@@ -106,6 +106,5 @@ tests:
       - tasty
       - tasty-hunit
       - tasty-hedgehog
-      - tasty-th
       - tasty-discover
       - hedgehog

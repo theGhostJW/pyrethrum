@@ -22,11 +22,10 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
   - base >= 4.7 && < 5
   - foundation
+  - freer-simple
+  - extra
 
 ghc-options:
-  - -threaded
-  - -rtsopts
-  - -with-rtsopts=-N
   - -fmax-pmcheck-iterations=10000000
   - -ferror-spans
   - -O2
@@ -92,6 +91,10 @@ executables:
   simple-hpack-exe:
     main:                Main.hs
     source-dirs:         app
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
     dependencies:
       - simple-hpack
 
@@ -100,7 +103,6 @@ tests:
     main:                Spec.hs
     source-dirs:         test
     dependencies:
-      - simple-hpack
       - tasty
       - tasty-hunit
       - tasty-quickcheck

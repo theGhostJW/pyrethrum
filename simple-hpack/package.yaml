@@ -108,3 +108,4 @@ tests:
       - tasty-hedgehog
       - tasty-th
       - tasty-discover
+      - hedgehog

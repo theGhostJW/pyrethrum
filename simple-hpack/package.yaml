@@ -100,11 +100,11 @@ executables:
 
 tests:
   simple-hpack-test:
-    main:                Spec.hs
+    main:                driver.hs
     source-dirs:         test
     dependencies:
       - tasty
       - tasty-hunit
-      - tasty-quickcheck
+      - tasty-hedgehog
       - tasty-th
       - tasty-discover

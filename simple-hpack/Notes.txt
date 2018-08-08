@@ -11,3 +11,16 @@ stack test Parser:test-Parser --fast --file-watch --ta "-p ""partial"" "
 
 -- final build --
   stack build --pedantic --ghc-options -O2
+
+
+-from http://dev.stephendiehl.com/hask/#historical-extensions
+-- Extended Default Rules --
+
+  {-# LANGUAGE OverloadedStrings #-}
+  {-# LANGUAGE ExtendedDefaultRules #-}
+
+  import qualified Data.Text as T
+
+  default (T.Text)
+
+  example = "foo"

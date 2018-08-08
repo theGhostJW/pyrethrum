@@ -62,6 +62,7 @@ default-extensions:
   - DerivingStrategies
   - EmptyCase
   - ExistentialQuantification
+  - ExtendedDefaultRules
   - FlexibleContexts
   - FlexibleInstances
   - FunctionalDependencies

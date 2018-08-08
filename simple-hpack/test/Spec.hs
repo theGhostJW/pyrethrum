@@ -7,7 +7,6 @@ import qualified Hedgehog.Gen        as Gen
 import qualified Hedgehog.Range      as Range
 import           Test.Tasty.Hedgehog ()
 import           Test.Tasty.HUnit
--- import           Test.Tasty.TH
 
 unit_try_me = 1 @=? 1
 

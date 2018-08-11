@@ -1,0 +1,9 @@
+
+* Simple Interactors eg
+* logging interactor - D list
+* logging interactor - Console
+ * File content
+  * load or default based on content of file
+  * errors IO error file does not exist
+ * runConfig - state
+  * mock file load

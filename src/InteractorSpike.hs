@@ -1,12 +1,20 @@
 
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE LambdaCase #-}
+
 module InteractorSpike where
 
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.State
 import           Control.Monad.Freer.Writer
-import           System.Exit                hiding (ExitCode (ExitSuccess))
-import Foundation.Extension
+import           System.Exit as SysExit                hiding (ExitCode (ExitSuccess))
+import Foundation.Extended hiding (putStrLn)
+import qualified Foundation.Extended as IOOps
+import qualified Prelude
 
 -- Example: Console DSL:  https://github.com/lexi-lambda/freer-simple
 
@@ -27,3 +35,15 @@ getLine = send GetLine
 
 exitSuccess :: Member Console effs => Eff effs ()
 exitSuccess = send ExitSuccess
+
+
+--------------------------------------------------------------------------------
+                          -- Effectful Interpreter --
+--------------------------------------------------------------------------------
+runConsole :: Eff [Console, IO] a -> IO a
+runConsole = runM . interpretM (
+  \case
+    PutStrLn msg -> IOOps.putStrLn msg
+    GetLine -> toString <$> Prelude.getLine
+    ExitSuccess ->  SysExit.exitSuccess
+    )

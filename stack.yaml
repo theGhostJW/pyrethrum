@@ -18,7 +18,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-12.5
+resolver: nightly-2018-08-07
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -34,21 +34,21 @@ resolver: lts-12.5
 #  - auto-update
 #  - wai
 packages:
-- simple-hpack
+- .
 # Dependency packages to be pulled from upstream that are not in the resolver
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
-
-extra-deps:
-- foundation-edge-0.0.3
-- git: https://theghostjw@bitbucket.org/principledautomation/extensions.git
-  commit: "46245e6"
+# extra-deps: []
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
 
 # Extra package databases containing global packages
 # extra-package-dbs: []
+extra-deps:
+- foundation-edge-0.0.3
+- git: https://theghostjw@bitbucket.org/principledautomation/extensions.git
+  commit: "46245e6"
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

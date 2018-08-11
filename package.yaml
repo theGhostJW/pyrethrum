@@ -1,4 +1,4 @@
-name:                simple-hpack
+name:                pyrethrum
 version:             0.1.0.0
 github:              "githubuser/simple-hpack"
 license:             BSD3
@@ -37,7 +37,9 @@ ghc-options:
   - -Wincomplete-record-updates
   - -Wincomplete-uni-patterns
   - -Wredundant-constraints
+  - -fwarn-tabs
   - -fno-warn-name-shadowing
+  - -fno-warn-unused-imports
   - -fno-warn-missing-signatures
   - -fno-warn-type-defaults
   - -fno-warn-unused-matches
@@ -98,7 +100,7 @@ executables:
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
-      - simple-hpack
+      - pyrethrum
 
 tests:
   simple-hpack-test:

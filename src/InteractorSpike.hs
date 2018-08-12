@@ -54,29 +54,43 @@ runConsole = runM . interpretM (
                             -- Pure Interpreter --
 --------------------------------------------------------------------------------
 
-runConsolePure :: [String] -> Eff '[Console] w -> [String]
+data PureResult a = PureResult {
+  result :: Either () a,
+  remainingInputs :: [String],
+  log :: [String]
+} deriving Show
+
+runConsolePure :: [String] -> Eff '[Console] w -> PureResult w
 runConsolePure inputs instructions =  let
                                        invoke :: Console v -> Eff '[Error (), State [String], Writer [String]] v
-                                       invoke (PutStrLn msg) = tell [msg]
+                                       invoke (PutStrLn msg) = tell [">>> " <> msg]
                                        invoke GetLine = do
                                                      nextLine <- get
                                                      case nextLine of
                                                        [] -> error "not enough lines"
-                                                       (x:xs) -> put xs >> pure x
+                                                       (x:xs) -> tell ["<<< " <> x ] >> put xs >> pure x
                                        invoke ExitSuccess = throwError ()
 
-                                       result = run (runWriter (runState inputs (runError (reinterpret3 invoke instructions))))
+                                       -- result :: ((Either () w, [String]), [String])
+                                       (ansState, log) = run (runWriter (runState inputs (runError (reinterpret3 invoke instructions))))
                                      in
-                                       snd . fst $ result
+                                       PureResult {
+                                         result = fst ansState,
+                                         remainingInputs = snd ansState,
+                                         log = log
+                                       }
 
 demoInstructions :: (Member Console r) => Eff r ()
 demoInstructions = do
-                      printString "What is your name? : "
+                      printString "What is your name?: "
                       name <- getLine
                       printString $ "Hello " <> name <> " have a nice day !!"
 
-demoPure :: [String]
+demoPure :: PureResult ()
 demoPure = runConsolePure ["John"] demoInstructions
+
+demoPureFail:: PureResult ()
+demoPureFail = runConsolePure [] demoInstructions
 
 demoEffectful :: IO ()
 demoEffectful = runConsole demoInstructions

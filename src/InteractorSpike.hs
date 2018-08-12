@@ -56,8 +56,8 @@ runConsole = runM . interpretM (
 
 data PureResult a = PureResult {
   result :: Either () a,
-  remainingInputs :: [String],
-  log :: [String]
+  interactionLog :: [String],
+  remainingInputs :: [String]
 } deriving Show
 
 runConsolePure :: [String] -> Eff '[Console] w -> PureResult w
@@ -67,7 +67,7 @@ runConsolePure inputs instructions =  let
                                        invoke GetLine = do
                                                      nextLine <- get
                                                      case nextLine of
-                                                       [] -> error "not enough lines"
+                                                       [] -> error "not enough input"
                                                        (x:xs) -> tell ["<<< " <> x ] >> put xs >> pure x
                                        invoke ExitSuccess = throwError ()
 
@@ -77,7 +77,7 @@ runConsolePure inputs instructions =  let
                                        PureResult {
                                          result = fst ansState,
                                          remainingInputs = snd ansState,
-                                         log = log
+                                         interactionLog = log
                                        }
 
 demoInstructions :: (Member Console r) => Eff r ()
@@ -87,7 +87,7 @@ demoInstructions = do
                       printString $ "Hello " <> name <> " have a nice day !!"
 
 demoPure :: PureResult ()
-demoPure = runConsolePure ["John"] demoInstructions
+demoPure = runConsolePure ["John", "I need to go write a monad tutorial nice to meet you"] demoInstructions
 
 demoPureFail:: PureResult ()
 demoPureFail = runConsolePure [] demoInstructions

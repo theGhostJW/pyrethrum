@@ -13,3 +13,18 @@
 ??
   inlining: {-# INLINE send #-}
   Type Families:  https://wiki.haskell.org/Type_families
+
+
+-- PR
+*Main InteractorSpike Lib> demoPure
+PureResult {result = Right (), interactionLog = [">>> What is your name?: ","<<< John",">>> Hello John have a nice day !!"], remainingInputs = ["I need to go write a monad tutorial nice to meet you"]}
+
+
+*Main InteractorSpike Lib> demoEffectful
+What is your name?:
+John
+Hello John have a nice day !!
+
+
+*Main InteractorSpike Lib> demoPureFail
+PureResult {result = *** Exception: not enough input

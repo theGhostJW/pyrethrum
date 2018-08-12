@@ -23,6 +23,7 @@ import qualified Prelude
 --------------------------------------------------------------------------------
 
 data Console r where
+
   PutStrLn    :: String -> Console ()
   GetLine     :: Console String
   ExitSuccess :: Console ()
@@ -68,12 +69,14 @@ runConsolePure inputs instructions =  let
                                      in
                                        snd . fst $ result
 
-demoInstructions :: Eff '[Console, IO] ()
+demoInstructions :: (Member Console r) => Eff r ()
 demoInstructions = do
                       printString "What is your name? : "
                       name <- getLine
                       printString $ "Hello " <> name <> " have a nice day !!"
 
+demoPure :: [String]
+demoPure = runConsolePure ["John"] demoInstructions
 
--- demoPure = runConsolePure ["John"] demoInstructions
+demoEffectful :: IO ()
 demoEffectful = runConsole demoInstructions

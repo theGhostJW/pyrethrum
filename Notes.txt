@@ -24,3 +24,7 @@ stack test Parser:test-Parser --fast --file-watch --ta "-p ""partial"" "
   default (T.Text)
 
   example = "foo"
+
+  -- Freer Simple --
+  ~ send ~ Lift into Eff
+  ~ https://stackoverflow.com/questions/44865000/what-does-an-apostrophe-in-front-of-a-list-something-mean-in-haskell

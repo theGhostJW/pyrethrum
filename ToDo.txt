@@ -7,3 +7,9 @@
   * errors IO error file does not exist
  * runConfig - state
   * mock file load
+
+ * check out class FindElem (t :: * -> *) (r :: [* -> *]) where ~ may be good for detecting effects
+
+??
+  inlining: {-# INLINE send #-}
+  Type Families:  https://wiki.haskell.org/Type_families

@@ -80,17 +80,18 @@ runConsolePure inputs instructions =  let
                                          interactionLog = log
                                        }
 
-demoInstructions :: (Member Console r) => Eff r ()
-demoInstructions = do
-                      printString "What is your name?: "
-                      name <- getLine
-                      printString $ "Hello " <> name <> " have a nice day !!"
-
-demoPure :: PureResult ()
-demoPure = runConsolePure ["John", "I need to go write a monad tutorial nice to meet you"] demoInstructions
-
-demoPureFail:: PureResult ()
-demoPureFail = runConsolePure [] demoInstructions
+app :: (Member Console r) => Eff r ()
+app = do
+        printString "What is your name?: "
+        name <- getLine
+        printString $ "Nanu Nanu " <> name <> " have a nice day !!"
+        printString "Bye !!"
 
 demoEffectful :: IO ()
-demoEffectful = runConsole demoInstructions
+demoEffectful = runConsole app
+
+demoPure :: PureResult ()
+demoPure = runConsolePure ["Mork", "I need to go write a monad tutorial, nice to meet you"] app
+
+demoPureFail:: PureResult ()
+demoPureFail = runConsolePure [] app

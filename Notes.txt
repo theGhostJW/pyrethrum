@@ -1,8 +1,3 @@
-check out:
-  https://downloads.haskell.org/~ghc/8.4.1/docs/html/users_guide/glasgow_exts.html#record-field-disambiguation
-  Record field selector polymorphysim etc.
-
-
 -- Example of test filters
 stack test --fast --ta "-p ""read"" "
 stack test --fast --file-watch --ta "--hide-successes -p ""read"" "

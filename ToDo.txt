@@ -8,23 +8,15 @@
  * runConfig - state
   * mock file load
 
- * check out class FindElem (t :: * -> *) (r :: [* -> *]) where ~ may be good for detecting effects
+ * check out class FindElem (t :: * -> *) (r :: [* -> *]) where
+ ~ may be good for detecting effects
 
 ??
   inlining: {-# INLINE send #-}
   Type Families:  https://wiki.haskell.org/Type_families
 
+  wtf: (->) :: TYPE q -> TYPE r -> *
 
--- PR
-*Main InteractorSpike Lib> demoPure
-PureResult {result = Right (), interactionLog = [">>> What is your name?: ","<<< John",">>> Hello John have a nice day !!"], remainingInputs = ["I need to go write a monad tutorial nice to meet you"]}
-
-
-*Main InteractorSpike Lib> demoEffectful
-What is your name?:
-John
-Hello John have a nice day !!
-
-
-*Main InteractorSpike Lib> demoPureFail
-PureResult {result = *** Exception: not enough input
+  check out:
+    https://downloads.haskell.org/~ghc/8.4.1/docs/html/users_guide/glasgow_exts.html#record-field-disambiguation
+    Record field selector polymorphysim etc.

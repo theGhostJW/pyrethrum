@@ -47,6 +47,8 @@ demoLaggy = (* 10) <$> addFive 5
 demoLaggyInfix = (* 10) <$> 5 ##> 10
 
 {-
+  https://youtu.be/2LJC-XD5Ffo?t=41m16s
+  
   A Natural Transofmation Transforms the Context where as functord transform
   the content
 
@@ -55,5 +57,5 @@ demoLaggyInfix = (* 10) <$> 5 ##> 10
 
   so a -> m a
   == Const a -> m a
-   and identity 
+   and identity
 -}

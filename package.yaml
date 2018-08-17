@@ -91,17 +91,6 @@ default-extensions:
 library:
   source-dirs: src
 
-executables:
-  simple-hpack-exe:
-    main:                Main.hs
-    source-dirs:         app
-    ghc-options:
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
-    dependencies:
-      - pyrethrum
-
 tests:
   simple-hpack-test:
     main:                driver.hs
@@ -112,3 +101,4 @@ tests:
       - tasty-hedgehog
       - tasty-discover
       - hedgehog
+      - pyrethrum

@@ -16,7 +16,29 @@ import Foundation.Extended hiding (putStrLn)
 import qualified Foundation.Extended as IOOps
 import qualified Prelude
 
--- Example: Console DSL:  https://github.com/lexi-lambda/freer-simple
+-- Example from: http://hackage.haskell.org/package/freer-simple-1.1.0.0/docs/Control-Monad-Freer.html#t:Eff
+
+-- data FileSystem r where
+--   ReadFile :: FilePath -> FileSystem String
+--   WriteFile :: FilePath -> String -> FileSystem ()
+--
+-- runInMemoryFileSystem :: [(FilePath, String)] -> Eff (FileSystem ': effs) ~> Eff effs
+-- runInMemoryFileSystem initVfs = let
+--                                   fsToState :: Eff (FileSystem ': effs) ~> Eff (State [(FilePath, String)] ': effs)
+--                                   fsToState = reinterpret $ case
+--                                     ReadFile path -> do
+--                                       vfs <- get
+--                                       case lookup path vfs of
+--                                         Just contents -> pure contents
+--                                         Nothing -> error ("readFile: no such file " ++ path)
+--
+--                                     WriteFile path contents -> modify $ \vfs ->
+--                                       (path, contents) : delete (path, contents) vfs
+--                                  in
+--                                    evalState initVfs . fsToState
+
+
+-- Example: Console DSL: from Readme -  https://github.com/lexi-lambda/freer-simple
 
 --------------------------------------------------------------------------------
                                -- Effect Model --
@@ -46,7 +68,7 @@ runConsole :: Eff '[Console, IO] a -> IO a
 runConsole = runM . interpretM (
                                   \case
                                     PutStrLn msg -> IOOps.putStrLn msg
-                                    GetLine -> toString <$> Prelude.getLine
+                                    GetLine -> toStr <$> Prelude.getLine
                                     ExitSuccess ->  SysExit.exitSuccess
                                )
 

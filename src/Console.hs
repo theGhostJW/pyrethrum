@@ -37,7 +37,7 @@ exitSuccess' = send ExitSuccess
 runConsole :: Eff '[Console, IO] a -> IO a
 runConsole = runM . interpretM (\case
   PutStrLn msg -> putStrLn msg
-  GetLine -> toString <$> Prelude.getLine
+  GetLine -> toStr <$> Prelude.getLine
   ExitSuccess -> exitSuccess)
 
 --------------------------------------------------------------------------------

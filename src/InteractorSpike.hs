@@ -11,6 +11,7 @@ import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.State
 import           Control.Monad.Freer.Writer
+import           Data.List
 import           System.Exit as SysExit                hiding (ExitCode (ExitSuccess))
 import Foundation.Extended hiding (putStrLn)
 import qualified Foundation.Extended as IOOps
@@ -18,24 +19,22 @@ import qualified Prelude
 
 -- Example from: http://hackage.haskell.org/package/freer-simple-1.1.0.0/docs/Control-Monad-Freer.html#t:Eff
 
--- data FileSystem r where
---   ReadFile :: FilePath -> FileSystem String
---   WriteFile :: FilePath -> String -> FileSystem ()
---
--- runInMemoryFileSystem :: [(FilePath, String)] -> Eff (FileSystem ': effs) ~> Eff effs
--- runInMemoryFileSystem initVfs = let
---                                   fsToState :: Eff (FileSystem ': effs) ~> Eff (State [(FilePath, String)] ': effs)
---                                   fsToState = reinterpret $ case
---                                     ReadFile path -> do
---                                       vfs <- get
---                                       case lookup path vfs of
---                                         Just contents -> pure contents
---                                         Nothing -> error ("readFile: no such file " ++ path)
---
---                                     WriteFile path contents -> modify $ \vfs ->
---                                       (path, contents) : delete (path, contents) vfs
---                                  in
---                                    evalState initVfs . fsToState
+type FilePath = String
+data FileSystem r where
+  ReadFile :: FilePath -> FileSystem String
+  WriteFile :: FilePath -> String -> FileSystem ()
+
+runInMemoryFileSystem :: [(FilePath, String)] -> Eff (FileSystem ': effs) ~> Eff effs
+runInMemoryFileSystem vfs = let
+                              fsToState :: Eff (FileSystem ': effs) ~> Eff (State [(FilePath, String)] ': effs)
+                              fsToState = reinterpret $ \case
+                                ReadFile path -> get >>= \vfs -> case Prelude.lookup path vfs of
+                                  Just contents -> pure contents
+                                  Nothing -> error ("readFile: no such file " <> path)
+                                WriteFile path contents -> modify $ \vfs ->
+                                  (path, contents) : delete (path, contents) vfs
+                                  in
+                                    evalState vfs . fsToState
 
 
 -- Example: Console DSL: from Readme -  https://github.com/lexi-lambda/freer-simple

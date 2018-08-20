@@ -35,6 +35,7 @@ capRunner (Capitalize s) = pure $ upper s
 runCapitalize :: Eff (Capitalize ': r) w -> Eff r w
 runCapitalize = interpret capRunner
 
+runCapitalizeIO :: Eff '[Capitalize, IO] a -> IO a
 runCapitalizeIO = runM . interpretM capIOInterpretor
 
 capIOInterpretor :: Capitalize ~> IO

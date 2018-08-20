@@ -11,12 +11,14 @@ import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.State
 import           Control.Monad.Freer.Writer
+import Control.Monad.Freer.Coroutine
 import           Data.List
 import           System.Exit as SysExit                hiding (ExitCode (ExitSuccess))
 import Foundation.Extended as F hiding (putStrLn)
 import qualified Foundation.Extended as IOOps
 import Foundation.String
 import qualified Prelude
+import Data.Function ((&))
 
 --  Example from: https://github.com/lexi-lambda/freer-simple/blob/master/examples/src/Capitalize.hs
 
@@ -35,7 +37,7 @@ capRunner (Capitalize s) = pure $ upper s
 runCapitalize :: Eff (Capitalize ': r) w -> Eff r w
 runCapitalize = interpret capRunner
 
-runCapitalizeIO :: Eff '[Capitalize, IO] a -> IO a
+runCapitalizeIO :: Eff '[Capitalize, IO] ~> IO
 runCapitalizeIO = runM . interpretM capIOInterpretor
 
 capIOInterpretor :: Capitalize ~> IO
@@ -206,3 +208,21 @@ demoPure = runConsolePure ["Mork", "I need to go write a monad tutorial, nice to
 
 demoPureFail:: PureResult ()
 demoPureFail = runConsolePure [] app
+
+
+-------------------------------------------------------------------------------
+                     -- Pure Interpreter for Deeper Stack --
+-------------------------------------------------------------------------------
+runConsolePureM :: forall effs w . [String] -> Eff (Console ': effs) w -> Eff effs (Maybe w, [String], [String])
+runConsolePureM inputs req = do
+    ((x, inputs'), output) <- reinterpret3 go req
+      & runError & runState inputs & runWriter
+    pure (either (const Nothing) Just x, inputs', output)
+  where
+    go :: Console v
+       -> Eff (Error () ': State [String] ': Writer [String] ': effs) v
+    go (PutStrLn msg) = tell [msg]
+    go GetLine = get >>= \case
+      [] -> error "not enough lines"
+      (x:xs) -> put xs >> pure x
+    go ExitSuccess = throwError ()

@@ -38,7 +38,6 @@ ghc-options:
   - -Wincomplete-uni-patterns
   - -Wredundant-constraints
   - -fwarn-tabs
-  - -fno-warn-name-shadowing
   - -fno-warn-unused-imports
   - -fno-warn-missing-signatures
   - -fno-warn-type-defaults

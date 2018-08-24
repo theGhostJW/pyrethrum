@@ -13,6 +13,7 @@ import           Control.Monad.Freer.State
 import           Control.Monad.Freer.Writer
 import Control.Monad.Freer.Coroutine
 import           Data.List
+import           Data.Functor
 import           System.Exit as SysExit                hiding (ExitCode (ExitSuccess))
 import Foundation.Extended as F hiding (putStrLn)
 import qualified Foundation.Extended as IOOps
@@ -28,25 +29,27 @@ data Capitalize v where
 capitalize :: Member Capitalize r => String -> Eff r String
 capitalize = send . Capitalize
 
-capRunner :: Capitalize x -> Eff r x
-capRunner (Capitalize s) = pure $ upper s
+pureCapInterpretor :: Capitalize x -> x
+pureCapInterpretor (Capitalize s) = upper s
+
+consoleInterpretor :: Capitalize ~> IO
+consoleInterpretor (Capitalize s) = let
+                                      u = upper s
+                                    in
+                                      IOOps.putStrLn u $> u
 
 -- like reinterpret but where the interpreter needs no effects ??
 -- interpret :: forall eff effs. (eff ~> Eff effs) -> Eff (eff ': effs) ~> Eff effs
 
+-- may be a not so usefull version
+-- runCapitalize :: Eff '[Capitalize] w -> w
+-- runCapitalize capApp = run $ interpret (pure . pureCapInterpretor) capApp
+
 runCapitalize :: Eff (Capitalize ': r) w -> Eff r w
-runCapitalize = interpret capRunner
+runCapitalize = interpret (pure . pureCapInterpretor)
 
-runCapitalizeIO :: Eff '[Capitalize, IO] ~> IO
-runCapitalizeIO = runM . interpretM capIOInterpretor
-
-capIOInterpretor :: Capitalize ~> IO
-capIOInterpretor (Capitalize s) = let
-                                    u = upper s
-                                  in
-                                    do
-                                       IOOps.putStrLn u
-                                       pure u
+runCapitalizeIO :: Eff '[Capitalize, IO] ~> Eff '[IO]
+runCapitalizeIO = interpretM consoleInterpretor
 
 
 capApp :: (Member Capitalize effs) => Eff effs String
@@ -56,7 +59,7 @@ capDemo :: String
 capDemo = run $ runCapitalize capApp
 
 capDemoIO :: IO String
-capDemoIO = runCapitalizeIO capApp
+capDemoIO = runM $ runCapitalizeIO capApp
 
 
 -- Example from: http://hackage.haskell.org/package/freer-simple-1.1.0.0/docs/Control-Monad-Freer.html#t:Eff
@@ -80,30 +83,20 @@ deriving instance Show a => Show (FileSystem a)
 -- reinterpretN :: forall gs f effs. Weakens gs => (f ~> Eff (gs :++: effs))            -> Eff (f ': effs)      ~> Eff (gs :++: effs)
    -- breaks type inference
 
-runInMemoryFileSystem :: [(FilePath, String)] -> Eff (FileSystem : effs) x -> Eff effs (x, [(FilePath, String)])
-runInMemoryFileSystem initVfs = let
-                                  --
-                                  -- reinterpret :: forall f g effs. (a ~> Eff (b ': effs)) -> Eff (a ': effs) ~> Eff ( b': effs)
-                                  fsToState :: Eff (FileSystem ': effs) ~> Eff (State [(FilePath, String)] ': effs)
-                                  fsToState = reinterpret runCommand
+   -- command runner
+inMemoryInterpretor :: FileSystem ~> Eff (State [(FilePath, String)] ': effs)
+inMemoryInterpretor = \case
+                     ReadFile path -> do
+                                       vfs <- get
+                                       case Prelude.lookup path vfs of
+                                         Just contents -> pure contents
+                                         Nothing -> error ("readFile: no such file " <> path)
 
-                                  -- command runner
-                                  runCommand :: FileSystem ~> Eff (State [(FilePath, String)] ': effs)
-                                  runCommand = \case
-                                                  ReadFile path -> do
-                                                                    vfs <- get
-                                                                    case Prelude.lookup path vfs of
-                                                                      Just contents -> pure contents
-                                                                      Nothing -> error ("readFile: no such file " <> path)
+                     WriteFile path contents -> modify $
+                       \vfs -> (path, contents) : deleteBy (\t0 t1 -> fst t0 == fst t1) (path, contents) vfs
 
-                                                  WriteFile path contents -> modify $
-                                                    \vfs -> (path, contents) : deleteBy (\t0 t1 -> fst t0 == fst t1) (path, contents) vfs
-
-                                  initFileSystem :: Eff (State [(FilePath, String)] ': effs) x -> Eff effs (x, [(FilePath, String)])
-                                  initFileSystem = runState initVfs
-                                 in
-                                   initFileSystem . fsToState
-
+runInMemoryFileSystem :: forall a. [(FilePath, String)] -> Eff '[FileSystem] a -> (a, [(FilePath, String)])
+runInMemoryFileSystem initVfs script = run $ runState initVfs $ reinterpret inMemoryInterpretor script
 
 -- lift algebra into the effect context
 -- send ~ “Sends” an effect, which should be a value defined as part of an effect algebra
@@ -119,13 +112,13 @@ writeFile path = send . WriteFile path
 
 fileApp :: (Member FileSystem fs) => Eff fs String
 fileApp = do
-            writeFile "temp.txt" "Nii"
-            writeFile "temp.txt" "Hello"
-            content <- readFile "temp.txt"
+            InteractorSpike.writeFile "temp.txt" "Nii"
+            InteractorSpike.writeFile "temp.txt" "Hello"
+            content <- InteractorSpike.readFile "temp.txt"
             pure $ "Content: " <> content
 
 
-demo = run $ runInMemoryFileSystem [] fileApp
+demo = runInMemoryFileSystem [] fileApp
 
 
 
@@ -173,19 +166,20 @@ data PureResult a = PureResult {
   remainingInputs :: [String]
 } deriving Show
 
+
+pureHandler :: Console v -> Eff '[Error (), State [String], Writer [String]] v
+pureHandler (PutStrLn msg) = tell [">>> " <> msg]
+pureHandler GetLine = do
+                    nextLine <- get
+                    case nextLine of
+                      [] -> error "not enough input"
+                      (x:xs) -> tell ["<<< " <> x ] >> put xs >> pure x
+pureHandler ExitSuccess = throwError ()
+
 runConsolePure :: [String] -> Eff '[Console] w -> PureResult w
 runConsolePure inputs instructions =  let
-                                       invoke :: Console v -> Eff '[Error (), State [String], Writer [String]] v
-                                       invoke (PutStrLn msg) = tell [">>> " <> msg]
-                                       invoke GetLine = do
-                                                     nextLine <- get
-                                                     case nextLine of
-                                                       [] -> error "not enough input"
-                                                       (x:xs) -> tell ["<<< " <> x ] >> put xs >> pure x
-                                       invoke ExitSuccess = throwError ()
-
                                        -- result :: ((Either () w, [String]), [String])
-                                       (ansState, log) = run (runWriter (runState inputs (runError (reinterpret3 invoke instructions))))
+                                       (ansState, log) = run (runWriter (runState inputs (runError (reinterpret3 pureHandler instructions))))
                                      in
                                        PureResult {
                                          result = fst ansState,

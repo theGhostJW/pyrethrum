@@ -25,7 +25,7 @@ noOranges = OrangeBag []
 getOrange :: Bag [Orange] -> Orange
 getOrange (OrangeBag x) = case x of
                             [] -> Orange 0
-                            x: xs -> x
+                            h: t -> h
 
 
 -----------------------------------------------

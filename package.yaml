@@ -24,6 +24,7 @@ dependencies:
   - foundation
   - freer-simple
   - principled-extended
+  - containers
   - extra
 
 ghc-options:

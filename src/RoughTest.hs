@@ -47,7 +47,7 @@ fileSystemInterpreter = \case
                            ReadFile path -> F.readFile path
                            WriteFile path str -> F.writeFile path str
 
-fileSystemDocInterpreter :: FileSystem ~> Eff (Writer [String] ': effs)
+fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
 fileSystemDocInterpreter =  let
                               mockContents = "Mock File Contents"
                             in
@@ -74,7 +74,7 @@ ensure condition message = send $ Ensure condition message
 fail :: Member AppError effs =>  String -> Eff effs ()
 fail = send . Fail
 
-errorDocInterpreter :: AppError ~> Eff (Writer [String] ': effs)
+errorDocInterpreter :: Member (Writer [String]) effs => AppError ~> Eff effs
 errorDocInterpreter = \case
                         Ensure condition errMsg -> tell [condition ? "Ensure Check Passed" $
                           "Ensure Check Failed ~ " <>  errMsg]
@@ -130,8 +130,11 @@ sampleRunConfig1 = [
 -- executeDocumented :: forall a. Eff '[FileSystem, AppError] a -> ((a, [String]), [String])
 -- executeDocumented app = run $ runWriter $ reinterpret failDocInterpreter $ runWriter $ reinterpret fileSystemDocInterpreter app
 
-executeDocumented :: forall a. Eff '[FileSystem, AppError] a -> ((a, [String]), [String])
-executeDocumented app = run $ runWriter $ reinterpret errorDocInterpreter $ runWriter $ reinterpret fileSystemDocInterpreter app
+executeDocumented :: forall a. Eff '[FileSystem, AppError, Writer [String]] a -> (a, [String])
+executeDocumented app = run $ runWriter
+                            $ interpret errorDocInterpreter
+                            $ interpret fileSystemDocInterpreter
+                            app
 
 executeFileSystem :: forall a. Eff '[FileSystem, IO] a -> IO a
 executeFileSystem app = runM $ interpretM fileSystemInterpreter app

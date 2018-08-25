@@ -22,9 +22,10 @@ import           Control.Monad.Freer.Reader
 import           Data.Function                 ((&))
 import           Data.Functor
 import           Data.List
-import           Foundation.Extended           hiding (putStrLn, readFile, writeFile)
+import           Foundation.Extended           hiding (putStrLn, readFile, writeFile, fail)
 import    qualified       Foundation.Extended  as F
 import           Foundation.String
+import qualified Text.PrettyPrint.GenericPretty as PP
 import           Paths_pyrethrum
 import qualified Prelude
 import           System.Exit                   as SysExit hiding (ExitCode (ExitSuccess))
@@ -58,8 +59,8 @@ fileSystemInterpreter = \case
                            ReadFile path -> F.readFile path
                            WriteFile path str -> F.writeFile path str
 
-documentationInterpreter :: FileSystem ~> Eff '[Writer [String], Reader TestItem, Reader RunConfig]
-documentationInterpreter =  let
+fileSystemDocInterpreter :: FileSystem ~> Eff '[Writer [String], effs]
+fileSystemDocInterpreter =  let
                               mockContents = "Mock File Contents"
                             in
                               \case
@@ -73,13 +74,32 @@ data ApState = ApState {
   filePath :: Path Abs File,
   fileText :: String
 }
-  deriving Show
+  deriving (Show, PP.Generic)
 
-interactor :: TestItem -> RunConfig -> (Member FileSystem r) => Eff r ApState
+data AppError r where
+  Ensure :: Bool -> String -> AppError ()
+  Fail :: String -> AppError ()
+
+failDocInterpreter :: AppError ~> Eff '[Writer [String]]
+failDocInterpreter = \case
+                        Ensure condition errMsg -> tell [condition ? "Ensure Check Passed" $ "Ensure Check Failed ~ " <>  errMsg]
+                        Fail errMsg -> tell ["Failure ~ " <>  errMsg]
+
+ensure :: Member AppError effs => Bool -> String -> Eff effs ()
+ensure condition message = send $ Ensure condition message
+
+fail :: Member AppError effs =>  String -> Eff effs ()
+fail = send . Fail
+
+type FileSys r = (Member FileSystem r)
+type AppFailure r = (Member AppError r)
+
+interactor :: TestItem -> RunConfig -> (AppFailure r, FileSys r) => Eff r ApState
 interactor item runConfig = do
                               let fullFilePath = path (runConfig :: RunConfig)
                               writeFile fullFilePath $ pre item  <> post item
-                              txt <- readFile [absfile|C:\Vids\SystemDesign\VidL.txt|]
+                              fail "random error ~ its a glitch"
+                              txt <- readFile [absfile|C:\Vids\SystemDesign\Wrong.txt|]
                               pure $ ApState fullFilePath txt
 
 sampleItem =  Item {
@@ -94,11 +114,25 @@ sampleRunConfig = RunConfig {
   path = [absfile|C:\Vids\SystemDesign\VidList.txt|]
 }
 
-executeDocumented :: forall a. Eff '[FileSystem, Reader TestItem, Reader RunConfig] a -> (a, [String])
-executeDocumented app = run $ runReader sampleRunConfig $ runReader sampleItem $ runWriter $ reinterpret documentationInterpreter app
+r = RunConfig
+null = Nothing
+
+sampleRunConfig1 = [
+                      r "Test"   44  [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   44  [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   44  [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   44  [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   44  [absfile|C:\Vids\SystemDesign\VidList.txt|]
+  ]
+
+-- executeDocumented :: forall a. Eff '[FileSystem, AppError] a -> ((a, [String]), [String])
+-- executeDocumented app = run $ runWriter $ reinterpret failDocInterpreter $ runWriter $ reinterpret fileSystemDocInterpreter app
+
+executeDocumented :: forall a. Eff '[FileSystem, AppError] a -> ((a, [String]), [String])
+executeDocumented app = run $ runWriter (reinterpret failDocInterpreter (runWriter $ reinterpret fileSystemDocInterpreter app))
 
 executeFileSystem :: forall a. Eff '[FileSystem, IO] a -> IO a
 executeFileSystem app = runM $ interpretM fileSystemInterpreter app
 
 demoDocument = executeDocumented $ interactor sampleItem sampleRunConfig
-demoIO = executeFileSystem $ interactor sampleItem sampleRunConfig
+-- demoIO = executeFileSystem $ interactor sampleItem sampleRunConfig

@@ -26,6 +26,7 @@ dependencies:
   - principled-extended
   - containers
   - extra
+  - GenericPretty
 
 ghc-options:
   - -fmax-pmcheck-iterations=10000000

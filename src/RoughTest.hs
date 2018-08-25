@@ -32,18 +32,6 @@ import           System.Exit                   as SysExit hiding (ExitCode (Exit
 
 default (String)
 
-data TestItem = Item {
-  pre :: String,
-  post :: String,
-  path :: Path Abs File
-}
-
-data RunConfig = RunConfig {
-  environment :: String,
-  depth :: Integer,
-  path :: Path Abs File
-}
-
 data FileSystem r where
   ReadFile :: Path a File -> FileSystem String
   WriteFile :: Path a File -> String -> FileSystem ()
@@ -59,7 +47,7 @@ fileSystemInterpreter = \case
                            ReadFile path -> F.readFile path
                            WriteFile path str -> F.writeFile path str
 
-fileSystemDocInterpreter :: FileSystem ~> Eff '[Writer [String], effs]
+fileSystemDocInterpreter :: FileSystem ~> Eff (Writer [String] ': effs)
 fileSystemDocInterpreter =  let
                               mockContents = "Mock File Contents"
                             in
@@ -80,16 +68,30 @@ data AppError r where
   Ensure :: Bool -> String -> AppError ()
   Fail :: String -> AppError ()
 
-failDocInterpreter :: AppError ~> Eff '[Writer [String]]
-failDocInterpreter = \case
-                        Ensure condition errMsg -> tell [condition ? "Ensure Check Passed" $ "Ensure Check Failed ~ " <>  errMsg]
-                        Fail errMsg -> tell ["Failure ~ " <>  errMsg]
-
 ensure :: Member AppError effs => Bool -> String -> Eff effs ()
 ensure condition message = send $ Ensure condition message
 
 fail :: Member AppError effs =>  String -> Eff effs ()
 fail = send . Fail
+
+errorDocInterpreter :: AppError ~> Eff (Writer [String] ': effs)
+errorDocInterpreter = \case
+                        Ensure condition errMsg -> tell [condition ? "Ensure Check Passed" $
+                          "Ensure Check Failed ~ " <>  errMsg]
+                        Fail errMsg -> tell ["Failure ~ " <>  errMsg]
+
+
+data TestItem = Item {
+  pre :: String,
+  post :: String,
+  path :: Path Abs File
+}
+
+data RunConfig = RunConfig {
+  environment :: String,
+  depth :: Integer,
+  path :: Path Abs File
+}
 
 type FileSys r = (Member FileSystem r)
 type AppFailure r = (Member AppError r)
@@ -129,7 +131,7 @@ sampleRunConfig1 = [
 -- executeDocumented app = run $ runWriter $ reinterpret failDocInterpreter $ runWriter $ reinterpret fileSystemDocInterpreter app
 
 executeDocumented :: forall a. Eff '[FileSystem, AppError] a -> ((a, [String]), [String])
-executeDocumented app = run $ runWriter (reinterpret failDocInterpreter (runWriter $ reinterpret fileSystemDocInterpreter app))
+executeDocumented app = run $ runWriter $ reinterpret errorDocInterpreter $ runWriter $ reinterpret fileSystemDocInterpreter app
 
 executeFileSystem :: forall a. Eff '[FileSystem, IO] a -> IO a
 executeFileSystem app = runM $ interpretM fileSystemInterpreter app

@@ -30,6 +30,13 @@ import           Control.Monad.Trans.Either
 import           Control.Monad.Trans.Either.Exit (orDie)
 import qualified Prelude
 import           System.Exit                   as SysExit hiding (ExitCode (ExitSuccess))
+import           System.IO                       (FilePath, IO,
+                                                  IOMode (ReadMode, WriteMode),
+                                                  withFile)
+import           System.IO.Error                 (isAlreadyInUseError,
+                                                  isDoesNotExistError,
+                                                  isPermissionError)
+import Control.Exception
 
 default (String)
 
@@ -82,13 +89,6 @@ errorDocInterpreter = \case
                         Fail errMsg -> tell ["Failure ~ " <>  errMsg]
 
 
--- errorIOInterpreter :: Member IO effs => AppEnsure ~> Eff effs
--- errorIOInterpreter = \case
---                         Ensure condition errMsg -> pure $ Monad.unless condition error errMsg
---                         Fail errMsg -> pure $ error errMsg
-
-
-
 errorIOInterpreter :: forall effs a. LastMember IO effs => Eff (AppEnsure ': effs) a -> Eff effs a
 errorIOInterpreter = interpretM $ \case
                                       Ensure condition errMsg -> Monad.unless condition $ Monad.fail $ toList errMsg
@@ -107,11 +107,40 @@ data RunConfig = RunConfig {
   path :: Path Abs File
 }
 
-newtype AppError = FileError String
+data FileErrorType
+  = AlreadyInUse
+  | DoesNotExist
+  | PermissionError
 
---
--- renderAppError :: AppError -> Text
--- renderAppError (AppFileError e)      = renderFileError e
+data FileError
+  = ReadFileError FilePath FileErrorType
+  | WriteFileError FilePath FileErrorType
+
+selectFileError :: IOException -> IO FileErrorType
+selectFileError e | isAlreadyInUseError e = return AlreadyInUse
+                  | isDoesNotExistError e = return DoesNotExist
+                  | isPermissionError e   = return PermissionError
+                  | otherwise             = throwIO e
+
+readFileEth :: Path a File -> EitherT FileError IO String
+readFileEth filePath =
+  let
+    errorHandler e = Left . ReadFileError (toFilePath filePath) <$> selectFileError e
+  in
+    newEitherT $ catch (Right <$> F.readFile filePath) errorHandler
+
+writeFileEth :: Path a File -> String -> EitherT FileError IO ()
+writeFileEth filePath contents =
+  let
+    errorHandler e = Left . WriteFileError (toFilePath filePath) <$> selectFileError e
+  in
+    newEitherT $ catch (F.writeFile filePath contents >> pure (Right ())) errorHandler
+
+-- data AppError = FileError (Path Abs File) String |
+--                 InteractorError String
+
+-- renderAppError :: AppError -> String
+-- renderAppError (FileError pth msg) = "Problem with file: " <> toStr (toFilePath pth) <> " " <> msg
 -- renderAppError (AppLineError e)      = renderLineError e
 -- renderAppError (AppNormaliseError e) = renderNormaliseError e
 

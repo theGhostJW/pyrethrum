@@ -47,9 +47,9 @@ packages:
 # extra-package-dbs: []
 extra-deps:
 - foundation-edge-0.0.3
-- GenericPretty-1.2.2
+- transformers-either-0.1.1
 - git: https://theghostjw@bitbucket.org/principledautomation/extensions.git
-  commit: "97a179a"
+  commit: "e90f4b9"
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

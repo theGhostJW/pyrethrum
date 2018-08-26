@@ -25,8 +25,9 @@ import           Data.List
 import           Foundation.Extended           hiding (putStrLn, readFile, writeFile, fail)
 import    qualified       Foundation.Extended  as F
 import           Foundation.String
-import qualified Text.PrettyPrint.GenericPretty as PP
 import           Paths_pyrethrum
+import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Either.Exit (orDie)
 import qualified Prelude
 import           System.Exit                   as SysExit hiding (ExitCode (ExitSuccess))
 
@@ -42,10 +43,10 @@ readFile = send . ReadFile
 writeFile :: Member FileSystem effs => Path a File -> String -> Eff effs ()
 writeFile pth = send . WriteFile pth
 
-fileSystemIOInterpreter :: FileSystem a -> IO a
-fileSystemIOInterpreter = \case
-                           ReadFile path -> F.readFile path
-                           WriteFile path str -> F.writeFile path str
+fileSystemIOInterpreter :: forall effs a. LastMember IO effs => Eff (FileSystem ': effs) a -> Eff effs a
+fileSystemIOInterpreter = interpretM $ \case
+                               ReadFile path -> F.readFile path
+                               WriteFile path str -> F.writeFile path str
 
 fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
 fileSystemDocInterpreter =  let
@@ -62,34 +63,36 @@ data ApState = ApState {
   filePath :: Path Abs File,
   fileText :: String
 }
-  deriving (Show, PP.Generic)
+  deriving Show
 
-data AppError r where
-  Ensure :: Bool -> String -> AppError ()
-  Fail :: String -> AppError ()
+data AppEnsure r where
+  Ensure :: Bool -> String -> AppEnsure ()
+  Fail :: String -> AppEnsure ()
 
-ensure :: Member AppError effs => Bool -> String -> Eff effs ()
+ensure :: Member AppEnsure effs => Bool -> String -> Eff effs ()
 ensure condition message = send $ Ensure condition message
 
-fail :: Member AppError effs =>  String -> Eff effs ()
+fail :: Member AppEnsure effs =>  String -> Eff effs ()
 fail = send . Fail
 
-errorDocInterpreter :: Member (Writer [String]) effs => AppError ~> Eff effs
+errorDocInterpreter :: Member (Writer [String]) effs => AppEnsure ~> Eff effs
 errorDocInterpreter = \case
                         Ensure condition errMsg -> tell [condition ? "Ensure Check Passed" $
                           "Ensure Check Failed ~ " <>  errMsg]
                         Fail errMsg -> tell ["Failure ~ " <>  errMsg]
 
 
--- errorIOInterpreter :: Member IO effs => AppError ~> Eff effs
+-- errorIOInterpreter :: Member IO effs => AppEnsure ~> Eff effs
 -- errorIOInterpreter = \case
 --                         Ensure condition errMsg -> pure $ Monad.unless condition error errMsg
 --                         Fail errMsg -> pure $ error errMsg
 
-errorIOInterpreter :: AppError a -> IO a
-errorIOInterpreter = \case
-                        Ensure condition errMsg ->  Monad.unless condition $ Monad.fail $ toList errMsg
-                        Fail errMsg -> Monad.fail $ toList errMsg
+
+
+errorIOInterpreter :: forall effs a. LastMember IO effs => Eff (AppEnsure ': effs) a -> Eff effs a
+errorIOInterpreter = interpretM $ \case
+                                      Ensure condition errMsg -> Monad.unless condition $ Monad.fail $ toList errMsg
+                                      Fail errMsg -> Monad.fail $ toList errMsg
 
 
 data TestItem = Item {
@@ -104,14 +107,19 @@ data RunConfig = RunConfig {
   path :: Path Abs File
 }
 
-type FileSys r = (Member FileSystem r)
-type AppFailure r = (Member AppError r)
+newtype AppError = FileError String
 
-interactor :: TestItem -> RunConfig -> (AppFailure r, FileSys r) => Eff r ApState
+--
+-- renderAppError :: AppError -> Text
+-- renderAppError (AppFileError e)      = renderFileError e
+-- renderAppError (AppLineError e)      = renderLineError e
+-- renderAppError (AppNormaliseError e) = renderNormaliseError e
+
+interactor :: Members '[AppEnsure, FileSystem] effs => TestItem -> RunConfig -> Eff effs ApState
 interactor item runConfig = do
                               let fullFilePath = path (runConfig :: RunConfig)
                               writeFile fullFilePath $ pre item  <> post item
-                              --fail "random error ~ its a glitch"
+                              -- fail "random error ~ its a glitch"
                               txt <- readFile [absfile|C:\Vids\SystemDesign\Wrong.txt|]
                               --txt <- readFile fullFilePath
                               pure $ ApState fullFilePath txt
@@ -144,14 +152,14 @@ sampleRunConfig1 = [
                       r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|]
   ]
 
-executeDocumented :: forall a. Eff '[FileSystem, AppError, Writer [String]] a -> (a, [String])
+executeDocumented :: forall a. Eff '[FileSystem, AppEnsure, Writer [String]] a -> (a, [String])
 executeDocumented app = run $ runWriter
                             $ interpret errorDocInterpreter
                             $ interpret fileSystemDocInterpreter
                             app
 
-executeInIO :: forall a. Eff '[FileSystem, AppError, IO] a -> IO a
-executeInIO app = runM $ interpretM errorIOInterpreter $ interpretM fileSystemIOInterpreter app
+executeInIO :: forall a. Eff '[FileSystem, AppEnsure, IO] a -> IO a
+executeInIO app = runM $ errorIOInterpreter $ fileSystemIOInterpreter app
 
 demoDocument = executeDocumented $ interactor sampleItem sampleRunConfig
 demoExecuteInIO = executeInIO $ interactor sampleItem sampleRunConfig

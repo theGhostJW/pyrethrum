@@ -12,7 +12,7 @@ module RoughTest where
 -- validation validation module ?? ~ terminal validations
 -- generalis runner
 
-
+import qualified Control.Monad as Monad
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Coroutine
 import           Control.Monad.Freer.Error
@@ -42,8 +42,8 @@ readFile = send . ReadFile
 writeFile :: Member FileSystem effs => Path a File -> String -> Eff effs ()
 writeFile pth = send . WriteFile pth
 
-fileSystemInterpreter :: FileSystem a -> IO a
-fileSystemInterpreter = \case
+fileSystemIOInterpreter :: FileSystem a -> IO a
+fileSystemIOInterpreter = \case
                            ReadFile path -> F.readFile path
                            WriteFile path str -> F.writeFile path str
 
@@ -81,6 +81,17 @@ errorDocInterpreter = \case
                         Fail errMsg -> tell ["Failure ~ " <>  errMsg]
 
 
+-- errorIOInterpreter :: Member IO effs => AppError ~> Eff effs
+-- errorIOInterpreter = \case
+--                         Ensure condition errMsg -> pure $ Monad.unless condition error errMsg
+--                         Fail errMsg -> pure $ error errMsg
+
+errorIOInterpreter :: AppError a -> IO a
+errorIOInterpreter = \case
+                        Ensure condition errMsg ->  Monad.unless condition $ Monad.fail $ toList errMsg
+                        Fail errMsg -> Monad.fail $ toList errMsg
+
+
 data TestItem = Item {
   pre :: String,
   post :: String,
@@ -100,8 +111,9 @@ interactor :: TestItem -> RunConfig -> (AppFailure r, FileSys r) => Eff r ApStat
 interactor item runConfig = do
                               let fullFilePath = path (runConfig :: RunConfig)
                               writeFile fullFilePath $ pre item  <> post item
-                              fail "random error ~ its a glitch"
+                              --fail "random error ~ its a glitch"
                               txt <- readFile [absfile|C:\Vids\SystemDesign\Wrong.txt|]
+                              --txt <- readFile fullFilePath
                               pure $ ApState fullFilePath txt
 
 sampleItem =  Item {
@@ -119,16 +131,18 @@ sampleRunConfig = RunConfig {
 r = RunConfig
 null = Nothing
 
-sampleRunConfig1 = [
-                      r "Test"   44  [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                      r "Test"   44  [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                      r "Test"   44  [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                      r "Test"   44  [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                      r "Test"   44  [absfile|C:\Vids\SystemDesign\VidList.txt|]
-  ]
+dEnv = "Test"
+dDepth = 44 :: Integer
+dPath = [absfile|C:\Vids\SystemDesign\VidList.txt|]
 
--- executeDocumented :: forall a. Eff '[FileSystem, AppError] a -> ((a, [String]), [String])
--- executeDocumented app = run $ runWriter $ reinterpret failDocInterpreter $ runWriter $ reinterpret fileSystemDocInterpreter app
+sampleRunConfig1 = [
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|]
+  ]
 
 executeDocumented :: forall a. Eff '[FileSystem, AppError, Writer [String]] a -> (a, [String])
 executeDocumented app = run $ runWriter
@@ -136,8 +150,8 @@ executeDocumented app = run $ runWriter
                             $ interpret fileSystemDocInterpreter
                             app
 
-executeFileSystem :: forall a. Eff '[FileSystem, IO] a -> IO a
-executeFileSystem app = runM $ interpretM fileSystemInterpreter app
+executeInIO :: forall a. Eff '[FileSystem, AppError, IO] a -> IO a
+executeInIO app = runM $ interpretM errorIOInterpreter $ interpretM fileSystemIOInterpreter app
 
 demoDocument = executeDocumented $ interactor sampleItem sampleRunConfig
--- demoIO = executeFileSystem $ interactor sampleItem sampleRunConfig
+demoExecuteInIO = executeInIO $ interactor sampleItem sampleRunConfig

@@ -14,7 +14,6 @@ module RoughTest where
 -- generalis runner
 
 import qualified Control.Monad as Monad
--- import Control.Exception
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Coroutine
 import           Control.Monad.Freer.Error
@@ -58,6 +57,10 @@ fileSystemIOInterpreter = interpretM $ \case
                                ReadFile path -> F.readFileUTF8 path
                                WriteFile path str -> F.writeFileUTF8 path str
 
+-- badIOInterpreter :: forall effs a. (Member (Error AppError) effs, LastMember IO effs) => Eff (FileSystem ': effs) a -> Eff effs a
+-- badIOInterpreter = \case
+--                       ReadFile path -> throwError $ GeneralError "OMG"
+--                       WriteFile path str -> throwError $ GeneralError "OMG"
 
 fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
 fileSystemDocInterpreter =  let
@@ -120,8 +123,8 @@ interactor item runConfig = do
                               writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
                               -- failEn "random error ~ its a glitch"
                               -- throwError $ GeneralError "Blahh"
-                              --txt <- readFile [absfile|C:\Vids\SystemDesign\Wrong.txt|]
-                              txt <- readFile fullFilePath
+                              txt <- readFile [absfile|C:\Vids\SystemDesign\Wrong.txt|]
+                              --txt <- readFile fullFilePath
                               pure $ ApState fullFilePath txt
 
 sampleItem =  Item {

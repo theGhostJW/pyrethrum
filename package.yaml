@@ -45,6 +45,7 @@ ghc-options:
   - -fno-warn-type-defaults
   - -fno-warn-unused-matches
   - -fno-warn-unused-binds
+  - -fno-warn-unused-do-bind
 
 default-extensions:
   - RecordWildCards

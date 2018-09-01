@@ -157,8 +157,9 @@ exageratorDemo = run $ runErrBig
 data FileSystem r where
   ReadFile :: Path a File -> FileSystem StrictReadResult
 
-
-newtype AppError = AppError String deriving Show
+data AppError = AppError String |
+                   IOAppError IOException
+                   deriving Show
 
 readFile :: Members '[FileSystem, Error AppError] effs => Path a File -> Eff effs StrictReadResult
 readFile path = let
@@ -173,11 +174,21 @@ readFile path = let
 runAppError :: Eff (Error AppError ': r) a -> Eff r (Either AppError a)
 runAppError = runError
 
-fileSystemIOInterpreter :: forall effs a. (Members '[Error AppError] effs, LastMember IO effs) => Eff (FileSystem ': effs) a -> Eff effs a
-fileSystemIOInterpreter = interpretM $ \case
-                                          ReadFile path -> F.readFileUTF8 path
+{-
+  interpretM takes an interpreter in IO (its first argument has type eff ~> m with m ~ IO here), so that doesn't allow you to throw AppErrors via
+  the Members '[Error AppError] effs constraint.
 
--- fileSystemIOInterpreter effs = throwError $ AppError "BLahh"
+  Instead you can use interpret, with full access to effs. That would roughly look like:
+-}
+fileSystemIOInterpreter :: forall effs a. (Members '[Error AppError] effs, LastMember IO effs) => Eff (FileSystem ': effs) a -> Eff effs a
+fileSystemIOInterpreter = interpret $ \case
+                                          ReadFile path -> do
+                                                             r <- sendM (try (F.readFileUTF8 path))
+                                                             case r of
+                                                               Left (e :: IOException) -> throwError (IOAppError e)
+                                                               Right f -> pure f
+
+--fileSystemIOInterpreter effs = throwError $ AppError "BLahh"
 
 application :: Members '[FileSystem, Error AppError] effs => Path a File -> Eff effs StrictReadResult
 application = readFile

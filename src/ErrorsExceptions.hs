@@ -180,15 +180,21 @@ runAppError = runError
 
   Instead you can use interpret, with full access to effs. That would roughly look like:
 -}
-fileSystemIOInterpreter :: forall effs a. (Members '[Error AppError] effs, LastMember IO effs) => Eff (FileSystem ': effs) a -> Eff effs a
+-- fileSystemIOInterpreter :: forall effs a. (Members '[Error AppError] effs, LastMember IO effs) => Eff (FileSystem ': effs) a -> Eff effs a
+-- fileSystemIOInterpreter = interpret $ \case
+--                                           ReadFile path -> do
+--                                                              r <- sendM (try (F.readFileUTF8 path))
+--                                                              case r of
+--                                                                Left (e :: IOException) -> throwError (IOAppError e)
+--                                                                Right f -> pure f
+
+fileSystemIOInterpreter :: forall effs a. (Members '[Error AppError, IO] effs) => Eff (FileSystem ': effs) a -> Eff effs a
 fileSystemIOInterpreter = interpret $ \case
                                           ReadFile path -> do
-                                                             r <- sendM (try (F.readFileUTF8 path))
+                                                             r <- send (try (F.readFileUTF8 path))
                                                              case r of
                                                                Left (e :: IOException) -> throwError (IOAppError e)
                                                                Right f -> pure f
-
---fileSystemIOInterpreter effs = throwError $ AppError "BLahh"
 
 application :: Members '[FileSystem, Error AppError] effs => Path a File -> Eff effs StrictReadResult
 application = readFile

@@ -25,13 +25,6 @@ TODO: Simple Interactors - 200 #spike
     https://downloads.haskell.org/~ghc/8.4.1/docs/html/users_guide/glasgow_exts.html#record-field-disambiguation
     Record field selector polymorphysim etc.
 
-### TODO: Error processing
-  * Simple errors
-  * Error Handling
-    * Eg. Catch File not Found Errors
-  * Typed user errors  
-  * ExceptT
-
 ### Break Through IO Testing
 
 ### Rest Req

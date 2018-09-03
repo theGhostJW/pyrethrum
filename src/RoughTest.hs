@@ -28,6 +28,7 @@ import    qualified       Foundation.Extended  as F
 import           Foundation.String
 import           Paths_pyrethrum
 import           Control.Monad.Trans.Either
+import Ensure
 import           Control.Monad.Trans.Either.Exit (orDie)
 import qualified Prelude
 import           System.Exit                   as SysExit hiding (ExitCode (ExitSuccess))
@@ -53,32 +54,12 @@ readFile = send . ReadFile
 writeFile :: Member FileSystem effs => Path a File -> String -> Eff effs ()
 writeFile pth = send . WriteFile pth
 
-{- Ensure Lang -}
-
-data AppEnsure r where
- Ensure :: Bool -> String -> AppEnsure ()
- FailEn :: String -> AppEnsure ()
-
-ensure :: Member AppEnsure effs => Bool -> String -> Eff effs ()
-ensure condition message = send $ Ensure condition message
-
-failEn :: Member AppEnsure effs =>  String -> Eff effs ()
-failEn = send . FailEn
-
 {- File System IO Interpreter -}
 
 fileSystemIOInterpreter :: forall effs a. LastMember IO effs => Eff (FileSystem ': effs) a -> Eff effs a
 fileSystemIOInterpreter = interpretM $ \case
                                ReadFile path -> F.readFileUTF8 path
                                WriteFile path str -> F.writeFileUTF8 path str
-
-
-{- Ensure IO Interpreter -}
-
-ensureIOInterpreter :: forall effs a. LastMember IO effs => Eff (AppEnsure ': effs) a -> Eff effs a
-ensureIOInterpreter = interpretM $ \case
-                                  Ensure condition errMsg -> Monad.unless condition $ Monad.fail $ toList errMsg
-                                  FailEn errMsg -> Monad.fail $ toList errMsg
 
 {- Application (Interactor) -}
 
@@ -100,18 +81,19 @@ data RunConfig = RunConfig {
   path :: Path Abs File
 }
 
-interactor :: Members '[AppEnsure, FileSystem] effs => TestItem -> RunConfig -> Eff effs ApState
+interactor :: Members '[Ensure String, FileSystem] effs => TestItem -> RunConfig -> Eff effs ApState
 interactor item runConfig = do
                               let fullFilePath = path (runConfig :: RunConfig)
                               writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
-                              -- failEn "random error ~ its a glitch"
-                              txt <- readFile fullFilePath
+                              fail "Blahh"
+                              txt <- readFile [absfile|C:\Vids\SystemDesign\Wrong.txt|]
                               pure $ ApState fullFilePath txt
 
 {- Application IO Interpreter -}
 
-executeInIO :: forall a. Eff '[FileSystem, AppEnsure, IO] a -> IO a
-executeInIO app = runM $ ensureIOInterpreter
+executeInIO :: Eff '[FileSystem, Ensure String, Error String, IO] a -> IO (Either String a)
+executeInIO app = runM $ runError
+                       $ ensureInterpreter
                        $ fileSystemIOInterpreter
                        app
 
@@ -151,20 +133,15 @@ fileSystemDocInterpreter =  let
                                                               "\nContents:\n" <>
                                                               str]
 
-errorDocInterpreter :: Member (Writer [String]) effs => AppEnsure ~> Eff effs
-errorDocInterpreter = \case
-                    Ensure condition errMsg -> tell [condition ? "Ensure Check Passed" $
-                      "Ensure Check Failed ~ " <>  errMsg]
-                    FailEn errMsg -> tell ["Failure ~ " <>  errMsg]
-
-executeDocumented :: forall a. Eff '[FileSystem, AppEnsure, Writer [String]] a -> (a, [String])
+executeDocumented :: forall a. Eff '[FileSystem, Ensure String, Error String, Writer [String]] a -> (Either String a, [String])
 executeDocumented app = run $ runWriter
-                            $ interpret errorDocInterpreter
+                            $ runError
+                            $ ensureInterpreter
                             $ interpret fileSystemDocInterpreter
                             app
 
 -- Demos
-demoDocument = executeDocumented $ interactor sampleItem sampleRunConfig
+demoDocument =  executeDocumented $ interactor sampleItem sampleRunConfig
 
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

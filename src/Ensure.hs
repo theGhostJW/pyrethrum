@@ -12,7 +12,7 @@ data Ensure e r where
  Fail :: e -> Ensure e ()
 
 ensure :: Member (Ensure e) effs => Bool -> e -> Eff effs ()
-ensure condition message = send $ Ensure condition message
+ensure condition err = send $ Ensure condition err
 
 fail :: Member (Ensure e) effs => e -> Eff effs ()
 fail = send . Fail

@@ -85,7 +85,7 @@ interactor :: Members '[Ensure String, FileSystem] effs => TestItem -> RunConfig
 interactor item runConfig = do
                               let fullFilePath = path (runConfig :: RunConfig)
                               writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
-                              fail "Blahh"
+                              ensure True "Blahh"
                               txt <- readFile [absfile|C:\Vids\SystemDesign\Wrong.txt|]
                               pure $ ApState fullFilePath txt
 

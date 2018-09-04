@@ -2,7 +2,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
-module RoughTest where
+module RoughTest2 where
 
 
 -- full run through writing file
@@ -13,7 +13,6 @@ module RoughTest where
 -- validation validation module ?? ~ terminal validations
 -- generalis runner
 
-import Runner
 import qualified Control.Monad as Monad
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Coroutine
@@ -30,8 +29,6 @@ import           Foundation.String
 import           Paths_pyrethrum
 import           Control.Monad.Trans.Either
 import Ensure
-import FileSystem
-import AppErrors
 import           Control.Monad.Trans.Either.Exit (orDie)
 import qualified Prelude
 import           System.Exit                   as SysExit hiding (ExitCode (ExitSuccess))
@@ -42,9 +39,27 @@ import           System.IO.Error                 (isAlreadyInUseError,
                                                   isDoesNotExistError,
                                                   isPermissionError)
 import Control.Exception
-import AppErrors
 
 default (String)
+
+{- File System Lang -}
+
+data FileSystem r where
+  ReadFile :: Path a File -> FileSystem StrictReadResult
+  WriteFile :: Path a File -> String -> FileSystem ()
+
+readFile :: Member FileSystem effs => Path a File -> Eff effs StrictReadResult
+readFile = send . ReadFile
+
+writeFile :: Member FileSystem effs => Path a File -> String -> Eff effs ()
+writeFile pth = send . WriteFile pth
+
+{- File System IO Interpreter -}
+
+fileSystemIOInterpreter :: forall effs a. LastMember IO effs => Eff (FileSystem ': effs) a -> Eff effs a
+fileSystemIOInterpreter = interpretM $ \case
+                               ReadFile path -> F.readFileUTF8 path
+                               WriteFile path str -> F.writeFileUTF8 path str
 
 {- Application (Interactor) -}
 
@@ -66,17 +81,16 @@ data RunConfig = RunConfig {
   path :: Path Abs File
 }
 
-interactor :: Members '[Ensure String, FileSystem] effs => RunConfig -> TestItem -> Eff effs ApState
-interactor runConfig item = do
+interactor :: Members '[FileSystem] effs => TestItem -> RunConfig -> Eff effs ApState
+interactor item runConfig = do
                               let fullFilePath = path (runConfig :: RunConfig)
                               writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
-                              ensure True "Blahh"
                               txt <- readFile [absfile|C:\Vids\SystemDesign\Wrong.txt|]
                               pure $ ApState fullFilePath txt
 
 {- Application IO Interpreter -}
 
-executeInIO :: Eff '[FileSystem, Error AppErrors, IO] a -> IO (Either String a)
+executeInIO :: Eff '[FileSystem, Ensure String, Error String, IO] a -> IO (Either String a)
 executeInIO app = runM $ runError
                        $ ensureInterpreter
                        $ fileSystemIOInterpreter
@@ -97,9 +111,7 @@ sampleRunConfig = RunConfig {
 }
 
 -- Demos
-demoExecuteInIO = executeInIO $ interactor sampleRunConfig sampleItem
-
-demoIOAll = Prelude.sequenceA $ runTest sampleRunConfig interactor sampleTestItems executeInIO
+demoExecuteInIO = executeInIO $ interactor sampleItem sampleRunConfig
 
 fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
 fileSystemDocInterpreter =  let
@@ -120,24 +132,23 @@ executeDocumented app = run $ runWriter
                             app
 
 -- Demos
-demoDocument = executeDocumented $ interactor sampleRunConfig sampleItem
-
+demoDocument =  executeDocumented $ interactor sampleItem sampleRunConfig
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-i = Item
+r = RunConfig
+null = Nothing
 
 sampleTestItems = [
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|]
-                  ];
-
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                      r "Test"   55   [absfile|C:\Vids\SystemDesign\VidList.txt|]
+  ]
 
 
   --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

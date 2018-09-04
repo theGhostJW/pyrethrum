@@ -31,7 +31,7 @@ import           Paths_pyrethrum
 import           Control.Monad.Trans.Either
 import Ensure
 import FileSystem
-import AppErrors
+import AppError
 import           Control.Monad.Trans.Either.Exit (orDie)
 import qualified Prelude
 import           System.Exit                   as SysExit hiding (ExitCode (ExitSuccess))
@@ -42,19 +42,20 @@ import           System.IO.Error                 (isAlreadyInUseError,
                                                   isDoesNotExistError,
                                                   isPermissionError)
 import Control.Exception
-import AppErrors
 
 default (String)
 
 {- Application (Interactor) -}
 
 data ApState = ApState {
+  itemId :: Int,
   filePath :: Path Abs File,
   fileText :: StrictReadResult
 }
   deriving Show
 
 data TestItem = Item {
+  id :: Int,
   pre :: String,
   post :: String,
   path :: Path Abs File
@@ -66,17 +67,17 @@ data RunConfig = RunConfig {
   path :: Path Abs File
 }
 
-interactor :: Members '[Ensure String, FileSystem] effs => RunConfig -> TestItem -> Eff effs ApState
+interactor :: Members '[Ensure, FileSystem] effs => RunConfig -> TestItem -> Eff effs ApState
 interactor runConfig item = do
-                              let fullFilePath = path (runConfig :: RunConfig)
+                              let fullFilePath = path (item :: TestItem)
                               writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
                               ensure True "Blahh"
-                              txt <- readFile [absfile|C:\Vids\SystemDesign\Wrong.txt|]
-                              pure $ ApState fullFilePath txt
+                              txt <- readFile fullFilePath
+                              pure $ ApState (RoughTest.id item) fullFilePath txt
 
 {- Application IO Interpreter -}
 
-executeInIO :: Eff '[FileSystem, Error AppErrors, IO] a -> IO (Either String a)
+executeInIO :: Eff '[FileSystem, Ensure, Error AppError, IO] a -> IO (Either AppError a)
 executeInIO app = runM $ runError
                        $ ensureInterpreter
                        $ fileSystemIOInterpreter
@@ -85,6 +86,7 @@ executeInIO app = runM $ runError
 {- Demo Execution -}
 
 sampleItem =  Item {
+  id = 500,
   pre = "I do a test",
   post = "the test runs",
   path = [absfile|C:\Vids\SystemDesign\VidList.txt|]
@@ -98,7 +100,6 @@ sampleRunConfig = RunConfig {
 
 -- Demos
 demoExecuteInIO = executeInIO $ interactor sampleRunConfig sampleItem
-
 demoIOAll = Prelude.sequenceA $ runTest sampleRunConfig interactor sampleTestItems executeInIO
 
 fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
@@ -112,7 +113,7 @@ fileSystemDocInterpreter =  let
                                                               "\nContents:\n" <>
                                                               str]
 
-executeDocumented :: forall a. Eff '[FileSystem, Ensure String, Error String, Writer [String]] a -> (Either String a, [String])
+executeDocumented :: forall a. Eff '[FileSystem, Ensure, Error AppError, Writer [String]] a -> (Either AppError a, [String])
 executeDocumented app = run $ runWriter
                             $ runError
                             $ ensureInterpreter
@@ -121,6 +122,7 @@ executeDocumented app = run $ runWriter
 
 -- Demos
 demoDocument = executeDocumented $ interactor sampleRunConfig sampleItem
+demoDocumentedAll = runTest sampleRunConfig interactor sampleTestItems executeDocumented
 
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -130,12 +132,12 @@ demoDocument = executeDocumented $ interactor sampleRunConfig sampleItem
 i = Item
 
 sampleTestItems = [
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|]
+                    i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                    i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                    i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|],
+                    i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                    i 140 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
+                    i 150 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|]
                   ];
 
 

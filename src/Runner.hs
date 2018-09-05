@@ -3,5 +3,23 @@ module Runner where
 
 import           Foundation.Extended
 
-runTest :: Functor f =>  runConfig -> (runConfig -> item -> apEffs) -> f item -> (apEffs -> result) -> f result
+data Filter a = IID Int |
+                All |
+                Last |
+                LastVal |
+                Pred (a -> Bool)
+
+runTest :: Functor f => runConfig
+                     -> (runConfig -> item -> apEffs)
+                     -> f item
+                     -> (apEffs -> result)
+                     -> f result
 runTest runConfig interactor items interpreter = interpreter . interactor runConfig <$> items
+
+class TestItem a where
+  identifier :: a -> Int
+  whenClause :: a -> String
+  thenClause :: a -> String
+  whenThen :: a -> String
+  whenThen a = "When: " <> whenClause a  <> "\n" <>
+               "Then: " <> thenClause a  <> "\n"

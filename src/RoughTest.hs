@@ -24,7 +24,7 @@ import           Control.Monad.Freer.Reader
 import           Data.Function                 ((&))
 import           Data.Functor
 import           Data.List
-import           Foundation.Extended           hiding (putStrLn, readFile, writeFile, fail)
+import           Foundation.Extended           hiding (putStrLn, readFile, writeFile, fail, Item)
 import    qualified       Foundation.Extended  as F
 import           Foundation.String
 import           Paths_pyrethrum
@@ -54,12 +54,12 @@ data ApState = ApState {
 }
   deriving Show
 
-data TestItem = Item {
-  id :: Int,
-  pre :: String,
-  post :: String,
-  path :: Path Abs File
-}
+data Item = Item {
+                    iid :: Int,
+                    pre :: String,
+                    post :: String,
+                    path :: Path Abs File
+                  }
 
 data RunConfig = RunConfig {
   environment :: String,
@@ -67,13 +67,13 @@ data RunConfig = RunConfig {
   path :: Path Abs File
 }
 
-interactor :: Members '[Ensure, FileSystem] effs => RunConfig -> TestItem -> Eff effs ApState
+interactor :: Members '[Ensure, FileSystem] effs => RunConfig -> Item -> Eff effs ApState
 interactor runConfig item = do
-                              let fullFilePath = path (item :: TestItem)
+                              let fullFilePath = path (item :: Item)
                               writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
                               ensure True "Blahh"
                               txt <- readFile fullFilePath
-                              pure $ ApState (RoughTest.id item) fullFilePath txt
+                              pure $ ApState (iid item) fullFilePath txt
 
 {- Application IO Interpreter -}
 
@@ -86,7 +86,7 @@ executeInIO app = runM $ runError
 {- Demo Execution -}
 
 sampleItem =  Item {
-  id = 500,
+  iid = 500,
   pre = "I do a test",
   post = "the test runs",
   path = [absfile|C:\Vids\SystemDesign\VidList.txt|]
@@ -125,6 +125,12 @@ demoDocument = executeDocumented $ interactor sampleRunConfig sampleItem
 demoDocumentedAll = runTest sampleRunConfig interactor sampleTestItems executeDocumented
 
 
+instance TestItem Item where
+  identifier = iid
+  whenClause = pre 
+  thenClause = post
+
+
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -139,8 +145,6 @@ sampleTestItems = [
                     i 140 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
                     i 150 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|]
                   ];
-
-
 
   --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

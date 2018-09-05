@@ -3,7 +3,8 @@ module AppError where
 
 import           Foundation.Extended
 
-data AppError = GenericError String |
+data AppError = InvalidItemFilter String |
+                GenericError String |
                 EnsureError String |
                 ReadFileError IOException |
                 WriteFileError IOException |

@@ -10,9 +10,9 @@ data Filter a = IID Int |
                 Pred (a -> Bool)
 
 runTest :: Functor f => runConfig
-                     -> (runConfig -> item -> apEffs)
-                     -> f item
-                     -> (apEffs -> result)
+                     -> (runConfig -> item -> apEffs) -- interactor
+                     -> f item                        -- test items
+                     -> (apEffs -> result)            -- interpreter
                      -> f result
 runTest runConfig interactor items interpreter = interpreter . interactor runConfig <$> items
 

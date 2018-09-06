@@ -94,6 +94,13 @@ default-extensions:
 library:
   source-dirs: src
 
+executables:
+  demo-exe:
+    main: Main.hs
+    source-dirs: .\demo\src
+    dependencies:
+      - pyrethrum
+
 tests:
   simple-hpack-test:
     main:                driver.hs

@@ -100,7 +100,7 @@ sampleRunConfig = RunConfig {
 
 -- Demos
 demoExecuteInIO = executeInIO $ interactor sampleRunConfig sampleItem
-demoIOAll = Prelude.sequenceA $ runTest sampleRunConfig interactor sampleTestItems executeInIO
+demoIOAll = Prelude.sequenceA $ runTest sampleRunConfig interactor sampleTestItems executeInIO All
 
 fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
 fileSystemDocInterpreter =  let
@@ -122,7 +122,7 @@ executeDocumented app = run $ runWriter
 
 -- Demos
 demoDocument = executeDocumented $ interactor sampleRunConfig sampleItem
-demoDocumentedAll = runTest sampleRunConfig interactor sampleTestItems executeDocumented
+demoDocumentedAll = runTest sampleRunConfig interactor sampleTestItems executeDocumented All
 
 
 instance TestItem Item where

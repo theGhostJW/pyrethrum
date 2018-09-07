@@ -93,6 +93,8 @@ default-extensions:
 
 library:
   source-dirs: src
+  dependencies:
+    - listsafe
 
 internal-libraries:
   demo:

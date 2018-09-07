@@ -1,5 +1,5 @@
 
-module Demo where
+module DemoTest where
 
 import           Foundation
 import qualified Prelude

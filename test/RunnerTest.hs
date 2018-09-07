@@ -1,5 +1,5 @@
 
-module InteractorSpikeTest where
+module RunnerTest where
 
 import           Foundation
 import qualified Prelude

@@ -94,17 +94,33 @@ default-extensions:
 library:
   source-dirs: src
 
-executables:
-  demo-exe:
-    main: Main.hs
+internal-libraries:
+  demo:
     source-dirs: .\demo\src
     dependencies:
       - pyrethrum
 
+executables:
+  demo-exe:
+    main: Main.hs
+    source-dirs: .\demo\app\src
+    dependencies:
+      - demo
+
 tests:
-  simple-hpack-test:
+  pyrethrum-test:
     main:                driver.hs
     source-dirs:         test
+    dependencies:
+      - tasty
+      - tasty-hunit
+      - tasty-hedgehog
+      - tasty-discover
+      - hedgehog
+      - pyrethrum
+  demo-test:
+    main:                driver.hs
+    source-dirs:         .\demo\test
     dependencies:
       - tasty
       - tasty-hunit

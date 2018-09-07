@@ -127,7 +127,7 @@ demoDocumentedAll = runTest sampleRunConfig interactor sampleTestItems executeDo
 
 instance TestItem Item where
   identifier = iid
-  whenClause = pre 
+  whenClause = pre
   thenClause = post
 
 
@@ -136,7 +136,6 @@ instance TestItem Item where
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 i = Item
-
 sampleTestItems = [
                     i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
                     i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],

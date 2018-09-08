@@ -62,11 +62,11 @@ data Item = Item {
                     path :: Path Abs File
                   } deriving Show
 
-type ValState = ApState
+--type ValState = ApState
 
--- newtype ValState = ValState {
---                     iidPlus10 :: Int
---                   } deriving Show
+newtype ValState = ValState {
+                    iidPlus10 :: Int
+                  } deriving Show
 
 data RunConfig = RunConfig {
   environment :: String,
@@ -84,7 +84,7 @@ interactor runConfig item = do
 
 
 prepState :: RunConfig -> ApState -> ValState
-prepState r a = a
+prepState r a = ValState $ 10 * itemId a
 {- Application IO Interpreter -}
 
 executeInIO :: (r -> a -> b) -> r -> Eff '[FileSystem, Ensure, Error AppError, IO] a -> IO (Either AppError b)
@@ -112,13 +112,13 @@ sampleRunConfig = RunConfig {
 demoExecuteInIO :: RunConfig -> IO (Either AppError ValState)
 demoExecuteInIO runConfig = executeInIO prepState runConfig (interactor sampleRunConfig sampleItem)
 
---demoIOAll = runTestNoValidation sampleRunConfig interactor sampleTestItems executeInIO All
+demoIOAll = runTestNoValidation sampleRunConfig interactor sampleTestItems (executeInIO prepState sampleRunConfig) All
 
--- demoIOAllValidate = runTestValidate prepState sampleRunConfig interactor sampleTestItems executeInIO All
+-- demoIOAllValidate = runTest prepState sampleRunConfig interactor sampleTestItems executeInIO All
 
--- demoIOAllRepl = Prelude.sequenceA $
---                   Prelude.sequenceA <$>
---                   demoIOAll
+demoIOAllRepl = Prelude.sequenceA $
+                  Prelude.sequenceA <$>
+                  demoIOAll
 
 fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
 fileSystemDocInterpreter =  let
@@ -131,16 +131,21 @@ fileSystemDocInterpreter =  let
                                                               "\nContents:\n" <>
                                                               str]
 
-executeDocumented :: Eff '[FileSystem, Ensure, Error AppError, Writer [String]] a -> (a -> b) -> (Either AppError b, [String])
-executeDocumented app func = run $ runWriter
-                              $ runError
-                              $ ensureInterpreter
-                              $ interpret fileSystemDocInterpreter
-                              $ func <$> app
+executeDocumented :: (r -> a -> b) -> r -> Eff '[FileSystem, Ensure, Error AppError, Writer [String]] a -> (Either AppError b, [String])
+executeDocumented func r app = run
+                                $ runWriter
+                                $ runError
+                                $ ensureInterpreter
+                                $ interpret fileSystemDocInterpreter
+                                $ func r <$> app
 
 -- Demos
-demoDocument = executeDocumented $ interactor sampleRunConfig sampleItem
-demoDocumentedAll = runTestNoValidation sampleRunConfig interactor sampleTestItems executeDocumented $ IID 120
+demoDocument :: (Either AppError ValState, [String])
+demoDocument = executeDocumented prepState sampleRunConfig (interactor sampleRunConfig sampleItem)
+
+demoDocumentedAll :: Either FilterError [(Either AppError ValState, [String])]
+demoDocumentedAll = runTestNoValidation sampleRunConfig interactor sampleTestItems (executeDocumented prepState sampleRunConfig) All
+
 --demoDocumentedAllValidate = runTestValidate prepState sampleRunConfig interactor sampleTestItems executeDocumented $ IID 120
 
 

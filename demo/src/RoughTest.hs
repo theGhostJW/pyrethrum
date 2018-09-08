@@ -68,8 +68,6 @@ type ValState = ApState
 --                     iidPlus10 :: Int
 --                   } deriving Show
 
-
-
 data RunConfig = RunConfig {
   environment :: String,
   depth :: Integer,
@@ -142,6 +140,7 @@ executeDocumented app = run $ runWriter
 -- Demos
 demoDocument = executeDocumented $ interactor sampleRunConfig sampleItem
 demoDocumentedAll = runTest sampleRunConfig interactor sampleTestItems executeDocumented $ IID 120
+--demoDocumentedAllValidate = runTestValidate prepState sampleRunConfig interactor sampleTestItems executeDocumented $ IID 120
 
 
 

@@ -9,6 +9,7 @@ import           AppError
 import           Foundation.Extended
 import           Runner.Internal
 import           Runner.Internal     as InternalFuncs (Filter (..),
+                                                       FilterError (..),
                                                        TestItem (..))
 
 runTest :: (TestItem item) => runConfig
@@ -16,7 +17,7 @@ runTest :: (TestItem item) => runConfig
                                       -> [item]                         -- test items
                                       -> (apEffs -> result)            -- interpreter
                                       -> Filter item                    -- item filter
-                                      -> Either AppError [result]
+                                      -> Either FilterError [result]
 runTest runConfig interactor items interpreter filtr = (interpreter . interactor runConfig <$>) <$> filterredItems filtr items
 
 
@@ -27,7 +28,7 @@ runTestValidate :: (TestItem item) => (runConfig -> apState -> valState)   -- pr
                                       -> [item]                               -- test items
                                       -> (apEffs -> apState)                  -- interpreter
                                       -> Filter item                          -- item filter
-                                      -> Either AppError [(apState, valState)]
+                                      -> Either FilterError [(apState, valState)]
 runTestValidate prepState runConfig interactor items interpreter filtr = let
                                                                            toValState = validate prepState runConfig
                                                                            valTuple apState = (apState, toValState apState)

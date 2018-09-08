@@ -1,9 +1,9 @@
 
 module Runner.Internal where
 
-import           AppError
 import qualified Data.List.Safe      as SafeList
 import           Foundation.Extended
+import qualified Prelude
 
 class TestItem a where
   identifier :: a -> Int
@@ -20,7 +20,20 @@ data Filter a = IID Int |
                Pred (a -> Bool)
 
 
-filterredItems :: (TestItem item) => Filter item -> [item] -> Either AppError [item]
+instance Prelude.Show (Filter a) where
+  show (IID i )    = "IID " <> Prelude.show i
+  show All         = "All"
+  show Last        = "Last"
+  show LastVal     = "LastVal"
+  show (Pred func) = "Pred itemPredicateFunction"
+
+data FilterError = InvalidItemFilter String  |
+                   NotImplemented String
+                   deriving (Eq, Show)
+
+
+
+filterredItems :: (TestItem item) => Filter item -> [item] -> Either FilterError [item]
 filterredItems filtr items = let
                               listOrFail lst msg = null lst
                                                           ? Left (InvalidItemFilter msg)

@@ -1,8 +1,7 @@
 
 module Runner (
   module InternalFuncs,
---  runTest,
-  runTestNoValidation
+  runTest
 ) where
 
 import           AppError
@@ -12,13 +11,15 @@ import           Runner.Internal     as InternalFuncs (Filter (..),
                                                        FilterError (..),
                                                        TestItem (..))
 
-runTestNoValidation :: (TestItem item) => runConfig
-                                      -> (runConfig -> item -> apEffs) -- interactor
-                                      -> [item]                        -- test items
-                                      -> (apEffs -> result)            -- interpreter
-                                      -> Filter item                   -- item filter
+runTest :: (TestItem item) => runConfig
+                                      -> (runConfig -> a -> b)                                     -- prepState
+                                      -> (runConfig -> item -> apEffs)                             -- interactor
+                                      -> [item]                                                    -- test items
+                                      -> ((runConfig -> a -> b) -> runConfig -> apEffs -> result)  -- interpreter
+                                      -> Filter item                                               -- item filter
                                       -> Either FilterError [result]
-runTestNoValidation runConfig interactor items interpreter filtr = (interpreter . interactor runConfig <$>) <$> filterredItems filtr items
+runTest runConfig transformApState interactor items interpreter filtr =
+    (interpreter transformApState runConfig . interactor runConfig <$>) <$> filterredItems filtr items
 
 
 -- runTest :: (TestItem item) => (runConfig -> apState -> valState)                            -- prepState

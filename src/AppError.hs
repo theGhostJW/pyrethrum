@@ -10,4 +10,4 @@ data AppError = InvalidItemFilter String |
                 ReadFileError IOException |
                 WriteFileError IOException |
                 IOError IOException
-                deriving Show
+                deriving (Show, Eq)

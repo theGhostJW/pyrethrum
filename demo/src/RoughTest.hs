@@ -32,6 +32,7 @@ import           Control.Monad.Trans.Either
 import Ensure
 import FileSystem
 import AppError
+import Data.Map
 import           Control.Monad.Trans.Either.Exit (orDie)
 import qualified Prelude
 import           System.Exit                   as SysExit hiding (ExitCode (ExitSuccess))
@@ -59,7 +60,15 @@ data Item = Item {
                     pre :: String,
                     post :: String,
                     path :: Path Abs File
-                  }
+                  } deriving Show
+
+type ValState = ApState
+
+-- newtype ValState = ValState {
+--                     iidPlus10 :: Int
+--                   } deriving Show
+
+
 
 data RunConfig = RunConfig {
   environment :: String,
@@ -75,6 +84,9 @@ interactor runConfig item = do
                               txt <- readFile fullFilePath
                               pure $ ApState (iid item) fullFilePath txt
 
+
+prepState :: RunConfig -> ApState -> ValState
+prepState r a = a
 {- Application IO Interpreter -}
 
 executeInIO :: Eff '[FileSystem, Ensure, Error AppError, IO] a -> IO (Either AppError a)
@@ -100,7 +112,14 @@ sampleRunConfig = RunConfig {
 
 -- Demos
 demoExecuteInIO = executeInIO $ interactor sampleRunConfig sampleItem
-demoIOAll = Prelude.sequenceA $ runTest sampleRunConfig interactor sampleTestItems executeInIO All
+
+demoIOAll = runTest sampleRunConfig interactor sampleTestItems executeInIO All
+
+--demoIOAllValidate = runTestValidate prepState sampleRunConfig interactor sampleTestItems executeInIO All
+
+demoIOAllRepl = Prelude.sequenceA $
+                  Prelude.sequenceA <$>
+                  demoIOAll
 
 fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
 fileSystemDocInterpreter =  let
@@ -122,7 +141,8 @@ executeDocumented app = run $ runWriter
 
 -- Demos
 demoDocument = executeDocumented $ interactor sampleRunConfig sampleItem
-demoDocumentedAll = runTest sampleRunConfig interactor sampleTestItems executeDocumented All
+demoDocumentedAll = runTest sampleRunConfig interactor sampleTestItems executeDocumented $ IID 120
+
 
 
 instance TestItem Item where
@@ -144,25 +164,3 @@ sampleTestItems = [
                     i 140 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
                     i 150 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|]
                   ];
-
-  --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-data FileErrorType
-  = AlreadyInUse
-  | DoesNotExist
-  | PermissionError
-
-data FileError
-  = ReadFileError FilePath FileErrorType
-  | WriteFileError FilePath FileErrorType
-
-newtype UserError
-  = UserError String
-
-selectFileError :: IOException -> IO FileErrorType
-selectFileError e | isAlreadyInUseError e = return AlreadyInUse
-                  | isDoesNotExistError e = return DoesNotExist
-                  | isPermissionError e   = return PermissionError
-                  | otherwise             = throwIO e

@@ -27,7 +27,7 @@ filterredItems filtr items = let
                                                           $ Right lst
                               in case filtr of
                                 IID iid -> listOrFail (filter (\i -> identifier i == iid) items) $ "id: " <> show iid <> " not in item list"
-                                All -> Right items
-                                Last -> maybe (Left $ InvalidItemFilter "items list is empty") (Right . pure) (SafeList.last items)
+                                All -> listOrFail items "Items list is empty"
+                                Last -> maybe (Left $ InvalidItemFilter "Items list is empty") (Right . pure) (SafeList.last items)
                                 LastVal -> Left $ NotImplemented "LastVal handler not implemented in runTest"
                                 Pred func -> listOrFail (filter func items) "No test items match filter function"

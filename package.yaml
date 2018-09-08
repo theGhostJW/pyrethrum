@@ -95,19 +95,19 @@ library:
   source-dirs: src
   dependencies:
     - listsafe
+    - time
 
 internal-libraries:
   demo:
     source-dirs: .\demo\src
     dependencies:
       - pyrethrum
+      - time
 
 executables:
   demo-exe:
     main: Main.hs
     source-dirs: .\demo\app\src
-    dependencies:
-      - demo
 
 tests:
   pyrethrum-test:
@@ -120,6 +120,7 @@ tests:
       - tasty-discover
       - hedgehog
       - pyrethrum
+      - listsafe
   demo-test:
     main:                driver.hs
     source-dirs:         .\demo\test
@@ -129,4 +130,4 @@ tests:
       - tasty-hedgehog
       - tasty-discover
       - hedgehog
-      - pyrethrum
+      - demo

@@ -109,16 +109,26 @@ sampleRunConfig = RunConfig {
 }
 
 -- Demos
-demoExecuteInIO :: RunConfig -> IO (Either AppError ValState)
-demoExecuteInIO runConfig = executeInIO prepState runConfig (interactor sampleRunConfig sampleItem)
+replShow d = Prelude.sequenceA $ Prelude.sequenceA <$> d
 
+demoExecuteInIO :: IO (Either AppError ValState)
+demoExecuteInIO = executeInIO prepState sampleRunConfig (interactor sampleRunConfig sampleItem)
+
+demoIOAll :: Either FilterError [IO (Either AppError ValState)]
 demoIOAll = runTestNoValidation sampleRunConfig interactor sampleTestItems (executeInIO prepState sampleRunConfig) All
 
--- demoIOAllValidate = runTest prepState sampleRunConfig interactor sampleTestItems executeInIO All
+demoIOAllRepl :: IO (Either FilterError [Either AppError ValState])
+demoIOAllRepl = replShow demoIOAll
 
-demoIOAllRepl = Prelude.sequenceA $
-                  Prelude.sequenceA <$>
-                  demoIOAll
+demoExecuteInIONoVal :: IO (Either AppError ApState)
+demoExecuteInIONoVal = executeInIO dummyPrepState sampleRunConfig (interactor sampleRunConfig sampleItem)
+
+demoIOAllNoVal:: Either FilterError [IO (Either AppError ApState)]
+demoIOAllNoVal = runTestNoValidation sampleRunConfig interactor sampleTestItems (executeInIO dummyPrepState sampleRunConfig) All
+
+demoIOAllNoValRepl ::  IO (Either FilterError [Either AppError ApState])
+demoIOAllNoValRepl = replShow demoIOAllNoVal
+-- demoIOAllValidate = runTest prepState sampleRunConfig interactor sampleTestItems executeInIO All
 
 fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
 fileSystemDocInterpreter =  let
@@ -145,6 +155,14 @@ demoDocument = executeDocumented prepState sampleRunConfig (interactor sampleRun
 
 demoDocumentedAll :: Either FilterError [(Either AppError ValState, [String])]
 demoDocumentedAll = runTestNoValidation sampleRunConfig interactor sampleTestItems (executeDocumented prepState sampleRunConfig) All
+
+dummyPrepState r a = a
+
+demoDocumentNoVal :: (Either AppError ApState, [String])
+demoDocumentNoVal = executeDocumented dummyPrepState sampleRunConfig (interactor sampleRunConfig sampleItem)
+
+demoDocumentedAllNoVal :: Either FilterError [(Either AppError ApState, [String])]
+demoDocumentedAllNoVal = runTestNoValidation sampleRunConfig interactor sampleTestItems (executeDocumented dummyPrepState sampleRunConfig) All
 
 --demoDocumentedAllValidate = runTestValidate prepState sampleRunConfig interactor sampleTestItems executeDocumented $ IID 120
 

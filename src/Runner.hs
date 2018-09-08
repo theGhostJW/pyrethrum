@@ -2,7 +2,7 @@
 module Runner (
   module InternalFuncs,
   runTest,
-  runTestValidate
+  runTestNoValidation
 ) where
 
 import           AppError
@@ -12,29 +12,28 @@ import           Runner.Internal     as InternalFuncs (Filter (..),
                                                        FilterError (..),
                                                        TestItem (..))
 
-runTest :: (TestItem item) => runConfig
-                                      -> (runConfig -> item -> apEffs)  -- interactor
-                                      -> [item]                         -- test items
-                                      -> (apEffs -> result)            -- interpreter
-                                      -> Filter item                    -- item filter
+runTestNoValidation :: (TestItem item) => runConfig
+                                      -> (runConfig -> item -> apEffs) -- interactor
+                                      -> [item]                        -- test items
+                                      -> (apEffs -> result)            -- prepState -> interpreter
+                                      -> Filter item                   -- item filter
                                       -> Either FilterError [result]
-runTest runConfig interactor items interpreter filtr = (interpreter . interactor runConfig <$>) <$> filterredItems filtr items
+runTestNoValidation runConfig interactor items interpreter filtr = (interpreter . interactor runConfig <$>) <$> filterredItems filtr items
 
 
-
-runTestValidate :: (TestItem item) => (runConfig -> apState -> valState)   -- prepState
+runTest :: (TestItem item) => (runConfig -> apState -> valState)                            -- prepState
                                       -> runConfig
-                                      -> (runConfig -> item -> apEffs)        -- interactor
-                                      -> [item]                               -- test items
-                                      -> (apEffs -> apState)                  -- interpreter
-                                      -> Filter item                          -- item filter
+                                      -> (runConfig -> item -> apEffs)                              -- interactor
+                                      -> [item]                                                     -- test items
+                                      -> ((runConfig -> apState -> valState) -> apEffs -> apState)  --  prepState -> interpreter
+                                      -> Filter item                                                -- item filter
                                       -> Either FilterError [(apState, valState)]
-runTestValidate prepState runConfig interactor items interpreter filtr = let
-                                                                           toValState = validate prepState runConfig
-                                                                           valTuple apState = (apState, toValState apState)
-                                                                           apStates = runTest runConfig interactor items interpreter filtr
-                                                                         in
-                                                                            (valTuple <$>) <$> apStates
+runTest prepState runConfig interactor items interpreter filtr = let
+                                                                    toValState = validate prepState runConfig
+                                                                    valTuple apState = (apState, toValState apState)
+                                                                    apStates = runTestNoValidation runConfig interactor items (interpreter prepState) filtr
+                                                                  in
+                                                                    (valTuple <$>) <$> apStates
 
 
 

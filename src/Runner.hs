@@ -12,14 +12,19 @@ import           Runner.Internal     as InternalFuncs (Filter (..),
                                                        TestItem (..))
 
 runTest :: (TestItem item) => runConfig
-                              -> (runConfig -> a -> b)                                     -- prepState
-                              -> (runConfig -> item -> apEffs)                             -- interactor
-                              -> [item]                                                    -- test items
-                              -> ((runConfig -> a -> b) -> runConfig -> apEffs -> result)  -- interpreter
-                              -> Filter item                                               -- item filter
+                              -> (runConfig -> a -> b)           -- prepState
+                              -> (a -> b -> c)                   -- prepStateToTransformer
+                              -> (runConfig -> item -> apEffs)   -- interactor
+                              -> [item]                          -- test items
+                              -> ((a -> c) -> apEffs -> result)  -- interpreter
+                              -> Filter item                     -- item filter
                               -> Either FilterError [result]
-runTest runConfig transformApState interactor items interpreter filtr =
-    (interpreter transformApState runConfig . interactor runConfig <$>) <$> filterredItems filtr items
+runTest runConfig prepState prepstateToTransformer interactor items interpreter filtr =
+    let
+      a2c a = prepstateToTransformer a (prepState runConfig a)
+      i2rslt = interpreter a2c . interactor runConfig
+    in
+      (i2rslt <$>) <$> filterredItems filtr items
 
 
 -- runTest :: (TestItem item) => (runConfig -> apState -> valState)                            -- prepState

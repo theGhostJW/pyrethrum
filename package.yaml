@@ -76,6 +76,7 @@ default-extensions:
   - InstanceSigs
   - KindSignatures
   - LambdaCase
+  - LiberalTypeSynonyms
   - MultiParamTypeClasses
   - MultiWayIf
   - NamedFieldPuns

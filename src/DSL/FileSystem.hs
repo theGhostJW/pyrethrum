@@ -1,4 +1,4 @@
-module FileSystem where
+module DSL.FileSystem where
 
 import           Foundation.Extended
 import           Data.Functor

@@ -1,5 +1,5 @@
 
-module Ensure where
+module DSL.Ensure where
 
 import AppError
 import           Foundation.Extended

@@ -29,8 +29,8 @@ import    qualified       Foundation.Extended  as F
 import           Foundation.String
 import           Paths_pyrethrum
 import           Control.Monad.Trans.Either
-import Ensure
-import FileSystem
+import DSL.Ensure
+import DSL.FileSystem
 import AppError
 import Data.Map
 import           Control.Monad.Trans.Either.Exit (orDie)

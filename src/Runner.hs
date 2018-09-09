@@ -2,7 +2,7 @@
 module Runner (
   module InternalFuncs,
   runTest,
-  runFullTest,
+--  runFullTest,
   TestInfo(..)
 ) where
 
@@ -13,9 +13,9 @@ import           Runner.Internal     as InternalFuncs (Filter (..),
                                                        FilterError (..),
                                                        TestItem (..))
 
-runTest :: (TestItem item) =>  (a -> b -> c)                     -- prepStateToTransformer
+runTest :: (TestItem item) =>  (a -> v -> c)                     -- prepStateToTransformer
                               -> runConfig                       -- runConfig
-                              -> (runConfig -> a -> b)           -- prepState
+                              -> (runConfig -> a -> v)           -- prepState
                               -> (runConfig -> item -> apEffs)   -- interactor
                               -> [item]                          -- test items
                               -> ((a -> c) -> apEffs -> result)  -- interpreter
@@ -34,12 +34,11 @@ data TestInfo a v = TestInfo {
   valState :: v
 } deriving Show
 
-runFullTest = undefined
--- runFullTest :: (TestItem item) =>  runConfig                       -- runConfig
---                                     -> (runConfig -> a -> b)           -- prepState
---                                     -> (runConfig -> item -> apEffs)   -- interactor
---                                     -> [item]                          -- test items
---                                     -> ((a -> c) -> apEffs -> result)  -- interpreter
---                                     -> Filter item                     -- item filter
---                                     -> Either FilterError [result]
--- runFullTest =  runTest TestInfo
+runFullTest :: (TestItem item) =>  runConfig                                    -- runConfig
+                                  -> (runConfig -> a -> b)                      -- prepState
+                                  -> (runConfig -> item -> apEffs)              -- interactor
+                                  -> [item]                                     -- test items
+                                  -> ((a -> TestInfo a b) -> apEffs -> result)  -- interpreter
+                                  -> Filter item                                -- item filter
+                                  -> Either FilterError [result]
+runFullTest = runTest TestInfo

@@ -102,7 +102,7 @@ sampleRunConfig = RunConfig {
 }
 
 
-executeInIO :: (a -> b) -> Eff '[FileSystem, Ensure, Error AppError, IO] a -> IO (Either AppError b)
+executeInIO :: (a -> v) -> Eff '[FileSystem, Ensure, Error AppError, IO] a -> IO (Either AppError v)
 executeInIO func app = runM $ runError
                             $ ensureInterpreter
                             $ fileSystemIOInterpreter
@@ -121,6 +121,7 @@ demoIOAll = runTest returnValState sampleRunConfig prepState interactor sampleTe
 
 demoIOAllRepl :: IO (Either FilterError [Either AppError ValState])
 demoIOAllRepl = replShow demoIOAll
+
 
 demoIOFull :: Either FilterError [IO (Either AppError (TestInfo ApState ValState))]
 demoIOFull = runTest TestInfo sampleRunConfig prepState interactor sampleTestItems executeInIO All

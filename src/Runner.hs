@@ -2,7 +2,8 @@
 module Runner (
   module InternalFuncs,
   runTest,
-  runFullTest
+  runFullTest,
+  TestInfo(..)
 ) where
 
 import           AppError
@@ -27,4 +28,18 @@ runTest prepstateToTransformer runConfig prepState interactor items interpreter 
     in
       (i2rslt <$>) <$> filterredItems filtr items
 
+
+data TestInfo a v = TestInfo {
+  apState  :: a,
+  valState :: v
+} deriving Show
+
 runFullTest = undefined
+-- runFullTest :: (TestItem item) =>  runConfig                       -- runConfig
+--                                     -> (runConfig -> a -> b)           -- prepState
+--                                     -> (runConfig -> item -> apEffs)   -- interactor
+--                                     -> [item]                          -- test items
+--                                     -> ((a -> c) -> apEffs -> result)  -- interpreter
+--                                     -> Filter item                     -- item filter
+--                                     -> Either FilterError [result]
+-- runFullTest =  runTest TestInfo

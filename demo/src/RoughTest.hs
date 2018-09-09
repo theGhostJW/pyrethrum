@@ -122,6 +122,12 @@ demoIOAll = runTest returnValState sampleRunConfig prepState interactor sampleTe
 demoIOAllRepl :: IO (Either FilterError [Either AppError ValState])
 demoIOAllRepl = replShow demoIOAll
 
+demoIOFull :: Either FilterError [IO (Either AppError (TestInfo ApState ValState))]
+demoIOFull = runTest TestInfo sampleRunConfig prepState interactor sampleTestItems executeInIO All
+
+demoIOFullRepl :: IO (Either FilterError [Either AppError (TestInfo ApState ValState)])
+demoIOFullRepl = replShow demoIOFull
+
 dummyPrepState r a = a
 
 demoExecuteInIONoVal :: IO (Either AppError ApState)

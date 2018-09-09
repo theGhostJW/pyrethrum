@@ -144,17 +144,6 @@ demoIOAllNoValRepl = replShow demoIOAllNoVal
 
 -- demoIOAllValidate = runTest prepState sampleRunConfig interactor sampleTestItems executeInIO All
 
-fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
-fileSystemDocInterpreter =  let
-                              mockContents = "Mock File Contents"
-                            in
-                              \case
-                                ReadFile path -> tell ["readFile: " <> show path] $> Right mockContents
-                                WriteFile path str -> tell ["write file: " <>
-                                                              show path <>
-                                                              "\nContents:\n" <>
-                                                              str]
-
 executeDocumented :: (a -> b) -> Eff '[FileSystem, Ensure, Error AppError, Writer [String]] a -> (Either AppError b, [String])
 executeDocumented func app = run
                               $ runWriter

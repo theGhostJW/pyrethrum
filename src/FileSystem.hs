@@ -1,10 +1,14 @@
 module FileSystem where
 
 import           Foundation.Extended
+import           Data.Functor
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
+import           Control.Monad.Freer.Writer
 import           Control.Exception
 import AppError
+
+default (String)
 
 {- File System Lang -}
 
@@ -32,3 +36,16 @@ fileSystemIOInterpreter =
                             interpret $ \case
                                           ReadFile path -> handleException (readFileUTF8 path) ReadFileError
                                           WriteFile path str -> handleException (writeFileUTF8 path str) WriteFileError
+
+
+
+fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
+fileSystemDocInterpreter =  let
+                              mockContents = "Mock File Contents"
+                            in
+                              \case
+                                ReadFile path -> tell ["readFile: " <> show path] $> Right mockContents
+                                WriteFile path str -> tell ["write file: " <>
+                                                              show path <>
+                                                              "\nContents:\n" <>
+                                                              str]

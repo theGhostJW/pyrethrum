@@ -6,6 +6,7 @@ import           Foundation      hiding (Item)
 import qualified Prelude
 import           Runner.Internal
 import           Test.Extended
+import           TestItem
 
 data Item = Item {
   iid  :: Int,

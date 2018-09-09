@@ -4,14 +4,7 @@ module Runner.Internal where
 import qualified Data.List.Safe      as SafeList
 import           Foundation.Extended
 import qualified Prelude
-
-class TestItem a where
-  identifier :: a -> Int
-  whenClause :: a -> String
-  thenClause :: a -> String
-  whenThen :: a -> String
-  whenThen a = "When: " <> whenClause a  <> "\n" <>
-               "Then: " <> thenClause a
+import           TestItem
 
 data Filter a = IID Int |
                All |

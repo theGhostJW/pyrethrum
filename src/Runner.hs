@@ -1,6 +1,7 @@
 
 module Runner (
   module InternalFuncs,
+  module TestItem,
   runTest,
 --  runFullTest,
   TestInfo(..)
@@ -10,8 +11,8 @@ import           AppError
 import           Foundation.Extended
 import           Runner.Internal
 import           Runner.Internal     as InternalFuncs (Filter (..),
-                                                       FilterError (..),
-                                                       TestItem (..))
+                                                       FilterError (..))
+import           TestItem
 
 runTest :: (TestItem item) =>  (a -> v -> c)                     -- prepStateToTransformer
                               -> runConfig                       -- runConfig

@@ -4,16 +4,8 @@
 
 module RoughTest where
 
-
--- full run through writing file
--- change to inmemory
--- change to document
--- through exception and check for
--- make document fail eg /0 based on get
--- validation validation module ?? ~ terminal validations
--- generalis runner
-
-import Runner
+import DSL.Interpreter
+import TestItem
 import qualified Control.Monad as Monad
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Coroutine
@@ -32,6 +24,7 @@ import           Control.Monad.Trans.Either
 import DSL.Ensure
 import DSL.FileSystem
 import AppError
+import Runner
 import Data.Map
 import           Control.Monad.Trans.Either.Exit (orDie)
 import qualified Prelude
@@ -74,7 +67,7 @@ data RunConfig = RunConfig {
   path :: Path Abs File
 }
 
-interactor :: Members '[Ensure, FileSystem] effs => RunConfig -> Item -> Eff effs ApState
+interactor :: InteractorFileSystem RunConfig Item ApState
 interactor runConfig item = do
                               let fullFilePath = path (item :: Item)
                               writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"

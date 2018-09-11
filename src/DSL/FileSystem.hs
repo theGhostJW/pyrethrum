@@ -16,6 +16,11 @@ data FileSystem r where
   ReadFile :: Path a File -> FileSystem StrictReadResult
   WriteFile :: Path a File -> String -> FileSystem ()
 
+data FileSystemError =
+    ReadFileError IOException |
+    WriteFileError IOException
+    deriving Show
+
 readFile :: Member FileSystem effs => Path a File -> Eff effs StrictReadResult
 readFile = send . ReadFile
 
@@ -24,7 +29,7 @@ writeFile pth = send . WriteFile pth
 
 {- File System IO Interpreter -}
 
-fileSystemIOInterpreter :: forall effs a. (Members '[Error AppError, IO] effs) => Eff (FileSystem ': effs) a -> Eff effs a
+fileSystemIOInterpreter :: forall effs a. (Members '[Error FileSystemError, IO] effs) => Eff (FileSystem ': effs) a -> Eff effs a
 fileSystemIOInterpreter =
                           let
                             handleException action handler = do

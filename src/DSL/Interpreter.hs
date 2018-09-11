@@ -12,13 +12,16 @@ import AppError
 
 type InteractorFileSystem runConfig item r = forall effs. (Members '[Ensure, FileSystem] effs, TestItem item) => runConfig -> item -> Eff effs r
 
-executeFileSystemInIO :: (a -> v) -> Eff '[FileSystem, Ensure, Error AppError, IO] a -> IO (Either AppError v)
-executeFileSystemInIO func app = runM $ runError
-                            $ ensureInterpreter
-                            $ fileSystemIOInterpreter
-                            $ func <$> app
+executeFileSystemInIO :: (a -> v) -> Eff '[FileSystem, Ensure, Error FileSystemError, Error EnsureError, IO] a
+                                                                                          -> IO (Either EnsureError (Either FileSystemError v))
+executeFileSystemInIO func app = runM
+                                  $ runError
+                                  $ runError
+                                  $ ensureInterpreter
+                                  $ fileSystemIOInterpreter
+                                  $ func <$> app
 
-executeFileSystemDocument :: (a -> b) -> Eff '[FileSystem, Ensure, Error AppError, Writer [String]] a -> (Either AppError b, [String])
+executeFileSystemDocument :: (a -> b) -> Eff '[FileSystem, Ensure, Error EnsureError, Writer [String]] a -> (Either EnsureError b, [String])
 executeFileSystemDocument func app = run
                               $ runWriter
                               $ runError

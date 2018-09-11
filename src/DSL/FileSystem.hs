@@ -6,7 +6,6 @@ import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.Writer
 import           Control.Exception
-import AppError
 
 default (String)
 
@@ -19,7 +18,7 @@ data FileSystem r where
 data FileSystemError =
     ReadFileError IOException |
     WriteFileError IOException
-    deriving Show
+    deriving (Show, Eq)
 
 readFile :: Member FileSystem effs => Path a File -> Eff effs StrictReadResult
 readFile = send . ReadFile

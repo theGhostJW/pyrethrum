@@ -11,7 +11,7 @@ data Ensure r where
  Ensure :: Bool -> String -> Ensure ()
  Throw :: String -> Ensure ()
 
-newtype EnsureError = EnsureError String deriving Show
+newtype EnsureError = EnsureError String deriving (Show, Eq)
 
 ensure :: Member Ensure effs => Bool -> String -> Eff effs ()
 ensure condition err = send $ Ensure condition err

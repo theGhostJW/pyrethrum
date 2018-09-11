@@ -7,7 +7,6 @@ module Runner (
   TestInfo(..)
 ) where
 
-import           AppError
 import           Foundation.Extended
 import           Runner.Internal
 import           Runner.Internal     as InternalFuncs (Filter (..),

@@ -97,13 +97,16 @@ library:
   dependencies:
     - listsafe
     - time
+    - either
 
-internal-libraries:
-  demo:
-    source-dirs: .\demo\src
-    dependencies:
-      - pyrethrum
-      - time
+# comment out for now no files in it causing issues
+# on compile ?? try again on next version of stack
+# internal-libraries:
+#   demo:
+#     source-dirs: .\demo\src
+#     dependencies:
+#       - pyrethrum
+#       - time
 
 executables:
   demo-exe:

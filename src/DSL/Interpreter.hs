@@ -7,24 +7,42 @@ import           Control.Monad.Freer.Writer
 import           DSL.FileSystem
 import           DSL.Ensure
 import           Foundation.Extended
+import Data.Either.Combinators
 import TestItem
-import AppError
 
 type InteractorFileSystem runConfig item r = forall effs. (Members '[Ensure, FileSystem] effs, TestItem item) => runConfig -> item -> Eff effs r
 
-executeFileSystemInIO :: (a -> v) -> Eff '[FileSystem, Ensure, Error FileSystemError, Error EnsureError, IO] a
-                                                                                          -> IO (Either EnsureError (Either FileSystemError v))
-executeFileSystemInIO func app = runM
-                                  $ runError
-                                  $ runError
-                                  $ ensureInterpreter
-                                  $ fileSystemIOInterpreter
-                                  $ func <$> app
+data AppError =
+              AppFileSystemError FileSystemError |
+              AppEnsureError EnsureError |
+              NotImplemented String |
+              GenericError String |
+              IOError IOException
+              deriving (Show, Eq)
 
-executeFileSystemDocument :: (a -> b) -> Eff '[FileSystem, Ensure, Error EnsureError, Writer [String]] a -> (Either EnsureError b, [String])
-executeFileSystemDocument func app = run
-                              $ runWriter
-                              $ runError
-                              $ ensureInterpreter
-                              $ interpret fileSystemDocInterpreter
-                              $ func <$> app
+unifyFSEnsureError :: Either EnsureError (Either FileSystemError v) -> Either AppError v
+unifyFSEnsureError = \case
+                       Right ee -> case ee of
+                                       Right v -> Right v
+                                       Left l -> Left $ AppFileSystemError l
+                       Left enFail -> Left $ AppEnsureError enFail
+
+executeFileSystemInIO :: (a -> v) -> Eff '[FileSystem, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError v)
+executeFileSystemInIO func app = unifyFSEnsureError <$> runM
+                                  (
+                                    runError
+                                    $ runError
+                                    $ ensureInterpreter
+                                    $ fileSystemIOInterpreter
+                                    $ func <$> app
+                                  )
+
+executeFileSystemDocument :: (a -> b) -> Eff '[FileSystem, Ensure, Error EnsureError, Writer [String]] a -> (Either AppError b, [String])
+executeFileSystemDocument func app =  let (val, log) = run
+                                                      $ runWriter
+                                                      $ runError
+                                                      $ ensureInterpreter
+                                                      $ interpret fileSystemDocInterpreter
+                                                      $ func <$> app
+                                      in
+                                        (mapLeft AppEnsureError val, log)

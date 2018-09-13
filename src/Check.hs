@@ -49,8 +49,8 @@ calcChecks vs chks = let
                        snd $ foldl' foldfunc (False, []) chks
 
 
--- chk :: String -> (v -> Bool) -> (v -> Check v)
--- chk msg prd val = let
---                     msgType = prd val ? Success $ Failure
---                   in
---                     msgType
+chk :: String -> (v -> Bool) -> (v -> Check v)
+chk msg prd val = let
+                    rsltType = prd val ? Success $ Failure
+                  in
+                    Check (Brief msg) (const $ rsltType (Brief msg))

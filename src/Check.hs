@@ -74,6 +74,19 @@ escalate =
   in
     ((escalateOutcome <$>) <$> )
 
+chkm :: String -> (v -> Bool) -> (v -> String) -> DList (v -> Check v)
+chkm msg prd msgf = pure $ chkSingularm msg prd msgf
+
+chkm' :: String -> (v -> Bool) -> (v -> String) -> DList (v -> Check v)
+chkm' msg prd msgf = escalate $ pure $ chkSingularm msg prd msgf
+
+chkSingularm :: String -> (v -> Bool) -> (v -> String) -> v -> Check v
+chkSingularm hdr prd msgf val = let
+                            rsltType = prd val ? Pass $ Fail
+                            msg = MessageInfo (msgf val) Nothing
+                          in
+                            Check (const rsltType) $ const $ Info hdr $ Just msg
+
 chk :: String -> (v -> Bool) -> DList (v -> Check v)
 chk msg prd = pure $ chkSingular msg prd
 

@@ -74,22 +74,22 @@ escalate =
   in
     ((escalateOutcome <$>) <$> )
 
-chkm :: String -> (v -> Bool) -> (v -> String) -> DList (v -> Check v)
-chkm msg prd msgf = pure $ chkSingularm msg prd msgf
+-- generate a check from a predicate
+prdCheck :: Truthy b => (v -> b) -> v -> (v -> CheckInfo) -> Check v
+prdCheck prd val = Check (const $ prd val ? Pass $ Fail)
 
-chkm' :: String -> (v -> Bool) -> (v -> String) -> DList (v -> Check v)
-chkm' msg prd msgf = escalate $ pure $ chkSingularm msg prd msgf
-
-prdRslt prd val = const $ prd val ? Pass $ Fail
-
-chkSingularm :: String -> (v -> Bool) -> (v -> String) -> v -> Check v
-chkSingularm hdr prd msgf val = Check (prdRslt prd val) $ const $ Info hdr $ Just $ MessageInfo (msgf val) Nothing
+chkmPriv :: String -> (v -> Bool) -> (v -> Maybe MessageInfo) -> DList (v -> Check v)
+chkmPriv hdr prd msgf = pure
+                      $ \v -> prdCheck prd v $ const $ Info hdr $ msgf v
 
 chk :: String -> (v -> Bool) -> DList (v -> Check v)
-chk msg prd = pure $ chkSingular msg prd
+chk hdr prd = chkmPriv hdr prd $ const Nothing
 
 chk' :: String -> (v -> Bool) -> DList (v -> Check v)
 chk' msg prd = escalate $ chk msg prd
 
-chkSingular :: String -> (v -> Bool) -> v -> Check v
-chkSingular msg prd val = Check (prdRslt prd val) $ const $ Info msg Nothing
+chkm :: String -> (v -> Bool) -> (v -> String) -> DList (v -> Check v)
+chkm hdr prd msgf = chkmPriv hdr prd $ \v -> Just $ MessageInfo (msgf v) Nothing
+
+chkm' :: String -> (v -> Bool) -> (v -> String) -> DList (v -> Check v)
+chkm' hdr prd msgf = escalate $ chkm hdr prd msgf

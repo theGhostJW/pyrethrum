@@ -20,7 +20,9 @@ isOdd' = chk' "Odd" P.odd
 isOdd = chk "Odd" P.odd
 
 isOddm' = chkm' "Odd Test" P.odd $ \v -> "The value was: " <> show v <> " and is expectedf to be odd"
-isOddm = chkm "Odd Test" P.odd $ \v -> "The value was: " <> show v <> " and is expectedf to be odd"
+isOddm = chkm "Odd Test"
+               P.odd $
+               \v -> "The value was: " <> show v <> " and is expectedf to be odd"
 
 tryMe = outcome <$> calcChecks 42 (isOdd' <> isBig <> isEven)
 
@@ -36,7 +38,7 @@ unit_chkOutcomes_inlined = chkOutcomes [Pass, Exception, Skip] 42 $ chk "More th
                                                                     chk' "Odd" P.odd <>
                                                                     chk "Even" P.even
 
-unit_chkWithChkm' = chkOutcomes [Pass, Pass, Exception, Skip, Skip]   42  $ isBig
+unit_chkWithChkm' = chkOutcomes [Pass, Pass, Exception, Skip, Skip]   42 $ isBig
                                                                          <> isEven
                                                                          <> isOddm'
                                                                          <> isOdd
@@ -48,8 +50,8 @@ unit_chkWithChkm = chkOutcomes [Pass, Pass, Fail, Fail, Pass] 42  $ isBig
                                                                   <> isOdd
                                                                   <> isEven
 
-_inspect = calcChecks 42  $ isBig
-                          <> isEven
-                          <> isOddm
-                          <> isOdd
-                          <> isEven
+_checkmDemo = calcChecks 42  $ isBig
+                         <> isEven
+                         <> isOddm
+                         <> isOdd
+                         <> isEven

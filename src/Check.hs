@@ -1,7 +1,8 @@
 
 module Check where
 
-import           Foundation.Extended
+import           Foundation.Extended hiding ((.))
+import           Foundation.List.DList
 import Data.Function
 
 data MessageInfo = MessageInfo {
@@ -16,10 +17,10 @@ data CheckInfo = Info {
                    }
                    deriving (Show, Eq)
 
-data CheckOutcome = Success |
-                    Failure |
+data CheckOutcome = Pass |
+                    Fail |
                     Exception |
-                    Skipped
+                    Skip
                     deriving (Show, Eq)
 
 data CheckResult = CheckResult {
@@ -42,26 +43,40 @@ isExcption = \case
                _ -> False
 
 forceSkipped :: v -> Check v -> CheckResult
-forceSkipped v (Check rule info) = applyCheck v (Check (const Skipped) info)
+forceSkipped v (Check rule info) = applyCheck v (Check (const Skip) info)
 
-calcChecks :: forall v. v -> [v -> Check v] -> [CheckResult]
+calcChecks :: forall v. v -> DList (v -> Check v )-> DList CheckResult
 calcChecks vs chks = let
                       chkLst = (vs &) <$> chks
 
                       iResult :: forall a. (Bool, a) -> Check v ->  CheckResult
                       iResult (excpt, _) = (excpt ? forceSkipped $ applyCheck) vs
 
-                      foldfunc :: (Bool, [CheckResult]) -> Check v ->  (Bool, [CheckResult])
+                      foldfunc :: (Bool, DList CheckResult) -> Check v -> (Bool, DList CheckResult)
                       foldfunc tpl@(hasEx, lstCr) ck = let
                                                           thisChkR = iResult tpl ck
                                                         in
-                                                          (hasEx || isExcption (outcome thisChkR), thisChkR : lstCr)
+                                                          (hasEx || isExcption (outcome thisChkR), cons thisChkR lstCr)
                       in
-                       snd $ foldl' foldfunc (False, []) chkLst
+                       reverse $ snd $ foldl' foldfunc (False, mempty) chkLst
 
+escalate :: Check v -> Check v
+escalate (Check rulef infof) =
+  let
+    escOutcome o = case o of
+                     Fail -> Exception
+                     _ -> o
+   in
+    Check (escOutcome . rulef) infof
 
-chk :: String -> (v -> Bool) -> (v -> Check v)
-chk msg prd val = let
-                    rsltType = prd val ? Success $ Failure
-                  in
-                    Check (const rsltType) $ const $ Info msg Nothing
+chk :: String -> (v -> Bool) -> DList (v -> Check v)
+chk msg prd = pure $ chkSingular msg prd
+
+chk' :: String -> (v -> Bool) -> DList (v -> Check v)
+chk' msg prd = (escalate <$>) <$> chk msg prd
+
+chkSingular :: String -> (v -> Bool) -> v -> Check v
+chkSingular msg prd val = let
+                            rsltType = prd val ? Pass $ Fail
+                          in
+                            Check (const rsltType) $ const $ Info msg Nothing

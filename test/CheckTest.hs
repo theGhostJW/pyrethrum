@@ -2,7 +2,7 @@ module CheckTest where
 
 import           Check               as Chk
 import           Foundation.Extended
-import qualified Prelude
+import qualified Prelude             as P
 import qualified Test.Extended       as UT
 
 
@@ -14,8 +14,23 @@ import qualified Test.Extended       as UT
 --     xs <- forAll $ list (linear 0 100) alpha
 --     reverse (reverse xs) === xs
 
-chkBig = chk "Sh" (> 10)
-chkEven = chk "Sh" (\a -> a `mod` 2 == 0)
+isBig = chk "More than 10" (> 10)
+isEven = chk "Even" P.even
+isOdd' = chk' "Odd" P.odd
+isOdd = chk "Odd" P.odd
 
+tryMe = outcome <$> calcChecks 42 (isOdd' <> isBig <> isEven)
 
-tryMe = calcChecks 42 [chkBig, chkEven]
+chkOutcomes expected val checks = UT.chkEq (fromList expected) $ outcome <$> calcChecks val checks
+
+unit_chkOutcomes_full_success = chkOutcomes [Pass, Pass] 42 (isBig <> isEven)
+unit_chkOutcomes_fail_and_success = chkOutcomes [Fail, Pass, Pass] 42 (isOdd <> isBig <> isEven)
+unit_chkOutcomes_fail_and_success2 = chkOutcomes [Pass, Pass, Fail] 42 (isBig <> isEven <> isOdd)
+
+unit_chkOutcomes_exception_and_skip_and_success2 = chkOutcomes [Pass, Exception, Skip] 42 (isBig <> isOdd' <> isEven)
+
+unit_chkOutcomes_inlined = chkOutcomes [Pass, Exception, Skip] 42 (
+                                                                    chk "More than 10" (> 10)  <>
+                                                                    chk' "Odd" P.odd <>
+                                                                    chk "Even" P.even
+                                                                  )

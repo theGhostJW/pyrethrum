@@ -60,17 +60,19 @@ calcChecks vs chks = let
                       in
                        reverse $ snd $ foldl' foldfunc (False, mempty) chkLst
 
-escalateOutcome :: Check v -> Check v
-escalateOutcome (Check rulef infof) =
-  let
-    escOutcome o = case o of
-                     Fail -> Exception
-                     _ -> o
-   in
-    Check (escOutcome . rulef) infof
-
 escalate :: (Functor f, Functor g) => f (g (Check v)) -> f (g (Check v))
-escalate = ((escalateOutcome <$>) <$> )
+escalate =
+  let
+    escalateOutcome :: Check v -> Check v
+    escalateOutcome (Check rulef infof) =
+      let
+        escOutcome o = case o of
+                         Fail -> Exception
+                         _ -> o
+       in
+        Check (escOutcome . rulef) infof
+  in
+    ((escalateOutcome <$>) <$> )
 
 chk :: String -> (v -> Bool) -> DList (v -> Check v)
 chk msg prd = pure $ chkSingular msg prd

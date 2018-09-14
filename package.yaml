@@ -134,4 +134,3 @@ tests:
       - tasty-hedgehog
       - tasty-discover
       - hedgehog
-      - demo

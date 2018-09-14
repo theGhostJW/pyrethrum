@@ -1,18 +1,21 @@
 module CheckTest where
 
-import           Check
+import           Check               as Chk
 import           Foundation.Extended
 import qualified Prelude
-import           Test.Extended
+import qualified Test.Extended       as UT
 
-{-
-unit_bool_ternary_true = chk $ (1 < 2) ? True $ False
 
-prop_reverse :: Property
-prop_reverse =
-  property $ do
-    xs <- forAll $ list (linear 0 100) alpha
-    reverse (reverse xs) === xs
--}
+-- unit_bool_ternary_true = chk $ (1 < 2) ? True $ False
 
-valState = 42
+-- uprop_reverse :: Property
+-- uprop_reverse =
+--   property $ do
+--     xs <- forAll $ list (linear 0 100) alpha
+--     reverse (reverse xs) === xs
+
+chkBig = chk "Sh" (> 10)
+chkEven = chk "Sh" (\a -> a `mod` 2 == 0)
+
+
+tryMe = calcChecks 42 [chkBig, chkEven]

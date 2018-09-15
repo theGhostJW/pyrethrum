@@ -31,15 +31,16 @@ data CheckResult = CheckResult {
   deriving (Show, Eq)
 
 data Check v = Check {
+    header :: String,
     rule :: v -> CheckOutcome,
-    infoFunc :: v -> CheckInfo
+    msgFunc :: v -> Maybe MessageInfo
   }
 
 instance P.Show (v -> Check v) where
   show = undefined
 
-applyCheck :: v -> Check v -> CheckResult
-applyCheck v ck = CheckResult (rule ck v) (infoFunc ck v)
+applyCheck :: forall v. v -> Check v -> CheckResult
+applyCheck v ck = CheckResult (rule ck v) $ Info (header (ck :: Check v)) (msgFunc ck v)
 
 isExcption :: CheckOutcome -> Bool
 isExcption = \case
@@ -47,7 +48,8 @@ isExcption = \case
                _ -> False
 
 forceSkipped :: v -> Check v -> CheckResult
-forceSkipped v (Check rule info) = applyCheck v (Check (const Skip) info)
+forceSkipped v ck = applyCheck v $ ck {rule = const Skip}
+
 
 calcChecks :: forall v. v -> DList (v -> Check v )-> DList CheckResult
 calcChecks vs chks = let
@@ -68,23 +70,22 @@ escalate :: (Functor f, Functor g) => f (g (Check v)) -> f (g (Check v))
 escalate =
   let
     escalateOutcome :: Check v -> Check v
-    escalateOutcome (Check rulef infof) =
+    escalateOutcome ck  =
       let
         escOutcome o = case o of
                          Fail -> Exception
                          _ -> o
        in
-        Check (escOutcome . rulef) infof
+         ck {rule = escOutcome . rule ck}
   in
     ((escalateOutcome <$>) <$> )
 
 -- generate a check from a predicate
-prdCheck :: Truthy b => (v -> b) -> v -> (v -> CheckInfo) -> Check v
-prdCheck prd val = Check (const $ prd val ? Pass $ Fail)
+prdCheck :: Truthy b =>  (v -> b) -> String -> v -> (v -> Maybe MessageInfo) -> Check v
+prdCheck prd hdr val = Check hdr (const $ prd val ? Pass $ Fail)
 
 chkmPriv :: String -> (v -> Bool) -> (v -> Maybe MessageInfo) -> DList (v -> Check v)
-chkmPriv hdr prd msgf = pure
-                      $ \v -> prdCheck prd v $ const $ Info hdr $ msgf v
+chkmPriv hdr prd msgf = pure $ \v -> prdCheck prd hdr v msgf
 
 chk :: String -> (v -> Bool) -> DList (v -> Check v)
 chk hdr prd = chkmPriv hdr prd $ const Nothing

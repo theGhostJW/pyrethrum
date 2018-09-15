@@ -68,7 +68,7 @@ data RunConfig = RunConfig {
   environment :: String,
   depth       :: Integer,
   path        :: Path Abs File
-}
+} deriving Show
 
 interactor :: InteractorFileSystem RunConfig Item ApState
 interactor runConfig item = do
@@ -101,12 +101,12 @@ sampleRunConfig = RunConfig {
 replShow d = Prelude.sequenceA $ Prelude.sequenceA <$> d
 
 demoExecuteFileSystemInIO :: IO (Either AppError ValState)
-demoExecuteFileSystemInIO = undefined -- executeFileSystemInIO (prepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
+demoExecuteFileSystemInIO = executeFileSystemInIO (prepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
 
 returnValState apState valState = valState
 
 demoIOAll :: Either FilterError [IO (Either AppError ValState)]
-demoIOAll = undefined -- runTest returnValState sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
+demoIOAll = runTest returnValState sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
 
 demoIOAllRepl :: IO (Either FilterError [Either AppError ValState])
 demoIOAllRepl = replShow demoIOAll
@@ -160,10 +160,10 @@ instance TestItem Item ValState where
 i = Item
 
 sampleTestItems = [
-                    i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-                    i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-                    i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
-                    i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-                    i 140 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-                    i 150 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty
+                    i 100 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+                    i 110 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+                    i 120 "Pre"  "Post" [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
+                    i 130 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+                    i 140 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+                    i 150 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty
                   ];

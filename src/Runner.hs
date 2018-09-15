@@ -7,6 +7,7 @@ module Runner (
   TestInfo(..)
 ) where
 
+import Check
 import           Foundation.Extended
 import           Runner.Internal
 import           Runner.Internal     as InternalFuncs (Filter (..),

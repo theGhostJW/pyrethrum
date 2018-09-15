@@ -13,14 +13,14 @@ import           Runner.Internal     as InternalFuncs (Filter (..),
                                                        FilterError (..))
 import           TestItem
 
-runTest :: (TestItem item) =>  (a -> v -> c)                     -- prepStateToTransformer
-                              -> runConfig                       -- runConfig
-                              -> (runConfig -> a -> v)           -- prepState
-                              -> (runConfig -> item -> apEffs)   -- interactor
-                              -> [item]                          -- test items
-                              -> ((a -> c) -> apEffs -> result)  -- interpreter
-                              -> Filter item                     -- item filter
-                              -> Either FilterError [result]
+runTest :: (TestItem item valState) =>  (a -> v -> c)                     -- prepStateToTransformer
+                                        -> runConfig                       -- runConfig
+                                        -> (runConfig -> a -> v)           -- prepState
+                                        -> (runConfig -> item -> apEffs)   -- interactor
+                                        -> [item]                          -- test items
+                                        -> ((a -> c) -> apEffs -> result)  -- interpreter
+                                        -> Filter item                     -- item filter
+                                        -> Either FilterError [result]
 runTest prepstateToTransformer runConfig prepState interactor items interpreter filtr =
     let
       a2c a = prepstateToTransformer a (prepState runConfig a)
@@ -34,11 +34,11 @@ data TestInfo a v = TestInfo {
   valState :: v
 } deriving Show
 
-runFullTest :: (TestItem item) =>  runConfig                                    -- runConfig
-                                  -> (runConfig -> a -> b)                      -- prepState
-                                  -> (runConfig -> item -> apEffs)              -- interactor
-                                  -> [item]                                     -- test items
-                                  -> ((a -> TestInfo a b) -> apEffs -> result)  -- interpreter
-                                  -> Filter item                                -- item filter
-                                  -> Either FilterError [result]
+runFullTest :: (TestItem item valState) =>  runConfig                                    -- runConfig
+                                          -> (runConfig -> a -> b)                      -- prepState
+                                          -> (runConfig -> item -> apEffs)              -- interactor
+                                          -> [item]                                     -- test items
+                                          -> ((a -> TestInfo a b) -> apEffs -> result)  -- interpreter
+                                          -> Filter item                                -- item filter
+                                          -> Either FilterError [result]
 runFullTest = runTest TestInfo

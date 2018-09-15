@@ -55,7 +55,7 @@ data Item = Item {
                     pre    :: String,
                     post   :: String,
                     path   :: Path Abs File,
-                    checks :: DList (ValState -> Check ValState)
+                    checks :: DList (Check ValState)
                   } deriving Show
 
 --type ValState = ApState
@@ -87,7 +87,8 @@ sampleItem =  Item {
   iid = 500,
   pre = "I do a test",
   post = "the test runs",
-  path = [absfile|C:\Vids\SystemDesign\VidList.txt|]
+  path = [absfile|C:\Vids\SystemDesign\VidList.txt|],
+  checks = mempty
 }
 
 sampleRunConfig = RunConfig {
@@ -109,7 +110,6 @@ demoIOAll = undefined -- runTest returnValState sampleRunConfig prepState intera
 
 demoIOAllRepl :: IO (Either FilterError [Either AppError ValState])
 demoIOAllRepl = replShow demoIOAll
-
 
 demoIOFull :: Either FilterError [IO (Either AppError (TestInfo ApState ValState))]
 demoIOFull = runTest TestInfo sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
@@ -145,10 +145,12 @@ demoDocumentNoVal = executeFileSystemDocument (dummyPrepState sampleRunConfig) (
 demoDocumentedAllNoVal :: Either FilterError [(Either AppError ApState, [String])]
 demoDocumentedAllNoVal = runTest returnApState sampleRunConfig prepState interactor sampleTestItems executeFileSystemDocument All
 
-instance TestItem Item where
+
+instance TestItem Item ValState where
   identifier = iid
   whenClause = pre
   thenClause = post
+  validation = checks
 
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -156,11 +158,12 @@ instance TestItem Item where
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 i = Item
+
 sampleTestItems = [
-                    i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|],
-                    i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i 140 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|],
-                    i 150 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|]
+                    i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+                    i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+                    i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
+                    i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+                    i 140 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+                    i 150 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty
                   ];

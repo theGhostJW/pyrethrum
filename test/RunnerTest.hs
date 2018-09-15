@@ -14,10 +14,11 @@ data Item = Item {
   post :: String
 } deriving (Eq, Show)
 
-instance TestItem Item where
+instance TestItem Item Item where
   identifier = iid
   whenClause = pre
   thenClause = post
+  validation = mempty
 
 i = Item
 

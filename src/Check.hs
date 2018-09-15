@@ -36,8 +36,8 @@ data Check v = Check {
     msgFunc :: v -> Maybe MessageInfo
   }
 
-instance P.Show (v -> Check v) where
-  show = undefined
+instance P.Show (Check v) where
+  show = fromStr . (header :: Check v  -> String)
 
 applyCheck :: forall v. v -> Check v -> CheckResult
 applyCheck v ck = CheckResult (rule ck v) $ Info (header (ck :: Check v)) (msgFunc ck v)
@@ -51,22 +51,20 @@ forceSkipped :: v -> Check v -> CheckResult
 forceSkipped v ck = applyCheck v $ ck {rule = const Skip}
 
 
-calcChecks :: forall v. v -> DList (v -> Check v )-> DList CheckResult
-calcChecks vs chks = let
-                      chkLst = (vs &) <$> chks
+calcChecks :: forall v. v -> DList (Check v) -> DList CheckResult
+calcChecks vs chkLst = let
+                        iResult :: forall a. (Bool, a) -> Check v ->  CheckResult
+                        iResult (excpt, _) = (excpt ? forceSkipped $ applyCheck) vs
 
-                      iResult :: forall a. (Bool, a) -> Check v ->  CheckResult
-                      iResult (excpt, _) = (excpt ? forceSkipped $ applyCheck) vs
+                        foldfunc :: (Bool, DList CheckResult) -> Check v -> (Bool, DList CheckResult)
+                        foldfunc tpl@(hasEx, lstCr) ck = let
+                                                            thisChkR = iResult tpl ck
+                                                          in
+                                                            (hasEx || isExcption (outcome thisChkR), cons thisChkR lstCr)
+                        in
+                         reverse $ snd $ foldl' foldfunc (False, mempty) chkLst
 
-                      foldfunc :: (Bool, DList CheckResult) -> Check v -> (Bool, DList CheckResult)
-                      foldfunc tpl@(hasEx, lstCr) ck = let
-                                                          thisChkR = iResult tpl ck
-                                                        in
-                                                          (hasEx || isExcption (outcome thisChkR), cons thisChkR lstCr)
-                      in
-                       reverse $ snd $ foldl' foldfunc (False, mempty) chkLst
-
-escalate :: (Functor f, Functor g) => f (g (Check v)) -> f (g (Check v))
+escalate :: Functor f => f (Check v) -> f (Check v)
 escalate =
   let
     escalateOutcome :: Check v -> Check v
@@ -78,23 +76,23 @@ escalate =
        in
          ck {rule = escOutcome . rule ck}
   in
-    ((escalateOutcome <$>) <$> )
+    (escalateOutcome <$>)
 
 -- generate a check from a predicate
-prdCheck :: Truthy b =>  (v -> b) -> String -> v -> (v -> Maybe MessageInfo) -> Check v
-prdCheck prd hdr val = Check hdr (const $ prd val ? Pass $ Fail)
+prdCheck :: Truthy b =>  (v -> b) -> String -> (v -> Maybe MessageInfo) -> Check v
+prdCheck prd hdr = Check hdr (\v -> prd v ? Pass $ Fail)
 
-chkmPriv :: String -> (v -> Bool) -> (v -> Maybe MessageInfo) -> DList (v -> Check v)
-chkmPriv hdr prd msgf = pure $ \v -> prdCheck prd hdr v msgf
+chkmPriv :: String -> (v -> Bool) -> (v -> Maybe MessageInfo) -> DList (Check v)
+chkmPriv hdr prd msgf = pure $ prdCheck prd hdr msgf
 
-chk :: String -> (v -> Bool) -> DList (v -> Check v)
+chk :: String -> (v -> Bool) -> DList (Check v)
 chk hdr prd = chkmPriv hdr prd $ const Nothing
 
-chk' :: String -> (v -> Bool) -> DList (v -> Check v)
+chk' :: String -> (v -> Bool) -> DList (Check v)
 chk' msg prd = escalate $ chk msg prd
 
-chkm :: String -> (v -> Bool) -> (v -> String) -> DList (v -> Check v)
+chkm :: String -> (v -> Bool) -> (v -> String) -> DList (Check v)
 chkm hdr prd msgf = chkmPriv hdr prd $ \v -> Just $ MessageInfo (msgf v) Nothing
 
-chkm' :: String -> (v -> Bool) -> (v -> String) -> DList (v -> Check v)
+chkm' :: String -> (v -> Bool) -> (v -> String) -> DList (Check v)
 chkm' hdr prd msgf = escalate $ chkm hdr prd msgf

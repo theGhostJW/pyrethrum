@@ -26,7 +26,7 @@ data FilterError = InvalidItemFilter String  |
 
 
 
-filterredItems :: (TestItem item) => Filter item -> [item] -> Either FilterError [item]
+filterredItems :: (TestItem item valState) => Filter item -> [item] -> Either FilterError [item]
 filterredItems filtr items = let
                               listOrFail lst msg = null lst
                                                           ? Left (InvalidItemFilter msg)

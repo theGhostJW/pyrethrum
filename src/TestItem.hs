@@ -5,11 +5,11 @@ import           Foundation.Extended
 import           Foundation.List.DList
 
 
-class TestItem a where
+class TestItem a v | a -> v where
   identifier :: a -> Int
   whenClause :: a -> String
   thenClause :: a -> String
   whenThen :: a -> String
   whenThen a = "When: " <> whenClause a  <> "\n" <>
                "Then: " <> thenClause a
-  checks :: a -> DList (v -> Check v)
+  validation :: a -> DList (Check v)

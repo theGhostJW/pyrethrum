@@ -4,6 +4,7 @@ module Check where
 import           Foundation.Extended hiding ((.))
 import           Foundation.List.DList
 import Data.Function
+import qualified Prelude as P
 
 data MessageInfo = MessageInfo {
                                   message :: String,
@@ -33,6 +34,9 @@ data Check v = Check {
     rule :: v -> CheckOutcome,
     infoFunc :: v -> CheckInfo
   }
+
+instance P.Show (v -> Check v) where
+  show = undefined
 
 applyCheck :: v -> Check v -> CheckResult
 applyCheck v ck = CheckResult (rule ck v) (infoFunc ck v)

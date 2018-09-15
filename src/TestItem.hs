@@ -1,6 +1,8 @@
 module TestItem where
 
+import           Check
 import           Foundation.Extended
+import           Foundation.List.DList
 
 
 class TestItem a where
@@ -10,3 +12,4 @@ class TestItem a where
   whenThen :: a -> String
   whenThen a = "When: " <> whenClause a  <> "\n" <>
                "Then: " <> thenClause a
+  checks :: a -> DList (v -> Check v)

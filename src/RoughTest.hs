@@ -4,6 +4,7 @@
 
 module RoughTest where
 
+import           Check
 import           Control.Exception
 import qualified Control.Monad                   as Monad
 import           Control.Monad.Freer
@@ -24,6 +25,7 @@ import           DSL.Interpreter
 import           Foundation.Extended             hiding (Item, fail, putStrLn,
                                                   readFile, writeFile)
 import qualified Foundation.Extended             as F
+import           Foundation.List.DList
 import           Foundation.String
 import           Paths_pyrethrum
 import qualified Prelude
@@ -49,10 +51,11 @@ data ApState = ApState {
   deriving Show
 
 data Item = Item {
-                    iid  :: Int,
-                    pre  :: String,
-                    post :: String,
-                    path :: Path Abs File
+                    iid    :: Int,
+                    pre    :: String,
+                    post   :: String,
+                    path   :: Path Abs File,
+                    checks :: DList (ValState -> Check ValState)
                   } deriving Show
 
 --type ValState = ApState

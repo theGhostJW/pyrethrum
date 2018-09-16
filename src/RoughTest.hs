@@ -100,21 +100,24 @@ sampleRunConfig = RunConfig {
 -- Demos
 replShow d = Prelude.sequenceA $ Prelude.sequenceA <$> d
 
-demoExecuteFileSystemInIO :: IO (Either AppError ValState)
-demoExecuteFileSystemInIO = executeFileSystemInIO (prepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
+demoExecuteFileSystemInIO :: IO (Either AppError ApState)
+demoExecuteFileSystemInIO = executeFileSystemInIO (interactor sampleRunConfig sampleItem)
 
 returnValState apState valState = valState
 
-demoIOAll :: Either FilterError [IO (Either AppError ValState)]
-demoIOAll = runTest returnValState sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
+This Does NOT Work Because We don't Know the Shape tof the Interactor Result ROLL BACK !!!
+--emoIOAll :: Either FilterError [IO (Either AppError (Item, ApState, ValState, ResultList))]
+demoIOAll = runTest prepState sampleRunConfig interactor executeFileSystemInIO sampleTestItems All
+{-
+-- runTest prepState runConfig interactor interpreter items filtr
 
 demoIOAllRepl :: IO (Either FilterError [Either AppError ValState])
 demoIOAllRepl = replShow demoIOAll
 
-demoIOFull :: Either FilterError [IO (Either AppError (TestInfo ApState ValState))]
-demoIOFull = runTest TestInfo sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
+--demoIOFull :: Either FilterError [IO (Either AppError (TestInfo ApState ValState))]
+demoIOFull = runTest sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
 
-demoIOFullRepl :: IO (Either FilterError [Either AppError (TestInfo ApState ValState)])
+--demoIOFullRepl :: IO (Either FilterError [Either AppError (TestInfo ApState ValState)])
 demoIOFullRepl = replShow demoIOFull
 
 dummyPrepState r a = a
@@ -145,6 +148,7 @@ demoDocumentNoVal = executeFileSystemDocument (dummyPrepState sampleRunConfig) (
 demoDocumentedAllNoVal :: Either FilterError [(Either AppError ApState, [String])]
 demoDocumentedAllNoVal = runTest returnApState sampleRunConfig prepState interactor sampleTestItems executeFileSystemDocument All
 
+-}
 
 instance TestItem Item ValState where
   identifier = iid
@@ -159,6 +163,7 @@ instance TestItem Item ValState where
 
 i = Item
 
+sampleTestItems :: [Item]
 sampleTestItems = [
                     i 100 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
                     i 110 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,

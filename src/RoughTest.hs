@@ -112,7 +112,7 @@ demoIOAllToValStateRepl :: IO (Either FilterError [Either AppError ValState])
 demoIOAllToValStateRepl = replShow demoIOToValState
 
 demoIOFull :: Either FilterError [IO (Either AppError (TestInfo Item ApState ValState))]
-demoIOFull = runTest TestInfo sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
+demoIOFull = runFullTest sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
 
 demoIOFullRepl :: IO (Either FilterError [Either AppError (TestInfo Item ApState ValState)])
 demoIOFullRepl = replShow demoIOFull
@@ -158,7 +158,9 @@ instance TestItem Item ValState where
 i = Item
 
 sampleTestItems = [
-                    i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+                    i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] $
+                                                                                      chk "iid is small" (\vs -> iidPlus10 vs < 200 ) <>
+                                                                                      chk "iid is big"  (\vs -> iidPlus10 vs > 500) ,
                     i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
                     i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
                     i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,

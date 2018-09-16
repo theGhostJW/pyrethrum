@@ -6,6 +6,8 @@ import           Foundation.List.DList
 import Data.Function
 import qualified Prelude as P
 
+type CheckResultList = DList CheckResult
+
 data MessageInfo = MessageInfo {
                                   message :: String,
                                   additionalInfo :: Maybe String

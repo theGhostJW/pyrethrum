@@ -28,7 +28,7 @@ runTest prepstateToTransformer runConfig prepState interactor items interpreter 
     in
       (i2rslt <$>) <$> filterredItems filtr items
 
-
+-- trivial
 data TestInfo a v = TestInfo {
   apState  :: a,
   valState :: v

@@ -33,7 +33,7 @@ ghc-options:
   - -ferror-spans
   - -O2
   - -Wall
-  - -Werror
+  #- -Werror
   - -fprint-potential-instances
   - -Wcompat
   - -Wincomplete-record-updates

@@ -78,8 +78,8 @@ interactor runConfig item = do
                               txt <- readFile fullFilePath
                               pure $ ApState (iid item) fullFilePath txt
 
-prepState :: RunConfig -> ApState -> ValState
-prepState r a = ValState $ 10 * itemId a
+prepState :: ApState -> ValState
+prepState a = ValState $ 10 * itemId a
 
 {- Application IO Interpreter -}
 
@@ -103,18 +103,18 @@ replShow d = Prelude.sequenceA $ Prelude.sequenceA <$> d
 demoExecuteFileSystemInIO :: IO (Either AppError ValState)
 demoExecuteFileSystemInIO = undefined -- executeFileSystemInIO (prepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
 
-returnValState apState valState = valState
+returnValState item apState valState = valState
 
-demoIOAll :: Either FilterError [IO (Either AppError ValState)]
-demoIOAll = undefined -- runTest returnValState sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
+demoIOToValState :: Either FilterError [IO (Either AppError ValState)]
+demoIOToValState = runTest returnValState sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
 
-demoIOAllRepl :: IO (Either FilterError [Either AppError ValState])
-demoIOAllRepl = replShow demoIOAll
+demoIOAllToValStateRepl :: IO (Either FilterError [Either AppError ValState])
+demoIOAllToValStateRepl = replShow demoIOToValState
 
-demoIOFull :: Either FilterError [IO (Either AppError (TestInfo ApState ValState))]
+demoIOFull :: Either FilterError [IO (Either AppError (TestInfo Item ApState ValState))]
 demoIOFull = runTest TestInfo sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
 
-demoIOFullRepl :: IO (Either FilterError [Either AppError (TestInfo ApState ValState)])
+demoIOFullRepl :: IO (Either FilterError [Either AppError (TestInfo Item ApState ValState)])
 demoIOFullRepl = replShow demoIOFull
 
 dummyPrepState r a = a
@@ -122,26 +122,24 @@ dummyPrepState r a = a
 demoExecuteFileSystemInIONoVal :: IO (Either AppError ApState)
 demoExecuteFileSystemInIONoVal = executeFileSystemInIO (dummyPrepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
 
-returnApState apState valState = apState
+returnApState item apState valState = apState
 
 demoIOAllNoVal:: Either FilterError [IO (Either AppError ApState)]
 demoIOAllNoVal = runTest returnApState sampleRunConfig prepState interactor sampleTestItems executeFileSystemInIO All
 
-demoIOAllNoValRepl ::  IO (Either FilterError [Either AppError ApState])
+demoIOAllNoValRepl :: IO (Either FilterError [Either AppError ApState])
 demoIOAllNoValRepl = replShow demoIOAllNoVal
 
--- demoIOAllValidate = runTest prepState sampleRunConfig interactor sampleTestItems executeFileSystemInIO All
-
--- Demos
+-- -- Demos
 demoDocument :: (Either AppError ValState, [String])
-demoDocument = executeFileSystemDocument (prepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
-
+demoDocument = executeFileSystemDocument prepState $ interactor sampleRunConfig sampleItem
+--
 demoDocumentedAll :: Either FilterError [(Either AppError ValState, [String])]
 demoDocumentedAll = runTest returnValState sampleRunConfig prepState interactor sampleTestItems executeFileSystemDocument  All
-
+--
 demoDocumentNoVal :: (Either AppError ApState, [String])
 demoDocumentNoVal = executeFileSystemDocument (dummyPrepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
-
+--
 demoDocumentedAllNoVal :: Either FilterError [(Either AppError ApState, [String])]
 demoDocumentedAllNoVal = runTest returnApState sampleRunConfig prepState interactor sampleTestItems executeFileSystemDocument All
 

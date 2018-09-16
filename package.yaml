@@ -81,6 +81,7 @@ default-extensions:
   - MultiWayIf
   - NamedFieldPuns
   - OverloadedStrings
+  - OverloadedLists 
   - PartialTypeSignatures
   - PatternSynonyms
   - RankNTypes

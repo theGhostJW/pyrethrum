@@ -28,22 +28,22 @@ unifyFSEnsureError = \case
                                        Left l -> Left $ AppFileSystemError l
                        Left enFail -> Left $ AppEnsureError enFail
 
-executeFileSystemInIO :: (a -> v) -> Eff '[FileSystem, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError v)
-executeFileSystemInIO func app = unifyFSEnsureError <$> runM
+executeFileSystemInIO :: Eff '[FileSystem, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError a)
+executeFileSystemInIO app = unifyFSEnsureError <$> runM
                                   (
                                     runError
                                     $ runError
                                     $ ensureInterpreter
                                     $ fileSystemIOInterpreter
-                                    $ func <$> app
+                                    app
                                   )
 
-executeFileSystemDocument :: (a -> b) -> Eff '[FileSystem, Ensure, Error EnsureError, Writer [String]] a -> (Either AppError b, [String])
-executeFileSystemDocument func app =  let (val, log) = run
+executeFileSystemDocument :: Eff '[FileSystem, Ensure, Error EnsureError, Writer [String]] a -> (Either AppError a, [String])
+executeFileSystemDocument app =  let (val, log) = run
                                                       $ runWriter
                                                       $ runError
                                                       $ ensureInterpreter
                                                       $ interpret fileSystemDocInterpreter
-                                                      $ func <$> app
-                                      in
-                                        (mapLeft AppEnsureError val, log)
+                                                      app
+                                  in
+                                   (mapLeft AppEnsureError val, log)

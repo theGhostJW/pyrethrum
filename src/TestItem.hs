@@ -12,4 +12,4 @@ class TestItem a v | a -> v where
   whenThen :: a -> String
   whenThen a = "When: " <> whenClause a  <> "\n" <>
                "Then: " <> thenClause a
-  validation :: a -> DList (Check v)
+  checkList :: a -> DList (Check v)

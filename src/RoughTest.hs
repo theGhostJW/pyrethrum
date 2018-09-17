@@ -148,7 +148,7 @@ instance TestItem Item ValState where
   identifier = iid
   whenClause = pre
   thenClause = post
-  validation = checks
+  checkList = checks
 
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

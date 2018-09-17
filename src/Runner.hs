@@ -35,7 +35,7 @@ data TestInfo i a v = TestInfo {
   item :: i,
   apState  :: Maybe a,
   valState :: Maybe v,
-  validationResult :: Maybe CheckResultList
+  checkResult :: Maybe CheckResultList
 } deriving Show
 
 testInfoFull :: TestItem item valState => item -> apState -> valState -> TestInfo item apState valState
@@ -44,7 +44,7 @@ testInfoFull item apState valState =
       item = item,
       apState = Just apState,
       valState = Just valState,
-      validationResult = Just $ calcChecks valState $ validation item
+      checkResult = Just $ calcChecks valState $ checkList item
     }
 
 runFullTest :: (TestItem item valState) => runConfig                                              -- runConfig
@@ -56,13 +56,13 @@ runFullTest :: (TestItem item valState) => runConfig                            
                                         -> Either FilterError [result]
 runFullTest = runTest testInfoFull
 
-testInfoNoValidation :: TestItem item valState => item -> apState -> valState -> TestInfo item apState valState
+testInfoNoValidation :: i -> a -> p -> TestInfo i a v
 testInfoNoValidation item apState valState =
   TestInfo {
       item = item,
       apState = Just apState,
-      valState = Just valState,
-      validationResult = Just $ calcChecks valState $ validation item
+      valState = Nothing,
+      checkResult = Nothing
     }
 
 

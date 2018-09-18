@@ -70,9 +70,7 @@ data RunConfig = RunConfig {
   path        :: Path Abs File
 }
 
-type InteractorType = InteractorFileSystem RunConfig Item ApState
-
-interactor :: InteractorType
+interactor :: InteractorFileSystem RunConfig Item ApState
 interactor runConfig item = do
                               let fullFilePath = path (item :: Item)
                               writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
@@ -99,7 +97,6 @@ sampleRunConfig = RunConfig {
   path = [absfile|C:\Vids\SystemDesign\VidList.txt|]
 }
 
-runElements ::  forall effs. (Members '[Ensure, FileSystem] effs) => TestRunElements RunConfig Item (Eff effs ApState) ApState ValState
 runElements = TestRunElements {
   testInteractor = interactor,
   testPrepState = prepState,
@@ -109,17 +106,6 @@ runElements = TestRunElements {
 -- Documentation Only
 
 dummyPrepState r a = a
-
-demoExecuteFileSystemInIONoVal :: IO (Either AppError ApState)
-demoExecuteFileSystemInIONoVal = executeFileSystemInIO (dummyPrepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
-
-returnApState item apState valState = apState
-
-demoIOAllNoVal:: Either FilterError [IO (Either AppError ApState)]
-demoIOAllNoVal = runTest returnApState sampleRunConfig runElements executeFileSystemInIO All
-
-demoIOAllNoValRepl :: IO (Either FilterError [Either AppError ApState])
-demoIOAllNoValRepl = replShow demoIOAllNoVal
 
 -- -- Demos
 demoDocument :: (Either AppError ValState, [String])
@@ -135,6 +121,16 @@ demoDocumentNoVal = executeFileSystemDocument (dummyPrepState sampleRunConfig) (
 demoDocumentedAllNoVal :: Either FilterError [(Either AppError ApState, [String])]
 demoDocumentedAllNoVal = runTest returnApState sampleRunConfig runElements executeFileSystemDocument All
 
+demoExecuteFileSystemInIONoVal :: IO (Either AppError ApState)
+demoExecuteFileSystemInIONoVal = executeFileSystemInIO (dummyPrepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
+
+returnApState item apState valState = apState
+
+demoIOAllNoVal:: Either FilterError [IO (Either AppError ApState)]
+demoIOAllNoVal = runTest returnApState sampleRunConfig runElements executeFileSystemInIO All
+
+demoIOAllNoValRepl :: IO (Either FilterError [Either AppError ApState])
+demoIOAllNoValRepl = replShow demoIOAllNoVal
 
 -- Run in IO
 replShow d = Prelude.sequenceA $ Prelude.sequenceA <$> d

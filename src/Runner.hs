@@ -5,6 +5,8 @@ module Runner (
   runTest,
   runFullTest,
   runTestNoValidation,
+  TestRunElements(..),
+
   TestInfo(..)
 ) where
 
@@ -23,25 +25,29 @@ class RunConfigCapabilities where
   runTitle :: a -> String
 
 
-data Test t = Test {
-  testConfig :: t
+data Test t runConfig item apEffs apState valState = Test {
+  testConfig :: t,
+  runElements :: TestRunElements runConfig item apEffs apState valState
 }
 
+data TestRunElements runConfig item apEffs apState valState = TestRunElements {
+  testInteractor :: runConfig -> item -> apEffs,
+  testPrepState :: apState -> valState,
+  testItems :: [item]
+}
 
 runTest :: (TestItem item valState) =>  (item -> a -> valState -> r)       -- prepStateToTransformer
                                         -> runConfig                       -- runConfig
-                                        -> (a -> valState)                 -- prepState
-                                        -> (runConfig -> item -> apEffs)   -- interactor
-                                        -> [item]                          -- test items
+                                        -> TestRunElements runConfig item apEffs a valState
                                         -> ((a -> r) -> apEffs -> result)  -- interpreter
                                         -> Filter item                     -- item filter
                                         -> Either FilterError [result]
-runTest prepstateToTransformer runConfig prepState interactor items interpreter filtr =
+runTest prepstateToTransformer runConfig TestRunElements {..} interpreter filtr =
     let
-      a2v i a = prepstateToTransformer i a (prepState a)
-      i2rslt i = interpreter (a2v i) $ interactor runConfig i
+      a2v i a = prepstateToTransformer i a (testPrepState a)
+      i2rslt i = interpreter (a2v i) $ testInteractor runConfig i
     in
-      (i2rslt <$>) <$> filterredItems filtr items
+      (i2rslt <$>) <$> filterredItems filtr testItems
 
 
 data TestInfo i a v = TestInfo {
@@ -61,9 +67,7 @@ testInfoFull item apState valState =
     }
 
 runFullTest :: (TestItem item valState) => runConfig                                              -- runConfig
-                                        -> (a -> valState)                                        -- prepState
-                                        -> (runConfig -> item -> apEffs)                          -- interactor
-                                        -> [item]                                                 -- test items
+                                        -> TestRunElements runConfig item apEffs a valState
                                         -> ((a -> TestInfo item a valState) -> apEffs -> result)  -- interpreter
                                         -> Filter item                                            -- item filter
                                         -> Either FilterError [result]
@@ -80,9 +84,7 @@ testInfoNoValidation item apState valState =
 
 
 runTestNoValidation :: (TestItem item valState) =>  runConfig                                             -- runConfig
-                                                -> (a -> valState)                                        -- prepState
-                                                -> (runConfig -> item -> apEffs)                          -- interactor
-                                                -> [item]                                                 -- test items
+                                                -> TestRunElements runConfig item apEffs a valState
                                                 -> ((a -> TestInfo item a valState) -> apEffs -> result)  -- interpreter
                                                 -> Filter item                                            -- item filter
                                                 -> Either FilterError [result]

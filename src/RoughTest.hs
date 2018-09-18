@@ -55,7 +55,7 @@ data Item = Item {
                     pre    :: String,
                     post   :: String,
                     path   :: Path Abs File,
-                    checks :: DList (Check ValState)
+                    checks :: CheckList ValState
                   } deriving Show
 
 --type ValState = ApState

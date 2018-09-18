@@ -9,7 +9,7 @@ import           TestItem
 data Filter a = IID Int |
                All |
                Last |
-               LastVal |
+               LastVal | -- return the last item with non-mempty validations
                Pred (a -> Bool)
 
 
@@ -28,6 +28,8 @@ data FilterError = InvalidItemFilter String  |
 
 filterredItems :: (TestItem item valState) => Filter item -> [item] -> Either FilterError [item]
 filterredItems filtr items = let
+                              hasVals i = not $ null $ checkList i
+                              lastWithVal = find hasVals $ reverse items
                               listOrFail lst msg = null lst
                                                           ? Left (InvalidItemFilter msg)
                                                           $ Right lst
@@ -35,5 +37,5 @@ filterredItems filtr items = let
                                 IID iid -> listOrFail (filter (\i -> identifier i == iid) items) $ "id: " <> show iid <> " not in item list"
                                 All -> listOrFail items "Items list is empty"
                                 Last -> maybe (Left $ InvalidItemFilter "Items list is empty") (Right . pure) (SafeList.last items)
-                                LastVal -> Left $ NotImplemented "LastVal handler not implemented in runTest"
+                                LastVal -> maybe (Left $ InvalidItemFilter "There is no item in the list with checks assigned") (Right . pure) lastWithVal
                                 Pred func -> listOrFail (filter func items) "No test items match filter function"

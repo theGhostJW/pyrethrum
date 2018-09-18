@@ -1,56 +1,118 @@
 
 module RunnerTest where
 
+import qualified Check           as C
 import           Data.List.Safe  as SafeList
-import           Foundation      hiding (Item)
-import qualified Prelude
+import           Foundation      as F hiding (Item)
+import qualified Prelude         as P
 import           Runner.Internal
 import           Test.Extended
 import           TestItem
 
 data Item = Item {
-  iid  :: Int,
-  pre  :: String,
-  post :: String
-} deriving (Eq, Show)
+  iid    :: Int,
+  pre    :: String,
+  post   :: String,
+  checks :: C.CheckList ValState
+} deriving (Show)
 
-instance TestItem Item Item where
+type ValState = Int
+
+instance TestItem Item ValState where
   identifier = iid
   whenClause = pre
   thenClause = post
-  validation = mempty
+  checkList = checks
 
 i = Item
 
+isOne = C.chk "is One" (== 1)
+
 items  = [
-          i 100 "Pre"  "Post",
-          i 110 "Pre"  "Post",
-          i 120 "Pre"  "Post",
-          i 130 "Pre"  "Post",
-          i 140 "Pre"  "Post",
-          i 150 "Pre"  "Post"
+          i 100 "Pre" "Post" mempty,
+          i 110 "Pre" "Post" mempty,
+          i 120 "Pre" "Post" mempty,
+          i 130 "Pre" "Post" mempty,
+          i 140 "Pre" "Post" mempty,
+          i 150 "Pre" "Post" mempty
         ]
 
 chkFilterError flter msg itms = chkErrorContains show msg $ filterredItems flter (itms ::  [Item])
+
 chkFilter flter expted extractor itms = chkEq (Right expted) $ extractor <$> filterredItems flter itms
 
--- IID Int
-unit_filter_iid = chkFilter (IID 120) (Just 120) (\is -> iid <$> SafeList.head is) items
-unit_filter_iid_first = chkFilter (IID 100) (Just 100) (\is -> iid <$> SafeList.head is) items
-unit_filter_iid_last = chkFilter (IID 150) (Just 150) (\is -> iid <$> SafeList.head is) items
+chkSingleton :: (TestItem item valState) => Filter item -> [item] -> Assertion
+chkSingleton flter itms = either (\r -> chk False) (chkEq (1 :: Int)) $ P.length <$> filterredItems flter itms
+
+blahh :: IO ()
+blahh = undefined
+
+chkFilterSingle flter expted extractor itms = chkSingleton flter itms >> chkEq (Right expted) (extractor <$> filterredItems flter itms)
+
+-- -- IID Int
+idOfHead lst = iid <$> SafeList.head lst
+--
+unit_filter_iid = chkFilterSingle (IID 120) (Just 120) idOfHead items
+unit_filter_iid_first = chkFilterSingle (IID 100) (Just 100) idOfHead items
+unit_filter_iid_last = chkFilterSingle (IID 150) (Just 150) idOfHead items
 unit_filter_iid_missing = chkFilterError (IID 1200) "not in item list" items
-
--- Last
-unit_filter_last = chkFilter Last (Just 150) (\is -> iid <$> SafeList.head is) items
+--
+-- -- Last
+unit_filter_last = chkFilterSingle Last (Just 150) idOfHead items
 unit_filter_last_empty = chkFilterError Last "is empty" []
-
+--
 -- LastVal
--- TODO: Implemnt
+items1  = [
+         i 100 "Pre" "Post" isOne,
+         i 110 "Pre" "Post" mempty,
+         i 120 "Pre" "Post" mempty,
+         i 130 "Pre" "Post" mempty,
+         i 140 "Pre" "Post" mempty,
+         i 150 "Pre" "Post" mempty
+       ]
+
+items2  = [
+         i 100 "Pre" "Post" isOne,
+         i 110 "Pre" "Post" isOne,
+         i 120 "Pre" "Post" mempty,
+         i 130 "Pre" "Post" mempty,
+         i 140 "Pre" "Post" mempty,
+         i 150 "Pre" "Post" mempty
+       ]
+
+items3  = [
+        i 100 "Pre" "Post" isOne,
+        i 110 "Pre" "Post" isOne,
+        i 120 "Pre" "Post" mempty,
+        i 130 "Pre" "Post" mempty,
+        i 140 "Pre" "Post" mempty,
+        i 150 "Pre" "Post" isOne
+      ]
+
+items4 = [
+        i 100 "Pre" "Post" mempty,
+        i 110 "Pre" "Post" mempty,
+        i 120 "Pre" "Post" isOne,
+        i 130 "Pre" "Post" isOne,
+        i 140 "Pre" "Post" mempty,
+        i 150 "Pre" "Post" mempty
+      ]
+
+unit_filter_lastVal_no_items_with_vals = chkFilterError LastVal "There is no item in the list with checks assigned" items
+
+chkLastVal expectedId = chkFilterSingle LastVal (Just expectedId) idOfHead
+
+unit_filter_lastVal_singleFirst = chkLastVal 100 items1
+unit_filter_lastVal_top2 = chkLastVal 110 items2
+unit_filter_lastVal_bottom = chkLastVal 150 items3
+unit_filter_lastVal_middle = chkLastVal 130 items4
 
 -- Pred (a -> Bool)
-unit_filter_pred = chkFilter (Pred $ \ii -> 150 == iid ii) (Just 150) (\is -> iid <$> SafeList.head is) items
+unit_filter_pred = chkFilterSingle (Pred $ \ii -> 150 == iid ii) (Just 150) idOfHead items
+
+unit_filter_pred_toList = chkFilter (Pred $ \ii -> 110 < iid ii) [120,  130, 140, 150] (iid <$>) items
 unit_filter_pred_missing = chkFilterError (Pred $ \ii -> 190 == iid ii) "No test items match filter function" items
 
--- All
+ -- All
 unit_filter_all = chkFilter All 6 SafeList.length items
 unit_filter_all_empty = chkFilterError All "is empty" []

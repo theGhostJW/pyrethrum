@@ -7,6 +7,7 @@ import Data.Function
 import qualified Prelude as P
 
 type CheckResultList = DList CheckResult
+type CheckList a = DList (Check a)
 
 data MessageInfo = MessageInfo {
                                   message :: String,

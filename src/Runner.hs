@@ -15,6 +15,19 @@ import           Runner.Internal     as InternalFuncs (Filter (..),
                                                        FilterError (..))
 import           TestItem
 
+class TestConfigCapabilities where
+  testTitle :: a -> String
+  active :: a -> Bool
+
+class RunConfigCapabilities where
+  runTitle :: a -> String
+
+
+data Test t = Test {
+  testConfig :: t
+}
+
+
 runTest :: (TestItem item valState) =>  (item -> a -> valState -> r)       -- prepStateToTransformer
                                         -> runConfig                       -- runConfig
                                         -> (a -> valState)                 -- prepState

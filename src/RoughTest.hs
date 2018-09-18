@@ -143,14 +143,6 @@ demoDocumentNoVal = executeFileSystemDocument (dummyPrepState sampleRunConfig) (
 demoDocumentedAllNoVal :: Either FilterError [(Either AppError ApState, [String])]
 demoDocumentedAllNoVal = runTest returnApState sampleRunConfig prepState interactor sampleTestItems executeFileSystemDocument All
 
-
-instance TestItem Item ValState where
-  identifier = iid
-  whenClause = pre
-  thenClause = post
-  checkList = checks
-
-
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -167,3 +159,13 @@ sampleTestItems = [
                     i 140 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
                     i 150 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty
                   ];
+
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+instance TestItem Item ValState where
+  identifier = iid
+  whenClause = pre
+  thenClause = post
+  checkList = checks

@@ -1,6 +1,6 @@
 
-{-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module DemoRoughTest where
 
@@ -39,26 +39,13 @@ import           System.IO.Error                 (isAlreadyInUseError,
                                                   isPermissionError)
 import           TestItem
 
-default (String)
-
-{- Application (Interactor) -}
+type Effects effs = EFFFileSystem effs
 
 data ApState = ApState {
   itemId   :: Int,
   filePath :: Path Abs File,
   fileText :: StrictReadResult
-}
-  deriving Show
-
-data Item = Item {
-                    iid    :: Int,
-                    pre    :: String,
-                    post   :: String,
-                    path   :: Path Abs File,
-                    checks :: CheckList ValState
-                  } deriving Show
-
---type ValState = ApState
+} deriving Show
 
 newtype ValState = ValState {
                     iidPlus10 :: Int
@@ -70,9 +57,7 @@ data RunConfig = RunConfig {
   path        :: Path Abs File
 }
 
-
--- interactor :: InteractorFileSystem RunConfig Item ApState
-interactor :: FileSystemEffs2 effs => (TestItem Item ValState) => RunConfig -> Item -> Eff effs ApState
+interactor :: Effects effs => (TestItem Item ValState) => RunConfig -> Item -> Eff effs ApState
 interactor runConfig item = do
                               let fullFilePath = path (item :: Item)
                               writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
@@ -83,40 +68,24 @@ interactor runConfig item = do
 prepState :: ApState -> ValState
 prepState a = ValState $ 10 * itemId a
 
-{- Application IO Interpreter -}
-
-sampleItem =  Item {
-  iid = 500,
-  pre = "I do a test",
-  post = "the test runs",
-  path = [absfile|C:\Vids\SystemDesign\VidList.txt|],
-  checks = mempty
-}
-
-sampleRunConfig = RunConfig {
-  environment = "Test",
-  depth = 44,
-  path = [absfile|C:\Vids\SystemDesign\VidList.txt|]
-}
-
-runElements :: FileSystemEffs2 effs => TestRunElements RunConfig Item (Eff effs ApState) ApState ValState
-runElements = TestRunElements {
-  testInteractor = interactor,
-  testPrepState = prepState,
-  testItems = items
-}
-
-
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Test Items %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+data Item = Item {
+                    iid    :: Int,
+                    pre    :: String,
+                    post   :: String,
+                    path   :: Path Abs File,
+                    checks :: CheckList ValState
+                  } deriving Show
 
 i = Item
 
 items = [
           i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] $
                                                                             chk "iid is small" (\vs -> iidPlus10 vs < 200 ) <>
-                                                                            chk "iid is big"  (\vs -> iidPlus10 vs > 500) ,
+                                                                            chk "iid is big"   (\vs -> iidPlus10 vs > 500),
           i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
           i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
           i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
@@ -133,3 +102,10 @@ instance TestItem Item ValState where
   whenClause = pre
   thenClause = post
   checkList = checks
+
+runElements :: Effects effs => TestRunElements RunConfig Item (Eff effs ApState) ApState ValState
+runElements = TestRunElements {
+  testInteractor = interactor,
+  testPrepState = prepState,
+  testItems = items
+}

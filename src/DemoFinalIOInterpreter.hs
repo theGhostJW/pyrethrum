@@ -1,7 +1,7 @@
 
-
 module DemoFinalIOInterpreter where
 
+import           DemoData
 import           DemoRoughTest
 import           DSL.Interpreter
 import           Foundation.Extended hiding (Item)
@@ -12,6 +12,9 @@ import           Runner
 dummyPrepState r a = a
 returnApState item apState valState = apState
 returnValState item apState valState = valState
+
+demoExecuteFileSystemInIONoVal :: IO (Either AppError ApState)
+demoExecuteFileSystemInIONoVal = executeFileSystemInIO (dummyPrepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
 
 demoIOAllNoVal:: Either FilterError [IO (Either AppError ApState)]
 demoIOAllNoVal = runTest returnApState sampleRunConfig runElements executeFileSystemInIO All

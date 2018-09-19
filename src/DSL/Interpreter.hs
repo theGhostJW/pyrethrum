@@ -11,9 +11,11 @@ import Data.Either.Combinators
 import TestItem
 import Check
 
-type FileSystemEffs a = forall effs. (Members '[Ensure, FileSystem] effs) => (Eff effs a)
+type FileSystemEffs effs a = (Members '[Ensure, FileSystem] effs) => (Eff effs a)
 
-type InteractorFileSystem runConfig item r = forall v. (TestItem item v) => runConfig -> item -> FileSystemEffs r
+type FileSystemEffs2 effs = (Members '[Ensure, FileSystem] effs) 
+
+type InteractorFileSystem runConfig item r = forall effs v. (TestItem item v) => runConfig -> item -> FileSystemEffs effs r
 
 data AppError =
               AppFileSystemError FileSystemError |

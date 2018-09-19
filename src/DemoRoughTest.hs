@@ -70,7 +70,9 @@ data RunConfig = RunConfig {
   path        :: Path Abs File
 }
 
-interactor :: InteractorFileSystem RunConfig Item ApState
+
+-- interactor :: InteractorFileSystem RunConfig Item ApState
+interactor :: FileSystemEffs2 effs => (TestItem Item ValState) => RunConfig -> Item -> Eff effs ApState
 interactor runConfig item = do
                               let fullFilePath = path (item :: Item)
                               writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
@@ -97,7 +99,7 @@ sampleRunConfig = RunConfig {
   path = [absfile|C:\Vids\SystemDesign\VidList.txt|]
 }
 
-runElements :: forall effs. (Members '[Ensure, FileSystem] effs) => TestRunElements RunConfig Item (Eff effs ApState) ApState ValState
+runElements :: FileSystemEffs2 effs => TestRunElements RunConfig Item (Eff effs ApState) ApState ValState
 runElements = TestRunElements {
   testInteractor = interactor,
   testPrepState = prepState,

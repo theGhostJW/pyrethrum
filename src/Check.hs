@@ -67,11 +67,10 @@ calcChecks vs chkLst = let
                         in
                          reverse $ snd $ foldl' foldfunc (False, mempty) chkLst
 
-escalate :: Functor f => f (Check v) -> f (Check v)
-escalate =
-  let
-    escalateOutcome :: Check v -> Check v
-    escalateOutcome ck  =
+guard :: Functor f => f (Check v) -> f (Check v)
+guard =  let
+    guardOutcome :: Check v -> Check v
+    guardOutcome ck  =
       let
         escOutcome o = case o of
                          Fail -> Exception
@@ -79,7 +78,7 @@ escalate =
        in
          ck {rule = escOutcome . rule ck}
   in
-    (escalateOutcome <$>)
+    (guardOutcome <$>)
 
 -- generate a check from a predicate
 prdCheck :: Truthy b =>  (v -> b) -> String -> (v -> Maybe MessageInfo) -> Check v
@@ -91,11 +90,5 @@ chkmPriv hdr prd msgf = pure $ prdCheck prd hdr msgf
 chk :: String -> (v -> Bool) -> DList (Check v)
 chk hdr prd = chkmPriv hdr prd $ const Nothing
 
-chk' :: String -> (v -> Bool) -> DList (Check v)
-chk' msg prd = escalate $ chk msg prd
-
 chkm :: String -> (v -> Bool) -> (v -> String) -> DList (Check v)
 chkm hdr prd msgf = chkmPriv hdr prd $ \v -> Just $ MessageInfo (msgf v) Nothing
-
-chkm' :: String -> (v -> Bool) -> (v -> String) -> DList (Check v)
-chkm' hdr prd msgf = escalate $ chkm hdr prd msgf

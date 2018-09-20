@@ -3,7 +3,6 @@ module DSL.Ensure where
 
 import           Foundation.Extended
 import           Control.Monad.Freer
-import           Control.Monad.Freer.Coroutine
 import           Control.Monad.Freer.Error
 import qualified Control.Monad as Monad
 

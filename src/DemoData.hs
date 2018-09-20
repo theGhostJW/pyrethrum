@@ -3,9 +3,7 @@
 module DemoData where
 
 import           DemoRoughTest
-import           DSL.Interpreter
 import           Foundation.Extended hiding (Item)
-import qualified Prelude             as P
 
 sampleItem =  Item {
   iid = 500,

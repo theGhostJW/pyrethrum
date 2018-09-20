@@ -2,17 +2,17 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE QuasiQuotes #-}
 
-module DemoRoughTest where
+module DemoRoughTestSimple where
 
 import           Check
+import DSL.FileSystem
+import DSL.Ensure
+import TestItem
+import Runner
 import           Control.Monad.Freer
-import           DSL.Ensure
-import           DSL.FileSystem
 import           DSL.Interpreter
 import           Foundation.Extended             hiding (Item, fail, putStrLn,
                                                   readFile, writeFile)
-import           Runner
-
 
 type Effects effs = EFFFileSystem effs
 

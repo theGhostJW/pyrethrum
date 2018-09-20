@@ -8,8 +8,6 @@ import           DSL.FileSystem
 import           DSL.Ensure
 import           Foundation.Extended
 import Data.Either.Combinators
-import TestItem
-import Check
 
 type EFFFileSystem effs = (Members '[Ensure, FileSystem] effs)
 

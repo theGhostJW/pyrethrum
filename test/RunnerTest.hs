@@ -3,13 +3,13 @@ module RunnerTest where
 
 import qualified Check           as C
 import           Data.List.Safe  as SafeList
-import           Foundation      as F hiding (Item)
+import           Foundation      as F
 import qualified Prelude         as P
 import           Runner.Internal
 import           Test.Extended
-import           TestItem
+import           ItemClass
 
-data Item = Item {
+data TestItem = TestItem {
   iid    :: Int,
   pre    :: String,
   post   :: String,
@@ -18,13 +18,13 @@ data Item = Item {
 
 type ValState = Int
 
-instance TestItem Item ValState where
+instance ItemClass TestItem ValState where
   identifier = iid
   whenClause = pre
   thenClause = post
   checkList = checks
 
-i = Item
+i = TestItem
 
 isOne = C.chk "is One" (== 1)
 
@@ -37,11 +37,11 @@ items  = [
           i 150 "Pre" "Post" mempty
         ]
 
-chkFilterError flter msg itms = chkErrorContains show msg $ filterredItems flter (itms ::  [Item])
+chkFilterError flter msg itms = chkErrorContains show msg $ filterredItems flter (itms ::  [TestItem])
 
 chkFilter flter expted extractor itms = chkEq (Right expted) $ extractor <$> filterredItems flter itms
 
-chkSingleton :: (TestItem item valState) => Filter item -> [item] -> Assertion
+chkSingleton :: (ItemClass item valState) => Filter item -> [item] -> Assertion
 chkSingleton flter itms = either (\r -> chk False) (chkEq (1 :: Int)) $ P.length <$> filterredItems flter itms
 
 blahh :: IO ()

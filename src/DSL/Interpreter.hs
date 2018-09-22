@@ -9,6 +9,7 @@ import           DSL.Ensure
 import           Foundation.Extended
 import Data.Either.Combinators
 
+type EFFEnsureOnly effs = (Members '[Ensure] effs)
 type EFFFileSystem effs = (Members '[Ensure, FileSystem] effs)
 
 data AppError =

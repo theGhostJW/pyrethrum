@@ -7,18 +7,18 @@ import           Control.Monad.Freer.Error
 import qualified Control.Monad as Monad
 
 data Ensure r where
- Ensure :: Bool -> String -> Ensure ()
+ Ensure :: String -> Bool -> Ensure ()
  Throw :: String -> Ensure ()
 
 newtype EnsureError = EnsureError String deriving (Show, Eq)
 
-ensure :: Member Ensure effs => Bool -> String -> Eff effs ()
-ensure condition err = send $ Ensure condition err
+ensure :: Member Ensure effs => String -> Bool -> Eff effs ()
+ensure err condition = send $ Ensure err condition
 
 throw :: Member Ensure effs => String -> Eff effs ()
 throw = send . Throw
 
 ensureInterpreter :: forall effs a. Member (Error EnsureError) effs => Eff (Ensure ': effs) a -> Eff effs a
 ensureInterpreter = interpret $ \case
-                                    Ensure condition message -> Monad.unless condition $ throwError $ EnsureError message
+                                    Ensure message condition -> Monad.unless condition $ throwError $ EnsureError message
                                     Throw message -> throwError $ EnsureError message

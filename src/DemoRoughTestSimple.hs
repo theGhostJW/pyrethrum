@@ -5,7 +5,6 @@
 module DemoRoughTestSimple where
 
 import           Check
-import DSL.FileSystem
 import DSL.Ensure
 import TestItem
 import Runner
@@ -13,18 +12,16 @@ import           Control.Monad.Freer
 import           DSL.Interpreter
 import           Foundation.Extended             hiding (Item, fail, putStrLn,
                                                   readFile, writeFile)
+import qualified Prelude as P
 
-type Effects effs = EFFFileSystem effs
+type Effects effs = EFFEnsureOnly effs
 
 data ApState = ApState {
-  itemId   :: Int,
-  filePath :: Path Abs File,
-  fileText :: StrictReadResult
+  itemId :: Int,
+  simpleMessage :: String
 } deriving Show
 
-newtype ValState = ValState {
-                    iidPlus10 :: Int
-                  } deriving Show
+type ValState = ApState
 
 data RunConfig = RunConfig {
   environment :: String,
@@ -33,15 +30,12 @@ data RunConfig = RunConfig {
 }
 
 interactor :: Effects effs => (TestItem Item ValState) => RunConfig -> Item -> Eff effs ApState
-interactor runConfig item = do
-                              let fullFilePath = path (item :: Item)
-                              writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
-                              ensure True "Blahh"
-                              txt <- readFile fullFilePath
-                              pure $ ApState (iid item) fullFilePath txt
+interactor runConfig Item{..} = do
+                                  ensure "Only even iids expected" $ P.even iid
+                                  pure $ ApState iid "Success"
 
 prepState :: ApState -> ValState
-prepState a = ValState $ 10 * itemId a
+prepState = id
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Test Items %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -59,8 +53,8 @@ i = Item
 
 items = [
           i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] $
-                                                                            chk "iid is small" (\ValState{..} -> iidPlus10 < 200 ) <>
-                                                                            chk "iid is big"   (\vs -> iidPlus10 vs > 500),
+                                                                            chk "iid is small" (\vs -> itemId vs < 200 ) <>
+                                                                            chk "iid is big"   (\vs -> itemId vs > 500),
           i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
           i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
           i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,

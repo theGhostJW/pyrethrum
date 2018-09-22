@@ -9,6 +9,7 @@ import           Control.Monad.Freer
 import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter
+import qualified Prelude as P
 import           Foundation.Extended             hiding (Item, fail, putStrLn,
                                                   readFile, writeFile)
 import           Runner
@@ -36,7 +37,7 @@ interactor :: Effects effs => (TestItem Item ValState) => RunConfig -> Item -> E
 interactor runConfig item = do
                               let fullFilePath = path (item :: Item)
                               writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
-                              ensure True "Blahh"
+                              ensure "Blahh" $ P.even $ iid item
                               txt <- readFile fullFilePath
                               pure $ ApState (iid item) fullFilePath txt
 

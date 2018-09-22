@@ -7,7 +7,7 @@ import           Control.Monad.Freer.Error
 import qualified Control.Monad as Monad
 
 data Ensure r where
- Ensure :: String -> Bool -> Ensure ()
+ Ensure :: Truthy conditon => String -> conditon -> Ensure ()
  Throw :: String -> Ensure ()
 
 newtype EnsureError = EnsureError String deriving (Show, Eq)
@@ -20,5 +20,5 @@ throw = send . Throw
 
 ensureInterpreter :: forall effs a. Member (Error EnsureError) effs => Eff (Ensure ': effs) a -> Eff effs a
 ensureInterpreter = interpret $ \case
-                                    Ensure message condition -> Monad.unless condition $ throwError $ EnsureError message
+                                    Ensure message condition -> Monad.unless (isTruthy condition) $ throwError $ EnsureError message
                                     Throw message -> throwError $ EnsureError message

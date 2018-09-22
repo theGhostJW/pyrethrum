@@ -1,7 +1,7 @@
 
 module Runner (
   module InternalFuncs,
-  module TestItem,
+  module ItemClass,
   runTest,
   runFullTest,
   runTestNoValidation,
@@ -15,7 +15,7 @@ import           Foundation.Extended
 import           Runner.Internal
 import           Runner.Internal     as InternalFuncs (Filter (..),
                                                        FilterError (..))
-import           TestItem
+import           ItemClass
 
 class TestConfigCapabilities where
   testTitle :: a -> String
@@ -36,7 +36,7 @@ data TestRunElements runConfig item apEffs apState valState = TestRunElements {
   testItems :: [item]
 }
 
-runTest :: (TestItem item valState) =>  (item -> a -> valState -> r)       -- prepStateToTransformer
+runTest :: (ItemClass item valState) =>  (item -> a -> valState -> r)       -- prepStateToTransformer
                                         -> runConfig                       -- runConfig
                                         -> TestRunElements runConfig item apEffs a valState
                                         -> ((a -> r) -> apEffs -> result)  -- interpreter
@@ -57,7 +57,7 @@ data TestInfo i a v = TestInfo {
   checkResult :: Maybe CheckResultList
 } deriving Show
 
-testInfoFull :: TestItem item valState => item -> apState -> valState -> TestInfo item apState valState
+testInfoFull :: ItemClass item valState => item -> apState -> valState -> TestInfo item apState valState
 testInfoFull item apState valState =
   TestInfo {
       item = item,
@@ -66,7 +66,7 @@ testInfoFull item apState valState =
       checkResult = Just $ calcChecks valState $ checkList item
     }
 
-runFullTest :: (TestItem item valState) => runConfig                                              -- runConfig
+runFullTest :: (ItemClass item valState) => runConfig                                              -- runConfig
                                         -> TestRunElements runConfig item apEffs a valState
                                         -> ((a -> TestInfo item a valState) -> apEffs -> result)  -- interpreter
                                         -> Filter item                                            -- item filter
@@ -83,7 +83,7 @@ testInfoNoValidation item apState valState =
     }
 
 
-runTestNoValidation :: (TestItem item valState) =>  runConfig                                             -- runConfig
+runTestNoValidation :: (ItemClass item valState) =>  runConfig                                             -- runConfig
                                                 -> TestRunElements runConfig item apEffs a valState
                                                 -> ((a -> TestInfo item a valState) -> apEffs -> result)  -- interpreter
                                                 -> Filter item                                            -- item filter

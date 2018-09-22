@@ -4,7 +4,7 @@ module Runner.Internal where
 import qualified Data.List.Safe      as SafeList
 import           Foundation.Extended
 import qualified Prelude
-import           TestItem
+import           ItemClass
 
 data Filter a = IID Int |
                All |
@@ -26,7 +26,7 @@ data FilterError = InvalidItemFilter String  |
 
 
 
-filterredItems :: (TestItem item valState) => Filter item -> [item] -> Either FilterError [item]
+filterredItems :: (ItemClass item valState) => Filter item -> [item] -> Either FilterError [item]
 filterredItems filtr items = let
                               hasVals i = not $ null $ checkList i
                               lastWithVal = find hasVals $ reverse items

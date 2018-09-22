@@ -4,7 +4,7 @@ module DemoFinalIOInterpreter where
 import           DemoData
 import           DemoRoughTest
 import           DSL.Interpreter
-import           Foundation.Extended hiding (Item)
+import           Foundation.Extended
 import qualified Prelude             as P
 import           Runner
 
@@ -34,8 +34,8 @@ demoIOToValState = runTest returnValState sampleRunConfig runElements executeFil
 demoIOAllToValStateRepl :: IO (Either FilterError [Either AppError ValState])
 demoIOAllToValStateRepl = replShow demoIOToValState
 
-demoIOFull :: Either FilterError [IO (Either AppError (TestInfo Item ApState ValState))]
+demoIOFull :: Either FilterError [IO (Either AppError (TestInfo TestItem ApState ValState))]
 demoIOFull = runFullTest sampleRunConfig runElements executeFileSystemInIO All
 
-demoIOFullRepl :: IO (Either FilterError [Either AppError (TestInfo Item ApState ValState)])
+demoIOFullRepl :: IO (Either FilterError [Either AppError (TestInfo TestItem ApState ValState)])
 demoIOFullRepl = replShow demoIOFull

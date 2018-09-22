@@ -3,9 +3,9 @@
 module DemoData where
 
 import           DemoRoughTest
-import           Foundation.Extended hiding (Item)
+import           Foundation.Extended
 
-sampleItem =  Item {
+sampleItem =  TestItem {
   iid = 500,
   pre = "I do a test",
   post = "the test runs",

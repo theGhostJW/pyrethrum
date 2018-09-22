@@ -12,9 +12,3 @@ sampleItem =  TestItem {
   path = [absfile|C:\Vids\SystemDesign\VidList.txt|],
   checks = mempty
 }
-
-sampleRunConfig = RunConfig {
-  environment = "Test",
-  depth = 44,
-  path = [absfile|C:\Vids\SystemDesign\VidList.txt|]
-}

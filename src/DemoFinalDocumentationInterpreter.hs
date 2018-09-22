@@ -2,6 +2,7 @@
 
 module DemoFinalDocumentationInterpreter where
 
+import           DemoConfig
 import           DemoData
 import           DemoRoughTest
 import           DSL.Interpreter

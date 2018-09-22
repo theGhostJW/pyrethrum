@@ -5,7 +5,8 @@
 module DemoRoughTestSimple where
 
 import           Check
-import           TestConfig
+import DemoConfig
+import           TestAndRunConfig
 import DSL.Ensure
 import Runner
 import           Control.Monad.Freer
@@ -22,12 +23,6 @@ data ApState = ApState {
 } deriving Show
 
 type ValState = ApState
-
-data RunConfig = RunConfig {
-  environment :: String,
-  depth       :: Integer,
-  path        :: Path Abs File
-}
 
 interactor :: Effects effs => (ItemClass TestItem ValState) => RunConfig -> TestItem -> Eff effs ApState
 interactor runConfig TestItem{..} = do

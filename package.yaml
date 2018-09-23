@@ -31,7 +31,7 @@ dependencies:
 ghc-options:
   - -fmax-pmcheck-iterations=10000000
   - -ferror-spans
-  - -O2
+  # - -O2
   - -Wall
   #- -Werror
   - -fprint-potential-instances

@@ -7,3 +7,5 @@ class Titled a where
 
 class Titled a => TestConfigClass a  where
   address :: a -> String
+
+type TestFilter runConfig testConfig =  runConfig -> testConfig -> Bool

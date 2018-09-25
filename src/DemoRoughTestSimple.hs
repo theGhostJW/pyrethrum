@@ -17,6 +17,9 @@ import qualified Prelude as P
 
 type Effects effs = EFFEnsureOnly effs
 
+config :: TestConfig
+config = testConfig { header = "This Simple Test Only Uses Ensure Effects" }
+
 data ApState = ApState {
   itemId :: Int,
   simpleMessage :: String
@@ -25,9 +28,9 @@ data ApState = ApState {
 type ValState = ApState
 
 interactor :: Effects effs => (ItemClass TestItem ValState) => RunConfig -> TestItem -> Eff effs ApState
-interactor runConfig TestItem{..} = do
-                                  ensure "Only even iids expected" $ P.even iid
-                                  pure $ ApState iid "Success"
+interactor rc TestItem{..} = do
+                              ensure "Only even iids expected" $ P.even iid
+                              pure $ ApState iid "Success"
 
 prepState :: ApState -> ValState
 prepState = id
@@ -67,8 +70,8 @@ instance ItemClass TestItem ValState where
   thenClause = post
   checkList = checks
 
-runElements :: Effects effs => TestRunElements RunConfig TestItem (Eff effs ApState) ApState ValState
-runElements = TestRunElements {
+runElements :: Effects effs => TestSteps RunConfig TestItem (Eff effs ApState) ApState ValState
+runElements = TestSteps {
   testInteractor = interactor,
   testPrepState = prepState,
   testItems = items

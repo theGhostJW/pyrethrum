@@ -5,7 +5,7 @@ module DemoData where
 import           DemoRoughTest
 import           Foundation.Extended
 
-sampleItem =  TestItem {
+sampleItem =  Item {
   iid = 500,
   pre = "I do a test",
   post = "the test runs",

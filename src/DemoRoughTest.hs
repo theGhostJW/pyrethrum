@@ -5,7 +5,7 @@
 module DemoRoughTest where
 
 import           Check
-import DemoConfig
+import DemoConfig as C
 import           TestAndRunConfig
 import           Control.Monad.Freer
 import           DSL.Ensure
@@ -13,13 +13,13 @@ import           DSL.FileSystem
 import           DSL.Interpreter
 import qualified Prelude as P
 import           Foundation.Extended             hiding (fail, putStrLn,
-                                                  readFile, writeFile)
+                                                  readFile, writeFile, Item)
 import           Runner
-
 
 type Effects effs = EFFFileSystem effs
 
--- data TestConfig =
+config :: TestConfig
+config = testConfig { header = "This is a Rough Test" }
 
 data ApState = ApState {
   itemId   :: Int,
@@ -27,17 +27,16 @@ data ApState = ApState {
   fileText :: StrictReadResult
 } deriving Show
 
+interactor :: Effects effs => (ItemClass Item ValState) => RunConfig -> Item -> Eff effs ApState
+interactor RunConfig{..} Item{..} = do
+                                      writeFile path $ pre  <> " ~ " <> post <> " !!"
+                                      ensure "Blahh" $ P.even iid
+                                      txt <- readFile path
+                                      pure $ ApState iid path txt
+
 newtype ValState = V {
                     iidx10 :: Int
                   } deriving Show
-
-interactor :: Effects effs => (ItemClass TestItem ValState) => RunConfig -> TestItem -> Eff effs ApState
-interactor runConfig item = do
-                              let fullFilePath = path (item :: TestItem)
-                              writeFile fullFilePath $ pre item  <> " ~ " <> post item <> " !!"
-                              ensure "Blahh" $ P.even $ iid item
-                              txt <- readFile fullFilePath
-                              pure $ ApState (iid item) fullFilePath txt
 
 prepState :: ApState -> ValState
 prepState ApState{..} = V $ 10 * itemId
@@ -46,7 +45,7 @@ prepState ApState{..} = V $ 10 * itemId
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Test Items %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-data TestItem = TestItem {
+data Item = Item {
                     iid    :: Int,
                     pre    :: String,
                     post   :: String,
@@ -54,12 +53,12 @@ data TestItem = TestItem {
                     checks :: CheckList ValState
                   } deriving Show
 
-i = TestItem
+i = Item
 
 items = [
           i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] $
-                                                                            chk "iid is small" (\V{..} -> iidx10 < 200 ) <>
-                                                                            chk "iid is big"   (\vs -> iidx10 vs > 500),
+                                chk "iid is small" (\V{..} -> iidx10 < 200 ) <>
+                                chk "iid is big"   (\V{..} -> iidx10 > 500),
           i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
           i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
           i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
@@ -71,15 +70,19 @@ items = [
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-instance ItemClass TestItem ValState where
+test :: Effects effs => C.Test Item (Eff effs ApState) ApState ValState
+test = Test {
+              address = moduleOf ''ApState,
+              configuration = config,
+              steps = TestSteps {
+                                      testInteractor = interactor,
+                                      testPrepState = prepState,
+                                      testItems = items
+                                    }
+            }
+
+instance ItemClass Item ValState where
   identifier = iid
   whenClause = pre
   thenClause = post
   checkList = checks
-
-runElements :: Effects effs => TestRunElements RunConfig TestItem (Eff effs ApState) ApState ValState
-runElements = TestRunElements {
-  testInteractor = interactor,
-  testPrepState = prepState,
-  testItems = items
-}

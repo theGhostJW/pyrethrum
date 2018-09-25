@@ -1,63 +1,51 @@
 
 module Runner (
-  module InternalFuncs,
-  module ItemClass,
-  runTest,
-  runFullTest,
-  runTestNoValidation,
-  TestRunElements(..),
-
-  TestInfo(..)
+    module Runner
+  , module InternalFuncs
+  , module ItemClass
 ) where
 
 import Check
+import TestAndRunConfig
 import           Foundation.Extended
 import           Runner.Internal
 import           Runner.Internal     as InternalFuncs (Filter (..),
                                                        FilterError (..))
 import           ItemClass
 
-class TestConfigCapabilities where
-  testTitle :: a -> String
-  active :: a -> Bool
-
-class RunConfigCapabilities where
-  runTitle :: a -> String
-
-
-data Test t runConfig item apEffs apState valState = Test {
-  testConfig :: t,
-  runElements :: TestRunElements runConfig item apEffs apState valState
+data GenericTest tc rc i effs as vs = Test {
+  address :: String,
+  configuration :: tc,
+  steps :: TestSteps rc i effs as vs
 }
 
-data TestRunElements runConfig item apEffs apState valState = TestRunElements {
-  testInteractor :: runConfig -> item -> apEffs,
-  testPrepState :: apState -> valState,
-  testItems :: [item]
+data TestSteps rc i effs as vs = TestSteps {
+  testInteractor :: rc -> i -> effs,
+  testPrepState :: as -> vs,
+  testItems :: [i]
 }
 
-runTest :: (ItemClass item valState) =>  (item -> a -> valState -> r)       -- prepStateToTransformer
-                                        -> runConfig                       -- runConfig
-                                        -> TestRunElements runConfig item apEffs a valState
-                                        -> ((a -> r) -> apEffs -> result)  -- interpreter
-                                        -> Filter item                     -- item filter
-                                        -> Either FilterError [result]
-runTest prepstateToTransformer runConfig TestRunElements {..} interpreter filtr =
+runTest :: (ItemClass i vs) =>  (i -> as -> vs -> ag)           -- aggreagator
+                            -> rc                               -- runConfig
+                            -> TestSteps rc i effs as vs
+                            -> ((as -> ag) -> effs -> rslt)     -- interpreter
+                            -> Filter i                         -- item filter
+                            -> Either FilterError [rslt]
+runTest prepstateToTransformer runConfig TestSteps {..} interpreter filtr =
     let
       a2v i a = prepstateToTransformer i a (testPrepState a)
       i2rslt i = interpreter (a2v i) $ testInteractor runConfig i
     in
       (i2rslt <$>) <$> filterredItems filtr testItems
 
-
-data TestInfo i a v = TestInfo {
+data TestInfo i as vs = TestInfo {
   item :: i,
-  apState  :: Maybe a,
-  valState :: Maybe v,
+  apState  :: Maybe as,
+  valState :: Maybe vs,
   checkResult :: Maybe CheckResultList
 } deriving Show
 
-testInfoFull :: ItemClass item valState => item -> apState -> valState -> TestInfo item apState valState
+testInfoFull :: ItemClass i vs => i -> as -> vs -> TestInfo i as vs
 testInfoFull item apState valState =
   TestInfo {
       item = item,
@@ -66,12 +54,21 @@ testInfoFull item apState valState =
       checkResult = Just $ calcChecks valState $ checkList item
     }
 
-runFullTest :: (ItemClass item valState) => runConfig                                              -- runConfig
-                                        -> TestRunElements runConfig item apEffs a valState
-                                        -> ((a -> TestInfo item a valState) -> apEffs -> result)  -- interpreter
-                                        -> Filter item                                            -- item filter
-                                        -> Either FilterError [result]
+runFullTest :: (ItemClass i vs) => rc                                        -- runConfig
+                                -> TestSteps rc i effs a vs
+                                -> ((a -> TestInfo i a vs) -> effs -> rslt)  -- interpreter
+                                -> Filter i                                  -- item filter
+                                -> Either FilterError [rslt]
 runFullTest = runTest testInfoFull
+
+runFullTestShow :: (Show i, Show as, Show vs) =>
+                                              (ItemClass i vs) => rc               -- runConfig
+                                              -> TestSteps rc i effs as vs
+                                              -> ((as -> String) -> effs -> rslt)  -- interpreter
+                                              -> Filter i                          -- item filter
+                                              -> Either FilterError [rslt]
+runFullTestShow =
+      runTest (\i as vs -> show $ testInfoFull i as vs)
 
 testInfoNoValidation :: i -> a -> p -> TestInfo i a v
 testInfoNoValidation item apState valState =
@@ -82,10 +79,9 @@ testInfoNoValidation item apState valState =
       checkResult = Nothing
     }
 
-
-runTestNoValidation :: (ItemClass item valState) =>  runConfig                                             -- runConfig
-                                                -> TestRunElements runConfig item apEffs a valState
-                                                -> ((a -> TestInfo item a valState) -> apEffs -> result)  -- interpreter
-                                                -> Filter item                                            -- item filter
-                                                -> Either FilterError [result]
+runTestNoValidation :: (ItemClass i vs) =>  rc                                         -- runConfig
+                                        -> TestSteps rc i effs as vs
+                                        -> ((as -> TestInfo i as vs) -> effs -> rslt)  -- interpreter
+                                        -> Filter i                                    -- item filter
+                                        -> Either FilterError [rslt]
 runTestNoValidation = runTest testInfoNoValidation

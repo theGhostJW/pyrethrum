@@ -7,10 +7,10 @@ import qualified Prelude
 import           ItemClass
 
 data Filter a = IID Int |
-               All |
-               Last |
-               LastVal | -- return the last item with non-mempty validations
-               Pred (a -> Bool)
+                All |
+                Last |
+                LastVal | -- return the last item with non-mempty validations
+                Pred (a -> Bool)
 
 
 instance Prelude.Show (Filter a) where

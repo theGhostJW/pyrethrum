@@ -19,7 +19,7 @@ demoExecuteFileSystemInIONoVal :: IO (Either AppError ApState)
 demoExecuteFileSystemInIONoVal = executeFileSystemInIO (dummyPrepState runConfig) (interactor runConfig sampleItem)
 
 demoIOAllNoVal:: Either FilterError [IO (Either AppError ApState)]
-demoIOAllNoVal = runTest returnApState runConfig testSteps executeFileSystemInIO All
+demoIOAllNoVal = runSteps returnApState runConfig testSteps executeFileSystemInIO All
 
 demoIOAllNoValRepl :: IO (Either FilterError [Either AppError ApState])
 demoIOAllNoValRepl = replShow demoIOAllNoVal
@@ -31,7 +31,7 @@ demoExecuteFileSystemInIO :: IO (Either AppError ValState)
 demoExecuteFileSystemInIO = undefined -- executeFileSystemInIO (prepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
 
 demoIOToValState :: Either FilterError [IO (Either AppError ValState)]
-demoIOToValState = runTest returnValState runConfig testSteps executeFileSystemInIO All
+demoIOToValState = runSteps returnValState runConfig testSteps executeFileSystemInIO All
 
 demoIOAllToValStateRepl :: IO (Either FilterError [Either AppError ValState])
 demoIOAllToValStateRepl = replShow demoIOToValState

@@ -7,7 +7,7 @@ import           Data.Set             as S
 import           DemoConfigPrimatives
 import           DemoRunConfig        as RC
 import           Foundation.Extended
-import qualified Runner               as R
+import           Runner
 import           TestAndRunConfig
 
 allEnvironments :: Set Environment
@@ -28,7 +28,20 @@ data TestConfig = TestConfig {
   active       :: Bool
 }  deriving Show
 
-type Test = R.GenericTest TestConfig RC.RunConfig
+type Test = GenericTest TestConfig RC.RunConfig
+
+testRunner :: (ItemClass i vs) =>  (i -> as -> vs -> ag)        -- aggreagator
+                               -> ((as -> ag) -> effs -> rslt)  -- interpreter
+                               -> Filter i                      -- item filter
+                               -> GenericTest tc RunConfig i effs as vs
+                               -> GenericResult tc rslt
+testRunner = runTest runConfig
+
+testRunnerFull :: (ItemClass i vs) => ((as -> TestInfo i as vs) -> effs -> rslt)  -- interpreter
+                                   -> Filter i                                    -- item filter
+                                   -> GenericTest tc RunConfig i effs as vs
+                                   -> GenericResult tc rslt
+testRunnerFull = runTest runConfig testInfoFull
 
 instance Titled TestConfig where
   title = header
@@ -42,6 +55,7 @@ testConfig = TestConfig {
   active       = True
 }
 
+runConfig :: RunConfig
 runConfig = RunConfig {
   runTitle = "Sample RunConfig",
   environment = TST,

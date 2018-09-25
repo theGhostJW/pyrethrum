@@ -19,21 +19,39 @@ data GenericTest tc rc i effs as vs = Test {
   steps :: TestSteps rc i effs as vs
 }
 
+data GenericResult tc rslt = TestResult {
+  address :: String,
+  configuration :: tc,
+  results :: Either FilterError [rslt]
+} deriving Show
+
 data TestSteps rc i effs as vs = TestSteps {
   testInteractor :: rc -> i -> effs,
   testPrepState :: as -> vs,
   testItems :: [i]
 }
 
-runTest :: (ItemClass i vs) =>  (i -> as -> vs -> ag)           -- aggreagator
+runTest :: (ItemClass i vs) => rc                               -- runConfig
+                            -> (i -> as -> vs -> ag)           -- aggreagator
+                            -> ((as -> ag) -> effs -> rslt)     -- interpreter
+                            -> Filter i                         -- item filter
+                            -> GenericTest tc rc i effs as vs
+                            -> GenericResult tc rslt
+runTest runConfig aggregator interpreter filtr Test {..} = TestResult {
+                                                              address = address,
+                                                              configuration = configuration,
+                                                              results = runSteps aggregator runConfig steps interpreter filtr
+                                                            }
+
+runSteps :: (ItemClass i vs) =>  (i -> as -> vs -> ag)           -- aggreagator
                             -> rc                               -- runConfig
                             -> TestSteps rc i effs as vs
                             -> ((as -> ag) -> effs -> rslt)     -- interpreter
                             -> Filter i                         -- item filter
                             -> Either FilterError [rslt]
-runTest prepstateToTransformer runConfig TestSteps {..} interpreter filtr =
+runSteps aggregator runConfig TestSteps {..} interpreter filtr =
     let
-      a2v i a = prepstateToTransformer i a (testPrepState a)
+      a2v i a = aggregator i a (testPrepState a)
       i2rslt i = interpreter (a2v i) $ testInteractor runConfig i
     in
       (i2rslt <$>) <$> filterredItems filtr testItems
@@ -59,16 +77,7 @@ runFullTest :: (ItemClass i vs) => rc                                        -- 
                                 -> ((a -> TestInfo i a vs) -> effs -> rslt)  -- interpreter
                                 -> Filter i                                  -- item filter
                                 -> Either FilterError [rslt]
-runFullTest = runTest testInfoFull
-
-runFullTestShow :: (Show i, Show as, Show vs) =>
-                                              (ItemClass i vs) => rc               -- runConfig
-                                              -> TestSteps rc i effs as vs
-                                              -> ((as -> String) -> effs -> rslt)  -- interpreter
-                                              -> Filter i                          -- item filter
-                                              -> Either FilterError [rslt]
-runFullTestShow =
-      runTest (\i as vs -> show $ testInfoFull i as vs)
+runFullTest = runSteps testInfoFull
 
 testInfoNoValidation :: i -> a -> p -> TestInfo i a v
 testInfoNoValidation item apState valState =
@@ -79,9 +88,9 @@ testInfoNoValidation item apState valState =
       checkResult = Nothing
     }
 
-runTestNoValidation :: (ItemClass i vs) =>  rc                                         -- runConfig
+runStepsNoValidation :: (ItemClass i vs) =>  rc                                         -- runConfig
                                         -> TestSteps rc i effs as vs
                                         -> ((as -> TestInfo i as vs) -> effs -> rslt)  -- interpreter
                                         -> Filter i                                    -- item filter
                                         -> Either FilterError [rslt]
-runTestNoValidation = runTest testInfoNoValidation
+runStepsNoValidation = runSteps testInfoNoValidation

@@ -21,9 +21,8 @@ demoDocument = executeFileSystemDocument prepState $ interactor runConfig sample
 demoDocumentedAll :: Either FilterError [(Either AppError ValState, [String])]
 demoDocumentedAll = runTest returnValState runConfig testSteps executeFileSystemDocument  All
 --
--- --
 demoDocumentNoVal :: (Either AppError ApState, [String])
 demoDocumentNoVal = executeFileSystemDocument (dummyPrepState runConfig) (interactor runConfig sampleItem)
--- --
+--
 demoDocumentedAllNoVal :: Either FilterError [(Either AppError ApState, [String])]
 demoDocumentedAllNoVal = runTest returnApState runConfig testSteps executeFileSystemDocument All

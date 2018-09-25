@@ -83,6 +83,7 @@ default-extensions:
   - OverloadedStrings
   - PartialTypeSignatures
   - PatternSynonyms
+  - QuasiQuotes
   - RankNTypes
   - ScopedTypeVariables
   - StandaloneDeriving

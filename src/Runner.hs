@@ -72,6 +72,9 @@ testInfoFull item apState valState =
       checkResult = Just $ calcChecks valState $ checkList item
     }
 
+testInfoFullShow :: ItemClass i vs => (TestInfo i as vs -> r) -> i -> as -> vs -> r
+testInfoFullShow presenter item apState valState = presenter $ testInfoFull item apState valState
+
 runFullTest :: (ItemClass i vs) => rc                                        -- runConfig
                                 -> TestSteps rc i effs a vs
                                 -> ((a -> TestInfo i a vs) -> effs -> rslt)  -- interpreter

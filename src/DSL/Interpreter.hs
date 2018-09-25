@@ -12,6 +12,8 @@ import Data.Either.Combinators
 type EFFEnsureOnly effs = (Members '[Ensure] effs)
 type EFFFileSystem effs = (Members '[Ensure, FileSystem] effs)
 
+type EFFFileSystemInIO effs = (Members '[FileSystem, Ensure, Error FileSystemError, Error EnsureError, IO] effs)
+
 data AppError =
               AppFileSystemError FileSystemError |
               AppEnsureError EnsureError |

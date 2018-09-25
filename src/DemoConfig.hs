@@ -29,6 +29,7 @@ data TestConfig = TestConfig {
 }  deriving Show
 
 type Test = GenericTest TestConfig RC.RunConfig
+type TestResult = GenericResult TestConfig
 
 testRunner :: (ItemClass i vs) =>  (i -> as -> vs -> ag)        -- aggreagator
                                -> ((as -> ag) -> effs -> rslt)  -- interpreter
@@ -37,11 +38,11 @@ testRunner :: (ItemClass i vs) =>  (i -> as -> vs -> ag)        -- aggreagator
                                -> GenericResult tc rslt
 testRunner = runTest runConfig
 
-testRunnerFull :: (ItemClass i vs) => ((as -> TestInfo i as vs) -> effs -> rslt)  -- interpreter
-                                   -> Filter i                                    -- item filter
+testRunnerFull :: (ItemClass i vs, Show i, Show as, Show vs) => ((as -> String) -> effs -> rslt)  -- interpreter
+                                   -> Filter i                                                    -- item filter
                                    -> GenericTest tc RunConfig i effs as vs
                                    -> GenericResult tc rslt
-testRunnerFull = runTest runConfig testInfoFull
+testRunnerFull = testRunner (testInfoFullShow show)
 
 instance Titled TestConfig where
   title = header

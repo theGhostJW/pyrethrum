@@ -1,5 +1,7 @@
 
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+-- should not need this: https://github.com/haskell/haskell-ide-engine/issues/842
+{-# LANGUAGE QuasiQuotes #-}
 
 module DemoRoughTest where
 
@@ -11,8 +13,7 @@ import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter
 import qualified Prelude as P
-import           Foundation.Extended             hiding (fail, putStrLn,
-                                                  readFile, writeFile, Item)
+import           Foundation.Extended             hiding (readFile, writeFile, Item)
 import           Runner
 
 type Effects effs = EFFFileSystem effs

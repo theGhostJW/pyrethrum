@@ -1,5 +1,7 @@
 
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+-- https://github.com/haskell/haskell-ide-engine/issues/842
+{-# LANGUAGE QuasiQuotes #-}
 
 module DemoRoughTestSimple where
 
@@ -10,8 +12,7 @@ import DSL.Ensure
 import Runner
 import           Control.Monad.Freer
 import           DSL.Interpreter
-import           Foundation.Extended             hiding (fail, putStrLn,
-                                                  readFile, writeFile)
+import           Foundation.Extended
 import qualified Prelude as P
 
 type Effects effs = EFFEnsureOnly effs

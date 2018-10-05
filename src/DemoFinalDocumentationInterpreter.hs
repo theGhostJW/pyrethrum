@@ -15,14 +15,14 @@ returnValState item apState valState = valState
 testSteps = steps test
 
 -- -- Demos
-demoDocument :: (Either AppError ValState, [String])
+demoDocument :: IO (Either AppError ValState, [String])
 demoDocument = executeFileSystemDocument prepState $ interactor runConfig sampleItem
 --
-demoDocumentedAll :: Either FilterError [(Either AppError ValState, [String])]
+demoDocumentedAll :: Either FilterError [IO (Either AppError ValState, [String])]
 demoDocumentedAll = runSteps returnValState runConfig testSteps executeFileSystemDocument  All
 --
-demoDocumentNoVal :: (Either AppError ApState, [String])
+demoDocumentNoVal :: IO (Either AppError ApState, [String])
 demoDocumentNoVal = executeFileSystemDocument (dummyPrepState runConfig) (interactor runConfig sampleItem)
 --
-demoDocumentedAllNoVal :: Either FilterError [(Either AppError ApState, [String])]
+demoDocumentedAllNoVal :: Either FilterError [IO (Either AppError ApState, [String])]
 demoDocumentedAllNoVal = runSteps returnApState runConfig testSteps executeFileSystemDocument All

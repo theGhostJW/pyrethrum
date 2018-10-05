@@ -28,7 +28,7 @@ writeFile pth = send . WriteFile pth
 
 {- File System IO Interpreter -}
 
-fileSystemIOInterpreter :: forall effs a. (Members '[Error FileSystemError, IO] effs) => Eff (FileSystem ': effs) a -> Eff effs a
+fileSystemIOInterpreter :: Members '[Error FileSystemError, IO] effs => Eff (FileSystem ': effs) a -> Eff effs a
 fileSystemIOInterpreter =
                           let
                             handleException action handler = do
@@ -43,13 +43,14 @@ fileSystemIOInterpreter =
 
 
 
-fileSystemDocInterpreter :: Member (Writer [String]) effs => FileSystem ~> Eff effs
-fileSystemDocInterpreter =  let
-                              mockContents = "Mock File Contents"
-                            in
-                              \case
-                                ReadFile path -> tell ["readFile: " <> show path] $> Right mockContents
-                                WriteFile path str -> tell ["write file: " <>
-                                                              show path <>
-                                                              "\nContents:\n" <>
-                                                              str]
+fileSystemDocInterpreter :: Member (Writer [String]) effs => Eff (FileSystem ': effs) a -> Eff effs a
+fileSystemDocInterpreter = interpret $
+                                      let
+                                        mockContents = "Mock File Contents"
+                                      in
+                                        \case
+                                          ReadFile path -> tell ["readFile: " <> show path] $> Right mockContents
+                                          WriteFile path str -> tell ["write file: " <>
+                                                                        show path <>
+                                                                        "\nContents:\n" <>
+                                                                        str]

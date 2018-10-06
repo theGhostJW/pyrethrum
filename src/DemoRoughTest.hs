@@ -74,10 +74,10 @@ test :: Effects effs => C.Test Item (Eff effs ApState) ApState ValState
 test = Test {
               address = moduleOf ''ApState,
               configuration = config,
-              steps = TestSteps {
+              components = TestComponents {
+                                      testItems = items,
                                       testInteractor = interactor,
-                                      testPrepState = prepState,
-                                      testItems = items
+                                      testPrepState = prepState
                                     }
             }
 

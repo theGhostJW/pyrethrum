@@ -63,17 +63,17 @@ items = [
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  
+
 
 test :: Effects effs => Test Item (Eff effs ApState) ApState ValState
 test = Test {
               address = moduleOf ''ApState,
               configuration = config,
-              steps = TestSteps {
-                                      testInteractor = interactor,
-                                      testPrepState = prepState,
-                                      testItems = items
-                                    }
+              components = TestComponents {
+                                testItems = items,
+                                testInteractor = interactor,
+                                testPrepState = prepState
+                            }
             }
 
 instance ItemClass Item ValState where

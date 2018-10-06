@@ -3,11 +3,13 @@ module DemoConfig (
   , module RC
 ) where
 
+import DSL.Interpreter
 import           Data.Set             as S
 import           DemoConfigPrimatives
 import           DemoRunConfig        as RC
 import           Foundation.Extended
 import           Runner
+import           Control.Monad.Freer
 import           TestAndRunConfig
 
 allEnvironments :: Set Environment
@@ -31,16 +33,16 @@ data TestConfig = TestConfig {
 type Test = GenericTest TestConfig RC.RunConfig
 type TestResult = GenericResult TestConfig
 
-testRunner :: (ItemClass i vs) =>  (i -> as -> vs -> ag)        -- aggreagator
-                               -> ((as -> ag) -> effs -> rslt)  -- interpreter
+testRunner :: (ItemClass i vs, EFFLogger effs) =>  (i -> as -> vs -> ag)        -- aggreagator
+                               -> ((as -> ag) -> Eff effs as -> rslt)  -- interpreter
                                -> Filter i                      -- item filter
-                               -> GenericTest tc RunConfig i effs as vs
+                               -> GenericTest tc RunConfig i (Eff effs as) as vs
                                -> GenericResult tc rslt
 testRunner = runTest runConfig
 
-testRunnerFull :: (ItemClass i vs, Show i, Show as, Show vs) => ((as -> String) -> effs -> rslt)  -- interpreter
+testRunnerFull :: (ItemClass i vs, EFFLogger effs, Show i, Show as, Show vs) => ((as -> String) -> Eff effs as -> rslt)  -- interpreter
                                    -> Filter i                                                    -- item filter
-                                   -> GenericTest tc RunConfig i effs as vs
+                                   -> GenericTest tc RunConfig i (Eff effs as) as vs
                                    -> GenericResult tc rslt
 testRunnerFull = testRunner (testInfoFullShow show)
 

@@ -6,17 +6,21 @@ module Runner (
 ) where
 
 import Check
+import DSL.Logger
 import TestAndRunConfig
+import           Control.Monad.Freer
 import           Foundation.Extended
 import           Runner.Internal
 import           Runner.Internal     as InternalFuncs (Filter (..),
                                                        FilterError (..))
 import           ItemClass
+import           DSL.Interpreter
+
 
 data GenericTest tc rc i effs as vs = Test {
   address :: String,
   configuration :: tc,
-  steps :: TestSteps rc i effs as vs
+  components :: TestComponents rc i effs as vs
 }
 
 data GenericResult tc rslt = TestResult {
@@ -25,36 +29,37 @@ data GenericResult tc rslt = TestResult {
   results :: Either FilterError [rslt]
 } deriving Show
 
-data TestSteps rc i effs as vs = TestSteps {
+data TestComponents rc i effs as vs = TestComponents {
+  testItems :: [i],
   testInteractor :: rc -> i -> effs,
-  testPrepState :: as -> vs,
-  testItems :: [i]
+  testPrepState :: as -> vs
 }
 
-runTest :: (ItemClass i vs) => rc                               -- runConfig
-                            -> (i -> as -> vs -> ag)           -- aggreagator
-                            -> ((as -> ag) -> effs -> rslt)     -- interpreter
-                            -> Filter i                         -- item filter
-                            -> GenericTest tc rc i effs as vs
+runTest :: (ItemClass i vs, EFFLogger effs) => rc                           -- runConfig
+                            -> (i -> as -> vs -> ag)                        -- aggreagator - a constructor for the final result type
+                            -> ((as -> ag) -> Eff effs as -> rslt)          -- interpreter
+                            -> Filter i                                     -- item filter
+                            -> GenericTest tc rc i (Eff effs as) as vs
                             -> GenericResult tc rslt
 runTest runConfig aggregator interpreter filtr Test {..} = TestResult {
                                                               address = address,
                                                               configuration = configuration,
-                                                              results = runSteps aggregator runConfig steps interpreter filtr
+                                                              results = runSteps aggregator runConfig components interpreter filtr
                                                             }
 
-runSteps :: (ItemClass i vs) =>  (i -> as -> vs -> ag)           -- aggreagator
-                            -> rc                               -- runConfig
-                            -> TestSteps rc i effs as vs
-                            -> ((as -> ag) -> effs -> rslt)     -- interpreter
-                            -> Filter i                         -- item filter
+runSteps :: (ItemClass i vs, EFFLogger effs) =>  (i -> as -> vs -> ag)      -- aggreagator - a constructor for the final result type
+                            -> rc                                           -- runConfig
+                            -> TestComponents rc i (Eff effs as) as vs      -- items / interactor / prepState
+                            -> ((as -> ag) -> Eff effs as -> rslt)          -- interpreter
+                            -> Filter i                                     -- item filter
                             -> Either FilterError [rslt]
-runSteps aggregator runConfig TestSteps {..} interpreter filtr =
+runSteps aggregator runConfig TestComponents {..} interpreter filtr =
     let
-      a2v i a = aggregator i a (testPrepState a)
-      i2rslt i = interpreter (a2v i) $ testInteractor runConfig i
+      apStateToValState i a = aggregator i a (testPrepState a)
+      interactorEffects = testInteractor runConfig
+      itemToResult i = interpreter (apStateToValState i) (interactorEffects i)
     in
-      (i2rslt <$>) <$> filterredItems filtr testItems
+      (itemToResult <$>) <$> filterredItems filtr testItems
 
 data TestInfo i as vs = TestInfo {
   item :: i,
@@ -75,15 +80,15 @@ testInfoFull item apState valState =
 testInfoFullShow :: ItemClass i vs => (TestInfo i as vs -> r) -> i -> as -> vs -> r
 testInfoFullShow presenter item apState valState = presenter $ testInfoFull item apState valState
 
-runFullTest :: (ItemClass i vs) => rc                                        -- runConfig
-                                -> TestSteps rc i effs a vs
-                                -> ((a -> TestInfo i a vs) -> effs -> rslt)  -- interpreter
-                                -> Filter i                                  -- item filter
+runFullTest :: (ItemClass i vs, EFFLogger effs) => rc                                  -- runConfig
+                                -> TestComponents rc i (Eff effs as) as vs             -- items / interactor / prepState
+                                -> ((as -> TestInfo i as vs) -> Eff effs as  -> rslt)  -- interpreter
+                                -> Filter i                                            -- item filter
                                 -> Either FilterError [rslt]
 runFullTest = runSteps testInfoFull
 
 testInfoNoValidation :: i -> a -> p -> TestInfo i a v
-testInfoNoValidation item apState valState =
+testInfoNoValidation item apState _ =
   TestInfo {
       item = item,
       apState = Just apState,
@@ -91,9 +96,9 @@ testInfoNoValidation item apState valState =
       checkResult = Nothing
     }
 
-runStepsNoValidation :: (ItemClass i vs) =>  rc                                         -- runConfig
-                                        -> TestSteps rc i effs as vs
-                                        -> ((as -> TestInfo i as vs) -> effs -> rslt)  -- interpreter
+runStepsNoValidation :: (ItemClass i vs, EFFLogger effs) =>  rc                                        -- runConfig
+                                        -> TestComponents rc i (Eff effs as) as vs
+                                        -> ((as -> TestInfo i as vs) -> Eff effs as -> rslt)  -- interpreter
                                         -> Filter i                                    -- item filter
                                         -> Either FilterError [rslt]
 runStepsNoValidation = runSteps testInfoNoValidation

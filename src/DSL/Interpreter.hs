@@ -10,6 +10,7 @@ import           DSL.Logger
 import           Foundation.Extended
 import Data.Either.Combinators
 
+type EFFLogger effs = Member Logger effs
 type EFFEnsureOnly effs = (Members '[Logger, Ensure] effs)
 type EFFFileSystem effs = (Members '[Logger, Ensure, FileSystem] effs)
 

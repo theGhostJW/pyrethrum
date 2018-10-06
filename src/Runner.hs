@@ -17,30 +17,30 @@ import           ItemClass
 import           DSL.Interpreter
 
 
-data GenericTest tc rc i effs as vs = Test {
+data GenericTest testConfig runConfig item effs apState valState = Test {
   address :: String,
-  configuration :: tc,
-  components :: TestComponents rc i effs as vs
+  configuration :: testConfig,
+  components :: TestComponents runConfig item effs apState valState
 }
 
-data GenericResult tc rslt = TestResult {
+data GenericResult testConfig rslt = TestResult {
   address :: String,
-  configuration :: tc,
+  configuration :: testConfig,
   results :: Either FilterError [rslt]
 } deriving Show
 
-data TestComponents rc i effs as vs = TestComponents {
-  testItems :: [i],
-  testInteractor :: rc -> i -> effs,
-  testPrepState :: as -> vs
+data TestComponents runConfig item effs apState valState = TestComponents {
+  testItems :: [item],
+  testInteractor :: runConfig -> item -> effs,
+  testPrepState :: apState -> valState
 }
 
 runTest :: (ItemClass i vs, EFFLogger effs) => rc                           -- runConfig
                             -> (i -> as -> vs -> ag)                        -- aggreagator - a constructor for the final result type
                             -> ((as -> ag) -> Eff effs as -> rslt)          -- interpreter
                             -> Filter i                                     -- item filter
-                            -> GenericTest tc rc i (Eff effs as) as vs
-                            -> GenericResult tc rslt
+                            -> GenericTest testConfig rc i (Eff effs as) as vs
+                            -> GenericResult testConfig rslt
 runTest runConfig aggregator interpreter filtr Test {..} = TestResult {
                                                               address = address,
                                                               configuration = configuration,
@@ -96,9 +96,9 @@ testInfoNoValidation item apState _ =
       checkResult = Nothing
     }
 
-runStepsNoValidation :: (ItemClass i vs, EFFLogger effs) =>  rc                                        -- runConfig
+runStepsNoValidation :: (ItemClass i vs, EFFLogger effs) =>  rc                               -- runConfig
                                         -> TestComponents rc i (Eff effs as) as vs
                                         -> ((as -> TestInfo i as vs) -> Eff effs as -> rslt)  -- interpreter
-                                        -> Filter i                                    -- item filter
+                                        -> Filter i                                           -- item filter
                                         -> Either FilterError [rslt]
 runStepsNoValidation = runSteps testInfoNoValidation

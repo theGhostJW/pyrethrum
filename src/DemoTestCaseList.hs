@@ -14,20 +14,23 @@ import           Foundation.Extended
 import           Runner
 import qualified Prelude as P
 
-runAllFull :: (ItemClass i vs, Show i, Show as, Show vs) => Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> TestResult (IO (Either AppError String))
+runAllFull :: (ItemClass i vs, Show i, Show as, Show vs) => Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()
 runAllFull = testRunnerFull executeFileSystemInIO All
 
-testRun :: [TestResult (IO (Either AppError String))]
-testRun = [
+runIOList :: [IO ()] -> IO ()
+runIOList = foldl' (>>) (pure ())
+
+testRun :: IO ()
+testRun = runIOList [
   runAllFull DemoRoughTest.test,
   runAllFull DemoRoughTestSimple.test
   ]
 
-runAllDoc :: (ItemClass i vs, Show i, Show as, Show vs) => Test i  (Eff '[FileSystem, Logger, Ensure, Error EnsureError, Writer [String], IO] as) as vs -> TestResult (IO (Either AppError String, [String]))
+runAllDoc :: (ItemClass i vs, Show i, Show as, Show vs) => Test i  (Eff '[FileSystem, Logger, Ensure, Error EnsureError, Writer [String], IO] as) as vs -> IO ()
 runAllDoc = testRunnerFull executeFileSystemDocument All
 
-testRunDoc :: [TestResult (IO (Either AppError String, [String]))]
-testRunDoc = [
+testRunDoc :: IO ()
+testRunDoc = runIOList [
   runAllDoc DemoRoughTest.test,
   runAllDoc DemoRoughTestSimple.test
   ]

@@ -14,7 +14,9 @@ import           Runner.Internal
 import           Runner.Internal     as InternalFuncs (Filter (..),
                                                        FilterError (..))
 import           ItemClass
+import qualified Prelude             as P
 import           DSL.Interpreter
+import Data.Functor
 
 
 data GenericTest testConfig runConfig item effs apState valState = Test {
@@ -35,24 +37,36 @@ data TestComponents runConfig item effs apState valState = TestComponents {
   testPrepState :: apState -> valState
 }
 
-runTest :: (ItemClass i vs, EFFLogger effs) => rc                           -- runConfig
+runTest :: forall rslt i vs effs rc testConfig as ag. (ItemClass i vs) =>
+                            rc                                              -- runConfig
+                            -> (GenericResult testConfig rslt -> IO ())     -- logger
                             -> (i -> as -> vs -> ag)                        -- aggreagator - a constructor for the final result type
-                            -> ((as -> ag) -> Eff effs as -> rslt)          -- interpreter
+                            -> ((as -> ag) -> Eff effs as -> IO rslt)       -- interpreter
                             -> Filter i                                     -- item filter
                             -> GenericTest testConfig rc i (Eff effs as) as vs
-                            -> GenericResult testConfig rslt
-runTest runConfig aggregator interpreter filtr Test {..} = TestResult {
-                                                              address = address,
-                                                              configuration = configuration,
-                                                              results = runSteps aggregator runConfig components interpreter filtr
-                                                            }
+                            -> IO ()
+runTest runConfig logger aggregator interpreter filtr Test {..} = let
+                                                              flipResult :: Either FilterError (IO [rslt]) -> IO (Either FilterError [rslt])
+                                                              flipResult = \case
+                                                                              Left fe -> pure $ Left fe
+                                                                              Right ioR -> Right <$> ioR
 
-runSteps :: (ItemClass i vs, EFFLogger effs) =>  (i -> as -> vs -> ag)      -- aggreagator - a constructor for the final result type
+                                                              rslts :: IO (Either FilterError [rslt])
+                                                              rslts = flipResult $
+                                                                      P.sequenceA <$>
+                                                                      runSteps aggregator runConfig components interpreter filtr
+                                                            in
+                                                              do
+                                                                rslt <- TestResult address configuration <$> rslts
+                                                                logger rslt
+
+runSteps :: (ItemClass i vs) =>
+                            (i -> as -> vs -> ag)                           -- aggreagator - a constructor for the final result type
                             -> rc                                           -- runConfig
                             -> TestComponents rc i (Eff effs as) as vs      -- items / interactor / prepState
-                            -> ((as -> ag) -> Eff effs as -> rslt)          -- interpreter
+                            -> ((as -> ag) -> Eff effs as -> IO rslt)       -- interpreter
                             -> Filter i                                     -- item filter
-                            -> Either FilterError [rslt]
+                            -> Either FilterError [IO rslt]
 runSteps aggregator runConfig TestComponents {..} interpreter filtr =
     let
       apStateToValState i a = aggregator i a (testPrepState a)
@@ -77,17 +91,7 @@ testInfoFull item apState valState =
       checkResult = Just $ calcChecks valState $ checkList item
     }
 
-testInfoFullShow :: ItemClass i vs => (TestInfo i as vs -> r) -> i -> as -> vs -> r
-testInfoFullShow presenter item apState valState = presenter $ testInfoFull item apState valState
-
-runFullTest :: (ItemClass i vs, EFFLogger effs) => rc                                  -- runConfig
-                                -> TestComponents rc i (Eff effs as) as vs             -- items / interactor / prepState
-                                -> ((as -> TestInfo i as vs) -> Eff effs as  -> rslt)  -- interpreter
-                                -> Filter i                                            -- item filter
-                                -> Either FilterError [rslt]
-runFullTest = runSteps testInfoFull
-
-testInfoNoValidation :: i -> a -> p -> TestInfo i a v
+testInfoNoValidation :: i -> a -> v -> TestInfo i a v
 testInfoNoValidation item apState _ =
   TestInfo {
       item = item,
@@ -96,9 +100,9 @@ testInfoNoValidation item apState _ =
       checkResult = Nothing
     }
 
-runStepsNoValidation :: (ItemClass i vs, EFFLogger effs) =>  rc                               -- runConfig
+runStepsNoValidation :: (ItemClass i vs) =>  rc                                  -- runConfig
                                         -> TestComponents rc i (Eff effs as) as vs
-                                        -> ((as -> TestInfo i as vs) -> Eff effs as -> rslt)  -- interpreter
-                                        -> Filter i                                           -- item filter
-                                        -> Either FilterError [rslt]
+                                        -> ((as -> TestInfo i as vs) -> Eff effs as -> IO rslt)  -- interpreter
+                                        -> Filter i                                              -- item filter
+                                        -> Either FilterError [IO rslt]
 runStepsNoValidation = runSteps testInfoNoValidation

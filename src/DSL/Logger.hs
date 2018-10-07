@@ -5,17 +5,30 @@ import           Foundation.Extended
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import qualified Control.Monad as Monad
+import qualified Prelude as P
 
 data Logger r where
- Log :: String -> Logger ()
+ Log :: Show s => s -> Logger ()
 
-log :: Member Logger effs => String -> Eff effs ()
+log :: (Show s, Member Logger effs) => s -> Eff effs ()
 log = send . Log
 
-
-logConsoleInterpreter :: forall effs a. LastMember IO effs => Eff (Logger ': effs) a -> Eff effs a
+logConsoleInterpreter :: LastMember IO effs => Eff (Logger ': effs) a -> Eff effs a
 logConsoleInterpreter =  interpretM $ \case
-                                         Log msg -> putStrLn msg
+                                         Log msg -> P.print msg
+
+-- -- interactor :: Effects effs => (ItemClass Item ValState) => RunConfig -> Item -> Eff effs ApState
+-- runConsole :: Eff '[Logger, IO] a -> IO a
+-- runConsole = runM . interpretM (\case
+--   PutStrLn msg -> putStrLn msg
+--   GetLine -> getLine
+--   ExitSuccess -> exitSuccess)
+
+applyLogger :: (Show s) => (Eff '[Logger, IO] () -> IO ()) -> s -> IO ()
+applyLogger interpreter = interpreter . log
+
+consoleLogger :: (Show s) => s -> IO ()
+consoleLogger = applyLogger (runM . logConsoleInterpreter)
 
 {-
 data MyData1 = MyData1 {name :: String, num :: Int}

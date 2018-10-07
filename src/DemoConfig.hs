@@ -4,6 +4,7 @@ module DemoConfig (
 ) where
 
 import DSL.Interpreter
+import DSL.Logger
 import           Data.Set             as S
 import           DemoConfigPrimatives
 import           DemoRunConfig        as RC
@@ -33,18 +34,20 @@ data TestConfig = TestConfig {
 type Test = GenericTest TestConfig RC.RunConfig
 type TestResult = GenericResult TestConfig
 
-testRunner :: (ItemClass i vs, EFFLogger effs) =>  (i -> as -> vs -> ag)        -- aggreagator
-                               -> ((as -> ag) -> Eff effs as -> rslt)  -- interpreter
-                               -> Filter i                      -- item filter
+testRunner :: (ItemClass i vs, Show tc, Show rslt) =>
+                               (i -> as -> vs -> ag)                       -- aggreagator
+                               -> ((as -> ag) -> Eff effs as -> IO rslt)   -- interpreter
+                               -> Filter i                                 -- item filter
                                -> GenericTest tc RunConfig i (Eff effs as) as vs
-                               -> GenericResult tc rslt
-testRunner = runTest runConfig
+                               -> IO ()
+testRunner = runTest runConfig consoleLogger
 
-testRunnerFull :: (ItemClass i vs, EFFLogger effs, Show i, Show as, Show vs) => ((as -> String) -> Eff effs as -> rslt)  -- interpreter
-                                   -> Filter i                                                    -- item filter
+testRunnerFull :: (ItemClass i vs, Show tc, Show rslt) =>
+                                    ((as -> TestInfo i as vs) -> Eff effs as -> IO rslt)   -- interpreter
+                                   -> Filter i                               -- item filter
                                    -> GenericTest tc RunConfig i (Eff effs as) as vs
-                                   -> GenericResult tc rslt
-testRunnerFull = testRunner (testInfoFullShow show)
+                                   ->  IO ()
+testRunnerFull = testRunner testInfoFull
 
 instance Titled TestConfig where
   title = header

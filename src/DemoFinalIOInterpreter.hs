@@ -24,20 +24,20 @@ demoIOAllNoVal = runSteps returnApState runConfig testComponents executeFileSyst
 demoIOAllNoValRepl :: IO (Either FilterError [Either AppError ApState])
 demoIOAllNoValRepl = replShow demoIOAllNoVal
 
--- Run in IO
+-- -- Run in IO
 replShow d = P.sequenceA $ P.sequenceA <$> d
-
-demoExecuteFileSystemInIO :: IO (Either AppError ValState)
-demoExecuteFileSystemInIO = undefined -- executeFileSystemInIO (prepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
-
-demoIOToValState :: Either FilterError [IO (Either AppError ValState)]
-demoIOToValState = runSteps returnValState runConfig testComponents executeFileSystemInIO All
-
-demoIOAllToValStateRepl :: IO (Either FilterError [Either AppError ValState])
-demoIOAllToValStateRepl = replShow demoIOToValState
-
-demoIOFull :: Either FilterError [IO (Either AppError (TestInfo Item ApState ValState))]
-demoIOFull = runFullTest runConfig testComponents executeFileSystemInIO All
-
-demoIOFullRepl :: IO (Either FilterError [Either AppError (TestInfo Item ApState ValState)])
-demoIOFullRepl = replShow demoIOFull
+--
+-- demoExecuteFileSystemInIO :: IO (Either AppError ValState)
+-- demoExecuteFileSystemInIO = undefined -- executeFileSystemInIO (prepState sampleRunConfig) (interactor sampleRunConfig sampleItem)
+--
+-- demoIOToValState :: Either FilterError [IO (Either AppError ValState)]
+-- demoIOToValState = runSteps returnValState runConfig testComponents executeFileSystemInIO All
+--
+-- demoIOAllToValStateRepl :: IO (Either FilterError [Either AppError ValState])
+-- demoIOAllToValStateRepl = replShow demoIOToValState
+--
+-- demoIOFull :: Either FilterError [IO (Either AppError (TestInfo Item ApState ValState))]
+-- demoIOFull = runFullTest runConfig testComponents executeFileSystemInIO All
+--
+-- demoIOFullRepl :: IO (Either FilterError [Either AppError (TestInfo Item ApState ValState)])
+-- demoIOFullRepl = replShow demoIOFull

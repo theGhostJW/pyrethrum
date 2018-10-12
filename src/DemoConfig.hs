@@ -3,8 +3,12 @@ module DemoConfig (
   , module RC
 ) where
 
-import DSL.Interpreter
-import DSL.Logger
+import           DSL.Interpreter
+import           DSL.FileSystem
+import           DSL.Logger
+import           DSL.Ensure
+import           Control.Monad.Freer.Error
+import           Control.Monad.Freer.Writer
 import           Data.Set             as S
 import           DemoConfigPrimatives
 import           DemoRunConfig        as RC
@@ -12,6 +16,12 @@ import           Foundation.Extended
 import           Runner
 import           Control.Monad.Freer
 import           TestAndRunConfig
+
+runAllDoc :: forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => Test i  (Eff '[FileSystem, Logger, Ensure, Error EnsureError, Writer [String], IO] as) as vs -> IO ()
+runAllDoc = testRunnerFull executeFileSystemDocument All
+
+runAllFull :: forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()
+runAllFull = testRunnerFull executeFileSystemInIO All
 
 allEnvironments :: Set Environment
 allEnvironments = S.fromList [TST, UAT, PreProd, Prod]

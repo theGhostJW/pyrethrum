@@ -7,8 +7,12 @@ module Runner (
 
 import Check
 import DSL.Logger
+import DSL.Ensure
+import DSL.FileSystem
 import TestAndRunConfig
 import           Control.Monad.Freer
+import           Control.Monad.Freer.Error
+
 import           Foundation.Extended
 import           Runner.Internal
 import           Runner.Internal     as InternalFuncs (Filter (..),
@@ -18,6 +22,7 @@ import qualified Prelude             as P
 import           DSL.Interpreter
 import Data.Functor
 
+type FullRunner = forall rc tc i as vs effs. (ItemClass i vs, Show i, Show as, Show vs, EFFFileSystem effs) => GenericTest rc tc i (Eff effs as) as vs -> IO ()
 
 data GenericTest testConfig runConfig item effs apState valState = Test {
   address :: String,

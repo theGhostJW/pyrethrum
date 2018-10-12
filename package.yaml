@@ -57,6 +57,7 @@ default-extensions:
   - OverloadedStrings
   - BangPatterns
   - ConstraintKinds
+  - ConstrainedClassMethods
   - DataKinds
   - DefaultSignatures
   - DeriveFoldable

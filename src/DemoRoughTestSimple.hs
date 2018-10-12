@@ -65,6 +65,9 @@ items = [
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
+execute :: Effects effs => (Test Item (Eff effs ApState) ApState ValState -> IO ()) -> IO ()
+execute f = f test
+
 test :: Effects effs => Test Item (Eff effs ApState) ApState ValState
 test = Test {
               address = moduleOf ''ApState,

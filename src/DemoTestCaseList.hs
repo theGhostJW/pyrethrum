@@ -1,33 +1,39 @@
 module DemoTestCaseList where
 
 import           Control.Monad.Freer
+import           Control.Monad.Freer.Error
+import           Control.Monad.Freer.Writer
 import           DemoConfig
 import           DemoRoughTest
 import           DemoRoughTestSimple
-import           DSL.Interpreter
-import           DSL.FileSystem
-import           DSL.Logger
 import           DSL.Ensure
-import           Control.Monad.Freer.Error
-import           Control.Monad.Freer.Writer
+import           DSL.FileSystem
+import           DSL.Interpreter
+import           DSL.Logger
 import           Foundation.Extended
+import qualified Prelude                    as P
 import           Runner
-import qualified Prelude as P
 
-runAllFull :: (ItemClass i vs, Show i, Show as, Show vs) => Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()
-runAllFull = testRunnerFull executeFileSystemInIO All
+
+-- -- interactor :: Effects effs => (ItemClass Item ValState) => RunConfig -> Item -> Eff effs ApState
+-- testRun :: forall i vs as effs. (ItemClass i vs, Show i, Show as, Show vs, EFFFileSystem effs) => (Test i (Eff effs as) as vs -> IO ()) -> IO ()
+-- testRun runner = let
+--                    testResultList = [
+--                      DemoRoughTest.execute runner,
+--                      DemoRoughTestSimple.execute runner
+--                     ]
+--                   in
+--                    undefined
+-- --runIOList $ (testExecutor runner) <$> testResultList
 
 runIOList :: [IO ()] -> IO ()
 runIOList = foldl' (>>) (pure ())
 
-testRun :: IO ()
-testRun = runIOList [
+testRun' :: IO ()
+testRun' = runIOList [
   runAllFull DemoRoughTest.test,
   runAllFull DemoRoughTestSimple.test
   ]
-
-runAllDoc :: (ItemClass i vs, Show i, Show as, Show vs) => Test i  (Eff '[FileSystem, Logger, Ensure, Error EnsureError, Writer [String], IO] as) as vs -> IO ()
-runAllDoc = testRunnerFull executeFileSystemDocument All
 
 testRunDoc :: IO ()
 testRunDoc = runIOList [

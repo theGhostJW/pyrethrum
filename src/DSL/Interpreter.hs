@@ -8,6 +8,7 @@ import           DSL.FileSystem
 import           DSL.Ensure
 import           DSL.Logger
 import           Foundation.Extended
+import ItemClass
 import Data.Either.Combinators
 
 type EFFLogger effs = Member Logger effs

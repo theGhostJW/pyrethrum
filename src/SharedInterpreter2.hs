@@ -15,28 +15,28 @@ import qualified Prelude                   as P
 newtype RunConfig = RunConfig {dummyProp :: String}
 newtype TestConfig = TestConfig {dummyPropT :: String}
 
-data GenericTest testConfig runConfig item apState = GenericTest {
+data GenericTest testConfig runConfig item apState valState = GenericTest {
   address       :: String,
   configuration :: testConfig,
-  components    :: TestComponents runConfig item apState
+  components    :: TestComponents runConfig item apState valState
 }
 
-data TestComponents runConfig item apState = TestComponents {
+data TestComponents runConfig item apState valState = TestComponents {
   testItems      :: [item],
   testInteractor :: runConfig,
-  testPrepState  :: apState
+  testPrepState  ::  apState -> valState
 }
 
 type Test = GenericTest RunConfig TestConfig
 
-test1 :: Test String String
+test1 :: Test String String String
 test1 = undefined
 
-test2 :: Test  Int Int
+test2 :: Test Int Int String
 test2 = undefined
 
 --runAllFull :: forall i as vs. Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()
-runAllFull :: forall i as. Test i as -> IO ()
+runAllFull :: forall i as vs. Test i as vs -> IO ()
 runAllFull = undefined
 
 mergeIO :: [IO ()] -> IO ()

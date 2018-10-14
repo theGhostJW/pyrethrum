@@ -29,14 +29,14 @@ data TestComponents runConfig item apState effs valState = TestComponents {
 
 type Test = GenericTest RunConfig TestConfig
 
-test1 :: Test String Double String String
+test1 :: Members '[FileSystem, Logger, Ensure] effs => Test String (Eff effs String) String String
 test1 = undefined
 
-test2 :: Test Int Double Int Int
+test2 :: Members '[Ensure] effs => Test Int (Eff effs Int) Int Int
 test2 = undefined
 
 --runAllFull :: forall i as vs. Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()
-runAllFull :: forall i as effs vs. Test i effs as vs -> IO ()
+runAllFull :: forall i as vs. Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()
 runAllFull = undefined
 
 mergeIO :: [IO ()] -> IO ()

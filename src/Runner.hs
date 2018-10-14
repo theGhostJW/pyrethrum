@@ -22,9 +22,9 @@ import qualified Prelude             as P
 import           DSL.Interpreter
 import Data.Functor
 
-type FullRunner = forall rc tc i as vs effs. (ItemClass i vs, Show i, Show as, Show vs, EFFFileSystem effs) => GenericTest rc tc i (Eff effs as) as vs -> IO ()
+-- type FullRunner = forall rc tc i as vs effs. (ItemClass i vs, Show i, Show as, Show vs, EFFFileSystem effs) => GenericTest rc tc i (Eff effs as) as vs -> IO ()
 
-data GenericTest testConfig runConfig item effs apState valState = Test {
+data GenericTest testConfig runConfig item effs apState valState = GenericTest {
   address :: String,
   configuration :: testConfig,
   components :: TestComponents runConfig item effs apState valState
@@ -50,7 +50,7 @@ runTest :: forall rslt i vs effs rc testConfig as ag. (ItemClass i vs) =>
                             -> Filter i                                     -- item filter
                             -> GenericTest testConfig rc i (Eff effs as) as vs
                             -> IO ()
-runTest runConfig logger aggregator interpreter filtr Test {..} = let
+runTest runConfig logger aggregator interpreter filtr GenericTest {..} = let
                                                               flipResult :: Either FilterError (IO [rslt]) -> IO (Either FilterError [rslt])
                                                               flipResult = \case
                                                                               Left fe -> pure $ Left fe
@@ -105,7 +105,7 @@ testInfoNoValidation item apState _ =
       checkResult = Nothing
     }
 
-runStepsNoValidation :: (ItemClass i vs) =>  rc                                  -- runConfig
+runStepsNoValidation :: (ItemClass i vs) =>  rc                                                   -- runConfig
                                         -> TestComponents rc i (Eff effs as) as vs
                                         -> ((as -> TestInfo i as vs) -> Eff effs as -> IO rslt)  -- interpreter
                                         -> Filter i                                              -- item filter

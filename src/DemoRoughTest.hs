@@ -8,7 +8,7 @@ module DemoRoughTest where
 import           DSL.Logger
 import           Control.Monad.Freer.Error
 import           Check
-import DemoConfig as C
+import DemoConfig
 import           TestAndRunConfig
 import           Control.Monad.Freer
 import           DSL.Ensure
@@ -29,7 +29,7 @@ data ApState = ApState {
   fileText :: StrictReadResult
 } deriving Show
 
-interactor :: Effects effs => (ItemClass Item ValState) => RunConfig -> Item -> Eff effs ApState
+interactor :: forall effs. Effects effs => (ItemClass Item ValState) => RunConfig -> Item -> Eff effs ApState
 interactor RunConfig{..} Item{..} = do
                                       writeFile path $ pre  <> " ~ " <> post <> " !!"
                                       ensure "Blahh" $ P.even iid
@@ -72,14 +72,17 @@ items = [
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-execute :: Effects effs => (Test Item (Eff effs ApState) ApState ValState -> IO ()) -> IO ()
+execute :: forall effs. Effects effs => (Test Item (Eff effs ApState) ApState ValState -> IO ()) -> IO ()
 execute f = f test
-
-exDocAll :: IO ()
-exDocAll = runAllDoc test
+--
+-- exDocAll :: IO ()
+-- exDocAll = runAllDoc test
+--
+-- exAll :: IO ()
+-- exAll = runAllFull test
 
 exAll :: IO ()
-exAll = runAllFull test
+exAll = execute runAllFull
 
 
 -- exDocAll' :: (ItemClass i vs, Show i, Show as, Show vs) => (Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()) -> IO ()
@@ -91,8 +94,8 @@ exAll = runAllFull test
 --   = forall i vs as. (ItemClass i vs, Show i, Show as, Show vs) => Test1 ((Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()) -> IO ())
 
 
-test :: Effects effs => Test Item (Eff effs ApState) ApState ValState
-test = Test {
+test :: forall effs. Effects effs => Test Item (Eff effs ApState) ApState ValState
+test = GenericTest {
               address = moduleOf ''ApState,
               configuration = config,
               components = TestComponents {

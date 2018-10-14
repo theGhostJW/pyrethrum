@@ -32,7 +32,7 @@ unifyFSEnsureError = \case
                                        Left l -> Left $ AppFileSystemError l
                        Left enFail -> Left $ AppEnsureError enFail
 
-executeFileSystemInIO :: (a -> v) -> Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError v)
+executeFileSystemInIO :: forall a v. (a -> v) -> Eff '[FileSystem,  Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError v)
 executeFileSystemInIO func app = unifyFSEnsureError <$> runM
                                   (
                                     runError

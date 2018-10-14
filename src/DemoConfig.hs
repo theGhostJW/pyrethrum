@@ -44,7 +44,7 @@ data TestConfig = TestConfig {
 type Test = GenericTest TestConfig RC.RunConfig
 type TestResult = GenericResult TestConfig
 
-testRunner :: (ItemClass i vs, Show tc, Show rslt) =>
+testRunner :: forall i vs rslt as tc effs ag. (ItemClass i vs, Show tc, Show rslt) =>
                                (i -> as -> vs -> ag)                       -- aggreagator
                                -> ((as -> ag) -> Eff effs as -> IO rslt)   -- interpreter
                                -> Filter i                                 -- item filter

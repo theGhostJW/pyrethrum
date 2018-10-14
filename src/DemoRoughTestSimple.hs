@@ -27,7 +27,7 @@ data ApState = ApState {
 
 type ValState = ApState
 
-interactor :: Effects effs => (ItemClass Item ValState) => RunConfig -> Item -> Eff effs ApState
+interactor :: forall effs. Effects effs => (ItemClass Item ValState) => RunConfig -> Item -> Eff effs ApState
 interactor rc TestItem{..} = do
                               ensure "Only even iids expected" $ P.even iid
                               pure $ ApState iid "Success"
@@ -68,8 +68,8 @@ items = [
 execute :: Effects effs => (Test Item (Eff effs ApState) ApState ValState -> IO ()) -> IO ()
 execute f = f test
 
-test :: Effects effs => Test Item (Eff effs ApState) ApState ValState
-test = Test {
+test :: forall effs. Effects effs => Test Item (Eff effs ApState) ApState ValState
+test = GenericTest {
               address = moduleOf ''ApState,
               configuration = config,
               components = TestComponents {

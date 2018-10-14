@@ -5,16 +5,14 @@ module SharedInterpreter2 where
 
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
-import           DSL.Ensure
-import           DSL.FileSystem
-import           DSL.Logger
+import           Control.Monad.Freer.Writer
+import           Control.Monad.Freer.Reader
 import           Foundation.Extended
-import qualified Prelude                   as P
 
 newtype RunConfig = RunConfig {dummyProp :: String}
 newtype TestConfig = TestConfig {dummyPropT :: String}
 
-data GenericTest testConfig runConfig item effs apState valState = GenericTest {
+data GenericTest testConfig runConfig item effs apState valState =  GenericTest {
   address       :: String,
   configuration :: testConfig,
   components    :: TestComponents runConfig item effs apState valState
@@ -28,13 +26,13 @@ data TestComponents runConfig item apState effs valState = TestComponents {
 
 type Test = GenericTest RunConfig TestConfig
 
-test1 :: Members '[FileSystem, Logger, Ensure] effs => Test String (Eff effs String) String String
+test1 :: Members '[Writer String, Reader Int, Error String] effs => Test String (Eff effs String) String String
 test1 = undefined
 
-test2 :: Members '[Ensure] effs => Test Int (Eff effs Int) Int Int
+test2 :: Members '[Reader Int] effs => Test Int (Eff effs Int) Int Int
 test2 = undefined
 
-runAllFull :: forall i as vs. Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()
+runAllFull :: forall i as vs. Test i (Eff '[Writer String, Reader Int, Error String, IO] as) as vs -> IO ()
 runAllFull = undefined
 
 mergeIO :: [IO ()] -> IO ()
@@ -47,13 +45,12 @@ runTest =
       runAllFull test2
     ]
 
--- testRunner :: (forall i as vs effs. Members '[Logger, Ensure, FileSystem] effs => Test i (Eff effs as) as vs -> IO ()) -> IO ()
-testRunner :: (forall i as vs effs. Members '[FileSystem, Logger, Ensure] effs => Test i (Eff effs as) as vs -> IO ()) -> IO ()
-testRunner f = undefined
-   -- mergeIO [
-   --    f test1,
-   --    f test2
-   --  ]
-
-  -- intended use
-runTest' = testRunner runAllFull
+-- testRunner :: (forall i as vs effs. Members '[Writer String, Reader Int, Error String] effs => Test i (Eff effs as) as vs -> IO ()) -> IO ()
+-- testRunner f = mergeIO [
+--                         f test1,
+--                         f test2
+--                       ]
+--
+-- --   -- intended use
+-- runTest' :: IO ()
+-- runTest' = testRunner runAllFull

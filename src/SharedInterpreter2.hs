@@ -1,4 +1,4 @@
-{-# LANGUAGE QuasiQuotes #-}
+
 {-# LANGUAGE RankNTypes  #-}
 
 module SharedInterpreter2 where
@@ -8,8 +8,7 @@ import           Control.Monad.Freer.Error
 import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Logger
-import           Foundation.Extended       hiding (writeFile)
-import           ItemClass
+import           Foundation.Extended
 import qualified Prelude                   as P
 
 newtype RunConfig = RunConfig {dummyProp :: String}
@@ -35,7 +34,6 @@ test1 = undefined
 test2 :: Members '[Ensure] effs => Test Int (Eff effs Int) Int Int
 test2 = undefined
 
---runAllFull :: forall i as vs. Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()
 runAllFull :: forall i as vs. Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()
 runAllFull = undefined
 
@@ -50,8 +48,12 @@ runTest =
     ]
 
 -- testRunner :: (forall i as vs effs. Members '[Logger, Ensure, FileSystem] effs => Test i (Eff effs as) as vs -> IO ()) -> IO ()
--- testRunner f =
---    mergeIO [
---       f test1,
---       f test2
---     ]
+testRunner :: (forall i as vs effs. Members '[FileSystem, Logger, Ensure] effs => Test i (Eff effs as) as vs -> IO ()) -> IO ()
+testRunner f = undefined
+   -- mergeIO [
+   --    f test1,
+   --    f test2
+   --  ]
+
+  -- intended use
+runTest' = testRunner runAllFull

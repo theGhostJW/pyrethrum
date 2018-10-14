@@ -79,8 +79,11 @@ testRunDoc = runIOList [
   runAllDoc DemoRoughTestSimple.test
   ]
 
-runner :: (forall i as vs effs. (ItemClass i vs, Show i, Show as, Show vs, EFFFileSystem effs) => Test i (Eff effs as) as vs -> IO ()) -> IO ()
-runner f = runIOList $ [
-  -- f RT.test --,
-   -- f DemoRoughTestSimple.test
-  ]
+-- runner :: (forall i as vs effs. (ItemClass i vs, Show i, Show as, Show vs, EFFFileSystem effs) => Test i (Eff effs as) as vs -> IO ()) -> IO ()
+-- runner f = runIOList $ [
+--   f RT.test,
+--   f DemoRoughTestSimple.test
+--   ]
+--
+-- demo :: IO ()
+-- demo = runner runAllFull

@@ -13,16 +13,16 @@ import           Runner
 dummyPrepState r a = a
 returnApState item apState valState = apState
 returnValState item apState valState = valState
-testComponents = components test
+-- testComponents = components test
 
-demoExecuteFileSystemInIONoVal :: IO (Either AppError ApState)
-demoExecuteFileSystemInIONoVal = executeFileSystemInIO (dummyPrepState runConfig) (interactor runConfig sampleItem)
+-- demoExecuteFileSystemInIONoVal :: IO (Either AppError ApState)
+-- demoExecuteFileSystemInIONoVal = executeFileSystemInIO (dummyPrepState runConfig) (interactor runConfig sampleItem)
+--
+-- demoIOAllNoVal:: Either FilterError [IO (Either AppError ApState)]
+-- demoIOAllNoVal = runSteps returnApState runConfig testComponents executeFileSystemInIO All
 
-demoIOAllNoVal:: Either FilterError [IO (Either AppError ApState)]
-demoIOAllNoVal = runSteps returnApState runConfig testComponents executeFileSystemInIO All
-
-demoIOAllNoValRepl :: IO (Either FilterError [Either AppError ApState])
-demoIOAllNoValRepl = replShow demoIOAllNoVal
+-- demoIOAllNoValRepl :: IO (Either FilterError [Either AppError ApState])
+-- demoIOAllNoValRepl = replShow demoIOAllNoVal
 
 -- -- Run in IO
 replShow d = P.sequenceA $ P.sequenceA <$> d

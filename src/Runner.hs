@@ -42,15 +42,15 @@ data TestComponents runConfig item effs apState valState = TestComponents {
   testPrepState :: apState -> valState
 }
 
-runTest :: forall rslt i vs effs rc testConfig as. (ItemClass i vs) =>
-                            rc                                                  -- runConfig
-                            -> (GenericResult testConfig rslt -> IO ())         -- logger
-                            -> (i -> as -> vs -> rslt)                            -- aggreagator - a constructor for the final result type
-                            -> Filter i                                         -- item filter
-                            -> GenericTest testConfig rc i (Eff effs as) as vs  -- Test
-                            -> (Eff effs as -> IO as)                         -- interpreter
+runTest :: forall rslt i vs effs rc testConfig as ag. (ItemClass i vs) =>
+                            rc                                              -- runConfig
+                            -> (GenericResult testConfig rslt -> IO ())     -- logger
+                            -> (i -> as -> vs -> ag)                        -- aggreagator - a constructor for the final result type
+                            -> ((as -> ag) -> Eff effs as -> IO rslt)       -- interpreter
+                            -> Filter i                                     -- item filter
+                            -> GenericTest testConfig rc i (Eff effs as) as vs
                             -> IO ()
-runTest runConfig logger aggregator filtr GenericTest {..} interpreter = let
+runTest runConfig logger aggregator interpreter filtr GenericTest {..} = let
                                                               flipResult :: Either FilterError (IO [rslt]) -> IO (Either FilterError [rslt])
                                                               flipResult = \case
                                                                               Left fe -> pure $ Left fe
@@ -59,23 +59,24 @@ runTest runConfig logger aggregator filtr GenericTest {..} interpreter = let
                                                               rslts :: IO (Either FilterError [rslt])
                                                               rslts = flipResult $
                                                                       P.sequenceA <$>
-                                                                      runSteps aggregator runConfig components filtr interpreter
+                                                                      runSteps aggregator runConfig components interpreter filtr
                                                             in
                                                               do
                                                                 rslt <- TestResult address configuration <$> rslts
                                                                 logger rslt
 
 runSteps :: (ItemClass i vs) =>
-                            (i -> as -> vs -> rslt)                         -- aggreagator - a constructor for the final result type
+                            (i -> as -> vs -> ag)                           -- aggreagator - a constructor for the final result type
                             -> rc                                           -- runConfig
                             -> TestComponents rc i (Eff effs as) as vs      -- items / interactor / prepState
+                            -> ((as -> ag) -> Eff effs as -> IO rslt)       -- interpreter
                             -> Filter i                                     -- item filter
-                            -> (Eff effs as -> IO as)                       -- interpreter
                             -> Either FilterError [IO rslt]
-runSteps aggregator runConfig TestComponents {..} filtr interpreter =
+runSteps aggregator runConfig TestComponents {..} interpreter filtr =
     let
-      itemToInteractorEffects = testInteractor runConfig
-      itemToResult i =  (\a -> aggregator i a (testPrepState a)) <$> interpreter (itemToInteractorEffects i)
+      apStateToValState i a = aggregator i a (testPrepState a)
+      interactorEffects = testInteractor runConfig
+      itemToResult i = interpreter (apStateToValState i) (interactorEffects i)
     in
       (itemToResult <$>) <$> filterredItems filtr testItems
 
@@ -104,10 +105,9 @@ testInfoNoValidation item apState _ =
       checkResult = Nothing
     }
 
-
 runStepsNoValidation :: (ItemClass i vs) =>  rc                                                   -- runConfig
                                         -> TestComponents rc i (Eff effs as) as vs
+                                        -> ((as -> TestInfo i as vs) -> Eff effs as -> IO rslt)  -- interpreter
                                         -> Filter i                                              -- item filter
-                                        -> (Eff effs as -> IO as)  -- interpreter
-                                        -> Either FilterError [IO (TestInfo i as vs)]
+                                        -> Either FilterError [IO rslt]
 runStepsNoValidation = runSteps testInfoNoValidation

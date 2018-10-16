@@ -34,11 +34,11 @@ type FullTestRunner = forall i as vs effs. (ItemClass i vs, Show i, Show as, Sho
 
 type SystemRunner = forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()
 
--- blahh :: [IO ()]
--- blahh = [
---   RT.execute runAllFull,
---   DemoRoughTestSimple.execute runAllFull
---   ]
+blahh :: [IO ()]
+blahh = [
+  RT.execute runAllFull,
+  DemoRoughTestSimple.execute runAllFull
+  ]
 
 -- blahh1 :: (forall i as vs effs. (ItemClass i vs, Show i, Show as, Show vs, EFFFileSystem effs) => Test i (Eff effs as) as vs -> IO ()) -> [IO ()]
 -- blahh1 f = [
@@ -66,21 +66,18 @@ type SystemRunner = forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =
 
 -- test :: Effects effs => Test Item (Eff effs ApState) ApState ValState
 
-
 testRun' :: IO ()
 testRun' =
    runIOList [
-      testRunner testInfoFull All RT.test executeFileSystemInIO--,
-      --runAllFull DemoRoughTestSimple.test
+      runAllFull RT.test,
+      runAllFull DemoRoughTestSimple.test
     ]
 
-{-
 testRunDoc :: IO ()
 testRunDoc = runIOList [
   runAllDoc RT.test,
   runAllDoc DemoRoughTestSimple.test
   ]
-  -}
 
 -- runner :: (forall i as vs effs. (ItemClass i vs, Show i, Show as, Show vs, EFFFileSystem effs) => Test i (Eff effs as) as vs -> IO ()) -> IO ()
 -- runner f = runIOList $ [

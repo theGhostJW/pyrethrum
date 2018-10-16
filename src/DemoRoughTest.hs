@@ -72,6 +72,28 @@ items = [
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+execute :: forall effs. Effects effs => (Test Item (Eff effs ApState) ApState ValState -> IO ()) -> IO ()
+execute f = f test
+--
+-- exDocAll :: IO ()
+-- exDocAll = runAllDoc test
+--
+-- exAll :: IO ()
+-- exAll = runAllFull test
+
+exAll :: IO ()
+exAll = execute runAllFull
+
+
+-- exDocAll' :: (ItemClass i vs, Show i, Show as, Show vs) => (Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()) -> IO ()
+-- exDocAll' f = f test
+
+-- data Test1
+--   -- | @Fold @ @ step @ @ initial @ @ extract@
+--   --  = forall x. Fold (x -> a -> x) x (x -> b
+--   = forall i vs as. (ItemClass i vs, Show i, Show as, Show vs) => Test1 ((Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()) -> IO ())
+
+
 test :: forall effs. Effects effs => Test Item (Eff effs ApState) ApState ValState
 test = GenericTest {
               address = moduleOf ''ApState,

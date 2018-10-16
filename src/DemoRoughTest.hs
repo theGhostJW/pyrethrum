@@ -115,5 +115,5 @@ instance ItemClass Item ValState where
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-interactorEffs :: Eff effs ()
+interactorEffs :: Effects effs => Eff effs ()
 interactorEffs = undefined

@@ -86,7 +86,7 @@ a2TestRunDoc = runIOList [
   a2ExecuteFileSystemInIO DemoRoughTestSimple.interactorEffs
   ]
 
-a2TestPriv :: (Eff effs () -> IO ()) -> IO ()
+a2TestPriv :: EFFFileSystem effs => (Eff effs () -> IO ()) -> IO ()
 a2TestPriv interpreter = runIOList $ interpreter <$> [
      RT.interactorEffs,
      DemoRoughTestSimple.interactorEffs

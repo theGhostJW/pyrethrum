@@ -13,7 +13,7 @@ import Data.Either.Combinators
 
 type EFFLogger effs = Member Logger effs
 type EFFEnsureOnly effs = (Members '[Logger, Ensure] effs)
-type EFFFileSystem effs = (Members '[Logger, Ensure, FileSystem] effs)
+type EFFFileSystem effs = Members '[Logger, Ensure, FileSystem] effs
 
 type EFFFileSystemInIO effs = (Members '[FileSystem, Ensure, Error FileSystemError, Error EnsureError, IO] effs)
 

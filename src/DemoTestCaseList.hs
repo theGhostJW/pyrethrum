@@ -68,16 +68,37 @@ blahh = [
 
 testRun' :: IO ()
 testRun' =
-   runIOList [
-      runAllFull RT.test,
-      runAllFull DemoRoughTestSimple.test
-    ]
+     runIOList [
+        runAllFull RT.test,
+        runAllFull DemoRoughTestSimple.test
+      ]
 
 testRunDoc :: IO ()
 testRunDoc = runIOList [
   runAllDoc RT.test,
   runAllDoc DemoRoughTestSimple.test
   ]
+
+-- A2 Hard Coded
+a2TestRunDoc :: IO ()
+a2TestRunDoc = runIOList [
+  a2ExecuteFileSystemInIO RT.interactorEffs,
+  a2ExecuteFileSystemInIO DemoRoughTestSimple.interactorEffs
+  ]
+
+a2TestPriv :: (Eff effs () -> IO ()) -> IO ()
+a2TestPriv interpreter = runIOList $ interpreter <$> [
+     RT.interactorEffs,
+     DemoRoughTestSimple.interactorEffs
+  ]
+
+sampleUse1 = a2TestPriv a2ExecuteFileSystemInIO
+sampleUse2 = a2TestPriv a2ExecuteFileSystemDocument
+
+
+
+
+--a2RunAll =
 
 -- runner :: (forall i as vs effs. (ItemClass i vs, Show i, Show as, Show vs, EFFFileSystem effs) => Test i (Eff effs as) as vs -> IO ()) -> IO ()
 -- runner f = runIOList $ [

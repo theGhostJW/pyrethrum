@@ -61,3 +61,31 @@ executeFileSystemDocument func app =  let
 
                                       in
                                         mapError vl
+
+a2ExecuteFileSystemInIO :: forall a. Eff '[FileSystem,  Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO ()
+a2ExecuteFileSystemInIO app = unifyFSEnsureError <$> runM
+                                  (
+                                    runError
+                                    $ runError
+                                    $ ensureInterpreter
+                                    $ logConsoleInterpreter
+                                    $ fileSystemIOInterpreter
+                                    $ app
+                                  ) >> pure ()
+
+a2ExecuteFileSystemDocument :: forall a.  Eff '[FileSystem, Logger, Ensure, Error EnsureError, Writer [String], IO] a -> IO ()
+a2ExecuteFileSystemDocument app =  let
+                                        vl = runM
+                                              $ runWriter
+                                              $ runError
+                                              $ ensureInterpreter
+                                              $ logConsoleInterpreter
+                                              $ fileSystemDocInterpreter app
+
+                                        mapError :: IO (Either EnsureError b, [String]) -> IO (Either AppError b, [String])
+                                        mapError r = do
+                                                      (val, logs) <- r
+                                                      pure (mapLeft AppEnsureError val, logs)
+
+                                      in
+                                        mapError vl >> pure ()

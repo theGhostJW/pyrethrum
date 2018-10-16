@@ -82,18 +82,26 @@ testRunDoc = runIOList [
 -- A2 Hard Coded
 a2TestRunDoc :: IO ()
 a2TestRunDoc = runIOList [
-  a2ExecuteFileSystemInIO RT.interactorEffs,
-  a2ExecuteFileSystemInIO DemoRoughTestSimple.interactorEffs
+  a2ExecuteFileSystemInIO $ RT.interactorEffs runConfig,
+  a2ExecuteFileSystemInIO $ DemoRoughTestSimple.interactorEffs runConfig
   ]
 
-a2TestPriv :: EFFFileSystem effs => (Eff effs () -> IO ()) -> IO ()
-a2TestPriv interpreter = runIOList $ interpreter <$> [
-     RT.interactorEffs,
-     DemoRoughTestSimple.interactorEffs
-  ]
+a2TestPriv :: EFFFileSystem effs => RunConfig -> (Eff effs () -> IO ()) -> IO ()
+a2TestPriv rc interpreter =
+  let
+    interpretTest :: (forall effs. EFFFileSystem effs => RunConfig -> Eff effs ()) -> IO ()
+    interpretTest testEffs = let
+                            justEffs = testEffs rc
+                          in
+                            interpreter justEffs
+  in
+    runIOList [
+        interpretTest RT.interactorEffs,
+        interpretTest DemoRoughTestSimple.interactorEffs
+    ]
 
-sampleUse1 = a2TestPriv a2ExecuteFileSystemInIO
-sampleUse2 = a2TestPriv a2ExecuteFileSystemDocument
+sampleUse1 = a2TestPriv runConfig a2ExecuteFileSystemInIO
+sampleUse2 = a2TestPriv runConfig a2ExecuteFileSystemDocument
 
 
 

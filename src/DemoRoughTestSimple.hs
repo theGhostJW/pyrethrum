@@ -89,7 +89,7 @@ instance ItemClass Item ValState where
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-interactorEffs :: Effects effs => Eff effs ()
-interactorEffs = do
-                  as <- interactor runConfig $ P.head items
+interactorEffs :: Effects effs => RunConfig -> Eff effs ()
+interactorEffs rc = do
+                  as <- interactor rc $ P.head items
                   pure ()

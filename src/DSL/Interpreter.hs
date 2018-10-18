@@ -69,8 +69,7 @@ a2ExecuteFileSystemInIO app = unifyFSEnsureError <$> runM
                                     $ runError
                                     $ ensureInterpreter
                                     $ logConsoleInterpreter
-                                    $ fileSystemIOInterpreter
-                                    $ app
+                                    $ fileSystemIOInterpreter app
                                   ) >> pure ()
 
 a2ExecuteFileSystemDocument :: forall a.  Eff '[FileSystem, Logger, Ensure, Error EnsureError, Writer [String], IO] a -> IO ()

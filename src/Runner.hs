@@ -87,7 +87,7 @@ data TestInfo i as vs = TestInfo {
   checkResult :: Maybe CheckResultList
 } deriving Show
 
-testInfoFull :: ItemClass i vs => i -> as -> vs -> TestInfo i as vs
+testInfoFull :: forall i as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs
 testInfoFull item apState valState =
   TestInfo {
       item = item,

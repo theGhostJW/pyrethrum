@@ -89,7 +89,7 @@ instance ItemClass Item ValState where
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-interactorEffs :: Effects effs => RunConfig -> Eff effs ()
-interactorEffs rc = do
+interactorEffs :: forall effs i. Effects effs => RunConfig -> (forall as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) -> Filter i -> Eff effs ()
+interactorEffs rc agf fltr = do
                   as <- interactor rc $ P.head items
                   pure ()

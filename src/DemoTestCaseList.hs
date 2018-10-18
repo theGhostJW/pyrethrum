@@ -82,16 +82,16 @@ testRunDoc = runIOList [
 -- A2 Hard Coded
 a2TestRunDoc :: IO ()
 a2TestRunDoc = runIOList [
-  a2ExecuteFileSystemInIO $ RT.interactorEffs runConfig testInfoFull All consoleLogger,
-  a2ExecuteFileSystemInIO $ DemoRoughTestSimple.interactorEffs runConfig testInfoFull All consoleLogger
+  a2ExecuteFileSystemInIO $ RT.interactorEffs runConfig testInfoFull consoleLogger,
+  a2ExecuteFileSystemInIO $ DemoRoughTestSimple.interactorEffs runConfig testInfoFull consoleLogger
   ]
 
-a2TestPriv :: forall i effs testConfig rslt. EFFFileSystem effs => RunConfig -> (forall as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) -> Filter i -> (GenericResult testConfig rslt -> IO ()) -> (Eff effs () -> IO ()) -> IO ()
-a2TestPriv rc aggregator flter logger interpreter =
+a2TestPriv :: forall effs testConfig rslt. EFFFileSystem effs => RunConfig -> (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) -> (GenericResult testConfig rslt -> IO ()) -> (Eff effs (IO ()) -> IO ()) -> IO ()
+a2TestPriv rc aggregator logger interpreter =
   let
-    interpretTest :: (EFFFileSystem effs => RunConfig -> (forall as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) -> Filter i -> (GenericResult testConfig rslt -> IO ()) -> Eff effs ()) -> IO ()
+    interpretTest :: (EFFFileSystem effs => RunConfig -> (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) -> (GenericResult testConfig rslt -> IO ()) -> Eff effs (IO ())) -> IO ()
     interpretTest testEffs = let
-                                justEffs = testEffs rc aggregator flter logger
+                                justEffs = testEffs rc aggregator logger
                              in
                                 interpreter justEffs
   in
@@ -100,8 +100,8 @@ a2TestPriv rc aggregator flter logger interpreter =
         interpretTest DemoRoughTestSimple.interactorEffs
     ]
 
-sampleUse1 = a2TestPriv runConfig testInfoFull All consoleLogger a2ExecuteFileSystemInIO
-sampleUse2 = a2TestPriv runConfig testInfoFull All consoleLogger a2ExecuteFileSystemDocument
+sampleUse1 = a2TestPriv runConfig testInfoFull consoleLogger a2ExecuteFileSystemInIO
+sampleUse2 = a2TestPriv runConfig testInfoFull consoleLogger a2ExecuteFileSystemDocument
 
 
 --a2RunAll =

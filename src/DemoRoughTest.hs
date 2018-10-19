@@ -115,9 +115,8 @@ instance ItemClass Item ValState where
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-interactorEffs :: forall effs testConfig rslt. Effects effs =>
+interactorEffs :: forall effs. Effects effs =>
                                   RunConfig ->
                                   (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
-                                  (GenericResult testConfig rslt -> IO ()) ->
                                   Eff effs (IO ())
 interactorEffs r agf = undefined

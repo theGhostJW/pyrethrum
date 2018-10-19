@@ -89,12 +89,11 @@ instance ItemClass Item ValState where
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-interactorEffs :: forall effs testConfig rslt. Effects effs =>
+interactorEffs :: forall effs. Effects effs =>
                                   RunConfig ->
                                   (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
-                                  (GenericResult testConfig rslt -> IO ()) ->
                                   Eff effs (IO ())
-interactorEffs rc agf logger = do
+interactorEffs rc agf = do
                   let
                    item = P.head items
                   as <- interactor rc item
@@ -102,3 +101,20 @@ interactorEffs rc agf logger = do
                     vs = prepState as
                     testInfo = agf item as vs
                   pure $ pure ()
+
+
+{-
+interactorEffs :: forall effs. Effects effs =>
+                                  RunConfig ->
+                                  (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
+                                  Eff effs ()
+interactorEffs rc agf = do
+                  let
+                   runItem :: Item -> Eff effs (TestInfo Item ApState ValState)
+                   runItem itm =  do
+                                    as <- interactor rc itm
+                                    pure $ agf itm as (prepState as)
+
+                   allresults = runItem <$> items
+                  pure ()
+-}

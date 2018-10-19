@@ -94,14 +94,16 @@ interactorEffs :: forall effs. Effects effs =>
                                   (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
                                   Eff effs (IO ())
 interactorEffs rc agf = do
-                  let
-                   item = P.head items
-                  as <- interactor rc item
-                  let
-                    vs = prepState as
-                    testInfo = agf item as vs
-                  pure $ pure ()
+                         let runitem itm = do
+                                            as <- interactor rc itm
+                                            let
+                                              vs = prepState as
+                                              testInfo = agf itm as vs
+                                            pure $ pure ()
+                         mergeIO <$> P.traverse runitem items
 
+mergeIO :: [IO ()] -> IO ()
+mergeIO = foldl' (>>) (pure ())
 
 {-
 interactorEffs :: forall effs. Effects effs =>

@@ -6,6 +6,7 @@
 module DemoRoughTestSimple where
 
 import           Check
+import DSL.Logger
 import DemoConfig
 import           TestAndRunConfig
 import DSL.Ensure
@@ -94,29 +95,13 @@ interactorEffs :: forall effs. Effects effs =>
                                   (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
                                   Eff effs (IO ())
 interactorEffs rc agf = do
-                         let runitem itm = do
+                         let
+                            runitem :: Item -> Eff effs (IO ())
+                            runitem itm = do
                                             as <- interactor rc itm
-                                            let
-                                              vs = prepState as
-                                              testInfo = agf itm as vs
+                                            log $ agf itm as $ prepState as
                                             pure $ pure ()
                          mergeIO <$> P.traverse runitem items
 
 mergeIO :: [IO ()] -> IO ()
 mergeIO = foldl' (>>) (pure ())
-
-{-
-interactorEffs :: forall effs. Effects effs =>
-                                  RunConfig ->
-                                  (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
-                                  Eff effs ()
-interactorEffs rc agf = do
-                  let
-                   runItem :: Item -> Eff effs (TestInfo Item ApState ValState)
-                   runItem itm =  do
-                                    as <- interactor rc itm
-                                    pure $ agf itm as (prepState as)
-
-                   allresults = runItem <$> items
-                  pure ()
--}

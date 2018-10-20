@@ -96,8 +96,8 @@ a2TestPriv rc aggregator interpreter =
                                 interpreter justEffs
   in
     runIOList [
-        interpretTest RT.interactorEffs,
-        interpretTest DemoRoughTestSimple.interactorEffs
+        interpretTest RT.interactorEffs --,
+        --interpretTest DemoRoughTestSimple.interactorEffs
     ]
 
 sampleUse1 = a2TestPriv runConfig testInfoFull a2ExecuteFileSystemInIO

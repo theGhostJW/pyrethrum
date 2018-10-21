@@ -101,6 +101,7 @@ library:
     - listsafe
     - time
     - either
+    - deepseq
 
 # comment out for now no files in it causing issues
 # on compile ?? try again on next version of stack
@@ -128,6 +129,7 @@ tests:
       - hedgehog
       - pyrethrum
       - listsafe
+
   demo-test:
     main:                driver.hs
     source-dirs:         .\demo\test

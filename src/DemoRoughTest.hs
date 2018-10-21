@@ -139,6 +139,15 @@ interactorEffsSingleItem rc agf itm = do
                                         log $ agf itm as $ prepState as
                                         pure $ pure ()
 
+--- may be usufull ??
+interactList :: forall effs. Effects effs => RunConfig ->
+            (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
+            [Eff effs (IO ())]
+interactList rc agf = let
+                        oneItem = interactorEffsSingleItem rc agf
+                      in
+                        oneItem <$> items
+
 
 mergeIO :: [IO ()] -> IO ()
 mergeIO = foldl' (>>) (pure ())

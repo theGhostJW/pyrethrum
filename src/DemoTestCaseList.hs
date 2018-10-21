@@ -100,6 +100,22 @@ a2TestPriv rc aggregator interpreter =
         --interpretTest DemoRoughTestSimple.interactorEffs
     ]
 
+a2TestPrivList :: forall effs. EFFFileSystem effs => RunConfig -> (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) -> (Eff effs (IO ()) -> IO ()) -> [IO ()]
+a2TestPrivList rc aggregator interpreter =
+  let
+    interpretTest :: (EFFFileSystem effs => RunConfig -> (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) -> [Eff effs (IO ())]) -> [IO ()]
+    interpretTest testEffs = let
+                                justEffs = testEffs rc aggregator
+                             in
+                                interpreter <$> justEffs
+  in
+    interpretTest RT.interactList
+    -- P.sequenceA [
+    --     interpretTest  RT.interactList --,
+    --     --interpretTest DemoRoughTestSimple.interactorEffs
+    -- ]
+sampleUseList1 = P.sequenceA $ a2TestPrivList runConfig testInfoFull a2ExecuteFileSystemInIO
+
 sampleUse1 = a2TestPriv runConfig testInfoFull a2ExecuteFileSystemInIO
 sampleUse2 = a2TestPriv runConfig testInfoFull a2ExecuteFileSystemDocument
 

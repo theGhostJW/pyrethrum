@@ -128,6 +128,18 @@ interactorEffs rc agf = do
                                           pure $ pure ()
                          P.traverse runitem items
 
+--- Single item maybe this will be usefull ??
+interactorEffsSingleItem :: forall effs. Effects effs =>
+                                RunConfig ->
+                                (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
+                                Item ->
+                                Eff effs (IO ())
+interactorEffsSingleItem rc agf itm = do
+                                        as <- interactor rc itm
+                                        log $ agf itm as $ prepState as
+                                        pure $ pure ()
+
+
 mergeIO :: [IO ()] -> IO ()
 mergeIO = foldl' (>>) (pure ())
 

@@ -86,16 +86,16 @@ a2TestRunDoc = runIOList [
   a2ExecuteFileSystemInIO $ DemoRoughTestSimple.interactorEffs runConfig testInfoFull
   ]
 
-a2TestPriv :: forall effs. EFFFileSystem effs => RunConfig -> (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) -> (Eff effs (IO ()) -> IO ()) -> IO ()
+a2TestPriv :: forall effs. EFFFileSystem effs => RunConfig -> (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) -> (Eff effs [IO ()] -> IO ()) -> IO [()]
 a2TestPriv rc aggregator interpreter =
   let
-    interpretTest :: (EFFFileSystem effs => RunConfig -> (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) -> Eff effs (IO ())) -> IO ()
+    interpretTest :: (EFFFileSystem effs => RunConfig -> (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) -> Eff effs [IO ()]) -> IO ()
     interpretTest testEffs = let
                                 justEffs = testEffs rc aggregator
                              in
                                 interpreter justEffs
   in
-    runIOList [
+    P.sequenceA [
         interpretTest RT.interactorEffs --,
         --interpretTest DemoRoughTestSimple.interactorEffs
     ]

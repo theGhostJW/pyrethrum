@@ -118,15 +118,21 @@ instance ItemClass Item ValState where
 interactorEffs :: forall effs. Effects effs =>
                                 RunConfig ->
                                 (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
-                                Eff effs (IO ())
+                                Eff effs [IO ()]
 interactorEffs rc agf = do
-                       let
-                          runitem :: Item -> Eff effs (IO ())
-                          runitem itm = do
+                         let
+                            runitem :: Item -> Eff effs (IO ())
+                            runitem itm = do
                                           as <- interactor rc itm
                                           log $ agf itm as $ prepState as
                                           pure $ pure ()
-                       mergeIO <$> P.traverse runitem items
+                         P.traverse runitem items
 
 mergeIO :: [IO ()] -> IO ()
 mergeIO = foldl' (>>) (pure ())
+
+{-
+
+
+
+-}

@@ -123,8 +123,10 @@ instance ItemClass Item ValState where
 -- 2. call multiple items from test list
 -- 3. inject separate logger
 -- 4. log
--- 5. Generalise
--- 6. ensure on prepstate
+-- 5. reinstate testInfo - including left
+-- 6. Generalise
+-- 7. ensure on prepstate
+-- 8. another testinfo constructor
 -- >>
 
 -- (i -> as -> vs -> ag)

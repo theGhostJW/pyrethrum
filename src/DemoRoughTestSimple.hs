@@ -92,19 +92,21 @@ instance ItemClass Item ValState where
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--- (i -> as -> vs -> ag)
--- runApState :: RunConfig -> (forall effs. Effects effs => Eff effs ApState -> IO (Either AppError ApState)) -> IO (Either AppError ApState)
-runApState agg rc intrprt = let
-                               itm = P.head items
-                               runVals as = agg itm as $ prepState as
-                            in
-                               (runVals <$>) <$> intrprt (interactor rc itm)
+runAllItems agg rc intrprt = runApState agg rc intrprt <$> items
 
-runApStatePrint agg intrprt = runApState agg runConfig intrprt >>= P.print
+runPrintAllItems agg rc intrprt = (P.print =<<) <$> runAllItems agg rc intrprt
+
+runApState agg rc intrprt itm = let
+                                   runVals as = agg itm as $ prepState as
+                                in
+                                   (runVals <$>) <$> intrprt (interactor rc itm)
+
+runApStatePrint agg intrprt itm = runApState agg runConfig intrprt itm >>= P.print
 -- --
-demoAsp :: IO ()
-demoAsp = runApStatePrint testInfoFull executeFileSystemInIOCopy
+firstItem = P.head items
 
+demoAsp :: IO ()
+demoAsp = runApStatePrint testInfoFull executeFileSystemInIOCopy firstItem
 
 
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

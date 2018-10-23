@@ -120,7 +120,7 @@ instance ItemClass Item ValState where
 --    ?? FAIL with type signatur ~ Ambigous type variable
 -- 1.1 Call multiple tests  ✔
 -- 1.2 constructor ✔
--- 2. call multiple items from test list
+-- 2. call multiple items from test list ✔
 -- 3. inject separate logger
 -- 4. log
 -- 5. reinstate testInfo - including left

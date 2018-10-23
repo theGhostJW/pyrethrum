@@ -126,8 +126,8 @@ sampleUse2 = a2TestPriv runConfig testInfoFull a2ExecuteFileSystemDocument
 a2TestPrivList2 :: forall effs. EFFFileSystem effs => (forall a. Eff effs a -> IO (Either AppError a)) -> IO ()
 a2TestPrivList2 interpreter =
   runIOList [
-      RT.runApStatePrint interpreter --,
-      -- DemoRoughTestSimple.runApStatePrint interpreter
+      RT.runApStatePrint testInfoFull interpreter,
+      DemoRoughTestSimple.runApStatePrint testInfoFull interpreter
     ]
 
 sampleUseList2 = a2TestPrivList2 executeFileSystemInIOCopy

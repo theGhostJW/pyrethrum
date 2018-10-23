@@ -119,23 +119,26 @@ instance ItemClass Item ValState where
 -- 1. interpret AppSate ~ will probably need in IO   ✔
 --    ?? FAIL with type signatur ~ Ambigous type variable
 -- 1.1 Call multiple tests  ✔
--- 1.2 constructor
--- 2. call injecting ap state
--- 3. call multiple from test list
--- 4. inject separate logger
--- 5. log
--- >> Profit
+-- 1.2 constructor ✔
+-- 2. call multiple items from test list
+-- 3. inject separate logger
+-- 4. log
+-- 5. Generalise
+-- 6. ensure on prepstate
+-- >>
 
+-- (i -> as -> vs -> ag)
 -- runApState :: RunConfig -> (forall effs. Effects effs => Eff effs ApState -> IO (Either AppError ApState)) -> IO (Either AppError ApState)
-runApState rc intrprt = let
-                          itm = P.head items
-                        in
-                          intrprt $ interactor rc itm
+runApState agg rc intrprt = let
+                               itm = P.head items
+                               runVals as = agg itm as $ prepState as
+                            in
+                               (runVals <$>) <$> intrprt (interactor rc itm)
 
-runApStatePrint intrprt = runApState runConfig intrprt >>= P.print
-
+runApStatePrint agg intrprt = runApState agg runConfig intrprt >>= P.print
+-- --
 demoAsp :: IO ()
-demoAsp = runApStatePrint executeFileSystemInIOCopy
+demoAsp = runApStatePrint testInfoFull executeFileSystemInIOCopy
 
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -88,24 +88,23 @@ instance ItemClass Item ValState where
   thenClause = post
   checkList = checks
 
--- 1. interpret AppSate ~ will probably need in IO
---    ?? FAIL ~ Ambigous type variable but works with no type signature
--- 2. call injecting ap state
--- 3. call multiple from test list
--- 4. inject separate logger
--- 5. constructor and log
--- >> Profit
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-- (i -> as -> vs -> ag)
 -- runApState :: RunConfig -> (forall effs. Effects effs => Eff effs ApState -> IO (Either AppError ApState)) -> IO (Either AppError ApState)
--- runApState :: RunConfig -> (forall effs. Effects effs => Eff effs ApState -> IO (Either AppError ApState)) -> IO (Either AppError ApState)
-runApState rc intrprt = let
-                          itm = P.head items
-                        in
-                          intrprt $ interactor rc itm
+runApState agg rc intrprt = let
+                               itm = P.head items
+                               runVals as = agg itm as $ prepState as
+                            in
+                               (runVals <$>) <$> intrprt (interactor rc itm)
 
-runApStatePrint intrprt = runApState runConfig intrprt >>= P.print
+runApStatePrint agg intrprt = runApState agg runConfig intrprt >>= P.print
+-- --
+demoAsp :: IO ()
+demoAsp = runApStatePrint testInfoFull executeFileSystemInIOCopy
 
-demoAspSimp = runApStatePrint executeFileSystemInIOCopy
 
 
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -126,7 +126,7 @@ instance ItemClass Item ValState where
 -- 5. reinstate testInfo - including left
 -- 6. Generalise
 -- 7. ensure on prepstate
--- 8. another testinfo constructor
+-- 8. another testinfo constructor for failed prepstate
 -- >>
 
 -- (i -> as -> vs -> ag)

@@ -14,6 +14,7 @@ import           Control.Monad.Freer
 import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter
+import Data.Either
 import qualified Prelude as P
 import           Foundation.Extended             hiding (readFile, writeFile, Item)
 import           Runner
@@ -58,10 +59,10 @@ data Item = Item {
 i = Item
 
 items = [
-          i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] $
-                                chk "iid is small" (\V{..} -> iidx10 < 200 ) <>
-                                chk "iid is big"   (\V{..} -> iidx10 > 500),
-          i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+          -- i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] $
+          --                       chk "iid is small" (\V{..} -> iidx10 < 200 ) <>
+          --                       chk "iid is big"   (\V{..} -> iidx10 > 500),
+          -- i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
           i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
           i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
           i 140 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
@@ -115,6 +116,30 @@ instance ItemClass Item ValState where
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-- 1. interpret AppSate ~ will probably need in IO
+--    ?? FAIL with type signatur ~ Ambigous type variable
+-- 1.1 Call multiple tests
+-- 2. call injecting ap state
+-- 3. call multiple from test list
+-- 4. inject separate logger
+-- 5. constructor and log
+-- >> Profit
+
+-- runApState :: RunConfig -> (forall effs. Effects effs => Eff effs ApState -> IO (Either AppError ApState)) -> IO (Either AppError ApState)
+runApState rc intrprt = let
+                          itm = P.head items
+                        in
+                          intrprt $ interactor rc itm
+
+runApStatePrint intrprt = runApState runConfig intrprt >>= P.print
+
+demoAsp = runApStatePrint executeFileSystemInIOCopy
+
+
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2- FAIL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 interactorEffs :: forall effs. Effects effs =>
                                 RunConfig ->
                                 (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
@@ -133,27 +158,20 @@ interactorEffsSingleItem :: forall effs. Effects effs =>
                                 RunConfig ->
                                 (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
                                 Item ->
-                                Eff effs (IO ())
+                                Eff effs (Either AppError (TestInfo Item ApState ValState))
 interactorEffsSingleItem rc agf itm = do
                                         as <- interactor rc itm
-                                        log $ agf itm as $ prepState as
-                                        pure $ pure ()
+                                        let rslt = agf itm as $ prepState as
+                                        log rslt
+                                        pure $ pure rslt
 
 --- may be usufull ??
 interactList :: forall effs. Effects effs => RunConfig ->
             (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
             [Eff effs (IO ())]
 interactList rc agf = let
-                        oneItem = interactorEffsSingleItem rc agf
+                        rsltLst :: [Eff effs (Either AppError (TestInfo Item ApState ValState))]
+                        rsltLst = interactorEffsSingleItem rc agf <$> items
+
                       in
-                        oneItem <$> items
-
-
-mergeIO :: [IO ()] -> IO ()
-mergeIO = foldl' (>>) (pure ())
-
-{-
-
-
-
--}
+                        (P.print <$>) <$> rsltLst

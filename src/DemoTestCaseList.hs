@@ -79,6 +79,8 @@ testRunDoc = runIOList [
   runAllDoc DemoRoughTestSimple.test
   ]
 
+
+
 -- A2 Hard Coded
 a2TestRunDoc :: IO ()
 a2TestRunDoc = runIOList [
@@ -120,13 +122,12 @@ sampleUse1 = a2TestPriv runConfig testInfoFull a2ExecuteFileSystemInIO
 sampleUse2 = a2TestPriv runConfig testInfoFull a2ExecuteFileSystemDocument
 
 
---a2RunAll =
-
--- runner :: (forall i as vs effs. (ItemClass i vs, Show i, Show as, Show vs, EFFFileSystem effs) => Test i (Eff effs as) as vs -> IO ()) -> IO ()
--- runner f = runIOList $ [
---   f RT.test,
---   f DemoRoughTestSimple.test
---   ]
 --
--- demo :: IO ()
--- demo = runner runAllFull
+a2TestPrivList2 :: forall effs. EFFFileSystem effs => (forall a. Eff effs a -> IO (Either AppError a)) -> [IO ()]
+a2TestPrivList2 interpreter =
+    [
+      RT.runApStatePrint interpreter,
+      DemoRoughTestSimple.runApStatePrint interpreter
+    ]
+
+sampleUseList2 = runIOList $ a2TestPrivList2 executeFileSystemInIOCopy

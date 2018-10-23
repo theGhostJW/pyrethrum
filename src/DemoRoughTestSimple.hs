@@ -14,6 +14,8 @@ import Runner
 import           Control.Monad.Freer
 import           DSL.Interpreter
 import           Foundation.Extended hiding (Item)
+import           Control.Monad.Freer.Error
+import           DSL.FileSystem
 import qualified Prelude as P
 
 type Effects effs = EFFEnsureOnly effs
@@ -86,8 +88,28 @@ instance ItemClass Item ValState where
   thenClause = post
   checkList = checks
 
+-- 1. interpret AppSate ~ will probably need in IO
+--    ?? FAIL ~ Ambigous type variable but works with no type signature
+-- 2. call injecting ap state
+-- 3. call multiple from test list
+-- 4. inject separate logger
+-- 5. constructor and log
+-- >> Profit
+
+-- runApState :: RunConfig -> (forall effs. Effects effs => Eff effs ApState -> IO (Either AppError ApState)) -> IO (Either AppError ApState)
+-- runApState :: RunConfig -> (forall effs. Effects effs => Eff effs ApState -> IO (Either AppError ApState)) -> IO (Either AppError ApState)
+runApState rc intrprt = let
+                          itm = P.head items
+                        in
+                          intrprt $ interactor rc itm
+
+runApStatePrint intrprt = runApState runConfig intrprt >>= P.print
+
+demoAspSimp = runApStatePrint executeFileSystemInIOCopy
+
+
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 - Fail %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 interactorEffs :: forall effs. Effects effs =>

@@ -94,7 +94,13 @@ instance ItemClass Item ValState where
 
 runAllItems agg rc intrprt = runApState agg rc intrprt <$> items
 
-runPrintAllItems agg rc intrprt = (P.print =<<) <$> runAllItems agg rc intrprt
+runPrintAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems agg rc intrprt
+
+runPrintAllItemsToConsole :: forall effs a. (Effects effs, Show a) => (Item -> ApState -> ValState -> a)
+                                     -> RunConfig
+                                     -> (Eff effs ApState -> IO (Either AppError ApState))
+                                     -> [IO ()]
+runPrintAllItemsToConsole = runPrintAllItems consoleLogger
 
 runApState agg rc intrprt itm = let
                                    runVals as = agg itm as $ prepState as
@@ -107,7 +113,6 @@ firstItem = P.head items
 
 demoAsp :: IO ()
 demoAsp = runApStatePrint testInfoFull executeFileSystemInIOCopy firstItem
-
 
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 - Fail %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

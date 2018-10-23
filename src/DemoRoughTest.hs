@@ -121,8 +121,8 @@ instance ItemClass Item ValState where
 -- 1.1 Call multiple tests  ✔
 -- 1.2 constructor ✔
 -- 2. call multiple items from test list ✔
--- 3. inject separate logger
--- 4. log
+-- 3. inject separate logger ✔
+-- 4. log ✔
 -- 5. reinstate testInfo - including left
 -- 6. Generalise
 -- 7. ensure on prepstate
@@ -133,7 +133,13 @@ instance ItemClass Item ValState where
 -- runApState :: RunConfig -> (forall effs. Effects effs => Eff effs ApState -> IO (Either AppError ApState)) -> IO (Either AppError ApState)
 runAllItems agg rc intrprt = runApState agg rc intrprt <$> items
 
-runPrintAllItems agg rc intrprt = (P.print =<<) <$> runAllItems agg rc intrprt
+runPrintAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems agg rc intrprt
+
+runPrintAllItemsToConsole :: forall effs a. (Effects effs, Show a) => (Item -> ApState -> ValState -> a)
+                                     -> RunConfig
+                                     -> (Eff effs ApState -> IO (Either AppError ApState))
+                                     -> [IO ()]
+runPrintAllItemsToConsole = runPrintAllItems consoleLogger
 
 runApState agg rc intrprt itm = let
                                    runVals as = agg itm as $ prepState as

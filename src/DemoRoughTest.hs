@@ -156,16 +156,8 @@ runLogAllItems :: (Monad m, Effects effs) =>
                    -> [m b]
 runLogAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems recoverTestInfo agg rc intrprt
 
-runLogAllItemsToConsole :: forall effs. Effects effs =>
-                                      (Item -> ApState -> ValState -> TestInfo Item ApState ValState)
-                                     -> RunConfig
-                                     -> (Eff effs ApState -> IO (Either AppError ApState))
-                                     -> [IO ()]
-runLogAllItemsToConsole = runLogAllItems consoleLogger
-
-
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2- FAIL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2- FAIL %%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 interactorEffs :: forall effs. Effects effs =>

@@ -129,29 +129,39 @@ instance ItemClass Item ValState where
 -- 8. another testinfo constructor for failed prepstate
 -- >>
 
--- (i -> as -> vs -> ag)
--- runApState :: RunConfig -> (forall effs. Effects effs => Eff effs ApState -> IO (Either AppError ApState)) -> IO (Either AppError ApState)
-runAllItems agg rc intrprt = runApState agg rc intrprt <$> items
-
-runPrintAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems agg rc intrprt
-
-runPrintAllItemsToConsole :: forall effs a. (Effects effs, Show a) => (Item -> ApState -> ValState -> a)
-                                     -> RunConfig
-                                     -> (Eff effs ApState -> IO (Either AppError ApState))
-                                     -> [IO ()]
-runPrintAllItemsToConsole = runPrintAllItems consoleLogger
-
+runApState :: (Functor f1, Functor f2, Effects effs) =>
+     (Item -> ApState -> ValState -> b)
+     -> RunConfig
+     -> (Eff effs ApState -> f1 (f2 ApState))
+     -> Item
+     -> f1 (f2 b)
 runApState agg rc intrprt itm = let
                                    runVals as = agg itm as $ prepState as
                                 in
                                    (runVals <$>) <$> intrprt (interactor rc itm)
 
-runApStatePrint agg intrprt itm = runApState agg runConfig intrprt itm >>= P.print
--- --
-firstItem = P.head items
+runAllItems :: (Functor f1, Functor f2, Effects effs) =>
+     (Item -> ApState -> ValState -> b)
+     -> RunConfig
+     -> (Eff effs ApState
+     -> f1 (f2 ApState))
+     -> [f1 (f2 b)]
+runAllItems agg rc intrprt = runApState agg rc intrprt <$> items
 
-demoAsp :: IO ()
-demoAsp = runApStatePrint testInfoFull executeFileSystemInIOCopy firstItem
+runPrintAllItems :: (Monad m, Effects effs, Functor f) =>
+     (f a -> m b)                           -- logger
+     -> (Item -> ApState -> ValState -> a)  -- result constructor
+     -> RunConfig
+     -> (Eff effs ApState -> m (f ApState))
+     -> [m b]
+runPrintAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems agg rc intrprt
+
+runPrintAllItemsToConsole :: forall effs a. (Effects effs, Show a) =>
+                                      (Item -> ApState -> ValState -> a)
+                                     -> RunConfig
+                                     -> (Eff effs ApState -> IO (Either AppError ApState))
+                                     -> [IO ()]
+runPrintAllItemsToConsole = runPrintAllItems consoleLogger
 
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

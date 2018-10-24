@@ -60,8 +60,8 @@ i = Item
 
 items = [
           i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] $
-                                chk "iid is small" (\V{..} -> iidx10 < 200 ) <>
-                                chk "iid is big"   (\V{..} -> iidx10 > 500),
+                                chk "iid x 10 is small" (\V{..} -> iidx10 < 200 ) <>
+                                chk "iid x 10 is big"   (\V{..} -> iidx10 > 500),
           i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
           i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
           i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,

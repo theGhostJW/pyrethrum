@@ -92,27 +92,41 @@ instance ItemClass Item ValState where
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-runAllItems agg rc intrprt = runApState agg rc intrprt <$> items
 
-runPrintAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems agg rc intrprt
-
-runPrintAllItemsToConsole :: forall effs a. (Effects effs, Show a) => (Item -> ApState -> ValState -> a)
-                                     -> RunConfig
-                                     -> (Eff effs ApState -> IO (Either AppError ApState))
-                                     -> [IO ()]
-runPrintAllItemsToConsole = runPrintAllItems consoleLogger
-
+runApState :: (Functor f1, Functor f2, Effects effs) =>
+     (Item -> ApState -> ValState -> b)
+     -> RunConfig
+     -> (Eff effs ApState -> f1 (f2 ApState))
+     -> Item
+     -> f1 (f2 b)
 runApState agg rc intrprt itm = let
                                    runVals as = agg itm as $ prepState as
                                 in
                                    (runVals <$>) <$> intrprt (interactor rc itm)
 
-runApStatePrint agg intrprt itm = runApState agg runConfig intrprt itm >>= P.print
--- --
-firstItem = P.head items
+runAllItems :: (Functor f1, Functor f2, Effects effs) =>
+     (Item -> f2 b -> b)                   -- recover from either
+     -> (Item -> ApState -> ValState -> b)
+     -> RunConfig
+     -> (Eff effs ApState -> f1 (f2 ApState))
+     -> [f1 b]
+runAllItems frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState agg rc intrprt itm) <$> items
 
-demoAsp :: IO ()
-demoAsp = runApStatePrint testInfoFull executeFileSystemInIOCopy firstItem
+runLogAllItems :: (Monad m, Effects effs) =>
+                   (TestInfo Item as vs -> m b)                             -- logger
+                   -> (Item -> ApState -> ValState -> TestInfo Item as vs)  -- rslt constructor
+                   -> RunConfig                                             -- runConfig
+                   -> (Eff effs ApState -> m (Either AppError ApState))     -- interpreter
+                   -> [m b]
+runLogAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems recoverTestInfo agg rc intrprt
+
+runLogAllItemsToConsole :: forall effs. Effects effs =>
+                                      (Item -> ApState -> ValState -> TestInfo Item ApState ValState)
+                                     -> RunConfig
+                                     -> (Eff effs ApState -> IO (Either AppError ApState))
+                                     -> [IO ()]
+runLogAllItemsToConsole = runLogAllItems consoleLogger
+
 
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 - Fail %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

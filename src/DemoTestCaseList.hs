@@ -123,14 +123,16 @@ sampleUse2 = a2TestPriv runConfig testInfoFull a2ExecuteFileSystemDocument
 
 
 --
-a2TestPrivList2 :: forall effs. EFFFileSystem effs =>
-                   RunConfig
+a2TestPrivList2 :: forall effs. (EFFFileSystem effs)=>
+                  (forall s. Show s => s -> IO ())
+                  -> RunConfig
                   -> (forall i as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs)
                   -> (forall a. Eff effs a -> IO (Either AppError a))
                   -> IO ()
-a2TestPrivList2 runCfg agf interpreter =
+a2TestPrivList2 logger runCfg agf interpreter =
                             runIOList $ runIOList <$> [
-                                              RT.runPrintAllItemsToConsole agf runCfg interpreter,
-                                              DemoRoughTestSimple.runPrintAllItemsToConsole agf runCfg interpreter
+                                              RT.runLogAllItems logger agf runCfg interpreter,
+                                              DemoRoughTestSimple.runLogAllItems logger agf runCfg interpreter
                                             ]
-sampleUseList2 = a2TestPrivList2 runConfig testInfoFull executeFileSystemInIOCopy
+
+sampleUseList2 = a2TestPrivList2 consoleLogger runConfig testInfoFull executeFileSystemInIOCopy

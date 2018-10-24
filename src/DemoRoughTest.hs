@@ -123,7 +123,7 @@ instance ItemClass Item ValState where
 -- 2. call multiple items from test list ✔
 -- 3. inject separate logger ✔
 -- 4. log ✔
--- 5. reinstate testInfo - including left
+-- 5. reinstate testInfo - including left ✔
 -- 6. Generalise
 -- 7. ensure on prepstate
 -- 8. another testinfo constructor for failed prepstate
@@ -141,27 +141,27 @@ runApState agg rc intrprt itm = let
                                    (runVals <$>) <$> intrprt (interactor rc itm)
 
 runAllItems :: (Functor f1, Functor f2, Effects effs) =>
-     (Item -> ApState -> ValState -> b)
+     (Item -> f2 b -> b)                   -- recover from either
+     -> (Item -> ApState -> ValState -> b)
      -> RunConfig
-     -> (Eff effs ApState
-     -> f1 (f2 ApState))
-     -> [f1 (f2 b)]
-runAllItems agg rc intrprt = runApState agg rc intrprt <$> items
+     -> (Eff effs ApState -> f1 (f2 ApState))
+     -> [f1 b]
+runAllItems frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState agg rc intrprt itm) <$> items
 
-runPrintAllItems :: (Monad m, Effects effs, Functor f) =>
-     (f a -> m b)                           -- logger
-     -> (Item -> ApState -> ValState -> a)  -- result constructor
-     -> RunConfig
-     -> (Eff effs ApState -> m (f ApState))
-     -> [m b]
-runPrintAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems agg rc intrprt
+runLogAllItems :: (Monad m, Effects effs) =>
+                   (TestInfo Item as vs -> m b)                             -- logger
+                   -> (Item -> ApState -> ValState -> TestInfo Item as vs)  -- rslt constructor
+                   -> RunConfig                                             -- runConfig
+                   -> (Eff effs ApState -> m (Either AppError ApState))     -- interpreter
+                   -> [m b]
+runLogAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems recoverTestInfo agg rc intrprt
 
-runPrintAllItemsToConsole :: forall effs a. (Effects effs, Show a) =>
-                                      (Item -> ApState -> ValState -> a)
+runLogAllItemsToConsole :: forall effs. Effects effs =>
+                                      (Item -> ApState -> ValState -> TestInfo Item ApState ValState)
                                      -> RunConfig
                                      -> (Eff effs ApState -> IO (Either AppError ApState))
                                      -> [IO ()]
-runPrintAllItemsToConsole = runPrintAllItems consoleLogger
+runLogAllItemsToConsole = runLogAllItems consoleLogger
 
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

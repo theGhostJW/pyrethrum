@@ -81,11 +81,17 @@ runSteps aggregator runConfig TestComponents {..} interpreter filtr =
       (itemToResult <$>) <$> filterredItems filtr testItems
 
 data TestInfo i as vs = TestInfo {
-  item :: i,
-  apState  :: Maybe as,
-  valState :: Maybe vs,
-  checkResult :: Maybe CheckResultList
-} deriving Show
+                                  item :: i,
+                                  apState  :: Maybe as,
+                                  valState :: Maybe vs,
+                                  checkResult :: Maybe CheckResultList
+                                } |
+
+                         TestFault {
+                                    item :: i,
+                                    error :: AppError
+                                  }
+                                  deriving Show
 
 testInfoFull :: forall i as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs
 testInfoFull item apState valState =
@@ -95,6 +101,9 @@ testInfoFull item apState valState =
       valState = Just valState,
       checkResult = Just $ calcChecks valState $ checkList item
     }
+
+recoverTestInfo :: i -> Either AppError (TestInfo i as vs) -> TestInfo i as vs
+recoverTestInfo i = either (TestFault i) id
 
 testInfoNoValidation :: i -> a -> v -> TestInfo i a v
 testInfoNoValidation item apState _ =

@@ -25,15 +25,15 @@ data AppError =
               IOError IOException
               deriving (Show, Eq)
 
-executeFileSystemInIOCopy :: forall a. {- v.(a -> v) -> -} Eff '[FileSystem,  Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError a)
-executeFileSystemInIOCopy {- func -} app = unifyFSEnsureError <$> runM
+executeFileSystemInIOCopy :: forall a. Eff '[FileSystem,  Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError a)
+executeFileSystemInIOCopy app = unifyFSEnsureError <$> runM
                                   (
                                     runError
                                     $ runError
                                     $ ensureInterpreter
                                     $ logConsoleInterpreter
                                     $ fileSystemIOInterpreter
-                                    $ {- func <$> -} app
+                                     app
                                   )
 
 unifyFSEnsureError :: Either EnsureError (Either FileSystemError v) -> Either AppError v

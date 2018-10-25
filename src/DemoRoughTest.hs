@@ -41,6 +41,7 @@ newtype ValState = V {
                     iidx10 :: Int
                   } deriving Show
 
+-- change to Ensure eff 
 prepState :: ApState -> ValState
 prepState ApState{..} = V $ 10 * itemId
 
@@ -58,6 +59,9 @@ data Item = Item {
 
 i = Item
 
+-- should be :: RunConfig -> [Item]
+-- later optional hedgehog
+items :: [Item]
 items = [
           i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] $
                                 chk "iid x 10 is small" (\V{..} -> iidx10 < 200 ) <>
@@ -72,28 +76,6 @@ items = [
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-execute :: forall effs. Effects effs => (Test Item (Eff effs ApState) ApState ValState -> IO ()) -> IO ()
-execute f = f test
---
--- exDocAll :: IO ()
--- exDocAll = runAllDoc test
---
--- exAll :: IO ()
--- exAll = runAllFull test
-
-exAll :: IO ()
-exAll = execute runAllFull
-
-
--- exDocAll' :: (ItemClass i vs, Show i, Show as, Show vs) => (Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()) -> IO ()
--- exDocAll' f = f test
-
--- data Test1
---   -- | @Fold @ @ step @ @ initial @ @ extract@
---   --  = forall x. Fold (x -> a -> x) x (x -> b
---   = forall i vs as. (ItemClass i vs, Show i, Show as, Show vs) => Test1 ((Test i (Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] as) as vs -> IO ()) -> IO ())
-
 
 test :: forall effs. Effects effs => Test Item (Eff effs ApState) ApState ValState
 test = GenericTest {
@@ -117,7 +99,7 @@ instance ItemClass Item ValState where
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -- 1. interpret AppSate ~ will probably need in IO   ✔
---    ?? FAIL with type signatur ~ Ambigous type variable
+--    ?? FAIL with type signature ~ Ambigous type variable
 -- 1.1 Call multiple tests  ✔
 -- 1.2 constructor ✔
 -- 2. call multiple items from test list ✔
@@ -157,7 +139,7 @@ runLogAllItems :: (Monad m, Effects effs) =>
 runLogAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems recoverTestInfo agg rc intrprt
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2- FAIL %%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 - FAIL %%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 interactorEffs :: forall effs. Effects effs =>

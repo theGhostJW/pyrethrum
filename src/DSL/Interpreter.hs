@@ -10,6 +10,7 @@ import           DSL.Logger
 import           Foundation.Extended
 import ItemClass
 import Data.Either.Combinators
+import Data.Tuple as T
 
 type EFFLogger effs = Member Logger effs
 type EFFEnsureOnly effs = (Members '[Logger, Ensure] effs)
@@ -24,24 +25,6 @@ data AppError =
               GenericError String |
               IOError IOException
               deriving (Show, Eq)
-
-executeFileSystemInIOCopy :: forall a. Eff '[FileSystem,  Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError a)
-executeFileSystemInIOCopy app = unifyFSEnsureError <$> runM
-                                  (
-                                    runError
-                                    $ runError
-                                    $ ensureInterpreter
-                                    $ logConsoleInterpreter
-                                    $ fileSystemIOInterpreter
-                                     app
-                                  )
-
-unifyFSEnsureError :: Either EnsureError (Either FileSystemError v) -> Either AppError v
-unifyFSEnsureError = \case
-                       Right ee -> case ee of
-                                       Right v -> Right v
-                                       Left l -> Left $ AppFileSystemError l
-                       Left enFail -> Left $ AppEnsureError enFail
 
 executeFileSystemInIO :: forall a v. (a -> v) -> Eff '[FileSystem,  Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError v)
 executeFileSystemInIO func app = unifyFSEnsureError <$> runM
@@ -73,18 +56,28 @@ executeFileSystemDocument func app =  let
                                       in
                                         mapError vl
 
-a2ExecuteFileSystemInIO :: forall a. Eff '[FileSystem,  Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO ()
-a2ExecuteFileSystemInIO app = unifyFSEnsureError <$> runM
-                                  (
-                                    runError
-                                    $ runError
-                                    $ ensureInterpreter
-                                    $ logConsoleInterpreter
-                                    $ fileSystemIOInterpreter app
-                                  ) >> pure ()
 
-a2ExecuteFileSystemDocument :: forall a.  Eff '[FileSystem, Logger, Ensure, Error EnsureError, Writer [String], IO] a -> IO ()
-a2ExecuteFileSystemDocument app =  let
+unifyFSEnsureError :: Either EnsureError (Either FileSystemError v) -> Either AppError v
+unifyFSEnsureError = \case
+                       Right ee -> case ee of
+                                       Right v -> Right v
+                                       Left l -> Left $ AppFileSystemError l
+                       Left enFail -> Left $ AppEnsureError enFail
+
+
+executeInIO :: forall a. Eff '[FileSystem,  Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError a)
+executeInIO app = unifyFSEnsureError <$> runM
+                                 (
+                                   runError
+                                   $ runError
+                                   $ ensureInterpreter
+                                   $ logConsoleInterpreter
+                                   $ fileSystemIOInterpreter
+                                    app
+                                 )
+
+executeDocument :: forall a.  Eff '[FileSystem, Logger, Ensure, Error EnsureError, Writer [String], IO] a -> IO (Either AppError a)
+executeDocument app =  let
                                         vl = runM
                                               $ runWriter
                                               $ runError
@@ -98,4 +91,4 @@ a2ExecuteFileSystemDocument app =  let
                                                       pure (mapLeft AppEnsureError val, logs)
 
                                       in
-                                        mapError vl >> pure ()
+                                         T.fst <$> mapError vl

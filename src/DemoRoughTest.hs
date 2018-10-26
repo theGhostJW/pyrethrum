@@ -41,7 +41,7 @@ newtype ValState = V {
                     iidx10 :: Int
                   } deriving Show
 
--- change to Ensure eff 
+-- change to Ensure eff
 prepState :: ApState -> ValState
 prepState ApState{..} = V $ 10 * itemId
 
@@ -109,7 +109,16 @@ instance ItemClass Item ValState where
 -- 6. Generalise
 -- 7. ensure on prepstate
 -- 8. another testinfo constructor for failed prepstate
--- >>
+-- 9. test filter
+-- 10. group - rollover - go home is home
+-- 11. test case end point
+-- 12. logging to file
+--    12.01 add hoc and results logging to the same file
+--    12.02 include test path in log
+-- 13. Log Formatting and Report Generation
+-- 13.1 ~ generalised log type
+-- 13.2 ~ serialisation format
+-- 13.3 ~ report generation
 
 runApState :: (Functor f1, Functor f2, Effects effs) =>
      (Item -> ApState -> ValState -> b)

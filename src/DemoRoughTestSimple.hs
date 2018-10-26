@@ -92,7 +92,6 @@ instance ItemClass Item ValState where
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 runApState :: (Functor f1, Functor f2, Effects effs) =>
      (Item -> ApState -> ValState -> b)
      -> RunConfig
@@ -119,24 +118,3 @@ runLogAllItems :: (Monad m, Effects effs) =>
                    -> (Eff effs ApState -> m (Either AppError ApState))     -- interpreter
                    -> [m b]
 runLogAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems recoverTestInfo agg rc intrprt
-
-
-  -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 - Fail %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-interactorEffs :: forall effs. Effects effs =>
-                                  RunConfig ->
-                                  (forall as vs i. ItemClass i vs => i -> as -> vs -> TestInfo i as vs) ->
-                                  Eff effs (IO ())
-interactorEffs rc agf = do
-                         let
-                            runitem :: Item -> Eff effs (IO ())
-                            runitem itm = do
-                                            as <- interactor rc itm
-                                            log $ agf itm as $ prepState as
-                                            pure $ pure ()
-                         mergeIO <$> P.traverse runitem items
-
-mergeIO :: [IO ()] -> IO ()
-mergeIO = foldl' (>>) (pure ())

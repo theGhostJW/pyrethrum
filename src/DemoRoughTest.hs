@@ -106,7 +106,7 @@ instance ItemClass Item ValState where
 -- 3. inject separate logger ✔
 -- 4. log ✔
 -- 5. reinstate testInfo - including left ✔
--- 6. Generalise
+-- 6. Generalise ✔
 -- 7. ensure on prepstate
 -- 8. another testinfo constructor for failed prepstate
 -- 9. test filter

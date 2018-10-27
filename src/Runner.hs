@@ -75,3 +75,42 @@ testInfoNoValidation item apState _ =
       valState = Nothing,
       checkResult = Nothing
     }
+
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Rqun Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+runApState :: (Functor f1, Functor f2) =>
+     (rc -> itm -> Eff effs as)
+     -> (as -> vs)
+     -> (itm -> as -> vs -> b)
+     -> rc
+     -> (Eff effs as -> f1 (f2 as))
+     -> itm
+     -> f1 (f2 b)
+runApState interactor prepState agg rc intrprt itm = let
+                                   runVals as = agg itm as $ prepState as
+                                in
+                                   (runVals <$>) <$> intrprt (interactor rc itm)
+
+runAllItems :: (Functor f1, Functor f2) =>
+      [itm]                                   -- items
+      -> (rc -> itm -> Eff effs as)           -- interactor
+      -> (as -> vs)                           -- prepsatate
+      -> (itm -> f2 b -> b)                   -- recover from either
+      -> (itm -> as -> vs -> b)               -- aggragator
+      -> rc                                   -- runconfig
+      -> (Eff effs as -> f1 (f2 as))          -- interpreter
+      -> [f1 b]
+runAllItems items interactor prepState frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState interactor prepState agg rc intrprt itm) <$> items
+
+runLogAllItems ::  forall itm rc as vs m b effs. (Monad m) =>
+                   (rc -> itm -> Eff effs as)                  -- interactor
+                   -> (as -> vs)                               -- prepstate
+                   -> [itm]                                    -- items
+                   -> (itm -> as -> vs -> TestInfo itm as vs)  -- aggregator i.e. rslt constructor
+                   -> (TestInfo itm as vs -> m b)              -- logger
+                   -> rc                                       -- runConfig
+                   -> (Eff effs as -> m (Either AppError as))  -- interpreter
+                   -> [m b]
+runLogAllItems interactor prepstate itms agg logger rc intrprt = (logger =<<) <$> runAllItems itms interactor prepstate recoverTestInfo agg rc intrprt

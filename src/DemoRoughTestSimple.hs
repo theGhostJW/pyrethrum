@@ -10,7 +10,7 @@ import DSL.Logger
 import DemoConfig
 import           TestAndRunConfig
 import DSL.Ensure
-import Runner
+import Runner as R
 import           Control.Monad.Freer
 import           DSL.Interpreter
 import           Foundation.Extended hiding (Item)
@@ -89,32 +89,13 @@ instance ItemClass Item ValState where
   checkList = checks
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Execution %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-runApState :: (Functor f1, Functor f2, Effects effs) =>
-     (Item -> ApState -> ValState -> b)
-     -> RunConfig
-     -> (Eff effs ApState -> f1 (f2 ApState))
-     -> Item
-     -> f1 (f2 b)
-runApState agg rc intrprt itm = let
-                                   runVals as = agg itm as $ prepState as
-                                in
-                                   (runVals <$>) <$> intrprt (interactor rc itm)
-
-runAllItems :: (Functor f1, Functor f2, Effects effs) =>
-     (Item -> f2 b -> b)                   -- recover from either
-     -> (Item -> ApState -> ValState -> b)
-     -> RunConfig
-     -> (Eff effs ApState -> f1 (f2 ApState))
-     -> [f1 b]
-runAllItems frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState agg rc intrprt itm) <$> items
-
 runLogAllItems :: (Monad m, Effects effs) =>
-                   (TestInfo Item as vs -> m b)                             -- logger
-                   -> (Item -> ApState -> ValState -> TestInfo Item as vs)  -- rslt constructor
+                   (Item -> ApState -> ValState -> TestInfo Item ApState ValState)  -- rslt constructor
+                   ->  (TestInfo Item ApState ValState -> m b)                -- logger
                    -> RunConfig                                             -- runConfig
                    -> (Eff effs ApState -> m (Either AppError ApState))     -- interpreter
                    -> [m b]
-runLogAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems recoverTestInfo agg rc intrprt
+runLogAllItems = R.runLogAllItems interactor prepState items 

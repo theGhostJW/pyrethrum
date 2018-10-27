@@ -17,7 +17,7 @@ import           DSL.Interpreter
 import Data.Either
 import qualified Prelude as P
 import           Foundation.Extended             hiding (readFile, writeFile, Item)
-import           Runner
+import           Runner as R
 
 type Effects effs = EFFFileSystem effs
 
@@ -112,6 +112,7 @@ instance ItemClass Item ValState where
 -- 9. test filter
 -- 10. group - rollover - go home is home
 -- 11. test case end point
+-- 11. ~ try merging into typeclass
 -- 12. logging to file
 --    12.01 add hoc and results logging to the same file
 --    12.02 include test path in log
@@ -120,29 +121,14 @@ instance ItemClass Item ValState where
 -- 13.2 ~ serialisation format
 -- 13.3 ~ report generation
 
-runApState :: (Functor f1, Functor f2, Effects effs) =>
-     (Item -> ApState -> ValState -> b)
-     -> RunConfig
-     -> (Eff effs ApState -> f1 (f2 ApState))
-     -> Item
-     -> f1 (f2 b)
-runApState agg rc intrprt itm = let
-                                   runVals as = agg itm as $ prepState as
-                                in
-                                   (runVals <$>) <$> intrprt (interactor rc itm)
-
-runAllItems :: (Functor f1, Functor f2, Effects effs) =>
-     (Item -> f2 b -> b)                   -- recover from either
-     -> (Item -> ApState -> ValState -> b)
-     -> RunConfig
-     -> (Eff effs ApState -> f1 (f2 ApState))
-     -> [f1 b]
-runAllItems frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState agg rc intrprt itm) <$> items
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Execution %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 runLogAllItems :: (Monad m, Effects effs) =>
-                   (TestInfo Item as vs -> m b)                             -- logger
-                   -> (Item -> ApState -> ValState -> TestInfo Item as vs)  -- rslt constructor
+                   (Item -> ApState -> ValState -> TestInfo Item ApState ValState)  -- rslt constructor
+                   ->  (TestInfo Item ApState ValState -> m b)                -- logger
                    -> RunConfig                                             -- runConfig
                    -> (Eff effs ApState -> m (Either AppError ApState))     -- interpreter
                    -> [m b]
-runLogAllItems logger agg rc intrprt = (logger =<<) <$> runAllItems recoverTestInfo agg rc intrprt
+runLogAllItems = R.runLogAllItems interactor prepState items

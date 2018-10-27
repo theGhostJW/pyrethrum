@@ -35,8 +35,8 @@ interactor rc TestItem{..} = do
                               ensure "Only even iids expected" $ P.even iid
                               pure $ ApState iid "Success"
 
-prepState :: ApState -> ValState
-prepState = id
+prepState :: ApState -> Ensurable ValState
+prepState = pure . id
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Test Items %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -98,4 +98,4 @@ runLogAllItems :: (Monad m, Effects effs) =>
                    -> RunConfig                                             -- runConfig
                    -> (Eff effs ApState -> m (Either AppError ApState))     -- interpreter
                    -> [m b]
-runLogAllItems = R.runLogAllItems interactor prepState items 
+runLogAllItems = R.runLogAllItems interactor prepState items

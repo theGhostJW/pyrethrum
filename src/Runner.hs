@@ -39,74 +39,92 @@ data GenericResult testConfig rslt = TestResult {
 data TestComponents runConfig item effs apState valState = TestComponents {
   testItems :: [item],
   testInteractor :: runConfig -> item -> effs,
-  testPrepState :: apState -> valState
+  testPrepState :: apState -> Ensurable valState
 }
 
 data TestInfo i as vs = TestInfo {
                                   item :: i,
-                                  apState  :: Maybe as,
-                                  valState :: Maybe vs,
-                                  checkResult :: Maybe CheckResultList
+                                  apState  :: as,
+                                  valState :: vs,
+                                  checkResult :: CheckResultList
                                 } |
 
-                         TestFault {
+                         InteractionFault {
                                     item :: i,
                                     error :: AppError
+                                  } |
+
+                         PrepStateFault {
+                                    item :: i,
+                                    apState  :: as,
+                                    error :: AppError
+                                  } |
+
+                         DocInfo {
+                                    item :: i,
+                                    apState  :: as
                                   }
+
                                   deriving Show
 
 testInfoFull :: forall i as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs
 testInfoFull item apState valState =
   TestInfo {
       item = item,
-      apState = Just apState,
-      valState = Just valState,
-      checkResult = Just $ calcChecks valState $ checkList item
+      apState = apState,
+      valState = valState,
+      checkResult = calcChecks valState $ checkList item
     }
 
 recoverTestInfo :: i -> Either AppError (TestInfo i as vs) -> TestInfo i as vs
-recoverTestInfo i = either (TestFault i) id
+recoverTestInfo i = either (InteractionFault i) id
 
 testInfoNoValidation :: i -> a -> v -> TestInfo i a v
 testInfoNoValidation item apState _ =
-  TestInfo {
+  DocInfo {
       item = item,
-      apState = Just apState,
-      valState = Nothing,
-      checkResult = Nothing
+      apState = apState
     }
 
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Rqun Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-- forall effs a. Member (Error EnsureError) effs => Eff (Ensure ': effs) a
 runApState :: (Functor f1, Functor f2) =>
      (rc -> itm -> Eff effs as)
-     -> (as -> vs)
-     -> (itm -> as -> vs -> b)
+     -> (as -> Ensurable vs)  -- prepstate
+     -> (itm -> as -> vs -> TestInfo itm as vs)
      -> rc
      -> (Eff effs as -> f1 (f2 as))
      -> itm
-     -> f1 (f2 b)
+     -> f1 (f2 (TestInfo itm as vs))
 runApState interactor prepState agg rc intrprt itm = let
-                                   runVals as = agg itm as $ prepState as
-                                in
-                                   (runVals <$>) <$> intrprt (interactor rc itm)
+                                                        runVals as =
+                                                          let
+                                                            ethVs = fullEnsureInterpreter $ prepState as
+                                                          in
+                                                            either
+                                                                (PrepStateFault itm as . AppEnsureError)
+                                                                (agg itm as)
+                                                                ethVs
+                                                     in
+                                                        (runVals <$>) <$> intrprt (interactor rc itm)
 
 runAllItems :: (Functor f1, Functor f2) =>
       [itm]                                   -- items
       -> (rc -> itm -> Eff effs as)           -- interactor
-      -> (as -> vs)                           -- prepsatate
-      -> (itm -> f2 b -> b)                   -- recover from either
-      -> (itm -> as -> vs -> b)               -- aggragator
+      -> (as -> Ensurable vs)                 -- prepstate
+      -> (itm -> f2 (TestInfo itm as vs) -> TestInfo itm as vs)                   -- recover from either
+      -> (itm -> as -> vs -> TestInfo itm as vs)    -- aggragator
       -> rc                                   -- runconfig
       -> (Eff effs as -> f1 (f2 as))          -- interpreter
-      -> [f1 b]
+      -> [f1 (TestInfo itm as vs)]
 runAllItems items interactor prepState frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState interactor prepState agg rc intrprt itm) <$> items
 
 runLogAllItems ::  forall itm rc as vs m b effs. (Monad m) =>
                    (rc -> itm -> Eff effs as)                  -- interactor
-                   -> (as -> vs)                               -- prepstate
+                   -> (as -> Ensurable vs)                     -- prepstate
                    -> [itm]                                    -- items
                    -> (itm -> as -> vs -> TestInfo itm as vs)  -- aggregator i.e. rslt constructor
                    -> (TestInfo itm as vs -> m b)              -- logger

@@ -42,8 +42,10 @@ newtype ValState = V {
                   } deriving Show
 
 -- change to Ensure eff
-prepState :: ApState -> ValState
-prepState ApState{..} = V $ 10 * itemId
+prepState :: ApState -> Ensurable ValState
+prepState ApState{..} = do
+                          ensure  "I do not like 110 in prepstate" (itemId /= 110)
+                          pure $ V $ 10 * itemId
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Test Items %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -107,8 +109,8 @@ instance ItemClass Item ValState where
 -- 4. log ✔
 -- 5. reinstate testInfo - including left ✔
 -- 6. Generalise ✔
--- 7. ensure on prepstate
--- 8. another testinfo constructor for failed prepstate
+-- 7. ensure on prepstate ✔
+-- 8. another testinfo constructor for failed prepstate ✔
 -- 9. test filter
 -- 10. group - rollover - go home is home
 -- 11. test case end point
@@ -119,7 +121,8 @@ instance ItemClass Item ValState where
 -- 13. Log Formatting and Report Generation
 -- 13.1 ~ generalised log type
 -- 13.2 ~ serialisation format
--- 13.3 ~ report generation
+-- 14.0 - hedgehog / randomiser
+-- 15.0 ~ report generation
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Execution %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

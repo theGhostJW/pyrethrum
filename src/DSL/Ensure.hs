@@ -6,6 +6,8 @@ import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import qualified Control.Monad as Monad
 
+type Ensurable a = Eff '[Ensure, Error EnsureError] a
+
 data Ensure r where
  Ensure :: Truthy conditon => String -> conditon -> Ensure ()
  Throw :: String -> Ensure ()
@@ -23,16 +25,5 @@ ensureInterpreter = interpret $ \case
                                     Ensure message condition -> Monad.unless (isTruthy condition) $ throwError $ EnsureError message
                                     Throw message -> throwError $ EnsureError message
 
-{-
-data MyData1 = MyData1 {name :: String, num :: Int}
-data MyData2 = MyData2 {name :: String, num2 :: Int}
-
-md2Name :: MyData2 -> String
-md2Name = name
-
-mixNames :: MyData1 -> MyData2 -> String
-mixNames MyData1{..} md2 = let
-                             name2 = md2Name md2
-                           in
-                             name <> " " <> name2
--}
+fullEnsureInterpreter :: Eff '[Ensure, Error EnsureError] a -> Either EnsureError a
+fullEnsureInterpreter effs = run $ runError $ ensureInterpreter effs

@@ -3,18 +3,18 @@ module DemoConfig (
   , module RC
 ) where
 
-import           DSL.Interpreter
-import           DSL.FileSystem
-import           DSL.Logger
-import           DSL.Ensure
+import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.Writer
-import           Data.Set             as S
+import           Data.Set                   as S
 import           DemoConfigPrimatives
-import           DemoRunConfig        as RC
+import           DemoRunConfig              as RC
+import           DSL.Ensure
+import           DSL.FileSystem
+import           DSL.Interpreter
+import           DSL.Logger
 import           Foundation.Extended
 import           Runner
-import           Control.Monad.Freer
 import           TestAndRunConfig
 
 allEnvironments :: Set Environment
@@ -37,21 +37,6 @@ data TestConfig = TestConfig {
 
 type Test = GenericTest TestConfig RC.RunConfig
 type TestResult = GenericResult TestConfig
-
-testRunner :: forall i vs rslt as tc effs ag. (ItemClass i vs, Show tc, Show rslt) =>
-                               (i -> as -> vs -> ag)                       -- aggreagator
-                               -> ((as -> ag) -> Eff effs as -> IO rslt)   -- interpreter
-                               -> Filter i                                 -- item filter
-                               -> GenericTest tc RunConfig i (Eff effs as) as vs
-                               -> IO ()
-testRunner = runTest runConfig consoleLogger
-
-testRunnerFull :: (ItemClass i vs, Show tc, Show rslt) =>
-                                    ((as -> TestInfo i as vs) -> Eff effs as -> IO rslt)   -- interpreter
-                                   -> Filter i                               -- item filter
-                                   -> GenericTest tc RunConfig i (Eff effs as) as vs
-                                   ->  IO ()
-testRunnerFull = testRunner testInfoFull
 
 instance Titled TestConfig where
   title = header

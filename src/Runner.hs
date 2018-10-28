@@ -121,12 +121,12 @@ runAllItems :: (Functor f1, Functor f2) =>
       -> [f1 (TestInfo itm as vs)]
 runAllItems items interactor prepState frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState interactor prepState agg rc intrprt itm) <$> items
 
-runLogAllItems ::  forall itm rc as vs m b effs. (Monad m) =>
+runLogAllItems ::  forall itm rc as vs m b effs. (Monad m, Show itm, Show as, Show vs) =>
                    (rc -> itm -> Eff effs as)                  -- interactor
                    -> (as -> Ensurable vs)                     -- prepstate
                    -> [itm]                                    -- items
                    -> (itm -> as -> vs -> TestInfo itm as vs)  -- aggregator i.e. rslt constructor
-                   -> (TestInfo itm as vs -> m b)              -- logger
+                   -> (forall s. Show s => s -> m b)           -- logger
                    -> rc                                       -- runConfig
                    -> (Eff effs as -> m (Either AppError as))  -- interpreter
                    -> [m b]

@@ -41,7 +41,7 @@ filterredItems filtr items = let
                                 Pred func -> listOrFail (filter func items) "No test items match filter function"
 
 type Reason = String
-data TestFilterResult testConfig = Accepted testConfig | Rejected testConfig Reason
+type TestFilterResult testConfig = Either Reason testConfig
 type TestFilter runConfig testConfig = runConfig -> testConfig -> TestFilterResult testConfig
 
 filterTests :: forall runConfig testConfig. [TestFilter runConfig testConfig] -> runConfig -> [testConfig] -> [TestFilterResult testConfig]

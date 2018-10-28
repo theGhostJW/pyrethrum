@@ -22,7 +22,12 @@ import qualified Prelude             as P
 import           DSL.Interpreter
 import Data.Functor
 
--- type FullRunner = forall rc tc i as vs effs. (ItemClass i vs, Show i, Show as, Show vs, EFFFileSystem effs) => GenericTest rc tc i (Eff effs as) as vs -> IO ()
+
+data TestComponents runConfig item effs apState valState = TestComponents {
+  testItems :: [item],
+  testInteractor :: runConfig -> item -> Eff effs apState,
+  testPrepState :: apState -> Ensurable valState
+}
 
 data GenericTest testConfig runConfig item effs apState valState = GenericTest {
   address :: String,
@@ -35,12 +40,6 @@ data GenericResult testConfig rslt = TestResult {
   configuration :: testConfig,
   results :: Either FilterError [rslt]
 } deriving Show
-
-data TestComponents runConfig item effs apState valState = TestComponents {
-  testItems :: [item],
-  testInteractor :: runConfig -> item -> Eff effs apState,
-  testPrepState :: apState -> Ensurable valState
-}
 
 data TestInfo i as vs = TestInfo {
                                   item :: i,
@@ -112,13 +111,13 @@ runApState interactor prepState agg rc intrprt itm = let
                                                         (runVals <$>) <$> intrprt (interactor rc itm)
 
 runAllItems :: (Functor f1, Functor f2) =>
-      [itm]                                   -- items
-      -> (rc -> itm -> Eff effs as)           -- interactor
-      -> (as -> Ensurable vs)                 -- prepstate
-      -> (itm -> f2 (TestInfo itm as vs) -> TestInfo itm as vs)                   -- recover from either
-      -> (itm -> as -> vs -> TestInfo itm as vs)    -- aggragator
-      -> rc                                   -- runconfig
-      -> (Eff effs as -> f1 (f2 as))          -- interpreter
+      [itm]                                                      -- items
+      -> (rc -> itm -> Eff effs as)                              -- interactor
+      -> (as -> Ensurable vs)                                    -- prepstate
+      -> (itm -> f2 (TestInfo itm as vs) -> TestInfo itm as vs)  -- recover from either
+      -> (itm -> as -> vs -> TestInfo itm as vs)                 -- aggragator
+      -> rc                                                      -- runconfig
+      -> (Eff effs as -> f1 (f2 as))                             -- interpreter
       -> [f1 (TestInfo itm as vs)]
 runAllItems items interactor prepState frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState interactor prepState agg rc intrprt itm) <$> items
 
@@ -133,14 +132,14 @@ runLogAllItems ::  forall itm rc as vs m b effs. (Monad m) =>
                    -> [m b]
 runLogAllItems interactor prepstate itms agg logger rc intrprt = (logger =<<) <$> runAllItems itms interactor prepstate recoverTestInfo agg rc intrprt
 
-runLogAllItems' ::  forall itm rc as vs m b tc effs. (Monad m, ItemClass itm vs) =>
-                   (itm -> as -> vs -> TestInfo itm as vs)  -- aggregator i.e. rslt constructor
+runLogAll ::  forall itm rc as vs m b tc effs. (Monad m, ItemClass itm vs) =>
+                   (itm -> as -> vs -> TestInfo itm as vs)     -- aggregator i.e. rslt constructor
                    -> (TestInfo itm as vs -> m b)              -- logger
                    -> rc                                       -- runConfig
                    -> (Eff effs as -> m (Either AppError as))  -- interpreter
-                   -> GenericTest tc rc itm effs as vs
+                   -> GenericTest tc rc itm effs as vs         -- Test Case
                    -> [m b]
-runLogAllItems' agg logger rc intrprt tst =
+runLogAll agg logger rc intrprt tst =
         let
           result TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
         in

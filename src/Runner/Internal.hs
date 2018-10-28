@@ -1,6 +1,8 @@
 
 module Runner.Internal where
 
+import DSL.Ensure
+import Control.Monad.Freer
 import qualified Data.List.Safe      as SafeList
 import           Foundation.Extended
 import qualified Prelude
@@ -24,8 +26,6 @@ data FilterError = InvalidItemFilter String  |
                    NotImplemented String
                    deriving (Eq, Show)
 
-
-
 filterredItems :: (ItemClass item valState) => Filter item -> [item] -> Either FilterError [item]
 filterredItems filtr items = let
                               hasVals i = not $ null $ checkList i
@@ -39,3 +39,14 @@ filterredItems filtr items = let
                                 Last -> maybe (Left $ InvalidItemFilter "Items list is empty") (Right . pure) (SafeList.last items)
                                 LastVal -> maybe (Left $ InvalidItemFilter "There is no item in the list with checks assigned") (Right . pure) lastWithVal
                                 Pred func -> listOrFail (filter func items) "No test items match filter function"
+
+type Reason = String
+data TestFilterResult testConfig = Accepted testConfig | Rejected testConfig Reason
+type TestFilter runConfig testConfig = runConfig -> testConfig -> TestFilterResult testConfig
+
+filterTests :: forall runConfig testConfig. [TestFilter runConfig testConfig] -> runConfig -> [testConfig] -> [TestFilterResult testConfig]
+filterTests testFilters runConfig test =
+                                      let
+                                         fltrs = (\f -> f runConfig) <$> testFilters
+                                       in
+                                         undefined

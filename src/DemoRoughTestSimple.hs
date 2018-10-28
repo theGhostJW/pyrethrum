@@ -84,15 +84,3 @@ instance ItemClass Item ValState where
   whenClause = pre
   thenClause = post
   checkList = checks
-
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Execution %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-runLogAllItems :: (Monad m, Effects effs) =>
-                   (Item -> ApState -> ValState -> TestInfo Item ApState ValState)  -- rslt constructor
-                   ->  (TestInfo Item ApState ValState -> m b)                -- logger
-                   -> RunConfig                                             -- runConfig
-                   -> (Eff effs ApState -> m (Either AppError ApState))     -- interpreter
-                   -> [m b]
-runLogAllItems = R.runLogAllItems interactor prepState items

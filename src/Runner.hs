@@ -27,7 +27,7 @@ import Data.Functor
 data GenericTest testConfig runConfig item effs apState valState = GenericTest {
   address :: String,
   configuration :: testConfig,
-  components :: TestComponents runConfig item effs apState valState
+  components :: ItemClass item valState => TestComponents runConfig item effs apState valState
 }
 
 data GenericResult testConfig rslt = TestResult {
@@ -38,7 +38,7 @@ data GenericResult testConfig rslt = TestResult {
 
 data TestComponents runConfig item effs apState valState = TestComponents {
   testItems :: [item],
-  testInteractor :: runConfig -> item -> effs,
+  testInteractor :: runConfig -> item -> Eff effs apState,
   testPrepState :: apState -> Ensurable valState
 }
 
@@ -49,7 +49,7 @@ data TestInfo i as vs = TestInfo {
                                   checkResult :: CheckResultList
                                 } |
 
-                         InteractionFault {
+                         InteractorFault {
                                     item :: i,
                                     error :: AppError
                                   } |
@@ -77,7 +77,7 @@ testInfoFull item apState valState =
     }
 
 recoverTestInfo :: i -> Either AppError (TestInfo i as vs) -> TestInfo i as vs
-recoverTestInfo i = either (InteractionFault i) id
+recoverTestInfo i = either (InteractorFault i) id
 
 testInfoNoValidation :: i -> a -> v -> TestInfo i a v
 testInfoNoValidation item apState _ =
@@ -132,3 +132,16 @@ runLogAllItems ::  forall itm rc as vs m b effs. (Monad m) =>
                    -> (Eff effs as -> m (Either AppError as))  -- interpreter
                    -> [m b]
 runLogAllItems interactor prepstate itms agg logger rc intrprt = (logger =<<) <$> runAllItems itms interactor prepstate recoverTestInfo agg rc intrprt
+
+runLogAllItems' ::  forall itm rc as vs m b tc effs. (Monad m, ItemClass itm vs) =>
+                   (itm -> as -> vs -> TestInfo itm as vs)  -- aggregator i.e. rslt constructor
+                   -> (TestInfo itm as vs -> m b)              -- logger
+                   -> rc                                       -- runConfig
+                   -> (Eff effs as -> m (Either AppError as))  -- interpreter
+                   -> GenericTest tc rc itm effs as vs
+                   -> [m b]
+runLogAllItems' agg logger rc intrprt tst =
+        let
+          result TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+        in
+          result $ components tst

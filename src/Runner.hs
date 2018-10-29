@@ -141,10 +141,24 @@ type Runner =  forall itm rc as vs m b tc effs. (Monad m, ItemClass itm vs, Show
                    -> GenericTest tc rc itm effs as vs         -- Test Case
                    -> [m b]
 
-
 runLogAll ::  Runner
 runLogAll agg logger rc intrprt tst =
         let
           result TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
         in
           result $ components tst
+
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+type Reason = String
+type TestFilterResult tc = Either Reason tc
+type TestFilter rc tc = rc -> tc -> TestFilterResult tc
+
+filterTests :: forall runConfig testConfig. [TestFilter runConfig testConfig] -> runConfig -> [testConfig] -> [TestFilterResult testConfig]
+filterTests testFilters runConfig test =
+                                      let
+                                         fltrs = (\f -> f runConfig) <$> testFilters
+                                       in
+                                         undefined

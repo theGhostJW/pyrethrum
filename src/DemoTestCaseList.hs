@@ -18,29 +18,29 @@ runInIO = testRun consoleLogger runConfig testInfoFull executeInIO
 runDocument  = testRun consoleLogger runConfig testInfoFull executeDocument
 
 testRun :: forall effs m. (EFFFileSystem effs, Monad m) =>
-                  (forall s. Show s => s -> m ())                                          -- logger
-                  -> RunConfig                                                             -- runConfig
+                  (forall s. Show s => s -> m ())                                           -- logger
+                  -> RunConfig                                                              -- runConfig
                   -> (forall i as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs)  -- aggregator (result constructor)
-                  -> (forall a. Eff effs a -> m (Either AppError a))                       -- interpreter
+                  -> (forall a. Eff effs a -> m (Either AppError a))                        -- interpreter
                   -> m ()
-testRun = runRunner R.runLogAll
+testRun l r a itm = let
+                      merge = foldl' (>>) (pure ())
+                    in
+                      merge $ merge <$> runRunner R.runLogAll l r a itm
 
 runRunner :: forall effs m. (EFFFileSystem effs, Monad m) =>
                               Runner
                               -> (forall s. Show s => s -> m ())                                        -- logger
                               -> RunConfig                                                              -- runConfig
                               -> (forall i as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs)  -- aggregator (result constructor)
-                              -> (forall a. Eff effs a -> m (Either AppError a))                       -- interpreter
-                              -> m ()
+                              -> (forall a. Eff effs a -> m (Either AppError a))                        -- interpreter
+                              -> [[m ()]]
 runRunner runner logger runCfg agf interpreter =
   let
-    mergeM_ :: [m ()] -> m ()
-    mergeM_ = foldl' (>>) (pure ())
-
-    r :: (ItemClass itm vs, Show itm, Show as, Show vs) => GenericTest tc RunConfig itm effs as vs -> m ()
-    r = mergeM_ . runner agf logger runCfg interpreter
+    r :: (ItemClass itm vs, Show itm, Show as, Show vs) => GenericTest tc RunConfig itm effs as vs -> [m ()]
+    r = runner agf logger runCfg interpreter
   in
-    mergeM_ [
+    [
       r RT.test,
       r ST.test
     ]

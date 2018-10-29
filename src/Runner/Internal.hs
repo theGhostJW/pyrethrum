@@ -39,14 +39,3 @@ filterredItems filtr items = let
                                 Last -> maybe (Left $ InvalidItemFilter "Items list is empty") (Right . pure) (SafeList.last items)
                                 LastVal -> maybe (Left $ InvalidItemFilter "There is no item in the list with checks assigned") (Right . pure) lastWithVal
                                 Pred func -> listOrFail (filter func items) "No test items match filter function"
-
-type Reason = String
-type TestFilterResult testConfig = Either Reason testConfig
-type TestFilter runConfig testConfig = runConfig -> testConfig -> TestFilterResult testConfig
-
-filterTests :: forall runConfig testConfig. [TestFilter runConfig testConfig] -> runConfig -> [testConfig] -> [TestFilterResult testConfig]
-filterTests testFilters runConfig test =
-                                      let
-                                         fltrs = (\f -> f runConfig) <$> testFilters
-                                       in
-                                         undefined

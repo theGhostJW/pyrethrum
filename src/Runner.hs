@@ -137,16 +137,13 @@ runLogAllItems ::  forall itm rc as vs m b effs. (Monad m, Show itm, Show as, Sh
                    -> [m b]
 runLogAllItems interactor prepstate itms agg logger rc intrprt = (logger =<<) <$> runAllItems itms interactor prepstate recoverTestInfo agg rc intrprt
 
-
-type Runner =  forall itm rc as vs m b tc effs. (Monad m, ItemClass itm vs, Show itm, Show as, Show vs) =>
+runLogAll ::  forall itm rc as vs m b tc effs. (Monad m, ItemClass itm vs, Show itm, Show as, Show vs) =>
                    (itm -> as -> vs -> TestInfo itm as vs)     -- aggregator i.e. rslt constructor
                    -> (forall s. Show s => s -> m b)            -- logger
                    -> rc                                       -- runConfig
                    -> (Eff effs as -> m (Either AppError as))  -- interpreter
                    -> GenericTest tc rc itm effs as vs         -- Test Case
                    -> [m b]
-
-runLogAll ::  Runner
 runLogAll agg logger rc intrprt tst =
         let
           result TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
@@ -156,7 +153,7 @@ runLogAll agg logger rc intrprt tst =
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- 
+--
 -- testHeaders ::  forall itm rc as vs m b tc effs. (Monad m, ItemClass itm vs, Show itm, Show as, Show vs) =>
 --                    TestFilters rc tc
 --                    -> (itm -> as -> vs -> TestInfo itm as vs)   -- aggregator i.e. rslt constructor

@@ -44,3 +44,14 @@ runRunner runner logger runCfg agf interpreter =
       r RT.test,
       r ST.test
     ]
+
+
+-- this does not compile
+-- runRunnerGen :: forall m. (forall effs itm as vs tc. (EFFFileSystem effs, ItemClass itm vs, Show itm, Show as, Show vs) => GenericTest tc RunConfig itm effs as vs -> [m ()]) -> [[m ()]]
+
+runRunnerGen :: forall m effs. EFFFileSystem effs => (forall itm as vs tc. (ItemClass itm vs, Show itm, Show as, Show vs) => GenericTest tc RunConfig itm effs as vs -> [m ()]) -> [[m ()]]
+runRunnerGen f =
+    [
+      f RT.test,
+      f ST.test
+    ]

@@ -156,6 +156,20 @@ runLogAll agg logger rc intrprt tst =
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- 
+-- testHeaders ::  forall itm rc as vs m b tc effs. (Monad m, ItemClass itm vs, Show itm, Show as, Show vs) =>
+--                    TestFilters rc tc
+--                    -> (itm -> as -> vs -> TestInfo itm as vs)   -- aggregator i.e. rslt constructor
+--                    -> (forall s. Show s => s -> m b)            -- logger
+--                    -> rc                                        -- runConfig
+--                    -> (Eff effs as -> m (Either AppError as))   -- interpreter
+--                    -> GenericTest tc rc itm effs as vs          -- Test Case
+--                    -> [m b]
+-- testHeaders fltrs _ _ rc _ tst =
+--         let
+--           headerInfo = headerData tst
+--         in
+--           [filterTest fltrs rc headerInfo]
 
 type Reason = String
 type TestFilterResult tc = Either Reason (TestHeaderData tc)
@@ -166,11 +180,8 @@ type TestFilters rc tc = [TestFilter rc tc]
 type PartialTestFilter tc = TestHeaderData tc -> TestFilterResult tc
 type PartialTestFilters tc = [PartialTestFilter tc]
 
-filterTest :: PartialTestFilters tc -> TestHeaderData tc -> TestFilterResult tc
-filterTest fltrs headr = fromMaybe (pure headr) $ find isLeft $ (headr F.&) <$> fltrs
+filterTest :: TestFilters rc tc -> rc -> TestHeaderData tc -> TestFilterResult tc
+filterTest fltrs rc headr = fromMaybe (pure headr) $ find isLeft $ (\f -> f rc headr) <$> fltrs
 
-filterTests :: rc -> TestFilters rc tc -> [TestHeaderData tc] -> [TestFilterResult tc]
-filterTests rc fltrs hdrs = let
-                              ptlFltrs = (rc F.&) <$> fltrs
-                            in
-                              filterTest ptlFltrs <$> hdrs
+filterTests :: TestFilters rc tc -> rc -> [TestHeaderData tc] -> [TestFilterResult tc]
+filterTests fltrs rc hdrs = filterTest fltrs rc <$> hdrs

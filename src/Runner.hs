@@ -9,6 +9,7 @@ import Check
 import DSL.Logger
 import DSL.Ensure
 import DSL.FileSystem
+import qualified Data.Function as F
 import TestAndRunConfig
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
@@ -20,19 +21,23 @@ import           Runner.Internal     as InternalFuncs (Filter (..),
 import           ItemClass
 import qualified Prelude             as P
 import           DSL.Interpreter
-import Data.Functor
+import Data.Either
 
 
-data TestComponents runConfig item effs apState valState = TestComponents {
-  testItems :: [item],
-  testInteractor :: runConfig -> item -> Eff effs apState,
-  testPrepState :: apState -> Ensurable valState
+data TestComponents rc i effs as vs = TestComponents {
+  testItems :: [i],
+  testInteractor :: rc -> i -> Eff effs as,
+  testPrepState :: as -> Ensurable vs
 }
 
-data GenericTest testConfig runConfig item effs apState valState = GenericTest {
+data TestHeaderData tc = TestHeaderData {
   address :: String,
-  configuration :: testConfig,
-  components :: ItemClass item valState => TestComponents runConfig item effs apState valState
+  configuration :: tc
+} deriving (Eq, Show)
+
+data GenericTest tc rc i effs as vs = GenericTest {
+  headerData :: TestHeaderData tc,
+  components :: ItemClass i vs => TestComponents rc i effs as vs
 }
 
 data GenericResult testConfig rslt = TestResult {
@@ -153,12 +158,19 @@ runLogAll agg logger rc intrprt tst =
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 type Reason = String
-type TestFilterResult tc = Either Reason tc
-type TestFilter rc tc = rc -> tc -> TestFilterResult tc
+type TestFilterResult tc = Either Reason (TestHeaderData tc)
 
-filterTests :: forall runConfig testConfig. [TestFilter runConfig testConfig] -> runConfig -> [testConfig] -> [TestFilterResult testConfig]
-filterTests testFilters runConfig test =
-                                      let
-                                         fltrs = (\f -> f runConfig) <$> testFilters
-                                       in
-                                         undefined
+type TestFilter rc tc = rc -> TestHeaderData tc -> TestFilterResult tc
+type TestFilters rc tc = [TestFilter rc tc]
+
+type PartialTestFilter tc = TestHeaderData tc -> TestFilterResult tc
+type PartialTestFilters tc = [PartialTestFilter tc]
+
+filterTest :: PartialTestFilters tc -> TestHeaderData tc -> TestFilterResult tc
+filterTest fltrs headr = fromMaybe (pure headr) $ find isLeft $ (headr F.&) <$> fltrs
+
+filterTests :: rc -> TestFilters rc tc -> [TestHeaderData tc] -> [TestFilterResult tc]
+filterTests rc fltrs hdrs = let
+                              ptlFltrs = (rc F.&) <$> fltrs
+                            in
+                              filterTest ptlFltrs <$> hdrs

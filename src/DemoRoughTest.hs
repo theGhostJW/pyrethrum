@@ -79,15 +79,17 @@ items = [
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+testHeader:: TestHeaderData TestConfig
+testHeader = TestHeaderData (moduleOf ''ApState) config
+
 test :: forall effs. Effects effs => Test Item effs ApState ValState
 test = GenericTest {
-              address = moduleOf ''ApState,
-              configuration = config,
+              headerData = testHeader,
               components = TestComponents {
-                                      testItems = items,
-                                      testInteractor = interactor,
-                                      testPrepState = prepState
-                                    }
+                                testItems = items,
+                                testInteractor = interactor,
+                                testPrepState = prepState
+                            }
             }
 
 instance ItemClass Item ValState where
@@ -96,10 +98,10 @@ instance ItemClass Item ValState where
   thenClause = post
   checkList = checks
 
+
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 -- 1. interpret AppSate ~ will probably need in IO   ✔
 --    ?? FAIL with type signature ~ Ambigous type variable
 -- 1.1 Call multiple tests  ✔

@@ -25,7 +25,7 @@ testRun :: forall effs m. (EFFFileSystem effs, Monad m) =>
                   -> m ()
 testRun l r agg itpr = foldl' (>>) (pure ()) $ P.concat $ runRunner $ R.runLogAll agg l r itpr
 
-runRunner :: forall m effs a. EFFFileSystem effs => (forall itm as vs tc. (ItemClass itm vs, Show itm, Show as, Show vs) => GenericTest tc RunConfig itm effs as vs -> [m a]) -> [[m a]]
+runRunner :: forall m m1 effs a. EFFFileSystem effs => (forall itm as vs tc. (ItemClass itm vs, Show itm, Show as, Show vs) => GenericTest tc RunConfig itm effs as vs -> m1 (m a)) -> [m1 (m a)]
 runRunner f =
     [
       f RT.test,

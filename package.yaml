@@ -48,16 +48,12 @@ ghc-options:
   - -fno-warn-unused-do-bind
 
 default-extensions:
-  - RecordWildCards
+  - AllowAmbiguousTypes
+  - BangPatterns
+  - ConstrainedClassMethods
+  - ConstraintKinds
   - DisambiguateRecordFields
   - DuplicateRecordFields
-  - NamedFieldPuns
-  - DeriveFunctor
-  - NoImplicitPrelude
-  - OverloadedStrings
-  - BangPatterns
-  - ConstraintKinds
-  - ConstrainedClassMethods
   - DataKinds
   - DefaultSignatures
   - DeriveFoldable
@@ -81,11 +77,13 @@ default-extensions:
   - MultiParamTypeClasses
   - MultiWayIf
   - NamedFieldPuns
+  - NoImplicitPrelude
   - OverloadedStrings
   - PartialTypeSignatures
   - PatternSynonyms
   - QuasiQuotes
   - RankNTypes
+  - RecordWildCards
   - ScopedTypeVariables
   - StandaloneDeriving
   - TemplateHaskell

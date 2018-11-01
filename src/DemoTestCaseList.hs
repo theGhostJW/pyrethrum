@@ -23,23 +23,23 @@ filterTests :: forall effs. EFFFileSystem effs =>
       (forall i as vs. TestFilters RunConfig TestConfig -> RunConfig -> GenericTest TestConfig RunConfig i effs as vs -> Identity (TestFilterResult TestConfig))
       -> TestFilters RunConfig TestConfig
       -> RunConfig
-      -> [Identity (TestFilterResult TestConfig)]
-filterTests fltrFunc fltrs rc = runRunner (fltrFunc fltrs rc)
+      -> [TestFilterResult TestConfig]
+filterTests fltrFunc fltrs rc =  runIdentity <$> runRunner (fltrFunc fltrs rc)
 
 testRun :: forall effs m. (EFFFileSystem effs, Monad m) =>
-                  TestFilters RunConfig TestConfig
-                  -> (forall s. Show s => s -> m ())                                           -- logger
+                  TestFilters RunConfig TestConfig                                          -- test filters
+                  -> (forall s. Show s => s -> m ())                                        -- logger
                   -> RunConfig                                                              -- runConfig
                   -> (forall i as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs)  -- aggregator (result constructor)
                   -> (forall a. Eff effs a -> m (Either AppError a))                        -- interpreter
                   -> m ()
 testRun fltrs l r agg itpr =
                       let
-                        testFilter :: forall i as vs. GenericTest TestConfig RunConfig i effs as vs -> Identity (TestFilterResult TestConfig)
-                        testFilter = filterTest fltrs r
+                        filterTests' :: (forall i as vs. TestFilters RunConfig TestConfig -> RunConfig -> GenericTest TestConfig RunConfig i effs as vs -> Identity (TestFilterResult TestConfig)) -> [TestFilterResult TestConfig]
+                        filterTests' ff = filterTests ff fltrs r
 
-                        fltrLog ::  [TestFilterResult TestConfig]
-                        fltrLog = runIdentity <$> runRunner testFilter
+                        fltrLog :: [TestFilterResult TestConfig]
+                        fltrLog = filterTests' filterTest
                       in
                         l fltrLog >> foldl' (>>) (pure ()) (P.concat $ runRunner $ R.runLogAll agg l r itpr)
 

@@ -156,7 +156,8 @@ runLogAll agg logger rc intrprt tst =
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 type Reason = String
-type TestFilterResult tc = Either Reason (TestHeaderData tc)
+data FilterRejection tc = FilterRejection Reason (TestHeaderData tc) deriving Show
+type TestFilterResult tc = Either (FilterRejection tc) (TestHeaderData tc)
 
 type TestFilter rc tc = rc -> TestHeaderData tc -> TestFilterResult tc
 type TestFilters rc tc = [TestFilter rc tc]
@@ -166,9 +167,6 @@ type PartialTestFilters tc = [PartialTestFilter tc]
 
 filterTestHdr :: TestFilters rc tc -> rc -> TestHeaderData tc -> TestFilterResult tc
 filterTestHdr fltrs rc headr = fromMaybe (pure headr) $ find isLeft $ (\f -> f rc headr) <$> fltrs
-
--- filterTests :: TestFilters rc tc -> rc -> [TestHeaderData tc] -> [TestFilterResult tc]
--- filterTests fltrs rc hdrs = filterTestHdr fltrs rc <$> hdrs
 
 filterTest :: forall i as vs tc rc effs. TestFilters rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc)
 filterTest fltrs rc t = Identity $ filterTestHdr fltrs rc $ headerData t

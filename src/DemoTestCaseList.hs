@@ -25,17 +25,7 @@ testRun :: forall effs m. (EFFFileSystem effs, Monad m) =>
                   -> (forall i as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs)  -- aggregator (result constructor)
                   -> (forall a. Eff effs a -> m (Either AppError a))                        -- interpreter
                   -> m ()
-testRun fltrs r agg itpr =
-                      let
-                        filterTests' :: (forall i as vs. TestFilters RunConfig TestConfig -> RunConfig -> GenericTest TestConfig RunConfig i effs as vs -> Identity (TestFilterResult TestConfig)) -> [TestFilterResult TestConfig]
-                        filterTests' ff = filterTests runRunner ff fltrs r
-
-                        fltrLog :: [TestFilterResult TestConfig]
-                        fltrLog = filterTests' filterTest
-
-                        log' = itpr . log
-                      in
-                        log' fltrLog >> foldl' (>>) (pure ()) (P.concat $ runRunner $ R.runLogAll agg r itpr)
+testRun = genericTestRun runRunner
 
 runRunner :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [m1 (m a)]
 runRunner f =

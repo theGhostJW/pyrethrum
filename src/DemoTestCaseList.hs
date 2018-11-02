@@ -40,8 +40,10 @@ testRun fltrs l r agg itpr =
 
                         fltrLog :: [TestFilterResult TestConfig]
                         fltrLog = filterTests' filterTest
+
+                        log' = itpr . log 
                       in
-                        l fltrLog >> foldl' (>>) (pure ()) (P.concat $ runRunner $ R.runLogAll agg l r itpr)
+                        log' fltrLog >> foldl' (>>) (pure ()) (P.concat $ runRunner $ R.runLogAll agg l r itpr)
 
 runRunner :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [m1 (m a)]
 runRunner f =

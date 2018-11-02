@@ -138,15 +138,20 @@ runLogAllItems ::  forall itm rc as vs m b effs. (Monad m, Show itm, Show as, Sh
                    -> [m b]
 runLogAllItems interactor prepstate itms agg logger rc intrprt = (logger =<<) <$> runAllItems itms interactor prepstate recoverTestInfo agg rc intrprt
 
-runLogAll ::  forall itm rc as vs m b tc effs. (Monad m, ItemClass itm vs, Show itm, Show as, Show vs) =>
+runLogAll ::  forall itm rc as vs m b tc effs. (Monad m, ItemClass itm vs, Show itm, Show as, Show vs, Member Logger effs) =>
                    (itm -> as -> vs -> TestInfo itm as vs)     -- aggregator i.e. rslt constructor
                    -> (forall s. Show s => s -> m b)            -- logger
                    -> rc                                       -- runConfig
-                   -> (Eff effs as -> m (Either AppError as))  -- interpreter
+                   -> (forall a. Eff effs a -> m (Either AppError a))  -- interpreter
                    -> GenericTest tc rc itm effs as vs         -- Test Case
                    -> [m b]
 runLogAll agg logger rc intrprt tst =
         let
+          log' :: (Show s) => s -> Eff effs ()
+          log' = log
+
+          log'' = intrprt . log
+
           result TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
         in
           result $ components tst

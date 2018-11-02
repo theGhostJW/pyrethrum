@@ -67,12 +67,9 @@ items = [
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-testHeader:: TestHeaderData TestConfig
-testHeader = TestHeaderData (moduleOf ''ApState) config
-
 test :: forall effs. Effects effs => Test Item effs ApState ValState
 test = GenericTest {
-              headerData = testHeader,
+              configuration = config {address = moduleOf ''ApState},
               components = TestComponents {
                                 testItems = items,
                                 testInteractor = interactor,

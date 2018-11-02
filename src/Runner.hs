@@ -11,7 +11,6 @@ import DSL.Ensure
 import Data.Functor.Identity
 import DSL.FileSystem
 import qualified Data.Function as F
-import TestAndRunConfig
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 
@@ -23,6 +22,7 @@ import           ItemClass
 import qualified Prelude             as P
 import           DSL.Interpreter
 import Data.Either
+import TestAndRunConfig as C
 import Control.Monad
 
 
@@ -32,19 +32,13 @@ data TestComponents rc i effs as vs = TestComponents {
   testPrepState :: as -> Ensurable vs
 }
 
-data TestHeaderData tc = TestHeaderData {
-  address :: String,
-  configuration :: tc
-} deriving (Eq, Show)
-
 data GenericTest tc rc i effs as vs = GenericTest {
-  headerData :: TestHeaderData tc,
+  configuration :: tc,
   components :: ItemClass i vs => TestComponents rc i effs as vs
 }
 
-data GenericResult testConfig rslt = TestResult {
-  address :: String,
-  configuration :: testConfig,
+data GenericResult tc rslt = TestResult {
+  configuration :: tc,
   results :: Either FilterError [rslt]
 } deriving Show
 
@@ -140,7 +134,7 @@ runLogAll agg rc intrprt tst =
         in
           result $ components tst
 
-genericTestRun :: forall effs m rc tc. (EFFFileSystem effs, Monad m, Show tc) =>
+genericTestRun :: forall effs m rc tc. (EFFFileSystem effs, Monad m,  TestConfigClass tc, Show tc) =>
                   (forall mr m1 a. (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (mr a)) -> [m1 (mr a)])
                   -> TestFilters rc tc                                                        -- genericTest filters
                   -> rc                                                                       -- runConfig
@@ -163,18 +157,29 @@ genericTestRun runner fltrs r agg itpr =
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-type Reason = String
-data FilterRejection tc = FilterRejection Reason (TestHeaderData tc) deriving Show
-type TestFilterResult tc = Either (FilterRejection tc) (TestHeaderData tc)
+data FilterRejection tc = FilterRejection String tc deriving Show
+type TestFilterResult tc = Either (FilterRejection tc) tc
+type TestAddress = String
 
-type TestFilter rc tc = rc -> TestHeaderData tc -> TestFilterResult tc
+data TestFilter rc tc = TestFilter {
+  title :: String,
+  predicate :: rc -> tc -> Bool
+}
+
 type TestFilters rc tc = [TestFilter rc tc]
 
-filterTestHdr :: TestFilters rc tc -> rc -> TestHeaderData tc -> TestFilterResult tc
-filterTestHdr fltrs rc headr = fromMaybe (pure headr) $ find isLeft $ (\f -> f rc headr) <$> fltrs
+filterTestHdr :: forall rc tc. Titled tc => TestFilters rc tc -> rc -> tc -> TestFilterResult tc
+filterTestHdr fltrs rc tc =
+  let
+    applyFilter :: TestFilter rc tc -> TestFilterResult tc
+    applyFilter fltr = predicate fltr rc tc ?
+                                        Right tc $
+                                        Left $ FilterRejection (C.title tc) tc
+  in
+    fromMaybe (pure tc) $ find isLeft $ applyFilter <$> fltrs
 
-filterTest :: forall i as vs tc rc effs. TestFilters rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc)
-filterTest fltrs rc t = Identity $ filterTestHdr fltrs rc $ headerData t
+filterTest :: forall i as vs tc rc effs. TestConfigClass tc => TestFilters rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc)
+filterTest fltrs rc t = Identity $ filterTestHdr fltrs rc $ (configuration :: (GenericTest tc rc i effs as vs -> tc)) t
 
 filterTests :: forall effs rc tc.
       ((forall i as vs. GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc)) -> [Identity (TestFilterResult tc)])

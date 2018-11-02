@@ -29,6 +29,7 @@ nzOnly = S.singleton NZ
 
 data TestConfig = TestConfig {
   header       :: String,
+  address      :: String,
   environments :: Set Environment,
   countries    :: Set Country,
   minDepth     :: Depth,
@@ -41,9 +42,13 @@ type TestResult = GenericResult TestConfig
 instance Titled TestConfig where
   title = header
 
+instance TestConfigClass TestConfig where
+  moduleAddress = address
+
 testConfig :: TestConfig
 testConfig = TestConfig {
-  header    = "No Title Assigned",
+  header    = "Configuration Error ~ No Title Assigned",
+  address = "Configuration Error ~ No Address Assigned",
   environments = allNonProdEnvironments,
   countries    = auOnly,
   minDepth     = DeepRegression,

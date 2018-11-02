@@ -19,12 +19,12 @@ import           Runner as R
 runInIO = testRun [] consoleLogger runConfig testInfoFull executeInIO
 runDocument  = testRun [] consoleLogger runConfig testInfoFull executeDocument
 
-filterTests :: forall effs. EFFFileSystem effs =>
+filterTestsLocal :: forall effs. EFFFileSystem effs =>
       (forall i as vs. TestFilters RunConfig TestConfig -> RunConfig -> GenericTest TestConfig RunConfig i effs as vs -> Identity (TestFilterResult TestConfig))
       -> TestFilters RunConfig TestConfig
       -> RunConfig
       -> [TestFilterResult TestConfig]
-filterTests fltrFunc fltrs rc =  runIdentity <$> runRunner (fltrFunc fltrs rc)
+filterTestsLocal = filterTests runRunner
 
 testRun :: forall effs m. (EFFFileSystem effs, Monad m) =>
                   TestFilters RunConfig TestConfig                                          -- test filters
@@ -36,7 +36,7 @@ testRun :: forall effs m. (EFFFileSystem effs, Monad m) =>
 testRun fltrs l r agg itpr =
                       let
                         filterTests' :: (forall i as vs. TestFilters RunConfig TestConfig -> RunConfig -> GenericTest TestConfig RunConfig i effs as vs -> Identity (TestFilterResult TestConfig)) -> [TestFilterResult TestConfig]
-                        filterTests' ff = filterTests ff fltrs r
+                        filterTests' ff = filterTestsLocal ff fltrs r
 
                         fltrLog :: [TestFilterResult TestConfig]
                         fltrLog = filterTests' filterTest

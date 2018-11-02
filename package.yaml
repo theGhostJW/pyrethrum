@@ -48,7 +48,6 @@ ghc-options:
   - -fno-warn-unused-do-bind
 
 default-extensions:
-  - AllowAmbiguousTypes
   - BangPatterns
   - ConstrainedClassMethods
   - ConstraintKinds

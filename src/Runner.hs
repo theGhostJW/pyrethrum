@@ -162,11 +162,16 @@ type TestFilterResult tc = Either (FilterRejection tc) (TestHeaderData tc)
 type TestFilter rc tc = rc -> TestHeaderData tc -> TestFilterResult tc
 type TestFilters rc tc = [TestFilter rc tc]
 
-type PartialTestFilter tc = TestHeaderData tc -> TestFilterResult tc
-type PartialTestFilters tc = [PartialTestFilter tc]
-
 filterTestHdr :: TestFilters rc tc -> rc -> TestHeaderData tc -> TestFilterResult tc
 filterTestHdr fltrs rc headr = fromMaybe (pure headr) $ find isLeft $ (\f -> f rc headr) <$> fltrs
 
 filterTest :: forall i as vs tc rc effs. TestFilters rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc)
 filterTest fltrs rc t = Identity $ filterTestHdr fltrs rc $ headerData t
+
+filterTests :: forall effs rc tc.
+      ((forall i as vs. GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc)) -> [Identity (TestFilterResult tc)])
+      -> (forall i as vs. TestFilters rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc))
+      -> TestFilters rc tc
+      -> rc
+      -> [TestFilterResult tc]
+filterTests runner fltrFunc fltrs rc =  runIdentity <$> runner (fltrFunc fltrs rc)

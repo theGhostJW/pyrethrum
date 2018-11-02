@@ -96,7 +96,6 @@ testInfoNoValidation item apState _ =
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--- forall effs a. Member (Error EnsureError) effs => Eff (Ensure ': effs) a
 runApState :: (Functor f1, Functor f2) =>
      (rc -> itm -> Eff effs as)
      -> (as -> Ensurable vs)  -- prepstate
@@ -118,21 +117,21 @@ runApState interactor prepState agg rc intrprt itm = let
                                                         (runVals <$>) <$> intrprt (interactor rc itm)
 
 runAllItems :: (Functor f1, Functor f2) =>
-      [i]                                                      -- items
-      -> (rc -> i -> Eff effs as)                              -- interactor
-      -> (as -> Ensurable vs)                                    -- prepstate
-      -> (i -> f2 (TestInfo i as vs) -> TestInfo i as vs)  -- recover from either
-      -> (i -> as -> vs -> TestInfo i as vs)                 -- aggragator
-      -> rc                                                      -- runconfig
-      -> (Eff effs as -> f1 (f2 as))                             -- interpreter
+      [i]                                                       -- items
+      -> (rc -> i -> Eff effs as)                               -- interactor
+      -> (as -> Ensurable vs)                                   -- prepstate
+      -> (i -> f2 (TestInfo i as vs) -> TestInfo i as vs)       -- recover from either
+      -> (i -> as -> vs -> TestInfo i as vs)                    -- aggragator
+      -> rc                                                     -- runconfig
+      -> (Eff effs as -> f1 (f2 as))                            -- interpreter
       -> [f1 (TestInfo i as vs)]
 runAllItems items interactor prepState frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState interactor prepState agg rc intrprt itm) <$> items
 
 runLogAll ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
-                   (i -> as -> vs -> TestInfo i as vs)     -- aggregator i.e. rslt constructor
-                   -> rc                                       -- runConfig
-                   -> (forall a. Eff effs a -> m (Either AppError a))  -- interpreter
-                   -> GenericTest tc rc i effs as vs         -- Test Case
+                   (i -> as -> vs -> TestInfo i as vs)                -- aggregator i.e. rslt constructor
+                   -> rc                                              -- runConfig
+                   -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
+                   -> GenericTest tc rc i effs as vs                  -- Test Case
                    -> [m ()]
 runLogAll agg rc intrprt tst =
         let
@@ -143,10 +142,10 @@ runLogAll agg rc intrprt tst =
 
 genericTestRun :: forall effs m rc tc. (EFFFileSystem effs, Monad m, Show tc) =>
                   (forall mr m1 a. (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (mr a)) -> [m1 (mr a)])
-                  -> TestFilters rc tc                                          -- genericTest filters
-                  -> rc                                                              -- runConfig
+                  -> TestFilters rc tc                                                        -- genericTest filters
+                  -> rc                                                                       -- runConfig
                   -> (forall i as vs. (ItemClass i vs) => i -> as -> vs -> TestInfo i as vs)  -- aggregator (result constructor)
-                  -> (forall a. Eff effs a -> m (Either AppError a))                        -- interpreter
+                  -> (forall a. Eff effs a -> m (Either AppError a))                          -- interpreter
                   -> m ()
 genericTestRun runner fltrs r agg itpr =
                       let

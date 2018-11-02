@@ -16,8 +16,8 @@ import           Foundation.Extended
 import qualified Prelude                    as P
 import           Runner as R
 
-runInIO = testRun [] consoleLogger runConfig testInfoFull executeInIO
-runDocument  = testRun [] consoleLogger runConfig testInfoFull executeDocument
+runInIO = testRun [] runConfig testInfoFull executeInIO
+runDocument  = testRun [] runConfig testInfoFull executeDocument
 
 filterTestsLocal :: forall effs. EFFFileSystem effs =>
       (forall i as vs. TestFilters RunConfig TestConfig -> RunConfig -> GenericTest TestConfig RunConfig i effs as vs -> Identity (TestFilterResult TestConfig))
@@ -28,12 +28,11 @@ filterTestsLocal = filterTests runRunner
 
 testRun :: forall effs m. (EFFFileSystem effs, Monad m) =>
                   TestFilters RunConfig TestConfig                                          -- test filters
-                  -> (forall s. Show s => s -> m ())                                        -- logger
                   -> RunConfig                                                              -- runConfig
                   -> (forall i as vs. ItemClass i vs => i -> as -> vs -> TestInfo i as vs)  -- aggregator (result constructor)
                   -> (forall a. Eff effs a -> m (Either AppError a))                        -- interpreter
                   -> m ()
-testRun fltrs l r agg itpr =
+testRun fltrs r agg itpr =
                       let
                         filterTests' :: (forall i as vs. TestFilters RunConfig TestConfig -> RunConfig -> GenericTest TestConfig RunConfig i effs as vs -> Identity (TestFilterResult TestConfig)) -> [TestFilterResult TestConfig]
                         filterTests' ff = filterTestsLocal ff fltrs r
@@ -41,9 +40,9 @@ testRun fltrs l r agg itpr =
                         fltrLog :: [TestFilterResult TestConfig]
                         fltrLog = filterTests' filterTest
 
-                        log' = itpr . log 
+                        log' = itpr . log
                       in
-                        log' fltrLog >> foldl' (>>) (pure ()) (P.concat $ runRunner $ R.runLogAll agg l r itpr)
+                        log' fltrLog >> foldl' (>>) (pure ()) (P.concat $ runRunner $ R.runLogAll agg r itpr)
 
 runRunner :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [m1 (m a)]
 runRunner f =

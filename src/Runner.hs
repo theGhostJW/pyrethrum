@@ -23,6 +23,7 @@ import           ItemClass
 import qualified Prelude             as P
 import           DSL.Interpreter
 import Data.Either
+import Control.Monad
 
 
 data TestComponents rc i effs as vs = TestComponents {
@@ -127,31 +128,15 @@ runAllItems :: (Functor f1, Functor f2) =>
       -> [f1 (TestInfo itm as vs)]
 runAllItems items interactor prepState frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState interactor prepState agg rc intrprt itm) <$> items
 
-runLogAllItems ::  forall itm rc as vs m b effs. (Monad m, Show itm, Show as, Show vs) =>
-                   (rc -> itm -> Eff effs as)                  -- interactor
-                   -> (as -> Ensurable vs)                     -- prepstate
-                   -> [itm]                                    -- items
-                   -> (itm -> as -> vs -> TestInfo itm as vs)  -- aggregator i.e. rslt constructor
-                   -> (forall s. Show s => s -> m b)           -- logger
-                   -> rc                                       -- runConfig
-                   -> (Eff effs as -> m (Either AppError as))  -- interpreter
-                   -> [m b]
-runLogAllItems interactor prepstate itms agg logger rc intrprt = (logger =<<) <$> runAllItems itms interactor prepstate recoverTestInfo agg rc intrprt
-
-runLogAll ::  forall itm rc as vs m b tc effs. (Monad m, ItemClass itm vs, Show itm, Show as, Show vs, Member Logger effs) =>
+runLogAll ::  forall itm rc as vs m tc effs. (Monad m, ItemClass itm vs, Show itm, Show as, Show vs, Member Logger effs) =>
                    (itm -> as -> vs -> TestInfo itm as vs)     -- aggregator i.e. rslt constructor
-                   -> (forall s. Show s => s -> m b)            -- logger
                    -> rc                                       -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a))  -- interpreter
                    -> GenericTest tc rc itm effs as vs         -- Test Case
-                   -> [m b]
-runLogAll agg logger rc intrprt tst =
+                   -> [m ()]
+runLogAll agg rc intrprt tst =
         let
-          log' :: (Show s) => s -> Eff effs ()
-          log' = log
-
-          log'' = intrprt . log
-
+          logger = void . intrprt . log
           result TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
         in
           result $ components tst

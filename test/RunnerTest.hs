@@ -166,6 +166,18 @@ unit_test_filter_country_nz = chkFilters ["test1", "test2"] $ RunConfig NZ Regre
 unit_test_filter_country2 = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
 
 
+filtersExcludeReasons :: RunConfig -> [String]
+filtersExcludeReasons rc = reason <$> lefts (filterTests runRunner filters rc)
+
+unit_test_filter_exclude_reasons = chkEq [
+                                          "depth must be withi run parameters (e.g. regression test will not be run in connectiviity run)",
+                                          "depth must be withi run parameters (e.g. regression test will not be run in connectiviity run)",
+                                          "country must match test run",
+                                          "country must match test run",
+                                          "test must be is enabled"
+                                          ]
+                                          $ filtersExcludeReasons $ RunConfig NZ Connectivity
+
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Item Filters %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

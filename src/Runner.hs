@@ -122,17 +122,21 @@ runAllItems :: (Functor f1, Functor f2) =>
 runAllItems items interactor prepState frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState interactor prepState agg rc intrprt itm) <$> items
 
 runLogAll ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
-                   (i -> as -> vs -> TestInfo i as vs)                -- aggregator i.e. rslt constructor
+                   TestFilters rc tc                                  -- filters
+                   -> (i -> as -> vs -> TestInfo i as vs)             -- aggregator i.e. rslt constructor
                    -> rc                                              -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> GenericTest tc rc i effs as vs                  -- Test Case
                    -> [m ()]
-runLogAll agg rc intrprt tst =
+runLogAll fltrs agg rc intrprt GenericTest{..} =
         let
           logger = void . intrprt . log
-          result TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+          runItems TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+          include = isRight $ filterTestCfg fltrs rc configuration
         in
-          result $ components tst
+          include
+              ? runItems components
+              $ pure $ pure ()
 
 genericTestRun :: forall effs m rc tc. (EFFFileSystem effs, Monad m, Show tc) =>
                   (forall mr m1 a. (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (mr a)) -> [m1 (mr a)]) -- test runner (applys funtion to hard coded list of tests)
@@ -148,7 +152,7 @@ genericTestRun runner fltrs r agg itpr =
 
                         log' = itpr . log
                       in
-                        log' filterTests' >> foldl' (>>) (pure ()) (P.concat $ runner $ runLogAll agg r itpr)
+                        log' filterTests' >> foldl' (>>) (pure ()) (P.concat $ runner $ runLogAll fltrs agg r itpr)
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%

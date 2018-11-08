@@ -10,7 +10,7 @@ import DSL.Logger
 import DemoConfig
 import           TestAndRunConfig
 import DSL.Ensure
-import Runner as R 
+import Runner as R
 import           Control.Monad.Freer
 import           DSL.Interpreter
 import           Foundation.Extended hiding (Item)
@@ -21,7 +21,9 @@ import qualified Prelude as P
 type Effects effs = EFFEnsureOnly effs
 
 config :: TestConfig
-config = testConfig { header = "This Simple Test Only Uses Ensure Effects" }
+config = testConfig {
+  header = "This Simple Test Only Uses Ensure Effects"
+}
 
 data ApState = ApState {
   itemId :: Int,

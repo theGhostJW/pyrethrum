@@ -17,6 +17,7 @@ import qualified Prelude                    as P
 import           Runner as R
 
 runInIO = testRun [] runConfig testInfoFull executeInIO
+runNZInIO = testRun filters runConfig {country = NZ} testInfoFull executeInIO
 runDocument  = testRun [] runConfig testInfoFull executeDocument
 
 testRun :: forall effs m. (EFFFileSystem effs, Monad m) =>

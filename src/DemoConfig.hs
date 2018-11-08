@@ -1,21 +1,34 @@
 module DemoConfig (
     module DemoConfig
-  , module RC
 ) where
 
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.Writer
 import           Data.Set                   as S
-import           DemoConfigPrimatives
-import           DemoRunConfig              as RC
 import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter
 import           DSL.Logger
 import           Foundation.Extended
+import qualified Prelude                    as P
 import           Runner
 import           TestAndRunConfig
+
+data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord)
+data Country = AU | NZ deriving (Show, Eq, Ord)
+data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord)
+
+
+data RunConfig = RunConfig {
+  runTitle    :: String,
+  environment :: Environment,
+  country     :: Country,
+  depth       :: Depth
+} deriving Show
+
+instance Titled RunConfig where
+  title = runTitle
 
 allEnvironments :: Set Environment
 allEnvironments = S.fromList [TST, UAT, PreProd, Prod]
@@ -36,7 +49,7 @@ data TestConfig = TestConfig {
   active       :: Bool
 }  deriving Show
 
-type Test = GenericTest TestConfig RC.RunConfig
+type Test = GenericTest TestConfig RunConfig
 type TestResult = GenericResult TestConfig
 
 instance Titled TestConfig where
@@ -59,5 +72,27 @@ runConfig :: RunConfig
 runConfig = RunConfig {
   runTitle = "Sample RunConfig",
   environment = TST,
+  country = AU,
   depth = DeepRegression
 }
+
+countryFilter :: TestFilter RunConfig TestConfig
+countryFilter = TestFilter {
+     title = "country must match test run",
+     predicate = \rc tc -> P.elem (country rc) $ countries tc
+   }
+
+levelFilter :: TestFilter RunConfig TestConfig
+levelFilter = TestFilter {
+     title = "minDepth must be at least depth of test run (e.g. regression test will not be run in connectivity run)",
+     predicate = \rc tc -> minDepth tc <= depth rc
+   }
+
+activeFilter :: TestFilter RunConfig TestConfig
+activeFilter = TestFilter {
+    title = "test must be is active",
+    predicate = \rc tc -> active tc
+  }
+
+filters :: [TestFilter RunConfig TestConfig]
+filters = [activeFilter, countryFilter, levelFilter]

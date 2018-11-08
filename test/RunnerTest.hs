@@ -146,7 +146,7 @@ countryFilter = TestFilter {
 
 levelFilter :: TestFilter RunConfig TestConfig
 levelFilter = TestFilter {
-     title = "depth must be withi run parameters (e.g. regression test will not be run in connectiviity run)",
+     title = "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
      predicate = \rc tc -> (level :: TestConfig -> TestDepth) tc <= (level :: RunConfig -> TestDepth) rc
    }
 
@@ -170,8 +170,8 @@ filtersExcludeReasons :: RunConfig -> [String]
 filtersExcludeReasons rc = reason <$> lefts (filterTests runRunner filters rc)
 
 unit_test_filter_exclude_reasons = chkEq [
-                                          "depth must be withi run parameters (e.g. regression test will not be run in connectiviity run)",
-                                          "depth must be withi run parameters (e.g. regression test will not be run in connectiviity run)",
+                                          "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
+                                          "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
                                           "country must match test run",
                                           "country must match test run",
                                           "test must be is enabled"

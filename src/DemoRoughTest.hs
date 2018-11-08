@@ -22,7 +22,10 @@ import           Runner as R
 type Effects effs = EFFFileSystem effs
 
 config :: TestConfig
-config = testConfig { header = "This is a Rough Test" }
+config = testConfig {
+  header = "This is a Rough Test",
+  countries = allCountries
+ }
 
 data ApState = ApState {
   itemId   :: Int,

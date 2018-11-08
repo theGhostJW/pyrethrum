@@ -10,6 +10,7 @@ import           Runner as R
 import           Test.Extended
 import           ItemClass
 import DSL.Interpreter
+import TestAndRunConfig
 
 
 data TestItem = TestItem {
@@ -26,15 +27,23 @@ type ValState = Int
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 data RunConfig = RunConfig {
-  country :: String,
-  level :: Int
+  country :: Country,
+  level :: TestDepth
 }
 
 data TestConfig = TestConfig {
-  countries :: String,
-  level :: Int,
+  header :: String,
+  address :: String,
+  countries :: [Country],
+  level :: TestDepth,
   enabled :: Bool
 }  deriving Show
+
+instance TestConfigClass TestConfig where
+  moduleAddress = address
+
+instance Titled TestConfig where
+  title = header
 
 type TST = GenericTest TestConfig RunConfig
 
@@ -46,35 +55,71 @@ instance ItemClass MyInt MyInt where
   thenClause _ =  "post"
   checkList = mempty
 
+data TestDepth = Connectivity | Regression | DeepRegression deriving (Eq, Ord, Show)
+data Country = Au |NZ deriving (Eq, Ord, Show)
+
+au = [Au]
+nz = [NZ]
+
 test1 :: TST MyInt effs MyInt MyInt
 test1 = GenericTest {
-              configuration = TestConfig "Au" 3 True,
+              configuration = TestConfig {
+                header = "test1",
+                address = "test1",
+                countries = au <> nz,
+                level = Regression,
+                enabled = True
+              },
               components = undefined
             }
 
 test2 :: TST MyInt effs MyInt MyInt
 test2 = GenericTest {
-              configuration = TestConfig "NZ" 3 True,
+              configuration = TestConfig {
+                header = "test2",
+                address = "test2",
+                countries = nz,
+                level = Regression,
+                enabled = True
+              },
               components = undefined
             }
 
 test3 :: TST MyInt effs MyInt MyInt
 test3 = GenericTest {
-                configuration = TestConfig "Au" 1 True,
+                configuration = TestConfig {
+                  header = "test3",
+                  address = "test3",
+                  countries = au,
+                  level = Connectivity,
+                  enabled = True
+                },
                 components = undefined
             }
 
 test4 :: TST MyInt effs MyInt MyInt
 test4 = GenericTest {
-              configuration = TestConfig "Au" 3 False,
+              configuration = TestConfig {
+                  header = "test4",
+                  address = "test4",
+                  countries = au,
+                  level = DeepRegression,
+                  enabled = True
+                },
               components = undefined
             }
 
-
-            -- data TestFilter rc tc = TestFilter {
-            --   title :: String,
-            --   predicate :: rc -> tc -> TestAddress -> Bool
-            -- }
+test5 :: TST MyInt effs MyInt MyInt
+test5 = GenericTest {
+              configuration = TestConfig {
+                  header = "test5",
+                  address = "test5",
+                  countries = au,
+                  level = DeepRegression,
+                  enabled = False
+                },
+              components = undefined
+            }
 
 runRunner :: forall m m1 effs a. (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [m1 (m a)]
 runRunner f =
@@ -82,20 +127,43 @@ runRunner f =
       f test1,
       f test2,
       f test3,
-      f test4
+      f test4,
+      f test5
     ]
 
 
--- enabledFilter :: RunConfig -> TestConfig -> String -> TestFilterResult TestConfig
--- enabledFilter =
---
--- enabledFilter :: RunConfig -> TestHeaderData TestConfig -> TestFilterResult TestConfig
--- enabledFilter rc TestHeaderData{..} = let
---                                         rslt TestConfig{..} = undefined
---                                       in
---                                         undefined
+enabledFilter :: TestFilter RunConfig TestConfig
+enabledFilter = TestFilter {
+     title = "test must be is enabled",
+     predicate = \rc tc -> enabled tc
+   }
+
+countryFilter :: TestFilter RunConfig TestConfig
+countryFilter = TestFilter {
+     title = "country must match test run",
+     predicate = \rc tc -> P.elem (country rc) $ countries tc
+   }
+
+levelFilter :: TestFilter RunConfig TestConfig
+levelFilter = TestFilter {
+     title = "depth must be withi run parameters (e.g. regression test will not be run in connectiviity run)",
+     predicate = \rc tc -> (level :: TestConfig -> TestDepth) tc <= (level :: RunConfig -> TestDepth) rc
+   }
 
 
+filters :: [TestFilter RunConfig TestConfig]
+filters = [enabledFilter, countryFilter, levelFilter]
+
+runFilters :: RunConfig -> [String]
+runFilters rc = header <$> rights (filterTests runRunner filters rc)
+
+chkFilters :: [String] -> RunConfig -> Assertion
+chkFilters expted rc = chkEq expted $ runFilters rc
+
+unit_test_filter_expect_empty = chkFilters [] $ RunConfig NZ Connectivity
+unit_test_filter_country = chkFilters ["test1", "test3"] $ RunConfig Au Regression
+unit_test_filter_country_nz = chkFilters ["test1", "test2"] $ RunConfig NZ Regression
+unit_test_filter_country2 = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
 
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -135,7 +135,7 @@ runLogAll agg rc intrprt tst =
           result $ components tst
 
 genericTestRun :: forall effs m rc tc. (EFFFileSystem effs, Monad m,  TestConfigClass tc, Show tc) =>
-                  (forall mr m1 a. (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (mr a)) -> [m1 (mr a)])
+                  (forall mr m1 a. (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (mr a)) -> [m1 (mr a)]) -- test runner (applys funtion to hard coded list of tests)
                   -> TestFilters rc tc                                                        -- genericTest filters
                   -> rc                                                                       -- runConfig
                   -> (forall i as vs. (ItemClass i vs) => i -> as -> vs -> TestInfo i as vs)  -- aggregator (result constructor)
@@ -143,15 +143,12 @@ genericTestRun :: forall effs m rc tc. (EFFFileSystem effs, Monad m,  TestConfig
                   -> m ()
 genericTestRun runner fltrs r agg itpr =
                       let
-                        filterTests' :: (forall i as vs. TestFilters rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc)) -> [TestFilterResult tc]
-                        filterTests' ff = filterTests runner ff fltrs r
-
-                        fltrLog :: [TestFilterResult tc]
-                        fltrLog = filterTests' filterTest
+                        filterTests' :: [TestFilterResult tc]
+                        filterTests' = filterTests runner fltrs r
 
                         log' = itpr . log
                       in
-                        log' fltrLog >> foldl' (>>) (pure ()) (P.concat $ runner $ runLogAll agg r itpr)
+                        log' filterTests' >> foldl' (>>) (pure ()) (P.concat $ runner $ runLogAll agg r itpr)
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -168,8 +165,8 @@ data TestFilter rc tc = TestFilter {
 
 type TestFilters rc tc = [TestFilter rc tc]
 
-filterTestHdr :: forall rc tc. Titled tc => TestFilters rc tc -> rc -> tc -> TestFilterResult tc
-filterTestHdr fltrs rc tc =
+filterTestCfg :: forall rc tc. Titled tc => TestFilters rc tc -> rc -> tc -> TestFilterResult tc
+filterTestCfg fltrs rc tc =
   let
     applyFilter :: TestFilter rc tc -> TestFilterResult tc
     applyFilter fltr = predicate fltr rc tc ?
@@ -179,12 +176,11 @@ filterTestHdr fltrs rc tc =
     fromMaybe (pure tc) $ find isLeft $ applyFilter <$> fltrs
 
 filterTest :: forall i as vs tc rc effs. TestConfigClass tc => TestFilters rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc)
-filterTest fltrs rc t = Identity $ filterTestHdr fltrs rc $ (configuration :: (GenericTest tc rc i effs as vs -> tc)) t
+filterTest fltrs rc t = Identity $ filterTestCfg fltrs rc $ (configuration :: (GenericTest tc rc i effs as vs -> tc)) t
 
-filterTests :: forall effs rc tc.
-      ((forall i as vs. GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc)) -> [Identity (TestFilterResult tc)])
-      -> (forall i as vs. TestFilters rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc))
+filterTests :: forall effs rc tc. TestConfigClass tc =>
+      ((forall i as vs. GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc)) -> [Identity (TestFilterResult tc)]) -- test runner (applys fucntion to hard coded list of tests)
       -> TestFilters rc tc
       -> rc
       -> [TestFilterResult tc]
-filterTests runner fltrFunc fltrs rc =  runIdentity <$> runner (fltrFunc fltrs rc)
+filterTests runner fltrs rc =  runIdentity <$> runner (filterTest fltrs rc)

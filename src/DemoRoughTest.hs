@@ -113,7 +113,7 @@ instance ItemClass Item ValState where
 -- 6. Generalise ✔
 -- 7. ensure on prepstate ✔
 -- 8. another testinfo constructor for failed prepstate ✔
--- 9. test filter
+-- 9. test filter ✔
 -- 10. group - rollover - go home is home
 -- 11. test case end point
 -- 11. ~ try merging into typeclass
@@ -121,7 +121,7 @@ instance ItemClass Item ValState where
 --    12.01 add hoc and results logging to the same file
 --    12.02 include test path in log
 -- 13. Log Formatting and Report Generation
--- 13.1 ~ generalised log type
+-- 13.1 ~ generalised log type / log protocol
 -- 13.2 ~ serialisation format
 -- 14.0 - hedgehog / randomiser
 -- 15.0 ~ report generation

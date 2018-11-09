@@ -49,8 +49,10 @@ fileSystemDocInterpreter = interpret $
                                         mockContents = "Mock File Contents"
                                       in
                                         \case
-                                          ReadFile path -> tell ["readFile: " <> show path] $> Right mockContents
-                                          WriteFile path str -> tell ["write file: " <>
+                                          ReadFile path ->
+                                            tell (["readFile: " <> show path] :: [String]) $> Right mockContents
+                                            
+                                          WriteFile path str -> tell (["write file: " <>
                                                                         show path <>
                                                                         "\nContents:\n" <>
-                                                                        str]
+                                                                        str] :: [String])

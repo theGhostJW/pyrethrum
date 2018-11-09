@@ -25,6 +25,20 @@ import Data.Either
 import TestAndRunConfig as C
 import Control.Monad
 
+data PreRun effs = PreRun {
+  run :: Eff effs (),
+  checkHasRun :: Eff effs Bool
+}
+
+data TestGroup tc rc effs =
+  SimpleGroup { tests :: forall i as vs. [GenericTest tc rc i effs as vs]} |
+
+  TestGroupWithInit {
+        rollover :: Maybe (PreRun effs),
+        preTest :: Maybe (PreRun effs),
+        tests :: forall i as vs. [GenericTest tc rc i effs as vs]
+      }
+
 
 data TestComponents rc i effs as vs = TestComponents {
   testItems :: [i],

@@ -31,7 +31,10 @@ data PreRun effs = PreRun {
 }
 
 doNothing :: PreRun effs
-doNothing = PreRun (pure ()) $ pure True
+doNothing = PreRun {
+  run = pure (),
+  checkHasRun = pure True
+}
 
 data TestGroup tc rc effs =
   TestGroup {

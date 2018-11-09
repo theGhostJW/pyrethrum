@@ -30,14 +30,15 @@ data PreRun effs = PreRun {
   checkHasRun :: Eff effs Bool
 }
 
-data TestGroup tc rc effs =
-  SimpleGroup { tests :: forall i as vs. [GenericTest tc rc i effs as vs]} |
+doNothing :: PreRun effs
+doNothing = PreRun (pure ()) $ pure True
 
-  TestGroupWithInit {
-        rollover :: Maybe (PreRun effs),
-        preTest :: Maybe (PreRun effs),
+data TestGroup tc rc effs =
+  TestGroup {
+        rollover :: PreRun effs,
+        preTest :: PreRun effs,
         tests :: forall i as vs. [GenericTest tc rc i effs as vs]
-      }
+   }
 
 
 data TestComponents rc i effs as vs = TestComponents {

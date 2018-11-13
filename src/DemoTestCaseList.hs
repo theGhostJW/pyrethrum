@@ -34,3 +34,10 @@ runRunner f =
       f RT.test,
       f ST.test
     ]
+
+-- runGroups :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. TestGroup TestConfig RunConfig effs -> m1 (m a)) -> [m1 (m a)]
+-- runGroups f =
+--     [
+--       f RT.test,
+--       f ST.test
+--     ]

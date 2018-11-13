@@ -40,7 +40,7 @@ data TestGroup tc rc effs =
   TestGroup {
         rollover :: PreRun effs,
         preTest :: PreRun effs,
-        tests :: forall i as vs. [GenericTest tc rc i effs as vs]
+        tests :: forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => [GenericTest tc rc i effs as vs]
    }
 
 
@@ -156,9 +156,31 @@ runLogAll fltrs agg rc intrprt GenericTest{..} =
               ? runItems components
               $ pure $ pure ()
 
+-- runLogGroup ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
+--                    TestFilters rc tc                                  -- filters
+--                    -> (i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
+--                    -> rc                                              -- runConfig
+--                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
+--                    -> TestGroup tc rc effs                            -- test group
+--                    -> [GenericTest tc rc i effs as vs]                -- Test Case
+--                    -> [m ()]
+-- runLogGroup fltrs agg rc intrprt TestGroup{..} =
+--         let
+--           logger = void . intrprt . log
+--           runItems TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+--           include = isRight $ filterTestCfg fltrs rc configuration
+--         in
+--           include
+--               ? runItems components
+--               $ pure $ pure ()
+
 genericTestRun :: forall effs m rc tc. (EFFFileSystem effs, Monad m, Show tc) =>
-                  (forall mr m1 a. (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (mr a)) -> [m1 (mr a)]) -- test runner (applys funtion to hard coded list of tests)
-                  -> TestFilters rc tc                                                        -- genericTest filters
+                  (
+                    forall mr m1 a.
+                      (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (mr a)) -- test case processor function
+                      -> [m1 (mr a)] -- test case processor function is applied to a hard coded list of tests and returns a list of results
+                  )
+                  -> TestFilters rc tc                                                        -- test filters
                   -> rc                                                                       -- runConfig
                   -> (forall i as vs. (ItemClass i vs) => i -> as -> vs -> TestInfo i as vs)  -- aggregator (result constructor)
                   -> (forall a. Eff effs a -> m (Either AppError a))                          -- interpreter

@@ -98,6 +98,28 @@ instance ItemClass Item ValState where
   thenClause = post
   checkList = checks
 
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+newtype WithEffects_ es0 es1 a = WithEffects { unWithEffects :: Members es0 es1 => a }
+
+
+-- 
+-- type EFileSystem2 = '[Logger, Ensure, FileSystem]
+-- type WithEffects = WithEffects_ EFileSystem2
+--
+-- test2 :: forall effs. WithEffects effs (Test Item effs ApState ValState)
+-- test2 = WithEffects $ \ _proxy -> test
+--
+-- effsRepTest :: Typeable es => WithEffects_ es0 es1 a -> TypeRep es
+-- effsRepTest _ = typeRep
+
+-- showEffsTest :: Typeable es => WithEffects_ es0 es1 a -> String
+-- showEffsTest = show . effsRepTest
+
+-- demo :: String
+-- demo = showEffsTest test2
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

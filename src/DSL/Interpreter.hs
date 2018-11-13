@@ -14,7 +14,7 @@ import Data.Tuple as T
 
 type EFFLogger effs = Member Logger effs
 type EFFEnsureOnly effs = (Members '[Logger, Ensure] effs)
-type EFFFileSystem effs = Members '[Logger, Ensure, FileSystem] effs
+type EFFFileSystem effs = Members '[Logger, Ensure, FileSystem] effs 
 
 type EFFFileSystemInIO effs = (Members '[FileSystem, Ensure, Error FileSystemError, Error EnsureError, IO] effs)
 
@@ -26,7 +26,7 @@ data AppError =
               IOError IOException
               deriving (Show, Eq)
 
-executeFileSystemInIO :: forall a v. (a -> v) -> Eff '[FileSystem,  Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError v)
+executeFileSystemInIO :: forall a v. (a -> v) -> Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError v)
 executeFileSystemInIO func app = unifyFSEnsureError <$> runM
                                   (
                                     runError

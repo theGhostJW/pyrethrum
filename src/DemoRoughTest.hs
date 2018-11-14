@@ -18,6 +18,7 @@ import Data.Either
 import qualified Prelude as P
 import           Foundation.Extended             hiding (readFile, writeFile, Item)
 import           Runner as R
+import Type.Reflection
 
 type Effects effs = EFFFileSystem effs
 
@@ -101,25 +102,42 @@ instance ItemClass Item ValState where
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- https://stackoverflow.com/questions/53272036/freer-simple-how-can-i-generate-a-list-of-effect-members-at-runtime/53272316#53272316
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 newtype WithEffects_ es0 es1 a = WithEffects { unWithEffects :: Members es0 es1 => a }
-
-
--- 
--- type EFileSystem2 = '[Logger, Ensure, FileSystem]
--- type WithEffects = WithEffects_ EFileSystem2
 --
--- test2 :: forall effs. WithEffects effs (Test Item effs ApState ValState)
--- test2 = WithEffects $ \ _proxy -> test
+type EFileSystem2 = '[Logger, Ensure, FileSystem]
+type WithEffects = WithEffects_ EFileSystem2
 --
--- effsRepTest :: Typeable es => WithEffects_ es0 es1 a -> TypeRep es
--- effsRepTest _ = typeRep
+test2 :: forall effs. WithEffects effs (Test Item effs ApState ValState)
+test2 = WithEffects test
+--
+effsRepTest :: Typeable es0 => WithEffects_ es0 es1 a -> TypeRep es0
+effsRepTest _ = typeRep
+--
+showEffsTest :: Typeable es0 => WithEffects_ es0 es1 a -> String
+showEffsTest = show . effsRepTest
+--
+demo :: String
+demo = showEffsTest test2
 
--- showEffsTest :: Typeable es => WithEffects_ es0 es1 a -> String
--- showEffsTest = show . effsRepTest
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--- demo :: String
--- demo = showEffsTest test2
+class ShowTypes (es :: [* -> *]) where
+  showTypes :: [String]
+
+instance ShowTypes '[] where
+  showTypes = []
+
+instance (Typeable e, ShowTypes es) => ShowTypes (e ': es) where
+  showTypes = show (typeRep @e) : showTypes @es
+
+showEffs2 :: forall es0 es1 a. ShowTypes es0 => WithEffects_ es0 es1 a -> [String]
+showEffs2 _ = showTypes @es0
+
+demo2 :: [String]
+demo2 = showEffs2 test2
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Approach 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

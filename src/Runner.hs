@@ -26,13 +26,13 @@ import TestAndRunConfig as C
 import Control.Monad
 
 data PreRun effs = PreRun {
-  run :: Eff effs (),
+  runEffs :: Eff effs (),
   checkHasRun :: Eff effs Bool
 }
 
 doNothing :: PreRun effs
 doNothing = PreRun {
-  run = pure (),
+  runEffs = pure (),
   checkHasRun = pure True
 }
 
@@ -156,23 +156,35 @@ runLogAll fltrs agg rc intrprt GenericTest{..} =
               ? runItems components
               $ pure $ pure ()
 
--- runLogGroup ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
---                    TestFilters rc tc                                  -- filters
---                    -> (i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
---                    -> rc                                              -- runConfig
---                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
---                    -> TestGroup tc rc effs                            -- test group
---                    -> [GenericTest tc rc i effs as vs]                -- Test Case
---                    -> [m ()]
--- runLogGroup fltrs agg rc intrprt TestGroup{..} =
---         let
---           logger = void . intrprt . log
---           runItems TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
---           include = isRight $ filterTestCfg fltrs rc configuration
---         in
---           include
---               ? runItems components
---               $ pure $ pure ()
+runLogGroup ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
+                   TestFilters rc tc                                  -- filters
+                   -> (i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
+                   -> rc                                              -- runConfig
+                   -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
+                   -> TestGroup tc rc effs                            -- test group
+                   -> [GenericTest tc rc i effs as vs]                -- Test Case
+                   -> [m ()]
+runLogGroup fltrs agg rc intrprt TestGroup{..} =
+        let
+
+          preRun :: PreRun effs -> m (Either AppError ())
+          preRun PreRun{..} = do
+                                a <- intrprt runEffs
+                                let success = do
+                                                s <- intrprt checkHasRun
+                                                undefined
+                                success
+                                --success ? pure a $ undefined
+
+
+          logger = void . intrprt . log
+          runItems TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+          include cfg = isRight $ filterTestCfg fltrs rc cfg
+        in
+          undefined
+          -- include
+          --     ? runItems components
+          --     $ pure $ pure ()
 
 genericTestRun :: forall effs m rc tc. (EFFFileSystem effs, Monad m, Show tc) =>
                   (

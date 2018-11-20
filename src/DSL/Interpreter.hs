@@ -26,12 +26,12 @@ data AppError =
               AppFileSystemError FileSystemError |
               AppEnsureError EnsureError |
 
-              NotImplemented String |
+              NotImplementedError String |
               GenericError String |
 
-              PreTest PreTestStage String AppError |
-              PreTestCheckExecution PreTestStage String AppError |
-              PreTestCheck PreTestStage String |
+              PreTestError PreTestStage String AppError |
+              PreTestCheckExecutionError PreTestStage String AppError |
+              PreTestCheckError PreTestStage String |
 
               IOError IOException
 

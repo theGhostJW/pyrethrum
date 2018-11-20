@@ -23,7 +23,7 @@ instance Prelude.Show (Filter a) where
   show (Pred func) = "Pred itemPredicateFunction"
 
 data FilterError = InvalidItemFilter String  |
-                   NotImplemented String
+                   NotImplementedError String
                    deriving (Eq, Show)
 
 filterredItems :: (ItemClass item valState) => Filter item -> [item] -> Either FilterError [item]

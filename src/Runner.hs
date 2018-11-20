@@ -38,8 +38,11 @@ doNothing = PreRun {
 
 data TestGroup tc rc effs =
   TestGroup {
+        -- occurs once on client before group is run
         rollover :: PreRun effs,
-        preTest :: PreRun effs,
+        -- occurs once before test iteration is run
+        preTestIteration :: PreRun effs,
+        -- a list of tests
         tests :: forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => [GenericTest tc rc i effs as vs]
    }
 
@@ -156,7 +159,7 @@ runLogAll fltrs agg rc intrprt GenericTest{..} =
               ? runItems components
               $ pure $ pure ()
 
-runLogGroup ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
+runGroup ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
                    TestFilters rc tc                                  -- filters
                    -> (i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> rc                                              -- runConfig
@@ -164,9 +167,8 @@ runLogGroup ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, S
                    -> TestGroup tc rc effs                            -- test group
                    -> [GenericTest tc rc i effs as vs]                -- Test Case
                    -> [m ()]
-runLogGroup fltrs agg rc intrprt TestGroup{..} =
+runGroup fltrs agg rc intrprt TestGroup{..} =
         let
-
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
           preRun PreRun{..} stage = do
                                 let
@@ -175,11 +177,11 @@ runLogGroup fltrs agg rc intrprt TestGroup{..} =
 
                                   verifyAction :: Either AppError Bool -> Either AppError ()
                                   verifyAction  = either
-                                                           (Left . PreTestCheckExecution stage (stageExLabel <> " check"))
+                                                           (Left . PreTestCheckExecutionError stage (stageExLabel <> " check"))
                                                            (\hmChk -> hmChk ?
                                                                           Right () $
                                                                           Left
-                                                                              $ PreTestCheck stage
+                                                                              $ PreTestCheckError stage
                                                                                 $ "Completion check returned False. Looks like "
                                                                                 <> stageStr
                                                                                 <> " did not run successfully"
@@ -188,7 +190,7 @@ runLogGroup fltrs agg rc intrprt TestGroup{..} =
                                 preRunRslt <- intrprt runAction
                                 runCheck <- intrprt checkHasRun
                                 pure $ either
-                                         (Left . PreTest stage stageExLabel)
+                                         (Left . PreTestError stage stageExLabel)
                                          (\_ -> verifyAction runCheck)
                                         preRunRslt
 

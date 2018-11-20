@@ -14,16 +14,27 @@ import Data.Tuple as T
 
 type EFFLogger effs = Member Logger effs
 type EFFEnsureOnly effs = (Members '[Logger, Ensure] effs)
-type EFFFileSystem effs = Members '[Logger, Ensure, FileSystem] effs 
+type EFFFileSystem effs = Members '[Logger, Ensure, FileSystem] effs
 
 type EFFFileSystemInIO effs = (Members '[FileSystem, Ensure, Error FileSystemError, Error EnsureError, IO] effs)
+
+data PreTestStage = Rollover |
+                      GoHome
+                      deriving (Show, Eq)
 
 data AppError =
               AppFileSystemError FileSystemError |
               AppEnsureError EnsureError |
+
               NotImplemented String |
               GenericError String |
+
+              PreTest PreTestStage String AppError |
+              PreTestCheckExecution PreTestStage String AppError |
+              PreTestCheck PreTestStage String |
+
               IOError IOException
+
               deriving (Show, Eq)
 
 executeFileSystemInIO :: forall a v. (a -> v) -> Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError v)

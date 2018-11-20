@@ -155,6 +155,7 @@ demo2 = showEffs2 test2
 -- 8. another testinfo constructor for failed prepstate ✔
 -- 9. test filter ✔
 -- 10. group - rollover - go home is home
+-- 10.1 ~ io prerun HOF for error handling ~ test with / without
 -- 11. test case end point
 -- 11. ~ try merging into typeclass
 -- 12. logging to file

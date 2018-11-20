@@ -26,13 +26,13 @@ import TestAndRunConfig as C
 import Control.Monad
 
 data PreRun effs = PreRun {
-  runEffs :: Eff effs (),
+  runAction :: Eff effs (),
   checkHasRun :: Eff effs Bool
 }
 
 doNothing :: PreRun effs
 doNothing = PreRun {
-  runEffs = pure (),
+  runAction = pure (),
   checkHasRun = pure True
 }
 
@@ -167,14 +167,30 @@ runLogGroup ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, S
 runLogGroup fltrs agg rc intrprt TestGroup{..} =
         let
 
-          preRun :: PreRun effs -> m (Either AppError ())
-          preRun PreRun{..} = do
-                                a <- intrprt runEffs
-                                let success = do
-                                                s <- intrprt checkHasRun
-                                                undefined
-                                success
-                                --success ? pure a $ undefined
+          preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
+          preRun PreRun{..} stage = do
+                                let
+                                  stageStr = show stage
+                                  stageExLabel = "Execution of " <> stageStr
+
+                                  verifyAction :: Either AppError Bool -> Either AppError ()
+                                  verifyAction  = either
+                                                           (Left . PreTestCheckExecution stage (stageExLabel <> " check"))
+                                                           (\hmChk -> hmChk ?
+                                                                          Right () $
+                                                                          Left
+                                                                              $ PreTestCheck stage
+                                                                                $ "Completion check returned False. Looks like "
+                                                                                <> stageStr
+                                                                                <> " did not run successfully"
+                                                           )
+
+                                preRunRslt <- intrprt runAction
+                                runCheck <- intrprt checkHasRun
+                                pure $ either
+                                         (Left . PreTest stage stageExLabel)
+                                         (\_ -> verifyAction runCheck)
+                                        preRunRslt
 
 
           logger = void . intrprt . log

@@ -41,7 +41,7 @@ data TestGroup tc rc effs =
         -- occurs once on client before group is run
         rollover :: PreRun effs,
         -- occurs once before test iteration is run
-        preTestIteration :: PreRun effs,
+        goHome :: PreRun effs,
         -- a list of tests
         tests :: forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => [GenericTest tc rc i effs as vs]
    }
@@ -166,7 +166,7 @@ runGroup ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> TestGroup tc rc effs                            -- test group
                    -> [GenericTest tc rc i effs as vs]                -- Test Case
-                   -> [m ()]
+                   -> m ()
 runGroup fltrs agg rc intrprt TestGroup{..} =
         let
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
@@ -194,12 +194,17 @@ runGroup fltrs agg rc intrprt TestGroup{..} =
                                          (\_ -> verifyAction runCheck)
                                         preRunRslt
 
-
+          logger :: Show s => s -> m ()
           logger = void . intrprt . log
-          runItems TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+
+          runItems :: TestComponents rc i effs as vs -> m ()
+          runItems TestComponents{..} = foldl' (>>) (pure ()) ((logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt)
+
+          include :: tc -> Bool
           include cfg = isRight $ filterTestCfg fltrs rc cfg
         in
-          undefined
+          do
+            undefined
           -- include
           --     ? runItems components
           --     $ pure $ pure ()

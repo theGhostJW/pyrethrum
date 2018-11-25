@@ -35,9 +35,26 @@ runRunner f =
       f ST.test
     ]
 
--- runGroups :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. TestGroup TestConfig RunConfig effs -> m1 (m a)) -> [m1 (m a)]
--- runGroups f =
---     [
---       f RT.test,
---       f ST.test
---     ]
+runGroups :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m m1 a effs]
+runGroups f =
+  [
+
+   TestGroup {
+          rollover = doNothing,
+          goHome = doNothing,
+          tests = [
+              f RT.test,
+              f ST.test
+            ]
+     },
+
+    TestGroup {
+          rollover = doNothing,
+          goHome = doNothing,
+          tests = [
+              f RT.test,
+              f ST.test
+            ]
+     }
+
+    ]

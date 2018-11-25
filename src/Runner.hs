@@ -36,14 +36,25 @@ doNothing = PreRun {
   checkHasRun = pure True
 }
 
-data TestGroup tc rc effs =
+-- data TestGroup tc rc effs =
+--   TestGroup {
+--         -- occurs once on client before group is run
+--         rollover :: PreRun effs,
+--         -- occurs once before test iteration is run
+--         goHome :: PreRun effs,
+--         -- a list of tests
+--         tests :: forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => [GenericTest tc rc i effs as vs]
+--    }
+
+data TestGroup m m1 a effs =
   TestGroup {
         -- occurs once on client before group is run
         rollover :: PreRun effs,
         -- occurs once before test iteration is run
         goHome :: PreRun effs,
         -- a list of tests
-        tests :: forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => [GenericTest tc rc i effs as vs]
+        tests :: [m1 (m a)]
+        -- [IO Either AppError TestInfo??]
    }
 
 
@@ -131,7 +142,7 @@ runApState interactor prepState agg rc intrprt itm = let
                                                      in
                                                         (runVals <$>) <$> intrprt (interactor rc itm)
 
-runAllItems :: (Functor f1, Functor f2) =>
+runTestItems :: forall i as vs rc effs f1 f2. (Functor f1, Functor f2) =>
       [i]                                                       -- items
       -> (rc -> i -> Eff effs as)                               -- interactor
       -> (as -> Ensurable vs)                                   -- prepstate
@@ -140,34 +151,74 @@ runAllItems :: (Functor f1, Functor f2) =>
       -> rc                                                     -- runconfig
       -> (Eff effs as -> f1 (f2 as))                            -- interpreter
       -> [f1 (TestInfo i as vs)]
-runAllItems items interactor prepState frmEth agg rc intrprt = (\itm -> frmEth itm <$> runApState interactor prepState agg rc intrprt itm) <$> items
+runTestItems items interactor prepState frmEth agg rc intrprt = 
+  let
+    runItem :: i -> f1 (TestInfo i as vs)
+    runItem itm = frmEth itm <$> runApState interactor prepState agg rc intrprt itm
+  in
+   runItem <$> items
 
-runLogAll ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
+runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
                    TestFilters rc tc                                  -- filters
                    -> (i -> as -> vs -> TestInfo i as vs)             -- aggregator i.e. rslt constructor
                    -> rc                                              -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> GenericTest tc rc i effs as vs                  -- Test Case
                    -> [m ()]
-runLogAll fltrs agg rc intrprt GenericTest{..} =
+runTest fltrs agg rc intrprt GenericTest{..} =
         let
-          logger = void . intrprt . log
-          runItems TestComponents{..} = (logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+          logger :: Show s => s -> m ()
+          logger = logger' intrprt
+
+          runItems TestComponents{..} = (logger =<<) <$> runTestItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
           include = isRight $ filterTestCfg fltrs rc configuration
         in
           include
               ? runItems components
               $ pure $ pure ()
 
-runGroup ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
-                   TestFilters rc tc                                  -- filters
-                   -> (i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
+
+logger' :: forall m s effs. (Monad m, Show s, Member Logger effs)
+                  =>
+                 (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
+                 -> s
+                 -> m ()
+logger' intrprt = void . intrprt . log
+
+
+genericTestRun :: forall effs m rc tc. (EFFFileSystem effs, Monad m, Show tc) =>
+                  (
+                    forall mr m1 a.
+                      (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (mr a)) -- test case processor function
+                      -> [m1 (mr a)] -- test case processor function is applied to a hard coded list of tests and returns a list of results
+                  )
+                  -> TestFilters rc tc                                                        -- test filters
+                  -> rc                                                                       -- runConfig
+                  -> (forall i as vs. (ItemClass i vs) => i -> as -> vs -> TestInfo i as vs)  -- aggregator (result constructor)
+                  -> (forall a. Eff effs a -> m (Either AppError a))                          -- interpreter
+                  -> m ()
+genericTestRun runner fltrs r agg itpr =
+                      let
+                        filterTests' :: [TestFilterResult tc]
+                        filterTests' = filterTests runner fltrs r
+
+                        log' = itpr . log
+                      in
+                        log' filterTests' >> foldl' (>>) (pure ()) (P.concat $ runner $ runTest fltrs agg r itpr)
+
+
+runGroup :: forall rc tc m effs m1 r. (Monad m, EFFFileSystem effs) =>
+                    (
+                      forall a.
+                        (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> m1 (m a)) -> [TestGroup m m1 a effs] -- test case processor function is applied to a hard coded list of tests and returns a list of results
+                    )
+                   -> TestFilters rc tc                                  -- filters
+                   -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> rc                                              -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
-                   -> TestGroup tc rc effs                            -- test group
-                   -> [GenericTest tc rc i effs as vs]                -- Test Case
+                   -> TestGroup m m1 r effs                           -- test group
                    -> m ()
-runGroup fltrs agg rc intrprt TestGroup{..} =
+runGroup runner fltrs agg rc intrprt TestGroup{..} =
         let
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
           preRun PreRun{..} stage = do
@@ -195,39 +246,20 @@ runGroup fltrs agg rc intrprt TestGroup{..} =
                                         preRunRslt
 
           logger :: Show s => s -> m ()
-          logger = void . intrprt . log
+          logger = logger' intrprt
 
-          runItems :: TestComponents rc i effs as vs -> m ()
-          runItems TestComponents{..} = foldl' (>>) (pure ()) ((logger =<<) <$> runAllItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt)
+          runItems :: (Show i, Show vs, Show as, ItemClass i vs) => TestComponents rc i effs as vs -> m ()
+          runItems TestComponents{..} = foldl' (>>) (pure ()) ((logger =<<) <$> runTestItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt)
 
           include :: tc -> Bool
           include cfg = isRight $ filterTestCfg fltrs rc cfg
         in
           do
+
             undefined
           -- include
           --     ? runItems components
           --     $ pure $ pure ()
-
-genericTestRun :: forall effs m rc tc. (EFFFileSystem effs, Monad m, Show tc) =>
-                  (
-                    forall mr m1 a.
-                      (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (mr a)) -- test case processor function
-                      -> [m1 (mr a)] -- test case processor function is applied to a hard coded list of tests and returns a list of results
-                  )
-                  -> TestFilters rc tc                                                        -- test filters
-                  -> rc                                                                       -- runConfig
-                  -> (forall i as vs. (ItemClass i vs) => i -> as -> vs -> TestInfo i as vs)  -- aggregator (result constructor)
-                  -> (forall a. Eff effs a -> m (Either AppError a))                          -- interpreter
-                  -> m ()
-genericTestRun runner fltrs r agg itpr =
-                      let
-                        filterTests' :: [TestFilterResult tc]
-                        filterTests' = filterTests runner fltrs r
-
-                        log' = itpr . log
-                      in
-                        log' filterTests' >> foldl' (>>) (pure ()) (P.concat $ runner $ runLogAll fltrs agg r itpr)
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -262,6 +294,7 @@ filterTest :: forall i as vs tc rc effs. TestFilters rc tc -> rc -> GenericTest 
 filterTest fltrs rc t = Identity $ filterTestCfg fltrs rc $ (configuration :: (GenericTest tc rc i effs as vs -> tc)) t
 
 filterTests :: forall effs rc tc.
+      --                            (tst                ->  Id FltrRslt) -> [Id FltrRslt]
       ((forall i as vs. GenericTest tc rc i effs as vs -> Identity (TestFilterResult tc)) -> [Identity (TestFilterResult tc)]) -- test runner (applys fucntion to hard coded list of tests)
       -> TestFilters rc tc
       -> rc

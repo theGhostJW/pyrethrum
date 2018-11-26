@@ -81,6 +81,11 @@ data TestInfo i as vs = TestInfo {
                                   checkResult :: CheckResultList
                                 } |
 
+                         GoHomeError {
+                                    item :: i,
+                                    error :: AppError
+                                  } |
+
                          InteractorFault {
                                     item :: i,
                                     error :: AppError
@@ -151,12 +156,37 @@ runTestItems :: forall i as vs rc effs f1 f2. (Functor f1, Functor f2) =>
       -> rc                                                     -- runconfig
       -> (Eff effs as -> f1 (f2 as))                            -- interpreter
       -> [f1 (TestInfo i as vs)]
-runTestItems items interactor prepState frmEth agg rc intrprt = 
+runTestItems items interactor prepState frmEth agg rc intrprt =
   let
     runItem :: i -> f1 (TestInfo i as vs)
     runItem itm = frmEth itm <$> runApState interactor prepState agg rc intrprt itm
   in
    runItem <$> items
+
+runTestItems' :: forall i as vs rc effs m f2. (Monad m, Functor f2) =>
+      m (Either AppError ())                                    -- go home
+      -> [i]                                                    -- items
+      -> (rc -> i -> Eff effs as)                               -- interactor
+      -> (as -> Ensurable vs)                                   -- prepstate
+      -> (i -> f2 (TestInfo i as vs) -> TestInfo i as vs)       -- recover from either
+      -> (i -> as -> vs -> TestInfo i as vs)                    -- aggragator
+      -> rc                                                     -- runconfig
+      -> (Eff effs as -> m (f2 as))                            -- interpreter
+      -> [m (TestInfo i as vs)]
+runTestItems' goHome items interactor prepState frmEth agg rc intrprt =
+  let
+    runItem :: i -> m (TestInfo i as vs)
+    runItem itm = do
+                   ethHome <- goHome
+                   either
+                    (\err -> pure $ GoHomeError {
+                               item = itm,
+                               error = err
+                             })
+                    (\_ -> frmEth itm <$> runApState interactor prepState agg rc intrprt itm)
+                    ethHome
+  in
+    runItem <$> items
 
 runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
                    TestFilters rc tc                                  -- filters
@@ -176,6 +206,45 @@ runTest fltrs agg rc intrprt GenericTest{..} =
           include
               ? runItems components
               $ pure $ pure ()
+
+runTest' ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
+                   m Bool                                             -- rollover
+                   -> m Bool                                          -- go home
+                   -> TestFilters rc tc                               -- filters
+                   -> (i -> as -> vs -> TestInfo i as vs)             -- aggregator i.e. rslt constructor
+                   -> rc                                              -- runConfig
+                   -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
+                   -> GenericTest tc rc i effs as vs                  -- Test Case
+                   -> Maybe (Either AppError [m ()])
+runTest' rollover goHome fltrs agg rc intrprt GenericTest{..} =
+        let
+          logger :: Show s => s -> m ()
+          logger = logger' intrprt
+
+          runItems :: TestComponents rc i effs as vs -> [m ()]
+          runItems TestComponents{..} = (logger =<<) <$> runTestItems' goHome testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+
+          testResults ::  [m ()]
+          testResults = runItems components
+
+          include :: Bool
+          include = isRight $ filterTestCfg fltrs rc configuration
+
+          --runItems' :: m [m ()]
+          runItems' = do
+                       go <- rollover
+                       undefined
+
+        in
+          not include ?
+                Nothing $
+                -- do
+                --   let
+                --     eith = do
+                --              go <- rollover
+                --              pure $ const testResults <$> go
+
+                  undefined -- include ? runItems' $ pure ()
 
 
 logger' :: forall m s effs. (Monad m, Show s, Member Logger effs)
@@ -245,11 +314,25 @@ runGroup runner fltrs agg rc intrprt TestGroup{..} =
                                          (\_ -> verifyAction runCheck)
                                         preRunRslt
 
-          logger :: Show s => s -> m ()
-          logger = logger' intrprt
+          log' :: Show s => s -> m ()
+          log' = logger' intrprt
 
-          runItems :: (Show i, Show vs, Show as, ItemClass i vs) => TestComponents rc i effs as vs -> m ()
-          runItems TestComponents{..} = foldl' (>>) (pure ()) ((logger =<<) <$> runTestItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt)
+          preRunLog :: PreRun effs -> PreTestStage -> m (Either AppError ())
+          preRunLog pr stage = do
+                                eth <- preRun pr stage
+                                either
+                                  (\err -> log' err >> pure (Left err))
+                                  (const $ pure $ pure ())
+                                  eth
+
+          -- runItems :: (Show i, Show vs, Show as, ItemClass i vs) => TestComponents rc i effs as vs -> m ()
+          -- runItems TestComponents{..} = foldl' (>>) (pure ()) ((log' =<<) <$> runTestItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt)
+
+          -- rollover' :: m Bool
+          -- rollover' = preRunLog rollover Rollover
+
+          goHome' ::  m (Either AppError ())
+          goHome' = preRunLog rollover Rollover
 
           include :: tc -> Bool
           include cfg = isRight $ filterTestCfg fltrs rc cfg

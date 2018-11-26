@@ -58,3 +58,31 @@ runGroups f =
      }
 
     ]
+
+
+fwtf :: IO Bool
+fwtf = do
+        putStrLn "Calculating"
+        pure True
+
+fwtfRun :: IO Bool -> IO Bool
+fwtfRun f = do
+             a <- f
+             b <- f
+             c <- f
+             pure c
+
+demoWtf = fwtfRun fwtf
+
+fwtfRun'' :: IO Bool -> IO Bool
+fwtfRun'' f = f >> f >> f
+
+demoWtf'' = fwtfRun fwtf
+
+fwtfRun' :: IO Bool -> IO Bool
+fwtfRun' f = do
+                f
+                f
+                f
+
+demoWtf' = fwtfRun' fwtf

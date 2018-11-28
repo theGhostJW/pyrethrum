@@ -25,7 +25,7 @@ data RunConfig = RunConfig {
   environment :: Environment,
   country     :: Country,
   depth       :: Depth
-} deriving Show
+} deriving (Eq, Show)
 
 instance Titled RunConfig where
   title = runTitle
@@ -47,7 +47,7 @@ data TestConfig = TestConfig {
   countries    :: Set Country,
   minDepth     :: Depth,
   active       :: Bool
-}  deriving Show
+}  deriving (Eq, Show)
 
 type Test = GenericTest TestConfig RunConfig
 type TestResult = GenericResult TestConfig

@@ -250,8 +250,8 @@ logger' intrprt = void . intrprt . log
 
 runGroup :: forall rc tc m effs m1 r. (Monad m, EFFFileSystem effs) =>
                     (
-                      forall a.
-                        (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> m1 (m a)) -> [TestGroup m m1 a effs]
+                      forall a mo mi.
+                        (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mi mo a effs]
                     )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
@@ -308,6 +308,9 @@ runGroup runner fltrs agg rc intrprt TestGroup{..} =
 
           includeTest :: tc -> Bool
           includeTest cfg = isRight $ filterTestCfg fltrs rc cfg
+
+        --  filterInfo :: [[Either (FilterRejection tc) tc]]
+          filterInfo = filterGroups runner fltrs rc
         in
           do
 
@@ -395,8 +398,11 @@ filterTests runner fltrs rc =  runIdentity <$> runner (filterTest fltrs rc)
 -- the run
 
 
-filterGroups :: forall tc rc.
-              (forall effs. (forall i as vs. (Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> Identity (Either (FilterRejection tc) tc)) -> [TestGroup (Either (FilterRejection tc)) Identity tc effs])
+filterGroups :: forall tc rc effs.
+              (
+                (forall i as vs. (Show i, Show as, Show vs) =>
+                      GenericTest tc rc i effs as vs -> Identity (Either (FilterRejection tc) tc)) -> [TestGroup (Either (FilterRejection tc)) Identity tc effs]
+              )
               -> TestFilters rc tc
               -> rc
               -> [[Either (FilterRejection tc) tc]]

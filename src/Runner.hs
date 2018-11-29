@@ -248,7 +248,7 @@ logger' :: forall m s effs. (Monad m, Show s, Member Logger effs) =>
                  -> m ()
 logger' intrprt = void . intrprt . log
 
-runGroup :: forall rc tc m effs m1 r. (Monad m, EFFFileSystem effs) =>
+runGroup :: forall rc tc m effs m1 r. (Monad m, Functor m1, EFFFileSystem effs) =>
                     (
                       forall a mo mi.
                         (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mi mo a effs]
@@ -257,9 +257,8 @@ runGroup :: forall rc tc m effs m1 r. (Monad m, EFFFileSystem effs) =>
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> rc                                              -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
-                   -> TestGroup m m1 r effs                           -- test group
                    -> m ()
-runGroup runner fltrs agg rc intrprt TestGroup{..} =
+runGroup runner fltrs agg rc intrprt =
         let
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
           preRun PreRun{..} stage = do
@@ -297,19 +296,16 @@ runGroup runner fltrs agg rc intrprt TestGroup{..} =
                                   (const $ pure $ pure ())
                                   eth
 
-          rollover' ::  m (Either AppError ())
-          rollover' = preRunLog rollover Rollover
+          rollover' :: TestGroup m m1 r effs  -> m (Either AppError ())
+          rollover' TestGroup{..} = preRunLog rollover Rollover
 
-          goHome' ::  m (Either AppError ())
-          goHome' = preRunLog rollover Rollover
-
-          includeGroup :: TestGroup m m1 a effs -> Bool
-          includeGroup grp = undefined
+          goHome' :: TestGroup m m1 r effs ->  m (Either AppError ())
+          goHome' TestGroup{..} = preRunLog goHome Rollover
 
           includeTest :: tc -> Bool
           includeTest cfg = isRight $ filterTestCfg fltrs rc cfg
 
-        --  filterInfo :: [[Either (FilterRejection tc) tc]]
+          filterInfo :: [[Either (FilterRejection tc) tc]]
           filterInfo = filterGroups runner fltrs rc
         in
           do

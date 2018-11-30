@@ -24,6 +24,7 @@ import           DSL.Interpreter
 import Data.Either
 import TestAndRunConfig as C
 import Control.Monad
+import Data.Bool
 
 data PreRun effs = PreRun {
   runAction :: Eff effs (),
@@ -46,7 +47,7 @@ doNothing = PreRun {
 --         tests :: forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => [GenericTest tc rc i effs as vs]
 --    }
 
-data TestGroup m m1 a effs =
+data TestGroup m1 m a effs =
   TestGroup {
         -- occurs once on client before group is run
         rollover :: PreRun effs,
@@ -214,33 +215,22 @@ runTest fltrs agg rc intrprt GenericTest{..} =
               ? runItems components
               $ pure $ pure ()
 
-runTest' ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
-                   m (Either AppError ())                             -- go home
-                   -> TestFilters rc tc                               -- filters
-                   -> (i -> as -> vs -> TestInfo i as vs)             -- aggregator i.e. rslt constructor
-                   -> rc                                              -- runConfig
-                   -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
-                   -> GenericTest tc rc i effs as vs                  -- Test Case
-                   -> Maybe (Either AppError [m ()])
-runTest' goHome fltrs agg rc intrprt GenericTest{..} =
-        let
-          logger :: Show s => s -> m ()
-          logger = logger' intrprt
-
-          runItems :: TestComponents rc i effs as vs -> [m ()]
-          runItems TestComponents{..} = (logger =<<) <$> runTestItems' goHome testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
-
-          testResults ::  [m ()]
-          testResults = runItems components
-
-          include :: Bool
-          include = isRight $ filterTestCfg fltrs rc configuration
-        in
-          include ?
-                (Just $ Right $ runItems components) $
-                Nothing
-
-
+-- runTest' ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
+--                    TestFilters rc tc                               -- filters
+--                    -> (i -> as -> vs -> TestInfo i as vs)             -- aggregator i.e. rslt constructor
+--                    -> rc                                              -- runConfig
+--                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
+--                    -> GenericTest tc rc i effs as vs                  -- Test Case
+--                    -> [m ()]
+-- runTest' fltrs agg rc intrprt GenericTest{..} =
+--           let
+--             logger :: Show s => s -> m ()
+--             logger = logger' intrprt
+--
+--             runItems TestComponents{..} = (logger =<<) <$> runTestItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+--             include = isRight $ filterTestCfg fltrs rc configuration
+--           in
+--             undefined
 
 logger' :: forall m s effs. (Monad m, Show s, Member Logger effs) =>
                  (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
@@ -248,32 +238,41 @@ logger' :: forall m s effs. (Monad m, Show s, Member Logger effs) =>
                  -> m ()
 logger' intrprt = void . intrprt . log
 
-runGroup :: forall rc tc m effs m1 r. (Monad m, Functor m1, EFFFileSystem effs) =>
+runGrouped :: forall rc tc m effs. (Monad m,  Show tc, EFFFileSystem effs) =>
                     (
                       forall a mo mi.
-                        (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mi mo a effs]
+                        (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]
                     )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> rc                                              -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> m ()
-runGroup runner fltrs agg rc intrprt =
+runGrouped runner fltrs agg rc intrprt =
         let
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
           preRun PreRun{..} stage = do
                                 let
+                                  stageStr :: String
                                   stageStr = show stage
+
+                                  stageExLabel :: String
                                   stageExLabel = "Execution of " <> stageStr
+
+                                  msgPrefix :: String
+                                  msgPrefix = case stage of
+                                                Rollover -> "No tests run in group. "
+                                                GoHome -> "No items run for test. "
 
                                   verifyAction :: Either AppError Bool -> Either AppError ()
                                   verifyAction  = either
-                                                           (Left . PreTestCheckExecutionError stage (stageExLabel <> " check"))
+                                                           (Left . PreTestCheckExecutionError stage (msgPrefix <> stageExLabel <> " check"))
                                                            (\hmChk -> hmChk ?
                                                                           Right () $
                                                                           Left
                                                                               $ PreTestCheckError stage
-                                                                                $ "Completion check returned False. Looks like "
+                                                                                $ msgPrefix
+                                                                                <> "Completion check returned False. Looks like "
                                                                                 <> stageStr
                                                                                 <> " did not run successfully"
                                                            )
@@ -296,26 +295,62 @@ runGroup runner fltrs agg rc intrprt =
                                   (const $ pure $ pure ())
                                   eth
 
-          rollover' :: TestGroup m m1 r effs  -> m (Either AppError ())
-          rollover' TestGroup{..} = preRunLog rollover Rollover
 
-          goHome' :: TestGroup m m1 r effs ->  m (Either AppError ())
+          goHome' :: TestGroup m10 m0 a0 effs ->  m (Either AppError ())
           goHome' TestGroup{..} = preRunLog goHome Rollover
-
-          includeTest :: tc -> Bool
-          includeTest cfg = isRight $ filterTestCfg fltrs rc cfg
 
           filterInfo :: [[Either (FilterRejection tc) tc]]
           filterInfo = filterGroups runner fltrs rc
+
+          filterFlags :: [Bool]
+          filterFlags = filterGroupFlags filterInfo
+
+          prepResults :: [TestGroup [] m () effs]
+          prepResults = runner $ runTest fltrs agg rc intrprt
+
+          runTuples ::  [(Bool, TestGroup [] m () effs)]
+          runTuples = P.zip filterFlags prepResults
+
+          foldEffects :: [m ()] -> m ()
+          foldEffects = foldl' (>>) (pure ())
+
+          exeGroup :: (Bool, TestGroup [] m () effs) -> m ()
+          exeGroup (include, tg) =
+            let
+              grpRollover :: m (Either AppError ())
+              grpRollover = preRunLog (rollover tg) Rollover
+
+              grpGoHome :: m (Either AppError ())
+              grpGoHome = preRunLog (goHome tg) GoHome
+
+              logFailOrRun :: m (Either AppError ()) -> m () -> m ()
+              logFailOrRun prerun mRun = do
+                                         pr <- prerun
+                                         either log' (const mRun) pr
+
+              runTestIteration :: m () -> m ()
+              runTestIteration itr = log' "Start Iteration" >> logFailOrRun grpGoHome itr
+
+              runTest' :: [m ()] -> m ()
+              runTest' testIterations = log' "Start Test" >> foldEffects (runTestIteration <$> testIterations)
+
+              testList :: [[m ()]]
+              testList = tests tg
+
+              runGroupAfterRollover :: m ()
+              runGroupAfterRollover = foldEffects $ runTest' <$> testList
+
+              runGroup :: m ()
+              runGroup = log' "Start Group" >> logFailOrRun grpRollover runGroupAfterRollover
+
+           in
+              include ? runGroup $ pure ()
+
         in
           do
-
-            undefined
-          -- include
-          --     ? runItems components
-          --     $ pure $ pure ()
-
-
+            log' "Filter Log"
+            log' filterInfo
+            foldEffects $ exeGroup <$> runTuples
 
 genericTestRun :: forall effs m rc tc. (EFFFileSystem effs, Monad m, Show tc) =>
                   (
@@ -397,7 +432,7 @@ filterTests runner fltrs rc =  runIdentity <$> runner (filterTest fltrs rc)
 filterGroups :: forall tc rc effs.
               (
                 (forall i as vs. (Show i, Show as, Show vs) =>
-                      GenericTest tc rc i effs as vs -> Identity (Either (FilterRejection tc) tc)) -> [TestGroup (Either (FilterRejection tc)) Identity tc effs]
+                      GenericTest tc rc i effs as vs -> Identity (Either (FilterRejection tc) tc)) -> [TestGroup Identity (Either (FilterRejection tc)) tc effs]
               )
               -> TestFilters rc tc
               -> rc

@@ -37,6 +37,7 @@ doNothing = PreRun {
   checkHasRun = pure True
 }
 
+
 data TestGroup m1 m a effs =
   TestGroup {
         -- occurs once on client before group is run
@@ -170,14 +171,18 @@ runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show 
                    -> [m ()]
 runTest fltrs agg rc intrprt GenericTest{..} =
         let
-          logger :: Show s => s -> m ()
-          logger = logger' intrprt
+          log' :: Show s => s -> m ()
+          log' = logger' intrprt
 
-          runItems TestComponents{..} = (logger =<<) <$> runTestItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+          runItems :: TestComponents rc i effs as vs -> [m ()]
+          runItems TestComponents{..} = (log' =<<) <$> runTestItems testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+
+          include :: Bool
           include = isRight $ filterTestCfg fltrs rc configuration
+
         in
           include
-              ? runItems components
+              ? (log' "Start Test" : ((log' "Start Iteration" >>) <$> runItems components))
               $ pure $ pure ()
 
 
@@ -221,9 +226,10 @@ runGrouped runner fltrs agg rc intrprt =
                                                                           Left
                                                                               $ PreTestCheckError stage
                                                                                 $ msgPrefix
-                                                                                <> "Completion check returned False. Looks like "
                                                                                 <> stageStr
-                                                                                <> " did not run successfully"
+                                                                                <> " action ran without exception but completion check returned False. Looks like "
+                                                                                <> stageStr
+                                                                                <> " did not run as expected"
                                                            )
 
                                 preRunRslt <- intrprt runAction
@@ -236,17 +242,9 @@ runGrouped runner fltrs agg rc intrprt =
           log' :: Show s => s -> m ()
           log' = logger' intrprt
 
-          preRunLog :: PreRun effs -> PreTestStage -> m (Either AppError ())
-          preRunLog pr stage = do
-                                eth <- preRun pr stage
-                                either
-                                  (\err -> log' err >> pure (Left err))
-                                  (const $ pure $ pure ())
-                                  eth
-
 
           goHome' :: TestGroup m10 m0 a0 effs ->  m (Either AppError ())
-          goHome' TestGroup{..} = preRunLog goHome Rollover
+          goHome' TestGroup{..} = preRun goHome Rollover
 
           filterInfo :: [[Either (FilterRejection tc) tc]]
           filterInfo = filterGroups runner fltrs rc
@@ -267,10 +265,10 @@ runGrouped runner fltrs agg rc intrprt =
           exeGroup (include, tg) =
             let
               grpRollover :: m (Either AppError ())
-              grpRollover = preRunLog (rollover tg) Rollover
+              grpRollover = preRun (rollover tg) Rollover
 
               grpGoHome :: m (Either AppError ())
-              grpGoHome = preRunLog (goHome tg) GoHome
+              grpGoHome = preRun (goHome tg) GoHome
 
               logFailOrRun :: m (Either AppError ()) -> m () -> m ()
               logFailOrRun prerun mRun = do
@@ -278,10 +276,10 @@ runGrouped runner fltrs agg rc intrprt =
                                          either log' (const mRun) pr
 
               runTestIteration :: m () -> m ()
-              runTestIteration itr = log' "Start Iteration" >> logFailOrRun grpGoHome itr
+              runTestIteration = logFailOrRun grpGoHome
 
               runTest' :: [m ()] -> m ()
-              runTest' testIterations = log' "Start Test" >> foldEffects (runTestIteration <$> testIterations)
+              runTest' testIterations = foldEffects (runTestIteration <$> testIterations)
 
               testList :: [[m ()]]
               testList = tests tg

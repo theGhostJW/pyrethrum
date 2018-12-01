@@ -3,12 +3,12 @@
 -- should not need this: https://github.com/haskell/haskell-ide-engine/issues/842
 {-# LANGUAGE QuasiQuotes #-}
 
-module DemoRoughTest where
+module DemoProject.DemoRoughTest where
 
 import           DSL.Logger
 import           Control.Monad.Freer.Error
 import           Check
-import DemoConfig
+import DemoProject.DemoConfig
 import           TestAndRunConfig
 import           Control.Monad.Freer
 import           DSL.Ensure

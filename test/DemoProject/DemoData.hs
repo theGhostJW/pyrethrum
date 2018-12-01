@@ -1,8 +1,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-module DemoData where
+module DemoProject.DemoData where
 
-import           DemoRoughTest
+import           DemoProject.DemoRoughTest
 import           Foundation.Extended
 
 sampleItem =  Item {

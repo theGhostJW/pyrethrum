@@ -1,13 +1,13 @@
 
-module DemoTestCaseList where
+module DemoProject.DemoTestCaseList where
 
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.Writer
 import Data.Functor.Identity
-import           DemoConfig
-import           DemoRoughTest as RT
-import           DemoRoughTestSimple as ST
+import           DemoProject.DemoConfig
+import           DemoProject.DemoRoughTest as RT
+import           DemoProject.DemoRoughTestSimple as ST
 import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter

@@ -3,11 +3,11 @@
 -- https://github.com/haskell/haskell-ide-engine/issues/842
 {-# LANGUAGE QuasiQuotes #-}
 
-module DemoRoughTestSimple where
+module DemoProject.DemoRoughTestSimple where
 
 import           Check
 import DSL.Logger
-import DemoConfig
+import DemoProject.DemoConfig
 import           TestAndRunConfig
 import DSL.Ensure
 import Runner as R

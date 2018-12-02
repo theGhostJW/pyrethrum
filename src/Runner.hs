@@ -192,7 +192,7 @@ logger' :: forall m s effs. (Monad m, Show s, Member Logger effs) =>
                  -> m ()
 logger' intrprt = void . intrprt . log
 
-runGrouped :: forall rc tc m effs. (Monad m,  Show tc, EFFFileSystem effs) =>
+runGrouped :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs) =>
                     (
                       forall a mo mi.
                         (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]

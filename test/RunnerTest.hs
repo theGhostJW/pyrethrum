@@ -287,6 +287,7 @@ unit_item_filter_lastVal_no_items_with_vals = chkFilterError LastVal "There is n
 
 chkLastVal expectedId = chkFilterSingle LastVal (Just expectedId) idOfHead
 
+
 unit_item_filter_lastVal_singleFirst = chkLastVal 100 items1
 unit_item_filter_lastVal_top2 = chkLastVal 110 items2
 unit_item_filter_lastVal_bottom = chkLastVal 150 items3

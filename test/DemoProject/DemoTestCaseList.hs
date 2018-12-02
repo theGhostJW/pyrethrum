@@ -52,9 +52,6 @@ testRun f =
 
     ]
 
-
-
-
 --- Monad Play ---
 
 fwtf :: IO Bool

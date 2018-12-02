@@ -296,7 +296,7 @@ runGrouped runner fltrs agg rc intrprt =
         in
           do
             log' "Filter Log"
-            log' filterInfo
+            log' $ filterLog filterInfo
             foldEffects $ exeGroup <$> runTuples
 
 

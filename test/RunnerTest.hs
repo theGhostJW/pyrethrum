@@ -1,4 +1,6 @@
 
+{-# LANGUAGE AllowAmbiguousTypes #-}
+
 module RunnerTest where
 
 import qualified Check           as C
@@ -121,14 +123,31 @@ test5 = GenericTest {
               components = undefined
             }
 
-runRunner :: forall m m1 effs a. (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [m1 (m a)]
+runRunner :: forall m m1 effs a.
+                (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a))
+                -> [TestGroup m1 m a effs]
 runRunner f =
-    [
-      f test1,
-      f test2,
-      f test3,
-      f test4,
-      f test5
+  [
+
+   TestGroup {
+          rollover = doNothing,
+          goHome = doNothing,
+          tests = [
+              f test1,
+              f test2,
+              f test3
+            ]
+     },
+
+    TestGroup {
+          rollover = doNothing,
+          goHome = doNothing,
+          tests = [
+              f test4,
+              f test5
+            ]
+     }
+
     ]
 
 
@@ -150,12 +169,14 @@ levelFilter = TestFilter {
      predicate = \rc tc -> (level :: TestConfig -> TestDepth) tc <= (level :: RunConfig -> TestDepth) rc
    }
 
-
 filters :: [TestFilter RunConfig TestConfig]
 filters = [enabledFilter, countryFilter, levelFilter]
 
+filterList :: RunConfig -> [Either (FilterRejection TestConfig) TestConfig]
+filterList rc = filterLog $ filterGroups runRunner filters rc
+
 runFilters :: RunConfig -> [String]
-runFilters rc = header <$> rights (filterTests runRunner filters rc)
+runFilters rc = header <$> rights (filterList rc)
 
 chkFilters :: [String] -> RunConfig -> Assertion
 chkFilters expted rc = chkEq expted $ runFilters rc
@@ -167,7 +188,7 @@ unit_test_filter_country2 = chkFilters ["test1", "test3", "test4"] $ RunConfig A
 
 
 filtersExcludeReasons :: RunConfig -> [String]
-filtersExcludeReasons rc = reason <$> lefts (filterTests runRunner filters rc)
+filtersExcludeReasons rc = reason <$> lefts (filterList rc)
 
 unit_test_filter_exclude_reasons = chkEq [
                                           "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",

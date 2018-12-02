@@ -18,7 +18,7 @@ import           Control.Monad.Freer.Error
 import           DSL.FileSystem
 import qualified Prelude as P
 
-type Effects effs = EFFEnsureOnly effs
+type Effects effs = EFFEnsureLog effs
 
 config :: TestConfig
 config = testConfig {

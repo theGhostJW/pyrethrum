@@ -16,20 +16,12 @@ import           Foundation.Extended
 import qualified Prelude                    as P
 import           Runner as R
 
-runInIO = executeTestRun [] testInfoFull runConfig executeInIO
-runNZInIO = executeTestRun filters testInfoFull runConfig {country = NZ} executeInIO
-runDocument  = executeTestRun [] testInfoFull runConfig executeDocument
+runInIO = runGrouped runSuccess [] testInfoFull runConfig executeInIO
+runNZInIO = runGrouped runSuccess filters testInfoFull runConfig {country = NZ} executeInIO
+runDocument  = runGrouped runSuccess [] testInfoFull runConfig executeDocument
 
-executeTestRun :: forall effs m. (EFFFileSystem effs, Monad m) =>
-                  TestFilters RunConfig TestConfig                                                                      -- filters
-                  -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)  -- test aggregator i.e. rslt constructor
-                  -> RunConfig                                                                                          -- runConfig
-                  -> (forall a. Eff effs a -> m (Either AppError a))                                                    -- interpreter
-                  -> m ()
-executeTestRun = runGrouped testRun
-
-testRun :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
-testRun f =
+runSuccess :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+runSuccess f =
   [
 
    TestGroup {
@@ -44,6 +36,40 @@ testRun f =
     TestGroup {
           rollover = doNothing,
           goHome = doNothing,
+          tests = [
+              f RT.test,
+              f ST.test
+            ]
+     }
+
+    ]
+
+
+alwaysFailCheck :: PreRun effs
+alwaysFailCheck = PreRun {
+  runAction = pure (),
+  checkHasRun = pure False
+}
+
+runInIOFailCheck = runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeInIO
+runDocumentFailCheck  = runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeDocument
+
+testRunFailHomeG2 :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+testRunFailHomeG2 f =
+  [
+
+   TestGroup {
+          rollover = doNothing,
+          goHome = doNothing,
+          tests = [
+              f RT.test,
+              f ST.test
+            ]
+     },
+
+    TestGroup {
+          rollover = doNothing,
+          goHome = alwaysFailCheck,
           tests = [
               f RT.test,
               f ST.test

@@ -39,37 +39,6 @@ data AppError =
 
               deriving (Show, Eq)
 
-executeFileSystemInIO :: forall a v. (a -> v) -> Eff '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError v)
-executeFileSystemInIO func app = unifyFSEnsureError <$> runM
-                                  (
-                                    runError
-                                    $ runError
-                                    $ ensureInterpreter
-                                    $ logConsoleInterpreter
-                                    $ fileSystemIOInterpreter
-                                    $ func <$> app
-                                  )
-
-executeFileSystemDocument :: forall a b. (a -> b) -> Eff '[FileSystem, Logger, Ensure, Error EnsureError, WriterDList, IO] a -> IO (Either AppError b, DList String)
-executeFileSystemDocument func app =  let
-                                        vl :: IO (Either EnsureError b, DList String)
-                                        vl = runM
-                                              $ runWriter
-                                              $ runError
-                                              $ ensureInterpreter
-                                              $ logConsoleInterpreter
-                                              $ fileSystemDocInterpreter
-                                              $ func <$> app
-
-                                        mapError :: IO (Either EnsureError b, DList String) -> IO (Either AppError b, DList String)
-                                        mapError r = do
-                                                      (val, logs) <- r
-                                                      pure (mapLeft AppEnsureError val, logs)
-
-                                      in
-                                        mapError vl
-
-
 unifyFSEnsureError :: Either EnsureError (Either FileSystemError v) -> Either AppError v
 unifyFSEnsureError = \case
                        Right ee -> case ee of

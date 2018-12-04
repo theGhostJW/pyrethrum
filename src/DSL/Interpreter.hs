@@ -58,14 +58,8 @@ executeInIO app = unifyFSEnsureError <$> runM
                                     app
                                  )
 
-executeDocument :: forall a.  Eff '[FileSystem, Logger, Ensure, Error EnsureError, WriterDList] a -> (Either AppError a, DList String)
-executeDocument app =  let
-                            -- (Either EnsureError a, DList String)
-                            (val, logs) = run
-                                          $ runWriter
-                                          $ runError
+executeDocument :: forall a.  Eff '[FileSystem, Logger, Ensure, Error EnsureError, WriterDList] a -> Eff '[WriterDList] (Either AppError a)
+executeDocument app =  (mapLeft AppEnsureError <$>) <$> runError
                                           $ ensureInterpreter
                                           $ logDocInterpreter
                                           $ fileSystemDocInterpreter app
-                            in
-                             (mapLeft AppEnsureError val, logs)

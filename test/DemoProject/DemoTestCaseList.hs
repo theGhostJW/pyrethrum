@@ -7,7 +7,9 @@ import           Control.Monad.Freer.Writer
 import Data.Functor.Identity
 import           DemoProject.DemoConfig
 import           DemoProject.DemoRoughTest as RT
+import           DemoProject.DemoRoughTest2 as RT2
 import           DemoProject.DemoRoughTestSimple as ST
+import           DemoProject.DemoRoughTestSimple2 as ST2
 import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter
@@ -38,8 +40,8 @@ runSuccess f =
           rollover = doNothing,
           goHome = doNothing,
           tests = [
-              f RT.test,
-              f ST.test
+              f RT2.test,
+              f ST2.test
             ]
      }
 
@@ -72,8 +74,8 @@ testRunFailHomeG2 f =
           rollover = doNothing,
           goHome = alwaysFailCheck,
           tests = [
-              f RT.test,
-              f ST.test
+              f RT2.test,
+              f ST2.test
             ]
      }
 

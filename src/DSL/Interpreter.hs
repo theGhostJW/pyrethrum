@@ -9,7 +9,7 @@ import           DSL.FileSystem
 import           DSL.Ensure
 import           DSL.Logger
 import           Foundation.List.DList
-import           Foundation.Extended
+import           Foundation.Extended as F
 import ItemClass
 import Data.Either.Combinators
 import Data.Tuple as T
@@ -63,3 +63,6 @@ executeDocument app =  (mapLeft AppEnsureError <$>) <$> runError
                                           $ ensureInterpreter
                                           $ logDocInterpreter
                                           $ fileSystemDocInterpreter app
+
+extractDocLog :: Eff '[WriterDList] () -> DList String
+extractDocLog app = F.snd $ run $ runWriter app

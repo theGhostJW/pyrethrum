@@ -18,7 +18,8 @@ import           Runner as R
 
 runInIO = runGrouped runSuccess [] testInfoFull runConfig executeInIO
 runNZInIO = runGrouped runSuccess filters testInfoFull runConfig {country = NZ} executeInIO
-runDocument  = runGrouped runSuccess [] testInfoFull runConfig executeDocument
+
+runDocument = extractDocLog $ runGrouped runSuccess [] testInfoFull runConfig executeDocument
 
 runSuccess :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
 runSuccess f =
@@ -52,7 +53,7 @@ alwaysFailCheck = PreRun {
 }
 
 runInIOFailCheck = runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeInIO
-runDocumentFailCheck  = runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeDocument
+runDocumentFailCheck = extractDocLog $ runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeDocument
 
 testRunFailHomeG2 :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
 testRunFailHomeG2 f =

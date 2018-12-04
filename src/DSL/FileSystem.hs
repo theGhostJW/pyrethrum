@@ -1,5 +1,6 @@
 module DSL.FileSystem where
 
+import DSL.Internal.Common
 import           Foundation.Extended
 import           Data.Functor
 import           Control.Monad.Freer
@@ -43,16 +44,16 @@ fileSystemIOInterpreter =
 
 
 
-fileSystemDocInterpreter :: Member (Writer [String]) effs => Eff (FileSystem ': effs) a -> Eff effs a
+fileSystemDocInterpreter :: Member WriterDList effs => Eff (FileSystem ': effs) a -> Eff effs a
 fileSystemDocInterpreter = interpret $
                                       let
                                         mockContents = "Mock File Contents"
                                       in
                                         \case
                                           ReadFile path ->
-                                            tell (["readFile: " <> show path] :: [String]) $> Right mockContents
-                                            
-                                          WriteFile path str -> tell (["write file: " <>
+                                            tell (dList $ "readFile: " <> show path) $> Right mockContents
+
+                                          WriteFile path str -> tell (dList $ "write file: " <>
                                                                         show path <>
                                                                         "\nContents:\n" <>
-                                                                        str] :: [String])
+                                                                        str)

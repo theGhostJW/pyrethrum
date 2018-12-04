@@ -79,7 +79,7 @@ default-extensions:
   - NamedFieldPuns
   - NoImplicitPrelude
   - OverloadedStrings
-  - OverloadedLists
+#  - OverloadedLists
   - PartialTypeSignatures
   - PatternSynonyms
   - QuasiQuotes

@@ -1,12 +1,14 @@
 
 module DSL.Interpreter where
 
+import DSL.Internal.Common
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.Writer
 import           DSL.FileSystem
 import           DSL.Ensure
 import           DSL.Logger
+import           Foundation.List.DList
 import           Foundation.Extended
 import ItemClass
 import Data.Either.Combinators
@@ -48,9 +50,9 @@ executeFileSystemInIO func app = unifyFSEnsureError <$> runM
                                     $ func <$> app
                                   )
 
-executeFileSystemDocument :: forall a b. (a -> b) -> Eff '[FileSystem, Logger, Ensure, Error EnsureError, Writer [String], IO] a -> IO (Either AppError b, [String])
+executeFileSystemDocument :: forall a b. (a -> b) -> Eff '[FileSystem, Logger, Ensure, Error EnsureError, WriterDList, IO] a -> IO (Either AppError b, DList String)
 executeFileSystemDocument func app =  let
-                                        vl :: IO (Either EnsureError b, [String])
+                                        vl :: IO (Either EnsureError b, DList String)
                                         vl = runM
                                               $ runWriter
                                               $ runError
@@ -59,7 +61,7 @@ executeFileSystemDocument func app =  let
                                               $ fileSystemDocInterpreter
                                               $ func <$> app
 
-                                        mapError :: IO (Either EnsureError b, [String]) -> IO (Either AppError b, [String])
+                                        mapError :: IO (Either EnsureError b, DList String) -> IO (Either AppError b, DList String)
                                         mapError r = do
                                                       (val, logs) <- r
                                                       pure (mapLeft AppEnsureError val, logs)
@@ -87,16 +89,16 @@ executeInIO app = unifyFSEnsureError <$> runM
                                     app
                                  )
 
-executeDocument :: forall a.  Eff '[FileSystem, Logger, Ensure, Error EnsureError, Writer [String], IO] a -> IO (Either AppError a)
+executeDocument :: forall a.  Eff '[FileSystem, Logger, Ensure, Error EnsureError, WriterDList, IO] a -> IO (Either AppError a)
 executeDocument app =  let
                                         vl = runM
                                               $ runWriter
                                               $ runError
                                               $ ensureInterpreter
-                                              $ logConsoleInterpreter
+                                              $ logDocInterpreter
                                               $ fileSystemDocInterpreter app
 
-                                        mapError :: IO (Either EnsureError b, [String]) -> IO (Either AppError b, [String])
+                                        mapError :: IO (Either EnsureError b, DList String) -> IO (Either AppError b, DList String)
                                         mapError r = do
                                                       (val, logs) <- r
                                                       pure (mapLeft AppEnsureError val, logs)

@@ -20,10 +20,10 @@ isEven = chk "Even" P.even
 isOddGuard = guard $ chk "Odd" P.odd
 isOdd = chk "Odd" P.odd
 
-isOddGuardm = guard $ chkm "Odd Test"
+isOddGuardm = guard $ chkGuard "Odd Test"
                             P.odd $
-                            \v -> "The value was: " <> show v <> " and is expectedf to be odd"
-isOddm = chkm "Odd Test"
+                            \v -> "The value was: " <> show v <> " and is expected to be odd"
+isOddm = chkGuard "Odd Test"
                P.odd $
                \v -> "The value was: " <> show v <> " and is expectedf to be odd"
 
@@ -31,23 +31,23 @@ tryMe = outcome <$> calcChecks 42 (isOddGuard <> isBig <> isEven)
 
 chkOutcomes expected val checks = UT.chkEq (fromList expected) $ outcome <$> calcChecks val checks
 
-unit_chkOutcomes_full_success = chkOutcomes [Pass, Pass] 42 $ isBig <> isEven
-unit_chkOutcomes_fail_and_success = chkOutcomes [Fail, Pass, Pass] 42 $ isOdd <> isBig <> isEven
-unit_chkOutcomes_fail_and_success2 = chkOutcomes [Pass, Pass, Fail] 42 $ isBig <> isEven <> isOdd
+unit_chk_outcomes_full_success = chkOutcomes [Pass, Pass] 42 $ isBig <> isEven
+unit_chk_outcomes_fail_and_success = chkOutcomes [Fail, Pass, Pass] 42 $ isOdd <> isBig <> isEven
+unit_chk_outcomes_fail_and_success2 = chkOutcomes [Pass, Pass, Fail] 42 $ isBig <> isEven <> isOdd
 
-unit_chkOutcomes_exception_and_skip_and_success2 = chkOutcomes [Pass, Exception, Skip] 42 (isBig <> isOddGuard <> isEven)
+unit_chk_outcomes_exception_and_skip_and_success2 = chkOutcomes [Pass, Exception, Skip] 42 (isBig <> isOddGuard <> isEven)
 
-unit_chkOutcomes_inlined_guard = chkOutcomes [Pass, Exception, Skip] 42 $ chk "More than 10" (> 10)  <>
+unit_chk_outcomes_inlined_guard = chkOutcomes [Pass, Exception, Skip] 42 $ chk "More than 10" (> 10)  <>
                                                                     guard (chk "Odd" P.odd) <>
                                                                     chk "Even" P.even
 
-unit_chkWithChkm_guard = chkOutcomes [Pass, Pass, Exception, Skip, Skip]   42 $ isBig
+unit_chk_with_chkGuard_guard = chkOutcomes [Pass, Pass, Exception, Skip, Skip]   42 $ isBig
                                                                            <> isEven
                                                                            <> isOddGuardm
                                                                            <> isOdd
                                                                            <> isEven
 
-unit_chkWithChkm = chkOutcomes [Pass, Pass, Fail, Fail, Pass] 42  $ isBig
+unit_chk_with_chkGuard = chkOutcomes [Pass, Pass, Fail, Fail, Pass] 42  $ isBig
                                                                   <> isEven
                                                                   <> isOddm
                                                                   <> isOdd

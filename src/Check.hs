@@ -84,11 +84,11 @@ guard =  let
 prdCheck :: Truthy b =>  (v -> b) -> String -> (v -> Maybe MessageInfo) -> Check v
 prdCheck prd hdr = Check hdr (\v -> prd v ? Pass $ Fail)
 
-chkmPriv :: String -> (v -> Bool) -> (v -> Maybe MessageInfo) -> DList (Check v)
-chkmPriv hdr prd msgf = pure $ prdCheck prd hdr msgf
+chkGuardPriv :: String -> (v -> Bool) -> (v -> Maybe MessageInfo) -> DList (Check v)
+chkGuardPriv hdr prd msgf = pure $ prdCheck prd hdr msgf
 
 chk :: String -> (v -> Bool) -> DList (Check v)
-chk hdr prd = chkmPriv hdr prd $ const Nothing
+chk hdr prd = chkGuardPriv hdr prd $ const Nothing
 
-chkm :: String -> (v -> Bool) -> (v -> String) -> DList (Check v)
-chkm hdr prd msgf = chkmPriv hdr prd $ \v -> Just $ MessageInfo (msgf v) Nothing
+chkGuard :: String -> (v -> Bool) -> (v -> String) -> DList (Check v)
+chkGuard hdr prd msgf = chkGuardPriv hdr prd $ \v -> Just $ MessageInfo (msgf v) Nothing

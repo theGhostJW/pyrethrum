@@ -13,7 +13,6 @@ data TestItem = TestItem {
 
 type ValState = Int
 
-
 instance ItemClass TestItem ValState where
   identifier = iid
   whenClause = pre

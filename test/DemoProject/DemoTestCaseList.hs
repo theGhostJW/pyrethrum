@@ -23,13 +23,18 @@ runNZInIO = runGrouped runSuccess filters testInfoFull runConfig {country = NZ} 
 
 runDocument = extractDocLog $ runGrouped runSuccess [] testInfoFull runConfig executeDocument
 
-runSuccess :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
-runSuccess f =
+validPlan :: forall m m1 effs a. EFFFileSystem effs =>
+  PreRun effs
+  -> PreRun effs
+  -> PreRun effs
+  -> PreRun effs
+  -> (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+validPlan ro0 gh0 ro1 gh1 f =
   [
 
    TestGroup {
-          rollover = doNothing,
-          goHome = doNothing,
+          rollover = ro0,
+          goHome = gh0,
           tests = [
               f RT.test,
               f ST.test
@@ -37,8 +42,8 @@ runSuccess f =
      },
 
     TestGroup {
-          rollover = doNothing,
-          goHome = doNothing,
+          rollover = ro1,
+          goHome = gh1,
           tests = [
               f RT2.test,
               f ST2.test
@@ -46,6 +51,9 @@ runSuccess f =
      }
 
     ]
+
+runSuccess :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+runSuccess = validPlan doNothing doNothing doNothing doNothing
 
 
 alwaysFailCheck :: PreRun effs
@@ -58,28 +66,7 @@ runInIOFailCheck = runGrouped testRunFailHomeG2 [] testInfoFull runConfig execut
 runDocumentFailCheck = extractDocLog $ runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeDocument
 
 testRunFailHomeG2 :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
-testRunFailHomeG2 f =
-  [
-
-   TestGroup {
-          rollover = doNothing,
-          goHome = doNothing,
-          tests = [
-              f RT.test,
-              f ST.test
-            ]
-     },
-
-    TestGroup {
-          rollover = doNothing,
-          goHome = alwaysFailCheck,
-          tests = [
-              f RT2.test,
-              f ST2.test
-            ]
-     }
-
-    ]
+testRunFailHomeG2 = validPlan doNothing doNothing doNothing alwaysFailCheck
 
 --- Monad Play ---
 

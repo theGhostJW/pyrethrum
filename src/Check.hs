@@ -23,7 +23,7 @@ data CheckInfo = Info {
 
 data CheckOutcome = Pass |
                     Fail |
-                    Exception |
+                    GuardFail |
                     Skip
                     deriving (Show, Eq)
 
@@ -45,9 +45,9 @@ instance P.Show (Check v) where
 applyCheck :: forall v. v -> Check v -> CheckResult
 applyCheck v ck = CheckResult (rule ck v) $ Info (header (ck :: Check v)) (msgFunc ck v)
 
-isExcption :: CheckOutcome -> Bool
-isExcption = \case
-               Exception -> True
+isGuardFail :: CheckOutcome -> Bool
+isGuardFail = \case
+               GuardFail -> True
                _ -> False
 
 forceSkipped :: v -> Check v -> CheckResult
@@ -63,7 +63,7 @@ calcChecks vs chkLst = let
                         foldfunc tpl@(hasEx, lstCr) ck = let
                                                             thisChkR = iResult tpl ck
                                                           in
-                                                            (hasEx || isExcption (outcome thisChkR), cons thisChkR lstCr)
+                                                            (hasEx || isGuardFail (outcome thisChkR), cons thisChkR lstCr)
                         in
                          reverse $ snd $ foldl' foldfunc (False, mempty) chkLst
 
@@ -73,7 +73,7 @@ guard =  let
     guardOutcome ck  =
       let
         escOutcome o = case o of
-                         Fail -> Exception
+                         Fail -> GuardFail
                          _ -> o
        in
          ck {rule = escOutcome . rule ck}
@@ -81,14 +81,14 @@ guard =  let
     (guardOutcome <$>)
 
 -- generate a check from a predicate
+chk :: String -> (v -> Bool) -> DList (Check v)
+chk hdr prd = chkGuardPriv hdr prd $ const Nothing
+
 prdCheck :: Truthy b =>  (v -> b) -> String -> (v -> Maybe MessageInfo) -> Check v
 prdCheck prd hdr = Check hdr (\v -> prd v ? Pass $ Fail)
 
 chkGuardPriv :: String -> (v -> Bool) -> (v -> Maybe MessageInfo) -> DList (Check v)
 chkGuardPriv hdr prd msgf = pure $ prdCheck prd hdr msgf
 
-chk :: String -> (v -> Bool) -> DList (Check v)
-chk hdr prd = chkGuardPriv hdr prd $ const Nothing
-
 chkGuard :: String -> (v -> Bool) -> (v -> String) -> DList (Check v)
-chkGuard hdr prd msgf = chkGuardPriv hdr prd $ \v -> Just $ MessageInfo (msgf v) Nothing
+chkGuard hdr prd msgf = guard $ chkGuardPriv hdr prd $ \v -> Just $ MessageInfo (msgf v) Nothing

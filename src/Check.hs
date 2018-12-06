@@ -82,13 +82,11 @@ guard =  let
 
 -- generate a check from a predicate
 chk :: String -> (v -> Bool) -> DList (Check v)
-chk hdr prd = chkGuardPriv hdr prd $ const Nothing
+chk hdr prd = pure $ prdCheck prd hdr $ const Nothing
+
+-- generate a check from a predicate
+chk' :: String -> (v -> String) -> (v -> Bool) -> DList (Check v)
+chk' hdr fMsg prd = pure $ prdCheck prd hdr $ \v -> Just $ MessageInfo hdr $ Just $ fMsg v
 
 prdCheck :: Truthy b =>  (v -> b) -> String -> (v -> Maybe MessageInfo) -> Check v
 prdCheck prd hdr = Check hdr (\v -> prd v ? Pass $ Fail)
-
-chkGuardPriv :: String -> (v -> Bool) -> (v -> Maybe MessageInfo) -> DList (Check v)
-chkGuardPriv hdr prd msgf = pure $ prdCheck prd hdr msgf
-
-chkGuard :: String -> (v -> Bool) -> (v -> String) -> DList (Check v)
-chkGuard hdr prd msgf = guard $ chkGuardPriv hdr prd $ \v -> Just $ MessageInfo (msgf v) Nothing

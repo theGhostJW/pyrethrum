@@ -19,9 +19,9 @@ isBig = chk "More than 10" (> 10)
 isEven = chk "Even" P.even
 isOdd = chk "Odd" P.odd
 
-isOddGuard = chkGuard "Odd Test"
-               P.odd $
-               \v -> "The value was: " <> show v <> " and is expected to be odd"
+isOddGuard = guard $ chk' "Odd Test"
+                   (\v -> "The value was: " <> show v <> " and is expected to be odd")
+                   P.odd
 
 tryMe = outcome <$> calcChecks 42 (isOddGuard <> isBig <> isEven)
 
@@ -47,6 +47,15 @@ unit_chk_with_chkGuard_success = chkOutcomes [Pass, Pass, GuardFail, Skip, Skip]
                                                                   <> isOddGuard
                                                                   <> isOdd
                                                                   <> isEven
+evenOddEven = isEven
+              <> isOdd
+              <> isOdd
+              <> isEven
+
+unit_chk_with_guard_on_list = chkOutcomes [Pass, Pass, GuardFail, Skip, Skip, Skip] 42  $ isBig
+                                                                  <> guard evenOddEven
+                                                                  <> isEven
+
 
 _checkmDemo = calcChecks 42  $ isBig
                              <> isEven

@@ -14,13 +14,18 @@ import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter
 import           DSL.Logger
+import           Foundation.List.DList
 import           Foundation.Extended
 import qualified Prelude                    as P
 import           Runner as R
 
+runInIO :: IO ()
 runInIO = runGrouped runSuccess [] testInfoFull runConfig executeInIO
+
+runNZInIO :: IO ()
 runNZInIO = runGrouped runSuccess filters testInfoFull runConfig {country = NZ} executeInIO
 
+runDocument :: DList String
 runDocument = extractDocLog $ runGrouped runSuccess [] testInfoFull runConfig executeDocument
 
 validPlan :: forall m m1 effs a. EFFFileSystem effs =>
@@ -62,11 +67,14 @@ alwaysFailCheck = PreRun {
   checkHasRun = pure False
 }
 
-runInIOFailCheck = runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeInIO
-runDocumentFailCheck = extractDocLog $ runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeDocument
-
 testRunFailHomeG2 :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
 testRunFailHomeG2 = validPlan doNothing doNothing doNothing alwaysFailCheck
+
+runFailHomeG2IO :: IO ()
+runFailHomeG2IO = runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeInIO
+
+runFailHomeG2IODocument :: DList String
+runFailHomeG2IODocument = extractDocLog $ runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeDocument
 
 --- Monad Play ---
 

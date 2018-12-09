@@ -3,7 +3,7 @@
 -- should not need this: https://github.com/haskell/haskell-ide-engine/issues/842
 {-# LANGUAGE QuasiQuotes #-}
 
-module DemoProject.RoughTest where
+module DemoProject.Test.Rough where
 
 import           DSL.Logger
 import           Control.Monad.Freer.Error

@@ -6,10 +6,10 @@ import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.Writer
 import Data.Functor.Identity
 import           DemoProject.Config
-import           DemoProject.RoughTest as RT
-import           DemoProject.RoughTest2 as RT2
-import           DemoProject.RoughTestSimple as ST
-import           DemoProject.RoughTestSimple2 as ST2
+import           DemoProject.Test.Rough as RT
+import           DemoProject.Test.Rough2 as RT2
+import           DemoProject.Test.Simple as ST
+import           DemoProject.Test.Simple2 as ST2
 import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter

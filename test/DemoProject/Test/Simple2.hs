@@ -3,10 +3,10 @@
 -- https://github.com/haskell/haskell-ide-engine/issues/842
 {-# LANGUAGE QuasiQuotes #-}
 
-module DemoProject.RoughTestSimple2 where
+module DemoProject.Test.Simple2 where
 
 
-import DemoProject.RoughTestSimple as T
+import DemoProject.Test.Simple as T
 import DemoProject.Config
 import           Foundation.Extended  hiding (Item)
 import           Runner as R

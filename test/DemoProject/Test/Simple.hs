@@ -3,7 +3,7 @@
 -- https://github.com/haskell/haskell-ide-engine/issues/842
 {-# LANGUAGE QuasiQuotes #-}
 
-module DemoProject.RoughTestSimple where
+module DemoProject.Test.Simple where
 
 import           Check
 import DSL.Logger

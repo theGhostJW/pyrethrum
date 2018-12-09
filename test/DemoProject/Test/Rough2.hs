@@ -3,9 +3,9 @@
 -- should not need this: https://github.com/haskell/haskell-ide-engine/issues/842
 {-# LANGUAGE QuasiQuotes #-}
 
-module DemoProject.RoughTest2 where
+module DemoProject.Test.Rough2 where
 
-import DemoProject.RoughTest as T
+import DemoProject.Test.Rough as T
 import DemoProject.Config
 import           Foundation.Extended  hiding (Item)
 import           Runner as R

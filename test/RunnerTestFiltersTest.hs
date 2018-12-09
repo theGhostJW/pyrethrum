@@ -4,7 +4,6 @@ import qualified Check           as C
 import           Data.List.Safe  as SafeList
 import           Foundation      as F
 import qualified Prelude         as P
-import           Runner.Internal
 import           Runner as R
 import           Test.Extended
 import           ItemClass

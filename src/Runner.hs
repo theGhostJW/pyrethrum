@@ -15,8 +15,7 @@ import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 
 import           Foundation.Extended
-import           Runner.Internal
-import           Runner.Internal     as InternalFuncs (Filter (..),
+import           Runner.Internal.ItemFilters     as InternalFuncs (Filter (..),
                                                        FilterError (..))
 import           ItemClass
 import qualified Prelude             as P

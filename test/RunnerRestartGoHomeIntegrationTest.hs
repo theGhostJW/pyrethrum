@@ -8,7 +8,7 @@ import           Foundation                   as F
 import           ItemClass
 import qualified Prelude                      as P
 import           Runner                       as R
-import           Runner.Internal
+import           Runner.Internal.ItemFilters
 import           RunnerShared
 import           Test.Extended
 import           TestAndRunConfig

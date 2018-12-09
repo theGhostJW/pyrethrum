@@ -1,5 +1,5 @@
 
-module Runner.Internal where
+module Runner.Internal.ItemFilters where
 
 import DSL.Ensure
 import Control.Monad.Freer

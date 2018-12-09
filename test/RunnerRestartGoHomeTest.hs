@@ -9,7 +9,6 @@ import           Foundation.List.DList
 import           ItemClass
 import qualified Prelude                      as P
 import           Runner                       as R
-import           Runner.Internal
 import           RunnerShared
 import           Test.Extended                as U
 import           TestAndRunConfig

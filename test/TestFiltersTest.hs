@@ -1,4 +1,4 @@
-module RunnerTestFiltersTest where
+module TestFiltersTest where
 
 import qualified Check           as C
 import           Data.List.Safe  as SafeList

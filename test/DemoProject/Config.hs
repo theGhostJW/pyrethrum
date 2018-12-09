@@ -1,4 +1,4 @@
-module DemoProject.DemoConfig where
+module DemoProject.Config where
 
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error

@@ -1,4 +1,4 @@
-module RunnerItemFiltersTest where
+module ItemFiltersTest where
 
 import qualified Check           as C
 import           Data.List.Safe  as SafeList
@@ -10,7 +10,22 @@ import           Test.Extended
 import           ItemClass
 import DSL.Interpreter
 import TestAndRunConfig
-import RunnerShared
+
+data TestItem = TestItem {
+  iid    :: Int,
+  pre    :: String,
+  post   :: String,
+  checks :: C.CheckList ValState
+} deriving (Show)
+
+type ValState = Int
+
+instance ItemClass TestItem ValState where
+  identifier = iid
+  whenClause = pre
+  thenClause = post
+  checkList = checks
+
 
 i = TestItem
 

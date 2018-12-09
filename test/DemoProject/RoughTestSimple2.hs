@@ -1,12 +1,13 @@
 
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
--- should not need this: https://github.com/haskell/haskell-ide-engine/issues/842
+-- https://github.com/haskell/haskell-ide-engine/issues/842
 {-# LANGUAGE QuasiQuotes #-}
 
-module DemoProject.DemoRoughTest2 where
+module DemoProject.RoughTestSimple2 where
 
-import DemoProject.DemoRoughTest as T
-import DemoProject.DemoConfig
+
+import DemoProject.RoughTestSimple as T
+import DemoProject.Config
 import           Foundation.Extended  hiding (Item)
 import           Runner as R
 

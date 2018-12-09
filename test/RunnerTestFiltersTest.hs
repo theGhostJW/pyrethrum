@@ -9,7 +9,6 @@ import           Test.Extended
 import           ItemClass
 import DSL.Interpreter
 import TestAndRunConfig
-import RunnerShared
 
 data RunConfig = RunConfig {
   country :: Country,

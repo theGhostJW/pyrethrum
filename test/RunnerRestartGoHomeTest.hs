@@ -25,4 +25,4 @@ goHomeMessage = "GoHome action ran without exception but completion check return
 isGoHomeMessage :: String -> Bool
 isGoHomeMessage = isInfixOf goHomeMessage
 
-unit_go_home_iteration_fail = chkLog (count isGoHomeMessage) (chkEq 14) runFailHomeG2Document
+unit_go_home_iteration_fail = chkLog (count isGoHomeMessage) (chkEq 12) runFailHomeG2Document

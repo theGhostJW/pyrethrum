@@ -183,6 +183,7 @@ runTest fltrs agg rc intrprt GenericTest{..} =
         in
           include
               ? (log' "Start Test" : ((log' "Start Iteration" >>) <$> runItems components))
+              ? (((log' "Start Iteration" >>) <$> debugf' P.length "runitems length from runTest INNER" (runItems components)))
               $ pure $ pure ()
 
 

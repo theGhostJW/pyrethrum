@@ -37,21 +37,21 @@ validPlan :: forall m m1 effs a. EFFFileSystem effs =>
 validPlan ro0 gh0 ro1 gh1 f =
   [
 
-   TestGroup {
-          rollover = ro0,
-          goHome = gh0,
-          tests = [
-              f RT.test,
-              f ST.test
-            ]
-     },
+   -- TestGroup {
+   --        rollover = ro0,
+   --        goHome = gh0,
+   --        tests = [
+   --            f RT.test,
+   --            f ST.test -- 6 iterations
+   --          ]
+   --   },
 
     TestGroup {
           rollover = ro1,
           goHome = gh1,
           tests = [
-              f RT2.test,
-              f ST2.test
+              f RT2.test --,
+            --  f ST2.test -- 6 iterations
             ]
      }
 
@@ -68,13 +68,13 @@ alwaysFailCheck = PreRun {
 }
 
 testRunFailHomeG2 :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
-testRunFailHomeG2 = validPlan doNothing doNothing doNothing alwaysFailCheck
+testRunFailHomeG2 = validPlan doNothing doNothing doNothing doNothing --alwaysFailCheck
 
 runFailHomeG2IO :: IO ()
 runFailHomeG2IO = runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeInIO
 
-runFailHomeG2IODocument :: DList String
-runFailHomeG2IODocument = extractDocLog $ runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeDocument
+runFailHomeG2Document :: DList String
+runFailHomeG2Document = extractDocLog $ runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeDocument
 
 --- Monad Play ---
 

@@ -12,3 +12,5 @@ import           Runner.Internal
 import           RunnerShared
 import           Test.Extended
 import           TestAndRunConfig
+
+-- unit_dummy = chk True

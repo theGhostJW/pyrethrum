@@ -160,7 +160,7 @@ runTestItems items interactor prepState frmEth agg rc intrprt =
     runItem :: i -> f1 (TestInfo i as vs)
     runItem itm = frmEth itm <$> runApState interactor prepState agg rc intrprt itm
   in
-   runItem <$> items
+   debugf' P.length "ITEMS COUNT OUTER:" $ runItem <$> debugf' P.length "ITEMS COUNT" items
 
 runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
                    TestFilters rc tc                                  -- filters
@@ -204,47 +204,46 @@ runGrouped :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs) =>
                    -> m ()
 runGrouped runner fltrs agg rc intrprt =
         let
+          -- preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
+          -- preRun PreRun{..} stage = do
+          --                       let
+          --                         stageStr :: String
+          --                         stageStr = show stage
+          --
+          --                         stageExLabel :: String
+          --                         stageExLabel = "Execution of " <> stageStr
+          --
+          --                         msgPrefix :: String
+          --                         msgPrefix = case stage of
+          --                                       Rollover -> "No tests run in group. "
+          --                                       GoHome -> "No items run for test. "
+          --
+          --                         verifyAction :: Either AppError Bool -> Either AppError ()
+          --                         verifyAction  = either
+          --                                                  (Left . PreTestCheckExecutionError stage (msgPrefix <> stageExLabel <> " check"))
+          --                                                  (\hmChk -> hmChk ?
+          --                                                                 Right () $
+          --                                                                 Left
+          --                                                                     $ PreTestCheckError stage
+          --                                                                       $ msgPrefix
+          --                                                                       <> stageStr
+          --                                                                       <> " action ran without exception but completion check returned False. Looks like "
+          --                                                                       <> stageStr
+          --                                                                       <> " did not run as expected"
+          --                                                  )
+          --
+          --                       preRunRslt <- intrprt runAction
+          --                       runCheck <- debug' (">>>>>>> RUN-CHECK >>>>> " <> stageStr) <$> intrprt checkHasRun
+          --                       pure $ either
+          --                                (Left . PreTestError stage stageExLabel)
+          --                                (\_ -> verifyAction runCheck)
+          --                               preRunRslt
+
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
-          preRun PreRun{..} stage = do
-                                let
-                                  stageStr :: String
-                                  stageStr = show stage
-
-                                  stageExLabel :: String
-                                  stageExLabel = "Execution of " <> stageStr
-
-                                  msgPrefix :: String
-                                  msgPrefix = case stage of
-                                                Rollover -> "No tests run in group. "
-                                                GoHome -> "No items run for test. "
-
-                                  verifyAction :: Either AppError Bool -> Either AppError ()
-                                  verifyAction  = either
-                                                           (Left . PreTestCheckExecutionError stage (msgPrefix <> stageExLabel <> " check"))
-                                                           (\hmChk -> hmChk ?
-                                                                          Right () $
-                                                                          Left
-                                                                              $ PreTestCheckError stage
-                                                                                $ msgPrefix
-                                                                                <> stageStr
-                                                                                <> " action ran without exception but completion check returned False. Looks like "
-                                                                                <> stageStr
-                                                                                <> " did not run as expected"
-                                                           )
-
-                                preRunRslt <- intrprt runAction
-                                runCheck <- intrprt checkHasRun
-                                pure $ either
-                                         (Left . PreTestError stage stageExLabel)
-                                         (\_ -> verifyAction runCheck)
-                                        preRunRslt
+          preRun PreRun{..} stage = pure $ pure ()
 
           log' :: Show s => s -> m ()
           log' = logger' intrprt
-
-
-          goHome' :: TestGroup m10 m0 a0 effs ->  m (Either AppError ())
-          goHome' TestGroup{..} = preRun goHome Rollover
 
           filterInfo :: [[Either (FilterRejection tc) tc]]
           filterInfo = filterGroups runner fltrs rc
@@ -252,14 +251,25 @@ runGrouped runner fltrs agg rc intrprt =
           filterFlags :: [Bool]
           filterFlags = filterGroupFlags filterInfo
 
+
+          debugInfo :: [TestGroup [] m () effs] -> (Int, Int, Int)
+          debugInfo tgLst =
+                        let
+                          gCount = P.length tgLst
+                          headTsts = tests $ P.head tgLst
+                          thCount = P.length headTsts
+                          headItCount = P.length $ P.head headTsts
+                        in
+                          (gCount, thCount, headItCount)
+
           prepResults :: [TestGroup [] m () effs]
-          prepResults = runner $ runTest fltrs agg rc intrprt
+          prepResults = debugf' debugInfo "(gCount, thCount, headItCount)" $ runner $ runTest fltrs agg rc intrprt
 
           runTuples ::  [(Bool, TestGroup [] m () effs)]
           runTuples = P.zip filterFlags prepResults
 
           foldEffects :: [m ()] -> m ()
-          foldEffects = foldl' (>>) (pure ())
+          foldEffects = foldl' (>>) $ pure ()
 
           exeGroup :: (Bool, TestGroup [] m () effs) -> m ()
           exeGroup (include, tg) =
@@ -272,23 +282,23 @@ runGrouped runner fltrs agg rc intrprt =
 
               logFailOrRun :: m (Either AppError ()) -> m () -> m ()
               logFailOrRun prerun mRun = do
-                                         pr <- prerun
+                                         pr <- debug' "LogFailOrRun !!!!!!!!!!!!!!!!!!" <$> prerun
                                          either log' (const mRun) pr
 
               runTestIteration :: m () -> m ()
               runTestIteration = logFailOrRun grpGoHome
 
               runTest' :: [m ()] -> m ()
-              runTest' testIterations = foldEffects (runTestIteration <$> testIterations)
+              runTest' testIterations = foldEffects (runTestIteration <$> debugf' length "number of iterations" testIterations)
 
               testList :: [[m ()]]
-              testList = tests tg
+              testList = debugf' length "number of tests" $ debugf' P.length "number of iterations inner" <$> tests tg
 
               runGroupAfterRollover :: m ()
               runGroupAfterRollover = foldEffects $ runTest' <$> testList
 
               runGroup :: m ()
-              runGroup = log' "Start Group" >> logFailOrRun grpRollover runGroupAfterRollover
+              runGroup = log' "Start Group" >> {- logFailOrRun grpRollover -} runGroupAfterRollover
 
            in
               include ? runGroup $ pure ()
@@ -299,10 +309,10 @@ runGrouped runner fltrs agg rc intrprt =
             log' $ filterLog filterInfo
             foldEffects $ exeGroup <$> runTuples
 
-
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 data FilterRejection tc = FilterRejection {
                   reason :: String,

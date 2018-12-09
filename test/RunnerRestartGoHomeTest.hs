@@ -16,16 +16,13 @@ import           TestAndRunConfig
 
 type Log = DList String
 
-chkLog :: (Log -> Bool) -> Log -> Assertion
-chkLog p = U.chk . p
-
-
-count :: (Foldable collection, Truthy b, Additive a, P.Num a) => (Element collection -> b) -> collection -> a
-count p = foldl' (\n x -> p x ? n + 1 $ n) 0
+chkLog :: (Log -> v) -> (v -> Assertion) -> Log -> Assertion
+chkLog intprt assrt = assrt . intprt
 
 goHomeMessage :: String
 goHomeMessage = "GoHome action ran without exception but completion check returned False. Looks like GoHome did not run as expected"
 
+isGoHomeMessage :: String -> Bool
+isGoHomeMessage = isInfixOf goHomeMessage
 
-
--- unit_check_expected_go_home_failures = chkLog
+unit_go_home_iteration_fail = chkLog (count isGoHomeMessage) (chkEq 14) runFailHomeG2Document

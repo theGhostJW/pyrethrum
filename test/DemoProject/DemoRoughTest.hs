@@ -69,13 +69,13 @@ i = Item
 -- later optional hedgehog
 items :: [Item]
 items = [
-          i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] $
-                                chk "iid x 10 is small" (\V{..} -> iidx10 < 200 ) <>
-                                chk "iid x 10 is big"   (\V{..} -> iidx10 > 500),
-          i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-          i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
-          i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-          i 140 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+          -- i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] $
+          --                       chk "iid x 10 is small" (\V{..} -> iidx10 < 200 ) <>
+          --                       chk "iid x 10 is big"   (\V{..} -> iidx10 > 500),
+          -- i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+          -- i 120 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
+          -- i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
+          -- i 140 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
           i 150 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty
   ]
 

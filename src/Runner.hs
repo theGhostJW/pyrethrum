@@ -252,9 +252,6 @@ runGrouped runner fltrs agg rc intrprt =
           runTuples ::  [(Bool, TestGroup [] m () effs)]
           runTuples = P.zip filterFlags prepResults
 
-          foldEffects :: [m ()] -> m ()
-          foldEffects = foldl' (>>) $ pure ()
-
           exeGroup :: (Bool, TestGroup [] m () effs) -> m ()
           exeGroup (include, tg) =
             let
@@ -273,13 +270,13 @@ runGrouped runner fltrs agg rc intrprt =
               runTestIteration = logFailOrRun grpGoHome
 
               runTest' :: [m ()] -> m ()
-              runTest' testIterations = log' "Start Test" >> foldEffects (runTestIteration <$> testIterations)
+              runTest' testIterations = log' "Start Test" >> sequence_ (runTestIteration <$> testIterations)
 
               testList :: [[m ()]]
               testList = tests tg
 
               runGroupAfterRollover :: m ()
-              runGroupAfterRollover = foldEffects $ runTest' <$> testList
+              runGroupAfterRollover = sequence_ $ runTest' <$> testList
 
               runGroup :: m ()
               runGroup = log' "Start Group" >> logFailOrRun grpRollover runGroupAfterRollover
@@ -291,7 +288,7 @@ runGrouped runner fltrs agg rc intrprt =
           do
             log' "Filter Log"
             log' $ filterLog filterInfo
-            foldEffects $ exeGroup <$> runTuples
+            sequence_ $ exeGroup <$> runTuples
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%

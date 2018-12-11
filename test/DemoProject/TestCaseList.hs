@@ -18,6 +18,7 @@ import           Foundation.List.DList
 import           Foundation.Extended
 import qualified Prelude                    as P
 import           Runner as R
+import Control.Exception as E
 
 runInIO :: IO ()
 runInIO = runGrouped runSuccess [] testInfoFull runConfig executeInIO
@@ -76,6 +77,31 @@ runFailHomeG2IO = runGrouped testRunFailHomeG2 [] testInfoFull runConfig execute
 runFailHomeG2Document :: DList String
 runFailHomeG2Document = extractDocLog $ runGrouped testRunFailHomeG2 [] testInfoFull runConfig executeDocument
 
+testRunFailRolloverG1 :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+testRunFailRolloverG1 = validPlan alwaysFailCheck doNothing doNothing doNothing
+
+runFailRolloverG1Document :: DList String
+runFailRolloverG1Document = extractDocLog $ runGrouped testRunFailRolloverG1 [] testInfoFull runConfig executeDocument
+
+runFailRolloverG1IO :: IO ()
+runFailRolloverG1IO = runGrouped testRunFailRolloverG1 [] testInfoFull runConfig executeInIO
+
+
+boolEx = P.error "exceptionInCheck Error"
+
+exceptionInCheck :: PreRun effs
+exceptionInCheck = PreRun {
+  runAction = pure (),
+  checkHasRun = (E.throw $ P.userError "Pretend IO Error") :: Eff effs Bool
+}
+
+testRunFailExceptG2GoHomeCheck :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+testRunFailExceptG2GoHomeCheck = validPlan doNothing doNothing doNothing exceptionInCheck
+
+runExceptG2GoHomeCheckIO :: IO ()
+runExceptG2GoHomeCheckIO = runGrouped testRunFailExceptG2GoHomeCheck [] testInfoFull runConfig executeInIO
+
+
 --- Monad Play ---
 
 fwtf :: IO Bool
@@ -103,3 +129,9 @@ fwtfRun' f = do
                 f
 
 demoWtf' = fwtfRun' fwtf
+
+
+-- q = do
+--     c <- P.getChar
+--     c <- P.getChar
+--     pure c

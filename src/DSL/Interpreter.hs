@@ -13,6 +13,7 @@ import           Foundation.Extended as F
 import ItemClass
 import Data.Either.Combinators
 import Data.Tuple as T
+import Control.Exception as E
 
 type EFFLogger effs = Member Logger effs
 type EFFEnsureLog effs = (Members '[Logger, Ensure] effs)
@@ -46,9 +47,11 @@ unifyFSEnsureError = \case
                                        Left l -> Left $ AppFileSystemError l
                        Left enFail -> Left $ AppEnsureError enFail
 
+handleIOException :: IO (Either AppError a) -> IO (Either AppError a)
+handleIOException = E.handle $ pure . Left . IOError
 
 executeInIO :: forall a. Eff '[FileSystem,  Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError a)
-executeInIO app = unifyFSEnsureError <$> runM
+executeInIO app = handleIOException $ unifyFSEnsureError <$> runM
                                  (
                                    runError
                                    $ runError

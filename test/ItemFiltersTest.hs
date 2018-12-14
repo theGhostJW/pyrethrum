@@ -43,7 +43,7 @@ chkFilterError flter msg itms = chkErrorContains show msg $ filterredItems flter
 
 chkFilter flter expted extractor itms = chkEq (Right expted) $ extractor <$> filterredItems flter itms
 
-chkSingleton :: (ItemClass item valState) => Filter item -> [item] -> Assertion
+chkSingleton :: (ItemClass item valState) => ItemFilter item -> [item] -> Assertion
 chkSingleton flter itms = either (\r -> chk False) (chkEq (1 :: Int)) $ P.length <$> filterredItems flter itms
 
 blahh :: IO ()
@@ -103,7 +103,6 @@ items4 = [
 unit_item_filter_lastVal_no_items_with_vals = chkFilterError LastVal "There is no item in the list with checks assigned" items
 
 chkLastVal expectedId = chkFilterSingle LastVal (Just expectedId) idOfHead
-
 
 unit_item_filter_lastVal_singleFirst = chkLastVal 100 items1
 unit_item_filter_lastVal_top2 = chkLastVal 110 items2

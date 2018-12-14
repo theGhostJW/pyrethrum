@@ -8,25 +8,22 @@ import           Foundation.Extended
 import qualified Prelude
 import           ItemClass
 
-data Filter a = IID Int |
+data ItemFilter a = IID Int |
                 All |
                 Last |
                 LastVal | -- return the last item with non-mempty validations
                 Pred (a -> Bool)
 
-
-instance Prelude.Show (Filter a) where
+instance Prelude.Show (ItemFilter a) where
   show (IID i )    = "IID " <> Prelude.show i
   show All         = "All"
   show Last        = "Last"
   show LastVal     = "LastVal"
   show (Pred func) = "Pred itemPredicateFunction"
 
-data FilterError = InvalidItemFilter String  |
-                   NotImplementedError String
-                   deriving (Eq, Show)
+newtype FilterError = InvalidItemFilter String deriving (Eq, Show)
 
-filterredItems :: (ItemClass item valState) => Filter item -> [item] -> Either FilterError [item]
+filterredItems :: (ItemClass item valState) => ItemFilter item -> [item] -> Either FilterError [item]
 filterredItems filtr items = let
                               hasVals i = not $ null $ checkList i
                               lastWithVal = find hasVals $ reverse items

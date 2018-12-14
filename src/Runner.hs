@@ -180,7 +180,7 @@ runTest fltrs agg rc intrprt GenericTest{..} =
           include = isRight $ filterTestCfg fltrs rc configuration
         in
           include
-              ? ((log' "Start Iteration" >>) <$> runItems components)
+              ? ((log' "Start Iteration" *>) <$> runItems components)
               $ pure $ pure ()
 
 
@@ -270,7 +270,7 @@ runGrouped runner fltrs agg rc intrprt =
               runTestIteration = logFailOrRun grpGoHome
 
               runTest' :: [m ()] -> m ()
-              runTest' testIterations = log' "Start Test" >> sequence_ (runTestIteration <$> testIterations)
+              runTest' testIterations = log' "Start Test" *> sequence_ (runTestIteration <$> testIterations)
 
               testList :: [[m ()]]
               testList = tests tg
@@ -278,11 +278,11 @@ runGrouped runner fltrs agg rc intrprt =
               runGroupAfterRollover :: m ()
               runGroupAfterRollover = sequence_ $ runTest' <$> testList
 
-              runGroup :: m ()
-              runGroup = log' "Start Group" >> logFailOrRun grpRollover runGroupAfterRollover
+              runGrp :: m ()
+              runGrp = log' "Start Group" *> logFailOrRun grpRollover runGroupAfterRollover
 
            in
-              include ? runGroup $ pure ()
+              include ? runGrp $ pure ()
 
         in
           do

@@ -5,8 +5,9 @@ import DSL.Ensure
 import Control.Monad.Freer
 import qualified Data.List.Safe      as SafeList
 import           Foundation.Extended
-import qualified Prelude
+import qualified Prelude as P
 import           ItemClass
+import qualified Data.Set as S
 
 data ItemFilter a = IID Int |
                 All |
@@ -14,25 +15,44 @@ data ItemFilter a = IID Int |
                 LastVal | -- return the last item with non-mempty validations
                 Pred (a -> Bool)
 
-instance Prelude.Show (ItemFilter a) where
-  show (IID i )    = "IID " <> Prelude.show i
+instance P.Show (ItemFilter a) where
+  show (IID i )    = "IID " <> P.show i
   show All         = "All"
   show Last        = "Last"
   show LastVal     = "LastVal"
   show (Pred func) = "Pred itemPredicateFunction"
 
-newtype FilterError = InvalidItemFilter String deriving (Eq, Show)
+data FilterError = InvalidItemFilter String |
+                   DuplicateItemId Int String deriving (Eq, Show)
 
-filterredItems :: (ItemClass item valState) => ItemFilter item -> [item] -> Either FilterError [item]
-filterredItems filtr items = let
-                              hasVals i = not $ null $ checkList i
-                              lastWithVal = find hasVals $ reverse items
-                              listOrFail lst msg = null lst
-                                                          ? Left (InvalidItemFilter msg)
-                                                          $ Right lst
-                              in case filtr of
-                                IID iid -> listOrFail (filter (\i -> identifier i == iid) items) $ "id: " <> show iid <> " not in item list"
-                                All -> listOrFail items "Items list is empty"
-                                Last -> maybe (Left $ InvalidItemFilter "Items list is empty") (Right . pure) (SafeList.last items)
-                                LastVal -> maybe (Left $ InvalidItemFilter "There is no item in the list with checks assigned") (Right . pure) lastWithVal
-                                Pred func -> listOrFail (filter func items) "No test items match filter function"
+filterredItemIds :: forall i vs. (ItemClass i vs) => ItemFilter i -> [i] -> Either FilterError (S.Set Int)
+filterredItemIds filtr items =
+  let
+    filterredItems :: Either FilterError [Int]
+    filterredItems = let
+                        hasVals i = not $ null $ checkList i
+                        lastWithVal = find hasVals $ reverse items
+                        listOrFail lst msg = null lst
+                                                    ? Left (InvalidItemFilter msg)
+                                                    $ Right lst
+                      in
+                        (identifier <$>) <$>
+                          case filtr of
+                            IID iid -> listOrFail (filter (\i -> identifier i == iid) items) $ "id: " <> show iid <> " not in item list"
+                            All -> listOrFail items "Items list is empty"
+                            Last -> maybe (Left $ InvalidItemFilter "Items list is empty") (Right . pure) (SafeList.last items)
+                            LastVal -> maybe (Left $ InvalidItemFilter "There is no item in the list with checks assigned") (Right . pure) lastWithVal
+                            Pred func -> listOrFail (filter func items) "No test items match filter function"
+
+    checkIds :: Either FilterError ()
+    checkIds =
+      let
+        ids = identifier <$> items
+        dupe = firstDuplicate ids
+       in
+        maybe
+          (pure ())
+          (\i -> Left $ DuplicateItemId i $ "Item id: " <> show i <> " is duplicated in items list.")
+          dupe
+     in
+       S.fromList <$> (checkIds *> filterredItems)

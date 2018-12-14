@@ -87,7 +87,6 @@ runFailRolloverG1Document = extractDocLog $ runGrouped testRunFailRolloverG1 [] 
 runFailRolloverG1IO :: IO ()
 runFailRolloverG1IO = runGrouped testRunFailRolloverG1 [] testInfoFull runConfig executeInIO
 
-
 ioException :: Eff effs Bool
 ioException = (E.throw $ P.userError "Pretend IO Error") :: Eff effs Bool
 

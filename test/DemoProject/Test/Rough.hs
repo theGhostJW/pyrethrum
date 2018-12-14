@@ -157,10 +157,10 @@ demo2 = showEffs2 test2
 -- 10. group - rollover - go home is home ✔
 -- 10.01 - structure demo group ✔
 -- 10.02 - fitering groups without prerun ✔
--- 10.03 - execution
--- 10.04 - testing
--- 10.10 - io prerun HOF for excption handling ~ test with / without
--- 10.11 - abstract ??
+-- 10.03 - execution ✔
+-- 10.04 - testing ✔
+-- 10.10 - io prerun HOF for excption handling ~ test with / without ✔
+-- 10.11 - abstract ✔
 -- 11. test case end point
 -- 11. ~ try merging into typeclass
 -- 12. logging to file

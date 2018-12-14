@@ -49,7 +49,7 @@ extra-deps:
 - foundation-edge-0.0.3
 - transformers-either-0.1.1
 - git: https://theghostjw@bitbucket.org/principledautomation/extensions.git
-  commit: "8eea726"
+  commit: "e0c3d74"
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

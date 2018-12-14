@@ -9,6 +9,7 @@ import           DemoProject.Config
 import           DemoProject.Test.Rough as RT
 import           DemoProject.Test.Rough2 as RT2
 import           DemoProject.Test.Simple as ST
+import Control.Monad
 import           DemoProject.Test.Simple2 as ST2
 import           DSL.Ensure
 import           DSL.FileSystem
@@ -87,12 +88,13 @@ runFailRolloverG1IO :: IO ()
 runFailRolloverG1IO = runGrouped testRunFailRolloverG1 [] testInfoFull runConfig executeInIO
 
 
-boolEx = P.error "exceptionInCheck Error"
+ioException :: Eff effs Bool
+ioException = (E.throw $ P.userError "Pretend IO Error") :: Eff effs Bool
 
 exceptionInCheck :: PreRun effs
 exceptionInCheck = PreRun {
   runAction = pure (),
-  checkHasRun = (E.throw $ P.userError "Pretend IO Error") :: Eff effs Bool
+  checkHasRun = ioException
 }
 
 testRunFailExceptG2GoHomeCheck :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
@@ -100,6 +102,18 @@ testRunFailExceptG2GoHomeCheck = validPlan doNothing doNothing doNothing excepti
 
 runExceptG2GoHomeCheckIO :: IO ()
 runExceptG2GoHomeCheckIO = runGrouped testRunFailExceptG2GoHomeCheck [] testInfoFull runConfig executeInIO
+
+exceptionInRollover :: PreRun effs
+exceptionInRollover = PreRun {
+  runAction = void ioException,
+  checkHasRun = pure True
+}
+
+testRunExceptG1Rollover:: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+testRunExceptG1Rollover = validPlan exceptionInRollover doNothing doNothing doNothing
+
+runExceptG1Rollover :: IO ()
+runExceptG1Rollover = runGrouped testRunExceptG1Rollover [] testInfoFull runConfig executeInIO
 
 
 --- Monad Play ---

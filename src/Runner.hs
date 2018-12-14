@@ -21,9 +21,9 @@ import           ItemClass
 import qualified Prelude             as P
 import           DSL.Interpreter
 import Data.Either
+import qualified Data.Set as S
 import TestAndRunConfig as C
 import Control.Monad
-import Data.Bool
 
 data PreRun effs = PreRun {
   runAction :: Eff effs (),
@@ -190,8 +190,9 @@ logger' :: forall m s effs. (Monad m, Show s, Member Logger effs) =>
                  -> m ()
 logger' intrprt = void . intrprt . log
 
-runGrouped :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs) =>
-                    (
+testRunOrEndPoint :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs) =>
+                    Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
+                    -> (
                       forall a mo mi.
                         (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]
                     )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
@@ -200,7 +201,7 @@ runGrouped :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs) =>
                    -> rc                                              -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> m ()
-runGrouped runner fltrs agg rc intrprt =
+testRunOrEndPoint itmIds runner fltrs agg rc intrprt =
         let
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
           preRun PreRun{..} stage = do
@@ -230,12 +231,17 @@ runGrouped runner fltrs agg rc intrprt =
                                                                                 <> " did not run as expected"
                                                            )
 
+                                -- let
+                                --   hasRun = intrprt checkHasRun
+                                --
+                                -- skip <- isNothing itmIds ? pure (Right False) $ hasRun
+
                                 preRunRslt <- intrprt runAction
                                 runCheck <- intrprt checkHasRun
                                 pure $ either
                                          (Left . PreTestError stage stageExLabel)
                                          (\_ -> verifyAction runCheck)
-                                        preRunRslt
+                                         preRunRslt
 
           log' :: Show s => s -> m ()
           log' = logger' intrprt
@@ -255,11 +261,28 @@ runGrouped runner fltrs agg rc intrprt =
           exeGroup :: (Bool, TestGroup [] m () effs) -> m ()
           exeGroup (include, tg) =
             let
+              -- when running an endpoint go home and rolllover are not run
+              -- if the application is already home
+              isEndPoint :: Bool
+              isEndPoint = isJust itmIds
+
+              preRunGuard ::  m (Either AppError Bool)
+              preRunGuard = isEndPoint ? intrprt (checkHasRun $ goHome tg) $ pure $ Right True
+
+              guardedPreRun :: (TestGroup [] m () effs -> PreRun effs) -> PreTestStage -> m (Either AppError ())
+              guardedPreRun sel stg =
+                do
+                  wantRun <- preRunGuard
+                  either
+                    (pure . Left)
+                    (bool (pure $ Right ()) $ preRun (sel tg) stg)
+                    wantRun
+
               grpRollover :: m (Either AppError ())
-              grpRollover = preRun (rollover tg) Rollover
+              grpRollover = guardedPreRun rollover Rollover
 
               grpGoHome :: m (Either AppError ())
-              grpGoHome = preRun (goHome tg) GoHome
+              grpGoHome = guardedPreRun goHome GoHome
 
               logFailOrRun :: m (Either AppError ()) -> m () -> m ()
               logFailOrRun prerun mRun = do
@@ -289,6 +312,18 @@ runGrouped runner fltrs agg rc intrprt =
             log' "Filter Log"
             log' $ filterLog filterInfo
             sequence_ $ exeGroup <$> runTuples
+
+testRun :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs) =>
+                    (
+                      forall a mo mi.
+                        (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]
+                    )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
+                   -> TestFilters rc tc                               -- filters
+                   -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
+                   -> rc                                              -- runConfig
+                   -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
+                   -> m ()
+testRun = testRunOrEndPoint Nothing
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%

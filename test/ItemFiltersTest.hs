@@ -26,7 +26,6 @@ instance ItemClass TestItem ValState where
   thenClause = post
   checkList = checks
 
-
 i = TestItem
 
 isOne = C.chk "is One" (== 1)

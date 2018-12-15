@@ -16,7 +16,8 @@ import           Control.Monad.Freer.Error
 
 import           Foundation.Extended
 import           Runner.Internal.ItemFilters     as InternalFuncs (ItemFilter (..),
-                                                       FilterError (..))
+                                                       FilterError (..),
+                                                       filterredItemIds)
 import           ItemClass
 import qualified Prelude             as P
 import           DSL.Interpreter
@@ -62,10 +63,13 @@ data TestComponents rc i effs as vs = TestComponents {
   testPrepState :: as -> Ensurable vs
 }
 
-data GenericTest tc rc i effs as vs = GenericTest {
+data TestConfigClass tc => GenericTest tc rc i effs as vs = GenericTest {
   configuration :: tc,
   components :: ItemClass i vs => TestComponents rc i effs as vs
 }
+
+testAddress :: forall tc rc i effs as vs. TestConfigClass tc => GenericTest tc rc i effs as vs -> String
+testAddress = moduleAddress . (configuration :: GenericTest tc rc i effs as vs -> tc)
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,
@@ -204,10 +208,10 @@ testRunOrEndPoint :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs, Tes
                     )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
-                   -> rc                                              -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
+                   -> rc                                              -- runConfig
                    -> m ()
-testRunOrEndPoint iIds runner fltrs agg rc intrprt =
+testRunOrEndPoint iIds runner fltrs agg intrprt rc =
         let
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
           preRun PreRun{..} stage = do
@@ -236,11 +240,6 @@ testRunOrEndPoint iIds runner fltrs agg rc intrprt =
                                                                                 <> stageStr
                                                                                 <> " did not run as expected"
                                                            )
-
-                                -- let
-                                --   hasRun = intrprt checkHasRun
-                                --
-                                -- skip <- isNothing itmIds ? pure (Right False) $ hasRun
 
                                 preRunRslt <- intrprt runAction
                                 runCheck <- intrprt checkHasRun
@@ -326,25 +325,25 @@ testRun :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs, TestConfigCl
                     )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
-                   -> rc                                              -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
+                   -> rc                                              -- runConfig
                    -> m ()
 testRun = testRunOrEndPoint Nothing
 
 
 testEndPointBase :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs, TestConfigClass tc) =>
-                    String                                                 -- test address
-                    -> Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
-                    -> (
+                    (
                       forall a mo mi.
                         (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]
                     )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
-                   -> rc                                              -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
+                   -> String                                          -- test address
+                   -> rc                                              -- runConfig
+                   -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints
                    -> m ()
-testEndPointBase tstAddress iIds runner fltrs =
+testEndPointBase runner fltrs agg intrprt tstAddress rc iIds =
   let
     endPointFilter :: String -> TestFilter rc tc
     endPointFilter targAddress = TestFilter {
@@ -355,7 +354,11 @@ testEndPointBase tstAddress iIds runner fltrs =
     allFilters :: [TestFilter rc tc]
     allFilters = endPointFilter tstAddress : fltrs
   in
-    testRunOrEndPoint iIds runner allFilters
+    either
+      (logger' intrprt)
+      (\idSet -> testRunOrEndPoint (Just idSet) runner fltrs agg intrprt rc)
+      iIds
+
 
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

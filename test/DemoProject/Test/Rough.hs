@@ -83,6 +83,7 @@ items = [
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 test :: forall effs. Effects effs => Test Item effs ApState ValState
 test = GenericTest {
               configuration = config {address = moduleOf ''ApState},

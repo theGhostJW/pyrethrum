@@ -82,15 +82,15 @@ countryFilter = TestFilter {
 
 levelFilter :: TestFilter RunConfig TestConfig
 levelFilter = TestFilter {
-     title = "minDepth must be at least depth of test run (e.g. regression test will not be run in connectivity run)",
+     title = "minDepth must be at least depth of test run (e.g. regression test will not be executed in connectivity run)",
      predicate = \rc tc -> minDepth tc <= depth rc
    }
 
-activeFilter :: TestFilter RunConfig TestConfig
-activeFilter = TestFilter {
+isActiveFilter :: TestFilter RunConfig TestConfig
+isActiveFilter = TestFilter {
     title = "test must be is active",
     predicate = \rc tc -> active tc
   }
 
 filters :: [TestFilter RunConfig TestConfig]
-filters = [activeFilter, countryFilter, levelFilter]
+filters = [isActiveFilter, countryFilter, levelFilter]

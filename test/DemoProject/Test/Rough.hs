@@ -83,6 +83,15 @@ items = [
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-- testEndPoint ::
+--      String
+--      -> RunConfig
+--      -> Either FilterError (Set Int)
+--      -> (forall a mo mi.
+--          (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i FullIOEffects as vs -> mo (mi a)) -> [TestGroup mo mi a FullIOEffects]
+--         )
+--      -> IO ()
+-- testEndPoint = testEndPoint  testEndPointBase filters testInfoFull executeInIO
 
 test :: forall effs. Effects effs => Test Item effs ApState ValState
 test = GenericTest {

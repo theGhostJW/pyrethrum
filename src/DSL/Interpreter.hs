@@ -50,7 +50,9 @@ unifyFSEnsureError = \case
 handleIOException :: IO (Either AppError a) -> IO (Either AppError a)
 handleIOException = E.handle $ pure . Left . IOError
 
-executeInIO :: forall a. Eff '[FileSystem,  Logger, Ensure, Error FileSystemError, Error EnsureError, IO] a -> IO (Either AppError a)
+type FullIOEffects = '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO]
+
+executeInIO :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
 executeInIO app = handleIOException $ unifyFSEnsureError <$> runM
                                  (
                                    runError
@@ -61,7 +63,9 @@ executeInIO app = handleIOException $ unifyFSEnsureError <$> runM
                                     app
                                  )
 
-executeDocument :: forall a.  Eff '[FileSystem, Logger, Ensure, Error EnsureError, WriterDList] a -> Eff '[WriterDList] (Either AppError a)
+type FullDocEffects = '[FileSystem, Logger, Ensure, Error EnsureError, WriterDList]
+
+executeDocument :: forall a. Eff FullDocEffects a -> Eff '[WriterDList] (Either AppError a)
 executeDocument app =  (mapLeft AppEnsureError <$>) <$> runError
                                           $ ensureInterpreter
                                           $ logDocInterpreter

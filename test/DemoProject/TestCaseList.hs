@@ -22,23 +22,6 @@ import qualified Prelude                    as P
 import           Runner as R
 import Control.Exception as E
 
--- activeTest = RT.test
-
--- activeConfig = runConfig
---
--- activeFilter = IID 100
---
--- endPoint = do
---             iids <- (filterredItemIds activeFilter $ testItems . components activeTest)
---             pure $ testEndPoint (testAddress activeTest) activeConfig iids
-
--- 
--- testEndPoint :: String -> RunConfig -> S.Set Int -> IO ()
--- testEndPoint = testEndPointBase plan filters testInfoFull executeInIO
---
--- testEndPointDoc :: String -> RunConfig -> S.Set Int -> DList String
--- testEndPointDoc tstaddr rc iids = extractDocLog $ testEndPointBase plan filters testInfoFull executeDocument tstaddr rc iids
-
 runInIO :: IO ()
 runInIO = testRun plan [] testInfoFull executeInIO runConfig
 

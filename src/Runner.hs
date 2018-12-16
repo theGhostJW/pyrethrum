@@ -63,7 +63,7 @@ data TestComponents rc i effs as vs = TestComponents {
   testPrepState :: as -> Ensurable vs
 }
 
-data TestConfigClass tc => GenericTest tc rc i effs as vs = GenericTest {
+data  GenericTest tc rc i effs as vs = GenericTest {
   configuration :: tc,
   components :: ItemClass i vs => TestComponents rc i effs as vs
 }
@@ -170,7 +170,7 @@ runTestItems iIds items interactor prepState frmEth agg rc intrprt =
   in
     runItem <$> filter inTargIds items
 
-runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, TestConfigClass tc, Member Logger effs) =>
+runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
                    Maybe (S.Set Int)                                  -- target Ids
                    -> TestFilters rc tc                                  -- filters
                    -> (i -> as -> vs -> TestInfo i as vs)             -- aggregator i.e. rslt constructor
@@ -200,7 +200,7 @@ logger' :: forall m s effs. (Monad m, Show s, Member Logger effs) =>
                  -> m ()
 logger' intrprt = void . intrprt . log
 
-testRunOrEndPoint :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs, TestConfigClass tc) =>
+testRunOrEndPoint :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs) =>
                     Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
                     -> (
                       forall a mo mi.
@@ -318,7 +318,7 @@ testRunOrEndPoint iIds runner fltrs agg intrprt rc =
             log' $ filterLog filterInfo
             sequence_ $ exeGroup <$> runTuples
 
-testRun :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs, TestConfigClass tc) =>
+testRun :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs) =>
                     (
                       forall a mo mi.
                         (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]
@@ -332,18 +332,18 @@ testRun = testRunOrEndPoint Nothing
 
 
 testEndPointBase :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs, TestConfigClass tc) =>
-                    (
-                      forall a mo mi.
-                        (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]
-                    )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
-                   -> TestFilters rc tc                               -- filters
+                   TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> String                                          -- test address
                    -> rc                                              -- runConfig
                    -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints
+                   -> (
+                     forall a mo mi.
+                       (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]
+                   )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> m ()
-testEndPointBase runner fltrs agg intrprt tstAddress rc iIds =
+testEndPointBase fltrs agg intrprt tstAddress rc iIds runner =
   let
     endPointFilter :: String -> TestFilter rc tc
     endPointFilter targAddress = TestFilter {
@@ -373,14 +373,14 @@ data FilterRejection tc = FilterRejection {
 
 type TestAddress = String
 
-data TestConfigClass tc => TestFilter rc tc = TestFilter {
+data TestFilter rc tc = TestFilter {
   title :: String,
   predicate :: rc -> tc -> Bool
 }
 
 type TestFilters rc tc = [TestFilter rc tc]
 
-filterTestCfg :: forall rc tc. TestConfigClass tc => TestFilters rc tc -> rc -> tc -> Either (FilterRejection tc) tc
+filterTestCfg :: forall rc tc. TestFilters rc tc -> rc -> tc -> Either (FilterRejection tc) tc
 filterTestCfg fltrs rc tc =
   let
     applyFilter :: TestFilter rc tc -> Either (FilterRejection tc) tc
@@ -390,10 +390,10 @@ filterTestCfg fltrs rc tc =
   in
     fromMaybe (pure tc) $ find isLeft $ applyFilter <$> fltrs
 
-filterTest :: forall i as vs tc rc effs. TestConfigClass tc => TestFilters rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (Either (FilterRejection tc) tc)
+filterTest :: forall i as vs tc rc effs.  TestFilters rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (Either (FilterRejection tc) tc)
 filterTest fltrs rc t = Identity $ filterTestCfg fltrs rc $ (configuration :: (GenericTest tc rc i effs as vs -> tc)) t
 
-filterGroups :: forall tc rc effs. TestConfigClass tc =>
+filterGroups :: forall tc rc effs.
               (
                 (forall i as vs. (Show i, Show as, Show vs) =>
                       GenericTest tc rc i effs as vs -> Identity (Either (FilterRejection tc) tc)) -> [TestGroup Identity (Either (FilterRejection tc)) tc effs]

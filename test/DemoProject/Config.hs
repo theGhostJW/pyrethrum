@@ -96,7 +96,7 @@ isActiveFilter = TestFilter {
 filters :: [TestFilter RunConfig TestConfig]
 filters = [isActiveFilter, countryFilter, levelFilter]
 
-testEndPoint ::
+testEndpoint ::
      String
      -> RunConfig
      -> Either FilterError (Set Int)
@@ -104,9 +104,9 @@ testEndPoint ::
          (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i FullIOEffects as vs -> mo (mi a)) -> [TestGroup mo mi a FullIOEffects]
         )
      -> IO ()
-testEndPoint = testEndPointBase filters testInfoFull executeInIO
+testEndpoint = testEndpointBase filters testInfoFull executeInIO
 
-testEndPointDoc ::
+testEndpointDoc ::
      String
      -> RunConfig
      -> Either FilterError (Set Int)
@@ -114,4 +114,4 @@ testEndPointDoc ::
          (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i FullDocEffects as vs -> mo (mi a)) -> [TestGroup mo mi a FullDocEffects]
         )
      -> DList String
-testEndPointDoc tstAdd rc iids pln = extractDocLog $ testEndPointBase filters testInfoFull executeDocument tstAdd rc iids pln
+testEndpointDoc tstAdd rc iids pln = extractDocLog $ testEndpointBase filters testInfoFull executeDocument tstAdd rc iids pln

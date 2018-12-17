@@ -28,8 +28,8 @@ config = testConfig {
   countries = allCountries
  }
 
-endPoint :: (forall a m m1. TestPlan TestConfig RunConfig FullIOEffects m1 m a) -> IO ()
-endPoint = ep runConfig (IID 120)
+endpoint :: (forall a m m1. TestPlan TestConfig RunConfig FullIOEffects m1 m a) -> IO ()
+endpoint = ep runConfig (IID 120)
 
 data ApState = ApState {
   itemId   :: Int,
@@ -90,7 +90,7 @@ nameOfModule :: String
 nameOfModule = moduleOf ''ApState
 
 ep :: RunConfig -> ItemFilter Item -> (forall a m m1. TestPlan TestConfig RunConfig FullIOEffects m1 m a) -> IO ()
-ep rc iFltr = testEndPoint nameOfModule rc (filterredItemIds iFltr items)
+ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr items)
 
 test :: forall effs. Effects effs => Test Item effs ApState ValState
 test = GenericTest {

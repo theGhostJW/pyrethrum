@@ -202,7 +202,7 @@ logger' :: forall m s effs. (Monad m, Show s, Member Logger effs) =>
                  -> m ()
 logger' intrprt = void . intrprt . log
 
-testRunOrEndPoint :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs) =>
+testRunOrEndpoint :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs) =>
                     Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
                     -> (
                       forall a mo mi.
@@ -213,7 +213,7 @@ testRunOrEndPoint :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs) =>
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> rc                                              -- runConfig
                    -> m ()
-testRunOrEndPoint iIds runner fltrs agg intrprt rc =
+testRunOrEndpoint iIds runner fltrs agg intrprt rc =
         let
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
           preRun PreRun{..} stage = do
@@ -270,11 +270,11 @@ testRunOrEndPoint iIds runner fltrs agg intrprt rc =
             let
               -- when running an endpoint go home and rolllover are not run
               -- if the application is already home
-              isEndPoint :: Bool
-              isEndPoint = isJust iIds
+              isEndpoint :: Bool
+              isEndpoint = isJust iIds
 
               preRunGuard ::  m (Either AppError Bool)
-              preRunGuard = isEndPoint ? intrprt (checkHasRun $ goHome tg) $ pure $ Right True
+              preRunGuard = isEndpoint ? intrprt (checkHasRun $ goHome tg) $ pure $ Right True
 
               guardedPreRun :: (TestGroup [] m () effs -> PreRun effs) -> PreTestStage -> m (Either AppError ())
               guardedPreRun sel stg =
@@ -330,10 +330,10 @@ testRun :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs) =>
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> rc                                              -- runConfig
                    -> m ()
-testRun = testRunOrEndPoint Nothing
+testRun = testRunOrEndpoint Nothing
 
 
-testEndPointBase :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs, TestConfigClass tc) =>
+testEndpointBase :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs, TestConfigClass tc) =>
                    TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
@@ -345,20 +345,20 @@ testEndPointBase :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs, Test
                        (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]
                    )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> m ()
-testEndPointBase fltrs agg intrprt tstAddress rc iIds runner =
+testEndpointBase fltrs agg intrprt tstAddress rc iIds runner =
   let
-    endPointFilter :: String -> TestFilter rc tc
-    endPointFilter targAddress = TestFilter {
-      title = "test address does not match endPoint target: " <> targAddress,
+    endpointFilter :: String -> TestFilter rc tc
+    endpointFilter targAddress = TestFilter {
+      title = "test address does not match endpoint target: " <> targAddress,
       predicate = \_ tc -> moduleAddress tc == targAddress
     }
 
     allFilters :: [TestFilter rc tc]
-    allFilters = endPointFilter tstAddress : fltrs
+    allFilters = endpointFilter tstAddress : fltrs
   in
     either
       (logger' intrprt)
-      (\idSet -> testRunOrEndPoint (Just idSet) runner allFilters agg intrprt rc)
+      (\idSet -> testRunOrEndpoint (Just idSet) runner allFilters agg intrprt rc)
       iIds
 
 

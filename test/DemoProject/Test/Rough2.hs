@@ -11,7 +11,7 @@ import DSL.Interpreter
 import           Foundation.Extended  hiding (Item)
 import           Runner as R
 
-endpoint :: (forall a m m1. TestPlan TestConfig RunConfig FullIOEffects m1 m a) -> IO ()
+endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig (IID 120)
 
 data Dummy = Dummy

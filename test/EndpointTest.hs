@@ -1,6 +1,7 @@
 module EndpointTest where
 
 import qualified Check                    as C
+import           DemoProject.Test.Rough
 import           DemoProject.TestCaseList
 import           DSL.Interpreter
 import           Foundation.Collection
@@ -15,3 +16,5 @@ import           Test.Extended            as U
 import           TestAndRunConfig
 
 unit_blahh = chk True
+
+unit_goHome_only_when_home = chk True

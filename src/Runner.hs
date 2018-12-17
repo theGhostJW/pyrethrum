@@ -26,7 +26,7 @@ import qualified Data.Set as S
 import TestAndRunConfig as C
 import Control.Monad
 
-type TestPlan tc rc effs m1 m a = (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+type TestPlanBase tc rc m1 m a effs = (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
 
 data PreRun effs = PreRun {
   runAction :: Eff effs (),

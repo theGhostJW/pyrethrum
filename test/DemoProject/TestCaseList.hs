@@ -12,6 +12,7 @@ import           DemoProject.Test.Simple as ST
 import Control.Monad
 import           DemoProject.Test.Simple2 as ST2
 import qualified Data.Set as S
+import  Data.Functor (($>))
 import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter
@@ -36,7 +37,7 @@ validPlan :: forall m m1 effs a. EFFFileSystem effs =>
   -> PreRun effs
   -> PreRun effs
   -> PreRun effs
-  -> TestPlan TestConfig RunConfig effs m1 m a
+  ->  TestPlan m1 m a effs
 validPlan ro0 gh0 ro1 gh1 f =
   [
 
@@ -60,7 +61,7 @@ validPlan ro0 gh0 ro1 gh1 f =
 
     ]
 
-plan :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+plan :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
 plan = validPlan doNothing doNothing doNothing doNothing
 
 
@@ -70,7 +71,7 @@ alwaysFailCheck = PreRun {
   checkHasRun = pure False
 }
 
-testRunFailHomeG2 :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+testRunFailHomeG2 :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
 testRunFailHomeG2 = validPlan doNothing doNothing doNothing alwaysFailCheck
 
 runFailHomeG2IO :: IO ()
@@ -79,7 +80,7 @@ runFailHomeG2IO = testRun testRunFailHomeG2 [] testInfoFull executeInIO runConfi
 runFailHomeG2Document :: DList String
 runFailHomeG2Document = extractDocLog $ testRun testRunFailHomeG2 [] testInfoFull executeDocument runConfig
 
-testRunFailRolloverG1 :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+testRunFailRolloverG1 :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
 testRunFailRolloverG1 = validPlan alwaysFailCheck doNothing doNothing doNothing
 
 runFailRolloverG1Document :: DList String
@@ -97,7 +98,7 @@ exceptionInCheck = PreRun {
   checkHasRun = ioException
 }
 
-testRunFailExceptG2GoHomeCheck :: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+testRunFailExceptG2GoHomeCheck :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
 testRunFailExceptG2GoHomeCheck = validPlan doNothing doNothing doNothing exceptionInCheck
 
 runExceptG2GoHomeCheckIO :: IO ()
@@ -109,8 +110,14 @@ exceptionInRollover = PreRun {
   checkHasRun = pure True
 }
 
-testRunExceptG1Rollover:: forall m m1 effs a. EFFFileSystem effs => (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+testRunExceptG1Rollover:: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
 testRunExceptG1Rollover = validPlan exceptionInRollover doNothing doNothing doNothing
 
 runExceptG1Rollover :: IO ()
 runExceptG1Rollover = testRun testRunExceptG1Rollover [] testInfoFull executeInIO runConfig
+
+justLogPreRun :: EFFLogger effs => PreRun effs
+justLogPreRun = PreRun {
+  runAction = log "Run Action",
+  checkHasRun = log "check Action Run" $> True
+}

@@ -5,11 +5,14 @@
 
 module DemoProject.Test.Simple2 where
 
-
 import DemoProject.Test.Simple as T
 import DemoProject.Config
+import DSL.Interpreter
 import           Foundation.Extended  hiding (Item)
 import           Runner as R
+
+endPoint :: (forall a m m1. TestPlan TestConfig RunConfig FullIOEffects m1 m a) -> IO ()
+endPoint = ep runConfig (IID 120)
 
 data Dummy = Dummy
 

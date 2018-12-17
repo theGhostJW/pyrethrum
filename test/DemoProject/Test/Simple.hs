@@ -25,6 +25,11 @@ config = testConfig {
   header = "This Simple Test Only Uses Ensure Effects"
 }
 
+jw = endPoint
+
+endPoint :: (forall a m m1. TestPlan TestConfig RunConfig FullIOEffects m1 m a) -> IO ()
+endPoint = ep runConfig (IID 123)
+
 data ApState = ApState {
   itemId :: Int,
   simpleMessage :: String
@@ -65,13 +70,20 @@ items = [
           i 150 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty
   ]
 
-  -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+nameOfModule :: String
+nameOfModule = moduleOf ''ApState
+
+ep :: RunConfig -> ItemFilter Item -> (forall a m m1. TestPlan TestConfig RunConfig FullIOEffects m1 m a) -> IO ()
+ep rc iFltr = testEndPoint nameOfModule rc (filterredItemIds iFltr items)
+
 
 test :: forall effs. Effects effs => Test Item effs ApState ValState
 test = GenericTest {
-              configuration = config {address = moduleOf ''ApState},
+              configuration = config {address = nameOfModule},
               components = TestComponents {
                                 testItems = items,
                                 testInteractor = interactor,

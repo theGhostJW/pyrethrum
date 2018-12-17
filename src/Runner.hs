@@ -26,6 +26,8 @@ import qualified Data.Set as S
 import TestAndRunConfig as C
 import Control.Monad
 
+--type TestRun tc rc effs = (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+
 data PreRun effs = PreRun {
   runAction :: Eff effs (),
   checkHasRun :: Eff effs Bool
@@ -356,7 +358,7 @@ testEndPointBase fltrs agg intrprt tstAddress rc iIds runner =
   in
     either
       (logger' intrprt)
-      (\idSet -> testRunOrEndPoint (Just idSet) runner fltrs agg intrprt rc)
+      (\idSet -> testRunOrEndPoint (Just idSet) runner allFilters agg intrprt rc)
       iIds
 
 

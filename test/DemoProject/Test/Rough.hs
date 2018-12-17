@@ -28,6 +28,8 @@ config = testConfig {
   countries = allCountries
  }
 
+endPoint = ep runConfig (IID 100)
+
 data ApState = ApState {
   itemId   :: Int,
   filePath :: Path Abs File,
@@ -83,19 +85,18 @@ items = [
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--- testEndPoint ::
---      String
---      -> RunConfig
---      -> Either FilterError (Set Int)
---      -> (forall a mo mi.
---          (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i FullIOEffects as vs -> mo (mi a)) -> [TestGroup mo mi a FullIOEffects]
---         )
---      -> IO ()
--- testEndPoint = testEndPoint  testEndPointBase filters testInfoFull executeInIO
+nameOfModule :: String
+nameOfModule = moduleOf ''ApState
+
+ep :: RunConfig -> ItemFilter Item -> (forall a mo mi.
+                                        (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i FullIOEffects as vs -> mo (mi a)) -> [TestGroup mo mi a FullIOEffects]
+                                      )
+                                     -> IO ()
+ep rc iFltr = testEndPoint nameOfModule rc (filterredItemIds iFltr items)
 
 test :: forall effs. Effects effs => Test Item effs ApState ValState
 test = GenericTest {
-              configuration = config {address = moduleOf ''ApState},
+              configuration = config {address = nameOfModule},
               components = TestComponents {
                                 testItems = items,
                                 testInteractor = interactor,

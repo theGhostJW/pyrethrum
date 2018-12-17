@@ -24,15 +24,20 @@ import           Runner as R
 import Control.Exception as E
 
 
+ioRun :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
+ioRun pln = testRun pln filters testInfoFull executeInIO runConfig
+
+docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
+docRun pln = extractDocLog $ testRun pln filters testInfoFull executeDocument runConfig
 
 runInIO :: IO ()
-runInIO = testRun plan filters testInfoFull executeInIO runConfig
+runInIO = ioRun plan
 
 runNZInIO :: IO ()
 runNZInIO = testRun plan filters testInfoFull executeInIO runConfig {country = NZ}
 
 runDocument :: DList String
-runDocument = extractDocLog $ testRun plan filters testInfoFull executeDocument runConfig
+runDocument = docRun plan
 
 validPlan :: forall m m1 effs a. EFFFileSystem effs =>
   PreRun effs
@@ -76,19 +81,19 @@ testRunFailHomeG2 :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a e
 testRunFailHomeG2 = validPlan doNothing doNothing doNothing alwaysFailCheck
 
 runFailHomeG2IO :: IO ()
-runFailHomeG2IO = testRun testRunFailHomeG2 filters testInfoFull executeInIO runConfig
+runFailHomeG2IO = ioRun testRunFailHomeG2
 
 runFailHomeG2Document :: DList String
-runFailHomeG2Document = extractDocLog $ testRun testRunFailHomeG2 filters testInfoFull executeDocument runConfig
+runFailHomeG2Document = docRun testRunFailHomeG2
 
 testRunFailRolloverG1 :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
 testRunFailRolloverG1 = validPlan alwaysFailCheck doNothing doNothing doNothing
 
 runFailRolloverG1Document :: DList String
-runFailRolloverG1Document = extractDocLog $ testRun testRunFailRolloverG1 filters testInfoFull executeDocument runConfig
+runFailRolloverG1Document = docRun testRunFailRolloverG1
 
 runFailRolloverG1IO :: IO ()
-runFailRolloverG1IO = testRun testRunFailRolloverG1 filters testInfoFull executeInIO runConfig
+runFailRolloverG1IO = ioRun testRunFailRolloverG1
 
 ioException :: Eff effs Bool
 ioException = (E.throw $ P.userError "Pretend IO Error") :: Eff effs Bool
@@ -103,7 +108,7 @@ testRunFailExceptG2GoHomeCheck :: forall m m1 effs a. EFFFileSystem effs => Test
 testRunFailExceptG2GoHomeCheck = validPlan doNothing doNothing doNothing exceptionInCheck
 
 runExceptG2GoHomeCheckIO :: IO ()
-runExceptG2GoHomeCheckIO = testRun testRunFailExceptG2GoHomeCheck filters testInfoFull executeInIO runConfig
+runExceptG2GoHomeCheckIO = ioRun testRunFailExceptG2GoHomeCheck
 
 exceptionInRollover :: PreRun effs
 exceptionInRollover = PreRun {
@@ -115,7 +120,7 @@ testRunExceptG1Rollover:: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 
 testRunExceptG1Rollover = validPlan exceptionInRollover doNothing doNothing doNothing
 
 runExceptG1Rollover :: IO ()
-runExceptG1Rollover = testRun testRunExceptG1Rollover filters testInfoFull executeInIO runConfig
+runExceptG1Rollover = ioRun testRunExceptG1Rollover
 
 justLogPreRun :: EFFLogger effs => PreRun effs
 justLogPreRun = PreRun {

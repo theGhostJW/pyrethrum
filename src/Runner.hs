@@ -203,12 +203,9 @@ logger' :: forall m s effs. (Monad m, Show s, Member Logger effs) =>
 logger' intrprt = void . intrprt . log
 
 testRunOrEndpoint :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs) =>
-                    Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
-                    -> (
-                      forall a mo mi.
-                        (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]
-                    )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
-                   -> TestFilters rc tc                               -- filters
+                    Maybe (S.Set Int)                                    -- a set of item Ids used for test case endpoints
+                   -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results
+                   -> TestFilters rc tc                                  -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> rc                                              -- runConfig
@@ -321,10 +318,7 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
             sequence_ $ exeGroup <$> runTuples
 
 testRun :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs) =>
-                    (
-                      forall a mo mi.
-                        (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]
-                    )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
+                   (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
@@ -340,10 +334,7 @@ testEndpointBase :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs, Test
                    -> String                                          -- test address
                    -> rc                                              -- runConfig
                    -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints
-                   -> (
-                     forall a mo mi.
-                       (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) =>  GenericTest tc rc i effs as vs -> mo (mi a)) -> [TestGroup mo mi a effs]
-                   )                                                 -- test case processor function is applied to a hard coded list of test goups and returns a list of results
+                   -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> m ()
 testEndpointBase fltrs agg intrprt tstAddress rc iIds runner =
   let

@@ -15,10 +15,13 @@ import qualified Prelude                  as P
 import           Runner                   as R
 import           Test.Extended            as U
 
-endPointLog = testEndpointDoc "DemoProject.Test.Rough" runConfig (filterredItemIds (IID 120) T.items) testG1GoHomeLogging
+endPointLog = testEndpointDoc "DemoProject.Test.Rough" runConfig (filterredItemIds (IID 110) T.items) testG1GoHomeLogging
 
 runActionMsg = "Run Action"
 checkActionMsg = "Check Action Run"
 
-unit_check_home_only_on_home_restart_check_run_once = chkMessageInstances checkActionMsg 1 endPointLog
-unit_no_restart_when_home_already = chkMessageInstances runActionMsg 0 endPointLog
+-- once before group deciding not to run rollover
+-- once before iteration - deciding not to run goHome
+unit_endpoint_already_home_check_home_run_once = chkMessageInstances checkActionMsg 2 endPointLog
+
+unit_endpoint_already_home_go_home_action_not_run = chkMessageInstances runActionMsg 0 endPointLog

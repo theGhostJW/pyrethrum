@@ -193,8 +193,7 @@ runTest iIds fltrs agg rc intrprt GenericTest{..} =
         in
           include
               ? ((log' "Start Iteration" *>) <$> runItems components)
-              $ pure $ pure ()
-
+              $ []
 
 logger' :: forall m s effs. (Monad m, Show s, Member Logger effs) =>
                  (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
@@ -271,7 +270,11 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
               isEndpoint = isJust iIds
 
               preRunGuard ::  m (Either AppError Bool)
-              preRunGuard = isEndpoint ? intrprt (checkHasRun $ goHome tg) $ pure $ Right True
+              preRunGuard = (
+                              isEndpoint ?
+                                  intrprt (not <$> checkHasRun (goHome tg)) $ -- we only want to run if is NOT already home
+                                  pure $ Right True
+                            )
 
               guardedPreRun :: (TestGroup [] m () effs -> PreRun effs) -> PreTestStage -> m (Either AppError ())
               guardedPreRun sel stg =
@@ -279,7 +282,10 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
                   wantRun <- preRunGuard
                   either
                     (pure . Left)
-                    (bool (pure $ Right ()) $ preRun (sel tg) stg)
+                    (bool
+                      (pure $ Right ()) $
+                      preRun (sel tg) stg
+                    )
                     wantRun
 
               grpRollover :: m (Either AppError ())
@@ -290,8 +296,8 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
 
               logFailOrRun :: m (Either AppError ()) -> m () -> m ()
               logFailOrRun prerun mRun = do
-                                         pr <- prerun
-                                         either log' (const mRun) pr
+                                          pr <- prerun
+                                          either log' (const mRun) pr
 
               runTestIteration :: m () -> m ()
               runTestIteration = logFailOrRun grpGoHome
@@ -300,7 +306,7 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
               runTest' testIterations = log' "Start Test" *> sequence_ (runTestIteration <$> testIterations)
 
               testList :: [[m ()]]
-              testList = tests tg
+              testList = filter (not . null) $ tests tg
 
               runGroupAfterRollover :: m ()
               runGroupAfterRollover = sequence_ $ runTest' <$> testList

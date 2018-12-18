@@ -122,11 +122,11 @@ testRunExceptG1Rollover = validPlan exceptionInRollover doNothing doNothing doNo
 runExceptG1Rollover :: IO ()
 runExceptG1Rollover = ioRun testRunExceptG1Rollover
 
-justLogPreRun :: EFFLogger effs => PreRun effs
-justLogPreRun = PreRun {
-  runAction = log "Run Action",
-  checkHasRun = log "Check Action Run" $> True
+justLogPreRun :: EFFLogger effs => PreTestStage -> PreRun effs
+justLogPreRun stage = PreRun {
+  runAction = log $ "Run Action: " <> show stage,
+  checkHasRun = log ("Check Action Run: " <> show stage) $> True
 }
 
 testG1GoHomeLogging:: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
-testG1GoHomeLogging = validPlan justLogPreRun doNothing doNothing doNothing
+testG1GoHomeLogging = validPlan (justLogPreRun Rollover) (justLogPreRun GoHome) doNothing doNothing

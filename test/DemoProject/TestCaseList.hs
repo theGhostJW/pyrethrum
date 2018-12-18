@@ -125,7 +125,7 @@ runExceptG1Rollover = ioRun testRunExceptG1Rollover
 justLogPreRun :: EFFLogger effs => PreRun effs
 justLogPreRun = PreRun {
   runAction = log "Run Action",
-  checkHasRun = log "check Action Run" $> True
+  checkHasRun = log "Check Action Run" $> True
 }
 
 testG1GoHomeLogging:: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs

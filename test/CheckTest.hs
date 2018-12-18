@@ -6,15 +6,6 @@ import           Foundation.Extended
 import qualified Prelude             as P
 import qualified Test.Extended       as UT
 
-
--- unit_bool_ternary_true = chk $ (1 < 2) ? True $ False
-
--- uprop_reverse :: Property
--- uprop_reverse =
---   property $ do
---     xs <- forAll $ list (linear 0 100) alpha
---     reverse (reverse xs) === xs
-
 isBig = chk "More than 10" (> 10)
 isEven = chk "Even" P.even
 isOdd = chk "Odd" P.odd
@@ -23,7 +14,7 @@ isOddGuard = guard $ chk' "Odd Test"
                    (\v -> "The value was: " <> show v <> " and is expected to be odd")
                    P.odd
 
-tryMe = outcome <$> calcChecks 42 (isOddGuard <> isBig <> isEven)
+_demo = outcome <$> calcChecks 42 (isOddGuard <> isBig <> isEven)
 
 chkOutcomes expected val checks = UT.chkEq (fromList expected) $ outcome <$> calcChecks val checks
 

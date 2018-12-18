@@ -1,13 +1,9 @@
 module TestFiltersTest where
 
-import qualified Check           as C
-import           Data.List.Safe  as SafeList
 import           Foundation      as F
 import qualified Prelude         as P
 import           Runner as R
 import           Test.Extended
-import           ItemClass
-import DSL.Interpreter
 import TestAndRunConfig
 
 data RunConfig = RunConfig {
@@ -136,7 +132,7 @@ runRunner f =
 enabledFilter :: TestFilter RunConfig TestConfig
 enabledFilter = TestFilter {
      title = "test must be is enabled",
-     predicate = \rc tc -> enabled tc
+     predicate = \_ tc -> enabled tc
    }
 
 countryFilter :: TestFilter RunConfig TestConfig

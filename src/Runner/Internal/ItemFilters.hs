@@ -1,8 +1,6 @@
 
 module Runner.Internal.ItemFilters where
 
-import DSL.Ensure
-import Control.Monad.Freer
 import qualified Data.List.Safe      as SafeList
 import           Foundation.Extended
 import qualified Prelude as P
@@ -20,7 +18,7 @@ instance P.Show (ItemFilter a) where
   show All         = "All"
   show Last        = "Last"
   show LastVal     = "LastVal"
-  show (Pred func) = "Pred itemPredicateFunction"
+  show (Pred _) = "Pred itemPredicateFunction"
 
 data FilterError = InvalidItemFilter String |
                    DuplicateItemId Int String deriving (Eq, Show)

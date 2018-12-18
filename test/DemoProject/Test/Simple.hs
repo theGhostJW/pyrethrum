@@ -6,16 +6,12 @@
 module DemoProject.Test.Simple where
 
 import           Check
-import DSL.Logger
 import DemoProject.Config
-import           TestAndRunConfig
 import DSL.Ensure
 import Runner as R
 import           Control.Monad.Freer
 import           DSL.Interpreter
 import           Foundation.Extended hiding (Item)
-import           Control.Monad.Freer.Error
-import           DSL.FileSystem
 import qualified Prelude as P
 
 type Effects effs = EFFEnsureLog effs
@@ -38,7 +34,7 @@ data ApState = ApState {
 type ValState = ApState
 
 interactor :: forall effs. Effects effs => (ItemClass Item ValState) => RunConfig -> Item -> Eff effs ApState
-interactor rc TestItem{..} = do
+interactor _rc TestItem{..} = do
                               ensure "Only even iids expected" $ P.even iid
                               pure $ ApState iid "Success"
 

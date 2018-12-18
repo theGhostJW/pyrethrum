@@ -1,13 +1,7 @@
 module DemoProject.Config where
 
-import           Control.Monad.Freer
-import           Control.Monad.Freer.Error
-import           Control.Monad.Freer.Writer
 import           Data.Set                   as S
-import           DSL.Ensure
-import           DSL.FileSystem
 import           DSL.Interpreter
-import           DSL.Logger
 import           Foundation.Extended
 import qualified Prelude                    as P
 import           Runner
@@ -90,7 +84,7 @@ levelFilter = TestFilter {
 isActiveFilter :: TestFilter RunConfig TestConfig
 isActiveFilter = TestFilter {
     title = "test must be is active",
-    predicate = \rc tc -> active tc
+    predicate = \_ tc -> active tc
   }
 
 filters :: [TestFilter RunConfig TestConfig]

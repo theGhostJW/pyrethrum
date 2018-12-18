@@ -1,16 +1,12 @@
 module ItemFiltersTest where
 
 import qualified Check           as C
-import           Data.List.Safe  as SafeList
 import           Foundation      as F
 import           Data.Set        as S
 import qualified Prelude         as P
 import           Runner.Internal.ItemFilters
 import           Runner as R
 import           Test.Extended
-import           ItemClass
-import DSL.Interpreter
-import TestAndRunConfig
 
 data TestItem = TestItem {
   iid    :: Int,
@@ -46,7 +42,7 @@ chkFilter flter expted itms = chkEq (Right $ S.fromList expted) $ filterredItemI
 chkFilter' flter expted itms = chkEq (Right $ S.singleton expted) $ filterredItemIds flter itms
 
 chkSingleton :: (ItemClass item valState) => ItemFilter item -> [item] -> Assertion
-chkSingleton flter itms = either (\r -> chk False) (chkEq (1 :: Int)) $ P.length <$> filterredItemIds flter itms
+chkSingleton flter itms = either (\_ -> chk False) (chkEq (1 :: Int)) $ P.length <$> filterredItemIds flter itms
 
 blahh :: IO ()
 blahh = undefined

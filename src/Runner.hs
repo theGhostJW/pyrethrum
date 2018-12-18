@@ -9,11 +9,7 @@ import Check
 import DSL.Logger
 import DSL.Ensure
 import Data.Functor.Identity
-import DSL.FileSystem
-import qualified Data.Function as F
 import           Control.Monad.Freer
-import           Control.Monad.Freer.Error
-
 import           Foundation.Extended
 import           Runner.Internal.ItemFilters     as InternalFuncs (ItemFilter (..),
                                                        FilterError (..),

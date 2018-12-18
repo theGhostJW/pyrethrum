@@ -2,19 +2,13 @@
 module DemoProject.TestCaseList where
 
 import           Control.Monad.Freer
-import           Control.Monad.Freer.Error
-import           Control.Monad.Freer.Writer
-import Data.Functor.Identity
 import           DemoProject.Config
 import           DemoProject.Test.Rough as RT
 import           DemoProject.Test.Rough2 as RT2
 import           DemoProject.Test.Simple as ST
 import Control.Monad
 import           DemoProject.Test.Simple2 as ST2
-import qualified Data.Set as S
 import  Data.Functor (($>))
-import           DSL.Ensure
-import           DSL.FileSystem
 import           DSL.Interpreter
 import           DSL.Logger
 import           Foundation.List.DList

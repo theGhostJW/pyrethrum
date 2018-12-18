@@ -6,15 +6,12 @@
 module DemoProject.Test.Rough where
 
 import           DSL.Logger
-import           Control.Monad.Freer.Error
 import           Check
 import DemoProject.Config
-import           TestAndRunConfig
 import           Control.Monad.Freer
 import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter
-import Data.Either
 import qualified Prelude as P
 import           Foundation.Extended             hiding (readFile, writeFile, Item)
 import           Runner as R

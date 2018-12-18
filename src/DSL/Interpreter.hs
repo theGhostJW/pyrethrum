@@ -10,9 +10,7 @@ import           DSL.Ensure
 import           DSL.Logger
 import           Foundation.List.DList
 import           Foundation.Extended as F
-import ItemClass
 import Data.Either.Combinators
-import Data.Tuple as T
 import Control.Exception as E
 
 type EFFLogger effs = Member Logger effs

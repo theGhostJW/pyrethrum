@@ -1,6 +1,5 @@
 module LogListCheck where
 
-import qualified Check                 as C
 import           Foundation.Extended   as F
 import           Foundation.List.DList
 import           Test.Extended         as U

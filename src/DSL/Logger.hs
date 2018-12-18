@@ -3,11 +3,8 @@ module DSL.Logger where
 
 import DSL.Internal.Common
 import           Foundation.Extended
-import           Foundation.List.DList
 import           Control.Monad.Freer
-import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.Writer
-import qualified Control.Monad as Monad
 import qualified Prelude as P
 
 data Logger r where

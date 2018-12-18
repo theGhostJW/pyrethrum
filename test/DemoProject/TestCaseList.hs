@@ -130,3 +130,12 @@ justLogPreRun stage = PreRun {
 
 testG1GoHomeLogging:: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
 testG1GoHomeLogging = validPlan (justLogPreRun Rollover) (justLogPreRun GoHome) doNothing doNothing
+
+justLogPreRunFailCheck :: EFFLogger effs => PreTestStage -> PreRun effs
+justLogPreRunFailCheck stage = PreRun {
+  runAction = log $ "Run Action: " <> show stage,
+  checkHasRun = log ("Check Action Run: " <> show stage) $> False
+}
+
+testG1GoHomeLoggingFailCheck :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
+testG1GoHomeLoggingFailCheck = validPlan (justLogPreRun Rollover) (justLogPreRunFailCheck GoHome) doNothing doNothing

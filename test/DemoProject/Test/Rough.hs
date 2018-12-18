@@ -170,8 +170,7 @@ demo2 = showEffs2 test2
 -- 10.04 - testing ✔
 -- 10.10 - io prerun HOF for excption handling ~ test with / without ✔
 -- 10.11 - abstract ✔
--- 11. test case end point
--- 11. ~ try merging into typeclass
+-- 11. test case end point ✔
 -- 12. logging to file
 --    12.01 add hoc and results logging to the same file
 --    12.02 include test path in log

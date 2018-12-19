@@ -44,6 +44,7 @@ validPlan ro0 gh0 ro1 gh1 f =
   [
 
     TestGroup {
+           header = "Group 1",
            rollover = ro0,
            goHome = gh0,
            tests = [
@@ -53,6 +54,7 @@ validPlan ro0 gh0 ro1 gh1 f =
       },
 
     TestGroup {
+          header = "Group 1",
           rollover = ro1,
           goHome = gh1,
           tests = [

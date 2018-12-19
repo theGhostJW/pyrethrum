@@ -39,6 +39,7 @@ doNothing = PreRun {
 
 data TestGroup m1 m a effs =
   TestGroup {
+        header :: String,
         -- occurs once on client before group is run
         rollover :: PreRun effs,
         -- occurs once before test iteration is run
@@ -48,6 +49,8 @@ data TestGroup m1 m a effs =
         -- eg [IO Either (AppError TestInfo)]
    }
 
+instance Titled (TestGroup m1 m a effs) where
+  title = header
 
 disablePreRun :: TestGroup m m1 a effs -> TestGroup m m1 a effs
 disablePreRun tg = tg {

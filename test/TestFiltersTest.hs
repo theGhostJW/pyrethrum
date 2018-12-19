@@ -2,7 +2,7 @@ module TestFiltersTest where
 
 import           Foundation      as F
 import qualified Prelude         as P
-import           Runner as R
+import           Runner as R 
 import           Test.Extended
 import TestAndRunConfig
 
@@ -108,6 +108,7 @@ runRunner f =
   [
 
    TestGroup {
+          header = "Group 1",
           rollover = doNothing,
           goHome = doNothing,
           tests = [
@@ -118,6 +119,7 @@ runRunner f =
      },
 
     TestGroup {
+          header = "Group 2",
           rollover = doNothing,
           goHome = doNothing,
           tests = [
@@ -154,7 +156,7 @@ filterList :: RunConfig -> [Either (FilterRejection TestConfig) TestConfig]
 filterList rc = filterLog $ filterGroups runRunner filters rc
 
 runFilters :: RunConfig -> [String]
-runFilters rc = header <$> rights (filterList rc)
+runFilters rc = (header :: TestConfig -> String ) <$> rights (filterList rc)
 
 chkFilters :: [String] -> RunConfig -> Assertion
 chkFilters expted rc = chkEq expted $ runFilters rc

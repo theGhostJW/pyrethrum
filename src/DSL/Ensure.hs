@@ -1,18 +1,18 @@
 
 module DSL.Ensure where
 
+import DSL.Internal.Common
 import           Foundation.Extended
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import qualified Control.Monad as Monad
 
+data Ensure r where
+  Ensure :: Truthy conditon => String -> conditon -> Ensure ()
+  Throw :: String -> Ensure ()
+
 type Ensurable a = Eff '[Ensure, Error EnsureError] a
 
-data Ensure r where
- Ensure :: Truthy conditon => String -> conditon -> Ensure ()
- Throw :: String -> Ensure ()
-
-newtype EnsureError = EnsureError String deriving (Show, Eq)
 
 ensure :: Member Ensure effs => String -> Bool -> Eff effs ()
 ensure err condition = send $ Ensure err condition

@@ -2,6 +2,7 @@
 module DSL.Logger where
 
 import DSL.Internal.Common
+import  DSL.LogProtocol
 import           Foundation.Extended
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Writer

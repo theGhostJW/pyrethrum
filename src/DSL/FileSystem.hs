@@ -16,11 +16,6 @@ data FileSystem r where
   ReadFile :: Path a File -> FileSystem StrictReadResult
   WriteFile :: Path a File -> String -> FileSystem ()
 
-data FileSystemError =
-    ReadFileError IOException |
-    WriteFileError IOException
-    deriving (Show, Eq)
-
 readFile :: Member FileSystem effs => Path a File -> Eff effs StrictReadResult
 readFile = send . ReadFile
 

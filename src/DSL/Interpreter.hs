@@ -19,25 +19,6 @@ type EFFFileSystem effs = Members '[Logger, Ensure, FileSystem] effs
 
 type EFFFileSystemInIO effs = (Members '[FileSystem, Ensure, Error FileSystemError, Error EnsureError, IO] effs)
 
-data PreTestStage = Rollover |
-                      GoHome
-                      deriving (Show, Eq)
-
-data AppError =
-              AppFileSystemError FileSystemError |
-              AppEnsureError EnsureError |
-
-              NotImplementedError String |
-              GenericError String |
-
-              PreTestError PreTestStage String AppError |
-              PreTestCheckExecutionError PreTestStage String AppError |
-              PreTestCheckError PreTestStage String |
-
-              IOError IOException
-
-              deriving (Show, Eq)
-
 unifyFSEnsureError :: Either EnsureError (Either FileSystemError v) -> Either AppError v
 unifyFSEnsureError = \case
                        Right ee -> case ee of

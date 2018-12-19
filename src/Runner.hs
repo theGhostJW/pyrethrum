@@ -6,6 +6,7 @@ module Runner (
 ) where
 
 import Check
+import DSL.Common
 import DSL.Logger
 import DSL.Ensure
 import Data.Functor.Identity

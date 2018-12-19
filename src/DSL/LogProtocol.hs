@@ -1,7 +1,7 @@
 
 module DSL.LogProtocol where
 
-import           DSL.Internal.Common
+import           DSL.Common
 import           Foundation.Extended
 
 data LogProtocol =
@@ -12,3 +12,4 @@ data LogProtocol =
                              } |
                   Warning String |
                   Error AppError
+                  deriving (Eq, Show)

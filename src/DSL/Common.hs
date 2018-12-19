@@ -1,11 +1,9 @@
 
-module DSL.Internal.Common where
+module DSL.Common where
 
 import           Control.Monad.Freer.Writer
 import           Foundation.Extended
 import           Foundation.List.DList
-
-type WriterDList = Writer (DList String)
 
 data PreTestStage = Rollover |
                     GoHome
@@ -32,6 +30,9 @@ data AppError =
             IOError IOException
 
             deriving (Show, Eq)
+
+
+type WriterDList = Writer (DList String)
 
 dList :: Show s => s -> DList String
 dList s = fromList [show s]

@@ -1,7 +1,7 @@
 
 module DSL.Ensure where
 
-import DSL.Internal.Common
+import DSL.Common
 import           Foundation.Extended
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error

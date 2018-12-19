@@ -1,7 +1,7 @@
 
 module DSL.Logger where
 
-import DSL.Internal.Common
+import DSL.Common
 import  DSL.LogProtocol
 import           Foundation.Extended
 import           Control.Monad.Freer
@@ -9,15 +9,19 @@ import           Control.Monad.Freer.Writer
 import qualified Prelude as P
 
 data Logger r where
- Log :: Show s => s -> Logger ()
+ LogItem :: LogProtocol -> Logger ()
+
+logItem :: Member Logger effs => LogProtocol -> Eff effs ()
+logItem = send . LogItem
 
 log :: (Show s, Member Logger effs) => s -> Eff effs ()
-log = send . Log
+log = logItem . Message . show
+
 
 logConsoleInterpreter :: LastMember IO effs => Eff (Logger ': effs) a -> Eff effs a
 logConsoleInterpreter =  interpretM $ \case
-                                         Log msg -> P.print msg
+                                         LogItem lp -> P.print lp
 
 logDocInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocInterpreter = interpret $ \case
-                                    Log msg -> tell $ dList msg
+                                    LogItem lp -> tell $ dList lp

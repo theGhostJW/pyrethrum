@@ -9,7 +9,22 @@ data PreTestStage = Rollover |
                     GoHome
                     deriving (Show, Eq)
 
+data DetailedInfo = Info {
+            message :: String,
+            info    :: String
+          }
+          deriving (Eq, Show)
+
 newtype EnsureError = EnsureError String deriving (Show, Eq)
+
+data FilterError = InvalidItemFilter String |
+                   DuplicateItemId Int String deriving (Eq, Show)
+
+data FilterRejection tc = FilterRejection {
+                 reason :: String,
+                 cfg    :: tc
+                 } deriving (Eq, Show)
+
 
 data FileSystemError =
     ReadFileError IOException |
@@ -19,12 +34,17 @@ data FileSystemError =
 data AppError =
             AppFileSystemError FileSystemError |
             AppEnsureError EnsureError |
+            AppFilterError FilterError |
 
             NotImplementedError String |
+
             GenericError String |
 
+            UserError String |
+            UserError' DetailedInfo |
+
             PreTestError PreTestStage String AppError |
-            PreTestCheckExecutionError PreTestStage String AppError |
+            PreTestCheckExecutionError PreTestStage String AppError|
             PreTestCheckError PreTestStage String |
 
             IOError IOException

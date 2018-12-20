@@ -54,7 +54,7 @@ validPlan ro0 gh0 ro1 gh1 f =
       },
 
     TestGroup {
-          header = "Group 1",
+          header = "Group 2",
           rollover = ro1,
           goHome = gh1,
           tests = [

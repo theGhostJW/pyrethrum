@@ -7,13 +7,13 @@ module Runner (
 
 import Check
 import DSL.Common
+import DSL.LogProtocol
 import DSL.Logger
 import DSL.Ensure
 import Data.Functor.Identity
 import           Control.Monad.Freer
 import           Foundation.Extended
 import           Runner.Internal.ItemFilters     as InternalFuncs (ItemFilter (..),
-                                                       FilterError (..),
                                                        filterredItemIds)
 import           ItemClass
 import qualified Prelude             as P
@@ -120,7 +120,7 @@ testInfoFull item apState valState =
 recoverTestInfo :: i -> Either AppError (TestInfo i as vs) -> TestInfo i as vs
 recoverTestInfo i = either (InteractorFault i) id
 
-testInfoNoValidation :: i -> a -> v -> TestInfo i a v
+testInfoNoValidation :: i -> as -> vs -> TestInfo i as vs
 testInfoNoValidation item apState _ =
   DocInfo {
       item = item,
@@ -132,13 +132,13 @@ testInfoNoValidation item apState _ =
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 runApState :: (Functor f1, Functor f2) =>
-     (rc -> itm -> Eff effs as)
+     (rc -> i -> Eff effs as)
      -> (as -> Ensurable vs)  -- prepstate
-     -> (itm -> as -> vs -> TestInfo itm as vs)
+     -> (i -> as -> vs -> TestInfo i as vs)
      -> rc
      -> (Eff effs as -> f1 (f2 as))
-     -> itm
-     -> f1 (f2 (TestInfo itm as vs))
+     -> i
+     -> f1 (f2 (TestInfo i as vs))
 runApState interactor prepState agg rc intrprt itm = let
                                                         runVals as =
                                                           let
@@ -172,7 +172,7 @@ runTestItems iIds items interactor prepState frmEth agg rc intrprt =
   in
     runItem <$> filter inTargIds items
 
-runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Member Logger effs) =>
+runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Show rc,  Show tc, Member Logger effs) =>
                    Maybe (S.Set Int)                                  -- target Ids
                    -> TestFilters rc tc                                  -- filters
                    -> (i -> as -> vs -> TestInfo i as vs)             -- aggregator i.e. rslt constructor
@@ -182,26 +182,26 @@ runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show 
                    -> [m ()]                                          -- [TestIterations]
 runTest iIds fltrs agg rc intrprt GenericTest{..} =
         let
-          log' :: Show s => s -> m ()
-          log' = logger' intrprt
+          logPtcl :: LogProtocol rc tc -> m ()
+          logPtcl = logger' intrprt
 
           runItems :: TestComponents rc i effs as vs -> [m ()]
-          runItems TestComponents{..} = (log' =<<) <$> runTestItems iIds testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+          runItems TestComponents{..} = undefined -- (logPtcl =<<) <$> runTestItems iIds testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
 
           include :: Bool
           include = isRight $ filterTestCfg fltrs rc configuration
         in
           include
-              ? ((log' "Start Iteration" *>) <$> runItems components)
+              ? undefined -- ((logPtcl "Start Iteration" *>) <$> runItems components)
               $ []
 
-logger' :: forall m s effs. (Monad m, Show s, Member Logger effs) =>
+logger' :: forall m tc rc effs. (Monad m, Show rc, Show tc, Member Logger effs) =>
                  (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
-                 -> s
+                 -> LogProtocol rc tc
                  -> m ()
-logger' intrprt = void . intrprt . log
+logger' intrprt = void . intrprt . logItem
 
-testRunOrEndpoint :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs) =>
+testRunOrEndpoint :: forall rc tc m effs. (Monad m, Show rc, Show tc, EFFLogger effs) =>
                     Maybe (S.Set Int)                                    -- a set of item Ids used for test case endpoints
                    -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> TestFilters rc tc                                  -- filters
@@ -246,8 +246,8 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
                                          (\_ -> verifyAction runCheck)
                                          preRunRslt
 
-          log' :: Show s => s -> m ()
-          log' = logger' intrprt
+          logPtcl :: LogProtocol rc tc -> m ()
+          logPtcl = logger' intrprt
 
           filterInfo :: [[Either (FilterRejection tc) tc]]
           filterInfo = filterGroups runner fltrs rc
@@ -297,13 +297,13 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
               logFailOrRun :: m (Either AppError ()) -> m () -> m ()
               logFailOrRun prerun mRun = do
                                           pr <- prerun
-                                          either log' (const mRun) pr
+                                          either (logPtcl . Error) (const mRun) pr
 
               runTestIteration :: m () -> m ()
               runTestIteration = logFailOrRun grpGoHome
 
               runTest' :: [m ()] -> m ()
-              runTest' testIterations = log' "Start Test" *> sequence_ (runTestIteration <$> testIterations)
+              runTest' testIterations = undefined -- logPtcl "Start Test" *> sequence_ (runTestIteration <$> testIterations)
 
               testList :: [[m ()]]
               testList = filter (not . null) $ tests tg
@@ -312,18 +312,17 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
               runGroupAfterRollover = sequence_ $ runTest' <$> testList
 
               runGrp :: m ()
-              runGrp = log' "Start Group" *> logFailOrRun grpRollover runGroupAfterRollover
+              runGrp = undefined -- logPtcl "Start Group" *> logFailOrRun grpRollover runGroupAfterRollover
 
            in
               include ? runGrp $ pure ()
 
         in
           do
-            log' "Filter Log"
-            log' $ filterLog filterInfo
+            logPtcl $ FilterLog $ filterLog filterInfo
             sequence_ $ exeGroup <$> runTuples
 
-testRun :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs) =>
+testRun :: forall rc tc m effs. (Monad m, Show rc, Show tc, EFFLogger effs) =>
                    (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
@@ -333,7 +332,7 @@ testRun :: forall rc tc m effs. (Monad m,  Show tc, EFFLogger effs) =>
 testRun = testRunOrEndpoint Nothing
 
 
-testEndpointBase :: forall rc tc m effs. (Monad m, Show tc, EFFLogger effs, TestConfigClass tc) =>
+testEndpointBase :: forall rc tc m effs. (Monad m, Show rc, Show tc, EFFLogger effs, TestConfigClass tc) =>
                    TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
@@ -354,7 +353,7 @@ testEndpointBase fltrs agg intrprt tstAddress rc iIds runner =
     allFilters = endpointFilter tstAddress : fltrs
   in
     either
-      (logger' intrprt)
+      (logger' intrprt . Error . AppFilterError)
       (\idSet -> testRunOrEndpoint (Just idSet) runner allFilters agg intrprt rc)
       iIds
 
@@ -363,12 +362,6 @@ testEndpointBase fltrs agg intrprt tstAddress rc iIds runner =
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-data FilterRejection tc = FilterRejection {
-                  reason :: String,
-                  cfg :: tc
-                  } deriving Show
 
 type TestAddress = String
 

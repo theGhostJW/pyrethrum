@@ -4,12 +4,24 @@ module DSL.LogProtocol where
 import           DSL.Common
 import           Foundation.Extended
 
-data LogProtocol =
+data LogProtocol rc tc =
                    Message String |
-                   Message' {
-                               message :: String,
-                               info    :: String
+                   Message' DetailedInfo |
+
+                   Warning String |
+                   Warning' DetailedInfo |
+
+                   Error AppError |
+                   FilterLog [Either (FilterRejection tc) tc] |
+
+                   StartRun rc |
+                   StartGroup String |
+                   StartTest tc |
+                   StartIteration {
+                               test :: String,
+                               iid  :: Int
                              } |
-                  Warning String |
-                  Error AppError
+                   EndIteration String
+
+
                   deriving (Eq, Show)

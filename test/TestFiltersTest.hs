@@ -2,8 +2,9 @@ module TestFiltersTest where
 
 import           Foundation      as F
 import qualified Prelude         as P
-import           Runner as R 
+import           Runner as R
 import           Test.Extended
+import           DSL.Common
 import TestAndRunConfig
 
 data RunConfig = RunConfig {

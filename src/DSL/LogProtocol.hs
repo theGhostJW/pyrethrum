@@ -21,7 +21,10 @@ data LogProtocol rc tc =
                                test :: String,
                                iid  :: Int
                              } |
-                   EndIteration String
+                   EndIteration {
+                               test :: String,
+                               info :: String
+                             }
 
 
                   deriving (Eq, Show)

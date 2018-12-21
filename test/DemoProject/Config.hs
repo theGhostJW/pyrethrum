@@ -2,6 +2,7 @@ module DemoProject.Config where
 
 import           Data.Set                   as S
 import           DSL.Interpreter
+import           DSL.Common
 import           Foundation.Extended
 import qualified Prelude                    as P
 import           Runner

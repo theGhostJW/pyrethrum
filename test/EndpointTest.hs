@@ -19,9 +19,9 @@ unit_endpoint_already_home_check_home_run_twice = chkMessageInstances checkActio
 
 unit_endpoint_already_home_go_home_action_not_run = chkMessageInstances runActionMsg 0 endPointLog
 
-unit_endpoint_single_iteration_only = chkMessageInstances startIterationStr 1 $ debug endPointLog
+unit_endpoint_single_iteration_only = chkMessageInstances startIterationStr 1 endPointLog
 
-endPointLogFailHomeCheck = debug $ testEndpointDoc "DemoProject.Test.Rough" runConfig (filterredItemIds (IID 110) T.items) testG1GoHomeLoggingFailCheck
+endPointLogFailHomeCheck = testEndpointDoc "DemoProject.Test.Rough" runConfig (filterredItemIds (IID 110) T.items) testG1GoHomeLoggingFailCheck
 
 -- go home check - once before group deciding to run rollover          | False
 -- rollove check - once to check rollover success                      | True

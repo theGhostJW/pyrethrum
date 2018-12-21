@@ -20,16 +20,16 @@ import Control.Exception as E
 
 
 ioRun :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-ioRun pln = testRun pln filters testInfoFull executeInIO runConfig
+ioRun pln = testRun pln filters testInfoFull executeInIOConsoleRaw runConfig
 
 docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
-docRun pln = extractDocLog $ testRun pln filters testInfoFull executeDocument runConfig
+docRun pln = extractDocLog $ testRun pln filters testInfoFull executeDocumentRaw runConfig
 
 runInIO :: IO ()
 runInIO = ioRun plan
 
 runNZInIO :: IO ()
-runNZInIO = testRun plan filters testInfoFull executeInIO runConfig {country = NZ}
+runNZInIO = testRun plan filters testInfoFull executeInIOConsoleRaw runConfig {country = NZ}
 
 runDocument :: DList String
 runDocument = docRun plan

@@ -32,9 +32,10 @@ logError = logItem . Error . UserError . show
 logError' :: (Show s, Member Logger effs) => s -> s -> Eff effs ()
 logError' msg additionalInfo = logItem $  Error $ UserError' $ Info (show msg) (show additionalInfo)
 
+type LogInterpreter effs = Eff (Logger ': effs) ~> Eff effs
 
-logConsoleInterpreter :: LastMember IO effs => Eff (Logger ': effs) a -> Eff effs a
+logConsoleInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsoleInterpreter = interpretM $ \(LogItem lp) -> P.print lp
 
-logDocInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
+logDocInterpreter :: Member WriterDList effs => LogInterpreter effs
 logDocInterpreter = interpret $ \(LogItem lp) -> tell $ dList lp

@@ -99,7 +99,7 @@ testEndpoint ::
      -> Either FilterError (Set Int)
      -> (forall m1 m a. TestPlan m1 m a FullIOEffects)
      -> IO ()
-testEndpoint = testEndpointBase filters testInfoFull executeInIO
+testEndpoint = testEndpointBase filters testInfoFull executeInIOConsoleRaw
 
 testEndpointDoc ::
      String
@@ -107,4 +107,4 @@ testEndpointDoc ::
      -> Either FilterError (Set Int)
      -> (forall a m m1. TestPlan m1 m a FullDocEffects)
      -> DList String
-testEndpointDoc tstAdd rc iids pln = extractDocLog $ testEndpointBase filters testInfoFull executeDocument tstAdd rc iids pln
+testEndpointDoc tstAdd rc iids pln = extractDocLog $ testEndpointBase filters testInfoFull executeDocumentRaw tstAdd rc iids pln

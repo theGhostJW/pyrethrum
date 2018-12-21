@@ -31,23 +31,29 @@ handleIOException = E.handle $ pure . Left . IOError
 
 type FullIOEffects = '[FileSystem, Logger, Ensure, Error FileSystemError, Error EnsureError, IO]
 
-executeInIO :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
-executeInIO app = handleIOException $ unifyFSEnsureError <$> runM
+executeInIOConsoleRaw :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
+executeInIOConsoleRaw = executeInIO logConsoleInterpreter
+
+executeInIO :: forall a. (forall effs. LastMember IO effs => Eff (Logger ': effs) ~> Eff effs) -> Eff FullIOEffects a -> IO (Either AppError a)
+executeInIO logger app = handleIOException $ unifyFSEnsureError <$> runM
                                  (
                                    runError
                                    $ runError
                                    $ ensureInterpreter
-                                   $ logConsoleInterpreter
+                                   $ logger
                                    $ fileSystemIOInterpreter
                                     app
                                  )
 
 type FullDocEffects = '[FileSystem, Logger, Ensure, Error EnsureError, WriterDList]
 
-executeDocument :: forall a. Eff FullDocEffects a -> Eff '[WriterDList] (Either AppError a)
-executeDocument app =  (mapLeft AppEnsureError <$>) <$> runError
+executeDocumentRaw :: forall a. Eff FullDocEffects a -> Eff '[WriterDList] (Either AppError a)
+executeDocumentRaw = executeDocument logDocInterpreter
+
+executeDocument :: forall a. (forall effs. Member WriterDList effs => LogInterpreter effs) -> Eff FullDocEffects a -> Eff '[WriterDList] (Either AppError a)
+executeDocument logger app =  (mapLeft AppEnsureError <$>) <$> runError
                                           $ ensureInterpreter
-                                          $ logDocInterpreter
+                                          $ logger
                                           $ fileSystemDocInterpreter app
 
 extractDocLog :: Eff '[WriterDList] () -> DList String

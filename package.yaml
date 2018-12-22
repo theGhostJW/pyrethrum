@@ -27,6 +27,7 @@ dependencies:
   - containers
   - extra
   - transformers-either
+  - aeson
 
 ghc-options:
   - -fmax-pmcheck-iterations=10000000
@@ -101,6 +102,7 @@ library:
     - time
     - either
     - deepseq
+    - yaml
 
 tests:
   pyrethrum-test:

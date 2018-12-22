@@ -50,7 +50,7 @@ type FullDocEffects = '[FileSystem, Logger, Ensure, Error EnsureError, WriterDLi
 executeDocumentRaw :: forall a. Eff FullDocEffects a -> Eff '[WriterDList] (Either AppError a)
 executeDocumentRaw = executeDocument logDocInterpreter
 
-executeDocument :: forall a. (forall effs. Member WriterDList effs => LogInterpreter effs) -> Eff FullDocEffects a -> Eff '[WriterDList] (Either AppError a)
+executeDocument :: forall a. (forall effs. Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs) -> Eff FullDocEffects a -> Eff '[WriterDList] (Either AppError a)
 executeDocument logger app =  (mapLeft AppEnsureError <$>) <$> runError
                                           $ ensureInterpreter
                                           $ logger

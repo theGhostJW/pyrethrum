@@ -16,6 +16,7 @@ import qualified Prelude as P
 import           Foundation.Extended             hiding (readFile, writeFile, Item)
 import           Runner as R
 import Type.Reflection
+import Data.Aeson.TH
 
 type Effects effs = EFFFileSystem effs
 

@@ -152,7 +152,7 @@ runApState interactor prepState agg rc intrprt itm = let
                                                      in
                                                         (runVals <$>) <$> intrprt (interactor rc itm)
 
-runTestItems :: forall i as vs tc rc effs m. (Show i, Show as, Show vs, Show tc, Show rc, Monad m, TestConfigClass tc, Titled rc, ItemClass i vs, Member Logger effs) =>
+runTestItems :: forall i as vs tc rc effs m. (Show i, Show as, Show vs, Show tc, Eq tc, Monad m, TestConfigClass tc, ItemClass i vs, Member Logger effs) =>
       tc
       -> Maybe (S.Set Int)                                                    -- target Ids
       -> [i]                                                                  -- items
@@ -165,14 +165,18 @@ runTestItems :: forall i as vs tc rc effs m. (Show i, Show as, Show vs, Show tc,
       -> [m ()]
 runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
   let
-    logPtcl :: LogProtocol rc tc -> m ()
+    logPtcl :: LogProtocol b -> m ()
     logPtcl = logger' intrprt
 
     runItem :: i -> m ()
-    runItem i = do
-                    logPtcl $ StartIteration (C.moduleAddress tc) (identifier i)
-                    info <- frmEth i <$> runApState interactor prepState agg rc intrprt i
-                    logPtcl $ EndIteration (moduleAddress tc) $ showPretty info
+    runItem i =  let
+                    iid = identifier i
+                    modAddress = C.moduleAddress tc
+                  in
+                    do
+                      logPtcl $ StartIteration modAddress iid
+                      info <- frmEth i <$> runApState interactor prepState agg rc intrprt i
+                      logPtcl $ EndIteration modAddress iid $ showPretty info
 
     inTargIds :: i -> Bool
     inTargIds i = maybe True (S.member (identifier i)) iIds
@@ -185,9 +189,9 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
       [] -> []
       x : xs -> (logPtcl (StartTest tc) *> runItem x) : (runItem <$> xs)
 
-runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Show rc, Show tc, Titled rc, TestConfigClass tc, Member Logger effs) =>
+runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Show tc, Eq tc, TestConfigClass tc, Member Logger effs) =>
                    Maybe (S.Set Int)                                  -- target Ids
-                   -> TestFilters rc tc                                  -- filters
+                   -> TestFilters rc tc                               -- filters
                    -> (i -> as -> vs -> TestInfo i as vs)             -- aggregator i.e. rslt constructor
                    -> rc                                              -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
@@ -195,7 +199,7 @@ runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show 
                    -> [m ()]                                          -- [TestIterations]
 runTest iIds fltrs agg rc intrprt GenericTest{..} =
         let
-          logPtcl :: LogProtocol rc tc -> m ()
+          logPtcl :: LogProtocol b -> m ()
           logPtcl = logger' intrprt
 
           runItems :: TestComponents rc i effs as vs -> [m ()]
@@ -208,13 +212,13 @@ runTest iIds fltrs agg rc intrprt GenericTest{..} =
               ? runItems components
               $ []
 
-logger' :: forall m tc rc effs. (Monad m, Show rc, Show tc, Member Logger effs, TestConfigClass tc, Titled rc) =>
+logger' :: forall m b effs. (Member Logger effs, Functor m) =>
                  (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
-                 -> LogProtocol rc tc
+                 -> LogProtocol b
                  -> m ()
 logger' intrprt = void . intrprt . logItem
 
-testRunOrEndpoint :: forall rc tc m effs. (Monad m, Show rc, Show tc, Titled rc, TestConfigClass tc, EFFLogger effs) =>
+testRunOrEndpoint :: forall rc tc m effs. (Monad m, Show rc, Eq rc, Eq tc, Titled rc, Show tc, TestConfigClass tc, EFFLogger effs) =>
                     Maybe (S.Set Int)                                    -- a set of item Ids used for test case endpoints
                    -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> TestFilters rc tc                                  -- filters
@@ -259,7 +263,7 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
                                          (\_ -> verifyAction runCheck)
                                          preRunRslt
 
-          logPtcl :: LogProtocol rc tc -> m ()
+          logPtcl :: LogProtocol b -> m ()
           logPtcl = logger' intrprt
 
           filterInfo :: [[Either (FilterRejection tc) tc]]
@@ -336,7 +340,7 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
             logPtcl $ FilterLog $ filterLog filterInfo
             sequence_ $ exeGroup <$> runTuples
 
-testRun :: forall rc tc m effs. (Monad m, Show rc, Show tc, Titled rc, TestConfigClass tc, EFFLogger effs) =>
+testRun :: forall rc tc m effs. (Monad m, Show rc, Show tc, Eq rc, Eq tc, Titled rc, TestConfigClass tc, EFFLogger effs) =>
                    (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
@@ -346,7 +350,7 @@ testRun :: forall rc tc m effs. (Monad m, Show rc, Show tc, Titled rc, TestConfi
 testRun = testRunOrEndpoint Nothing
 
 
-testEndpointBase :: forall rc tc m effs. (Monad m, Show rc, Show tc, EFFLogger effs, Titled rc, TestConfigClass tc) =>
+testEndpointBase :: forall rc tc m effs. (Monad m, Show rc, Eq rc, Titled rc, Eq tc, Show tc, TestConfigClass tc, EFFLogger effs) =>
                    TestFilters rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
@@ -357,7 +361,7 @@ testEndpointBase :: forall rc tc m effs. (Monad m, Show rc, Show tc, EFFLogger e
                    -> m ()
 testEndpointBase fltrs agg intrprt tstAddress rc iIds runner =
   let
-    logPtcl :: LogProtocol rc tc -> m ()
+    logPtcl :: LogProtocol b -> m ()
     logPtcl = logger' intrprt
 
     endpointFilter :: String -> TestFilter rc tc

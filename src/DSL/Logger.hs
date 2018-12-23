@@ -11,47 +11,47 @@ import Text.Show.Pretty
 import TestAndRunConfig
 import qualified Prelude as P
 
-showPretty :: Show a => a -> String
-showPretty = toStr . ppShow
-
-prtyInfo :: (Show s, Show s1)  => s -> s1 -> DetailedInfo
-prtyInfo msg adInfo = Info (showPretty msg) (showPretty adInfo)
-
 data Logger r where
- LogItem :: (Show rc, Show tc, TestConfigClass tc, Titled rc) => LogProtocol rc tc -> Logger ()
+ LogItem :: LogProtocol a -> Logger ()
 
-logItem :: (Show rc, Show tc, TestConfigClass tc, Titled rc, Member Logger effs) => LogProtocol rc tc -> Eff effs ()
+logItem :: Member Logger effs => LogProtocol a -> Eff effs ()
 logItem = send . LogItem
 
-simpleLog :: forall s rc tc effs. (Show s, Show rc, Show tc, TestConfigClass tc, Titled rc, Member Logger effs) => (String -> LogProtocol rc tc) -> s -> Eff effs ()
-simpleLog lpCons = (logItem :: LogProtocol rc tc -> Eff effs ()) . lpCons . showPretty
+simpleLog :: forall s a effs. (Show s, Member Logger effs) => (String -> LogProtocol a) -> s -> Eff effs ()
+simpleLog lpCons = logItem . lpCons . showPretty
 
-detailLog :: forall s rc tc effs. (Show s, Show rc, Show tc, TestConfigClass tc, Titled rc, Member Logger effs) => (DetailedInfo -> LogProtocol rc tc) -> s -> s -> Eff effs ()
-detailLog lpCons msg additionalInfo = (logItem :: LogProtocol rc tc -> Eff effs ()) $ lpCons $ prtyInfo msg additionalInfo
+detailLog :: forall a s effs. (Show s, Member Logger effs) => (DetailedInfo -> LogProtocol a) -> s -> s -> Eff effs ()
+detailLog lpCons msg additionalInfo = logItem $ lpCons $ prtyInfo msg additionalInfo
 
-log :: forall s rc tc effs. (Show s, Show rc, Show tc, TestConfigClass tc, Titled rc, Member Logger effs) => s -> Eff effs ()
-log = (simpleLog :: (String -> LogProtocol rc tc) -> s -> Eff effs ()) Message
+log :: forall s effs. (Show s, Member Logger effs) => s -> Eff effs ()
+log = simpleLog Message
 
-log' :: forall s rc tc effs. (Show s, Show rc, Show tc, TestConfigClass tc, Titled rc, Member Logger effs) => s -> s -> Eff effs ()
-log' = (detailLog :: (DetailedInfo -> LogProtocol rc tc) -> s -> s -> Eff effs ()) Message'
+log' :: forall s effs. (Show s,  Member Logger effs) => s -> s -> Eff effs ()
+log' = detailLog  Message'
 
-logWaring :: forall s rc tc effs. (Show s, Show rc, Show tc, TestConfigClass tc, Titled rc, Member Logger effs) => s -> Eff effs ()
-logWaring = (simpleLog :: (String -> LogProtocol rc tc) -> s -> Eff effs ()) Warning
+logWarning :: forall s effs. (Show s, Member Logger effs) => s -> Eff effs ()
+logWarning = simpleLog Warning
 
-logWarning' :: forall s rc tc effs. (Show s, Show rc, Show tc, TestConfigClass tc, Titled rc, Member Logger effs) => s -> s -> Eff effs ()
-logWarning' = (detailLog :: (DetailedInfo -> LogProtocol rc tc) -> s -> s -> Eff effs ()) Warning'
+logWarning' :: forall s effs. (Show s, Member Logger effs) => s -> s -> Eff effs ()
+logWarning' = detailLog  Warning'
 
-logError :: forall s rc tc effs. (Show s, Show rc, Show tc, TestConfigClass tc, Titled rc, Member Logger effs) => s -> Eff effs ()
-logError =  (simpleLog :: (String -> LogProtocol rc tc) -> s -> Eff effs ()) (Error . UserError)
+logError :: forall s effs. (Show s, Member Logger effs) => s -> Eff effs ()
+logError = simpleLog (Error . UserError)
 
-logError' :: forall s rc tc effs. (Show s, Show rc, Show tc, TestConfigClass tc, Titled rc, Member Logger effs) => s -> s -> Eff effs ()
-logError' = (detailLog :: (DetailedInfo -> LogProtocol rc tc) -> s -> s -> Eff effs ()) (Error . UserError')
+logError' :: forall s effs. (Show s, Member Logger effs) => s -> s -> Eff effs ()
+logError' = detailLog  (Error . UserError')
 
 logConsoleInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsoleInterpreter = interpretM $ \(LogItem lp) -> P.print lp
 
 logDocInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocInterpreter = interpret $ \(LogItem lp) -> tell $ dList lp
+
+showPretty :: Show a => a -> String
+showPretty = toStr . ppShow
+
+prtyInfo :: (Show s, Show s1)  => s -> s1 -> DetailedInfo
+prtyInfo msg adInfo = Info (showPretty msg) (showPretty adInfo)
 
 putLines :: String -> IO ()
 putLines s = P.sequence_ $ P.putStrLn . toList <$> S.lines s
@@ -63,10 +63,10 @@ ppFilterItem =
       (\cfg -> "accepted: " <> title cfg)
 
 
-logString :: (Show rc, Show tc, TestConfigClass tc, Titled rc)=> LogProtocol rc tc -> String
+logString :: LogProtocol a -> String
 logString =
             let
-              hdr l h c = l <> " " <> h <> " " <> l <> "\n" <> c
+              hdr l h = l <> " " <> h <> " " <> l
               subHeader = hdr "----"
               header = hdr "===="
             in
@@ -74,20 +74,20 @@ logString =
                    Message s -> s
                    Message' detailedInfo -> showPretty detailedInfo
 
-                   Warning s -> subHeader "Warning" s
-                   Warning' detailedInfo -> subHeader "Warning" $ showPretty detailedInfo
+                   Warning s -> subHeader "Warning" <> "\n" <> s
+                   Warning' detailedInfo -> subHeader "Warning" <> "\n" <>  showPretty detailedInfo
 
-                   er@(Error e) -> showPretty er
-                   FilterLog liFilterInfo -> subHeader "Filter Log" $ foldl' (\acc ip -> acc <> ip <> "\n") "" (ppFilterItem <$> liFilterInfo) 
+                   e@(Error _) -> showPretty e
+                   FilterLog liFilterInfo -> subHeader "Filter Log" <> "\n" <> foldl' (\acc ip -> acc <> ip <> "\n") "" (ppFilterItem <$> liFilterInfo)
 
-                   StartRun rc -> undefined
-                   StartGroup s -> "==== Group: " <> s <> " ===="
+                   StartRun rc -> header "Test Run: " <> title rc <> "\n" <> showPretty rc
+                   StartGroup s -> header "Group: " <> s
 
                    StartTest tc -> undefined
-                   StartIteration test iid  -> undefined
-                   EndIteration test info -> undefined
+                   StartIteration test iid -> undefined
+                   EndIteration test iid info -> undefined
+                   EndRun rc -> undefined
 
--- \(LogItem lp) -> P.putStrLn $ ppShow lp
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsolePrettyInterpreter = interpretM $ \(LogItem lp) -> putLines $ logString lp
 

@@ -34,6 +34,9 @@ type FullIOEffects = '[FileSystem, Logger, Ensure, Error FileSystemError, Error 
 executeInIOConsoleRaw :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
 executeInIOConsoleRaw = executeInIO logConsoleInterpreter
 
+executeInIOConsolePretty :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
+executeInIOConsolePretty = executeInIO logConsolePrettyInterpreter
+
 executeInIO :: forall a. (forall effs. LastMember IO effs => Eff (Logger ': effs) ~> Eff effs) -> Eff FullIOEffects a -> IO (Either AppError a)
 executeInIO logger app = handleIOException $ unifyFSEnsureError <$> runM
                                  (

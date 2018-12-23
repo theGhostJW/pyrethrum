@@ -20,7 +20,7 @@ import Control.Exception as E
 
 
 ioRun :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-ioRun pln = testRun pln filters testInfoFull executeInIOConsoleRaw runConfig
+ioRun pln = testRun pln filters testInfoFull executeInIOConsolePretty runConfig
 
 docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
 docRun pln = extractDocLog $ testRun pln filters testInfoFull executeDocumentRaw runConfig

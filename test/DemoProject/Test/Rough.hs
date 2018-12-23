@@ -14,9 +14,12 @@ import           DSL.FileSystem
 import           DSL.Interpreter
 import qualified Prelude as P
 import           Foundation.Extended             hiding (readFile, writeFile, Item)
+import           Foundation.String
 import           Runner as R
 import Type.Reflection
 import Data.Aeson.TH
+import GHC.Generics
+import qualified Data.Serialize as S
 
 type Effects effs = EFFFileSystem effs
 
@@ -29,16 +32,40 @@ config = testConfig {
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig (IID 120)
 
+
+
+data StrictReadFailure' = Failure ValidationFailure
+                             | IncompleteRead -- should never happen as is strict
+                             deriving Show
+
+type UArrayWord8 = UArray Word8
+
+data StrictReadError'  = StrictReadError {
+  error     :: StrictReadFailure,
+  remainder :: UArray Word8
+} deriving (Show, Generic)
+
+type StrictReadResult' = Either StrictReadError String
+
 data ApState = ApState {
   itemId   :: Int,
   filePath :: Path Abs File,
   fileText :: StrictReadResult
+} deriving (Show, Generic)
+
+-- instance S.Serialize ApState
+
+data ApStateDeleteMe = ApStateDeleteMe {
+  itemId   :: Int,
+--  filePath :: Path Abs File,
+ fileText :: StrictReadResult'
 } deriving Show
 
 interactor :: forall effs. Effects effs => (ItemClass Item ValState) => RunConfig -> Item -> Eff effs ApState
 interactor RunConfig{..} Item{..} = do
                                       writeFile path $ pre  <> " ~ " <> post <> " !!"
                                       ensure "Blahh" $ P.even iid
+                                      log "Hi"
                                       txt <- readFile path
                                       pure $ ApState iid path txt
 
@@ -105,6 +132,10 @@ instance ItemClass Item ValState where
   whenClause = pre
   thenClause = post
   checkList = checks
+
+-- $(deriveJSON defaultOptions ''Item)
+-- $(deriveJSON defaultOptions ''StrictReadError')
+-- $(deriveToJSON defaultOptions ''ApStateDeleteMe)
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -28,6 +28,9 @@ dependencies:
   - extra
   - transformers-either
   - aeson
+  - yaml
+  - cereal
+  - pretty-show
 
 ghc-options:
   - -fmax-pmcheck-iterations=10000000
@@ -35,7 +38,7 @@ ghc-options:
   # - -O2
   - -Wall
   #- -Werror
-  - -fprint-potential-instances
+  # - -fprint-potential-instances
   - -Wcompat
   - -Wincomplete-record-updates
   - -Wincomplete-uni-patterns
@@ -102,7 +105,6 @@ library:
     - time
     - either
     - deepseq
-    - yaml
 
 tests:
   pyrethrum-test:

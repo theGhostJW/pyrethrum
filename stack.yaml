@@ -42,12 +42,15 @@ packages:
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
+#
+allow-newer: true
 
 # Extra package databases containing global packages
 # extra-package-dbs: []
 extra-deps:
 - foundation-edge-0.0.3
 - transformers-either-0.1.1
+- pretty-show-1.9.4
 - git: https://theghostjw@bitbucket.org/principledautomation/extensions.git
   commit: "89899cb"
 

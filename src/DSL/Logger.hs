@@ -7,7 +7,7 @@ import           Foundation.Extended
 import           Foundation.String as S
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Writer
-import Text.Show.Pretty
+import Text.Show.Pretty as PP
 import TestAndRunConfig
 import qualified Prelude as P
 
@@ -69,24 +69,26 @@ logString =
               hdr l h = l <> " " <> h <> " " <> l
               subHeader = hdr "----"
               header = hdr "===="
+              iterId tst iid = tst <> " / item " <> show iid
+              newLn = "\n" :: String
             in
               \case
                    Message s -> s
                    Message' detailedInfo -> showPretty detailedInfo
 
-                   Warning s -> subHeader "Warning" <> "\n" <> s
-                   Warning' detailedInfo -> subHeader "Warning" <> "\n" <>  showPretty detailedInfo
+                   Warning s -> subHeader "Warning" <> newLn <> s
+                   Warning' detailedInfo -> subHeader "Warning" <> newLn <>  showPretty detailedInfo
 
                    e@(Error _) -> showPretty e
-                   FilterLog liFilterInfo -> subHeader "Filter Log" <> "\n" <> foldl' (\acc ip -> acc <> ip <> "\n") "" (ppFilterItem <$> liFilterInfo)
+                   FilterLog liFilterInfo -> subHeader "Filter Log" <> newLn <> foldl' (\acc ip -> acc <> ip <> newLn) "" (ppFilterItem <$> liFilterInfo)
 
-                   StartRun rc -> header "Test Run: " <> title rc <> "\n" <> showPretty rc
-                   StartGroup s -> header "Group: " <> s
+                   StartRun rc -> header ("Test Run: " <> title rc) <> newLn <> showPretty rc
+                   StartGroup s -> header $ "Group: " <> s
 
-                   StartTest tc -> undefined
-                   StartIteration test iid -> undefined
-                   EndIteration test iid info -> undefined
-                   EndRun rc -> undefined
+                   StartTest tc -> subHeader ("Start Test: " <> moduleAddress tc <> " - " <> title tc)
+                   StartIteration test iid -> subHeader ("Start Iteration: " <> iterId test iid)
+                   EndIteration test iid info -> subHeader ("End Iteration: " <> iterId test iid) <> newLn <> info
+                   EndRun rc -> header "End Run"
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsolePrettyInterpreter = interpretM $ \(LogItem lp) -> putLines $ logString lp

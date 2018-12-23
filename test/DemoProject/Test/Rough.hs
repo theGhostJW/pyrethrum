@@ -202,9 +202,13 @@ demo2 = showEffs2 test2
 -- 11. test case end point ✔
 -- 12. logging to file
 --    12.01 add hoc and results logging to the same file
---    12.02 include test path in log
+--    12.02 include test path in log  ✔
 -- 13. Log Formatting and Report Generation
--- 13.1 ~ generalised log type / log protocol
+-- 13.1 ~ generalised log type / log protocol  ✔
 -- 13.2 ~ serialisation format
+    -- log to file
+    -- log to both
+    -- log summary - data types -> print
+
 -- 14.0 - hedgehog / randomiser
 -- 15.0 ~ report generation

@@ -13,7 +13,6 @@ data Ensure r where
 
 type Ensurable a = Eff '[Ensure, Error EnsureError] a
 
-
 ensure :: Member Ensure effs => String -> Bool -> Eff effs ()
 ensure err condition = send $ Ensure err condition
 

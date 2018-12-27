@@ -12,6 +12,8 @@ data LogProtocol a where
   Warning :: String -> LogProtocol String
   Warning' :: DetailedInfo -> LogProtocol DetailedInfo
 
+  IOAction :: String -> LogProtocol String
+
   Error :: AppError -> LogProtocol AppError
   FilterLog :: (Show tc, Eq tc, TestConfigClass tc) => [Either (FilterRejection tc) tc] -> LogProtocol tc
 

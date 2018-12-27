@@ -10,6 +10,7 @@ import           Control.Monad.Freer.Writer
 import Text.Show.Pretty as PP
 import TestAndRunConfig
 import qualified Prelude as P
+import System.IO
 
 data Logger r where
  LogItem :: LogProtocol a -> Logger ()
@@ -53,8 +54,8 @@ showPretty = toStr . ppShow
 prtyInfo :: (Show s, Show s1)  => s -> s1 -> DetailedInfo
 prtyInfo msg adInfo = Info (showPretty msg) (showPretty adInfo)
 
-putLines :: String -> IO ()
-putLines s = P.sequence_ $ P.putStrLn . toList <$> S.lines s
+putLines :: Handle -> String -> IO ()
+putLines hOut s = P.sequence_ $ hPutStrLn hOut . toList <$> S.lines s
 
 ppFilterItem :: Titled tc => Either (FilterRejection tc) tc -> String
 ppFilterItem =
@@ -91,7 +92,7 @@ logString =
                    EndRun rc -> header "End Run"
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
-logConsolePrettyInterpreter = interpretM $ \(LogItem lp) -> putLines $ logString lp
+logConsolePrettyInterpreter = interpretM $ \(LogItem lp) -> putLines stdout $ logString lp
 
 logDocPrettyInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocPrettyInterpreter = interpret $ \(LogItem lp) -> tell $ dList $ ppShow lp

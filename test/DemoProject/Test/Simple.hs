@@ -21,8 +21,6 @@ config = testConfig {
   header = "This Simple Test Only Uses Ensure Effects"
 }
 
-jw = endpoint
-
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig (IID 123)
 

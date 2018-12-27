@@ -99,7 +99,7 @@ testEndpoint ::
      -> Either FilterError (Set Int)
      -> (forall m1 m a. TestPlan m1 m a FullIOEffects)
      -> IO ()
-testEndpoint = testEndpointBase filters testInfoFull executeInIOConsoleRaw
+testEndpoint = testEndpointBase filters testInfoFull executeInIOConsolePretty
 
 testEndpointDoc ::
      String

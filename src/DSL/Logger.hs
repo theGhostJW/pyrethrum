@@ -74,6 +74,8 @@ logString =
               newLn = "\n" :: String
             in
               \case
+                   IOAction msg -> "IO Action: " <> showPretty msg
+
                    Message s -> s
                    Message' detailedInfo -> showPretty detailedInfo
 

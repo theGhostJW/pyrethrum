@@ -40,7 +40,7 @@ runNZInIO = testRun plan filters testInfoFull executeInIOConsoleRaw runConfig {c
 runDocument :: DList String
 runDocument = docRun plan
 
-validPlan :: forall m m1 effs a. EFFFileSystem effs =>
+validPlan :: forall m m1 effs a. EFFAllEffects effs =>
   PreRun effs
   -> PreRun effs
   -> PreRun effs
@@ -71,7 +71,7 @@ validPlan ro0 gh0 ro1 gh1 f =
 
     ]
 
-plan :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
+plan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 plan = validPlan doNothing doNothing doNothing doNothing
 
 alwaysFailCheck :: PreRun effs
@@ -80,7 +80,7 @@ alwaysFailCheck = PreRun {
   checkHasRun = pure False
 }
 
-testRunFailHomeG2 :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
+testRunFailHomeG2 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testRunFailHomeG2 = validPlan doNothing doNothing doNothing alwaysFailCheck
 
 runFailHomeG2IO :: IO ()
@@ -89,7 +89,7 @@ runFailHomeG2IO = ioRun testRunFailHomeG2
 runFailHomeG2Document :: DList String
 runFailHomeG2Document = docRun testRunFailHomeG2
 
-testRunFailRolloverG1 :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
+testRunFailRolloverG1 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testRunFailRolloverG1 = validPlan alwaysFailCheck doNothing doNothing doNothing
 
 runFailRolloverG1Document :: DList String
@@ -107,7 +107,7 @@ exceptionInCheck = PreRun {
   checkHasRun = ioException
 }
 
-testRunFailExceptG2GoHomeCheck :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
+testRunFailExceptG2GoHomeCheck :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testRunFailExceptG2GoHomeCheck = validPlan doNothing doNothing doNothing exceptionInCheck
 
 runExceptG2GoHomeCheckIO :: IO ()
@@ -119,7 +119,7 @@ exceptionInRollover = PreRun {
   checkHasRun = pure True
 }
 
-testRunExceptG1Rollover:: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
+testRunExceptG1Rollover:: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testRunExceptG1Rollover = validPlan exceptionInRollover doNothing doNothing doNothing
 
 runExceptG1Rollover :: IO ()
@@ -131,7 +131,7 @@ justLogPreRun stage = PreRun {
   checkHasRun = log ("Check Action Run: " <> show stage) $> True
 }
 
-testG1GoHomeLogging:: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
+testG1GoHomeLogging:: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testG1GoHomeLogging = validPlan (justLogPreRun Rollover) (justLogPreRun GoHome) doNothing doNothing
 
 justLogPreRunFailCheck :: EFFLogger effs => PreTestStage -> PreRun effs
@@ -140,5 +140,5 @@ justLogPreRunFailCheck stage = PreRun {
   checkHasRun = log ("Check Action Run: " <> show stage) $> False
 }
 
-testG1GoHomeLoggingFailCheck :: forall m m1 effs a. EFFFileSystem effs => TestPlan m1 m a effs
+testG1GoHomeLoggingFailCheck :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testG1GoHomeLoggingFailCheck = validPlan (justLogPreRun Rollover) (justLogPreRunFailCheck GoHome) doNothing doNothing

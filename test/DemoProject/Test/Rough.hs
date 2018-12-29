@@ -12,6 +12,7 @@ import           Control.Monad.Freer
 import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter
+import           DSL.ArbitraryIO
 import qualified Prelude as P
 import           Foundation.Extended             hiding (readFile, writeFile, Item)
 import           Foundation.String
@@ -22,7 +23,7 @@ import GHC.Generics
 import qualified Data.Serialize as S
 import qualified System.Environment as E
 
-type Effects effs = Members '[Logger, Ensure, FileSystem] effs
+type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
 
 config :: TestConfig
 config = testConfig {
@@ -47,6 +48,7 @@ interactor RunConfig{..} Item{..} = do
                                       writeFile path $ pre  <> " ~ " <> post <> " !!"
                                       ensure "Blahh" $ P.even iid
                                       log "Hi"
+                                      arbitraryIO "This is an arbitrary Put Line" () (putStrLn "Hello from random action")
                                       txt <- readFile path
                                       pure $ ApState  {
                                         itemId  = iid,
@@ -132,7 +134,7 @@ instance ItemClass Item ValState where
 
 newtype WithEffects_ es0 es1 a = WithEffects { unWithEffects :: Members es0 es1 => a }
 --
-type EFileSystem2 = '[Logger, Ensure, FileSystem]
+type EFileSystem2 = '[Logger, Ensure, ArbitraryIO, FileSystem]
 type WithEffects = WithEffects_ EFileSystem2
 --
 test2 :: forall effs. WithEffects effs (Test Item effs ApState ValState)

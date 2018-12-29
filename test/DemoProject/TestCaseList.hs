@@ -25,8 +25,11 @@ ioRun pln = testRun pln filters testInfoFull executeInIOConsolePretty runConfig
 ioRunRaw :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 ioRunRaw pln = testRun pln filters testInfoFull executeInIOConsoleRaw runConfig
 
+docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
+docRunRaw pln = extractDocLog $ testRun pln filters testInfoFull executeDocumentRaw runConfig
+
 docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
-docRun pln = extractDocLog $ testRun pln filters testInfoFull executeDocumentRaw runConfig
+docRun pln = extractDocLog $ testRun pln filters testInfoFull executeDocumentPretty runConfig
 
 runInIO :: IO ()
 runInIO = ioRun plan
@@ -39,6 +42,9 @@ runNZInIO = testRun plan filters testInfoFull executeInIOConsoleRaw runConfig {c
 
 runDocument :: DList String
 runDocument = docRun plan
+
+runDocumentToConsole :: IO ()
+runDocumentToConsole = sequence_ . toList $ putStrLn <$> runDocument
 
 validPlan :: forall m m1 effs a. EFFAllEffects effs =>
   PreRun effs

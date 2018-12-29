@@ -3,6 +3,7 @@ module DSL.Logger where
 
 import DSL.Common
 import  DSL.LogProtocol
+import           Foundation.List.DList
 import           Foundation.Extended
 import           Foundation.String as S
 import           Control.Monad.Freer
@@ -96,5 +97,8 @@ logString =
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsolePrettyInterpreter = interpretM $ \(LogItem lp) -> putLines stdout $ logString lp
 
+toDList :: [String] -> DList String
+toDList = fromList
+
 logDocPrettyInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
-logDocPrettyInterpreter = interpret $ \(LogItem lp) -> tell $ dList $ ppShow lp
+logDocPrettyInterpreter = interpret $ \(LogItem lp) -> tell $ toDList $ lines $ logString lp

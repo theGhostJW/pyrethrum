@@ -9,6 +9,7 @@ import           DSL.Logger
 import           Check
 import DemoProject.Config
 import           Control.Monad.Freer
+import           Control.Monad
 import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter
@@ -34,7 +35,7 @@ config = testConfig {
 jw = endpoint
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-endpoint = ep runConfig All
+endpoint = ep runConfig $ IID 140
 
 data ApState = ApState {
   itemId   :: Int,
@@ -50,6 +51,10 @@ interactor RunConfig{..} Item{..} = do
                                       log "Hi"
                                       arbitraryIO "This is an arbitrary Put Line" () (putStrLn "Hello from random action")
                                       txt <- readFile path
+
+                                      when (iid == 140)
+                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" (Right "tHIS WILL BLOW UP") (readFileUTF8 [absfile|C:\Vids\SystemDesign\Blahhh.txt|])
+
                                       pure $ ApState  {
                                         itemId  = iid,
                                         filePath = path,

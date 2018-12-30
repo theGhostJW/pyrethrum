@@ -23,10 +23,10 @@ arbitraryIODocInterpreter = interpret $ \(ArbitraryIO msg def _) -> logItem (IOA
 arbitraryIOIOInterpreter :: Members '[Error AppError, Logger, IO] effs => Eff (ArbitraryIO ': effs) a -> Eff effs a
 arbitraryIOIOInterpreter =
                           let
-                            handleException action = do
+                            handleException msg action = do
                                                        r <- send (try action)
                                                        case r of
-                                                         Left (e :: IOException) -> throwError (IOError e)
+                                                         Left (e :: IOException) -> throwError (IOError' ("Exception raised when executing arbituary IO action with message: " <> msg) e)
                                                          Right f -> pure f
                            in
-                            interpret $ \(ArbitraryIO msg _ actn) -> logItem (IOAction msg) *> handleException actn
+                            interpret $ \(ArbitraryIO msg _ actn) -> logItem (IOAction msg) *> handleException msg actn

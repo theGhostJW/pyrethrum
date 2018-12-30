@@ -47,7 +47,8 @@ data AppError =
             PreTestCheckExecutionError PreTestStage String AppError|
             PreTestCheckError PreTestStage String |
 
-            IOError IOException
+            IOError IOException |
+            IOError' String IOException
 
             deriving (Show, Eq)
 

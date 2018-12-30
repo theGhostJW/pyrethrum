@@ -58,11 +58,15 @@ prtyInfo msg adInfo = Info (showPretty msg) (showPretty adInfo)
 putLines :: Handle -> String -> IO ()
 putLines hOut s = P.sequence_ $ hPutStrLn hOut . toList <$> S.lines s
 
-ppFilterItem :: Titled tc => Either (FilterRejection tc) tc -> String
+ppFilterItem :: TestConfigClass tc => Either (FilterRejection tc) tc -> String
 ppFilterItem =
-    either
-      (\r -> "rejected: " <> title (cfg r) <> " - " <> reason r)
-      (\cfg -> "accepted: " <> title cfg)
+    let
+      description :: TestConfigClass cfg => cfg -> String
+      description cnfg = moduleAddress cnfg <> " - " <> title cnfg
+    in
+      either
+        (\r -> "rejected: " <> description (cfg r) <> " - Reason: " <> reason r)
+        (\cfg -> "accepted: " <> description cfg)
 
 
 logString :: LogProtocol a -> String

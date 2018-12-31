@@ -58,8 +58,8 @@ prtyInfo msg adInfo = Info (showPretty msg) (showPretty adInfo)
 putLines :: Handle -> String -> IO ()
 putLines hOut s = P.sequence_ $ hPutStrLn hOut . toList <$> S.lines s
 
-ppFilterItem :: TestConfigClass tc => Either (FilterRejection tc) tc -> String
-ppFilterItem =
+prettyPrintFilterItem :: TestConfigClass tc => Either (FilterRejection tc) tc -> String
+prettyPrintFilterItem =
     let
       description :: TestConfigClass cfg => cfg -> String
       description cnfg = moduleAddress cnfg <> " - " <> title cnfg
@@ -88,7 +88,8 @@ logString =
                    Warning' detailedInfo -> subHeader "Warning" <> newLn <>  showPretty detailedInfo
 
                    e@(Error _) -> showPretty e
-                   FilterLog liFilterInfo -> subHeader "Filter Log" <> newLn <> foldl' (\acc ip -> acc <> ip <> newLn) "" (ppFilterItem <$> liFilterInfo)
+                   FilterLog fltrInfos -> subHeader "Filter Log" <> newLn <>
+                                                foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
                    StartRun rc -> header ("Test Run: " <> title rc) <> newLn <> showPretty rc
                    StartGroup s -> header $ "Group: " <> s
@@ -101,8 +102,12 @@ logString =
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsolePrettyInterpreter = interpretM $ \(LogItem lp) -> putLines stdout $ logString lp
 
-toDList :: [String] -> DList String
-toDList = fromList
+logToHandlePrettyInterpreter :: LastMember IO effs => Handle -> Eff (Logger ': effs) ~> Eff effs
+logToHandlePrettyInterpreter h = interpretM $ \(LogItem lp) -> putLines h $ logString lp
 
 logDocPrettyInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
-logDocPrettyInterpreter = interpret $ \(LogItem lp) -> tell $ toDList $ lines $ logString lp
+logDocPrettyInterpreter = let
+                            toDList :: [String] -> DList String
+                            toDList = fromList
+                          in
+                            interpret $ \(LogItem lp) -> tell $ toDList $ lines $ logString lp

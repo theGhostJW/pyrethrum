@@ -11,7 +11,6 @@ import           DSL.Logger
 import           DSL.ArbitraryIO
 import           Foundation.List.DList
 import           Foundation.Extended as F
-import Data.Either.Combinators
 import Control.Exception as E
 
 type EFFLogger effs = Member Logger effs

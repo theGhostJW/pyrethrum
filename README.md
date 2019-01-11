@@ -1,4 +1,4 @@
-# pyrethrum
+# Pyrethrum
 
 This project is a work in progress is not close to being in a usable state.
 

@@ -36,7 +36,7 @@ items  = [
           i 150 "Pre" "Post" mempty
         ]
 
-chkFilterError flter msg itms = chkErrorContains show msg $ filterredItemIds flter (itms ::  [TestItem])
+chkFilterError flter msg itms = chkLeftContains msg $ filterredItemIds flter (itms ::  [TestItem])
 
 chkFilter flter expted itms = chkEq (Right $ S.fromList expted) $ filterredItemIds flter itms
 chkFilter' flter expted itms = chkEq (Right $ S.singleton expted) $ filterredItemIds flter itms

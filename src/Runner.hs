@@ -18,7 +18,6 @@ import           Runner.Internal.ItemFilters     as InternalFuncs (ItemFilter (.
 import           ItemClass
 import qualified Prelude             as P
 import           DSL.Interpreter
-import Data.Either
 import qualified Data.Set as S
 import TestAndRunConfig as C
 import Control.Monad
@@ -151,7 +150,7 @@ runApState interactor prepState agg rc intrprt itm = let
                                                                 ethVs
                                                      in
                                                         (runVals <$>) <$> intrprt (interactor rc itm)
-              
+
 runTestItems :: forall i as vs tc rc effs m. (Show i, Show as, Show vs, Show tc, Eq tc, Monad m, TestConfigClass tc, ItemClass i vs, Member Logger effs) =>
       tc
       -> Maybe (S.Set Int)                                                    -- target Ids

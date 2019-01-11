@@ -103,7 +103,6 @@ library:
   dependencies:
     - listsafe
     - time
-    - either
     - deepseq
 
 tests:

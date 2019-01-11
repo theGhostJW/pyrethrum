@@ -8,7 +8,7 @@ import           Foundation.Extended
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import qualified Control.Monad as Monad
-import           Control.Exception
+import           Control.Exception as E
 import           Data.Functor
 
 data ArbitraryIO r where
@@ -24,7 +24,7 @@ arbitraryIOIOInterpreter :: Members '[Error AppError, Logger, IO] effs => Eff (A
 arbitraryIOIOInterpreter =
                           let
                             handleException msg action = do
-                                                       r <- send (try action)
+                                                       r <- send (E.try action)
                                                        case r of
                                                          Left (e :: IOException) -> throwError (IOError' ("Exception raised when executing arbituary IO action with message: " <> msg) e)
                                                          Right f -> pure f

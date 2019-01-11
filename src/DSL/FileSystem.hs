@@ -6,7 +6,7 @@ import           Data.Functor
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.Writer
-import           Control.Exception
+import           Control.Exception as E
 
 default (String)
 
@@ -28,7 +28,7 @@ fileSystemIOInterpreter :: Members '[Error FileSystemError, IO] effs => Eff (Fil
 fileSystemIOInterpreter =
                           let
                             handleException action handler = do
-                                                               r <- send (try action)
+                                                               r <- send (E.try action)
                                                                case r of
                                                                  Left (e :: IOException) -> throwError (handler e)
                                                                  Right f -> pure f

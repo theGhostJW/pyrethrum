@@ -52,7 +52,7 @@ extra-deps:
 - transformers-either-0.1.1
 - pretty-show-1.9.4
 - git: https://theghostjw@bitbucket.org/principledautomation/extensions.git
-  commit: "89899cb"
+  commit: "4bc8ec3"
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

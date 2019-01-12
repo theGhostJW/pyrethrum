@@ -2,13 +2,14 @@
 
 module AuxFiles where
 
-import           Foundation.Extended
+import Foundation.Extended as F
 import qualified Prelude as P
 import Paths_pyrethrum
 import Data.Time
 import Data.Fixed
 import Data.Time.Calendar
 import Data.Time.Clock
+import qualified System.IO as S
 
 binDir :: IO AbsDir
 binDir = parseAbsDir =<< getBinDir
@@ -71,7 +72,10 @@ logFilePath now suffix = do
                             (pure . Left . P.userError . toCharList . show)
                             tempFile
 
-logHandle = do
-              now <- getCurrentTime
-              fp <- logFilePath now "raw"
-              undefined
+logFileHandle :: IO (Either P.IOError S.Handle)
+logFileHandle = do
+                  now <- getCurrentTime
+                  fp <- logFilePath now "raw"
+                  eitherf fp
+                    (pure . Left)
+                    (\pth -> Right <$> S.openFile (toFilePath pth) S.WriteMode)

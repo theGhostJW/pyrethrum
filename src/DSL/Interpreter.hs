@@ -12,6 +12,7 @@ import           DSL.ArbitraryIO
 import           Foundation.List.DList
 import           Foundation.Extended as F
 import Control.Exception as E
+import AuxFiles
 
 type EFFLogger effs = Member Logger effs
 type EFFEnsureLog effs = (Members '[Logger, Ensure] effs)
@@ -38,6 +39,18 @@ executeInIOConsoleRaw = executeInIO logConsoleInterpreter
 
 executeInIOConsolePretty :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
 executeInIOConsolePretty = executeInIO logConsolePrettyInterpreter
+
+-- executeInIOFilePretty :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
+-- executeInIOFilePretty effs = do
+--                                 h <- logFileHandle
+--                                 eitherf h
+--                                   (pure . Left . IOError)
+--                                   (\h ->
+--                                       let
+--                                         loggr = logToHandlePrettyInterpreter h
+--                                       in
+--                                        undefined -- executeInIO loggr effs
+--                                   )
 
 type FullIOEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, Error FileSystemError, Error EnsureError, Error AppError, IO]
 type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, Error EnsureError]

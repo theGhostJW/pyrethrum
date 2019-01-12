@@ -100,7 +100,7 @@ logString =
                    EndRun rc -> header "End Run"
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
-logConsolePrettyInterpreter = interpretM $ \(LogItem lp) -> putLines stdout $ logString lp
+logConsolePrettyInterpreter = logToHandlePrettyInterpreter stdout
 
 logToHandlePrettyInterpreter :: LastMember IO effs => Handle -> Eff (Logger ': effs) ~> Eff effs
 logToHandlePrettyInterpreter h = interpretM $ \(LogItem lp) -> putLines h $ logString lp

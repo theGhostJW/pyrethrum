@@ -67,7 +67,7 @@ newtype ValState = V {
                     iidx10 :: Int
                   } deriving Show
 
--- change to Ensure eff
+
 prepState :: ApState -> Ensurable ValState
 prepState ApState{..} = do
                           ensure  "I do not like 110 in prepstate" (itemId /= 110)

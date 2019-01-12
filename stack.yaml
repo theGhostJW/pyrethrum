@@ -50,6 +50,7 @@ allow-newer: true
 extra-deps:
 - foundation-edge-0.0.3
 - transformers-either-0.1.1
+- time-1.9.2
 - pretty-show-1.9.4
 - git: https://github.com/theGhostJW/reexports-and-extensions
   commit: "29efb249618405cc93ebc1c062c6ec087ad17250"

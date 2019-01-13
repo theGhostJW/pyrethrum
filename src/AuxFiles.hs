@@ -47,20 +47,23 @@ timeStamp = do
 logFileName :: UTCTime -> String -> String
 logFileName now suffix =
   let
-    leftInYear :: Int
     leftInYear = let
-                  (y, m, d)  = toGregorian $ utctDay now
-                  nyd = UTCTime (fromGregorian (y + 1) 1 1) 0
+                   (y, m, d)  = toGregorian $ utctDay now
+                   nyd = UTCTime (fromGregorian (y + 1) 1 1) 0
+                   daysDif = diffDays (utctDay nyd) (utctDay now)
+                   msPerDay = 24 * 60 * 60 * 1000
+                   timeDifm = fromIntegral (diffTimeToPicoseconds $ utctDayTime nyd P.- utctDayTime now) / 1000000000000
                  in
-                  P.round $ nominalDiffTimeToSeconds $ diffUTCTime nyd now
+                   fromIntegral (daysDif * msPerDay) + timeDifm
 
     nowStr :: String
-    nowStr = toStr $ formatTime defaultTimeLocale (toCharList "%F %X") now
+    nowStr = toStr $ formatTime defaultTimeLocale (toCharList "%F %H_%M_%S") now
   in
-    show leftInYear <> "-" <> nowStr <> "-" <> suffix <> ".log"
+    show leftInYear <> " " <> nowStr <> " " <> suffix <> ".log"
 
 _logFileName = do
-                putStrLn $ logFileName (UTCTime (fromGregorian 2019 1 10) 500) "raw"
+                putStrLn $ logFileName (UTCTime (fromGregorian 2019 1 10) 86399) "raw"
+                putStrLn $ logFileName (UTCTime (fromGregorian 2019 1 10) 86399.547) "raw"
                 putStrLn $ logFileName (UTCTime (fromGregorian 2019 1 10) 700) "raw"
                 putStrLn $ logFileName (UTCTime (fromGregorian 2019 1 20) 500) "raw"
 
@@ -79,3 +82,5 @@ logFileHandle = do
                   eitherf fp
                     (pure . Left)
                     (\pth -> Right <$> S.openFile (toFilePath pth) S.WriteMode)
+
+--_logFileHandle =  do

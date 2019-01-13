@@ -47,14 +47,14 @@ timeStamp = do
 logFileName :: UTCTime -> String -> String
 logFileName now suffix =
   let
-    leftInYear = let
-                   (y, m, d)  = toGregorian $ utctDay now
-                   nyd = UTCTime (fromGregorian (y + 1) 1 1) 0
-                   daysDif = diffDays (utctDay nyd) (utctDay now)
-                   msPerDay = 24 * 60 * 60 * 1000
-                   timeDifm = fromIntegral (diffTimeToPicoseconds $ utctDayTime nyd P.- utctDayTime now) / 1000000000000
-                 in
-                   fromIntegral (daysDif * msPerDay) + timeDifm
+    leftInYear =  let
+                    (y, m, d)  = toGregorian $ utctDay now
+                    nyd = UTCTime (fromGregorian (y + 1) 1 1) 0
+                    daysDif = diffDays (utctDay nyd) (utctDay now)
+                    msPerDay = 24 * 60 * 60 * 1000
+                    timeDifm = fromIntegral (diffTimeToPicoseconds $ utctDayTime nyd P.- utctDayTime now) / 1000000000000
+                  in
+                    fromIntegral (daysDif * msPerDay) + timeDifm
 
     nowStr :: String
     nowStr = toStr $ formatTime defaultTimeLocale (toCharList "%F %H_%M_%S") now

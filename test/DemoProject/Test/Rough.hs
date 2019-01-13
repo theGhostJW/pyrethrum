@@ -26,6 +26,30 @@ import qualified System.Environment as E
 
 type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
 
+-- PROBLEMS
+--  - HIE not compiling for ghc 8.6.3
+--  - HIE not working on windows for GHC 8.6.2
+
+--  - Intero not installing for 6.3 due to ghci-issues package index not availible
+--    -- 8.0.1, 8.0.2, 8.2.1, 8.2.2, 8.4.1, 8.4.2, 8.4.3, 8.6.1
+--  - clone intero change stack and intalled
+--  - installed stack-run with modifications found on github (custom stack.yaml added to intero directory)
+--  - neither haskelly or Haskello eunning in vs code (loading (endlessly) / no type information available)
+
+--  - rollback to ghc 8.4.2 rebuild pyrethru and hie - to as per issue 9725bc0bfcd1b0f112e5e7299d482168fbe1efb3
+--   HIE build fails
+--      -  src\Haskell\Ide\Engine\Plugin\GhcMod.hs:179:32: error:
+--      ot in scope: GM.getTypecheckedModuleGhc'
+--      either `GhcMod', `GhcMod.DynFlags', `GhcMod.Error', `GhcMod.Gap',
+--             `GhcMod.ModuleLoader', `GhcMod.Monad', `GhcMod.SrcUtils',
+--             `GhcMod.Types' nor `GhcMod.Utils' exports getTypecheckedModuleGhc'.
+--
+--      79 |                               (GM.getTypecheckedModuleGhc' (myLogger rfm) fp)
+--
+-- Update buildlatest.ps to point to yaml.8.4.2
+--  build using script + add one dependency
+-- works !!!!!! -- build agasin when HIE issues fixed
+
 config :: TestConfig
 config = testConfig {
   header = "This is a Rough Test",

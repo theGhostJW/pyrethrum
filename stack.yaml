@@ -18,7 +18,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: ghc-8.6.2
+resolver: ghc-8.4.2
 # nightly-2018-08-07
 
 # User packages to be built.
@@ -63,7 +63,6 @@ extra-deps:
 - extra-1.6.14@sha256:e3e1f379bdef036033ac59ac68e92cb03f88efa9aee448597c44e1a8ae96e779
 - foundation-0.0.21@sha256:4063eec656b8e32b3af8d918b052f4fd150522e9ab3e91a9b0f3505e0e73bf1e
 - freer-simple-1.2.1.0@sha256:85498b8e0b71d94361d432242d55a16c7647cffda98063a3216d8739abceb854
-- happy-1.19.9@sha256:f8c774230735a390c287b2980cfcd2703d24d8dde85a01ea721b7b4b4c82944f
 - haskell-lexer-1.0.2@sha256:1c84537dbd29809c1004ccb156552429de35fe77fab6dd484ac8deb318cc6b64
 - hedgehog-0.6.1@sha256:eaaf3dafbc7d2e126fea533679d5dd7e0e7c85063ddcedb477afef86a5e011d0
 - listsafe-0.1.0.1@sha256:066b02e56926b5bbdb68dec7e2f3b84c62c91898246abed3eb08006d94a41338
@@ -132,6 +131,9 @@ extra-deps:
 - unliftio-core-0.1.2.0@sha256:49d43dc863d14d89d91a676a968cea8d9f0030ad6ac95768747a44d0d273dd68
 - split-0.2.3.3@sha256:f1c7b12865e38d1e241ceef74c85eb81d82301022fea1a5012d8d9803af5e26f
 - vector-algorithms-0.8.0.1@sha256:94ef7560517dfd133157e0532ccf3c039477a8eef4b270fe59b52a036fc1f0a1
+- happy-1.19.9@sha256:f8c774230735a390c287b2980cfcd2703d24d8dde85a01ea721b7b4b4c82944f
+- tasty-discover-4.2.1@sha256:cd474a555cf524a82a294127588d91e7d93802c5fa276ea08b4f1f2bf6c37180
+- Glob-0.10.0@sha256:6ecdfb044f2fb9c3b3716c2093e5da0eeea2cd0f6aebac5cdf40979c038e836f
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

@@ -26,7 +26,7 @@ arbitraryIOIOInterpreter =
                             handleException msg action = do
                                                        r <- send (E.try action)
                                                        case r of
-                                                         Left (e :: IOException) -> throwError (IOError' ("Exception raised when executing arbituary IO action with message: " <> msg) e)
+                                                         Left (e :: IOException) -> throwError (AppIOError' ("Exception raised when executing arbituary IO action with message: " <> msg) e)
                                                          Right f -> pure f
                            in
                             interpret $ \(ArbitraryIO msg _ actn) -> logItem (IOAction msg) *> handleException msg actn

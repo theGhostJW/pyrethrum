@@ -28,7 +28,7 @@ tempDir :: IO (Either P.IOError AbsDir)
 tempDir = auxDir [reldir|temp|]
 
 logDir :: IO (Either P.IOError AbsDir)
-logDir = auxDir [reldir|log|]
+logDir = auxDir [reldir|logs|]
 
 tempFile :: RelFile -> IO (Either P.IOError AbsFile)
 tempFile = subPath tempDir
@@ -73,7 +73,7 @@ logFilePath now suffix = do
                           rf <- parseRelFileSafe $ toCharList $ logFileName now suffix
                           eitherf rf
                             (pure . Left . P.userError . toCharList . show)
-                            tempFile
+                            logFile
 
 logFileHandle :: IO (Either P.IOError S.Handle)
 logFileHandle = do

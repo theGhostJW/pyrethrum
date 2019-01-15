@@ -38,10 +38,10 @@ logWarning' :: forall s effs. (Show s, Member Logger effs) => s -> s -> Eff effs
 logWarning' = detailLog  Warning'
 
 logError :: forall s effs. (Show s, Member Logger effs) => s -> Eff effs ()
-logError = simpleLog (Error . UserError)
+logError = simpleLog (Error . AppUserError)
 
 logError' :: forall s effs. (Show s, Member Logger effs) => s -> s -> Eff effs ()
-logError' = detailLog  (Error . UserError')
+logError' = detailLog  (Error . AppUserError')
 
 logConsoleInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsoleInterpreter = interpretM $ \(LogItem lp) -> P.print lp
@@ -69,8 +69,8 @@ prettyPrintFilterItem =
         (\cfg -> "accepted: " <> description cfg)
 
 
-logString :: LogProtocol a -> String
-logString =
+logStrPP :: LogProtocol a -> String
+logStrPP =
             let
               hdr l h = l <> " " <> h <> " " <> l
               subHeader = hdr "----"
@@ -103,11 +103,11 @@ logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff
 logConsolePrettyInterpreter = logToHandlePrettyInterpreter stdout
 
 logToHandlePrettyInterpreter :: LastMember IO effs => Handle -> Eff (Logger ': effs) ~> Eff effs
-logToHandlePrettyInterpreter h = interpretM $ \(LogItem lp) -> putLines h $ logString lp
+logToHandlePrettyInterpreter h = interpretM $ \(LogItem lp) -> putLines h $ logStrPP lp
 
 logDocPrettyInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocPrettyInterpreter = let
                             toDList :: [String] -> DList String
                             toDList = fromList
                           in
-                            interpret $ \(LogItem lp) -> tell $ toDList $ lines $ logString lp
+                            interpret $ \(LogItem lp) -> tell $ toDList $ lines $ logStrPP lp

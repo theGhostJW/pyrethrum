@@ -11,8 +11,10 @@ import           DSL.Logger
 import           DSL.ArbitraryIO
 import           Foundation.List.DList
 import           Foundation.Extended as F
-import Control.Exception as E
 import AuxFiles
+import qualified System.IO as S
+import qualified Prelude as P
+
 
 type EFFLogger effs = Member Logger effs
 type EFFEnsureLog effs = (Members '[Logger, Ensure] effs)
@@ -32,7 +34,7 @@ flattenErrors = let
                             Left apErr -> Left apErr
 
 handleIOException :: IO (Either AppError a) -> IO (Either AppError a)
-handleIOException = E.handle $ pure . Left . IOError
+handleIOException = handle $ pure . Left . AppIOError
 
 executeInIOConsoleRaw :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
 executeInIOConsoleRaw = executeInIO logConsoleInterpreter
@@ -40,18 +42,24 @@ executeInIOConsoleRaw = executeInIO logConsoleInterpreter
 executeInIOConsolePretty :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
 executeInIOConsolePretty = executeInIO logConsolePrettyInterpreter
 
--- executeInIOFilePretty :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
--- executeInIOFilePretty effs = do
---                                 h <- logFileHandle
---                                 eitherf h
---                                   (pure . Left . IOError)
---                                   (\h ->
---                                       let
---                                         loggr = logToHandlePrettyInterpreter h
---                                       in
---                                        undefined -- executeInIO loggr effs
---                                   )
+executeInIOFilePretty :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
+executeInIOFilePretty effs = 
+   let 
+      releaseLogHandle :: S.Handle -> IO ()
+      releaseLogHandle = S.hClose
 
+      mkLeft :: P.IOError -> IO (Either AppError a)
+      mkLeft ioErr = pure $ Left $ AppIOError' "Run failed to start: failed create / open log file " ioErr
+
+      runEffects :: Eff FullIOEffects a -> S.Handle -> IO (Either AppError a)
+      runEffects efx h = executeInIO (logToHandlePrettyInterpreter h) efx
+   in 
+      do 
+         ehtHdl <- logFileHandle
+         eitherf ehtHdl
+            mkLeft
+            (\h -> bracket (pure h) S.hClose $ runEffects effs)
+      
 type FullIOEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, Error FileSystemError, Error EnsureError, Error AppError, IO]
 type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, Error EnsureError]
 

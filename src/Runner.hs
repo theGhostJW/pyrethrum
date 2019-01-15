@@ -243,11 +243,11 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
 
                                   verifyAction :: Either AppError Bool -> Either AppError ()
                                   verifyAction  = either
-                                                           (Left . PreTestCheckExecutionError stage (msgPrefix <> stageExLabel <> " check"))
+                                                           (Left . AppPreTestCheckExecutionError stage (msgPrefix <> stageExLabel <> " check"))
                                                            (\hmChk -> hmChk ?
                                                                           Right () $
                                                                           Left
-                                                                              $ PreTestCheckError stage
+                                                                              $ AppPreTestCheckError stage
                                                                                 $ msgPrefix
                                                                                 <> stageStr
                                                                                 <> " action ran without exception but completion check returned False. Looks like "
@@ -258,7 +258,7 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
                                 preRunRslt <- intrprt runAction
                                 runCheck <- intrprt checkHasRun
                                 pure $ either
-                                         (Left . PreTestError stage stageExLabel)
+                                         (Left . AppPreTestError stage stageExLabel)
                                          (\_ -> verifyAction runCheck)
                                          preRunRslt
 

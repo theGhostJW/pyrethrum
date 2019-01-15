@@ -36,19 +36,19 @@ data AppError =
             AppEnsureError EnsureError |
             AppFilterError FilterError |
 
-            NotImplementedError String |
+            AppNotImplementedError String |
 
-            GenericError String |
+            AppGenericError String |
 
-            UserError String |
-            UserError' DetailedInfo |
+            AppUserError String |
+            AppUserError' DetailedInfo |
 
-            PreTestError PreTestStage String AppError |
-            PreTestCheckExecutionError PreTestStage String AppError|
-            PreTestCheckError PreTestStage String |
+            AppPreTestError PreTestStage String AppError |
+            AppPreTestCheckExecutionError PreTestStage String AppError|
+            AppPreTestCheckError PreTestStage String |
 
-            IOError IOException |
-            IOError' String IOException
+            AppIOError IOException |
+            AppIOError' String IOException
 
             deriving (Show, Eq)
 

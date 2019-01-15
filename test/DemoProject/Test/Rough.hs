@@ -7,7 +7,7 @@ module DemoProject.Test.Rough where
 
 import           DSL.Logger
 import           Check
-import DemoProject.Config
+import           DemoProject.Config
 import           Control.Monad.Freer
 import           Control.Monad
 import           DSL.Ensure

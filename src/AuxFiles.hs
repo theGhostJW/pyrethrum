@@ -75,12 +75,12 @@ logFilePath now suffix = do
                             (pure . Left . P.userError . toCharList . show)
                             logFile
 
-logFileHandle :: IO (Either P.IOError S.Handle)
+logFileHandle :: IO (Either P.IOError (AbsFile, S.Handle))
 logFileHandle = do
                   now <- getCurrentTime
                   fp <- logFilePath now "raw"
                   eitherf fp
                     (pure . Left)
-                    (\pth -> Right <$> S.openFile (toFilePath pth) S.WriteMode)
+                    (\pth -> ((pth,) <$>) <$> (Right <$> S.openFile (toFilePath pth) S.WriteMode))
 
 --_logFileHandle =  do

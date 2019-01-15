@@ -42,24 +42,6 @@ executeInIOConsoleRaw = executeInIO logConsoleInterpreter
 executeInIOConsolePretty :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
 executeInIOConsolePretty = executeInIO logConsolePrettyInterpreter
 
-executeInIOFilePretty :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
-executeInIOFilePretty effs = 
-   let 
-      releaseLogHandle :: S.Handle -> IO ()
-      releaseLogHandle = S.hClose
-
-      mkLeft :: P.IOError -> IO (Either AppError a)
-      mkLeft ioErr = pure $ Left $ AppIOError' "Run failed to start: failed create / open log file " ioErr
-
-      runEffects :: Eff FullIOEffects a -> S.Handle -> IO (Either AppError a)
-      runEffects efx h = executeInIO (logToHandlePrettyInterpreter h) efx
-   in 
-      do 
-         ehtHdl <- logFileHandle
-         eitherf ehtHdl
-            mkLeft
-            (\h -> bracket (pure h) S.hClose $ runEffects effs)
-      
 type FullIOEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, Error FileSystemError, Error EnsureError, Error AppError, IO]
 type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, Error EnsureError]
 

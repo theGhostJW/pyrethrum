@@ -16,7 +16,9 @@ import           Foundation.List.DList
 import           Foundation.Extended
 import qualified Prelude                    as P
 import           Runner as R
-import Control.Exception as E
+import qualified System.IO as S
+import qualified Control.Exception as E
+import AuxFiles
 
 
 ioRun :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
@@ -26,7 +28,42 @@ ioRunRaw :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 ioRunRaw pln = testRun pln filters testInfoFull executeInIOConsoleRaw runConfig
 
 ioRunToFile :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-ioRunToFile pln = testRun pln filters testInfoFull executeInIOFilePretty runConfig
+ioRunToFile pln = let 
+                    mkLeft ::  P.IOError -> Either AppError a
+                    mkLeft ioErr = Left $ AppIOError' "Run failed to start: failed create / open log file " ioErr 
+                    
+                    runTheTest :: S.Handle -> IO ()
+                    runTheTest h = testRun pln filters testInfoFull (executeInIO (logToHandlePrettyInterpreter h)) runConfig
+                  in 
+                    do 
+                      ehtPthHdl <- logFileHandle
+                      eitherf ehtPthHdl
+                        (putStrLn . show . mkLeft)
+                        (\(lgFile, h) -> do 
+                                           bracket (pure h) S.hClose $ runTheTest
+                                           putStrLn $ "Log File: " <> (toStr $ toFilePath lgFile) 
+                        )
+
+
+{-
+executeInIOFilePretty :: forall a. Eff FullIOEffects a -> IO (Either AppError a)
+executeInIOFilePretty effs = let 
+                                releaseLogHandle :: S.Handle -> IO ()
+                                releaseLogHandle = S.hClose 
+                                
+                                mkLeft :: P.IOError -> IO (Either AppError a)
+                                mkLeft ioErr = pure $ Left $ AppIOError' "Run failed to start: failed create / open log file " ioErr 
+                                
+                                runEffects :: Eff FullIOEffects a -> S.Handle -> IO (Either AppError a)
+                                runEffects efx h = executeInIO (logToHandlePrettyInterpreter h) efx
+                              in 
+                                do 
+                                 ehtPthHdl <- logFileHandle
+                                 eitherf ehtPthHdl
+                                    mkLeft
+                                    (\(_, h) -> bracket (pure h) S.hClose $ runEffects effs)
+-}
+
 
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
 docRunRaw pln = extractDocLog $ testRun pln filters testInfoFull executeDocumentRaw runConfig

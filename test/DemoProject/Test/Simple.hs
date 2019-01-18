@@ -85,6 +85,8 @@ test = GenericTest {
                             }
             }
 
+$(deriveToJSON defaultOptions ''Item)
+
 instance ItemClass Item ValState where
   identifier = iid
   whenClause = pre

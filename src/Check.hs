@@ -5,6 +5,7 @@ import           Foundation.Extended hiding ((.))
 import           Foundation.List.DList
 import Data.Function
 import qualified Prelude as P
+import Data.Yaml
 
 type CheckResultList = DList CheckResult
 type CheckList a = DList (Check a)
@@ -41,6 +42,12 @@ data Check v = Check {
 
 instance P.Show (Check v) where
   show = fromStr . (header :: Check v  -> String)
+
+instance ToJSON (Check v)  where
+  toJSON = String . toText . (header :: Check v  -> String)
+
+instance ToJSON (CheckList a) where 
+  toJSON cl = _ 
 
 applyCheck :: forall v. v -> Check v -> CheckResult
 applyCheck v ck = CheckResult (rule ck v) $ Info (header (ck :: Check v)) (msgFunc ck v)

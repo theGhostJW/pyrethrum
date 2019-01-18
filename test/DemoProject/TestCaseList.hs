@@ -6,8 +6,8 @@ import           DemoProject.Config
 import           DemoProject.Test.Rough as RT
 import           DemoProject.Test.Rough2 as RT2
 import           DemoProject.Test.Simple as ST
+import  DemoProject.Test.Simple2 as ST2
 import Control.Monad
-import           DemoProject.Test.Simple2 as ST2
 import  Data.Functor (($>))
 import           DSL.Common
 import           DSL.Interpreter

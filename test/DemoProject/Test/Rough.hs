@@ -23,6 +23,7 @@ import Data.Aeson.TH
 import GHC.Generics
 import qualified Data.Serialize as S
 import qualified System.Environment as E
+import OrphanedInstances
 
 type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
 
@@ -151,7 +152,8 @@ instance ItemClass Item ValState where
   thenClause = post
   checkList = checks
 
--- $(deriveJSON defaultOptions ''Item)
+$(deriveToJSON defaultOptions ''Item)
+
 -- $(deriveJSON defaultOptions ''StrictReadError')
 -- $(deriveToJSON defaultOptions ''ApStateDeleteMe)
 

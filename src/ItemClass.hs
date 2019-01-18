@@ -3,9 +3,10 @@ module ItemClass where
 import           Check
 import           Foundation.Extended
 import           Foundation.List.DList
+import           Data.Yaml
 
 
-class ItemClass i v | i -> v where
+class ToJSON i => ItemClass i v | i -> v  where
   identifier :: i -> Int
   whenClause :: i -> String
   thenClause :: i -> String

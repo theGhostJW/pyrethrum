@@ -29,6 +29,9 @@ import Text.Show.Pretty as PP
 import Foundation.String as S
 import qualified Data.Yaml.Pretty as Y
 import Foundation.Compat.ByteString
+import qualified System.IO as S
+import DSL.Common
+import AuxFiles
 
 
 
@@ -71,7 +74,26 @@ config = testConfig {
 -- to file
 -- function add to type class - look up should be OK
 jw = putLines SIO.stdout $ fst $ fromBytesLenient $ fromByteString $ Y.encodePretty Y.defConfig items
-jw' = sequence_ $ (putLines SIO.stdout) . showPretty <$> items
+jw' = let 
+        mkLeft ::  P.IOError -> Either AppError ()
+        mkLeft ioErr = Left $ AppIOError' "Run failed to start: failed create / open log file " ioErr 
+
+        
+        log2Both :: S.Handle -> String -> IO ()
+        log2Both fileHndl lgStr = putLines SIO.stdout lgStr *> putLines fileHndl lgStr
+      in
+        do 
+          ehtPthHdl <- logFileHandle "items"
+          eitherf ehtPthHdl
+            (putStrLn . show . mkLeft)
+            (
+              \(absFile, h) -> do 
+                  bracket (pure h) S.hClose (const $ sequence_ $ ((log2Both h) . showPretty) <$> items) 
+                  putStrLn ""
+                  putStrLn $ "File: " <> (toStr $ toFilePath absFile) 
+                  putStrLn ""     
+            )
+
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig $ IID 140

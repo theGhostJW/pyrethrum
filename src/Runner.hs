@@ -36,7 +36,6 @@ doNothing = PreRun {
   checkHasRun = pure True
 }
 
-
 data TestGroup m1 m a effs =
   TestGroup {
         header :: String,

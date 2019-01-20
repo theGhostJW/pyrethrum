@@ -6,13 +6,15 @@
 module DemoProject.Test.Simple where
 
 import           Check
-import DemoProject.Config
+import  DemoProject.Config
 import DSL.Ensure
 import Runner as R
 import           Control.Monad.Freer
 import           DSL.Interpreter
 import           Foundation.Extended hiding (Item)
 import qualified Prelude as P
+import Data.Aeson.TH
+import OrphanedInstances
 
 type Effects effs = EFFEnsureLog effs
 

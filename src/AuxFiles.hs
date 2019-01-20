@@ -17,7 +17,7 @@ binDir :: IO AbsDir
 binDir = parseAbsDir =<< getBinDir
 
 auxBase :: IO (Either P.IOError AbsDir)
-auxBase = subDirFromBaseDir binDir [reldir|.auxFiles|]
+auxBase = subDirFromBaseDir binDir [reldir|auxFiles|]
 
 subPath :: IO (Either P.IOError AbsDir) -> Path Rel a -> IO (Either P.IOError (Path Abs a))
 subPath prent chld = ((</> chld) <$>) <$> prent
@@ -55,9 +55,9 @@ logFileName now suffix =
                     daysDif * msPerDay + timeDifms
 
     nowStr :: String
-    nowStr = toStr $ formatTime defaultTimeLocale (toCharList "%F %H_%M_%S") now
+    nowStr = toStr $ formatTime defaultTimeLocale (toCharList "%F_%H-%M-%S") now
   in
-    base36 msLeftInYear 7 <> " " <> nowStr <> " " <> suffix <> ".log"
+    base36 msLeftInYear 7 <> "_" <> nowStr <> "_" <> suffix <> ".log"
 
 logFilePath :: ZonedTime -> String -> IO (Either P.IOError AbsFile)
 logFilePath now suffix = do
@@ -66,13 +66,13 @@ logFilePath now suffix = do
                             (pure . Left . P.userError . toCharList . show)
                             logFile
 
-logFileHandle :: IO (Either P.IOError (AbsFile, S.Handle))
-logFileHandle = do
-                  now <- debug' "Zoned" <$> getZonedTime
-                  fp <- logFilePath now "raw"
-                  eitherf fp
-                    (pure . Left)
-                    (\pth -> ((pth,) <$>) <$> (Right <$> S.openFile (toFilePath pth) S.WriteMode))
+logFileHandle :: String -> IO (Either P.IOError (AbsFile, S.Handle))
+logFileHandle fileNameSuffix = do
+                                now <- getZonedTime
+                                fp <- logFilePath now fileNameSuffix
+                                eitherf fp
+                                  (pure . Left)
+                                  (\pth -> ((pth,) <$>) <$> (Right <$> S.openFile (toFilePath pth) S.WriteMode))
 
 -- based on https://gist.github.com/jdeseno/9501557
 base36 :: Integer -> Int -> String

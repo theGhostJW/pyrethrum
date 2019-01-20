@@ -13,7 +13,6 @@ data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord)
 data Country = AU | NZ deriving (Show, Eq, Ord)
 data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord)
 
-
 data RunConfig = RunConfig {
   runTitle    :: String,
   environment :: Environment,

@@ -8,4 +8,4 @@ import           Foundation.Extended
 
 
 instance ToJSON String where 
-  toJSON cl = _ 
+  toJSON = String . toText 

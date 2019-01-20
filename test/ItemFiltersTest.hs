@@ -7,13 +7,21 @@ import qualified Prelude         as P
 import           Runner.Internal.ItemFilters
 import           Runner as R
 import           Test.Extended
+import GHC.Generics
+import Data.Aeson.TH
+import Data.Aeson.Types
+import OrphanedInstances
+
 
 data TestItem = TestItem {
   iid    :: Int,
   pre    :: String,
   post   :: String,
   checks :: C.CheckList ValState
-} deriving (Show)
+} deriving (Show, Generic)
+
+instance ToJSON TestItem where
+  toEncoding = genericToEncoding defaultOptions
 
 type ValState = Int
 

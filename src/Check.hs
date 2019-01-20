@@ -47,7 +47,7 @@ instance ToJSON (Check v)  where
   toJSON = String . toText . (header :: Check v  -> String)
 
 instance ToJSON (CheckList a) where 
-  toJSON cl = _ 
+  toJSON cl = Array . fromList $ toJSON <$> toList cl
 
 applyCheck :: forall v. v -> Check v -> CheckResult
 applyCheck v ck = CheckResult (rule ck v) $ Info (header (ck :: Check v)) (msgFunc ck v)

@@ -6,6 +6,11 @@ import           Runner as R
 import           Test.Extended
 import           DSL.Common
 import TestAndRunConfig
+import Data.Yaml
+import Data.Aeson.TH
+import Data.Aeson.Types
+import GHC.Generics
+
 
 data RunConfig = RunConfig {
   country :: Country,
@@ -28,13 +33,17 @@ instance Titled TestConfig where
 
 type TST = GenericTest TestConfig RunConfig
 
-newtype MyInt = MyInt Int deriving Show
+newtype MyInt = MyInt Int deriving (Show, Generic)
 
 instance ItemClass MyInt MyInt where
   identifier _ =  -999
   whenClause _ =  "pre"
   thenClause _ =  "post"
   checkList = mempty
+
+
+instance ToJSON MyInt where
+  toEncoding = genericToEncoding defaultOptions
 
 data TestDepth = Connectivity | Regression | DeepRegression deriving (Eq, Ord, Show)
 data Country = Au |NZ deriving (Eq, Ord, Show)

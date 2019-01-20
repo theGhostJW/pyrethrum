@@ -8,6 +8,7 @@ module DemoProject.Test.Rough where
 import           DSL.Logger
 import           Check
 import           DemoProject.Config
+import Text.Show.Pretty as PP
 import           Control.Monad.Freer
 import           Control.Monad
 import           DSL.Ensure
@@ -16,7 +17,6 @@ import           DSL.Interpreter
 import           DSL.ArbitraryIO
 import qualified Prelude as P
 import           Foundation.Extended             hiding (readFile, writeFile, Item)
-import           Foundation.String
 import           Runner as R
 import Type.Reflection
 import Data.Aeson.TH
@@ -24,6 +24,14 @@ import GHC.Generics
 import qualified Data.Serialize as S
 import qualified System.Environment as E
 import OrphanedInstances
+import qualified System.IO as SIO
+import Text.Show.Pretty as PP
+import Foundation.String as S
+import qualified Data.Yaml.Pretty as Y
+import Foundation.Compat.ByteString
+
+
+
 
 type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
 
@@ -57,7 +65,13 @@ config = testConfig {
   countries = allCountries
  }
 
-jw = endpoint
+-- to do
+-- separate records <$>
+-- ordering of fields
+-- to file
+-- function add to type class - look up should be OK
+jw = putLines SIO.stdout $ fst $ fromBytesLenient $ fromByteString $ Y.encodePretty Y.defConfig items
+jw' = sequence_ $ (putLines SIO.stdout) . showPretty <$> items
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig $ IID 140
@@ -123,7 +137,7 @@ items = [
           i 120 "Pre"  "Post" [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
           i 130 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
           i 140 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-          i 150 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty
+          i 150 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\Vid List.txt|] mempty
   ]
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

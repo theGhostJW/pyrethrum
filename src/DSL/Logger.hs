@@ -102,12 +102,24 @@ logStrPP =
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsolePrettyInterpreter = logToHandlePrettyInterpreter stdout
 
-logToHandlePrettyInterpreter :: LastMember IO effs => Handle -> Eff (Logger ': effs) ~> Eff effs
-logToHandlePrettyInterpreter h = interpretM $ \(LogItem lp) -> putLines h $ logStrPP lp
+logToHandlePP :: Logger r -> Handle -> IO ()
+logToHandlePP (LogItem lp) h = putLines h $ logStrPP lp
 
+logToHandlePrettyInterpreter :: LastMember IO effs => Handle -> Eff (Logger ': effs) ~> Eff effs
+logToHandlePrettyInterpreter h = interpretM $ \li@(LogItem lp) -> logToHandlePP li h
+
+logToHandlesPrettyInterpreter :: LastMember IO effs => (Handle, Handle) -> Eff (Logger ': effs) ~> Eff effs
+logToHandlesPrettyInterpreter (h1, h2) = 
+           interpretM $ \li@(LogItem lp) -> 
+                          let 
+                            logToh :: Handle -> IO ()
+                            logToh = logToHandlePP li
+                          in
+                            logToh h1 *> logToh h2
+                             
 logDocPrettyInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocPrettyInterpreter = let
                             toDList :: [String] -> DList String
                             toDList = fromList
                           in
-                            interpret $ \(LogItem lp) -> tell $ toDList $ lines $ logStrPP lp
+                            interpret $ \(LogItem lp) -> tell . toDList . lines $ logStrPP lp

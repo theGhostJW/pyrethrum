@@ -33,15 +33,17 @@ ioRunToFile pln = let
                     mkLeft ioErr = Left $ AppIOError' "Run failed to start: failed create / open log file " ioErr 
                     
                     runTheTest :: S.Handle -> IO ()
-                    runTheTest h = testRun pln filters testInfoFull (executeInIO (logToHandlePrettyInterpreter h)) runConfig
+                    runTheTest h = testRun pln filters testInfoFull (executeInIO (logToHandlesPrettyInterpreter (S.stdout, h))) runConfig
                   in 
                     do 
-                      ehtPthHdl <- logFileHandle
+                      ehtPthHdl <- logFileHandle "raw"
                       eitherf ehtPthHdl
                         (putStrLn . show . mkLeft)
                         (\(lgFile, h) -> do 
                                            bracket (pure h) S.hClose $ runTheTest
+                                           putStrLn ""
                                            putStrLn $ "Log File: " <> (toStr $ toFilePath lgFile) 
+                                           putStrLn ""
                         )
 
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String

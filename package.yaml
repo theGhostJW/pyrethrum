@@ -22,6 +22,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
   - base
   - foundation
+  - foundation-edge # move to extended later Maybe
   - freer-simple
   - principled-extended
   - containers

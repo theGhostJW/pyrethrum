@@ -24,43 +24,8 @@ import GHC.Generics
 import qualified Data.Serialize as S
 import qualified System.Environment as E
 import OrphanedInstances
-import qualified System.IO as SIO
-import Text.Show.Pretty as PP
-import Foundation.String as S
-import qualified Data.Yaml.Pretty as Y
-import Foundation.Compat.ByteString
-import qualified System.IO as S
-import DSL.Common
-import AuxFiles
-
-
-
 
 type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
-
--- PROBLEMS
---  - HIE not compiling for ghc 8.6.3
---  - HIE not working on windows for GHC 8.6.2
-
---  - Intero not installing for 6.3 due to ghci-issues package index not availible
---    -- 8.0.1, 8.0.2, 8.2.1, 8.2.2, 8.4.1, 8.4.2, 8.4.3, 8.6.1
---  - clone intero change stack and intalled
---  - installed stack-run with modifications found on github (custom stack.yaml added to intero directory)
---  - neither haskelly or Haskello eunning in vs code (loading (endlessly) / no type information available)
-
---  - rollback to ghc 8.4.2 rebuild pyrethru and hie - to as per issue 9725bc0bfcd1b0f112e5e7299d482168fbe1efb3
---   HIE build fails
---      -  src\Haskell\Ide\Engine\Plugin\GhcMod.hs:179:32: error:
---      ot in scope: GM.getTypecheckedModuleGhc'
---      either `GhcMod', `GhcMod.DynFlags', `GhcMod.Error', `GhcMod.Gap',
---             `GhcMod.ModuleLoader', `GhcMod.Monad', `GhcMod.SrcUtils',
---             `GhcMod.Types' nor `GhcMod.Utils' exports getTypecheckedModuleGhc'.
---
---      79 |                               (GM.getTypecheckedModuleGhc' (myLogger rfm) fp)
---
--- Update buildlatest.ps to point to yaml.8.4.2
---  build using script + add one dependency
--- works !!!!!! -- build agasin when HIE issues fixed
 
 config :: TestConfig
 config = testConfig {
@@ -68,32 +33,10 @@ config = testConfig {
   countries = allCountries
  }
 
--- to do
--- separate records <$>
--- ordering of fields
--- to file
--- function add to type class - look up should be OK
-jw = putLines SIO.stdout $ fst $ fromBytesLenient $ fromByteString $ Y.encodePretty Y.defConfig items
-jw' = let 
-        mkLeft ::  P.IOError -> Either AppError ()
-        mkLeft ioErr = Left $ AppIOError' "Run failed to start: failed create / open log file " ioErr 
+jw = showItems
 
-        
-        log2Both :: S.Handle -> String -> IO ()
-        log2Both fileHndl lgStr = putLines SIO.stdout lgStr *> putLines fileHndl lgStr
-      in
-        do 
-          ehtPthHdl <- logFileHandle "items"
-          eitherf ehtPthHdl
-            (putStrLn . show . mkLeft)
-            (
-              \(absFile, h) -> do 
-                  bracket (pure h) S.hClose (const $ sequence_ $ ((log2Both h) . showPretty) <$> items) 
-                  putStrLn ""
-                  putStrLn $ "File: " <> (toStr $ toFilePath absFile) 
-                  putStrLn ""     
-            )
-
+showItems :: IO ()
+showItems = showAndLogItems items
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig $ IID 140
@@ -190,9 +133,6 @@ instance ItemClass Item ValState where
 
 $(deriveToJSON defaultOptions ''Item)
 
--- $(deriveJSON defaultOptions ''StrictReadError')
--- $(deriveToJSON defaultOptions ''ApStateDeleteMe)
-
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -261,9 +201,9 @@ demo2 = showEffs2 test2
 --    12.02 include test path in log  ✔
 -- 13. Log Formatting and Report Generation
 -- 13.1 ~ generalised log type / log protocol  ✔
--- 13.2 ~ serialisation format
-    -- log to file
-    -- log to both
+-- 13.2 ~ serialisation format ✔
+    -- log to file ✔
+    -- log to both ✔
     -- log summary - data types -> print
 
 -- 14.0 - hedgehog / randomiser

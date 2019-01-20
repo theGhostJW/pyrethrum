@@ -23,6 +23,9 @@ config = testConfig {
   header = "This Simple Test Only Uses Ensure Effects"
 }
 
+showItems :: IO ()
+showItems = showAndLogItems items
+
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig (IID 123)
 

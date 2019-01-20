@@ -29,22 +29,11 @@ ioRunRaw pln = testRun pln filters testInfoFull executeInIOConsoleRaw runConfig
 
 ioRunToFile :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 ioRunToFile pln = let 
-                    mkLeft ::  P.IOError -> Either AppError a
-                    mkLeft ioErr = Left $ AppIOError' "Run failed to start: failed create / open log file " ioErr 
-                    
                     runTheTest :: S.Handle -> IO ()
                     runTheTest fileHndl = testRun pln filters testInfoFull (executeInIO (logToHandlesPrettyInterpreter (S.stdout, fileHndl))) runConfig
                   in 
-                    do 
-                      ehtPthHdl <- logFileHandle "raw"
-                      eitherf ehtPthHdl
-                        (putStrLn . show . mkLeft)
-                        (\(lgFile, h) -> do 
-                                           bracket (pure h) S.hClose $ runTheTest
-                                           putStrLn ""
-                                           putStrLn $ "Log File: " <> (toStr $ toFilePath lgFile) 
-                                           putStrLn ""
-                        )
+                    ioActionLogToConsoleAndFile "raw" runTheTest
+                   
 
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
 docRunRaw pln = extractDocLog $ testRun pln filters testInfoFull executeDocumentRaw runConfig

@@ -22,8 +22,38 @@ import qualified Data.Set as S
 import TestAndRunConfig as C
 import Control.Monad
 import Text.Show.Pretty
+import qualified System.IO as SIO
+import AuxFiles
+import DSL.Logger
 
 type TestPlanBase tc rc m1 m a effs = (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
+
+showAndLogItems :: Show a => [a] -> IO ()
+showAndLogItems = showAndLogList "items"
+
+showAndLogList :: Show a => String -> [a] -> IO ()
+showAndLogList logFileSuffix items = 
+      let 
+        log2Both :: SIO.Handle -> String -> IO ()
+        log2Both fileHndl lgStr = putLines SIO.stdout lgStr *> putLines fileHndl lgStr
+
+        listItems :: SIO.Handle -> IO ()
+        listItems h = sequence_ $ ((log2Both h) . showPretty) <$> items
+      in
+        ioActionLogToConsoleAndFile logFileSuffix listItems
+
+ioActionLogToConsoleAndFile :: String -> (SIO.Handle -> IO ()) -> IO ()
+ioActionLogToConsoleAndFile logFileSuffix ioAction = 
+                    do 
+                      ehtPthHdl <- logFileHandle logFileSuffix
+                      eitherf ehtPthHdl
+                        (putStrLn . show . Left . (AppIOError' "Log file creation failed"))
+                        (\(lgFile, h) -> do 
+                                            bracket (pure h) SIO.hClose $ ioAction
+                                            putStrLn ""
+                                            putStrLn $ "Log File: " <> (toStr $ toFilePath lgFile) 
+                                            putStrLn ""
+                        )
 
 data PreRun effs = PreRun {
   runAction :: Eff effs (),

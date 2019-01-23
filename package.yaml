@@ -104,6 +104,7 @@ library:
     - listsafe
     - time
     - deepseq
+    - unordered-containers
 
 tests:
   pyrethrum-test:

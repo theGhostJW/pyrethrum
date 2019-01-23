@@ -8,6 +8,9 @@ import GHC.Generics
 import OrphanedInstances
 import Data.Aeson
 import Data.Either
+import Data.Aeson.Types
+import qualified Data.HashMap.Lazy as HML
+
 
 
 data LogProtocol a where
@@ -36,6 +39,8 @@ deriving instance Eq (LogProtocol a)
 -- Logger.hs get really ugly -> hand roll JSON instances
 
 instance ToJSON (LogProtocol a) where
+  
+  toJSON :: LogProtocol a -> Value
   toJSON = \case 
               Message str -> object [
                                       "type" .= "message", 
@@ -105,5 +110,42 @@ instance ToJSON (LogProtocol a) where
                                   ] 
 
 instance FromJSON (LogProtocol a) where 
-  parseJSON = undefined
-  -- No need to provide a parseJSON implementation.
+  parseJSON :: Value -> Parser (LogProtocol a)
+  parseJSON v@(Object obj) = 
+    maybe 
+      (fail $ toCharList $ "Could not parse LogProtocol no type field specified in: " <> show v) 
+      (\case
+        "message" -> undefined -- finish
+        _ -> undefined
+      )
+      (HML.lookup "type" obj)
+      
+
+  parseJSON wtf = typeMismatch "LogProtocol" wtf
+
+
+  {-
+  instance FromJSON Command where
+    -- First of all we lookup for mandatory key `type`
+    parseJSON (Object o) = case HML.lookup "type" o of
+        Just (String "command") -> let dt = HML.lookup "data" o
+                                   in case HML.lookup "name" o of
+            -- Then we lookup for key `name`, to distinguish commands
+            Just (String "create") -> createCmd dt
+            Just (String "update") -> updateCmd dt
+            Just (String "delete") -> CommandDelete <$> o .: "data"
+            _                      -> unrecognizedCommand
+        _ -> pure NotCommand
+        where createCmd Nothing           = missingData
+              createCmd (Just (Object d)) = CommandCreate <$> d .: "name" <*> d .: "value"
+              createCmd _                 = incorrectData
+              updateCmd Nothing           = missingData
+              updateCmd (Just (Object d)) = CommandUpdate <$> d .: "id"   <*> d .: "value"
+              updateCmd _                 = incorrectData
+
+              missingData         = pure $ WrongArg "Missing mandatory `data` key."
+              incorrectData       = pure $ WrongArg "Incorrect data received."
+              unrecognizedCommand = pure $ WrongArg "Unrecognized command name."
+    parseJSON _ = pure NotCommand
+  
+  -}

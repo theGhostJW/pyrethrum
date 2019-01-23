@@ -4,10 +4,14 @@ module DSL.Common where
 import           Control.Monad.Freer.Writer
 import           Foundation.Extended
 import           Foundation.List.DList
+import Data.Aeson.TH
+import OrphanedInstances
 
 data PreTestStage = Rollover |
                     GoHome
                     deriving (Show, Eq)
+
+$(deriveJSON defaultOptions ''PreTestStage)
 
 data DetailedInfo = Info {
             message :: String,
@@ -15,21 +19,30 @@ data DetailedInfo = Info {
           }
           deriving (Eq, Show)
 
+$(deriveJSON defaultOptions ''DetailedInfo)
+
 newtype EnsureError = EnsureError String deriving (Show, Eq)
+
+$(deriveJSON defaultOptions ''DSL.Common.EnsureError)
 
 data FilterError = InvalidItemFilter String |
                    DuplicateItemId Int String deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''FilterError)
 
 data FilterRejection tc = FilterRejection {
                  reason :: String,
                  cfg    :: tc
                  } deriving (Eq, Show)
 
+$(deriveJSON defaultOptions ''FilterRejection)
 
 data FileSystemError =
     ReadFileError IOException |
     WriteFileError IOException
     deriving (Show, Eq)
+
+$(deriveJSON defaultOptions ''FileSystemError)
 
 data AppError =
             AppFileSystemError FileSystemError |
@@ -52,6 +65,7 @@ data AppError =
 
             deriving (Show, Eq)
 
+$(deriveJSON defaultOptions ''AppError)
 
 type WriterDList = Writer (DList String)
 

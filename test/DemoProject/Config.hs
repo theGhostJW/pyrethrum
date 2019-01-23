@@ -8,6 +8,8 @@ import qualified Prelude                    as P
 import           Runner
 import           TestAndRunConfig
 import           Foundation.List.DList
+import Data.Aeson
+import Data.Aeson.TH
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord)
 data Country = AU | NZ deriving (Show, Eq, Ord)
@@ -19,6 +21,11 @@ data RunConfig = RunConfig {
   country     :: Country,
   depth       :: Depth
 } deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''Environment)
+$(deriveJSON defaultOptions ''Country)
+$(deriveJSON defaultOptions ''Depth)
+$(deriveJSON defaultOptions ''RunConfig)
 
 instance Titled RunConfig where
   title = runTitle
@@ -41,6 +48,8 @@ data TestConfig = TestConfig {
   minDepth     :: Depth,
   active       :: Bool
 }  deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''TestConfig)
 
 type Test = GenericTest TestConfig RunConfig
 type TestResult = GenericResult TestConfig

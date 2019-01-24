@@ -54,7 +54,7 @@ extra-deps:
 - time-1.9.2
 - pretty-show-1.9.4
 - git: https://github.com/theGhostJW/reexports-and-extensions
-  commit: "d05725d0ad9820d2bd2fc58a72ca3cfc201021b0"
+  commit: "6ebb71be07c74f70635b33bfe23dd0472a0838c4"
 - aeson-1.4.2.0@sha256:8166752a9669597db375343df19805069595fed9c613f98504e418849f40fe18
 - cereal-0.5.8.0@sha256:15025beeec1727ac986d22d8d68791bf98211022fb749c6bc24d28d7b5d70672
 - discrimination-0.3@sha256:6f88488e62fd4aca71497a4909371476eb18720b3c113869e769a65d1bdb69dc

@@ -27,6 +27,7 @@ dependencies:
   - principled-extended
   - containers
   - extra
+  - text
   - transformers-either
   - aeson
   - yaml

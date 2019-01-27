@@ -1,7 +1,9 @@
 
+{-# LANGUAGE PolyKinds #-}
+
 module DSL.LogProtocol where
 
-import           DSL.Common
+import           DSL.Common (DetailedInfo, AppError, FilterRejection )
 import           Foundation.Extended
 import           TestAndRunConfig
 import GHC.Generics
@@ -9,9 +11,9 @@ import OrphanedInstances
 import Data.Aeson
 import Data.Either
 import Data.Aeson.Types
+import Data.Aeson.TH
 import qualified Data.HashMap.Lazy as HML
-
-
+import qualified Data.Text as T
 
 data LogProtocol a where
   Message :: String -> LogProtocol String
@@ -23,7 +25,7 @@ data LogProtocol a where
   IOAction :: String -> LogProtocol String
 
   Error :: AppError -> LogProtocol AppError
-  FilterLog :: (Show tc, Eq tc, TestConfigClass tc, ToJSON tc, FromJSON tc) => [Either (FilterRejection tc) tc] -> LogProtocol tc
+  FilterLog :: forall tc. (Show tc, Eq tc, TestConfigClass tc, ToJSON tc, FromJSON tc) => [Either (FilterRejection tc) tc] -> LogProtocol tc
 
   StartRun :: forall rc. (Show rc, Eq rc, Titled rc, ToJSON rc, FromJSON rc) => rc -> LogProtocol rc
   StartGroup :: String -> LogProtocol String
@@ -38,114 +40,140 @@ deriving instance Eq (LogProtocol a)
 -- note can't derive Generic for a GADT need to use GADT otherwise type signatures in 
 -- Logger.hs get really ugly -> hand roll JSON instances
 
+data LPTag = MessageT |
+              MessageT' |
+              WarningT |
+              WarningT' |
+              IOActionT |
+              ErrorT |
+              FilterLogT  |
+              StartRunT |
+              StartGroupT |
+              StartTestT |
+              StartIterationT |
+              EndIterationT |
+              EndRunT 
+              deriving (Show, Eq, Enum, Bounded)
+                      
+$(deriveJSON defaultOptions ''LPTag)
+
+-- https://stackoverflow.com/a/41207422/5589037
+-- https://stackoverflow.com/questions/2300275/how-to-unpack-a-haskell-existential-type -- cant be done
+-- https://medium.com/@jonathangfischoff/existential-quantification-patterns-and-antipatterns-3b7b683b7d71 -- pattern 2
+
+--data AnyLogProtocol = forall a. AnyLogProtocol (LogProtocol a)
+
+-- applyLPFunc :: forall b. (forall a. LogProtocol a -> b) -> Some LogProtocol -> b
+-- applyLPFunc f (Some LogProtocol) = f lp
+
+data Some (t :: k -> *) where
+  Some :: t x -> Some t
+
+instance FromJSON (Some LogProtocol) where
+
+  parseJSON :: Value -> Parser (Some LogProtocol)
+  parseJSON v@(Object o) =
+    let 
+      tag :: Maybe LPTag 
+      tag = do 
+        t <- (HML.lookup "type" o) 
+        parseMaybe parseJSON t 
+
+      failMessage :: [Char]
+      failMessage = toS $ "Could not parse LogProtocol no type field or type fiield value is not a member of specified in: " 
+                      <> (mconcat $ show <$> (tagList :: [LPTag])) 
+                      <> show v
+
+    in 
+      maybef tag 
+        (fail failMessage )
+        (
+          \case 
+            MessageT -> Some <$> (Message <$> o .: "txt")
+            MessageT' -> Some <$> (Message' <$> o .: "info")
+            WarningT -> Some <$> (Warning <$> o .: "txt")
+            WarningT' -> Some <$> (Warning' <$> o .: "info")
+            IOActionT -> Some <$> (IOAction <$> o .: "txt")
+            ErrorT -> Some <$> (DSL.LogProtocol.Error <$> o .: "err")
+            FilterLogT -> Some <$> (FilterLog <$> o .: "errList")
+            StartRunT -> Some <$> (StartRun <$> o .: "runConfig")
+            StartGroupT -> Some <$> (StartGroup <$> o .: "runConfig")
+            StartTestT -> Some <$> (StartTest <$> o .: "testConfig")
+            StartIterationT -> Some <$> (StartIteration <$> o .: "moduleAddress" <*> o .: "iterationId")
+            EndIterationT -> Some <$> (EndIteration <$> o .: "moduleAddress" <*> o .: "iterationId" <*> o .: "tstInfo")
+            EndRunT -> Some <$> (EndRun <$> o .: "runConfig")
+        )       
+
+  parseJSON wtf = typeMismatch "LogProtocol" wtf
+
+tagList :: Enum a => [a]
+tagList = enumFrom $ toEnum 0
+
 instance ToJSON (LogProtocol a) where
-  
   toJSON :: LogProtocol a -> Value
   toJSON = \case 
               Message str -> object [
-                                      "type" .= "message", 
+                                      "type" .= toJSON MessageT, 
                                       "txt" .= str
                                     ]
 
               Message' detailedInfo -> object [
-                                              "type" .= "messagePlus", 
+                                              "type" .= toJSON MessageT', 
                                                "info" .= toJSON detailedInfo
-                                              ]
-              
+                                              ]           
               Warning str -> object [
-                                      "type" .= "warning", 
+                                      "type" .= toJSON WarningT, 
                                       "txt" .= str
                                     ]
 
               Warning' detailedInfo -> object [
-                                              "type" .= "warningPlus", 
+                                              "type" .= toJSON WarningT', 
                                               "info" .= toJSON detailedInfo
                                               ]
 
               IOAction str -> object [
-                                       "type" .= "ioAction", 
+                                       "type" .= toJSON IOActionT, 
                                        "txt" .= str
                                       ]
 
               DSL.LogProtocol.Error e -> object [
-                                                  "type" .= "error", 
+                                                  "type" .= toJSON ErrorT, 
                                                   "err" .= toJSON e
                                                 ]
 
               FilterLog fList -> object [
-                                         "type" .= "filterLog", 
+                                         "type" .= toJSON FilterLogT, 
                                          "errList" .= toJSON fList
                                          ] 
 
               StartRun rc -> object [
-                                      "type" .= "startRun", 
+                                      "type" .= toJSON StartRunT, 
                                       "runConfig" .= rc
                                     ] 
 
               StartGroup header -> object [
-                                            "type" .= "startGroup", 
+                                            "type" .= toJSON StartGroupT, 
                                             "runConfig" .= header
                                           ] 
 
               StartTest tc -> object [
-                                      "type" .= "startTest", 
+                                      "type" .= toJSON StartTestT, 
                                       "testConfig" .= tc
                                     ] 
 
               StartIteration moduleAddress' iterationId -> object [
-                                                                    "type" .= "startIteration", 
+                                                                    "type" .= toJSON StartIterationT, 
                                                                     "moduleAddress" .= moduleAddress',
                                                                     "iterartionId" .= iterationId
                                                                   ] 
 
               EndIteration moduleAddress' iterationId tstInfo ->  object [
-                                                                          "type" .= "endIteration", 
+                                                                          "type" .= toJSON EndIterationT, 
                                                                           "moduleAddress" .= moduleAddress',
                                                                           "iterartionId" .= iterationId,
                                                                           "tstInfo" .= tstInfo
                                                                           ] 
               EndRun rc -> object [
-                                    "type" .= "endRun", 
+                                    "type" .= toJSON EndRunT, 
                                     "runConfig" .= rc
-                                  ] 
-
-instance FromJSON (LogProtocol a) where 
-  parseJSON :: Value -> Parser (LogProtocol a)
-  parseJSON v@(Object obj) = 
-    maybe 
-      (fail $ toCharList $ "Could not parse LogProtocol no type field specified in: " <> show v) 
-      (\case
-        "message" -> undefined -- finish
-        _ -> undefined
-      )
-      (HML.lookup "type" obj)
-      
-
-  parseJSON wtf = typeMismatch "LogProtocol" wtf
-
-
-  {-
-  instance FromJSON Command where
-    -- First of all we lookup for mandatory key `type`
-    parseJSON (Object o) = case HML.lookup "type" o of
-        Just (String "command") -> let dt = HML.lookup "data" o
-                                   in case HML.lookup "name" o of
-            -- Then we lookup for key `name`, to distinguish commands
-            Just (String "create") -> createCmd dt
-            Just (String "update") -> updateCmd dt
-            Just (String "delete") -> CommandDelete <$> o .: "data"
-            _                      -> unrecognizedCommand
-        _ -> pure NotCommand
-        where createCmd Nothing           = missingData
-              createCmd (Just (Object d)) = CommandCreate <$> d .: "name" <*> d .: "value"
-              createCmd _                 = incorrectData
-              updateCmd Nothing           = missingData
-              updateCmd (Just (Object d)) = CommandUpdate <$> d .: "id"   <*> d .: "value"
-              updateCmd _                 = incorrectData
-
-              missingData         = pure $ WrongArg "Missing mandatory `data` key."
-              incorrectData       = pure $ WrongArg "Incorrect data received."
-              unrecognizedCommand = pure $ WrongArg "Unrecognized command name."
-    parseJSON _ = pure NotCommand
-  
-  -}
+                                  ]

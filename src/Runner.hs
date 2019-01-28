@@ -366,7 +366,7 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
 
         in
           do
-            logPtcl $ StartRun rc
+            logPtcl $ StartRun (moduleAddress rc) (C.title rc) rc
             logPtcl $ FilterLog $ filterLog filterInfo
             sequence_ $ exeGroup <$> runTuples
             logPtcl $ EndRun rc

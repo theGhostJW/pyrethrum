@@ -25,14 +25,14 @@ data LogProtocol a where
   IOAction :: String -> LogProtocol String
 
   Error :: AppError -> LogProtocol AppError
-  FilterLog :: forall tc. (Show tc, Eq tc, TestConfigClass tc, ToJSON tc, FromJSON tc) => [Either (FilterRejection tc) tc] -> LogProtocol tc
+  FilterLog :: forall tc. (Show tc, Eq tc, ToJSON tc, FromJSON tc) => [Either (FilterRejection tc) tc] -> LogProtocol tc
 
-  StartRun :: forall rc. (Show rc, Eq rc, Titled rc, ToJSON rc, FromJSON rc) => rc -> LogProtocol rc
+  StartRun :: forall rc. (Show rc, Eq rc, ToJSON rc, FromJSON rc) => String -> String -> rc -> LogProtocol rc
   StartGroup :: String -> LogProtocol String
-  StartTest :: forall tc. (Show tc, Eq tc, TestConfigClass tc, ToJSON tc, FromJSON tc) => tc -> LogProtocol tc
+  StartTest :: forall tc. (Show tc, Eq tc, ToJSON tc, FromJSON tc) => tc -> LogProtocol tc
   StartIteration :: String -> Int -> LogProtocol (String, Int) -- iid / test module
   EndIteration :: String -> Int -> String -> LogProtocol (String, Int, String) -- test module / test Info
-  EndRun :: forall rc. (Show rc, Eq rc, Titled rc, ToJSON rc, FromJSON rc) => rc -> LogProtocol rc
+  EndRun :: forall rc. (Show rc, Eq rc, ToJSON rc, FromJSON rc) => rc -> LogProtocol rc
 
 deriving instance Show (LogProtocol a)
 deriving instance Eq (LogProtocol a)
@@ -53,13 +53,13 @@ data LPTag = MessageT |
               StartIterationT |
               EndIterationT |
               EndRunT 
-              deriving (Show, Eq, Enum, Bounded)
+              deriving (Show, Eq, Enum)
                       
 $(deriveJSON defaultOptions ''LPTag)
 
 -- https://stackoverflow.com/a/41207422/5589037
--- https://stackoverflow.com/questions/2300275/how-to-unpack-a-haskell-existential-type -- cant be done
 -- https://medium.com/@jonathangfischoff/existential-quantification-patterns-and-antipatterns-3b7b683b7d71 -- pattern 2
+-- https://stackoverflow.com/questions/2300275/how-to-unpack-a-haskell-existential-type -- cant be done
 
 --data AnyLogProtocol = forall a. AnyLogProtocol (LogProtocol a)
 
@@ -80,8 +80,8 @@ instance FromJSON (Some LogProtocol) where
         parseMaybe parseJSON t 
 
       failMessage :: [Char]
-      failMessage = toS $ "Could not parse LogProtocol no type field or type fiield value is not a member of specified in: " 
-                      <> (mconcat $ show <$> (tagList :: [LPTag])) 
+      failMessage = toS $ "Could not parse LogProtocol no type field or type field value is not a member of specified in: " 
+                      <> (show (tagList :: [LPTag])) 
                       <> show v
 
     in 
@@ -96,7 +96,7 @@ instance FromJSON (Some LogProtocol) where
             IOActionT -> Some <$> (IOAction <$> o .: "txt")
             ErrorT -> Some <$> (DSL.LogProtocol.Error <$> o .: "err")
             FilterLogT -> Some <$> (FilterLog <$> o .: "errList")
-            StartRunT -> Some <$> (StartRun <$> o .: "runConfig")
+            StartRunT -> Some <$> (StartRun <$> o .: "address" <*> o .: "title" <*> o .: "runConfig")
             StartGroupT -> Some <$> (StartGroup <$> o .: "runConfig")
             StartTestT -> Some <$> (StartTest <$> o .: "testConfig")
             StartIterationT -> Some <$> (StartIteration <$> o .: "moduleAddress" <*> o .: "iterationId")
@@ -146,8 +146,10 @@ instance ToJSON (LogProtocol a) where
                                          "errList" .= toJSON fList
                                          ] 
 
-              StartRun rc -> object [
+              StartRun addr ttle rc -> object [
                                       "type" .= toJSON StartRunT, 
+                                      "address" .= addr,
+                                      "title" .= ttle,
                                       "runConfig" .= rc
                                     ] 
 

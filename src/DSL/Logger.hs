@@ -91,7 +91,7 @@ logStrPP =
                    FilterLog fltrInfos -> subHeader "Filter Log" <> newLn <>
                                                 foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
-                   StartRun rc -> header ("Test Run: " <> title rc) <> newLn <> showPretty rc
+                   StartRun add ttle rc -> header ("Test Run: " <> ttle) <> newLn <> showPretty rc
                    StartGroup s -> header $ "Group: " <> s
 
                    StartTest tc -> subHeader ("Start Test: " <> moduleAddress tc <> " - " <> title tc)

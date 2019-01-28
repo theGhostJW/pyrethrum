@@ -3,7 +3,8 @@
 
 module DSL.LogProtocol where
 
-import           DSL.Common (DetailedInfo, AppError, FilterRejection )
+import           DSL.Common (DetailedInfo, AppError)
+import           TestFilter (FilterRejection)
 import           Foundation.Extended
 import           TestAndRunConfig
 import GHC.Generics
@@ -27,7 +28,7 @@ data LogProtocol a where
   Error :: AppError -> LogProtocol AppError
   FilterLog :: forall tc. (Show tc, Eq tc, ToJSON tc, FromJSON tc) => [Either (FilterRejection tc) tc] -> LogProtocol tc
 
-  StartRun :: forall rc. (Show rc, Eq rc, ToJSON rc, FromJSON rc) => String -> String -> rc -> LogProtocol rc
+  StartRun :: forall rc. (Show rc, Eq rc, ToJSON rc, FromJSON rc) => String -> rc -> LogProtocol rc
   StartGroup :: String -> LogProtocol String
   StartTest :: forall tc. (Show tc, Eq tc, ToJSON tc, FromJSON tc) => tc -> LogProtocol tc
   StartIteration :: String -> Int -> LogProtocol (String, Int) -- iid / test module
@@ -96,7 +97,7 @@ instance FromJSON (Some LogProtocol) where
             IOActionT -> Some <$> (IOAction <$> o .: "txt")
             ErrorT -> Some <$> (DSL.LogProtocol.Error <$> o .: "err")
             FilterLogT -> Some <$> (FilterLog <$> o .: "errList")
-            StartRunT -> Some <$> (StartRun <$> o .: "address" <*> o .: "title" <*> o .: "runConfig")
+            StartRunT -> Some <$> (StartRun <$> o .: "title" <*> o .: "runConfig")
             StartGroupT -> Some <$> (StartGroup <$> o .: "runConfig")
             StartTestT -> Some <$> (StartTest <$> o .: "testConfig")
             StartIterationT -> Some <$> (StartIteration <$> o .: "moduleAddress" <*> o .: "iterationId")
@@ -146,9 +147,8 @@ instance ToJSON (LogProtocol a) where
                                          "errList" .= toJSON fList
                                          ] 
 
-              StartRun addr ttle rc -> object [
+              StartRun ttle rc -> object [
                                       "type" .= toJSON StartRunT, 
-                                      "address" .= addr,
                                       "title" .= ttle,
                                       "runConfig" .= rc
                                     ] 

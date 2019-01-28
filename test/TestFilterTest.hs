@@ -1,4 +1,4 @@
-module TestFiltersTest where
+module TestFilterTest where
 
 import           Foundation      as F
 import qualified Prelude         as P
@@ -10,6 +10,7 @@ import Data.Yaml
 import Data.Aeson.TH
 import Data.Aeson.Types
 import GHC.Generics
+import TestFilter
 
 
 data RunConfig = RunConfig {

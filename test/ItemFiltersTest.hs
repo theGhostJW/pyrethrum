@@ -4,7 +4,7 @@ import qualified Check           as C
 import           Foundation      as F
 import           Data.Set        as S
 import qualified Prelude         as P
-import           Runner.Internal.ItemFilters
+import           ItemFilter
 import           Runner as R
 import           Test.Extended
 import GHC.Generics

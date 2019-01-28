@@ -1,5 +1,5 @@
 
-module Runner.Internal.ItemFilters where
+module ItemFilter where
 
 import qualified Data.List.Safe      as SafeList
 import DSL.Common 

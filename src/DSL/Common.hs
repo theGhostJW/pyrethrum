@@ -30,13 +30,6 @@ data FilterError = InvalidItemFilter String |
 
 $(deriveJSON defaultOptions ''FilterError)
 
-data FilterRejection tc = FilterRejection {
-                 reason :: String,
-                 cfg    :: tc
-                 } deriving (Eq, Show)
-
-$(deriveJSON defaultOptions ''FilterRejection)
-
 data FileSystemError =
     ReadFileError IOException |
     WriteFileError IOException

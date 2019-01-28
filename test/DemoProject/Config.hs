@@ -6,6 +6,7 @@ import           DSL.Common
 import           Foundation.Extended
 import qualified Prelude                    as P
 import           Runner
+import           TestFilter
 import           TestAndRunConfig
 import           Foundation.List.DList
 import Data.Aeson

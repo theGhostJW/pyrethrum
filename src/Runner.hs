@@ -1,7 +1,8 @@
 
 module Runner (
     module Runner
-  , module InternalFuncs
+  , module RB
+  , module ItemFilter
   , module ItemClass
 ) where
 
@@ -10,11 +11,9 @@ import DSL.Common
 import DSL.LogProtocol as LP
 import DSL.Logger
 import DSL.Ensure
-import Data.Functor.Identity
 import           Control.Monad.Freer
 import           Foundation.Extended
-import           Runner.Internal.ItemFilters     as InternalFuncs (ItemFilter (..),
-                                                       filterredItemIds)
+import           ItemFilter  (ItemFilter (..), filterredItemIds)
 import           ItemClass
 import qualified Prelude             as P
 import           DSL.Interpreter
@@ -27,6 +26,8 @@ import AuxFiles
 import DSL.Logger
 import OrphanedInstances
 import Data.Aeson
+import TestFilter
+import RunnerBase as RB
 
 type TestPlanBase tc rc m1 m a effs = (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
 
@@ -57,31 +58,11 @@ ioActionLogToConsoleAndFile logFileSuffix ioAction =
                                             putStrLn ""
                         )
 
-data PreRun effs = PreRun {
-  runAction :: Eff effs (),
-  checkHasRun :: Eff effs Bool
-}
-
 doNothing :: PreRun effs
 doNothing = PreRun {
   runAction = pure (),
   checkHasRun = pure True
 }
-
-data TestGroup m1 m a effs =
-  TestGroup {
-        header :: String,
-        -- occurs once on client before group is run
-        rollover :: PreRun effs,
-        -- occurs once before test iteration is run
-        goHome :: PreRun effs,
-        -- a list of tests
-        tests :: [m1 (m a)]
-        -- eg [IO Either (AppError TestInfo)]
-   }
-
-instance Titled (TestGroup m1 m a effs) where
-  title = header
 
 disablePreRun :: TestGroup m m1 a effs -> TestGroup m m1 a effs
 disablePreRun tg = tg {
@@ -89,25 +70,8 @@ disablePreRun tg = tg {
                         goHome = doNothing
                       }
 
-
-data TestComponents rc i effs as vs = TestComponents {
-  testItems :: [i],
-  testInteractor :: rc -> i -> Eff effs as,
-  testPrepState :: as -> Ensurable vs
-}
-
-data  GenericTest tc rc i effs as vs = GenericTest {
-  configuration :: tc,
-  components :: ItemClass i vs => TestComponents rc i effs as vs
-}
-
 testAddress :: forall tc rc i effs as vs. TestConfigClass tc => GenericTest tc rc i effs as vs -> String
 testAddress = moduleAddress . (configuration :: GenericTest tc rc i effs as vs -> tc)
-
-data GenericResult tc rslt = TestResult {
-  configuration :: tc,
-  results :: Either FilterError [rslt]
-} deriving Show
 
 data TestInfo i as vs = TestInfo {
                                   item :: i,
@@ -242,6 +206,8 @@ runTest iIds fltrs agg rc intrprt GenericTest{..} =
               ? runItems components
               $ []
 
+
+
 logger' :: forall m b effs. (Member Logger effs, Functor m) =>
                  (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                  -> LogProtocol b
@@ -359,14 +325,14 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
               runGroupAfterRollover = sequence_ $ runTest' <$> testList
 
               runGrp :: m ()
-              runGrp = logPtcl (StartGroup $ Runner.header tg) *> logFailOrRun grpRollover runGroupAfterRollover
+              runGrp = logPtcl (StartGroup $ RB.header tg) *> logFailOrRun grpRollover runGroupAfterRollover
 
            in
               include ? runGrp $ pure ()
 
         in
           do
-            logPtcl $ StartRun (moduleAddress rc) (C.title rc) rc
+            logPtcl $ StartRun (C.title rc) rc
             logPtcl $ FilterLog $ filterLog filterInfo
             sequence_ $ exeGroup <$> runTuples
             logPtcl $ EndRun rc
@@ -408,50 +374,3 @@ testEndpointBase fltrs agg intrprt tstAddress rc iIds runner =
       (logPtcl . LP.Error . AppFilterError)
       (\idSet -> testRunOrEndpoint (Just idSet) runner allFilters agg intrprt rc)
       iIds
-
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Filtering Tests %%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-type TestAddress = String
-
-data TestFilter rc tc = TestFilter {
-  title :: String,
-  predicate :: rc -> tc -> Bool
-}
-
-type TestFilters rc tc = [TestFilter rc tc]
-
-filterTestCfg :: forall rc tc. TestFilters rc tc -> rc -> tc -> Either (FilterRejection tc) tc
-filterTestCfg fltrs rc tc =
-  let
-    applyFilter :: TestFilter rc tc -> Either (FilterRejection tc) tc
-    applyFilter fltr = predicate fltr rc tc ?
-                                        Right tc $
-                                        Left $ FilterRejection (Runner.title fltr) tc
-  in
-    fromMaybe (pure tc) $ find isLeft $ applyFilter <$> fltrs
-
-filterTest :: forall i as vs tc rc effs.  TestFilters rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (Either (FilterRejection tc) tc)
-filterTest fltrs rc t = Identity $ filterTestCfg fltrs rc $ (configuration :: (GenericTest tc rc i effs as vs -> tc)) t
-
-filterGroups :: forall tc rc effs.
-              (
-                (forall i as vs. (Show i, Show as, Show vs) =>
-                      GenericTest tc rc i effs as vs -> Identity (Either (FilterRejection tc) tc)) -> [TestGroup Identity (Either (FilterRejection tc)) tc effs]
-              )
-              -> TestFilters rc tc
-              -> rc
-              -> [[Either (FilterRejection tc) tc]]
-filterGroups groupLst fltrs rc =
-    let
-      testFilter :: GenericTest tc rc i effs as vs -> Identity (Either (FilterRejection tc) tc)
-      testFilter = filterTest fltrs rc
-    in
-      (runIdentity <$>) <$> (tests <$> groupLst testFilter)
-
-filterLog :: forall tc. [[Either (FilterRejection tc) tc]] -> [Either (FilterRejection tc) tc]
-filterLog = mconcat
-
-filterGroupFlags :: forall tc. [[Either (FilterRejection tc) tc]] -> [Bool]
-filterGroupFlags grpFltrRslts = any isRight <$> grpFltrRslts

@@ -12,6 +12,7 @@ import Text.Show.Pretty as PP
 import TestAndRunConfig
 import qualified Prelude as P
 import System.IO
+import           TestFilter (FilterRejection)
 
 data Logger r where
  LogItem :: LogProtocol a -> Logger ()
@@ -91,7 +92,7 @@ logStrPP =
                    FilterLog fltrInfos -> subHeader "Filter Log" <> newLn <>
                                                 foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
-                   StartRun add ttle rc -> header ("Test Run: " <> ttle) <> newLn <> showPretty rc
+                   StartRun ttle rc -> header ("Test Run: " <> ttle) <> newLn <> showPretty rc
                    StartGroup s -> header $ "Group: " <> s
 
                    StartTest tc -> subHeader ("Start Test: " <> moduleAddress tc <> " - " <> title tc)

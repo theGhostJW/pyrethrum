@@ -11,6 +11,7 @@ import           TestAndRunConfig
 import           Foundation.List.DList
 import Data.Aeson
 import Data.Aeson.TH
+import RunnerBase
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord)
 data Country = AU | NZ deriving (Show, Eq, Ord)
@@ -43,7 +44,7 @@ nzOnly = S.singleton NZ
 
 data TestConfig = TestConfig {
   header       :: String,
-  address      :: String,
+  address      :: TestModule,
   environments :: Set Environment,
   countries    :: Set Country,
   minDepth     :: Depth,
@@ -64,7 +65,7 @@ instance TestConfigClass TestConfig where
 testConfig :: TestConfig
 testConfig = TestConfig {
   header    = "Configuration Error ~ No Title Assigned",
-  address = "Configuration Error ~ No Address Assigned",
+  address = TestModule "Configuration Error ~ No Address Assigned",
   environments = allNonProdEnvironments,
   countries    = auOnly,
   minDepth     = DeepRegression,
@@ -103,7 +104,7 @@ filters = [isActiveFilter, countryFilter, levelFilter]
 type TestPlan m1 m a effs = TestPlanBase TestConfig RunConfig m1 m a effs
 
 testEndpoint ::
-     String
+     TestModule
      -> RunConfig
      -> Either FilterError (Set Int)
      -> (forall m1 m a. TestPlan m1 m a FullIOEffects)
@@ -111,7 +112,7 @@ testEndpoint ::
 testEndpoint = testEndpointBase filters testInfoFull executeInIOConsolePretty
 
 testEndpointDoc ::
-     String
+     TestModule
      -> RunConfig
      -> Either FilterError (Set Int)
      -> (forall a m m1. TestPlan m1 m a FullDocEffects)

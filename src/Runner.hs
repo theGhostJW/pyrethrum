@@ -29,6 +29,7 @@ import Data.Aeson
 import TestFilter
 import RunnerBase as RB
 
+
 type TestPlanBase tc rc m1 m a effs = (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
 
 showAndLogItems :: Show a => [a] -> IO ()
@@ -70,8 +71,8 @@ disablePreRun tg = tg {
                         goHome = doNothing
                       }
 
-testAddress :: forall tc rc i effs as vs. TestConfigClass tc => GenericTest tc rc i effs as vs -> String
-testAddress = moduleAddress . (configuration :: GenericTest tc rc i effs as vs -> tc)
+testAddress :: forall tc rc i effs as vs. TestConfigClass tc => GenericTest tc rc i effs as vs -> TestModule
+testAddress =  moduleAddress . (configuration :: GenericTest tc rc i effs as vs -> tc)
 
 data TestInfo i as vs = TestInfo {
                                   item :: i,
@@ -181,11 +182,11 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
   in
     case filteredItems of
       [] -> []
-      x : xs -> (logPtcl (StartTest tc) *> runItem x) : (runItem <$> xs)
+      x : xs -> (logPtcl (StartTest $ mkDisplayInfo tc) *> runItem x) : (runItem <$> xs)
 
 runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Show tc, Eq tc, TestConfigClass tc, ToJSON tc, FromJSON tc, ToJSON rc, FromJSON rc, Member Logger effs) =>
                    Maybe (S.Set Int)                                  -- target Ids
-                   -> TestFilters rc tc                               -- filters
+                   -> FilterList rc tc                               -- filters
                    -> (i -> as -> vs -> TestInfo i as vs)             -- aggregator i.e. rslt constructor
                    -> rc                                              -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
@@ -200,7 +201,7 @@ runTest iIds fltrs agg rc intrprt GenericTest{..} =
           runItems TestComponents{..} = runTestItems configuration iIds testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
 
           include :: Bool
-          include = isRight $ filterTestCfg fltrs rc configuration
+          include = acceptFilter $ filterTestCfg fltrs rc configuration
         in
           include
               ? runItems components
@@ -217,7 +218,7 @@ logger' intrprt = void . intrprt . logItem
 testRunOrEndpoint :: forall rc tc m effs. (Monad m, Show rc, Eq rc, Eq tc, Titled rc, Show tc, ToJSON tc, FromJSON tc, ToJSON rc, FromJSON rc, TestConfigClass tc, EFFLogger effs) =>
                     Maybe (S.Set Int)                                    -- a set of item Ids used for test case endpoints
                    -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results
-                   -> TestFilters rc tc                                  -- filters
+                   -> FilterList rc tc                                  -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> rc                                              -- runConfig
@@ -262,7 +263,7 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
           logPtcl :: LogProtocol b -> m ()
           logPtcl = logger' intrprt
 
-          filterInfo :: [[Either (FilterRejection tc) tc]]
+          filterInfo :: [[FilterResult tc]]
           filterInfo = filterGroups runner fltrs rc
 
           filterFlags :: [Bool]
@@ -339,7 +340,7 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
 
 testRun :: forall rc tc m effs. (Monad m, Show rc, Show tc, Eq rc, Eq tc, Titled rc, TestConfigClass tc, ToJSON tc, FromJSON tc, ToJSON rc, FromJSON rc, EFFLogger effs) =>
                    (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
-                   -> TestFilters rc tc                               -- filters
+                   -> FilterList rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> rc                                              -- runConfig
@@ -347,11 +348,11 @@ testRun :: forall rc tc m effs. (Monad m, Show rc, Show tc, Eq rc, Eq tc, Titled
 testRun = testRunOrEndpoint Nothing
 
 
-testEndpointBase :: forall rc tc m effs. (Monad m, Show rc, Eq rc, Titled rc, Eq tc, Show tc, ToJSON tc, FromJSON tc, ToJSON rc, FromJSON rc,TestConfigClass tc, EFFLogger effs) =>
-                   TestFilters rc tc                               -- filters
+testEndpointBase :: forall rc tc m effs. (Monad m, Show rc, Eq rc, Titled rc, Eq tc, Show tc, ToJSON tc, FromJSON tc, ToJSON rc, FromJSON rc, TestConfigClass tc, EFFLogger effs) =>
+                   FilterList rc tc                               -- filters
                    -> (forall i as vs. (ItemClass i vs, Show i, Show vs, Show as) => i -> as -> vs -> TestInfo i as vs)             -- test aggregator i.e. rslt constructor
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
-                   -> String                                          -- test address
+                   -> TestModule                                          -- test address
                    -> rc                                              -- runConfig
                    -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints
                    -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
@@ -361,9 +362,9 @@ testEndpointBase fltrs agg intrprt tstAddress rc iIds runner =
     logPtcl :: LogProtocol b -> m ()
     logPtcl = logger' intrprt
 
-    endpointFilter :: String -> TestFilter rc tc
+    endpointFilter :: TestModule -> TestFilter rc tc
     endpointFilter targAddress = TestFilter {
-      title = "test address does not match endpoint target: " <> targAddress,
+      title = "test address does not match endpoint target: " <> toString targAddress,
       predicate = \_ tc -> moduleAddress tc == targAddress
     }
 

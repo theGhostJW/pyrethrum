@@ -6,9 +6,30 @@ import ItemClass
 import Foundation.Extended
 import  Control.Monad.Freer
 import TestAndRunConfig
+import Data.Aeson.TH
+import Data.Aeson
 
-newtype ModuleAddress = ModuleAddress String
-newtype TestTitle = TestTitle String
+-- this result is ultimately serialsed to JSON as part of the log protocol data  
+-- type and can't serialise with custom typeclass constraints so forced to
+-- have the redundant testModAddress and testTitle even though this
+-- data is available via TestConfigClass
+data TestDisplayInfo tc = TestDisplayInfo {
+  testModAddress :: TestModule,
+  testTitle :: String,
+  testConfig :: tc
+}  
+
+deriving instance (Show tc) => Show (TestDisplayInfo tc) 
+deriving instance (Eq tc) => Eq (TestDisplayInfo tc)
+
+$(deriveJSON defaultOptions ''TestDisplayInfo)
+
+mkDisplayInfo :: TestConfigClass tc => tc -> TestDisplayInfo tc
+mkDisplayInfo tc = TestDisplayInfo {
+                                    testModAddress = moduleAddress tc,
+                                    testTitle = title tc,
+                                    testConfig = tc
+                                   }
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,
@@ -41,8 +62,7 @@ data TestComponents rc i effs as vs = TestComponents {
   testPrepState :: as -> Ensurable vs
 }
 
-data  GenericTest tc rc i effs as vs = GenericTest {
+data GenericTest tc rc i effs as vs = GenericTest {
   configuration :: tc,
   components :: ItemClass i vs => TestComponents rc i effs as vs
 }
-  

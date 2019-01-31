@@ -4,7 +4,7 @@
 module DSL.LogProtocol where
 
 import           DSL.Common (DetailedInfo, AppError)
-import           TestFilter (FilterRejection)
+import           TestFilter
 import           Foundation.Extended
 import           TestAndRunConfig
 import GHC.Generics
@@ -13,6 +13,7 @@ import Data.Aeson
 import Data.Either
 import Data.Aeson.Types
 import Data.Aeson.TH
+import RunnerBase as RB
 import qualified Data.HashMap.Lazy as HML
 import qualified Data.Text as T
 
@@ -26,17 +27,17 @@ data LogProtocol a where
   IOAction :: String -> LogProtocol String
 
   Error :: AppError -> LogProtocol AppError
-  FilterLog :: forall tc. (Show tc, Eq tc, ToJSON tc, FromJSON tc) => [Either (FilterRejection tc) tc] -> LogProtocol tc
+  FilterLog :: forall tc. (Show tc, Eq tc, ToJSON tc, FromJSON tc) => [FilterResult tc] -> LogProtocol tc
 
   StartRun :: forall rc. (Show rc, Eq rc, ToJSON rc, FromJSON rc) => String -> rc -> LogProtocol rc
   StartGroup :: String -> LogProtocol String
-  StartTest :: forall tc. (Show tc, Eq tc, ToJSON tc, FromJSON tc) => tc -> LogProtocol tc
-  StartIteration :: String -> Int -> LogProtocol (String, Int) -- iid / test module
-  EndIteration :: String -> Int -> String -> LogProtocol (String, Int, String) -- test module / test Info
+  StartTest :: forall tc. (Show tc, Eq tc, ToJSON tc, FromJSON tc) => TestDisplayInfo tc -> LogProtocol tc
+  StartIteration :: TestModule -> Int -> LogProtocol (String, Int) -- iid / test module
+  EndIteration :: TestModule -> Int -> String -> LogProtocol (String, Int, String) -- test module / iid / test Info
   EndRun :: forall rc. (Show rc, Eq rc, ToJSON rc, FromJSON rc) => rc -> LogProtocol rc
 
 deriving instance Show (LogProtocol a)
-deriving instance Eq (LogProtocol a)
+deriving instance Eq a => Eq (LogProtocol a)
 
 -- note can't derive Generic for a GADT need to use GADT otherwise type signatures in 
 -- Logger.hs get really ugly -> hand roll JSON instances
@@ -144,7 +145,7 @@ instance ToJSON (LogProtocol a) where
 
               FilterLog fList -> object [
                                          "type" .= toJSON FilterLogT, 
-                                         "errList" .= toJSON fList
+                                         "filterResults" .= toJSON fList
                                          ] 
 
               StartRun ttle rc -> object [
@@ -155,12 +156,12 @@ instance ToJSON (LogProtocol a) where
 
               StartGroup header -> object [
                                             "type" .= toJSON StartGroupT, 
-                                            "runConfig" .= header
+                                            "header" .= header
                                           ] 
 
-              StartTest tc -> object [
+              StartTest displayInfo -> object [
                                       "type" .= toJSON StartTestT, 
-                                      "testConfig" .= tc
+                                      "displayInfo" .= displayInfo
                                     ] 
 
               StartIteration moduleAddress' iterationId -> object [

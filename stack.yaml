@@ -134,6 +134,8 @@ extra-deps:
 - happy-1.19.9@sha256:f8c774230735a390c287b2980cfcd2703d24d8dde85a01ea721b7b4b4c82944f
 - tasty-discover-4.2.1@sha256:cd474a555cf524a82a294127588d91e7d93802c5fa276ea08b4f1f2bf6c37180
 - Glob-0.10.0@sha256:6ecdfb044f2fb9c3b3716c2093e5da0eeea2cd0f6aebac5cdf40979c038e836f
+- cmdargs-0.10.20@sha256:76cf238367e669833929dd264b4fc2278145ddf5b743624f2d5558cca16a08a9
+- fsnotify-0.3.0.1@sha256:58bb530d7acf93eb4ed69473e32a1485581815f04f69dfc8a278523781ba49dd
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

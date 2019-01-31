@@ -6,7 +6,7 @@
 module DemoProject.Test.Simple where
 
 import           Check
-import  DemoProject.Config
+import  DemoProject.Config as C
 import DSL.Ensure
 import Runner as R
 import           Control.Monad.Freer
@@ -15,11 +15,12 @@ import           Foundation.Extended hiding (Item)
 import qualified Prelude as P
 import Data.Aeson.TH
 import OrphanedInstances
+import TestAndRunConfig
 
 type Effects effs = EFFEnsureLog effs
 
 config :: TestConfig
-config = testConfig {
+config = C.testConfig {
   header = "This Simple Test Only Uses Ensure Effects"
 }
 
@@ -73,8 +74,8 @@ items = [
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-nameOfModule :: String
-nameOfModule = moduleOf ''ApState
+nameOfModule :: TestModule
+nameOfModule = mkTestModule ''ApState
 
 ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr items)

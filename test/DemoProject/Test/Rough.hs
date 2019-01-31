@@ -7,7 +7,7 @@ module DemoProject.Test.Rough where
 
 import           DSL.Logger
 import           Check
-import           DemoProject.Config
+import           DemoProject.Config as C
 import Text.Show.Pretty as PP
 import           Control.Monad.Freer
 import           Control.Monad
@@ -17,18 +17,19 @@ import           DSL.Interpreter
 import           DSL.ArbitraryIO
 import qualified Prelude as P
 import           Foundation.Extended             hiding (readFile, writeFile, Item)
-import           Runner as R
+import Runner as R 
 import Type.Reflection
 import Data.Aeson.TH
 import GHC.Generics
 import qualified Data.Serialize as S
 import qualified System.Environment as E
 import OrphanedInstances
+import TestAndRunConfig
 
 type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
 
 config :: TestConfig
-config = testConfig {
+config = C.testConfig {
   header = "This is a Rough Test",
   countries = allCountries
  }
@@ -109,8 +110,10 @@ items = [
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-nameOfModule :: String
-nameOfModule = moduleOf ''ApState
+
+nameOfModule :: TestModule
+nameOfModule = mkTestModule ''ApState
+
 
 ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr items)

@@ -9,10 +9,11 @@ import           Foundation.String as S
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Writer
 import Text.Show.Pretty as PP
-import TestAndRunConfig
+import TestAndRunConfig as C
 import qualified Prelude as P
 import System.IO
-import           TestFilter (FilterRejection)
+import           TestFilter
+import           RunnerBase
 
 data Logger r where
  LogItem :: LogProtocol a -> Logger ()
@@ -59,15 +60,15 @@ prtyInfo msg adInfo = Info (showPretty msg) (showPretty adInfo)
 putLines :: Handle -> String -> IO ()
 putLines hOut s = P.sequence_ $ hPutStrLn hOut . toList <$> S.lines s
 
-prettyPrintFilterItem :: TestConfigClass tc => Either (FilterRejection tc) tc -> String
-prettyPrintFilterItem =
+prettyPrintFilterItem :: FilterResult tc -> String
+prettyPrintFilterItem FilterResult{..} =
     let
-      description :: TestConfigClass cfg => cfg -> String
-      description cnfg = moduleAddress cnfg <> " - " <> title cnfg
+      description :: String
+      description = (toString $ testModAddress testInfo) <> " - " <> testTitle testInfo
     in
-      either
-        (\r -> "rejected: " <> description (cfg r) <> " - Reason: " <> reason r)
-        (\cfg -> "accepted: " <> description cfg)
+      maybef reasonForRejection
+        ("accepted: " <> description)
+        (\reason -> "rejected: " <> description <> " - Reason: " <> reason)
 
 
 logStrPP :: LogProtocol a -> String
@@ -76,7 +77,7 @@ logStrPP =
               hdr l h = l <> " " <> h <> " " <> l
               subHeader = hdr "----"
               header = hdr "===="
-              iterId tst iid = tst <> " / item " <> show iid
+              iterId tst iid = toString tst <> " / item " <> show iid
               newLn = "\n" :: String
             in
               \case
@@ -95,7 +96,7 @@ logStrPP =
                    StartRun ttle rc -> header ("Test Run: " <> ttle) <> newLn <> showPretty rc
                    StartGroup s -> header $ "Group: " <> s
 
-                   StartTest tc -> subHeader ("Start Test: " <> moduleAddress tc <> " - " <> title tc)
+                   StartTest TestDisplayInfo{..} -> subHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle)
                    StartIteration test iid -> subHeader ("Start Iteration: " <> iterId test iid)
                    EndIteration test iid info -> subHeader ("End Iteration: " <> iterId test iid) <> newLn <> info
                    EndRun rc -> header "End Run"

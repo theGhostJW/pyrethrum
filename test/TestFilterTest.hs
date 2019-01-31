@@ -20,7 +20,7 @@ data RunConfig = RunConfig {
 
 data TestConfig = TestConfig {
   header :: String,
-  address :: String,
+  address :: TestModule,
   countries :: [Country],
   level :: TestDepth,
   enabled :: Bool
@@ -56,7 +56,7 @@ test1 :: TST MyInt effs MyInt MyInt
 test1 = GenericTest {
               configuration = TestConfig {
                 header = "test1",
-                address = "test1",
+                address = TestModule "test1",
                 countries = au <> nz,
                 level = Regression,
                 enabled = True
@@ -68,7 +68,7 @@ test2 :: TST MyInt effs MyInt MyInt
 test2 = GenericTest {
               configuration = TestConfig {
                 header = "test2",
-                address = "test2",
+                address = TestModule "test2",
                 countries = nz,
                 level = Regression,
                 enabled = True
@@ -80,7 +80,7 @@ test3 :: TST MyInt effs MyInt MyInt
 test3 = GenericTest {
                 configuration = TestConfig {
                   header = "test3",
-                  address = "test3",
+                  address = TestModule "test3",
                   countries = au,
                   level = Connectivity,
                   enabled = True
@@ -92,7 +92,7 @@ test4 :: TST MyInt effs MyInt MyInt
 test4 = GenericTest {
               configuration = TestConfig {
                   header = "test4",
-                  address = "test4",
+                  address = TestModule "test4",
                   countries = au,
                   level = DeepRegression,
                   enabled = True
@@ -104,7 +104,7 @@ test5 :: TST MyInt effs MyInt MyInt
 test5 = GenericTest {
               configuration = TestConfig {
                   header = "test5",
-                  address = "test5",
+                  address = TestModule "test5",
                   countries = au,
                   level = DeepRegression,
                   enabled = False
@@ -163,11 +163,11 @@ levelFilter = TestFilter {
 filters :: [TestFilter RunConfig TestConfig]
 filters = [enabledFilter, countryFilter, levelFilter]
 
-filterList :: RunConfig -> [Either (FilterRejection TestConfig) TestConfig]
+filterList :: RunConfig -> [FilterResult TestConfig]
 filterList rc = filterLog $ filterGroups runRunner filters rc
 
 runFilters :: RunConfig -> [String]
-runFilters rc = (header :: TestConfig -> String ) <$> rights (filterList rc)
+runFilters rc = (header :: TestConfig -> String ) <$> testConfig . testInfo <$> F.filter acceptFilter (filterList rc)
 
 chkFilters :: [String] -> RunConfig -> Assertion
 chkFilters expted rc = chkEq expted $ runFilters rc
@@ -179,7 +179,7 @@ unit_test_filter_country2 = chkFilters ["test1", "test3", "test4"] $ RunConfig A
 
 
 filtersExcludeReasons :: RunConfig -> [String]
-filtersExcludeReasons rc = reason <$> lefts (filterList rc)
+filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> F.filter rejectFilter (filterList rc)
 
 unit_test_filter_exclude_reasons = chkEq [
                                           "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",

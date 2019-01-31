@@ -51,7 +51,7 @@ ghc-options:
   - -fno-warn-unused-matches
   - -fno-warn-unused-binds
   - -fno-warn-unused-do-bind
-  - -fdefer-type-errors
+  # - -fdefer-type-errors
 
 default-extensions:
   - AllowAmbiguousTypes
@@ -107,6 +107,7 @@ library:
     - time
     - deepseq
     - unordered-containers
+    - template-haskell
 
 tests:
   pyrethrum-test:

@@ -147,7 +147,7 @@ runApState interactor prepState agg rc intrprt itm = let
                                                      in
                                                         (runVals <$>) <$> intrprt (interactor rc itm)
 
-runTestItems :: forall i as vs tc rc effs m. (Show i, Show as, Show vs, Show tc, Eq tc, Monad m, TestConfigClass tc, ItemClass i vs, Member Logger effs, ToJSON tc, FromJSON tc, ToJSON rc, FromJSON rc) =>
+runTestItems :: forall i as vs tc rc effs m. (Show i, Show as, Show vs, Show tc, Eq tc, Monad m, TestConfigClass tc, ItemClass i vs, Member Logger effs, ToJSON tc, FromJSON tc) =>
       tc
       -> Maybe (S.Set Int)                                                    -- target Ids
       -> [i]                                                                  -- items
@@ -184,7 +184,7 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
       [] -> []
       x : xs -> (logPtcl (StartTest $ mkDisplayInfo tc) *> runItem x) : (runItem <$> xs)
 
-runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Show tc, Eq tc, TestConfigClass tc, ToJSON tc, FromJSON tc, ToJSON rc, FromJSON rc, Member Logger effs) =>
+runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, Show tc, Eq tc, TestConfigClass tc, ToJSON tc, FromJSON tc, Member Logger effs) =>
                    Maybe (S.Set Int)                                  -- target Ids
                    -> FilterList rc tc                               -- filters
                    -> (i -> as -> vs -> TestInfo i as vs)             -- aggregator i.e. rslt constructor

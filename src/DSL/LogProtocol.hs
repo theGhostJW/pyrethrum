@@ -85,7 +85,6 @@ instance FromJSON (Some LogProtocol) where
       failMessage = toS $ "Could not parse LogProtocol no type field or type field value is not a member of specified in: " 
                       <> (show (tagList :: [LPTag])) 
                       <> show v
-
     in 
       maybef tag 
         (fail failMessage )
@@ -97,10 +96,10 @@ instance FromJSON (Some LogProtocol) where
             WarningT' -> Some <$> (Warning' <$> o .: "info")
             IOActionT -> Some <$> (IOAction <$> o .: "txt")
             ErrorT -> Some <$> (DSL.LogProtocol.Error <$> o .: "err")
-            FilterLogT -> Some <$> (FilterLog <$> o .: "errList")
+            FilterLogT -> Some <$> (FilterLog <$> o .: "filterResults")
             StartRunT -> Some <$> (StartRun <$> o .: "title" <*> o .: "runConfig")
-            StartGroupT -> Some <$> (StartGroup <$> o .: "runConfig")
-            StartTestT -> Some <$> (StartTest <$> o .: "testConfig")
+            StartGroupT -> Some <$> (StartGroup <$> o .: "header")
+            StartTestT -> Some <$> (StartTest <$> o .: "displayInfo")
             StartIterationT -> Some <$> (StartIteration <$> o .: "moduleAddress" <*> o .: "iterationId")
             EndIterationT -> Some <$> (EndIteration <$> o .: "moduleAddress" <*> o .: "iterationId" <*> o .: "tstInfo")
             EndRunT -> Some <$> (EndRun <$> o .: "runConfig")

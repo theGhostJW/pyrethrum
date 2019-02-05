@@ -121,3 +121,4 @@ tests:
       - hedgehog
       - pyrethrum
       - listsafe
+      - bytestring

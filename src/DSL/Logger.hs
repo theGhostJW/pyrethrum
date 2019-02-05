@@ -55,7 +55,7 @@ showPretty :: Show a => a -> String
 showPretty = toStr . ppShow
 
 prtyInfo :: (Show s, Show s1)  => s -> s1 -> DetailedInfo
-prtyInfo msg adInfo = Info (showPretty msg) (showPretty adInfo)
+prtyInfo msg adInfo = DetailedInfo (showPretty msg) (showPretty adInfo)
 
 putLines :: Handle -> String -> IO ()
 putLines hOut s = P.sequence_ $ hPutStrLn hOut . toList <$> S.lines s

@@ -13,7 +13,7 @@ data PreTestStage = Rollover |
 
 $(deriveJSON defaultOptions ''PreTestStage)
 
-data DetailedInfo = Info {
+data DetailedInfo = DetailedInfo {
             message :: String,
             info    :: String
           }

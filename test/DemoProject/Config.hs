@@ -13,9 +13,9 @@ import Data.Aeson
 import Data.Aeson.TH
 import RunnerBase
 
-data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord)
-data Country = AU | NZ deriving (Show, Eq, Ord)
-data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord)
+data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
+data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
+data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
 
 data RunConfig = RunConfig {
   runTitle    :: String,
@@ -33,7 +33,7 @@ instance Titled RunConfig where
   title = runTitle
 
 allEnvironments :: Set Environment
-allEnvironments = S.fromList [TST, UAT, PreProd, Prod]
+allEnvironments = S.fromList $ enumList
 
 allNonProdEnvironments :: Set Environment
 allNonProdEnvironments = S.fromList [TST, UAT, PreProd]

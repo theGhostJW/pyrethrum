@@ -62,6 +62,7 @@ $(deriveJSON defaultOptions ''LPTag)
 -- https://stackoverflow.com/a/41207422/5589037
 -- https://medium.com/@jonathangfischoff/existential-quantification-patterns-and-antipatterns-3b7b683b7d71 -- pattern 2
 -- https://stackoverflow.com/questions/2300275/how-to-unpack-a-haskell-existential-type -- cant be done
+-- https://stackoverflow.com/questions/54393198/how-can-i-implement-fromjson-on-a-gadt-with-custom-type-class-constraints -- I shouldn't do this
 
 --data AnyLogProtocol = forall a. AnyLogProtocol (LogProtocol a)
 
@@ -70,6 +71,8 @@ $(deriveJSON defaultOptions ''LPTag)
 
 data Some (t :: k -> *) where
   Some :: t x -> Some t
+
+deriving instance Show (Some LogProtocol)
 
 instance FromJSON (Some LogProtocol) where
 
@@ -83,7 +86,7 @@ instance FromJSON (Some LogProtocol) where
 
       failMessage :: [Char]
       failMessage = toS $ "Could not parse LogProtocol no type field or type field value is not a member of specified in: " 
-                      <> (show (tagList :: [LPTag])) 
+                      <> (show (enumList :: [LPTag])) 
                       <> show v
     in 
       maybef tag 
@@ -107,75 +110,72 @@ instance FromJSON (Some LogProtocol) where
 
   parseJSON wtf = typeMismatch "LogProtocol" wtf
 
-tagList :: Enum a => [a]
-tagList = enumFrom $ toEnum 0
-
-instance ToJSON (LogProtocol a) where
-  toJSON :: LogProtocol a -> Value
+instance ToJSON (Some LogProtocol) where
+  toJSON :: Some LogProtocol -> Value
   toJSON = \case 
-              Message str -> object [
+              Some (Message str) -> object [
                                       "type" .= toJSON MessageT, 
                                       "txt" .= str
                                     ]
 
-              Message' detailedInfo -> object [
+              Some (Message' detailedInfo) -> object [
                                               "type" .= toJSON MessageT', 
                                                "info" .= toJSON detailedInfo
                                               ]           
-              Warning str -> object [
+              Some (Warning str) -> object [
                                       "type" .= toJSON WarningT, 
                                       "txt" .= str
                                     ]
 
-              Warning' detailedInfo -> object [
+              Some (Warning' detailedInfo) -> object [
                                               "type" .= toJSON WarningT', 
                                               "info" .= toJSON detailedInfo
                                               ]
 
-              IOAction str -> object [
+              Some (IOAction str) -> object [
                                        "type" .= toJSON IOActionT, 
                                        "txt" .= str
                                       ]
 
-              DSL.LogProtocol.Error e -> object [
+              Some (DSL.LogProtocol.Error e) -> object [
                                                   "type" .= toJSON ErrorT, 
                                                   "err" .= toJSON e
                                                 ]
 
-              FilterLog fList -> object [
+              Some (FilterLog fList) -> object [
                                          "type" .= toJSON FilterLogT, 
                                          "filterResults" .= toJSON fList
                                          ] 
 
-              StartRun ttle rc -> object [
+              Some (StartRun ttle rc) -> object [
                                       "type" .= toJSON StartRunT, 
                                       "title" .= ttle,
                                       "runConfig" .= rc
                                     ] 
 
-              StartGroup header -> object [
+              Some (StartGroup header) -> object [
                                             "type" .= toJSON StartGroupT, 
                                             "header" .= header
                                           ] 
 
-              StartTest displayInfo -> object [
+              Some (StartTest displayInfo) -> object [
                                       "type" .= toJSON StartTestT, 
                                       "displayInfo" .= displayInfo
                                     ] 
 
-              StartIteration moduleAddress' iterationId -> object [
+              Some (StartIteration moduleAddress' iterationId) -> object [
                                                                     "type" .= toJSON StartIterationT, 
                                                                     "moduleAddress" .= moduleAddress',
                                                                     "iterartionId" .= iterationId
                                                                   ] 
 
-              EndIteration moduleAddress' iterationId tstInfo ->  object [
+              Some (EndIteration moduleAddress' iterationId tstInfo) ->  object [
                                                                           "type" .= toJSON EndIterationT, 
                                                                           "moduleAddress" .= moduleAddress',
                                                                           "iterartionId" .= iterationId,
                                                                           "tstInfo" .= tstInfo
                                                                           ] 
-              EndRun rc -> object [
+              Some (EndRun rc) -> object [
                                     "type" .= toJSON EndRunT, 
                                     "runConfig" .= rc
                                   ]

@@ -139,7 +139,7 @@ $(deriveToJSON defaultOptions ''Item)
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- https://stackoverflow.com/questions/53272036/freer-simple-how-can-i-generate-a-list-of-effect-members-at-runtime/53272316#53272316
+-- https://stackoverflow.com/a/53272316/5589037
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 newtype WithEffects_ es0 es1 a = WithEffects { unWithEffects :: Members es0 es1 => a }

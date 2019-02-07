@@ -16,6 +16,7 @@ import qualified Prelude as P
 import Data.Aeson.TH
 import OrphanedInstances
 import TestAndRunConfig
+import DemoProject.Test.TestFilePaths
 
 type Effects effs = EFFEnsureLog effs
 
@@ -60,14 +61,14 @@ data Item = TestItem {
 i = TestItem
 
 items = [
-          i 100 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] $
-                                                                            chk "iid is small" (\ApState{..} -> itemId < 200 ) <>
-                                                                            chk "iid is big"   (\vs -> itemId vs > 500),
-          i 110 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-          i 123 "Pre"  "Post"   [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
-          i 130 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-          i 140 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-          i 150 "Pre"  "Post"   [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty
+          i 100 "Pre"  "Post" validFile $
+                                         chk "iid is small" (\ApState{..} -> itemId < 200 ) <>
+                                         chk "iid is big"   (\vs -> itemId vs > 500),
+          i 110 "Pre"  "Post" validFile mempty,
+          i 123 "Pre"  "Post" invalidFile2 mempty,
+          i 130 "Pre"  "Post" validFile mempty,
+          i 140 "Pre"  "Post" validFile mempty,
+          i 150 "Pre"  "Post" validFile mempty
   ]
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

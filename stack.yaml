@@ -136,6 +136,7 @@ extra-deps:
 - Glob-0.10.0@sha256:6ecdfb044f2fb9c3b3716c2093e5da0eeea2cd0f6aebac5cdf40979c038e836f
 - cmdargs-0.10.20@sha256:76cf238367e669833929dd264b4fc2278145ddf5b743624f2d5558cca16a08a9
 - fsnotify-0.3.0.1@sha256:58bb530d7acf93eb4ed69473e32a1485581815f04f69dfc8a278523781ba49dd
+- wcwidth-0.0.2@sha256:77531eb6683c505c22ab3fa11bbc43d3ce1e7dac21401d4d5a19677d348bb5f3
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

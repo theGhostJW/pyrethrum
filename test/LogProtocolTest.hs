@@ -242,5 +242,5 @@ _failCaseData = StartTest
                       }
 
 
-hprop_fail1_log_protocol_tc_round_trip :: Property
-hprop_fail1_log_protocol_tc_round_trip  = lpRoundTrip (pure failCaseData) checkLogProtocoltc
+hprop_fail_log_protocol_tc_round_trip :: Property
+hprop_fail_log_protocol_tc_round_trip  = lpRoundTrip (pure failCaseData) checkLogProtocoltc

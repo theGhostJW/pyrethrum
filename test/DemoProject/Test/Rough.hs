@@ -2,6 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 -- should not need this: https://github.com/haskell/haskell-ide-engine/issues/842
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE CPP #-}
 
 module DemoProject.Test.Rough where
 
@@ -25,6 +26,7 @@ import qualified Data.Serialize as S
 import qualified System.Environment as E
 import OrphanedInstances
 import TestAndRunConfig
+import DemoProject.Test.TestFilePaths
 
 type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
 
@@ -58,7 +60,7 @@ interactor RunConfig{..} Item{..} = do
                                       txt <- readFile path
 
                                       when (iid == 140)
-                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" (Right "tHIS WILL BLOW UP") (readFileUTF8 [absfile|C:\Vids\SystemDesign\Blahhh.txt|])
+                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" (Right "tHIS WILL BLOW UP") (readFileUTF8 invalidFile)
 
                                       pure $ ApState  {
                                         itemId  = iid,
@@ -96,14 +98,14 @@ i = Item
 -- later optional hedgehog
 items :: [Item]
 items = [
-          i 100 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] $
+          i 100 "Pre"  "Post" validFile $
                               chk "iid x 10 is small" (\V{..} -> iidx10 < 200 ) <>
                               chk "iid x 10 is big"   (\V{..} -> iidx10 > 500),
-          i 110 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-          i 120 "Pre"  "Post" [absfile|R:\Vids\SystemDesign\Wrong.txt|]   mempty,
-          i 130 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-          i 140 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\VidList.txt|] mempty,
-          i 150 "Pre"  "Post" [absfile|C:\Vids\SystemDesign\Vid List.txt|] mempty
+          i 110 "Pre"  "Post" validFile mempty,
+          i 120 "Pre"  "Post" invalidFile2 mempty,
+          i 130 "Pre"  "Post" validFile mempty,
+          i 140 "Pre"  "Post" validFile mempty,
+          i 150 "Pre"  "Post" validFileWithSpace mempty
   ]
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

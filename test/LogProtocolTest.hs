@@ -21,6 +21,12 @@ import Data.Traversable
 import Data.Char
 import Data.Aeson.TH
 
+-- copied from later version of Data.Functor ~ remove later
+(<&>) :: Functor f => f a -> (a -> b) -> f b
+as <&> f = f <$> as
+
+infixl 1 <&>
+
 genStr :: Gen String
 genStr = 
   let 

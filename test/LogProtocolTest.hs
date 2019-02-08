@@ -21,12 +21,6 @@ import Data.Traversable
 import Data.Char
 import Data.Aeson.TH
 
--- copied from later version of Data.Functor ~ remove later
-(<&>) :: Functor f => f a -> (a -> b) -> f b
-as <&> f = f <$> as
-
-infixl 1 <&>
-
 genStr :: Gen String
 genStr = 
   let 
@@ -214,9 +208,6 @@ checkLogProtocoltc lp slp =
                 Some (EndIteration _ _ _) -> failure
                 Some (EndRun _) -> failure
 
-hprop_log_protocol_tc_round_trip  :: Property
-hprop_log_protocol_tc_round_trip = lpRoundTrip genLPTestConfig checkLogProtocoltc
-
 failCaseData = StartTest
                     TestDisplayInfo
                       { testModAddress = TestModule "v"
@@ -232,21 +223,9 @@ failCaseData = StartTest
                             }
                       }
 
-_failCaseData = StartTest
-                    TestDisplayInfo
-                      { testModAddress = TestModule "\ENQ"
-                      , testTitle = "\ENQ"
-                      , testConfig =
-                          TestConfig
-                            { header = "\ENQ"
-                            , address = TestModule "\ENQ"
-                            , environments = S.fromList []
-                            , countries = S.fromList []
-                            , minDepth = DeepRegression
-                            , active = False
-                            }
-                      }
-
-
 hprop_fail_log_protocol_tc_round_trip :: Property
 hprop_fail_log_protocol_tc_round_trip = lpRoundTrip (pure failCaseData) checkLogProtocoltc
+
+
+hprop_log_protocol_tc_round_trip  :: Property
+hprop_log_protocol_tc_round_trip = lpRoundTrip genLPTestConfig checkLogProtocoltc

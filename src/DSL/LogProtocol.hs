@@ -17,6 +17,7 @@ import RunnerBase as RB
 import qualified Data.HashMap.Lazy as HML
 import qualified Data.Text as T
 
+
 data LogProtocol a where
   Message :: String -> LogProtocol String
   Message' :: DetailedInfo -> LogProtocol DetailedInfo
@@ -41,6 +42,7 @@ deriving instance Eq a => Eq (LogProtocol a)
 
 -- note can't derive Generic for a GADT need to use GADT otherwise type signatures in 
 -- Logger.hs get really ugly -> hand roll JSON instances
+
 
 data LPTag = MessageT |
               MessageT' |

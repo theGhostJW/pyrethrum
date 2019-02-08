@@ -4,9 +4,10 @@ import           Check
 import           Foundation.Extended
 import           Foundation.List.DList
 import           Data.Yaml
+import GHC.Generics
 
 
-class ToJSON i => ItemClass i v | i -> v  where
+class (ToJSON i, Generic i) => ItemClass i v | i -> v  where
   identifier :: i -> Int
   whenClause :: i -> String
   thenClause :: i -> String

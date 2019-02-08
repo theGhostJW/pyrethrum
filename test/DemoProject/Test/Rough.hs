@@ -90,7 +90,7 @@ data Item = Item {
                     post   :: String,
                     path   :: Path Abs File,
                     checks :: CheckList ValState
-                  } deriving Show
+                  } deriving (Show, Generic)
 
 i = Item
 

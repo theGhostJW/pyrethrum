@@ -17,6 +17,7 @@ import Data.Aeson.TH
 import OrphanedInstances
 import TestAndRunConfig
 import DemoProject.Test.TestFilePaths
+import GHC.Generics
 
 type Effects effs = EFFEnsureLog effs
 
@@ -56,7 +57,7 @@ data Item = TestItem {
                       post   :: String,
                       path   :: Path Abs File,
                       checks :: CheckList ValState
-                    } deriving Show
+                    } deriving (Show, Generic)
 
 i = TestItem
 

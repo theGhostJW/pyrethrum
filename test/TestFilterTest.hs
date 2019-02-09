@@ -11,7 +11,7 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import GHC.Generics
 import TestFilter
-
+import Data.Aeson
 
 data RunConfig = RunConfig {
   country :: Country,
@@ -163,11 +163,11 @@ levelFilter = TestFilter {
 filters :: [TestFilter RunConfig TestConfig]
 filters = [enabledFilter, countryFilter, levelFilter]
 
-filterList :: RunConfig -> [FilterResult TestConfig]
+filterList :: RunConfig -> [FilterResult]
 filterList rc = filterLog $ filterGroups runRunner filters rc
 
 runFilters :: RunConfig -> [String]
-runFilters rc = (header :: TestConfig -> String ) <$> testConfig . testInfo <$> F.filter acceptFilter (filterList rc)
+runFilters rc = testTitle  <$> F.filter acceptFilter (filterList rc)
 
 chkFilters :: [String] -> RunConfig -> Assertion
 chkFilters expted rc = chkEq expted $ runFilters rc

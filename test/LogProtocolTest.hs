@@ -30,6 +30,9 @@ genStr =
     T.filter useVal $ string (linear 0 1000) ascii
 
 
+genTestModule :: Gen TestModule
+genTestModule = (TestModule <$> genStr)
+
 genTestConfig :: Gen TestConfig
 genTestConfig =
   let
@@ -38,7 +41,7 @@ genTestConfig =
   in
     TestConfig 
       <$> genStr 
-      <*> (TestModule <$> genStr)
+      <*> genTestModule
       <*> set'
       <*> set'
       <*> element enumList
@@ -55,177 +58,59 @@ genRunConfig =
 genDetailedInfo:: Gen DetailedInfo
 genDetailedInfo = DetailedInfo <$> genStr <*> genStr
 
-genTestDisplayInfo:: Gen (TestDisplayInfo TestConfig)
+genTestDisplayInfo:: Gen TestDisplayInfo
 genTestDisplayInfo = TestDisplayInfo 
-                                <$> (TestModule <$> genStr) 
+                                <$> genTestModule
                                 <*> genStr 
-                                <*> genTestConfig
+                                <*> (toJSON <$> genTestConfig)
 
-genFilterResult:: Gen (FilterResult TestConfig)
+genFilterResult:: Gen FilterResult
 genFilterResult = FilterResult 
                             <$> genTestDisplayInfo
                             <*> T.maybe genStr
 
-genFilterResults :: Gen [(FilterResult TestConfig)]
+genFilterResults :: Gen [FilterResult]
 genFilterResults =
          list (linear 0 20) genFilterResult
 
-genLogProtocol :: Gen (LogProtocol RunConfig)
+genInt :: Gen Int
+genInt = integral $ T.linear 0 1000
+
+genLogProtocol :: Gen LogProtocol
 genLogProtocol = choice [
-                   StartRun <$> genStr <*> genRunConfig,
-                   EndRun <$> genRunConfig
+                    Message <$> genStr,
+                    Message' <$> genDetailedInfo,
+                  
+                    Warning <$> genStr,
+                    Warning' <$> genDetailedInfo,
+                  
+                    IOAction <$> genStr,
+                  
+                    Error <$> AppUserError <$> genStr,
+                    FilterLog <$> genFilterResults,
+                  
+                    StartRun <$> genStr <*> (toJSON <$> genRunConfig),  -- title / runconfig
+                    StartGroup <$> genStr,
+                    StartTest <$> genTestDisplayInfo,
+                    StartIteration <$> genTestModule <*> genInt <*> (toJSON <$> genRunConfig),-- iid / test module / item - using runconfig for rand om JSON object
+                    EndIteration <$> genTestModule <*> genInt <*> genStr, -- test module / iid / test Info
+                    pure EndRun
                  ]
 
-genLPStringInt :: Gen (LogProtocol (String, Int))
-genLPStringInt = StartIteration <$> (TestModule <$> genStr) <*> int (linear 0 1000)
-
-genLPStringIntString :: Gen (LogProtocol (String, Int, String))
-genLPStringIntString = EndIteration <$> (TestModule <$> genStr) <*> int (linear 0 1000) <*> genStr
-
-genLPString:: Gen (LogProtocol String)
-genLPString =
-  choice $ (genStr <&>) <$> [
-    Message,
-    Warning,
-    IOAction,
-    StartGroup
-  ]
-
-genLPDetailedInfo:: Gen (LogProtocol DetailedInfo)
-genLPDetailedInfo = choice $ (genDetailedInfo <&>) <$> [Message', Warning']
-
-genLPError:: Gen (LogProtocol AppError)
-genLPError = (Error . AppUserError) <$> genStr
-
-genLPTestConfig:: Gen (LogProtocol TestConfig)
-genLPTestConfig = choice [
-                          StartTest <$> genTestDisplayInfo,
-                          FilterLog <$> genFilterResults
-                         ]
-
-lpRoundTrip :: Gen (LogProtocol a) -> (LogProtocol a -> Some LogProtocol -> PropertyT IO ()) -> Property
-lpRoundTrip g chkFunc = property $ do
-  lp <- forAll g
+hprop_log_protocol_round_trip :: Property
+hprop_log_protocol_round_trip = property $ do
+  lp <- forAll genLogProtocol
   let 
     serialised :: B.ByteString
     serialised = --debug' "Serialised" $ 
                  encode 
                 -- $ debug' "Log Protocol Obj" 
-                 $ Some lp
+                 $ lp
 
-    unserialised :: Either P.String (Some LogProtocol)
+    unserialised :: Either P.String LogProtocol
     unserialised = -- debug' "Deserialised" $ 
                     eitherDecode serialised
 
   eitherf unserialised
     (\s -> (footnote s) *> failure)
-    (chkFunc {- $ debug -} lp)
-
-checkIt :: IO [LogProtocol String]
-checkIt = traverse (\_ -> sample genLPString) [0..50]
-
-hprop_log_protocol_string_round_trip  :: Property
-hprop_log_protocol_string_round_trip  =
-  let 
-    checker :: LogProtocol String -> Some LogProtocol -> PropertyT IO ()
-    checker lp slp = 
-                case slp of
-                    Some m@(Message _) -> lp === m
-                    Some (Message' _) -> failure
-                    Some w@(Warning _) -> lp === w
-                    Some (Warning' _) -> failure
-                    Some a@(IOAction _) -> lp === a
-                    Some (Error _) -> failure
-                    Some (FilterLog _) -> failure
-                    Some (StartRun _ _) -> failure
-                    Some s@(StartGroup _) -> lp === s
-                    Some (StartTest _) -> failure
-                    Some (StartIteration _ _) -> failure
-                    Some (EndIteration _ _ _) -> failure
-                    Some (EndRun _) -> failure
-  in 
-    lpRoundTrip genLPString checker
-
-hprop_log_protocol_detailInfo_round_trip  :: Property
-hprop_log_protocol_detailInfo_round_trip  =
-  let 
-    checker :: LogProtocol DetailedInfo -> Some LogProtocol -> PropertyT IO ()
-    checker lp slp = 
-                case slp of
-                    Some (Message _) -> failure
-                    Some m@(Message' _) -> lp === m
-                    Some (Warning _) -> failure
-                    Some m@(Warning' _) -> lp === m
-                    Some (IOAction _) -> failure
-                    Some (Error _) -> failure
-                    Some (FilterLog _) -> failure
-                    Some (StartRun _ _) -> failure
-                    Some (StartGroup _) -> failure
-                    Some (StartTest _) -> failure
-                    Some (StartIteration _ _) -> failure
-                    Some (EndIteration _ _ _) -> failure
-                    Some (EndRun _) -> failure
-  in 
-    lpRoundTrip genLPDetailedInfo checker
-
-hprop_log_protocol_errorInfo_round_trip  :: Property
-hprop_log_protocol_errorInfo_round_trip  =
-  let 
-    checker :: LogProtocol AppError -> Some LogProtocol -> PropertyT IO ()
-    checker lp slp = 
-                case slp of
-                    Some (Message _) -> failure
-                    Some m@(Message' _) -> failure
-                    Some (Warning _) -> failure
-                    Some m@(Warning' _) -> failure
-                    Some (IOAction _) -> failure
-                    Some e@(Error _) -> lp === e
-                    Some (FilterLog _) -> failure
-                    Some (StartRun _ _) -> failure
-                    Some (StartGroup _) -> failure
-                    Some (StartTest _) -> failure
-                    Some (StartIteration _ _) -> failure
-                    Some (EndIteration _ _ _) -> failure
-                    Some (EndRun _) -> failure
-  in 
-    lpRoundTrip genLPError checker
-
-
-checkLogProtocoltc :: LogProtocol TestConfig -> Some LogProtocol -> PropertyT IO ()
-checkLogProtocoltc lp slp = 
-            case slp of
-                Some (Message _) -> failure
-                Some (Message' _) -> failure
-                Some (Warning _) -> failure
-                Some (Warning' _) -> failure
-                Some (IOAction _) -> failure
-                Some (Error _) -> failure
-                Some i@(FilterLog _) -> show lp === show i 
-                Some (StartRun _ _) -> failure
-                Some (StartGroup _) -> failure
-                Some (i@(StartTest displayInfo)) -> show lp === show i 
-                Some (StartIteration _ _) -> failure
-                Some (EndIteration _ _ _) -> failure
-                Some (EndRun _) -> failure
-
-failCaseData = StartTest
-                    TestDisplayInfo
-                      { testModAddress = TestModule "v"
-                      , testTitle = "v"
-                      , testConfig =
-                          TestConfig
-                            { header = "v"
-                            , address = TestModule "v"
-                            , environments = S.fromList []
-                            , countries = S.fromList []
-                            , minDepth = DeepRegression
-                            , active = False
-                            }
-                      }
-
-hprop_fail_log_protocol_tc_round_trip :: Property
-hprop_fail_log_protocol_tc_round_trip = lpRoundTrip (pure failCaseData) checkLogProtocoltc
-
-
-hprop_log_protocol_tc_round_trip  :: Property
-hprop_log_protocol_tc_round_trip = lpRoundTrip genLPTestConfig checkLogProtocoltc
+    (lp ===)

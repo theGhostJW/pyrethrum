@@ -17,9 +17,6 @@ import RunnerBase as RB
 import qualified Data.HashMap.Lazy as HML
 import qualified Data.Text as T
 
-
-
-
 data LogProtocol =
   Message String |
   Message' DetailedInfo |
@@ -35,7 +32,7 @@ data LogProtocol =
   StartRun String Value |  -- title / runconfig
   StartGroup String |
   StartTest TestDisplayInfo |
-  StartIteration TestModule Int Value| -- iid / test module / item
+  StartIteration TestModule Int Value | -- iid / test module / item
   EndIteration TestModule Int String  | -- test module / iid / test Info
   EndRun
 

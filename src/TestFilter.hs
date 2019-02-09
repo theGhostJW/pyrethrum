@@ -7,30 +7,25 @@ import Data.Functor.Identity
 import RunnerBase as RB
 import TestAndRunConfig as C
 import Data.List as L
+import Data.Aeson
 
 type TestAddress = String
 
--- this result is ultimately serialsed to JSON as part of the log protocol data  
--- type and can't serialise with custom typeclass constraints so forced to
--- have the redundant testModAddress and testTitle even though this
--- data is available via TestConfigClass
-data FilterResult tc = FilterResult {
-  testInfo  :: TestDisplayInfo tc,
+data FilterResult = FilterResult {
+  testInfo  :: TestDisplayInfo, 
   reasonForRejection :: Maybe String
-}  deriving Show
+}  deriving (Show, Eq)
 
-deriving instance (Eq tc) => Eq (FilterResult tc)
-
-acceptFilter :: FilterResult tc -> Bool
+acceptFilter :: FilterResult -> Bool
 acceptFilter = isNothing . reasonForRejection
 
-rejectFilter :: FilterResult tc -> Bool
+rejectFilter :: FilterResult -> Bool
 rejectFilter = isJust . reasonForRejection
 
 $(deriveJSON defaultOptions ''FilterResult)
 
-mkFilterResult :: TestConfigClass tc => tc -> Maybe String -> FilterResult tc
-mkFilterResult tc rejection= FilterResult {
+mkFilterResult :: TestConfigClass tc => tc -> Maybe String -> FilterResult
+mkFilterResult tc rejection = FilterResult {
                                 testInfo = mkDisplayInfo tc,
                                 reasonForRejection = rejection
                               }
@@ -42,40 +37,43 @@ data TestFilter rc tc = TestFilter {
 
 type FilterList rc tc = [TestFilter rc tc]
 
-filterTestCfg :: forall rc tc. TestConfigClass tc => FilterList rc tc -> rc -> tc -> FilterResult tc
+filterTestCfg :: forall rc tc. TestConfigClass tc => FilterList rc tc -> rc -> tc -> FilterResult
 filterTestCfg fltrs rc tc =
   let
-    applyFilter :: TestFilter rc tc -> FilterResult tc
-    applyFilter fltr = mkFilterResult tc $ predicate fltr rc tc 
+    fltrRslt :: Maybe String -> FilterResult
+    fltrRslt = mkFilterResult tc 
+
+    applyFilter :: TestFilter rc tc -> FilterResult
+    applyFilter fltr = fltrRslt $ predicate fltr rc tc 
                                              ? Nothing 
                                              $ Just $ TestFilter.title fltr
 
     firstRejectReason :: Maybe String
     firstRejectReason = (L.find rejectFilter $ applyFilter <$> fltrs) >>= reasonForRejection
   in
-    mkFilterResult tc firstRejectReason
+    fltrRslt firstRejectReason
     
 
-filterTest :: forall i as vs tc rc effs. TestConfigClass tc => FilterList rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (Identity (FilterResult tc))
+filterTest :: forall i as vs tc rc effs. TestConfigClass tc => FilterList rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (Identity (FilterResult))
 filterTest fltrs rc GenericTest{..} = Identity . Identity $ filterTestCfg fltrs rc configuration
 
 filterGroups :: forall tc rc effs. TestConfigClass tc =>
               (
                 (forall i as vs. (Show i, Show as, Show vs) =>
-                      GenericTest tc rc i effs as vs -> Identity (Identity (FilterResult tc))) -> [TestGroup Identity Identity (FilterResult tc) effs]
+                      GenericTest tc rc i effs as vs -> Identity (Identity (FilterResult))) -> [TestGroup Identity Identity (FilterResult) effs]
               )
               -> FilterList rc tc
               -> rc
-              -> [[FilterResult tc]]
+              -> [[FilterResult]]
 filterGroups groupLst fltrs rc =
     let
-      testFilter :: GenericTest tc rc i effs as vs -> Identity (Identity (FilterResult tc))
+      testFilter :: GenericTest tc rc i effs as vs -> Identity (Identity (FilterResult))
       testFilter = filterTest fltrs rc
     in
       (runIdentity . runIdentity <$>) <$> (tests <$> groupLst testFilter)
 
-filterLog :: forall tc. [[FilterResult tc]] -> [FilterResult tc]
+filterLog :: [[FilterResult]] -> [FilterResult]
 filterLog = mconcat
 
-filterGroupFlags :: forall tc. [[FilterResult tc]] -> [Bool]
+filterGroupFlags :: [[FilterResult]] -> [Bool]
 filterGroupFlags grpFltrRslts = F.any acceptFilter <$> grpFltrRslts

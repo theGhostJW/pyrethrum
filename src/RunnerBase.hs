@@ -13,22 +13,19 @@ import Data.Aeson
 -- type and can't serialise with custom typeclass constraints so forced to
 -- have the redundant testModAddress and testTitle even though this
 -- data is available via TestConfigClass
-data TestDisplayInfo tc = TestDisplayInfo {
+data TestDisplayInfo = TestDisplayInfo {
   testModAddress :: TestModule,
   testTitle :: String,
-  testConfig :: tc
-}  
-
-deriving instance (Show tc) => Show (TestDisplayInfo tc) 
-deriving instance (Eq tc) => Eq (TestDisplayInfo tc)
+  testConfig :: Value -- test Config as Json
+}  deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''TestDisplayInfo)
 
-mkDisplayInfo :: TestConfigClass tc => tc -> TestDisplayInfo tc
+mkDisplayInfo :: TestConfigClass tc => tc -> TestDisplayInfo
 mkDisplayInfo tc = TestDisplayInfo {
                                     testModAddress = moduleAddress tc,
                                     testTitle = title tc,
-                                    testConfig = tc
+                                    testConfig = toJSON tc
                                    }
 
 data GenericResult tc rslt = TestResult {

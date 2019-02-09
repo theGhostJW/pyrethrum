@@ -32,6 +32,8 @@ $(deriveJSON defaultOptions ''RunConfig)
 instance Titled RunConfig where
   title = runTitle
 
+instance RunConfigClass RunConfig
+
 allEnvironments :: Set Environment
 allEnvironments = S.fromList $ enumList
 

@@ -70,8 +70,8 @@ genFilterResults :: Gen [(FilterResult TestConfig)]
 genFilterResults =
          list (linear 0 20) genFilterResult
 
-genLPrc :: Gen (LogProtocol RunConfig)
-genLPrc = choice [
+genLogProtocol :: Gen (LogProtocol RunConfig)
+genLogProtocol = choice [
                    StartRun <$> genStr <*> genRunConfig,
                    EndRun <$> genRunConfig
                  ]

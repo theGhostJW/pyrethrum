@@ -16,15 +16,15 @@ import           TestFilter
 import           RunnerBase
 
 data Logger r where
- LogItem :: LogProtocol a -> Logger ()
+ LogItem :: LogProtocol -> Logger ()
 
-logItem :: Member Logger effs => LogProtocol a -> Eff effs ()
+logItem :: Member Logger effs => LogProtocol -> Eff effs ()
 logItem = send . LogItem
 
-simpleLog :: forall s a effs. (Show s, Member Logger effs) => (String -> LogProtocol a) -> s -> Eff effs ()
+simpleLog :: forall s effs. (Show s, Member Logger effs) => (String -> LogProtocol) -> s -> Eff effs ()
 simpleLog lpCons = logItem . lpCons . showPretty
 
-detailLog :: forall a s effs. (Show s, Member Logger effs) => (DetailedInfo -> LogProtocol a) -> s -> s -> Eff effs ()
+detailLog :: forall s effs. (Show s, Member Logger effs) => (DetailedInfo -> LogProtocol) -> s -> s -> Eff effs ()
 detailLog lpCons msg additionalInfo = logItem $ lpCons $ prtyInfo msg additionalInfo
 
 log :: forall s effs. (Show s, Member Logger effs) => s -> Eff effs ()
@@ -60,7 +60,7 @@ prtyInfo msg adInfo = DetailedInfo (showPretty msg) (showPretty adInfo)
 putLines :: Handle -> String -> IO ()
 putLines hOut s = P.sequence_ $ hPutStrLn hOut . toList <$> S.lines s
 
-prettyPrintFilterItem :: FilterResult tc -> String
+prettyPrintFilterItem :: FilterResult -> String
 prettyPrintFilterItem FilterResult{..} =
     let
       description :: String
@@ -71,7 +71,7 @@ prettyPrintFilterItem FilterResult{..} =
         (\reason -> "rejected: " <> description <> " - Reason: " <> reason)
 
 
-logStrPP :: LogProtocol a -> String
+logStrPP :: LogProtocol -> String
 logStrPP =
             let
               hdr l h = l <> " " <> h <> " " <> l
@@ -97,9 +97,9 @@ logStrPP =
                    StartGroup s -> header $ "Group: " <> s
 
                    StartTest TestDisplayInfo{..} -> subHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle)
-                   StartIteration test iid -> subHeader ("Start Iteration: " <> iterId test iid)
+                   StartIteration test iid _ -> subHeader ("Start Iteration: " <> iterId test iid)
                    EndIteration test iid info -> subHeader ("End Iteration: " <> iterId test iid) <> newLn <> info
-                   EndRun rc -> header "End Run"
+                   EndRun -> header "End Run"
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsolePrettyInterpreter = logToHandlePrettyInterpreter stdout

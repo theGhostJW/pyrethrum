@@ -30,7 +30,6 @@ dependencies:
   - text
   - transformers-either
   - aeson
-  - waargonaut
   - yaml
   - cereal
   - pretty-show

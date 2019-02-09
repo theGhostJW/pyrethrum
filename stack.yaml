@@ -53,15 +53,9 @@ extra-deps:
 # mine
 - git: https://github.com/theGhostJW/reexports-and-extensions
   commit: "548b19b"
-- hw-json-0.9.0.1
-- hw-parser-0.1.0.0
 # stack
 - foundation-edge-0.0.3@sha256:ae2133074cb651379c101697a71fa0d3693d8780687c8ec8a13cb98c1fb48d7f
 - transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961
-- waargonaut-0.5.2.1@sha256:10ebb223fc26197a8a4986079bcaa20683409746162e8b27dac69f49606f9d38
-- digit-0.7@sha256:d7e8252022d89cc962da29fdb54bdda54d997c2073b6977e6490b8bcd877650c
-- hoist-error-0.2.1.0@sha256:25dba3c9472369f01defad260af30f3d585fb9e2c8775fe04e731a92bbbf7f29
-- natural-0.3.0.4@sha256:c8246773a32240738a18b17b33b794e4fe0a6a41d45a78e9683b616280a8a799
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

@@ -22,12 +22,7 @@ import Data.Char
 import Data.Aeson.TH
 
 genStr :: Gen String
-genStr = 
-  let 
-    useVal :: String -> Bool
-    useVal s = not $ F.elem s ["", "\NUL", "\SOH",  "\STX", "\ETX", "\EOT"]
-  in
-    T.filter useVal $ string (linear 0 1000) ascii
+genStr = string (linear 0 1000) ascii
 
 
 genTestModule :: Gen TestModule
@@ -104,7 +99,7 @@ hprop_log_protocol_round_trip = property $ do
     serialised :: B.ByteString
     serialised = --debug' "Serialised" $ 
                  encode 
-                -- $ debug' "Log Protocol Obj" 
+                 -- $ debug' "Log Protocol Obj" 
                  $ lp
 
     unserialised :: Either P.String LogProtocol

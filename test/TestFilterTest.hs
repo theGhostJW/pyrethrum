@@ -13,6 +13,12 @@ import GHC.Generics
 import TestFilter
 import Data.Aeson
 
+data TestDepth = Connectivity | Regression | DeepRegression deriving (Eq, Ord, Show)
+data Country = Au | NZ deriving (Eq, Ord, Show)
+
+$(deriveJSON defaultOptions ''Country)
+$(deriveJSON defaultOptions ''TestDepth)
+
 data RunConfig = RunConfig {
   country :: Country,
   level :: TestDepth
@@ -24,13 +30,15 @@ data TestConfig = TestConfig {
   countries :: [Country],
   level :: TestDepth,
   enabled :: Bool
-}  deriving Show
+}  deriving (Show ,Eq)
 
 instance TestConfigClass TestConfig where
   moduleAddress = address
 
 instance Titled TestConfig where
   title = header
+
+$(deriveJSON defaultOptions ''TestConfig)
 
 type TST = GenericTest TestConfig RunConfig
 
@@ -45,9 +53,6 @@ instance ItemClass MyInt MyInt where
 
 instance ToJSON MyInt where
   toEncoding = genericToEncoding defaultOptions
-
-data TestDepth = Connectivity | Regression | DeepRegression deriving (Eq, Ord, Show)
-data Country = Au |NZ deriving (Eq, Ord, Show)
 
 au = [Au]
 nz = [NZ]
@@ -167,7 +172,7 @@ filterList :: RunConfig -> [FilterResult]
 filterList rc = filterLog $ filterGroups runRunner filters rc
 
 runFilters :: RunConfig -> [String]
-runFilters rc = testTitle  <$> F.filter acceptFilter (filterList rc)
+runFilters rc = testTitle . testInfo <$> F.filter acceptFilter (filterList rc)
 
 chkFilters :: [String] -> RunConfig -> Assertion
 chkFilters expted rc = chkEq expted $ runFilters rc

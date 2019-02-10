@@ -24,7 +24,6 @@ import Data.Aeson.TH
 genStr :: Gen String
 genStr = string (linear 0 1000) ascii
 
-
 genTestModule :: Gen TestModule
 genTestModule = (TestModule <$> genStr)
 

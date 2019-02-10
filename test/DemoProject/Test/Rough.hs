@@ -210,6 +210,14 @@ demo2 = showEffs2 test2
     -- log to file ✔
     -- log to both ✔
     -- log summary - data types -> print
+    -- In memory
+    --   * Json to file 
+    --   * raw -> test iteration summary
+    --   * iteration summarry -> Test Summary 
+    --   * Test Summary -> Run Summary
+    --   * broken
+    -- > on file  
 
+    -- 12. A selenium
 -- 14.0 - hedgehog / randomiser
 -- 15.0 ~ report generation

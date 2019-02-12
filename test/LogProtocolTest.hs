@@ -87,7 +87,8 @@ genLogProtocol = choice [
                     StartGroup <$> genStr,
                     StartTest <$> genTestDisplayInfo,
                     StartIteration <$> genTestModule <*> genInt <*> (toJSON <$> genRunConfig),-- iid / test module / item - using runconfig for rand om JSON object
-                    EndIteration <$> genTestModule <*> genInt <*> genStr, -- test module / iid / test Info
+                    Result <$> genTestModule <*> genInt <*> genStr, -- test module / iid / test Info
+                    EndIteration <$> genTestModule <*> genInt, -- test module / iid / test Info
                     pure EndRun
                  ]
 

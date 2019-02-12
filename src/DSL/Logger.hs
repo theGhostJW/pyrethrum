@@ -77,6 +77,8 @@ logStrPP =
               hdr l h = l <> " " <> h <> " " <> l
               subHeader = hdr "----"
               header = hdr "===="
+              tstHeader = hdr "==="
+              itrHeader = hdr "=="
               iterId tst iid = toString tst <> " / item " <> show iid
               newLn = "\n" :: String
             in
@@ -95,11 +97,16 @@ logStrPP =
 
                    StartRun ttle rc -> header ("Test Run: " <> ttle) <> newLn <> showPretty rc
                    StartGroup s -> header $ "Group: " <> s
+                   EndGroup s -> header $ "End Group: " <> s
 
-                   StartTest TestDisplayInfo{..} -> subHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle)
-                   StartIteration test iid _ -> subHeader ("Start Iteration: " <> iterId test iid)
-                   EndIteration test iid info -> subHeader ("End Iteration: " <> iterId test iid) <> newLn <> info
-                   EndRun -> header "End Run"
+
+                   StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle)
+                   EndTest TestDisplayInfo{..} -> tstHeader ("End Test: " <> toString testModAddress <> " - " <> testTitle)
+                   StartIteration test iid _ -> newLn <> subHeader ("Start Iteration: " <> iterId test iid)
+
+                   Result test iid rsltInfo -> newLn <> subHeader ("Result: " <> iterId test iid) <> newLn <> rsltInfo
+                   EndIteration test iid -> subHeader $ "End Iteration: " <> iterId test iid
+                   EndRun -> newLn <> header "End Run"
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsolePrettyInterpreter = logToHandlePrettyInterpreter stdout

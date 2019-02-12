@@ -163,6 +163,15 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
     logPtcl :: LogProtocol -> m ()
     logPtcl = logger' intrprt
 
+    logDisplayItem :: (TestDisplayInfo -> LogProtocol) -> m ()
+    logDisplayItem getter = logPtcl $ getter $ mkDisplayInfo tc
+
+    filteredItems :: [i]
+    filteredItems = filter inTargIds items
+
+    lastId :: Int 
+    lastId = fromMaybe 0 $ identifier <$> safeLast filteredItems
+
     runItem :: i -> m ()
     runItem i =  let
                     iid = identifier i
@@ -171,18 +180,24 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
                     do
                       logPtcl $ StartIteration modAddress iid $ toJSON tc
                       info <- frmEth i <$> runApState interactor prepState agg rc intrprt i
-                      logPtcl $ EndIteration modAddress iid $ showPretty info
+                      logPtcl $ Result modAddress iid $ showPretty info
+                      logPtcl $ EndIteration modAddress iid
+                      when (iid == lastId)
+                        $ logDisplayItem EndTest
 
     inTargIds :: i -> Bool
     inTargIds i = maybe True (S.member (identifier i)) iIds
 
-    filteredItems :: [i]
-    filteredItems = filter inTargIds items
 
+ 
   in
-    case filteredItems of
-      [] -> []
-      x : xs -> (logPtcl (StartTest $ mkDisplayInfo tc) *> runItem x) : (runItem <$> xs)
+    do
+      case filteredItems of
+        [] -> []
+        x : xs -> (logDisplayItem StartTest *> runItem x )
+                  : (runItem <$> xs)
+                     
+ 
 
 runTest ::  forall i rc as vs m tc effs. (Monad m, ItemClass i vs, Show i, Show as, Show vs, TestConfigClass tc, Member Logger effs) =>
                    Maybe (S.Set Int)                                  -- target Ids
@@ -326,8 +341,13 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
               runGroupAfterRollover = sequence_ $ runTest' <$> testList
 
               runGrp :: m ()
-              runGrp = logPtcl (StartGroup $ RB.header tg) *> logFailOrRun grpRollover runGroupAfterRollover
-
+              runGrp = 
+                      let 
+                        hdr = RB.header tg
+                      in
+                        logPtcl (StartGroup hdr)
+                        *> logFailOrRun grpRollover runGroupAfterRollover
+                        *> logPtcl (EndGroup hdr)
            in
               include ? runGrp $ pure ()
 

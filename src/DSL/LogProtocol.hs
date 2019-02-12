@@ -30,11 +30,18 @@ data LogProtocol =
   FilterLog [FilterResult] |
 
   StartRun String Value |  -- title / runconfig
+  EndRun |
+
   StartGroup String |
+  EndGroup String |
+
   StartTest TestDisplayInfo |
+  EndTest TestDisplayInfo |
+
   StartIteration TestModule Int Value | -- iid / test module / item
-  EndIteration TestModule Int String  | -- test module / iid / test Info
-  EndRun
+  Result TestModule Int String | -- test module / iid / test Info
+  EndIteration TestModule Int -- test module / iid
+
 
   deriving (Eq, Show)
 

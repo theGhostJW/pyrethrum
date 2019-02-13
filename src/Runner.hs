@@ -168,9 +168,6 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
     filteredItems :: [i]
     filteredItems = filter inTargIds items
 
-    lastId :: Int 
-    lastId = maybe 0 identifier (safeLast filteredItems)
-
     runItem :: i -> m ()
     runItem i =  let
                     iid = identifier i
@@ -181,8 +178,6 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
                       info <- frmEth i <$> runApState interactor prepState agg rc intrprt i
                       logPtcl $ Result modAddress iid $ showPretty info
                       logPtcl $ EndIteration modAddress iid
-                      when (iid == lastId)
-                        $ logDisplayItem EndTest
 
     inTargIds :: i -> Bool
     inTargIds i = maybe True (S.member (identifier i)) iIds
@@ -190,8 +185,10 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
   in
     case filteredItems of
       [] -> []
-      x : xs -> (logDisplayItem StartTest *> runItem x )
-                : (runItem <$> xs)
+      [x] -> [logDisplayItem StartTest *> runItem x *> logDisplayItem EndTest]
+      x : xs -> (logDisplayItem StartTest *> runItem x)
+                : (runItem <$> P.init xs)
+                <> [runItem (P.last xs) *> logDisplayItem EndTest]
                      
  
 

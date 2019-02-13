@@ -49,25 +49,25 @@ filterTestCfg fltrs rc tc =
                                              $ Just $ TestFilter.title fltr
 
     firstRejectReason :: Maybe String
-    firstRejectReason = (L.find rejectFilter $ applyFilter <$> fltrs) >>= reasonForRejection
+    firstRejectReason = L.find rejectFilter (applyFilter <$> fltrs) >>= reasonForRejection
   in
     fltrRslt firstRejectReason
     
 
-filterTest :: forall i as vs tc rc effs. TestConfigClass tc => FilterList rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (Identity (FilterResult))
+filterTest :: forall i as vs tc rc effs. TestConfigClass tc => FilterList rc tc -> rc -> GenericTest tc rc i effs as vs -> Identity (Identity FilterResult)
 filterTest fltrs rc GenericTest{..} = Identity . Identity $ filterTestCfg fltrs rc configuration
 
 filterGroups :: forall tc rc effs. TestConfigClass tc =>
               (
                 (forall i as vs. (Show i, Show as, Show vs) =>
-                      GenericTest tc rc i effs as vs -> Identity (Identity (FilterResult))) -> [TestGroup Identity Identity (FilterResult) effs]
+                      GenericTest tc rc i effs as vs -> Identity (Identity FilterResult)) -> [TestGroup Identity Identity FilterResult effs]
               )
               -> FilterList rc tc
               -> rc
               -> [[FilterResult]]
 filterGroups groupLst fltrs rc =
     let
-      testFilter :: GenericTest tc rc i effs as vs -> Identity (Identity (FilterResult))
+      testFilter :: GenericTest tc rc i effs as vs -> Identity (Identity FilterResult)
       testFilter = filterTest fltrs rc
     in
       (runIdentity . runIdentity <$>) <$> (tests <$> groupLst testFilter)

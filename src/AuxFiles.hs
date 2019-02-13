@@ -46,7 +46,7 @@ logFileName now suffix =
     msLeftInYear :: Integer
     msLeftInYear =  let
                     utcNow = zonedTimeToUTC now
-                    (y, m, d)  = toGregorian $ utctDay $ utcNow
+                    (y, m, d)  = toGregorian $ utctDay utcNow
                     nyd = UTCTime (fromGregorian (y + 1) 1 1) 0
                     daysDif = diffDays (utctDay nyd) (utctDay utcNow)
                     msPerDay = 24 * 60 * 60 * 1000
@@ -78,22 +78,22 @@ logFileHandle fileNameSuffix = do
 base36 :: Integer -> Int -> String
 base36 num minWidth =
   let 
-    conv :: Int -> [Char] -> [Char]
-    conv n s = (C.chr $ n + 48 + ((n-9) `div` (-27) * (-7))) : s
+    conv :: Int -> P.String -> P.String
+    conv n s = C.chr (n + 48 + ((n-9) `div` (-27) * (-7))) : s
 
     units :: Integer -> [Int]
     units n 
       | n < (36 :: Integer) = [fromIntegral n] 
-      | otherwise = (units (n `div` (36 :: Integer))) <> [fromIntegral n `P.rem` 36]
+      | otherwise = units (n `div` (36 :: Integer)) <> [fromIntegral n `P.rem` 36]
 
-    unpadded :: [Char]
+    unpadded :: P.String
     unpadded = foldr conv [] $ units num
 
     len :: Int
     len = fromCount $ length unpadded
 
-    prefix :: [Char]
-    prefix = (fromIntegral len) < minWidth ? replicate (toCount (minWidth - len)) '0' $ []
+    prefix :: P.String
+    prefix = fromIntegral len < minWidth ? replicate (toCount (minWidth - len)) '0' $ []
   in
-    toStr $ prefix <> (foldr conv [] $ units num)
+    toS $ prefix <> foldr conv [] (units num)
 

@@ -64,7 +64,7 @@ prettyPrintFilterItem :: FilterResult -> String
 prettyPrintFilterItem FilterResult{..} =
     let
       description :: String
-      description = (toString $ testModAddress testInfo) <> " - " <> testTitle testInfo
+      description = toString (testModAddress testInfo) <> " - " <> testTitle testInfo
     in
       maybef reasonForRejection
         ("accepted: " <> description)

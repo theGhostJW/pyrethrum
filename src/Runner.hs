@@ -9,7 +9,6 @@ module Runner (
 import Check
 import DSL.Common
 import DSL.LogProtocol as LP
-import DSL.Logger
 import DSL.Ensure
 import           Control.Monad.Freer
 import           Foundation.Extended
@@ -42,7 +41,7 @@ showAndLogList logFileSuffix items =
         log2Both fileHndl lgStr = putLines SIO.stdout lgStr *> putLines fileHndl lgStr
 
         listItems :: SIO.Handle -> IO ()
-        listItems h = sequence_ $ ((log2Both h) . showPretty) <$> items
+        listItems h = sequence_ $ log2Both h . showPretty <$> items
       in
         ioActionLogToConsoleAndFile logFileSuffix listItems
 
@@ -51,11 +50,11 @@ ioActionLogToConsoleAndFile logFileSuffix ioAction =
                     do 
                       ehtPthHdl <- logFileHandle logFileSuffix
                       eitherf ehtPthHdl
-                        (putStrLn . show . Left . (AppIOError' "Log file creation failed"))
+                        (P.print . Left . AppIOError' "Log file creation failed")
                         (\(lgFile, h) -> do 
-                                            bracket (pure h) SIO.hClose $ ioAction
+                                            bracket (pure h) SIO.hClose  ioAction
                                             putStrLn ""
-                                            putStrLn $ "Log File: " <> (toStr $ toFilePath lgFile) 
+                                            putStrLn $ "Log File: " <> toStr (toFilePath lgFile) 
                                             putStrLn ""
                         )
 
@@ -170,7 +169,7 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
     filteredItems = filter inTargIds items
 
     lastId :: Int 
-    lastId = fromMaybe 0 $ identifier <$> safeLast filteredItems
+    lastId = maybe 0 identifier (safeLast filteredItems)
 
     runItem :: i -> m ()
     runItem i =  let
@@ -188,14 +187,11 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
     inTargIds :: i -> Bool
     inTargIds i = maybe True (S.member (identifier i)) iIds
 
-
- 
   in
-    do
-      case filteredItems of
-        [] -> []
-        x : xs -> (logDisplayItem StartTest *> runItem x )
-                  : (runItem <$> xs)
+    case filteredItems of
+      [] -> []
+      x : xs -> (logDisplayItem StartTest *> runItem x )
+                : (runItem <$> xs)
                      
  
 

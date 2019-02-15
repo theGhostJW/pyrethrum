@@ -42,8 +42,8 @@ _tempFile = tempFile [relfile|demoTemp.txt|]
 
 newtype FileExt = FileExt {unFileExt :: String}
 
-logExtension :: FileExt
-logExtension = FileExt ".log"
+logFileExt :: FileExt
+logFileExt = FileExt ".log"
 
 logFileSuffix :: String -> FileExt -> String
 logFileSuffix suffix fileExt = "_" <> suffix <> unFileExt fileExt

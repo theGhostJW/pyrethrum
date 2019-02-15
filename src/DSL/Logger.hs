@@ -97,7 +97,7 @@ logStrPP =
                    Warning' detailedInfo -> subHeader "Warning" <> newLn <>  showPretty detailedInfo
 
                    e@(Error _) -> showPretty e
-                   FilterLog fltrInfos -> subHeader "Filter Log" <> newLn <>
+                   FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
                                                 foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
                    StartRun ttle rc -> header ("Test Run: " <> ttle) <> newLn <> showPretty rc
@@ -119,7 +119,7 @@ logConsolePrettyInterpreter = logToHandles [(logStrPP, stdout)]
 logToHandles :: LastMember IO effs => [(LogProtocol -> String, Handle)] -> Eff (Logger ': effs) ~> Eff effs
 logToHandles convertersHandlers = 
                         let 
-                          logToHandle :: (LogProtocol -> String) -> Handle ->  Logger r -> IO ()
+                          logToHandle :: (LogProtocol -> String) -> Handle -> Logger r -> IO ()
                           logToHandle lp2Str h (LogItem lp) = putLines h $ lp2Str lp
                         in
                           interpretM $ \li@(LogItem lp) -> 

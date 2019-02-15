@@ -44,7 +44,7 @@ showAndLogList logSuffix items =
         listItems :: SIO.Handle -> IO ()
         listItems h = sequence_ $ log2Both h . showPretty <$> items
       in
-        runWithlogFileNameAndHandles [(logSuffix, logExtension, listItems)]
+        runWithlogFileNameAndHandles [(logSuffix, logFileExt, listItems)]
 
 -- generates log file and cleans up log file handles
 -- when actions are run
@@ -63,6 +63,7 @@ runWithlogFileNameAndHandles suffixActions =
                           strBasePth :: String
                           strBasePth = toS . toFilePath $ basePath
 
+                          newPath :: String
                           newPath = maybef (stripSuffix baseSuffix strBasePth)
                                       (strBasePth <> unFileExt ext) -- shouldn't get here but if we do well just slap on the new extension
                                       (\pfx -> fullLogFileName pfx sfx ext)
@@ -82,30 +83,28 @@ runWithlogFileNameAndHandles suffixActions =
                                     eitherf ehtPthHdlx
                                       printError 
                                       (\fstRec@(sfile1, _, _) -> 
-                                          do 
-                                            othHandles <- P.traverse (creatAuxFile sfile1 baseSuffix) xs
-                                            let 
-                                              errs :: [P.IOError]
-                                              errs = lefts othHandles
+                                        do 
+                                          othHandles <- P.traverse (creatAuxFile sfile1 baseSuffix) xs
+                                          let 
+                                            errs :: [P.IOError]
+                                            errs = lefts othHandles
 
-                                              runActions :: [(AbsFile, S.Handle, S.Handle -> IO ())] -> IO ()
-                                              runActions acts = sequence_ $ (\(f, h, actn)  -> actn h) <$> acts
+                                            runActions :: [(AbsFile, S.Handle, S.Handle -> IO ())] -> IO ()
+                                            runActions acts = sequence_ $ (\(f, h, actn)  -> actn h) <$> acts
 
-                                            not (null errs) 
-                                              ? sequence_ (printError <$> errs)
-                                              $ 
-                                                let
-                                                  allHndls = fstRec : rights othHandles
-                                                  prntLogPath pth = putStrLn *> putStrLn $ "  " <> toS (toFilePath pth)
-
-                                                in
-                                                  do 
-                                                    runActions allHndls
-                                                    putStrLn ""
-                                                    putStrLn "Log Files"
-                                                    sequence_ (prntLogPath . fst <$> allHndls)  
-                                                    putStrLn ""
-
+                                          not (null errs) 
+                                            ? sequence_ (printError <$> errs)
+                                            $ 
+                                              let
+                                                allHndls = fstRec : rights othHandles
+                                                prntLogPath pth = putStrLn *> putStrLn $ "  " <> toS (toFilePath pth)
+                                              in
+                                                do 
+                                                  runActions allHndls
+                                                  putStrLn ""
+                                                  putStrLn "Log Files"
+                                                  sequence_ (prntLogPath . fst <$> allHndls)  
+                                                  putStrLn ""
                                       )
 
 doNothing :: PreRun effs

@@ -30,11 +30,10 @@ ioRunRaw pln = testRun pln filters testInfoFull executeInIOConsoleRaw runConfig
 ioRunToFile :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 ioRunToFile pln = let 
                     runTheTest :: S.Handle -> IO ()
-                    runTheTest fileHndl = testRun pln filters testInfoFull (executeInIO (logToHandlesPrettyInterpreter (S.stdout, fileHndl))) runConfig
+                    runTheTest fileHndl = testRun pln filters testInfoFull (executeInIO (logToHandles [(logStrPP, S.stdout), (logStrPP, fileHndl)])) runConfig
                   in 
-                    ioActionLogToConsoleAndFile "raw" runTheTest
+                    runWithlogFileNameAndHandles [("raw", logExtension, runTheTest)]
                    
-
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
 docRunRaw pln = extractDocLog $ testRun pln filters testInfoFull executeDocumentRaw runConfig
 

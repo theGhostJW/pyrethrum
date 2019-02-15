@@ -108,6 +108,7 @@ library:
     - deepseq
     - unordered-containers
     - template-haskell
+    - bytestring
 
 tests:
   pyrethrum-test:

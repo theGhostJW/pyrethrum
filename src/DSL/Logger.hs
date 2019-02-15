@@ -14,6 +14,9 @@ import qualified Prelude as P
 import System.IO
 import           TestFilter
 import           RunnerBase
+import  qualified Data.Aeson as A
+import Foundation.Compat.ByteString
+import qualified Data.ByteString.Lazy as B
 
 data Logger r where
  LogItem :: LogProtocol -> Logger ()
@@ -70,6 +73,8 @@ prettyPrintFilterItem FilterResult{..} =
         ("accepted: " <> description)
         (\reason -> "rejected: " <> description <> " - Reason: " <> reason)
 
+logStrJSON :: LogProtocol -> String
+logStrJSON = fst . fromBytesLenient . fromByteString . B.toStrict . A.encode
 
 logStrPP :: LogProtocol -> String
 logStrPP =
@@ -109,22 +114,20 @@ logStrPP =
                    EndRun -> newLn <> header "End Run"
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
-logConsolePrettyInterpreter = logToHandlePrettyInterpreter stdout
+logConsolePrettyInterpreter = logToHandles [(logStrPP, stdout)]
 
-logToHandlePP :: Logger r -> Handle -> IO ()
-logToHandlePP (LogItem lp) h = putLines h $ logStrPP lp
-
-logToHandlePrettyInterpreter :: LastMember IO effs => Handle -> Eff (Logger ': effs) ~> Eff effs
-logToHandlePrettyInterpreter h = interpretM $ \li@(LogItem lp) -> logToHandlePP li h
-
-logToHandlesPrettyInterpreter :: LastMember IO effs => (Handle, Handle) -> Eff (Logger ': effs) ~> Eff effs
-logToHandlesPrettyInterpreter (h1, h2) = 
-           interpretM $ \li@(LogItem lp) -> 
-                          let 
-                            logToh :: Handle -> IO ()
-                            logToh = logToHandlePP li
-                          in
-                            logToh h1 *> logToh h2
+logToHandles :: LastMember IO effs => [(LogProtocol -> String, Handle)] -> Eff (Logger ': effs) ~> Eff effs
+logToHandles convertersHandlers = 
+                        let 
+                          logToHandle :: (LogProtocol -> String) -> Handle ->  Logger r -> IO ()
+                          logToHandle lp2Str h (LogItem lp) = putLines h $ lp2Str lp
+                        in
+                          interpretM $ \li@(LogItem lp) -> 
+                                        let 
+                                          logToh :: (LogProtocol -> String, Handle) -> IO ()
+                                          logToh (f, h) = logToHandle f h li
+                                        in
+                                          P.sequence_ $ logToh <$> convertersHandlers
                              
 logDocPrettyInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocPrettyInterpreter = let

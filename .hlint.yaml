@@ -1,4 +1,4 @@
 - arguments:
   - -XQuasiQuotes
 
-- ignore: {name: Use camelCase, within: [CheckTest, RunnerTest, DemoTest]}
+- ignore: {name: Use String}

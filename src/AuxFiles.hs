@@ -40,8 +40,19 @@ logFile = subPath logDir
 
 _tempFile = tempFile [relfile|demoTemp.txt|]
 
-logFileName :: ZonedTime -> String -> String
-logFileName now suffix =
+newtype FileExt = FileExt {unFileExt :: String}
+
+logExtension :: FileExt
+logExtension = FileExt ".log"
+
+logFileSuffix :: String -> FileExt -> String
+logFileSuffix suffix fileExt = "_" <> suffix <> unFileExt fileExt
+
+fullLogFileName :: String -> String -> FileExt -> String
+fullLogFileName prefix suffix fileExt = prefix <> logFileSuffix suffix fileExt
+
+logFileName :: ZonedTime -> String -> FileExt -> String
+logFileName now suffix fileExt =
   let
     msLeftInYear :: Integer
     msLeftInYear =  let
@@ -57,22 +68,25 @@ logFileName now suffix =
     nowStr :: String
     nowStr = toStr $ formatTime defaultTimeLocale (toCharList "%F_%H-%M-%S") now
   in
-    base36 msLeftInYear 7 <> "_" <> nowStr <> "_" <> suffix <> ".log"
+    fullLogFileName (base36 msLeftInYear 7 <> "_" <> nowStr) suffix fileExt
 
-logFilePath :: ZonedTime -> String -> IO (Either P.IOError AbsFile)
-logFilePath now suffix = do
-                          rf <- parseRelFileSafe $ toCharList $ logFileName now suffix
+logFilePath :: ZonedTime -> String -> FileExt -> IO (Either P.IOError AbsFile)
+logFilePath now suffix fileExt = do
+                          rf <- parseRelFileSafe $ toCharList $ logFileName now suffix fileExt
                           eitherf rf
                             (pure . Left . P.userError . toCharList . show)
                             logFile
 
-logFileHandle :: String -> IO (Either P.IOError (AbsFile, S.Handle))
-logFileHandle fileNameSuffix = do
+handleFromPath :: Either P.IOError AbsFile -> IO (Either P.IOError (AbsFile, S.Handle))
+handleFromPath = either
+                  (pure . Left)
+                  (\pth -> ((pth,) <$>) <$> (Right <$> S.openFile (toFilePath pth) S.WriteMode))
+
+logFileNameAndHandle :: String -> FileExt -> IO (Either P.IOError (AbsFile, S.Handle))
+logFileNameAndHandle fileNameSuffix fileExt = do
                                 now <- getZonedTime
-                                fp <- logFilePath now fileNameSuffix
-                                eitherf fp
-                                  (pure . Left)
-                                  (\pth -> ((pth,) <$>) <$> (Right <$> S.openFile (toFilePath pth) S.WriteMode))
+                                fp <- logFilePath now fileNameSuffix fileExt
+                                handleFromPath fp
 
 -- based on https://gist.github.com/jdeseno/9501557
 base36 :: Integer -> Int -> String

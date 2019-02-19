@@ -35,7 +35,7 @@ ioRunToFile pln = let
                     handleSpec :: M.Map (String, FileExt) (LogProtocol -> String) 
                     handleSpec = M.fromList [
                                                 (("raw", FileExt ".log"), logStrPP)
-                                              , (("raw", FileExt ".json"), logStrJSON)
+                                              , (("raw", FileExt ".jsoni"), logStrJSON)
                                             ]
 
                     fileHandleInfo :: IO (Either AppError [(LogProtocol -> String, HandleInfo)])

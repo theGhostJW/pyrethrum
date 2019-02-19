@@ -15,7 +15,6 @@ import RunnerBase
 import Data.Aeson hiding (Error)
 import Data.ByteString.Lazy as B
 import Hedgehog.Internal.Property
-import Hedgehog.Internal.Property
 import Control.Monad.IO.Class
 import Data.Traversable
 import Data.Char
@@ -25,7 +24,7 @@ genStr :: Gen String
 genStr = string (linear 0 1000) ascii
 
 genTestModule :: Gen TestModule
-genTestModule = (TestModule <$> genStr)
+genTestModule = TestModule <$> genStr
 
 genTestConfig :: Gen TestConfig
 genTestConfig =
@@ -80,7 +79,7 @@ genLogProtocol = choice [
                   
                     IOAction <$> genStr,
                   
-                    Error <$> AppUserError <$> genStr,
+                    Error . AppUserError <$> genStr,
                     FilterLog <$> genFilterResults,
                   
                     StartRun <$> genStr <*> (toJSON <$> genRunConfig),  -- title / runconfig
@@ -99,13 +98,13 @@ hprop_log_protocol_round_trip = property $ do
     serialised :: B.ByteString
     serialised = --debug' "Serialised" $ 
                  encode 
-                 -- $ debug' "Log Protocol Obj" 
-                 $ lp
+                 -- $ debug' "Log Protocol Obj" $
+                 lp
 
     unserialised :: Either P.String LogProtocol
     unserialised = -- debug' "Deserialised" $ 
                     eitherDecode serialised
 
   eitherf unserialised
-    (\s -> (footnote s) *> failure)
+    (\s -> footnote s *> failure)
     (lp ===)

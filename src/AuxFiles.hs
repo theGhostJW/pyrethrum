@@ -32,11 +32,17 @@ tempDir = auxDir [reldir|temp|]
 logDir :: IO (Either P.IOError AbsDir)
 logDir = auxDir [reldir|logs|]
 
+dataDir :: IO (Either P.IOError AbsDir)
+dataDir = auxDir [reldir|data|]
+
 tempFile :: RelFile -> IO (Either P.IOError AbsFile)
 tempFile = subPath tempDir
 
 logFile :: RelFile -> IO (Either P.IOError AbsFile)
 logFile = subPath logDir
+
+dataFile :: RelFile -> IO (Either P.IOError AbsFile)
+dataFile = subPath logDir
 
 _tempFile = tempFile [relfile|demoTemp.txt|]
 

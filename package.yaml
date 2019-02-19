@@ -22,7 +22,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
   - base
   - foundation
-  - foundation-edge # move to extended later Maybe
+  - foundation-edge # TODO: move to extended later Maybe
   - freer-simple
   - principled-extended
   - containers
@@ -110,11 +110,7 @@ library:
     - template-haskell
     - bytestring
 
-tests:
-  pyrethrum-test:
-    main:                driver.hs
-    source-dirs:         test
-    dependencies:
+_testDep: &testdependencies
       - tasty
       - tasty-hunit
       - tasty-hedgehog
@@ -123,3 +119,18 @@ tests:
       - pyrethrum
       - listsafe
       - bytestring
+
+tests:
+  pyrethrum-test:
+    main:                driver.hs
+    source-dirs:         test
+    dependencies: *testdependencies
+  
+  pyrethrum-test-Integration:
+    main:                driver.hs
+    source-dirs:         testIntegration
+    dependencies: 
+      *testdependencies
+      
+
+    

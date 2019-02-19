@@ -1,4 +1,4 @@
-module ZRunnerRestartGoHomeIntegrationTest where
+module RunnerRestartGoHomeIOTest where
 
 import           Foundation.Extended as F
 
@@ -15,3 +15,4 @@ goHomeExceptionMessage = "PreTestCheckExecutionError GoHome \"No items run for t
 --                                   "PreTestError Rollover \"Execution of Rollover\" (IOError user error (Pretend IO Error))"
 --                                   1
 --                                   $ fromList . lines $ toStr log
+ 

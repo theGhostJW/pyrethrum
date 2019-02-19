@@ -33,7 +33,10 @@ ioRunRaw pln = testRun pln filters testInfoFull executeInIOConsoleRaw runConfig
 ioRunToFile :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO (Either AppError [AbsFile])
 ioRunToFile pln = let 
                     handleSpec :: M.Map (String, FileExt) (LogProtocol -> String) 
-                    handleSpec = M.fromList [(("raw", FileExt ".log"), logStrPP)]
+                    handleSpec = M.fromList [
+                                                (("raw", FileExt ".log"), logStrPP)
+                                              , (("raw", FileExt ".json"), logStrJSON)
+                                            ]
 
                     fileHandleInfo :: IO (Either AppError [(LogProtocol -> String, HandleInfo)])
                     fileHandleInfo = logFileHandles handleSpec

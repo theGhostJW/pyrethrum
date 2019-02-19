@@ -96,14 +96,11 @@ hprop_log_protocol_round_trip = property $ do
   lp <- forAll genLogProtocol
   let 
     serialised :: B.ByteString
-    serialised = --debug' "Serialised" $ 
-                 encode 
-                 -- $ debug' "Log Protocol Obj" $
+    serialised = encode 
                  lp
 
     unserialised :: Either P.String LogProtocol
-    unserialised = -- debug' "Deserialised" $ 
-                    eitherDecode serialised
+    unserialised = eitherDecode serialised
 
   eitherf unserialised
     (\s -> footnote s *> failure)

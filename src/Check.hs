@@ -74,6 +74,7 @@ calcChecks vs chkLst = let
                         in
                          reverse $ snd $ foldl' foldfunc (False, mempty) chkLst
 
+-- TODO: clashes with guard on Alternative rename ??
 guard :: Functor f => f (Check v) -> f (Check v)
 guard =  let
     guardOutcome :: Check v -> Check v

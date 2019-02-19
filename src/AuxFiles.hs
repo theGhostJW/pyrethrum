@@ -40,53 +40,10 @@ logFile = subPath logDir
 
 _tempFile = tempFile [relfile|demoTemp.txt|]
 
-newtype FileExt = FileExt {unFileExt :: String}
+newtype FileExt = FileExt {unFileExt :: String} deriving (Show, Eq, Ord)
 
 logFileExt :: FileExt
 logFileExt = FileExt ".log"
-
-logFileSuffix :: String -> FileExt -> String
-logFileSuffix suffix fileExt = "_" <> suffix <> unFileExt fileExt
-
-fullLogFileName :: String -> String -> FileExt -> String
-fullLogFileName prefix suffix fileExt = prefix <> logFileSuffix suffix fileExt
-
-logFileName :: ZonedTime -> String -> FileExt -> String
-logFileName now suffix fileExt =
-  let
-    msLeftInYear :: Integer
-    msLeftInYear =  let
-                    utcNow = zonedTimeToUTC now
-                    (y, m, d)  = toGregorian $ utctDay utcNow
-                    nyd = UTCTime (fromGregorian (y + 1) 1 1) 0
-                    daysDif = diffDays (utctDay nyd) (utctDay utcNow)
-                    msPerDay = 24 * 60 * 60 * 1000
-                    timeDifms = P.round $ fromIntegral (diffTimeToPicoseconds $ utctDayTime nyd P.- utctDayTime utcNow) / 1000000000
-                  in
-                    daysDif * msPerDay + timeDifms
-
-    nowStr :: String
-    nowStr = toStr $ formatTime defaultTimeLocale (toCharList "%F_%H-%M-%S") now
-  in
-    fullLogFileName (base36 msLeftInYear 7 <> "_" <> nowStr) suffix fileExt
-
-logFilePath :: ZonedTime -> String -> FileExt -> IO (Either P.IOError AbsFile)
-logFilePath now suffix fileExt = do
-                          rf <- parseRelFileSafe $ toCharList $ logFileName now suffix fileExt
-                          eitherf rf
-                            (pure . Left . P.userError . toCharList . show)
-                            logFile
-
-handleFromPath :: Either P.IOError AbsFile -> IO (Either P.IOError (AbsFile, S.Handle))
-handleFromPath = either
-                  (pure . Left)
-                  (\pth -> ((pth,) <$>) <$> (Right <$> S.openFile (toFilePath pth) S.WriteMode))
-
-logFileNameAndHandle :: String -> FileExt -> IO (Either P.IOError (AbsFile, S.Handle))
-logFileNameAndHandle fileNameSuffix fileExt = do
-                                now <- getZonedTime
-                                fp <- logFilePath now fileNameSuffix fileExt
-                                handleFromPath fp
 
 -- based on https://gist.github.com/jdeseno/9501557
 base36 :: Integer -> Int -> String
@@ -111,3 +68,52 @@ base36 num minWidth =
   in
     toS $ prefix <> foldr conv [] (units num)
 
+logFileSuffix :: String -> FileExt -> String
+logFileSuffix suffix fileExt = "_" <> suffix <> unFileExt fileExt
+
+fullLogFileName :: String -> String -> FileExt -> String
+fullLogFileName prefix suffix fileExt = prefix <> logFileSuffix suffix fileExt
+
+logFilePrefix :: ZonedTime -> String
+logFilePrefix now =
+  let
+    msLeftInYear :: Integer
+    msLeftInYear =  let
+                      utcNow = zonedTimeToUTC now
+                      (y, m, d)  = toGregorian $ utctDay utcNow
+                      nyd = UTCTime (fromGregorian (y + 1) 1 1) 0
+                      daysDif = diffDays (utctDay nyd) (utctDay utcNow)
+                      msPerDay = 24 * 60 * 60 * 1000
+                      timeDifms = P.round $ fromIntegral (diffTimeToPicoseconds $ utctDayTime nyd P.- utctDayTime utcNow) / 1000000000
+                    in
+                      daysDif * msPerDay + timeDifms
+  in 
+    base36 msLeftInYear 7 <> "_" <> toS (formatTime defaultTimeLocale (toCharList "%F_%H-%M-%S") now)
+
+logFilePath :: Maybe String -> String -> FileExt -> IO (Either P.IOError (String, AbsFile))
+logFilePath mNamePrefix suffix fileExt = 
+  do
+    pfx <- maybef mNamePrefix
+              (logFilePrefix <$> getZonedTime)
+              pure
+    relPath <- parseRelFileSafe $ fullLogFileName pfx suffix fileExt
+    eitherf relPath
+      (pure . Left . P.userError . toS . show)
+      (\relFle -> ((pfx,) <$>) <$> logFile relFle)
+
+safeOpenFile :: AbsFile -> S.IOMode -> IO (Either P.IOError S.Handle)
+safeOpenFile pth mode = 
+  catchIOError (Right <$> S.openFile (toFilePath pth) mode) (pure . Left)
+
+data HandleInfo = HandleInfo {
+  prefix :: String,
+  path ::  AbsFile,
+  fileHandle :: S.Handle
+}
+
+logFileHandle ::  Maybe String -> String -> FileExt -> IO (Either P.IOError HandleInfo)
+logFileHandle mFilePrefix fileNameSuffix fileExt = do
+                                                    ethPth <- logFilePath mFilePrefix fileNameSuffix fileExt
+                                                    eitherf ethPth 
+                                                      (pure . Left)
+                                                      (\(pfx, pth) -> (HandleInfo pfx pth <$>) <$> safeOpenFile pth S.WriteMode)

@@ -28,6 +28,8 @@ import Data.Aeson
 import TestFilter
 import RunnerBase as RB
 import qualified System.IO as S
+import qualified Data.Map as M
+import qualified Data.Set as St
 
 
 type TestPlanBase tc rc m1 m a effs = (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest tc rc i effs as vs -> m1 (m a)) -> [TestGroup m1 m a effs]
@@ -44,68 +46,112 @@ showAndLogList logSuffix items =
         listItems :: SIO.Handle -> IO ()
         listItems h = sequence_ $ log2Both h . showPretty <$> items
       in
-        runWithlogFileNameAndHandles [(logSuffix, logFileExt, listItems)]
+        undefined -- runWithlogFileNameAndHandles [(logSuffix, logFileExt, listItems)]
 
--- generates log file and cleans up log file handles
--- when actions are run
-runWithlogFileNameAndHandles :: [(String, FileExt, SIO.Handle -> IO ())] -> IO ()
-runWithlogFileNameAndHandles suffixActions = 
-                    let 
-                      printError :: P.IOError -> IO ()
-                      printError = P.print . Left . AppIOError' "Log file creation failed"
+data Step a = Step {
+                  filePrefix :: Maybe String,
+                  result :: Either AppError [(a, HandleInfo)]
+                }
 
-                      createFile :: (String, FileExt, SIO.Handle -> IO ()) -> IO (Either P.IOError (AbsFile, S.Handle, SIO.Handle -> IO ()))
-                      createFile (sfx, ext, actn) = ((\(f, h) -> (f, h, actn)) <$>) <$> logFileNameAndHandle sfx ext
+logFileHandles :: forall a. M.Map (String, FileExt) a -> IO (Either AppError [(a, HandleInfo)])
+logFileHandles mpSuffixExt = 
+  let
+    seed :: IO (Step a)
+    seed = pure $ Step {
+      filePrefix = Nothing,
+      result = Right []
+    }
+
+    step :: IO (Step a) -> (String, FileExt) -> a -> IO (Step a)
+    step accum (suff, ext) a = 
+      do 
+        iStep <- accum
+        let 
+          iResult = result iStep 
+          iPrefix = filePrefix iStep 
+        eitherf iResult 
+          (const $ pure iStep)
+          (
+            \hInfoLst -> 
+              do 
+                eHandInfo <- logFileHandle iPrefix suff ext
+                pure $ eitherf eHandInfo
+                        (\ioErr -> iStep {result = Left $ AppIOError' "Error creating log file" ioErr} )
+                        (
+                          \hi@HandleInfo{..} -> Step {
+                                                    filePrefix = Just prefix,
+                                                    result = Right $ hInfoLst <> [(a, hi)]
+                                                  }
+                        )
+          )
+
+    finalRslt :: IO (Step a)
+    finalRslt = M.foldlWithKey' step seed mpSuffixExt
+  in 
+     result <$> finalRslt 
+
+        --  logFileNameAndHandle ::  Maybe String -> String -> FileExt -> S.IOMode -> IO (Either P.IOError (AbsFile, S.Handle))
+
+-- -- generates log file and cleans up log file handles
+-- -- when actions are run
+-- runWithlogFileNameAndHandles :: St.Set (String, FileExt) -> (HandleMap -> IO ()) -> IO ()
+-- runWithlogFileNameAndHandles suffixActions = 
+--                     let 
+--                       printError :: P.IOError -> IO ()
+--                       printError = P.print . Left . AppIOError' "Log file creation failed"
+
+--                       createFile :: (String, FileExt, SIO.Handle -> IO ()) -> IO (Either P.IOError (AbsFile, S.Handle, SIO.Handle -> IO ()))
+--                       createFile (sfx, ext, actn) = ((\(f, h) -> (f, h, actn)) <$>) <$> logFileNameAndHandle sfx ext
                       
-                      creatAuxFile :: AbsFile -> String -> (String, FileExt, SIO.Handle -> IO ()) -> IO (Either P.IOError (AbsFile, S.Handle, SIO.Handle -> IO ()))
-                      creatAuxFile basePath baseSuffix (sfx, ext, actn)=
-                        let 
-                          strBasePth :: String
-                          strBasePth = toS . toFilePath $ basePath
+--                       creatAuxFile :: AbsFile -> String -> (String, FileExt, SIO.Handle -> IO ()) -> IO (Either P.IOError (AbsFile, S.Handle, SIO.Handle -> IO ()))
+--                       creatAuxFile basePath baseSuffix (sfx, ext, actn)=
+--                         let 
+--                           strBasePth :: String
+--                           strBasePth = toS . toFilePath $ basePath
 
-                          newPath :: String
-                          newPath = maybef (stripSuffix baseSuffix strBasePth)
-                                      (strBasePth <> unFileExt ext) -- shouldn't get here but if we do well just slap on the new extension
-                                      (\pfx -> fullLogFileName pfx sfx ext)
-                        in 
-                          do 
-                            ePth <- parseAbsFileSafe newPath
-                            pthH <- handleFromPath $ mapLeft (P.userError . toS . show) ePth
-                            pure $ (\(f, h) -> (f, h, actn)) <$> pthH
-                    in
-                      case suffixActions of 
-                        [] -> pure ()
-                        x@(sfx, ext, act) : xs -> do 
-                                    ehtPthHdlx <- createFile x
-                                    let 
-                                      baseSuffix = logFileSuffix sfx ext
+--                           newPath :: String
+--                           newPath = maybef (stripSuffix baseSuffix strBasePth)
+--                                       (strBasePth <> unFileExt ext) -- shouldn't get here but if we do well just slap on the new extension
+--                                       (\pfx -> fullLogFileName pfx sfx ext)
+--                         in 
+--                           do 
+--                             ePth <- parseAbsFileSafe newPath
+--                             pthH <- handleFromPath $ mapLeft (P.userError . toS . show) ePth
+--                             pure $ (\(f, h) -> (f, h, actn)) <$> pthH
+--                     in
+--                       case suffixActions of 
+--                         [] -> pure ()
+--                         x@(sfx, ext, act) : xs -> do 
+--                                     ehtPthHdlx <- createFile x
+--                                     let 
+--                                       baseSuffix = logFileSuffix sfx ext
 
-                                    eitherf ehtPthHdlx
-                                      printError 
-                                      (\fstRec@(sfile1, _, _) -> 
-                                        do 
-                                          othHandles <- P.traverse (creatAuxFile sfile1 baseSuffix) xs
-                                          let 
-                                            errs :: [P.IOError]
-                                            errs = lefts othHandles
+--                                     eitherf ehtPthHdlx
+--                                       printError 
+--                                       (\fstRec@(sfile1, _, _) -> 
+--                                         do 
+--                                           othHandles <- P.traverse (creatAuxFile sfile1 baseSuffix) xs
+--                                           let 
+--                                             errs :: [P.IOError]
+--                                             errs = lefts othHandles
 
-                                            runActions :: [(AbsFile, S.Handle, S.Handle -> IO ())] -> IO ()
-                                            runActions acts = sequence_ $ (\(f, h, actn)  -> actn h) <$> acts
+--                                             runActions :: [(AbsFile, S.Handle, S.Handle -> IO ())] -> IO ()
+--                                             runActions acts = sequence_ $ (\(f, h, actn)  -> actn h) <$> acts
 
-                                          not (null errs) 
-                                            ? sequence_ (printError <$> errs)
-                                            $ 
-                                              let
-                                                allHndls = fstRec : rights othHandles
-                                                prntLogPath pth = putStrLn *> putStrLn $ "  " <> toS (toFilePath pth)
-                                              in
-                                                do 
-                                                  runActions allHndls
-                                                  putStrLn ""
-                                                  putStrLn "Log Files"
-                                                  sequence_ (prntLogPath . fst <$> allHndls)  
-                                                  putStrLn ""
-                                      )
+--                                           not (null errs) 
+--                                             ? sequence_ (printError <$> errs)
+--                                             $ 
+--                                               let
+--                                                 allHndls = fstRec : rights othHandles
+--                                                 prntLogPath pth = putStrLn *> putStrLn $ "  " <> toS (toFilePath pth)
+--                                               in
+--                                                 do 
+--                                                   runActions allHndls
+--                                                   putStrLn ""
+--                                                   putStrLn "Log Files"
+--                                                   sequence_ (prntLogPath . fst <$> allHndls)  
+--                                                   putStrLn ""
+--                                       )
 
 doNothing :: PreRun effs
 doNothing = PreRun {

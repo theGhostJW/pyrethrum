@@ -12,13 +12,15 @@ import  Data.Functor (($>))
 import           DSL.Common
 import           DSL.Interpreter
 import           DSL.Logger
+import DSL.LogProtocol
 import           Foundation.List.DList
-import           Foundation.Extended
+import           Foundation.Extended as E
 import qualified Prelude                    as P
 import           Runner as R
 import qualified System.IO as S
 import qualified Control.Exception as E
-import AuxFiles
+import AuxFiles as A
+import Data.Map as M
 
 
 ioRun :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
@@ -27,12 +29,47 @@ ioRun pln = testRun pln filters testInfoFull executeInIOConsolePretty runConfig
 ioRunRaw :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 ioRunRaw pln = testRun pln filters testInfoFull executeInIOConsoleRaw runConfig
 
-ioRunToFile :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
+-- TODO: move to library file 
+ioRunToFile :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO (Either AppError [AbsFile])
 ioRunToFile pln = let 
-                    runTheTest :: S.Handle -> IO ()
-                    runTheTest fileHndl = testRun pln filters testInfoFull (executeInIO (logToHandles [(logStrPP, S.stdout), (logStrPP, fileHndl)])) runConfig
+                    handleSpec :: M.Map (String, FileExt) (LogProtocol -> String) 
+                    handleSpec = M.fromList [(("raw", FileExt ".log"), logStrPP)]
+
+                    fileHandleInfo :: IO (Either AppError [(LogProtocol -> String, HandleInfo)])
+                    fileHandleInfo = logFileHandles handleSpec
+
+                    printFilePaths :: [AbsFile] -> IO ()
+                    printFilePaths lsFiles = do 
+                                                putStrLn ""
+                                                putStrLn "--- Log Files ---"
+                                                sequence_ $ putStrLn . toS . toFilePath <$> lsFiles
+                                                putStrLn ""
+                                         
+                    fileHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> String, S.Handle)])
+                    fileHandles = (((\(fn, fh) -> (Just $ A.path fh, fn, fileHandle fh)) <$>) <$>) <$> fileHandleInfo
+
+                    closeFileHandles :: [S.Handle] -> IO ()
+                    closeFileHandles hdls = sequence_ $ S.hClose <$> hdls
+
+                    allHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> String, S.Handle)])
+                    allHandles = (((Nothing, logStrPP, S.stdout) :) <$>) <$> fileHandles
+                    
+                    runTheTest :: [(LogProtocol -> String, S.Handle)] -> IO ()
+                    runTheTest targHndls = testRun pln filters testInfoFull (executeInIO (logToHandles targHndls)) runConfig
                   in 
-                    runWithlogFileNameAndHandles [("raw", logFileExt, runTheTest)]
+                    do 
+                      hndls <- allHandles
+                      eitherf hndls
+                        (pure . Left)
+                        (\hList -> 
+                          do 
+                            let 
+                              fileHndls = E.filter (isJust . fst) hList
+                              logPths = catMaybes $ fst <$> fileHndls
+                            runTheTest ((\(af, fn, h) -> (fn, h)) <$> hList) `finally` closeFileHandles ((\(af, fn, h) -> h) <$> fileHndls)
+                            printFilePaths logPths 
+                            pure $ Right logPths
+                        )
                    
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
 docRunRaw pln = extractDocLog $ testRun pln filters testInfoFull executeDocumentRaw runConfig
@@ -44,7 +81,7 @@ runInIO :: IO ()
 runInIO = ioRun plan
 
 runInIOLogToFile :: IO ()
-runInIOLogToFile = ioRunToFile plan
+runInIOLogToFile = void $ ioRunToFile plan
 
 runInIORaw :: IO ()
 runInIORaw = ioRunRaw plan
@@ -56,7 +93,7 @@ runDocument :: DList String
 runDocument = docRun plan
 
 runDocumentToConsole :: IO ()
-runDocumentToConsole = sequence_ . toList $ putStrLn <$> runDocument
+runDocumentToConsole = sequence_ . E.toList $ putStrLn <$> runDocument
 
 validPlan :: forall m m1 effs a. EFFAllEffects effs =>
   PreRun effs

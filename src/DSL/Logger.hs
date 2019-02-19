@@ -104,7 +104,6 @@ logStrPP =
                    StartGroup s -> header $ "Group: " <> s
                    EndGroup s -> header $ "End Group: " <> s
 
-
                    StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle)
                    EndTest TestDisplayInfo{..} -> tstHeader ("End Test: " <> toString testModAddress <> " - " <> testTitle)
                    StartIteration test iid _ -> newLn <> subHeader ("Start Iteration: " <> iterId test iid)

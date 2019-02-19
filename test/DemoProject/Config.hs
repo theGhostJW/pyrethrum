@@ -35,7 +35,7 @@ instance Titled RunConfig where
 instance RunConfigClass RunConfig
 
 allEnvironments :: Set Environment
-allEnvironments = S.fromList $ enumList
+allEnvironments = S.fromList enumList
 
 allNonProdEnvironments :: Set Environment
 allNonProdEnvironments = S.fromList [TST, UAT, PreProd]

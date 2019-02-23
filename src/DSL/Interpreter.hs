@@ -1,7 +1,7 @@
 
 module DSL.Interpreter where
 
-import DSL.Common
+import Common
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.Writer

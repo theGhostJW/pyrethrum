@@ -33,6 +33,7 @@ dependencies:
   - yaml
   - cereal
   - pretty-show
+  - basement
 
 ghc-options:
   - -fmax-pmcheck-iterations=10000000

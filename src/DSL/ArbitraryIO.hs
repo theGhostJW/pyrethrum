@@ -1,7 +1,7 @@
 
 module DSL.ArbitraryIO where
 
-import DSL.Common
+import Common
 import DSL.LogProtocol
 import DSL.Logger
 import           Foundation.Extended

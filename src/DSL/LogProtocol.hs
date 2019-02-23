@@ -3,7 +3,7 @@
 
 module DSL.LogProtocol where
 
-import           DSL.Common (DetailedInfo, AppError)
+import           Common (DetailedInfo, AppError)
 import           TestFilter
 import           Foundation.Extended
 import           TestAndRunConfig

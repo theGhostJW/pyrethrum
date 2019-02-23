@@ -7,7 +7,7 @@ module Runner (
 ) where
 
 import Check
-import DSL.Common
+import Common
 import DSL.LogProtocol as LP
 import DSL.Ensure
 import           Control.Monad.Freer

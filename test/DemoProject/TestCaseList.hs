@@ -9,7 +9,7 @@ import           DemoProject.Test.Simple as ST
 import  DemoProject.Test.Simple2 as ST2
 import Control.Monad
 import  Data.Functor (($>))
-import           DSL.Common
+import           Common
 import           DSL.Interpreter
 import           DSL.Logger
 import DSL.LogProtocol

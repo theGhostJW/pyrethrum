@@ -4,7 +4,7 @@ import           Foundation      as F
 import qualified Prelude         as P
 import           Runner as R
 import           Test.Extended
-import           DSL.Common
+import           Common
 import TestAndRunConfig
 import Data.Yaml
 import Data.Aeson.TH

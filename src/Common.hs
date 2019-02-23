@@ -1,5 +1,5 @@
 
-module DSL.Common where
+module Common where
 
 import           Control.Monad.Freer.Writer
 import           Foundation.Extended
@@ -23,7 +23,7 @@ $(deriveJSON defaultOptions ''DetailedInfo)
 
 newtype EnsureError = EnsureError String deriving (Show, Eq)
 
-$(deriveJSON defaultOptions ''DSL.Common.EnsureError)
+$(deriveJSON defaultOptions ''Common.EnsureError)
 
 data FilterError = InvalidItemFilter String |
                    DuplicateItemId Int String deriving (Eq, Show)

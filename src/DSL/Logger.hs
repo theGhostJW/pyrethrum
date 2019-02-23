@@ -1,7 +1,7 @@
 
 module DSL.Logger where
 
-import DSL.Common
+import Common
 import  DSL.LogProtocol
 import           Foundation.List.DList
 import           Foundation.Extended
@@ -14,7 +14,7 @@ import qualified Prelude as P
 import System.IO
 import           TestFilter
 import           RunnerBase
-import  qualified Data.Aeson as A
+import qualified Data.Aeson as A
 import Foundation.Compat.ByteString
 import qualified Data.ByteString.Lazy as B
 
@@ -55,7 +55,7 @@ logDocInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocInterpreter = interpret $ \(LogItem lp) -> tell $ dList lp
 
 showPretty :: Show a => a -> String
-showPretty = toStr . ppShow
+showPretty = toS . ppShow
 
 prtyInfo :: (Show s, Show s1)  => s -> s1 -> DetailedInfo
 prtyInfo msg adInfo = DetailedInfo (showPretty msg) (showPretty adInfo)
@@ -75,6 +75,9 @@ prettyPrintFilterItem FilterResult{..} =
 
 logStrJSON :: LogProtocol -> String
 logStrJSON = fst . fromBytesLenient . fromByteString . B.toStrict . A.encode
+
+-- logStrToLogProtocol :: String -> LogProtocol
+-- logStrToLogProtocol = A.decode
 
 logStrPP :: LogProtocol -> String
 logStrPP =

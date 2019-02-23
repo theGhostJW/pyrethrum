@@ -1,6 +1,6 @@
 module DSL.FileSystem where
 
-import DSL.Common
+import Common
 import           Foundation.Extended
 import           Data.Functor
 import           Control.Monad.Freer

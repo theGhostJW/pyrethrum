@@ -13,6 +13,8 @@ import qualified System.IO as S
 import qualified Data.Char as C
 import Data.Time.LocalTime
 
+bdr = getBinDir
+
 binDir :: IO AbsDir
 binDir = parseAbsDir =<< getBinDir
 
@@ -42,7 +44,7 @@ logFile :: RelFile -> IO (Either P.IOError AbsFile)
 logFile = subPath logDir
 
 dataFile :: RelFile -> IO (Either P.IOError AbsFile)
-dataFile = subPath logDir
+dataFile = subPath dataDir
 
 _tempFile = tempFile [relfile|demoTemp.txt|]
 
@@ -94,7 +96,7 @@ logFilePrefix now =
                     in
                       daysDif * msPerDay + timeDifms
   in 
-    base36 msLeftInYear 7 <> "_" <> toS (formatTime defaultTimeLocale (toCharList "%F_%H-%M-%S") now)
+    base36 msLeftInYear 7 <> "_" <> toS (formatTime defaultTimeLocale (toS "%F_%H-%M-%S") now)
 
 logFilePath :: Maybe String -> String -> FileExt -> IO (Either P.IOError (String, AbsFile))
 logFilePath mNamePrefix suffix fileExt = 
@@ -107,6 +109,7 @@ logFilePath mNamePrefix suffix fileExt =
       (pure . Left . P.userError . toS . show)
       (\relFle -> ((pfx,) <$>) <$> logFile relFle)
 
+-- toDo  - move to extended
 safeOpenFile :: AbsFile -> S.IOMode -> IO (Either P.IOError S.Handle)
 safeOpenFile pth mode = 
   catchIOError (Right <$> S.openFile (toFilePath pth) mode) (pure . Left)

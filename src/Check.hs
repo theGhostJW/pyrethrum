@@ -41,10 +41,10 @@ data Check v = Check {
   }
 
 instance P.Show (Check v) where
-  show = fromStr . (header :: Check v  -> String)
+  show = toS . (header :: Check v  -> String)
 
 instance ToJSON (Check v)  where
-  toJSON = String . toText . (header :: Check v  -> String)
+  toJSON = String . toS . (header :: Check v  -> String)
 
 instance ToJSON (CheckList a) where 
   toJSON cl = Array . fromList $ toJSON <$> toList cl
@@ -60,10 +60,9 @@ isGuardFail = \case
 forceSkipped :: v -> Check v -> CheckResult
 forceSkipped v ck = applyCheck v $ ck {rule = const Skip}
 
-
 calcChecks :: forall v. v -> DList (Check v) -> DList CheckResult
 calcChecks vs chkLst = let
-                        iResult :: forall a. (Bool, a) -> Check v ->  CheckResult
+                        iResult :: (Bool, a) -> Check v ->  CheckResult
                         iResult (excpt, _) = (excpt ? forceSkipped $ applyCheck) vs
 
                         foldfunc :: (Bool, DList CheckResult) -> Check v -> (Bool, DList CheckResult)

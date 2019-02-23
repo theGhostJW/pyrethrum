@@ -1,7 +1,7 @@
 module RunnerBase where
 
 import DSL.Ensure
-import DSL.Common (FilterError)
+import Common (FilterError)
 import ItemClass
 import Foundation.Extended
 import  Control.Monad.Freer

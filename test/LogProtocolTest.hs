@@ -9,7 +9,7 @@ import Data.Functor
 import DemoProject.Config
 import TestAndRunConfig
 import Data.Set as S
-import DSL.Common
+import Common
 import TestFilter
 import RunnerBase
 import Data.Aeson hiding (Error)

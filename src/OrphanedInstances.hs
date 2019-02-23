@@ -11,10 +11,10 @@ import Data.Aeson.TH
 import qualified Prelude as P
 
 instance ToJSON String where 
-  toJSON = String . toText 
+  toJSON = String . toS 
 
 instance FromJSON String where 
-  parseJSON (String txt) = pure $ toStr txt
+  parseJSON (String txt) = pure $ toS txt
   parseJSON badVal        = typeMismatch "Expecting a String" badVal
 
 $(deriveJSON defaultOptions ''IOErrorType)

@@ -2,7 +2,7 @@
 module ItemFilter where
 
 import qualified Data.List.Safe      as SafeList
-import DSL.Common 
+import Common 
 import           Foundation.Extended
 import qualified Prelude as P
 import           ItemClass

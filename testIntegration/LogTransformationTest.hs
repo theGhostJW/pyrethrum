@@ -4,7 +4,14 @@ import           Foundation.Extended
 import qualified Prelude             as P
 import Test.Extended       as T
 import AuxFiles
+import Control.Monad
+import LogTransformation
 
-unit_blahh = chk True
+-- unit_demo :: IO ()
+-- unit_demo = _ 
+--     -- jsoniFile >>= 
+    --                   either 
+    --                       (chkFail . show)
+    --                       runLines
 
-_dataFile = [relfile|demo_raw_log.ijson|] -- windows  
+jsoniFile = dataFile [relfile|demo_raw_log.ijson|]

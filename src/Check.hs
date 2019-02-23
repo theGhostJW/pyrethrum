@@ -24,7 +24,7 @@ data CheckInfo = Info {
 
 data CheckOutcome = Pass |
                     Fail |
-                    GuardFail |
+                    GateFail |
                     Skip
                     deriving (Show, Eq)
 
@@ -52,9 +52,9 @@ instance ToJSON (CheckList a) where
 applyCheck :: forall v. v -> Check v -> CheckResult
 applyCheck v ck = CheckResult (rule ck v) $ Info (header (ck :: Check v)) (msgFunc ck v)
 
-isGuardFail :: CheckOutcome -> Bool
-isGuardFail = \case
-               GuardFail -> True
+isGateFail :: CheckOutcome -> Bool
+isGateFail = \case
+               GateFail -> True
                _ -> False
 
 forceSkipped :: v -> Check v -> CheckResult
@@ -69,23 +69,23 @@ calcChecks vs chkLst = let
                         foldfunc tpl@(hasEx, lstCr) ck = let
                                                             thisChkR = iResult tpl ck
                                                           in
-                                                            (hasEx || isGuardFail (outcome thisChkR), cons thisChkR lstCr)
+                                                            (hasEx || isGateFail (outcome thisChkR), cons thisChkR lstCr)
                         in
                          reverse $ snd $ foldl' foldfunc (False, mempty) chkLst
 
--- TODO: clashes with guard on Alternative rename ??
-guard :: Functor f => f (Check v) -> f (Check v)
-guard =  let
-    guardOutcome :: Check v -> Check v
-    guardOutcome ck  =
+gate :: Functor f => f (Check v) -> f (Check v)
+gate =  let
+    gateOutcome :: Check v -> Check v
+    gateOutcome ck  =
       let
-        escOutcome o = case o of
-                         Fail -> GuardFail
-                         _ -> o
+        escOutcome :: CheckOutcome -> CheckOutcome
+        escOutcome = \case
+                         Fail -> GateFail
+                         othOutcome -> othOutcome
        in
          ck {rule = escOutcome . rule ck}
   in
-    (guardOutcome <$>)
+    (gateOutcome <$>)
 
 -- generate a check from a predicate
 chk :: String -> (v -> Bool) -> DList (Check v)

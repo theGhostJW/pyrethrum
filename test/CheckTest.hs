@@ -10,11 +10,11 @@ isBig = chk "More than 10" (> 10)
 isEven = chk "Even" P.even
 isOdd = chk "Odd" P.odd
 
-isOddGuard = guard $ chk' "Odd Test"
+isOddGate = gate $ chk' "Odd Test"
                    (\v -> "The value was: " <> show v <> " and is expected to be odd")
                    P.odd
 
-_demo = outcome <$> calcChecks 42 (isOddGuard <> isBig <> isEven)
+_demo = outcome <$> calcChecks 42 (isOddGate <> isBig <> isEven)
 
 chkOutcomes expected val checks = UT.chkEq (fromList expected) $ outcome <$> calcChecks val checks
 
@@ -22,20 +22,20 @@ unit_chk_outcomes_full_success = chkOutcomes [Pass, Pass] 42 $ isBig <> isEven
 unit_chk_outcomes_fail_and_success = chkOutcomes [Fail, Pass, Pass] 42 $ isOdd <> isBig <> isEven
 unit_chk_outcomes_fail_and_success2 = chkOutcomes [Pass, Pass, Fail] 42 $ isBig <> isEven <> isOdd
 
-unit_chk_outcomes_guardFail_and_skip_and_success2 = chkOutcomes [Pass, GuardFail, Skip] 42 (isBig <> isOddGuard <> isEven)
+unit_chk_outcomes_gateFail_and_skip_and_success2 = chkOutcomes [Pass, GateFail, Skip] 42 (isBig <> isOddGate <> isEven)
 
-unit_chk_outcomes_inlined_guard = chkOutcomes [Pass, GuardFail, Skip] 42 $ chk "More than 10" (> 10)  <>
-                                                                    guard (chk "Odd" P.odd) <>
+unit_chk_outcomes_inlined_gate = chkOutcomes [Pass, GateFail, Skip] 42 $ chk "More than 10" (> 10)  <>
+                                                                    gate (chk "Odd" P.odd) <>
                                                                     chk "Even" P.even
 
-unit_chk_with_with_guard_fail = chkOutcomes [Pass, Pass, GuardFail, Skip]   42 $ isBig
+unit_chk_with_with_gate_fail = chkOutcomes [Pass, Pass, GateFail, Skip]   42 $ isBig
                                                                            <> isEven
-                                                                           <> guard isOdd
+                                                                           <> gate isOdd
                                                                            <> isEven
 
-unit_chk_with_chkGuard_success = chkOutcomes [Pass, Pass, GuardFail, Skip, Skip] 42  $ isBig
+unit_chk_with_chkGate_success = chkOutcomes [Pass, Pass, GateFail, Skip, Skip] 42  $ isBig
                                                                   <> isEven
-                                                                  <> isOddGuard
+                                                                  <> isOddGate
                                                                   <> isOdd
                                                                   <> isEven
 evenOddEven = isEven
@@ -43,13 +43,13 @@ evenOddEven = isEven
               <> isOdd
               <> isEven
 
-unit_chk_with_guard_on_list = chkOutcomes [Pass, Pass, GuardFail, Skip, Skip, Skip] 42  $ isBig
-                                                                  <> guard evenOddEven
+unit_chk_with_gate_on_list = chkOutcomes [Pass, Pass, GateFail, Skip, Skip, Skip] 42 $ isBig
+                                                                  <> gate evenOddEven
                                                                   <> isEven
 
 
 _checkmDemo = calcChecks 42  $ isBig
                              <> isEven
-                             <> isOddGuard
+                             <> isOddGate
                              <> isOdd
                              <> isEven

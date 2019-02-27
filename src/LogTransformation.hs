@@ -20,11 +20,12 @@ runLines :: forall accum err itm rslt. Step accum itm err rslt
                                       -> ISerialiser err 
                                       -> accum 
                                       -> AbsFile 
+                                      -> Handle
                                       -> IO ()
-runLines step ipsr rsltSersr errSersr seed file = safeOpenFile file ReadMode
+runLines step ipsr rsltSersr errSersr seed file hOut = safeOpenFile file ReadMode
                     >>= either 
                           P.print
-                          (\hIn -> mainloop step ipsr rsltSersr errSersr hIn stdout 1 seed)
+                          (\hIn -> finally (hClose hIn) $ mainloop step ipsr rsltSersr errSersr hIn hOut 1 seed)
 
 mainloop :: forall accum err itm rslt. Step accum itm err rslt 
                                     -> IParser err itm 

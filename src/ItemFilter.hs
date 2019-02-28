@@ -21,7 +21,7 @@ instance P.Show (ItemFilter a) where
   show LastVal     = "LastVal"
   show (Pred _) = "Pred itemPredicateFunction"
 
-filterredItemIds :: forall i vs. (ItemClass i vs) => ItemFilter i -> [i] -> Either FilterError (S.Set Int)
+filterredItemIds :: forall i ds. (ItemClass i ds) => ItemFilter i -> [i] -> Either FilterError (S.Set Int)
 filterredItemIds filtr items =
   let
     filterredItems :: Either FilterError [Int]

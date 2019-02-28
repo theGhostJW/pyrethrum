@@ -37,14 +37,14 @@ data ApState = ApState {
   simpleMessage :: String
 } deriving Show
 
-type ValState = ApState
+type DState = ApState
 
-interactor :: forall effs. Effects effs => (ItemClass Item ValState) => RunConfig -> Item -> Eff effs ApState
+interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Eff effs ApState
 interactor _rc TestItem{..} = do
                               ensure "Only even iids expected" $ P.even iid
                               pure $ ApState iid "Success"
 
-prepState :: ApState -> Ensurable ValState
+prepState :: ApState -> Ensurable DState
 prepState = pure . id
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -56,7 +56,7 @@ data Item = TestItem {
                       pre    :: String,
                       post   :: String,
                       path   :: Path Abs File,
-                      checks :: CheckList ValState
+                      checks :: CheckList DState
                     } deriving (Show, Generic)
 
 i = TestItem
@@ -64,7 +64,7 @@ i = TestItem
 items = [
           i 100 "Pre"  "Post" validFile $
                                          chk "iid is small" (\ApState{..} -> itemId < 200 ) <>
-                                         chk "iid is big"   (\vs -> itemId vs > 500),
+                                         chk "iid is big"   (\ds -> itemId ds > 500),
           i 110 "Pre"  "Post" validFile mempty,
           i 123 "Pre"  "Post" invalidFile2 mempty,
           i 130 "Pre"  "Post" validFile mempty,
@@ -83,7 +83,7 @@ ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffe
 ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr items)
 
 
-test :: forall effs. Effects effs => Test Item effs ApState ValState
+test :: forall effs. Effects effs => Test Item effs ApState DState
 test = GenericTest {
               configuration = config {address = nameOfModule},
               components = TestComponents {
@@ -95,7 +95,7 @@ test = GenericTest {
 
 $(deriveToJSON defaultOptions ''Item)
 
-instance ItemClass Item ValState where
+instance ItemClass Item DState where
   identifier = iid
   whenClause = pre
   thenClause = post

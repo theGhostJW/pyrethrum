@@ -17,15 +17,15 @@ data TestItem = TestItem {
   iid    :: Int,
   pre    :: String,
   post   :: String,
-  checks :: C.CheckList ValState
+  checks :: C.CheckList DState
 } deriving (Show, Generic)
 
 instance ToJSON TestItem where
   toEncoding = genericToEncoding defaultOptions
 
-type ValState = Int
+type DState = Int
 
-instance ItemClass TestItem ValState where
+instance ItemClass TestItem DState where
   identifier = iid
   whenClause = pre
   thenClause = post
@@ -49,7 +49,7 @@ chkFilterError flter msg itms = chkLeftContains msg $ filterredItemIds flter (it
 chkFilter flter expted itms = chkEq (Right $ S.fromList expted) $ filterredItemIds flter itms
 chkFilter' flter expted itms = chkEq (Right $ S.singleton expted) $ filterredItemIds flter itms
 
-chkSingleton :: (ItemClass item valState) => ItemFilter item -> [item] -> Assertion
+chkSingleton :: (ItemClass item dState) => ItemFilter item -> [item] -> Assertion
 chkSingleton flter itms = either (\_ -> chk False) (chkEq (1 :: Int)) $ P.length <$> filterredItemIds flter itms
 
 blahh :: IO ()

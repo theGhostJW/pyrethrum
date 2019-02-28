@@ -118,7 +118,7 @@ test5 = GenericTest {
             }
 
 runRunner :: forall m m1 effs a.
-                (forall i as vs. (ItemClass i vs, Show i, Show as, Show vs) => GenericTest TestConfig RunConfig i effs as vs -> m1 (m a))
+                (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => GenericTest TestConfig RunConfig i effs as ds -> m1 (m a))
                 -> [TestGroup m1 m a effs]
 runRunner f =
   [

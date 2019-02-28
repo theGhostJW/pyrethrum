@@ -61,9 +61,9 @@ forceSkipped :: v -> Check v -> CheckResult
 forceSkipped v ck = applyCheck v $ ck {rule = const Skip}
 
 calcChecks :: forall v. v -> DList (Check v) -> DList CheckResult
-calcChecks vs chkLst = let
+calcChecks ds chkLst = let
                         iResult :: (Bool, a) -> Check v ->  CheckResult
-                        iResult (excpt, _) = (excpt ? forceSkipped $ applyCheck) vs
+                        iResult (excpt, _) = (excpt ? forceSkipped $ applyCheck) ds
 
                         foldfunc :: (Bool, DList CheckResult) -> Check v -> (Bool, DList CheckResult)
                         foldfunc tpl@(hasEx, lstCr) ck = let

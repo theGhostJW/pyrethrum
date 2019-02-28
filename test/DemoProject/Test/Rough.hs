@@ -51,7 +51,7 @@ data ApState = ApState {
   fileText :: StrictReadResult
 } deriving Show
 
-interactor :: forall effs. Effects effs => (ItemClass Item ValState) => RunConfig -> Item -> Eff effs ApState
+interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Eff effs ApState
 interactor RunConfig{..} Item{..} = do
                                       writeFile path $ pre  <> " ~ " <> post <> " !!"
                                       ensure "Blahh" $ P.even iid
@@ -70,12 +70,12 @@ interactor RunConfig{..} Item{..} = do
                                       }
 
 
-newtype ValState = V {
+newtype DState = V {
                     iidx10 :: Int
                   } deriving Show
 
 
-prepState :: ApState -> Ensurable ValState
+prepState :: ApState -> Ensurable DState
 prepState ApState{..} = do
                           ensure  "I do not like 110 in prepstate" (itemId /= 110)
                           pure $ V $ 10 * itemId
@@ -89,7 +89,7 @@ data Item = Item {
                     pre    :: String,
                     post   :: String,
                     path   :: Path Abs File,
-                    checks :: CheckList ValState
+                    checks :: CheckList DState
                   } deriving (Show, Generic)
 
 i = Item
@@ -120,7 +120,7 @@ nameOfModule = mkTestModule ''ApState
 ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr items)
 
-test :: forall effs. Effects effs => Test Item effs ApState ValState
+test :: forall effs. Effects effs => Test Item effs ApState DState
 test = GenericTest {
               configuration = config {address = nameOfModule},
               components = TestComponents {
@@ -130,7 +130,7 @@ test = GenericTest {
                             }
             }
 
-instance ItemClass Item ValState where
+instance ItemClass Item DState where
   identifier = iid
   whenClause = pre
   thenClause = post
@@ -149,7 +149,7 @@ newtype WithEffects_ es0 es1 a = WithEffects { unWithEffects :: Members es0 es1 
 type EFileSystem2 = '[Logger, Ensure, ArbitraryIO, FileSystem]
 type WithEffects = WithEffects_ EFileSystem2
 --
-test2 :: forall effs. WithEffects effs (Test Item effs ApState ValState)
+test2 :: forall effs. WithEffects effs (Test Item effs ApState DState)
 test2 = WithEffects test
 --
 effsRepTest :: Typeable es0 => WithEffects_ es0 es1 a -> TypeRep es0

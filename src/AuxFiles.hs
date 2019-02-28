@@ -112,7 +112,7 @@ logFilePath mNamePrefix suffix fileExt =
 -- toDo  - move to extended
 safeOpenFile :: AbsFile -> S.IOMode -> IO (Either P.IOError S.Handle)
 safeOpenFile pth mode = 
-  catchIOError (Right <$> S.openFile (toFilePath pth) mode) (pure . Left)
+  catchIOError (Right <$> S.openFile (debug' "FILE PATH" $ toFilePath pth) mode) (pure . Left)
 
 data HandleInfo = HandleInfo {
   prefix :: String,

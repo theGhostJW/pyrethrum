@@ -45,14 +45,14 @@ packages:
 # Override default flag values for local packages and extra-deps
 # flags: {}
 #
-allow-newer: true
+allow-newer: false
 
 # Extra package databases containing global packages
 # extra-package-dbs: []
 extra-deps:
 # mine
 - git: https://github.com/theGhostJW/reexports-and-extensions
-  commit: "77d1080"
+  commit: "03e0c3c"
 # stack
 - foundation-edge-0.0.3@sha256:ae2133074cb651379c101697a71fa0d3693d8780687c8ec8a13cb98c1fb48d7f
 - transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961

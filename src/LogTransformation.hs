@@ -1,9 +1,8 @@
 module LogTransformation where
 
 import Common
-import Foundation.Extended
+import Foundation.Extended as E
 import Foundation.Compat.ByteString
-import System.IO
 import qualified Prelude as P
 import Basement.String
 import AuxFiles
@@ -12,6 +11,8 @@ import Text.Show.Pretty as PP
 import qualified Data.Aeson as A
 import Data.Aeson.TH
 import Data.ByteString.Char8 as B
+import System.IO as S
+import Data.Functor
 
 -- TODO: re-implement with streams
 runLines :: forall accum err itm rslt. Step accum itm err rslt 
@@ -22,10 +23,11 @@ runLines :: forall accum err itm rslt. Step accum itm err rslt
                                       -> AbsFile 
                                       -> Handle
                                       -> IO ()
-runLines step ipsr rsltSersr errSersr seed file hOut = safeOpenFile file ReadMode
-                    >>= either 
-                          P.print
-                          (\hIn -> finally (hClose hIn) $ mainloop step ipsr rsltSersr errSersr hIn hOut 1 seed)
+runLines step ipsr rsltSersr errSersr seed file hOut = do 
+                                                        eHIn <- safeOpenFile file ReadMode
+                                                        eitherf eHIn
+                                                              P.print
+                                                              (\hIn -> P.print "Hello from RunLines" *> finally (mainloop step ipsr rsltSersr errSersr hIn hOut 1 seed) (hClose hIn))
 
 mainloop :: forall accum err itm rslt. Step accum itm err rslt 
                                     -> IParser err itm 
@@ -42,25 +44,33 @@ mainloop step ipsr rsltSersr errSersr inh outh lineNo accum =
       localLoop = mainloop step ipsr rsltSersr errSersr inh outh 
 
       output :: B.ByteString -> IO ()
-      output = B.hPutStrLn outh
+      output bs = debug' "putlnstr" <$> B.hPutStrLn outh bs
     in
+      P.print ("Hello from MainLoop " <> show lineNo) *>
       hIsEOF inh >>=
                   bool
-                      (pure ())
-                      (
-                      do 
-                        byteLine <- B.hGetLine inh
-                        let 
-                          (nxtAccum, result) = step lineNo accum (ipsr byteLine)
-                        
-                        eitherf result
-                          (output . errSersr)
-                          (maybe
-                            (pure ())
-                            (output . rsltSersr)
-                          )
+                      ( -- not EOF -> has data
+                        do 
+                          P.print "PROCESSING LINE"
+                          byteLine <- B.hGetLine inh
+                          let 
+                            (nxtAccum, result) = step lineNo accum (ipsr byteLine)
                           
-                        localLoop (lineNo + 1) nxtAccum
+                          eitherf result
+                            (output . errSersr)
+                            (maybe
+                              (debug' "NOTHING" <$> pure ())
+                              (output . debug' "HAS LINE" . rsltSersr)
+                            )
+                            
+                          localLoop (lineNo + 1) nxtAccum
+                      )
+                      (do 
+                        fSize <- hFileSize inh
+                        eof <- hIsEOF inh
+                        P.print $ "Done hIsEOF: " <> show inh
+                        P.print $ "Size: " <> show fSize
+                        pure ()
                       )
             
 type Step accum itm err rslt = Int -> accum -> Either err itm -> (accum, Either err (Maybe rslt))
@@ -87,3 +97,19 @@ strSerialise = toByteString . toBytes UTF8
 
 lpParser :: ByteString -> Either String LogProtocol
 lpParser bs = mapLeft toS $ A.eitherDecode $ toS bs
+
+summariseIterations :: AbsFile -> IO String
+summariseIterations inputLog = 
+                              let
+                                seed :: IterationAccumulator 
+                                seed = uu
+
+                                processLines :: Handle -> IO ()
+                                processLines h = debug' "RUN LINES" <$> runLines iterationStep lpParser itrSerialise strSerialise seed (debug' "INPUT LOG" inputLog) h
+                              in
+                                do 
+                                  itrFile <- inputLog -<.> ".itr"
+                                  outHndle <- safeOpenFile itrFile S.WriteMode
+                                  eitherf outHndle
+                                    (pure . show . debug' "FAILED OPEN")
+                                    (\h -> finally (processLines h) (S.hClose h) $> (toS . toFilePath $ itrFile))

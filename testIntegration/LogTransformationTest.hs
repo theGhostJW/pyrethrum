@@ -11,9 +11,7 @@ unit_demo :: IO ()
 unit_demo = do 
                 eFile <- jsoniFile 
                 eItems <- P.traverse summariseIterations eFile
-                P.print eItems
                 chk $ isRight eItems  
-                P.print "Hello"
                 chk ("" /= fromRight' eItems)
 
 jsoniFile :: IO (Either P.IOError AbsFile)

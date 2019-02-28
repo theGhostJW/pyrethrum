@@ -27,7 +27,7 @@ runLines step ipsr rsltSersr errSersr seed file hOut = do
                                                         eHIn <- safeOpenFile file ReadMode
                                                         eitherf eHIn
                                                               P.print
-                                                              (\hIn -> P.print "Hello from RunLines" *> finally (mainloop step ipsr rsltSersr errSersr hIn hOut 1 seed) (hClose hIn))
+                                                              (\hIn -> finally (mainloop step ipsr rsltSersr errSersr hIn hOut 1 seed) (hClose hIn))
 
 mainloop :: forall accum err itm rslt. Step accum itm err rslt 
                                     -> IParser err itm 
@@ -44,14 +44,12 @@ mainloop step ipsr rsltSersr errSersr inh outh lineNo accum =
       localLoop = mainloop step ipsr rsltSersr errSersr inh outh 
 
       output :: B.ByteString -> IO ()
-      output bs = debug' "putlnstr" <$> B.hPutStrLn outh bs
+      output = B.hPutStrLn outh
     in
-      P.print ("Hello from MainLoop " <> show lineNo) *>
       hIsEOF inh >>=
                   bool
                       ( -- not EOF -> has data
                         do 
-                          P.print "PROCESSING LINE"
                           byteLine <- B.hGetLine inh
                           let 
                             (nxtAccum, result) = step lineNo accum (ipsr byteLine)
@@ -59,8 +57,8 @@ mainloop step ipsr rsltSersr errSersr inh outh lineNo accum =
                           eitherf result
                             (output . errSersr)
                             (maybe
-                              (debug' "NOTHING" <$> pure ())
-                              (output . debug' "HAS LINE" . rsltSersr)
+                              (pure ())
+                              (output . rsltSersr)
                             )
                             
                           localLoop (lineNo + 1) nxtAccum
@@ -68,8 +66,6 @@ mainloop step ipsr rsltSersr errSersr inh outh lineNo accum =
                       (do 
                         fSize <- hFileSize inh
                         eof <- hIsEOF inh
-                        P.print $ "Done hIsEOF: " <> show inh
-                        P.print $ "Size: " <> show fSize
                         pure ()
                       )
             
@@ -105,11 +101,11 @@ summariseIterations inputLog =
                                 seed = uu
 
                                 processLines :: Handle -> IO ()
-                                processLines h = debug' "RUN LINES" <$> runLines iterationStep lpParser itrSerialise strSerialise seed (debug' "INPUT LOG" inputLog) h
+                                processLines = runLines iterationStep lpParser itrSerialise strSerialise seed inputLog
                               in
                                 do 
                                   itrFile <- inputLog -<.> ".itr"
                                   outHndle <- safeOpenFile itrFile S.WriteMode
                                   eitherf outHndle
-                                    (pure . show . debug' "FAILED OPEN")
+                                    (pure . show)
                                     (\h -> finally (processLines h) (S.hClose h) $> (toS . toFilePath $ itrFile))

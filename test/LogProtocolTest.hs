@@ -7,7 +7,7 @@ import DSL.LogProtocol
 import Data.Functor.Identity
 import Data.Functor
 import DemoProject.Config
-import TestAndRunConfig
+import RunElementClasses
 import Data.Set as S
 import Common
 import TestFilter

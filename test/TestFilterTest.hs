@@ -5,7 +5,7 @@ import qualified Prelude         as P
 import           Runner as R
 import           Test.Extended
 import           Common
-import TestAndRunConfig
+import RunElementClasses
 import Data.Yaml
 import Data.Aeson.TH
 import Data.Aeson.Types

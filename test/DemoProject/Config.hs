@@ -7,7 +7,7 @@ import           Foundation.Extended
 import qualified Prelude                    as P
 import           Runner
 import           TestFilter
-import           TestAndRunConfig
+import           RunElementClasses
 import           Foundation.List.DList
 import Data.Aeson
 import Data.Aeson.TH

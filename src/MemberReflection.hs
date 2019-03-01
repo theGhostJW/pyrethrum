@@ -11,7 +11,7 @@ import           DSL.ArbitraryIO
 import           DSL.Logger
 import           Runner
 import           Data.Aeson.TH
-import           TestAndRunConfig
+import           RunElementClasses
 import           Data.Set as S
 import Type.Reflection
 import Check

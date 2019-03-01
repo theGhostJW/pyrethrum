@@ -10,7 +10,7 @@ import DemoProject.Config
 import DSL.Interpreter
 import           Foundation.Extended  hiding (Item)
 import           Runner as R
-import           TestAndRunConfig
+import           RunElementClasses
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig (IID 120)

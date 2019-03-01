@@ -4,8 +4,8 @@ module ItemFilter where
 import qualified Data.List.Safe      as SafeList
 import Common 
 import           Foundation.Extended
+import RunElementClasses
 import qualified Prelude as P
-import           ItemClass
 import qualified Data.Set as S
 
 data ItemFilter a = IID Int |

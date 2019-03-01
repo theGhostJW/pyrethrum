@@ -15,7 +15,7 @@ import           Foundation.Extended hiding (Item)
 import qualified Prelude as P
 import Data.Aeson.TH
 import OrphanedInstances
-import TestAndRunConfig
+import RunElementClasses
 import DemoProject.Test.TestFilePaths
 import GHC.Generics
 

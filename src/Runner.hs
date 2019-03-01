@@ -3,7 +3,7 @@ module Runner (
     module Runner
   , module RB
   , module ItemFilter
-  , module ItemClass
+  , module C
 ) where
 
 import Check
@@ -13,11 +13,10 @@ import DSL.Ensure
 import           Control.Monad.Freer
 import           Foundation.Extended
 import           ItemFilter  (ItemFilter (..), filterredItemIds)
-import           ItemClass
 import qualified Prelude             as P
 import           DSL.Interpreter
 import qualified Data.Set as S
-import TestAndRunConfig as C
+import RunElementClasses as C
 import Control.Monad
 import Text.Show.Pretty
 import AuxFiles

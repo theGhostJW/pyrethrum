@@ -1,10 +1,13 @@
-module TestAndRunConfig where
+module RunElementClasses where
 
 import           Foundation.Extended
 import Data.Aeson.TH
 import OrphanedInstances
 import Language.Haskell.TH.Syntax
 import Data.Aeson.Types
+import           Foundation.List.DList
+import GHC.Generics
+import           Check
 
 newtype TestModule = TestModule String deriving (Eq, Show, IsString)
 
@@ -23,3 +26,14 @@ class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => TestConfigClass a where
   moduleAddress:: a -> TestModule
 
 class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => RunConfigClass a
+
+
+class (ToJSON i, Generic i) => ItemClass i v | i -> v  where
+  identifier :: i -> Int
+  whenClause :: i -> String
+  thenClause :: i -> String
+  checkList :: i -> DList (Check v)
+
+  whenThen :: i -> String
+  whenThen i = "When: " <> whenClause i  <> "\n" <>
+               "Then: " <> thenClause i

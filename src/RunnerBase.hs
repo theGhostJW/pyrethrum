@@ -2,10 +2,9 @@ module RunnerBase where
 
 import DSL.Ensure
 import Common (FilterError)
-import ItemClass
 import Foundation.Extended
 import  Control.Monad.Freer
-import TestAndRunConfig
+import RunElementClasses
 import Data.Aeson.TH
 import Data.Aeson
 

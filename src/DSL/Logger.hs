@@ -9,7 +9,7 @@ import           Foundation.String as S
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Writer
 import Text.Show.Pretty as PP
-import TestAndRunConfig as C
+import RunElementClasses as C
 import qualified Prelude as P
 import System.IO
 import           TestFilter

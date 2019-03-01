@@ -25,7 +25,7 @@ import GHC.Generics
 import qualified Data.Serialize as S
 import qualified System.Environment as E
 import OrphanedInstances
-import TestAndRunConfig
+import RunElementClasses
 import DemoProject.Test.TestFilePaths
 
 type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs

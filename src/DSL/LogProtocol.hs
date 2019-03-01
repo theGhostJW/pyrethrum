@@ -6,7 +6,7 @@ module DSL.LogProtocol where
 import           Common (DetailedInfo, AppError)
 import           TestFilter
 import           Foundation.Extended
-import           TestAndRunConfig
+import           RunElementClasses
 import GHC.Generics
 import OrphanedInstances
 import Data.Aeson
@@ -16,6 +16,10 @@ import Data.Aeson.TH
 import RunnerBase as RB
 import qualified Data.HashMap.Lazy as HML
 import qualified Data.Text as T
+
+newtype RunTitle = RunTitle {unRunTitle :: String} deriving (Eq, Show, IsString)
+newtype GroupTitle = GroupTitle {unGroupTitle :: String} deriving (Eq, Show, IsString)
+newtype TestTitle = TestTitle {unTestTitle :: String} deriving (Eq, Show, IsString)
 
 data LogProtocol =
   Message String |

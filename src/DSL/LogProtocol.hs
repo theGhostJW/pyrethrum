@@ -36,9 +36,9 @@ data LogProtocol =
   EndGroup String |
 
   StartTest TestDisplayInfo |
-  EndTest TestDisplayInfo |
+  EndTest TestModule |
 
-  StartIteration TestModule Int Value | -- iid / test module / item
+  StartIteration TestModule Int Value | -- test / iid / module / item
   Result TestModule Int String | -- test module / iid / test Info
   EndIteration TestModule Int -- test module / iid
 

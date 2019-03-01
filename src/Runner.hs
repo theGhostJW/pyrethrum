@@ -216,8 +216,11 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
     logPtcl :: LogProtocol -> m ()
     logPtcl = logger' intrprt
 
-    logDisplayItem :: (TestDisplayInfo -> LogProtocol) -> m ()
-    logDisplayItem getter = logPtcl $ getter $ mkDisplayInfo tc
+    startTest :: m ()
+    startTest = logPtcl . StartTest $ mkDisplayInfo tc
+
+    endTest :: m ()
+    endTest = logPtcl . EndTest $ moduleAddress tc
 
     filteredItems :: [i]
     filteredItems = filter inTargIds items
@@ -239,10 +242,10 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
   in
     case filteredItems of
       [] -> []
-      [x] -> [logDisplayItem StartTest *> runItem x *> logDisplayItem EndTest]
-      x : xs -> (logDisplayItem StartTest *> runItem x)
+      [x] -> [startTest *> runItem x *> endTest]
+      x : xs -> (startTest *> runItem x)
                 : (runItem <$> P.init xs)
-                <> [runItem (P.last xs) *> logDisplayItem EndTest]
+                <> [runItem (P.last xs) *> endTest]
                      
  
 

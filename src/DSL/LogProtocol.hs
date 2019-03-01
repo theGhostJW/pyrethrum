@@ -21,6 +21,10 @@ newtype RunTitle = RunTitle {unRunTitle :: String} deriving (Eq, Show, IsString)
 newtype GroupTitle = GroupTitle {unGroupTitle :: String} deriving (Eq, Show, IsString)
 newtype TestTitle = TestTitle {unTestTitle :: String} deriving (Eq, Show, IsString)
 
+$(deriveJSON defaultOptions ''RunTitle)
+$(deriveJSON defaultOptions ''GroupTitle)
+$(deriveJSON defaultOptions ''TestTitle)
+
 data LogProtocol =
   Message String |
   Message' DetailedInfo |
@@ -33,11 +37,11 @@ data LogProtocol =
   Error AppError |
   FilterLog [FilterResult] |
 
-  StartRun String Value |  -- title / runconfig
+  StartRun RunTitle Value |  -- title / runconfig
   EndRun |
 
-  StartGroup String |
-  EndGroup String |
+  StartGroup GroupTitle |
+  EndGroup GroupTitle |
 
   StartTest TestDisplayInfo |
   EndTest TestModule |

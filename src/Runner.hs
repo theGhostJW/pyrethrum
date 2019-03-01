@@ -392,7 +392,7 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
               runGrp :: m ()
               runGrp = 
                       let 
-                        hdr = RB.header tg
+                        hdr = GroupTitle $ RB.header tg
                       in
                         logPtcl (StartGroup hdr)
                         *> logFailOrRun grpRollover runGroupAfterRollover
@@ -402,7 +402,7 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
 
         in
           do
-            logPtcl $ StartRun (C.title rc) $ toJSON rc
+            logPtcl $ StartRun (RunTitle $ C.title rc) $ toJSON rc
             logPtcl $ FilterLog $ filterLog filterInfo
             sequence_ $ exeGroup <$> runTuples
             logPtcl EndRun
@@ -421,7 +421,7 @@ testEndpointBase :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfig
                    FilterList rc tc                               -- filters
                    -> (forall i as ds. (ItemClass i ds, Show i, Show ds, Show as) => i -> as -> ds -> TestInfo i as ds)             -- test aggregator i.e. rslt constructor
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
-                   -> TestModule                                          -- test address
+                   -> TestModule                                      -- test address
                    -> rc                                              -- runConfig
                    -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints
                    -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results

@@ -100,9 +100,9 @@ logStrPP =
                    FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
                                                 foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
-                   StartRun ttle rc -> header ("Test Run: " <> ttle) <> newLn <> showPretty rc
-                   StartGroup s -> header $ "Group: " <> s
-                   EndGroup s -> header $ "End Group: " <> s
+                   StartRun ttle rc -> header ("Test Run: " <> unRunTitle ttle) <> newLn <> showPretty rc
+                   StartGroup gt -> header $ "Group: " <> unGroupTitle gt
+                   EndGroup gt -> header $ "End Group: " <> unGroupTitle gt
 
                    StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle)
                    EndTest (TestModule address) -> tstHeader ("End Test: " <> address)

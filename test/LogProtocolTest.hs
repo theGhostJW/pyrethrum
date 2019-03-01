@@ -82,8 +82,8 @@ genLogProtocol = choice [
                     Error . AppUserError <$> genStr,
                     FilterLog <$> genFilterResults,
                   
-                    StartRun <$> genStr <*> (toJSON <$> genRunConfig),  -- title / runconfig
-                    StartGroup <$> genStr,
+                    StartRun <$> (RunTitle <$> genStr) <*> (toJSON <$> genRunConfig),  -- title / runconfig
+                    StartGroup <$> (GroupTitle <$> genStr),
                     StartTest <$> genTestDisplayInfo,
                     StartIteration <$> genTestModule <*> genInt <*> (toJSON <$> genRunConfig),-- iid / test module / item - using runconfig for rand om JSON object
                     Result <$> genTestModule <*> genInt <*> genStr, -- test module / iid / test Info

@@ -76,9 +76,6 @@ prettyPrintFilterItem FilterResult{..} =
 logStrJSON :: LogProtocol -> String
 logStrJSON = fst . fromBytesLenient . fromByteString . B.toStrict . A.encode
 
--- logStrToLogProtocol :: String -> LogProtocol
--- logStrToLogProtocol = A.decode
-
 logStrPP :: LogProtocol -> String
 logStrPP =
             let

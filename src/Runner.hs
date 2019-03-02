@@ -6,7 +6,7 @@ module Runner (
   , module C
 ) where
 
-import Check
+import qualified Check as CK
 import Common
 import DSL.LogProtocol as LP
 import DSL.Ensure
@@ -88,7 +88,7 @@ logFileHandles mpSuffixExt =
       do 
         iStep <- accum
         let 
-          iResult = result iStep 
+          iResult = result iStep
           iPrefix = filePrefix iStep 
         eitherf iResult 
           (const $ pure iStep)
@@ -97,7 +97,7 @@ logFileHandles mpSuffixExt =
               do 
                 eHandInfo <- logFileHandle iPrefix suff ext
                 pure $ eitherf eHandInfo
-                        (\ioErr -> iStep {result = Left $ AppIOError' "Error creating log file" ioErr} )
+                        (\ioErr -> (iStep :: Step a) {result = Left $ AppIOError' "Error creating log file" ioErr} )
                         (
                           \hi@HandleInfo{..} -> Step {
                                                     filePrefix = Just prefix,
@@ -130,7 +130,7 @@ data TestInfo i as ds = TestInfo {
                                   item :: i,
                                   apState  :: as,
                                   domainState :: ds,
-                                  checkResult :: CheckResultList
+                                  checkResult :: CK.CheckReportList
                                 } |
 
                          GoHomeError {
@@ -162,7 +162,7 @@ testInfoFull item apState dState =
       item = item,
       apState = apState,
       domainState = dState,
-      checkResult = calcChecks dState $ checkList item
+      checkResult = CK.calcChecks dState $ checkList item
     }
 
 recoverTestInfo :: i -> Either AppError (TestInfo i as ds) -> TestInfo i as ds

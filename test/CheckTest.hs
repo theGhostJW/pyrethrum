@@ -14,9 +14,9 @@ isOddGate = gate $ chk' "Odd Test"
                    (\v -> "The value was: " <> show v <> " and is expected to be odd")
                    P.odd
 
-_demo = outcome <$> calcChecks 42 (isOddGate <> isBig <> isEven)
+_demo = result <$> calcChecks 42 (isOddGate <> isBig <> isEven)
 
-chkOutcomes expected val checks = UT.chkEq (fromList expected) $ outcome <$> calcChecks val checks
+chkOutcomes expected val checks = UT.chkEq (fromList expected) $ result <$> calcChecks val checks
 
 unit_chk_outcomes_full_success = chkOutcomes [Pass, Pass] 42 $ isBig <> isEven
 unit_chk_outcomes_fail_and_success = chkOutcomes [Fail, Pass, Pass] 42 $ isOdd <> isBig <> isEven
@@ -33,11 +33,44 @@ unit_chk_with_with_gate_fail = chkOutcomes [Pass, Pass, GateFail, Skip]   42 $ i
                                                                            <> gate isOdd
                                                                            <> isEven
 
-unit_chk_with_chkGate_success = chkOutcomes [Pass, Pass, GateFail, Skip, Skip] 42  $ isBig
+unit_chk_with_chkGate_fail = chkOutcomes [Pass, Pass, GateFail, Skip, Skip] 42  $ isBig
                                                                   <> isEven
                                                                   <> isOddGate
                                                                   <> isOdd
                                                                   <> isEven
+
+unit_chk_with_chkGate_fail_expected = chkOutcomes [Pass, Pass, GateFailExpected "Known Issue", Skip, Skip] 42  $ isBig
+                                                                  <> isEven
+                                                                  <> expectFailure "Known Issue" isOddGate
+                                                                  <> isOdd
+                                                                  <> isEven
+
+unit_chk_with_chkGate_fail_regression = chkOutcomes [Pass, Pass, GateRegression "Known Issue", Skip, Skip] 42  $ isBig
+                                                                  <> isEven
+                                                                  <> expectFailureFixed "Known Issue" isOddGate
+                                                                  <> isOdd
+                                                                  <> isEven
+
+unit_chk_with_fail_regression = chkOutcomes [Pass, Pass, Regression "Known Issue", Fail, Pass] 42  $ isBig
+                                                                  <> isEven
+                                                                  <> expectFailureFixed "Known Issue" isOdd
+                                                                  <> isOdd
+                                                                  <> isEven
+
+unit_chk_with_chkGate_fail_unexpected_pass_gate = chkOutcomes [Pass, Pass, PassWhenFailExpected "Known Issue", Fail, Pass] 42  $ 
+                                                                  isBig
+                                                                  <> isEven
+                                                                  <> expectFailure "Known Issue" (gate isEven)
+                                                                  <> isOdd
+                                                                  <> isEven
+
+unit_chk_with_chkGate_fail_unexpected_pass = chkOutcomes [Pass, Pass, PassWhenFailExpected "Known Issue", Fail, Pass] 42  $ 
+                                                                  isBig
+                                                                  <> isEven
+                                                                  <> expectFailure "Known Issue" isEven
+                                                                  <> isOdd
+                                                                  <> isEven
+
 evenOddEven = isEven
               <> isOdd
               <> isOdd
@@ -46,10 +79,3 @@ evenOddEven = isEven
 unit_chk_with_gate_on_list = chkOutcomes [Pass, Pass, GateFail, Skip, Skip, Skip] 42 $ isBig
                                                                   <> gate evenOddEven
                                                                   <> isEven
-
-
-_checkmDemo = calcChecks 42  $ isBig
-                             <> isEven
-                             <> isOddGate
-                             <> isOdd
-                             <> isEven

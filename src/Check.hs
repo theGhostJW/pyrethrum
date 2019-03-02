@@ -1,13 +1,51 @@
+module Check (
+              chk,
+              chk',
+              gate,
+              expectFailure,
+              expectFailureFixed,
+              calcChecks,
+              Check(..),
+              CheckList,
+              CheckReportList,
+              CheckReport(..),
+              CheckResult(..)
 
-module Check where
+              ) where
 
 import           Foundation.Extended hiding ((.))
 import           Foundation.List.DList
 import Data.Function
 import qualified Prelude as P
-import Data.Yaml
+import Data.Aeson.Types hiding (Error)
 
-type CheckResultList = DList CheckResult
+-- generate a check from a predicate
+chk :: String -> (v -> Bool) -> DList (Check v)
+chk hdr prd = pure $ prdCheck prd hdr $ const Nothing
+
+-- generate a check from a predicate with detailed message
+chk' :: String -> (v -> String) -> (v -> Bool) -> DList (Check v)
+chk' hdr fMsg prd = pure $ prdCheck prd hdr $ \v -> Just $ MessageInfo hdr $ Just $ fMsg v
+
+prdCheck :: forall ds. (ds -> Bool) -> String -> (ds -> Maybe MessageInfo) -> Check ds
+prdCheck prd hdr msgf = Check {
+                          header = hdr,
+                          rule = prd,
+                          msgFunc = msgf,
+                          expectation = ExpectPass,
+                          gateStatus = StandardCheck
+                        }
+
+gate :: forall f v. Functor f => f (Check v) -> f (Check v)
+gate fck = (\ck -> ck {gateStatus = GateCheck}) <$> fck
+
+expectFailure :: forall f v. Functor f => String -> f (Check v) -> f (Check v)
+expectFailure = expectFailurePriv Active
+
+expectFailureFixed :: forall f v. Functor f => String -> f (Check v) -> f (Check v)
+expectFailureFixed = expectFailurePriv Inactive
+
+type CheckReportList = DList CheckReport
 type CheckList a = DList (Check a)
 
 data MessageInfo = MessageInfo {
@@ -22,22 +60,58 @@ data CheckInfo = Info {
                    }
                    deriving (Show, Eq)
 
-data CheckOutcome = Pass |
-                    Fail |
-                    GateFail |
-                    Skip
+data CheckResult = Pass |
+                   Fail |
+                   GateFail |
+                   FailExpected String |
+                   GateFailExpected String |
+                   PassWhenFailExpected String|
+                   Regression String |
+                   GateRegression String |
+                   Skip
                     deriving (Show, Eq)
 
-data CheckResult = CheckResult {
-    outcome :: CheckOutcome,
+data CheckResultClassification = 
+                   OK |
+                   Error |
+                   Warning |
+                   Skipped
+                    deriving (Show, Eq)
+
+classifyResult :: CheckResult -> CheckResultClassification
+classifyResult  = \case 
+                      Pass -> OK
+                      Fail -> Error
+                      GateFail -> Error
+                      FailExpected _ -> Warning
+                      GateFailExpected _ -> Warning
+                      PassWhenFailExpected _ -> Error
+                      Regression _ -> Error
+                      GateRegression _ -> Error
+                      Skip -> Skipped
+
+data ExpectationActive = Active | Inactive deriving (Show, Eq)
+
+data ResultExpectation = ExpectPass 
+                          | ExpectFailure String ExpectationActive
+                          deriving (Show, Eq)
+
+data GateStatus = GateCheck 
+              | StandardCheck
+              deriving (Show, Eq)
+
+data CheckReport = CheckReport {
+    result :: CheckResult,
     info :: CheckInfo
   }
   deriving (Show, Eq)
 
 data Check v = Check {
     header :: String,
-    rule :: v -> CheckOutcome,
-    msgFunc :: v -> Maybe MessageInfo
+    rule :: v -> Bool,
+    msgFunc :: v -> Maybe MessageInfo,
+    expectation :: ResultExpectation,
+    gateStatus :: GateStatus
   }
 
 instance P.Show (Check v) where
@@ -49,51 +123,55 @@ instance ToJSON (Check v)  where
 instance ToJSON (CheckList a) where 
   toJSON cl = Array . fromList $ toJSON <$> toList cl
 
-applyCheck :: forall v. v -> Check v -> CheckResult
-applyCheck v ck = CheckResult (rule ck v) $ Info (header (ck :: Check v)) (msgFunc ck v)
 
-isGateFail :: CheckOutcome -> Bool
-isGateFail = \case
-               GateFail -> True
-               _ -> False
+isGateFail :: CheckResult -> Bool
+isGateFail = \case 
+                Pass -> False
+                Fail -> False
+                GateFail -> True
+                FailExpected _ -> False
+                GateFailExpected _ -> True
+                PassWhenFailExpected _ -> False
+                Regression _ -> False
+                GateRegression _ -> True
+                Skip -> False
 
-forceSkipped :: v -> Check v -> CheckResult
-forceSkipped v ck = applyCheck v $ ck {rule = const Skip}
-
-calcChecks :: forall v. v -> DList (Check v) -> DList CheckResult
+calcChecks :: forall ds. ds -> DList (Check ds) -> DList CheckReport
 calcChecks ds chkLst = let
-                        iResult :: (Bool, a) -> Check v ->  CheckResult
-                        iResult (excpt, _) = (excpt ? forceSkipped $ applyCheck) ds
+                        applyCheck :: Bool -> Check ds -> CheckReport
+                        applyCheck skip Check{..} = 
+                          let 
+                            isGate :: Bool
+                            isGate = gateStatus == GateCheck
 
-                        foldfunc :: (Bool, DList CheckResult) -> Check v -> (Bool, DList CheckResult)
-                        foldfunc tpl@(hasEx, lstCr) ck = let
-                                                            thisChkR = iResult tpl ck
-                                                          in
-                                                            (hasEx || isGateFail (outcome thisChkR), cons thisChkR lstCr)
+                            rslt :: CheckResult
+                            rslt = skip ? 
+                                      Skip $     -- skip cases
+                                      rule ds ?  -- pass case 
+                                                ( 
+                                                  case expectation of 
+                                                    ExpectPass -> Pass 
+                                                    ExpectFailure msg Active -> PassWhenFailExpected msg 
+                                                    ExpectFailure _ Inactive -> Pass
+                                                ) 
+                                              $  -- fail cases
+                                                ( 
+                                                  case expectation of 
+                                                    ExpectPass -> isGate ? GateFail $ Fail   
+                                                    ExpectFailure msg Active -> (isGate ? GateFailExpected $ FailExpected) msg
+                                                    ExpectFailure msg Inactive -> (isGate ? GateRegression $ Regression) msg
+                                                )
+                          in 
+                            CheckReport rslt $ Info header (msgFunc ds)
+
+                        foldfunc :: (Bool, DList CheckReport) -> Check ds -> (Bool, DList CheckReport)
+                        foldfunc (wantSkip, lstCr) ck = let
+                                                          thisChkR :: CheckReport
+                                                          thisChkR = applyCheck wantSkip ck
+                                                        in
+                                                          (wantSkip || isGateFail (result thisChkR), cons thisChkR lstCr)
                         in
                          reverse $ snd $ foldl' foldfunc (False, mempty) chkLst
 
-gate :: Functor f => f (Check v) -> f (Check v)
-gate =  let
-    gateOutcome :: Check v -> Check v
-    gateOutcome ck  =
-      let
-        escOutcome :: CheckOutcome -> CheckOutcome
-        escOutcome = \case
-                         Fail -> GateFail
-                         othOutcome -> othOutcome
-       in
-         ck {rule = escOutcome . rule ck}
-  in
-    (gateOutcome <$>)
-
--- generate a check from a predicate
-chk :: String -> (v -> Bool) -> DList (Check v)
-chk hdr prd = pure $ prdCheck prd hdr $ const Nothing
-
--- generate a check from a predicate
-chk' :: String -> (v -> String) -> (v -> Bool) -> DList (Check v)
-chk' hdr fMsg prd = pure $ prdCheck prd hdr $ \v -> Just $ MessageInfo hdr $ Just $ fMsg v
-
-prdCheck :: Truthy b =>  (v -> b) -> String -> (v -> Maybe MessageInfo) -> Check v
-prdCheck prd hdr = Check hdr (\v -> prd v ? Pass $ Fail)
+expectFailurePriv :: forall f v. Functor f => ExpectationActive -> String -> f (Check v) -> f (Check v)
+expectFailurePriv isActive msg fck = (\ck -> ck {expectation = ExpectFailure msg isActive}) <$> fck

@@ -106,10 +106,9 @@ logStrPP =
 
                    StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle)
                    EndTest (TestModule address) -> tstHeader ("End Test: " <> address)
-                   StartIteration test iid _ -> newLn <> subHeader ("Start Iteration: " <> iterId test iid)
+                   StartIteration (ItemId test iid) -> newLn <> subHeader ("Start Iteration: " <> iterId test iid)
 
-                   Result test iid rsltInfo -> newLn <> subHeader ("Result: " <> iterId test iid) <> newLn <> rsltInfo
-                   EndIteration test iid -> subHeader $ "End Iteration: " <> iterId test iid
+                   EndIteration (ItemId test iid) -> subHeader $ "End Iteration: " <> iterId test iid
                    EndRun -> newLn <> header "End Run"
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs

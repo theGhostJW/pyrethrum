@@ -4,6 +4,7 @@
 module DSL.LogProtocol where
 
 import           Common (DetailedInfo, AppError)
+import           Check
 import           TestFilter
 import           Foundation.Extended
 import           RunElementClasses
@@ -20,10 +21,16 @@ import qualified Data.Text as T
 newtype RunTitle = RunTitle {unRunTitle :: String} deriving (Eq, Show, IsString)
 newtype GroupTitle = GroupTitle {unGroupTitle :: String} deriving (Eq, Show, IsString)
 newtype TestTitle = TestTitle {unTestTitle :: String} deriving (Eq, Show, IsString)
+newtype ApStateDisplay = ApStateDisplay {unApStateDisplay :: String} deriving (Eq, Show, IsString)
+newtype DStateDisplay = DStateDisplay {unDStateDisplay :: String} deriving (Eq, Show, IsString)
+data ItemId = ItemId TestModule Int deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''RunTitle)
 $(deriveJSON defaultOptions ''GroupTitle)
 $(deriveJSON defaultOptions ''TestTitle)
+$(deriveJSON defaultOptions ''ApStateDisplay)
+$(deriveJSON defaultOptions ''DStateDisplay)
+$(deriveJSON defaultOptions ''ItemId)
 
 data LogProtocol =
   Message String |
@@ -33,6 +40,12 @@ data LogProtocol =
   Warning' DetailedInfo |
 
   IOAction String |
+
+  InteractorSuccess ItemId ApStateDisplay |
+  InteractorFailure ItemId AppError |
+
+  PrepStateSuccess ItemId DStateDisplay |
+  PrepStateFailure ItemId AppError |
 
   Error AppError |
   FilterLog [FilterResult] |
@@ -46,9 +59,10 @@ data LogProtocol =
   StartTest TestDisplayInfo |
   EndTest TestModule |
 
-  StartIteration TestModule Int Value | -- test / iid / module / item
-  Result TestModule Int String | -- test module / iid / test Info
-  EndIteration TestModule Int -- test module / iid
+  CheckOutcome ItemId CheckReport |
+
+  StartIteration ItemId | 
+  EndIteration ItemId 
 
 
   deriving (Eq, Show)

@@ -12,6 +12,7 @@ import DSL.LogProtocol as LP
 import DSL.Ensure
 import           Control.Monad.Freer
 import           Foundation.Extended
+import           Foundation.List.DList
 import           ItemFilter  (ItemFilter (..), filterredItemIds)
 import qualified Prelude             as P
 import           DSL.Interpreter
@@ -29,6 +30,7 @@ import qualified System.IO as SIO
 import System.IO (Handle)
 import qualified Data.Map as M
 import qualified Data.Set as St
+import qualified Data.Foldable as F
 
 
 type TestPlanBase tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => GenericTest tc rc i effs as ds -> m1 (m a)) -> [TestGroup m1 m a effs]
@@ -126,6 +128,7 @@ disablePreRun tg = tg {
 testAddress :: forall tc rc i effs as ds. TestConfigClass tc => GenericTest tc rc i effs as ds -> TestModule
 testAddress =  moduleAddress . (configuration :: GenericTest tc rc i effs as ds -> tc)
 
+-- TODO:: Delete This
 data TestInfo i as ds = TestInfo {
                                   item :: i,
                                   apState  :: as,
@@ -179,24 +182,65 @@ testInfoNoValidation item apState _ =
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+runApState' :: forall m effs rc tc i as ds. (Monad m, ItemClass i ds, Show as, Show ds, TestConfigClass tc, Member Logger effs) =>
+     (rc -> i -> Eff effs as)                              -- Interactor          
+     -> (as -> Ensurable ds)                               -- prepstate
+     -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
+     -> tc                                                 -- TestConfig
+     -> rc                                                 -- RunConfig
+     -> i                                                  -- item
+     -> m ()                                               -- result
+runApState' interactor prepState intrprt tc rc i = let
+                                                      logPtcl :: LogProtocol -> m ()
+                                                      logPtcl = logger' intrprt
+
+                                                      iid :: ItemId
+                                                      iid = ItemId (moduleAddress tc) (identifier i)
+
+                                                      runChecks :: ds -> m ()
+                                                      runChecks ds = let 
+                                                                       logChk :: CK.CheckReport -> m ()
+                                                                       logChk cr = logPtcl $ CheckOutcome iid cr
+                                                                     in
+                                                                       F.traverse_ logChk $ toList $ CK.calcChecks ds (checkList i)
+                                                    in 
+                                                      do 
+                                                        ethas <- intrprt $ interactor rc i
+                                                        eitherf ethas
+                                                          (logPtcl . InteractorFailure iid)
+                                                          (\as -> do 
+                                                                    logPtcl . InteractorSuccess iid $ ApStateDisplay . toS . ppShow $ as 
+                                                                    
+                                                                    let 
+                                                                      eds = fullEnsureInterpreter $ prepState as
+                                                                    
+                                                                    eitherf eds
+                                                                      (logPtcl . PrepStateFailure iid . AppEnsureError)
+                                                                      (
+                                                                        \ds -> 
+                                                                          do
+                                                                            logPtcl . PrepStateSuccess iid $ DStateDisplay . toS . ppShow $ ds 
+                                                                            runChecks ds
+                                                                      )
+                                                                      
+                                                          )
+
 runApState :: (Functor f1, Functor f2) =>
-     (rc -> i -> Eff effs as)
+     (rc -> i -> Eff effs as)             
      -> (as -> Ensurable ds)  -- prepstate
      -> (i -> as -> ds -> TestInfo i as ds)
      -> rc
      -> (Eff effs as -> f1 (f2 as))
      -> i
      -> f1 (f2 (TestInfo i as ds))
-runApState interactor prepState agg rc intrprt itm = let
+runApState interactor prepState agg rc intrprt itm =  let
                                                         runVals as =
-                                                          let
-                                                            ethds = fullEnsureInterpreter $ prepState as
-                                                          in
-                                                            either
-                                                                (PrepStateFault itm as . AppEnsureError)
-                                                                (agg itm as)
-                                                                ethds
-                                                     in
+                                                          either
+                                                              (PrepStateFault itm as . AppEnsureError)
+                                                              (agg itm as)
+                                                              (fullEnsureInterpreter $ prepState as)
+                                                      in
                                                         (runVals <$>) <$> intrprt (interactor rc itm)
 
 runTestItems :: forall i as ds tc rc effs m. (Show i, Show as, Show ds, Monad m, TestConfigClass tc, ItemClass i ds, Member Logger effs) =>
@@ -226,14 +270,13 @@ runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
 
     runItem :: i -> m ()
     runItem i =  let
-                    iid = identifier i
-                    modAddress = C.moduleAddress tc
+                    iid :: ItemId
+                    iid = ItemId (moduleAddress tc) (identifier i)
                   in
                     do
-                      logPtcl $ StartIteration modAddress iid $ toJSON tc
+                      logPtcl $ StartIteration iid
                       info <- frmEth i <$> runApState interactor prepState agg rc intrprt i
-                      logPtcl $ Result modAddress iid $ showPretty info
-                      logPtcl $ EndIteration modAddress iid
+                      logPtcl $ EndIteration iid
 
     inTargIds :: i -> Bool
     inTargIds i = maybe True (S.member (identifier i)) iIds
@@ -271,13 +314,17 @@ runTest iIds fltrs agg rc intrprt GenericTest{..} =
               ? runItems components
               $ []
 
-
-
 logger' :: forall m effs. (Member Logger effs, Functor m) =>
                  (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                  -> LogProtocol
                  -> m ()
 logger' intrprt = void . intrprt . logItem
+
+logger'' :: forall m effs. (Member Logger effs) =>
+                 (forall a. Eff effs a -> m ()) -- interpreter
+                 -> LogProtocol
+                 -> m ()
+logger'' intrprt = intrprt . logItem
 
 testRunOrEndpoint :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                     Maybe (S.Set Int)                                    -- a set of item Ids used for test case endpoints

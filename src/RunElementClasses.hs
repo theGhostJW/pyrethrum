@@ -27,12 +27,11 @@ class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => TestConfigClass a where
 
 class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => RunConfigClass a
 
-
-class (ToJSON i, Generic i) => ItemClass i v | i -> v  where
+class (ToJSON i, Generic i) => ItemClass i ds | i -> ds  where
   identifier :: i -> Int
   whenClause :: i -> String
   thenClause :: i -> String
-  checkList :: i -> DList (Check v)
+  checkList :: i -> CheckList ds
 
   whenThen :: i -> String
   whenThen i = "When: " <> whenClause i  <> "\n" <>

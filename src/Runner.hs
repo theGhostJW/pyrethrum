@@ -128,62 +128,12 @@ disablePreRun tg = tg {
 testAddress :: forall tc rc i effs as ds. TestConfigClass tc => GenericTest tc rc i effs as ds -> TestModule
 testAddress =  moduleAddress . (configuration :: GenericTest tc rc i effs as ds -> tc)
 
--- TODO:: Delete This
-data TestInfo i as ds = TestInfo {
-                                  item :: i,
-                                  apState  :: as,
-                                  domainState :: ds,
-                                  checkResult :: CK.CheckReportList
-                                } |
-
-                         GoHomeError {
-                                    item :: i,
-                                    error :: AppError
-                                  } |
-
-                         InteractorFault {
-                                    item :: i,
-                                    error :: AppError
-                                  } |
-
-                         PrepStateFault {
-                                    item :: i,
-                                    apState  :: as,
-                                    error :: AppError
-                                  } |
-
-                         DocInfo {
-                                    item :: i,
-                                    apState  :: as
-                                  }
-
-                                  deriving Show
-
-testInfoFull :: forall i as ds. ItemClass i ds => i -> as -> ds -> TestInfo i as ds
-testInfoFull item apState dState =
-  TestInfo {
-      item = item,
-      apState = apState,
-      domainState = dState,
-      checkResult = CK.calcChecks dState $ checkList item
-    }
-
-recoverTestInfo :: i -> Either AppError (TestInfo i as ds) -> TestInfo i as ds
-recoverTestInfo i = either (InteractorFault i) id
-
-testInfoNoValidation :: i -> as -> ds -> TestInfo i as ds
-testInfoNoValidation item apState _ =
-  DocInfo {
-      item = item,
-      apState = apState
-    }
-
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-runApState' :: forall m effs rc tc i as ds. (Monad m, ItemClass i ds, Show as, Show ds, TestConfigClass tc, Member Logger effs) =>
+normalExecution :: forall m effs rc tc i as ds. (Monad m, ItemClass i ds, Show as, Show ds, TestConfigClass tc, Member Logger effs) =>
      (rc -> i -> Eff effs as)                              -- Interactor          
      -> (as -> Ensurable ds)                               -- prepstate
      -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
@@ -191,7 +141,7 @@ runApState' :: forall m effs rc tc i as ds. (Monad m, ItemClass i ds, Show as, S
      -> rc                                                 -- RunConfig
      -> i                                                  -- item
      -> m ()                                               -- result
-runApState' interactor prepState intrprt tc rc i = let
+normalExecution interactor prepState intrprt tc rc i = let
                                                       logPtcl :: LogProtocol -> m ()
                                                       logPtcl = logger' intrprt
 
@@ -226,71 +176,8 @@ runApState' interactor prepState intrprt tc rc i = let
                                                                       
                                                           )
 
-runApState :: (Functor f1, Functor f2) =>
-     (rc -> i -> Eff effs as)             
-     -> (as -> Ensurable ds)  -- prepstate
-     -> (i -> as -> ds -> TestInfo i as ds)
-     -> rc
-     -> (Eff effs as -> f1 (f2 as))
-     -> i
-     -> f1 (f2 (TestInfo i as ds))
-runApState interactor prepState agg rc intrprt itm =  let
-                                                        runVals as =
-                                                          either
-                                                              (PrepStateFault itm as . AppEnsureError)
-                                                              (agg itm as)
-                                                              (fullEnsureInterpreter $ prepState as)
-                                                      in
-                                                        (runVals <$>) <$> intrprt (interactor rc itm)
 
-runTestItems :: forall i as ds tc rc effs m. (Show i, Show as, Show ds, Monad m, TestConfigClass tc, ItemClass i ds, Member Logger effs) =>
-      tc
-      -> Maybe (S.Set Int)                                                    -- target Ids
-      -> [i]                                                                  -- items
-      -> (rc -> i -> Eff effs as)                                             -- interactor
-      -> (as -> Ensurable ds)                                                 -- prepstate
-      -> (i -> Either AppError (TestInfo i as ds) -> TestInfo i as ds)        -- recover from either
-      -> (i -> as -> ds -> TestInfo i as ds)                                  -- aggragator
-      -> rc                                                                   -- runconfig
-      -> (forall a. Eff effs a -> m (Either AppError a))                      -- interpreter
-      -> [m ()]
-runTestItems tc iIds items interactor prepState frmEth agg rc intrprt =
-  let
-    logPtcl :: LogProtocol -> m ()
-    logPtcl = logger' intrprt
-
-    startTest :: m ()
-    startTest = logPtcl . StartTest $ mkDisplayInfo tc
-
-    endTest :: m ()
-    endTest = logPtcl . EndTest $ moduleAddress tc
-
-    filteredItems :: [i]
-    filteredItems = filter inTargIds items
-
-    runItem :: i -> m ()
-    runItem i =  let
-                    iid :: ItemId
-                    iid = ItemId (moduleAddress tc) (identifier i)
-                  in
-                    do
-                      logPtcl $ StartIteration iid
-                      info <- frmEth i <$> runApState interactor prepState agg rc intrprt i
-                      logPtcl $ EndIteration iid
-
-    inTargIds :: i -> Bool
-    inTargIds i = maybe True (S.member (identifier i)) iIds
-
-  in
-    case filteredItems of
-      [] -> []
-      [x] -> [startTest *> runItem x *> endTest]
-      x : xs -> (startTest *> runItem x)
-                : (runItem <$> P.init xs)
-                <> [runItem (P.last xs) *> endTest]
-                     
-
-runTestItems' :: forall i as ds tc rc effs m. (Show as, Show ds, Monad m, TestConfigClass tc, ItemClass i ds, Member Logger effs) =>
+runTestItems :: forall i as ds tc rc effs m. (Show as, Show ds, Monad m, TestConfigClass tc, ItemClass i ds, Member Logger effs) =>
       tc
       -> Maybe (S.Set Int)                                                    -- target Ids
       -> [i]                                                                  -- items
@@ -298,9 +185,9 @@ runTestItems' :: forall i as ds tc rc effs m. (Show as, Show ds, Monad m, TestCo
       -> (as -> Ensurable ds)                                                 -- prepstate
       -> rc                                                                   -- runconfig
       -> (forall a. Eff effs a -> m (Either AppError a))                      -- interpreter
-      -> (forall as1 ds1. (Show as, Show ds) =>                               -- item runner logger - this does all the work and logs results as side effect
-          (rc -> i -> Eff effs as1)                             -- Interactor          
-          -> (as1 -> Ensurable ds1)                             -- prepstate
+      -> ((Show as, Show ds) =>                               -- item runner logger - this does all the work and logs results as side effect
+          (rc -> i -> Eff effs as)                             -- Interactor          
+          -> (as -> Ensurable ds)                             -- prepstate
           -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
           -> tc                                                 -- TestConfig
           -> rc                                                 -- RunConfig
@@ -308,7 +195,7 @@ runTestItems' :: forall i as ds tc rc effs m. (Show as, Show ds, Monad m, TestCo
           -> m ()                                               -- result
       )
       -> [m ()]
-runTestItems' tc iIds items interactor prepState rc intrprt runnerLogger =
+runTestItems tc iIds items interactor prepState rc intrprt runnerLogger =
   let
     logPtcl :: LogProtocol -> m ()
     logPtcl = logger' intrprt
@@ -345,53 +232,29 @@ runTestItems' tc iIds items interactor prepState rc intrprt runnerLogger =
                      
  
 
-runTest' ::  forall i rc as ds m tc effs. (Monad m, ItemClass i ds, Show i, Show as, Show ds, TestConfigClass tc, Member Logger effs) =>
+runTest ::  forall i rc as ds m tc effs. (Monad m, ItemClass i ds, Show as, Show ds, TestConfigClass tc, Member Logger effs) =>
                    Maybe (S.Set Int)                                                        -- target Ids
                    -> FilterList rc tc                                                      -- filters
-                   -> (forall as1 ds1. (Show as, Show ds) =>                                -- item runner logger - this does all the work and logs results as side effect
-                      (rc -> i -> Eff effs as1)                             -- Interactor          
-                      -> (as1 -> Ensurable ds1)                             -- prepstate
+                   -> (                               -- item runner logger - this does all the work and logs results as side effect
+                      (rc -> i -> Eff effs as)                              -- Interactor          
+                      -> (as -> Ensurable ds)                               -- prepstate
                       -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
                       -> tc                                                 -- TestConfig
                       -> rc                                                 -- RunConfig
                       -> i                                                  -- item
                       -> m ()                                               -- result
-                  )
+                   )
                    -> rc                                                                    -- runConfig
                    -> (forall a. Eff effs a -> m (Either AppError a))                       -- interpreter
                    -> GenericTest tc rc i effs as ds                                        -- Test Case
                    -> [m ()]                                                                -- [TestIterations]
-runTest' iIds fltrs runnerLogger rc intrprt GenericTest{..} =
+runTest iIds fltrs runnerLogger rc intrprt GenericTest{..} =
         let
           logPtcl :: LogProtocol -> m ()
           logPtcl = logger' intrprt
 
           runItems :: TestComponents rc i effs as ds -> [m ()]
-          runItems TestComponents{..} = runTestItems' configuration iIds testItems testInteractor testPrepState rc intrprt runnerLogger 
-
-          include :: Bool
-          include = acceptFilter $ filterTestCfg fltrs rc configuration
-        in
-          include
-              ? runItems components
-              $ []
- 
-
-runTest ::  forall i rc as ds m tc effs. (Monad m, ItemClass i ds, Show i, Show as, Show ds, TestConfigClass tc, Member Logger effs) =>
-                   Maybe (S.Set Int)                                  -- target Ids
-                   -> FilterList rc tc                               -- filters
-                   -> (i -> as -> ds -> TestInfo i as ds)             -- aggregator i.e. rslt constructor
-                   -> rc                                              -- runConfig
-                   -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
-                   -> GenericTest tc rc i effs as ds                  -- Test Case
-                   -> [m ()]                                          -- [TestIterations]
-runTest iIds fltrs agg rc intrprt GenericTest{..} =
-        let
-          logPtcl :: LogProtocol -> m ()
-          logPtcl = logger' intrprt
-
-          runItems :: TestComponents rc i effs as ds -> [m ()]
-          runItems TestComponents{..} = runTestItems configuration iIds testItems testInteractor testPrepState recoverTestInfo agg rc intrprt
+          runItems TestComponents{..} = runTestItems configuration iIds testItems testInteractor testPrepState rc intrprt runnerLogger 
 
           include :: Bool
           include = acceptFilter $ filterTestCfg fltrs rc configuration
@@ -414,13 +277,21 @@ logger'' intrprt = intrprt . logItem
 
 testRunOrEndpoint :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                     Maybe (S.Set Int)                                    -- a set of item Ids used for test case endpoints
-                   -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results
+                   -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test groups and returns a list of results
                    -> FilterList rc tc                                  -- filters
-                   -> (forall i as ds. (ItemClass i ds, Show i, Show ds, Show as) => i -> as -> ds -> TestInfo i as ds)             -- test aggregator i.e. rslt constructor
+                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds) =>                                -- item runner logger - this does all the work and logs results as side effect
+                        (rc -> i -> Eff effs as)                             -- interactor          
+                        -> (as -> Ensurable ds)                               -- prepstate
+                        -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
+                        -> tc                                                 -- TestConfig
+                        -> rc                                                 -- RunConfig
+                        -> i                                                  -- item
+                        -> m ()                                               -- result
+                    )
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> rc                                              -- runConfig
                    -> m ()
-testRunOrEndpoint iIds runner fltrs agg intrprt rc =
+testRunOrEndpoint iIds runner fltrs runnerLogger intrprt rc =
         let
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
           preRun PreRun{..} stage = do
@@ -467,7 +338,7 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
           filterFlags = filterGroupFlags filterInfo
 
           prepResults :: [TestGroup [] m () effs]
-          prepResults = runner $ runTest iIds fltrs agg rc intrprt
+          prepResults = runner $ runTest iIds fltrs runnerLogger rc intrprt
 
           runTuples ::  [(Bool, TestGroup [] m () effs)]
           runTuples = P.zip filterFlags prepResults
@@ -543,7 +414,15 @@ testRunOrEndpoint iIds runner fltrs agg intrprt rc =
 testRun :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                    (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> FilterList rc tc                               -- filters
-                   -> (forall i as ds. (ItemClass i ds, Show i, Show ds, Show as) => i -> as -> ds -> TestInfo i as ds)             -- test aggregator i.e. rslt constructor
+                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds) =>                                -- item runner logger - this does all the work and logs results as side effect
+                        (rc -> i -> Eff effs as)                             -- interactor          
+                        -> (as -> Ensurable ds)                               -- prepstate
+                        -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
+                        -> tc                                                 -- TestConfig
+                        -> rc                                                 -- RunConfig
+                        -> i                                                  -- item
+                        -> m ()                                               -- result
+                    )
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> rc                                              -- runConfig
                    -> m ()
@@ -552,14 +431,22 @@ testRun = testRunOrEndpoint Nothing
 
 testEndpointBase :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                    FilterList rc tc                               -- filters
-                   -> (forall i as ds. (ItemClass i ds, Show i, Show ds, Show as) => i -> as -> ds -> TestInfo i as ds)             -- test aggregator i.e. rslt constructor
+                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds) =>                                -- item runner logger - this does all the work and logs results as side effect
+                        (rc -> i -> Eff effs as)                             -- interactor          
+                        -> (as -> Ensurable ds)                               -- prepstate
+                        -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
+                        -> tc                                                 -- TestConfig
+                        -> rc                                                 -- RunConfig
+                        -> i                                                  -- item
+                        -> m ()                                               -- result
+                    )
                    -> (forall a. Eff effs a -> m (Either AppError a)) -- interpreter
                    -> TestModule                                      -- test address
                    -> rc                                              -- runConfig
                    -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints
                    -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> m ()
-testEndpointBase fltrs agg intrprt tstAddress rc iIds runner =
+testEndpointBase fltrs runnerLogger intrprt tstAddress rc iIds runner =
   let
     logPtcl :: LogProtocol -> m ()
     logPtcl = logger' intrprt
@@ -573,7 +460,6 @@ testEndpointBase fltrs agg intrprt tstAddress rc iIds runner =
     allFilters :: [TestFilter rc tc]
     allFilters = endpointFilter tstAddress : fltrs
   in
-    either
+    eitherf iIds
       (logPtcl . LP.Error . AppFilterError)
-      (\idSet -> testRunOrEndpoint (Just idSet) runner allFilters agg intrprt rc)
-      iIds
+      (\idSet -> testRunOrEndpoint (Just idSet) runner allFilters runnerLogger intrprt rc)

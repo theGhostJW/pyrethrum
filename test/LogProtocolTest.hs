@@ -69,6 +69,12 @@ genFilterResults =
 genInt :: Gen Int
 genInt = integral $ T.linear 0 1000
 
+genItemId :: Gen ItemId
+genItemId  = ItemId <$> genTestModule <*> genInt
+
+genError :: Gen AppError
+genError = AppUserError <$> genStr
+
 genLogProtocol :: Gen LogProtocol
 genLogProtocol = choice [
                     Message <$> genStr,
@@ -79,17 +85,36 @@ genLogProtocol = choice [
                   
                     IOAction <$> genStr,
                   
-                    Error . AppUserError <$> genStr,
+                    Error <$> genError,
                     FilterLog <$> genFilterResults,
+
+                    InteractorSuccess <$> genItemId <*> (ApStateDisplay <$> genStr),
+                    InteractorFailure <$> genItemId <*> genError,
+
+                    PrepStateSuccess <$> genItemId <*> (DStateDisplay <$> genStr),
+                    PrepStateFailure <$> genItemId <*> genError,
                   
-                    StartRun <$> (RunTitle <$> genStr) <*> (toJSON <$> genRunConfig),  -- title / runconfig
+                    StartRun <$> (RunTitle <$> genStr) <*> (toJSON <$> genRunConfig), 
                     StartGroup <$> (GroupTitle <$> genStr),
+                    EndGroup <$> (GroupTitle <$> genStr),
                     StartTest <$> genTestDisplayInfo,
-                    StartIteration <$> genTestModule <*> genInt <*> (toJSON <$> genRunConfig),-- iid / test module / item - using runconfig for rand om JSON object
-                    Result <$> genTestModule <*> genInt <*> genStr, -- test module / iid / test Info
-                    EndIteration <$> genTestModule <*> genInt, -- test module / iid / test Info
+                    EndTest <$> genTestModule,
+                    StartIteration <$> genItemId,
+                    EndIteration <$> genItemId,
                     pure EndRun
                  ]
+
+
+{-
+  
+  EndTest TestModule |
+
+  CheckOutcome ItemId CheckReport |
+
+  StartIteration ItemId | 
+  EndIteration ItemId 
+
+-}
 
 hprop_log_protocol_round_trip :: Property
 hprop_log_protocol_round_trip = property $ do

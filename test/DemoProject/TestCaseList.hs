@@ -24,10 +24,10 @@ import Data.Map as M
 
 
 ioRun :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-ioRun pln = testRun pln filters testInfoFull executeInIOConsolePretty runConfig
+ioRun pln = testRun pln filters normalExecution executeInIOConsolePretty runConfig
 
 ioRunRaw :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-ioRunRaw pln = testRun pln filters testInfoFull executeInIOConsoleRaw runConfig
+ioRunRaw pln = testRun pln filters normalExecution executeInIOConsoleRaw runConfig
 
 -- TODO: move to library file 
 ioRunToFile :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO (Either AppError [AbsFile])
@@ -58,7 +58,7 @@ ioRunToFile pln = let
                     allHandles = (((Nothing, logStrPP, S.stdout) :) <$>) <$> fileHandles
                     
                     runTheTest :: [(LogProtocol -> String, S.Handle)] -> IO ()
-                    runTheTest targHndls = testRun pln filters testInfoFull (executeInIO (logToHandles targHndls)) runConfig
+                    runTheTest targHndls = testRun pln filters normalExecution (executeInIO (logToHandles targHndls)) runConfig
                   in 
                     do 
                       hndls <- allHandles
@@ -75,10 +75,10 @@ ioRunToFile pln = let
                         )
                    
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
-docRunRaw pln = extractDocLog $ testRun pln filters testInfoFull executeDocumentRaw runConfig
+docRunRaw pln = extractDocLog $ testRun pln filters normalExecution executeDocumentRaw runConfig
 
 docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
-docRun pln = extractDocLog $ testRun pln filters testInfoFull executeDocumentPretty runConfig
+docRun pln = extractDocLog $ testRun pln filters normalExecution executeDocumentPretty runConfig
 
 runInIO :: IO ()
 runInIO = ioRun plan
@@ -90,7 +90,7 @@ runInIORaw :: IO ()
 runInIORaw = ioRunRaw plan
 
 runNZInIO :: IO ()
-runNZInIO = testRun plan filters testInfoFull executeInIOConsoleRaw runConfig {country = NZ}
+runNZInIO = testRun plan filters normalExecution executeInIOConsoleRaw runConfig {country = NZ}
 
 runDocument :: DList String
 runDocument = docRun plan

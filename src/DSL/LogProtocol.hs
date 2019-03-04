@@ -23,6 +23,8 @@ newtype GroupTitle = GroupTitle {unGroupTitle :: String} deriving (Eq, Show, IsS
 newtype TestTitle = TestTitle {unTestTitle :: String} deriving (Eq, Show, IsString)
 newtype ApStateDisplay = ApStateDisplay {unApStateDisplay :: String} deriving (Eq, Show, IsString)
 newtype DStateDisplay = DStateDisplay {unDStateDisplay :: String} deriving (Eq, Show, IsString)
+newtype DTestConfig = DTestConfig {unDTestConfig :: String} deriving (Eq, Show, IsString)
+newtype DRunConfig = DRunConfig {unDRunConfig :: String} deriving (Eq, Show, IsString)
 data ItemId = ItemId TestModule Int deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''RunTitle)
@@ -50,20 +52,19 @@ data LogProtocol =
   Error AppError |
   FilterLog [FilterResult] |
 
-  StartRun RunTitle Value |  -- title / runconfig
+  StartRun RunTitle Value | 
   EndRun |
 
   StartGroup GroupTitle |
   EndGroup GroupTitle |
 
-  StartTest TestDisplayInfo |
+  StartTest TestDisplayInfo Value |
   EndTest TestModule |
 
   CheckOutcome ItemId CheckReport |
 
-  StartIteration ItemId | 
+  StartIteration ItemId Value | 
   EndIteration ItemId 
-
 
   deriving (Eq, Show)
 

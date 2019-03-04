@@ -5,11 +5,13 @@ module Check (
               expectFailure,
               expectFailureFixed,
               calcChecks,
+              classifyResult,
               Check(..),
               CheckList,
               CheckReportList,
               CheckReport(..),
-              CheckResult(..)
+              CheckResult(..),
+              CheckInfo(..)
               ) where
 
 import           Foundation.Extended hiding ((.))
@@ -68,7 +70,7 @@ data MessageInfo = MessageInfo {
                                 }
                                 deriving (Show, Eq)
 
-data CheckInfo = Info {
+data CheckInfo = CheckInfo {
                      header :: String,
                      messageInfo :: Maybe MessageInfo
                    }
@@ -173,7 +175,7 @@ calcChecks ds chkLst = let
                                                     ExpectFailure msg Inactive -> (isGate ? GateRegression $ Regression) msg
                                                 )
                           in 
-                            CheckReport rslt $ Info header (msgFunc ds)
+                            CheckReport rslt $ CheckInfo header (msgFunc ds)
 
                         foldfunc :: (Bool, DList CheckReport) -> Check ds -> (Bool, DList CheckReport)
                         foldfunc (wantSkip, lstCr) ck = let

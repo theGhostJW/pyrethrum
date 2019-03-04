@@ -17,6 +17,7 @@ import           RunnerBase
 import qualified Data.Aeson as A
 import Foundation.Compat.ByteString
 import qualified Data.ByteString.Lazy as B
+import Check
 
 data Logger r where
  LogItem :: LogProtocol -> Logger ()
@@ -57,6 +58,9 @@ logDocInterpreter = interpret $ \(LogItem lp) -> tell $ dList lp
 showPretty :: Show a => a -> String
 showPretty = toS . ppShow
 
+showPrettyIndent :: Show a => a -> Int -> String
+showPrettyIndent s i = (replicate (CountOf i) ' ' <>)  <$> S.lines toS $ ppShow s
+
 prtyInfo :: (Show s, Show s1)  => s -> s1 -> DetailedInfo
 prtyInfo msg adInfo = DetailedInfo (showPretty msg) (showPretty adInfo)
 
@@ -84,7 +88,10 @@ logStrPP =
               header = hdr "===="
               tstHeader = hdr "==="
               itrHeader = hdr "=="
-              iterId tst iid = toString tst <> " / item " <> show iid
+
+              iterId :: ItemId -> String
+              iterId (ItemId tst iid) = toString tst <> " / item " <> show iid
+
               newLn = "\n" :: String
             in
               \case
@@ -94,8 +101,20 @@ logStrPP =
                    Message' detailedInfo -> showPretty detailedInfo
 
                    Warning s -> subHeader "Warning" <> newLn <> s
-                   Warning' detailedInfo -> subHeader "Warning" <> newLn <>  showPretty detailedInfo
+                   Warning' detailedInfo -> subHeader "Warning" <> newLn <> showPretty detailedInfo
 
+                   InteractorSuccess iid (ApStateDisplay as) -> subHeader ("Interactor Complete " <> iterId iid) <> newLn <> as
+                   InteractorFailure iid err -> subHeader ("Interactor Failure " <> iterId iid) <> newLn <> showPretty err
+                   PrepStateSuccess iid (DStateDisplay ds) -> subHeader ("PrepState Complete " <> iterId iid) <> newLn <> ds
+                   PrepStateFailure iid err -> subHeader ("PrepState Failure " <> iterId iid) <> newLn <> showPretty err
+                   CheckOutcome iid (CheckReport reslt (CheckInfo chkhdr mbInfo)) -> subHeader ("Check: " <> showPretty (classifyResult reslt)) <> newLn <>
+                                                                                                               iterId iid <> " " <> newLn <> 
+                                                                                                               chkhdr  <> " " <> newLn <> 
+                                                                                                               showPretty reslt <> " " <> newLn <> 
+                                                                                                               maybef mbInfo
+                                                                                                                ""
+                                                                                                                (\info -> showPretty info  <> " " <> newLn)
+                                                                                                               
                    e@(Error _) -> showPretty e
                    FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
                                                 foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
@@ -104,11 +123,11 @@ logStrPP =
                    StartGroup gt -> header $ "Group: " <> unGroupTitle gt
                    EndGroup gt -> header $ "End Group: " <> unGroupTitle gt
 
-                   StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle)
+                   StartTest TestDisplayInfo{..} cfgJson -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle)
                    EndTest (TestModule address) -> tstHeader ("End Test: " <> address)
-                   StartIteration (ItemId test iid) -> newLn <> subHeader ("Start Iteration: " <> iterId test iid)
+                   StartIteration iid -> newLn <> subHeader ("Start Iteration: " <> iterId iid)
 
-                   EndIteration (ItemId test iid) -> subHeader $ "End Iteration: " <> iterId test iid
+                   EndIteration iid -> subHeader $ "End Iteration: " <> iterId iid
                    EndRun -> newLn <> header "End Run"
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs

@@ -99,7 +99,7 @@ genLogProtocol = choice [
                     EndGroup <$> (GroupTitle <$> genStr),
                     StartTest <$> genTestDisplayInfo,
                     EndTest <$> genTestModule,
-                    StartIteration <$> genItemId,
+                    StartIteration <$> genItemId <*> (toJSON <$> genRunConfig), --- using runconfig as an easy proxy for item
                     EndIteration <$> genItemId,
                     pure EndRun
                  ]

@@ -58,7 +58,7 @@ data LogProtocol =
   StartGroup GroupTitle |
   EndGroup GroupTitle |
 
-  StartTest TestDisplayInfo Value |
+  StartTest TestDisplayInfo |
   EndTest TestModule |
 
   CheckOutcome ItemId CheckReport |

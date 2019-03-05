@@ -4,7 +4,7 @@ module DSL.Logger where
 import Common
 import  DSL.LogProtocol
 import           Foundation.List.DList
-import           Foundation.Extended
+import           Foundation.Extended as F
 import           Foundation.String as S
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Writer
@@ -18,6 +18,9 @@ import qualified Data.Aeson as A
 import Foundation.Compat.ByteString
 import qualified Data.ByteString.Lazy as B
 import Check
+import Data.Yaml as Y
+import qualified Data.Text as T
+import Basement.String as S
 
 data Logger r where
  LogItem :: LogProtocol -> Logger ()
@@ -58,8 +61,16 @@ logDocInterpreter = interpret $ \(LogItem lp) -> tell $ dList lp
 showPretty :: Show a => a -> String
 showPretty = toS . ppShow
 
-showPrettyIndent :: Show a => a -> Int -> String
-showPrettyIndent s i = (replicate (CountOf i) ' ' <>)  <$> S.lines toS $ ppShow s
+indentString :: Int -> String -> String
+indentString i s = 
+  let 
+    linesClean :: [String]
+    linesClean = fst . F.breakEnd (not . S.all (' ' ==)) $ S.lines s
+
+    unlined :: P.String
+    unlined = P.unlines $ (\s' -> s == "" ? "" $ toS $ F.replicate (CountOf i) ' ' <> s')  <$> linesClean
+  in 
+    toS $ safeLast unlined == Just '\n' ? P.init unlined $ unlined  
 
 prtyInfo :: (Show s, Show s1)  => s -> s1 -> DetailedInfo
 prtyInfo msg adInfo = DetailedInfo (showPretty msg) (showPretty adInfo)
@@ -92,7 +103,20 @@ logStrPP =
               iterId :: ItemId -> String
               iterId (ItemId tst iid) = toString tst <> " / item " <> show iid
 
+              newLn :: String
               newLn = "\n" :: String
+
+              indent2 :: String -> String
+              indent2 = indentString 2 
+
+              prettyBlock :: Char -> String -> ItemId -> String -> String
+              prettyBlock pfxChr headr iid body = newLn <> F.replicate (CountOf 3) pfxChr <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
+
+              ppAeson:: Y.Value -> String
+              ppAeson val = toS ((getLenient . toS . Y.encode $ val) :: T.Text)
+
+              ppAesonBlock:: Y.Value -> String
+              ppAesonBlock = indentString 2 . ppAeson
             in
               \case
                    IOAction msg -> "IO Action: " <> showPretty msg
@@ -103,31 +127,40 @@ logStrPP =
                    Warning s -> subHeader "Warning" <> newLn <> s
                    Warning' detailedInfo -> subHeader "Warning" <> newLn <> showPretty detailedInfo
 
-                   InteractorSuccess iid (ApStateDisplay as) -> subHeader ("Interactor Complete " <> iterId iid) <> newLn <> as
-                   InteractorFailure iid err -> subHeader ("Interactor Failure " <> iterId iid) <> newLn <> showPretty err
-                   PrepStateSuccess iid (DStateDisplay ds) -> subHeader ("PrepState Complete " <> iterId iid) <> newLn <> ds
-                   PrepStateFailure iid err -> subHeader ("PrepState Failure " <> iterId iid) <> newLn <> showPretty err
-                   CheckOutcome iid (CheckReport reslt (CheckInfo chkhdr mbInfo)) -> subHeader ("Check: " <> showPretty (classifyResult reslt)) <> newLn <>
-                                                                                                               iterId iid <> " " <> newLn <> 
-                                                                                                               chkhdr  <> " " <> newLn <> 
-                                                                                                               showPretty reslt <> " " <> newLn <> 
+                   InteractorSuccess iid (ApStateDisplay as) -> prettyBlock '>' "Interactor Complete"  iid as
+                    
+                   InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ showPretty err
+
+                   PrepStateSuccess iid (DStateDisplay ds) -> prettyBlock '>' "PrepState Complete" iid ds
+                   PrepStateFailure iid err -> prettyBlock '>' "PrepState Failure" iid $ showPretty err
+
+                   CheckOutcome iid (CheckReport reslt (CheckInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> showPretty (classifyResult reslt)) iid $ 
+                                                                                                               chkhdr  <> " -> " <> showPretty reslt <> 
                                                                                                                maybef mbInfo
                                                                                                                 ""
-                                                                                                                (\info -> showPretty info  <> " " <> newLn)
+                                                                                                                (\m -> newLn <> showPretty m)
                                                                                                                
                    e@(Error _) -> showPretty e
                    FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
                                                 foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
-                   StartRun ttle rc -> header ("Test Run: " <> unRunTitle ttle) <> newLn <> showPretty rc
+                   StartRun ttle rc -> header ("Test Run: " <> unRunTitle ttle) <> 
+                                       newLn <> "Run Config:" <>
+                                       newLn <> ppAesonBlock rc
+
                    StartGroup gt -> header $ "Group: " <> unGroupTitle gt
                    EndGroup gt -> header $ "End Group: " <> unGroupTitle gt
 
-                   StartTest TestDisplayInfo{..} cfgJson -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle)
-                   EndTest (TestModule address) -> tstHeader ("End Test: " <> address)
-                   StartIteration iid -> newLn <> subHeader ("Start Iteration: " <> iterId iid)
+                   StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
+                                                    newLn <> "Test Config:" <>
+                                                    newLn <> ppAesonBlock testConfig
 
-                   EndIteration iid -> subHeader $ "End Iteration: " <> iterId iid
+                   EndTest (TestModule address) -> newLn <> tstHeader ("End Test: " <> address)
+                   StartIteration iid val -> newLn <> subHeader ("Start Iteration: " <> iterId iid) <> 
+                                             newLn <> "Item:" <> 
+                                             newLn <> ppAesonBlock val
+
+                   EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
                    EndRun -> newLn <> header "End Run"
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs

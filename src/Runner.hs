@@ -160,7 +160,7 @@ normalExecution interactor prepState intrprt tc rc i = let
                                                         eitherf ethas
                                                           (logPtcl . InteractorFailure iid)
                                                           (\as -> do 
-                                                                    logPtcl . InteractorSuccess iid $ ApStateDisplay . toS . ppShow $ as 
+                                                                    logPtcl . InteractorSuccess iid $ ApStateDisplay . showPretty $ as 
                                                                     
                                                                     let 
                                                                       eds = fullEnsureInterpreter $ prepState as
@@ -201,7 +201,7 @@ runTestItems tc iIds items interactor prepState rc intrprt runnerLogger =
     logPtcl = logger' intrprt
 
     startTest :: m ()
-    startTest = logPtcl . StartTest $ mkDisplayInfo tc
+    startTest = logPtcl $ StartTest (mkDisplayInfo tc)
 
     endTest :: m ()
     endTest = logPtcl . EndTest $ moduleAddress tc
@@ -215,7 +215,7 @@ runTestItems tc iIds items interactor prepState rc intrprt runnerLogger =
                     iid = ItemId (moduleAddress tc) (identifier i)
                   in
                     do
-                      logPtcl $ StartIteration iid
+                      logPtcl $ StartIteration iid $ toJSON i
                       runnerLogger interactor prepState intrprt tc rc i
                       logPtcl $ EndIteration iid
 

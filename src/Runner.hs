@@ -170,7 +170,7 @@ normalExecution interactor prepState intrprt tc rc i = let
                                                                       (
                                                                         \ds -> 
                                                                           do
-                                                                            logPtcl . PrepStateSuccess iid $ DStateDisplay . toS . ppShow $ ds 
+                                                                            logPtcl . PrepStateSuccess iid . DStateDisplay . showPretty $ ds 
                                                                             runChecks ds
                                                                       )
                                                                       
@@ -250,9 +250,6 @@ runTest ::  forall i rc as ds m tc effs. (Monad m, ItemClass i ds, Show as, Show
                    -> [m ()]                                                                -- [TestIterations]
 runTest iIds fltrs runnerLogger rc intrprt GenericTest{..} =
         let
-          logPtcl :: LogProtocol -> m ()
-          logPtcl = logger' intrprt
-
           runItems :: TestComponents rc i effs as ds -> [m ()]
           runItems TestComponents{..} = runTestItems configuration iIds testItems testInteractor testPrepState rc intrprt runnerLogger 
 
@@ -268,12 +265,6 @@ logger' :: forall m effs. (Member Logger effs, Functor m) =>
                  -> LogProtocol
                  -> m ()
 logger' intrprt = void . intrprt . logItem
-
-logger'' :: forall m effs. (Member Logger effs) =>
-                 (forall a. Eff effs a -> m ()) -- interpreter
-                 -> LogProtocol
-                 -> m ()
-logger'' intrprt = intrprt . logItem
 
 testRunOrEndpoint :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                     Maybe (S.Set Int)                                    -- a set of item Ids used for test case endpoints

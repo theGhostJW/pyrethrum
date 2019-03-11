@@ -79,3 +79,4 @@ evenOddEven = isEven
 unit_chk_with_gate_on_list = chkOutcomes [Pass, Pass, GateFail, Skip, Skip, Skip] 42 $ isBig
                                                                   <> gate evenOddEven
                                                                   <> isEven
+

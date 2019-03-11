@@ -99,7 +99,7 @@ i = Item
 items :: [Item]
 items = [
           i 100 "Pre"  "Post" validFile $
-                              chk "iid x 10 is small" (\V{..} -> iidx10 < 200 ) <>
+                              gate (chk "iid x 10 is small" (\V{..} -> iidx10 < 200 )) <>
                               chk "iid x 10 is big"   (\V{..} -> iidx10 > 500),
           i 110 "Pre"  "Post" validFile mempty,
           i 120 "Pre"  "Post" invalidFile2 mempty,

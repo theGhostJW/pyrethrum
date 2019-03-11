@@ -12,6 +12,7 @@ import  Data.Functor (($>))
 import           Common
 import           DSL.Interpreter
 import           DSL.Logger
+import           DSL.Ensure
 import DSL.LogProtocol
 import           Foundation.List.DList
 import           Foundation.Extended as E
@@ -30,8 +31,19 @@ ioRunRaw :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 ioRunRaw pln = testRun pln filters normalExecution executeInIOConsoleRaw runConfig
 
 -- TODO: move to library file 
-ioRunToFile :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO (Either AppError [AbsFile])
-ioRunToFile pln = let 
+ioRunToFile :: (forall m1 m a. TestPlan m1 m a FullIOEffects) 
+    -> (
+        forall as ds i. (ItemClass i ds, Show as, Show ds) => 
+          (LogProtocol -> IO ()) 
+          -> (RunConfig -> i -> Eff FullIOEffects as) 
+          -> (as -> Ensurable ds) 
+          -> (forall a. Eff FullIOEffects a -> IO (Either AppError a))  
+          -> TestConfig -> RunConfig 
+          -> i 
+          -> IO ()
+       ) 
+     -> IO (Either AppError [AbsFile])
+ioRunToFile pln itemRunner = let 
                     handleSpec :: M.Map (String, FileExt) (LogProtocol -> String) 
                     handleSpec = M.fromList [
                                                 (("raw", FileExt ".log"), logStrPP)
@@ -58,7 +70,7 @@ ioRunToFile pln = let
                     allHandles = (((Nothing, logStrPP, S.stdout) :) <$>) <$> fileHandles
                     
                     runTheTest :: [(LogProtocol -> String, S.Handle)] -> IO ()
-                    runTheTest targHndls = testRun pln filters normalExecution (executeInIO (logToHandles targHndls)) runConfig
+                    runTheTest targHndls = testRun pln filters docExecution (executeInIO (logToHandles targHndls)) runConfig
                   in 
                     do 
                       hndls <- allHandles
@@ -73,18 +85,21 @@ ioRunToFile pln = let
                             printFilePaths logPths 
                             pure $ Right logPths
                         )
-                   
+                        
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
-docRunRaw pln = extractDocLog $ testRun pln filters normalExecution executeDocumentRaw runConfig
+docRunRaw pln = extractDocLog $ testRun pln filters docExecution executeDocumentRaw runConfig
 
 docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
-docRun pln = extractDocLog $ testRun pln filters normalExecution executeDocumentPretty runConfig
+docRun pln = extractDocLog $ testRun pln filters docExecution executeDocumentPretty runConfig
 
 runInIO :: IO ()
 runInIO = ioRun plan
 
 runInIOLogToFile :: IO ()
-runInIOLogToFile = void $ ioRunToFile plan
+runInIOLogToFile = void $ ioRunToFile plan normalExecution
+
+docConsoleAndFile :: IO ()
+docConsoleAndFile = void $ ioRunToFile plan docExecution
 
 runInIORaw :: IO ()
 runInIORaw = ioRunRaw plan

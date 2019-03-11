@@ -204,7 +204,7 @@ runTestItems :: forall i as ds tc rc effs m. (Show as, Show ds, Monad m, TestCon
       -> ((Show as, Show ds) =>                               -- item runner logger - this does all the work and logs results as side effect
           (LogProtocol -> m ())                                 -- logger
           -> (rc -> i -> Eff effs as)                           -- interactor    
-          -> (as -> Ensurable ds)                             -- prepstate
+          -> (as -> Ensurable ds)                               -- prepstate
           -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
           -> tc                                                 -- TestConfig
           -> rc                                                 -- RunConfig
@@ -424,7 +424,7 @@ testRunOrEndpoint iIds runner fltrs runnerLogger intrprt rc =
 testRun :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                    (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> FilterList rc tc                               -- filters
-                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds) =>                                -- item runner logger - this does all the work and logs results as side effect
+                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds) =>  -- item runner logger - this does all the work and logs results as side effect
                         (LogProtocol -> m ())                                 -- logger
                         -> (rc -> i -> Eff effs as)                           -- interactor          
                         -> (as -> Ensurable ds)                               -- prepstate

@@ -150,7 +150,7 @@ logStrPP =
                   DocIOAction m -> logIO m
                   IOAction m -> logIO m
 
-                  Message s -> s
+                  Message s -> "USER MSG >>" <> s
                   Message' detailedInfo -> showPretty detailedInfo
 
                   Warning s -> subHeader "Warning" <> newLn <> s

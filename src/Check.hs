@@ -1,11 +1,12 @@
 module Check (
-              chk,
-              chk',
-              gate,
-              expectFailure,
-              expectFailureFixed,
               calcChecks,
               classifyResult,
+              chk,
+              chk',
+              expectFailure,
+              expectFailureFixed,
+              gate,
+              gateFirst,
               ExpectationActive(..),
               ResultExpectation(..),
               GateStatus(..),
@@ -42,7 +43,6 @@ data Check v = Check {
     gateStatus :: GateStatus
   }
 
-
 prdCheck :: forall ds. (ds -> Bool) -> String -> (ds -> Maybe MessageInfo) -> Check ds
 prdCheck prd hdr msgf = Check {
                           header = hdr,
@@ -51,6 +51,11 @@ prdCheck prd hdr msgf = Check {
                           expectation = ExpectPass,
                           gateStatus = StandardCheck
                         }
+
+gateFirst :: DList (Check ds) -> DList (Check ds)
+gateFirst chks = fromList $ case toList chks of 
+                        [] -> []
+                        x:xs -> x {gateStatus = GateCheck} : xs
 
 gate :: forall f v. Functor f => f (Check v) -> f (Check v)
 gate fck = (\ck -> ck {gateStatus = GateCheck}) <$> fck

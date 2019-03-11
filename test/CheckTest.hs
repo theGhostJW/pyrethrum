@@ -5,6 +5,7 @@ import           Data.Function
 import           Foundation.Extended
 import qualified Prelude             as P
 import qualified Test.Extended       as UT
+import  Test.Extended  ((...))
 
 isBig = chk "More than 10" (> 10)
 isEven = chk "Even" P.even
@@ -80,3 +81,12 @@ unit_chk_with_gate_on_list = chkOutcomes [Pass, Pass, GateFail, Skip, Skip, Skip
                                                                   <> gate evenOddEven
                                                                   <> isEven
 
+unit_chk_with_gateFirst_on_list = chkOutcomes [Pass, Pass, Fail, Fail, Pass, Pass] 42 $ isBig
+                                                                  <> gateFirst evenOddEven
+                                                                  <> isEven
+
+
+unit_chk_with_gatefirst_on_list_only_gates_first = [GateCheck, StandardCheck, StandardCheck, StandardCheck] ... toList (gateStatus <$> gateFirst evenOddEven)
+
+unit_chk_with_gate_on_list_only_gates_all = [GateCheck, GateCheck, GateCheck, GateCheck] ... toList (gateStatus <$> gate evenOddEven)
+                                                          

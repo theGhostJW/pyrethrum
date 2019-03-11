@@ -5,7 +5,6 @@ module DSL.LogProtocol where
 
 import           Common (DetailedInfo, AppError)
 import           Check
-import           TestFilter
 import           Foundation.Extended
 import           RunElementClasses
 import GHC.Generics
@@ -14,7 +13,6 @@ import Data.Aeson
 import Data.Either
 import Data.Aeson.Types
 import Data.Aeson.TH
-import RunnerBase as RB
 import qualified Data.HashMap.Lazy as HML
 import qualified Data.Text as T
 
@@ -25,7 +23,13 @@ newtype ApStateDisplay = ApStateDisplay {unApStateDisplay :: String} deriving (E
 newtype DStateDisplay = DStateDisplay {unDStateDisplay :: String} deriving (Eq, Show, IsString)
 newtype DTestConfig = DTestConfig {unDTestConfig :: String} deriving (Eq, Show, IsString)
 newtype DRunConfig = DRunConfig {unDRunConfig :: String} deriving (Eq, Show, IsString)
+newtype WhenClause = WhenClause {unWhenClause :: String} deriving (Eq, Show, IsString)
+newtype ThenClause = ThenClause {unThenClause :: String} deriving (Eq, Show, IsString)
 data ItemId = ItemId TestModule Int deriving (Eq, Show)
+data DocActionInfo = 
+    ActionInfo String |
+    ActionInfoM String String 
+    deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''RunTitle)
 $(deriveJSON defaultOptions ''GroupTitle)
@@ -33,6 +37,9 @@ $(deriveJSON defaultOptions ''TestTitle)
 $(deriveJSON defaultOptions ''ApStateDisplay)
 $(deriveJSON defaultOptions ''DStateDisplay)
 $(deriveJSON defaultOptions ''ItemId)
+$(deriveJSON defaultOptions ''DocActionInfo)
+$(deriveJSON defaultOptions ''WhenClause)
+$(deriveJSON defaultOptions ''ThenClause)
 
 data LogProtocol =
   Message String |
@@ -42,6 +49,9 @@ data LogProtocol =
   Warning' DetailedInfo |
 
   IOAction String |
+  DocIOAction String |
+  DocAction DocActionInfo |
+  DocCheck ItemId String ResultExpectation GateStatus | 
 
   InteractorSuccess ItemId ApStateDisplay |
   InteractorFailure ItemId AppError |
@@ -63,7 +73,7 @@ data LogProtocol =
 
   CheckOutcome ItemId CheckReport |
 
-  StartIteration ItemId Value | 
+  StartIteration ItemId WhenClause ThenClause Value | 
   EndIteration ItemId 
 
   deriving (Eq, Show)

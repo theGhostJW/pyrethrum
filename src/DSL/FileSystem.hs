@@ -7,6 +7,8 @@ import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import           Control.Monad.Freer.Writer
 import           Control.Exception as E
+import           DSL.Logger
+import           DSL.LogProtocol
 
 default (String)
 
@@ -39,16 +41,15 @@ fileSystemIOInterpreter =
 
 
 
-fileSystemDocInterpreter :: Member WriterDList effs => Eff (FileSystem ': effs) a -> Eff effs a
+fileSystemDocInterpreter :: Member Logger effs => Eff (FileSystem ': effs) a -> Eff effs a
 fileSystemDocInterpreter = interpret $
                                       let
                                         mockContents = "Mock File Contents"
                                       in
                                         \case
                                           ReadFile path ->
-                                            tell (dList $ "readFile: " <> show path) $> Right mockContents
+                                            logItem (DocAction $ ActionInfo ("readFile: " <> show path) ) $> Right mockContents
 
-                                          WriteFile path str -> tell (dList $ "write file: " <>
-                                                                        show path <>
-                                                                        "\nContents:\n" <>
-                                                                        str)
+                                          WriteFile path str -> logItem. DocAction $ ActionInfoM 
+                                                                                        ("write file: " <> show path)
+                                                                                        $ "contents:\n" <> str

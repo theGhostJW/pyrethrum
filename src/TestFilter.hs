@@ -11,18 +11,11 @@ import Data.Aeson
 
 type TestAddress = String
 
-data FilterResult = FilterResult {
-  testInfo  :: TestDisplayInfo, 
-  reasonForRejection :: Maybe String
-}  deriving (Show, Eq)
-
 acceptFilter :: FilterResult -> Bool
 acceptFilter = isNothing . reasonForRejection
 
 rejectFilter :: FilterResult -> Bool
 rejectFilter = isJust . reasonForRejection
-
-$(deriveJSON defaultOptions ''FilterResult)
 
 mkFilterResult :: TestConfigClass tc => tc -> Maybe String -> FilterResult
 mkFilterResult tc rejection = FilterResult {

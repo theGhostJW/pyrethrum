@@ -12,8 +12,7 @@ import Text.Show.Pretty as PP
 import RunElementClasses as C
 import qualified Prelude as P
 import System.IO
-import           TestFilter
-import           RunnerBase
+--import           RunnerBase
 import qualified Data.Aeson as A
 import Foundation.Compat.ByteString
 import qualified Data.ByteString.Lazy as B
@@ -116,52 +115,79 @@ logStrPP =
               ppAeson val = toS ((getLenient . toS . Y.encode $ val) :: T.Text)
 
               ppAesonBlock:: Y.Value -> String
-              ppAesonBlock = indentString 2 . ppAeson
+              ppAesonBlock = indent2 . ppAeson
+
+              ppMsgInfo :: Show a => Maybe a -> String
+              ppMsgInfo mbInfo = maybef mbInfo
+                                        ""
+                                        (\m -> newLn <> indent2 (showPretty m))
+
+              logIO :: Show a => a -> String
+              logIO m = "IO Action: " <> showPretty m
+                                                                                                               
             in
               \case
-                   IOAction msg -> "IO Action: " <> showPretty msg
+                  DocAction ai -> case ai of
+                                      ActionInfo msg -> ">> " <> msg
+                                      ActionInfoM msg extended -> ">> " <> 
+                                                                      msg <> 
+                                                                      newLn <> 
+                                                                      indent2 extended
 
-                   Message s -> s
-                   Message' detailedInfo -> showPretty detailedInfo
+                  DocCheck iid chkhdr resultExpectation gateStatus -> "check -> " <> showPretty chkhdr  <> 
+                                                              (
+                                                                gateStatus == GateCheck 
+                                                                  ? " - * Gate (subsequent checks will not be executed if this check fails)" 
+                                                                  $ ""
+                                                              ) <> 
+                                                              (
+                                                              case resultExpectation of 
+                                                                ExpectPass -> ""
+                                                                ExpectFailure _ Inactive -> ""
+                                                                ExpectFailure message Active -> newLn <> indent2 ("This check is expected to fail: " <> message)
+                                                              )
+                  
+                  DocIOAction m -> logIO m
+                  IOAction m -> logIO m
 
-                   Warning s -> subHeader "Warning" <> newLn <> s
-                   Warning' detailedInfo -> subHeader "Warning" <> newLn <> showPretty detailedInfo
+                  Message s -> s
+                  Message' detailedInfo -> showPretty detailedInfo
 
-                   InteractorSuccess iid (ApStateDisplay as) -> prettyBlock '>' "Interactor Complete"  iid as
+                  Warning s -> subHeader "Warning" <> newLn <> s
+                  Warning' detailedInfo -> subHeader "Warning" <> newLn <> showPretty detailedInfo
+
+                  InteractorSuccess iid (ApStateDisplay as) -> prettyBlock '>' "Interactor Complete"  iid as
                     
-                   InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ showPretty err
+                  InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ showPretty err
 
-                   PrepStateSuccess iid (DStateDisplay ds) -> prettyBlock '>' "PrepState Complete" iid ds
-                   PrepStateFailure iid err -> prettyBlock '>' "PrepState Failure" iid $ showPretty err
+                  PrepStateSuccess iid (DStateDisplay ds) -> prettyBlock '>' "PrepState Complete" iid ds
+                  PrepStateFailure iid err -> prettyBlock '>' "PrepState Failure" iid $ showPretty err
 
-                   CheckOutcome iid (CheckReport reslt (CheckInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> showPretty (classifyResult reslt)) iid $ 
+                  CheckOutcome iid (CheckReport reslt (CheckInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> showPretty (classifyResult reslt)) iid $ 
                                                                                                                chkhdr  <> " -> " <> showPretty reslt <> 
-                                                                                                               maybef mbInfo
-                                                                                                                ""
-                                                                                                                (\m -> newLn <> showPretty m)
-                                                                                                               
-                   e@(Error _) -> showPretty e
-                   FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
+                                                                                                               ppMsgInfo mbInfo
+                  e@(Error _) -> showPretty e
+                  FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
                                                 foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
-                   StartRun ttle rc -> header ("Test Run: " <> unRunTitle ttle) <> 
+                  StartRun ttle rc -> header ("Test Run: " <> unRunTitle ttle) <> 
                                        newLn <> "Run Config:" <>
                                        newLn <> ppAesonBlock rc
 
-                   StartGroup gt -> header $ "Group: " <> unGroupTitle gt
-                   EndGroup gt -> header $ "End Group: " <> unGroupTitle gt
+                  StartGroup gt -> header $ "Group: " <> unGroupTitle gt
+                  EndGroup gt -> header $ "End Group: " <> unGroupTitle gt
 
-                   StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
+                  StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
                                                     newLn <> "Test Config:" <>
                                                     newLn <> ppAesonBlock testConfig
 
-                   EndTest (TestModule address) -> newLn <> tstHeader ("End Test: " <> address)
-                   StartIteration iid val -> newLn <> subHeader ("Start Iteration: " <> iterId iid) <> 
-                                             newLn <> "Item:" <> 
-                                             newLn <> ppAesonBlock val
+                  EndTest (TestModule address) -> newLn <> tstHeader ("End Test: " <> address)
+                  StartIteration iid  _ _ val -> newLn <> subHeader ("Start Iteration: " <> iterId iid) <> 
+                                                  newLn <> "Item:" <> 
+                                                  newLn <> ppAesonBlock val
 
-                   EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
-                   EndRun -> newLn <> header "End Run"
+                  EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
+                  EndRun -> newLn <> header "End Run"
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsolePrettyInterpreter = logToHandles [(logStrPP, stdout)]

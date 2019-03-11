@@ -19,6 +19,7 @@ import Control.Monad.IO.Class
 import Data.Traversable
 import Data.Char
 import Data.Aeson.TH
+import qualified Check as C
 
 genStr :: Gen String
 genStr = string (linear 0 1000) ascii
@@ -75,6 +76,25 @@ genItemId  = ItemId <$> genTestModule <*> genInt
 genError :: Gen AppError
 genError = AppUserError <$> genStr
 
+genDocActionInfo :: Gen DocActionInfo
+genDocActionInfo = choice [
+  ActionInfo <$> genStr,
+  ActionInfoM <$> genStr <*> genStr
+ ]
+
+genResultExpectation :: Gen C.ResultExpectation
+genResultExpectation = choice [
+  pure C.ExpectPass, 
+  C.ExpectFailure <$> genStr <*> pure C.Inactive,
+  C.ExpectFailure <$> genStr <*> pure C.Active
+ ]
+
+genGateStatus :: Gen C.GateStatus
+genGateStatus = choice [
+  pure C.StandardCheck,
+  pure C.GateCheck
+ ]
+
 genLogProtocol :: Gen LogProtocol
 genLogProtocol = choice [
                     Message <$> genStr,
@@ -83,6 +103,10 @@ genLogProtocol = choice [
                     Warning <$> genStr,
                     Warning' <$> genDetailedInfo,
                   
+                    DocAction <$> genDocActionInfo,
+                    DocIOAction <$> genStr,
+                    DocCheck <$> genItemId <*> genStr <*>  genResultExpectation <*> genGateStatus, 
+
                     IOAction <$> genStr,
                   
                     Error <$> genError,
@@ -99,7 +123,7 @@ genLogProtocol = choice [
                     EndGroup <$> (GroupTitle <$> genStr),
                     StartTest <$> genTestDisplayInfo,
                     EndTest <$> genTestModule,
-                    StartIteration <$> genItemId <*> (toJSON <$> genRunConfig), --- using runconfig as an easy proxy for item
+                    StartIteration <$> genItemId <*> (WhenClause <$> genStr) <*> (ThenClause <$> genStr) <*> (toJSON <$> genRunConfig), --- using runconfig as an easy proxy for item
                     EndIteration <$> genItemId,
                     pure EndRun
                  ]

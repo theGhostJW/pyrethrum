@@ -11,6 +11,25 @@ import           Check
 
 newtype TestModule = TestModule String deriving (Eq, Show, IsString)
 
+-- this result is ultimately serialsed to JSON as part of the log protocol data  
+-- type and can't serialise with custom typeclass constraints so forced to
+-- have the redundant testModAddress and testTitle even though this
+-- data is available via TestConfigClass
+data TestDisplayInfo = TestDisplayInfo {
+  testModAddress :: TestModule,
+  testTitle :: String,
+  testConfig :: Value -- test Config as Json
+}  deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''TestDisplayInfo)
+
+data FilterResult = FilterResult {
+  testInfo  :: TestDisplayInfo, 
+  reasonForRejection :: Maybe String
+}  deriving (Show, Eq)
+
+$(deriveJSON defaultOptions ''FilterResult)
+
 mkTestModule :: Name -> TestModule
 mkTestModule = TestModule . moduleOf
 
@@ -36,3 +55,10 @@ class (ToJSON i, Generic i) => ItemClass i ds | i -> ds  where
   whenThen :: i -> String
   whenThen i = "When: " <> whenClause i  <> "\n" <>
                "Then: " <> thenClause i
+
+mkDisplayInfo :: TestConfigClass tc => tc -> TestDisplayInfo
+mkDisplayInfo tc = TestDisplayInfo {
+                                    testModAddress = moduleAddress tc,
+                                    testTitle = title tc,
+                                    testConfig = toJSON tc
+                                  }

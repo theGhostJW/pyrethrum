@@ -6,6 +6,9 @@ module Check (
               expectFailureFixed,
               calcChecks,
               classifyResult,
+              ExpectationActive(..),
+              ResultExpectation(..),
+              GateStatus(..),
               Check(..),
               CheckList,
               CheckReportList,
@@ -126,6 +129,9 @@ $(deriveJSON defaultOptions ''MessageInfo)
 $(deriveJSON defaultOptions ''CheckInfo)
 $(deriveJSON defaultOptions ''CheckResult)
 $(deriveJSON defaultOptions ''CheckReport)
+$(deriveJSON defaultOptions ''ResultExpectation)
+$(deriveJSON defaultOptions ''ExpectationActive)
+$(deriveJSON defaultOptions ''GateStatus)
 
 instance P.Show (Check v) where
   show = toS . (header :: Check v  -> String)

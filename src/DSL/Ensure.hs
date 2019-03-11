@@ -2,6 +2,7 @@
 module DSL.Ensure where
 
 import Common
+import DSL.Logger
 import           Foundation.Extended
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
@@ -24,5 +25,13 @@ ensureInterpreter = interpret $ \case
                                     Ensure message condition -> Monad.unless (isTruthy condition) $ throwError $ EnsureError message
                                     Throw message -> throwError $ EnsureError message
 
+-- when documenting actions we do nothing as ensure and throw 
+-- are just programming constructs, they don't represnt user actions
+ensureDocInterpreter :: forall effs a. Eff (Ensure ': effs) a -> Eff effs a
+ensureDocInterpreter = interpret $ \case
+                                    Ensure message condition -> pure ()
+                                    Throw message -> pure ()
+
 fullEnsureInterpreter :: Eff '[Ensure, Error EnsureError] a -> Either EnsureError a
 fullEnsureInterpreter effs = run $ runError $ ensureInterpreter effs
+

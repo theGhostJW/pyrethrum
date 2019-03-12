@@ -129,7 +129,7 @@ logStrPP docMode =
               logIO m =  docMarkUp $ "IO Action: " <> showPretty m
 
               detailDoc :: String -> DetailedInfo -> String
-              detailDoc hedr (DetailedInfo msg det) = (docMode ? newLn $ "") <> indent2 (subHeader hedr <> newLn <> msg <> newLn <> det)
+              detailDoc hedr (DetailedInfo msg det) = newLn <> (docMode ? indent2 $ id) (subHeader hedr <> newLn <> msg <> newLn <> det)
                                                                                                                
             in
               \case

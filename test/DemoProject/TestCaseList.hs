@@ -78,7 +78,7 @@ ioRunToFile docMode pln interpt itemRunner = let
                     allHandles = (((Nothing, logStrPP docMode, S.stdout) :) <$>) <$> fileHandles
                     
                     runTheTest :: [(LogProtocol -> String, S.Handle)] -> IO ()
-                    runTheTest targHndls = testRun pln filters docExecution (interpt (logToHandles targHndls)) runConfig
+                    runTheTest targHndls = testRun pln filters itemRunner (interpt (logToHandles targHndls)) runConfig
                   in 
                     do 
                       hndls <- allHandles

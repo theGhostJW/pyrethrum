@@ -50,6 +50,6 @@ fileSystemDocInterpreter = interpret $
                                           ReadFile path ->
                                             logItem (DocAction $ ActionInfo ("readFile: " <> show path) ) $> Right mockContents
 
-                                          WriteFile path str -> logItem. DocAction $ ActionInfoM 
+                                          WriteFile path str -> logItem . DocAction $ ActionInfoM 
                                                                                         ("write file: " <> show path)
                                                                                         $ "contents:\n" <> str

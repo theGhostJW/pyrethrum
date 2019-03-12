@@ -190,7 +190,11 @@ docExecution logger interactor _ intrprt tc rc i = let
                                                       logChecks :: m ()
                                                       logChecks =  P.sequence_ $  (\chk -> logger $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> toList (checkList i)
                                                     in 
-                                                      intrprt (interactor rc i) *> logChecks
+                                                      do 
+                                                        logger DocStartInteraction
+                                                        intrprt (interactor rc i)
+                                                        logger DocStartChecks
+                                                        logChecks
 
 
 runTestItems :: forall i as ds tc rc effs m. (Show as, Show ds, Monad m, TestConfigClass tc, ItemClass i ds, Member Logger effs) =>

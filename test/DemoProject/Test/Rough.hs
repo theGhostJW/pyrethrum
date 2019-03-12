@@ -56,11 +56,18 @@ interactor RunConfig{..} Item{..} = do
                                       writeFile path $ pre  <> " ~ " <> post <> " !!"
                                       ensure "Blahh" $ P.even iid
                                       log "Hi"
+                                      logWarning "a warning"
                                       arbitraryIO "This is an arbitrary Put Line" () (putStrLn "Hello from random action")
                                       txt <- readFile path
 
                                       when (iid == 140)
                                         $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" (Right "tHIS WILL BLOW UP") (readFileUTF8 invalidFile)
+
+                                      when (iid == 130) $
+                                        do 
+                                          log' "Hi there" "a verry long message dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
+                                          logWarning' "Hi there warning" "a verry long warning dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
+                                          logWarning' "Hi there warning 2" "a verry long warning dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
 
                                       pure $ ApState  {
                                         itemId  = iid,
@@ -100,7 +107,7 @@ items :: [Item]
 items = [
           i 100 "Pre"  "Post" validFile $
                               gateFirst $ chk "iid x 10 is small" (\V{..} -> iidx10 < 200 ) <>
-                              chk "iid x 10 is big"   (\V{..} -> iidx10 > 500),
+                              expectFailure "this bug was introduced in an earlier version and will be fixed eventually" (chk "iid x 10 is big" (\V{..} -> iidx10 > 500)),
           i 110 "Pre"  "Post" validFile mempty,
           i 120 "Pre"  "Post" invalidFile2 mempty,
           i 130 "Pre"  "Post" validFile mempty,

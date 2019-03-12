@@ -52,7 +52,7 @@ executeInIO logger app = handleIOException $ flattenErrors <$> runM
                                    $ runError
                                    $ runError
                                    $ logger
-                                   $ arbitraryIOIOInterpreter
+                                   $ arbitraryIOInterpreter
                                    $ ensureInterpreter
                                    $ fileSystemIOInterpreter
                                     app

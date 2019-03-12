@@ -52,6 +52,8 @@ data LogProtocol =
   DocIOAction String |
   DocAction DocActionInfo |
   DocCheck ItemId String ResultExpectation GateStatus | 
+  DocStartInteraction | 
+  DocStartChecks | 
 
   InteractorSuccess ItemId ApStateDisplay |
   InteractorFailure ItemId AppError |

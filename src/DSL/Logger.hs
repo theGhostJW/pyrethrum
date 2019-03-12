@@ -27,28 +27,28 @@ data Logger r where
 logItem :: Member Logger effs => LogProtocol -> Eff effs ()
 logItem = send . LogItem
 
-simpleLog :: forall s effs. (Show s, Member Logger effs) => (String -> LogProtocol) -> s -> Eff effs ()
-simpleLog lpCons = logItem . lpCons . showPretty
+simpleLog :: forall effs. Member Logger effs => (String -> LogProtocol) -> String -> Eff effs ()
+simpleLog lpCons = logItem . lpCons
 
-detailLog :: forall s effs. (Show s, Member Logger effs) => (DetailedInfo -> LogProtocol) -> s -> s -> Eff effs ()
-detailLog lpCons msg additionalInfo = logItem $ lpCons $ prtyInfo msg additionalInfo
+detailLog :: forall effs. Member Logger effs => (DetailedInfo -> LogProtocol) -> String -> String -> Eff effs ()
+detailLog lpCons msg additionalInfo = logItem $ lpCons $ DetailedInfo msg additionalInfo
 
-log :: forall s effs. (Show s, Member Logger effs) => s -> Eff effs ()
+log :: forall effs. Member Logger effs => String -> Eff effs ()
 log = simpleLog Message
 
-log' :: forall s effs. (Show s,  Member Logger effs) => s -> s -> Eff effs ()
+log' :: forall effs. Member Logger effs => String -> String -> Eff effs ()
 log' = detailLog  Message'
 
-logWarning :: forall s effs. (Show s, Member Logger effs) => s -> Eff effs ()
+logWarning :: forall effs. Member Logger effs => String -> Eff effs ()
 logWarning = simpleLog Warning
 
-logWarning' :: forall s effs. (Show s, Member Logger effs) => s -> s -> Eff effs ()
+logWarning' :: forall effs. (Member Logger effs) => String -> String -> Eff effs ()
 logWarning' = detailLog  Warning'
 
-logError :: forall s effs. (Show s, Member Logger effs) => s -> Eff effs ()
+logError :: forall effs.  Member Logger effs => String -> Eff effs ()
 logError = simpleLog (Error . AppUserError)
 
-logError' :: forall s effs. (Show s, Member Logger effs) => s -> s -> Eff effs ()
+logError' :: forall effs. Member Logger effs => String -> String -> Eff effs ()
 logError' = detailLog  (Error . AppUserError')
 
 logConsoleInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
@@ -71,8 +71,8 @@ indentString i s =
   in 
     toS $ safeLast unlined == Just '\n' ? P.init unlined $ unlined  
 
-prtyInfo :: (Show s, Show s1)  => s -> s1 -> DetailedInfo
-prtyInfo msg adInfo = DetailedInfo (showPretty msg) (showPretty adInfo)
+-- prtyInfo :: (Show s, Show s1)  => s -> s1 -> DetailedInfo
+-- prtyInfo msg adInfo = DetailedInfo (showPretty msg) (showPretty adInfo)
 
 putLines :: Handle -> String -> IO ()
 putLines hOut s = P.sequence_ $ hPutStrLn hOut . toList <$> S.lines s
@@ -90,8 +90,8 @@ prettyPrintFilterItem FilterResult{..} =
 logStrJSON :: LogProtocol -> String
 logStrJSON = fst . fromBytesLenient . fromByteString . B.toStrict . A.encode
 
-logStrPP :: LogProtocol -> String
-logStrPP =
+logStrPP :: Bool -> LogProtocol -> String
+logStrPP docMode =
             let
               hdr l h = l <> " " <> h <> " " <> l
               subHeader = hdr "----"
@@ -122,39 +122,48 @@ logStrPP =
                                         ""
                                         (\m -> newLn <> indent2 (showPretty m))
 
+              docMarkUp :: String -> String
+              docMarkUp s = (docMode ? "  >> " $ "") <> s
+
               logIO :: Show a => a -> String
-              logIO m = "IO Action: " <> showPretty m
+              logIO m =  docMarkUp $ "IO Action: " <> showPretty m
+
+              detailDoc :: String -> DetailedInfo -> String
+              detailDoc hedr (DetailedInfo msg det) = (docMode ? newLn $ "") <> indent2 (subHeader hedr <> newLn <> msg <> newLn <> det)
                                                                                                                
             in
               \case
+                  DocStartInteraction -> newLn <> "Interaction:"
+                  DocStartChecks -> newLn <> "Checks:"
+
                   DocAction ai -> case ai of
-                                      ActionInfo msg -> ">> " <> msg
-                                      ActionInfoM msg extended -> ">> " <> 
+                                      ActionInfo msg -> "  >> " <> msg
+                                      ActionInfoM msg extended -> "  >> " <> 
                                                                       msg <> 
                                                                       newLn <> 
                                                                       indent2 extended
 
-                  DocCheck iid chkhdr resultExpectation gateStatus -> "check -> " <> showPretty chkhdr  <> 
+                  DocCheck iid chkhdr resultExpectation gateStatus -> indent2 $ "% " <> chkhdr  <> 
                                                               (
                                                                 gateStatus == GateCheck 
-                                                                  ? " - * Gate (subsequent checks will not be executed if this check fails)" 
+                                                                  ? "(Gate: subsequent checks will not be executed if this check fails)" 
                                                                   $ ""
                                                               ) <> 
                                                               (
                                                               case resultExpectation of 
                                                                 ExpectPass -> ""
                                                                 ExpectFailure _ Inactive -> ""
-                                                                ExpectFailure message Active -> newLn <> indent2 ("This check is expected to fail: " <> message)
+                                                                ExpectFailure message Active -> newLn <> indent2 ("!! This check is expected to fail: " <> message)
                                                               )
                   
                   DocIOAction m -> logIO m
                   IOAction m -> logIO m
 
-                  Message s -> "USER MSG >>" <> s
-                  Message' detailedInfo -> showPretty detailedInfo
+                  Message s -> docMarkUp $ "message: " <> s
+                  Message' detailedInfo -> detailDoc "Message" detailedInfo
 
-                  Warning s -> subHeader "Warning" <> newLn <> s
-                  Warning' detailedInfo -> subHeader "Warning" <> newLn <> showPretty detailedInfo
+                  Warning s -> docMarkUp $ "warning: " <> s
+                  Warning' detailedInfo -> detailDoc "Warning" detailedInfo
 
                   InteractorSuccess iid (ApStateDisplay as) -> prettyBlock '>' "Interactor Complete"  iid as
                     
@@ -184,13 +193,14 @@ logStrPP =
                   EndTest (TestModule address) -> newLn <> tstHeader ("End Test: " <> address)
                   StartIteration iid  _ _ val -> newLn <> subHeader ("Start Iteration: " <> iterId iid) <> 
                                                   newLn <> "Item:" <> 
-                                                  newLn <> ppAesonBlock val
+                                                  newLn <> ppAesonBlock val <>
+                                                  (docMode ? "" $ newLn)
 
                   EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
                   EndRun -> newLn <> header "End Run"
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
-logConsolePrettyInterpreter = logToHandles [(logStrPP, stdout)]
+logConsolePrettyInterpreter = logToHandles [(logStrPP False, stdout)]
 
 logToHandles :: LastMember IO effs => [(LogProtocol -> String, Handle)] -> Eff (Logger ': effs) ~> Eff effs
 logToHandles convertersHandlers = 
@@ -210,4 +220,4 @@ logDocPrettyInterpreter = let
                             toDList :: [String] -> DList String
                             toDList = fromList
                           in
-                            interpret $ \(LogItem lp) -> tell . toDList . lines $ logStrPP lp
+                            interpret $ \(LogItem lp) -> tell . toDList . lines $ logStrPP True lp

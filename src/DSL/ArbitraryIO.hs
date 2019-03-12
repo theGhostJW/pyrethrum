@@ -20,8 +20,8 @@ arbitraryIO msg def action = send $ ArbitraryIO msg def action
 arbitraryIODocInterpreter :: forall effs a. Member Logger effs => Eff (ArbitraryIO ': effs) a -> Eff effs a
 arbitraryIODocInterpreter = interpret $ \(ArbitraryIO msg def _) -> logItem (DocIOAction msg) $> def
 
-arbitraryIOIOInterpreter :: Members '[Error AppError, Logger, IO] effs => Eff (ArbitraryIO ': effs) a -> Eff effs a
-arbitraryIOIOInterpreter =
+arbitraryIOInterpreter :: Members '[Error AppError, Logger, IO] effs => Eff (ArbitraryIO ': effs) a -> Eff effs a
+arbitraryIOInterpreter =
                           let
                             handleException msg action = do
                                                        r <- send (E.try action)

@@ -34,6 +34,12 @@ ioRunRaw pln = testRun pln filters normalExecution executeInIOConsoleRaw runConf
 ioRunToFile :: 
     Bool 
     -> (forall m1 m a. TestPlan m1 m a FullIOEffects) 
+    -> (forall a.
+          (forall (effs :: [* -> *]).
+          LastMember IO effs =>
+          Eff (Logger : effs) ~> Eff effs)
+          -> Eff FullIOEffects a -> IO (Either AppError a)
+    )
     -> (
         forall as ds i. (ItemClass i ds, Show as, Show ds) => 
           (LogProtocol -> IO ()) 
@@ -45,7 +51,7 @@ ioRunToFile ::
           -> IO ()
        ) 
      -> IO (Either AppError [AbsFile])
-ioRunToFile docMode pln itemRunner = let 
+ioRunToFile docMode pln interpt itemRunner = let 
                     handleSpec :: M.Map (String, FileExt) (LogProtocol -> String) 
                     handleSpec = M.fromList [
                                                 (("raw", FileExt ".log"), logStrPP docMode)
@@ -72,7 +78,7 @@ ioRunToFile docMode pln itemRunner = let
                     allHandles = (((Nothing, logStrPP docMode, S.stdout) :) <$>) <$> fileHandles
                     
                     runTheTest :: [(LogProtocol -> String, S.Handle)] -> IO ()
-                    runTheTest targHndls = testRun pln filters docExecution (executeInIO (logToHandles targHndls)) runConfig
+                    runTheTest targHndls = testRun pln filters docExecution (interpt (logToHandles targHndls)) runConfig
                   in 
                     do 
                       hndls <- allHandles
@@ -98,10 +104,10 @@ runInIO :: IO ()
 runInIO = ioRun plan
 
 runInIOLogToFile :: IO ()
-runInIOLogToFile = void $ ioRunToFile False plan normalExecution
+runInIOLogToFile = void $ ioRunToFile False plan executeInIO normalExecution 
 
 docConsoleAndFile :: IO ()
-docConsoleAndFile = void $ ioRunToFile True plan docExecution
+docConsoleAndFile = void $ ioRunToFile True plan documentInIO docExecution
 
 runInIORaw :: IO ()
 runInIORaw = ioRunRaw plan

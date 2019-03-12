@@ -58,6 +58,19 @@ executeInIO logger app = handleIOException $ flattenErrors <$> runM
                                     app
                                  )
 
+documentInIO :: forall a. (forall effs. LastMember IO effs => Eff (Logger ': effs) ~> Eff effs) -> Eff FullIOEffects a -> IO (Either AppError a)
+documentInIO logger app = handleIOException $ flattenErrors <$> runM
+                                 (
+                                   runError
+                                   $ runError
+                                   $ runError
+                                   $ logger
+                                   $ arbitraryIODocInterpreter
+                                   $ ensureDocInterpreter
+                                   $ fileSystemDocInterpreter
+                                    app
+                                 )
+
 type FullDocEffects = '[FileSystem, ArbitraryIO, Logger, Ensure, Error EnsureError, WriterDList]
 
 executeDocumentRaw :: forall a. Eff FullDocEffects a -> Eff '[WriterDList] (Either AppError a)

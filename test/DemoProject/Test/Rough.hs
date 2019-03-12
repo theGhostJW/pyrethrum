@@ -69,6 +69,11 @@ interactor RunConfig{..} Item{..} = do
                                           logWarning' "Hi there warning" "a verry long warning dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
                                           logWarning' "Hi there warning 2" "a verry long warning dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
 
+                                      when (iid == 110) $
+                                        do
+                                          log "SHould Crash"
+                                          error "BANG !!!"
+
                                       pure $ ApState  {
                                         itemId  = iid,
                                         filePath = path,

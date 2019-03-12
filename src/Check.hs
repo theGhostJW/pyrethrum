@@ -25,6 +25,7 @@ import qualified Prelude as P
 import Data.Aeson.Types hiding (Error)
 import Data.Aeson.TH
 import OrphanedInstances
+import Common
 
 -- generate a check from a predicate
 chk :: String -> (v -> Bool) -> DList (Check v)
@@ -35,13 +36,22 @@ chk' :: String -> (v -> String) -> (v -> Bool) -> DList (Check v)
 chk' hdr fMsg prd = pure $ prdCheck prd hdr $ \v -> Just $ MessageInfo hdr $ Just $ fMsg v
 
 
-data Check v = Check {
+data Check ds = Check {
     header :: String,
-    rule :: v -> Bool,
-    msgFunc :: v -> Maybe MessageInfo,
+    rule :: ds -> Bool,
+    msgFunc :: ds -> Maybe MessageInfo,
     expectation :: ResultExpectation,
     gateStatus :: GateStatus
   }
+
+data SpecialCheck = SpecialCheck {
+    rule :: String,
+    expectation :: ResultExpectation,
+    isGate :: Bool
+  } deriving Show 
+
+toDisplay :: Check v -> SpecialCheck
+toDisplay Check{..} = SpecialCheck header expectation (GateCheck == gateStatus)
 
 prdCheck :: forall ds. (ds -> Bool) -> String -> (ds -> Maybe MessageInfo) -> Check ds
 prdCheck prd hdr msgf = Check {
@@ -52,16 +62,16 @@ prdCheck prd hdr msgf = Check {
                           gateStatus = StandardCheck
                         }
 
-gateFirst :: DList (Check ds) -> DList (Check ds)
+gateFirst :: forall ds. DList (Check ds) -> DList (Check ds)
 gateFirst chks = fromList $ case toList chks of 
                         [] -> []
-                        x:xs -> x {gateStatus = GateCheck} : xs
+                        x:xs -> (x :: Check ds){gateStatus = GateCheck} : xs
 
-gate :: forall f v. Functor f => f (Check v) -> f (Check v)
-gate fck = (\ck -> ck {gateStatus = GateCheck}) <$> fck
+gate :: forall f ds. Functor f => f (Check ds) -> f (Check ds)
+gate fck = (\ck -> (ck :: Check ds) {gateStatus = GateCheck}) <$> fck
 
-expectFailurePriv :: forall f v. Functor f => ExpectationActive -> String -> f (Check v) -> f (Check v)
-expectFailurePriv isActive msg fck = (\ck -> ck {expectation = ExpectFailure msg isActive}) <$> fck
+expectFailurePriv :: forall f ds. Functor f => ExpectationActive -> String -> f (Check ds) -> f (Check ds)
+expectFailurePriv isActive msg fck = (\ck -> (ck:: Check ds) {expectation = ExpectFailure isActive msg}) <$> fck
 
 expectFailure :: forall f v. Functor f => String -> f (Check v) -> f (Check v)
 expectFailure = expectFailurePriv Active
@@ -117,7 +127,10 @@ classifyResult  = \case
 data ExpectationActive = Active | Inactive deriving (Show, Eq)
 
 data ResultExpectation = ExpectPass 
-                          | ExpectFailure String ExpectationActive
+                          | ExpectFailure {
+                                            isActive :: ExpectationActive,
+                                            reason :: String
+                                          }
                           deriving (Show, Eq)
 
 data GateStatus = GateCheck 
@@ -139,14 +152,16 @@ $(deriveJSON defaultOptions ''ExpectationActive)
 $(deriveJSON defaultOptions ''GateStatus)
 
 instance P.Show (Check v) where
-  show = toS . (header :: Check v  -> String)
+  show ck@Check{..} = toS $ 
+                        gateStatus == GateCheck && (expectation == ExpectPass)?
+                          header $
+                          show $ toDisplay ck
 
 instance ToJSON (Check v)  where
   toJSON = String . toS . (header :: Check v  -> String)
 
 instance ToJSON (CheckList a) where 
   toJSON cl = Array . fromList $ toJSON <$> toList cl
-
 
 isGateFail :: CheckResult -> Bool
 isGateFail = \case 
@@ -175,15 +190,15 @@ calcChecks ds chkLst = let
                                                 ( 
                                                   case expectation of 
                                                     ExpectPass -> Pass 
-                                                    ExpectFailure msg Active -> PassWhenFailExpected msg 
-                                                    ExpectFailure _ Inactive -> Pass
+                                                    ExpectFailure Active msg-> PassWhenFailExpected msg 
+                                                    ExpectFailure Inactive _ -> Pass
                                                 ) 
                                               $  -- fail cases
                                                 ( 
                                                   case expectation of 
                                                     ExpectPass -> isGate ? GateFail $ Fail   
-                                                    ExpectFailure msg Active -> (isGate ? GateFailExpected $ FailExpected) msg
-                                                    ExpectFailure msg Inactive -> (isGate ? GateRegression $ Regression) msg
+                                                    ExpectFailure Active msg -> (isGate ? GateFailExpected $ FailExpected) msg
+                                                    ExpectFailure Inactive msg -> (isGate ? GateRegression $ Regression) msg
                                                 )
                           in 
                             CheckReport rslt $ CheckInfo header (msgFunc ds)

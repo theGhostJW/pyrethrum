@@ -103,8 +103,8 @@ docRun pln = extractDocLog $ testRun pln filters docExecution executeDocumentPre
 runInIO :: IO ()
 runInIO = ioRun plan
 
-runInIOLogToFile :: IO ()
-runInIOLogToFile = void $ ioRunToFile False plan executeInIO normalExecution 
+runConsoleAndFile :: IO ()
+runConsoleAndFile = void $ ioRunToFile False plan executeInIO normalExecution 
 
 docConsoleAndFile :: IO ()
 docConsoleAndFile = void $ ioRunToFile True plan documentInIO docExecution

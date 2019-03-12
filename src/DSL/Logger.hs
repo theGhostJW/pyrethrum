@@ -57,23 +57,6 @@ logConsoleInterpreter = interpretM $ \(LogItem lp) -> P.print lp
 logDocInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocInterpreter = interpret $ \(LogItem lp) -> tell $ dList lp
 
-showPretty :: Show a => a -> String
-showPretty = toS . ppShow
-
-indentString :: Int -> String -> String
-indentString i s = 
-  let 
-    linesClean :: [String]
-    linesClean = fst . F.breakEnd (not . S.all (' ' ==)) $ S.lines s
-
-    unlined :: P.String
-    unlined = P.unlines $ (\s' -> s == "" ? "" $ toS $ F.replicate (CountOf i) ' ' <> s')  <$> linesClean
-  in 
-    toS $ safeLast unlined == Just '\n' ? P.init unlined $ unlined  
-
--- prtyInfo :: (Show s, Show s1)  => s -> s1 -> DetailedInfo
--- prtyInfo msg adInfo = DetailedInfo (showPretty msg) (showPretty adInfo)
-
 putLines :: Handle -> String -> IO ()
 putLines hOut s = P.sequence_ $ hPutStrLn hOut . toList <$> S.lines s
 
@@ -152,8 +135,8 @@ logStrPP docMode =
                                                               (
                                                               case resultExpectation of 
                                                                 ExpectPass -> ""
-                                                                ExpectFailure _ Inactive -> ""
-                                                                ExpectFailure message Active -> newLn <> indent2 ("!! This check is expected to fail: " <> message)
+                                                                ExpectFailure Inactive  _  -> ""
+                                                                ExpectFailure Active message -> newLn <> indent2 ("!! This check is expected to fail: " <> message)
                                                               )
                   
                   DocIOAction m -> logIO m

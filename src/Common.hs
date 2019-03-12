@@ -2,10 +2,29 @@
 module Common where
 
 import           Control.Monad.Freer.Writer
-import           Foundation.Extended
+import           Foundation.Extended as F
 import           Foundation.List.DList
 import Data.Aeson.TH
 import OrphanedInstances
+import           Foundation.String as S
+import Text.Show.Pretty as PP
+import qualified Prelude as P
+import Basement.String as S
+
+showPretty :: Show a => a -> String
+showPretty = toS . ppShow
+
+indentString :: Int -> String -> String
+indentString i s = 
+  let 
+    linesClean :: [String]
+    linesClean = fst . F.breakEnd (not . S.all (' ' ==)) $ S.lines s
+
+    unlined :: P.String
+    unlined = P.unlines $ (\s' -> s == "" ? "" $ toS $ F.replicate (CountOf i) ' ' <> s')  <$> linesClean
+  in 
+    toS $ safeLast unlined == Just '\n' ? P.init unlined $ unlined  
+
 
 data PreTestStage = Rollover |
                     GoHome

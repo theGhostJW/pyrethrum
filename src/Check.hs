@@ -62,21 +62,24 @@ prdCheck prd hdr msgf = Check {
                           gateStatus = StandardCheck
                         }
 
-gate :: forall ds. DList (Check ds) -> DList (Check ds)
-gate chks = fromList $ case toList chks of 
-                        [] -> []
-                        x:xs -> (x :: Check ds){gateStatus = GateCheck} : xs
+applyToFirst :: (Check ds -> Check ds) -> DList (Check ds) -> DList (Check ds)
+applyToFirst f l = fromList $ case toList l of
+                                [] -> []
+                                x:xs -> f x : xs
 
-gateAll :: forall f ds. Functor f => f (Check ds) -> f (Check ds)
+gate :: forall ds. DList (Check ds) -> DList (Check ds)
+gate = applyToFirst (\c -> (c :: Check ds){gateStatus = GateCheck})
+
+gateAll :: forall ds. DList (Check ds) -> DList (Check ds)
 gateAll fck = (\ck -> (ck :: Check ds) {gateStatus = GateCheck}) <$> fck
 
-expectFailurePriv :: forall f ds. Functor f => ExpectationActive -> String -> f (Check ds) -> f (Check ds)
-expectFailurePriv isActive msg fck = (\ck -> (ck:: Check ds) {expectation = ExpectFailure isActive msg}) <$> fck
+expectFailurePriv :: forall ds. ExpectationActive -> String -> DList (Check ds) -> DList (Check ds)
+expectFailurePriv isActive msg = applyToFirst (\c -> (c :: Check ds){expectation = ExpectFailure isActive msg})
 
-expectFailure :: forall f v. Functor f => String -> f (Check v) -> f (Check v)
+expectFailure :: String -> DList (Check ds) -> DList (Check ds)
 expectFailure = expectFailurePriv Active
 
-expectFailureFixed :: forall f v. Functor f => String -> f (Check v) -> f (Check v)
+expectFailureFixed :: String -> DList (Check ds) -> DList (Check ds)
 expectFailureFixed = expectFailurePriv Inactive
 
 type CheckReportList = DList CheckReport

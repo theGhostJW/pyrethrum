@@ -2,7 +2,7 @@ module CheckTest where
 
 import           Check               as Chk
 import           Data.Function
-import           Foundation.Extended
+import           Foundation.Extended as F
 import qualified Prelude             as P
 import qualified Test.Extended       as UT
 import  Test.Extended  ((...))
@@ -72,28 +72,24 @@ unit_chk_with_chkGate_fail_unexpected_pass = chkOutcomes [Pass, Pass, PassWhenFa
                                                                   <> isOdd
                                                                   <> isEven
 
--- unit_chk_with_chkGate_fail_unexpected_pass = chkOutcomes [Pass, Pass, PassWhenFailExpected "Known Issue", Fail, Pass] 42  $ 
---                                                                   isBig
---                                                                   <> isEven
---                                                                   <> expectFailure "Known Issue" isEven
---                                                                   <> isOdd
---                                                                   <> isEven
-
 evenOddEven = isEven
               <> isOdd
               <> isOdd
               <> isEven
 
-unit_chk_with_gate_on_list = chkOutcomes [Pass, Pass, GateFail, Skip, Skip, Skip] 42 $ isBig
+unit_chk_with_gateAll_on_list = chkOutcomes [Pass, Pass, GateFail, Skip, Skip, Skip] 42 $ isBig
                                                                   <> gateAll evenOddEven
                                                                   <> isEven
 
-unit_chk_with_gateFirst_on_list = chkOutcomes [Pass, Pass, Fail, Fail, Pass, Pass] 42 $ isBig
+unit_chk_with_gate_on_list = chkOutcomes [Pass, Pass, Fail, Fail, Pass, Pass] 42 $ isBig
                                                                   <> gate evenOddEven
                                                                   <> isEven
 
 
-unit_chk_with_gatefirst_on_list_only_gates_first = [GateCheck, StandardCheck, StandardCheck, StandardCheck] ... toList (gateStatus <$> gate evenOddEven)
+unit_chk_with_gate_on_list_only_gates_first = [GateCheck, StandardCheck, StandardCheck, StandardCheck] ... toList (gateStatus <$> gate evenOddEven)
 
-unit_chk_with_gate_on_list_only_gates_all = [GateCheck, GateCheck, GateCheck, GateCheck] ... toList (gateStatus <$> gateAll evenOddEven)
-                                                          
+unit_chk_with_gateAll_on_list_gates_all = [GateCheck, GateCheck, GateCheck, GateCheck] ... toList (gateStatus <$> gateAll evenOddEven)
+
+unit_chk_expect_defect_only_affects_first = [False, True, True, True] ... toList ((ExpectPass ==) F.. expectation <$> expectFailure "Failed" evenOddEven)
+
+unit_chk_expect_defect_fixed_only_affects_first = [True, False, False, False] ... toList ((ExpectFailure Inactive "Failed" ==) F.. expectation <$> expectFailureFixed "Failed" evenOddEven)

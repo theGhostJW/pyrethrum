@@ -83,7 +83,7 @@ data TestIteraion = Iteration |
 $(deriveJSON defaultOptions ''TestIteraion)
 
 iterationStep :: Step IterationAccumulator LogProtocol String TestIteraion
-iterationStep linNo accum lp = (accum, Right $ Just Iteration)
+iterationStep linNo accum lp = (accum, Left . show $ AppNotImplementedError "Arrghh")
 
 itrSerialise :: ISerialiser TestIteraion
 itrSerialise = toS . A.encode

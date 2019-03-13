@@ -6,7 +6,7 @@ module Check (
               expectFailure,
               expectFailureFixed,
               gate,
-              gateFirst,
+              gateAll,
               ExpectationActive(..),
               ResultExpectation(..),
               GateStatus(..),
@@ -62,13 +62,13 @@ prdCheck prd hdr msgf = Check {
                           gateStatus = StandardCheck
                         }
 
-gateFirst :: forall ds. DList (Check ds) -> DList (Check ds)
-gateFirst chks = fromList $ case toList chks of 
+gate :: forall ds. DList (Check ds) -> DList (Check ds)
+gate chks = fromList $ case toList chks of 
                         [] -> []
                         x:xs -> (x :: Check ds){gateStatus = GateCheck} : xs
 
-gate :: forall f ds. Functor f => f (Check ds) -> f (Check ds)
-gate fck = (\ck -> (ck :: Check ds) {gateStatus = GateCheck}) <$> fck
+gateAll :: forall f ds. Functor f => f (Check ds) -> f (Check ds)
+gateAll fck = (\ck -> (ck :: Check ds) {gateStatus = GateCheck}) <$> fck
 
 expectFailurePriv :: forall f ds. Functor f => ExpectationActive -> String -> f (Check ds) -> f (Check ds)
 expectFailurePriv isActive msg fck = (\ck -> (ck:: Check ds) {expectation = ExpectFailure isActive msg}) <$> fck

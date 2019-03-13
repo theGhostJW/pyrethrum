@@ -15,6 +15,9 @@
 {"tag":"Message","contents":"Hi"}
 {"tag":"Warning","contents":"a warning"}
 {"tag":"IOAction","contents":"This is an arbitrary Put Line"}
+{"tag":"Message","contents":"SHould Crash"}
+{"tag":"Message","contents":""}
+{"tag":"IOAction","contents":"Debug Stack"}
 {"tag":"InteractorSuccess","contents":[["DemoProject.Test.Rough",110],{"unApStateDisplay":"ApState\n  { itemId = 110\n  , filePath = \"C:\\\\Vids\\\\SystemDesign\\\\VidList.txt\"\n  , exePath = \"NOT IMPLEMENTED\"\n  , fileText = Right \"Pre ~ Post !!\"\n  }"}]}
 {"tag":"PrepStateFailure","contents":[["DemoProject.Test.Rough",110],{"tag":"AppEnsureError","contents":"I do not like 110 in prepstate"}]}
 {"tag":"EndIteration","contents":["DemoProject.Test.Rough",110]}
@@ -90,6 +93,9 @@
 {"tag":"Message","contents":"Hi"}
 {"tag":"Warning","contents":"a warning"}
 {"tag":"IOAction","contents":"This is an arbitrary Put Line"}
+{"tag":"Message","contents":"SHould Crash"}
+{"tag":"Message","contents":""}
+{"tag":"IOAction","contents":"Debug Stack"}
 {"tag":"InteractorSuccess","contents":[["DemoProject.Test.Rough2",110],{"unApStateDisplay":"ApState\n  { itemId = 110\n  , filePath = \"C:\\\\Vids\\\\SystemDesign\\\\VidList.txt\"\n  , exePath = \"NOT IMPLEMENTED\"\n  , fileText = Right \"Pre ~ Post !!\"\n  }"}]}
 {"tag":"PrepStateFailure","contents":[["DemoProject.Test.Rough2",110],{"tag":"AppEnsureError","contents":"I do not like 110 in prepstate"}]}
 {"tag":"EndIteration","contents":["DemoProject.Test.Rough2",110]}

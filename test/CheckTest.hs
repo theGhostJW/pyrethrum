@@ -72,21 +72,28 @@ unit_chk_with_chkGate_fail_unexpected_pass = chkOutcomes [Pass, Pass, PassWhenFa
                                                                   <> isOdd
                                                                   <> isEven
 
+-- unit_chk_with_chkGate_fail_unexpected_pass = chkOutcomes [Pass, Pass, PassWhenFailExpected "Known Issue", Fail, Pass] 42  $ 
+--                                                                   isBig
+--                                                                   <> isEven
+--                                                                   <> expectFailure "Known Issue" isEven
+--                                                                   <> isOdd
+--                                                                   <> isEven
+
 evenOddEven = isEven
               <> isOdd
               <> isOdd
               <> isEven
 
 unit_chk_with_gate_on_list = chkOutcomes [Pass, Pass, GateFail, Skip, Skip, Skip] 42 $ isBig
-                                                                  <> gate evenOddEven
+                                                                  <> gateAll evenOddEven
                                                                   <> isEven
 
 unit_chk_with_gateFirst_on_list = chkOutcomes [Pass, Pass, Fail, Fail, Pass, Pass] 42 $ isBig
-                                                                  <> gateFirst evenOddEven
+                                                                  <> gate evenOddEven
                                                                   <> isEven
 
 
-unit_chk_with_gatefirst_on_list_only_gates_first = [GateCheck, StandardCheck, StandardCheck, StandardCheck] ... toList (gateStatus <$> gateFirst evenOddEven)
+unit_chk_with_gatefirst_on_list_only_gates_first = [GateCheck, StandardCheck, StandardCheck, StandardCheck] ... toList (gateStatus <$> gate evenOddEven)
 
-unit_chk_with_gate_on_list_only_gates_all = [GateCheck, GateCheck, GateCheck, GateCheck] ... toList (gateStatus <$> gate evenOddEven)
+unit_chk_with_gate_on_list_only_gates_all = [GateCheck, GateCheck, GateCheck, GateCheck] ... toList (gateStatus <$> gateAll evenOddEven)
                                                           

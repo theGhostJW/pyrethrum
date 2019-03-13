@@ -131,7 +131,7 @@ testAddress =  moduleAddress . (configuration :: GenericTest tc rc i effs as ds 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-normalExecution :: forall m effs rc tc i as ds. (Monad m, MonadCatch m, ItemClass i ds, Show as, Show ds, TestConfigClass tc) =>
+normalExecution :: forall m effs rc tc i as ds. (Monad m, MonadCatch m, MonadMask m, ItemClass i ds, Show as, Show ds, TestConfigClass tc) =>
      (LogProtocol -> m ())                                  -- logger
      -> (rc -> i -> Eff effs as)                           -- Interactor          
      -> (as -> Ensurable ds)                               -- prepstate
@@ -146,9 +146,9 @@ normalExecution logger interactor prepState intrprt tc rc i  =
         iid = ItemId (moduleAddress tc) (identifier i)
 
         handler :: SomeException -> m ()
-        handler e = logger . LP.Error . AppGenericError ("Unexpected Error Executing iteration: " <> show iid) . toS $ displayException e
-        
-        normalExecution' :: m()
+        handler e = logger . LP.Error . AppGenericError' ("Unexpected Error Executing iteration: " <> show iid) . toS $ displayException e
+
+        normalExecution' :: m ()
         normalExecution' = 
               let
                 runChecks :: ds -> m ()
@@ -159,7 +159,10 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                                 F.traverse_ logChk $ toList $ CK.calcChecks ds (checkList i)
               in 
                 do 
-                  ethas <- intrprt $ interactor rc i
+                  ethas <- onError 
+                              (intrprt $ interactor rc i) 
+                              (logger . LP.Error $ AppGenericError "Interactor Exception has Occurred")
+
                   eitherf ethas
                     (logger . InteractorFailure iid)
                     (\as -> do 

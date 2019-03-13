@@ -53,6 +53,9 @@ data ApState = ApState {
 } deriving Show
 
 
+-- https://www.parsonsmatt.org/2017/07/29/using_ghc_callstacks.html
+-- error has calstack by default maybe catch exception and rethrow as error 
+-- to get callstack
 putStrLnWithCallStack :: String -> IO ()
 putStrLnWithCallStack msg = do
   putStrLn msg
@@ -81,7 +84,7 @@ interactor RunConfig{..} Item{..} = do
                                           log "SHould Crash" 
                                           log $ toS (prettyCallStack callStack)
                                           arbitraryIO "Debug Stack" () (putStrLnWithCallStack "Hello with stack")
-                                          error "BANG !!!"
+                                          -- error "BANG !!!"
 
                                       pure $ ApState  {
                                         itemId  = iid,

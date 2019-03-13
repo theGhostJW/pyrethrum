@@ -32,7 +32,6 @@ import qualified Data.Map as M
 import qualified Data.Set as St
 import qualified Data.Foldable as F
 
-
 type TestPlanBase tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => GenericTest tc rc i effs as ds -> m1 (m a)) -> [TestGroup m1 m a effs]
 
 showAndLogItems :: Show a => [a] -> IO ()
@@ -132,8 +131,7 @@ testAddress =  moduleAddress . (configuration :: GenericTest tc rc i effs as ds 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-normalExecution :: forall m effs rc tc i as ds. (Monad m, ItemClass i ds, Show as, Show ds, TestConfigClass tc) =>
+normalExecution :: forall m effs rc tc i as ds. (Monad m, MonadCatch m, ItemClass i ds, Show as, Show ds, TestConfigClass tc) =>
      (LogProtocol -> m ())                                  -- logger
      -> (rc -> i -> Eff effs as)                           -- Interactor          
      -> (as -> Ensurable ds)                               -- prepstate
@@ -142,37 +140,48 @@ normalExecution :: forall m effs rc tc i as ds. (Monad m, ItemClass i ds, Show a
      -> rc                                                 -- RunConfig
      -> i                                                  -- item
      -> m ()                                               -- result
-normalExecution logger interactor prepState intrprt tc rc i = let
-                                                      iid :: ItemId
-                                                      iid = ItemId (moduleAddress tc) (identifier i)
+normalExecution logger interactor prepState intrprt tc rc i  = 
+      let
+        iid :: ItemId
+        iid = ItemId (moduleAddress tc) (identifier i)
 
-                                                      runChecks :: ds -> m ()
-                                                      runChecks ds = let 
-                                                                       logChk :: CK.CheckReport -> m ()
-                                                                       logChk cr = logger $ CheckOutcome iid cr
-                                                                     in
-                                                                       F.traverse_ logChk $ toList $ CK.calcChecks ds (checkList i)
-                                                    in 
-                                                      do 
-                                                        ethas <- intrprt $ interactor rc i
-                                                        eitherf ethas
-                                                          (logger . InteractorFailure iid)
-                                                          (\as -> do 
-                                                                    logger . InteractorSuccess iid $ ApStateDisplay . showPretty $ as 
-                                                                    
-                                                                    let 
-                                                                      eds = fullEnsureInterpreter $ prepState as
-                                                                    
-                                                                    eitherf eds
-                                                                      (logger . PrepStateFailure iid . AppEnsureError)
-                                                                      (
-                                                                        \ds -> 
-                                                                          do
-                                                                            logger . PrepStateSuccess iid . DStateDisplay . showPretty $ ds 
-                                                                            runChecks ds
-                                                                      )
-                                                                      
-                                                          )
+        handler :: SomeException -> m ()
+        handler e = logger . LP.Error . AppGenericError ("Unexpected Error Executing iteration: " <> show iid) . toS $ displayException e
+        
+        normalExecution' :: m()
+        normalExecution' = 
+              let
+                runChecks :: ds -> m ()
+                runChecks ds = let 
+                                logChk :: CK.CheckReport -> m ()
+                                logChk cr = logger $ CheckOutcome iid cr
+                              in
+                                F.traverse_ logChk $ toList $ CK.calcChecks ds (checkList i)
+              in 
+                do 
+                  ethas <- intrprt $ interactor rc i
+                  eitherf ethas
+                    (logger . InteractorFailure iid)
+                    (\as -> do 
+                              logger . InteractorSuccess iid $ ApStateDisplay . showPretty $ as 
+                              
+                              let 
+                                eds = fullEnsureInterpreter $ prepState as
+                              
+                              eitherf eds
+                                (logger . PrepStateFailure iid . AppEnsureError)
+                                (
+                                  \ds -> 
+                                    do
+                                      logger . PrepStateSuccess iid . DStateDisplay . showPretty $ ds 
+                                      runChecks ds
+                                )
+                                
+                    )
+  in 
+    catch
+        normalExecution'
+        handler
 
 docExecution :: forall m effs rc tc i as ds. (Monad m, ItemClass i ds, TestConfigClass tc) =>
      (LogProtocol -> m ())                                  -- logger

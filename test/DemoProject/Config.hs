@@ -119,4 +119,4 @@ testEndpointDoc ::
      -> Either FilterError (Set Int)
      -> (forall a m m1. TestPlan m1 m a FullDocEffects)
      -> DList String
-testEndpointDoc tstAdd rc iids pln = extractDocLog $ testEndpointBase filters normalExecution executeDocumentRaw tstAdd rc iids pln
+testEndpointDoc tstAdd rc iids pln = extractDocLog $ testEndpointBase filters docExecution executeDocumentRaw tstAdd rc iids pln

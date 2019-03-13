@@ -27,6 +27,7 @@ import qualified System.Environment as E
 import OrphanedInstances
 import RunElementClasses
 import DemoProject.Test.TestFilePaths
+import GHC.Stack
 
 type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
 
@@ -51,6 +52,12 @@ data ApState = ApState {
   fileText :: StrictReadResult
 } deriving Show
 
+
+putStrLnWithCallStack :: String -> IO ()
+putStrLnWithCallStack msg = do
+  putStrLn msg
+  putStrLn $ toS (prettyCallStack callStack)
+
 interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Eff effs ApState
 interactor RunConfig{..} Item{..} = do
                                       writeFile path $ pre  <> " ~ " <> post <> " !!"
@@ -70,8 +77,10 @@ interactor RunConfig{..} Item{..} = do
                                           logWarning' "Hi there warning 2" "a verry long warning dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
 
                                       when (iid == 110) $
-                                        do
-                                          log "SHould Crash"
+                                        do 
+                                          log "SHould Crash" 
+                                          log $ toS (prettyCallStack callStack)
+                                          arbitraryIO "Debug Stack" () (putStrLnWithCallStack "Hello with stack")
                                           error "BANG !!!"
 
                                       pure $ ApState  {

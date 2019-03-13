@@ -63,7 +63,7 @@ data AppError =
 
             AppNotImplementedError String |
 
-            AppGenericError String |
+            AppGenericError String String |
 
             AppUserError String |
             AppUserError' DetailedInfo |

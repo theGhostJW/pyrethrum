@@ -1,0 +1,3 @@
+{
+    ghciCmd: "--with-ghc=haskell-dap"
+}

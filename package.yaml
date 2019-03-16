@@ -112,14 +112,15 @@ library:
     - bytestring
 
 _testDep: &testdependencies
-      - tasty
-      - tasty-hunit
-      - tasty-hedgehog
-      - tasty-discover
-      - hedgehog
-      - pyrethrum
-      - listsafe
-      - bytestring
+- tasty
+- tasty-hunit
+- tasty-hedgehog
+- tasty-discover
+- hedgehog
+- pyrethrum
+- listsafe
+- bytestring
+- raw-strings-qq
 
 tests:
   pyrethrum-test:

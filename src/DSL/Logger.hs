@@ -92,7 +92,7 @@ logStrPP docMode =
               indent2 = indentString 2 
 
               prettyBlock :: Char -> String -> ItemId -> String -> String
-              prettyBlock pfxChr headr iid body = newLn <> F.replicate (CountOf 3) pfxChr <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
+              prettyBlock pfxChr headr iid body = indent2 $ F.replicate (CountOf 3) pfxChr <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
 
               ppAeson:: Y.Value -> String
               ppAeson val = toS ((getLenient . toS . Y.encode $ val) :: T.Text)
@@ -106,18 +106,19 @@ logStrPP docMode =
                                         (\m -> newLn <> indent2 (showPretty m))
 
               docMarkUp :: String -> String
-              docMarkUp s = (docMode ? "  >> " $ "") <> s
+              docMarkUp s = (docMode ? id $ indent2) $ (docMode ? "  >> " $ "") <> s
 
               logIO :: Show a => a -> String
               logIO m =  docMarkUp $ "IO Action: " <> showPretty m
 
               detailDoc :: String -> DetailedInfo -> String
-              detailDoc hedr (DetailedInfo msg det) = newLn <> (docMode ? indent2 $ id) (subHeader hedr <> newLn <> msg <> newLn <> det)
+              detailDoc hedr (DetailedInfo msg det) = newLn <> (docMode ? id $ indent2) (subHeader hedr <> newLn <> msg <> newLn <> det)
                                                                                                                
             in
               \case
-                  DocStartInteraction -> newLn <> "Interaction:"
-                  DocStartChecks -> newLn <> "Checks:"
+                  StartInteraction -> newLn <> "Interaction:"
+                  StartChecks -> newLn <> "Checks:"
+                  StartPrepState -> newLn <> "PrepState:"
 
                   DocAction ai -> case ai of
                                       ActionInfo msg -> "  >> " <> msg
@@ -140,7 +141,7 @@ logStrPP docMode =
                                                               )
                   
                   DocIOAction m -> logIO m
-                  IOAction m -> logIO m
+                  IOAction m -> indent2 $ logIO m
 
                   Message s -> docMarkUp $ "message: " <> s
                   Message' detailedInfo -> detailDoc "Message" detailedInfo
@@ -148,7 +149,7 @@ logStrPP docMode =
                   Warning s -> docMarkUp $ "warning: " <> s
                   Warning' detailedInfo -> detailDoc "Warning" detailedInfo
 
-                  InteractorSuccess iid (ApStateDisplay as) -> prettyBlock '>' "Interactor Complete"  iid as
+                  InteractorSuccess iid (ApStateDisplay as) -> newLn <> prettyBlock '>' "Interactor Complete"  iid as
                     
                   InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ showPretty err
 

@@ -159,6 +159,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                                 F.traverse_ logChk $ toList $ CK.calcChecks ds (checkList i)
               in 
                 do 
+                  logger StartInteraction
                   ethas <- onError 
                               (intrprt $ interactor rc i) 
                               (logger . LP.Error $ AppGenericError "Interactor Exception has Occurred")
@@ -176,7 +177,9 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                                 (
                                   \ds -> 
                                     do
-                                      logger . PrepStateSuccess iid . DStateDisplay . showPretty $ ds 
+                                      logger StartPrepState
+                                      logger . PrepStateSuccess iid . DStateDisplay . showPretty $ ds
+                                      logger StartChecks
                                       runChecks ds
                                 )
                                 
@@ -203,9 +206,9 @@ docExecution logger interactor _ intrprt tc rc i = let
                                                       logChecks =  P.sequence_ $  (\chk -> logger $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> toList (checkList i)
                                                     in 
                                                       do 
-                                                        logger DocStartInteraction
+                                                        logger StartInteraction
                                                         intrprt (interactor rc i)
-                                                        logger DocStartChecks
+                                                        logger StartChecks
                                                         logChecks
 
 

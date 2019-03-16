@@ -1,4 +1,4 @@
-module LogTransformationTest where 
+module LogTransformationIntegrationTest where 
 
 import           Foundation.Extended as E
 import qualified Prelude             as P

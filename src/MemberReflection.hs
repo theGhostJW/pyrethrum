@@ -3,7 +3,8 @@
 
 module MemberReflection where
 
-import Pyrelude  hiding (Item, readFile, writeFile)
+import Pyrelude  hiding (readFile, writeFile)
+import qualified Pyrelude as P
 import Control.Monad.Freer
 import           DSL.Ensure
 import           DSL.FileSystem
@@ -14,10 +15,9 @@ import           Runner
 import           Data.Aeson.TH
 import           RunElementClasses
 import           Data.Set as S
-import Type.Reflection
+import Type.Reflection as R
 import Check
 import GHC.Generics
-import qualified Prelude as P
 import Control.Monad
 
 {-# ANN module "HLint: ignore" #-}
@@ -33,7 +33,7 @@ data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
 data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
 
 data RunConfig = RunConfig {
-  runTitle    :: String,
+  runTitle    :: Text,
   environment :: Environment,
   country     :: Country,
   depth       :: Depth
@@ -60,7 +60,7 @@ auOnly = S.singleton AU
 nzOnly = S.singleton NZ
 
 data TestConfig = TestConfig {
-  header       :: String,
+  header       :: Text,
   address      :: TestModule,
   environments :: Set Environment,
   countries    :: Set Country,
@@ -98,8 +98,8 @@ type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
 data ApState = ApState {
   itemId   :: Int,
   filePath :: Path Abs File,
-  exePath :: String,
-  fileText :: StrictReadResult
+  exePath :: Text,
+  fileText :: Text
 } deriving Show
 
 newtype DState = V {
@@ -112,16 +112,16 @@ interactor RunConfig{..} Item{..} = do
                                       ensure "Blahh" $ P.even iid
                                       log "Hi"
                                       arbitraryIO "This is an arbitrary Put Line" () (putStrLn "Hello from random action")
-                                      txt <- readFile path
+                                      tx <- readFile path
 
                                       when (iid == 140)
-                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" (Right "tHIS WILL BLOW UP") (readFileUTF8 invalidFile)
+                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (P.readFile $ toFilePath invalidFile)
 
                                       pure $ ApState  {
                                         itemId  = iid,
                                         filePath = path,
                                         exePath = "NOT IMPLEMENTED",
-                                        fileText = txt
+                                        fileText = tx
                                       }
 
 prepState :: ApState -> Ensurable DState
@@ -190,8 +190,8 @@ test = GenericTest {
 
 data Item = Item {
   iid    :: Int,
-  pre    :: String,
-  post   :: String,
+  pre    :: Text,
+  post   :: Text,
   path   :: Path Abs File,
   checks :: CheckDList DState
 } deriving (Show, Generic)
@@ -210,28 +210,28 @@ type WithEffects = WithEffects_ EFileSystem2
 test2 :: forall effs. WithEffects effs (Test Item effs ApState DState)
 test2 = WithEffects test
 --
-effsRepTest :: Typeable es0 => WithEffects_ es0 es1 a -> TypeRep es0
-effsRepTest _ = typeRep
+effsRepTest :: Typeable es0 => WithEffects_ es0 es1 a -> R.TypeRep es0
+effsRepTest _ = R.typeRep
 --
-showEffsTest :: Typeable es0 => WithEffects_ es0 es1 a -> String
-showEffsTest = show . effsRepTest
+showEffsTest :: Typeable es0 => WithEffects_ es0 es1 a -> Text
+showEffsTest = txt . effsRepTest
 --
-demo :: String
+demo :: Text
 demo = showEffsTest test2
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 class ShowTypes (es :: [* -> *]) where
-  showTypes :: [String]
+  showTypes :: [Text]
 
 instance ShowTypes '[] where
   showTypes = []
 
 instance (Typeable e, ShowTypes es) => ShowTypes (e ': es) where
-   showTypes = show (typeRep @e) : showTypes @es
+   showTypes = txt (R.typeRep @e) : showTypes @es
 
-showEffs2 :: forall es0 es1 a. ShowTypes es0 => WithEffects_ es0 es1 a -> [String]
+showEffs2 :: forall es0 es1 a. ShowTypes es0 => WithEffects_ es0 es1 a -> [Text]
 showEffs2 _ = showTypes @es0
 
-demo2 :: [String]
+demo2 :: [Text]
 demo2 = showEffs2 test2

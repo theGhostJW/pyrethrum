@@ -5,6 +5,7 @@ import Common
 import  DSL.LogProtocol
 import           Data.DList
 import           Pyrelude as P
+import  qualified Pyrelude.Data.Text.Hidden as H
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Writer
 import Text.Show.Pretty as PP
@@ -13,6 +14,7 @@ import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
 import Check
 import Data.Yaml as Y
+import System.IO (stdout)
 
 data Logger r where
  LogItem :: LogProtocol -> Logger ()
@@ -64,7 +66,9 @@ prettyPrintFilterItem FilterResult{..} =
         (\reason -> "rejected: " <> description <> " - Reason: " <> reason)
 
 logStrJSON :: LogProtocol -> Text
-logStrJSON = toS . fromByteString . B.toStrict . A.encode
+logStrJSON lp = eitherf (decodeUtf8' . B.toStrict . A.encode $ lp)
+                  (\e -> "Encode error: " <> txt e)
+                  id
 
 logStrPP :: Bool -> LogProtocol -> Text
 logStrPP docMode =
@@ -82,10 +86,10 @@ logStrPP docMode =
               newLn = "\n" :: Text
 
               indent2 :: Text -> Text
-              indent2 = indentString 2 
+              indent2 = indentText 2 
 
               prettyBlock :: Char -> Text -> ItemId -> Text -> Text
-              prettyBlock pfxChr headr iid body = indent2 $ P.replicate 3 pfxChr <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
+              prettyBlock pfxChr headr iid body = indent2 $ H.replicate 3 (P.singleton pfxChr )<> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
 
               ppAeson:: Y.Value -> Text
               ppAeson val = toS ((getLenient . toS . Y.encode $ val) :: Text)

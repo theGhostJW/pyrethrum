@@ -18,11 +18,11 @@ module Check (
               CheckInfo(..)
               ) where
 
-import           Pyrelude hiding ((.))
+import           Pyrelude as P hiding ((.)) 
 import           Data.DList as D
 import Data.Function
-import qualified Prelude as P 
-import Data.Aeson.Types hiding (Error)
+import qualified Prelude as PO 
+import Data.Aeson.Types as AT hiding (Error) 
 import Data.Aeson.TH
 import OrphanedInstances
 import Common
@@ -65,7 +65,8 @@ prdCheck prd hdr msgf = Check {
 applyToFirst :: (Check ds -> Check ds) -> DList (Check ds) -> DList (Check ds)
 applyToFirst f = \case
                     Nil -> D.empty
-                    Cons x xs -> D.cons (f x) xs
+                    Cons x xs -> D.cons (f x) $ fromList xs
+                    _ -> error "DList case failure - should not happen"
 
 gate :: forall ds. DList (Check ds) -> DList (Check ds)
 gate = applyToFirst (\c -> (c :: Check ds){gateStatus = GateCheck})
@@ -158,13 +159,10 @@ instance P.Show (Check v) where
   show ck@Check{..} = toS $ 
                         gateStatus == GateCheck && (expectation == ExpectPass)?
                           header $
-                          show $ toDisplay ck
+                          txt $ toDisplay ck
 
 instance ToJSON (Check v)  where
-  toJSON = Text . toS . (header :: Check v  -> Text)
-
-instance ToJSON (CheckDList a) where 
-  toJSON cl = Array . fromList $ toJSON <$> cl
+  toJSON = String . toS . (header :: Check v  -> Text)
 
 isGateFail :: CheckResult -> Bool
 isGateFail = \case 
@@ -213,4 +211,4 @@ calcChecks ds chkLst = let
                                                         in
                                                           (wantSkip || isGateFail (result thisChkR), D.cons thisChkR lstCr)
                         in
-                         reverse $ snd $ foldl' foldfunc (False, mempty) chkLst
+                         D.fromList . reverse . D.toList . snd $ foldl' foldfunc (False, mempty) chkLst

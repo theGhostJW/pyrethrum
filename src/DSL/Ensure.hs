@@ -22,7 +22,7 @@ throw = send . Throw
 
 ensureInterpreter :: forall effs a. Member (Error EnsureError) effs => Eff (Ensure ': effs) a -> Eff effs a
 ensureInterpreter = interpret $ \case
-                                    Ensure message condition -> Monad.unless (isTruthy condition) $ throwError $ EnsureError message
+                                    Ensure message condition -> Monad.unless condition $ throwError $ EnsureError message
                                     Throw message -> throwError $ EnsureError message
 
 -- when documenting actions we do nothing as ensure and throw 

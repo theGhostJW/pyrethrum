@@ -12,9 +12,9 @@ import           Control.Exception as E
 import           Data.Functor
 
 data ArbitraryIO r where
-  ArbitraryIO :: forall a. String -> a -> IO a -> ArbitraryIO a
+  ArbitraryIO :: forall a. Text -> a -> IO a -> ArbitraryIO a
 
-arbitraryIO :: forall effs a. Member ArbitraryIO effs => String -> a -> IO a -> Eff effs a
+arbitraryIO :: forall effs a. Member ArbitraryIO effs => Text -> a -> IO a -> Eff effs a
 arbitraryIO msg def action = send $ ArbitraryIO msg def action
 
 arbitraryIODocInterpreter :: forall effs a. Member Logger effs => Eff (ArbitraryIO ': effs) a -> Eff effs a

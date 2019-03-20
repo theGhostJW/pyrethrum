@@ -10,11 +10,10 @@ import qualified Check as CK
 import Common
 import DSL.LogProtocol as LP
 import DSL.Ensure
+import Pyrelude as P
 import           Control.Monad.Freer
-import           Pyrelude
-import           Dlist
+import qualified Data.DList as D
 import           ItemFilter  (ItemFilter (..), filterredItemIds)
-import qualified Prelude             as P
 import           DSL.Interpreter
 import qualified Data.Set as S
 import RunElementClasses as C
@@ -31,16 +30,17 @@ import System.IO (Handle)
 import qualified Data.Map as M
 import qualified Data.Set as St
 import qualified Data.Foldable as F
+import qualified Prelude
 
 type TestPlanBase tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => GenericTest tc rc i effs as ds -> m1 (m a)) -> [TestGroup m1 m a effs]
 
 showAndLogItems :: Show a => [a] -> IO ()
 showAndLogItems = showAndLogList "items"
 
-showAndLogList :: Show a => String -> [a] -> IO ()
+showAndLogList :: Show a => Text -> [a] -> IO ()
 showAndLogList logSuffix items = 
       let 
-        logSpec :: M.Map (String, FileExt) ()
+        logSpec :: M.Map (Text, FileExt) ()
         logSpec = M.singleton (logSuffix, FileExt ".log") ()
 
         hndle :: IO (Either AppError HandleInfo)
@@ -50,11 +50,11 @@ showAndLogList logSuffix items =
                     maybe
                       (Left $ AppUserError "showAndLogList - no Handle returned")
                       (Right . snd)
-                    . safeHead
+                    . head
                   ) 
                 <$> logFileHandles logSpec
 
-        log2Both :: SIO.Handle -> String -> IO ()
+        log2Both :: SIO.Handle -> Text -> IO ()
         log2Both fileHndl lgStr = putLines SIO.stdout lgStr *> putLines fileHndl lgStr
 
         listItems :: SIO.Handle -> IO ()
@@ -71,11 +71,11 @@ showAndLogList logSuffix items =
 
 
 data Step a = Step {
-                  filePrefix :: Maybe String,
+                  filePrefix :: Maybe Text,
                   result :: Either AppError [(a, HandleInfo)]
                 }
 
-logFileHandles :: forall a. M.Map (String, FileExt) a -> IO (Either AppError [(a, HandleInfo)])
+logFileHandles :: forall a. M.Map (Text, FileExt) a -> IO (Either AppError [(a, HandleInfo)])
 logFileHandles mpSuffixExt = 
   let
     seed :: IO (Step a)
@@ -84,7 +84,7 @@ logFileHandles mpSuffixExt =
       result = Right []
     }
 
-    step :: IO (Step a) -> (String, FileExt) -> a -> IO (Step a)
+    step :: IO (Step a) -> (Text, FileExt) -> a -> IO (Step a)
     step accum (suff, ext) a = 
       do 
         iStep <- accum
@@ -146,7 +146,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
         iid = ItemId (moduleAddress tc) (identifier i)
 
         handler :: SomeException -> m ()
-        handler e = logger . LP.Error . AppGenericError' ("Unexpected Error Executing iteration: " <> show iid) . toS $ displayException e
+        handler e = logger . LP.Error . AppGenericError' ("Unexpected Error Executing iteration: " <> txt iid) . toS $ displayException e
 
         normalExecution' :: m ()
         normalExecution' = 
@@ -156,7 +156,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                                 logChk :: CK.CheckReport -> m ()
                                 logChk cr = logger $ CheckOutcome iid cr
                               in
-                                F.traverse_ logChk $ toList $ CK.calcChecks ds (checkList i)
+                                F.traverse_ logChk $ D.toList $ CK.calcChecks ds (checkList i)
               in 
                 do 
                   logger StartInteraction
@@ -203,7 +203,7 @@ docExecution logger interactor _ intrprt tc rc i = let
                                                       iid = ItemId (moduleAddress tc) $ identifier i
 
                                                       logChecks :: m ()
-                                                      logChecks =  P.sequence_ $  (\chk -> logger $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> toList (checkList i)
+                                                      logChecks =  P.sequence_ $  (\chk -> logger $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
                                                     in 
                                                       do 
                                                         logger StartInteraction
@@ -263,8 +263,8 @@ runTestItems tc iIds items interactor prepState rc intrprt runnerLogger =
       [] -> []
       [x] -> [startTest *> runItem x *> endTest]
       x : xs -> (startTest *> runItem x)
-                : (runItem <$> P.init xs)
-                <> [runItem (P.last xs) *> endTest]
+                : (runItem <$> Prelude.init xs)
+                <> [runItem (Prelude.last xs) *> endTest]
                      
  
 
@@ -325,13 +325,13 @@ testRunOrEndpoint iIds runner fltrs runnerLogger intrprt rc =
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
           preRun PreRun{..} stage = do
                                 let
-                                  stageStr :: String
-                                  stageStr = show stage
+                                  stageStr :: Text
+                                  stageStr = txt stage
 
-                                  stageExLabel :: String
+                                  stageExLabel :: Text
                                   stageExLabel = "Execution of " <> stageStr
 
-                                  msgPrefix :: String
+                                  msgPrefix :: Text
                                   msgPrefix = case stage of
                                                 Rollover -> "No tests run in group. "
                                                 GoHome -> "No items run for test. "

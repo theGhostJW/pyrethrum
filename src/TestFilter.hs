@@ -9,7 +9,7 @@ import RunElementClasses as C
 import Data.List as L
 import Data.Aeson
 
-type TestAddress = String
+type TestAddress = Text
 
 acceptFilter :: FilterResult -> Bool
 acceptFilter = isNothing . reasonForRejection
@@ -17,14 +17,14 @@ acceptFilter = isNothing . reasonForRejection
 rejectFilter :: FilterResult -> Bool
 rejectFilter = isJust . reasonForRejection
 
-mkFilterResult :: TestConfigClass tc => tc -> Maybe String -> FilterResult
+mkFilterResult :: TestConfigClass tc => tc -> Maybe Text -> FilterResult
 mkFilterResult tc rejection = FilterResult {
                                 testInfo = mkDisplayInfo tc,
                                 reasonForRejection = rejection
                               }
 
 data TestFilter rc tc = TestFilter {
-  title :: String,
+  title :: Text,
   predicate :: rc -> tc -> Bool
 }
 
@@ -33,7 +33,7 @@ type FilterList rc tc = [TestFilter rc tc]
 filterTestCfg :: forall rc tc. TestConfigClass tc => FilterList rc tc -> rc -> tc -> FilterResult
 filterTestCfg fltrs rc tc =
   let
-    fltrRslt :: Maybe String -> FilterResult
+    fltrRslt :: Maybe Text -> FilterResult
     fltrRslt = mkFilterResult tc 
 
     applyFilter :: TestFilter rc tc -> FilterResult
@@ -41,7 +41,7 @@ filterTestCfg fltrs rc tc =
                                              ? Nothing 
                                              $ Just $ TestFilter.title fltr
 
-    firstRejectReason :: Maybe String
+    firstRejectReason :: Maybe Text
     firstRejectReason = L.find rejectFilter (applyFilter <$> fltrs) >>= reasonForRejection
   in
     fltrRslt firstRejectReason

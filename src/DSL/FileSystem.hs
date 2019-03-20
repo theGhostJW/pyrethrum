@@ -1,7 +1,7 @@
 module DSL.FileSystem where
 
 import Common
-import           Pyrelude
+import           Pyrelude as P
 import           Data.Functor
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
@@ -10,18 +10,16 @@ import           Control.Exception as E
 import           DSL.Logger
 import           DSL.LogProtocol
 
-default (String)
-
 {- File System Lang -}
 
 data FileSystem r where
-  ReadFile :: Path a File -> FileSystem StrictReadResult
-  WriteFile :: Path a File -> String -> FileSystem ()
+  ReadFile :: Path a File -> FileSystem Text
+  WriteFile :: Path a File -> Text -> FileSystem ()
 
-readFile :: Member FileSystem effs => Path a File -> Eff effs StrictReadResult
+readFile :: Member FileSystem effs => Path a File -> Eff effs Text
 readFile = send . ReadFile
 
-writeFile :: Member FileSystem effs => Path a File -> String -> Eff effs ()
+writeFile :: Member FileSystem effs => Path a File -> Text -> Eff effs ()
 writeFile pth = send . WriteFile pth
 
 {- File System IO Interpreter -}
@@ -36,20 +34,21 @@ fileSystemIOInterpreter =
                                                                  Right f -> pure f
                            in
                             interpret $ \case
-                                          ReadFile path -> handleException (readFileUTF8 path) ReadFileError
-                                          WriteFile path str -> handleException (writeFileUTF8 path str) WriteFileError
+                                          ReadFile path -> handleException (P.readFile $ toFilePath path) ReadFileError
+                                          WriteFile path str -> handleException (P.writeFile (toFilePath path) str) WriteFileError
 
 
 
 fileSystemDocInterpreter :: Member Logger effs => Eff (FileSystem ': effs) a -> Eff effs a
 fileSystemDocInterpreter = interpret $
                                       let
+                                        mockContents :: Text
                                         mockContents = "Mock File Contents"
                                       in
                                         \case
                                           ReadFile path ->
-                                            logItem (DocAction $ ActionInfo ("readFile: " <> show path) ) $> Right mockContents
+                                            logItem (DocAction $ ActionInfo ("readFile: " <> txt path) ) $> mockContents
 
                                           WriteFile path str -> logItem . DocAction $ ActionInfoM 
-                                                                                        ("write file: " <> show path)
+                                                                                        ("write file: " <> txt path)
                                                                                         $ "contents:\n" <> str

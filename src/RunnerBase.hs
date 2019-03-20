@@ -23,7 +23,7 @@ data PreRun effs = PreRun {
 
 data TestGroup m1 m a effs =
   TestGroup {
-        header :: String,
+        header :: Text,
         -- occurs once on client before group is run
         rollover :: PreRun effs,
         -- occurs once before test iteration is run

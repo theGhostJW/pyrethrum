@@ -9,8 +9,8 @@ import           DSL.FileSystem
 import           DSL.Ensure
 import           DSL.Logger
 import           DSL.ArbitraryIO
-import           Dlist
-import           Pyrelude as F
+import           Data.DList
+import           Pyrelude as F hiding (app)
 import AuxFiles
 import qualified System.IO as S
 import qualified Prelude as P
@@ -86,5 +86,5 @@ executeDocument logger app =  (mapLeft AppEnsureError <$>) <$> runError
                                           $ arbitraryIODocInterpreter
                                           $ fileSystemDocInterpreter app
 
-extractDocLog :: Eff '[WriterDList] () -> DList String
+extractDocLog :: Eff '[WriterDList] () -> DList Text
 extractDocLog app = F.snd $ run $ runWriter app

@@ -11,7 +11,7 @@ import DSL.Ensure
 import Runner as R
 import           Control.Monad.Freer
 import           DSL.Interpreter
-import           Pyrelude hiding (Item)
+import           Pyrelude
 import qualified Prelude as P
 import Data.Aeson.TH
 import OrphanedInstances
@@ -34,7 +34,7 @@ endpoint = ep runConfig (IID 123)
 
 data ApState = ApState {
   itemId :: Int,
-  simpleMessage :: String
+  simpleMessage :: Text
 } deriving Show
 
 type DState = ApState
@@ -53,8 +53,8 @@ prepState = pure . id
 
 data Item = TestItem {
                       iid    :: Int,
-                      pre    :: String,
-                      post   :: String,
+                      pre    :: Text,
+                      post   :: Text,
                       path   :: Path Abs File,
                       checks :: CheckDList DState
                     } deriving (Show, Generic)

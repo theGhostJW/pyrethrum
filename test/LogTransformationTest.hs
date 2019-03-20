@@ -1,33 +1,25 @@
 module LogTransformationTest where 
 
-import           Pyrelude as E
-import           Data.Dlist
-import qualified Prelude             as P
-import Test.Extended       as T
+import           Pyrelude as P
+import           Data.DList
+import Pyrelude.Test       as T
 import AuxFiles
 import Control.Monad
 import LogTransformation
 import Text.RawString.QQ
 import Data.ByteString.Char8 as B
 import qualified Data.Foldable as F
-import Foundation.Compat.ByteString
 
 unit_demo :: IO ()
 unit_demo = eitherf (testPrettyPrint rawFile)
-              (E.putStr . show)
+              (P.putStr . txt)
               (\bsList -> 
                 let 
                   slList :: DList (IO ()) 
-                  slList = E.putStrLn . fst . fromBytesLenient . fromByteString  <$> bsList 
+                  slList = P.putStrLn . decodeUtf8 <$> bsList 
                 in 
                   sequence_ slList
-
                 )
-
-
-jsoniFile :: IO (Either P.IOError AbsFile)
-jsoniFile = dataFile [relfile|demo_raw_log.ijson|]
-
 
 rawFile :: DList ByteString
 rawFile = fromList . B.lines $ toS 

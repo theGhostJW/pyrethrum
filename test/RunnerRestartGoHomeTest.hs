@@ -4,10 +4,10 @@ import           DemoProject.TestCaseList
 import           Pyrelude      as F
 import           LogListCheck
 
-goHomeCheckMessage :: String
+goHomeCheckMessage :: Text
 goHomeCheckMessage = "GoHome action ran without exception but completion check returned False. Looks like GoHome did not run as expected"
 
-rolloverCheckMessage :: String
+rolloverCheckMessage :: Text
 rolloverCheckMessage = "No tests run in group. Rollover action ran without exception but completion check returned False. Looks like Rollover did not run as expected"
 
 unit_all_prerun_success_no_go_home_check_error = chkMessageInstances rolloverCheckMessage 0 runDocument

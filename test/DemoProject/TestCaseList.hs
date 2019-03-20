@@ -14,9 +14,8 @@ import           DSL.Interpreter
 import           DSL.Logger
 import           DSL.Ensure
 import DSL.LogProtocol
-import           Dlist
-import           Pyrelude as E
-import qualified Prelude                    as P
+import           Data.DList
+import           Pyrelude as P
 import           Runner as R
 import qualified System.IO as S
 import qualified Control.Exception as E
@@ -52,13 +51,13 @@ ioRunToFile ::
        ) 
      -> IO (Either AppError [AbsFile])
 ioRunToFile docMode pln interpt itemRunner = let 
-                    handleSpec :: M.Map (String, FileExt) (LogProtocol -> String) 
+                    handleSpec :: M.Map (Text, FileExt) (LogProtocol -> Text) 
                     handleSpec = M.fromList [
                                                 (("raw", FileExt ".log"), logStrPP docMode)
                                               , (("raw", FileExt ".jsoni"), logStrJSON)
                                             ]
 
-                    fileHandleInfo :: IO (Either AppError [(LogProtocol -> String, HandleInfo)])
+                    fileHandleInfo :: IO (Either AppError [(LogProtocol -> Text, HandleInfo)])
                     fileHandleInfo = logFileHandles handleSpec
 
                     printFilePaths :: [AbsFile] -> IO ()
@@ -68,16 +67,16 @@ ioRunToFile docMode pln interpt itemRunner = let
                                                 sequence_ $ putStrLn . toS . toFilePath <$> lsFiles
                                                 putStrLn ""
                                          
-                    fileHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> String, S.Handle)])
+                    fileHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> Text, S.Handle)])
                     fileHandles = (((\(fn, fh) -> (Just $ A.path fh, fn, fileHandle fh)) <$>) <$>) <$> fileHandleInfo
 
                     closeFileHandles :: [S.Handle] -> IO ()
                     closeFileHandles hdls = sequence_ $ S.hClose <$> hdls
 
-                    allHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> String, S.Handle)])
+                    allHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> Text, S.Handle)])
                     allHandles = (((Nothing, logStrPP docMode, S.stdout) :) <$>) <$> fileHandles
                     
-                    runTheTest :: [(LogProtocol -> String, S.Handle)] -> IO ()
+                    runTheTest :: [(LogProtocol -> Text, S.Handle)] -> IO ()
                     runTheTest targHndls = testRun pln filters itemRunner (interpt (logToHandles targHndls)) runConfig
                   in 
                     do 
@@ -87,17 +86,18 @@ ioRunToFile docMode pln interpt itemRunner = let
                         (\hList -> 
                           do 
                             let 
-                              fileHndls = E.filter (isJust . fst) hList
-                              logPths = catMaybes $ fst <$> fileHndls
+                              getFile (mfile, _, _)  = mfile
+                              fileHndls = P.filter (isJust . getFile) hList
+                              logPths = catMaybes $ getFile <$> fileHndls
                             runTheTest ((\(af, fn, h) -> (fn, h)) <$> hList) `finally` closeFileHandles ((\(af, fn, h) -> h) <$> fileHndls)
                             printFilePaths logPths 
                             pure $ Right logPths
                         )
                         
-docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
+docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
 docRunRaw pln = extractDocLog $ testRun pln filters docExecution executeDocumentRaw runConfig
 
-docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList String
+docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
 docRun pln = extractDocLog $ testRun pln filters docExecution executeDocumentPretty runConfig
 
 runInIO :: IO ()
@@ -115,11 +115,11 @@ runInIORaw = ioRunRaw plan
 runNZInIO :: IO ()
 runNZInIO = testRun plan filters normalExecution executeInIOConsoleRaw runConfig {country = NZ}
 
-runDocument :: DList String
+runDocument :: DList Text
 runDocument = docRun plan
 
 runDocumentToConsole :: IO ()
-runDocumentToConsole = sequence_ . E.toList $ putStrLn <$> runDocument
+runDocumentToConsole = sequence_ . P.toList $ putStrLn <$> runDocument
 
 validPlan :: forall m m1 effs a. EFFAllEffects effs =>
   PreRun effs
@@ -167,25 +167,25 @@ testRunFailHomeG2 = validPlan doNothing doNothing doNothing alwaysFailCheck
 runFailHomeG2IO :: IO ()
 runFailHomeG2IO = ioRun testRunFailHomeG2
 
-runFailHomeG2Document :: DList String
+runFailHomeG2Document :: DList Text
 runFailHomeG2Document = docRun testRunFailHomeG2
 
 testRunFailRolloverG1 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testRunFailRolloverG1 = validPlan alwaysFailCheck doNothing doNothing doNothing
 
-runFailRolloverG1Document :: DList String
+runFailRolloverG1Document :: DList Text
 runFailRolloverG1Document = docRun testRunFailRolloverG1
 
 runFailRolloverG1IO :: IO ()
 runFailRolloverG1IO = ioRun testRunFailRolloverG1
 
-ioException :: Eff effs Bool
-ioException = (E.throw $ P.userError "Pretend IO Error") :: Eff effs Bool
+dummyIOException :: Eff effs Bool
+dummyIOException = (E.throw $ P.userError "Pretend IO Error") :: Eff effs Bool
 
 exceptionInCheck :: PreRun effs
 exceptionInCheck = PreRun {
   runAction = pure (),
-  checkHasRun = ioException
+  checkHasRun = dummyIOException
 }
 
 testRunFailExceptG2GoHomeCheck :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
@@ -196,7 +196,7 @@ runExceptG2GoHomeCheckIO = ioRun testRunFailExceptG2GoHomeCheck
 
 exceptionInRollover :: PreRun effs
 exceptionInRollover = PreRun {
-  runAction = void ioException,
+  runAction = void dummyIOException,
   checkHasRun = pure True
 }
 
@@ -208,8 +208,8 @@ runExceptG1Rollover = ioRun testRunExceptG1Rollover
 
 justLogPreRun :: EFFLogger effs => PreTestStage -> PreRun effs
 justLogPreRun stage = PreRun {
-  runAction = log $ "Run Action: " <> show stage,
-  checkHasRun = log ("Check Action Run: " <> show stage) $> True
+  runAction = log $ "Run Action: " <> txt stage,
+  checkHasRun = log ("Check Action Run: " <> txt stage) $> True
 }
 
 testG1GoHomeLogging:: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
@@ -217,8 +217,8 @@ testG1GoHomeLogging = validPlan (justLogPreRun Rollover) (justLogPreRun GoHome) 
 
 justLogPreRunFailCheck :: EFFLogger effs => PreTestStage -> PreRun effs
 justLogPreRunFailCheck stage = PreRun {
-  runAction = log $ "Run Action: " <> show stage,
-  checkHasRun = log ("Check Action Run: " <> show stage) $> False
+  runAction = log $ "Run Action: " <> txt stage,
+  checkHasRun = log ("Check Action Run: " <> txt stage) $> False
 }
 
 testG1GoHomeLoggingFailCheck :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs

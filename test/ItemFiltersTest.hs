@@ -1,12 +1,12 @@
 module ItemFiltersTest where
 
 import qualified Check           as C
-import           Foundation      as F
+import           Pyrelude      as P
 import           Data.Set        as S
-import qualified Prelude         as P
+import qualified Prelude         as PO
 import           ItemFilter
 import           Runner as R
-import           Test.Extended
+import           Pyrelude.Test
 import GHC.Generics
 import Data.Aeson.TH
 import Data.Aeson.Types
@@ -15,8 +15,8 @@ import OrphanedInstances
 
 data TestItem = TestItem {
   iid    :: Int,
-  pre    :: String,
-  post   :: String,
+  pre    :: Text,
+  post   :: Text,
   checks :: C.CheckDList DState
 } deriving (Show, Generic)
 

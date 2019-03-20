@@ -17,12 +17,11 @@ import           DSL.FileSystem
 import           DSL.Interpreter
 import           DSL.ArbitraryIO
 import qualified Prelude as P
-import           Pyrelude             hiding (readFile, writeFile, Item)
+import           Pyrelude             hiding (readFile, writeFile)
 import Runner as R 
 import Type.Reflection
 import Data.Aeson.TH
 import GHC.Generics
-import qualified Data.Serialize as S
 import qualified System.Environment as E
 import OrphanedInstances
 import RunElementClasses
@@ -48,15 +47,14 @@ endpoint = ep runConfig $ IID 140
 data ApState = ApState {
   itemId   :: Int,
   filePath :: Path Abs File,
-  exePath :: String,
-  fileText :: StrictReadResult
+  exePath :: Text,
+  fileText :: Text
 } deriving Show
 
 
--- https://www.parsonsmatt.org/2017/07/29/using_ghc_callstacks.html
 -- error has calstack by default maybe catch exception and rethrow as error 
 -- to get callstack
-putStrLnWithCallStack :: String -> IO ()
+putStrLnWithCallStack :: Text -> IO ()
 putStrLnWithCallStack msg = do
   putStrLn msg
   putStrLn $ toS (prettyCallStack callStack)
@@ -68,10 +66,10 @@ interactor RunConfig{..} Item{..} = do
                                       log "Hi"
                                       logWarning "a warning"
                                       arbitraryIO "This is an arbitrary Put Line" () (putStrLn "Hello from random action")
-                                      txt <- readFile path
+                                      tx <- readFile path
 
                                       when (iid == 140)
-                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" (Right "tHIS WILL BLOW UP") (readFileUTF8 invalidFile)
+                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (P.readFile $ toFilePath invalidFile)
 
                                       when (iid == 130) $
                                         do 
@@ -90,7 +88,7 @@ interactor RunConfig{..} Item{..} = do
                                         itemId  = iid,
                                         filePath = path,
                                         exePath = "NOT IMPLEMENTED",
-                                        fileText = txt
+                                        fileText = tx
                                       }
 
 
@@ -110,8 +108,8 @@ prepState ApState{..} = do
 
 data Item = Item {
                     iid    :: Int,
-                    pre    :: String,
-                    post   :: String,
+                    pre    :: Text,
+                    post   :: Text,
                     path   :: Path Abs File,
                     checks :: CheckDList DState
                   } deriving (Show, Generic)

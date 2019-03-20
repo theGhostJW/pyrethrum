@@ -1,8 +1,7 @@
 module LogProtocolTest where
 
-import           Pyrelude as F
-import           Test.Extended as T
-import qualified Prelude             as P
+import           Pyrelude as P
+import           Pyrelude.Test as T
 import DSL.LogProtocol
 import Data.Functor.Identity
 import Data.Functor
@@ -21,8 +20,8 @@ import Data.Char
 import Data.Aeson.TH
 import qualified Check as C
 
-genStr :: Gen String
-genStr = string (linear 0 1000) ascii
+genStr :: Gen Text
+genStr = text (linear 0 1000) ascii
 
 genTestModule :: Gen TestModule
 genTestModule = TestModule <$> genStr
@@ -65,7 +64,7 @@ genFilterResult = FilterResult
 
 genFilterResults :: Gen [FilterResult]
 genFilterResults =
-         list (linear 0 20) genFilterResult
+         T.list (linear 0 20) genFilterResult
 
 genInt :: Gen Int
 genInt = integral $ T.linear 0 1000
@@ -145,12 +144,11 @@ hprop_log_protocol_round_trip = property $ do
   lp <- forAll genLogProtocol
   let 
     serialised :: B.ByteString
-    serialised = encode 
-                 lp
+    serialised = encode lp
 
-    unserialised :: Either P.String LogProtocol
-    unserialised = eitherDecode serialised
+    unserialised :: Either Text LogProtocol
+    unserialised = mapLeft txt $ eitherDecode serialised
 
   eitherf unserialised
-    (\s -> footnote s *> failure)
+    (\s -> footnote (toS s) *> failure)
     (lp ===)

@@ -1,9 +1,8 @@
 module TestFilterTest where
 
-import           Foundation      as F
-import qualified Prelude         as P
+import Pyrelude         as P
 import           Runner as R
-import           Test.Extended
+import           Pyrelude.Test
 import           Common
 import RunElementClasses
 import Data.Yaml
@@ -25,7 +24,7 @@ data RunConfig = RunConfig {
 }
 
 data TestConfig = TestConfig {
-  header :: String,
+  header :: Text,
   address :: TestModule,
   countries :: [Country],
   level :: TestDepth,
@@ -171,10 +170,10 @@ filters = [enabledFilter, countryFilter, levelFilter]
 filterList :: RunConfig -> [FilterResult]
 filterList rc = filterLog $ filterGroups runRunner filters rc
 
-runFilters :: RunConfig -> [String]
-runFilters rc = testTitle . testInfo <$> F.filter acceptFilter (filterList rc)
+runFilters :: RunConfig -> [Text]
+runFilters rc = testTitle . testInfo <$> P.filter acceptFilter (filterList rc)
 
-chkFilters :: [String] -> RunConfig -> Assertion
+chkFilters :: [Text] -> RunConfig -> Assertion
 chkFilters expted rc = chkEq expted $ runFilters rc
 
 unit_test_filter_expect_empty = chkFilters [] $ RunConfig NZ Connectivity
@@ -183,8 +182,8 @@ unit_test_filter_country_nz = chkFilters ["test1", "test2"] $ RunConfig NZ Regre
 unit_test_filter_country2 = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
 
 
-filtersExcludeReasons :: RunConfig -> [String]
-filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> F.filter rejectFilter (filterList rc)
+filtersExcludeReasons :: RunConfig -> [Text]
+filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> P.filter rejectFilter (filterList rc)
 
 unit_test_filter_exclude_reasons = chkEq [
                                           "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",

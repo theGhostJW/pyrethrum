@@ -1,13 +1,14 @@
 module LogListCheck where
 
-import           Pyrelude   as F
-import           Dlist
-import           Test.Extended         as U
+import           Pyrelude   as P
+import           Data.DList
+import           Pyrelude.Test         as U
+import           Pyrelude.Data.Text.Hidden         as H
 
-type Log = DList String
+type Log = DList Text
 
 chkLog :: (Log -> v) -> (v -> Assertion) -> Log -> Assertion
 chkLog intprt assrt = assrt . intprt
 
-chkMessageInstances :: String -> Int -> DList String -> Assertion
-chkMessageInstances msg exCount  = chkLog (count (isInfixOf msg)) (chkEq exCount)
+chkMessageInstances :: Text -> Int -> DList Text -> Assertion
+chkMessageInstances msg exCount  = chkLog (P.count (H.isInfixOf msg)) (chkEq exCount)

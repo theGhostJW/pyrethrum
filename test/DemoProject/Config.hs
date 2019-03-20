@@ -8,7 +8,7 @@ import qualified Prelude                    as P
 import           Runner
 import           TestFilter
 import           RunElementClasses
-import           Dlist
+import           Data.DList
 import Data.Aeson
 import Data.Aeson.TH
 import RunnerBase
@@ -18,7 +18,7 @@ data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
 data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
 
 data RunConfig = RunConfig {
-  runTitle    :: String,
+  runTitle    :: Text,
   environment :: Environment,
   country     :: Country,
   depth       :: Depth
@@ -45,7 +45,7 @@ auOnly = S.singleton AU
 nzOnly = S.singleton NZ
 
 data TestConfig = TestConfig {
-  header       :: String,
+  header       :: Text,
   address      :: TestModule,
   environments :: Set Environment,
   countries    :: Set Country,
@@ -118,5 +118,5 @@ testEndpointDoc ::
      -> RunConfig
      -> Either FilterError (Set Int)
      -> (forall a m m1. TestPlan m1 m a FullDocEffects)
-     -> DList String
+     -> DList Text
 testEndpointDoc tstAdd rc iids pln = extractDocLog $ testEndpointBase filters docExecution executeDocumentRaw tstAdd rc iids pln

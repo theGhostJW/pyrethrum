@@ -11,7 +11,7 @@ import DSL.Ensure
 import Runner as R
 import           Control.Monad.Freer
 import           DSL.Interpreter
-import           Foundation.Extended hiding (Item)
+import           Pyrelude hiding (Item)
 import qualified Prelude as P
 import Data.Aeson.TH
 import OrphanedInstances
@@ -56,7 +56,7 @@ data Item = TestItem {
                       pre    :: String,
                       post   :: String,
                       path   :: Path Abs File,
-                      checks :: CheckList DState
+                      checks :: CheckDList DState
                     } deriving (Show, Generic)
 
 i = TestItem

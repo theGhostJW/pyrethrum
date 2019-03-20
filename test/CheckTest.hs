@@ -2,7 +2,7 @@ module CheckTest where
 
 import           Check               as Chk
 import           Data.Function
-import           Foundation.Extended as F
+import           Pyrelude as F
 import qualified Prelude             as P
 import qualified Test.Extended       as UT
 import  Test.Extended  ((...))

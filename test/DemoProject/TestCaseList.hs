@@ -14,8 +14,8 @@ import           DSL.Interpreter
 import           DSL.Logger
 import           DSL.Ensure
 import DSL.LogProtocol
-import           Foundation.List.DList
-import           Foundation.Extended as E
+import           Dlist
+import           Pyrelude as E
 import qualified Prelude                    as P
 import           Runner as R
 import qualified System.IO as S

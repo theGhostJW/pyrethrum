@@ -1,11 +1,9 @@
 module LogTransformation where
 
 import Common
-import Foundation.Extended as E
-import Foundation.List.DList
-import Foundation.Compat.ByteString
+import Pyrelude as E
+import Data.DList as D
 import qualified Prelude as P
-import Basement.String
 import AuxFiles
 import DSL.LogProtocol
 import Text.Show.Pretty as PP
@@ -40,13 +38,13 @@ transformToFile ipsr rser eser step seed srcPth destPthFunc =
                   eitherf outHndle
                     (pure . Left)
                     (\h -> finally (processLines h) (S.hClose h) $> pure rsltFile)
-                    
+
 testTransform :: forall accum err itm rslt. (LineNo -> accum -> Either err itm -> (accum, Either err (Maybe rslt))) -- reducer step
-                                    -> (ByteString -> Either err itm)                                           -- a parser for the item
-                                    -> (rslt -> ByteString)                                                     -- a serialiser for the result
-                                    -> (err -> ByteString)                                                      -- a serialiser for the error
-                                    -> accum                                                                    -- accumulator
-                                    -> DList ByteString                                                         -- input lines
+                                    -> (ByteString -> Either err itm)                                               -- a parser for the item
+                                    -> (rslt -> ByteString)                                                         -- a serialiser for the result
+                                    -> (err -> ByteString)                                                          -- a serialiser for the error
+                                    -> accum                                                                        -- accumulator
+                                    -> DList ByteString                                                             -- input lines
                                     -> Either err (DList ByteString)
 testTransform step iPsr rsltSersr errSersr seed lstIn = 
   let
@@ -59,9 +57,9 @@ testTransform step iPsr rsltSersr errSersr seed lstIn =
       do 
         inL <- inLst
         outL <- outLst
-        case E.uncons inL of
-          Nothing -> pure outL
-          Just (x, xs) -> 
+        case inL of
+          Nil -> pure outL
+          Cons x xs -> 
             let 
               (newAccm, stepLine) = step lineNo accum (iPsr x)
             in 
@@ -70,15 +68,16 @@ testTransform step iPsr rsltSersr errSersr seed lstIn =
                 let 
                   newLOut = maybef sl 
                               outL
-                              (E.snoc outL . rsltSersr) 
-                testParseStep newAccm (Right xs) (Right newLOut) (LineNo . succ $ unLineNo lineNo) 
+                              (D.snoc outL . rsltSersr) 
+                testParseStep newAccm (Right $ fromList xs) (Right newLOut) (LineNo . succ $ unLineNo lineNo)
+          _ -> error "DList pattern match error this should never happen"
     in 
       testParseStep seed (Right lstIn) (Right $ fromList []) $ LineNo 1
 
 
 -- TODO: re-implement with streams or logging lib such as co-log
 runLines :: forall accum err itm rslt. (LineNo -> accum -> Either err itm -> (accum, Either err (Maybe rslt)))  -- line processor / stepper
-                                      -> (ByteString -> Either err itm)                                         -- a parser for the item
+                                      -> (ByteString -> Either err itm)                               -- a parser for the item
                                       -> (rslt -> ByteString)                                                   -- a serialiser for the result
                                       -> (err -> ByteString)                                                    -- a serialiser for the error
                                       -> accum                                                                  -- accumulator
@@ -89,7 +88,7 @@ runLines step ipsr rsltSersr errSersr seed fileIn hOut = do
                                                         eHIn <- safeOpenFile fileIn ReadMode
                                                         eitherf eHIn
                                                               (pure . Left)
-                                                              (\hIn -> pure <$> finally (mainloop step ipsr rsltSersr errSersr hIn hOut 1 seed) (hClose hIn))
+                                                              (\hIn -> pure <$> finally (mainloop step ipsr rsltSersr errSersr hIn hOut (LineNo 1) seed) (hClose hIn))
 
 mainloop :: forall accum err itm rslt. (LineNo -> accum -> Either err itm -> (accum, Either err (Maybe rslt))) -- reducer step
                                     -> (ByteString -> Either err itm)
@@ -125,11 +124,7 @@ mainloop step ipsr rsltSersr errSersr inh outh lineNo accum =
                             
                           localLoop (LineNo $ unLineNo lineNo + 1) nxtAccum
                       )
-                      (do 
-                        fSize <- hFileSize inh
-                        eof <- hIsEOF inh
-                        pure ()
-                      )
+                      (pure ())
             
 --- type Step accum itm err rslt = (Int -> accum -> Either err itm -> (accum, Either err (Maybe rslt)))
 type IParser err itm = ByteString -> Either err itm
@@ -143,40 +138,59 @@ data TestIteraion = Iteration |
 
 $(deriveJSON defaultOptions ''TestIteraion)
 
-prettyPrintItem :: LineNo -> () -> Either AppError ByteString -> ((), Either AppError (Maybe String))
-prettyPrintItem lnNo _ ethLn = 
-  let
-    connvertedLine :: Either AppError (Maybe String)
-    connvertedLine = eitherf ethLn 
-                            Left 
-                            (\bs ->
-                              let 
-                                valMaybe :: Maybe LogProtocol
-                                valMaybe = A.decode $ L.fromStrict bs
+-- prettyPrintItem :: LineNo -> () -> Either AppError ByteString -> ((), Either AppError (Maybe Text))
+-- prettyPrintItem lnNo _ ethLn = 
+--   let
+--     connvertedLine :: Either AppError (Maybe Text)
+--     connvertedLine = eitherf ethLn 
+--                             Left 
+--                             (\bs ->
+--                               let 
+--                                 valMaybe :: Maybe LogProtocol
+--                                 valMaybe = A.decode $ L.fromStrict bs
 
-                                lineAsString :: String
-                                lineAsString = fst . fromBytesLenient $ fromByteString bs
-                              in 
-                                maybef valMaybe
-                                 (Left $ AppGenericError $ "Failed to decode JSON line: " <> show (unLineNo lnNo) <> "(check file full line might not be displayed) : " <> lineAsString)
-                                 (Right . Just . logStrPP False)
-                            )
+--                                 lineAsString :: Text
+--                                 lineAsString = fst . fromBytesLenient $ fromByteString bs
+--                               in 
+--                                 maybef valMaybe
+--                                  (Left $ AppGenericError $ "Failed to decode JSON line: " <> show (unLineNo lnNo) <> "(check file full line might not be displayed) : " <> lineAsString)
+--                                  (Right . Just . logStrPP False)
+--                             )
+--   in 
+--     ((), connvertedLine)
+
+prettyPrintItem :: LineNo -> () -> Either AppError LogProtocol -> ((), Either AppError (Maybe Text))
+prettyPrintItem _ _ ethLn = 
+  let
+    connvertedLine :: Either AppError (Maybe Text)
+    connvertedLine = pure <$> (logStrPP False <$> ethLn)
   in 
     ((), connvertedLine)
 
-iterationStep :: Int -> IterationAccumulator -> Either String LogProtocol -> (IterationAccumulator, Either String (Maybe TestIteraion))
+testPrettyPrint :: DList ByteString -> Either AppError (DList ByteString)
+testPrettyPrint =  testTransform
+                            prettyPrintItem    -- reducer step
+                            lpParser           -- a parser for the item
+                            encodeUtf8         -- a serialiser for the result
+                            (encodeUtf8 . txt) -- a serialiser for the error
+                            ()                 -- accumulator
+  
+-- testTransform prettyPrintItem lpParser encodeUtf8 _ ()
+-- testPrettyPrint = testTransform prettyPrintItem lpParser (toByteString . toBytes UTF8) (toByteString . toBytes UTF8 . show) ()
+
+iterationStep :: Int -> IterationAccumulator -> Either Text LogProtocol -> (IterationAccumulator, Either Text (Maybe TestIteraion))
 iterationStep linNo accum = uu
   -- \case
-  --                               Message String            -> uu
+  --                               Message Text            -> uu
   --                               Message' DetailedInfo |
 
-  --                               Warning String |
+  --                               Warning Text |
   --                               Warning' DetailedInfo |
 
-  --                               IOAction String |
-  --                               DocIOAction String |
+  --                               IOAction Text |
+  --                               DocIOAction Text |
   --                               DocAction DocActionInfo |
-  --                               DocCheck ItemId String ResultExpectation GateStatus | 
+  --                               DocCheck ItemId Text ResultExpectation GateStatus | 
   --                               DocStartInteraction | 
   --                               DocStartChecks | 
 
@@ -207,24 +221,23 @@ iterationStep linNo accum = uu
 jsnSerialise :: A.ToJSON v => v -> ByteString
 jsnSerialise = toS . A.encode
 
-strSerialise :: String -> ByteString
-strSerialise = toByteString . toBytes UTF8 
+lpParser :: ByteString -> Either AppError LogProtocol
+lpParser bs = mapLeft (AppGenericError . toS) $ A.eitherDecode $ L.fromStrict bs
 
-lpParser :: ByteString -> Either String LogProtocol
-lpParser bs = mapLeft toS $ A.eitherDecode $ toS bs
+-- itrSerialise = uu
 
-summariseIterations :: AbsFile -> IO String
-summariseIterations inputLog = 
-                              let
-                                seed :: IterationAccumulator 
-                                seed = uu
+summariseIterations :: AbsFile -> IO Text
+summariseIterations inputLog = uu
+                              -- let
+                              --   seed :: IterationAccumulator 
+                              --   seed = uu
 
-                                processLines :: Handle -> IO ()
-                                processLines = runLines iterationStep lpParser itrSerialise strSerialise seed inputLog
-                              in
-                                do 
-                                  itrFile <- inputLog -<.> ".itr"
-                                  outHndle <- safeOpenFile itrFile S.WriteMode
-                                  eitherf outHndle
-                                    (pure . show)
-                                    (\h -> finally (processLines h) (S.hClose h) $> (toS . toFilePath $ itrFile))
+                              --   processLines :: Handle -> IO ()
+                              --   processLines = runLines iterationStep lpParser itrSerialise encodeUtf8 seed inputLog
+                              -- in
+                              --   do 
+                              --     itrFile <- inputLog -<.> ".itr"
+                              --     outHndle <- safeOpenFile itrFile S.WriteMode
+                              --     eitherf outHndle
+                              --       (pure . show)
+                              --       (\h -> finally (processLines h) (S.hClose h) $> (toS . toFilePath $ itrFile))

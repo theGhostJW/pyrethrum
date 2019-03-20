@@ -1,7 +1,7 @@
 module DSL.FileSystem where
 
 import Common
-import           Foundation.Extended
+import           Pyrelude
 import           Data.Functor
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error

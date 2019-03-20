@@ -2,7 +2,7 @@
 
 module AuxFiles where
 
-import Foundation.Extended as F
+import Pyrelude as F
 import qualified Prelude as P
 import Paths_pyrethrum
 import Data.Fixed
@@ -48,13 +48,13 @@ dataFile = subPath dataDir
 
 _tempFile = tempFile [relfile|demoTemp.txt|]
 
-newtype FileExt = FileExt {unFileExt :: String} deriving (Show, Eq, Ord)
+newtype FileExt = FileExt {unFileExt :: Text} deriving (Show, Eq, Ord)
 
 logFileExt :: FileExt
 logFileExt = FileExt ".log"
 
 -- based on https://gist.github.com/jdeseno/9501557
-base36 :: Integer -> Int -> String
+base36 :: Integer -> Int -> Text
 base36 num minWidth =
   let 
     conv :: Int -> P.String -> P.String
@@ -69,20 +69,20 @@ base36 num minWidth =
     unpadded = foldr conv [] $ units num
 
     len :: Int
-    len = fromCount $ length unpadded
+    len = length unpadded
 
     prefix :: P.String
-    prefix = fromIntegral len < minWidth ? replicate (toCount (minWidth - len)) '0' $ []
+    prefix = fromIntegral len < minWidth ? replicate (minWidth - len) '0' $ []
   in
     toS $ prefix <> foldr conv [] (units num)
 
-logFileSuffix :: String -> FileExt -> String
+logFileSuffix :: Text -> FileExt -> Text
 logFileSuffix suffix fileExt = "_" <> suffix <> unFileExt fileExt
 
-fullLogFileName :: String -> String -> FileExt -> String
+fullLogFileName :: Text -> Text -> FileExt -> Text
 fullLogFileName prefix suffix fileExt = prefix <> logFileSuffix suffix fileExt
 
-logFilePrefix :: ZonedTime -> String
+logFilePrefix :: ZonedTime -> Text
 logFilePrefix now =
   let
     msLeftInYear :: Integer
@@ -98,7 +98,7 @@ logFilePrefix now =
   in 
     base36 msLeftInYear 7 <> "_" <> toS (formatTime defaultTimeLocale (toS "%F_%H-%M-%S") now)
 
-logFilePath :: Maybe String -> String -> FileExt -> IO (Either P.IOError (String, AbsFile))
+logFilePath :: Maybe Text -> Text -> FileExt -> IO (Either P.IOError (Text, AbsFile))
 logFilePath mNamePrefix suffix fileExt = 
   do
     pfx <- maybef mNamePrefix
@@ -115,12 +115,12 @@ safeOpenFile pth mode =
   catchIOError (Right <$> S.openFile (toFilePath pth) mode) (pure . Left)
 
 data HandleInfo = HandleInfo {
-  prefix :: String,
+  prefix :: Text,
   path ::  AbsFile,
   fileHandle :: S.Handle
 }
 
-logFileHandle ::  Maybe String -> String -> FileExt -> IO (Either P.IOError HandleInfo)
+logFileHandle ::  Maybe Text -> Text -> FileExt -> IO (Either P.IOError HandleInfo)
 logFileHandle mFilePrefix fileNameSuffix fileExt = do
                                                     ethPth <- logFilePath mFilePrefix fileNameSuffix fileExt
                                                     eitherf ethPth 

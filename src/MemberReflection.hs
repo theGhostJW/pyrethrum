@@ -3,7 +3,7 @@
 
 module MemberReflection where
 
-import Foundation.Extended  hiding (Item, readFile, writeFile)
+import Pyrelude  hiding (Item, readFile, writeFile)
 import Control.Monad.Freer
 import           DSL.Ensure
 import           DSL.FileSystem
@@ -193,7 +193,7 @@ data Item = Item {
   pre    :: String,
   post   :: String,
   path   :: Path Abs File,
-  checks :: CheckList DState
+  checks :: CheckDList DState
 } deriving (Show, Generic)
 
 

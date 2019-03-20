@@ -1,7 +1,7 @@
 module LogTransformationTest where 
 
-import           Foundation.Extended as E
-import           Basement.String as S
+import           Pyrelude as E
+import           Data.Dlist
 import qualified Prelude             as P
 import Test.Extended       as T
 import AuxFiles
@@ -9,20 +9,28 @@ import Control.Monad
 import LogTransformation
 import Text.RawString.QQ
 import Data.ByteString.Char8 as B
+import qualified Data.Foldable as F
+import Foundation.Compat.ByteString
 
 unit_demo :: IO ()
-unit_demo = do 
-                eFile <- jsoniFile 
-                eItems <- P.traverse summariseIterations eFile
-                chk $ isRight eItems  
-                chk ("" /= fromRight' eItems)
+unit_demo = eitherf (testPrettyPrint rawFile)
+              (E.putStr . show)
+              (\bsList -> 
+                let 
+                  slList :: DList (IO ()) 
+                  slList = E.putStrLn . fst . fromBytesLenient . fromByteString  <$> bsList 
+                in 
+                  sequence_ slList
+
+                )
+
 
 jsoniFile :: IO (Either P.IOError AbsFile)
 jsoniFile = dataFile [relfile|demo_raw_log.ijson|]
 
 
-rawFile :: [ByteString]
-rawFile = B.lines $ toS 
+rawFile :: DList ByteString
+rawFile = fromList . B.lines $ toS 
   [r|{"tag":"StartRun","contents":[{"unRunTitle":"Sample RunConfig"},{"environment":"TST","country":"AU","runTitle":"Sample RunConfig","depth":"DeepRegression"}]}
   {"tag":"FilterLog","contents":[{"testInfo":{"testModAddress":"DemoProject.Test.Rough","testTitle":"This is a Rough Test","testConfig":{"minDepth":"DeepRegression","address":"DemoProject.Test.Rough","countries":["AU","NZ"],"active":true,"header":"This is a Rough Test","environments":["TST","UAT","PreProd"]}},"reasonForRejection":null},{"testInfo":{"testModAddress":"DemoProject.Test.Simple","testTitle":"This Simple Test Only Uses Ensure Effects","testConfig":{"minDepth":"DeepRegression","address":"DemoProject.Test.Simple","countries":["AU"],"active":true,"header":"This Simple Test Only Uses Ensure Effects","environments":["TST","UAT","PreProd"]}},"reasonForRejection":null},{"testInfo":{"testModAddress":"DemoProject.Test.Rough2","testTitle":"This is a Rough Test","testConfig":{"minDepth":"DeepRegression","address":"DemoProject.Test.Rough2","countries":["AU","NZ"],"active":true,"header":"This is a Rough Test","environments":["TST","UAT","PreProd"]}},"reasonForRejection":null},{"testInfo":{"testModAddress":"DemoProject.Test.Simple2","testTitle":"This Simple Test Only Uses Ensure Effects","testConfig":{"minDepth":"DeepRegression","address":"DemoProject.Test.Simple2","countries":["AU"],"active":true,"header":"This Simple Test Only Uses Ensure Effects","environments":["TST","UAT","PreProd"]}},"reasonForRejection":null}]}
   {"tag":"StartGroup","contents":{"unGroupTitle":"Group 1"}}

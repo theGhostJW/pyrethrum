@@ -2,7 +2,7 @@ module RunnerBase where
 
 import DSL.Ensure
 import Common (FilterError)
-import Foundation.Extended
+import Pyrelude
 import  Control.Monad.Freer
 import RunElementClasses
 import Data.Aeson.TH

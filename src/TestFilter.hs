@@ -1,6 +1,6 @@
 module TestFilter where 
 
-import           Foundation.Extended as F
+import           Pyrelude as F
 import Data.Aeson.TH
 import OrphanedInstances
 import Data.Functor.Identity

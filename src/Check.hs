@@ -11,15 +11,15 @@ module Check (
               ResultExpectation(..),
               GateStatus(..),
               Check(..),
-              CheckList,
+              CheckDList,
               CheckReportList,
               CheckReport(..),
               CheckResult(..),
               CheckInfo(..)
               ) where
 
-import           Foundation.Extended hiding ((.))
-import           Foundation.List.DList
+import           Pyrelude hiding ((.))
+import           Data.DList as D
 import Data.Function
 import qualified Prelude as P 
 import Data.Aeson.Types hiding (Error)
@@ -28,16 +28,16 @@ import OrphanedInstances
 import Common
 
 -- generate a check from a predicate
-chk :: String -> (v -> Bool) -> DList (Check v)
+chk :: Text -> (v -> Bool) -> DList (Check v)
 chk hdr prd = pure $ prdCheck prd hdr $ const Nothing
 
 -- generate a check from a predicate with detailed message
-chk' :: String -> (v -> String) -> (v -> Bool) -> DList (Check v)
+chk' :: Text -> (v -> Text) -> (v -> Bool) -> DList (Check v)
 chk' hdr fMsg prd = pure $ prdCheck prd hdr $ \v -> Just $ MessageInfo hdr $ Just $ fMsg v
 
 
 data Check ds = Check {
-    header :: String,
+    header :: Text,
     rule :: ds -> Bool,
     msgFunc :: ds -> Maybe MessageInfo,
     expectation :: ResultExpectation,
@@ -45,7 +45,7 @@ data Check ds = Check {
   }
 
 data SpecialCheck = SpecialCheck {
-    rule :: String,
+    rule :: Text,
     expectation :: ResultExpectation,
     isGate :: Bool
   } deriving Show 
@@ -53,7 +53,7 @@ data SpecialCheck = SpecialCheck {
 toDisplay :: Check v -> SpecialCheck
 toDisplay Check{..} = SpecialCheck header expectation (GateCheck == gateStatus)
 
-prdCheck :: forall ds. (ds -> Bool) -> String -> (ds -> Maybe MessageInfo) -> Check ds
+prdCheck :: forall ds. (ds -> Bool) -> Text -> (ds -> Maybe MessageInfo) -> Check ds
 prdCheck prd hdr msgf = Check {
                           header = hdr,
                           rule = prd,
@@ -63,9 +63,9 @@ prdCheck prd hdr msgf = Check {
                         }
 
 applyToFirst :: (Check ds -> Check ds) -> DList (Check ds) -> DList (Check ds)
-applyToFirst f l = fromList $ case toList l of
-                                [] -> []
-                                x:xs -> f x : xs
+applyToFirst f = \case
+                    Nil -> D.empty
+                    Cons x xs -> D.cons (f x) xs
 
 gate :: forall ds. DList (Check ds) -> DList (Check ds)
 gate = applyToFirst (\c -> (c :: Check ds){gateStatus = GateCheck})
@@ -73,26 +73,26 @@ gate = applyToFirst (\c -> (c :: Check ds){gateStatus = GateCheck})
 gateAll :: forall ds. DList (Check ds) -> DList (Check ds)
 gateAll fck = (\ck -> (ck :: Check ds) {gateStatus = GateCheck}) <$> fck
 
-expectFailurePriv :: forall ds. ExpectationActive -> String -> DList (Check ds) -> DList (Check ds)
+expectFailurePriv :: forall ds. ExpectationActive -> Text -> DList (Check ds) -> DList (Check ds)
 expectFailurePriv isActive msg = applyToFirst (\c -> (c :: Check ds){expectation = ExpectFailure isActive msg})
 
-expectFailure :: String -> DList (Check ds) -> DList (Check ds)
+expectFailure :: Text -> DList (Check ds) -> DList (Check ds)
 expectFailure = expectFailurePriv Active
 
-expectFailureFixed :: String -> DList (Check ds) -> DList (Check ds)
+expectFailureFixed :: Text -> DList (Check ds) -> DList (Check ds)
 expectFailureFixed = expectFailurePriv Inactive
 
 type CheckReportList = DList CheckReport
-type CheckList a = DList (Check a)
+type CheckDList a = DList (Check a)
 
 data MessageInfo = MessageInfo {
-                                  message :: String,
-                                  additionalInfo :: Maybe String
+                                  message :: Text,
+                                  additionalInfo :: Maybe Text
                                 }
                                 deriving (Show, Eq)
 
 data CheckInfo = CheckInfo {
-                     header :: String,
+                     header :: Text,
                      messageInfo :: Maybe MessageInfo
                    }
                    deriving (Show, Eq)
@@ -100,11 +100,11 @@ data CheckInfo = CheckInfo {
 data CheckResult = Pass |
                    Fail |
                    GateFail |
-                   FailExpected String |
-                   GateFailExpected String |
-                   PassWhenFailExpected String|
-                   Regression String |
-                   GateRegression String |
+                   FailExpected Text |
+                   GateFailExpected Text |
+                   PassWhenFailExpected Text|
+                   Regression Text |
+                   GateRegression Text |
                    Skip
                     deriving (Show, Eq)
 
@@ -132,7 +132,7 @@ data ExpectationActive = Active | Inactive deriving (Show, Eq)
 data ResultExpectation = ExpectPass 
                           | ExpectFailure {
                                             isActive :: ExpectationActive,
-                                            reason :: String
+                                            reason :: Text
                                           }
                           deriving (Show, Eq)
 
@@ -161,10 +161,10 @@ instance P.Show (Check v) where
                           show $ toDisplay ck
 
 instance ToJSON (Check v)  where
-  toJSON = String . toS . (header :: Check v  -> String)
+  toJSON = Text . toS . (header :: Check v  -> Text)
 
-instance ToJSON (CheckList a) where 
-  toJSON cl = Array . fromList $ toJSON <$> toList cl
+instance ToJSON (CheckDList a) where 
+  toJSON cl = Array . fromList $ toJSON <$> cl
 
 isGateFail :: CheckResult -> Bool
 isGateFail = \case 
@@ -211,6 +211,6 @@ calcChecks ds chkLst = let
                                                           thisChkR :: CheckReport
                                                           thisChkR = applyCheck wantSkip ck
                                                         in
-                                                          (wantSkip || isGateFail (result thisChkR), cons thisChkR lstCr)
+                                                          (wantSkip || isGateFail (result thisChkR), D.cons thisChkR lstCr)
                         in
                          reverse $ snd $ foldl' foldfunc (False, mempty) chkLst

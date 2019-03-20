@@ -2,29 +2,32 @@
 module Common where
 
 import           Control.Monad.Freer.Writer
-import           Foundation.Extended as F
-import           Foundation.List.DList
+import           Pyrelude as F
+import           Pyrelude.Data.Text.Hidden as T
+import           Data.DList
 import Data.Aeson.TH
 import OrphanedInstances
-import           Foundation.String as S
 import Text.Show.Pretty as PP
 import qualified Prelude as P
-import Basement.String as S
 
-showPretty :: Show a => a -> String
+showPretty :: Show a => a -> Text
 showPretty = toS . ppShow
 
-indentString :: Int -> String -> String
-indentString i s = 
+indentText :: Int -> Text -> Text
+indentText i s = 
   let 
-    linesClean :: [String]
-    linesClean = fst . F.breakEnd (not . S.all (' ' ==)) $ S.lines s
+    linesClean :: [Text]
+    linesClean = fst . F.breakEnd (not . T.all (' ' ==)) $ lines s
 
-    unlined :: P.String
-    unlined = P.unlines $ (\s' -> s == "" ? "" $ toS $ F.replicate (CountOf i) ' ' <> s')  <$> linesClean
+    unlined :: Text
+    unlined = unlines $ (\s' -> s == "" ? "" $ toS $ T.replicate i " " <> s')  <$> linesClean
   in 
-    toS $ safeLast unlined == Just '\n' ? P.init unlined $ unlined  
-
+    toS $ 
+          T.last unlined /= Just '\n' 
+            ? unlined   
+            $ maybef (T.init unlined)
+                ""
+                id 
 
 data PreTestStage = Rollover |
                     GoHome
@@ -33,19 +36,19 @@ data PreTestStage = Rollover |
 $(deriveJSON defaultOptions ''PreTestStage)
 
 data DetailedInfo = DetailedInfo {
-            message :: String,
-            info    :: String
+            message :: Text,
+            info    :: Text
           }
           deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''DetailedInfo)
 
-newtype EnsureError = EnsureError String deriving (Show, Eq)
+newtype EnsureError = EnsureError Text deriving (Show, Eq)
 
 $(deriveJSON defaultOptions ''Common.EnsureError)
 
-data FilterError = InvalidItemFilter String |
-                   DuplicateItemId Int String deriving (Eq, Show)
+data FilterError = InvalidItemFilter Text |
+                   DuplicateItemId Int Text deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''FilterError)
 
@@ -61,26 +64,26 @@ data AppError =
             AppEnsureError EnsureError |
             AppFilterError FilterError |
 
-            AppNotImplementedError String |
+            AppNotImplementedError Text |
 
-            AppGenericError String |
-            AppGenericError' String String |
+            AppGenericError Text |
+            AppGenericError' Text Text |
 
-            AppUserError String |
+            AppUserError Text |
             AppUserError' DetailedInfo |
 
-            AppPreTestError PreTestStage String AppError |
-            AppPreTestCheckExecutionError PreTestStage String AppError|
-            AppPreTestCheckError PreTestStage String |
+            AppPreTestError PreTestStage Text AppError |
+            AppPreTestCheckExecutionError PreTestStage Text AppError|
+            AppPreTestCheckError PreTestStage Text |
 
             AppIOError IOException |
-            AppIOError' String IOException
+            AppIOError' Text IOException
 
             deriving (Show, Eq)
 
 $(deriveJSON defaultOptions ''AppError)
 
-type WriterDList = Writer (DList String)
+type WriterDList = Writer (DList Text)
 
-dList :: Show s => s -> DList String
-dList s = fromList [show s]
+dList :: Show s => s -> DList Text
+dList s = fromList [txt s]

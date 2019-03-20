@@ -17,7 +17,7 @@ import           DSL.FileSystem
 import           DSL.Interpreter
 import           DSL.ArbitraryIO
 import qualified Prelude as P
-import           Foundation.Extended             hiding (readFile, writeFile, Item)
+import           Pyrelude             hiding (readFile, writeFile, Item)
 import Runner as R 
 import Type.Reflection
 import Data.Aeson.TH
@@ -113,7 +113,7 @@ data Item = Item {
                     pre    :: String,
                     post   :: String,
                     path   :: Path Abs File,
-                    checks :: CheckList DState
+                    checks :: CheckDList DState
                   } deriving (Show, Generic)
 
 i = Item

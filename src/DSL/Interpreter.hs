@@ -9,8 +9,8 @@ import           DSL.FileSystem
 import           DSL.Ensure
 import           DSL.Logger
 import           DSL.ArbitraryIO
-import           Foundation.List.DList
-import           Foundation.Extended as F
+import           Dlist
+import           Pyrelude as F
 import AuxFiles
 import qualified System.IO as S
 import qualified Prelude as P

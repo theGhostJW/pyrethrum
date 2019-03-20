@@ -1,6 +1,6 @@
 module LogTransformationIntegrationTest where 
 
-import           Foundation.Extended as E
+import           Pyrelude as E
 import qualified Prelude             as P
 import Test.Extended       as T
 import AuxFiles

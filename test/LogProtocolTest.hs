@@ -1,6 +1,6 @@
 module LogProtocolTest where
 
-import           Foundation.Extended as F
+import           Pyrelude as F
 import           Test.Extended as T
 import qualified Prelude             as P
 import DSL.LogProtocol

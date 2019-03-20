@@ -17,7 +17,7 @@ data TestItem = TestItem {
   iid    :: Int,
   pre    :: String,
   post   :: String,
-  checks :: C.CheckList DState
+  checks :: C.CheckDList DState
 } deriving (Show, Generic)
 
 instance ToJSON TestItem where

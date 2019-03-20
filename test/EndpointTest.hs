@@ -3,7 +3,7 @@ module EndpointTest where
 import           DemoProject.Config
 import           DemoProject.Test.Rough   as T
 import           DemoProject.TestCaseList
-import           Foundation.Extended      as F
+import           Pyrelude      as F
 import           LogListCheck
 import           Runner                   as R
 

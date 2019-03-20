@@ -1,7 +1,7 @@
 module RunnerRestartGoHomeTest where
 
 import           DemoProject.TestCaseList
-import           Foundation.Extended      as F
+import           Pyrelude      as F
 import           LogListCheck
 
 goHomeCheckMessage :: String

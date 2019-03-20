@@ -11,8 +11,8 @@ import Common
 import DSL.LogProtocol as LP
 import DSL.Ensure
 import           Control.Monad.Freer
-import           Foundation.Extended
-import           Foundation.List.DList
+import           Pyrelude
+import           Dlist
 import           ItemFilter  (ItemFilter (..), filterredItemIds)
 import qualified Prelude             as P
 import           DSL.Interpreter

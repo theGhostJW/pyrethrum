@@ -4,7 +4,7 @@ module DSL.ArbitraryIO where
 import Common
 import DSL.LogProtocol
 import DSL.Logger
-import           Foundation.Extended
+import           Pyrelude
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import qualified Control.Monad as Monad

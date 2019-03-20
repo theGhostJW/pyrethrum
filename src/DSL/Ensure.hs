@@ -3,7 +3,7 @@ module DSL.Ensure where
 
 import Common
 import DSL.Logger
-import           Foundation.Extended
+import           Pyrelude
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
 import qualified Control.Monad as Monad

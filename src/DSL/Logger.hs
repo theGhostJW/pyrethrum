@@ -3,23 +3,16 @@ module DSL.Logger where
 
 import Common
 import  DSL.LogProtocol
-import           Foundation.List.DList
-import           Foundation.Extended as F
-import           Foundation.String as S
+import           Data.DList
+import           Pyrelude as P
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Writer
 import Text.Show.Pretty as PP
 import RunElementClasses as C
-import qualified Prelude as P
-import System.IO
---import           RunnerBase
 import qualified Data.Aeson as A
-import Foundation.Compat.ByteString
 import qualified Data.ByteString.Lazy as B
 import Check
 import Data.Yaml as Y
-import qualified Data.Text as T
-import Basement.String as S
 
 data Logger r where
  LogItem :: LogProtocol -> Logger ()
@@ -27,28 +20,28 @@ data Logger r where
 logItem :: Member Logger effs => LogProtocol -> Eff effs ()
 logItem = send . LogItem
 
-simpleLog :: forall effs. Member Logger effs => (String -> LogProtocol) -> String -> Eff effs ()
+simpleLog :: forall effs. Member Logger effs => (Text -> LogProtocol) -> Text -> Eff effs ()
 simpleLog lpCons = logItem . lpCons
 
-detailLog :: forall effs. Member Logger effs => (DetailedInfo -> LogProtocol) -> String -> String -> Eff effs ()
-detailLog lpCons msg additionalInfo = logItem $ lpCons $ DetailedInfo msg additionalInfo
+detailLog :: forall effs. Member Logger effs => (DetailedInfo -> LogProtocol) -> Text -> Text -> Eff effs ()
+detailLog lpCons msg additionalInfo = logItem . lpCons $ DetailedInfo msg additionalInfo
 
-log :: forall effs. Member Logger effs => String -> Eff effs ()
+log :: forall effs. Member Logger effs => Text -> Eff effs ()
 log = simpleLog Message
 
-log' :: forall effs. Member Logger effs => String -> String -> Eff effs ()
+log' :: forall effs. Member Logger effs => Text -> Text -> Eff effs ()
 log' = detailLog  Message'
 
-logWarning :: forall effs. Member Logger effs => String -> Eff effs ()
+logWarning :: forall effs. Member Logger effs => Text -> Eff effs ()
 logWarning = simpleLog Warning
 
-logWarning' :: forall effs. (Member Logger effs) => String -> String -> Eff effs ()
+logWarning' :: forall effs. (Member Logger effs) => Text -> Text -> Eff effs ()
 logWarning' = detailLog  Warning'
 
-logError :: forall effs.  Member Logger effs => String -> Eff effs ()
+logError :: forall effs.  Member Logger effs => Text -> Eff effs ()
 logError = simpleLog (Error . AppUserError)
 
-logError' :: forall effs. Member Logger effs => String -> String -> Eff effs ()
+logError' :: forall effs. Member Logger effs => Text -> Text -> Eff effs ()
 logError' = detailLog  (Error . AppUserError')
 
 logConsoleInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
@@ -57,23 +50,23 @@ logConsoleInterpreter = interpretM $ \(LogItem lp) -> P.print lp
 logDocInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocInterpreter = interpret $ \(LogItem lp) -> tell $ dList lp
 
-putLines :: Handle -> String -> IO ()
-putLines hOut s = P.sequence_ $ hPutStrLn hOut . toList <$> S.lines s
+putLines :: Handle -> Text -> IO ()
+putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
 
-prettyPrintFilterItem :: FilterResult -> String
+prettyPrintFilterItem :: FilterResult -> Text
 prettyPrintFilterItem FilterResult{..} =
     let
-      description :: String
+      description :: Text
       description = toString (testModAddress testInfo) <> " - " <> testTitle testInfo
     in
       maybef reasonForRejection
         ("accepted: " <> description)
         (\reason -> "rejected: " <> description <> " - Reason: " <> reason)
 
-logStrJSON :: LogProtocol -> String
-logStrJSON = fst . fromBytesLenient . fromByteString . B.toStrict . A.encode
+logStrJSON :: LogProtocol -> Text
+logStrJSON = toS . fromByteString . B.toStrict . A.encode
 
-logStrPP :: Bool -> LogProtocol -> String
+logStrPP :: Bool -> LogProtocol -> Text
 logStrPP docMode =
             let
               hdr l h = l <> " " <> h <> " " <> l
@@ -82,36 +75,36 @@ logStrPP docMode =
               tstHeader = hdr "==="
               itrHeader = hdr "=="
 
-              iterId :: ItemId -> String
-              iterId (ItemId tst iid) = toString tst <> " / item " <> show iid
+              iterId :: ItemId -> Text
+              iterId (ItemId tst iid) = toString tst <> " / item " <> txt iid
 
-              newLn :: String
-              newLn = "\n" :: String
+              newLn :: Text
+              newLn = "\n" :: Text
 
-              indent2 :: String -> String
+              indent2 :: Text -> Text
               indent2 = indentString 2 
 
-              prettyBlock :: Char -> String -> ItemId -> String -> String
-              prettyBlock pfxChr headr iid body = indent2 $ F.replicate (CountOf 3) pfxChr <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
+              prettyBlock :: Char -> Text -> ItemId -> Text -> Text
+              prettyBlock pfxChr headr iid body = indent2 $ P.replicate 3 pfxChr <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
 
-              ppAeson:: Y.Value -> String
-              ppAeson val = toS ((getLenient . toS . Y.encode $ val) :: T.Text)
+              ppAeson:: Y.Value -> Text
+              ppAeson val = toS ((getLenient . toS . Y.encode $ val) :: Text)
 
-              ppAesonBlock:: Y.Value -> String
+              ppAesonBlock:: Y.Value -> Text
               ppAesonBlock = indent2 . ppAeson
 
-              ppMsgInfo :: Show a => Maybe a -> String
+              ppMsgInfo :: Show a => Maybe a -> Text
               ppMsgInfo mbInfo = maybef mbInfo
                                         ""
                                         (\m -> newLn <> indent2 (showPretty m))
 
-              docMarkUp :: String -> String
+              docMarkUp :: Text -> Text
               docMarkUp s = (docMode ? id $ indent2) $ (docMode ? "  >> " $ "") <> s
 
-              logIO :: Show a => a -> String
+              logIO :: Show a => a -> Text
               logIO m =  docMarkUp $ "IO Action: " <> showPretty m
 
-              detailDoc :: String -> DetailedInfo -> String
+              detailDoc :: Text -> DetailedInfo -> Text
               detailDoc hedr (DetailedInfo msg det) = newLn <> (docMode ? id $ indent2) (subHeader hedr <> newLn <> msg <> newLn <> det)
                                                                                                                
             in
@@ -186,22 +179,22 @@ logStrPP docMode =
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsolePrettyInterpreter = logToHandles [(logStrPP False, stdout)]
 
-logToHandles :: LastMember IO effs => [(LogProtocol -> String, Handle)] -> Eff (Logger ': effs) ~> Eff effs
+logToHandles :: LastMember IO effs => [(LogProtocol -> Text, Handle)] -> Eff (Logger ': effs) ~> Eff effs
 logToHandles convertersHandlers = 
                         let 
-                          logToHandle :: (LogProtocol -> String) -> Handle -> Logger r -> IO ()
+                          logToHandle :: (LogProtocol -> Text) -> Handle -> Logger r -> IO ()
                           logToHandle lp2Str h (LogItem lp) = putLines h $ lp2Str lp
                         in
                           interpretM $ \li@(LogItem lp) -> 
                                         let 
-                                          logToh :: (LogProtocol -> String, Handle) -> IO ()
+                                          logToh :: (LogProtocol -> Text, Handle) -> IO ()
                                           logToh (f, h) = logToHandle f h li
                                         in
                                           P.sequence_ $ logToh <$> convertersHandlers
                              
 logDocPrettyInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocPrettyInterpreter = let
-                            toDList :: [String] -> DList String
+                            toDList :: [Text] -> DList Text
                             toDList = fromList
                           in
                             interpret $ \(LogItem lp) -> tell . toDList . lines $ logStrPP True lp

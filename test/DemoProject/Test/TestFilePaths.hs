@@ -2,7 +2,7 @@
 
 module DemoProject.Test.TestFilePaths where
 
-import  Foundation.Extended
+import  Pyrelude
 
 invalidFile :: Path Abs File  
 invalidFile = 

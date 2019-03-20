@@ -1,9 +1,8 @@
 
 module ItemFilter where
 
-import qualified Data.List.Safe      as SafeList
 import Common 
-import           Foundation.Extended
+import           Pyrelude
 import RunElementClasses
 import qualified Prelude as P
 import qualified Data.Set as S
@@ -34,9 +33,9 @@ filterredItemIds filtr items =
                       in
                         (identifier <$>) <$>
                           case filtr of
-                            IID iid -> listOrFail (filter (\i -> identifier i == iid) items) $ "id: " <> show iid <> " not in item list"
+                            IID iid -> listOrFail (filter (\i -> identifier i == iid) items) $ "id: " <> txt iid <> " not in item list"
                             All -> listOrFail items "Items list is empty"
-                            Last -> maybe (Left $ InvalidItemFilter "Items list is empty") (Right . pure) (SafeList.last items)
+                            Last -> maybe (Left $ InvalidItemFilter "Items list is empty") (Right . pure) (last items)
                             LastVal -> maybe (Left $ InvalidItemFilter "There is no item in the list with checks assigned") (Right . pure) lastWithVal
                             Pred func -> listOrFail (filter func items) "No test items match filter function"
 
@@ -48,7 +47,7 @@ filterredItemIds filtr items =
        in
         maybe
           (pure ())
-          (\i -> Left $ DuplicateItemId i $ "Item id: " <> show i <> " is duplicated in items list.")
+          (\i -> Left $ DuplicateItemId i $ "Item id: " <> txt i <> " is duplicated in items list.")
           dupe
      in
        S.fromList <$> (checkIds *> filterredItems)

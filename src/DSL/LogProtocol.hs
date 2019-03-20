@@ -5,7 +5,7 @@ module DSL.LogProtocol where
 
 import           Common (DetailedInfo, AppError)
 import           Check
-import           Foundation.Extended
+import           Pyrelude
 import           RunElementClasses
 import GHC.Generics
 import OrphanedInstances
@@ -16,19 +16,19 @@ import Data.Aeson.TH
 import qualified Data.HashMap.Lazy as HML
 import qualified Data.Text as T
 
-newtype RunTitle = RunTitle {unRunTitle :: String} deriving (Eq, Show, IsString)
-newtype GroupTitle = GroupTitle {unGroupTitle :: String} deriving (Eq, Show, IsString)
-newtype TestTitle = TestTitle {unTestTitle :: String} deriving (Eq, Show, IsString)
-newtype ApStateDisplay = ApStateDisplay {unApStateDisplay :: String} deriving (Eq, Show, IsString)
-newtype DStateDisplay = DStateDisplay {unDStateDisplay :: String} deriving (Eq, Show, IsString)
-newtype DTestConfig = DTestConfig {unDTestConfig :: String} deriving (Eq, Show, IsString)
-newtype DRunConfig = DRunConfig {unDRunConfig :: String} deriving (Eq, Show, IsString)
-newtype WhenClause = WhenClause {unWhenClause :: String} deriving (Eq, Show, IsString)
-newtype ThenClause = ThenClause {unThenClause :: String} deriving (Eq, Show, IsString)
+newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)
+newtype GroupTitle = GroupTitle {unGroupTitle :: Text} deriving (Eq, Show, IsString)
+newtype TestTitle = TestTitle {unTestTitle :: Text} deriving (Eq, Show, IsString)
+newtype ApStateDisplay = ApStateDisplay {unApStateDisplay :: Text} deriving (Eq, Show, IsString)
+newtype DStateDisplay = DStateDisplay {unDStateDisplay :: Text} deriving (Eq, Show, IsString)
+newtype DTestConfig = DTestConfig {unDTestConfig :: Text} deriving (Eq, Show, IsString)
+newtype DRunConfig = DRunConfig {unDRunConfig :: Text} deriving (Eq, Show, IsString)
+newtype WhenClause = WhenClause {unWhenClause :: Text} deriving (Eq, Show, IsString)
+newtype ThenClause = ThenClause {unThenClause :: Text} deriving (Eq, Show, IsString)
 data ItemId = ItemId TestModule Int deriving (Eq, Show)
 data DocActionInfo = 
-    ActionInfo String |
-    ActionInfoM String String 
+    ActionInfo Text |
+    ActionInfoM Text Text 
     deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''RunTitle)
@@ -42,16 +42,16 @@ $(deriveJSON defaultOptions ''WhenClause)
 $(deriveJSON defaultOptions ''ThenClause)
 
 data LogProtocol =
-  Message String |
+  Message Text |
   Message' DetailedInfo |
 
-  Warning String |
+  Warning Text |
   Warning' DetailedInfo |
 
-  IOAction String |
-  DocIOAction String |
+  IOAction Text |
+  DocIOAction Text |
   DocAction DocActionInfo |
-  DocCheck ItemId String ResultExpectation GateStatus | 
+  DocCheck ItemId Text ResultExpectation GateStatus | 
   StartInteraction | 
   StartPrepState |
   StartChecks | 

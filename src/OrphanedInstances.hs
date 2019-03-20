@@ -5,17 +5,10 @@ module OrphanedInstances where
 
 import           Data.Yaml
 import           Data.Aeson.Types
-import           Foundation.Extended
+import           Pyrelude
 import           GHC.IO.Exception
 import Data.Aeson.TH
 import qualified Prelude as P
-
-instance ToJSON String where 
-  toJSON = String . toS 
-
-instance FromJSON String where 
-  parseJSON (String txt) = pure $ toS txt
-  parseJSON badVal        = typeMismatch "Expecting a String" badVal
 
 $(deriveJSON defaultOptions ''IOErrorType)
 

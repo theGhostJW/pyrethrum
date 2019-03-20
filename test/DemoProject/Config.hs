@@ -3,12 +3,12 @@ module DemoProject.Config where
 import           Data.Set                   as S
 import           DSL.Interpreter
 import           Common
-import           Foundation.Extended
+import           Pyrelude
 import qualified Prelude                    as P
 import           Runner
 import           TestFilter
 import           RunElementClasses
-import           Foundation.List.DList
+import           Dlist
 import Data.Aeson
 import Data.Aeson.TH
 import RunnerBase

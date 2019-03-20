@@ -1,6 +1,6 @@
 module RunnerRestartGoHomeIOTest where
 
-import           Foundation.Extended as F
+import           Pyrelude as F
 
 goHomeExceptionMessage :: String
 goHomeExceptionMessage = "PreTestCheckExecutionError GoHome \"No items run for test. Execution of GoHome check\" (IOError user error (Pretend IO Error))"

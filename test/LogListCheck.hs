@@ -1,7 +1,7 @@
 module LogListCheck where
 
-import           Foundation.Extended   as F
-import           Foundation.List.DList
+import           Pyrelude   as F
+import           Dlist
 import           Test.Extended         as U
 
 type Log = DList String

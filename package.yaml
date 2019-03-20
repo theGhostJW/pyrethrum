@@ -21,19 +21,16 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
   - base
-  - foundation
-  - foundation-edge # TODO: move to extended later Maybe
+  - pyrelude
   - freer-simple
-  - principled-extended
   - containers
   - extra
   - text
   - transformers-either
   - aeson
   - yaml
-  - cereal
   - pretty-show
-  - basement
+  - dlist
 
 ghc-options:
   - -fmax-pmcheck-iterations=10000000
@@ -104,7 +101,6 @@ default-extensions:
 library:
   source-dirs: src
   dependencies:
-    - listsafe
     - time
     - deepseq
     - unordered-containers
@@ -118,7 +114,6 @@ _testDep: &testdependencies
 - tasty-discover
 - hedgehog
 - pyrethrum
-- listsafe
 - bytestring
 - raw-strings-qq
 
@@ -133,6 +128,4 @@ tests:
     source-dirs:         testIntegration
     dependencies: 
       *testdependencies
-      
-
     

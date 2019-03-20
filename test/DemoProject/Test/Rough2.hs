@@ -8,7 +8,7 @@ module DemoProject.Test.Rough2 where
 import DemoProject.Test.Rough as T
 import DemoProject.Config
 import DSL.Interpreter
-import           Foundation.Extended  hiding (Item)
+import           Pyrelude  hiding (Item)
 import           Runner as R
 import           RunElementClasses
 

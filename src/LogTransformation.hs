@@ -120,6 +120,38 @@ mainloop step ipsr rsltSersr errSersr inh outh lineNo accum =
                           localLoop (LineNo $ unLineNo lineNo + 1) nxtAccum
                       )
                       (pure ())
+
+mainloop2 :: forall a itm rslt m. Monad m => (LineNo -> a -> Either AppError itm -> (a, Either AppError (Maybe rslt))) -- reducer step
+                                    -> (ByteString -> Either AppError itm)
+                                    -> (rslt -> ByteString)   
+                                    -> (AppError -> ByteString)
+                                    -> m (Maybe ByteString)      -- source
+                                    -> (ByteString -> m ())     -- sink
+                                    -> LineNo 
+                                    -> a
+                                    -> m a
+mainloop2 step ipsr rsltSersr errSersr src snk lineNo accum =
+    let 
+      localLoop :: LineNo -> a -> m a
+      localLoop = mainloop2 step ipsr rsltSersr errSersr src snk
+    in
+      src >>=
+        maybe 
+          (pure accum)
+          (\bs ->
+            let 
+             (nxtAccum, result) = step lineNo accum $ ipsr bs
+
+             sinkNxt :: ByteString -> m a
+             sinkNxt b = snk b $> nxtAccum
+            in
+              eitherf result
+                (sinkNxt . errSersr)
+                (maybe
+                  (pure nxtAccum)
+                  (sinkNxt . rsltSersr)                     
+                )
+          )
             
 --- type Step accum itm AppError rslt = (Int -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt)))
 type IParser itm = ByteString -> Either AppError itm

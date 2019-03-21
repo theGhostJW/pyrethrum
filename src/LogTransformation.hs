@@ -15,14 +15,11 @@ import System.IO as S
 import Data.Functor
 import DSL.Logger
 
-newtype LineNo = LineNo { unLineNo :: Int }
-
-
-transformToFile :: forall itm rslt err accum.                          
-                (ByteString -> Either err itm)                                              -- a parser for the item
+transformToFile :: forall itm rslt accum.                          
+                (ByteString -> Either AppError itm)                                              -- a parser for the item
                 -> (rslt -> ByteString)                                                     -- a serialiser for the result
-                -> (err -> ByteString)                                                      -- a serialiser for the error
-                -> (LineNo -> accum -> Either err itm -> (accum, Either err (Maybe rslt)))  -- line stepper
+                -> (AppError -> ByteString)                                                      -- a serialiser for the error
+                -> (LineNo -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt)))  -- line stepper
                 -> accum                                                                    -- seed accumulator
                 -> AbsFile                                                                  -- source file
                 -> (forall m. MonadThrow m => AbsFile -> m AbsFile)                         -- dest file calculation                                                          -- seed accumulator
@@ -39,20 +36,20 @@ transformToFile ipsr rser eser step seed srcPth destPthFunc =
                     (pure . Left)
                     (\h -> finally (processLines h) (S.hClose h) $> pure rsltFile)
 
-testTransform :: forall accum err itm rslt. (LineNo -> accum -> Either err itm -> (accum, Either err (Maybe rslt))) -- reducer step
-                                    -> (ByteString -> Either err itm)                                               -- a parser for the item
+testTransform :: forall accum itm rslt. (LineNo -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt))) -- reducer step
+                                    -> (ByteString -> Either AppError itm)                                               -- a parser for the item
                                     -> (rslt -> ByteString)                                                         -- a serialiser for the result
-                                    -> (err -> ByteString)                                                          -- a serialiser for the error
+                                    -> (AppError -> ByteString)                                                    -- a serialiser for the error
                                     -> accum                                                                        -- accumulator
                                     -> DList ByteString                                                             -- input lines
-                                    -> Either err (DList ByteString)
+                                    -> Either AppError (DList ByteString)
 testTransform step iPsr rsltSersr errSersr seed lstIn = 
   let
     testParseStep :: accum 
-                  -> Either err (DList ByteString)
-                  -> Either err (DList ByteString)
+                  -> Either AppError (DList ByteString)
+                  -> Either AppError (DList ByteString)
                   -> LineNo
-                  -> Either err (DList ByteString)
+                  -> Either AppError (DList ByteString)
     testParseStep accum inLst outLst lineNo = 
       do 
         inL <- inLst
@@ -61,28 +58,29 @@ testTransform step iPsr rsltSersr errSersr seed lstIn =
           Nil -> pure outL
           Cons x xs -> 
             let 
-              (newAccm, stepLine) = step lineNo accum (iPsr x)
-            in 
-              do
-                sl <- stepLine
-                let 
-                  newLOut = maybef sl 
+              (newAccm, stepLine) = mapLeft (AppParseError lineNo) <$> step lineNo accum (iPsr x)
+              newLOut = eitherf stepLine
+                          (D.snoc outL . errSersr) 
+                          ( \sl ->
+                            maybef sl 
                               outL
                               (D.snoc outL . rsltSersr) 
-                testParseStep newAccm (Right $ fromList xs) (Right newLOut) (LineNo . succ $ unLineNo lineNo)
+                          )
+            in 
+              testParseStep newAccm (Right $ fromList xs) (Right newLOut) (LineNo . succ $ unLineNo lineNo)
           _ -> error "DList pattern match error this should never happen"
     in 
       testParseStep seed (Right lstIn) (Right $ fromList []) $ LineNo 1
 
 
 -- TODO: re-implement with streams or logging lib such as co-log
-runLines :: forall accum err itm rslt. (LineNo -> accum -> Either err itm -> (accum, Either err (Maybe rslt)))  -- line processor / stepper
-                                      -> (ByteString -> Either err itm)                               -- a parser for the item
-                                      -> (rslt -> ByteString)                                                   -- a serialiser for the result
-                                      -> (err -> ByteString)                                                    -- a serialiser for the error
-                                      -> accum                                                                  -- accumulator
-                                      -> AbsFile                                                                -- input file
-                                      -> Handle                                                                 -- output handle
+runLines :: forall accum itm rslt. (LineNo -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt)))  -- line processor / stepper
+                                      -> (ByteString -> Either AppError itm)                               -- a parser for the item
+                                      -> (rslt -> ByteString)                                              -- a serialiser for the result
+                                      -> (AppError -> ByteString)                                          -- a serialiser for the error
+                                      -> accum                                                             -- accumulator
+                                      -> AbsFile                                                           -- input file
+                                      -> Handle                                                            -- output handle
                                       -> IO (Either P.IOError ())
 runLines step ipsr rsltSersr errSersr seed fileIn hOut = do 
                                                         eHIn <- safeOpenFile fileIn ReadMode
@@ -90,10 +88,10 @@ runLines step ipsr rsltSersr errSersr seed fileIn hOut = do
                                                               (pure . Left)
                                                               (\hIn -> pure <$> finally (mainloop step ipsr rsltSersr errSersr hIn hOut (LineNo 1) seed) (hClose hIn))
 
-mainloop :: forall accum err itm rslt. (LineNo -> accum -> Either err itm -> (accum, Either err (Maybe rslt))) -- reducer step
-                                    -> (ByteString -> Either err itm)
+mainloop :: forall accum itm rslt. (LineNo -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt))) -- reducer step
+                                    -> (ByteString -> Either AppError itm)
                                     -> (rslt -> ByteString)   
-                                    -> (err -> ByteString)
+                                    -> (AppError -> ByteString)
                                     -> Handle                       -- source
                                     -> Handle                       -- sink
                                     -> LineNo 
@@ -126,8 +124,8 @@ mainloop step ipsr rsltSersr errSersr inh outh lineNo accum =
                       )
                       (pure ())
             
---- type Step accum itm err rslt = (Int -> accum -> Either err itm -> (accum, Either err (Maybe rslt)))
-type IParser err itm = ByteString -> Either err itm
+--- type Step accum itm AppError rslt = (Int -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt)))
+type IParser itm = ByteString -> Either AppError itm
 
 data IterationAccumulator = IterationAccumulator
 

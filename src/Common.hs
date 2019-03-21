@@ -33,7 +33,7 @@ data PreTestStage = Rollover |
                     GoHome
                     deriving (Show, Eq)
 
-$(deriveJSON defaultOptions ''PreTestStage)
+newtype LineNo = LineNo { unLineNo :: Int } deriving (Show, Eq)
 
 data DetailedInfo = DetailedInfo {
             message :: Text,
@@ -60,6 +60,10 @@ data FileSystemError =
 $(deriveJSON defaultOptions ''FileSystemError)
 
 data AppError =
+            AppParseError {
+              linNo :: LineNo,
+              err :: AppError
+            } |
             AppFileSystemError FileSystemError |
             AppEnsureError EnsureError |
             AppFilterError FilterError |
@@ -87,3 +91,6 @@ type WriterDList = Writer (DList Text)
 
 dList :: Show s => s -> DList Text
 dList s = fromList [txt s]
+
+$(deriveJSON defaultOptions ''PreTestStage)
+$(deriveJSON defaultOptions ''LineNo)

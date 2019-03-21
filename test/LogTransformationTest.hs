@@ -12,7 +12,7 @@ import qualified Data.Foldable as F
 
 unit_demo :: IO ()
 unit_demo = eitherf (testPrettyPrint rawFile)
-              (P.putStr . txt)
+              (\e -> P.putStr $ "ERROR !!!" <> txt e)
               (\bsList -> 
                 let 
                   slList :: DList (IO ()) 
@@ -181,5 +181,4 @@ rawFile = fromList . B.lines $ toS
   {"tag":"EndIteration","contents":["DemoProject.Test.Simple2",150]}
   {"tag":"EndTest","contents":"DemoProject.Test.Simple2"}
   {"tag":"EndGroup","contents":{"unGroupTitle":"Group 2"}}
-  {"tag":"EndRun"} 
-  |]
+  {"tag":"EndRun"}|]

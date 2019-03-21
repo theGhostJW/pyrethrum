@@ -42,35 +42,32 @@ testTransform :: forall accum itm rslt. (LineNo -> accum -> Either AppError itm 
                                     -> (AppError -> ByteString)                                                    -- a serialiser for the error
                                     -> accum                                                                        -- accumulator
                                     -> DList ByteString                                                             -- input lines
-                                    -> Either AppError (DList ByteString)
+                                    -> DList ByteString
 testTransform step iPsr rsltSersr errSersr seed lstIn = 
   let
     testParseStep :: accum 
-                  -> Either AppError (DList ByteString)
-                  -> Either AppError (DList ByteString)
+                  -> DList ByteString
+                  -> DList ByteString
                   -> LineNo
-                  -> Either AppError (DList ByteString)
+                  -> DList ByteString
     testParseStep accum inLst outLst lineNo = 
-      do 
-        inL <- inLst
-        outL <- outLst
-        case inL of
-          Nil -> pure outL
-          Cons x xs -> 
-            let 
-              (newAccm, stepLine) = mapLeft (AppParseError lineNo) <$> step lineNo accum (iPsr x)
-              newLOut = eitherf stepLine
-                          (D.snoc outL . errSersr) 
-                          ( \sl ->
-                            maybef sl 
-                              outL
-                              (D.snoc outL . rsltSersr) 
-                          )
-            in 
-              testParseStep newAccm (Right $ fromList xs) (Right newLOut) (LineNo . succ $ unLineNo lineNo)
-          _ -> error "DList pattern match error this should never happen"
+      case inLst of
+        Nil -> outLst
+        Cons x xs -> 
+          let 
+            (newAccm, stepLine) = mapLeft (AppParseError lineNo) <$> step lineNo accum (iPsr x)
+            newLOut = eitherf stepLine
+                        (D.snoc outLst . errSersr) 
+                        ( \sl ->
+                          maybef sl 
+                            outLst
+                            (D.snoc outLst . rsltSersr) 
+                        )
+          in 
+            testParseStep newAccm (fromList xs) newLOut (LineNo . succ $ unLineNo lineNo)
+        _ -> error "DList pattern match error this should never happen"
     in 
-      testParseStep seed (Right lstIn) (Right $ fromList []) $ LineNo 1
+      testParseStep seed lstIn (fromList []) $ LineNo 1
 
 
 -- TODO: re-implement with streams or logging lib such as co-log
@@ -165,7 +162,7 @@ prettyPrintItem _ _ ethLn =
   in 
     ((), connvertedLine)
 
-testPrettyPrint :: DList ByteString -> Either AppError (DList ByteString)
+testPrettyPrint :: DList ByteString -> DList ByteString
 testPrettyPrint =  testTransform
                             prettyPrintItem    -- reducer step
                             lpParser           -- a parser for the item

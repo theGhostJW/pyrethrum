@@ -3,8 +3,9 @@
 
 module MemberReflection where
 
-import Pyrelude  hiding (readFile, writeFile)
+import Pyrelude
 import qualified Pyrelude as P
+import qualified Pyrelude.IO as PIO
 import Control.Monad.Freer
 import           DSL.Ensure
 import           DSL.FileSystem
@@ -111,11 +112,11 @@ interactor RunConfig{..} Item{..} = do
                                       writeFile path $ pre  <> " ~ " <> post <> " !!"
                                       ensure "Blahh" $ P.even iid
                                       log "Hi"
-                                      arbitraryIO "This is an arbitrary Put Line" () (putStrLn "Hello from random action")
+                                      arbitraryIO "This is an arbitrary Put Line" () (PIO.putStrLn "Hello from random action")
                                       tx <- readFile path
 
                                       when (iid == 140)
-                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (P.readFile $ toFilePath invalidFile)
+                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (PIO.readFile $ toFilePath invalidFile)
 
                                       pure $ ApState  {
                                         itemId  = iid,

@@ -17,7 +17,8 @@ import           DSL.FileSystem
 import           DSL.Interpreter
 import           DSL.ArbitraryIO
 import qualified Prelude as P
-import           Pyrelude             hiding (readFile, writeFile)
+import qualified Pyrelude.IO as PIO
+import           Pyrelude
 import Runner as R 
 import Type.Reflection
 import Data.Aeson.TH
@@ -56,8 +57,8 @@ data ApState = ApState {
 -- to get callstack
 putStrLnWithCallStack :: Text -> IO ()
 putStrLnWithCallStack msg = do
-  putStrLn msg
-  putStrLn $ toS (prettyCallStack callStack)
+  PIO.putStrLn msg
+  PIO.putStrLn $ toS (prettyCallStack callStack)
 
 interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Eff effs ApState
 interactor RunConfig{..} Item{..} = do
@@ -65,11 +66,11 @@ interactor RunConfig{..} Item{..} = do
                                       ensure "Blahh" $ P.even iid
                                       log "Hi"
                                       logWarning "a warning"
-                                      arbitraryIO "This is an arbitrary Put Line" () (putStrLn "Hello from random action")
+                                      arbitraryIO "This is an arbitrary Put Line" () (PIO.putStrLn "Hello from random action")
                                       tx <- readFile path
 
                                       when (iid == 140)
-                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (P.readFile $ toFilePath invalidFile)
+                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (PIO.readFile $ toFilePath invalidFile)
 
                                       when (iid == 130) $
                                         do 

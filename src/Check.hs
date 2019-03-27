@@ -26,6 +26,7 @@ import Data.Aeson.Types as AT hiding (Error)
 import Data.Aeson.TH
 import OrphanedInstances
 import Common
+import qualified Data.List as L
 
 -- generate a check from a predicate
 chk :: Text -> (v -> Bool) -> DList (Check v)
@@ -211,4 +212,4 @@ calcChecks ds chkLst = let
                                                         in
                                                           (wantSkip || isGateFail (result thisChkR), D.cons thisChkR lstCr)
                         in
-                         D.fromList . reverse . D.toList . snd $ foldl' foldfunc (False, mempty) chkLst
+                         D.fromList . reverse . D.toList . snd $ L.foldl' foldfunc (False, mempty) chkLst

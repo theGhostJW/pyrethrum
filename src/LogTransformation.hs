@@ -2,6 +2,7 @@ module LogTransformation where
 
 import Common
 import Pyrelude as E
+import Pyrelude.IO
 import Data.DList as D
 import qualified Prelude as P
 import AuxFiles
@@ -69,6 +70,83 @@ testTransform step iPsr rsltSersr errSersr seed lstIn =
     in 
       testParseStep seed lstIn (fromList []) $ LineNo 1
 
+testTransform2 :: forall accum itm rslt. (LineNo -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt))) -- reducer step
+                                    -> (ByteString -> Either AppError itm)                                               -- a parser for the item
+                                    -> (rslt -> ByteString)                                                         -- a serialiser for the result
+                                    -> (AppError -> ByteString)                                                    -- a serialiser for the error
+                                    -> accum                                                                        -- accumulator
+                                    -> DList ByteString                                                             -- input lines
+                                    -> DList ByteString
+testTransform2 step iPsr rsltSersr errSersr seed lstIn = 
+  let
+    (source, remainder) = case lstIn of 
+                            Nil -> (Nothing, D.empty)
+                            Cons x xs -> (Just $ D.singleton x, fromList xs)
+                            _ -> error "DList pattern match error this should never happen"
+
+    -- sink :: ByteString -> m ()
+    
+    testParseStep :: accum 
+                  -> DList ByteString
+                  -> DList ByteString
+                  -> LineNo
+                  -> DList ByteString
+    testParseStep accum inLst outLst lineNo = 
+      case inLst of
+        Nil -> outLst
+        Cons x xs -> 
+          let 
+            (newAccm, stepLine) = mapLeft (AppParseError lineNo) <$> step lineNo accum (iPsr x)
+            newLOut = eitherf stepLine
+                        (D.snoc outLst . errSersr) 
+                        ( \sl ->
+                          maybef sl 
+                            outLst
+                            (D.snoc outLst . rsltSersr) 
+                        )
+          in 
+            testParseStep newAccm (fromList xs) newLOut (LineNo . succ $ unLineNo lineNo)
+        _ -> error "DList pattern match error this should never happen"
+    in 
+      testParseStep seed lstIn (fromList []) $ LineNo 1
+
+
+
+mainloop :: forall accum itm rslt. (LineNo -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt))) -- reducer step
+  -> (ByteString -> Either AppError itm)
+  -> (rslt -> ByteString)   
+  -> (AppError -> ByteString)
+  -> Handle                       -- source
+  -> Handle                       -- sink
+  -> LineNo 
+  -> accum 
+  -> IO ()
+mainloop step ipsr rsltSersr errSersr inh outh lineNo accum =
+  let 
+    localLoop :: LineNo -> accum -> IO () 
+    localLoop = mainloop step ipsr rsltSersr errSersr inh outh 
+
+    output :: B.ByteString -> IO ()
+    output = B.hPutStrLn outh
+  in
+    hIsEOF inh >>=
+              bool
+                  ( -- not EOF -> has data
+                    do 
+                      byteLine <- B.hGetLine inh
+                      let 
+                        (nxtAccum, result) = step lineNo accum (ipsr byteLine)
+                      
+                      eitherf result
+                        (output . errSersr)
+                        (maybe
+                          (pure ())
+                          (output . rsltSersr)
+                        )
+                        
+                      localLoop (LineNo $ unLineNo lineNo + 1) nxtAccum
+                  )
+                  (pure ())
 
 -- TODO: re-implement with streams or logging lib such as co-log
 runLines :: forall accum itm rslt. (LineNo -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt)))  -- line processor / stepper
@@ -85,54 +163,19 @@ runLines step ipsr rsltSersr errSersr seed fileIn hOut = do
                                                               (pure . Left)
                                                               (\hIn -> pure <$> finally (mainloop step ipsr rsltSersr errSersr hIn hOut (LineNo 1) seed) (hClose hIn))
 
-mainloop :: forall accum itm rslt. (LineNo -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt))) -- reducer step
+{-
+mainloop2 :: forall a itm rsltItem m fnlRslt. Monad m => (LineNo -> a -> Either AppError itm -> (a, Either AppError (Maybe rsltItem))) -- reducer step
                                     -> (ByteString -> Either AppError itm)
-                                    -> (rslt -> ByteString)   
-                                    -> (AppError -> ByteString)
-                                    -> Handle                       -- source
-                                    -> Handle                       -- sink
-                                    -> LineNo 
-                                    -> accum 
-                                    -> IO ()
-mainloop step ipsr rsltSersr errSersr inh outh lineNo accum =
-    let 
-      localLoop :: LineNo -> accum -> IO () 
-      localLoop = mainloop step ipsr rsltSersr errSersr inh outh 
-
-      output :: B.ByteString -> IO ()
-      output = B.hPutStrLn outh
-    in
-      hIsEOF inh >>=
-                  bool
-                      ( -- not EOF -> has data
-                        do 
-                          byteLine <- B.hGetLine inh
-                          let 
-                            (nxtAccum, result) = step lineNo accum (ipsr byteLine)
-                          
-                          eitherf result
-                            (output . errSersr)
-                            (maybe
-                              (pure ())
-                              (output . rsltSersr)
-                            )
-                            
-                          localLoop (LineNo $ unLineNo lineNo + 1) nxtAccum
-                      )
-                      (pure ())
-
-mainloop2 :: forall a itm rslt m. Monad m => (LineNo -> a -> Either AppError itm -> (a, Either AppError (Maybe rslt))) -- reducer step
-                                    -> (ByteString -> Either AppError itm)
-                                    -> (rslt -> ByteString)   
+                                    -> (rsltItem -> ByteString)   
                                     -> (AppError -> ByteString)
                                     -> m (Maybe ByteString)      -- source
-                                    -> (ByteString -> m ())     -- sink
+                                    -> (ByteString -> m fnlRslt)     -- sink
                                     -> LineNo 
-                                    -> a
-                                    -> m a
+                                    -> a                          -- accumulattor
+                                    -> m fnlRslt
 mainloop2 step ipsr rsltSersr errSersr src snk lineNo accum =
     let 
-      localLoop :: LineNo -> a -> m a
+      localLoop :: LineNo -> a -> m fnlRslt
       localLoop = mainloop2 step ipsr rsltSersr errSersr src snk
     in
       src >>=
@@ -141,18 +184,15 @@ mainloop2 step ipsr rsltSersr errSersr src snk lineNo accum =
           (\bs ->
             let 
              (nxtAccum, result) = step lineNo accum $ ipsr bs
-
-             sinkNxt :: ByteString -> m a
-             sinkNxt b = snk b $> nxtAccum
             in
               eitherf result
-                (sinkNxt . errSersr)
+                (snk . errSersr)
                 (maybe
                   (pure nxtAccum)
-                  (sinkNxt . rsltSersr)                     
+                  (snk . rsltSersr)                     
                 )
           )
-            
+-}            
 --- type Step accum itm AppError rslt = (Int -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt)))
 type IParser itm = ByteString -> Either AppError itm
 

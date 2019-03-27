@@ -3,9 +3,9 @@ module DSL.Logger where
 
 import Common
 import  DSL.LogProtocol
-import           Data.DList
+import           Data.DList hiding (replicate)
 import           Pyrelude as P
-import  qualified Pyrelude.Data.Text.Hidden as H
+import           Pyrelude.IO
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Writer
 import Text.Show.Pretty as PP
@@ -89,7 +89,7 @@ logStrPP docMode =
               indent2 = indentText 2 
 
               prettyBlock :: Char -> Text -> ItemId -> Text -> Text
-              prettyBlock pfxChr headr iid body = indent2 $ H.replicate 3 (P.singleton pfxChr )<> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
+              prettyBlock pfxChr headr iid body = indent2 $ toS (replicate 3 ' ') <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
 
               ppAeson:: Y.Value -> Text
               ppAeson val = toS ((getLenient . toS . Y.encode $ val) :: Text)
@@ -158,7 +158,7 @@ logStrPP docMode =
                                                                                                                ppMsgInfo mbInfo
                   e@(Error _) -> showPretty e
                   FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
-                                                foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
+                                                foldl (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
                   StartRun ttle rc -> header ("Test Run: " <> unRunTitle ttle) <> 
                                        newLn <> "Run Config:" <>

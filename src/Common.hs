@@ -2,13 +2,12 @@
 module Common where
 
 import           Control.Monad.Freer.Writer
-import           Pyrelude as F
-import           Pyrelude.Data.Text.Hidden as T
-import           Data.DList
+import           Pyrelude as P
+import  qualified        Data.DList as D
 import Data.Aeson.TH
 import OrphanedInstances
 import Text.Show.Pretty as PP
-import qualified Prelude as P
+---import qualified Prelude as P
 
 showPretty :: Show a => a -> Text
 showPretty = toS . ppShow
@@ -17,15 +16,15 @@ indentText :: Int -> Text -> Text
 indentText i s = 
   let 
     linesClean :: [Text]
-    linesClean = fst . F.breakEnd (not . T.all (' ' ==)) $ lines s
+    linesClean = fst . P.breakEnd (not . all (' ' ==)) $ lines s
 
     unlined :: Text
-    unlined = unlines $ (\s' -> s == "" ? "" $ toS $ T.replicate i " " <> s')  <$> linesClean
+    unlined = unlines $ (\s' -> s == "" ? "" $ toS $ replicateText i " " <> s')  <$> linesClean
   in 
     toS $ 
-          T.last unlined /= Just '\n' 
+          last unlined /= Just '\n' 
             ? unlined   
-            $ maybef (T.init unlined)
+            $ maybef (init unlined)
                 ""
                 id 
 
@@ -87,10 +86,10 @@ data AppError =
 
 $(deriveJSON defaultOptions ''AppError)
 
-type WriterDList = Writer (DList Text)
+type WriterDList = Writer (D.DList Text)
 
-dList :: Show s => s -> DList Text
-dList s = fromList [txt s]
+dList :: Show s => s -> D.DList Text
+dList s = D.fromList [txt s]
 
 $(deriveJSON defaultOptions ''PreTestStage)
 $(deriveJSON defaultOptions ''LineNo)

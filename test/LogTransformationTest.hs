@@ -1,6 +1,7 @@
 module LogTransformationTest where 
 
 import           Pyrelude as P
+import           Pyrelude.IO as PIO
 import           Data.DList
 import Pyrelude.Test       as T
 import AuxFiles
@@ -14,7 +15,7 @@ unit_demo :: IO ()
 unit_demo = let 
               bsList = testPrettyPrint rawFile
               slList :: DList (IO ()) 
-              slList = P.putStrLn . decodeUtf8 <$> bsList 
+              slList = PIO.putStrLn . decodeUtf8 <$> bsList 
             in 
               sequence_ slList
 

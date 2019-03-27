@@ -25,8 +25,8 @@ filterredItemIds filtr items =
   let
     filterredItems :: Either FilterError [Int]
     filterredItems = let
-                        hasVals i = not $ null $ checkList i
-                        lastWithVal = find hasVals $ reverse items
+                        hasVals i = not $ nullFoldable $ checkList i
+                        lastWithVal = findFoldable hasVals $ reverse items
                         listOrFail lst msg = null lst
                                                     ? Left (InvalidItemFilter msg)
                                                     $ Right lst

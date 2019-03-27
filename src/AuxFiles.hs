@@ -3,6 +3,7 @@
 module AuxFiles where
 
 import Pyrelude as F
+import Pyrelude.IO
 import qualified Prelude as P
 import Paths_pyrethrum
 import Data.Fixed

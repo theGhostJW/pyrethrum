@@ -2,6 +2,7 @@ module DSL.FileSystem where
 
 import Common
 import           Pyrelude as P
+import           Pyrelude.IO as PO
 import           Data.Functor
 import           Control.Monad.Freer
 import           Control.Monad.Freer.Error
@@ -34,8 +35,8 @@ fileSystemIOInterpreter =
                                                                  Right f -> pure f
                            in
                             interpret $ \case
-                                          ReadFile path -> handleException (P.readFile $ toFilePath path) ReadFileError
-                                          WriteFile path str -> handleException (P.writeFile (toFilePath path) str) WriteFileError
+                                          ReadFile path -> handleException (PO.readFile $ toFilePath path) ReadFileError
+                                          WriteFile path str -> handleException (PO.writeFile (toFilePath path) str) WriteFileError
 
 
 

@@ -106,6 +106,7 @@ library:
     - unordered-containers
     - template-haskell
     - bytestring
+    - mtl
 
 _testDep: &testdependencies
 - tasty

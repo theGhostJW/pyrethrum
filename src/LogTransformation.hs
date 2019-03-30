@@ -135,22 +135,22 @@ runLines step ipsr rsltSersr errSersr seed fileIn hOut = do
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% -}
 
 -- logTransform :: forall a itm rsltItem m. Monad m => 
-logTransform :: forall a itm rsltItem.
-                                     WriterState (Maybe ByteString)                 -- source
-                                    -> (ByteString -> WriterState ())                 -- sink
+logTransform :: forall a itm rsltItem m. Monad m =>
+                                     m (Maybe ByteString)                 -- source
+                                    -> (ByteString -> m ())                 -- sink
                                     -> (LineNo -> a -> Either AppError itm -> (a, Either AppError (Maybe rsltItem))) -- reducer step
                                     -> (ByteString -> Either AppError itm)  -- item desrialiser
                                     -> (rsltItem -> ByteString)             -- result serialiser
                                     -> (AppError -> ByteString)             -- error serialiser
                                     -> LineNo                               -- linNo
                                     -> a                                    -- accumulattor
-                                    -> WriterState ()
+                                    -> m ()
 logTransform src snk step ipsr rsltSersr errSersr lineNo accum =
     let 
-      localLoop :: LineNo -> a -> WriterState ()
+      localLoop :: LineNo -> a -> m ()
       localLoop = logTransform src snk step ipsr rsltSersr errSersr
 
-      errorSnk :: AppError -> WriterState ()
+      errorSnk :: AppError -> m ()
       errorSnk = snk . errSersr
 
       lineSink :: rsltItem -> m ()
@@ -158,6 +158,7 @@ logTransform src snk step ipsr rsltSersr errSersr lineNo accum =
     in
       do 
         lg <- src
+
         maybef lg
           (pure ()) -- EOF
           (\bs ->
@@ -177,7 +178,7 @@ logTransform src snk step ipsr rsltSersr errSersr lineNo accum =
 type WriterState a = WriterT (DList ByteString) (StateT (DList ByteString) Identity) a
 
 runToList :: DList ByteString -> WriterState a -> DList ByteString
-runToList input m =  snd . runIdentity $ runStateT (runWriterT m) input
+runToList input m = snd . fst . runIdentity $ runStateT (runWriterT m) input
 
 testSource :: WriterState (Maybe ByteString)     
 testSource = do 
@@ -190,7 +191,7 @@ testSource = do
                 _ -> error "DList pattern match error this should never happen"
 
 testSink :: ByteString -> WriterState ()
-testSink = put . D.singleton
+testSink = tell . D.singleton
 
 testPrettyPrint2 :: DList ByteString -> DList ByteString
 testPrettyPrint2 input = runToList input $ logTransform testSource testSink prettyPrintItem lpParser toS (toS . txt) (LineNo 1) ()

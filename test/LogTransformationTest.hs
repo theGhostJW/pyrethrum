@@ -13,7 +13,9 @@ import qualified Data.Foldable as F
 
 unit_demo :: IO ()
 unit_demo = let 
-              bsList = testPrettyPrint2 rawFile
+              bsList :: DList ByteString
+              bsList = debugf lengthFoldable $ testPrettyPrint2 rawFile
+
               slList :: DList (IO ()) 
               slList = PIO.putStrLn . decodeUtf8 <$> bsList 
             in 

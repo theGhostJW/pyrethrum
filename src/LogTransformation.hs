@@ -15,6 +15,10 @@ import qualified Data.ByteString.Lazy as L
 import System.IO as S
 import Data.Functor
 import DSL.Logger
+import Control.Monad.Writer.Strict
+import Control.Monad.State.Strict
+import Control.Monad.Identity
+
 
 transformToFile :: forall itm rslt accum.                          
                 (ByteString -> Either AppError itm)                                              -- a parser for the item
@@ -70,8 +74,8 @@ testTransform step iPsr rsltSersr errSersr seed lstIn =
     in 
       testParseStep seed lstIn (fromList []) $ LineNo 1
 
+testPrettyPrint :: DList ByteString -> DList ByteString
 testPrettyPrint = testTransform prettyPrintItem lpParser toS (toS . txt) ()
-
 
 mainloop :: forall accum itm rslt. (LineNo -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt))) -- reducer step
   -> (ByteString -> Either AppError itm)
@@ -130,46 +134,66 @@ runLines step ipsr rsltSersr errSersr seed fileIn hOut = do
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% -}
 
-mainloop2 :: forall a itm rsltItem m. Monad m => 
-                                    (LineNo -> a -> Either AppError itm -> (a, Either AppError (Maybe rsltItem))) -- reducer step
+-- logTransform :: forall a itm rsltItem m. Monad m => 
+logTransform :: forall a itm rsltItem.
+                                     WriterState (Maybe ByteString)                 -- source
+                                    -> (ByteString -> WriterState ())                 -- sink
+                                    -> (LineNo -> a -> Either AppError itm -> (a, Either AppError (Maybe rsltItem))) -- reducer step
                                     -> (ByteString -> Either AppError itm)  -- item desrialiser
                                     -> (rsltItem -> ByteString)             -- result serialiser
                                     -> (AppError -> ByteString)             -- error serialiser
-                                    -> m (Maybe ByteString)                 -- source
-                                    -> (ByteString -> m ())                 -- sink
                                     -> LineNo                               -- linNo
                                     -> a                                    -- accumulattor
-                                    -> m ()
-mainloop2 step ipsr rsltSersr errSersr src snk lineNo accum =
+                                    -> WriterState ()
+logTransform src snk step ipsr rsltSersr errSersr lineNo accum =
     let 
-      localLoop :: LineNo -> a -> m ()
-      localLoop = mainloop2 step ipsr rsltSersr errSersr src snk
+      localLoop :: LineNo -> a -> WriterState ()
+      localLoop = logTransform src snk step ipsr rsltSersr errSersr
 
-      errorSnk :: AppError -> m ()
+      errorSnk :: AppError -> WriterState ()
       errorSnk = snk . errSersr
 
       lineSink :: rsltItem -> m ()
       lineSink = snk . rsltSersr
     in
-      src >>=
-        maybe 
+      do 
+        lg <- src
+        maybef lg
           (pure ()) -- EOF
           (\bs ->
             let 
              (nxtAccum, result) = step lineNo accum $ ipsr bs
             in
-              eitherf result
-                errorSnk
-                (maybe
-                  (pure ())
-                  lineSink                    
-                ) 
-              *> localLoop (LineNo $ unLineNo lineNo + 1) nxtAccum
+              do
+                eitherf result
+                  errorSnk
+                  (maybe
+                    (pure ())
+                    lineSink                    
+                  ) 
+                localLoop (debug $ LineNo $ unLineNo lineNo + 1) nxtAccum
           )
 
+type WriterState a = WriterT (DList ByteString) (StateT (DList ByteString) Identity) a
 
+runToList :: DList ByteString -> WriterState a -> DList ByteString
+runToList input m =  snd . runIdentity $ runStateT (runWriterT m) input
 
+testSource :: WriterState (Maybe ByteString)     
+testSource = do 
+              dlst <- get 
+              case dlst of
+                Nil -> pure Nothing
+                Cons x xs -> do
+                              put $ fromList xs
+                              pure $ Just x 
+                _ -> error "DList pattern match error this should never happen"
 
+testSink :: ByteString -> WriterState ()
+testSink = put . D.singleton
+
+testPrettyPrint2 :: DList ByteString -> DList ByteString
+testPrettyPrint2 input = runToList input $ logTransform testSource testSink prettyPrintItem lpParser toS (toS . txt) (LineNo 1) ()
 
 testTransform2 :: forall accum itm rslt. (LineNo -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt))) -- reducer step
                                     -> (ByteString -> Either AppError itm)                                               -- a parser for the item
@@ -177,7 +201,7 @@ testTransform2 :: forall accum itm rslt. (LineNo -> accum -> Either AppError itm
                                     -> (AppError -> ByteString)                                                    -- a serialiser for the error
                                     -> accum                                                                        -- accumulator
                                     -> DList ByteString                                                             -- input lines
-                                    -> DList ByteString
+                                    -> DList ByteString                                                             -- reult lines
 testTransform2 step iPsr rsltSersr errSersr seed lstIn = 
   let
     (source, remainder) = case lstIn of 
@@ -226,14 +250,7 @@ prettyPrintItem :: LineNo                                             -- lineNo
                     -> ()                                             -- accumulator
                     -> Either AppError LogProtocol                     -- line item
                     -> ((), Either AppError (Maybe Text))             -- (accum, result item)
-prettyPrintItem lnNo _ ethLn = 
-  let
-    connvertedLine :: Either AppError (Maybe Text)
-    connvertedLine = eitherf ethLn 
-                            Left 
-                            (Right . Just . logStrPP False)
-  in 
-    ((), connvertedLine)
+prettyPrintItem lnNo _ ethLn = ((), Just . logStrPP False <$> ethLn)
 
 iterationStep :: Int -> IterationAccumulator -> Either Text LogProtocol -> (IterationAccumulator, Either Text (Maybe TestIteraion))
 iterationStep linNo accum = uu

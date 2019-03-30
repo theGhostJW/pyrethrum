@@ -54,6 +54,7 @@ ghc-options:
 default-extensions:
   - AllowAmbiguousTypes
   - BangPatterns
+  # - BlockArguments
   - ConstrainedClassMethods
   - ConstraintKinds
   - DisambiguateRecordFields

@@ -26,7 +26,7 @@ import Control.Monad.Identity
 logTransform :: forall a itm rsltItem m. Monad m =>
                                      m (Maybe ByteString)                                                             -- source
                                     -> (ByteString -> m ())                                                           -- sink
-                                    -> (LineNo -> a -> Either AppError itm -> (a, Either AppError (Maybe rsltItem)))  -- reducer step
+                                    -> (a -> Either AppError itm -> (a, Either AppError (Maybe rsltItem)))  -- reducer step
                                     -> (ByteString -> Either AppError itm)                                            -- item desrialiser
                                     -> (rsltItem -> ByteString)                                                       -- result serialiser
                                     -> (AppError -> ByteString)                                                       -- error serialiser
@@ -51,11 +51,11 @@ logTransform src snk step ipsr rsltSersr errSersr lineNo accum =
           (pure ()) -- EOF
           (\bs ->
             let 
-             (nxtAccum, result) = step lineNo accum $ ipsr bs
+             (nxtAccum, result) = step accum $ ipsr bs
             in
               do
                 eitherf result
-                  errorSnk
+                  (errorSnk . AppLineError lineNo)
                   (maybe
                     (pure ())
                     lineSink                    
@@ -68,7 +68,7 @@ logTransform src snk step ipsr rsltSersr errSersr lineNo accum =
 -----------------------------------------------------
 
 transformToFile :: forall itm rslt accum.    
-                  (LineNo -> accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt)))  -- line stepper
+                  (accum -> Either AppError itm -> (accum, Either AppError (Maybe rslt)))  -- line stepper
                   -> (ByteString -> Either AppError itm)                                             -- a parser for the item
                   -> (rslt -> ByteString)                                                            -- a serialiser for the result
                   -> (AppError -> ByteString)                                                        -- a serialiser for the error
@@ -107,7 +107,7 @@ transformToFile step ipsr rser eser seed srcPth destPthFunc =
 testPrettyPrintFile :: AbsFile                                            -- source file
                     -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
                     -> IO (Either AppError AbsFile)                       -- dest file path or error 
-testPrettyPrintFile = transformToFile prettyPrintItem lpParser toS (toS . txt) ()
+testPrettyPrintFile = transformToFile prettyPrintItem lpParser textToByteString showableToByteString ()
 
 ------------------------------------------------------
 ----------------- Testing Using DList ----------------
@@ -132,7 +132,26 @@ testSink :: ByteString -> WriterState ()
 testSink = tell . D.singleton
 
 testPrettyPrint :: DList ByteString -> DList ByteString
-testPrettyPrint input = runToList input $ logTransform testSource testSink prettyPrintItem lpParser toS (toS . txt) (LineNo 1) ()
+testPrettyPrint input = runToList input $ logTransform testSource testSink prettyPrintItem lpParser textToByteString showableToByteString (LineNo 1) ()
+
+------------------------------------------------------------
+-------------------- Shared Item Components ----------------
+------------------------------------------------------------
+
+prettyPrintItem :: ()                                             -- accumulator
+                -> Either AppError LogProtocol                    -- line item
+                -> ((), Either AppError (Maybe Text))             -- (accum, result item)
+prettyPrintItem _ ethLn = ((), Just . logStrPP False <$> ethLn)
+
+lpParser :: ByteString -> Either AppError LogProtocol
+lpParser bs = mapLeft (AppGenericError . toS) $ A.eitherDecode $ L.fromStrict bs
+
+textToByteString :: Text ->  ByteString
+textToByteString = toS
+
+showableToByteString :: Show a => a ->  ByteString
+showableToByteString = textToByteString . txt
+
 
 --------------------------------------------------------
 ----------------- Iteration Aggregation ----------------
@@ -145,13 +164,9 @@ data TestIteraion = Iteration |
                     ParseError AppError
                     deriving (Show, Eq)
 
-prettyPrintItem :: LineNo                                             -- lineNo
-                    -> ()                                             -- accumulator
-                    -> Either AppError LogProtocol                     -- line item
-                    -> ((), Either AppError (Maybe Text))             -- (accum, result item)
-prettyPrintItem lnNo _ ethLn = ((), Just . logStrPP False <$> ethLn)
 
-iterationStep :: Int -> IterationAccumulator -> Either Text LogProtocol -> (IterationAccumulator, Either Text (Maybe TestIteraion))
+
+iterationStep :: (LineNo -> a -> Either AppError itm -> (a, Either AppError (Maybe rsltItem)))  -- reducer step
 iterationStep linNo accum = uu
   -- \case
   --                               Message Text            -> uu
@@ -193,9 +208,6 @@ iterationStep linNo accum = uu
 
 jsnSerialise :: A.ToJSON v => v -> ByteString
 jsnSerialise = toS . A.encode
-
-lpParser :: ByteString -> Either AppError LogProtocol
-lpParser bs = mapLeft (AppGenericError . toS) $ A.eitherDecode $ L.fromStrict bs
 
 -- itrSerialise = uu
 

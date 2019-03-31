@@ -59,7 +59,7 @@ data FileSystemError =
 $(deriveJSON defaultOptions ''FileSystemError)
 
 data AppError =
-            AppParseError {
+            AppLineError {
               linNo :: LineNo,
               err :: AppError
             } |

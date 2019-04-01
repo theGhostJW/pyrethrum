@@ -113,49 +113,12 @@ logStrPP docMode =
                                                                                                                
             in
               \case
-                  StartInteraction -> newLn <> "Interaction:"
-                  StartChecks -> newLn <> "Checks:"
-                  StartPrepState -> newLn <> "PrepState:"
-
-                  DocAction ai -> case ai of
-                                      ActionInfo msg -> "  >> " <> msg
-                                      ActionInfoM msg extended -> "  >> " <> 
-                                                                      msg <> 
-                                                                      newLn <> 
-                                                                      indent2 extended
-
-                  DocCheck iid chkhdr resultExpectation gateStatus -> indent2 $ "% " <> chkhdr  <> 
-                                                              (
-                                                                gateStatus == GateCheck 
-                                                                  ? "(Gate: subsequent checks will not be executed if this check fails)" 
-                                                                  $ ""
-                                                              ) <> 
-                                                              (
-                                                              case resultExpectation of 
-                                                                ExpectPass -> ""
-                                                                ExpectFailure Inactive  _  -> ""
-                                                                ExpectFailure Active message -> newLn <> indent2 ("!! This check is expected to fail: " <> message)
-                                                              )
-                  
-                  DocIOAction m -> logIO m
-                  IOAction m -> indent2 $ logIO m
-
                   Message s -> docMarkUp $ "message: " <> s
                   Message' detailedInfo -> detailDoc "Message" detailedInfo
 
                   Warning s -> docMarkUp $ "warning: " <> s
                   Warning' detailedInfo -> detailDoc "Warning" detailedInfo
 
-                  InteractorSuccess iid (ApStateDisplay as) -> newLn <> prettyBlock '>' "Interactor Complete"  iid as
-                    
-                  InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ showPretty err
-
-                  PrepStateSuccess iid (DStateDisplay ds) -> prettyBlock '>' "PrepState Complete" iid ds
-                  PrepStateFailure iid err -> prettyBlock '>' "PrepState Failure" iid $ showPretty err
-
-                  CheckOutcome iid (CheckReport reslt (CheckInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> showPretty (classifyResult reslt)) iid $ 
-                                                                                                               chkhdr  <> " -> " <> showPretty reslt <> 
-                                                                                                               ppMsgInfo mbInfo
                   e@(Error _) -> showPretty e
                   FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
                                                 foldl (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
@@ -177,8 +140,52 @@ logStrPP docMode =
                                                   newLn <> ppAesonBlock val <>
                                                   (docMode ? "" $ newLn)
 
+                  StartInteraction -> newLn <> "Interaction:"
+                  StartChecks -> newLn <> "Checks:"
+
                   EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
                   EndRun -> newLn <> header "End Run"
+
+                  SubLog (Doc dp) -> case dp of 
+                                        DocAction ai -> case ai of
+                                          ActionInfo msg -> "  >> " <> msg
+                                          ActionInfoM msg extended -> "  >> " <> 
+                                                                          msg <> 
+                                                                          newLn <> 
+                                                                          indent2 extended
+
+                                        DocCheck iid chkhdr resultExpectation gateStatus -> 
+                                                    indent2 $ "% " <> chkhdr  <> 
+                                                        (
+                                                          gateStatus == GateCheck 
+                                                            ? "(Gate: subsequent checks will not be executed if this check fails)" 
+                                                            $ ""
+                                                        ) <> 
+                                                        (
+                                                        case resultExpectation of 
+                                                          ExpectPass -> ""
+                                                          ExpectFailure Inactive  _  -> ""
+                                                          ExpectFailure Active message -> newLn <> indent2 ("!! This check is expected to fail: " <> message)
+                                                        )
+  
+                                        DocIOAction m -> logIO m
+
+                  SubLog (Run rp) -> case rp of
+                                        StartPrepState -> newLn <> "PrepState:"
+                      
+                                        IOAction m -> indent2 $ logIO m 
+                                        
+                                        InteractorSuccess iid (ApStateDisplay as) -> newLn <> prettyBlock '>' "Interactor Complete"  iid as
+                                          
+                                        InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ showPretty err
+
+                                        PrepStateSuccess iid (DStateDisplay ds) -> prettyBlock '>' "PrepState Complete" iid ds
+                                        PrepStateFailure iid err -> prettyBlock '>' "PrepState Failure" iid $ showPretty err
+
+                                        CheckOutcome iid (CheckReport reslt (CheckInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> showPretty (classifyResult reslt)) iid $ 
+                                                                                                                                    chkhdr  <> " -> " <> showPretty reslt <> 
+                                                                                                                                    ppMsgInfo mbInfo
+
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsolePrettyInterpreter = logToHandles [(logStrPP False, stdout)]

@@ -102,20 +102,20 @@ genLogProtocol = choice [
                     Warning <$> genStr,
                     Warning' <$> genDetailedInfo,
                   
-                    DocAction <$> genDocActionInfo,
-                    DocIOAction <$> genStr,
-                    DocCheck <$> genItemId <*> genStr <*>  genResultExpectation <*> genGateStatus, 
+                    logDoc . DocAction <$> genDocActionInfo,
+                    logDoc . DocIOAction <$> genStr,
+                    logDoc <$> (DocCheck <$> genItemId <*> genStr <*>  genResultExpectation <*> genGateStatus), 
 
-                    IOAction <$> genStr,
+                    logRun . IOAction <$> genStr,
                   
                     Error <$> genError,
                     FilterLog <$> genFilterResults,
 
-                    InteractorSuccess <$> genItemId <*> (ApStateDisplay <$> genStr),
-                    InteractorFailure <$> genItemId <*> genError,
+                    logRun <$> (InteractorSuccess <$> genItemId <*> (ApStateDisplay <$> genStr)),
+                    logRun <$> (InteractorFailure <$> genItemId <*> genError),
 
-                    PrepStateSuccess <$> genItemId <*> (DStateDisplay <$> genStr),
-                    PrepStateFailure <$> genItemId <*> genError,
+                    logRun <$> (PrepStateSuccess <$> genItemId <*> (DStateDisplay <$> genStr)),
+                    logRun <$> (PrepStateFailure <$> genItemId <*> genError),
                   
                     StartRun <$> (RunTitle <$> genStr) <*> (toJSON <$> genRunConfig), 
                     StartGroup <$> (GroupTitle <$> genStr),
@@ -126,18 +126,6 @@ genLogProtocol = choice [
                     EndIteration <$> genItemId,
                     pure EndRun
                  ]
-
-
-{-
-  
-  EndTest TestModule |
-
-  CheckOutcome ItemId CheckReport |
-
-  StartIteration ItemId | 
-  EndIteration ItemId 
-
--}
 
 hprop_log_protocol_round_trip :: Property
 hprop_log_protocol_round_trip = property $ do

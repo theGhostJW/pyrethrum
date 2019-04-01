@@ -31,38 +31,36 @@ data DocActionInfo =
     ActionInfoM Text Text 
     deriving (Eq, Show)
 
-$(deriveJSON defaultOptions ''RunTitle)
-$(deriveJSON defaultOptions ''GroupTitle)
-$(deriveJSON defaultOptions ''TestTitle)
-$(deriveJSON defaultOptions ''ApStateDisplay)
-$(deriveJSON defaultOptions ''DStateDisplay)
-$(deriveJSON defaultOptions ''ItemId)
-$(deriveJSON defaultOptions ''DocActionInfo)
-$(deriveJSON defaultOptions ''WhenClause)
-$(deriveJSON defaultOptions ''ThenClause)
+logDoc :: DocProtocol -> LogProtocol
+logDoc = SubLog . Doc
+
+logRun :: RunProtocol -> LogProtocol
+logRun = SubLog . Run
+
+data DocProtocol =   
+                DocIOAction Text |
+                DocAction DocActionInfo |
+                DocCheck ItemId Text ResultExpectation GateStatus 
+              deriving (Eq, Show)
+
+data RunProtocol =   
+                IOAction Text |
+                StartPrepState |
+              
+                InteractorSuccess ItemId ApStateDisplay |
+                InteractorFailure ItemId AppError |
+              
+                PrepStateSuccess ItemId DStateDisplay |
+                PrepStateFailure ItemId AppError |
+                CheckOutcome ItemId CheckReport 
+              deriving (Eq, Show)
+
+data SubProtocol = 
+    Doc DocProtocol |
+    Run RunProtocol
+  deriving (Eq, Show)
 
 data LogProtocol =
-  Message Text |
-  Message' DetailedInfo |
-
-  Warning Text |
-  Warning' DetailedInfo |
-
-  IOAction Text |
-  DocIOAction Text |
-  DocAction DocActionInfo |
-  DocCheck ItemId Text ResultExpectation GateStatus | 
-  StartInteraction | 
-  StartPrepState |
-  StartChecks | 
-
-  InteractorSuccess ItemId ApStateDisplay |
-  InteractorFailure ItemId AppError |
-
-  PrepStateSuccess ItemId DStateDisplay |
-  PrepStateFailure ItemId AppError |
-
-  Error AppError |
   FilterLog [FilterResult] |
 
   StartRun RunTitle Value | 
@@ -74,11 +72,34 @@ data LogProtocol =
   StartTest TestDisplayInfo |
   EndTest TestModule |
 
-  CheckOutcome ItemId CheckReport |
-
   StartIteration ItemId WhenClause ThenClause Value | 
-  EndIteration ItemId 
+  EndIteration ItemId |
+
+  StartInteraction |
+  StartChecks | 
+  
+  Message Text |
+  Message' DetailedInfo |
+
+  Warning Text |
+  Warning' DetailedInfo |
+
+  Error AppError |
+
+  SubLog SubProtocol
 
   deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''LogProtocol)
+$(deriveJSON defaultOptions ''DocProtocol)
+$(deriveJSON defaultOptions ''RunProtocol)
+$(deriveJSON defaultOptions ''SubProtocol)
+$(deriveJSON defaultOptions ''RunTitle)
+$(deriveJSON defaultOptions ''GroupTitle)
+$(deriveJSON defaultOptions ''TestTitle)
+$(deriveJSON defaultOptions ''ApStateDisplay)
+$(deriveJSON defaultOptions ''DStateDisplay)
+$(deriveJSON defaultOptions ''ItemId)
+$(deriveJSON defaultOptions ''DocActionInfo)
+$(deriveJSON defaultOptions ''WhenClause)
+$(deriveJSON defaultOptions ''ThenClause)

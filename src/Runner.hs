@@ -152,12 +152,17 @@ normalExecution logger interactor prepState intrprt tc rc i  =
         normalExecution' :: m ()
         normalExecution' = 
               let
+                logRunItem :: RunProtocol -> m ()
+                logRunItem = logger . logRun
+
                 runChecks :: ds -> m ()
                 runChecks ds = let 
                                 logChk :: CK.CheckReport -> m ()
-                                logChk cr = logger $ CheckOutcome iid cr
+                                logChk cr = logRunItem $ CheckOutcome iid cr
                               in
                                 F.traverse_ logChk $ D.toList $ CK.calcChecks ds (checkList i)
+
+                
               in 
                 do 
                   logger StartInteraction
@@ -166,20 +171,20 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                               (logger . LP.Error $ AppGenericError "Interactor Exception has Occurred")
 
                   eitherf ethas
-                    (logger . InteractorFailure iid)
+                    (logRunItem . InteractorFailure iid)
                     (\as -> do 
-                              logger . InteractorSuccess iid $ ApStateDisplay . showPretty $ as 
+                              logRunItem . InteractorSuccess iid $ ApStateDisplay . showPretty $ as 
                               
                               let 
                                 eds = fullEnsureInterpreter $ prepState as
                               
                               eitherf eds
-                                (logger . PrepStateFailure iid . AppEnsureError)
+                                (logRunItem . PrepStateFailure iid . AppEnsureError)
                                 (
                                   \ds -> 
                                     do
-                                      logger StartPrepState
-                                      logger . PrepStateSuccess iid . DStateDisplay . showPretty $ ds
+                                      logRunItem StartPrepState
+                                      logRunItem . PrepStateSuccess iid . DStateDisplay . showPretty $ ds
                                       logger StartChecks
                                       runChecks ds
                                 )
@@ -204,7 +209,7 @@ docExecution logger interactor _ intrprt tc rc i = let
                                                       iid = ItemId (moduleAddress tc) $ identifier i
 
                                                       logChecks :: m ()
-                                                      logChecks =  P.sequence_ $  (\chk -> logger $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
+                                                      logChecks =  P.sequence_ $  (\chk -> logger . logDoc $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
                                                     in 
                                                       do 
                                                         logger StartInteraction

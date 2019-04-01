@@ -48,8 +48,8 @@ fileSystemDocInterpreter = interpret $
                                       in
                                         \case
                                           ReadFile path ->
-                                            logItem (DocAction $ ActionInfo ("readFile: " <> txt path) ) $> mockContents
+                                            logItem (SubLog . Doc . DocAction $ ActionInfo ("readFile: " <> txt path) ) $> mockContents
 
-                                          WriteFile path str -> logItem . DocAction $ ActionInfoM 
+                                          WriteFile path str -> logItem . SubLog . Doc . DocAction $ ActionInfoM 
                                                                                         ("write file: " <> txt path)
                                                                                         $ "contents:\n" <> str

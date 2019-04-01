@@ -1,6 +1,7 @@
 module LogTransformation where
 
 import Common
+import Check
 import Pyrelude as E
 import Pyrelude.IO
 import Data.DList as D
@@ -156,8 +157,26 @@ showableToByteString = textToByteString . txt
 --------------------------------------------------------
 ----------------- Iteration Aggregation ----------------
 --------------------------------------------------------
+data IterationPhase = Unknown | 
+                      Interactor | 
+                      PrepState |
+                      Validation
+                      deriving (Eq, Show)
 
-data IterationAccumulator = IterationAccumulator
+data IterationResult = Inconclusive |
+                       Pass |
+                       Fail IterationPhase |
+                       Warning IterationPhase
+                       deriving (Eq, Show)
+                        
+data IterationRecord = IterationRecord {
+  summary :: IterationResult,
+  validation :: [CheckReport],
+  domainState :: LogProtocol,
+  item :: LogProtocol,
+  apState :: LogProtocol,
+  rawLog :: DList LogProtocol
+}
 
 data TestIteraion = Iteration |
                     OutOfIterationError AppError |
@@ -166,44 +185,44 @@ data TestIteraion = Iteration |
 
 
 
-iterationStep :: (LineNo -> a -> Either AppError itm -> (a, Either AppError (Maybe rsltItem)))  -- reducer step
-iterationStep linNo accum = uu
-  -- \case
-  --                               Message Text            -> uu
-  --                               Message' DetailedInfo |
+-- iterationStep :: (IterationAccumulator -> Either AppError LogProtocol -> (IterationAccumulator, Either AppError (Maybe TestIteraion)))  -- reducer step
+-- iterationStep linNo accum = uu
+--   -- \case
+--   --                               Message Text            -> uu
+--   --                               Message' DetailedInfo |
 
-  --                               Warning Text |
-  --                               Warning' DetailedInfo |
+--   --                               Warning Text |
+--   --                               Warning' DetailedInfo |
 
-  --                               IOAction Text |
-  --                               DocIOAction Text |
-  --                               DocAction DocActionInfo |
-  --                               DocCheck ItemId Text ResultExpectation GateStatus | 
-  --                               DocStartInteraction | 
-  --                               DocStartChecks | 
+--   --                               IOAction Text |
+--   --                               DocIOAction Text |
+--   --                               DocAction DocActionInfo |
+--   --                               DocCheck ItemId Text ResultExpectation GateStatus | 
+--   --                               DocStartInteraction | 
+--   --                               DocStartChecks | 
 
-  --                               InteractorSuccess ItemId ApStateDisplay |
-  --                               InteractorFailure ItemId AppError |
+--   --                               InteractorSuccess ItemId ApStateDisplay |
+--   --                               InteractorFailure ItemId AppError |
 
-  --                               PrepStateSuccess ItemId DStateDisplay |
-  --                               PrepStateFailure ItemId AppError |
+--   --                               PrepStateSuccess ItemId DStateDisplay |
+--   --                               PrepStateFailure ItemId AppError |
 
-  --                               Error AppError |
-  --                               FilterLog [FilterResult] |
+--   --                               Error AppError |
+--   --                               FilterLog [FilterResult] |
 
-  --                               StartRun RunTitle Value | 
-  --                               EndRun |
+--   --                               StartRun RunTitle Value | 
+--   --                               EndRun |
 
-  --                               StartGroup GroupTitle |
-  --                               EndGroup GroupTitle |
+--   --                               StartGroup GroupTitle |
+--   --                               EndGroup GroupTitle |
 
-  --                               StartTest TestDisplayInfo |
-  --                               EndTest TestModule |
+--   --                               StartTest TestDisplayInfo |
+--   --                               EndTest TestModule |
 
-  --                               CheckOutcome ItemId CheckReport |
+--   --                               CheckOutcome ItemId CheckReport |
 
-  --                               StartIteration ItemId WhenClause ThenClause Value | 
-  --                               EndIteration ItemId 
+--   --                               StartIteration ItemId WhenClause ThenClause Value | 
+--   --                               EndIteration ItemId 
 
 
 jsnSerialise :: A.ToJSON v => v -> ByteString

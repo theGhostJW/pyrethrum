@@ -12,7 +12,7 @@ import Text.Show.Pretty as PP
 import RunElementClasses as C
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
-import Check
+import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), CheckInfo(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y
 import System.IO (stdout)
 

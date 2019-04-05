@@ -15,7 +15,8 @@ module Check (
               CheckReportList,
               CheckReport(..),
               CheckResult(..),
-              CheckInfo(..)
+              CheckInfo(..),
+              CheckResultClassification(..)
               ) where
 
 import           Pyrelude as P hiding ((.)) 

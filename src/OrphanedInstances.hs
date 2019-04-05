@@ -11,6 +11,7 @@ import Data.Aeson.TH
 import qualified Prelude as P
 
 $(deriveJSON defaultOptions ''IOErrorType)
+$(deriveJSON defaultOptions ''UnicodeException)
 
 instance ToJSON IOException where 
   toJSON IOError {..} =  object [

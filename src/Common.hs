@@ -7,7 +7,6 @@ import  qualified        Data.DList as D
 import Data.Aeson.TH
 import OrphanedInstances
 import Text.Show.Pretty as PP
----import qualified Prelude as P
 
 showPretty :: Show a => a -> Text
 showPretty = toS . ppShow
@@ -31,8 +30,6 @@ indentText i s =
 data PreTestStage = Rollover |
                     GoHome
                     deriving (Show, Eq)
-
-newtype LineNo = LineNo { unLineNo :: Int } deriving (Show, Eq)
 
 data DetailedInfo = DetailedInfo {
             message :: Text,
@@ -59,10 +56,6 @@ data FileSystemError =
 $(deriveJSON defaultOptions ''FileSystemError)
 
 data AppError =
-            AppLineError {
-              linNo :: LineNo,
-              err :: AppError
-            } |
             AppFileSystemError FileSystemError |
             AppEnsureError EnsureError |
             AppFilterError FilterError |
@@ -92,4 +85,3 @@ dList :: Show s => s -> D.DList Text
 dList s = D.fromList [txt s]
 
 $(deriveJSON defaultOptions ''PreTestStage)
-$(deriveJSON defaultOptions ''LineNo)

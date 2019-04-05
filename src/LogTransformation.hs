@@ -52,8 +52,8 @@ newtype LineNo = LineNo { unLineNo :: Int } deriving (Show, Eq)
 logTransform :: forall a itm rsltItem m. Monad m =>
                                      m (Maybe ByteString)                                                             -- source
                                     -> ([ByteString] -> m ())                                                         -- sink
-                                    -> (a -> itm -> (a, Either LogTransformError (Maybe [rsltItem])))          -- reducer step
-                                    -> (LineNo -> ByteString -> Either DeserialisationError itm)                                            -- item desrialiser
+                                    -> (LineNo -> a -> itm -> (a, Either LogTransformError (Maybe [rsltItem])))       -- reducer step
+                                    -> (LineNo -> ByteString -> Either DeserialisationError itm)                      -- item desrialiser
                                     -> (rsltItem -> ByteString)                                                       -- result serialiser
                                     -> (LogTransformError -> ByteString)                                              -- error serialiser
                                     -> LineNo                                                                         -- linNo
@@ -79,7 +79,7 @@ logTransform src snk step idser rsltSersr errSersr lineNo accum =
             let 
               (nxtAccum, result) = either
                                      (\e -> (accum, Left e)) 
-                                     (step accum)
+                                     (step lineNo accum)
                                      (mapLeft LogDeserialisationError $ idser lineNo bs)
             in
               do
@@ -92,7 +92,7 @@ logTransform src snk step idser rsltSersr errSersr lineNo accum =
 -- -----------------------------------------------------
 
 transformToFile :: forall itm rslt accum.    
-                  (accum -> itm -> (accum, Either LogTransformError (Maybe [rslt])))             -- line stepper
+                  (LineNo -> accum -> itm -> (accum, Either LogTransformError (Maybe [rslt])))   -- line stepper
                   -> (LineNo -> ByteString -> Either DeserialisationError itm)                   -- a deserialiser for the item
                   -> (rslt -> ByteString)                                                        -- a serialiser for the result
                   -> (LogTransformError -> ByteString)                                           -- a serialiser for the error
@@ -165,10 +165,12 @@ testPrettyPrint input = runToList input $ logTransform testSource testSink prett
 -------------------- Shared Item Components ----------------
 ------------------------------------------------------------
 
-prettyPrintItem :: ()                                             -- accumulator
+prettyPrintItem :: 
+                LineNo 
+                -> ()                                             -- accumulator
                 -> LogProtocol                    -- line item
                 -> ((), Either LogTransformError (Maybe [Text]))             -- (accum, result item)
-prettyPrintItem _ lp = ((), Right .  Just . pure $ logStrPP False lp)
+prettyPrintItem _ _ lp = ((), Right .  Just . pure $ logStrPP False lp)
 
 lpDeserialiser :: LineNo -> ByteString -> Either DeserialisationError LogProtocol
 lpDeserialiser ln bs = mapLeft (\erStr -> DeserialisationError ln (toS erStr) (decodeUtf8' bs)) $ A.eitherDecode $ L.fromStrict bs
@@ -440,10 +442,12 @@ nextPhase current lp = case lp of
 outOfIterationLog :: LogProtocol -> TestIteration
 outOfIterationLog = OutOfIterationLog
 
-iterationStep :: IterationAccum                                           -- accum
-              -> Either LogTransformError LogProtocol                              -- parse error or apperror
-              -> (IterationAccum, Either LogTransformError (Maybe [TestIteration]))  -- (newAccum, err / result)
-iterationStep accum@(IterationAccum thisPhase stageFailure mRec) elp = 
+iterationStep ::
+              LineNo                                                                -- lineNo
+              -> IterationAccum                                                     -- accum
+              -> Either LogTransformError LogProtocol                               -- parse error or apperror
+              -> (IterationAccum, Either LogTransformError (Maybe [TestIteration])) -- (newAccum, err / result)
+iterationStep lineNo accum@(IterationAccum thisPhase stageFailure mRec) elp = 
     eitherf elp 
       (\e -> (accum, Left e)) -- seirialisation error
       (\lp ->
@@ -458,32 +462,38 @@ iterationStep accum@(IterationAccum thisPhase stageFailure mRec) elp =
                               EndIteration _ -> True
                               _ -> False
 
-          validPhaseChange :: Bool
-          validPhaseChange = expectedCurrentPhase thisPhase stageFailure lp == thisPhase && 
+          phaseChangeIsValid :: Bool
+          phaseChangeIsValid = expectedCurrentPhase thisPhase stageFailure lp == thisPhase && 
                              (thisPhase == OutOfIteration) == isNothing mRec
 
-          -- TODO:: check adding raw line to log steps
+
           invalidPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
           invalidPhaseStep =
             let 
+              nextAccum :: IterationAccum
               nextAccum = IterationAccum {
                 phase = OutOfIteration,         
                 stageFailure = NoFailure,
                 rec = Nothing
               } 
+
+              err :: TestIteration
+              err = LineError LogTransformError {
+                                  linNo = lineNo,
+                                  logItem = lp,
+                                  info = "Unexpected log message encounterred - Messages have either been lost or received out of order. Summary may not reflect true results of the test"
+                                } 
             in
-            
-            maybef mRec 
-                              uu --(Nothing, AppLineError)
-                              uu
+              (nextAccum, Right . Just $ maybef mRec 
+                                    [err] 
+                                    (\r -> [Iteration r , err])
+              )
 
           validPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
           validPhaseStep = uu
 
         in 
-          validPhaseChange 
-              ? validPhaseStep 
-              $ invalidPhaseStep
+          phaseChangeIsValid ? validPhaseStep $ invalidPhaseStep
       )
                        
 

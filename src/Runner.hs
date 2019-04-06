@@ -163,7 +163,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                                 F.traverse_ logChk $ D.toList $ CK.calcChecks ds (checkList i)
               in 
                 do 
-                  logger StartInteraction
+                  logRunItem StartInteraction
                   ethas <- onError 
                               (intrprt $ interactor rc i) 
                               (logger . LP.Error $ AppGenericError "Interactor Exception has Occurred")
@@ -183,7 +183,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                                     do
                                       logRunItem StartPrepState
                                       logRunItem . PrepStateSuccess iid . DStateDisplay . showPretty $ ds
-                                      logger StartChecks
+                                      logRunItem StartChecks
                                       runChecks ds
                                 )
                                 
@@ -206,13 +206,15 @@ docExecution logger interactor _ intrprt tc rc i = let
                                                       iid :: ItemId
                                                       iid = ItemId (moduleAddress tc) $ identifier i
 
+                                                      docLog = logger . logDoc
+
                                                       logChecks :: m ()
-                                                      logChecks =  P.sequence_ $  (\chk -> logger . logDoc $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
+                                                      logChecks =  P.sequence_ $  (\chk -> docLog $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
                                                     in 
                                                       do 
-                                                        logger DocInteraction
+                                                        docLog DocInteraction
                                                         intrprt (interactor rc i)
-                                                        logger DocChecks
+                                                        docLog DocChecks
                                                         logChecks
 
 

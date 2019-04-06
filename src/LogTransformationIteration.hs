@@ -1,6 +1,7 @@
 module LogTransformationIteration where
 
 import Common as C (AppError(..))
+import LogTransformationCommon
 import Check as CK
 import Pyrelude as P
 import Pyrelude.IO
@@ -279,143 +280,141 @@ nextPhase current lp = case lp of
                                                 StartChecks{} -> Checks
                                                 CheckOutcome{}  -> Checks
 
+serialiseIteration :: TestIteration -> ByteString
+serialiseIteration = L.toStrict . A.encode
+
 iterationStep ::
               LineNo                                                                -- lineNo
               -> IterationAccum                                                     -- accum
-              -> Either LogTransformError LogProtocol                               -- parse error or apperror
+              -> LogProtocol                                                        -- parse error or apperror
               -> (IterationAccum, Either LogTransformError (Maybe [TestIteration])) -- (newAccum, err / result)
-iterationStep lineNo accum@(IterationAccum thisPhase stageFailure mRec) ethLp = 
-    eitherf ethLp 
-      (\e -> (accum, Left e)) -- seirialisation error
-      (\lp ->
-        let
-          isStartIteration :: Bool 
-          isStartIteration = case lp of
-                                StartIteration{} -> True
-                                _ -> False
+iterationStep lineNo accum@(IterationAccum thisPhase stageFailure mRec) lp = 
+  let
+    isStartIteration :: Bool 
+    isStartIteration = case lp of
+                          StartIteration{} -> True
+                          _ -> False
 
-          isEndIteration ::  Bool 
-          isEndIteration = case lp of 
-                              EndIteration _ -> True
-                              _ -> False
-
-          -- this is the wrong kind of sublog
-          -- should never happen                                                 
-          isDocLog ::  Bool
-          isDocLog = case lp of
-                        SubLog (Doc _) -> True
+    isEndIteration ::  Bool 
+    isEndIteration = case lp of 
+                        EndIteration _ -> True
                         _ -> False
 
-          phaseChangeIsValid :: Bool
-          phaseChangeIsValid = expectedCurrentPhase thisPhase stageFailure lp == thisPhase 
-                               &&  (thisPhase == OutOfIteration) == isNothing mRec
-                               && not isDocLog
+    -- this is the wrong kind of sublog
+    -- should never happen                                                 
+    isDocLog ::  Bool
+    isDocLog = case lp of
+                  SubLog (Doc _) -> True
+                  _ -> False
 
-          invalidPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
-          invalidPhaseStep =
-            let 
-              nextAccum :: IterationAccum
-              nextAccum = IterationAccum {
-                phase = OutOfIteration,         
-                stageFailure = NoFailure,
-                rec = Nothing
-              } 
+    phaseChangeIsValid :: Bool
+    phaseChangeIsValid = expectedCurrentPhase thisPhase stageFailure lp == thisPhase 
+                          &&  (thisPhase == OutOfIteration) == isNothing mRec
+                          && not isDocLog
 
-              err :: TestIteration
-              err = LineError LogTransformError {
-                                  linNo = lineNo,
-                                  logItem = lp,
-                                  info = isDocLog 
-                                            ? "A documentation log has been encountered during a run - this type of log should not be generated during a run"
-                                            $ "Unexpected log message encounterred - Messages have either been lost or received out of order.\n"
-                                               <> "Test and Interation summaries may not reflect true results of the test"
-                                } 
-            in
-              (nextAccum, Right . Just $ maybef mRec 
-                                          [err] 
-                                          (\r -> [Iteration r , err]) -- if the record exists close it off add add a error record after
-              )
+    invalidPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
+    invalidPhaseStep =
+      let 
+        nextAccum :: IterationAccum
+        nextAccum = IterationAccum {
+          phase = OutOfIteration,         
+          stageFailure = NoFailure,
+          rec = Nothing
+        } 
 
-          -- TODO: Add raw log - special processing for end iteration
-          -- UpdateErrors
-          -- phase change
-          -- if nothing result is singleton - OutOfIterationLog
-          -- subLog Doc log error
-          validPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
-          validPhaseStep = let 
-                            nextRec:: LogProtocol -> IterationRecord -> Maybe IterationRecord
-                            nextRec lgp thisRec =
-                              updateErrsWarnings thisPhase lgp  
-                              . apppendRaw lgp <$>  
-                                    case lgp of
-                                      Message _ -> pure thisRec
-                                      Message' _ -> pure thisRec
-                                      LP.Warning _ -> pure thisRec
-                                      Warning' detailedInfo -> pure thisRec
-                                      LP.Error _ -> pure thisRec
+        err :: TestIteration
+        err = LineError LogTransformError {
+                            linNo = lineNo,
+                            logItem = lp,
+                            info = isDocLog 
+                                      ? "A documentation log has been encountered during a run - this type of log should not be generated during a run"
+                                      $ "Unexpected log message encounterred - Messages have either been lost or received out of order.\n"
+                                          <> "Test and Interation summaries may not reflect true results of the test"
+                          } 
+      in
+        (nextAccum, Right . Just $ maybef mRec 
+                                    [err] 
+                                    (\r -> [Iteration r , err]) -- if the record exists close it off add add a error record after
+        )
 
-                                      StartRun{} -> Nothing
-                                      EndRun -> Nothing
-                                      FilterLog _ -> Nothing
-                                      StartGroup _ -> Nothing
-                                      EndGroup _ -> Nothing
-                                      StartTest _ -> Nothing
-                                      EndTest _ -> Nothing
-                                      
-                                      StartIteration iid pre post val -> pure $ IterationRecord {
-                                                                                                  summary = IterationSummary {
-                                                                                                    iid = iid,
-                                                                                                    pre = pre,
-                                                                                                    post = post,
-                                                                                                    result = Inconclusive
-                                                                                                  },
-                                                                                                  validation = [],
-                                                                                                  otherErrorsDesc = [],
-                                                                                                  otherWarningsDesc = [],
-                                                                                                  item = Just $ ItemInfo iid pre post val,
-                                                                                                  apState = Nothing,
-                                                                                                  domainState = Nothing,
-                                                                                                  rawLog = D.empty
-                                                                                                }
-                                      
-                                      EndIteration _ -> Nothing -- note special processing for end iteration
+    -- TODO: Add raw log - special processing for end iteration
+    -- UpdateErrors
+    -- phase change
+    -- if nothing result is singleton - OutOfIterationLog
+    -- subLog Doc log error
+    validPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
+    validPhaseStep = let 
+                      nextRec:: LogProtocol -> IterationRecord -> Maybe IterationRecord
+                      nextRec lgp thisRec =
+                        updateErrsWarnings thisPhase lgp  
+                        . apppendRaw lgp <$>  
+                              case lgp of
+                                Message _ -> pure thisRec
+                                Message' _ -> pure thisRec
+                                LP.Warning _ -> pure thisRec
+                                Warning' detailedInfo -> pure thisRec
+                                LP.Error _ -> pure thisRec
 
-                                      SubLog (Doc _) -> Nothing
+                                StartRun{} -> Nothing
+                                EndRun -> Nothing
+                                FilterLog _ -> Nothing
+                                StartGroup _ -> Nothing
+                                EndGroup _ -> Nothing
+                                StartTest _ -> Nothing
+                                EndTest _ -> Nothing
+                                
+                                StartIteration iid pre post val -> pure $ IterationRecord {
+                                                                                            summary = IterationSummary {
+                                                                                              iid = iid,
+                                                                                              pre = pre,
+                                                                                              post = post,
+                                                                                              result = Inconclusive
+                                                                                            },
+                                                                                            validation = [],
+                                                                                            otherErrorsDesc = [],
+                                                                                            otherWarningsDesc = [],
+                                                                                            item = Just $ ItemInfo iid pre post val,
+                                                                                            apState = Nothing,
+                                                                                            domainState = Nothing,
+                                                                                            rawLog = D.empty
+                                                                                          }
+                                
+                                EndIteration _ -> Nothing -- note special processing for end iteration
 
-                                      SubLog (Run rp) -> case rp of
-                                        StartInteraction -> pure thisRec
-                                        StartChecks -> pure thisRec
-                                        StartPrepState -> pure thisRec
-                      
-                                        IOAction m -> pure thisRec
-                                        
-                                        InteractorSuccess iid displayInfo -> pure $ thisRec {apState = Just $ SucceededInteractor displayInfo}
-                                          
-                                        InteractorFailure iid err -> pure $ thisRec {apState = Just $ FailedInteractor err}
+                                SubLog (Doc _) -> Nothing
 
-                                        LP.PrepStateSuccess iid dStateDisplayInfo -> pure $ thisRec {domainState = Just $ SucceededPrepState dStateDisplayInfo}
-                                        PrepStateFailure iid err -> pure $ thisRec {domainState = Just $ FailedPrepState err}
+                                SubLog (Run rp) -> case rp of
+                                  StartInteraction -> pure thisRec
+                                  StartChecks -> pure thisRec
+                                  StartPrepState -> pure thisRec
+                
+                                  IOAction m -> pure thisRec
+                                  
+                                  InteractorSuccess iid displayInfo -> pure $ thisRec {apState = Just $ SucceededInteractor displayInfo}
+                                    
+                                  InteractorFailure iid err -> pure $ thisRec {apState = Just $ FailedInteractor err}
 
-                                        CheckOutcome iid cr@(CheckReport reslt (CheckInfo chkhdr mbInfo)) -> 
-                                          pure $ thisRec {validation = P.snoc (validation thisRec) cr}
-                            in 
-                             (
-                              IterationAccum {
-                                phase = nextPhase thisPhase lp,
-                                stageFailure = failStage lp,
-                                rec = mRec >>= nextRec lp
-                              }, Right $ 
-                                    maybef mRec
-                                     (Just [OutOfIterationLog lp])
-                                     (\irec -> isEndIteration 
-                                                    ? Just [Iteration $ apppendRaw lp irec]
-                                                    $ Nothing
-                                                    )
-                             )
-        in 
-            phaseChangeIsValid ? validPhaseStep $ invalidPhaseStep
-      )
+                                  LP.PrepStateSuccess iid dStateDisplayInfo -> pure $ thisRec {domainState = Just $ SucceededPrepState dStateDisplayInfo}
+                                  PrepStateFailure iid err -> pure $ thisRec {domainState = Just $ FailedPrepState err}
 
+                                  CheckOutcome iid cr@(CheckReport reslt (CheckInfo chkhdr mbInfo)) -> 
+                                    pure $ thisRec {validation = P.snoc (validation thisRec) cr}
+                      in 
+                        (
+                        IterationAccum {
+                          phase = nextPhase thisPhase lp,
+                          stageFailure = failStage lp,
+                          rec = mRec >>= nextRec lp
+                        }, Right $ 
+                              maybef mRec
+                                (Just [OutOfIterationLog lp])
+                                (\irec -> isEndIteration 
+                                              ? Just [Iteration $ apppendRaw lp irec]
+                                              $ Nothing
+                                              )
+                        )
+  in 
+      phaseChangeIsValid ? validPhaseStep $ invalidPhaseStep
 
 $(deriveJSON defaultOptions ''IterationRecord)
 $(deriveJSON defaultOptions ''ApStateInfo)
@@ -426,6 +425,4 @@ $(deriveJSON defaultOptions ''IterationSummary)
 $(deriveJSON defaultOptions ''IterationResult)
 $(deriveJSON defaultOptions ''IterationError)
 $(deriveJSON defaultOptions ''IterationPhase)
-$(deriveJSON defaultOptions ''LineNo)
-$(deriveJSON defaultOptions ''DeserialisationError)
-$(deriveJSON defaultOptions ''LogTransformError)
+$(deriveJSON defaultOptions ''TestIteration)

@@ -21,167 +21,6 @@ import Control.Monad.Writer.Strict
 import Control.Monad.State.Strict
 import Control.Monad.Identity
 
--- TODO: update to use streaming library such as streamly
-
-
-data LogTransformError =  LogDeserialisationError DeserialisationError |
-
-                          LogIOError {
-                                  message :: Text,
-                                  error :: IOError
-                                } |
-
-                          LogTransformError {
-                                  linNo :: LineNo,
-                                  logItem :: LogProtocol,
-                                  info :: Text
-                                } deriving (Eq, Show)
-
-data DeserialisationError  = DeserialisationError {
-                              linNo :: LineNo,
-                              errorTxt :: Text,
-                              line :: Either UnicodeException Text -- the type for decode UTF8
-                            }  deriving (Eq, Show)
-
------------------------------------------------------------------
------------------ Generalised Log Transformation ----------------
------------------------------------------------------------------
-
-newtype LineNo = LineNo { unLineNo :: Int } deriving (Show, Eq)
-
-logTransform :: forall a itm rsltItem m src snk. Monad m =>
-                                     m (Maybe src)                                                             -- source
-                                    -> ([snk] -> m ())                                                         -- sink
-                                    -> (LineNo -> a -> itm -> (a, Either LogTransformError (Maybe [rsltItem])))       -- reducer step
-                                    -> (LineNo -> src -> Either DeserialisationError itm)                      -- item desrialiser
-                                    -> (rsltItem -> snk)                                                       -- result serialiser
-                                    -> (LogTransformError -> snk)                                              -- error serialiser
-                                    -> LineNo                                                                  -- linNo
-                                    -> a                                                                       -- accumulattor
-                                    -> m ()
-logTransform src snk step idser rsltSersr errSersr lineNo accum =
-    let 
-      localLoop :: LineNo -> a -> m ()
-      localLoop = logTransform src snk step idser rsltSersr errSersr
-
-      errorSnk :: LogTransformError -> m ()
-      errorSnk = snk . pure . errSersr 
-
-      rsltSink :: [rsltItem] -> m ()
-      rsltSink = snk . fmap rsltSersr
-    in
-      do 
-        lg <- src
-
-        maybef lg
-          (pure ()) -- EOF
-          (\bs ->
-            let 
-              (nxtAccum, result) = either
-                                     (\e -> (accum, Left e)) 
-                                     (step lineNo accum)
-                                     (mapLeft LogDeserialisationError $ idser lineNo bs)
-            in
-              do
-                either errorSnk (maybe (pure ()) rsltSink) result
-                localLoop (LineNo $ unLineNo lineNo + 1) nxtAccum
-          )
-          
--- -----------------------------------------------------
--- ----------------- FileTransformation ----------------
--- -----------------------------------------------------
-
-transformToFile :: forall itm rslt accum.    
-                  (LineNo -> accum -> itm -> (accum, Either LogTransformError (Maybe [rslt])))   -- line stepper
-                  -> (LineNo -> ByteString -> Either DeserialisationError itm)                   -- a deserialiser for the item
-                  -> (rslt -> ByteString)                                                        -- a serialiser for the result
-                  -> (LogTransformError -> ByteString)                                           -- a serialiser for the error
-                  -> accum                                                                       -- seed accumulator
-                  -> AbsFile                                                                     -- source file
-                  -> (forall m. MonadThrow m => AbsFile -> m AbsFile)                             -- dest file calculation                                                          -- seed accumulator
-                  -> IO (Either LogTransformError AbsFile)
-transformToFile step idser rser eser seed srcPth destPthFunc =
-        let
-          source :: Handle -> IO (Maybe ByteString) 
-          source h = hIsEOF h >>= bool (Just <$> B.hGetLine h) (pure Nothing)
-          
-          sink :: Handle -> [ByteString] -> IO () 
-          sink h bs = sequence_ $ B.hPutStrLn h <$> bs
-          
-          processLines :: Handle -> Handle -> IO ()
-          processLines hIn hOut = logTransform (source hIn) (sink hOut) step idser rser eser (LineNo 1) seed 
-        in
-          do
-            hSrc <- safeOpenFile srcPth ReadMode
-            eitherf hSrc
-                (pure . Left . LogIOError "Openning Source File")
-                (\hIn -> 
-                        (
-                          do
-                            rsltFile <- destPthFunc srcPth
-                            outHndle <- safeOpenFile rsltFile S.WriteMode 
-                            eitherf outHndle
-                              (pure . Left . LogIOError "Openning Output File")
-                              (\hOut -> finally (processLines hIn hOut) (S.hClose hOut) $> Right rsltFile)        
-                        ) 
-                        `finally`
-                           hClose hIn
-                )
-                
-testPrettyPrintFile :: AbsFile                                            -- source file
-                    -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
-                    -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
-testPrettyPrintFile = transformToFile prettyPrintItem lpDeserialiser textToByteString showToByteString ()
-
-
-
-
-------------------------------------------------------
------------------ Testing Using DList ----------------
-------------------------------------------------------
-
-type WriterState a = WriterT (DList ByteString) (StateT (DList ByteString) Identity) a
-
-runToList :: DList ByteString -> WriterState a -> DList ByteString
-runToList input m = snd . fst . runIdentity $ runStateT (runWriterT m) input
-
-testSource :: WriterState (Maybe ByteString)     
-testSource = do 
-              dlst <- get 
-              case dlst of
-                Nil -> pure Nothing
-                Cons x xs -> do
-                              put $ fromList xs
-                              pure $ Just x 
-                _ -> P.error "DList pattern match error this should never happen"
-
-testSink :: [ByteString] -> WriterState ()
-testSink = tell . fromList 
-
-testPrettyPrint :: DList ByteString -> DList ByteString
-testPrettyPrint input = runToList input $ logTransform testSource testSink prettyPrintItem lpDeserialiser textToByteString showToByteString (LineNo 1) ()
-
-------------------------------------------------------------
--------------------- Shared Item Components ----------------
-------------------------------------------------------------
-
-prettyPrintItem :: 
-                LineNo 
-                -> ()                                             -- accumulator
-                -> LogProtocol                    -- line item
-                -> ((), Either LogTransformError (Maybe [Text]))             -- (accum, result item)
-prettyPrintItem _ _ lp = ((), Right .  Just . pure $ logStrPP False lp)
-
-lpDeserialiser :: LineNo -> ByteString -> Either DeserialisationError LogProtocol
-lpDeserialiser ln bs = mapLeft (\erStr -> DeserialisationError ln (toS erStr) (decodeUtf8' bs)) $ A.eitherDecode $ L.fromStrict bs
-
-textToByteString :: Text ->  ByteString
-textToByteString = toS
-
-showToByteString :: Show a => a ->  ByteString
-showToByteString = textToByteString . txt
-
-
 --------------------------------------------------------
 ----------------- Iteration Aggregation ----------------
 --------------------------------------------------------
@@ -204,16 +43,16 @@ data IterationResult = Inconclusive |
 isFailure :: IterationResult -> Bool
 isFailure = \case 
               Inconclusive -> False
-              LogTransformation.Pass -> False
-              LogTransformation.Warning _ -> False
-              LogTransformation.Fail _ -> True
+              LogTransformationIteration.Pass -> False
+              LogTransformationIteration.Warning _ -> False
+              LogTransformationIteration.Fail _ -> True
 
 isWarning :: IterationResult -> Bool
 isWarning = \case 
               Inconclusive -> False
-              LogTransformation.Pass -> False
-              LogTransformation.Warning _ -> True
-              LogTransformation.Fail _ -> False
+              LogTransformationIteration.Pass -> False
+              LogTransformationIteration.Warning _ -> True
+              LogTransformationIteration.Fail _ -> False
 
 data IterationSummary = IterationSummary {
                         iid :: ItemId,
@@ -286,9 +125,9 @@ updateErrsWarnings p lp ir =
       Message _ -> Inconclusive
       Message' _ -> Inconclusive
 
-      (LP.Warning _) -> LogTransformation.Warning p
-      (Warning' _) -> LogTransformation.Warning p
-      (LP.Error _) -> LogTransformation.Fail p
+      (LP.Warning _) -> LogTransformationIteration.Warning p
+      (Warning' _) -> LogTransformationIteration.Warning p
+      (LP.Error _) -> LogTransformationIteration.Fail p
 
       StartRun{} -> Inconclusive
       EndRun -> Inconclusive
@@ -301,30 +140,30 @@ updateErrsWarnings p lp ir =
       StartIteration {} -> Inconclusive
       EndIteration _ -> Inconclusive
       
-      SubLog (Doc dp) -> LogTransformation.Fail p
+      SubLog (Doc dp) -> LogTransformationIteration.Fail p
       SubLog (Run rp) -> case rp of
                               StartPrepState -> Inconclusive
                               IOAction _ -> Inconclusive
 
                               StartInteraction -> Inconclusive
-                              InteractorSuccess {} -> LogTransformation.Pass
-                              InteractorFailure {} -> LogTransformation.Fail p
+                              InteractorSuccess {} -> LogTransformationIteration.Pass
+                              InteractorFailure {} -> LogTransformationIteration.Fail p
 
-                              LP.PrepStateSuccess {} -> LogTransformation.Pass
-                              PrepStateFailure {} -> LogTransformation.Fail p
+                              LP.PrepStateSuccess {} -> LogTransformationIteration.Pass
+                              PrepStateFailure {} -> LogTransformationIteration.Fail p
 
                               StartChecks{} -> Inconclusive
                               CheckOutcome _ (CheckReport reslt _) -> case classifyResult reslt of
-                                                                        OK -> LogTransformation.Pass
-                                                                        CK.Error -> LogTransformation.Fail p
-                                                                        CK.Warning -> LogTransformation.Warning p
+                                                                        OK -> LogTransformationIteration.Pass
+                                                                        CK.Error -> LogTransformationIteration.Fail p
+                                                                        CK.Warning -> LogTransformationIteration.Warning p
                                                                         Skipped -> Inconclusive
 
     notCheckPhase :: Bool
     notCheckPhase = p /= Checks
 
     worstResult :: IterationResult
-    worstResult = max lpResult $ LogTransformation.result (summary ir)
+    worstResult = max lpResult $ LogTransformationIteration.result (summary ir)
 
   in 
     ir {

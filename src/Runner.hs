@@ -161,8 +161,6 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                                 logChk cr = logRunItem $ CheckOutcome iid cr
                               in
                                 F.traverse_ logChk $ D.toList $ CK.calcChecks ds (checkList i)
-
-                
               in 
                 do 
                   logger StartInteraction
@@ -212,9 +210,9 @@ docExecution logger interactor _ intrprt tc rc i = let
                                                       logChecks =  P.sequence_ $  (\chk -> logger . logDoc $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
                                                     in 
                                                       do 
-                                                        logger StartInteraction
+                                                        logger DocInteraction
                                                         intrprt (interactor rc i)
-                                                        logger StartChecks
+                                                        logger DocChecks
                                                         logChecks
 
 

@@ -40,7 +40,7 @@ logWarning = simpleLog Warning
 logWarning' :: forall effs. (Member Logger effs) => Text -> Text -> Eff effs ()
 logWarning' = detailLog  Warning'
 
-logError :: forall effs.  Member Logger effs => Text -> Eff effs ()
+logError :: forall effs. Member Logger effs => Text -> Eff effs ()
 logError = simpleLog (Error . AppUserError)
 
 logError' :: forall effs. Member Logger effs => Text -> Text -> Eff effs ()
@@ -140,9 +140,6 @@ logStrPP docMode =
                                                   newLn <> ppAesonBlock val <>
                                                   (docMode ? "" $ newLn)
 
-                  StartInteraction -> newLn <> "Interaction:"
-                  StartChecks -> newLn <> "Checks:"
-
                   EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
                   EndRun -> newLn <> header "End Run"
 
@@ -153,7 +150,8 @@ logStrPP docMode =
                                                                           msg <> 
                                                                           newLn <> 
                                                                           indent2 extended
-
+                                        DocInteraction -> newLn <> "Interaction:"
+                                        DocChecks -> newLn <> "Checks:"
                                         DocCheck iid chkhdr resultExpectation gateStatus -> 
                                                     indent2 $ "% " <> chkhdr  <> 
                                                         (
@@ -171,6 +169,8 @@ logStrPP docMode =
                                         DocIOAction m -> logIO m
 
                   SubLog (Run rp) -> case rp of
+                                        StartInteraction -> newLn <> "Interaction:"
+                                        StartChecks -> newLn <> "Checks:"
                                         StartPrepState -> newLn <> "PrepState:"
                       
                                         IOAction m -> indent2 $ logIO m 

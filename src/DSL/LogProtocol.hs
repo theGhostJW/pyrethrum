@@ -38,20 +38,23 @@ logRun :: RunProtocol -> LogProtocol
 logRun = SubLog . Run
 
 data DocProtocol =   
-                DocIOAction Text |
+                DocInteraction |
                 DocAction DocActionInfo |
+                DocIOAction Text |
+                DocChecks | 
                 DocCheck ItemId Text ResultExpectation GateStatus 
               deriving (Eq, Show)
 
 data RunProtocol =   
                 IOAction Text |
                 StartPrepState |
-              
+                StartInteraction |
                 InteractorSuccess ItemId ApStateDisplay |
                 InteractorFailure ItemId AppError |
               
                 PrepStateSuccess ItemId DStateDisplay |
                 PrepStateFailure ItemId AppError |
+                StartChecks | 
                 CheckOutcome ItemId CheckReport 
               deriving (Eq, Show)
 
@@ -75,9 +78,6 @@ data LogProtocol =
   StartIteration ItemId WhenClause ThenClause Value | 
   EndIteration ItemId |
 
-  StartInteraction |
-  StartChecks | 
-  
   Message Text |
   Message' DetailedInfo |
 

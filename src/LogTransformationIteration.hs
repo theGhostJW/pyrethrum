@@ -308,10 +308,9 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                   _ -> False
 
     phaseChangeIsValid :: Bool
-    phaseChangeIsValid = debug' (txt lineNo <> " FINAL " <> txt lp) $
-                          debug' (txt lineNo <> " Phase") (expectedCurrentPhase lastPhase stageFailure lp == lastPhase)
-                          && debug' (txt lineNo <> " correlates with Maybe") ((isStartIteration || (lastPhase == OutOfIteration)) == isNothing mRec)
-                          && debug' (txt lineNo <> " notDocLog") (not isDocLog)
+    phaseChangeIsValid =  expectedCurrentPhase lastPhase stageFailure lp == lastPhase
+                          && ((isStartIteration || (lastPhase == OutOfIteration)) == isNothing mRec)
+                          && not isDocLog
 
     invalidPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
     invalidPhaseStep =

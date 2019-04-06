@@ -18,6 +18,8 @@ import System.IO (stdout)
 
 data Logger r where
  LogItem :: LogProtocol -> Logger ()
+ LogError :: Text -> Logger ()
+ LogError' :: Text -> Text -> Logger ()
 
 logItem :: Member Logger effs => LogProtocol -> Eff effs ()
 logItem = send . LogItem
@@ -41,16 +43,23 @@ logWarning' :: forall effs. (Member Logger effs) => Text -> Text -> Eff effs ()
 logWarning' = detailLog  Warning'
 
 logError :: forall effs. Member Logger effs => Text -> Eff effs ()
-logError = simpleLog (Error . AppUserError)
+logError = send . LogError  --simpleLog (Error . AppUserError)
 
 logError' :: forall effs. Member Logger effs => Text -> Text -> Eff effs ()
-logError' = detailLog  (Error . AppUserError')
+logError' msg = send . LogError' msg --- detailLog  (Error . AppUserError')
 
 logConsoleInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
-logConsoleInterpreter = interpretM $ \(LogItem lp) -> P.print lp
+logConsoleInterpreter = interpretM $ \case 
+                                        LogItem lp -> P.print lp
+                                        LogError msg -> P.print . logRun . Error $ AppUserError msg 
+                                        LogError' msg info -> P.print . logRun . Error . AppUserError' $ DetailedInfo msg info
 
 logDocInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
-logDocInterpreter = interpret $ \(LogItem lp) -> tell $ dList lp
+logDocInterpreter = interpret $ \case 
+                                    LogItem lp -> tell $ dList lp
+                                    LogError msg -> tell . dList . logDoc . DocError $ AppUserError msg 
+                                    LogError' msg info -> tell . dList . logDoc . DocError . AppUserError' $ DetailedInfo msg info
+
 
 putLines :: Handle -> Text -> IO ()
 putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
@@ -119,7 +128,6 @@ logStrPP docMode =
                   Warning s -> docMarkUp $ "warning: " <> s
                   Warning' detailedInfo -> detailDoc "Warning" detailedInfo
 
-                  e@(Error _) -> showPretty e
                   FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
                                                 foldl (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
@@ -167,6 +175,7 @@ logStrPP docMode =
                                                         )
   
                                         DocIOAction m -> logIO m
+                                        e@(DocError _) -> showPretty e
 
                   SubLog (Run rp) -> case rp of
                                         StartInteraction -> newLn <> "Interaction:"
@@ -185,6 +194,7 @@ logStrPP docMode =
                                         CheckOutcome iid (CheckReport reslt (CheckInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> showPretty (classifyResult reslt)) iid $ 
                                                                                                                                     chkhdr  <> " -> " <> showPretty reslt <> 
                                                                                                                                     ppMsgInfo mbInfo
+                                        e@(Error _) -> showPretty e
 
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
@@ -193,19 +203,38 @@ logConsolePrettyInterpreter = logToHandles [(logStrPP False, stdout)]
 logToHandles :: LastMember IO effs => [(LogProtocol -> Text, Handle)] -> Eff (Logger ': effs) ~> Eff effs
 logToHandles convertersHandlers = 
                         let 
+                          toLogProtocol :: Logger r -> LogProtocol
+                          toLogProtocol = \case 
+                                              LogItem lp -> lp
+                                              LogError msg -> SubLog (Run . Error $ AppUserError msg)
+                                              LogError' msg info -> SubLog (Run . Error . AppUserError' $ DetailedInfo msg info)
+
                           logToHandle :: (LogProtocol -> Text) -> Handle -> Logger r -> IO ()
-                          logToHandle lp2Str h (LogItem lp) = putLines h $ lp2Str lp
+                          logToHandle lp2Str h = putLines h . lp2Str . toLogProtocol
+
+                          logToh ::  Logger r -> (LogProtocol -> Text, Handle) -> IO ()
+                          logToh li (f, h) = logToHandle f h li
+
+                          logTohandles ::  Logger r -> IO ()
+                          logTohandles lgr =  P.sequence_ $ logToh lgr <$> convertersHandlers
                         in
-                          interpretM $ \li@(LogItem lp) -> 
-                                        let 
-                                          logToh :: (LogProtocol -> Text, Handle) -> IO ()
-                                          logToh (f, h) = logToHandle f h li
-                                        in
-                                          P.sequence_ $ logToh <$> convertersHandlers
+                          interpretM $ \case 
+                                          li@(LogItem _) -> logTohandles li
+                                          li@(LogError _) -> logTohandles li
+                                          li@LogError'{} -> logTohandles li
+                                          
                              
-logDocPrettyInterpreter :: Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
+logDocPrettyInterpreter :: forall effs. Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocPrettyInterpreter = let
                             toDList :: [Text] -> DList Text
                             toDList = fromList
+
+                            pushItem :: LogProtocol -> Eff effs () 
+                            pushItem lp = tell . toDList . lines $ logStrPP True lp
                           in
-                            interpret $ \(LogItem lp) -> tell . toDList . lines $ logStrPP True lp
+                            interpret $ \case 
+                                          LogItem lp -> pushItem lp
+                                          LogError msg -> pushItem li
+                                          LogError' msg inf -> pushItem li
+
+                               

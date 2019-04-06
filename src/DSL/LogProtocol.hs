@@ -42,7 +42,9 @@ data DocProtocol =
                 DocAction DocActionInfo |
                 DocIOAction Text |
                 DocChecks | 
-                DocCheck ItemId Text ResultExpectation GateStatus 
+                DocCheck ItemId Text ResultExpectation GateStatus |
+                
+                DocError AppError
               deriving (Eq, Show)
 
 data RunProtocol =   
@@ -55,7 +57,9 @@ data RunProtocol =
                 PrepStateSuccess ItemId DStateDisplay |
                 PrepStateFailure ItemId AppError |
                 StartChecks | 
-                CheckOutcome ItemId CheckReport 
+                CheckOutcome ItemId CheckReport |
+
+                Error AppError
               deriving (Eq, Show)
 
 data SubProtocol = 
@@ -83,8 +87,6 @@ data LogProtocol =
 
   Warning Text |
   Warning' DetailedInfo |
-
-  Error AppError |
 
   SubLog SubProtocol
 

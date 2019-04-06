@@ -113,6 +113,12 @@ testPrettyPrintFile :: AbsFile                                            -- sou
                     -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
 testPrettyPrintFile = transformToFile prettyPrintItem lpDeserialiser textToByteString showToByteString ()
 
+                
+testIterationStepFile :: AbsFile                                            -- source file
+                    -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
+                    -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
+testIterationStepFile = transformToFile iterationStep lpDeserialiser serialiseIteration showToByteString emptyAccum
+
 
 ------------------------------------------------------
 ----------------- Testing Using DList ----------------

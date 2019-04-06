@@ -181,6 +181,37 @@ updateErrsWarnings p lp ir =
 apppendRaw :: LogProtocol -> IterationRecord -> IterationRecord
 apppendRaw lp ir = ir {rawLog = D.snoc (rawLog ir) lp} 
 
+failStage :: LogProtocol -> FailStage
+failStage = \case
+                StartRun{} -> NoFailure
+                EndRun -> NoFailure
+                Message _ -> NoFailure
+                Message' _ -> NoFailure
+                LP.Warning{} -> NoFailure
+                Warning' _ -> NoFailure
+                LP.Error _ -> NoFailure
+                FilterLog _ -> NoFailure
+                StartGroup _ -> NoFailure
+                EndGroup _ -> NoFailure
+                StartTest _ -> NoFailure
+                EndTest _ -> NoFailure
+
+                StartIteration{} -> NoFailure
+                EndIteration _ -> NoFailure
+
+                -- should never happen
+                SubLog (Doc _) -> NoFailure
+                SubLog (Run rp) -> case rp of
+                                      StartPrepState -> NoFailure
+                                      IOAction _ -> NoFailure
+                                      StartInteraction -> NoFailure
+                                      InteractorSuccess{} -> NoFailure
+                                      InteractorFailure{}  -> InteractorFailed
+                                      LP.PrepStateSuccess{}  -> NoFailure
+                                      PrepStateFailure iid err -> PrepStateFailed
+                                      StartChecks{} -> NoFailure
+                                      CheckOutcome{} -> NoFailure
+
 expectedCurrentPhase :: IterationPhase -> FailStage -> LogProtocol -> IterationPhase
 expectedCurrentPhase current fs lp = case lp of
                                       StartRun{} -> OutOfIteration
@@ -218,37 +249,6 @@ expectedCurrentPhase current fs lp = case lp of
                                                             StartChecks{} -> PreChecks
                                                             CheckOutcome{} -> Checks
 
-failStage :: LogProtocol -> FailStage
-failStage = \case
-                StartRun{} -> NoFailure
-                EndRun -> NoFailure
-                Message _ -> NoFailure
-                Message' _ -> NoFailure
-                LP.Warning{} -> NoFailure
-                Warning' _ -> NoFailure
-                LP.Error _ -> NoFailure
-                FilterLog _ -> NoFailure
-                StartGroup _ -> NoFailure
-                EndGroup _ -> NoFailure
-                StartTest _ -> NoFailure
-                EndTest _ -> NoFailure
-
-                StartIteration{} -> NoFailure
-                EndIteration _ -> NoFailure
-
-                -- should never happen
-                SubLog (Doc _) -> NoFailure
-                SubLog (Run rp) -> case rp of
-                                      StartPrepState -> NoFailure
-                                      IOAction _ -> NoFailure
-                                      StartInteraction -> NoFailure
-                                      InteractorSuccess{} -> NoFailure
-                                      InteractorFailure{}  -> InteractorFailed
-                                      LP.PrepStateSuccess{}  -> NoFailure
-                                      PrepStateFailure iid err -> PrepStateFailed
-                                      StartChecks{} -> NoFailure
-                                      CheckOutcome{} -> NoFailure
-
 nextPhase :: IterationPhase -> LogProtocol -> IterationPhase
 nextPhase current lp = case lp of
                           StartRun{} -> OutOfIteration
@@ -273,10 +273,10 @@ nextPhase current lp = case lp of
                                                 StartPrepState -> PrepState
                                                 IOAction _ -> current
                                                 StartInteraction -> Interactor
-                                                InteractorSuccess{} -> PrepState 
-                                                InteractorFailure{}  -> PrepState
+                                                InteractorSuccess{} -> PrePrepState 
+                                                InteractorFailure{}  -> Interactor  -- leave in failed phase
                                                 LP.PrepStateSuccess{}  -> PreChecks
-                                                PrepStateFailure iid err -> PreChecks
+                                                PrepStateFailure iid err -> PrepState -- leave in failed phase
                                                 StartChecks{} -> Checks
                                                 CheckOutcome{}  -> Checks
 
@@ -288,7 +288,7 @@ iterationStep ::
               -> IterationAccum                                                     -- accum
               -> LogProtocol                                                        -- parse error or apperror
               -> (IterationAccum, Either LogTransformError (Maybe [TestIteration])) -- (newAccum, err / result)
-iterationStep lineNo accum@(IterationAccum thisPhase stageFailure mRec) lp = 
+iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp = 
   let
     isStartIteration :: Bool 
     isStartIteration = case lp of
@@ -308,9 +308,10 @@ iterationStep lineNo accum@(IterationAccum thisPhase stageFailure mRec) lp =
                   _ -> False
 
     phaseChangeIsValid :: Bool
-    phaseChangeIsValid = expectedCurrentPhase thisPhase stageFailure lp == thisPhase 
-                          &&  (thisPhase == OutOfIteration) == isNothing mRec
-                          && not isDocLog
+    phaseChangeIsValid = debug' (txt lineNo <> " FINAL " <> txt lp) $
+                          debug' (txt lineNo <> " Phase") (expectedCurrentPhase lastPhase stageFailure lp == lastPhase)
+                          && debug' (txt lineNo <> " correlates with Maybe") ((isStartIteration || (lastPhase == OutOfIteration)) == isNothing mRec)
+                          && debug' (txt lineNo <> " notDocLog") (not isDocLog)
 
     invalidPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
     invalidPhaseStep =
@@ -337,18 +338,34 @@ iterationStep lineNo accum@(IterationAccum thisPhase stageFailure mRec) lp =
                                     (\r -> [Iteration r , err]) -- if the record exists close it off add add a error record after
         )
 
-    -- TODO: Add raw log - special processing for end iteration
-    -- UpdateErrors
-    -- phase change
-    -- if nothing result is singleton - OutOfIterationLog
-    -- subLog Doc log error
+    -- the only Log prtocol that produces a new rec is StartIteration
+    newRec :: Maybe IterationRecord
+    newRec = case lp of 
+                StartIteration iid pre post val -> pure $ IterationRecord {
+                                                    summary = IterationSummary {
+                                                      iid = iid,
+                                                      pre = pre,
+                                                      post = post,
+                                                      result = Inconclusive
+                                                    },
+                                                    validation = [],
+                                                    otherErrorsDesc = [],
+                                                    otherWarningsDesc = [],
+                                                    item = Just $ ItemInfo iid pre post val,
+                                                    apState = Nothing,
+                                                    domainState = Nothing,
+                                                    rawLog = D.empty
+                                                  }
+                _ -> Nothing
+
+
     validPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
     validPhaseStep = let 
-                      nextRec:: LogProtocol -> IterationRecord -> Maybe IterationRecord
-                      nextRec lgp thisRec =
-                        updateErrsWarnings thisPhase lgp  
-                        . apppendRaw lgp <$>  
-                              case lgp of
+                      nextRec:: IterationRecord -> Maybe IterationRecord
+                      nextRec thisRec =
+                        updateErrsWarnings lastPhase lp  
+                        . apppendRaw lp <$>  
+                              case lp of
                                 Message _ -> pure thisRec
                                 Message' _ -> pure thisRec
                                 LP.Warning _ -> pure thisRec
@@ -363,21 +380,7 @@ iterationStep lineNo accum@(IterationAccum thisPhase stageFailure mRec) lp =
                                 StartTest _ -> Nothing
                                 EndTest _ -> Nothing
                                 
-                                StartIteration iid pre post val -> pure $ IterationRecord {
-                                                                                            summary = IterationSummary {
-                                                                                              iid = iid,
-                                                                                              pre = pre,
-                                                                                              post = post,
-                                                                                              result = Inconclusive
-                                                                                            },
-                                                                                            validation = [],
-                                                                                            otherErrorsDesc = [],
-                                                                                            otherWarningsDesc = [],
-                                                                                            item = Just $ ItemInfo iid pre post val,
-                                                                                            apState = Nothing,
-                                                                                            domainState = Nothing,
-                                                                                            rawLog = D.empty
-                                                                                          }
+                                si@StartIteration{} -> newRec
                                 
                                 EndIteration _ -> Nothing -- note special processing for end iteration
 
@@ -402,12 +405,12 @@ iterationStep lineNo accum@(IterationAccum thisPhase stageFailure mRec) lp =
                       in 
                         (
                         IterationAccum {
-                          phase = nextPhase thisPhase lp,
+                          phase = nextPhase lastPhase lp,
                           stageFailure = failStage lp,
-                          rec = mRec >>= nextRec lp
+                          rec = isStartIteration ? newRec $ mRec >>= nextRec 
                         }, Right $ 
                               maybef mRec
-                                (Just [OutOfIterationLog lp])
+                                (isStartIteration ? Nothing $ Just [OutOfIterationLog lp])
                                 (\irec -> isEndIteration 
                                               ? Just [Iteration $ apppendRaw lp irec]
                                               $ Nothing

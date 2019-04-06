@@ -23,6 +23,7 @@
 {"tag":"Message","contents":""}
 {"tag":"SubLog","contents":{"tag":"Run","contents":{"tag":"IOAction","contents":"Debug Stack"}}}
 {"tag":"SubLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[["DemoProject.Test.Rough",110],{"unApStateDisplay":"ApState\n  { itemId = 110\n  , filePath = \"C:\\\\Vids\\\\SystemDesign\\\\VidList.txt\"\n  , exePath = \"NOT IMPLEMENTED\"\n  , fileText = \"Pre ~ Post !!\"\n  }"}]}}}
+{"tag":"SubLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"SubLog","contents":{"tag":"Run","contents":{"tag":"PrepStateFailure","contents":[["DemoProject.Test.Rough",110],{"tag":"AppEnsureError","contents":"I do not like 110 in prepstate"}]}}}
 {"tag":"EndIteration","contents":["DemoProject.Test.Rough",110]}
 {"tag":"StartIteration","contents":[["DemoProject.Test.Rough",120],{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":120,"pre":"Pre","path":"R:\\Vids\\SystemDesign\\Wrong.txt","checks":[],"post":"Post"}]}
@@ -128,6 +129,7 @@
 {"tag":"Message","contents":""}
 {"tag":"SubLog","contents":{"tag":"Run","contents":{"tag":"IOAction","contents":"Debug Stack"}}}
 {"tag":"SubLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[["DemoProject.Test.Rough2",110],{"unApStateDisplay":"ApState\n  { itemId = 110\n  , filePath = \"C:\\\\Vids\\\\SystemDesign\\\\VidList.txt\"\n  , exePath = \"NOT IMPLEMENTED\"\n  , fileText = \"Pre ~ Post !!\"\n  }"}]}}}
+{"tag":"SubLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"SubLog","contents":{"tag":"Run","contents":{"tag":"PrepStateFailure","contents":[["DemoProject.Test.Rough2",110],{"tag":"AppEnsureError","contents":"I do not like 110 in prepstate"}]}}}
 {"tag":"EndIteration","contents":["DemoProject.Test.Rough2",110]}
 {"tag":"StartIteration","contents":[["DemoProject.Test.Rough2",120],{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":120,"pre":"Pre","path":"R:\\Vids\\SystemDesign\\Wrong.txt","checks":[],"post":"Post"}]}

@@ -174,14 +174,15 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                               logRunItem . InteractorSuccess iid $ ApStateDisplay . showPretty $ as 
                               
                               let 
+                                eds :: Either EnsureError ds
                                 eds = fullEnsureInterpreter $ prepState as
                               
+                              logRunItem StartPrepState
                               eitherf eds
                                 (logRunItem . PrepStateFailure iid . AppEnsureError)
                                 (
                                   \ds -> 
                                     do
-                                      logRunItem StartPrepState
                                       logRunItem . PrepStateSuccess iid . DStateDisplay . showPretty $ ds
                                       logRunItem StartChecks
                                       runChecks ds

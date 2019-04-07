@@ -32,10 +32,10 @@ data DocActionInfo =
     deriving (Eq, Show)
 
 logDoc :: DocProtocol -> LogProtocol
-logDoc = SubLog . Doc
+logDoc = IterationLog . Doc
 
 logRun :: RunProtocol -> LogProtocol
-logRun = SubLog . Run
+logRun = IterationLog . Run
 
 data DocProtocol =   
                 DocInteraction |
@@ -79,22 +79,25 @@ data SubProtocol =
     Run RunProtocol
   deriving (Eq, Show)
 
+data BoundaryEvent = 
+    FilterLog [FilterResult] |
+
+    StartRun RunTitle Value | 
+    EndRun |
+
+    StartGroup GroupTitle |
+    EndGroup GroupTitle |
+
+    StartTest TestDisplayInfo |
+    EndTest TestModule |
+
+    StartIteration ItemId WhenClause ThenClause Value | 
+    EndIteration ItemId 
+  deriving (Eq, Show)
+
 data LogProtocol =
-  FilterLog [FilterResult] |
-
-  StartRun RunTitle Value | 
-  EndRun |
-
-  StartGroup GroupTitle |
-  EndGroup GroupTitle |
-
-  StartTest TestDisplayInfo |
-  EndTest TestModule |
-
-  StartIteration ItemId WhenClause ThenClause Value | 
-  EndIteration ItemId |
-
-  SubLog SubProtocol
+  BoundaryLog BoundaryEvent |
+  IterationLog SubProtocol
 
   deriving (Eq, Show)
 
@@ -111,3 +114,4 @@ $(deriveJSON defaultOptions ''ItemId)
 $(deriveJSON defaultOptions ''DocActionInfo)
 $(deriveJSON defaultOptions ''WhenClause)
 $(deriveJSON defaultOptions ''ThenClause)
+$(deriveJSON defaultOptions ''BoundaryEvent)

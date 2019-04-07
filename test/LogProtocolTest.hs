@@ -96,15 +96,15 @@ genGateStatus = choice [
 
 genLogProtocol :: Gen LogProtocol
 genLogProtocol = choice [
-                    StartRun <$> (RunTitle <$> genStr) <*> (toJSON <$> genRunConfig), 
-                    StartGroup <$> (GroupTitle <$> genStr),
-                    EndGroup <$> (GroupTitle <$> genStr),
-                    StartTest <$> genTestDisplayInfo,
-                    EndTest <$> genTestModule,
-                    StartIteration <$> genItemId <*> (WhenClause <$> genStr) <*> (ThenClause <$> genStr) <*> (toJSON <$> genRunConfig), --- using runconfig as an easy proxy for item
-                    EndIteration <$> genItemId,
-                    FilterLog <$> genFilterResults,
-                    pure EndRun,
+                    BoundaryLog <$> (StartRun <$> (RunTitle <$> genStr) <*> (toJSON <$> genRunConfig)), 
+                    BoundaryLog . StartGroup <$> (GroupTitle <$> genStr),
+                    BoundaryLog . EndGroup <$> (GroupTitle <$> genStr),
+                    BoundaryLog . StartTest <$> genTestDisplayInfo,
+                    BoundaryLog . EndTest <$> genTestModule,
+                    BoundaryLog <$> (StartIteration <$> genItemId <*> (WhenClause <$> genStr) <*> (ThenClause <$> genStr) <*> (toJSON <$> genRunConfig)), --- using runconfig as an easy proxy for item
+                    BoundaryLog . EndIteration <$> genItemId,
+                    BoundaryLog . FilterLog <$> genFilterResults,
+                    pure $ BoundaryLog EndRun,
 
                     logDoc . DocAction <$> genDocActionInfo,
                     logDoc . DocIOAction <$> genStr,

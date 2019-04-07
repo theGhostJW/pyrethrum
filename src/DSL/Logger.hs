@@ -146,30 +146,31 @@ logStrPP docMode =
                                                                                                                
             in
               \case
-                  FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
-                                                foldl (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
+                  BoundaryLog bl -> case bl of 
+                                      FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
+                                                                    foldl (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
-                  StartRun ttle rc -> header ("Test Run: " <> unRunTitle ttle) <> 
-                                       newLn <> "Run Config:" <>
-                                       newLn <> ppAesonBlock rc
+                                      StartRun ttle rc -> header ("Test Run: " <> unRunTitle ttle) <> 
+                                                          newLn <> "Run Config:" <>
+                                                          newLn <> ppAesonBlock rc
 
-                  StartGroup gt -> header $ "Group: " <> unGroupTitle gt
-                  EndGroup gt -> header $ "End Group: " <> unGroupTitle gt
+                                      StartGroup gt -> header $ "Group: " <> unGroupTitle gt
+                                      EndGroup gt -> header $ "End Group: " <> unGroupTitle gt
 
-                  StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
-                                                    newLn <> "Test Config:" <>
-                                                    newLn <> ppAesonBlock testConfig
+                                      StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
+                                                                        newLn <> "Test Config:" <>
+                                                                        newLn <> ppAesonBlock testConfig
 
-                  EndTest (TestModule address) -> newLn <> tstHeader ("End Test: " <> address)
-                  StartIteration iid  _ _ val -> newLn <> subHeader ("Start Iteration: " <> iterId iid) <> 
-                                                  newLn <> "Item:" <> 
-                                                  newLn <> ppAesonBlock val <>
-                                                  (docMode ? "" $ newLn)
+                                      EndTest (TestModule address) -> newLn <> tstHeader ("End Test: " <> address)
+                                      StartIteration iid  _ _ val -> newLn <> subHeader ("Start Iteration: " <> iterId iid) <> 
+                                                                      newLn <> "Item:" <> 
+                                                                      newLn <> ppAesonBlock val <>
+                                                                      (docMode ? "" $ newLn)
 
-                  EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
-                  EndRun -> newLn <> header "End Run"
+                                      EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
+                                      EndRun -> newLn <> header "End Run"
 
-                  SubLog (Doc dp) -> case dp of 
+                  IterationLog (Doc dp) -> case dp of 
                                         DocAction ai -> case ai of
                                           ActionInfo msg -> "  >> " <> msg
                                           ActionInfoM msg extended -> "  >> " <> 
@@ -202,7 +203,7 @@ logStrPP docMode =
 
                                         e@(DocError _) -> showPretty e
 
-                  SubLog (Run rp) -> case rp of
+                  IterationLog (Run rp) -> case rp of
                                         StartInteraction -> newLn <> "Interaction:"
                                         StartChecks -> newLn <> "Checks:"
                                         StartPrepState -> newLn <> "PrepState:"
@@ -244,7 +245,7 @@ logToHandles convertersHandlers =
                           logTohandles lp =  P.sequence_ $ logToh lp <$> convertersHandlers
 
                           logRunTohandles :: RunProtocol -> IO ()
-                          logRunTohandles = logTohandles . SubLog . Run 
+                          logRunTohandles = logTohandles . IterationLog . Run 
                         in
                           interpretM $ \case 
                                           LogItem lp -> logTohandles lp
@@ -268,7 +269,7 @@ logDocPrettyInterpreter = let
                             pushItem = tell . toDList . lines . logStrPP True
 
                             pushDoc :: DocProtocol -> Eff effs () 
-                            pushDoc = pushItem . SubLog . Doc
+                            pushDoc = pushItem . IterationLog . Doc
                           in
                             interpret $  \case 
                                             LogItem lp -> pushItem lp

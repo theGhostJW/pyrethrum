@@ -18,7 +18,7 @@ arbitraryIO :: forall effs a. Member ArbitraryIO effs => Text -> a -> IO a -> Ef
 arbitraryIO msg def action = send $ ArbitraryIO msg def action
 
 arbitraryIODocInterpreter :: forall effs a. Member Logger effs => Eff (ArbitraryIO ': effs) a -> Eff effs a
-arbitraryIODocInterpreter = interpret $ \(ArbitraryIO msg def _) -> logItem (SubLog . Doc $ DocIOAction msg) $> def
+arbitraryIODocInterpreter = interpret $ \(ArbitraryIO msg def _) -> logItem (IterationLog . Doc $ DocIOAction msg) $> def
 
 arbitraryIOInterpreter :: Members '[Error AppError, Logger, IO] effs => Eff (ArbitraryIO ': effs) a -> Eff effs a
 arbitraryIOInterpreter =
@@ -29,4 +29,4 @@ arbitraryIOInterpreter =
                                                          Left (e :: IOException) -> throwError (AppIOError' ("Exception raised when executing arbituary IO action with message: " <> msg) e)
                                                          Right f -> pure f
                            in
-                            interpret $ \(ArbitraryIO msg _ actn) -> logItem (SubLog . Run $ IOAction msg) *> handleException msg actn
+                            interpret $ \(ArbitraryIO msg _ actn) -> logItem (IterationLog . Run $ IOAction msg) *> handleException msg actn

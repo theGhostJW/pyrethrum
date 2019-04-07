@@ -244,10 +244,10 @@ runTestItems tc iIds items interactor prepState rc intrprt runnerLogger =
     logPtcl = logger' intrprt
 
     startTest :: m ()
-    startTest = logPtcl $ StartTest (mkDisplayInfo tc)
+    startTest = logPtcl . BoundaryLog . StartTest $ mkDisplayInfo tc
 
     endTest :: m ()
-    endTest = logPtcl . EndTest $ moduleAddress tc
+    endTest = logPtcl .  BoundaryLog . EndTest $ moduleAddress tc
 
     filteredItems :: [i]
     filteredItems = filter inTargIds items
@@ -258,9 +258,9 @@ runTestItems tc iIds items interactor prepState rc intrprt runnerLogger =
                     iid = ItemId (moduleAddress tc) (identifier i)
                   in
                     do
-                      logPtcl . StartIteration iid (WhenClause $ whenClause i) (ThenClause $ thenClause i) $ toJSON i
+                      logPtcl .  BoundaryLog . StartIteration iid (WhenClause $ whenClause i) (ThenClause $ thenClause i) $ toJSON i
                       runnerLogger logPtcl interactor prepState intrprt tc rc i
-                      logPtcl $ EndIteration iid
+                      logPtcl . BoundaryLog $ EndIteration iid
 
     inTargIds :: i -> Bool
     inTargIds i = maybe True (S.member (identifier i)) iIds
@@ -431,21 +431,21 @@ testRunOrEndpoint iIds runner fltrs runnerLogger intrprt rc =
 
               runGrp :: m ()
               runGrp = 
-                      let 
-                        hdr = GroupTitle $ RB.header tg
-                      in
-                        logPtcl (StartGroup hdr)
-                        *> logFailOrRun grpRollover runGroupAfterRollover
-                        *> logPtcl (EndGroup hdr)
+                    let 
+                      hdr = GroupTitle $ RB.header tg
+                    in
+                      do
+                        logPtcl . BoundaryLog $ StartGroup hdr
+                        logFailOrRun grpRollover runGroupAfterRollover
+                        logPtcl . BoundaryLog $ EndGroup hdr
            in
               include ? runGrp $ pure ()
-
         in
           do
-            logPtcl $ StartRun (RunTitle $ C.title rc) $ toJSON rc
-            logPtcl $ FilterLog $ filterLog filterInfo
+            logPtcl . BoundaryLog . StartRun (RunTitle $ C.title rc) $ toJSON rc
+            logPtcl . BoundaryLog . FilterLog $ filterLog filterInfo
             sequence_ $ exeGroup <$> runTuples
-            logPtcl EndRun
+            logPtcl $ BoundaryLog EndRun
 
 testRun :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                    (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results

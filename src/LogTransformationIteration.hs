@@ -122,20 +122,21 @@ updateErrsWarnings:: IterationPhase -> LogProtocol -> IterationRecord -> Iterati
 updateErrsWarnings p lp ir = 
   let
     lpResult :: IterationResult 
-    lpResult = case lp of 
-      StartRun{} -> Inconclusive
-      EndRun -> Inconclusive
-      FilterLog _ -> Inconclusive
-      StartGroup _ -> Inconclusive
-      EndGroup _ -> Inconclusive
-      StartTest _ -> Inconclusive
-      EndTest _ -> Inconclusive
+    lpResult = case lp of
+      BoundaryLog bl -> case bl of              
+                          StartRun{} -> Inconclusive
+                          EndRun -> Inconclusive
+                          FilterLog _ -> Inconclusive
+                          StartGroup _ -> Inconclusive
+                          EndGroup _ -> Inconclusive
+                          StartTest _ -> Inconclusive
+                          EndTest _ -> Inconclusive
+                          
+                          StartIteration {} -> Inconclusive
+                          EndIteration _ -> Inconclusive
       
-      StartIteration {} -> Inconclusive
-      EndIteration _ -> Inconclusive
-      
-      SubLog (Doc dp) -> LogTransformationIteration.Fail p
-      SubLog (Run rp) -> case rp of
+      IterationLog (Doc dp) -> LogTransformationIteration.Fail p
+      IterationLog (Run rp) -> case rp of
                               StartPrepState -> Inconclusive
                               IOAction _ -> Inconclusive
 
@@ -183,21 +184,22 @@ apppendRaw lp ir = ir {rawLog = D.snoc (rawLog ir) lp}
 
 failStage :: LogProtocol -> FailStage
 failStage = \case
-                StartRun{} -> NoFailure
-                EndRun -> NoFailure
-                
-                FilterLog _ -> NoFailure
-                StartGroup _ -> NoFailure
-                EndGroup _ -> NoFailure
-                StartTest _ -> NoFailure
-                EndTest _ -> NoFailure
+                BoundaryLog bl -> case bl of 
+                                      StartRun{} -> NoFailure
+                                      EndRun -> NoFailure
+                                      
+                                      FilterLog _ -> NoFailure
+                                      StartGroup _ -> NoFailure
+                                      EndGroup _ -> NoFailure
+                                      StartTest _ -> NoFailure
+                                      EndTest _ -> NoFailure
 
-                StartIteration{} -> NoFailure
-                EndIteration _ -> NoFailure
+                                      StartIteration{} -> NoFailure
+                                      EndIteration _ -> NoFailure
 
                 -- should never happen
-                SubLog (Doc _) -> NoFailure
-                SubLog (Run rp) -> case rp of
+                IterationLog (Doc _) -> NoFailure
+                IterationLog (Run rp) -> case rp of
                                       StartPrepState -> NoFailure
                                       IOAction _ -> NoFailure
                                       StartInteraction -> NoFailure
@@ -215,24 +217,25 @@ failStage = \case
 
 expectedCurrentPhase :: IterationPhase -> FailStage -> LogProtocol -> IterationPhase
 expectedCurrentPhase current fs lp = case lp of
-                                      StartRun{} -> OutOfIteration
-                                      EndRun -> OutOfIteration
-                                      
-                                      FilterLog _ -> OutOfIteration
-                                      StartGroup _ -> OutOfIteration
-                                      EndGroup _ -> OutOfIteration
-                                      StartTest _ -> OutOfIteration
-                                      EndTest _ -> OutOfIteration
+                                      BoundaryLog bl -> case bl of 
+                                                            StartRun{} -> OutOfIteration
+                                                            EndRun -> OutOfIteration
+                                                            
+                                                            FilterLog _ -> OutOfIteration
+                                                            StartGroup _ -> OutOfIteration
+                                                            EndGroup _ -> OutOfIteration
+                                                            StartTest _ -> OutOfIteration
+                                                            EndTest _ -> OutOfIteration
 
-                                      StartIteration{} -> OutOfIteration
-                                      EndIteration _ -> case fs of 
-                                                          NoFailure -> Checks  -- TODO: ensure raw file test with no checks
-                                                          InteractorFailed -> Interactor
-                                                          PrepStateFailed -> PrepState
+                                                            StartIteration{} -> OutOfIteration
+                                                            EndIteration _ -> case fs of 
+                                                                                NoFailure -> Checks  -- TODO: ensure raw file test with no checks
+                                                                                InteractorFailed -> Interactor
+                                                                                PrepStateFailed -> PrepState
 
                                       -- should never happen
-                                      SubLog (Doc _) -> current
-                                      SubLog (Run rp) -> case rp of
+                                      IterationLog (Doc _) -> current
+                                      IterationLog (Run rp) -> case rp of
                                                             StartPrepState -> PrePrepState
                                                             IOAction _ -> current
 
@@ -253,21 +256,22 @@ expectedCurrentPhase current fs lp = case lp of
 
 nextPhase :: IterationPhase -> LogProtocol -> IterationPhase
 nextPhase current lp = case lp of
-                          StartRun{} -> OutOfIteration
-                          EndRun -> OutOfIteration
+                          BoundaryLog bl -> case bl of 
+                                              StartRun{} -> OutOfIteration
+                                              EndRun -> OutOfIteration
 
-                          FilterLog _ -> OutOfIteration
-                          StartGroup _ -> OutOfIteration
-                          EndGroup _ -> OutOfIteration
-                          StartTest _ -> OutOfIteration
-                          EndTest _ -> OutOfIteration
-                          StartIteration{} -> PreInteractor
-                          EndIteration _ -> OutOfIteration
+                                              FilterLog _ -> OutOfIteration
+                                              StartGroup _ -> OutOfIteration
+                                              EndGroup _ -> OutOfIteration
+                                              StartTest _ -> OutOfIteration
+                                              EndTest _ -> OutOfIteration
+                                              StartIteration{} -> PreInteractor
+                                              EndIteration _ -> OutOfIteration
 
-                          -- should never happen
-                          SubLog (Doc _) -> current
+                                              -- should never happen
+                          IterationLog (Doc _) -> current
                           
-                          SubLog (Run rp) -> case rp of
+                          IterationLog (Run rp) -> case rp of
                                                 LP.Error _ -> current
                                                 StartPrepState -> PrepState
                                                 IOAction _ -> current
@@ -295,19 +299,19 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
   let
     isStartIteration :: Bool 
     isStartIteration = case lp of
-                          StartIteration{} -> True
+                          BoundaryLog StartIteration{} -> True
                           _ -> False
 
     isEndIteration ::  Bool 
     isEndIteration = case lp of 
-                        EndIteration _ -> True
+                        BoundaryLog EndIteration{} -> True
                         _ -> False
 
-    -- this is the wrong kind of sublog
+    -- this is the wrong kind of IterationLog
     -- should never happen                                                 
     isDocLog ::  Bool
     isDocLog = case lp of
-                  SubLog (Doc _) -> True
+                  IterationLog (Doc _) -> True
                   _ -> False
 
     phaseChangeIsValid :: Bool
@@ -343,7 +347,7 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
     -- the only Log prtocol that produces a new rec is StartIteration
     newRec :: Maybe IterationRecord
     newRec = case lp of 
-                StartIteration iid pre post val -> pure $ IterationRecord {
+                BoundaryLog (StartIteration iid pre post val) -> pure $ IterationRecord {
                                                     summary = IterationSummary {
                                                       iid = iid,
                                                       pre = pre,
@@ -368,21 +372,21 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                         updateErrsWarnings lastPhase lp  
                         . apppendRaw lp <$>  
                               case lp of
-                                StartRun{} -> Nothing
-                                EndRun -> Nothing
-                                FilterLog _ -> Nothing
-                                StartGroup _ -> Nothing
-                                EndGroup _ -> Nothing
-                                StartTest _ -> Nothing
-                                EndTest _ -> Nothing
-                                
-                                si@StartIteration{} -> newRec
-                                
-                                EndIteration _ -> Nothing -- note special processing for end iteration
+                                BoundaryLog bl -> case bl of 
+                                    StartRun{} -> Nothing
+                                    EndRun -> Nothing
+                                    FilterLog _ -> Nothing
+                                    StartGroup _ -> Nothing
+                                    EndGroup _ -> Nothing
+                                    StartTest _ -> Nothing
+                                    EndTest _ -> Nothing
+                                    
+                                    StartIteration{} -> newRec
+                                    
+                                    EndIteration _ -> Nothing -- note special processing for end iteration
 
-                                SubLog (Doc _) -> Nothing
-
-                                SubLog (Run rp) -> case rp of
+                                IterationLog (Doc _) -> Nothing
+                                IterationLog (Run rp) -> case rp of
                                   StartInteraction -> pure thisRec
                                   StartChecks -> pure thisRec
                                   StartPrepState -> pure thisRec

@@ -209,19 +209,19 @@ logToHandles convertersHandlers =
                                               LogError msg -> SubLog (Run . Error $ AppUserError msg)
                                               LogError' msg info -> SubLog (Run . Error . AppUserError' $ DetailedInfo msg info)
 
-                          logToHandle :: (LogProtocol -> Text) -> Handle -> Logger r -> IO ()
-                          logToHandle lp2Str h = putLines h . lp2Str . toLogProtocol
+                          logToHandle :: (LogProtocol -> Text) -> Handle -> LogProtocol -> IO ()
+                          logToHandle lp2Str h = putLines h . lp2Str 
 
-                          logToh ::  Logger r -> (LogProtocol -> Text, Handle) -> IO ()
-                          logToh li (f, h) = logToHandle f h li
+                          logToh :: LogProtocol -> (LogProtocol -> Text, Handle) -> IO ()
+                          logToh lp (f, h) = logToHandle f h lp
 
-                          logTohandles ::  Logger r -> IO ()
-                          logTohandles lgr =  P.sequence_ $ logToh lgr <$> convertersHandlers
+                          logTohandles :: LogProtocol -> IO ()
+                          logTohandles lp =  P.sequence_ $ logToh lp <$> convertersHandlers
                         in
                           interpretM $ \case 
-                                          li@(LogItem _) -> logTohandles li
-                                          li@(LogError _) -> logTohandles li
-                                          li@LogError'{} -> logTohandles li
+                                          LogItem lp -> logTohandles lp
+                                          LogError msg -> logTohandles . SubLog . Run . Error $ AppUserError msg
+                                          LogError' msg info -> logTohandles . SubLog . Run . Error . AppUserError' $ DetailedInfo msg info
                                           
                              
 logDocPrettyInterpreter :: forall effs. Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
@@ -230,11 +230,11 @@ logDocPrettyInterpreter = let
                             toDList = fromList
 
                             pushItem :: LogProtocol -> Eff effs () 
-                            pushItem lp = tell . toDList . lines $ logStrPP True lp
+                            pushItem = tell . toDList . lines . logStrPP True
                           in
-                            interpret $ \case 
-                                          LogItem lp -> pushItem lp
-                                          LogError msg -> pushItem li
-                                          LogError' msg inf -> pushItem li
+                            interpret $  \case 
+                                            LogItem lp -> pushItem lp
+                                            LogError msg -> pushItem . SubLog $ Doc . DocError $ AppUserError msg
+                                            LogError' msg inf -> pushItem . SubLog $ Doc . DocError . AppUserError' $ DetailedInfo msg inf
 
                                

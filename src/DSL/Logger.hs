@@ -203,12 +203,6 @@ logConsolePrettyInterpreter = logToHandles [(logStrPP False, stdout)]
 logToHandles :: LastMember IO effs => [(LogProtocol -> Text, Handle)] -> Eff (Logger ': effs) ~> Eff effs
 logToHandles convertersHandlers = 
                         let 
-                          toLogProtocol :: Logger r -> LogProtocol
-                          toLogProtocol = \case 
-                                              LogItem lp -> lp
-                                              LogError msg -> SubLog (Run . Error $ AppUserError msg)
-                                              LogError' msg info -> SubLog (Run . Error . AppUserError' $ DetailedInfo msg info)
-
                           logToHandle :: (LogProtocol -> Text) -> Handle -> LogProtocol -> IO ()
                           logToHandle lp2Str h = putLines h . lp2Str 
 
@@ -234,7 +228,7 @@ logDocPrettyInterpreter = let
                           in
                             interpret $  \case 
                                             LogItem lp -> pushItem lp
-                                            LogError msg -> pushItem . SubLog $ Doc . DocError $ AppUserError msg
-                                            LogError' msg inf -> pushItem . SubLog $ Doc . DocError . AppUserError' $ DetailedInfo msg inf
+                                            LogError msg -> pushItem . SubLog . Doc . DocError $ AppUserError msg
+                                            LogError' msg inf -> pushItem . SubLog . Doc . DocError . AppUserError' $ DetailedInfo msg inf
 
                                

@@ -128,7 +128,6 @@ updateErrsWarnings p lp ir =
 
       (LP.Warning _) -> LogTransformationIteration.Warning p
       (Warning' _) -> LogTransformationIteration.Warning p
-      (LP.Error _) -> LogTransformationIteration.Fail p
 
       StartRun{} -> Inconclusive
       EndRun -> Inconclusive
@@ -160,6 +159,8 @@ updateErrsWarnings p lp ir =
                                                                         CK.Warning -> LogTransformationIteration.Warning p
                                                                         Skipped -> Inconclusive
 
+                              LP.Error _ -> LogTransformationIteration.Fail p
+
     notCheckPhase :: Bool
     notCheckPhase = p /= Checks
 
@@ -189,7 +190,6 @@ failStage = \case
                 Message' _ -> NoFailure
                 LP.Warning{} -> NoFailure
                 Warning' _ -> NoFailure
-                LP.Error _ -> NoFailure
                 FilterLog _ -> NoFailure
                 StartGroup _ -> NoFailure
                 EndGroup _ -> NoFailure
@@ -211,6 +211,7 @@ failStage = \case
                                       PrepStateFailure iid err -> PrepStateFailed
                                       StartChecks{} -> NoFailure
                                       CheckOutcome{} -> NoFailure
+                                      LP.Error _ -> NoFailure
 
 expectedCurrentPhase :: IterationPhase -> FailStage -> LogProtocol -> IterationPhase
 expectedCurrentPhase current fs lp = case lp of
@@ -220,7 +221,6 @@ expectedCurrentPhase current fs lp = case lp of
                                       Message' _ -> current
                                       LP.Warning{} -> current
                                       Warning' _ -> current
-                                      LP.Error _ -> current
                                       FilterLog _ -> OutOfIteration
                                       StartGroup _ -> OutOfIteration
                                       EndGroup _ -> OutOfIteration
@@ -248,6 +248,7 @@ expectedCurrentPhase current fs lp = case lp of
 
                                                             StartChecks{} -> PreChecks
                                                             CheckOutcome{} -> Checks
+                                                            LP.Error _ -> current
 
 nextPhase :: IterationPhase -> LogProtocol -> IterationPhase
 nextPhase current lp = case lp of
@@ -257,7 +258,7 @@ nextPhase current lp = case lp of
                           Message' _ -> current
                           LP.Warning s -> current
                           Warning' detailedInfo -> current
-                          LP.Error _ -> current
+                          
                           FilterLog _ -> OutOfIteration
                           StartGroup _ -> OutOfIteration
                           EndGroup _ -> OutOfIteration
@@ -270,6 +271,7 @@ nextPhase current lp = case lp of
                           SubLog (Doc _) -> current
                           
                           SubLog (Run rp) -> case rp of
+                                                LP.Error _ -> current
                                                 StartPrepState -> PrepState
                                                 IOAction _ -> current
                                                 StartInteraction -> Interactor
@@ -369,7 +371,6 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                                 Message' _ -> pure thisRec
                                 LP.Warning _ -> pure thisRec
                                 Warning' detailedInfo -> pure thisRec
-                                LP.Error _ -> pure thisRec
 
                                 StartRun{} -> Nothing
                                 EndRun -> Nothing
@@ -401,6 +402,8 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
 
                                   CheckOutcome iid cr@(CheckReport reslt (CheckInfo chkhdr mbInfo)) -> 
                                     pure $ thisRec {validation = P.snoc (validation thisRec) cr}
+                                  
+                                  LP.Error _ -> pure thisRec
                       in 
                         (
                         IterationAccum {

@@ -147,7 +147,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
         iid = ItemId (moduleAddress tc) (identifier i)
 
         handler :: SomeException -> m ()
-        handler e = logger . LP.Error . AppGenericError' ("Unexpected Error Executing iteration: " <> txt iid) . toS $ displayException e
+        handler e = logger . logRun . LP.Error . AppGenericError' ("Unexpected Error Executing iteration: " <> txt iid) . toS $ displayException e
 
         normalExecution' :: m ()
         normalExecution' = 
@@ -166,7 +166,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                   logRunItem StartInteraction
                   ethas <- onError 
                               (intrprt $ interactor rc i) 
-                              (logger . LP.Error $ AppGenericError "Interactor Exception has Occurred")
+                              (logger . logRun . LP.Error $ AppGenericError "Interactor Exception has Occurred")
 
                   eitherf ethas
                     (logRunItem . InteractorFailure iid)
@@ -415,7 +415,7 @@ testRunOrEndpoint iIds runner fltrs runnerLogger intrprt rc =
               logFailOrRun :: m (Either AppError ()) -> m () -> m ()
               logFailOrRun prerun mRun = do
                                           pr <- prerun
-                                          either (logPtcl . LP.Error) (const mRun) pr
+                                          either (logPtcl . logRun . LP.Error) (const mRun) pr
 
               runTestIteration :: m () -> m ()
               runTestIteration = logFailOrRun grpGoHome
@@ -499,5 +499,5 @@ testEndpointBase fltrs runnerLogger intrprt tstAddress rc iIds runner =
     allFilters = endpointFilter tstAddress : fltrs
   in
     eitherf iIds
-      (logPtcl . LP.Error . AppFilterError)
+      (logPtcl . logRun . LP.Error . AppFilterError)
       (\idSet -> testRunOrEndpoint (Just idSet) runner allFilters runnerLogger intrprt rc)

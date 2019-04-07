@@ -96,27 +96,6 @@ genGateStatus = choice [
 
 genLogProtocol :: Gen LogProtocol
 genLogProtocol = choice [
-                    Message <$> genStr,
-                    Message' <$> genDetailedInfo,
-                  
-                    Warning <$> genStr,
-                    Warning' <$> genDetailedInfo,
-                  
-                    logDoc . DocAction <$> genDocActionInfo,
-                    logDoc . DocIOAction <$> genStr,
-                    logDoc <$> (DocCheck <$> genItemId <*> genStr <*>  genResultExpectation <*> genGateStatus), 
-
-                    logRun . IOAction <$> genStr,
-                  
-                    Error <$> genError,
-                    FilterLog <$> genFilterResults,
-
-                    logRun <$> (InteractorSuccess <$> genItemId <*> (ApStateDisplay <$> genStr)),
-                    logRun <$> (InteractorFailure <$> genItemId <*> genError),
-
-                    logRun <$> (PrepStateSuccess <$> genItemId <*> (DStateDisplay <$> genStr)),
-                    logRun <$> (PrepStateFailure <$> genItemId <*> genError),
-                  
                     StartRun <$> (RunTitle <$> genStr) <*> (toJSON <$> genRunConfig), 
                     StartGroup <$> (GroupTitle <$> genStr),
                     EndGroup <$> (GroupTitle <$> genStr),
@@ -124,8 +103,36 @@ genLogProtocol = choice [
                     EndTest <$> genTestModule,
                     StartIteration <$> genItemId <*> (WhenClause <$> genStr) <*> (ThenClause <$> genStr) <*> (toJSON <$> genRunConfig), --- using runconfig as an easy proxy for item
                     EndIteration <$> genItemId,
-                    pure EndRun
+                    FilterLog <$> genFilterResults,
+                    pure EndRun,
+
+                    logDoc . DocAction <$> genDocActionInfo,
+                    logDoc . DocIOAction <$> genStr,
+                    logDoc <$> (DocCheck <$> genItemId <*> genStr <*>  genResultExpectation <*> genGateStatus),
+                    logDoc . DocMessage <$> genStr,
+                    logDoc . DocMessage' <$> genDetailedInfo,
+                  
+                    logDoc . DocWarning <$> genStr,
+                    logDoc . DocWarning' <$> genDetailedInfo,
+                    logDoc . DocError <$> genError,
+
+                    logRun . IOAction <$> genStr,
+                    logRun <$> (InteractorSuccess <$> genItemId <*> (ApStateDisplay <$> genStr)),
+                    logRun <$> (InteractorFailure <$> genItemId <*> genError),
+
+                    logRun <$> (PrepStateSuccess <$> genItemId <*> (DStateDisplay <$> genStr)),
+                    logRun <$> (PrepStateFailure <$> genItemId <*> genError),
+
+                    logRun . Message <$> genStr,
+                    logRun . Message' <$> genDetailedInfo,
+                  
+                    logRun . Warning <$> genStr,
+                    logRun . Warning' <$> genDetailedInfo,
+                    logRun . Error <$> genError
                  ]
+
+
+
 
 hprop_log_protocol_round_trip :: Property
 hprop_log_protocol_round_trip = property $ do

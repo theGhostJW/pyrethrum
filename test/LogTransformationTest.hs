@@ -21,22 +21,11 @@ runAgregator f = let
             in 
               sequence_ slList
 
-unit_demo_prettyPrint :: IO ()
-unit_demo_prettyPrint = runAgregator testPrettyPrint
-
-unit_demo_iteration :: IO ()
-unit_demo_iteration = runAgregator testIterationStep
-
 -- unit_demo_prettyPrint :: IO ()
--- unit_demo_prettyPrint = let 
---               bsList :: DList ByteString
---               bsList = testPrettyPrint rawFile
+-- unit_demo_prettyPrint = runAgregator testPrettyPrint
 
---               slList :: DList (IO ()) 
---               slList = PIO.putStrLn . decodeUtf8 <$> bsList 
---             in 
---               sequence_ slList
-
+-- unit_demo_iteration :: IO ()
+-- unit_demo_iteration = runAgregator testIterationStep
 
 rawFile :: DList ByteString
 rawFile = fromList . B.lines $ toS 

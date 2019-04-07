@@ -123,12 +123,6 @@ updateErrsWarnings p lp ir =
   let
     lpResult :: IterationResult 
     lpResult = case lp of 
-      Message _ -> Inconclusive
-      Message' _ -> Inconclusive
-
-      (LP.Warning _) -> LogTransformationIteration.Warning p
-      (Warning' _) -> LogTransformationIteration.Warning p
-
       StartRun{} -> Inconclusive
       EndRun -> Inconclusive
       FilterLog _ -> Inconclusive
@@ -159,6 +153,11 @@ updateErrsWarnings p lp ir =
                                                                         CK.Warning -> LogTransformationIteration.Warning p
                                                                         Skipped -> Inconclusive
 
+                              Message _ -> Inconclusive
+                              Message' _ -> Inconclusive
+                                                      
+                              LP.Warning _ -> LogTransformationIteration.Warning p
+                              Warning' _ -> LogTransformationIteration.Warning p
                               LP.Error _ -> LogTransformationIteration.Fail p
 
     notCheckPhase :: Bool
@@ -186,10 +185,7 @@ failStage :: LogProtocol -> FailStage
 failStage = \case
                 StartRun{} -> NoFailure
                 EndRun -> NoFailure
-                Message _ -> NoFailure
-                Message' _ -> NoFailure
-                LP.Warning{} -> NoFailure
-                Warning' _ -> NoFailure
+                
                 FilterLog _ -> NoFailure
                 StartGroup _ -> NoFailure
                 EndGroup _ -> NoFailure
@@ -211,16 +207,17 @@ failStage = \case
                                       PrepStateFailure iid err -> PrepStateFailed
                                       StartChecks{} -> NoFailure
                                       CheckOutcome{} -> NoFailure
+                                      Message _ -> NoFailure
+                                      Message' _ -> NoFailure
+                                      LP.Warning{} -> NoFailure
+                                      Warning' _ -> NoFailure
                                       LP.Error _ -> NoFailure
 
 expectedCurrentPhase :: IterationPhase -> FailStage -> LogProtocol -> IterationPhase
 expectedCurrentPhase current fs lp = case lp of
                                       StartRun{} -> OutOfIteration
                                       EndRun -> OutOfIteration
-                                      Message _ -> current
-                                      Message' _ -> current
-                                      LP.Warning{} -> current
-                                      Warning' _ -> current
+                                      
                                       FilterLog _ -> OutOfIteration
                                       StartGroup _ -> OutOfIteration
                                       EndGroup _ -> OutOfIteration
@@ -248,17 +245,17 @@ expectedCurrentPhase current fs lp = case lp of
 
                                                             StartChecks{} -> PreChecks
                                                             CheckOutcome{} -> Checks
+                                                            Message _ -> current
+                                                            Message' _ -> current
+                                                            LP.Warning{} -> current
+                                                            Warning' _ -> current
                                                             LP.Error _ -> current
 
 nextPhase :: IterationPhase -> LogProtocol -> IterationPhase
 nextPhase current lp = case lp of
                           StartRun{} -> OutOfIteration
                           EndRun -> OutOfIteration
-                          Message _ -> current
-                          Message' _ -> current
-                          LP.Warning s -> current
-                          Warning' detailedInfo -> current
-                          
+
                           FilterLog _ -> OutOfIteration
                           StartGroup _ -> OutOfIteration
                           EndGroup _ -> OutOfIteration
@@ -280,6 +277,10 @@ nextPhase current lp = case lp of
                                                 LP.PrepStateSuccess{}  -> PreChecks
                                                 PrepStateFailure iid err -> PrepState -- leave in failed phase
                                                 StartChecks{} -> Checks
+                                                Message _ -> current
+                                                Message' _ -> current
+                                                LP.Warning s -> current
+                                                Warning' detailedInfo -> current
                                                 CheckOutcome{}  -> Checks
 
 serialiseIteration :: TestIteration -> ByteString
@@ -367,11 +368,6 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                         updateErrsWarnings lastPhase lp  
                         . apppendRaw lp <$>  
                               case lp of
-                                Message _ -> pure thisRec
-                                Message' _ -> pure thisRec
-                                LP.Warning _ -> pure thisRec
-                                Warning' detailedInfo -> pure thisRec
-
                                 StartRun{} -> Nothing
                                 EndRun -> Nothing
                                 FilterLog _ -> Nothing
@@ -403,6 +399,10 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                                   CheckOutcome iid cr@(CheckReport reslt (CheckInfo chkhdr mbInfo)) -> 
                                     pure $ thisRec {validation = P.snoc (validation thisRec) cr}
                                   
+                                  Message _ -> pure thisRec
+                                  Message' _ -> pure thisRec
+                                  LP.Warning _ -> pure thisRec
+                                  Warning' detailedInfo -> pure thisRec
                                   LP.Error _ -> pure thisRec
                       in 
                         (

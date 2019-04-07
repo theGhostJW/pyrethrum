@@ -44,6 +44,12 @@ data DocProtocol =
                 DocChecks | 
                 DocCheck ItemId Text ResultExpectation GateStatus |
                 
+                DocMessage Text |
+                DocMessage' DetailedInfo |
+              
+                DocWarning Text |
+                DocWarning' DetailedInfo |
+
                 DocError AppError
               deriving (Eq, Show)
 
@@ -58,6 +64,12 @@ data RunProtocol =
                 PrepStateFailure ItemId AppError |
                 StartChecks | 
                 CheckOutcome ItemId CheckReport |
+
+                Message Text |
+                Message' DetailedInfo |
+              
+                Warning Text |
+                Warning' DetailedInfo |
 
                 Error AppError
               deriving (Eq, Show)
@@ -81,12 +93,6 @@ data LogProtocol =
 
   StartIteration ItemId WhenClause ThenClause Value | 
   EndIteration ItemId |
-
-  Message Text |
-  Message' DetailedInfo |
-
-  Warning Text |
-  Warning' DetailedInfo |
 
   SubLog SubProtocol
 

@@ -98,8 +98,7 @@ data BoundaryEvent =
 data LogProtocol =
   BoundaryLog BoundaryEvent |
   IterationLog SubProtocol
-
-  deriving (Eq, Show)
+ deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''LogProtocol)
 $(deriveJSON defaultOptions ''DocProtocol)

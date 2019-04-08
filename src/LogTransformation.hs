@@ -1,8 +1,8 @@
 module LogTransformation where
 
 import Common as C (AppError(..))
-import LogTransformationCommon
-import LogTransformationIteration
+import LogTransformation.Common
+import LogTransformation.Iteration
 import Check as CK
 import Pyrelude as P
 import Pyrelude.IO

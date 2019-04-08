@@ -1,4 +1,4 @@
-module LogTransformationCommon where
+module LogTransformation.Common where
 
 import Common as C (AppError(..))
 import Check as CK

@@ -1,7 +1,7 @@
-module LogTransformationIteration where
+module LogTransformation.Iteration where
 
 import Common as C (AppError(..))
-import LogTransformationCommon
+import LogTransformation.Common
 import Check as CK
 import Pyrelude as P
 import Pyrelude.IO
@@ -21,6 +21,13 @@ import DSL.Logger
 import Control.Monad.Writer.Strict
 import Control.Monad.State.Strict
 import Control.Monad.Identity
+
+
+data TestIteration = Iteration IterationRecord |
+                    BoundaryItem BoundaryEvent  |
+                    LineError LogTransformError 
+                    deriving (Show, Eq)
+
 
 --------------------------------------------------------
 ----------------- Iteration Aggregation ----------------
@@ -44,16 +51,16 @@ data IterationResult = Inconclusive |
 isFailure :: IterationResult -> Bool
 isFailure = \case 
               Inconclusive -> False
-              LogTransformationIteration.Pass -> False
-              LogTransformationIteration.Warning _ -> False
-              LogTransformationIteration.Fail _ -> True
+              LogTransformation.Iteration.Pass -> False
+              LogTransformation.Iteration.Warning _ -> False
+              LogTransformation.Iteration.Fail _ -> True
 
 isWarning :: IterationResult -> Bool
 isWarning = \case 
               Inconclusive -> False
-              LogTransformationIteration.Pass -> False
-              LogTransformationIteration.Warning _ -> True
-              LogTransformationIteration.Fail _ -> False
+              LogTransformation.Iteration.Pass -> False
+              LogTransformation.Iteration.Warning _ -> True
+              LogTransformation.Iteration.Fail _ -> False
 
 data IterationSummary = IterationSummary {
                         iid :: ItemId,
@@ -112,12 +119,6 @@ emptyAccum = IterationAccum {
   rec = Nothing
 }
 
-
-data TestIteration = Iteration IterationRecord |
-                    OutOfIterationLog LogProtocol |
-                    LineError LogTransformError 
-                    deriving (Show, Eq)
-
 updateErrsWarnings:: IterationPhase -> LogProtocol -> IterationRecord -> IterationRecord
 updateErrsWarnings p lp ir = 
   let
@@ -135,37 +136,37 @@ updateErrsWarnings p lp ir =
                           StartIteration {} -> Inconclusive
                           EndIteration _ -> Inconclusive
       
-      IterationLog (Doc dp) -> LogTransformationIteration.Fail p
+      IterationLog (Doc dp) -> LogTransformation.Iteration.Fail p
       IterationLog (Run rp) -> case rp of
                               StartPrepState -> Inconclusive
                               IOAction _ -> Inconclusive
 
                               StartInteraction -> Inconclusive
-                              InteractorSuccess {} -> LogTransformationIteration.Pass
-                              InteractorFailure {} -> LogTransformationIteration.Fail p
+                              InteractorSuccess {} -> LogTransformation.Iteration.Pass
+                              InteractorFailure {} -> LogTransformation.Iteration.Fail p
 
-                              LP.PrepStateSuccess {} -> LogTransformationIteration.Pass
-                              PrepStateFailure {} -> LogTransformationIteration.Fail p
+                              LP.PrepStateSuccess {} -> LogTransformation.Iteration.Pass
+                              PrepStateFailure {} -> LogTransformation.Iteration.Fail p
 
                               StartChecks{} -> Inconclusive
                               CheckOutcome _ (CheckReport reslt _) -> case classifyResult reslt of
-                                                                        OK -> LogTransformationIteration.Pass
-                                                                        CK.Error -> LogTransformationIteration.Fail p
-                                                                        CK.Warning -> LogTransformationIteration.Warning p
+                                                                        OK -> LogTransformation.Iteration.Pass
+                                                                        CK.Error -> LogTransformation.Iteration.Fail p
+                                                                        CK.Warning -> LogTransformation.Iteration.Warning p
                                                                         Skipped -> Inconclusive
 
                               Message _ -> Inconclusive
                               Message' _ -> Inconclusive
                                                       
-                              LP.Warning _ -> LogTransformationIteration.Warning p
-                              Warning' _ -> LogTransformationIteration.Warning p
-                              LP.Error _ -> LogTransformationIteration.Fail p
+                              LP.Warning _ -> LogTransformation.Iteration.Warning p
+                              Warning' _ -> LogTransformation.Iteration.Warning p
+                              LP.Error _ -> LogTransformation.Iteration.Fail p
 
     notCheckPhase :: Bool
     notCheckPhase = p /= Checks
 
     worstResult :: IterationResult
-    worstResult = max lpResult $ LogTransformationIteration.result (summary ir)
+    worstResult = max lpResult $ LogTransformation.Iteration.result (summary ir)
 
   in 
     ir {
@@ -334,7 +335,7 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                             linNo = lineNo,
                             logItem = lp,
                             info = isDocLog 
-                                      ? "A documentation log has been encountered during a run - this type of log should not be generated during a run"
+                                      ? "A documentation log has been encountered during a run - this type of log should message not be generated during a run"
                                       $ "Unexpected log message encounterred - Messages have either been lost or received out of order.\n"
                                           <> "Test and Interation summaries may not reflect true results of the test"
                           } 
@@ -364,6 +365,15 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                                                   }
                 _ -> Nothing
 
+
+    outOfIteration :: LogProtocol -> TestIteration
+    outOfIteration = \case 
+                        BoundaryLog be -> BoundaryItem be
+                        logp@IterationLog{} -> LineError LogTransformError {
+                                                linNo = lineNo,
+                                                logItem = logp,
+                                                info = ""
+                                              }
 
     validPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
     validPhaseStep = let 
@@ -416,14 +426,14 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                           rec = isStartIteration ? newRec $ mRec >>= nextRec 
                         }, Right $ 
                               maybef mRec
-                                (isStartIteration ? Nothing $ Just [OutOfIterationLog lp])
+                                (isStartIteration ? Nothing $ Just [outOfIteration lp])
                                 (\irec -> isEndIteration 
                                               ? Just [Iteration $ apppendRaw lp irec]
                                               $ Nothing
                                               )
                         )
   in 
-      phaseChangeIsValid ? validPhaseStep $ invalidPhaseStep
+    phaseChangeIsValid ? validPhaseStep $ invalidPhaseStep
 
 $(deriveJSON defaultOptions ''IterationRecord)
 $(deriveJSON defaultOptions ''ApStateInfo)

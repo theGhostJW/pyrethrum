@@ -5,7 +5,7 @@ import           Pyrelude.IO
 import Pyrelude.Test      as T
 import AuxFiles
 import LogTransformation
-import LogTransformationCommon
+import LogTransformation.Common
 
 
 type FileAggregator = AbsFile                                            -- source file

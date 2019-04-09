@@ -21,8 +21,6 @@ import Control.Monad.Writer.Strict
 import Control.Monad.State.Strict
 import Control.Monad.Identity
 
--- TODO: update to use streaming library such as streamly
-
 newtype LineNo = LineNo { unLineNo :: Int } deriving (Show, Eq)
 
 data LogTransformError =  LogDeserialisationError DeserialisationError |
@@ -44,7 +42,7 @@ data DeserialisationError  = DeserialisationError {
   errorTxt :: Text,
   line :: Either UnicodeException Text -- the type for decode UTF8
 }  deriving (Eq, Show)
-    
+
 $(deriveJSON defaultOptions ''LogTransformError)
 $(deriveJSON defaultOptions ''LineNo)
 $(deriveJSON defaultOptions ''DeserialisationError)

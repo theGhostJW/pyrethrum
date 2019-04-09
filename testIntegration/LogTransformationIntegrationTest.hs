@@ -12,9 +12,9 @@ type FileAggregator = AbsFile                                            -- sour
                     -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
                     -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
 
-runAgregator :: FileAggregator ->  IO ()
-runAgregator fa = do 
-                  eFile <- jsoniFile 
+runAggregator :: IO (Either IOError AbsFile) ->  FileAggregator ->  IO ()
+runAggregator file fa = do 
+                  eFile <- file 
                   eitherf eFile
                     (chkFail . txt)
                     (\inputFile ->
@@ -25,10 +25,16 @@ runAgregator fa = do
                     )
 
 unit_demo_prettyPrint_integration :: IO ()
-unit_demo_prettyPrint_integration = runAgregator testPrettyPrintFile
+unit_demo_prettyPrint_integration = runAggregator jsoniFile testPrettyPrintFile
 
 unit_demo_itemAggregator_integration :: IO ()
-unit_demo_itemAggregator_integration = runAgregator testIterationStepFile
+unit_demo_itemAggregator_integration = runAggregator jsoniFile testIterationStepFile
+
+unit_demo_itemAggregator_integration_i140 :: IO ()
+unit_demo_itemAggregator_integration_i140 = runAggregator jsoniFileIteration120 testIterationStepFile
 
 jsoniFile :: IO (Either IOError AbsFile)
 jsoniFile = dataFile [relfile|demo_raw_log.ijson|]
+
+jsoniFileIteration120 :: IO (Either IOError AbsFile)
+jsoniFileIteration120 = dataFile [relfile|demo_raw_log_140.ijson|]

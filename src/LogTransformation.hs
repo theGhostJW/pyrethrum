@@ -117,7 +117,7 @@ testPrettyPrintFile = transformToFile prettyPrintItem lpDeserialiser textToByteS
 testIterationStepFile :: AbsFile                                            -- source file
                     -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
                     -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
-testIterationStepFile = transformToFile iterationStep lpDeserialiser serialiseIteration showToByteString emptyAccum
+testIterationStepFile = transformToFile iterationStep lpDeserialiser serialiseIteration showToByteString emptyIterationAccum
 
 
 ------------------------------------------------------
@@ -146,7 +146,7 @@ testPrettyPrint :: DList ByteString -> DList ByteString
 testPrettyPrint input = runToList input $ logTransform testSource testSink prettyPrintItem lpDeserialiser textToByteString showToByteString (LineNo 1) ()
 
 testIterationStep :: DList ByteString -> DList ByteString
-testIterationStep input = runToList input $ logTransform testSource testSink iterationStep lpDeserialiser serialiseIteration showToByteString (LineNo 1) emptyAccum
+testIterationStep input = runToList input $ logTransform testSource testSink iterationStep lpDeserialiser serialiseIteration showToByteString (LineNo 1) emptyIterationAccum
 
 ------------------------------------------------------------
 -------------------- Shared Item Components ----------------

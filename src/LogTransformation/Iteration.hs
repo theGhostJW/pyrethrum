@@ -1,33 +1,26 @@
-module LogTransformation.Iteration where
+module LogTransformation.Iteration (
+  emptyIterationAccum,
+  iterationStep,
+  serialiseIteration,
+  TestIteration(..),
+  IterationStats(..)
+) where
 
 import Common as C (AppError(..))
 import LogTransformation.Common
 import Check as CK
 import Pyrelude as P
-import Pyrelude.IO
 import Data.DList as D
-import qualified Prelude as PO
-import AuxFiles
-import OrphanedInstances
 import DSL.LogProtocol as LP
-import Text.Show.Pretty as PP
 import qualified Data.Aeson as A
 import Data.Aeson.TH
 import Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
-import System.IO as S
-import Data.Functor
-import DSL.Logger
-import Control.Monad.Writer.Strict
-import Control.Monad.State.Strict
-import Control.Monad.Identity
-
 
 data TestIteration = Iteration IterationRecord |
                     BoundaryItem BoundaryEvent  |
                     LineError LogTransformError 
                     deriving (Show, Eq)
-
 
 --------------------------------------------------------
 ----------------- Iteration Aggregation ----------------
@@ -46,7 +39,26 @@ data IterationResult = Inconclusive |
                        Pass |
                        Warning IterationPhase |
                        Fail IterationPhase 
-                       deriving (Eq, Ord, Show)
+                       deriving (Eq, Show)
+                      
+instance Ord IterationResult where
+     (<=) :: IterationResult -> IterationResult -> Bool 
+     Inconclusive <= _ = True
+
+     LogTransformation.Iteration.Pass <= Inconclusive = False
+     LogTransformation.Iteration.Pass <= LogTransformation.Iteration.Pass = True
+     LogTransformation.Iteration.Pass <= LogTransformation.Iteration.Warning _ = True
+     LogTransformation.Iteration.Pass <= LogTransformation.Iteration.Fail _ = True
+
+     LogTransformation.Iteration.Warning _ <= Inconclusive = False
+     LogTransformation.Iteration.Warning _ <= LogTransformation.Iteration.Pass = True
+     LogTransformation.Iteration.Warning p0 <= LogTransformation.Iteration.Warning p1 = p0 > p1 -- if phase is greater then warning is smaller (favour earlier warnings)
+     LogTransformation.Iteration.Warning _ <= LogTransformation.Iteration.Fail _ = True
+
+     LogTransformation.Iteration.Fail _ <= Inconclusive = False
+     LogTransformation.Iteration.Fail _ <= LogTransformation.Iteration.Pass = False
+     LogTransformation.Iteration.Fail _ <= LogTransformation.Iteration.Warning _ = False
+     LogTransformation.Iteration.Fail p0 <= LogTransformation.Iteration.Fail p1 = p0 > p1 -- if phase is greater then warning is smaller (favour earlier failures)
 
 isFailure :: IterationResult -> Bool
 isFailure = \case 
@@ -62,12 +74,37 @@ isWarning = \case
               LogTransformation.Iteration.Warning _ -> True
               LogTransformation.Iteration.Fail _ -> False
 
+calcResult :: IterationStats -> (IterationPhase -> IterationResult)
+calcResult stats  
+   | type2Failure stats > 0 = LogTransformation.Iteration.Fail 
+   | LogTransformation.Iteration.fail stats > 0 = LogTransformation.Iteration.Fail 
+   | regression stats > 0 = LogTransformation.Iteration.Fail 
+
+   | (LogTransformation.Iteration.warning :: IterationStats -> Int) stats > 0 = LogTransformation.Iteration.Warning
+   | expectedFailure stats > 0 = LogTransformation.Iteration.Warning
+
+   | pass stats > 0 = const LogTransformation.Iteration.Pass
+   | otherwise = const Inconclusive
+
 data IterationSummary = IterationSummary {
-                        iid :: ItemId,
-                        pre :: WhenClause,
-                        post:: ThenClause,
-                        result :: IterationResult
+                          iid :: ItemId,
+                          pre :: WhenClause,
+                          post:: ThenClause,
+                          result :: IterationResult,
+                          stats :: IterationStats
                         } deriving (Eq, Show)
+
+data IterationStats = IterationStats {
+  pass :: Int,
+  warning :: Int,
+  expectedFailure :: Int,
+  type2Failure :: Int,
+  fail :: Int,
+  regression :: Int
+}  deriving (Show, Eq)
+
+emptyStats :: IterationStats
+emptyStats = IterationStats 0 0 0 0 0 0
 
 data IterationError = IterationError {
     phase :: IterationPhase,
@@ -112,76 +149,103 @@ data IterationAccum = IterationAccum {
   rec :: Maybe IterationRecord
 } deriving (Eq, Show)
 
-emptyAccum :: IterationAccum
-emptyAccum = IterationAccum {
+emptyIterationAccum :: IterationAccum
+emptyIterationAccum = IterationAccum {
   phase = OutOfIteration,
   stageFailure = NoFailure,
   rec = Nothing
 }
 
-updateErrsWarnings:: IterationPhase -> LogProtocol -> IterationRecord -> IterationRecord
-updateErrsWarnings p lp ir = 
+updateIterationErrsWarnings:: IterationPhase -> LogProtocol -> IterationRecord -> IterationRecord
+updateIterationErrsWarnings p lp iRec = 
   let
-    lpResult :: IterationResult 
-    lpResult = case lp of
-      BoundaryLog bl -> case bl of              
-                          StartRun{} -> Inconclusive
-                          EndRun -> Inconclusive
-                          FilterLog _ -> Inconclusive
-                          StartGroup _ -> Inconclusive
-                          EndGroup _ -> Inconclusive
-                          StartTest _ -> Inconclusive
-                          EndTest _ -> Inconclusive
-                          
-                          StartIteration {} -> Inconclusive
-                          EndIteration _ -> Inconclusive
-      
-      IterationLog (Doc dp) -> LogTransformation.Iteration.Fail p
-      IterationLog (Run rp) -> case rp of
-                              StartPrepState -> Inconclusive
-                              IOAction _ -> Inconclusive
+    thisResult :: IterationResult
+    thisResult = calcResult newStats p
 
-                              StartInteraction -> Inconclusive
-                              InteractorSuccess {} -> LogTransformation.Iteration.Pass
-                              InteractorFailure {} -> LogTransformation.Iteration.Fail p
+    worstResult :: IterationResult
+    worstResult = 
+      let
+        oldResult :: IterationResult
+        oldResult = LogTransformation.Iteration.result (summary iRec)
+      in 
+        max oldResult thisResult
 
-                              LP.PrepStateSuccess {} -> LogTransformation.Iteration.Pass
-                              PrepStateFailure {} -> LogTransformation.Iteration.Fail p
+    newStats :: IterationStats
+    newStats = 
+      let 
+        modifier :: IterationStats -> IterationStats
+        modifier = 
+          -- good motivating case for lens
+          let 
+            incFailure :: IterationStats -> IterationStats
+            incFailure s = s {LogTransformation.Iteration.fail = LogTransformation.Iteration.fail s + 1}
+          
+            incExpectedFailure :: IterationStats -> IterationStats
+            incExpectedFailure s = s {LogTransformation.Iteration.expectedFailure = LogTransformation.Iteration.expectedFailure s + 1}
+          
+            incRegresssion :: IterationStats -> IterationStats
+            incRegresssion s = s {LogTransformation.Iteration.regression = LogTransformation.Iteration.regression s + 1}
 
-                              StartChecks{} -> Inconclusive
-                              CheckOutcome _ (CheckReport reslt _) -> case classifyResult reslt of
-                                                                        OK -> LogTransformation.Iteration.Pass
-                                                                        CK.Error -> LogTransformation.Iteration.Fail p
-                                                                        CK.Warning -> LogTransformation.Iteration.Warning p
-                                                                        Skipped -> Inconclusive
-
-                              Message _ -> Inconclusive
-                              Message' _ -> Inconclusive
-                                                      
-                              LP.Warning _ -> LogTransformation.Iteration.Warning p
-                              Warning' _ -> LogTransformation.Iteration.Warning p
-                              LP.Error _ -> LogTransformation.Iteration.Fail p
+            incWarning :: IterationStats -> IterationStats
+            incWarning s = s {LogTransformation.Iteration.warning = (LogTransformation.Iteration.warning :: IterationStats -> Int) s + 1 }
+          in
+            case lp of
+              -- TODO :: Test for out of iteration errors warnings
+              BoundaryLog bl -> id  -- this should not happen and will cause a phase error to be logged
+              IterationLog (Doc dp) -> id -- this should not happen and will cause a phase error to be logged
+              IterationLog (Run rp) -> case rp of
+                                          StartPrepState -> id
+                                          IOAction _ -> id
+            
+                                          StartInteraction -> id
+                                          InteractorSuccess {} -> id 
+                                          InteractorFailure {} -> incFailure
+            
+                                          LP.PrepStateSuccess {} -> id
+                                          PrepStateFailure {} -> incFailure
+            
+                                          StartChecks{} -> id
+                                          CheckOutcome _ (CheckReport reslt _) -> case reslt of
+                                                                                        CK.Pass -> id
+                                                                                        CK.Fail -> incFailure
+                                                                                        GateFail -> incFailure
+                                                                                        FailExpected _ -> incExpectedFailure
+                                                                                        GateFailExpected _ -> incExpectedFailure
+                                                                                        PassWhenFailExpected _ -> \s -> s {LogTransformation.Iteration.type2Failure = LogTransformation.Iteration.type2Failure s + 1}
+                                                                                        Regression _ -> incRegresssion
+                                                                                        GateRegression _ -> incRegresssion
+                                                                                        Skip -> id
+            
+                                          Message _ -> id
+                                          Message' _ -> id
+                                                                  
+                                          LP.Warning _ -> incWarning
+                                          Warning' _ -> incWarning
+                                          LP.Error _ -> incFailure
+        in 
+          modifier . stats $ summary iRec
 
     notCheckPhase :: Bool
     notCheckPhase = p /= Checks
 
-    worstResult :: IterationResult
-    worstResult = max lpResult $ LogTransformation.Iteration.result (summary ir)
-
   in 
-    ir {
-      summary = (summary ir) {result = worstResult}
-      , otherErrorsDesc = isFailure lpResult && notCheckPhase 
-                              ? IterationError p lp : otherErrorsDesc ir  
-                              $ otherErrorsDesc ir
+    iRec {
+      summary = (summary iRec) {
+                                result = worstResult,
+                                stats = newStats
+                               }
 
-      , otherWarningsDesc = isWarning lpResult && notCheckPhase 
-                              ? IterationWarning p lp : otherWarningsDesc ir 
-                              $ otherWarningsDesc ir
+      , otherErrorsDesc = isFailure thisResult && notCheckPhase 
+                              ? IterationError p lp : otherErrorsDesc iRec  
+                              $ otherErrorsDesc iRec
+
+      , otherWarningsDesc = isWarning thisResult && notCheckPhase 
+                              ? IterationWarning p lp : otherWarningsDesc iRec 
+                              $ otherWarningsDesc iRec
     }
 
 apppendRaw :: LogProtocol -> IterationRecord -> IterationRecord
-apppendRaw lp ir = ir {rawLog = D.snoc (rawLog ir) lp} 
+apppendRaw lp iRec = iRec {rawLog = D.snoc (rawLog iRec) lp} 
 
 failStage :: LogProtocol -> FailStage
 failStage = \case
@@ -353,7 +417,8 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                                                       iid = iid,
                                                       pre = pre,
                                                       post = post,
-                                                      result = Inconclusive
+                                                      result = Inconclusive,
+                                                      stats = emptyStats
                                                     },
                                                     validation = [],
                                                     otherErrorsDesc = [],
@@ -379,7 +444,7 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
     validPhaseStep = let 
                       nextRec:: IterationRecord -> Maybe IterationRecord
                       nextRec thisRec =
-                        updateErrsWarnings lastPhase lp  
+                        updateIterationErrsWarnings lastPhase lp  
                         . apppendRaw lp <$>  
                               case lp of
                                 BoundaryLog bl -> case bl of 
@@ -445,3 +510,4 @@ $(deriveJSON defaultOptions ''IterationResult)
 $(deriveJSON defaultOptions ''IterationError)
 $(deriveJSON defaultOptions ''IterationPhase)
 $(deriveJSON defaultOptions ''TestIteration)
+$(deriveJSON defaultOptions ''IterationStats)

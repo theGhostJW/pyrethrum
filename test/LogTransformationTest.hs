@@ -11,8 +11,8 @@ import Text.RawString.QQ
 import Data.ByteString.Char8 as B
 import qualified Data.Foldable as F
 
-runAgregator :: (DList ByteString -> DList ByteString) ->  IO ()
-runAgregator f = let 
+runAggregator :: (DList ByteString -> DList ByteString) ->  IO ()
+runAggregator f = let 
               bsList :: DList ByteString
               bsList = f rawFile
 
@@ -22,10 +22,10 @@ runAgregator f = let
               sequence_ slList
 
 -- unit_demo_prettyPrint :: IO ()
--- unit_demo_prettyPrint = runAgregator testPrettyPrint
+-- unit_demo_prettyPrint = runAggregator testPrettyPrint
 
 -- unit_demo_iteration :: IO ()
--- unit_demo_iteration = runAgregator testIterationStep
+-- unit_demo_iteration = runAggregator testIterationStep
 
 rawFile :: DList ByteString
 rawFile = fromList . B.lines $ toS 

@@ -37,13 +37,13 @@ config = C.testConfig {
   countries = allCountries
  }
 
-jw = showItems
+jw = endpoint
 
 showItems :: IO ()
 showItems = showAndLogItems items
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-endpoint = ep runConfig $ IID 140
+endpoint = ep runConfig $ IID 120
 
 data ApState = ApState {
   itemId   :: Int,

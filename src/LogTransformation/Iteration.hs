@@ -3,7 +3,9 @@ module LogTransformation.Iteration (
   iterationStep,
   serialiseIteration,
   TestIteration(..),
-  IterationStats(..)
+  IterationStats(..),
+  ExecutionStatus(..),
+  IterationRecord(..)
 ) where
 
 import Common as C (AppError(..))
@@ -35,14 +37,14 @@ data IterationPhase = OutOfIteration |
                       Checks 
                       deriving (Eq, Ord, Show)
 
-data IterationResult = Inconclusive |
+data ExecutionStatus = Inconclusive |
                        Pass |
                        Warning IterationPhase |
                        Fail IterationPhase 
                        deriving (Eq, Show)
                       
-instance Ord IterationResult where
-     (<=) :: IterationResult -> IterationResult -> Bool 
+instance Ord ExecutionStatus where
+     (<=) :: ExecutionStatus -> ExecutionStatus -> Bool 
      Inconclusive <= _ = True
 
      LogTransformation.Iteration.Pass <= Inconclusive = False
@@ -60,22 +62,22 @@ instance Ord IterationResult where
      LogTransformation.Iteration.Fail _ <= LogTransformation.Iteration.Warning _ = False
      LogTransformation.Iteration.Fail p0 <= LogTransformation.Iteration.Fail p1 = p0 > p1 -- if phase is greater then warning is smaller (favour earlier failures)
 
-isFailure :: IterationResult -> Bool
+isFailure :: ExecutionStatus -> Bool
 isFailure = \case 
               Inconclusive -> False
               LogTransformation.Iteration.Pass -> False
               LogTransformation.Iteration.Warning _ -> False
               LogTransformation.Iteration.Fail _ -> True
 
-isWarning :: IterationResult -> Bool
+isWarning :: ExecutionStatus -> Bool
 isWarning = \case 
               Inconclusive -> False
               LogTransformation.Iteration.Pass -> False
               LogTransformation.Iteration.Warning _ -> True
               LogTransformation.Iteration.Fail _ -> False
 
-calcResult :: IterationStats -> (IterationPhase -> IterationResult)
-calcResult stats  
+calcStatus :: IterationStats -> (IterationPhase -> ExecutionStatus)
+calcStatus stats  
    | type2Failure stats > 0 = LogTransformation.Iteration.Fail 
    | LogTransformation.Iteration.fail stats > 0 = LogTransformation.Iteration.Fail 
    | regression stats > 0 = LogTransformation.Iteration.Fail 
@@ -90,7 +92,7 @@ data IterationSummary = IterationSummary {
                           iid :: ItemId,
                           pre :: WhenClause,
                           post:: ThenClause,
-                          result :: IterationResult,
+                          status :: ExecutionStatus,
                           stats :: IterationStats
                         } deriving (Eq, Show)
 
@@ -103,8 +105,23 @@ data IterationStats = IterationStats {
   regression :: Int
 }  deriving (Show, Eq)
 
-emptyStats :: IterationStats
-emptyStats = IterationStats 0 0 0 0 0 0
+instance Semigroup IterationStats where 
+  s0 <> s1 = 
+    let 
+      plus :: (IterationStats -> Int) -> Int
+      plus f = f s0 + f s1 
+    in 
+      IterationStats {
+                       pass = plus pass,
+                       warning = plus warning,
+                       expectedFailure = plus expectedFailure,
+                       type2Failure = plus type2Failure,
+                       fail = plus LogTransformation.Iteration.fail,
+                       regression = plus regression
+                      } 
+
+instance Monoid IterationStats where 
+  mempty = IterationStats 0 0 0 0 0 0
 
 data IterationError = IterationError {
     phase :: IterationPhase,
@@ -115,8 +132,7 @@ data IterationWarning = IterationWarning {
     phase :: IterationPhase,
     warning :: LogProtocol
   } deriving (Eq, Show)
-                          
-                        
+                                        
 data IterationRecord = IterationRecord {
   summary :: IterationSummary,
   validation :: [CheckReport],
@@ -159,14 +175,14 @@ emptyIterationAccum = IterationAccum {
 updateIterationErrsWarnings:: IterationPhase -> LogProtocol -> IterationRecord -> IterationRecord
 updateIterationErrsWarnings p lp iRec = 
   let
-    thisResult :: IterationResult
-    thisResult = calcResult newStats p
+    thisResult :: ExecutionStatus
+    thisResult = calcStatus newStats p
 
-    worstResult :: IterationResult
+    worstResult :: ExecutionStatus
     worstResult = 
       let
-        oldResult :: IterationResult
-        oldResult = LogTransformation.Iteration.result (summary iRec)
+        oldResult :: ExecutionStatus
+        oldResult = status (summary iRec)
       in 
         max oldResult thisResult
 
@@ -231,7 +247,7 @@ updateIterationErrsWarnings p lp iRec =
   in 
     iRec {
       summary = (summary iRec) {
-                                result = worstResult,
+                                status = worstResult,
                                 stats = newStats
                                }
 
@@ -417,8 +433,8 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                                                       iid = iid,
                                                       pre = pre,
                                                       post = post,
-                                                      result = Inconclusive,
-                                                      stats = emptyStats
+                                                      status = Inconclusive,
+                                                      stats = mempty
                                                     },
                                                     validation = [],
                                                     otherErrorsDesc = [],
@@ -506,7 +522,7 @@ $(deriveJSON defaultOptions ''PrepStateInfo)
 $(deriveJSON defaultOptions ''ItemInfo)
 $(deriveJSON defaultOptions ''IterationWarning)
 $(deriveJSON defaultOptions ''IterationSummary)
-$(deriveJSON defaultOptions ''IterationResult)
+$(deriveJSON defaultOptions ''ExecutionStatus)
 $(deriveJSON defaultOptions ''IterationError)
 $(deriveJSON defaultOptions ''IterationPhase)
 $(deriveJSON defaultOptions ''TestIteration)

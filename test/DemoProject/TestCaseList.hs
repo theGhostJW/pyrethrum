@@ -54,7 +54,7 @@ ioRunToFile ::
 ioRunToFile docMode pln interpt itemRunner = let 
                     handleSpec :: M.Map (Text, FileExt) (LogProtocol -> Text) 
                     handleSpec = M.fromList [
-                                                (("raw", FileExt ".log"), logStrPP docMode)
+                                                (("raw", FileExt ".log"), prettyPrintLogProtocol docMode)
                                               , (("raw", FileExt ".jsoni"), logStrJSON)
                                             ]
 
@@ -75,7 +75,7 @@ ioRunToFile docMode pln interpt itemRunner = let
                     closeFileHandles hdls = sequence_ $ S.hClose <$> hdls
 
                     allHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> Text, S.Handle)])
-                    allHandles = (((Nothing, logStrPP docMode, S.stdout) :) <$>) <$> fileHandles
+                    allHandles = (((Nothing, prettyPrintLogProtocol docMode, S.stdout) :) <$>) <$> fileHandles
                     
                     runTheTest :: [(LogProtocol -> Text, S.Handle)] -> IO ()
                     runTheTest targHndls = testRun pln filters itemRunner (interpt (logToHandles targHndls)) runConfig

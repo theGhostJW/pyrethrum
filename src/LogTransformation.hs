@@ -11,6 +11,7 @@ import qualified Prelude as PO
 import AuxFiles
 import OrphanedInstances
 import DSL.LogProtocol as LP
+import DSL.LogProtocol.PrettyPrint
 import Text.Show.Pretty as PP
 import qualified Data.Aeson as A
 import Data.Aeson.TH
@@ -157,7 +158,7 @@ prettyPrintItem ::
                 -> ()                                             -- accumulator
                 -> LogProtocol                    -- line item
                 -> ((), Either LogTransformError (Maybe [Text]))             -- (accum, result item)
-prettyPrintItem _ _ lp = ((), Right .  Just . pure $ logStrPP False lp)
+prettyPrintItem _ _ lp = ((), Right .  Just . pure $ prettyPrintLogProtocol False lp)
 
 lpDeserialiser :: LineNo -> ByteString -> Either DeserialisationError LogProtocol
 lpDeserialiser ln bs = mapLeft (\erStr -> DeserialisationError ln (toS erStr) (decodeUtf8' bs)) $ A.eitherDecode $ L.fromStrict bs

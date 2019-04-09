@@ -19,6 +19,11 @@ import Data.Aeson.TH
 import Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
 
+-- Test aggregators deleted write an aggregator later to create 
+-- relational records from Iteration records and use reporting service
+-- to provide full report - use sql lite locally 
+-- see https://www.oreilly.com/library/view/microservices-antipatterns-and/9781492042716/ch04.html
+
 data TestIteration = Iteration IterationRecord |
                     BoundaryItem BoundaryEvent  |
                     LineError LogTransformError 

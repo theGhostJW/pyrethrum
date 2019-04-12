@@ -23,6 +23,7 @@ import DSL.Logger
 import Control.Monad.Writer.Strict
 import Control.Monad.State.Strict
 import Control.Monad.Identity
+import LogTransformation.Iteration.PrettyPrint
 
 -- TODO: update to use streaming library such as streamly
 
@@ -119,6 +120,11 @@ testIterationStepFile :: AbsFile                                            -- s
                     -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
                     -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
 testIterationStepFile = transformToFile iterationStep lpDeserialiser serialiseIteration showToByteString emptyIterationAccum
+                
+testIterationPrettyPrintFile :: AbsFile                                   -- source file
+                    -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
+                    -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
+testIterationPrettyPrintFile = transformToFile iterationStep lpDeserialiser prettyPrintSerialiseIteration showToByteString emptyIterationAccum
 
 
 ------------------------------------------------------
@@ -148,6 +154,9 @@ testPrettyPrint input = runToList input $ logTransform testSource testSink prett
 
 testIterationStep :: DList ByteString -> DList ByteString
 testIterationStep input = runToList input $ logTransform testSource testSink iterationStep lpDeserialiser serialiseIteration showToByteString (LineNo 1) emptyIterationAccum
+
+testIterationPPStep :: DList ByteString -> DList ByteString
+testIterationPPStep input = runToList input $ logTransform testSource testSink iterationStep lpDeserialiser prettyPrintSerialiseIteration showToByteString (LineNo 1) emptyIterationAccum
 
 ------------------------------------------------------------
 -------------------- Shared Item Components ----------------

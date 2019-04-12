@@ -4,6 +4,7 @@ module DSL.LogProtocol.PrettyPrint (
 ) where
 
 import Common
+import PrettyPrintCommon as PC
 import  DSL.LogProtocol
 import           Pyrelude as P
 import Text.Show.Pretty as PP
@@ -24,12 +25,6 @@ prettyPrintFilterItem FilterResult{..} =
 prettyPrintLogProtocol :: Bool -> LogProtocol -> Text
 prettyPrintLogProtocol docMode =
   let
-    hdr l h = l <> " " <> h <> " " <> l
-    subHeader = hdr "----"
-    header = hdr "===="
-    tstHeader = hdr "==="
-    itrHeader = hdr "=="
-
     iterId :: ItemId -> Text
     iterId (ItemId tst iid) = toString tst <> " / item " <> txt iid
 
@@ -65,15 +60,15 @@ prettyPrintLogProtocol docMode =
   in
     \case
         BoundaryLog bl -> case bl of 
-                            FilterLog fltrInfos -> newLn <> header "Filter Log" <> newLn <>
+                            FilterLog fltrInfos -> newLn <> PC.header "Filter Log" <> newLn <>
                                                           foldl (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
-                            StartRun ttle rc -> header ("Test Run: " <> unRunTitle ttle) <> 
+                            StartRun ttle rc -> PC.header ("Test Run: " <> unRunTitle ttle) <> 
                                                 newLn <> "Run Config:" <>
                                                 newLn <> ppAesonBlock rc
 
-                            StartGroup gt -> header $ "Group: " <> unGroupTitle gt
-                            EndGroup gt -> header $ "End Group: " <> unGroupTitle gt
+                            StartGroup gt -> PC.header $ "Group: " <> unGroupTitle gt
+                            EndGroup gt -> PC.header $ "End Group: " <> unGroupTitle gt
 
                             StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
                                                               newLn <> "Test Config:" <>
@@ -86,7 +81,7 @@ prettyPrintLogProtocol docMode =
                                                             (docMode ? "" $ newLn)
 
                             EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
-                            EndRun -> newLn <> header "End Run"
+                            EndRun -> newLn <> PC.header "End Run"
 
         IterationLog (Doc dp) -> case dp of 
                               DocAction ai -> case ai of

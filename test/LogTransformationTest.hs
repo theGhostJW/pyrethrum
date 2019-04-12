@@ -27,6 +27,9 @@ runAggregator f = let
 -- unit_demo_iteration :: IO ()
 -- unit_demo_iteration = runAggregator testIterationStep
 
+unit_demo_pp_iteration :: IO ()
+unit_demo_pp_iteration = runAggregator testIterationPPStep
+
 rawFile :: DList ByteString
 rawFile = fromList . B.lines $ toS 
   [r|{"tag":"StartRun","contents":[{"unRunTitle":"Sample RunConfig"},{"environment":"TST","country":"AU","runTitle":"Sample RunConfig","depth":"DeepRegression"}]}

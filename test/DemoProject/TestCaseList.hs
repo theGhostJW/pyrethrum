@@ -14,6 +14,7 @@ import           DSL.Interpreter
 import           DSL.Logger
 import           DSL.Ensure
 import DSL.LogProtocol
+import DSL.LogProtocol.PrettyPrint
 import           Data.DList
 import           Pyrelude as P
 import           Pyrelude.IO as PIO 

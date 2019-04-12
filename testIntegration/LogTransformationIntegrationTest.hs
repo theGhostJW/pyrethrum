@@ -30,11 +30,14 @@ unit_demo_prettyPrint_integration = runAggregator jsoniFile testPrettyPrintFile
 unit_demo_itemAggregator_integration :: IO ()
 unit_demo_itemAggregator_integration = runAggregator jsoniFile testIterationStepFile
 
+unit_demo_itemAggregator_pp_integration :: IO ()
+unit_demo_itemAggregator_pp_integration = runAggregator jsoniFile testIterationPrettyPrintFile
+
 unit_demo_itemAggregator_integration_i140 :: IO ()
-unit_demo_itemAggregator_integration_i140 = runAggregator jsoniFileIteration120 testIterationStepFile
+unit_demo_itemAggregator_integration_i140 = runAggregator jsoniFileIteration140 testIterationStepFile
 
 jsoniFile :: IO (Either IOError AbsFile)
 jsoniFile = dataFile [relfile|demo_raw_log.ijson|]
 
-jsoniFileIteration120 :: IO (Either IOError AbsFile)
-jsoniFileIteration120 = dataFile [relfile|demo_raw_log_140.ijson|]
+jsoniFileIteration140 :: IO (Either IOError AbsFile)
+jsoniFileIteration140 = dataFile [relfile|demo_raw_log_140.ijson|]

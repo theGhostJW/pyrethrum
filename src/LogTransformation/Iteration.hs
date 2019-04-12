@@ -5,7 +5,14 @@ module LogTransformation.Iteration (
   TestIteration(..),
   IterationStats(..),
   ExecutionStatus(..),
-  IterationRecord(..)
+  IterationRecord(..),
+  LogTransformError(..),
+  IterationSummary(..),
+  IterationError(..),
+  IterationWarning(..),
+  ItemInfo(..),
+  ApStateInfo(..),
+  PrepStateInfo(..)
 ) where
 
 import Common as C (AppError(..))

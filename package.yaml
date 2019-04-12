@@ -33,6 +33,7 @@ dependencies:
   - dlist
 
 ghc-options:
+  # - -F -pgmF=record-dot-preprocessor 
   - -fmax-pmcheck-iterations=10000000
   - -ferror-spans
   # - -O2

@@ -41,9 +41,11 @@ prettyPrintLogIteration = \case
 printIteration :: PrintIteration -> Text
 printIteration PrintIteration {..} = 
   let 
-    I.IterationSummary {..} = summary
+    sumTxt I.IterationSummary {..} = 
+      let 
+        hdr = itrHeader txt $ unItemId iid
   in
-    uu --- itrHeader iid
+    uu
 
 
 prepForPrinting :: I.IterationRecord -> PrintIteration

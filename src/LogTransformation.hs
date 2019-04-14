@@ -23,7 +23,6 @@ import DSL.Logger
 import Control.Monad.Writer.Strict
 import Control.Monad.State.Strict
 import Control.Monad.Identity
-import LogTransformation.Iteration.PrettyPrint
 
 -- TODO: update to use streaming library such as streamly
 

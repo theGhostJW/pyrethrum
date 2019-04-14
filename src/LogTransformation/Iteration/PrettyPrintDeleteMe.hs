@@ -1,4 +1,4 @@
-module LogTransformation.Iteration.PrettyPrint where
+module LogTransformation.Iteration.PrettyPrintDeleteMe where
 
 import Common
 import PrettyPrintCommon
@@ -43,7 +43,10 @@ printIteration PrintIteration {..} =
   let 
     sumTxt I.IterationSummary {..} = 
       let 
-        hdr = itrHeader txt $ unItemId iid
+        ItemId tstMod id' = iid
+        header' = itrHeader $ unTestModule tstMod <> " " <> txt id'
+      in 
+        uu
   in
     uu
 

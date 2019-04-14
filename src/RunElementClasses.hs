@@ -8,7 +8,7 @@ import Data.Aeson.Types
 import GHC.Generics
 import           Check
 
-newtype TestModule = TestModule Text deriving (Eq, Show, IsString)
+newtype TestModule = TestModule {unTestModule :: Text} deriving (Eq, Show, IsString)
 
 -- this result is ultimately serialsed to JSON as part of the log protocol data  
 -- type and can't serialise with custom typeclass constraints so forced to

@@ -3,7 +3,7 @@ module LogTransformation.Iteration (
   iterationStep,
   serialiseIteration,
   TestIteration(..),
-  IterationStats(..),
+  Issues(..),
   ExecutionStatus(..),
   IterationRecord(..),
   LogTransformError(..),
@@ -26,7 +26,7 @@ import Data.Aeson.TH
 import Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
 
--- Test aggregators deleted write an aggregator later to create 
+-- TODO: creation relational records
 -- relational records from Iteration records and use reporting service
 -- to provide full report - use sql lite locally 
 -- see https://www.oreilly.com/library/view/microservices-antipatterns-and/9781492042716/ch04.html
@@ -88,52 +88,49 @@ isWarning = \case
               LogTransformation.Iteration.Warning _ -> True
               LogTransformation.Iteration.Fail _ -> False
 
-calcStatus :: IterationStats -> (IterationPhase -> ExecutionStatus)
+calcStatus :: Issues -> (IterationPhase -> ExecutionStatus)
 calcStatus stats  
    | type2Failure stats > 0 = LogTransformation.Iteration.Fail 
    | LogTransformation.Iteration.fail stats > 0 = LogTransformation.Iteration.Fail 
    | regression stats > 0 = LogTransformation.Iteration.Fail 
 
-   | (LogTransformation.Iteration.warning :: IterationStats -> Int) stats > 0 = LogTransformation.Iteration.Warning
+   | (LogTransformation.Iteration.warning :: Issues -> Int) stats > 0 = LogTransformation.Iteration.Warning
    | expectedFailure stats > 0 = LogTransformation.Iteration.Warning
 
-   | pass stats > 0 = const LogTransformation.Iteration.Pass
-   | otherwise = const Inconclusive
+   | otherwise = const LogTransformation.Iteration.Pass
 
 data IterationSummary = IterationSummary {
                           iid :: ItemId,
                           pre :: WhenClause,
                           post:: ThenClause,
                           status :: ExecutionStatus,
-                          stats :: IterationStats
+                          stats :: Issues
                         } deriving (Eq, Show)
 
-data IterationStats = IterationStats {
-  pass :: Int,
-  warning :: Int,
+data Issues = Issues {
   expectedFailure :: Int,
+  warning :: Int,
   type2Failure :: Int,
   fail :: Int,
   regression :: Int
 }  deriving (Show, Eq)
 
-instance Semigroup IterationStats where 
+instance Semigroup Issues where 
   s0 <> s1 = 
     let 
-      plus :: (IterationStats -> Int) -> Int
+      plus :: (Issues -> Int) -> Int
       plus f = f s0 + f s1 
     in 
-      IterationStats {
-                       pass = plus pass,
-                       warning = plus warning,
-                       expectedFailure = plus expectedFailure,
-                       type2Failure = plus type2Failure,
-                       fail = plus LogTransformation.Iteration.fail,
-                       regression = plus regression
-                      } 
+      Issues {
+                warning = plus warning,
+                expectedFailure = plus expectedFailure,
+                type2Failure = plus type2Failure,
+                fail = plus LogTransformation.Iteration.fail,
+                regression = plus regression
+              } 
 
-instance Monoid IterationStats where 
-  mempty = IterationStats 0 0 0 0 0 0
+instance Monoid Issues where 
+  mempty = Issues 0 0 0 0 0
 
 data IterationError = IterationError {
     phase :: IterationPhase,
@@ -184,6 +181,7 @@ emptyIterationAccum = IterationAccum {
   rec = Nothing
 }
 
+
 updateIterationErrsWarnings:: IterationPhase -> LogProtocol -> IterationRecord -> IterationRecord
 updateIterationErrsWarnings p lp iRec = 
   let
@@ -198,24 +196,24 @@ updateIterationErrsWarnings p lp iRec =
       in 
         max oldResult thisResult
 
-    newStats :: IterationStats
+    newStats :: Issues
     newStats = 
       let 
-        modifier :: IterationStats -> IterationStats
+        modifier :: Issues -> Issues
         modifier = 
           -- good motivating case for lens
           let 
-            incFailure :: IterationStats -> IterationStats
+            incFailure :: Issues -> Issues
             incFailure s = s {LogTransformation.Iteration.fail = LogTransformation.Iteration.fail s + 1}
           
-            incExpectedFailure :: IterationStats -> IterationStats
+            incExpectedFailure :: Issues -> Issues
             incExpectedFailure s = s {LogTransformation.Iteration.expectedFailure = LogTransformation.Iteration.expectedFailure s + 1}
           
-            incRegresssion :: IterationStats -> IterationStats
+            incRegresssion :: Issues -> Issues
             incRegresssion s = s {LogTransformation.Iteration.regression = LogTransformation.Iteration.regression s + 1}
 
-            incWarning :: IterationStats -> IterationStats
-            incWarning s = s {LogTransformation.Iteration.warning = (LogTransformation.Iteration.warning :: IterationStats -> Int) s + 1 }
+            incWarning :: Issues -> Issues
+            incWarning s = s {LogTransformation.Iteration.warning = (LogTransformation.Iteration.warning :: Issues -> Int) s + 1 }
           in
             case lp of
               -- TODO :: Test for out of iteration errors warnings
@@ -486,7 +484,7 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                                     
                                     StartIteration{} -> newRec
                                     
-                                    EndIteration _ -> Nothing -- note special processing for end iteration
+                                    EndIteration _ -> Nothing -- special processing for end iteration
 
                                 IterationLog (Doc _) -> Nothing
                                 IterationLog (Run rp) -> case rp of
@@ -538,4 +536,4 @@ $(deriveJSON defaultOptions ''ExecutionStatus)
 $(deriveJSON defaultOptions ''IterationError)
 $(deriveJSON defaultOptions ''IterationPhase)
 $(deriveJSON defaultOptions ''TestIteration)
-$(deriveJSON defaultOptions ''IterationStats)
+$(deriveJSON defaultOptions ''Issues)

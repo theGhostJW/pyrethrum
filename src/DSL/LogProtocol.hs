@@ -26,6 +26,7 @@ newtype DRunConfig = DRunConfig {unDRunConfig :: Text} deriving (Eq, Show, IsStr
 newtype WhenClause = WhenClause {unWhenClause :: Text} deriving (Eq, Show, IsString)
 newtype ThenClause = ThenClause {unThenClause :: Text} deriving (Eq, Show, IsString)
 data ItemId = ItemId TestModule Int deriving (Eq, Show)
+
 data DocActionInfo = 
     ActionInfo Text |
     ActionInfoM Text Text 

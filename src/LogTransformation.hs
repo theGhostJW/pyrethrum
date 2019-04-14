@@ -120,12 +120,6 @@ testIterationStepFile :: AbsFile                                            -- s
                     -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
 testIterationStepFile = transformToFile iterationStep lpDeserialiser serialiseIteration showToByteString emptyIterationAccum
                 
-testIterationPrettyPrintFile :: AbsFile                                   -- source file
-                    -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
-                    -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
-testIterationPrettyPrintFile = transformToFile iterationStep lpDeserialiser prettyPrintSerialiseIteration showToByteString emptyIterationAccum
-
-
 ------------------------------------------------------
 ----------------- Testing Using DList ----------------
 ------------------------------------------------------
@@ -154,17 +148,14 @@ testPrettyPrint input = runToList input $ logTransform testSource testSink prett
 testIterationStep :: DList ByteString -> DList ByteString
 testIterationStep input = runToList input $ logTransform testSource testSink iterationStep lpDeserialiser serialiseIteration showToByteString (LineNo 1) emptyIterationAccum
 
-testIterationPPStep :: DList ByteString -> DList ByteString
-testIterationPPStep input = runToList input $ logTransform testSource testSink iterationStep lpDeserialiser prettyPrintSerialiseIteration showToByteString (LineNo 1) emptyIterationAccum
-
 ------------------------------------------------------------
 -------------------- Shared Item Components ----------------
 ------------------------------------------------------------
 
 prettyPrintItem :: 
                 LineNo 
-                -> ()                                             -- accumulator
-                -> LogProtocol                    -- line item
+                -> ()                  -- accumulator
+                -> LogProtocol         -- line item
                 -> ((), Either LogTransformError (Maybe [Text]))             -- (accum, result item)
 prettyPrintItem _ _ lp = ((), Right .  Just . pure $ prettyPrintLogProtocol False lp)
 

@@ -6,6 +6,7 @@ module LogTransformation.Iteration (
   Issues(..),
   ExecutionStatus(..),
   IterationRecord(..),
+  IterationAuxEvent(..),
   LogTransformError(..),
   IterationSummary(..),
   IterationError(..),
@@ -20,11 +21,12 @@ import LogTransformation.Common
 import Check as CK
 import Pyrelude as P
 import Data.DList as D
-import DSL.LogProtocol as LP
+import DSL.LogProtocol as L
 import qualified Data.Aeson as A
 import Data.Aeson.TH
 import Data.ByteString.Char8 as B
-import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.Lazy as BL
+import RunElementClasses
 
 -- TODO: creation relational records
 -- relational records from Iteration records and use reporting service
@@ -32,13 +34,26 @@ import qualified Data.ByteString.Lazy as L
 -- see https://www.oreilly.com/library/view/microservices-antipatterns-and/9781492042716/ch04.html
 
 data TestIteration = Iteration IterationRecord |
-                    BoundaryItem BoundaryEvent  |
+                    BoundaryItem IterationAuxEvent  |
                     LineError LogTransformError 
                     deriving (Show, Eq)
 
 --------------------------------------------------------
 ----------------- Iteration Aggregation ----------------
 --------------------------------------------------------
+
+data IterationAuxEvent = 
+  FilterLog [FilterResult] |
+
+  StartRun RunTitle A.Value | 
+  EndRun |
+
+  StartGroup GroupTitle |
+  EndGroup GroupTitle |
+
+  StartTest TestDisplayInfo |
+  EndTest TestModule 
+  deriving (Eq, Show)
 
 data IterationPhase = OutOfIteration | 
                       PreInteractor | 
@@ -89,13 +104,13 @@ isWarning = \case
               LogTransformation.Iteration.Fail _ -> False
 
 calcStatus :: Issues -> (IterationPhase -> ExecutionStatus)
-calcStatus stats  
-   | type2Failure stats > 0 = LogTransformation.Iteration.Fail 
-   | LogTransformation.Iteration.fail stats > 0 = LogTransformation.Iteration.Fail 
-   | regression stats > 0 = LogTransformation.Iteration.Fail 
+calcStatus issues  
+   | type2Failure issues > 0 = LogTransformation.Iteration.Fail 
+   | LogTransformation.Iteration.fail issues > 0 = LogTransformation.Iteration.Fail 
+   | regression issues > 0 = LogTransformation.Iteration.Fail 
 
-   | (LogTransformation.Iteration.warning :: Issues -> Int) stats > 0 = LogTransformation.Iteration.Warning
-   | expectedFailure stats > 0 = LogTransformation.Iteration.Warning
+   | (LogTransformation.Iteration.warning :: Issues -> Int) issues > 0 = LogTransformation.Iteration.Warning
+   | expectedFailure issues > 0 = LogTransformation.Iteration.Warning
 
    | otherwise = const LogTransformation.Iteration.Pass
 
@@ -104,7 +119,7 @@ data IterationSummary = IterationSummary {
                           pre :: WhenClause,
                           post:: ThenClause,
                           status :: ExecutionStatus,
-                          stats :: Issues
+                          issues :: Issues
                         } deriving (Eq, Show)
 
 data Issues = Issues {
@@ -186,7 +201,7 @@ updateIterationErrsWarnings:: IterationPhase -> LogProtocol -> IterationRecord -
 updateIterationErrsWarnings p lp iRec = 
   let
     thisResult :: ExecutionStatus
-    thisResult = calcStatus newStats p
+    thisResult = calcStatus newIssues p
 
     worstResult :: ExecutionStatus
     worstResult = 
@@ -196,8 +211,8 @@ updateIterationErrsWarnings p lp iRec =
       in 
         max oldResult thisResult
 
-    newStats :: Issues
-    newStats = 
+    newIssues :: Issues
+    newIssues = 
       let 
         modifier :: Issues -> Issues
         modifier = 
@@ -227,7 +242,7 @@ updateIterationErrsWarnings p lp iRec =
                                           InteractorSuccess {} -> id 
                                           InteractorFailure {} -> incFailure
             
-                                          LP.PrepStateSuccess {} -> id
+                                          L.PrepStateSuccess {} -> id
                                           PrepStateFailure {} -> incFailure
             
                                           StartChecks{} -> id
@@ -245,11 +260,11 @@ updateIterationErrsWarnings p lp iRec =
                                           Message _ -> id
                                           Message' _ -> id
                                                                   
-                                          LP.Warning _ -> incWarning
+                                          L.Warning _ -> incWarning
                                           Warning' _ -> incWarning
-                                          LP.Error _ -> incFailure
+                                          L.Error _ -> incFailure
         in 
-          modifier . stats $ summary iRec
+          modifier . issues $ summary iRec
 
     notCheckPhase :: Bool
     notCheckPhase = p /= Checks
@@ -258,7 +273,7 @@ updateIterationErrsWarnings p lp iRec =
     iRec {
       summary = (summary iRec) {
                                 status = worstResult,
-                                stats = newStats
+                                issues = newIssues
                                }
 
       , otherErrorsDesc = isFailure thisResult && notCheckPhase 
@@ -276,17 +291,17 @@ apppendRaw lp iRec = iRec {rawLog = D.snoc (rawLog iRec) lp}
 failStage :: LogProtocol -> FailStage
 failStage = \case
                 BoundaryLog bl -> case bl of 
-                                      StartRun{} -> NoFailure
-                                      EndRun -> NoFailure
+                                      L.StartRun{} -> NoFailure
+                                      L.EndRun -> NoFailure
                                       
-                                      FilterLog _ -> NoFailure
-                                      StartGroup _ -> NoFailure
-                                      EndGroup _ -> NoFailure
-                                      StartTest _ -> NoFailure
-                                      EndTest _ -> NoFailure
+                                      L.FilterLog _ -> NoFailure
+                                      L.StartGroup _ -> NoFailure
+                                      L.EndGroup _ -> NoFailure
+                                      L.StartTest _ -> NoFailure
+                                      L.EndTest _ -> NoFailure
 
-                                      StartIteration{} -> NoFailure
-                                      EndIteration _ -> NoFailure
+                                      L.StartIteration{} -> NoFailure
+                                      L.EndIteration _ -> NoFailure
 
                 -- should never happen
                 IterationLog (Doc _) -> NoFailure
@@ -296,30 +311,30 @@ failStage = \case
                                       StartInteraction -> NoFailure
                                       InteractorSuccess{} -> NoFailure
                                       InteractorFailure{}  -> InteractorFailed
-                                      LP.PrepStateSuccess{}  -> NoFailure
+                                      L.PrepStateSuccess{}  -> NoFailure
                                       PrepStateFailure iid err -> PrepStateFailed
                                       StartChecks{} -> NoFailure
                                       CheckOutcome{} -> NoFailure
                                       Message _ -> NoFailure
                                       Message' _ -> NoFailure
-                                      LP.Warning{} -> NoFailure
+                                      L.Warning{} -> NoFailure
                                       Warning' _ -> NoFailure
-                                      LP.Error _ -> NoFailure
+                                      L.Error _ -> NoFailure
 
 expectedCurrentPhase :: IterationPhase -> FailStage -> LogProtocol -> IterationPhase
 expectedCurrentPhase current fs lp = case lp of
                                       BoundaryLog bl -> case bl of 
-                                                            StartRun{} -> OutOfIteration
-                                                            EndRun -> OutOfIteration
+                                                            L.StartRun{} -> OutOfIteration
+                                                            L.EndRun -> OutOfIteration
                                                             
-                                                            FilterLog _ -> OutOfIteration
-                                                            StartGroup _ -> OutOfIteration
-                                                            EndGroup _ -> OutOfIteration
-                                                            StartTest _ -> OutOfIteration
-                                                            EndTest _ -> OutOfIteration
+                                                            L.FilterLog _ -> OutOfIteration
+                                                            L.StartGroup _ -> OutOfIteration
+                                                            L.EndGroup _ -> OutOfIteration
+                                                            L.StartTest _ -> OutOfIteration
+                                                            L.EndTest _ -> OutOfIteration
 
-                                                            StartIteration{} -> OutOfIteration
-                                                            EndIteration _ -> case fs of 
+                                                            L.StartIteration{} -> OutOfIteration
+                                                            L.EndIteration _ -> case fs of 
                                                                                 NoFailure -> Checks  -- TODO: ensure raw file test with no checks
                                                                                 InteractorFailed -> Interactor
                                                                                 PrepStateFailed -> PrepState
@@ -334,52 +349,52 @@ expectedCurrentPhase current fs lp = case lp of
                                                             InteractorSuccess{} -> Interactor
                                                             InteractorFailure{}  -> Interactor
 
-                                                            LP.PrepStateSuccess{}  -> PrepState
+                                                            L.PrepStateSuccess{}  -> PrepState
                                                             PrepStateFailure iid err -> PrepState
 
                                                             StartChecks{} -> PreChecks
                                                             CheckOutcome{} -> Checks
                                                             Message _ -> current
                                                             Message' _ -> current
-                                                            LP.Warning{} -> current
+                                                            L.Warning{} -> current
                                                             Warning' _ -> current
-                                                            LP.Error _ -> current
+                                                            L.Error _ -> current
 
 nextPhase :: IterationPhase -> LogProtocol -> IterationPhase
 nextPhase current lp = case lp of
                           BoundaryLog bl -> case bl of 
-                                              StartRun{} -> OutOfIteration
-                                              EndRun -> OutOfIteration
+                                              L.StartRun{} -> OutOfIteration
+                                              L.EndRun -> OutOfIteration
 
-                                              FilterLog _ -> OutOfIteration
-                                              StartGroup _ -> OutOfIteration
-                                              EndGroup _ -> OutOfIteration
-                                              StartTest _ -> OutOfIteration
-                                              EndTest _ -> OutOfIteration
-                                              StartIteration{} -> PreInteractor
-                                              EndIteration _ -> OutOfIteration
+                                              L.FilterLog _ -> OutOfIteration
+                                              L.StartGroup _ -> OutOfIteration
+                                              L.EndGroup _ -> OutOfIteration
+                                              L.StartTest _ -> OutOfIteration
+                                              L.EndTest _ -> OutOfIteration
+                                              L.StartIteration{} -> PreInteractor
+                                              L.EndIteration _ -> OutOfIteration
 
                                               -- should never happen
                           IterationLog (Doc _) -> current
                           
                           IterationLog (Run rp) -> case rp of
-                                                LP.Error _ -> current
+                                                L.Error _ -> current
                                                 StartPrepState -> PrepState
                                                 IOAction _ -> current
                                                 StartInteraction -> Interactor
                                                 InteractorSuccess{} -> PrePrepState 
                                                 InteractorFailure{}  -> Interactor  -- leave in failed phase
-                                                LP.PrepStateSuccess{}  -> PreChecks
+                                                L.PrepStateSuccess{}  -> PreChecks
                                                 PrepStateFailure iid err -> PrepState -- leave in failed phase
                                                 StartChecks{} -> Checks
                                                 Message _ -> current
                                                 Message' _ -> current
-                                                LP.Warning s -> current
+                                                L.Warning s -> current
                                                 Warning' detailedInfo -> current
                                                 CheckOutcome{}  -> Checks
 
 serialiseIteration :: TestIteration -> ByteString
-serialiseIteration = L.toStrict . A.encode
+serialiseIteration = BL.toStrict . A.encode
 
 iterationStep ::
               LineNo                                                                -- lineNo
@@ -444,7 +459,7 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                                                       pre = pre,
                                                       post = post,
                                                       status = Inconclusive,
-                                                      stats = mempty
+                                                      issues = mempty
                                                     },
                                                     validation = [],
                                                     otherErrorsDesc = [],
@@ -459,7 +474,29 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
 
     outOfIteration :: LogProtocol -> TestIteration
     outOfIteration = \case 
-                        BoundaryLog be -> BoundaryItem be
+                        logp@(BoundaryLog be) -> 
+                          let 
+                            bug = LineError LogTransformError {
+                                                                linNo = lineNo,
+                                                                logItem = logp,
+                                                                info = "Logic bug in iteration record generation start or end iteration record should not be processed by this function"
+                                                              }
+                          in
+                            case be of 
+                              L.FilterLog lg -> BoundaryItem $ LogTransformation.Iteration.FilterLog lg
+
+                              L.StartRun t v -> BoundaryItem $ LogTransformation.Iteration.StartRun t v
+                              L.EndRun -> BoundaryItem LogTransformation.Iteration.EndRun
+                          
+                              L.StartGroup t -> BoundaryItem $ LogTransformation.Iteration.StartGroup t
+                              L.EndGroup t -> BoundaryItem $ LogTransformation.Iteration.EndGroup t
+                          
+                              L.StartTest d -> BoundaryItem $ LogTransformation.Iteration.StartTest d
+                              L.EndTest tm -> BoundaryItem $ LogTransformation.Iteration.EndTest tm 
+                          
+                              L.StartIteration{} -> bug 
+                              L.EndIteration{} -> bug
+                          
                         logp@IterationLog{} -> LineError LogTransformError {
                                                 linNo = lineNo,
                                                 logItem = logp,
@@ -474,17 +511,17 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                         . apppendRaw lp <$>  
                               case lp of
                                 BoundaryLog bl -> case bl of 
-                                    StartRun{} -> Nothing
-                                    EndRun -> Nothing
-                                    FilterLog _ -> Nothing
-                                    StartGroup _ -> Nothing
-                                    EndGroup _ -> Nothing
-                                    StartTest _ -> Nothing
-                                    EndTest _ -> Nothing
+                                    L.StartRun{} -> Nothing
+                                    L.EndRun -> Nothing
+                                    L.FilterLog _ -> Nothing
+                                    L.StartGroup _ -> Nothing
+                                    L.EndGroup _ -> Nothing
+                                    L.StartTest _ -> Nothing
+                                    L.EndTest _ -> Nothing
                                     
                                     StartIteration{} -> newRec
                                     
-                                    EndIteration _ -> Nothing -- special processing for end iteration
+                                    EndIteration _ -> Nothing -- special processing for end iteration elsewhere
 
                                 IterationLog (Doc _) -> Nothing
                                 IterationLog (Run rp) -> case rp of
@@ -498,7 +535,7 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                                     
                                   InteractorFailure iid err -> pure $ thisRec {apState = Just $ FailedInteractor err}
 
-                                  LP.PrepStateSuccess iid dStateDisplayInfo -> pure $ thisRec {domainState = Just $ SucceededPrepState dStateDisplayInfo}
+                                  L.PrepStateSuccess iid dStateDisplayInfo -> pure $ thisRec {domainState = Just $ SucceededPrepState dStateDisplayInfo}
                                   PrepStateFailure iid err -> pure $ thisRec {domainState = Just $ FailedPrepState err}
 
                                   CheckOutcome iid cr@(CheckReport reslt (CheckInfo chkhdr mbInfo)) -> 
@@ -506,9 +543,9 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                                   
                                   Message _ -> pure thisRec
                                   Message' _ -> pure thisRec
-                                  LP.Warning _ -> pure thisRec
+                                  L.Warning _ -> pure thisRec
                                   Warning' detailedInfo -> pure thisRec
-                                  LP.Error _ -> pure thisRec
+                                  L.Error _ -> pure thisRec
                       in 
                         (
                         IterationAccum {
@@ -536,4 +573,5 @@ $(deriveJSON defaultOptions ''ExecutionStatus)
 $(deriveJSON defaultOptions ''IterationError)
 $(deriveJSON defaultOptions ''IterationPhase)
 $(deriveJSON defaultOptions ''TestIteration)
+$(deriveJSON defaultOptions ''IterationAuxEvent)
 $(deriveJSON defaultOptions ''Issues)

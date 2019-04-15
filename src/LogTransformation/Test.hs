@@ -2,10 +2,10 @@ module LogTransformation.Test where
 
 import Common as C (AppError(..))
 import LogTransformation.Common
-import LogTransformation.Iteration
-import RunElementClasses
+import LogTransformation.Iteration as I
+import RunElementClasses (FilterResult)
 import Check as CK
-import Pyrelude as P
+import Pyrelude as P hiding (fail)
 import Pyrelude.IO
 import Data.DList as D
 import DSL.LogProtocol as LP
@@ -18,12 +18,61 @@ iterationStep ::
               LineNo                                                    -- lineNo
               -> TestAccum                                              -- accum
               -> TestIteration                                          -- parse error or apperror
-              -> (TestAccum, Either IterationTransformError (Maybe [TestIteration])) -- (newAccum, err / result)
-iterationStep lineNo (TestAccum mLastPhase mRunInfo mCurrentTest) iter = uu
+              -> (TestAccum, Either TestTransformError (Maybe [TestIteration])) -- (newAccum, err / result)
+iterationStep lineNo (TestAccum mGroup mLastPhase mRunInfo mCurrentTest) itr =
+  let 
+    thisTest :: TestRecord
+    thisTest = fromMaybe emptyRecord mCurrentTest
 
-data IterationTransformError = LogTransError LogTransformError |
+    defaultProp :: a -> (TestRecord -> a) -> a
+    defaultProp = maybef mCurrentTest
+
+    nxtRec :: Test                   
+    nxtRec = case itr of
+              i@(Iteration ir) -> 
+                let 
+                  iSummary = summary ir
+                  iIssues = issues iSummary
+                  iStatus = I.status iSummary
+                  tStats = stats thisTest
+                in 
+                  Test $ thisTest {
+                              title = defaultProp "Unavailable Error In Source Logs" title,
+                              address = defaultProp "Unavailable Error In Source Logs" address,
+                              status = max (LogTransformation.Test.status thisTest) iStatus,
+                              stats = tStats {
+                                iterationStatusCounts = incStatusCount (iterationStatusCounts tStats) iStatus,
+                                issueCounts = issueCounts tStats <> iIssues
+                              },
+                              iterationsDesc = ir : iterationsDesc thisTest
+                            }
+
+              BoundaryItem iaux -> case iaux of
+                                      I.FilterLog fl ->
+
+                                      StartRun RunTitle A.Value | 
+                                      EndRun |
+                                    
+                                      StartGroup GroupTitle |
+                                      EndGroup GroupTitle |
+                                    
+                                      StartTest TestDisplayInfo |
+                                      EndTest TestModule 
+              I.LineError le -> uu
+  in 
+    uu
+
+data TestTransformError = LogTransError LogTransformError |
                                 IterationTransError TestIteration
                                 deriving (Eq, Show)
+
+incStatusCount :: StatusCount -> ExecutionStatus -> StatusCount
+incStatusCount sc@StatusCount{..} =
+  \case 
+    Inconclusive -> sc{inconclusive = inconclusive + 1}
+    I.Pass -> sc{pass = pass + 1}
+    I.Warning _ -> sc{warning = warning + 1}
+    I.Fail _ -> sc{fail = fail + 1}
 
 data StatusCount = StatusCount {
                     inconclusive :: Int,
@@ -51,7 +100,7 @@ instance Monoid StatusCount where
 
 data TestStats = TestStats {
                     iterationStatusCounts :: StatusCount,
-                    counts :: Issues
+                    issueCounts :: Issues
                   }
                   deriving (Eq, Show)
 
@@ -70,6 +119,16 @@ data TestRecord = TestRecord {
                     iterationsDesc :: [IterationRecord]
                   } deriving (Eq, Show)
 
+emptyRecord :: TestRecord
+emptyRecord = TestRecord {
+  title = "",
+  address = "",
+  config = A.Null,
+  status = Inconclusive,
+  stats = mempty,
+  iterationsDesc = []
+}
+
 data Test = Test TestRecord |
 
               FilterLog [FilterResult] |
@@ -80,12 +139,13 @@ data Test = Test TestRecord |
               StartGroup GroupTitle |
               EndGroup GroupTitle |
 
-              LineError IterationTransformError |
+              LineError TestTransformError |
 
               RunStats TestStats
             deriving (Eq, Show)
 
 data TestAccum = TestAccum {
+  group :: Maybe Text,
   lastElement :: Maybe Test,
   runInfo :: TestStats,
   currentRec :: Maybe TestRecord

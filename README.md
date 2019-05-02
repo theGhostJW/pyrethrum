@@ -6,7 +6,7 @@ When functional this will be a single library that provides an opinionated end
 to end test framework using Haskell.
 
 I am currently working on the framework workflow and base functionality such as
-logging, test filtering and report generation. Integration with Selenium, REST
+logging, test filtering and report generation. Integration with webdriver, REST
 services and property base testing will follow. This is what I would regard as
 MVP.
 

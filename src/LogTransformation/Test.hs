@@ -1,6 +1,7 @@
 module LogTransformation.Test where
 
 import Common as C (AppError(..))
+import qualified RunElementClasses as RC
 import LogTransformation.Common
 import LogTransformation.Iteration as I
 import RunElementClasses (FilterResult)
@@ -18,53 +19,173 @@ iterationStep ::
               LineNo                                                    -- lineNo
               -> TestAccum                                              -- accum
               -> TestIteration                                          -- parse error or apperror
-              -> (TestAccum, Either TestTransformError (Maybe [TestIteration])) -- (newAccum, err / result)
-iterationStep lineNo (TestAccum mGroup mLastPhase mRunInfo mCurrentTest) itr =
+              -> (TestAccum, Either LogTransformError (Maybe [TestLog])) -- (newAccum, err / result)
+iterationStep lineNo (TestAccum runStats mThisRec mGroup) itr =
   let 
-    thisTest :: TestRecord
-    thisTest = fromMaybe emptyRecord mCurrentTest
+    thisRec :: TestRecord
+    thisRec = fromMaybe emptyRecord mThisRec
 
     defaultProp :: a -> (TestRecord -> a) -> a
-    defaultProp = maybef mCurrentTest
+    defaultProp = maybef mThisRec
 
-    nxtRec :: Test                   
+    nxtRec :: Maybe TestRecord                   
     nxtRec = case itr of
               i@(Iteration ir) -> 
                 let 
                   iSummary = summary ir
                   iIssues = issues iSummary
                   iStatus = I.status iSummary
-                  tStats = stats thisTest
+                  tStats = stats thisRec
                 in 
-                  Test $ thisTest {
+                  Just $ thisRec {
                               title = defaultProp "Unavailable Error In Source Logs" title,
                               address = defaultProp "Unavailable Error In Source Logs" address,
-                              status = max (LogTransformation.Test.status thisTest) iStatus,
+                              status = max (LogTransformation.Test.status thisRec) iStatus,
                               stats = tStats {
                                 iterationStatusCounts = incStatusCount (iterationStatusCounts tStats) iStatus,
                                 issueCounts = issueCounts tStats <> iIssues
                               },
-                              iterationsDesc = ir : iterationsDesc thisTest
+                              iterationsDesc = ir : iterationsDesc thisRec
                             }
 
-              BoundaryItem iaux -> case iaux of
-                                      I.FilterLog fl ->
+              be@(BoundaryItem iaux) -> case iaux of
+                                            I.FilterLog fl -> Nothing
+                                            I.StartRun title val -> Nothing
+                                            e@I.EndRun -> Nothing
+                                            I.StartGroup gt -> Nothing
+                                            I.EndGroup gt -> Nothing
+                                            I.StartTest (RC.TestDisplayInfo address title config) -> Just $ emptyRecord {
+                                              title = title,
+                                              address = RC.unTestModule address,
+                                              config = config
+                                            } 
+                                            I.EndTest tm -> Nothing
+              I.LineError le -> mThisRec
 
-                                      StartRun RunTitle A.Value | 
-                                      EndRun |
-                                    
-                                      StartGroup GroupTitle |
-                                      EndGroup GroupTitle |
-                                    
-                                      StartTest TestDisplayInfo |
-                                      EndTest TestModule 
-              I.LineError le -> uu
+    nxtTestLog :: Maybe TestLog                   
+    nxtTestLog = case itr of
+              i@(Iteration ir) -> Nothing
+              be@(BoundaryItem iaux) -> case iaux of
+                                            I.FilterLog fl -> Just $ LogTransformation.Test.FilterLog fl
+
+                                            I.StartRun title val -> Just $ LogTransformation.Test.StartRun title val
+                                            e@I.EndRun -> Just $ LogTransformation.Test.EndRun runStats
+                                          
+                                            I.StartGroup gt -> Just $ LogTransformation.Test.StartGroup gt
+                                            I.EndGroup gt -> Just $ LogTransformation.Test.EndGroup gt
+                                          
+                                            I.StartTest{} -> Nothing
+                                            I.EndTest tm -> Test <$> mThisRec
+              I.LineError le -> Nothing -- handled in nxtError
+
+    nxtStats :: TestStats                   
+    nxtStats = 
+      let 
+        incFailed :: TestStats
+        incFailed = 
+          let 
+            fails' = I.fail (issueCounts runStats) + 1
+          in 
+            runStats { issueCounts = (issueCounts runStats) {fail = fails'} }
+
+        newStats :: TestStats
+        newStats = isJust nxtError || isJust nxtPassThroughError ? incFailed $ runStats
+      in
+        case itr of
+              Iteration _ -> runStats
+              be@(BoundaryItem iaux) -> case iaux of
+                                              I.FilterLog _ -> newStats
+                                              I.StartRun{} -> newStats
+                                              I.EndRun -> newStats
+                                              I.StartGroup _ -> newStats
+                                              I.EndGroup _ -> newStats
+                                              I.StartTest{} -> newStats
+                                              I.EndTest tm -> newStats <> stats thisRec
+              I.LineError _ -> newStats
+    
+    transErr :: TestIteration -> Text ->  Maybe TestTransformError
+    transErr i txt' = Just $ IterationTransError (txt' <> "\n" <> "This could be due to lost messages or messages being received out of sequence") i
+
+    chkGroupAndTestEmpty :: TestIteration -> Text -> Text -> Maybe TestTransformError  
+    chkGroupAndTestEmpty i tstErrorTxt grpErrorTxt = isJust mThisRec ? transErr i tstErrorTxt 
+                                                     $ isJust mGroup ? transErr i grpErrorTxt
+                                                     $ Nothing
+    
+    nxtGroup :: Maybe Text               
+    nxtGroup = case itr of
+                  i@Iteration{} -> mGroup
+                  bi@(BoundaryItem iaux) -> 
+                      case iaux of
+                            I.FilterLog{} -> Nothing
+                            I.StartRun{} -> Nothing
+                            I.EndRun -> Nothing
+                            I.StartGroup gt -> Just $ unGroupTitle gt
+                            I.EndGroup{} ->  Nothing
+
+                            I.StartTest{} -> mGroup
+                            I.EndTest tm -> mGroup
+                  I.LineError e -> mGroup
+    
+    nxtError :: Maybe TestTransformError                  
+    nxtError = case itr of
+                  i@Iteration{} -> isJust mThisRec 
+                                    ? Nothing 
+                                    $ transErr i "Unexpected log message encountered, an iteration message has been received before a test has started."
+                                                        
+                  bi@(BoundaryItem iaux) -> 
+                    let 
+                      chkBothEmpty = chkGroupAndTestEmpty bi
+                      err = transErr bi
+                    in 
+                      case iaux of
+                            I.FilterLog{} -> Nothing
+                            I.StartRun{} -> Nothing
+                            I.EndRun -> chkBothEmpty "End of run encountered before end of test" "End of run encountered before end of group" 
+                            I.StartGroup _ -> chkBothEmpty "Start of group encountered before end of test" "Start of group encountered before end of previous group"
+                            I.EndGroup _ -> isJust mThisRec 
+                                              ? err "End of group encountered before end of test"
+                                              $ isNothing mGroup 
+                                                  ? err "End of group encountered before start of group"
+                                                  $ Nothing
+
+                            I.StartTest{} -> isJust mThisRec 
+                                              ? err "Start of test encountered before end of previous test"
+                                              $ isNothing mGroup 
+                                                  ? err "Start of test encountered before start of group"
+                                                  $ Nothing
+
+                            I.EndTest tm -> isNothing mThisRec 
+                                              ? err "End of test encountered before start of test"
+                                              $ Nothing
+
+                  I.LineError e -> Nothing
+
+    nxtPassThroughError :: Maybe LogTransformError                   
+    nxtPassThroughError = case itr of
+                            Iteration{} -> Nothing
+                            BoundaryItem iaux -> Nothing
+                            I.LineError e -> Just e
+
+    nxtAccum :: TestAccum
+    nxtAccum = TestAccum {
+                 runInfo = nxtStats,
+                 currentRec = nxtRec,
+                 testGroup = nxtGroup
+               }
+
+    nextResultItem :: Either LogTransformError (Maybe [TestLog])
+    nextResultItem = 
+      let 
+        logs = catMaybes [nxtTestLog, TransError <$> nxtError]
+        mLogs = P.null logs ? Nothing $ Just logs
+      in
+        isJust nxtPassThroughError ? 
+                          Left (fromJust nxtPassThroughError) $ 
+                          uu
   in 
-    uu
+    (nxtAccum, nextResultItem)
 
-data TestTransformError = LogTransError LogTransformError |
-                                IterationTransError TestIteration
-                                deriving (Eq, Show)
+data TestTransformError = IterationTransError Text TestIteration deriving (Eq, Show)
 
 incStatusCount :: StatusCount -> ExecutionStatus -> StatusCount
 incStatusCount sc@StatusCount{..} =
@@ -129,24 +250,21 @@ emptyRecord = TestRecord {
   iterationsDesc = []
 }
 
-data Test = Test TestRecord |
+data TestLog = Test TestRecord |
+            FilterLog [FilterResult] |
 
-              FilterLog [FilterResult] |
+            StartRun RunTitle A.Value | 
+            EndRun TestStats |
 
-              StartRun RunTitle A.Value | 
-              EndRun |
+            StartGroup GroupTitle |
+            EndGroup GroupTitle |
 
-              StartGroup GroupTitle |
-              EndGroup GroupTitle |
+            TransError TestTransformError 
 
-              LineError TestTransformError |
-
-              RunStats TestStats
-            deriving (Eq, Show)
+          deriving (Eq, Show)
 
 data TestAccum = TestAccum {
-  group :: Maybe Text,
-  lastElement :: Maybe Test,
   runInfo :: TestStats,
-  currentRec :: Maybe TestRecord
+  currentRec :: Maybe TestRecord,
+  testGroup :: Maybe Text
 }

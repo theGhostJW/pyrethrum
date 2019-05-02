@@ -103,14 +103,6 @@ iterationStep lineNo (TestAccum runStats mThisRec mGroup) itr =
                                               I.EndTest tm -> newStats <> stats thisRec
               I.LineError _ -> newStats
     
-    transErr :: TestIteration -> Text ->  Maybe TestTransformError
-    transErr i txt' = Just $ IterationTransError (txt' <> "\n" <> "This could be due to lost messages or messages being received out of sequence") i
-
-    chkGroupAndTestEmpty :: TestIteration -> Text -> Text -> Maybe TestTransformError  
-    chkGroupAndTestEmpty i tstErrorTxt grpErrorTxt = isJust mThisRec ? transErr i tstErrorTxt 
-                                                     $ isJust mGroup ? transErr i grpErrorTxt
-                                                     $ Nothing
-    
     nxtGroup :: Maybe Text               
     nxtGroup = case itr of
                   i@Iteration{} -> mGroup
@@ -127,38 +119,48 @@ iterationStep lineNo (TestAccum runStats mThisRec mGroup) itr =
                   I.LineError e -> mGroup
     
     nxtError :: Maybe TestTransformError                  
-    nxtError = case itr of
-                  i@Iteration{} -> isJust mThisRec 
-                                    ? Nothing 
-                                    $ transErr i "Unexpected log message encountered, an iteration message has been received before a test has started."
-                                                        
-                  bi@(BoundaryItem iaux) -> 
-                    let 
-                      chkBothEmpty = chkGroupAndTestEmpty bi
-                      err = transErr bi
-                    in 
-                      case iaux of
-                            I.FilterLog{} -> Nothing
-                            I.StartRun{} -> Nothing
-                            I.EndRun -> chkBothEmpty "End of run encountered before end of test" "End of run encountered before end of group" 
-                            I.StartGroup _ -> chkBothEmpty "Start of group encountered before end of test" "Start of group encountered before end of previous group"
-                            I.EndGroup _ -> isJust mThisRec 
-                                              ? err "End of group encountered before end of test"
-                                              $ isNothing mGroup 
-                                                  ? err "End of group encountered before start of group"
-                                                  $ Nothing
+    nxtError = 
+      let 
+        transErr :: TestIteration -> Text ->  Maybe TestTransformError
+        transErr i txt' = Just $ IterationTransError (txt' <> "\n" <> "This could be due to lost messages or messages being received out of sequence") i
+    
+        chkGroupAndTestEmpty :: TestIteration -> Text -> Text -> Maybe TestTransformError  
+        chkGroupAndTestEmpty i tstErrorTxt grpErrorTxt = isJust mThisRec ? transErr i tstErrorTxt 
+                                                         $ isJust mGroup ? transErr i grpErrorTxt
+                                                         $ Nothing
+      in
+        case itr of
+            i@Iteration{} -> isJust mThisRec 
+                              ? Nothing 
+                              $ transErr i "Unexpected log message encountered, an iteration message has been received before a test has started."
+                                                  
+            bi@(BoundaryItem iaux) -> 
+              let 
+                chkBothEmpty = chkGroupAndTestEmpty bi
+                err = transErr bi
+              in 
+                case iaux of
+                  I.FilterLog{} -> Nothing
+                  I.StartRun{} -> Nothing
+                  I.EndRun -> chkBothEmpty "End of run encountered before end of test" "End of run encountered before end of group" 
+                  I.StartGroup _ -> chkBothEmpty "Start of group encountered before end of test" "Start of group encountered before end of previous group"
+                  I.EndGroup _ -> isJust mThisRec 
+                                    ? err "End of group encountered before end of test"
+                                    $ isNothing mGroup 
+                                        ? err "End of group encountered before start of group"
+                                        $ Nothing
 
-                            I.StartTest{} -> isJust mThisRec 
-                                              ? err "Start of test encountered before end of previous test"
-                                              $ isNothing mGroup 
-                                                  ? err "Start of test encountered before start of group"
-                                                  $ Nothing
+                  I.StartTest{} -> isJust mThisRec 
+                                    ? err "Start of test encountered before end of previous test"
+                                    $ isNothing mGroup 
+                                        ? err "Start of test encountered before start of group"
+                                        $ Nothing
 
-                            I.EndTest tm -> isNothing mThisRec 
-                                              ? err "End of test encountered before start of test"
-                                              $ Nothing
+                  I.EndTest tm -> isNothing mThisRec 
+                                    ? err "End of test encountered before start of test"
+                                    $ Nothing
 
-                  I.LineError e -> Nothing
+            I.LineError e -> Nothing
 
     nxtPassThroughError :: Maybe LogTransformError                   
     nxtPassThroughError = case itr of

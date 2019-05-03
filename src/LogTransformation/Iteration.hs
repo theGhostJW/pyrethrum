@@ -1,6 +1,7 @@
 module LogTransformation.Iteration (
   emptyIterationAccum,
   iterationStep,
+  prettyPrintSerialiseIteration,
   serialiseIteration,
   TestIteration(..),
   Issues(..),
@@ -23,10 +24,12 @@ import Pyrelude as P
 import Data.DList as D
 import DSL.LogProtocol as L
 import qualified Data.Aeson as A
+import qualified Data.Yaml as Y
 import Data.Aeson.TH
 import Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as BL
 import RunElementClasses
+import PrettyPrintCommon
 
 -- TODO: creation relational records
 -- relational records from Iteration records and use reporting service
@@ -395,6 +398,9 @@ nextPhase current lp = case lp of
 
 serialiseIteration :: TestIteration -> ByteString
 serialiseIteration = BL.toStrict . A.encode
+
+prettyPrintSerialiseIteration :: TestIteration -> ByteString
+prettyPrintSerialiseIteration = Y.encode . Y.toJSON
 
 iterationStep ::
               LineNo                                                                -- lineNo

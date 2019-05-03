@@ -7,6 +7,7 @@ import Check as CK
 import Pyrelude as P
 import Pyrelude.IO
 import Data.DList as D
+import Data.Yaml as Y
 import qualified Prelude as PO
 import AuxFiles
 import OrphanedInstances
@@ -23,6 +24,7 @@ import DSL.Logger
 import Control.Monad.Writer.Strict
 import Control.Monad.State.Strict
 import Control.Monad.Identity
+import PrettyPrintCommon as PC
 
 -- TODO: update to use streaming library such as streamly
 
@@ -147,6 +149,9 @@ testPrettyPrint input = runToList input $ logTransform testSource testSink prett
 
 testIterationStep :: DList ByteString -> DList ByteString
 testIterationStep input = runToList input $ logTransform testSource testSink iterationStep lpDeserialiser serialiseIteration showToByteString (LineNo 1) emptyIterationAccum
+
+testIterationPretyPrintStep :: DList ByteString -> DList ByteString
+testIterationPretyPrintStep input = runToList input $ logTransform testSource testSink iterationStep lpDeserialiser prettyPrintSerialiseIteration showToByteString (LineNo 1) emptyIterationAccum
 
 ------------------------------------------------------------
 -------------------- Shared Item Components ----------------

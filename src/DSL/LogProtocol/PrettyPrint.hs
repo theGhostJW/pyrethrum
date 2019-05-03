@@ -37,9 +37,6 @@ prettyPrintLogProtocol docMode =
     prettyBlock :: Char -> Text -> ItemId -> Text -> Text
     prettyBlock pfxChr headr iid body = indent2 $ toS (replicate 3 ' ') <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
 
-    ppAeson:: Y.Value -> Text
-    ppAeson val = toS ((getLenient . toS . Y.encode $ val) :: Text)
-
     ppAesonBlock:: Y.Value -> Text
     ppAesonBlock = indent2 . ppAeson
 

@@ -30,9 +30,6 @@ unit_demo_prettyPrint_integration = runAggregator jsoniFile testPrettyPrintFile
 unit_demo_itemAggregator_integration :: IO ()
 unit_demo_itemAggregator_integration = runAggregator jsoniFile testIterationStepFile
 
-unit_demo_itemAggregator_pp_integration :: IO ()
-unit_demo_itemAggregator_pp_integration = runAggregator jsoniFile testIterationPrettyPrintFile
-
 unit_demo_itemAggregator_integration_i140 :: IO ()
 unit_demo_itemAggregator_integration_i140 = runAggregator jsoniFileIteration140 testIterationStepFile
 

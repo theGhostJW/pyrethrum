@@ -2,7 +2,8 @@ module LogTransformation where
 
 import Common as C (AppError(..))
 import LogTransformation.Common
-import LogTransformation.Iteration
+import LogTransformation.Iteration as I
+import LogTransformation.Test
 import Check as CK
 import Pyrelude as P
 import Pyrelude.IO
@@ -32,20 +33,22 @@ import PrettyPrintCommon as PC
 ----------------- Generalised Log Transformation ----------------
 -----------------------------------------------------------------
 
-logTransform :: forall a itm rsltItem m src snk. Monad m =>
-                                     m (Maybe src)                                                             -- source
-                                    -> ([snk] -> m ())                                                         -- sink
-                                    -> (LineNo -> a -> itm -> (a, Either LogTransformError (Maybe [rsltItem])))       -- reducer step
-                                    -> (LineNo -> src -> Either DeserialisationError itm)                      -- item desrialiser
-                                    -> (rsltItem -> snk)                                                       -- result serialiser
-                                    -> (LogTransformError -> snk)                                              -- error serialiser
-                                    -> LineNo                                                                  -- linNo
-                                    -> a                                                                       -- accumulattor
-                                    -> m ()
-logTransform src snk step idser rsltSersr errSersr lineNo accum =
+data LogTransformParams a itm rsltItem m src snk = LogTransformParams {
+  source :: m (Maybe src),
+  sink :: [snk] -> m (),
+  reducer:: LineNo -> a -> itm -> (a, Either LogTransformError (Maybe [rsltItem])),
+  itemDesrialiser :: LineNo -> src -> Either DeserialisationError itm,
+  resultSerialiser :: rsltItem -> snk,    
+  errorSerialiser :: LogTransformError -> snk,
+  linNo :: LineNo,
+  accumulator :: a
+}
+
+logTransform :: forall a itm rsltItem m src snk. Monad m => LogTransformParams a itm rsltItem m src snk -> m ()
+logTransform (LogTransformParams src snk step idser rsltSersr errSersr lineNo accum) =
     let 
       localLoop :: LineNo -> a -> m ()
-      localLoop = logTransform src snk step idser rsltSersr errSersr
+      localLoop ln a = logTransform (LogTransformParams src snk step idser rsltSersr errSersr ln a)
 
       errorSnk :: LogTransformError -> m ()
       errorSnk = snk . pure . errSersr 
@@ -92,7 +95,16 @@ transformToFile step idser rser eser seed srcPth destPthFunc =
           sink h bs = sequence_ $ B.hPutStrLn h <$> bs
           
           processLines :: Handle -> Handle -> IO ()
-          processLines hIn hOut = logTransform (source hIn) (sink hOut) step idser rser eser (LineNo 1) seed 
+          processLines hIn hOut = logTransform  LogTransformParams {
+                                                  source = source hIn,
+                                                  sink = sink hOut,
+                                                  reducer = step,
+                                                  itemDesrialiser = idser,
+                                                  resultSerialiser = rser,    
+                                                  errorSerialiser = eser,
+                                                  linNo = LineNo 1,
+                                                  accumulator = seed
+                                                }
         in
           do
             hSrc <- safeOpenFile srcPth ReadMode
@@ -114,24 +126,24 @@ transformToFile step idser rser eser seed srcPth destPthFunc =
 testPrettyPrintFile :: AbsFile                                            -- source file
                     -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
                     -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
-testPrettyPrintFile = transformToFile prettyPrintItem lpDeserialiser textToByteString showToByteString ()
+testPrettyPrintFile = transformToFile prettyPrintItem jsonDeserialiser textToByteString showToByteString ()
 
                 
 testIterationStepFile :: AbsFile                                            -- source file
                     -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
                     -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
-testIterationStepFile = transformToFile iterationStep lpDeserialiser serialiseIteration showToByteString emptyIterationAccum
+testIterationStepFile = transformToFile iterationStep jsonDeserialiser yamlSerialiser showToByteString emptyIterationAccum
                 
 ------------------------------------------------------
 ----------------- Testing Using DList ----------------
 ------------------------------------------------------
 
-type WriterState a = WriterT (DList ByteString) (StateT (DList ByteString) Identity) a
+type WriterState a i o = WriterT (DList o) (StateT (DList i) Identity) a
 
-runToList :: DList ByteString -> WriterState a -> DList ByteString
+runToList :: DList i -> WriterState a i o -> DList o
 runToList input m = snd . fst . runIdentity $ runStateT (runWriterT m) input
 
-testSource :: WriterState (Maybe ByteString)     
+testSource :: WriterState (Maybe i) i o 
 testSource = do 
               dlst <- get 
               case dlst of
@@ -141,17 +153,62 @@ testSource = do
                               pure $ Just x 
                 _ -> P.error "DList pattern match error this should never happen"
 
-testSink :: [ByteString] -> WriterState ()
+testSink :: [o] -> WriterState () i o
 testSink = tell . fromList 
 
 testPrettyPrint :: DList ByteString -> DList ByteString
-testPrettyPrint input = runToList input $ logTransform testSource testSink prettyPrintItem lpDeserialiser textToByteString showToByteString (LineNo 1) ()
+testPrettyPrint input = runToList input $ logTransform LogTransformParams {
+                                                                            source = testSource,
+                                                                            sink = testSink,
+                                                                            reducer = prettyPrintItem,
+                                                                            itemDesrialiser = jsonDeserialiser,
+                                                                            resultSerialiser = textToByteString,    
+                                                                            errorSerialiser = showToByteString,
+                                                                            linNo = LineNo 1,
+                                                                            accumulator = ()
+                                                                          }
+
+iterationToJsonParams :: LogTransformParams I.IterationAccum LogProtocol IterationLogElement (WriterT (DList ByteString) (StateT (DList ByteString) Identity)) ByteString ByteString
+iterationToJsonParams = LogTransformParams {
+                          source = testSource,
+                          sink = testSink,
+                          reducer = iterationStep,
+                          itemDesrialiser = jsonDeserialiser,
+                          resultSerialiser = jsonSerialiser,    
+                          errorSerialiser = jsonSerialiser,
+                          linNo = LineNo 1,
+                          accumulator = emptyIterationAccum
+                        }
 
 testIterationStep :: DList ByteString -> DList ByteString
-testIterationStep input = runToList input $ logTransform testSource testSink iterationStep lpDeserialiser serialiseIteration showToByteString (LineNo 1) emptyIterationAccum
+testIterationStep input = runToList input $ logTransform iterationToJsonParams
 
 testIterationPretyPrintStep :: DList ByteString -> DList ByteString
-testIterationPretyPrintStep input = runToList input $ logTransform testSource testSink iterationStep lpDeserialiser prettyPrintSerialiseIteration showToByteString (LineNo 1) emptyIterationAccum
+testIterationPretyPrintStep input = runToList input $ logTransform iterationToJsonParams {
+                                                                            resultSerialiser = yamlSerialiser,    
+                                                                            errorSerialiser = showToByteString
+                                                                          } 
+
+iterationToTestLogParams :: LogTransformParams TestAccum IterationLogElement TestLogElement (WriterT (DList ByteString) (StateT (DList ByteString) Identity)) ByteString ByteString
+iterationToTestLogParams = LogTransformParams {
+                                      source = testSource,
+                                      sink = testSink,
+                                      reducer = testStep,
+                                      itemDesrialiser = jsonDeserialiser,
+                                      resultSerialiser = jsonSerialiser,    
+                                      errorSerialiser = jsonSerialiser,
+                                      linNo = LineNo 1,
+                                      accumulator = emptyTestAccum
+                                    }
+
+testTestLogStep :: DList ByteString -> DList ByteString
+testTestLogStep input = runToList input $ logTransform iterationToTestLogParams
+
+testTestLogPrettyPrintStep :: DList ByteString -> DList ByteString
+testTestLogPrettyPrintStep input = runToList input $ logTransform iterationToTestLogParams  {
+                                                                                              resultSerialiser = yamlSerialiser,    
+                                                                                              errorSerialiser = showToByteString
+                                                                                            } 
 
 ------------------------------------------------------------
 -------------------- Shared Item Components ----------------
@@ -164,8 +221,14 @@ prettyPrintItem ::
                 -> ((), Either LogTransformError (Maybe [Text]))             -- (accum, result item)
 prettyPrintItem _ _ lp = ((), Right .  Just . pure $ prettyPrintLogProtocol False lp)
 
-lpDeserialiser :: LineNo -> ByteString -> Either DeserialisationError LogProtocol
-lpDeserialiser ln bs = mapLeft (\erStr -> DeserialisationError ln (toS erStr) (decodeUtf8' bs)) $ A.eitherDecode $ L.fromStrict bs
+jsonSerialiser :: A.ToJSON a => a -> ByteString
+jsonSerialiser = L.toStrict . A.encode
+
+jsonDeserialiser :: FromJSON a => LineNo -> ByteString -> Either DeserialisationError a
+jsonDeserialiser ln bs = mapLeft (\erStr -> DeserialisationError ln (toS erStr) (decodeUtf8' bs)) $ A.eitherDecode $ L.fromStrict bs
+
+yamlSerialiser :: A.ToJSON a => a -> ByteString
+yamlSerialiser = Y.encode . Y.toJSON
 
 textToByteString :: Text ->  ByteString
 textToByteString = toS

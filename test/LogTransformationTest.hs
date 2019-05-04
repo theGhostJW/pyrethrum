@@ -1,5 +1,6 @@
 module LogTransformationTest where 
 
+import Text.RawString.QQ
 import           Pyrelude as P
 import           Pyrelude.IO as PIO
 import           Data.DList
@@ -7,7 +8,6 @@ import Pyrelude.Test       as T
 import AuxFiles
 import Control.Monad
 import LogTransformation
-import Text.RawString.QQ
 import PrettyPrintCommon
 import Data.ByteString.Char8 as B
 import qualified Data.Foldable as F
@@ -19,18 +19,23 @@ runAgg :: (DList ByteString -> DList ByteString) -> DList ByteString -> DList Te
 runAgg f l = decodeUtf8 <$> f l 
 
 -- todo: get file utils really sorted
-dumpFile ::  (DList ByteString -> DList ByteString) -> DList ByteString -> RelFile -> IO ()
-dumpFile func lst file  = 
-    do
-      ePth <- tempFile file
-      eitherf ePth 
-        throw
-        (\pth -> do 
-                  h <- S.openFile (toFilePath pth ) S.WriteMode 
-                  sequence_ $ PIO.hPutStrLn h <$> runAgg func lst
-                  S.hClose h
-                  S.print pth
-        )
+dumpFile ::  DList Text -> RelFile -> IO ()
+dumpFile lst file = do
+                      ePth <- tempFile file
+                      eitherf ePth 
+                        throw
+                        (\pth -> do 
+                                  h <- S.openFile (toFilePath pth ) S.WriteMode 
+                                  sequence_ $ PIO.hPutStrLn h <$> lst
+                                  S.hClose h
+                                  S.print pth
+                        )
+
+aggregateDumpFile :: (DList ByteString -> DList ByteString) -> DList ByteString -> RelFile -> IO ()
+aggregateDumpFile func lst = dumpFile (runAgg func lst) 
+
+dumpFileSimple ::  DList ByteString -> RelFile -> IO ()
+dumpFileSimple = uu
 
 display :: (DList ByteString -> DList ByteString) -> DList ByteString -> IO ()
 display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
@@ -39,17 +44,22 @@ unit_demo_prettyPrint :: IO ()
 unit_demo_prettyPrint = display testPrettyPrint rawFile
 
 unit_demo_iteration :: IO ()
-unit_demo_iteration = dumpFile testIterationStep rawFile [relfile|iterations.yaml|]
+unit_demo_iteration = aggregateDumpFile testIterationStep rawFile [relfile|iterations.yaml|]
 
 unit_demo_prettyPrint_iteration :: IO ()
-unit_demo_prettyPrint_iteration = dumpFile testIterationPretyPrintStep rawFile [relfile|demoTemp.yaml|]
+unit_demo_prettyPrint_iteration = aggregateDumpFile testIterationPretyPrintStep rawFile [relfile|demoTemp.yaml|]
+
+unit_demo_test_items_pretty :: IO ()
+unit_demo_test_items_pretty = dumpFile (decodeUtf8 <$> testTestLogPrettyPrintStep (testIterationStep rawFile)) [relfile|tests.yaml|]
 
 unit_demo_test_items :: IO ()
-unit_demo_test_items = let 
-                         itrs = testIterationStep rawFile
-                        in 
-                         uu
+unit_demo_test_items = dumpFile (decodeUtf8 <$> testTestLogStep (testIterationStep rawFile)) [relfile|tests.jsoni|]
 
+-- ToDo - Pretty print test
+-- ToDo - Test parser - totals etc
+-- ToDo - Test parser - include errors - may need to restructure for errors  such as file missing ??
+-- ToDo - plug into run
+-- Move stats to top -- concatinate files
 
 rawFile :: DList ByteString
 rawFile = fromList . B.lines $ toS 

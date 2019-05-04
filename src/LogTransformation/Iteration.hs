@@ -1,9 +1,8 @@
 module LogTransformation.Iteration (
   emptyIterationAccum,
   iterationStep,
-  prettyPrintSerialiseIteration,
-  serialiseIteration,
-  TestIteration(..),
+  IterationAccum(..),
+  IterationLogElement(..),
   Issues(..),
   ExecutionStatus(..),
   IterationRecord(..),
@@ -36,7 +35,7 @@ import PrettyPrintCommon
 -- to provide full report - use sql lite locally 
 -- see https://www.oreilly.com/library/view/microservices-antipatterns-and/9781492042716/ch04.html
 
-data TestIteration = Iteration IterationRecord |
+data IterationLogElement = Iteration IterationRecord |
                     BoundaryItem IterationAuxEvent  |
                     LineError LogTransformError 
                     deriving (Show, Eq)
@@ -396,17 +395,11 @@ nextPhase current lp = case lp of
                                                 Warning' detailedInfo -> current
                                                 CheckOutcome{}  -> Checks
 
-serialiseIteration :: TestIteration -> ByteString
-serialiseIteration = BL.toStrict . A.encode
-
-prettyPrintSerialiseIteration :: TestIteration -> ByteString
-prettyPrintSerialiseIteration = Y.encode . Y.toJSON
-
 iterationStep ::
               LineNo                                                                -- lineNo
               -> IterationAccum                                                     -- accum
               -> LogProtocol                                                        -- parse error or apperror
-              -> (IterationAccum, Either LogTransformError (Maybe [TestIteration])) -- (newAccum, err / result)
+              -> (IterationAccum, Either LogTransformError (Maybe [IterationLogElement])) -- (newAccum, err / result)
 iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp = 
   let
     isStartIteration :: Bool 
@@ -431,7 +424,7 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                           && ((isStartIteration || (lastPhase == OutOfIteration)) == isNothing mRec)
                           && not isDocLog
 
-    invalidPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
+    invalidPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [IterationLogElement])) 
     invalidPhaseStep =
       let 
         nextAccum :: IterationAccum
@@ -441,7 +434,7 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
           rec = Nothing
         } 
 
-        err :: TestIteration
+        err :: IterationLogElement
         err = LineError LogTransformError {
                             linNo = lineNo,
                             logItem = lp,
@@ -478,7 +471,7 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                 _ -> Nothing
 
 
-    outOfIteration :: LogProtocol -> TestIteration
+    outOfIteration :: LogProtocol -> IterationLogElement
     outOfIteration = \case 
                         logp@(BoundaryLog be) -> 
                           let 
@@ -509,7 +502,7 @@ iterationStep lineNo accum@(IterationAccum lastPhase stageFailure mRec) lp =
                                                 info = ""
                                               }
 
-    validPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [TestIteration])) 
+    validPhaseStep :: (IterationAccum, Either LogTransformError (Maybe [IterationLogElement])) 
     validPhaseStep = let 
                       nextRec:: IterationRecord -> Maybe IterationRecord
                       nextRec thisRec =
@@ -578,6 +571,6 @@ $(deriveJSON defaultOptions ''IterationSummary)
 $(deriveJSON defaultOptions ''ExecutionStatus)
 $(deriveJSON defaultOptions ''IterationError)
 $(deriveJSON defaultOptions ''IterationPhase)
-$(deriveJSON defaultOptions ''TestIteration)
+$(deriveJSON defaultOptions ''IterationLogElement)
 $(deriveJSON defaultOptions ''IterationAuxEvent)
 $(deriveJSON defaultOptions ''Issues)

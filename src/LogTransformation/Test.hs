@@ -15,12 +15,11 @@ import Data.Aeson.TH
 import Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
 
-iterationStep ::
-              LineNo                                                    -- lineNo
-              -> TestAccum                                              -- accum
-              -> TestIteration                                          -- parse error or apperror
-              -> (TestAccum, Either LogTransformError (Maybe [TestLog])) -- (newAccum, err / result)
-iterationStep lineNo (TestAccum runStats mThisRec mGroup) itr =
+testStep :: LineNo                                                            -- lineNo
+            -> TestAccum                                                      -- accum
+            -> IterationLogElement                                            -- parse error or apperror
+            -> (TestAccum, Either LogTransformError (Maybe [TestLogElement])) -- (newAccum, err / result)
+testStep lineNo (TestAccum runStats mThisRec mGroup) itr =
   let 
     thisRec :: TestRecord
     thisRec = fromMaybe emptyRecord mThisRec
@@ -55,14 +54,14 @@ iterationStep lineNo (TestAccum runStats mThisRec mGroup) itr =
                                             I.StartGroup gt -> Nothing
                                             I.EndGroup gt -> Nothing
                                             I.StartTest (RC.TestDisplayInfo address title config) -> Just $ emptyRecord {
-                                              title = title,
-                                              address = RC.unTestModule address,
-                                              config = config
-                                            } 
+                                                                                                              title = title,
+                                                                                                              address = RC.unTestModule address,
+                                                                                                              config = config
+                                                                                                            } 
                                             I.EndTest tm -> Nothing
               I.LineError le -> mThisRec
 
-    nxtTestLog :: Maybe TestLog                   
+    nxtTestLog :: Maybe TestLogElement                   
     nxtTestLog = case itr of
               i@(Iteration ir) -> Nothing
               be@(BoundaryItem iaux) -> case iaux of
@@ -121,10 +120,10 @@ iterationStep lineNo (TestAccum runStats mThisRec mGroup) itr =
     nxtError :: Maybe TestTransformError                  
     nxtError = 
       let 
-        transErr :: TestIteration -> Text ->  Maybe TestTransformError
+        transErr :: IterationLogElement -> Text ->  Maybe TestTransformError
         transErr i txt' = Just $ IterationTransError (txt' <> "\n" <> "This could be due to lost messages or messages being received out of sequence") i
     
-        chkGroupAndTestEmpty :: TestIteration -> Text -> Text -> Maybe TestTransformError  
+        chkGroupAndTestEmpty :: IterationLogElement -> Text -> Text -> Maybe TestTransformError  
         chkGroupAndTestEmpty i tstErrorTxt grpErrorTxt = isJust mThisRec ? transErr i tstErrorTxt 
                                                          $ isJust mGroup ? transErr i grpErrorTxt
                                                          $ Nothing
@@ -175,19 +174,17 @@ iterationStep lineNo (TestAccum runStats mThisRec mGroup) itr =
                  testGroup = nxtGroup
                }
 
-    nextResultItem :: Either LogTransformError (Maybe [TestLog])
+    nextResultItem :: Either LogTransformError (Maybe [TestLogElement])
     nextResultItem = 
       let 
         logs = catMaybes [nxtTestLog, TransError <$> nxtError]
         mLogs = P.null logs ? Nothing $ Just logs
       in
-        isJust nxtPassThroughError ? 
-                          Left (fromJust nxtPassThroughError) $ 
-                          uu
+        maybe (Right mLogs) Left nxtPassThroughError
   in 
     (nxtAccum, nextResultItem)
 
-data TestTransformError = IterationTransError Text TestIteration deriving (Eq, Show)
+data TestTransformError = IterationTransError Text IterationLogElement deriving (Eq, Show)
 
 incStatusCount :: StatusCount -> ExecutionStatus -> StatusCount
 incStatusCount sc@StatusCount{..} =
@@ -252,7 +249,7 @@ emptyRecord = TestRecord {
   iterationsDesc = []
 }
 
-data TestLog = Test TestRecord |
+data TestLogElement = Test TestRecord |
             FilterLog [FilterResult] |
 
             StartRun RunTitle A.Value | 
@@ -270,3 +267,12 @@ data TestAccum = TestAccum {
   currentRec :: Maybe TestRecord,
   testGroup :: Maybe Text
 }
+
+emptyTestAccum :: TestAccum
+emptyTestAccum = TestAccum mempty Nothing Nothing
+
+$(deriveJSON defaultOptions ''TestLogElement)
+$(deriveJSON defaultOptions ''TestRecord)
+$(deriveJSON defaultOptions ''TestStats)
+$(deriveJSON defaultOptions ''TestTransformError)
+$(deriveJSON defaultOptions ''StatusCount)

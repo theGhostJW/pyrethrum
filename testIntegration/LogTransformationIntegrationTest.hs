@@ -12,7 +12,7 @@ type FileAggregator = AbsFile                                            -- sour
                     -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
                     -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
 
-runAggregator :: IO (Either IOError AbsFile) ->  FileAggregator ->  IO ()
+runAggregator :: IO (Either IOError AbsFile) -> FileAggregator ->  IO ()
 runAggregator file fa = do 
                   eFile <- file 
                   eitherf eFile

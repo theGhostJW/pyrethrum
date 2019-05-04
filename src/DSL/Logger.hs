@@ -83,6 +83,7 @@ logDocInterpreter =
                                       LogWarning' msg info ->  tellDoc . DocWarning' $ DetailedInfo msg info
 
 
+-- ToDo move to lib
 putLines :: Handle -> Text -> IO ()
 putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
 

@@ -18,7 +18,8 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: nightly-2018-05-30 # last nightly for GHC 8.4.2
+resolver:  nightly-2019-05-07 # ghc-8.6.5
+# nightly-2018-05-30 # last nightly for GHC 8.4.2
 # ghc-8.4.2
 # nightly-2018-08-07
 
@@ -53,9 +54,9 @@ extra-deps:
 # mine
 - git: https://github.com/theGhostJW/pyrelude
   commit: "58680fe"
-# stack
-- transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961
+- discrimination-0.3@sha256:6f88488e62fd4aca71497a4909371476eb18720b3c113869e769a65d1bdb69dc
 - encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce
+- transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

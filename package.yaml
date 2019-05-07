@@ -33,7 +33,7 @@ dependencies:
   - dlist
 
 ghc-options:
-  # - -F -pgmF=record-dot-preprocessor 
+  #- -F -pgmF=record-dot-preprocessor 
   - -fmax-pmcheck-iterations=10000000
   - -ferror-spans
   # - -O2
@@ -55,7 +55,7 @@ ghc-options:
 default-extensions:
   - AllowAmbiguousTypes
   - BangPatterns
-  # - BlockArguments
+  - BlockArguments
   - ConstrainedClassMethods
   - ConstraintKinds
   - DisambiguateRecordFields

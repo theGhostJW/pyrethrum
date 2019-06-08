@@ -206,8 +206,9 @@ testTestLogStep input = runToList input $ logTransform iterationToTestLogParams
 
 testTestLogPrettyPrintStep :: DList ByteString -> DList ByteString
 testTestLogPrettyPrintStep input = runToList input $ logTransform iterationToTestLogParams  {
-                                                                                              resultSerialiser = yamlSerialiser,    
-                                                                                              errorSerialiser = showToByteString
+                                                                                              resultSerialiser = toS . prettyPrintTestLogElement,    
+                                                                                              errorSerialiser = toS . prettyPrintTestLogElement 
+                                                                                                                . TransError . IterationTransError "Log Processing Error" . LineError
                                                                                             } 
 
 ------------------------------------------------------------
@@ -235,3 +236,4 @@ textToByteString = toS
 
 showToByteString :: Show a => a ->  ByteString
 showToByteString = textToByteString . txt
+

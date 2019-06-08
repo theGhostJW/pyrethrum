@@ -49,13 +49,14 @@ unit_demo_iteration = aggregateDumpFile testIterationStep rawFile [relfile|itera
 unit_demo_prettyPrint_iteration :: IO ()
 unit_demo_prettyPrint_iteration = aggregateDumpFile testIterationPretyPrintStep rawFile [relfile|demoTemp.yaml|]
 
-unit_demo_test_items_pretty :: IO ()
-unit_demo_test_items_pretty = dumpFile (decodeUtf8 <$> testTestLogPrettyPrintStep (testIterationStep rawFile)) [relfile|tests.yaml|]
-
 unit_demo_test_items :: IO ()
 unit_demo_test_items = dumpFile (decodeUtf8 <$> testTestLogStep (testIterationStep rawFile)) [relfile|tests.jsoni|]
 
--- ToDo - Pretty print test
+
+unit_demo_test_items_pretty :: IO ()
+unit_demo_test_items_pretty = dumpFile (decodeUtf8 <$> testTestLogPrettyPrintStep (testIterationStep rawFile)) [relfile|tests.yaml|]
+
+-- ToDo - Pretty print test - may need to use state monad
 -- ToDo - Test parser - totals etc
 -- ToDo - Test parser - include errors - may need to restructure for errors  such as file missing ??
 -- ToDo - plug into run

@@ -16,7 +16,6 @@ import Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
 import System.IO as S
 import Data.Functor
-import DSL.Logger
 import Control.Monad.Writer.Strict
 import Control.Monad.State.Strict
 import Control.Monad.Identity

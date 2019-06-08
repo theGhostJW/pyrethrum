@@ -5,22 +5,13 @@ module DSL.LogProtocol.PrettyPrint (
 
 import Common
 import PrettyPrintCommon as PC
-import  DSL.LogProtocol
+import  DSL.LogProtocol as LP
+import LogTransformation.Test as T
 import           Pyrelude as P
 import Text.Show.Pretty as PP
 import RunElementClasses as C
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), CheckInfo(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y
-
-prettyPrintFilterItem :: FilterResult -> Text
-prettyPrintFilterItem FilterResult{..} =
-    let
-      description :: Text
-      description = toString (testModAddress testInfo) <> " - " <> testTitle testInfo
-    in
-      maybef reasonForRejection
-        ("accepted: " <> description)
-        (\reason -> "rejected: " <> description <> " - Reason: " <> reason)
 
 prettyPrintLogProtocol :: Bool -> LogProtocol -> Text
 prettyPrintLogProtocol docMode =
@@ -28,17 +19,8 @@ prettyPrintLogProtocol docMode =
     iterId :: ItemId -> Text
     iterId (ItemId tst iid) = toString tst <> " / item " <> txt iid
 
-    newLn :: Text
-    newLn = "\n" :: Text
-
-    indent2 :: Text -> Text
-    indent2 = indentText 2 
-
     prettyBlock :: Char -> Text -> ItemId -> Text -> Text
     prettyBlock pfxChr headr iid body = indent2 $ toS (replicate 3 ' ') <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
-
-    ppAesonBlock:: Y.Value -> Text
-    ppAesonBlock = indent2 . ppAeson
 
     ppMsgInfo :: Show a => Maybe a -> Text
     ppMsgInfo mbInfo = maybef mbInfo
@@ -57,17 +39,13 @@ prettyPrintLogProtocol docMode =
   in
     \case
         BoundaryLog bl -> case bl of 
-                            FilterLog fltrInfos -> newLn <> PC.header "Filter Log" <> newLn <>
-                                                          foldl (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
+                            LP.FilterLog fltrInfos -> ppFilterLog fltrInfos
+                            LP.StartRun ttle rc -> ppStartRun ttle rc
 
-                            StartRun ttle rc -> PC.header ("Test Run: " <> unRunTitle ttle) <> 
-                                                newLn <> "Run Config:" <>
-                                                newLn <> ppAesonBlock rc
+                            LP.StartGroup gt -> PC.header $ "Group: " <> unGroupTitle gt
+                            LP.EndGroup gt -> PC.header $ "End Group: " <> unGroupTitle gt
 
-                            StartGroup gt -> PC.header $ "Group: " <> unGroupTitle gt
-                            EndGroup gt -> PC.header $ "End Group: " <> unGroupTitle gt
-
-                            StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
+                            LP.StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
                                                               newLn <> "Test Config:" <>
                                                               newLn <> ppAesonBlock testConfig
 
@@ -78,7 +56,7 @@ prettyPrintLogProtocol docMode =
                                                             (docMode ? "" $ newLn)
 
                             EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
-                            EndRun -> newLn <> PC.header "End Run"
+                            LP.EndRun -> newLn <> PC.header "End Run"
 
         IterationLog (Doc dp) -> case dp of 
                               DocAction ai -> case ai of
@@ -137,5 +115,3 @@ prettyPrintLogProtocol docMode =
                               Warning' detailedInfo -> detailDoc "Warning" detailedInfo
 
                               e@(Error _) -> showPretty e
-
-                               

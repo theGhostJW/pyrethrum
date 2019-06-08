@@ -14,6 +14,7 @@ import qualified Data.Aeson as A
 import Data.Aeson.TH
 import Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
+import PrettyPrintCommon
 
 testStep :: LineNo                                                            -- lineNo
             -> TestAccum                                                      -- accum
@@ -270,6 +271,16 @@ data TestAccum = TestAccum {
 
 emptyTestAccum :: TestAccum
 emptyTestAccum = TestAccum mempty Nothing Nothing
+
+prettyPrintTestLogElement :: TestLogElement -> Text
+prettyPrintTestLogElement = \case 
+                                LogTransformation.Test.StartRun ttle rc -> ppStartRun ttle rc
+                                LogTransformation.Test.FilterLog arFltrRslt -> ppFilterLog arFltrRslt
+                                LogTransformation.Test.StartGroup (LP.GroupTitle titl) -> "NOT IMPLEMENTED"
+                                Test (TestRecord titl address config status stats iterationsDesc) -> "NOT IMPLEMENTED"
+                                LogTransformation.Test.EndGroup (LP.GroupTitle titl) -> "NOT IMPLEMENTED"
+                                TransError err -> "NOT IMPLEMENTED"
+                                LogTransformation.Test.EndRun stats -> "NOT IMPLEMENTED"
 
 $(deriveJSON defaultOptions ''TestLogElement)
 $(deriveJSON defaultOptions ''TestRecord)

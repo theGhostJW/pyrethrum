@@ -14,6 +14,9 @@ import qualified Data.Foldable as F
 import qualified System.IO as S
 import LogTransformation.Test as LT
 import DSL.Logger
+import DSL.LogProtocol as LP
+import RunElementClasses
+import LogTransformation.Iteration
 
 runAgg :: (DList ByteString -> DList ByteString) -> DList ByteString -> DList Text
 runAgg f l = decodeUtf8 <$> f l 
@@ -40,8 +43,8 @@ dumpFileSimple = uu
 display :: (DList ByteString -> DList ByteString) -> DList ByteString -> IO ()
 display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
 
-unit_demo_prettyPrint :: IO ()
-unit_demo_prettyPrint = display testPrettyPrint rawFile
+unit_demo_logs_prettyPrint :: IO ()
+unit_demo_logs_prettyPrint = dumpFile (decodeUtf8 <$> testPrettyPrint rawFile) [relfile|steps.yaml|]
 
 unit_demo_iteration :: IO ()
 unit_demo_iteration = aggregateDumpFile testIterationStep rawFile [relfile|iterations.yaml|]
@@ -52,6 +55,34 @@ unit_demo_prettyPrint_iteration = aggregateDumpFile testIterationPretyPrintStep 
 unit_demo_test_items :: IO ()
 unit_demo_test_items = dumpFile (decodeUtf8 <$> testTestLogStep (testIterationStep rawFile)) [relfile|tests.jsoni|]
 
+-- bug fix
+unit_other_warnings_as_expected :: IO ()
+unit_other_warnings_as_expected =
+  let
+    targetTest = "DemoProject.Test.Rough"
+    logSteps = testTestLogStepRaw (testIterationStep rawFile)
+    testDemoProjectTestRough = P.find (\case 
+                                        Test tr@(TestRecord titl address config status stats iterationsDesc) -> address == targetTest
+                                        _ -> False
+                                      ) logSteps
+
+    iteration100 :: TestLogElement -> Maybe IterationRecord
+    iteration100 = \case 
+                      Test tle -> P.find (\i -> iid (summary i) == ItemId (TestModule targetTest) 100) $ iterationsDesc tle
+                      _ -> Nothing
+
+    chkSingleInteractorWarning :: IterationRecord -> Assertion
+    chkSingleInteractorWarning i = 
+      let 
+        othWarnings = otherWarningsDesc i
+      in 
+        chkEq 1 $ P.length othWarnings
+  in 
+    maybef (testDemoProjectTestRough >>= iteration100)
+      (chkFail $ "iteration 100 of " <> targetTest <> " not found" )
+      chkSingleInteractorWarning
+
+                            
 
 unit_demo_test_items_pretty :: IO ()
 unit_demo_test_items_pretty = dumpFile (decodeUtf8 <$> testTestLogPrettyPrintStep (testIterationStep rawFile)) [relfile|tests.yaml|]

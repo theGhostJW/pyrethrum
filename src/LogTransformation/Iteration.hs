@@ -202,19 +202,17 @@ emptyIterationAccum = IterationAccum {
 updateIterationErrsWarnings:: IterationPhase -> LogProtocol -> IterationRecord -> IterationRecord
 updateIterationErrsWarnings p lp iRec = 
   let
-    thisResult :: ExecutionStatus
-    thisResult = calcStatus newIssues p
+    updatedIssues :: Issues
+    updatedIssues = updateIssues . issues $ summary iRec
 
-    worstResult :: ExecutionStatus
-    worstResult = 
-      let
-        oldResult :: ExecutionStatus
-        oldResult = status (summary iRec)
-      in 
-        max oldResult thisResult
+    worstStatus :: ExecutionStatus
+    worstStatus = calcStatus updatedIssues p
 
-    newIssues :: Issues
-    newIssues = 
+    stepStatus :: ExecutionStatus
+    stepStatus = calcStatus (updateIssues mempty) p
+
+    updateIssues :: Issues -> Issues
+    updateIssues oldIssues = 
       let 
         modifier :: Issues -> Issues
         modifier = 
@@ -233,40 +231,42 @@ updateIterationErrsWarnings p lp iRec =
             incWarning s = s {LogTransformation.Iteration.warning = (LogTransformation.Iteration.warning :: Issues -> Int) s + 1 }
           in
             case lp of
-              -- TODO :: Test for out of iteration errors warnings
               BoundaryLog bl -> id  -- this should not happen and will cause a phase error to be logged
               IterationLog (Doc dp) -> id -- this should not happen and will cause a phase error to be logged
-              IterationLog (Run rp) -> case rp of
-                                          StartPrepState -> id
-                                          IOAction _ -> id
-            
-                                          StartInteraction -> id
-                                          InteractorSuccess {} -> id 
-                                          InteractorFailure {} -> incFailure
-            
-                                          L.PrepStateSuccess {} -> id
-                                          PrepStateFailure {} -> incFailure
-            
-                                          StartChecks{} -> id
-                                          CheckOutcome _ (CheckReport reslt _) -> case reslt of
-                                                                                        CK.Pass -> id
-                                                                                        CK.Fail -> incFailure
-                                                                                        GateFail -> incFailure
-                                                                                        FailExpected _ -> incExpectedFailure
-                                                                                        GateFailExpected _ -> incExpectedFailure
-                                                                                        PassWhenFailExpected _ -> \s -> s {LogTransformation.Iteration.type2Failure = LogTransformation.Iteration.type2Failure s + 1}
-                                                                                        Regression _ -> incRegresssion
-                                                                                        GateRegression _ -> incRegresssion
-                                                                                        Skip -> id
-            
-                                          Message _ -> id
-                                          Message' _ -> id
-                                                                  
-                                          L.Warning _ -> incWarning
-                                          Warning' _ -> incWarning
-                                          L.Error _ -> incFailure
+              IterationLog (Run rp) -> 
+                case rp of
+                  StartPrepState -> id
+                  IOAction _ -> id
+
+                  StartInteraction -> id
+                  InteractorSuccess {} -> id 
+                  InteractorFailure {} -> incFailure
+
+                  L.PrepStateSuccess {} -> id
+                  PrepStateFailure {} -> incFailure
+
+                  StartChecks{} -> id
+                  CheckOutcome _ (CheckReport reslt _) -> 
+                    case reslt of
+                      CK.Pass -> id
+                      CK.Fail -> incFailure
+                      GateFail -> incFailure
+                      FailExpected _ -> incExpectedFailure
+                      GateFailExpected _ -> incExpectedFailure
+                      PassWhenFailExpected _ -> 
+                        \s -> s {LogTransformation.Iteration.type2Failure = LogTransformation.Iteration.type2Failure s + 1}
+                      Regression _ -> incRegresssion
+                      GateRegression _ -> incRegresssion
+                      Skip -> id
+
+                  Message _ -> id
+                  Message' _ -> id
+                                          
+                  L.Warning _ -> incWarning
+                  Warning' _ -> incWarning
+                  L.Error _ -> incFailure
         in 
-          modifier . issues $ summary iRec
+          modifier oldIssues
 
     notCheckPhase :: Bool
     notCheckPhase = p /= Checks
@@ -274,15 +274,15 @@ updateIterationErrsWarnings p lp iRec =
   in 
     iRec {
       summary = (summary iRec) {
-                                status = worstResult,
-                                issues = newIssues
+                                status = worstStatus,
+                                issues = updatedIssues
                                }
 
-      , otherErrorsDesc = isFailure thisResult && notCheckPhase 
+      , otherErrorsDesc = isFailure stepStatus && notCheckPhase 
                               ? IterationError p lp : otherErrorsDesc iRec  
                               $ otherErrorsDesc iRec
 
-      , otherWarningsDesc = isWarning thisResult && notCheckPhase 
+      , otherWarningsDesc = isWarning stepStatus && notCheckPhase 
                               ? IterationWarning p lp : otherWarningsDesc iRec 
                               $ otherWarningsDesc iRec
     }

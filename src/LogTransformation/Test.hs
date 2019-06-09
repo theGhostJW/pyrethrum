@@ -4,7 +4,7 @@ import Common as C (AppError(..))
 import qualified RunElementClasses as RC
 import LogTransformation.Common
 import LogTransformation.Iteration as I
-import RunElementClasses (FilterResult)
+import RunElementClasses (FilterResult, unTestModule)
 import Check as CK
 import Pyrelude as P hiding (fail)
 import Pyrelude.IO
@@ -12,9 +12,11 @@ import Data.DList as D
 import DSL.LogProtocol as LP
 import qualified Data.Aeson as A
 import Data.Aeson.TH
-import Data.ByteString.Char8 as B
+import Data.Aeson as A
+import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
-import PrettyPrintCommon
+import PrettyPrintCommon as PC
+import Data.HashMap.Strict as H
 
 testStep :: LineNo                                                            -- lineNo
             -> TestAccum                                                      -- accum
@@ -196,10 +198,10 @@ incStatusCount sc@StatusCount{..} =
     I.Fail _ -> sc{fail = fail + 1}
 
 data StatusCount = StatusCount {
-                    inconclusive :: Int,
                     pass :: Int,
+                    fail :: Int,
                     warning :: Int,
-                    fail :: Int
+                    inconclusive :: Int
                   }
                   deriving (Eq, Show)
 
@@ -250,7 +252,8 @@ emptyRecord = TestRecord {
   iterationsDesc = []
 }
 
-data TestLogElement = Test TestRecord |
+data TestLogElement = 
+            Test TestRecord |
             FilterLog [FilterResult] |
 
             StartRun RunTitle A.Value | 
@@ -272,15 +275,58 @@ data TestAccum = TestAccum {
 emptyTestAccum :: TestAccum
 emptyTestAccum = TestAccum mempty Nothing Nothing
 
+removeHeaderAndAddress :: A.Value -> A.Value
+removeHeaderAndAddress val = case val of
+                               Object o -> Object $ H.delete "header" $ H.delete "address" o 
+                               _ -> val
+                            
+displayStats :: TestStats -> Text
+displayStats ts = unlines $ P.foldr (\r lst -> isInfixOf "issueCounts:" r ? "" : r : lst $ r : lst ) [] $ lines $ ppAsYaml ts
+
+ppIteration :: IterationRecord -> Text
+ppIteration (IterationRecord summary validation otherErrors otherWarnings item apState domainState rawLog) = 
+  let 
+    ItemId md i = iid summary
+    headr = PC.header $ unTestModule md <> " / " <> txt i <> " - " <> txt (I.status summary)
+  in 
+    headr <> newLn <>
+    "when: " <> unWhenClause (pre summary) <> newLn <>
+    "then: " <> unThenClause (post summary) <> newLn <>
+    "issues:" <> newLn <> ppAsYaml (issues summary) <> newLn <>
+    "checks:" <> newLn <> ppAsYaml validation <> newLn <>
+    "otherErrors:" <> newLn <> ppAsYaml otherErrors <> newLn <>
+    "otherWarnings:" <> newLn <> ppAsYaml otherWarnings
+
+
+{-
+data IterationRecord = IterationRecord {
+  summary :: IterationSummary,
+  validation :: [CheckReport],
+  otherErrorsDesc :: [IterationError],
+  otherWarningsDesc :: [IterationWarning],
+  item :: Maybe ItemInfo,
+  apState :: Maybe ApStateInfo,
+  domainState :: Maybe PrepStateInfo,
+  rawLog :: DList LogProtocol
+} deriving (Eq, Show)
+-}
+
 prettyPrintTestLogElement :: TestLogElement -> Text
 prettyPrintTestLogElement = \case 
                                 LogTransformation.Test.StartRun ttle rc -> ppStartRun ttle rc
                                 LogTransformation.Test.FilterLog arFltrRslt -> ppFilterLog arFltrRslt
-                                LogTransformation.Test.StartGroup (LP.GroupTitle titl) -> "NOT IMPLEMENTED"
-                                Test (TestRecord titl address config status stats iterationsDesc) -> "NOT IMPLEMENTED"
-                                LogTransformation.Test.EndGroup (LP.GroupTitle titl) -> "NOT IMPLEMENTED"
-                                TransError err -> "NOT IMPLEMENTED"
-                                LogTransformation.Test.EndRun stats -> "NOT IMPLEMENTED"
+                                LogTransformation.Test.StartGroup gt -> groupHeader gt <> newLn
+                                Test tr@(TestRecord titl address config status stats iterationsDesc) -> 
+                                  PC.header (address <> " - " <> titl <> " - " <> txt status) <> newLn <>
+                                  "Config:" <> newLn <> ppAsYaml (removeHeaderAndAddress config) <> newLn <> newLn <>
+                                  "Stats:" <> newLn <> displayStats stats <> newLn <> newLn <>
+                                  P.intercalate newLn (ppIteration <$> P.reverse iterationsDesc) 
+
+                                  
+                                LogTransformation.Test.EndGroup gt -> groupFooter gt
+                                TransError err -> newLn <> PC.header "ERROR" <> newLn <> ppAesonBlock (toJSON err)
+                                LogTransformation.Test.EndRun stats -> newLn <> PC.header "End Run" <> newLn <> ppAsYaml stats
+                                                                        
 
 $(deriveJSON defaultOptions ''TestLogElement)
 $(deriveJSON defaultOptions ''TestRecord)

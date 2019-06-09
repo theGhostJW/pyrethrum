@@ -189,6 +189,21 @@ testIterationPretyPrintStep input = runToList input $ logTransform iterationToJs
                                                                             errorSerialiser = showToByteString
                                                                           } 
 
+iterationToRawTestLogParams :: LogTransformParams TestAccum IterationLogElement TestLogElement (WriterT (DList TestLogElement) (StateT (DList ByteString) Identity)) ByteString TestLogElement
+iterationToRawTestLogParams = LogTransformParams {
+                                      source = testSource,
+                                      sink = testSink,
+                                      reducer = testStep,
+                                      itemDesrialiser = jsonDeserialiser,
+                                      resultSerialiser = id,    
+                                      errorSerialiser = TransError . IterationTransError "Log Processing Error" . LineError,
+                                      linNo = LineNo 1,
+                                      accumulator = emptyTestAccum
+                                    }
+
+testTestLogStepRaw :: DList ByteString -> [TestLogElement]
+testTestLogStepRaw input = P.toList . runToList input $ logTransform iterationToRawTestLogParams
+
 iterationToTestLogParams :: LogTransformParams TestAccum IterationLogElement TestLogElement (WriterT (DList ByteString) (StateT (DList ByteString) Identity)) ByteString ByteString
 iterationToTestLogParams = LogTransformParams {
                                       source = testSource,

@@ -42,8 +42,8 @@ prettyPrintLogProtocol docMode =
                             LP.FilterLog fltrInfos -> ppFilterLog fltrInfos
                             LP.StartRun ttle rc -> ppStartRun ttle rc
 
-                            LP.StartGroup gt -> PC.header $ "Group: " <> unGroupTitle gt
-                            LP.EndGroup gt -> PC.header $ "End Group: " <> unGroupTitle gt
+                            LP.StartGroup gt -> groupHeader gt
+                            LP.EndGroup gt -> groupFooter gt
 
                             LP.StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
                                                               newLn <> "Test Config:" <>

@@ -8,7 +8,7 @@ import RunElementClasses (FilterResult, unTestModule)
 import Check as CK
 import Pyrelude as P hiding (fail)
 import Pyrelude.IO
-import Data.DList as D
+import qualified Data.DList as D
 import DSL.LogProtocol as LP
 import qualified Data.Aeson as A
 import Data.Aeson.TH
@@ -284,7 +284,7 @@ displayStats :: TestStats -> Text
 displayStats ts = unlines $ P.foldr (\r lst -> isInfixOf "issueCounts:" r ? "" : r : lst $ r : lst ) [] $ lines $ ppAsYaml ts
 
 ppIteration :: IterationRecord -> Text
-ppIteration (IterationRecord summary validation otherErrors otherWarnings item apState domainState rawLog) = 
+ppIteration (IterationRecord summary validation otherErrorsDesc otherWarningsDesc item apState domainState rawLog) = 
   let 
     ItemId md i = iid summary
     headr = PC.header $ unTestModule md <> " / " <> txt i <> " - " <> txt (I.status summary)
@@ -294,8 +294,8 @@ ppIteration (IterationRecord summary validation otherErrors otherWarnings item a
     "then: " <> unThenClause (post summary) <> newLn <>
     "issues:" <> newLn <> ppAsYaml (issues summary) <> newLn <>
     "checks:" <> newLn <> ppAsYaml validation <> newLn <>
-    "otherErrors:" <> newLn <> ppAsYaml otherErrors <> newLn <>
-    "otherWarnings:" <> newLn <> ppAsYaml otherWarnings
+    "other errors:" <> newLn <> ppAsYaml (reverse otherErrorsDesc) <> newLn <>
+    "other warnings:" <> newLn <> ppAsYaml (reverse otherWarningsDesc)
 
 
 {-

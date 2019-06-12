@@ -52,10 +52,34 @@ ppAesonBlock:: Y.Value -> Text
 ppAesonBlock = indent2 . ppAeson
 
 ppStartRun :: RunTitle -> Y.Value -> Text
-ppStartRun ttle rc = header ("Test Run - " <> unRunTitle ttle) <> 
-        newLn <> "Run Config:" <>
-        newLn <> ppAesonBlock rc
+ppStartRun ttle rc = majorHeader (unRunTitle ttle) <> 
+                      newLn <> newLn <> "Run Config:" <>
+                      newLn <> ppAesonBlock rc
 
 ppFilterLog :: [FilterResult] -> Text
 ppFilterLog fltrInfos = newLn <> header "Filter Log" <> newLn <>
                         foldl (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
+
+
+headerLine :: Int -> Bool -> Char -> Text -> Text
+headerLine len wantPrcntChar padChr hdrTxt = 
+  let 
+    padTxt = P.singleton padChr
+    txtLen = length hdrTxt + 2
+    sfxLen = ceiling $ fromIntegral (len - txtLen ) / 2
+    pfxLen = txtLen + sfxLen * 2 > len ? pred sfxLen $ sfxLen
+    pfxBase = replicateText pfxLen padTxt
+    pfx = wantPrcntChar ? replaceFirst (padTxt <> padTxt) (padTxt <> "%") pfxBase $ pfxBase
+  in 
+    pfx <> " " <> hdrTxt <> " " <> replicateText sfxLen padTxt
+
+fullHeader :: Char -> Bool -> Text -> Text
+fullHeader padChr wantPrcntChar hdrTxt = 
+  let 
+    headerCharWidth = 80
+    line = replicateText headerCharWidth (P.singleton padChr) <> newLn
+  in
+    line <> headerLine headerCharWidth wantPrcntChar padChr hdrTxt <> newLn <> line
+
+majorHeader = fullHeader '#' False
+      

@@ -24,7 +24,6 @@ import LogTransformation.Stats
 import LogTransformation.Common as LTC
 import Data.Foldable as F
 import qualified Data.Map.Strict as M
-import Common (showPretty)
 -- import LogTransformation.Iteration
 
 runAgg :: (DList ByteString -> DList ByteString) -> DList ByteString -> DList Text
@@ -117,11 +116,11 @@ display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
 
 _demo_pretty_print = dumpFile (prettyPrintLogProtocol False <$> sampleLog) [relfile|raw.yaml|] 
 
-_base_results = dumpTxt (showPretty $ iterationResults . runResults $ F.foldl' statsStep emptyStepAccum sampleLog) [relfile|baseResults.yaml|] 
+_base_results = dumpTxt (txtPretty $ iterationResults . runResults $ F.foldl' statsStep emptyStepAccum sampleLog) [relfile|baseResults.yaml|] 
 
-_demo_test_stats = showPretty $ testStatusCounts . listTestStatus $ F.foldl' statsStep emptyStepAccum sampleLog
+_demo_test_stats = txtPretty $ testStatusCounts . listTestStatus $ F.foldl' statsStep emptyStepAccum sampleLog
 
-_demo_iteration_stats = showPretty $ iterationStatusCounts . listIterationStatus $ F.foldl' statsStep emptyStepAccum sampleLog
+_demo_iteration_stats = txtPretty $ iterationStatusCounts . listIterationStatus $ F.foldl' statsStep emptyStepAccum sampleLog
 
 unit_iteration_counts_correct = chkEq (M.fromList [(Pass,8),(KnownError,2),(LTC.Warning,4),(Fail,10)]) $ iterationStatusCounts . listIterationStatus $ F.foldl' statsStep emptyStepAccum sampleLog
 

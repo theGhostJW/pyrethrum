@@ -25,13 +25,13 @@ prettyPrintLogProtocol docMode =
     ppMsgInfo :: Show a => Maybe a -> Text
     ppMsgInfo mbInfo = maybef mbInfo
                               ""
-                              (\m -> newLn <> indent2 (showPretty m))
+                              (\m -> newLn <> indent2 (txtPretty m))
 
     docMarkUp :: Text -> Text
     docMarkUp s = (docMode ? id $ indent2) $ (docMode ? "  >> " $ "") <> s
 
     logIO :: Show a => a -> Text
-    logIO m =  docMarkUp $ "IO Action: " <> showPretty m
+    logIO m =  docMarkUp $ "IO Action: " <> txtPretty m
 
     detailDoc :: Text -> DetailedInfo -> Text
     detailDoc hedr (DetailedInfo msg det) = newLn <> (docMode ? id $ indent2) (subHeader hedr <> newLn <> msg <> newLn <> det)
@@ -89,7 +89,7 @@ prettyPrintLogProtocol docMode =
                               DocWarning s -> docMarkUp $ "warning: " <> s
                               DocWarning' detailedInfo -> detailDoc "Warning" detailedInfo
 
-                              e@(DocError _) -> showPretty e
+                              e@(DocError _) -> txtPretty e
 
         IterationLog (Run rp) -> case rp of
                               StartInteraction -> newLn <> "Interaction:"
@@ -100,13 +100,13 @@ prettyPrintLogProtocol docMode =
                               
                               InteractorSuccess iid (ApStateDisplay as) -> newLn <> prettyBlock '>' "Interactor Complete"  iid as
                                 
-                              InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ showPretty err
+                              InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ txtPretty err
 
                               PrepStateSuccess iid (DStateDisplay ds) -> prettyBlock '>' "PrepState Complete" iid ds
-                              PrepStateFailure iid err -> prettyBlock '>' "PrepState Failure" iid $ showPretty err
+                              PrepStateFailure iid err -> prettyBlock '>' "PrepState Failure" iid $ txtPretty err
 
-                              CheckOutcome iid (CheckReport reslt (CheckInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> showPretty (classifyResult reslt)) iid $ 
-                                                                                                                          chkhdr  <> " -> " <> showPretty reslt <> 
+                              CheckOutcome iid (CheckReport reslt (CheckInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> txtPretty (classifyResult reslt)) iid $ 
+                                                                                                                          chkhdr  <> " -> " <> txtPretty reslt <> 
                                                                                                                           ppMsgInfo mbInfo
                               Message s -> docMarkUp $ "message: " <> s
                               Message' detailedInfo -> detailDoc "Message" detailedInfo
@@ -114,4 +114,4 @@ prettyPrintLogProtocol docMode =
                               Warning s -> docMarkUp $ "warning: " <> s
                               Warning' detailedInfo -> detailDoc "Warning" detailedInfo
 
-                              e@(Error _) -> showPretty e
+                              e@(Error _) -> txtPretty e

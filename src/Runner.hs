@@ -59,7 +59,7 @@ showAndLogList logSuffix items =
         log2Both fileHndl lgStr = putLines SIO.stdout lgStr *> putLines fileHndl lgStr
 
         listItems :: SIO.Handle -> IO ()
-        listItems h = sequence_ $ log2Both h . showPretty <$> items
+        listItems h = sequence_ $ log2Both h . txtPretty <$> items
       in
         hndle >>=
                 either pPrint (\HandleInfo{..} -> 
@@ -171,7 +171,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                   eitherf ethas
                     (logRunItem . InteractorFailure iid)
                     (\as -> do 
-                              logRunItem . InteractorSuccess iid $ ApStateDisplay . showPretty $ as 
+                              logRunItem . InteractorSuccess iid $ ApStateDisplay . txtPretty $ as 
                               
                               let 
                                 eds :: Either EnsureError ds
@@ -183,7 +183,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                                 (
                                   \ds -> 
                                     do
-                                      logRunItem . PrepStateSuccess iid . DStateDisplay . showPretty $ ds
+                                      logRunItem . PrepStateSuccess iid . DStateDisplay . txtPretty $ ds
                                       logRunItem StartChecks
                                       runChecks ds
                                 )

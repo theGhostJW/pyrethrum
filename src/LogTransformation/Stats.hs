@@ -74,9 +74,6 @@ statsStep (StepAccum failStage phase runResults@(RunResults outOfTest itrRslts) 
 testExStatus :: IterationResults -> M.Map TestModule ExecutionStatus
 testExStatus ir = executionStatus <$> M.mapKeysWith max tstModule ir
 
-countValues :: Ord v => M.Map k v -> M.Map v Int
-countValues = M.fromList . fmap ((\arr' -> (unsafeHead arr', length arr')) <$>) group . sort . M.elems
-
 listTestStatus :: StepAccum -> M.Map TestModule ExecutionStatus 
 listTestStatus = testExStatus . iterationResults . runResults
 

@@ -8,9 +8,6 @@ import Data.Aeson.TH
 import OrphanedInstances
 import Text.Show.Pretty as PP
 
-showPretty :: Show a => a -> Text
-showPretty = toS . ppShow
-
 indentText :: Int -> Text -> Text
 indentText i s = 
   let 

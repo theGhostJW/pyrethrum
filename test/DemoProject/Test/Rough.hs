@@ -65,7 +65,10 @@ interactor RunConfig{..} Item{..} = do
                                       writeFile path $ pre  <> " ~ " <> post <> " !!"
                                       ensure "Blahh" $ P.even iid
                                       log "Hi"
-                                      logWarning "a warning"
+
+                                      unless (iid == 100)
+                                        $ logWarning "a warning"
+
                                       arbitraryIO "This is an arbitrary Put Line" () (PIO.putStrLn "Hello from random action")
                                       tx <- readFile path
 

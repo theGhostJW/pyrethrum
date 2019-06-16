@@ -8,7 +8,7 @@ import Data.Aeson.Types
 import GHC.Generics
 import           Check
 
-newtype TestModule = TestModule {unTestModule :: Text} deriving (Eq, Show, IsString)
+newtype TestModule = TestModule {unTestModule :: Text} deriving (Eq, Ord, Show, IsString)
 
 -- this result is ultimately serialsed to JSON as part of the log protocol data  
 -- type and can't serialise with custom typeclass constraints so forced to
@@ -20,12 +20,15 @@ data TestDisplayInfo = TestDisplayInfo {
   testConfig :: Value -- test Config as Json
 }  deriving (Eq, Show)
 
+instance Ord TestDisplayInfo where 
+  (<=) v1 v2 = testModAddress v1 <= testModAddress v2
+
 $(deriveJSON defaultOptions ''TestDisplayInfo)
 
 data FilterResult = FilterResult {
   testInfo  :: TestDisplayInfo, 
   reasonForRejection :: Maybe Text
-}  deriving (Show, Eq)
+}  deriving (Eq, Ord, Show)
 
 $(deriveJSON defaultOptions ''FilterResult)
 

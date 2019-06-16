@@ -26,11 +26,11 @@ runAggregator file fa = do
 unit_demo_prettyPrint_integration :: IO ()
 unit_demo_prettyPrint_integration = runAggregator jsoniFile testPrettyPrintFile
 
-unit_demo_itemAggregator_integration :: IO ()
-unit_demo_itemAggregator_integration = runAggregator jsoniFile testIterationStepFile
+-- unit_demo_itemAggregator_integration :: IO ()
+-- unit_demo_itemAggregator_integration = runAggregator jsoniFile testIterationStepFile
 
-unit_demo_itemAggregator_integration_i140 :: IO ()
-unit_demo_itemAggregator_integration_i140 = runAggregator jsoniFileIteration140 testIterationStepFile
+-- unit_demo_itemAggregator_integration_i140 :: IO ()
+-- unit_demo_itemAggregator_integration_i140 = runAggregator jsoniFileIteration140 testIterationStepFile
 
 jsoniFile :: IO (Either IOError AbsFile)
 jsoniFile = dataFile [relfile|demo_raw_log.ijson|]

@@ -109,6 +109,7 @@ library:
     - template-haskell
     - bytestring
     - mtl
+    - fmt
 
 _testDep: &testdependencies
 - tasty

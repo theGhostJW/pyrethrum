@@ -21,6 +21,8 @@ import Control.Monad.State.Strict
 import Control.Monad.Identity
 import qualified Data.Map.Strict as M
 import RunElementClasses
+import Data.Yaml as Y
+import DSL.LogProtocol.PrettyPrint 
 
 newtype LineNo = LineNo { unLineNo :: Int } deriving (Show, Eq)
 
@@ -55,6 +57,11 @@ data ExecutionStatus = Pass
                   | Regression
                   deriving (Show, Eq, Ord)
 
+instance A.ToJSONKey ExecutionStatus where
+  -- default implementation
+
+instance A.FromJSONKey ExecutionStatus where
+   -- default implementation
 
 logProtocolStatus :: LogProtocol -> ExecutionStatus
 logProtocolStatus = \case
@@ -117,35 +124,6 @@ data RunResults = RunResults {
                                 iterationResults :: IterationResults
                              } 
                              deriving Show
-
-
--- data FailStage =  InteractorFailed |
---                   PrepStateFailed |
---                   NoFailure
---                   deriving (Eq, Ord, Show)
-
-
-
--- calcFailStage :: LogProtocol -> FailStage
--- calcFailStage = \case
---                   BoundaryLog _ -> NoFailure
---                   -- should never happen
---                   IterationLog (Doc _) -> NoFailure
---                   IterationLog (Run rp) -> case rp of
---                                             InteractorFailure{}  -> InteractorFailed
---                                             PrepStateFailure iid err -> PrepStateFailed
---                                             StartPrepState -> NoFailure
---                                             IOAction _ -> NoFailure
---                                             StartInteraction -> NoFailure
---                                             InteractorSuccess{} -> NoFailure
---                                             PrepStateSuccess{}  -> NoFailure
---                                             StartChecks{} -> NoFailure
---                                             CheckOutcome{} -> NoFailure
---                                             Message _ -> NoFailure
---                                             Message' _ -> NoFailure
---                                             LP.Warning{} -> NoFailure
---                                             Warning' _ -> NoFailure
---                                             LP.Error _ -> NoFailure
 
 data PhaseSwitch = PhaseSwitch {
                         from :: IterationPhase, 
@@ -248,8 +226,65 @@ nxtIteration current lp =
                             Clear -> Nothing
                             Leave -> current
                             New itmId -> Just (itmId, IterationOutcome Pass OutOfIteration)
+
+
+------------------------------------------------------
+----------------- Testing Using DList ----------------
+------------------------------------------------------
+
+type WriterState a i o = WriterT (DList o) (StateT (DList i) Identity) a
+
+runToList :: DList input -> WriterState accum input outputItem -> (accum, DList outputItem)
+runToList input m = fst . runIdentity $ runStateT (runWriterT m) input
+
+testSource :: WriterState (Maybe i) i o 
+testSource = do 
+              dlst <- get 
+              case dlst of
+                Nil -> pure Nothing
+                Cons x xs -> do
+                              put $ fromList xs
+                              pure $ Just x 
+                _ -> P.error "DList pattern match error this should never happen"
+
+testSink :: [o] -> WriterState () i o
+testSink = tell . fromList
+                             
+------------------------------------------------------------
+-------------------- Shared Item Components ----------------
+------------------------------------------------------------
+
+logProtocolPrettyPrintReducer :: 
+                LineNo 
+                -> ()                  -- accumulator
+                -> Either DeserialisationError LogProtocol         -- line item
+                -> ((), Maybe [Text])             -- (accum, result item)
+logProtocolPrettyPrintReducer _ _ ethLp = (
+                                              (), Just . pure $ eitherf ethLp  
+                                                               txtPretty 
+                                                               (prettyPrintLogProtocol False)
+                                           )
+
+jsonSerialiser :: A.ToJSON a => a -> ByteString
+jsonSerialiser = L.toStrict . A.encode
+
+jsonDeserialiser :: FromJSON a => LineNo -> ByteString -> Either DeserialisationError a
+jsonDeserialiser ln bs = mapLeft (\erStr -> DeserialisationError ln (toS erStr) (decodeUtf8' bs)) $ A.eitherDecode $ L.fromStrict bs
+
+yamlSerialiser :: A.ToJSON a => a -> ByteString
+yamlSerialiser = Y.encode . Y.toJSON
+
+textToByteString :: Text -> ByteString
+textToByteString = toS
+
+showToByteString :: Show a => a ->  ByteString
+showToByteString = textToByteString . txt
                             
 
 $(deriveJSON defaultOptions ''LogTransformError)
 $(deriveJSON defaultOptions ''LineNo)
 $(deriveJSON defaultOptions ''DeserialisationError)
+$(deriveJSON defaultOptions ''IterationPhase)
+$(deriveJSON defaultOptions ''ExecutionStatus)
+$(deriveJSON defaultOptions ''IterationOutcome)
+$(deriveJSON defaultOptions ''RunResults)

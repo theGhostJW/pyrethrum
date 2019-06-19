@@ -5,6 +5,7 @@ import qualified Data.Map.Strict as M
 import RunElementClasses
 import DSL.LogProtocol
 import LogTransformation.Common
+import Data.Aeson.TH
 
 
 data StepAccum = StepAccum {
@@ -22,8 +23,14 @@ emptyStepAccum = StepAccum {
   activeIteration = Nothing
 }
 
-statsStep :: StepAccum -> LogProtocol -> StepAccum
-statsStep (StepAccum failStage phase runResults@(RunResults outOfTest itrRslts) activeIteration) lp = 
+statsStepForReducer :: LineNo                                             -- lineNo
+                    -> StepAccum                                          -- accum
+                    -> Either DeserialisationError LogProtocol            -- Logprotocol
+                    -> (StepAccum, Maybe [StepAccum])                     -- (newAccum, err / result)
+statsStepForReducer _ accum lp = (statsStep accum lp, Nothing)
+
+statsStepFromLogProtocol :: StepAccum -> LogProtocol -> StepAccum
+statsStepFromLogProtocol (StepAccum failStage phase runResults@(RunResults outOfTest itrRslts) activeIteration) lp = 
   let 
     (
       phaseValid :: Bool, 
@@ -71,6 +78,32 @@ statsStep (StepAccum failStage phase runResults@(RunResults outOfTest itrRslts) 
       activeIteration = nxtActiveItr
     }
 
+statsStepFromDeserialisationError :: StepAccum -> DeserialisationError -> StepAccum
+statsStepFromDeserialisationError stepAccum@(StepAccum failStage phase runResults@(RunResults outOfTest itrRslts) activeIteration) lp = 
+  let 
+    nxtOutOfTest :: StatusCount
+    nxtOutOfTest = isJust activeIteration
+                         ?  outOfTest 
+                         $  M.insertWith (+) Fail 1 outOfTest
+
+    nxtItrRslts :: IterationResults
+    nxtItrRslts = maybef activeIteration
+                    itrRslts
+                    (\(iid, outcome) -> M.insertWith max iid (IterationOutcome Fail phase) itrRslts)
+  in 
+    stepAccum {
+      runResults = RunResults {
+        outOfTest = nxtOutOfTest,
+        iterationResults = nxtItrRslts
+      }
+    }
+
+statsStep :: StepAccum -> Either DeserialisationError LogProtocol -> StepAccum
+statsStep stepAccum@(StepAccum failStage phase runResults@(RunResults outOfTest itrRslts) activeIteration) eithLP = 
+    eitherf eithLP
+      (statsStepFromDeserialisationError stepAccum)
+      (statsStepFromLogProtocol stepAccum)
+
 testExStatus :: IterationResults -> M.Map TestModule ExecutionStatus
 testExStatus ir = executionStatus <$> M.mapKeysWith max tstModule ir
 
@@ -85,3 +118,5 @@ listIterationStatus accum = executionStatus <$> iterationResults (runResults acc
 
 iterationStatusCounts :: M.Map ItemId ExecutionStatus -> StatusCount
 iterationStatusCounts = countValues
+
+$(deriveJSON defaultOptions ''StepAccum)

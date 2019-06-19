@@ -27,6 +27,13 @@ newtype WhenClause = WhenClause {unWhenClause :: Text} deriving (Eq, Show, IsStr
 newtype ThenClause = ThenClause {unThenClause :: Text} deriving (Eq, Show, IsString)
 data ItemId = ItemId {tstModule :: TestModule, itmId :: Int} deriving (Eq, Ord, Show)
 
+-- needed because ItemId is used in a map
+instance ToJSONKey ItemId where
+  -- default implementation
+
+instance FromJSONKey ItemId where
+   -- default implementation
+
 data DocActionInfo = 
     ActionInfo Text |
     ActionInfoM Text Text 

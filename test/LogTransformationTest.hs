@@ -8,6 +8,7 @@ import Pyrelude.Test       as T
 import AuxFiles
 import Control.Monad
 import LogTransformation
+import LogTransformation.PrintLogDisplayElement
 import PrettyPrintCommon
 import Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
@@ -32,15 +33,15 @@ runAgg f l = decodeUtf8 <$> f l
 -- todo: get file utils really sorted
 dumpFile ::  DList Text -> RelFile -> IO ()
 dumpFile lst file = do
-                      ePth <- tempFile file
-                      eitherf ePth 
-                        throw
-                        (\pth -> do 
-                                  h <- S.openFile (toFilePath pth ) S.WriteMode 
-                                  sequence_ $ PIO.hPutStrLn h <$> lst
-                                  S.hClose h
-                                  S.print pth
-                        )
+      ePth <- tempFile file
+      eitherf ePth 
+        throw
+        (\pth -> do 
+                  h <- S.openFile (toFilePath pth ) S.WriteMode 
+                  sequence_ $ PIO.hPutStrLn h <$> lst
+                  S.hClose h
+                  S.print pth
+        )
 
 -- todo: get file utils really sorted
 dumpTxt :: Text -> RelFile -> IO ()
@@ -49,7 +50,7 @@ dumpTxt txt' file = do
                       eitherf ePth 
                         throw
                         (\pth -> do 
-                                  h <- S.openFile (toFilePath pth ) S.WriteMode 
+                                  h <- S.openFile (toFilePath pth) S.WriteMode 
                                   PIO.hPutStrLn h txt'
                                   S.hClose h
                                   S.print pth
@@ -58,8 +59,17 @@ dumpTxt txt' file = do
 aggregateDumpFile :: (DList ByteString -> DList ByteString) -> DList ByteString -> RelFile -> IO ()
 aggregateDumpFile func lst = dumpFile (runAgg func lst) 
 
-dumpFileSimple ::  DList ByteString -> RelFile -> IO ()
-dumpFileSimple = uu
+dumpByteStrings :: DList ByteString -> RelFile -> IO ()
+dumpByteStrings lst file = do
+                            ePth <- tempFile file
+                            eitherf ePth 
+                              throw
+                              (\pth -> do 
+                                        h <- S.openFile (toFilePath pth ) S.WriteMode 
+                                        sequence_ $ B.hPutStrLn h <$> lst
+                                        S.hClose h
+                                        S.print pth
+                              )
 
 display :: (DList ByteString -> DList ByteString) -> DList ByteString -> IO ()
 display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
@@ -114,17 +124,61 @@ display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
 -- ToDo - plug into run
 -- Move stats to top -- concatinate files 
 
-_demo_pretty_print = dumpFile (prettyPrintLogProtocol False <$> sampleLog) [relfile|raw.yaml|] 
+_sampleStatsSimple = F.foldl' statsStep emptyStepAccum $ Right <$> sampleLog
 
-_base_results = dumpTxt (txtPretty $ iterationResults . runResults $ F.foldl' statsStep emptyStepAccum sampleLog) [relfile|baseResults.yaml|] 
+sampleStats = 
+  let 
+    transParams = LogTransformParams {
+      source = testSource,
+      sink = const $ pure (),
+      reducer = statsStepForReducer,
+      itemDesrialiser = jsonDeserialiser,
+      resultSerialiser = yamlSerialiser,    
+      linNo = LineNo 1,
+      accumulator = emptyStepAccum
+    }
+  in
+    (fst $ transformDList rawFile transParams)
 
-_demo_test_stats = txtPretty $ testStatusCounts . listTestStatus $ F.foldl' statsStep emptyStepAccum sampleLog
+_demo_pretty_print_LP = dumpFile (prettyPrintLogProtocol False <$> sampleLog) [relfile|raw.yaml|]
 
-_demo_iteration_stats = txtPretty $ iterationStatusCounts . listIterationStatus $ F.foldl' statsStep emptyStepAccum sampleLog
+_demo_pretty_print_LP_with_reducer = 
+  let 
+    transParams = LogTransformParams {
+      source = testSource,
+      sink = testSink,
+      reducer = prettyPrintLogprotocolReducer,
+      itemDesrialiser = jsonDeserialiser,
+      resultSerialiser = id,    
+      linNo = LineNo 1,
+      accumulator = ()
+    }
+  in
+    dumpFile (snd $ transformDList rawFile transParams) [relfile|raw.yaml|]
 
-unit_iteration_counts_correct = chkEq (M.fromList [(Pass,8),(KnownError,2),(LTC.Warning,4),(Fail,10)]) $ iterationStatusCounts . listIterationStatus $ F.foldl' statsStep emptyStepAccum sampleLog
+_base_results = dumpTxt (txtPretty $ iterationResults $ runResults sampleStats) [relfile|baseResults.yaml|] 
 
-unit_test_counts_correct = chkEq (M.fromList [(Fail,4)]) $ testStatusCounts . listTestStatus $ F.foldl' statsStep emptyStepAccum sampleLog
+_demo_test_stats = txtPretty $ testStatusCounts . listTestStatus $ sampleStats
+
+_demo_iteration_stats = txtPretty $ iterationStatusCounts . listIterationStatus $ sampleStats
+
+unit_iteration_counts_correct = chkEq (M.fromList [(Pass,8),(KnownError,2),(LTC.Warning,4),(Fail,10)]) $ iterationStatusCounts . listIterationStatus $ sampleStats
+
+unit_test_counts_correct = chkEq (M.fromList [(Fail,4)]) $ testStatusCounts . listTestStatus $ sampleStats
+
+_demo_pretty_print_log = 
+  let 
+    transParams = LogTransformParams {
+      source = testSource,
+      sink = testSink,
+      reducer = printLogDisplayStep (runResults sampleStats),
+      itemDesrialiser = jsonDeserialiser,
+      resultSerialiser = yamlSerialiser,    
+      linNo = LineNo 1,
+      accumulator = emptyIterationAccum
+    }
+  in
+    dumpByteStrings (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
 
 sampleLog :: DList LogProtocol
 sampleLog = fromRight' . A.eitherDecode . toS <$> rawFile

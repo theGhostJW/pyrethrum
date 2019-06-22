@@ -1,9 +1,9 @@
 module LogTransformation.PrintLogDisplayElement (
   emptyIterationAccum,
   printLogDisplayStep,
+  prettyPrintDisplayElement,
   IterationAccum(..),
   PrintLogDisplayElement(..),
-  ExecutionStatus(..),
   IterationRecord(..),
   LogTransformError(..),
   IterationSummary(..),
@@ -13,12 +13,13 @@ module LogTransformation.PrintLogDisplayElement (
   PrepStateInfo(..)
 ) where
 
-import Common as C (AppError(..))
-import LogTransformation.Common
+import Common as C (AppError(..), DetailedInfo(..))
+import LogTransformation.Common as LC
 import Check as CK
 import Pyrelude as P
 import Data.DList as D
-import DSL.LogProtocol as L
+import qualified DSL.LogProtocol as LP
+import DSL.LogProtocol hiding (StartRun)
 import qualified Data.Aeson as A
 import qualified Data.Yaml as Y
 import Data.Aeson.TH
@@ -27,6 +28,8 @@ import qualified Data.ByteString.Lazy as BL
 import RunElementClasses
 import LogTransformation.Stats
 import PrettyPrintCommon
+import Data.Yaml.Pretty as YP
+import qualified Data.Map as M
 
 -- TODO: creation relational records
 -- relational records from Iteration records and use reporting service
@@ -37,11 +40,18 @@ import PrettyPrintCommon
 --------------------------------------------------------
 ----------------- Iteration Aggregation ----------------
 --------------------------------------------------------
+
 data PrintLogDisplayElement =
-  RunHeader |
   FilterLog [FilterResult] |
 
-  StartRun RunTitle A.Value | 
+  StartRun {  
+        title :: RunTitle, 
+        config :: A.Value, 
+        runStatus :: ExecutionStatus,
+        testStats :: StatusCount, 
+        iterationStats :: StatusCount,
+        outOfTest :: StatusCount
+    } | 
   EndRun |
 
   StartGroup GroupTitle |
@@ -50,7 +60,8 @@ data PrintLogDisplayElement =
   StartTest TestDisplayInfo |
   EndTest TestModule |
   Iteration IterationRecord |
-  LineError LogTransformError 
+  LineError LogTransformError |
+  NotImplemented -- delete later
   deriving (Show, Eq)
 
 data IterationSummary = IterationSummary {
@@ -92,14 +103,16 @@ data IterationRecord = IterationRecord {
 data IterationAccum = IterationAccum {
   phase :: IterationPhase,
   stageFailure :: Maybe IterationPhase,
-  rec :: Maybe IterationRecord
+  rec :: Maybe IterationRecord,
+  filterLog :: Maybe [FilterResult]
 } deriving (Eq, Show)
 
 emptyIterationAccum :: IterationAccum
 emptyIterationAccum = IterationAccum {
   phase = OutOfIteration,
   stageFailure = Nothing,
-  rec = Nothing
+  rec = Nothing,
+  filterLog = Nothing
 }
 
 printLogDisplayStep ::
@@ -108,13 +121,159 @@ printLogDisplayStep ::
               -> IterationAccum                                                     -- accum
               -> Either DeserialisationError LogProtocol                                                        -- parse error or apperror
               -> (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
-printLogDisplayStep runResults lineNo accum@(IterationAccum lastPhase stageFailure mRec) eithLp = 
+printLogDisplayStep runResults lineNo accum@(IterationAccum lastPhase stageFailure mRec mFltrLg) eithLp = 
+  
   eitherf eithLp
-   uu
-   uu
+   (\err -> (
+              accum {stageFailure = calcNextIterationFailStage stageFailure LC.Fail lastPhase}, 
+              Just [LineError $ LogDeserialisationError err]
+              )
+    )
+
+   (\lp ->
+     let 
+        noImp = (accum, Nothing)
+        RunResults outOfTest iterationResults = runResults;
+        elOut a = Just [a]
+        
+
+        nxtWithoutPhaseErrorOrPhase :: (IterationAccum, Maybe [PrintLogDisplayElement]) 
+        nxtWithoutPhaseErrorOrPhase@(nxtAccum, mbePrntElms) = 
+          case lp of
+              BoundaryLog bl-> 
+                case bl of
+                  LP.FilterLog flgs -> (accum {filterLog = Just flgs}, Nothing) 
+
+                  LP.StartRun runTitle jsonCfg -> (accum, elOut $ StartRun {  
+                    title = runTitle, 
+                    config = jsonCfg, 
+                    -- here
+                    runStatus = worstStatus runResults,
+                    testStats = testStatusCounts runResults, 
+                    iterationStats = iterationStatusCounts runResults,
+                    outOfTest = outOfTest
+                  } )
+                  LP.EndRun -> noImp
+              
+                  LP.StartGroup (GroupTitle txt') -> noImp
+                  LP.EndGroup (GroupTitle txt') -> noImp
+              
+                  LP.StartTest TestDisplayInfo{} -> noImp
+                  LP.EndTest TestModule{} -> noImp
+              
+                  StartIteration (ItemId tstModule itmId) (WhenClause whn) (ThenClause thn) jsonVal -> noImp
+                  EndIteration (ItemId tstModule itmId) -> noImp
+              
+              IterationLog subProtocol -> 
+                case subProtocol of
+                  Doc _ -> noImp
+                  Run action -> 
+                    case action of
+                      IOAction txt' -> noImp
+                      StartPrepState -> noImp
+                      StartInteraction -> noImp
+                      InteractorSuccess{} -> noImp
+                      InteractorFailure{} -> noImp
+                    
+                      PrepStateSuccess{} -> noImp
+                      PrepStateFailure{} -> noImp
+                      StartChecks -> noImp 
+                      CheckOutcome itmId (CheckReport rslt mInfo) -> noImp
+      
+                      Message txt' -> noImp
+                      Message' (DetailedInfo msg txt') -> noImp
+                    
+                      LP.Warning txt' -> noImp
+                      Warning' (DetailedInfo msg txt') -> noImp
+      
+                      LP.Error err -> noImp
+      in 
+        nxtWithoutPhaseErrorOrPhase
+      )
 
 prettyPrintDisplayElement :: PrintLogDisplayElement -> Text
-prettyPrintDisplayElement = uu
+prettyPrintDisplayElement pde = 
+  let 
+    noImp = txtPretty pde
+    newLn2 = newLn <> newLn
+  in 
+    case pde of
+      LogTransformation.PrintLogDisplayElement.FilterLog arrFr -> noImp
+
+      LogTransformation.PrintLogDisplayElement.StartRun (RunTitle titl) config runStatus testStats iterationStats outOfTest -> 
+            majorHeader (titl <> " - " <> toTitle (statusLabel False runStatus) <> " - 00:00:88") 
+                <> newLn
+                <> "toDo - start end duration raw file" 
+                <> newLn2 
+                <> "runConfig: " 
+                <> newLn 
+                <> prettyYamlKeyValues 2 LeftJustify config
+                <> newLn
+                <> "test stats:" 
+                <> newLn
+                <> alignKeyValues 2 RightJustify (statusCountTupleText False testStats)
+                <> newLn
+                <> "iteration stats:" 
+                <> newLn
+                <> alignKeyValues 2 RightJustify (statusCountTupleText False iterationStats)
+                <> newLn
+                <> "out of test issues:" 
+                <> newLn
+                <> alignKeyValues 2 RightJustify (statusCountTupleText True outOfTest)
+
+
+      LogTransformation.PrintLogDisplayElement.EndRun -> noImp
+
+      LogTransformation.PrintLogDisplayElement.StartGroup (GroupTitle titl)-> noImp
+      LogTransformation.PrintLogDisplayElement.EndGroup (GroupTitle titl) -> noImp
+
+      LogTransformation.PrintLogDisplayElement.StartTest TestDisplayInfo{} -> noImp
+      LogTransformation.PrintLogDisplayElement.EndTest TestModule{} -> noImp
+      LogTransformation.PrintLogDisplayElement.Iteration IterationRecord{} -> noImp
+      LineError err -> noImp
+      NotImplemented -> noImp
+
+statusLabel :: Bool -> ExecutionStatus -> Text
+statusLabel outOfTest = \case
+                          LC.Pass -> "pass"
+                          LC.Fail -> outOfTest ? "error" $ "fail"
+                          LC.Regression -> "regression"
+                          Type2Error -> "type 2 error"
+                          LC.Warning -> "warning"
+                          KnownError -> "known error"
+
+statusCountTupleText :: Bool -> StatusCount -> [(Text, Text)]
+statusCountTupleText outOfTest sc = 
+  let
+    chkOnlyStatuses :: [ExecutionStatus]
+    chkOnlyStatuses = [KnownError, Type2Error, LC.Regression, LC.Pass]
+
+    defList :: [ExecutionStatus]
+    defList = outOfTest ? enumList \\ chkOnlyStatuses $ enumList
+    
+    defaults :: StatusCount
+    defaults = M.fromList $ (\es -> (es, 0)) <$> defList
+
+    displayOrder :: (ExecutionStatus, a) -> (ExecutionStatus, a) -> Ordering
+    displayOrder (es1, _) (es2, _) =
+      let 
+        exOrd :: ExecutionStatus -> Int
+        exOrd  = \case
+                    LC.Pass -> 0
+                    LC.Fail -> 1
+                    LC.Regression -> 2
+                    Type2Error -> 3
+                    KnownError -> 4
+                    LC.Warning -> 5
+      in 
+        compare (exOrd es1) (exOrd es2)
+
+    statusTuples :: [(Text, Text)]
+    statusTuples = bimap ((<> ":") . statusLabel outOfTest) txt <$> sortBy displayOrder (M.toList (M.union sc defaults))
+  in
+    outOfTest 
+        ? statusTuples 
+        $ ("total:", txt . sum $ M.elems sc) : statusTuples 
 
 -- data ExecutionStatus = Inconclusive |
 --                        Pass |
@@ -261,7 +420,7 @@ prettyPrintDisplayElement = uu
 --                   InteractorSuccess {} -> id 
 --                   InteractorFailure {} -> incFailure
 
---                   L.PrepStateSuccess {} -> id
+--                   LP,PrepStateSuccess {} -> id
 --                   PrepStateFailure {} -> incFailure
 
 --                   StartChecks{} -> id
@@ -281,9 +440,9 @@ prettyPrintDisplayElement = uu
 --                   Message _ -> id
 --                   Message' _ -> id
                                           
---                   L.Warning _ -> incWarning
+--                   LP,Warning _ -> incWarning
 --                   Warning' _ -> incWarning
---                   L.Error _ -> incFailure
+--                   LP,Error _ -> incFailure
 --         in 
 --           modifier oldIssues
 
@@ -312,17 +471,17 @@ prettyPrintDisplayElement = uu
 -- failStage :: LogProtocol -> FailStage
 -- failStage = \case
 --                 BoundaryLog bl -> case bl of 
---                                       L.StartRun{} -> NoFailure
---                                       L.EndRun -> NoFailure
+--                                       LP,StartRun{} -> NoFailure
+--                                       LP,EndRun -> NoFailure
                                       
---                                       L.FilterLog _ -> NoFailure
---                                       L.StartGroup _ -> NoFailure
---                                       L.EndGroup _ -> NoFailure
---                                       L.StartTest _ -> NoFailure
---                                       L.EndTest _ -> NoFailure
+--                                       LP,FilterLog _ -> NoFailure
+--                                       LP,StartGroup _ -> NoFailure
+--                                       LP,EndGroup _ -> NoFailure
+--                                       LP,StartTest _ -> NoFailure
+--                                       LP,EndTest _ -> NoFailure
 
---                                       L.StartIteration{} -> NoFailure
---                                       L.EndIteration _ -> NoFailure
+--                                       LP,StartIteration{} -> NoFailure
+--                                       LP,EndIteration _ -> NoFailure
 
 --                 -- should never happen
 --                 IterationLog (Doc _) -> NoFailure
@@ -332,30 +491,30 @@ prettyPrintDisplayElement = uu
 --                                       StartInteraction -> NoFailure
 --                                       InteractorSuccess{} -> NoFailure
 --                                       InteractorFailure{}  -> InteractorFailed
---                                       L.PrepStateSuccess{}  -> NoFailure
+--                                       LP,PrepStateSuccess{}  -> NoFailure
 --                                       PrepStateFailure iid err -> PrepStateFailed
 --                                       StartChecks{} -> NoFailure
 --                                       CheckOutcome{} -> NoFailure
 --                                       Message _ -> NoFailure
 --                                       Message' _ -> NoFailure
---                                       L.Warning{} -> NoFailure
+--                                       LP,Warning{} -> NoFailure
 --                                       Warning' _ -> NoFailure
---                                       L.Error _ -> NoFailure
+--                                       LP,Error _ -> NoFailure
 
 -- expectedCurrentPhase :: IterationPhase -> FailStage -> LogProtocol -> IterationPhase
 -- expectedCurrentPhase current fs lp = case lp of
 --                                       BoundaryLog bl -> case bl of 
---                                                             L.StartRun{} -> OutOfIteration
---                                                             L.EndRun -> OutOfIteration
+--                                                             LP,StartRun{} -> OutOfIteration
+--                                                             LP,EndRun -> OutOfIteration
                                                             
---                                                             L.FilterLog _ -> OutOfIteration
---                                                             L.StartGroup _ -> OutOfIteration
---                                                             L.EndGroup _ -> OutOfIteration
---                                                             L.StartTest _ -> OutOfIteration
---                                                             L.EndTest _ -> OutOfIteration
+--                                                             LP,FilterLog _ -> OutOfIteration
+--                                                             LP,StartGroup _ -> OutOfIteration
+--                                                             LP,EndGroup _ -> OutOfIteration
+--                                                             LP,StartTest _ -> OutOfIteration
+--                                                             LP,EndTest _ -> OutOfIteration
 
---                                                             L.StartIteration{} -> OutOfIteration
---                                                             L.EndIteration _ -> case fs of 
+--                                                             LP,StartIteration{} -> OutOfIteration
+--                                                             LP,EndIteration _ -> case fs of 
 --                                                                                 NoFailure -> Checks  -- TODO: ensure raw file test with no checks
 --                                                                                 InteractorFailed -> Interactor
 --                                                                                 PrepStateFailed -> PrepState
@@ -370,47 +529,47 @@ prettyPrintDisplayElement = uu
 --                                                             InteractorSuccess{} -> Interactor
 --                                                             InteractorFailure{}  -> Interactor
 
---                                                             L.PrepStateSuccess{}  -> PrepState
+--                                                             LP,PrepStateSuccess{}  -> PrepState
 --                                                             PrepStateFailure iid err -> PrepState
 
 --                                                             StartChecks{} -> PreChecks
 --                                                             CheckOutcome{} -> Checks
 --                                                             Message _ -> current
 --                                                             Message' _ -> current
---                                                             L.Warning{} -> current
+--                                                             LP,Warning{} -> current
 --                                                             Warning' _ -> current
---                                                             L.Error _ -> current
+--                                                             LP,Error _ -> current
 
 -- nextPhase :: IterationPhase -> LogProtocol -> IterationPhase
 -- nextPhase current lp = case lp of
 --                           BoundaryLog bl -> case bl of 
---                                               L.StartRun{} -> OutOfIteration
---                                               L.EndRun -> OutOfIteration
+--                                               LP,StartRun{} -> OutOfIteration
+--                                               LP,EndRun -> OutOfIteration
 
---                                               L.FilterLog _ -> OutOfIteration
---                                               L.StartGroup _ -> OutOfIteration
---                                               L.EndGroup _ -> OutOfIteration
---                                               L.StartTest _ -> OutOfIteration
---                                               L.EndTest _ -> OutOfIteration
---                                               L.StartIteration{} -> PreInteractor
---                                               L.EndIteration _ -> OutOfIteration
+--                                               LP,FilterLog _ -> OutOfIteration
+--                                               LP,StartGroup _ -> OutOfIteration
+--                                               LP,EndGroup _ -> OutOfIteration
+--                                               LP,StartTest _ -> OutOfIteration
+--                                               LP,EndTest _ -> OutOfIteration
+--                                               LP,StartIteration{} -> PreInteractor
+--                                               LP,EndIteration _ -> OutOfIteration
 
 --                                               -- should never happen
 --                           IterationLog (Doc _) -> current
                           
 --                           IterationLog (Run rp) -> case rp of
---                                                 L.Error _ -> current
+--                                                 LP,Error _ -> current
 --                                                 StartPrepState -> PrepState
 --                                                 IOAction _ -> current
 --                                                 StartInteraction -> Interactor
 --                                                 InteractorSuccess{} -> PrePrepState 
 --                                                 InteractorFailure{}  -> Interactor  -- leave in failed phase
---                                                 L.PrepStateSuccess{}  -> PreChecks
+--                                                 LP,PrepStateSuccess{}  -> PreChecks
 --                                                 PrepStateFailure iid err -> PrepState -- leave in failed phase
 --                                                 StartChecks{} -> Checks
 --                                                 Message _ -> current
 --                                                 Message' _ -> current
---                                                 L.Warning s -> current
+--                                                 LP,Warning s -> current
 --                                                 Warning' detailedInfo -> current
 --                                                 CheckOutcome{}  -> Checks
 

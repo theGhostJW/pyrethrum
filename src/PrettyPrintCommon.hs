@@ -1,6 +1,7 @@
 module PrettyPrintCommon where
 
 import           Pyrelude as P
+import           Data.Yaml.Pretty as YP
 import           Data.Yaml as Y
 import Text.Show.Pretty as PP
 import DSL.LogProtocol
@@ -82,4 +83,38 @@ fullHeader padChr wantPrcntChar hdrTxt =
     line <> headerLine headerCharWidth wantPrcntChar padChr hdrTxt <> newLn <> line
 
 majorHeader = fullHeader '#' False
+
+data Justification = LeftJustify | RightJustify
+
+prettyYamlKeyValues :: Int -> Justification -> A.Value -> Text
+prettyYamlKeyValues indentation justification a = 
+  let 
+    parts = breakOn ": " <$> (lines . getLenient . convertString $ encodePretty defConfig a)
+    fixedParts = bimap (<> ": ") (\s -> fromMaybe s $ stripPrefix ": " s) <$> parts
+  in
+    alignKeyValues indentation justification fixedParts
+
+
+alignKeyValues :: Int -> Justification -> [(Text, Text)] -> Text
+alignKeyValues indentation justification kvs = 
+  let 
+    spaces = flip replicateText " "
+    trimmedKvs = bimap strip strip <$> kvs 
+    (maxLKey, maxLVal) = foldl (\(kl, vl) -> bimap (max kl . length) (max vl . length)) (0, 0) trimmedKvs
+    paddedKvs = (\(k, v) -> (
+                              spaces indentation <> k <> "  ", -- key
+                              let 
+                                kSpaces = spaces (maxLKey - length k)
+                              in
+                                case justification of 
+                                  LeftJustify ->  kSpaces <> v
+                                  RightJustify -> kSpaces <> spaces (maxLVal - length v) <> v
+                              )) <$> trimmedKvs
+  in  
+    unlines $ uncurry (<>) <$> paddedKvs
+
+
+
+
+
       

@@ -55,13 +55,24 @@ data ExecutionStatus = Pass
                   | Type2Error 
                   | Fail 
                   | Regression
-                  deriving (Show, Eq, Ord)
+                  deriving (Show, Eq, Ord, Enum)
 
 instance A.ToJSONKey ExecutionStatus where
   -- default implementation
 
 instance A.FromJSONKey ExecutionStatus where
    -- default implementation
+
+calcNextIterationFailStage :: Maybe IterationPhase -> ExecutionStatus -> IterationPhase -> Maybe IterationPhase
+calcNextIterationFailStage mCurrentFailPhase nxtStatus nxtPhase = 
+  nxtPhase == OutOfIteration 
+      ? Nothing
+      $ 
+        nxtStatus == Fail 
+          ?  maybef mCurrentFailPhase
+                (Just nxtPhase)
+                (\fs -> Just $ max fs nxtPhase)
+          $ mCurrentFailPhase
 
 logProtocolStatus :: LogProtocol -> ExecutionStatus
 logProtocolStatus = \case

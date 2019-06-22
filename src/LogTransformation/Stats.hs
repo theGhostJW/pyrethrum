@@ -57,15 +57,7 @@ statsStepFromLogProtocol (StepAccum failStage phase runResults@(RunResults outOf
                     (\(iid, outcome) -> M.insertWith max iid (IterationOutcome nxtStatus nxtPhase) itrRslts)
 
     nxtFailStage :: Maybe IterationPhase
-    nxtFailStage = inIteration ? 
-                      (
-                        nxtStatus == Fail ? 
-                          maybef failStage
-                            (Just nxtPhase)
-                            (\fs -> Just $ max fs nxtPhase)
-                          $ failStage
-                      )
-                      $ Nothing -- out of iteration
+    nxtFailStage = calcNextIterationFailStage failStage nxtStatus nxtPhase
 
   in 
     StepAccum {
@@ -107,16 +99,30 @@ statsStep stepAccum@(StepAccum failStage phase runResults@(RunResults outOfTest 
 testExStatus :: IterationResults -> M.Map TestModule ExecutionStatus
 testExStatus ir = executionStatus <$> M.mapKeysWith max tstModule ir
 
-listTestStatus :: StepAccum -> M.Map TestModule ExecutionStatus 
-listTestStatus = testExStatus . iterationResults . runResults
+listTestStatus :: RunResults -> M.Map TestModule ExecutionStatus 
+listTestStatus = testExStatus . iterationResults 
 
-testStatusCounts :: M.Map TestModule ExecutionStatus -> StatusCount
-testStatusCounts = countValues 
+testStatusCounts :: RunResults -> StatusCount
+testStatusCounts = countValues . listTestStatus
 
-listIterationStatus :: StepAccum -> M.Map ItemId ExecutionStatus 
-listIterationStatus accum = executionStatus <$> iterationResults (runResults accum)
+listIterationStatus :: RunResults -> M.Map ItemId ExecutionStatus 
+listIterationStatus runResults = executionStatus <$> iterationResults runResults
 
-iterationStatusCounts :: M.Map ItemId ExecutionStatus -> StatusCount
-iterationStatusCounts = countValues
+iterationStatusCounts :: RunResults -> StatusCount
+iterationStatusCounts = countValues . listIterationStatus
+
+worstStatus :: RunResults -> ExecutionStatus
+worstStatus rr@(RunResults outOfTest _) = 
+  let 
+    nonZero :: StatusCount -> [ExecutionStatus]
+    nonZero = M.keys . M.filter (> 0) -- should not be in map anyway
+
+    testStatuses :: [ExecutionStatus]
+    testStatuses = nonZero $ testStatusCounts rr
+  in 
+    null testStatuses
+      ? Fail -- empty test statuses is deemed fail
+      $ fromMaybe Fail $ maximum $ nonZero outOfTest <> testStatuses
+
 
 $(deriveJSON defaultOptions ''StepAccum)

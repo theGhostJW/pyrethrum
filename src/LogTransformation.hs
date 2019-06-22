@@ -2,7 +2,6 @@ module LogTransformation where
 
 import Common as C (AppError(..))
 import LogTransformation.Common
--- pimport LogTransformation.Iteration as I
 import LogTransformation.Test
 import Check as CK
 import Pyrelude as P

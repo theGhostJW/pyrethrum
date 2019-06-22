@@ -45,16 +45,11 @@ dumpFile lst file = do
 
 -- todo: get file utils really sorted
 dumpTxt :: Text -> RelFile -> IO ()
-dumpTxt txt' file = do
+dumpTxt txt' file = do 
                       ePth <- tempFile file
-                      eitherf ePth 
+                      eitherf ePth
                         throw
-                        (\pth -> do 
-                                  h <- S.openFile (toFilePath pth) S.WriteMode 
-                                  PIO.hPutStrLn h txt'
-                                  S.hClose h
-                                  S.print pth
-                        )
+                        (\p -> PIO.writeFile (toFilePath p) txt')
 
 aggregateDumpFile :: (DList ByteString -> DList ByteString) -> DList ByteString -> RelFile -> IO ()
 aggregateDumpFile func lst = dumpFile (runAgg func lst) 
@@ -126,6 +121,7 @@ display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
 
 _sampleStatsSimple = F.foldl' statsStep emptyStepAccum $ Right <$> sampleLog
 
+sampleStats :: RunResults
 sampleStats = 
   let 
     transParams = LogTransformParams {
@@ -138,7 +134,7 @@ sampleStats =
       accumulator = emptyStepAccum
     }
   in
-    (fst $ transformDList rawFile transParams)
+    runResults (fst $ transformDList rawFile transParams)
 
 _demo_pretty_print_LP = dumpFile (prettyPrintLogProtocol False <$> sampleLog) [relfile|raw.yaml|]
 
@@ -156,29 +152,35 @@ _demo_pretty_print_LP_with_reducer =
   in
     dumpFile (snd $ transformDList rawFile transParams) [relfile|raw.yaml|]
 
-_base_results = dumpTxt (txtPretty $ iterationResults $ runResults sampleStats) [relfile|baseResults.yaml|] 
+_base_results = dumpTxt (txtPretty $ iterationResults sampleStats) [relfile|baseResults.yaml|] 
 
-_demo_test_stats = txtPretty $ testStatusCounts . listTestStatus $ sampleStats
+_demo_test_stats = txtPretty $ testStatusCounts sampleStats
 
-_demo_iteration_stats = txtPretty $ iterationStatusCounts . listIterationStatus $ sampleStats
+_demo_iteration_stats = txtPretty $ iterationStatusCounts sampleStats
 
-unit_iteration_counts_correct = chkEq (M.fromList [(Pass,8),(KnownError,2),(LTC.Warning,4),(Fail,10)]) $ iterationStatusCounts . listIterationStatus $ sampleStats
+unit_iteration_counts_correct = M.fromList [(Pass,8),(KnownError,2),(LTC.Warning,4),(Fail,10)] ... iterationStatusCounts sampleStats
 
-unit_test_counts_correct = chkEq (M.fromList [(Fail,4)]) $ testStatusCounts . listTestStatus $ sampleStats
+unit_test_counts_correct = M.fromList [(Fail,4)] ... testStatusCounts sampleStats
+
+unit_no_out_of_test_issues = M.empty ... LTC.outOfTest sampleStats
+
+--TODO:: Out of test issues test correct
 
 _demo_pretty_print_log = 
   let 
     transParams = LogTransformParams {
       source = testSource,
       sink = testSink,
-      reducer = printLogDisplayStep (runResults sampleStats),
+      reducer = printLogDisplayStep sampleStats,
       itemDesrialiser = jsonDeserialiser,
-      resultSerialiser = yamlSerialiser,    
+      resultSerialiser = (toS . prettyPrintDisplayElement) :: PrintLogDisplayElement -> ByteString,    
       linNo = LineNo 1,
       accumulator = emptyIterationAccum
     }
   in
     dumpByteStrings (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
+
+unit_demo_pretty_print = _demo_pretty_print_log 
 
 sampleLog :: DList LogProtocol
 sampleLog = fromRight' . A.eitherDecode . toS <$> rawFile

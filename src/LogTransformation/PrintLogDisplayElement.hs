@@ -101,17 +101,15 @@ data IterationRecord = IterationRecord {
 } deriving (Eq, Show)
 
 data IterationAccum = IterationAccum {
-  phase :: IterationPhase,
-  stageFailure :: Maybe IterationPhase,
   rec :: Maybe IterationRecord,
+  stepInfo :: LPStep,
   filterLog :: Maybe [FilterResult]
-} deriving (Eq, Show)
+} deriving Show
 
 emptyIterationAccum :: IterationAccum
 emptyIterationAccum = IterationAccum {
-  phase = OutOfIteration,
-  stageFailure = Nothing,
   rec = Nothing,
+  stepInfo = emptyLPStep,
   filterLog = Nothing
 }
 
@@ -121,14 +119,19 @@ printLogDisplayStep ::
               -> IterationAccum                                                     -- accum
               -> Either DeserialisationError LogProtocol                                                        -- parse error or apperror
               -> (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
-printLogDisplayStep runResults lineNo accum@(IterationAccum lastPhase stageFailure mRec mFltrLg) eithLp = 
+printLogDisplayStep runResults lineNo accum@(IterationAccum mRec stepInfo mFltrLg) eithLp = 
   
   eitherf eithLp
-   (\err -> (
-              accum {stageFailure = calcNextIterationFailStage stageFailure LC.Fail lastPhase}, 
-              Just [LineError $ LogDeserialisationError err]
-              )
-    )
+   (\err -> 
+      let 
+        nxtFailStage = calcNextIterationFailStage (faileStage stepInfo) LC.Fail (LC.phase stepInfo)
+        nxtStepInfo = stepInfo {faileStage = nxtFailStage}
+      in
+        (
+          accum { stepInfo = nxtStepInfo} :: IterationAccum, 
+          Just [LineError $ LogDeserialisationError err]
+        )
+   )
 
    (\lp ->
      let 
@@ -138,6 +141,9 @@ printLogDisplayStep runResults lineNo accum@(IterationAccum lastPhase stageFailu
 
         elOut  :: a -> Maybe [a]
         elOut a = Just [a]
+
+        nxtStepInfo@(LPStep nxtPhaseValid nxtFailStage nxtPhase
+                       logItemStatus nxtActiveItr) = logProtocolStep stepInfo lp
 
         nxtWithoutPhaseErrorOrPhase :: (IterationAccum, Maybe [PrintLogDisplayElement]) 
         nxtWithoutPhaseErrorOrPhase@(nxtAccum, mbePrntElms) = 

@@ -156,7 +156,7 @@ printLogDisplayStep runResults lineNo accum@(IterationAccum lastPhase stageFailu
                   } )
                   LP.EndRun -> noImp
               
-                  LP.StartGroup gt -> LogTransformation.PrintLogDisplayElement.StartGroup gt
+                  LP.StartGroup gt -> noImp
                   LP.EndGroup (GroupTitle txt') -> noImp
               
                   LP.StartTest TestDisplayInfo{} -> noImp

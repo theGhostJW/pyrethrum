@@ -9,18 +9,14 @@ import Data.Aeson.TH
 
 
 data StepAccum = StepAccum {
-    failStage :: Maybe IterationPhase,
-    phase :: IterationPhase,
     runResults :: RunResults,
-    activeIteration :: Maybe (ItemId, IterationOutcome)
+    stepInfo :: LPStep
   } deriving Show
 
 
 emptyStepAccum = StepAccum {
-  failStage = Nothing,
-  phase = OutOfIteration,
   runResults = RunResults M.empty M.empty,
-  activeIteration = Nothing
+  stepInfo = emptyLPStep
 }
 
 statsStepForReducer :: LineNo                                             -- lineNo
@@ -30,58 +26,47 @@ statsStepForReducer :: LineNo                                             -- lin
 statsStepForReducer _ accum lp = (statsStep accum lp, Nothing)
 
 statsStepFromLogProtocol :: StepAccum -> LogProtocol -> StepAccum
-statsStepFromLogProtocol (StepAccum failStage phase runResults@(RunResults outOfTest itrRslts) activeIteration) lp = 
+statsStepFromLogProtocol (StepAccum runResults@(RunResults outOfTest itrRslts) stepInfo) lp = 
   let 
-    (
-      phaseValid :: Bool, 
-      nxtPhase :: IterationPhase
-      ) = phaseChange phase failStage lp
-
-    nxtActiveItr :: Maybe (ItemId, IterationOutcome)
-    nxtActiveItr = nxtIteration activeIteration lp
-
-    nxtStatus :: ExecutionStatus
-    nxtStatus = max (logProtocolStatus lp) (phaseValid ? Pass $ Fail)
+    nxtStepInfo@(LPStep nxtPhaseValid nxtFailStage nxtPhase
+                    logItemStatus nxtActiveItr) = logProtocolStep stepInfo lp
 
     inIteration :: Bool
     inIteration = isJust nxtActiveItr
 
     nxtOutOfTest :: StatusCount
-    nxtOutOfTest = inIteration || nxtStatus == Pass --only count out of iteration messages that have not passed 
+    nxtOutOfTest = inIteration || logItemStatus == Pass --only count out of iteration messages that have not passed 
                                   ? outOfTest 
-                                  $ M.insertWith (+) nxtStatus 1 outOfTest
+                                  $ M.insertWith (+) logItemStatus 1 outOfTest
 
     nxtItrRslts :: IterationResults
     nxtItrRslts = maybef nxtActiveItr
                     itrRslts
-                    (\(iid, outcome) -> M.insertWith max iid (IterationOutcome nxtStatus nxtPhase) itrRslts)
-
-    nxtFailStage :: Maybe IterationPhase
-    nxtFailStage = calcNextIterationFailStage failStage nxtStatus nxtPhase
+                    (\(iid, outcome) -> M.insertWith max iid (IterationOutcome logItemStatus nxtPhase) itrRslts)
 
   in 
     StepAccum {
-      failStage = nxtFailStage,
-      phase = nxtPhase,
       runResults = RunResults {
         outOfTest = nxtOutOfTest,
         iterationResults = nxtItrRslts
       },
-      activeIteration = nxtActiveItr
+      stepInfo = nxtStepInfo
     }
 
 statsStepFromDeserialisationError :: StepAccum -> DeserialisationError -> StepAccum
-statsStepFromDeserialisationError stepAccum@(StepAccum failStage phase runResults@(RunResults outOfTest itrRslts) activeIteration) lp = 
+statsStepFromDeserialisationError stepAccum@(StepAccum (RunResults outOfTest itrRslts) stepInfo) lp = 
   let 
+    activeItr = activeIteration stepInfo
+
     nxtOutOfTest :: StatusCount
-    nxtOutOfTest = isJust activeIteration
+    nxtOutOfTest = isJust activeItr
                          ?  outOfTest 
                          $  M.insertWith (+) Fail 1 outOfTest
 
     nxtItrRslts :: IterationResults
-    nxtItrRslts = maybef activeIteration
+    nxtItrRslts = maybef activeItr
                     itrRslts
-                    (\(iid, outcome) -> M.insertWith max iid (IterationOutcome Fail phase) itrRslts)
+                    (\(iid, outcome) -> M.insertWith max iid (IterationOutcome Fail (phase stepInfo)) itrRslts)
   in 
     stepAccum {
       runResults = RunResults {
@@ -91,7 +76,7 @@ statsStepFromDeserialisationError stepAccum@(StepAccum failStage phase runResult
     }
 
 statsStep :: StepAccum -> Either DeserialisationError LogProtocol -> StepAccum
-statsStep stepAccum@(StepAccum failStage phase runResults@(RunResults outOfTest itrRslts) activeIteration) eithLP = 
+statsStep stepAccum eithLP = 
     eitherf eithLP
       (statsStepFromDeserialisationError stepAccum)
       (statsStepFromLogProtocol stepAccum)
@@ -123,6 +108,5 @@ worstStatus rr@(RunResults outOfTest _) =
     null testStatuses
       ? Fail -- empty test statuses is deemed fail
       $ fromMaybe Fail $ maximum $ nonZero outOfTest <> testStatuses
-
 
 $(deriveJSON defaultOptions ''StepAccum)

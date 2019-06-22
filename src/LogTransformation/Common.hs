@@ -64,14 +64,14 @@ instance A.FromJSONKey ExecutionStatus where
    -- default implementation
 
 calcNextIterationFailStage :: Maybe IterationPhase -> ExecutionStatus -> IterationPhase -> Maybe IterationPhase
-calcNextIterationFailStage mCurrentFailPhase nxtStatus nxtPhase = 
-  nxtPhase == OutOfIteration 
+calcNextIterationFailStage mCurrentFailPhase lgStatus currPhase = 
+  currPhase == OutOfIteration 
       ? Nothing
       $ 
-        nxtStatus == Fail 
+        lgStatus > LogTransformation.Common.Warning
           ?  maybef mCurrentFailPhase
-                (Just nxtPhase)
-                (\fs -> Just $ max fs nxtPhase)
+                (Just currPhase)
+                (\fs -> Just $ max fs currPhase)
           $ mCurrentFailPhase
 
 logProtocolStatus :: LogProtocol -> ExecutionStatus
@@ -238,28 +238,29 @@ nxtIteration current lp =
                             New itmId -> Just (itmId, IterationOutcome Pass OutOfIteration)
 
 
-statsStepFromLogProtocol :: LPStep -> LogProtocol -> LPStep
-statsStepFromLogProtocol (LPStep phaseValid failStage phase activeIteration) lp = 
+logProtocolStep :: LPStep -> LogProtocol -> LPStep
+logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration) lp = 
   let 
     (
-      nxtPhaseValid :: Bool, 
-      nxtPhase :: IterationPhase
+      currPhaseValid :: Bool, 
+      currPhase :: IterationPhase
       ) = phaseChange phase failStage lp
 
     nxtActiveItr :: Maybe (ItemId, IterationOutcome)
     nxtActiveItr = nxtIteration activeIteration lp
 
-    nxtStatus :: ExecutionStatus
-    nxtStatus = max (logProtocolStatus lp) (nxtPhaseValid ? Pass $ Fail)
+    lgStatus :: ExecutionStatus
+    lgStatus = max (logProtocolStatus lp) (currPhaseValid ? Pass $ Fail)
 
     nxtFailStage :: Maybe IterationPhase
-    nxtFailStage = calcNextIterationFailStage failStage nxtStatus nxtPhase
+    nxtFailStage = calcNextIterationFailStage failStage lgStatus currPhase
 
   in 
     LPStep {
-      phaseValid = nxtPhaseValid, 
+      phaseValid = currPhaseValid, 
       faileStage = nxtFailStage,
-      phase = nxtPhase,
+      phase = currPhase,
+      logItemStatus = lgStatus,
       activeIteration = nxtActiveItr
     }
 
@@ -267,8 +268,12 @@ data LPStep = LPStep {
   phaseValid :: Bool, 
   faileStage ::  Maybe IterationPhase,
   phase :: IterationPhase,
+  logItemStatus :: ExecutionStatus,
   activeIteration :: Maybe (ItemId, IterationOutcome)
-}
+} deriving Show
+
+emptyLPStep = LPStep True Nothing OutOfIteration Pass Nothing
+
 ------------------------------------------------------
 ----------------- Testing Using DList ----------------
 ------------------------------------------------------
@@ -329,3 +334,4 @@ $(deriveJSON defaultOptions ''IterationPhase)
 $(deriveJSON defaultOptions ''ExecutionStatus)
 $(deriveJSON defaultOptions ''IterationOutcome)
 $(deriveJSON defaultOptions ''RunResults)
+$(deriveJSON defaultOptions ''LPStep)

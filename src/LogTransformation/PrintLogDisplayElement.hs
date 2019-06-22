@@ -133,9 +133,11 @@ printLogDisplayStep runResults lineNo accum@(IterationAccum lastPhase stageFailu
    (\lp ->
      let 
         noImp = (accum, Nothing)
-        RunResults outOfTest iterationResults = runResults;
+
+        RunResults outOfTest iterationResults = runResults
+
+        elOut  :: a -> Maybe [a]
         elOut a = Just [a]
-        
 
         nxtWithoutPhaseErrorOrPhase :: (IterationAccum, Maybe [PrintLogDisplayElement]) 
         nxtWithoutPhaseErrorOrPhase@(nxtAccum, mbePrntElms) = 
@@ -147,7 +149,6 @@ printLogDisplayStep runResults lineNo accum@(IterationAccum lastPhase stageFailu
                   LP.StartRun runTitle jsonCfg -> (accum, elOut $ StartRun {  
                     title = runTitle, 
                     config = jsonCfg, 
-                    -- here
                     runStatus = worstStatus runResults,
                     testStats = testStatusCounts runResults, 
                     iterationStats = iterationStatusCounts runResults,
@@ -155,7 +156,7 @@ printLogDisplayStep runResults lineNo accum@(IterationAccum lastPhase stageFailu
                   } )
                   LP.EndRun -> noImp
               
-                  LP.StartGroup (GroupTitle txt') -> noImp
+                  LP.StartGroup gt -> LogTransformation.PrintLogDisplayElement.StartGroup gt
                   LP.EndGroup (GroupTitle txt') -> noImp
               
                   LP.StartTest TestDisplayInfo{} -> noImp

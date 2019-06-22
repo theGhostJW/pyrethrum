@@ -2,7 +2,7 @@ module LogTransformation.Common where
 
 import Common as C (AppError(..))
 import qualified Check as CK
-import Pyrelude as P
+import Pyrelude as P hiding (phase)
 import Pyrelude.IO
 import Data.DList as D
 import qualified Prelude as PO
@@ -217,7 +217,6 @@ testItrDelta =
       IterationLog (Doc _) -> leave -- should not happen
       IterationLog (Run rp) -> leave
 
-   -- move to common
 nxtIteration :: Maybe (ItemId, IterationOutcome) -> LogProtocol -> Maybe (ItemId, IterationOutcome) 
 nxtIteration current lp = 
   let 
@@ -239,6 +238,37 @@ nxtIteration current lp =
                             New itmId -> Just (itmId, IterationOutcome Pass OutOfIteration)
 
 
+statsStepFromLogProtocol :: LPStep -> LogProtocol -> LPStep
+statsStepFromLogProtocol (LPStep phaseValid failStage phase activeIteration) lp = 
+  let 
+    (
+      nxtPhaseValid :: Bool, 
+      nxtPhase :: IterationPhase
+      ) = phaseChange phase failStage lp
+
+    nxtActiveItr :: Maybe (ItemId, IterationOutcome)
+    nxtActiveItr = nxtIteration activeIteration lp
+
+    nxtStatus :: ExecutionStatus
+    nxtStatus = max (logProtocolStatus lp) (nxtPhaseValid ? Pass $ Fail)
+
+    nxtFailStage :: Maybe IterationPhase
+    nxtFailStage = calcNextIterationFailStage failStage nxtStatus nxtPhase
+
+  in 
+    LPStep {
+      phaseValid = nxtPhaseValid, 
+      faileStage = nxtFailStage,
+      phase = nxtPhase,
+      activeIteration = nxtActiveItr
+    }
+
+data LPStep = LPStep {
+  phaseValid :: Bool, 
+  faileStage ::  Maybe IterationPhase,
+  phase :: IterationPhase,
+  activeIteration :: Maybe (ItemId, IterationOutcome)
+}
 ------------------------------------------------------
 ----------------- Testing Using DList ----------------
 ------------------------------------------------------

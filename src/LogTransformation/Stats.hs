@@ -93,6 +93,25 @@ testStatusCounts = countValues . listTestStatus
 listIterationStatus :: RunResults -> M.Map ItemId ExecutionStatus 
 listIterationStatus runResults = executionStatus <$> iterationResults runResults
 
+itrStatusesGroupedByTest :: RunResults -> M.Map TestModule (M.Map ItemId ExecutionStatus)
+itrStatusesGroupedByTest rr = 
+  let 
+    step :: M.Map TestModule (M.Map ItemId ExecutionStatus) -> ItemId -> ExecutionStatus -> M.Map TestModule (M.Map ItemId ExecutionStatus) 
+    step accum iid status = 
+       let 
+         tstMod :: TestModule
+         tstMod = tstModule iid
+
+         tstMap :: M.Map ItemId ExecutionStatus
+         tstMap = M.findWithDefault M.empty tstMod accum 
+       in 
+        M.insert tstMod (M.insert iid status tstMap) accum
+  in 
+    M.foldlWithKey' step M.empty $ listIterationStatus rr
+
+testIterationStatusCounts :: RunResults -> M.Map TestModule StatusCount
+testIterationStatusCounts rr = countValues <$> itrStatusesGroupedByTest rr
+
 iterationStatusCounts :: RunResults -> StatusCount
 iterationStatusCounts = countValues . listIterationStatus
 

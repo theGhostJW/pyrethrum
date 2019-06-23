@@ -54,14 +54,19 @@ data PrintLogDisplayElement =
     } | 
   EndRun |
 
-  StartGroup GroupTitle |
-  EndGroup GroupTitle |
+  -- StartGroup GroupTitle |
+  -- EndGroup GroupTitle |
 
-  StartTest TestDisplayInfo |
-  EndTest TestModule |
+  StartTest {  
+    tstTitle :: Text,
+    modAddress :: TestModule,
+    config :: A.Value, -- test Config as Json
+    status :: ExecutionStatus, -- test Config as Json
+    stats :: StatusCount
+  }  |
+  -- EndTest TestModule |
   Iteration IterationRecord |
-  LineError LogTransformError |
-  NotImplemented -- delete later
+  LineError LogTransformError
   deriving (Show, Eq)
 
 data IterationSummary = IterationSummary {
@@ -119,7 +124,7 @@ printLogDisplayStep ::
               -> IterationAccum                                                     -- accum
               -> Either DeserialisationError LogProtocol                                                        -- parse error or apperror
               -> (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
-printLogDisplayStep runResults lineNo accum@(IterationAccum mRec stepInfo mFltrLg) eithLp = 
+printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFltrLg) eithLp = 
   
   eitherf eithLp
    (\err -> 
@@ -128,25 +133,43 @@ printLogDisplayStep runResults lineNo accum@(IterationAccum mRec stepInfo mFltrL
         nxtStepInfo = stepInfo {faileStage = nxtFailStage}
       in
         (
-          accum { stepInfo = nxtStepInfo} :: IterationAccum, 
+          oldAccum { stepInfo = nxtStepInfo} :: IterationAccum, 
           Just [LineError $ LogDeserialisationError err]
         )
    )
 
    (\lp ->
      let 
-        noImp = (accum, Nothing)
+        noImp = (oldAccum, Nothing)
+
+        skipLog = (oldAccum, Nothing)
 
         RunResults outOfTest iterationResults = runResults
 
-        elOut  :: a -> Maybe [a]
+        -- itrOutcome ItemId -> Maybe IterationOutcome
+        testStatuses :: M.Map TestModule ExecutionStatus
+        testStatuses = testExStatus iterationResults
+
+        testStatus :: TestModule -> ExecutionStatus
+        testStatus tm = fromMaybe LC.Fail $ M.lookup tm testStatuses
+
+        tstIterationStatusCounts :: M.Map TestModule StatusCount
+        tstIterationStatusCounts = testIterationStatusCounts runResults
+
+        testItrStats :: TestModule -> StatusCount
+        testItrStats tm = M.findWithDefault M.empty tm tstIterationStatusCounts
+
+        elOut :: a -> Maybe [a]
         elOut a = Just [a]
 
         nxtStepInfo@(LPStep nxtPhaseValid nxtFailStage nxtPhase
                        logItemStatus nxtActiveItr) = logProtocolStep stepInfo lp
 
+        accum :: IterationAccum
+        accum = oldAccum {stepInfo = nxtStepInfo}
+
         nxtWithoutPhaseErrorOrPhase :: (IterationAccum, Maybe [PrintLogDisplayElement]) 
-        nxtWithoutPhaseErrorOrPhase@(nxtAccum, mbePrntElms) = 
+        nxtWithoutPhaseErrorOrPhase@(accmNoPhase, mbePrntElms) = 
           case lp of
               BoundaryLog bl-> 
                 case bl of
@@ -160,13 +183,21 @@ printLogDisplayStep runResults lineNo accum@(IterationAccum mRec stepInfo mFltrL
                     iterationStats = iterationStatusCounts runResults,
                     outOfTest = outOfTest
                   } )
-                  LP.EndRun -> noImp
+                  LP.EndRun -> (accum, elOut LogTransformation.PrintLogDisplayElement.EndRun)
+                  
+                  LP.StartGroup _ -> skipLog
+                  LP.EndGroup _ -> skipLog
               
-                  LP.StartGroup gt -> noImp
-                  LP.EndGroup (GroupTitle txt') -> noImp
-              
-                  LP.StartTest TestDisplayInfo{} -> noImp
-                  LP.EndTest TestModule{} -> noImp
+                  LP.StartTest (TestDisplayInfo testModAddress testTitle testConfig) -> (
+                        accum, elOut $ 
+                                LogTransformation.PrintLogDisplayElement.StartTest 
+                                  testTitle
+                                  testModAddress
+                                  testConfig
+                                  (testStatus testModAddress)
+                                  (testItrStats testModAddress)
+                    )
+                  LP.EndTest _ -> skipLog
               
                   StartIteration (ItemId tstModule itmId) (WhenClause whn) (ThenClause thn) jsonVal -> noImp
                   EndIteration (ItemId tstModule itmId) -> noImp
@@ -201,7 +232,7 @@ printLogDisplayStep runResults lineNo accum@(IterationAccum mRec stepInfo mFltrL
 prettyPrintDisplayElement :: PrintLogDisplayElement -> Text
 prettyPrintDisplayElement pde = 
   let 
-    noImp = txtPretty pde
+    noImp = ""
     newLn2 = newLn <> newLn
   in 
     case pde of
@@ -231,14 +262,19 @@ prettyPrintDisplayElement pde =
 
       LogTransformation.PrintLogDisplayElement.EndRun -> noImp
 
-      LogTransformation.PrintLogDisplayElement.StartGroup (GroupTitle titl)-> noImp
-      LogTransformation.PrintLogDisplayElement.EndGroup (GroupTitle titl) -> noImp
+      LogTransformation.PrintLogDisplayElement.StartTest titl tstMod cfg status itrStats -> 
+        majorHeader (titl <> " - " <> toTitle (statusLabel False status) <> " - 00:00:88") 
+           <> newLn
+           <> "module:" 
+           <> newLn
+           <> indent2 (unTestModule tstMod)
+           <> newLn2 
+           <> "stats:" 
+           <> newLn
+           <> alignKeyValues 2 RightJustify (statusCountTupleText False itrStats)
 
-      LogTransformation.PrintLogDisplayElement.StartTest TestDisplayInfo{} -> noImp
-      LogTransformation.PrintLogDisplayElement.EndTest TestModule{} -> noImp
       LogTransformation.PrintLogDisplayElement.Iteration IterationRecord{} -> noImp
       LineError err -> noImp
-      NotImplemented -> noImp
 
 statusLabel :: Bool -> ExecutionStatus -> Text
 statusLabel outOfTest = \case
@@ -259,7 +295,7 @@ statusCountTupleText outOfTest sc =
     defList = outOfTest ? enumList \\ chkOnlyStatuses $ enumList
     
     defaults :: StatusCount
-    defaults = M.fromList $ (\es -> (es, 0)) <$> defList
+    defaults = M.fromList $ (, 0) <$> defList
 
     displayOrder :: (ExecutionStatus, a) -> (ExecutionStatus, a) -> Ordering
     displayOrder (es1, _) (es2, _) =

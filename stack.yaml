@@ -53,7 +53,7 @@ allow-newer: false
 extra-deps:
 # mine
 - git: https://github.com/theGhostJW/pyrelude
-  commit: "82bd3aa"
+  commit: "fcc35e5"
 - discrimination-0.3@sha256:6f88488e62fd4aca71497a4909371476eb18720b3c113869e769a65d1bdb69dc
 - encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce
 - transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961

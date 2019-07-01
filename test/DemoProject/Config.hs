@@ -48,8 +48,6 @@ data TestConfig = TestConfig {
   active       :: Bool
 }  deriving (Eq, Show)
 
-$(deriveJSON defaultOptions ''TestConfig)
-
 type Test = GenericTest TestConfig RunConfig
 type TestResult = GenericResult TestConfig
 
@@ -116,6 +114,7 @@ testEndpointDoc ::
      -> DList Text
 testEndpointDoc tstAdd rc iids pln = extractDocLog $ testEndpointBase filters docExecution executeDocumentRaw tstAdd rc iids pln
 
+$(deriveJSON defaultOptions ''TestConfig)
 $(deriveJSON defaultOptions ''Environment)
 $(deriveJSON defaultOptions ''Country)
 $(deriveJSON defaultOptions ''Depth)

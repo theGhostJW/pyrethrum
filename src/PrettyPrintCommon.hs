@@ -59,7 +59,7 @@ ppStartRun ttle rc = majorHeader (unRunTitle ttle) <>
 
 ppFilterLog :: [FilterResult] -> Text
 ppFilterLog fltrInfos = newLn <> header "Filter Log" <> newLn <>
-                        foldl (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
+                        foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 
 
 headerLine :: Int -> Bool -> Char -> Text -> Text
@@ -100,7 +100,7 @@ alignKeyValues indentation justification kvs =
   let 
     spaces = flip replicateText " "
     trimmedKvs = bimap strip strip <$> kvs 
-    (maxLKey, maxLVal) = foldl (\(kl, vl) -> bimap (max kl . length) (max vl . length)) (0, 0) trimmedKvs
+    (maxLKey, maxLVal) = foldl' (\(kl, vl) -> bimap (max kl . length) (max vl . length)) (0, 0) trimmedKvs
     paddedKvs = (\(k, v) -> (
                               spaces indentation <> k <> "  ", -- key
                               let 

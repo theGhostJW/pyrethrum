@@ -24,11 +24,6 @@ data RunConfig = RunConfig {
   depth       :: Depth
 } deriving (Eq, Show)
 
-$(deriveJSON defaultOptions ''Environment)
-$(deriveJSON defaultOptions ''Country)
-$(deriveJSON defaultOptions ''Depth)
-$(deriveJSON defaultOptions ''RunConfig)
-
 instance Titled RunConfig where
   title = runTitle
 
@@ -120,3 +115,8 @@ testEndpointDoc ::
      -> (forall a m m1. TestPlan m1 m a FullDocEffects)
      -> DList Text
 testEndpointDoc tstAdd rc iids pln = extractDocLog $ testEndpointBase filters docExecution executeDocumentRaw tstAdd rc iids pln
+
+$(deriveJSON defaultOptions ''Environment)
+$(deriveJSON defaultOptions ''Country)
+$(deriveJSON defaultOptions ''Depth)
+$(deriveJSON defaultOptions ''RunConfig)

@@ -125,8 +125,10 @@ i = Item
 items :: [Item]
 items = [
           i 100 "Pre"  "Post" validFile $
-                              expectFailure "this bug was introduced in an earlier version and will be fixed eventually" $ gate $ chk "iid x 10 is small" (\V{..} -> iidx10 < 200 ) <>
-                              chk "iid x 10 is big" (\V{..} -> iidx10 > 500),
+                                gate 
+                                . expectFailure "this bug was introduced in an earlier version and will be fixed eventually" 
+                                $ chk "iid x 10 is small" ((200 >) . iidx10) 
+                                <> chk "iid x 10 is big"  ((500 <) . iidx10),
           i 110 "Pre"  "Post" validFile mempty,
           i 120 "Pre"  "Post" invalidFile2 mempty,
           i 130 "Pre"  "Post" validFile mempty,

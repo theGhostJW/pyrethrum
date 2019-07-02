@@ -9,7 +9,6 @@ import RunElementClasses
 import Common 
 import Data.Aeson as A
 
-
 hdr :: Text -> Text -> Text
 hdr l h = l <> " " <> h <> " " <> l
 
@@ -67,22 +66,28 @@ headerLine len wantPrcntChar padChr hdrTxt =
   let 
     padTxt = P.singleton padChr
     txtLen = length hdrTxt + 2
-    sfxLen = ceiling $ fromIntegral (len - txtLen ) / 2
+    sfxLen = ceiling $ fromIntegral (len - txtLen) / 2
     pfxLen = txtLen + sfxLen * 2 > len ? pred sfxLen $ sfxLen
     pfxBase = replicateText pfxLen padTxt
-    pfx = wantPrcntChar ? replaceFirst (padTxt <> padTxt) (padTxt <> "%") pfxBase $ pfxBase
+    pfx = wantPrcntChar 
+                ? replaceFirst (padTxt <> padTxt) "#%" pfxBase 
+                $ replaceFirst padTxt "#" pfxBase
   in 
     pfx <> " " <> hdrTxt <> " " <> replicateText sfxLen padTxt
 
 fullHeader :: Char -> Bool -> Text -> Text
 fullHeader padChr wantPrcntChar hdrTxt = 
   let 
-    headerCharWidth = 80
-    line = replicateText headerCharWidth (P.singleton padChr) <> newLn
+    headerCharWidth :: Int
+    headerCharWidth = max 80 $ length hdrTxt + 4
+
+    line :: Text
+    line = "#" <> replicateText (headerCharWidth - 1) (P.singleton padChr) <> newLn
   in
     line <> headerLine headerCharWidth wantPrcntChar padChr hdrTxt <> newLn <> line
 
 majorHeader = fullHeader '#' False
+iterationHeader = fullHeader '-' True
 
 data Justification = LeftJustify | RightJustify
 
@@ -92,17 +97,17 @@ prettyYamlKeyValues indentation justification a =
     parts = breakOn ": " <$> (lines . getLenient . convertString $ encodePretty defConfig a)
     fixedParts = bimap (<> ": ") (\s -> fromMaybe s $ stripPrefix ": " s) <$> parts
   in
-    alignKeyValues indentation justification fixedParts
+    alignKeyValues False indentation justification fixedParts
 
 
-alignKeyValues :: Int -> Justification -> [(Text, Text)] -> Text
-alignKeyValues indentation justification kvs = 
+alignKeyValues :: Bool -> Int -> Justification -> [(Text, Text)] -> Text
+alignKeyValues wantColon indentation justification kvs = 
   let 
     spaces = flip replicateText " "
     trimmedKvs = bimap strip strip <$> kvs 
     (maxLKey, maxLVal) = foldl' (\(kl, vl) -> bimap (max kl . length) (max vl . length)) (0, 0) trimmedKvs
     paddedKvs = (\(k, v) -> (
-                              spaces indentation <> k <> "  ", -- key
+                              spaces indentation <> k <> ((wantColon ? ":" $ "") <> "  "), -- key
                               let 
                                 kSpaces = spaces (maxLKey - length k)
                               in

@@ -57,8 +57,8 @@ expectedRight = unlines [
     "  k:         vvvvvvvvvvvvvvvvvv"
   ]
 
-unit_alignKeyValues_left = expectedLeft ... alignKeyValues 2 LeftJustify source
-unit_alignKeyValues_right = expectedRight ... alignKeyValues 2 RightJustify source
+unit_alignKeyValues_left = expectedLeft ... alignKeyValues False 2 LeftJustify source
+unit_alignKeyValues_right = expectedRight ... alignKeyValues False 2 RightJustify source
 
 
 

@@ -255,8 +255,16 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                       domainState = Nothing
                     } 
                   }, Nothing)
-                EndIteration (ItemId tstModule itmId) -> skipLog -- fix this
-            
+                EndIteration (ItemId tstModule itmId) -> (
+                                                          accum {rec = Nothing}, 
+                                                          elOut $ maybef (rec accum)
+                                                            (LineError $ LogTransformError {
+                                                              linNo = lineNo,
+                                                              logItem = lp,
+                                                              info = "Error end iteration message encountered when the before start iteration - check raw logs"
+                                                            })
+                                                            Iteration
+                                                        ) 
             IterationLog subProtocol -> 
               case subProtocol of
                 Doc dp -> (accum, lineError "Documentation log item encounterred in live test log - this should not happen - probably a bug in the test runner")
@@ -288,12 +296,13 @@ prettyPrintDisplayElement pde =
   let 
     noImp = ""
     newLn2 = newLn <> newLn
+    header' ttlTxt status = ttlTxt <> " - " <> toTitle (statusLabel False status) <> " - 00:00:88"
   in 
     case pde of
       LogTransformation.PrintLogDisplayElement.FilterLog arrFr -> noImp
 
       LogTransformation.PrintLogDisplayElement.StartRun (RunTitle titl) config runStatus testStats iterationStats outOfTest -> 
-            majorHeader (titl <> " - " <> toTitle (statusLabel False runStatus) <> " - 00:00:88") 
+            majorHeader (header' titl runStatus) 
                 <> newLn
                 <> "toDo - start end duration raw file" 
                 <> newLn2 
@@ -303,20 +312,20 @@ prettyPrintDisplayElement pde =
                 <> newLn
                 <> "test stats:" 
                 <> newLn
-                <> alignKeyValues 2 RightJustify (statusCountTupleText False testStats)
+                <> alignKeyValues True 2 RightJustify (statusCountTupleText False testStats)
                 <> newLn
                 <> "iteration stats:" 
                 <> newLn
-                <> alignKeyValues 2 RightJustify (statusCountTupleText False iterationStats)
+                <> alignKeyValues True 2 RightJustify (statusCountTupleText False iterationStats)
                 <> newLn
                 <> "out of test issues:" 
                 <> newLn
-                <> alignKeyValues 2 RightJustify (statusCountTupleText True outOfTest)
+                <> alignKeyValues True 2 RightJustify (statusCountTupleText True outOfTest)
 
       LogTransformation.PrintLogDisplayElement.EndRun -> noImp -- TODO: Filter Log
 
       LogTransformation.PrintLogDisplayElement.StartTest titl tstMod notes cfg status itrStats -> 
-        majorHeader (titl <> " - " <> toTitle (statusLabel False status) <> " - 00:00:88") 
+          majorHeader (header' titl status) 
            <> newLn
            <> "module:" 
            <> newLn
@@ -324,9 +333,32 @@ prettyPrintDisplayElement pde =
            <> newLn2 
            <> "stats:" 
            <> newLn
-           <> alignKeyValues 2 RightJustify (statusCountTupleText False itrStats)
+           <> alignKeyValues True 2 RightJustify (statusCountTupleText False itrStats)
 
-      LogTransformation.PrintLogDisplayElement.Iteration IterationRecord{} -> noImp
+      LogTransformation.PrintLogDisplayElement.Iteration (
+          IterationRecord
+            modulePath
+            itmId
+            notes
+            when'
+            then'
+            outcome@(IterationOutcome status phse)
+            validation
+            otherErrors
+            otherWarnings
+            item
+            apStateInfo
+            domainState) -> 
+              let 
+                hdrLines = [
+                  ("when", when')
+                  , ("then", then')
+                  , ("status", statusLabel False status <> (status == LC.Pass ? "" $ " - " <> txt phse))
+                 ]
+              in
+                iterationHeader (header' modulePath status)
+                <> newLn
+                <> alignKeyValues True 0 LeftJustify hdrLines
       LineError err -> noImp
 
 statusLabel :: Bool -> ExecutionStatus -> Text
@@ -365,11 +397,11 @@ statusCountTupleText outOfTest sc =
         compare (exOrd es1) (exOrd es2)
 
     statusTuples :: [(Text, Text)]
-    statusTuples = bimap ((<> ":") . statusLabel outOfTest) txt <$> sortBy displayOrder (M.toList (M.union sc defaults))
+    statusTuples = bimap (statusLabel outOfTest) txt <$> sortBy displayOrder (M.toList (M.union sc defaults))
   in
     outOfTest 
         ? statusTuples 
-        $ ("total:", txt . sum $ M.elems sc) : statusTuples 
+        $ ("total", txt . sum $ M.elems sc) : statusTuples 
 
 -- data ExecutionStatus = Inconclusive |
 --                        Pass |

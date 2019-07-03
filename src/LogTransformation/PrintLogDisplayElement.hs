@@ -93,7 +93,7 @@ data ApStateInfo = SucceededInteractor ApStateDisplay |
                    FailedInteractor AppError
                    deriving (Eq, Show)
 
-data PrepStateInfo = SucceededPrepState DStateDisplay |
+data PrepStateInfo = SucceededPrepState DStateJSON |
                      FailedPrepState AppError
                      deriving (Eq, Show)
 
@@ -276,7 +276,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                     InteractorSuccess iid apStateDisplayText -> updateItrRec (\ir -> ir {apState = Just $ SucceededInteractor apStateDisplayText})
                     InteractorFailure iid err -> updateItrRec (\ir -> ir {apState = Just $ FailedInteractor err})
                   
-                    PrepStateSuccess iid dStateDisplay -> updateItrRec (\ir -> ir {domainState = Just $ SucceededPrepState dStateDisplay})
+                    PrepStateSuccess iid dStateJSON -> updateItrRec (\ir -> ir {domainState = Just $ SucceededPrepState dStateJSON})
                   
                     PrepStateFailure iid err -> updateItrRec (\ir -> ir {domainState = Just $ FailedPrepState err})
                     StartChecks -> skipLog 
@@ -355,10 +355,32 @@ prettyPrintDisplayElement pde =
                   , ("then", then')
                   , ("status", statusLabel False status <> (status == LC.Pass ? "" $ " - " <> txt phse))
                  ]
+
+                valLine :: CheckReport -> (Text, Text)
+                valLine (CheckReport result (CheckInfo hder extrInfo)) = (hder, toLower $ txt result)
+
+                dsText :: Text
+                dsText = maybef domainState
+                          "- DOMAIN STATE IS EMPTY"
+                          (
+                            \case 
+                              SucceededPrepState dsDisplay -> prettyYamlKeyValues 2 LeftJustify $ unDStateJSON dsDisplay
+                              FailedPrepState err -> "PREP STATE FAILURE - DSTATE EMPTY:\n" <> indent2 (txtPretty err)
+                          )
               in
                 iterationHeader (header' modulePath status)
                 <> newLn
                 <> alignKeyValues True 0 LeftJustify hdrLines
+                <> newLn
+                <> "validation:"
+                <> newLn
+                <> (P.null validation ? "  - NO VALIDATIONS RUN\n" $ alignKeyValues True 2 LeftJustify (valLine <$> validation))
+                <> newLn
+                <> "dState:"
+                <> newLn
+                <> indent2 dsText
+                <> newLn
+
       LineError err -> noImp
 
 statusLabel :: Bool -> ExecutionStatus -> Text
@@ -496,7 +518,7 @@ statusCountTupleText outOfTest sc =
 --                    FailedInteractor AppError
 --                    deriving (Eq, Show)
 
--- data PrepStateInfo = SucceededPrepState DStateDisplay |
+-- data PrepStateInfo = SucceededPrepState DStateJSON |
 --                      FailedPrepState AppError
 --                      deriving (Eq, Show)
 

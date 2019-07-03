@@ -93,10 +93,12 @@ test = GenericTest {
                             }
             }
 
-$(deriveToJSON defaultOptions ''Item)
-
 instance ItemClass Item DState where
   identifier = iid
   whenClause = pre
   thenClause = post
   checkList = checks
+
+
+$(deriveToJSON defaultOptions ''Item)
+$(deriveToJSON defaultOptions ''ApState)

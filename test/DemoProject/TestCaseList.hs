@@ -22,6 +22,7 @@ import           Runner as R
 import qualified System.IO as S
 import qualified Control.Exception as E
 import AuxFiles as A
+import Data.Aeson (ToJSON(..))
 import Data.Map as M
 
 
@@ -42,7 +43,7 @@ ioRunToFile ::
           -> Eff FullIOEffects a -> IO (Either AppError a)
     )
     -> (
-        forall as ds i. (ItemClass i ds, Show as, Show ds) => 
+        forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON ds) => 
           (LogProtocol -> IO ()) 
           -> (RunConfig -> i -> Eff FullIOEffects as) 
           -> (as -> Ensurable ds) 

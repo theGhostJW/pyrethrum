@@ -11,7 +11,7 @@ import Data.Set as S
 import Common
 import TestFilter
 import RunnerBase
-import Data.Aeson hiding (Error)
+import qualified Data.Aeson as A
 import Data.ByteString.Lazy as B
 import Hedgehog.Internal.Property
 import Control.Monad.IO.Class
@@ -19,6 +19,9 @@ import Data.Traversable
 import Data.Char
 import Data.Aeson.TH
 import qualified Check as C
+
+genJSON :: Gen A.Value
+genJSON = A.toJSON <$> genRunConfig -- using runconfig as easy proxy for random aeson
 
 genStr :: Gen Text
 genStr = text (linear 0 1000) ascii
@@ -55,7 +58,7 @@ genTestDisplayInfo:: Gen TestDisplayInfo
 genTestDisplayInfo = TestDisplayInfo 
                                 <$> genTestModule
                                 <*> genStr 
-                                <*> (toJSON <$> genTestConfig)
+                                <*> (A.toJSON <$> genTestConfig)
 
 genFilterResult:: Gen FilterResult
 genFilterResult = FilterResult 
@@ -96,12 +99,12 @@ genGateStatus = choice [
 
 genLogProtocol :: Gen LogProtocol
 genLogProtocol = choice [
-                    BoundaryLog <$> (StartRun <$> (RunTitle <$> genStr) <*> (toJSON <$> genRunConfig)), 
+                    BoundaryLog <$> (StartRun <$> (RunTitle <$> genStr) <*> (A.toJSON <$> genRunConfig)), 
                     BoundaryLog . StartGroup <$> (GroupTitle <$> genStr),
                     BoundaryLog . EndGroup <$> (GroupTitle <$> genStr),
                     BoundaryLog . StartTest <$> genTestDisplayInfo,
                     BoundaryLog . EndTest <$> genTestModule,
-                    BoundaryLog <$> (StartIteration <$> genItemId <*> (WhenClause <$> genStr) <*> (ThenClause <$> genStr) <*> (toJSON <$> genRunConfig)), --- using runconfig as an easy proxy for item
+                    BoundaryLog <$> (StartIteration <$> genItemId <*> (WhenClause <$> genStr) <*> (ThenClause <$> genStr) <*> (A.toJSON <$> genRunConfig)), --- using runconfig as an easy proxy for item
                     BoundaryLog . EndIteration <$> genItemId,
                     BoundaryLog . FilterLog <$> genFilterResults,
                     pure $ BoundaryLog EndRun,
@@ -120,7 +123,7 @@ genLogProtocol = choice [
                     logRun <$> (InteractorSuccess <$> genItemId <*> (ApStateDisplay <$> genStr)),
                     logRun <$> (InteractorFailure <$> genItemId <*> genError),
 
-                    logRun <$> (PrepStateSuccess <$> genItemId <*> (DStateDisplay <$> genStr)),
+                    logRun <$> (PrepStateSuccess <$> genItemId <*> (DStateJSON <$> genJSON)),
                     logRun <$> (PrepStateFailure <$> genItemId <*> genError),
 
                     logRun . Message <$> genStr,
@@ -133,16 +136,15 @@ genLogProtocol = choice [
 
 
 
-
 hprop_log_protocol_round_trip :: Property
 hprop_log_protocol_round_trip = property $ do
   lp <- forAll genLogProtocol
   let 
     serialised :: B.ByteString
-    serialised = encode lp
+    serialised = A.encode lp
 
     unserialised :: Either Text LogProtocol
-    unserialised = mapLeft txt $ eitherDecode serialised
+    unserialised = mapLeft txt $ A.eitherDecode serialised
 
   eitherf unserialised
     (\s -> footnote (toS s) *> failure)

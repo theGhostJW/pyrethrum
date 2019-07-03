@@ -165,3 +165,4 @@ instance ItemClass Item DState where
   checkList = checks
 
 $(deriveToJSON defaultOptions ''Item)
+$(deriveToJSON defaultOptions ''DState)

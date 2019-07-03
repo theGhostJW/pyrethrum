@@ -9,7 +9,7 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"IOAction","contents":"This is an arbitrary Put Line"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough"},100],{"unApStateDisplay":"ApState\n  { itemId = 100\n  , filePath = \"C:\\\\Vids\\\\SystemDesign\\\\VidList.txt\"\n  , exePath = \"NOT IMPLEMENTED\"\n  , fileText = \"Pre ~ Post !!\"\n  }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough"},100],{"unDStateDisplay":"V { iidx10 = 1000 }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough"},100],{"unDStateJSON":"V { iidx10 = 1000 }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[[{"unTestModule":"DemoProject.Test.Rough"},100],{"result":{"tag":"GateFailExpected","contents":"this bug was introduced in an earlier version and will be fixed eventually"},"info":{"header":"iid x 10 is small","messageInfo":null}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[[{"unTestModule":"DemoProject.Test.Rough"},100],{"result":{"tag":"Skip"},"info":{"header":"iid x 10 is big","messageInfo":null}}]}}}
@@ -40,7 +40,7 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"Warning'","contents":{"message":"Hi there warning 2","info":"a verry long warning dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf"}}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough"},130],{"unApStateDisplay":"ApState\n  { itemId = 130\n  , filePath = \"C:\\\\Vids\\\\SystemDesign\\\\VidList.txt\"\n  , exePath = \"NOT IMPLEMENTED\"\n  , fileText = \"Pre ~ Post !!\"\n  }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough"},130],{"unDStateDisplay":"V { iidx10 = 1300 }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough"},130],{"unDStateJSON":"V { iidx10 = 1300 }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Rough"},130]}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[[{"unTestModule":"DemoProject.Test.Rough"},140],{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":140,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":[],"post":"Post"}]}}
@@ -58,7 +58,7 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"IOAction","contents":"This is an arbitrary Put Line"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough"},150],{"unApStateDisplay":"ApState\n  { itemId = 150\n  , filePath = \"C:\\\\Vids\\\\SystemDesign\\\\Vid List.txt\"\n  , exePath = \"NOT IMPLEMENTED\"\n  , fileText = \"Pre ~ Post !!\"\n  }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough"},150],{"unDStateDisplay":"V { iidx10 = 1500 }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough"},150],{"unDStateJSON":"V { iidx10 = 1500 }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Rough"},150]}}
 {"tag":"BoundaryLog","contents":{"tag":"EndTest","contents":{"unTestModule":"DemoProject.Test.Rough"}}}
@@ -67,7 +67,7 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},100],{"unApStateDisplay":"ApState { itemId = 100 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},100],{"unDStateDisplay":"ApState { itemId = 100 , simpleMessage = \"Success\" }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},100],{"unDStateJSON":"ApState { itemId = 100 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[[{"unTestModule":"DemoProject.Test.Simple"},100],{"result":{"tag":"Pass"},"info":{"header":"iid is small","messageInfo":null}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[[{"unTestModule":"DemoProject.Test.Simple"},100],{"result":{"tag":"Fail"},"info":{"header":"iid is big","messageInfo":null}}]}}}
@@ -76,7 +76,7 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},110],{"unApStateDisplay":"ApState { itemId = 110 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},110],{"unDStateDisplay":"ApState { itemId = 110 , simpleMessage = \"Success\" }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},110],{"unDStateJSON":"ApState { itemId = 110 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Simple"},110]}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[[{"unTestModule":"DemoProject.Test.Simple"},123],{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":123,"pre":"Pre","path":"R:\\Vids\\SystemDesign\\Wrong.txt","checks":[],"post":"Post"}]}}
@@ -87,21 +87,21 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},130],{"unApStateDisplay":"ApState { itemId = 130 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},130],{"unDStateDisplay":"ApState { itemId = 130 , simpleMessage = \"Success\" }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},130],{"unDStateJSON":"ApState { itemId = 130 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Simple"},130]}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[[{"unTestModule":"DemoProject.Test.Simple"},140],{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":140,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":[],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},140],{"unApStateDisplay":"ApState { itemId = 140 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},140],{"unDStateDisplay":"ApState { itemId = 140 , simpleMessage = \"Success\" }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},140],{"unDStateJSON":"ApState { itemId = 140 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Simple"},140]}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[[{"unTestModule":"DemoProject.Test.Simple"},150],{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":150,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":[],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},150],{"unApStateDisplay":"ApState { itemId = 150 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},150],{"unDStateDisplay":"ApState { itemId = 150 , simpleMessage = \"Success\" }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple"},150],{"unDStateJSON":"ApState { itemId = 150 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Simple"},150]}}
 {"tag":"BoundaryLog","contents":{"tag":"EndTest","contents":{"unTestModule":"DemoProject.Test.Simple"}}}
@@ -115,7 +115,7 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"IOAction","contents":"This is an arbitrary Put Line"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},100],{"unApStateDisplay":"ApState\n  { itemId = 100\n  , filePath = \"C:\\\\Vids\\\\SystemDesign\\\\VidList.txt\"\n  , exePath = \"NOT IMPLEMENTED\"\n  , fileText = \"Pre ~ Post !!\"\n  }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},100],{"unDStateDisplay":"V { iidx10 = 1000 }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},100],{"unDStateJSON":"V { iidx10 = 1000 }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},100],{"result":{"tag":"GateFailExpected","contents":"this bug was introduced in an earlier version and will be fixed eventually"},"info":{"header":"iid x 10 is small","messageInfo":null}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},100],{"result":{"tag":"Skip"},"info":{"header":"iid x 10 is big","messageInfo":null}}]}}}
@@ -146,7 +146,7 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"Warning'","contents":{"message":"Hi there warning 2","info":"a verry long warning dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf"}}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},130],{"unApStateDisplay":"ApState\n  { itemId = 130\n  , filePath = \"C:\\\\Vids\\\\SystemDesign\\\\VidList.txt\"\n  , exePath = \"NOT IMPLEMENTED\"\n  , fileText = \"Pre ~ Post !!\"\n  }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},130],{"unDStateDisplay":"V { iidx10 = 1300 }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},130],{"unDStateJSON":"V { iidx10 = 1300 }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Rough2"},130]}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},140],{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":140,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":[],"post":"Post"}]}}
@@ -164,7 +164,7 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"IOAction","contents":"This is an arbitrary Put Line"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},150],{"unApStateDisplay":"ApState\n  { itemId = 150\n  , filePath = \"C:\\\\Vids\\\\SystemDesign\\\\Vid List.txt\"\n  , exePath = \"NOT IMPLEMENTED\"\n  , fileText = \"Pre ~ Post !!\"\n  }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},150],{"unDStateDisplay":"V { iidx10 = 1500 }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Rough2"},150],{"unDStateJSON":"V { iidx10 = 1500 }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Rough2"},150]}}
 {"tag":"BoundaryLog","contents":{"tag":"EndTest","contents":{"unTestModule":"DemoProject.Test.Rough2"}}}
@@ -173,7 +173,7 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},100],{"unApStateDisplay":"ApState { itemId = 100 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},100],{"unDStateDisplay":"ApState { itemId = 100 , simpleMessage = \"Success\" }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},100],{"unDStateJSON":"ApState { itemId = 100 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},100],{"result":{"tag":"Pass"},"info":{"header":"iid is small","messageInfo":null}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},100],{"result":{"tag":"Fail"},"info":{"header":"iid is big","messageInfo":null}}]}}}
@@ -182,7 +182,7 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},110],{"unApStateDisplay":"ApState { itemId = 110 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},110],{"unDStateDisplay":"ApState { itemId = 110 , simpleMessage = \"Success\" }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},110],{"unDStateJSON":"ApState { itemId = 110 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Simple2"},110]}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},123],{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":123,"pre":"Pre","path":"R:\\Vids\\SystemDesign\\Wrong.txt","checks":[],"post":"Post"}]}}
@@ -193,21 +193,21 @@
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},130],{"unApStateDisplay":"ApState { itemId = 130 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},130],{"unDStateDisplay":"ApState { itemId = 130 , simpleMessage = \"Success\" }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},130],{"unDStateJSON":"ApState { itemId = 130 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Simple2"},130]}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},140],{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":140,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":[],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},140],{"unApStateDisplay":"ApState { itemId = 140 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},140],{"unDStateDisplay":"ApState { itemId = 140 , simpleMessage = \"Success\" }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},140],{"unDStateJSON":"ApState { itemId = 140 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Simple2"},140]}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},150],{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":150,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":[],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},150],{"unApStateDisplay":"ApState { itemId = 150 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},150],{"unDStateDisplay":"ApState { itemId = 150 , simpleMessage = \"Success\" }"}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[[{"unTestModule":"DemoProject.Test.Simple2"},150],{"unDStateJSON":"ApState { itemId = 150 , simpleMessage = \"Success\" }"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":[{"unTestModule":"DemoProject.Test.Simple2"},150]}}
 {"tag":"BoundaryLog","contents":{"tag":"EndTest","contents":{"unTestModule":"DemoProject.Test.Simple2"}}}

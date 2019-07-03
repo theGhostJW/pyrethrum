@@ -9,7 +9,7 @@ import           Pyrelude
 import           RunElementClasses
 import GHC.Generics
 import OrphanedInstances
-import Data.Aeson
+import Data.Aeson as A
 import Data.Either
 import Data.Aeson.Types
 import Data.Aeson.TH
@@ -20,7 +20,7 @@ newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)
 newtype GroupTitle = GroupTitle {unGroupTitle :: Text} deriving (Eq, Show, IsString)
 newtype TestTitle = TestTitle {unTestTitle :: Text} deriving (Eq, Show, IsString)
 newtype ApStateDisplay = ApStateDisplay {unApStateDisplay :: Text} deriving (Eq, Show, IsString)
-newtype DStateDisplay = DStateDisplay {unDStateDisplay :: Text} deriving (Eq, Show, IsString)
+newtype DStateJSON = DStateJSON {unDStateJSON :: A.Value} deriving (Eq, Show, IsString)
 newtype DTestConfig = DTestConfig {unDTestConfig :: Text} deriving (Eq, Show, IsString)
 newtype DRunConfig = DRunConfig {unDRunConfig :: Text} deriving (Eq, Show, IsString)
 newtype WhenClause = WhenClause {unWhenClause :: Text} deriving (Eq, Show, IsString)
@@ -68,7 +68,7 @@ data RunProtocol =
                 InteractorSuccess ItemId ApStateDisplay |
                 InteractorFailure ItemId AppError |
               
-                PrepStateSuccess ItemId DStateDisplay |
+                PrepStateSuccess ItemId DStateJSON |
                 PrepStateFailure ItemId AppError |
                 StartChecks | 
                 CheckOutcome ItemId CheckReport |
@@ -116,7 +116,7 @@ $(deriveJSON defaultOptions ''RunTitle)
 $(deriveJSON defaultOptions ''GroupTitle)
 $(deriveJSON defaultOptions ''TestTitle)
 $(deriveJSON defaultOptions ''ApStateDisplay)
-$(deriveJSON defaultOptions ''DStateDisplay)
+$(deriveJSON defaultOptions ''DStateJSON)
 $(deriveJSON defaultOptions ''ItemId)
 $(deriveJSON defaultOptions ''DocActionInfo)
 $(deriveJSON defaultOptions ''WhenClause)

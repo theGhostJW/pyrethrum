@@ -98,7 +98,7 @@ prettyPrintLogProtocol docMode =
             
                               IOAction m -> indent2 $ logIO m 
                               
-                              InteractorSuccess iid (ApStateDisplay as) -> newLn <> prettyBlock '>' "Interactor Complete"  iid as
+                              InteractorSuccess iid (ApStateJSON as) -> newLn <> prettyBlock '>' "Interactor Complete" iid (prettyYamlKeyValues 2 LeftJustify as)
                                 
                               InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ txtPretty err
 

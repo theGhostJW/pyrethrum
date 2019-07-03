@@ -89,7 +89,7 @@ data IterationWarning = IterationWarning {
     warning :: LogProtocol
   } deriving (Eq, Show)
 
-data ApStateInfo = SucceededInteractor ApStateDisplay | 
+data ApStateInfo = SucceededInteractor ApStateJSON | 
                    FailedInteractor AppError
                    deriving (Eq, Show)
 
@@ -273,7 +273,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                     IOAction txt' -> skipLog
                     StartPrepState -> skipLog
                     StartInteraction -> skipLog
-                    InteractorSuccess iid apStateDisplayText -> updateItrRec (\ir -> ir {apState = Just $ SucceededInteractor apStateDisplayText})
+                    InteractorSuccess iid apStateJSON -> updateItrRec (\ir -> ir {apState = Just $ SucceededInteractor apStateJSON})
                     InteractorFailure iid err -> updateItrRec (\ir -> ir {apState = Just $ FailedInteractor err})
                   
                     PrepStateSuccess iid dStateJSON -> updateItrRec (\ir -> ir {domainState = Just $ SucceededPrepState dStateJSON})
@@ -514,7 +514,7 @@ statusCountTupleText outOfTest sc =
                                         
 -- data ItemInfo = ItemInfo ItemId WhenClause ThenClause A.Value deriving (Eq, Show)
 
--- data ApStateInfo = SucceededInteractor ApStateDisplay | 
+-- data ApStateInfo = SucceededInteractor ApStateJSON | 
 --                    FailedInteractor AppError
 --                    deriving (Eq, Show)
 

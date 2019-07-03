@@ -120,7 +120,7 @@ genLogProtocol = choice [
                     logDoc . DocError <$> genError,
 
                     logRun . IOAction <$> genStr,
-                    logRun <$> (InteractorSuccess <$> genItemId <*> (ApStateDisplay <$> genStr)),
+                    logRun <$> (InteractorSuccess <$> genItemId <*> (ApStateJSON <$> genJSON)),
                     logRun <$> (InteractorFailure <$> genItemId <*> genError),
 
                     logRun <$> (PrepStateSuccess <$> genItemId <*> (DStateJSON <$> genJSON)),

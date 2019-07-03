@@ -43,7 +43,7 @@ ioRunToFile ::
           -> Eff FullIOEffects a -> IO (Either AppError a)
     )
     -> (
-        forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON ds) => 
+        forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => 
           (LogProtocol -> IO ()) 
           -> (RunConfig -> i -> Eff FullIOEffects as) 
           -> (as -> Ensurable ds) 

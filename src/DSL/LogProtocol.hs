@@ -19,7 +19,7 @@ import qualified Data.Text as T
 newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)
 newtype GroupTitle = GroupTitle {unGroupTitle :: Text} deriving (Eq, Show, IsString)
 newtype TestTitle = TestTitle {unTestTitle :: Text} deriving (Eq, Show, IsString)
-newtype ApStateDisplay = ApStateDisplay {unApStateDisplay :: Text} deriving (Eq, Show, IsString)
+newtype ApStateJSON = ApStateJSON {unApStateJSON :: A.Value} deriving (Eq, Show, IsString)
 newtype DStateJSON = DStateJSON {unDStateJSON :: A.Value} deriving (Eq, Show, IsString)
 newtype DTestConfig = DTestConfig {unDTestConfig :: Text} deriving (Eq, Show, IsString)
 newtype DRunConfig = DRunConfig {unDRunConfig :: Text} deriving (Eq, Show, IsString)
@@ -65,7 +65,7 @@ data RunProtocol =
                 IOAction Text |
                 StartPrepState |
                 StartInteraction |
-                InteractorSuccess ItemId ApStateDisplay |
+                InteractorSuccess ItemId ApStateJSON |
                 InteractorFailure ItemId AppError |
               
                 PrepStateSuccess ItemId DStateJSON |
@@ -115,7 +115,7 @@ $(deriveJSON defaultOptions ''SubProtocol)
 $(deriveJSON defaultOptions ''RunTitle)
 $(deriveJSON defaultOptions ''GroupTitle)
 $(deriveJSON defaultOptions ''TestTitle)
-$(deriveJSON defaultOptions ''ApStateDisplay)
+$(deriveJSON defaultOptions ''ApStateJSON)
 $(deriveJSON defaultOptions ''DStateJSON)
 $(deriveJSON defaultOptions ''ItemId)
 $(deriveJSON defaultOptions ''DocActionInfo)

@@ -33,7 +33,7 @@ import qualified Data.Set as St
 import qualified Data.Foldable as F
 import qualified Prelude
 
-type TestPlanBase tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON ds) => GenericTest tc rc i effs as ds -> m1 (m a)) -> [TestGroup m1 m a effs]
+type TestPlanBase tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => GenericTest tc rc i effs as ds -> m1 (m a)) -> [TestGroup m1 m a effs]
 
 showAndLogItems :: Show a => [a] -> IO ()
 showAndLogItems = showAndLogList "items"
@@ -128,11 +128,12 @@ disablePreRun tg = tg {
 testAddress :: forall tc rc i effs as ds. TestConfigClass tc => GenericTest tc rc i effs as ds -> TestModule
 testAddress =  moduleAddress . (configuration :: GenericTest tc rc i effs as ds -> tc)
 
+
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-normalExecution :: forall m effs rc tc i as ds. (Monad m, MonadCatch m, MonadMask m, ToJSON ds, ItemClass i ds, Show as, TestConfigClass tc) =>
+normalExecution :: forall m effs rc tc i as ds. (Monad m, MonadCatch m, MonadMask m, ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc) =>
      (LogProtocol -> m ())                                  -- logger
      -> (rc -> i -> Eff effs as)                           -- Interactor          
      -> (as -> Ensurable ds)                               -- prepstate
@@ -171,7 +172,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                   eitherf ethas
                     (logRunItem . InteractorFailure iid)
                     (\as -> do 
-                              logRunItem . InteractorSuccess iid $ ApStateDisplay . txtPretty $ as 
+                              logRunItem . InteractorSuccess iid . ApStateJSON . toJSON $ as
                               
                               let 
                                 eds :: Either EnsureError ds
@@ -312,7 +313,7 @@ testRunOrEndpoint :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfi
                     Maybe (S.Set Int)                                    -- a set of item Ids used for test case endpoints
                    -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test groups and returns a list of results
                    -> FilterList rc tc                                  -- filters
-                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON ds) =>                                -- item runner logger - this does all the work and logs results as side effect
+                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) =>                                -- item runner logger - this does all the work and logs results as side effect
                         (LogProtocol -> m ())                                 -- logger
                         -> (rc -> i -> Eff effs as)                           -- interactor   
                         -> (as -> Ensurable ds)                               -- prepstate
@@ -448,7 +449,7 @@ testRunOrEndpoint iIds runner fltrs runnerLogger intrprt rc =
 testRun :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                    (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> FilterList rc tc                               -- filters
-                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON ds) =>  -- item runner logger - this does all the work and logs results as side effect
+                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) =>  -- item runner logger - this does all the work and logs results as side effect
                         (LogProtocol -> m ())                                 -- logger
                         -> (rc -> i -> Eff effs as)                           -- interactor          
                         -> (as -> Ensurable ds)                               -- prepstate
@@ -465,7 +466,7 @@ testRun = testRunOrEndpoint Nothing
 
 testEndpointBase :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                    FilterList rc tc                               -- filters
-                   -> (forall as ds i. (ItemClass i ds, Show as, ToJSON ds) =>                                -- item runner logger - this does all the work and logs results as side effect
+                   -> (forall as ds i. (ItemClass i ds, Show as, ToJSON as, ToJSON ds) =>                                -- item runner logger - this does all the work and logs results as side effect
                         (LogProtocol -> m ())                                  -- logger
                         -> (rc -> i -> Eff effs as)                            -- interactor          
                         -> (as -> Ensurable ds)                               -- prepstate

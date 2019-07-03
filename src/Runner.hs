@@ -247,7 +247,7 @@ runTestItems tc iIds items interactor prepState rc intrprt runnerLogger =
     startTest = logPtcl . BoundaryLog . StartTest $ mkDisplayInfo tc
 
     endTest :: m ()
-    endTest = logPtcl .  BoundaryLog . EndTest $ moduleAddress tc
+    endTest = logPtcl . BoundaryLog . EndTest $ moduleAddress tc
 
     filteredItems :: [i]
     filteredItems = filter inTargIds items
@@ -258,7 +258,7 @@ runTestItems tc iIds items interactor prepState rc intrprt runnerLogger =
                     iid = ItemId (moduleAddress tc) (identifier i)
                   in
                     do
-                      logPtcl .  BoundaryLog . StartIteration iid (WhenClause $ whenClause i) (ThenClause $ thenClause i) $ toJSON i
+                      logPtcl . BoundaryLog . StartIteration iid (WhenClause $ whenClause i) (ThenClause $ thenClause i) $ toJSON i
                       runnerLogger logPtcl interactor prepState intrprt tc rc i
                       logPtcl . BoundaryLog $ EndIteration iid
 
@@ -272,8 +272,6 @@ runTestItems tc iIds items interactor prepState rc intrprt runnerLogger =
       x : xs -> (startTest *> runItem x)
                 : (runItem <$> Prelude.init xs)
                 <> [runItem (Prelude.last xs) *> endTest]
-                     
- 
 
 runTest ::  forall i rc as ds m tc effs. (Monad m, ItemClass i ds, Show as, Show ds, TestConfigClass tc, Member Logger effs) =>
                    Maybe (S.Set Int)                                                        -- target Ids
@@ -464,7 +462,6 @@ testRun :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc,
                    -> rc                                              -- runConfig
                    -> m ()
 testRun = testRunOrEndpoint Nothing
-
 
 testEndpointBase :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                    FilterList rc tc                               -- filters

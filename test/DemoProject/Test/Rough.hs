@@ -166,3 +166,4 @@ instance ItemClass Item DState where
 
 $(deriveToJSON defaultOptions ''Item)
 $(deriveToJSON defaultOptions ''DState)
+$(deriveToJSON defaultOptions ''ApState)

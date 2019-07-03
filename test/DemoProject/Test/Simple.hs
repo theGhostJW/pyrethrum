@@ -98,7 +98,5 @@ instance ItemClass Item DState where
   whenClause = pre
   thenClause = post
   checkList = checks
-
-
 $(deriveToJSON defaultOptions ''Item)
 $(deriveToJSON defaultOptions ''ApState)

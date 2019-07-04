@@ -7,6 +7,7 @@ module Check (
               expectFailureFixed,
               gate,
               gateAll,
+              skipChecks,
               ExpectationActive(..),
               ResultExpectation(..),
               GateStatus(..),
@@ -149,14 +150,6 @@ data CheckReport = CheckReport {
   }
   deriving (Show, Eq)
 
-$(deriveJSON defaultOptions ''MessageInfo)
-$(deriveJSON defaultOptions ''CheckInfo)
-$(deriveJSON defaultOptions ''CheckResult)
-$(deriveJSON defaultOptions ''CheckReport)
-$(deriveJSON defaultOptions ''ResultExpectation)
-$(deriveJSON defaultOptions ''ExpectationActive)
-$(deriveJSON defaultOptions ''GateStatus)
-
 instance P.Show (Check v) where
   show ck@Check{..} = toS $ 
                         gateStatus == GateCheck && (expectation == ExpectPass)?
@@ -165,6 +158,10 @@ instance P.Show (Check v) where
 
 instance ToJSON (Check v)  where
   toJSON = String . toS . (header :: Check v  -> Text)
+
+
+reverseDList :: DList a -> DList a
+reverseDList = D.fromList . reverse . D.toList
 
 isGateFail :: CheckResult -> Bool
 isGateFail = \case 
@@ -178,39 +175,56 @@ isGateFail = \case
                 GateRegression _ -> True
                 Skip -> False
 
+skipChecks :: DList (Check ds) -> DList CheckReport
+skipChecks chks = 
+  let 
+    skippedResult :: Check ds -> CheckReport
+    skippedResult (Check headr _ _ _ _)  = CheckReport Skip $ CheckInfo headr . Just $ MessageInfo "Check was not executed"  Nothing
+  in 
+    reverseDList $ skippedResult <$> chks 
+
 calcChecks :: forall ds. ds -> DList (Check ds) -> DList CheckReport
-calcChecks ds chkLst = let
-                        applyCheck :: Bool -> Check ds -> CheckReport
-                        applyCheck skip Check{..} = 
-                          let 
-                            isGate :: Bool
-                            isGate = gateStatus == GateCheck
+calcChecks ds chkLst = 
+  let
+    applyCheck :: Bool -> Check ds -> CheckReport
+    applyCheck skip (Check header rule msgFunc expectation gateStatus) = 
+      let 
+        isGate :: Bool
+        isGate = gateStatus == GateCheck
 
-                            rslt :: CheckResult
-                            rslt = skip ? 
-                                      Skip $     -- skip cases
-                                      rule ds ?  -- pass case 
-                                                ( 
-                                                  case expectation of 
-                                                    ExpectPass -> Pass 
-                                                    ExpectFailure Active msg-> PassWhenFailExpected msg 
-                                                    ExpectFailure Inactive _ -> Pass
-                                                ) 
-                                              $  -- fail cases
-                                                ( 
-                                                  case expectation of 
-                                                    ExpectPass -> isGate ? GateFail $ Fail   
-                                                    ExpectFailure Active msg -> (isGate ? GateFailExpected $ FailExpected) msg
-                                                    ExpectFailure Inactive msg -> (isGate ? GateRegression $ Regression) msg
-                                                )
-                          in 
-                            CheckReport rslt $ CheckInfo header (msgFunc ds)
+        rslt :: CheckResult
+        rslt = skip
+                 ? Skip    -- skip cases
+                   $ rule ds 
+                       ? ( -- pass case 
+                            case expectation of 
+                              ExpectPass -> Pass 
+                              ExpectFailure Active msg-> PassWhenFailExpected msg 
+                              ExpectFailure Inactive _ -> Pass
+                        ) 
+                        $ ( -- fail cases
+                            case expectation of 
+                              ExpectPass -> isGate ? GateFail $ Fail   
+                              ExpectFailure Active msg -> (isGate ? GateFailExpected $ FailExpected) msg
+                              ExpectFailure Inactive msg -> (isGate ? GateRegression $ Regression) msg
+                        )
+      in 
+        CheckReport rslt $ CheckInfo header (msgFunc ds)
 
-                        foldfunc :: (Bool, DList CheckReport) -> Check ds -> (Bool, DList CheckReport)
-                        foldfunc (wantSkip, lstCr) ck = let
-                                                          thisChkR :: CheckReport
-                                                          thisChkR = applyCheck wantSkip ck
-                                                        in
-                                                          (wantSkip || isGateFail (result thisChkR), D.cons thisChkR lstCr)
-                        in
-                         D.fromList . reverse . D.toList . snd $ L.foldl' foldfunc (False, mempty) chkLst
+    foldfunc :: (Bool, DList CheckReport) -> Check ds -> (Bool, DList CheckReport)
+    foldfunc (wantSkip, lstCr) ck = let
+                                      thisChkR :: CheckReport
+                                      thisChkR = applyCheck wantSkip ck
+                                    in
+                                      (wantSkip || isGateFail (result thisChkR), D.cons thisChkR lstCr)
+    in
+      reverseDList . snd $ L.foldl' foldfunc (False, mempty) chkLst
+
+$(deriveJSON defaultOptions ''MessageInfo)
+$(deriveJSON defaultOptions ''CheckInfo)
+$(deriveJSON defaultOptions ''CheckResult)
+$(deriveJSON defaultOptions ''CheckReport)
+$(deriveJSON defaultOptions ''ResultExpectation)
+$(deriveJSON defaultOptions ''ExpectationActive)
+$(deriveJSON defaultOptions ''GateStatus)
+                         

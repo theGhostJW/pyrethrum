@@ -147,21 +147,25 @@ normalExecution logger interactor prepState intrprt tc rc i  =
         iid :: ItemId
         iid = ItemId (moduleAddress tc) (identifier i)
 
+        logRunItem :: RunProtocol -> m ()
+        logRunItem = logger . logRun
+
+        logChk :: CK.CheckReport -> m ()
+        logChk cr = logRunItem $ CheckOutcome iid cr
+
         handler :: SomeException -> m ()
         handler e = logger . logRun . LP.Error . AppGenericError' ("Unexpected Error Executing iteration: " <> txt iid) . toS $ displayException e
+
+        recordSkippedChecks :: m ()
+        recordSkippedChecks = do 
+                                logRunItem StartChecks 
+                                F.traverse_ logChk $ D.toList $ CK.skipChecks (checkList i)
 
         normalExecution' :: m ()
         normalExecution' = 
               let
-                logRunItem :: RunProtocol -> m ()
-                logRunItem = logger . logRun
-
                 runChecks :: ds -> m ()
-                runChecks ds = let 
-                                logChk :: CK.CheckReport -> m ()
-                                logChk cr = logRunItem $ CheckOutcome iid cr
-                              in
-                                F.traverse_ logChk $ D.toList $ CK.calcChecks ds (checkList i)
+                runChecks ds = F.traverse_ logChk $ D.toList $ CK.calcChecks ds (checkList i)
               in 
                 do 
                   logRunItem StartInteraction
@@ -170,7 +174,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                               (logger . logRun . LP.Error $ AppGenericError "Interactor Exception has Occurred")
 
                   eitherf ethas
-                    (logRunItem . InteractorFailure iid)
+                    (\e -> logRunItem (InteractorFailure iid e) *> recordSkippedChecks)
                     (\as -> do 
                               logRunItem . InteractorSuccess iid . ApStateJSON . toJSON $ as
                               
@@ -180,7 +184,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                               
                               logRunItem StartPrepState
                               eitherf eds
-                                (logRunItem . PrepStateFailure iid . AppEnsureError)
+                                (\e -> (logRunItem . PrepStateFailure iid $ AppEnsureError e) *> recordSkippedChecks)
                                 (
                                   \ds -> 
                                     do

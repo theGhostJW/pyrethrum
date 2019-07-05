@@ -23,6 +23,7 @@ import qualified Data.Map.Strict as M
 import RunElementClasses
 import Data.Yaml as Y
 import DSL.LogProtocol.PrettyPrint 
+import qualified Data.Set as S
 
 newtype LineNo = LineNo { unLineNo :: Int } deriving (Show, Eq)
 
@@ -74,9 +75,14 @@ calcNextIterationFailStage mCurrentFailPhase lgStatus currPhase =
                 (\fs -> Just $ max fs currPhase)
           $ mCurrentFailPhase
 
-logProtocolStatus :: LogProtocol -> ExecutionStatus
-logProtocolStatus = \case
-                        BoundaryLog bl -> Pass 
+logProtocolStatus :: Bool -> LogProtocol -> ExecutionStatus
+logProtocolStatus chkEncountered = \case
+                        BoundaryLog bl -> 
+                          case bl of 
+                            -- a test with o checks is deemed a fail
+                            EndIteration{} -> chkEncountered ? Pass $ Fail 
+                            _ -> Pass
+
                         IterationLog (Doc dp) -> Pass -- this should not happen and will cause a phase error to be logged
                         IterationLog (Run rp) -> 
                           case rp of
@@ -137,16 +143,23 @@ data RunResults = RunResults {
                              deriving Show
 
 data PhaseSwitch = PhaseSwitch {
-                        from :: IterationPhase, 
+                        from :: S.Set IterationPhase, 
                          to :: IterationPhase
                      }
+
+isEndIteration :: LogProtocol -> Bool
+isEndIteration = \case
+                    BoundaryLog bl -> case bl of 
+                                        EndIteration _ -> True
+                                        _ -> False
+                    _ -> False
 
 -- calculate expected from / to base on log message
 phaseSwitch :: LogProtocol -> Maybe IterationPhase -> Maybe PhaseSwitch
 phaseSwitch lp mFailedPhase = 
   let
     ps :: IterationPhase -> IterationPhase -> Maybe PhaseSwitch
-    ps cur = Just . PhaseSwitch cur
+    ps cur nxt = Just $ PhaseSwitch (S.singleton cur) nxt
 
     outToOut :: Maybe PhaseSwitch
     outToOut = ps OutOfIteration OutOfIteration
@@ -159,9 +172,9 @@ phaseSwitch lp mFailedPhase =
                             StartGroup _ -> outToOut
                             EndGroup _ -> outToOut
                             StartTest _ -> outToOut
-                            EndTest _ -> outToOut
-                            StartIteration{} -> ps OutOfIteration PreInteractor
-                            EndIteration _ -> ps (fromMaybe Checks mFailedPhase) OutOfIteration
+                            EndTest _ -> Just $ PhaseSwitch (S.fromList [Checks, OutOfIteration]) OutOfIteration
+                            StartIteration{} -> Just $ PhaseSwitch (S.fromList [Checks, OutOfIteration]) PreInteractor
+                            EndIteration _ -> ps (fromMaybe Checks mFailedPhase) Checks
 
         IterationLog (Doc _) -> Nothing
         
@@ -171,9 +184,9 @@ phaseSwitch lp mFailedPhase =
                                     IOAction _ -> Nothing
                                     StartInteraction -> ps PreInteractor Interactor
                                     InteractorSuccess{} -> ps Interactor PrePrepState 
-                                    InteractorFailure{}  -> Nothing -- leave in failed stage
+                                    InteractorFailure{}  -> Nothing -- keep in failed stage
                                     PrepStateSuccess{}  -> ps PrepState PreChecks
-                                    PrepStateFailure iid err -> Nothing -- leave in failed phase
+                                    PrepStateFailure iid err -> Nothing -- keep in failed phase
                                     StartChecks{} -> ps PreChecks Checks
                                     Message _ -> Nothing
                                     Message' _ -> Nothing
@@ -185,28 +198,28 @@ phaseChange :: IterationPhase -> Maybe IterationPhase -> LogProtocol -> (Bool, I
 phaseChange lastPhase stageFailure lp =  
   maybef (phaseSwitch lp stageFailure)
     (True, lastPhase)
-    (\(PhaseSwitch from to) -> (from == lastPhase, to))
+    (\(PhaseSwitch from to) -> (lastPhase `S.member` from, to))
 
-data DeltaAction a = Clear | Leave | New a
+data DeltaAction a = Clear | Keep | New a
 
 nxtValue :: Maybe a -> DeltaAction a -> Maybe a
 nxtValue  mCurrent = \case 
                         Clear -> Nothing 
-                        Leave -> mCurrent 
+                        Keep -> mCurrent 
                         New val -> Just val
 
 testItrDelta :: LogProtocol -> (DeltaAction TestModule, DeltaAction ItemId)
 testItrDelta = 
   let 
     clear = (Clear, Clear)
-    leave = (Leave, Leave)
+    keep = (Keep, Keep)
   in
     \case 
       BoundaryLog bl -> 
         case bl of 
             StartTest (TestDisplayInfo mdule _ _) -> (New mdule, Clear)
-            StartIteration iid _ _ _ -> (Leave, New iid)
-            EndIteration _ -> (Leave, Clear)
+            StartIteration iid _ _ _ -> (Keep, New iid)
+            EndIteration _ -> keep
             StartRun{} -> clear
             EndRun -> clear
             FilterLog _ -> clear
@@ -214,8 +227,8 @@ testItrDelta =
             EndGroup _ -> clear
             EndTest _ -> clear
                         
-      IterationLog (Doc _) -> leave -- should not happen
-      IterationLog (Run rp) -> leave
+      IterationLog (Doc _) -> keep -- should not happen
+      IterationLog (Run rp) -> keep
 
 nxtIteration :: Maybe (ItemId, IterationOutcome) -> LogProtocol -> Maybe (ItemId, IterationOutcome) 
 nxtIteration current lp = 
@@ -227,41 +240,70 @@ nxtIteration current lp =
 
     newId :: ItemId -> Maybe (ItemId, IterationOutcome) -> Maybe (ItemId, IterationOutcome)
     newId itmId = const $ Just (itmId, IterationOutcome Pass OutOfIteration) 
-
   in 
     case modAction of 
-                Clear -> Nothing
-                New testMod -> Nothing
-                Leave -> case idAction of 
-                            Clear -> Nothing
-                            Leave -> current
-                            New itmId -> Just (itmId, IterationOutcome Pass OutOfIteration)
+      Clear -> Nothing
+      New testMod -> Nothing
+      Keep -> case idAction of 
+                  Clear -> Nothing
+                  Keep -> current
+                  New itmId -> Just (itmId, IterationOutcome Pass OutOfIteration)
 
 
 logProtocolStep :: LPStep -> LogProtocol -> LPStep
-logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration) lp = 
+logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration checkEncountered) lp = 
   let 
     (
-      currPhaseValid :: Bool, 
-      currPhase :: IterationPhase
+      nxtPhaseValid :: Bool, 
+      nxtPhase :: IterationPhase
       ) = phaseChange phase failStage lp
 
     nxtActiveItr :: Maybe (ItemId, IterationOutcome)
     nxtActiveItr = nxtIteration activeIteration lp
 
+    isCheck :: LogProtocol -> Bool 
+    isCheck = 
+      \case 
+          BoundaryLog{} -> False
+          IterationLog sp ->
+            case sp of 
+              Doc _ -> False
+              Run rp -> 
+                case rp of 
+                  CheckOutcome{} -> True 
+                  _ -> False 
+
+    resetCheck :: LogProtocol -> Bool 
+    resetCheck = 
+      \case 
+          BoundaryLog bl -> 
+            case bl of 
+              EndIteration _ -> False
+              _ -> True
+
+          lp'@(IterationLog sp) ->
+            case sp of 
+              Doc _ -> False
+              Run rp -> not $ isCheck lp'
+
+    nxtCheckEncountered :: Bool
+    nxtCheckEncountered = isNothing nxtActiveItr || resetCheck lp
+                            ? False
+                            $ checkEncountered || isCheck lp
+
     lgStatus :: ExecutionStatus
-    lgStatus = max (logProtocolStatus lp) (currPhaseValid ? Pass $ Fail)
+    lgStatus = max (logProtocolStatus checkEncountered lp) (nxtPhaseValid ? Pass $ Fail)
 
     nxtFailStage :: Maybe IterationPhase
-    nxtFailStage = calcNextIterationFailStage failStage lgStatus currPhase
-
+    nxtFailStage = calcNextIterationFailStage failStage lgStatus nxtPhase
   in 
     LPStep {
-      phaseValid = currPhaseValid, 
+      phaseValid = nxtPhaseValid, 
       faileStage = nxtFailStage,
-      phase = currPhase,
+      phase = nxtPhase,
       logItemStatus = lgStatus,
-      activeIteration = nxtActiveItr
+      activeIteration = nxtActiveItr,
+      checkEncountered = nxtCheckEncountered
     }
 
 data LPStep = LPStep {
@@ -269,10 +311,11 @@ data LPStep = LPStep {
   faileStage ::  Maybe IterationPhase,
   phase :: IterationPhase,
   logItemStatus :: ExecutionStatus,
-  activeIteration :: Maybe (ItemId, IterationOutcome)
+  activeIteration :: Maybe (ItemId, IterationOutcome),
+  checkEncountered :: Bool
 } deriving Show
 
-emptyLPStep = LPStep True Nothing OutOfIteration Pass Nothing
+emptyLPStep = LPStep True Nothing OutOfIteration Pass Nothing False
 
 ------------------------------------------------------
 ----------------- Testing Using DList ----------------

@@ -29,7 +29,7 @@ statsStepFromLogProtocol :: StepAccum -> LogProtocol -> StepAccum
 statsStepFromLogProtocol (StepAccum runResults@(RunResults outOfTest itrRslts) stepInfo) lp = 
   let 
     nxtStepInfo@(LPStep nxtPhaseValid nxtFailStage nxtPhase
-                    logItemStatus nxtActiveItr) = logProtocolStep stepInfo lp
+                    logItemStatus nxtActiveItr nxtCheckEncountered) = logProtocolStep stepInfo lp
 
     inIteration :: Bool
     inIteration = isJust nxtActiveItr
@@ -40,9 +40,20 @@ statsStepFromLogProtocol (StepAccum runResults@(RunResults outOfTest itrRslts) s
                                   $ M.insertWith (+) logItemStatus 1 outOfTest
 
     nxtItrRslts :: IterationResults
-    nxtItrRslts = maybef nxtActiveItr
-                    itrRslts
-                    (\(iid, outcome) -> M.insertWith max iid (IterationOutcome logItemStatus nxtPhase) itrRslts)
+    nxtItrRslts = 
+        maybef nxtActiveItr
+            itrRslts
+            (\(iid, outcome) -> 
+              let 
+                missingChecksOutcome = IterationOutcome (
+                                          isEndIteration lp && not nxtCheckEncountered
+                                            ? Fail
+                                            $  Pass  
+                                      ) Checks
+
+              in
+                M.insertWith max iid (max (IterationOutcome logItemStatus nxtPhase) missingChecksOutcome) itrRslts
+            )
 
   in 
     StepAccum {

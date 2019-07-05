@@ -168,7 +168,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
         elOut a = Just [a]
 
         nxtStepInfo@(LPStep nxtPhaseValid nxtFailStage nxtPhase
-                       logItemStatus nxtActiveItr) = logProtocolStep stepInfo lp
+                       logItemStatus nxtActiveItr nxtCheckEncountered) = logProtocolStep stepInfo lp
 
         accum :: IterationAccum
         accum = oldAccum {stepInfo = nxtStepInfo}
@@ -361,11 +361,11 @@ prettyPrintDisplayElement pde =
 
                 dsText :: Text
                 dsText = maybef domainState
-                          "- DOMAIN STATE IS EMPTY"
+                          "- Domain State is Empty"
                           (
                             \case 
                               SucceededPrepState dsDisplay -> prettyYamlKeyValues 2 LeftJustify $ unDStateJSON dsDisplay
-                              FailedPrepState err -> "PREP STATE FAILURE - DSTATE EMPTY:\n" <> indent2 (txtPretty err)
+                              FailedPrepState err -> "PrepState Failure - Domain State is Empty:\n" <> indent2 ("- " <> txtPretty err)
                           )
               in
                 iterationHeader (header' modulePath status)
@@ -374,7 +374,7 @@ prettyPrintDisplayElement pde =
                 <> newLn
                 <> "validation:"
                 <> newLn
-                <> (P.null validation ? "  - NO VALIDATIONS RUN\n" $ alignKeyValues True 2 LeftJustify (valLine <$> validation))
+                <> (P.null validation ? "  - Test Design Error - This test has no checks\n" $ alignKeyValues True 2 LeftJustify (valLine <$> validation))
                 <> newLn
                 <> "dState:"
                 <> newLn

@@ -207,9 +207,9 @@ phaseSwitch lp mFailedPhase =
                   
 phaseChange :: IterationPhase -> Maybe IterationPhase -> LogProtocol -> (Bool, IterationPhase)
 phaseChange lastPhase stageFailure lp =  
-  maybef (phaseSwitch (debug' "LP" lp) (debug' "SFail" stageFailure))
+  maybef (phaseSwitch lp stageFailure)
     (True, lastPhase)
-    (\(PhaseSwitch from to) -> (debug' "VALID" $ debug' "lastPhase" lastPhase `S.member` debug' "fromList" from, to))
+    (\(PhaseSwitch from to) -> (lastPhase `S.member` from, to))
 
 data DeltaAction a = Clear | Keep | New a
 

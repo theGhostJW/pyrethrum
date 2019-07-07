@@ -172,9 +172,14 @@ phaseSwitch lp mFailedPhase =
                             StartGroup _ -> outToOut
                             EndGroup _ -> outToOut
                             StartTest _ -> outToOut
+                            -- if test is empty state will be OutOfIteration else Checks
                             EndTest _ -> Just $ PhaseSwitch (S.fromList [Checks, OutOfIteration]) OutOfIteration
+                            -- first iteration will be OutOfIteration else Checks 
                             StartIteration{} -> Just $ PhaseSwitch (S.fromList [Checks, OutOfIteration]) PreInteractor
-                            EndIteration _ -> ps (fromMaybe Checks mFailedPhase) Checks
+                            -- checks -> checks checks is the last status of an iteration
+                            -- need to leave in checks until after EndIteration because need to be in iteration when 
+                            -- processing final EndIteration 
+                            EndIteration _ -> Nothing
 
         IterationLog (Doc _) -> Nothing
         
@@ -196,9 +201,9 @@ phaseSwitch lp mFailedPhase =
                   
 phaseChange :: IterationPhase -> Maybe IterationPhase -> LogProtocol -> (Bool, IterationPhase)
 phaseChange lastPhase stageFailure lp =  
-  maybef (phaseSwitch lp stageFailure)
+  maybef (phaseSwitch (debug' "LP" lp) stageFailure)
     (True, lastPhase)
-    (\(PhaseSwitch from to) -> (lastPhase `S.member` from, to))
+    (\(PhaseSwitch from to) -> (debug' "VALID" $ debug' "lastPhase" lastPhase `S.member` debug' "fromList" from, to))
 
 data DeltaAction a = Clear | Keep | New a
 
@@ -217,15 +222,15 @@ testItrDelta =
     \case 
       BoundaryLog bl -> 
         case bl of 
-            StartTest (TestDisplayInfo mdule _ _) -> (New mdule, Clear)
-            StartIteration iid _ _ _ -> (Keep, New iid)
-            EndIteration _ -> keep
-            StartRun{} -> clear
-            EndRun -> clear
-            FilterLog _ -> clear
-            StartGroup _ -> clear
-            EndGroup _ -> clear
-            EndTest _ -> clear
+          StartTest (TestDisplayInfo mdule _ _) -> (New mdule, Clear)
+          StartIteration iid _ _ _ -> (Keep, New iid)
+          EndIteration _ -> keep
+          StartRun{} -> clear
+          EndRun -> clear
+          FilterLog _ -> clear
+          StartGroup _ -> clear
+          EndGroup _ -> clear
+          EndTest _ -> clear
                         
       IterationLog (Doc _) -> keep -- should not happen
       IterationLog (Run rp) -> keep
@@ -245,9 +250,9 @@ nxtIteration current lp =
       Clear -> Nothing
       New testMod -> Nothing
       Keep -> case idAction of 
-                  Clear -> Nothing
-                  Keep -> current
-                  New itmId -> Just (itmId, IterationOutcome Pass OutOfIteration)
+                Clear -> Nothing
+                Keep -> current
+                New itmId -> Just (itmId, IterationOutcome Pass OutOfIteration)
 
 
 logProtocolStep :: LPStep -> LogProtocol -> LPStep
@@ -292,7 +297,7 @@ logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration
                             $ checkEncountered || isCheck lp
 
     lgStatus :: ExecutionStatus
-    lgStatus = max (logProtocolStatus checkEncountered lp) (nxtPhaseValid ? Pass $ Fail)
+    lgStatus = max (debug' "normalExStatus" $ logProtocolStatus (debug' "chkEncountered" checkEncountered) (debugf' isEndIteration "End Iteration" lp)) (debug' "nxtPhaseValid" nxtPhaseValid ? Pass $ Fail)
 
     nxtFailStage :: Maybe IterationPhase
     nxtFailStage = calcNextIterationFailStage failStage lgStatus nxtPhase

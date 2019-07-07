@@ -43,16 +43,16 @@ statsStepFromLogProtocol (StepAccum runResults@(RunResults outOfTest itrRslts) s
     nxtItrRslts = 
         maybef nxtActiveItr
             itrRslts
-            (\(iid, outcome) -> 
+            (\(iid@(ItemId mdule itt), outcome) -> 
               let 
-                missingChecksOutcome = IterationOutcome (
-                                          isEndIteration lp && not nxtCheckEncountered
+                missingChecksOutcome = debugf' executionStatus "chk ex status" $  IterationOutcome (
+                                          debugf' (const nxtCheckEncountered) ("-- nxt chkEncounteed " <>  txt itt <> " " <> unTestModule mdule) (debug' "Endit" (isEndIteration lp) && not (debug' "chkencount" nxtCheckEncountered))
                                             ? Fail
                                             $  Pass  
                                       ) Checks
-
+                normalOutcome = debugf' executionStatus "normal status" $  IterationOutcome logItemStatus nxtPhase
               in
-                M.insertWith max iid (max (IterationOutcome logItemStatus nxtPhase) missingChecksOutcome) itrRslts
+                M.insertWith max iid (debug' ("FINAL " <> txt itt <> " " <> unTestModule mdule ) (max normalOutcome missingChecksOutcome)) itrRslts
             )
 
   in 

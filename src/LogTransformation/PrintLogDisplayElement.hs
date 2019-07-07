@@ -368,7 +368,7 @@ prettyPrintDisplayElement pde =
                               FailedPrepState err -> "PrepState Failure - Domain State is Empty:\n" <> indent2 ("- " <> txtPretty err)
                           )
               in
-                iterationHeader (header' modulePath status)
+                iterationHeader (header' (modulePath <> " - " <> txt itmId) status)
                 <> newLn
                 <> alignKeyValues True 0 LeftJustify hdrLines
                 <> newLn

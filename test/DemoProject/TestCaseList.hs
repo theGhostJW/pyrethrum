@@ -53,49 +53,50 @@ ioRunToFile ::
           -> IO ()
        ) 
      -> IO (Either AppError [AbsFile])
-ioRunToFile docMode pln interpt itemRunner = let 
-                    handleSpec :: M.Map (Text, FileExt) (LogProtocol -> Text) 
-                    handleSpec = M.fromList [
-                                                (("raw", FileExt ".log"), prettyPrintLogProtocol docMode)
-                                              , (("raw", FileExt ".jsoni"), logStrJSON)
-                                            ]
+ioRunToFile docMode pln interpt itemRunner = 
+  let 
+    handleSpec :: M.Map (Text, FileExt) (LogProtocol -> Text) 
+    handleSpec = M.fromList [
+                                (("raw", FileExt ".log"), prettyPrintLogProtocol docMode)
+                              , (("raw", FileExt ".jsoni"), logStrJSON)
+                            ]
 
-                    fileHandleInfo :: IO (Either AppError [(LogProtocol -> Text, HandleInfo)])
-                    fileHandleInfo = logFileHandles handleSpec
+    fileHandleInfo :: IO (Either AppError [(LogProtocol -> Text, HandleInfo)])
+    fileHandleInfo = logFileHandles handleSpec
 
-                    printFilePaths :: [AbsFile] -> IO ()
-                    printFilePaths lsFiles = do 
-                                                putStrLn ""
-                                                putStrLn "--- Log Files ---"
-                                                sequence_ $ putStrLn . toS . toFilePath <$> lsFiles
-                                                putStrLn ""
-                                         
-                    fileHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> Text, S.Handle)])
-                    fileHandles = (((\(fn, fh) -> (Just $ A.path fh, fn, fileHandle fh)) <$>) <$>) <$> fileHandleInfo
+    printFilePaths :: [AbsFile] -> IO ()
+    printFilePaths lsFiles = do 
+                                putStrLn ""
+                                putStrLn "--- Log Files ---"
+                                sequence_ $ putStrLn . toS . toFilePath <$> lsFiles
+                                putStrLn ""
+                          
+    fileHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> Text, S.Handle)])
+    fileHandles = (((\(fn, fh) -> (Just $ A.path fh, fn, fileHandle fh)) <$>) <$>) <$> fileHandleInfo
 
-                    closeFileHandles :: [S.Handle] -> IO ()
-                    closeFileHandles hdls = sequence_ $ S.hClose <$> hdls
+    closeFileHandles :: [S.Handle] -> IO ()
+    closeFileHandles hdls = sequence_ $ S.hClose <$> hdls
 
-                    allHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> Text, S.Handle)])
-                    allHandles = (((Nothing, prettyPrintLogProtocol docMode, S.stdout) :) <$>) <$> fileHandles
-                    
-                    runTheTest :: [(LogProtocol -> Text, S.Handle)] -> IO ()
-                    runTheTest targHndls = testRun pln filters itemRunner (interpt (logToHandles targHndls)) runConfig
-                  in 
-                    do 
-                      hndls <- allHandles
-                      eitherf hndls
-                        (pure . Left)
-                        (\hList -> 
-                          do 
-                            let 
-                              getFile (mfile, _, _)  = mfile
-                              fileHndls = P.filter (isJust . getFile) hList
-                              logPths = catMaybes $ getFile <$> fileHndls
-                            runTheTest ((\(af, fn, h) -> (fn, h)) <$> hList) `finally` closeFileHandles ((\(af, fn, h) -> h) <$> fileHndls)
-                            printFilePaths logPths 
-                            pure $ Right logPths
-                        )
+    allHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> Text, S.Handle)])
+    allHandles = (((Nothing, prettyPrintLogProtocol docMode, S.stdout) :) <$>) <$> fileHandles
+    
+    runTheTest :: [(LogProtocol -> Text, S.Handle)] -> IO ()
+    runTheTest targHndls = testRun pln filters itemRunner (interpt (logToHandles targHndls)) runConfig
+  in 
+    do 
+      hndls <- allHandles
+      eitherf hndls
+        (pure . Left)
+        (\hList -> 
+          do 
+            let 
+              getFile (mfile, _, _)  = mfile
+              fileHndls = P.filter (isJust . getFile) hList
+              logPths = catMaybes $ getFile <$> fileHndls
+            runTheTest ((\(af, fn, h) -> (fn, h)) <$> hList) `finally` closeFileHandles ((\(af, fn, h) -> h) <$> fileHndls)
+            printFilePaths logPths 
+            pure $ Right logPths
+        )
                         
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
 docRunRaw pln = extractDocLog $ testRun pln filters docExecution executeDocumentRaw runConfig

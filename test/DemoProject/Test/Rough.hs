@@ -61,40 +61,38 @@ putStrLnWithCallStack msg = do
   PIO.putStrLn $ toS (prettyCallStack callStack)
 
 interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Eff effs ApState
-interactor RunConfig{..} Item{..} = do
-                                      writeFile path $ pre  <> " ~ " <> post <> " !!"
-                                      ensure "Blahh" $ P.even iid
-                                      log "Hi"
+interactor RunConfig{..} Item{..} = 
+  do
+    writeFile path $ pre  <> " ~ " <> post <> " !!"
+    ensure "Blahh" $ P.even iid
+    log "Hi"
 
-                                      unless (iid == 100)
-                                        $ logWarning "a warning"
+    arbitraryIO "This is an arbitrary Put Line" () (PIO.putStrLn "Hello from random action")
+    tx <- readFile path
 
-                                      arbitraryIO "This is an arbitrary Put Line" () (PIO.putStrLn "Hello from random action")
-                                      tx <- readFile path
+    when (iid == 140)
+      $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (PIO.readFile $ toFilePath invalidFile)
 
-                                      when (iid == 140)
-                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (PIO.readFile $ toFilePath invalidFile)
+    when (iid == 130) $
+      do 
+        logWarning "a warning"
+        log' "Hi there" "a verry long message dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
+        logWarning' "Hi there warning" "a verry long warning dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
+        logWarning' "Hi there warning 2" "a verry long warning dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
 
-                                      when (iid == 130) $
-                                        do 
-                                          log' "Hi there" "a verry long message dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
-                                          logWarning' "Hi there warning" "a verry long warning dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
-                                          logWarning' "Hi there warning 2" "a verry long warning dfsdfdsfdsf dfdsf sdfdsf sdfds dsfsdf bsfdfsdvf" 
+    when (iid == 110) $
+      do 
+        log "SHould Crash" 
+        log $ toS (prettyCallStack callStack)
+        arbitraryIO "Debug Stack" () (putStrLnWithCallStack "Hello with stack")
+        -- error "BANG !!!"
 
-                                      when (iid == 110) $
-                                        do 
-                                          log "SHould Crash" 
-                                          log $ toS (prettyCallStack callStack)
-                                          arbitraryIO "Debug Stack" () (putStrLnWithCallStack "Hello with stack")
-                                          -- error "BANG !!!"
-
-                                      pure $ ApState  {
-                                        itemId  = iid,
-                                        filePath = path,
-                                        exePath = "NOT IMPLEMENTED",
-                                        fileText = tx
-                                      }
-
+    pure $ ApState  {
+      itemId  = iid,
+      filePath = path,
+      exePath = "NOT IMPLEMENTED",
+      fileText = tx
+    }
 
 newtype DState = V {
                     iidx10 :: Int
@@ -120,6 +118,8 @@ data Item = Item {
 
 i = Item
 
+passAlwaysChk = chk "pass every time" $ const True
+
 -- should be :: RunConfig -> [Item]
 -- later optional hedgehog
 items :: [Item]
@@ -129,11 +129,15 @@ items = [
                                 . expectFailure "this bug was introduced in an earlier version and will be fixed eventually" 
                                 $ chk "iid x 10 is small" ((200 >) . iidx10) 
                                 <> chk "iid x 10 is big"  ((500 <) . iidx10),
-          i 110 "Pre"  "Post" validFile mempty,
-          i 120 "Pre"  "Post" invalidFile2 mempty,
-          i 130 "Pre"  "Post" validFile mempty,
-          i 140 "Pre"  "Post" validFile mempty,
-          i 150 "Pre"  "Post" validFileWithSpace mempty
+          i 110 "Pre"  "Post" validFile passAlwaysChk ,
+          i 120 "Pre"  "Post" invalidFile2 passAlwaysChk,
+          i 130 "Pre"  "Post" validFile passAlwaysChk,
+          i 140 "Pre"  "Post" validFile passAlwaysChk,
+          i 150 "Pre"  "Post" validFileWithSpace mempty,
+          i 160 "Pre"  "Post" validFile passAlwaysChk ,
+          i 170 "Pre"  "Post" validFile passAlwaysChk,
+          i 180 "Pre"  "Post" validFile passAlwaysChk,
+          i 190 "Pre"  "Post" validFile passAlwaysChk
   ]
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -158,7 +158,13 @@ _demo_test_stats = txtPretty $ testStatusCounts sampleStats
 
 _demo_iteration_stats = txtPretty $ iterationStatusCounts sampleStats
 
-unit_iteration_counts_correct = M.fromList [(Pass,8),(KnownError,2),(LTC.Warning,4),(Fail,10)] ... iterationStatusCounts sampleStats
+unit_iteration_counts_correct = 
+  M.fromList [
+              (Pass,         8),
+              (KnownError,   2),
+              (LTC.Warning,  2),
+              (Fail,        20)
+             ] ... iterationStatusCounts sampleStats
 
 unit_test_counts_correct = M.fromList [(Fail,4)] ... testStatusCounts sampleStats
 

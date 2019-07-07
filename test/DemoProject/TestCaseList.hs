@@ -126,10 +126,10 @@ runDocumentToConsole :: IO ()
 runDocumentToConsole = sequence_ . P.toList $ putStrLn <$> runDocument
 
 validPlan :: forall m m1 effs a. EFFAllEffects effs =>
-  PreRun effs
-  -> PreRun effs
-  -> PreRun effs
-  -> PreRun effs
+  PreRun effs      -- rollOver0
+  -> PreRun effs   -- goHome0
+  -> PreRun effs   -- rollOver1
+  -> PreRun effs   -- goHome1
   ->  TestPlan m1 m a effs
 validPlan ro0 gh0 ro1 gh1 f =
   [
@@ -166,7 +166,10 @@ alwaysFailCheck = PreRun {
 }
 
 testRunFailHomeG2 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
-testRunFailHomeG2 = validPlan doNothing doNothing doNothing alwaysFailCheck
+testRunFailHomeG2 = validPlan doNothing -- rollOver0
+                              doNothing -- goHome0
+                              doNothing -- rollOver1
+                              alwaysFailCheck -- goHome1
 
 runFailHomeG2IO :: IO ()
 runFailHomeG2IO = ioRun testRunFailHomeG2

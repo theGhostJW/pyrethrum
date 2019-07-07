@@ -13,5 +13,7 @@ rolloverCheckMessage = "No tests run in group. Rollover action ran without excep
 unit_all_prerun_success_no_go_home_check_error = chkMessageInstances rolloverCheckMessage 0 runDocument
 unit_all_prerun_success_no_rollover_check_error = chkMessageInstances goHomeCheckMessage 0 runDocument
 
-unit_go_home_iteration_check_fail = chkMessageInstances goHomeCheckMessage 12 runFailHomeG2Document
+-- go home on all second group will fail 16 iterations
+unit_go_home_iteration_check_fail = chkMessageInstances goHomeCheckMessage 16 runFailHomeG2Document
+
 unit_rollover_check_fail = chkMessageInstances rolloverCheckMessage 1 runFailRolloverG1Document

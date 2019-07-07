@@ -64,9 +64,15 @@ instance A.ToJSONKey ExecutionStatus where
 instance A.FromJSONKey ExecutionStatus where
    -- default implementation
 
-calcNextIterationFailStage :: Maybe IterationPhase -> ExecutionStatus -> IterationPhase -> Maybe IterationPhase
-calcNextIterationFailStage mCurrentFailPhase lgStatus currPhase = 
-  currPhase == OutOfIteration 
+isBoundaryLog :: LogProtocol -> Bool
+isBoundaryLog = 
+  \case
+   BoundaryLog bl -> True
+   _ -> False
+
+calcNextIterationFailStage :: Maybe IterationPhase -> ExecutionStatus -> IterationPhase -> Maybe LogProtocol -> Maybe IterationPhase
+calcNextIterationFailStage mCurrentFailPhase lgStatus currPhase mLp = 
+  currPhase == OutOfIteration || maybe False isBoundaryLog mLp
       ? Nothing
       $ 
         lgStatus > LogTransformation.Common.Warning
@@ -192,7 +198,7 @@ phaseSwitch lp mFailedPhase =
                                     InteractorFailure{}  -> Nothing -- keep in failed stage
                                     PrepStateSuccess{}  -> ps PrepState PreChecks
                                     PrepStateFailure iid err -> Nothing -- keep in failed phase
-                                    StartChecks{} -> ps PreChecks Checks
+                                    StartChecks{} -> ps (fromMaybe PreChecks mFailedPhase) Checks
                                     Message _ -> Nothing
                                     Message' _ -> Nothing
                                     LP.Warning s -> Nothing
@@ -201,7 +207,7 @@ phaseSwitch lp mFailedPhase =
                   
 phaseChange :: IterationPhase -> Maybe IterationPhase -> LogProtocol -> (Bool, IterationPhase)
 phaseChange lastPhase stageFailure lp =  
-  maybef (phaseSwitch (debug' "LP" lp) stageFailure)
+  maybef (phaseSwitch (debug' "LP" lp) (debug' "SFail" stageFailure))
     (True, lastPhase)
     (\(PhaseSwitch from to) -> (debug' "VALID" $ debug' "lastPhase" lastPhase `S.member` debug' "fromList" from, to))
 
@@ -297,10 +303,10 @@ logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration
                             $ checkEncountered || isCheck lp
 
     lgStatus :: ExecutionStatus
-    lgStatus = max (debug' "normalExStatus" $ logProtocolStatus (debug' "chkEncountered" checkEncountered) (debugf' isEndIteration "End Iteration" lp)) (debug' "nxtPhaseValid" nxtPhaseValid ? Pass $ Fail)
+    lgStatus = max (logProtocolStatus checkEncountered lp) (nxtPhaseValid ? Pass $ Fail)
 
     nxtFailStage :: Maybe IterationPhase
-    nxtFailStage = calcNextIterationFailStage failStage lgStatus nxtPhase
+    nxtFailStage = calcNextIterationFailStage failStage lgStatus nxtPhase $ Just lp
   in 
     LPStep {
       phaseValid = nxtPhaseValid, 

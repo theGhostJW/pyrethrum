@@ -136,7 +136,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
   eitherf eithLp
    (\err -> 
       let 
-        nxtFailStage = calcNextIterationFailStage (faileStage stepInfo) LC.Fail (LC.phase stepInfo)
+        nxtFailStage = calcNextIterationFailStage (faileStage stepInfo) LC.Fail (LC.phase stepInfo) Nothing
         nxtStepInfo = stepInfo {faileStage = nxtFailStage}
       in
         (

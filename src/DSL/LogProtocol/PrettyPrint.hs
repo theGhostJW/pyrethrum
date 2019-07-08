@@ -10,7 +10,7 @@ import LogTransformation.Test as T
 import           Pyrelude as P
 import Text.Show.Pretty as PP
 import RunElementClasses as C
-import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), CheckInfo(..), GateStatus(..), classifyResult)
+import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), MessageInfo(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y
 
 prettyPrintLogProtocol :: Bool -> LogProtocol -> Text
@@ -105,7 +105,7 @@ prettyPrintLogProtocol docMode =
                               PrepStateSuccess iid (DStateJSON ds) -> prettyBlock '>' "PrepState Complete" iid $ prettyYamlKeyValues 2 LeftJustify ds
                               PrepStateFailure iid err -> prettyBlock '>' "PrepState Failure" iid $ txtPretty err
 
-                              CheckOutcome iid (CheckReport reslt (CheckInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> txtPretty (classifyResult reslt)) iid $ 
+                              CheckOutcome iid (CheckReport reslt (MessageInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> txtPretty (classifyResult reslt)) iid $ 
                                                                                                                           chkhdr  <> " -> " <> txtPretty reslt <> 
                                                                                                                           ppMsgInfo mbInfo
                               Message s -> docMarkUp $ "message: " <> s

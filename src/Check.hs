@@ -16,7 +16,7 @@ module Check (
               CheckReportList,
               CheckReport(..),
               CheckResult(..),
-              CheckInfo(..),
+              MessageInfo(..),
               CheckResultClassification(..)
               ) where
 
@@ -36,13 +36,13 @@ chk hdr prd = pure $ prdCheck prd hdr $ const Nothing
 
 -- generate a check from a predicate with detailed message
 chk' :: Text -> (v -> Text) -> (v -> Bool) -> DList (Check v)
-chk' hdr fMsg prd = pure $ prdCheck prd hdr $ \v -> Just $ MessageInfo hdr $ Just $ fMsg v
+chk' hdr fMsg prd = pure $ prdCheck prd hdr $ \v -> Just $ fMsg v
 
 
 data Check ds = Check {
     header :: Text,
     rule :: ds -> Bool,
-    msgFunc :: ds -> Maybe MessageInfo,
+    msgFunc :: ds -> Maybe Text,
     expectation :: ResultExpectation,
     gateStatus :: GateStatus
   }
@@ -56,7 +56,7 @@ data SpecialCheck = SpecialCheck {
 toDisplay :: Check v -> SpecialCheck
 toDisplay Check{..} = SpecialCheck header expectation (GateCheck == gateStatus)
 
-prdCheck :: forall ds. (ds -> Bool) -> Text -> (ds -> Maybe MessageInfo) -> Check ds
+prdCheck :: forall ds. (ds -> Bool) -> Text -> (ds -> Maybe Text) -> Check ds
 prdCheck prd hdr msgf = Check {
                           header = hdr,
                           rule = prd,
@@ -94,12 +94,6 @@ data MessageInfo = MessageInfo {
                                   additionalInfo :: Maybe Text
                                 }
                                 deriving (Show, Eq)
-
-data CheckInfo = CheckInfo {
-                     header :: Text,
-                     messageInfo :: Maybe MessageInfo
-                   }
-                   deriving (Show, Eq)
 
 data CheckResult = Pass |
                    Fail |
@@ -146,7 +140,7 @@ data GateStatus = GateCheck
 
 data CheckReport = CheckReport {
     result :: CheckResult,
-    info :: CheckInfo
+    info :: MessageInfo
   }
   deriving (Show, Eq)
 
@@ -179,7 +173,7 @@ skipChecks :: DList (Check ds) -> DList CheckReport
 skipChecks chks = 
   let 
     skippedResult :: Check ds -> CheckReport
-    skippedResult (Check headr _ _ _ _)  = CheckReport Skip $ CheckInfo headr . Just $ MessageInfo "Check was not executed"  Nothing
+    skippedResult (Check headr _ _ _ _)  = CheckReport Skip $ MessageInfo "Check was not executed"  Nothing
   in 
     reverseDList $ skippedResult <$> chks 
 
@@ -209,7 +203,7 @@ calcChecks ds chkLst =
                               ExpectFailure Inactive msg -> (isGate ? GateRegression $ Regression) msg
                         )
       in 
-        CheckReport rslt $ CheckInfo header (msgFunc ds)
+        CheckReport rslt $ MessageInfo header (msgFunc ds)
 
     foldfunc :: (Bool, DList CheckReport) -> Check ds -> (Bool, DList CheckReport)
     foldfunc (wantSkip, lstCr) ck = let
@@ -221,7 +215,6 @@ calcChecks ds chkLst =
       reverseDList . snd $ L.foldl' foldfunc (False, mempty) chkLst
 
 $(deriveJSON defaultOptions ''MessageInfo)
-$(deriveJSON defaultOptions ''CheckInfo)
 $(deriveJSON defaultOptions ''CheckResult)
 $(deriveJSON defaultOptions ''CheckReport)
 $(deriveJSON defaultOptions ''ResultExpectation)

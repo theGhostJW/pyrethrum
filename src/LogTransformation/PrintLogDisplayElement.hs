@@ -357,7 +357,14 @@ prettyPrintDisplayElement pde =
                  ]
 
                 valLine :: CheckReport -> (Text, Text)
-                valLine (CheckReport result (CheckInfo hder extrInfo)) = (hder, toLower $ txt result)
+                valLine (CheckReport result (MessageInfo hder extrInfo)) = (hder, toLower $ txt result)
+
+                detailValLine :: CheckReport -> (Text, Text)
+                detailValLine (CheckReport result (MessageInfo hder extrInfo)) = (hder, toLower $ txt result <> 
+                                            maybef extrInfo 
+                                            " - no additional info " 
+                                            (\exInfo -> newLn <> "additional info:" <> newLn <> indent2 exInfo)
+                                          )
 
                 dsText :: Text
                 dsText = maybef domainState
@@ -379,7 +386,10 @@ prettyPrintDisplayElement pde =
                 <> "dState:"
                 <> newLn
                 <> indent2 dsText
+                <> newLn2
+                <> "check Details:"
                 <> newLn
+                <> alignKeyValues True 2 LeftJustify (detailValLine <$> validation)
 
       LineError err -> noImp
 

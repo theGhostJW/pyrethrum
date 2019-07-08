@@ -205,8 +205,8 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":100},{"unDStateJSON":{"iidx10":1000}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":100},{"result":{"tag":"GateFailExpected","contents":"this bug was introduced in an earlier version and will be fixed eventually"},"info":{"header":"iid x 10 is small","messageInfo":null}}]}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":100},{"result":{"tag":"Skip"},"info":{"header":"iid x 10 is big","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":100},{"result":{"tag":"GateFailExpected","contents":"this bug was introduced in an earlier version and will be fixed eventually"},"info":{"message":"iid x 10 is small","additionalInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":100},{"result":{"tag":"Skip"},"info":{"message":"iid x 10 is big","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":100}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":110},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":110,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -219,13 +219,13 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateFailure","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":110},{"tag":"AppEnsureError","contents":"I do not like 110 in prepstate"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":110},{"result":{"tag":"Skip"},"info":{"header":"pass every time","messageInfo":{"message":"Check was not executed","additionalInfo":null}}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":110},{"result":{"tag":"Skip"},"info":{"message":"Check was not executed","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":110}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":120},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":120,"pre":"Pre","path":"R:\\Vids\\SystemDesign\\Wrong.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorFailure","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":120},{"tag":"AppFileSystemError","contents":{"tag":"WriteFileError","contents":{"ioe_description":"No such file or directory","ioe_location":"openFile","ioe_type":"NoSuchThing","ioe_filename":"R:\\Vids\\SystemDesign\\Wrong.txt","ioe_errno":"Just 2"}}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":120},{"result":{"tag":"Skip"},"info":{"header":"pass every time","messageInfo":{"message":"Check was not executed","additionalInfo":null}}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":120},{"result":{"tag":"Skip"},"info":{"message":"Check was not executed","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":120}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":130},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":130,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -239,7 +239,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":130},{"unDStateJSON":{"iidx10":1300}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":130},{"result":{"tag":"Pass"},"info":{"header":"pass every time","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":130},{"result":{"tag":"Pass"},"info":{"message":"pass every time","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":130}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":140},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":140,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -248,7 +248,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"IOAction","contents":"This is an arbitrary THING THAT WILL BLOW UP"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorFailure","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":140},{"tag":"AppIOError'","contents":["Exception raised when executing arbituary IO action with message: This is an arbitrary THING THAT WILL BLOW UP",{"ioe_description":"No such file or directory","ioe_location":"openFile","ioe_type":"NoSuchThing","ioe_filename":"C:\\Vids\\SystemDesign\\Blahhh.txt","ioe_errno":"Just 2"}]}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":140},{"result":{"tag":"Skip"},"info":{"header":"pass every time","messageInfo":{"message":"Check was not executed","additionalInfo":null}}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":140},{"result":{"tag":"Skip"},"info":{"message":"Check was not executed","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":140}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":150},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":150,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\Vid List.txt","checks":[],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -267,7 +267,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":160},{"unDStateJSON":{"iidx10":1600}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":160},{"result":{"tag":"Pass"},"info":{"header":"pass every time","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":160},{"result":{"tag":"Pass"},"info":{"message":"pass every time","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":160}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":170},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":170,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -277,7 +277,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":170},{"unDStateJSON":{"iidx10":1700}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":170},{"result":{"tag":"Pass"},"info":{"header":"pass every time","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":170},{"result":{"tag":"Pass"},"info":{"message":"pass every time","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":170}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":180},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":180,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -287,7 +287,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":180},{"unDStateJSON":{"iidx10":1800}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":180},{"result":{"tag":"Pass"},"info":{"header":"pass every time","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":180},{"result":{"tag":"Pass"},"info":{"message":"pass every time","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":180}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":190},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":190,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -297,7 +297,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":190},{"unDStateJSON":{"iidx10":1900}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":190},{"result":{"tag":"Pass"},"info":{"header":"pass every time","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":190},{"result":{"tag":"Pass"},"info":{"message":"pass every time","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough"},"itmId":190}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndTest","contents":{"unTestModule":"DemoProject.Test.Rough"}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartTest","contents":{"testModAddress":{"unTestModule":"DemoProject.Test.Simple"},"testTitle":"This Simple Test Only Uses Ensure Effects","testConfig":{"minDepth":"DeepRegression","address":{"unTestModule":"DemoProject.Test.Simple"},"countries":["AU"],"active":true,"header":"This Simple Test Only Uses Ensure Effects","environments":["TST","UAT","PreProd"]}}}}
@@ -307,8 +307,8 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple"},"itmId":100},{"unDStateJSON":{"simpleMessage":"Success","itemId":100}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple"},"itmId":100},{"result":{"tag":"Pass"},"info":{"header":"iid is small","messageInfo":null}}]}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple"},"itmId":100},{"result":{"tag":"Fail"},"info":{"header":"iid is big","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple"},"itmId":100},{"result":{"tag":"Pass"},"info":{"message":"iid is small","additionalInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple"},"itmId":100},{"result":{"tag":"Fail"},"info":{"message":"iid is big","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Simple"},"itmId":100}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple"},"itmId":110},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":110,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":[],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -355,8 +355,8 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":100},{"unDStateJSON":{"iidx10":1000}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":100},{"result":{"tag":"GateFailExpected","contents":"this bug was introduced in an earlier version and will be fixed eventually"},"info":{"header":"iid x 10 is small","messageInfo":null}}]}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":100},{"result":{"tag":"Skip"},"info":{"header":"iid x 10 is big","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":100},{"result":{"tag":"GateFailExpected","contents":"this bug was introduced in an earlier version and will be fixed eventually"},"info":{"message":"iid x 10 is small","additionalInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":100},{"result":{"tag":"Skip"},"info":{"message":"iid x 10 is big","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":100}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":110},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":110,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -369,13 +369,13 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateFailure","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":110},{"tag":"AppEnsureError","contents":"I do not like 110 in prepstate"}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":110},{"result":{"tag":"Skip"},"info":{"header":"pass every time","messageInfo":{"message":"Check was not executed","additionalInfo":null}}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":110},{"result":{"tag":"Skip"},"info":{"message":"Check was not executed","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":110}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":120},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":120,"pre":"Pre","path":"R:\\Vids\\SystemDesign\\Wrong.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorFailure","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":120},{"tag":"AppFileSystemError","contents":{"tag":"WriteFileError","contents":{"ioe_description":"No such file or directory","ioe_location":"openFile","ioe_type":"NoSuchThing","ioe_filename":"R:\\Vids\\SystemDesign\\Wrong.txt","ioe_errno":"Just 2"}}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":120},{"result":{"tag":"Skip"},"info":{"header":"pass every time","messageInfo":{"message":"Check was not executed","additionalInfo":null}}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":120},{"result":{"tag":"Skip"},"info":{"message":"Check was not executed","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":120}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":130},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":130,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -389,7 +389,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":130},{"unDStateJSON":{"iidx10":1300}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":130},{"result":{"tag":"Pass"},"info":{"header":"pass every time","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":130},{"result":{"tag":"Pass"},"info":{"message":"pass every time","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":130}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":140},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":140,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -398,7 +398,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"IOAction","contents":"This is an arbitrary THING THAT WILL BLOW UP"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"InteractorFailure","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":140},{"tag":"AppIOError'","contents":["Exception raised when executing arbituary IO action with message: This is an arbitrary THING THAT WILL BLOW UP",{"ioe_description":"No such file or directory","ioe_location":"openFile","ioe_type":"NoSuchThing","ioe_filename":"C:\\Vids\\SystemDesign\\Blahhh.txt","ioe_errno":"Just 2"}]}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":140},{"result":{"tag":"Skip"},"info":{"header":"pass every time","messageInfo":{"message":"Check was not executed","additionalInfo":null}}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":140},{"result":{"tag":"Skip"},"info":{"message":"Check was not executed","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":140}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":150},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":150,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\Vid List.txt","checks":[],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -417,7 +417,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":160},{"unDStateJSON":{"iidx10":1600}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":160},{"result":{"tag":"Pass"},"info":{"header":"pass every time","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":160},{"result":{"tag":"Pass"},"info":{"message":"pass every time","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":160}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":170},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":170,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -427,7 +427,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":170},{"unDStateJSON":{"iidx10":1700}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":170},{"result":{"tag":"Pass"},"info":{"header":"pass every time","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":170},{"result":{"tag":"Pass"},"info":{"message":"pass every time","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":170}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":180},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":180,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -437,7 +437,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":180},{"unDStateJSON":{"iidx10":1800}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":180},{"result":{"tag":"Pass"},"info":{"header":"pass every time","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":180},{"result":{"tag":"Pass"},"info":{"message":"pass every time","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":180}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":190},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":190,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":["pass every time"],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}
@@ -447,7 +447,7 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":190},{"unDStateJSON":{"iidx10":1900}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":190},{"result":{"tag":"Pass"},"info":{"header":"pass every time","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":190},{"result":{"tag":"Pass"},"info":{"message":"pass every time","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Rough2"},"itmId":190}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndTest","contents":{"unTestModule":"DemoProject.Test.Rough2"}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartTest","contents":{"testModAddress":{"unTestModule":"DemoProject.Test.Simple2"},"testTitle":"This Simple Test Only Uses Ensure Effects","testConfig":{"minDepth":"DeepRegression","address":{"unTestModule":"DemoProject.Test.Simple2"},"countries":["AU"],"active":true,"header":"This Simple Test Only Uses Ensure Effects","environments":["TST","UAT","PreProd"]}}}}
@@ -457,8 +457,8 @@ rawFile = fromList . B.lines $ toS
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartPrepState"}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"PrepStateSuccess","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple2"},"itmId":100},{"unDStateJSON":{"simpleMessage":"Success","itemId":100}}]}}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartChecks"}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple2"},"itmId":100},{"result":{"tag":"Pass"},"info":{"header":"iid is small","messageInfo":null}}]}}}
-{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple2"},"itmId":100},{"result":{"tag":"Fail"},"info":{"header":"iid is big","messageInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple2"},"itmId":100},{"result":{"tag":"Pass"},"info":{"message":"iid is small","additionalInfo":null}}]}}}
+{"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"CheckOutcome","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple2"},"itmId":100},{"result":{"tag":"Fail"},"info":{"message":"iid is big","additionalInfo":null}}]}}}
 {"tag":"BoundaryLog","contents":{"tag":"EndIteration","contents":{"tstModule":{"unTestModule":"DemoProject.Test.Simple2"},"itmId":100}}}
 {"tag":"BoundaryLog","contents":{"tag":"StartIteration","contents":[{"tstModule":{"unTestModule":"DemoProject.Test.Simple2"},"itmId":110},{"unWhenClause":"Pre"},{"unThenClause":"Post"},{"iid":110,"pre":"Pre","path":"C:\\Vids\\SystemDesign\\VidList.txt","checks":[],"post":"Post"}]}}
 {"tag":"IterationLog","contents":{"tag":"Run","contents":{"tag":"StartInteraction"}}}

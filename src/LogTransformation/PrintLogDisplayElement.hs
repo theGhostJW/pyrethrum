@@ -387,9 +387,13 @@ prettyPrintDisplayElement pde =
                 <> newLn
                 <> indent2 dsText
                 <> newLn2
-                <> "check Details:"
-                <> newLn
-                <> alignKeyValues True 2 LeftJustify (detailValLine <$> validation)
+                <> (
+                  P.null validation 
+                      ? "" 
+                      $ "check details:"
+                      <> newLn
+                      <> alignKeyValues True 2 LeftJustify (detailValLine <$> validation)
+                )
 
       LineError err -> noImp
 

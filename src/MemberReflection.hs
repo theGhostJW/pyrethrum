@@ -40,11 +40,6 @@ data RunConfig = RunConfig {
   depth       :: Depth
 } deriving (Eq, Show)
 
-$(deriveJSON defaultOptions ''Environment)
-$(deriveJSON defaultOptions ''Country)
-$(deriveJSON defaultOptions ''Depth)
-$(deriveJSON defaultOptions ''RunConfig)
-
 instance Titled RunConfig where
   title = runTitle
 
@@ -68,8 +63,6 @@ data TestConfig = TestConfig {
   minDepth     :: Depth,
   active       :: Bool
 }  deriving (Eq, Show)
-
-$(deriveJSON defaultOptions ''TestConfig)
 
 type Test = GenericTest TestConfig RunConfig
 type TestResult = GenericResult TestConfig
@@ -236,3 +229,9 @@ showEffs2 _ = showTypes @es0
 
 demo2 :: [Text]
 demo2 = showEffs2 test2
+
+$(deriveJSON defaultOptions ''TestConfig)
+$(deriveJSON defaultOptions ''Environment)
+$(deriveJSON defaultOptions ''Country)
+$(deriveJSON defaultOptions ''Depth)
+$(deriveJSON defaultOptions ''RunConfig)

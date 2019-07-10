@@ -6,6 +6,7 @@ import           DemoProject.Config
 import           DemoProject.Test.Rough as RT
 import           DemoProject.Test.Rough2 as RT2
 import           DemoProject.Test.Simple as ST
+import DemoProject.Test.RoughDisabled as DT
 import  DemoProject.Test.Simple2 as ST2
 import Control.Monad
 import  Data.Functor (($>))
@@ -140,7 +141,8 @@ validPlan ro0 gh0 ro1 gh1 f =
            goHome = gh0,
            tests = [
                f RT.test,
-               f ST.test -- 6 iterations
+               f DT.test,
+               f ST.test
              ]
       },
 
@@ -150,7 +152,7 @@ validPlan ro0 gh0 ro1 gh1 f =
           goHome = gh1,
           tests = [
               f RT2.test,
-              f ST2.test -- 6 iterations
+              f ST2.test
             ]
      }
 

@@ -106,6 +106,24 @@ data CheckResult = Pass |
                    Skip
                     deriving (Show, Eq)
 
+-- order by severity
+instance Ord CheckResult where 
+  v0 <= v1 = 
+    let 
+      idx :: CheckResult -> Int
+      idx = \case 
+              Pass -> 0
+              Skip -> 1
+              FailExpected _ -> 2
+              GateFailExpected _ -> 3
+              PassWhenFailExpected _ -> 4
+              Fail -> 5
+              GateFail -> 6
+              Regression _ -> 7
+              GateRegression _ -> 8
+    in 
+      idx v0 <= idx v1
+
 data CheckResultClassification = 
                    OK |
                    Error |

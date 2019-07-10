@@ -52,7 +52,7 @@ data PrintLogDisplayElement =
         iterationStats :: StatusCount,
         outOfTest :: StatusCount
     } | 
-  EndRun |
+  EndRun (Maybe [FilterResult]) |
 
   -- StartGroup GroupTitle |
   -- EndGroup GroupTitle |
@@ -221,7 +221,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                   iterationStats = iterationStatusCounts runResults,
                   outOfTest = outOfTest
                 } )
-                LP.EndRun -> (accum, elOut LogTransformation.PrintLogDisplayElement.EndRun)
+                LP.EndRun -> (accum, elOut . LogTransformation.PrintLogDisplayElement.EndRun $ filterLog accum)
                 
                 LP.StartGroup _ -> skipLog
                 LP.EndGroup _ -> skipLog
@@ -255,16 +255,27 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                       domainState = Nothing
                     } 
                   }, Nothing)
-                EndIteration (ItemId tstModule itmId) -> (
-                                                          accum {rec = Nothing}, 
-                                                          elOut $ maybef (rec accum)
-                                                            (LineError $ LogTransformError {
-                                                              linNo = lineNo,
-                                                              logItem = lp,
-                                                              info = "Error end iteration message encountered when the before start iteration - check raw logs"
-                                                            })
-                                                            Iteration
-                                                        ) 
+
+                EndIteration (ItemId tstModule itmId) -> 
+                  let 
+                    severityDesc :: CheckReport -> CheckReport -> Ordering
+                    severityDesc (CheckReport rslt1 _) (CheckReport rslt2 _) = compare (Down rslt1) (Down rslt2)
+
+                    sortChecks :: IterationRecord -> IterationRecord
+                    sortChecks ir = ir { validation = sortBy severityDesc $ validation ir}
+                  in
+                    (
+                      accum {rec = Nothing}, 
+                      elOut $ 
+                        maybef (rec accum)
+                          (LineError $ LogTransformError {
+                            linNo = lineNo,
+                            logItem = lp,
+                            info = "Error end iteration message encountered when the before start iteration - check raw logs"
+                          })
+                          (Iteration . sortChecks)
+                    ) 
+
             IterationLog subProtocol -> 
               case subProtocol of
                 Doc dp -> (accum, lineError "Documentation log item encounterred in live test log - this should not happen - probably a bug in the test runner")
@@ -322,7 +333,53 @@ prettyPrintDisplayElement pde =
                 <> newLn
                 <> alignKeyValues True 2 RightJustify (statusCountTupleText True outOfTest)
 
-      LogTransformation.PrintLogDisplayElement.EndRun -> noImp -- TODO: Filter Log
+      LogTransformation.PrintLogDisplayElement.EndRun mFltrLog -> 
+        majorHeader "End Run"
+        <> newLn
+        <> fullHeader '-' False "Filter Log"
+        <> newLn
+        <> maybef mFltrLog
+             "  No Filter Log Available"
+             (
+               \fltrs -> 
+                let 
+                  fltrItems :: (Maybe Text -> Bool) -> [FilterResult]
+                  fltrItems f = P.filter (f . reasonForRejection) fltrs
+
+                  acceptedItems:: [FilterResult]
+                  acceptedItems = fltrItems isNothing
+
+                  rejectedItems :: [FilterResult]
+                  rejectedItems = fltrItems isJust
+
+                  address :: FilterResult -> Text
+                  address = unTestModule . testModAddress . testInfo 
+
+                  rejectText :: FilterResult -> Text
+                  rejectText fr = maybef (reasonForRejection fr) 
+                                    "ACCEPTED" -- should never happen
+                                    (\rtxt -> address fr <> " - " <> rtxt)
+
+                  accepted :: Text
+                  accepted = P.null acceptedItems 
+                              ? "  No Tests Accepted" 
+                              $ indent2 . P.unlines . P.sort $ ("- " <>) . address <$> acceptedItems
+
+                  rejected :: Text
+                  rejected = P.null rejectedItems 
+                              ? "  No Tests Rejected" 
+                              $ indent2 . P.unlines . P.sort $ ("- " <>) . rejectText <$> rejectedItems
+                in
+                 "accepted: " 
+                    <> newLn 
+                    <> accepted 
+                    <> newLn2
+                    <> "rejected:"
+                    <> newLn 
+                    <> rejected
+             )
+        <> newLn
+
 
       LogTransformation.PrintLogDisplayElement.StartTest titl tstMod notes cfg status itrStats -> 
           majorHeader (header' titl status) 
@@ -350,11 +407,33 @@ prettyPrintDisplayElement pde =
             apStateInfo
             domainState) -> 
               let 
-                hdrLines = [
-                  ("when", when')
-                  , ("then", then')
-                  , ("status", statusLabel False status <> (status == LC.Pass ? "" $ " - " <> txt phse))
-                 ]
+                
+                hdrLines :: [(Text, Text)]
+                hdrLines = 
+                  let baseLines = [
+                       ("when", when')
+                       , ("then", then')
+                       , ("status", statusLabel False status <> (status == LC.Pass ? "" $ " - " <> txt phse))
+                       ]
+                  in 
+                    maybef notes 
+                      baseLines
+                      (\n -> P.snoc baseLines ("notes:", n))
+
+                keyOrdering :: Text -> Text -> Ordering
+                keyOrdering k1 k2 = 
+                  let 
+
+                    pos :: Text -> Int
+                    pos k 
+                      | "iid" == k = 0
+                      | "pre" == k = 1
+                      | "post" == k = 2
+                      | "notes" == k = 3
+                      | "checks" == k = 100
+                      | otherwise = 10
+                  in
+                    compare (pos k1) (pos k2)
 
                 valLine :: CheckReport -> (Text, Text)
                 valLine (CheckReport result (MessageInfo hder extrInfo)) = (hder, toLower $ txt result)
@@ -383,19 +462,33 @@ prettyPrintDisplayElement pde =
                 <> newLn
                 <> (P.null validation ? "  - Test Design Error - This test has no checks\n" $ alignKeyValues True 2 LeftJustify (valLine <$> validation))
                 <> newLn
-                <> "dState:"
+                <> "domain state:"
                 <> newLn
                 <> indent2 dsText
                 <> newLn2
+               
+                <> "application state:"
+                <> newLn
+                <> maybef apStateInfo "  No ApState Recorded" (indent2 . getLenient . convertString . encodePretty defConfig)
+                
                 <> (
-                  P.null validation 
-                      ? "" 
-                      $ "check details:"
-                      <> newLn
-                      <> alignKeyValues True 2 LeftJustify (detailValLine <$> validation)
+                P.null validation 
+                   ? newLn 
+                   $ newLn2 
+                   <> "validation details:"
+                   <> newLn
+                   <> alignKeyValues True 2 LeftJustify (detailValLine <$> validation)
                 )
+                <> newLn
 
-      LineError err -> noImp
+                <> "full item:"
+                <> newLn
+                <> maybef item "  No Item Recorded" (indent2 . getLenient . convertString . encodePretty (setConfCompare keyOrdering defConfig))
+                <> newLn
+
+      LineError err -> fullHeader '!' True "ERROR"
+                       <> newLn
+                       <> indent2 (txt err)
 
 statusLabel :: Bool -> ExecutionStatus -> Text
 statusLabel outOfTest = \case

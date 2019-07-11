@@ -89,16 +89,18 @@ fullHeader padChr wantPrcntChar hdrTxt =
 majorHeader = fullHeader '#' False
 iterationHeader = fullHeader '-' True
 
-data Justification = LeftJustify | RightJustify
+data Justification = LeftJustify | RightJustify | None
 
 prettyYamlKeyValues :: Int -> Justification -> A.Value -> Text
-prettyYamlKeyValues indentation justification a = 
+prettyYamlKeyValues indentation justification val = 
   let 
-    parts = breakOn ": " <$> (lines . getLenient . convertString $ encodePretty defConfig a)
+    prettyYaml = getLenient . convertString $ encodePretty defConfig val
+    parts = breakOn ": " <$> lines prettyYaml
     fixedParts = bimap (<> ": ") (\s -> fromMaybe s $ stripPrefix ": " s) <$> parts
   in
-    alignKeyValues False indentation justification fixedParts
-
+    case val of 
+      Object _ -> alignKeyValues False indentation justification fixedParts
+      _ -> indent2 prettyYaml <> newLn
 
 alignKeyValues :: Bool -> Int -> Justification -> [(Text, Text)] -> Text
 alignKeyValues wantColon indentation justification kvs = 
@@ -107,12 +109,15 @@ alignKeyValues wantColon indentation justification kvs =
     trimmedKvs = bimap strip strip <$> kvs 
     (maxLKey, maxLVal) = foldl' (\(kl, vl) -> bimap (max kl . length) (max vl . length)) (0, 0) trimmedKvs
     paddedKvs = (\(k, v) -> (
-                              spaces indentation <> k <> ((wantColon ? ":" $ "") <> "  "), -- key
+                              -- key:
+                              spaces indentation <> k <> ((wantColon ? ":" $ "") <> " "), 
+                              -- value
                               let 
                                 kSpaces = spaces (maxLKey - length k)
                               in
                                 case justification of 
                                   LeftJustify ->  kSpaces <> v
+                                  None -> v
                                   RightJustify -> kSpaces <> spaces (maxLVal - length v) <> v
                               )) <$> trimmedKvs
   in  

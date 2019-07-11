@@ -191,7 +191,7 @@ skipChecks :: DList (Check ds) -> DList CheckReport
 skipChecks chks = 
   let 
     skippedResult :: Check ds -> CheckReport
-    skippedResult (Check headr _ _ _ _)  = CheckReport Skip $ MessageInfo "Check was not executed"  Nothing
+    skippedResult (Check headr _ _ _ _)  = CheckReport Skip $ MessageInfo headr $ Just "Validation checks not executed"
   in 
     reverseDList $ skippedResult <$> chks 
 

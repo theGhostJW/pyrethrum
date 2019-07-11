@@ -6,6 +6,7 @@ import           DemoProject.Config
 import           DemoProject.Test.Rough as RT
 import           DemoProject.Test.Rough2 as RT2
 import           DemoProject.Test.Simple as ST
+import DemoProject.Test.RoughIntState
 import DemoProject.Test.RoughDisabled as DT
 import  DemoProject.Test.Simple2 as ST2
 import Control.Monad
@@ -25,6 +26,39 @@ import qualified Control.Exception as E
 import AuxFiles as A
 import Data.Aeson (ToJSON(..))
 import Data.Map as M
+
+validPlan :: forall m m1 effs a. EFFAllEffects effs =>
+  PreRun effs      -- rollOver0
+  -> PreRun effs   -- goHome0
+  -> PreRun effs   -- rollOver1
+  -> PreRun effs   -- goHome1
+  ->  TestPlan m1 m a effs
+validPlan ro0 gh0 ro1 gh1 f =
+  [
+
+    TestGroup {
+           header = "Group 1",
+           rollover = ro0,
+           goHome = gh0,
+           tests = [
+               f RT.test,
+               f DT.test,
+               f ST.test,
+               f DemoProject.Test.RoughIntState.test
+             ]
+      },
+
+    TestGroup {
+          header = "Group 2",
+          rollover = ro1,
+          goHome = gh1,
+          tests = [
+              f RT2.test,
+              f ST2.test
+            ]
+     }
+
+    ]
 
 
 ioRun :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
@@ -125,38 +159,6 @@ runDocument = docRun plan
 
 runDocumentToConsole :: IO ()
 runDocumentToConsole = sequence_ . P.toList $ putStrLn <$> runDocument
-
-validPlan :: forall m m1 effs a. EFFAllEffects effs =>
-  PreRun effs      -- rollOver0
-  -> PreRun effs   -- goHome0
-  -> PreRun effs   -- rollOver1
-  -> PreRun effs   -- goHome1
-  ->  TestPlan m1 m a effs
-validPlan ro0 gh0 ro1 gh1 f =
-  [
-
-    TestGroup {
-           header = "Group 1",
-           rollover = ro0,
-           goHome = gh0,
-           tests = [
-               f RT.test,
-               f DT.test,
-               f ST.test
-             ]
-      },
-
-    TestGroup {
-          header = "Group 2",
-          rollover = ro1,
-          goHome = gh1,
-          tests = [
-              f RT2.test,
-              f ST2.test
-            ]
-     }
-
-    ]
 
 plan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 plan = validPlan doNothing doNothing doNothing doNothing

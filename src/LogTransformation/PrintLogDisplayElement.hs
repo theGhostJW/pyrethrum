@@ -12,7 +12,7 @@ module LogTransformation.PrintLogDisplayElement (
   PrepStateInfo(..)
 ) where
 
-import Common as C (AppError(..), DetailedInfo(..))
+import Common as C (AppError(..), DetailedInfo(..), indentText)
 import LogTransformation.Common as LC
 import Check as CK
 import Pyrelude as P
@@ -438,21 +438,53 @@ prettyPrintDisplayElement pde =
                 valLine :: CheckReport -> (Text, Text)
                 valLine (CheckReport result (MessageInfo hder extrInfo)) = (hder, toLower $ txt result)
 
-                detailValLine :: CheckReport -> (Text, Text)
-                detailValLine (CheckReport result (MessageInfo hder extrInfo)) = (hder, toLower $ txt result <> 
-                                            maybef extrInfo 
-                                            " - no additional info " 
-                                            (\exInfo -> newLn <> "additional info:" <> newLn <> indent2 exInfo)
-                                          )
+                valDetailsTxt :: Text
+                valDetailsTxt = 
+                  let 
+                    detailValLine :: CheckReport -> Text
+                    detailValLine (CheckReport result (MessageInfo hder extrInfo)) =
+                        hder <> ": " <> 
+                          toLower ( txt result <> 
+                            maybef extrInfo 
+                              " - no additional info "
+                              (\exInfo -> newLn <> indentText 2 exInfo)
+                        )
+
+                    vdStep :: ([Text], Bool) -> CheckReport -> ([Text], Bool) 
+                    vdStep (rsltLines, separatorNeeded) ckRpt@(CheckReport result (MessageInfo hder extrInfo)) = 
+                      ( 
+                        P.snoc rsltLines $ (separatorNeeded ? newLn $ "") <> detailValLine ckRpt, 
+                        isJust extrInfo
+                      )
+                  in 
+                   P.unlines . fst $ P.foldl' vdStep ([], False) validation
+                   
 
                 dsText :: Text
                 dsText = maybef domainState
-                          "- Domain State is Empty"
+                          ("  Domain State is Empty" <> newLn)
                           (
                             \case 
                               SucceededPrepState dsDisplay -> prettyYamlKeyValues 2 LeftJustify $ unDStateJSON dsDisplay
-                              FailedPrepState err -> "PrepState Failure - Domain State is Empty:\n" <> indent2 ("- " <> txtPretty err)
+                              FailedPrepState err -> 
+                                indent2 (
+                                  "PrepState Failure - Domain State is Empty:" 
+                                  <> newLn 
+                                  <> indent2 ("- " <> txtPretty err)
+                                )
+                                <> newLn
                           )
+
+                displayApState :: ApStateInfo -> Text
+                displayApState = 
+                  let 
+                    mkTxt :: Y.Value -> Text
+                    mkTxt = indent2 . getLenient . convertString . encodePretty defConfig
+                  in
+                    \case 
+                      SucceededInteractor val -> mkTxt $ unApStateJSON val
+                      FailedInteractor err -> mkTxt $ Y.toJSON err
+
               in
                 iterationHeader (header' (modulePath <> " - " <> txt itmId) status)
                 <> newLn
@@ -464,12 +496,12 @@ prettyPrintDisplayElement pde =
                 <> newLn
                 <> "domain state:"
                 <> newLn
-                <> indent2 dsText
-                <> newLn2
+                <> dsText
+                <> newLn
                
                 <> "application state:"
                 <> newLn
-                <> maybef apStateInfo "  No ApState Recorded" (indent2 . getLenient . convertString . encodePretty defConfig)
+                <> maybef apStateInfo "  No ApState Recorded" displayApState
                 
                 <> (
                 P.null validation 
@@ -477,7 +509,8 @@ prettyPrintDisplayElement pde =
                    $ newLn2 
                    <> "validation details:"
                    <> newLn
-                   <> alignKeyValues True 2 LeftJustify (detailValLine <$> validation)
+                   <> indent2 valDetailsTxt
+                   <> newLn
                 )
                 <> newLn
 

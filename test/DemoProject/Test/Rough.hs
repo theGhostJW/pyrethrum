@@ -118,7 +118,7 @@ data Item = Item {
 
 i = Item
 
-passAlwaysChk = chk "pass every time" $ const True
+passAlwaysChk = chk' "pass every time" (const "this is additoinal info \nblahh\nblahh\nblahh") $ const True
 
 -- should be :: RunConfig -> [Item]
 -- later optional hedgehog
@@ -127,7 +127,7 @@ items = [
           i 100 "Pre"  "Post" validFile $
                                 gate 
                                 . expectFailure "this bug was introduced in an earlier version and will be fixed eventually" 
-                                $ chk "iid x 10 is small" ((200 >) . iidx10) 
+                                $ chk' "iid x 10 is small" (const "this is additoinal info \nblahh\nblahh\nblahh") ((200 >) . iidx10) 
                                 <> chk "iid x 10 is big"  ((500 <) . iidx10),
           i 110 "Pre"  "Post" validFile passAlwaysChk ,
           i 120 "Pre"  "Post" invalidFile2 passAlwaysChk,

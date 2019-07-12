@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module LogTransformationTest where 
 
 import Text.RawString.QQ
@@ -8,7 +10,7 @@ import Pyrelude.Test       as T
 import AuxFiles
 import Control.Monad
 import LogTransformation
-import LogTransformation.PrintLogDisplayElement
+import LogTransformation.PrintLogDisplayElement as LTPDE
 import PrettyPrintCommon
 import Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
@@ -69,56 +71,6 @@ dumpByteStrings lst file = do
 display :: (DList ByteString -> DList ByteString) -> DList ByteString -> IO ()
 display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
 
--- unit_demo_logs_prettyPrint :: IO ()
--- unit_demo_logs_prettyPrint = dumpFile (decodeUtf8 <$> testPrettyPrint rawFile) [relfile|steps.yaml|]
-
--- unit_demo_iteration :: IO ()
--- unit_demo_iteration = aggregateDumpFile testIterationStep rawFile [relfile|iterations.yaml|]
-
--- unit_demo_prettyPrint_iteration :: IO ()
--- unit_demo_prettyPrint_iteration = aggregateDumpFile testIterationPretyPrintStep rawFile [relfile|demoTemp.yaml|]
-
--- unit_demo_test_items :: IO ()
--- unit_demo_test_items = dumpFile (decodeUtf8 <$> testTestLogStep (testIterationStep rawFile)) [relfile|tests.jsoni|]
-
--- -- bug fix
--- unit_other_warnings_as_expected :: IO ()
--- unit_other_warnings_as_expected =
---   let
---     targetTest = "DemoProject.Test.Rough"
---     logSteps = testTestLogStepRaw (testIterationStep rawFile)
---     testDemoProjectTestRough = P.find (\case 
---                                         Test tr@(TestRecord titl address config status stats iterationsDesc) -> address == targetTest
---                                         _ -> False
---                                       ) logSteps
-
---     iteration100 :: TestLogElement -> Maybe IterationRecord
---     iteration100 = \case 
---                       Test tle -> P.find (\i -> iid (summary i) == ItemId (TestModule targetTest) 100) $ iterationsDesc tle
---                       _ -> Nothing
-
---     chkSingleInteractorWarning :: IterationRecord -> Assertion
---     chkSingleInteractorWarning i = 
---       let 
---         othWarnings = otherWarningsDesc i
---       in 
---         chkEq 1 $ P.length othWarnings
---   in 
---     maybef (testDemoProjectTestRough >>= iteration100)
---       (chkFail $ "iteration 100 of " <> targetTest <> " not found" )
---       chkSingleInteractorWarning
-
-                            
-
--- unit_demo_test_items_pretty :: IO ()
--- unit_demo_test_items_pretty = dumpFile (decodeUtf8 <$> testTestLogPrettyPrintStep (testIterationStep rawFile)) [relfile|tests.yaml|]
-
--- ToDo - Pretty print test - may need to use state monad
--- ToDo - Test parser - totals etc
--- ToDo - Test parser - include errors - may need to restructure for errors  such as file missing ??
--- ToDo - plug into run
--- Move stats to top -- concatinate files 
-
 _sampleStatsSimple = F.foldl' statsStep emptyStepAccum $ Right <$> sampleLog
 
 sampleStats :: RunResults
@@ -171,6 +123,61 @@ unit_test_counts_correct = M.fromList [(Pass,1), (Fail,4)] ... testStatusCounts 
 unit_no_out_of_test_issues = M.empty ... LTC.outOfTest sampleStats
 
 --TODO:: Out of test issues test correct
+
+prettyPrintLog :: [PrintLogDisplayElement]
+prettyPrintLog = 
+  let 
+    transParams = LogTransformParams {
+      source = testSource,
+      sink = testSink,
+      reducer = printLogDisplayStep sampleStats,
+      itemDesrialiser = jsonDeserialiser,
+      resultSerialiser = id,    
+      linNo = LineNo 1,
+      accumulator = emptyIterationAccum
+    }
+  in
+    DL.toList . snd $ transformDList rawFile transParams 
+
+prettyProblemsPrintLog :: [PrintLogDisplayElement]
+prettyProblemsPrintLog =
+  let 
+    transParams = LogTransformParams {
+      source = testSource,
+      sink = testSink,
+      reducer = printProblemsDisplayStep sampleStats,
+      itemDesrialiser = jsonDeserialiser,
+      resultSerialiser = id,    
+      linNo = LineNo 1,
+      accumulator = emptyProbleIterationAccum
+    }
+  in
+    DL.toList . snd $ transformDList rawFile transParams
+
+isPassingTestHeader :: PrintLogDisplayElement -> Bool
+isPassingTestHeader = 
+  \case 
+    LTPDE.StartTest{..} -> status == Pass
+    _ -> False
+
+unit_problems_no_passing_tests = 
+  0 ... P.count isPassingTestHeader prettyProblemsPrintLog 
+
+unit_unfilterd_has_passing_tests = 
+  1 ... P.count isPassingTestHeader prettyPrintLog
+
+isPassingIterationHeader :: PrintLogDisplayElement -> Bool
+isPassingIterationHeader = 
+  \case 
+    LTPDE.Iteration LTPDE.IterationRecord{..} -> executionStatus outcome == Pass
+    _ -> False
+     
+unit_problems_no_passing_iterations = 
+  0 ... P.count isPassingIterationHeader prettyProblemsPrintLog 
+
+unit_unfilterd_has_passing_iterations = 
+  9 ... P.count isPassingIterationHeader prettyPrintLog 
+
 
 _demo_pretty_print_log = 
   let 

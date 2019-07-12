@@ -44,17 +44,17 @@ source = [
   ]
 
 expectedLeft = unlines [
-    "  k:         v",
-    "  kkkkk:     vvvv",
-    "  kvvvvvvv:  vv",
-    "  k:         vvvvvvvvvvvvvvvvvv"
+    "  k:        v",
+    "  kkkkk:    vvvv",
+    "  kvvvvvvv: vv",
+    "  k:        vvvvvvvvvvvvvvvvvv"
   ]
 
 expectedRight = unlines [
-    "  k:                          v",
-    "  kkkkk:                   vvvv",
-    "  kvvvvvvv:                  vv",
-    "  k:         vvvvvvvvvvvvvvvvvv"
+    "  k:                         v",
+    "  kkkkk:                  vvvv",
+    "  kvvvvvvv:                 vv",
+    "  k:        vvvvvvvvvvvvvvvvvv"
   ]
 
 unit_alignKeyValues_left = expectedLeft ... alignKeyValues False 2 LeftJustify source

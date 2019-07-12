@@ -186,6 +186,20 @@ _demo_pretty_print_log =
   in
     dumpByteStrings (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
 
+_demo_pretty_print_problems_log = 
+  let 
+    transParams = LogTransformParams {
+      source = testSource,
+      sink = testSink,
+      reducer = printProblemsDisplayStep sampleStats,
+      itemDesrialiser = jsonDeserialiser,
+      resultSerialiser = (toS . prettyPrintDisplayElement) :: PrintLogDisplayElement -> ByteString,    
+      linNo = LineNo 1,
+      accumulator = emptyProbleIterationAccum
+    }
+  in
+    dumpByteStrings (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
+
 unit_demo_pretty_print = _demo_pretty_print_log 
 
 sampleLog :: DList LogProtocol

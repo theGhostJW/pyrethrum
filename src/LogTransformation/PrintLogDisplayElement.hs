@@ -1,6 +1,8 @@
 module LogTransformation.PrintLogDisplayElement (
   emptyIterationAccum,
+  emptyProbleIterationAccum,
   printLogDisplayStep,
+  printProblemsDisplayStep,
   prettyPrintDisplayElement,
   IterationAccum(..),
   PrintLogDisplayElement(..),
@@ -125,12 +127,59 @@ emptyIterationAccum = IterationAccum {
   filterLog = Nothing
 }
 
+data ProblemIterationAccum = ProblemIterationAccum {
+  accum :: IterationAccum,
+  skipIteration :: Bool,
+  skipTest :: Bool
+}
+
+emptyProbleIterationAccum :: ProblemIterationAccum
+emptyProbleIterationAccum = ProblemIterationAccum emptyIterationAccum False False
+
+printProblemsDisplayStep ::
+  RunResults                                                            -- RunResults
+  -> LineNo                                                             -- lineNo
+  -> ProblemIterationAccum                                              -- accum
+  -> Either DeserialisationError LogProtocol                            -- source                           -- parse error or apperror
+  -> (ProblemIterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
+printProblemsDisplayStep runResults@(RunResults outOfTest iterationResults) lineNo (ProblemIterationAccum itAccum@(IterationAccum mRec stepInfo mFltrLg) skipItt skipTst) eithLp = 
+  let 
+    -- (IterationAccum, Maybe [PrintLogDisplayElement])
+    normalStep :: (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
+    normalStep@(nxtItAccum@(IterationAccum nxtMRec nxtStepInfo nxtMFltrLg), mDisplayElement) = printLogDisplayStep runResults lineNo itAccum eithLp
+
+    testStatus' :: TestModule -> ExecutionStatus
+    testStatus' = testStatus $ testExStatus iterationResults
+    
+    skipFlags :: (Bool, Bool) -- (newAccum, err / result)
+    skipFlags@(nxtSkipItt, nxtSkipTst) =
+      eitherf eithLp 
+        (const (skipItt, skipTst))
+        (\case
+            BoundaryLog (LP.StartTest (TestDisplayInfo tstMod _ _ )) -> (False, LC.Pass == testStatus' tstMod)
+            BoundaryLog (StartIteration iid _ _ _) -> (LC.Pass == executionStatus (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
+            _ -> (skipItt, skipTst)
+        )
+
+    nxtAccum :: ProblemIterationAccum
+    nxtAccum = ProblemIterationAccum nxtItAccum nxtSkipItt nxtSkipTst
+  in 
+    (nxtAccum, isRight eithLp && (nxtSkipItt || nxtSkipTst) ? Nothing $ mDisplayElement)
+
+
+-- itrOutcome ItemId -> Maybe IterationOutcome
+testStatusMap :: RunResults -> M.Map TestModule ExecutionStatus
+testStatusMap = testExStatus . iterationResults
+
+testStatus :: M.Map TestModule ExecutionStatus -> TestModule -> ExecutionStatus
+testStatus tstStatusMap tm = fromMaybe LC.Fail $ M.lookup tm tstStatusMap
+
 printLogDisplayStep ::
-              RunResults                                                            -- RunResults
-              -> LineNo                                                             -- lineNo
-              -> IterationAccum                                                     -- accum
-              -> Either DeserialisationError LogProtocol                                                        -- parse error or apperror
-              -> (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
+  RunResults                                                            -- RunResults
+  -> LineNo                                                             -- lineNo
+  -> IterationAccum                                                     -- accum
+  -> Either DeserialisationError LogProtocol                            -- source                           -- parse error or apperror
+  -> (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
 printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFltrLg) eithLp = 
   
   eitherf eithLp
@@ -151,12 +200,11 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
 
         RunResults outOfTest iterationResults = runResults
 
-        -- itrOutcome ItemId -> Maybe IterationOutcome
         testStatuses :: M.Map TestModule ExecutionStatus
-        testStatuses = testExStatus iterationResults
+        testStatuses = testStatusMap runResults
 
-        testStatus :: TestModule -> ExecutionStatus
-        testStatus tm = fromMaybe LC.Fail $ M.lookup tm testStatuses
+        testStatus' :: TestModule -> ExecutionStatus
+        testStatus' = testStatus testStatuses
 
         tstIterationStatusCounts :: M.Map TestModule StatusCount
         tstIterationStatusCounts = testIterationStatusCounts runResults
@@ -233,7 +281,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                                 testModAddress
                                 (getNotes testConfig)
                                 testConfig
-                                (testStatus testModAddress)
+                                (testStatus' testModAddress)
                                 (testItrStats testModAddress)
                   )
                 LP.EndTest _ -> skipLog

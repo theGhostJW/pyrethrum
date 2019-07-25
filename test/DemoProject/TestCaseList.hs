@@ -24,6 +24,7 @@ import           Runner as R
 import qualified System.IO as S
 import qualified Control.Exception as E
 import AuxFiles as A
+import LogTransformation (prepareFinalLogs)
 import Data.Aeson (ToJSON(..))
 import Data.Map as M
 
@@ -67,9 +68,14 @@ ioRun pln = testRun pln filters normalExecution executeInIOConsolePretty runConf
 ioRunRaw :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 ioRunRaw pln = testRun pln filters normalExecution executeInIOConsoleRaw runConfig
 
+data WantConsole = Console | NoConsole deriving Eq
+
+jsonItemLogExt = ".jsoni"
+
 -- TODO: move to library file 
 ioRunToFile :: 
-    Bool 
+    WantConsole
+    -> Bool 
     -> (forall m1 m a. TestPlan m1 m a FullIOEffects) 
     -> (forall a.
           (forall (effs :: [* -> *]).
@@ -88,12 +94,12 @@ ioRunToFile ::
           -> IO ()
        ) 
      -> IO (Either AppError [AbsFile])
-ioRunToFile docMode pln interpt itemRunner = 
+ioRunToFile wantConsole docMode pln interpt itemRunner = 
   let 
     handleSpec :: M.Map (Text, FileExt) (LogProtocol -> Text) 
     handleSpec = M.fromList [
                                 (("raw", FileExt ".log"), prettyPrintLogProtocol docMode)
-                              , (("raw", FileExt ".jsoni"), logStrJSON)
+                              , (("raw", FileExt jsonItemLogExt), logStrJSON)
                             ]
 
     fileHandleInfo :: IO (Either AppError [(LogProtocol -> Text, HandleInfo)])
@@ -113,7 +119,9 @@ ioRunToFile docMode pln interpt itemRunner =
     closeFileHandles hdls = sequence_ $ S.hClose <$> hdls
 
     allHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> Text, S.Handle)])
-    allHandles = (((Nothing, prettyPrintLogProtocol docMode, S.stdout) :) <$>) <$> fileHandles
+    allHandles = wantConsole == Console
+                      ? (((Nothing, prettyPrintLogProtocol docMode, S.stdout) :) <$>) <$> fileHandles
+                      $ fileHandles
     
     runTheTest :: [(LogProtocol -> Text, S.Handle)] -> IO ()
     runTheTest targHndls = testRun pln filters itemRunner (interpt (logToHandles targHndls)) runConfig
@@ -142,11 +150,25 @@ docRun pln = extractDocLog $ testRun pln filters docExecution executeDocumentPre
 runInIO :: IO ()
 runInIO = ioRun plan
 
+runLogToFile :: IO ()
+runLogToFile = do 
+                ePths <- ioRunToFile NoConsole False plan executeInIO normalExecution 
+                eitherf ePths 
+                  (\err -> putStrLn $ "Error Encountered\n" <> txt err)
+                  (\pths ->
+                      let 
+                        jsnItmsPth = find ((== jsonItemLogExt) . toS . fileExtension) pths
+                      in
+                        maybef jsnItmsPth
+                          (putStrLn $ "Unable to generate report no: " <> jsonItemLogExt <> " file found in log files\n")
+                          prepareFinalLogs
+                  )
+
 runConsoleAndFile :: IO ()
-runConsoleAndFile = void $ ioRunToFile False plan executeInIO normalExecution 
+runConsoleAndFile = void $ ioRunToFile Console False plan executeInIO normalExecution 
 
 docConsoleAndFile :: IO ()
-docConsoleAndFile = void $ ioRunToFile True plan documentInIO docExecution
+docConsoleAndFile = void $ ioRunToFile Console True plan documentInIO docExecution
 
 runInIORaw :: IO ()
 runInIORaw = ioRunRaw plan

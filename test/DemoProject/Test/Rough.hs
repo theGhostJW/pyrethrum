@@ -127,8 +127,8 @@ items = [
           i 100 "Pre"  "Post" validFile $
                                 gate 
                                 . expectFailure "this bug was introduced in an earlier version and will be fixed eventually" 
-                                $ chk' "iid x 10 is small" (const "this is additoinal info \nblahh\nblahh\nblahh") ((200 >) . iidx10) 
-                                <> chk "iid x 10 is big"  ((500 <) . iidx10),
+                                $ chk' "iid x 10 is small" (\V{..} -> "the iid x 10 (" <> txt iidx10 <> ") is expected to be less than 200") ((200 >) . iidx10) 
+                                <> chk' "iid x 10 is big"  (\V{..} -> "the iid x 10 (" <> txt iidx10 <> ") is expected to be greater than 500") ((500 <) . iidx10),
           i 110 "Pre"  "Post" validFile passAlwaysChk ,
           i 120 "Pre"  "Post" invalidFile2 passAlwaysChk,
           i 130 "Pre"  "Post" validFile passAlwaysChk,

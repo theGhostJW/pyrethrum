@@ -71,7 +71,7 @@ dumpByteStrings lst file = do
 display :: (DList ByteString -> DList ByteString) -> DList ByteString -> IO ()
 display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
 
-_sampleStatsSimple = F.foldl' statsStep emptyStepAccum $ Right <$> sampleLog
+_sampleStatsSimple = F.foldl' statsStep emptyStatsAccum $ Right <$> sampleLog
 
 sampleStats :: RunResults
 sampleStats = 
@@ -83,7 +83,7 @@ sampleStats =
       itemDesrialiser = jsonDeserialiser,
       resultSerialiser = yamlSerialiser,    
       linNo = LineNo 1,
-      accumulator = emptyStepAccum
+      accumulator = emptyStatsAccum
     }
   in
     runResults (fst $ transformDList rawFile transParams)

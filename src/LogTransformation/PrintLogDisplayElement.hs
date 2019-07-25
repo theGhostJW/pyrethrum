@@ -545,22 +545,21 @@ prettyPrintDisplayElement pde =
                 <> "domain state:"
                 <> newLn
                 <> dsText
-                <> newLn
-               
-                <> "application state:"
-                <> newLn
-                <> maybef apStateInfo "  No ApState Recorded" displayApState
-                
+ 
                 <> (
                 P.null validation 
                    ? newLn 
-                   $ newLn2 
+                   $ newLn 
                    <> "validation details:"
                    <> newLn
                    <> indent2 valDetailsTxt
-                   <> newLn
+                   <> newLn2
                 )
+                               
+                <> "application state:"
                 <> newLn
+                <> maybef apStateInfo "  No ApState Recorded" displayApState
+                <> newLn2
 
                 <> "full item:"
                 <> newLn

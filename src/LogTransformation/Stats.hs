@@ -8,25 +8,25 @@ import LogTransformation.Common
 import Data.Aeson.TH
 
 
-data StepAccum = StepAccum {
+data StatsAccum = StatsAccum {
     runResults :: RunResults,
     stepInfo :: LPStep
   } deriving Show
 
 
-emptyStepAccum = StepAccum {
+emptyStatsAccum = StatsAccum {
   runResults = RunResults M.empty M.empty,
   stepInfo = emptyLPStep
 }
 
 statsStepForReducer :: LineNo                                             -- lineNo
-                    -> StepAccum                                          -- accum
+                    -> StatsAccum                                          -- accum
                     -> Either DeserialisationError LogProtocol            -- Logprotocol
-                    -> (StepAccum, Maybe [StepAccum])                     -- (newAccum, err / result)
+                    -> (StatsAccum, Maybe [StatsAccum])                     -- (newAccum, err / result)
 statsStepForReducer _ accum lp = (statsStep accum lp, Nothing)
 
-statsStepFromLogProtocol :: StepAccum -> LogProtocol -> StepAccum
-statsStepFromLogProtocol (StepAccum runResults@(RunResults outOfTest itrRslts) stepInfo) lp = 
+statsStepFromLogProtocol :: StatsAccum -> LogProtocol -> StatsAccum
+statsStepFromLogProtocol (StatsAccum runResults@(RunResults outOfTest itrRslts) stepInfo) lp = 
   let 
     nxtStepInfo@(LPStep nxtPhaseValid nxtFailStage nxtPhase
                     logItemStatus nxtActiveItr nxtCheckEncountered) = logProtocolStep stepInfo lp
@@ -56,7 +56,7 @@ statsStepFromLogProtocol (StepAccum runResults@(RunResults outOfTest itrRslts) s
             )
 
   in 
-    StepAccum {
+    StatsAccum {
       runResults = RunResults {
         outOfTest = nxtOutOfTest,
         iterationResults = nxtItrRslts
@@ -64,8 +64,8 @@ statsStepFromLogProtocol (StepAccum runResults@(RunResults outOfTest itrRslts) s
       stepInfo = nxtStepInfo
     }
 
-statsStepFromDeserialisationError :: StepAccum -> DeserialisationError -> StepAccum
-statsStepFromDeserialisationError stepAccum@(StepAccum (RunResults outOfTest itrRslts) stepInfo) lp = 
+statsStepFromDeserialisationError :: StatsAccum -> DeserialisationError -> StatsAccum
+statsStepFromDeserialisationError statsAccum@(StatsAccum (RunResults outOfTest itrRslts) stepInfo) _lp = 
   let 
     activeItr = activeIteration stepInfo
 
@@ -79,18 +79,18 @@ statsStepFromDeserialisationError stepAccum@(StepAccum (RunResults outOfTest itr
                     itrRslts
                     (\(iid, outcome) -> M.insertWith max iid (IterationOutcome Fail (phase stepInfo)) itrRslts)
   in 
-    stepAccum {
+    statsAccum {
       runResults = RunResults {
         outOfTest = nxtOutOfTest,
         iterationResults = nxtItrRslts
       }
     }
 
-statsStep :: StepAccum -> Either DeserialisationError LogProtocol -> StepAccum
-statsStep stepAccum eithLP = 
+statsStep :: StatsAccum -> Either DeserialisationError LogProtocol -> StatsAccum
+statsStep statsAccum eithLP = 
     eitherf eithLP
-      (statsStepFromDeserialisationError stepAccum)
-      (statsStepFromLogProtocol stepAccum)
+      (statsStepFromDeserialisationError statsAccum)
+      (statsStepFromLogProtocol statsAccum)
 
 testExStatus :: IterationResults -> M.Map TestModule ExecutionStatus
 testExStatus ir = executionStatus <$> M.mapKeysWith max tstModule ir
@@ -139,4 +139,4 @@ worstStatus rr@(RunResults outOfTest _) =
       ? Fail -- empty test statuses is deemed fail
       $ fromMaybe Fail $ maximum $ nonZero outOfTest <> testStatuses
 
-$(deriveJSON defaultOptions ''StepAccum)
+$(deriveJSON defaultOptions ''StatsAccum)

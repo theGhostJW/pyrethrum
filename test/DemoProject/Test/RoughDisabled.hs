@@ -39,7 +39,7 @@ config = C.testConfig {
  }
 
 showItems :: IO ()
-showItems = showAndLogItems items
+showItems = showAndLogItems $ items runConfig
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig $ IID 120
@@ -65,10 +65,10 @@ newtype DState = V {
                   } deriving Show
 
 
-prepState :: ApState -> Ensurable DState
-prepState ApState{..} = do
-                          ensure  "I do not like 110 in prepstate" (itemId /= 110)
-                          pure $ V $ 10 * itemId
+prepState :: ApState -> Item -> Ensurable DState
+prepState ApState{..} itm = do
+                              ensure  "I do not like 110 in prepstate" (itemId /= 110)
+                              pure $ V $ 10 * itemId
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Test Items %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -84,8 +84,8 @@ data Item = Item {
 
 -- should be :: RunConfig -> [Item]
 -- later optional hedgehog
-items :: [Item]
-items = [Item 120 "Pre" "Post" invalidFile2 mempty]
+items :: RunConfig ->  [Item]
+items rc = [Item 120 "Pre" "Post" invalidFile2 mempty]
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -95,7 +95,7 @@ nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState
 
 ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr items)
+ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr $ items runConfig)
 
 test :: forall effs. Effects effs => Test Item effs ApState DState
 test = GenericTest {

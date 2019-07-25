@@ -99,10 +99,10 @@ newtype DState = V {
                   } deriving Show
 
 
-prepState :: ApState -> Ensurable DState
-prepState ApState{..} = do
-                          ensure  "I do not like 110 in prepstate" (itemId /= 110)
-                          pure $ V $ 10 * itemId
+prepState :: ApState -> Item -> Ensurable DState
+prepState ApState{..} _i = do
+                            ensure  "I do not like 110 in prepstate" (itemId /= 110)
+                            pure $ V $ 10 * itemId
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Test Items %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

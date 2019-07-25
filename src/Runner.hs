@@ -136,7 +136,7 @@ testAddress =  moduleAddress . (configuration :: GenericTest tc rc i effs as ds 
 normalExecution :: forall m effs rc tc i as ds. (Monad m, MonadCatch m, MonadMask m, ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc) =>
      (LogProtocol -> m ())                                  -- logger
      -> (rc -> i -> Eff effs as)                           -- Interactor          
-     -> (as -> Ensurable ds)                               -- prepstate
+     -> (as -> i -> Ensurable ds)                               -- prepstate
      -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
      -> tc                                                 -- TestConfig
      -> rc                                                 -- RunConfig
@@ -180,7 +180,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
                               
                               let 
                                 eds :: Either EnsureError ds
-                                eds = fullEnsureInterpreter $ prepState as
+                                eds = fullEnsureInterpreter $ prepState as i
                               
                               logRunItem StartPrepState
                               eitherf eds
@@ -200,9 +200,9 @@ normalExecution logger interactor prepState intrprt tc rc i  =
         handler
 
 docExecution :: forall m effs rc tc i as ds. (Monad m, ItemClass i ds, TestConfigClass tc) =>
-     (LogProtocol -> m ())                                  -- logger
+     (LogProtocol -> m ())                                 -- logger
      -> (rc -> i -> Eff effs as)                           -- Interactor          
-     -> (as -> Ensurable ds)                               -- prepstate
+     -> (as -> i -> Ensurable ds)                          -- prepstate
      -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
      -> tc                                                 -- TestConfig
      -> rc                                                 -- RunConfig
@@ -229,13 +229,13 @@ runTestItems :: forall i as ds tc rc effs m. (Show as, Show ds, Monad m, TestCon
       -> Maybe (S.Set Int)                                                    -- target Ids
       -> [i]                                                                  -- items
       -> (rc -> i -> Eff effs as)                                             -- interactor
-      -> (as -> Ensurable ds)                                                 -- prepstate
+      -> (as -> i -> Ensurable ds)                                            -- prepstate
       -> rc                                                                   -- runconfig
       -> (forall a. Eff effs a -> m (Either AppError a))                      -- interpreter
       -> ((Show as, Show ds) =>                               -- item runner logger - this does all the work and logs results as side effect
           (LogProtocol -> m ())                                 -- logger
           -> (rc -> i -> Eff effs as)                           -- interactor    
-          -> (as -> Ensurable ds)                               -- prepstate
+          -> (as -> i -> Ensurable ds)                          -- prepstate
           -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
           -> tc                                                 -- TestConfig
           -> rc                                                 -- RunConfig
@@ -284,7 +284,7 @@ runTest ::  forall i rc as ds m tc effs. (Monad m, ItemClass i ds, Show as, Show
                    -> (                               -- item runner logger - this does all the work and logs results as side effect
                       (LogProtocol -> m ())                                 -- logger
                       -> (rc -> i -> Eff effs as)                           -- interactor           
-                      -> (as -> Ensurable ds)                               -- prepstate
+                      -> (as -> i -> Ensurable ds)                               -- prepstate
                       -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
                       -> tc                                                 -- TestConfig
                       -> rc                                                 -- RunConfig
@@ -320,7 +320,7 @@ testRunOrEndpoint :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfi
                    -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) =>                                -- item runner logger - this does all the work and logs results as side effect
                         (LogProtocol -> m ())                                 -- logger
                         -> (rc -> i -> Eff effs as)                           -- interactor   
-                        -> (as -> Ensurable ds)                               -- prepstate
+                        -> (as -> i -> Ensurable ds)                               -- prepstate
                         -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
                         -> tc                                                 -- TestConfig
                         -> rc                                                 -- RunConfig
@@ -456,7 +456,7 @@ testRun :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc,
                    -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) =>  -- item runner logger - this does all the work and logs results as side effect
                         (LogProtocol -> m ())                                 -- logger
                         -> (rc -> i -> Eff effs as)                           -- interactor          
-                        -> (as -> Ensurable ds)                               -- prepstate
+                        -> (as -> i -> Ensurable ds)                               -- prepstate
                         -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
                         -> tc                                                 -- TestConfig
                         -> rc                                                 -- RunConfig
@@ -471,9 +471,9 @@ testRun = testRunOrEndpoint Nothing
 testEndpointBase :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                    FilterList rc tc                               -- filters
                    -> (forall as ds i. (ItemClass i ds, Show as, ToJSON as, ToJSON ds) => -- item runner logger - this does all the work and logs results as side effect
-                        (LogProtocol -> m ())                                  -- logger
-                        -> (rc -> i -> Eff effs as)                            -- interactor          
-                        -> (as -> Ensurable ds)                               -- prepstate
+                        (LogProtocol -> m ())                                 -- logger
+                        -> (rc -> i -> Eff effs as)                           -- interactor          
+                        -> (as -> i -> Ensurable ds)                          -- prepstate
                         -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
                         -> tc                                                 -- TestConfig
                         -> rc                                                 -- RunConfig

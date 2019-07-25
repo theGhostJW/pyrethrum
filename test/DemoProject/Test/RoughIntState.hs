@@ -49,8 +49,8 @@ type DState = Int
 interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Eff effs ApState
 interactor RunConfig{..} Item{..} = pure 5
 
-prepState :: ApState -> Ensurable DState
-prepState _ = pure 6
+prepState :: ApState -> Item -> Ensurable DState
+prepState _  _ = pure 6
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Test Items %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

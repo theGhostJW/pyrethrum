@@ -44,8 +44,8 @@ interactor _rc TestItem{..} = do
                               ensure "Only even iids expected" $ P.even iid
                               pure $ ApState iid "Success"
 
-prepState :: ApState -> Ensurable DState
-prepState = pure . id
+prepState :: ApState -> Item -> Ensurable DState
+prepState as itm = pure as
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Test Items %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

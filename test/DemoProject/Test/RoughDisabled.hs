@@ -65,8 +65,8 @@ newtype DState = V {
                   } deriving Show
 
 
-prepState :: ApState -> Item -> Ensurable DState
-prepState ApState{..} itm = do
+prepState :: Item -> ApState -> Ensurable DState
+prepState itm ApState{..} = do
                               ensure  "I do not like 110 in prepstate" (itemId /= 110)
                               pure $ V $ 10 * itemId
 

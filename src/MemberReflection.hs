@@ -118,8 +118,8 @@ interactor RunConfig{..} Item{..} = do
                                         fileText = tx
                                       }
 
-prepState :: ApState -> Item -> Ensurable DState
-prepState ApState{..} _i = do
+prepState :: Item -> ApState -> Ensurable DState
+prepState _i ApState{..} = do
                           ensure  "I do not like 110 in prepstate" (itemId /= 110)
                           pure $ V $ 10 * itemId
 

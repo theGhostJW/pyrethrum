@@ -39,7 +39,7 @@ instance Titled (TestGroup m1 m a effs) where
 data TestComponents rc i effs as ds = TestComponents {
   testItems :: rc -> [i],
   testInteractor :: rc -> i -> Eff effs as,
-  testPrepState :: as -> i -> Ensurable ds
+  testPrepState :: i -> as -> Ensurable ds
 }
 
 data GenericTest tc rc i effs as ds = GenericTest {

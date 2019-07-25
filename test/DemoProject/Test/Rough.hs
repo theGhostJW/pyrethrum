@@ -40,7 +40,7 @@ config = C.testConfig {
 jw = endpoint
 
 showItems :: IO ()
-showItems = showAndLogItems items
+showItems = showAndLogItems $ items runConfig
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig $ IID 120
@@ -122,8 +122,8 @@ passAlwaysChk = chk' "pass every time" (const "this is additoinal info \nblahh\n
 
 -- should be :: RunConfig -> [Item]
 -- later optional hedgehog
-items :: [Item]
-items = [
+items :: RunConfig -> [Item]
+items rc = [
           i 100 "Pre"  "Post" validFile $
                                 gate 
                                 . expectFailure "this bug was introduced in an earlier version and will be fixed eventually" 
@@ -148,9 +148,8 @@ items = [
 nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState
 
-
 ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr items)
+ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr $ items runConfig)
 
 test :: forall effs. Effects effs => Test Item effs ApState DState
 test = GenericTest {

@@ -157,8 +157,8 @@ validFileWithSpace =
   [absfile|/mnt/c/Vids/SystemDesign/Vid List.txt|] -- linux
 #endif
 
-items :: [Item]
-items = [
+items :: RunConfig -> [Item]
+items rc = [
           i 100 "Pre"  "Post" validFile $
                               chk "iid x 10 is small" (\V{..} -> iidx10 < 200 ) <>
                               chk "iid x 10 is big"   (\V{..} -> iidx10 > 500),

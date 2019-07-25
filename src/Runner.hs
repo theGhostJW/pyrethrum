@@ -298,7 +298,7 @@ runTest ::  forall i rc as ds m tc effs. (Monad m, ItemClass i ds, Show as, Show
 runTest iIds fltrs runnerLogger rc intrprt GenericTest{..} =
         let
           runItems :: TestComponents rc i effs as ds -> [m ()]
-          runItems TestComponents{..} = runTestItems configuration iIds testItems testInteractor testPrepState rc intrprt runnerLogger 
+          runItems TestComponents{..} = runTestItems configuration iIds (testItems rc) testInteractor testPrepState rc intrprt runnerLogger 
 
           include :: Bool
           include = acceptFilter $ filterTestCfg fltrs rc configuration
@@ -470,7 +470,7 @@ testRun = testRunOrEndpoint Nothing
 
 testEndpointBase :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                    FilterList rc tc                               -- filters
-                   -> (forall as ds i. (ItemClass i ds, Show as, ToJSON as, ToJSON ds) =>                                -- item runner logger - this does all the work and logs results as side effect
+                   -> (forall as ds i. (ItemClass i ds, Show as, ToJSON as, ToJSON ds) => -- item runner logger - this does all the work and logs results as side effect
                         (LogProtocol -> m ())                                  -- logger
                         -> (rc -> i -> Eff effs as)                            -- interactor          
                         -> (as -> Ensurable ds)                               -- prepstate

@@ -7,7 +7,7 @@ import           Pyrelude      as F
 import           LogListCheck
 import           Runner                   as R
 
-endPointLog = testEndpointDoc "DemoProject.Test.Rough" runConfig (filterredItemIds (IID 110) T.items) testG1GoHomeLogging
+endPointLog = testEndpointDoc "DemoProject.Test.Rough" runConfig (filterredItemIds (IID 110) (T.items runConfig)) testG1GoHomeLogging
 
 runActionMsg = "Run Action"
 checkActionMsg = "Check Action Run"
@@ -21,7 +21,11 @@ unit_endpoint_already_home_go_home_action_not_run = chkMessageInstances runActio
 
 unit_endpoint_single_iteration_only = chkMessageInstances startIterationStr 1 endPointLog
 
-endPointLogFailHomeCheck = testEndpointDoc "DemoProject.Test.Rough" runConfig (filterredItemIds (IID 110) T.items) testG1GoHomeLoggingFailCheck
+endPointLogFailHomeCheck = testEndpointDoc 
+                                "DemoProject.Test.Rough" 
+                                runConfig 
+                                (filterredItemIds (IID 110) (T.items runConfig)) 
+                                testG1GoHomeLoggingFailCheck
 
 -- go home check - once before group deciding to run rollover          | False
 -- rollove check - once to check rollover success                      | True

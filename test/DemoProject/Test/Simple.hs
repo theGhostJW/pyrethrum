@@ -27,7 +27,7 @@ config = C.testConfig {
 }
 
 showItems :: IO ()
-showItems = showAndLogItems items
+showItems = showAndLogItems $ items runConfig
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig (IID 123)
@@ -61,16 +61,17 @@ data Item = TestItem {
 
 i = TestItem
 
-items = [
-          i 100 "Pre"  "Post" validFile $
-                                         chk "iid is small" (\ApState{..} -> itemId < 200 ) <>
-                                         chk "iid is big"   (\ds -> itemId ds > 500),
-          i 110 "Pre"  "Post" validFile mempty,
-          i 123 "Pre"  "Post" invalidFile2 mempty,
-          i 130 "Pre"  "Post" validFile mempty,
-          i 140 "Pre"  "Post" validFile mempty,
-          i 150 "Pre"  "Post" validFile mempty
-  ]
+items :: RunConfig -> [Item]
+items rc = [
+              i 100 "Pre"  "Post" validFile $
+                                            chk "iid is small" (\ApState{..} -> itemId < 200 ) <>
+                                            chk "iid is big"   (\ds -> itemId ds > 500),
+              i 110 "Pre"  "Post" validFile mempty,
+              i 123 "Pre"  "Post" invalidFile2 mempty,
+              i 130 "Pre"  "Post" validFile mempty,
+              i 140 "Pre"  "Post" validFile mempty,
+              i 150 "Pre"  "Post" validFile mempty
+      ]
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -80,7 +81,7 @@ nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState
 
 ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr items)
+ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr $ items runConfig)
 
 
 test :: forall effs. Effects effs => Test Item effs ApState DState

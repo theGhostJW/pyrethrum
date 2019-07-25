@@ -38,7 +38,7 @@ config = C.testConfig {
  }
 
 showItems :: IO ()
-showItems = showAndLogItems items
+showItems = showAndLogItems $ items runConfig
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig $ IID 120
@@ -69,8 +69,8 @@ passAlwaysChk = chk "pass every time" $ const True
 
 -- should be :: RunConfig -> [Item]
 -- later optional hedgehog
-items :: [Item]
-items = [ Item 110 "Whene Statement"  "Then Statement" validFile passAlwaysChk]
+items :: RunConfig -> [Item]
+items rc = [ Item 110 "Whene Statement"  "Then Statement" validFile passAlwaysChk]
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Registration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -82,7 +82,7 @@ nameOfModule = mkTestModule ''ApState
 
 
 ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr items)
+ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr $ items rc)
 
 test :: forall effs. Effects effs => Test Item effs ApState DState
 test = GenericTest {

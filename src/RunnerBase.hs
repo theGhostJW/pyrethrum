@@ -37,7 +37,7 @@ instance Titled (TestGroup m1 m a effs) where
   title = header
 
 data TestComponents rc i effs as ds = TestComponents {
-  testItems :: [i],
+  testItems :: rc -> [i],
   testInteractor :: rc -> i -> Eff effs as,
   testPrepState :: as -> Ensurable ds
 }

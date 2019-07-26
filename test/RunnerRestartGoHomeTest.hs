@@ -23,56 +23,26 @@ unit_go_home_iteration_check_fail = chkMessageInstances goHomeCheckMessage 16 ru
 
 unit_rollover_check_fail = chkMessageInstances rolloverCheckMessage 1 runFailRolloverG1Document
 
+-----------------------------------------------------------------
+---------------------- Duplicate Group Names --------------------
+-----------------------------------------------------------------
 
+emptyGroup :: Text -> TestGroup m1 m a effs
+emptyGroup hdr = TestGroup hdr doNothing doNothing []
 
 planWithDuplicates :: forall m m1 effs a. TestPlan m1 m a effs
 planWithDuplicates f = [
-    TestGroup {
-           header = "Group 1",
-           rollover = doNothing,
-           goHome = doNothing,
-           tests = []
-      },
-
-    TestGroup {
-          header = "Group 2",
-          rollover = doNothing,
-          goHome = doNothing,
-          tests = []
-     },
-
-    TestGroup {
-          header = "Group 1",
-          rollover = doNothing,
-          goHome = doNothing,
-          tests = []
-     }
+    emptyGroup "Group 1",
+    emptyGroup "Group 2",
+    emptyGroup "Group 1"
   ]
 
 planWithNoDuplicates :: forall m m1 effs a. TestPlan m1 m a effs
 planWithNoDuplicates f = [
-    TestGroup {
-           header = "Group 1",
-           rollover = doNothing,
-           goHome = doNothing,
-           tests = []
-      },
-
-    TestGroup {
-          header = "Group 2",
-          rollover = doNothing,
-          goHome = doNothing,
-          tests = []
-     },
-
-    TestGroup {
-          header = "Group 3",
-          rollover = doNothing,
-          goHome = doNothing,
-          tests = []
-     }
-  ]
-
+    emptyGroup "Group 1",
+    emptyGroup "Group 2",
+    emptyGroup "Group 3"
+ ]
 
 docRunDuplicates :: [Text]
 docRunDuplicates = toList $ docRunRaw planWithDuplicates

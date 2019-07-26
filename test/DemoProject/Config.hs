@@ -96,6 +96,9 @@ isActiveFilter = TestFilter {
 filters :: [TestFilter RunConfig TestConfig]
 filters = [isActiveFilter, countryFilter, levelFilter]
 
+applyTestFiltersToItems :: RunConfig -> (i -> TestConfig) -> [i] -> [i]
+applyTestFiltersToItems = applyTestFilters filters
+
 type TestPlan m1 m a effs = TestPlanBase TestConfig RunConfig m1 m a effs
 
 testEndpoint ::

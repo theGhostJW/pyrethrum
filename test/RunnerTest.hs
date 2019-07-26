@@ -1,4 +1,4 @@
-module RunnerRestartGoHomeTest where
+module RunnerTest where
 
 import           DemoProject.TestCaseList
 import           Pyrelude      as F
@@ -6,7 +6,7 @@ import           Pyrelude.Test
 import           LogListCheck
 import           RunnerBase
 import           Runner
-import           DemoProject.Config
+import           DemoProject.Config as CFG
 import           DSL.Interpreter 
 
 goHomeCheckMessage :: Text

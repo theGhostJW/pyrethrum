@@ -35,6 +35,24 @@ import qualified Prelude
 
 type TestPlanBase tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => GenericTest tc rc i effs as ds -> m1 (m a)) -> [TestGroup m1 m a effs]
 
+
+--- Reapplying test Filters to Items ---
+
+applyTestFilters :: forall i tc rc. TestConfigClass tc => [TestFilter rc tc] -> rc -> (i -> tc) -> [i] -> [i]
+applyTestFilters fltrs rc cvtr itms = 
+    fst <$> filter (isNothing . snd) (applyTestFiltersToItemsShowReason fltrs rc cvtr itms) 
+
+-- debugging
+applyTestFiltersToItemsShowReason :: forall i tc rc. TestConfigClass tc => [TestFilter rc tc] -> rc -> (i -> tc) -> [i] -> [(i, Maybe Text)]
+applyTestFiltersToItemsShowReason fltrs rc cvtr itms = 
+  let 
+    fltrItm :: i -> (i, Maybe Text)
+    fltrItm i = (i, reasonForRejection . filterTestCfg fltrs rc $ cvtr i)
+  in 
+    fltrItm <$> itms
+
+---
+
 showAndLogItems :: Show a => [a] -> IO ()
 showAndLogItems = showAndLogList "items"
 
@@ -175,24 +193,24 @@ normalExecution logger interactor prepState intrprt tc rc i  =
 
             eitherf ethas
               (\e -> logRunItem (InteractorFailure iid e) *> recordSkippedChecks)
-              (\as -> do 
-                        logRunItem . InteractorSuccess iid . ApStateJSON . toJSON $ as
-                        
-                        let 
-                          eds :: Either EnsureError ds
-                          eds = fullEnsureInterpreter $ prepState i as
-                        
-                        logRunItem StartPrepState
-                        eitherf eds
-                          (\e -> (logRunItem . PrepStateFailure iid $ AppEnsureError e) *> recordSkippedChecks)
-                          (
-                            \ds -> 
-                              do
-                                logRunItem . PrepStateSuccess iid . DStateJSON . toJSON $ ds
-                                logRunItem StartChecks
-                                runChecks ds
-                          )
-                          
+              (\as -> 
+                  do 
+                    logRunItem . InteractorSuccess iid . ApStateJSON . toJSON $ as
+                    
+                    let 
+                      eds :: Either EnsureError ds
+                      eds = fullEnsureInterpreter $ prepState i as
+                    
+                    logRunItem StartPrepState
+                    eitherf eds
+                      (\e -> (logRunItem . PrepStateFailure iid $ AppEnsureError e) *> recordSkippedChecks)
+                      (
+                        \ds -> 
+                          do
+                            logRunItem . PrepStateSuccess iid . DStateJSON . toJSON $ ds
+                            logRunItem StartChecks
+                            runChecks ds
+                      )
               )
   in 
     catch

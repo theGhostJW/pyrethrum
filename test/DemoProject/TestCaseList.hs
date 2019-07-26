@@ -87,7 +87,7 @@ ioRunToFile ::
         forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => 
           (LogProtocol -> IO ()) 
           -> (RunConfig -> i -> Eff FullIOEffects as) 
-          -> (as -> i -> Ensurable ds) 
+          -> (i -> as -> Ensurable ds) 
           -> (forall a. Eff FullIOEffects a -> IO (Either AppError a))  
           -> TestConfig -> RunConfig 
           -> i 

@@ -134,66 +134,66 @@ testAddress =  moduleAddress . (configuration :: GenericTest tc rc i effs as ds 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 normalExecution :: forall m effs rc tc i as ds. (Monad m, MonadCatch m, MonadMask m, ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc) =>
-     (LogProtocol -> m ())                                  -- logger
+     (LogProtocol -> m ())                                 -- logger
      -> (rc -> i -> Eff effs as)                           -- Interactor          
-     -> (i -> as -> Ensurable ds)                               -- prepstate
+     -> (i -> as -> Ensurable ds)                          -- prepstate
      -> (forall a. Eff effs a -> m (Either AppError a))    -- interpreter
      -> tc                                                 -- TestConfig
      -> rc                                                 -- RunConfig
      -> i                                                  -- item
      -> m ()                                               -- result
 normalExecution logger interactor prepState intrprt tc rc i  = 
-      let
-        iid :: ItemId
-        iid = ItemId (moduleAddress tc) (identifier i)
+    let
+      iid :: ItemId
+      iid = ItemId (moduleAddress tc) (identifier i)
 
-        logRunItem :: RunProtocol -> m ()
-        logRunItem = logger . logRun
+      logRunItem :: RunProtocol -> m ()
+      logRunItem = logger . logRun
 
-        logChk :: CK.CheckReport -> m ()
-        logChk cr = logRunItem $ CheckOutcome iid cr
+      logChk :: CK.CheckReport -> m ()
+      logChk cr = logRunItem $ CheckOutcome iid cr
 
-        handler :: SomeException -> m ()
-        handler e = logger . logRun . LP.Error . AppGenericError' ("Unexpected Error Executing iteration: " <> txt iid) . toS $ displayException e
+      handler :: SomeException -> m ()
+      handler e = logger . logRun . LP.Error . AppGenericError' ("Unexpected Error Executing iteration: " <> txt iid) . toS $ displayException e
 
-        recordSkippedChecks :: m ()
-        recordSkippedChecks = do 
-                                logRunItem StartChecks 
-                                F.traverse_ logChk $ D.toList $ CK.skipChecks (checkList i)
+      recordSkippedChecks :: m ()
+      recordSkippedChecks = do 
+                              logRunItem StartChecks 
+                              F.traverse_ logChk $ D.toList $ CK.skipChecks (checkList i)
 
-        normalExecution' :: m ()
-        normalExecution' = 
-              let
-                runChecks :: ds -> m ()
-                runChecks ds = F.traverse_ logChk $ D.toList $ CK.calcChecks ds (checkList i)
-              in 
-                do 
-                  logRunItem StartInteraction
-                  ethas <- onError 
-                              (intrprt $ interactor rc i) 
-                              (logger . logRun . LP.Error $ AppGenericError "Interactor Exception has Occurred")
+      normalExecution' :: m ()
+      normalExecution' = 
+        let
+          runChecks :: ds -> m ()
+          runChecks ds = F.traverse_ logChk $ D.toList $ CK.calcChecks ds (checkList i)
+        in 
+          do 
+            logRunItem StartInteraction
+            ethas <- onError 
+                        (intrprt $ interactor rc i) 
+                        (logger . logRun . LP.Error $ AppGenericError "Interactor Exception")
 
-                  eitherf ethas
-                    (\e -> logRunItem (InteractorFailure iid e) *> recordSkippedChecks)
-                    (\as -> do 
-                              logRunItem . InteractorSuccess iid . ApStateJSON . toJSON $ as
-                              
-                              let 
-                                eds :: Either EnsureError ds
-                                eds = fullEnsureInterpreter $ prepState i as
-                              
-                              logRunItem StartPrepState
-                              eitherf eds
-                                (\e -> (logRunItem . PrepStateFailure iid $ AppEnsureError e) *> recordSkippedChecks)
-                                (
-                                  \ds -> 
-                                    do
-                                      logRunItem . PrepStateSuccess iid . DStateJSON . toJSON $ ds
-                                      logRunItem StartChecks
-                                      runChecks ds
-                                )
-                                
-                    )
+            eitherf ethas
+              (\e -> logRunItem (InteractorFailure iid e) *> recordSkippedChecks)
+              (\as -> do 
+                        logRunItem . InteractorSuccess iid . ApStateJSON . toJSON $ as
+                        
+                        let 
+                          eds :: Either EnsureError ds
+                          eds = fullEnsureInterpreter $ prepState i as
+                        
+                        logRunItem StartPrepState
+                        eitherf eds
+                          (\e -> (logRunItem . PrepStateFailure iid $ AppEnsureError e) *> recordSkippedChecks)
+                          (
+                            \ds -> 
+                              do
+                                logRunItem . PrepStateSuccess iid . DStateJSON . toJSON $ ds
+                                logRunItem StartChecks
+                                runChecks ds
+                          )
+                          
+              )
   in 
     catch
         normalExecution'
@@ -208,20 +208,21 @@ docExecution :: forall m effs rc tc i as ds. (Monad m, ItemClass i ds, TestConfi
      -> rc                                                 -- RunConfig
      -> i                                                  -- item
      -> m ()                                               -- result
-docExecution logger interactor _ intrprt tc rc i = let
-                                                      iid :: ItemId
-                                                      iid = ItemId (moduleAddress tc) $ identifier i
+docExecution logger interactor _ intrprt tc rc i = 
+  let
+    iid :: ItemId
+    iid = ItemId (moduleAddress tc) $ identifier i
 
-                                                      docLog = logger . logDoc
+    docLog = logger . logDoc
 
-                                                      logChecks :: m ()
-                                                      logChecks =  P.sequence_ $  (\chk -> docLog $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
-                                                    in 
-                                                      do 
-                                                        docLog DocInteraction
-                                                        intrprt (interactor rc i)
-                                                        docLog DocChecks
-                                                        logChecks
+    logChecks :: m ()
+    logChecks =  P.sequence_ $  (\chk -> docLog $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
+  in 
+    do 
+      docLog DocInteraction
+      intrprt (interactor rc i)
+      docLog DocChecks
+      logChecks
 
 
 runTestItems :: forall i as ds tc rc effs m. (Show as, Show ds, Monad m, TestConfigClass tc, ItemClass i ds, Member Logger effs) =>
@@ -245,14 +246,17 @@ runTestItems :: forall i as ds tc rc effs m. (Show as, Show ds, Monad m, TestCon
       -> [m ()]
 runTestItems tc iIds items interactor prepState rc intrprt runnerLogger =
   let
-    logPtcl :: LogProtocol -> m ()
-    logPtcl = logger' intrprt
+    logPrtcl :: LogProtocol -> m ()
+    logPrtcl = logger' intrprt
+    
+    logBoundry :: BoundaryEvent -> m ()
+    logBoundry = logPrtcl . BoundaryLog
 
     startTest :: m ()
-    startTest = logPtcl . BoundaryLog . StartTest $ mkDisplayInfo tc
+    startTest = logBoundry . StartTest $ mkDisplayInfo tc
 
     endTest :: m ()
-    endTest = logPtcl . BoundaryLog . EndTest $ moduleAddress tc
+    endTest = logBoundry . EndTest $ moduleAddress tc
 
     filteredItems :: [i]
     filteredItems = filter inTargIds items
@@ -263,9 +267,9 @@ runTestItems tc iIds items interactor prepState rc intrprt runnerLogger =
                     iid = ItemId (moduleAddress tc) (identifier i)
                   in
                     do
-                      logPtcl . BoundaryLog . StartIteration iid (WhenClause $ whenClause i) (ThenClause $ thenClause i) $ toJSON i
-                      runnerLogger logPtcl interactor prepState intrprt tc rc i
-                      logPtcl . BoundaryLog $ EndIteration iid
+                      logBoundry . StartIteration iid (WhenClause $ whenClause i) (ThenClause $ thenClause i) $ toJSON i
+                      runnerLogger logPrtcl interactor prepState intrprt tc rc i
+                      logBoundry $ EndIteration iid
 
     inTargIds :: i -> Bool
     inTargIds i = maybe True (S.member (identifier i)) iIds
@@ -333,42 +337,40 @@ testRunOrEndpoint :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfi
 testRunOrEndpoint iIds runner fltrs runnerLogger intrprt rc =
         let
           preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
-          preRun PreRun{..} stage = do
-                                let
-                                  stageStr :: Text
-                                  stageStr = txt stage
+          preRun PreRun{..} stage = 
+            do
+              let
+                stageStr :: Text
+                stageStr = txt stage
 
-                                  stageExLabel :: Text
-                                  stageExLabel = "Execution of " <> stageStr
+                stageExLabel :: Text
+                stageExLabel = "Execution of " <> stageStr
 
-                                  msgPrefix :: Text
-                                  msgPrefix = case stage of
-                                                Rollover -> "No tests run in group. "
-                                                GoHome -> "No items run for test. "
+                msgPrefix :: Text
+                msgPrefix = case stage of
+                              Rollover -> "No tests run in group. "
+                              GoHome -> "No items run for test. "
 
-                                  verifyAction :: Either AppError Bool -> Either AppError ()
-                                  verifyAction  = either
-                                                           (Left . AppPreTestCheckExecutionError stage (msgPrefix <> stageExLabel <> " check"))
-                                                           (\hmChk -> hmChk ?
-                                                                          Right () $
-                                                                          Left
-                                                                              $ AppPreTestCheckError stage
-                                                                                $ msgPrefix
-                                                                                <> stageStr
-                                                                                <> " action ran without exception but completion check returned False. Looks like "
-                                                                                <> stageStr
-                                                                                <> " did not run as expected"
-                                                           )
+                verifyAction :: Either AppError Bool -> Either AppError ()
+                verifyAction  = either
+                                          (Left . AppPreTestCheckExecutionError stage (msgPrefix <> stageExLabel <> " check"))
+                                          (\hmChk -> hmChk ?
+                                                        Right () $
+                                                        Left
+                                                            $ AppPreTestCheckError stage
+                                                              $ msgPrefix
+                                                              <> stageStr
+                                                              <> " action ran without exception but completion check returned False. Looks like "
+                                                              <> stageStr
+                                                              <> " did not run as expected"
+                                          )
 
-                                preRunRslt <- intrprt runAction
-                                runCheck <- intrprt checkHasRun
-                                pure $ either
-                                         (Left . AppPreTestError stage stageExLabel)
-                                         (\_ -> verifyAction runCheck)
-                                         preRunRslt
-
-          logPtcl :: LogProtocol -> m ()
-          logPtcl = logger' intrprt
+              preRunRslt <- intrprt runAction
+              runCheck <- intrprt checkHasRun
+              pure $ either
+                        (Left . AppPreTestError stage stageExLabel)
+                        (\_ -> verifyAction runCheck)
+                        preRunRslt
 
           filterInfo :: [[FilterResult]]
           filterInfo = filterGroups runner fltrs rc
@@ -379,8 +381,20 @@ testRunOrEndpoint iIds runner fltrs runnerLogger intrprt rc =
           prepResults :: [TestGroup [] m () effs]
           prepResults = runner $ runTest iIds fltrs runnerLogger rc intrprt
 
+          firstDuplicateGroupTitle :: Maybe Text
+          firstDuplicateGroupTitle = toS <$> firstDuplicate (toS . C.title <$> prepResults :: [Prelude.String])
+
           runTuples ::  [(Bool, TestGroup [] m () effs)]
           runTuples = P.zip filterFlags prepResults
+          
+          logPtcl :: LogProtocol -> m ()
+          logPtcl = logger' intrprt
+          
+          logBoundry :: BoundaryEvent -> m ()
+          logBoundry = logPtcl . BoundaryLog
+
+          logLPError :: AppError -> m ()
+          logLPError = logPtcl . logRun . LP.Error
 
           exeGroup :: (Bool, TestGroup [] m () effs) -> m ()
           exeGroup (include, tg) =
@@ -418,7 +432,7 @@ testRunOrEndpoint iIds runner fltrs runnerLogger intrprt rc =
               logFailOrRun :: m (Either AppError ()) -> m () -> m ()
               logFailOrRun prerun mRun = do
                                           pr <- prerun
-                                          either (logPtcl . logRun . LP.Error) (const mRun) pr
+                                          either logLPError (const mRun) pr
 
               runTestIteration :: m () -> m ()
               runTestIteration = logFailOrRun grpGoHome
@@ -438,17 +452,22 @@ testRunOrEndpoint iIds runner fltrs runnerLogger intrprt rc =
                       hdr = GroupTitle $ RB.header tg
                     in
                       do
-                        logPtcl . BoundaryLog $ StartGroup hdr
+                        logBoundry $ StartGroup hdr
                         logFailOrRun grpRollover runGroupAfterRollover
-                        logPtcl . BoundaryLog $ EndGroup hdr
+                        logBoundry $ EndGroup hdr
            in
               include ? runGrp $ pure ()
         in
-          do
-            logPtcl . BoundaryLog . StartRun (RunTitle $ C.title rc) $ toJSON rc
-            logPtcl . BoundaryLog . FilterLog $ filterLog filterInfo
-            sequence_ $ exeGroup <$> runTuples
-            logPtcl $ BoundaryLog EndRun
+          maybef firstDuplicateGroupTitle
+          (
+            do
+              logBoundry . StartRun (RunTitle $ C.title rc) $ toJSON rc
+              logBoundry . FilterLog $ filterLog filterInfo
+              sequence_ $ exeGroup <$> runTuples
+              logBoundry EndRun
+          )
+          (\dupeTxt -> logLPError . AppGenericError $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
+          
 
 testRun :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
                    (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results

@@ -26,7 +26,7 @@ ensureInterpreter = interpret $ \case
                                     Throw message -> throwError $ EnsureError message
 
 -- when documenting actions we do nothing as ensure and throw 
--- are just programming constructs, they don't represnt user actions
+-- are just programming constructs, they don't represent user actions
 ensureDocInterpreter :: forall effs a. Eff (Ensure ': effs) a -> Eff effs a
 ensureDocInterpreter = interpret $ \case
                                     Ensure message condition -> pure ()

@@ -38,8 +38,6 @@ fileSystemIOInterpreter =
                                           ReadFile path -> handleException (PO.readFile $ toFilePath path) ReadFileError
                                           WriteFile path str -> handleException (PO.writeFile (toFilePath path) str) WriteFileError
 
-
-
 fileSystemDocInterpreter :: Member Logger effs => Eff (FileSystem ': effs) a -> Eff effs a
 fileSystemDocInterpreter = interpret $
                                       let

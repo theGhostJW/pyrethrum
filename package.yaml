@@ -41,9 +41,12 @@ ghc-options:
   - -Wall
   #- -Werror
   - -Wcompat
+  - -flate-specialise # reqiuired for polyseemy
+  - -fspecialise-aggressively # reqiuired for polyseemy
   - -Wincomplete-record-updates
   - -Wincomplete-uni-patterns
   - -Wredundant-constraints
+  - -fplugin=Polysemy.Plugin
   - -fwarn-tabs
   - -fno-warn-unused-imports
   - -fno-warn-missing-signatures
@@ -88,6 +91,7 @@ default-extensions:
   - OverloadedStrings
   - PartialTypeSignatures
   - PatternSynonyms
+  - PolyKinds
   - QuasiQuotes
   - RankNTypes
   - RecordWildCards
@@ -111,6 +115,8 @@ library:
     - bytestring
     - mtl
     - fmt
+    - polysemy
+    - polysemy-plugin
 
 _testDep: &testdependencies
 - tasty

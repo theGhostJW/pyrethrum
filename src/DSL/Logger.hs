@@ -1,4 +1,3 @@
-
 module DSL.Logger where
 
 import Common
@@ -18,16 +17,16 @@ import Data.Yaml as Y
 import System.IO (stdout)
 
 data Logger r where
- LogItem :: LogProtocol -> Logger ()
+  LogItem :: LogProtocol -> Logger ()
 
- LogMessage :: Text -> Logger ()
- LogMessage' :: Text -> Text -> Logger ()
+  LogMessage :: Text -> Logger ()
+  LogMessage' :: Text -> Text -> Logger ()
 
- LogWarning :: Text -> Logger ()
- LogWarning' :: Text -> Text -> Logger ()
+  LogWarning :: Text -> Logger ()
+  LogWarning' :: Text -> Text -> Logger ()
 
- LogError :: Text -> Logger ()
- LogError' :: Text -> Text -> Logger ()
+  LogError :: Text -> Logger ()
+  LogError' :: Text -> Text -> Logger ()
 
 logItem :: Member Logger effs => LogProtocol -> Eff effs ()
 logItem = send . LogItem
@@ -55,32 +54,32 @@ logError' msg = send . LogError' msg --- detailLog  (Error . AppUserError')
 
 logConsoleInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsoleInterpreter = interpretM $ \case 
-                                        LogItem lp -> P.print lp
-                                        LogError msg -> P.print . logRun . Error $ AppUserError msg 
-                                        LogError' msg info -> P.print . logRun . Error . AppUserError' $ DetailedInfo msg info
-                                        
-                                        LogMessage s ->  P.print . logRun $ Message s 
-                                        LogMessage' msg info -> P.print . logRun . Message' $ DetailedInfo msg info
-                      
-                                        LogWarning s -> P.print. logRun $ Warning s 
-                                        LogWarning' msg info ->  P.print . logRun . Warning' $ DetailedInfo msg info
+                                      LogItem lp -> P.print lp
+                                      LogError msg -> P.print . logRun . Error $ AppUserError msg 
+                                      LogError' msg info -> P.print . logRun . Error . AppUserError' $ DetailedInfo msg info
+                                      
+                                      LogMessage s ->  P.print . logRun $ Message s 
+                                      LogMessage' msg info -> P.print . logRun . Message' $ DetailedInfo msg info
+                    
+                                      LogWarning s -> P.print. logRun $ Warning s 
+                                      LogWarning' msg info ->  P.print . logRun . Warning' $ DetailedInfo msg info
 
 logDocInterpreter :: forall effs. Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocInterpreter = 
-                    let 
-                      tellDoc :: DocProtocol -> Eff effs ()
-                      tellDoc = tell . dList . logDoc
-                    in
-                      interpret $ \case 
-                                      LogItem lp -> tell $ dList lp
-                                      LogError msg -> tellDoc . DocError $ AppUserError msg 
-                                      LogError' msg info -> tellDoc . DocError . AppUserError' $ DetailedInfo msg info
+                  let 
+                    tellDoc :: DocProtocol -> Eff effs ()
+                    tellDoc = tell . dList . logDoc
+                  in
+                    interpret $ \case 
+                                    LogItem lp -> tell $ dList lp
+                                    LogError msg -> tellDoc . DocError $ AppUserError msg 
+                                    LogError' msg info -> tellDoc . DocError . AppUserError' $ DetailedInfo msg info
 
-                                      LogMessage s ->  tellDoc $ DocMessage s 
-                                      LogMessage' msg info -> tellDoc . DocMessage' $ DetailedInfo msg info
+                                    LogMessage s ->  tellDoc $ DocMessage s 
+                                    LogMessage' msg info -> tellDoc . DocMessage' $ DetailedInfo msg info
 
-                                      LogWarning s -> tellDoc $ DocWarning s 
-                                      LogWarning' msg info ->  tellDoc . DocWarning' $ DetailedInfo msg info
+                                    LogWarning s -> tellDoc $ DocWarning s 
+                                    LogWarning' msg info ->  tellDoc . DocWarning' $ DetailedInfo msg info
 
 
 -- ToDo move to lib
@@ -89,61 +88,61 @@ putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
 
 logStrJSON :: LogProtocol -> Text
 logStrJSON lp = eitherf (decodeUtf8' . B.toStrict . A.encode $ lp)
-                  (\e -> "Encode error: " <> txt e)
-                  id
+                (\e -> "Encode error: " <> txt e)
+                id
 
 logConsolePrettyInterpreter :: LastMember IO effs => Eff (Logger ': effs) ~> Eff effs
 logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocol False, stdout)]
 
 logToHandles :: LastMember IO effs => [(LogProtocol -> Text, Handle)] -> Eff (Logger ': effs) ~> Eff effs
 logToHandles convertersHandlers = 
-                        let 
-                          logToHandle :: (LogProtocol -> Text) -> Handle -> LogProtocol -> IO ()
-                          logToHandle lp2Str h = putLines h . lp2Str 
+                      let 
+                        logToHandle :: (LogProtocol -> Text) -> Handle -> LogProtocol -> IO ()
+                        logToHandle lp2Str h = putLines h . lp2Str 
 
-                          logToh :: LogProtocol -> (LogProtocol -> Text, Handle) -> IO ()
-                          logToh lp (f, h) = logToHandle f h lp
+                        logToh :: LogProtocol -> (LogProtocol -> Text, Handle) -> IO ()
+                        logToh lp (f, h) = logToHandle f h lp
 
-                          logTohandles :: LogProtocol -> IO ()
-                          logTohandles lp =  P.sequence_ $ logToh lp <$> convertersHandlers
+                        logTohandles :: LogProtocol -> IO ()
+                        logTohandles lp =  P.sequence_ $ logToh lp <$> convertersHandlers
 
-                          logRunTohandles :: RunProtocol -> IO ()
-                          logRunTohandles = logTohandles . IterationLog . Run 
-                        in
-                          interpretM $ \case 
-                                          LogItem lp -> logTohandles lp
+                        logRunTohandles :: RunProtocol -> IO ()
+                        logRunTohandles = logTohandles . IterationLog . Run 
+                      in
+                        interpretM $ \case 
+                                        LogItem lp -> logTohandles lp
 
-                                          LogError msg -> logRunTohandles . Error $ AppUserError msg
-                                          LogError' msg info -> logRunTohandles . Error . AppUserError' $ DetailedInfo msg info
+                                        LogError msg -> logRunTohandles . Error $ AppUserError msg
+                                        LogError' msg info -> logRunTohandles . Error . AppUserError' $ DetailedInfo msg info
 
-                                          LogMessage s ->  logRunTohandles $ Message s 
-                                          LogMessage' msg info -> logRunTohandles . Message' $ DetailedInfo msg info
+                                        LogMessage s ->  logRunTohandles $ Message s 
+                                        LogMessage' msg info -> logRunTohandles . Message' $ DetailedInfo msg info
 
-                                          LogWarning s -> logRunTohandles $ Warning s 
-                                          LogWarning' msg info ->  logRunTohandles . Warning' $ DetailedInfo msg info
-                                          
-                             
+                                        LogWarning s -> logRunTohandles $ Warning s 
+                                        LogWarning' msg info ->  logRunTohandles . Warning' $ DetailedInfo msg info
+                                        
+                            
 logDocPrettyInterpreter :: forall effs. Member WriterDList effs => Eff (Logger ': effs) ~> Eff effs
 logDocPrettyInterpreter = let
-                            toDList :: [Text] -> DList Text
-                            toDList = fromList
+                          toDList :: [Text] -> DList Text
+                          toDList = fromList
 
-                            pushItem :: LogProtocol -> Eff effs () 
-                            pushItem = tell . toDList . lines . prettyPrintLogProtocol True
+                          pushItem :: LogProtocol -> Eff effs () 
+                          pushItem = tell . toDList . lines . prettyPrintLogProtocol True
 
-                            pushDoc :: DocProtocol -> Eff effs () 
-                            pushDoc = pushItem . IterationLog . Doc
-                          in
-                            interpret $  \case 
-                                            LogItem lp -> pushItem lp
+                          pushDoc :: DocProtocol -> Eff effs () 
+                          pushDoc = pushItem . IterationLog . Doc
+                        in
+                          interpret $  \case 
+                                          LogItem lp -> pushItem lp
 
-                                            LogError msg -> pushDoc. DocError $ AppUserError msg
-                                            LogError' msg inf -> pushDoc . DocError . AppUserError' $ DetailedInfo msg inf
+                                          LogError msg -> pushDoc. DocError $ AppUserError msg
+                                          LogError' msg inf -> pushDoc . DocError . AppUserError' $ DetailedInfo msg inf
 
-                                            LogMessage s ->  pushDoc $ DocMessage s 
-                                            LogMessage' msg info -> pushDoc . DocMessage' $ DetailedInfo msg info
+                                          LogMessage s ->  pushDoc $ DocMessage s 
+                                          LogMessage' msg info -> pushDoc . DocMessage' $ DetailedInfo msg info
 
-                                            LogWarning s -> pushDoc $ DocWarning s 
-                                            LogWarning' msg info ->  pushDoc . DocWarning' $ DetailedInfo msg info
+                                          LogWarning s -> pushDoc $ DocWarning s 
+                                          LogWarning' msg info ->  pushDoc . DocWarning' $ DetailedInfo msg info
 
-                               
+                              

@@ -25,9 +25,10 @@ writeFile pth = send . WriteFile pth
 
 {- File System IO Interpreter -}
 
-fileSystemIOInterpreter :: Members '[Error FileSystemError, IO] effs => Eff (FileSystem ': effs) a -> Eff effs a
+fileSystemIOInterpreter :: forall effs a. Members '[Error FileSystemError, IO] effs => Eff (FileSystem ': effs) a -> Eff effs a
 fileSystemIOInterpreter =
                           let
+                            handleException :: forall b. IO b -> (IOException -> FileSystemError) -> Eff effs b
                             handleException action handler = do
                                                                r <- send (E.try action)
                                                                case r of

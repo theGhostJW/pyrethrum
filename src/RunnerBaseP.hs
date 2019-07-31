@@ -1,9 +1,9 @@
-module RunnerBase where
+module RunnerBaseP where
 
 import DSL.Ensure
 import Common (FilterError)
 import Pyrelude
-import  Control.Monad.Freer
+import Polysemy
 import RunElementClasses
 import Data.Aeson.TH
 import Data.Aeson
@@ -14,8 +14,8 @@ data GenericResult tc rslt = TestResult {
 } deriving Show
 
 data PreRun effs = PreRun {
-  runAction :: Eff effs (),
-  checkHasRun :: Eff effs Bool
+  runAction :: Sem effs (),
+  checkHasRun :: Sem effs Bool
 }
 
 data TestGroup m1 m a effs =
@@ -35,7 +35,7 @@ instance Titled (TestGroup m1 m a effs) where
 
 data TestComponents rc i effs as ds = TestComponents {
   testItems :: rc -> [i],
-  testInteractor :: rc -> i -> Eff effs as,
+  testInteractor :: rc -> i -> Sem effs as,
   testPrepState :: i -> as -> Ensurable ds
 }
 

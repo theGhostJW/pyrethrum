@@ -10,7 +10,7 @@ import           DSL.Logger
 import           Check
 import           DemoProject.Config as C
 import Text.Show.Pretty as PP
-import           Control.Monad.Freer
+import           Polysemy
 import           Control.Monad
 import           DSL.Ensure
 import           DSL.FileSystem
@@ -19,7 +19,7 @@ import           DSL.ArbitraryIO
 import qualified Prelude as P
 import qualified Pyrelude.IO as PIO
 import           Pyrelude
-import Runner as R 
+import RunnerP as R 
 import Type.Reflection
 import Data.Aeson.TH
 import GHC.Generics
@@ -60,7 +60,7 @@ putStrLnWithCallStack msg = do
   PIO.putStrLn msg
   PIO.putStrLn $ toS (prettyCallStack callStack)
 
-interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Eff effs ApState
+interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Sem effs ApState
 interactor RunConfig{..} Item{..} = 
   do
     writeFile path $ pre  <> " ~ " <> post <> " !!"
@@ -97,7 +97,6 @@ interactor RunConfig{..} Item{..} =
 newtype DState = V {
                     iidx10 :: Int
                   } deriving Show
-
 
 prepState :: Item -> ApState -> Ensurable DState
 prepState _i ApState{..} = do

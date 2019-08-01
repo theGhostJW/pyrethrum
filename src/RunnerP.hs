@@ -1,3 +1,8 @@
+
+
+{-# LANGUAGE NoPolyKinds #-} 
+-- TODO: work out why this is needed - investigate polykinds
+
 module RunnerP (
     module RunnerP
   , module RB
@@ -388,13 +393,13 @@ testRunOrEndpoint iIds runner fltrs runnerLogger intrprt rc =
                         (\_ -> verifyAction runCheck)
                         preRunRslt
 
-          filterInfo :: [[FilterResult]]
+          -- filterInfo :: [[FilterResult]]
           filterInfo = filterGroups runner fltrs rc
 
           filterFlags :: [Bool]
           filterFlags = filterGroupFlags filterInfo
 
-          prepResults :: [TestGroup [] m () effs]
+          -- prepResults :: [TestGroup [] m () effs]
           prepResults = runner $ runTest iIds fltrs runnerLogger rc intrprt
 
           firstDuplicateGroupTitle :: Maybe Text

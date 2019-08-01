@@ -3,235 +3,235 @@
 
 module MemberReflection where
 
-import Pyrelude
-import qualified Pyrelude as P
-import qualified Pyrelude.IO as PIO
-import Control.Monad.Freer
-import           DSL.Ensure
-import           DSL.FileSystem
-import           DSL.Interpreter
-import           DSL.ArbitraryIO
-import           DSL.Logger
-import           Runner
-import           Data.Aeson.TH
-import           RunElementClasses
-import           Data.Set as S
-import Type.Reflection as R
-import Check
-import GHC.Generics
-import Control.Monad
+-- import Pyrelude
+-- import qualified Pyrelude as P
+-- import qualified Pyrelude.IO as PIO
+-- import Control.Monad.Freer
+-- import           DSL.Ensure
+-- import           DSL.FileSystem
+-- import           DSL.Interpreter
+-- import           DSL.ArbitraryIO
+-- import           DSL.Logger
+-- import           Runner
+-- import           Data.Aeson.TH
+-- import           RunElementClasses
+-- import           Data.Set as S
+-- import Type.Reflection as R
+-- import Check
+-- import GHC.Generics
+-- import Control.Monad
 
-{-# ANN module "HLint: ignore" #-}
-
-
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Example Config %%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- {-# ANN module "HLint: ignore" #-}
 
 
-data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
-data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
-data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
+-- -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Example Config %%%%%%%%%%%%%%%%%%%%%%%%
+-- -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-data RunConfig = RunConfig {
-  runTitle    :: Text,
-  environment :: Environment,
-  country     :: Country,
-  depth       :: Depth
-} deriving (Eq, Show)
 
-instance Titled RunConfig where
-  title = runTitle
+-- data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
+-- data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
+-- data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
 
-instance RunConfigClass RunConfig
+-- data RunConfig = RunConfig {
+--   runTitle    :: Text,
+--   environment :: Environment,
+--   country     :: Country,
+--   depth       :: Depth
+-- } deriving (Eq, Show)
 
-allEnvironments :: Set Environment
-allEnvironments = S.fromList enumList
+-- instance Titled RunConfig where
+--   title = runTitle
 
-allNonProdEnvironments :: Set Environment
-allNonProdEnvironments = S.fromList [TST, UAT, PreProd]
+-- instance RunConfigClass RunConfig
 
-allCountries = S.fromList [AU, NZ]
-auOnly = S.singleton AU
-nzOnly = S.singleton NZ
+-- allEnvironments :: Set Environment
+-- allEnvironments = S.fromList enumList
 
-data TestConfig = TestConfig {
-  header       :: Text,
-  address      :: TestModule,
-  environments :: Set Environment,
-  countries    :: Set Country,
-  minDepth     :: Depth,
-  active       :: Bool
-}  deriving (Eq, Show)
+-- allNonProdEnvironments :: Set Environment
+-- allNonProdEnvironments = S.fromList [TST, UAT, PreProd]
 
-type Test = GenericTest TestConfig RunConfig
-type TestResult = GenericResult TestConfig
+-- allCountries = S.fromList [AU, NZ]
+-- auOnly = S.singleton AU
+-- nzOnly = S.singleton NZ
 
-instance Titled TestConfig where
-  title = header
+-- data TestConfig = TestConfig {
+--   header       :: Text,
+--   address      :: TestModule,
+--   environments :: Set Environment,
+--   countries    :: Set Country,
+--   minDepth     :: Depth,
+--   active       :: Bool
+-- }  deriving (Eq, Show)
 
-instance TestConfigClass TestConfig where
-  moduleAddress = address
+-- type Test = GenericTest TestConfig RunConfig
+-- type TestResult = GenericResult TestConfig
 
-testConfig :: TestConfig
-testConfig = TestConfig {
-  header    = "Configuration Error ~ No Title Assigned",
-  address = TestModule "Configuration Error ~ No Address Assigned",
-  environments = allNonProdEnvironments,
-  countries    = auOnly,
-  minDepth     = DeepRegression,
-  active       = True
-}
+-- instance Titled TestConfig where
+--   title = header
 
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Example Test Case %%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- instance TestConfigClass TestConfig where
+--   moduleAddress = address
 
-type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
+-- testConfig :: TestConfig
+-- testConfig = TestConfig {
+--   header    = "Configuration Error ~ No Title Assigned",
+--   address = TestModule "Configuration Error ~ No Address Assigned",
+--   environments = allNonProdEnvironments,
+--   countries    = auOnly,
+--   minDepth     = DeepRegression,
+--   active       = True
+-- }
 
-data ApState = ApState {
-  itemId   :: Int,
-  filePath :: Path Abs File,
-  exePath :: Text,
-  fileText :: Text
-} deriving Show
+-- -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Example Test Case %%%%%%%%%%%%%%%%%%%%%%%%
+-- -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-newtype DState = V {
-                    iidx10 :: Int
-                  } deriving Show
+-- type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
 
-interactor :: forall effs. Effects effs => RunConfig -> Item -> Eff effs ApState
-interactor RunConfig{..} Item{..} = do
-                                      writeFile path $ pre  <> " ~ " <> post <> " !!"
-                                      ensure "Blahh" $ P.even iid
-                                      log "Hi"
-                                      arbitraryIO "This is an arbitrary Put Line" () (PIO.putStrLn "Hello from random action")
-                                      tx <- readFile path
+-- data ApState = ApState {
+--   itemId   :: Int,
+--   filePath :: Path Abs File,
+--   exePath :: Text,
+--   fileText :: Text
+-- } deriving Show
 
-                                      when (iid == 140)
-                                        $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (PIO.readFile $ toFilePath invalidFile)
+-- newtype DState = V {
+--                     iidx10 :: Int
+--                   } deriving Show
 
-                                      pure $ ApState  {
-                                        itemId  = iid,
-                                        filePath = path,
-                                        exePath = "NOT IMPLEMENTED",
-                                        fileText = tx
-                                      }
+-- interactor :: forall effs. Effects effs => RunConfig -> Item -> Eff effs ApState
+-- interactor RunConfig{..} Item{..} = do
+--                                       writeFile path $ pre  <> " ~ " <> post <> " !!"
+--                                       ensure "Blahh" $ P.even iid
+--                                       log "Hi"
+--                                       arbitraryIO "This is an arbitrary Put Line" () (PIO.putStrLn "Hello from random action")
+--                                       tx <- readFile path
 
-prepState :: Item -> ApState -> Ensurable DState
-prepState _i ApState{..} = do
-                          ensure  "I do not like 110 in prepstate" (itemId /= 110)
-                          pure $ V $ 10 * itemId
+--                                       when (iid == 140)
+--                                         $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (PIO.readFile $ toFilePath invalidFile)
 
-i = Item
+--                                       pure $ ApState  {
+--                                         itemId  = iid,
+--                                         filePath = path,
+--                                         exePath = "NOT IMPLEMENTED",
+--                                         fileText = tx
+--                                       }
 
-invalidFile :: Path Abs File  
-invalidFile = 
-#ifdef mingw32_HOST_OS 
-  [absfile|C:\Vids\SystemDesign\Blahhh.txt|] -- windows
-#else 
-  [absfile|/mnt/c/vids/systemdesign/blahhh.txt|] -- linux
-#endif
+-- prepState :: Item -> ApState -> Ensurable DState
+-- prepState _i ApState{..} = do
+--                           ensure  "I do not like 110 in prepstate" (itemId /= 110)
+--                           pure $ V $ 10 * itemId
 
-invalidFile2 :: Path Abs File  
-invalidFile2 = 
-#ifdef mingw32_HOST_OS 
-  [absfile|R:\Vids\SystemDesign\Wrong.txt|] -- windows
-#else 
-  [absfile|/mnt/r/Vids/SystemDesign/Wrong.txt|] -- linux
-#endif
+-- i = Item
 
-validFile :: Path Abs File  
-validFile = 
-#ifdef mingw32_HOST_OS 
-  [absfile|C:\Vids\SystemDesign\VidList.txt|] -- windows
-#else 
-  [absfile|/mnt/c/Vids/SystemDesign/VidList.txt|] -- linux
-#endif
+-- invalidFile :: Path Abs File  
+-- invalidFile = 
+-- #ifdef mingw32_HOST_OS 
+--   [absfile|C:\Vids\SystemDesign\Blahhh.txt|] -- windows
+-- #else 
+--   [absfile|/mnt/c/vids/systemdesign/blahhh.txt|] -- linux
+-- #endif
 
-validFileWithSpace :: Path Abs File  
-validFileWithSpace = 
-#ifdef mingw32_HOST_OS 
-  [absfile|C:\Vids\SystemDesign\Vid List.txt|] -- windows
-#else 
-  [absfile|/mnt/c/Vids/SystemDesign/Vid List.txt|] -- linux
-#endif
+-- invalidFile2 :: Path Abs File  
+-- invalidFile2 = 
+-- #ifdef mingw32_HOST_OS 
+--   [absfile|R:\Vids\SystemDesign\Wrong.txt|] -- windows
+-- #else 
+--   [absfile|/mnt/r/Vids/SystemDesign/Wrong.txt|] -- linux
+-- #endif
 
-items :: RunConfig -> [Item]
-items rc = [
-          i 100 "Pre"  "Post" validFile $
-                              chk "iid x 10 is small" (\V{..} -> iidx10 < 200 ) <>
-                              chk "iid x 10 is big"   (\V{..} -> iidx10 > 500),
-          i 110 "Pre"  "Post" validFile mempty,
-          i 120 "Pre"  "Post" invalidFile2 mempty,
-          i 130 "Pre"  "Post" validFile mempty,
-          i 140 "Pre"  "Post" validFile mempty,
-          i 150 "Pre"  "Post" validFileWithSpace mempty
-  ]
+-- validFile :: Path Abs File  
+-- validFile = 
+-- #ifdef mingw32_HOST_OS 
+--   [absfile|C:\Vids\SystemDesign\VidList.txt|] -- windows
+-- #else 
+--   [absfile|/mnt/c/Vids/SystemDesign/VidList.txt|] -- linux
+-- #endif
+
+-- validFileWithSpace :: Path Abs File  
+-- validFileWithSpace = 
+-- #ifdef mingw32_HOST_OS 
+--   [absfile|C:\Vids\SystemDesign\Vid List.txt|] -- windows
+-- #else 
+--   [absfile|/mnt/c/Vids/SystemDesign/Vid List.txt|] -- linux
+-- #endif
+
+-- items :: RunConfig -> [Item]
+-- items rc = [
+--           i 100 "Pre"  "Post" validFile $
+--                               chk "iid x 10 is small" (\V{..} -> iidx10 < 200 ) <>
+--                               chk "iid x 10 is big"   (\V{..} -> iidx10 > 500),
+--           i 110 "Pre"  "Post" validFile mempty,
+--           i 120 "Pre"  "Post" invalidFile2 mempty,
+--           i 130 "Pre"  "Post" validFile mempty,
+--           i 140 "Pre"  "Post" validFile mempty,
+--           i 150 "Pre"  "Post" validFileWithSpace mempty
+--   ]
   
-nameOfModule :: TestModule
-nameOfModule = mkTestModule ''ApState
+-- nameOfModule :: TestModule
+-- nameOfModule = mkTestModule ''ApState
 
-test :: forall effs. Effects effs => Test Item effs ApState DState
-test = GenericTest {
-              configuration = MemberReflection.testConfig {address = nameOfModule},
-              components = TestComponents {
-                                testItems = items,
-                                testInteractor = interactor,
-                                testPrepState = prepState
-                            }
-            }
+-- test :: forall effs. Effects effs => Test Item effs ApState DState
+-- test = GenericTest {
+--               configuration = MemberReflection.testConfig {address = nameOfModule},
+--               components = TestComponents {
+--                                 testItems = items,
+--                                 testInteractor = interactor,
+--                                 testPrepState = prepState
+--                             }
+--             }
 
-data Item = Item {
-  iid    :: Int,
-  pre    :: Text,
-  post   :: Text,
-  path   :: Path Abs File,
-  checks :: CheckDList DState
-} deriving (Show, Generic)
+-- data Item = Item {
+--   iid    :: Int,
+--   pre    :: Text,
+--   post   :: Text,
+--   path   :: Path Abs File,
+--   checks :: CheckDList DState
+-- } deriving (Show, Generic)
 
 
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- https://stackoverflow.com/a/53272316/5589037
+-- -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- -- https://stackoverflow.com/a/53272316/5589037
 
-newtype WithEffects_ es0 es1 a = WithEffects { unWithEffects :: Members es0 es1 => a }
---
-type EFileSystem2 = '[Logger, Ensure, ArbitraryIO, FileSystem]
-type WithEffects = WithEffects_ EFileSystem2
---
-test2 :: forall effs. WithEffects effs (Test Item effs ApState DState)
-test2 = WithEffects test
---
-effsRepTest :: Typeable es0 => WithEffects_ es0 es1 a -> R.TypeRep es0
-effsRepTest _ = R.typeRep
---
-showEffsTest :: Typeable es0 => WithEffects_ es0 es1 a -> Text
-showEffsTest = txt . effsRepTest
---
-demo :: Text
-demo = showEffsTest test2
+-- newtype WithEffects_ es0 es1 a = WithEffects { unWithEffects :: Members es0 es1 => a }
+-- --
+-- type EFileSystem2 = '[Logger, Ensure, ArbitraryIO, FileSystem]
+-- type WithEffects = WithEffects_ EFileSystem2
+-- --
+-- test2 :: forall effs. WithEffects effs (Test Item effs ApState DState)
+-- test2 = WithEffects test
+-- --
+-- effsRepTest :: Typeable es0 => WithEffects_ es0 es1 a -> R.TypeRep es0
+-- effsRepTest _ = R.typeRep
+-- --
+-- showEffsTest :: Typeable es0 => WithEffects_ es0 es1 a -> Text
+-- showEffsTest = txt . effsRepTest
+-- --
+-- demo :: Text
+-- demo = showEffsTest test2
 
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-class ShowTypes (es :: [* -> *]) where
-  showTypes :: [Text]
+-- class ShowTypes (es :: [* -> *]) where
+--   showTypes :: [Text]
 
-instance ShowTypes '[] where
-  showTypes = []
+-- instance ShowTypes '[] where
+--   showTypes = []
 
-instance (Typeable e, ShowTypes es) => ShowTypes (e ': es) where
-   showTypes = txt (R.typeRep @e) : showTypes @es
+-- instance (Typeable e, ShowTypes es) => ShowTypes (e ': es) where
+--    showTypes = txt (R.typeRep @e) : showTypes @es
 
-showEffs2 :: forall es0 es1 a. ShowTypes es0 => WithEffects_ es0 es1 a -> [Text]
-showEffs2 _ = showTypes @es0
+-- showEffs2 :: forall es0 es1 a. ShowTypes es0 => WithEffects_ es0 es1 a -> [Text]
+-- showEffs2 _ = showTypes @es0
 
-demo2 :: [Text]
-demo2 = showEffs2 test2
+-- demo2 :: [Text]
+-- demo2 = showEffs2 test2
 
-$(deriveJSON defaultOptions ''TestConfig)
-$(deriveJSON defaultOptions ''Environment)
-$(deriveJSON defaultOptions ''Country)
-$(deriveJSON defaultOptions ''Depth)
-$(deriveJSON defaultOptions ''RunConfig)
+-- $(deriveJSON defaultOptions ''TestConfig)
+-- $(deriveJSON defaultOptions ''Environment)
+-- $(deriveJSON defaultOptions ''Country)
+-- $(deriveJSON defaultOptions ''Depth)
+-- $(deriveJSON defaultOptions ''RunConfig)

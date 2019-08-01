@@ -1,6 +1,6 @@
 module RunnerBaseP where
 
-import DSL.Ensure
+import DSL.EnsureP
 import Common (FilterError)
 import Pyrelude
 import Polysemy

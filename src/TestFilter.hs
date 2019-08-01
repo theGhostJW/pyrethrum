@@ -4,7 +4,7 @@ import           Pyrelude as F
 import Data.Aeson.TH
 import OrphanedInstances
 import Data.Functor.Identity
-import RunnerBase as RB
+import RunnerBaseP as RB
 import RunElementClasses as C
 import Data.List as L
 import Data.Aeson

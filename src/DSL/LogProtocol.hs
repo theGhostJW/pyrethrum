@@ -1,6 +1,3 @@
-
-{-# LANGUAGE PolyKinds #-}
-
 module DSL.LogProtocol where
 
 import           Common (DetailedInfo, AppError)

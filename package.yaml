@@ -22,7 +22,6 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
   - base
   - pyrelude
-  - freer-simple
   - containers
   - extra
   - text
@@ -32,7 +31,7 @@ dependencies:
   - pretty-show
   - dlist
   - raw-strings-qq
-
+  
 ghc-options:
   #- -F -pgmF=record-dot-preprocessor 
   - -fmax-pmcheck-iterations=10000000

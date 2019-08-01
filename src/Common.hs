@@ -1,7 +1,6 @@
 
 module Common where
 
-import           Control.Monad.Freer.Writer
 import           Pyrelude as P
 import  qualified        Data.DList as D
 import Data.Aeson.TH
@@ -76,9 +75,6 @@ data AppError =
             deriving (Show, Eq)
 
 $(deriveJSON defaultOptions ''AppError)
-
-type WriterDList = Writer (D.DList Text)
-
 
 type WriterDListP = O.Output (D.DList Text)
 

@@ -2,7 +2,7 @@
 module DSL.EnsureP where
 
 import Common
-import DSL.Logger
+import DSL.LoggerP
 import           Pyrelude
 import qualified Control.Monad as Monad
 import Polysemy

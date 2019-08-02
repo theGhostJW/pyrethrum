@@ -1,7 +1,10 @@
 
+{-# LANGUAGE NoPolyKinds #-} 
+-- TODO: work out why this is needed - investigate polykinds
+
 module DemoProject.TestCaseList where
 
-import           Control.Monad.Freer
+import           Polysemy
 import           DemoProject.Config
 import           DemoProject.Test.Rough as RT
 import           DemoProject.Test.Rough2 as RT2
@@ -12,15 +15,15 @@ import  DemoProject.Test.Simple2 as ST2
 import Control.Monad
 import  Data.Functor (($>))
 import           Common
-import           DSL.Interpreter
-import           DSL.Logger
-import           DSL.Ensure
+import           DSL.InterpreterP
+import           DSL.LoggerP
+import           DSL.EnsureP
 import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList
 import           Pyrelude as P
 import           Pyrelude.IO as PIO 
-import           Runner as R
+import           RunnerP as R
 import qualified System.IO as S
 import qualified Control.Exception as E
 import AuxFiles as A
@@ -78,17 +81,17 @@ ioRunToFile ::
     -> Bool 
     -> (forall m1 m a. TestPlan m1 m a FullIOEffects) 
     -> (forall a.
-          (forall (effs :: [* -> *]).
-          LastMember IO effs =>
-          Eff (Logger : effs) ~> Eff effs)
-          -> Eff FullIOEffects a -> IO (Either AppError a)
+          (forall effs.
+          Member (Embed IO) effs =>
+          Sem (Logger : effs) a -> Sem effs a) 
+          -> Sem FullIOEffects a -> IO (Either AppError a)
     )
     -> (
         forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => 
           (LogProtocol -> IO ()) 
-          -> (RunConfig -> i -> Eff FullIOEffects as) 
+          -> (RunConfig -> i -> Sem FullIOEffects as) 
           -> (i -> as -> Ensurable ds) 
-          -> (forall a. Eff FullIOEffects a -> IO (Either AppError a))  
+          -> (forall a. Sem FullIOEffects a -> IO (Either AppError a))  
           -> TestConfig -> RunConfig 
           -> i 
           -> IO ()
@@ -212,8 +215,8 @@ runFailRolloverG1Document = docRun testRunFailRolloverG1
 runFailRolloverG1IO :: IO ()
 runFailRolloverG1IO = ioRun testRunFailRolloverG1
 
-dummyIOException :: Eff effs Bool
-dummyIOException = (E.throw $ P.userError "Pretend IO Error") :: Eff effs Bool
+dummyIOException :: Sem effs Bool
+dummyIOException = (E.throw $ P.userError "Pretend IO Error") :: Sem effs Bool
 
 exceptionInCheck :: PreRun effs
 exceptionInCheck = PreRun {

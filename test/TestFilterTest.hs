@@ -1,7 +1,7 @@
 module TestFilterTest where
 
 import Pyrelude         as P
-import           Runner as R
+import           RunnerP as R
 import           Pyrelude.Test
 import           Common
 import RunElementClasses

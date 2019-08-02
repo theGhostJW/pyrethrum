@@ -5,7 +5,7 @@ import           Pyrelude      as P
 import           Data.Set        as S
 import qualified Prelude         as PO
 import           ItemFilter
-import           Runner as R
+import           RunnerP as R
 import           Pyrelude.Test
 import GHC.Generics
 import Data.Aeson.TH

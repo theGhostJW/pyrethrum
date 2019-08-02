@@ -7,10 +7,10 @@ module DemoProject.Test.Simple where
 
 import           Check
 import  DemoProject.Config as C
-import DSL.Ensure
-import Runner as R
-import           Control.Monad.Freer
-import           DSL.Interpreter
+import DSL.EnsureP
+import RunnerP as R
+import           Polysemy
+import           DSL.InterpreterP
 import           Pyrelude
 import qualified Prelude as P
 import Data.Aeson.TH
@@ -39,7 +39,7 @@ data ApState = ApState {
 
 type DState = ApState
 
-interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Eff effs ApState
+interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Sem effs ApState
 interactor _rc TestItem{..} = do
                               ensure "Only even iids expected" $ P.even iid
                               pure $ ApState iid "Success"
@@ -99,5 +99,6 @@ instance ItemClass Item DState where
   whenClause = pre
   thenClause = post
   checkList = checks
+
 $(deriveToJSON defaultOptions ''Item)
 $(deriveToJSON defaultOptions ''ApState)

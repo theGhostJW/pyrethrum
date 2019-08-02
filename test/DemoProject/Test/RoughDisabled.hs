@@ -6,20 +6,20 @@
 
 module DemoProject.Test.RoughDisabled where
 
-import           DSL.Logger
+import           DSL.LoggerP
 import           Check
 import           DemoProject.Config as C
 import Text.Show.Pretty as PP
-import           Control.Monad.Freer
+import           Polysemy
 import           Control.Monad
-import           DSL.Ensure
-import           DSL.FileSystem
-import           DSL.Interpreter
-import           DSL.ArbitraryIO
+import           DSL.EnsureP
+import           DSL.FileSystemP
+import           DSL.InterpreterP
+import           DSL.ArbitraryIOP
 import qualified Prelude as P
 import qualified Pyrelude.IO as PIO
 import           Pyrelude
-import Runner as R 
+import RunnerP as R 
 import Type.Reflection
 import Data.Aeson.TH
 import GHC.Generics
@@ -51,7 +51,7 @@ data ApState = ApState {
   fileText :: Text
 } deriving Show
 
-interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Eff effs ApState
+interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Sem effs ApState
 interactor RunConfig{..} Item{..} = 
     pure $ ApState {
       itemId  = iid,

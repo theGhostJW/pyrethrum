@@ -31,7 +31,9 @@ dependencies:
   - pretty-show
   - dlist
   - raw-strings-qq
-  
+  - polysemy
+  - polysemy-plugin
+
 ghc-options:
   #- -F -pgmF=record-dot-preprocessor 
   - -fmax-pmcheck-iterations=10000000
@@ -114,8 +116,6 @@ library:
     - bytestring
     - mtl
     - fmt
-    - polysemy
-    - polysemy-plugin
 
 _testDep: &testdependencies
 - tasty

@@ -1,4 +1,5 @@
 {
   "languageServerHaskell.useCustomHieWrapper": true,
-  "languageServerHaskell.useCustomHieWrapperPath": "hie-wrapper"
+  "languageServerHaskell.useCustomHieWrapperPath": "hie-wrapper",
+  "workbench.colorCustomizations": {}
 }

@@ -6,20 +6,20 @@
 
 module DemoProject.Test.Rough where
 
-import           DSL.LoggerP
+import           DSL.Logger
 import           Check
 import           DemoProject.Config as C
 import Text.Show.Pretty as PP
 import           Polysemy
 import           Control.Monad
-import           DSL.EnsureP
-import           DSL.FileSystemP
-import           DSL.InterpreterP
-import           DSL.ArbitraryIOP
+import           DSL.Ensure
+import           DSL.FileSystem
+import           DSL.Interpreter
+import           DSL.ArbitraryIO
 import qualified Prelude as P
 import qualified Pyrelude.IO as PIO
 import           Pyrelude
-import RunnerP as R 
+import Runner as R 
 import Type.Reflection
 import Data.Aeson.TH
 import GHC.Generics

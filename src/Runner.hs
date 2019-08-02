@@ -3,8 +3,8 @@
 {-# LANGUAGE NoPolyKinds #-} 
 -- TODO: work out why this is needed - investigate polykinds
 
-module RunnerP (
-    module RunnerP
+module Runner (
+    module Runner
   , module RB
   , module ItemFilter
   , module C
@@ -12,10 +12,10 @@ module RunnerP (
 
 import qualified Check as CK
 import Common
-import DSL.InterpreterP
-import DSL.LoggerP
+import DSL.Interpreter
+import DSL.Logger
 import DSL.LogProtocol as LP
-import DSL.EnsureP
+import DSL.Ensure
 import Pyrelude as P
 import Pyrelude.IO
 import Polysemy
@@ -29,7 +29,7 @@ import AuxFiles
 import OrphanedInstances
 import Data.Aeson
 import TestFilter
-import RunnerBaseP as RB
+import RunnerBase as RB
 import qualified System.IO as SIO
 import System.IO (Handle)
 import qualified Data.Map as M

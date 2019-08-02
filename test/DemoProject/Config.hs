@@ -1,17 +1,17 @@
 module DemoProject.Config where
 
 import           Data.Set                   as S
-import           DSL.InterpreterP
+import           DSL.Interpreter
 import           Common
 import           Pyrelude
 import qualified Prelude                    as P
-import           RunnerP
+import           Runner
 import           TestFilter
 import           RunElementClasses
 import           Data.DList
 import Data.Aeson
 import Data.Aeson.TH
-import RunnerBaseP
+import RunnerBase
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
 data Country = AU | NZ deriving (Show, Eq, Ord, Enum)

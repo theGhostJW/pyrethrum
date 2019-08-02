@@ -1,8 +1,8 @@
-module DSL.ArbitraryIOP where
+module DSL.ArbitraryIO where
 
 import Common
 import DSL.LogProtocol
-import DSL.LoggerP
+import DSL.Logger
 import           Pyrelude
 -- import           Control.Monad.Freer
 -- import           Control.Monad.Freer.Error

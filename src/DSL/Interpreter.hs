@@ -1,14 +1,14 @@
 
-module DSL.InterpreterP where
+module DSL.Interpreter where
 
 import Common
 import Polysemy 
 import Polysemy.Output
 import Polysemy.Error
-import           DSL.FileSystemP
-import           DSL.EnsureP as EP
-import           DSL.LoggerP
-import           DSL.ArbitraryIOP
+import           DSL.FileSystem
+import           DSL.Ensure as EP
+import           DSL.Logger
+import           DSL.ArbitraryIO
 import           Data.DList as D
 import           Pyrelude as F hiding (app)
 import AuxFiles
@@ -21,7 +21,7 @@ type EFFEnsureLog effs = (Members '[Logger, EP.Ensure] effs)
 type EFFAllEffects effs = Members FullEffects effs
 type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, Error EnsureError]
 type FullIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, Logger, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
-type FullDocEffects = '[FileSystem, ArbitraryIO, Logger, Ensure, Error EnsureError, WriterDListP]
+type FullDocEffects = '[FileSystem, ArbitraryIO, Logger, Ensure, Error EnsureError, WriterDList]
 
 flattenErrors :: Either AppError (Either EnsureError (Either FileSystemError v)) -> Either AppError v
 flattenErrors = let
@@ -72,18 +72,18 @@ documentInIO logger app = handleIOException $ flattenErrors <$> runM
                                     app
                                  )
 
-executeDocumentRaw :: forall a. Sem FullDocEffects a -> Sem '[WriterDListP] (Either AppError a)
+executeDocumentRaw :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
 executeDocumentRaw = executeDocument logDocInterpreter
 
-executeDocumentPretty :: forall a. Sem FullDocEffects a -> Sem '[WriterDListP] (Either AppError a)
+executeDocumentPretty :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
 executeDocumentPretty = executeDocument logDocPrettyInterpreter
 
-executeDocument :: forall a. (forall effs. Member WriterDListP effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocEffects a -> Sem '[WriterDListP] (Either AppError a)
+executeDocument :: forall a. (forall effs. Member WriterDList effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
 executeDocument logger app =  (mapLeft AppEnsureError <$>) <$> runError
                                           $ ensureInterpreter
                                           $ logger
                                           $ arbitraryIODocInterpreter
                                           $ fileSystemDocInterpreter app
 
-extractDocLog :: Sem '[WriterDListP] () -> DList Text
+extractDocLog :: Sem '[WriterDList] () -> DList Text
 extractDocLog app =  fst . run $ runOutputMonoid id app

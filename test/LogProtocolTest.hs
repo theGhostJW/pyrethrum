@@ -10,7 +10,7 @@ import RunElementClasses
 import Data.Set as S
 import Common
 import TestFilter
-import RunnerBaseP
+import RunnerBase
 import qualified Data.Aeson as A
 import Data.ByteString.Lazy as B
 import Hedgehog.Internal.Property

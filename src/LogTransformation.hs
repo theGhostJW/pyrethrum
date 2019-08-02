@@ -21,7 +21,7 @@ import Data.ByteString.Char8 as B hiding (putStrLn)
 import qualified Data.ByteString.Lazy as L
 import System.IO as S hiding (putStrLn)
 import Data.Functor
-import DSL.LoggerP
+import DSL.Logger
 import Control.Monad.Writer.Strict
 import Control.Monad.State.Strict
 import Control.Monad.Identity

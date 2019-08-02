@@ -15,15 +15,15 @@ import  DemoProject.Test.Simple2 as ST2
 import Control.Monad
 import  Data.Functor (($>))
 import           Common
-import           DSL.InterpreterP
-import           DSL.LoggerP
-import           DSL.EnsureP
+import           DSL.Interpreter
+import           DSL.Logger
+import           DSL.Ensure
 import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList
 import           Pyrelude as P
 import           Pyrelude.IO as PIO 
-import           RunnerP as R
+import           Runner as R
 import qualified System.IO as S
 import qualified Control.Exception as E
 import AuxFiles as A

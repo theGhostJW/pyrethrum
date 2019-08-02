@@ -7,9 +7,9 @@ module DemoProject.Test.Rough2 where
 
 import DemoProject.Test.Rough as T
 import DemoProject.Config
-import DSL.InterpreterP
+import DSL.Interpreter
 import           Pyrelude
-import           RunnerP as R
+import           Runner as R
 import           RunElementClasses
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()

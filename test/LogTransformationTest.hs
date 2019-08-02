@@ -17,7 +17,7 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.Foldable as F
 import qualified System.IO as S
 import LogTransformation.Test as LT
-import DSL.LoggerP
+import DSL.Logger
 import DSL.LogProtocol as LP
 import RunElementClasses
 import Data.Aeson as A

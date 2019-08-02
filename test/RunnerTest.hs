@@ -4,10 +4,10 @@ import           DemoProject.TestCaseList
 import           Pyrelude      as F
 import           Pyrelude.Test
 import           LogListCheck
-import           RunnerBaseP
-import           RunnerP
+import           RunnerBase
+import           Runner
 import           DemoProject.Config as CFG
-import           DSL.InterpreterP
+import           DSL.Interpreter
 
 goHomeCheckMessage :: Text
 goHomeCheckMessage = "GoHome action ran without exception but completion check returned False. Looks like GoHome did not run as expected"

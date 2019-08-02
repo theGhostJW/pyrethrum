@@ -7,10 +7,10 @@ module DemoProject.Test.Simple where
 
 import           Check
 import  DemoProject.Config as C
-import DSL.EnsureP
-import RunnerP as R
+import DSL.Ensure
+import Runner as R
 import           Polysemy
-import           DSL.InterpreterP
+import           DSL.Interpreter
 import           Pyrelude
 import qualified Prelude as P
 import Data.Aeson.TH

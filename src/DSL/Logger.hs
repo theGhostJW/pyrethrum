@@ -1,5 +1,5 @@
 
-module DSL.LoggerP where
+module DSL.Logger where
 
 import Common
 import  DSL.LogProtocol
@@ -57,7 +57,7 @@ logConsoleInterpreter =
                         LogWarning s -> P.print. logRun $ Warning s 
                         LogWarning' msg info -> P.print . logRun . Warning' $ DetailedInfo msg info
 
-logDocInterpreter :: forall effs a. Member WriterDListP effs => Sem (Logger ': effs) a -> Sem effs a
+logDocInterpreter :: forall effs a. Member WriterDList effs => Sem (Logger ': effs) a -> Sem effs a
 logDocInterpreter = 
   let 
     tellDoc :: DocProtocol -> Sem effs ()
@@ -116,7 +116,7 @@ logToHandles convertersHandlers =
                             LogWarning' msg info ->  logRunTohandles . Warning' $ DetailedInfo msg info
                                           
                               
-logDocPrettyInterpreter :: forall effs a. Member WriterDListP effs => Sem (Logger ': effs) a -> Sem effs a
+logDocPrettyInterpreter :: forall effs a. Member WriterDList effs => Sem (Logger ': effs) a -> Sem effs a
 logDocPrettyInterpreter = 
   let
     toDList :: [Text] -> DList Text

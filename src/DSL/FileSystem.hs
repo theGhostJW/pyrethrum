@@ -1,11 +1,11 @@
-module DSL.FileSystemP where
+module DSL.FileSystem where
 
 import Common
 import           Pyrelude as P
 import           Pyrelude.IO as PO
 import           Data.Functor
 import           Control.Exception as E
-import           DSL.LoggerP
+import           DSL.Logger
 import           DSL.LogProtocol
 import Polysemy
 import Polysemy.Input

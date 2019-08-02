@@ -76,7 +76,7 @@ data AppError =
 
 $(deriveJSON defaultOptions ''AppError)
 
-type WriterDListP = O.Output (D.DList Text)
+type WriterDList = O.Output (D.DList Text)
 
 dList :: Show s => s -> D.DList Text
 dList s = D.fromList [txt s]

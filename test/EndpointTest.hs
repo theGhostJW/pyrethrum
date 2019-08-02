@@ -5,7 +5,7 @@ import           DemoProject.Test.Rough   as T
 import           DemoProject.TestCaseList
 import           Pyrelude      as F
 import           LogListCheck
-import           RunnerP                 as R
+import           Runner                 as R
 
 endPointLog = testEndpointDoc "DemoProject.Test.Rough" runConfig (filterredItemIds (IID 110) (T.items runConfig)) testG1GoHomeLogging
 

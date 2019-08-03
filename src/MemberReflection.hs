@@ -89,7 +89,8 @@ testConfig = TestConfig {
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Example Test Case %%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
+
+type Effects = '[Logger, Ensure, ArbitraryIO]
 
 data ApState = ApState {
   itemId   :: Int,
@@ -102,7 +103,7 @@ newtype DState = V {
                     iidx10 :: Int
                   } deriving Show
 
-interactor :: forall effs. Effects effs => RunConfig -> Item -> Sem effs ApState
+interactor :: forall effs. Members Effects effs => RunConfig -> Item -> Sem effs ApState
 interactor RunConfig{..} Item{..} = uu
 
 prepState :: Item -> ApState -> Ensurable DState
@@ -122,7 +123,7 @@ items rc = []
 nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState
 
-test :: forall effs. Effects effs => Test Item effs ApState DState
+test :: forall effs. Members Effects effs => Test Item effs ApState DState
 test = GenericTest {
               configuration = MemberReflection.testConfig {address = nameOfModule},
               components = TestComponents {
@@ -132,32 +133,16 @@ test = GenericTest {
                             }
             }
 
-
-
-
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- https://stackoverflow.com/a/53272316/5589037
 
-newtype WithEffects_ es0 es1 a = WithEffects { unWithEffects :: Members es0 es1 => a }
---
-type EFileSystem2 = '[Logger, Ensure, ArbitraryIO, FileSystem]
-type WithEffects = WithEffects_ EFileSystem2
---
-test2 :: forall effs. WithEffects effs (Test Item effs ApState DState)
-test2 = WithEffects test
---
-effsRepTest :: Typeable es0 => WithEffects_ es0 es1 a -> R.TypeRep es0
-effsRepTest _ = R.typeRep
---
-showEffsTest :: Typeable es0 => WithEffects_ es0 es1 a -> Text
-showEffsTest = txt . effsRepTest
---
-demo :: Text
-demo = showEffsTest test2
+-- Logger (* -> *) -> Logger
+removeKindSuffix :: Text -> Text
+removeKindSuffix = fst . breakOn " "
 
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+newtype MembersFuncWrapper memberEffs allEffs a = WrappedTest (Members memberEffs allEffs => a)
 
 class ShowTypes es where
   showTypes :: [Text]
@@ -168,11 +153,20 @@ instance ShowTypes '[] where
 instance (Typeable e, ShowTypes es) => ShowTypes (e ': es) where
    showTypes = txt (R.typeRep @e) : showTypes @es
 
-showEffs2 :: forall es0 es1 a. ShowTypes es0 => WithEffects_ es0 es1 a -> [Text]
-showEffs2 _ = showTypes @es0
+showEffs :: forall es0 es1 a. ShowTypes es0 => MembersFuncWrapper es0 es1 a -> [Text]
+showEffs _ = removeKindSuffix <$> showTypes @es0
+
+demo :: [Text]
+demo = showEffs (WrappedTest test :: MembersFuncWrapper Effects effs (Test Item effs ApState DState))
+
+newtype InteractorFuncWrapper memberEffs allEffs a = WrappedInteractor (Members memberEffs allEffs => RunConfig -> Item -> Sem allEffs ApState)
+
+showInteractorEffs :: forall es0 es1 a. ShowTypes es0 => InteractorFuncWrapper es0 es1 a -> [Text]
+showInteractorEffs _ = showTypes @es0
 
 demo2 :: [Text]
-demo2 = showEffs2 test2
+demo2 = removeKindSuffix <$> showInteractorEffs (WrappedInteractor interactor :: InteractorFuncWrapper Effects effs (RunConfig -> Item -> Sem effs ApState))
+
 
 $(deriveJSON defaultOptions ''TestConfig)
 $(deriveJSON defaultOptions ''Environment)

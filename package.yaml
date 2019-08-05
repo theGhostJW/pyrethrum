@@ -109,7 +109,6 @@ default-extensions:
 library:
   source-dirs: src
   dependencies:
-    - time
     - deepseq
     - unordered-containers
     - template-haskell

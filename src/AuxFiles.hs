@@ -7,12 +7,8 @@ import Pyrelude.IO
 import qualified Prelude as P
 import Paths_pyrethrum
 import Data.Fixed
-import Data.Time.Calendar
-import Data.Time.Clock
-import Data.Time.Format
 import qualified System.IO as S
 import qualified Data.Char as C
-import Data.Time.LocalTime
 
 bdr = getBinDir
 
@@ -88,12 +84,14 @@ logFilePrefix now =
   let
     msLeftInYear :: Integer
     msLeftInYear =  let
-                      utcNow = zonedTimeToUTC now
+                      utcNow = unUTCTime $ zonedTimeToUTC now
                       (y, m, d)  = toGregorian $ utctDay utcNow
                       nyd = UTCTime (fromGregorian (y + 1) 1 1) 0
-                      daysDif = diffDays (utctDay nyd) (utctDay utcNow)
+                      daysDif :: Integer
+                      daysDif = fromIntegral $ diffDays (utctDay nyd) (utctDay utcNow)
+                      msPerDay :: Integer
                       msPerDay = 24 * 60 * 60 * 1000
-                      timeDifms = P.round $ fromIntegral (diffTimeToPicoseconds $ utctDayTime nyd P.- utctDayTime utcNow) / 1000000000
+                      timeDifms = fromIntegral . P.round $ (utctDayTime nyd P.- utctDayTime utcNow) / 1000000
                     in
                       daysDif * msPerDay + timeDifms
   in 

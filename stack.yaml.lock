@@ -6,18 +6,18 @@
 packages:
 - completed:
     cabal-file:
-      size: 4393
-      sha256: 241cce45c6640c83554a8c57de62d03e001432c1ce86827a95f2a624740174fb
+      size: 4434
+      sha256: 997a1f57ab8e209ac3cde2fb8a074700da1c0ac1e3c8740022abbea145b3225e
     name: pyrelude
     version: 0.1.0.0
     git: https://github.com/theGhostJW/pyrelude
     pantry-tree:
-      size: 2198
-      sha256: 85ce20fb69a67341508f135ceba20a289043084acde06bb59b8258775c5b0239
-    commit: 556f97f5f6f135493460d6a96026d2d8e1b4f718
+      size: 2254
+      sha256: 31e04373c7aef3bea06208f29784ac2d21b6c2c8f20535fde069eb7690f654ec
+    commit: df1a7214c3f2cd0d19f3eae1d330fde762f1621c
   original:
     git: https://github.com/theGhostJW/pyrelude
-    commit: 556f97f5f6f135493460d6a96026d2d8e1b4f718
+    commit: df1a7214c3f2cd0d19f3eae1d330fde762f1621c
 - completed:
     hackage: discrimination-0.4@sha256:ad60cb42d42648ebc6f649ce761fe61cb58eca9e2b17a6b4fe68ed2e1fdd4146,2479
     pantry-tree:

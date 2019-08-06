@@ -5,8 +5,6 @@ import Common (FilterError)
 import Pyrelude
 import Polysemy
 import RunElementClasses
-import Data.Aeson.TH
-import Data.Aeson
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,

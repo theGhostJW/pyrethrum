@@ -3,7 +3,6 @@ module PrettyPrintCommon where
 import           Pyrelude as P
 import           Data.Yaml.Pretty as YP
 import           Data.Yaml as Y
-import Text.Show.Pretty as PP
 import DSL.LogProtocol
 import RunElementClasses
 import Common 

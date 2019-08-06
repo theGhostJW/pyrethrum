@@ -3,21 +3,12 @@ module LogProtocolTest where
 import           Pyrelude as P
 import           Pyrelude.Test as T
 import DSL.LogProtocol
-import Data.Functor.Identity
-import Data.Functor
 import DemoProject.Config
 import RunElementClasses
 import Data.Set as S
 import Common
-import TestFilter
-import RunnerBase
 import qualified Data.Aeson as A
 import Data.ByteString.Lazy as B
-import Hedgehog.Internal.Property
-import Control.Monad.IO.Class
-import Data.Traversable
-import Data.Char
-import Data.Aeson.TH
 import qualified Check as C
 
 genJSON :: Gen A.Value

@@ -23,17 +23,14 @@ import qualified Data.DList as D
 import           ItemFilter  (ItemFilter (..), filterredItemIds)
 import qualified Data.Set as S
 import RunElementClasses as C
-import Control.Monad
 import Text.Show.Pretty
 import AuxFiles
-import OrphanedInstances
+import OrphanedInstances()
 import Data.Aeson
 import TestFilter
 import RunnerBase as RB
 import qualified System.IO as SIO
-import System.IO (Handle)
 import qualified Data.Map as M
-import qualified Data.Set as St
 import qualified Data.Foldable as F
 import qualified Prelude
 

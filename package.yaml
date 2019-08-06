@@ -49,7 +49,7 @@ ghc-options:
   - -Wredundant-constraints
   - -fplugin=Polysemy.Plugin
   - -fwarn-tabs
-  - -fno-warn-unused-imports
+# - -fno-warn-unused-imports
   - -fno-warn-missing-signatures
   - -fno-warn-type-defaults
   - -fno-warn-unused-matches

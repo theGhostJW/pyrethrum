@@ -10,7 +10,6 @@ import DemoProject.Config
 import DSL.Interpreter
 import           Pyrelude
 import           Runner as R
-import           RunElementClasses
 
 endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
 endpoint = ep runConfig (IID 120)

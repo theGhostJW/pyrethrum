@@ -2,10 +2,8 @@ module RunElementClasses where
 
 import           Pyrelude
 import Data.Aeson.TH
-import OrphanedInstances
 import Language.Haskell.TH.Syntax
 import Data.Aeson.Types
-import GHC.Generics
 import           Check
 
 newtype TestModule = TestModule {unTestModule :: Text} deriving (Eq, Ord, Show, IsString)

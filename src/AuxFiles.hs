@@ -6,7 +6,6 @@ import Pyrelude as F
 import Pyrelude.IO
 import qualified Prelude as P
 import Paths_pyrethrum
-import Data.Fixed
 import qualified System.IO as S
 import qualified Data.Char as C
 
@@ -84,13 +83,21 @@ logFilePrefix now =
   let
     msLeftInYear :: Integer
     msLeftInYear =  let
+                      utcNow :: UTCView
                       utcNow = unUTCTime $ zonedTimeToUTC now
-                      (y, m, d)  = toGregorian $ utctDay utcNow
+                      
+                      (y, _m, _d) :: (Year, Month, DayOfMonth) = toGregorian $ utctDay utcNow
+                      
+                      nyd :: UTCView
                       nyd = UTCTime (fromGregorian (y + 1) 1 1) 0
+                      
                       daysDif :: Integer
                       daysDif = fromIntegral $ diffDays (utctDay nyd) (utctDay utcNow)
+                      
                       msPerDay :: Integer
                       msPerDay = 24 * 60 * 60 * 1000
+                      
+                      timeDifms :: Integer
                       timeDifms = fromIntegral . P.round $ (utctDayTime nyd P.- utctDayTime utcNow) / 1000000
                     in
                       daysDif * msPerDay + timeDifms

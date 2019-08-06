@@ -6,12 +6,9 @@ module DSL.LogProtocol.PrettyPrint (
 import Common
 import PrettyPrintCommon as PC
 import  DSL.LogProtocol as LP
-import LogTransformation.Test as T
 import           Pyrelude as P
-import Text.Show.Pretty as PP
 import RunElementClasses as C
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), MessageInfo(..), GateStatus(..), classifyResult)
-import Data.Yaml as Y
 
 prettyPrintLogProtocol :: Bool -> LogProtocol -> Text
 prettyPrintLogProtocol docMode =

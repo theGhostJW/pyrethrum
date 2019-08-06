@@ -14,10 +14,8 @@ import           DSL.Interpreter
 import           Pyrelude
 import qualified Prelude as P
 import Data.Aeson.TH
-import OrphanedInstances
-import RunElementClasses
+import OrphanedInstances()
 import DemoProject.Test.TestFilePaths
-import GHC.Generics
 
 type Effects effs = EFFEnsureLog effs
 

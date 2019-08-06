@@ -3,14 +3,10 @@ module TestFilterTest where
 import Pyrelude         as P
 import           Runner as R
 import           Pyrelude.Test
-import           Common
-import RunElementClasses
 import Data.Yaml
 import Data.Aeson.TH
 import Data.Aeson.Types
-import GHC.Generics
 import TestFilter
-import Data.Aeson
 
 data TestDepth = Connectivity | Regression | DeepRegression deriving (Eq, Ord, Show)
 data Country = Au | NZ deriving (Eq, Ord, Show)

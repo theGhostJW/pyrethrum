@@ -23,11 +23,8 @@ module Check (
 import           Pyrelude as P hiding ((.)) 
 import           Data.DList as D
 import Data.Function
-import qualified Prelude as PO 
 import Data.Aeson.Types as AT hiding (Error) 
 import Data.Aeson.TH
-import OrphanedInstances
-import Common
 import qualified Data.List as L
 
 -- generate a check from a predicate

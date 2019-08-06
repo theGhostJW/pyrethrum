@@ -1,24 +1,16 @@
 module LogTransformation.Common where
 
-import Common as C (AppError(..))
 import qualified Check as CK
 import Pyrelude as P hiding (phase)
-import Pyrelude.IO
 import Data.DList as D
-import qualified Prelude as PO
-import AuxFiles
-import OrphanedInstances
+import OrphanedInstances()
 import DSL.LogProtocol as LP
-import Text.Show.Pretty as PP
 import qualified Data.Aeson as A
 import Data.Aeson.TH
 import Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
-import System.IO as S
-import Data.Functor
 import Control.Monad.Writer.Strict
 import Control.Monad.State.Strict
-import Control.Monad.Identity
 import qualified Data.Map.Strict as M
 import RunElementClasses
 import Data.Yaml as Y

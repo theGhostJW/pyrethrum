@@ -7,18 +7,11 @@ import DSL.LogProtocol.PrettyPrint
 import           Data.DList
 import           Pyrelude as P
 import           Pyrelude.IO
-import Text.Show.Pretty as PP
-import RunElementClasses as C
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
-import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), MessageInfo(..), GateStatus(..), classifyResult)
-import Data.Yaml as Y
 import System.IO (stdout)
 import Polysemy
-import Polysemy.Input
 import Polysemy.Output
-import Polysemy.Error
-import Polysemy.IO
 
 
 data Logger m a where

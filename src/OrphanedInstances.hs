@@ -6,7 +6,6 @@ module OrphanedInstances where
 import           Data.Yaml
 import           Data.Aeson.Types
 import           Pyrelude
-import           GHC.IO.Exception
 import Data.Aeson.TH
 import qualified Prelude as P
 

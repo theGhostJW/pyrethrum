@@ -4,14 +4,8 @@ import           Common (DetailedInfo, AppError)
 import           Check
 import           Pyrelude
 import           RunElementClasses
-import GHC.Generics
-import OrphanedInstances
 import Data.Aeson as A
-import Data.Either
-import Data.Aeson.Types
 import Data.Aeson.TH
-import qualified Data.HashMap.Lazy as HML
-import qualified Data.Text as T
 
 newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)
 newtype GroupTitle = GroupTitle {unGroupTitle :: Text} deriving (Eq, Show, IsString)

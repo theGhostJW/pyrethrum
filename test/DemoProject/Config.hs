@@ -7,11 +7,9 @@ import           Pyrelude
 import qualified Prelude                    as P
 import           Runner
 import           TestFilter
-import           RunElementClasses
 import           Data.DList
 import Data.Aeson
 import Data.Aeson.TH
-import RunnerBase
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
 data Country = AU | NZ deriving (Show, Eq, Ord, Enum)

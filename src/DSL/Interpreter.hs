@@ -11,10 +11,6 @@ import           DSL.Logger
 import           DSL.ArbitraryIO
 import           Data.DList as D
 import           Pyrelude as F hiding (app)
-import AuxFiles
-import qualified System.IO as S
-import qualified Prelude as P
-
 
 type EFFLogger effs = Member Logger effs
 type EFFEnsureLog effs = (Members '[Logger, EP.Ensure] effs)

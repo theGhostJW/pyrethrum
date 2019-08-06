@@ -9,7 +9,6 @@ module DemoProject.Test.Rough where
 import           DSL.Logger
 import           Check
 import           DemoProject.Config as C
-import Text.Show.Pretty as PP
 import           Polysemy
 import           Control.Monad
 import           DSL.Ensure
@@ -20,12 +19,8 @@ import qualified Prelude as P
 import qualified Pyrelude.IO as PIO
 import           Pyrelude
 import Runner as R 
-import Type.Reflection
 import Data.Aeson.TH
-import GHC.Generics
-import qualified System.Environment as E
-import OrphanedInstances
-import RunElementClasses
+import OrphanedInstances()
 import DemoProject.Test.TestFilePaths
 import GHC.Stack
 

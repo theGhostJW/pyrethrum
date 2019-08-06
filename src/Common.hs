@@ -4,8 +4,7 @@ module Common where
 import           Pyrelude as P
 import  qualified        Data.DList as D
 import Data.Aeson.TH
-import OrphanedInstances
-import Text.Show.Pretty as PP
+import OrphanedInstances()
 import Polysemy.Output as O
 
 indentText :: Int -> Text -> Text

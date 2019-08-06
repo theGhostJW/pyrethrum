@@ -6,12 +6,8 @@ import DSL.Logger
 import           Pyrelude
 -- import           Control.Monad.Freer
 -- import           Control.Monad.Freer.Error
-import qualified Control.Monad as Monad
 import           Control.Exception as E
-import           Data.Functor
 import Polysemy
-import Polysemy.Input
-import Polysemy.Output
 import Polysemy.Error as PE
 
 

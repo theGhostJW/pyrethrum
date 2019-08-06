@@ -3,13 +3,10 @@ module DSL.FileSystem where
 import Common
 import           Pyrelude as P
 import           Pyrelude.IO as PO
-import           Data.Functor
 import           Control.Exception as E
 import           DSL.Logger
 import           DSL.LogProtocol
 import Polysemy
-import Polysemy.Input
-import Polysemy.Output
 import Polysemy.Error as PE
 
 {- File System Lang -}

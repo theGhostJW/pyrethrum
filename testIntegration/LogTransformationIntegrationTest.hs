@@ -4,7 +4,6 @@ import           Pyrelude as E
 import           Pyrelude.IO
 import Pyrelude.Test      as T
 import AuxFiles
-import LogTransformation
 import LogTransformation.Common
 
 

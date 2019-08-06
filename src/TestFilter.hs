@@ -1,13 +1,10 @@
 module TestFilter where 
 
 import           Pyrelude as F
-import Data.Aeson.TH
-import OrphanedInstances
-import Data.Functor.Identity
+import OrphanedInstances()
 import RunnerBase as RB
 import RunElementClasses as C
 import Data.List as L
-import Data.Aeson
 
 type TestAddress = Text
 

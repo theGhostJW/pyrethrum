@@ -28,7 +28,7 @@ statsStepForReducer _ accum lp = (statsStep accum lp, Nothing)
 statsStepFromLogProtocol :: StatsAccum -> LogProtocol -> StatsAccum
 statsStepFromLogProtocol (StatsAccum runResults@(RunResults outOfTest itrRslts) stepInfo) lp = 
   let 
-    nxtStepInfo@(LPStep nxtPhaseValid nxtFailStage nxtPhase
+    nxtStepInfo@(LPStep _nxtPhaseValid _nxtFailStage nxtPhase
                     logItemStatus nxtActiveItr nxtCheckEncountered) = logProtocolStep stepInfo lp
 
     inIteration :: Bool

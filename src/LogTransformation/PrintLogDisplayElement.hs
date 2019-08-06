@@ -18,14 +18,11 @@ import Common as C (AppError(..), DetailedInfo(..), indentText)
 import LogTransformation.Common as LC
 import Check as CK
 import Pyrelude as P
-import Data.DList as D
 import qualified DSL.LogProtocol as LP
 import DSL.LogProtocol hiding (StartRun)
 import qualified Data.Aeson as A
 import qualified Data.Yaml as Y
 import Data.Aeson.TH
-import Data.ByteString.Char8 as B
-import qualified Data.ByteString.Lazy as BL
 import RunElementClasses
 import LogTransformation.Stats
 import PrettyPrintCommon
@@ -145,14 +142,14 @@ printProblemsDisplayStep ::
 printProblemsDisplayStep runResults@(RunResults outOfTest iterationResults) lineNo (ProblemIterationAccum itAccum@(IterationAccum mRec stepInfo mFltrLg) skipItt skipTst) eithLp = 
   let 
     -- (IterationAccum, Maybe [PrintLogDisplayElement])
-    normalStep :: (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
-    normalStep@(nxtItAccum@(IterationAccum nxtMRec nxtStepInfo nxtMFltrLg), mDisplayElement) = printLogDisplayStep runResults lineNo itAccum eithLp
+    _normalStep :: (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
+    _normalStep@(nxtItAccum@(IterationAccum _nxtMRec _nxtStepInfo _nxtMFltrLg), mDisplayElement) = printLogDisplayStep runResults lineNo itAccum eithLp
 
     testStatus' :: TestModule -> ExecutionStatus
     testStatus' = testStatus $ testExStatus iterationResults
     
-    skipFlags :: (Bool, Bool) -- (newAccum, err / result)
-    skipFlags@(nxtSkipItt, nxtSkipTst) =
+    _skipFlags :: (Bool, Bool) -- (newAccum, err / result)
+    _skipFlags@(nxtSkipItt, nxtSkipTst) =
       eitherf eithLp 
         (const (skipItt, skipTst))
         (\case
@@ -162,7 +159,12 @@ printProblemsDisplayStep runResults@(RunResults outOfTest iterationResults) line
         )
 
     nxtAccum :: ProblemIterationAccum
-    nxtAccum = ProblemIterationAccum nxtItAccum nxtSkipItt nxtSkipTst
+    nxtAccum = ProblemIterationAccum {
+      accum = nxtItAccum,
+      skipIteration = nxtSkipItt,
+      skipTest = nxtSkipTst
+    }
+      
   in 
     (nxtAccum, isRight eithLp && (nxtSkipItt || nxtSkipTst) ? Nothing $ mDisplayElement)
 
@@ -215,8 +217,8 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
         elOut :: a -> Maybe [a]
         elOut a = Just [a]
 
-        nxtStepInfo@(LPStep nxtPhaseValid nxtFailStage nxtPhase
-                       logItemStatus nxtActiveItr nxtCheckEncountered) = logProtocolStep stepInfo lp
+        nxtStepInfo@(LPStep _nxtPhaseValid _nxtFailStage nxtPhase
+                       _logItemStatus _nxtActiveItr _nxtCheckEncountered) = logProtocolStep stepInfo lp
 
         accum :: IterationAccum
         accum = oldAccum {stepInfo = nxtStepInfo}

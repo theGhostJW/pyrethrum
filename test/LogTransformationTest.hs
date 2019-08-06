@@ -8,24 +8,16 @@ import           Pyrelude.IO as PIO
 import           Data.DList as DL
 import Pyrelude.Test       as T
 import AuxFiles
-import Control.Monad
 import LogTransformation
 import LogTransformation.PrintLogDisplayElement as LTPDE
-import PrettyPrintCommon
 import Data.ByteString.Char8 as B
-import qualified Data.ByteString.Lazy as L
 import qualified Data.Foldable as F
 import qualified System.IO as S
-import LogTransformation.Test as LT
-import DSL.Logger
 import DSL.LogProtocol as LP
-import RunElementClasses
 import Data.Aeson as A
 import DSL.LogProtocol.PrettyPrint
-import Prelude (String)
 import LogTransformation.Stats
 import LogTransformation.Common as LTC
-import Data.Foldable as F
 import qualified Data.Map.Strict as M
 -- import LogTransformation.Iteration
 

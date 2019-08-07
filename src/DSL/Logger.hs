@@ -3,6 +3,7 @@ module DSL.Logger where
 
 import Common
 import  DSL.LogProtocol
+import  DSL.CurrentTime as CT
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList
 import           Pyrelude as P
@@ -28,6 +29,12 @@ data Logger m a where
 
 makeSem ''Logger
 
+data LogAuxInfo = LogAuxInfo {
+  runId :: Text,
+  threadID :: Int,
+  logTime :: UTCTime
+}
+
 detailLog :: forall effs. Member Logger effs => (DetailedInfo -> LogProtocol) -> Text -> Text -> Sem effs ()
 detailLog lpCons msg additionalInfo = logItem . lpCons $ DetailedInfo msg additionalInfo
 
@@ -37,18 +44,20 @@ log = logMessage
 log' :: forall effs. Member Logger effs => Text -> Text -> Sem effs ()
 log' = detailLog (logRun . Message')
 
-logConsoleInterpreter :: Member (Embed IO) effs => Sem (Logger ': effs) a -> Sem effs a
+logConsoleInterpreter :: forall effs a. Members '[CurrentTime, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a
 logConsoleInterpreter = 
-  interpret $ embed . \case 
-                        LogItem lp -> P.print lp
-                        LogError msg -> P.print . logRun . Error $ AppUserError msg 
-                        LogError' msg info -> P.print . logRun . Error . AppUserError' $ DetailedInfo msg info
-                        
-                        LogMessage s ->  P.print . logRun $ Message s 
-                        LogMessage' msg info -> P.print . logRun . Message' $ DetailedInfo msg info
-      
-                        LogWarning s -> P.print. logRun $ Warning s 
-                        LogWarning' msg info -> P.print . logRun . Warning' $ DetailedInfo msg info
+    interpret $ \lg -> do 
+                        now <- CT.getCurrentTime
+                        embed $ case lg of
+                            LogItem lp -> P.print lp
+                            LogError msg -> P.print . logRun . Error $ AppUserError msg 
+                            LogError' msg info -> P.print . logRun . Error . AppUserError' $ DetailedInfo msg info
+                            
+                            LogMessage s ->  P.print . logRun $ Message s 
+                            LogMessage' msg info -> P.print . logRun . Message' $ DetailedInfo msg info
+          
+                            LogWarning s -> P.print. logRun $ Warning s 
+                            LogWarning' msg info -> P.print . logRun . Warning' $ DetailedInfo msg info
 
 logDocInterpreter :: forall effs a. Member WriterDList effs => Sem (Logger ': effs) a -> Sem effs a
 logDocInterpreter = 

@@ -110,6 +110,7 @@ logFileHandles mpSuffixExt =
         let 
           iResult = result iStep
           iPrefix = filePrefix iStep 
+          
         eitherf iResult 
           (const $ pure iStep)
           (

@@ -494,7 +494,7 @@ testRun :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc,
                    -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) =>  -- item runner logger - this does all the work and logs results as side effect
                         (LogProtocol -> m ())                                 -- logger
                         -> (rc -> i -> Sem effs as)                           -- interactor          
-                        -> (i -> as -> Ensurable ds)                               -- prepstate
+                        -> (i -> as -> Ensurable ds)                          -- prepstate
                         -> (forall a. Sem effs a -> m (Either AppError a))    -- interpreter
                         -> tc                                                 -- TestConfig
                         -> rc                                                 -- RunConfig

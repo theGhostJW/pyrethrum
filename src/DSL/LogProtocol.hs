@@ -27,7 +27,7 @@ instance FromJSONKey ItemId where
 
 data DocActionInfo = 
     ActionInfo Text |
-    ActionInfoM Text Text 
+    ActionInfo' Text Text 
     deriving (Eq, Show)
 
 logDoc :: DocProtocol -> LogProtocol

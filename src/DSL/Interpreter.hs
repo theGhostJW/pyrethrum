@@ -10,15 +10,17 @@ import           DSL.Ensure as EP
 import           DSL.Logger
 import           DSL.ArbitraryIO
 import           DSL.CurrentTime
+import           DSL.CurrentTimeDocLogger
 import           Data.DList as D
 import           Pyrelude as F hiding (app)
 
 type EFFLogger effs = Member Logger effs
 type EFFEnsureLog effs = (Members '[Logger, EP.Ensure] effs)
 type EFFAllEffects effs = Members FullEffects effs
-type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, Error EnsureError]
+type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, CurrentTime, Error EnsureError]
 type FullIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, Logger, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
-type FullDocEffects = '[FileSystem, ArbitraryIO, Logger, Ensure, Error EnsureError, WriterDList]
+type FullDocIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logger, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
+type FullDocEffects = '[FileSystem, ArbitraryIO, CurrentTime, Logger, Ensure, Error EnsureError, WriterDList]
 
 flattenErrors :: Either AppError (Either EnsureError (Either FileSystemError v)) -> Either AppError v
 flattenErrors = let
@@ -42,36 +44,35 @@ executeInIOConsoleRaw = executeInIO logConsoleInterpreter
 executeInIOConsolePretty :: forall a. Sem FullIOEffects a -> IO (Either AppError a)
 executeInIOConsolePretty = executeInIO logConsolePrettyInterpreter
 
-executeInIO :: forall a. (forall effs. Members [CurrentTime, Embed IO ]effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullIOEffects a -> IO (Either AppError a)
-executeInIO logger app = handleIOException $ flattenErrors <$> 
-                                 (
-                                    runM
-                                   . runError
-                                   . runError
-                                   . runError
-                                   . currentTimeIOInterpreter
-                                   . logger
-                                   . arbitraryIOInterpreter
-                                   . ensureInterpreter
-                                   . fileSystemIOInterpreter
-                                   $ app
-                                 )
+executeInIO :: forall a. (forall effs. Members [CurrentTime, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullIOEffects a -> IO (Either AppError a)
+executeInIO logger app = handleIOException $ flattenErrors <$> runM
+                                   ( 
+                                     runError
+                                      $ runError
+                                      $ runError
+                                      $ currentTimeIOInterpreter
+                                      $ logger
+                                      $ arbitraryIOInterpreter
+                                      $ ensureInterpreter
+                                      $ fileSystemIOInterpreter
+                                      app
+                                  )
 
                               
-documentInIO :: forall a. (forall effs. Sem (Logger ': effs) a -> Sem effs a) -> Sem FullIOEffects a -> IO (Either AppError a)
-documentInIO logger app = handleIOException $ flattenErrors <$> 
-                                 (
-                                   runM
-                                   . runError
-                                   . runError
-                                   . runError
-                                   . currentTimeIOInterpreter
-                                   . logger
-                                   . arbitraryIODocInterpreter
-                                   . ensureDocInterpreter
-                                   . fileSystemDocInterpreter
-                                   $ app
-                                 )
+documentInIO :: forall a. (forall effs. Members '[Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocIOEffects a -> IO (Either AppError a)
+documentInIO logger app = handleIOException $ flattenErrors <$> runM
+                                  (
+                                    runError
+                                    $ runError
+                                    $ runError
+                                    $ currentTimeIOInterpreter
+                                    $ logger
+                                    $ currentTimeDocInterpreter
+                                    $ arbitraryIODocInterpreter
+                                    $ ensureDocInterpreter
+                                    $ fileSystemDocInterpreter
+                                    app
+                                  )
 
 executeDocumentRaw :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
 executeDocumentRaw = executeDocument logDocInterpreter
@@ -80,9 +81,10 @@ executeDocumentPretty :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (E
 executeDocumentPretty = executeDocument logDocPrettyInterpreter
 
 executeDocument :: forall a. (forall effs. Member WriterDList effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
-executeDocument logger app =  (mapLeft AppEnsureError <$>) <$> runError
+executeDocument logger app = (mapLeft AppEnsureError <$>) <$> runError
                                           $ ensureInterpreter
                                           $ logger
+                                          $ janFst2000UTCTimeInterpreter
                                           $ arbitraryIODocInterpreter
                                           $ fileSystemDocInterpreter app
 

@@ -72,7 +72,7 @@ genError = AppUserError <$> genStr
 genDocActionInfo :: Gen DocActionInfo
 genDocActionInfo = choice [
   ActionInfo <$> genStr,
-  ActionInfoM <$> genStr <*> genStr
+  ActionInfo' <$> genStr <*> genStr
  ]
 
 genResultExpectation :: Gen C.ResultExpectation

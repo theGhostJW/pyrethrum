@@ -115,6 +115,7 @@ library:
     - bytestring
     - mtl
     - fmt
+    - lens
 
 _testDep: &testdependencies
 - tasty

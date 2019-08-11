@@ -76,22 +76,22 @@ data WantConsole = Console | NoConsole deriving Eq
 jsonItemLogExt = ".jsoni"
 
 -- TODO: move to library file 
-ioRunToFile :: 
+ioRunToFile :: forall effs. Member Logger effs =>
     WantConsole
     -> Bool 
-    -> (forall m1 m a. TestPlan m1 m a FullIOEffects) 
+    -> (forall m1 m a. TestPlan m1 m a effs) 
     -> (forall a.
-          (forall effs.
-          Member (Embed IO) effs =>
-          Sem (Logger : effs) a -> Sem effs a) 
-          -> Sem FullIOEffects a -> IO (Either AppError a)
+          (forall effs'.
+          Member (Embed IO) effs' =>
+          Sem (Logger : effs') a -> Sem effs' a) 
+          -> Sem effs a -> IO (Either AppError a)
     )
     -> (
         forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => 
           (LogProtocol -> IO ()) 
-          -> (RunConfig -> i -> Sem FullIOEffects as) 
+          -> (RunConfig -> i -> Sem effs as) 
           -> (i -> as -> Ensurable ds) 
-          -> (forall a. Sem FullIOEffects a -> IO (Either AppError a))  
+          -> (forall a. Sem effs a -> IO (Either AppError a))  
           -> TestConfig -> RunConfig 
           -> i 
           -> IO ()

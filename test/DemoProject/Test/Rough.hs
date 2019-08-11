@@ -15,6 +15,7 @@ import           DSL.Ensure
 import           DSL.FileSystem
 import           DSL.Interpreter
 import           DSL.ArbitraryIO
+import           DSL.CurrentTime as CT
 import qualified Prelude as P
 import qualified Pyrelude.IO as PIO
 import           Pyrelude
@@ -24,7 +25,7 @@ import OrphanedInstances()
 import DemoProject.Test.TestFilePaths
 import GHC.Stack
 
-type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
+type Effects effs = Members '[Logger, Ensure, ArbitraryIO, CurrentTime, FileSystem] effs
 
 config :: TestConfig
 config = C.testConfig {
@@ -64,6 +65,7 @@ interactor RunConfig{..} Item{..} =
 
     arbitraryIO "This is an arbitrary Put Line" () (PIO.putStrLn "Hello from random action")
     tx <- readFile path
+    now <- CT.getCurrentTime
 
     when (iid == 140)
       $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (PIO.readFile $ toFilePath invalidFile)

@@ -29,6 +29,9 @@ data Logger m a where
 
 makeSem ''Logger
 
+logDocAction :: Member Logger effs => Text -> Sem effs ()
+logDocAction = logItem . IterationLog . Doc . DocAction . ActionInfo
+
 data LogAuxInfo = LogAuxInfo {
   runId :: Text,
   threadID :: Int,

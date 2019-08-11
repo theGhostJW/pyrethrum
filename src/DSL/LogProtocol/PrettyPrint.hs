@@ -58,7 +58,7 @@ prettyPrintLogProtocol docMode =
         IterationLog (Doc dp) -> case dp of 
                               DocAction ai -> case ai of
                                 ActionInfo msg -> "  >> " <> msg
-                                ActionInfoM msg extended -> "  >> " <> 
+                                ActionInfo' msg extended -> "  >> " <> 
                                                                 msg <> 
                                                                 newLn <> 
                                                                 indent2 extended

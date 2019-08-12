@@ -11,11 +11,15 @@ import DSL.Logger
 currentTimeDocInterpreter :: forall a effs. Members [Logger, Embed IO] effs => Sem (CurrentTime ': effs) a -> Sem effs a
 currentTimeDocInterpreter = 
   interpret $ \ct ->
-                  do
-                    (lbl :: Text, v) <- embed $ case ct of
-                            GetCurrentTime -> (\a -> ("getCurrentTime: " <> txt a, a)) <$> PIO.getCurrentTime
-                            GetCurrentTimeZone -> (\a -> ("getCurrentTimeZone: " <> txt a, a)) <$> PIO.getCurrentTimeZone
-                            GetTimeZone utcTime' -> (\a -> ("getTimeZone: " <> txt a, a)) <$> PIO.getTimeZone utcTime'
-                            UtcToLocalZonedTime utcTime' -> (\a -> ("utcToLocalZonedTime: " <> txt a, a)) <$>PIO.utcToLocalZonedTime utcTime'
-                    logDocAction lbl
-                    pure v
+                  let 
+                    showTup :: forall v. Show v => Text -> v -> (Text, v)
+                    showTup lbl v = (lbl <> txt v, v)
+                  in
+                    do
+                      (lbl :: Text, v) <- embed $ case ct of
+                              GetCurrentTime -> showTup "getCurrentTime: " <$> PIO.getCurrentTime
+                              GetCurrentTimeZone -> showTup "getCurrentTimeZone: " <$> PIO.getCurrentTimeZone
+                              GetTimeZone utcTime' -> showTup "getTimeZone: " <$> PIO.getTimeZone utcTime'
+                              UtcToLocalZonedTime utcTime' -> showTup "utcToLocalZonedTime: " <$>PIO.utcToLocalZonedTime utcTime'
+                      logDocAction lbl
+                      pure v

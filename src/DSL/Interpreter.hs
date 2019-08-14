@@ -22,7 +22,7 @@ type EFFEnsureLog effs = (Members '[Logger, EP.Ensure] effs)
 type EFFAllEffects effs = Members FullEffects effs
 type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, CurrentTime, Error EnsureError]
 type FullIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, Logger, Reader ThreadInfo, State LogIndex, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
-type FullDocIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logger, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
+type FullDocIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logger, Reader ThreadInfo, State LogIndex, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
 type FullDocEffects = '[FileSystem, ArbitraryIO, CurrentTime, Logger, Ensure, Error EnsureError, WriterDList]
 
 flattenErrors :: Either AppError (Either EnsureError (Either FileSystemError v)) -> Either AppError v
@@ -66,13 +66,15 @@ executeInIO logger app =
                                   )
 
                               
-documentInIO :: forall a. (forall effs. Members '[Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocIOEffects a -> IO (Either AppError a)
+documentInIO :: forall a. (forall effs. Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocIOEffects a -> IO (Either AppError a)
 documentInIO logger app = handleIOException $ flattenErrors <$> runM
                                   (
                                     runError
                                     $ runError
                                     $ runError
                                     $ currentTimeIOInterpreter
+                                    $ evalState (LogIndex 0)
+                                    $ runIOThreadInfoReader
                                     $ logger
                                     $ currentTimeDocInterpreter
                                     $ arbitraryIODocInterpreter
@@ -80,6 +82,8 @@ documentInIO logger app = handleIOException $ flattenErrors <$> runM
                                     $ fileSystemDocInterpreter
                                     app
                                   )
+
+-- '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Reader ThreadInfo, State LogIndex, Logger, ]
 
 executeDocumentRaw :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
 executeDocumentRaw = executeDocument logDocInterpreter

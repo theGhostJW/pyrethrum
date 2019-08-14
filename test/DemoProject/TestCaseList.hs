@@ -85,7 +85,7 @@ ioRunToFile :: forall effs. Members '[Embed IO, Logger, Reader ThreadInfo, State
     -> (forall m1 m a. TestPlan m1 m a effs) 
     -> (forall a.
           (forall effs'.
-          Members '[Embed IO, Logger, Reader ThreadInfo, State LogIndex, CurrentTime] effs' =>
+          Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs' =>
           Sem (Logger : effs') a -> Sem effs' a) 
           -> Sem effs a -> IO (Either AppError a)
     )

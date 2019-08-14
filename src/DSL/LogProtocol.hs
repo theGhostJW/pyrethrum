@@ -25,6 +25,19 @@ instance ToJSONKey ItemId where
 instance FromJSONKey ItemId where
    -- default implementation
 
+data ThreadInfo = ThreadInfo { 
+  runId :: Text, 
+  threadIndex :: Int,
+  timeZone :: TimeZone
+}
+
+data LogInfo = LogInfo { 
+  index :: Int,
+  time :: UTCTime
+}
+
+newtype LogIndex = LogIndex { unLogIndex :: Int}
+
 data DocActionInfo = 
     ActionInfo Text |
     ActionInfo' Text Text 

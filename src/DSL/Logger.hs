@@ -13,6 +13,8 @@ import qualified Data.ByteString.Lazy as B
 import System.IO (stdout)
 import Polysemy
 import Polysemy.Output
+import Polysemy.Reader
+import Polysemy.State
 
 
 data Logger m a where
@@ -85,40 +87,71 @@ logDocInterpreter =
 putLines :: Handle -> Text -> IO ()
 putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
 
+-- TODO - update to use info
+logStrJSONWith :: ThreadInfo -> LogInfo -> LogProtocol -> Text
+logStrJSONWith _ _ lp = eitherf (decodeUtf8' . B.toStrict . A.encode $ lp)
+                  (\e -> "Encode error: " <> txt e)
+                  id
+
 logStrJSON :: LogProtocol -> Text
 logStrJSON lp = eitherf (decodeUtf8' . B.toStrict . A.encode $ lp)
                   (\e -> "Encode error: " <> txt e)
                   id
 
-logConsolePrettyInterpreter :: Member (Embed IO) effs => Sem (Logger ': effs) a -> Sem effs a
-logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocol False, stdout)]
+runIOThreadInfoReader :: Member CurrentTime r => Sem (Reader ThreadInfo ': r) a -> Sem r a 
+runIOThreadInfoReader sem = 
+  do 
+    zone <- CT.getCurrentTimeZone
+    runReader (ThreadInfo "local" 1 zone) sem
 
-logToHandles :: Member (Embed IO) effs => [(LogProtocol -> Text, Handle)] -> Sem (Logger ': effs) a -> Sem effs a
-logToHandles convertersHandlers = 
-  let 
-    logToHandle :: (LogProtocol -> Text) -> Handle -> LogProtocol -> IO ()
-    logToHandle lp2Str h = putLines h . lp2Str 
+logConsolePrettyInterpreter :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => Sem (Logger ': effs) a -> Sem effs a
+logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocolWith False, stdout)]
 
-    logToh :: LogProtocol -> (LogProtocol -> Text, Handle) -> IO ()
-    logToh lp (f, h) = logToHandle f h lp
+incIdx :: LogIndex -> LogIndex
+incIdx (LogIndex i) = LogIndex $ i + 1
 
-    logTohandles :: LogProtocol -> IO ()
-    logTohandles lp =  P.sequence_ $ logToh lp <$> convertersHandlers
+logToHandles :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => [(ThreadInfo -> LogInfo -> LogProtocol -> Text, Handle)] -> Sem (Logger ': effs) a -> Sem effs a
+logToHandles convertersHandles = 
+    interpret $ \lg -> 
+                    do 
+                      threadInfo :: ThreadInfo <- ask
+                      modify incIdx
+                      idx :: LogIndex <- get
+                      now <- CT.getCurrentTime
+                      let 
+                        lgInfo :: LogInfo
+                        lgInfo = LogInfo (unLogIndex idx) now
 
-    logRunTohandles :: RunProtocol -> IO ()
-    logRunTohandles = logTohandles . IterationLog . Run 
-  in
-    interpret $ embed . \case 
-                            LogItem lp -> logTohandles lp
+                        simpleConvertersHandles :: [(LogProtocol -> Text, Handle)]
+                        simpleConvertersHandles = (\(f , h) -> (f threadInfo lgInfo, h)) <$> convertersHandles
 
-                            LogError msg -> logRunTohandles . Error $ AppUserError msg
-                            LogError' msg info -> logRunTohandles . Error . AppUserError' $ DetailedInfo msg info
+                        logToHandle :: (LogProtocol -> Text) -> Handle -> LogProtocol -> IO ()
+                        logToHandle cvtr h = putLines h . cvtr
+                    
+                        logToh :: LogProtocol -> (LogProtocol -> Text, Handle) -> IO ()
+                        logToh lp (f, h) = logToHandle f h lp
+                    
+                        logTohandles :: LogProtocol -> IO ()
+                        logTohandles lp =  P.sequence_ $ logToh lp <$> simpleConvertersHandles
+                    
+                        logRunTohandles :: RunProtocol -> IO ()
+                        logRunTohandles = logTohandles . IterationLog . Run 
+                      
+                        logToIO :: Logger m a -> IO a
+                        logToIO = \case 
+                                    LogItem lp -> logTohandles lp
 
-                            LogMessage s ->  logRunTohandles $ Message s 
-                            LogMessage' msg info -> logRunTohandles . Message' $ DetailedInfo msg info
+                                    LogError msg -> logRunTohandles . Error $ AppUserError msg
+                                    LogError' msg info -> logRunTohandles . Error . AppUserError' $ DetailedInfo msg info
 
-                            LogWarning s -> logRunTohandles $ Warning s 
-                            LogWarning' msg info ->  logRunTohandles . Warning' $ DetailedInfo msg info
+                                    LogMessage s ->  logRunTohandles $ Message s 
+                                    LogMessage' msg info -> logRunTohandles . Message' $ DetailedInfo msg info
+
+                                    LogWarning s -> logRunTohandles $ Warning s 
+                                    LogWarning' msg info ->  logRunTohandles . Warning' $ DetailedInfo msg info
+
+                      embed $ logToIO lg
+                         
                                           
                               
 logDocPrettyInterpreter :: forall effs a. Member WriterDList effs => Sem (Logger ': effs) a -> Sem effs a

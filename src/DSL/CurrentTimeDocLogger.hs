@@ -12,14 +12,14 @@ currentTimeDocInterpreter :: forall a effs. Members [Logger, Embed IO] effs => S
 currentTimeDocInterpreter = 
   interpret $ \ct ->
                   let 
-                    showTup :: forall v. Show v => Text -> v -> (Text, v)
-                    showTup lbl v = (lbl <> txt v, v)
+                    showTup :: forall v. Show v => Text -> IO v -> IO (Text, v)
+                    showTup lbl v = (\v' -> (lbl <> txt v', v')) <$> v
                   in
                     do
-                      (lbl :: Text, v) <- embed $ case ct of
-                              GetCurrentTime -> showTup "getCurrentTime: " <$> PIO.getCurrentTime
-                              GetCurrentTimeZone -> showTup "getCurrentTimeZone: " <$> PIO.getCurrentTimeZone
-                              GetTimeZone utcTime' -> showTup "getTimeZone: " <$> PIO.getTimeZone utcTime'
-                              UtcToLocalZonedTime utcTime' -> showTup "utcToLocalZonedTime: " <$>PIO.utcToLocalZonedTime utcTime'
+                      (lbl, v) <- embed $ case ct of
+                              GetCurrentTime -> showTup "getCurrentTime: " PIO.getCurrentTime
+                              GetCurrentTimeZone -> showTup "getCurrentTimeZone: " PIO.getCurrentTimeZone
+                              GetTimeZone utcTime' -> showTup "getTimeZone: " $ PIO.getTimeZone utcTime'
+                              UtcToLocalZonedTime utcTime' -> showTup "utcToLocalZonedTime: " $ PIO.utcToLocalZonedTime utcTime'
                       logDocAction lbl
                       pure v

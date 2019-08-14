@@ -5,6 +5,8 @@
 module DemoProject.TestCaseList where
 
 import           Polysemy
+import           Polysemy.State
+import           Polysemy.Reader
 import           DemoProject.Config
 import           DemoProject.Test.Rough as RT
 import           DemoProject.Test.Rough2 as RT2
@@ -18,6 +20,7 @@ import           Common
 import           DSL.Interpreter
 import           DSL.Logger
 import           DSL.Ensure
+import           DSL.CurrentTime
 import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList
@@ -76,13 +79,13 @@ data WantConsole = Console | NoConsole deriving Eq
 jsonItemLogExt = ".jsoni"
 
 -- TODO: move to library file 
-ioRunToFile :: forall effs. Member Logger effs =>
+ioRunToFile :: forall effs. Members '[Embed IO, Logger, Reader ThreadInfo, State LogIndex, CurrentTime] effs =>
     WantConsole
     -> Bool 
     -> (forall m1 m a. TestPlan m1 m a effs) 
     -> (forall a.
           (forall effs'.
-          Member (Embed IO) effs' =>
+          Members '[Embed IO, Logger, Reader ThreadInfo, State LogIndex, CurrentTime] effs' =>
           Sem (Logger : effs') a -> Sem effs' a) 
           -> Sem effs a -> IO (Either AppError a)
     )
@@ -99,13 +102,13 @@ ioRunToFile :: forall effs. Member Logger effs =>
      -> IO (Either AppError [AbsFile])
 ioRunToFile wantConsole docMode pln interpt itemRunner = 
   let 
-    handleSpec :: M.Map (Text, FileExt) (LogProtocol -> Text) 
+    handleSpec :: M.Map (Text, FileExt) (ThreadInfo -> LogInfo -> LogProtocol -> Text) 
     handleSpec = M.fromList [
-                                (("raw", FileExt ".log"), prettyPrintLogProtocol docMode)
-                              , (("raw", FileExt jsonItemLogExt), logStrJSON)
+                                (("raw", FileExt ".log"), prettyPrintLogProtocolWith docMode)
+                              , (("raw", FileExt jsonItemLogExt), logStrJSONWith)
                             ]
 
-    fileHandleInfo :: IO (Either AppError [(LogProtocol -> Text, HandleInfo)])
+    fileHandleInfo :: IO (Either AppError [(ThreadInfo -> LogInfo -> LogProtocol -> Text, HandleInfo)])
     fileHandleInfo = logFileHandles handleSpec
 
     printFilePaths :: [AbsFile] -> IO ()
@@ -115,18 +118,18 @@ ioRunToFile wantConsole docMode pln interpt itemRunner =
                                 sequence_ $ putStrLn . toS . toFilePath <$> lsFiles
                                 putStrLn ""
                           
-    fileHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> Text, S.Handle)])
+    fileHandles :: IO (Either AppError [(Maybe AbsFile, ThreadInfo -> LogInfo -> LogProtocol -> Text, S.Handle)])
     fileHandles = (((\(fn, fh) -> (Just $ A.path fh, fn, fileHandle fh)) <$>) <$>) <$> fileHandleInfo
 
     closeFileHandles :: [S.Handle] -> IO ()
     closeFileHandles hdls = sequence_ $ S.hClose <$> hdls
 
-    allHandles :: IO (Either AppError [(Maybe AbsFile, LogProtocol -> Text, S.Handle)])
+    allHandles :: IO (Either AppError [(Maybe AbsFile, ThreadInfo -> LogInfo -> LogProtocol -> Text, S.Handle)])
     allHandles = wantConsole == Console
-                      ? (((Nothing, prettyPrintLogProtocol docMode, S.stdout) :) <$>) <$> fileHandles
+                      ? (((Nothing, prettyPrintLogProtocolWith docMode, S.stdout) :) <$>) <$> fileHandles
                       $ fileHandles
     
-    runTheTest :: [(LogProtocol -> Text, S.Handle)] -> IO ()
+    runTheTest :: [(ThreadInfo -> LogInfo -> LogProtocol -> Text, S.Handle)] -> IO ()
     runTheTest targHndls = testRun pln filters itemRunner (interpt (logToHandles targHndls)) runConfig
   in 
     do 

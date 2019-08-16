@@ -173,7 +173,7 @@ normalExecution logger interactor prepState intrprt tc rc i  =
       logChk cr = logRunItem $ CheckOutcome iid cr
 
       handler :: SomeException -> m ()
-      handler e = logger . logRun . LP.Error . AppGenericError' ("Unexpected Error Executing iteration: " <> txt iid) . toS $ displayException e
+      handler e = logger . logRun . LP.Error . AppGenericError' ("Unexpected Error Executing Iteration: " <> txt iid) . toS $ displayException e
 
       recordSkippedChecks :: m ()
       recordSkippedChecks = do 
@@ -232,6 +232,7 @@ docExecution logger interactor _ intrprt tc rc i =
     iid :: ItemId
     iid = ItemId (moduleAddress tc) $ identifier i
 
+    docLog :: DocProtocol -> m ()
     docLog = logger . logDoc
 
     logChecks :: m ()
@@ -307,7 +308,7 @@ runTest ::  forall i rc as ds m tc effs. (Monad m, ItemClass i ds, Show as, Show
                    -> (                               -- item runner logger - this does all the work and logs results as side effect
                       (LogProtocol -> m ())                                 -- logger
                       -> (rc -> i -> Sem effs as)                           -- interactor           
-                      -> (i -> as -> Ensurable ds)                               -- prepstate
+                      -> (i -> as -> Ensurable ds)                          -- prepstate
                       -> (forall a. Sem effs a -> m (Either AppError a))    -- interpreter
                       -> tc                                                 -- TestConfig
                       -> rc                                                 -- RunConfig
@@ -343,7 +344,7 @@ testRunOrEndpoint :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfi
                    -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) =>                                -- item runner logger - this does all the work and logs results as side effect
                         (LogProtocol -> m ())                                 -- logger
                         -> (rc -> i -> Sem effs as)                           -- interactor   
-                        -> (i -> as -> Ensurable ds)                               -- prepstate
+                        -> (i -> as -> Ensurable ds)                          -- prepstate
                         -> (forall a. Sem effs a -> m (Either AppError a))    -- interpreter
                         -> tc                                                 -- TestConfig
                         -> rc                                                 -- RunConfig

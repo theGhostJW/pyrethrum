@@ -91,13 +91,7 @@ ioRunToFile :: forall effs. Members '[Embed IO, Logger, Reader ThreadInfo, State
     )
     -> (
         forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => 
-          (LogProtocol -> IO ()) 
-          -> (RunConfig -> i -> Sem effs as) 
-          -> (i -> as -> Ensurable ds) 
-          -> (forall a. Sem effs a -> IO (Either AppError a))  
-          -> TestConfig -> RunConfig 
-          -> i 
-          -> IO ()
+          ItemRunner as ds i TestConfig RunConfig effs IO
        ) 
      -> IO (Either AppError [AbsFile])
 ioRunToFile wantConsole docMode pln interpt itemRunner = 

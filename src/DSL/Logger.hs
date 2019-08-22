@@ -178,5 +178,9 @@ logDocPrettyInterpreter =
                   LogWarning s -> pushDoc $ DocWarning s 
                   LogWarning' msg info ->  pushDoc . DocWarning' $ DetailedInfo msg info
 
+
+itrFuncDeleteMe :: Logger m x -> Sem effs x
+itrFuncDeleteMe = uu
+
                                  
   

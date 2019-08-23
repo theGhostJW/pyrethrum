@@ -83,8 +83,6 @@ documentInIO logger app = handleIOException $ flattenErrors <$> runM
                                     app
                                   )
 
--- '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Reader ThreadInfo, State LogIndex, Logger, ]
-
 executeDocumentRaw :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
 executeDocumentRaw = executeDocument logDocInterpreter
 

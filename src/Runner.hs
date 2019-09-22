@@ -30,6 +30,7 @@ import DSL.Ensure
 import Pyrelude as P
 import Pyrelude.IO
 import Polysemy
+import Polysemy.Error as PE
 import qualified Data.DList as D
 import           ItemFilter  (ItemFilter (..), filterredItemIds)
 import qualified Data.Set as S
@@ -45,7 +46,7 @@ import qualified Data.Map as M
 import qualified Data.Foldable as F
 import qualified Prelude
 
-type TestPlanBase tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => GenericTest tc rc i effs as ds -> m1 (m a)) -> [TestGroup m1 m a effs]
+type TestPlanBase tc rc m1 m a itmEffs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => GenericTest tc rc i itmEffs as ds -> m1 (m a)) -> [TestGroup m1 m a itmEffs]
 
 --- Reapplying test Filters to Items ---
 
@@ -143,75 +144,74 @@ logFileHandles mpSuffixExt =
   in 
      result <$> finalRslt 
 
-doNothing :: PreRun effs
+doNothing :: PreRun itmEffs
 doNothing = PreRun {
   runAction = pure (),
   checkHasRun = pure True
 }
 
-disablePreRun :: TestGroup m m1 a effs -> TestGroup m m1 a effs
+disablePreRun :: TestGroup m m1 a itmEffs -> TestGroup m m1 a itmEffs
 disablePreRun tg = tg {
                         rollover = doNothing,
                         goHome = doNothing
                       }
 
-testAddress :: forall tc rc i effs as ds. TestConfigClass tc => GenericTest tc rc i effs as ds -> TestModule
-testAddress =  moduleAddress . (configuration :: GenericTest tc rc i effs as ds -> tc)
+testAddress :: forall tc rc i itmEffs as ds. TestConfigClass tc => GenericTest tc rc i itmEffs as ds -> TestModule
+testAddress =  moduleAddress . (configuration :: GenericTest tc rc i itmEffs as ds -> tc)
 
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-type ItemRunner as ds i tc rc effs m = ItemRunParams as ds i tc rc effs m -> m ()                                            
+type ItemRunner as ds i tc rc itmEffs apEffs = ItemRunParams as ds i tc rc itmEffs apEffs -> Sem apEffs ()                                            
 
-data TestRunParams as ds i tc rc effs m = TestRunParams {
-  logger :: LogProtocol -> m (),                                
-  interactor :: rc -> i -> Sem effs as,                         
+data TestRunParams as ds i tc rc itmEffs apEffs = TestRunParams {  
+  logger :: LogProtocol -> Sem apEffs (),                         
+  interactor :: rc -> i -> Sem itmEffs as,                         
   prepState :: i -> as -> Ensurable ds,                         
-  interpreter :: forall a. Sem effs a -> m (Either AppError a), 
+  interpreter :: forall a. Sem itmEffs a -> Sem apEffs (Either AppError a), 
   tc :: tc,                                                     
   rc :: rc                                                      
 }
 
-data ItemRunParams as ds i tc rc effs m = ItemRunParams {
-  testRunParams :: TestRunParams as ds i tc rc effs m,                                                     
+data ItemRunParams as ds i tc rc itmEffs apEffs = ItemRunParams {
+  testRunParams :: TestRunParams as ds i tc rc itmEffs apEffs,                                                     
   item :: i                                                        
 }
 
-normalExecution :: forall m effs rc tc i as ds. (Monad m, MonadCatch m, MonadMask m, ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc) 
-                  => ItemRunner as ds i tc rc effs m
+normalExecution :: forall m itmEffs apEffs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs apEffs) 
+                  => ItemRunner as ds i tc rc itmEffs apEffs
 normalExecution (ItemRunParams (TestRunParams logger interactor prepState intrprt tc rc) i)  = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) (identifier i)
 
-    logRunItem :: RunProtocol -> m ()
+    logRunItem :: RunProtocol -> Sem apEffs ()
     logRunItem = logger . logRun
 
-    logChk :: CK.CheckReport -> m ()
+    logChk :: CK.CheckReport -> Sem apEffs ()
     logChk cr = logRunItem $ CheckOutcome iid cr
 
-    handler :: SomeException -> m ()
-    handler e = logger . logRun . LP.Error . AppGenericError' ("Unexpected Error Executing Iteration: " <> txt iid) . toS $ displayException e
+    handler :: AppError -> Sem apEffs ()
+    handler = logger . logRun . LP.Error 
 
-    recordSkippedChecks :: m ()
+    recordSkippedChecks :: Sem apEffs ()
     recordSkippedChecks = do 
                             logRunItem StartChecks 
                             F.traverse_ logChk $ D.toList $ CK.skipChecks (checkList i)
 
-    normalExecution' :: m ()
+    normalExecution' :: Sem apEffs ()
     normalExecution' = 
       let
-        runChecks :: ds -> m ()
+        runChecks :: ds -> Sem apEffs ()
         runChecks ds = F.traverse_ logChk $ D.toList $ CK.calcChecks ds (checkList i)
       in 
         do 
           logRunItem StartInteraction
-          ethas <- onError 
-                      (intrprt $ interactor rc i) 
-                      (logger . logRun . LP.Error $ AppGenericError "Interactor Exception")
-
+          -- TODO: check for io exceptions / SomeException - use throw from test
+          ethas <- intrprt $ interactor rc i
+        
           eitherf ethas
             (\e -> logRunItem (InteractorFailure iid e) *> recordSkippedChecks)
             (\as -> 
@@ -234,21 +234,21 @@ normalExecution (ItemRunParams (TestRunParams logger interactor prepState intrpr
                     )
             )
   in 
-    catch
+    PE.catch
       normalExecution'
       handler
 
-docExecution :: forall m effs rc tc i as ds. (Monad m, ItemClass i ds, TestConfigClass tc)
-              => ItemRunner as ds i tc rc effs m
+docExecution :: forall apEffs itmEffs rc tc i as ds. (ItemClass i ds, TestConfigClass tc)
+              => ItemRunner as ds i tc rc itmEffs apEffs
 docExecution (ItemRunParams (TestRunParams logger interactor prepState intrprt tc rc) i) = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) $ identifier i
 
-    docLog :: DocProtocol -> m ()
+    docLog :: DocProtocol -> Sem apEffs ()
     docLog = logger . logDoc
 
-    logChecks :: m ()
+    logChecks :: Sem apEffs ()
     logChecks =  P.sequence_ $  (\chk -> docLog $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
   in 
     do 
@@ -257,27 +257,27 @@ docExecution (ItemRunParams (TestRunParams logger interactor prepState intrprt t
       docLog DocChecks
       logChecks
 
-runTestItems :: forall i as ds tc rc effs m. (Monad m, TestConfigClass tc, ItemClass i ds) =>
+runTestItems :: forall i as ds tc rc itmEffs apEffs. (TestConfigClass tc, ItemClass i ds) =>
       Maybe (S.Set Int)                                                    -- target Ids
       -> [i]                                                               -- items
-      -> TestRunParams as ds i tc rc effs m
-      -> ItemRunner as ds i tc rc effs m
-      -> [m ()]
+      -> TestRunParams as ds i tc rc itmEffs apEffs
+      -> ItemRunner as ds i tc rc itmEffs apEffs
+      -> [Sem apEffs ()]
 runTestItems iIds items runPrms@(TestRunParams logger interactor prepState intrprt tc rc) itemRunner =
   let
-    logBoundry :: BoundaryEvent -> m ()
+    logBoundry :: BoundaryEvent -> Sem apEffs ()
     logBoundry = logger . BoundaryLog
 
-    startTest :: m ()
+    startTest :: Sem apEffs ()
     startTest = logBoundry . StartTest $ mkDisplayInfo tc
 
-    endTest :: m ()
+    endTest :: Sem apEffs ()
     endTest = logBoundry . EndTest $ moduleAddress tc
 
     filteredItems :: [i]
     filteredItems = filter inTargIds items
 
-    runItem :: i -> m ()
+    runItem :: i -> Sem apEffs ()
     runItem i =  let
                     iid :: ItemId
                     iid = ItemId (moduleAddress tc) (identifier i)
@@ -298,20 +298,20 @@ runTestItems iIds items runPrms@(TestRunParams logger interactor prepState intrp
                 : (runItem <$> Prelude.init xs)
                 <> [runItem (Prelude.last xs) *> endTest]
 
-runTest ::  forall i rc as ds m tc effs. (Monad m, ItemClass i ds, TestConfigClass tc, Member Logger effs) =>
+runTest ::  forall i rc as ds tc itmEffs apEffs. (ItemClass i ds, TestConfigClass tc, Member Logger itmEffs) =>
                    Maybe (S.Set Int)                                                        -- target Ids
                    -> FilterList rc tc                                                      -- filters
-                   -> ItemRunner as ds i tc rc effs m                                       -- item runner
+                   -> ItemRunner as ds i tc rc itmEffs apEffs                               -- item runner
                    -> rc                                                                    -- runConfig
-                   -> (forall a. Sem effs a -> m (Either AppError a))                       -- interpreter
-                   -> GenericTest tc rc i effs as ds                                        -- Test Case
-                   -> [m ()]                                                                -- [TestIterations]
+                   -> (forall a. Sem itmEffs a -> Sem apEffs (Either AppError a))           -- interpreter
+                   -> GenericTest tc rc i itmEffs as ds                                     -- Test Case
+                   -> [Sem apEffs ()]                                                        -- [TestIterations]
 runTest iIds fltrs itemRunner rc intrprt GenericTest{configuration = tc, components} =
   let
-    logPrtcl :: LogProtocol -> m ()
+    logPrtcl :: LogProtocol -> Sem apEffs ()
     logPrtcl = logger' intrprt
 
-    runItems :: TestComponents rc i effs as ds -> [m ()]
+    runItems :: TestComponents rc i itmEffs as ds -> [Sem apEffs ()]
     runItems TestComponents {testItems, testInteractor, testPrepState} = runTestItems iIds (testItems rc) (TestRunParams logPrtcl testInteractor testPrepState intrprt tc rc) itemRunner
 
     include :: Bool
@@ -321,23 +321,23 @@ runTest iIds fltrs itemRunner rc intrprt GenericTest{configuration = tc, compone
         ? runItems components
         $ []
 
-logger' :: forall m effs. (Member Logger effs, Functor m) =>
-                 (forall a. Sem effs a -> m (Either AppError a)) -- interpreter
+logger' :: forall itmEffs apEffs. (Member Logger itmEffs) =>
+                 (forall a. Sem itmEffs a -> Sem apEffs (Either AppError a)) -- interpreter
                  -> LogProtocol
-                 -> m ()
+                 -> Sem apEffs ()
 logger' intrprt = void . intrprt . logItem
 
-testRunOrEndpoint :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
+testRunOrEndpoint :: forall rc tc itmEffs apEffs. (RunConfigClass rc, TestConfigClass tc, EFFLogger itmEffs) =>
                     Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
-                   -> (forall a mo mi. TestPlanBase tc rc mo mi a effs) -- test case processor function is applied to a hard coded list of test groups and returns a list of results
+                   -> (forall a mo mi. TestPlanBase tc rc mo mi a itmEffs) -- test case processor function is applied to a hard coded list of test groups and returns a list of results
                    -> FilterList rc tc                                  -- filters
-                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner as ds i tc rc effs m)                   -- item runner
-                   -> (forall a. Sem effs a -> m (Either AppError a))   -- interpreter
+                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner as ds i tc rc itmEffs apEffs)                   -- item runner
+                   -> (forall a. Sem itmEffs a -> Sem apEffs (Either AppError a))   -- interpreter
                    -> rc                                                -- runConfig
-                   -> m ()
+                   -> Sem apEffs ()
 testRunOrEndpoint iIds runner fltrs itemRunner intrprt rc =
         let
-          preRun :: PreRun effs -> PreTestStage ->  m (Either AppError ())
+          preRun :: PreRun itmEffs -> PreTestStage -> Sem apEffs (Either AppError ())
           preRun PreRun{..} stage = 
             do
               let
@@ -373,31 +373,31 @@ testRunOrEndpoint iIds runner fltrs itemRunner intrprt rc =
                         (\_ -> verifyAction runCheck)
                         preRunRslt
 
-          -- filterInfo :: [[FilterResult]]
+          filterInfo :: [[FilterResult]]
           filterInfo = filterGroups runner fltrs rc
 
           filterFlags :: [Bool]
           filterFlags = filterGroupFlags filterInfo
 
-          -- prepResults :: [TestGroup [] m () effs]
+          prepResults :: [TestGroup [] (Sem apEffs) () itmEffs]
           prepResults = runner $ runTest iIds fltrs itemRunner rc intrprt
 
           firstDuplicateGroupTitle :: Maybe Text
           firstDuplicateGroupTitle = toS <$> firstDuplicate (toS . C.title <$> prepResults :: [Prelude.String])
 
-          runTuples ::  [(Bool, TestGroup [] m () effs)]
+          runTuples ::  [(Bool, TestGroup [] (Sem apEffs) () itmEffs)]
           runTuples = P.zip filterFlags prepResults
           
-          logPtcl :: LogProtocol -> m ()
+          logPtcl :: LogProtocol -> Sem apEffs ()
           logPtcl = logger' intrprt
           
-          logBoundry :: BoundaryEvent -> m ()
+          logBoundry :: BoundaryEvent -> Sem apEffs ()
           logBoundry = logPtcl . BoundaryLog
 
-          logLPError :: AppError -> m ()
+          logLPError :: AppError -> Sem apEffs ()
           logLPError = logPtcl . logRun . LP.Error
 
-          exeGroup :: (Bool, TestGroup [] m () effs) -> m ()
+          exeGroup :: (Bool, TestGroup [] (Sem apEffs) () itmEffs) -> Sem apEffs ()
           exeGroup (include, tg) =
             let
               -- when running an endpoint go home and rolllover are not run
@@ -405,14 +405,14 @@ testRunOrEndpoint iIds runner fltrs itemRunner intrprt rc =
               isEndpoint :: Bool
               isEndpoint = isJust iIds
 
-              preRunGuard ::  m (Either AppError Bool)
+              preRunGuard ::  Sem apEffs (Either AppError Bool)
               preRunGuard = (
                               isEndpoint ?
                                   intrprt (not <$> checkHasRun (goHome tg)) $ -- we only want to run if is NOT already home
                                   pure $ Right True
                             )
 
-              guardedPreRun :: (TestGroup [] m () effs -> PreRun effs) -> PreTestStage -> m (Either AppError ())
+              guardedPreRun :: (TestGroup [] (Sem apEffs) () itmEffs -> PreRun itmEffs) -> PreTestStage -> Sem apEffs (Either AppError ())
               guardedPreRun sel stg =
                 do
                   wantRun <- preRunGuard
@@ -424,30 +424,30 @@ testRunOrEndpoint iIds runner fltrs itemRunner intrprt rc =
                     )
                     wantRun
 
-              grpRollover :: m (Either AppError ())
+              grpRollover :: Sem apEffs (Either AppError ())
               grpRollover = guardedPreRun rollover Rollover
 
-              grpGoHome :: m (Either AppError ())
+              grpGoHome :: Sem apEffs (Either AppError ())
               grpGoHome = guardedPreRun goHome GoHome
 
-              logFailOrRun :: m (Either AppError ()) -> m () -> m ()
+              logFailOrRun :: Sem apEffs (Either AppError ()) -> Sem apEffs () -> Sem apEffs ()
               logFailOrRun prerun mRun = do
                                           pr <- prerun
                                           either logLPError (const mRun) pr
 
-              runTestIteration :: m () -> m ()
+              runTestIteration :: Sem apEffs () -> Sem apEffs ()
               runTestIteration = logFailOrRun grpGoHome
 
-              runTest' :: [m ()] -> m ()
+              runTest' :: [Sem apEffs ()] -> Sem apEffs ()
               runTest' testIterations = sequence_ (runTestIteration <$> testIterations)
 
-              testList :: [[m ()]]
+              testList :: [[Sem apEffs ()]]
               testList = filter (not . null) $ tests tg
 
-              runGroupAfterRollover :: m ()
+              runGroupAfterRollover :: Sem apEffs ()
               runGroupAfterRollover = sequence_ $ runTest' <$> testList
 
-              runGrp :: m ()
+              runGrp :: Sem apEffs ()
               runGrp = 
                     let 
                       hdr = GroupTitle $ RB.header tg
@@ -470,27 +470,27 @@ testRunOrEndpoint iIds runner fltrs itemRunner intrprt rc =
           (\dupeTxt -> logLPError . AppGenericError $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
           
 
-testRun :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
-            (forall a mo mi. TestPlanBase tc rc mo mi a effs) -- test case processor function is applied to a hard coded list of test groups and returns a list of results
+testRun :: forall rc tc m itmEffs apEffs. (RunConfigClass rc, TestConfigClass tc, EFFLogger itmEffs) =>
+            (forall a mo mi. TestPlanBase tc rc mo mi a itmEffs) -- test case processor function is applied to a hard coded list of test groups and returns a list of results
             -> FilterList rc tc                                  -- filters
-            -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner as ds i tc rc effs m)                   -- item runner
-            -> (forall a. Sem effs a -> m (Either AppError a))   -- interpreter
+            -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner as ds i tc rc itmEffs apEffs)                   -- item runner
+            -> (forall a. Sem itmEffs a -> Sem apEffs (Either AppError a))   -- interpreter
             -> rc                                                -- runConfig
-            -> m ()
+            -> Sem apEffs ()
 testRun = testRunOrEndpoint Nothing
 
-testEndpointBase :: forall rc tc m effs. (Monad m, RunConfigClass rc, TestConfigClass tc, EFFLogger effs) =>
+testEndpointBase :: forall rc tc itmEffs apEffs. (RunConfigClass rc, TestConfigClass tc, EFFLogger itmEffs) =>
                    FilterList rc tc                               -- filters
-                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner as ds i tc rc effs m)  
-                   -> (forall a. Sem effs a -> m (Either AppError a)) -- interpreter
+                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner as ds i tc rc itmEffs apEffs)  
+                   -> (forall a. Sem itmEffs a -> Sem apEffs (Either AppError a)) -- interpreter
                    -> TestModule                                      -- test address
                    -> rc                                              -- runConfig
                    -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints
-                   -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
-                   -> m ()
+                   -> (forall a mo mi. TestPlanBase tc rc mo mi a itmEffs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
+                   -> Sem apEffs ()
 testEndpointBase fltrs itemRunner intrprt tstAddress rc iIds runner =
   let
-    logPtcl :: LogProtocol -> m ()
+    logPtcl :: LogProtocol -> Sem apEffs ()
     logPtcl = logger' intrprt
 
     endpointFilter :: TestModule -> TestFilter rc tc

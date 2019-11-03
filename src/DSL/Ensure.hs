@@ -13,8 +13,6 @@ data Ensure m a where
 
 makeSem ''Ensure
 
-type Ensurable a = Sem '[Ensure, Error EnsureError] a
-
 ensureInterpreter :: forall effs a. Member (Error EnsureError) effs => Sem (Ensure ': effs) a -> Sem effs a
 ensureInterpreter = interpret $ \case
                                     Ensure message condition -> Monad.unless condition $ PE.throw $ EnsureError message
@@ -27,6 +25,7 @@ ensureDocInterpreter = interpret $ \case
                                       Ensure message condition -> pure ()
                                       DSL.Ensure.Throw message -> pure ()
 
-fullEnsureInterpreter :: Sem '[Ensure, Error EnsureError] a -> Either EnsureError a
-fullEnsureInterpreter effs = run . runError $ ensureInterpreter effs
+-- delete later
+-- fullEnsureInterpreter :: Sem '[Ensure, Error EnsureError] a -> Either EnsureError a
+-- fullEnsureInterpreter effs = run . runError $ ensureInterpreter effs
 

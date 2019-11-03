@@ -1,10 +1,13 @@
 module RunnerBase where
 
 import DSL.Ensure
-import Common (FilterError)
+import Common (FilterError, EnsureError)
 import Pyrelude
 import Polysemy
+import Polysemy.Error
 import RunElementClasses
+
+type Ensurable effs = Members '[Ensure, Error EnsureError] effs
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,
@@ -34,7 +37,7 @@ instance Titled (TestGroup m1 m a effs) where
 data TestComponents rc i effs as ds = TestComponents {
   testItems :: rc -> [i],
   testInteractor :: rc -> i -> Sem effs as,
-  testPrepState :: i -> as -> Ensurable ds
+  testPrepState :: forall pEffs. Ensurable pEffs => i -> as -> Sem pEffs ds
 }
 
 data GenericTest tc rc i effs as ds = GenericTest {

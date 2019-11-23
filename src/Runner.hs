@@ -391,9 +391,7 @@ testRunOrEndpoint iIds runner fltrs itemRunner rc =
 
         guardedPreRun :: (TestGroup [] (Sem apEffs) () apEffs -> PreRun apEffs) -> PreTestStage -> Sem apEffs ()
         guardedPreRun sel stg =
-          do
-            wantRun <- preRunGuard
-            wantRun ? preRun (sel tg) stg $ pure ()
+            preRunGuard >>= bool (pure ()) (preRun (sel tg) stg)
 
         grpRollover :: Sem apEffs ()
         grpRollover = guardedPreRun rollover Rollover
@@ -441,7 +439,7 @@ testRunOrEndpoint iIds runner fltrs itemRunner rc =
     (\dupeTxt -> logLPError . AppGenericError $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
           
 
-testRun :: forall rc tc m apEffs. (RunConfigClass rc, TestConfigClass tc, ApEffs apEffs) =>
+testRun :: forall rc tc apEffs. (RunConfigClass rc, TestConfigClass tc, ApEffs apEffs) =>
             (forall a mo mi. TestPlanBase tc rc mo mi a apEffs)                                                              -- test case processor function is applied to a hard coded list of test groups and returns a list of results
             -> FilterList rc tc                                                                                               -- filters
             -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner as ds i tc rc apEffs)  -- item runner

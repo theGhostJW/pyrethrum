@@ -144,20 +144,20 @@ logFileHandles mpSuffixExt =
   in 
      result <$> finalRslt 
 
-doNothing :: PreRun itmEffs
+doNothing :: PreRun apEffs
 doNothing = PreRun {
   runAction = pure (),
   checkHasRun = pure True
 }
 
-disablePreRun :: TestGroup m m1 a itmEffs -> TestGroup m m1 a itmEffs
+disablePreRun :: TestGroup m m1 a apEffs -> TestGroup m m1 a apEffs
 disablePreRun tg = tg {
                         rollover = doNothing,
                         goHome = doNothing
                       }
 
-testAddress :: forall tc rc i itmEffs as ds. TestConfigClass tc => GenericTest tc rc i itmEffs as ds -> TestModule
-testAddress =  moduleAddress . (configuration :: GenericTest tc rc i itmEffs as ds -> tc)
+testAddress :: forall tc rc i apEffs as ds. TestConfigClass tc => GenericTest tc rc i apEffs as ds -> TestModule
+testAddress =  moduleAddress . (configuration :: GenericTest tc rc i apEffs as ds -> tc)
 
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -234,7 +234,7 @@ normalExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i)  =
           e -> logRP $ LP.Error e
       )
 
-docExecution :: forall apEffs itmEffs rc tc i as ds. (ItemClass i ds, TestConfigClass tc)
+docExecution :: forall apEffs rc tc i as ds. (ItemClass i ds, TestConfigClass tc, Member Logger apEffs)
               => ItemRunner as ds i tc rc apEffs
 docExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i) = 
   let
@@ -242,18 +242,18 @@ docExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i) =
     iid = ItemId (moduleAddress tc) $ identifier i
 
     docLog :: DocProtocol -> Sem apEffs ()
-    docLog = logger . logDoc
+    docLog = logLP . logDoc
 
     logChecks :: Sem apEffs ()
     logChecks =  P.sequence_ $  (\chk -> docLog $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
   in 
     do 
       docLog DocInteraction
-      intrprt (interactor rc i)
+      interactor rc i
       docLog DocChecks
       logChecks
 
-runTestItems :: forall i as ds tc rc apEffs. (TestConfigClass tc, ItemClass i ds) =>
+runTestItems :: forall i as ds tc rc apEffs. (TestConfigClass tc, ItemClass i ds, Member Logger apEffs) =>
       Maybe (S.Set Int)                                                    -- target Ids
       -> [i]                                                               -- items
       -> TestRunParams as ds i tc rc apEffs
@@ -262,7 +262,7 @@ runTestItems :: forall i as ds tc rc apEffs. (TestConfigClass tc, ItemClass i ds
 runTestItems iIds items runPrms@(TestRunParams interactor prepState tc rc) itemRunner =
   let
     logBoundry :: BoundaryEvent -> Sem apEffs ()
-    logBoundry = logger . BoundaryLog
+    logBoundry = logLP . BoundaryLog
 
     startTest :: Sem apEffs ()
     startTest = logBoundry . StartTest $ mkDisplayInfo tc
@@ -303,8 +303,9 @@ runTest ::  forall i rc as ds tc apEffs. (ItemClass i ds, TestConfigClass tc, Me
                    -> [Sem apEffs ()]                                                        -- [TestIterations]
 runTest iIds fltrs itemRunner rc GenericTest{configuration = tc, components} =
   let
-    runItems :: TestComponents rc i itmEffs as ds -> [Sem apEffs ()]
-    runItems TestComponents {testItems, testInteractor, testPrepState} = runTestItems iIds (testItems rc) (TestRunParams logPrtcl testInteractor testPrepState intrprt tc rc) itemRunner
+    runItems :: TestComponents rc i apEffs as ds -> [Sem apEffs ()]
+    runItems TestComponents {testItems, testInteractor, testPrepState} = 
+      runTestItems iIds (testItems rc) (TestRunParams testInteractor testPrepState tc rc) itemRunner
 
     include :: Bool
     include = acceptFilter $ filterTestCfg fltrs rc tc
@@ -341,9 +342,7 @@ preRun PreRun{runAction, checkHasRun} stage =
       
     preRunRslt <- PE.catch runAction (PE.throw . rolloverFailError)
     runCheck <- checkHasRun
-    unless runCheck
-      (PE.throw rolloverCheckFalseError)
-    pure ()
+    unless runCheck (PE.throw rolloverCheckFalseError)
 
 testRunOrEndpoint :: forall rc tc apEffs. (RunConfigClass rc, TestConfigClass tc, ApEffs apEffs) =>
                     Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
@@ -353,102 +352,93 @@ testRunOrEndpoint :: forall rc tc apEffs. (RunConfigClass rc, TestConfigClass tc
                    -> rc                                                -- runConfig
                    -> Sem apEffs ()
 testRunOrEndpoint iIds runner fltrs itemRunner rc =
-        let
-          filterInfo :: [[FilterResult]]
-          filterInfo = filterGroups runner fltrs rc
+  let
+    filterInfo :: [[FilterResult]]
+    filterInfo = filterGroups runner fltrs rc
 
-          filterFlags :: [Bool]
-          filterFlags = filterGroupFlags filterInfo
+    filterFlags :: [Bool]
+    filterFlags = filterGroupFlags filterInfo
 
-          prepResults :: [TestGroup [] (Sem apEffs) () itmEffs]
-          prepResults = runner $ runTest iIds fltrs itemRunner rc intrprt
+    prepResults :: [TestGroup [] (Sem apEffs) () apEffs]
+    prepResults = runner $ runTest iIds fltrs itemRunner rc 
 
-          firstDuplicateGroupTitle :: Maybe Text
-          firstDuplicateGroupTitle = toS <$> firstDuplicate (toS . C.title <$> prepResults :: [Prelude.String])
+    firstDuplicateGroupTitle :: Maybe Text
+    firstDuplicateGroupTitle = toS <$> firstDuplicate (toS . C.title <$> prepResults :: [Prelude.String])
 
-          runTuples ::  [(Bool, TestGroup [] (Sem apEffs) () itmEffs)]
-          runTuples = P.zip filterFlags prepResults
-          
-          logPtcl :: LogProtocol -> Sem apEffs ()
-          logPtcl = logger' intrprt
-          
-          logBoundry :: BoundaryEvent -> Sem apEffs ()
-          logBoundry = logPtcl . BoundaryLog
+    runTuples ::  [(Bool, TestGroup [] (Sem apEffs) () apEffs)]
+    runTuples = P.zip filterFlags prepResults
 
-          logLPError :: AppError -> Sem apEffs ()
-          logLPError = logPtcl . logRun . LP.Error
+    logBoundry :: BoundaryEvent -> Sem apEffs ()
+    logBoundry = logLP . BoundaryLog
 
-          exeGroup :: (Bool, TestGroup [] (Sem apEffs) () itmEffs) -> Sem apEffs ()
-          exeGroup (include, tg) =
-            let
-              -- when running an endpoint go home and rolllover are not run
-              -- if the application is already home
-              isEndpoint :: Bool
-              isEndpoint = isJust iIds
+    logLPError :: AppError -> Sem apEffs ()
+    logLPError = logLP . logRun . LP.Error
 
-              preRunGuard ::  Sem apEffs (Either AppError Bool)
-              preRunGuard = (
-                              isEndpoint ?
-                                  intrprt (not <$> checkHasRun (goHome tg)) $ -- we only want to run if is NOT already home
-                                  pure $ Right True
-                            )
+    exeGroup :: (Bool, TestGroup [] (Sem apEffs) () apEffs) -> Sem apEffs ()
+    exeGroup (include, tg) =
+      let
+        isEndpoint :: Bool
+        isEndpoint = isJust iIds
 
-              guardedPreRun :: (TestGroup [] (Sem apEffs) () itmEffs -> PreRun itmEffs) -> PreTestStage -> Sem apEffs (Either AppError ())
-              guardedPreRun sel stg =
+        -- when running an endpoint go home and rolllover are not run
+        -- if the application is already home
+        preRunGuard :: Sem apEffs Bool
+        preRunGuard = (
+                        isEndpoint ?
+                            (not <$> checkHasRun (goHome tg)) $ -- we only want to run if is NOT already home
+                            pure True
+                      )
+
+        guardedPreRun :: (TestGroup [] (Sem apEffs) () apEffs -> PreRun apEffs) -> PreTestStage -> Sem apEffs ()
+        guardedPreRun sel stg =
+          do
+            wantRun <- preRunGuard
+            wantRun ? preRun (sel tg) stg $ pure ()
+
+        grpRollover :: Sem apEffs ()
+        grpRollover = guardedPreRun rollover Rollover
+
+        grpGoHome :: Sem apEffs ()
+        grpGoHome = guardedPreRun goHome GoHome
+
+        preRunAndRun :: Sem apEffs () -> Sem apEffs () -> Sem apEffs ()
+        preRunAndRun prerun mRun = do
+                                    prerun
+                                    mRun
+
+        runTestIteration :: Sem apEffs () -> Sem apEffs ()
+        runTestIteration = preRunAndRun grpGoHome
+
+        runTest' :: [Sem apEffs ()] -> Sem apEffs ()
+        runTest' testIterations = sequence_ (runTestIteration <$> testIterations)
+
+        testList :: [[Sem apEffs ()]]
+        testList = filter (not . null) $ tests tg
+
+        runGroupAfterRollover :: Sem apEffs ()
+        runGroupAfterRollover = sequence_ $ runTest' <$> testList
+
+        runGrp :: Sem apEffs ()
+        runGrp = 
+              let 
+                hdr = GroupTitle $ RB.header tg
+              in
                 do
-                  wantRun <- preRunGuard
-                  either
-                    (pure . Left)
-                    (bool
-                      (pure $ Right ()) $
-                      preRun (sel tg) stg
-                    )
-                    wantRun
-
-              grpRollover :: Sem apEffs (Either AppError ())
-              grpRollover = guardedPreRun rollover Rollover
-
-              grpGoHome :: Sem apEffs (Either AppError ())
-              grpGoHome = guardedPreRun goHome GoHome
-
-              logFailOrRun :: Sem apEffs (Either AppError ()) -> Sem apEffs () -> Sem apEffs ()
-              logFailOrRun prerun mRun = do
-                                          pr <- prerun
-                                          either logLPError (const mRun) pr
-
-              runTestIteration :: Sem apEffs () -> Sem apEffs ()
-              runTestIteration = logFailOrRun grpGoHome
-
-              runTest' :: [Sem apEffs ()] -> Sem apEffs ()
-              runTest' testIterations = sequence_ (runTestIteration <$> testIterations)
-
-              testList :: [[Sem apEffs ()]]
-              testList = filter (not . null) $ tests tg
-
-              runGroupAfterRollover :: Sem apEffs ()
-              runGroupAfterRollover = sequence_ $ runTest' <$> testList
-
-              runGrp :: Sem apEffs ()
-              runGrp = 
-                    let 
-                      hdr = GroupTitle $ RB.header tg
-                    in
-                      do
-                        logBoundry $ StartGroup hdr
-                        logFailOrRun grpRollover runGroupAfterRollover
-                        logBoundry $ EndGroup hdr
-           in
-              include ? runGrp $ pure ()
-        in
-          maybef firstDuplicateGroupTitle
-          (
-            do
-              logBoundry . StartRun (RunTitle $ C.title rc) $ toJSON rc
-              logBoundry . FilterLog $ filterLog filterInfo
-              sequence_ $ exeGroup <$> runTuples
-              logBoundry EndRun
-          )
-          (\dupeTxt -> logLPError . AppGenericError $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
+                  logBoundry $ StartGroup hdr
+                  preRunAndRun grpRollover runGroupAfterRollover
+                  logBoundry $ EndGroup hdr
+      in
+        include ? runGrp $ pure ()
+  in
+    maybef firstDuplicateGroupTitle
+    (
+      do
+        logBoundry . StartRun (RunTitle $ C.title rc) $ toJSON rc
+        logBoundry . FilterLog $ filterLog filterInfo
+        sequence_ $ exeGroup <$> runTuples
+        logBoundry EndRun
+    )
+    (\dupeTxt -> logLPError . AppGenericError $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
           
 
 testRun :: forall rc tc m apEffs. (RunConfigClass rc, TestConfigClass tc, ApEffs apEffs) =>

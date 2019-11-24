@@ -185,7 +185,7 @@ logLP = logItem
 logRP :: Member Logger effs => RunProtocol -> Sem effs ()
 logRP = logLP . logRun 
 
-normalExecution :: forall m effs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs effs) 
+normalExecution :: forall effs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs effs) 
                   => ItemRunner as ds i tc rc effs
 normalExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i)  = 
   let

@@ -38,7 +38,7 @@ jw = endpoint
 showItems :: IO ()
 showItems = showAndLogItems $ items runConfig
 
-endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
+endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
 endpoint = ep runConfig $ IID 120
 
 data ApState = ApState {
@@ -95,7 +95,7 @@ newtype DState = V {
                     iidx10 :: Int
                   } deriving Show
 
-prepState :: Item -> ApState -> Ensurable DState
+prepState :: Ensurable effs => Item -> ApState -> Sem effs DState
 prepState _i ApState{..} = do
                             ensure  "I do not like 110 in prepstate" (itemId /= 110)
                             pure $ V $ 10 * itemId
@@ -144,7 +144,7 @@ items rc = [
 nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState
 
-ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
+ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
 ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr $ items runConfig)
 
 test :: forall effs. Effects effs => Test Item effs ApState DState

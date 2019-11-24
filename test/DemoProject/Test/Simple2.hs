@@ -8,10 +8,11 @@ module DemoProject.Test.Simple2 where
 import DemoProject.Test.Simple as T
 import DemoProject.Config
 import DSL.Interpreter
+import           Polysemy
 import           Pyrelude
 import           Runner as R
 
-endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
+endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
 endpoint = ep runConfig (IID 120)
 
 data Dummy = Dummy

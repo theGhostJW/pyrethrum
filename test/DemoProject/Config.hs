@@ -10,6 +10,8 @@ import           TestFilter
 import           Data.DList
 import Data.Aeson
 import Data.Aeson.TH
+import Polysemy
+import Polysemy.Error as PE
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
 data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
@@ -104,16 +106,19 @@ testEndpoint ::
      -> RunConfig
      -> Either FilterError (Set Int)
      -> (forall m1 m a. TestPlan m1 m a FullIOEffects)
-     -> IO ()
-testEndpoint = testEndpointBase filters normalExecution executeInIOConsolePretty
+     -> Sem FullIOEffects ()
+testEndpoint = testEndpointBase filters normalExecution 
 
 testEndpointDoc ::
      TestModule
      -> RunConfig
      -> Either FilterError (Set Int)
      -> (forall a m m1. TestPlan m1 m a FullDocEffects)
-     -> DList Text
-testEndpointDoc tstAdd rc iids pln = extractDocLog $ testEndpointBase filters docExecution executeDocumentRaw tstAdd rc iids pln
+     -> Sem FullDocEffects ()
+testEndpointDoc = testEndpointBase filters docExecution
+--  tstAdd rc iids pln
+-- extractDocLog $ 
+-- executeDocumentRaw tstAdd rc iids pln
 
 $(deriveJSON defaultOptions ''TestConfig)
 $(deriveJSON defaultOptions ''Environment)

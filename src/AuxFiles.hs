@@ -72,12 +72,6 @@ base36 num minWidth =
   in
     toS $ prefix <> foldr conv [] (units num)
 
-logFileSuffix :: Text -> FileExt -> Text
-logFileSuffix suffix fileExt = "_" <> suffix <> unFileExt fileExt
-
-fullLogFileName :: Text -> Text -> FileExt -> Text
-fullLogFileName prefix suffix fileExt = prefix <> logFileSuffix suffix fileExt
-
 logFilePrefix :: ZonedTime -> Text
 logFilePrefix now =
   let
@@ -110,7 +104,7 @@ logFilePath mNamePrefix suffix fileExt =
     pfx <- maybef mNamePrefix
               (logFilePrefix <$> getZonedTime)
               pure
-    relPath <- parseRelFileSafe $ fullLogFileName pfx suffix fileExt
+    relPath <- parseRelFileSafe $ pfx <> "_" <> suffix <> unFileExt fileExt
     eitherf relPath
       (pure . Left . P.userError . toS . show)
       (\relFle -> ((pfx,) <$>) <$> logFile relFle)

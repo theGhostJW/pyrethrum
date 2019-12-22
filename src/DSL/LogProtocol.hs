@@ -31,7 +31,7 @@ data ThreadInfo = ThreadInfo {
   timeZone :: TimeZone
 }
 
-data LogInfo = LogInfo { 
+data LogIdxTime = LogIdxTime { 
   index :: Int,
   time :: UTCTime
 }

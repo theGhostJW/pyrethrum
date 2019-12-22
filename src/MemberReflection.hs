@@ -98,7 +98,7 @@ newtype DState = V {
 interactor :: forall effs. Members Effects effs => RunConfig -> Item -> Sem effs ApState
 interactor RunConfig{..} Item{..} = uu
 
-prepState :: Item -> ApState -> Ensurable DState
+prepState :: Ensurable effs => Item -> ApState -> Sem effs DState
 prepState _i ApState{..} = uu
 
 data Item = Item {
@@ -115,7 +115,7 @@ items rc = []
 nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState
 
-test :: forall effs. Members Effects effs => Test Item effs ApState DState
+test :: forall effs. Members Effects effs => Test Item ApState DState effs
 test = GenericTest {
               configuration = MemberReflection.testConfig {address = nameOfModule},
               components = TestComponents {
@@ -149,7 +149,7 @@ showEffs :: forall es0 es1 a. ShowTypes es0 => MembersFuncWrapper es0 es1 a -> [
 showEffs _ = removeKindSuffix <$> showTypes @es0
 
 demo :: [Text]
-demo = showEffs (WrappedTest test :: MembersFuncWrapper Effects effs (Test Item effs ApState DState))
+demo = showEffs (WrappedTest test :: MembersFuncWrapper Effects effs (Test Item ApState DState effs))
 
 newtype InteractorFuncWrapper memberEffs allEffs a = WrappedInteractor (Members memberEffs allEffs => RunConfig -> Item -> Sem allEffs ApState)
 

@@ -87,7 +87,7 @@ nameOfModule = mkTestModule ''ApState
 ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
 ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr $ items runConfig)
 
-test :: forall effs. Effects effs => Test Item effs ApState DState
+test :: forall effs. Effects effs => Test Item ApState DState effs
 test = GenericTest {
               configuration = config {address = nameOfModule},
               components = TestComponents {

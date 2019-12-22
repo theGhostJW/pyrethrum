@@ -25,14 +25,14 @@ import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList
 import           Pyrelude as P
-import           Pyrelude.IO as PIO 
 import           Runner as R
-import qualified System.IO as S
 import qualified Control.Exception as E
 import AuxFiles as A
 import LogTransformation (prepareFinalLogs)
 import Data.Aeson (ToJSON(..))
 import Data.Map as M
+import TestFilter
+import RunnerConsoleAndFile
 
 validPlan :: forall m m1 effs a. EFFAllEffects effs =>
   PreRun effs      -- rollOver0
@@ -67,79 +67,13 @@ validPlan ro0 gh0 ro1 gh1 f =
 
     ]
 
+    -- executeInIOConsolePretty
+ioRun :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
+ioRun pln = testRun pln filters normalExecution runConfig
 
-ioRun :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-ioRun pln = testRun pln filters normalExecution executeInIOConsolePretty runConfig
-
-ioRunRaw :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> IO ()
-ioRunRaw pln = testRun pln filters normalExecution executeInIOConsoleRaw runConfig
-
-data WantConsole = Console | NoConsole deriving Eq
-
-jsonItemLogExt = ".jsoni"
-
--- TODO: move to library file 
-ioRunToFile :: forall effs. Members '[Embed IO, Logger, Reader ThreadInfo, State LogIndex, CurrentTime] effs =>
-    WantConsole
-    -> Bool 
-    -> (forall m1 m a. TestPlan m1 m a effs) 
-    -> (forall a.
-          (forall effs'.
-          Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs' =>
-          Sem (Logger : effs') a -> Sem effs' a) 
-          -> Sem effs a -> IO (Either AppError a)
-    )
-    -> (
-        forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => 
-          ItemRunner as ds i TestConfig RunConfig effs IO
-       ) 
-     -> IO (Either AppError [AbsFile])
-ioRunToFile wantConsole docMode pln interpt itemRunner = 
-  let 
-    handleSpec :: M.Map (Text, FileExt) (ThreadInfo -> LogInfo -> LogProtocol -> Text) 
-    handleSpec = M.fromList [
-                                (("raw", FileExt ".log"), prettyPrintLogProtocolWith docMode)
-                              , (("raw", FileExt jsonItemLogExt), logStrJSONWith)
-                            ]
-
-    fileHandleInfo :: IO (Either AppError [(ThreadInfo -> LogInfo -> LogProtocol -> Text, HandleInfo)])
-    fileHandleInfo = logFileHandles handleSpec
-
-    printFilePaths :: [AbsFile] -> IO ()
-    printFilePaths lsFiles = do 
-                                putStrLn ""
-                                putStrLn "--- Log Files ---"
-                                sequence_ $ putStrLn . toS . toFilePath <$> lsFiles
-                                putStrLn ""
-                          
-    fileHandles :: IO (Either AppError [(Maybe AbsFile, ThreadInfo -> LogInfo -> LogProtocol -> Text, S.Handle)])
-    fileHandles = (((\(fn, fh) -> (Just $ A.path fh, fn, fileHandle fh)) <$>) <$>) <$> fileHandleInfo
-
-    closeFileHandles :: [S.Handle] -> IO ()
-    closeFileHandles hdls = sequence_ $ S.hClose <$> hdls
-
-    allHandles :: IO (Either AppError [(Maybe AbsFile, ThreadInfo -> LogInfo -> LogProtocol -> Text, S.Handle)])
-    allHandles = wantConsole == Console
-                      ? (((Nothing, prettyPrintLogProtocolWith docMode, S.stdout) :) <$>) <$> fileHandles
-                      $ fileHandles
-    
-    runTheTest :: [(ThreadInfo -> LogInfo -> LogProtocol -> Text, S.Handle)] -> IO ()
-    runTheTest targHndls = testRun pln filters itemRunner (interpt (logToHandles targHndls)) runConfig
-  in 
-    do 
-      hndls <- allHandles
-      eitherf hndls
-        (pure . Left)
-        (\hList -> 
-          do 
-            let 
-              getFile (mfile, _, _)  = mfile
-              fileHndls = P.filter (isJust . getFile) hList
-              logPths = catMaybes $ getFile <$> fileHndls
-            runTheTest ((\(af, fn, h) -> (fn, h)) <$> hList) `finally` closeFileHandles ((\(af, fn, h) -> h) <$> fileHndls)
-            printFilePaths logPths 
-            pure $ Right logPths
-        )
+-- executeInIOConsoleRaw
+ioRunRaw :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
+ioRunRaw pln = testRun pln filters normalExecution runConfig
                         
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
 docRunRaw pln = extractDocLog $ testRun pln filters docExecution executeDocumentRaw runConfig

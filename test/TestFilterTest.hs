@@ -52,7 +52,7 @@ instance ToJSON MyInt where
 au = [Au]
 nz = [NZ]
 
-test1 :: TST MyInt effs MyInt MyInt
+test1 :: TST MyInt MyInt MyInt effs
 test1 = GenericTest {
               configuration = TestConfig {
                 header = "test1",
@@ -64,7 +64,7 @@ test1 = GenericTest {
               components = undefined
             }
 
-test2 :: TST MyInt effs MyInt MyInt
+test2 :: TST MyInt MyInt MyInt effs
 test2 = GenericTest {
               configuration = TestConfig {
                 header = "test2",
@@ -76,7 +76,7 @@ test2 = GenericTest {
               components = undefined
             }
 
-test3 :: TST MyInt effs MyInt MyInt
+test3 :: TST MyInt MyInt MyInt effs
 test3 = GenericTest {
                 configuration = TestConfig {
                   header = "test3",
@@ -88,7 +88,7 @@ test3 = GenericTest {
                 components = undefined
             }
 
-test4 :: TST MyInt effs MyInt MyInt
+test4 :: TST MyInt MyInt MyInt effs 
 test4 = GenericTest {
               configuration = TestConfig {
                   header = "test4",
@@ -100,7 +100,7 @@ test4 = GenericTest {
               components = undefined
             }
 
-test5 :: TST MyInt effs MyInt MyInt
+test5 :: TST MyInt MyInt MyInt effs
 test5 = GenericTest {
               configuration = TestConfig {
                   header = "test5",
@@ -113,7 +113,7 @@ test5 = GenericTest {
             }
 
 runRunner :: forall m m1 effs a.
-                (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => GenericTest TestConfig RunConfig i effs as ds -> m1 (m a))
+                (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => GenericTest TestConfig RunConfig i as ds effs -> m1 (m a))
                 -> [TestGroup m1 m a effs]
 runRunner f =
   [

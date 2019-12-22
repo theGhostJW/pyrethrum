@@ -1,5 +1,3 @@
-
-
 {-# LANGUAGE NoPolyKinds #-} 
 -- TODO: work out why this is needed - investigate polykinds
 
@@ -7,7 +5,6 @@ module Runner (
   applyTestFilters
   , docExecution
   , doNothing
-  , ItemRunner
   , logFileHandles
   , normalExecution
   , showAndLogItems
@@ -46,7 +43,8 @@ import qualified Data.Map as M
 import qualified Data.Foldable as F
 import qualified Prelude
 
-type TestPlanBase tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => GenericTest tc rc i effs as ds -> m1 (m a)) -> [TestGroup m1 m a effs]
+type TestPlanBase tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => 
+                                                          GenericTest tc rc i as ds effs -> m1 (m a)) -> [TestGroup m1 m a effs]
 
 --- Reapplying test Filters to Items ---
 
@@ -92,7 +90,7 @@ showAndLogList logSuffix items =
         listItems h = sequence_ $ log2Both h . txtPretty <$> items
       in
         hndle >>=
-                either pPrint (\HandleInfo{..} -> 
+                either pPrint (\HandleInfo{path, fileHandle} -> 
                                   listItems fileHandle `finally` SIO.hClose fileHandle
                                   *> putStrLn ""
                                   *> putStrLn "--- Log Files ---"
@@ -162,14 +160,11 @@ testAddress =  moduleAddress . (configuration :: GenericTest tc rc i effs as ds 
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-type ItemRunner as ds i tc rc effs = ItemRunParams as ds i tc rc effs -> Sem effs ()                                            
+-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                                   
 
 data TestRunParams as ds i tc rc effs = TestRunParams {                       
   interactor :: rc -> i -> Sem effs as,                         
-  prepState :: forall pEffs. Ensurable pEffs => i -> as -> Sem pEffs ds,                         
-  -- interpreter :: forall a. Sem itmEffs a -> Sem effs (Either AppError a), 
+  prepState :: forall pEffs. Ensurable pEffs => i -> as -> Sem pEffs ds,                      
   tc :: tc,                                                     
   rc :: rc                                                      
 }
@@ -186,7 +181,7 @@ logRP :: Member Logger effs => RunProtocol -> Sem effs ()
 logRP = logLP . logRun 
 
 normalExecution :: forall effs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs effs) 
-                  => ItemRunner as ds i tc rc effs
+                  => ItemRunParams as ds i tc rc effs -> Sem effs ()  
 normalExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i)  = 
   let
     iid :: ItemId
@@ -235,7 +230,7 @@ normalExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i)  =
       )
 
 docExecution :: forall effs rc tc i as ds. (ItemClass i ds, TestConfigClass tc, Member Logger effs)
-              => ItemRunner as ds i tc rc effs
+              => ItemRunParams as ds i tc rc effs -> Sem effs () 
 docExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i) = 
   let
     iid :: ItemId
@@ -257,7 +252,7 @@ runTestItems :: forall i as ds tc rc effs. (TestConfigClass tc, ItemClass i ds, 
       Maybe (S.Set Int)                                                    -- target Ids
       -> [i]                                                               -- items
       -> TestRunParams as ds i tc rc effs
-      -> ItemRunner as ds i tc rc effs
+      -> (ItemRunParams as ds i tc rc effs -> Sem effs ())
       -> [Sem effs ()]
 runTestItems iIds items runPrms@(TestRunParams interactor prepState tc rc) itemRunner =
   let
@@ -297,13 +292,13 @@ runTestItems iIds items runPrms@(TestRunParams interactor prepState tc rc) itemR
 runTest ::  forall i rc as ds tc effs. (ItemClass i ds, TestConfigClass tc, Member Logger effs) =>
                    Maybe (S.Set Int)                                                        -- target Ids
                    -> FilterList rc tc                                                      -- filters
-                   -> ItemRunner as ds i tc rc effs                               -- item runner
+                   -> (ItemRunParams as ds i tc rc effs -> Sem effs ())                                 -- item runner
                    -> rc                                                                    -- runConfig
-                   -> GenericTest tc rc i effs as ds                                      -- Test Case
+                   -> GenericTest tc rc i  as ds effs                                      -- Test Case
                    -> [Sem effs ()]                                                        -- [TestIterations]
 runTest iIds fltrs itemRunner rc GenericTest{configuration = tc, components} =
   let
-    runItems :: TestComponents rc i effs as ds -> [Sem effs ()]
+    runItems :: TestComponents rc i as ds effs -> [Sem effs ()]
     runItems TestComponents {testItems, testInteractor, testPrepState} = 
       runTestItems iIds (testItems rc) (TestRunParams testInteractor testPrepState tc rc) itemRunner
 
@@ -348,7 +343,7 @@ testRunOrEndpoint :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, 
                     Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
                    -> (forall a mo mi. TestPlanBase tc rc mo mi a effs) -- test case processor function is applied to a hard coded list of test groups and returns a list of results
                    -> FilterList rc tc                                  -- filters
-                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner as ds i tc rc effs)                   -- item runner
+                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))                     -- item runner
                    -> rc                                                -- runConfig
                    -> Sem effs ()
 testRunOrEndpoint iIds runner fltrs itemRunner rc =
@@ -442,18 +437,19 @@ testRunOrEndpoint iIds runner fltrs itemRunner rc =
 testRun :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
             (forall a mo mi. TestPlanBase tc rc mo mi a effs)                                                              -- test case processor function is applied to a hard coded list of test groups and returns a list of results
             -> FilterList rc tc                                                                                               -- filters
-            -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner as ds i tc rc effs)  -- item runner
+            -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))  -- item runner
             -> rc                                                -- runConfig
             -> Sem effs ()
 testRun = testRunOrEndpoint Nothing
 
 testEndpointBase :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
                    FilterList rc tc                               -- filters
-                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner as ds i tc rc effs)  
+                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))  
                    -> TestModule                                      -- test address
                    -> rc                                              -- runConfig
                    -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints
-                   -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
+                   -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded 
+                                                                        -- list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> Sem effs ()
 testEndpointBase fltrs itemRunner tstAddress rc iIds runner =
   let

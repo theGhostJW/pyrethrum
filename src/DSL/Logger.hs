@@ -88,7 +88,7 @@ putLines :: Handle -> Text -> IO ()
 putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
 
 -- TODO - update to use info
-logStrJSONWith :: ThreadInfo -> LogInfo -> LogProtocol -> Text
+logStrJSONWith :: ThreadInfo -> LogIdxTime -> LogProtocol -> Text
 logStrJSONWith _ _ lp = eitherf (decodeUtf8' . B.toStrict . A.encode $ lp)
                   (\e -> "Encode error: " <> txt e)
                   id
@@ -110,7 +110,7 @@ logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocolWith False, s
 incIdx :: LogIndex -> LogIndex
 incIdx (LogIndex i) = LogIndex $ i + 1
 
-logToHandles :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => [(ThreadInfo -> LogInfo -> LogProtocol -> Text, Handle)] -> Sem (Logger ': effs) a -> Sem effs a
+logToHandles :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => [(ThreadInfo -> LogIdxTime -> LogProtocol -> Text, Handle)] -> Sem (Logger ': effs) a -> Sem effs a
 logToHandles convertersHandles = 
     interpret $ \lg -> 
                     do 
@@ -119,8 +119,8 @@ logToHandles convertersHandles =
                       idx :: LogIndex <- get
                       now <- CT.getCurrentTime
                       let 
-                        lgInfo :: LogInfo
-                        lgInfo = LogInfo (unLogIndex idx) now
+                        lgInfo :: LogIdxTime
+                        lgInfo = LogIdxTime (unLogIndex idx) now
 
                         simpleConvertersHandles :: [(LogProtocol -> Text, Handle)]
                         simpleConvertersHandles = (\(f , h) -> (f threadInfo lgInfo, h)) <$> convertersHandles

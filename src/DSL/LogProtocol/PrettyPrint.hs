@@ -12,8 +12,8 @@ import RunElementClasses as C
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), MessageInfo(..), GateStatus(..), classifyResult)
 import Control.Lens
 
-prettyPrintLogProtocolWith :: Bool -> ThreadInfo -> LogInfo -> LogProtocol -> Text
-prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex, timeZone} LogInfo{index = idx, time} lgProtocol = 
+prettyPrintLogProtocolWith :: Bool -> ThreadInfo -> LogIdxTime -> LogProtocol -> Text
+prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex, timeZone} LogIdxTime{index = idx, time} lgProtocol = 
   let 
     localTime = txt $ time ^. utcLocalTime timeZone
     timeLine = runId <>  " - " <> txt threadIndex <> " - " <> txt idx <> " - " <>  localTime

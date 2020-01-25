@@ -22,7 +22,7 @@ type ApEffs effs = Members '[Logger, Ensure, Error EnsureError, Error AppError] 
 
 type EFFEnsureLog effs = (Members '[Logger, EP.Ensure] effs)
 type EFFAllEffects effs = Members FullEffects effs
-type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, CurrentTime, Error EnsureError]
+type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, CurrentTime, Error EnsureError, Error AppError]
 type FullIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, Logger, Reader ThreadInfo, State LogIndex, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
 type FullDocIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logger, Reader ThreadInfo, State LogIndex, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
 type FullDocEffects = '[FileSystem, ArbitraryIO, CurrentTime, Logger, Ensure, Error EnsureError, Error AppError, WriterDList]

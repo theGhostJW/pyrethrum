@@ -343,10 +343,10 @@ testRunOrEndpoint :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, 
                     Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
                    -> (forall a mo mi. TestPlanBase tc rc mo mi a effs) -- test case processor function is applied to a hard coded list of test groups and returns a list of results
                    -> FilterList rc tc                                  -- filters
-                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))                     -- item runner
                    -> rc                                                -- runConfig
+                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))                     -- item runner
                    -> Sem effs ()
-testRunOrEndpoint iIds runner fltrs itemRunner rc =
+testRunOrEndpoint iIds runner fltrs rc itemRunner =
   let
     filterInfo :: [[FilterResult]]
     filterInfo = filterGroups runner fltrs rc
@@ -437,8 +437,8 @@ testRunOrEndpoint iIds runner fltrs itemRunner rc =
 testRun :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
             (forall a mo mi. TestPlanBase tc rc mo mi a effs)                                                              -- test case processor function is applied to a hard coded list of test groups and returns a list of results
             -> FilterList rc tc                                                                                               -- filters
-            -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))  -- item runner
-            -> rc                                                -- runConfig
+            -> rc
+            -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))  -- item runner                                                -- runConfig
             -> Sem effs ()
 testRun = testRunOrEndpoint Nothing
 
@@ -464,4 +464,4 @@ testEndpointBase fltrs itemRunner tstAddress rc iIds runner =
   in
     eitherf iIds
       (logItem . logRun . LP.Error . AppFilterError)
-      (\idSet -> testRunOrEndpoint (Just idSet) runner allFilters itemRunner rc)
+      (\idSet -> testRunOrEndpoint (Just idSet) runner allFilters rc itemRunner)

@@ -3,6 +3,7 @@ module RunnerConsoleAndFile where
 import           Polysemy
 import           Polysemy.Reader
 import           Polysemy.State
+import           Polysemy.Resource
 import Polysemy.Error as PE
 import           Common
 import           DSL.Interpreter
@@ -11,7 +12,7 @@ import           DSL.Ensure
 import           DSL.CurrentTime
 import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
-import           Pyrelude as P
+import           Pyrelude as P hiding (finally)
 import           Pyrelude.IO as PIO 
 import           Runner as R
 import qualified System.IO as S
@@ -29,7 +30,7 @@ jsonItemLogExt = ".jsoni" :: Text
 ioRunToFile :: forall tc rc effs. (
     RunConfigClass rc, 
     TestConfigClass tc, 
-    Members '[Embed IO, Logger, Reader ThreadInfo, State LogIndex, Ensure, Error EnsureError, Error AppError, CurrentTime] effs
+    Members '[Embed IO, Logger, Reader ThreadInfo, State LogIndex, Resource, Ensure, Error EnsureError, Error AppError, CurrentTime] effs
     ) =>
     WantConsole
     -> Bool 
@@ -67,34 +68,26 @@ ioRunToFile wantConsole docMode rc testFilters pln itemRunner =
                       ? (((Nothing, prettyPrintLogProtocolWith docMode, S.stdout) :) <$>) <$> fileHandles
                       $ fileHandles
     
-    runTheTest :: [(ThreadInfo -> LogIdxTime -> LogProtocol -> Text, S.Handle)] -> Sem effs ()
-    runTheTest targHndls = testRun pln testFilters itemRunner rc
+    executeRun :: [(ThreadInfo -> LogIdxTime -> LogProtocol -> Text, S.Handle)] -> Sem effs ()
+    executeRun targHndls = testRun pln testFilters rc itemRunner
+
   in 
     do 
       hndls <- embed allHandles
       eitherf hndls
         (pure . Left)
-        (\hList -> 
+        (\fileLoggerHandles -> 
           do 
             let 
               getFile (mfile, _, _) = mfile
-              fileHndls = P.filter (isJust . getFile) hList
-              logPths = catMaybes $ getFile <$> fileHndls
-
-            -- up to here ???? USE bracket effect?
-            runTheTest ((\(af, fn, h) -> (fn, h)) <$> hList) 
-            `finally` 
-             embed (closeFileHandles ((\(af, fn, h) -> h) <$> fileHndls))
+              getHandle (_, _, h) = h
+              fileRecs = P.filter (isJust . getFile) fileLoggerHandles
+              logPths = catMaybes $ getFile <$> fileRecs
+              fileHndles = getHandle <$> fileRecs
+              closeHandles = embed $ closeFileHandles fileHndles
+            
+            executeRun ((\(_file, loggerFunc, handl) -> (loggerFunc, handl)) <$> fileLoggerHandles) `finally` closeHandles
 
             embed $ printFilePaths logPths 
             pure $ Right logPths
         )
-
-
-        -- testRun :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
-        --     (forall a mo mi. TestPlanBase tc rc mo mi a effs)                                                              -- test case processor function is applied to a hard coded list of test groups and returns a list of results
-        --     -> FilterList rc tc                                                                                               -- filters
-        --     -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))  -- item runner
-        --     -> rc                                                -- runConfig
-        --     -> Sem effs ()
-

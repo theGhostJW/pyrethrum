@@ -64,22 +64,32 @@ validPlan ro0 gh0 ro1 gh1 f =
               f ST2.test
             ]
      }
-
     ]
+
+plan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
+plan = validPlan doNothing doNothing doNothing doNothing
+
+projectTestRun :: forall effs. (EFFAllEffects effs) =>
+            (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i TestConfig RunConfig effs -> Sem effs ()))  -- item runner                                                -- runConfig
+            -> Sem effs ()
+projectTestRun = testRun plan filters runConfig
 
     -- executeInIOConsolePretty
 ioRun :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
-ioRun pln = testRun pln filters normalExecution runConfig
+ioRun pln = projectTestRun normalExecution
+     
+docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> Sem FullDocEffects ()
+docRunRaw pln = projectTestRun docExecution
+
+docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
+docRun pln = extractDocLog $ testRun pln filters docExecution executeDocumentPretty runConfig
 
 -- executeInIOConsoleRaw
 ioRunRaw :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
 ioRunRaw pln = testRun pln filters normalExecution runConfig
-                        
-docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
-docRunRaw pln = extractDocLog $ testRun pln filters docExecution executeDocumentRaw runConfig
 
-docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
-docRun pln = extractDocLog $ testRun pln filters docExecution executeDocumentPretty runConfig
+
+
 
 runInIO :: IO ()
 runInIO = ioRun plan
@@ -115,9 +125,6 @@ runDocument = docRun plan
 
 runDocumentToConsole :: IO ()
 runDocumentToConsole = sequence_ . P.toList $ putStrLn <$> runDocument
-
-plan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
-plan = validPlan doNothing doNothing doNothing doNothing
 
 alwaysFailCheck :: PreRun effs
 alwaysFailCheck = PreRun {

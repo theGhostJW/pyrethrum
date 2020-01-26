@@ -74,22 +74,31 @@ projectTestRun :: forall effs. (EFFAllEffects effs) =>
             -> Sem effs ()
 projectTestRun = testRun plan filters runConfig
 
-    -- executeInIOConsolePretty
-ioRun :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
-ioRun pln = projectTestRun normalExecution
-     
-docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> Sem FullDocEffects ()
-docRunRaw pln = projectTestRun docExecution
+-----------------------------
+--------- Run Types ---------
+-----------------------------
 
-docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
-docRun pln = extractDocLog $ testRun pln filters docExecution executeDocumentPretty runConfig
+run :: Sem FullIOEffects ()
+run = projectTestRun normalExecution
+     
+listing :: Sem FullDocEffects ()
+listing = projectTestRun docExecution
+
+------------------------------
+---------- Listings ----------
+------------------------------
+
+rawListing ::  Sem '[WriterDList] (Either AppError (Either AppError ()))
+rawListing = executeDocumentRaw listing
+
+prettyListing ::  Sem '[WriterDList] (Either AppError (Either AppError ()))
+prettyListing = executeDocumentPretty listing
+
+
 
 -- executeInIOConsoleRaw
 ioRunRaw :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
 ioRunRaw pln = testRun pln filters normalExecution runConfig
-
-
-
 
 runInIO :: IO ()
 runInIO = ioRun plan

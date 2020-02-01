@@ -86,20 +86,28 @@ documentInIO logger app = handleIOException $ flattenErrors <$> runM
                                   )
 
 -- todo come back to this nested errors drill down on reason
-executeDocumentRaw :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError (Either AppError a))
+executeDocumentRaw :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
 executeDocumentRaw = executeDocument logDocInterpreter
 
-executeDocumentPretty :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError (Either AppError a))
+executeDocumentPretty :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
 executeDocumentPretty = executeDocument logDocPrettyInterpreter
 
-executeDocument :: forall a. (forall effs. Member WriterDList effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError (Either AppError a))
-executeDocument logger app = ((mapLeft AppEnsureError <$>) <$>) <$> runError
-                                          $ runError
-                                          $ ensureInterpreter
-                                          $ logger
-                                          $ janFst2000UTCTimeInterpreter
-                                          $ arbitraryIODocInterpreter
-                                          $ fileSystemDocInterpreter app
+executeDocument :: forall a. (forall effs. Member WriterDList effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
+executeDocument logger app =   
+  let 
+    joinErrors ::  Either AppError (Either EnsureError a) -> Either AppError a
+    joinErrors e = e >>= mapLeft AppEnsureError
+  in
+    joinErrors <$>
+      runError 
+      ( 
+        runError
+        $ ensureInterpreter
+        $ logger
+        $ janFst2000UTCTimeInterpreter
+        $ arbitraryIODocInterpreter
+        $ fileSystemDocInterpreter app
+      )
 
 extractDocLog :: Sem '[WriterDList] () -> DList Text
 extractDocLog app =  fst . run $ runOutputMonoid id app

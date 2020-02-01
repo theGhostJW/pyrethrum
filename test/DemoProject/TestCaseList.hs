@@ -88,12 +88,11 @@ listing = projectTestRun docExecution
 ---------- Listings ----------
 ------------------------------
 
-rawListing ::  Sem '[WriterDList] (Either AppError (Either AppError ()))
+rawListing ::  Sem '[WriterDList] (Either AppError ())
 rawListing = executeDocumentRaw listing
 
-prettyListing ::  Sem '[WriterDList] (Either AppError (Either AppError ()))
+prettyListing ::  Sem '[WriterDList] (Either AppError ())
 prettyListing = executeDocumentPretty listing
-
 
 
 -- executeInIOConsoleRaw

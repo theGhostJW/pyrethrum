@@ -64,7 +64,7 @@ logConsoleInterpreter =
                             LogWarning s -> P.print. logRun $ Warning s 
                             LogWarning' msg info -> P.print . logRun . Warning' $ DetailedInfo msg info
 
-logDocInterpreter :: forall effs a. Member WriterDList effs => Sem (Logger ': effs) a -> Sem effs a
+logDocInterpreter :: forall effs a. Member DListOutput effs => Sem (Logger ': effs) a -> Sem effs a
 logDocInterpreter = 
   let 
     tellDoc :: DocProtocol -> Sem effs ()
@@ -131,15 +131,15 @@ logToHandles convertersHandles =
                         logToh :: LogProtocol -> (LogProtocol -> Text, Handle) -> IO ()
                         logToh lp (f, h) = logToHandle f h lp
                     
-                        logTohandles :: LogProtocol -> IO ()
-                        logTohandles lp =  P.sequence_ $ logToh lp <$> simpleConvertersHandles
+                        logLogProtocol :: LogProtocol -> IO ()
+                        logLogProtocol lp =  P.sequence_ $ logToh lp <$> simpleConvertersHandles
                     
                         logRunTohandles :: RunProtocol -> IO ()
-                        logRunTohandles = logTohandles . IterationLog . Run 
+                        logRunTohandles = logLogProtocol . IterationLog . Run 
                       
                         logToIO :: Logger m a -> IO a
                         logToIO = \case 
-                                    LogItem lp -> logTohandles lp
+                                    LogItem lp -> logLogProtocol lp
 
                                     LogError msg -> logRunTohandles . Error $ AppUserError msg
                                     LogError' msg info -> logRunTohandles . Error . AppUserError' $ DetailedInfo msg info
@@ -154,7 +154,7 @@ logToHandles convertersHandles =
                          
                                           
                               
-logDocPrettyInterpreter :: forall effs a. Member WriterDList effs => Sem (Logger ': effs) a -> Sem effs a
+logDocPrettyInterpreter :: forall effs a. Member DListOutput effs => Sem (Logger ': effs) a -> Sem effs a
 logDocPrettyInterpreter = 
   let
     toDList :: [Text] -> DList Text

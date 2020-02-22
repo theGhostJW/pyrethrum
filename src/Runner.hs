@@ -39,7 +39,7 @@ import Data.Aeson
 import TestFilter
 import RunnerBase as RB
 import qualified System.IO as SIO
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Data.Foldable as F
 import qualified Prelude
 
@@ -99,48 +99,35 @@ showAndLogList logSuffix items =
                               )
 
 
-data Step a = Step {
-                  filePrefix :: Maybe Text,
-                  result :: Either AppError [(a, HandleInfo)]
-                }
-
 logFileHandles :: forall a. M.Map (Text, FileExt) a -> IO (Either AppError [(a, HandleInfo)])
-logFileHandles mpSuffixExt = 
+logFileHandles suffixExtensionMap = 
   let
-    seed :: IO (Step a)
-    seed = pure $ Step {
-      filePrefix = Nothing,
-      result = Right []
-    }
-
-    step :: IO (Step a) -> (Text, FileExt) -> a -> IO (Step a)
-    step accum (suff, ext) a = 
+    openHandle :: (Text, FileExt) -> a -> IO (Either AppError (a, HandleInfo))
+    openHandle (suff, ext) a = 
       do 
-        iStep <- accum
-        let 
-          iResult = result iStep
-          iPrefix = filePrefix iStep 
-          
-        eitherf iResult 
-          (const $ pure iStep)
-          (
-            \hInfoLst -> 
-              do 
-                eHandInfo <- logFileHandle iPrefix suff ext
-                pure $ eitherf eHandInfo
-                        (\ioErr -> (iStep :: Step a) {result = Left $ AppIOError' "Error creating log file" ioErr} )
-                        (
-                          \hi@HandleInfo{..} -> Step {
-                                                  filePrefix = Just prefix,
-                                                  result = Right $ hInfoLst <> [(a, hi)]
-                                                }
-                        )
-          )
+        eHandInfo <- logFileHandle suff ext
+        pure $ eitherf eHandInfo
+                (Left . AppIOError' "Error creating log file" )
+                (\hInfo -> Right (a, hInfo))
 
-    finalRslt :: IO (Step a)
-    finalRslt = M.foldlWithKey' step seed mpSuffixExt
+    openHandles :: IO [((Text, FileExt), Either AppError (a, HandleInfo))]
+    openHandles = M.toList <$> M.traverseWithKey openHandle suffixExtensionMap
   in 
-     result <$> finalRslt 
+    do 
+      hlst <- openHandles
+      let 
+        fstErr = find (isLeft . snd) hlst
+        openHndls = rights (snd <$> hlst)
+      maybef fstErr
+        (pure $ Right openHndls)
+        (
+          \((sfx, ext), fstErr') -> 
+            do 
+              traverse_ (hClose . fileHandle . snd) openHndls
+              pure . Left $ AppAnnotatedError 
+                              ("Failed to create log file with suffix: " <> sfx) 
+                              $ fromLeft (AppGenericError "wont happen") fstErr'
+        )
 
 doNothing :: PreRun effs
 doNothing = PreRun {

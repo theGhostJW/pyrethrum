@@ -69,13 +69,14 @@ data AppError =
             AppPreTestCheckError PreTestStage Text |
 
             AppIOError IOException |
-            AppIOError' Text IOException
+            AppIOError' Text IOException |
 
+            AppAnnotatedError Text AppError
             deriving (Show, Eq)
 
 $(deriveJSON defaultOptions ''AppError)
 
-type WriterDList = O.Output (D.DList Text)
+type DListOutput = O.Output (D.DList Text)
 
 dList :: Show s => s -> D.DList Text
 dList s = D.fromList [txt s]

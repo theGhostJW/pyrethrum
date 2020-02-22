@@ -25,7 +25,7 @@ type EFFAllEffects effs = Members FullEffects effs
 type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, CurrentTime, Error EnsureError, Error AppError]
 type FullIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, Logger, Reader ThreadInfo, State LogIndex, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
 type FullDocIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logger, Reader ThreadInfo, State LogIndex, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
-type FullDocEffects = '[FileSystem, ArbitraryIO, CurrentTime, Logger, Ensure, Error EnsureError, Error AppError, WriterDList]
+type FullDocEffects = '[FileSystem, ArbitraryIO, CurrentTime, Logger, Ensure, Error EnsureError, Error AppError, DListOutput]
 
 flattenErrors :: Either AppError (Either EnsureError (Either FileSystemError v)) -> Either AppError v
 flattenErrors = 
@@ -45,13 +45,13 @@ handleIOException :: IO (Either AppError a) -> IO (Either AppError a)
 handleIOException = handle $ pure . Left . AppIOError
 
 executeInIOConsoleRaw :: forall a. Sem FullIOEffects a -> IO (Either AppError a)
-executeInIOConsoleRaw = executeInIO logConsoleInterpreter
+executeInIOConsoleRaw = executeWithLogger logConsoleInterpreter
 
 executeInIOConsolePretty :: forall a. Sem FullIOEffects a -> IO (Either AppError a)
-executeInIOConsolePretty = executeInIO logConsolePrettyInterpreter
+executeInIOConsolePretty = executeWithLogger logConsolePrettyInterpreter
 
-executeInIO :: forall a. (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullIOEffects a -> IO (Either AppError a)
-executeInIO logger app = 
+executeWithLogger :: forall a. (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullIOEffects a -> IO (Either AppError a)
+executeWithLogger logger app = 
     handleIOException $ flattenErrors <$> runM
                                    ( 
                                      runError
@@ -68,8 +68,8 @@ executeInIO logger app =
                                   )
 
                               
-documentInIO :: forall a. (forall effs. Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocIOEffects a -> IO (Either AppError a)
-documentInIO logger app = handleIOException $ flattenErrors <$> runM
+documentWithLogger :: forall a. (forall effs. Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocIOEffects a -> IO (Either AppError a)
+documentWithLogger logger app = handleIOException $ flattenErrors <$> runM
                                   (
                                     runError
                                     $ runError
@@ -86,28 +86,24 @@ documentInIO logger app = handleIOException $ flattenErrors <$> runM
                                   )
 
 -- todo come back to this nested errors drill down on reason
-executeDocumentRaw :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
+executeDocumentRaw :: forall a. Sem FullDocEffects a -> (DList Text, Either AppError a)
 executeDocumentRaw = executeDocument logDocInterpreter
 
-executeDocumentPretty :: forall a. Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
+executeDocumentPretty :: forall a. Sem FullDocEffects a -> (DList Text, Either AppError a)
 executeDocumentPretty = executeDocument logDocPrettyInterpreter
 
-executeDocument :: forall a. (forall effs. Member WriterDList effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocEffects a -> Sem '[WriterDList] (Either AppError a)
+executeDocument :: forall a. (forall effs. Member DListOutput effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocEffects a -> (DList Text, Either AppError a)
 executeDocument logger app =   
-  let 
-    joinErrors ::  Either AppError (Either EnsureError a) -> Either AppError a
-    joinErrors e = e >>= mapLeft AppEnsureError
-  in
-    joinErrors <$>
-      runError 
-      ( 
-        runError
-        $ ensureInterpreter
-        $ logger
-        $ janFst2000UTCTimeInterpreter
-        $ arbitraryIODocInterpreter
-        $ fileSystemDocInterpreter app
-      )
-
-extractDocLog :: Sem '[WriterDList] () -> DList Text
-extractDocLog app =  fst . run $ runOutputMonoid id app
+    run .
+    runOutputMonoid id $
+    (mapLeft AppEnsureError =<<) <$>
+    ( 
+        runError 
+      . runError
+      . ensureInterpreter
+      . logger
+      . janFst2000UTCTimeInterpreter
+      . arbitraryIODocInterpreter
+      . fileSystemDocInterpreter 
+      $ app
+    )

@@ -120,9 +120,9 @@ data HandleInfo = HandleInfo {
   fileHandle :: S.Handle
 }
 
-logFileHandle ::  Maybe Text -> Text -> FileExt -> IO (Either P.IOError HandleInfo)
-logFileHandle mFilePrefix fileNameSuffix fileExt = do
-                                                    ethPth <- logFilePath mFilePrefix fileNameSuffix fileExt
+logFileHandle :: Text -> FileExt -> IO (Either P.IOError HandleInfo)
+logFileHandle fileNameSuffix fileExt = do
+                                                    ethPth <- logFilePath Nothing fileNameSuffix fileExt
                                                     eitherf ethPth 
                                                       (pure . Left)
                                                       (\(pfx, pth) -> (HandleInfo pfx pth <$>) <$> safeOpenFile pth S.WriteMode)

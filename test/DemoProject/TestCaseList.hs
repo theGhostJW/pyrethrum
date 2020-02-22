@@ -69,42 +69,41 @@ validPlan ro0 gh0 ro1 gh1 f =
 plan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 plan = validPlan doNothing doNothing doNothing doNothing
 
-projectTestRun :: forall effs. (EFFAllEffects effs) =>
+runPlan :: forall effs. (EFFAllEffects effs) =>
             (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i TestConfig RunConfig effs -> Sem effs ()))  -- item runner                                                -- runConfig
             -> Sem effs ()
-projectTestRun = testRun plan filters runConfig
+runPlan = testRun plan filters runConfig
 
 -----------------------------
 --------- Run Types ---------
 -----------------------------
 
-run :: Sem FullIOEffects ()
-run = projectTestRun normalExecution
+planRun :: Sem FullIOEffects ()
+planRun = runPlan normalExecution
      
-listing :: Sem FullDocEffects ()
-listing = projectTestRun docExecution
+planListing :: Sem FullDocEffects ()
+planListing = runPlan docExecution
 
 ------------------------------
 ---------- Listings ----------
 ------------------------------
 
-rawListing ::  Sem '[WriterDList] (Either AppError ())
-rawListing = executeDocumentRaw listing
+rawListing :: (DList Text, Either AppError ())
+rawListing = executeDocumentRaw planListing
 
-prettyListing ::  Sem '[WriterDList] (Either AppError ())
-prettyListing = executeDocumentPretty listing
+prettyListing :: (DList Text, Either AppError ())
+prettyListing = executeDocumentPretty planListing
 
-
--- executeInIOConsoleRaw
-ioRunRaw :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
-ioRunRaw pln = testRun pln filters normalExecution runConfig
+------------------------------
+------------ Runs ------------
+------------------------------
 
 runInIO :: IO ()
-runInIO = ioRun plan
+runInIO = executeInIOConsolePretty planRun
 
 runLogToFile :: IO ()
 runLogToFile = do 
-                ePths <- ioRunToFile NoConsole False plan executeInIO normalExecution 
+                ePths <- ioRunToFile NoConsole False plan executeWithLogger normalExecution 
                 eitherf ePths 
                   (\err -> putStrLn $ "Error Encountered\n" <> txt err)
                   (\pths ->
@@ -117,10 +116,10 @@ runLogToFile = do
                   )
 
 runConsoleAndFile :: IO ()
-runConsoleAndFile = void $ ioRunToFile Console False plan executeInIO normalExecution 
+runConsoleAndFile = void $ ioRunToFile Console False plan executeWithLogger normalExecution 
 
 docConsoleAndFile :: IO ()
-docConsoleAndFile = void $ ioRunToFile Console True plan documentInIO docExecution
+docConsoleAndFile = void $ ioRunToFile Console True plan documentWithLogger docExecution
 
 runInIORaw :: IO ()
 runInIORaw = ioRunRaw plan

@@ -25,6 +25,7 @@ import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList
 import           Pyrelude as P
+import           Pyrelude.IO as PIO (putStrLn)
 import           Runner as R
 import qualified Control.Exception as E
 import AuxFiles as A
@@ -98,12 +99,12 @@ prettyListing = executeDocumentPretty planListing
 ------------ Runs ------------
 ------------------------------
 
-runInIO :: IO ()
-runInIO = executeInIOConsolePretty planRun
+-- runInIO :: IO ()
+-- runInIO = executeInIOConsolePretty planRun
 
 runLogToFile :: IO ()
 runLogToFile = do 
-                ePths <- ioRunToFile NoConsole False plan executeWithLogger normalExecution 
+                ePths <- ioRunToFile NoConsole False executeWithLogger planRun 
                 eitherf ePths 
                   (\err -> putStrLn $ "Error Encountered\n" <> txt err)
                   (\pths ->
@@ -115,23 +116,23 @@ runLogToFile = do
                           prepareFinalLogs
                   )
 
-runConsoleAndFile :: IO ()
-runConsoleAndFile = void $ ioRunToFile Console False plan executeWithLogger normalExecution 
+-- runConsoleAndFile :: IO ()
+-- runConsoleAndFile = void $ ioRunToFile Console False plan executeWithLogger normalExecution 
 
-docConsoleAndFile :: IO ()
-docConsoleAndFile = void $ ioRunToFile Console True plan documentWithLogger docExecution
+-- docConsoleAndFile :: IO ()
+-- docConsoleAndFile = void $ ioRunToFile Console True plan documentWithLogger docExecution
 
-runInIORaw :: IO ()
-runInIORaw = ioRunRaw plan
+-- runInIORaw :: IO ()
+-- runInIORaw = ioRunRaw plan
 
-runNZInIO :: IO ()
-runNZInIO = testRun plan filters normalExecution executeInIOConsoleRaw runConfig {country = NZ}
+-- runNZInIO :: IO ()
+-- runNZInIO = testRun plan filters normalExecution executeInIOConsoleRaw runConfig {country = NZ}
 
-runDocument :: DList Text
-runDocument = docRun plan
+-- runDocument :: DList Text
+-- runDocument = docRun plan
 
-runDocumentToConsole :: IO ()
-runDocumentToConsole = sequence_ . P.toList $ putStrLn <$> runDocument
+-- runDocumentToConsole :: IO ()
+-- runDocumentToConsole = sequence_ . P.toList $ putStrLn <$> runDocument
 
 alwaysFailCheck :: PreRun effs
 alwaysFailCheck = PreRun {
@@ -145,20 +146,20 @@ testRunFailHomeG2 = validPlan doNothing -- rollOver0
                               doNothing -- rollOver1
                               alwaysFailCheck -- goHome1
 
-runFailHomeG2IO :: IO ()
-runFailHomeG2IO = ioRun testRunFailHomeG2
+-- runFailHomeG2IO :: IO ()
+-- runFailHomeG2IO = ioRun testRunFailHomeG2
 
-runFailHomeG2Document :: DList Text
-runFailHomeG2Document = docRun testRunFailHomeG2
+-- runFailHomeG2Document :: DList Text
+-- runFailHomeG2Document = docRun testRunFailHomeG2
 
-testRunFailRolloverG1 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
-testRunFailRolloverG1 = validPlan alwaysFailCheck doNothing doNothing doNothing
+-- testRunFailRolloverG1 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
+-- testRunFailRolloverG1 = validPlan alwaysFailCheck doNothing doNothing doNothing
 
-runFailRolloverG1Document :: DList Text
-runFailRolloverG1Document = docRun testRunFailRolloverG1
+-- runFailRolloverG1Document :: DList Text
+-- runFailRolloverG1Document = docRun testRunFailRolloverG1
 
-runFailRolloverG1IO :: IO ()
-runFailRolloverG1IO = ioRun testRunFailRolloverG1
+-- runFailRolloverG1IO :: IO ()
+-- runFailRolloverG1IO = ioRun testRunFailRolloverG1
 
 dummyIOException :: Sem effs Bool
 dummyIOException = (E.throw $ P.userError "Pretend IO Error") :: Sem effs Bool
@@ -172,8 +173,8 @@ exceptionInCheck = PreRun {
 testRunFailExceptG2GoHomeCheck :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testRunFailExceptG2GoHomeCheck = validPlan doNothing doNothing doNothing exceptionInCheck
 
-runExceptG2GoHomeCheckIO :: IO ()
-runExceptG2GoHomeCheckIO = ioRun testRunFailExceptG2GoHomeCheck
+-- runExceptG2GoHomeCheckIO :: IO ()
+-- runExceptG2GoHomeCheckIO = ioRun testRunFailExceptG2GoHomeCheck
 
 exceptionInRollover :: PreRun effs
 exceptionInRollover = PreRun {
@@ -184,8 +185,8 @@ exceptionInRollover = PreRun {
 testRunExceptG1Rollover:: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testRunExceptG1Rollover = validPlan exceptionInRollover doNothing doNothing doNothing
 
-runExceptG1Rollover :: IO ()
-runExceptG1Rollover = ioRun testRunExceptG1Rollover
+-- runExceptG1Rollover :: IO ()
+-- runExceptG1Rollover = ioRun testRunExceptG1Rollover
 
 justLogPreRun :: EFFLogger effs => PreTestStage -> PreRun effs
 justLogPreRun stage = PreRun {

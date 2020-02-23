@@ -26,12 +26,10 @@ import TestFilter
 data WantConsole = Console | NoConsole deriving Eq
 jsonItemLogExt = ".jsoni" :: Text
 
-ioRunToFile :: forall effs. (
-    Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs
-    ) =>
+ioRunToFile ::  
     WantConsole
     -> Bool 
-    -> (forall a. (Sem (Logger ': effs) a -> Sem effs a) -> Sem FullIOEffects a -> IO (Either AppError a))
+    -> (forall a. (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullIOEffects a -> IO (Either AppError a))
     -> Sem FullIOEffects (Either AppError [AbsFile])
     -> IO (Either AppError [AbsFile])
 ioRunToFile wantConsole docMode runner app = 
@@ -63,6 +61,8 @@ ioRunToFile wantConsole docMode runner app =
                       ? (((Nothing, prettyPrintLogProtocolWith docMode, S.stdout) :) <$>) <$> fileHandles
                       $ fileHandles
 
+    printError :: AppError -> IO ()
+    printError err = print $ "Error Encountered \n" <> show err
   in 
     do 
       hndls <- allHandles
@@ -78,10 +78,18 @@ ioRunToFile wantConsole docMode runner app =
               fileHndles = getHandle <$> fileRecs
               closeHandles = closeFileHandles fileHndles
               loggerHandles = (\(f, l, h) -> (l, h)) <$> fileLoggerHandles
-              logger = logToHandles loggerHandles
-            
-            runner logger app `P.finally` closeHandles
 
+              logger :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => Sem (Logger ': effs) a -> Sem effs a
+              logger = logToHandles loggerHandles
+              
+            runResult <- runner logger app `P.finally` closeHandles
+
+            -- Console Out Errors
+            case runResult of
+              (Left e) -> printError e 
+              (Right (Left e)) -> printError e 
+              (Right (Right _)) -> pure ()
+               
             printFilePaths logPths 
             pure $ Right logPths
         )

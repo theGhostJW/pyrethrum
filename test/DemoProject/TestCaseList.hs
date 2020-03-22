@@ -110,6 +110,10 @@ rawListing = executeDocumentRaw listingSem
 prettyListing :: (DList Text, Either AppError ())
 prettyListing = executeDocumentPretty listingSem
 
+-- a testing helper
+runDocument :: DList Text
+runDocument = extractDocLog rawListing
+
 ------------------------------
 ------------ Runs ------------
 ------------------------------
@@ -160,9 +164,6 @@ runInIORaw = runConsoleRaw runSem
 runNZInIO :: IO ()
 runNZInIO = runConsoleRaw $ cfgRunSem runConfig {country = NZ}
 
--- runDocument :: DList Text
--- runDocument = docRun plan
-
 -- runDocumentToConsole :: IO ()
 -- runDocumentToConsole = sequence_ . P.toList $ putStrLn <$> runDocument
 
@@ -171,6 +172,8 @@ alwaysFailCheck = PreRun {
   runAction = pure (),
   checkHasRun = pure False
 }
+
+-- broken plans for testing
 
 testRunFailHomeG2 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testRunFailHomeG2 = validPlan doNothing -- rollOver0
@@ -181,8 +184,8 @@ testRunFailHomeG2 = validPlan doNothing -- rollOver0
 -- runFailHomeG2IO :: IO ()
 -- runFailHomeG2IO = ioRun testRunFailHomeG2
 
--- runFailHomeG2Document :: DList Text
--- runFailHomeG2Document = docRun testRunFailHomeG2
+runFailHomeG2Document :: DList Text
+runFailHomeG2Document = docRun testRunFailHomeG2
 
 -- testRunFailRolloverG1 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 -- testRunFailRolloverG1 = validPlan alwaysFailCheck doNothing doNothing doNothing

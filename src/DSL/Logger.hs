@@ -98,8 +98,8 @@ logStrJSON lp = eitherf (decodeUtf8' . B.toStrict . A.encode $ lp)
                   (\e -> "Encode error: " <> txt e)
                   id
 
-runIOThreadInfoReader :: Member CurrentTime r => Sem (Reader ThreadInfo ': r) a -> Sem r a 
-runIOThreadInfoReader sem = 
+runThreadInfoReader :: Member CurrentTime r => Sem (Reader ThreadInfo ': r) a -> Sem r a 
+runThreadInfoReader sem = 
   do 
     zone <- CT.getCurrentTimeZone
     runReader (ThreadInfo "local" 1 zone) sem

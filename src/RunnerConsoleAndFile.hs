@@ -26,13 +26,13 @@ import TestFilter
 data WantConsole = Console | NoConsole deriving Eq
 jsonItemLogExt = ".jsoni" :: Text
 
-ioRunToFile ::  
+ioRunToFile :: forall b appEffs. Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] appEffs =>
     WantConsole
     -> Bool 
-    -> (forall a. (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullIOEffects a -> IO (Either AppError a))
-    -> Sem FullIOEffects (Either AppError [AbsFile])
+    -> (forall a. (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem appEffs a -> IO (Either AppError a))
+    -> Sem appEffs b
     -> IO (Either AppError [AbsFile])
-ioRunToFile wantConsole docMode runner app = 
+ioRunToFile wantConsole docMode interpreter app = 
   let 
     handleSpec :: M.Map (Text, FileExt) (ThreadInfo -> LogIdxTime -> LogProtocol -> Text) 
     handleSpec = M.fromList [
@@ -82,14 +82,11 @@ ioRunToFile wantConsole docMode runner app =
               logger :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => Sem (Logger ': effs) a -> Sem effs a
               logger = logToHandles loggerHandles
               
-            runResult <- runner logger app `P.finally` closeHandles
+            runResult <- interpreter logger app `P.finally` closeHandles
+            
+            when (isLeft runResult) 
+              (putStrLn $ "Error Encountered \n" <> txt (fromLeft' runResult))
 
-            -- Console Out Errors
-            case runResult of
-              (Left e) -> printError e 
-              (Right (Left e)) -> printError e 
-              (Right (Right _)) -> pure ()
-               
             printFilePaths logPths 
             pure $ Right logPths
         )

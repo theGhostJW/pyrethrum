@@ -25,7 +25,7 @@ type EFFAllEffects effs = Members FullEffects effs
 type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, CurrentTime, Error EnsureError, Error AppError]
 type FullIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, Logger, Reader ThreadInfo, State LogIndex, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
 type FullDocIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logger, Reader ThreadInfo, State LogIndex, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
-type FullDocEffects = '[FileSystem, ArbitraryIO, CurrentTime, Logger, Ensure, Error EnsureError, Error AppError, DListOutput]
+type FullDocEffects = '[FileSystem, ArbitraryIO, Reader ThreadInfo, State LogIndex, CurrentTime, Logger, Ensure, Error EnsureError, Error AppError, DListOutput]
 
 flattenErrors :: Either AppError (Either EnsureError (Either FileSystemError v)) -> Either AppError v
 flattenErrors = 
@@ -59,7 +59,7 @@ executeWithLogger logger app =
                                       $ runError
                                       $ currentTimeIOInterpreter
                                       $ evalState (LogIndex 0)
-                                      $ runIOThreadInfoReader
+                                      $ runThreadInfoReader
                                       $ logger
                                       $ arbitraryIOInterpreter
                                       $ ensureInterpreter
@@ -76,7 +76,7 @@ documentWithLogger logger app = handleIOException $ flattenErrors <$> runM
                                     $ runError
                                     $ currentTimeIOInterpreter
                                     $ evalState (LogIndex 0)
-                                    $ runIOThreadInfoReader
+                                    $ runThreadInfoReader
                                     $ logger
                                     $ currentTimeDocInterpreter
                                     $ arbitraryIODocInterpreter
@@ -103,6 +103,8 @@ executeDocument logger app =
       . ensureInterpreter
       . logger
       . janFst2000UTCTimeInterpreter
+      . evalState (LogIndex 0)
+      . runThreadInfoReader
       . arbitraryIODocInterpreter
       . fileSystemDocInterpreter 
       $ app

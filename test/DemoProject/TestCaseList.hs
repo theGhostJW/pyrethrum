@@ -70,63 +70,95 @@ validPlan ro0 gh0 ro1 gh1 f =
 plan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 plan = validPlan doNothing doNothing doNothing doNothing
 
+----------------------------------------
+------- Apply Plan and Filters ---------
+----------------------------------------
+
 runPlan :: forall effs. (EFFAllEffects effs) =>
             (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i TestConfig RunConfig effs -> Sem effs ()))  -- item runner                                                -- runConfig
+            -> RunConfig
             -> Sem effs ()
-runPlan = testRun plan filters runConfig
+runPlan = testRun plan filters
 
------------------------------
---------- Run Types ---------
------------------------------
+--------------------------------------
+--------- Apply Item Runners ---------
+--------------------------------------
 
-planRun :: Sem FullIOEffects ()
-planRun = runPlan normalExecution
+cfgRunSem :: RunConfig -> Sem FullIOEffects ()
+cfgRunSem = runPlan normalExecution
      
-planListing :: Sem FullDocEffects ()
-planListing = runPlan docExecution
+cfgListingSem :: RunConfig -> Sem FullDocEffects ()
+cfgListingSem = runPlan docExecution
 
-------------------------------
----------- Listings ----------
-------------------------------
+------------------------------------------
+--------- Apply Default Configs ----------
+------------------------------------------
+
+runSem :: Sem FullIOEffects ()
+runSem = cfgRunSem runConfig
+     
+listingSem :: Sem FullDocEffects ()
+listingSem = cfgListingSem runConfig
+
+-----------------------------------------
+---------- Listings - to DList ----------
+-----------------------------------------
 
 rawListing :: (DList Text, Either AppError ())
-rawListing = executeDocumentRaw planListing
+rawListing = executeDocumentRaw listingSem
 
 prettyListing :: (DList Text, Either AppError ())
-prettyListing = executeDocumentPretty planListing
+prettyListing = executeDocumentPretty listingSem
 
 ------------------------------
 ------------ Runs ------------
 ------------------------------
 
--- runInIO :: IO ()
--- runInIO = executeInIOConsolePretty planRun
+consoleRunResults :: Either AppError [AbsFile] -> IO ()
+consoleRunResults = 
+  either 
+    (\err -> putStrLn $ "Error Encountered\n" <> txt err)
+    (\pths ->
+      let 
+        jsnItmsPth = find ((== jsonItemLogExt) . toS . fileExtension) pths
+      in
+        maybef jsnItmsPth
+          (putStrLn $ "Unable to generate report no: " <> jsonItemLogExt <> " file found in log files\n")
+          prepareFinalLogs
+    )
 
-runLogToFile :: IO ()
-runLogToFile = do 
-                ePths <- ioRunToFile NoConsole False executeWithLogger planRun 
-                eitherf ePths 
-                  (\err -> putStrLn $ "Error Encountered\n" <> txt err)
-                  (\pths ->
-                      let 
-                        jsnItmsPth = find ((== jsonItemLogExt) . toS . fileExtension) pths
-                      in
-                        maybef jsnItmsPth
-                          (putStrLn $ "Unable to generate report no: " <> jsonItemLogExt <> " file found in log files\n")
-                          prepareFinalLogs
-                  )
+runLogToFile :: WantConsole -> IO ()
+runLogToFile wc = 
+    ioRunToFile wc False executeWithLogger runSem >>= consoleRunResults
+    
+runToFile :: IO ()
+runToFile = runLogToFile NoConsole
 
--- runConsoleAndFile :: IO ()
--- runConsoleAndFile = void $ ioRunToFile Console False plan executeWithLogger normalExecution 
+runToFileAndConsole :: IO ()
+runToFileAndConsole = runLogToFile Console
 
--- docConsoleAndFile :: IO ()
--- docConsoleAndFile = void $ ioRunToFile Console True plan documentWithLogger docExecution
+docLogToFile :: WantConsole -> IO ()
+docLogToFile wc = 
+    ioRunToFile wc True documentWithLogger (runPlan docExecution runConfig) >>= consoleRunResults
+    
+docToFile :: IO ()
+docToFile = docLogToFile NoConsole
 
--- runInIORaw :: IO ()
--- runInIORaw = ioRunRaw plan
+docToFileAndConsole :: IO ()
+docToFileAndConsole = docLogToFile Console
 
--- runNZInIO :: IO ()
--- runNZInIO = testRun plan filters normalExecution executeInIOConsoleRaw runConfig {country = NZ}
+runConsoleRaw :: Sem FullIOEffects () -> IO ()
+runConsoleRaw sem = executeInIOConsoleRaw sem >>= 
+                        \eth ->  putStrLn $ either 
+                                        (\err ->  "Error - Problem Encountered\n" <> txt err)
+                                        (const "run complete")
+                                        eth
+
+runInIORaw :: IO ()
+runInIORaw = runConsoleRaw runSem
+                
+runNZInIO :: IO ()
+runNZInIO = runConsoleRaw $ cfgRunSem runConfig {country = NZ}
 
 -- runDocument :: DList Text
 -- runDocument = docRun plan

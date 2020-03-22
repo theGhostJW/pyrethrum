@@ -227,7 +227,8 @@ docExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i) =
     docLog = logLP . logDoc
 
     logChecks :: Sem effs ()
-    logChecks =  P.sequence_ $  (\chk -> docLog $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
+    logChecks =  P.sequence_ $  
+                    (\chk -> docLog $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
   in 
     do 
       docLog DocInteraction
@@ -424,10 +425,10 @@ testRunOrEndpoint iIds runner fltrs rc itemRunner =
 testRun :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
             (forall a mo mi. TestPlanBase tc rc mo mi a effs)                                                              -- test case processor function is applied to a hard coded list of test groups and returns a list of results
             -> FilterList rc tc                                                                                               -- filters
-            -> rc
             -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))  -- item runner                                                -- runConfig
+            -> rc
             -> Sem effs ()
-testRun = testRunOrEndpoint Nothing
+testRun runner fltrs itemRunner rc = testRunOrEndpoint Nothing runner fltrs rc itemRunner 
 
 testEndpointBase :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
                    FilterList rc tc                               -- filters

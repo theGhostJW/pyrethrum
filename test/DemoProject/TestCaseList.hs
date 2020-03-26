@@ -35,6 +35,7 @@ import Data.Map as M
 import TestFilter
 import RunnerConsoleAndFile
 
+-- parametrised so can inject different preruns for testing
 validPlan :: forall m m1 effs a. EFFAllEffects effs =>
   PreRun effs      -- rollOver0
   -> PreRun effs   -- goHome0
@@ -67,38 +68,39 @@ validPlan ro0 gh0 ro1 gh1 f =
      }
     ]
 
-plan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
-plan = validPlan doNothing doNothing doNothing doNothing
+simplePlan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
+simplePlan = validPlan doNothing doNothing doNothing doNothing
 
-----------------------------------------
-------- Apply Plan and Filters ---------
-----------------------------------------
-
-runPlan :: forall effs. (EFFAllEffects effs) =>
-            (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemParams as ds i TestConfig RunConfig effs -> Sem effs ()))  -- item runner                                                -- runConfig
-            -> RunConfig
-            -> Sem effs ()
-runPlan = testRun plan filters
-
---------------------------------------
---------- Apply Item Runners ---------
---------------------------------------
-
-cfgRunSem :: RunConfig -> Sem FullIOEffects ()
-cfgRunSem = runPlan normalExecution
-     
-cfgListingSem :: RunConfig -> Sem FullDocEffects ()
-cfgListingSem = runPlan docExecution
+runParams :: RunParams RunConfig TestConfig FullIOEffects
+runParams = RunParams {
+      plan = simplePlan,
+      filters = filterList,
+      itemRunner = normalExecution,
+      rc = runConfig
+    }
 
 ------------------------------------------
 --------- Apply Default Configs ----------
 ------------------------------------------
 
 runSem :: Sem FullIOEffects ()
-runSem = cfgRunSem runConfig
+runSem = testRun runParams
      
 listingSem :: Sem FullDocEffects ()
-listingSem = cfgListingSem runConfig
+listingSem = testRun RunParams {
+                                plan = simplePlan,
+                                filters = filterList,
+                                itemRunner = docExecution,
+                                rc = runConfig
+                              }
+
+listingIOSem :: Sem FullDocIOEffects ()
+listingIOSem = testRun RunParams {
+                                plan = simplePlan,
+                                filters = filterList,
+                                itemRunner = docExecution,
+                                rc = runConfig
+                              }
 
 -----------------------------------------
 ---------- Listings - to DList ----------
@@ -143,7 +145,7 @@ runToFileAndConsole = runLogToFile Console
 
 docLogToFile :: WantConsole -> IO ()
 docLogToFile wc = 
-    ioRunToFile wc True documentWithLogger (runPlan docExecution runConfig) >>= consoleRunResults
+    ioRunToFile wc True documentWithLogger listingIOSem >>= consoleRunResults
     
 docToFile :: IO ()
 docToFile = docLogToFile NoConsole
@@ -162,7 +164,7 @@ runInIORaw :: IO ()
 runInIORaw = runConsoleRaw runSem
                 
 runNZInIO :: IO ()
-runNZInIO = runConsoleRaw $ cfgRunSem runConfig {country = NZ}
+runNZInIO = runConsoleRaw $ testRun runParams {rc = runConfig {country = NZ}}
 
 runDocumentToConsole :: IO ()
 runDocumentToConsole = sequence_ . P.toList $ putStrLn <$> runDocument
@@ -174,13 +176,24 @@ alwaysFailCheck = PreRun {
 }
 
 -- broken plans for testing
+
 runIO :: (forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs) -> IO ()
 runIO plan' = ioRunToFile Console False executeWithLogger 
-                    (testRun plan' filters normalExecution runConfig) 
+                    (testRun RunParams {
+                        plan = plan',
+                        filters = filterList,
+                        itemRunner = normalExecution,
+                        rc = runConfig
+                      }) 
                     >>= consoleRunResults
 
 runDocs :: (forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs) -> DList Text
-runDocs plan' = fst $ executeDocumentRaw (testRun plan' filters docExecution runConfig) 
+runDocs plan' = fst $ executeDocumentRaw  (testRun RunParams {
+                                              plan = plan',
+                                              filters = filterList,
+                                              itemRunner = docExecution,
+                                              rc = runConfig
+                                            })
 
 testRunFailHomeG2 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testRunFailHomeG2 = validPlan doNothing -- rollOver0

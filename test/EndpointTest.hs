@@ -1,12 +1,12 @@
 module EndpointTest where
 
-import           DemoProject.Config
+import           DemoProject.Config as C
 import           DemoProject.Test.Rough   as T
 import           DemoProject.TestCaseList
 import           LogListCheck
 import           Runner                 as R
 
-endPointLog = testEndpointDoc "DemoProject.Test.Rough" runConfig (filterredItemIds (IID 110) (T.items runConfig)) testG1GoHomeLogging
+endPointLog = testEndpointDoc "DemoProject.Test.Rough" C.runConfig (filterredItemIds (IID 110) (T.items C.runConfig)) testG1GoHomeLogging
 
 runActionMsg = "Run Action"
 checkActionMsg = "Check Action Run"

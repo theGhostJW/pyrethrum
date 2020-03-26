@@ -160,11 +160,11 @@ levelFilter = TestFilter {
      predicate = \rc tc -> (level :: TestConfig -> TestDepth) tc <= (level :: RunConfig -> TestDepth) rc
    }
 
-filters :: [TestFilter RunConfig TestConfig]
-filters = [enabledFilter, countryFilter, levelFilter]
+filters' :: [TestFilter RunConfig TestConfig]
+filters' = [enabledFilter, countryFilter, levelFilter]
 
 filterList :: RunConfig -> [FilterResult]
-filterList rc = filterLog $ filterGroups runRunner filters rc
+filterList rc = filterLog $ filterGroups runRunner filters' rc
 
 runFilters :: RunConfig -> [Text]
 runFilters rc = testTitle . testInfo <$> P.filter acceptFilter (filterList rc)

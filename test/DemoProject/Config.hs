@@ -135,8 +135,8 @@ testEndpointDoc ::
      -> RunConfig
      -> Either FilterError (Set Int)
      -> (forall a m m1. TestPlan m1 m a FullDocEffects)
-     -> Sem FullDocEffects ()
-testEndpointDoc =  testEndpointPriv docExecution
+     -> DList Text
+testEndpointDoc testMod rc itrSet plan = fst . executeDocumentRaw $ testEndpointPriv docExecution testMod rc itrSet plan
 
 
 $(deriveJSON defaultOptions ''TestConfig)

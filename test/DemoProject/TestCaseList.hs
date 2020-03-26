@@ -112,6 +112,17 @@ rawListing = executeDocumentRaw listingSem
 prettyListing :: (DList Text, Either AppError ())
 prettyListing = executeDocumentPretty listingSem
 
+docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
+docRunRaw plan' = fst . executeDocumentRaw $ testRun RunParams {
+                                                            plan = plan',
+                                                            filters = filterList,
+                                                            itemRunner = docExecution,
+                                                            rc = runConfig
+                                                         }
+
+-- docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
+-- docRun pln = extractDocLog $ testRun pln filters docExecution executeDocumentPretty runConfig
+
 -- a testing helper
 runDocument :: DList Text
 runDocument = fst rawListing

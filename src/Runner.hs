@@ -10,8 +10,9 @@ module Runner (
   , showAndLogItems
   , testEndpointBase
   , TestPlanBase
-  , TestRunParams
-  , ItemRunParams
+  , TestParams
+  , RunParams(..)
+  , ItemParams
   , testRun
   , module RB
   , module ItemFilter
@@ -149,15 +150,15 @@ testAddress =  moduleAddress . (configuration :: GenericTest tc rc i effs as ds 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                                   
 
-data TestRunParams as ds i tc rc effs = TestRunParams {                       
+data TestParams as ds i tc rc effs = TestParams {                       
   interactor :: rc -> i -> Sem effs as,                         
   prepState :: forall pEffs. Ensurable pEffs => i -> as -> Sem pEffs ds,                      
   tc :: tc,                                                     
   rc :: rc                                                      
 }
 
-data ItemRunParams as ds i tc rc effs = ItemRunParams {
-  testRunParams :: TestRunParams as ds i tc rc effs,                                                     
+data ItemParams as ds i tc rc effs = ItemParams {
+  testParams :: TestParams as ds i tc rc effs,                                                     
   item :: i                                                        
 }
 
@@ -168,8 +169,8 @@ logRP :: Member Logger effs => RunProtocol -> Sem effs ()
 logRP = logLP . logRun 
 
 normalExecution :: forall effs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs effs) 
-                  => ItemRunParams as ds i tc rc effs -> Sem effs ()  
-normalExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i)  = 
+                  => ItemParams as ds i tc rc effs -> Sem effs ()  
+normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) (identifier i)
@@ -217,8 +218,8 @@ normalExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i)  =
       )
 
 docExecution :: forall effs rc tc i as ds. (ItemClass i ds, TestConfigClass tc, Member Logger effs)
-              => ItemRunParams as ds i tc rc effs -> Sem effs () 
-docExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i) = 
+              => ItemParams as ds i tc rc effs -> Sem effs () 
+docExecution (ItemParams (TestParams interactor prepState tc rc) i) = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) $ identifier i
@@ -239,10 +240,10 @@ docExecution (ItemRunParams (TestRunParams interactor prepState tc rc) i) =
 runTestItems :: forall i as ds tc rc effs. (TestConfigClass tc, ItemClass i ds, Member Logger effs) =>
       Maybe (S.Set Int)                                                    -- target Ids
       -> [i]                                                               -- items
-      -> TestRunParams as ds i tc rc effs
-      -> (ItemRunParams as ds i tc rc effs -> Sem effs ())
+      -> TestParams as ds i tc rc effs
+      -> (ItemParams as ds i tc rc effs -> Sem effs ())
       -> [Sem effs ()]
-runTestItems iIds items runPrms@(TestRunParams interactor prepState tc rc) itemRunner =
+runTestItems iIds items runPrms@(TestParams interactor prepState tc rc) itemRunner =
   let
     logBoundry :: BoundaryEvent -> Sem effs ()
     logBoundry = logLP . BoundaryLog
@@ -263,7 +264,7 @@ runTestItems iIds items runPrms@(TestRunParams interactor prepState tc rc) itemR
                   in
                     do
                       logBoundry . StartIteration iid (WhenClause $ whenClause i) (ThenClause $ thenClause i) $ toJSON i
-                      itemRunner $ ItemRunParams runPrms i
+                      itemRunner $ ItemParams runPrms i
                       logBoundry $ EndIteration iid
 
     inTargIds :: i -> Bool
@@ -280,7 +281,7 @@ runTestItems iIds items runPrms@(TestRunParams interactor prepState tc rc) itemR
 runTest ::  forall i rc as ds tc effs. (ItemClass i ds, TestConfigClass tc, Member Logger effs) =>
                    Maybe (S.Set Int)                                                        -- target Ids
                    -> FilterList rc tc                                                      -- filters
-                   -> (ItemRunParams as ds i tc rc effs -> Sem effs ())                                 -- item runner
+                   -> (ItemParams as ds i tc rc effs -> Sem effs ())                                 -- item runner
                    -> rc                                                                    -- runConfig
                    -> GenericTest tc rc i  as ds effs                                      -- Test Case
                    -> [Sem effs ()]                                                        -- [TestIterations]
@@ -288,7 +289,7 @@ runTest iIds fltrs itemRunner rc GenericTest{configuration = tc, components} =
   let
     runItems :: TestComponents rc i as ds effs -> [Sem effs ()]
     runItems TestComponents {testItems, testInteractor, testPrepState} = 
-      runTestItems iIds (testItems rc) (TestRunParams testInteractor testPrepState tc rc) itemRunner
+      runTestItems iIds (testItems rc) (TestParams testInteractor testPrepState tc rc) itemRunner
 
     include :: Bool
     include = acceptFilter $ filterTestCfg fltrs rc tc
@@ -327,23 +328,27 @@ preRun PreRun{runAction, checkHasRun} stage =
     runCheck <- checkHasRun
     unless runCheck (PE.throw rolloverCheckFalseError)
 
+data RunParams rc tc effs = RunParams {
+  plan :: forall a mo mi. TestPlanBase tc rc mo mi a effs,
+  filters :: FilterList rc tc,
+  itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemParams as ds i tc rc effs -> Sem effs ()),
+  rc :: rc
+}
+
 testRunOrEndpoint :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
                     Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
-                   -> (forall a mo mi. TestPlanBase tc rc mo mi a effs) -- test case processor function is applied to a hard coded list of test groups and returns a list of results
-                   -> FilterList rc tc                                  -- filters
-                   -> rc                                                -- runConfig
-                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))                     -- item runner
-                   -> Sem effs ()
-testRunOrEndpoint iIds runner fltrs rc itemRunner =
+                    -> RunParams rc tc effs
+                    -> Sem effs ()
+testRunOrEndpoint iIds RunParams {plan, filters, rc, itemRunner} =
   let
     filterInfo :: [[FilterResult]]
-    filterInfo = filterGroups runner fltrs rc
+    filterInfo = filterGroups plan filters rc
 
     filterFlags :: [Bool]
     filterFlags = filterGroupFlags filterInfo
 
     prepResults :: [TestGroup [] (Sem effs) () effs]
-    prepResults = runner $ runTest iIds fltrs itemRunner rc 
+    prepResults = plan $ runTest iIds filters itemRunner rc 
 
     firstDuplicateGroupTitle :: Maybe Text
     firstDuplicateGroupTitle = toS <$> firstDuplicate (toS . C.title <$> prepResults :: [Prelude.String])
@@ -420,26 +425,16 @@ testRunOrEndpoint iIds runner fltrs rc itemRunner =
         logBoundry EndRun
     )
     (\dupeTxt -> logLPError . AppGenericError $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
-          
 
-testRun :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
-            (forall a mo mi. TestPlanBase tc rc mo mi a effs)                                                              -- test case processor function is applied to a hard coded list of test groups and returns a list of results
-            -> FilterList rc tc                                                                                               -- filters
-            -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))  -- item runner                                                -- runConfig
-            -> rc
-            -> Sem effs ()
-testRun runner fltrs itemRunner rc = testRunOrEndpoint Nothing runner fltrs rc itemRunner 
+testRun :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) => RunParams rc tc effs -> Sem effs ()
+testRun = testRunOrEndpoint Nothing 
 
 testEndpointBase :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
-                   FilterList rc tc                               -- filters
-                   -> (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i tc rc effs -> Sem effs ()))  
+                   RunParams rc tc effs
                    -> TestModule                                      -- test address
-                   -> rc                                              -- runConfig
-                   -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints
-                   -> (forall a mo mi. TestPlanBase tc rc mo mi a effs)  -- test case processor function is applied to a hard coded 
-                                                                        -- list of test goups and returns a list of results                                                -- test case processor function is applied to a hard coded list of test goups and returns a list of results
+                   -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> Sem effs ()
-testEndpointBase fltrs itemRunner tstAddress rc iIds runner =
+testEndpointBase runParams@RunParams {filters} tstAddress iIds =
   let
     endpointFilter :: TestModule -> TestFilter rc tc
     endpointFilter targAddress = TestFilter {
@@ -448,8 +443,8 @@ testEndpointBase fltrs itemRunner tstAddress rc iIds runner =
     }
 
     allFilters :: [TestFilter rc tc]
-    allFilters = endpointFilter tstAddress : fltrs
+    allFilters = endpointFilter tstAddress : filters
   in
     eitherf iIds
       (logItem . logRun . LP.Error . AppFilterError)
-      (\idSet -> testRunOrEndpoint (Just idSet) runner allFilters rc itemRunner)
+      (\idSet -> testRunOrEndpoint (Just idSet) runParams)

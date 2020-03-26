@@ -75,7 +75,7 @@ plan = validPlan doNothing doNothing doNothing doNothing
 ----------------------------------------
 
 runPlan :: forall effs. (EFFAllEffects effs) =>
-            (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemRunParams as ds i TestConfig RunConfig effs -> Sem effs ()))  -- item runner                                                -- runConfig
+            (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemParams as ds i TestConfig RunConfig effs -> Sem effs ()))  -- item runner                                                -- runConfig
             -> RunConfig
             -> Sem effs ()
 runPlan = testRun plan filters

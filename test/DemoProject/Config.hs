@@ -5,7 +5,7 @@ import           DSL.Interpreter
 import           Common
 import           Pyrelude
 import qualified Prelude                    as P
-import           Runner
+import           Runner 
 import           TestFilter
 import           Data.DList
 import Data.Aeson
@@ -93,13 +93,34 @@ isActiveFilter = TestFilter {
     predicate = \_ tc -> active tc
   }
 
-filters :: [TestFilter RunConfig TestConfig]
-filters = [isActiveFilter, countryFilter, levelFilter]
+filterList :: [TestFilter RunConfig TestConfig]
+filterList = [isActiveFilter, countryFilter, levelFilter]
 
 applyTestFiltersToItems :: RunConfig -> (i -> TestConfig) -> [i] -> [i]
-applyTestFiltersToItems = applyTestFilters filters
+applyTestFiltersToItems = applyTestFilters filterList
 
 type TestPlan m1 m a effs = TestPlanBase TestConfig RunConfig m1 m a effs
+
+
+testEndpointPriv :: forall effs1. ApEffs effs1 =>
+      (forall rc tc i as ds effs. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs effs) 
+                  => ItemParams as ds i tc rc effs -> Sem effs ())  
+     -> TestModule
+     -> RunConfig
+     -> Either FilterError (Set Int)
+     -> (forall m1 m a. TestPlan m1 m a effs1)
+     -> Sem effs1 ()
+testEndpointPriv itmRunner testMod rc itrSet plan = 
+  let 
+    runParams :: RunParams RunConfig TestConfig effs1 
+    runParams = RunParams {
+      plan = plan,
+      filters = filterList,
+      itemRunner = itmRunner,
+      rc = rc
+    }
+  in
+    testEndpointBase runParams testMod itrSet
 
 testEndpoint ::
      TestModule
@@ -107,7 +128,7 @@ testEndpoint ::
      -> Either FilterError (Set Int)
      -> (forall m1 m a. TestPlan m1 m a FullIOEffects)
      -> Sem FullIOEffects ()
-testEndpoint = testEndpointBase filters normalExecution 
+testEndpoint = testEndpointPriv normalExecution
 
 testEndpointDoc ::
      TestModule
@@ -115,10 +136,8 @@ testEndpointDoc ::
      -> Either FilterError (Set Int)
      -> (forall a m m1. TestPlan m1 m a FullDocEffects)
      -> Sem FullDocEffects ()
-testEndpointDoc = testEndpointBase filters docExecution
---  tstAdd rc iids pln
--- extractDocLog $ 
--- executeDocumentRaw tstAdd rc iids pln
+testEndpointDoc =  testEndpointPriv docExecution
+
 
 $(deriveJSON defaultOptions ''TestConfig)
 $(deriveJSON defaultOptions ''Environment)

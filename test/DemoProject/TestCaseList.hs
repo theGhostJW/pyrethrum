@@ -253,21 +253,3 @@ testRunExceptG1Rollover = validPlan exceptionInRollover doNothing doNothing doNo
 
 runExceptG1Rollover :: IO ()
 runExceptG1Rollover = runIO testRunExceptG1Rollover
-
-justLogPreRun :: EFFLogger effs => PreTestStage -> PreRun effs
-justLogPreRun stage = PreRun {
-  runAction = log $ "Run Action: " <> txt stage,
-  checkHasRun = log ("Check Action Run: " <> txt stage) $> True
-}
-
-testG1GoHomeLogging:: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
-testG1GoHomeLogging = validPlan (justLogPreRun Rollover) (justLogPreRun GoHome) doNothing doNothing
-
-justLogPreRunFailCheck :: EFFLogger effs => PreTestStage -> PreRun effs
-justLogPreRunFailCheck stage = PreRun {
-  runAction = log $ "Run Action: " <> txt stage,
-  checkHasRun = log ("Check Action Run: " <> txt stage) $> False
-}
-
-testG1GoHomeLoggingFailCheck :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
-testG1GoHomeLoggingFailCheck = validPlan (justLogPreRun Rollover) (justLogPreRunFailCheck GoHome) doNothing doNothing

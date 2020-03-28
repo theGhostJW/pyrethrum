@@ -447,4 +447,4 @@ testEndpointBase runParams@RunParams {filters} tstAddress iIds =
   in
     eitherf iIds
       (logItem . logRun . LP.Error . AppFilterError)
-      (\idSet -> testRunOrEndpoint (Just idSet) runParams)
+      (\idSet -> testRunOrEndpoint (Just idSet) runParams { filters = allFilters })

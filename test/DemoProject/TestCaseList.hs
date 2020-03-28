@@ -199,33 +199,12 @@ runIO plan' = ioRunToFile Console False executeWithLogger
                     >>= consoleRunResults
 
 runDocs :: (forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs) -> DList Text
-runDocs plan' = fst $ executeDocumentRaw  (testRun RunParams {
+runDocs plan' = fst $ executeDocumentRaw (testRun RunParams {
                                               plan = plan',
                                               filters = filterList,
                                               itemRunner = docExecution,
                                               rc = runConfig
                                             })
-
-testRunFailHomeG2 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
-testRunFailHomeG2 = validPlan doNothing -- rollOver0
-                              doNothing -- goHome0
-                              doNothing -- rollOver1
-                              alwaysFailCheck -- goHome1
-
-runFailHomeG2IO :: IO ()
-runFailHomeG2IO = runIO testRunFailHomeG2
-
-runFailHomeG2Document :: DList Text
-runFailHomeG2Document = runDocs testRunFailHomeG2
-
-testRunFailRolloverG1 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
-testRunFailRolloverG1 = validPlan alwaysFailCheck doNothing doNothing doNothing
-
-runFailRolloverG1Document :: DList Text
-runFailRolloverG1Document = runDocs testRunFailRolloverG1
-
-runFailRolloverG1IO :: IO ()
-runFailRolloverG1IO = runIO testRunFailRolloverG1
 
 dummyIOException :: Sem effs Bool
 dummyIOException = (E.throw $ P.userError "Pretend IO Error") :: Sem effs Bool

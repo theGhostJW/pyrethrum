@@ -298,8 +298,11 @@ runTest iIds fltrs itemRunner rc GenericTest{configuration = tc, components} =
         ? runItems components
         $ []
 
-preRun :: forall effs. Member (Error AppError) effs => PreRun effs -> PreTestStage -> Sem effs ()
-preRun PreRun{runAction, checkHasRun} stage = 
+logLPError ::  forall effs. Member Logger effs => AppError -> Sem effs ()
+logLPError = logLP . logRun . LP.Error
+
+runHook :: forall effs. Member (Error AppError) effs => PreRun effs -> PreTestStage -> Sem effs (Either AppError ())
+runHook PreRun{runAction, checkHasRun} stage = 
   do
     let
       stageStr :: Text
@@ -323,10 +326,15 @@ preRun PreRun{runAction, checkHasRun} stage =
                                   <> " action ran without exception but completion check returned False. Looks like "
                                   <> stageStr
                                   <> " did not run as expected"
+      exeHook :: Sem effs ()
+      exeHook = 
+        do 
+          preRunRslt <- PE.catch runAction (PE.throw . rolloverFailError)
+          runCheck <- PE.catch checkHasRun (PE.throw . AppPreTestCheckExecutionError stage "exception encountered verifying hook has run")
+          unless runCheck (PE.throw rolloverCheckFalseError)
       
-    preRunRslt <- PE.catch runAction (PE.throw . rolloverFailError)
-    runCheck <- checkHasRun
-    unless runCheck (PE.throw rolloverCheckFalseError)
+    (Right <$> exeHook) `PE.catch` (pure . Left)
+
 
 data RunParams rc tc effs = RunParams {
   plan :: forall a mo mi. TestPlanBase tc rc mo mi a effs,
@@ -359,50 +367,37 @@ testRunOrEndpoint iIds RunParams {plan, filters, rc, itemRunner} =
     logBoundry :: BoundaryEvent -> Sem effs ()
     logBoundry = logLP . BoundaryLog
 
-    logLPError :: AppError -> Sem effs ()
-    logLPError = logLP . logRun . LP.Error
-
     exeGroup :: (Bool, TestGroup [] (Sem effs) () effs) -> Sem effs ()
     exeGroup (include, tg) =
       let
-        isEndpoint :: Bool
-        isEndpoint = isJust iIds
-
-        -- when running an endpoint go home and rolllover are not run
-        -- if the application is already home
-        preRunGuard :: Sem effs Bool
-        preRunGuard = (
-                        isEndpoint ?
-                            (not <$> checkHasRun (goHome tg)) $ -- we only want to run if is NOT already home
+        -- if ids are passed in we are running an endpoint
+        -- endpoint go home and rolllover are not run if the application is already home
+        guardedHookRun :: (TestGroup [] (Sem effs) () effs -> PreRun effs) -> PreTestStage -> Sem effs (Either AppError ())
+        guardedHookRun hookSelector hookLabel =
+          do 
+            wantHookRun <- isJust iIds ? 
+                            (not <$> checkHasRun (goHome tg)) $ 
                             pure True
-                      )
+            wantHookRun ? runHook (hookSelector tg) hookLabel $ pure $ Right ()
 
-        guardedPreRun :: (TestGroup [] (Sem effs) () effs -> PreRun effs) -> PreTestStage -> Sem effs ()
-        guardedPreRun sel stg =
-            preRunGuard >>= bool (pure ()) (preRun (sel tg) stg)
+        rollover' :: Sem effs (Either AppError ())
+        rollover' = guardedHookRun rollover Rollover
 
-        grpRollover :: Sem effs ()
-        grpRollover = guardedPreRun rollover Rollover
+        goHome' :: Sem effs (Either AppError ())
+        goHome' = guardedHookRun goHome GoHome
 
-        grpGoHome :: Sem effs ()
-        grpGoHome = guardedPreRun goHome GoHome
-
-        preRunAndRun :: Sem effs () -> Sem effs () -> Sem effs ()
-        preRunAndRun prerun mRun = do
-                                    prerun
-                                    mRun
-
-        runTestIteration :: Sem effs () -> Sem effs ()
-        runTestIteration = preRunAndRun grpGoHome
+        hookThenRun :: Sem effs (Either AppError ()) -> Sem effs () -> Sem effs ()
+        hookThenRun hook mRun = do
+                                  eth <- hook
+                                  eitherf eth
+                                    logLPError
+                                    (const mRun)
 
         runTest' :: [Sem effs ()] -> Sem effs ()
-        runTest' testIterations = sequence_ (runTestIteration <$> testIterations)
+        runTest' testIterations = sequence_ (hookThenRun goHome' <$> testIterations)
 
-        testList :: [[Sem effs ()]]
-        testList = filter (not . null) $ tests tg
-
-        runGroupAfterRollover :: Sem effs ()
-        runGroupAfterRollover = sequence_ $ runTest' <$> testList
+        runTests :: Sem effs ()
+        runTests = sequence_ $ runTest' <$> filter (not . null) (tests tg)
 
         runGrp :: Sem effs ()
         runGrp = 
@@ -411,7 +406,7 @@ testRunOrEndpoint iIds RunParams {plan, filters, rc, itemRunner} =
               in
                 do
                   logBoundry $ StartGroup hdr
-                  preRunAndRun grpRollover runGroupAfterRollover
+                  hookThenRun rollover' runTests
                   logBoundry $ EndGroup hdr
       in
         include ? runGrp $ pure ()

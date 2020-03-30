@@ -11,10 +11,10 @@ import           DemoProject.Config
 import           DemoProject.Test.Rough as RT
 import           DemoProject.Test.Rough2 as RT2
 import           DemoProject.Test.Simple as ST
-import DemoProject.Test.RoughIntState
-import DemoProject.Test.RoughDisabled as DT
+import  DemoProject.Test.RoughIntState
+import  DemoProject.Test.RoughDisabled as DT
 import  DemoProject.Test.Simple2 as ST2
-import Control.Monad
+import  Control.Monad
 import  Data.Functor (($>))
 import           Common
 import           DSL.Interpreter

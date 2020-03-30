@@ -100,7 +100,7 @@ executeDocument logger app =
     ( 
         runError 
       . runError
-      . ensureInterpreter
+      . ensureDocInterpreter
       . logger
       . janFst2000UTCTimeInterpreter
       . evalState (LogIndex 0)

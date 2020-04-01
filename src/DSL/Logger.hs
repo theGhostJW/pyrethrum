@@ -49,8 +49,9 @@ log = logMessage
 log' :: forall effs. Member Logger effs => Text -> Text -> Sem effs ()
 log' = detailLog (logRun . Message')
 
-logConsoleInterpreter :: forall effs a. Members '[CurrentTime, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a
-logConsoleInterpreter = 
+-- TODO - phantom types ? 
+logRunConsoleInterpreter :: forall effs a. Members '[CurrentTime, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a
+logRunConsoleInterpreter = 
     interpret $ \lg -> do 
                         now <- CT.getCurrentTime
                         embed $ case lg of
@@ -64,25 +65,6 @@ logConsoleInterpreter =
                             LogWarning s -> P.print. logRun $ Warning s 
                             LogWarning' msg info -> P.print . logRun . Warning' $ DetailedInfo msg info
 
-logDocInterpreter :: forall effs a. Member DListOutput effs => Sem (Logger ': effs) a -> Sem effs a
-logDocInterpreter = 
-  let 
-    tellDoc :: DocProtocol -> Sem effs ()
-    tellDoc = output . dList . logDoc
-  in
-    interpret $ \case 
-                    LogItem lp -> output $ dList lp
-
-                    LogError msg -> tellDoc . DocError $ AppUserError msg 
-                    LogError' msg info -> tellDoc . DocError . AppUserError' $ DetailedInfo msg info
-
-                    LogMessage s ->  tellDoc $ DocMessage s 
-                    LogMessage' msg info -> tellDoc . DocMessage' $ DetailedInfo msg info
-
-                    LogWarning s -> tellDoc $ DocWarning s 
-                    LogWarning' msg info ->  tellDoc . DocWarning' $ DetailedInfo msg info
-
-
 -- ToDo move to lib
 putLines :: Handle -> Text -> IO ()
 putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
@@ -90,13 +72,8 @@ putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
 -- TODO - update to use info
 logStrJSONWith :: ThreadInfo -> LogIdxTime -> LogProtocol -> Text
 logStrJSONWith _ _ lp = eitherf (decodeUtf8' . B.toStrict . A.encode $ lp)
-                  (\e -> "Encode error: " <> txt e)
-                  id
-
-logStrJSON :: LogProtocol -> Text
-logStrJSON lp = eitherf (decodeUtf8' . B.toStrict . A.encode $ lp)
-                  (\e -> "Encode error: " <> txt e)
-                  id
+                          (\e -> "Encode error: " <> txt e)
+                          id
 
 runThreadInfoReader :: Member CurrentTime r => Sem (Reader ThreadInfo ': r) a -> Sem r a 
 runThreadInfoReader sem = 
@@ -151,10 +128,26 @@ logToHandles convertersHandles =
                                     LogWarning' msg info ->  logRunTohandles . Warning' $ DetailedInfo msg info
 
                       embed $ logToIO lg
-                         
-                                          
-                              
-logDocPrettyInterpreter :: forall effs a. Member DListOutput effs => Sem (Logger ': effs) a -> Sem effs a
+
+logDocInterpreter :: forall effs a. Member OutputDListText effs => Sem (Logger ': effs) a -> Sem effs a
+logDocInterpreter = 
+  let 
+    tellDoc :: DocProtocol -> Sem effs ()
+    tellDoc = output . dList . logDoc
+  in
+    interpret $ \case 
+                    LogItem lp -> output $ dList lp
+
+                    LogError msg -> tellDoc . DocError $ AppUserError msg 
+                    LogError' msg info -> tellDoc . DocError . AppUserError' $ DetailedInfo msg info
+
+                    LogMessage s ->  tellDoc $ DocMessage s 
+                    LogMessage' msg info -> tellDoc . DocMessage' $ DetailedInfo msg info
+
+                    LogWarning s -> tellDoc $ DocWarning s 
+                    LogWarning' msg info ->  tellDoc . DocWarning' $ DetailedInfo msg info                      
+                                                     
+logDocPrettyInterpreter :: forall effs a. Member OutputDListText effs => Sem (Logger ': effs) a -> Sem effs a
 logDocPrettyInterpreter = 
   let
     toDList :: [Text] -> DList Text
@@ -177,6 +170,3 @@ logDocPrettyInterpreter =
 
                   LogWarning s -> pushDoc $ DocWarning s 
                   LogWarning' msg info ->  pushDoc . DocWarning' $ DetailedInfo msg info
-
-                                 
-  

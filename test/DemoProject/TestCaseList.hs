@@ -107,13 +107,13 @@ listingIOSem = testRun RunParams {
 -----------------------------------------
 
 rawListing :: (DList Text, Either AppError ())
-rawListing = executeDocumentRaw listingSem
+rawListing = documentRaw listingSem
 
 prettyListing :: (DList Text, Either AppError ())
-prettyListing = executeDocumentPretty listingSem
+prettyListing = documentPretty listingSem
 
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
-docRunRaw plan' = fst . executeDocumentRaw $ testRun RunParams {
+docRunRaw plan' = fst . documentRaw $ testRun RunParams {
                                                             plan = plan',
                                                             filters = filterList,
                                                             itemRunner = docExecution,
@@ -121,7 +121,7 @@ docRunRaw plan' = fst . executeDocumentRaw $ testRun RunParams {
                                                          }
 
 -- docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
--- docRun pln = extractDocLog $ testRun pln filters docExecution executeDocumentPretty runConfig
+-- docRun pln = extractDocLog $ testRun pln filters docExecution documentPretty runConfig
 
 -- a testing helper
 runDocument :: DList Text
@@ -199,7 +199,7 @@ runIO plan' = ioRunToFile Console False executeWithLogger
                     >>= consoleRunResults
 
 runDocs :: (forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs) -> DList Text
-runDocs plan' = fst $ executeDocumentRaw (testRun RunParams {
+runDocs plan' = fst $ documentRaw (testRun RunParams {
                                               plan = plan',
                                               filters = filterList,
                                               itemRunner = docExecution,

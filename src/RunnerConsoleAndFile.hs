@@ -60,9 +60,6 @@ ioRunToFile wantConsole docMode interpreter app =
     allHandles = wantConsole == Console
                       ? (((Nothing, prettyPrintLogProtocolWith docMode, S.stdout) :) <$>) <$> fileHandles
                       $ fileHandles
-
-    printError :: AppError -> IO ()
-    printError err = print $ "Error Encountered \n" <> show err
   in 
     do 
       hndls <- allHandles
@@ -84,9 +81,7 @@ ioRunToFile wantConsole docMode interpreter app =
               
             runResult <- interpreter logger app `P.finally` closeHandles
             
-            when (isLeft runResult) 
-              (putStrLn $ "Error Encountered \n" <> txt (fromLeft' runResult))
-
-            printFilePaths logPths 
-            pure $ Right logPths
+            eitherf runResult 
+              (\e -> print ("Error Encountered \n" <> show e) $> Left e) 
+              (const $ printFilePaths logPths $> Right logPths)
         )

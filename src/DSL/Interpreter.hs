@@ -25,7 +25,7 @@ type EFFAllEffects effs = Members FullEffects effs
 type FullEffects = '[FileSystem, Ensure, ArbitraryIO, Logger, CurrentTime, Error EnsureError, Error AppError]
 type FullIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, Logger, Reader ThreadInfo, State LogIndex, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
 type FullDocIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logger, Reader ThreadInfo, State LogIndex, CurrentTime, Error FileSystemError, Error EnsureError, Error AppError, Embed IO]
-type FullDocEffects = '[FileSystem, ArbitraryIO, Reader ThreadInfo, State LogIndex, CurrentTime, Logger, Ensure, Error EnsureError, Error AppError, DListOutput]
+type FullDocEffects = '[FileSystem, ArbitraryIO, Reader ThreadInfo, State LogIndex, CurrentTime, Logger, Ensure, Error EnsureError, Error AppError, OutputDListText]
 
 flattenErrors :: Either AppError (Either EnsureError (Either FileSystemError v)) -> Either AppError v
 flattenErrors = 
@@ -45,7 +45,7 @@ handleIOException :: IO (Either AppError a) -> IO (Either AppError a)
 handleIOException = handle $ pure . Left . AppIOError
 
 executeInIOConsoleRaw :: forall a. Sem FullIOEffects a -> IO (Either AppError a)
-executeInIOConsoleRaw = executeWithLogger logConsoleInterpreter
+executeInIOConsoleRaw = executeWithLogger logRunConsoleInterpreter
 
 executeInIOConsolePretty :: forall a. Sem FullIOEffects a -> IO (Either AppError a)
 executeInIOConsolePretty = executeWithLogger logConsolePrettyInterpreter
@@ -86,14 +86,14 @@ documentWithLogger logger app = handleIOException $ flattenErrors <$> runM
                                   )
 
 -- todo come back to this nested errors drill down on reason
-executeDocumentRaw :: forall a. Sem FullDocEffects a -> (DList Text, Either AppError a)
-executeDocumentRaw = executeDocument logDocInterpreter
+documentRaw :: forall a. Sem FullDocEffects a -> (DList Text, Either AppError a)
+documentRaw = document logDocInterpreter
 
-executeDocumentPretty :: forall a. Sem FullDocEffects a -> (DList Text, Either AppError a)
-executeDocumentPretty = executeDocument logDocPrettyInterpreter
+documentPretty :: forall a. Sem FullDocEffects a -> (DList Text, Either AppError a)
+documentPretty = document logDocPrettyInterpreter
 
-executeDocument :: forall a. (forall effs. Member DListOutput effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocEffects a -> (DList Text, Either AppError a)
-executeDocument logger app =   
+document :: forall a. (forall effs. Member OutputDListText effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocEffects a -> (DList Text, Either AppError a)
+document logger app =   
     run .
     runOutputMonoid id $
     (mapLeft AppEnsureError =<<) <$>

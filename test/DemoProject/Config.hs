@@ -136,7 +136,7 @@ testEndpointDoc ::
      -> Either FilterError (Set Int)
      -> (forall a m m1. TestPlan m1 m a FullDocEffects)
      -> DList Text
-testEndpointDoc testMod rc itrSet plan = fst . executeDocumentRaw $ testEndpointPriv docExecution testMod rc itrSet plan
+testEndpointDoc testMod rc itrSet plan = fst . documentRaw $ testEndpointPriv docExecution testMod rc itrSet plan
 
 
 $(deriveJSON defaultOptions ''TestConfig)

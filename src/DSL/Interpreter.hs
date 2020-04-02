@@ -44,12 +44,6 @@ flattenErrors =
 handleIOException :: IO (Either AppError a) -> IO (Either AppError a)
 handleIOException = handle $ pure . Left . AppIOError
 
-executeInIOConsoleRaw :: forall a. Sem FullIOEffects a -> IO (Either AppError a)
-executeInIOConsoleRaw = executeWithLogger logRunConsoleInterpreter
-
-executeInIOConsolePretty :: forall a. Sem FullIOEffects a -> IO (Either AppError a)
-executeInIOConsolePretty = executeWithLogger logConsolePrettyInterpreter
-
 executeWithLogger :: forall a. (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullIOEffects a -> IO (Either AppError a)
 executeWithLogger logger app = 
     handleIOException $ flattenErrors <$> runM
@@ -66,6 +60,12 @@ executeWithLogger logger app =
                                       $ fileSystemIOInterpreter
                                       app
                                   )
+
+executeInIOConsoleRaw :: forall a. Sem FullIOEffects a -> IO (Either AppError a)
+executeInIOConsoleRaw = executeWithLogger logRunConsoleInterpreter
+
+executeInIOConsolePretty :: forall a. Sem FullIOEffects a -> IO (Either AppError a)
+executeInIOConsolePretty = executeWithLogger logConsolePrettyInterpreter                                 
 
                               
 documentWithLogger :: forall a. (forall effs. Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem FullDocIOEffects a -> IO (Either AppError a)
@@ -97,15 +97,14 @@ document logger app =
     run .
     runOutputMonoid id $
     (mapLeft AppEnsureError =<<) <$>
-    ( 
-        runError 
-      . runError
-      . ensureDocInterpreter
-      . logger
-      . janFst2000UTCTimeInterpreter
-      . evalState (LogIndex 0)
-      . runThreadInfoReader
-      . arbitraryIODocInterpreter
-      . fileSystemDocInterpreter 
-      $ app
+    runError 
+      (runError
+      $ ensureDocInterpreter
+      $ logger
+      $ janFst2000UTCTimeInterpreter
+      $ evalState (LogIndex 0)
+      $ runThreadInfoReader
+      $ arbitraryIODocInterpreter
+      $ fileSystemDocInterpreter 
+      app
     )

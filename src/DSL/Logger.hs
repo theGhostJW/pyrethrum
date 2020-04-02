@@ -129,35 +129,15 @@ logToHandles convertersHandles =
 
                       embed $ logToIO lg
 
-logDocInterpreter :: forall effs a. Member OutputDListText effs => Sem (Logger ': effs) a -> Sem effs a
-logDocInterpreter = 
-  let 
-    tellDoc :: DocProtocol -> Sem effs ()
-    tellDoc = output . dList . logDoc
-  in
-    interpret $ \case 
-                    LogItem lp -> output $ dList lp
 
-                    LogError msg -> tellDoc . DocError $ AppUserError msg 
-                    LogError' msg info -> tellDoc . DocError . AppUserError' $ DetailedInfo msg info
-
-                    LogMessage s ->  tellDoc $ DocMessage s 
-                    LogMessage' msg info -> tellDoc . DocMessage' $ DetailedInfo msg info
-
-                    LogWarning s -> tellDoc $ DocWarning s 
-                    LogWarning' msg info ->  tellDoc . DocWarning' $ DetailedInfo msg info                      
-                                                     
-logDocPrettyInterpreter :: forall effs a. Member OutputDListText effs => Sem (Logger ': effs) a -> Sem effs a
-logDocPrettyInterpreter = 
+logDocWithInterpreter :: forall effs a. (LogProtocol -> Sem effs ()) -> Sem (Logger ': effs) a -> Sem effs a
+logDocWithInterpreter pushItem = 
   let
     toDList :: [Text] -> DList Text
     toDList = fromList
 
-    pushItem :: LogProtocol -> Sem effs () 
-    pushItem = output . toDList . lines . prettyPrintLogProtocol True
-
     pushDoc :: DocProtocol -> Sem effs () 
-    pushDoc = pushItem . IterationLog . Doc
+    pushDoc = pushItem . logDoc
   in
     interpret $ \case 
                   LogItem lp -> pushItem lp
@@ -170,3 +150,10 @@ logDocPrettyInterpreter =
 
                   LogWarning s -> pushDoc $ DocWarning s 
                   LogWarning' msg info ->  pushDoc . DocWarning' $ DetailedInfo msg info
+
+
+logDocInterpreter :: forall effs a. Member OutputDListText effs => Sem (Logger ': effs) a -> Sem effs a
+logDocInterpreter = logDocWithInterpreter (output . dList)
+                                                     
+logDocPrettyInterpreter :: forall effs a. Member OutputDListText effs => Sem (Logger ': effs) a -> Sem effs a
+logDocPrettyInterpreter = logDocWithInterpreter (output . fromList . lines . prettyPrintLogProtocol True)

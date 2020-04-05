@@ -12,7 +12,7 @@ import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
 import System.IO (stdout)
 import Polysemy
-import Polysemy.Output
+import Polysemy.Output as O
 import Polysemy.Reader
 import Polysemy.State
 
@@ -87,6 +87,28 @@ logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocolWith False, s
 incIdx :: LogIndex -> LogIndex
 incIdx (LogIndex i) = LogIndex $ i + 1
 
+logRunWithSink :: forall effs a. (LogProtocol -> Sem effs ()) -> Sem (Logger ': effs) a -> Sem effs a
+logRunWithSink pushItem = 
+  let
+    pushRun :: RunProtocol -> Sem effs () 
+    pushRun = pushItem . logRun
+  in
+    interpret $ \case 
+                  LogItem lp -> pushItem lp
+
+                  LogError msg -> pushRun . Error $ AppUserError msg
+                  LogError' msg inf -> pushRun . Error . AppUserError' $ DetailedInfo msg inf
+
+                  LogMessage s -> pushRun $ Message s 
+                  LogMessage' msg info -> pushRun . Message' $ DetailedInfo msg info
+
+                  LogWarning s -> pushRun $ Warning s 
+                  LogWarning' msg info ->  pushRun . Warning' $ DetailedInfo msg info
+
+-- can produce a list of LogProtocols - used for testing
+logRunRawInterpreter :: forall effs a. Member (Output LogProtocol) effs => Sem (Logger ': effs) a -> Sem effs a
+logRunRawInterpreter = logRunWithSink output
+
 logToHandles :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => [(ThreadInfo -> LogIdxTime -> LogProtocol -> Text, Handle)] -> Sem (Logger ': effs) a -> Sem effs a
 logToHandles convertersHandles = 
     interpret $ \lg -> 
@@ -112,7 +134,7 @@ logToHandles convertersHandles =
                         logLogProtocol lp =  P.sequence_ $ logToh lp <$> simpleConvertersHandles
                     
                         logRunTohandles :: RunProtocol -> IO ()
-                        logRunTohandles = logLogProtocol . IterationLog . Run 
+                        logRunTohandles = logLogProtocol . logRun 
                       
                         logToIO :: Logger m a -> IO a
                         logToIO = \case 
@@ -130,12 +152,9 @@ logToHandles convertersHandles =
                       embed $ logToIO lg
 
 
-logDocWithInterpreter :: forall effs a. (LogProtocol -> Sem effs ()) -> Sem (Logger ': effs) a -> Sem effs a
-logDocWithInterpreter pushItem = 
+logDocWithSink :: forall effs a. (LogProtocol -> Sem effs ()) -> Sem (Logger ': effs) a -> Sem effs a
+logDocWithSink pushItem = 
   let
-    toDList :: [Text] -> DList Text
-    toDList = fromList
-
     pushDoc :: DocProtocol -> Sem effs () 
     pushDoc = pushItem . logDoc
   in
@@ -153,7 +172,7 @@ logDocWithInterpreter pushItem =
 
 
 logDocInterpreter :: forall effs a. Member OutputDListText effs => Sem (Logger ': effs) a -> Sem effs a
-logDocInterpreter = logDocWithInterpreter (output . dList)
+logDocInterpreter = logDocWithSink (output . dList)
                                                      
 logDocPrettyInterpreter :: forall effs a. Member OutputDListText effs => Sem (Logger ': effs) a -> Sem effs a
-logDocPrettyInterpreter = logDocWithInterpreter (output . fromList . lines . prettyPrintLogProtocol True)
+logDocPrettyInterpreter = logDocWithSink (output . fromList . lines . prettyPrintLogProtocol True)

@@ -2,12 +2,15 @@ module LogListCheck where
 
 import           Pyrelude   as P
 import           Data.DList
-import           Pyrelude.Test         as U
+import           Pyrelude.Test
+import           DSL.LogProtocol
 
-type Log = DList Text
+type TxtLog = DList Text
 
-chkLog :: (Log -> v) -> (v -> Assertion) -> Log -> Assertion
+chkLog :: (TxtLog -> v) -> (v -> Assertion) -> TxtLog -> Assertion
 chkLog intprt assrt = assrt . intprt
 
 chkMessageInstances :: Text -> Int -> DList Text -> Assertion
 chkMessageInstances msg exCount  = chkLog (P.count (isInfixOf msg)) (chkEq exCount)
+
+type Log = [LogProtocol]

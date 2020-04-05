@@ -13,7 +13,7 @@ module Runner (
   , TestParams
   , RunParams(..)
   , ItemParams
-  , mkTestSem
+  , mkRunSem
   , module RB
   , module ItemFilter
   , module C
@@ -421,8 +421,8 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
     )
     (\dupeTxt -> logLPError . AppGenericError $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
 
-mkTestSem :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) => RunParams rc tc effs -> Sem effs ()
-mkTestSem = mkSem Nothing 
+mkRunSem :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) => RunParams rc tc effs -> Sem effs ()
+mkRunSem = mkSem Nothing 
 
 mkEndpointSem :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
                    RunParams rc tc effs

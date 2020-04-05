@@ -71,7 +71,7 @@ validPlan ro0 gh0 ro1 gh1 f =
 simplePlan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 simplePlan = validPlan doNothing doNothing doNothing doNothing
 
-runParams :: RunParams RunConfig TestConfig FullIOEffects
+runParams :: forall effs. EFFAllEffects effs => RunParams RunConfig TestConfig effs
 runParams = RunParams {
       plan = simplePlan,
       filters = filterList,
@@ -83,24 +83,11 @@ runParams = RunParams {
 --------- Apply Default Configs ----------
 ------------------------------------------
 
-runSem :: Sem FullIOEffects ()
-runSem = mkTestSem runParams
+runSem :: forall effs. EFFAllEffects effs => Sem effs ()
+runSem = mkRunSem runParams
      
-listingSem :: Sem FullDocEffects ()
-listingSem = mkTestSem RunParams {
-                                plan = simplePlan,
-                                filters = filterList,
-                                itemRunner = docExecution,
-                                rc = runConfig
-                              }
-
-listingIOSem :: Sem FullDocIOEffects ()
-listingIOSem = mkTestSem RunParams {
-                                plan = simplePlan,
-                                filters = filterList,
-                                itemRunner = docExecution,
-                                rc = runConfig
-                              }
+listingSem :: forall effs. EFFAllEffects effs => Sem effs ()
+listingSem = mkRunSem runParams {itemRunner = docExecution}
 
 -----------------------------------------
 ---------- Listings - to DList ----------
@@ -113,7 +100,7 @@ prettyListing :: (DList Text, Either AppError ())
 prettyListing = documentPretty listingSem
 
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
-docRunRaw plan' = fst . documentRaw $ mkTestSem RunParams {
+docRunRaw plan' = fst . documentRaw $ mkRunSem RunParams {
                                                             plan = plan',
                                                             filters = filterList,
                                                             itemRunner = docExecution,
@@ -121,7 +108,7 @@ docRunRaw plan' = fst . documentRaw $ mkTestSem RunParams {
                                                          }
 
 -- docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
--- docRun pln = extractDocLog $ mkTestSem pln filters docExecution documentPretty runConfig
+-- docRun pln = extractDocLog $ mkRunSem pln filters docExecution documentPretty runConfig
 
 -- a testing helper
 runDocument :: DList Text
@@ -130,6 +117,9 @@ runDocument = fst rawListing
 ------------------------------
 ------------ Runs ------------
 ------------------------------
+
+runToLPList :: IO ([LogProtocol], Either AppError ())
+runToLPList = executeForTest runSem
 
 consoleRunResults :: Either AppError [AbsFile] -> IO ()
 consoleRunResults = 
@@ -156,7 +146,7 @@ runToFileAndConsole = runLogToFile Console
 
 docLogToFile :: WantConsole -> IO ()
 docLogToFile wc = 
-    ioRunToFile wc True documentWithLogger listingIOSem >>= consoleRunResults
+    ioRunToFile wc True documentWithLogger listingSem >>= consoleRunResults
     
 docToFile :: IO ()
 docToFile = docLogToFile NoConsole
@@ -175,7 +165,7 @@ runInIORaw :: IO ()
 runInIORaw = runConsoleRaw runSem
                 
 runNZInIO :: IO ()
-runNZInIO = runConsoleRaw $ mkTestSem runParams {rc = runConfig {country = NZ}}
+runNZInIO = runConsoleRaw $ mkRunSem runParams {rc = runConfig {country = NZ}}
 
 runDocumentToConsole :: IO ()
 runDocumentToConsole = sequence_ . P.toList $ putStrLn <$> runDocument
@@ -190,7 +180,7 @@ alwaysFailCheck = PreRun {
 
 runIO :: (forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs) -> IO ()
 runIO plan' = ioRunToFile Console False executeWithLogger 
-                    (mkTestSem RunParams {
+                    (mkRunSem RunParams {
                         plan = plan',
                         filters = filterList,
                         itemRunner = normalExecution,
@@ -199,7 +189,7 @@ runIO plan' = ioRunToFile Console False executeWithLogger
                     >>= consoleRunResults
 
 runDocs :: (forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs) -> DList Text
-runDocs plan' = fst $ documentRaw (mkTestSem RunParams {
+runDocs plan' = fst $ documentRaw (mkRunSem RunParams {
                                               plan = plan',
                                               filters = filterList,
                                               itemRunner = docExecution,

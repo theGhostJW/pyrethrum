@@ -7,6 +7,7 @@ import AuxFiles
 import LogTransformation.Common
 import DSL.LogProtocol
 import Common
+import DemoProject.TestCaseList
 
 
 -- fullLog :: IO ([LogProtocol], Either AppError ())

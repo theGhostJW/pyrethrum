@@ -129,12 +129,17 @@ _testDep: &testdependencies
 tests:
   pyrethrum-test:
     main:                driver.hs
-    source-dirs:         test
+    source-dirs:        
+    - test
+    - testDemoProject
+
     dependencies: *testdependencies
   
   pyrethrum-test-Integration:
     main:                driver.hs
-    source-dirs:         testIntegration
+    source-dirs:         
+    - testIntegration
+    - testDemoProject
     dependencies: 
       *testdependencies
     

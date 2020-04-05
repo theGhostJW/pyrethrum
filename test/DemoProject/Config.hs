@@ -120,7 +120,7 @@ testEndpointPriv itmRunner testMod rc itrSet plan =
       rc = rc
     }
   in
-    testEndpointBase runParams testMod itrSet
+    mkEndpointSem runParams testMod itrSet
 
 testEndpoint ::
      TestModule

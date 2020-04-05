@@ -84,10 +84,10 @@ runParams = RunParams {
 ------------------------------------------
 
 runSem :: Sem FullIOEffects ()
-runSem = testRun runParams
+runSem = mkTestSem runParams
      
 listingSem :: Sem FullDocEffects ()
-listingSem = testRun RunParams {
+listingSem = mkTestSem RunParams {
                                 plan = simplePlan,
                                 filters = filterList,
                                 itemRunner = docExecution,
@@ -95,7 +95,7 @@ listingSem = testRun RunParams {
                               }
 
 listingIOSem :: Sem FullDocIOEffects ()
-listingIOSem = testRun RunParams {
+listingIOSem = mkTestSem RunParams {
                                 plan = simplePlan,
                                 filters = filterList,
                                 itemRunner = docExecution,
@@ -113,7 +113,7 @@ prettyListing :: (DList Text, Either AppError ())
 prettyListing = documentPretty listingSem
 
 docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
-docRunRaw plan' = fst . documentRaw $ testRun RunParams {
+docRunRaw plan' = fst . documentRaw $ mkTestSem RunParams {
                                                             plan = plan',
                                                             filters = filterList,
                                                             itemRunner = docExecution,
@@ -121,7 +121,7 @@ docRunRaw plan' = fst . documentRaw $ testRun RunParams {
                                                          }
 
 -- docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
--- docRun pln = extractDocLog $ testRun pln filters docExecution documentPretty runConfig
+-- docRun pln = extractDocLog $ mkTestSem pln filters docExecution documentPretty runConfig
 
 -- a testing helper
 runDocument :: DList Text
@@ -175,7 +175,7 @@ runInIORaw :: IO ()
 runInIORaw = runConsoleRaw runSem
                 
 runNZInIO :: IO ()
-runNZInIO = runConsoleRaw $ testRun runParams {rc = runConfig {country = NZ}}
+runNZInIO = runConsoleRaw $ mkTestSem runParams {rc = runConfig {country = NZ}}
 
 runDocumentToConsole :: IO ()
 runDocumentToConsole = sequence_ . P.toList $ putStrLn <$> runDocument
@@ -190,7 +190,7 @@ alwaysFailCheck = PreRun {
 
 runIO :: (forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs) -> IO ()
 runIO plan' = ioRunToFile Console False executeWithLogger 
-                    (testRun RunParams {
+                    (mkTestSem RunParams {
                         plan = plan',
                         filters = filterList,
                         itemRunner = normalExecution,
@@ -199,7 +199,7 @@ runIO plan' = ioRunToFile Console False executeWithLogger
                     >>= consoleRunResults
 
 runDocs :: (forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs) -> DList Text
-runDocs plan' = fst $ documentRaw (testRun RunParams {
+runDocs plan' = fst $ documentRaw (mkTestSem RunParams {
                                               plan = plan',
                                               filters = filterList,
                                               itemRunner = docExecution,

@@ -8,12 +8,12 @@ module Runner (
   , logFileHandles
   , normalExecution
   , showAndLogItems
-  , testEndpointBase
+  , mkEndpointSem
   , TestPlanBase
   , TestParams
   , RunParams(..)
   , ItemParams
-  , testRun
+  , mkTestSem
   , module RB
   , module ItemFilter
   , module C
@@ -343,11 +343,11 @@ data RunParams rc tc effs = RunParams {
   rc :: rc
 }
 
-testRunOrEndpoint :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
+mkSem :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
                     Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
                     -> RunParams rc tc effs
                     -> Sem effs ()
-testRunOrEndpoint iIds RunParams {plan, filters, rc, itemRunner} =
+mkSem iIds RunParams {plan, filters, rc, itemRunner} =
   let
     filterInfo :: [[FilterResult]]
     filterInfo = filterGroups plan filters rc
@@ -421,15 +421,15 @@ testRunOrEndpoint iIds RunParams {plan, filters, rc, itemRunner} =
     )
     (\dupeTxt -> logLPError . AppGenericError $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
 
-testRun :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) => RunParams rc tc effs -> Sem effs ()
-testRun = testRunOrEndpoint Nothing 
+mkTestSem :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) => RunParams rc tc effs -> Sem effs ()
+mkTestSem = mkSem Nothing 
 
-testEndpointBase :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
+mkEndpointSem :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
                    RunParams rc tc effs
                    -> TestModule                                      -- test address
                    -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> Sem effs ()
-testEndpointBase runParams@RunParams {filters} tstAddress iIds =
+mkEndpointSem runParams@RunParams {filters} tstAddress iIds =
   let
     endpointFilter :: TestModule -> TestFilter rc tc
     endpointFilter targAddress = TestFilter {
@@ -442,4 +442,4 @@ testEndpointBase runParams@RunParams {filters} tstAddress iIds =
   in
     eitherf iIds
       (logItem . logRun . LP.Error . AppFilterError)
-      (\idSet -> testRunOrEndpoint (Just idSet) runParams { filters = allFilters })
+      (\idSet -> mkSem (Just idSet) runParams { filters = allFilters })

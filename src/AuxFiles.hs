@@ -8,6 +8,9 @@ import qualified Prelude as P
 import Paths_pyrethrum
 import qualified System.IO as S
 import qualified Data.Char as C
+import Control.Monad.IO.Class
+
+data WantConsole = Console | NoConsole deriving Eq
 
 bdr = getBinDir
 
@@ -122,7 +125,55 @@ data HandleInfo = HandleInfo {
 
 logFileHandle :: Text -> FileExt -> IO (Either P.IOError HandleInfo)
 logFileHandle fileNameSuffix fileExt = do
-                                                    ethPth <- logFilePath Nothing fileNameSuffix fileExt
-                                                    eitherf ethPth 
-                                                      (pure . Left)
-                                                      (\(pfx, pth) -> (HandleInfo pfx pth <$>) <$> safeOpenFile pth S.WriteMode)
+                                        ethPth <- logFilePath Nothing fileNameSuffix fileExt
+                                        eitherf ethPth 
+                                          (pure . Left)
+                                          (\(pfx, pth) -> (HandleInfo pfx pth <$>) <$> safeOpenFile pth S.WriteMode)
+
+
+-- Writing temp files used mostly used for debugging 
+defaultTempFileName :: RelFile
+defaultTempFileName = [relfile|temp.txt|]
+
+listToText :: Show a => [a] -> Text
+listToText lst = unlines $ txt <$> lst
+
+toTempBase' :: WantConsole -> Text -> RelFile -> IO ()
+toTempBase' wantConsole txt' fileName = 
+  do 
+    ethQPth <- tempFile fileName
+    eitherf ethQPth
+      (\e -> putStrLn $ "failed to generate path: " <> txt e)
+      (\adsPath ->
+        do 
+          let 
+            destPath = toFilePath adsPath 
+          when (wantConsole == Console) 
+            (putStrLn $ "temp file written to: " <> toS destPath)
+          writeFile destPath txt'
+      )
+ 
+
+toTemp' :: Text -> RelFile -> IO ()
+toTemp' = toTempBase' Console
+
+toTemp :: Text -> IO ()
+toTemp = flip toTemp' defaultTempFileName
+
+toTempFromList' :: Show a => [a] -> RelFile -> IO ()
+toTempFromList' = toTemp' . listToText
+
+toTempFromList :: Show a => [a] -> IO ()
+toTempFromList = flip toTempFromList' defaultTempFileName
+
+toTempNoConsole' :: Text -> RelFile -> IO ()
+toTempNoConsole' = toTempBase' NoConsole
+
+toTempNoConsole :: Text -> IO ()
+toTempNoConsole = flip toTempNoConsole' defaultTempFileName
+
+toTempFromListNoConsole' :: Show a => [a] -> RelFile -> IO ()
+toTempFromListNoConsole' = toTempNoConsole' . listToText
+
+toTempFromListNoConsole :: Show a => [a] -> IO ()
+toTempFromListNoConsole = flip toTempFromList' defaultTempFileName

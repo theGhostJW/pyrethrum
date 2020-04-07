@@ -23,7 +23,6 @@ import Data.Aeson (ToJSON(..))
 import Data.Map as M
 import TestFilter
 
-data WantConsole = Console | NoConsole deriving Eq
 jsonItemLogExt = ".jsoni" :: Text
 
 ioRunToFile :: forall b appEffs. Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] appEffs =>

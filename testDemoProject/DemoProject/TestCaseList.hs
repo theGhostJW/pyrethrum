@@ -76,6 +76,7 @@ runParams = RunParams {
       plan = simplePlan,
       filters = filterList,
       itemRunner = normalExecution,
+      exceptionCatcher = catchExceptionsInIO,
       rc = runConfig
     }
 
@@ -98,14 +99,6 @@ rawListing = documentRaw listingSem
 
 prettyListing :: (DList Text, Either AppError ())
 prettyListing = documentPretty listingSem
-
-docRunRaw :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
-docRunRaw plan' = fst . documentRaw $ mkRunSem RunParams {
-                                                            plan = plan',
-                                                            filters = filterList,
-                                                            itemRunner = docExecution,
-                                                            rc = runConfig
-                                                         }
 
 -- docRun :: (forall m1 m a. TestPlan m1 m a FullDocEffects) -> DList Text
 -- docRun pln = extractDocLog $ mkRunSem pln filters docExecution documentPretty runConfig
@@ -184,17 +177,19 @@ runIO plan' = ioRunToFile Console False executeWithLogger
                         plan = plan',
                         filters = filterList,
                         itemRunner = normalExecution,
+                        exceptionCatcher = catchExceptionsInIO,
                         rc = runConfig
                       }) 
                     >>= consoleRunResults
 
-runDocs :: (forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs) -> DList Text
-runDocs plan' = fst $ documentRaw (mkRunSem RunParams {
-                                              plan = plan',
-                                              filters = filterList,
-                                              itemRunner = docExecution,
-                                              rc = runConfig
-                                            })
+listRaw :: (forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs) -> DList Text
+listRaw plan' = fst . documentRaw $ mkRunSem RunParams {
+                                                            plan = plan',
+                                                            filters = filterList,
+                                                            itemRunner = docExecution,
+                                                            exceptionCatcher = catchExceptionsInIO,
+                                                            rc = runConfig
+                                                         }
 
 dummyIOException :: Sem effs Bool
 dummyIOException = (E.throw $ P.userError "Pretend IO Error") :: Sem effs Bool

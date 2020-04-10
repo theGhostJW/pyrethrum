@@ -35,7 +35,7 @@ runFailHomeG2IO :: IO ()
 runFailHomeG2IO = runIO failG2GoHomePlan
 
 failGroup2GoHomeLog :: DList Text
-failGroup2GoHomeLog = runDocs failG2GoHomePlan
+failGroup2GoHomeLog = listRaw failG2GoHomePlan
 
 goHomeCheckMessage :: Text
 goHomeCheckMessage = "GoHome action ran without exception but completion check returned False. Looks like GoHome did not run as expected"
@@ -54,7 +54,7 @@ testRunFailRolloverG1 :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m
 testRunFailRolloverG1 = validPlan alwaysFailCheck doNothing doNothing doNothing
 
 runFailRolloverG1Document :: DList Text
-runFailRolloverG1Document = runDocs testRunFailRolloverG1
+runFailRolloverG1Document = listRaw testRunFailRolloverG1
 
 unit_rollover_check_fail = chkMessageInstances rolloverCheckMessage 1 runFailRolloverG1Document
 
@@ -80,12 +80,12 @@ planWithNoDuplicates f = [
  ]
 
 docRunDuplicates :: [Text]
-docRunDuplicates = F.toList $ docRunRaw planWithDuplicates
+docRunDuplicates = F.toList $ listRaw planWithDuplicates
 
 unit_duplicate_group_name_config_error = 1 ... length docRunDuplicates
 unit_duplicate_group_name_config_error_txt = chk  . isInfixOf "Test Run Configuration Error. Duplicate Group Names: Group 1" . txt $ unsafeHead docRunDuplicates
 
 docRunNoDuplicates :: [Text]
-docRunNoDuplicates = F.toList $ docRunRaw planWithNoDuplicates
+docRunNoDuplicates = F.toList $ listRaw planWithNoDuplicates
 
 unit_no_duplicate_group_name_config_error = chkFalse . isInfixOf "Test Run Configuration Error" $ unlines docRunNoDuplicates

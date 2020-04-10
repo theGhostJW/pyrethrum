@@ -3,6 +3,7 @@
 
 module Runner (
   applyTestFilters
+  , catchExceptionsInIO
   , docExecution
   , doNothing
   , logFileHandles
@@ -167,6 +168,10 @@ logLP = logItem
 
 logRP :: Member Logger effs => RunProtocol -> Sem effs ()
 logRP = logLP . logRun 
+
+-- catchExceptionsInIO :: forall effs a. Member (Embed IO) effs => Sem effs a -> (SomeException -> Sem effs a) -> Sem effs a
+catchExceptionsInIO :: forall effs a. Sem effs a -> (SomeException -> Sem effs a) -> Sem effs a
+catchExceptionsInIO sem func = sem
 
 normalExecution :: forall effs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs effs) 
                   => ItemParams as ds i tc rc effs -> Sem effs ()  
@@ -340,6 +345,7 @@ data RunParams rc tc effs = RunParams {
   plan :: forall a mo mi. TestPlanBase tc rc mo mi a effs,
   filters :: FilterList rc tc,
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemParams as ds i tc rc effs -> Sem effs ()),
+  exceptionCatcher :: forall a. Sem effs a -> (SomeException -> Sem effs a) -> Sem effs a,
   rc :: rc
 }
 
@@ -429,7 +435,7 @@ mkEndpointSem :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEf
                    -> TestModule                                      -- test address
                    -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> Sem effs ()
-mkEndpointSem runParams@RunParams {filters} tstAddress iIds =
+mkEndpointSem runParams@RunParams { filters } tstAddress iIds =
   let
     endpointFilter :: TestModule -> TestFilter rc tc
     endpointFilter targAddress = TestFilter {

@@ -105,18 +105,20 @@ type TestPlan m1 m a effs = TestPlanBase TestConfig RunConfig m1 m a effs
 testEndpointPriv :: forall effs1. ApEffs effs1 =>
       (forall rc tc i as ds effs. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs effs) 
                   => ItemParams as ds i tc rc effs -> Sem effs ())  
+     -> (forall a. Sem effs1 a -> (SomeException -> Sem effs1 a) -> Sem effs1 a)
      -> TestModule
      -> RunConfig
      -> Either FilterError (Set Int)
      -> (forall m1 m a. TestPlan m1 m a effs1)
      -> Sem effs1 ()
-testEndpointPriv itmRunner testMod rc itrSet plan = 
+testEndpointPriv itmRunner exceptionCatcher testMod rc itrSet plan = 
   let 
     runParams :: RunParams RunConfig TestConfig effs1 
     runParams = RunParams {
       plan = plan,
       filters = filterList,
       itemRunner = itmRunner,
+      exceptionCatcher = exceptionCatcher,
       rc = rc
     }
   in
@@ -128,7 +130,7 @@ testEndpoint ::
      -> Either FilterError (Set Int)
      -> (forall m1 m a. TestPlan m1 m a FullIOEffects)
      -> Sem FullIOEffects ()
-testEndpoint = testEndpointPriv normalExecution
+testEndpoint = testEndpointPriv normalExecution catchExceptionsInIO
 
 testEndpointDoc ::
      TestModule
@@ -136,7 +138,7 @@ testEndpointDoc ::
      -> Either FilterError (Set Int)
      -> (forall a m m1. TestPlan m1 m a FullDocEffects)
      -> DList Text
-testEndpointDoc testMod rc itrSet plan = fst . documentRaw $ testEndpointPriv docExecution testMod rc itrSet plan
+testEndpointDoc testMod rc itrSet plan = fst . documentRaw $ testEndpointPriv docExecution catchExceptionsInIO testMod rc itrSet plan
 
 
 $(deriveJSON defaultOptions ''TestConfig)

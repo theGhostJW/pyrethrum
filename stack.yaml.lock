@@ -39,9 +39,23 @@ packages:
       sha256: a69c9cbc1d8340c63cc8a9bbd718e13a41869d30a7c84d27be94bbc04ad73a69
   original:
     hackage: transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961
+- completed:
+    hackage: hashable-1.2.7.0@sha256:03b6836ca9cd3ad0e5a2f3cce989b001dd0e05f306a873db3196037adb30e0a4,5215
+    pantry-tree:
+      size: 1514
+      sha256: 901c4f10bcf6bda842b849950a2767c918f4ed59fa8885f7c945dd6c7e763332
+  original:
+    hackage: hashable-1.2.7.0@sha256:03b6836ca9cd3ad0e5a2f3cce989b001dd0e05f306a873db3196037adb30e0a4,5215
+- completed:
+    hackage: polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
+    pantry-tree:
+      size: 1232
+      sha256: 5c90dac2eba48b4e337b302347c233ecaedb63e333641e094e718a548ac86711
+  original:
+    hackage: polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
 snapshots:
 - completed:
-    size: 522772
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2019/7/29.yaml
-    sha256: d945ead425b8c8d4b09eb85720d7205a6f621a9700c49683fd819644d56713bc
-  original: nightly-2019-07-29
+    size: 511252
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/4/10.yaml
+    sha256: 336e02c3b381ec740d73ac099e56f6786c0ba022cfbfaf1558849a1526dcaef0
+  original: nightly-2020-04-10

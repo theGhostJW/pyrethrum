@@ -17,7 +17,7 @@ runAggregator file fa = do
                     (chkFail . txt)
                     (\inputFile ->
                       do
-                        pth <- fa inputFile (-<.> ".log")                                          -- source file
+                        pth <- fa inputFile (replaceExtension ".log") -- source file
                         putStrLn $ txt pth
                         chk $ isRight pth   
                     )

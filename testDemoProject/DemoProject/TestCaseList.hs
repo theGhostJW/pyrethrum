@@ -120,7 +120,7 @@ consoleRunResults =
     (\err -> putStrLn $ "Error Encountered\n" <> txt err)
     (\pths ->
       let 
-        jsnItmsPth = find ((== jsonItemLogExt) . toS . fileExtension) pths
+        jsnItmsPth = find ((== jsonItemLogExt) . toS . fromMaybe "" . fileExtension) pths
       in
         maybef jsnItmsPth
           (putStrLn $ "Unable to generate report no: " <> jsonItemLogExt <> " file found in log files\n")

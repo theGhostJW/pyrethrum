@@ -35,15 +35,15 @@ dependencies:
   - polysemy-plugin
 
 ghc-options:
-  #- -F -pgmF=record-dot-preprocessor 
   - -fmax-pmcheck-iterations=10000000
   - -ferror-spans
+  # TODO: prgma to turn optimisations on for non-dev build
   # - -O2
   - -Wall
   #- -Werror
   - -Wcompat
-  - -flate-specialise # reqiuired for polyseemy
-  - -fspecialise-aggressively # reqiuired for polyseemy
+  # - -flate-specialise # reqiuired for polysemy
+  # - -fspecialise-aggressively # reqiuired for polysemy
   - -Wincomplete-record-updates
   - -Wincomplete-uni-patterns
   - -Wredundant-constraints

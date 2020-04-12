@@ -19,19 +19,19 @@ makeSem ''FileSystem
 
 -- {- File System IO Interpreter -}
 
-fileSystemIOInterpreter :: forall effs a. Members '[Error FileSystemError, Embed IO] effs => Sem (FileSystem ': effs) a -> Sem effs a
+fileSystemIOInterpreter :: forall effs a. Members '[Error AppError, Embed IO] effs => Sem (FileSystem ': effs) a -> Sem effs a
 fileSystemIOInterpreter =
-                          let
-                            handleException :: forall b. IO b -> (IOException -> FileSystemError) -> Sem effs b
-                            handleException action handler = do
-                                                               r <- embed (E.try action)
-                                                               case r of
-                                                                 Left (e :: IOException) -> PE.throw (handler e)
-                                                                 Right f -> pure f
-                          in
-                            interpret $ \case
-                                          ReadFile path -> handleException (PO.readFile $ toFilePath path) ReadFileError
-                                          WriteFile path str -> handleException (PO.writeFile (toFilePath path) str) WriteFileError
+  let
+    handleException :: forall b. IO b -> (IOException -> FileSystemError) -> Sem effs b
+    handleException action handler = do
+                                        r <- embed (E.try action)
+                                        case r of
+                                          Left (e :: IOException) -> PE.throw (AppFileSystemError $ handler e)
+                                          Right f -> pure f
+  in
+    interpret $ \case
+                  ReadFile path -> handleException (PO.readFile $ toFilePath path) ReadFileError
+                  WriteFile path str -> handleException (PO.writeFile (toFilePath path) str) WriteFileError
 
 fileSystemDocInterpreter :: Member Logger effs => Sem (FileSystem ': effs) a -> Sem effs a
 fileSystemDocInterpreter = interpret $

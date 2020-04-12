@@ -3,7 +3,6 @@
 
 module Runner (
   applyTestFilters
-  , catchExceptionsInIO
   , docExecution
   , doNothing
   , logFileHandles
@@ -169,10 +168,6 @@ logLP = logItem
 logRP :: Member Logger effs => RunProtocol -> Sem effs ()
 logRP = logLP . logRun 
 
--- catchExceptionsInIO :: forall effs a. Member (Embed IO) effs => Sem effs a -> (SomeException -> Sem effs a) -> Sem effs a
-catchExceptionsInIO :: forall effs a. Sem effs a -> (SomeException -> Sem effs a) -> Sem effs a
-catchExceptionsInIO sem func = sem
-
 normalExecution :: forall effs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs effs) 
                   => ItemParams as ds i tc rc effs -> Sem effs ()  
 normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  = 
@@ -207,19 +202,26 @@ normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  =
         do 
           logRP StartInteraction
           -- TODO: check for io exceptions / SomeException - use throw from test
-          as <- interactor rc i
-          logRP . InteractorSuccess iid . ApStateJSON . toJSON $ as
-          ds <- PE.catch (prepState i as) prepStateErrorHandler
-           
-          logRP . PrepStateSuccess iid . DStateJSON . toJSON $ ds
-          logRP StartChecks
-          runChecks ds
+          log "interact start"
+          ethApState <- PE.try $ interactor rc i
+          eitherf ethApState
+            (logRP . LP.Error)
+            (\as -> do 
+                log "interact end"
+                logRP . InteractorSuccess iid . ApStateJSON . toJSON $ as
+                ds <- PE.catch (prepState i as) prepStateErrorHandler
+                logRP . PrepStateSuccess iid . DStateJSON . toJSON $ ds
+                logRP StartChecks
+                runChecks ds
+              )
   in 
     PE.catch
       normalExecution'
       (\case 
           AppEnsureError e -> pure ()
-          e -> logRP $ LP.Error e
+          e -> do 
+                log "handle error"
+                logRP $ LP.Error e
       )
 
 docExecution :: forall effs rc tc i as ds. (ItemClass i ds, TestConfigClass tc, Member Logger effs)
@@ -345,7 +347,6 @@ data RunParams rc tc effs = RunParams {
   plan :: forall a mo mi. TestPlanBase tc rc mo mi a effs,
   filters :: FilterList rc tc,
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemParams as ds i tc rc effs -> Sem effs ()),
-  exceptionCatcher :: forall a. Sem effs a -> (SomeException -> Sem effs a) -> Sem effs a,
   rc :: rc
 }
 

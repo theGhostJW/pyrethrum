@@ -76,7 +76,6 @@ runParams = RunParams {
       plan = simplePlan,
       filters = filterList,
       itemRunner = normalExecution,
-      exceptionCatcher = catchExceptionsInIO,
       rc = runConfig
     }
 
@@ -177,7 +176,6 @@ runIO plan' = ioRunToFile Console False executeWithLogger
                         plan = plan',
                         filters = filterList,
                         itemRunner = normalExecution,
-                        exceptionCatcher = catchExceptionsInIO,
                         rc = runConfig
                       }) 
                     >>= consoleRunResults
@@ -187,7 +185,6 @@ listRaw plan' = fst . documentRaw $ mkRunSem RunParams {
                                                             plan = plan',
                                                             filters = filterList,
                                                             itemRunner = docExecution,
-                                                            exceptionCatcher = catchExceptionsInIO,
                                                             rc = runConfig
                                                          }
 

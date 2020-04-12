@@ -37,6 +37,7 @@ dependencies:
 ghc-options:
   - -fmax-pmcheck-iterations=10000000
   - -ferror-spans
+  - -O
   # TODO: prgma to turn optimisations on for non-dev build
   # - -O2
   - -Wall

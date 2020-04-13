@@ -189,6 +189,10 @@ normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  =
         logRP $ PrepStateFailure iid e
         recordSkippedChecks
         PE.throw e
+
+    -- provided natively by polysemy in later versions of polysemy
+    try' :: Member (Error e) r => Sem r a -> Sem r (Either e a)
+    try' m = PE.catch (Right <$> m) (return . Left)
        
     normalExecution' :: Sem effs ()
     normalExecution' = 
@@ -200,7 +204,7 @@ normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  =
           logRP StartInteraction
           -- TODO: check for io exceptions / SomeException - use throw from test
           log "interact start"
-          ethApState <- PE.try $ interactor rc i
+          ethApState <- try' $ interactor rc i
           eitherf ethApState
             (logRP . LP.Error)
             (\as -> do 

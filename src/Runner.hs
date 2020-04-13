@@ -183,15 +183,12 @@ normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  =
                             logRP StartChecks 
                             F.traverse_ logChk $ D.toList $ CK.skipChecks (checkList i)
 
-    prepStateErrorHandler :: EnsureError -> Sem effs ds
+    prepStateErrorHandler :: AppError -> Sem effs ds
     prepStateErrorHandler e = 
-      let 
-        err = AppEnsureError e
-      in
-        do 
-          logRP $ PrepStateFailure iid err
-          recordSkippedChecks
-          PE.throw err
+      do 
+        logRP $ PrepStateFailure iid e
+        recordSkippedChecks
+        PE.throw e
        
     normalExecution' :: Sem effs ()
     normalExecution' = 
@@ -218,7 +215,9 @@ normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  =
     PE.catch
       normalExecution'
       (\case 
-          AppEnsureError e -> pure ()
+          e@(AppEnsureError _) -> do 
+                                    log "In ensure handler"
+                                    logRP $ LP.Error e
           e -> do 
                 log "handle error"
                 logRP $ LP.Error e

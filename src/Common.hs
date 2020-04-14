@@ -35,25 +35,19 @@ data DetailedInfo = DetailedInfo {
 
 $(deriveJSON defaultOptions ''DetailedInfo)
 
-newtype EnsureError = EnsureError Text deriving (Show, Eq)
-
-$(deriveJSON defaultOptions ''Common.EnsureError)
-
 data FilterError = InvalidItemFilter Text |
                    DuplicateItemId Int Text deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''FilterError)
 
-data FileSystemError =
-    ReadFileError IOException |
-    WriteFileError IOException
+data FileSystemErrorType = ReadFileError | WriteFileError
     deriving (Show, Eq)
 
-$(deriveJSON defaultOptions ''FileSystemError)
+$(deriveJSON defaultOptions ''FileSystemErrorType)
 
 data AppError =
-            AppFileSystemError FileSystemError |
-            AppEnsureError EnsureError |
+            FileSystemError FileSystemErrorType IOError |
+            EnsureError Text |
             AppFilterError FilterError |
 
             AppNotImplementedError Text |

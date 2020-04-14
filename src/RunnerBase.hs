@@ -1,13 +1,13 @@
 module RunnerBase where
 
 import DSL.Ensure
-import Common (FilterError, EnsureError)
+import Common (FilterError, AppError)
 import Pyrelude
 import Polysemy
 import Polysemy.Error
 import RunElementClasses
 
-type Ensurable effs = Members '[Ensure, Error EnsureError] effs
+type Ensurable effs = Members '[Ensure, Error AppError] effs
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,

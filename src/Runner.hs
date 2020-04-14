@@ -216,16 +216,7 @@ normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  =
                 runChecks ds
               )
   in 
-    PE.catch
-      normalExecution'
-      (\case 
-          e@(AppEnsureError _) -> do 
-                                    log "In ensure handler"
-                                    logRP $ LP.Error e
-          e -> do 
-                log "handle error"
-                logRP $ LP.Error e
-      )
+    normalExecution' `PE.catch` (logRP . LP.Error)
 
 docExecution :: forall effs rc tc i as ds. (ItemClass i ds, TestConfigClass tc, Member Logger effs)
               => ItemParams as ds i tc rc effs -> Sem effs () 

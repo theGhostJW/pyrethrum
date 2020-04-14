@@ -15,8 +15,8 @@ makeSem ''Ensure
 
 ensureInterpreter :: forall effs a. Member (Error AppError) effs => Sem (Ensure ': effs) a -> Sem effs a
 ensureInterpreter = interpret $ \case
-                                    Ensure message condition -> Monad.unless condition . PE.throw . AppEnsureError . EnsureError $ message
-                                    DSL.Ensure.Throw message -> PE.throw . AppEnsureError . EnsureError $ message
+                                    Ensure message condition -> Monad.unless condition . PE.throw . EnsureError $ message
+                                    DSL.Ensure.Throw message -> PE.throw $ EnsureError message
 
 -- when documenting actions we do nothing as ensure and throw 
 -- are just programming constructs, they don't represent user actions

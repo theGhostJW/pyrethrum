@@ -2,7 +2,7 @@ module LogProtocolTest where
 
 import           Pyrelude as P
 import           Pyrelude.Test as T
-import DSL.LogProtocol
+import DSL.LogProtocol as LP
 import DemoProject.Config
 import RunElementClasses
 import Data.Set as S
@@ -67,7 +67,7 @@ genItemId :: Gen ItemId
 genItemId  = ItemId <$> genTestModule <*> genInt
 
 genError :: Gen AppError
-genError = AppUserError <$> genStr
+genError = Common.Error <$> genStr
 
 genDocActionInfo :: Gen DocActionInfo
 genDocActionInfo = choice [
@@ -122,7 +122,7 @@ genLogProtocol = choice [
                   
                     logRun . Warning <$> genStr,
                     logRun . Warning' <$> genDetailedInfo,
-                    logRun . Error <$> genError
+                    logRun . LP.Error <$> genError
                  ]
 
 

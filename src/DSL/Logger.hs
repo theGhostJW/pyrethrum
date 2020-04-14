@@ -1,8 +1,8 @@
 
 module DSL.Logger where
 
-import Common
-import  DSL.LogProtocol
+import Common as C
+import  DSL.LogProtocol as LP
 import  DSL.CurrentTime as CT
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList
@@ -56,8 +56,8 @@ logRunConsoleInterpreter =
                         now <- CT.getCurrentTime
                         embed $ case lg of
                             LogItem lp -> P.print lp
-                            LogError msg -> P.print . logRun . Error $ AppUserError msg 
-                            LogError' msg info -> P.print . logRun . Error . AppUserError' $ DetailedInfo msg info
+                            LogError msg -> P.print . logRun . LP.Error $ C.Error msg 
+                            LogError' msg info -> P.print . logRun . LP.Error . Error' $ DetailedInfo msg info
                             
                             LogMessage s ->  P.print . logRun $ Message s 
                             LogMessage' msg info -> P.print . logRun . Message' $ DetailedInfo msg info
@@ -96,8 +96,8 @@ logRunWithSink pushItem =
     interpret $ \case 
                   LogItem lp -> pushItem lp
 
-                  LogError msg -> pushRun . Error $ AppUserError msg
-                  LogError' msg inf -> pushRun . Error . AppUserError' $ DetailedInfo msg inf
+                  LogError msg -> pushRun . LP.Error $ C.Error msg
+                  LogError' msg inf -> pushRun . LP.Error . C.Error' $ DetailedInfo msg inf
 
                   LogMessage s -> pushRun $ Message s 
                   LogMessage' msg info -> pushRun . Message' $ DetailedInfo msg info
@@ -140,8 +140,8 @@ logToHandles convertersHandles =
                         logToIO = \case 
                                     LogItem lp -> logLogProtocol lp
 
-                                    LogError msg -> logRunTohandles . Error $ AppUserError msg
-                                    LogError' msg info -> logRunTohandles . Error . AppUserError' $ DetailedInfo msg info
+                                    LogError msg -> logRunTohandles . LP.Error $ C.Error msg
+                                    LogError' msg info -> logRunTohandles . LP.Error . C.Error' $ DetailedInfo msg info
 
                                     LogMessage s ->  logRunTohandles $ Message s 
                                     LogMessage' msg info -> logRunTohandles . Message' $ DetailedInfo msg info
@@ -161,8 +161,8 @@ logDocWithSink pushItem =
     interpret $ \case 
                   LogItem lp -> pushItem lp
 
-                  LogError msg -> pushDoc. DocError $ AppUserError msg
-                  LogError' msg inf -> pushDoc . DocError . AppUserError' $ DetailedInfo msg inf
+                  LogError msg -> pushDoc. DocError $ C.Error msg
+                  LogError' msg inf -> pushDoc . DocError . C.Error' $ DetailedInfo msg inf
 
                   LogMessage s ->  pushDoc $ DocMessage s 
                   LogMessage' msg info -> pushDoc . DocMessage' $ DetailedInfo msg info

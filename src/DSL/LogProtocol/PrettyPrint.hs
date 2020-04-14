@@ -4,11 +4,11 @@ module DSL.LogProtocol.PrettyPrint (
   prettyPrintLogProtocolWith
 ) where
 
-import Common
+import Common as C hiding (Error)
 import PrettyPrintCommon as PC
 import  DSL.LogProtocol as LP
 import           Pyrelude as P
-import RunElementClasses as C
+import RunElementClasses as REC
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), MessageInfo(..), GateStatus(..), classifyResult)
 import Control.Lens
 

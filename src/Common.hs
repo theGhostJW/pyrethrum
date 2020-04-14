@@ -46,26 +46,23 @@ data FileSystemErrorType = ReadFileError | WriteFileError
 $(deriveJSON defaultOptions ''FileSystemErrorType)
 
 data AppError =
-            FileSystemError FileSystemErrorType IOError |
+            Error Text |
+            Error' DetailedInfo |
+
+            FileSystemError FileSystemErrorType P.IOError |
             EnsureError Text |
             FilterError FilterErrorType |
 
-            AppNotImplementedError Text |
+            NotImplementedError Text |
 
-            AppGenericError Text |
-            AppGenericError' Text Text |
+            PreTestError PreTestStage Text AppError |
+            PreTestCheckExecutionError PreTestStage Text AppError|
+            PreTestCheckError PreTestStage Text |
 
-            AppUserError Text |
-            AppUserError' DetailedInfo |
+            IOError IOException |
+            IOError' Text IOException |
 
-            AppPreTestError PreTestStage Text AppError |
-            AppPreTestCheckExecutionError PreTestStage Text AppError|
-            AppPreTestCheckError PreTestStage Text |
-
-            AppIOError IOException |
-            AppIOError' Text IOException |
-
-            AppAnnotatedError Text AppError
+            AnnotatedError Text AppError
             deriving (Show, Eq)
 
 $(deriveJSON defaultOptions ''AppError)

@@ -1,7 +1,7 @@
 
 module DSL.Interpreter where
 
-import Common
+import Common as C
 import Polysemy 
 import Polysemy.Output
 import Polysemy.Error
@@ -15,7 +15,7 @@ import           DSL.CurrentTime
 import           DSL.CurrentTimeDocLogger
 import           DSL.LogProtocol
 import           Data.DList as D
-import           Pyrelude as F hiding (app)
+import           Pyrelude as P hiding (app)
 
 type EFFLogger effs = Member Logger effs
 type ApEffs effs = Members '[Logger, Ensure, Error AppError] effs
@@ -32,7 +32,7 @@ type FullDocIOEffects = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logge
 type FullDocEffects = '[FileSystem, ArbitraryIO, Reader ThreadInfo, State LogIndex, CurrentTime, Logger, Ensure, Error AppError, OutputDListText]
 
 handleIOException :: IO (Either AppError a) -> IO (Either AppError a)
-handleIOException = handle $ pure . Left . AppIOError
+handleIOException = handle $ pure . Left . C.IOError
 
 -- todo find a type level <> and replace cons with list
 baseEffExecute :: forall effs a. Member (Embed IO) effs => (forall effs0. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs0 => Sem (Logger ': effs0) a -> Sem effs0 a) ->  Sem (FileSystem ':  EP.Ensure ': ArbitraryIO ': Logger ': Reader ThreadInfo ': State LogIndex ': CurrentTime ': Error AppError ': effs) a -> Sem effs (Either AppError a)

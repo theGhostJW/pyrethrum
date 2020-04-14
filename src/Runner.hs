@@ -20,7 +20,7 @@ module Runner (
 ) where
 
 import qualified Check as CK
-import Common
+import Common as C
 import DSL.Interpreter
 import DSL.Logger
 import DSL.LogProtocol as LP
@@ -78,7 +78,7 @@ showAndLogList logSuffix items =
                   Left
                   (
                     maybe
-                      (Left $ AppUserError "showAndLogList - no Handle returned")
+                      (Left $ C.Error "showAndLogList - no Handle returned")
                       (Right . snd)
                     . head
                   ) 
@@ -108,7 +108,7 @@ logFileHandles suffixExtensionMap =
       do 
         eHandInfo <- logFileHandle suff ext
         pure $ eitherf eHandInfo
-                (Left . AppIOError' "Error creating log file" )
+                (Left . IOError' "Error creating log file" )
                 (\hInfo -> Right (a, hInfo))
 
     openHandles :: IO [((Text, FileExt), Either AppError (a, HandleInfo))]
@@ -125,9 +125,9 @@ logFileHandles suffixExtensionMap =
           \((sfx, ext), fstErr') -> 
             do 
               traverse_ (hClose . fileHandle . snd) openHndls
-              pure . Left $ AppAnnotatedError 
+              pure . Left $ AnnotatedError 
                               ("Failed to create log file with suffix: " <> sfx) 
-                              $ fromLeft (AppGenericError "wont happen") fstErr'
+                              $ fromLeft (C.Error "wont happen") fstErr'
         )
 
 doNothing :: PreRun effs
@@ -318,10 +318,10 @@ runHook PreRun{runAction, checkHasRun} stage =
                     GoHome -> "No items run for test. "
 
       rolloverFailError :: AppError -> AppError
-      rolloverFailError = AppPreTestCheckExecutionError stage $ msgPrefix <> stageExLabel <> " check"
+      rolloverFailError = PreTestCheckExecutionError stage $ msgPrefix <> stageExLabel <> " check"
 
       rolloverCheckFalseError :: AppError
-      rolloverCheckFalseError = AppPreTestCheckError stage
+      rolloverCheckFalseError = PreTestCheckError stage
                                   $ msgPrefix
                                   <> stageStr
                                   <> " action ran without exception but completion check returned False. Looks like "
@@ -331,7 +331,7 @@ runHook PreRun{runAction, checkHasRun} stage =
       exeHook = 
         do 
           preRunRslt <- PE.catch runAction (PE.throw . rolloverFailError)
-          runCheck <- PE.catch checkHasRun (PE.throw . AppPreTestCheckExecutionError stage "exception encountered verifying hook has run")
+          runCheck <- PE.catch checkHasRun (PE.throw . PreTestCheckExecutionError stage "exception encountered verifying hook has run")
           unless runCheck (PE.throw rolloverCheckFalseError)
       
     (Right <$> exeHook) `PE.catch` (pure . Left)
@@ -420,7 +420,7 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
         sequence_ $ exeGroup <$> runTuples
         logBoundry EndRun
     )
-    (\dupeTxt -> logLPError . AppGenericError $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
+    (\dupeTxt -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
 
 mkRunSem :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) => RunParams rc tc effs -> Sem effs ()
 mkRunSem = mkSem Nothing 

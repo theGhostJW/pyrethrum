@@ -107,7 +107,7 @@ testEndpointPriv :: forall effs1. ApEffs effs1 =>
                   => ItemParams as ds i tc rc effs -> Sem effs ())  
      -> TestModule
      -> RunConfig
-     -> Either FilterError (Set Int)
+     -> Either FilterErrorType (Set Int)
      -> (forall m1 m a. TestPlan m1 m a effs1)
      -> Sem effs1 ()
 testEndpointPriv itmRunner testMod rc itrSet plan = 
@@ -125,7 +125,7 @@ testEndpointPriv itmRunner testMod rc itrSet plan =
 testEndpoint ::
      TestModule
      -> RunConfig
-     -> Either FilterError (Set Int)
+     -> Either FilterErrorType (Set Int)
      -> (forall m1 m a. TestPlan m1 m a FullIOEffects)
      -> Sem FullIOEffects ()
 testEndpoint = testEndpointPriv normalExecution
@@ -133,7 +133,7 @@ testEndpoint = testEndpointPriv normalExecution
 testEndpointDoc ::
      TestModule
      -> RunConfig
-     -> Either FilterError (Set Int)
+     -> Either FilterErrorType (Set Int)
      -> (forall a m m1. TestPlan m1 m a FullDocEffects)
      -> DList Text
 testEndpointDoc testMod rc itrSet plan = fst . documentRaw $ testEndpointPriv docExecution testMod rc itrSet plan

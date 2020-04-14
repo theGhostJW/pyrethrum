@@ -1,7 +1,7 @@
 module RunnerBase where
 
 import DSL.Ensure
-import Common (FilterError, AppError)
+import Common (FilterErrorType, AppError)
 import Pyrelude
 import Polysemy
 import Polysemy.Error
@@ -11,7 +11,7 @@ type Ensurable effs = Members '[Ensure, Error AppError] effs
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,
-  results :: Either FilterError [rslt]
+  results :: Either FilterErrorType [rslt]
 } deriving Show
 
 data PreRun effs = PreRun {

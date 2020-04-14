@@ -428,7 +428,7 @@ mkRunSem = mkSem Nothing
 mkEndpointSem :: forall rc tc effs. (RunConfigClass rc, TestConfigClass tc, ApEffs effs) =>
                    RunParams rc tc effs
                    -> TestModule                                      -- test address
-                   -> Either FilterError (S.Set Int)                  -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
+                   -> Either FilterErrorType (S.Set Int)                  -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> Sem effs ()
 mkEndpointSem runParams@RunParams { filters } tstAddress iIds =
   let
@@ -442,5 +442,5 @@ mkEndpointSem runParams@RunParams { filters } tstAddress iIds =
     allFilters = endpointFilter tstAddress : filters
   in
     eitherf iIds
-      (logItem . logRun . LP.Error . AppFilterError)
+      (logItem . logRun . LP.Error . FilterError)
       (\idSet -> mkSem (Just idSet) runParams { filters = allFilters })

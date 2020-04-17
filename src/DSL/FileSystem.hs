@@ -1,5 +1,6 @@
 module DSL.FileSystem where
 
+import qualified Data.Aeson as A
 import Common
 import           Pyrelude as P
 import           Pyrelude.IO as PO
@@ -19,10 +20,10 @@ makeSem ''FileSystem
 
 -- {- File System IO Interpreter -}
 
-fileSystemIOInterpreter :: forall effs a. Members '[Error AppError, Embed IO] effs => Sem (FileSystem ': effs) a -> Sem effs a
+fileSystemIOInterpreter :: forall a e effs. Members '[Error (AppError e), Embed IO] effs => Sem (FileSystem ': effs) a -> Sem effs a
 fileSystemIOInterpreter =
   let
-    handleException :: forall b. IO b  -> (IOException -> AppError) -> Sem effs b
+    handleException :: forall b. IO b  -> (IOException -> AppError e) -> Sem effs b
     handleException action handler = do
                                         r <- embed (E.try action)
                                         case r of
@@ -33,7 +34,7 @@ fileSystemIOInterpreter =
                   ReadFile path -> handleException (PO.readFile $ toFilePath path) (FileSystemError ReadFileError)
                   WriteFile path str -> handleException (PO.writeFile (toFilePath path) str) (FileSystemError WriteFileError)
 
-fileSystemDocInterpreter :: Member Logger effs => Sem (FileSystem ': effs) a -> Sem effs a
+fileSystemDocInterpreter :: forall a e effs. (Show e, A.ToJSON e, Member (Logger e) effs) => Sem (FileSystem ': effs) a -> Sem effs a
 fileSystemDocInterpreter = interpret $
                                       let
                                         mockContents :: Text

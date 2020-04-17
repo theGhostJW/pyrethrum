@@ -7,7 +7,7 @@ import Polysemy
 import Polysemy.Error
 import RunElementClasses
 
-type Ensurable effs = Members '[Ensure, Error AppError] effs
+type Ensurable e effs = Members '[Ensure, Error (AppError e)] effs
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,
@@ -34,13 +34,13 @@ data TestGroup m1 m a effs =
 instance Titled (TestGroup m1 m a effs) where
   title = header
 
-data TestComponents rc i as ds effs = TestComponents {
+data TestComponents rc i as ds e effs = TestComponents {
   testItems :: rc -> [i],
   testInteractor :: rc -> i -> Sem effs as,
-  testPrepState :: forall psEffs. Ensurable psEffs => i -> as -> Sem psEffs ds
+  testPrepState :: forall psEffs. (Ensurable e) psEffs => i -> as -> Sem psEffs ds
 }
 
-data GenericTest tc rc i as ds effs = GenericTest {
+data GenericTest tc rc i as ds e effs = GenericTest {
   configuration :: tc,
-  components :: ItemClass i ds => TestComponents rc i as ds effs
+  components :: ItemClass i ds => TestComponents rc i as ds e effs
 }

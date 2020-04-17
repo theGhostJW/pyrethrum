@@ -12,7 +12,7 @@ import RunElementClasses as REC
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), MessageInfo(..), GateStatus(..), classifyResult)
 import Control.Lens
 
-prettyPrintLogProtocolWith :: Bool -> ThreadInfo -> LogIdxTime -> LogProtocol -> Text
+prettyPrintLogProtocolWith :: Show e => Bool -> ThreadInfo -> LogIdxTime -> LogProtocol e -> Text
 prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex, timeZone} LogIdxTime{index = idx, time} lgProtocol = 
   let 
     localTime = txt $ time ^. utcLocalTime timeZone
@@ -23,7 +23,7 @@ prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex, timeZone} LogI
     <> prettyPrintLogProtocol docMode lgProtocol
 
 
-prettyPrintLogProtocol :: Bool -> LogProtocol -> Text
+prettyPrintLogProtocol :: Show e => Bool -> LogProtocol e -> Text
 prettyPrintLogProtocol docMode =
   let
     iterId :: ItemId -> Text

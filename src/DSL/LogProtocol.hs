@@ -43,13 +43,13 @@ data DocActionInfo =
     ActionInfo' Text Text 
     deriving (Eq, Show)
 
-logDoc :: DocProtocol -> LogProtocol
+logDoc :: DocProtocol e -> LogProtocol e
 logDoc = IterationLog . Doc
 
-logRun :: RunProtocol -> LogProtocol
+logRun :: RunProtocol e -> LogProtocol e
 logRun = IterationLog . Run
 
-data DocProtocol =   
+data DocProtocol e =   
                 DocInteraction |
                 DocAction DocActionInfo |
                 DocIOAction Text |
@@ -62,18 +62,18 @@ data DocProtocol =
                 DocWarning Text |
                 DocWarning' DetailedInfo |
 
-                DocError AppError
+                DocError (AppError e)
               deriving (Eq, Show)
 
-data RunProtocol =   
+data RunProtocol e =   
                 IOAction Text |
                 StartPrepState |
                 StartInteraction |
                 InteractorSuccess ItemId ApStateJSON |
-                InteractorFailure ItemId AppError |
+                InteractorFailure ItemId (AppError e) |
               
                 PrepStateSuccess ItemId DStateJSON |
-                PrepStateFailure ItemId AppError |
+                PrepStateFailure ItemId (AppError e) |
                 StartChecks | 
                 CheckOutcome ItemId CheckReport |
 
@@ -83,12 +83,12 @@ data RunProtocol =
                 Warning Text |
                 Warning' DetailedInfo |
 
-                Error AppError
+                Error (AppError e)
               deriving (Eq, Show)
 
-data SubProtocol = 
-    Doc DocProtocol |
-    Run RunProtocol
+data SubProtocol e = 
+    Doc (DocProtocol e)|
+    Run (RunProtocol e)
   deriving (Eq, Show)
 
 data BoundaryEvent = 
@@ -107,9 +107,9 @@ data BoundaryEvent =
     EndIteration ItemId 
   deriving (Eq, Show)
 
-data LogProtocol =
+data LogProtocol e =
   BoundaryLog BoundaryEvent |
-  IterationLog SubProtocol
+  IterationLog (SubProtocol e)
  deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''LogProtocol)

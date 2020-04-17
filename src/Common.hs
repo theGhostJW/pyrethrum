@@ -45,7 +45,7 @@ data FileSystemErrorType = ReadFileError | WriteFileError
 
 $(deriveJSON defaultOptions ''FileSystemErrorType)
 
-data AppError =
+data AppError e =
             Error Text |
             Error' DetailedInfo |
 
@@ -55,14 +55,16 @@ data AppError =
 
             NotImplementedError Text |
 
-            PreTestError PreTestStage Text AppError |
-            PreTestCheckExecutionError PreTestStage Text AppError|
+            PreTestError PreTestStage Text (AppError e) |
+            PreTestCheckExecutionError PreTestStage Text (AppError e)|
             PreTestCheckError PreTestStage Text |
 
             IOError IOException |
             IOError' Text IOException |
 
-            AnnotatedError Text AppError
+            AnnotatedError Text (AppError e) |
+
+            SuiteError e
             deriving (Show, Eq)
 
 $(deriveJSON defaultOptions ''AppError)

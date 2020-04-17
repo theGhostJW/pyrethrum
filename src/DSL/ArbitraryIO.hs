@@ -1,11 +1,10 @@
 module DSL.ArbitraryIO where
 
+import qualified Data.Aeson as A
 import Common
 import DSL.LogProtocol
 import DSL.Logger
 import           Pyrelude
--- import           Control.Monad.Freer
--- import           Control.Monad.Freer.Error
 import           Control.Exception as E
 import Polysemy
 import Polysemy.Error as PE
@@ -16,10 +15,10 @@ data ArbitraryIO m a where
 
 makeSem ''ArbitraryIO
 
-arbitraryIODocInterpreter :: forall effs a. Member Logger effs => Sem (ArbitraryIO ': effs) a -> Sem effs a
+arbitraryIODocInterpreter :: forall effs a e. (Show e, A.ToJSON e, Member (Logger e) effs) => Sem (ArbitraryIO ': effs) a -> Sem effs a
 arbitraryIODocInterpreter = interpret $ \(ArbitraryIO msg def _) -> logItem (IterationLog . Doc $ DocIOAction msg) $> def
 
-arbitraryIOInterpreter :: forall effs a. Members '[Error AppError, Logger, Embed IO] effs => Sem (ArbitraryIO ': effs) a -> Sem effs a
+arbitraryIOInterpreter :: forall effs a e. (Show e, A.ToJSON e, Members '[Error (AppError e), Logger e, Embed IO] effs) => Sem (ArbitraryIO ': effs) a -> Sem effs a
 arbitraryIOInterpreter =
   let
     handleException :: forall b. Text -> IO b -> Sem effs b

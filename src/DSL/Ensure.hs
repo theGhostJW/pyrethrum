@@ -13,7 +13,7 @@ data Ensure m a where
 
 makeSem ''Ensure
 
-ensureInterpreter :: forall effs a. Member (Error AppError) effs => Sem (Ensure ': effs) a -> Sem effs a
+ensureInterpreter :: forall effs a e. Member (Error (AppError e)) effs => Sem (Ensure ': effs) a -> Sem effs a
 ensureInterpreter = interpret $ \case
                                     Ensure message condition -> Monad.unless condition . PE.throw . EnsureError $ message
                                     DSL.Ensure.Throw message -> PE.throw $ EnsureError message

@@ -1,6 +1,7 @@
 
 module DSL.CurrentTimeDocLogger where
 
+import qualified Data.Aeson as A
 import           Pyrelude as P
 import           Pyrelude.IO as PIO
 import Polysemy
@@ -8,7 +9,7 @@ import Control.Lens
 import DSL.CurrentTime as CT
 import DSL.Logger
 
-currentTimeDocInterpreter :: forall a effs. Members [Logger, Embed IO] effs => Sem (CurrentTime ': effs) a -> Sem effs a
+currentTimeDocInterpreter :: forall a e effs. (Show e, A.ToJSON e, Members [Logger e, Embed IO] effs) => Sem (CurrentTime ': effs) a -> Sem effs a
 currentTimeDocInterpreter = 
   interpret $ \ct ->
                   let 

@@ -58,9 +58,11 @@ data TestConfig = TestConfig {
   active       :: Bool
 }  deriving (Eq, Show)
 
-data AutoError = MyError1 | MyError2
+data SuiteError = MyError1 | 
+                  MyError2 
+                  deriving (Show, Typeable)
 
-type Test = GenericTest AutoError TestConfig RunConfig
+type Test = GenericTest SuiteError TestConfig RunConfig
 type TestResult = GenericResult TestConfig
 
 instance Titled TestConfig where
@@ -84,7 +86,7 @@ testConfig = TestConfig {
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-type Effects = '[Logger, Ensure, ArbitraryIO]
+type Effects e = '[Logger e , Ensure, ArbitraryIO]
 
 data ApState = ApState {
   itemId   :: Int,
@@ -97,10 +99,10 @@ newtype DState = V {
                     iidx10 :: Int
                   } deriving Show
 
-interactor :: forall effs. Members Effects effs => RunConfig -> Item -> Sem effs ApState
+interactor :: forall e effs. Members (Effects e) effs => RunConfig -> Item -> Sem effs ApState
 interactor RunConfig{..} Item{..} = uu
 
-prepState :: Ensurable effs => Item -> ApState -> Sem effs DState
+prepState :: forall e effs. (Ensurable e) effs => Item -> ApState -> Sem effs DState
 prepState _i ApState{..} = uu
 
 data Item = Item {
@@ -117,7 +119,7 @@ items rc = []
 nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState
 
-test :: forall effs. Members Effects effs => Test Item ApState DState effs
+test :: forall effs. Members (Effects SuiteError) effs => Test Item ApState DState effs
 test = GenericTest {
               configuration = MemberReflection.testConfig {address = nameOfModule},
               components = TestComponents {
@@ -151,7 +153,7 @@ showEffs :: forall es0 es1 a. ShowTypes es0 => MembersFuncWrapper es0 es1 a -> [
 showEffs _ = removeKindSuffix <$> showTypes @es0
 
 demo :: [Text]
-demo = showEffs (WrappedTest test :: MembersFuncWrapper Effects effs (Test Item ApState DState effs))
+demo = showEffs (WrappedTest test :: MembersFuncWrapper (Effects SuiteError) effs (Test Item ApState DState effs))
 
 newtype InteractorFuncWrapper memberEffs allEffs a = WrappedInteractor (Members memberEffs allEffs => RunConfig -> Item -> Sem allEffs ApState)
 
@@ -159,7 +161,7 @@ showInteractorEffs :: forall es0 es1 a. ShowTypes es0 => InteractorFuncWrapper e
 showInteractorEffs _ = showTypes @es0
 
 demo2 :: [Text]
-demo2 = removeKindSuffix <$> showInteractorEffs (WrappedInteractor interactor :: InteractorFuncWrapper Effects effs (RunConfig -> Item -> Sem effs ApState))
+demo2 = removeKindSuffix <$> showInteractorEffs (WrappedInteractor interactor :: InteractorFuncWrapper (Effects SuiteError) effs (RunConfig -> Item -> Sem effs ApState))
 
 
 $(deriveJSON defaultOptions ''TestConfig)

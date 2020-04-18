@@ -24,6 +24,10 @@ data RunConfig = RunConfig {
   depth       :: Depth
 } deriving (Eq, Show)
 
+data SuiteError = MyError Text | 
+                  MyOtherError 
+                  deriving (Show, Typeable)
+
 instance Titled RunConfig where
   title = runTitle
 
@@ -99,12 +103,12 @@ filterList = [isActiveFilter, countryFilter, levelFilter]
 applyTestFiltersToItems :: RunConfig -> (i -> TestConfig) -> [i] -> [i]
 applyTestFiltersToItems = applyTestFilters filterList
 
-type TestPlan m1 m a effs = TestPlanBase TestConfig RunConfig m1 m a effs
+type TestPlan m1 m a effs = TestPlanBase SuiteError TestConfig RunConfig m1 m a effs
 
 
-testEndpointPriv :: forall effs1. ApEffs e effs1 =>
-      (forall rc tc i as ds effs. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs e effs) 
-                  => ItemParams as ds i tc rc effs -> Sem effs ())  
+testEndpointPriv :: forall effs1. ApEffs SuiteError effs1 =>
+      (forall rc tc i as ds effs. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs SuiteError effs) 
+                  => ItemParams SuiteError as ds i tc rc effs -> Sem effs ())  
      -> TestModule
      -> RunConfig
      -> Either FilterErrorType (Set Int)
@@ -112,7 +116,7 @@ testEndpointPriv :: forall effs1. ApEffs e effs1 =>
      -> Sem effs1 ()
 testEndpointPriv itmRunner testMod rc itrSet plan = 
   let 
-    runParams :: RunParams RunConfig TestConfig effs1 
+    runParams :: RunParams SuiteError RunConfig TestConfig effs1 
     runParams = RunParams {
       plan = plan,
       filters = filterList,
@@ -126,20 +130,21 @@ testEndpoint ::
      TestModule
      -> RunConfig
      -> Either FilterErrorType (Set Int)
-     -> (forall m1 m a. TestPlan m1 m a FullIOEffects)
-     -> Sem FullIOEffects ()
+     -> (forall m1 m a. TestPlan m1 m a (FullIOEffects SuiteError))
+     -> Sem (FullIOEffects SuiteError) ()
 testEndpoint = testEndpointPriv normalExecution
 
 testEndpointDoc ::
      TestModule
      -> RunConfig
      -> Either FilterErrorType (Set Int)
-     -> (forall a m m1. TestPlan m1 m a FullDocEffects)
+     -> (forall a m m1. TestPlan m1 m a (FullDocEffects SuiteError))
      -> DList Text
 testEndpointDoc testMod rc itrSet plan = fst . documentRaw $ testEndpointPriv docExecution testMod rc itrSet plan
 
 
 $(deriveJSON defaultOptions ''TestConfig)
+$(deriveJSON defaultOptions ''SuiteError)
 $(deriveJSON defaultOptions ''Environment)
 $(deriveJSON defaultOptions ''Country)
 $(deriveJSON defaultOptions ''Depth)

@@ -17,7 +17,7 @@ import Data.Aeson.TH
 import OrphanedInstances()
 import DemoProject.Test.TestFilePaths
 
-type Effects effs = EFFEnsureLog effs
+type Effects effs = EFFEnsureLog SuiteError effs
 
 config :: TestConfig
 config = C.testConfig {

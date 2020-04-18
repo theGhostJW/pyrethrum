@@ -102,8 +102,8 @@ applyTestFiltersToItems = applyTestFilters filterList
 type TestPlan m1 m a effs = TestPlanBase TestConfig RunConfig m1 m a effs
 
 
-testEndpointPriv :: forall effs1. ApEffs effs1 =>
-      (forall rc tc i as ds effs. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs effs) 
+testEndpointPriv :: forall effs1. ApEffs e effs1 =>
+      (forall rc tc i as ds effs. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs e effs) 
                   => ItemParams as ds i tc rc effs -> Sem effs ())  
      -> TestModule
      -> RunConfig

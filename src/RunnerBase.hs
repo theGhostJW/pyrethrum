@@ -34,13 +34,13 @@ data TestGroup m1 m a effs =
 instance Titled (TestGroup m1 m a effs) where
   title = header
 
-data TestComponents rc i as ds e effs = TestComponents {
+data TestComponents e rc i as ds effs = TestComponents {
   testItems :: rc -> [i],
   testInteractor :: rc -> i -> Sem effs as,
   testPrepState :: forall psEffs. (Ensurable e) psEffs => i -> as -> Sem psEffs ds
 }
 
-data GenericTest tc rc i as ds e effs = GenericTest {
+data GenericTest e tc rc i as ds effs = GenericTest {
   configuration :: tc,
-  components :: ItemClass i ds => TestComponents rc i as ds e effs
+  components :: ItemClass i ds => TestComponents e  rc i as ds effs
 }

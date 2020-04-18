@@ -58,7 +58,9 @@ data TestConfig = TestConfig {
   active       :: Bool
 }  deriving (Eq, Show)
 
-type Test = GenericTest TestConfig RunConfig
+data AutoError = MyError1 | MyError2
+
+type Test = GenericTest AutoError TestConfig RunConfig
 type TestResult = GenericResult TestConfig
 
 instance Titled TestConfig where

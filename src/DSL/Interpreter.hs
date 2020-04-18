@@ -19,7 +19,7 @@ import           Data.DList as D
 import           Pyrelude as P hiding (app)
 
 type EFFLogger effs = Member Logger effs
-type ApEffs effs e = Members '[Logger e, Ensure, Error (AppError e)] effs
+type ApEffs e effs = Members '[Logger e, Ensure, Error (AppError e)] effs
 
 type EFFEnsureLog e effs = (Members '[Logger e, EP.Ensure] effs)
 type EFFAllEffects e effs = Members (FullEffects e) effs

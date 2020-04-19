@@ -63,7 +63,7 @@ dumpByteStrings lst file = do
 display :: (DList ByteString -> DList ByteString) -> DList ByteString -> IO ()
 display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
 
-_sampleStatsSimple = F.foldl' statsStep emptyStatsAccum $ Right <$> sampleLog
+_sampleStatsSimple e = F.foldl' statsStep emptyStatsAccum $ Right <$> sampleLog 
 
 sampleStats :: RunResults
 sampleStats = 
@@ -116,7 +116,7 @@ unit_no_out_of_test_issues = M.empty ... LTC.outOfTest sampleStats
 
 --TODO:: Out of test issues test correct
 
-prettyPrintLog :: [PrintLogDisplayElement]
+prettyPrintLog :: [PrintLogDisplayElement e]
 prettyPrintLog = 
   let 
     transParams = LogTransformParams {
@@ -131,7 +131,7 @@ prettyPrintLog =
   in
     DL.toList . snd $ transformDList rawFile transParams 
 
-prettyProblemsPrintLog :: [PrintLogDisplayElement]
+prettyProblemsPrintLog :: [PrintLogDisplayElement e]
 prettyProblemsPrintLog =
   let 
     transParams = LogTransformParams {
@@ -146,7 +146,7 @@ prettyProblemsPrintLog =
   in
     DL.toList . snd $ transformDList rawFile transParams
 
-isPassingTestHeader :: PrintLogDisplayElement -> Bool
+isPassingTestHeader :: PrintLogDisplayElement e -> Bool
 isPassingTestHeader = 
   \case 
     LTPDE.StartTest{..} -> status == Pass
@@ -158,7 +158,7 @@ unit_problems_no_passing_tests =
 unit_unfilterd_has_passing_tests = 
   1 ... P.count isPassingTestHeader prettyPrintLog
 
-isPassingIterationHeader :: PrintLogDisplayElement -> Bool
+isPassingIterationHeader :: PrintLogDisplayElement e -> Bool
 isPassingIterationHeader = 
   \case 
     LTPDE.Iteration LTPDE.IterationRecord{..} -> executionStatus outcome == Pass
@@ -201,7 +201,7 @@ _demo_pretty_print_problems_log =
 
 unit_demo_pretty_print = _demo_pretty_print_log 
 
-sampleLog :: DList LogProtocol
+sampleLog :: FromJSON e => DList (LogProtocol e)
 sampleLog = fromRight' . A.eitherDecode . toS <$> rawFile
 
 rawFile :: DList ByteString

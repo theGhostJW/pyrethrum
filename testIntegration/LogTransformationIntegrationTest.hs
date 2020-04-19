@@ -7,10 +7,10 @@ import AuxFiles
 import LogTransformation.Common
 
 
-type FileAggregator = AbsFile                                            -- source file
+type FileAggregator e = AbsFile                                            -- source file
                     -> (forall m. MonadThrow m => AbsFile -> m AbsFile)   -- destFileFunc
-                    -> IO (Either LogTransformError AbsFile)              -- dest file path or error 
-runAggregator :: IO (Either IOError AbsFile) -> FileAggregator ->  IO ()
+                    -> IO (Either (LogTransformError e) AbsFile)              -- dest file path or error 
+runAggregator :: Show e => IO (Either IOError AbsFile) -> FileAggregator e ->  IO ()
 runAggregator file fa = do 
                   eFile <- file 
                   eitherf eFile

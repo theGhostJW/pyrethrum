@@ -35,7 +35,7 @@ instance Titled TestConfig where
 
 $(deriveJSON defaultOptions ''TestConfig)
 
-type TST = GenericTest TestConfig RunConfig
+type TST = GenericTest Int TestConfig RunConfig
 
 newtype MyInt = MyInt Int deriving (Show, Generic)
 
@@ -113,7 +113,7 @@ test5 = GenericTest {
             }
 
 runRunner :: forall m m1 effs a.
-                (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => GenericTest TestConfig RunConfig i as ds effs -> m1 (m a))
+                (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => GenericTest Int TestConfig RunConfig i as ds effs -> m1 (m a))
                 -> [TestGroup m1 m a effs]
 runRunner f =
   [

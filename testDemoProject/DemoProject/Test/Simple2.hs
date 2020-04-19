@@ -12,7 +12,7 @@ import           Polysemy
 import           Pyrelude
 import           Runner as R
 
-endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
+endpoint :: (forall m1 m a. TestPlan m1 m a FullIOMembers) -> Sem FullIOMembers ()
 endpoint = ep runConfig (IID 120)
 
 data Dummy = Dummy

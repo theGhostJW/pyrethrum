@@ -20,7 +20,7 @@ import Data.Aeson.TH
 import OrphanedInstances()
 import DemoProject.Test.TestFilePaths
 
-type Effects effs = Members '[Logger, Ensure, ArbitraryIO, FileSystem] effs
+type Effects effs = Members '[SuiteLogger, Ensure, ArbitraryIO, FileSystem] effs
 
 config :: TestConfig
 config = C.testConfig {
@@ -31,7 +31,7 @@ config = C.testConfig {
 showItems :: IO ()
 showItems = showAndLogItems $ items runConfig
 
-endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
+endpoint :: (forall m1 m a. TestPlan m1 m a FullIOMembers) -> Sem FullIOMembers ()
 endpoint = ep runConfig $ IID 120
 
 type ApState = Int
@@ -40,7 +40,7 @@ type DState = Int
 interactor :: forall effs. Effects effs => (ItemClass Item DState) => RunConfig -> Item -> Sem effs ApState
 interactor RunConfig{..} Item{..} = pure 5
 
-prepState :: Ensurable effs => Item -> ApState -> Sem effs DState
+prepState :: EnsureEffs effs => Item -> ApState -> Sem effs DState
 prepState _  _ = pure 6
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -72,7 +72,7 @@ nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState
 
 
-ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
+ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOMembers) -> Sem FullIOMembers ()
 ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr $ items rc)
 
 test :: forall effs. Effects effs => Test Item ApState DState effs

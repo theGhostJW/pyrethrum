@@ -66,7 +66,7 @@ genInt = integral $ T.linear 0 1000
 genItemId :: Gen ItemId
 genItemId  = ItemId <$> genTestModule <*> genInt
 
-genError :: Gen AppError
+genError :: Gen (AppError Int)
 genError = Common.Error <$> genStr
 
 genDocActionInfo :: Gen DocActionInfo
@@ -88,7 +88,7 @@ genGateStatus = choice [
   pure C.GateCheck
  ]
 
-genLogProtocol :: Gen LogProtocol
+genLogProtocol :: Gen (LogProtocol Int)
 genLogProtocol = choice [
                     BoundaryLog <$> (StartRun <$> (RunTitle <$> genStr) <*> (A.toJSON <$> genRunConfig)), 
                     BoundaryLog . StartGroup <$> (GroupTitle <$> genStr),
@@ -134,7 +134,7 @@ hprop_log_protocol_round_trip = property $ do
     serialised :: B.ByteString
     serialised = A.encode lp
 
-    unserialised :: Either Text LogProtocol
+    unserialised :: Either Text (LogProtocol Int)
     unserialised = mapLeft txt $ A.eitherDecode serialised
 
   eitherf unserialised

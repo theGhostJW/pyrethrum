@@ -21,11 +21,11 @@ emptyStatsAccum = StatsAccum {
 
 statsStepForReducer :: LineNo                                             -- lineNo
                     -> StatsAccum                                          -- accum
-                    -> Either DeserialisationError LogProtocol            -- Logprotocol
+                    -> Either DeserialisationError (LogProtocol e)           -- Logprotocol
                     -> (StatsAccum, Maybe [StatsAccum])                     -- (newAccum, err / result)
 statsStepForReducer _ accum lp = (statsStep accum lp, Nothing)
 
-statsStepFromLogProtocol :: StatsAccum -> LogProtocol -> StatsAccum
+statsStepFromLogProtocol :: StatsAccum -> LogProtocol e -> StatsAccum
 statsStepFromLogProtocol (StatsAccum runResults@(RunResults outOfTest itrRslts) stepInfo) lp = 
   let 
     nxtStepInfo@(LPStep _nxtPhaseValid _nxtFailStage nxtPhase
@@ -86,7 +86,7 @@ statsStepFromDeserialisationError statsAccum@(StatsAccum (RunResults outOfTest i
       }
     }
 
-statsStep :: StatsAccum -> Either DeserialisationError LogProtocol -> StatsAccum
+statsStep :: StatsAccum -> Either DeserialisationError (LogProtocol e) -> StatsAccum
 statsStep statsAccum eithLP = 
     eitherf eithLP
       (statsStepFromDeserialisationError statsAccum)

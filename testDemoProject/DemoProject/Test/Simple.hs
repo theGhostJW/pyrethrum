@@ -17,7 +17,7 @@ import Data.Aeson.TH
 import OrphanedInstances()
 import DemoProject.Test.TestFilePaths
 
-type Effects effs = EFFEnsureLog SuiteError effs
+type Effects effs = EnsureLogEffs effs
 
 config :: TestConfig
 config = C.testConfig {
@@ -27,7 +27,7 @@ config = C.testConfig {
 showItems :: IO ()
 showItems = showAndLogItems $ items runConfig
 
-endpoint :: (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
+endpoint :: (forall m1 m a. TestPlan m1 m a FullIOMembers) -> Sem FullIOMembers ()
 endpoint = ep runConfig (IID 123)
 
 data ApState = ApState {
@@ -42,7 +42,7 @@ interactor _rc TestItem{..} = do
                               ensure "Only even iids expected" $ P.even iid
                               pure $ ApState iid "Success"
 
-prepState :: Ensurable effs => Item -> ApState -> Sem effs DState
+prepState :: EnsureEffs effs => Item -> ApState -> Sem effs DState
 prepState itm = pure
 
 --- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -78,7 +78,7 @@ items rc = [
 nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState
 
-ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOEffects) -> Sem FullIOEffects ()
+ep :: RunConfig -> ItemFilter Item -> (forall m1 m a. TestPlan m1 m a FullIOMembers) -> Sem FullIOMembers ()
 ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr $ items runConfig)
 
 

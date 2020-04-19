@@ -12,6 +12,15 @@ import Data.Aeson
 import Data.Aeson.TH
 import Polysemy
 import Polysemy.Error as PE
+import DSL.Ensure
+import DSL.Logger
+
+type EnsureLogEffs effs = EFFEnsureLog SuiteError effs
+type EnsureEffs effs = Ensurable SuiteError effs
+
+type FullIOMembers = FullIOEffects SuiteError
+
+type SuiteLogger = Logger SuiteError
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
 data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
@@ -52,7 +61,7 @@ data TestConfig = TestConfig {
   active       :: Bool
 }  deriving (Eq, Show)
 
-type Test = GenericTest TestConfig RunConfig
+type Test = GenericTest SuiteError TestConfig RunConfig
 type TestResult = GenericResult TestConfig
 
 instance Titled TestConfig where

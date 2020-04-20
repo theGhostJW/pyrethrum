@@ -86,7 +86,7 @@ statsStepFromDeserialisationError statsAccum@(StatsAccum (RunResults outOfTest i
       }
     }
 
-statsStep :: StatsAccum -> Either DeserialisationError (LogProtocol e) -> StatsAccum
+statsStep :: forall e. StatsAccum -> Either DeserialisationError (LogProtocol e) -> StatsAccum
 statsStep statsAccum eithLP = 
     eitherf eithLP
       (statsStepFromDeserialisationError statsAccum)

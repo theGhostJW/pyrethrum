@@ -63,16 +63,17 @@ dumpByteStrings lst file = do
 display :: (DList ByteString -> DList ByteString) -> DList ByteString -> IO ()
 display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
 
-_sampleStatsSimple e = F.foldl' statsStep emptyStatsAccum $ Right <$> sampleLog 
+_sampleStatsSimple :: forall e. FromJSON e => StatsAccum
+_sampleStatsSimple = F.foldl' statsStep emptyStatsAccum $ Right <$> (sampleLog :: DList (LogProtocol e)) 
 
-sampleStats :: RunResults
+sampleStats :: forall e. FromJSON e => RunResults
 sampleStats = 
   let 
     transParams = LogTransformParams {
       source = testSource,
       sink = const $ pure (),
       reducer = statsStepForReducer,
-      itemDesrialiser = jsonDeserialiser,
+      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocol e),
       resultSerialiser = yamlSerialiser,    
       linNo = LineNo 1,
       accumulator = emptyStatsAccum
@@ -82,13 +83,14 @@ sampleStats =
 
 _demo_pretty_print_LP = dumpFile (prettyPrintLogProtocol False <$> sampleLog) [relfile|raw.yaml|]
 
+_demo_pretty_print_LP_with_reducer :: forall e. FromJSON e => IO ()
 _demo_pretty_print_LP_with_reducer = 
   let 
     transParams = LogTransformParams {
       source = testSource,
       sink = testSink,
       reducer = prettyPrintLogprotocolReducer,
-      itemDesrialiser = jsonDeserialiser,
+      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocol e),
       resultSerialiser = id,    
       linNo = LineNo 1,
       accumulator = ()
@@ -171,6 +173,7 @@ unit_unfilterd_has_passing_iterations =
   9 ... P.count isPassingIterationHeader prettyPrintLog 
 
 
+_demo_pretty_print_log :: IO ()
 _demo_pretty_print_log = 
   let 
     transParams = LogTransformParams {
@@ -178,13 +181,14 @@ _demo_pretty_print_log =
       sink = testSink,
       reducer = printLogDisplayStep sampleStats,
       itemDesrialiser = jsonDeserialiser,
-      resultSerialiser = (toS . prettyPrintDisplayElement) :: PrintLogDisplayElement -> ByteString,    
+      resultSerialiser = (toS . prettyPrintDisplayElement), -- :: PrintLogDisplayElement e -> ByteString,    
       linNo = LineNo 1,
       accumulator = emptyIterationAccum
     }
   in
     dumpByteStrings (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
 
+_demo_pretty_print_problems_log :: IO ()
 _demo_pretty_print_problems_log = 
   let 
     transParams = LogTransformParams {
@@ -192,7 +196,7 @@ _demo_pretty_print_problems_log =
       sink = testSink,
       reducer = printProblemsDisplayStep sampleStats,
       itemDesrialiser = jsonDeserialiser,
-      resultSerialiser = (toS . prettyPrintDisplayElement) :: PrintLogDisplayElement -> ByteString,    
+      resultSerialiser = (toS . prettyPrintDisplayElement), -- :: PrintLogDisplayElement -> ByteString,    
       linNo = LineNo 1,
       accumulator = emptyProbleIterationAccum
     }
@@ -204,6 +208,7 @@ unit_demo_pretty_print = _demo_pretty_print_log
 sampleLog :: FromJSON e => DList (LogProtocol e)
 sampleLog = fromRight' . A.eitherDecode . toS <$> rawFile
 
+-- todo needs to be regenerated with new log structure
 rawFile :: DList ByteString
 rawFile = fromList . B.lines $ toS 
   [r|{"tag":"BoundaryLog","contents":{"tag":"StartRun","contents":[{"unRunTitle":"Sample RunConfig"},{"environment":"TST","country":"AU","runTitle":"Sample RunConfig","depth":"DeepRegression"}]}}

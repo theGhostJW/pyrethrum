@@ -25,21 +25,21 @@ import TestFilter
 
 jsonItemLogExt = ".jsoni" :: Text
 
-ioRunToFile :: forall b appEffs. Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] appEffs =>
+ioRunToFile :: forall b e appEffs. (Show e, ToJSON e, Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] appEffs) =>
     WantConsole
     -> Bool 
-    -> (forall a. (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger ': effs) a -> Sem effs a) -> Sem appEffs a -> IO (Either AppError a))
+    -> (forall a. (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger e ': effs) a -> Sem effs a) -> Sem appEffs a -> IO (Either (AppError e) a))
     -> Sem appEffs b
-    -> IO (Either AppError [AbsFile])
+    -> IO (Either (AppError e) [AbsFile])
 ioRunToFile wantConsole docMode interpreter app = 
   let 
-    handleSpec :: M.Map (Text, FileExt) (ThreadInfo -> LogIdxTime -> LogProtocol -> Text) 
+    handleSpec :: M.Map (Text, FileExt) (ThreadInfo -> LogIdxTime -> LogProtocol e -> Text) 
     handleSpec = M.fromList [
                                 (("raw", FileExt ".log"), prettyPrintLogProtocolWith docMode)
                               , (("raw", FileExt jsonItemLogExt), logStrJSONWith)
                             ]
 
-    fileHandleInfo :: IO (Either AppError [(ThreadInfo -> LogIdxTime -> LogProtocol -> Text, HandleInfo)])
+    fileHandleInfo :: IO (Either (AppError e) [(ThreadInfo -> LogIdxTime -> LogProtocol e -> Text, HandleInfo)])
     fileHandleInfo = logFileHandles handleSpec
 
     printFilePaths :: [AbsFile] -> IO ()
@@ -49,13 +49,13 @@ ioRunToFile wantConsole docMode interpreter app =
                                 sequence_ $ putStrLn . toS . toFilePath <$> lsFiles
                                 putStrLn ""
                           
-    fileHandles :: IO (Either AppError [(Maybe AbsFile, ThreadInfo -> LogIdxTime -> LogProtocol -> Text, S.Handle)])
+    fileHandles :: IO (Either (AppError e) [(Maybe AbsFile, ThreadInfo -> LogIdxTime -> LogProtocol e -> Text, S.Handle)])
     fileHandles = (((\(fn, fh) -> (Just $ A.path fh, fn, fileHandle fh)) <$>) <$>) <$> fileHandleInfo
 
     closeFileHandles :: [S.Handle] -> IO ()
     closeFileHandles  = traverse_ S.hClose
 
-    allHandles :: IO (Either AppError [(Maybe AbsFile, ThreadInfo -> LogIdxTime -> LogProtocol -> Text, S.Handle)])
+    allHandles :: IO (Either (AppError e) [(Maybe AbsFile, ThreadInfo -> LogIdxTime -> LogProtocol e -> Text, S.Handle)])
     allHandles = wantConsole == Console
                       ? (((Nothing, prettyPrintLogProtocolWith docMode, S.stdout) :) <$>) <$> fileHandles
                       $ fileHandles
@@ -75,7 +75,7 @@ ioRunToFile wantConsole docMode interpreter app =
               closeHandles = closeFileHandles fileHndles
               loggerHandles = (\(f, l, h) -> (l, h)) <$> fileLoggerHandles
 
-              logger :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => Sem (Logger ': effs) a -> Sem effs a
+              logger :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => Sem (Logger e ': effs) a -> Sem effs a
               logger = logToHandles loggerHandles
               
             runResult <- interpreter logger app `P.finally` closeHandles

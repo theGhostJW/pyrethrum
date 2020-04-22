@@ -127,6 +127,7 @@ _testDep: &testdependencies
 - hedgehog
 - pyrethrum
 - bytestring
+- mtl
 
 tests:
   pyrethrum-test:

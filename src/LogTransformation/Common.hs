@@ -324,12 +324,12 @@ emptyLPStep = LPStep True Nothing OutOfIteration Pass Nothing False
 ----------------- Testing Using DList ----------------
 ------------------------------------------------------
 
-type WriterState a i o = WriterT (DList o) (StateT (DList i) Identity) a
+type WriterState i o a = WriterT (DList o) (StateT (DList i) Identity) a
 
-runToList :: DList input -> WriterState accum input outputItem -> (accum, DList outputItem)
+runToList :: DList input -> WriterState input outputItem accum -> (accum, DList outputItem)
 runToList input m = fst . runIdentity $ runStateT (runWriterT m) input
 
-testSource :: WriterState (Maybe i) i o 
+testSource :: WriterState i o (Maybe i)  
 testSource = do 
               dlst <- get 
               case dlst of
@@ -339,7 +339,7 @@ testSource = do
                               pure $ Just x 
                 _ -> P.error "DList pattern match error this should never happen"
 
-testSink :: [o] -> WriterState () i o
+testSink :: [o] -> WriterState i o () 
 testSink = tell . fromList
                              
 ------------------------------------------------------------

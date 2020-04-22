@@ -19,6 +19,9 @@ import DSL.LogProtocol.PrettyPrint
 import LogTransformation.Stats
 import LogTransformation.Common as LTC
 import qualified Data.Map.Strict as M
+import Control.Monad.Writer.Strict (WriterT)
+import Control.Monad.State.Strict (State)
+
 -- import LogTransformation.Iteration
 
 runAgg :: (DList ByteString -> DList ByteString) -> DList ByteString -> DList Text
@@ -66,9 +69,13 @@ display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
 _sampleStatsSimple :: forall e. FromJSON e => StatsAccum
 _sampleStatsSimple = F.foldl' statsStep emptyStatsAccum $ Right <$> (sampleLog :: DList (LogProtocol e)) 
 
+type WriterStateByteString o a = WriterState ByteString o a
 sampleStats :: forall e. FromJSON e => RunResults
 sampleStats = 
-  let 
+  let
+    -- data LogTransformParams accum itm rsltItem m srcFmt snkFmt 
+    -- type WriterState i o a = WriterT (DList o) (StateT (DList i) Identity) a
+    transParams :: LogTransformParams StatsAccum (LogProtocol e) StatsAccum (WriterT (DList o) (State (DList ByteString))) ByteString ByteString
     transParams = LogTransformParams {
       source = testSource,
       sink = const $ pure (),
@@ -83,7 +90,7 @@ sampleStats =
 
 _demo_pretty_print_LP = dumpFile (prettyPrintLogProtocol False <$> sampleLog) [relfile|raw.yaml|]
 
-_demo_pretty_print_LP_with_reducer :: forall e. FromJSON e => IO ()
+_demo_pretty_print_LP_with_reducer :: forall e.(FromJSON e, Show e) => IO ()
 _demo_pretty_print_LP_with_reducer = 
   let 
     transParams = LogTransformParams {
@@ -98,11 +105,13 @@ _demo_pretty_print_LP_with_reducer =
   in
     dumpFile (snd $ transformDList rawFile transParams) [relfile|raw.yaml|]
 
-_base_results = dumpTxt (txtPretty $ iterationResults sampleStats) [relfile|baseResults.yaml|] 
+_demo_test_stats :: Text
+_demo_test_stats = txtPretty $ testStatusCounts (sampleStats @RunResults)
 
-_demo_test_stats = txtPretty $ testStatusCounts sampleStats
+_base_results :: IO()
+_base_results = dumpTxt (txtPretty $ iterationResults (sampleStats @RunResults)) [relfile|baseResults.yaml|]
 
-_demo_iteration_stats = txtPretty $ iterationStatusCounts sampleStats
+_demo_iteration_stats = txtPretty $ iterationStatusCounts (sampleStats @RunResults)
 
 unit_iteration_counts_correct = 
   M.fromList [
@@ -110,22 +119,22 @@ unit_iteration_counts_correct =
               (KnownError,   2),
               (LTC.Warning,  2),
               (Fail,        20)
-             ] ... iterationStatusCounts sampleStats
+             ] ... iterationStatusCounts (sampleStats @RunResults)
 
-unit_test_counts_correct = M.fromList [(Pass,1), (Fail,4)] ... testStatusCounts sampleStats
+unit_test_counts_correct = M.fromList [(Pass,1), (Fail,4)] ... testStatusCounts (sampleStats @RunResults)
 
-unit_no_out_of_test_issues = M.empty ... LTC.outOfTest sampleStats
+unit_no_out_of_test_issues = M.empty ... LTC.outOfTest (sampleStats @RunResults)
 
 --TODO:: Out of test issues test correct
 
-prettyPrintLog :: [PrintLogDisplayElement e]
+prettyPrintLog :: forall e. FromJSON e => [PrintLogDisplayElement e]
 prettyPrintLog = 
   let 
     transParams = LogTransformParams {
       source = testSource,
       sink = testSink,
-      reducer = printLogDisplayStep sampleStats,
-      itemDesrialiser = jsonDeserialiser,
+      reducer = printLogDisplayStep (sampleStats @RunResults),
+      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocol e),
       resultSerialiser = id,    
       linNo = LineNo 1,
       accumulator = emptyIterationAccum
@@ -133,14 +142,14 @@ prettyPrintLog =
   in
     DL.toList . snd $ transformDList rawFile transParams 
 
-prettyProblemsPrintLog :: [PrintLogDisplayElement e]
+prettyProblemsPrintLog :: forall e. FromJSON e => [PrintLogDisplayElement e]
 prettyProblemsPrintLog =
   let 
     transParams = LogTransformParams {
       source = testSource,
       sink = testSink,
-      reducer = printProblemsDisplayStep sampleStats,
-      itemDesrialiser = jsonDeserialiser,
+      reducer = printProblemsDisplayStep (sampleStats @RunResults),
+      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocol e),
       resultSerialiser = id,    
       linNo = LineNo 1,
       accumulator = emptyProbleIterationAccum
@@ -154,11 +163,13 @@ isPassingTestHeader =
     LTPDE.StartTest{..} -> status == Pass
     _ -> False
 
+unit_problems_no_passing_tests :: forall e. FromJSON e => IO() 
 unit_problems_no_passing_tests = 
-  0 ... P.count isPassingTestHeader prettyProblemsPrintLog 
+  0 ... P.count isPassingTestHeader (prettyProblemsPrintLog :: [PrintLogDisplayElement e])
 
+unit_unfilterd_has_passing_tests :: forall e. FromJSON e => IO()  
 unit_unfilterd_has_passing_tests = 
-  1 ... P.count isPassingTestHeader prettyPrintLog
+  1 ... P.count isPassingTestHeader (prettyPrintLog :: [PrintLogDisplayElement e])
 
 isPassingIterationHeader :: PrintLogDisplayElement e -> Bool
 isPassingIterationHeader = 
@@ -166,11 +177,13 @@ isPassingIterationHeader =
     LTPDE.Iteration LTPDE.IterationRecord{..} -> executionStatus outcome == Pass
     _ -> False
      
+unit_problems_no_passing_iterations :: forall e. FromJSON e => IO()
 unit_problems_no_passing_iterations = 
-  0 ... P.count isPassingIterationHeader prettyProblemsPrintLog 
+  0 ... P.count isPassingIterationHeader (prettyProblemsPrintLog :: [PrintLogDisplayElement e])
 
+unit_unfilterd_has_passing_iterations :: forall e. FromJSON e => IO()  
 unit_unfilterd_has_passing_iterations = 
-  9 ... P.count isPassingIterationHeader prettyPrintLog 
+  9 ... P.count isPassingIterationHeader (prettyPrintLog :: [PrintLogDisplayElement e])
 
 
 _demo_pretty_print_log :: IO ()
@@ -179,9 +192,9 @@ _demo_pretty_print_log =
     transParams = LogTransformParams {
       source = testSource,
       sink = testSink,
-      reducer = printLogDisplayStep sampleStats,
+      reducer = printLogDisplayStep (sampleStats @RunResults),
       itemDesrialiser = jsonDeserialiser,
-      resultSerialiser = (toS . prettyPrintDisplayElement), -- :: PrintLogDisplayElement e -> ByteString,    
+      resultSerialiser = toS . prettyPrintDisplayElement, -- :: PrintLogDisplayElement e -> ByteString,    
       linNo = LineNo 1,
       accumulator = emptyIterationAccum
     }
@@ -194,9 +207,9 @@ _demo_pretty_print_problems_log =
     transParams = LogTransformParams {
       source = testSource,
       sink = testSink,
-      reducer = printProblemsDisplayStep sampleStats,
+      reducer = printProblemsDisplayStep (sampleStats @RunResults),
       itemDesrialiser = jsonDeserialiser,
-      resultSerialiser = (toS . prettyPrintDisplayElement), -- :: PrintLogDisplayElement -> ByteString,    
+      resultSerialiser = toS . prettyPrintDisplayElement, 
       linNo = LineNo 1,
       accumulator = emptyProbleIterationAccum
     }

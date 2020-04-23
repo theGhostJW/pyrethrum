@@ -13,4 +13,4 @@ chkLog intprt assrt = assrt . intprt
 chkMessageInstances :: Text -> Int -> DList Text -> Assertion
 chkMessageInstances msg exCount  = chkLog (P.count (isInfixOf msg)) (chkEq exCount)
 
-type Log = [LogProtocol Int]
+type Log = [LogProtocolBase Int]

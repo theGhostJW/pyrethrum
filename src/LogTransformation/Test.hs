@@ -1,6 +1,6 @@
 module LogTransformation.Test where
 
--- import Common as C (AppError(..))
+-- import Common as C (FrameworkError(..))
 -- import qualified RunElementClasses as RC
 -- import LogTransformation.Common
 -- import LogTransformation.Iteration as I
@@ -20,7 +20,7 @@ module LogTransformation.Test where
 
 -- testStep :: LineNo                                                            -- lineNo
 --             -> TestAccum                                                      -- accum
---             -> IterationLogElement                                            -- parse error or apperror
+--             -> IterationLogElement                                            -- parse error or FrameworkError
 --             -> (TestAccum, Either LogTransformError (Maybe [TestLogElement])) -- (newAccum, err / result)
 -- testStep lineNo (TestAccum runStats mThisRec mGroup) itr =
 --   let 
@@ -307,7 +307,7 @@ module LogTransformation.Test where
 --   item :: Maybe ItemInfo,
 --   apState :: Maybe ApStateInfo,
 --   domainState :: Maybe PrepStateInfo,
---   rawLog :: DList LogProtocol
+--   rawLog :: DList LogProtocolBase
 -- } deriving (Eq, Show)
 -- -}
 

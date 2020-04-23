@@ -18,7 +18,7 @@ makeSem ''ArbitraryIO
 arbitraryIODocInterpreter :: forall effs a e. (Show e, A.ToJSON e, Member (Logger e) effs) => Sem (ArbitraryIO ': effs) a -> Sem effs a
 arbitraryIODocInterpreter = interpret $ \(ArbitraryIO msg def _) -> logItem (IterationLog . Doc $ DocIOAction msg) $> def
 
-arbitraryIOInterpreter :: forall effs a e. (Show e, A.ToJSON e, Members '[Error (AppError e), Logger e, Embed IO] effs) => Sem (ArbitraryIO ': effs) a -> Sem effs a
+arbitraryIOInterpreter :: forall effs a e. (Show e, A.ToJSON e, Members '[Error (FrameworkError e), Logger e, Embed IO] effs) => Sem (ArbitraryIO ': effs) a -> Sem effs a
 arbitraryIOInterpreter =
   let
     handleException :: forall b. Text -> IO b -> Sem effs b

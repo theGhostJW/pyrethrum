@@ -45,7 +45,7 @@ data FileSystemErrorType = ReadFileError | WriteFileError
 
 $(deriveJSON defaultOptions ''FileSystemErrorType)
 
-data AppError e =
+data FrameworkError e =
             Error Text |
             Error' DetailedInfo |
 
@@ -55,19 +55,19 @@ data AppError e =
 
             NotImplementedError Text |
 
-            PreTestError PreTestStage Text (AppError e) |
-            PreTestCheckExecutionError PreTestStage Text (AppError e)|
+            PreTestError PreTestStage Text (FrameworkError e) |
+            PreTestCheckExecutionError PreTestStage Text (FrameworkError e)|
             PreTestCheckError PreTestStage Text |
 
             IOError IOException |
             IOError' Text IOException |
 
-            AnnotatedError Text (AppError e) |
+            AnnotatedError Text (FrameworkError e) |
 
             SuiteError e
             deriving (Show, Eq)
 
-$(deriveJSON defaultOptions ''AppError)
+$(deriveJSON defaultOptions ''FrameworkError)
 
 type OutputDListText = O.Output (D.DList Text)
 

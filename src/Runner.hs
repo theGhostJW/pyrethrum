@@ -73,7 +73,7 @@ showAndLogList logSuffix items =
         logSpec :: M.Map (Text, FileExt) ()
         logSpec = M.singleton (logSuffix, FileExt ".log") ()
 
-        hndle :: IO (Either (AppError e) HandleInfo)
+        hndle :: IO (Either (FrameworkError e) HandleInfo)
         hndle = either
                   Left
                   (
@@ -100,10 +100,10 @@ showAndLogList logSuffix items =
                               )
 
 
-logFileHandles :: forall a e. M.Map (Text, FileExt) a -> IO (Either (AppError e) [(a, HandleInfo)])
+logFileHandles :: forall a e. M.Map (Text, FileExt) a -> IO (Either (FrameworkError e) [(a, HandleInfo)])
 logFileHandles suffixExtensionMap = 
   let
-    openHandle :: (Text, FileExt) -> a -> IO (Either (AppError e) (a, HandleInfo))
+    openHandle :: (Text, FileExt) -> a -> IO (Either (FrameworkError e) (a, HandleInfo))
     openHandle (suff, ext) a = 
       do 
         eHandInfo <- logFileHandle suff ext
@@ -111,7 +111,7 @@ logFileHandles suffixExtensionMap =
                 (Left . IOError' "Error creating log file" )
                 (\hInfo -> Right (a, hInfo))
 
-    openHandles :: IO [((Text, FileExt), Either (AppError e) (a, HandleInfo))]
+    openHandles :: IO [((Text, FileExt), Either (FrameworkError e) (a, HandleInfo))]
     openHandles = M.toList <$> M.traverseWithKey openHandle suffixExtensionMap
   in 
     do 
@@ -162,7 +162,7 @@ data ItemParams e as ds i tc rc effs = ItemParams {
   item :: i                                                        
 }
 
-logLP :: forall e effs. (Show e, ToJSON e, Member (Logger e) effs) => LogProtocol e -> Sem effs ()
+logLP :: forall e effs. (Show e, ToJSON e, Member (Logger e) effs) => LogProtocolBase e -> Sem effs ()
 logLP = logItem 
 
 logRP :: forall e effs. (Show e, ToJSON e, Member (Logger e) effs) => RunProtocol e -> Sem effs ()
@@ -183,7 +183,7 @@ normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  =
                             logRP StartChecks 
                             F.traverse_ logChk $ D.toList $ CK.skipChecks (checkList i)
 
-    prepStateErrorHandler :: AppError e -> Sem effs ds
+    prepStateErrorHandler :: FrameworkError e -> Sem effs ds
     prepStateErrorHandler e = 
       do 
         logRP $ PrepStateFailure iid e
@@ -299,10 +299,10 @@ runTest iIds fltrs itemRunner rc GenericTest {configuration = tc, components} =
         ? runItems components
         $ []
 
-logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => AppError e -> Sem effs ()
+logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
 logLPError = logLP . logRun . LP.Error
 
-runHook :: forall e effs. Member (Error (AppError e)) effs => PreRun effs -> PreTestStage -> Sem effs (Either (AppError e) ())
+runHook :: forall e effs. Member (Error (FrameworkError e)) effs => PreRun effs -> PreTestStage -> Sem effs (Either (FrameworkError e) ())
 runHook PreRun{runAction, checkHasRun} stage = 
   do
     let
@@ -317,10 +317,10 @@ runHook PreRun{runAction, checkHasRun} stage =
                     Rollover -> "No tests run in group. "
                     GoHome -> "No items run for test. "
 
-      rolloverFailError :: AppError e -> AppError e
+      rolloverFailError :: FrameworkError e -> FrameworkError e
       rolloverFailError = PreTestCheckExecutionError stage $ msgPrefix <> stageExLabel <> " check"
 
-      rolloverCheckFalseError :: AppError e
+      rolloverCheckFalseError :: FrameworkError e
       rolloverCheckFalseError = PreTestCheckError stage
                                   $ msgPrefix
                                   <> stageStr
@@ -373,7 +373,7 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
       let
         -- if ids are passed in we are running an endpoint
         -- endpoint go home and rolllover are not run if the application is already home
-        guardedHookRun :: (TestGroup [] (Sem effs) () effs -> PreRun effs) -> PreTestStage -> Sem effs (Either (AppError e) ())
+        guardedHookRun :: (TestGroup [] (Sem effs) () effs -> PreRun effs) -> PreTestStage -> Sem effs (Either (FrameworkError e) ())
         guardedHookRun hookSelector hookLabel =
           do 
             wantHookRun <- isJust iIds ? 
@@ -381,13 +381,13 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
                             pure True
             wantHookRun ? runHook (hookSelector tg) hookLabel $ pure $ Right ()
 
-        rollover' :: Sem effs (Either (AppError e) ())
+        rollover' :: Sem effs (Either (FrameworkError e) ())
         rollover' = guardedHookRun rollover Rollover
 
-        goHome' :: Sem effs (Either (AppError e) ())
+        goHome' :: Sem effs (Either (FrameworkError e) ())
         goHome' = guardedHookRun goHome GoHome
 
-        hookThenRun :: Sem effs (Either (AppError e) ()) -> Sem effs () -> Sem effs ()
+        hookThenRun :: Sem effs (Either (FrameworkError e) ()) -> Sem effs () -> Sem effs ()
         hookThenRun hook mRun = do
                                   eth <- hook
                                   eitherf eth

@@ -18,7 +18,7 @@ import Polysemy.State
 
 
 data Logger e m a where
-  LogItem :: (Show e, A.ToJSON e) => LogProtocol e -> Logger e m ()
+  LogItem :: (Show e, A.ToJSON e) => LogProtocolBase e -> Logger e m ()
 
   LogMessage :: Text -> Logger e m ()
   LogMessage' :: Text -> Text -> Logger e m ()
@@ -40,7 +40,7 @@ data LogAuxInfo = LogAuxInfo {
   logTime :: UTCTime
 }
 
-detailLog :: forall effs e. (Show e, A.ToJSON e, Member (Logger e) effs) => (DetailedInfo -> LogProtocol e) -> Text -> Text -> Sem effs ()
+detailLog :: forall effs e. (Show e, A.ToJSON e, Member (Logger e) effs) => (DetailedInfo -> LogProtocolBase e) -> Text -> Text -> Sem effs ()
 detailLog lpCons msg additionalInfo = logItem . lpCons $ DetailedInfo msg additionalInfo
 
 log :: forall effs e. Member (Logger e) effs => Text -> Sem effs ()
@@ -70,7 +70,7 @@ putLines :: Handle -> Text -> IO ()
 putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
 
 -- TODO - update to use info
-logStrJSONWith :: A.ToJSON e => ThreadInfo -> LogIdxTime -> LogProtocol e -> Text
+logStrJSONWith :: A.ToJSON e => ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text
 logStrJSONWith _ _ lp = eitherf (decodeUtf8' . B.toStrict . A.encode $ lp)
                           (\e -> "Encode error: " <> txt e)
                           id
@@ -87,7 +87,7 @@ logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocolWith False, s
 incIdx :: LogIndex -> LogIndex
 incIdx (LogIndex i) = LogIndex $ i + 1
 
-logRunWithSink :: forall effs a e. (Show e, A.ToJSON e) => ((Show e, A.ToJSON e) => LogProtocol e -> Sem effs ()) -> Sem (Logger e ': effs) a -> Sem effs a
+logRunWithSink :: forall effs a e. (Show e, A.ToJSON e) => ((Show e, A.ToJSON e) => LogProtocolBase e -> Sem effs ()) -> Sem (Logger e ': effs) a -> Sem effs a
 logRunWithSink pushItem = 
   let
     pushRun :: RunProtocol e -> Sem effs () 
@@ -106,9 +106,9 @@ logRunWithSink pushItem =
                   LogWarning' msg info ->  pushRun . Warning' $ DetailedInfo msg info
 
 -- can produce a list of LogProtocols - used for testing
-logRunRawInterpreter :: forall effs a e. (Show e, A.ToJSON e, Member (Output (LogProtocol e)) effs) => Sem (Logger e ': effs) a -> Sem effs a
+logRunRawInterpreter :: forall effs a e. (Show e, A.ToJSON e, Member (Output (LogProtocolBase e)) effs) => Sem (Logger e ': effs) a -> Sem effs a
 logRunRawInterpreter = logRunWithSink output
-logToHandles :: forall effs e a. Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => [(ThreadInfo -> LogIdxTime -> LogProtocol e -> Text, Handle)] -> Sem (Logger e ': effs) a -> Sem effs a
+logToHandles :: forall effs e a. Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => [(ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text, Handle)] -> Sem (Logger e ': effs) a -> Sem effs a
 
 logToHandles convertersHandles = 
     interpret $ \lg -> 
@@ -121,16 +121,16 @@ logToHandles convertersHandles =
                         lgInfo :: LogIdxTime
                         lgInfo = LogIdxTime (unLogIndex idx) now
 
-                        simpleConvertersHandles :: [(LogProtocol e -> Text, Handle)]
+                        simpleConvertersHandles :: [(LogProtocolBase e -> Text, Handle)]
                         simpleConvertersHandles = (\(f , h) -> (f threadInfo lgInfo, h)) <$> convertersHandles
 
-                        logToHandle :: (LogProtocol e -> Text) -> Handle -> LogProtocol e -> IO ()
+                        logToHandle :: (LogProtocolBase e -> Text) -> Handle -> LogProtocolBase e -> IO ()
                         logToHandle cvtr h = putLines h . cvtr
                     
-                        logToh :: LogProtocol e -> (LogProtocol e -> Text, Handle) -> IO ()
+                        logToh :: LogProtocolBase e -> (LogProtocolBase e -> Text, Handle) -> IO ()
                         logToh lp (f, h) = logToHandle f h lp
                     
-                        logLogProtocol :: LogProtocol e -> IO ()
+                        logLogProtocol :: LogProtocolBase e -> IO ()
                         logLogProtocol lp =  P.sequence_ $ logToh lp <$> simpleConvertersHandles
                     
                         logRunTohandles :: RunProtocol e -> IO ()
@@ -152,7 +152,7 @@ logToHandles convertersHandles =
                       embed $ logToIO lg
 
 
-logDocWithSink :: forall effs a e. (LogProtocol e -> Sem effs ()) -> Sem (Logger e ': effs) a -> Sem effs a
+logDocWithSink :: forall effs a e. (LogProtocolBase e -> Sem effs ()) -> Sem (Logger e ': effs) a -> Sem effs a
 logDocWithSink pushItem = 
   let
     pushDoc :: DocProtocol e -> Sem effs () 

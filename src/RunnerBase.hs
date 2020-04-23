@@ -1,13 +1,13 @@
 module RunnerBase where
 
 import DSL.Ensure
-import Common (FilterErrorType, AppError)
+import Common (FilterErrorType, FrameworkError)
 import Pyrelude
 import Polysemy
 import Polysemy.Error
 import RunElementClasses
 
-type Ensurable e effs = Members '[Ensure, Error (AppError e)] effs
+type Ensurable e effs = Members '[Ensure, Error (FrameworkError e)] effs
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,
@@ -28,7 +28,7 @@ data TestGroup m1 m a effs =
         goHome :: PreRun effs,
         -- a list of tests
         tests :: [m1 (m a)]
-        -- eg [IO Either (AppError TestInfo)]
+        -- eg [IO Either (FrameworkError TestInfo)]
    }
 
 instance Titled (TestGroup m1 m a effs) where

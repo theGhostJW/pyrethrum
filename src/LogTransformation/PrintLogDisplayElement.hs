@@ -14,7 +14,7 @@ module LogTransformation.PrintLogDisplayElement (
   PrepStateInfo(..)
 ) where
 
-import Common as C (AppError(..), DetailedInfo(..), indentText)
+import Common as C (FrameworkError(..), DetailedInfo(..), indentText)
 import LogTransformation.Common as LC
 import Check as CK
 import Pyrelude as P
@@ -81,20 +81,20 @@ data IterationSummary = IterationSummary {
 
 data IterationError e = IterationError {
     phase :: IterationPhase,
-    error :: LogProtocol e
+    error :: LogProtocolBase e
   } deriving (Eq, Show)
                           
 data IterationWarning e = IterationWarning {
     phase :: IterationPhase,
-    warning :: LogProtocol e
+    warning :: LogProtocolBase e
   } deriving (Eq, Show)
 
 data ApStateInfo e = SucceededInteractor ApStateJSON | 
-                   FailedInteractor (AppError e)
+                   FailedInteractor (FrameworkError e)
                    deriving (Eq, Show)
 
 data PrepStateInfo e = SucceededPrepState DStateJSON |
-                     FailedPrepState (AppError e)
+                     FailedPrepState (FrameworkError e)
                      deriving (Eq, Show)
 
 data IterationRecord e = IterationRecord {
@@ -138,7 +138,7 @@ printProblemsDisplayStep :: forall e.
   RunResults                                                            -- RunResults
   -> LineNo                                                             -- lineNo
   -> ProblemIterationAccum e                                              -- accum
-  -> Either DeserialisationError (LogProtocol e)                            -- source                           -- parse error or apperror
+  -> Either DeserialisationError (LogProtocolBase e)                            -- source                           -- parse error or FrameworkError
   -> (ProblemIterationAccum e, Maybe [PrintLogDisplayElement e]) -- (newAccum, err / result)
 printProblemsDisplayStep runResults@(RunResults outOfTest iterationResults) lineNo (ProblemIterationAccum itAccum@(IterationAccum mRec stepInfo mFltrLg) skipItt skipTst) eithLp = 
   let 
@@ -181,7 +181,7 @@ printLogDisplayStep :: forall e.
   RunResults                                                            -- RunResults
   -> LineNo                                                             -- lineNo
   -> IterationAccum e                                                    -- accum
-  -> Either DeserialisationError (LogProtocol e)                            -- source                           -- parse error or apperror
+  -> Either DeserialisationError (LogProtocolBase e)                            -- source                           -- parse error or FrameworkError
   -> (IterationAccum e, Maybe [PrintLogDisplayElement e]) -- (newAccum, err / result)
 printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFltrLg) eithLp = 
   

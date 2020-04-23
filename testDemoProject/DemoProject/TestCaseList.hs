@@ -71,7 +71,7 @@ validPlan ro0 gh0 ro1 gh1 f =
 simplePlan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 simplePlan = validPlan doNothing doNothing doNothing doNothing
 
-runParams :: forall effs. EFFAllEffects effs => RunParams RunConfig TestConfig effs
+runParams :: forall effs. EFFAllEffects effs => (RunParams SuiteError) RunConfig TestConfig effs
 runParams = RunParams {
       plan = simplePlan,
       filters = filterList,
@@ -93,7 +93,7 @@ listingSem = mkRunSem runParams {itemRunner = docExecution}
 ---------- Listings - to DList ----------
 -----------------------------------------
 
-rawListing :: (DList Text, Either AppError ())
+rawListing :: (DList Text, Either (FrameworkError SuiteError) ())
 rawListing = documentRaw listingSem
 
 prettyListing :: (DList Text, Either AppError ())

@@ -28,7 +28,7 @@ data LogTransformError e = LogDeserialisationError DeserialisationError |
 
                           LogTransformError {
                                   linNo :: LineNo,
-                                  logItem :: LogProtocol e,
+                                  logItem :: LogProtocolBase e,
                                   info :: Text
                                 } deriving (Eq, Show)
 
@@ -56,13 +56,13 @@ instance A.ToJSONKey ExecutionStatus where
 instance A.FromJSONKey ExecutionStatus where
    -- default implementation
 
-isBoundaryLog :: LogProtocol e -> Bool
+isBoundaryLog :: LogProtocolBase e -> Bool
 isBoundaryLog = 
   \case
    BoundaryLog bl -> True
    _ -> False
 
-calcNextIterationFailStage :: Maybe IterationPhase -> ExecutionStatus -> IterationPhase -> Maybe (LogProtocol e) -> Maybe IterationPhase
+calcNextIterationFailStage :: Maybe IterationPhase -> ExecutionStatus -> IterationPhase -> Maybe (LogProtocolBase e) -> Maybe IterationPhase
 calcNextIterationFailStage mCurrentFailPhase lgStatus currPhase mLp = 
   currPhase == OutOfIteration || maybe False isBoundaryLog mLp
       ? Nothing
@@ -73,7 +73,7 @@ calcNextIterationFailStage mCurrentFailPhase lgStatus currPhase mLp =
                 (\fs -> Just $ max fs currPhase)
           $ mCurrentFailPhase
 
-logProtocolStatus :: Bool -> LogProtocol e -> ExecutionStatus
+logProtocolStatus :: Bool -> LogProtocolBase e -> ExecutionStatus
 logProtocolStatus chkEncountered = \case
                         BoundaryLog bl -> 
                           case bl of 
@@ -145,7 +145,7 @@ data PhaseSwitch = PhaseSwitch {
                          to :: IterationPhase
                      }
 
-isEndIteration :: LogProtocol e -> Bool
+isEndIteration :: LogProtocolBase e -> Bool
 isEndIteration = \case
                     BoundaryLog bl -> case bl of 
                                         EndIteration _ -> True
@@ -153,7 +153,7 @@ isEndIteration = \case
                     _ -> False
 
 -- calculate expected from / to base on log message
-phaseSwitch :: LogProtocol e -> Maybe IterationPhase -> Maybe PhaseSwitch
+phaseSwitch :: LogProtocolBase e -> Maybe IterationPhase -> Maybe PhaseSwitch
 phaseSwitch lp mFailedPhase = 
   let
     ps :: IterationPhase -> IterationPhase -> Maybe PhaseSwitch
@@ -197,7 +197,7 @@ phaseSwitch lp mFailedPhase =
                                     Warning' detailedInfo -> Nothing
                                     CheckOutcome{} -> Nothing -- stay in checks
                   
-phaseChange :: IterationPhase -> Maybe IterationPhase -> LogProtocol e -> (Bool, IterationPhase)
+phaseChange :: IterationPhase -> Maybe IterationPhase -> LogProtocolBase e -> (Bool, IterationPhase)
 phaseChange lastPhase stageFailure lp =  
   maybef (phaseSwitch lp stageFailure)
     (True, lastPhase)
@@ -211,7 +211,7 @@ nxtValue  mCurrent = \case
                         Keep -> mCurrent 
                         New val -> Just val
 
-testItrDelta :: LogProtocol e -> (DeltaAction TestModule, DeltaAction ItemId)
+testItrDelta :: LogProtocolBase e -> (DeltaAction TestModule, DeltaAction ItemId)
 testItrDelta = 
   let 
     clear = (Clear, Clear)
@@ -233,7 +233,7 @@ testItrDelta =
       IterationLog (Doc _) -> keep -- should not happen
       IterationLog (Run rp) -> keep
 
-nxtIteration :: Maybe (ItemId, IterationOutcome) -> LogProtocol e -> Maybe (ItemId, IterationOutcome) 
+nxtIteration :: Maybe (ItemId, IterationOutcome) -> LogProtocolBase e -> Maybe (ItemId, IterationOutcome) 
 nxtIteration current lp = 
   let 
     (
@@ -253,7 +253,7 @@ nxtIteration current lp =
                 New itmId -> Just (itmId, IterationOutcome Pass OutOfIteration)
 
 
-logProtocolStep :: LPStep -> LogProtocol e -> LPStep
+logProtocolStep :: LPStep -> LogProtocolBase e -> LPStep
 logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration checkEncountered) lp = 
   let 
     (
@@ -264,7 +264,7 @@ logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration
     nxtActiveItr :: Maybe (ItemId, IterationOutcome)
     nxtActiveItr = nxtIteration activeIteration lp
 
-    isCheck :: LogProtocol e -> Bool 
+    isCheck :: LogProtocolBase e -> Bool 
     isCheck = 
       \case 
           BoundaryLog{} -> False
@@ -276,7 +276,7 @@ logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration
                   CheckOutcome{} -> True 
                   _ -> False 
 
-    resetCheck :: LogProtocol e -> Bool 
+    resetCheck :: LogProtocolBase e -> Bool 
     resetCheck = 
       \case 
           BoundaryLog bl -> 
@@ -349,7 +349,7 @@ testSink = tell . fromList
 logProtocolPrettyPrintReducer :: Show e =>
                 LineNo 
                 -> ()                  -- accumulator
-                -> Either DeserialisationError (LogProtocol e)         -- line item
+                -> Either DeserialisationError (LogProtocolBase e)         -- line item
                 -> ((), Maybe [Text])             -- (accum, result item)
 logProtocolPrettyPrintReducer _ _ ethLp = (
                                               (), Just . pure $ eitherf ethLp  

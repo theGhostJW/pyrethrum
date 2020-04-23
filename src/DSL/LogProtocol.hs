@@ -1,6 +1,6 @@
 module DSL.LogProtocol where
 
-import           Common (DetailedInfo, AppError)
+import           Common (DetailedInfo, FrameworkError)
 import           Check
 import           Pyrelude
 import           RunElementClasses
@@ -43,10 +43,10 @@ data DocActionInfo =
     ActionInfo' Text Text 
     deriving (Eq, Show)
 
-logDoc :: DocProtocol e -> LogProtocol e
+logDoc :: DocProtocol e -> LogProtocolBase e
 logDoc = IterationLog . Doc
 
-logRun :: RunProtocol e -> LogProtocol e
+logRun :: RunProtocol e -> LogProtocolBase e
 logRun = IterationLog . Run
 
 data DocProtocol e =   
@@ -62,7 +62,7 @@ data DocProtocol e =
                 DocWarning Text |
                 DocWarning' DetailedInfo |
 
-                DocError (AppError e)
+                DocError (FrameworkError e)
               deriving (Eq, Show)
 
 data RunProtocol e =   
@@ -70,10 +70,10 @@ data RunProtocol e =
                 StartPrepState |
                 StartInteraction |
                 InteractorSuccess ItemId ApStateJSON |
-                InteractorFailure ItemId (AppError e) |
+                InteractorFailure ItemId (FrameworkError e) |
               
                 PrepStateSuccess ItemId DStateJSON |
-                PrepStateFailure ItemId (AppError e) |
+                PrepStateFailure ItemId (FrameworkError e) |
                 StartChecks | 
                 CheckOutcome ItemId CheckReport |
 
@@ -83,7 +83,7 @@ data RunProtocol e =
                 Warning Text |
                 Warning' DetailedInfo |
 
-                Error (AppError e)
+                Error (FrameworkError e)
               deriving (Eq, Show)
 
 data SubProtocol e = 
@@ -107,12 +107,12 @@ data BoundaryEvent =
     EndIteration ItemId 
   deriving (Eq, Show)
 
-data LogProtocol e =
+data LogProtocolBase e =
   BoundaryLog BoundaryEvent |
   IterationLog (SubProtocol e)
  deriving (Eq, Show)
 
-$(deriveJSON defaultOptions ''LogProtocol)
+$(deriveJSON defaultOptions ''LogProtocolBase)
 $(deriveJSON defaultOptions ''DocProtocol)
 $(deriveJSON defaultOptions ''RunProtocol)
 $(deriveJSON defaultOptions ''SubProtocol)

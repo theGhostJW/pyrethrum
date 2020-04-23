@@ -12,12 +12,12 @@ import DSL.LogProtocol.PrettyPrint
 
 -- Helpers --
 
-fullLog :: IO ([LogProtocol], Either AppError ())
+fullLog :: IO ([LogProtocolBase], Either FrameworkError ())
 fullLog = runToLPList
 
 logAllways = True
 
-chkFullLog :: (([LogProtocol], Either AppError ()) -> Bool) -> (([LogProtocol], Either AppError ()) -> Text) -> IO ()
+chkFullLog :: (([LogProtocolBase], Either FrameworkError ()) -> Bool) -> (([LogProtocolBase], Either FrameworkError ()) -> Text) -> IO ()
 chkFullLog prd msgFunc = 
   do 
     lg <- fullLog
@@ -31,11 +31,11 @@ chkFullLog prd msgFunc =
      )
     chk' (msgFunc lg) success'
 
-chkRunRslt :: (Either AppError () -> Bool) -> Text -> IO ()
+chkRunRslt :: (Either FrameworkError () -> Bool) -> Text -> IO ()
 chkRunRslt prd msg =
     chkFullLog  (prd . snd) (\flg -> msg <> "\n" <> txt (snd flg))
 
-chkLog :: ([LogProtocol] -> Bool) -> Text -> IO ()
+chkLog :: ([LogProtocolBase] -> Bool) -> Text -> IO ()
 chkLog prd msg =
     chkFullLog (prd . fst) (const (msg <> " - see linked file for log details"))
 
@@ -45,7 +45,7 @@ unit_runs_without_error = chkRunRslt isRight "Error in run result should be Righ
 
 unit_records_expected_prepstate_failures = 
   let 
-    isPrepFailure :: LogProtocol -> Bool 
+    isPrepFailure :: LogProtocolBase -> Bool 
     isPrepFailure = \case 
                         IterationLog (Run (PrepStateFailure _ _)) -> True
                         _ -> False

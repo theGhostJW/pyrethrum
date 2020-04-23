@@ -19,24 +19,24 @@ import           Data.DList as D
 import           Pyrelude as P hiding (app)
 
 type EFFLogger effs = Member Logger effs
-type ApEffs e effs = Members '[Logger e, Ensure, Error (AppError e)] effs
+type ApEffs e effs = Members '[Logger e, Ensure, Error (FrameworkError e)] effs
 
 type EFFEnsureLog e effs = (Members '[Logger e, EP.Ensure] effs)
-type EFFAllEffects e effs = Members (FullEffects e) effs
-type FullEffects e = '[FileSystem, Ensure, ArbitraryIO, Logger e, CurrentTime, Error (AppError e)]
+type EFFAllEffectsBase e effs = Members (FullEffects e) effs
+type FullEffects e = '[FileSystem, Ensure, ArbitraryIO, Logger e, CurrentTime, Error (FrameworkError e)]
 
 -- TODO is there a type level <> DRY out
-type FullIOEffects e = '[FileSystem, EP.Ensure, ArbitraryIO, (Logger e), Reader ThreadInfo, State LogIndex, CurrentTime, Error (AppError e), Embed IO]
-type TestIOEffects e = '[FileSystem, EP.Ensure, ArbitraryIO, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Error (AppError e), Output (LogProtocol e), Embed IO]
+type FullIOMembersBase e = '[FileSystem, EP.Ensure, ArbitraryIO, (Logger e), Reader ThreadInfo, State LogIndex, CurrentTime, Error (FrameworkError e), Embed IO]
+type TestIOEffects e = '[FileSystem, EP.Ensure, ArbitraryIO, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Error (FrameworkError e), Output (LogProtocolBase e), Embed IO]
 
-type FullDocIOEffects e = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Error (AppError e), Embed IO]
-type FullDocEffects e = '[FileSystem, ArbitraryIO, Reader ThreadInfo, State LogIndex, CurrentTime, Logger e, Ensure, Error (AppError e), OutputDListText]
+type FullDocIOEffects e = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Error (FrameworkError e), Embed IO]
+type FullDocEffects e = '[FileSystem, ArbitraryIO, Reader ThreadInfo, State LogIndex, CurrentTime, Logger e, Ensure, Error (FrameworkError e), OutputDListText]
 
-handleIOException :: IO (Either (AppError e) a) -> IO (Either (AppError e) a)
+handleIOException :: IO (Either (FrameworkError e) a) -> IO (Either (FrameworkError e) a)
 handleIOException = handle $ pure . Left . C.IOError
 
 -- todo find a type level <> and replace cons with list
-baseEffExecute :: forall effs a e. (Show e, A.ToJSON e, Member (Embed IO) effs) => (forall effs0. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs0 => Sem (Logger e ': effs0) a -> Sem effs0 a) ->  Sem (FileSystem ':  EP.Ensure ': ArbitraryIO ': Logger e ': Reader ThreadInfo ': State LogIndex ': CurrentTime ': Error (AppError e) ': effs) a -> Sem effs (Either (AppError e) a)
+baseEffExecute :: forall effs a e. (Show e, A.ToJSON e, Member (Embed IO) effs) => (forall effs0. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs0 => Sem (Logger e ': effs0) a -> Sem effs0 a) ->  Sem (FileSystem ':  EP.Ensure ': ArbitraryIO ': Logger e ': Reader ThreadInfo ': State LogIndex ': CurrentTime ': Error (FrameworkError e) ': effs) a -> Sem effs (Either (FrameworkError e) a)
 baseEffExecute logger app = runError
                               $ currentTimeIOInterpreter
                               $ evalState (LogIndex 0)
@@ -47,27 +47,27 @@ baseEffExecute logger app = runError
                               $ fileSystemIOInterpreter
                               app
 
-executeWithLogger :: forall a e. (Show e, A.ToJSON e) => (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger e ': effs) a -> Sem effs a) -> Sem (FullIOEffects e) a -> IO (Either (AppError e) a)
+executeWithLogger :: forall a e. (Show e, A.ToJSON e) => (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger e ': effs) a -> Sem effs a) -> Sem (FullIOMembersBase e) a -> IO (Either (FrameworkError e) a)
 executeWithLogger logger app = 
     handleIOException $ runM (baseEffExecute logger app)
 
-executeInIOConsoleRaw :: forall a e. (Show e, A.ToJSON e) => Sem (FullIOEffects e) a -> IO (Either (AppError e) a)
+executeInIOConsoleRaw :: forall a e. (Show e, A.ToJSON e) => Sem (FullIOMembersBase e) a -> IO (Either (FrameworkError e) a)
 executeInIOConsoleRaw = executeWithLogger logRunConsoleInterpreter
   
-executeInIOConsolePretty :: forall a e. (Show e, A.ToJSON e) => Sem (FullIOEffects e) a -> IO (Either (AppError e) a)
+executeInIOConsolePretty :: forall a e. (Show e, A.ToJSON e) => Sem (FullIOMembersBase e) a -> IO (Either (FrameworkError e) a)
 executeInIOConsolePretty = executeWithLogger logConsolePrettyInterpreter
 
 -- todo find if this is possible
 -- Could not deduce: Polysemy.Internal.Union.IndexOf
---                       effs0 (Polysemy.Internal.Union.Found effs0 (Output LogProtocol))
---                     ~ Output LogProtocol
+--                       effs0 (Polysemy.Internal.Union.Found effs0 (Output LogProtocolBase))
+--                     ~ Output LogProtocolBase
 --     arising from a use of `logRunRawInterpreter'
 --   from the context: Members
 --                       '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs0
--- executeForTest :: forall a. Sem TestIOEffects a -> IO ([LogProtocol], Either AppError a)
+-- executeForTest :: forall a. Sem TestIOEffects a -> IO ([LogProtocolBase], Either FrameworkError a)
 -- executeForTest app = second flattenErrors <$> runM (runOutputList $ baseEffExecute logRunRawInterpreter app)
 
-executeForTest :: forall a e. (Show e, A.ToJSON e) => Sem (TestIOEffects e) a -> IO ([LogProtocol e], Either (AppError e) a)
+executeForTest :: forall a e. (Show e, A.ToJSON e) => Sem (TestIOEffects e) a -> IO ([LogProtocolBase e], Either (FrameworkError e) a)
 executeForTest app = runM $ runOutputList 
                           $ runError
                           $ currentTimeIOInterpreter
@@ -79,7 +79,7 @@ executeForTest app = runM $ runOutputList
                           $ fileSystemIOInterpreter
                           app
                            
-documentWithLogger :: forall a e. (Show e, A.ToJSON e) => (forall effs. Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger e ': effs) a -> Sem effs a) -> Sem (FullDocIOEffects e) a -> IO (Either (AppError e) a)
+documentWithLogger :: forall a e. (Show e, A.ToJSON e) => (forall effs. Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger e ': effs) a -> Sem effs a) -> Sem (FullDocIOEffects e) a -> IO (Either (FrameworkError e) a)
 documentWithLogger logger app = handleIOException
                                     $ runM
                                     $ runError
@@ -93,7 +93,7 @@ documentWithLogger logger app = handleIOException
                                     $ fileSystemDocInterpreter
                                     app
 
-document :: forall a e. (Show e, A.ToJSON e) => (forall effs. Member OutputDListText effs => Sem (Logger e ': effs) a -> Sem effs a) -> Sem (FullDocEffects e) a -> (DList Text, Either (AppError e) a)
+document :: forall a e. (Show e, A.ToJSON e) => (forall effs. Member OutputDListText effs => Sem (Logger e ': effs) a -> Sem effs a) -> Sem (FullDocEffects e) a -> (DList Text, Either (FrameworkError e) a)
 document logger app =   
     run .
     runOutputMonoid id $
@@ -107,8 +107,8 @@ document logger app =
       $ fileSystemDocInterpreter 
       app
       
-documentRaw :: forall a e. (Show e, A.ToJSON e) => Sem (FullDocEffects e) a -> (DList Text, Either (AppError e) a)
+documentRaw :: forall a e. (Show e, A.ToJSON e) => Sem (FullDocEffects e) a -> (DList Text, Either (FrameworkError e) a)
 documentRaw = document logDocInterpreter
 
-documentPretty :: forall a e. (Show e, A.ToJSON e) => Sem (FullDocEffects e) a -> (DList Text, Either (AppError e) a)
+documentPretty :: forall a e. (Show e, A.ToJSON e) => Sem (FullDocEffects e) a -> (DList Text, Either (FrameworkError e) a)
 documentPretty = document logDocPrettyInterpreter

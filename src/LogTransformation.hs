@@ -118,7 +118,7 @@ transformToFile step idser rser seed srcPth destPthFunc =
                   
 prettyPrintLogprotocolReducer :: forall e. (Show e) => LineNo                 -- lineNo
           -> ()                                         -- accum
-          -> Either DeserialisationError (LogProtocol e)    -- Logprotocol
+          -> Either DeserialisationError (LogProtocolBase e)    -- Logprotocol
           -> ((), Maybe [Text])                         -- (newAccum, err / result)
 prettyPrintLogprotocolReducer _ _ ethLp = ((), Just [either txtPretty (prettyPrintLogProtocol False) ethLp])
 
@@ -145,7 +145,7 @@ fileStats srcJsonIniPath =
                                               source = sourceFromHandle hIn,
                                               sink = const $ pure (),
                                               reducer = statsStepForReducer,
-                                              itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocol e),
+                                              itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocolBase e),
                                               resultSerialiser = yamlSerialiser,    
                                               linNo = LineNo 1,
                                               accumulator = emptyStatsAccum
@@ -153,7 +153,7 @@ fileStats srcJsonIniPath =
   in
     (runResults <$>) <$> withInputFile srcJsonIniPath processLines
 
-prepareFinalLogs :: forall e. FromJSON e =>  AbsFile -> IO ()
+prepareFinalLogs :: forall e. FromJSON e => AbsFile -> IO ()
 prepareFinalLogs srcJsonIniPath = 
   do 
     let 

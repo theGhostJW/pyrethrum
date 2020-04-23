@@ -20,10 +20,10 @@ makeSem ''FileSystem
 
 -- {- File System IO Interpreter -}
 
-fileSystemIOInterpreter :: forall a e effs. Members '[Error (AppError e), Embed IO] effs => Sem (FileSystem ': effs) a -> Sem effs a
+fileSystemIOInterpreter :: forall a e effs. Members '[Error (FrameworkError e), Embed IO] effs => Sem (FileSystem ': effs) a -> Sem effs a
 fileSystemIOInterpreter =
   let
-    handleException :: forall b. IO b  -> (IOException -> AppError e) -> Sem effs b
+    handleException :: forall b. IO b  -> (IOException -> FrameworkError e) -> Sem effs b
     handleException action handler = do
                                         r <- embed (E.try action)
                                         case r of

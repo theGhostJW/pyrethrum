@@ -14,11 +14,10 @@ import Polysemy
 import Polysemy.Error as PE
 import DSL.Ensure
 import DSL.Logger
+import DSL.LogProtocol
 
 type EnsureLogEffs effs = EFFEnsureLog SuiteError effs
 type EnsureEffs effs = Ensurable SuiteError effs
-
-type FullIOMembers = FullIOEffects SuiteError
 
 type SuiteLogger = Logger SuiteError
 
@@ -36,6 +35,12 @@ data RunConfig = RunConfig {
 data SuiteError = MyError Text | 
                   MyOtherError 
                   deriving (Show, Typeable)
+
+type AppError = FrameworkError SuiteError
+type EFFAllEffects effs = EFFAllEffectsBase SuiteError effs
+type FullIOEffects = FullIOMembersBase SuiteError
+type FullIOMembers = FullIOMembersBase SuiteError
+type LogProtocol = LogProtocolBase SuiteError
 
 instance Titled RunConfig where
   title = runTitle
@@ -139,8 +144,8 @@ testEndpoint ::
      TestModule
      -> RunConfig
      -> Either FilterErrorType (Set Int)
-     -> (forall m1 m a. TestPlan m1 m a (FullIOEffects SuiteError))
-     -> Sem (FullIOEffects SuiteError) ()
+     -> (forall m1 m a. TestPlan m1 m a FullIOMembers)
+     -> Sem FullIOMembers ()
 testEndpoint = testEndpointPriv normalExecution
 
 testEndpointDoc ::

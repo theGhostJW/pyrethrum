@@ -67,7 +67,7 @@ display :: (DList ByteString -> DList ByteString) -> DList ByteString -> IO ()
 display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
 
 _sampleStatsSimple :: forall e. FromJSON e => StatsAccum
-_sampleStatsSimple = F.foldl' statsStep emptyStatsAccum $ Right <$> (sampleLog :: DList (LogProtocol e)) 
+_sampleStatsSimple = F.foldl' statsStep emptyStatsAccum $ Right <$> (sampleLog :: DList (LogProtocolBase e)) 
 
 type WriterStateByteString o a = WriterState ByteString o a
 sampleStats :: forall e. FromJSON e => RunResults
@@ -75,12 +75,12 @@ sampleStats =
   let
     -- data LogTransformParams accum itm rsltItem m srcFmt snkFmt 
     -- type WriterState i o a = WriterT (DList o) (StateT (DList i) Identity) a
-    transParams :: LogTransformParams StatsAccum (LogProtocol e) StatsAccum (WriterT (DList o) (State (DList ByteString))) ByteString ByteString
+    transParams :: LogTransformParams StatsAccum (LogProtocolBase e) StatsAccum (WriterT (DList o) (State (DList ByteString))) ByteString ByteString
     transParams = LogTransformParams {
       source = testSource,
       sink = const $ pure (),
       reducer = statsStepForReducer,
-      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocol e),
+      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocolBase e),
       resultSerialiser = yamlSerialiser,    
       linNo = LineNo 1,
       accumulator = emptyStatsAccum
@@ -97,7 +97,7 @@ _demo_pretty_print_LP_with_reducer =
       source = testSource,
       sink = testSink,
       reducer = prettyPrintLogprotocolReducer,
-      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocol e),
+      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocolBase e),
       resultSerialiser = id,    
       linNo = LineNo 1,
       accumulator = ()
@@ -134,7 +134,7 @@ prettyPrintLog =
       source = testSource,
       sink = testSink,
       reducer = printLogDisplayStep (sampleStats @RunResults),
-      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocol e),
+      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocolBase e),
       resultSerialiser = id,    
       linNo = LineNo 1,
       accumulator = emptyIterationAccum
@@ -149,7 +149,7 @@ prettyProblemsPrintLog =
       source = testSource,
       sink = testSink,
       reducer = printProblemsDisplayStep (sampleStats @RunResults),
-      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocol e),
+      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocolBase e),
       resultSerialiser = id,    
       linNo = LineNo 1,
       accumulator = emptyProbleIterationAccum
@@ -218,7 +218,7 @@ _demo_pretty_print_problems_log =
 
 unit_demo_pretty_print = _demo_pretty_print_log 
 
-sampleLog :: FromJSON e => DList (LogProtocol e)
+sampleLog :: FromJSON e => DList (LogProtocolBase e)
 sampleLog = fromRight' . A.eitherDecode . toS <$> rawFile
 
 -- todo needs to be regenerated with new log structure

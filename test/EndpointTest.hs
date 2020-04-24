@@ -10,6 +10,7 @@ import           Pyrelude.IO
 import           DSL.Interpreter
 import           Common
 import           DSL.Logger
+import Polysemy
 import           DemoProject.Test.Rough as RT
 import           DemoProject.Test.Rough2 as RT2
 import           DemoProject.Test.Simple as ST
@@ -17,13 +18,13 @@ import DemoProject.Test.RoughIntState
 import DemoProject.Test.RoughDisabled as DT
 import  DemoProject.Test.Simple2 as ST2
 
-justLogPreRun :: EFFLogger effs => PreTestStage -> PreRun effs
+justLogPreRun :: Member (Logger SuiteError) effs => PreTestStage -> PreRun effs
 justLogPreRun stage = PreRun {
   runAction = log $ "Run Action: " <> txt stage,
   checkHasRun = log ("Check Action Run: " <> txt stage) $> True
 }
 
-justLogPreRunFailCheck :: EFFLogger effs => PreTestStage -> PreRun effs
+justLogPreRunFailCheck :: Member (Logger SuiteError) effs => PreTestStage -> PreRun effs
 justLogPreRunFailCheck stage = PreRun {
   runAction = log $ "Run Action: " <> txt stage,
   checkHasRun = log ("Check Action Run: " <> txt stage) $> False

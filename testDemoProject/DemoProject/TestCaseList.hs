@@ -30,7 +30,7 @@ import           Runner as R
 import qualified Control.Exception as E
 import AuxFiles as A
 import LogTransformation (prepareFinalLogs)
-import Data.Aeson (ToJSON(..))
+import Data.Aeson (ToJSON(..), FromJSON)
 import Data.Map as M
 import TestFilter
 import RunnerConsoleAndFile
@@ -113,25 +113,10 @@ runDocument = fst rawListing
 runToLPList :: IO ([LogProtocol], Either AppError ())
 runToLPList = executeForTest runSem
 
-consoleRunResults :: Either AppError [AbsFile] -> IO ()
-consoleRunResults = 
-  either 
-    (\err -> putStrLn $ "Error Encountered\n" <> txt err)
-    (\pths ->
-      let 
-        -- later version of Path changes type of fileExtension
-        -- jsnItmsPth = find ((== jsonItemLogExt) . toS . fromMaybe "" . fileExtension) pths
-        jsnItmsPth = find ((== jsonItemLogExt) . toS . fileExtension) pths
-      in
-        maybef jsnItmsPth
-          (putStrLn $ "Unable to generate report no: " <> jsonItemLogExt <> " file found in log files\n")
-          prepareFinalLogs
-    )
-
 runLogToFile :: WantConsole -> IO ()
 runLogToFile wc = 
     ioRunToFile wc False executeWithLogger runSem >>= consoleRunResults
-    
+
 runToFile :: IO ()
 runToFile = runLogToFile NoConsole
 
@@ -216,3 +201,19 @@ testRunExceptG1Rollover = validPlan exceptionInRollover doNothing doNothing doNo
 
 runExceptG1Rollover :: IO ()
 runExceptG1Rollover = runIO testRunExceptG1Rollover
+
+-- TODO fix parse error - run hlint
+consoleRunResults :: Either AppError [AbsFile] -> IO ()
+consoleRunResults = 
+    either 
+      (\err -> putStrLn $ "Error Encountered\n" <> txt err)
+      (\pths ->
+        let 
+          -- later version of Path changes type of fileExtension
+          -- jsnItmsPth = find ((== jsonItemLogExt) . toS . fromMaybe "" . fileExtension) pths
+          jsnItmsPth = find ((== jsonItemLogExt) . toS . fileExtension) pths
+        in
+          maybef jsnItmsPth
+            (putStrLn $ "Unable to generate report no: " <> jsonItemLogExt <> " file found in log files\n")
+            (prepareFinalLogs @SuiteError)
+      )

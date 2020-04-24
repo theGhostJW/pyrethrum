@@ -18,7 +18,6 @@ import           DSL.LogProtocol
 import           Data.DList as D
 import           Pyrelude as P hiding (app)
 
-type EFFLogger effs = Member Logger effs
 type ApEffs e effs = Members '[Logger e, Ensure, Error (FrameworkError e)] effs
 
 type EFFEnsureLog e effs = (Members '[Logger e, EP.Ensure] effs)

@@ -1,0 +1,71 @@
+**Context**
+---
+
+**One IDE to Rule Them All**
+* [HIE](https://github.com/haskell/haskell-ide-engine)
+    * [LSP Server](https://microsoft.github.io/language-server-protocol/specification)
+    * Provenance ?? I think:
+      * Arose from a previous non LSP project by [Alan Zimmerman](https://github.com/alanz) 
+      * Built on a wide consensus of contributors at the time
+* [ghcide - formally hieCore](https://github.com/digital-asset/ghcide)
+    * Shake based highly optimised orchestration / plugin / state management system for building Haskell IDE tooling. Depends on many upstream changes maded for HIE
+    * [Neil Mitchell](https://github.com/ndmitchell) [et al. x 48](https://github.com/digital-asset/ghcide/graphs/contributors)
+    * from [Announce](http://neilmitchell.blogspot.com/2020/01/one-haskell-ide-to-rule-them-all.html)
+      * Ghcide uses a Shake graph based approach to manage the IDE state, allowing a simpler programming model.
+      * Ghcide breaks the GHC monad apart, making it easier to do tricks like reusing .hi files
+
+ [HIE](https://github.com/haskell/haskell-ide-engine) <> [ghcide - formally hieCore](https://github.com/digital-asset/ghcide) >>= [haskell language server](https://github.com/haskell/haskell-language-server) is a major rerewrite of [HIE] by both these teams such that HIE will sit on top of ghcide
+
+ [HIE files?](https://www.haskell.org/ghc/blog/20190626-HIEFiles.html)
+  
+* [ghcide Talk](https://www.youtube.com/watch?v=cijsaeWNf2E&list=PLxxF72uPfQVRdAsvj7THoys-nVj-oc4Ss)
+* [Announce](http://neilmitchell.blogspot.com/2020/01/one-haskell-ide-to-rule-them-all.html)
+
+---
+**The apparent convergence in effect systems to Polysemy and or eff**
+
+[freer](https://gitlab.com/queertypes/freer) >>= [freer-effects](https://github.com/IxpertaSolutions/freer-effects) >>= [freer-simple*](https://github.com/lexi-lambda/freer-simple#readme)
+
+[mtl](https://github.com/haskell/mtl) <> [fused effects](https://github.com/fused-effects/fused-effects) <> [freer-simple](https://github.com/lexi-lambda/freer-simple#readme) >>= [polysemy](https://github.com/polysemy-research/polysemy)
+
+[mtl](https://github.com/haskell/mtl) <> [fused effects](https://github.com/fused-effects/fused-effects) <> [freer-simple](https://github.com/lexi-lambda/freer-simple#readme) <> [polysemy](https://github.com/polysemy-research/polysemy) >>= [eff*](https://github.com/hasura/eff)
+
+*Seeking*
+ * expressiveness
+ * ease of use (eg. intuitive, low boiler plate, error messages)
+ * **performance**
+
+ *Current Comparisons - Current*
+  * [fused effects readme](https://github.com/fused-effects/fused-effects#comparison-to-other-effect-libraries)
+  * [polysemy readme](https://github.com/polysemy-research/polysemy#overview)
+  * [eff readme](https://github.com/hasura/eff#eff--screaming-fast-extensible-effects-for-less--)
+
+---
+**Record Dot syntax**
+
+[proposal](https://github.com/shayne-fletcher-da/ghc-proposals/blob/record-dot-syntax/proposals/0000-record-dot-syntax.md#23-lexing-and-parsing)
+```haskell
+{-# LANGUAGE RecordDotSyntax #-}
+
+data Company = Company {name :: String, owner :: Person}
+data Person = Person {name :: String, age :: Int}
+
+display :: Company -> String
+display c = c.name ++ " is run by " ++ c.owner.name
+
+nameAfterOwner :: Company -> Company
+nameAfterOwner c = c{name = c.owner.name ++ "'s Company"}
+```
+
+* depends on [the HasField proposal](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0158-record-set-field.rst)
+* [a more detailed example](https://github.com/shayne-fletcher-da/ghc-proposals/blob/record-dot-syntax/proposals/0000-record-dot-syntax.md#3-examples)
+* [PR](https://github.com/ghc-proposals/ghc-proposals/pull/282)
+---
+
+* A couple of books that are being worked on that look pretty interesting
+* The existential crises I have each time I restart Pyrethrium and realise I want to redesign the whole thing
+* My new hobby of cyberstalking the GHC mailing list
+
+---
+
+[other ideas - Stephen Diehl](http://www.stephendiehl.com/posts/decade.html)

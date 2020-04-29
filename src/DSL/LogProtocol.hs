@@ -63,7 +63,7 @@ data DocProtocol e =
                 DocWarning' DetailedInfo |
 
                 DocError (FrameworkError e)
-              deriving (Eq, Show)
+              deriving (Eq, Show, Functor)
 
 data RunProtocol e =   
                 IOAction Text |
@@ -84,12 +84,12 @@ data RunProtocol e =
                 Warning' DetailedInfo |
 
                 Error (FrameworkError e)
-              deriving (Eq, Show)
+              deriving (Eq, Show, Functor)
 
 data SubProtocol e = 
     Doc (DocProtocol e)|
     Run (RunProtocol e)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 
 data BoundaryEvent = 
     FilterLog [FilterResult] |
@@ -110,7 +110,9 @@ data BoundaryEvent =
 data LogProtocolBase e =
   BoundaryLog BoundaryEvent |
   IterationLog (SubProtocol e)
- deriving (Eq, Show)
+ deriving (Eq, Show, Functor)
+
+type LogProtocolOut = LogProtocolBase Text
 
 $(deriveJSON defaultOptions ''LogProtocolBase)
 $(deriveJSON defaultOptions ''DocProtocol)

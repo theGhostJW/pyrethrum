@@ -69,12 +69,16 @@ logRunConsoleInterpreter =
 putLines :: Handle -> Text -> IO ()
 putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
 
+utfEncode :: A.ToJSON a => a -> Text
+utfEncode a = either 
+                (\e -> "Encode error: " <> txt e)
+                id
+                (decodeUtf8' . B.toStrict $ A.encode a)
+
 -- TODO - update to use info
 logStrJSONWith :: A.ToJSON e => ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text
-logStrJSONWith _ _ lp = eitherf (decodeUtf8' . B.toStrict . A.encode $ lp)
-                          (\e -> "Encode error: " <> txt e)
-                          id
-
+logStrJSONWith _ _ lp = utfEncode $ utfEncode <$> lp
+                
 runThreadInfoReader :: Member CurrentTime r => Sem (Reader ThreadInfo ': r) a -> Sem r a 
 runThreadInfoReader sem = 
   do 
@@ -108,8 +112,8 @@ logRunWithSink pushItem =
 -- can produce a list of LogProtocols - used for testing
 logRunRawInterpreter :: forall effs a e. (Show e, A.ToJSON e, Member (Output (LogProtocolBase e)) effs) => Sem (Logger e ': effs) a -> Sem effs a
 logRunRawInterpreter = logRunWithSink output
-logToHandles :: forall effs e a. Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => [(ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text, Handle)] -> Sem (Logger e ': effs) a -> Sem effs a
 
+logToHandles :: forall effs e a. Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => [(ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text, Handle)] -> Sem (Logger e ': effs) a -> Sem effs a
 logToHandles convertersHandles = 
     interpret $ \lg -> 
                     do 

@@ -215,5 +215,5 @@ consoleRunResults =
         in
           maybef jsnItmsPth
             (putStrLn $ "Unable to generate report no: " <> jsonItemLogExt <> " file found in log files\n")
-            (prepareFinalLogs @SuiteError)
+            prepareFinalLogs
       )

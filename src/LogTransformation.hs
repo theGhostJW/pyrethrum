@@ -43,7 +43,6 @@ logTransform (LogTransformParams src snk step idser rsltSersr lineNo accum) =
     in
       do 
         lg <- src
-
         maybef lg
           (pure accum) -- EOF
           (\bs -> 
@@ -76,7 +75,7 @@ sourceFromHandle h = hIsEOF h >>= bool (Just <$> B.hGetLine h) (pure Nothing)
 sinkFromHandle :: Handle -> [ByteString] -> IO () 
 sinkFromHandle h bs = sequence_ $ B.hPutStrLn h <$> bs
 
-withInputFile :: AbsFile -> (Handle -> IO (Either (LogTransformError e) a)) -> IO (Either (LogTransformError e) a)
+withInputFile :: AbsFile -> (Handle -> IO (Either LogTransformError a)) -> IO (Either LogTransformError a)
 withInputFile srcPth fLinesProcessor = 
   do
     hSrc <- safeOpenFile srcPth ReadMode
@@ -84,14 +83,14 @@ withInputFile srcPth fLinesProcessor =
       (pure . Left . LogIOError "Openning Source File")
       (\hIn -> fLinesProcessor hIn `finally` hClose hIn)
 
-transformToFile :: forall itm rslt accum e.    
+transformToFile :: forall itm rslt accum.    
                   (LineNo -> accum -> Either DeserialisationError itm -> (accum, Maybe [rslt]))  -- line stepper
                   -> (LineNo -> ByteString -> Either DeserialisationError itm)                   -- a deserialiser for the item
                   -> (rslt -> ByteString)                                                        -- a serialiser for the result
                   -> accum                                                                       -- seed accumulator
                   -> AbsFile                                                                     -- source file
                   -> (forall m. MonadThrow m => AbsFile -> m AbsFile)                            -- dest file calculation                                                          -- seed accumulator
-                  -> IO (Either (LogTransformError e) AbsFile)
+                  -> IO (Either LogTransformError AbsFile)
 transformToFile step idser rser seed srcPth destPthFunc =
   let
     processLines :: Handle -> Handle -> IO accum
@@ -105,7 +104,7 @@ transformToFile step idser rser seed srcPth destPthFunc =
                                             accumulator = seed
                                           }
 
-    writeLines :: Handle -> IO (Either (LogTransformError e) AbsFile)
+    writeLines :: Handle -> IO (Either LogTransformError AbsFile)
     writeLines hIn = 
       do
         rsltFile <- destPthFunc srcPth
@@ -127,7 +126,7 @@ prettyPrintLogprotocolReducer _ _ ethLp = ((), Just [either txtPretty (prettyPri
 --------------- Log File Post Processing ----------------
 ---------------------------------------------------------
 
-prettyPrintTestRun :: RunResults -> AbsFile -> IO (Either (LogTransformError e) AbsFile)
+prettyPrintTestRun :: RunResults -> AbsFile -> IO (Either LogTransformError AbsFile)
 prettyPrintTestRun rr srcJsonIniPath = transformToFile 
                                           (printLogDisplayStep rr)
                                           jsonDeserialiser
@@ -137,15 +136,15 @@ prettyPrintTestRun rr srcJsonIniPath = transformToFile
                                           -- (replaceExtension ".full.yaml") -- later version of Path
                                           (-<.> ".full.yaml")
 
-fileStats :: forall e. FromJSON e => AbsFile -> IO (Either (LogTransformError e) RunResults)
+fileStats :: AbsFile -> IO (Either LogTransformError RunResults)
 fileStats srcJsonIniPath = 
   let
-    processLines :: Handle -> IO (Either (LogTransformError e) StatsAccum)
+    processLines :: Handle -> IO (Either LogTransformError StatsAccum)
     processLines hIn = Right <$> logTransform LogTransformParams {
                                               source = sourceFromHandle hIn,
                                               sink = const $ pure (),
                                               reducer = statsStepForReducer,
-                                              itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError (LogProtocolBase e),
+                                              itemDesrialiser = jsonDeserialiser,
                                               resultSerialiser = yamlSerialiser,    
                                               linNo = LineNo 1,
                                               accumulator = emptyStatsAccum
@@ -153,11 +152,12 @@ fileStats srcJsonIniPath =
   in
     (runResults <$>) <$> withInputFile srcJsonIniPath processLines
 
-prepareFinalLogs :: forall e. FromJSON e => AbsFile -> IO ()
+
+prepareFinalLogs :: AbsFile -> IO ()
 prepareFinalLogs srcJsonIniPath = 
   do 
     let 
-      fileStats' :: AbsFile -> IO (Either (LogTransformError e) RunResults)
+      fileStats' :: AbsFile -> IO (Either LogTransformError RunResults)
       fileStats' = fileStats
 
     putStrLn "=== Preparing Final Report ==="

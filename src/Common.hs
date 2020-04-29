@@ -65,7 +65,7 @@ data FrameworkError e =
             AnnotatedError Text (FrameworkError e) |
 
             SuiteError e
-            deriving (Show, Eq)
+            deriving (Show, Eq, Functor)
 
 $(deriveJSON defaultOptions ''FrameworkError)
 

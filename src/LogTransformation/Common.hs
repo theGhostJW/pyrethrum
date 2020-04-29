@@ -19,7 +19,7 @@ import qualified Data.Set as S
 
 newtype LineNo = LineNo { unLineNo :: Int } deriving (Show, Eq)
 
-data LogTransformError e = LogDeserialisationError DeserialisationError |
+data LogTransformError = LogDeserialisationError DeserialisationError |
 
                           LogIOError {
                                   message :: Text,
@@ -28,7 +28,7 @@ data LogTransformError e = LogDeserialisationError DeserialisationError |
 
                           LogTransformError {
                                   linNo :: LineNo,
-                                  logItem :: LogProtocolBase e,
+                                  logItem :: LogProtocolOut,
                                   info :: Text
                                 } deriving (Eq, Show)
 
@@ -253,7 +253,7 @@ nxtIteration current lp =
                 New itmId -> Just (itmId, IterationOutcome Pass OutOfIteration)
 
 
-logProtocolStep :: LPStep -> LogProtocolBase e -> LPStep
+logProtocolStep :: LPStep -> LogProtocolOut -> LPStep
 logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration checkEncountered) lp = 
   let 
     (
@@ -295,7 +295,7 @@ logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration
                             $ checkEncountered || isCheck lp
 
     lgStatus :: ExecutionStatus
-    lgStatus = max (logProtocolStatus checkEncountered lp) (nxtPhaseValid ? Pass $ Fail)
+    lgStatus = max (debug $ logProtocolStatus checkEncountered lp) (nxtPhaseValid ? Pass $ Fail)
 
     nxtFailStage :: Maybe IterationPhase
     nxtFailStage = calcNextIterationFailStage failStage lgStatus nxtPhase $ Just lp

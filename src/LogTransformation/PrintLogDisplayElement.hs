@@ -41,7 +41,7 @@ import qualified Data.HashMap.Strict as HM
 ----------------- Iteration Aggregation ----------------
 --------------------------------------------------------
 
-data PrintLogDisplayElement e =
+data PrintLogDisplayElement =
   FilterLog [FilterResult] |
 
   StartRun {  
@@ -65,9 +65,10 @@ data PrintLogDisplayElement e =
     status :: ExecutionStatus, -- test Config as Json
     stats :: StatusCount
   }  |
+  
   -- EndTest TestModule |
-  Iteration (IterationRecord e) |
-  LineError (LogTransformError e)
+  Iteration IterationRecord |
+  LineError LogTransformError
   deriving (Show, Eq)
 
 data IterationSummary = IterationSummary {
@@ -79,25 +80,25 @@ data IterationSummary = IterationSummary {
                           status :: ExecutionStatus
                         } deriving (Eq, Show)
 
-data IterationError e = IterationError {
+data IterationError = IterationError {
     phase :: IterationPhase,
-    error :: LogProtocolBase e
+    error :: LogProtocolOut
   } deriving (Eq, Show)
                           
-data IterationWarning e = IterationWarning {
+data IterationWarning = IterationWarning {
     phase :: IterationPhase,
-    warning :: LogProtocolBase e
+    warning :: LogProtocolOut
   } deriving (Eq, Show)
 
-data ApStateInfo e = SucceededInteractor ApStateJSON | 
-                   FailedInteractor (FrameworkError e)
+data ApStateInfo = SucceededInteractor ApStateJSON | 
+                   FailedInteractor (FrameworkError Text)
                    deriving (Eq, Show)
 
-data PrepStateInfo e = SucceededPrepState DStateJSON |
-                     FailedPrepState (FrameworkError e)
+data PrepStateInfo = SucceededPrepState DStateJSON |
+                     FailedPrepState (FrameworkError Text)
                      deriving (Eq, Show)
 
-data IterationRecord e = IterationRecord {
+data IterationRecord = IterationRecord {
   modulePath :: Text,
   itmId :: Int,
   notes :: Maybe Text,
@@ -105,45 +106,45 @@ data IterationRecord e = IterationRecord {
   post:: Text,
   outcome :: IterationOutcome,
   validation :: [CheckReport],
-  otherErrors :: [IterationError e],
-  otherWarnings :: [IterationWarning e],
+  otherErrors :: [IterationError],
+  otherWarnings :: [IterationWarning],
   item :: Maybe A.Value,
-  apState :: Maybe (ApStateInfo e),
-  domainState :: Maybe (PrepStateInfo e)
+  apState :: Maybe ApStateInfo,
+  domainState :: Maybe PrepStateInfo
 } deriving (Eq, Show)
 
-data IterationAccum e = IterationAccum {
-  rec :: Maybe (IterationRecord e),
+data IterationAccum = IterationAccum {
+  rec :: Maybe IterationRecord,
   stepInfo :: LPStep,
   filterLog :: Maybe [FilterResult]
 } deriving Show
 
-emptyIterationAccum :: IterationAccum e
+emptyIterationAccum :: IterationAccum
 emptyIterationAccum = IterationAccum {
   rec = Nothing,
   stepInfo = emptyLPStep,
   filterLog = Nothing
 }
 
-data ProblemIterationAccum e = ProblemIterationAccum {
-  accum :: IterationAccum e,
+data ProblemIterationAccum = ProblemIterationAccum {
+  accum :: IterationAccum,
   skipIteration :: Bool,
   skipTest :: Bool
 }
 
-emptyProbleIterationAccum :: ProblemIterationAccum e
+emptyProbleIterationAccum :: ProblemIterationAccum
 emptyProbleIterationAccum = ProblemIterationAccum emptyIterationAccum False False
 
-printProblemsDisplayStep :: forall e.
+printProblemsDisplayStep :: 
   RunResults                                                            -- RunResults
   -> LineNo                                                             -- lineNo
-  -> ProblemIterationAccum e                                              -- accum
-  -> Either DeserialisationError (LogProtocolBase e)                            -- source                           -- parse error or FrameworkError
-  -> (ProblemIterationAccum e, Maybe [PrintLogDisplayElement e]) -- (newAccum, err / result)
+  -> ProblemIterationAccum                                              -- accum
+  -> Either DeserialisationError LogProtocolOut                           -- source                           -- parse error or FrameworkError
+  -> (ProblemIterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
 printProblemsDisplayStep runResults@(RunResults outOfTest iterationResults) lineNo (ProblemIterationAccum itAccum@(IterationAccum mRec stepInfo mFltrLg) skipItt skipTst) eithLp = 
   let 
     -- (IterationAccum, Maybe [PrintLogDisplayElement])
-    _normalStep :: (IterationAccum e, Maybe [PrintLogDisplayElement e]) -- (newAccum, err / result)
+    _normalStep :: (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
     _normalStep@(nxtItAccum@(IterationAccum _nxtMRec _nxtStepInfo _nxtMFltrLg), mDisplayElement) = printLogDisplayStep runResults lineNo itAccum eithLp
 
     testStatus' :: TestModule -> ExecutionStatus
@@ -159,7 +160,7 @@ printProblemsDisplayStep runResults@(RunResults outOfTest iterationResults) line
             _ -> (skipItt, skipTst)
         )
 
-    nxtAccum :: ProblemIterationAccum e
+    nxtAccum :: ProblemIterationAccum
     nxtAccum = ProblemIterationAccum {
       accum = nxtItAccum,
       skipIteration = nxtSkipItt,
@@ -177,12 +178,12 @@ testStatusMap = testExStatus . iterationResults
 testStatus :: M.Map TestModule ExecutionStatus -> TestModule -> ExecutionStatus
 testStatus tstStatusMap tm = fromMaybe LC.Fail $ M.lookup tm tstStatusMap
 
-printLogDisplayStep :: forall e.
+printLogDisplayStep ::
   RunResults                                                            -- RunResults
   -> LineNo                                                             -- lineNo
-  -> IterationAccum e                                                    -- accum
-  -> Either DeserialisationError (LogProtocolBase e)                            -- source                           -- parse error or FrameworkError
-  -> (IterationAccum e, Maybe [PrintLogDisplayElement e]) -- (newAccum, err / result)
+  -> IterationAccum                                                    -- accum
+  -> Either DeserialisationError LogProtocolOut                           -- source                           -- parse error or FrameworkError
+  -> (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
 printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFltrLg) eithLp = 
   
   eitherf eithLp
@@ -192,7 +193,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
         nxtStepInfo = stepInfo {faileStage = nxtFailStage}
       in
         (
-          oldAccum { stepInfo = nxtStepInfo} :: IterationAccum e, 
+          oldAccum { stepInfo = nxtStepInfo} :: IterationAccum, 
           Just [LineError $ LogDeserialisationError err]
         )
    )
@@ -221,10 +222,10 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
         nxtStepInfo@(LPStep _nxtPhaseValid _nxtFailStage nxtPhase
                        _logItemStatus _nxtActiveItr _nxtCheckEncountered) = logProtocolStep stepInfo lp
 
-        accum :: IterationAccum e
+        accum :: IterationAccum
         accum = oldAccum {stepInfo = nxtStepInfo}
 
-        lineError :: Text -> Maybe [PrintLogDisplayElement e]
+        lineError :: Text -> Maybe [PrintLogDisplayElement]
         lineError txt' = Just [LineError $ LogTransformError lineNo lp txt']
 
         getNotes :: Y.Value -> Maybe Text
@@ -248,10 +249,10 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
               Y.Bool _ -> Nothing 
               Y.Null -> Nothing 
 
-        updateItrRec :: (IterationRecord e -> IterationRecord e) -> (IterationAccum e, Maybe [PrintLogDisplayElement e]) 
+        updateItrRec :: (IterationRecord -> IterationRecord) -> (IterationAccum, Maybe [PrintLogDisplayElement]) 
         updateItrRec func = 
           let 
-            mIrec :: Maybe (IterationRecord e)
+            mIrec :: Maybe (IterationRecord)
             mIrec = rec accum
           in 
             maybef mIrec
@@ -312,7 +313,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                     severityDesc :: CheckReport -> CheckReport -> Ordering
                     severityDesc (CheckReport rslt1 _) (CheckReport rslt2 _) = compare (Down rslt1) (Down rslt2)
 
-                    sortChecks :: IterationRecord e -> IterationRecord e
+                    sortChecks :: IterationRecord -> IterationRecord
                     sortChecks ir = ir { validation = sortBy severityDesc $ validation ir}
                   in
                     (
@@ -353,7 +354,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                     LP.Error err -> updateItrRec (\ir -> ir {otherErrors = IterationError nxtPhase lp : otherErrors ir})
       )
 
-prettyPrintDisplayElement :: forall e. (Show e, ToJSON e)=> PrintLogDisplayElement e -> Text
+prettyPrintDisplayElement :: PrintLogDisplayElement -> Text
 prettyPrintDisplayElement pde = 
   let 
     noImp = ""
@@ -526,7 +527,7 @@ prettyPrintDisplayElement pde =
                                 <> newLn
                           )
 
-                displayApState :: ApStateInfo e -> Text
+                displayApState :: ApStateInfo -> Text
                 displayApState = 
                   let 
                     mkTxt :: Y.Value -> Text

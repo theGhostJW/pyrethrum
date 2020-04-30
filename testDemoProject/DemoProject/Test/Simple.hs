@@ -61,7 +61,7 @@ i = TestItem
 
 items :: RunConfig -> [Item]
 items rc = [
-              i 100 "Pre"  "Post" validFile $
+              i 100 "Pre" "Post" validFile $
                                             chk "iid is small" (\ApState{..} -> itemId < 200 ) <>
                                             chk "iid is big"   (\ds -> itemId ds > 500),
               i 110 "Pre"  "Post" validFile mempty,

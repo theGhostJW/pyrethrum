@@ -1,4 +1,6 @@
 ## Context
+...
+
 ---
 
 ## One IDE to Rule Them All
@@ -20,6 +22,7 @@
   
 * [ghcide Talk](https://www.youtube.com/watch?v=cijsaeWNf2E&list=PLxxF72uPfQVRdAsvj7THoys-nVj-oc4Ss)
 * [Announce](http://neilmitchell.blogspot.com/2020/01/one-haskell-ide-to-rule-them-all.html)
+* [intero end of life](https://www.reddit.com/r/haskell/comments/dr91dv/the_intero_project_has_reached_its_end_of_life/)
 
 ---
 ## The apparent convergence in effect systems to Polysemy and or eff
@@ -74,11 +77,27 @@ nameAfterOwner c = c{name = c.owner.name ++ "'s Company"}
 * [Old Guide](https://github.com/theGhostJW/zenith-test-complete/blob/master/Documentation/Zenith%20Automation%20Framework.pdf)
     * [local page 41](../../ebooks/ZenithAutomationFramework.pdf)
 * [pyrethrum](https://github.com/theGhostJW/pyrethrum)
-
+  * change of mind on choice of prelude
+  * change from freer simple -> polysemy
+  * polymorphising errors 
+  * [injecting interpreters was a bad idea](https://github.com/theGhostJW/pyrethrum/blob/master/src/Runner.hs#L335)
+  * and still to come:
+    * a [test plan](/testDemoProject\DemoProject\TestCaseList.hs) should be:
+      > a recursive data structure
+      >> a GADT
+      >>> an Effect
+  * contradiction between a controller and effects
+   
+ * [simple test](testDemoProject\DemoProject\Test\Simple.hs)
 ---
 
-## The GHC Contributors Mailing List
-* My new hobby of cyberstalking the GHC mailing list
+## The GHC Steering Committee Mailing List
+* [here it is](https://mail.haskell.org/pipermail/ghc-steering-committee/2020-April/date.html)
+
+---
+## StringBeGone - (not new)
+* [just call encode-string](https://github.com/theGhostJW/pyrelude/blob/1d0a2a28eb5b69a4608b31a17fa46dec1513b8a2/src/Stringy.hs)
+[encode-string](https://hackage.haskell.org/package/encode-string-0.1.0.0/docs/Data-String-Encode.html)
 
 ---
 

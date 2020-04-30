@@ -1,7 +1,7 @@
-**Context**
+## Context
 ---
 
-**One IDE to Rule Them All**
+## One IDE to Rule Them All
 * [HIE](https://github.com/haskell/haskell-ide-engine)
     * [LSP Server](https://microsoft.github.io/language-server-protocol/specification)
     * Provenance ?? I think:
@@ -22,7 +22,7 @@
 * [Announce](http://neilmitchell.blogspot.com/2020/01/one-haskell-ide-to-rule-them-all.html)
 
 ---
-**The apparent convergence in effect systems to Polysemy and or eff**
+## The apparent convergence in effect systems to Polysemy and or eff
 
 [freer](https://gitlab.com/queertypes/freer) >>= [freer-effects](https://github.com/IxpertaSolutions/freer-effects) >>= [freer-simple*](https://github.com/lexi-lambda/freer-simple#readme)
 
@@ -41,7 +41,7 @@
   * [eff readme](https://github.com/hasura/eff#eff--screaming-fast-extensible-effects-for-less--)
 
 ---
-**Record Dot syntax**
+## Record Dot syntax
 
 [proposal](https://github.com/shayne-fletcher-da/ghc-proposals/blob/record-dot-syntax/proposals/0000-record-dot-syntax.md#23-lexing-and-parsing)
 ```haskell
@@ -62,8 +62,22 @@ nameAfterOwner c = c{name = c.owner.name ++ "'s Company"}
 * [PR](https://github.com/ghc-proposals/ghc-proposals/pull/282)
 ---
 
-* A couple of books that are being worked on that look pretty interesting
-* The existential crises I have each time I restart Pyrethrium and realise I want to redesign the whole thing
+## A Couple of Books
+
+* [Functional Design and Architecture - Alexander Granin](https://graninas.com/functional-design-and-architecture-book/)
+  * [local](../../ebooks/Book Draft (6 chapters).pdf)
+* [Algebra-Driven Design - Sandy Maguire](https://leanpub.com/algebra-driven-design)
+  * [local](../../ebooks/algebra-driven-design.pdf)
+---
+## An Existential Crisis
+
+* [Old Guide](https://github.com/theGhostJW/zenith-test-complete/blob/master/Documentation/Zenith%20Automation%20Framework.pdf)
+    * [local page 41](../../ebooks/ZenithAutomationFramework.pdf)
+* [pyrethrum](https://github.com/theGhostJW/pyrethrum)
+
+---
+
+## The GHC Contributors Mailing List
 * My new hobby of cyberstalking the GHC mailing list
 
 ---

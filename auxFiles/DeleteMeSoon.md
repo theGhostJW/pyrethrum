@@ -34,7 +34,7 @@
 [mtl](https://github.com/haskell/mtl) <> [fused effects](https://github.com/fused-effects/fused-effects) <> [freer-simple](https://github.com/lexi-lambda/freer-simple#readme) <> [polysemy](https://github.com/polysemy-research/polysemy) >>= [eff*](https://github.com/hasura/eff)
 
 *Seeking*
- * expressiveness
+ * expressiveness (scoped effects)
  * ease of use (eg. intuitive, low boiler plate, error messages)
  * **performance**
 

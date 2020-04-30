@@ -22,7 +22,6 @@ prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex, timeZone} LogI
     <> newLn 
     <> prettyPrintLogProtocol docMode lgProtocol
 
-
 prettyPrintLogProtocol :: Show e => Bool -> LogProtocolBase e -> Text
 prettyPrintLogProtocol docMode =
   let

@@ -137,21 +137,21 @@ logToHandles convertersHandles =
                         logLogProtocol :: LogProtocolBase e -> IO ()
                         logLogProtocol lp =  P.sequence_ $ logToh lp <$> simpleConvertersHandles
                     
-                        logRunTohandles :: RunProtocol e -> IO ()
-                        logRunTohandles = logLogProtocol . logRun 
+                        logRunToHandles :: RunProtocol e -> IO ()
+                        logRunToHandles = logLogProtocol . logRun 
                       
                         logToIO :: Logger e m x -> IO x
                         logToIO = \case 
                                     LogItem lp -> logLogProtocol lp
 
-                                    LogError msg -> logRunTohandles . LP.Error $ C.Error msg
-                                    LogError' msg info -> logRunTohandles . LP.Error . C.Error' $ DetailedInfo msg info
+                                    LogError msg -> logRunToHandles . LP.Error $ C.Error msg
+                                    LogError' msg info -> logRunToHandles . LP.Error . C.Error' $ DetailedInfo msg info
 
-                                    LogMessage s ->  logRunTohandles $ Message s 
-                                    LogMessage' msg info -> logRunTohandles . Message' $ DetailedInfo msg info
+                                    LogMessage s ->  logRunToHandles $ Message s 
+                                    LogMessage' msg info -> logRunToHandles . Message' $ DetailedInfo msg info
 
-                                    LogWarning s -> logRunTohandles $ Warning s 
-                                    LogWarning' msg info ->  logRunTohandles . Warning' $ DetailedInfo msg info
+                                    LogWarning s -> logRunToHandles $ Warning s 
+                                    LogWarning' msg info ->  logRunToHandles . Warning' $ DetailedInfo msg info
 
                       embed $ logToIO lg
 

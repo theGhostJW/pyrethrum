@@ -112,6 +112,7 @@ prettyPrintLogProtocol docMode =
                               InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ txtPretty err
 
                               PrepStateSuccess iid (DStateJSON ds) -> prettyBlock '>' "PrepState Complete" iid $ prettyYamlKeyValues 2 LeftJustify ds
+                              PrepStateSkipped iid -> docMarkUp $ "PrepState Skipped: " <> txt iid
                               PrepStateFailure iid err -> prettyBlock '>' "PrepState Failure" iid $ txtPretty err
 
                               CheckOutcome iid (CheckReport reslt (MessageInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> txtPretty (classifyResult reslt)) iid $ 

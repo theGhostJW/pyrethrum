@@ -7,6 +7,13 @@ import           RunElementClasses
 import Data.Aeson as A
 import Data.Aeson.TH
 
+-- TODO - Move to Pyrelude
+debug'_ :: Text -> a -> a
+debug'_ _ a = a
+
+debugf'_ :: f -> Text -> a -> a
+debugf'_ _ _ a = a
+
 newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)
 newtype GroupTitle = GroupTitle {unGroupTitle :: Text} deriving (Eq, Show, IsString)
 newtype TestTitle = TestTitle {unTestTitle :: Text} deriving (Eq, Show, IsString)
@@ -67,13 +74,16 @@ data DocProtocol e =
 
 data RunProtocol e =   
                 IOAction Text |
-                StartPrepState |
+                
                 StartInteraction |
                 InteractorSuccess ItemId ApStateJSON |
                 InteractorFailure ItemId (FrameworkError e) |
               
+                StartPrepState |
                 PrepStateSuccess ItemId DStateJSON |
+                PrepStateSkipped ItemId |
                 PrepStateFailure ItemId (FrameworkError e) |
+                
                 StartChecks | 
                 CheckOutcome ItemId CheckReport |
 

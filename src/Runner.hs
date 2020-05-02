@@ -206,10 +206,15 @@ normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  =
           log "interact start"
           ethApState <- try' $ interactor rc i
           eitherf ethApState
-            (logRP . LP.Error)
+            (\e -> do 
+                    logRP $ InteractorFailure iid e
+                    logRP $ PrepStateSkipped iid
+                    recordSkippedChecks
+                    )
             (\as -> do 
                 log "interact end"
                 logRP . InteractorSuccess iid . ApStateJSON . toJSON $ as
+                logRP StartPrepState
                 ds <- PE.catch (prepState i as) prepStateErrorHandler
                 logRP . PrepStateSuccess iid . DStateJSON . toJSON $ ds
                 logRP StartChecks

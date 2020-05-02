@@ -95,6 +95,7 @@ data ApStateInfo = SucceededInteractor ApStateJSON |
                    deriving (Eq, Show)
 
 data PrepStateInfo = SucceededPrepState DStateJSON |
+                     SkippedPrepState ItemId |
                      FailedPrepState (FrameworkError Text)
                      deriving (Eq, Show)
 
@@ -340,7 +341,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                     InteractorFailure iid err -> updateItrRec (\ir -> ir {apState = Just $ FailedInteractor err})
                   
                     PrepStateSuccess iid dStateJSON -> updateItrRec (\ir -> ir {domainState = Just $ SucceededPrepState dStateJSON})
-                  
+                    PrepStateSkipped iid -> updateItrRec (\ir -> ir {domainState = Just $ SkippedPrepState iid})
                     PrepStateFailure iid err -> updateItrRec (\ir -> ir {domainState = Just $ FailedPrepState err})
                     StartChecks -> skipLog 
                     CheckOutcome itmId chkReport -> updateItrRec (\ir -> ir {validation = chkReport : validation ir})
@@ -518,6 +519,7 @@ prettyPrintDisplayElement pde =
                           (
                             \case 
                               SucceededPrepState dsDisplay -> prettyYamlKeyValues 2 LeftJustify $ unDStateJSON dsDisplay
+                              SkippedPrepState iid -> "  Domain State is Empty - Execution Skipped" <> newLn
                               FailedPrepState err -> 
                                 indent2 (
                                   "PrepState Failure - Domain State is Empty:" 

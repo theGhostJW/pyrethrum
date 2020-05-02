@@ -62,7 +62,7 @@ logTransform (LogTransformParams src snk step idser rsltSersr lineNo accum) =
 --                - input: StateT a DList which returns one item until the list is empty
 --                - output: WriterT a DList of rsltItem values 
 transformDList :: DList srcFmt -> LogTransformParams accum input rsltItem (WriterT (DList snkFmt) (StateT (DList srcFmt) Identity)) srcFmt snkFmt -> (accum, DList snkFmt)
-transformDList sourceList = runToList sourceList .  logTransform
+transformDList sourceList = runToList sourceList . logTransform
 
 
 ------------------------------------------------------

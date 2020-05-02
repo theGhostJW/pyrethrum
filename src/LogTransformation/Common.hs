@@ -92,6 +92,7 @@ logProtocolStatus chkEncountered = \case
                             InteractorFailure {} -> Fail
           
                             PrepStateSuccess {} -> Pass
+                            PrepStateSkipped {} -> Pass
                             PrepStateFailure {} -> Fail
           
                             StartChecks{} -> Pass
@@ -141,8 +142,8 @@ data RunResults = RunResults {
                              deriving Show
 
 data PhaseSwitch = PhaseSwitch {
-                        from :: S.Set IterationPhase, 
-                         to :: IterationPhase
+                        legalFromPhases :: S.Set IterationPhase, 
+                        to :: IterationPhase
                      }
 
 isEndIteration :: LogProtocolBase e -> Bool
@@ -153,7 +154,7 @@ isEndIteration = \case
                     _ -> False
 
 -- calculate expected from / to base on log message
-phaseSwitch :: LogProtocolBase e -> Maybe IterationPhase -> Maybe PhaseSwitch
+phaseSwitch :: LogProtocolOut -> Maybe IterationPhase -> Maybe PhaseSwitch
 phaseSwitch lp mFailedPhase = 
   let
     ps :: IterationPhase -> IterationPhase -> Maybe PhaseSwitch
@@ -162,7 +163,7 @@ phaseSwitch lp mFailedPhase =
     outToOut :: Maybe PhaseSwitch
     outToOut = ps OutOfIteration OutOfIteration
   in
-    case lp of
+    case (debug' "========== LOG PROTOCOL =============" lp) of
         BoundaryLog bl -> case bl of 
                             StartRun{} -> outToOut
                             EndRun -> outToOut
@@ -189,6 +190,7 @@ phaseSwitch lp mFailedPhase =
                                     InteractorSuccess{} -> ps Interactor PrePrepState 
                                     InteractorFailure{}  -> Nothing -- keep in failed stage
                                     PrepStateSuccess{}  -> ps PrepState PreChecks
+                                    PrepStateSkipped{}  -> ps Interactor PreChecks
                                     PrepStateFailure iid err -> Nothing -- keep in failed phase
                                     StartChecks{} -> ps (fromMaybe PreChecks mFailedPhase) Checks
                                     Message _ -> Nothing
@@ -196,12 +198,18 @@ phaseSwitch lp mFailedPhase =
                                     LP.Warning s -> Nothing
                                     Warning' detailedInfo -> Nothing
                                     CheckOutcome{} -> Nothing -- stay in checks
-                  
-phaseChange :: IterationPhase -> Maybe IterationPhase -> LogProtocolBase e -> (Bool, IterationPhase)
+
+data PhaseChangeValidation = PhaseChangeValidation {
+  fromPhase ::  IterationPhase,
+  toPhase ::  IterationPhase,
+  valid :: Bool
+} deriving Show
+
+phaseChange :: IterationPhase -> Maybe IterationPhase -> LogProtocolOut -> PhaseChangeValidation
 phaseChange lastPhase stageFailure lp =  
   maybef (phaseSwitch lp stageFailure)
-    (True, lastPhase)
-    (\(PhaseSwitch from to) -> (lastPhase `S.member` from, to))
+    (PhaseChangeValidation lastPhase lastPhase True)
+    (\(PhaseSwitch legalFromPhases to) -> PhaseChangeValidation lastPhase to $ (debug' "LAST PHASE" lastPhase) `S.member` legalFromPhases)
 
 data DeltaAction a = Clear | Keep | New a
 
@@ -256,10 +264,7 @@ nxtIteration current lp =
 logProtocolStep :: LPStep -> LogProtocolOut -> LPStep
 logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration checkEncountered) lp = 
   let 
-    (
-      nxtPhaseValid :: Bool, 
-      nxtPhase :: IterationPhase
-      ) = phaseChange phase failStage lp
+    PhaseChangeValidation {toPhase = nxtPhase, valid = nxtPhaseValid } = debug' "PHASECHANGE" $ phaseChange phase failStage lp
 
     nxtActiveItr :: Maybe (ItemId, IterationOutcome)
     nxtActiveItr = nxtIteration activeIteration lp
@@ -295,7 +300,7 @@ logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration
                             $ checkEncountered || isCheck lp
 
     lgStatus :: ExecutionStatus
-    lgStatus = max (debug $ logProtocolStatus checkEncountered lp) (nxtPhaseValid ? Pass $ Fail)
+    lgStatus = debug' "LGSTATUS" $ max (debug' "LGSTATUS - Left" $ logProtocolStatus checkEncountered lp) (debug' "LGSTATUS - Right" $ nxtPhaseValid ? Pass $ Fail)
 
     nxtFailStage :: Maybe IterationPhase
     nxtFailStage = calcNextIterationFailStage failStage lgStatus nxtPhase $ Just lp
@@ -337,7 +342,7 @@ testSource = do
                 Cons x xs -> do
                               put $ fromList xs
                               pure $ Just x 
-                _ -> P.error "DList pattern match error this should never happen"
+                _ -> P.error $ debug' "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" "DList pattern match error this should never happen"
 
 testSink :: [o] -> WriterState i o () 
 testSink = tell . fromList

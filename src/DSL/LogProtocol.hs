@@ -7,7 +7,7 @@ import           RunElementClasses
 import Data.Aeson as A
 import Data.Aeson.TH
 
--- TODO - Move to Pyrelude
+-- TODO - Move to Pyrelude also check out trace again
 debug'_ :: Text -> a -> a
 debug'_ _ a = a
 

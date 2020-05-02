@@ -53,7 +53,7 @@ applyTestFilters :: forall i tc rc. TestConfigClass tc => [TestFilter rc tc] -> 
 applyTestFilters fltrs rc cvtr itms = 
     fst <$> filter (isNothing . snd) (applyTestFiltersToItemsShowReason fltrs rc cvtr itms) 
 
--- debugging
+-- de bugging
 applyTestFiltersToItemsShowReason :: forall i tc rc. TestConfigClass tc => [TestFilter rc tc] -> rc -> (i -> tc) -> [i] -> [(i, Maybe Text)]
 applyTestFiltersToItemsShowReason fltrs rc cvtr itms = 
   let 

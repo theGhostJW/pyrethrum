@@ -163,7 +163,7 @@ phaseSwitch lp mFailedPhase =
     outToOut :: Maybe PhaseSwitch
     outToOut = ps OutOfIteration OutOfIteration
   in
-    case (debug' "========== LOG PROTOCOL =============" lp) of
+    case lp of
         BoundaryLog bl -> case bl of 
                             StartRun{} -> outToOut
                             EndRun -> outToOut
@@ -209,7 +209,7 @@ phaseChange :: IterationPhase -> Maybe IterationPhase -> LogProtocolOut -> Phase
 phaseChange lastPhase stageFailure lp =  
   maybef (phaseSwitch lp stageFailure)
     (PhaseChangeValidation lastPhase lastPhase True)
-    (\(PhaseSwitch legalFromPhases to) -> PhaseChangeValidation lastPhase to $ (debug' "LAST PHASE" lastPhase) `S.member` legalFromPhases)
+    (\(PhaseSwitch legalFromPhases to) -> PhaseChangeValidation lastPhase to $ lastPhase `S.member` legalFromPhases)
 
 data DeltaAction a = Clear | Keep | New a
 
@@ -264,7 +264,7 @@ nxtIteration current lp =
 logProtocolStep :: LPStep -> LogProtocolOut -> LPStep
 logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration checkEncountered) lp = 
   let 
-    PhaseChangeValidation {toPhase = nxtPhase, valid = nxtPhaseValid } = debug' "PHASECHANGE" $ phaseChange phase failStage lp
+    PhaseChangeValidation {toPhase = nxtPhase, valid = nxtPhaseValid } = phaseChange phase failStage lp
 
     nxtActiveItr :: Maybe (ItemId, IterationOutcome)
     nxtActiveItr = nxtIteration activeIteration lp
@@ -300,7 +300,7 @@ logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration
                             $ checkEncountered || isCheck lp
 
     lgStatus :: ExecutionStatus
-    lgStatus = debug' "LGSTATUS" $ max (debug' "LGSTATUS - Left" $ logProtocolStatus checkEncountered lp) (debug' "LGSTATUS - Right" $ nxtPhaseValid ? Pass $ Fail)
+    lgStatus = max (logProtocolStatus checkEncountered lp) (nxtPhaseValid ? Pass $ Fail)
 
     nxtFailStage :: Maybe IterationPhase
     nxtFailStage = calcNextIterationFailStage failStage lgStatus nxtPhase $ Just lp
@@ -342,7 +342,7 @@ testSource = do
                 Cons x xs -> do
                               put $ fromList xs
                               pure $ Just x 
-                _ -> P.error $ debug' "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" "DList pattern match error this should never happen"
+                _ -> P.error "DList pattern match error this should never happen"
 
 testSink :: [o] -> WriterState i o () 
 testSink = tell . fromList

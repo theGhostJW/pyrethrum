@@ -52,7 +52,7 @@ statsStepFromLogProtocol (StatsAccum runResults@(RunResults outOfTest itrRslts) 
                                       ) Checks
                 normalOutcome = IterationOutcome logItemStatus nxtPhase
               in
-                M.insertWith (\a b -> debug'_ "--- Inserted ---"  $ max a b) iid (max normalOutcome missingChecksOutcome) (debugf'_ (txt . M.lookup iid) "currentItrResults" itrRslts)
+                M.insertWith max iid (max normalOutcome missingChecksOutcome) itrRslts
             )
 
   in 
@@ -91,16 +91,7 @@ statsStep :: StatsAccum -> Either DeserialisationError LogProtocolOut -> StatsAc
 statsStep statsAccum eithLP = 
     eitherf eithLP
       (statsStepFromDeserialisationError statsAccum)
-      (\lp -> debugf'_ (
-              \a -> "!!!! -------------------- !!!!!  " <> 
-                      txt lp <> 
-                      "!!!! ======================= !!!!!  " <> 
-                      (txt . logItemStatus $ stepInfo a) <> " |||||||||||||||||||| " <> (txt . activeIteration $ stepInfo a) <> 
-                     -- (txt . iterationResults $ runResults a) <>
-                     ""
-              ) 
-              "============================================================================================" $ 
-              statsStepFromLogProtocol statsAccum lp)
+      (\lp -> statsStepFromLogProtocol statsAccum lp)
 
 testExStatus :: IterationResults -> M.Map TestModule ExecutionStatus
 testExStatus ir = executionStatus <$> M.mapKeysWith max tstModule ir
@@ -134,7 +125,7 @@ testIterationStatusCounts :: RunResults -> M.Map TestModule StatusCount
 testIterationStatusCounts rr = countValues <$> itrStatusesGroupedByTest rr
 
 iterationStatusCounts :: RunResults -> StatusCount
-iterationStatusCounts = countValues . debug'_ "FAILING - listIterationStatus" . listIterationStatus
+iterationStatusCounts = countValues . listIterationStatus
 
 worstStatus :: RunResults -> ExecutionStatus
 worstStatus rr@(RunResults outOfTest _) = 

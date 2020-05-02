@@ -131,7 +131,7 @@ logFileHandle fileNameSuffix fileExt = do
                                           (\(pfx, pth) -> (HandleInfo pfx pth <$>) <$> safeOpenFile pth S.WriteMode)
 
 
--- Writing temp files used mostly used for debugging 
+-- Writing temp files used mostly used for de bugging 
 defaultTempFileName :: RelFile
 defaultTempFileName = [relfile|temp.txt|]
 

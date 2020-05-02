@@ -88,7 +88,7 @@ sampleRunResults =
     }
   in
     runResults (fst $ transformDList rawFile transParams)
-    -- can use for debugging -- runResults (fst $ transformDList rawFileSmall transParams)
+    -- can use for de bugging -- runResults (fst $ transformDList rawFileSmall transParams)
 
 demo_pretty_print_LP = dumpFile (prettyPrintLogProtocol False <$> sampleLog) [relfile|raw.yaml|]
 
@@ -121,7 +121,7 @@ unit_iteration_counts_correct =
               (KnownError,   2),
               (LTC.Warning,  2),
               (Fail,        20)
-             ] ... debug' "FAILING === SAMPLE STATS ===" . iterationStatusCounts . debug'_ "FAILING sampleRunResults" $ sampleRunResults
+             ] ... iterationStatusCounts sampleRunResults
 
 unit_test_counts_correct = M.fromList [(Pass,1), (Fail,4)] ... testStatusCounts sampleRunResults
 
@@ -613,7 +613,7 @@ rawFile = fromList . B.lines $ toS
 sampleLogSmall :: DList LogProtocolOut
 sampleLogSmall = fromRight' . A.eitherDecode . toS <$> rawFileSmall
 
--- a fragment of the above can be used for debugging after updating fragment
+-- a fragment of the above can be used for de bugging after updating fragment
 rawFileSmall :: DList ByteString
 rawFileSmall = fromList . B.lines $ toS 
   [r|{"tag":"BoundaryLog","contents":{"tag":"StartRun","contents":[{"unRunTitle":"Sample RunConfig"},{"environment":"TST","country":"AU","runTitle":"Sample RunConfig","depth":"DeepRegression"}]}}

@@ -95,7 +95,7 @@ logFilePrefix now =
                       msPerDay = 24 * 60 * 60 * 1000
                       
                       timeDifms :: Integer
-                      timeDifms = fromIntegral . P.round $ (utctDayTime nyd P.- utctDayTime utcNow) / 1000000
+                      timeDifms = fromIntegral . round $ (utctDayTime nyd P.- utctDayTime utcNow) * 1000
                     in
                       daysDif * msPerDay + timeDifms
   in 

@@ -8,16 +8,16 @@ import Data.Aeson as A
 import Data.Aeson.TH
 
 newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)
-newtype LogTimeZone = LogTimeZone {unLogTimeZone :: TimeZone} 
-    deriving (Eq, 
-              Show,
-              Bounded,
-              Ord,
-              Generic,
-              ParseTime,
-              FormatTime,
-              Typeable
-    )
+-- newtype LogTimeZone = LogTimeZone {unLogTimeZone :: TimeZone} 
+--     deriving (Eq, 
+--               Show,
+--               Bounded,
+--               Ord,
+--               Generic,
+--               ParseTime,
+--               FormatTime,
+--               Typeable
+--     )
 newtype GroupTitle = GroupTitle {unGroupTitle :: Text} deriving (Eq, Show, IsString)
 newtype TestTitle = TestTitle {unTestTitle :: Text} deriving (Eq, Show, IsString)
 newtype ApStateJSON = ApStateJSON {unApStateJSON :: A.Value} deriving (Eq, Show, IsString)
@@ -127,28 +127,7 @@ data LogProtocolBase e =
 
 type LogProtocolOut = LogProtocolBase Text
 
-instance ToJSON LogTimeZone where
-    -- this generates a Value
-    toJSON (LogTimeZone TimeZone {timeZoneMinutes , timeZoneSummerOnly, timeZoneName} ) =
-        object [
-                "timeZoneMinutes" .= timeZoneMinutes, 
-                "timeZoneSummerOnly" .= timeZoneSummerOnly,
-                "timeZoneName" .= timeZoneName
-                ]
-
-    -- this encodes directly to a bytestring Builder
-    toEncoding (LogTimeZone TimeZone {timeZoneMinutes , timeZoneSummerOnly, timeZoneName} )=
-        pairs ("timeZoneMinutes" .= timeZoneMinutes <> 
-               "timeZoneSummerOnly" .= timeZoneSummerOnly <>
-                "timeZoneName" .= timeZoneName)
-
-instance FromJSON LogTimeZone where
-    parseJSON = withObject "LogTimeZone" $ \v -> LogTimeZone <$> (TimeZone
-        <$> v .: "timeZoneMinutes"
-        <*>  v .: "timeZoneSummerOnly"
-        <*>  v .: "timeZoneName")
-
-
+$(deriveJSON defaultOptions ''BoundaryEvent)
 $(deriveJSON defaultOptions ''LogProtocolBase)
 $(deriveJSON defaultOptions ''DocProtocol)
 $(deriveJSON defaultOptions ''RunProtocol)

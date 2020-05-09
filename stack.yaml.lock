@@ -5,19 +5,16 @@
 
 packages:
 - completed:
-    cabal-file:
-      size: 4434
-      sha256: 997a1f57ab8e209ac3cde2fb8a074700da1c0ac1e3c8740022abbea145b3225e
     name: pyrelude
     version: 0.1.0.0
     git: https://github.com/theGhostJW/pyrelude
     pantry-tree:
-      size: 2254
-      sha256: 63691a316b6ffa5df8795ebfc887e568fee20018b5dda06fcc357d86727f7626
-    commit: 6dcb056edbfb2b3e98ed32ad16b45d17fd6e03e7
+      size: 2368
+      sha256: 6de758334f38125ef87b27f797b5d8961e998afd9d526064eeefe034e0b131b5
+    commit: 1320251feef22b746ea7696c8a2a9924c2cb9daf
   original:
     git: https://github.com/theGhostJW/pyrelude
-    commit: 6dcb056edbfb2b3e98ed32ad16b45d17fd6e03e7
+    commit: 1320251feef22b746ea7696c8a2a9924c2cb9daf
 - completed:
     hackage: discrimination-0.4@sha256:ad60cb42d42648ebc6f649ce761fe61cb58eca9e2b17a6b4fe68ed2e1fdd4146,2479
     pantry-tree:
@@ -46,9 +43,16 @@ packages:
       sha256: 901c4f10bcf6bda842b849950a2767c918f4ed59fa8885f7c945dd6c7e763332
   original:
     hackage: hashable-1.2.7.0@sha256:03b6836ca9cd3ad0e5a2f3cce989b001dd0e05f306a873db3196037adb30e0a4,5215
+- completed:
+    hackage: polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
+    pantry-tree:
+      size: 1232
+      sha256: 5c90dac2eba48b4e337b302347c233ecaedb63e333641e094e718a548ac86711
+  original:
+    hackage: polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
 snapshots:
 - completed:
-    size: 522772
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2019/7/29.yaml
-    sha256: d945ead425b8c8d4b09eb85720d7205a6f621a9700c49683fd819644d56713bc
-  original: nightly-2019-07-29
+    size: 521183
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/5/7.yaml
+    sha256: c72b9c63b7faa8812cb6308a3d74652cf0e9b793ff197e972ee74ade774ec4eb
+  original: nightly-2020-05-07

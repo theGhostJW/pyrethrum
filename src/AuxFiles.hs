@@ -75,31 +75,16 @@ base36 num minWidth =
   in
     toS $ prefix <> foldr conv [] (units num)
 
-logFilePrefix :: ZonedTime -> Text
-logFilePrefix now =
-  let
-    msLeftInYear :: Integer
-    msLeftInYear =  let
-                      utcNow :: UTCView
-                      utcNow = unUTCTime $ zonedTimeToUTC now
-                      
-                      (y, _m, _d) :: (Year, Month, DayOfMonth) = toGregorian $ utctDay utcNow
-                      
-                      nyd :: UTCView
-                      nyd = UTCTime (fromGregorian (y + 1) 1 1) 0
-                      
-                      daysDif :: Integer
-                      daysDif = fromIntegral $ diffDays (utctDay nyd) (utctDay utcNow)
-                      
-                      msPerDay :: Integer
-                      msPerDay = 24 * 60 * 60 * 1000
-                      
-                      timeDifms :: Integer
-                      timeDifms = fromIntegral . round $ (utctDayTime nyd P.- utctDayTime utcNow) * 1000
-                    in
-                      daysDif * msPerDay + timeDifms
-  in 
-    base36 msLeftInYear 7 <> "_" <> toS (formatTime defaultTimeLocale (toS "%F_%H-%M-%S") now)
+logFilePrefix :: Time -> Text
+logFilePrefix currentTime =
+      let
+        nextYear =  (getYear . dateYear . datetimeDate . timeToDatetime $ currentTime) + 1
+        nyd = timeFromYmdhms nextYear 1 1 0 0 0
+        msLeftInYear :: Integer
+        msLeftInYear = fromIntegral (getTimespan . width $ nyd .... currentTime) / 1000000
+      in 
+        base36 msLeftInYear 7 <> "_" <> toS (encode_YmdHMS SubsecondPrecisionAuto (DatetimeFormat "_" "-" "-") (timeToDatetime  currentTime))
+ 
 
 logFilePath :: Maybe Text -> Text -> FileExt -> IO (Either P.IOError (Text, AbsFile))
 logFilePath mNamePrefix suffix fileExt = 

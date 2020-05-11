@@ -7,43 +7,29 @@ import Polysemy
 import Control.Lens
 
 data CurrentTime m a where
-  GetCurrentTime :: CurrentTime m UTCTime
-  GetCurrentTimeZone :: CurrentTime m TimeZone
-  GetTimeZone :: UTCTime -> CurrentTime m TimeZone
-  UtcToLocalZonedTime :: UTCTime -> CurrentTime m ZonedTime
+  Now :: CurrentTime m Time
+  GetTimeZone :: CurrentTime m TimeZone
 
 makeSem ''CurrentTime
 
-currentTimeFromIO :: CurrentTime m a -> IO a
-currentTimeFromIO = \case 
-                        GetCurrentTime -> PIO.getCurrentTime
-                        GetCurrentTimeZone -> PIO.getCurrentTimeZone
-                        GetTimeZone utcTime' -> PIO.getTimeZone utcTime'
-                        UtcToLocalZonedTime utcTime' -> PIO.utcToLocalZonedTime utcTime'
-
 currentTimeIOInterpreter :: Member (Embed IO) effs => Sem (CurrentTime ': effs) a -> Sem effs a
 currentTimeIOInterpreter = interpret $ embed . \case 
-                                                  GetCurrentTime -> PIO.getCurrentTime
-                                                  GetCurrentTimeZone -> PIO.getCurrentTimeZone
-                                                  GetTimeZone utcTime' -> PIO.getTimeZone utcTime'
-                                                  UtcToLocalZonedTime utcTime' -> PIO.utcToLocalZonedTime utcTime'
+                                                  Now -> PIO.now
+                                                  GetTimeZone -> PIO.getCurrentTimeZone
 
-constTimeInterpreter :: forall effs a. UTCTime -> TimeZone -> TimeZone -> ZonedTime -> Sem (CurrentTime ': effs) a -> Sem effs a
-constTimeInterpreter currentTime currentZone zoneFromTime localZonedTimeFromUTC = 
+
+constTimeInterpreter :: forall effs a. Time -> TimeZone -> Sem (CurrentTime ': effs) a -> Sem effs a
+constTimeInterpreter time zone  = 
   interpret $ pure . \case 
-                        GetCurrentTime -> currentTime
-                        GetCurrentTimeZone -> currentZone 
-                        GetTimeZone utcTime' -> zoneFromTime
-                        UtcToLocalZonedTime utcTime' -> localZonedTimeFromUTC
+                        Now -> time
+                        GetTimeZone -> zone
 
-janFst2000UTCTimeInterpreter :: Sem (CurrentTime ': effs) a -> Sem effs a
-janFst2000UTCTimeInterpreter = constTimeInterpreter janFst2000Midnight utc utc ((utc, janFst2000Midnight) ^. zonedTime)
-
-janFst2000Midnight :: UTCTime
-janFst2000Midnight = UTCTime janFst2000 (timeOfDayToTime midnight) ^. from utcTime
-
-janFst2000 :: Day
-janFst2000 = fromGregorian 2000 1 1 
+janFst2000Midnight :: Time
+janFst2000Midnight = timeFromYmdhms 2000 0 1 0 0 0
 
 midNight :: TimeOfDay
 midNight = TimeOfDay 0 0 0
+
+janFst2000UTCTimeInterpreter :: Sem (CurrentTime ': effs) a -> Sem effs a
+janFst2000UTCTimeInterpreter = constTimeInterpreter janFst2000Midnight utc
+

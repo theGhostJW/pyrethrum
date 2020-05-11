@@ -43,7 +43,7 @@ data ThreadInfo = ThreadInfo {
 
 data LogIdxTime = LogIdxTime { 
   index :: Int,
-  time :: UTCTime
+  time :: Time
 }
 
 newtype LogIndex = LogIndex { unLogIndex :: Int}

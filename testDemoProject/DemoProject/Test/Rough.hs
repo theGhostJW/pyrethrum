@@ -65,7 +65,7 @@ interactor RunConfig{..} Item{..} =
 
     arbitraryIO "This is an arbitrary Put Line" () (PIO.putStrLn "Hello from random action")
     tx <- readFile path
-    now <- CT.getCurrentTime
+    now' <- CT.now
 
     when (iid == 140)
       $ void $ arbitraryIO "This is an arbitrary THING THAT WILL BLOW UP" "tHIS WILL BLOW UP" (PIO.readFile $ toFilePath invalidFile)

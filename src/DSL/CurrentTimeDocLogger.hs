@@ -18,9 +18,7 @@ currentTimeDocInterpreter =
                   in
                     do
                       (lbl, v) <- embed $ case ct of
-                              Now -> showTup "getCurrentTime: " PIO.getCurrentTime
-                              UTCOffset -> showTup "getCurrentTimeZone: " PIO.getCurrentTimeZone
-                              GetTimeZone utcTime' -> showTup "getTimeZone: " $ PIO.getTimeZone utcTime'
-                              UtcToLocalZonedTime utcTime' -> showTup "utcToLocalZonedTime: " $ PIO.utcToLocalZonedTime utcTime'
+                              Now -> showTup "getCurrentTime: " PIO.now
+                              GetTimeZone -> showTup "getTimeZone: " $ PIO.getCurrentTimeZone
                       logDocAction lbl
                       pure v

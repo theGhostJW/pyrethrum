@@ -7,7 +7,7 @@ import  DSL.CurrentTime as CT
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList
 import           Pyrelude as P
-import           Pyrelude.IO
+import           Pyrelude.IO hiding (now)
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
 import System.IO (stdout)
@@ -37,7 +37,7 @@ logDocAction = logItem . IterationLog . Doc . DocAction . ActionInfo
 data LogAuxInfo = LogAuxInfo {
   runId :: Text,
   threadID :: Int,
-  logTime :: UTCTime
+  logTime :: Time
 }
 
 detailLog :: forall effs e. (Show e, A.ToJSON e, Member (Logger e) effs) => (DetailedInfo -> LogProtocolBase e) -> Text -> Text -> Sem effs ()
@@ -52,18 +52,16 @@ log' = detailLog (logRun . Message')
 -- TODO - phantom types ? 
 logRunConsoleInterpreter :: forall effs a e. (Show e, Members '[CurrentTime, Embed IO] effs) => Sem (Logger e ': effs) a -> Sem effs a
 logRunConsoleInterpreter = 
-    interpret $ \lg -> do 
-                        now <- CT.getCurrentTime
-                        embed $ case lg of
-                            LogItem lp -> P.print lp
-                            LogError msg -> P.print . logRun . LP.Error $ C.Error msg 
-                            LogError' msg info -> P.print . logRun . LP.Error . Error' $ DetailedInfo msg info
-                            
-                            LogMessage s ->  P.print . logRun $ Message s 
-                            LogMessage' msg info -> P.print . logRun . Message' $ DetailedInfo msg info
-          
-                            LogWarning s -> P.print. logRun $ Warning s 
-                            LogWarning' msg info -> P.print . logRun . Warning' $ DetailedInfo msg info
+    interpret $ \lg -> embed $ case lg of
+                          LogItem lp -> P.print lp
+                          LogError msg -> P.print . logRun . LP.Error $ C.Error msg 
+                          LogError' msg info -> P.print . logRun . LP.Error . Error' $ DetailedInfo msg info
+                          
+                          LogMessage s ->  P.print . logRun $ Message s 
+                          LogMessage' msg info -> P.print . logRun . Message' $ DetailedInfo msg info
+        
+                          LogWarning s -> P.print. logRun $ Warning s 
+                          LogWarning' msg info -> P.print . logRun . Warning' $ DetailedInfo msg info
 
 -- ToDo move to lib
 putLines :: Handle -> Text -> IO ()
@@ -80,10 +78,9 @@ logStrJSONWith :: A.ToJSON e => ThreadInfo -> LogIdxTime -> LogProtocolBase e ->
 logStrJSONWith _ _ lp = utfEncode $ utfEncode <$> lp
                 
 runThreadInfoReader :: Member CurrentTime r => Sem (Reader ThreadInfo ': r) a -> Sem r a 
-runThreadInfoReader sem = 
-  do 
-    zone <- CT.getCurrentTimeZone
-    runReader (ThreadInfo "local" 1 zone) sem
+runThreadInfoReader sem = do 
+                            tz <- CT.getTimeZone
+                            runReader (ThreadInfo "local" 1 tz) sem
 
 logConsolePrettyInterpreter :: (Show e, Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs) => Sem (Logger e ': effs) a -> Sem effs a
 logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocolWith False, stdout)]
@@ -120,10 +117,10 @@ logToHandles convertersHandles =
                       threadInfo :: ThreadInfo <- ask
                       modify incIdx
                       idx :: LogIndex <- get
-                      now <- CT.getCurrentTime
+                      now' <- now
                       let 
                         lgInfo :: LogIdxTime
-                        lgInfo = LogIdxTime (unLogIndex idx) now
+                        lgInfo = LogIdxTime (unLogIndex idx) now'
 
                         simpleConvertersHandles :: [(LogProtocolBase e -> Text, Handle)]
                         simpleConvertersHandles = (\(f , h) -> (f threadInfo lgInfo, h)) <$> convertersHandles

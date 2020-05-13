@@ -13,12 +13,8 @@ import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), Me
 import Control.Lens
 
 prettyPrintLogProtocolWith :: Show e => Bool -> ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text
-prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex, timeZone} LogIdxTime{index = idx, time} lgProtocol = 
-  let 
-    localTime = txt $ time ^. utcLocalTime timeZone
-    timeLine = runId <>  " - " <> txt threadIndex <> " - " <> txt idx <> " - " <>  localTime
-  in 
-    timeLine 
+prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex} LogIdxTime{index = idx, time} lgProtocol = 
+    runId <>  " - " <> txt threadIndex <> " - " <> txt idx <> " - " <>  txt time
     <> newLn 
     <> prettyPrintLogProtocol docMode lgProtocol
 

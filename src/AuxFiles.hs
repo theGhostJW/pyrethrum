@@ -79,18 +79,19 @@ logFilePrefix :: Time -> Text
 logFilePrefix currentTime =
       let
         nextYear =  (getYear . dateYear . datetimeDate . timeToDatetime $ currentTime) + 1
+        
         nyd = timeFromYmdhms nextYear 1 1 0 0 0
         msLeftInYear :: Integer
-        msLeftInYear = fromIntegral (getTimespan . width $ nyd .... currentTime) / 1000000
+        msLeftInYear = fromIntegral (getTimespan . width $ nyd .... currentTime) `div` 1000000
       in 
-        base36 msLeftInYear 7 <> "_" <> toS (encode_YmdHMS SubsecondPrecisionAuto (DatetimeFormat "_" "-" "-") (timeToDatetime  currentTime))
+        base36 msLeftInYear 7 <> "_" <> toS (encode_YmdHMS SubsecondPrecisionAuto (DatetimeFormat (Just '_') (Just '_') (Just '-')) (timeToDatetime  currentTime))
  
 
 logFilePath :: Maybe Text -> Text -> FileExt -> IO (Either P.IOError (Text, AbsFile))
 logFilePath mNamePrefix suffix fileExt = 
   do
     pfx <- maybef mNamePrefix
-              (logFilePrefix <$> getZonedTime)
+              (logFilePrefix <$> now)
               pure
     relPath <- parseRelFileSafe $ pfx <> "_" <> suffix <> unFileExt fileExt
     eitherf relPath

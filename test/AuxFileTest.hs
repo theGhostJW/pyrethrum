@@ -13,8 +13,11 @@ success' = \case
 
 unit_a_file_prefix_generated_at_a_later_date_will_be_smaller = 
   let 
-    pfxLate = logFilePrefix  . success' $ fromJSON "2020-05-02T20:18:39.659+1000"
-    pfxEarly = logFilePrefix . success' $ fromJSON "2020-05-02T20:18:39.658+1000"
+    timeEarly = TimeOfDay {timeOfDayHour = 0, timeOfDayMinute = 0, timeOfDayNanoseconds = 0}
+    timeLate = TimeOfDay {timeOfDayHour = 0, timeOfDayMinute = 0, timeOfDayNanoseconds = 1000000}
+    date = debug' "Date" $ Date (Year 2000) january $ DayOfMonth 1
+    pfxLate = debug' "Late" . logFilePrefix . datetimeToTime $ Datetime date timeLate
+    pfxEarly = debug' "Early" . logFilePrefix . datetimeToTime $ Datetime date timeEarly
   in
    chk $ pfxLate < pfxEarly
 

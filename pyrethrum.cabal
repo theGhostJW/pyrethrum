@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fac42a8ed1568ddd4892291d37bd44f095f8895a6dabcfc2c2f9bf0749c8d552
+-- hash: 570a6db5782f6077a6a6e25d6a07cee1a5723b23401634b0cba09dbf14c8f6b2
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -87,7 +87,7 @@ test-suite pyrethrum-test
   main-is: driver.hs
   other-modules:
       ArbitraryIOTest
-      AuxFileTest
+      AuxFilesTest
       CheckTest
       EndpointTest
       ItemFiltersTest

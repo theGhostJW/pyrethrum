@@ -4,7 +4,6 @@ module DSL.CurrentTime where
 import           Pyrelude as P
 import qualified Pyrelude.IO as PIO
 import Polysemy
-import Control.Lens
 
 data CurrentTime m a where
   Now :: CurrentTime m Time

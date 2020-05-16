@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 570a6db5782f6077a6a6e25d6a07cee1a5723b23401634b0cba09dbf14c8f6b2
+-- hash: 2bed3c8806c668eea298ddc0d5d214cd956c7d11a604ce12933f9b74dfc59855
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -68,7 +68,6 @@ library
     , dlist
     , extra
     , fmt
-    , lens
     , mtl
     , polysemy
     , polysemy-plugin

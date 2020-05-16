@@ -54,11 +54,10 @@ extra-deps:
 # mine
 - git: https://github.com/theGhostJW/pyrelude
   commit: "4077213a476d31f9127eebc8126130024ddfdedf"
-- discrimination-0.4@sha256:ad60cb42d42648ebc6f649ce761fe61cb58eca9e2b17a6b4fe68ed2e1fdd4146
-- encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce
-- transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961
-- hashable-1.2.7.0@sha256:03b6836ca9cd3ad0e5a2f3cce989b001dd0e05f306a873db3196037adb30e0a4,5215
+- discrimination-0.4@sha256:d42ae36c97ea9c0c8844b47ee162c5530f3daf708636f01010f58dcf52602876,2571
+- encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce,1864
 - polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
+- transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

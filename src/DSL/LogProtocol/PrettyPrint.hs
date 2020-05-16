@@ -10,7 +10,6 @@ import  DSL.LogProtocol as LP
 import           Pyrelude as P
 import RunElementClasses as REC
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), MessageInfo(..), GateStatus(..), classifyResult)
-import Control.Lens
 
 prettyPrintLogProtocolWith :: Show e => Bool -> ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text
 prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex} LogIdxTime{index = idx, time} lgProtocol = 

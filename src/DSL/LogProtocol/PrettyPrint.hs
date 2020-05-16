@@ -44,7 +44,7 @@ prettyPrintLogProtocol docMode =
     \case
         BoundaryLog bl -> case bl of 
                             LP.FilterLog fltrInfos -> ppFilterLog fltrInfos
-                            LP.StartRun ttle rc -> ppStartRun ttle rc
+                            LP.StartRun ttle offset rc -> ppStartRun ttle rc
 
                             LP.StartGroup gt -> groupHeader gt
                             LP.EndGroup gt -> groupFooter gt

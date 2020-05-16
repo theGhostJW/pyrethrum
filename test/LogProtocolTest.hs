@@ -90,7 +90,7 @@ genGateStatus = choice [
 
 genLogProtocol :: Gen (LogProtocolBase Int)
 genLogProtocol = choice [
-                    BoundaryLog <$> (StartRun <$> (RunTitle <$> genStr) <*> (A.toJSON <$> genRunConfig)), 
+                    BoundaryLog <$> (StartRun <$> (RunTitle <$> genStr) <*> genInt <*> (A.toJSON <$> genRunConfig)), 
                     BoundaryLog . StartGroup <$> (GroupTitle <$> genStr),
                     BoundaryLog . EndGroup <$> (GroupTitle <$> genStr),
                     BoundaryLog . StartTest <$> genTestDisplayInfo,

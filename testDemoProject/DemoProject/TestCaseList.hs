@@ -7,7 +7,7 @@ module DemoProject.TestCaseList where
 import           Polysemy
 import           Polysemy.State
 import           Polysemy.Reader
-import           DemoProject.Config
+import           DemoProject.Config as C
 import           DemoProject.Test.Rough as RT
 import           DemoProject.Test.Rough2 as RT2
 import           DemoProject.Test.Simple as ST
@@ -21,7 +21,7 @@ import           DSL.Interpreter
 import           DSL.Logger
 import           DSL.Ensure
 import           DSL.CurrentTime
-import DSL.LogProtocol
+import DSL.LogProtocol hiding (runConfig)
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList
 import           Pyrelude as P

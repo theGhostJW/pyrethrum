@@ -25,6 +25,7 @@ import DSL.Interpreter
 import DSL.Logger
 import DSL.LogProtocol as LP
 import DSL.Ensure
+import DSL.CurrentTime
 import Pyrelude as P
 import Pyrelude.IO
 import Polysemy
@@ -420,7 +421,8 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
     maybef firstDuplicateGroupTitle
     (
       do
-        logBoundry . StartRun (RunTitle $ C.title rc) $ toJSON rc
+        offset' <- utcOffset
+        logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
         logBoundry . FilterLog $ filterLog filterInfo
         sequence_ $ exeGroup <$> runTuples
         logBoundry EndRun

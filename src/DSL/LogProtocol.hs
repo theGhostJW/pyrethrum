@@ -107,7 +107,11 @@ data SubProtocol e =
 data BoundaryEvent = 
     FilterLog [FilterResult] |
 
-    StartRun RunTitle Value | 
+    StartRun {
+              runTitle :: RunTitle, 
+              runUtcOffset :: Int,
+              runConfig :: Value
+              } | 
     EndRun |
 
     StartGroup GroupTitle |

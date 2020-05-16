@@ -266,7 +266,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
               case bl of
                 LP.FilterLog flgs -> (accum {filterLog = Just flgs}, Nothing) 
 
-                LP.StartRun runTitle jsonCfg -> (accum, elOut $ StartRun {  
+                LP.StartRun runTitle offset jsonCfg -> (accum, elOut $ StartRun {  
                   title = runTitle, 
                   config = jsonCfg, 
                   runStatus = worstStatus runResults,

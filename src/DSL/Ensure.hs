@@ -25,7 +25,3 @@ ensureDocInterpreter = interpret $ \case
                                       Ensure message condition -> pure ()
                                       DSL.Ensure.Throw message -> pure ()
 
--- delete later
--- fullEnsureInterpreter :: Sem '[Ensure, Error EnsureError] a -> Either EnsureError a
--- fullEnsureInterpreter effs = run . runError $ ensureInterpreter effs
-

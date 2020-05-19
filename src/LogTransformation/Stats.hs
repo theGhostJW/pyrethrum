@@ -26,10 +26,10 @@ statsStepForReducer :: LineNo                                       -- lineNo
 statsStepForReducer _ accum lp = (statsStep accum lp, Nothing)
 
 statsStepFromLogProtocol :: StatsAccum -> LogProtocolOut -> StatsAccum
-statsStepFromLogProtocol (StatsAccum runResults@(RunResults outOfTest itrRslts) stepInfo) lp = 
+statsStepFromLogProtocol (StatsAccum runResults@(RunResults outOfTest itrRslts) stepInfo) lpo@LogProtocolOut{ logIndex, time, logInfo = lp } = 
   let 
     nxtStepInfo@(LPStep _nxtPhaseValid _nxtFailStage nxtPhase
-                    logItemStatus nxtActiveItr nxtCheckEncountered) = logProtocolStep stepInfo lp
+                    logItemStatus nxtActiveItr nxtCheckEncountered) = logProtocolStep stepInfo lpo
 
     inIteration :: Bool
     inIteration = isJust nxtActiveItr

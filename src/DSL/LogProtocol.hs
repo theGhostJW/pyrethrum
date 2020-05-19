@@ -35,18 +35,20 @@ instance ToJSONKey ItemId where
 instance FromJSONKey ItemId where
    -- default implementation
 
+newtype LogIndex = LogIndex {unLogIndex :: Int}  deriving (Eq, Ord, Show)
+
+data LogEventInfo = LogEventInfo {
+   runId :: Text,
+   threadIndex :: Int,
+   time :: Time,
+   idx :: LogIndex
+} deriving (Eq, Ord, Show)
+
 data ThreadInfo = ThreadInfo { 
   runId :: Text, 
   threadIndex :: Int,
   timeZone :: TimeZone
 }
-
-data LogIdxTime = LogIdxTime { 
-  index :: Int,
-  time :: Time
-}
-
-newtype LogIndex = LogIndex { unLogIndex :: Int}
 
 data DocActionInfo = 
     ActionInfo Text |
@@ -109,7 +111,7 @@ data BoundaryEvent =
 
     StartRun {
               runTitle :: RunTitle, 
-              runUtcOffset :: Int,
+              runUtcOffsetMins :: Int,
               runConfig :: Value
               } | 
     EndRun |
@@ -129,8 +131,16 @@ data LogProtocolBase e =
   IterationLog (SubProtocol e)
  deriving (Eq, Show, Functor)
 
-type LogProtocolOut = LogProtocolBase Text
+data LogProtocolOut = LogProtocolOut {
+    logIndex :: LogEventInfo,
+    time :: Time,
+    logInfo :: LogProtocolBase Text
+  }
+  deriving (Eq, Show)
 
+$(deriveJSON defaultOptions ''LogEventInfo)
+$(deriveJSON defaultOptions ''LogIndex)
+$(deriveJSON defaultOptions ''LogProtocolOut)
 $(deriveJSON defaultOptions ''BoundaryEvent)
 $(deriveJSON defaultOptions ''LogProtocolBase)
 $(deriveJSON defaultOptions ''DocProtocol)

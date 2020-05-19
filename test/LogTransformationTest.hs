@@ -90,7 +90,7 @@ sampleRunResults =
     runResults (fst $ transformDList rawFile transParams)
     -- can use for de bugging -- runResults (fst $ transformDList rawFileSmall transParams)
 
-demo_pretty_print_LP = dumpFile (prettyPrintLogProtocol False <$> sampleLog) [relfile|raw.yaml|]
+demo_pretty_print_LP = dumpFile (prettyPrintLogProtocol False . logInfo <$> sampleLog) [relfile|raw.yaml|]
 
 _demo_pretty_print_LP_with_reducer :: IO ()
 _demo_pretty_print_LP_with_reducer = 

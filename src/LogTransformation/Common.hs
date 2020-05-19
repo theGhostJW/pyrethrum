@@ -155,7 +155,7 @@ isEndIteration = \case
 
 -- calculate expected from / to base on log message
 phaseSwitch :: LogProtocolOut -> Maybe IterationPhase -> Maybe PhaseSwitch
-phaseSwitch lp mFailedPhase = 
+phaseSwitch LogProtocolOut{ logIndex, time, logInfo = lp } mFailedPhase = 
   let
     ps :: IterationPhase -> IterationPhase -> Maybe PhaseSwitch
     ps cur nxt = Just $ PhaseSwitch (S.singleton cur) nxt
@@ -262,9 +262,9 @@ nxtIteration current lp =
 
 
 logProtocolStep :: LPStep -> LogProtocolOut -> LPStep
-logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration checkEncountered) lp = 
+logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration checkEncountered) lpOut@LogProtocolOut{ logIndex, time, logInfo = lp} = 
   let 
-    PhaseChangeValidation {toPhase = nxtPhase, valid = nxtPhaseValid } = phaseChange phase failStage lp
+    PhaseChangeValidation {toPhase = nxtPhase, valid = nxtPhaseValid } = phaseChange phase failStage lpOut
 
     nxtActiveItr :: Maybe (ItemId, IterationOutcome)
     nxtActiveItr = nxtIteration activeIteration lp

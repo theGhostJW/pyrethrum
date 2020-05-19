@@ -155,10 +155,12 @@ printProblemsDisplayStep runResults@(RunResults outOfTest iterationResults) line
     _skipFlags@(nxtSkipItt, nxtSkipTst) =
       eitherf eithLp 
         (const (skipItt, skipTst))
-        (\case
-            BoundaryLog (LP.StartTest (TestDisplayInfo tstMod _ _ )) -> (False, LC.Pass == testStatus' tstMod)
-            BoundaryLog (StartIteration iid _ _ _) -> (LC.Pass == executionStatus (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
-            _ -> (skipItt, skipTst)
+        (
+          \LogProtocolOut{ logIndex, time, logInfo = lp } -> 
+            case lp of
+              BoundaryLog (LP.StartTest (TestDisplayInfo tstMod _ _ )) -> (False, LC.Pass == testStatus' tstMod)
+              BoundaryLog (StartIteration iid _ _ _) -> (LC.Pass == executionStatus (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
+              _ -> (skipItt, skipTst)
         )
 
     nxtAccum :: ProblemIterationAccum
@@ -199,8 +201,8 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
         )
    )
 
-   (\lp ->
-     let 
+   (\lpo@LogProtocolOut{ logIndex, time, logInfo = lp} ->
+      let 
         skipLog = (oldAccum, Nothing)
 
         RunResults outOfTest iterationResults = runResults
@@ -221,13 +223,13 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
         elOut a = Just [a]
 
         nxtStepInfo@(LPStep _nxtPhaseValid _nxtFailStage nxtPhase
-                       _logItemStatus _nxtActiveItr _nxtCheckEncountered) = logProtocolStep stepInfo lp
+                      _logItemStatus _nxtActiveItr _nxtCheckEncountered) = logProtocolStep stepInfo lpo
 
         accum :: IterationAccum
         accum = oldAccum {stepInfo = nxtStepInfo}
 
         lineError :: Text -> Maybe [PrintLogDisplayElement]
-        lineError txt' = Just [LineError $ LogTransformError lineNo lp txt']
+        lineError txt' = Just [LineError $ LogTransformError lineNo lpo txt']
 
         getNotes :: Y.Value -> Maybe Text
         getNotes = 
@@ -253,7 +255,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
         updateItrRec :: (IterationRecord -> IterationRecord) -> (IterationAccum, Maybe [PrintLogDisplayElement]) 
         updateItrRec func = 
           let 
-            mIrec :: Maybe (IterationRecord)
+            mIrec :: Maybe IterationRecord
             mIrec = rec accum
           in 
             maybef mIrec
@@ -323,7 +325,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                         maybef (rec accum)
                           (LineError $ LogTransformError {
                             linNo = lineNo,
-                            logItem = lp,
+                            logItem = lpo,
                             info = "Error end iteration message encountered when the before start iteration - check raw logs"
                           })
                           (Iteration . sortChecks)
@@ -349,10 +351,10 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                     Message txt' -> skipLog
                     Message' (DetailedInfo msg txt') -> skipLog
                   
-                    LP.Warning _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lp : otherWarnings ir})
-                    Warning' (DetailedInfo msg txt') -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lp : otherWarnings ir})
+                    LP.Warning _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : otherWarnings ir})
+                    Warning' (DetailedInfo msg txt') -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : otherWarnings ir})
     
-                    LP.Error err -> updateItrRec (\ir -> ir {otherErrors = IterationError nxtPhase lp : otherErrors ir})
+                    LP.Error err -> updateItrRec (\ir -> ir {otherErrors = IterationError nxtPhase lpo : otherErrors ir})
       )
 
 prettyPrintDisplayElement :: PrintLogDisplayElement -> Text

@@ -74,8 +74,8 @@ utfEncode a = either
                 (decodeUtf8' . B.toStrict $ A.encode a)
 
 -- TODO - update to use info
-logStrJSONWith :: A.ToJSON e => ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text
-logStrJSONWith _ _ lp = utfEncode $ utfEncode <$> lp
+logStrJSONWith :: A.ToJSON e => ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
+logStrJSONWith _ _ _ lp = utfEncode $ utfEncode <$> lp
                 
 runThreadInfoReader :: Member CurrentTime r => Sem (Reader ThreadInfo ': r) a -> Sem r a 
 runThreadInfoReader sem = do 
@@ -110,20 +110,17 @@ logRunWithSink pushItem =
 logRunRawInterpreter :: forall effs a e. (Show e, A.ToJSON e, Member (Output (LogProtocolBase e)) effs) => Sem (Logger e ': effs) a -> Sem effs a
 logRunRawInterpreter = logRunWithSink output
 
-logToHandles :: forall effs e a. Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => [(ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text, Handle)] -> Sem (Logger e ': effs) a -> Sem effs a
+logToHandles :: forall effs e a. Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => [(ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text, Handle)] -> Sem (Logger e ': effs) a -> Sem effs a
 logToHandles convertersHandles = 
     interpret $ \lg -> 
                     do 
                       threadInfo :: ThreadInfo <- ask
                       modify incIdx
-                      idx :: LogIndex <- get
+                      idx <- get
                       now' <- now
                       let 
-                        lgInfo :: LogIdxTime
-                        lgInfo = LogIdxTime (unLogIndex idx) now'
-
                         simpleConvertersHandles :: [(LogProtocolBase e -> Text, Handle)]
-                        simpleConvertersHandles = (\(f , h) -> (f threadInfo lgInfo, h)) <$> convertersHandles
+                        simpleConvertersHandles = (\(f , h) -> (f threadInfo idx now', h)) <$> convertersHandles
 
                         logToHandle :: (LogProtocolBase e -> Text) -> Handle -> LogProtocolBase e -> IO ()
                         logToHandle cvtr h = putLines h . cvtr

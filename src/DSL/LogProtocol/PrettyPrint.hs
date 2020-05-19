@@ -11,8 +11,8 @@ import           Pyrelude as P
 import RunElementClasses as REC
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), MessageInfo(..), GateStatus(..), classifyResult)
 
-prettyPrintLogProtocolWith :: Show e => Bool -> ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text
-prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex} LogIdxTime{index = idx, time} lgProtocol = 
+prettyPrintLogProtocolWith :: Show e => Bool -> ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
+prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex} (LogIndex idx) time lgProtocol = 
     runId <>  " - " <> txt threadIndex <> " - " <> txt idx <> " - " <>  txt time
     <> newLn 
     <> prettyPrintLogProtocol docMode lgProtocol
@@ -38,8 +38,7 @@ prettyPrintLogProtocol docMode =
     logIO m =  docMarkUp $ "IO Action: " <> txtPretty m
 
     detailDoc :: Text -> DetailedInfo -> Text
-    detailDoc hedr (DetailedInfo msg det) = newLn <> (docMode ? id $ indent2) (subHeader hedr <> newLn <> msg <> newLn <> det)
-                                                                                                      
+    detailDoc hedr (DetailedInfo msg det) = newLn <> (docMode ? id $ indent2) (subHeader hedr <> newLn <> msg <> newLn <> det)                                                                                                  
   in
     \case
         BoundaryLog bl -> case bl of 

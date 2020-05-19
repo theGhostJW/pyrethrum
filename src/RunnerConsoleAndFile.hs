@@ -33,13 +33,13 @@ ioRunToFile :: forall b e appEffs. (Show e, ToJSON e, Members '[CurrentTime, Rea
     -> IO (Either (FrameworkError e) [AbsFile])
 ioRunToFile wantConsole docMode interpreter app = 
   let 
-    handleSpec :: M.Map (Text, FileExt) (ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text) 
+    handleSpec :: M.Map (Text, FileExt) (ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text) 
     handleSpec = M.fromList [
                                 (("raw", FileExt ".log"), prettyPrintLogProtocolWith docMode)
                               , (("raw", FileExt jsonItemLogExt), logStrJSONWith)
                             ]
 
-    fileHandleInfo :: IO (Either (FrameworkError e) [(ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text, HandleInfo)])
+    fileHandleInfo :: IO (Either (FrameworkError e) [(ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text, HandleInfo)])
     fileHandleInfo = logFileHandles handleSpec
 
     printFilePaths :: [AbsFile] -> IO ()
@@ -49,13 +49,13 @@ ioRunToFile wantConsole docMode interpreter app =
                                 sequence_ $ putStrLn . toS . toFilePath <$> lsFiles
                                 putStrLn ""
                           
-    fileHandles :: IO (Either (FrameworkError e) [(Maybe AbsFile, ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text, S.Handle)])
+    fileHandles :: IO (Either (FrameworkError e) [(Maybe AbsFile, ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text, S.Handle)])
     fileHandles = (((\(fn, fh) -> (Just $ A.path fh, fn, fileHandle fh)) <$>) <$>) <$> fileHandleInfo
 
     closeFileHandles :: [S.Handle] -> IO ()
     closeFileHandles  = traverse_ S.hClose
 
-    allHandles :: IO (Either (FrameworkError e) [(Maybe AbsFile, ThreadInfo -> LogIdxTime -> LogProtocolBase e -> Text, S.Handle)])
+    allHandles :: IO (Either (FrameworkError e) [(Maybe AbsFile, ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text, S.Handle)])
     allHandles = wantConsole == Console
                       ? (((Nothing, prettyPrintLogProtocolWith docMode, S.stdout) :) <$>) <$> fileHandles
                       $ fileHandles

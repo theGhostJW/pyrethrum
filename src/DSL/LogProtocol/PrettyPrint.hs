@@ -18,8 +18,14 @@ prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex} (LogIndex idx)
     <> prettyPrintLogProtocol docMode lgProtocol
 
 prettyPrintLogProtocol :: Show e => Bool -> LogProtocolBase e -> Text
-prettyPrintLogProtocol docMode =
+prettyPrintLogProtocol = prettyPrintLogProtocolBase Nothing
+
+prettyPrintLogProtocolBase :: Show e => Maybe Text -> Bool -> LogProtocolBase e -> Text
+prettyPrintLogProtocolBase mTimeSuffix docMode =
   let
+    timeSuffix :: Text
+    timeSuffix = fromMaybe "" mTimeSuffix
+
     iterId :: ItemId -> Text
     iterId (ItemId tst iid) = toString tst <> " / item " <> txt iid
 

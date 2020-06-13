@@ -8,5 +8,8 @@
     "Pyrelude"
   ],
   "cSpell.language": "en-GB",
-  "cSpell.enabled": false
+  "cSpell.enabled": false,
+  "cSpell.enableFiletypes": [
+    "log"
+  ]
 }

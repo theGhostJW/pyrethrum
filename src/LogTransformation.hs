@@ -133,7 +133,7 @@ prettyPrintTestRun rr srcJsonIniPath = transformToFile
                                           (toS . prettyPrintDisplayElement)
                                           emptyIterationAccum
                                           srcJsonIniPath
-                                          $ replaceExtension ".full.yaml"
+                                          $ replaceExtension ".yaml" >=> addExtension ".full" 
 
 fileStats :: AbsFile -> IO (Either LogTransformError RunResults)
 fileStats srcJsonIniPath = 

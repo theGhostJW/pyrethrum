@@ -38,8 +38,8 @@ instance FromJSONKey ItemId where
 newtype LogIndex = LogIndex {unLogIndex :: Int}  deriving (Eq, Ord, Show)
 
 data LogEventInfo = LogEventInfo {
-   runId :: Text,
-   threadIndex :: Int,
+   rnId :: Text,
+   threadIdx :: Int,
    time :: Time,
    idx :: LogIndex
 } deriving (Eq, Ord, Show)

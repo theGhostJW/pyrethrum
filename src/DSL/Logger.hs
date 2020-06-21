@@ -34,12 +34,6 @@ makeSem ''Logger
 logDocAction :: (Show e, A.ToJSON e) => Member (Logger e) effs => Text -> Sem effs ()
 logDocAction = logItem . IterationLog . Doc . DocAction . ActionInfo
 
-data LogAuxInfo = LogAuxInfo {
-  runId :: Text,
-  threadID :: Int,
-  logTime :: Time
-}
-
 detailLog :: forall effs e. (Show e, A.ToJSON e, Member (Logger e) effs) => (DetailedInfo -> LogProtocolBase e) -> Text -> Text -> Sem effs ()
 detailLog lpCons msg additionalInfo = logItem . lpCons $ DetailedInfo msg additionalInfo
 
@@ -75,7 +69,16 @@ utfEncode a = either
 
 -- TODO - update to use info
 logStrJSONWith :: A.ToJSON e => ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
-logStrJSONWith _ _ _ lp = utfEncode $ utfEncode <$> lp
+logStrJSONWith thrdInfo lgIdx time lp = utfEncode $  LogProtocolOut {
+    logIndex = LogEventInfo {
+                              rnId = runId thrdInfo, 
+                              threadIdx = threadIndex thrdInfo,
+                              time = time,
+                              idx = lgIdx
+                            },
+    time = time,
+    logInfo = utfEncode <$> lp
+  }
                 
 runThreadInfoReader :: Member CurrentTime r => Sem (Reader ThreadInfo ': r) a -> Sem r a 
 runThreadInfoReader sem = do 

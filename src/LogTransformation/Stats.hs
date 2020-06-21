@@ -91,7 +91,7 @@ statsStep :: StatsAccum -> Either DeserialisationError LogProtocolOut -> StatsAc
 statsStep statsAccum eithLP = 
     eitherf eithLP
       (statsStepFromDeserialisationError statsAccum)
-      (\lp -> statsStepFromLogProtocol statsAccum lp)
+      (statsStepFromLogProtocol statsAccum)
 
 testExStatus :: IterationResults -> M.Map TestModule ExecutionStatus
 testExStatus ir = executionStatus <$> M.mapKeysWith max tstModule ir

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2bed3c8806c668eea298ddc0d5d214cd956c7d11a604ce12933f9b74dfc59855
+-- hash: 7403b3123400abd5ee2ac37b4f83ef31a79f46143eaaf7ac0d40109142185a62
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -44,7 +44,6 @@ library
       LogTransformation.Common
       LogTransformation.PrintLogDisplayElement
       LogTransformation.Stats
-      LogTransformation.Test
       MemberReflection
       OrphanedInstances
       PrettyPrintCommon

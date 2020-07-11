@@ -1,4 +1,3 @@
-
 module TestPlanGADT where
 
 import Data.Aeson
@@ -128,24 +127,23 @@ data HookFrequency = All | Each
 
 -- makeSem ''FileSystem
 
-data TestPlan m1 m a where 
-  SubPlan :: Text -> [TestPlan m1 m a] -> TestPlan m1 m ()
-  Test :: m1 m a -> TestPlan m1 m ()
-  Hook :: Text -> m1 m a -> HookPos -> HookFrequency -> TestPlan m1 m a -> TestPlan m1 m ()
-  Label :: Text -> TestPlan m1 m a -> TestPlan m1 m ()
-  Notes :: Text -> Text -> TestPlan m1 m a -> TestPlan m1 m ()
+data TestPlan m a where 
+  SubPlan :: [TestPlan m a] -> TestPlan m ()
+  Test :: m a -> TestPlan m ()
+  Hook :: { 
+    description :: Text,
+    run :: m a,
+    pos :: HookPos,
+    freq :: HookFrequency,
+    plan :: TestPlan m a 
+    } -> TestPlan m ()
+  Label :: Text -> TestPlan m () -> TestPlan m ()
+  Message1 :: Text -> TestPlan m ()
+  Notes :: Text -> Text -> TestPlan m a -> TestPlan m ()
 
 makeSem ''TestPlan
 
 -- myTest :: IO (Either Text Int) = uu
-
--- myPlan :: TestPlan IO (Either Text) ()
--- myPlan = do 
-        
-
-
-
-
 -- logIn :: IO (Either Text Int) = uu
 -- goToHomepage :: IO (Either Text Int) = uu
 -- clearAddTrasactionForm:: IO (Either Text Int) = uu
@@ -160,9 +158,23 @@ makeSem ''TestPlan
 -- debitTests = Test <$> [myTest, myTest, myTest]
 -- debitTestsInvalid = Test <$> [myTest, myTest, myTest]
 
+-- myPlan :: TestPlan IO (Either Text) ()
+-- myPlan = Test myTest 
+
+myRun :: forall effs. Member TestPlan effs => Sem effs ()
+myRun = do 
+          label "hello" $
+                            Message1 "Hello2"
+        
 
 
--- myPlan = 
+
+
+
+
+
+
+-- myRun = 
 --   Label "ACME Tests" $
 --   Hook "login" logIn Before All $
 --   Hook "ensure logged in" ensureStillLoggedIn After Each $

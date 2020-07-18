@@ -103,7 +103,6 @@ myRun =
     ]
   ]
 
-
 instance Titled (TestGroup m1 m a effs) where
   title = header
 

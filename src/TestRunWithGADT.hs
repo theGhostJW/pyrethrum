@@ -10,7 +10,7 @@ import           DSL.LogProtocol
 import Polysemy
 import Polysemy.Error as PE
 import RunElementClasses
-import RunnerBase hiding (tests)
+import RunnerBase hiding (tests, TestComponents)
 
 data HookFrequency = All | Each
 
@@ -85,7 +85,7 @@ myRun =
     before All "login" logIn  $
     after Each "ensure logged in" ensureStillLoggedIn  $
     after All "close down" closeDown  $
-    plan "debit" [
+    tests [
       label "valid" debitTests,
       label "invalid" debitTestsInvalid,
       myTest
@@ -102,3 +102,21 @@ myRun =
         ]
     ]
   ]
+
+
+instance Titled (TestGroup m1 m a effs) where
+  title = header
+
+data TestComponents e rc i as ds effs = TestComponents {
+  testItems :: rc -> [i],
+  testInteractor :: rc -> i -> Sem effs as,
+  testPrepState :: forall psEffs. (Ensurable e) psEffs => i -> as -> Sem psEffs ds
+}
+
+data GenericTest e tc rc i as ds effs = GenericTest {
+  configuration :: tc,
+  components :: ItemClass i ds => TestComponents e  rc i as ds effs
+}
+
+type TestPlanBase e tc rc m1 m a effs = 
+    (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => GenericTest e tc rc i as ds effs -> m1 (m a)) -> [TestGroup m1 m a effs]

@@ -45,8 +45,8 @@ import qualified Data.Map.Strict as M
 import qualified Data.Foldable as F
 import qualified Prelude
 
-type TestPlanBase e tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => 
-                                                          GenericTest e tc rc i as ds effs -> m1 (m a)) -> [TestGroup m1 m a effs]
+type TestPlanBase e tc rc m1 m a effs = 
+    (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => GenericTest e tc rc i as ds effs -> m1 (m a)) -> [TestGroup m1 m a effs]
 
 --- Reapplying test Filters to Items ---
 

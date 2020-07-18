@@ -35,6 +35,34 @@ import Data.Map as M
 import TestFilter
 import RunnerConsoleAndFile
 
+-- simplified plan
+simpleHardCodedPlan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
+simpleHardCodedPlan f =
+  [
+
+    TestGroup {
+           header = "Group 1",
+           rollover = doNothing,
+           goHome = doNothing,
+           tests = [
+               f RT.test,
+               f DT.test,
+               f ST.test,
+               f DemoProject.Test.RoughIntState.test
+             ]
+      },
+
+    TestGroup {
+          header = "Group 2",
+          rollover = doNothing,
+          goHome = doNothing,
+          tests = [
+              f RT2.test,
+              f ST2.test
+            ]
+     }
+  ]
+
 -- parametrised so can inject different preruns for testing
 validPlan :: forall m m1 effs a. EFFAllEffects effs =>
   PreRun effs      -- rollOver0

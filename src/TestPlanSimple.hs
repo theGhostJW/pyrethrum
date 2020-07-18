@@ -141,49 +141,49 @@ data TestPlan m1 m a =
     plan :: TestPlan m1 m a
     }
 
-myTest :: IO (Either Text Int) = uu
-logIn :: IO (Either Text Int) = uu
-goToHomepage :: IO (Either Text Int) = uu
-clearAddTrasactionForm:: IO (Either Text Int) = uu
-openAddTransactionForm :: IO (Either Text Int) = uu
-ensureStillLoggedIn :: IO (Either Text Int) = uu
-closeDown :: IO (Either Text Int) = uu
-goTransactionsPage :: IO (Either Text Int) = uu
+myTestC :: IO (Either Text Int) = uu
+logInC :: IO (Either Text Int) = uu
+goToHomepageC :: IO (Either Text Int) = uu
+clearAddTrasactionFormC :: IO (Either Text Int) = uu
+openAddTransactionFormC :: IO (Either Text Int) = uu
+ensureStillLoggedInC :: IO (Either Text Int) = uu
+closeDownC :: IO (Either Text Int) = uu
+goTransactionsPageC :: IO (Either Text Int) = uu
 
-testList = Test <$> [myTest, myTest, myTest, myTest]
-postTestList = Test <$> [myTest, myTest, myTest]
-creditTests = Test <$> [myTest, myTest, myTest]
-debitTests = Test <$> [myTest, myTest, myTest]
-debitTestsInvalid = Test <$> [myTest, myTest, myTest]
+testListC = Test <$> [myTestC, myTestC, myTestC, myTestC]
+postTestListC = Test <$> [myTestC, myTestC, myTestC]
+creditTestsC = Test <$> [myTestC, myTestC, myTestC]
+debitTestsC = Test <$> [myTestC, myTestC, myTestC]
+debitTestsInvalidC = Test <$> [myTestC, myTestC, myTestC]
 
 
-
+myPlan :: TestPlan IO (Either Text) Int
 myPlan = 
   Label "ACME Tests" $
-  Hook "login" logIn Before All $
-  Hook "ensure logged in" ensureStillLoggedIn After Each $
-  Hook "close down" closeDown After All $
+  Hook "login" logInC Before All $
+  Hook "ensure logged in" ensureStillLoggedInC After Each $
+  Hook "close down" closeDownC After All $
 
     Label "Transaction Control" $
-    Hook "go trans page" goTransactionsPage Before Each $
-    Hook "clear transactions" clearAddTrasactionForm After All $
+    Hook "go trans page" goTransactionsPageC Before Each $
+    Hook "clear transactions" clearAddTrasactionFormC After All $
       SubPlan $ 
         Label "Credit" (
-        Hook "open transaction form" openAddTransactionForm Before Each $
-        Hook "clear transaction form" clearAddTrasactionForm After All $
-        SubPlan creditTests
+        Hook "open transaction form" openAddTransactionFormC Before Each $
+        Hook "clear transaction form" clearAddTrasactionFormC After All $
+        SubPlan creditTestsC
       ) :
 
       Label "Debit" (
-      Hook "go pay anyone" openAddTransactionForm Before Each $
-      Hook "clear transaction form" clearAddTrasactionForm After All $
+      Hook "go pay anyone" openAddTransactionFormC Before Each $
+      Hook "clear transaction form" clearAddTrasactionFormC After All $
       SubPlan [
                 Label "valid scenarios" $
-                SubPlan debitTests,
+                SubPlan debitTestsC,
                 
                 Label "invalid scenarios" $
-                SubPlan debitTests
+                SubPlan debitTestsC
               ]
     ) :
 
-    [SubPlan (testList <> postTestList)]
+    [SubPlan (testListC <> postTestListC)]

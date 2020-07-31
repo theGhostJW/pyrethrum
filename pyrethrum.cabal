@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 509670cc5ff19d17c359bc3f08a34aeb1879ac9e10c2638d512a9bff4e93b100
+-- hash: d9329933182a655d3b65ff869c733ca58eddda92a0eef8270ac0b2dde6b38fef
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -56,6 +56,7 @@ library
       TestPlanGADTFail
       TestPlanSimple
       TestRunWithGADT
+      TestRunWithGADTTypesFit
   other-modules:
       Paths_pyrethrum
   hs-source-dirs:

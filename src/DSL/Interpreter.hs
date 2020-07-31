@@ -26,7 +26,7 @@ type FullEffects e = '[FileSystem, Ensure, ArbitraryIO, Logger e, CurrentTime, E
 
 -- TODO is there a type level <> DRY out
 type FullIOMembersBase e = '[FileSystem, EP.Ensure, ArbitraryIO, (Logger e), Reader ThreadInfo, State LogIndex, CurrentTime, Error (FrameworkError e), Embed IO]
-type TestIOEffects e = '[FileSystem, EP.Ensure, ArbitraryIO, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Error (FrameworkError e), Output (LogProtocolBase e), Embed IO]
+type TestIOEffects e =     '[FileSystem, EP.Ensure, ArbitraryIO, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Error (FrameworkError e), Output (LogProtocolBase e), Embed IO]
 
 type FullDocIOEffects e = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Error (FrameworkError e), Embed IO]
 type FullDocEffects e = '[FileSystem, ArbitraryIO, Reader ThreadInfo, State LogIndex, CurrentTime, Logger e, Ensure, Error (FrameworkError e), OutputDListText]

@@ -17,48 +17,56 @@ import DSL.Interpreter
 data HookFrequency = All | Each
 
 
--- data BaseTest rc tc e i as ds effs = BaseTest {
---   config :: tc,
---   items :: rc -> [i],
---   interactor :: rc -> i -> Sem effs as,
---   prepState :: forall effs0. (Ensurable e) effs0 => i -> as -> Sem effs0 ds
--- }
-data BaseTest rc tc e i as ds m = BaseTest {
+data BaseTest rc tc e i as ds effs = BaseTest {
   config :: tc,
   items :: rc -> [i],
-  interactor :: rc -> i -> m as,
-  prepState :: i -> as -> Either e ds
+  interactor :: rc -> i -> Sem effs as,
+  prepState :: forall effs0. (Ensurable e) effs0 => i -> as -> Sem effs0 ds
 }
+
+class (ToJSON i, Generic i) => ItemClass' i ds | i -> ds  where
+  identifier :: i -> Int
+  whenClause :: i -> Text
+  thenClause :: i -> Text
+  checkList :: i -> CheckDList ds
+
+  whenThen :: i -> Text
+  whenThen i = "When: " <> whenClause i  <> "\n" <>
+               "Then: " <> thenClause i
 
 
 data RunElement rc tc e m a where 
-  Plan :: Text -> [m a] -> RunElement rc tc e m ()
-  Tests :: [m a] -> RunElement rc tc e m ()
-  Test :: BaseTest rc tc e i as ds m -> RunElement rc tc e m o
-  Before :: {   
-    freq :: HookFrequency,
-    description :: Text,
-    run :: m a,
-    body :: m a 
-    } -> RunElement rc tc e m ()
-  After :: {     
-    freq :: HookFrequency,
-    description :: Text,
-    run :: m a,
-    body :: m a 
-    } -> RunElement rc tc e m ()
-  Label :: Text -> m () -> RunElement rc tc e m ()
-  Message :: Text -> RunElement rc tc e m ()
-  Notes :: Text -> Text -> m a -> RunElement rc tc e m ()
+  -- Plan :: Text -> [m a] -> RunElement rc tc e m ()
+  -- Tests :: [m a] -> RunElement rc tc e m ()
+  Test :: ItemClass' i ds => {
+    config :: tc,
+    items :: rc -> [i],
+    interactor :: rc -> i -> m as,
+    prepState :: i -> as -> Either e ds
+  } -> RunElement rc tc e m o
+  -- Before :: {   
+  --   freq :: HookFrequency,
+  --   description :: Text,
+  --   run :: m a,
+  --   body :: m a 
+  --   } -> RunElement rc tc e m ()
+  -- After :: {     
+  --   freq :: HookFrequency,
+  --   description :: Text,
+  --   run :: m a,
+  --   body :: m a 
+  --   } -> RunElement rc tc e m ()
+  -- Label :: Text -> m () -> RunElement rc tc e m ()
+  -- Message :: Text -> RunElement rc tc e m ()
+  -- Notes :: Text -> Text -> m a -> RunElement rc tc e m ()
 
 makeSem ''RunElement
 
-
--- testRunInterpreter :: forall rc tc e testEffs effs a. Members (TestIOEffects e) effs => rc -> Sem (RunElement rc tc e ': effs) a -> Sem effs [a]
+-- testRunInterpreter :: forall rc tc e a effs. Sem (RunElement rc tc e ': effs) a -> Sem effs a
 -- testRunInterpreter =
---     interpret $ \case 
---                   Test bt -> _ 
---                   _ -> uu
+--     interpretH \case 
+--                   Test {config} -> _
+
 
 
 -- runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, Show e, Member (Logger e) effs) =>
@@ -144,16 +152,6 @@ makeSem ''RunElement
 
 -- type TestSource rc tc e m1 m a effs = (forall i as ds. (ItemClass' i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => BaseTest rc tc e effs i as ds -> m1 (m a))
 
-
--- class (ToJSON i, Generic i) => ItemClass' i ds | i -> ds  where
---   identifier :: i -> Int
---   whenClause :: i -> Text
---   thenClause :: i -> Text
---   checkList :: i -> CheckDList ds
-
---   whenThen :: i -> Text
---   whenThen i = "When: " <> whenClause i  <> "\n" <>
---                "Then: " <> thenClause i
 
 
 -- type TestPlanBase rc tc e m1 m a effs = 

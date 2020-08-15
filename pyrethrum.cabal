@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d9329933182a655d3b65ff869c733ca58eddda92a0eef8270ac0b2dde6b38fef
+-- hash: 8960ff1d99efa6589ae08dc263900056b972e6fa68315d0f4ad0714bb417fd94
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -55,6 +55,7 @@ library
       TestPlanGADTAttempt2
       TestPlanGADTFail
       TestPlanSimple
+      TestPlanSimple2
       TestRunWithGADT
       TestRunWithGADTTypesFit
   other-modules:

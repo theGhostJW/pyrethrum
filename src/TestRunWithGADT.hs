@@ -35,37 +35,38 @@ class (ToJSON i, Generic i) => ItemClass' i ds | i -> ds  where
                "Then: " <> thenClause i
 
 
-data RunElement rc tc e m a where 
-  -- Plan :: Text -> [m a] -> RunElement rc tc e m ()
-  -- Tests :: [m a] -> RunElement rc tc e m ()
+data RunElement m a where 
+  -- Plan :: Text -> [m a] -> RunElement  m ()
+  -- Tests :: [m a] -> RunElement  m ()
   Test :: ItemClass' i ds => {
-    config :: tc,
     items :: rc -> [i],
+    config :: tc,
     interactor :: rc -> i -> m as,
     prepState :: i -> as -> Either e ds
-  } -> RunElement rc tc e m o
+  } -> RunElement m ()
   -- Before :: {   
   --   freq :: HookFrequency,
   --   description :: Text,
   --   run :: m a,
   --   body :: m a 
-  --   } -> RunElement rc tc e m ()
+  --   } -> RunElement  m ()
   -- After :: {     
   --   freq :: HookFrequency,
   --   description :: Text,
   --   run :: m a,
   --   body :: m a 
-  --   } -> RunElement rc tc e m ()
-  -- Label :: Text -> m () -> RunElement rc tc e m ()
-  -- Message :: Text -> RunElement rc tc e m ()
-  -- Notes :: Text -> Text -> m a -> RunElement rc tc e m ()
+  --   } -> RunElement  m ()
+  -- Label :: Text -> m () -> RunElement  m ()
+  -- Message :: Text -> RunElement  m ()
+  -- Notes :: Text -> Text -> m a -> RunElement  m ()
 
 makeSem ''RunElement
 
--- testRunInterpreter :: forall rc tc e a effs. Sem (RunElement rc tc e ': effs) a -> Sem effs a
+-- testRunInterpreter :: forall  a effs. Sem (RunElement  ': effs) a -> Sem effs a
 -- testRunInterpreter =
---     interpretH \case 
---                   Test {config} -> _
+--     interpret \case 
+--                   Test {} -> pure ()
+--                   _ -> uu
 
 
 

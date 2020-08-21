@@ -50,7 +50,7 @@ filterTest fltrs rc GenericTest{ configuration = tc } = Identity . Identity $ fi
 filterGroups :: forall tc rc e effs. TestConfigClass tc =>
               (
                 (forall i as ds. (Show i, Show as, Show ds) =>
-                      GenericTest e tc rc i as ds effs -> Identity (Identity FilterResult)) -> [TestGroup Identity Identity FilterResult effs]
+                      GenericTest e tc rc i as ds effs -> Identity (Identity FilterResult)) -> [RunElement Identity Identity FilterResult effs]
               )
               -> FilterList rc tc
               -> rc

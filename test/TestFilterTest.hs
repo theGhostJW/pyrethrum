@@ -114,11 +114,11 @@ test5 = GenericTest {
 
 runRunner :: forall m m1 effs a.
                 (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => GenericTest Int TestConfig RunConfig i as ds effs -> m1 (m a))
-                -> [TestGroup m1 m a effs]
+                -> [RunElement m1 m a effs]
 runRunner f =
   [
 
-   TestGroup {
+   RunElement {
           header = "Group 1",
           rollover = doNothing,
           goHome = doNothing,
@@ -129,7 +129,7 @@ runRunner f =
             ]
      },
 
-    TestGroup {
+    RunElement {
           header = "Group 2",
           rollover = doNothing,
           goHome = doNothing,

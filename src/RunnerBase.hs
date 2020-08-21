@@ -19,8 +19,8 @@ data PreRun effs = PreRun {
   checkHasRun :: Sem effs Bool
 }
 
-data TestGroup m1 m a effs =
-  TestGroup {
+data RunElement m1 m a effs =
+  RunElement {
         header :: Text,
         -- occurs once on client before group is run
         rollover :: PreRun effs,
@@ -31,7 +31,7 @@ data TestGroup m1 m a effs =
         -- eg [IO Either (FrameworkError TestInfo)]
    }
 
-instance Titled (TestGroup m1 m a effs) where
+instance Titled (RunElement m1 m a effs) where
   title = header
 
 data TestComponents e rc i as ds effs = TestComponents {

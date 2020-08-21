@@ -174,7 +174,7 @@ module LogTransformation.Test where
 --     nxtAccum = TestAccum {
 --                  runInfo = nxtStats,
 --                  currentRec = nxtRec,
---                  testGroup = nxtGroup
+--                  RunElement = nxtGroup
 --                }
 
 --     nextResultItem :: Either LogTransformError (Maybe [TestLogElement])
@@ -269,7 +269,7 @@ module LogTransformation.Test where
 -- data TestAccum = TestAccum {
 --   runInfo :: TestStats,
 --   currentRec :: Maybe TestRecord,
---   testGroup :: Maybe Text
+--   RunElement :: Maybe Text
 -- }
 
 -- emptyTestAccum :: TestAccum

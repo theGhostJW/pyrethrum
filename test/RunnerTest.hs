@@ -20,7 +20,7 @@ import  DemoProject.Test.Simple2 as ST2
 failG2GoHomePlan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 failG2GoHomePlan f =
   [
-    TestGroup {
+    RunElement {
           header = "Group 2",
           rollover = doNothing,
           goHome = alwaysFailCheck,
@@ -62,8 +62,8 @@ unit_rollover_check_fail = chkMessageInstances rolloverCheckMessage 1 runFailRol
 ---------------------- Duplicate Group Names --------------------
 -----------------------------------------------------------------
 
-emptyGroup :: Text -> TestGroup m1 m a effs
-emptyGroup hdr = TestGroup hdr doNothing doNothing []
+emptyGroup :: Text -> RunElement m1 m a effs
+emptyGroup hdr = RunElement hdr doNothing doNothing []
 
 planWithDuplicates :: forall m m1 effs a. TestPlan m1 m a effs
 planWithDuplicates f = [

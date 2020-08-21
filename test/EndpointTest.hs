@@ -34,7 +34,7 @@ testPlan :: forall m m1 effs a. EFFAllEffects effs => TestPlan m1 m a effs
 testPlan f =
   [
 
-    TestGroup {
+    RunElement {
            header = "Group 1",
            rollover = justLogPreRun Rollover,
            goHome = justLogPreRun GoHome, -- checkHasRun returns true so thinks its already home
@@ -46,7 +46,7 @@ testPlan f =
              ]
       },
 
-    TestGroup {
+    RunElement {
           header = "Group 2",
           rollover = justLogPreRun Rollover,
           goHome = justLogPreRunFailCheck GoHome,

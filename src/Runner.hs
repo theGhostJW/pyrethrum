@@ -46,7 +46,7 @@ import qualified Data.Foldable as F
 import qualified Prelude
 
 type TestPlanBase e tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => 
-                                                          GenericTest e tc rc i as ds effs -> m1 (m a)) -> [TestGroup m1 m a effs]
+                                                          GenericTest e tc rc i as ds effs -> m1 (m a)) -> [RunElement m1 m a effs]
 
 --- Reapplying test Filters to Items ---
 
@@ -137,7 +137,7 @@ doNothing = PreRun {
   checkHasRun = pure True
 }
 
-disablePreRun :: TestGroup m m1 a effs -> TestGroup m m1 a effs
+disablePreRun :: RunElement m m1 a effs -> RunElement m m1 a effs
 disablePreRun tg = tg {
                         rollover = doNothing,
                         goHome = doNothing
@@ -362,24 +362,24 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
     filterFlags :: [Bool]
     filterFlags = filterGroupFlags filterInfo
 
-    prepResults :: [TestGroup [] (Sem effs) () effs]
+    prepResults :: [RunElement [] (Sem effs) () effs]
     prepResults = plan $ runTest iIds filters itemRunner rc 
 
     firstDuplicateGroupTitle :: Maybe Text
     firstDuplicateGroupTitle = toS <$> firstDuplicate (toS . C.title <$> prepResults :: [Prelude.String])
 
-    runTuples ::  [(Bool, TestGroup [] (Sem effs) () effs)]
+    runTuples ::  [(Bool, RunElement [] (Sem effs) () effs)]
     runTuples = P.zip filterFlags prepResults
 
     logBoundry :: BoundaryEvent -> Sem effs ()
     logBoundry = logLP . BoundaryLog
 
-    exeGroup :: (Bool, TestGroup [] (Sem effs) () effs) -> Sem effs ()
+    exeGroup :: (Bool, RunElement [] (Sem effs) () effs) -> Sem effs ()
     exeGroup (include, tg) =
       let
         -- if ids are passed in we are running an endpoint
         -- endpoint go home and rolllover are not run if the application is already home
-        guardedHookRun :: (TestGroup [] (Sem effs) () effs -> PreRun effs) -> PreTestStage -> Sem effs (Either (FrameworkError e) ())
+        guardedHookRun :: (RunElement [] (Sem effs) () effs -> PreRun effs) -> PreTestStage -> Sem effs (Either (FrameworkError e) ())
         guardedHookRun hookSelector hookLabel =
           do 
             wantHookRun <- isJust iIds ? 

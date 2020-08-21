@@ -118,7 +118,7 @@ runRunner :: forall m m1 effs a.
 runRunner f =
   [
 
-   RunElement {
+   Tests {
           header = "Group 1",
           rollover = doNothing,
           goHome = doNothing,
@@ -129,7 +129,7 @@ runRunner f =
             ]
      },
 
-    RunElement {
+    Tests {
           header = "Group 2",
           rollover = doNothing,
           goHome = doNothing,

@@ -20,7 +20,7 @@ data PreRun effs = PreRun {
 }
 
 data RunElement m1 m a effs =
-  RunElement {
+  Tests {
         header :: Text,
         -- occurs once on client before group is run
         rollover :: PreRun effs,

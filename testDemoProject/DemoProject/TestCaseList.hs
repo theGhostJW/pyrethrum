@@ -45,7 +45,7 @@ validPlan :: forall m m1 effs a. EFFAllEffects effs =>
 validPlan ro0 gh0 ro1 gh1 f =
   [
 
-    RunElement {
+    Tests {
            header = "Group 1",
            rollover = ro0,
            goHome = gh0,
@@ -57,7 +57,7 @@ validPlan ro0 gh0 ro1 gh1 f =
              ]
       },
 
-    RunElement {
+    Tests {
           header = "Group 2",
           rollover = ro1,
           goHome = gh1,

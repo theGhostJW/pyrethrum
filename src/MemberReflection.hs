@@ -121,13 +121,11 @@ nameOfModule = mkTestModule ''ApState
 
 test :: forall effs. Members (Effects SuiteError) effs => Test Item ApState DState effs
 test = GenericTest {
-              configuration = MemberReflection.testConfig {address = nameOfModule},
-              components = TestComponents {
-                                testItems = items,
-                                testInteractor = interactor,
-                                testPrepState = prepState
-                            }
-            }
+              config = MemberReflection.testConfig {address = nameOfModule},
+              testItems = items,
+              testInteractor = interactor,
+              testPrepState = prepState
+        }
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

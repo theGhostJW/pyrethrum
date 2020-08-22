@@ -22,8 +22,8 @@ import DemoProject.Test.TestFilePaths
 
 type Effects effs = Members '[SuiteLogger, Ensure, ArbitraryIO, FileSystem] effs
 
-config :: TestConfig
-config = C.testConfig {
+tc :: TestConfig
+tc = defaultConfig {
   header = "This is a Rough Test",
   countries = allCountries
  }
@@ -77,12 +77,10 @@ ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr $ items rc)
 
 test :: forall effs. Effects effs => Test Item ApState DState effs
 test = GenericTest {
-              configuration = config {address = nameOfModule},
-              components = TestComponents {
-                                testItems = items,
-                                testInteractor = interactor,
-                                testPrepState = prepState
-                            }
+              config = tc {address = nameOfModule},
+              testItems = items,
+              testInteractor = interactor,
+              testPrepState = prepState
             }
 
 instance ItemClass Item DState where

@@ -75,8 +75,8 @@ instance Titled TestConfig where
 instance TestConfigClass TestConfig where
   moduleAddress = address
 
-testConfig :: TestConfig
-testConfig = TestConfig {
+defaultConfig :: TestConfig
+defaultConfig = TestConfig {
   header    = "Configuration Error ~ No Title Assigned",
   address = TestModule "Configuration Error ~ No Address Assigned",
   environments = allNonProdEnvironments,

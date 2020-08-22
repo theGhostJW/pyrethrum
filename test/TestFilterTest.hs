@@ -54,62 +54,72 @@ nz = [NZ]
 
 test1 :: TST MyInt MyInt MyInt effs
 test1 = GenericTest {
-              configuration = TestConfig {
+              config = TestConfig {
                 header = "test1",
                 address = TestModule "test1",
                 countries = au <> nz,
                 level = Regression,
                 enabled = True
               },
-              components = undefined
+              testItems = undefined,
+              testInteractor = undefined,
+              testPrepState = undefined 
             }
 
 test2 :: TST MyInt MyInt MyInt effs
 test2 = GenericTest {
-              configuration = TestConfig {
+              config = TestConfig {
                 header = "test2",
                 address = TestModule "test2",
                 countries = nz,
                 level = Regression,
                 enabled = True
               },
-              components = undefined
+              testItems = undefined,
+              testInteractor = undefined,
+              testPrepState = undefined 
             }
 
 test3 :: TST MyInt MyInt MyInt effs
 test3 = GenericTest {
-                configuration = TestConfig {
+                config = TestConfig {
                   header = "test3",
                   address = TestModule "test3",
                   countries = au,
                   level = Connectivity,
                   enabled = True
                 },
-                components = undefined
+              testItems = undefined,
+              testInteractor = undefined,
+              testPrepState = undefined 
             }
 
 test4 :: TST MyInt MyInt MyInt effs 
 test4 = GenericTest {
-              configuration = TestConfig {
+              config = TestConfig {
                   header = "test4",
                   address = TestModule "test4",
                   countries = au,
                   level = DeepRegression,
                   enabled = True
                 },
-              components = undefined
+              testItems = undefined,
+              testInteractor = undefined,
+              testPrepState = undefined 
             }
 
 test5 :: TST MyInt MyInt MyInt effs
 test5 = GenericTest {
-              configuration = TestConfig {
+              config = TestConfig {
                   header = "test5",
                   address = TestModule "test5",
                   countries = au,
                   level = DeepRegression,
                   enabled = False
                 },
-              components = undefined
+              testItems = undefined,
+              testInteractor = undefined,
+              testPrepState = undefined 
             }
 
 runRunner :: forall m m1 effs a.

@@ -34,13 +34,10 @@ data RunElement m1 m a effs =
 instance Titled (RunElement m1 m a effs) where
   title = header
 
-data TestComponents e rc i as ds effs = TestComponents {
+
+data GenericTest e tc rc i as ds effs = GenericTest {
+  config :: tc,
   testItems :: rc -> [i],
   testInteractor :: rc -> i -> Sem effs as,
   testPrepState :: forall psEffs. (Ensurable e) psEffs => i -> as -> Sem psEffs ds
-}
-
-data GenericTest e tc rc i as ds effs = GenericTest {
-  configuration :: tc,
-  components :: ItemClass i ds => TestComponents e  rc i as ds effs
 }

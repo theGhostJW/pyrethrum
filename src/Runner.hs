@@ -144,7 +144,7 @@ disablePreRun tg = tg {
                       }
 
 testAddress :: forall tc rc i effs as ds e. TestConfigClass tc => GenericTest e tc rc i effs as ds -> TestModule
-testAddress =  moduleAddress . (configuration :: GenericTest e tc rc i effs as ds -> tc)
+testAddress =  moduleAddress . (config :: GenericTest e tc rc i effs as ds -> tc)
 
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -292,17 +292,9 @@ runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, To
                    -> rc                                                                    -- runConfig
                    -> GenericTest e tc rc i as ds effs                                     -- Test Case
                    -> [Sem effs ()]                                                         -- [TestIterations]
-runTest iIds fltrs itemRunner rc GenericTest {configuration = tc, components} =
-  let
-    runItems :: TestComponents e rc i as ds effs -> [Sem effs ()]
-    runItems TestComponents {testItems, testInteractor, testPrepState} = 
-      runTestItems iIds (testItems rc) (TestParams testInteractor testPrepState tc rc) itemRunner
-
-    include :: Bool
-    include = acceptFilter $ filterTestCfg fltrs rc tc
-  in
-    include
-        ? runItems components
+runTest iIds fltrs itemRunner rc GenericTest {config = tc, testItems, testInteractor, testPrepState} =
+    (acceptFilter $ filterTestCfg fltrs rc tc)
+        ? runTestItems iIds (testItems rc) (TestParams testInteractor testPrepState tc rc) itemRunner
         $ []
 
 logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()

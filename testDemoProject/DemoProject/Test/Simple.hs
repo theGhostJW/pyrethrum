@@ -19,8 +19,8 @@ import DemoProject.Test.TestFilePaths
 
 type Effects effs = EnsureLogEffs effs
 
-config :: TestConfig
-config = C.testConfig {
+tc :: TestConfig
+tc = defaultConfig {
   header = "This Simple Test Only Uses Ensure Effects"
 }
 
@@ -84,12 +84,10 @@ ep rc iFltr = testEndpoint nameOfModule rc (filterredItemIds iFltr $ items runCo
 
 test :: forall effs. Effects effs => Test Item ApState DState effs
 test = GenericTest {
-              configuration = config {address = nameOfModule},
-              components = TestComponents {
-                                testItems = items,
-                                testInteractor = interactor,
-                                testPrepState = prepState
-                            }
+              config = tc {address = nameOfModule},
+              testItems = items,
+              testInteractor = interactor,
+              testPrepState = prepState
             }
 
 instance ItemClass Item DState where

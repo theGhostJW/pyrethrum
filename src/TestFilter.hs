@@ -45,7 +45,7 @@ filterTestCfg fltrs rc tc =
     
 
 filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => FilterList rc tc -> rc -> GenericTest e tc rc i as ds effs -> Identity (Identity FilterResult)
-filterTest fltrs rc GenericTest{ configuration = tc } = Identity . Identity $ filterTestCfg fltrs rc tc
+filterTest fltrs rc GenericTest{ config = tc } = Identity . Identity $ filterTestCfg fltrs rc tc
 
 filterGroups :: forall tc rc e effs. TestConfigClass tc =>
               (

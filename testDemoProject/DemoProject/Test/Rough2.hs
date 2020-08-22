@@ -18,4 +18,4 @@ endpoint = ep runConfig (IID 120)
 data Dummy = Dummy
 
 test :: forall effs. T.Effects effs => Test Item ApState DState effs
-test = T.test { configuration = config {address = mkTestModule ''Dummy} }
+test = T.test { config = defaultConfig {address = mkTestModule ''Dummy} }

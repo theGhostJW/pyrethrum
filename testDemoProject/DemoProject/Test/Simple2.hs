@@ -6,7 +6,7 @@
 module DemoProject.Test.Simple2 where
   
 import DemoProject.Test.Simple as T
-import DemoProject.Config
+import DemoProject.Config as C
 import DSL.Interpreter
 import           Polysemy
 import           Pyrelude
@@ -18,4 +18,4 @@ endpoint = ep runConfig (IID 120)
 data Dummy = Dummy
 
 test :: forall effs. Effects effs => Test Item ApState DState effs
-test = T.test { configuration = config {address = mkTestModule ''Dummy} }
+test = T.test { config = defaultConfig {address = mkTestModule ''Dummy} }

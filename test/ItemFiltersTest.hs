@@ -137,7 +137,7 @@ unit_item_filter_dupe_error = chkFilterError All "Item id: 120 is duplicated in 
 sampleItems = P.take 99 [1..]
 
 converter :: Int -> TestConfig
-converter i' = CFG.testConfig { 
+converter i' = defaultConfig { 
                                 countries = case i' `mod` 3 of
                                                   0 -> auOnly
                                                   1 -> nzOnly 

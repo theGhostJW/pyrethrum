@@ -57,7 +57,8 @@ ghc-options:
   - -fno-warn-unused-matches
   - -fno-warn-unused-binds
   - -fno-warn-unused-do-bind
-  - -fdefer-type-errors
+  - -fwrite-ide-info
+  # - -fdefer-type-errors
 
 default-extensions:
   - AllowAmbiguousTypes
@@ -134,7 +135,6 @@ tests:
     source-dirs:        
     - test
     - testDemoProject
-
     dependencies: *testdependencies
   
   pyrethrum-test-Integration:

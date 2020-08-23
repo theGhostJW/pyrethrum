@@ -1,12 +1,14 @@
 module TestFilterTest where
 
 import Pyrelude         as P
+import Polysemy
 import           Runner as R
 import           Pyrelude.Test
 import Data.Yaml
 import Data.Aeson.TH
 import Data.Aeson.Types
 import TestFilter
+import RunnerBase
 
 data TestDepth = Connectivity | Regression | DeepRegression deriving (Eq, Ord, Show)
 data Country = Au | NZ deriving (Eq, Ord, Show)
@@ -52,6 +54,11 @@ instance ToJSON MyInt where
 au = [Au]
 nz = [NZ]
 
+empti = const ([] :: [MyInt])
+
+emptiInteractor :: RunConfig -> MyInt -> Sem effs MyInt
+emptiInteractor = \_ _ -> pure $ MyInt 1
+
 test1 :: TST MyInt MyInt MyInt effs
 test1 = GenericTest {
               config = TestConfig {
@@ -61,9 +68,9 @@ test1 = GenericTest {
                 level = Regression,
                 enabled = True
               },
-              testItems = undefined,
-              testInteractor = undefined,
-              testPrepState = undefined 
+              testItems = empti,
+              testInteractor = emptiInteractor,
+              testPrepState = \i ii -> pure ii 
             }
 
 test2 :: TST MyInt MyInt MyInt effs
@@ -75,9 +82,9 @@ test2 = GenericTest {
                 level = Regression,
                 enabled = True
               },
-              testItems = undefined,
-              testInteractor = undefined,
-              testPrepState = undefined 
+              testItems = empti,
+              testInteractor = emptiInteractor,
+              testPrepState = \i ii -> pure ii 
             }
 
 test3 :: TST MyInt MyInt MyInt effs
@@ -89,9 +96,9 @@ test3 = GenericTest {
                   level = Connectivity,
                   enabled = True
                 },
-              testItems = undefined,
-              testInteractor = undefined,
-              testPrepState = undefined 
+              testItems = empti,
+              testInteractor = emptiInteractor,
+              testPrepState = \i ii -> pure ii 
             }
 
 test4 :: TST MyInt MyInt MyInt effs 
@@ -103,9 +110,9 @@ test4 = GenericTest {
                   level = DeepRegression,
                   enabled = True
                 },
-              testItems = undefined,
-              testInteractor = undefined,
-              testPrepState = undefined 
+              testItems = empti,
+              testInteractor = emptiInteractor,
+              testPrepState = \i ii -> pure ii 
             }
 
 test5 :: TST MyInt MyInt MyInt effs
@@ -117,9 +124,9 @@ test5 = GenericTest {
                   level = DeepRegression,
                   enabled = False
                 },
-              testItems = undefined,
-              testInteractor = undefined,
-              testPrepState = undefined 
+              testItems = empti,
+              testInteractor = emptiInteractor,
+              testPrepState = \i ii -> pure ii  
             }
 
 runRunner :: forall m m1 effs a.

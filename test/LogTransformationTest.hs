@@ -21,7 +21,7 @@ import LogTransformation.Common as LTC
 import qualified Data.Map.Strict as M
 import Control.Monad.Writer.Strict (WriterT)
 import Control.Monad.State.Strict (State)
-import DemoProject.Config
+import Config
 
 -- import LogTransformation.Iteration
 

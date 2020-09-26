@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3c954aa15dc562bd39dafc3fd9ea2aeca568ae2d6c738cd21c101646e9b66f56
+-- hash: 8c75eaa59efcdc0182e5984b8f0d6ff92f26e2cfcd6570acf495f82fc4a03b03
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -88,6 +88,7 @@ test-suite pyrethrum-test
       ArbitraryIOTest
       AuxFilesTest
       CheckTest
+      Config
       EndpointTest
       ItemFiltersTest
       LogListCheck
@@ -96,19 +97,9 @@ test-suite pyrethrum-test
       PrettyPrintTest
       RunnerTest
       TestFilterTest
-      DemoProject.Config
-      DemoProject.Test.Rough
-      DemoProject.Test.Rough2
-      DemoProject.Test.RoughDisabled
-      DemoProject.Test.RoughIntState
-      DemoProject.Test.Simple
-      DemoProject.Test.Simple2
-      DemoProject.Test.TestFilePaths
-      DemoProject.TestCaseList
       Paths_pyrethrum
   hs-source-dirs:
       test
-      testDemoProject
   default-extensions: AllowAmbiguousTypes BangPatterns BlockArguments ConstrainedClassMethods ConstraintKinds DisambiguateRecordFields DuplicateRecordFields DataKinds DefaultSignatures DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification ExtendedDefaultRules FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase LiberalTypeSynonyms MultiParamTypeClasses MultiWayIf NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures PatternSynonyms PolyKinds QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving StrictData TemplateHaskell TupleSections TypeApplications TypeFamilies TypeFamilyDependencies TypeOperators
   ghc-options: -fmax-pmcheck-iterations=10000000 -ferror-spans -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
   build-depends:
@@ -142,19 +133,9 @@ test-suite pyrethrum-test-Integration
       EndToEndSanityTest
       LogTransformationIntegrationTest
       RunnerRestartGoHomeIOTest
-      DemoProject.Config
-      DemoProject.Test.Rough
-      DemoProject.Test.Rough2
-      DemoProject.Test.RoughDisabled
-      DemoProject.Test.RoughIntState
-      DemoProject.Test.Simple
-      DemoProject.Test.Simple2
-      DemoProject.Test.TestFilePaths
-      DemoProject.TestCaseList
       Paths_pyrethrum
   hs-source-dirs:
       testIntegration
-      testDemoProject
   default-extensions: AllowAmbiguousTypes BangPatterns BlockArguments ConstrainedClassMethods ConstraintKinds DisambiguateRecordFields DuplicateRecordFields DataKinds DefaultSignatures DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification ExtendedDefaultRules FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase LiberalTypeSynonyms MultiParamTypeClasses MultiWayIf NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures PatternSynonyms PolyKinds QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving StrictData TemplateHaskell TupleSections TypeApplications TypeFamilies TypeFamilyDependencies TypeOperators
   ghc-options: -fmax-pmcheck-iterations=10000000 -ferror-spans -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
   build-depends:

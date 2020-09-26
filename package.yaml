@@ -134,14 +134,12 @@ tests:
     main:                driver.hs
     source-dirs:        
     - test
-    - testDemoProject
     dependencies: *testdependencies
   
   pyrethrum-test-Integration:
     main:                driver.hs
     source-dirs:         
     - testIntegration
-    - testDemoProject
     dependencies: 
       *testdependencies
     

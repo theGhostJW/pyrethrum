@@ -3,13 +3,42 @@ module LogProtocolTest where
 import           Pyrelude as P
 import           Pyrelude.Test as T
 import DSL.LogProtocol as LP
-import DemoProject.Config
 import RunElementClasses
 import Data.Set as S
 import Common
 import qualified Data.Aeson as A
 import Data.ByteString.Lazy as B
 import qualified Check as C
+import Data.Aeson
+import Data.Aeson.TH
+
+data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
+data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
+data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
+
+data TestConfig = TestConfig {
+  header       :: Text,
+  address      :: TestModule,
+  environments :: Set Environment,
+  countries    :: Set Country,
+  minDepth     :: Depth,
+  active       :: Bool
+}  deriving (Eq, Show)
+
+data RunConfig = RunConfig {
+  runTitle    :: Text,
+  environment :: Environment,
+  country     :: Country,
+  depth       :: Depth
+} deriving (Eq, Show)
+
+runConfig :: RunConfig
+runConfig = RunConfig {
+  runTitle = "Sample RunConfig",
+  environment = TST,
+  country = AU,
+  depth = DeepRegression
+}
 
 genJSON :: Gen A.Value
 genJSON = A.toJSON <$> genRunConfig -- using runconfig as easy proxy for random aeson
@@ -140,3 +169,9 @@ hprop_log_protocol_round_trip = property $ do
   eitherf unserialised
     (\s -> footnote (toS s) *> failure)
     (lp ===)
+
+$(deriveJSON defaultOptions ''TestConfig)
+$(deriveJSON defaultOptions ''Environment)
+$(deriveJSON defaultOptions ''Country)
+$(deriveJSON defaultOptions ''Depth)
+$(deriveJSON defaultOptions ''RunConfig)

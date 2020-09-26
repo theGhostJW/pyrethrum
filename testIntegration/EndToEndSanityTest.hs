@@ -1,17 +1,21 @@
 module EndToEndSanityTest where 
 
+{- 
 import           Pyrelude as E
 import           Pyrelude.IO
 import Pyrelude.Test      as T
 import AuxFiles
 import LogTransformation.Common
 import DSL.LogProtocol
+import DSL.Interpreter
 import Common
-import DemoProject.TestCaseList
-import DemoProject.Config
+import Config
 import DSL.LogProtocol.PrettyPrint
 
 -- Helpers --
+
+runToLPList :: IO ([LogProtocol], Either AppError ())
+runToLPList = executeForTest runSem
 
 fullLog :: IO ([LogProtocol], Either AppError ())
 fullLog = runToLPList
@@ -53,4 +57,6 @@ unit_records_expected_prepstate_failures =
   in
     chkLog (\lg -> 2 == count isPrepFailure lg) "expect 2 prep failures 1 for each Rough test iteration 110"
     
-      
+
+
+-}  

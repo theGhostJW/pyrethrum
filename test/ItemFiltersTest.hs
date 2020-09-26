@@ -8,7 +8,7 @@ import           Runner as R
 import           Pyrelude.Test
 import Data.Aeson.TH
 import Data.Aeson.Types
-import           DemoProject.Config as CFG
+-- import           DemoProject.Config as CFG
 
 
 data TestItem = TestItem {
@@ -136,20 +136,20 @@ unit_item_filter_dupe_error = chkFilterError All "Item id: 120 is duplicated in 
 
 sampleItems = P.take 99 [1..]
 
-converter :: Int -> TestConfig
-converter i' = defaultConfig { 
-                                countries = case i' `mod` 3 of
-                                                  0 -> auOnly
-                                                  1 -> nzOnly 
-                                                  _ -> allCountries
-                          }
+-- converter :: Int -> TestConfig
+-- converter i' = defaultConfig { 
+--                                 countries = case i' `mod` 3 of
+--                                                   0 -> auOnly
+--                                                   1 -> nzOnly 
+--                                                   _ -> allCountries
+--                           }
 
-runcfg = CFG.runConfig {country = AU}
+-- runcfg = CFG.runConfig {country = AU}
 
-auTestItems = applyTestFiltersToItems runcfg converter sampleItems 
+-- auTestItems = applyTestFiltersToItems runcfg converter sampleItems 
 
--- expect 1/3 of the 99 nzOnly to be filterred out due to country filter
-unit_filter_items_length = 66 ... length auTestItems
+-- -- expect 1/3 of the 99 nzOnly to be filterred out due to country filter
+-- unit_filter_items_length = 66 ... length auTestItems
 
--- no items mapped to NZ only should be present
-unit_filter_items = Nothing ... find (\i' -> i' `mod` 3 == 1) auTestItems
+-- -- no items mapped to NZ only should be present
+-- unit_filter_items = Nothing ... find (\i' -> i' `mod` 3 == 1) auTestItems

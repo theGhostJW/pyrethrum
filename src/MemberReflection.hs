@@ -3,6 +3,7 @@
 
 module MemberReflection where
 
+-- import Pyrelude hiding (Item)
 import Pyrelude
 import Polysemy
 import Polysemy.Internal.CustomErrors
@@ -100,10 +101,10 @@ newtype DState = V {
                   } deriving Show
 
 interactor :: forall e effs. Members (Effects e) effs => RunConfig -> Item -> Sem effs ApState
-interactor RunConfig{..} Item{..} = uu
+interactor RunConfig{} Item{} = uu
 
 prepState :: forall e effs. (Ensurable e) effs => Item -> ApState -> Sem effs DState
-prepState _i ApState{..} = uu
+prepState _i ApState{} = uu
 
 data Item = Item {
   iid    :: Int,

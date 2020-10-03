@@ -128,7 +128,7 @@ logFileHandles suffixExtensionMap =
               traverse_ (hClose . fileHandle . snd) openHndls
               pure . Left $ AnnotatedError 
                               ("Failed to create log file with suffix: " <> sfx) 
-                              $ fromLeft (C.Error "wont happen") fstErr'
+                              $ fromLeft (C.Error "won't happen") fstErr'
         )
 
 doNothing :: PreRun effs

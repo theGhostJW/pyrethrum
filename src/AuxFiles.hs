@@ -5,6 +5,7 @@ module AuxFiles where
 import Pyrelude as F
 import Pyrelude.IO
 import qualified Prelude as P
+import System.Environment
 import Paths_pyrethrum
 import qualified System.IO as S
 import qualified Data.Char as C
@@ -12,13 +13,11 @@ import Control.Monad.IO.Class
 
 data WantConsole = Console | NoConsole deriving Eq
 
-bdr = getBinDir
-
-binDir :: IO AbsDir
-binDir = parseAbsDir =<< getBinDir
+exeDir :: IO AbsDir
+exeDir = parent <$> (parseAbsFile =<< getExecutablePath)
 
 auxBase :: IO (Either P.IOError AbsDir)
-auxBase = subDirFromBaseDir binDir [reldir|auxFiles|]
+auxBase = subDirFromBaseDir exeDir [reldir|auxFiles|]
 
 subPath :: IO (Either P.IOError AbsDir) -> Path Rel a -> IO (Either P.IOError (Path Abs a))
 subPath prent chld = ((</> chld) <$>) <$> prent

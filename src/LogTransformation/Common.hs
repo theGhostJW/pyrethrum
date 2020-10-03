@@ -345,6 +345,7 @@ testSource = do
                 _ -> P.error "DList pattern match error this should never happen"
 
 testSink :: [o] -> WriterState i o () 
+-- testSink = tell . P.fromList
 testSink = tell . fromList
                              
 ------------------------------------------------------------

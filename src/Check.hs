@@ -65,7 +65,7 @@ prdCheck prd hdr msgf = Check {
 applyToFirst :: (Check ds -> Check ds) -> DList (Check ds) -> DList (Check ds)
 applyToFirst f = \case
                     Nil -> D.empty
-                    Cons x xs -> D.cons (f x) $ fromList xs
+                    Cons x xs -> D.cons (f x) $ D.fromList xs
                     _ -> error "DList case failure - should not happen"
 
 gate :: forall ds. DList (Check ds) -> DList (Check ds)

@@ -5,7 +5,7 @@ import Common as C
 import  DSL.LogProtocol as LP
 import  DSL.CurrentTime as CT
 import DSL.LogProtocol.PrettyPrint
-import           Data.DList
+import           Data.DList as D
 import           Pyrelude as P
 import           Pyrelude.IO hiding (now)
 import qualified Data.Aeson as A
@@ -176,4 +176,4 @@ logDocInterpreter :: forall effs a e. (Show e, Member OutputDListText effs) => S
 logDocInterpreter = logDocWithSink (output . dList)
                                                      
 logDocPrettyInterpreter :: forall effs a e. (Show e, Member OutputDListText effs) => Sem (Logger e ': effs) a -> Sem effs a
-logDocPrettyInterpreter = logDocWithSink (output . fromList . lines . prettyPrintLogProtocol True)
+logDocPrettyInterpreter = logDocWithSink (output . D.fromList . lines . prettyPrintLogProtocol True)

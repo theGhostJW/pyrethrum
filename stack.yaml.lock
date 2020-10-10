@@ -10,11 +10,11 @@ packages:
     git: https://github.com/theGhostJW/pyrelude
     pantry-tree:
       size: 2368
-      sha256: e48a1d5447d34d2361b3953fdddf19546ff5091a1d961b51d49c6446e6fd1345
-    commit: 4077213a476d31f9127eebc8126130024ddfdedf
+      sha256: 934ec956f2788482a535619eb187aac3a2ba368d1fe50878a8055887dda2f8cd
+    commit: c76160f33ec5f4fed5dbbebfa64cd2c6e3ad8323
   original:
     git: https://github.com/theGhostJW/pyrelude
-    commit: 4077213a476d31f9127eebc8126130024ddfdedf
+    commit: c76160f33ec5f4fed5dbbebfa64cd2c6e3ad8323
 - completed:
     hackage: discrimination-0.4@sha256:d42ae36c97ea9c0c8844b47ee162c5530f3daf708636f01010f58dcf52602876,2571
     pantry-tree:
@@ -30,12 +30,12 @@ packages:
   original:
     hackage: encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce,1864
 - completed:
-    hackage: polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
+    hackage: polysemy-plugin-0.2.5.1@sha256:61c6c0aad2852377aa5d5a8f9639a437905e3a6f0e2a99a41e96fb231dc86836,2952
     pantry-tree:
       size: 1232
-      sha256: 5c90dac2eba48b4e337b302347c233ecaedb63e333641e094e718a548ac86711
+      sha256: 9720d9a1675c7ac3e2635b8c9f002f7ab0764eb60738a3405603cb33bdffc493
   original:
-    hackage: polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
+    hackage: polysemy-plugin-0.2.5.1
 - completed:
     hackage: transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
     pantry-tree:
@@ -45,7 +45,7 @@ packages:
     hackage: transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
 snapshots:
 - completed:
-    size: 521183
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/5/7.yaml
-    sha256: c72b9c63b7faa8812cb6308a3d74652cf0e9b793ff197e972ee74ade774ec4eb
-  original: nightly-2020-05-07
+    size: 533430
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/9/29.yaml
+    sha256: 257d950f082432a4807a9f18fb35c4712470cd534d3e45af9732753e30b967d3
+  original: nightly-2020-09-29

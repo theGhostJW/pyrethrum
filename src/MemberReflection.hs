@@ -4,7 +4,7 @@
 module MemberReflection where
 
 -- import Pyrelude hiding (Item)
-import Pyrelude
+import Pyrelude hiding (Item)
 import Polysemy
 import Polysemy.Internal.CustomErrors
 import           DSL.Ensure

@@ -340,13 +340,13 @@ testSource = do
               case dlst of
                 Nil -> pure Nothing
                 Cons x xs -> do
-                              put $ fromList xs
+                              put $ D.fromList xs
                               pure $ Just x 
                 _ -> P.error "DList pattern match error this should never happen"
 
 testSink :: [o] -> WriterState i o () 
 -- testSink = tell . P.fromList
-testSink = tell . fromList
+testSink = tell . D.fromList
                              
 ------------------------------------------------------------
 -------------------- Shared Item Components ----------------

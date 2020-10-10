@@ -18,7 +18,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: nightly-2020-05-07
+resolver: nightly-2020-09-29
 # nightly-2018-05-30 # last nightly for GHC 8.4.2
 # ghc-8.4.2
 # nightly-2018-08-07
@@ -53,10 +53,10 @@ allow-newer: true
 extra-deps:
 # mine
 - git: https://github.com/theGhostJW/pyrelude
-  commit: "4077213a476d31f9127eebc8126130024ddfdedf"
+  commit: "c76160f33ec5f4fed5dbbebfa64cd2c6e3ad8323"
 - discrimination-0.4@sha256:d42ae36c97ea9c0c8844b47ee162c5530f3daf708636f01010f58dcf52602876,2571
 - encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce,1864
-- polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
+- polysemy-plugin-0.2.5.1
 - transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
 
 # Control whether we use the GHC we find on the path

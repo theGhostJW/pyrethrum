@@ -10,11 +10,11 @@ packages:
     git: https://github.com/theGhostJW/pyrelude
     pantry-tree:
       size: 2368
-      sha256: 934ec956f2788482a535619eb187aac3a2ba368d1fe50878a8055887dda2f8cd
-    commit: c76160f33ec5f4fed5dbbebfa64cd2c6e3ad8323
+      sha256: 67c326c91b2bc82014586b19ac9d923dbf883e11f609d5ca21811477e99cb65c
+    commit: e04227c10607b6c0f4acdd30f79a4af5f3858042
   original:
     git: https://github.com/theGhostJW/pyrelude
-    commit: c76160f33ec5f4fed5dbbebfa64cd2c6e3ad8323
+    commit: e04227c10607b6c0f4acdd30f79a4af5f3858042
 - completed:
     hackage: discrimination-0.4@sha256:d42ae36c97ea9c0c8844b47ee162c5530f3daf708636f01010f58dcf52602876,2571
     pantry-tree:

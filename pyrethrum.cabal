@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 49dbc6b9f95388b1f57b4955abb42972c87c4302b4a7d5513fdadd3c0e04bd30
+-- hash: 648dc9105b2916fbdd9f748d6e65e0777d333707a036268c252b24f85d8920d1
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -130,7 +130,6 @@ test-suite pyrethrum-test-Integration
   type: exitcode-stdio-1.0
   main-is: driver.hs
   other-modules:
-      EndToEndSanityTest
       LogTransformationIntegrationTest
       RunnerRestartGoHomeIOTest
       Paths_pyrethrum

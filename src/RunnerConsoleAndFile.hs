@@ -5,7 +5,6 @@ import           Polysemy.Reader
 import           Polysemy.State
 import           Common
 import           DSL.Logger
-import           DSL.Ensure
 import           DSL.CurrentTime
 import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
@@ -13,7 +12,6 @@ import           Pyrelude as P hiding (app)
 import           Pyrelude.IO as PIO 
 import           Runner as R
 import qualified System.IO as S
-import qualified Control.Exception as E
 import AuxFiles as A
 import Data.Aeson (ToJSON(..))
 import Data.Map as M
@@ -69,7 +67,7 @@ ioRunToFile projRoot wantConsole docMode interpreter app =
               logPths = catMaybes $ getFile <$> fileRecs
               fileHndles = getHandle <$> fileRecs
               closeHandles = closeFileHandles fileHndles
-              loggerHandles = (\(f, l, h) -> (l, h)) <$> fileLoggerHandles
+              loggerHandles = (\(_f, l, h) -> (l, h)) <$> fileLoggerHandles
 
               logger :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => Sem (Logger e ': effs) a -> Sem effs a
               logger = logToHandles loggerHandles

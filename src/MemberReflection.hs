@@ -115,7 +115,7 @@ data Item = Item {
 } deriving (Show, Generic)
 
 items :: RunConfig -> [Item]
-items rc = []
+items _ = []
   
 nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState

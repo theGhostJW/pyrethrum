@@ -136,15 +136,6 @@ doNothing = PreRun {
   checkHasRun = pure True
 }
 
-disablePreRun :: RunElement m m1 a effs -> RunElement m m1 a effs
-disablePreRun tg = tg {
-                        rollover = doNothing,
-                        goHome = doNothing
-                      }
-
-testAddress :: forall tc rc i effs as ds e. TestConfigClass tc => GenericTest e tc rc i effs as ds -> TestModule
-testAddress =  moduleAddress . (config :: GenericTest e tc rc i effs as ds -> tc)
-
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -170,7 +161,7 @@ logRP = logLP . logRun
 
 normalExecution :: forall e effs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) 
                       => ItemParams e as ds i tc rc effs -> Sem effs ()  
-normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  = 
+normalExecution (ItemParams {testParams = TestParams{interactor, prepState, tc, rc}, item = i})  = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) (identifier i)
@@ -225,7 +216,7 @@ normalExecution (ItemParams (TestParams interactor prepState tc rc) i)  =
 
 docExecution :: forall e effs rc tc i as ds. (ToJSON e, Show e, ItemClass i ds, TestConfigClass tc, Member (Logger e) effs)
               => ItemParams e as ds i tc rc effs -> Sem effs () 
-docExecution (ItemParams (TestParams interactor prepState tc rc) i) = 
+docExecution (ItemParams (TestParams interactor _prepState tc rc) i) = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) $ identifier i
@@ -249,7 +240,7 @@ runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass 
       -> TestParams e as ds i tc rc effs
       -> (ItemParams e as ds i tc rc effs -> Sem effs ())
       -> [Sem effs ()]
-runTestItems iIds items runPrms@(TestParams interactor prepState tc rc) itemRunner =
+runTestItems iIds items runPrms@TestParams{ tc } itemRunner =
   let
     logBoundry :: BoundaryEvent -> Sem effs ()
     logBoundry = logLP . BoundaryLog
@@ -327,7 +318,7 @@ runHook PreRun{runAction, checkHasRun} stage =
       exeHook :: Sem effs ()
       exeHook = 
         do 
-          preRunRslt <- PE.catch runAction (PE.throw . rolloverFailError)
+          PE.catch runAction (PE.throw . rolloverFailError)
           runCheck <- PE.catch checkHasRun (PE.throw . PreTestCheckExecutionError stage "exception encountered verifying hook has run")
           unless runCheck (PE.throw rolloverCheckFalseError)
       

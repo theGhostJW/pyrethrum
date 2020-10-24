@@ -45,7 +45,7 @@ aggregateDumpFile projRoot func lst = dumpFile projRoot (runAgg func lst)
 
 dumpByteStrings :: IO AbsDir -> DList ByteString -> RelFile -> IO ()
 dumpByteStrings projRoot lst file = do
-                            ePth <- tempFile projRoot file
+                            ePth <- tempFileBase projRoot file
                             eitherf ePth 
                               throw
                               (\pth -> do 

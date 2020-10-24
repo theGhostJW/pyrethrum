@@ -5,11 +5,8 @@ module AuxFiles where
 import Pyrelude as F
 import Pyrelude.IO
 import qualified Prelude as P
-import System.Environment
-import Paths_pyrethrum
 import qualified System.IO as S
 import qualified Data.Char as C
-import Control.Monad.IO.Class
 
 data WantConsole = Console | NoConsole deriving Eq
 

@@ -3,10 +3,7 @@ module RunnerConsoleAndFile where
 import           Polysemy
 import           Polysemy.Reader
 import           Polysemy.State
-import           Polysemy.Resource
-import Polysemy.Error as PE
 import           Common
-import           DSL.Interpreter
 import           DSL.Logger
 import           DSL.Ensure
 import           DSL.CurrentTime
@@ -18,10 +15,8 @@ import           Runner as R
 import qualified System.IO as S
 import qualified Control.Exception as E
 import AuxFiles as A
-import LogTransformation (prepareFinalLogs)
 import Data.Aeson (ToJSON(..))
 import Data.Map as M
-import TestFilter
 
 jsonItemLogExt = ".jsoni" :: Text
 

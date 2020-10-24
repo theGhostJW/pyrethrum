@@ -24,7 +24,6 @@ import Common as C
 import DSL.Interpreter
 import DSL.Logger
 import DSL.LogProtocol as LP
-import DSL.Ensure
 import DSL.CurrentTime
 import Pyrelude as P
 import Pyrelude.IO
@@ -123,7 +122,7 @@ logFileHandles projRoot suffixExtensionMap =
       maybef fstErr
         (pure $ Right openHndls)
         (
-          \((sfx, ext), fstErr') -> 
+          \((sfx, _ext), fstErr') -> 
             do 
               traverse_ (hClose . fileHandle . snd) openHndls
               pure . Left $ AnnotatedError 

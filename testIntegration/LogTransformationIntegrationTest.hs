@@ -31,8 +31,8 @@ runAggregator file fa = do
 -- unit_demo_itemAggregator_integration_i140 :: IO ()
 -- unit_demo_itemAggregator_integration_i140 = runAggregator jsoniFileIteration140 testIterationStepFile
 
-jsoniFile :: IO (Either IOError AbsFile)
-jsoniFile = dataFile [relfile|demo_raw_log.ijson|]
+jsoniFile :: IO AbsDir -> IO (Either IOError AbsFile)
+jsoniFile projRoot = dataFile projRoot [relfile|demo_raw_log.ijson|]
 
-jsoniFileIteration140 :: IO (Either IOError AbsFile)
-jsoniFileIteration140 = dataFile [relfile|demo_raw_log_140.ijson|]
+jsoniFileIteration140 :: IO AbsDir -> IO (Either IOError AbsFile)
+jsoniFileIteration140 projRoot = dataFile projRoot [relfile|demo_raw_log_140.ijson|]

@@ -26,12 +26,13 @@ import TestFilter
 jsonItemLogExt = ".jsoni" :: Text
 
 ioRunToFile :: forall b e appEffs. (Show e, ToJSON e, Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] appEffs) =>
-    WantConsole
+    IO AbsDir
+    -> WantConsole
     -> Bool 
     -> (forall a. (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger e ': effs) a -> Sem effs a) -> Sem appEffs a -> IO (Either (FrameworkError e) a))
     -> Sem appEffs b
     -> IO (Either (FrameworkError e) [AbsFile])
-ioRunToFile wantConsole docMode interpreter app = 
+ioRunToFile projRoot wantConsole docMode interpreter app = 
   let 
     handleSpec :: M.Map (Text, FileExt) (ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text) 
     handleSpec = M.fromList [
@@ -39,8 +40,8 @@ ioRunToFile wantConsole docMode interpreter app =
                               , (("raw", FileExt jsonItemLogExt), logStrJSONWith)
                             ]
 
-    fileHandleInfo :: IO (Either (FrameworkError e) [(ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text, HandleInfo)])
-    fileHandleInfo = logFileHandles handleSpec
+    fileHandleInfo ::  IO (Either (FrameworkError e) [(ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text, HandleInfo)])
+    fileHandleInfo = logFileHandles projRoot handleSpec
 
     printFilePaths :: [AbsFile] -> IO ()
     printFilePaths lsFiles = do 

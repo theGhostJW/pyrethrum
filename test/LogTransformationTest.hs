@@ -29,9 +29,9 @@ runAgg :: (DList ByteString -> DList ByteString) -> DList ByteString -> DList Te
 runAgg f l = decodeUtf8 <$> f l 
 
 -- todo: get file utils really sorted
-dumpFile ::  DList Text -> RelFile -> IO ()
-dumpFile lst file = do
-      ePth <- tempFile file
+dumpFile ::  IO AbsDir -> DList Text -> RelFile -> IO ()
+dumpFile projRoot lst file = do
+      ePth <- tempFile projRoot file
       eitherf ePth 
         throw
         (\pth -> do 
@@ -41,20 +41,12 @@ dumpFile lst file = do
                   S.print pth
         )
 
--- todo: get file utils really sorted
-dumpTxt :: Text -> RelFile -> IO ()
-dumpTxt txt' file = do 
-                      ePth <- tempFile file
-                      eitherf ePth
-                        throw
-                        (\p -> PIO.writeFile (toFilePath p) txt')
+aggregateDumpFile :: IO AbsDir -> (DList ByteString -> DList ByteString) -> DList ByteString -> RelFile -> IO ()
+aggregateDumpFile projRoot func lst = dumpFile projRoot (runAgg func lst) 
 
-aggregateDumpFile :: (DList ByteString -> DList ByteString) -> DList ByteString -> RelFile -> IO ()
-aggregateDumpFile func lst = dumpFile (runAgg func lst) 
-
-dumpByteStrings :: DList ByteString -> RelFile -> IO ()
-dumpByteStrings lst file = do
-                            ePth <- tempFile file
+dumpByteStrings :: IO AbsDir -> DList ByteString -> RelFile -> IO ()
+dumpByteStrings projRoot lst file = do
+                            ePth <- tempFile projRoot file
                             eitherf ePth 
                               throw
                               (\pth -> do 
@@ -90,7 +82,10 @@ sampleRunResults =
     runResults (fst $ transformDList rawFile transParams)
     -- can use for de bugging -- runResults (fst $ transformDList rawFileSmall transParams)
 
-demo_pretty_print_LP = dumpFile (prettyPrintLogProtocol False . logInfo <$> sampleLog) [relfile|raw.yaml|]
+_thisExeDir :: IO AbsDir
+_thisExeDir = parent <$> (parseAbsFile =<< getExecutablePath)
+
+demo_pretty_print_LP = dumpFile _thisExeDir (prettyPrintLogProtocol False . logInfo <$> sampleLog) [relfile|raw.yaml|]
 
 _demo_pretty_print_LP_with_reducer :: IO ()
 _demo_pretty_print_LP_with_reducer = 
@@ -105,13 +100,13 @@ _demo_pretty_print_LP_with_reducer =
       accumulator = ()
     }
   in
-    dumpFile (snd $ transformDList rawFile transParams) [relfile|raw.yaml|]
+    dumpFile _thisExeDir (snd $ transformDList rawFile transParams) [relfile|raw.yaml|]
 
 demo_test_stats :: Text
 demo_test_stats = txtPretty $ testStatusCounts sampleRunResults
 
 _base_results :: IO()
-_base_results = dumpTxt (txtPretty $ iterationResults sampleRunResults) [relfile|baseResults.yaml|]
+_base_results = dumpTxt _thisExeDir (txtPretty $ iterationResults sampleRunResults) [relfile|baseResults.yaml|]
 
 demo_iteration_stats = txtPretty $ iterationStatusCounts sampleRunResults
 
@@ -200,7 +195,7 @@ _demo_pretty_print_log =
       accumulator = emptyIterationAccum
     }
   in
-    dumpByteStrings (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
+    dumpByteStrings _thisExeDir (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
 
 _demo_pretty_print_problems_log :: IO ()
 _demo_pretty_print_problems_log = 
@@ -215,7 +210,7 @@ _demo_pretty_print_problems_log =
       accumulator = emptyProbleIterationAccum
     }
   in
-    dumpByteStrings (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
+    dumpByteStrings _thisExeDir (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
 
 unit_demo_pretty_print = _demo_pretty_print_log 
 

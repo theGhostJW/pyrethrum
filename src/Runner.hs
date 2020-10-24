@@ -65,11 +65,11 @@ applyTestFiltersToItemsShowReason fltrs rc cvtr itms =
 
 ---
 
-showAndLogItems :: Show a => [a] -> IO ()
-showAndLogItems = showAndLogList "items"
+showAndLogItems :: Show a => IO AbsDir -> [a] -> IO ()
+showAndLogItems projRoot = showAndLogList projRoot "items"
 
-showAndLogList :: Show a => Text -> [a] -> IO ()
-showAndLogList logSuffix items = 
+showAndLogList :: Show a => IO AbsDir -> Text -> [a] -> IO ()
+showAndLogList projRoot logSuffix items = 
       let 
         logSpec :: M.Map (Text, FileExt) ()
         logSpec = M.singleton (logSuffix, FileExt ".log") ()
@@ -83,7 +83,7 @@ showAndLogList logSuffix items =
                       (Right . snd)
                     . head
                   ) 
-                <$> logFileHandles logSpec
+                <$> logFileHandles projRoot logSpec
 
         log2Both :: SIO.Handle -> Text -> IO ()
         log2Both fileHndl lgStr = putLines SIO.stdout lgStr *> putLines fileHndl lgStr
@@ -101,13 +101,13 @@ showAndLogList logSuffix items =
                               )
 
 
-logFileHandles :: forall a e. M.Map (Text, FileExt) a -> IO (Either (FrameworkError e) [(a, HandleInfo)])
-logFileHandles suffixExtensionMap = 
+logFileHandles :: forall a e. IO AbsDir -> M.Map (Text, FileExt) a -> IO (Either (FrameworkError e) [(a, HandleInfo)])
+logFileHandles projRoot suffixExtensionMap = 
   let
     openHandle :: (Text, FileExt) -> a -> IO (Either (FrameworkError e) (a, HandleInfo))
     openHandle (suff, ext) a = 
       do 
-        eHandInfo <- logFileHandle suff ext
+        eHandInfo <- logFileHandle projRoot suff ext
         pure $ eitherf eHandInfo
                 (Left . IOError' "Error creating log file" )
                 (\hInfo -> Right (a, hInfo))

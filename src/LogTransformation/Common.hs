@@ -59,7 +59,7 @@ instance A.FromJSONKey ExecutionStatus where
 isBoundaryLog :: LogProtocolBase e -> Bool
 isBoundaryLog = 
   \case
-   BoundaryLog bl -> True
+   BoundaryLog _ -> True
    _ -> False
 
 calcNextIterationFailStage :: Maybe IterationPhase -> ExecutionStatus -> IterationPhase -> Maybe (LogProtocolBase e) -> Maybe IterationPhase
@@ -81,7 +81,7 @@ logProtocolStatus chkEncountered = \case
                             EndIteration{} -> chkEncountered ? Pass $ Fail 
                             _ -> Pass
 
-                        IterationLog (Doc dp) -> Pass -- this should not happen and will cause a phase error to be logged
+                        IterationLog (Doc _) -> Pass -- this should not happen and will cause a phase error to be logged
                         IterationLog (Run rp) -> 
                           case rp of
                             StartPrepState -> Pass
@@ -155,7 +155,7 @@ isEndIteration = \case
 
 -- calculate expected from / to base on log message
 phaseSwitch :: LogProtocolOut -> Maybe IterationPhase -> Maybe PhaseSwitch
-phaseSwitch LogProtocolOut{ logIndex, time, logInfo = lp } mFailedPhase = 
+phaseSwitch LogProtocolOut{ logInfo = lp } mFailedPhase = 
   let
     ps :: IterationPhase -> IterationPhase -> Maybe PhaseSwitch
     ps cur nxt = Just $ PhaseSwitch (S.singleton cur) nxt
@@ -191,12 +191,12 @@ phaseSwitch LogProtocolOut{ logIndex, time, logInfo = lp } mFailedPhase =
                                     InteractorFailure{}  -> Nothing -- keep in failed stage
                                     PrepStateSuccess{}  -> ps PrepState PreChecks
                                     PrepStateSkipped{}  -> ps Interactor PreChecks
-                                    PrepStateFailure iid err -> Nothing -- keep in failed phase
+                                    PrepStateFailure{} -> Nothing -- keep in failed phase
                                     StartChecks{} -> ps (fromMaybe PreChecks mFailedPhase) Checks
                                     Message _ -> Nothing
                                     Message' _ -> Nothing
-                                    LP.Warning s -> Nothing
-                                    Warning' detailedInfo -> Nothing
+                                    LP.Warning _ -> Nothing
+                                    Warning' _ -> Nothing
                                     CheckOutcome{} -> Nothing -- stay in checks
 
 data PhaseChangeValidation = PhaseChangeValidation {
@@ -239,7 +239,7 @@ testItrDelta =
           EndTest _ -> clear
                         
       IterationLog (Doc _) -> keep -- should not happen
-      IterationLog (Run rp) -> keep
+      IterationLog (Run _) -> keep
 
 nxtIteration :: Maybe (ItemId, IterationOutcome) -> LogProtocolBase e -> Maybe (ItemId, IterationOutcome) 
 nxtIteration current lp = 
@@ -248,13 +248,10 @@ nxtIteration current lp =
       modAction :: DeltaAction TestModule, 
       idAction :: DeltaAction ItemId
      ) = testItrDelta lp
-
-    newId :: ItemId -> Maybe (ItemId, IterationOutcome) -> Maybe (ItemId, IterationOutcome)
-    newId itmId = const $ Just (itmId, IterationOutcome Pass OutOfIteration) 
   in 
     case modAction of 
       Clear -> Nothing
-      New testMod -> Nothing
+      New _ -> Nothing
       Keep -> case idAction of 
                 Clear -> Nothing
                 Keep -> current
@@ -262,7 +259,7 @@ nxtIteration current lp =
 
 
 logProtocolStep :: LPStep -> LogProtocolOut -> LPStep
-logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration checkEncountered) lpOut@LogProtocolOut{ logIndex, time, logInfo = lp} = 
+logProtocolStep (LPStep _phaseValid failStage phase _logItemStatus activeIteration checkEncountered) lpOut@LogProtocolOut{ logInfo = lp} = 
   let 
     PhaseChangeValidation {toPhase = nxtPhase, valid = nxtPhaseValid } = phaseChange phase failStage lpOut
 
@@ -292,7 +289,7 @@ logProtocolStep (LPStep phaseValid failStage phase logItemStatus activeIteration
           lp'@(IterationLog sp) ->
             case sp of 
               Doc _ -> False
-              Run rp -> not $ isCheck lp'
+              Run _ -> not $ isCheck lp'
 
     nxtCheckEncountered :: Bool
     nxtCheckEncountered = isNothing nxtActiveItr || resetCheck lp

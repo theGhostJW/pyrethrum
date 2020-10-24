@@ -14,14 +14,13 @@ module LogTransformation.PrintLogDisplayElement (
   PrepStateInfo(..)
 ) where
 
-import Common as C (FrameworkError(..), DetailedInfo(..), indentText)
+import Common as C (FrameworkError(..), indentText)
 import LogTransformation.Common as LC
 import Check as CK
 import Pyrelude as P
 import qualified DSL.LogProtocol as LP
 import DSL.LogProtocol hiding (StartRun)
 import qualified Data.Aeson as A
-import Data.Aeson (ToJSON)
 import qualified Data.Yaml as Y
 import Data.Aeson.TH
 import RunElementClasses
@@ -142,7 +141,7 @@ printProblemsDisplayStep ::
   -> ProblemIterationAccum                                              -- accum
   -> Either DeserialisationError LogProtocolOut                           -- source                           -- parse error or FrameworkError
   -> (ProblemIterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
-printProblemsDisplayStep runResults@(RunResults outOfTest iterationResults) lineNo (ProblemIterationAccum itAccum@(IterationAccum mRec stepInfo mFltrLg) skipItt skipTst) eithLp = 
+printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lineNo (ProblemIterationAccum itAccum skipItt skipTst) eithLp = 
   let 
     -- (IterationAccum, Maybe [PrintLogDisplayElement])
     _normalStep :: (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
@@ -156,7 +155,7 @@ printProblemsDisplayStep runResults@(RunResults outOfTest iterationResults) line
       eitherf eithLp 
         (const (skipItt, skipTst))
         (
-          \LogProtocolOut{ logIndex, time, logInfo = lp } -> 
+          \LogProtocolOut{ logInfo = lp } -> 
             case lp of
               BoundaryLog (LP.StartTest (TestDisplayInfo tstMod _ _ )) -> (False, LC.Pass == testStatus' tstMod)
               BoundaryLog (StartIteration iid _ _ _) -> (LC.Pass == executionStatus (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
@@ -187,7 +186,7 @@ printLogDisplayStep ::
   -> IterationAccum                                                    -- accum
   -> Either DeserialisationError LogProtocolOut                           -- source                           -- parse error or FrameworkError
   -> (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
-printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFltrLg) eithLp = 
+printLogDisplayStep runResults lineNo oldAccum@(IterationAccum{ stepInfo }) eithLp = 
   
   eitherf eithLp
    (\err -> 
@@ -201,7 +200,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
         )
    )
 
-   (\lpo@LogProtocolOut{ logIndex, time, logInfo = lp} ->
+   (\lpo@LogProtocolOut{ logInfo = lp} ->
       let 
         skipLog = (oldAccum, Nothing)
 
@@ -237,7 +236,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
             txtOf :: Y.Value -> Maybe Text
             txtOf = 
               \case
-                Y.Object obj -> Nothing
+                Y.Object _ -> Nothing
                 Y.Array _ -> Nothing
                 Y.String txt' -> Just txt'
                 Y.Number _ -> Nothing 
@@ -268,7 +267,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
               case bl of
                 LP.FilterLog flgs -> (accum {filterLog = Just flgs}, Nothing) 
 
-                LP.StartRun runTitle offset jsonCfg -> (accum, elOut $ StartRun {  
+                LP.StartRun runTitle _offset jsonCfg -> (accum, elOut $ StartRun {  
                   title = runTitle, 
                   config = jsonCfg, 
                   runStatus = worstStatus runResults,
@@ -311,7 +310,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
                     } 
                   }, Nothing)
 
-                EndIteration (ItemId tstModule itmId) -> 
+                EndIteration _ -> 
                   let 
                     severityDesc :: CheckReport -> CheckReport -> Ordering
                     severityDesc (CheckReport rslt1 _) (CheckReport rslt2 _) = compare (Down rslt1) (Down rslt2)
@@ -333,28 +332,28 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum mRec stepInfo mFl
 
             IterationLog subProtocol -> 
               case subProtocol of
-                Doc dp -> (accum, lineError "Documentation log item encounterred in live test log - this should not happen - probably a bug in the test runner")
+                Doc _ -> (accum, lineError "Documentation log item encounterred in live test log - this should not happen - probably a bug in the test runner")
                 Run action -> 
                   case action of
-                    IOAction txt' -> skipLog
+                    IOAction _txt' -> skipLog
                     StartPrepState -> skipLog
                     StartInteraction -> skipLog
-                    InteractorSuccess iid apStateJSON -> updateItrRec (\ir -> ir {apState = Just $ SucceededInteractor apStateJSON})
-                    InteractorFailure iid err -> updateItrRec (\ir -> ir {apState = Just $ FailedInteractor err})
+                    InteractorSuccess _iid apStateJSON -> updateItrRec (\ir -> ir {apState = Just $ SucceededInteractor apStateJSON})
+                    InteractorFailure _iid err -> updateItrRec (\ir -> ir {apState = Just $ FailedInteractor err})
                   
-                    PrepStateSuccess iid dStateJSON -> updateItrRec (\ir -> ir {domainState = Just $ SucceededPrepState dStateJSON})
+                    PrepStateSuccess _iid dStateJSON -> updateItrRec (\ir -> ir {domainState = Just $ SucceededPrepState dStateJSON})
                     PrepStateSkipped iid -> updateItrRec (\ir -> ir {domainState = Just $ SkippedPrepState iid})
-                    PrepStateFailure iid err -> updateItrRec (\ir -> ir {domainState = Just $ FailedPrepState err})
+                    PrepStateFailure _iid err -> updateItrRec (\ir -> ir {domainState = Just $ FailedPrepState err})
                     StartChecks -> skipLog 
-                    CheckOutcome itmId chkReport -> updateItrRec (\ir -> ir {validation = chkReport : validation ir})
+                    CheckOutcome _itmId chkReport -> updateItrRec (\ir -> ir {validation = chkReport : validation ir})
     
-                    Message txt' -> skipLog
-                    Message' (DetailedInfo msg txt') -> skipLog
+                    Message _ -> skipLog
+                    Message' _ -> skipLog
                   
                     LP.Warning _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : otherWarnings ir})
-                    Warning' (DetailedInfo msg txt') -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : otherWarnings ir})
+                    Warning' _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : otherWarnings ir})
     
-                    LP.Error err -> updateItrRec (\ir -> ir {otherErrors = IterationError nxtPhase lpo : otherErrors ir})
+                    LP.Error _ -> updateItrRec (\ir -> ir {otherErrors = IterationError nxtPhase lpo : otherErrors ir})
       )
 
 prettyPrintDisplayElement :: PrintLogDisplayElement -> Text
@@ -365,7 +364,7 @@ prettyPrintDisplayElement pde =
     header' ttlTxt status = ttlTxt <> " - " <> toTitle (statusLabel False status) <> " - 00:00:88"
   in 
     case pde of
-      LogTransformation.PrintLogDisplayElement.FilterLog arrFr -> noImp
+      LogTransformation.PrintLogDisplayElement.FilterLog _arrFr -> noImp
 
       LogTransformation.PrintLogDisplayElement.StartRun (RunTitle titl) config runStatus testStats iterationStats outOfTest -> 
             majorHeader (header' titl runStatus) 
@@ -436,7 +435,7 @@ prettyPrintDisplayElement pde =
         <> newLn
 
 
-      LogTransformation.PrintLogDisplayElement.StartTest titl tstMod notes cfg status itrStats -> 
+      LogTransformation.PrintLogDisplayElement.StartTest titl tstMod _notes _cfg status itrStats -> 
           majorHeader (header' titl status) 
            <> newLn
            <> "module:" 
@@ -454,10 +453,10 @@ prettyPrintDisplayElement pde =
             notes
             when'
             then'
-            outcome@(IterationOutcome status phse)
+            (IterationOutcome status phse)
             validation
-            otherErrors
-            otherWarnings
+            _otherErrors
+            _otherWarnings
             item
             apStateInfo
             domainState) -> 
@@ -491,7 +490,7 @@ prettyPrintDisplayElement pde =
                     compare (pos k1) (pos k2)
 
                 valLine :: CheckReport -> (Text, Text)
-                valLine (CheckReport result (MessageInfo hder extrInfo)) = (hder, toLower $ txt result)
+                valLine (CheckReport result MessageInfo {message} ) = (message, toLower $ txt result)
 
                 valDetailsTxt :: Text
                 valDetailsTxt = 
@@ -506,7 +505,7 @@ prettyPrintDisplayElement pde =
                         )
 
                     vdStep :: ([Text], Bool) -> CheckReport -> ([Text], Bool) 
-                    vdStep (rsltLines, separatorNeeded) ckRpt@(CheckReport result (MessageInfo hder extrInfo)) = 
+                    vdStep (rsltLines, separatorNeeded) ckRpt@(CheckReport _result (MessageInfo _hder extrInfo)) = 
                       ( 
                         P.snoc rsltLines $ (separatorNeeded ? newLn $ "") <> detailValLine ckRpt, 
                         isJust extrInfo
@@ -521,7 +520,7 @@ prettyPrintDisplayElement pde =
                           (
                             \case 
                               SucceededPrepState dsDisplay -> prettyYamlKeyValues 2 LeftJustify $ unDStateJSON dsDisplay
-                              SkippedPrepState iid -> "  Domain State is Empty - Execution Skipped" <> newLn
+                              SkippedPrepState _iid -> "  Domain State is Empty - Execution Skipped" <> newLn
                               FailedPrepState err -> 
                                 indent2 (
                                   "PrepState Failure - Domain State is Empty:" 

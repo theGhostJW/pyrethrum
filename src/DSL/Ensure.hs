@@ -22,6 +22,6 @@ ensureInterpreter = interpret $ \case
 -- are just programming constructs, they don't represent user actions
 ensureDocInterpreter :: forall effs a. Sem (Ensure ': effs) a -> Sem effs a
 ensureDocInterpreter = interpret $ \case
-                                      Ensure message condition -> pure ()
-                                      DSL.Ensure.Throw message -> pure ()
+                                      Ensure _ _ -> pure ()
+                                      DSL.Ensure.Throw _ -> pure ()
 

@@ -26,7 +26,7 @@ statsStepForReducer :: LineNo                                       -- lineNo
 statsStepForReducer _ accum lp = (statsStep accum lp, Nothing)
 
 statsStepFromLogProtocol :: StatsAccum -> LogProtocolOut -> StatsAccum
-statsStepFromLogProtocol (StatsAccum runResults@(RunResults outOfTest itrRslts) stepInfo) lpo@LogProtocolOut{ logIndex, time, logInfo = lp } = 
+statsStepFromLogProtocol (StatsAccum (RunResults outOfTest itrRslts) stepInfo) lpo@LogProtocolOut{ logInfo = lp } = 
   let 
     nxtStepInfo@(LPStep _nxtPhaseValid _nxtFailStage nxtPhase
                     logItemStatus nxtActiveItr nxtCheckEncountered) = logProtocolStep stepInfo lpo
@@ -43,7 +43,7 @@ statsStepFromLogProtocol (StatsAccum runResults@(RunResults outOfTest itrRslts) 
     nxtItrRslts = 
         maybef nxtActiveItr
             itrRslts
-            (\(iid@(ItemId mdule itt), outcome) -> 
+            (\(iid, _) -> 
               let 
                 missingChecksOutcome = IterationOutcome (
                                             isEndIteration lp && not nxtCheckEncountered
@@ -77,7 +77,7 @@ statsStepFromDeserialisationError statsAccum@(StatsAccum (RunResults outOfTest i
     nxtItrRslts :: IterationResults
     nxtItrRslts = maybef activeItr
                     itrRslts
-                    (\(iid, outcome) -> M.insertWith max iid (IterationOutcome Fail (phase stepInfo)) itrRslts)
+                    (\(iid, _) -> M.insertWith max iid (IterationOutcome Fail (phase stepInfo)) itrRslts)
   in 
     statsAccum {
       runResults = RunResults {

@@ -21,16 +21,13 @@ prettyPrintLogProtocol :: Show e => Bool -> LogProtocolBase e -> Text
 prettyPrintLogProtocol = prettyPrintLogProtocolBase Nothing
 
 prettyPrintLogProtocolBase :: Show e => Maybe Text -> Bool -> LogProtocolBase e -> Text
-prettyPrintLogProtocolBase mTimeSuffix docMode =
+prettyPrintLogProtocolBase _mTimeSuffix docMode =
   let
-    timeSuffix :: Text
-    timeSuffix = fromMaybe "" mTimeSuffix
-
     iterId :: ItemId -> Text
     iterId (ItemId tst iid) = toString tst <> " / item " <> txt iid
 
     prettyBlock :: Char -> Text -> ItemId -> Text -> Text
-    prettyBlock pfxChr headr iid body = indent2 $ toS (replicate 3 ' ') <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
+    prettyBlock pfxChr headr iid body = indent2 $ toS (replicate 4 ' ') <> singleton pfxChr <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
 
     ppMsgInfo :: Show a => Maybe a -> Text
     ppMsgInfo mbInfo = maybef mbInfo
@@ -49,7 +46,7 @@ prettyPrintLogProtocolBase mTimeSuffix docMode =
     \case
         BoundaryLog bl -> case bl of 
                             LP.FilterLog fltrInfos -> ppFilterLog fltrInfos
-                            LP.StartRun ttle offset rc -> ppStartRun ttle rc
+                            LP.StartRun ttle _offset rc -> ppStartRun ttle rc
 
                             LP.StartGroup gt -> groupHeader gt
                             LP.EndGroup gt -> groupFooter gt
@@ -76,7 +73,7 @@ prettyPrintLogProtocolBase mTimeSuffix docMode =
                                                                 indent2 extended
                               DocInteraction -> newLn <> "Interaction:"
                               DocChecks -> newLn <> "Checks:"
-                              DocCheck iid chkhdr resultExpectation gateStatus -> 
+                              DocCheck _iid chkhdr resultExpectation gateStatus -> 
                                           indent2 $ "% " <> chkhdr  <> 
                                               (
                                                 gateStatus == GateCheck 

@@ -30,7 +30,7 @@ runAgg f l = decodeUtf8 <$> f l
 -- todo: get file utils really sorted
 dumpFile ::  IO AbsDir -> DList Text -> RelFile -> IO ()
 dumpFile projRoot lst file = do
-      ePth <- tempFile projRoot file
+      ePth <- tempFileBase projRoot file
       eitherf ePth 
         throw
         (\pth -> do 

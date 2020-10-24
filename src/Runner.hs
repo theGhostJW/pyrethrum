@@ -7,7 +7,7 @@ module Runner (
   , doNothing
   , logFileHandles
   , normalExecution
-  , showAndLogItems
+  , showAndLogItemsBase
   , mkEndpointSem
   , TestPlanBase
   , TestParams
@@ -64,8 +64,8 @@ applyTestFiltersToItemsShowReason fltrs rc cvtr itms =
 
 ---
 
-showAndLogItems :: Show a => IO AbsDir -> [a] -> IO ()
-showAndLogItems projRoot = showAndLogList projRoot "items"
+showAndLogItemsBase :: Show a => IO AbsDir -> [a] -> IO ()
+showAndLogItemsBase projRoot = showAndLogList projRoot "items"
 
 showAndLogList :: Show a => IO AbsDir -> Text -> [a] -> IO ()
 showAndLogList projRoot logSuffix items = 

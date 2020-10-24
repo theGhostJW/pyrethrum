@@ -20,32 +20,32 @@ auxDir :: IO AbsDir -> RelDir -> IO (Either P.IOError AbsDir)
 auxDir projRoot relDir = subPath (auxBase projRoot) relDir
 
 -- local temp not OS
-tempDir :: IO AbsDir -> IO (Either P.IOError AbsDir)
-tempDir projRoot = auxDir projRoot [reldir|temp|]
+tempDirBase :: IO AbsDir -> IO (Either P.IOError AbsDir)
+tempDirBase projRoot = auxDir projRoot [reldir|temp|]
 
-logDir :: IO AbsDir -> IO (Either P.IOError AbsDir)
-logDir projRoot = auxDir projRoot [reldir|logs|]
+logDirBase :: IO AbsDir -> IO (Either P.IOError AbsDir)
+logDirBase projRoot = auxDir projRoot [reldir|logs|]
 
-dataDir :: IO AbsDir -> IO (Either P.IOError AbsDir)
-dataDir projRoot = auxDir projRoot [reldir|data|]
+dataDirBase :: IO AbsDir -> IO (Either P.IOError AbsDir)
+dataDirBase projRoot = auxDir projRoot [reldir|data|]
 
-tempFile :: IO AbsDir -> RelFile -> IO (Either P.IOError AbsFile)
-tempFile projRoot = subPath (tempDir projRoot)
+tempFileBase :: IO AbsDir -> RelFile -> IO (Either P.IOError AbsFile)
+tempFileBase projRoot = subPath (tempDirBase projRoot)
 
 logFile :: IO AbsDir -> RelFile -> IO (Either P.IOError AbsFile)
-logFile projRoot = subPath (logDir projRoot)
+logFile projRoot = subPath (logDirBase projRoot)
 
 dataFile :: IO AbsDir -> RelFile -> IO (Either P.IOError AbsFile)
-dataFile projRoot = subPath (dataDir projRoot)
+dataFile projRoot = subPath (dataDirBase projRoot)
 
 dumpTxt :: IO AbsDir -> Text -> RelFile -> IO ()
 dumpTxt projRoot txt' file = do 
-                      ePth <- tempFile projRoot file
+                      ePth <- tempFileBase projRoot file
                       eitherf ePth
                         throw
                         (\p -> writeFile (toFilePath p) txt')
 
-_tempFile = tempFile (parent <$> (parseAbsFile =<< getExecutablePath)) [relfile|demoTemp.txt|]
+_tempFile = tempFileBase (parent <$> (parseAbsFile =<< getExecutablePath)) [relfile|demoTemp.txt|]
 
 newtype FileExt = FileExt {unFileExt :: Text} deriving (Show, Eq, Ord)
 
@@ -126,7 +126,7 @@ listToText lst = unlines $ txt <$> lst
 toTempBase' :: IO AbsDir -> WantConsole -> Text -> RelFile -> IO ()
 toTempBase' projRoot wantConsole txt' fileName = 
   do 
-    ethQPth <- tempFile projRoot fileName
+    ethQPth <- tempFileBase projRoot fileName
     eitherf ethQPth
       (\e -> putStrLn $ "failed to generate path: " <> txt e)
       (\adsPath ->

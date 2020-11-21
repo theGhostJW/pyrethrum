@@ -161,7 +161,7 @@ logRP = logLP . logRun
 
 normalExecution :: forall e effs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) 
                       => ItemParams e as ds i tc rc effs -> Sem effs ()  
-normalExecution (ItemParams {testParams = TestParams{interactor, prepState, tc, rc}, item = i})  = 
+normalExecution ItemParams {testParams = TestParams{interactor, prepState, tc, rc}, item = i}  = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) (identifier i)

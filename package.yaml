@@ -39,6 +39,7 @@ ghc-options:
   #  for later
   # - -fmax-pmcheck-models=10000000
   - -ferror-spans
+  # - -dth-dec-file -- generate template haskell
 
   - -O0
   # TODO: prgma to turn optimisations on for non-dev build

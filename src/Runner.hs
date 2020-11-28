@@ -153,11 +153,8 @@ data ItemParams e as ds i tc rc effs = ItemParams {
   item :: i                                                        
 }
 
-logLP :: forall e effs. (Show e, ToJSON e, Member (Logger e) effs) => LogProtocolBase e -> Sem effs ()
-logLP = logItem 
-
 logRP :: forall e effs. (Show e, ToJSON e, Member (Logger e) effs) => RunProtocol e -> Sem effs ()
-logRP = logLP . logRun 
+logRP = logItem . logRun 
 
 normalExecution :: forall e effs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) 
                       => ItemParams e as ds i tc rc effs -> Sem effs ()  
@@ -222,7 +219,7 @@ docExecution (ItemParams (TestParams interactor _prepState tc rc) i) =
     iid = ItemId (moduleAddress tc) $ identifier i
 
     docLog :: DocProtocol e -> Sem effs ()
-    docLog = logLP . logDoc
+    docLog = logItem . logDoc
 
     logChecks :: Sem effs ()
     logChecks =  P.sequence_ $  
@@ -243,7 +240,7 @@ runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass 
 runTestItems iIds items runPrms@TestParams{ tc } itemRunner =
   let
     logBoundry :: BoundaryEvent -> Sem effs ()
-    logBoundry = logLP . BoundaryLog
+    logBoundry = logItem . BoundaryLog
 
     startTest :: Sem effs ()
     startTest = logBoundry . StartTest $ mkDisplayInfo tc
@@ -280,15 +277,17 @@ runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, To
                    -> FilterList rc tc                                                      -- filters
                    -> (ItemParams e as ds i tc rc effs -> Sem effs ())                      -- item runner
                    -> rc                                                                    -- runConfig
-                   -> GenericTest e tc rc i as ds effs                                     -- Test Case
+                   -> GenericTest e tc rc i as ds effs                                      -- Test Case
                    -> [Sem effs ()]                                                         -- [TestIterations]
 runTest iIds fltrs itemRunner rc GenericTest {config = tc, testItems, testInteractor, testPrepState} =
-    (acceptFilter $ filterTestCfg fltrs rc tc)
-        ? runTestItems iIds (testItems rc) (TestParams testInteractor testPrepState tc rc) itemRunner
+    acceptFilter (filterTestCfg fltrs rc tc)
+    ? runTestItems
+        iIds (testItems rc) (TestParams testInteractor testPrepState tc rc)
+        itemRunner
         $ []
 
 logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
-logLPError = logLP . logRun . LP.Error
+logLPError = logItem . logRun . LP.Error
 
 runHook :: forall e effs. Member (Error (FrameworkError e)) effs => PreRun effs -> PreTestStage -> Sem effs (Either (FrameworkError e) ())
 runHook PreRun{runAction, checkHasRun} stage = 
@@ -354,7 +353,7 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
     runTuples = P.zip filterFlags prepResults
 
     logBoundry :: BoundaryEvent -> Sem effs ()
-    logBoundry = logLP . BoundaryLog
+    logBoundry = logItem . BoundaryLog
 
     exeGroup :: (Bool, RunElement [] (Sem effs) () effs) -> Sem effs ()
     exeGroup (include, tg) =

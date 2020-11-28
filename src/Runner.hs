@@ -2,15 +2,8 @@
 -- TODO: work out why this is needed - investigate polykinds
 
 module Runner (
-  applyTestFilters
-  , docExecution
-  , doNothing
-  , logFileHandles
-  , normalExecution
-  , showAndLogItemsBase
-  , mkEndpointSem
-  , TestPlanBase
-  , TestParams
+  mkEndpointSem
+  , TestParams(..)
   , RunParams(..)
   , mkRunSem
   , module RB
@@ -18,223 +11,28 @@ module Runner (
   , module C
 ) where
 
-import qualified Check as CK
 import Common as C
 import DSL.Interpreter
 import DSL.Logger
 import DSL.LogProtocol as LP
 import DSL.CurrentTime
 import Pyrelude as P
-import Pyrelude.IO
 import Polysemy
 import Polysemy.Error as PE
-import qualified Data.DList as D
-import           ItemFilter  (ItemFilter (..), filterredItemIds)
+import ItemFilter  (ItemFilter (..), filterredItemIds)
 import qualified Data.Set as S
 import RunElementClasses as C
-import Text.Show.Pretty
-import AuxFiles
 import OrphanedInstances()
 import Data.Aeson
 import TestFilter
 import RunnerBase as RB
-import qualified System.IO as SIO
-import qualified Data.Map.Strict as M
-import qualified Data.Foldable as F
 import qualified Prelude
-
-type TestPlanBase e tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => 
-                                                          GenericTest e tc rc i as ds effs -> m1 (m a)) -> [RunElement m1 m a effs]
-
---- Reapplying test Filters to Items ---
-
-applyTestFilters :: forall i tc rc. TestConfigClass tc => [TestFilter rc tc] -> rc -> (i -> tc) -> [i] -> [i]
-applyTestFilters fltrs rc cvtr itms = 
-    fst <$> filter (isNothing . snd) (applyTestFiltersToItemsShowReason fltrs rc cvtr itms) 
-
--- de bugging
-applyTestFiltersToItemsShowReason :: forall i tc rc. TestConfigClass tc => [TestFilter rc tc] -> rc -> (i -> tc) -> [i] -> [(i, Maybe Text)]
-applyTestFiltersToItemsShowReason fltrs rc cvtr itms = 
-  let 
-    fltrItm :: i -> (i, Maybe Text)
-    fltrItm i = (i, reasonForRejection . filterTestCfg fltrs rc $ cvtr i)
-  in 
-    fltrItm <$> itms
-
----
-
-showAndLogItemsBase :: Show a => IO AbsDir -> [a] -> IO ()
-showAndLogItemsBase projRoot = showAndLogList projRoot "items"
-
-showAndLogList :: Show a => IO AbsDir -> Text -> [a] -> IO ()
-showAndLogList projRoot logSuffix items = 
-      let 
-        logSpec :: M.Map (Text, FileExt) ()
-        logSpec = M.singleton (logSuffix, FileExt ".log") ()
-
-        hndle :: IO (Either (FrameworkError e) HandleInfo)
-        hndle = either
-                  Left
-                  (
-                    maybe
-                      (Left $ C.Error "showAndLogList - no Handle returned")
-                      (Right . snd)
-                    . head
-                  ) 
-                <$> logFileHandles projRoot logSpec
-
-        log2Both :: SIO.Handle -> Text -> IO ()
-        log2Both fileHndl lgStr = putLines SIO.stdout lgStr *> putLines fileHndl lgStr
-
-        listItems :: SIO.Handle -> IO ()
-        listItems h = sequence_ $ log2Both h . txtPretty <$> items
-      in
-        hndle >>=
-                either pPrint (\HandleInfo{path, fileHandle} -> 
-                                  listItems fileHandle `finally` SIO.hClose fileHandle
-                                  *> putStrLn ""
-                                  *> putStrLn "--- Log Files ---"
-                                  *> putStrLn (toS . toFilePath $ path)
-                                  *> putStrLn ""
-                              )
-
-
-logFileHandles :: forall a e. IO AbsDir -> M.Map (Text, FileExt) a -> IO (Either (FrameworkError e) [(a, HandleInfo)])
-logFileHandles projRoot suffixExtensionMap = 
-  let
-    openHandle :: (Text, FileExt) -> a -> IO (Either (FrameworkError e) (a, HandleInfo))
-    openHandle (suff, ext) a = 
-      do 
-        eHandInfo <- logFileHandle projRoot suff ext
-        pure $ eitherf eHandInfo
-                (Left . IOError' "Error creating log file" )
-                (\hInfo -> Right (a, hInfo))
-
-    openHandles :: IO [((Text, FileExt), Either (FrameworkError e) (a, HandleInfo))]
-    openHandles = M.toList <$> M.traverseWithKey openHandle suffixExtensionMap
-  in 
-    do 
-      hlst <- openHandles
-      let 
-        fstErr = find (isLeft . snd) hlst
-        openHndls = rights (snd <$> hlst)
-      maybef fstErr
-        (pure $ Right openHndls)
-        (
-          \((sfx, _ext), fstErr') -> 
-            do 
-              traverse_ (hClose . fileHandle . snd) openHndls
-              pure . Left $ AnnotatedError 
-                              ("Failed to create log file with suffix: " <> sfx) 
-                              $ fromLeft (C.Error "won't happen") fstErr'
-        )
-
-doNothing :: PreRun effs
-doNothing = PreRun {
-  runAction = pure (),
-  checkHasRun = pure True
-}
-
-
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Run Functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                                   
-
-data TestParams e as ds i tc rc effs = TestParams {                       
-  interactor :: rc -> i -> Sem effs as,                         
-  prepState :: forall pEffs. (Ensurable e) pEffs => i -> as -> Sem pEffs ds,                      
-  tc :: tc,                                                     
-  rc :: rc                                                      
-}
-
--- data ItemParams e as ds i tc rc effs = ItemParams {
---   testParams :: TestParams e as ds i tc rc effs,                                                     
---   item :: i                                                        
--- }
-
-logRP :: forall e effs. (Show e, ToJSON e, Member (Logger e) effs) => RunProtocol e -> Sem effs ()
-logRP = logItem . logRun 
-
-normalExecution :: forall e effs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) 
-                      => TestParams e as ds i tc rc effs -> i -> Sem effs ()  
-normalExecution (TestParams interactor prepState tc rc) i  = 
-  let
-    iid :: ItemId
-    iid = ItemId (moduleAddress tc) (identifier i)
-
-    logChk :: CK.CheckReport -> Sem effs ()
-    logChk cr = logRP $ CheckOutcome iid cr
-
-    recordSkippedChecks :: Sem effs ()
-    recordSkippedChecks = do 
-                            logRP StartChecks 
-                            F.traverse_ logChk $ D.toList $ CK.skipChecks (checkList i)
-
-    prepStateErrorHandler :: FrameworkError e -> Sem effs ds
-    prepStateErrorHandler e = 
-      do 
-        logRP $ PrepStateFailure iid e
-        recordSkippedChecks
-        PE.throw e
-
-    -- provided natively by polysemy in later versions of polysemy
-    try' :: Member (Error er) r => Sem r a -> Sem r (Either er a)
-    try' m = PE.catch (Right <$> m) (return . Left)
-       
-    normalExecution' :: Sem effs ()
-    normalExecution' = 
-      let
-        runChecks :: ds -> Sem effs ()
-        runChecks ds = F.traverse_ logChk $ D.toList $ CK.calcChecks ds (checkList i)
-      in 
-        do 
-          logRP StartInteraction
-          -- TODO: check for io exceptions / SomeException - use throw from test
-          log "interact start"
-          ethApState <- try' $ interactor rc i
-          eitherf ethApState
-            (\e -> do 
-                    logRP $ InteractorFailure iid e
-                    logRP $ PrepStateSkipped iid
-                    recordSkippedChecks
-                    )
-            (\as -> do 
-                log "interact end"
-                logRP . InteractorSuccess iid . ApStateJSON . toJSON $ as
-                logRP StartPrepState
-                ds <- PE.catch (prepState i as) prepStateErrorHandler
-                logRP . PrepStateSuccess iid . DStateJSON . toJSON $ ds
-                logRP StartChecks
-                runChecks ds
-              )
-  in 
-    normalExecution' `PE.catch` (logRP . LP.Error)
-
-docExecution :: forall e effs rc tc i as ds. (ToJSON e, Show e, ItemClass i ds, TestConfigClass tc, Member (Logger e) effs)
-              => TestParams e as ds i tc rc effs -> i -> Sem effs () 
-docExecution (TestParams interactor _prepState tc rc) i = 
-  let
-    iid :: ItemId
-    iid = ItemId (moduleAddress tc) $ identifier i
-
-    docLog :: DocProtocol e -> Sem effs ()
-    docLog = logItem . logDoc
-
-    logChecks :: Sem effs ()
-    logChecks =  P.sequence_ $  
-                    (\chk -> docLog $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
-  in 
-    do 
-      docLog DocInteraction
-      interactor rc i
-      docLog DocChecks
-      logChecks
 
 runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ItemClass i ds, Member (Logger e) effs) =>
       Maybe (S.Set Int)                                                    -- target Ids
       -> [i]                                                               -- items
       -> TestParams e as ds i tc rc effs
-      -> (TestParams e as ds i tc rc effs -> i -> Sem effs ())
+      -> ItemRunner e as ds i tc rc effs
       -> [Sem effs ()]
 runTestItems iIds items runPrms@TestParams{ tc } itemRunner =
   let
@@ -250,8 +48,8 @@ runTestItems iIds items runPrms@TestParams{ tc } itemRunner =
     filteredItems :: [i]
     filteredItems = filter inTargIds items
 
-    runItem :: i -> Sem effs ()
-    runItem i =  let
+    applyRunner :: i -> Sem effs ()
+    applyRunner i =  let
                     iid :: ItemId
                     iid = ItemId (moduleAddress tc) (identifier i)
                   in
@@ -266,15 +64,15 @@ runTestItems iIds items runPrms@TestParams{ tc } itemRunner =
   in
     case filteredItems of
       [] -> []
-      [x] -> [startTest *> runItem x *> endTest]
-      x : xs -> (startTest *> runItem x)
-                : (runItem <$> Prelude.init xs)
-                <> [runItem (Prelude.last xs) *> endTest]
+      [x] -> [startTest *> applyRunner x *> endTest]
+      x : xs -> (startTest *> applyRunner x)
+                : (applyRunner <$> Prelude.init xs)
+                <> [applyRunner (Prelude.last xs) *> endTest]
 
 runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, Show e, Member (Logger e) effs) =>
                    Maybe (S.Set Int)                                                        -- target Ids
                    -> FilterList rc tc                                                      -- filters
-                   -> (TestParams e as ds i tc rc effs -> i -> Sem effs ())                 -- item runner
+                   -> ItemRunner e as ds i tc rc effs                                       -- item runner
                    -> rc                                                                    -- runConfig
                    -> GenericTest e tc rc i as ds effs                                      -- Test Case
                    -> [Sem effs ()]                                                         -- [TestIterations]
@@ -324,9 +122,9 @@ runHook PreRun{runAction, checkHasRun} stage =
 
 
 data RunParams e rc tc effs = RunParams {
-  plan :: forall a mo mi. TestPlanBase e tc rc mo mi a effs,
+  plan :: forall a mo mi. TestPlan e tc rc mo mi a effs,
   filters :: FilterList rc tc,
-  itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (TestParams e as ds i tc rc effs -> i -> Sem effs ()),
+  itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner e as ds i tc rc effs,
   rc :: rc
 }
 

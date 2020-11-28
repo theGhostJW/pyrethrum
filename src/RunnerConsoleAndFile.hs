@@ -10,7 +10,7 @@ import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
 import           Pyrelude as P hiding (app)
 import           Pyrelude.IO as PIO 
-import           Runner as R
+import           FileLogging
 import qualified System.IO as S
 import AuxFiles as A
 import Data.Aeson (ToJSON(..))

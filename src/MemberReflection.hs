@@ -3,14 +3,13 @@
 
 module MemberReflection where
 
--- import Pyrelude hiding (Item)
 import Pyrelude
 import Polysemy
 import Polysemy.Internal.CustomErrors
 import           DSL.Ensure
 import           DSL.ArbitraryIO
 import           DSL.Logger
-import           Runner
+import           Runner  as R hiding (interactor, prepState)
 import           Data.Aeson.TH
 import           Data.Set as S
 import Type.Reflection as R
@@ -120,7 +119,7 @@ items _ = []
 nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState
 
-test :: forall effs. Members (Effects SuiteError) effs => Test Item ApState DState effs
+test :: forall effs. Members (Effects SuiteError) effs => MemberReflection.Test Item ApState DState effs
 test = GenericTest {
               config = MemberReflection.testConfig {address = nameOfModule},
               testItems = items,
@@ -152,7 +151,7 @@ showEffs :: forall es0 es1 a. ShowTypes es0 => MembersFuncWrapper es0 es1 a -> [
 showEffs _ = removeKindSuffix <$> showTypes @es0
 
 demo :: [Text]
-demo = showEffs (WrappedTest test :: MembersFuncWrapper (Effects SuiteError) effs (Test Item ApState DState effs))
+demo = showEffs (WrappedTest test :: MembersFuncWrapper (Effects SuiteError) effs (MemberReflection.Test Item ApState DState effs))
 
 newtype InteractorFuncWrapper memberEffs allEffs a = WrappedInteractor (Members memberEffs allEffs => RunConfig -> Item -> Sem allEffs ApState)
 

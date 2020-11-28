@@ -31,6 +31,9 @@ data Logger e m a where
 
 makeSem ''Logger
 
+logRP :: forall e effs. (Show e, A.ToJSON e, Member (Logger e) effs) => RunProtocol e -> Sem effs ()
+logRP = logItem . logRun 
+
 logDocAction :: (Show e, A.ToJSON e) => Member (Logger e) effs => Text -> Sem effs ()
 logDocAction = logItem . IterationLog . Doc . DocAction . ActionInfo
 

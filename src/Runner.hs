@@ -12,7 +12,6 @@ module Runner (
   , TestPlanBase
   , TestParams
   , RunParams(..)
-  , ItemParams
   , mkRunSem
   , module RB
   , module ItemFilter
@@ -148,17 +147,17 @@ data TestParams e as ds i tc rc effs = TestParams {
   rc :: rc                                                      
 }
 
-data ItemParams e as ds i tc rc effs = ItemParams {
-  testParams :: TestParams e as ds i tc rc effs,                                                     
-  item :: i                                                        
-}
+-- data ItemParams e as ds i tc rc effs = ItemParams {
+--   testParams :: TestParams e as ds i tc rc effs,                                                     
+--   item :: i                                                        
+-- }
 
 logRP :: forall e effs. (Show e, ToJSON e, Member (Logger e) effs) => RunProtocol e -> Sem effs ()
 logRP = logItem . logRun 
 
 normalExecution :: forall e effs rc tc i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) 
-                      => ItemParams e as ds i tc rc effs -> Sem effs ()  
-normalExecution ItemParams {testParams = TestParams{interactor, prepState, tc, rc}, item = i}  = 
+                      => TestParams e as ds i tc rc effs -> i -> Sem effs ()  
+normalExecution (TestParams interactor prepState tc rc) i  = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) (identifier i)
@@ -212,8 +211,8 @@ normalExecution ItemParams {testParams = TestParams{interactor, prepState, tc, r
     normalExecution' `PE.catch` (logRP . LP.Error)
 
 docExecution :: forall e effs rc tc i as ds. (ToJSON e, Show e, ItemClass i ds, TestConfigClass tc, Member (Logger e) effs)
-              => ItemParams e as ds i tc rc effs -> Sem effs () 
-docExecution (ItemParams (TestParams interactor _prepState tc rc) i) = 
+              => TestParams e as ds i tc rc effs -> i -> Sem effs () 
+docExecution (TestParams interactor _prepState tc rc) i = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) $ identifier i
@@ -235,7 +234,7 @@ runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass 
       Maybe (S.Set Int)                                                    -- target Ids
       -> [i]                                                               -- items
       -> TestParams e as ds i tc rc effs
-      -> (ItemParams e as ds i tc rc effs -> Sem effs ())
+      -> (TestParams e as ds i tc rc effs -> i -> Sem effs ())
       -> [Sem effs ()]
 runTestItems iIds items runPrms@TestParams{ tc } itemRunner =
   let
@@ -258,7 +257,7 @@ runTestItems iIds items runPrms@TestParams{ tc } itemRunner =
                   in
                     do
                       logBoundry . StartIteration iid (WhenClause $ whenClause i) (ThenClause $ thenClause i) $ toJSON i
-                      itemRunner $ ItemParams runPrms i
+                      itemRunner runPrms i
                       logBoundry $ EndIteration iid
 
     inTargIds :: i -> Bool
@@ -275,7 +274,7 @@ runTestItems iIds items runPrms@TestParams{ tc } itemRunner =
 runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, Show e, Member (Logger e) effs) =>
                    Maybe (S.Set Int)                                                        -- target Ids
                    -> FilterList rc tc                                                      -- filters
-                   -> (ItemParams e as ds i tc rc effs -> Sem effs ())                      -- item runner
+                   -> (TestParams e as ds i tc rc effs -> i -> Sem effs ())                 -- item runner
                    -> rc                                                                    -- runConfig
                    -> GenericTest e tc rc i as ds effs                                      -- Test Case
                    -> [Sem effs ()]                                                         -- [TestIterations]
@@ -327,7 +326,7 @@ runHook PreRun{runAction, checkHasRun} stage =
 data RunParams e rc tc effs = RunParams {
   plan :: forall a mo mi. TestPlanBase e tc rc mo mi a effs,
   filters :: FilterList rc tc,
-  itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (ItemParams e as ds i tc rc effs -> Sem effs ()),
+  itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => (TestParams e as ds i tc rc effs -> i -> Sem effs ()),
   rc :: rc
 }
 

@@ -22,7 +22,7 @@ runItem :: forall e effs rc tc i as ds. (ApEffs e effs,
                                             ToJSON e, 
                                             ToJSON as, 
                                             ToJSON ds) => ItemRunner e as ds i tc rc effs
-runItem (TestParams interactor prepState tc rc) i  = 
+runItem rc (Test tc _items interactor prepState) i  = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) (identifier i)
@@ -81,7 +81,7 @@ documentItem :: forall e effs rc tc i as ds. (ToJSON e,
                                                  TestConfigClass tc, 
                                                  Member (Logger e) effs)
                                                 => ItemRunner e as ds i tc rc effs
-documentItem (TestParams interactor _prepState tc rc) i = 
+documentItem rc (Test tc _items interactor _prepState) i = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) $ identifier i

@@ -1,10 +1,10 @@
 module ItemFiltersTest where
 
-import qualified Check           as C
+import qualified Check         as C
 import           Pyrelude      as P
-import           Data.Set        as S
+import           Data.Set      as S
 import           ItemFilter
-import           Runner as R
+import           Runner as R hiding (items)
 import           Pyrelude.Test
 import Data.Aeson.TH
 import Data.Aeson.Types

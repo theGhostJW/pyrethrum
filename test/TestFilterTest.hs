@@ -37,7 +37,7 @@ instance Titled TestConfig where
 
 $(deriveJSON defaultOptions ''TestConfig)
 
-type TST = GenericTest Int TestConfig RunConfig
+type TST = RunnerBase.Test Int TestConfig RunConfig
 
 newtype MyInt = MyInt Int deriving (Show, Generic)
 
@@ -60,7 +60,7 @@ emptiInteractor :: RunConfig -> MyInt -> Sem effs MyInt
 emptiInteractor = \_ _ -> pure $ MyInt 1
 
 test1 :: TST MyInt MyInt MyInt effs
-test1 = GenericTest {
+test1 = Test {
               config = TestConfig {
                 header = "test1",
                 address = TestModule "test1",
@@ -68,13 +68,13 @@ test1 = GenericTest {
                 level = Regression,
                 enabled = True
               },
-              testItems = empti,
-              testInteractor = emptiInteractor,
-              testPrepState = \i ii -> pure ii 
+              items = empti,
+              interactor = emptiInteractor,
+              prepState = \i ii -> pure ii 
             }
 
 test2 :: TST MyInt MyInt MyInt effs
-test2 = GenericTest {
+test2 = Test {
               config = TestConfig {
                 header = "test2",
                 address = TestModule "test2",
@@ -82,13 +82,13 @@ test2 = GenericTest {
                 level = Regression,
                 enabled = True
               },
-              testItems = empti,
-              testInteractor = emptiInteractor,
-              testPrepState = \i ii -> pure ii 
+              items = empti,
+              interactor = emptiInteractor,
+              prepState = \i ii -> pure ii 
             }
 
 test3 :: TST MyInt MyInt MyInt effs
-test3 = GenericTest {
+test3 = Test {
                 config = TestConfig {
                   header = "test3",
                   address = TestModule "test3",
@@ -96,13 +96,13 @@ test3 = GenericTest {
                   level = Connectivity,
                   enabled = True
                 },
-              testItems = empti,
-              testInteractor = emptiInteractor,
-              testPrepState = \i ii -> pure ii 
+              items = empti,
+              interactor = emptiInteractor,
+              prepState = \i ii -> pure ii 
             }
 
 test4 :: TST MyInt MyInt MyInt effs 
-test4 = GenericTest {
+test4 = Test {
               config = TestConfig {
                   header = "test4",
                   address = TestModule "test4",
@@ -110,13 +110,13 @@ test4 = GenericTest {
                   level = DeepRegression,
                   enabled = True
                 },
-              testItems = empti,
-              testInteractor = emptiInteractor,
-              testPrepState = \i ii -> pure ii 
+              items = empti,
+              interactor = emptiInteractor,
+              prepState = \i ii -> pure ii 
             }
 
 test5 :: TST MyInt MyInt MyInt effs
-test5 = GenericTest {
+test5 = Test {
               config = TestConfig {
                   header = "test5",
                   address = TestModule "test5",
@@ -124,13 +124,13 @@ test5 = GenericTest {
                   level = DeepRegression,
                   enabled = False
                 },
-              testItems = empti,
-              testInteractor = emptiInteractor,
-              testPrepState = \i ii -> pure ii  
+              items = empti,
+              interactor = emptiInteractor,
+              prepState = \i ii -> pure ii  
             }
 
 runRunner :: forall m m1 effs a.
-                (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => GenericTest Int TestConfig RunConfig i as ds effs -> m1 (m a))
+                (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => RunnerBase.Test Int TestConfig RunConfig i as ds effs -> m1 (m a))
                 -> [RunElement m1 m a effs]
 runRunner f =
   [

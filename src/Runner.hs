@@ -3,7 +3,6 @@
 
 module Runner (
   mkEndpointSem
-  , TestParams(..)
   , RunParams(..)
   , mkRunSem
   , module RB
@@ -30,11 +29,12 @@ import qualified Prelude
 
 runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ItemClass i ds, Member (Logger e) effs) =>
       Maybe (S.Set Int)                                                    -- target Ids
-      -> [i]                                                               -- items
-      -> TestParams e as ds i tc rc effs
+      -> [i]   
+      -> rc                                                            -- items
+      -> Test e tc rc i as ds effs
       -> ItemRunner e as ds i tc rc effs
       -> [Sem effs ()]
-runTestItems iIds items runPrms@TestParams{ tc } itemRunner =
+runTestItems iIds items rc test@Test{ config = tc } itemRunner =
   let
     logBoundry :: BoundaryEvent -> Sem effs ()
     logBoundry = logItem . BoundaryLog
@@ -49,14 +49,15 @@ runTestItems iIds items runPrms@TestParams{ tc } itemRunner =
     filteredItems = filter inTargIds items
 
     applyRunner :: i -> Sem effs ()
-    applyRunner i =  let
-                    iid :: ItemId
-                    iid = ItemId (moduleAddress tc) (identifier i)
-                  in
-                    do
-                      logBoundry . StartIteration iid (WhenClause $ whenClause i) (ThenClause $ thenClause i) $ toJSON i
-                      itemRunner runPrms i
-                      logBoundry $ EndIteration iid
+    applyRunner i =  
+      let
+        iid :: ItemId
+        iid = ItemId (moduleAddress tc) (identifier i)
+      in
+        do
+          logBoundry . StartIteration iid (WhenClause $ whenClause i) (ThenClause $ thenClause i) $ toJSON i
+          itemRunner rc test i
+          logBoundry $ EndIteration iid
 
     inTargIds :: i -> Bool
     inTargIds i = maybe True (S.member (identifier i)) iIds
@@ -70,16 +71,19 @@ runTestItems iIds items runPrms@TestParams{ tc } itemRunner =
                 <> [applyRunner (Prelude.last xs) *> endTest]
 
 runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, Show e, Member (Logger e) effs) =>
-                   Maybe (S.Set Int)                                                        -- target Ids
-                   -> FilterList rc tc                                                      -- filters
-                   -> ItemRunner e as ds i tc rc effs                                       -- item runner
-                   -> rc                                                                    -- runConfig
-                   -> GenericTest e tc rc i as ds effs                                      -- Test Case
-                   -> [Sem effs ()]                                                         -- [TestIterations]
-runTest iIds fltrs itemRunner rc GenericTest {config = tc, testItems, testInteractor, testPrepState} =
+                   Maybe (S.Set Int)                     -- target Ids
+                   -> FilterList rc tc                   -- filters
+                   -> ItemRunner e as ds i tc rc effs    -- item runner
+                   -> rc                                 -- runConfig
+                   -> Test e tc rc i as ds effs          -- Test Case
+                   -> [Sem effs ()]                      -- [TestIterations]
+runTest iIds fltrs itemRunner rc test@Test {config = tc, items} =
     acceptFilter (filterTestCfg fltrs rc tc)
     ? runTestItems
-        iIds (testItems rc) (TestParams testInteractor testPrepState tc rc)
+        iIds 
+        (items rc) 
+        rc
+        test
         itemRunner
         $ []
 
@@ -212,8 +216,8 @@ mkRunSem = mkSem Nothing
 
 mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) =>
                    RunParams e rc tc effs
-                   -> TestModule                                      -- test address
-                   -> Either FilterErrorType (S.Set Int)                  -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
+                   -> TestModule                            -- test address
+                   -> Either FilterErrorType (S.Set Int)    -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> Sem effs ()
 mkEndpointSem runParams@RunParams { filters } tstAddress iIds =
   let

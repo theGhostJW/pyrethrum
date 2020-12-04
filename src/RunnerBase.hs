@@ -9,10 +9,10 @@ import RunElementClasses
 import Data.Aeson
 
 type ItemRunner e as ds i tc rc effs = 
-    TestParams e as ds i tc rc effs -> i -> Sem effs ()
+    rc -> Test e tc rc i as ds effs -> i -> Sem effs ()
 
 type TestRunner e tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => 
-                                                          GenericTest e tc rc i as ds effs -> m1 (m a)) 
+                                                          Test e tc rc i as ds effs -> m1 (m a)) 
 
 type TestPlan e tc rc m1 m a effs = TestRunner e tc rc m1 m a effs -> [RunElement m1 m a effs]
 
@@ -50,16 +50,11 @@ data RunElement m1 m a effs =
 instance Titled (RunElement m1 m a effs) where
   title = header
 
-data TestParams e as ds i tc rc effs = TestParams {                       
-  interactor :: rc -> i -> Sem effs as,                         
-  prepState :: forall pEffs. (Ensurable e) pEffs => i -> as -> Sem pEffs ds,                      
-  tc :: tc,                                                     
-  rc :: rc                                                      
-}
 
-data GenericTest e tc rc i as ds effs = GenericTest {
+
+data Test e tc rc i as ds effs = Test {
   config :: tc,
-  testItems :: rc -> [i],
-  testInteractor :: rc -> i -> Sem effs as,
-  testPrepState :: forall psEffs. (Ensurable e) psEffs => i -> as -> Sem psEffs ds
+  items :: rc -> [i],
+  interactor :: rc -> i -> Sem effs as,
+  prepState :: forall psEffs. (Ensurable e) psEffs => i -> as -> Sem psEffs ds
 }

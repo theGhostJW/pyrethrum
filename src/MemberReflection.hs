@@ -62,7 +62,7 @@ data SuiteError = MyError1 |
                   MyError2 
                   deriving (Show, Typeable)
 
-type Test = GenericTest SuiteError TestConfig RunConfig
+type Test = R.Test SuiteError TestConfig RunConfig
 type TestResult = GenericResult TestConfig
 
 instance Titled TestConfig where
@@ -120,12 +120,10 @@ nameOfModule :: TestModule
 nameOfModule = mkTestModule ''ApState
 
 test :: forall effs. Members (Effects SuiteError) effs => MemberReflection.Test Item ApState DState effs
-test = GenericTest {
-              config = MemberReflection.testConfig {address = nameOfModule},
-              testItems = items,
-              testInteractor = interactor,
-              testPrepState = prepState
-        }
+test = Test MemberReflection.testConfig {address = nameOfModule}
+              MemberReflection.items
+              interactor
+              prepState
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

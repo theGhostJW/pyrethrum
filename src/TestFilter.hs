@@ -44,20 +44,20 @@ filterTestCfg fltrs rc tc =
     fltrRslt firstRejectReason
     
 
-filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => FilterList rc tc -> rc -> GenericTest e tc rc i as ds effs -> Identity (Identity FilterResult)
-filterTest fltrs rc GenericTest{ config = tc } = Identity . Identity $ filterTestCfg fltrs rc tc
+filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => FilterList rc tc -> rc -> Test e tc rc i as ds effs -> Identity (Identity FilterResult)
+filterTest fltrs rc Test{ config = tc } = Identity . Identity $ filterTestCfg fltrs rc tc
 
 filterGroups :: forall tc rc e effs. TestConfigClass tc =>
               (
                 (forall i as ds. (Show i, Show as, Show ds) =>
-                      GenericTest e tc rc i as ds effs -> Identity (Identity FilterResult)) -> [RunElement Identity Identity FilterResult effs]
+                      Test e tc rc i as ds effs -> Identity (Identity FilterResult)) -> [RunElement Identity Identity FilterResult effs]
               )
               -> FilterList rc tc
               -> rc
               -> [[FilterResult]]
 filterGroups groupLst fltrs rc =
     let
-      testFilter :: GenericTest e tc rc i as ds effs -> Identity (Identity FilterResult)
+      testFilter :: Test e tc rc i as ds effs -> Identity (Identity FilterResult)
       testFilter = filterTest fltrs rc
     in
       (runIdentity . runIdentity <$>) <$> (tests <$> groupLst testFilter)

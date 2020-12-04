@@ -4,7 +4,7 @@ module LogTransformation.Test where
 -- import qualified RunElementClasses as RC
 -- import LogTransformation.Common
 -- import LogTransformation.Iteration as I
--- import RunElementClasses (FilterResult, unTestModule)
+-- import RunElementClasses (FilterResult, unTestAddress)
 -- import Check as CK
 -- import Pyrelude as P hiding (fail)
 -- import Pyrelude.IO
@@ -58,7 +58,7 @@ module LogTransformation.Test where
 --                                             I.EndGroup gt -> Nothing
 --                                             I.StartTest (RC.TestDisplayInfo address title config) -> Just $ emptyRecord {
 --                                                                                                               title = title,
---                                                                                                               address = RC.unTestModule address,
+--                                                                                                               address = RC.unTestAddress address,
 --                                                                                                               config = config
 --                                                                                                             } 
 --                                             I.EndTest tm -> Nothing
@@ -287,7 +287,7 @@ module LogTransformation.Test where
 -- ppIteration (IterationRecord summary validation otherErrorsDesc otherWarningsDesc item apState domainState rawLog) = 
 --   let 
 --     ItemId md i = iid summary
---     headr = PC.header $ unTestModule md <> " / " <> txt i <> " - " <> txt (I.status summary)
+--     headr = PC.header $ unTestAddress md <> " / " <> txt i <> " - " <> txt (I.status summary)
 --   in 
 --     headr <> newLn <>
 --     "when: " <> unWhenClause (pre summary) <> newLn <>

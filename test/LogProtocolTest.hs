@@ -18,7 +18,7 @@ data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show
 
 data TestConfig = TestConfig {
   header       :: Text,
-  address      :: TestModule,
+  address      :: TestAddress,
   environments :: Set Environment,
   countries    :: Set Country,
   minDepth     :: Depth,
@@ -46,8 +46,8 @@ genJSON = A.toJSON <$> genRunConfig -- using runconfig as easy proxy for random 
 genStr :: Gen Text
 genStr = text (linear 0 1000) ascii
 
-genTestModule :: Gen TestModule
-genTestModule = TestModule <$> genStr
+genTestAddress :: Gen TestAddress
+genTestAddress = TestAddress <$> genStr
 
 genTestConfig :: Gen TestConfig
 genTestConfig =
@@ -57,7 +57,7 @@ genTestConfig =
   in
     TestConfig 
       <$> genStr 
-      <*> genTestModule
+      <*> genTestAddress
       <*> set'
       <*> set'
       <*> element enumList
@@ -76,7 +76,7 @@ genDetailedInfo = DetailedInfo <$> genStr <*> genStr
 
 genTestDisplayInfo:: Gen TestDisplayInfo
 genTestDisplayInfo = TestDisplayInfo 
-                                <$> genTestModule
+                                <$> genTestAddress
                                 <*> genStr 
                                 <*> (A.toJSON <$> genTestConfig)
 
@@ -93,7 +93,7 @@ genInt :: Gen Int
 genInt = integral $ T.linear 0 1000
 
 genItemId :: Gen ItemId
-genItemId  = ItemId <$> genTestModule <*> genInt
+genItemId  = ItemId <$> genTestAddress <*> genInt
 
 genError :: Gen (FrameworkError Int)
 genError = Common.Error <$> genStr
@@ -123,7 +123,7 @@ genLogProtocol = choice [
                     BoundaryLog . StartGroup <$> (GroupTitle <$> genStr),
                     BoundaryLog . EndGroup <$> (GroupTitle <$> genStr),
                     BoundaryLog . StartTest <$> genTestDisplayInfo,
-                    BoundaryLog . EndTest <$> genTestModule,
+                    BoundaryLog . EndTest <$> genTestAddress,
                     BoundaryLog <$> (StartIteration <$> genItemId <*> (WhenClause <$> genStr) <*> (ThenClause <$> genStr) <*> (A.toJSON <$> genRunConfig)), --- using runconfig as an easy proxy for item
                     BoundaryLog . EndIteration <$> genItemId,
                     BoundaryLog . FilterLog <$> genFilterResults,

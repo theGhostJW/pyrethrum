@@ -23,7 +23,7 @@ data RunConfig = RunConfig {
 
 data TestConfig = TestConfig {
   header :: Text,
-  address :: TestModule,
+  address :: TestAddress,
   countries :: [Country],
   level :: TestDepth,
   enabled :: Bool
@@ -63,7 +63,7 @@ test1 :: TST MyInt MyInt MyInt effs
 test1 = Test {
               config = TestConfig {
                 header = "test1",
-                address = TestModule "test1",
+                address = TestAddress "test1",
                 countries = au <> nz,
                 level = Regression,
                 enabled = True
@@ -77,7 +77,7 @@ test2 :: TST MyInt MyInt MyInt effs
 test2 = Test {
               config = TestConfig {
                 header = "test2",
-                address = TestModule "test2",
+                address = TestAddress "test2",
                 countries = nz,
                 level = Regression,
                 enabled = True
@@ -91,7 +91,7 @@ test3 :: TST MyInt MyInt MyInt effs
 test3 = Test {
                 config = TestConfig {
                   header = "test3",
-                  address = TestModule "test3",
+                  address = TestAddress "test3",
                   countries = au,
                   level = Connectivity,
                   enabled = True
@@ -105,7 +105,7 @@ test4 :: TST MyInt MyInt MyInt effs
 test4 = Test {
               config = TestConfig {
                   header = "test4",
-                  address = TestModule "test4",
+                  address = TestAddress "test4",
                   countries = au,
                   level = DeepRegression,
                   enabled = True
@@ -119,7 +119,7 @@ test5 :: TST MyInt MyInt MyInt effs
 test5 = Test {
               config = TestConfig {
                   header = "test5",
-                  address = TestModule "test5",
+                  address = TestAddress "test5",
                   countries = au,
                   level = DeepRegression,
                   enabled = False

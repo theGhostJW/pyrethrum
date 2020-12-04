@@ -58,14 +58,14 @@ data PrintLogDisplayElement =
 
   StartTest {  
     tstTitle :: Text,
-    modAddress :: TestModule,
+    modAddress :: TestAddress,
     notes :: Maybe Text,
     config :: A.Value, -- test Config as Json
     status :: ExecutionStatus, -- test Config as Json
     stats :: StatusCount
   }  |
   
-  -- EndTest TestModule |
+  -- EndTest TestAddress |
   Iteration IterationRecord |
   LineError LogTransformError
   deriving (Show, Eq)
@@ -147,7 +147,7 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
     _normalStep :: (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
     _normalStep@(nxtItAccum@(IterationAccum _nxtMRec _nxtStepInfo _nxtMFltrLg), mDisplayElement) = printLogDisplayStep runResults lineNo itAccum eithLp
 
-    testStatus' :: TestModule -> ExecutionStatus
+    testStatus' :: TestAddress -> ExecutionStatus
     testStatus' = testStatus $ testExStatus iterationResults
     
     _skipFlags :: (Bool, Bool) -- (newAccum, err / result)
@@ -174,10 +174,10 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
 
 
 -- itrOutcome ItemId -> Maybe IterationOutcome
-testStatusMap :: RunResults -> M.Map TestModule ExecutionStatus
+testStatusMap :: RunResults -> M.Map TestAddress ExecutionStatus
 testStatusMap = testExStatus . iterationResults
 
-testStatus :: M.Map TestModule ExecutionStatus -> TestModule -> ExecutionStatus
+testStatus :: M.Map TestAddress ExecutionStatus -> TestAddress -> ExecutionStatus
 testStatus tstStatusMap tm = fromMaybe LC.Fail $ M.lookup tm tstStatusMap
 
 printLogDisplayStep ::
@@ -206,16 +206,16 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum{ stepInfo }) eith
 
         RunResults outOfTest iterationResults = runResults
 
-        testStatuses :: M.Map TestModule ExecutionStatus
+        testStatuses :: M.Map TestAddress ExecutionStatus
         testStatuses = testStatusMap runResults
 
-        testStatus' :: TestModule -> ExecutionStatus
+        testStatus' :: TestAddress -> ExecutionStatus
         testStatus' = testStatus testStatuses
 
-        tstIterationStatusCounts :: M.Map TestModule StatusCount
+        tstIterationStatusCounts :: M.Map TestAddress StatusCount
         tstIterationStatusCounts = testIterationStatusCounts runResults
 
-        testItrStats :: TestModule -> StatusCount
+        testItrStats :: TestAddress -> StatusCount
         testItrStats tm = M.findWithDefault M.empty tm tstIterationStatusCounts
 
         elOut :: a -> Maybe [a]
@@ -295,7 +295,7 @@ printLogDisplayStep runResults lineNo oldAccum@(IterationAccum{ stepInfo }) eith
                 StartIteration iid@(ItemId tstModule itmId) (WhenClause whn) (ThenClause thn) jsonItmVal ->  
                   (accum 
                     {rec = Just $ IterationRecord {
-                      modulePath = unTestModule tstModule,
+                      modulePath = unTestAddress tstModule,
                       itmId = itmId,
                       notes = getNotes jsonItmVal,
                       pre = whn,
@@ -407,7 +407,7 @@ prettyPrintDisplayElement pde =
                   rejectedItems = fltrItems isJust
 
                   address :: FilterResult -> Text
-                  address = unTestModule . testModAddress . testInfo 
+                  address = unTestAddress . testModAddress . testInfo 
 
                   rejectText :: FilterResult -> Text
                   rejectText fr = maybef (reasonForRejection fr) 
@@ -440,7 +440,7 @@ prettyPrintDisplayElement pde =
            <> newLn
            <> "module:" 
            <> newLn
-           <> indent2 (unTestModule tstMod)
+           <> indent2 (unTestAddress tstMod)
            <> newLn2 
            <> "stats:" 
            <> newLn

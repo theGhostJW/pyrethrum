@@ -6,14 +6,14 @@ import Language.Haskell.TH.Syntax
 import Data.Aeson.Types
 import           Check
 
-newtype TestModule = TestModule {unTestModule :: Text} deriving (Eq, Ord, Show, IsString)
+newtype TestAddress = TestAddress {unTestAddress :: Text} deriving (Eq, Ord, Show, IsString)
 
 -- this result is ultimately serialsed to JSON as part of the log protocol data  
 -- type and can't serialise with custom typeclass constraints so forced to
 -- have the redundant testModAddress and testTitle even though this
 -- data is available via TestConfigClass
 data TestDisplayInfo = TestDisplayInfo {
-  testModAddress :: TestModule,
+  testModAddress :: TestAddress,
   testTitle :: Text,
   testConfig :: Value -- test Config as Json
 }  deriving (Eq, Show)
@@ -30,19 +30,19 @@ data FilterResult = FilterResult {
 
 $(deriveJSON defaultOptions ''FilterResult)
 
-mkTestModule :: Name -> TestModule
-mkTestModule = TestModule . moduleOf
+mkTestAddress :: Name -> TestAddress
+mkTestAddress = TestAddress . moduleOf
 
-$(deriveJSON defaultOptions ''TestModule)
+$(deriveJSON defaultOptions ''TestAddress)
 
-toString :: TestModule -> Text
-toString (TestModule s) = s
+toString :: TestAddress -> Text
+toString (TestAddress s) = s
 
 class Titled a where
   title :: a -> Text
 
 class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => TestConfigClass a where
-  moduleAddress:: a -> TestModule
+  moduleAddress:: a -> TestAddress
 
 class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => RunConfigClass a
 

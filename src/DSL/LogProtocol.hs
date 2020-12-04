@@ -26,7 +26,7 @@ newtype DTestConfig = DTestConfig {unDTestConfig :: Text} deriving (Eq, Show, Is
 newtype DRunConfig = DRunConfig {unDRunConfig :: Text} deriving (Eq, Show, IsString)
 newtype WhenClause = WhenClause {unWhenClause :: Text} deriving (Eq, Show, IsString)
 newtype ThenClause = ThenClause {unThenClause :: Text} deriving (Eq, Show, IsString)
-data ItemId = ItemId {tstModule :: TestModule, itmId :: Int} deriving (Eq, Ord, Show)
+data ItemId = ItemId {tstModule :: TestAddress, itmId :: Int} deriving (Eq, Ord, Show)
 
 -- needed because ItemId is used in a map
 instance ToJSONKey ItemId where
@@ -120,7 +120,7 @@ data BoundaryEvent =
     EndGroup GroupTitle |
 
     StartTest TestDisplayInfo |
-    EndTest TestModule |
+    EndTest TestAddress |
 
     StartIteration ItemId WhenClause ThenClause Value | 
     EndIteration ItemId 

@@ -55,7 +55,7 @@ prettyPrintLogProtocolBase _mTimeSuffix docMode =
                                                               newLn <> "Test Config:" <>
                                                               newLn <> ppAesonBlock testConfig
 
-                            EndTest (TestModule address) -> newLn <> tstHeader ("End Test: " <> address)
+                            EndTest (TestAddress address) -> newLn <> tstHeader ("End Test: " <> address)
                             StartIteration iid  _ _ val -> newLn <> subHeader ("Start Iteration: " <> iterId iid) <> 
                                                             newLn <> "Item:" <> 
                                                             newLn <> ppAesonBlock val <>

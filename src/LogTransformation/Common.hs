@@ -219,7 +219,7 @@ nxtValue  mCurrent = \case
                         Keep -> mCurrent 
                         New val -> Just val
 
-testItrDelta :: LogProtocolBase e -> (DeltaAction TestModule, DeltaAction ItemId)
+testItrDelta :: LogProtocolBase e -> (DeltaAction TestAddress, DeltaAction ItemId)
 testItrDelta = 
   let 
     clear = (Clear, Clear)
@@ -245,7 +245,7 @@ nxtIteration :: Maybe (ItemId, IterationOutcome) -> LogProtocolBase e -> Maybe (
 nxtIteration current lp = 
   let 
     (
-      modAction :: DeltaAction TestModule, 
+      modAction :: DeltaAction TestAddress, 
       idAction :: DeltaAction ItemId
      ) = testItrDelta lp
   in 

@@ -24,7 +24,7 @@ data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show
 
 data TestConfig = TestConfig {
   header       :: Text,
-  address      :: TestModule,
+  address      :: TestAddress,
   environments :: Set Environment,
   countries    :: Set Country,
   minDepth     :: Depth,

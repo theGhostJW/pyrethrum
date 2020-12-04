@@ -6,8 +6,6 @@ import RunnerBase as RB
 import RunElementClasses as C
 import Data.List as L
 
-type TestAddress = Text
-
 acceptFilter :: FilterResult -> Bool
 acceptFilter = isNothing . reasonForRejection
 

@@ -51,7 +51,7 @@ nzOnly = S.singleton NZ
 
 data TestConfig = TestConfig {
   header       :: Text,
-  address      :: TestModule,
+  address      :: TestAddress,
   environments :: Set Environment,
   countries    :: Set Country,
   minDepth     :: Depth,
@@ -74,7 +74,7 @@ instance TestConfigClass TestConfig where
 testConfig :: TestConfig
 testConfig = TestConfig {
   header    = "Configuration Error ~ No Title Assigned",
-  address = TestModule "Configuration Error ~ No Address Assigned",
+  address = TestAddress "Configuration Error ~ No Address Assigned",
   environments = allNonProdEnvironments,
   countries    = auOnly,
   minDepth     = DeepRegression,
@@ -116,8 +116,8 @@ data Item = Item {
 items :: RunConfig -> [Item]
 items _ = []
   
-nameOfModule :: TestModule
-nameOfModule = mkTestModule ''ApState
+nameOfModule :: TestAddress
+nameOfModule = mkTestAddress ''ApState
 
 test :: forall effs. Members (Effects SuiteError) effs => MemberReflection.Test Item ApState DState effs
 test = Test MemberReflection.testConfig {address = nameOfModule}

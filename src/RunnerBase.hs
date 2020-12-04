@@ -34,7 +34,6 @@ doNothing = PreRun {
   checkHasRun = pure True
 }
 
-
 data RunElement m1 m a effs =
   Tests {
         header :: Text,
@@ -49,8 +48,6 @@ data RunElement m1 m a effs =
 
 instance Titled (RunElement m1 m a effs) where
   title = header
-
-
 
 data Test e tc rc i as ds effs = Test {
   config :: tc,

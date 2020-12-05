@@ -126,7 +126,7 @@ runHook PreRun{runAction, checkHasRun} stage =
 
 
 data RunParams e rc tc effs = RunParams {
-  plan :: forall a mo mi. TestPlan e tc rc mo mi a effs,
+  plan :: forall mo mi a. TestPlan e tc rc mo mi a effs,
   filters :: FilterList rc tc,
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner e as ds i tc rc effs,
   rc :: rc

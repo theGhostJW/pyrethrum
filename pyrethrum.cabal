@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0a33e697f349cacede90adc1cd590e892362206b99855759392c3c844df6a4fb
+-- hash: 051d59cbdde02a81b4884f29e60b891f1cec9c780ef58488519527e80cf2a596
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -30,6 +30,7 @@ library
       AuxFiles
       Check
       Common
+      Config
       DSL.ArbitraryIO
       DSL.CurrentTime
       DSL.CurrentTimeDocLogger

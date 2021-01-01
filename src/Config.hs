@@ -5,7 +5,7 @@ import           DSL.Interpreter
 import           Common
 import           Pyrelude
 import qualified Prelude                    as P
-import Runner as R hiding (TestPlan, Test)
+import Runner as R hiding (Test)
 import qualified Runner as R
 import FileLogging as L
 import TestFilters as F
@@ -127,11 +127,43 @@ filterList = [isActiveFilter, countryFilter, levelFilter]
 applyTestFiltersToItems :: RunConfig -> (i -> TestConfig) -> [i] -> [i]
 applyTestFiltersToItems = F.applyTestFilters filterList
 
-type TestPlan m1 m a effs = R.TestPlan SuiteError TestConfig RunConfig m1 m a effs
+type TestPlan m1 m a effs = R.TestPlanBase SuiteError TestConfig RunConfig m1 m a effs
 
 
+-- testEndpointPriv' :: forall effs1. ApEffs SuiteError effs1 =>
+--       (forall rc tc i as ds effs. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs SuiteError effs) 
+--                   => OldItemParams SuiteError as ds i tc rc effs -> Sem effs ())   
+--      -> TestAddress
+--      -> RunConfig
+--      -> Either FilterErrorType (Set Int)
+--      -> (forall m1 m a. TestPlan m1 m a effs1)
+--      -> Sem effs1 ()
+-- testEndpointPriv' itmRunner testMod rc itrSet plan = 
+--   let 
+--     runParams :: RunParams SuiteError RunConfig TestConfig effs1 
+--     runParams = RunParams {
+--       plan = plan,
+--       filters = filterList,
+--       itemRunner = itmRunner,
+--       rc = rc
+--     }
+--   in
+--     mkEndpointSem runParams testMod itrSet
+
+{-
+  Expected type: 
+  R.Test SuiteError TestConfig RunConfig i as ds effs -> mo0 (mi0 a1)
+  R.Test SuiteError TestConfig RunConfig i as ds effs -> mo (mi a)
+
+
+
+
+
+-}
+
+{-
 testEndpointPriv :: forall effs. ApEffs SuiteError effs =>
-      (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner SuiteError as ds i TestConfig RunConfig effs)  
+      (forall as ds i effs1. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner SuiteError as ds i TestConfig RunConfig effs1)  
      -> TestAddress
      -> RunConfig
      -> Either FilterErrorType (Set Int)
@@ -149,6 +181,9 @@ testEndpointPriv itmRunner testAddress rc itemIds plan =
   in
     mkEndpointSem runParams testAddress itemIds
 
+
+
+
 testEndpoint ::
      TestAddress
      -> RunConfig
@@ -164,7 +199,7 @@ testEndpointDoc ::
      -> (forall mo mi a. TestPlan mo mi a (FullDocEffects SuiteError))
      -> DList Text
 testEndpointDoc testMod rc itrSet plan = fst . documentRaw $ testEndpointPriv docExecution testMod rc itrSet plan
-
+-}
 
 $(deriveJSON defaultOptions ''TestConfig)
 $(deriveJSON defaultOptions ''SuiteError)

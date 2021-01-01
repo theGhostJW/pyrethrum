@@ -1,0 +1,21 @@
+module New where 
+  
+testEndpointPriv :: forall effs1. ApEffs SuiteError effs1 =>
+      (forall rc tc i as ds effs. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs SuiteError effs) 
+                  => ItemRunner SuiteError as ds i tc rc effs -> i -> Sem effs ())  
+     -> TestAddress
+     -> RunConfig
+     -> Either FilterErrorType (Set Int)
+     -> (forall mo mi a. TestPlan mo mi a effs1)
+     -> Sem effs1 ()
+testEndpointPriv itmRunner testAddress rc itemIds plan = 
+  let 
+    runParams :: RunParams SuiteError RunConfig TestConfig effs1 
+    runParams = RunParams {
+      plan = plan,
+      filters = filterList,
+      itemRunner = itmRunner,
+      rc = rc
+    }
+  in
+    mkEndpointSem runParams testAddress itemIds

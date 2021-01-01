@@ -122,8 +122,8 @@ nameOfModule = mkTestAddress ''ApState
 test :: forall effs. Members (Effects SuiteError) effs => MemberReflection.Test Item ApState DState effs
 test = Test MemberReflection.testConfig {address = nameOfModule}
               MemberReflection.items
-              interactor
-              prepState
+              MemberReflection.interactor
+              MemberReflection.prepState
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -157,7 +157,7 @@ showInteractorEffs :: forall es0 es1 a. ShowTypes es0 => InteractorFuncWrapper e
 showInteractorEffs _ = showTypes @es0
 
 demo2 :: [Text]
-demo2 = removeKindSuffix <$> showInteractorEffs (WrappedInteractor interactor :: InteractorFuncWrapper (Effects SuiteError) effs (RunConfig -> Item -> Sem effs ApState))
+demo2 = removeKindSuffix <$> showInteractorEffs (WrappedInteractor MemberReflection.interactor :: InteractorFuncWrapper (Effects SuiteError) effs (RunConfig -> Item -> Sem effs ApState))
 
 
 $(deriveJSON defaultOptions ''TestConfig)

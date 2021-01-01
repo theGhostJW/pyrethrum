@@ -7,7 +7,7 @@ import  DSL.CurrentTime as CT
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList as D
 import           Pyrelude as P
-import           Pyrelude.IO hiding (now)
+import           Pyrelude.IO as PIO hiding (now)
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
 import System.IO (stdout)
@@ -62,7 +62,7 @@ logRunConsoleInterpreter =
 
 -- ToDo move to lib
 putLines :: Handle -> Text -> IO ()
-putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
+putLines hOut tx = sequence_ $ PIO.hPutStrLn hOut <$> lines tx
 
 utfEncode :: A.ToJSON a => a -> Text
 utfEncode a = either 

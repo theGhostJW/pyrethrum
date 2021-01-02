@@ -45,7 +45,7 @@ packages:
     hackage: transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
 snapshots:
 - completed:
-    size: 521183
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/5/7.yaml
-    sha256: c72b9c63b7faa8812cb6308a3d74652cf0e9b793ff197e972ee74ade774ec4eb
-  original: nightly-2020-05-07
+    size: 532381
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/11.yaml
+    sha256: 1f43c4ad661a114a4f9dd4580988f30da1208d844c097714f5867c52a02e0aa1
+  original: lts-16.11

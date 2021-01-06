@@ -1,3 +1,6 @@
+{-# LANGUAGE NoPolyKinds #-} 
+-- TODO: work out why this is needed - investigate polykinds
+
 module ItemRunners where
 
 import qualified Check as CK

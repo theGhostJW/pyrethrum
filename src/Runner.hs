@@ -8,8 +8,6 @@ module Runner (
   , module RB
   , module ItemFilter
   , module C
-
-  , RunParamsDB(..)
 ) where
 
 import Common as C
@@ -28,10 +26,6 @@ import Data.Aeson
 import TestFilter
 import RunnerBase as RB
 import qualified Prelude
-
-data RunParamsDB e rc tc effs = RunParamsDB {
-  plan :: forall mo mi a. TestPlanBase e tc rc mo mi a effs
-}
 
 runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ItemClass i ds, Member (Logger e) effs) =>
       Maybe (S.Set Int)                                                    -- target Ids

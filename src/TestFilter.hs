@@ -4,7 +4,7 @@ import           Pyrelude as F
 import OrphanedInstances()
 import RunnerBase as RB
 import RunElementClasses as C
-import Data.List as L
+import qualified Data.List as L 
 
 acceptFilter :: FilterResult -> Bool
 acceptFilter = isNothing . reasonForRejection

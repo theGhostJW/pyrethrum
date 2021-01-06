@@ -11,25 +11,6 @@ import Data.Aeson
 type ItemRunner e as ds i tc rc effs = 
     rc -> Test e tc rc i as ds effs -> i -> Sem effs ()
 
-data OldItemParams e as ds i tc rc effs = ItemParams {
-  testParams :: OldTestParams e as ds i tc rc effs,                                                     
-  item :: i                                                        
-}
-
-data OldTestParams e as ds i tc rc effs = TestParams {                       
-  interactor :: rc -> i -> Sem effs as,                         
-  prepState :: forall pEffs. (Ensurable e) pEffs => i -> as -> Sem pEffs ds,                      
-  tc :: tc,                                                     
-  rc :: rc                                                      
-}
-
--- type TestRunner e tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => 
---                                                           Test e tc rc i as ds effs -> m1 (m a)) 
-
--- old
--- type TestPlanBase e tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => 
---                                                           GenericTest e tc rc i as ds effs -> m1 (m a)) -> [TestGroup m1 m a effs]
-
 type TestPlanBase e tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => 
                                                           Test e tc rc i as ds effs -> m1 (m a)) -> [RunElement m1 m a effs]
 

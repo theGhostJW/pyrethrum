@@ -131,8 +131,23 @@ data RunParams e rc tc effs = RunParams {
   rc :: rc
 }
 
+firstDuplicateGroupTitle :: RunParams e rc tc effs -> Maybe Text
+firstDuplicateGroupTitle =
+  let
+    prepResults :: [RunElement [] (Sem effs) () effs]
+    prepResults = plan $ runTest iIds filters itemRunner rc 
+  in
+    firstDuplicateGroupTitle = toS <$> firstDuplicate (toS . C.title <$> prepResults :: [Prelude.String])
+
+mkSemNew :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
+                    Maybe (S.Set Int)         -- a set of item Ids used for test case endpoints
+                    -> RunParams e rc tc effs
+                    -> Sem effs ()
+mkSemNew iIds RunParams {plan, filters, rc, itemRunner} =
+
+
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
-                    Maybe (S.Set Int)                                   -- a set of item Ids used for test case endpoints
+                    Maybe (S.Set Int)         -- a set of item Ids used for test case endpoints
                     -> RunParams e rc tc effs
                     -> Sem effs ()
 mkSem iIds RunParams {plan, filters, rc, itemRunner} =
@@ -156,7 +171,7 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
     logBoundry = logItem . BoundaryLog
 
     exeGroup :: (Bool, RunElement [] (Sem effs) () effs) -> Sem effs ()
-    exeGroup (include, tg) =
+    exeGroup (include, runElm) =
       let
         -- if ids are passed in we are running an endpoint
         -- endpoint go home and rolllover are not run if the application is already home
@@ -164,9 +179,9 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
         guardedHookRun hookSelector hookLabel =
           do 
             wantHookRun <- isJust iIds ? 
-                            (not <$> checkHasRun (goHome tg)) $ 
+                            (not <$> checkHasRun (goHome runElm)) $ 
                             pure True
-            wantHookRun ? runHook (hookSelector tg) hookLabel $ pure $ Right ()
+            wantHookRun ? runHook (hookSelector runElm) hookLabel $ pure $ Right ()
 
         rollover' :: Sem effs (Either (FrameworkError e) ())
         rollover' = guardedHookRun rollover Rollover
@@ -185,12 +200,12 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
         runTest' testIterations = sequence_ (hookThenRun goHome' <$> testIterations)
 
         runTests :: Sem effs ()
-        runTests = sequence_ $ runTest' <$> filter (not . null) (tests tg)
+        runTests = sequence_ $ runTest' <$> filter (not . null) (tests runElm)
 
         runGrp :: Sem effs ()
         runGrp = 
               let 
-                hdr = GroupTitle $ RB.header tg
+                hdr = GroupTitle $ RB.header runElm
               in
                 do
                   logBoundry $ StartGroup hdr

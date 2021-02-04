@@ -1,6 +1,7 @@
 {-# LANGUAGE NoPolyKinds #-} 
 -- TODO: work out why this is needed - investigate polykinds
 
+{-# OPTIONS_GHC -Wno-deferred-type-errors #-}
 module Runner (
   mkEndpointSem
   , RunParams(..)
@@ -11,21 +12,72 @@ module Runner (
 ) where
 
 import Common as C
-import DSL.Interpreter
-import DSL.Logger
+    ( dList,
+      indentText,
+      DetailedInfo(..),
+      FileSystemErrorType(..),
+      FilterErrorType(..),
+      FrameworkError(..),
+      OutputDListText,
+      PreTestStage(..) )
+import DSL.Interpreter ( ApEffs )
+import DSL.Logger ( logItem, Logger )
 import DSL.LogProtocol as LP
-import DSL.CurrentTime
+import DSL.CurrentTime ( utcOffset )
 import Pyrelude as P
+    ( zip,
+      fst,
+      snd,
+      ($),
+      Eq((==)),
+      Show,
+      Applicative(pure, (*>)),
+      Semigroup((<>)),
+      Bool(True),
+      Int,
+      Maybe(..),
+      Either(..),
+      Text,
+      Category((.)),
+      (<$>),
+      sequence_,
+      maybe,
+      unless,
+      eitherf,
+      firstDuplicate,
+      txt,
+      uu,
+      toS,
+      (?),
+      Listy(filter), Traversable (sequenceA) )
 import Polysemy
-import Polysemy.Error as PE
+import Polysemy.Error as PE ( Error, catch, throw )
 import ItemFilter  (ItemFilter (..), filterredItemIds)
 import qualified Data.Set as S
 import RunElementClasses as C
 import OrphanedInstances()
-import Data.Aeson
+import Data.Aeson as A
 import TestFilter
+    ( acceptFilter,
+      filterGroups,
+      filterLog,
+      filterTestCfg,
+      FilterList,
+      TestFilter(..), acceptGroup )
 import RunnerBase as RB
+    ( doNothing,
+      Ensurable,
+      GenericResult(..),
+      HookLocation(..),
+      ItemRunner,
+      PreRun(..),
+      RunElement(..),
+      Test(..),
+      TestPlanBase )
 import qualified Prelude
+
+logBoundry :: forall e effs. (Show e, A.ToJSON e, Member (Logger e) effs) => BoundaryEvent -> Sem effs ()
+logBoundry = logItem . BoundaryLog
 
 runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ItemClass i ds, Member (Logger e) effs) =>
       Maybe (S.Set Int)                                                    -- target Ids
@@ -36,9 +88,6 @@ runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass 
       -> [Sem effs ()]
 runTestItems iIds items rc test@Test{ config = tc } itemRunner =
   let
-    logBoundry :: BoundaryEvent -> Sem effs ()
-    logBoundry = logItem . BoundaryLog
-
     startTest :: Sem effs ()
     startTest = logBoundry . StartTest $ mkDisplayInfo tc
 
@@ -71,21 +120,13 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
                 <> [applyRunner (Prelude.last xs) *> endTest]
 
 runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, Show e, Member (Logger e) effs) =>
-                   Maybe (S.Set Int)                     -- target Ids
-                   -> FilterList rc tc                   -- filters
-                   -> ItemRunner e as ds i tc rc effs    -- item runner
-                   -> rc                                 -- runConfig
+                   RunParams e rc tc effs                -- Run Params
                    -> Test e tc rc i as ds effs          -- Test Case
                    -> [Sem effs ()]                      -- [TestIterations]
-runTest iIds fltrs itemRunner rc test@Test {config = tc, items} =
-    acceptFilter (filterTestCfg fltrs rc tc)
-    ? runTestItems
-        iIds 
-        (items rc) 
-        rc
-        test
-        itemRunner
-        $ []
+runTest RunParams {filters, rc, itemIds, itemRunner}  test@Test {config = tc, items} =
+    acceptFilter (filterTestCfg filters rc tc)
+      ? runTestItems itemIds (items rc) rc test itemRunner
+      $ []
 
 logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
 logLPError = logItem . logRun . LP.Error
@@ -127,25 +168,48 @@ runHook PreRun{runAction, checkHasRun} stage =
 data RunParams e rc tc effs = RunParams {
   plan :: forall mo mi a. TestPlanBase e tc rc mo mi a effs,
   filters :: FilterList rc tc,
+  itemIds :: Maybe (S.Set Int),   
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner e as ds i tc rc effs,
   rc :: rc
 }
 
-firstDuplicateGroupTitle :: RunParams e rc tc effs -> Maybe Text
-firstDuplicateGroupTitle =
-  let
-    prepResults :: [RunElement [] (Sem effs) () effs]
-    prepResults = plan $ runTest iIds filters itemRunner rc 
-  in
-    firstDuplicateGroupTitle = toS <$> firstDuplicate (toS . C.title <$> prepResults :: [Prelude.String])
+exeElm :: RunElement [] (Sem effs) () effs -> Sem effs ()
+exeElm elm = \case 
+                Tests tests' -> sequence_ . sequence_ tests'
 
-mkSemNew :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
-                    Maybe (S.Set Int)         -- a set of item Ids used for test case endpoints
-                    -> RunParams e rc tc effs
+                Hook location' hook' subTests' -> 
+                  case location' of 
+                    BeforeEach -> exeElm $ sequence_ hook' <$> subTests'
+                    BeforeAll -> sequence_ hook' $ exeElm subTests'
+                    AfterAll  -> sequence_ exeElm subTests' hook'
+                    AfterEach -> exeElm $ \t -> sequence_ t hook' <$> subTests'
+                    
+                Group title' subTests' -> here
+
+mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
+                    RunParams e rc tc effs
                     -> Sem effs ()
-mkSemNew iIds RunParams {plan, filters, rc, itemRunner} =
+mkSem rp@RunParams {plan, filters, rc, itemIds, itemRunner} = 
+  let
+    allElms :: [RunElement [] (Sem effs) () effs]
+    allElms = plan $ runTest rp 
 
+    filterInfo :: [[FilterResult]]
+    filterInfo = filterGroups plan filters rc
+  in
+    maybe
+    (
+      do
+        offset' <- utcOffset
+        logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
+        logBoundry . FilterLog $ filterLog filterInfo
+        sequence_ $ exeElm <$> filter acceptGroup allElms
+        logBoundry EndRun
+    )
+    (\dupeTxt -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
+    toS <$> firstDuplicate (toS . C.title <$> allElms :: [Prelude.String])
 
+{- 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
                     Maybe (S.Set Int)         -- a set of item Ids used for test case endpoints
                     -> RunParams e rc tc effs
@@ -166,9 +230,6 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
 
     runTuples ::  [(Bool, RunElement [] (Sem effs) () effs)]
     runTuples = P.zip filterFlags prepResults
-
-    logBoundry :: BoundaryEvent -> Sem effs ()
-    logBoundry = logItem . BoundaryLog
 
     exeGroup :: (Bool, RunElement [] (Sem effs) () effs) -> Sem effs ()
     exeGroup (include, runElm) =
@@ -224,6 +285,7 @@ mkSem iIds RunParams {plan, filters, rc, itemRunner} =
         logBoundry EndRun
     )
     (\dupeTxt -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
+-}
 
 mkRunSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) => RunParams e rc tc effs -> Sem effs ()
 mkRunSem = mkSem Nothing 

@@ -63,5 +63,5 @@ filterGroups groupLst fltrs rc =
 filterLog :: [[FilterResult]] -> [FilterResult]
 filterLog = mconcat
 
-filterGroupFlags :: [[FilterResult]] -> [Bool]
-filterGroupFlags grpFltrRslts = F.any acceptFilter <$> grpFltrRslts
+acceptGroup :: [FilterResult] -> Bool
+acceptGroup = F.any acceptFilter 

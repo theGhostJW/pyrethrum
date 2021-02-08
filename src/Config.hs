@@ -27,6 +27,7 @@ import DSL.Ensure
 import DSL.Logger
 import DSL.LogProtocol
 import ItemRunners
+import Data.Either.Extra (eitherToMaybe)
 -- import Paths_pyrethrumDemo
 
 exeDir :: IO AbsDir
@@ -152,6 +153,7 @@ testEndpointPriv itmRunner testAddress rc itemIds plan =
       plan = plan,
       filters = filterList,
       itemRunner = itmRunner,
+      itemIds = eitherToMaybe itemIds,
       rc = rc
     }
   in

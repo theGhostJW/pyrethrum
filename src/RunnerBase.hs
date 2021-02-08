@@ -1,7 +1,7 @@
 module RunnerBase where
 
 import DSL.Ensure
-import Common (FilterErrorType, FrameworkError)
+import Common (ItemFilterError, FrameworkError)
 import Pyrelude
 import Polysemy
 import Polysemy.Error
@@ -18,7 +18,7 @@ type Ensurable e effs = Members '[Ensure, Error (FrameworkError e)] effs
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,
-  results :: Either FilterErrorType [rslt]
+  results :: Either ItemFilterError [rslt]
 } deriving Show
 
 data PreRun effs = PreRun {

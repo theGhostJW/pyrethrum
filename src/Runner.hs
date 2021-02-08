@@ -16,7 +16,7 @@ import Common as C
       indentText,
       DetailedInfo(..),
       FileSystemErrorType(..),
-      FilterErrorType(..),
+      ItemFilterError(..),
       FrameworkError(..),
       OutputDListText,
       PreTestStage(..) )
@@ -298,7 +298,7 @@ mkRunSem = mkSem Nothing
 mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) =>
                    RunParams e rc tc effs
                    -> TestAddress                            -- test address
-                   -> Either FilterErrorType (S.Set Int)    -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
+                   -> Either ItemFilterError (S.Set Int)    -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> Sem effs ()
 mkEndpointSem runParams@RunParams { filters } tstAddress iIds =
   let

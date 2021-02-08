@@ -144,7 +144,7 @@ testEndpointPriv :: forall effs. ApEffs SuiteError effs =>
         ItemRunner SuiteError as ds i TestConfig RunConfig effs)  
      -> TestAddress
      -> RunConfig
-     -> Either FilterErrorType (Set Int)
+     -> Either ItemFilterError (Set Int)
      -> (forall mo mi a. TestPlan mo mi a effs)
      -> Sem effs ()
 testEndpointPriv itmRunner testAddress rc itemIds plan = 
@@ -162,7 +162,7 @@ testEndpointPriv itmRunner testAddress rc itemIds plan =
 testEndpoint ::
      TestAddress
      -> RunConfig
-     -> Either FilterErrorType (Set Int)
+     -> Either ItemFilterError (Set Int)
      -> (forall mo mi a. TestPlan mo mi a FullIOMembers)
      -> Sem FullIOMembers ()
 testEndpoint = testEndpointPriv runItem
@@ -170,7 +170,7 @@ testEndpoint = testEndpointPriv runItem
 testEndpointDoc ::
      TestAddress
      -> RunConfig
-     -> Either FilterErrorType (Set Int)
+     -> Either ItemFilterError (Set Int)
      -> (forall mo mi a. TestPlan mo mi a (FullDocEffects SuiteError))
      -> DList Text
 testEndpointDoc testMod rc itrSet plan = fst . documentRaw $ testEndpointPriv documentItem testMod rc itrSet plan

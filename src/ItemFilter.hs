@@ -20,10 +20,10 @@ instance P.Show (ItemFilter a) where
   show LastVal     = "LastVal"
   show (Pred _) = "Pred itemPredicateFunction"
 
-filterredItemIds :: forall i ds. (ItemClass i ds) => ItemFilter i -> [i] -> Either FilterErrorType (S.Set Int)
+filterredItemIds :: forall i ds. (ItemClass i ds) => ItemFilter i -> [i] -> Either ItemFilterError (S.Set Int)
 filterredItemIds filtr items =
   let
-    filterredItems :: Either FilterErrorType [Int]
+    filterredItems :: Either ItemFilterError [Int]
     filterredItems = let
                         hasVals i = not $ nullFoldable $ checkList i
                         lastWithVal = findFoldable hasVals $ reverse items
@@ -39,7 +39,7 @@ filterredItemIds filtr items =
                             LastVal -> maybe (Left $ InvalidItemFilter "There is no item in the list with checks assigned") (Right . pure) lastWithVal
                             Pred func -> listOrFail (filter func items) "No test items match filter function"
 
-    checkIds :: Either FilterErrorType ()
+    checkIds :: Either ItemFilterError ()
     checkIds =
       let
         ids = identifier <$> items

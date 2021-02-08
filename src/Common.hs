@@ -35,10 +35,10 @@ data DetailedInfo = DetailedInfo {
 
 $(deriveJSON defaultOptions ''DetailedInfo)
 
-data FilterErrorType = InvalidItemFilter Text |
+data ItemFilterError = InvalidItemFilter Text |
                         DuplicateItemId Int Text deriving (Eq, Show)
 
-$(deriveJSON defaultOptions ''FilterErrorType)
+$(deriveJSON defaultOptions ''ItemFilterError)
 
 data FileSystemErrorType = ReadFileError | WriteFileError
     deriving (Show, Eq)
@@ -51,7 +51,7 @@ data FrameworkError e =
 
             FileSystemError FileSystemErrorType P.IOError |
             EnsureError Text |
-            FilterError FilterErrorType |
+            FilterError ItemFilterError |
 
             NotImplementedError Text |
 

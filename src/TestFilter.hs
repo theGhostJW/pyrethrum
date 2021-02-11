@@ -1,19 +1,19 @@
 module TestFilter where 
 
-import           Pyrelude as F
+import           Pyrelude as P
 import OrphanedInstances()
 import RunnerBase as RB
 import RunElementClasses as C
 import qualified Data.List as L 
 
-acceptFilter :: FilterResult -> Bool
+acceptFilter :: TestFilterResult -> Bool
 acceptFilter = isNothing . reasonForRejection
 
-rejectFilter :: FilterResult -> Bool
+rejectFilter :: TestFilterResult -> Bool
 rejectFilter = isJust . reasonForRejection
 
-mkFilterResult :: TestConfigClass tc => tc -> Maybe Text -> FilterResult
-mkFilterResult tc rejection = FilterResult {
+mkTestFilterResult :: TestConfigClass tc => tc -> Maybe Text -> TestFilterResult
+mkTestFilterResult tc rejection = TestFilterResult {
                                 testInfo = mkDisplayInfo tc,
                                 reasonForRejection = rejection
                               }
@@ -25,13 +25,13 @@ data TestFilter rc tc = TestFilter {
 
 type FilterList rc tc = [TestFilter rc tc]
 
-filterTestCfg :: forall rc tc. TestConfigClass tc => FilterList rc tc -> rc -> tc -> FilterResult
+filterTestCfg :: forall rc tc. TestConfigClass tc => FilterList rc tc -> rc -> tc -> TestFilterResult
 filterTestCfg fltrs rc tc =
   let
-    fltrRslt :: Maybe Text -> FilterResult
-    fltrRslt = mkFilterResult tc 
+    fltrRslt :: Maybe Text -> TestFilterResult
+    fltrRslt = mkTestFilterResult tc 
 
-    applyFilter :: TestFilter rc tc -> FilterResult
+    applyFilter :: TestFilter rc tc -> TestFilterResult
     applyFilter fltr = fltrRslt $ predicate fltr rc tc 
                                              ? Nothing 
                                              $ Just $ TestFilter.title fltr
@@ -42,26 +42,23 @@ filterTestCfg fltrs rc tc =
     fltrRslt firstRejectReason
     
 
-filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => FilterList rc tc -> rc -> Test e tc rc i as ds effs -> Identity (Identity FilterResult)
+filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => FilterList rc tc -> rc -> Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)
 filterTest fltrs rc Test{ config = tc } = Identity . Identity $ filterTestCfg fltrs rc tc
 
 filterGroups :: forall tc rc e effs. TestConfigClass tc =>
               (
                 (forall i as ds. (Show i, Show as, Show ds) =>
-                      Test e tc rc i as ds effs -> Identity (Identity FilterResult)) -> [RunElement Identity Identity FilterResult effs]
+                      Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)) -> [RunElement Identity Identity TestFilterResult effs]
               )
               -> FilterList rc tc
               -> rc
-              -> [[FilterResult]]
+              -> [[TestFilterResult]]
 filterGroups groupLst fltrs rc =
     let
-      testFilter :: Test e tc rc i as ds effs -> Identity (Identity FilterResult)
+      testFilter :: Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)
       testFilter = filterTest fltrs rc
     in
       (runIdentity . runIdentity <$>) <$> (tests <$> groupLst testFilter)
 
-filterLog :: [[FilterResult]] -> [FilterResult]
-filterLog = mconcat
-
-acceptGroup :: [FilterResult] -> Bool
-acceptGroup = F.any acceptFilter 
+acceptAnyFilter :: [TestFilterResult] -> Bool
+acceptAnyFilter = P.any acceptFilter 

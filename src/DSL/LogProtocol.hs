@@ -107,7 +107,7 @@ data SubProtocol e =
   deriving (Eq, Show, Functor)
 
 data BoundaryEvent = 
-    FilterLog [FilterResult] |
+    FilterLog [TestFilterResult] |
 
     StartRun {
               runTitle :: RunTitle, 

@@ -49,7 +49,7 @@ import Pyrelude as P
       uu,
       toS,
       (?),
-      Listy(filter), Traversable (sequenceA) )
+      Listy(filter), Traversable (sequenceA), fold )
 import Polysemy
 import Polysemy.Error as PE ( Error, catch, throw )
 import ItemFilter  (ItemFilter (..), filterredItemIds)
@@ -60,10 +60,9 @@ import Data.Aeson as A
 import TestFilter
     ( acceptFilter,
       filterGroups,
-      filterLog,
       filterTestCfg,
       FilterList,
-      TestFilter(..), acceptGroup )
+      TestFilter(..), acceptAnyFilter )
 import RunnerBase as RB
     ( doNothing,
       Ensurable,
@@ -131,40 +130,6 @@ runTest RunParams {filters, rc, itemIds, itemRunner}  test@Test {config = tc, it
 logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
 logLPError = logItem . logRun . LP.Error
 
-runHook :: forall e effs. Member (Error (FrameworkError e)) effs => PreRun effs -> PreTestStage -> Sem effs (Either (FrameworkError e) ())
-runHook PreRun{runAction, checkHasRun} stage = 
-  do
-    let
-      stageStr :: Text
-      stageStr = txt stage
-
-      stageExLabel :: Text
-      stageExLabel = "Execution of " <> stageStr
-
-      msgPrefix :: Text
-      msgPrefix = case stage of
-                    Rollover -> "No tests run in group. "
-                    GoHome -> "No items run for test. "
-
-      rolloverFailError :: FrameworkError e -> FrameworkError e
-      rolloverFailError = PreTestCheckExecutionError stage $ msgPrefix <> stageExLabel <> " check"
-
-      rolloverCheckFalseError :: FrameworkError e
-      rolloverCheckFalseError = PreTestCheckError stage
-                                  $ msgPrefix
-                                  <> stageStr
-                                  <> " action ran without exception but completion check returned False. Looks like "
-                                  <> stageStr
-                                  <> " did not run as expected"
-      exeHook :: Sem effs ()
-      exeHook = 
-        do 
-          PE.catch runAction (PE.throw . rolloverFailError)
-          runCheck <- PE.catch checkHasRun (PE.throw . PreTestCheckExecutionError stage "exception encountered verifying hook has run")
-          unless runCheck (PE.throw rolloverCheckFalseError)
-      
-    (Right <$> exeHook) `PE.catch` (pure . Left)
-
 data RunParams e rc tc effs = RunParams {
   plan :: forall mo mi a. TestPlanBase e tc rc mo mi a effs,
   filters :: FilterList rc tc,
@@ -194,12 +159,12 @@ exeElm elm = \case
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
                     RunParams e rc tc effs
                     -> Sem effs ()
-mkSem rp@RunParams {plan, filters, rc, itemIds, itemRunner} = 
+mkSem rp@RunParams {plan, filters, rc} = 
   let
     allElms :: [RunElement [] (Sem effs) () effs]
     allElms = plan $ runTest rp 
 
-    filterInfo :: [[FilterResult]]
+    filterInfo :: [[TestFilterResult]]
     filterInfo = filterGroups plan filters rc
   in
     maybe
@@ -207,90 +172,12 @@ mkSem rp@RunParams {plan, filters, rc, itemIds, itemRunner} =
       do
         offset' <- utcOffset
         logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
-        logBoundry . FilterLog $ filterLog filterInfo
-        sequence_ $ exeElm <$> filter acceptGroup allElms
+        logBoundry . FilterLog $ fold filterInfo
+        sequence_ $ exeElm <$> filter acceptAnyFilter allElms
         logBoundry EndRun
     )
     (\dupeTxt -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
     toS <$> firstDuplicate (toS . C.title <$> allElms :: [Prelude.String])
-
-{- 
-mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
-                    Maybe (S.Set Int)         -- a set of item Ids used for test case endpoints
-                    -> RunParams e rc tc effs
-                    -> Sem effs ()
-mkSem iIds RunParams {plan, filters, rc, itemRunner} =
-  let
-    filterInfo :: [[FilterResult]]
-    filterInfo = filterGroups plan filters rc
-
-    filterFlags :: [Bool]
-    filterFlags = filterGroupFlags filterInfo
-
-    prepResults :: [RunElement [] (Sem effs) () effs]
-    prepResults = plan $ runTest iIds filters itemRunner rc 
-
-    firstDuplicateGroupTitle :: Maybe Text
-    firstDuplicateGroupTitle = toS <$> firstDuplicate (toS . C.title <$> prepResults :: [Prelude.String])
-
-    runTuples ::  [(Bool, RunElement [] (Sem effs) () effs)]
-    runTuples = P.zip filterFlags prepResults
-
-    exeGroup :: (Bool, RunElement [] (Sem effs) () effs) -> Sem effs ()
-    exeGroup (include, runElm) =
-      let
-        -- if ids are passed in we are running an endpoint
-        -- endpoint go home and rolllover are not run if the application is already home
-        guardedHookRun :: (RunElement [] (Sem effs) () effs -> PreRun effs) -> PreTestStage -> Sem effs (Either (FrameworkError e) ())
-        guardedHookRun hookSelector hookLabel =
-          do 
-            wantHookRun <- isJust iIds ? 
-                            (not <$> checkHasRun (goHome runElm)) $ 
-                            pure True
-            wantHookRun ? runHook (hookSelector runElm) hookLabel $ pure $ Right ()
-
-        rollover' :: Sem effs (Either (FrameworkError e) ())
-        rollover' = guardedHookRun rollover Rollover
-
-        goHome' :: Sem effs (Either (FrameworkError e) ())
-        goHome' = guardedHookRun goHome GoHome
-
-        hookThenRun :: Sem effs (Either (FrameworkError e) ()) -> Sem effs () -> Sem effs ()
-        hookThenRun hook mRun = do
-                                  eth <- hook
-                                  eitherf eth
-                                    logLPError
-                                    (const mRun)
-
-        runTest' :: [Sem effs ()] -> Sem effs ()
-        runTest' testIterations = sequence_ (hookThenRun goHome' <$> testIterations)
-
-        runTests :: Sem effs ()
-        runTests = sequence_ $ runTest' <$> filter (not . null) (tests runElm)
-
-        runGrp :: Sem effs ()
-        runGrp = 
-              let 
-                hdr = GroupTitle $ RB.header runElm
-              in
-                do
-                  logBoundry $ StartGroup hdr
-                  hookThenRun rollover' runTests
-                  logBoundry $ EndGroup hdr
-      in
-        include ? runGrp $ pure ()
-  in
-    maybef firstDuplicateGroupTitle
-    (
-      do
-        offset' <- utcOffset
-        logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
-        logBoundry . FilterLog $ filterLog filterInfo
-        sequence_ $ exeGroup <$> runTuples
-        logBoundry EndRun
-    )
-    (\dupeTxt -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
--}
 
 mkRunSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) => RunParams e rc tc effs -> Sem effs ()
 mkRunSem = mkSem Nothing 

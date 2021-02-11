@@ -80,14 +80,14 @@ genTestDisplayInfo = TestDisplayInfo
                                 <*> genStr 
                                 <*> (A.toJSON <$> genTestConfig)
 
-genFilterResult:: Gen FilterResult
-genFilterResult = FilterResult 
+genTestFilterResult:: Gen TestFilterResult
+genTestFilterResult = TestFilterResult 
                             <$> genTestDisplayInfo
                             <*> T.maybe genStr
 
-genFilterResults :: Gen [FilterResult]
-genFilterResults =
-         T.list (linear 0 20) genFilterResult
+genTestFilterResults :: Gen [TestFilterResult]
+genTestFilterResults =
+         T.list (linear 0 20) genTestFilterResult
 
 genInt :: Gen Int
 genInt = integral $ T.linear 0 1000
@@ -126,7 +126,7 @@ genLogProtocol = choice [
                     BoundaryLog . EndTest <$> genTestAddress,
                     BoundaryLog <$> (StartIteration <$> genItemId <*> (WhenClause <$> genStr) <*> (ThenClause <$> genStr) <*> (A.toJSON <$> genRunConfig)), --- using runconfig as an easy proxy for item
                     BoundaryLog . EndIteration <$> genItemId,
-                    BoundaryLog . FilterLog <$> genFilterResults,
+                    BoundaryLog . FilterLog <$> genTestFilterResults,
                     pure $ BoundaryLog EndRun,
 
                     logDoc . DocAction <$> genDocActionInfo,

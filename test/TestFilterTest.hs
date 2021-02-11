@@ -180,7 +180,7 @@ levelFilter = TestFilter {
 filters' :: [TestFilter RunConfig TestConfig]
 filters' = [enabledFilter, countryFilter, levelFilter]
 
-filterList :: RunConfig -> [FilterResult]
+filterList :: RunConfig -> [TestFilterResult]
 filterList rc = filterLog $ filterGroups runRunner filters' rc
 
 runFilters :: RunConfig -> [Text]

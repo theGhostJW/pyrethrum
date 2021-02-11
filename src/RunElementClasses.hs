@@ -23,12 +23,12 @@ instance Ord TestDisplayInfo where
 
 $(deriveJSON defaultOptions ''TestDisplayInfo)
 
-data FilterResult = FilterResult {
+data TestFilterResult = TestFilterResult {
   testInfo  :: TestDisplayInfo, 
   reasonForRejection :: Maybe Text
 }  deriving (Eq, Ord, Show)
 
-$(deriveJSON defaultOptions ''FilterResult)
+$(deriveJSON defaultOptions ''TestFilterResult)
 
 mkTestAddress :: Name -> TestAddress
 mkTestAddress = TestAddress . moduleOf

@@ -4,7 +4,7 @@ module LogTransformation.Test where
 -- import qualified RunElementClasses as RC
 -- import LogTransformation.Common
 -- import LogTransformation.Iteration as I
--- import RunElementClasses (FilterResult, unTestAddress)
+-- import RunElementClasses (TestFilterResult, unTestAddress)
 -- import Check as CK
 -- import Pyrelude as P hiding (fail)
 -- import Pyrelude.IO
@@ -254,7 +254,7 @@ module LogTransformation.Test where
 
 -- data TestLogElement = 
 --             Test TestRecord |
---             FilterLog [FilterResult] |
+--             FilterLog [TestFilterResult] |
 
 --             StartRun RunTitle A.Value | 
 --             EndRun TestStats |

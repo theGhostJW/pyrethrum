@@ -41,7 +41,7 @@ import qualified Data.HashMap.Strict as HM
 --------------------------------------------------------
 
 data PrintLogDisplayElement =
-  FilterLog [FilterResult] |
+  FilterLog [TestFilterResult] |
 
   StartRun {  
         title :: RunTitle, 
@@ -51,7 +51,7 @@ data PrintLogDisplayElement =
         iterationStats :: StatusCount,
         outOfTest :: StatusCount
     } | 
-  EndRun (Maybe [FilterResult]) |
+  EndRun (Maybe [TestFilterResult]) |
 
   -- StartGroup GroupTitle |
   -- EndGroup GroupTitle |
@@ -116,7 +116,7 @@ data IterationRecord = IterationRecord {
 data IterationAccum = IterationAccum {
   rec :: Maybe IterationRecord,
   stepInfo :: LPStep,
-  filterLog :: Maybe [FilterResult]
+  filterLog :: Maybe [TestFilterResult]
 } deriving Show
 
 emptyIterationAccum :: IterationAccum
@@ -397,19 +397,19 @@ prettyPrintDisplayElement pde =
              (
                \fltrs -> 
                 let 
-                  fltrItems :: (Maybe Text -> Bool) -> [FilterResult]
+                  fltrItems :: (Maybe Text -> Bool) -> [TestFilterResult]
                   fltrItems f = P.filter (f . reasonForRejection) fltrs
 
-                  acceptedItems:: [FilterResult]
+                  acceptedItems:: [TestFilterResult]
                   acceptedItems = fltrItems isNothing
 
-                  rejectedItems :: [FilterResult]
+                  rejectedItems :: [TestFilterResult]
                   rejectedItems = fltrItems isJust
 
-                  address :: FilterResult -> Text
+                  address :: TestFilterResult -> Text
                   address = unTestAddress . testModAddress . testInfo 
 
-                  rejectText :: FilterResult -> Text
+                  rejectText :: TestFilterResult -> Text
                   rejectText fr = maybef (reasonForRejection fr) 
                                     "ACCEPTED" -- should never happen
                                     (\rtxt -> address fr <> " - " <> rtxt)

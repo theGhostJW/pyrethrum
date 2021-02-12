@@ -140,21 +140,21 @@ data RunParams e rc tc effs = RunParams {
 
 -- TODO - Error handling especially outside tests 
 exeElm :: RunElement [] (Sem effs) () effs -> Sem effs ()
-exeElm elm = \case 
-                Tests tests' -> sequence_ . sequence_ tests'
+exeElm = \case 
+            Tests tests' -> sequence_ . sequence_ tests'
 
-                Hook location' hook' subTests' -> 
-                  case location' of 
-                    BeforeEach -> exeElm $ sequence_ hook' <$> subTests'
-                    BeforeAll -> sequence_ hook' $ exeElm subTests'
-                    AfterAll  -> sequence_ exeElm subTests' hook'
-                    AfterEach -> exeElm $ \t -> sequence_ t hook' <$> subTests'
-                    
-                Group title' subTests' -> 
-                   do
-                     logBoundry . StartGroup $ GroupTitle title'
-                     exeElm subTests'
-                     logBoundry $ EndGroup title'
+            Hook location' hook' subTests' -> 
+              case location' of 
+                BeforeEach -> exeElm $ sequence_ hook' <$> subTests'
+                BeforeAll -> sequence_ hook' $ exeElm subTests'
+                AfterAll  -> sequence_ exeElm subTests' hook'
+                AfterEach -> exeElm $ \t -> sequence_ t hook' <$> subTests'
+                
+            Group title' subTests' -> 
+                do
+                  logBoundry . StartGroup $ GroupTitle title'
+                  exeElm subTests'
+                  logBoundry $ EndGroup title'
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
                     RunParams e rc tc effs

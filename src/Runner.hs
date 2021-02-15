@@ -138,23 +138,38 @@ data RunParams e rc tc effs = RunParams {
   rc :: rc
 }
 
--- TODO - Error handling especially outside tests 
-exeElm :: RunElement [] (Sem effs) () effs -> Sem effs ()
-exeElm = \case 
-            Tests tests' -> sequence_ . sequence_ tests'
+data Hooks effs = Hooks {
+  beforeAll :: Sem effs (),
+  beforeEach :: Sem effs (),
+  afterEach :: Sem effs (),
+  afterAll :: Sem effs ()
+}
 
-            Hook location' hook' subTests' -> 
-              case location' of 
-                BeforeEach -> exeElm $ sequence_ hook' <$> subTests'
-                BeforeAll -> sequence_ hook' $ exeElm subTests'
-                AfterAll  -> sequence_ exeElm subTests' hook'
-                AfterEach -> exeElm $ \t -> sequence_ t hook' <$> subTests'
-                
-            Group title' subTests' -> 
-                do
-                  logBoundry . StartGroup $ GroupTitle title'
-                  exeElm subTests'
-                  logBoundry $ EndGroup title'
+
+
+-- TODO - Error handling especially outside tests 
+exeElm :: 
+  Sem effs () ->
+  Sem effs () ->
+  RunElement [] (Sem effs) () effs -> 
+  Sem effs ()
+exeElm beforeEach afterEach runElm = 
+    case runElm of
+      Tests tests' -> sequence_ $ \t -> beforeEach >> t >> afterEach <$> fold tests'
+
+      Hook location' hook' subElms' -> 
+        case location' of 
+          BeforeAll -> hook' >> exeElm beforeEach afterEach subElms'
+          AfterAll  -> exeElm beforeEach afterEach subElms' >> hook'
+
+          BeforeEach -> exeElm (hook' >> beforeEach) subElms'
+          AfterEach -> exeElm (afterEach >> hook') subElms'
+          
+      Group title' subElms' -> 
+          do
+            logBoundry . StartGroup $ GroupTitle title'
+            exeElm beforeEach afterEach subElms'
+            logBoundry $ EndGroup title'
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
                     RunParams e rc tc effs

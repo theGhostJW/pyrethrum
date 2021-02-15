@@ -57,12 +57,12 @@ data RunElement m1 m a effs =
    Hook {
      location :: HookLocation,
      hook :: Sem effs (),
-     subTests :: [RunElement m1 m a effs]
+     subElms :: [RunElement m1 m a effs]
    } |
 
    Group {
     title :: Text,
-    subTests :: [RunElement m1 m a effs]
+    subElms :: [RunElement m1 m a effs]
    }
 
 

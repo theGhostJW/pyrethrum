@@ -118,7 +118,7 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
                 : (applyRunner <$> Prelude.init xs)
                 <> [applyRunner (Prelude.last xs) *> endTest]
 
-runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, Show e, Member (Logger e) effs) =>
+runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs) =>
                    RunParams e rc tc effs                -- Run Params
                    -> Test e tc rc i as ds effs          -- Test Case
                    -> [Sem effs ()]                      -- [TestIterations]
@@ -148,54 +148,54 @@ data Hooks effs = Hooks {
 
 
 -- TODO - Error handling especially outside tests 
-exeElm :: 
+exeElm' :: 
   Sem effs () ->
   Sem effs () ->
   RunElement [] (Sem effs) () effs -> 
   Sem effs ()
-exeElm beforeEach afterEach runElm = 
-    case runElm of
-      Tests tests' -> sequence_ $ \t -> beforeEach >> t >> afterEach <$> fold tests'
+exeElm' beforeEach afterEach runElm = uu
+  -- case runElm of
+  --   Tests tests' -> sequence_ $ \t -> beforeEach >> t >> afterEach <$> fold tests'
 
-      Hook location' hook' subElms' -> 
-        case location' of 
-          BeforeAll -> hook' >> exeElm beforeEach afterEach subElms'
-          AfterAll  -> exeElm beforeEach afterEach subElms' >> hook'
+  --   Hook location' hook' subElms' -> 
+  --     case location' of 
+  --       BeforeAll -> hook' >> exeElm beforeEach afterEach subElms'
+  --       AfterAll  -> exeElm beforeEach afterEach subElms' >> hook'
 
-          BeforeEach -> exeElm (hook' >> beforeEach) subElms'
-          AfterEach -> exeElm (afterEach >> hook') subElms'
-          
-      Group title' subElms' -> 
-          do
-            logBoundry . StartGroup $ GroupTitle title'
-            exeElm beforeEach afterEach subElms'
-            logBoundry $ EndGroup title'
+  --       BeforeEach -> exeElm (hook' >> beforeEach) afterEach subElms'
+  --       AfterEach -> exeElm beforeEach (afterEach >> hook') subElms'
+        
+  --   Group title' subElms' -> 
+  --       do
+  --         logBoundry . StartGroup $ GroupTitle title'
+  --         exeElm beforeEach afterEach subElms'
+  --         logBoundry $ EndGroup title'
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
                     RunParams e rc tc effs
                     -> Sem effs ()
-mkSem rp@RunParams {plan, filters, rc} = 
-  let
-    allElms :: [RunElement [] (Sem effs) () effs]
-    allElms = plan $ runTest rp 
+mkSem rp@RunParams {plan, filters, rc} = uu
+  -- let
+  --   allElms :: [RunElement [] (Sem effs) () effs]
+  --   allElms = plan $ runTest rp 
 
-    filterInfo :: [[TestFilterResult]]
-    filterInfo = filterGroups plan filters rc
-  in
-    maybe
-    (
-      do
-        offset' <- utcOffset
-        logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
-        logBoundry . FilterLog $ fold filterInfo
-        sequence_ $ exeElm <$> filter acceptAnyFilter allElms
-        logBoundry EndRun
-    )
-    (\dupeTxt -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
-    toS <$> firstDuplicate (toS . C.title <$> allElms :: [Prelude.String])
+  --   filterInfo :: [[TestFilterResult]]
+  --   filterInfo = filterGroups plan filters rc
+  -- in
+  --   maybe
+  --   (
+  --     do
+  --       offset' <- utcOffset
+  --       logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
+  --       logBoundry . FilterLog $ fold filterInfo
+  --       sequence_ $ exeElm <$> filter acceptAnyFilter allElms
+  --       logBoundry EndRun
+  --   )
+  --   (\dupeTxt -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
+  --   toS <$> firstDuplicate (toS . C.title <$> allElms :: [Prelude.String])
 
 mkRunSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) => RunParams e rc tc effs -> Sem effs ()
-mkRunSem = mkSem Nothing 
+mkRunSem = mkSem 
 
 mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) =>
                    RunParams e rc tc effs
@@ -215,4 +215,4 @@ mkEndpointSem runParams@RunParams { filters } tstAddress iIds =
   in
     eitherf iIds
       (logItem . logRun . LP.Error . FilterError)
-      (\idSet -> mkSem (Just idSet) runParams { filters = allFilters })
+      (\idSet -> mkSem runParams { filters = allFilters })

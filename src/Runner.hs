@@ -119,7 +119,7 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
                 <> [applyRunner (Prelude.last xs) *> endTest]
 
 runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs) =>
-                   RunParams e rc tc effs                -- Run Params
+                   RunParams Maybe e rc tc effs                -- Run Params
                    -> Test e tc rc i as ds effs          -- Test Case
                    -> [Sem effs ()]                      -- [TestIterations]
 runTest RunParams {filters, rc, itemIds, itemRunner}  test@Test {config = tc, items} =
@@ -130,10 +130,10 @@ runTest RunParams {filters, rc, itemIds, itemRunner}  test@Test {config = tc, it
 logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
 logLPError = logItem . logRun . LP.Error
 
-data RunParams e rc tc effs = RunParams {
+data RunParams m e rc tc effs = RunParams {
   plan :: forall mo mi a. TestPlanBase e tc rc mo mi a effs,
   filters :: FilterList rc tc,
-  itemIds :: Maybe (S.Set Int),   
+  itemIds :: m (S.Set Int),   
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner e as ds i tc rc effs,
   rc :: rc
 }
@@ -172,7 +172,7 @@ exeElm' beforeEach afterEach runElm = uu
   --         logBoundry $ EndGroup title'
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
-                    RunParams e rc tc effs
+                    RunParams Maybe e rc tc effs
                     -> Sem effs ()
 mkSem rp@RunParams {plan, filters, rc} = uu
   -- let
@@ -194,15 +194,15 @@ mkSem rp@RunParams {plan, filters, rc} = uu
   --   (\dupeTxt -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
   --   toS <$> firstDuplicate (toS . C.title <$> allElms :: [Prelude.String])
 
-mkRunSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) => RunParams e rc tc effs -> Sem effs ()
+mkRunSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) => RunParams Maybe e rc tc effs -> Sem effs ()
 mkRunSem = mkSem 
 
 mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) =>
-                   RunParams e rc tc effs
+                   RunParams (Either FilterErrorType) e rc tc effs
                    -> TestAddress                            -- test address
                    -> Either FilterErrorType (S.Set Int)    -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> Sem effs ()
-mkEndpointSem runParams@RunParams { filters } tstAddress iIds =
+mkEndpointSem runParams@RunParams { filters, itemIds } tstAddress iIds =
   let
     endpointFilter :: TestAddress -> TestFilter rc tc
     endpointFilter targAddress = TestFilter {
@@ -213,6 +213,6 @@ mkEndpointSem runParams@RunParams { filters } tstAddress iIds =
     allFilters :: [TestFilter rc tc]
     allFilters = endpointFilter tstAddress : filters
   in
-    eitherf iIds
+    eitherf itemIds
       (logItem . logRun . LP.Error . FilterError)
-      (\idSet -> mkSem runParams { filters = allFilters })
+      (\idSet -> mkSem runParams { filters = allFilters, itemIds = eitherToMaybe itemIds })

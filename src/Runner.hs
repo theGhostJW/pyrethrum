@@ -24,6 +24,7 @@ import DSL.Interpreter ( ApEffs )
 import DSL.Logger ( logItem, Logger )
 import DSL.LogProtocol as LP
 import DSL.CurrentTime ( utcOffset )
+import Data.Either.Extra
 import Pyrelude as P
     ( zip,
       fst,
@@ -42,6 +43,7 @@ import Pyrelude as P
       (<$>),
       sequence_,
       maybe,
+      catMaybes,
       unless,
       eitherf,
       firstDuplicate,
@@ -59,12 +61,13 @@ import OrphanedInstances()
 import Data.Aeson as A
 import TestFilter
     ( acceptFilter,
-      filterGroups,
-      filterTestCfg,
+      filterRunElements,
+      applyFilters,
       FilterList,
       TestFilter(..), acceptAnyFilter )
 import RunnerBase as RB
     ( doNothing,
+      groupName,
       Ensurable,
       GenericResult(..),
       HookLocation(..),
@@ -119,11 +122,11 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
                 <> [applyRunner (Prelude.last xs) *> endTest]
 
 runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs) =>
-                   RunParams Maybe e rc tc effs                -- Run Params
+                   RunParams Maybe e rc tc effs          -- Run Params
                    -> Test e tc rc i as ds effs          -- Test Case
                    -> [Sem effs ()]                      -- [TestIterations]
 runTest RunParams {filters, rc, itemIds, itemRunner}  test@Test {config = tc, items} =
-    acceptFilter (filterTestCfg filters rc tc)
+    acceptFilter (applyFilters filters rc tc)
       ? runTestItems itemIds (items rc) rc test itemRunner
       $ []
 
@@ -148,12 +151,12 @@ data Hooks effs = Hooks {
 
 
 -- TODO - Error handling especially outside tests 
-exeElm' :: 
+exeElm :: 
   Sem effs () ->
   Sem effs () ->
   RunElement [] (Sem effs) () effs -> 
   Sem effs ()
-exeElm' beforeEach afterEach runElm = uu
+exeElm beforeEach afterEach runElm = uu
   -- case runElm of
   --   Tests tests' -> sequence_ $ \t -> beforeEach >> t >> afterEach <$> fold tests'
 
@@ -171,28 +174,33 @@ exeElm' beforeEach afterEach runElm = uu
   --         exeElm beforeEach afterEach subElms'
   --         logBoundry $ EndGroup title'
 
+
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
                     RunParams Maybe e rc tc effs
                     -> Sem effs ()
 mkSem rp@RunParams {plan, filters, rc} = uu
-  -- let
-  --   allElms :: [RunElement [] (Sem effs) () effs]
-  --   allElms = plan $ runTest rp 
+  let
+    allElms :: [RunElement [] (Sem effs) () effs]
+    allElms = plan $ runTest rp 
 
-  --   filterInfo :: [[TestFilterResult]]
-  --   filterInfo = filterGroups plan filters rc
-  -- in
-  --   maybe
-  --   (
-  --     do
-  --       offset' <- utcOffset
-  --       logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
-  --       logBoundry . FilterLog $ fold filterInfo
-  --       sequence_ $ exeElm <$> filter acceptAnyFilter allElms
-  --       logBoundry EndRun
-  --   )
-  --   (\dupeTxt -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
-  --   toS <$> firstDuplicate (toS . C.title <$> allElms :: [Prelude.String])
+    groupNames :: [Text]
+    groupNames = catMaybes $ groupName <$> allElms
+
+    filterInfo :: [[TestFilterResult]]
+    filterInfo = filterRunElements plan filters rc
+  in
+    maybe
+    -- (
+    --   do
+    --     offset' <- utcOffset
+    --     logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
+    --     logBoundry . FilterLog $ fold filterInfo
+    --     sequence_ $ exeElm (pure ()) (pure ()) <$> filter acceptAnyFilter allElms
+    --     logBoundry EndRun
+    -- )
+    uu
+    uu --(\dupeTxt -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
+    uu --toS <$> firstDuplicate (toS . C.title <$> groupNames :: [Prelude.String])
 
 mkRunSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) => RunParams Maybe e rc tc effs -> Sem effs ()
 mkRunSem = mkSem 

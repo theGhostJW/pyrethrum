@@ -153,7 +153,7 @@ testEndpointPriv itmRunner testAddress rc itemIds plan =
       plan = plan,
       filters = filterList,
       itemRunner = itmRunner,
-      itemIds = eitherToMaybe itemIds,
+      itemIds = itemIds,
       rc = rc
     }
   in

@@ -181,7 +181,7 @@ filters' :: [TestFilter RunConfig TestConfig]
 filters' = [enabledFilter, countryFilter, levelFilter]
 
 filterList :: RunConfig -> [TestFilterResult]
-filterList rc = filterLog $ filterGroups runRunner filters' rc
+filterList rc = filterLog $ filterRunElements runRunner filters' rc
 
 runFilters :: RunConfig -> [Text]
 runFilters rc = testTitle . testInfo <$> P.filter acceptFilter (filterList rc)

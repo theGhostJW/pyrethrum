@@ -11,8 +11,9 @@ import Data.Aeson
 type ItemRunner e as ds i tc rc effs = 
     rc -> Test e tc rc i as ds effs -> i -> Sem effs ()
 
-type TestPlanBase e tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => 
-                                                          Test e tc rc i as ds effs -> m1 (m a)) -> [RunElement m1 m a effs]
+type TestPlanBase e tc rc m1 m a effs = 
+    (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => Test e tc rc i as ds effs -> m1 (m a)) 
+    -> [RunElement m1 m a effs]
 
 type Ensurable e effs = Members '[Ensure, Error (FrameworkError e)] effs
 
@@ -44,7 +45,7 @@ data HookLocation = BeforeAll |
   3. Update Demo
   4. Concurrency
   5. Update Demo
-  6. Runner that extracts test items - eg to report knowne errors
+  6. Runner that extracts test items - eg to report known errors
 -}
 
 data RunElement m1 m a effs =
@@ -65,21 +66,11 @@ data RunElement m1 m a effs =
     subElms :: [RunElement m1 m a effs]
    }
 
-
--- data RunElement m1 m a effs =
---   Tests {
---         header :: Text,
---         -- occurs once on client before group is run
---         rollover :: PreRun effs,
---         -- occurs once before test iteration is run
---         goHome :: PreRun effs,
---         -- a list of tests
---         tests :: [m1 (m a)]
---         -- eg [IO Either (FrameworkError TestInfo)]
---    } 
-
--- instance Titled (RunElement m1 m a effs) where
---   title = header
+groupName :: RunElement m n a effs -> Maybe Text
+groupName = \case 
+              Tests _ -> Nothing
+              Hook _ _ _ -> Nothing
+              Group t _ -> Just t
 
 data Test e tc rc i as ds effs = Test {
   config :: tc,

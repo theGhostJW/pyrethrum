@@ -13,7 +13,7 @@ type ItemRunner e as ds i tc rc effs =
 
 type TestPlanBase e tc rc m1 m a effs = 
     (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => Test e tc rc i as ds effs -> m1 (m a)) 
-    -> [RunElement m1 m a effs]
+    -> RunElement m1 m a effs
 
 type Ensurable e effs = Members '[Ensure, Error (FrameworkError e)] effs
 
@@ -71,6 +71,29 @@ groupName = \case
               Tests _ -> Nothing
               Hook _ _ _ -> Nothing
               Group t _ -> Just t
+
+groupAddresses' :: [Text] -> Text -> RunElement m n a effs -> [Text]
+groupAddresses' accum base re = 
+  let
+    delim = "."
+
+    appendDelim :: Text -> Text -> Text
+    appendDelim p s = p <> (null p || null s ? empty $ delim) <> s
+  in
+    case re of
+      Tests _ -> accum
+      Hook _ _ subElems -> 
+        fold $ groupAddresses' accum base <$> subElems
+      Group t subElems -> 
+        let 
+          address = appendDelim base  t 
+          nxtAccum = snoc accum address
+        in 
+          nxtAccum <> fold (groupAddresses' nxtAccum address <$> subElems)
+        
+
+groupAddresses :: RunElement m n a effs -> [Text]
+groupAddresses = groupAddresses' [] "" 
 
 data Test e tc rc i as ds effs = Test {
   config :: tc,

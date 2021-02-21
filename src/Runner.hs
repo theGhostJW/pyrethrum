@@ -180,11 +180,8 @@ mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigCl
                     -> Sem effs ()
 mkSem rp@RunParams {plan, filters, rc} = uu
   let
-    allElms :: [RunElement [] (Sem effs) () effs]
-    allElms = plan $ runTest rp 
-
-    groupNames :: [Text]
-    groupNames = catMaybes $ groupName <$> allElms
+    allElms :: RunElement [] (Sem effs) () effs
+    allElms = plan $ runTest rp
 
     filterInfo :: [[TestFilterResult]]
     filterInfo = filterRunElements plan filters rc

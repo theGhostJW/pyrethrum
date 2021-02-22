@@ -63,7 +63,6 @@ import TestFilter
     ( acceptFilter,
       filterRunElements,
       applyFilters,
-      FilterList,
       TestFilter(..), acceptAnyFilter )
 import RunnerBase as RB
     ( doNothing,
@@ -135,7 +134,7 @@ logLPError = logItem . logRun . LP.Error
 
 data RunParams m e rc tc effs = RunParams {
   plan :: forall mo mi a. TestPlanBase e tc rc mo mi a effs,
-  filters :: FilterList rc tc,
+  filters :: [TestFilter rc tc],
   itemIds :: m (S.Set Int),   
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner e as ds i tc rc effs,
   rc :: rc
@@ -183,7 +182,7 @@ mkSem rp@RunParams {plan, filters, rc} = uu
     allElms :: RunElement [] (Sem effs) () effs
     allElms = plan $ runTest rp
 
-    filterInfo :: [[TestFilterResult]]
+    filterInfo :: [TestFilterResult]
     filterInfo = filterRunElements plan filters rc
   in
     maybe
@@ -191,7 +190,7 @@ mkSem rp@RunParams {plan, filters, rc} = uu
     --   do
     --     offset' <- utcOffset
     --     logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
-    --     logBoundry . FilterLog $ fold filterInfo
+    --     logBoundry . FilterLog $ filterInfo
     --     sequence_ $ exeElm (pure ()) (pure ()) <$> filter acceptAnyFilter allElms
     --     logBoundry EndRun
     -- )

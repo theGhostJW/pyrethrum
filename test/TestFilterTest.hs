@@ -59,150 +59,150 @@ empti = const ([] :: [MyInt])
 emptiInteractor :: RunConfig -> MyInt -> Sem effs MyInt
 emptiInteractor = \_ _ -> pure $ MyInt 1
 
-test1 :: TST MyInt MyInt MyInt effs
-test1 = Test {
-              config = TestConfig {
-                header = "test1",
-                address = TestAddress "test1",
-                countries = au <> nz,
-                level = Regression,
-                enabled = True
-              },
-              items = empti,
-              interactor = emptiInteractor,
-              prepState = \i ii -> pure ii 
-            }
+-- test1 :: TST MyInt MyInt MyInt effs
+-- test1 = Test {
+--               config = TestConfig {
+--                 header = "test1",
+--                 address = TestAddress "test1",
+--                 countries = au <> nz,
+--                 level = Regression,
+--                 enabled = True
+--               },
+--               items = empti,
+--               interactor = emptiInteractor,
+--               prepState = \i ii -> pure ii 
+--             }
 
-test2 :: TST MyInt MyInt MyInt effs
-test2 = Test {
-              config = TestConfig {
-                header = "test2",
-                address = TestAddress "test2",
-                countries = nz,
-                level = Regression,
-                enabled = True
-              },
-              items = empti,
-              interactor = emptiInteractor,
-              prepState = \i ii -> pure ii 
-            }
+-- test2 :: TST MyInt MyInt MyInt effs
+-- test2 = Test {
+--               config = TestConfig {
+--                 header = "test2",
+--                 address = TestAddress "test2",
+--                 countries = nz,
+--                 level = Regression,
+--                 enabled = True
+--               },
+--               items = empti,
+--               interactor = emptiInteractor,
+--               prepState = \i ii -> pure ii 
+--             }
 
-test3 :: TST MyInt MyInt MyInt effs
-test3 = Test {
-                config = TestConfig {
-                  header = "test3",
-                  address = TestAddress "test3",
-                  countries = au,
-                  level = Connectivity,
-                  enabled = True
-                },
-              items = empti,
-              interactor = emptiInteractor,
-              prepState = \i ii -> pure ii 
-            }
+-- test3 :: TST MyInt MyInt MyInt effs
+-- test3 = Test {
+--                 config = TestConfig {
+--                   header = "test3",
+--                   address = TestAddress "test3",
+--                   countries = au,
+--                   level = Connectivity,
+--                   enabled = True
+--                 },
+--               items = empti,
+--               interactor = emptiInteractor,
+--               prepState = \i ii -> pure ii 
+--             }
 
-test4 :: TST MyInt MyInt MyInt effs 
-test4 = Test {
-              config = TestConfig {
-                  header = "test4",
-                  address = TestAddress "test4",
-                  countries = au,
-                  level = DeepRegression,
-                  enabled = True
-                },
-              items = empti,
-              interactor = emptiInteractor,
-              prepState = \i ii -> pure ii 
-            }
+-- test4 :: TST MyInt MyInt MyInt effs 
+-- test4 = Test {
+--               config = TestConfig {
+--                   header = "test4",
+--                   address = TestAddress "test4",
+--                   countries = au,
+--                   level = DeepRegression,
+--                   enabled = True
+--                 },
+--               items = empti,
+--               interactor = emptiInteractor,
+--               prepState = \i ii -> pure ii 
+--             }
 
-test5 :: TST MyInt MyInt MyInt effs
-test5 = Test {
-              config = TestConfig {
-                  header = "test5",
-                  address = TestAddress "test5",
-                  countries = au,
-                  level = DeepRegression,
-                  enabled = False
-                },
-              items = empti,
-              interactor = emptiInteractor,
-              prepState = \i ii -> pure ii  
-            }
+-- test5 :: TST MyInt MyInt MyInt effs
+-- test5 = Test {
+--               config = TestConfig {
+--                   header = "test5",
+--                   address = TestAddress "test5",
+--                   countries = au,
+--                   level = DeepRegression,
+--                   enabled = False
+--                 },
+--               items = empti,
+--               interactor = emptiInteractor,
+--               prepState = \i ii -> pure ii  
+--             }
 
-runRunner :: forall m m1 effs a.
-                (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => RunnerBase.Test Int TestConfig RunConfig i as ds effs -> m1 (m a))
-                -> [RunElement m1 m a effs]
-runRunner f =
-  [
+-- runRunner :: forall m m1 effs a.
+--                 (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => RunnerBase.Test Int TestConfig RunConfig i as ds effs -> m1 (m a))
+--                 -> [RunElement m1 m a effs]
+-- runRunner f =
+--   [
 
-   Tests {
-          header = "Group 1",
-          rollover = doNothing,
-          goHome = doNothing,
-          tests = [
-              f test1,
-              f test2,
-              f test3
-            ]
-     },
+--    Tests {
+--           header = "Group 1",
+--           rollover = doNothing,
+--           goHome = doNothing,
+--           tests = [
+--               f test1,
+--               f test2,
+--               f test3
+--             ]
+--      },
 
-    Tests {
-          header = "Group 2",
-          rollover = doNothing,
-          goHome = doNothing,
-          tests = [
-              f test4,
-              f test5
-            ]
-     }
+--     Tests {
+--           header = "Group 2",
+--           rollover = doNothing,
+--           goHome = doNothing,
+--           tests = [
+--               f test4,
+--               f test5
+--             ]
+--      }
 
-    ]
-
-
-enabledFilter :: TestFilter RunConfig TestConfig
-enabledFilter = TestFilter {
-     title = "test must be is enabled",
-     predicate = \_ tc -> enabled tc
-   }
-
-countryFilter :: TestFilter RunConfig TestConfig
-countryFilter = TestFilter {
-     title = "country must match test run",
-     predicate = \rc tc -> P.elem (country rc) $ countries tc
-   }
-
-levelFilter :: TestFilter RunConfig TestConfig
-levelFilter = TestFilter {
-     title = "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
-     predicate = \rc tc -> (level :: TestConfig -> TestDepth) tc <= (level :: RunConfig -> TestDepth) rc
-   }
-
-filters' :: [TestFilter RunConfig TestConfig]
-filters' = [enabledFilter, countryFilter, levelFilter]
-
-filterList :: RunConfig -> [TestFilterResult]
-filterList rc = filterLog $ filterRunElements runRunner filters' rc
-
-runFilters :: RunConfig -> [Text]
-runFilters rc = testTitle . testInfo <$> P.filter acceptFilter (filterList rc)
-
-chkFilters :: [Text] -> RunConfig -> Assertion
-chkFilters expted rc = chkEq expted $ runFilters rc
-
-unit_test_filter_expect_empty = chkFilters [] $ RunConfig NZ Connectivity
-unit_test_filter_country = chkFilters ["test1", "test3"] $ RunConfig Au Regression
-unit_test_filter_country_nz = chkFilters ["test1", "test2"] $ RunConfig NZ Regression
-unit_test_filter_country2 = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
+--     ]
 
 
-filtersExcludeReasons :: RunConfig -> [Text]
-filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> P.filter rejectFilter (filterList rc)
+-- enabledFilter :: TestFilter RunConfig TestConfig
+-- enabledFilter = TestFilter {
+--      title = "test must be is enabled",
+--      predicate = \_ tc -> enabled tc
+--    }
 
-unit_test_filter_exclude_reasons = chkEq [
-                                          "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
-                                          "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
-                                          "country must match test run",
-                                          "country must match test run",
-                                          "test must be is enabled"
-                                          ]
-                                          $ filtersExcludeReasons $ RunConfig NZ Connectivity
+-- countryFilter :: TestFilter RunConfig TestConfig
+-- countryFilter = TestFilter {
+--      title = "country must match test run",
+--      predicate = \rc tc -> P.elem (country rc) $ countries tc
+--    }
+
+-- levelFilter :: TestFilter RunConfig TestConfig
+-- levelFilter = TestFilter {
+--      title = "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
+--      predicate = \rc tc -> (level :: TestConfig -> TestDepth) tc <= (level :: RunConfig -> TestDepth) rc
+--    }
+
+-- filters' :: [TestFilter RunConfig TestConfig]
+-- filters' = [enabledFilter, countryFilter, levelFilter]
+
+-- filterList :: RunConfig -> [TestFilterResult]
+-- filterList rc = filterLog $ filterRunElements runRunner filters' rc
+
+-- runFilters :: RunConfig -> [Text]
+-- runFilters rc = testTitle . testInfo <$> P.filter acceptFilter (filterList rc)
+
+-- chkFilters :: [Text] -> RunConfig -> Assertion
+-- chkFilters expted rc = chkEq expted $ runFilters rc
+
+-- unit_test_filter_expect_empty = chkFilters [] $ RunConfig NZ Connectivity
+-- unit_test_filter_country = chkFilters ["test1", "test3"] $ RunConfig Au Regression
+-- unit_test_filter_country_nz = chkFilters ["test1", "test2"] $ RunConfig NZ Regression
+-- unit_test_filter_country2 = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
+
+
+-- filtersExcludeReasons :: RunConfig -> [Text]
+-- filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> P.filter rejectFilter (filterList rc)
+
+-- unit_test_filter_exclude_reasons = chkEq [
+--                                           "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
+--                                           "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
+--                                           "country must match test run",
+--                                           "country must match test run",
+--                                           "test must be is enabled"
+--                                           ]
+--                                           $ filtersExcludeReasons $ RunConfig NZ Connectivity

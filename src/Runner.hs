@@ -66,6 +66,7 @@ import TestFilter
       TestFilter(..), acceptAnyFilter )
 import RunnerBase as RB
     ( doNothing,
+      groupAddresses,
       groupName,
       Ensurable,
       GenericResult(..),
@@ -179,24 +180,26 @@ mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigCl
                     -> Sem effs ()
 mkSem rp@RunParams {plan, filters, rc} = uu
   let
-    allElms :: RunElement [] (Sem effs) () effs
-    allElms = plan $ runTest rp
+    root :: RunElement [] (Sem effs) () effs
+    root = plan $ runTest rp
 
     filterInfo :: [TestFilterResult]
     filterInfo = filterRunElements plan filters rc
+
+    run' :: Sem effs ()
+    run' = do
+            offset' <- utcOffset
+            logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
+            logBoundry . FilterLog $ filterInfo
+            exeElm (pure ()) (pure ()) root
+            logBoundry EndRun
   in
-    maybe
-    -- (
-    --   do
-    --     offset' <- utcOffset
-    --     logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
-    --     logBoundry . FilterLog $ filterInfo
-    --     sequence_ $ exeElm (pure ()) (pure ()) <$> filter acceptAnyFilter allElms
-    --     logBoundry EndRun
-    -- )
-    uu
-    uu --(\dupeTxt -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> dupeTxt)
-    uu --toS <$> firstDuplicate (toS . C.title <$> groupNames :: [Prelude.String])
+    maybe 
+      run'
+      (\da -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> da)
+      -- all the string conversion shannanigans below is due to descrmination which drives firstDuplicate
+      -- only working with chars / strings
+      (toS <$> (firstDuplicate $ toS @_ @Prelude.String <$> groupAddresses root))
 
 mkRunSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) => RunParams Maybe e rc tc effs -> Sem effs ()
 mkRunSem = mkSem 

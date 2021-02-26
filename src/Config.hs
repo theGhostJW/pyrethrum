@@ -137,7 +137,7 @@ filterList = [isActiveFilter, countryFilter, levelFilter]
 applyTestFiltersToItems :: RunConfig -> (i -> TestConfig) -> [i] -> [i]
 applyTestFiltersToItems = F.applyTestFilters filterList
 
-type TestPlan m1 m a effs = R.TestPlanBase SuiteError TestConfig RunConfig m1 m a effs
+type TestPlan m a effs = R.TestPlanBase SuiteError TestConfig RunConfig m a effs
 
 testEndpointPriv :: forall effs. ApEffs SuiteError effs =>
       (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => 
@@ -145,7 +145,7 @@ testEndpointPriv :: forall effs. ApEffs SuiteError effs =>
      -> TestAddress
      -> RunConfig
      -> Either FilterErrorType (Set Int)
-     -> (forall mo mi a. TestPlan mo mi a effs)
+     -> (forall m0 a. TestPlan m0 a effs)
      -> Sem effs ()
 testEndpointPriv itmRunner testAddress rc itemIds plan = 
   let 
@@ -163,7 +163,7 @@ testEndpoint ::
      TestAddress
      -> RunConfig
      -> Either FilterErrorType (Set Int)
-     -> (forall mo mi a. TestPlan mo mi a FullIOMembers)
+     -> (forall m a. TestPlan m a FullIOMembers)
      -> Sem FullIOMembers ()
 testEndpoint = testEndpointPriv runItem
 
@@ -171,7 +171,7 @@ testEndpointDoc ::
      TestAddress
      -> RunConfig
      -> Either FilterErrorType (Set Int)
-     -> (forall mo mi a. TestPlan mo mi a (FullDocEffects SuiteError))
+     -> (forall m a. TestPlan m a (FullDocEffects SuiteError))
      -> DList Text
 testEndpointDoc testMod rc itrSet plan = fst . documentRaw $ testEndpointPriv documentItem testMod rc itrSet plan
 

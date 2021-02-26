@@ -51,7 +51,7 @@ import Pyrelude as P
       uu,
       toS,
       (?),
-      Listy(filter), Traversable (sequenceA), fold )
+      Listy(..), Traversable (sequenceA), fold, (>>) )
 import Polysemy
 import Polysemy.Error as PE ( Error, catch, throw )
 import ItemFilter  (ItemFilter (..), filterredItemIds)
@@ -149,30 +149,38 @@ data Hooks effs = Hooks {
 }
 
 
+emptyElm :: forall m1 m a effs. RunElement m1 m a effs -> Bool
+emptyElm
+  = \case
+      Tests t -> null t
+      Hook _ _ s -> all emptyElm s
+      Group _ s -> all emptyElm s
 
--- TODO - Error handling especially outside tests 
+-- TODO - Error handling especially outside tests
 exeElm :: 
   Sem effs () ->
   Sem effs () ->
   RunElement [] (Sem effs) () effs -> 
   Sem effs ()
-exeElm beforeEach afterEach runElm = uu
-  -- case runElm of
-  --   Tests tests' -> sequence_ $ \t -> beforeEach >> t >> afterEach <$> fold tests'
+exeElm beforeEach afterEach runElm = 
+  emptyElm runElm ?
+    pure () $
+    case runElm of
+      Tests { tests } -> sequence_ $ fold $ \t -> beforeEach >> t >> afterEach <$> tests
 
-  --   Hook location' hook' subElms' -> 
-  --     case location' of 
-  --       BeforeAll -> hook' >> exeElm beforeEach afterEach subElms'
-  --       AfterAll  -> exeElm beforeEach afterEach subElms' >> hook'
+      Hook {location, hook, subElms } -> 
+        case location of 
+          BeforeAll -> hook >> fold (exeElm beforeEach afterEach <$> subElms)
+          AfterAll  -> fold (exeElm beforeEach afterEach <$> subElms) >> hook
 
-  --       BeforeEach -> exeElm (hook' >> beforeEach) afterEach subElms'
-  --       AfterEach -> exeElm beforeEach (afterEach >> hook') subElms'
-        
-  --   Group title' subElms' -> 
-  --       do
-  --         logBoundry . StartGroup $ GroupTitle title'
-  --         exeElm beforeEach afterEach subElms'
-  --         logBoundry $ EndGroup title'
+          BeforeEach -> fold $ exeElm (hook >> beforeEach) afterEach <$> subElms
+          AfterEach -> fold $  exeElm beforeEach (afterEach >> hook) <$> subElms
+          
+      Group { title = t, subElms } -> 
+        do
+          logBoundry . StartGroup $ GroupTitle t
+          fold $ exeElm beforeEach afterEach <$> subElms
+          logBoundry $ EndGroup t
 
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
@@ -199,7 +207,7 @@ mkSem rp@RunParams {plan, filters, rc} = uu
       (\da -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> da)
       -- all the string conversion shannanigans below is due to descrmination which drives firstDuplicate
       -- only working with chars / strings
-      (toS <$> (firstDuplicate $ toS @_ @Prelude.String <$> groupAddresses root))
+      (toS <$> firstDuplicate (toS @_ @Prelude.String <$> groupAddresses root))
 
 mkRunSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) => RunParams Maybe e rc tc effs -> Sem effs ()
 mkRunSem = mkSem 

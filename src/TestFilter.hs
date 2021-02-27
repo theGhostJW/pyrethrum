@@ -56,7 +56,7 @@ filterRunElements groupLst fltrs rc =
       testFilter :: Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)
       testFilter = filterTest fltrs rc
     in
-      runIdentity . runIdentity <$> (tests $ groupLst testFilter)
+      runIdentity . runIdentity <$> tests (groupLst testFilter)
 
 acceptAnyFilter :: [TestFilterResult] -> Bool
 acceptAnyFilter = P.any acceptFilter 

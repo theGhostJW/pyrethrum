@@ -69,7 +69,7 @@ data RunElement m1 m a effs =
 groupName :: RunElement m n a effs -> Maybe Text
 groupName = \case 
               Tests _ -> Nothing
-              Hook _ _ _ -> Nothing
+              Hook {} -> Nothing
               Group t _ -> Just t
 
 groupAddresses' :: [Text] -> Text -> RunElement m n a effs -> [Text]

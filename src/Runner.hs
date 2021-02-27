@@ -134,7 +134,7 @@ logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => Fram
 logLPError = logItem . logRun . LP.Error
 
 data RunParams m e rc tc effs = RunParams {
-  plan :: forall n a. TestPlanBase e tc rc n a effs,
+  plan :: forall mo mi a. TestPlanBase e tc rc mo mi a effs,
   filters :: [TestFilter rc tc],
   itemIds :: m (S.Set Int),   
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner e as ds i tc rc effs,
@@ -149,7 +149,7 @@ data Hooks effs = Hooks {
 }
 
 
-emptyElm :: forall m a effs. RunElement m a effs -> Bool
+emptyElm :: forall m1 m a effs. RunElement m1 m a effs -> Bool
 emptyElm
   = \case
       Tests t -> null t
@@ -157,16 +157,16 @@ emptyElm
       Group _ s -> all emptyElm s
 
 -- TODO - Error handling especially outside tests
-exeElm :: forall effs e. Members '[Logger e] effs =>
+exeElm :: 
   Sem effs () ->
   Sem effs () ->
-  RunElement (Sem effs) () effs -> 
+  RunElement [] (Sem effs) () effs -> 
   Sem effs ()
 exeElm beforeEach afterEach runElm = 
   emptyElm runElm ?
     pure () $
     case runElm of
-      Tests { tests } -> sequence_ $ (\t -> beforeEach >> t >> afterEach) <$> tests
+      Tests { tests } -> sequence_ $ fold $ \t -> beforeEach >> t >> afterEach <$> tests
 
       Hook {location, hook, subElms } -> 
         case location of 
@@ -178,9 +178,9 @@ exeElm beforeEach afterEach runElm =
           
       Group { title = t, subElms } -> 
         do
-          logBoundry $ StartGroup $ GroupTitle t
+          logBoundry . StartGroup $ GroupTitle t
           fold $ exeElm beforeEach afterEach <$> subElms
-          logBoundry $ EndGroup $ GroupTitle t
+          logBoundry $ EndGroup t
 
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
@@ -188,7 +188,7 @@ mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigCl
                     -> Sem effs ()
 mkSem rp@RunParams {plan, filters, rc} = uu
   let
-    root :: RunElement (Sem effs) () effs
+    root :: RunElement [] (Sem effs) () effs
     root = plan $ runTest rp
 
     filterInfo :: [TestFilterResult]

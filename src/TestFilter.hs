@@ -40,23 +40,23 @@ applyFilters fltrs rc tc =
     fltrRslt firstRejectReason
     
 
-filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => [TestFilter rc tc] -> rc -> Test e tc rc i as ds effs -> Identity TestFilterResult
-filterTest fltrs rc Test{ config = tc } = Identity $ applyFilters fltrs rc tc
+filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => [TestFilter rc tc] -> rc -> Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)
+filterTest fltrs rc Test{ config = tc } = Identity . Identity $ applyFilters fltrs rc tc
 
 filterRunElements :: forall tc rc e effs. TestConfigClass tc =>
               (
                 (forall i as ds. (Show i, Show as, Show ds) =>
-                      Test e tc rc i as ds effs -> Identity TestFilterResult) -> RunElement Identity TestFilterResult effs
+                      Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)) -> RunElement Identity Identity TestFilterResult effs
               )
               -> [TestFilter rc tc]
               -> rc
               -> [TestFilterResult]
 filterRunElements groupLst fltrs rc =
     let
-      testFilter :: Test e tc rc i as ds effs -> Identity TestFilterResult
+      testFilter :: Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)
       testFilter = filterTest fltrs rc
     in
-      runIdentity <$> tests (groupLst testFilter)
+      runIdentity . runIdentity <$> (tests $ groupLst testFilter)
 
 acceptAnyFilter :: [TestFilterResult] -> Bool
 acceptAnyFilter = P.any acceptFilter 

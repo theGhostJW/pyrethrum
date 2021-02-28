@@ -46,17 +46,17 @@ filterTest fltrs rc Test{ config = tc } = Identity . Identity $ applyFilters flt
 filterRunElements :: forall tc rc e effs. TestConfigClass tc =>
               (
                 (forall i as ds. (Show i, Show as, Show ds) =>
-                      Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)) -> RunElement Identity Identity TestFilterResult effs
+                      Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)) -> RunElement effs [Identity (Identity TestFilterResult)]
               )
               -> [TestFilter rc tc]
               -> rc
               -> [TestFilterResult]
-filterRunElements groupLst fltrs rc =
+filterRunElements suite fltrs rc =
     let
       testFilter :: Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)
       testFilter = filterTest fltrs rc
     in
-      runIdentity . runIdentity <$> tests (groupLst testFilter)
+      runIdentity . runIdentity <$> tests (suite testFilter)
 
 acceptAnyFilter :: [TestFilterResult] -> Bool
 acceptAnyFilter = P.any acceptFilter 

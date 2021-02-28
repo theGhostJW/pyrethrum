@@ -75,7 +75,7 @@ import RunnerBase as RB
       PreRun(..),
       RunElement(..),
       Test(..),
-      TestPlanBase )
+      TestSuite )
 import qualified Prelude
 
 logBoundry :: forall e effs. (Show e, A.ToJSON e, Member (Logger e) effs) => BoundaryEvent -> Sem effs ()
@@ -134,7 +134,7 @@ logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => Fram
 logLPError = logItem . logRun . LP.Error
 
 data RunParams m e rc tc effs = RunParams {
-  plan :: forall mo mi a. TestPlanBase e tc rc mo mi a effs,
+  plan :: forall a. TestSuite e tc rc effs a,
   filters :: [TestFilter rc tc],
   itemIds :: m (S.Set Int),   
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner e as ds i tc rc effs,
@@ -149,7 +149,7 @@ data Hooks effs = Hooks {
 }
 
 
-emptyElm :: forall m1 m a effs. RunElement m1 m a effs -> Bool
+emptyElm :: forall a effs. RunElement effs [a] -> Bool
 emptyElm
   = \case
       Tests t -> null t
@@ -157,38 +157,38 @@ emptyElm
       Group _ s -> all emptyElm s
 
 -- TODO - Error handling especially outside tests
-exeElm :: 
+exeElm :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) =>
   Sem effs () ->
   Sem effs () ->
-  RunElement [] (Sem effs) () effs -> 
+  RunElement effs [[Sem effs ()]] -> 
   Sem effs ()
 exeElm beforeEach afterEach runElm = 
   emptyElm runElm ?
     pure () $
     case runElm of
-      Tests { tests } -> sequence_ $ fold $ \t -> beforeEach >> t >> afterEach <$> tests
+      Tests { tests } -> sequence_ $ fold $ ((\t -> beforeEach >> t >> afterEach) <$>) <$> tests
 
       Hook {location, hook, subElms } -> 
         case location of 
-          BeforeAll -> hook >> fold (exeElm beforeEach afterEach <$> subElms)
-          AfterAll  -> fold (exeElm beforeEach afterEach <$> subElms) >> hook
+          BeforeAll -> hook >> sequence_ (exeElm beforeEach afterEach <$> subElms)
+          AfterAll  -> sequence_ (exeElm beforeEach afterEach <$> subElms) >> hook
 
-          BeforeEach -> fold $ exeElm (hook >> beforeEach) afterEach <$> subElms
-          AfterEach -> fold $  exeElm beforeEach (afterEach >> hook) <$> subElms
+          BeforeEach -> sequence_ $ exeElm (hook >> beforeEach) afterEach <$> subElms
+          AfterEach -> sequence_ $ exeElm beforeEach (afterEach >> hook) <$> subElms
           
       Group { title = t, subElms } -> 
         do
           logBoundry . StartGroup $ GroupTitle t
-          fold $ exeElm beforeEach afterEach <$> subElms
-          logBoundry $ EndGroup t
+          sequence_ $ exeElm beforeEach afterEach <$> subElms
+          logBoundry . EndGroup $ GroupTitle t
 
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
                     RunParams Maybe e rc tc effs
                     -> Sem effs ()
-mkSem rp@RunParams {plan, filters, rc} = uu
+mkSem rp@RunParams {plan, filters, rc} =
   let
-    root :: RunElement [] (Sem effs) () effs
+    root :: RunElement effs [[Sem effs ()]]
     root = plan $ runTest rp
 
     filterInfo :: [TestFilterResult]

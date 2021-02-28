@@ -11,9 +11,9 @@ import Data.Aeson
 type ItemRunner e as ds i tc rc effs = 
     rc -> Test e tc rc i as ds effs -> i -> Sem effs ()
 
-type TestPlanBase e tc rc m1 m a effs = 
-    (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => Test e tc rc i as ds effs -> m1 (m a)) 
-    -> RunElement m1 m a effs
+type TestSuite e tc rc effs a = 
+    (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => Test e tc rc i as ds effs -> a) 
+    -> RunElement effs [a]
 
 type Ensurable e effs = Members '[Ensure, Error (FrameworkError e)] effs
 
@@ -48,31 +48,32 @@ data HookLocation = BeforeAll |
   6. Runner that extracts test items - eg to report known errors
 -}
 
-data RunElement m1 m a effs =
+data RunElement effs a =
   Tests {
         -- a list of tests
-        tests :: [m1 (m a)]
+        tests :: a
         -- eg [IO Either (FrameworkError TestInfo)]
    } |
 
    Hook {
      location :: HookLocation,
      hook :: Sem effs (),
-     subElms :: [RunElement m1 m a effs]
+     subElms :: [RunElement effs a]
    } |
 
    Group {
     title :: Text,
-    subElms :: [RunElement m1 m a effs]
+    subElms :: [RunElement effs a]
    }
+   deriving Functor
 
-groupName :: RunElement m n a effs -> Maybe Text
+groupName :: RunElement effs a -> Maybe Text
 groupName = \case 
               Tests _ -> Nothing
               Hook {} -> Nothing
               Group t _ -> Just t
 
-groupAddresses' :: [Text] -> Text -> RunElement m n a effs -> [Text]
+groupAddresses' :: [Text] -> Text -> RunElement effs a -> [Text]
 groupAddresses' accum base re = 
   let
     delim = "."
@@ -92,7 +93,7 @@ groupAddresses' accum base re =
           nxtAccum <> fold (groupAddresses' nxtAccum address <$> subElems)
         
 
-groupAddresses :: RunElement m n a effs -> [Text]
+groupAddresses :: RunElement effs a -> [Text]
 groupAddresses = groupAddresses' [] "" 
 
 data Test e tc rc i as ds effs = Test {

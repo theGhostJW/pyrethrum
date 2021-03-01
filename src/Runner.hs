@@ -73,7 +73,7 @@ import RunnerBase as RB
       HookLocation(..),
       ItemRunner,
       PreRun(..),
-      RunElement(..),
+      SuiteItem(..),
       Test(..),
       TestSuite )
 import qualified Prelude
@@ -134,7 +134,7 @@ logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => Fram
 logLPError = logItem . logRun . LP.Error
 
 data RunParams m e rc tc effs = RunParams {
-  plan :: forall a. TestSuite e tc rc effs a,
+  suite :: forall a. TestSuite e tc rc effs a,
   filters :: [TestFilter rc tc],
   itemIds :: m (S.Set Int),   
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner e as ds i tc rc effs,
@@ -149,7 +149,7 @@ data Hooks effs = Hooks {
 }
 
 
-emptyElm :: forall a effs. RunElement effs [a] -> Bool
+emptyElm :: forall a effs. SuiteItem effs [a] -> Bool
 emptyElm
   = \case
       Tests t -> null t
@@ -160,7 +160,7 @@ emptyElm
 exeElm :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) =>
   Sem effs () ->
   Sem effs () ->
-  RunElement effs [[Sem effs ()]] -> 
+  SuiteItem effs [[Sem effs ()]] -> 
   Sem effs ()
 exeElm beforeEach afterEach runElm = 
   emptyElm runElm ?
@@ -186,13 +186,13 @@ exeElm beforeEach afterEach runElm =
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
                     RunParams Maybe e rc tc effs
                     -> Sem effs ()
-mkSem rp@RunParams {plan, filters, rc} =
+mkSem rp@RunParams {suite, filters, rc} =
   let
-    root :: RunElement effs [[Sem effs ()]]
-    root = plan $ runTest rp
+    root :: SuiteItem effs [[Sem effs ()]]
+    root = suite $ runTest rp
 
     filterInfo :: [TestFilterResult]
-    filterInfo = filterRunElements plan filters rc
+    filterInfo = filterRunElements suite filters rc
 
     run' :: Sem effs ()
     run' = do

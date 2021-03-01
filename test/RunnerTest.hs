@@ -62,7 +62,7 @@ module RunnerTest where
 -- ---------------------- Duplicate Group Names --------------------
 -- -----------------------------------------------------------------
 
--- emptyGroup :: Text -> RunElement m1 m a effs
+-- emptyGroup :: Text -> SuiteItem m1 m a effs
 -- emptyGroup hdr = Tests hdr doNothing doNothing []
 
 -- planWithDuplicates :: forall m m1 effs a. TestPlan m1 m a effs

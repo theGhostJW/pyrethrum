@@ -37,7 +37,7 @@ instance Titled TestConfig where
 
 $(deriveJSON defaultOptions ''TestConfig)
 
-type TST = RunnerBase.Test Int TestConfig RunConfig
+type MockTest = RunnerBase.Test Int TestConfig RunConfig
 
 newtype MyInt = MyInt Int deriving (Show, Generic)
 
@@ -51,87 +51,95 @@ instance ItemClass MyInt MyInt where
 instance ToJSON MyInt where
   toEncoding = genericToEncoding defaultOptions
 
+au :: [Country]
 au = [Au]
+
+nz :: [Country]
 nz = [NZ]
 
+empti :: b -> [MyInt]
 empti = const ([] :: [MyInt])
 
 emptiInteractor :: RunConfig -> MyInt -> Sem effs MyInt
-emptiInteractor = \_ _ -> pure $ MyInt 1
+emptiInteractor _ _ = pure $ MyInt 1
 
--- test1 :: TST MyInt MyInt MyInt effs
--- test1 = Test {
---               config = TestConfig {
---                 header = "test1",
---                 address = TestAddress "test1",
---                 countries = au <> nz,
---                 level = Regression,
---                 enabled = True
---               },
---               items = empti,
---               interactor = emptiInteractor,
---               prepState = \i ii -> pure ii 
---             }
+test1 :: MockTest MyInt MyInt MyInt effs
+test1 = Test {
+              config = TestConfig {
+                header = "test1",
+                address = TestAddress "test1",
+                countries = au <> nz,
+                level = Regression,
+                enabled = True
+              },
+              items = empti,
+              interactor = emptiInteractor,
+              prepState = \i as -> pure as
+            }
 
--- test2 :: TST MyInt MyInt MyInt effs
--- test2 = Test {
---               config = TestConfig {
---                 header = "test2",
---                 address = TestAddress "test2",
---                 countries = nz,
---                 level = Regression,
---                 enabled = True
---               },
---               items = empti,
---               interactor = emptiInteractor,
---               prepState = \i ii -> pure ii 
---             }
+test2 :: MockTest MyInt MyInt MyInt effs
+test2 = Test {
+              config = TestConfig {
+                header = "test2",
+                address = TestAddress "test2",
+                countries = nz,
+                level = Regression,
+                enabled = True
+              },
+              items = empti,
+              interactor = emptiInteractor,
+              prepState = \i as -> pure as
+            }
 
--- test3 :: TST MyInt MyInt MyInt effs
--- test3 = Test {
---                 config = TestConfig {
---                   header = "test3",
---                   address = TestAddress "test3",
---                   countries = au,
---                   level = Connectivity,
---                   enabled = True
---                 },
---               items = empti,
---               interactor = emptiInteractor,
---               prepState = \i ii -> pure ii 
---             }
+test3 :: MockTest MyInt MyInt MyInt effs
+test3 = Test {
+                config = TestConfig {
+                  header = "test3",
+                  address = TestAddress "test3",
+                  countries = au,
+                  level = Connectivity,
+                  enabled = True
+                },
+              items = empti,
+              interactor = emptiInteractor,
+              prepState = \i as -> pure as
+            }
 
--- test4 :: TST MyInt MyInt MyInt effs 
--- test4 = Test {
---               config = TestConfig {
---                   header = "test4",
---                   address = TestAddress "test4",
---                   countries = au,
---                   level = DeepRegression,
---                   enabled = True
---                 },
---               items = empti,
---               interactor = emptiInteractor,
---               prepState = \i ii -> pure ii 
---             }
+test4 :: MockTest MyInt MyInt MyInt effs 
+test4 = Test {
+              config = TestConfig {
+                  header = "test4",
+                  address = TestAddress "test4",
+                  countries = au,
+                  level = DeepRegression,
+                  enabled = True
+                },
+              items = empti,
+              interactor = emptiInteractor,
+              prepState = \i as -> pure as
+            }
 
--- test5 :: TST MyInt MyInt MyInt effs
--- test5 = Test {
---               config = TestConfig {
---                   header = "test5",
---                   address = TestAddress "test5",
---                   countries = au,
---                   level = DeepRegression,
---                   enabled = False
---                 },
---               items = empti,
---               interactor = emptiInteractor,
---               prepState = \i ii -> pure ii  
---             }
+test5 :: MockTest MyInt MyInt MyInt effs
+test5 = Test {
+              config = TestConfig {
+                  header = "test5",
+                  address = TestAddress "test5",
+                  countries = au,
+                  level = DeepRegression,
+                  enabled = False
+                },
+              items = empti,
+              interactor = emptiInteractor,
+              prepState = \i as -> pure as 
+            }
+
+
+-- mockSuite = 
+
 
 -- runRunner :: forall m m1 effs a.
 --                 (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => RunnerBase.Test Int TestConfig RunConfig i as ds effs -> m1 (m a))
---                 -> [RunElement m1 m a effs]
+--                 -> [SuiteItem m1 m a effs]
 -- runRunner f =
 --   [
 

@@ -46,7 +46,7 @@ filterTest fltrs rc Test{ config = tc } = Identity . Identity $ applyFilters flt
 filterRunElements :: forall tc rc e effs. TestConfigClass tc =>
               (
                 (forall i as ds. (Show i, Show as, Show ds) =>
-                      Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)) -> RunElement effs [Identity (Identity TestFilterResult)]
+                      Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)) -> SuiteItem effs [Identity (Identity TestFilterResult)]
               )
               -> [TestFilter rc tc]
               -> rc

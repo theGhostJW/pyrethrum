@@ -147,10 +147,10 @@ testEndpointPriv :: forall effs. ApEffs SuiteError effs =>
      -> Either FilterErrorType (Set Int)
      -> (forall a. TestPlan effs a)
      -> Sem effs ()
-testEndpointPriv itmRunner testAddress rc itemIds plan = 
+testEndpointPriv itmRunner testAddress rc itemIds suite = 
   let 
     runParams = RunParams {
-      plan = plan,
+      suite = suite,
       filters = filterList,
       itemRunner = itmRunner,
       itemIds = itemIds,
@@ -173,7 +173,7 @@ testEndpointDoc ::
      -> Either FilterErrorType (Set Int)
      -> (forall a. TestPlan (FullDocEffects SuiteError) a)
      -> DList Text
-testEndpointDoc testMod rc itrSet plan = fst . documentRaw $ testEndpointPriv documentItem testMod rc itrSet plan
+testEndpointDoc testMod rc itrSet suite = fst . documentRaw $ testEndpointPriv documentItem testMod rc itrSet suite
 
 $(deriveJSON defaultOptions ''TestConfig)
 $(deriveJSON defaultOptions ''SuiteError)

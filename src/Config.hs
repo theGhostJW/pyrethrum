@@ -137,7 +137,7 @@ filterList = [isActiveFilter, countryFilter, levelFilter]
 applyTestFiltersToItems :: RunConfig -> (i -> TestConfig) -> [i] -> [i]
 applyTestFiltersToItems = F.applyTestFilters filterList
 
-type TestPlan effs a = R.TestSuite SuiteError TestConfig RunConfig effs a
+type TestPlan effs a = R.Suite SuiteError TestConfig RunConfig effs a
 
 testEndpointPriv :: forall effs. ApEffs SuiteError effs =>
       (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => 

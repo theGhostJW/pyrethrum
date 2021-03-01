@@ -75,7 +75,7 @@ import RunnerBase as RB
       PreRun(..),
       SuiteItem(..),
       Test(..),
-      TestSuite )
+      Suite )
 import qualified Prelude
 
 logBoundry :: forall e effs. (Show e, A.ToJSON e, Member (Logger e) effs) => BoundaryEvent -> Sem effs ()
@@ -134,7 +134,7 @@ logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => Fram
 logLPError = logItem . logRun . LP.Error
 
 data RunParams m e rc tc effs = RunParams {
-  suite :: forall a. TestSuite e tc rc effs a,
+  suite :: forall a. Suite e tc rc effs a,
   filters :: [TestFilter rc tc],
   itemIds :: m (S.Set Int),   
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner e as ds i tc rc effs,

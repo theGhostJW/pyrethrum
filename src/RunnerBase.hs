@@ -11,8 +11,8 @@ import Data.Aeson
 type ItemRunner e as ds i tc rc effs = 
     rc -> Test e tc rc i as ds effs -> i -> Sem effs ()
 
-type TestSuite e tc rc effs a = 
-    (forall i as ds. Test e tc rc i as ds effs -> a) -> SuiteItem effs [a]
+type Suite e tc rc effs a = 
+    (forall i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i) => Test e tc rc i as ds effs -> a) -> SuiteItem effs [a]
 
 type Ensurable e effs = Members '[Ensure, Error (FrameworkError e)] effs
 

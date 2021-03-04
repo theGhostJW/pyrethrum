@@ -3,7 +3,7 @@ module TestFilterTest where
 import Pyrelude         as P
 import Polysemy
 import           Runner as R
-import           Pyrelude.Test
+import           Pyrelude.Test hiding (Group)
 import Data.Yaml
 import Data.Aeson.TH
 import Data.Aeson.Types
@@ -41,7 +41,15 @@ type MockTest = RunnerBase.Test Int TestConfig RunConfig
 
 newtype MyInt = MyInt Int deriving (Show, Generic)
 
+newtype MyText = MyText Text deriving (Show, Generic, ToJSON)
+
 instance ItemClass MyInt MyInt where
+  identifier _ =  -999
+  whenClause _ =  "pre"
+  thenClause _ =  "post"
+  checkList = mempty
+
+instance ItemClass MyText MyText  where
   identifier _ =  -999
   whenClause _ =  "pre"
   thenClause _ =  "post"
@@ -57,13 +65,72 @@ au = [Au]
 nz :: [Country]
 nz = [NZ]
 
-empti :: b -> [MyInt]
-empti = const ([] :: [MyInt])
 
-emptiInteractor :: RunConfig -> MyInt -> Sem effs MyInt
-emptiInteractor _ _ = pure $ MyInt 1
+data TestSimple e tc rc i as ds = TestSimple {
+  config :: tc,
+  items :: rc -> [i],
+  interactor :: rc -> i -> as,
+  prepState ::  i -> as -> ds
+}
 
-test1 :: MockTest MyInt MyInt MyInt effs
+type SuiteSimple e tc rc a = 
+    (forall i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i) => TestSimple e tc rc i as ds -> a) -> SuiteItemSimple [a]
+
+data SuiteItemSimple  a =
+  TestsSimple {
+        header :: Text,
+        -- a list of tests
+        testsSimple :: a
+        -- eg [IO Either (FrameworkError TestInfo)]
+   }
+
+type MockTestS = TestSimple Text TestConfig RunConfig
+
+test2s :: MockTestS MyInt MyInt MyInt
+test2s = TestSimple {
+              config = TestConfig {
+                header = "test2",
+                address = TestAddress "test2",
+                countries = nz,
+                level = Regression,
+                enabled = True
+              },
+              items = empti,
+              interactor = \_ _ -> MyInt 1,
+              prepState = \i as -> as
+            }
+
+test3s :: MockTestS MyText MyText MyText
+test3s = TestSimple {
+              config = TestConfig {
+                header = "test2",
+                address = TestAddress "test2",
+                countries = nz,
+                level = Regression,
+                enabled = True
+              },
+              items = empti,
+              interactor = \_ _ -> MyText "Hello",
+              prepState = \i as -> as
+            }
+
+mockSuiteSimple :: SuiteSimple Text TestConfig RunConfig a
+mockSuiteSimple r = 
+  TestsSimple "Blahh"  [
+        r test3s,
+        r test2s
+      ]
+
+empti :: a -> [b]
+empti = const ([] :: [b])
+
+emptiInteractor :: b -> RunConfig -> a -> Sem effs b
+emptiInteractor b _ _ = pure b
+
+emptiPrepState:: a -> i -> as -> Sem effs a
+emptiPrepState a _ _ = pure a
+
+test1 :: MockTest MyInt Text MyInt effs
 test1 = Test {
               config = TestConfig {
                 header = "test1",
@@ -73,8 +140,8 @@ test1 = Test {
                 enabled = True
               },
               items = empti,
-              interactor = emptiInteractor,
-              prepState = \i as -> pure as
+              interactor = emptiInteractor "Hello",
+              prepState = emptiPrepState (MyInt 1)
             }
 
 test2 :: MockTest MyInt MyInt MyInt effs
@@ -87,7 +154,7 @@ test2 = Test {
                 enabled = True
               },
               items = empti,
-              interactor = emptiInteractor,
+              interactor = emptiInteractor (MyInt 1),
               prepState = \i as -> pure as
             }
 
@@ -101,11 +168,11 @@ test3 = Test {
                   enabled = True
                 },
               items = empti,
-              interactor = emptiInteractor,
+              interactor = emptiInteractor (MyInt 3),
               prepState = \i as -> pure as
             }
 
-test4 :: MockTest MyInt MyInt MyInt effs 
+test4 :: MockTest Text Text Text effs 
 test4 = Test {
               config = TestConfig {
                   header = "test4",
@@ -115,7 +182,7 @@ test4 = Test {
                   enabled = True
                 },
               items = empti,
-              interactor = emptiInteractor,
+              interactor = emptiInteractor "Hello",
               prepState = \i as -> pure as
             }
 
@@ -129,14 +196,20 @@ test5 = Test {
                   enabled = False
                 },
               items = empti,
-              interactor = emptiInteractor,
+              interactor = emptiInteractor (MyInt 1),
               prepState = \i as -> pure as 
             }
 
 
--- mockSuite = 
-
-
+-- mockSuite :: Suite Text TestConfig RunConfig effs a
+-- mockSuite r = 
+--   Group "Filter SUite" [
+--     Hook BeforeAll (pure ()) [
+--       Tests [
+--         r test2
+--       ]
+--     ]
+--   ]
 -- runRunner :: forall m m1 effs a.
 --                 (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => RunnerBase.Test Int TestConfig RunConfig i as ds effs -> m1 (m a))
 --                 -> [SuiteItem m1 m a effs]

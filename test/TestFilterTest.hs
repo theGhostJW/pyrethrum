@@ -8,7 +8,7 @@ import Data.Yaml
 import Data.Aeson.TH
 import Data.Aeson.Types
 import TestFilter
-import RunnerBase
+import RunnerBase ( Test )
 
 data TestDepth = Connectivity | Regression | DeepRegression deriving (Eq, Ord, Show)
 data Country = Au | NZ deriving (Eq, Ord, Show)
@@ -37,7 +37,7 @@ instance Titled TestConfig where
 
 $(deriveJSON defaultOptions ''TestConfig)
 
-type MockTest = RunnerBase.Test Int TestConfig RunConfig
+type MockTest i as ds effs = RunnerBase.Test Int TestConfig RunConfig i as ds effs
 
 newtype MyInt = MyInt Int deriving (Show, Generic)
 
@@ -64,62 +64,6 @@ au = [Au]
 
 nz :: [Country]
 nz = [NZ]
-
-
-data TestSimple e tc rc i as ds = TestSimple {
-  config :: tc,
-  items :: rc -> [i],
-  interactor :: rc -> i -> as,
-  prepState ::  i -> as -> ds
-}
-
-type SuiteSimple e tc rc a = 
-    (forall i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i) => TestSimple e tc rc i as ds -> a) -> SuiteItemSimple [a]
-
-data SuiteItemSimple  a =
-  TestsSimple {
-        header :: Text,
-        -- a list of tests
-        testsSimple :: a
-        -- eg [IO Either (FrameworkError TestInfo)]
-   }
-
-type MockTestS = TestSimple Text TestConfig RunConfig
-
-test2s :: MockTestS MyInt MyInt MyInt
-test2s = TestSimple {
-              config = TestConfig {
-                header = "test2",
-                address = TestAddress "test2",
-                countries = nz,
-                level = Regression,
-                enabled = True
-              },
-              items = empti,
-              interactor = \_ _ -> MyInt 1,
-              prepState = \i as -> as
-            }
-
-test3s :: MockTestS MyText MyText MyText
-test3s = TestSimple {
-              config = TestConfig {
-                header = "test2",
-                address = TestAddress "test2",
-                countries = nz,
-                level = Regression,
-                enabled = True
-              },
-              items = empti,
-              interactor = \_ _ -> MyText "Hello",
-              prepState = \i as -> as
-            }
-
-mockSuiteSimple :: SuiteSimple Text TestConfig RunConfig a
-mockSuiteSimple r = 
-  TestsSimple "Blahh"  [
-        r test3s,
-        r test2s
-      ]
 
 empti :: a -> [b]
 empti = const ([] :: [b])
@@ -201,89 +145,14 @@ test5 = Test {
             }
 
 
--- mockSuite :: Suite Text TestConfig RunConfig effs a
--- mockSuite r = 
---   Group "Filter SUite" [
---     Hook BeforeAll (pure ()) [
---       Tests [
---         r test2
---       ]
---     ]
---   ]
--- runRunner :: forall m m1 effs a.
---                 (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => RunnerBase.Test Int TestConfig RunConfig i as ds effs -> m1 (m a))
---                 -> [SuiteItem m1 m a effs]
--- runRunner f =
---   [
-
---    Tests {
---           header = "Group 1",
---           rollover = doNothing,
---           goHome = doNothing,
---           tests = [
---               f test1,
---               f test2,
---               f test3
---             ]
---      },
-
---     Tests {
---           header = "Group 2",
---           rollover = doNothing,
---           goHome = doNothing,
---           tests = [
---               f test4,
---               f test5
---             ]
---      }
-
---     ]
-
-
--- enabledFilter :: TestFilter RunConfig TestConfig
--- enabledFilter = TestFilter {
---      title = "test must be is enabled",
---      predicate = \_ tc -> enabled tc
---    }
-
--- countryFilter :: TestFilter RunConfig TestConfig
--- countryFilter = TestFilter {
---      title = "country must match test run",
---      predicate = \rc tc -> P.elem (country rc) $ countries tc
---    }
-
--- levelFilter :: TestFilter RunConfig TestConfig
--- levelFilter = TestFilter {
---      title = "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
---      predicate = \rc tc -> (level :: TestConfig -> TestDepth) tc <= (level :: RunConfig -> TestDepth) rc
---    }
-
--- filters' :: [TestFilter RunConfig TestConfig]
--- filters' = [enabledFilter, countryFilter, levelFilter]
-
--- filterList :: RunConfig -> [TestFilterResult]
--- filterList rc = filterLog $ filterRunElements runRunner filters' rc
-
--- runFilters :: RunConfig -> [Text]
--- runFilters rc = testTitle . testInfo <$> P.filter acceptFilter (filterList rc)
-
--- chkFilters :: [Text] -> RunConfig -> Assertion
--- chkFilters expted rc = chkEq expted $ runFilters rc
-
--- unit_test_filter_expect_empty = chkFilters [] $ RunConfig NZ Connectivity
--- unit_test_filter_country = chkFilters ["test1", "test3"] $ RunConfig Au Regression
--- unit_test_filter_country_nz = chkFilters ["test1", "test2"] $ RunConfig NZ Regression
--- unit_test_filter_country2 = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
-
-
--- filtersExcludeReasons :: RunConfig -> [Text]
--- filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> P.filter rejectFilter (filterList rc)
-
--- unit_test_filter_exclude_reasons = chkEq [
---                                           "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
---                                           "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
---                                           "country must match test run",
---                                           "country must match test run",
---                                           "test must be is enabled"
---                                           ]
---                                           $ filtersExcludeReasons $ RunConfig NZ Connectivity
+mockSuite :: forall effs a. (forall i as ds. MockTest i as ds effs -> a) -> SuiteItem effs [a]
+mockSuite r = 
+  R.Group "Filter SUite" [
+    Hook BeforeAll (pure ()) [
+      Tests [
+        r test1,
+        r test2,
+        r test3
+      ]
+    ]
+  ]

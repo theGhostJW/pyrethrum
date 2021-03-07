@@ -61,7 +61,7 @@ import OrphanedInstances()
 import Data.Aeson as A
 import TestFilter
     ( acceptFilter,
-      filterRunElements,
+      filterSuite,
       applyFilters,
       TestFilter(..), acceptAnyFilter )
 import RunnerBase as RB
@@ -192,7 +192,7 @@ mkSem rp@RunParams {suite, filters, rc} =
     root = suite $ runTest rp
 
     filterInfo :: [TestFilterResult]
-    filterInfo = filterRunElements suite filters rc
+    filterInfo = filterSuite suite filters rc
 
     run' :: Sem effs ()
     run' = do

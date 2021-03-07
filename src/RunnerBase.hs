@@ -87,6 +87,17 @@ data SuiteItem effs a =
    }
    deriving Functor
 
+concatTests :: SuiteItem effs t -> [t]
+concatTests = 
+  let 
+    concat' ts = mconcat $ concatTests <$> ts
+  in
+    \case
+      (Tests t) -> [t]
+      (Hook _ _ ts) -> concat' ts
+      (Group _ ts) -> concat' ts
+
+
 groupName :: SuiteItem effs a -> Maybe Text
 groupName = \case 
               Tests _ -> Nothing

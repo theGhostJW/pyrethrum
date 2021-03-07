@@ -40,23 +40,29 @@ applyFilters fltrs rc tc =
     fltrRslt firstRejectReason
     
 
-filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => [TestFilter rc tc] -> rc -> Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)
-filterTest fltrs rc Test{ config = tc } = Identity . Identity $ applyFilters fltrs rc tc
+filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => [TestFilter rc tc] -> rc -> Test e tc rc i as ds effs -> TestFilterResult
+filterTest fltrs rc Test{ config = tc } = applyFilters fltrs rc tc
 
-filterRunElements :: forall tc rc e effs. TestConfigClass tc =>
+
+filterSuite :: forall tc rc e effs. TestConfigClass tc =>
               (
-                (forall i as ds. (Show i, Show as, Show ds) =>
-                      Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)) -> SuiteItem effs [Identity (Identity TestFilterResult)]
+                (forall i as ds.
+                      Test e tc rc i as ds effs -> TestFilterResult) -> SuiteItem effs [TestFilterResult]
               )
               -> [TestFilter rc tc]
               -> rc
               -> [TestFilterResult]
-filterRunElements suite fltrs rc =
-    let
-      testFilter :: Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)
-      testFilter = filterTest fltrs rc
-    in
-      runIdentity . runIdentity <$> tests (suite testFilter)
+filterSuite suite fltrs rc =
+  let
+    testFilter :: Test e tc rc i as ds effs -> TestFilterResult
+    testFilter = filterTest fltrs rc
+
+    si :: SuiteItem effs [TestFilterResult]
+    si = suite testFilter
+  in
+    mconcat $ concatTests si
+
+
 
 acceptAnyFilter :: [TestFilterResult] -> Bool
 acceptAnyFilter = P.any acceptFilter 

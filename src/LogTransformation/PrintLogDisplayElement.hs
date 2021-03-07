@@ -186,7 +186,7 @@ printLogDisplayStep ::
   -> IterationAccum                                                    -- accum
   -> Either DeserialisationError LogProtocolOut                           -- source                           -- parse error or FrameworkError
   -> (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
-printLogDisplayStep runResults lineNo oldAccum@(IterationAccum{ stepInfo }) eithLp = 
+printLogDisplayStep runResults lineNo oldAccum@IterationAccum{ stepInfo } eithLp = 
   
   eitherf eithLp
    (\err -> 

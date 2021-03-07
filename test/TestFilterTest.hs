@@ -92,7 +92,7 @@ test2 :: MockTest MyInt MyInt MyInt effs
 test2 = Test {
               config = TestConfig {
                 header = "test2",
-                address = TestAddress "test2",
+                address = TestAddress "test2 address",
                 countries = nz,
                 level = Regression,
                 enabled = True
@@ -106,7 +106,7 @@ test3 :: MockTest MyInt MyInt MyInt effs
 test3 = Test {
                 config = TestConfig {
                   header = "test3",
-                  address = TestAddress "test3",
+                  address = TestAddress "test3 address",
                   countries = au,
                   level = Connectivity,
                   enabled = True
@@ -120,7 +120,7 @@ test4 :: MockTest Text Text Text effs
 test4 = Test {
               config = TestConfig {
                   header = "test4",
-                  address = TestAddress "test4",
+                  address = TestAddress "test4 address",
                   countries = au,
                   level = DeepRegression,
                   enabled = True
@@ -134,7 +134,7 @@ test5 :: MockTest MyInt MyInt MyInt effs
 test5 = Test {
               config = TestConfig {
                   header = "test5",
-                  address = TestAddress "test5",
+                  address = TestAddress "test5 address",
                   countries = au,
                   level = DeepRegression,
                   enabled = False
@@ -145,14 +145,85 @@ test5 = Test {
             }
 
 
-mockSuite :: forall effs a. (forall i as ds. MockTest i as ds effs -> a) -> SuiteItem effs [a]
+enabledFilter :: TestFilter RunConfig TestConfig
+enabledFilter = TestFilter {
+     title = "test must be is enabled",
+     predicate = \_ tc -> enabled tc
+   }
+
+countryFilter :: TestFilter RunConfig TestConfig
+countryFilter = TestFilter {
+     title = "country must match test run",
+     predicate = \rc tc -> P.elem (country rc) $ countries tc
+   }
+
+levelFilter :: TestFilter RunConfig TestConfig
+levelFilter = TestFilter {
+     title = "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
+     predicate = \rc tc -> (level :: TestConfig -> TestDepth) tc <= (level :: RunConfig -> TestDepth) rc
+   }
+
+filters' :: [TestFilter RunConfig TestConfig]
+filters' = [enabledFilter, countryFilter, levelFilter]
+
+
+mockSuite :: forall effs a. (forall i as ds. (Show i, Show as, Show ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
 mockSuite r = 
-  R.Group "Filter SUite" [
+  R.Group "Filter Suite" [
     Hook BeforeAll (pure ()) [
       Tests [
         r test1,
         r test2,
         r test3
       ]
+    ],
+
+    R.Group "Sub Group" [
+      Tests [
+        r test4,
+        r test5
+      ]
+    ],
+
+    R.Group "Empty Group" [
+      Tests []
     ]
+      
   ]
+
+
+
+filterResults :: RunConfig -> [TestFilterResult]
+filterResults = filterSuite mockSuite filters'
+
+acceptedTests :: RunConfig -> [TestFilterResult]
+acceptedTests rc = P.filter acceptFilter $ filterResults rc
+
+chkFilters :: [Text] -> RunConfig -> Assertion
+chkFilters expted rc = chkEq expted $ testTitle . testInfo <$> acceptedTests rc
+
+unit_test_filter_expect_empty :: Assertion
+unit_test_filter_expect_empty = chkFilters [] $ RunConfig NZ Connectivity
+
+unit_test_filter_country :: Assertion
+unit_test_filter_country = chkFilters ["test1", "test3"] $ RunConfig Au Regression
+
+unit_test_filter_country_nz :: Assertion
+unit_test_filter_country_nz = chkFilters ["test1", "test2"] $ RunConfig NZ Regression
+
+unit_test_filter_country_au_deep_regression :: Assertion
+unit_test_filter_country_au_deep_regression = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
+
+
+filtersExcludeReasons :: RunConfig -> [Text]
+filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> P.filter rejectFilter (filterResults rc)
+
+unit_test_filter_exclude_reasons :: Assertion
+unit_test_filter_exclude_reasons = chkEq [
+                                          "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
+                                          "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
+                                          "country must match test run",
+                                          "country must match test run",
+                                          "test must be is enabled"
+                                          ]
+                                          $ filtersExcludeReasons $ RunConfig NZ Connectivity

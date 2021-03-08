@@ -1,7 +1,9 @@
 {-# LANGUAGE NoPolyKinds #-} 
 -- TODO: work out why this is needed - investigate polykinds
 
+-- this is what broke HLS
 {-# OPTIONS_GHC -Wno-deferred-type-errors #-}
+
 module Runner (
   RunParams(..)
   , module RB

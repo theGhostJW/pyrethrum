@@ -3,8 +3,7 @@ module RunPlan where
 
 import Data.Aeson
 import Common hiding (message)
-import           Pyrelude as P hiding (First)
-import           Pyrelude.IO as PO
+import           Prelude as P hiding (First)
 import           Control.Exception as E
 import           DSL.Logger
 import           DSL.LogProtocol

@@ -1,10 +1,13 @@
 module RunElementClasses where
 
-import           Pyrelude
+import           Prelude
 import Data.Aeson.TH
 import Language.Haskell.TH.Syntax
 import Data.Aeson.Types
 import           Check
+import Data.Text
+import Data.String (IsString)
+import GHC.Generics
 
 newtype TestAddress = TestAddress {unTestAddress :: Text} deriving (Eq, Ord, Show, IsString)
 
@@ -31,7 +34,7 @@ data TestFilterResult = TestFilterResult {
 $(deriveJSON defaultOptions ''TestFilterResult)
 
 mkTestAddress :: Name -> TestAddress
-mkTestAddress = TestAddress . moduleOf
+mkTestAddress = undefined
 
 $(deriveJSON defaultOptions ''TestAddress)
 

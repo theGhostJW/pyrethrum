@@ -1,5 +1,0 @@
--- poweshell - :set prompt "\ESC[1;34m%s\nλ>"
-
--- :set prompt "\ESC[1;34m%s\n\ESC[0;34mλ> \ESC[m"
-
-:set prompt "\ESC[1;34m\STX%s\n\ESC[0;34m\STXλ> \ESC[m\STX"

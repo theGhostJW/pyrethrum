@@ -2,10 +2,11 @@
 module DSL.Ensure where
 
 import Common
-import           Pyrelude
+import           Prelude
 import qualified Control.Monad as Monad
 import Polysemy
 import Polysemy.Error as PE
+import Data.Text
 
 data Ensure m a where
   Ensure :: Text -> Bool -> Ensure m ()

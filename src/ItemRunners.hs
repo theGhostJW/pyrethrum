@@ -8,12 +8,11 @@ import Common as C
 import DSL.Interpreter
 import DSL.Logger
 import DSL.LogProtocol as LP
-import Pyrelude as P
+import Prelude as P
 import Polysemy
 import Polysemy.Error as PE
 import qualified Data.DList as D
 import RunElementClasses as C
-import OrphanedInstances()
 import Data.Aeson
 import RunnerBase as RB
 import qualified Data.Foldable as F
@@ -58,16 +57,14 @@ runItem rc (Test tc _items interactor prepState) i  =
         do 
           logRP StartInteraction
           -- TODO: check for io exceptions / SomeException - use throw from test
-          log "interact start"
           ethApState <- try' $ interactor rc i
-          eitherf ethApState
+          either 
             (\e -> do 
                     logRP $ InteractorFailure iid e
                     logRP $ PrepStateSkipped iid
                     recordSkippedChecks
                     )
             (\as -> do 
-                log "interact end"
                 logRP . InteractorSuccess iid . ApStateJSON . toJSON $ as
                 logRP StartPrepState
                 ds <- PE.catch (prepState i as) prepStateErrorHandler
@@ -75,6 +72,7 @@ runItem rc (Test tc _items interactor prepState) i  =
                 logRP StartChecks
                 runChecks ds
               )
+              ethApState
   in 
     runItem' `PE.catch` (logRP . LP.Error)
 

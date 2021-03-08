@@ -1,27 +1,16 @@
 
 module Common where
 
-import           Pyrelude as P
+import           Prelude as P
 import  qualified        Data.DList as D
 import Data.Aeson.TH
-import OrphanedInstances()
 import Polysemy.Output as O
+import Data.Text as T
+import Control.Exception (IOException)
+
 
 indentText :: Int -> Text -> Text
-indentText i s = 
-  let 
-    linesClean :: [Text]
-    linesClean = fst . P.breakEnd (not . all (' ' ==)) $ lines s
-
-    unlined :: Text
-    unlined = unlines $ (\s' -> s == "" ? "" $ toS $ replicateText i " " <> s')  <$> linesClean
-  in 
-    toS $ 
-          last unlined /= Just '\n' 
-            ? unlined   
-            $ maybef (init unlined)
-                ""
-                id 
+indentText i s =  undefined
 
 data PreTestStage = Rollover |
                     GoHome
@@ -67,11 +56,11 @@ data FrameworkError e =
             SuiteError e
             deriving (Show, Eq, Functor)
 
-$(deriveJSON defaultOptions ''FrameworkError)
+            
 
 type OutputDListText = O.Output (D.DList Text)
 
 dList :: Show s => s -> D.DList Text
-dList s = D.fromList [txt s]
+dList s = undefined
 
 $(deriveJSON defaultOptions ''PreTestStage)

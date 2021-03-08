@@ -4,17 +4,18 @@ module DSL.Logger where
 import Common as C
 import  DSL.LogProtocol as LP
 import  DSL.CurrentTime as CT
-import DSL.LogProtocol.PrettyPrint
 import           Data.DList as D
-import           Pyrelude as P
-import           Pyrelude.IO as PIO hiding (now)
+import           Prelude as P
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
-import System.IO (stdout)
+import System.IO (stdout, Handle)
 import Polysemy
 import Polysemy.Output as O
 import Polysemy.Reader
 import Polysemy.State
+import Data.Text
+import Chronos
+import Data.Text.IO
 
 
 data Logger e m a where
@@ -62,34 +63,21 @@ logRunConsoleInterpreter =
 
 -- ToDo move to lib
 putLines :: Handle -> Text -> IO ()
-putLines hOut tx = sequence_ $ PIO.hPutStrLn hOut <$> lines tx
+putLines hOut tx = sequence_ $ hPutStrLn hOut <$> Data.Text.lines tx
 
 utfEncode :: A.ToJSON a => a -> Text
-utfEncode a = either 
-                (\e -> "Encode error: " <> txt e)
-                id
-                (decodeUtf8' . B.toStrict $ A.encode a)
+utfEncode a = undefined
 
 -- TODO - update to use info
 logStrJSONWith :: A.ToJSON e => ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
-logStrJSONWith thrdInfo lgIdx time lp = utfEncode $  LogProtocolOut {
-    logIndex = LogEventInfo {
-                              rnId = runId thrdInfo, 
-                              threadIdx = threadIndex thrdInfo,
-                              time = time,
-                              idx = lgIdx
-                            },
-    time = time,
-    logInfo = utfEncode <$> lp
-  }
-                
+logStrJSONWith thrdInfo lgIdx time lp = undefined       
 runThreadInfoReader :: Member CurrentTime r => Sem (Reader ThreadInfo ': r) a -> Sem r a 
 runThreadInfoReader sem = do 
                             tz <- CT.getTimeZone
                             runReader (ThreadInfo "local" 1 tz) sem
 
 logConsolePrettyInterpreter :: (Show e, Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs) => Sem (Logger e ': effs) a -> Sem effs a
-logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocolWith False, stdout)]
+logConsolePrettyInterpreter = undefined
 
 incIdx :: LogIndex -> LogIndex
 incIdx (LogIndex i) = LogIndex $ i + 1
@@ -123,7 +111,7 @@ logToHandles convertersHandles =
                       threadInfo :: ThreadInfo <- ask
                       modify incIdx
                       idx <- get
-                      now' <- now
+                      now' <- CT.now
                       let 
                         simpleConvertersHandles :: [(LogProtocolBase e -> Text, Handle)]
                         simpleConvertersHandles = (\(f , h) -> (f threadInfo idx now', h)) <$> convertersHandles
@@ -179,4 +167,4 @@ logDocInterpreter :: forall effs a e. (Show e, Member OutputDListText effs) => S
 logDocInterpreter = logDocWithSink (output . dList)
                                                      
 logDocPrettyInterpreter :: forall effs a e. (Show e, Member OutputDListText effs) => Sem (Logger e ': effs) a -> Sem effs a
-logDocPrettyInterpreter = logDocWithSink (output . D.fromList . lines . prettyPrintLogProtocol True)
+logDocPrettyInterpreter = undefined

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d01b7f87c24f928c00d66a58e0a4bc28ec59fa6f4e66707506f262c1be9f34fc
+-- hash: 9dedb44b8396069ec82349c7759d794b8ef1fc1d1677b15d469810d7d1c4bf77
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -30,24 +30,17 @@ library
       AuxFiles
       Check
       Common
-      Config
       DSL.CurrentTime
       DSL.CurrentTimeDocLogger
       DSL.Ensure
-      DSL.FileSystem
       DSL.Interpreter
       DSL.Logger
       DSL.LogProtocol
-      DSL.LogProtocol.PrettyPrint
-      FileLogging
       ItemFilter
       ItemRunners
-      OrphanedInstances
-      PrettyPrintCommon
       RunElementClasses
       Runner
       RunnerBase
-      RunnerConsoleAndFile
       RunPlan
       TestFilter
       TestFilters
@@ -61,6 +54,7 @@ library
       aeson
     , base
     , bytestring
+    , chronos
     , containers
     , deepseq
     , dlist
@@ -70,10 +64,10 @@ library
     , polysemy
     , polysemy-plugin
     , pretty-show
-    , pyrelude
     , raw-strings-qq
     , template-haskell
     , text
+    , time
     , transformers-either
     , unordered-containers
     , yaml

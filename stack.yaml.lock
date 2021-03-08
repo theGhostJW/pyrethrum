@@ -5,17 +5,6 @@
 
 packages:
 - completed:
-    name: pyrelude
-    version: 0.1.0.0
-    git: https://github.com/theGhostJW/pyrelude
-    pantry-tree:
-      size: 2414
-      sha256: c13042007e03fc67c0feae5eda4b9b77ab417db2856b5c72537f1280f5da4771
-    commit: 36fffcb758ebf73b7fcf3c7e38519ad0e9e38d96
-  original:
-    git: https://github.com/theGhostJW/pyrelude
-    commit: 36fffcb758ebf73b7fcf3c7e38519ad0e9e38d96
-- completed:
     hackage: discrimination-0.4@sha256:d42ae36c97ea9c0c8844b47ee162c5530f3daf708636f01010f58dcf52602876,2571
     pantry-tree:
       size: 923

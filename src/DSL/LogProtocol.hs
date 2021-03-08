@@ -2,10 +2,14 @@ module DSL.LogProtocol where
 
 import           Common (DetailedInfo, FrameworkError)
 import           Check
-import           Pyrelude
+import           Prelude
 import           RunElementClasses
 import Data.Aeson as A
 import Data.Aeson.TH
+import Data.Text
+import Data.String (IsString)
+import Chronos
+import Data.Time
 
 newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)
 -- newtype LogTimeZone = LogTimeZone {unLogTimeZone :: TimeZone} 
@@ -140,12 +144,7 @@ data LogProtocolOut = LogProtocolOut {
 
 $(deriveJSON defaultOptions ''LogEventInfo)
 $(deriveJSON defaultOptions ''LogIndex)
-$(deriveJSON defaultOptions ''LogProtocolOut)
 $(deriveJSON defaultOptions ''BoundaryEvent)
-$(deriveJSON defaultOptions ''LogProtocolBase)
-$(deriveJSON defaultOptions ''DocProtocol)
-$(deriveJSON defaultOptions ''RunProtocol)
-$(deriveJSON defaultOptions ''SubProtocol)
 $(deriveJSON defaultOptions ''RunTitle)
 $(deriveJSON defaultOptions ''GroupTitle)
 $(deriveJSON defaultOptions ''TestTitle)

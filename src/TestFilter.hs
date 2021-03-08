@@ -1,10 +1,12 @@
 module TestFilter where 
 
-import           Pyrelude as P
-import OrphanedInstances()
+import           Prelude as P
 import RunnerBase as RB
 import RunElementClasses as C
 import qualified Data.List as L 
+import Control.Monad.Identity
+import Data.Text
+import Data.Maybe
 
 acceptFilter :: TestFilterResult -> Bool
 acceptFilter = isNothing . reasonForRejection
@@ -26,20 +28,7 @@ data TestFilter rc tc = TestFilter {
 type FilterList rc tc = [TestFilter rc tc]
 
 filterTestCfg :: forall rc tc. TestConfigClass tc => FilterList rc tc -> rc -> tc -> TestFilterResult
-filterTestCfg fltrs rc tc =
-  let
-    fltrRslt :: Maybe Text -> TestFilterResult
-    fltrRslt = mkTestFilterResult tc 
-
-    applyFilter :: TestFilter rc tc -> TestFilterResult
-    applyFilter fltr = fltrRslt $ predicate fltr rc tc 
-                                             ? Nothing 
-                                             $ Just $ TestFilter.title fltr
-
-    firstRejectReason :: Maybe Text
-    firstRejectReason = L.find rejectFilter (applyFilter <$> fltrs) >>= reasonForRejection
-  in
-    fltrRslt firstRejectReason
+filterTestCfg fltrs rc tc = undefined
     
 
 filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => FilterList rc tc -> rc -> Test e tc rc i as ds effs -> Identity (Identity TestFilterResult)

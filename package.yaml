@@ -21,9 +21,10 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
   - base
-  - pyrelude
   - containers
   - extra
+  - chronos
+  - time
   - text
   - transformers-either
   - aeson

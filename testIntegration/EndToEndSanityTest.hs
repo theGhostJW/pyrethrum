@@ -1,21 +1,21 @@
 module EndToEndSanityTest where 
 
 
--- import           Pyrelude as E
--- import           Pyrelude.IO
--- import Pyrelude.Test      as T
--- import AuxFiles
--- import LogTransformation.Common
--- import DSL.LogProtocol
--- import DSL.Interpreter
--- import Common
--- import Config
--- import DSL.LogProtocol.PrettyPrint
+import           Pyrelude as E
+import           Pyrelude.IO
+import Pyrelude.Test      as T
+import AuxFiles
+import LogTransformation.Common
+import DSL.LogProtocol
+import DSL.Interpreter
+import Common
+import Config
+import DSL.LogProtocol.PrettyPrint
 
 -- -- Helpers --
 
--- runToLPList :: IO ([LogProtocol], Either AppError ())
--- runToLPList = executeForTest runSem
+runToLPList :: IO ([LogProtocol], Either AppError ())
+runToLPList = executeForTest runSem
 
 -- fullLog :: IO ([LogProtocol], Either AppError ())
 -- fullLog = runToLPList

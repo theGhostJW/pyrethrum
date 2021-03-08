@@ -10,13 +10,6 @@ extra-source-files:
 - README.md
 - ChangeLog.md
 
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
-
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
 description:         Please see the README on GitHub at <https://github.com/githubuser/simple-hpack#readme>
 
 dependencies:
@@ -38,14 +31,7 @@ dependencies:
 ghc-options:
   - -fmax-pmcheck-models=10000000
   - -ferror-spans
-  # - -dth-dec-file -- generate template haskell
-
   - -O0
-  # TODO: prgma to turn optimisations on for non-dev build
-  # - -O2
-  # - -flate-specialise # reqiuired for polysemy
-  # - -fspecialise-aggressively # reqiuired for polysemy
-  # - -Werror
   - -Wall
   - -Wcompat
   - -Wincomplete-record-updates
@@ -60,7 +46,6 @@ ghc-options:
   - -fno-warn-unused-binds
   - -fno-warn-unused-do-bind
   - -fwrite-ide-info
-  # - -fdefer-type-errors
 
 default-extensions:
   - AllowAmbiguousTypes

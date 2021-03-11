@@ -68,7 +68,6 @@ import RunnerBase as RB
     ( doNothing,
       groupAddresses,
       groupName,
-      Ensurable,
       GenericResult(..),
       HookLocation(..),
       ItemRunner,
@@ -140,14 +139,6 @@ data RunParams m e rc tc effs = RunParams {
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner e as ds i tc rc effs,
   rc :: rc
 }
-
-data Hooks effs = Hooks {
-  beforeAll :: Sem effs (),
-  beforeEach :: Sem effs (),
-  afterEach :: Sem effs (),
-  afterAll :: Sem effs ()
-}
-
 
 emptyElm :: forall a effs. SuiteItem effs [a] -> Bool
 emptyElm

@@ -5,11 +5,10 @@ import qualified Data.Aeson as A
 import Common as C
 import Polysemy 
 import Polysemy.Output
-import Polysemy.Error
+import Polysemy.Error as E
 import Polysemy.State
 import Polysemy.Reader
 import           DSL.FileSystem
-import           DSL.Ensure as EP
 import           DSL.Logger
 import           DSL.ArbitraryIO
 import           DSL.CurrentTime
@@ -18,31 +17,32 @@ import           DSL.LogProtocol
 import           Data.DList as D
 import           Pyrelude as P hiding (app)
 
-type ApEffs e effs = Members '[Logger e, Ensure, Error (FrameworkError e), CurrentTime] effs
 
-type EFFEnsureLog e effs = (Members '[Logger e, EP.Ensure] effs)
+type Failure e = Error (FrameworkError e)
+type ApEffs e effs = Members '[Logger e, Failure e, CurrentTime] effs
+
+type EFFEnsureLog e effs = (Members '[Logger e, Failure e] effs)
 type EFFAllEffectsBase e effs = Members (FullEffects e) effs
-type FullEffects e = '[FileSystem, Ensure, ArbitraryIO, Logger e, CurrentTime, Error (FrameworkError e)]
+type FullEffects e = '[FileSystem, ArbitraryIO, Logger e, CurrentTime, Failure e]
 
 -- TODO is there a type level <> DRY out
-type FullIOMembersBase e = '[FileSystem, EP.Ensure, ArbitraryIO, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Error (FrameworkError e), Embed IO]
-type TestIOEffects e = '[FileSystem, EP.Ensure, ArbitraryIO, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Error (FrameworkError e), Output (LogProtocolBase e), Embed IO]
+type FullIOMembersBase e = '[FileSystem, ArbitraryIO, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Failure e, Embed IO]
+type TestIOEffects e = '[FileSystem, ArbitraryIO, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Failure e, Output (LogProtocolBase e), Embed IO]
 
-type FullDocIOEffects e = '[FileSystem, EP.Ensure, ArbitraryIO, CurrentTime, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Error (FrameworkError e), Embed IO]
-type FullDocEffects e = '[FileSystem, ArbitraryIO, Reader ThreadInfo, State LogIndex, CurrentTime, Logger e, Ensure, Error (FrameworkError e), OutputDListText]
+type FullDocIOEffects e = '[FileSystem, ArbitraryIO, CurrentTime, Logger e, Reader ThreadInfo, State LogIndex, CurrentTime, Failure e, Embed IO]
+type FullDocEffects e = '[FileSystem, ArbitraryIO, Reader ThreadInfo, State LogIndex, CurrentTime, Logger e, Failure e, OutputDListText]
 
 handleIOException :: IO (Either (FrameworkError e) a) -> IO (Either (FrameworkError e) a)
 handleIOException = handle $ pure . Left . C.IOError
 
 -- todo find a type level <> and replace cons with list
-baseEffExecute :: forall effs a e. (Show e, A.ToJSON e, Member (Embed IO) effs) => (forall effs0. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs0 => Sem (Logger e ': effs0) a -> Sem effs0 a) ->  Sem (FileSystem ':  EP.Ensure ': ArbitraryIO ': Logger e ': Reader ThreadInfo ': State LogIndex ': CurrentTime ': Error (FrameworkError e) ': effs) a -> Sem effs (Either (FrameworkError e) a)
+baseEffExecute :: forall effs a e. (Show e, A.ToJSON e, Member (Embed IO) effs) => (forall effs0. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs0 => Sem (Logger e ': effs0) a -> Sem effs0 a) ->  Sem (FileSystem ': ArbitraryIO ': Logger e ': Reader ThreadInfo ': State LogIndex ': CurrentTime ': Failure e ': effs) a -> Sem effs (Either (FrameworkError e) a)
 baseEffExecute logger app = runError
                               $ currentTimeIOInterpreter
                               $ evalState (LogIndex 0)
                               $ runThreadInfoReader
                               $ logger
                               $ arbitraryIOInterpreter 
-                              $ ensureInterpreter 
                               $ fileSystemIOInterpreter 
                               app
 
@@ -64,7 +64,6 @@ executeForTest app = runM $ runOutputList
                           $ runThreadInfoReader
                           $ logRunRawInterpreter
                           $ arbitraryIOInterpreter
-                          $ ensureInterpreter
                           $ fileSystemIOInterpreter
                           app
                            
@@ -78,7 +77,6 @@ documentWithLogger logger app = handleIOException
                                     $ logger
                                     $ currentTimeDocInterpreter
                                     $ arbitraryIODocInterpreter
-                                    $ ensureDocInterpreter
                                     $ fileSystemDocInterpreter
                                     app
 
@@ -87,7 +85,6 @@ document logger app =
     run .
     runOutputMonoid id $
       runError
-      $ ensureDocInterpreter
       $ logger
       $ janFst2000UTCTimeInterpreter
       $ evalState (LogIndex 0)

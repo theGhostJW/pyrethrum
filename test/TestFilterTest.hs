@@ -191,8 +191,6 @@ mockSuite r =
       
   ]
 
-
-
 filterResults :: RunConfig -> [TestFilterResult]
 filterResults = filterSuite mockSuite filters'
 

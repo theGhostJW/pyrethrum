@@ -23,7 +23,6 @@ import Data.Aeson
 import Data.Aeson.TH
 import Polysemy
 import Polysemy.Error as PE
-import DSL.Ensure
 import DSL.Logger
 import DSL.LogProtocol
 import ItemRunners
@@ -36,8 +35,6 @@ exeDir = debug . parent <$> (parseAbsFile =<< uu)
 showAndLogItems :: Show a => [a] -> IO ()
 showAndLogItems = L.showAndLogItems exeDir
 
-type EnsureLogEffs effs = EFFEnsureLog SuiteError effs
-type EnsureEffs effs = Ensurable SuiteError effs
 
 type SuiteLogger = Logger SuiteError
 

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7c5c3a27144aa2985eab72076e40da8499a8b9ae889c00c4cf4180b7a0a8acdf
+-- hash: 48741e4c1bf440ed395748651ae7dfc58048a0eb43dcbde677d0701a693bb27b
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -31,10 +31,10 @@ library
       Check
       Common
       Config
+      DSL
       DSL.ArbitraryIO
       DSL.CurrentTime
       DSL.CurrentTimeDocLogger
-      DSL.Ensure
       DSL.FileSystem
       DSL.Interpreter
       DSL.Logger
@@ -101,6 +101,7 @@ test-suite pyrethrum-test
       LogTransformationTest
       PrettyPrintTest
       RunnerTest
+      SemTest
       TestFilterTest
       Paths_pyrethrum
   hs-source-dirs:

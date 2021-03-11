@@ -1,6 +1,5 @@
 module RunnerBase where
 
-import DSL.Ensure
 import Common (FilterErrorType, FrameworkError)
 import Pyrelude
 import Polysemy
@@ -29,8 +28,6 @@ type ItemRunner e as ds i tc rc effs =
 
 type Suite e tc rc effs a = 
     (forall i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i) => Test e tc rc i as ds effs -> a) -> SuiteItem effs [a]
-
-type Ensurable e effs = Members '[Ensure, Error (FrameworkError e)] effs
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,
@@ -131,5 +128,5 @@ data Test e tc rc i as ds effs = Test {
   config :: tc,
   items :: rc -> [i],
   interactor :: rc -> i -> Sem effs as,
-  prepState :: forall psEffs. (Ensurable e) psEffs => i -> as -> Sem psEffs ds
+  prepState :: forall psEffs. (Member (Error (FrameworkError e)) psEffs) => i -> as -> Sem psEffs ds
 }

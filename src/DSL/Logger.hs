@@ -46,7 +46,6 @@ log = logMessage
 log' :: forall effs e. (Show e, A.ToJSON e, Member (Logger e) effs) => Text -> Text -> Sem effs ()
 log' = detailLog (logRun . Message')
 
--- TODO - phantom types ? 
 logRunConsoleInterpreter :: forall effs a e. (Show e, Members '[CurrentTime, Embed IO] effs) => Sem (Logger e ': effs) a -> Sem effs a
 logRunConsoleInterpreter = 
     interpret $ \lg -> embed $ case lg of
@@ -95,13 +94,13 @@ incIdx :: LogIndex -> LogIndex
 incIdx (LogIndex i) = LogIndex $ i + 1
 
 logRunWithSink :: forall effs a e. (Show e, A.ToJSON e) => ((Show e, A.ToJSON e) => LogProtocolBase e -> Sem effs ()) -> Sem (Logger e ': effs) a -> Sem effs a
-logRunWithSink pushItem = 
+logRunWithSink push = 
   let
     pushRun :: RunProtocol e -> Sem effs () 
-    pushRun = pushItem . logRun
+    pushRun = push . logRun
   in
     interpret $ \case 
-                  LogItem lp -> pushItem lp
+                  LogItem lp -> push lp
 
                   LogError msg -> pushRun . LP.Error $ C.Error msg
                   LogError' msg inf -> pushRun . LP.Error . C.Error' $ DetailedInfo msg inf
@@ -157,13 +156,13 @@ logToHandles convertersHandles =
 
 
 logDocWithSink :: forall effs a e. (LogProtocolBase e -> Sem effs ()) -> Sem (Logger e ': effs) a -> Sem effs a
-logDocWithSink pushItem = 
+logDocWithSink push = 
   let
     pushDoc :: DocProtocol e -> Sem effs () 
-    pushDoc = pushItem . logDoc
+    pushDoc = push . logDoc
   in
     interpret $ \case 
-                  LogItem lp -> pushItem lp
+                  LogItem lp -> push lp
 
                   LogError msg -> pushDoc. DocError $ C.Error msg
                   LogError' msg inf -> pushDoc . DocError . C.Error' $ DetailedInfo msg inf

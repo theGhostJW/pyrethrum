@@ -19,7 +19,7 @@ import           Pyrelude as P hiding (app)
 
 
 type Failure e = Error (FrameworkError e)
-type ApEffs e effs = Members '[Logger e, Failure e, CurrentTime] effs
+type MinEffs e effs = Members '[Logger e, Failure e, CurrentTime] effs
 
 type EFFEnsureLog e effs = (Members '[Logger e, Failure e] effs)
 type EFFAllEffectsBase e effs = Members (FullEffects e) effs

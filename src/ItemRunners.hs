@@ -18,7 +18,7 @@ import Data.Aeson
 import RunnerBase as RB
 import qualified Data.Foldable as F
 
-runItem :: forall e effs rc tc i as ds. (ApEffs e effs, 
+runItem :: forall e effs rc tc i as ds. (MinEffs e effs, 
                                             Show e, 
                                             ItemClass i ds, 
                                             TestConfigClass tc, 

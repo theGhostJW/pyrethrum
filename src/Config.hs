@@ -136,7 +136,7 @@ applyTestFiltersToItems = F.applyTestFilters filterList
 
 type TestPlan effs a = R.Suite SuiteError TestConfig RunConfig effs a
 
-testEndpointPriv :: forall effs. ApEffs SuiteError effs =>
+testEndpointPriv :: forall effs. MinEffs SuiteError effs =>
       (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => 
         ItemRunner SuiteError as ds i TestConfig RunConfig effs)  
      -> TestAddress

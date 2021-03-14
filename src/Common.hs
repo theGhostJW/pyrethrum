@@ -1,11 +1,34 @@
 
 module Common where
 
-import           Pyrelude as P
+import Pyrelude as P
+    ( fst,
+      ($),
+      Eq(..),
+      Functor,
+      Show,
+      Semigroup((<>)),
+      Int,
+      Maybe(Just),
+      Text,
+      IOError,
+      IOException,
+      Category(id, (.)),
+      (<$>),
+      not,
+      breakEnd,
+      replicateText,
+      maybef,
+      txt,
+      toS,
+      (?),
+      lines,
+      unlines,
+      Listy(init, all, last), maybe, fromMaybe )
 import  qualified        Data.DList as D
-import Data.Aeson.TH
+import Data.Aeson.TH ( defaultOptions, deriveJSON )
 import OrphanedInstances()
-import Polysemy.Output as O
+import Polysemy.Output as O ( Output )
 
 indentText :: Int -> Text -> Text
 indentText i s = 
@@ -19,19 +42,13 @@ indentText i s =
     toS $ 
           last unlined /= Just '\n' 
             ? unlined   
-            $ maybef (init unlined)
-                ""
-                id 
-
-data PreTestStage = Rollover |
-                    GoHome
-                    deriving (Show, Eq)
+            $ fromMaybe "" (init unlined)
 
 data DetailedInfo = DetailedInfo {
-            message :: Text,
-            info    :: Text
-          }
-          deriving (Eq, Show)
+                      message :: Text,
+                      info    :: Text
+                    }
+                    deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''DetailedInfo)
 
@@ -55,9 +72,10 @@ data FrameworkError e =
 
             NotImplementedError Text |
 
-            PreTestError PreTestStage Text (FrameworkError e) |
-            PreTestCheckExecutionError PreTestStage Text (FrameworkError e)|
-            PreTestCheckError PreTestStage Text |
+            -- TODO Change this for hooks
+            PreTestError Text (FrameworkError e) |
+            PreTestCheckExecutionError Text (FrameworkError e)|
+            PreTestCheckError Text |
 
             IOError IOException |
             IOError' Text IOException |
@@ -73,5 +91,3 @@ type OutputDListText = O.Output (D.DList Text)
 
 dList :: Show s => s -> D.DList Text
 dList s = D.fromList [txt s]
-
-$(deriveJSON defaultOptions ''PreTestStage)

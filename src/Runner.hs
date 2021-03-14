@@ -18,9 +18,8 @@ import Common as C
       FileSystemErrorType(..),
       FilterErrorType(..),
       FrameworkError(..),
-      OutputDListText,
-      PreTestStage(..) )
-import DSL.Interpreter ( ApEffs )
+      OutputDListText )
+import DSL.Interpreter ( MinEffs )
 import DSL.Logger ( logItem, Logger )
 import DSL.LogProtocol as LP
 import DSL.CurrentTime ( utcOffset )
@@ -174,7 +173,7 @@ exeElm beforeEach afterEach runElm =
           logBoundry . EndGroup $ GroupTitle t
 
 
-mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, ApEffs e effs) =>
+mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, MinEffs e effs) =>
                     RunParams Maybe e rc tc effs
                     -> Sem effs ()
 mkSem rp@RunParams {suite, filters, rc} =
@@ -200,10 +199,10 @@ mkSem rp@RunParams {suite, filters, rc} =
       -- only working with chars / strings
       (toS <$> firstDuplicate (toS @_ @Prelude.String <$> groupAddresses root))
 
-mkRunSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) => RunParams Maybe e rc tc effs -> Sem effs ()
+mkRunSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, MinEffs e effs) => RunParams Maybe e rc tc effs -> Sem effs ()
 mkRunSem = mkSem 
 
-mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, ApEffs e effs) =>
+mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, MinEffs e effs) =>
                    RunParams (Either FilterErrorType) e rc tc effs
                    -> TestAddress                            -- test address
                    -> Either FilterErrorType (S.Set Int)    -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results

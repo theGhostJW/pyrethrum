@@ -71,16 +71,16 @@ utfEncode a = either
 
 -- TODO - update to use info
 logStrJSONWith :: A.ToJSON e => ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
-logStrJSONWith thrdInfo lgIdx time lp = utfEncode $  LogProtocolOut {
-    logIndex = LogEventInfo {
-                              rnId = runId thrdInfo, 
-                              threadIdx = threadIndex thrdInfo,
-                              time = time,
-                              idx = lgIdx
-                            },
-    time = time,
-    logInfo = utfEncode <$> lp
-  }
+logStrJSONWith thrdInfo lgIdx time lp = 
+  utfEncode LogProtocolOut {
+                        logIndex = LogEventInfo {
+                          rnId = runId thrdInfo, 
+                          threadIdx = threadIndex thrdInfo,
+                          time = time,
+                          idx = lgIdx
+                        },
+                        logInfo = utfEncode <$> lp
+                      }
                 
 runThreadInfoReader :: Member CurrentTime r => Sem (Reader ThreadInfo ': r) a -> Sem r a 
 runThreadInfoReader sem = do 

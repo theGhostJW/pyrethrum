@@ -133,7 +133,6 @@ data LogProtocolBase e =
 
 data LogProtocolOut = LogProtocolOut {
     logIndex :: LogEventInfo,
-    time :: Time,
     logInfo :: LogProtocolBase Text
   }
   deriving (Eq, Show)

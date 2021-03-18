@@ -2,20 +2,41 @@
 module DSL.Interpreter where
 
 import qualified Data.Aeson as A
-import Common as C
-import Polysemy 
-import Polysemy.Output
-import Polysemy.Error as E
-import Polysemy.State
-import Polysemy.Reader
-import           DSL.FileSystem
-import           DSL.Logger
-import           DSL.ArbitraryIO
-import           DSL.CurrentTime
-import           DSL.CurrentTimeDocLogger
-import           DSL.LogProtocol
-import           Data.DList as D
-import           Pyrelude as P hiding (app)
+import Common as C ( FrameworkError(IOError), OutputDListText )
+import Polysemy ( Sem, Member, Embed, run, runM, Members ) 
+import Polysemy.Output ( Output, runOutputList, runOutputMonoid, runOutputSem )
+import Polysemy.Error as E ( Error, runError )
+import Polysemy.State ( State, evalState )
+import Polysemy.Reader ( Reader )
+import DSL.FileSystem
+    ( fileSystemDocInterpreter, fileSystemIOInterpreter, FileSystem )
+import DSL.Logger
+    ( Logger,
+      logRunConsoleInterpreter,
+      runThreadInfoReader,
+      logConsolePrettyInterpreter,
+      logRunRawInterpreter,
+      logDocInterpreter,
+      logDocPrettyInterpreter, consLog )
+import DSL.ArbitraryIO
+    ( arbitraryIODocInterpreter, arbitraryIOInterpreter, ArbitraryIO )
+import DSL.CurrentTime
+    ( currentTimeIOInterpreter,
+      janFst2000UTCTimeInterpreter,
+      CurrentTime, janFst2000Midnight )
+import DSL.CurrentTimeDocLogger ( currentTimeDocInterpreter )
+import DSL.LogProtocol
+    ( LogIndex(LogIndex), LogProtocolBase, ThreadInfo )
+import Data.DList as D ( DList )
+import Pyrelude as P
+    ( ($),
+      Show,
+      Applicative(pure),
+      IO,
+      Either(Left),
+      Text,
+      Category((.), id),
+      handle )
 
 
 type Failure e = Error (FrameworkError e)
@@ -36,7 +57,10 @@ handleIOException :: IO (Either (FrameworkError e) a) -> IO (Either (FrameworkEr
 handleIOException = handle $ pure . Left . C.IOError
 
 -- todo find a type level <> and replace cons with list
-baseEffExecute :: forall effs a e. (Show e, A.ToJSON e, Member (Embed IO) effs) => (forall effs0. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs0 => Sem (Logger e ': effs0) a -> Sem effs0 a) ->  Sem (FileSystem ': ArbitraryIO ': Logger e ': Reader ThreadInfo ': State LogIndex ': CurrentTime ': Failure e ': effs) a -> Sem effs (Either (FrameworkError e) a)
+baseEffExecute :: forall effs a e. (Show e, A.ToJSON e, Member (Embed IO) effs) => 
+      (forall effs0. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs0 => Sem (Logger e ': effs0) a -> Sem effs0 a) 
+      ->  Sem (FileSystem ': ArbitraryIO ': Logger e ': Reader ThreadInfo ': State LogIndex ': CurrentTime ': Failure e ': effs) a 
+      -> Sem effs (Either (FrameworkError e) a)
 baseEffExecute logger app = runError
                               $ currentTimeIOInterpreter
                               $ evalState (LogIndex 0)
@@ -45,6 +69,15 @@ baseEffExecute logger app = runError
                               $ arbitraryIOInterpreter 
                               $ fileSystemIOInterpreter 
                               app
+
+minInterpret  ::  forall a e. Sem '[Logger e, Output (LogProtocolBase e), CurrentTime, Failure e] a -> Either (FrameworkError e) ([LogProtocolBase e], a)
+minInterpret app = run 
+                    $ runError
+                    $ janFst2000UTCTimeInterpreter
+                    $ runOutputList
+                    $ consLog
+                    app
+
 
 executeWithLogger :: forall a e. (Show e, A.ToJSON e) => (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger e ': effs) a -> Sem effs a) -> Sem (FullIOMembersBase e) a -> IO (Either (FrameworkError e) a)
 executeWithLogger logger app = 

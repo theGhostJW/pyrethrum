@@ -174,6 +174,10 @@ logDocWithSink push =
                   LogWarning' msg info ->  pushDoc . DocWarning' $ DetailedInfo msg info
 
 
+-- used for testing ~ cons to a list (so log is in reverse order)
+consLog :: forall effs a e. Member (Output (LogProtocolBase e)) effs => Sem (Logger e ': effs) a -> Sem effs a
+consLog = logDocWithSink output
+
 logDocInterpreter :: forall effs a e. (Show e, Member OutputDListText effs) => Sem (Logger e ': effs) a -> Sem effs a
 logDocInterpreter = logDocWithSink (output . dList)
                                                      

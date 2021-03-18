@@ -93,6 +93,7 @@ logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocolWith False, s
 incIdx :: LogIndex -> LogIndex
 incIdx (LogIndex i) = LogIndex $ i + 1
 
+-- TODO: looks like output
 logRunWithSink :: forall effs a e. (Show e, A.ToJSON e) => ((Show e, A.ToJSON e) => LogProtocolBase e -> Sem effs ()) -> Sem (Logger e ': effs) a -> Sem effs a
 logRunWithSink push = 
   let
@@ -154,7 +155,7 @@ logToHandles convertersHandles =
 
                       embed $ logToIO lg
 
-
+-- TODO - this looks like output
 logDocWithSink :: forall effs a e. (LogProtocolBase e -> Sem effs ()) -> Sem (Logger e ': effs) a -> Sem effs a
 logDocWithSink push = 
   let

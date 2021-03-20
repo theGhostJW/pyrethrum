@@ -100,7 +100,7 @@ prettyPrintLogProtocolBase _mTimeSuffix docMode =
         IterationLog (Run rp) -> case rp of
                               StartInteraction -> newLn <> "Interaction:"
                               StartChecks -> newLn <> "Checks:"
-                              StartPrepState -> newLn <> "PrepState:"
+                              StartParser -> newLn <> "Domain:"
             
                               IOAction m -> indent2 $ logIO m 
                               
@@ -108,9 +108,9 @@ prettyPrintLogProtocolBase _mTimeSuffix docMode =
                                 
                               InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ txtPretty err
 
-                              PrepStateSuccess iid (DStateJSON ds) -> prettyBlock '>' "PrepState Complete" iid $ prettyYamlKeyValues 2 LeftJustify ds
-                              PrepStateSkipped iid -> docMarkUp $ "PrepState Skipped: " <> txt iid
-                              PrepStateFailure iid err -> prettyBlock '>' "PrepState Failure" iid $ txtPretty err
+                              ParserSuccess iid (DStateJSON ds) -> prettyBlock '>' "ParseComplete" iid $ prettyYamlKeyValues 2 LeftJustify ds
+                              ParserSkipped iid -> docMarkUp $ "ParseSkipped: " <> txt iid
+                              ParserFailure iid err -> prettyBlock '>' "ParseFailure" iid $ txtPretty err
 
                               CheckOutcome iid (CheckReport reslt (MessageInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> txtPretty (classifyResult reslt)) iid $ 
                                                                                                                           chkhdr  <> " -> " <> txtPretty reslt <> 

@@ -8,7 +8,7 @@ import Polysemy
 import Polysemy.Internal.CustomErrors
 import           DSL.ArbitraryIO
 import           DSL.Logger
-import           Runner  as R hiding (interactor, prepState)
+import           Runner  as R hiding (interactor, parse)
 import           Data.Aeson.TH
 import           Data.Set as S
 import Type.Reflection as R
@@ -101,8 +101,8 @@ newtype DState = V {
 interactor :: forall e effs. Members (Effects e) effs => RunConfig -> Item -> Sem effs ApState
 interactor RunConfig{} Item{} = uu
 
-prepState :: forall e effs. Member (Failure e) effs => Item -> ApState -> Sem effs DState
-prepState _i ApState{} = uu
+parse :: forall e effs. Member (Failure e) effs => Item -> ApState -> Sem effs DState
+parse _i ApState{} = uu
 
 data Item = Item {
   iid    :: Int,
@@ -122,7 +122,7 @@ test :: forall effs. Members (Effects SuiteError) effs => MemberReflection.Test 
 test = Test MemberReflection.testConfig {address = nameOfModule}
               MemberReflection.items
               MemberReflection.interactor
-              MemberReflection.prepState
+              MemberReflection.parse
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

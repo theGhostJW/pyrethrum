@@ -84,16 +84,16 @@ logProtocolStatus chkEncountered = \case
                         IterationLog (Doc _) -> Pass -- this should not happen and will cause a phase error to be logged
                         IterationLog (Run rp) -> 
                           case rp of
-                            StartPrepState -> Pass
+                            StartParser -> Pass
                             IOAction _ -> Pass
           
                             StartInteraction -> Pass
                             InteractorSuccess {} -> Pass
                             InteractorFailure {} -> Fail
           
-                            PrepStateSuccess {} -> Pass
-                            PrepStateSkipped {} -> Pass
-                            PrepStateFailure {} -> Fail
+                            ParserSuccess {} -> Pass
+                            ParserSkipped {} -> Pass
+                            ParserFailure {} -> Fail
           
                             StartChecks{} -> Pass
                             CheckOutcome _ (CK.CheckReport reslt _) -> 
@@ -120,8 +120,8 @@ logProtocolStatus chkEncountered = \case
 data IterationPhase = OutOfIteration
                       | Checks 
                       | PreChecks
-                      | PrepState 
-                      | PrePrepState 
+                      | Parse
+                      | PreParse 
                       | Interactor
                       | PreInteractor 
                        deriving (Eq, Ord, Show)
@@ -184,14 +184,14 @@ phaseSwitch LogProtocolOut{ logInfo = lp } mFailedPhase =
         
         IterationLog (Run rp) -> case rp of
                                     LP.Error _ -> Nothing
-                                    StartPrepState -> ps PrePrepState PrepState
+                                    StartParser -> ps PreParse Parse
                                     IOAction _ -> Nothing
                                     StartInteraction -> ps PreInteractor Interactor
-                                    InteractorSuccess{} -> ps Interactor PrePrepState 
+                                    InteractorSuccess{} -> ps Interactor PreParse 
                                     InteractorFailure{}  -> Nothing -- keep in failed stage
-                                    PrepStateSuccess{}  -> ps PrepState PreChecks
-                                    PrepStateSkipped{}  -> ps Interactor PreChecks
-                                    PrepStateFailure{} -> Nothing -- keep in failed phase
+                                    ParserSuccess{}  -> ps Parse PreChecks
+                                    ParserSkipped{}  -> ps Interactor PreChecks
+                                    ParserFailure{} -> Nothing -- keep in failed phase
                                     StartChecks{} -> ps (fromMaybe PreChecks mFailedPhase) Checks
                                     Message _ -> Nothing
                                     Message' _ -> Nothing

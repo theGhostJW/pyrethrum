@@ -143,8 +143,8 @@ genLogProtocol = choice [
                     logRun <$> (InteractorSuccess <$> genItemId <*> (ApStateJSON <$> genJSON)),
                     logRun <$> (InteractorFailure <$> genItemId <*> genError),
 
-                    logRun <$> (PrepStateSuccess <$> genItemId <*> (DStateJSON <$> genJSON)),
-                    logRun <$> (PrepStateFailure <$> genItemId <*> genError),
+                    logRun <$> (ParserSuccess <$> genItemId <*> (DStateJSON <$> genJSON)),
+                    logRun <$> (ParserFailure <$> genItemId <*> genError),
 
                     logRun . Message <$> genStr,
                     logRun . Message' <$> genDetailedInfo,

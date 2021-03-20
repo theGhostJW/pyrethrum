@@ -25,7 +25,7 @@ runItem :: forall e effs rc tc i as ds. (MinEffs e effs,
                                             ToJSON e, 
                                             ToJSON as, 
                                             ToJSON ds) => ItemRunner e as ds i tc rc effs
-runItem rc (Test tc _items interactor prepState) i  = 
+runItem rc (Test tc _items interactor parse) i  = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) (identifier i)
@@ -38,10 +38,10 @@ runItem rc (Test tc _items interactor prepState) i  =
                             logRP StartChecks 
                             F.traverse_ logChk $ D.toList $ CK.skipChecks (checkList i)
 
-    prepStateErrorHandler :: FrameworkError e -> Sem effs ds
-    prepStateErrorHandler e = 
+    parseErrorHandler :: FrameworkError e -> Sem effs ds
+    parseErrorHandler e = 
       do 
-        logRP $ PrepStateFailure iid e
+        logRP $ ParserFailure iid e
         recordSkippedChecks
         PE.throw e
 
@@ -63,15 +63,15 @@ runItem rc (Test tc _items interactor prepState) i  =
           eitherf ethApState
             (\e -> do 
                     logRP $ InteractorFailure iid e
-                    logRP $ PrepStateSkipped iid
+                    logRP $ ParserSkipped iid
                     recordSkippedChecks
                     )
             (\as -> do 
                 log "interact end"
                 logRP . InteractorSuccess iid . ApStateJSON . toJSON $ as
-                logRP StartPrepState
-                ds <- PE.catch (prepState i as) prepStateErrorHandler
-                logRP . PrepStateSuccess iid . DStateJSON . toJSON $ ds
+                logRP StartParser
+                ds <- PE.catch (parse i as) parseErrorHandler
+                logRP . ParserSuccess iid . DStateJSON . toJSON $ ds
                 logRP StartChecks
                 runChecks ds
               )
@@ -84,7 +84,7 @@ documentItem :: forall e effs rc tc i as ds. (ToJSON e,
                                                  TestConfigClass tc, 
                                                  Member (Logger e) effs)
                                                 => ItemRunner e as ds i tc rc effs
-documentItem rc (Test tc _items interactor _prepState) i = 
+documentItem rc (Test tc _items interactor _parse) i = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) $ identifier i

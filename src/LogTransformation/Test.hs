@@ -306,7 +306,7 @@ module LogTransformation.Test where
 --   otherWarningsDesc :: [IterationWarning],
 --   item :: Maybe ItemInfo,
 --   apState :: Maybe ApStateInfo,
---   domainState :: Maybe PrepStateInfo,
+--   domainState :: Maybe ParserStatus,
 --   rawLog :: DList LogProtocolBase
 -- } deriving (Eq, Show)
 -- -}

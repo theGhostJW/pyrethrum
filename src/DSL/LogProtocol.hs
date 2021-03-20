@@ -84,10 +84,10 @@ data RunProtocol e =
                 InteractorSuccess ItemId ApStateJSON |
                 InteractorFailure ItemId (FrameworkError e) |
               
-                StartPrepState |
-                PrepStateSuccess ItemId DStateJSON |
-                PrepStateSkipped ItemId |
-                PrepStateFailure ItemId (FrameworkError e) |
+                StartParser |
+                ParserSuccess ItemId DStateJSON |
+                ParserSkipped ItemId |
+                ParserFailure ItemId (FrameworkError e) |
                 
                 StartChecks | 
                 CheckOutcome ItemId CheckReport |

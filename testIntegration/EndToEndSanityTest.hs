@@ -73,8 +73,8 @@ empti = const ([] :: [b])
 emptiInteractor :: b -> RunConfig -> a -> Sem effs b
 emptiInteractor b _ _ = pure b
 
-emptiPrepState:: a -> i -> as -> Sem effs a
-emptiPrepState a _ _ = pure a
+emptiParser:: a -> i -> as -> Sem effs a
+emptiParser a _ _ = pure a
 
 test1 :: MockTest MyInt Text MyText effs
 test1 = RunnerBase.Test {
@@ -85,7 +85,7 @@ test1 = RunnerBase.Test {
               },
               items = empti,
               interactor = emptiInteractor "Hello",
-              prepState = \i -> pure . MyText . txt
+              parse = \i -> pure . MyText . txt
           }
 
 
@@ -98,7 +98,7 @@ test2 = Test {
               },
               items = empti,
               interactor = emptiInteractor 1,
-              prepState = \i -> pure . MyText . txt
+              parse = \i -> pure . MyText . txt
             }
 
 test3 :: MockTest MyInt Int MyText effs
@@ -110,7 +110,7 @@ test3 = Test {
                 },
               items = empti,
               interactor = emptiInteractor 3,
-              prepState = \i -> pure . MyText . txt
+              parse = \i -> pure . MyText . txt
             }
 
 test4 :: MockTest MyText Text MyText effs 
@@ -122,7 +122,7 @@ test4 = Test {
                 },
               items = empti,
               interactor = emptiInteractor "Hello",
-              prepState = \i -> pure . MyText . txt
+              parse = \i -> pure . MyText . txt
             }
 
 test5 :: MockTest MyInt Int MyText effs
@@ -134,8 +134,8 @@ test5 = Test {
                 },
               items = empti,
               interactor = emptiInteractor 1,
-              prepState = \i -> pure . MyText . txt
-              -- prepState = \i _ -> pure i 
+              parse = \i -> pure . MyText . txt
+              -- parse = \i _ -> pure i 
             }
 
 
@@ -222,11 +222,11 @@ result = minInterpret testRun
 
 -- unit_runs_without_error = chkRunRslt isRight "Error in run result should be Right"
 
--- unit_records_expected_prepstate_failures = 
+-- unit_records_expected_parser_failures = 
 --   let 
 --     isPrepFailure :: LogProtocol -> Bool 
 --     isPrepFailure = \case 
---                         IterationLog (Run (PrepStateFailure _ _)) -> True
+--                         IterationLog (Run (ParserFailure _ _)) -> True
 --                         _ -> False
 --   in
 --     chkLog (\lg -> 2 == count isPrepFailure lg) "expect 2 prep failures 1 for each Rough test iteration 110"

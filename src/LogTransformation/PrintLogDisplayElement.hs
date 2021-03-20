@@ -11,7 +11,7 @@ module LogTransformation.PrintLogDisplayElement (
   IterationError(..),
   IterationWarning(..),
   ApStateInfo(..),
-  PrepStateInfo(..)
+  ParserStatus(..)
 ) where
 
 import Common as C (FrameworkError(..), indentText)
@@ -93,10 +93,11 @@ data ApStateInfo = SucceededInteractor ApStateJSON |
                    FailedInteractor (FrameworkError Text)
                    deriving (Eq, Show)
 
-data PrepStateInfo = SucceededPrepState DStateJSON |
-                     SkippedPrepState ItemId |
-                     FailedPrepState (FrameworkError Text)
+data ParserStatus = ParserSuccess DStateJSON |
+                     ParserSkipped ItemId |
+                     ParserFailed (FrameworkError Text)
                      deriving (Eq, Show)
+
 
 data IterationRecord = IterationRecord {
   modulePath :: Text,
@@ -110,7 +111,7 @@ data IterationRecord = IterationRecord {
   otherWarnings :: [IterationWarning],
   item :: Maybe A.Value,
   apState :: Maybe ApStateInfo,
-  domainState :: Maybe PrepStateInfo
+  domainState :: Maybe ParserStatus
 } deriving (Eq, Show)
 
 data IterationAccum = IterationAccum {
@@ -336,14 +337,14 @@ printLogDisplayStep runResults lineNo oldAccum@IterationAccum{ stepInfo } eithLp
                 Run action -> 
                   case action of
                     IOAction _txt' -> skipLog
-                    StartPrepState -> skipLog
+                    StartParser -> skipLog
                     StartInteraction -> skipLog
                     InteractorSuccess _iid apStateJSON -> updateItrRec (\ir -> ir {apState = Just $ SucceededInteractor apStateJSON})
                     InteractorFailure _iid err -> updateItrRec (\ir -> ir {apState = Just $ FailedInteractor err})
                   
-                    PrepStateSuccess _iid dStateJSON -> updateItrRec (\ir -> ir {domainState = Just $ SucceededPrepState dStateJSON})
-                    PrepStateSkipped iid -> updateItrRec (\ir -> ir {domainState = Just $ SkippedPrepState iid})
-                    PrepStateFailure _iid err -> updateItrRec (\ir -> ir {domainState = Just $ FailedPrepState err})
+                    LP.ParserSuccess _iid dStateJSON -> updateItrRec (\ir -> ir {domainState = Just $ LogTransformation.PrintLogDisplayElement.ParserSuccess dStateJSON})
+                    LP.ParserSkipped iid -> updateItrRec (\ir -> ir {domainState = Just $ LogTransformation.PrintLogDisplayElement.ParserSkipped iid})
+                    ParserFailure _iid err -> updateItrRec (\ir -> ir {domainState = Just $ ParserFailed err})
                     StartChecks -> skipLog 
                     CheckOutcome _itmId chkReport -> updateItrRec (\ir -> ir {validation = chkReport : validation ir})
     
@@ -519,11 +520,11 @@ prettyPrintDisplayElement pde =
                           ("  Domain State is Empty" <> newLn)
                           (
                             \case 
-                              SucceededPrepState dsDisplay -> prettyYamlKeyValues 2 LeftJustify $ unDStateJSON dsDisplay
-                              SkippedPrepState _iid -> "  Domain State is Empty - Execution Skipped" <> newLn
-                              FailedPrepState err -> 
+                              LogTransformation.PrintLogDisplayElement.ParserSuccess dsDisplay -> prettyYamlKeyValues 2 LeftJustify $ unDStateJSON dsDisplay
+                              LogTransformation.PrintLogDisplayElement.ParserSkipped _iid -> "  Domain State is Empty - Execution Skipped" <> newLn
+                              ParserFailed err -> 
                                 indent2 (
-                                  "PrepState Failure - Domain State is Empty:" 
+                                  "ParseFailure - Domain State is Empty:" 
                                   <> newLn 
                                   <> indent2 ("- " <> txtPretty err)
                                 )
@@ -624,4 +625,4 @@ $(deriveJSON defaultOptions ''IterationRecord)
 $(deriveJSON defaultOptions ''ApStateInfo)
 $(deriveJSON defaultOptions ''IterationWarning)
 $(deriveJSON defaultOptions ''IterationError)
-$(deriveJSON defaultOptions ''PrepStateInfo)
+$(deriveJSON defaultOptions ''ParserStatus)

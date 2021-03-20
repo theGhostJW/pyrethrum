@@ -60,8 +60,8 @@ empti = const ([] :: [b])
 emptiInteractor :: b -> RunConfig -> a -> Sem effs b
 emptiInteractor b _ _ = pure b
 
-emptiPrepState:: a -> i -> as -> Sem effs a
-emptiPrepState a _ _ = pure a
+emptiParser:: a -> i -> as -> Sem effs a
+emptiParser a _ _ = pure a
 
 test1 :: MockTest MyInt Text MyInt effs
 test1 = Test {
@@ -72,7 +72,7 @@ test1 = Test {
               },
               items = empti,
               interactor = emptiInteractor "Hello",
-              prepState = emptiPrepState (MyInt 1)
+              parse = emptiParser (MyInt 1)
             }
 
 test2 :: MockTest MyInt MyInt MyInt effs
@@ -84,7 +84,7 @@ test2 = Test {
               },
               items = empti,
               interactor = emptiInteractor (MyInt 1),
-              prepState = \i as -> pure as
+              parse = \i as -> pure as
             }
 
 test3 :: MockTest MyInt MyInt MyInt effs
@@ -96,7 +96,7 @@ test3 = Test {
             },
               items = empti,
               interactor = emptiInteractor (MyInt 3),
-              prepState = \i as -> pure as
+              parse = \i as -> pure as
             }
 
 test4 :: MockTest Text Text Text effs 
@@ -108,7 +108,7 @@ test4 = Test {
               },
               items = empti,
               interactor = emptiInteractor "Hello",
-              prepState = \i as -> pure as
+              parse = \i as -> pure as
             }
 
 test5 :: MockTest MyInt MyInt MyInt effs
@@ -120,7 +120,7 @@ test5 = Test {
                 },
               items = empti,
               interactor = emptiInteractor (MyInt 1),
-              prepState = \i as -> pure as 
+              parse = \i as -> pure as 
             }
 
 

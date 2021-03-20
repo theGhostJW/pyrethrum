@@ -70,7 +70,7 @@ runItem rc (Test tc _items interactor parse) i  =
                 log "interact end"
                 logRP . InteractorSuccess iid . ApStateJSON . toJSON $ as
                 logRP StartParser
-                ds <- PE.catch (parse i as) parseErrorHandler
+                ds <- PE.catch (parse as) parseErrorHandler
                 logRP . ParserSuccess iid . DStateJSON . toJSON $ ds
                 logRP StartChecks
                 runChecks ds

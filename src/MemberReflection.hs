@@ -101,8 +101,8 @@ newtype DState = V {
 interactor :: forall e effs. Members (Effects e) effs => RunConfig -> Item -> Sem effs ApState
 interactor RunConfig{} Item{} = uu
 
-parse :: forall e effs. Member (Failure e) effs => Item -> ApState -> Sem effs DState
-parse _i ApState{} = uu
+parse :: forall e effs. Member (Failure e) effs => ApState -> Sem effs DState
+parse = uu
 
 data Item = Item {
   iid    :: Int,

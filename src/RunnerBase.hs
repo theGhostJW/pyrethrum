@@ -128,5 +128,5 @@ data Test e tc rc i as ds effs = Test {
   config :: tc,
   items :: rc -> [i],
   interactor :: rc -> i -> Sem effs as,
-  parse :: forall psEffs. (Member (Error (FrameworkError e)) psEffs) => i -> as -> Sem psEffs ds
+  parse :: forall psEffs. (Member (Error (FrameworkError e)) psEffs) => as -> Sem psEffs ds
 }

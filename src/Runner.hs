@@ -1,7 +1,6 @@
 {-# LANGUAGE NoPolyKinds #-} 
 -- TODO: work out why this is needed - investigate polykinds
 
-{-# OPTIONS_GHC -Wno-deferred-type-errors #-}
 module Runner (
   mkEndpointSem
   , RunParams(..)
@@ -121,15 +120,15 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
     applyRunner i =  
       let
         iid :: ItemId
-        iid = ItemId (moduleAddress tc) (identifier i)
+        iid = ItemId (moduleAddress tc) (identifier @_ @ds i)
       in
         do
-          logBoundry . StartIteration iid (WhenClause $ whenClause i) (ThenClause $ thenClause i) $ toJSON i
+          logBoundry . StartIteration iid (WhenClause $ whenClause @_ @ds i) (ThenClause $ thenClause @_ @ds  i) $ toJSON i
           itemRunner rc test i
           logBoundry $ EndIteration iid
 
     inTargIds :: i -> Bool
-    inTargIds i = maybe True (S.member (identifier i)) iIds
+    inTargIds i = maybe True (S.member (identifier @_ @ds i)) iIds
 
   in
     case filteredItems of

@@ -28,7 +28,7 @@ runItem :: forall e effs rc tc i as ds. (MinEffs e effs,
 runItem rc (Test tc _items interactor parse) i  = 
   let
     iid :: ItemId
-    iid = ItemId (moduleAddress tc) (identifier i)
+    iid = ItemId (moduleAddress tc) (identifier @i @ds i)
 
     logChk :: CK.CheckReport -> Sem effs ()
     logChk cr = logRP $ CheckOutcome iid cr
@@ -36,7 +36,7 @@ runItem rc (Test tc _items interactor parse) i  =
     recordSkippedChecks :: Sem effs ()
     recordSkippedChecks = do 
                             logRP StartChecks 
-                            F.traverse_ logChk $ D.toList $ CK.skipChecks (checkList i)
+                            F.traverse_ logChk $ D.toList $ CK.skipChecks (checkList @i @ds i)
 
     parseErrorHandler :: FrameworkError e -> Sem effs ds
     parseErrorHandler e = 
@@ -87,7 +87,7 @@ documentItem :: forall e effs rc tc i as ds. (ToJSON e,
 documentItem rc (Test tc _items interactor _parse) i = 
   let
     iid :: ItemId
-    iid = ItemId (moduleAddress tc) $ identifier i
+    iid = ItemId (moduleAddress tc) $ identifier @i @ds i
 
     docLog :: DocProtocol e -> Sem effs ()
     docLog = logItem . logDoc

@@ -42,13 +42,16 @@ items  = [
           i 150 "Pre" "Post" mempty
         ]
 
-chkFilterError flter msg itms = chkLeftContains msg $ filterredItemIds flter (itms ::  [TestItem])
+chkFilterError flter msg itms = chkLeftContains msg $ filterredItemIds @TestItem @DState flter (itms ::  [TestItem])
 
-chkFilter flter expted itms = chkEq (Right $ S.fromList expted) $ filterredItemIds flter itms
-chkFilter' flter expted itms = chkEq (Right $ S.singleton expted) $ filterredItemIds flter itms
+chkFilter :: ItemClass TestItem DState => ItemFilter TestItem -> [Int] -> [TestItem] -> Assertion
+chkFilter flter expted itms = chkEq (Right $ S.fromList expted) $ filterredItemIds @TestItem @DState flter itms
 
-chkSingleton :: (ItemClass item dState) => ItemFilter item -> [item] -> Assertion
-chkSingleton flter itms = P.either (\_ -> chk False) (chkEq (1 :: Int)) $ lengthFoldable <$> filterredItemIds flter itms
+chkFilter' :: ItemClass TestItem DState => ItemFilter TestItem -> Int -> [TestItem] -> Assertion
+chkFilter' flter expted itms = chkEq (Right $ S.singleton expted) $ filterredItemIds @TestItem @DState flter itms
+
+chkSingleton :: forall i ds. (ItemClass i ds) => ItemFilter i -> [i] -> Assertion
+chkSingleton flter itms = P.either (\_ -> chk False) (chkEq (1 :: Int)) $ lengthFoldable <$> filterredItemIds @i @ds flter itms
 
 blahh :: IO ()
 blahh = undefined

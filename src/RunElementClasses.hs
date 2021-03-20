@@ -46,15 +46,15 @@ class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => TestConfigClass a where
 
 class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => RunConfigClass a
 
-class (ToJSON i, Generic i) => ItemClass i ds | i -> ds  where
+class (ToJSON i, Generic i) => ItemClass i ds  where
   identifier :: i -> Int
   whenClause :: i -> Text
   thenClause :: i -> Text
   checkList :: i -> CheckDList ds
 
   whenThen :: i -> Text
-  whenThen i = "When: " <> whenClause i  <> "\n" <>
-               "Then: " <> thenClause i
+  whenThen i = "When: " <> whenClause @i @ds i  <> "\n" <>
+               "Then: " <> thenClause @i @ds i
 
 mkDisplayInfo :: TestConfigClass tc => tc -> TestDisplayInfo
 mkDisplayInfo tc = TestDisplayInfo {

@@ -17,7 +17,7 @@ subPath :: IO (Either P.IOError AbsDir) -> Path Rel a -> IO (Either P.IOError (P
 subPath prent chld = ((</> chld) <$>) <$> prent
 
 auxDir :: IO AbsDir -> RelDir -> IO (Either P.IOError AbsDir)
-auxDir projRoot relDir = subPath (auxBase projRoot) relDir
+auxDir projRoot = subPath (auxBase projRoot)
 
 -- local temp not OS
 tempDirBase :: IO AbsDir -> IO (Either P.IOError AbsDir)

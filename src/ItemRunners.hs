@@ -10,12 +10,13 @@ import DSL.Logger
 import DSL.LogProtocol as LP
 import Pyrelude as P
 import Polysemy
-import Polysemy.Error as PE
+import Polysemy.Error as PE ( Error, catch, throw )
 import qualified Data.DList as D
 import RunElementClasses as C
+    ( ItemClass(checkList, identifier), TestConfigClass(..) )
 import OrphanedInstances()
-import Data.Aeson
-import RunnerBase as RB
+import Data.Aeson ( ToJSON(toJSON) )
+import RunnerBase as RB ( Test(Test), ItemRunner )
 import qualified Data.Foldable as F
 
 runItem :: forall e effs rc tc i as ds. (MinEffs e effs, 

@@ -65,22 +65,20 @@ data HookLocation = BeforeAll |
 
 -} 
 
-data SuiteItem effs a =
+data SuiteItem effs t =
   Tests {
-        -- a list of tests
-        tests :: a
-        -- eg [IO Either (FrameworkError TestInfo)]
+      tests :: t
    } |
 
    Hook {
      location :: HookLocation,
      hook :: Sem effs (),
-     subElms :: [SuiteItem effs a]
+     subElms :: [SuiteItem effs t]
    } |
 
    Group {
     title :: Text,
-    subElms :: [SuiteItem effs a]
+    subElms :: [SuiteItem effs t]
    }
    deriving Functor
 
@@ -102,23 +100,24 @@ groupName = \case
               Group t _ -> Just t
 
 groupAddresses' :: [Text] -> Text -> SuiteItem effs a -> [Text]
-groupAddresses' accum base re = 
+groupAddresses' accum root el = 
   let
     delim = "."
 
     appendDelim :: Text -> Text -> Text
     appendDelim p s = p <> (null p || null s ? empty $ delim) <> s
   in
-    case re of
+    case el of
       Tests _ -> accum
+      
       Hook _ _ subElems -> 
-        fold $ groupAddresses' accum base <$> subElems
+        mconcat $ debug' "HOOK" . groupAddresses' accum root <$> subElems
+      
       Group t subElems -> 
         let 
-          address = appendDelim base  t 
-          nxtAccum = snoc accum address
+          address = appendDelim root t 
         in 
-          nxtAccum <> fold (groupAddresses' nxtAccum address <$> subElems)
+          address : mconcat (groupAddresses' accum address <$> subElems)
         
 
 groupAddresses :: SuiteItem effs a -> [Text]

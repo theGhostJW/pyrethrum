@@ -157,6 +157,34 @@ includeFilter =
 filters' :: [TestFilter RunConfig TestConfig]
 filters' = [includeFilter]
 
+demoSuit ::  SuiteItem effs [Text]
+demoSuit =
+  R.Group
+    "Happy Suite"
+    [ Hook
+        BeforeAll
+        (pure ())
+        [ Tests
+            [ "test 1",
+              "test 2",
+              "test 3"
+            ]
+        ],
+      R.Group
+        "Sub Group"
+        [ Tests
+            [ 
+              "test 4",
+              "test 5"
+            ]
+        ],
+      R.Group
+        "Empty Group"
+        [ 
+          Tests []
+        ]
+    ]
+
 happySuite :: forall effs a. (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ItemClass i ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
 happySuite r =
   R.Group
@@ -179,7 +207,8 @@ happySuite r =
         ],
       R.Group
         "Empty Group"
-        [ Tests []
+        [ 
+          Tests []
         ]
     ]
 

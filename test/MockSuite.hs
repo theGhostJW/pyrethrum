@@ -6,6 +6,7 @@ import DSL.Interpreter (MinEffs, executeForTest, minInterpret)
 import DSL.LogProtocol (LogProtocolBase)
 import DSL.LogProtocol.PrettyPrint ()
 import Data.Aeson
+    ( FromJSON, ToJSON(toEncoding), defaultOptions, genericToEncoding )
 import Data.Aeson.TH
 import ItemRunners
 import LogTransformation.Common ()
@@ -15,22 +16,39 @@ import qualified Pyrelude as P
 import Pyrelude.IO ()
 import Pyrelude.Test as T ()
 import RunElementClasses
+    ( TestAddress(TestAddress),
+      ItemClass(checkList, thenClause, whenClause, identifier),
+      TestConfigClass(..),
+      RunConfigClass,
+      Titled(..) )
 import Runner as R
+    ( FrameworkError,
+      mkRunSem,
+      RunParams(..),
+      HookLocation(BeforeAll),
+      SuiteItem(Tests, Hook, Group),
+      Test(Test, config, items, interactor, parse))
+      
 import qualified RunnerBase
-import TestFilter
+import TestFilter ( TestFilter(..) )
+import DSL.Logger
 
 type AppError = FrameworkError Text
 type LogProtocol = LogProtocolBase AppError
 
-newtype RunConfig = RunConfig
-  { include :: Bool
+data RunConfig = RunConfig
+  { 
+    cfgHeader :: Text,
+    include :: Bool
   }
-  deriving (Eq, ToJSON, Show, FromJSON)
+  deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''RunConfig)
 
 instance RunConfigClass RunConfig
 
 instance Titled RunConfig where
-  title rc = toS $ show rc
+  title rc = cfgHeader rc
 
 data TestConfig = TestConfig
   { header :: Text,
@@ -47,7 +65,7 @@ instance TestConfigClass TestConfig where
 instance Titled TestConfig where
   title = header
 
-type MockTest i as ds effs = RunnerBase.Test MyText TestConfig RunConfig i as ds effs
+type MockTest i as ds effs = RunnerBase.Test Text TestConfig RunConfig i as ds effs
 
 newtype MyInt = MyInt Int deriving (Show, Generic)
 
@@ -71,11 +89,12 @@ instance ItemClass MyText MyText where
 empti :: a -> [b]
 empti = const ([] :: [b])
 
-emptiInteractor :: b -> RunConfig -> a -> Sem effs b
-emptiInteractor b _ _ = pure b
+logInteractor :: forall i b as effs. Member (Logger Text) effs => as -> RunConfig -> i -> Sem effs as
+logInteractor as (RunConfig t' _) i = log (t' <> " " <> txt i) >> pure as
 
 emptiParser :: a -> i -> as -> Sem effs a
 emptiParser a _ _ = pure a
+
 
 test1 :: MockTest MyInt Text MyText effs
 test1 =
@@ -87,7 +106,7 @@ test1 =
             include = True
           },
       items = empti,
-      interactor = emptiInteractor "Hello",
+      interactor = log "Hello Test 1",
       parse = pure . MyText . txt
     }
 
@@ -101,7 +120,7 @@ test2 =
             include = True
           },
       items = empti,
-      interactor = emptiInteractor 1,
+      interactor = logInteractor "test 2",
       parse = pure . MyText . txt
     }
 
@@ -115,7 +134,7 @@ test3 =
             include = True
           },
       items = empti,
-      interactor = emptiInteractor 3,
+      interactor = logInteractor "test 3",
       parse = pure . MyText . txt
     }
 
@@ -129,7 +148,7 @@ test4 =
             include = True
           },
       items = empti,
-      interactor = emptiInteractor "Hello",
+      interactor = logInteractor "test 4",
       parse = pure . MyText . txt
     }
 
@@ -139,11 +158,11 @@ test5 =
     { config =
         TestConfig
           { header = "test5",
-            address = TestAddress "test5 address",
+            address = TestAddress "test 5",
             include = True
           },
       items = empti,
-      interactor = emptiInteractor 1,
+      interactor = logInteractor 1,
       parse = pure . MyText . txt
     }
 
@@ -219,7 +238,7 @@ runParams =
       filters = filters',
       itemIds = Nothing,
       itemRunner = runItem,
-      rc = RunConfig True
+      rc = RunConfig "Happy Run" True
     }
 
 happyRun :: forall effs. MinEffs MyText effs => Sem effs ()

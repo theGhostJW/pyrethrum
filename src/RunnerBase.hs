@@ -10,22 +10,6 @@ import Data.Aeson
 type ItemRunner e as ds i tc rc effs = 
     rc -> Test e tc rc i as ds effs -> i -> Sem effs ()
 
-
--- type TestPlanBase e tc rc m1 m a effs = (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds, ToJSON as, ToJSON ds) => 
---                                                           GenericTest e tc rc i as ds effs -> m1 (m a)) -> [TestGroup m1 m a effs]
-
--- data TestGroup m1 m a effs =
---   TestGroup {
---         header :: Text,
---         -- occurs once on client before group is run
---         rollover :: PreRun effs,
---         -- occurs once before test iteration is run
---         goHome :: PreRun effs,
---         -- a list of tests
---         tests :: [m1 (m a)]
---         -- eg [IO Either (FrameworkError TestInfo)]
---    }
-
 type Suite e tc rc effs a = 
     (forall i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i) => Test e tc rc i as ds effs -> a) -> SuiteItem effs [a]
 

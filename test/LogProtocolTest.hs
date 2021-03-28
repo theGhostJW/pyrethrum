@@ -107,8 +107,8 @@ genDocActionInfo = choice [
 genResultExpectation :: Gen C.ResultExpectation
 genResultExpectation = choice [
   pure C.ExpectPass, 
-  C.ExpectFailure <$> pure C.Inactive <*> genStr,
-  C.ExpectFailure <$> pure C.Active <*> genStr 
+  C.ExpectFailure C.Inactive <$> genStr,
+  C.ExpectFailure C.Active <$> genStr 
  ]
 
 genGateStatus :: Gen C.GateStatus

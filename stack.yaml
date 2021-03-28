@@ -59,6 +59,7 @@ extra-deps:
 - polysemy-1.4.0.0
 - polysemy-plugin-0.2.5.2
 - transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
+
 # Control whether we use the GHC we find on the path
 # system-ghc: true
 #

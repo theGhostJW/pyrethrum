@@ -89,14 +89,16 @@ instance ItemClass MyText MyText where
 empti :: a -> [b]
 empti = const ([] :: [b])
 
-logInteractor :: forall i b as effs. Member (Logger Text) effs => as -> RunConfig -> i -> Sem effs as
-logInteractor as (RunConfig t' _) i = log (t' <> " " <> txt i) >> pure as
+logInteractor :: forall i as effs. Member (Logger Text) effs => as -> RunConfig -> i -> Sem effs as
+logInteractor as (RunConfig t' _) i = log (t' <> " Hello from test " <> txt i) >> pure as
+
+logInteractor' :: Member (Logger Text) effs => RunConfig -> MyInt -> Sem effs Text
+logInteractor' = logInteractor "Hello"
 
 emptiParser :: a -> i -> as -> Sem effs a
 emptiParser a _ _ = pure a
 
-
-test1 :: MockTest MyInt Text MyText effs
+test1 :: Member (Logger Text) effs => MockTest MyInt Text MyText effs
 test1 =
   RunnerBase.Test
     { config =
@@ -106,7 +108,7 @@ test1 =
             include = True
           },
       items = empti,
-      interactor = log "Hello Test 1",
+      interactor = logInteractor',
       parse = pure . MyText . txt
     }
 
@@ -120,7 +122,7 @@ test2 =
             include = True
           },
       items = empti,
-      interactor = logInteractor "test 2",
+      interactor = logInteractor 2,
       parse = pure . MyText . txt
     }
 
@@ -134,7 +136,7 @@ test3 =
             include = True
           },
       items = empti,
-      interactor = logInteractor "test 3",
+      interactor = logInteractor,
       parse = pure . MyText . txt
     }
 
@@ -148,7 +150,7 @@ test4 =
             include = True
           },
       items = empti,
-      interactor = logInteractor "test 4",
+      interactor = logInteractor,
       parse = pure . MyText . txt
     }
 
@@ -162,7 +164,7 @@ test5 =
             include = True
           },
       items = empti,
-      interactor = logInteractor 1,
+      interactor = logInteractor,
       parse = pure . MyText . txt
     }
 

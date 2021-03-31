@@ -92,13 +92,13 @@ empti = const ([] :: [b])
 logInteractor :: forall i as effs. Member (Logger Text) effs => as -> RunConfig -> i -> Sem effs as
 logInteractor as (RunConfig t' _) i = log (t' <> " Hello from test " <> txt i) >> pure as
 
-logInteractor' :: Member (Logger Text) effs => RunConfig -> MyInt -> Sem effs Text
-logInteractor' = logInteractor "Hello"
 
 emptiParser :: a -> i -> as -> Sem effs a
 emptiParser a _ _ = pure a
 
-test1 :: Member (Logger Text) effs => MockTest MyInt Text MyText effs
+type LGEffs effs = Member (Logger Text) effs
+
+test1 :: forall effs. LGEffs effs => MockTest MyInt Text MyText effs
 test1 =
   RunnerBase.Test
     { config =
@@ -108,11 +108,11 @@ test1 =
             include = True
           },
       items = empti,
-      interactor = logInteractor',
+      interactor = logInteractor "Hello",
       parse = pure . MyText . txt
     }
 
-test2 :: MockTest MyInt Int MyText effs
+test2 :: forall effs. LGEffs effs => MockTest MyInt Int MyText effs
 test2 =
   Test
     { config =
@@ -126,7 +126,7 @@ test2 =
       parse = pure . MyText . txt
     }
 
-test3 :: MockTest MyInt Int MyText effs
+test3 :: forall effs. LGEffs effs => MockTest MyInt Int MyText effs
 test3 =
   Test
     { config =
@@ -136,11 +136,11 @@ test3 =
             include = True
           },
       items = empti,
-      interactor = logInteractor,
+      interactor = logInteractor 5,
       parse = pure . MyText . txt
     }
 
-test4 :: MockTest MyText Text MyText effs
+test4 :: forall effs. LGEffs effs => MockTest MyText Text MyText effs
 test4 =
   Test
     { config =
@@ -150,11 +150,11 @@ test4 =
             include = True
           },
       items = empti,
-      interactor = logInteractor,
+      interactor = logInteractor "4",
       parse = pure . MyText . txt
     }
 
-test5 :: MockTest MyInt Int MyText effs
+test5 :: forall effs. LGEffs effs => MockTest MyInt Int MyText effs
 test5 =
   Test
     { config =
@@ -164,7 +164,7 @@ test5 =
             include = True
           },
       items = empti,
-      interactor = logInteractor,
+      interactor = logInteractor 5,
       parse = pure . MyText . txt
     }
 
@@ -206,7 +206,7 @@ demoSuit =
         ]
     ]
 
-happySuite :: forall effs a. (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ItemClass i ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
+happySuite :: forall a effs. LGEffs effs => (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ItemClass i ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
 happySuite r =
   R.Group
     "Filter Suite"
@@ -233,7 +233,7 @@ happySuite r =
         ]
     ]
 
-runParams :: forall effs. MinEffs MyText effs => RunParams Maybe MyText RunConfig TestConfig effs
+runParams :: forall effs. MinEffs Text effs => RunParams Maybe MyText RunConfig TestConfig effs
 runParams =
   RunParams
     { suite = happySuite,

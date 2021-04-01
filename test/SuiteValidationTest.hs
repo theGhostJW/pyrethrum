@@ -24,7 +24,7 @@ unit_demo_group_addresses =
   expectedDemoGroupNames ... groupAddresses demoSuit
 
 -- >>> happySuiteResult
-happySuiteResult :: Either (FrameworkError MyText) ([LogProtocolBase MyText], ())
+happySuiteResult :: Either (FrameworkError Text) ([LogProtocolBase Text], ())
 happySuiteResult = minInterpret happyRun
 
 unit_happy_suit_passes_validation :: Assertion

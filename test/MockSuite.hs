@@ -89,16 +89,18 @@ instance ItemClass MyText MyText where
 empti :: a -> [b]
 empti = const ([] :: [b])
 
-logInteractor :: forall i as effs. Member (Logger Text) effs => as -> RunConfig -> i -> Sem effs as
+logInteractor :: forall i as effs. (Member (Logger Text) effs, Show i) => as -> RunConfig -> i -> Sem effs as
 logInteractor as (RunConfig t' _) i = log (t' <> " Hello from test " <> txt i) >> pure as
 
 
 emptiParser :: a -> i -> as -> Sem effs a
 emptiParser a _ _ = pure a
 
-type LGEffs effs = Member (Logger Text) effs
+type Lgrffs effs = Member (Logger Text) effs
 
-test1 :: forall effs. LGEffs effs => MockTest MyInt Text MyText effs
+type DemoEffs effs = MinEffs Text effs
+
+test1 :: forall effs. Lgrffs effs => MockTest MyInt Text MyText effs
 test1 =
   RunnerBase.Test
     { config =
@@ -112,7 +114,7 @@ test1 =
       parse = pure . MyText . txt
     }
 
-test2 :: forall effs. LGEffs effs => MockTest MyInt Int MyText effs
+test2 :: forall effs. Lgrffs effs => MockTest MyInt Int MyText effs
 test2 =
   Test
     { config =
@@ -126,7 +128,7 @@ test2 =
       parse = pure . MyText . txt
     }
 
-test3 :: forall effs. LGEffs effs => MockTest MyInt Int MyText effs
+test3 :: forall effs. Lgrffs effs => MockTest MyInt Int MyText effs
 test3 =
   Test
     { config =
@@ -140,7 +142,7 @@ test3 =
       parse = pure . MyText . txt
     }
 
-test4 :: forall effs. LGEffs effs => MockTest MyText Text MyText effs
+test4 :: forall effs. Lgrffs effs => MockTest MyText Text MyText effs
 test4 =
   Test
     { config =
@@ -154,7 +156,7 @@ test4 =
       parse = pure . MyText . txt
     }
 
-test5 :: forall effs. LGEffs effs => MockTest MyInt Int MyText effs
+test5 :: forall effs. Lgrffs effs => MockTest MyInt Int MyText effs
 test5 =
   Test
     { config =
@@ -206,7 +208,7 @@ demoSuit =
         ]
     ]
 
-happySuite :: forall a effs. LGEffs effs => (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ItemClass i ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
+happySuite :: forall a effs. Lgrffs effs => (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ItemClass i ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
 happySuite r =
   R.Group
     "Filter Suite"
@@ -233,7 +235,7 @@ happySuite r =
         ]
     ]
 
-runParams :: forall effs. MinEffs Text effs => RunParams Maybe MyText RunConfig TestConfig effs
+runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs
 runParams =
   RunParams
     { suite = happySuite,
@@ -243,5 +245,5 @@ runParams =
       rc = RunConfig "Happy Run" True
     }
 
-happyRun :: forall effs. MinEffs MyText effs => Sem effs ()
+happyRun :: forall effs. DemoEffs effs => Sem effs ()
 happyRun = mkRunSem runParams

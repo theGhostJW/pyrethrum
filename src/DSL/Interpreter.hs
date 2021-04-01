@@ -17,7 +17,7 @@ import DSL.Logger
       logConsolePrettyInterpreter,
       logRunRawInterpreter,
       logDocInterpreter,
-      logDocPrettyInterpreter, consLog )
+      logDocPrettyInterpreter, consListLog )
 import DSL.ArbitraryIO
     ( arbitraryIODocInterpreter, arbitraryIOInterpreter, ArbitraryIO )
 import DSL.CurrentTime
@@ -70,12 +70,12 @@ baseEffExecute logger app = runError
                               $ fileSystemIOInterpreter 
                               app
 
-minInterpret  ::  forall a e. Sem '[Logger e, Output (LogProtocolBase e), CurrentTime, Failure e] a -> Either (FrameworkError e) ([LogProtocolBase e], a)
+minInterpret  ::  forall r e. Sem '[Logger e, Output (LogProtocolBase e), CurrentTime, Failure e] r -> Either (FrameworkError e) ([LogProtocolBase e], r)
 minInterpret app = run 
                     $ runError
                     $ janFst2000UTCTimeInterpreter
                     $ runOutputList
-                    $ consLog
+                    $ consListLog
                     app
 
 

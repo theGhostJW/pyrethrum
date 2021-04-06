@@ -235,6 +235,17 @@ happySuite r =
         ]
     ]
 
+hookSuite :: forall a effs. Lgrffs effs => (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ItemClass i ds) => MockTest i as ds effs -> a) -- ^ test runner
+  -> SuiteItem effs [a]
+hookSuite r =
+  R.Group
+    "Hook Suite"
+    [ Hook
+        BeforeAll
+        (pure ())
+        [ Tests [ r test1 ]]
+    ]
+
 runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs
 runParams =
   RunParams
@@ -247,3 +258,17 @@ runParams =
 
 happyRun :: forall effs. DemoEffs effs => Sem effs ()
 happyRun = mkRunSem runParams
+
+hookParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs
+hookParams =
+  RunParams
+    { suite = hookSuite,
+      filters = [],
+      itemIds = Nothing,
+      itemRunner = runItem,
+      rc = RunConfig "Happy Run" True
+    }
+
+hookRun :: forall effs. DemoEffs effs => Sem effs ()
+hookRun = mkRunSem hookParams
+

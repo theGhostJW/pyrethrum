@@ -74,6 +74,12 @@ instance ToJSON MyInt where
 
 newtype MyText = MyText Text deriving (Show, Generic, ToJSON)
 
+instance ItemClass Int MyText where
+  identifier _ = -999
+  whenClause _ = "pre"
+  thenClause _ = "post"
+  checkList = mempty
+
 instance ItemClass MyInt MyText where
   identifier _ = -999
   whenClause _ = "pre"
@@ -90,7 +96,7 @@ empti :: a -> [b]
 empti = const ([] :: [b])
 
 logInteractor :: forall i as effs. (Member (Logger Text) effs, Show i) => as -> RunConfig -> i -> Sem effs as
-logInteractor as (RunConfig t' _) i = log (t' <> " Hello from test " <> txt i) >> pure as
+logInteractor as (RunConfig t' _) i = log (t' <> " Hello from item " <> txt i) >> pure as
 
 
 emptiParser :: a -> i -> as -> Sem effs a
@@ -100,7 +106,7 @@ type Lgrffs effs = Member (Logger Text) effs
 
 type DemoEffs effs = MinEffs Text effs
 
-test1 :: forall effs. Lgrffs effs => MockTest MyInt Text MyText effs
+test1 :: forall effs. Lgrffs effs => MockTest Int Text MyText effs
 test1 =
   RunnerBase.Test
     { config =
@@ -109,8 +115,8 @@ test1 =
             address = TestAddress "test1",
             include = True
           },
-      items = empti,
-      interactor = logInteractor "Hello",
+      items = const [1, 2],
+      interactor = logInteractor "test1: ",
       parse = pure . MyText . txt
     }
 
@@ -242,7 +248,7 @@ hookSuite r =
     "Hook Suite"
     [ Hook
         BeforeAll
-        (pure ())
+        (log "Before All Hook")
         [ Tests [ r test1 ]]
     ]
 
@@ -253,7 +259,7 @@ runParams =
       filters = filters',
       itemIds = Nothing,
       itemRunner = runItem,
-      rc = RunConfig "Happy Run" True
+      rc = RunConfig "Hook Suite" True
     }
 
 happyRun :: forall effs. DemoEffs effs => Sem effs ()

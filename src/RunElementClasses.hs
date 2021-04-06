@@ -46,7 +46,7 @@ class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => TestConfigClass a where
 
 class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => RunConfigClass a
 
-class (ToJSON i) => ItemClass i ds  where
+class ItemClass i ds  where
   identifier :: i -> Int
   whenClause :: i -> Text
   thenClause :: i -> Text

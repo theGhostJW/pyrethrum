@@ -98,7 +98,7 @@ import qualified Prelude
 logBoundry :: forall e effs. (Show e, A.ToJSON e, Member (Logger e) effs) => BoundaryEvent -> Sem effs ()
 logBoundry = logItem . BoundaryLog
 
-runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ItemClass i ds, Member (Logger e) effs) =>
+runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ToJSON i, ItemClass i ds, Member (Logger e) effs) =>
       Maybe (S.Set Int)                                                    -- target Ids
       -> [i]   
       -> rc                                                            -- items
@@ -138,7 +138,7 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
                 : (applyRunner <$> Prelude.init xs)
                 <> [applyRunner (Prelude.last xs) *> endTest]
 
-runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs) =>
+runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
                    RunParams Maybe e rc tc effs          -- Run Params
                    -> Test e tc rc i as ds effs          -- Test Case
                    -> [Sem effs ()]                      -- [TestIterations]
@@ -154,7 +154,7 @@ data RunParams m e rc tc effs = RunParams {
   suite :: forall a. Suite e tc rc effs a,
   filters :: [TestFilter rc tc],
   itemIds :: m (S.Set Int),   
-  itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => ItemRunner e as ds i tc rc effs,
+  itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON i, ToJSON ds) => ItemRunner e as ds i tc rc effs,
   rc :: rc
 }
 

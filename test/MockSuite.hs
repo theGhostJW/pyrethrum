@@ -5,8 +5,13 @@ import Common ()
 import DSL.Interpreter (MinEffs, executeForTest, minInterpret)
 import DSL.LogProtocol (LogProtocolBase)
 import DSL.LogProtocol.PrettyPrint ()
+import DSL.Logger
 import Data.Aeson
-    ( FromJSON, ToJSON(toEncoding), defaultOptions, genericToEncoding )
+  ( FromJSON,
+    ToJSON (toEncoding),
+    defaultOptions,
+    genericToEncoding,
+  )
 import Data.Aeson.TH
 import ItemRunners
 import LogTransformation.Common ()
@@ -16,29 +21,31 @@ import qualified Pyrelude as P
 import Pyrelude.IO ()
 import Pyrelude.Test as T ()
 import RunElementClasses
-    ( TestAddress(TestAddress),
-      ItemClass(checkList, thenClause, whenClause, identifier),
-      TestConfigClass(..),
-      RunConfigClass,
-      Titled(..) )
+  ( ItemClass (checkList, identifier, thenClause, whenClause),
+    RunConfigClass,
+    TestAddress (TestAddress),
+    TestConfigClass (..),
+    Titled (..),
+  )
 import Runner as R
-    ( FrameworkError,
-      mkRunSem,
-      RunParams(..),
-      HookLocation(BeforeAll),
-      SuiteItem(Tests, Hook, Group),
-      Test(Test, config, items, interactor, parse))
-      
+  ( FrameworkError,
+    HookLocation (BeforeAll, BeforeEach),
+    RunParams (..),
+    SuiteItem (Group, Hook, Tests),
+    Test (Test, config, interactor, items, parse),
+    mkRunSem,
+  )
 import qualified RunnerBase
-import TestFilter ( TestFilter(..) )
-import DSL.Logger
+import TestFilter (TestFilter (..))
 
 type AppError = FrameworkError Text
+
 type LogProtocol = LogProtocolBase AppError
 
+type LogProtocolTextError = LogProtocolBase Text
+
 data RunConfig = RunConfig
-  { 
-    cfgHeader :: Text,
+  { cfgHeader :: Text,
     include :: Bool
   }
   deriving (Eq, Show)
@@ -75,7 +82,7 @@ instance ToJSON MyInt where
 newtype MyText = MyText Text deriving (Show, Generic, ToJSON)
 
 instance ItemClass Int MyText where
-  identifier _ = -999
+  identifier i = i
   whenClause _ = "pre"
   thenClause _ = "post"
   checkList = mempty
@@ -96,8 +103,7 @@ empti :: a -> [b]
 empti = const ([] :: [b])
 
 logInteractor :: forall i as effs. (Member (Logger Text) effs, Show i) => as -> RunConfig -> i -> Sem effs as
-logInteractor as (RunConfig t' _) i = log (t' <> " Hello from item " <> txt i) >> pure as
-
+logInteractor as (RunConfig t' _) i = log (t' <> " - Hello from item " <> txt i) >> pure as
 
 emptiParser :: a -> i -> as -> Sem effs a
 emptiParser a _ _ = pure a
@@ -186,7 +192,7 @@ includeFilter =
 filters' :: [TestFilter RunConfig TestConfig]
 filters' = [includeFilter]
 
-demoSuit ::  SuiteItem effs [Text]
+demoSuit :: SuiteItem effs [Text]
 demoSuit =
   R.Group
     "Happy Suite"
@@ -202,15 +208,13 @@ demoSuit =
       R.Group
         "Sub Group"
         [ Tests
-            [ 
-              "test 4",
+            [ "test 4",
               "test 5"
             ]
         ],
       R.Group
         "Empty Group"
-        [ 
-          Tests []
+        [ Tests []
         ]
     ]
 
@@ -236,20 +240,27 @@ happySuite r =
         ],
       R.Group
         "Empty Group"
-        [ 
-          Tests []
+        [ Tests []
         ]
     ]
 
-hookSuite :: forall a effs. Lgrffs effs => (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ItemClass i ds) => MockTest i as ds effs -> a) -- ^ test runner
-  -> SuiteItem effs [a]
+hookSuite ::
+  forall a effs.
+  Lgrffs effs =>
+  -- | test runner
+  (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ItemClass i ds) => MockTest i as ds effs -> a) ->
+  SuiteItem effs [a]
 hookSuite r =
   R.Group
     "Hook Suite"
     [ Hook
-        BeforeAll
-        (log "Before All Hook")
-        [ Tests [ r test1 ]]
+        BeforeEach
+        (log "Before Each Hook")
+        [ Hook
+            BeforeAll
+            (log "Before All Hook")
+            [Tests [r test1]]
+        ]
     ]
 
 runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs
@@ -259,7 +270,7 @@ runParams =
       filters = filters',
       itemIds = Nothing,
       itemRunner = runItem,
-      rc = RunConfig "Hook Suite" True
+      rc = RunConfig "Happy Suite" True
     }
 
 happyRun :: forall effs. DemoEffs effs => Sem effs ()
@@ -272,9 +283,8 @@ hookParams =
       filters = [],
       itemIds = Nothing,
       itemRunner = runItem,
-      rc = RunConfig "Happy Run" True
+      rc = RunConfig "Hook Suite" True
     }
 
 hookRun :: forall effs. DemoEffs effs => Sem effs ()
 hookRun = mkRunSem hookParams
-

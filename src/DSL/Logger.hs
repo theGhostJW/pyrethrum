@@ -176,8 +176,8 @@ logDocWithSink push =
 
 
 -- used for testing ~ cons to a list (so log is in reverse order)
-consListLog :: forall effs a e. Member (Output (LogProtocolBase e)) effs => Sem (Logger e ': effs) a -> Sem effs a
-consListLog = logDocWithSink output
+consListLog :: forall effs a e. (Show e, Member (Output (LogProtocolBase e)) effs, A.ToJSON e) => Sem (Logger e ': effs) a -> Sem effs a
+consListLog = logRunWithSink output
 
 logDocInterpreter :: forall effs a e. (Show e, Member OutputDListText effs) => Sem (Logger e ': effs) a -> Sem effs a
 logDocInterpreter = logDocWithSink (output . dList)

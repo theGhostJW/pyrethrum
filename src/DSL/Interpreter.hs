@@ -70,7 +70,7 @@ baseEffExecute logger app = runError
                               $ fileSystemIOInterpreter 
                               app
 
-minInterpret  ::  forall r e. Sem '[Logger e, Output (LogProtocolBase e), CurrentTime, Failure e] r -> Either (FrameworkError e) ([LogProtocolBase e], r)
+minInterpret  ::  forall r e. (Show e, A.ToJSON e) => Sem '[Logger e, Output (LogProtocolBase e), CurrentTime, Failure e] r -> Either (FrameworkError e) ([LogProtocolBase e], r)
 minInterpret app = run 
                     $ runError
                     $ janFst2000UTCTimeInterpreter

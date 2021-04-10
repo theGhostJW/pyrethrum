@@ -32,17 +32,17 @@ runItem rc (Test tc _items interactor parse) i  =
     iid = ItemId (moduleAddress tc) (identifier @i @ds i)
 
     logChk :: CK.CheckReport -> Sem effs ()
-    logChk cr = logRP $ CheckOutcome iid cr
+    logChk cr = logItem $ CheckOutcome iid cr
 
     recordSkippedChecks :: Sem effs ()
     recordSkippedChecks = do 
-                            logRP StartChecks 
+                            logItem StartChecks 
                             F.traverse_ logChk $ D.toList $ CK.skipChecks (checkList @i @ds i)
 
     parseErrorHandler :: FrameworkError e -> Sem effs ds
     parseErrorHandler e = 
       do 
-        logRP $ ParserFailure iid e
+        logItem $ ParserFailure iid e
         recordSkippedChecks
         PE.throw e
 
@@ -57,27 +57,27 @@ runItem rc (Test tc _items interactor parse) i  =
         runChecks ds = F.traverse_ logChk $ D.toList $ CK.calcChecks ds (checkList i)
       in 
         do 
-          logRP StartInteraction
+          logItem StartInteraction
           -- TODO: check for io exceptions / SomeException - use throw from test
           log "interact start"
           ethApState <- try' $ interactor rc i
           eitherf ethApState
             (\e -> do 
-                    logRP $ InteractorFailure iid e
-                    logRP $ ParserSkipped iid
+                    logItem $ InteractorFailure iid e
+                    logItem $ ParserSkipped iid
                     recordSkippedChecks
                     )
             (\as -> do 
                 log "interact end"
-                logRP . InteractorSuccess iid . ApStateJSON . toJSON $ as
-                logRP StartParser
+                logItem . InteractorSuccess iid . ApStateJSON . toJSON $ as
+                logItem StartParser
                 ds <- PE.catch (parse as) parseErrorHandler
-                logRP . ParserSuccess iid . DStateJSON . toJSON $ ds
-                logRP StartChecks
+                logItem . ParserSuccess iid . DStateJSON . toJSON $ ds
+                logItem StartChecks
                 runChecks ds
               )
   in 
-    runItem' `PE.catch` (logRP . LP.Error)
+    runItem' `PE.catch` (logItem . LP.Error)
 
 documentItem :: forall e effs rc tc i as ds. (ToJSON e, 
                                                 Show e, 
@@ -90,15 +90,16 @@ documentItem rc (Test tc _items interactor _parse) i =
     iid :: ItemId
     iid = ItemId (moduleAddress tc) $ identifier @i @ds i
 
-    docLog :: DocProtocol e -> Sem effs ()
-    docLog = logItem . logDoc
+    lgChk :: CK.Check ds -> Sem effs ()
+    lgChk chk = logItem . CheckOutcome iid 
+                                      . CK.CheckReport CK.Skip 
+                                      $ DetailedInfo (CK.header (chk :: CK.Check ds) <> " - " <> txt (CK.expectation chk)) ""
 
     logChecks :: Sem effs ()
-    logChecks =  P.sequence_ $  
-                    (\chk -> docLog $ DocCheck iid (CK.header (chk :: CK.Check ds)) (CK.expectation chk) (CK.gateStatus chk)) <$> D.toList (checkList i)
+    logChecks =  P.sequence_ $ lgChk <$> D.toList (checkList i)
   in 
     do 
-      docLog DocInteraction
+      logItem StartInteraction 
       interactor rc i
-      docLog DocChecks
+      logItem StartChecks
       logChecks

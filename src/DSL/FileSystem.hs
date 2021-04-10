@@ -42,8 +42,8 @@ fileSystemDocInterpreter = interpret $
                                       in
                                         \case
                                           ReadFile path ->
-                                            logDocAction ("readFile: " <> txt path) $> mockContents
+                                            logAction ("readFile: " <> txt path) $> mockContents
 
-                                          WriteFile path str -> logItem . IterationLog . Doc . DocAction $ ActionInfo' 
+                                          WriteFile path str -> logItem  . IOAction' $ DetailedInfo 
                                                                                         ("write file: " <> txt path)
                                                                                         $ "contents:\n" <> str

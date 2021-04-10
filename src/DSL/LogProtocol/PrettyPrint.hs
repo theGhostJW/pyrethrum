@@ -9,7 +9,7 @@ import PrettyPrintCommon as PC
 import  DSL.LogProtocol as LP
 import           Pyrelude as P
 import RunElementClasses as REC
-import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), MessageInfo(..), GateStatus(..), classifyResult)
+import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
 
 prettyPrintLogProtocolWith :: Show e => Bool -> ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
 prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex} (LogIndex idx) time lgProtocol = 
@@ -29,16 +29,19 @@ prettyPrintLogProtocolBase _mTimeSuffix docMode =
     prettyBlock :: Char -> Text -> ItemId -> Text -> Text
     prettyBlock pfxChr headr iid body = indent2 $ toS (replicate 4 ' ') <> singleton pfxChr <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
 
-    ppMsgInfo :: Show a => Maybe a -> Text
-    ppMsgInfo mbInfo = maybef mbInfo
-                              ""
-                              (\m -> newLn <> indent2 (txtPretty m))
+    ppMsgInfo :: Text -> Text
+    ppMsgInfo dtl = null dtl ?
+                              "" $
+                              newLn <> indent2 (txtPretty dtl)
 
     docMarkUp :: Text -> Text
     docMarkUp s = (docMode ? id $ indent2) $ (docMode ? "  >> " $ "") <> s
 
     logIO :: Show a => a -> Text
     logIO m =  docMarkUp $ "IO Action: " <> txtPretty m
+
+    logIO' :: DetailedInfo -> Text
+    logIO' (DetailedInfo m i) =  docMarkUp $ "IO Action: " <> txtPretty m <> "\n" <> txtPretty i
 
     detailDoc :: Text -> DetailedInfo -> Text
     detailDoc hedr (DetailedInfo msg det) = newLn <> (docMode ? id $ indent2) (subHeader hedr <> newLn <> msg <> newLn <> det)                                                                                                  
@@ -64,61 +67,61 @@ prettyPrintLogProtocolBase _mTimeSuffix docMode =
                             EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
                             LP.EndRun -> newLn <> PC.header "End Run"
 
-        IterationLog (Doc dp) -> case dp of 
-                              DocAction ai -> case ai of
-                                ActionInfo msg -> "  >> " <> msg
-                                ActionInfo' msg extended -> "  >> " <> 
-                                                                msg <> 
-                                                                newLn <> 
-                                                                indent2 extended
-                              DocInteraction -> newLn <> "Interaction:"
-                              DocChecks -> newLn <> "Checks:"
-                              DocCheck _iid chkhdr resultExpectation gateStatus -> 
-                                          indent2 $ "% " <> chkhdr  <> 
-                                              (
-                                                gateStatus == GateCheck 
-                                                  ? "(Gate: subsequent checks will not be executed if this check fails)" 
-                                                  $ ""
-                                              ) <> 
-                                              (
-                                              case resultExpectation of 
-                                                ExpectPass -> ""
-                                                ExpectFailure Inactive  _  -> ""
-                                                ExpectFailure Active message -> newLn <> indent2 ("!! This check is expected to fail: " <> message)
-                                              )
+        -- IterationLog (Doc dp) -> case dp of 
+        --                       DocAction ai -> case ai of
+        --                         ActionInfo msg -> "  >> " <> msg
+        --                         ActionInfo' msg extended -> "  >> " <> 
+        --                                                         msg <> 
+        --                                                         newLn <> 
+        --                                                         indent2 extended
+        --                       DocInteraction -> newLn <> "Interaction:"
+        --                       DocChecks -> newLn <> "Checks:"
+        --                       DocCheck _iid chkhdr resultExpectation gateStatus -> 
+        --                                   indent2 $ "% " <> chkhdr  <> 
+        --                                       (
+        --                                         gateStatus == GateCheck 
+        --                                           ? "(Gate: subsequent checks will not be executed if this check fails)" 
+        --                                           $ ""
+        --                                       ) <> 
+        --                                       (
+        --                                       case resultExpectation of 
+        --                                         ExpectPass -> ""
+        --                                         ExpectFailure Inactive  _  -> ""
+        --                                         ExpectFailure Active message -> newLn <> indent2 ("!! This check is expected to fail: " <> message)
+        --                                       )
 
-                              DocIOAction m -> logIO m
+        --                       DocIOAction m -> logIO m
 
-                              DocMessage s -> docMarkUp $ "message: " <> s
-                              DocMessage' detailedInfo -> detailDoc "Message" detailedInfo
+        --                       DocMessage s -> docMarkUp $ "message: " <> s
+        --                       DocMessage' detailedInfo -> detailDoc "Message" detailedInfo
             
-                              DocWarning s -> docMarkUp $ "warning: " <> s
-                              DocWarning' detailedInfo -> detailDoc "Warning" detailedInfo
+        --                       DocWarning s -> docMarkUp $ "warning: " <> s
+        --                       DocWarning' detailedInfo -> detailDoc "Warning" detailedInfo
 
-                              e@(DocError _) -> txtPretty e
+        --                       e@(DocError _) -> txtPretty e
 
-        IterationLog (Run rp) -> case rp of
-                              StartInteraction -> newLn <> "Interaction:"
-                              StartChecks -> newLn <> "Checks:"
-                              StartParser -> newLn <> "Domain:"
-            
-                              IOAction m -> indent2 $ logIO m 
-                              
-                              InteractorSuccess iid (ApStateJSON as) -> newLn <> prettyBlock '>' "Interactor Complete" iid (prettyYamlKeyValues 2 LeftJustify as)
-                                
-                              InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ txtPretty err
+        StartInteraction -> newLn <> "Interaction:"
+        StartChecks -> newLn <> "Checks:"
+        StartParser -> newLn <> "Domain:"
 
-                              ParserSuccess iid (DStateJSON ds) -> prettyBlock '>' "ParseComplete" iid $ prettyYamlKeyValues 2 LeftJustify ds
-                              ParserSkipped iid -> docMarkUp $ "ParseSkipped: " <> txt iid
-                              ParserFailure iid err -> prettyBlock '>' "ParseFailure" iid $ txtPretty err
+        IOAction m -> indent2 $ logIO m 
+        IOAction' i -> logIO' i
+        
+        InteractorSuccess iid (ApStateJSON as) -> newLn <> prettyBlock '>' "Interactor Complete" iid (prettyYamlKeyValues 2 LeftJustify as)
+          
+        InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ txtPretty err
 
-                              CheckOutcome iid (CheckReport reslt (MessageInfo chkhdr mbInfo)) -> prettyBlock 'x' ("Check: " <> txtPretty (classifyResult reslt)) iid $ 
-                                                                                                                          chkhdr  <> " -> " <> txtPretty reslt <> 
-                                                                                                                          ppMsgInfo mbInfo
-                              Message s -> docMarkUp $ "message: " <> s
-                              Message' detailedInfo -> detailDoc "Message" detailedInfo
-            
-                              Warning s -> docMarkUp $ "warning: " <> s
-                              Warning' detailedInfo -> detailDoc "Warning" detailedInfo
+        ParserSuccess iid (DStateJSON ds) -> prettyBlock '>' "ParseComplete" iid $ prettyYamlKeyValues 2 LeftJustify ds
+        ParserSkipped iid -> docMarkUp $ "ParseSkipped: " <> txt iid
+        ParserFailure iid err -> prettyBlock '>' "ParseFailure" iid $ txtPretty err
 
-                              e@(Error _) -> txtPretty e
+        CheckOutcome iid (CheckReport reslt (DetailedInfo chkhdr info)) -> prettyBlock 'x' ("Check: " <> txtPretty (classifyResult reslt)) iid $ 
+                                                                                                    chkhdr  <> " -> " <> txtPretty reslt <> 
+                                                                                                    ppMsgInfo info
+        Message s -> docMarkUp $ "message: " <> s
+        Message' detailedInfo -> detailDoc "Message" detailedInfo
+
+        Warning s -> docMarkUp $ "warning: " <> s
+        Warning' detailedInfo -> detailDoc "Warning" detailedInfo
+
+        e@(Error _) -> txtPretty e

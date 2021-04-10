@@ -20,17 +20,13 @@ import Common as C
       OutputDListText )
 import DSL.Interpreter ( MinEffs )
 import DSL.Logger ( logItem, Logger )
-import DSL.LogProtocol as LP
-    ( logRun,
-      BoundaryEvent(EndRun, StartTest, EndTest, StartIteration,
-                    EndIteration, StartGroup, EndGroup, StartRun, FilterLog),
+import DSL.LogProtocol as LP (
       GroupTitle(GroupTitle),
       ItemId(ItemId),
-      LogProtocolBase(BoundaryLog),
-      RunProtocol(Error),
+      LogProtocolBase(BoundaryLog, Error),
       RunTitle(RunTitle),
       ThenClause(ThenClause),
-      WhenClause(WhenClause) )
+      WhenClause(WhenClause), BoundaryEvent (..) )
 import DSL.CurrentTime ( utcOffset )
 import Data.Either.Extra ( Either, eitherToMaybe )
 import Pyrelude as P
@@ -95,9 +91,6 @@ import RunnerBase as RB
       Suite )
 import qualified Prelude
 
-logBoundry :: forall e effs. (Show e, A.ToJSON e, Member (Logger e) effs) => BoundaryEvent -> Sem effs ()
-logBoundry = logItem . BoundaryLog
-
 runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ToJSON i, ItemClass i ds, Member (Logger e) effs) =>
       Maybe (S.Set Int)                                                    -- target Ids
       -> [i]   
@@ -108,10 +101,10 @@ runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass 
 runTestItems iIds items rc test@Test{ config = tc } itemRunner =
   let
     startTest :: Sem effs ()
-    startTest = logBoundry . StartTest $ mkDisplayInfo tc
+    startTest = logItem . BoundaryLog . StartTest $ mkDisplayInfo tc
 
     endTest :: Sem effs ()
-    endTest = logBoundry . EndTest $ moduleAddress tc
+    endTest = logItem .  BoundaryLog . EndTest $ moduleAddress tc
 
     filteredItems :: [i]
     filteredItems = filter inTargIds items
@@ -123,9 +116,9 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
         iid = ItemId (moduleAddress tc) (identifier @_ @ds i)
       in
         do
-          logBoundry . StartIteration iid (WhenClause $ whenClause @_ @ds i) (ThenClause $ thenClause @_ @ds  i) $ toJSON i
+          logItem .  BoundaryLog . StartIteration iid (WhenClause $ whenClause @_ @ds i) (ThenClause $ thenClause @_ @ds  i) $ toJSON i
           itemRunner rc test i
-          logBoundry $ EndIteration iid
+          logItem .  BoundaryLog $ EndIteration iid
 
     inTargIds :: i -> Bool
     inTargIds i = maybe True (S.member (identifier @_ @ds i)) iIds
@@ -148,7 +141,7 @@ runTest RunParams {filters, rc, itemIds, itemRunner}  test@Test {config = tc, it
       $ []
 
 logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
-logLPError = logItem . logRun . LP.Error
+logLPError = logItem . LP.Error
 
 data RunParams m e rc tc effs = RunParams {
   suite :: forall a. Suite e tc rc effs a,
@@ -187,9 +180,9 @@ exeElm beforeEach afterEach runElm =
           
       Group { title = t, subElms } -> 
         do
-          logBoundry . StartGroup $ GroupTitle t
+          logItem .  BoundaryLog . StartGroup $ GroupTitle t
           sequence_ $ exeElm beforeEach afterEach <$> subElms
-          logBoundry . EndGroup $ GroupTitle t
+          logItem .  BoundaryLog . EndGroup $ GroupTitle t
 
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, MinEffs e effs) =>
@@ -206,10 +199,10 @@ mkSem rp@RunParams {suite, filters, rc} =
     run' :: Sem effs ()
     run' = do
             offset' <- utcOffset
-            logBoundry . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
-            logBoundry . FilterLog $ filterInfo
+            logItem .  BoundaryLog . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
+            logItem .  BoundaryLog . FilterLog $ filterInfo
             exeElm (pure ()) (pure ()) root
-            logBoundry EndRun
+            logItem .  BoundaryLog $ EndRun
   in
     maybe 
       run'
@@ -238,5 +231,5 @@ mkEndpointSem runParams@RunParams { filters, itemIds } tstAddress iIds =
     allFilters = endpointFilter tstAddress : filters
   in
     eitherf itemIds
-      (logItem . logRun . LP.Error . FilterError)
+      (logItem . LP.Error . FilterError)
       (\idSet -> mkSem runParams { filters = allFilters, itemIds = eitherToMaybe itemIds })

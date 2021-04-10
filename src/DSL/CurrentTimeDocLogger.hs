@@ -7,6 +7,7 @@ import           Pyrelude.IO as PIO
 import Polysemy
 import DSL.CurrentTime as CT
 import DSL.Logger
+import DSL.LogProtocol
 
 currentTimeDocInterpreter :: forall a e effs. (Show e, A.ToJSON e, Members [Logger e, Embed IO] effs) => Sem (CurrentTime ': effs) a -> Sem effs a
 currentTimeDocInterpreter = 
@@ -20,5 +21,5 @@ currentTimeDocInterpreter =
                               Now -> showTup "getCurrentTime: " PIO.now
                               GetTimeZone -> showTup "getTimeZone: " PIO.getCurrentTimeZone
                               UtcOffset -> showTup "utcOffset: " $ timeZoneMinutes <$> PIO.getCurrentTimeZone
-                      logDocAction lbl
+                      logAction lbl
                       pure v

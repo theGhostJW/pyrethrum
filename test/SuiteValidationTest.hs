@@ -4,7 +4,7 @@ import MockSuite ( happyRun, MyText, happySuite, demoSuit, hookRun, LogProtocolT
 import DSL.Interpreter ( minInterpret )
 import Pyrelude ( ($), Either, isRight, debug, fromRight', toS, Listy (isInfixOf), catMaybes )
 import Pyrelude.Test ( chk, Assertion, (...) )
-import DSL.LogProtocol ( LogProtocolBase (..), SubProtocol (..), RunProtocol(..))
+import DSL.LogProtocol ( LogProtocolBase (..))
 import Common  ( FrameworkError, DetailedInfo, DetailedInfo(DetailedInfo) )
 import Runner (groupAddresses)
 import ItemRunners (runItem)
@@ -46,8 +46,7 @@ hookResultPretty = hookRunResult
 msgTxt :: LogProtocolTextError -> Maybe Text 
 msgTxt = \case 
                 BoundaryLog _ -> Nothing  
-                IterationLog (Doc _) -> Nothing 
-                IterationLog (Run rp) -> case rp of 
+                rp -> case rp of 
                     Message txt -> Just txt
                     Message' (DetailedInfo m i) -> Just $ m <> " - " <> i 
                     _ -> Nothing  
@@ -55,8 +54,7 @@ msgTxt = \case
 msgPredicate :: (Text -> Bool) -> LogProtocolTextError -> Bool 
 msgPredicate prd = \case 
                       BoundaryLog _ -> False 
-                      IterationLog (Doc _) -> False
-                      IterationLog (Run rp) -> case rp of 
+                      rp -> case rp of 
                           Message txt -> prd txt
                           Message' (DetailedInfo m i) -> prd m || prd i 
                           _ -> False 

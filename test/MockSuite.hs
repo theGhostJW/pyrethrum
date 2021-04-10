@@ -218,7 +218,7 @@ demoSuit =
         ]
     ]
 
-happySuite :: forall a effs. Lgrffs effs => (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ItemClass i ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
+happySuite :: forall a effs. Lgrffs effs => (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
 happySuite r =
   R.Group
     "Filter Suite"
@@ -248,7 +248,7 @@ hookSuite ::
   forall a effs.
   Lgrffs effs =>
   -- | test runner
-  (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ItemClass i ds) => MockTest i as ds effs -> a) ->
+  (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest i as ds effs -> a) ->
   SuiteItem effs [a]
 hookSuite r =
   R.Group

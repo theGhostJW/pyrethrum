@@ -1,0 +1,10 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "pyrethrum:lib"
+
+    - path: "./test"
+      component: "pyrethrum:test:pyrethrum-test"
+
+    - path: "./testIntegration"
+      component: "pyrethrum:test:pyrethrum-test-Integration"

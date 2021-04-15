@@ -9,12 +9,12 @@ packages:
     version: 0.1.0.0
     git: https://github.com/theGhostJW/pyrelude
     pantry-tree:
-      size: 2368
-      sha256: e48a1d5447d34d2361b3953fdddf19546ff5091a1d961b51d49c6446e6fd1345
-    commit: 4077213a476d31f9127eebc8126130024ddfdedf
+      size: 2414
+      sha256: c13042007e03fc67c0feae5eda4b9b77ab417db2856b5c72537f1280f5da4771
+    commit: 36fffcb758ebf73b7fcf3c7e38519ad0e9e38d96
   original:
     git: https://github.com/theGhostJW/pyrelude
-    commit: 4077213a476d31f9127eebc8126130024ddfdedf
+    commit: 36fffcb758ebf73b7fcf3c7e38519ad0e9e38d96
 - completed:
     hackage: discrimination-0.4@sha256:d42ae36c97ea9c0c8844b47ee162c5530f3daf708636f01010f58dcf52602876,2571
     pantry-tree:
@@ -30,12 +30,19 @@ packages:
   original:
     hackage: encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce,1864
 - completed:
-    hackage: polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
+    hackage: polysemy-1.4.0.0@sha256:0245a046eaf936557d4208b5a355df1a20799c9e274f91fa889ab2644ecbabae,6541
     pantry-tree:
-      size: 1232
-      sha256: 5c90dac2eba48b4e337b302347c233ecaedb63e333641e094e718a548ac86711
+      size: 4379
+      sha256: babfd86f145bc6017f7b8c20e46266ab3a3bb5d5d415d8cf651036b11e57465a
   original:
-    hackage: polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
+    hackage: polysemy-1.4.0.0
+- completed:
+    hackage: polysemy-plugin-0.2.5.2@sha256:649cea55749c38af841e9f3750ccf65be351e597f3085234e28e3491e78d1f78,3155
+    pantry-tree:
+      size: 1162
+      sha256: 20b462f8095a8108ef4d920f0d494ba1299821403ad30169168f4b1968b06c2a
+  original:
+    hackage: polysemy-plugin-0.2.5.2
 - completed:
     hackage: transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
     pantry-tree:
@@ -45,7 +52,7 @@ packages:
     hackage: transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
 snapshots:
 - completed:
-    size: 521183
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/5/7.yaml
-    sha256: c72b9c63b7faa8812cb6308a3d74652cf0e9b793ff197e972ee74ade774ec4eb
-  original: nightly-2020-05-07
+    size: 563103
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/17/4.yaml
+    sha256: f11e2153044f5f71ea7b1c9398f4721f517c9bd37642ed769647b896564021f3
+  original: lts-17.4

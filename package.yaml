@@ -35,8 +35,9 @@ dependencies:
   - polysemy-plugin
 
 ghc-options:
-  - -fmax-pmcheck-iterations=10000000
+  - -fmax-pmcheck-models=10000000
   - -ferror-spans
+  # - -dth-dec-file -- generate template haskell
 
   - -O0
   # TODO: prgma to turn optimisations on for non-dev build
@@ -57,7 +58,8 @@ ghc-options:
   - -fno-warn-unused-matches
   - -fno-warn-unused-binds
   - -fno-warn-unused-do-bind
-  # -fdefer-type-errors
+  - -fwrite-ide-info
+  # - -fdefer-type-errors
 
 default-extensions:
   - AllowAmbiguousTypes
@@ -133,15 +135,12 @@ tests:
     main:                driver.hs
     source-dirs:        
     - test
-    - testDemoProject
-
     dependencies: *testdependencies
   
   pyrethrum-test-Integration:
     main:                driver.hs
     source-dirs:         
     - testIntegration
-    - testDemoProject
     dependencies: 
       *testdependencies
     

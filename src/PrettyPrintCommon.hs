@@ -37,8 +37,8 @@ ppAsYaml = indent2 . ppAeson . toJSON
 ppAeson:: Y.Value -> Text
 ppAeson val = toS ((getLenient . toS . Y.encode $ val) :: Text)
 
-prettyPrintFilterItem :: FilterResult -> Text
-prettyPrintFilterItem FilterResult{..} =
+prettyPrintFilterItem :: TestFilterResult -> Text
+prettyPrintFilterItem TestFilterResult{..} =
     let
       description :: Text
       description = toString (testModAddress testInfo) <> " - " <> testTitle testInfo
@@ -55,7 +55,7 @@ ppStartRun ttle rc = majorHeader (unRunTitle ttle) <>
                       newLn <> newLn <> "Run Config:" <>
                       newLn <> ppAesonBlock rc
 
-ppFilterLog :: [FilterResult] -> Text
+ppFilterLog :: [TestFilterResult] -> Text
 ppFilterLog fltrInfos = newLn <> header "Filter Log" <> newLn <>
                         foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
 

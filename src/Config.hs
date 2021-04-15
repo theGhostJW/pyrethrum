@@ -1,23 +1,40 @@
-module DemoProject.Config where
+{-# LANGUAGE NoPolyKinds #-} 
+-- TODO: work out why this is needed - investigate polykinds
+
+module Config where
+  
+  {- 
+  A temp module to get types worked out.
+  This module will ultimately end up in the end user test project
+  -}
 
 import           Data.Set                   as S
 import           DSL.Interpreter
 import           Common
 import           Pyrelude
 import qualified Prelude                    as P
-import           Runner 
+import Runner as R hiding (Test)
+import qualified Runner as R
+import FileLogging as L
+import TestFilters as F
 import           TestFilter
 import           Data.DList
 import Data.Aeson
 import Data.Aeson.TH
 import Polysemy
 import Polysemy.Error as PE
-import DSL.Ensure
 import DSL.Logger
 import DSL.LogProtocol
+import ItemRunners
+import Data.Either.Extra (eitherToMaybe)
+-- import Paths_pyrethrumDemo
 
-type EnsureLogEffs effs = EFFEnsureLog SuiteError effs
-type EnsureEffs effs = Ensurable SuiteError effs
+exeDir :: IO AbsDir
+exeDir = debug . parent <$> (parseAbsFile =<< uu)
+
+showAndLogItems :: Show a => [a] -> IO ()
+showAndLogItems = L.showAndLogItems exeDir
+
 
 type SuiteLogger = Logger SuiteError
 
@@ -59,14 +76,14 @@ nzOnly = S.singleton NZ
 
 data TestConfig = TestConfig {
   header       :: Text,
-  address      :: TestModule,
+  address      :: TestAddress,
   environments :: Set Environment,
   countries    :: Set Country,
   minDepth     :: Depth,
   active       :: Bool
 }  deriving (Eq, Show)
 
-type Test = GenericTest SuiteError TestConfig RunConfig
+type Test = R.Test SuiteError TestConfig RunConfig
 type TestResult = GenericResult TestConfig
 
 instance Titled TestConfig where
@@ -78,7 +95,7 @@ instance TestConfigClass TestConfig where
 testConfig :: TestConfig
 testConfig = TestConfig {
   header    = "Configuration Error ~ No Title Assigned",
-  address = TestModule "Configuration Error ~ No Address Assigned",
+  address = TestAddress "Configuration Error ~ No Address Assigned",
   environments = allNonProdEnvironments,
   countries    = auOnly,
   minDepth     = DeepRegression,
@@ -115,47 +132,45 @@ filterList :: [TestFilter RunConfig TestConfig]
 filterList = [isActiveFilter, countryFilter, levelFilter]
 
 applyTestFiltersToItems :: RunConfig -> (i -> TestConfig) -> [i] -> [i]
-applyTestFiltersToItems = applyTestFilters filterList
+applyTestFiltersToItems = F.applyTestFilters filterList
 
-type TestPlan m1 m a effs = TestPlanBase SuiteError TestConfig RunConfig m1 m a effs
+type TestPlan effs a = R.Suite SuiteError TestConfig RunConfig effs a
 
-
-testEndpointPriv :: forall effs1. ApEffs SuiteError effs1 =>
-      (forall rc tc i as ds effs. (ItemClass i ds, ToJSON as, ToJSON ds, TestConfigClass tc, ApEffs SuiteError effs) 
-                  => ItemParams SuiteError as ds i tc rc effs -> Sem effs ())  
-     -> TestModule
+testEndpointPriv :: forall effs. MinEffs SuiteError effs =>
+      (forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => 
+        ItemRunner SuiteError as ds i TestConfig RunConfig effs)  
+     -> TestAddress
      -> RunConfig
      -> Either FilterErrorType (Set Int)
-     -> (forall m1 m a. TestPlan m1 m a effs1)
-     -> Sem effs1 ()
-testEndpointPriv itmRunner testMod rc itrSet plan = 
+     -> (forall a. TestPlan effs a)
+     -> Sem effs ()
+testEndpointPriv itmRunner testAddress rc itemIds suite = 
   let 
-    runParams :: RunParams SuiteError RunConfig TestConfig effs1 
     runParams = RunParams {
-      plan = plan,
+      suite = suite,
       filters = filterList,
       itemRunner = itmRunner,
+      itemIds = itemIds,
       rc = rc
     }
   in
-    mkEndpointSem runParams testMod itrSet
+    mkEndpointSem runParams testAddress itemIds
 
 testEndpoint ::
-     TestModule
+     TestAddress
      -> RunConfig
      -> Either FilterErrorType (Set Int)
-     -> (forall m1 m a. TestPlan m1 m a FullIOMembers)
+     -> (forall a. TestPlan FullIOMembers a)
      -> Sem FullIOMembers ()
-testEndpoint = testEndpointPriv normalExecution
+testEndpoint = testEndpointPriv runItem
 
 testEndpointDoc ::
-     TestModule
+     TestAddress
      -> RunConfig
      -> Either FilterErrorType (Set Int)
-     -> (forall a m m1. TestPlan m1 m a (FullDocEffects SuiteError))
+     -> (forall a. TestPlan (FullDocEffects SuiteError) a)
      -> DList Text
-testEndpointDoc testMod rc itrSet plan = fst . documentRaw $ testEndpointPriv docExecution testMod rc itrSet plan
-
+testEndpointDoc testMod rc itrSet suite = fst . documentRaw $ testEndpointPriv documentItem testMod rc itrSet suite
 
 $(deriveJSON defaultOptions ''TestConfig)
 $(deriveJSON defaultOptions ''SuiteError)

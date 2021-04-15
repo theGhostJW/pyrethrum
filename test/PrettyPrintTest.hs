@@ -28,14 +28,6 @@ $(deriveJSON defaultOptions ''Country)
 $(deriveJSON defaultOptions ''Depth)
 $(deriveJSON defaultOptions ''RunConfig)
 
--- todo: get file utils really sorted
-dumpTxt :: Text -> RelFile -> IO ()
-dumpTxt txt' file = do 
-                      ePth <- tempFile file
-                      eitherf ePth
-                        throw
-                        (\p -> PIO.writeFile (toFilePath p) txt')
-
 source = [
     ("k:", "v"),
     ("kkkkk:", "vvvv"),

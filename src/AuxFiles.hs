@@ -1,51 +1,107 @@
-{-# LANGUAGE QuasiQuotes #-}
-
 module AuxFiles where
 
 import Pyrelude as F
-import Pyrelude.IO
+    ( otherwise,
+      ($),
+      fromIntegral,
+      Eq((==)),
+      Integral(div),
+      Num((+), (*), (-)),
+      Ord((<)),
+      Show(show),
+      Applicative(pure),
+      Semigroup((<>)),
+      Int,
+      Integer,
+      Maybe(..),
+      IO,
+      Either(..),
+      (<$>),
+      (=<<),
+      flip,
+      when,
+      throw,
+      replicate,
+      getExecutablePath,
+      encode_YmdHMS,
+      timeFromYmdhms,
+      timeToDatetime,
+      width,
+      catchIOError,
+      toFilePath,
+      (</>),
+      parent,
+      parseAbsFile,
+      reldir,
+      relfile,
+      parseRelFileSafe,
+      (....),
+      eitherf,
+      maybef,
+      txt,
+      toS,
+      (?),
+      unlines,
+      Category((.)),
+      Date(dateYear),
+      Datetime(datetimeDate),
+      DatetimeFormat(DatetimeFormat),
+      SubsecondPrecision(SubsecondPrecisionAuto),
+      Time,
+      Timespan(getTimespan),
+      Year(getYear),
+      Path,
+      Abs,
+      Rel,
+      Listy(foldr, length),
+      AbsDir,
+      AbsFile,
+      RelDir,
+      RelFile,
+      Text )
+import Pyrelude.IO ( now, subDirFromBaseDir, putStrLn, writeFile )
 import qualified Prelude as P
-import Paths_pyrethrum
 import qualified System.IO as S
 import qualified Data.Char as C
-import Control.Monad.IO.Class
 
 data WantConsole = Console | NoConsole deriving Eq
 
-bdr = getBinDir
-
-binDir :: IO AbsDir
-binDir = parseAbsDir =<< getBinDir
-
-auxBase :: IO (Either P.IOError AbsDir)
-auxBase = subDirFromBaseDir binDir [reldir|auxFiles|]
+auxBase :: IO AbsDir -> IO (Either P.IOError AbsDir)
+auxBase projRoot = subDirFromBaseDir projRoot [reldir|auxFiles|]
 
 subPath :: IO (Either P.IOError AbsDir) -> Path Rel a -> IO (Either P.IOError (Path Abs a))
 subPath prent chld = ((</> chld) <$>) <$> prent
 
-auxDir :: RelDir -> IO (Either P.IOError AbsDir)
-auxDir = subPath auxBase
+auxDir :: IO AbsDir -> RelDir -> IO (Either P.IOError AbsDir)
+auxDir projRoot = subPath (auxBase projRoot)
 
 -- local temp not OS
-tempDir :: IO (Either P.IOError AbsDir)
-tempDir = auxDir [reldir|temp|]
+tempDirBase :: IO AbsDir -> IO (Either P.IOError AbsDir)
+tempDirBase projRoot = auxDir projRoot [reldir|temp|]
 
-logDir :: IO (Either P.IOError AbsDir)
-logDir = auxDir [reldir|logs|]
+logDirBase :: IO AbsDir -> IO (Either P.IOError AbsDir)
+logDirBase projRoot = auxDir projRoot [reldir|logs|]
 
-dataDir :: IO (Either P.IOError AbsDir)
-dataDir = auxDir [reldir|data|]
+dataDirBase :: IO AbsDir -> IO (Either P.IOError AbsDir)
+dataDirBase projRoot = auxDir projRoot [reldir|data|]
 
-tempFile :: RelFile -> IO (Either P.IOError AbsFile)
-tempFile = subPath tempDir
+tempFileBase :: IO AbsDir -> RelFile -> IO (Either P.IOError AbsFile)
+tempFileBase projRoot = subPath (tempDirBase projRoot)
 
-logFile :: RelFile -> IO (Either P.IOError AbsFile)
-logFile = subPath logDir
+logFile :: IO AbsDir -> RelFile -> IO (Either P.IOError AbsFile)
+logFile projRoot = subPath (logDirBase projRoot)
 
-dataFile :: RelFile -> IO (Either P.IOError AbsFile)
-dataFile = subPath dataDir
+dataFile :: IO AbsDir -> RelFile -> IO (Either P.IOError AbsFile)
+dataFile projRoot = subPath (dataDirBase projRoot)
 
-_tempFile = tempFile [relfile|demoTemp.txt|]
+dumpTxt :: IO AbsDir -> Text -> RelFile -> IO ()
+dumpTxt projRoot txt' file = do 
+                      ePth <- tempFileBase projRoot file
+                      eitherf ePth
+                        throw
+                        (\p -> writeFile (toFilePath p) txt')
+
+_tempFile = tempFileBase (parent <$> (parseAbsFile =<< getExecutablePath)) [relfile|demoTemp.txt|]
 
 newtype FileExt = FileExt {unFileExt :: Text} deriving (Show, Eq, Ord)
 
@@ -79,7 +135,6 @@ logFilePrefix :: Time -> Text
 logFilePrefix currentTime =
       let
         nextYear =  (getYear . dateYear . datetimeDate . timeToDatetime $ currentTime) + 1
-        
         nyd = timeFromYmdhms nextYear 1 1 0 0 0
         msLeftInYear :: Integer
         msLeftInYear = fromIntegral (getTimespan . width $ nyd .... currentTime) `div` 1000000
@@ -87,8 +142,8 @@ logFilePrefix currentTime =
         base36 msLeftInYear 7 <> "_" <> toS (encode_YmdHMS SubsecondPrecisionAuto (DatetimeFormat (Just '_') (Just '_') (Just '-')) (timeToDatetime  currentTime))
  
 
-logFilePath :: Maybe Text -> Text -> FileExt -> IO (Either P.IOError (Text, AbsFile))
-logFilePath mNamePrefix suffix fileExt = 
+logFilePath :: IO AbsDir -> Maybe Text -> Text -> FileExt -> IO (Either P.IOError (Text, AbsFile))
+logFilePath projRoot mNamePrefix suffix fileExt = 
   do
     pfx <- maybef mNamePrefix
               (logFilePrefix <$> now)
@@ -96,7 +151,7 @@ logFilePath mNamePrefix suffix fileExt =
     relPath <- parseRelFileSafe $ pfx <> "_" <> suffix <> unFileExt fileExt
     eitherf relPath
       (pure . Left . P.userError . toS . show)
-      (\relFle -> ((pfx,) <$>) <$> logFile relFle)
+      (\relFle -> ((pfx,) <$>) <$> logFile projRoot relFle)
 
 -- toDo  - move to extended
 safeOpenFile :: AbsFile -> S.IOMode -> IO (Either P.IOError S.Handle)
@@ -109,9 +164,9 @@ data HandleInfo = HandleInfo {
   fileHandle :: S.Handle
 }
 
-logFileHandle :: Text -> FileExt -> IO (Either P.IOError HandleInfo)
-logFileHandle fileNameSuffix fileExt = do
-                                        ethPth <- logFilePath Nothing fileNameSuffix fileExt
+logFileHandle :: IO AbsDir -> Text -> FileExt -> IO (Either P.IOError HandleInfo)
+logFileHandle projRoot fileNameSuffix fileExt = do
+                                        ethPth <- logFilePath projRoot Nothing fileNameSuffix fileExt
                                         eitherf ethPth 
                                           (pure . Left)
                                           (\(pfx, pth) -> (HandleInfo pfx pth <$>) <$> safeOpenFile pth S.WriteMode)
@@ -124,10 +179,10 @@ defaultTempFileName = [relfile|temp.txt|]
 listToText :: Show a => [a] -> Text
 listToText lst = unlines $ txt <$> lst
 
-toTempBase' :: WantConsole -> Text -> RelFile -> IO ()
-toTempBase' wantConsole txt' fileName = 
+toTempBase' :: IO AbsDir -> WantConsole -> Text -> RelFile -> IO ()
+toTempBase' projRoot wantConsole txt' fileName = 
   do 
-    ethQPth <- tempFile fileName
+    ethQPth <- tempFileBase projRoot fileName
     eitherf ethQPth
       (\e -> putStrLn $ "failed to generate path: " <> txt e)
       (\adsPath ->
@@ -140,26 +195,26 @@ toTempBase' wantConsole txt' fileName =
       )
  
 
-toTemp' :: Text -> RelFile -> IO ()
-toTemp' = toTempBase' Console
+toTemp' :: IO AbsDir -> Text -> RelFile -> IO ()
+toTemp' projRoot = toTempBase' projRoot Console
 
-toTemp :: Text -> IO ()
-toTemp = flip toTemp' defaultTempFileName
+toTemp :: IO AbsDir -> Text -> IO ()
+toTemp projRoot = flip (toTemp' projRoot) defaultTempFileName
 
-toTempFromList' :: Show a => [a] -> RelFile -> IO ()
-toTempFromList' = toTemp' . listToText
+toTempFromList' :: Show a => IO AbsDir -> [a] -> RelFile -> IO ()
+toTempFromList' projRoot = toTemp' projRoot . listToText
 
-toTempFromList :: Show a => [a] -> IO ()
-toTempFromList = flip toTempFromList' defaultTempFileName
+toTempFromList :: Show a => IO AbsDir -> [a] -> IO ()
+toTempFromList projRoot = flip (toTempFromList' projRoot) defaultTempFileName
 
-toTempNoConsole' :: Text -> RelFile -> IO ()
-toTempNoConsole' = toTempBase' NoConsole
+toTempNoConsole' :: IO AbsDir -> Text -> RelFile -> IO ()
+toTempNoConsole' projRoot = toTempBase' projRoot NoConsole
 
-toTempNoConsole :: Text -> IO ()
-toTempNoConsole = flip toTempNoConsole' defaultTempFileName
+toTempNoConsole :: IO AbsDir -> Text -> IO ()
+toTempNoConsole projRoot = flip (toTempNoConsole' projRoot) defaultTempFileName
 
-toTempFromListNoConsole' :: Show a => [a] -> RelFile -> IO ()
-toTempFromListNoConsole' = toTempNoConsole' . listToText
+toTempFromListNoConsole' :: Show a => IO AbsDir -> [a] -> RelFile -> IO ()
+toTempFromListNoConsole' projRoot = toTempNoConsole' projRoot . listToText
 
-toTempFromListNoConsole :: Show a => [a] -> IO ()
-toTempFromListNoConsole = flip toTempFromList' defaultTempFileName
+toTempFromListNoConsole :: Show a => IO AbsDir -> [a] -> IO ()
+toTempFromListNoConsole projRoot = flip (toTempFromList' projRoot) defaultTempFileName

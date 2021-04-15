@@ -3,35 +3,29 @@ module RunnerConsoleAndFile where
 import           Polysemy
 import           Polysemy.Reader
 import           Polysemy.State
-import           Polysemy.Resource
-import Polysemy.Error as PE
 import           Common
-import           DSL.Interpreter
 import           DSL.Logger
-import           DSL.Ensure
 import           DSL.CurrentTime
 import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
 import           Pyrelude as P hiding (app)
 import           Pyrelude.IO as PIO 
-import           Runner as R
+import           FileLogging
 import qualified System.IO as S
-import qualified Control.Exception as E
 import AuxFiles as A
-import LogTransformation (prepareFinalLogs)
 import Data.Aeson (ToJSON(..))
 import Data.Map as M
-import TestFilter
 
 jsonItemLogExt = ".jsoni" :: Text
 
 ioRunToFile :: forall b e appEffs. (Show e, ToJSON e, Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] appEffs) =>
-    WantConsole
+    IO AbsDir
+    -> WantConsole
     -> Bool 
     -> (forall a. (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger e ': effs) a -> Sem effs a) -> Sem appEffs a -> IO (Either (FrameworkError e) a))
     -> Sem appEffs b
     -> IO (Either (FrameworkError e) [AbsFile])
-ioRunToFile wantConsole docMode interpreter app = 
+ioRunToFile projRoot wantConsole docMode interpreter app = 
   let 
     handleSpec :: M.Map (Text, FileExt) (ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text) 
     handleSpec = M.fromList [
@@ -39,8 +33,8 @@ ioRunToFile wantConsole docMode interpreter app =
                               , (("raw", FileExt jsonItemLogExt), logStrJSONWith)
                             ]
 
-    fileHandleInfo :: IO (Either (FrameworkError e) [(ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text, HandleInfo)])
-    fileHandleInfo = logFileHandles handleSpec
+    fileHandleInfo ::  IO (Either (FrameworkError e) [(ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text, HandleInfo)])
+    fileHandleInfo = logFileHandles projRoot handleSpec
 
     printFilePaths :: [AbsFile] -> IO ()
     printFilePaths lsFiles = do 
@@ -73,7 +67,7 @@ ioRunToFile wantConsole docMode interpreter app =
               logPths = catMaybes $ getFile <$> fileRecs
               fileHndles = getHandle <$> fileRecs
               closeHandles = closeFileHandles fileHndles
-              loggerHandles = (\(f, l, h) -> (l, h)) <$> fileLoggerHandles
+              loggerHandles = (\(_f, l, h) -> (l, h)) <$> fileLoggerHandles
 
               logger :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => Sem (Logger e ': effs) a -> Sem effs a
               logger = logToHandles loggerHandles

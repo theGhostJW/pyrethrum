@@ -25,15 +25,15 @@ filterredItemIds filtr items =
   let
     filterredItems :: Either FilterErrorType [Int]
     filterredItems = let
-                        hasVals i = not $ nullFoldable $ checkList i
+                        hasVals i = not $ nullFoldable $ checkList @i @ds i
                         lastWithVal = findFoldable hasVals $ reverse items
                         listOrFail lst msg = null lst
                                                     ? Left (InvalidItemFilter msg)
                                                     $ Right lst
                       in
-                        (identifier <$>) <$>
+                        (identifier @i @ds <$>) <$>
                           case filtr of
-                            IID iid -> listOrFail (filter (\i -> identifier i == iid) items) $ "id: " <> txt iid <> " not in item list"
+                            IID iid -> listOrFail (filter (\i -> identifier @i @ds i == iid) items) $ "id: " <> txt iid <> " not in item list"
                             All -> listOrFail items "Items list is empty"
                             Last -> maybe (Left $ InvalidItemFilter "Items list is empty") (Right . pure) (last items)
                             LastVal -> maybe (Left $ InvalidItemFilter "There is no item in the list with checks assigned") (Right . pure) lastWithVal
@@ -42,7 +42,7 @@ filterredItemIds filtr items =
     checkIds :: Either FilterErrorType ()
     checkIds =
       let
-        ids = identifier <$> items
+        ids = identifier @i @ds <$> items
         dupe = firstDuplicate ids
        in
         maybe

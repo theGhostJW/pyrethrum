@@ -1,14 +1,14 @@
 module ItemFiltersTest where
 
-import qualified Check           as C
+import qualified Check         as C
 import           Pyrelude      as P
-import           Data.Set        as S
+import           Data.Set      as S
 import           ItemFilter
-import           Runner as R
+import           Runner as R hiding (items)
 import           Pyrelude.Test
 import Data.Aeson.TH
 import Data.Aeson.Types
-import           DemoProject.Config as CFG
+-- import           DemoProject.Config as CFG
 
 
 data TestItem = TestItem {
@@ -42,13 +42,16 @@ items  = [
           i 150 "Pre" "Post" mempty
         ]
 
-chkFilterError flter msg itms = chkLeftContains msg $ filterredItemIds flter (itms ::  [TestItem])
+chkFilterError flter msg itms = chkLeftContains msg $ filterredItemIds @TestItem @DState flter (itms ::  [TestItem])
 
-chkFilter flter expted itms = chkEq (Right $ S.fromList expted) $ filterredItemIds flter itms
-chkFilter' flter expted itms = chkEq (Right $ S.singleton expted) $ filterredItemIds flter itms
+chkFilter :: ItemClass TestItem DState => ItemFilter TestItem -> [Int] -> [TestItem] -> Assertion
+chkFilter flter expted itms = chkEq (Right $ S.fromList expted) $ filterredItemIds @TestItem @DState flter itms
 
-chkSingleton :: (ItemClass item dState) => ItemFilter item -> [item] -> Assertion
-chkSingleton flter itms = either (\_ -> chk False) (chkEq (1 :: Int)) $ lengthFoldable <$> filterredItemIds flter itms
+chkFilter' :: ItemClass TestItem DState => ItemFilter TestItem -> Int -> [TestItem] -> Assertion
+chkFilter' flter expted itms = chkEq (Right $ S.singleton expted) $ filterredItemIds @TestItem @DState flter itms
+
+chkSingleton :: forall i ds. (ItemClass i ds) => ItemFilter i -> [i] -> Assertion
+chkSingleton flter itms = P.either (\_ -> chk False) (chkEq (1 :: Int)) $ lengthFoldable <$> filterredItemIds @i @ds flter itms
 
 blahh :: IO ()
 blahh = undefined
@@ -136,20 +139,20 @@ unit_item_filter_dupe_error = chkFilterError All "Item id: 120 is duplicated in 
 
 sampleItems = P.take 99 [1..]
 
-converter :: Int -> TestConfig
-converter i' = CFG.testConfig { 
-                                countries = case i' `mod` 3 of
-                                                  0 -> auOnly
-                                                  1 -> nzOnly 
-                                                  _ -> allCountries
-                          }
+-- converter :: Int -> TestConfig
+-- converter i' = defaultConfig { 
+--                                 countries = case i' `mod` 3 of
+--                                                   0 -> auOnly
+--                                                   1 -> nzOnly 
+--                                                   _ -> allCountries
+--                           }
 
-runcfg = CFG.runConfig {country = AU}
+-- runcfg = CFG.runConfig {country = AU}
 
-auTestItems = applyTestFiltersToItems runcfg converter sampleItems 
+-- auTestItems = applyTestFiltersToItems runcfg converter sampleItems 
 
--- expect 1/3 of the 99 nzOnly to be filterred out due to country filter
-unit_filter_items_length = 66 ... length auTestItems
+-- -- expect 1/3 of the 99 nzOnly to be filterred out due to country filter
+-- unit_filter_items_length = 66 ... length auTestItems
 
--- no items mapped to NZ only should be present
-unit_filter_items = Nothing ... find (\i' -> i' `mod` 3 == 1) auTestItems
+-- -- no items mapped to NZ only should be present
+-- unit_filter_items = Nothing ... find (\i' -> i' `mod` 3 == 1) auTestItems

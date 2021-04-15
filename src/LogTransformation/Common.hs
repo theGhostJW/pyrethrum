@@ -61,8 +61,31 @@ instance A.FromJSONKey ExecutionStatus
 isBoundaryLog :: LogProtocolBase e -> Bool
 isBoundaryLog =
   \case
-    BoundaryLog _ -> True
-    _ -> False
+    FilterLog _ -> True
+    StartRun {} -> True
+    EndRun -> True
+    StartGroup _ -> True
+    EndGroup _ -> True
+    StartTest _ -> True
+    EndTest _ -> True
+    StartIteration {} -> True
+    EndIteration _ -> True
+    IOAction _ -> False
+    IOAction' _ -> False
+    StartInteraction -> False
+    InteractorSuccess {} -> False
+    InteractorFailure {} -> False
+    StartParser -> False
+    ParserSuccess {} -> False
+    ParserSkipped _ -> False
+    ParserFailure {} -> False
+    StartChecks -> False
+    CheckOutcome {} -> False
+    Message _ -> False
+    Message' _ -> False
+    LP.Warning _ -> False
+    Warning' _ -> False
+    Error _ -> False
 
 calcNextIterationFailStage :: Maybe IterationPhase -> ExecutionStatus -> IterationPhase -> Maybe (LogProtocolBase e) -> Maybe IterationPhase
 calcNextIterationFailStage mCurrentFailPhase lgStatus currPhase mLp =
@@ -77,11 +100,16 @@ calcNextIterationFailStage mCurrentFailPhase lgStatus currPhase mLp =
 
 logProtocolStatus :: Bool -> LogProtocolBase e -> ExecutionStatus
 logProtocolStatus chkEncountered = \case
-  BoundaryLog bl ->
-    case bl of
-      -- a test with o checks is deemed a fail
-      EndIteration {} -> chkEncountered ? Pass $ Fail
-      _ -> Pass
+  FilterLog _ -> Pass
+  StartRun {} -> Pass
+  EndRun -> Pass
+  StartGroup _ -> Pass
+  EndGroup _ -> Pass
+  StartTest _ -> Pass
+  EndTest _ -> Pass
+  StartIteration {} -> Pass
+  -- a test with 0 checks is deemed a fail
+  EndIteration {} -> chkEncountered ? Pass $ Fail
   StartParser -> Pass
   IOAction _ -> Pass
   IOAction' _ -> Pass
@@ -144,9 +172,7 @@ data PhaseSwitch = PhaseSwitch
 
 isEndIteration :: LogProtocolBase e -> Bool
 isEndIteration = \case
-  BoundaryLog bl -> case bl of
-    EndIteration _ -> True
-    _ -> False
+  EndIteration _ -> True
   _ -> False
 
 -- calculate expected from / to base on log message
@@ -158,22 +184,20 @@ phaseSwitch LogProtocolOut {logInfo = lp} mFailedPhase =
       outToOut :: Maybe PhaseSwitch
       outToOut = ps OutOfIteration OutOfIteration
    in case lp of
-        BoundaryLog bl -> case bl of
-          StartRun {} -> outToOut
-          EndRun -> outToOut
-          FilterLog _ -> outToOut
-          StartGroup _ -> outToOut
-          EndGroup _ -> outToOut
-          StartTest _ -> outToOut
-          -- if test is empty state will be OutOfIteration else Checks
-          EndTest _ -> Just $ PhaseSwitch (S.fromList [Checks, OutOfIteration]) OutOfIteration
-          -- first iteration will be OutOfIteration else Checks
-          StartIteration {} -> Just $ PhaseSwitch (S.fromList [Checks, OutOfIteration]) PreInteractor
-          -- checks -> checks checks is the last status of an iteration
-          -- need to leave in checks until after EndIteration because need to be in iteration when
-          -- processing final EndIteration
-          EndIteration _ -> Nothing
-        -- IterationLog (Doc _) -> Nothing
+        StartRun {} -> outToOut
+        EndRun -> outToOut
+        FilterLog _ -> outToOut
+        StartGroup _ -> outToOut
+        EndGroup _ -> outToOut
+        StartTest _ -> outToOut
+        -- if test is empty state will be OutOfIteration else Checks
+        EndTest _ -> Just $ PhaseSwitch (S.fromList [Checks, OutOfIteration]) OutOfIteration
+        -- first iteration will be OutOfIteration else Checks
+        StartIteration {} -> Just $ PhaseSwitch (S.fromList [Checks, OutOfIteration]) PreInteractor
+        -- checks -> checks checks is the last status of an iteration
+        -- need to leave in checks until after EndIteration because need to be in iteration when
+        -- processing final EndIteration
+        EndIteration _ -> Nothing
         LP.Error _ -> Nothing
         StartParser -> ps PreParse Parse
         IOAction _ -> Nothing
@@ -218,17 +242,15 @@ testItrDelta =
   let clear = (Clear, Clear)
       keep = (Keep, Keep)
    in \case
-        BoundaryLog bl ->
-          case bl of
-            StartTest (TestDisplayInfo mdule _ _) -> (New mdule, Clear)
-            StartIteration iid _ _ _ -> (Keep, New iid)
-            EndIteration _ -> keep
-            StartRun {} -> clear
-            EndRun -> clear
-            FilterLog _ -> clear
-            StartGroup _ -> clear
-            EndGroup _ -> clear
-            EndTest _ -> clear
+        StartTest (TestDisplayInfo mdule _ _) -> (New mdule, Clear)
+        StartIteration iid _ _ _ -> (Keep, New iid)
+        EndIteration _ -> keep
+        StartRun {} -> clear
+        EndRun -> clear
+        FilterLog _ -> clear
+        StartGroup _ -> clear
+        EndGroup _ -> clear
+        EndTest _ -> clear
         -- non-boundry logs
         _ -> keep
 
@@ -245,48 +267,47 @@ nxtIteration current lp =
           Keep -> current
           New itmId -> Just (itmId, IterationOutcome Pass OutOfIteration)
 
+isCheck :: LogProtocolBase e -> Bool
+isCheck =
+  \case
+    CheckOutcome {} -> True
+    _ -> False
+
+resetCheck :: LogProtocolBase e -> Bool
+resetCheck =
+  \case
+    EndIteration _ -> False
+    lp' -> not $ isCheck lp'
+          
 logProtocolStep :: LPStep -> LogProtocolOut -> LPStep
 logProtocolStep (LPStep _phaseValid failStage phase _logItemStatus activeIteration checkEncountered) lpOut@LogProtocolOut {logInfo = lp} =
-  let PhaseChangeValidation {toPhase = nxtPhase, valid = nxtPhaseValid} = phaseChange phase failStage lpOut
+  let 
+    PhaseChangeValidation {toPhase = nxtPhase, valid = nxtPhaseValid} = phaseChange phase failStage lpOut
 
-      nxtActiveItr :: Maybe (ItemId, IterationOutcome)
-      nxtActiveItr = nxtIteration activeIteration lp
+    nxtActiveItr :: Maybe (ItemId, IterationOutcome)
+    nxtActiveItr = nxtIteration activeIteration lp
 
-      isCheck :: LogProtocolBase e -> Bool
-      isCheck =
-        \case
-          BoundaryLog {} -> False
-          CheckOutcome {} -> True
-          _ -> False
+    nxtCheckEncountered :: Bool
+    nxtCheckEncountered =
+      isNothing nxtActiveItr || resetCheck lp
+        ? False
+        $ checkEncountered || isCheck lp
 
-      resetCheck :: LogProtocolBase e -> Bool
-      resetCheck =
-        \case
-          BoundaryLog bl ->
-            case bl of
-              EndIteration _ -> False
-              _ -> True
-          lp' -> not $ isCheck lp'
+    lgStatus :: ExecutionStatus
+    lgStatus = max (logProtocolStatus checkEncountered lp) (nxtPhaseValid ? Pass $ Fail)
 
-      nxtCheckEncountered :: Bool
-      nxtCheckEncountered =
-        isNothing nxtActiveItr || resetCheck lp
-          ? False
-          $ checkEncountered || isCheck lp
-
-      lgStatus :: ExecutionStatus
-      lgStatus = max (logProtocolStatus checkEncountered lp) (nxtPhaseValid ? Pass $ Fail)
-
-      nxtFailStage :: Maybe IterationPhase
-      nxtFailStage = calcNextIterationFailStage failStage lgStatus nxtPhase $ Just lp
-   in LPStep
-        { phaseValid = nxtPhaseValid,
-          faileStage = nxtFailStage,
-          phase = nxtPhase,
-          logItemStatus = lgStatus,
-          activeIteration = nxtActiveItr,
-          checkEncountered = nxtCheckEncountered
-        }
+    nxtFailStage :: Maybe IterationPhase
+    nxtFailStage = calcNextIterationFailStage failStage lgStatus nxtPhase $ Just lp
+  in 
+    LPStep
+      { 
+        phaseValid = nxtPhaseValid,
+        faileStage = nxtFailStage,
+        phase = nxtPhase,
+        logItemStatus = lgStatus,
+        activeIteration = nxtActiveItr,
+        checkEncountered = nxtCheckEncountered
+      }
 
 data LPStep = LPStep
   { phaseValid :: Bool,

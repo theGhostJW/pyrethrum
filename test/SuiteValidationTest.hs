@@ -10,7 +10,7 @@ import Runner (groupAddresses)
 import ItemRunners (runItem)
 import Data.Foldable (Foldable(length))
 import Data.Text ( Text )
-import Prelude as Eval
+import Prelude
 import DSL.LogProtocol.PrettyPrint
 import qualified Data.Text as Text
 

@@ -62,7 +62,7 @@ data ThreadInfo = ThreadInfo
     timeZone :: TimeZone
   }
 
-data BoundaryEvent
+data LogProtocolBase e
   = FilterLog [TestFilterResult]
   | StartRun
       { runTitle :: RunTitle,
@@ -76,10 +76,7 @@ data BoundaryEvent
   | EndTest TestAddress
   | StartIteration ItemId WhenClause ThenClause Value
   | EndIteration ItemId
-  deriving (Eq, Show)
-
-data LogProtocolBase e
-  = BoundaryLog BoundaryEvent
+  
   | IOAction Text
   | IOAction' DetailedInfo
   | StartInteraction
@@ -107,7 +104,6 @@ data LogProtocolOut = LogProtocolOut
 $(deriveJSON defaultOptions ''LogEventInfo)
 $(deriveJSON defaultOptions ''LogIndex)
 $(deriveJSON defaultOptions ''LogProtocolOut)
-$(deriveJSON defaultOptions ''BoundaryEvent)
 $(deriveJSON defaultOptions ''LogProtocolBase)
 $(deriveJSON defaultOptions ''RunTitle)
 $(deriveJSON defaultOptions ''GroupTitle)

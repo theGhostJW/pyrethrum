@@ -23,10 +23,10 @@ import DSL.Logger ( logItem, Logger )
 import DSL.LogProtocol as LP (
       GroupTitle(GroupTitle),
       ItemId(ItemId),
-      LogProtocolBase(BoundaryLog, Error),
+      LogProtocolBase(..),
       RunTitle(RunTitle),
       ThenClause(ThenClause),
-      WhenClause(WhenClause), BoundaryEvent (..) )
+      WhenClause(WhenClause) )
 import DSL.CurrentTime ( utcOffset )
 import Data.Either.Extra ( Either, eitherToMaybe )
 import Pyrelude as P
@@ -101,10 +101,10 @@ runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass 
 runTestItems iIds items rc test@Test{ config = tc } itemRunner =
   let
     startTest :: Sem effs ()
-    startTest = logItem . BoundaryLog . StartTest $ mkDisplayInfo tc
+    startTest = logItem . StartTest $ mkDisplayInfo tc
 
     endTest :: Sem effs ()
-    endTest = logItem .  BoundaryLog . EndTest $ moduleAddress tc
+    endTest = logItem . EndTest $ moduleAddress tc
 
     filteredItems :: [i]
     filteredItems = filter inTargIds items
@@ -116,9 +116,9 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
         iid = ItemId (moduleAddress tc) (identifier @_ @ds i)
       in
         do
-          logItem .  BoundaryLog . StartIteration iid (WhenClause $ whenClause @_ @ds i) (ThenClause $ thenClause @_ @ds  i) $ toJSON i
+          logItem . StartIteration iid (WhenClause $ whenClause @_ @ds i) (ThenClause $ thenClause @_ @ds  i) $ toJSON i
           itemRunner rc test i
-          logItem .  BoundaryLog $ EndIteration iid
+          logItem $ EndIteration iid
 
     inTargIds :: i -> Bool
     inTargIds i = maybe True (S.member (identifier @_ @ds i)) iIds
@@ -180,9 +180,9 @@ exeElm beforeEach afterEach runElm =
           
       Group { title = t, subElms } -> 
         do
-          logItem .  BoundaryLog . StartGroup $ GroupTitle t
+          logItem .  StartGroup $ GroupTitle t
           sequence_ $ exeElm beforeEach afterEach <$> subElms
-          logItem .  BoundaryLog . EndGroup $ GroupTitle t
+          logItem .  EndGroup $ GroupTitle t
 
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, MinEffs e effs) =>
@@ -199,10 +199,10 @@ mkSem rp@RunParams {suite, filters, rc} =
     run' :: Sem effs ()
     run' = do
             offset' <- utcOffset
-            logItem .  BoundaryLog . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
-            logItem .  BoundaryLog . FilterLog $ filterInfo
+            logItem . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
+            logItem . FilterLog $ filterInfo
             exeElm (pure ()) (pure ()) root
-            logItem .  BoundaryLog $ EndRun
+            logItem EndRun
   in
     maybe 
       run'

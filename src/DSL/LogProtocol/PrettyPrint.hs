@@ -47,25 +47,24 @@ prettyPrintLogProtocolBase _mTimeSuffix docMode =
     detailDoc hedr (DetailedInfo msg det) = newLn <> (docMode ? id $ indent2) (subHeader hedr <> newLn <> msg <> newLn <> det)                                                                                                  
   in
     \case
-        BoundaryLog bl -> case bl of 
-                            LP.FilterLog fltrInfos -> ppFilterLog fltrInfos
-                            LP.StartRun ttle _offset rc -> ppStartRun ttle rc
+        LP.FilterLog fltrInfos -> ppFilterLog fltrInfos
+        LP.StartRun ttle _offset rc -> ppStartRun ttle rc
 
-                            LP.StartGroup gt -> groupHeader gt
-                            LP.EndGroup gt -> groupFooter gt
+        LP.StartGroup gt -> groupHeader gt
+        LP.EndGroup gt -> groupFooter gt
 
-                            LP.StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
-                                                              newLn <> "Test Config:" <>
-                                                              newLn <> ppAesonBlock testConfig
+        LP.StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
+                                          newLn <> "Test Config:" <>
+                                          newLn <> ppAesonBlock testConfig
 
-                            EndTest (TestAddress address) -> newLn <> tstHeader ("End Test: " <> address)
-                            StartIteration iid  _ _ val -> newLn <> subHeader ("Start Iteration: " <> iterId iid) <> 
-                                                            newLn <> "Item:" <> 
-                                                            newLn <> ppAesonBlock val <>
-                                                            (docMode ? "" $ newLn)
+        EndTest (TestAddress address) -> newLn <> tstHeader ("End Test: " <> address)
+        StartIteration iid  _ _ val -> newLn <> subHeader ("Start Iteration: " <> iterId iid) <> 
+                                        newLn <> "Item:" <> 
+                                        newLn <> ppAesonBlock val <>
+                                        (docMode ? "" $ newLn)
 
-                            EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
-                            LP.EndRun -> newLn <> PC.header "End Run"
+        EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
+        LP.EndRun -> newLn <> PC.header "End Run"
 
         -- IterationLog (Doc dp) -> case dp of 
         --                       DocAction ai -> case ai of

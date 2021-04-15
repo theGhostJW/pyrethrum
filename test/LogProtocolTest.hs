@@ -121,15 +121,15 @@ genGateStatus =
 genLogProtocol :: Gen (LogProtocolBase Int)
 genLogProtocol =
   choice
-    [ BoundaryLog <$> (StartRun <$> (RunTitle <$> genStr) <*> genInt <*> (A.toJSON <$> genRunConfig)),
-      BoundaryLog . StartGroup <$> (GroupTitle <$> genStr),
-      BoundaryLog . EndGroup <$> (GroupTitle <$> genStr),
-      BoundaryLog . StartTest <$> genTestDisplayInfo,
-      BoundaryLog . EndTest <$> genTestAddress,
-      BoundaryLog <$> (StartIteration <$> genItemId <*> (WhenClause <$> genStr) <*> (ThenClause <$> genStr) <*> (A.toJSON <$> genRunConfig)), --- using runconfig as an easy proxy for item
-      BoundaryLog . EndIteration <$> genItemId,
-      BoundaryLog . FilterLog <$> genTestFilterResults,
-      pure $ BoundaryLog EndRun,
+    [ StartRun <$> (RunTitle <$> genStr) <*> genInt <*> (A.toJSON <$> genRunConfig),
+      StartGroup <$> (GroupTitle <$> genStr),
+      EndGroup <$> (GroupTitle <$> genStr),
+      StartTest <$> genTestDisplayInfo,
+      EndTest <$> genTestAddress,
+      StartIteration <$> genItemId <*> (WhenClause <$> genStr) <*> (ThenClause <$> genStr) <*> (A.toJSON <$> genRunConfig), --- using runconfig as an easy proxy for item
+      EndIteration <$> genItemId,
+      FilterLog <$> genTestFilterResults,
+      pure EndRun,
       IOAction <$> genStr,
       IOAction' <$> (DetailedInfo <$> genStr <*> genStr),
       InteractorSuccess <$> genItemId <*> (ApStateJSON <$> genJSON),

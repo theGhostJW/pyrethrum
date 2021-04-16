@@ -84,7 +84,7 @@ runThreadInfoReader sem = do
                             runReader (ThreadInfo "local" 1 tz) sem
 
 logConsolePrettyInterpreter :: (Show e, Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs) => Sem (Logger e ': effs) a -> Sem effs a
-logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocolWith False, stdout)]
+logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocolWith Run, stdout)]
 
 incIdx :: LogIndex -> LogIndex
 incIdx (LogIndex i) = LogIndex $ i + 1
@@ -153,4 +153,4 @@ logDocInterpreter :: forall effs a e. (Show e, Member OutputDListText effs, A.To
 logDocInterpreter = logWithSink (output . dList)
                                                      
 logDocPrettyInterpreter :: forall effs a e. (Show e, Member OutputDListText effs, A.ToJSON e) => Sem (Logger e ': effs) a -> Sem effs a
-logDocPrettyInterpreter = logWithSink (output . D.fromList . lines . prettyPrintLogProtocol True)
+logDocPrettyInterpreter = logWithSink (output . D.fromList . lines . prettyPrintLogProtocol Doc)

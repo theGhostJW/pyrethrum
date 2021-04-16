@@ -118,7 +118,7 @@ prettyPrintLogprotocolReducer :: forall e. (Show e) => LineNo                 --
           -> ()                                         -- accum
           -> Either DeserialisationError (LogProtocolBase e)    -- Logprotocol
           -> ((), Maybe [Text])                         -- (newAccum, err / result)
-prettyPrintLogprotocolReducer _ _ ethLp = ((), Just [either txtPretty (prettyPrintLogProtocol False) ethLp])
+prettyPrintLogprotocolReducer _ _ ethLp = ((), Just [either txtPretty (prettyPrintLogProtocol Run) ethLp])
 
 
 ---------------------------------------------------------

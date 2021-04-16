@@ -84,7 +84,7 @@ sampleRunResults =
 _thisExeDir :: IO AbsDir
 _thisExeDir = parent <$> (parseAbsFile =<< getExecutablePath)
 
-demo_pretty_print_LP = dumpFile _thisExeDir (prettyPrintLogProtocol False . logInfo <$> sampleLog) [relfile|raw.yaml|]
+demo_pretty_print_LP = dumpFile _thisExeDir (prettyPrintLogProtocol Run . logInfo <$> sampleLog) [relfile|raw.yaml|]
 
 _demo_pretty_print_LP_with_reducer :: IO ()
 _demo_pretty_print_LP_with_reducer = 

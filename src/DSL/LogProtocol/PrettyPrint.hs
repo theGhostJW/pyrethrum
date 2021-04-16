@@ -1,50 +1,109 @@
 
 module DSL.LogProtocol.PrettyPrint (
   prettyPrintLogProtocol,
-  prettyPrintLogProtocolWith
+  prettyPrintLogProtocolWith,
+  -- prettyPrintLogProtocolSimple,
+  LogStyle(..)
 ) where
 
-import Common as C hiding (Error)
+import Common as C ( DetailedInfo(DetailedInfo) )
 import PrettyPrintCommon as PC
-import  DSL.LogProtocol as LP
-import           Pyrelude as P
+    ( Justification(LeftJustify),
+      newLn,
+      indent2,
+      subHeader,
+      header,
+      tstHeader,
+      groupHeader,
+      groupFooter,
+      ppAesonBlock,
+      ppStartRun,
+      ppFilterLog,
+      prettyYamlKeyValues )
+import DSL.LogProtocol as LP
+    ( LogProtocolBase(Error, FilterLog, StartRun, StartGroup, EndGroup,
+                      StartTest, EndTest, StartIteration, EndIteration, EndRun,
+                      StartInteraction, StartChecks, StartParser, IOAction, IOAction',
+                      InteractorSuccess, InteractorFailure, ParserSuccess, ParserSkipped,
+                      ParserFailure, CheckOutcome, Message, Message', Warning, Warning'),
+      ThreadInfo(ThreadInfo, runId, threadIndex),
+      LogIndex(LogIndex),
+      ItemId(ItemId),
+      DStateJSON(DStateJSON),
+      ApStateJSON(ApStateJSON) )
+import Pyrelude as P
+    ( ($),
+      Show,
+      Semigroup((<>)),
+      Bool,
+      Char,
+      Maybe(Nothing),
+      Text,
+      Category(id),
+      Listy(null),
+      replicate,
+      txt,
+      txtPretty,
+      toS,
+      (?),
+      singleton,
+      Time, Eq ((==)) )
 import RunElementClasses as REC
+    ( TestDisplayInfo(TestDisplayInfo, testConfig, testTitle,
+                      testModAddress),
+      TestAddress(TestAddress),
+      toString )
+
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
 
-prettyPrintLogProtocolWith :: Show e => Bool -> ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
-prettyPrintLogProtocolWith docMode ThreadInfo{runId, threadIndex} (LogIndex idx) time lgProtocol = 
-    runId <>  " - " <> txt threadIndex <> " - " <> txt idx <> " - " <>  txt time
-    <> newLn 
-    <> prettyPrintLogProtocol docMode lgProtocol
+data LogStyle = Run | Doc | SimpleText deriving Eq
 
-prettyPrintLogProtocol :: Show e => Bool -> LogProtocolBase e -> Text
+separator' :: LogStyle -> Text
+separator' = \case
+                Run -> newLn
+                Doc -> newLn
+                SimpleText -> " !!!! "
+
+prettyPrintLogProtocolWith :: Show e => LogStyle -> ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
+prettyPrintLogProtocolWith style ThreadInfo{runId, threadIndex} (LogIndex idx) time lgProtocol = 
+    runId <>  " - " <> txt threadIndex <> " - " <> txt idx <> " - " <>  txt time
+    <> separator' style 
+    <> prettyPrintLogProtocol style lgProtocol
+
+prettyPrintLogProtocolSimple :: Show e => LogProtocolBase e -> Text
+prettyPrintLogProtocolSimple = prettyPrintLogProtocolBase Nothing SimpleText
+
+prettyPrintLogProtocol :: Show e => LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocol = prettyPrintLogProtocolBase Nothing
 
-prettyPrintLogProtocolBase :: Show e => Maybe Text -> Bool -> LogProtocolBase e -> Text
-prettyPrintLogProtocolBase _mTimeSuffix docMode =
-  let
+prettyPrintLogProtocolBase :: Show e => Maybe Text -> LogStyle -> LogProtocolBase e -> Text
+prettyPrintLogProtocolBase _mTimeSuffix style =
+  let  
+    separator :: Text
+    separator = separator' style
+
     iterId :: ItemId -> Text
     iterId (ItemId tst iid) = toString tst <> " / item " <> txt iid
 
     prettyBlock :: Char -> Text -> ItemId -> Text -> Text
-    prettyBlock pfxChr headr iid body = indent2 $ toS (replicate 4 ' ') <> singleton pfxChr <> " " <> headr <> " - " <> iterId iid <> newLn <> indent2 body
+    prettyBlock pfxChr headr iid body = indent2 $ toS (replicate 4 ' ') <> singleton pfxChr <> " " <> headr <> " - " <> iterId iid <> separator <> indent2 body
 
     ppMsgInfo :: Text -> Text
     ppMsgInfo dtl = null dtl ?
                               "" $
-                              newLn <> indent2 (txtPretty dtl)
+                              separator <> indent2 (txtPretty dtl)
 
     docMarkUp :: Text -> Text
-    docMarkUp s = (docMode ? id $ indent2) $ (docMode ? "  >> " $ "") <> s
+    docMarkUp s = (style == Doc ? id $ indent2) $ (style == Doc ? "  >> " $ "") <> s
 
     logIO :: Show a => a -> Text
     logIO m =  docMarkUp $ "IO Action: " <> txtPretty m
 
     logIO' :: DetailedInfo -> Text
-    logIO' (DetailedInfo m i) =  docMarkUp $ "IO Action: " <> txtPretty m <> "\n" <> txtPretty i
+    logIO' (DetailedInfo m i) = docMarkUp $ "IO Action: " <> txtPretty m <> "\n" <> txtPretty i
 
     detailDoc :: Text -> DetailedInfo -> Text
-    detailDoc hedr (DetailedInfo msg det) = newLn <> (docMode ? id $ indent2) (subHeader hedr <> newLn <> msg <> newLn <> det)                                                                                                  
+    detailDoc hedr (DetailedInfo msg det) = separator <> (style == Doc ? id $ indent2) (subHeader hedr <> separator <> msg <> separator <> det)                                                                                                  
   in
     \case
         LP.FilterLog fltrInfos -> ppFilterLog fltrInfos
@@ -53,28 +112,28 @@ prettyPrintLogProtocolBase _mTimeSuffix docMode =
         LP.StartGroup gt -> groupHeader gt
         LP.EndGroup gt -> groupFooter gt
 
-        LP.StartTest TestDisplayInfo{..} -> newLn <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
-                                          newLn <> "Test Config:" <>
-                                          newLn <> ppAesonBlock testConfig
+        LP.StartTest TestDisplayInfo{..} -> separator <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
+                                          separator <> "Test Config:" <>
+                                          separator <> ppAesonBlock testConfig
 
-        EndTest (TestAddress address) -> newLn <> tstHeader ("End Test: " <> address)
-        StartIteration iid  _ _ val -> newLn <> subHeader ("Start Iteration: " <> iterId iid) <> 
-                                        newLn <> "Item:" <> 
-                                        newLn <> ppAesonBlock val <>
-                                        (docMode ? "" $ newLn)
+        EndTest (TestAddress address) -> separator <> tstHeader ("End Test: " <> address)
+        StartIteration iid  _ _ val -> separator <> subHeader ("Start Iteration: " <> iterId iid) <> 
+                                        separator <> "Item:" <> 
+                                        separator <> ppAesonBlock val <>
+                                        (style == Doc ? "" $ separator)
 
-        EndIteration iid -> newLn <> subHeader ("End Iteration: " <> iterId iid)
-        LP.EndRun -> newLn <> PC.header "End Run"
+        EndIteration iid -> separator <> subHeader ("End Iteration: " <> iterId iid)
+        LP.EndRun -> separator <> PC.header "End Run"
 
         -- IterationLog (Doc dp) -> case dp of 
         --                       DocAction ai -> case ai of
         --                         ActionInfo msg -> "  >> " <> msg
         --                         ActionInfo' msg extended -> "  >> " <> 
         --                                                         msg <> 
-        --                                                         newLn <> 
+        --                                                         separator <> 
         --                                                         indent2 extended
-        --                       DocInteraction -> newLn <> "Interaction:"
-        --                       DocChecks -> newLn <> "Checks:"
+        --                       DocInteraction -> separator <> "Interaction:"
+        --                       DocChecks -> separator <> "Checks:"
         --                       DocCheck _iid chkhdr resultExpectation gateStatus -> 
         --                                   indent2 $ "% " <> chkhdr  <> 
         --                                       (
@@ -86,7 +145,7 @@ prettyPrintLogProtocolBase _mTimeSuffix docMode =
         --                                       case resultExpectation of 
         --                                         ExpectPass -> ""
         --                                         ExpectFailure Inactive  _  -> ""
-        --                                         ExpectFailure Active message -> newLn <> indent2 ("!! This check is expected to fail: " <> message)
+        --                                         ExpectFailure Active message -> separator <> indent2 ("!! This check is expected to fail: " <> message)
         --                                       )
 
         --                       DocIOAction m -> logIO m
@@ -99,14 +158,14 @@ prettyPrintLogProtocolBase _mTimeSuffix docMode =
 
         --                       e@(DocError _) -> txtPretty e
 
-        StartInteraction -> newLn <> "Interaction:"
-        StartChecks -> newLn <> "Checks:"
-        StartParser -> newLn <> "Domain:"
+        StartInteraction -> separator <> "Interaction:"
+        StartChecks -> separator <> "Checks:"
+        StartParser -> separator <> "Domain:"
 
         IOAction m -> indent2 $ logIO m 
         IOAction' i -> logIO' i
         
-        InteractorSuccess iid (ApStateJSON as) -> newLn <> prettyBlock '>' "Interactor Complete" iid (prettyYamlKeyValues 2 LeftJustify as)
+        InteractorSuccess iid (ApStateJSON as) -> separator <> prettyBlock '>' "Interactor Complete" iid (prettyYamlKeyValues 2 LeftJustify as)
           
         InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ txtPretty err
 

@@ -21,7 +21,7 @@ jsonItemLogExt = ".jsoni" :: Text
 ioRunToFile :: forall b e appEffs. (Show e, ToJSON e, Members '[CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] appEffs) =>
     IO AbsDir
     -> WantConsole
-    -> Bool 
+    -> LogStyle 
     -> (forall a. (forall effs. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs => Sem (Logger e ': effs) a -> Sem effs a) -> Sem appEffs a -> IO (Either (FrameworkError e) a))
     -> Sem appEffs b
     -> IO (Either (FrameworkError e) [AbsFile])

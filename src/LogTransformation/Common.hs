@@ -360,7 +360,7 @@ logProtocolPrettyPrintReducer _ _ ethLp =
       eitherf
         ethLp
         txtPretty
-        (prettyPrintLogProtocol False)
+        (prettyPrintLogProtocol Run)
   )
 
 jsonSerialiser :: A.ToJSON a => a -> ByteString

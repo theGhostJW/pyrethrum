@@ -33,7 +33,6 @@ ghc-options:
   - -Wincomplete-record-updates
   - -Wincomplete-uni-patterns
   - -Wredundant-constraints
-  - -fplugin=Polysemy.Plugin
   - -fwarn-tabs
   - -fno-warn-unused-imports
   - -fno-warn-missing-signatures
@@ -44,60 +43,13 @@ ghc-options:
   - -fwrite-ide-info
   # - -fdefer-type-errors
 
-default-extensions:
-  - AllowAmbiguousTypes
-  - BangPatterns
-  - BlockArguments
-  - ConstrainedClassMethods
-  - ConstraintKinds
-  - DisambiguateRecordFields
-  - DuplicateRecordFields
-  - DataKinds
-  - DefaultSignatures
-  - DeriveFoldable
-  - DeriveFunctor
-  - DeriveGeneric
-  - DeriveLift
-  - DeriveTraversable
-  - DerivingStrategies
-  - EmptyCase
-  - ExistentialQuantification
-  - ExtendedDefaultRules
-  - FlexibleContexts
-  - FlexibleInstances
-  - FunctionalDependencies
-  - GADTs
-  - GeneralizedNewtypeDeriving
-  - InstanceSigs
-  - KindSignatures
-  - LambdaCase
-  - LiberalTypeSynonyms
-  - MultiParamTypeClasses
-  - MultiWayIf
-  - NamedFieldPuns
-  - NoImplicitPrelude
-  - OverloadedStrings
-  - PartialTypeSignatures
-  - PatternSynonyms
-  - PolyKinds
-  - QuasiQuotes
-  - RankNTypes
-  - RecordWildCards
-  - ScopedTypeVariables
-  - StandaloneDeriving
-  - StrictData
-  - TemplateHaskell
-  - TupleSections
-  - TypeApplications
-  - TypeFamilies
-  - TypeFamilyDependencies
-  - TypeOperators
-
 library:
   source-dirs: src
 
 tests:
   pyrethrum-test:
-    main:                driver.hs
+    main:                DemoTest.hs
     source-dirs:        
     - test
+    dependencies:
+    - pyrethrum

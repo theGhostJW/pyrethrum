@@ -2,7 +2,7 @@ module Demo where
 
 import Prelude
 
-Demo :: IO ()
-Demo = putStr "Hello World"
--- Demo = putStr "Hello Hello"
+callDemo :: IO ()
+callDemo = putStr "Hello World"
+-- demo = putStr "Hello Hello"
 

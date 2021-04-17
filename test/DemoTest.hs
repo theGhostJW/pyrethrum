@@ -1,8 +1,8 @@
-module DemoTest where
-
+import Demo (salutation)
 import Prelude
-import Demo
-
 
 main :: IO ()
-main = callDemo
+main = putStr salutation
+
+-- >>> "Hello " <> salutation
+-- "Hello Hello"

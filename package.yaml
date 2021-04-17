@@ -18,37 +18,12 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
   - base
 
-ghc-options:
-  - -fmax-pmcheck-models=10000000
-  - -ferror-spans
-  # - -dth-dec-file -- generate template haskell
-
-  - -O0
-  # - -O2
-  # - -flate-specialise # reqiuired for polysemy
-  # - -fspecialise-aggressively # reqiuired for polysemy
-  # - -Werror
-  - -Wall
-  - -Wcompat
-  - -Wincomplete-record-updates
-  - -Wincomplete-uni-patterns
-  - -Wredundant-constraints
-  - -fwarn-tabs
-  - -fno-warn-unused-imports
-  - -fno-warn-missing-signatures
-  - -fno-warn-type-defaults
-  - -fno-warn-unused-matches
-  - -fno-warn-unused-binds
-  - -fno-warn-unused-do-bind
-  - -fwrite-ide-info
-  # - -fdefer-type-errors
-
 library:
   source-dirs: src
 
 tests:
   pyrethrum-test:
-    main:                DemoTest.hs
+    main: DemoTest.hs
     source-dirs:        
     - test
     dependencies:

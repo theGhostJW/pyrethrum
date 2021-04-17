@@ -47,20 +47,11 @@ packages:
 # Override default flag values for local packages and extra-deps
 # flags: {}
 #
-allow-newer: true
+# allow-newer: true
 
 # Extra package databases containing global packages
 # extra-package-dbs: []
-extra-deps:
-# mine
-- git: https://github.com/theGhostJW/pyrelude
-  commit: "36fffcb758ebf73b7fcf3c7e38519ad0e9e38d96"
-- discrimination-0.4@sha256:d42ae36c97ea9c0c8844b47ee162c5530f3daf708636f01010f58dcf52602876,2571
-- encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce,1864
-- polysemy-1.4.0.0
-- polysemy-plugin-0.2.5.2
-- transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
-
+# extra-deps:
 # Control whether we use the GHC we find on the path
 # system-ghc: true
 #

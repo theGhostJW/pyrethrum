@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 552906e6d880b9d92a57c92a6ff7b89763f96c90e51130bbb3a39a91f15cd752
+-- hash: 453cf5cc8b80254b2322b98f5b40d12fe77cae4b9b4effd94d0ca33ea64eea52
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -15,11 +15,7 @@ author:         Author name here
 maintainer:     example@example.com
 copyright:      2018 Author name here
 license:        BSD3
-license-file:   LICENSE
 build-type:     Simple
-extra-source-files:
-    README.md
-    ChangeLog.md
 
 source-repository head
   type: git
@@ -27,37 +23,7 @@ source-repository head
 
 library
   exposed-modules:
-      AuxFiles
-      Check
-      Common
-      Config
-      DSL
-      DSL.ArbitraryIO
-      DSL.CurrentTime
-      DSL.CurrentTimeDocLogger
-      DSL.FileSystem
-      DSL.Interpreter
-      DSL.Logger
-      DSL.LogProtocol
-      DSL.LogProtocol.PrettyPrint
-      FileLogging
-      ItemFilter
-      ItemRunners
-      LogTransformation
-      LogTransformation.Common
-      LogTransformation.PrintLogDisplayElement
-      LogTransformation.Stats
-      LogTransformation.Test
-      MemberReflection
-      OrphanedInstances
-      PrettyPrintCommon
-      RunElementClasses
-      Runner
-      RunnerBase
-      RunnerConsoleAndFile
-      RunPlan
-      TestFilter
-      TestFilters
+      Demo
   other-modules:
       Paths_pyrethrum
   hs-source-dirs:
@@ -65,107 +31,19 @@ library
   default-extensions: AllowAmbiguousTypes BangPatterns BlockArguments ConstrainedClassMethods ConstraintKinds DisambiguateRecordFields DuplicateRecordFields DataKinds DefaultSignatures DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification ExtendedDefaultRules FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase LiberalTypeSynonyms MultiParamTypeClasses MultiWayIf NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures PatternSynonyms PolyKinds QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving StrictData TemplateHaskell TupleSections TypeApplications TypeFamilies TypeFamilyDependencies TypeOperators
   ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
   build-depends:
-      aeson
-    , base
-    , bytestring
-    , containers
-    , deepseq
-    , dlist
-    , extra
-    , fmt
-    , mtl
-    , polysemy
-    , polysemy-plugin
-    , pretty-show
-    , pyrelude
-    , raw-strings-qq
-    , template-haskell
-    , text
-    , transformers-either
-    , unordered-containers
-    , yaml
+      base
   default-language: Haskell2010
 
 test-suite pyrethrum-test
   type: exitcode-stdio-1.0
   main-is: driver.hs
   other-modules:
-      ArbitraryIOTest
-      AuxFilesTest
-      CheckTest
-      DemoConfig
-      EndpointTest
-      ItemFiltersTest
-      LogListCheck
-      LogProtocolTest
-      LogTransformationTest
-      MockSuite
-      PrettyPrintTest
-      RunnerTest
-      SemTest
-      SuiteValidationTest
-      TestFilterTest
+      Demo
       Paths_pyrethrum
   hs-source-dirs:
       test
   default-extensions: AllowAmbiguousTypes BangPatterns BlockArguments ConstrainedClassMethods ConstraintKinds DisambiguateRecordFields DuplicateRecordFields DataKinds DefaultSignatures DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification ExtendedDefaultRules FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase LiberalTypeSynonyms MultiParamTypeClasses MultiWayIf NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures PatternSynonyms PolyKinds QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving StrictData TemplateHaskell TupleSections TypeApplications TypeFamilies TypeFamilyDependencies TypeOperators
   ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
   build-depends:
-      aeson
-    , base
-    , bytestring
-    , containers
-    , dlist
-    , extra
-    , hedgehog
-    , mtl
-    , polysemy
-    , polysemy-plugin
-    , pretty-show
-    , pyrelude
-    , pyrethrum
-    , raw-strings-qq
-    , tasty
-    , tasty-discover
-    , tasty-hedgehog
-    , tasty-hunit
-    , text
-    , transformers-either
-    , yaml
-  default-language: Haskell2010
-
-test-suite pyrethrum-test-Integration
-  type: exitcode-stdio-1.0
-  main-is: driver.hs
-  other-modules:
-      EndToEndSanityTest
-      LogTransformationIntegrationTest
-      RunnerRestartGoHomeIOTest
-      Paths_pyrethrum
-  hs-source-dirs:
-      testIntegration
-  default-extensions: AllowAmbiguousTypes BangPatterns BlockArguments ConstrainedClassMethods ConstraintKinds DisambiguateRecordFields DuplicateRecordFields DataKinds DefaultSignatures DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification ExtendedDefaultRules FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase LiberalTypeSynonyms MultiParamTypeClasses MultiWayIf NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures PatternSynonyms PolyKinds QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving StrictData TemplateHaskell TupleSections TypeApplications TypeFamilies TypeFamilyDependencies TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
-  build-depends:
-      aeson
-    , base
-    , bytestring
-    , containers
-    , dlist
-    , extra
-    , hedgehog
-    , mtl
-    , polysemy
-    , polysemy-plugin
-    , pretty-show
-    , pyrelude
-    , pyrethrum
-    , raw-strings-qq
-    , tasty
-    , tasty-discover
-    , tasty-hedgehog
-    , tasty-hunit
-    , text
-    , transformers-either
-    , yaml
+      base
   default-language: Haskell2010

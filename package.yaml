@@ -6,10 +6,6 @@ author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
 
-extra-source-files:
-- README.md
-- ChangeLog.md
-
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
 # category:            Web
@@ -21,18 +17,6 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
   - base
-  - pyrelude
-  - containers
-  - extra
-  - text
-  - transformers-either
-  - aeson
-  - yaml
-  - pretty-show
-  - dlist
-  - raw-strings-qq
-  - polysemy
-  - polysemy-plugin
 
 ghc-options:
   - -fmax-pmcheck-models=10000000
@@ -40,7 +24,6 @@ ghc-options:
   # - -dth-dec-file -- generate template haskell
 
   - -O0
-  # TODO: prgma to turn optimisations on for non-dev build
   # - -O2
   # - -flate-specialise # reqiuired for polysemy
   # - -fspecialise-aggressively # reqiuired for polysemy
@@ -112,35 +95,9 @@ default-extensions:
 
 library:
   source-dirs: src
-  dependencies:
-    - deepseq
-    - unordered-containers
-    - template-haskell
-    - bytestring
-    - mtl
-    - fmt
-
-_testDep: &testdependencies
-- tasty
-- tasty-hunit
-- tasty-hedgehog
-- tasty-discover
-- hedgehog
-- pyrethrum
-- bytestring
-- mtl
 
 tests:
   pyrethrum-test:
     main:                driver.hs
     source-dirs:        
     - test
-    dependencies: *testdependencies
-  
-  pyrethrum-test-Integration:
-    main:                driver.hs
-    source-dirs:         
-    - testIntegration
-    dependencies: 
-      *testdependencies
-    

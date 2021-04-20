@@ -368,7 +368,7 @@ prettyPrintDisplayElement pde =
    in case pde of
         LogTransformation.PrintLogDisplayElement.FilterLog _arrFr -> noImp
         LogTransformation.PrintLogDisplayElement.StartRun (RunTitle titl) config runStatus testStats iterationStats outOfTest ->
-          majorHeader (header' titl runStatus)
+          majorHeader False (header' titl runStatus)
             <> newLn
             <> "toDo - start end duration raw file"
             <> newLn2
@@ -388,9 +388,9 @@ prettyPrintDisplayElement pde =
             <> newLn
             <> alignKeyValues True 2 RightJustify (statusCountTupleText True outOfTest)
         LogTransformation.PrintLogDisplayElement.EndRun mFltrLog ->
-          majorHeader "End Run"
+          majorHeader False "End Run"
             <> newLn
-            <> fullHeader '-' False "Filter Log"
+            <> fullHeader False '-' False "Filter Log"
             <> newLn
             <> maybef
               mFltrLog
@@ -436,7 +436,7 @@ prettyPrintDisplayElement pde =
               )
             <> newLn
         LogTransformation.PrintLogDisplayElement.StartTest titl tstMod _notes _cfg status itrStats ->
-          majorHeader (header' titl status)
+          majorHeader False (header' titl status)
             <> newLn
             <> "module:"
             <> newLn
@@ -531,7 +531,7 @@ prettyPrintDisplayElement pde =
                    in \case
                         SucceededInteractor val -> mkTxt $ unApStateJSON val
                         FailedInteractor err -> mkTxt $ Y.toJSON err
-             in iterationHeader (header' (modulePath <> " - " <> txt itmId) status)
+             in iterationHeader False (header' (modulePath <> " - " <> txt itmId) status)
                   <> newLn
                   <> alignKeyValues True 0 LeftJustify hdrLines
                   <> newLn
@@ -559,7 +559,7 @@ prettyPrintDisplayElement pde =
                   <> maybef item "  No Item Recorded" (indent2 . getLenient . convertString . encodePretty (setConfCompare keyOrdering defConfig))
                   <> newLn
         LineError err ->
-          fullHeader '!' True "ERROR"
+          fullHeader False '!' True "ERROR"
             <> newLn
             <> indent2 (txt err)
 

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 552906e6d880b9d92a57c92a6ff7b89763f96c90e51130bbb3a39a91f15cd752
+-- hash: cefbe61568f1fcffb346862d8ff502982684d1809f5566591ac7943038ebbba5
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -56,6 +56,7 @@ library
       RunnerBase
       RunnerConsoleAndFile
       RunPlan
+      TempUtils
       TestFilter
       TestFilters
   other-modules:

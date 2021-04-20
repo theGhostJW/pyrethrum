@@ -8,18 +8,14 @@ module DSL.LogProtocol.PrettyPrint (
 
 import Common as C ( DetailedInfo(DetailedInfo) )
 import PrettyPrintCommon as PC
-    ( Justification(LeftJustify),
-      newLn,
-      indent2,
-      subHeader,
-      header,
-      tstHeader,
-      groupHeader,
-      groupFooter,
-      ppAesonBlock,
-      ppStartRun,
-      ppFilterLog,
-      prettyYamlKeyValues )
+    ( Justification(LeftJustify)
+     , newLn
+     , indent2
+     , majorHeader
+     , fullHeader
+     , ppAesonBlock
+     , prettyYamlKeyValues 
+     , prettyPrintFilterItem )
 import DSL.LogProtocol as LP
     ( LogProtocolBase(Error, FilterLog, StartRun, StartGroup, EndGroup,
                       StartTest, EndTest, StartIteration, EndIteration, EndRun,
@@ -30,39 +26,23 @@ import DSL.LogProtocol as LP
       LogIndex(LogIndex),
       ItemId(ItemId),
       DStateJSON(DStateJSON),
-      ApStateJSON(ApStateJSON) )
+      ApStateJSON(ApStateJSON), GroupTitle, unGroupTitle, RunTitle, unRunTitle )
 import Pyrelude as P
-    ( ($),
-      Show,
-      Semigroup((<>)),
-      Bool,
-      Char,
-      Maybe(Nothing),
-      Text,
-      Category(id),
-      Listy(null),
-      replicate,
-      txt,
-      txtPretty,
-      toS,
-      (?),
-      singleton,
-      Time, Eq ((==)) )
 import RunElementClasses as REC
     ( TestDisplayInfo(TestDisplayInfo, testConfig, testTitle,
                       testModAddress),
       TestAddress(TestAddress),
-      toString )
-
+      toString, TestFilterResult )
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
+import Data.Yaml as Y ( Value )
 
-data LogStyle = Run | Doc | SimpleText deriving Eq
+data LogStyle = Run | Doc | Outline deriving Eq
 
 separator' :: LogStyle -> Text
 separator' = \case
                 Run -> newLn
                 Doc -> newLn
-                SimpleText -> " !!!! "
+                Outline -> " - "
 
 prettyPrintLogProtocolWith :: Show e => LogStyle -> ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
 prettyPrintLogProtocolWith style ThreadInfo{runId, threadIndex} (LogIndex idx) time lgProtocol = 
@@ -71,14 +51,40 @@ prettyPrintLogProtocolWith style ThreadInfo{runId, threadIndex} (LogIndex idx) t
     <> prettyPrintLogProtocol style lgProtocol
 
 prettyPrintLogProtocolSimple :: Show e => LogProtocolBase e -> Text
-prettyPrintLogProtocolSimple = prettyPrintLogProtocolBase Nothing SimpleText
+prettyPrintLogProtocolSimple = prettyPrintLogProtocolBase Nothing Outline
 
 prettyPrintLogProtocol :: Show e => LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocol = prettyPrintLogProtocolBase Nothing
 
 prettyPrintLogProtocolBase :: Show e => Maybe Text -> LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocolBase _mTimeSuffix style =
-  let  
+  let 
+    isOutline = style == Outline 
+    hdr :: Text -> Text -> Text
+    hdr l h = isOutline ? h $ l <> " " <> h <> " " <> l
+    subHeader = hdr "----"
+    header = hdr "===="
+    tstHeader = hdr "==="
+    itrHeader = hdr "=="
+
+    ppStartRun :: RunTitle -> Y.Value -> Text
+    ppStartRun ttle rc = majorHeader isOutline (unRunTitle ttle) <> 
+                          newLn <> newLn <> "Run Config:" <>
+                          newLn <> ppAesonBlock rc
+
+    groupHeader :: GroupTitle -> Text
+    groupHeader = groupTitle "Group"
+
+    groupFooter :: GroupTitle -> Text
+    groupFooter = groupTitle "End Group"
+
+    groupTitle :: Text -> GroupTitle -> Text
+    groupTitle hdr' gt = header $ hdr' <> " - " <> unGroupTitle gt
+
+    ppFilterLog :: [TestFilterResult] -> Text
+    ppFilterLog fltrInfos = newLn <> header "Filter Log" <> newLn <>
+                        foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
+
     separator :: Text
     separator = separator' style
 
@@ -123,7 +129,7 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
                                         (style == Doc ? "" $ separator)
 
         EndIteration iid -> separator <> subHeader ("End Iteration: " <> iterId iid)
-        LP.EndRun -> separator <> PC.header "End Run"
+        LP.EndRun -> separator <> header "End Run"
 
         -- IterationLog (Doc dp) -> case dp of 
         --                       DocAction ai -> case ai of

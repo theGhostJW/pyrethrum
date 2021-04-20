@@ -276,15 +276,13 @@ runParams =
 happyRun :: forall effs. DemoEffs effs => Sem effs ()
 happyRun = mkRunSem runParams
 
-hookParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs
-hookParams =
-  RunParams
-    { suite = hookSuite,
-      filters = [],
-      itemIds = Nothing,
-      itemRunner = runItem,
-      rc = RunConfig "Hook Suite" True
-    }
+ 
 
 hookRun :: forall effs. DemoEffs effs => Sem effs ()
-hookRun = mkRunSem hookParams
+hookRun = mkRunSem $ RunParams { 
+                                 suite = hookSuite,
+                                 filters = [],
+                                 itemIds = Nothing,
+                                 itemRunner = runItem,
+                                 rc = RunConfig "Hook Suite" True
+                               }

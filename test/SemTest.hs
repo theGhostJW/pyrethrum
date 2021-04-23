@@ -137,7 +137,10 @@ filters' = [includeFilter]
 mockSuite :: forall effs a. (forall i as ds. (Show i, Show as, Show ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
 mockSuite r = 
   R.Group "Filter Suite" [
-    Hook BeforeAll (pure ()) [
+    Hook 
+    "Before All" 
+     BeforeAll 
+     (pure ()) [
       Tests [
         r test1,
         r test2,

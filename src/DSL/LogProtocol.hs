@@ -1,7 +1,7 @@
 module DSL.LogProtocol where
 
 import Check
-import Common (DetailedInfo, FrameworkError)
+import Common (DetailedInfo, FrameworkError, HookLocation)
 import Data.Aeson as A
 import Data.Aeson.TH
 import Pyrelude
@@ -72,6 +72,8 @@ data LogProtocolBase e
   | EndRun
   | StartGroup GroupTitle
   | EndGroup GroupTitle
+  | StartHook HookLocation Text
+  | EndHook HookLocation Text
   | StartTest TestDisplayInfo
   | EndTest TestAddress
   | StartIteration ItemId WhenClause ThenClause Value

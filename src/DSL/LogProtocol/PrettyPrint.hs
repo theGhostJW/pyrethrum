@@ -6,7 +6,7 @@ module DSL.LogProtocol.PrettyPrint (
   LogStyle(..)
 ) where
 
-import Common as C ( DetailedInfo(DetailedInfo) )
+import Common as C ( DetailedInfo(DetailedInfo), HookLocation(..) )
 import PrettyPrintCommon as PC
     ( Justification(LeftJustify)
      , newLn
@@ -17,11 +17,7 @@ import PrettyPrintCommon as PC
      , prettyYamlKeyValues 
      , prettyPrintFilterItem )
 import DSL.LogProtocol as LP
-    ( LogProtocolBase(Error, FilterLog, StartRun, StartGroup, EndGroup,
-                      StartTest, EndTest, StartIteration, EndIteration, EndRun,
-                      StartInteraction, StartChecks, StartParser, IOAction, IOAction',
-                      InteractorSuccess, InteractorFailure, ParserSuccess, ParserSkipped,
-                      ParserFailure, CheckOutcome, Message, Message', Warning, Warning'),
+    ( LogProtocolBase(..),
       ThreadInfo(ThreadInfo, runId, threadIndex),
       LogIndex(LogIndex),
       ItemId(ItemId),
@@ -44,6 +40,13 @@ separator' = \case
                 Doc -> newLn
                 Outline -> " - "
 
+describeLoc :: HookLocation -> Text
+describeLoc = \case 
+                 BeforeAll -> "Before All"
+                 AfterAll -> "After All"
+                 BeforeEach -> "Before Each"
+                 AfterEach -> "After Each"
+
 prettyPrintLogProtocolWith :: Show e => LogStyle -> ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
 prettyPrintLogProtocolWith style ThreadInfo{runId, threadIndex} (LogIndex idx) time lgProtocol = 
     runId <>  " - " <> txt threadIndex <> " - " <> txt idx <> " - " <>  txt time
@@ -55,6 +58,9 @@ prettyPrintLogProtocolSimple = prettyPrintLogProtocolBase Nothing Outline
 
 prettyPrintLogProtocol :: Show e => LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocol = prettyPrintLogProtocolBase Nothing
+
+iterId :: ItemId -> Text
+iterId (ItemId tst iid) = toString tst <> " / item " <> txt iid
 
 prettyPrintLogProtocolBase :: Show e => Maybe Text -> LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocolBase _mTimeSuffix style =
@@ -88,9 +94,6 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
     separator :: Text
     separator = separator' style
 
-    iterId :: ItemId -> Text
-    iterId (ItemId tst iid) = toString tst <> " / item " <> txt iid
-
     prettyBlock :: Char -> Text -> ItemId -> Text -> Text
     prettyBlock pfxChr headr iid body = indent2 $ toS (replicate 4 ' ') <> singleton pfxChr <> " " <> headr <> " - " <> iterId iid <> separator <> indent2 body
 
@@ -118,6 +121,9 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
         LP.StartGroup gt -> groupHeader gt
         LP.EndGroup gt -> groupFooter gt
 
+        LP.StartHook loc title -> "Start " <> describeLoc loc <> " Hook: " <> title
+        LP.EndHook loc title ->   "End " <> describeLoc loc <> " Hook: "  <> title
+
         LP.StartTest TestDisplayInfo{..} -> separator <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
                                           separator <> "Test Config:" <>
                                           separator <> ppAesonBlock testConfig
@@ -131,39 +137,6 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
         EndIteration iid -> separator <> subHeader ("End Iteration: " <> iterId iid)
         LP.EndRun -> separator <> header "End Run"
 
-        -- IterationLog (Doc dp) -> case dp of 
-        --                       DocAction ai -> case ai of
-        --                         ActionInfo msg -> "  >> " <> msg
-        --                         ActionInfo' msg extended -> "  >> " <> 
-        --                                                         msg <> 
-        --                                                         separator <> 
-        --                                                         indent2 extended
-        --                       DocInteraction -> separator <> "Interaction:"
-        --                       DocChecks -> separator <> "Checks:"
-        --                       DocCheck _iid chkhdr resultExpectation gateStatus -> 
-        --                                   indent2 $ "% " <> chkhdr  <> 
-        --                                       (
-        --                                         gateStatus == GateCheck 
-        --                                           ? "(Gate: subsequent checks will not be executed if this check fails)" 
-        --                                           $ ""
-        --                                       ) <> 
-        --                                       (
-        --                                       case resultExpectation of 
-        --                                         ExpectPass -> ""
-        --                                         ExpectFailure Inactive  _  -> ""
-        --                                         ExpectFailure Active message -> separator <> indent2 ("!! This check is expected to fail: " <> message)
-        --                                       )
-
-        --                       DocIOAction m -> logIO m
-
-        --                       DocMessage s -> docMarkUp $ "message: " <> s
-        --                       DocMessage' detailedInfo -> detailDoc "Message" detailedInfo
-            
-        --                       DocWarning s -> docMarkUp $ "warning: " <> s
-        --                       DocWarning' detailedInfo -> detailDoc "Warning" detailedInfo
-
-        --                       e@(DocError _) -> txtPretty e
-
         StartInteraction -> separator <> "Interaction:"
         StartChecks -> separator <> "Checks:"
         StartParser -> separator <> "Domain:"
@@ -171,7 +144,13 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
         IOAction m -> indent2 $ logIO m 
         IOAction' i -> logIO' i
         
-        InteractorSuccess iid (ApStateJSON as) -> separator <> prettyBlock '>' "Interactor Complete" iid (prettyYamlKeyValues 2 LeftJustify as)
+        InteractorSuccess iid (ApStateJSON as) -> 
+          separator <> 
+            ( 
+              isOutline ?
+                "Interactor Complete " <> iterId iid $
+                prettyBlock '>' "Interactor Complete" iid (prettyYamlKeyValues 2 LeftJustify as)
+            )
           
         InteractorFailure iid err -> prettyBlock '>' "Interactor Failure" iid $ txtPretty err
 

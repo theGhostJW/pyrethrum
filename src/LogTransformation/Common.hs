@@ -68,6 +68,8 @@ isBoundaryLog =
     EndGroup _ -> True
     StartTest _ -> True
     EndTest _ -> True
+    StartHook {} -> True
+    EndHook {} -> True
     StartIteration {} -> True
     EndIteration _ -> True
     IOAction _ -> False
@@ -105,6 +107,8 @@ logProtocolStatus chkEncountered = \case
   EndRun -> Pass
   StartGroup _ -> Pass
   EndGroup _ -> Pass
+  StartHook {} -> Pass
+  EndHook {}  -> Pass
   StartTest _ -> Pass
   EndTest _ -> Pass
   StartIteration {} -> Pass
@@ -189,6 +193,8 @@ phaseSwitch LogProtocolOut {logInfo = lp} mFailedPhase =
         FilterLog _ -> outToOut
         StartGroup _ -> outToOut
         EndGroup _ -> outToOut
+        StartHook {} -> outToOut
+        EndHook {}  -> outToOut
         StartTest _ -> outToOut
         -- if test is empty state will be OutOfIteration else Checks
         EndTest _ -> Just $ PhaseSwitch (S.fromList [Checks, OutOfIteration]) OutOfIteration

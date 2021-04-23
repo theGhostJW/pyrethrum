@@ -15,6 +15,7 @@ import Common as C
       indentText,
       DetailedInfo(..),
       FileSystemErrorType(..),
+      HookLocation(..),
       FilterErrorType(..),
       FrameworkError(..),
       OutputDListText )
@@ -83,7 +84,6 @@ import RunnerBase as RB
       groupAddresses,
       groupName,
       GenericResult(..),
-      HookLocation(..),
       ItemRunner,
       PreRun(..),
       SuiteItem(..),
@@ -155,10 +155,10 @@ emptyElm :: forall a effs. SuiteItem effs [a] -> Bool
 emptyElm
   = \case
       Tests t -> null t
-      Hook _ _ s -> all emptyElm s
+      Hook _ _ _ s -> all emptyElm s
       Group _ s -> all emptyElm s
 
--- TODO - Error handling especially outside tests
+-- TODO - Error handling especially outside tests eg. in hooks
 exeElm :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) =>
   Sem effs () ->
   Sem effs () ->

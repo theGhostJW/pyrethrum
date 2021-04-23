@@ -197,6 +197,7 @@ demoSuit =
   R.Group
     "Happy Suite"
     [ Hook
+        "Hook 1"
         BeforeAll
         (pure ())
         [ Tests
@@ -223,6 +224,7 @@ happySuite r =
   R.Group
     "Filter Suite"
     [ Hook
+        "Before All"
         BeforeAll
         (pure ())
         [ Tests
@@ -254,9 +256,11 @@ hookSuite r =
   R.Group
     "Hook Suite"
     [ Hook
+        "Before Each Outer"
         BeforeEach
         (log "Before Each Hook")
         [ Hook
+            "Before Each Inner"
             BeforeAll
             (log "Before All Hook")
             [Tests [r test1]]
@@ -275,8 +279,6 @@ runParams =
 
 happyRun :: forall effs. DemoEffs effs => Sem effs ()
 happyRun = mkRunSem runParams
-
- 
 
 hookRun :: forall effs. DemoEffs effs => Sem effs ()
 hookRun = mkRunSem $ RunParams { 

@@ -271,6 +271,8 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
     LP.EndRun -> (accum, elOut . LogTransformation.PrintLogDisplayElement.EndRun $ filterLog accum)
     LP.StartGroup _ -> skipLog
     LP.EndGroup _ -> skipLog
+    StartHook {} -> skipLog
+    EndHook {}  -> skipLog
     LP.StartTest (TestDisplayInfo testModAddress testTitle testConfig) ->
         ( accum,
           elOut $

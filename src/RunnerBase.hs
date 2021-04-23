@@ -1,6 +1,6 @@
 module RunnerBase where
 
-import Common (FilterErrorType, FrameworkError)
+import Common (FilterErrorType, FrameworkError, HookLocation(..))
 import Pyrelude
 import Polysemy
 import Polysemy.Error
@@ -29,11 +29,6 @@ doNothing = PreRun {
   checkHasRun = pure True
 }
 
-data HookLocation = BeforeAll | 
-                    AfterAll | 
-                    BeforeEach |
-                    AfterEach
-
 {- SuiteItem Update
   1. DONE - Add Hook     
   2. Update Tests
@@ -55,6 +50,7 @@ data SuiteItem effs t =
    } |
 
    Hook {
+     title :: Text,
      location :: HookLocation,
      hook :: Sem effs (),
      subElms :: [SuiteItem effs t]
@@ -73,7 +69,7 @@ concatTests =
   in
     \case
       (Tests t) -> [t]
-      (Hook _ _ ts) -> concat' ts
+      (Hook _ _ _ ts) -> concat' ts
       (Group _ ts) -> concat' ts
 
 
@@ -94,8 +90,8 @@ groupAddresses' accum root el =
     case el of
       Tests _ -> accum
       
-      Hook _ _ subElems -> 
-        mconcat $ debug' "HOOK" . groupAddresses' accum root <$> subElems
+      Hook _ _ _ subElems -> 
+        mconcat $ groupAddresses' accum root <$> subElems
       
       Group t subElems -> 
         let 

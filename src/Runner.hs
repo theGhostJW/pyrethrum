@@ -97,7 +97,7 @@ runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass 
       -> rc                                                            -- items
       -> Test e tc rc i as ds effs
       -> ItemRunner e as ds i tc rc effs
-      -> [Sem effs ()]
+      -> [Sem effs () -> Sem effs () -> Sem effs ()]
 runTestItems iIds items rc test@Test{ config = tc } itemRunner =
   let
     startTest :: Sem effs ()
@@ -126,15 +126,15 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
   in
     case filteredItems of
       [] -> []
-      [x] -> [startTest *> applyRunner x *> endTest]
-      x : xs -> (startTest *> applyRunner x)
-                : (applyRunner <$> Prelude.init xs)
-                <> [applyRunner (Prelude.last xs) *> endTest]
+      [x] -> [\be ae -> startTest *> be *> applyRunner x *> ae *> endTest]
+      x : xs -> (\be ae -> startTest *> be *> applyRunner x *> ae)
+                          : ((\i be ae -> be *> applyRunner i *> ae) <$> Prelude.init xs)
+                          <> [\be ae -> be *> applyRunner (Prelude.last xs) *> ae *> endTest]
 
 runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
                    RunParams Maybe e rc tc effs          -- Run Params
                    -> Test e tc rc i as ds effs          -- Test Case
-                   -> [Sem effs ()]                      -- [TestIterations]
+                   -> [Sem effs () -> Sem effs () -> Sem effs ()]                      -- [TestIterations]
 runTest RunParams {filters, rc, itemIds, itemRunner}  test@Test {config = tc, items} =
     acceptFilter (applyFilters filters rc tc)
       ? runTestItems itemIds (items rc) rc test itemRunner
@@ -162,13 +162,13 @@ emptyElm
 exeElm :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
   Sem effs () -- ^ beforeEach
   -> Sem effs () -- ^ afterEach
-  -> SuiteItem effs [[Sem effs ()]] -- ^ 
+  -> SuiteItem effs [[Sem effs () -> Sem effs () -> Sem effs ()]] -- ^ 
   -> Sem effs ()
 exeElm beforeEach afterEach suiteElm = 
   emptyElm suiteElm ?
     pure () $
     case suiteElm of
-      Tests { tests } -> sequence_ $ fold $ ((\i -> beforeEach >> i >> afterEach) <$>) <$> tests
+      Tests { tests } -> sequence_ $ fold $ ((\i -> i beforeEach afterEach) <$>) <$> tests
 
       Hook {location, title = ttl, hook, subElms } -> 
         let 
@@ -196,7 +196,7 @@ mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigCl
                     -> Sem effs ()
 mkSem rp@RunParams {suite, filters, rc} =
   let
-    root :: SuiteItem effs [[Sem effs ()]]
+    root :: SuiteItem effs [[Sem effs () -> Sem effs () -> Sem effs ()]]
     root = suite $ runTest rp
 
     filterInfo :: [TestFilterResult]

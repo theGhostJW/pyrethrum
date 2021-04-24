@@ -160,15 +160,15 @@ emptyElm
 
 -- TODO - Error handling especially outside tests eg. in hooks
 exeElm :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
-  Sem effs () -- ^ 
-  -> Sem effs () -- ^ 
+  Sem effs () -- ^ beforeEach
+  -> Sem effs () -- ^ afterEach
   -> SuiteItem effs [[Sem effs ()]] -- ^ 
   -> Sem effs ()
 exeElm beforeEach afterEach suiteElm = 
   emptyElm suiteElm ?
     pure () $
     case suiteElm of
-      Tests { tests } -> sequence_ $ fold $ ((\t -> beforeEach >> t >> afterEach) <$>) <$> tests
+      Tests { tests } -> sequence_ $ fold $ ((\i -> beforeEach >> i >> afterEach) <$>) <$> tests
 
       Hook {location, title = ttl, hook, subElms } -> 
         let 

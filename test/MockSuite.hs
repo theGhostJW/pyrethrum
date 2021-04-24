@@ -245,7 +245,7 @@ happySuite r =
         ]
     ]
 
-doNothing :: forall a. Applicative a =>  a ()
+doNothing :: forall a. Applicative a => a ()
 doNothing = pure ()
 
 hookSuite ::
@@ -255,15 +255,28 @@ hookSuite ::
   (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest i as ds effs -> a) ->
   SuiteItem effs [a]
 hookSuite r =
-  R.Group "Hook Suite"
-    [ Hook "After Each Outer" AfterEach doNothing
-    [ Hook "After Each Outer" AfterEach doNothing
-      [ Hook "Before Each Outer" BeforeEach doNothing
-        [ Hook "Before All Inner" BeforeAll doNothing
-          [Tests [r test1]]
+  R.Group
+    "Hook Suite"
+    [ Hook
+        "After Each Outer"
+        AfterEach
+        doNothing
+        [ Hook
+            "After All Outer"
+            AfterAll
+            doNothing
+            [ Hook
+                "Before Each Outer"
+                BeforeEach
+                doNothing
+                [ Hook
+                    "Before All Inner"
+                    BeforeAll
+                    doNothing
+                    [Tests [r test1]]
+                ]
+            ]
         ]
-      ]
-     ]
     ]
 
 runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs
@@ -280,10 +293,12 @@ happyRun :: forall effs. DemoEffs effs => Sem effs ()
 happyRun = mkSem runParams
 
 hookRun :: forall effs. DemoEffs effs => Sem effs ()
-hookRun = mkSem $ RunParams { 
-                                 suite = hookSuite,
-                                 filters = [],
-                                 itemIds = Nothing,
-                                 itemRunner = runItem,
-                                 rc = RunConfig "Hook Suite" True
-                               }
+hookRun =
+  mkSem $
+    RunParams
+      { suite = hookSuite,
+        filters = [],
+        itemIds = Nothing,
+        itemRunner = runItem,
+        rc = RunConfig "Hook Suite" True
+      }

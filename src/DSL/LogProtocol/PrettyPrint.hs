@@ -38,7 +38,7 @@ separator' :: LogStyle -> Text
 separator' = \case
                 Run -> newLn
                 Doc -> newLn
-                Outline -> " - "
+                Outline -> ""
 
 describeLoc :: HookLocation -> Text
 describeLoc = \case 

@@ -4,7 +4,7 @@
 module Runner (
   mkEndpointSem
   , RunParams(..)
-  , mkRunSem
+  , mkSem
   , module RB
   , module ItemFilter
   , module C
@@ -159,30 +159,36 @@ emptyElm
       Group _ s -> all emptyElm s
 
 -- TODO - Error handling especially outside tests eg. in hooks
-exeElm :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) =>
-  Sem effs () ->
-  Sem effs () ->
-  SuiteItem effs [[Sem effs ()]] -> 
-  Sem effs ()
-exeElm beforeEach afterEach runElm = 
-  emptyElm runElm ?
+exeElm :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
+  Sem effs () -- ^ 
+  -> Sem effs () -- ^ 
+  -> SuiteItem effs [[Sem effs ()]] -- ^ 
+  -> Sem effs ()
+exeElm beforeEach afterEach suiteElm = 
+  emptyElm suiteElm ?
     pure () $
-    case runElm of
+    case suiteElm of
       Tests { tests } -> sequence_ $ fold $ ((\t -> beforeEach >> t >> afterEach) <$>) <$> tests
 
-      Hook {location, hook, subElms } -> 
+      Hook {location, title = ttl, hook, subElms } -> 
+        let 
+          loggedHook = do 
+                        logItem $ StartHook location ttl
+                        hook
+                        logItem $ EndHook location ttl
+        in
         case location of 
-          BeforeAll -> hook >> sequence_ (exeElm beforeEach afterEach <$> subElms)
-          AfterAll  -> sequence_ (exeElm beforeEach afterEach <$> subElms) >> hook
+          BeforeAll -> loggedHook >> sequence_ (exeElm beforeEach afterEach <$> subElms)
+          AfterAll  -> sequence_ (exeElm beforeEach afterEach <$> subElms) >> loggedHook
 
-          BeforeEach -> sequence_ $ exeElm (hook >> beforeEach) afterEach <$> subElms
-          AfterEach -> sequence_ $ exeElm beforeEach (afterEach >> hook) <$> subElms
+          BeforeEach -> sequence_ $ exeElm (loggedHook >> beforeEach) afterEach <$> subElms
+          AfterEach -> sequence_ $ exeElm beforeEach (afterEach >> loggedHook) <$> subElms
           
       Group { title = t, subElms } -> 
         do
-          logItem .  StartGroup $ GroupTitle t
+          logItem . StartGroup $ GroupTitle t
           sequence_ $ exeElm beforeEach afterEach <$> subElms
-          logItem .  EndGroup $ GroupTitle t
+          logItem . EndGroup $ GroupTitle t
 
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, MinEffs e effs) =>
@@ -211,8 +217,6 @@ mkSem rp@RunParams {suite, filters, rc} =
       -- only working with chars / strings
       (toS <$> firstDuplicate (toS @_ @Prelude.String <$> groupAddresses root))
 
-mkRunSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, MinEffs e effs) => RunParams Maybe e rc tc effs -> Sem effs ()
-mkRunSem = mkSem 
 
 mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, MinEffs e effs) =>
                    RunParams (Either FilterErrorType) e rc tc effs

@@ -1,7 +1,7 @@
 module MockSuite where
 
 import AuxFiles ()
-import Common ()
+import Common (HookLocation (..))
 import DSL.Interpreter (MinEffs, executeForTest, minInterpret)
 import DSL.LogProtocol (LogProtocolBase)
 import DSL.LogProtocol.PrettyPrint ()
@@ -29,11 +29,10 @@ import RunElementClasses
   )
 import Runner as R
   ( FrameworkError,
-    HookLocation (BeforeAll, BeforeEach),
     RunParams (..),
     SuiteItem (Group, Hook, Tests),
     Test (Test, config, interactor, items, parse),
-    mkRunSem,
+    mkSem,
   )
 import qualified RunnerBase
 import TestFilter (TestFilter (..))
@@ -42,7 +41,7 @@ type AppError = FrameworkError Text
 
 type LogProtocol = LogProtocolBase AppError
 
-type LogProtocolTextError = LogProtocolBase Text
+type LogProtocolWithTextError = LogProtocolBase Text
 
 data RunConfig = RunConfig
   { cfgHeader :: Text,
@@ -246,6 +245,9 @@ happySuite r =
         ]
     ]
 
+doNothing :: forall a. Applicative a =>  a ()
+doNothing = pure ()
+
 hookSuite ::
   forall a effs.
   Lgrffs effs =>
@@ -253,18 +255,15 @@ hookSuite ::
   (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest i as ds effs -> a) ->
   SuiteItem effs [a]
 hookSuite r =
-  R.Group
-    "Hook Suite"
-    [ Hook
-        "Before Each Outer"
-        BeforeEach
-        (log "Before Each Hook")
-        [ Hook
-            "Before Each Inner"
-            BeforeAll
-            (log "Before All Hook")
-            [Tests [r test1]]
+  R.Group "Hook Suite"
+    [ Hook "After Each Outer" AfterEach doNothing
+    [ Hook "After Each Outer" AfterEach doNothing
+      [ Hook "Before Each Outer" BeforeEach doNothing
+        [ Hook "Before All Inner" BeforeAll doNothing
+          [Tests [r test1]]
         ]
+      ]
+     ]
     ]
 
 runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs
@@ -278,10 +277,10 @@ runParams =
     }
 
 happyRun :: forall effs. DemoEffs effs => Sem effs ()
-happyRun = mkRunSem runParams
+happyRun = mkSem runParams
 
 hookRun :: forall effs. DemoEffs effs => Sem effs ()
-hookRun = mkRunSem $ RunParams { 
+hookRun = mkSem $ RunParams { 
                                  suite = hookSuite,
                                  filters = [],
                                  itemIds = Nothing,

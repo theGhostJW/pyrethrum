@@ -1,11 +1,11 @@
 module SuiteValidationTest where
 
-import MockSuite ( happyRun, MyText, happySuite, demoSuit, hookRun, LogProtocolTextError)
+import MockSuite ( happyRun, MyText, happySuite, demoSuit, hookRun, LogProtocolWithTextError)
 import DSL.Interpreter ( minInterpret )
 import Pyrelude as P
-import Pyrelude.Test ( chk, Assertion, (...) )
+import Pyrelude.Test ( chk, chk', Assertion, (...) )
 import DSL.LogProtocol ( LogProtocolBase (..))
-import Common  ( FrameworkError, DetailedInfo(DetailedInfo) )
+import Common  ( FrameworkError, DetailedInfo(DetailedInfo), HookLocation(..) )
 import Runner (groupAddresses)
 import TempUtils
 import ItemRunners (runItem)
@@ -34,24 +34,37 @@ unit_happy_suit_passes_validation :: Assertion
 unit_happy_suit_passes_validation = chk $ isRight happySuiteResult
 
 
-hookRunResult :: [LogProtocolTextError]
+hookRunResult :: [LogProtocolWithTextError]
 hookRunResult = fst . fromRight' $ minInterpret hookRun
 
 -- $> hookResultPretty
 hookResultPretty :: IO ()
 hookResultPretty = debugLines $ prettyPrintLogProtocol Outline <$> hookRunResult
 
-msgTxt :: LogProtocolTextError -> Maybe Text 
-msgTxt = \case 
-            Message tx -> Just tx
-            Message' (DetailedInfo m i) -> Just $ m <> " - " <> i 
-            _ -> Nothing  
+offsetList :: [a] -> Int -> [(a, a)]
+offsetList l i = zip l $ drop i l
 
-msgPredicate :: (Text -> Bool) -> LogProtocolTextError -> Bool 
-msgPredicate prd = \case 
-                      Message tx -> prd tx
-                      Message' (DetailedInfo m i) -> prd m || prd i 
-                      _ -> False 
+chkOffsetList :: Show t => Int -> (t -> Bool) -> (t -> Bool) -> [t] -> IO ()
+chkOffsetList i p1 p2 l = 
+  let 
+    fails = filter (\(f, s) -> p1 f && not (p2 s)) $ offsetList l i
+    msg (f, s) = "target element: " <> txt f <> "\n" <> "element " <> txt i <> " after:\n" <> txt s
+  in 
+    chk' (unlines $ msg <$> fails) (null fails)
 
-msgContains :: Text -> LogProtocolTextError -> Bool 
-msgContains tx = msgPredicate (isInfixOf tx)
+chkNext :: Show t => (t -> Bool) -> (t -> Bool) -> [t] -> IO ()
+chkNext = chkOffsetList 1
+
+isEndHook :: HookLocation -> LogProtocolWithTextError -> Bool
+isEndHook hl = \case 
+                  EndHook loc _ -> loc == hl
+                  _ -> False
+
+isStartIteration :: LogProtocolWithTextError -> Bool
+isStartIteration = \case 
+                      StartIteration {} -> True
+                      _ -> False
+
+-- $ > unit_before_each_hook_precedes_each_interaction
+unit_before_each_hook_precedes_each_interaction :: IO ()
+unit_before_each_hook_precedes_each_interaction = chkNext (isEndHook BeforeEach) isStartIteration hookRunResult

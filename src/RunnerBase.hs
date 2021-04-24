@@ -62,6 +62,28 @@ data SuiteItem effs t =
    }
    deriving Functor
 
+{- 
+interact :: forall rc i as effs. rc -> i -> Sem effs as
+interact = interactWithLogOn interactWithCreds
+
+interactWithLogOn :: forall rc i as effs. (Text -> Text -> rc -> i -> Sem effs as) -> rc -> i -> Sem effs as
+interactWithLogOn f rc i = do 
+                            n <- uName
+                            p <- uPw
+                            f n p rc i
+
+
+uName :: forall effs. Sem effs Text
+uName = uu
+
+uPw :: forall effs. Sem effs Text
+uPw = uu
+
+interactWithCreds :: Text -> Text -> rc -> i -> Sem effs as
+interactWithCreds = uu
+-}
+
+
 concatTests :: SuiteItem effs t -> [t]
 concatTests = 
   let 

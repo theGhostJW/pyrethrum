@@ -29,18 +29,19 @@ doNothing = PreRun {
   checkHasRun = pure True
 }
 
-{- SuiteItem Update
-  1. DONE - Add Hook     
-  2. Update Tests
-  3. Add Suite Tests
-  4. Thread Hook Output to Subelements (GADT)
-  5. Update Tests
-  6. Concurrency
-  7. Update Tests
-  8. Update log interpretor 
-  9. Runner that extracts test items - eg to report known errors
-  10. Update Tests
-  11. Update Demo
+{- 
+TODO 
+ SuiteItem Update
+  DONE - Add Hook     
+  Add Suite Tests
+  Thread Hook Output to Subelements (GADT)
+  Update Tests
+  Concurrency
+  Update Tests
+  Update log interpretor 
+  Runner that extracts test items - eg to report known errors
+  Update Tests
+  Update Demo
 
 -} 
 

@@ -43,7 +43,22 @@ TODO
   Update Tests
   Update Demo
 
--} 
+-}
+
+
+data SuiteItemGADT i o effs t where
+  Tests' ::  { 
+    tests :: i -> t 
+  } -> SuiteItemGADT i () effs t
+
+  Hook' :: { 
+    hook :: i -> Sem effs o, 
+    subElms :: o -> [SuiteItemGADT o o2 effs t] 
+  } -> SuiteItemGADT o o2 effs t
+  
+  -- Group' :: {
+  --   subElms :: [SuiteItemGADT i o effs t]
+  -- } -> SuiteItemGADT i o effs t
 
 data SuiteItem effs t =
   Tests {

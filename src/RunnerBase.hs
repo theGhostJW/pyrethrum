@@ -46,6 +46,8 @@ TODO
 -}
 
 
+{-  Play Data Structure -}
+
 data SuiteItemGADT i o effs t where
   Tests' ::  { 
     tests :: i -> t 
@@ -56,9 +58,22 @@ data SuiteItemGADT i o effs t where
     subElms :: o -> [SuiteItemGADT o o2 effs t] 
   } -> SuiteItemGADT o o2 effs t
   
-  -- Group' :: {
-  --   subElms :: [SuiteItemGADT i o effs t]
-  -- } -> SuiteItemGADT i o effs t
+
+mkTests :: Int -> [Text]
+mkTests i = ("item:" <>) . txt <$> take 10 [1..]
+
+tests' :: SuiteItemGADT Int () effs [Text]
+tests' = Tests' { tests = mkTests }
+
+hookFunc :: IO Int 
+hookFunc = pure 7
+
+suit = Hook' {
+  hook = hookFunc,
+  subElms = tests'
+}
+
+{-  Play Data Structure End -}
 
 data SuiteItem effs t =
   Tests {

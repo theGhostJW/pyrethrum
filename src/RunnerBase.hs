@@ -36,41 +36,51 @@ TODO
   Add Suite Tests
   Thread Hook Output to Subelements (GADT)
   Update Tests
+  Query static data - items / checks / Config / Known Defects on Checks
+  Update Tests
   Concurrency
   Update Tests
+  Known Defect on interact / parse
+  Exception error handling
+  Update Tests
+  sample for actions that return values in the context of documentation
   Update log interpretor 
   Runner that extracts test items - eg to report known errors
   Update Tests
   Update Demo
-
 -}
 
 
 {-  Play Data Structure -}
 
-data SuiteItemGADT i o effs t where
+data SuiteItemGADT i effs t where
   Tests' ::  { 
-    tests :: i -> t 
-  } -> SuiteItemGADT i () effs t
+    tests :: b -> t 
+  } -> SuiteItemGADT b effs t
 
   Hook' :: { 
     hook :: i -> Sem effs o, 
-    subElms :: o -> [SuiteItemGADT o o2 effs t] 
-  } -> SuiteItemGADT o o2 effs t
+    subElms :: [SuiteItemGADT o effs t] 
+  } -> SuiteItemGADT o effs t
   
 
-mkTests :: Int -> [Text]
-mkTests i = ("item:" <>) . txt <$> take 10 [1..]
+mkTests :: (Num a, Show a, Enum a) => a -> [Text]
+mkTests i = (\ii -> "item:" <> txt (ii + i)) <$> take 10 [1..]
 
-tests' :: SuiteItemGADT Int () effs [Text]
+tests' :: SuiteItemGADT Int effs [Text]
 tests' = Tests' { tests = mkTests }
 
-hookFunc :: IO Int 
-hookFunc = pure 7
+hookFunc :: forall effs. Text -> Sem effs Int 
+hookFunc t = pure 7
 
+-- embed hook with different tests test input 
+-- must handle nested hooks
+-- hook needs input
+
+suit :: SuiteItemGADT Int effs [Text]
 suit = Hook' {
   hook = hookFunc,
-  subElms = tests'
+  subElms = [tests']
 }
 
 {-  Play Data Structure End -}

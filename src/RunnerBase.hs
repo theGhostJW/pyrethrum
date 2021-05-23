@@ -55,13 +55,13 @@ TODO
 
 data SuiteItemGADT i effs t where
   Tests' ::  { 
-    tests :: b -> t 
-  } -> SuiteItemGADT b effs t
+    tests :: i -> t 
+  } -> SuiteItemGADT i effs t
 
   Hook' :: { 
     hook :: i -> Sem effs o, 
     subElms :: [SuiteItemGADT o effs t] 
-  } -> SuiteItemGADT o effs t
+  } -> SuiteItemGADT () effs t
   
 
 mkTests :: (Num a, Show a, Enum a) => a -> [Text]
@@ -77,7 +77,7 @@ hookFunc t = pure 7
 -- must handle nested hooks
 -- hook needs input
 
-suit :: SuiteItemGADT Int effs [Text]
+suit :: SuiteItemGADT () effs [Text]
 suit = Hook' {
   hook = hookFunc,
   subElms = [tests']

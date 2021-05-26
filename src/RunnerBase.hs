@@ -61,7 +61,7 @@ data SuiteItemGADT i effs t where
   Hook' :: { 
     hook :: i -> Sem effs o, 
     subElms :: [SuiteItemGADT o effs t] 
-  } -> SuiteItemGADT () effs t
+  } -> SuiteItemGADT i effs t
   
 
 mkTests :: (Num a, Show a, Enum a) => a -> [Text]
@@ -70,17 +70,41 @@ mkTests i = (\ii -> "item:" <> txt (ii + i)) <$> take 10 [1..]
 tests' :: SuiteItemGADT Int effs [Text]
 tests' = Tests' { tests = mkTests }
 
-hookFunc :: forall effs. Text -> Sem effs Int 
+hookFunc :: forall effs. () -> Sem effs Int 
 hookFunc t = pure 7
 
 -- embed hook with different tests test input 
 -- must handle nested hooks
 -- hook needs input
 
-suit :: SuiteItemGADT () effs [Text]
-suit = Hook' {
+suiteSimple :: SuiteItemGADT () effs [Text]
+suiteSimple = Hook' {
   hook = hookFunc,
   subElms = [tests']
+}
+
+hookInnerFunc :: forall effs. Int -> Sem effs Int 
+hookInnerFunc i = pure $ i + i
+
+subHook :: SuiteItemGADT Int effs [Text]
+subHook = Hook' {
+    hook = hookInnerFunc,
+    subElms = [tests']
+  }
+
+suiteNested :: forall effs. SuiteItemGADT () effs [Text]
+suiteNested = Hook' {
+  hook = hookFunc,
+  subElms = [subHook]
+}
+
+suiteNested2 :: forall effs. SuiteItemGADT () effs [Text]
+suiteNested2 = Hook' {
+  hook = hookFunc,
+  subElms = [
+    subHook, 
+    tests'
+  ]
 }
 
 {-  Play Data Structure End -}

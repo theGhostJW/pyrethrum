@@ -3,8 +3,16 @@ cradle:
     - path: "./src"
       component: "pyrethrum:lib"
 
+    # use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
     - path: "./test"
-      component: "pyrethrum:test:pyrethrum-test"
+      component: "pyrethrum:lib"
 
     - path: "./testIntegration"
-      component: "pyrethrum:test:pyrethrum-test-Integration"
+      component: "pyrethrum:lib"
+
+    # use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
+    # - path: "./test"
+    #   component: "pyrethrum:test:pyrethrum-test"
+
+    # - path: "./testIntegration"
+    #   component: "pyrethrum:test:pyrethrum-test-Integration"

@@ -111,7 +111,10 @@ default-extensions:
   - TypeOperators
 
 library:
-  source-dirs: src
+  source-dirs: 
+    - src
+    - test
+    - testIntegration
   dependencies:
     - deepseq
     - unordered-containers
@@ -119,28 +122,35 @@ library:
     - bytestring
     - mtl
     - fmt
+    # test modules
+    - tasty
+    - tasty-hunit
+    - tasty-hedgehog
+    - tasty-discover
+    - hedgehog
 
-_testDep: &testdependencies
-- tasty
-- tasty-hunit
-- tasty-hedgehog
-- tasty-discover
-- hedgehog
-- pyrethrum
-- bytestring
-- mtl
+#  reinstate when LHS can live load multiple modules
+# use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
+# _testDep: &testdependencies
+# - tasty
+# - tasty-hunit
+# - tasty-hedgehog
+# - tasty-discover
+# - hedgehog
+# - pyrethrum
+# - bytestring
+# - mtl
 
-tests:
-  pyrethrum-test:
-    main:                driver.hs
-    source-dirs:        
-    - test
-    dependencies: *testdependencies
+# tests:
+#   pyrethrum-test:
+#     main:                driver.hs
+#     source-dirs:        
+#     - test
+#     dependencies: *testdependencies
   
-  pyrethrum-test-Integration:
-    main:                driver.hs
-    source-dirs:         
-    - testIntegration
-    dependencies: 
-      *testdependencies
-    
+#   pyrethrum-test-Integration:
+#     main:                driver.hs
+#     source-dirs:         
+#     - testIntegration
+#     dependencies: 
+#       *testdependencies

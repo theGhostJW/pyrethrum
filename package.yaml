@@ -110,7 +110,8 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
-library:
+executable:
+  main: driver.hs
   source-dirs: 
     - src
     - test

@@ -24,197 +24,197 @@ import Control.Monad.State.Strict (State)
 
 -- import LogTransformation.Iteration
 
-runAgg :: (DList ByteString -> DList ByteString) -> DList ByteString -> DList Text
-runAgg f l = decodeUtf8 <$> f l 
+-- runAgg :: (DList ByteString -> DList ByteString) -> DList ByteString -> DList Text
+-- runAgg f l = decodeUtf8 <$> f l 
 
--- todo: get file utils really sorted
-dumpFile ::  IO AbsDir -> DList Text -> RelFile -> IO ()
-dumpFile projRoot lst file = do
-      ePth <- tempFileBase projRoot file
-      eitherf ePth 
-        throw
-        (\pth -> do 
-                  h <- S.openFile (toFilePath pth ) S.WriteMode 
-                  sequence_ $ PIO.hPutStrLn h <$> lst
-                  S.hClose h
-                  S.print pth
-        )
+-- -- todo: get file utils really sorted
+-- dumpFile ::  IO AbsDir -> DList Text -> RelFile -> IO ()
+-- dumpFile projRoot lst file = do
+--       ePth <- tempFileBase projRoot file
+--       eitherf ePth 
+--         throw
+--         (\pth -> do 
+--                   h <- S.openFile (toFilePath pth ) S.WriteMode 
+--                   sequence_ $ PIO.hPutStrLn h <$> lst
+--                   S.hClose h
+--                   S.print pth
+--         )
 
-aggregateDumpFile :: IO AbsDir -> (DList ByteString -> DList ByteString) -> DList ByteString -> RelFile -> IO ()
-aggregateDumpFile projRoot func lst = dumpFile projRoot (runAgg func lst) 
+-- aggregateDumpFile :: IO AbsDir -> (DList ByteString -> DList ByteString) -> DList ByteString -> RelFile -> IO ()
+-- aggregateDumpFile projRoot func lst = dumpFile projRoot (runAgg func lst) 
 
-dumpByteStrings :: IO AbsDir -> DList ByteString -> RelFile -> IO ()
-dumpByteStrings projRoot lst file = do
-                            ePth <- tempFileBase projRoot file
-                            eitherf ePth 
-                              throw
-                              (\pth -> do 
-                                        h <- S.openFile (toFilePath pth ) S.WriteMode 
-                                        sequence_ $ B.hPutStrLn h <$> lst
-                                        S.hClose h
-                                        S.print pth
-                              )
+-- dumpByteStrings :: IO AbsDir -> DList ByteString -> RelFile -> IO ()
+-- dumpByteStrings projRoot lst file = do
+--                             ePth <- tempFileBase projRoot file
+--                             eitherf ePth 
+--                               throw
+--                               (\pth -> do 
+--                                         h <- S.openFile (toFilePath pth ) S.WriteMode 
+--                                         sequence_ $ B.hPutStrLn h <$> lst
+--                                         S.hClose h
+--                                         S.print pth
+--                               )
 
-display :: (DList ByteString -> DList ByteString) -> DList ByteString -> IO ()
-display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
+-- display :: (DList ByteString -> DList ByteString) -> DList ByteString -> IO ()
+-- display f l = sequence_ $ PIO.putStrLn <$> runAgg f l
 
-_sampleRunResultsSimple :: StatsAccum
-_sampleRunResultsSimple = F.foldl' statsStep emptyStatsAccum $ Right <$> sampleLog
+-- _sampleRunResultsSimple :: StatsAccum
+-- _sampleRunResultsSimple = F.foldl' statsStep emptyStatsAccum $ Right <$> sampleLog
 
-type WriterStateByteString o a = WriterState ByteString o a
-sampleRunResults :: RunResults
-sampleRunResults = 
-  let
-    -- data LogTransformParams accum itm rsltItem m srcFmt snkFmt 
-    -- type WriterState i o a = WriterT (DList o) (StateT (DList i) Identity) a
-    transParams :: LogTransformParams StatsAccum LogProtocolOut StatsAccum (WriterT (DList o) (State (DList ByteString))) ByteString ByteString
-    transParams = LogTransformParams {
-      source = testSource,
-      sink = const $ pure (),
-      reducer = statsStepForReducer,
-      itemDesrialiser = jsonDeserialiser,
-      resultSerialiser = yamlSerialiser,    
-      linNo = LineNo 1,
-      accumulator = emptyStatsAccum
-    }
-  in
-    runResults (fst $ transformDList rawFile transParams)
-    -- can use for de bugging -- runResults (fst $ transformDList rawFileSmall transParams)
+-- type WriterStateByteString o a = WriterState ByteString o a
+-- sampleRunResults :: RunResults
+-- sampleRunResults = 
+--   let
+--     -- data LogTransformParams accum itm rsltItem m srcFmt snkFmt 
+--     -- type WriterState i o a = WriterT (DList o) (StateT (DList i) Identity) a
+--     transParams :: LogTransformParams StatsAccum LogProtocolOut StatsAccum (WriterT (DList o) (State (DList ByteString))) ByteString ByteString
+--     transParams = LogTransformParams {
+--       source = testSource,
+--       sink = const $ pure (),
+--       reducer = statsStepForReducer,
+--       itemDesrialiser = jsonDeserialiser,
+--       resultSerialiser = yamlSerialiser,    
+--       linNo = LineNo 1,
+--       accumulator = emptyStatsAccum
+--     }
+--   in
+--     runResults (fst $ transformDList rawFile transParams)
+--     -- can use for de bugging -- runResults (fst $ transformDList rawFileSmall transParams)
 
-_thisExeDir :: IO AbsDir
-_thisExeDir = parent <$> (parseAbsFile =<< getExecutablePath)
+-- _thisExeDir :: IO AbsDir
+-- _thisExeDir = parent <$> (parseAbsFile =<< getExecutablePath)
 
-demo_pretty_print_LP = dumpFile _thisExeDir (prettyPrintLogProtocol Run . logInfo <$> sampleLog) [relfile|raw.yaml|]
+-- demo_pretty_print_LP = dumpFile _thisExeDir (prettyPrintLogProtocol Run . logInfo <$> sampleLog) [relfile|raw.yaml|]
 
-_demo_pretty_print_LP_with_reducer :: IO ()
-_demo_pretty_print_LP_with_reducer = 
-  let 
-    transParams = LogTransformParams {
-      source = testSource,
-      sink = testSink,
-      reducer = prettyPrintLogprotocolReducer,
-      itemDesrialiser = jsonDeserialiser,
-      resultSerialiser = id,    
-      linNo = LineNo 1,
-      accumulator = ()
-    }
-  in
-    dumpFile _thisExeDir (snd $ transformDList rawFile transParams) [relfile|raw.yaml|]
+-- _demo_pretty_print_LP_with_reducer :: IO ()
+-- _demo_pretty_print_LP_with_reducer = 
+--   let 
+--     transParams = LogTransformParams {
+--       source = testSource,
+--       sink = testSink,
+--       reducer = prettyPrintLogprotocolReducer,
+--       itemDesrialiser = jsonDeserialiser,
+--       resultSerialiser = id,    
+--       linNo = LineNo 1,
+--       accumulator = ()
+--     }
+--   in
+--     dumpFile _thisExeDir (snd $ transformDList rawFile transParams) [relfile|raw.yaml|]
 
-demo_test_stats :: Text
-demo_test_stats = txtPretty $ testStatusCounts sampleRunResults
+-- demo_test_stats :: Text
+-- demo_test_stats = txtPretty $ testStatusCounts sampleRunResults
 
-_base_results :: IO()
-_base_results = dumpTxt _thisExeDir (txtPretty $ iterationResults sampleRunResults) [relfile|baseResults.yaml|]
+-- _base_results :: IO()
+-- _base_results = dumpTxt _thisExeDir (txtPretty $ iterationResults sampleRunResults) [relfile|baseResults.yaml|]
 
-demo_iteration_stats = txtPretty $ iterationStatusCounts sampleRunResults
+-- demo_iteration_stats = txtPretty $ iterationStatusCounts sampleRunResults
 
-unit_iteration_counts_correct = 
-  M.fromList [
-              (Pass,         9),
-              (KnownError,   2),
-              (LTC.Warning,  2),
-              (Fail,        20)
-             ] ... iterationStatusCounts sampleRunResults
+-- unit_iteration_counts_correct = 
+--   M.fromList [
+--               (Pass,         9),
+--               (KnownError,   2),
+--               (LTC.Warning,  2),
+--               (Fail,        20)
+--              ] ... iterationStatusCounts sampleRunResults
 
-unit_test_counts_correct = M.fromList [(Pass,1), (Fail,4)] ... testStatusCounts sampleRunResults
+-- unit_test_counts_correct = M.fromList [(Pass,1), (Fail,4)] ... testStatusCounts sampleRunResults
 
-unit_no_out_of_test_issues = M.empty ... LTC.outOfTest sampleRunResults
+-- unit_no_out_of_test_issues = M.empty ... LTC.outOfTest sampleRunResults
 
---TODO:: Out of test issues test correct
+-- --TODO:: Out of test issues test correct
 
-prettyPrintLog :: [PrintLogDisplayElement]
-prettyPrintLog = 
-  let 
-    transParams = LogTransformParams {
-      source = testSource,
-      sink = testSink,
-      reducer = printLogDisplayStep sampleRunResults,
-      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError LogProtocolOut,
-      resultSerialiser = id,    
-      linNo = LineNo 1,
-      accumulator = emptyIterationAccum
-    }
-  in
-    DL.toList . snd $ transformDList rawFile transParams 
+-- prettyPrintLog :: [PrintLogDisplayElement]
+-- prettyPrintLog = 
+--   let 
+--     transParams = LogTransformParams {
+--       source = testSource,
+--       sink = testSink,
+--       reducer = printLogDisplayStep sampleRunResults,
+--       itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError LogProtocolOut,
+--       resultSerialiser = id,    
+--       linNo = LineNo 1,
+--       accumulator = emptyIterationAccum
+--     }
+--   in
+--     DL.toList . snd $ transformDList rawFile transParams 
 
-prettyProblemsPrintLog :: [PrintLogDisplayElement]
-prettyProblemsPrintLog =
-  let 
-    transParams = LogTransformParams {
-      source = testSource,
-      sink = testSink,
-      reducer = printProblemsDisplayStep sampleRunResults,
-      itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError LogProtocolOut,
-      resultSerialiser = id,    
-      linNo = LineNo 1,
-      accumulator = emptyProbleIterationAccum
-    }
-  in
-    DL.toList . snd $ transformDList rawFile transParams
+-- prettyProblemsPrintLog :: [PrintLogDisplayElement]
+-- prettyProblemsPrintLog =
+--   let 
+--     transParams = LogTransformParams {
+--       source = testSource,
+--       sink = testSink,
+--       reducer = printProblemsDisplayStep sampleRunResults,
+--       itemDesrialiser = jsonDeserialiser :: LineNo -> ByteString -> Either DeserialisationError LogProtocolOut,
+--       resultSerialiser = id,    
+--       linNo = LineNo 1,
+--       accumulator = emptyProbleIterationAccum
+--     }
+--   in
+--     DL.toList . snd $ transformDList rawFile transParams
 
-isPassingTestHeader :: PrintLogDisplayElement -> Bool
-isPassingTestHeader = 
-  \case 
-    LTPDE.StartTest{..} -> status == Pass
-    _ -> False
+-- isPassingTestHeader :: PrintLogDisplayElement -> Bool
+-- isPassingTestHeader = 
+--   \case 
+--     LTPDE.StartTest{..} -> status == Pass
+--     _ -> False
 
-unit_problems_no_passing_tests = 
-  0 ... P.count isPassingTestHeader (prettyProblemsPrintLog :: [PrintLogDisplayElement])
+-- unit_problems_no_passing_tests = 
+--   0 ... P.count isPassingTestHeader (prettyProblemsPrintLog :: [PrintLogDisplayElement])
 
-unit_unfilterd_has_passing_tests :: IO()  
-unit_unfilterd_has_passing_tests = 
-  1 ... P.count isPassingTestHeader (prettyPrintLog :: [PrintLogDisplayElement])
+-- unit_unfilterd_has_passing_tests :: IO()  
+-- unit_unfilterd_has_passing_tests = 
+--   1 ... P.count isPassingTestHeader (prettyPrintLog :: [PrintLogDisplayElement])
 
-isPassingIterationHeader :: PrintLogDisplayElement -> Bool
-isPassingIterationHeader = 
-  \case 
-    LTPDE.Iteration LTPDE.IterationRecord{..} -> executionStatus outcome == Pass
-    _ -> False
+-- isPassingIterationHeader :: PrintLogDisplayElement -> Bool
+-- isPassingIterationHeader = 
+--   \case 
+--     LTPDE.Iteration LTPDE.IterationRecord{..} -> executionStatus outcome == Pass
+--     _ -> False
      
-unit_problems_no_passing_iterations :: IO()
-unit_problems_no_passing_iterations = 
-  0 ... P.count isPassingIterationHeader (prettyProblemsPrintLog :: [PrintLogDisplayElement])
+-- unit_problems_no_passing_iterations :: IO()
+-- unit_problems_no_passing_iterations = 
+--   0 ... P.count isPassingIterationHeader (prettyProblemsPrintLog :: [PrintLogDisplayElement])
 
-unit_unfilterd_has_passing_iterations :: IO()  
-unit_unfilterd_has_passing_iterations = 
-  9 ... P.count isPassingIterationHeader (prettyPrintLog :: [PrintLogDisplayElement])
+-- unit_unfilterd_has_passing_iterations :: IO()  
+-- unit_unfilterd_has_passing_iterations = 
+--   9 ... P.count isPassingIterationHeader (prettyPrintLog :: [PrintLogDisplayElement])
 
 
-_demo_pretty_print_log :: IO ()
-_demo_pretty_print_log = 
-  let 
-    transParams = LogTransformParams {
-      source = testSource,
-      sink = testSink,
-      reducer = printLogDisplayStep sampleRunResults,
-      itemDesrialiser = jsonDeserialiser,
-      resultSerialiser = toS . prettyPrintDisplayElement, -- :: PrintLogDisplayElement e -> ByteString,    
-      linNo = LineNo 1,
-      accumulator = emptyIterationAccum
-    }
-  in
-    dumpByteStrings _thisExeDir (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
+-- _demo_pretty_print_log :: IO ()
+-- _demo_pretty_print_log = 
+--   let 
+--     transParams = LogTransformParams {
+--       source = testSource,
+--       sink = testSink,
+--       reducer = printLogDisplayStep sampleRunResults,
+--       itemDesrialiser = jsonDeserialiser,
+--       resultSerialiser = toS . prettyPrintDisplayElement, -- :: PrintLogDisplayElement e -> ByteString,    
+--       linNo = LineNo 1,
+--       accumulator = emptyIterationAccum
+--     }
+--   in
+--     dumpByteStrings _thisExeDir (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
 
-_demo_pretty_print_problems_log :: IO ()
-_demo_pretty_print_problems_log = 
-  let 
-    transParams = LogTransformParams {
-      source = testSource,
-      sink = testSink,
-      reducer = printProblemsDisplayStep sampleRunResults,
-      itemDesrialiser = jsonDeserialiser,
-      resultSerialiser = toS . prettyPrintDisplayElement, 
-      linNo = LineNo 1,
-      accumulator = emptyProbleIterationAccum
-    }
-  in
-    dumpByteStrings _thisExeDir (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
+-- _demo_pretty_print_problems_log :: IO ()
+-- _demo_pretty_print_problems_log = 
+--   let 
+--     transParams = LogTransformParams {
+--       source = testSource,
+--       sink = testSink,
+--       reducer = printProblemsDisplayStep sampleRunResults,
+--       itemDesrialiser = jsonDeserialiser,
+--       resultSerialiser = toS . prettyPrintDisplayElement, 
+--       linNo = LineNo 1,
+--       accumulator = emptyProbleIterationAccum
+--     }
+--   in
+--     dumpByteStrings _thisExeDir (snd $ transformDList rawFile transParams) [relfile|pretty.yaml|] 
 
-unit_demo_pretty_print = _demo_pretty_print_log 
+-- unit_demo_pretty_print = _demo_pretty_print_log 
 
-sampleLog :: DList LogProtocolOut
-sampleLog = fromRight' . A.eitherDecode . toS <$> rawFile
+-- sampleLog :: DList LogProtocolOut
+-- sampleLog = fromRight' . A.eitherDecode . toS <$> rawFile
 
 -- source doc can be generated by running:
 -- >> stack repl --test

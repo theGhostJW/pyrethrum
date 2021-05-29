@@ -10,8 +10,8 @@ import Data.Aeson
 type ItemRunner e as ds i tc rc effs = 
     rc -> Test e tc rc i as ds effs -> i -> Sem effs ()
 
-type Suite e tc rc effs a = 
-    (forall i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i, ToJSON i) => Test e tc rc i as ds effs -> a) -> SuiteItem effs [a]
+type Suite e tc rc effs hi a = 
+    (forall i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i, ToJSON i) => Test e tc rc i as ds effs -> a) -> SuiteItem hi effs [a]
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,
@@ -33,10 +33,14 @@ doNothing = PreRun {
 TODO 
  SuiteItem Update
   DONE - Add Hook     
-  Add Suite Tests
-  Thread Hook Output to Subelements (GADT)
-  Update Tests
-  Query static data - items / checks / Config / Known Defects on Checks
+  DONE - Add Suite Tests
+    * Thread Hook Output to Subelements (GADT)
+      * get compiling
+      * utilise input - ie change test runner
+    * Update Tests
+    * Explicit Hook connstructors
+    * Update Tests
+    * Query static data - items / checks / Config / Known Defects on Checks / Effects
   Update Tests
   Concurrency
   Update Tests
@@ -73,10 +77,6 @@ tests' = Tests' { tests = mkTests }
 hookFunc :: forall effs. () -> Sem effs Int 
 hookFunc t = pure 7
 
--- embed hook with different tests test input 
--- must handle nested hooks
--- hook needs input
-
 suiteSimple :: SuiteItemGADT () effs [Text]
 suiteSimple = Hook' {
   hook = hookFunc,
@@ -100,52 +100,64 @@ suiteNested = Hook' {
 
 suiteNested2 :: forall effs. SuiteItemGADT () effs [Text]
 suiteNested2 = Hook' {
-  hook = hookFunc,
+  hook = \() -> pure 7,
   subElms = [
     subHook, 
     tests'
   ]
 }
 
+suiteNested2Exp :: forall effs. SuiteItemGADT () effs [Text]
+suiteNested2Exp = Hook' {
+  hook = hookFunc,
+  subElms = [
+    Hook' {
+      hook = \i -> pure $ i + i,
+      subElms = [Tests' \i -> (\ii -> "item:" <> txt (ii + i)) <$> take 10 [1..]]
+    }, 
+    tests'
+  ]
+}
+
 {-  Play Data Structure End -}
 
-data SuiteItem effs t =
-  Tests {
-      tests :: t
-   } |
+data SuiteItem hi effs t where
+  Tests ::  { 
+    hookIn :: i,
+    tests :: t 
+  } -> SuiteItem hi effs t
 
-   Hook {
+  Hook :: {
      title :: Text,
      location :: HookLocation,
-     hook :: Sem effs (),
-     subElms :: [SuiteItem effs t]
-   } |
+     hook :: hi -> Sem effs o,
+     elms :: [SuiteItem o effs t]
+  } -> SuiteItem hi effs t
 
-   Group {
+  Group :: {
     title :: Text,
-    subElms :: [SuiteItem effs t]
-   }
-   deriving Functor
+    elms :: [SuiteItem o effs t]
+  } -> SuiteItem hi effs t
 
 
-concatTests :: SuiteItem effs t -> [t]
+concatTests :: SuiteItem hi effs t -> [t]
 concatTests = 
   let 
     concat' ts = mconcat $ concatTests <$> ts
   in
     \case
-      (Tests t) -> [t]
+      (Tests _ t) -> [t]
       (Hook _ _ _ ts) -> concat' ts
       (Group _ ts) -> concat' ts
 
 
-groupName :: SuiteItem effs a -> Maybe Text
+groupName :: SuiteItem hi effs a -> Maybe Text
 groupName = \case 
-              Tests _ -> Nothing
+              Tests _ _ -> Nothing
               Hook {} -> Nothing
               Group t _ -> Just t
 
-groupAddresses' :: [Text] -> Text -> SuiteItem effs a -> [Text]
+groupAddresses' :: [Text] -> Text -> SuiteItem hi effs a -> [Text]
 groupAddresses' accum root el = 
   let
     delim = "."
@@ -154,7 +166,7 @@ groupAddresses' accum root el =
     appendDelim p s = p <> (null p || null s ? empty $ delim) <> s
   in
     case el of
-      Tests _ -> accum
+      Tests _ _ -> accum
       
       Hook _ _ _ subElems -> 
         mconcat $ groupAddresses' accum root <$> subElems
@@ -166,7 +178,7 @@ groupAddresses' accum root el =
           address : mconcat (groupAddresses' accum address <$> subElems)
         
 
-groupAddresses :: SuiteItem effs a -> [Text]
+groupAddresses :: SuiteItem hi effs a -> [Text]
 groupAddresses = groupAddresses' [] "" 
 
 data Test e tc rc i as ds effs = Test {

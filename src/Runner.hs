@@ -89,7 +89,7 @@ import RunnerBase as RB
       SuiteItem(..),
       Test(..),
       Suite )
-import qualified Prelude
+import qualified Prelude as PRL
 
 runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ToJSON i, ItemClass i ds, Member (Logger e) effs) =>
       Maybe (S.Set Int)                                                    -- target Ids
@@ -128,8 +128,8 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
       [] -> []
       [x] -> [\be ae -> startTest *> be *> applyRunner x *> ae *> endTest]
       x : xs -> (\be ae -> startTest *> be *> applyRunner x *> ae)
-                          : ((\i be ae -> be *> applyRunner i *> ae) <$> Prelude.init xs)
-                          <> [\be ae -> be *> applyRunner (Prelude.last xs) *> ae *> endTest]
+                          : ((\i be ae -> be *> applyRunner i *> ae) <$> PRL.init xs)
+                          <> [\be ae -> be *> applyRunner (PRL.last xs) *> ae *> endTest]
 
 runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
                    RunParams Maybe e rc tc effs          -- Run Params
@@ -144,25 +144,25 @@ logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => Fram
 logLPError = logItem . LP.Error
 
 data RunParams m e rc tc effs = RunParams {
-  suite :: forall a. Suite e tc rc effs a,
+  suite :: forall hi a. Suite e tc rc effs hi a,
   filters :: [TestFilter rc tc],
   itemIds :: m (S.Set Int),   
   itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON i, ToJSON ds) => ItemRunner e as ds i tc rc effs,
   rc :: rc
 }
 
-emptyElm :: forall a effs. SuiteItem effs [a] -> Bool
+emptyElm :: forall hi a effs. SuiteItem hi effs [a] -> Bool
 emptyElm
   = \case
-      Tests t -> null t
+      Tests _ t -> null t
       Hook _ _ _ s -> all emptyElm s
       Group _ s -> all emptyElm s
 
 -- TODO - Error handling especially outside tests eg. in hooks
-exeElm :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
+exeElm :: forall hi e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
   Sem effs () -- ^ beforeEach
   -> Sem effs () -- ^ afterEach
-  -> SuiteItem effs [[Sem effs () -> Sem effs () -> Sem effs ()]] -- ^ 
+  -> SuiteItem hi effs [[Sem effs () -> Sem effs () -> Sem effs ()]] -- ^ 
   -> Sem effs ()
 exeElm beforeEach afterEach suiteElm = 
   emptyElm suiteElm ?
@@ -170,7 +170,7 @@ exeElm beforeEach afterEach suiteElm =
     case suiteElm of
       Tests { tests } -> sequence_ $ fold $ ((\i -> i beforeEach afterEach) <$>) <$> tests
 
-      Hook {location, title = ttl, hook, subElms } -> 
+      Hook {location, title = ttl, hook, elms } -> 
         let 
           loggedHook = do 
                         logItem $ StartHook location ttl
@@ -178,16 +178,16 @@ exeElm beforeEach afterEach suiteElm =
                         logItem $ EndHook location ttl
         in
         case location of 
-          BeforeAll -> loggedHook >> sequence_ (exeElm beforeEach afterEach <$> subElms)
-          AfterAll  -> sequence_ (exeElm beforeEach afterEach <$> subElms) >> loggedHook
+          BeforeAll -> loggedHook >> sequence_ (exeElm beforeEach afterEach <$> elms)
+          AfterAll  -> sequence_ (exeElm beforeEach afterEach <$> elms) >> loggedHook
 
-          BeforeEach -> sequence_ $ exeElm (loggedHook >> beforeEach) afterEach <$> subElms
-          AfterEach -> sequence_ $ exeElm beforeEach (afterEach >> loggedHook) <$> subElms
+          BeforeEach -> sequence_ $ exeElm (loggedHook >> beforeEach) afterEach <$> elms
+          AfterEach -> sequence_ $ exeElm beforeEach (afterEach >> loggedHook) <$> elms
           
-      Group { title = t, subElms } -> 
+      Group { title = t, elms } -> 
         do
           logItem . StartGroup $ GroupTitle t
-          sequence_ $ exeElm beforeEach afterEach <$> subElms
+          sequence_ $ exeElm beforeEach afterEach <$> elms
           logItem . EndGroup $ GroupTitle t
 
 
@@ -196,7 +196,7 @@ mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigCl
                     -> Sem effs ()
 mkSem rp@RunParams {suite, filters, rc} =
   let
-    root :: SuiteItem effs [[Sem effs () -> Sem effs () -> Sem effs ()]]
+    root :: SuiteItem hi effs [[Sem effs () -> Sem effs () -> Sem effs ()]]
     root = suite $ runTest rp
 
     filterInfo :: [TestFilterResult]
@@ -215,7 +215,7 @@ mkSem rp@RunParams {suite, filters, rc} =
       (\da -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> da)
       -- all the string conversion shannanigans below is due to descrmination which drives firstDuplicate
       -- only working with chars / strings
-      (toS <$> firstDuplicate (toS @_ @Prelude.String <$> groupAddresses root))
+      (toS <$> firstDuplicate (toS @_ @PRL.String <$> groupAddresses root))
 
 
 mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, MinEffs e effs) =>

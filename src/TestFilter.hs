@@ -44,10 +44,10 @@ filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => [TestFilter rc 
 filterTest fltrs rc Test{ config = tc } = applyFilters fltrs rc tc
 
 
-filterSuite :: forall tc rc e effs. TestConfigClass tc =>
+filterSuite :: forall tc rc e hin effs. TestConfigClass tc =>
               (
                 (forall i as ds.
-                      Test e tc rc i as ds effs -> TestFilterResult) -> SuiteItem effs [TestFilterResult]
+                      Test e tc rc i as ds effs -> TestFilterResult) -> SuiteItem hin effs [TestFilterResult]
               )
               -> [TestFilter rc tc]
               -> rc
@@ -57,7 +57,7 @@ filterSuite suite fltrs rc =
     testFilter :: Test e tc rc i as ds effs -> TestFilterResult
     testFilter = filterTest fltrs rc
 
-    si :: SuiteItem effs [TestFilterResult]
+    si :: SuiteItem hin effs [TestFilterResult]
     si = suite testFilter
   in
     mconcat $ concatTests si

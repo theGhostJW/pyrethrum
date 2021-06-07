@@ -24,40 +24,40 @@ data TestFilter rc tc = TestFilter {
 }
 
 applyFilters :: forall rc tc. TestConfigClass tc => [TestFilter rc tc] -> rc -> tc -> TestFilterResult
-applyFilters fltrs rc tc =
-  let
-    fltrRslt :: Maybe Text -> TestFilterResult
-    fltrRslt = mkTestFilterResult tc 
+applyFilters fltrs rc tc = uu
+ let
+  fltrRslt :: Maybe Text -> TestFilterResult
+  fltrRslt = mkTestFilterResult tc 
 
-    applyFilter :: TestFilter rc tc -> TestFilterResult
-    applyFilter fltr = fltrRslt $ predicate fltr rc tc 
-                                             ? Nothing 
-                                             $ Just $ TestFilter.title fltr
+  applyFilter :: TestFilter rc tc -> TestFilterResult
+  applyFilter fltr = fltrRslt $ predicate fltr rc tc 
+                                            ? Nothing 
+                                            $ Just $ TestFilter.title fltr
 
-    firstRejectReason :: Maybe Text
-    firstRejectReason = L.find rejectFilter (applyFilter <$> fltrs) >>= reasonForRejection
-  in
-    fltrRslt firstRejectReason
+  firstRejectReason :: Maybe Text
+  firstRejectReason = L.find rejectFilter (applyFilter <$> fltrs) >>= reasonForRejection
+ in
+  fltrRslt firstRejectReason
     
 
-filterTest :: forall i as ds tc rc e effs. TestConfigClass tc => [TestFilter rc tc] -> rc -> Test e tc rc i as ds effs -> TestFilterResult
+filterTest :: forall i as ds tc hi rc e effs. TestConfigClass tc => [TestFilter rc tc] -> rc -> Test e tc rc hi i as ds effs -> TestFilterResult
 filterTest fltrs rc Test{ config = tc } = applyFilters fltrs rc tc
 
 
-filterSuite :: forall tc rc e hin effs. TestConfigClass tc =>
+filterSuite :: forall tc rc e hi effs. TestConfigClass tc =>
               (
                 (forall i as ds.
-                      Test e tc rc i as ds effs -> TestFilterResult) -> SuiteItem hin effs [TestFilterResult]
+                  Test e tc rc hi i as ds effs -> TestFilterResult) -> SuiteItem hi effs [TestFilterResult]
               )
               -> [TestFilter rc tc]
               -> rc
               -> [TestFilterResult]
 filterSuite suite fltrs rc =
   let
-    testFilter :: Test e tc rc i as ds effs -> TestFilterResult
+    testFilter :: Test e tc rc hi i as ds effs -> TestFilterResult
     testFilter = filterTest fltrs rc
 
-    si :: SuiteItem hin effs [TestFilterResult]
+    si :: SuiteItem hi effs [TestFilterResult]
     si = suite testFilter
   in
     mconcat $ concatTests si

@@ -74,7 +74,7 @@ import RunElementClasses as C
       Titled(..) )
 import OrphanedInstances()
 import Data.Aeson as A ( ToJSON(toJSON) )
-import TestFilter
+import qualified TestFilter as F
     ( acceptFilter,
       filterSuite,
       applyFilters,
@@ -91,14 +91,16 @@ import RunnerBase as RB
       Suite )
 import qualified Prelude as PRL
 
-runTestItems :: forall i as ds tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ToJSON i, ItemClass i ds, Member (Logger e) effs) =>
-      Maybe (S.Set Int)                                                    -- target Ids
-      -> [i]   
-      -> rc                                                            -- items
-      -> Test e tc rc i as ds effs
-      -> ItemRunner e as ds i tc rc effs
-      -> [Sem effs () -> Sem effs () -> Sem effs ()]
-runTestItems iIds items rc test@Test{ config = tc } itemRunner =
+runTestItems :: forall i as ds hi tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ToJSON i, ItemClass i ds, Member (Logger e) effs) =>
+      Maybe (S.Set Int)     -- target Ids
+      -> [i]                -- ids
+      -> Sem effs hi        --before each
+      -> (hi -> Sem effs ()) -- after each
+      -> rc                 -- runcoonfig
+      -> Test e tc rc hi i as ds effs
+      -> ItemRunner e as ds i hi tc rc effs
+      -> [Sem effs ()]
+runTestItems iIds items beforEach afterEach rc test@Test{ config = tc } itemRunner =
   let
     startTest :: Sem effs ()
     startTest = logItem . StartTest $ mkDisplayInfo tc
@@ -109,6 +111,9 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
     filteredItems :: [i]
     filteredItems = filter inTargIds items
 
+    runItem' :: hi -> i -> Sem effs ()
+    runItem' i = uu --
+
     applyRunner :: i -> Sem effs ()
     applyRunner i =  
       let
@@ -117,87 +122,129 @@ runTestItems iIds items rc test@Test{ config = tc } itemRunner =
       in
         do
           logItem . StartIteration iid (WhenClause $ whenClause @_ @ds i) (ThenClause $ thenClause @_ @ds  i) $ toJSON i
-          itemRunner rc test i
+          hi <- beforEach
+          itemRunner rc hi test i
+          afterEach hi
           logItem $ EndIteration iid
 
     inTargIds :: i -> Bool
     inTargIds i = maybe True (S.member (identifier @_ @ds i)) iIds
-
   in
     case filteredItems of
       [] -> []
-      [x] -> [\be ae -> startTest *> be *> applyRunner x *> ae *> endTest]
-      x : xs -> (\be ae -> startTest *> be *> applyRunner x *> ae)
-                          : ((\i be ae -> be *> applyRunner i *> ae) <$> PRL.init xs)
-                          <> [\be ae -> be *> applyRunner (PRL.last xs) *> ae *> endTest]
+      xs -> [startTest >> sequence_ (applyRunner <$> xs) >> endTest]
 
-runTest ::  forall i rc as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
-                   RunParams Maybe e rc tc effs          -- Run Params
-                   -> Test e tc rc i as ds effs          -- Test Case
-                   -> [Sem effs () -> Sem effs () -> Sem effs ()]                      -- [TestIterations]
-runTest RunParams {filters, rc, itemIds, itemRunner}  test@Test {config = tc, items} =
-    acceptFilter (applyFilters filters rc tc)
-      ? runTestItems itemIds (items rc) rc test itemRunner
-      $ []
+runTest :: forall i rc hi as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
+                   Sem effs hi                           -- before each
+                   -> (hi -> Sem effs ())                -- after each
+                   -> RunParams Maybe e rc tc effs ()    -- Run Params
+                   -> Test e tc rc hi i as ds effs      -- Test Case
+                   -> [Sem effs ()]                      -- [TestIterations]
+runTest be ae RunParams {filters, rc, itemIds, itemRunner} test@Test {config = tc, items} =
+     F.acceptFilter (F.applyFilters filters rc tc)
+        ? runTestItems itemIds (items rc) be ae rc test itemRunner
+        $ []
 
 logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
 logLPError = logItem . LP.Error
 
-data RunParams m e rc tc effs = RunParams {
-  suite :: forall hi a. Suite e tc rc effs hi a,
-  filters :: [TestFilter rc tc],
+data RunParams m e rc tc effs a = RunParams {
+  suite :: forall hi. Suite e tc rc hi effs a,
+  filters :: [F.TestFilter rc tc],
   itemIds :: m (S.Set Int),   
-  itemRunner :: forall as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON i, ToJSON ds) => ItemRunner e as ds i tc rc effs,
+  itemRunner :: forall hi as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON i, ToJSON ds) => ItemRunner e as ds i hi tc rc effs,
   rc :: rc
 }
 
 emptyElm :: forall hi a effs. SuiteItem hi effs [a] -> Bool
 emptyElm
   = \case
-      Tests _ t -> null t
+      Tests t -> null t
       Hook _ _ _ s -> all emptyElm s
       Group _ s -> all emptyElm s
 
--- TODO - Error handling especially outside tests eg. in hooks
-exeElm :: forall hi e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
+{-
+exeElm :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
   Sem effs () -- ^ beforeEach
   -> Sem effs () -- ^ afterEach
-  -> SuiteItem hi effs [[Sem effs () -> Sem effs () -> Sem effs ()]] -- ^ 
+  -> SuiteItem effs [[Sem effs () -> Sem effs () -> Sem effs ()]] -- ^ 
   -> Sem effs ()
-exeElm beforeEach afterEach suiteElm = 
+-}
+
+-- TODO - Error handling especially outside tests eg. in hooks
+exeElm :: forall hi ho e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
+  hi
+  -> (hi -> Sem effs ho) -- ^ beforeEach
+  -> (ho -> Sem effs ()) -- ^ afterEach
+  -> SuiteItem ho effs [[Sem effs ho -> Sem effs () -> Sem effs ()]] -- ^ test list - [beforeEach -> afterEach -> test]
+  -> Sem effs ()
+exeElm hi beforeEach afterEach suiteElm = 
   emptyElm suiteElm ?
     pure () $
     case suiteElm of
-      Tests { tests } -> sequence_ $ fold $ ((\i -> i beforeEach afterEach) <$>) <$> tests
+      Tests { tests } -> 
+        sequence_ $ fold $ ((\f -> f (beforeEach hi) afterEach) <$>) <$> tests
 
-      Hook {location, title = ttl, hook, elms } -> 
+      Hook {location, hkTitle = title, hook, hElms } -> 
         let 
+          loggedHook :: Sem ho
           loggedHook = do 
-                        logItem $ StartHook location ttl
-                        hook
-                        logItem $ EndHook location ttl
+                        logItem $ StartHook location title
+                        ho <- hook hi
+                        logItem $ EndHook location title
+                        pure ho
         in
-        case location of 
-          BeforeAll -> loggedHook >> sequence_ (exeElm beforeEach afterEach <$> elms)
-          AfterAll  -> sequence_ (exeElm beforeEach afterEach <$> elms) >> loggedHook
-
-          BeforeEach -> sequence_ $ exeElm (loggedHook >> beforeEach) afterEach <$> elms
-          AfterEach -> sequence_ $ exeElm beforeEach (afterEach >> loggedHook) <$> elms
+         case location of 
+           BeforeAll -> do 
+                         ho <- loggedHook +
+                         sequence_ (exeElm hi beforeEach afterEach <$> elms)
+           AfterAll  -> sequence_ (exeElm hi beforeEach afterEach <$> elms) >> void loggedHook 
+           BeforeEach -> sequence_ $ exeElm (loggedHook >> beforeEach) afterEach <$> elms
+           AfterEach -> sequence_ $ exeElm beforeEach (afterEach >> loggedHook) <$> elms
           
-      Group { title = t, elms } -> 
+      Group { grpTitle = title, gElms } -> 
         do
-          logItem . StartGroup $ GroupTitle t
-          sequence_ $ exeElm beforeEach afterEach <$> elms
-          logItem . EndGroup $ GroupTitle t
+          logItem . StartGroup $ GroupTitle title
+          sequence_ $ exeElm beforeEach afterEach <$> gElms
+          logItem . EndGroup $ GroupTitle title
 
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, MinEffs e effs) =>
-                    RunParams Maybe e rc tc effs
+                    RunParams Maybe e rc tc effs ()
                     -> Sem effs ()
 mkSem rp@RunParams {suite, filters, rc} =
   let
+    -- data RunParams m e rc tc effs a = RunParams {
+    --   suite :: forall hi. Suite e tc rc hi effs a,
+    --   filters :: [F.TestFilter rc tc],
+    --   itemIds :: m (S.Set Int),   
+    --   itemRunner :: forall hi as ds i. ItemRunner e as ds i hi tc rc effs,
+    --   rc :: rc
+    -- }
+
+    -- type ItemRunner e as ds i hi tc rc effs = 
+    --    rc -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
+
+    -- runTest :: forall i rc hi as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
+    --                Sem effs hi                           -- before each
+    --                -> (hi -> Sem effs ())                -- after each
+    --                -> RunParams Maybe e rc tc effs ()    -- Run Params
+    --                -> Test e tc rc hi i as ds effs      -- Test Case
+    --                -> [Sem effs ()]                      -- [TestIterations]
+    -- runTest be ae RunParams {filters, rc, itemIds, itemRunner} test@Test {config = tc, items} = ...
+
+    -- type Suite e tc rc hi effs a = 
+    --   (forall i as ds. Test e tc rc hi i as ds effs -> a) -> SuiteItem hi effs [a]
+
+    -- exeElm :: forall hi ho e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
+    --   hi
+    --   -> (hi -> Sem effs ho) -- ^ beforeEach
+    --   -> (ho -> Sem effs ()) -- ^ afterEach
+    --   -> SuiteItem ho effs [[Sem effs ho -> Sem effs () -> Sem effs ()]] -- ^ test list - [beforeEach -> afterEach -> test]
+    --   -> Sem effs ()
+
     root :: SuiteItem hi effs [[Sem effs () -> Sem effs () -> Sem effs ()]]
-    root = suite $ runTest rp
+    root = suite $ runTest (pure ()) (\_ -> pure ()) rp
 
     filterInfo :: [TestFilterResult]
     filterInfo = filterSuite suite filters rc
@@ -207,7 +254,7 @@ mkSem rp@RunParams {suite, filters, rc} =
             offset' <- utcOffset
             logItem . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
             logItem . FilterLog $ filterInfo
-            exeElm (pure ()) (pure ()) root
+            exeElm pure pure root
             logItem EndRun
   in
     maybe 
@@ -219,19 +266,19 @@ mkSem rp@RunParams {suite, filters, rc} =
 
 
 mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, MinEffs e effs) =>
-                   RunParams (Either FilterErrorType) e rc tc effs
+                   RunParams (Either FilterErrorType) e rc tc effs ()
                    -> TestAddress                            -- test address
                    -> Either FilterErrorType (S.Set Int)    -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> Sem effs ()
 mkEndpointSem runParams@RunParams { filters, itemIds } tstAddress iIds =
   let
-    endpointFilter :: TestAddress -> TestFilter rc tc
-    endpointFilter targAddress = TestFilter {
+    endpointFilter :: TestAddress -> F.TestFilter rc tc
+    endpointFilter targAddress = F.TestFilter {
       title = "test address does not match endpoint target: " <> toString targAddress,
       predicate = \_ tc -> moduleAddress tc == targAddress
     }
 
-    allFilters :: [TestFilter rc tc]
+    allFilters :: [F.TestFilter rc tc]
     allFilters = endpointFilter tstAddress : filters
   in
     eitherf itemIds

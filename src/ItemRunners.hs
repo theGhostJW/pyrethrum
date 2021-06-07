@@ -19,14 +19,14 @@ import Data.Aeson ( ToJSON(toJSON) )
 import RunnerBase as RB ( Test(Test), ItemRunner )
 import qualified Data.Foldable as F
 
-runItem :: forall e effs rc tc i as ds. (MinEffs e effs, 
+runItem :: forall e effs rc tc hi i as ds. (MinEffs e effs, 
                                             Show e, 
                                             ItemClass i ds, 
                                             TestConfigClass tc, 
                                             ToJSON e, 
                                             ToJSON as, 
-                                            ToJSON ds) => ItemRunner e as ds i tc rc effs
-runItem rc (Test tc _items interactor parse) i  = 
+                                            ToJSON ds) => ItemRunner e as ds i hi tc rc effs
+runItem rc hi (Test tc _items interactor parse) i  = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) (identifier @i @ds i)
@@ -47,7 +47,7 @@ runItem rc (Test tc _items interactor parse) i  =
         PE.throw e
 
     -- provided natively by polysemy in later versions of polysemy
-    try' :: Member (Error er) r => Sem r a -> Sem r (Either er a)
+    try' :: Member (Error er) r => Sem r o -> Sem r (Either er o)
     try' m = PE.catch (Right <$> m) (return . Left)
        
     runItem' :: Sem effs ()
@@ -60,7 +60,7 @@ runItem rc (Test tc _items interactor parse) i  =
           logItem StartInteraction
           -- TODO: check for io exceptions / SomeException - use throw from test
           log "interact start"
-          ethApState <- try' $ interactor rc i
+          ethApState <- try' $ interactor rc hi i
           eitherf ethApState
             (\e -> do 
                     logItem $ InteractorFailure iid e
@@ -79,13 +79,13 @@ runItem rc (Test tc _items interactor parse) i  =
   in 
     runItem' `PE.catch` (logItem . LP.Error)
 
-documentItem :: forall e effs rc tc i as ds. (ToJSON e, 
+documentItem :: forall e effs rc tc hi i as ds. (ToJSON e, 
                                                 Show e, 
                                                 ItemClass i ds,
                                                  TestConfigClass tc, 
                                                  Member (Logger e) effs)
-                                                => ItemRunner e as ds i tc rc effs
-documentItem rc (Test tc _items interactor _parse) i = 
+                                                => ItemRunner e as ds i hi tc rc effs
+documentItem rc hi (Test tc _items interactor _parse) i = 
   let
     iid :: ItemId
     iid = ItemId (moduleAddress tc) $ identifier @i @ds i
@@ -100,6 +100,6 @@ documentItem rc (Test tc _items interactor _parse) i =
   in 
     do 
       logItem StartInteraction 
-      interactor rc i
+      interactor rc hi i
       logItem StartChecks
       logChecks

@@ -8,7 +8,7 @@ import TestFilter
 import Data.Maybe
 import Data.Tuple
 import Control.Applicative
-import Pyrelude
+import Pyrelude ( ($), Text, Listy(filter), Category((.)) )
 
 
 applyTestFilters :: forall i tc rc. TestConfigClass tc => [TestFilter rc tc] -> rc -> (i -> tc) -> [i] -> [i]

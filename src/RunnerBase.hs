@@ -7,11 +7,11 @@ import Polysemy.Error
 import RunElementClasses
 import Data.Aeson
 
-type ItemRunner e as ds i tc rc effs = 
-    rc -> Test e tc rc i as ds effs -> i -> Sem effs ()
+type ItemRunner e as ds i hi tc rc effs = 
+    rc -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
-type Suite e tc rc effs hi a = 
-    (forall i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i, ToJSON i) => Test e tc rc i as ds effs -> a) -> SuiteItem hi effs [a]
+type Suite e tc rc hi effs a = 
+    (forall i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i, ToJSON i) => Test e tc rc hi i as ds effs -> a) -> SuiteItem hi effs [a]
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,
@@ -123,21 +123,20 @@ suiteNested2Exp = Hook' {
 
 data SuiteItem hi effs t where
   Tests ::  { 
-    hookIn :: i,
     tests :: t 
   } -> SuiteItem hi effs t
 
   Hook :: {
-     title :: Text,
+     hkTitle :: Text,
      location :: HookLocation,
      hook :: hi -> Sem effs o,
-     elms :: [SuiteItem o effs t]
+     hElms :: [SuiteItem o effs t]
   } -> SuiteItem hi effs t
 
   Group :: {
-    title :: Text,
-    elms :: [SuiteItem o effs t]
-  } -> SuiteItem hi effs t
+    grpTitle :: Text,
+    gElms :: [SuiteItem () effs t]
+  } -> SuiteItem () effs t
 
 
 concatTests :: SuiteItem hi effs t -> [t]
@@ -146,14 +145,14 @@ concatTests =
     concat' ts = mconcat $ concatTests <$> ts
   in
     \case
-      (Tests _ t) -> [t]
+      (Tests f) -> [f]
       (Hook _ _ _ ts) -> concat' ts
       (Group _ ts) -> concat' ts
 
 
 groupName :: SuiteItem hi effs a -> Maybe Text
 groupName = \case 
-              Tests _ _ -> Nothing
+              Tests _ -> Nothing
               Hook {} -> Nothing
               Group t _ -> Just t
 
@@ -166,7 +165,7 @@ groupAddresses' accum root el =
     appendDelim p s = p <> (null p || null s ? empty $ delim) <> s
   in
     case el of
-      Tests _ _ -> accum
+      Tests _ -> accum
       
       Hook _ _ _ subElems -> 
         mconcat $ groupAddresses' accum root <$> subElems
@@ -181,9 +180,9 @@ groupAddresses' accum root el =
 groupAddresses :: SuiteItem hi effs a -> [Text]
 groupAddresses = groupAddresses' [] "" 
 
-data Test e tc rc i as ds effs = Test {
+data Test e tc rc hi i as ds effs = Test {
   config :: tc,
   items :: rc -> [i],
-  interactor :: rc -> i -> Sem effs as,
+  interactor :: rc -> hi -> i -> Sem effs as,
   parse :: forall psEffs. (Member (Error (FrameworkError e)) psEffs) => as -> Sem psEffs ds
 }

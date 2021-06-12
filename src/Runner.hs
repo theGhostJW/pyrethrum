@@ -56,7 +56,12 @@ import Pyrelude as P
       uu,
       toS,
       (?),
-      Listy(..), Traversable (sequenceA), fold, (>>), debug )
+      Listy(..), 
+      Traversable (sequenceA), 
+      fold, 
+      (>>), 
+      debug, 
+      void )
 import Polysemy ( Sem, Member )
 import Polysemy.Error as PE ( Error, catch, throw )
 import ItemFilter  (ItemFilter (..), filterredItemIds)
@@ -135,12 +140,12 @@ runTestItems iIds items beforEach afterEach rc test@Test{ config = tc } itemRunn
       xs -> [startTest >> sequence_ (applyRunner <$> xs) >> endTest]
 
 runTest :: forall i rc hi as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
-                   Sem effs hi                           -- before each
-                   -> (hi -> Sem effs ())                -- after each
-                   -> RunParams Maybe e rc tc effs ()    -- Run Params
-                   -> Test e tc rc hi i as ds effs      -- Test Case
-                   -> [Sem effs ()]                      -- [TestIterations]
-runTest be ae RunParams {filters, rc, itemIds, itemRunner} test@Test {config = tc, items} =
+                   RunParams Maybe e rc tc effs ()    -- Run Params
+                   -> Sem effs hi                     -- before each
+                   -> (hi -> Sem effs ())             -- after each
+                   -> Test e tc rc hi i as ds effs    -- Test Case
+                   -> [Sem effs ()]                   -- [TestIterations]
+runTest RunParams {filters, rc, itemIds, itemRunner} be ae test@Test {config = tc, items}  =
      F.acceptFilter (F.applyFilters filters rc tc)
         ? runTestItems itemIds (items rc) be ae rc test itemRunner
         $ []
@@ -173,12 +178,12 @@ exeElm :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) =>
 
 -- TODO - Error handling especially outside tests eg. in hooks
 exeElm :: forall hi ho e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
-  hi
+  Sem effs hi
   -> (hi -> Sem effs ho) -- ^ beforeEach
   -> (ho -> Sem effs ()) -- ^ afterEach
-  -> SuiteItem ho effs [[Sem effs ho -> Sem effs () -> Sem effs ()]] -- ^ test list - [beforeEach -> afterEach -> test]
+  -> SuiteItem ho effs [[Sem effs ho -> Sem effs () -> Sem effs ()]] -- ^ test list - [beforeEach -> afterEach -> testIteration]
   -> Sem effs ()
-exeElm hi beforeEach afterEach suiteElm = 
+exeElm hiSem beforeEach afterEach suiteElm = uu
   emptyElm suiteElm ?
     pure () $
     case suiteElm of
@@ -187,52 +192,49 @@ exeElm hi beforeEach afterEach suiteElm =
 
       Hook {location, hkTitle = title, hook, hElms } -> 
         let 
-          loggedHook :: Sem ho
-          loggedHook = do 
+          hkResult :: Sem effs ho
+          hkResult = do 
                         logItem $ StartHook location title
+                        hi <- hiSem
                         ho <- hook hi
                         logItem $ EndHook location title
                         pure ho
         in
          case location of 
-           BeforeAll -> do 
-                         ho <- loggedHook +
-                         sequence_ (exeElm hi beforeEach afterEach <$> elms)
-           AfterAll  -> sequence_ (exeElm hi beforeEach afterEach <$> elms) >> void loggedHook 
-           BeforeEach -> sequence_ $ exeElm (loggedHook >> beforeEach) afterEach <$> elms
-           AfterEach -> sequence_ $ exeElm beforeEach (afterEach >> loggedHook) <$> elms
+           BeforeAll -> sequence_ (exeElm hkResult beforeEach afterEach <$> hElms)
+           AfterAll  -> sequence_ (exeElm hi beforeEach afterEach <$> hElms) >> void hkResult 
+           BeforeEach -> sequence_ $ exeElm hi (hkResult >> beforeEach) afterEach <$> hElms
+           AfterEach -> sequence_ $ exeElm beforeEach (afterEach >> hkResult) <$> hElms
           
       Group { grpTitle = title, gElms } -> 
         do
           logItem . StartGroup $ GroupTitle title
-          sequence_ $ exeElm beforeEach afterEach <$> gElms
+          sequence_ $ exeElm hi beforeEach afterEach <$> gElms
           logItem . EndGroup $ GroupTitle title
 
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, MinEffs e effs) =>
                     RunParams Maybe e rc tc effs ()
                     -> Sem effs ()
-mkSem rp@RunParams {suite, filters, rc} =
+mkSem rp@RunParams {suite, filters, rc} = uu {-
   let
     -- data RunParams m e rc tc effs a = RunParams {
     --   suite :: forall hi. Suite e tc rc hi effs a,
     --   filters :: [F.TestFilter rc tc],
     --   itemIds :: m (S.Set Int),   
-    --   itemRunner :: forall hi as ds i. ItemRunner e as ds i hi tc rc effs,
+    --   itemRunner :: rc -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs (),
     --   rc :: rc
     -- }
 
-    -- type ItemRunner e as ds i hi tc rc effs = 
-    --    rc -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
+--   runTest :: forall i rc hi as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
+--                    RunParams Maybe e rc tc effs ()    -- Run Params
+--                    -> Test e tc rc hi i as ds effs    -- Test Case
+--                    -> Sem effs hi                     -- before each
+--                    -> (hi -> Sem effs ())             -- after each
+--                    -> [Sem effs ()]                   -- [TestIterations]
+-- runTest RunParams {filters, rc, itemIds, itemRunner} test@Test {config = tc, items} be ae =
 
-    -- runTest :: forall i rc hi as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
-    --                Sem effs hi                           -- before each
-    --                -> (hi -> Sem effs ())                -- after each
-    --                -> RunParams Maybe e rc tc effs ()    -- Run Params
-    --                -> Test e tc rc hi i as ds effs      -- Test Case
-    --                -> [Sem effs ()]                      -- [TestIterations]
-    -- runTest be ae RunParams {filters, rc, itemIds, itemRunner} test@Test {config = tc, items} = ...
-
+    --   suite :: (Test e tc rc hi i as ds effs -> a) -> SuiteItem hi effs [a]
     -- type Suite e tc rc hi effs a = 
     --   (forall i as ds. Test e tc rc hi i as ds effs -> a) -> SuiteItem hi effs [a]
 
@@ -243,8 +245,18 @@ mkSem rp@RunParams {suite, filters, rc} =
     --   -> SuiteItem ho effs [[Sem effs ho -> Sem effs () -> Sem effs ()]] -- ^ test list - [beforeEach -> afterEach -> test]
     --   -> Sem effs ()
 
-    root :: SuiteItem hi effs [[Sem effs () -> Sem effs () -> Sem effs ()]]
-    root = suite $ runTest (pure ()) (\_ -> pure ()) rp
+    -- suite :: (Test e tc rc hi i as ds effs -> a) -> SuiteItem hi effs [a]
+
+    {-
+      Expected type: Test e tc rc hii i as ds effs -> [Sem effs hii -> Sem effs () -> Sem effs ()]
+        Actual type: Sem effs hi1 -> (hi1 -> Sem effs ()) -> Test e tc rc hi1 i0 as0 ds0 effs -> [Sem effs ()]
+    -}
+  
+    root :: forall hii. SuiteItem hii effs [[Sem effs hii -> Sem effs () -> Sem effs ()]] 
+    root = (runTest rp) suite  -- Test e tc rc () i0 as0 ds0 effs -> [Sem effs ()]
+
+    -- runtest rp -- Test e tc rc hi2 i0 as0 ds0 effs -> Sem effs hi2 -> (hi2 -> Sem effs ()) -> [Sem effs ()]
+    -- suite :: (Test e tc rc hi i as ds effs -> a) -> SuiteItem hi effs [a]
 
     filterInfo :: [TestFilterResult]
     filterInfo = filterSuite suite filters rc
@@ -263,7 +275,7 @@ mkSem rp@RunParams {suite, filters, rc} =
       -- all the string conversion shannanigans below is due to descrmination which drives firstDuplicate
       -- only working with chars / strings
       (toS <$> firstDuplicate (toS @_ @PRL.String <$> groupAddresses root))
-
+-}
 
 mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, MinEffs e effs) =>
                    RunParams (Either FilterErrorType) e rc tc effs ()

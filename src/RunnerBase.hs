@@ -40,11 +40,11 @@ TODO
     * Update Tests
     * Explicit Hook connstructors
     * Update Tests
-    * Query static data - items / checks / Config / Known Defects on Checks / Effects
+    * Query static data - items / checks / Config / Known Defects on Checks / Effects esp Hook effects how to query
   Update Tests
   Concurrency
   Update Tests
-  Known Defect on interact / parse
+  Known Defect on interact / parse 
   Exception error handling
   Update Tests
   sample for actions that return values in the context of documentation
@@ -135,8 +135,8 @@ data SuiteItem hi effs t where
 
   Group :: {
     grpTitle :: Text,
-    gElms :: [SuiteItem () effs t]
-  } -> SuiteItem () effs t
+    gElms :: [SuiteItem hi effs t]
+  } -> SuiteItem hi effs t
 
 
 concatTests :: SuiteItem hi effs t -> [t]

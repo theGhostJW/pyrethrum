@@ -6,7 +6,7 @@ module DSL.LogProtocol.PrettyPrint (
   LogStyle(..)
 ) where
 
-import Common as C ( DetailedInfo(DetailedInfo), HookLocation(..) )
+import Common as C ( DetailedInfo(DetailedInfo), HookCardinality(..) )
 import PrettyPrintCommon as PC
     ( Justification(LeftJustify)
      , newLn
@@ -40,12 +40,11 @@ separator' = \case
                 Doc -> newLn
                 Outline -> ""
 
-describeLoc :: HookLocation -> Text
+describeLoc :: HookCardinality -> Text
 describeLoc = \case 
-                 BeforeAll -> "Before All"
-                 AfterAll -> "After All"
-                 BeforeEach -> "Before Each"
-                 AfterEach -> "After Each"
+                 ExeOnce -> "Once"
+                 ExeForEach -> "Each"
+    
 
 prettyPrintLogProtocolWith :: Show e => LogStyle -> ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
 prettyPrintLogProtocolWith style ThreadInfo{runId, threadIndex} (LogIndex idx) time lgProtocol = 

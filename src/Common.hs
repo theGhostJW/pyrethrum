@@ -30,10 +30,9 @@ import Data.Aeson.TH ( defaultOptions, deriveJSON )
 import OrphanedInstances()
 import Polysemy.Output as O ( Output )
 
-data HookLocation = BeforeAll | 
-                    AfterAll | 
-                    BeforeEach |
-                    AfterEach deriving (Eq, Show)
+data HookCardinality =  ExeOnce | 
+                        ExeForEach  
+                        deriving (Eq, Show)
 
 indentText :: Int -> Text -> Text
 indentText i s = 
@@ -97,4 +96,4 @@ type OutputDListText = O.Output (D.DList Text)
 dList :: Show s => s -> D.DList Text
 dList s = D.fromList [txt s]
 
-$(deriveJSON defaultOptions ''HookLocation)
+$(deriveJSON defaultOptions ''HookCardinality)

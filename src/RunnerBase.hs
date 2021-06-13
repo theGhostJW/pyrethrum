@@ -1,6 +1,6 @@
 module RunnerBase where
 
-import Common (FilterErrorType, FrameworkError, HookLocation(..))
+import Common (FilterErrorType, FrameworkError, HookCardinality(..))
 import Pyrelude
 import Polysemy
 import Polysemy.Error
@@ -126,15 +126,22 @@ data SuiteItem hi effs t where
     tests :: t 
   } -> SuiteItem hi effs t
 
-  Hook :: {
-     hkTitle :: Text,
-     location :: HookLocation,
-     hook :: hi -> Sem effs o,
-     hElms :: [SuiteItem o effs t]
+  BeforeHook :: {
+     title :: Text,
+     cardinality :: HookCardinality,
+     bHook :: hi -> Sem effs o,
+     bhElms :: [SuiteItem o effs t]
+  } -> SuiteItem hi effs t
+
+  AfterHook :: {
+     title :: Text,
+     cardinality :: HookCardinality,
+     aHook :: hi -> Sem effs hi,
+     ahElms :: [SuiteItem hi effs t]
   } -> SuiteItem hi effs t
 
   Group :: {
-    grpTitle :: Text,
+    title :: Text,
     gElms :: [SuiteItem hi effs t]
   } -> SuiteItem hi effs t
 
@@ -146,14 +153,16 @@ concatTests =
   in
     \case
       (Tests f) -> [f]
-      (Hook _ _ _ ts) -> concat' ts
+      (BeforeHook _ _ _ ts) -> concat' ts
+      (AfterHook _ _ _ ts) -> concat' ts
       (Group _ ts) -> concat' ts
 
 
 groupName :: SuiteItem hi effs a -> Maybe Text
 groupName = \case 
               Tests _ -> Nothing
-              Hook {} -> Nothing
+              BeforeHook {} -> Nothing
+              AfterHook {} -> Nothing
               Group t _ -> Just t
 
 groupAddresses' :: [Text] -> Text -> SuiteItem hi effs a -> [Text]
@@ -163,13 +172,17 @@ groupAddresses' accum root el =
 
     appendDelim :: Text -> Text -> Text
     appendDelim p s = p <> (null p || null s ? empty $ delim) <> s
+
+    childAddresses :: [SuiteItem o effs a] -> [Text]
+    childAddresses  se = mconcat $ groupAddresses' accum root <$> se
   in
     case el of
       Tests _ -> accum
       
-      Hook _ _ _ subElems -> 
-        mconcat $ groupAddresses' accum root <$> subElems
+      BeforeHook _ _ _ subElems -> childAddresses subElems
       
+      AfterHook _ _ _ subElems -> childAddresses subElems
+
       Group t subElems -> 
         let 
           address = appendDelim root t 

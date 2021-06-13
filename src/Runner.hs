@@ -15,7 +15,7 @@ import Common as C
       indentText,
       DetailedInfo(..),
       FileSystemErrorType(..),
-      HookLocation(..),
+      HookCardinality(..),
       FilterErrorType(..),
       FrameworkError(..),
       OutputDListText )
@@ -162,55 +162,75 @@ data RunParams m e rc tc effs a = RunParams {
 }
 
 emptyElm :: forall hi a effs. SuiteItem hi effs [a] -> Bool
-emptyElm
-  = \case
-      Tests t -> null t
-      Hook _ _ _ s -> all emptyElm s
-      Group _ s -> all emptyElm s
-
-{-
-exeElm :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
-  Sem effs () -- ^ beforeEach
-  -> Sem effs () -- ^ afterEach
-  -> SuiteItem effs [[Sem effs () -> Sem effs () -> Sem effs ()]] -- ^ 
-  -> Sem effs ()
--}
+emptyElm = 
+    let 
+      allEmpty :: forall b. [SuiteItem b effs [a]] -> Bool
+      allEmpty = all emptyElm
+    in
+      \case
+        Tests t -> null t
+        BeforeHook _ _ _ s -> allEmpty s
+        AfterHook _ _ _ s -> allEmpty s
+        Group _ s -> allEmpty s
 
 -- TODO - Error handling especially outside tests eg. in hooks
-exeElm :: forall hi ho e effs. (ToJSON e, Show e, Member (Logger e) effs) => 
-  Sem effs hi
-  -> (hi -> Sem effs ho) -- ^ beforeEach
-  -> (ho -> Sem effs ()) -- ^ afterEach
-  -> SuiteItem ho effs [[Sem effs ho -> Sem effs () -> Sem effs ()]] -- ^ test list - [beforeEach -> afterEach -> testIteration]
+exeElm :: forall hi e effs a. (ToJSON e, Show e, Member (Logger e) effs) => 
+  (forall hii. hii -> a -> Sem effs ())
+  -> hi
+  -> SuiteItem hi effs [a] 
   -> Sem effs ()
-exeElm hiSem beforeEach afterEach suiteElm = uu
-  emptyElm suiteElm ?
+exeElm runner hi si = 
+  emptyElm si ?
     pure () $
-    case suiteElm of
-      Tests { tests } -> 
-        sequence_ $ fold $ ((\f -> f (beforeEach hi) afterEach) <$>) <$> tests
 
-      Hook {location, hkTitle = title, hook, hElms } -> 
+    case si of
+      Tests { tests } -> sequence_ $ runner hi <$> tests
+
+      BeforeHook {cardinality, title = ttl, bHook , bhElms } -> 
         let 
-          hkResult :: Sem effs ho
-          hkResult = do 
-                        logItem $ StartHook location title
-                        hi <- hiSem
-                        ho <- hook hi
-                        logItem $ EndHook location title
-                        pure ho
+          hkResult = do
+                      logItem $ StartHook cardinality ttl
+                      ho <- bHook hi
+                      logItem $ EndHook cardinality ttl
+                      pure ho
         in
-         case location of 
-           BeforeAll -> sequence_ (exeElm hkResult beforeEach afterEach <$> hElms)
-           AfterAll  -> sequence_ (exeElm hi beforeEach afterEach <$> hElms) >> void hkResult 
-           BeforeEach -> sequence_ $ exeElm hi (hkResult >> beforeEach) afterEach <$> hElms
-           AfterEach -> sequence_ $ exeElm beforeEach (afterEach >> hkResult) <$> hElms
+         case cardinality of 
+           ExeOnce -> do 
+                       r <- hkResult
+                       sequence_ $ exeElm runner r <$> bhElms
+
+           ExeForEach -> let 
+                          runElm si' = do 
+                                        r <- hkResult
+                                        exeElm runner r si'
+                         in
+                          sequence_ $ runElm <$> bhElms
+
+      AfterHook {cardinality , title = ttl, aHook , ahElms } ->
+        let 
+          hkResult = do 
+                      logItem $ StartHook cardinality ttl
+                      ho <- aHook hi
+                      logItem $ EndHook cardinality ttl
+                      pure ho
+        in
+         case cardinality of 
+           ExeOnce -> do 
+                       sequence_ $ exeElm runner hi <$> ahElms
+                       void hkResult
+
+           ExeForEach -> let 
+                          runElm si' = do 
+                                        exeElm runner hi si'
+                                        hkResult
+                         in
+                          sequence_ $ runElm <$> ahElms
           
-      Group { grpTitle = title, gElms } -> 
-        do
-          logItem . StartGroup $ GroupTitle title
-          sequence_ $ exeElm hi beforeEach afterEach <$> gElms
-          logItem . EndGroup $ GroupTitle title
+      Group { title = ttl, gElms } -> 
+        do 
+          logItem . StartGroup . GroupTitle $ ttl
+          sequence_ $ exeElm runner hi <$> gElms
+          logItem . EndGroup . GroupTitle $ ttl
 
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, MinEffs e effs) =>

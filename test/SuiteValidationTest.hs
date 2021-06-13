@@ -5,7 +5,7 @@ import DSL.Interpreter ( minInterpret )
 import Pyrelude as P
 import Pyrelude.Test ( chk, chk', Assertion, (...) )
 import DSL.LogProtocol ( LogProtocolBase (..))
-import Common  ( FrameworkError, DetailedInfo(DetailedInfo), HookLocation(..) )
+import Common  ( FrameworkError, DetailedInfo(DetailedInfo), HookCardinality(..) )
 import Runner (groupAddresses)
 import TempUtils
 import ItemRunners (runItem)
@@ -55,7 +55,7 @@ chkOffsetList i p1 p2 l =
 chkNext :: Show t => (t -> Bool) -> (t -> Bool) -> [t] -> IO ()
 chkNext = chkOffsetList 1
 
-isEndHook :: HookLocation -> LogProtocolWithTextError -> Bool
+isEndHook :: HookCardinality -> LogProtocolWithTextError -> Bool
 isEndHook hl = \case 
                   EndHook loc _ -> loc == hl
                   _ -> False
@@ -69,7 +69,7 @@ isStartIteration = \case
 unit_before_each_hook_precedes_each_iteration :: IO ()
 unit_before_each_hook_precedes_each_iteration = chkNext (isEndHook BeforeEach) isStartIteration hookRunResult
 
-isStartHook :: HookLocation -> LogProtocolWithTextError -> Bool
+isStartHook :: HookCardinality -> LogProtocolWithTextError -> Bool
 isStartHook hl = \case 
                   StartHook loc _ -> loc == hl
                   _ -> False

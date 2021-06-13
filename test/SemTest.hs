@@ -139,7 +139,7 @@ mockSuite r =
   R.Group "Filter Suite" [
     Hook 
     "Before All" 
-     BeforeAll 
+     ExeOnce 
      (pure ()) [
       Tests [
         r test1,

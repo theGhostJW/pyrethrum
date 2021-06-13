@@ -1,7 +1,7 @@
 module MockSuite where
 
 import AuxFiles ()
-import Common (HookLocation (..))
+import Common (HookCardinality (..))
 import DSL.Interpreter (MinEffs, executeForTest, minInterpret)
 import DSL.LogProtocol (LogProtocolBase)
 import DSL.LogProtocol.PrettyPrint ()
@@ -197,7 +197,7 @@ demoSuit =
     "Happy Suite"
     [ Hook
         "Hook 1"
-        BeforeAll
+        ExeOnce
         (pure ())
         [ Tests
             [ "test 1",
@@ -224,7 +224,7 @@ happySuite r =
     "Filter Suite"
     [ Hook
         "Before All"
-        BeforeAll
+        ExeOnce
         (pure ())
         [ Tests
             [ r test1,
@@ -263,7 +263,7 @@ hookSuite r =
         doNothing
         [ Hook
             "After All Outer"
-            AfterAll
+            ExeForEach
             doNothing
             [ Hook
                 "Before Each Outer"
@@ -271,7 +271,7 @@ hookSuite r =
                 doNothing
                 [ Hook
                     "Before All Inner"
-                    BeforeAll
+                    ExeOnce
                     doNothing
                     [Tests [r test1]]
                 ]

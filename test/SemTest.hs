@@ -31,7 +31,8 @@ instance Titled TestConfig where
 
 $(deriveJSON defaultOptions ''TestConfig)
 
-type MockTest i as ds effs = RunnerBase.Test Int TestConfig RunConfig i as ds effs
+                                          --    e      tc        rc       hi i as ds effs 
+type MockTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi i as ds effs
 
 newtype MyInt = MyInt Int deriving (Show, Generic)
 
@@ -57,13 +58,14 @@ instance ToJSON MyInt where
 empti :: a -> [b]
 empti = const ([] :: [b])
 
-emptiInteractor :: b -> RunConfig -> a -> Sem effs b
-emptiInteractor b _ _ = pure b
+--                 as ->    rc     -> hi -> i -> Sem effs as
+emptiInteractor :: as -> RunConfig -> hi -> i -> Sem effs as
+emptiInteractor as _ _ _ = pure as
 
 emptiParser:: a -> as -> Sem effs a
 emptiParser a _ = pure a
 
-test1 :: MockTest MyInt Text MyInt effs
+test1 :: MockTest Text MyInt Text MyInt effs
 test1 = Test {
               config = TestConfig {
                 header = "test1",
@@ -75,7 +77,8 @@ test1 = Test {
               parse = emptiParser (MyInt 1)
             }
 
-test2 :: MockTest MyInt MyInt MyInt effs
+                  
+test2 :: MockTest Int MyInt MyInt MyInt effs
 test2 = Test {
               config = TestConfig {
                 header = "test2",
@@ -87,7 +90,7 @@ test2 = Test {
               parse = pure
             }
 
-test3 :: MockTest MyInt MyInt MyInt effs
+test3 :: MockTest Bool MyInt MyInt MyInt effs
 test3 = Test {
                 config = TestConfig {
                 header = "test3",
@@ -99,7 +102,7 @@ test3 = Test {
               parse = pure
             }
 
-test4 :: MockTest Text Text Text effs 
+test4 :: MockTest Char Text Text Text effs 
 test4 = Test {
               config = TestConfig {
                   header = "test4",
@@ -111,7 +114,7 @@ test4 = Test {
               parse = pure
             }
 
-test5 :: MockTest MyInt MyInt MyInt effs
+test5 :: MockTest Int MyInt MyInt MyInt effs
 test5 = Test {
               config = TestConfig {
                   header = "test5",
@@ -134,13 +137,13 @@ filters' :: [TestFilter RunConfig TestConfig]
 filters' = [includeFilter]
 
 
-mockSuite :: forall effs a. (forall i as ds. (Show i, Show as, Show ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
+mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
 mockSuite r = 
   R.Group "Filter Suite" [
-    Hook 
+    BeforeHook 
     "Before All" 
      ExeOnce 
-     (pure ()) [
+     (\_ -> pure ()) [
       Tests [
         r test1,
         r test2,

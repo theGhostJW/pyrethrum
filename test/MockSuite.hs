@@ -30,7 +30,7 @@ import RunElementClasses
 import Runner as R
   ( FrameworkError,
     RunParams (..),
-    SuiteItem (Group, Hook, Tests),
+    SuiteItem (..),
     Test (Test, config, interactor, items, parse),
     mkSem,
   )
@@ -71,7 +71,7 @@ instance TestConfigClass TestConfig where
 instance Titled TestConfig where
   title = header
 
-type MockTest i as ds effs = RunnerBase.Test Text TestConfig RunConfig i as ds effs
+type MockTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi i as ds effs
 
 newtype MyInt = MyInt Int deriving (Show, Generic)
 
@@ -101,8 +101,8 @@ instance ItemClass MyText MyText where
 empti :: a -> [b]
 empti = const ([] :: [b])
 
-logInteractor :: forall i as effs. (Member (Logger Text) effs, Show i) => as -> RunConfig -> i -> Sem effs as
-logInteractor as (RunConfig t' _) i = log (t' <> " - Hello from item " <> txt i) >> pure as
+logInteractor :: forall hi i as effs. (Member (Logger Text) effs, Show i) => as -> RunConfig -> hi -> i -> Sem effs as
+logInteractor as (RunConfig t' _) _hi i = log (t' <> " - Hello from item " <> txt i) >> pure as
 
 emptiParser :: a -> i -> as -> Sem effs a
 emptiParser a _ _ = pure a
@@ -111,7 +111,7 @@ type Lgrffs effs = Member (Logger Text) effs
 
 type DemoEffs effs = MinEffs Text effs
 
-test1 :: forall effs. Lgrffs effs => MockTest Int Text MyText effs
+test1 :: forall effs. Lgrffs effs => MockTest Text Int Text MyText effs
 test1 =
   RunnerBase.Test
     { config =
@@ -125,7 +125,7 @@ test1 =
       parse = pure . MyText . txt
     }
 
-test2 :: forall effs. Lgrffs effs => MockTest MyInt Int MyText effs
+test2 :: forall effs. Lgrffs effs => MockTest Int MyInt Int MyText effs
 test2 =
   Test
     { config =
@@ -139,7 +139,7 @@ test2 =
       parse = pure . MyText . txt
     }
 
-test3 :: forall effs. Lgrffs effs => MockTest MyInt Int MyText effs
+test3 :: forall effs. Lgrffs effs => MockTest Bool MyInt Int MyText effs
 test3 =
   Test
     { config =
@@ -153,7 +153,7 @@ test3 =
       parse = pure . MyText . txt
     }
 
-test4 :: forall effs. Lgrffs effs => MockTest MyText Text MyText effs
+test4 :: forall effs. Lgrffs effs => MockTest Char MyText Text MyText effs
 test4 =
   Test
     { config =
@@ -167,7 +167,7 @@ test4 =
       parse = pure . MyText . txt
     }
 
-test5 :: forall effs. Lgrffs effs => MockTest MyInt Int MyText effs
+test5 :: forall effs. Lgrffs effs => MockTest Bool MyInt Int MyText effs
 test5 =
   Test
     { config =
@@ -191,34 +191,66 @@ includeFilter =
 filters' :: [TestFilter RunConfig TestConfig]
 filters' = [includeFilter]
 
-demoSuit :: SuiteItem effs [Text]
+{-
+
+data SuiteItem hi effs t where
+  Tests ::  {
+    tests :: t
+  } -> SuiteItem hi effs t
+
+  BeforeHook :: {
+     title :: Text,
+     cardinality :: HookCardinality,
+     bHook :: hi -> Sem effs o,
+     bhElms :: [SuiteItem o effs t]
+  } -> SuiteItem hi effs t
+
+  AfterHook :: {
+     title :: Text,
+     cardinality :: HookCardinality,
+     aHook :: hi -> Sem effs hi,
+     ahElms :: [SuiteItem hi effs t]
+  } -> SuiteItem hi effs t
+
+  Group :: {
+    title :: Text,
+    gElms :: [SuiteItem hi effs t]
+  } -> SuiteItem hi effs t
+
+-}
+
+demoSuit :: SuiteItem () effs [Text]
 demoSuit =
   R.Group
-    "Happy Suite"
-    [ Hook
-        "Hook 1"
-        ExeOnce
-        (pure ())
-        [ Tests
-            [ "test 1",
-              "test 2",
-              "test 3"
-            ]
-        ],
-      R.Group
-        "Sub Group"
-        [ Tests
-            [ "test 4",
-              "test 5"
-            ]
-        ],
-      R.Group
-        "Empty Group"
-        [ Tests []
+    { title = "Happy Suite",
+      gElms =
+        [ BeforeHook
+            { title = "Hook 1",
+              cardinality = ExeOnce,
+              bHook = \_ -> pure (),
+              bhElms =
+                [ Tests
+                    [ "test 1",
+                      "test 2",
+                      "test 3"
+                    ],
+                  R.Group
+                    "Sub Group"
+                    [ Tests
+                        [ "test 4",
+                          "test 5"
+                        ]
+                    ],
+                  R.Group
+                    "Empty Group"
+                    [ Tests []
+                    ]
+                ]
+            }
         ]
-    ]
+    }
 
-happySuite :: forall a effs. Lgrffs effs => (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
+happySuite :: forall a effs. Lgrffs effs => (forall hi i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
 happySuite r =
   R.Group
     "Filter Suite"

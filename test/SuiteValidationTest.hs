@@ -65,9 +65,9 @@ isStartIteration = \case
                       StartIteration {} -> True
                       _ -> False
 
--- $> unit_before_each_hook_precedes_each_iteration 
-unit_before_each_hook_precedes_each_iteration :: IO ()
-unit_before_each_hook_precedes_each_iteration = chkNext (isEndHook BeforeEach) isStartIteration hookRunResult
+-- $> unit_before_each_hook_precedes_each_iteration TODO
+-- unit_before_each_hook_precedes_each_iteration :: IO ()
+-- unit_before_each_hook_precedes_each_iteration = chkNext (isEndHook BeforeEach) isStartIteration hookRunResult
 
 isStartHook :: HookCardinality -> LogProtocolWithTextError -> Bool
 isStartHook hl = \case 
@@ -79,6 +79,6 @@ isEndIteration = \case
                       EndIteration _ -> True
                       _ -> False
 
--- $> unit_after_each_hook_follows_each_interaction
-unit_after_each_hook_follows_each_interaction :: IO ()
-unit_after_each_hook_follows_each_interaction = chkNext isEndIteration (isStartHook AfterEach) hookRunResult
+-- $> unit_after_each_hook_follows_each_interaction TODO
+-- unit_after_each_hook_follows_each_interaction :: IO ()
+-- unit_after_each_hook_follows_each_interaction = chkNext isEndIteration (isStartHook AfterEach) hookRunResult

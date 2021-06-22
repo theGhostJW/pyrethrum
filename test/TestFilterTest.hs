@@ -74,6 +74,7 @@ emptiInteractor b _ _ = pure b
 emptiParser:: a -> as -> Sem effs a
 emptiParser a _ = pure a
 
+{- TODO
 test1 :: MockTest MyInt Text MyInt effs
 test1 = Test {
               config = TestConfig {
@@ -229,3 +230,5 @@ unit_test_filter_exclude_reasons = chkEq [
                                           "test must be is enabled"
                                           ]
                                           $ filtersExcludeReasons $ RunConfig NZ Connectivity
+
+-}

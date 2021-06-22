@@ -154,7 +154,7 @@ logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => Fram
 logLPError = logItem . LP.Error
 
 data RunParams m e rc tc effs a = RunParams {
-  suite :: forall hi. Suite e tc rc hi effs a,
+  suite :: Suite e tc rc effs a,
   filters :: [F.TestFilter rc tc],
   itemIds :: m (S.Set Int),   
   itemRunner :: forall hi as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON i, ToJSON ds) => ItemRunner e as ds i hi tc rc effs,

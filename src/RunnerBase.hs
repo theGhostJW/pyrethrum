@@ -10,8 +10,8 @@ import Data.Aeson
 type ItemRunner e as ds i hi tc rc effs = 
     rc -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
-type Suite e tc rc hi effs a = 
-    (forall i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i, ToJSON i) => Test e tc rc hi i as ds effs -> a) -> SuiteItem hi effs [a]
+type Suite e tc rc effs a = 
+    (forall hi i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i, ToJSON i) => Test e tc rc hi i as ds effs -> a) -> SuiteItem () effs [a]
 
 data GenericResult tc rslt = TestResult {
   configuration :: tc,

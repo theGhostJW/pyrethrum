@@ -254,14 +254,14 @@ happySuite :: forall a effs. Lgrffs effs => (forall hi i as ds. (Show i, Show as
 happySuite r =
   R.Group
     "Filter Suite"
-    [ Hook
+    [ BeforeHook
         "Before All"
         ExeOnce
-        (pure ())
-        [ Tests
-            [ r test1,
-              r test2,
-              r test3
+        (\_ -> pure ())
+        [ Tests         --- this should not compile different hook in
+            [ r test1,  -- hi: Int
+              r test2,  -- hi: Int
+              r test3   -- hi: Bool
             ]
         ],
       R.Group
@@ -277,31 +277,31 @@ happySuite r =
         ]
     ]
 
-doNothing :: forall a. Applicative a => a ()
-doNothing = pure ()
+doNothing :: forall m a. Applicative m => a -> m ()
+doNothing _ =  pure ()
 
 hookSuite ::
   forall a effs.
   Lgrffs effs =>
   -- | test runner
-  (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest i as ds effs -> a) ->
-  SuiteItem effs [a]
+  (forall hi i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest hi i as ds effs -> a) ->
+  SuiteItem () effs [a]
 hookSuite r =
   R.Group
     "Hook Suite"
-    [ Hook
+    [ AfterHook
         "After Each Outer"
-        AfterEach
+        ExeForEach
         doNothing
-        [ Hook
+        [ AfterHook
             "After All Outer"
-            ExeForEach
+            ExeOnce 
             doNothing
-            [ Hook
+            [ BeforeHook
                 "Before Each Outer"
-                BeforeEach
+                ExeForEach
                 doNothing
-                [ Hook
+                [ BeforeHook
                     "Before All Inner"
                     ExeOnce
                     doNothing
@@ -311,7 +311,7 @@ hookSuite r =
         ]
     ]
 
-runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs
+runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs ()
 runParams =
   RunParams
     { suite = happySuite,

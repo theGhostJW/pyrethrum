@@ -37,7 +37,7 @@ unit_happy_suit_passes_validation = chk $ isRight happySuiteResult
 hookRunResult :: [LogProtocolWithTextError]
 hookRunResult = fst . fromRight' $ minInterpret hookRun
 
--- $> hookResultPretty
+-- $ > hookResultPretty
 hookResultPretty :: IO ()
 hookResultPretty = debugLines $ prettyPrintLogProtocol Outline <$> hookRunResult
 
@@ -65,7 +65,7 @@ isStartIteration = \case
                       StartIteration {} -> True
                       _ -> False
 
--- $> unit_before_each_hook_precedes_each_iteration TODO
+-- $ > unit_before_each_hook_precedes_each_iteration TODO
 -- unit_before_each_hook_precedes_each_iteration :: IO ()
 -- unit_before_each_hook_precedes_each_iteration = chkNext (isEndHook BeforeEach) isStartIteration hookRunResult
 
@@ -79,6 +79,6 @@ isEndIteration = \case
                       EndIteration _ -> True
                       _ -> False
 
--- $> unit_after_each_hook_follows_each_interaction TODO
+-- $ > unit_after_each_hook_follows_each_interaction TODO
 -- unit_after_each_hook_follows_each_interaction :: IO ()
 -- unit_after_each_hook_follows_each_interaction = chkNext isEndIteration (isStartHook AfterEach) hookRunResult

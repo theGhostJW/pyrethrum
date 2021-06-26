@@ -250,6 +250,10 @@ demoSuit =
         ]
     }
 
+--  read int from environment
+intHook :: Applicative f => p -> f Int
+intHook _ = pure 7
+
 happySuite :: forall a effs. Lgrffs effs => (forall hi i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
 happySuite r =
   R.Group
@@ -257,9 +261,10 @@ happySuite r =
     [ BeforeHook
         "Before All"
         ExeOnce
-        (\_ -> pure ())
+        intHook
         [ Tests         --- this should not compile different hook in
-            [ r test1,  -- hi: Int
+            [ 
+              r test1,  -- hi: Int
               r test2,  -- hi: Int
               r test3   -- hi: Bool
             ]

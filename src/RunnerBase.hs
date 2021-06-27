@@ -123,21 +123,21 @@ suiteNested2Exp = Hook' {
 
 data SuiteItem hi effs t where
   Tests ::  { 
-    tests :: t 
+    tests :: t
   } -> SuiteItem hi effs t
 
   BeforeHook :: {
      title :: Text,
      cardinality :: HookCardinality,
-     bHook :: hi -> Sem effs o,
-     bhElms :: [SuiteItem o effs t]
+     bHook :: Sem effs o,
+     bhElms :: [o -> SuiteItem o effs t]
   } -> SuiteItem hi effs t
 
   AfterHook :: {
      title :: Text,
      cardinality :: HookCardinality,
-     aHook :: hi -> Sem effs hi,
-     ahElms :: [SuiteItem hi effs t]
+     aHook :: Sem effs (),
+     ahElms :: [hi -> SuiteItem hi effs t]
   } -> SuiteItem hi effs t
 
   Group :: {
@@ -147,15 +147,15 @@ data SuiteItem hi effs t where
 
 
 concatTests :: SuiteItem hi effs t -> [t]
-concatTests = 
-  let 
-    concat' ts = mconcat $ concatTests <$> ts
-  in
-    \case
-      (Tests f) -> [f]
-      (BeforeHook _ _ _ ts) -> concat' ts
-      (AfterHook _ _ _ ts) -> concat' ts
-      (Group _ ts) -> concat' ts
+concatTests = uu
+  -- let 
+  --   concat' ts = mconcat $ concatTests <$> ts
+  -- in
+  --   \case
+  --     (Tests f) -> [f]
+  --     (BeforeHook _ _ _ ts) -> concat' ts
+  --     (AfterHook _ _ _ ts) -> concat' ts
+  --     (Group _ ts) -> concat' ts
 
 
 groupName :: SuiteItem hi effs a -> Maybe Text
@@ -166,28 +166,28 @@ groupName = \case
               Group t _ -> Just t
 
 groupAddresses' :: [Text] -> Text -> SuiteItem hi effs a -> [Text]
-groupAddresses' accum root el = 
-  let
-    delim = "."
+groupAddresses' accum root el = uu
+  -- let
+  --   delim = "."
 
-    appendDelim :: Text -> Text -> Text
-    appendDelim p s = p <> (null p || null s ? empty $ delim) <> s
+  --   appendDelim :: Text -> Text -> Text
+  --   appendDelim p s = p <> (null p || null s ? empty $ delim) <> s
 
-    childAddresses :: [SuiteItem o effs a] -> [Text]
-    childAddresses  se = mconcat $ groupAddresses' accum root <$> se
-  in
-    case el of
-      Tests _ -> accum
+  --   childAddresses :: [SuiteItem o effs a] -> [Text]
+  --   childAddresses  se = mconcat $ groupAddresses' accum root <$> se
+  -- in
+  --   case el of
+  --     Tests _ -> accum
       
-      BeforeHook _ _ _ subElems -> childAddresses subElems
+  --     BeforeHook _ _ _ subElems -> childAddresses subElems
       
-      AfterHook _ _ _ subElems -> childAddresses subElems
+  --     AfterHook _ _ _ subElems -> childAddresses subElems
 
-      Group t subElems -> 
-        let 
-          address = appendDelim root t 
-        in 
-          address : mconcat (groupAddresses' accum address <$> subElems)
+  --     Group t subElems -> 
+  --       let 
+  --         address = appendDelim root t 
+  --       in 
+  --         address : mconcat (groupAddresses' accum address <$> subElems)
         
 
 groupAddresses :: SuiteItem hi effs a -> [Text]

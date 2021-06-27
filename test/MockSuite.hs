@@ -1,69 +1,27 @@
 module MockSuite where
 
-import AuxFiles ()
-import Common (HookCardinality (..))
-import DSL.Interpreter (MinEffs, executeForTest, minInterpret)
-import DSL.LogProtocol (LogProtocolBase)
-import DSL.LogProtocol.PrettyPrint ()
-import DSL.Logger
-import Data.Aeson
-  ( FromJSON,
-    ToJSON (toEncoding),
-    defaultOptions,
-    genericToEncoding,
-  )
 import Data.Aeson.TH
-import ItemRunners
-import LogTransformation.Common ()
+import Data.Aeson.Types
+import Data.Yaml
 import Polysemy
-import Pyrelude
-import qualified Pyrelude as P
-import Pyrelude.IO ()
-import Pyrelude.Test as T ()
-import RunElementClasses
-  ( ItemClass (checkList, identifier, thenClause, whenClause),
-    RunConfigClass,
-    TestAddress (TestAddress),
-    TestConfigClass (..),
-    Titled (..),
-  )
+import Pyrelude as P
+import Pyrelude.Test hiding (Group)
 import Runner as R
-  ( FrameworkError,
-    RunParams (..),
-    SuiteItem (..),
-    Test (Test, config, interactor, items, parse),
-    mkSem,
-  )
-import qualified RunnerBase
-import TestFilter (TestFilter (..))
+import RunnerBase (Test)
+import TestFilter
 
-type AppError = FrameworkError Text
+data Include = In | Out deriving (Eq, Ord, Show)
 
-type LogProtocol = LogProtocolBase AppError
+$(deriveJSON defaultOptions ''Include)
 
-type LogProtocolWithTextError = LogProtocolBase Text
-
-data RunConfig = RunConfig
-  { cfgHeader :: Text,
-    include :: Bool
-  }
-  deriving (Eq, Show)
-
-$(deriveJSON defaultOptions ''RunConfig)
-
-instance RunConfigClass RunConfig
-
-instance Titled RunConfig where
-  title rc = cfgHeader rc
+newtype RunConfig = RunConfig Include
 
 data TestConfig = TestConfig
   { header :: Text,
     address :: TestAddress,
-    include :: Bool
+    include :: Include
   }
   deriving (Show, Eq)
-
-$(deriveJSON defaultOptions ''TestConfig)
 
 instance TestConfigClass TestConfig where
   moduleAddress = address
@@ -71,22 +29,16 @@ instance TestConfigClass TestConfig where
 instance Titled TestConfig where
   title = header
 
+$(deriveJSON defaultOptions ''TestConfig)
+
+--    e      tc        rc       hi i as ds effs
 type MockTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi i as ds effs
 
 newtype MyInt = MyInt Int deriving (Show, Generic)
 
-instance ToJSON MyInt where
-  toEncoding = genericToEncoding defaultOptions
-
 newtype MyText = MyText Text deriving (Show, Generic, ToJSON)
 
-instance ItemClass Int MyText where
-  identifier i = i
-  whenClause _ = "pre"
-  thenClause _ = "post"
-  checkList = mempty
-
-instance ItemClass MyInt MyText where
+instance ItemClass MyInt MyInt where
   identifier _ = -999
   whenClause _ = "pre"
   thenClause _ = "post"
@@ -98,244 +50,147 @@ instance ItemClass MyText MyText where
   thenClause _ = "post"
   checkList = mempty
 
+instance ToJSON MyInt where
+  toEncoding = genericToEncoding defaultOptions
+
 empti :: a -> [b]
 empti = const ([] :: [b])
 
-logInteractor :: forall hi i as effs. (Member (Logger Text) effs, Show i) => as -> RunConfig -> hi -> i -> Sem effs as
-logInteractor as (RunConfig t' _) _hi i = log (t' <> " - Hello from item " <> txt i) >> pure as
+--                 as ->    rc     -> hi -> i -> Sem effs as
+emptiInteractor :: as -> RunConfig -> hi -> i -> Sem effs as
+emptiInteractor as _ _ _ = pure as
 
-emptiParser :: a -> i -> as -> Sem effs a
-emptiParser a _ _ = pure a
+emptiParser :: a -> as -> Sem effs a
+emptiParser a _ = pure a
 
-type Lgrffs effs = Member (Logger Text) effs
-
-type DemoEffs effs = MinEffs Text effs
-
-test1 :: forall effs. Lgrffs effs => MockTest Text Int Text MyText effs
-test1 =
-  RunnerBase.Test
+test1Txt :: MockTest Text MyInt Text MyInt effs
+test1Txt =
+  Test
     { config =
         TestConfig
           { header = "test1",
             address = TestAddress "test1",
-            include = True
+            include = In
           },
-      items = const [1, 2],
-      interactor = logInteractor "test1: ",
-      parse = pure . MyText . txt
+      items = empti,
+      interactor = emptiInteractor "Hello",
+      parse = emptiParser (MyInt 1)
     }
 
-test2 :: forall effs. Lgrffs effs => MockTest Int MyInt Int MyText effs
-test2 =
+test2Int :: MockTest Int MyInt MyInt MyInt effs
+test2Int =
   Test
     { config =
         TestConfig
           { header = "test2",
             address = TestAddress "test2 address",
-            include = True
+            include = In
           },
       items = empti,
-      interactor = logInteractor 2,
-      parse = pure . MyText . txt
+      interactor = emptiInteractor (MyInt 1),
+      parse = pure
     }
 
-test3 :: forall effs. Lgrffs effs => MockTest Bool MyInt Int MyText effs
-test3 =
+test3Bool :: MockTest Bool MyInt MyInt MyInt effs
+test3Bool =
   Test
     { config =
         TestConfig
           { header = "test3",
             address = TestAddress "test3 address",
-            include = True
+            include = Out
           },
       items = empti,
-      interactor = logInteractor 5,
-      parse = pure . MyText . txt
+      interactor = emptiInteractor (MyInt 3),
+      parse = pure
     }
 
-test4 :: forall effs. Lgrffs effs => MockTest Char MyText Text MyText effs
-test4 =
+test4Txt :: MockTest Text Text Text Text effs
+test4Txt =
   Test
     { config =
         TestConfig
           { header = "test4",
             address = TestAddress "test4 address",
-            include = True
+            include = In
           },
       items = empti,
-      interactor = logInteractor "4",
-      parse = pure . MyText . txt
+      interactor = emptiInteractor "Hello",
+      parse = pure
     }
 
-test5 :: forall effs. Lgrffs effs => MockTest Bool MyInt Int MyText effs
-test5 =
+test5Int :: MockTest Int MyInt MyInt MyInt effs
+test5Int =
   Test
     { config =
         TestConfig
           { header = "test5",
-            address = TestAddress "test 5",
-            include = True
+            address = TestAddress "test5 address",
+            include = Out
           },
       items = empti,
-      interactor = logInteractor 5,
-      parse = pure . MyText . txt
+      interactor = emptiInteractor (MyInt 1),
+      parse = pure
     }
 
 includeFilter :: TestFilter RunConfig TestConfig
 includeFilter =
   TestFilter
-    { title = "test must be is enabled",
-      predicate = \rc tc -> (include :: TestConfig -> Bool) tc == (include :: RunConfig -> Bool) rc
+    { title = "test include must match run",
+      predicate = \(RunConfig inc) tc -> include tc == inc
     }
 
 filters' :: [TestFilter RunConfig TestConfig]
 filters' = [includeFilter]
 
-{-
-
-data SuiteItem hi effs t where
-  Tests ::  {
-    tests :: t
-  } -> SuiteItem hi effs t
-
-  BeforeHook :: {
-     title :: Text,
-     cardinality :: HookCardinality,
-     bHook :: hi -> Sem effs o,
-     bhElms :: [SuiteItem o effs t]
-  } -> SuiteItem hi effs t
-
-  AfterHook :: {
-     title :: Text,
-     cardinality :: HookCardinality,
-     aHook :: hi -> Sem effs hi,
-     ahElms :: [SuiteItem hi effs t]
-  } -> SuiteItem hi effs t
-
-  Group :: {
-    title :: Text,
-    gElms :: [SuiteItem hi effs t]
-  } -> SuiteItem hi effs t
-
--}
-
-demoSuit :: SuiteItem () effs [Text]
-demoSuit =
-  R.Group
-    { title = "Happy Suite",
-      gElms =
-        [ BeforeHook
-            { title = "Hook 1",
-              cardinality = ExeOnce,
-              bHook = \_ -> pure (),
-              bhElms =
-                [ Tests
-                    [ "test 1",
-                      "test 2",
-                      "test 3"
-                    ],
-                  R.Group
-                    "Sub Group"
-                    [ Tests
-                        [ "test 4",
-                          "test 5"
-                        ]
-                    ],
-                  R.Group
-                    "Empty Group"
-                    [ Tests []
-                    ]
-                ]
-            }
-        ]
-    }
-
---  read int from environment
-intHook :: Applicative f => p -> f Int
-intHook _ = pure 7
-
-happySuite :: forall a effs. Lgrffs effs => (forall hi i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
-happySuite r =
+mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
+mockSuite r =
   R.Group
     "Filter Suite"
     [ BeforeHook
-        "Before All"
-        ExeOnce
-        intHook
-        [ Tests         --- this should not compile different hook in
-            [ 
-              r test1,  -- hi: Int
-              r test2,  -- hi: Int
-              r test3   -- hi: Bool
+        { title = "Before All",
+          cardinality = ExeOnce,
+          bHook = pure "hello",
+          bhElms =
+            [ \t ->
+                Tests
+                  [ r t test1Txt,
+                    r t test4Txt
+                  ],
+              const
+                R.Group
+                  { title = "Empty Group",
+                    gElms =
+                      [ Tests []
+                      ]
+                  }
             ]
-        ],
+        },
       R.Group
-        "Sub Group"
-        [ Tests
-            [ r test4,
-              r test5
-            ]
-        ],
-      R.Group
-        "Empty Group"
-        [ Tests []
-        ]
-    ]
-
-doNothing :: forall m a. Applicative m => a -> m ()
-doNothing _ =  pure ()
-
-hookSuite ::
-  forall a effs.
-  Lgrffs effs =>
-  -- | test runner
-  (forall hi i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest hi i as ds effs -> a) ->
-  SuiteItem () effs [a]
-hookSuite r =
-  R.Group
-    "Hook Suite"
-    [ AfterHook
-        "After Each Outer"
-        ExeForEach
-        doNothing
-        [ AfterHook
-            "After All Outer"
-            ExeOnce 
-            doNothing
+        { title = "Nested Int Group",
+          gElms =
             [ BeforeHook
-                "Before Each Outer"
-                ExeForEach
-                doNothing
-                [ BeforeHook
-                    "Before All Inner"
-                    ExeOnce
-                    doNothing
-                    [Tests [r test1]]
-                ]
+                { title = "Int Group",
+                  cardinality = ExeForEach,
+                  bHook = pure 23,
+                  bhElms =
+                    [ \t ->
+                        AfterHook
+                          { title = "After Exch Int",
+                            cardinality = ExeForEach,
+                            aHook = t == 23 ? pure () $ pure (),
+                            ahElms =
+                              [ \i ->
+                                  Tests
+                                    [ r i test5Int,
+                                      r i test2Int
+                                    ]
+                              ]
+                          }
+                    ]
+                }
             ]
-        ]
+        }
     ]
 
-runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs ()
-runParams =
-  RunParams
-    { suite = happySuite,
-      filters = filters',
-      itemIds = Nothing,
-      itemRunner = runItem,
-      rc = RunConfig "Happy Suite" True
-    }
-
-happyRun :: forall effs. DemoEffs effs => Sem effs ()
-happyRun = mkSem runParams
-
-hookRun :: forall effs. DemoEffs effs => Sem effs ()
-hookRun =
-  mkSem $
-    RunParams
-      { suite = hookSuite,
-        filters = [],
-        itemIds = Nothing,
-        itemRunner = runItem,
-        rc = RunConfig "Hook Suite" True
-      }
+-- unit_test_filter_expect_empty

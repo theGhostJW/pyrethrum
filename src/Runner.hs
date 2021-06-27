@@ -162,16 +162,16 @@ data RunParams m e rc tc effs a = RunParams {
 }
 
 emptyElm :: forall hi a effs. SuiteItem hi effs [a] -> Bool
-emptyElm = 
-    let 
-      allEmpty :: forall b. [SuiteItem b effs [a]] -> Bool
-      allEmpty = all emptyElm
-    in
-      \case
-        Tests t -> null t
-        BeforeHook _ _ _ s -> allEmpty s
-        AfterHook _ _ _ s -> allEmpty s
-        Group _ s -> allEmpty s
+emptyElm = uu
+    -- let 
+    --   allEmpty :: forall b. [SuiteItem b effs [a]] -> Bool
+    --   allEmpty = all emptyElm
+    -- in
+    --   \case
+    --     Tests t -> null t
+    --     BeforeHook _ _ _ s -> allEmpty s
+    --     AfterHook _ _ _ s -> allEmpty s
+    --     Group _ s -> allEmpty s
 
 -- TODO - Error handling especially outside tests eg. in hooks
 exeElm :: forall hi e effs a. (ToJSON e, Show e, Member (Logger e) effs) => 
@@ -179,58 +179,58 @@ exeElm :: forall hi e effs a. (ToJSON e, Show e, Member (Logger e) effs) =>
   -> hi
   -> SuiteItem hi effs [a] 
   -> Sem effs ()
-exeElm runner hi si = 
-  emptyElm si ?
-    pure () $
+exeElm runner hi si = uu
+  -- emptyElm si ?
+  --   pure () $
 
-    case si of
-      Tests { tests } -> sequence_ $ runner hi <$> tests
+  --   case si of
+  --     Tests { tests } -> sequence_ $ runner hi <$> tests
 
-      BeforeHook {cardinality, title = ttl, bHook , bhElms } -> 
-        let 
-          hkResult = do
-                      logItem $ StartHook cardinality ttl
-                      ho <- bHook hi
-                      logItem $ EndHook cardinality ttl
-                      pure ho
-        in
-         case cardinality of 
-           ExeOnce -> do 
-                       r <- hkResult
-                       sequence_ $ exeElm runner r <$> bhElms
+  --     BeforeHook {cardinality, title = ttl, bHook , bhElms } -> 
+  --       let 
+  --         hkResult = do
+  --                     logItem $ StartHook cardinality ttl
+  --                     ho <- bHook hi
+  --                     logItem $ EndHook cardinality ttl
+  --                     pure ho
+  --       in
+  --        case cardinality of 
+  --          ExeOnce -> do 
+  --                      r <- hkResult
+  --                      sequence_ $ exeElm runner r <$> bhElms
 
-           ExeForEach -> let 
-                          runElm si' = do 
-                                        r <- hkResult
-                                        exeElm runner r si'
-                         in
-                          sequence_ $ runElm <$> bhElms
+  --          ExeForEach -> let 
+  --                         runElm si' = do 
+  --                                       r <- hkResult
+  --                                       exeElm runner r si'
+  --                        in
+  --                         sequence_ $ runElm <$> bhElms
 
-      AfterHook {cardinality , title = ttl, aHook , ahElms } ->
-        let 
-          hkResult = do 
-                      logItem $ StartHook cardinality ttl
-                      ho <- aHook hi
-                      logItem $ EndHook cardinality ttl
-                      pure ho
-        in
-         case cardinality of 
-           ExeOnce -> do 
-                       sequence_ $ exeElm runner hi <$> ahElms
-                       void hkResult
+  --     AfterHook {cardinality , title = ttl, aHook , ahElms } ->
+  --       let 
+  --         hkResult = do 
+  --                     logItem $ StartHook cardinality ttl
+  --                     ho <- aHook hi
+  --                     logItem $ EndHook cardinality ttl
+  --                     pure ho
+  --       in
+  --        case cardinality of 
+  --          ExeOnce -> do 
+  --                      sequence_ $ exeElm runner hi <$> ahElms
+  --                      void hkResult
 
-           ExeForEach -> let 
-                          runElm si' = do 
-                                        exeElm runner hi si'
-                                        hkResult
-                         in
-                          sequence_ $ runElm <$> ahElms
+  --          ExeForEach -> let 
+  --                         runElm si' = do 
+  --                                       exeElm runner hi si'
+  --                                       hkResult
+  --                        in
+  --                         sequence_ $ runElm <$> ahElms
           
-      Group { title = ttl, gElms } -> 
-        do 
-          logItem . StartGroup . GroupTitle $ ttl
-          sequence_ $ exeElm runner hi <$> gElms
-          logItem . EndGroup . GroupTitle $ ttl
+  --     Group { title = ttl, gElms } -> 
+  --       do 
+  --         logItem . StartGroup . GroupTitle $ ttl
+  --         sequence_ $ exeElm runner hi <$> gElms
+  --         logItem . EndGroup . GroupTitle $ ttl
 
 
 

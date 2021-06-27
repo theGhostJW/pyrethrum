@@ -60,7 +60,8 @@ filterSuite suite fltrs rc =
     si :: SuiteItem hi effs [TestFilterResult]
     si = suite testFilter
   in
-    mconcat $ concatTests si
+    uu
+    -- mconcat $ concatTests si
 
 
 

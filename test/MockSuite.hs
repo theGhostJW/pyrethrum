@@ -9,13 +9,20 @@ import Pyrelude.Test hiding (Group)
 import Runner as R
 import RunnerBase (Test)
 import TestFilter
+import DSL.Interpreter (MinEffs)
+import ItemRunners (runItem)
 
 data Include = In | Out deriving (Eq, Ord, Show)
 
 $(deriveJSON defaultOptions ''Include)
 
-newtype RunConfig = RunConfig Include
+data RunConfig = RunConfig
+  { cfgHeader :: Text,
+    inFilter :: Bool
+  }
+  deriving (Eq, Show)
 
+type DemoEffs effs = MinEffs Text effs
 data TestConfig = TestConfig
   { header :: Text,
     address :: TestAddress,
@@ -137,7 +144,7 @@ includeFilter :: TestFilter RunConfig TestConfig
 includeFilter =
   TestFilter
     { title = "test include must match run",
-      predicate = \(RunConfig inc) tc -> include tc == inc
+      predicate = \(RunConfig _ inc) tc -> (include tc == In) == inc
     }
 
 filters' :: [TestFilter RunConfig TestConfig]
@@ -196,7 +203,7 @@ mockSuite r =
 runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs ()
 runParams =
   RunParams
-    { suite = happySuite,
+    { suite = mockSuite,
       filters = filters',
       itemIds = Nothing,
       itemRunner = runItem,

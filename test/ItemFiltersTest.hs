@@ -48,7 +48,7 @@ chkFilter flter expted itms = chkEq (Right $ S.fromList expted) $ filterredItemI
 chkFilter' flter expted itms = chkEq (Right $ S.singleton expted) $ filterredItemIds flter itms
 
 chkSingleton :: (ItemClass item dState) => ItemFilter item -> [item] -> Assertion
-chkSingleton flter itms = either (\_ -> chk False) (chkEq (1 :: Int)) $ lengthFoldable <$> filterredItemIds flter itms
+chkSingleton flter itms = P.either (\_ -> chk False) (chkEq (1 :: Int)) $ lengthFoldable <$> filterredItemIds flter itms
 
 blahh :: IO ()
 blahh = undefined

@@ -26,7 +26,7 @@ statsStepForReducer :: LineNo                                       -- lineNo
 statsStepForReducer _ accum lp = (statsStep accum lp, Nothing)
 
 statsStepFromLogProtocol :: StatsAccum -> LogProtocolOut -> StatsAccum
-statsStepFromLogProtocol (StatsAccum runResults@(RunResults outOfTest itrRslts) stepInfo) lpo@LogProtocolOut{ logIndex, time, logInfo = lp } = 
+statsStepFromLogProtocol (StatsAccum (RunResults outOfTest itrRslts) stepInfo) lpo@LogProtocolOut{ logInfo = lp } = 
   let 
     nxtStepInfo@(LPStep _nxtPhaseValid _nxtFailStage nxtPhase
                     logItemStatus nxtActiveItr nxtCheckEncountered) = logProtocolStep stepInfo lpo
@@ -43,7 +43,7 @@ statsStepFromLogProtocol (StatsAccum runResults@(RunResults outOfTest itrRslts) 
     nxtItrRslts = 
         maybef nxtActiveItr
             itrRslts
-            (\(iid@(ItemId mdule itt), outcome) -> 
+            (\(iid, _) -> 
               let 
                 missingChecksOutcome = IterationOutcome (
                                             isEndIteration lp && not nxtCheckEncountered
@@ -77,7 +77,7 @@ statsStepFromDeserialisationError statsAccum@(StatsAccum (RunResults outOfTest i
     nxtItrRslts :: IterationResults
     nxtItrRslts = maybef activeItr
                     itrRslts
-                    (\(iid, outcome) -> M.insertWith max iid (IterationOutcome Fail (phase stepInfo)) itrRslts)
+                    (\(iid, _) -> M.insertWith max iid (IterationOutcome Fail (phase stepInfo)) itrRslts)
   in 
     statsAccum {
       runResults = RunResults {
@@ -93,10 +93,10 @@ statsStep statsAccum eithLP =
       (statsStepFromDeserialisationError statsAccum)
       (statsStepFromLogProtocol statsAccum)
 
-testExStatus :: IterationResults -> M.Map TestModule ExecutionStatus
+testExStatus :: IterationResults -> M.Map TestAddress ExecutionStatus
 testExStatus ir = executionStatus <$> M.mapKeysWith max tstModule ir
 
-listTestStatus :: RunResults -> M.Map TestModule ExecutionStatus 
+listTestStatus :: RunResults -> M.Map TestAddress ExecutionStatus 
 listTestStatus = testExStatus . iterationResults 
 
 testStatusCounts :: RunResults -> StatusCount
@@ -105,13 +105,13 @@ testStatusCounts = countValues . listTestStatus
 listIterationStatus :: RunResults -> M.Map ItemId ExecutionStatus 
 listIterationStatus runResults = executionStatus <$> iterationResults runResults
 
-itrStatusesGroupedByTest :: RunResults -> M.Map TestModule (M.Map ItemId ExecutionStatus)
+itrStatusesGroupedByTest :: RunResults -> M.Map TestAddress (M.Map ItemId ExecutionStatus)
 itrStatusesGroupedByTest rr = 
   let 
-    step :: M.Map TestModule (M.Map ItemId ExecutionStatus) -> ItemId -> ExecutionStatus -> M.Map TestModule (M.Map ItemId ExecutionStatus) 
+    step :: M.Map TestAddress (M.Map ItemId ExecutionStatus) -> ItemId -> ExecutionStatus -> M.Map TestAddress (M.Map ItemId ExecutionStatus) 
     step accum iid status = 
        let 
-         tstMod :: TestModule
+         tstMod :: TestAddress
          tstMod = tstModule iid
 
          tstMap :: M.Map ItemId ExecutionStatus
@@ -121,7 +121,7 @@ itrStatusesGroupedByTest rr =
   in 
     M.foldlWithKey' step M.empty $ listIterationStatus rr
 
-testIterationStatusCounts :: RunResults -> M.Map TestModule StatusCount
+testIterationStatusCounts :: RunResults -> M.Map TestAddress StatusCount
 testIterationStatusCounts rr = countValues <$> itrStatusesGroupedByTest rr
 
 iterationStatusCounts :: RunResults -> StatusCount

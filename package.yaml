@@ -35,8 +35,9 @@ dependencies:
   - polysemy-plugin
 
 ghc-options:
-  - -fmax-pmcheck-iterations=10000000
+  - -fmax-pmcheck-models=10000000
   - -ferror-spans
+  # - -dth-dec-file -- generate template haskell
 
   - -O0
   # TODO: prgma to turn optimisations on for non-dev build
@@ -57,7 +58,8 @@ ghc-options:
   - -fno-warn-unused-matches
   - -fno-warn-unused-binds
   - -fno-warn-unused-do-bind
-  # -fdefer-type-errors
+  - -fwrite-ide-info
+  # - -fdefer-type-errors
 
 default-extensions:
   - AllowAmbiguousTypes
@@ -108,8 +110,12 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
-library:
-  source-dirs: src
+executable:
+  main: driver.hs
+  source-dirs: 
+    - src
+    - test
+    - testIntegration
   dependencies:
     - deepseq
     - unordered-containers
@@ -117,31 +123,35 @@ library:
     - bytestring
     - mtl
     - fmt
+    # test modules
+    - tasty
+    - tasty-hunit
+    - tasty-hedgehog
+    - tasty-discover
+    - hedgehog
 
-_testDep: &testdependencies
-- tasty
-- tasty-hunit
-- tasty-hedgehog
-- tasty-discover
-- hedgehog
-- pyrethrum
-- bytestring
-- mtl
+#  reinstate when LHS can live load multiple modules
+# use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
+# _testDep: &testdependencies
+# - tasty
+# - tasty-hunit
+# - tasty-hedgehog
+# - tasty-discover
+# - hedgehog
+# - pyrethrum
+# - bytestring
+# - mtl
 
-tests:
-  pyrethrum-test:
-    main:                driver.hs
-    source-dirs:        
-    - test
-    - testDemoProject
-
-    dependencies: *testdependencies
+# tests:
+#   pyrethrum-test:
+#     main:                driver.hs
+#     source-dirs:        
+#     - test
+#     dependencies: *testdependencies
   
-  pyrethrum-test-Integration:
-    main:                driver.hs
-    source-dirs:         
-    - testIntegration
-    - testDemoProject
-    dependencies: 
-      *testdependencies
-    
+#   pyrethrum-test-Integration:
+#     main:                driver.hs
+#     source-dirs:         
+#     - testIntegration
+#     dependencies: 
+#       *testdependencies

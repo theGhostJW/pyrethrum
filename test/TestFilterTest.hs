@@ -1,12 +1,14 @@
 module TestFilterTest where
 
 import Pyrelude         as P
+import Polysemy
 import           Runner as R
-import           Pyrelude.Test
+import           Pyrelude.Test hiding (Group)
 import Data.Yaml
 import Data.Aeson.TH
 import Data.Aeson.Types
 import TestFilter
+import RunnerBase ( Test )
 
 data TestDepth = Connectivity | Regression | DeepRegression deriving (Eq, Ord, Show)
 data Country = Au | NZ deriving (Eq, Ord, Show)
@@ -21,7 +23,7 @@ data RunConfig = RunConfig {
 
 data TestConfig = TestConfig {
   header :: Text,
-  address :: TestModule,
+  address :: TestAddress,
   countries :: [Country],
   level :: TestDepth,
   enabled :: Bool
@@ -35,11 +37,19 @@ instance Titled TestConfig where
 
 $(deriveJSON defaultOptions ''TestConfig)
 
-type TST = GenericTest Int TestConfig RunConfig
+type MockTest i as ds effs = RunnerBase.Test Int TestConfig RunConfig i as ds effs
 
 newtype MyInt = MyInt Int deriving (Show, Generic)
 
+newtype MyText = MyText Text deriving (Show, Generic, ToJSON)
+
 instance ItemClass MyInt MyInt where
+  identifier _ =  -999
+  whenClause _ =  "pre"
+  thenClause _ =  "post"
+  checkList = mempty
+
+instance ItemClass MyText MyText  where
   identifier _ =  -999
   whenClause _ =  "pre"
   thenClause _ =  "post"
@@ -49,97 +59,90 @@ instance ItemClass MyInt MyInt where
 instance ToJSON MyInt where
   toEncoding = genericToEncoding defaultOptions
 
+au :: [Country]
 au = [Au]
+
+nz :: [Country]
 nz = [NZ]
 
-test1 :: TST MyInt MyInt MyInt effs
-test1 = GenericTest {
-              configuration = TestConfig {
+empti :: a -> [b]
+empti = const ([] :: [b])
+
+emptiInteractor :: b -> RunConfig -> a -> Sem effs b
+emptiInteractor b _ _ = pure b
+
+emptiParser:: a -> as -> Sem effs a
+emptiParser a _ = pure a
+
+test1 :: MockTest MyInt Text MyInt effs
+test1 = Test {
+              config = TestConfig {
                 header = "test1",
-                address = TestModule "test1",
+                address = TestAddress "test1",
                 countries = au <> nz,
                 level = Regression,
                 enabled = True
               },
-              components = undefined
+              items = empti,
+              interactor = emptiInteractor "Hello",
+              parse = emptiParser (MyInt 1)
             }
 
-test2 :: TST MyInt MyInt MyInt effs
-test2 = GenericTest {
-              configuration = TestConfig {
+test2 :: MockTest MyInt MyInt MyInt effs
+test2 = Test {
+              config = TestConfig {
                 header = "test2",
-                address = TestModule "test2",
+                address = TestAddress "test2 address",
                 countries = nz,
                 level = Regression,
                 enabled = True
               },
-              components = undefined
+              items = empti,
+              interactor = emptiInteractor (MyInt 1),
+              parse = pure
             }
 
-test3 :: TST MyInt MyInt MyInt effs
-test3 = GenericTest {
-                configuration = TestConfig {
+test3 :: MockTest MyInt MyInt MyInt effs
+test3 = Test {
+                config = TestConfig {
                   header = "test3",
-                  address = TestModule "test3",
+                  address = TestAddress "test3 address",
                   countries = au,
                   level = Connectivity,
                   enabled = True
                 },
-                components = undefined
+              items = empti,
+              interactor = emptiInteractor (MyInt 3),
+              parse = pure
             }
 
-test4 :: TST MyInt MyInt MyInt effs 
-test4 = GenericTest {
-              configuration = TestConfig {
+test4 :: MockTest Text Text Text effs 
+test4 = Test {
+              config = TestConfig {
                   header = "test4",
-                  address = TestModule "test4",
+                  address = TestAddress "test4 address",
                   countries = au,
                   level = DeepRegression,
                   enabled = True
                 },
-              components = undefined
+              items = empti,
+              interactor = emptiInteractor "Hello",
+              parse = pure
             }
 
-test5 :: TST MyInt MyInt MyInt effs
-test5 = GenericTest {
-              configuration = TestConfig {
+test5 :: MockTest MyInt MyInt MyInt effs
+test5 = Test {
+              config = TestConfig {
                   header = "test5",
-                  address = TestModule "test5",
+                  address = TestAddress "test5 address",
                   countries = au,
                   level = DeepRegression,
                   enabled = False
                 },
-              components = undefined
+              items = empti,
+              interactor = emptiInteractor (MyInt 1),
+              parse = pure
             }
-
-runRunner :: forall m m1 effs a.
-                (forall i as ds. (ItemClass i ds, Show i, Show as, Show ds) => GenericTest Int TestConfig RunConfig i as ds effs -> m1 (m a))
-                -> [TestGroup m1 m a effs]
-runRunner f =
-  [
-
-   TestGroup {
-          header = "Group 1",
-          rollover = doNothing,
-          goHome = doNothing,
-          tests = [
-              f test1,
-              f test2,
-              f test3
-            ]
-     },
-
-    TestGroup {
-          header = "Group 2",
-          rollover = doNothing,
-          goHome = doNothing,
-          tests = [
-              f test4,
-              f test5
-            ]
-     }
-
-    ]
 
 
 enabledFilter :: TestFilter RunConfig TestConfig
@@ -163,24 +166,61 @@ levelFilter = TestFilter {
 filters' :: [TestFilter RunConfig TestConfig]
 filters' = [enabledFilter, countryFilter, levelFilter]
 
-filterList :: RunConfig -> [FilterResult]
-filterList rc = filterLog $ filterGroups runRunner filters' rc
 
-runFilters :: RunConfig -> [Text]
-runFilters rc = testTitle . testInfo <$> P.filter acceptFilter (filterList rc)
+mockSuite :: forall effs a. (forall i as ds. (Show i, Show as, Show ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
+mockSuite r = 
+  R.Group "Filter Suite" [
+    Hook 
+      "Before All" 
+      BeforeAll 
+      (pure ()) [
+      Tests [
+        r test1,
+        r test2,
+        r test3
+      ]
+    ],
+
+    R.Group "Sub Group" [
+      Tests [
+        r test4,
+        r test5
+      ]
+    ],
+
+    R.Group "Empty Group" [
+      Tests []
+    ]
+      
+  ]
+
+
+filterResults :: RunConfig -> [TestFilterResult]
+filterResults = filterSuite mockSuite filters'
+
+acceptedTests :: RunConfig -> [TestFilterResult]
+acceptedTests rc = P.filter acceptFilter $ filterResults rc
 
 chkFilters :: [Text] -> RunConfig -> Assertion
-chkFilters expted rc = chkEq expted $ runFilters rc
+chkFilters expted rc = chkEq expted $ testTitle . testInfo <$> acceptedTests rc
 
+unit_test_filter_expect_empty :: Assertion
 unit_test_filter_expect_empty = chkFilters [] $ RunConfig NZ Connectivity
+
+unit_test_filter_country :: Assertion
 unit_test_filter_country = chkFilters ["test1", "test3"] $ RunConfig Au Regression
+
+unit_test_filter_country_nz :: Assertion
 unit_test_filter_country_nz = chkFilters ["test1", "test2"] $ RunConfig NZ Regression
-unit_test_filter_country2 = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
+
+unit_test_filter_country_au_deep_regression :: Assertion
+unit_test_filter_country_au_deep_regression = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
 
 
 filtersExcludeReasons :: RunConfig -> [Text]
-filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> P.filter rejectFilter (filterList rc)
+filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> P.filter rejectFilter (filterResults rc)
 
+unit_test_filter_exclude_reasons :: Assertion
 unit_test_filter_exclude_reasons = chkEq [
                                           "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
                                           "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",

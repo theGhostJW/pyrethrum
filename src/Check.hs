@@ -16,7 +16,6 @@ module Check (
               CheckReportList,
               CheckReport(..),
               CheckResult(..),
-              MessageInfo(..),
               CheckResultClassification(..)
               ) where
 
@@ -26,6 +25,7 @@ import Data.Function
 import Data.Aeson.Types as AT hiding (Error) 
 import Data.Aeson.TH
 import qualified Data.List as L
+import Common (DetailedInfo(DetailedInfo))
 
 -- generate a check from a predicate
 chk :: Text -> (v -> Bool) -> DList (Check v)
@@ -65,7 +65,7 @@ prdCheck prd hdr msgf = Check {
 applyToFirst :: (Check ds -> Check ds) -> DList (Check ds) -> DList (Check ds)
 applyToFirst f = \case
                     Nil -> D.empty
-                    Cons x xs -> D.cons (f x) $ fromList xs
+                    Cons x xs -> D.cons (f x) $ D.fromList xs
                     _ -> error "DList case failure - should not happen"
 
 gate :: forall ds. DList (Check ds) -> DList (Check ds)
@@ -85,12 +85,6 @@ expectFailureFixed = expectFailurePriv Inactive
 
 type CheckReportList = DList CheckReport
 type CheckDList a = DList (Check a)
-
-data MessageInfo = MessageInfo {
-                                  message :: Text,
-                                  additionalInfo :: Maybe Text
-                                }
-                                deriving (Show, Eq)
 
 data CheckResult = Pass |
                    Fail |
@@ -155,7 +149,7 @@ data GateStatus = GateCheck
 
 data CheckReport = CheckReport {
     result :: CheckResult,
-    info :: MessageInfo
+    info :: DetailedInfo
   }
   deriving (Show, Eq)
 
@@ -188,7 +182,7 @@ skipChecks :: DList (Check ds) -> DList CheckReport
 skipChecks chks = 
   let 
     skippedResult :: Check ds -> CheckReport
-    skippedResult (Check headr _ _ _ _)  = CheckReport Skip $ MessageInfo headr $ Just "Validation checks not executed"
+    skippedResult (Check headr _ _ _ _)  = CheckReport Skip $ DetailedInfo headr "Validation checks not executed"
   in 
     reverseDList $ skippedResult <$> chks 
 
@@ -218,7 +212,7 @@ calcChecks ds chkLst =
                               ExpectFailure Inactive msg -> (isGate ? GateRegression $ Regression) msg
                         )
       in 
-        CheckReport rslt $ MessageInfo header (msgFunc ds)
+        CheckReport rslt $ DetailedInfo header (fromMaybe "" $ msgFunc ds)
 
     foldfunc :: (Bool, DList CheckReport) -> Check ds -> (Bool, DList CheckReport)
     foldfunc (wantSkip, lstCr) ck = let
@@ -229,7 +223,6 @@ calcChecks ds chkLst =
     in
       reverseDList . snd $ L.foldl' foldfunc (False, mempty) chkLst
 
-$(deriveJSON defaultOptions ''MessageInfo)
 $(deriveJSON defaultOptions ''CheckResult)
 $(deriveJSON defaultOptions ''CheckReport)
 $(deriveJSON defaultOptions ''ResultExpectation)

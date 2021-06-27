@@ -8,28 +8,11 @@ import RunElementClasses
 import Common 
 import Data.Aeson as A
 
-hdr :: Text -> Text -> Text
-hdr l h = l <> " " <> h <> " " <> l
-
 newLn :: Text
 newLn = "\n"
 
 indent2 :: Text -> Text
 indent2 = indentText 2 
-
-subHeader = hdr "----"
-header = hdr "===="
-tstHeader = hdr "==="
-itrHeader = hdr "=="
-
-groupHeader :: GroupTitle -> Text
-groupHeader = groupTitle "Group"
-
-groupFooter :: GroupTitle -> Text
-groupFooter = groupTitle "End Group"
-
-groupTitle :: Text -> GroupTitle -> Text
-groupTitle hdr' gt = header $ hdr' <> " - " <> unGroupTitle gt
 
 ppAsYaml :: ToJSON a => a -> Text
 ppAsYaml = indent2 . ppAeson . toJSON
@@ -37,31 +20,18 @@ ppAsYaml = indent2 . ppAeson . toJSON
 ppAeson:: Y.Value -> Text
 ppAeson val = toS ((getLenient . toS . Y.encode $ val) :: Text)
 
-prettyPrintFilterItem :: FilterResult -> Text
-prettyPrintFilterItem FilterResult{..} =
-    let
-      description :: Text
-      description = toString (testModAddress testInfo) <> " - " <> testTitle testInfo
-    in
-      maybef reasonForRejection
-        ("accepted: " <> description)
-        (\reason -> "rejected: " <> description <> " - Reason: " <> reason)
+prettyPrintFilterItem :: TestFilterResult -> Text
+prettyPrintFilterItem TestFilterResult{..} =
+  let
+    description :: Text
+    description = toString (testModAddress testInfo) <> " - " <> testTitle testInfo
+  in
+    maybef reasonForRejection
+      ("accepted: " <> description)
+      (\reason -> "rejected: " <> description <> " - Reason: " <> reason)
 
-ppAesonBlock:: Y.Value -> Text
-ppAesonBlock = indent2 . ppAeson
-
-ppStartRun :: RunTitle -> Y.Value -> Text
-ppStartRun ttle rc = majorHeader (unRunTitle ttle) <> 
-                      newLn <> newLn <> "Run Config:" <>
-                      newLn <> ppAesonBlock rc
-
-ppFilterLog :: [FilterResult] -> Text
-ppFilterLog fltrInfos = newLn <> header "Filter Log" <> newLn <>
-                        foldl' (\acc fi -> acc <> fi <> newLn) "" (prettyPrintFilterItem <$> fltrInfos)
-
-
-headerLine :: Int -> Bool -> Char -> Text -> Text
-headerLine len wantPrcntChar padChr hdrTxt = 
+headerLine ::  Bool -> Int -> Bool -> Char -> Text -> Text
+headerLine isOutline len wantPrcntChar padChr hdrTxt = 
   let 
     padTxt = P.singleton padChr
     txtLen = length hdrTxt + 2
@@ -74,8 +44,8 @@ headerLine len wantPrcntChar padChr hdrTxt =
   in 
     pfx <> " " <> hdrTxt <> " " <> replicateText sfxLen padTxt
 
-fullHeader :: Char -> Bool -> Text -> Text
-fullHeader padChr wantPrcntChar hdrTxt = 
+fullHeader :: Bool -> Char -> Bool -> Text -> Text
+fullHeader isOutline padChr wantPrcntChar hdrTxt =
   let 
     headerCharWidth :: Int
     headerCharWidth = max 80 $ length hdrTxt + 4
@@ -83,10 +53,18 @@ fullHeader padChr wantPrcntChar hdrTxt =
     line :: Text
     line = "#" <> replicateText (headerCharWidth - 1) (P.singleton padChr) <> newLn
   in
-    line <> headerLine headerCharWidth wantPrcntChar padChr hdrTxt <> newLn <> line
+    isOutline ? 
+      hdrTxt $
+      line <> headerLine isOutline headerCharWidth wantPrcntChar padChr hdrTxt <> newLn <> line
 
-majorHeader = fullHeader '#' False
-iterationHeader = fullHeader '-' True
+majorHeader :: Bool -> Text -> Text
+majorHeader isOutline = fullHeader isOutline '#' False
+
+iterationHeader :: Bool -> Text -> Text
+iterationHeader isOutline = fullHeader isOutline '-' True
+
+ppAesonBlock:: Y.Value -> Text
+ppAesonBlock = indent2 . ppAeson
 
 data Justification = LeftJustify | RightJustify | None
 

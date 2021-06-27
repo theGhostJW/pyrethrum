@@ -1,13 +1,12 @@
-
 module DSL.Logger where
 
 import Common as C
 import  DSL.LogProtocol as LP
 import  DSL.CurrentTime as CT
 import DSL.LogProtocol.PrettyPrint
-import           Data.DList
+import           Data.DList as D
 import           Pyrelude as P
-import           Pyrelude.IO hiding (now)
+import           Pyrelude.IO as PIO hiding (now)
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
 import System.IO (stdout)
@@ -31,35 +30,34 @@ data Logger e m a where
 
 makeSem ''Logger
 
-logDocAction :: (Show e, A.ToJSON e) => Member (Logger e) effs => Text -> Sem effs ()
-logDocAction = logItem . IterationLog . Doc . DocAction . ActionInfo
-
 detailLog :: forall effs e. (Show e, A.ToJSON e, Member (Logger e) effs) => (DetailedInfo -> LogProtocolBase e) -> Text -> Text -> Sem effs ()
 detailLog lpCons msg additionalInfo = logItem . lpCons $ DetailedInfo msg additionalInfo
 
 log :: forall effs e. Member (Logger e) effs => Text -> Sem effs ()
 log = logMessage
 
-log' :: forall effs e. (Show e, A.ToJSON e, Member (Logger e) effs) => Text -> Text -> Sem effs ()
-log' = detailLog (logRun . Message')
+logAction ::(Show e, A.ToJSON e, Member (Logger e) effs) => Text -> Sem effs ()
+logAction = logItem . IOAction
 
--- TODO - phantom types ? 
+log' :: forall effs e. (Show e, A.ToJSON e, Member (Logger e) effs) => Text -> Text -> Sem effs ()
+log' = detailLog Message'
+
 logRunConsoleInterpreter :: forall effs a e. (Show e, Members '[CurrentTime, Embed IO] effs) => Sem (Logger e ': effs) a -> Sem effs a
 logRunConsoleInterpreter = 
     interpret $ \lg -> embed $ case lg of
                           LogItem lp -> P.print lp
-                          LogError msg -> P.print . logRun . LP.Error $ C.Error msg 
-                          LogError' msg info -> P.print . logRun . LP.Error . Error' $ DetailedInfo msg info
+                          LogError msg -> P.print . LP.Error $ C.Error msg 
+                          LogError' msg info -> P.print . LP.Error . Error' $ DetailedInfo msg info
                           
-                          LogMessage s ->  P.print . logRun $ Message s 
-                          LogMessage' msg info -> P.print . logRun . Message' $ DetailedInfo msg info
+                          LogMessage s ->  P.print $ Message s 
+                          LogMessage' msg info -> P.print . Message' $ DetailedInfo msg info
         
-                          LogWarning s -> P.print. logRun $ Warning s 
-                          LogWarning' msg info -> P.print . logRun . Warning' $ DetailedInfo msg info
+                          LogWarning s -> P.print $ Warning s 
+                          LogWarning' msg info -> P.print . Warning' $ DetailedInfo msg info
 
 -- ToDo move to lib
 putLines :: Handle -> Text -> IO ()
-putLines hOut tx = sequence_ $ hPutStrLn hOut <$> lines tx
+putLines hOut tx = sequence_ $ PIO.hPutStrLn hOut <$> lines tx
 
 utfEncode :: A.ToJSON a => a -> Text
 utfEncode a = either 
@@ -69,16 +67,16 @@ utfEncode a = either
 
 -- TODO - update to use info
 logStrJSONWith :: A.ToJSON e => ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
-logStrJSONWith thrdInfo lgIdx time lp = utfEncode $  LogProtocolOut {
-    logIndex = LogEventInfo {
-                              rnId = runId thrdInfo, 
-                              threadIdx = threadIndex thrdInfo,
-                              time = time,
-                              idx = lgIdx
-                            },
-    time = time,
-    logInfo = utfEncode <$> lp
-  }
+logStrJSONWith thrdInfo lgIdx time lp = 
+  utfEncode LogProtocolOut {
+                        logIndex = LogEventInfo {
+                          rnId = runId thrdInfo, 
+                          threadIdx = threadIndex thrdInfo,
+                          time = time,
+                          idx = lgIdx
+                        },
+                        logInfo = utfEncode <$> lp
+                      }
                 
 runThreadInfoReader :: Member CurrentTime r => Sem (Reader ThreadInfo ': r) a -> Sem r a 
 runThreadInfoReader sem = do 
@@ -86,32 +84,29 @@ runThreadInfoReader sem = do
                             runReader (ThreadInfo "local" 1 tz) sem
 
 logConsolePrettyInterpreter :: (Show e, Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs) => Sem (Logger e ': effs) a -> Sem effs a
-logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocolWith False, stdout)]
+logConsolePrettyInterpreter = logToHandles [(prettyPrintLogProtocolWith Run, stdout)]
 
 incIdx :: LogIndex -> LogIndex
 incIdx (LogIndex i) = LogIndex $ i + 1
 
-logRunWithSink :: forall effs a e. (Show e, A.ToJSON e) => ((Show e, A.ToJSON e) => LogProtocolBase e -> Sem effs ()) -> Sem (Logger e ': effs) a -> Sem effs a
-logRunWithSink pushItem = 
-  let
-    pushRun :: RunProtocol e -> Sem effs () 
-    pushRun = pushItem . logRun
-  in
+-- TODO: looks like output
+logWithSink :: forall effs a e. (Show e, A.ToJSON e) => ((Show e, A.ToJSON e) => LogProtocolBase e -> Sem effs ()) -> Sem (Logger e ': effs) a -> Sem effs a
+logWithSink push = 
     interpret $ \case 
-                  LogItem lp -> pushItem lp
+                  LogItem lp -> push lp
 
-                  LogError msg -> pushRun . LP.Error $ C.Error msg
-                  LogError' msg inf -> pushRun . LP.Error . C.Error' $ DetailedInfo msg inf
+                  LogError msg -> push . LP.Error $ C.Error msg
+                  LogError' msg inf -> push . LP.Error . C.Error' $ DetailedInfo msg inf
 
-                  LogMessage s -> pushRun $ Message s 
-                  LogMessage' msg info -> pushRun . Message' $ DetailedInfo msg info
+                  LogMessage s -> push $ Message s 
+                  LogMessage' msg info -> push . Message' $ DetailedInfo msg info
 
-                  LogWarning s -> pushRun $ Warning s 
-                  LogWarning' msg info ->  pushRun . Warning' $ DetailedInfo msg info
+                  LogWarning s -> push $ Warning s 
+                  LogWarning' msg info ->  push . Warning' $ DetailedInfo msg info
 
 -- can produce a list of LogProtocols - used for testing
 logRunRawInterpreter :: forall effs a e. (Show e, A.ToJSON e, Member (Output (LogProtocolBase e)) effs) => Sem (Logger e ': effs) a -> Sem effs a
-logRunRawInterpreter = logRunWithSink output
+logRunRawInterpreter = logWithSink output
 
 logToHandles :: forall effs e a. Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => [(ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text, Handle)] -> Sem (Logger e ': effs) a -> Sem effs a
 logToHandles convertersHandles = 
@@ -133,47 +128,29 @@ logToHandles convertersHandles =
                     
                         logLogProtocol :: LogProtocolBase e -> IO ()
                         logLogProtocol lp =  P.sequence_ $ logToh lp <$> simpleConvertersHandles
-                    
-                        logRunToHandles :: RunProtocol e -> IO ()
-                        logRunToHandles = logLogProtocol . logRun 
-                      
+                                         
                         logToIO :: Logger e m x -> IO x
                         logToIO = \case 
                                     LogItem lp -> logLogProtocol lp
 
-                                    LogError msg -> logRunToHandles . LP.Error $ C.Error msg
-                                    LogError' msg info -> logRunToHandles . LP.Error . C.Error' $ DetailedInfo msg info
+                                    LogError msg -> logLogProtocol . LP.Error $ C.Error msg
+                                    LogError' msg info -> logLogProtocol . LP.Error . C.Error' $ DetailedInfo msg info
 
-                                    LogMessage s ->  logRunToHandles $ Message s 
-                                    LogMessage' msg info -> logRunToHandles . Message' $ DetailedInfo msg info
+                                    LogMessage s ->  logLogProtocol $ Message s 
+                                    LogMessage' msg info -> logLogProtocol . Message' $ DetailedInfo msg info
 
-                                    LogWarning s -> logRunToHandles $ Warning s 
-                                    LogWarning' msg info ->  logRunToHandles . Warning' $ DetailedInfo msg info
+                                    LogWarning s -> logLogProtocol $ Warning s 
+                                    LogWarning' msg info ->  logLogProtocol . Warning' $ DetailedInfo msg info
 
                       embed $ logToIO lg
 
 
-logDocWithSink :: forall effs a e. (LogProtocolBase e -> Sem effs ()) -> Sem (Logger e ': effs) a -> Sem effs a
-logDocWithSink pushItem = 
-  let
-    pushDoc :: DocProtocol e -> Sem effs () 
-    pushDoc = pushItem . logDoc
-  in
-    interpret $ \case 
-                  LogItem lp -> pushItem lp
+-- used for testing ~ cons to a list (so log is in reverse order)
+consListLog :: forall effs a e. (Show e, Member (Output (LogProtocolBase e)) effs, A.ToJSON e) => Sem (Logger e ': effs) a -> Sem effs a
+consListLog = logWithSink output
 
-                  LogError msg -> pushDoc. DocError $ C.Error msg
-                  LogError' msg inf -> pushDoc . DocError . C.Error' $ DetailedInfo msg inf
-
-                  LogMessage s ->  pushDoc $ DocMessage s 
-                  LogMessage' msg info -> pushDoc . DocMessage' $ DetailedInfo msg info
-
-                  LogWarning s -> pushDoc $ DocWarning s 
-                  LogWarning' msg info ->  pushDoc . DocWarning' $ DetailedInfo msg info
-
-
-logDocInterpreter :: forall effs a e. (Show e, Member OutputDListText effs) => Sem (Logger e ': effs) a -> Sem effs a
-logDocInterpreter = logDocWithSink (output . dList)
+logDocInterpreter :: forall effs a e. (Show e, Member OutputDListText effs, A.ToJSON e) => Sem (Logger e ': effs) a -> Sem effs a
+logDocInterpreter = logWithSink (output . dList)
                                                      
-logDocPrettyInterpreter :: forall effs a e. (Show e, Member OutputDListText effs) => Sem (Logger e ': effs) a -> Sem effs a
-logDocPrettyInterpreter = logDocWithSink (output . fromList . lines . prettyPrintLogProtocol True)
+logDocPrettyInterpreter :: forall effs a e. (Show e, Member OutputDListText effs, A.ToJSON e) => Sem (Logger e ': effs) a -> Sem effs a
+logDocPrettyInterpreter = logWithSink (output . D.fromList . lines . prettyPrintLogProtocol Doc)

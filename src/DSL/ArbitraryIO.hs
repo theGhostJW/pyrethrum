@@ -16,7 +16,7 @@ data ArbitraryIO m a where
 makeSem ''ArbitraryIO
 
 arbitraryIODocInterpreter :: forall effs a e. (Show e, A.ToJSON e, Member (Logger e) effs) => Sem (ArbitraryIO ': effs) a -> Sem effs a
-arbitraryIODocInterpreter = interpret $ \(ArbitraryIO msg def _) -> logItem (IterationLog . Doc $ DocIOAction msg) $> def
+arbitraryIODocInterpreter = interpret $ \(ArbitraryIO msg def _) -> logItem (IOAction msg) $> def
 
 arbitraryIOInterpreter :: forall effs a e. (Show e, A.ToJSON e, Members '[Error (FrameworkError e), Logger e, Embed IO] effs) => Sem (ArbitraryIO ': effs) a -> Sem effs a
 arbitraryIOInterpreter =
@@ -28,5 +28,5 @@ arbitraryIOInterpreter =
                                   Left (e :: IOException) -> PE.throw (IOError' ("Exception raised when executing arbitrary IO action with message: " <> msg) e)
                                   Right f -> pure f
   in
-    interpret $ \(ArbitraryIO msg _ actn) -> logItem (IterationLog . Run $ IOAction msg) *> handleException msg actn
+    interpret $ \(ArbitraryIO msg _ actn) -> logItem (IOAction msg) *> handleException msg actn
 

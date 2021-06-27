@@ -4,7 +4,7 @@ module LogTransformation.Test where
 -- import qualified RunElementClasses as RC
 -- import LogTransformation.Common
 -- import LogTransformation.Iteration as I
--- import RunElementClasses (FilterResult, unTestModule)
+-- import RunElementClasses (TestFilterResult, unTestAddress)
 -- import Check as CK
 -- import Pyrelude as P hiding (fail)
 -- import Pyrelude.IO
@@ -58,7 +58,7 @@ module LogTransformation.Test where
 --                                             I.EndGroup gt -> Nothing
 --                                             I.StartTest (RC.TestDisplayInfo address title config) -> Just $ emptyRecord {
 --                                                                                                               title = title,
---                                                                                                               address = RC.unTestModule address,
+--                                                                                                               address = RC.unTestAddress address,
 --                                                                                                               config = config
 --                                                                                                             } 
 --                                             I.EndTest tm -> Nothing
@@ -174,7 +174,7 @@ module LogTransformation.Test where
 --     nxtAccum = TestAccum {
 --                  runInfo = nxtStats,
 --                  currentRec = nxtRec,
---                  testGroup = nxtGroup
+--                  SuiteItem = nxtGroup
 --                }
 
 --     nextResultItem :: Either LogTransformError (Maybe [TestLogElement])
@@ -254,7 +254,7 @@ module LogTransformation.Test where
 
 -- data TestLogElement = 
 --             Test TestRecord |
---             FilterLog [FilterResult] |
+--             FilterLog [TestFilterResult] |
 
 --             StartRun RunTitle A.Value | 
 --             EndRun TestStats |
@@ -269,7 +269,7 @@ module LogTransformation.Test where
 -- data TestAccum = TestAccum {
 --   runInfo :: TestStats,
 --   currentRec :: Maybe TestRecord,
---   testGroup :: Maybe Text
+--   SuiteItem :: Maybe Text
 -- }
 
 -- emptyTestAccum :: TestAccum
@@ -287,7 +287,7 @@ module LogTransformation.Test where
 -- ppIteration (IterationRecord summary validation otherErrorsDesc otherWarningsDesc item apState domainState rawLog) = 
 --   let 
 --     ItemId md i = iid summary
---     headr = PC.header $ unTestModule md <> " / " <> txt i <> " - " <> txt (I.status summary)
+--     headr = PC.header $ unTestAddress md <> " / " <> txt i <> " - " <> txt (I.status summary)
 --   in 
 --     headr <> newLn <>
 --     "when: " <> unWhenClause (pre summary) <> newLn <>
@@ -306,7 +306,7 @@ module LogTransformation.Test where
 --   otherWarningsDesc :: [IterationWarning],
 --   item :: Maybe ItemInfo,
 --   apState :: Maybe ApStateInfo,
---   domainState :: Maybe PrepStateInfo,
+--   domainState :: Maybe ParserStatus,
 --   rawLog :: DList LogProtocolBase
 -- } deriving (Eq, Show)
 -- -}

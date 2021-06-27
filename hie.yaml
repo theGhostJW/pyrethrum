@@ -1,0 +1,469 @@
+cradle:
+  stack:
+    - path: "./src/driver.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/driver.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/driver.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/AuxFiles.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/Check.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/Common.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/Config.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/DSL.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/DSL/ArbitraryIO.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/DSL/CurrentTime.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/DSL/CurrentTimeDocLogger.hs"   
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/DSL/FileSystem.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/DSL/Interpreter.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/DSL/Logger.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/DSL/LogProtocol.hs"
+      component: "pyrethrum:exe:pyrethrum"        
+
+    - path: "./src/DSL/LogProtocol/PrettyPrint.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/FileLogging.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/ItemFilter.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/ItemRunners.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/LogTransformation.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/LogTransformation/Common.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/LogTransformation/PrintLogDisplayElement.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/LogTransformation/Stats.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/LogTransformation/Test.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/MemberReflection.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/OrphanedInstances.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/PrettyPrintCommon.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/RunElementClasses.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/Runner.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/RunnerBase.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/RunnerConsoleAndFile.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/RunPlan.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/TempUtils.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/TestFilter.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/TestFilters.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/ArbitraryIOTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/AuxFilesTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/CheckTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/DemoConfig.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/EndpointTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/ItemFiltersTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/LogListCheck.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/LogProtocolTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/LogTransformationTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/MockSuite.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/PrettyPrintTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/RunnerTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/SemTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/SuiteValidationTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/TestFilterTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/EndToEndSanityTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/LogTransformationIntegrationTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/RunnerRestartGoHomeIOTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/Paths_pyrethrum.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/AuxFiles.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/Check.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/Common.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/Config.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/DSL.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/DSL/ArbitraryIO.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/DSL/CurrentTime.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/DSL/CurrentTimeDocLogger.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/DSL/FileSystem.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/DSL/Interpreter.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/DSL/Logger.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/DSL/LogProtocol.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/DSL/LogProtocol/PrettyPrint.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/FileLogging.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/ItemFilter.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/ItemRunners.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/LogTransformation.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/LogTransformation/Common.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/LogTransformation/PrintLogDisplayElement.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/LogTransformation/Stats.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/LogTransformation/Test.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/MemberReflection.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/OrphanedInstances.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/PrettyPrintCommon.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/RunElementClasses.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/Runner.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/RunnerBase.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/RunnerConsoleAndFile.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/RunPlan.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/TempUtils.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/TestFilter.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/TestFilters.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/ArbitraryIOTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/AuxFilesTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/CheckTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/DemoConfig.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/EndpointTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/ItemFiltersTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/LogListCheck.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/LogProtocolTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/LogTransformationTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/MockSuite.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/PrettyPrintTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/RunnerTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/SemTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/SuiteValidationTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/TestFilterTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/EndToEndSanityTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/LogTransformationIntegrationTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/RunnerRestartGoHomeIOTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./test/Paths_pyrethrum.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/AuxFiles.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/Check.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/Common.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/Config.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/DSL.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/DSL/ArbitraryIO.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/DSL/CurrentTime.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/DSL/CurrentTimeDocLogger.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/DSL/FileSystem.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/DSL/Interpreter.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/DSL/Logger.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/DSL/LogProtocol.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/DSL/LogProtocol/PrettyPrint.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/FileLogging.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/ItemFilter.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/ItemRunners.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/LogTransformation.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/LogTransformation/Common.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/LogTransformation/PrintLogDisplayElement.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/LogTransformation/Stats.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/LogTransformation/Test.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/MemberReflection.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/OrphanedInstances.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/PrettyPrintCommon.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/RunElementClasses.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/Runner.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/RunnerBase.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/RunnerConsoleAndFile.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/RunPlan.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/TempUtils.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/TestFilter.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/TestFilters.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/ArbitraryIOTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/AuxFilesTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/CheckTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/DemoConfig.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/EndpointTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/ItemFiltersTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/LogListCheck.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/LogProtocolTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/LogTransformationTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/MockSuite.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/PrettyPrintTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/RunnerTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/SemTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/SuiteValidationTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/TestFilterTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/EndToEndSanityTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/LogTransformationIntegrationTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/RunnerRestartGoHomeIOTest.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/Paths_pyrethrum.hs"
+      component: "pyrethrum:exe:pyrethrum"

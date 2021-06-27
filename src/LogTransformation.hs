@@ -14,7 +14,6 @@ import Control.Monad.Writer.Strict
 import Control.Monad.State.Strict
 import PrettyPrintCommon as PC
 import LogTransformation.PrintLogDisplayElement
-import Data.Aeson
 
 -- TODO: update to use streaming library such as streamly
 
@@ -119,7 +118,7 @@ prettyPrintLogprotocolReducer :: forall e. (Show e) => LineNo                 --
           -> ()                                         -- accum
           -> Either DeserialisationError (LogProtocolBase e)    -- Logprotocol
           -> ((), Maybe [Text])                         -- (newAccum, err / result)
-prettyPrintLogprotocolReducer _ _ ethLp = ((), Just [either txtPretty (prettyPrintLogProtocol False) ethLp])
+prettyPrintLogprotocolReducer _ _ ethLp = ((), Just [either txtPretty (prettyPrintLogProtocol Run) ethLp])
 
 
 ---------------------------------------------------------
@@ -133,7 +132,7 @@ prettyPrintTestRun rr srcJsonIniPath = transformToFile
                                           (toS . prettyPrintDisplayElement)
                                           emptyIterationAccum
                                           srcJsonIniPath
-                                          $ replaceExtension ".yaml" >=> addExtension ".full" 
+                                          $ replaceExtension ".full" >=> addExtension ".yaml" 
 
 fileStats :: AbsFile -> IO (Either LogTransformError RunResults)
 fileStats srcJsonIniPath = 

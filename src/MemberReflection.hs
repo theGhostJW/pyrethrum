@@ -3,19 +3,18 @@
 
 module MemberReflection where
 
-import Pyrelude
+import Pyrelude hiding (Item)
 import Polysemy
 import Polysemy.Internal.CustomErrors
-import           DSL.Ensure
 import           DSL.ArbitraryIO
 import           DSL.Logger
-import           Runner
+import           Runner  as R hiding (interactor, parse)
 import           Data.Aeson.TH
 import           Data.Set as S
 import Type.Reflection as R
 import Check
+import DSL.Interpreter (Failure)
 
-type EnsureType = DefiningModule Ensure
 
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -51,7 +50,7 @@ nzOnly = S.singleton NZ
 
 data TestConfig = TestConfig {
   header       :: Text,
-  address      :: TestModule,
+  address      :: TestAddress,
   environments :: Set Environment,
   countries    :: Set Country,
   minDepth     :: Depth,
@@ -62,7 +61,7 @@ data SuiteError = MyError1 |
                   MyError2 
                   deriving (Show, Typeable)
 
-type Test = GenericTest SuiteError TestConfig RunConfig
+type Test = R.Test SuiteError TestConfig RunConfig
 type TestResult = GenericResult TestConfig
 
 instance Titled TestConfig where
@@ -74,7 +73,7 @@ instance TestConfigClass TestConfig where
 testConfig :: TestConfig
 testConfig = TestConfig {
   header    = "Configuration Error ~ No Title Assigned",
-  address = TestModule "Configuration Error ~ No Address Assigned",
+  address = TestAddress "Configuration Error ~ No Address Assigned",
   environments = allNonProdEnvironments,
   countries    = auOnly,
   minDepth     = DeepRegression,
@@ -86,7 +85,7 @@ testConfig = TestConfig {
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-type Effects e = '[Logger e , Ensure, ArbitraryIO]
+type Effects e = '[Logger e , ArbitraryIO]
 
 data ApState = ApState {
   itemId   :: Int,
@@ -100,10 +99,10 @@ newtype DState = V {
                   } deriving Show
 
 interactor :: forall e effs. Members (Effects e) effs => RunConfig -> Item -> Sem effs ApState
-interactor RunConfig{..} Item{..} = uu
+interactor RunConfig{} Item{} = uu
 
-prepState :: forall e effs. (Ensurable e) effs => Item -> ApState -> Sem effs DState
-prepState _i ApState{..} = uu
+parse :: forall e effs. Member (Failure e) effs => ApState -> Sem effs DState
+parse = uu
 
 data Item = Item {
   iid    :: Int,
@@ -114,20 +113,16 @@ data Item = Item {
 } deriving (Show, Generic)
 
 items :: RunConfig -> [Item]
-items rc = []
+items _ = []
   
-nameOfModule :: TestModule
-nameOfModule = mkTestModule ''ApState
+nameOfModule :: TestAddress
+nameOfModule = mkTestAddress ''ApState
 
-test :: forall effs. Members (Effects SuiteError) effs => Test Item ApState DState effs
-test = GenericTest {
-              configuration = MemberReflection.testConfig {address = nameOfModule},
-              components = TestComponents {
-                                testItems = items,
-                                testInteractor = interactor,
-                                testPrepState = prepState
-                            }
-            }
+test :: forall effs. Members (Effects SuiteError) effs => MemberReflection.Test Item ApState DState effs
+test = Test MemberReflection.testConfig {address = nameOfModule}
+              MemberReflection.items
+              MemberReflection.interactor
+              MemberReflection.parse
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Reflection %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -153,7 +148,7 @@ showEffs :: forall es0 es1 a. ShowTypes es0 => MembersFuncWrapper es0 es1 a -> [
 showEffs _ = removeKindSuffix <$> showTypes @es0
 
 demo :: [Text]
-demo = showEffs (WrappedTest test :: MembersFuncWrapper (Effects SuiteError) effs (Test Item ApState DState effs))
+demo = showEffs (WrappedTest test :: MembersFuncWrapper (Effects SuiteError) effs (MemberReflection.Test Item ApState DState effs))
 
 newtype InteractorFuncWrapper memberEffs allEffs a = WrappedInteractor (Members memberEffs allEffs => RunConfig -> Item -> Sem allEffs ApState)
 
@@ -161,7 +156,7 @@ showInteractorEffs :: forall es0 es1 a. ShowTypes es0 => InteractorFuncWrapper e
 showInteractorEffs _ = showTypes @es0
 
 demo2 :: [Text]
-demo2 = removeKindSuffix <$> showInteractorEffs (WrappedInteractor interactor :: InteractorFuncWrapper (Effects SuiteError) effs (RunConfig -> Item -> Sem effs ApState))
+demo2 = removeKindSuffix <$> showInteractorEffs (WrappedInteractor MemberReflection.interactor :: InteractorFuncWrapper (Effects SuiteError) effs (RunConfig -> Item -> Sem effs ApState))
 
 
 $(deriveJSON defaultOptions ''TestConfig)

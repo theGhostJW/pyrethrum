@@ -193,4 +193,17 @@ mockSuite r =
         }
     ]
 
+runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs ()
+runParams =
+  RunParams
+    { suite = happySuite,
+      filters = filters',
+      itemIds = Nothing,
+      itemRunner = runItem,
+      rc = RunConfig "Happy Suite" True
+    }
+
+happyRun :: forall effs. DemoEffs effs => Sem effs ()
+happyRun = mkSem runParams
+
 -- unit_test_filter_expect_empty

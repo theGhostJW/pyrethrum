@@ -39,7 +39,7 @@ import Pyrelude as P
       Show,
       Applicative(pure, (*>)),
       Semigroup((<>)),
-      Bool(True),
+      Bool(True, False),
       Int,
       Maybe(..),
       Either(..),
@@ -57,12 +57,12 @@ import Pyrelude as P
       uu,
       toS,
       (?),
-      Listy(..), 
-      Traversable (sequenceA), 
-      fold, 
-      (>>), 
-      debug, 
-      void )
+      Listy(..),
+      Traversable (sequenceA),
+      fold,
+      (>>),
+      debug,
+      void, not, const )
 import Polysemy ( Sem, Member )
 import Polysemy.Error as PE ( Error, catch, throw )
 import ItemFilter  (ItemFilter (..), filterredItemIds)
@@ -162,72 +162,69 @@ data RunParams m e rc tc effs a = RunParams {
   rc :: rc
 }
 
-emptyElm :: forall hi a effs. SuiteItem hi effs [a] -> Bool
-emptyElm = uu
-    -- let 
-    --   allEmpty :: forall b. [SuiteItem b effs [a]] -> Bool
-    --   allEmpty = all emptyElm
-    -- in
-    --   \case
-    --     Tests t -> null t
-    --     BeforeHook _ _ _ s -> allEmpty s
-    --     AfterHook _ _ _ s -> allEmpty s
-    --     Group _ s -> allEmpty s
 
 -- TODO - Error handling especially outside tests eg. in hooks
 exeElm :: forall hi e effs a. (ToJSON e, Show e, Member (Logger e) effs) => 
   (forall hii. hii -> a -> Sem effs ()) 
+  -> (a -> Bool)
   -> hi
   -> SuiteItem hi effs [a] 
   -> Sem effs ()
-exeElm runner hi si = uu
-  emptyElm si ?
-    pure () $
+exeElm runner pred hi si =
 
-    case si of
-      Tests { tests } -> sequence_ $ runner hi <$> tests
+  do
+    mt <- emptyElm pred si
+    mt ? 
+      pure () $
+      case si of
+        Tests { tests } -> sequence_ $ runner hi <$> tests
 
-      BeforeHook {cardinality, title = ttl, bHook , bhElms } -> 
-         let 
-           logRun = do 
-                       logItem $ StartHook cardinality ttl
-                       o <- bHook
-                       logItem $ EndHook cardinality ttl
-                       pure o
-         in
-          case cardinality of
+        BeforeHook {cardinality, title = ttl, bHook , bhElms } -> 
+            let 
+              logRun = do 
+                logItem $ StartHook cardinality ttl
+                o <- bHook
+                logItem $ EndHook cardinality ttl
+                pure o
+            in
+            case cardinality of
+              ExeOnce ->
+                  do 
+                    o <- logRun
+                    sequence_ $ (\f -> exeElm runner o $ f o) <$> bhElms
+
+              ExeForEach -> let 
+                              runElm f = do 
+                                          o <- logRun
+                                          exeElm runner o $ f o
+                            in
+                              sequence_ $ runElm <$> bhElms
+
+        AfterHook {cardinality , title = ttl, aHook , ahElms } ->
+          let 
+            logRun = do 
+                      logItem $ StartHook cardinality ttl
+                      o <- aHook
+                      logItem $ EndHook cardinality ttl
+          in
+          case cardinality of 
             ExeOnce -> do 
-                         o <- logRun
-                         sequence_ $ (\f -> exeElm runner o $ f o) <$> bhElms
+                        sequence_ $ (\f -> exeElm runner hi $ f hi) <$> ahElms
+                        logRun
 
-            ExeForEach -> let 
-                            runElm f = do 
-                                        o <- logRun
-                                        exeElm runner o $ f o
-                          in
-                            sequence_ $ runElm <$> bhElms
+            ExeForEach -> sequence_ $ (\f -> exeElm runner hi (f hi) >> logRun) <$> ahElms
+            
+        Group { title = ttl, gElms } -> 
+          do 
+            logItem . StartGroup . GroupTitle $ ttl
+            sequence_ $ exeElm runner hi <$> gElms
+            logItem . EndGroup . GroupTitle $ ttl
 
-      AfterHook {cardinality , title = ttl, aHook , ahElms } ->
-        let 
-          logRun = do 
-                    logItem $ StartHook cardinality ttl
-                    o <- aHook
-                    logItem $ EndHook cardinality ttl
-        in
-         case cardinality of 
-           ExeOnce -> do 
-                       sequence_ $ (\f -> exeElm runner hi $ f hi) <$> ahElms
-                       logRun
-
-           ExeForEach -> sequence_ $ (\f -> exeElm runner hi (f hi) >> logRun) <$> ahElms
-          
-      Group { title = ttl, gElms } -> 
-        do 
-          logItem . StartGroup . GroupTitle $ ttl
-          sequence_ $ exeElm runner hi <$> gElms
-          logItem . EndGroup . GroupTitle $ ttl
-
-
+emptyElm :: forall hi a effs. (a -> Bool) -> SuiteItem hi effs [a] -> Sem effs Bool
+emptyElm pred si = 
+  case si of
+     Tests { tests } -> pure . null $ filter pred tests
+     BeforeHook { bhElms } -> -- [hi -> SuiteItem hi effs t]
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, MinEffs e effs) =>
                     RunParams Maybe e rc tc effs ()

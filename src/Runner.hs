@@ -45,6 +45,7 @@ import Pyrelude as P
       Either(..),
       Text,
       Category((.)),
+      (&),
       (<$>),
       sequence_,
       maybe,
@@ -180,57 +181,51 @@ exeElm :: forall hi e effs a. (ToJSON e, Show e, Member (Logger e) effs) =>
   -> SuiteItem hi effs [a] 
   -> Sem effs ()
 exeElm runner hi si = uu
-  -- emptyElm si ?
-  --   pure () $
+  emptyElm si ?
+    pure () $
 
-  --   case si of
-  --     Tests { tests } -> sequence_ $ runner hi <$> tests
+    case si of
+      Tests { tests } -> sequence_ $ runner hi <$> tests
 
-  --     BeforeHook {cardinality, title = ttl, bHook , bhElms } -> 
-  --       let 
-  --         hkResult = do
-  --                     logItem $ StartHook cardinality ttl
-  --                     ho <- bHook hi
-  --                     logItem $ EndHook cardinality ttl
-  --                     pure ho
-  --       in
-  --        case cardinality of 
-  --          ExeOnce -> do 
-  --                      r <- hkResult
-  --                      sequence_ $ exeElm runner r <$> bhElms
+      BeforeHook {cardinality, title = ttl, bHook , bhElms } -> 
+         let 
+           logRun = do 
+                       logItem $ StartHook cardinality ttl
+                       o <- bHook
+                       logItem $ EndHook cardinality ttl
+                       pure o
+         in
+          case cardinality of
+            ExeOnce -> do 
+                         o <- logRun
+                         sequence_ $ (\f -> exeElm runner o $ f o) <$> bhElms
 
-  --          ExeForEach -> let 
-  --                         runElm si' = do 
-  --                                       r <- hkResult
-  --                                       exeElm runner r si'
-  --                        in
-  --                         sequence_ $ runElm <$> bhElms
+            ExeForEach -> let 
+                            runElm f = do 
+                                        o <- logRun
+                                        exeElm runner o $ f o
+                          in
+                            sequence_ $ runElm <$> bhElms
 
-  --     AfterHook {cardinality , title = ttl, aHook , ahElms } ->
-  --       let 
-  --         hkResult = do 
-  --                     logItem $ StartHook cardinality ttl
-  --                     ho <- aHook hi
-  --                     logItem $ EndHook cardinality ttl
-  --                     pure ho
-  --       in
-  --        case cardinality of 
-  --          ExeOnce -> do 
-  --                      sequence_ $ exeElm runner hi <$> ahElms
-  --                      void hkResult
+      AfterHook {cardinality , title = ttl, aHook , ahElms } ->
+        let 
+          logRun = do 
+                    logItem $ StartHook cardinality ttl
+                    o <- aHook
+                    logItem $ EndHook cardinality ttl
+        in
+         case cardinality of 
+           ExeOnce -> do 
+                       sequence_ $ (\f -> exeElm runner hi $ f hi) <$> ahElms
+                       logRun
 
-  --          ExeForEach -> let 
-  --                         runElm si' = do 
-  --                                       exeElm runner hi si'
-  --                                       hkResult
-  --                        in
-  --                         sequence_ $ runElm <$> ahElms
+           ExeForEach -> sequence_ $ (\f -> exeElm runner hi (f hi) >> logRun) <$> ahElms
           
-  --     Group { title = ttl, gElms } -> 
-  --       do 
-  --         logItem . StartGroup . GroupTitle $ ttl
-  --         sequence_ $ exeElm runner hi <$> gElms
-  --         logItem . EndGroup . GroupTitle $ ttl
+      Group { title = ttl, gElms } -> 
+        do 
+          logItem . StartGroup . GroupTitle $ ttl
+          sequence_ $ exeElm runner hi <$> gElms
+          logItem . EndGroup . GroupTitle $ ttl
 
 
 
@@ -238,84 +233,31 @@ mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigCl
                     RunParams Maybe e rc tc effs ()
                     -> Sem effs ()
 mkSem rp@RunParams {suite, filters, rc} = uu
-  {- 
-  {-                   
-      exeElm ::  (hii -> a -> Sem effs ()) -> hi      -> SuiteItem hi effs [a] -> Sem effs ()
-      exeElm ::   element (test) runnner   -> hook in -> Test List             -> Sem effs ()
-      
-      runTest :: RunParams Maybe e rc tc effs () -> Sem effs hi -> (hi -> Sem effs ())  -> Test e tc rc hi i as ds effs -> [Sem effs ()]   
-                          Run Params             -> before each ->   after each         -> Test Case                    -> [TestIterations]                
-
-      -- apply params
-      runTest' :: Sem effs hi -> (hi -> Sem effs ())  -> Test e tc rc hi i as ds effs -> [Sem effs ()]   
-                  before each ->   after each         -> Test Case                    -> [TestIterations] 
-
-
-      data RunParams m e rc tc effs a = RunParams {
-        suite :: (forall i as ds. Test e tc rc hi i as ds effs -> a) -> SuiteItem hi effs [a],
-        filters :: [F.TestFilter rc tc],
-        itemIds :: m (S.Set Int),   
-        itemRunner :: forall hi as ds i. rc -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs (),
-        rc :: rc
-      }
-
-      data Test e tc rc hi i as ds effs = Test {
-        config :: tc,
-        items :: rc -> [i],
-        interactor :: rc -> hi -> i -> Sem effs as,
-        parse :: forall psEffs. (Member (Error (FrameworkError e)) psEffs) => as -> Sem psEffs ds
-      }
-
-      data SuiteItem hi effs t where
-      Tests ::  { 
-        tests :: t 
-      } -> SuiteItem hi effs t
-
-      BeforeHook :: {
-        title :: Text,
-        cardinality :: HookCardinality,
-        bHook :: hi -> Sem effs o,
-        bhElms :: [SuiteItem o effs t]
-      } -> SuiteItem hi effs t
-
-      AfterHook :: {
-        title :: Text,
-        cardinality :: HookCardinality,
-        aHook :: hi -> Sem effs hi,
-        ahElms :: [SuiteItem hi effs t]
-      } -> SuiteItem hi effs t
-
-      Group :: {
-        title :: Text,
-        gElms :: [SuiteItem hi effs t]
-      } -> SuiteItem hi effs t
-  -}
-  let
+  -- let
   
-  
-    -- forall i as ds. Test e tc rc hi i as ds effs -> a) -> SuiteItem hi effs [a]
-    root :: forall hii. SuiteItem hii effs [[Sem effs hii -> Sem effs () -> Sem effs ()]] 
-    root = (runTest rp) suite  -- Test e tc rc () i0 as0 ds0 effs -> [Sem effs ()]
+  --   -- forall i as ds. Test e tc rc hi i as ds effs -> a) -> SuiteItem hi effs [a]
+  --   root :: forall hii. SuiteItem hii effs [[Sem effs hii -> Sem effs () -> Sem effs ()]] 
+  --   root = (runTest rp) suite  -- Test e tc rc () i0 as0 ds0 effs -> [Sem effs ()]
 
 
-    filterInfo :: [TestFilterResult]
-    filterInfo = filterSuite suite filters rc
+  --   filterInfo :: [TestFilterResult]
+  --   filterInfo = filterSuite suite filters rc
 
-    run' :: Sem effs ()
-    run' = do
-            offset' <- utcOffset
-            logItem . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
-            logItem . FilterLog $ filterInfo
-            exeElm pure pure root
-            logItem EndRun
-  in
-    maybe 
-      run'
-      (\da -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> da)
-      -- all the string conversion shannanigans below is due to descrmination which drives firstDuplicate
-      -- only working with chars / strings
-      (toS <$> firstDuplicate (toS @_ @PRL.String <$> groupAddresses root))
--}
+  --   run' :: Sem effs ()
+  --   run' = do
+  --           offset' <- utcOffset
+  --           logItem . StartRun (RunTitle $ C.title rc) offset' $ toJSON rc
+  --           logItem . FilterLog $ filterInfo
+  --           exeElm pure pure root
+  --           logItem EndRun
+  -- in
+  --   maybe 
+  --     run'
+  --     (\da -> logLPError . C.Error $ "Test Run Configuration Error. Duplicate Group Names: " <> da)
+  --     -- all the string conversion shannanigans below is due to descrmination which drives firstDuplicate
+  --     -- only working with chars / strings
+  --     (toS <$> firstDuplicate (toS @_ @PRL.String <$> groupAddresses root))
+
 
 mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, MinEffs e effs) =>
                    RunParams (Either FilterErrorType) e rc tc effs ()

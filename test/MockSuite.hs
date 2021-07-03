@@ -210,7 +210,7 @@ runParams =
       rc = RunConfig "Happy Suite" True
     }
 
-happyRun :: forall effs. DemoEffs effs => Sem effs ()
-happyRun = mkSem runParams
+-- happyRun :: forall effs. DemoEffs effs => Sem effs ()
+-- happyRun = mkSem runParams
 
 -- unit_test_filter_expect_empty

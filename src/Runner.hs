@@ -166,14 +166,13 @@ data RunParams m e rc tc effs a = RunParams {
 -- TODO - Error handling especially outside tests eg. in hooks
 exeElm :: forall hi e effs a. (ToJSON e, Show e, Member (Logger e) effs) => 
   (forall hii. hii -> a -> Sem effs ()) 
-  -> (a -> Bool)
   -> hi
   -> SuiteItem hi effs [a] 
   -> Sem effs ()
-exeElm runner pred hi si =
+exeElm runner hi si =
 
   do
-    mt <- emptyElm pred si
+    mt <- emptyElm si
     mt ? 
       pure () $
       case si of
@@ -220,11 +219,11 @@ exeElm runner pred hi si =
             sequence_ $ exeElm runner hi <$> gElms
             logItem . EndGroup . GroupTitle $ ttl
 
-emptyElm :: forall hi a effs. (a -> Bool) -> SuiteItem hi effs [a] -> Sem effs Bool
-emptyElm pred si = 
-  case si of
-     Tests { tests } -> pure . null $ filter pred tests
-     BeforeHook { bhElms } -> -- [hi -> SuiteItem hi effs t]
+emptyElm :: forall hi a effs. SuiteItem hi effs [a] -> Sem effs Bool
+emptyElm si = uu
+  -- case si of
+  --    Tests { tests } -> pure . null $ filter pred tests
+  --    BeforeHook { bhElms } -> uu -- [hi -> SuiteItem hi effs t]
 
 mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, MinEffs e effs) =>
                     RunParams Maybe e rc tc effs ()

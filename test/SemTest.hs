@@ -143,55 +143,55 @@ includeFilter =
 filters' :: [TestFilter RunConfig TestConfig]
 filters' = [includeFilter]
 
-mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
-mockSuite r =
-  R.Group
-    "Filter Suite"
-    [ BeforeHook
-        { title = "Before All",
-          cardinality = ExeOnce,
-          bHook = pure "hello",
-          bhElms =
-            [ \t ->
-                Tests
-                  [ r t test1Txt,
-                    r t test4Txt
-                  ],
-              const
-                R.Group
-                  { title = "Empty Group",
-                    gElms =
-                      [ Tests []
-                      ]
-                  }
-            ]
-        },
-      R.Group
-        { title = "Empty Group",
-          gElms =
-            [ BeforeHook
-                { title = "Int Group",
-                  cardinality = ExeForEach,
-                  bHook = pure 23,
-                  bhElms =
-                    [ \t ->
-                        AfterHook
-                          { title = "After Exch Int",
-                            cardinality = ExeForEach,
-                            aHook = t == 23 ? pure () $ pure (),
-                            ahElms =
-                              [ \i ->
-                                  Tests
-                                    [ r i test5Int,
-                                      r i test2Int
-                                    ]
-                              ]
-                          }
-                    ]
-                }
-            ]
-        }
-        -- ,
+-- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
+-- mockSuite r =
+--   R.Group
+--     "Filter Suite"
+--     [ BeforeHook
+--         { title = "Before All",
+--           cardinality = ExeOnce,
+--           bHook = pure "hello",
+--           bhElms =
+--             [ \t ->
+--                 Tests
+--                   [ r t test1Txt,
+--                     r t test4Txt
+--                   ],
+--               const
+--                 R.Group
+--                   { title = "Empty Group",
+--                     gElms =
+--                       [ Tests []
+--                       ]
+--                   }
+--             ]
+--         },
+--       R.Group
+--         { title = "Empty Group",
+--           gElms =
+--             [ BeforeHook
+--                 { title = "Int Group",
+--                   cardinality = ExeForEach,
+--                   bHook = pure 23,
+--                   bhElms =
+--                     [ \t ->
+--                         AfterHook
+--                           { title = "After Exch Int",
+--                             cardinality = ExeForEach,
+--                             aHook = t == 23 ? pure () $ pure (),
+--                             ahElms =
+--                               [ \i ->
+--                                   Tests
+--                                     [ r i test5Int,
+--                                       r i test2Int
+--                                     ]
+--                               ]
+--                           }
+--                     ]
+--                 }
+--             ]
+--         }
+--         -- ,
 
         -- R.Group "Sub Group" [
         --   Tests [
@@ -199,6 +199,6 @@ mockSuite r =
         --     r test5
         --   ]
         -- ],
-    ]
+    -- ]
 
 -- unit_test_filter_expect_empty

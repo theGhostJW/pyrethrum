@@ -1,3 +1,5 @@
+-- {-# LANGUAGE NoStrictData #-} 
+
 module MockSuite where
 
 import Data.Aeson.TH
@@ -21,6 +23,11 @@ data RunConfig = RunConfig
     inFilter :: Bool
   }
   deriving (Eq, Show)
+
+instance Titled RunConfig where
+  title = cfgHeader
+
+instance RunConfigClass RunConfig
 
 type DemoEffs effs = MinEffs Text effs
 data TestConfig = TestConfig
@@ -210,7 +217,9 @@ runParams =
       rc = RunConfig "Happy Suite" True
     }
 
--- happyRun :: forall effs. DemoEffs effs => Sem effs ()
--- happyRun = mkSem runParams
+happyRun :: forall effs. DemoEffs effs => Sem effs ()
+happyRun = mkSem runParams
+
+$(deriveJSON defaultOptions ''RunConfig)
 
 -- unit_test_filter_expect_empty

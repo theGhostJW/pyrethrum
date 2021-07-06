@@ -1,10 +1,12 @@
-{-# LANGUAGE NoPolyKinds #-} 
 -- TODO: work out why this is needed - investigate polykinds
+{-# LANGUAGE NoPolyKinds #-} 
+-- {-# LANGUAGE NoStrictData #-} 
 
 module Runner (
   mkEndpointSem
   , RunParams(..)
   , mkSem
+  , queryElm
   , module RB
   , module ItemFilter
   , module C
@@ -62,7 +64,7 @@ import Pyrelude as P
       fold,
       (>>),
       debug,
-      void, not, const )
+      void, not, const, error, join )
 import Polysemy ( Sem, Member )
 import Polysemy.Error as PE ( Error, catch, throw )
 import ItemFilter  (ItemFilter (..), filterredItemIds)
@@ -86,12 +88,10 @@ import qualified TestFilter as F
       applyFilters,
       TestFilter(..), acceptAnyFilter )
 import RunnerBase as RB
-    ( doNothing,
-      groupAddresses,
+    ( groupAddresses,
       groupName,
       GenericResult(..),
       ItemRunner,
-      PreRun(..),
       SuiteItem(..),
       Test(..),
       Suite )
@@ -161,6 +161,25 @@ data RunParams m e rc tc effs a = RunParams {
   itemRunner :: forall hi as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON i, ToJSON ds) => ItemRunner e as ds i hi tc rc effs,
   rc :: rc
 }
+
+
+queryElm :: forall hi effs a. SuiteItem hi effs [a] -> [a]
+queryElm si =
+  let 
+    badParam = error "Bad param - this param should never be called"
+  in
+    case si of
+      Tests { tests } -> tests
+
+      BeforeHook { bhElms } ->
+        join $ queryElm <$> ((\f -> f badParam) <$> bhElms)
+
+      AfterHook { ahElms } -> 
+        join $ queryElm <$> ((\f -> f badParam) <$> ahElms)
+
+      Group { gElms } -> 
+        join $ queryElm <$> gElms
+
 
 
 -- TODO - Error handling especially outside tests eg. in hooks

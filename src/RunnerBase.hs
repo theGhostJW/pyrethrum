@@ -1,4 +1,16 @@
-module RunnerBase where
+
+
+module RunnerBase (
+  ItemRunner,
+  Suite,
+  IRB.SuiteItem(..),
+  Test(..),
+  GenericResult(..),
+  concatTests,
+  groupAddresses,
+  groupName
+  )
+ where
 
 import Common (FilterErrorType, FrameworkError, HookCardinality(..))
 import Pyrelude
@@ -6,6 +18,7 @@ import Polysemy
 import Polysemy.Error
 import RunElementClasses
 import Data.Aeson
+import Internal.RunnerBase as IRB
 
 type ItemRunner e as ds i hi tc rc effs = 
     rc -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
@@ -19,16 +32,6 @@ data GenericResult tc rslt = TestResult {
   results :: Either FilterErrorType [rslt]
 } deriving Show
 
-data PreRun effs = PreRun {
-  runAction :: Sem effs (),
-  checkHasRun :: Sem effs Bool
-}
-
-doNothing :: PreRun effs
-doNothing = PreRun {
-  runAction = pure (),
-  checkHasRun = pure True
-}
 
 {- 
 TODO 
@@ -54,97 +57,6 @@ TODO
   Update Tests
   Update Demo
 -}
-
-
-{-  Play Data Structure -}
-
-data SuiteItemGADT i effs t where
-  Tests' ::  { 
-    tests :: i -> t 
-  } -> SuiteItemGADT i effs t
-
-  Hook' :: { 
-    hook :: i -> Sem effs o, 
-    subElms :: [SuiteItemGADT o effs t] 
-  } -> SuiteItemGADT i effs t
-  
-
-mkTests :: (Num a, Show a, Enum a) => a -> [Text]
-mkTests i = (\ii -> "item:" <> txt (ii + i)) <$> take 10 [1..]
-
-tests' :: SuiteItemGADT Int effs [Text]
-tests' = Tests' { tests = mkTests }
-
-hookFunc :: forall effs. () -> Sem effs Int 
-hookFunc t = pure 7
-
-suiteSimple :: SuiteItemGADT () effs [Text]
-suiteSimple = Hook' {
-  hook = hookFunc,
-  subElms = [tests']
-}
-
-hookInnerFunc :: forall effs. Int -> Sem effs Int 
-hookInnerFunc i = pure $ i + i
-
-subHook :: SuiteItemGADT Int effs [Text]
-subHook = Hook' {
-    hook = hookInnerFunc,
-    subElms = [tests']
-  }
-
-suiteNested :: forall effs. SuiteItemGADT () effs [Text]
-suiteNested = Hook' {
-  hook = hookFunc,
-  subElms = [subHook]
-}
-
-suiteNested2 :: forall effs. SuiteItemGADT () effs [Text]
-suiteNested2 = Hook' {
-  hook = \() -> pure 7,
-  subElms = [
-    subHook, 
-    tests'
-  ]
-}
-
-suiteNested2Exp :: forall effs. SuiteItemGADT () effs [Text]
-suiteNested2Exp = Hook' {
-  hook = hookFunc,
-  subElms = [
-    Hook' {
-      hook = \i -> pure $ i + i,
-      subElms = [Tests' \i -> (\ii -> "item:" <> txt (ii + i)) <$> take 10 [1..]]
-    }, 
-    tests'
-  ]
-}
-
-{-  Play Data Structure End -}
-
-data SuiteItem hi effs t where
-  Tests ::  { 
-    tests :: t
-  } -> SuiteItem hi effs t
-
-  BeforeHook :: {
-     title :: Text,
-     cardinality :: HookCardinality,
-     bHook :: Sem effs o,
-     bhElms :: [o -> SuiteItem o effs t]
-  } -> SuiteItem hi effs t
-
-  AfterHook :: {
-     title :: Text,
-     cardinality :: HookCardinality,
-     aHook :: Sem effs (),
-     ahElms :: [hi -> SuiteItem hi effs t]
-  } -> SuiteItem hi effs t
-
-  Group :: {
-    title :: Text,
-    gElms :: [SuiteItem hi effs t]
-  } -> SuiteItem hi effs t
 
 
 concatTests :: SuiteItem hi effs t -> [t]
@@ -193,6 +105,9 @@ groupAddresses' accum root el = uu
 
 groupAddresses :: SuiteItem hi effs a -> [Text]
 groupAddresses = groupAddresses' [] "" 
+
+-- data up to here want items to have title and validations 
+-- and config
 
 data Test e tc rc hi i as ds effs = Test {
   config :: tc,

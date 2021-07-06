@@ -1,18 +1,34 @@
+-- {-# LANGUAGE NoStrictData #-} 
+
+
 module SuiteValidationTest where
 
--- import MockSuite ( happyRun, MyText, happySuite, demoSuit, hookRun, LogProtocolWithTextError)
+import MockSuite ( happyRun, MyText, MockTest, mockSuite)
 import DSL.Interpreter ( minInterpret )
 import Pyrelude as P
 import Pyrelude.Test ( chk, chk', Assertion, (...) )
 import DSL.LogProtocol ( LogProtocolBase (..))
 import Common  ( FrameworkError, DetailedInfo(DetailedInfo), HookCardinality(..) )
-import Runner (groupAddresses)
+import Runner (groupAddresses, Titled (title), queryElm, config)
 import TempUtils
 import ItemRunners (runItem)
 import Data.Foldable (Foldable(length))
 import Data.Text ( Text )
 import DSL.LogProtocol.PrettyPrint (prettyPrintLogProtocol, LogStyle(..))
 import qualified Data.Text as Text
+
+-- >>> demoQueryElem
+-- ["test1","test4","test5","test2"]
+-- 
+
+demoQueryElem = 
+  let 
+    getTitle :: a -> MockTest hi i as ds effs -> Text
+    getTitle _ mt = title $ config mt
+  
+    root = mockSuite getTitle
+  in
+    queryElm root
 
 
 expectedDemoGroupNames :: [Text]

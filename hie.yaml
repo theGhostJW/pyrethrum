@@ -7,48 +7,51 @@ cradle:
       component: "pyrethrum:exe:pyrethrum"
 
     - path: "./testIntegration/driver.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/AuxFiles.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/Check.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/Common.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/Config.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/DSL.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/DSL/ArbitraryIO.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/DSL/CurrentTime.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
-    - path: "./src/DSL/CurrentTimeDocLogger.hs"   
-      component: "pyrethrum:exe:pyrethrum"        
+    - path: "./src/DSL/CurrentTimeDocLogger.hs"
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/DSL/FileSystem.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/DSL/Interpreter.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/DSL/Logger.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/DSL/LogProtocol.hs"
-      component: "pyrethrum:exe:pyrethrum"        
+      component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/DSL/LogProtocol/PrettyPrint.hs"
       component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/FileLogging.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./src/Internal/RunnerBase.hs"
       component: "pyrethrum:exe:pyrethrum"
 
     - path: "./src/ItemFilter.hs"
@@ -204,6 +207,9 @@ cradle:
     - path: "./test/FileLogging.hs"
       component: "pyrethrum:exe:pyrethrum"
 
+    - path: "./test/Internal/RunnerBase.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
     - path: "./test/ItemFilter.hs"
       component: "pyrethrum:exe:pyrethrum"
 
@@ -355,6 +361,9 @@ cradle:
       component: "pyrethrum:exe:pyrethrum"
 
     - path: "./testIntegration/FileLogging.hs"
+      component: "pyrethrum:exe:pyrethrum"
+
+    - path: "./testIntegration/Internal/RunnerBase.hs"
       component: "pyrethrum:exe:pyrethrum"
 
     - path: "./testIntegration/ItemFilter.hs"

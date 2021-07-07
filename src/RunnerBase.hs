@@ -3,7 +3,7 @@
 module RunnerBase (
   ItemRunner,
   Suite,
-  IRB.SuiteItem(..),
+  LRB.SuiteItem(..),
   Test(..),
   GenericResult(..),
   concatTests,
@@ -18,7 +18,7 @@ import Polysemy
 import Polysemy.Error
 import RunElementClasses
 import Data.Aeson
-import Internal.RunnerBase as IRB
+import Internal.RunnerBaseLazy as LRB
 
 type ItemRunner e as ds i hi tc rc effs = 
     rc -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()

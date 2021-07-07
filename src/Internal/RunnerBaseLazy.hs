@@ -1,6 +1,6 @@
 {-# LANGUAGE NoStrictData #-} 
 
-module Internal.RunnerBase where
+module Internal.RunnerBaseLazy where
 
 import Common (FilterErrorType, FrameworkError, HookCardinality(..))
 import Pyrelude

@@ -6,7 +6,6 @@ module Runner (
   mkEndpointSem
   , RunParams(..)
   , mkSem
-  , queryElm
   , module RB
   , module ItemFilter
   , module C
@@ -94,7 +93,7 @@ import RunnerBase as RB
       ItemRunner,
       SuiteItem(..),
       Test(..),
-      Suite )
+      TestSuite )
 import qualified Prelude as PRL
 
 runTestItems :: forall i as ds hi tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ToJSON i, ItemClass i ds, Member (Logger e) effs) =>
@@ -155,31 +154,12 @@ logLPError ::  forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => Fram
 logLPError = logItem . LP.Error
 
 data RunParams m e rc tc effs a = RunParams {
-  suite :: Suite e tc rc effs a,
+  suite :: TestSuite e tc rc effs a,
   filters :: [F.TestFilter rc tc],
   itemIds :: m (S.Set Int),   
   itemRunner :: forall hi as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON i, ToJSON ds) => ItemRunner e as ds i hi tc rc effs,
   rc :: rc
 }
-
-
-queryElm :: forall hi effs a. SuiteItem hi effs [a] -> [a]
-queryElm si =
-  let 
-    badParam = error "Bad param - this param should never be called"
-  in
-    case si of
-      Tests { tests } -> tests
-
-      BeforeHook { bhElms } ->
-        join $ queryElm <$> ((\f -> f badParam) <$> bhElms)
-
-      AfterHook { ahElms } -> 
-        join $ queryElm <$> ((\f -> f badParam) <$> ahElms)
-
-      Group { gElms } -> 
-        join $ queryElm <$> gElms
-
 
 
 -- TODO - Error handling especially outside tests eg. in hooks

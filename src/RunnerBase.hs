@@ -1,8 +1,9 @@
 
 
 module RunnerBase (
+  queryElm,
   ItemRunner,
-  Suite,
+  TestSuite,
   LRB.SuiteItem(..),
   Test(..),
   GenericResult(..),
@@ -20,10 +21,10 @@ import RunElementClasses
 import Data.Aeson
 import Internal.RunnerBaseLazy as LRB
 
-type ItemRunner e as ds i hi tc rc effs = 
+type ItemRunner e as ds i hi tc rc effs =
     rc -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
-type Suite e tc rc effs a = 
+type TestSuite e tc rc effs a =
    (forall hi i as ds. (Show i, Show as, Show ds) => hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem () effs [a]
     --  (forall hi i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i, ToJSON i) => Test e tc rc hi i as ds effs -> a) -> SuiteItem () effs [a]
 
@@ -32,12 +33,23 @@ data GenericResult tc rslt = TestResult {
   results :: Either FilterErrorType [rslt]
 } deriving Show
 
+queryElm :: forall hi effs a. SuiteItem hi effs [a] -> [a]
+queryElm =
+  let
+    hkElms = (queryElm . (\f -> f $ error "Bad param - this param should never be accessed") =<<)
+  in
+    \case
+      Tests { tests } -> tests
+      BeforeHook { bhElms } -> hkElms bhElms
+      AfterHook { ahElms } -> hkElms ahElms
+      Group { gElms } -> queryElm =<< gElms
+
 
 {- 
 TODO 
  SuiteItem Update
   DONE - Add Hook     
-  DONE - Add Suite Tests
+  DONE - Add TestSuite Tests
     * Thread Hook Output to Subelements (GADT)
       * get compiling
       * utilise input - ie change test runner
@@ -72,7 +84,7 @@ concatTests = uu
 
 
 groupName :: SuiteItem hi effs a -> Maybe Text
-groupName = \case 
+groupName = \case
               Tests _ -> Nothing
               BeforeHook {} -> Nothing
               AfterHook {} -> Nothing
@@ -91,9 +103,9 @@ groupAddresses' accum root el = uu
   -- in
   --   case el of
   --     Tests _ -> accum
-      
+
   --     BeforeHook _ _ _ subElems -> childAddresses subElems
-      
+
   --     AfterHook _ _ _ subElems -> childAddresses subElems
 
   --     Group t subElems -> 
@@ -101,10 +113,10 @@ groupAddresses' accum root el = uu
   --         address = appendDelim root t 
   --       in 
   --         address : mconcat (groupAddresses' accum address <$> subElems)
-        
+
 
 groupAddresses :: SuiteItem hi effs a -> [Text]
-groupAddresses = groupAddresses' [] "" 
+groupAddresses = groupAddresses' [] ""
 
 -- data up to here want items to have title and validations 
 -- and config

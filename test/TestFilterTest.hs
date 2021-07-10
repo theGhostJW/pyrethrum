@@ -170,7 +170,7 @@ emptiParser a _ = pure a
 
 -- mockSuite :: forall effs a. (forall i as ds. (Show i, Show as, Show ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
 -- mockSuite r = 
---   R.Group "Filter Suite" [
+--   R.Group "Filter TestSuite" [
 --     Hook 
 --       "Before All" 
 --       ExeOnce 

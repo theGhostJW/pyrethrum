@@ -9,7 +9,8 @@ import Pyrelude as P
 import Pyrelude.Test ( chk, chk', Assertion, (...) )
 import DSL.LogProtocol ( LogProtocolBase (..))
 import Common  ( FrameworkError, DetailedInfo(DetailedInfo), HookCardinality(..) )
-import Runner (groupAddresses, Titled (title), queryElm, config)
+import Runner (groupAddresses, Titled (title), config)
+import RunnerBase (queryElm)
 import TempUtils
 import ItemRunners (runItem)
 import Data.Foldable (Foldable(length))
@@ -20,7 +21,6 @@ import qualified Data.Text as Text
 -- >>> demoQueryElem
 -- ["test1","test4","test5","test2"]
 -- 
-
 demoQueryElem = 
   let 
     getTitle :: a -> MockTest hi i as ds effs -> Text
@@ -32,7 +32,7 @@ demoQueryElem =
 
 
 expectedDemoGroupNames :: [Text]
-expectedDemoGroupNames = ["Happy Suite", "Happy Suite.Sub Group", "Happy Suite.Empty Group"] 
+expectedDemoGroupNames = ["Happy TestSuite", "Happy TestSuite.Sub Group", "Happy TestSuite.Empty Group"] 
 
 -- unit_demo_group_addresses_count :: Assertion
 -- unit_demo_group_addresses_count = 

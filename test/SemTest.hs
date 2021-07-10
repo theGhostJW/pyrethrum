@@ -146,7 +146,7 @@ filters' = [includeFilter]
 -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
 -- mockSuite r =
 --   R.Group
---     "Filter Suite"
+--     "Filter TestSuite"
 --     [ BeforeHook
 --         { title = "Before All",
 --           cardinality = ExeOnce,

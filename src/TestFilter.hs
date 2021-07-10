@@ -44,20 +44,17 @@ filterTest :: forall i as ds tc hi rc e effs. TestConfigClass tc => [TestFilter 
 filterTest fltrs rc Test{ config = tc } = applyFilters fltrs rc tc
 
 
-filterSuite :: forall tc rc e hi effs. TestConfigClass tc =>
-              (
-                (forall i as ds.
-                  Test e tc rc hi i as ds effs -> TestFilterResult) -> SuiteItem hi effs [TestFilterResult]
-              )
+filterSuite :: forall tc rc e effs. TestConfigClass tc =>
+              TestSuite e tc rc effs TestFilterResult 
               -> [TestFilter rc tc]
               -> rc
               -> [TestFilterResult]
 filterSuite suite fltrs rc =
   let
-    testFilter :: Test e tc rc hi i as ds effs -> TestFilterResult
-    testFilter = filterTest fltrs rc
+    testFilter :: hi -> Test e tc rc hi i as ds effs -> TestFilterResult
+    testFilter _ = filterTest fltrs rc
 
-    si :: SuiteItem hi effs [TestFilterResult]
+    si :: SuiteItem () effs [TestFilterResult]
     si = suite testFilter
   in
     uu

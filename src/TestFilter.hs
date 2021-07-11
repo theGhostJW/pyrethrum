@@ -24,7 +24,7 @@ data TestFilter rc tc = TestFilter {
 }
 
 applyFilters :: forall rc tc. TestConfigClass tc => [TestFilter rc tc] -> rc -> tc -> TestFilterResult
-applyFilters fltrs rc tc = uu
+applyFilters fltrs rc tc = 
  let
   fltrRslt :: Maybe Text -> TestFilterResult
   fltrRslt = mkTestFilterResult tc 
@@ -44,12 +44,12 @@ filterTest :: forall i as ds tc hi rc e effs. TestConfigClass tc => [TestFilter 
 filterTest fltrs rc Test{ config = tc } = applyFilters fltrs rc tc
 
 
-filterSuite :: forall tc rc e effs. TestConfigClass tc =>
+filterLog :: forall tc rc e effs. TestConfigClass tc =>
               TestSuite e tc rc effs TestFilterResult 
               -> [TestFilter rc tc]
               -> rc
               -> [TestFilterResult]
-filterSuite suite fltrs rc =
+filterLog suite fltrs rc =
   let
     testFilter :: hi -> Test e tc rc hi i as ds effs -> TestFilterResult
     testFilter _ = filterTest fltrs rc
@@ -57,8 +57,7 @@ filterSuite suite fltrs rc =
     si :: SuiteItem () effs [TestFilterResult]
     si = suite testFilter
   in
-    uu
-    -- mconcat $ concatTests si
+    queryElm si
 
 
 

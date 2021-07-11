@@ -3,13 +3,13 @@
 
 module SuiteValidationTest where
 
-import MockSuite ( happyRun, MyText, MockTest, mockSuite)
+import MockSuite ( happyRun, MyText, MockTest, mockSuite, inOutFilter, inFilterRunConfig, TestConfig (TestConfig), RunConfig (RunConfig), outOfFilterRunConfig)
 import DSL.Interpreter ( minInterpret )
 import Pyrelude as P
 import Pyrelude.Test ( chk, chk', Assertion, (...) )
 import DSL.LogProtocol ( LogProtocolBase (..))
 import Common  ( FrameworkError, DetailedInfo(DetailedInfo), HookCardinality(..) )
-import Runner (groupAddresses, Titled (title), config)
+import Runner (groupAddresses, Titled (title), config, TestFilterResult (TestFilterResult, testInfo, reasonForRejection), TestDisplayInfo (testModAddress), TestAddress (unTestAddress))
 import RunnerBase (queryElm)
 import TempUtils
 import ItemRunners (runItem)
@@ -17,22 +17,43 @@ import Data.Foldable (Foldable(length))
 import Data.Text ( Text )
 import DSL.LogProtocol.PrettyPrint (prettyPrintLogProtocol, LogStyle(..))
 import qualified Data.Text as Text
+import TestFilter
 
 -- >>> demoQueryElem
 -- ["test1","test4","test5","test2"]
 -- 
-demoQueryElem = 
-  let 
+demoQueryElem =
+  let
     getTitle :: a -> MockTest hi i as ds effs -> Text
-    getTitle _ mt = title $ config mt
-  
+    getTitle _ mt = Runner.title $ config mt
+
     root = mockSuite getTitle
   in
     queryElm root
 
+applyFilterLog :: TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]
+applyFilterLog fltr = filterLog mockSuite [fltr]
+
+
+listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
+listTests fltr rc =
+   unTestAddress . testModAddress . testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
+
+-- $> inFilterTests
+-- 
+inFilterTests :: [Text]
+inFilterTests = listTests inOutFilter inFilterRunConfig
+
+-- $> outFilterTests
+-- 
+outFilterTests :: [Text]
+outFilterTests = listTests inOutFilter outOfFilterRunConfig
+
+-- todo filter out empty items
+
 
 expectedDemoGroupNames :: [Text]
-expectedDemoGroupNames = ["Happy TestSuite", "Happy TestSuite.Sub Group", "Happy TestSuite.Empty Group"] 
+expectedDemoGroupNames = ["Happy TestSuite", "Happy TestSuite.Sub Group", "Happy TestSuite.Empty Group"]
 
 -- unit_demo_group_addresses_count :: Assertion
 -- unit_demo_group_addresses_count = 
@@ -61,11 +82,11 @@ offsetList :: [a] -> Int -> [(a, a)]
 offsetList l i = zip l $ drop i l
 
 chkOffsetList :: Show t => Int -> (t -> Bool) -> (t -> Bool) -> [t] -> IO ()
-chkOffsetList i p1 p2 l = 
-  let 
+chkOffsetList i p1 p2 l =
+  let
     fails = filter (\(f, s) -> p1 f && not (p2 s)) $ offsetList l i
     msg (f, s) = "target element: " <> txt f <> "\n" <> "element " <> txt i <> " after:\n" <> txt s
-  in 
+  in
     chk' (unlines $ msg <$> fails) (null fails)
 
 chkNext :: Show t => (t -> Bool) -> (t -> Bool) -> [t] -> IO ()

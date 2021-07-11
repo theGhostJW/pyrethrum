@@ -24,6 +24,19 @@ data RunConfig = RunConfig
   }
   deriving (Eq, Show)
 
+inFilterRunConfig :: RunConfig
+inFilterRunConfig = RunConfig "In Filter" True
+
+outOfFilterRunConfig :: RunConfig
+outOfFilterRunConfig = RunConfig "In Filter" False
+
+inOutFilter :: TestFilter RunConfig TestConfig
+inOutFilter = TestFilter {
+     title = "in out filter state must match",
+     predicate = \rc tc -> inFilter rc == (include tc == In)
+   }
+
+
 instance Titled RunConfig where
   title = cfgHeader
 

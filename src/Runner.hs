@@ -83,7 +83,7 @@ import OrphanedInstances()
 import Data.Aeson as A ( ToJSON(toJSON) )
 import qualified TestFilter as F
     ( acceptFilter,
-      filterSuite,
+      filterLog,
       applyFilters,
       TestFilter(..), acceptAnyFilter )
 import RunnerBase as RB

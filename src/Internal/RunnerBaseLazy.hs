@@ -44,6 +44,6 @@ instance Functor (SuiteItem hi effs) where
         f'' fi l = f''' fi <$> l
      in case si of
           Tests a -> Tests $ f a
-          BeforeHook title cardinality bHook bhElms -> BeforeHook title cardinality bHook (f'' f bhElms)
-          AfterHook title cardinality aHook ahElms -> AfterHook title cardinality aHook (f'' f ahElms)
+          BeforeHook title' cardinality bHook bhElms -> BeforeHook title' cardinality bHook (f'' f bhElms)
+          AfterHook title' cardinality aHook ahElms -> AfterHook title' cardinality aHook (f'' f ahElms)
           Group {title = t, gElms} -> Group t $ (f <$>) <$> gElms

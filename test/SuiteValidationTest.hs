@@ -40,12 +40,10 @@ listTests fltr rc =
    unTestAddress . testModAddress . testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
 
 -- $> inFilterTests
--- 
 inFilterTests :: [Text]
 inFilterTests = listTests inOutFilter inFilterRunConfig
 
 -- $> outFilterTests
--- 
 outFilterTests :: [Text]
 outFilterTests = listTests inOutFilter outOfFilterRunConfig
 

@@ -9,6 +9,10 @@ import Polysemy.Error
 import Pyrelude
 import RunElementClasses
 
+newtype Suite hi effs t = Suite
+  { root :: SuiteItem hi effs t
+  }
+
 data SuiteItem hi effs t where
   Tests ::
     { tests :: t

@@ -50,6 +50,13 @@ packages:
       sha256: a69c9cbc1d8340c63cc8a9bbd718e13a41869d30a7c84d27be94bbc04ad73a69
   original:
     hackage: transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
+- completed:
+    hackage: Stack-0.4.0@sha256:ada69a23ed9bbaf97260397f6b39b7a1f4e22a11bcac3fe2e8f23f1513f59fd8,1092
+    pantry-tree:
+      size: 355
+      sha256: 4a0e8d5c268b9d19cb472ac94f0e2291afbb899ce4f5878bbbe86effeba36c6f
+  original:
+    hackage: Stack-0.4.0@sha256:ada69a23ed9bbaf97260397f6b39b7a1f4e22a11bcac3fe2e8f23f1513f59fd8,1092
 snapshots:
 - completed:
     size: 563103

@@ -33,6 +33,7 @@ dependencies:
   - raw-strings-qq
   - polysemy
   - polysemy-plugin
+  - Stack
 
 ghc-options:
   - -fmax-pmcheck-models=10000000

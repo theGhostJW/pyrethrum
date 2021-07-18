@@ -1,5 +1,6 @@
 module RunnerBase
-  ( queryElm,
+  ( AddressedElm (..),
+    querySuite,
     ItemRunner,
     TestSuite,
     LRB.SuiteItem (..),
@@ -24,35 +25,34 @@ type ItemRunner e as ds i hi tc rc effs =
   rc -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
 type TestSuite e tc rc effs a =
-  (forall hi i as ds. (Show i, Show as, Show ds) => hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem () effs [a]
+  (forall hi i as ds. (Show i, Show as, Show ds) => hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
 
 --  (forall hi i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i, ToJSON i) => Test e tc rc hi i as ds effs -> a) -> SuiteItem () effs [a]
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
     results :: Either FilterErrorType [rslt]
-  }  deriving (Show)
+  }
+  deriving (Show)
 
 data AddressedElm a = AddressedElm
   { address :: Stack Text,
     element :: a
   }
 
-queryElm' :: forall hi effs a. (a -> Text) -> Stack Text -> SuiteItem hi effs [a] -> [AddressedElm a]
+queryElm' :: forall r hi effs a. (a -> Text) -> Stack Text -> SuiteItem r hi effs [a] -> [AddressedElm a]
 queryElm' getTitle address =
-  let 
-      badCall f = f $ error "Bad param - this param should never be called"
+  let badCall f = f $ error "Bad param - this param should never be called"
       newStack ttl = stackPush address ttl
    in \case
+        Group {title = t, gElms} -> gElms >>= queryElm' getTitle (newStack t)
         Tests {tests} -> (\t -> AddressedElm (newStack (getTitle t)) t) <$> tests
         BeforeHook {title = t, bhElms} -> bhElms >>= queryElm' getTitle (newStack t) . badCall
-        AfterHook {title = t,  ahElms} -> ahElms >>= queryElm' getTitle (newStack t) . badCall
-        Group {title = t, gElms} -> gElms >>= queryElm' getTitle (newStack t) 
+        AfterHook {title = t, ahElms} -> ahElms >>= queryElm' getTitle (newStack t) . badCall
+        Root {rootElms} -> rootElms >>= queryElm' getTitle address
 
-
-querySuite :: forall hi effs a. (a -> Text) -> Suite hi effs [a] -> [AddressedElm a]
-querySuite gt s = queryElm' gt stackNew (root s)
-   
+querySuite :: forall r hi effs a. (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
+querySuite gt = queryElm' gt stackNew
 
 -- queryElm :: forall hi effs a. SuiteItem hi effs [a] -> [a]
 -- queryElm =
@@ -88,7 +88,7 @@ TODO
   Update Demo
 -}
 
-concatTests :: SuiteItem hi effs t -> [t]
+concatTests :: SuiteItem r hi effs t -> [t]
 concatTests = uu
 
 -- let
@@ -100,14 +100,14 @@ concatTests = uu
 --     (AfterHook _ _ _ ts) -> concat' ts
 --     (Group _ ts) -> concat' ts
 
-groupName :: SuiteItem hi effs a -> Maybe Text
+groupName :: SuiteItem r hi effs a -> Maybe Text
 groupName = \case
   Tests _ -> Nothing
   BeforeHook {} -> Nothing
   AfterHook {} -> Nothing
   Group t _ -> Just t
 
-groupAddresses' :: [Text] -> Text -> SuiteItem hi effs a -> [Text]
+groupAddresses' :: [Text] -> Text -> SuiteItem r hi effs a -> [Text]
 groupAddresses' accum root el = uu
 
 -- let
@@ -132,7 +132,7 @@ groupAddresses' accum root el = uu
 --       in
 --         address : mconcat (groupAddresses' accum address <$> subElems)
 
-groupAddresses :: SuiteItem hi effs a -> [Text]
+groupAddresses :: SuiteItem r hi effs a -> [Text]
 groupAddresses = groupAddresses' [] ""
 
 -- data up to here want items to have title and validations

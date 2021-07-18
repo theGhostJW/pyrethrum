@@ -5,6 +5,8 @@ import OrphanedInstances()
 import RunnerBase as RB
 import RunElementClasses as C
 import qualified Data.List as L 
+import Internal.RunnerBaseLazy (IsRoot)
+import RunnerBase (AddressedElm(..))
 
 acceptFilter :: TestFilterResult -> Bool
 acceptFilter = isNothing . reasonForRejection
@@ -48,16 +50,16 @@ filterLog :: forall tc rc e effs. TestConfigClass tc =>
               TestSuite e tc rc effs TestFilterResult 
               -> [TestFilter rc tc]
               -> rc
-              -> [TestFilterResult]
+              -> [AddressedElm TestFilterResult]
 filterLog suite fltrs rc =
   let
     testFilter :: hi -> Test e tc rc hi i as ds effs -> TestFilterResult
     testFilter _ = filterTest fltrs rc
 
-    si :: SuiteItem () effs [TestFilterResult]
+    si :: SuiteItem IsRoot () effs [TestFilterResult]
     si = suite testFilter
   in
-    queryElm si
+    querySuite si
 
 
 

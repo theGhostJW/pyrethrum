@@ -9,45 +9,52 @@ import Polysemy.Error
 import Pyrelude
 import RunElementClasses
 
-newtype Suite hi effs t = Suite
-  { root :: SuiteItem hi effs t
-  }
 
-data SuiteItem hi effs t where
+
+data IsRoot
+
+data NotRoot
+
+data SuiteItem r hi effs t where
+  Root ::
+    { rootElms :: [SuiteItem NotRoot hi effs t]
+    } ->
+    SuiteItem IsRoot hi effs t
   Tests ::
     { tests :: t
     } ->
-    SuiteItem hi effs t
+    SuiteItem NotRoot hi effs t
   BeforeHook ::
     { title :: Text,
       cardinality :: HookCardinality,
       bHook :: Sem effs o,
-      bhElms :: [o -> SuiteItem o effs t]
+      bhElms :: [o -> SuiteItem NotRoot o effs t]
     } ->
-    SuiteItem hi effs t
+    SuiteItem NotRoot hi effs t
   AfterHook ::
     { title :: Text,
       cardinality :: HookCardinality,
       aHook :: Sem effs (),
-      ahElms :: [hi -> SuiteItem hi effs t]
+      ahElms :: [hi -> SuiteItem NotRoot hi effs t]
     } ->
-    SuiteItem hi effs t
+    SuiteItem NotRoot hi effs t
   Group ::
     { title :: Text,
-      gElms :: [SuiteItem hi effs t]
+      gElms :: [SuiteItem NotRoot hi effs t]
     } ->
-    SuiteItem hi effs t
+    SuiteItem NotRoot hi effs t
 
-instance Functor (SuiteItem hi effs) where
-  fmap :: (a -> b) -> SuiteItem hi effs a -> SuiteItem hi effs b
+instance Functor (SuiteItem r hi effs) where
+  fmap :: (a -> b) -> SuiteItem r hi effs a -> SuiteItem r hi effs b
   fmap f si =
-    let f''' :: (a' -> b') -> (c -> SuiteItem hi' effs a') -> (c -> SuiteItem hi' effs b')
+    let f''' :: (a' -> b') -> (c -> SuiteItem r hi' effs a') -> (c -> SuiteItem r hi' effs b')
         f''' f1 f2 = (f1 <$>) . f2
 
-        f'' :: (a' -> b') -> [c -> SuiteItem hi' effs a'] -> [c -> SuiteItem hi' effs b']
+        f'' :: (a' -> b') -> [c -> SuiteItem r hi' effs a'] -> [c -> SuiteItem r hi' effs b']
         f'' fi l = f''' fi <$> l
      in case si of
           Tests a -> Tests $ f a
           BeforeHook title' cardinality bHook bhElms -> BeforeHook title' cardinality bHook (f'' f bhElms)
           AfterHook title' cardinality aHook ahElms -> AfterHook title' cardinality aHook (f'' f ahElms)
           Group {title = t, gElms} -> Group t $ (f <$>) <$> gElms
+          Root elms' -> Root $ (f <$>) <$> elms'

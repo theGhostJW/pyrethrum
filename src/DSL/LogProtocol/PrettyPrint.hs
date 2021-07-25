@@ -25,10 +25,7 @@ import DSL.LogProtocol as LP
       ApStateJSON(ApStateJSON), GroupTitle, unGroupTitle, RunTitle, unRunTitle )
 import Pyrelude as P
 import RunElementClasses as REC
-    ( TestDisplayInfo(TestDisplayInfo, testConfig, testTitle,
-                      testModAddress),
-      TestAddress(TestAddress),
-      toString, TestFilterResult )
+    ( TestFilterResult, TestDisplayInfo (TestDisplayInfo), testTitle, testConfig )
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y ( Value )
 
@@ -59,7 +56,7 @@ prettyPrintLogProtocol :: Show e => LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocol = prettyPrintLogProtocolBase Nothing
 
 iterId :: ItemId -> Text
-iterId (ItemId tst iid) = toString tst <> " / item " <> txt iid
+iterId (ItemId tst iid) = tst <> " / item " <> txt iid
 
 prettyPrintLogProtocolBase :: Show e => Maybe Text -> LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocolBase _mTimeSuffix style =
@@ -123,11 +120,11 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
         LP.StartHook loc title -> "Start " <> describeLoc loc <> " Hook: " <> title
         LP.EndHook loc title ->   "End " <> describeLoc loc <> " Hook: "  <> title
 
-        LP.StartTest TestDisplayInfo{..} -> separator <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
+        LP.StartTest TestDisplayInfo{ testTitle, testConfig  } -> separator <> tstHeader ("Start Test: " <> testTitle <> " - " <> testTitle) <> 
                                           separator <> "Test Config:" <>
                                           separator <> ppAesonBlock testConfig
 
-        EndTest (TestAddress address) -> separator <> tstHeader ("End Test: " <> address)
+        EndTest address -> separator <> tstHeader ("End Test: " <> address)
         StartIteration iid  _ _ val -> separator <> subHeader ("Start Iteration: " <> iterId iid) <> 
                                         separator <> "Item:" <> 
                                         separator <> ppAesonBlock val <>

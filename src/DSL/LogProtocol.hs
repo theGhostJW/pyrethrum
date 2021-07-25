@@ -35,7 +35,7 @@ newtype WhenClause = WhenClause {unWhenClause :: Text} deriving (Eq, Show, IsStr
 
 newtype ThenClause = ThenClause {unThenClause :: Text} deriving (Eq, Show, IsString)
 
-data ItemId = ItemId {tstModule :: TestAddress, itmId :: Int} deriving (Eq, Ord, Show)
+data ItemId = ItemId {tstModule :: Text, itmId :: Int} deriving (Eq, Ord, Show)
 
 -- needed because ItemId is used in a map
 instance ToJSONKey ItemId
@@ -75,7 +75,7 @@ data LogProtocolBase e
   | StartHook HookCardinality Text
   | EndHook HookCardinality Text
   | StartTest TestDisplayInfo
-  | EndTest TestAddress
+  | EndTest Text
   | StartIteration ItemId WhenClause ThenClause Value
   | EndIteration ItemId
   

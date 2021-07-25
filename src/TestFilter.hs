@@ -59,7 +59,7 @@ filterLog suite fltrs rc =
     si :: SuiteItem IsRoot () effs [TestFilterResult]
     si = suite testFilter
   in
-    querySuite si
+    querySuite (testTitle . testInfo) si
 
 
 

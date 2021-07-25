@@ -1,18 +1,18 @@
--- {-# LANGUAGE NoStrictData #-} 
+-- {-# LANGUAGE NoStrictData #-}
 
 module MockSuite where
 
+import DSL.Interpreter (MinEffs)
 import Data.Aeson.TH
 import Data.Aeson.Types
 import Data.Yaml
+import ItemRunners (runItem)
 import Polysemy
 import Pyrelude as P
 import Pyrelude.Test hiding (Group)
 import Runner as R
-import RunnerBase (Test)
+import RunnerBase (IsRoot, Test)
 import TestFilter
-import DSL.Interpreter (MinEffs)
-import ItemRunners (runItem)
 
 data Include = In | Out deriving (Eq, Ord, Show)
 
@@ -31,11 +31,11 @@ outOfFilterRunConfig :: RunConfig
 outOfFilterRunConfig = RunConfig "In Filter" False
 
 inOutFilter :: TestFilter RunConfig TestConfig
-inOutFilter = TestFilter {
-     title = "in out filter state must match",
-     predicate = \rc tc -> inFilter rc == (include tc == In)
-   }
-
+inOutFilter =
+  TestFilter
+    { title = "in out filter state must match",
+      predicate = \rc tc -> inFilter rc == (include tc == In)
+    }
 
 instance Titled RunConfig where
   title = cfgHeader
@@ -43,6 +43,7 @@ instance Titled RunConfig where
 instance RunConfigClass RunConfig
 
 type DemoEffs effs = MinEffs Text effs
+
 data TestConfig = TestConfig
   { header :: Text,
     address :: TestAddress,
@@ -170,54 +171,56 @@ includeFilter =
 filters' :: [TestFilter RunConfig TestConfig]
 filters' = [includeFilter]
 
-mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
+mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
 mockSuite r =
-  R.Group
-    "Filter TestSuite"
-    [ BeforeHook
-        { title = "Before All",
-          cardinality = ExeOnce,
-          bHook = pure "hello",
-          bhElms =
-            [ \t ->
-                Tests
-                  [ r t test1Txt,
-                    r t test4Txt
-                  ],
-              const
-                R.Group
-                  { title = "Empty Group",
-                    gElms =
-                      [ Tests []
-                      ]
-                  }
-            ]
-        },
-      R.Group
-        { title = "Nested Int Group",
-          gElms =
-            [ BeforeHook
-                { title = "Int Group",
-                  cardinality = ExeForEach,
-                  bHook = pure 23,
-                  bhElms =
-                    [ \t ->
-                        AfterHook
-                          { title = "After Exch Int",
-                            cardinality = ExeForEach,
-                            aHook = t == 23 ? pure () $ pure (),
-                            ahElms =
-                              [ \i ->
-                                  Tests
-                                    [ r i test5Int,
-                                      r i test2Int
-                                    ]
-                              ]
-                          }
-                    ]
-                }
-            ]
-        }
+  R.Root
+    [ R.Group
+        "Filter TestSuite"
+        [ BeforeHook
+            { title = "Before All",
+              cardinality = ExeOnce,
+              bHook = pure "hello",
+              bhElms =
+                [ \t ->
+                    Tests
+                      [ r t test1Txt,
+                        r t test4Txt
+                      ],
+                  const
+                    R.Group
+                      { title = "Empty Group",
+                        gElms =
+                          [ Tests []
+                          ]
+                      }
+                ]
+            },
+          R.Group
+            { title = "Nested Int Group",
+              gElms =
+                [ BeforeHook
+                    { title = "Int Group",
+                      cardinality = ExeForEach,
+                      bHook = pure 23,
+                      bhElms =
+                        [ \t ->
+                            AfterHook
+                              { title = "After Exch Int",
+                                cardinality = ExeForEach,
+                                aHook = t == 23 ? pure () $ pure (),
+                                ahElms =
+                                  [ \i ->
+                                      Tests
+                                        [ r i test5Int,
+                                          r i test2Int
+                                        ]
+                                  ]
+                              }
+                        ]
+                    }
+                ]
+            }
+        ]
     ]
 
 runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs ()

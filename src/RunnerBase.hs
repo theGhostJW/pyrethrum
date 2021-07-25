@@ -4,6 +4,8 @@ module RunnerBase
     ItemRunner,
     TestSuite,
     LRB.SuiteItem (..),
+    LRB.IsRoot,
+    LRB.NotRoot,
     Test (..),
     GenericResult (..),
     concatTests,
@@ -39,6 +41,7 @@ data AddressedElm a = AddressedElm
   { address :: Stack Text,
     element :: a
   }
+  deriving Show
 
 queryElm' :: forall r hi effs a. (a -> Text) -> Stack Text -> SuiteItem r hi effs [a] -> [AddressedElm a]
 queryElm' getTitle address =
@@ -47,11 +50,12 @@ queryElm' getTitle address =
    in \case
         Group {title = t, gElms} -> gElms >>= queryElm' getTitle (newStack t)
         Tests {tests} -> (\t -> AddressedElm (newStack (getTitle t)) t) <$> tests
-        BeforeHook {title = t, bhElms} -> bhElms >>= queryElm' getTitle (newStack t) . badCall
-        AfterHook {title = t, ahElms} -> ahElms >>= queryElm' getTitle (newStack t) . badCall
+        -- beforeHook, afterHook and root do not contribute to the address
+        BeforeHook {title = t, bhElms} -> bhElms >>= queryElm' getTitle address . badCall
+        AfterHook {title = t, ahElms} -> ahElms >>= queryElm' getTitle address . badCall
         Root {rootElms} -> rootElms >>= queryElm' getTitle address
 
-querySuite :: forall r hi effs a. (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
+querySuite :: forall hi effs a. (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
 querySuite gt = queryElm' gt stackNew
 
 -- queryElm :: forall hi effs a. SuiteItem hi effs [a] -> [a]
@@ -105,6 +109,7 @@ groupName = \case
   Tests _ -> Nothing
   BeforeHook {} -> Nothing
   AfterHook {} -> Nothing
+  Root{} -> Nothing
   Group t _ -> Just t
 
 groupAddresses' :: [Text] -> Text -> SuiteItem r hi effs a -> [Text]

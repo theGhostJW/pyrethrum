@@ -10,7 +10,7 @@ import Pyrelude.Test ( chk, chk', Assertion, (...) )
 import DSL.LogProtocol ( LogProtocolBase (..))
 import Common  ( FrameworkError, DetailedInfo(DetailedInfo), HookCardinality(..) )
 import Runner (groupAddresses, Titled (title), config, TestFilterResult (TestFilterResult, testInfo, reasonForRejection), TestDisplayInfo (testModAddress), TestAddress (unTestAddress))
-import RunnerBase (queryElm)
+import RunnerBase (querySuite, AddressedElm (AddressedElm, element))
 import TempUtils
 import ItemRunners (runItem)
 import Data.Foldable (Foldable(length))
@@ -20,8 +20,9 @@ import qualified Data.Text as Text
 import TestFilter
 
 -- >>> demoQueryElem
--- ["test1","test4","test5","test2"]
+-- [AddressedElm {address = Stack 2 ["test1","Filter TestSuite"], element = "test1"},AddressedElm {address = Stack 2 ["test4","Filter TestSuite"], element = "test4"},AddressedElm {address = Stack 3 ["test5","Nested Int Group","Filter TestSuite"], element = "test5"},AddressedElm {address = Stack 3 ["test2","Nested Int Group","Filter TestSuite"], element = "test2"}]
 -- 
+demoQueryElem :: [AddressedElm Text]
 demoQueryElem =
   let
     getTitle :: a -> MockTest hi i as ds effs -> Text
@@ -29,15 +30,14 @@ demoQueryElem =
 
     root = mockSuite getTitle
   in
-    queryElm root
+    querySuite id root
 
-applyFilterLog :: TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]
+applyFilterLog :: TestFilter RunConfig TestConfig -> RunConfig -> [RunnerBase.AddressedElm TestFilterResult]
 applyFilterLog fltr = filterLog mockSuite [fltr]
-
 
 listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
-   unTestAddress . testModAddress . testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
+   unTestAddress . testModAddress . testInfo . element <$> filter (isNothing . reasonForRejection . element) (applyFilterLog fltr rc)
 
 -- $> inFilterTests
 inFilterTests :: [Text]

@@ -25,7 +25,7 @@ import DSL.LogProtocol as LP
       ApStateJSON(ApStateJSON), GroupTitle, unGroupTitle, RunTitle, unRunTitle )
 import Pyrelude as P
 import RunElementClasses as REC
-    ( TestFilterResult, TestDisplayInfo (TestDisplayInfo), testTitle, testConfig )
+    ( TestFilterResult, TestLogInfo (TestLogInfo), title, testConfig )
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y ( Value )
 
@@ -120,7 +120,7 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
         LP.StartHook loc title -> "Start " <> describeLoc loc <> " Hook: " <> title
         LP.EndHook loc title ->   "End " <> describeLoc loc <> " Hook: "  <> title
 
-        LP.StartTest TestDisplayInfo{ testTitle, testConfig  } -> separator <> tstHeader ("Start Test: " <> testTitle <> " - " <> testTitle) <> 
+        LP.StartTest TestLogInfo{ title, testConfig  } -> separator <> tstHeader ("Start Test: " <> title <> " - " <> title) <> 
                                           separator <> "Test Config:" <>
                                           separator <> ppAesonBlock testConfig
 

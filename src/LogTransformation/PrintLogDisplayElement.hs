@@ -161,7 +161,7 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
           (const (skipItt, skipTst))
           ( \LogProtocolOut {logInfo = lp} ->
               case lp of
-                LP.StartTest (TestDisplayInfo tstMod _ _) -> (False, LC.Pass == testStatus' tstMod)
+                LP.StartTest (TestLogInfo tstMod _ _) -> (False, LC.Pass == testStatus' tstMod)
                 StartIteration iid _ _ _ -> (LC.Pass == executionStatus (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
                 _ -> (skipItt, skipTst)
           )
@@ -273,11 +273,11 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
     LP.EndGroup _ -> skipLog
     StartHook {} -> skipLog
     EndHook {}  -> skipLog
-    LP.StartTest (TestDisplayInfo testModAddress testTitle testConfig) ->
+    LP.StartTest (TestLogInfo testModAddress title testConfig) ->
         ( accum,
           elOut $
             LogTransformation.PrintLogDisplayElement.StartTest
-              testTitle
+              title
               testModAddress
               (getNotes testConfig)
               testConfig

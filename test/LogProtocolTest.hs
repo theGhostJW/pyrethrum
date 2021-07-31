@@ -77,9 +77,9 @@ genRunConfig =
 genDetailedInfo :: Gen DetailedInfo
 genDetailedInfo = DetailedInfo <$> genStr <*> genStr
 
-genTestDisplayInfo :: Gen TestDisplayInfo
+genTestDisplayInfo :: Gen TestLogInfo
 genTestDisplayInfo =
-  TestDisplayInfo
+  TestLogInfo
     <$> genTestAddress
     <*> genStr
     <*> (A.toJSON <$> genTestConfig)

@@ -1,6 +1,6 @@
 module RunnerBase
   ( AddressedElm (..),
-    querySuite,
+    Domain,
     ItemRunner,
     TestSuite,
     LRB.SuiteItem (..),
@@ -9,8 +9,11 @@ module RunnerBase
     Test (..),
     GenericResult (..),
     concatTests,
+    emptyDomain,
     groupAddresses,
     groupName,
+    push,
+    querySuite,
   )
 where
 
@@ -21,10 +24,33 @@ import Internal.RunnerBaseLazy as LRB
 import Polysemy
 import Polysemy.Error
 import Pyrelude
+  ( Applicative ((<*>)),
+    Bool (..),
+    Category ((.)),
+    Either,
+    Eq (..),
+    Maybe (..),
+    Monad ((>>=)),
+    Ord (..),
+    Ordering (..),
+    Show,
+    Text,
+    error,
+    fromJust,
+    fromMaybe,
+    not,
+    otherwise,
+    uu,
+    ($),
+    (&&),
+    (<$>),
+    (?),
+    (||), isNothing
+  )
 import RunElementClasses
 
-type ItemRunner e as ds i hi tc rc effs =
-  rc -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
+type ItemRunner e as ds i hi tc rc pd effs =
+  rc -> pd -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
 type TestSuite e tc rc effs a =
   (forall hi i as ds. (Show i, Show as, Show ds) => hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
@@ -37,26 +63,63 @@ data GenericResult tc rslt = TestResult
   }
   deriving (Show)
 
+newtype Domain = Domain {un :: Stack Text} deriving (Show)
+
+instance Eq Domain where
+  (==) :: Domain -> Domain -> Bool
+  Domain sl == Domain sr =
+    let subsEq :: Maybe (Stack Text, Text) -> Maybe (Stack Text, Text) -> Bool
+        subsEq ml mr = isNothing ml && isNothing mr || fromMaybe False (do
+          (sl', txtl) <- ml
+          (sr', txtr) <- mr
+          Just $ txtl == txtr && stacksEq sl' sr')
+
+        stacksEq :: Stack Text -> Stack Text -> Bool
+        stacksEq ssl ssr = subsEq (stackPop ssl) (stackPop ssr)
+     in stacksEq sl sr
+
+instance Ord Domain where
+  compare (Domain l) (Domain r) =
+    let stackCompare sl sr
+          | lempty && rempty = EQ
+          | lempty && not rempty = LT
+          | not lempty && rempty = GT
+          | otherwise =
+            let (sl', ltxt) = fromJust $ stackPop sl
+                (sr', rtxt) = fromJust $ stackPop sr
+                txtCompare = compare ltxt rtxt
+             in txtCompare /= EQ ? txtCompare $ stackCompare sl' sr'
+          where
+            lempty = stackIsEmpty sl
+            rempty = stackIsEmpty sr
+     in stackCompare l r
+
+push :: Domain -> Text -> Domain
+push d t = Domain $ stackPush (un d) t
+
+emptyDomain :: Domain
+emptyDomain = Domain stackNew
+
 data AddressedElm a = AddressedElm
-  { address :: Stack Text,
+  { domain :: Domain,
     element :: a
   }
-  deriving Show
+  deriving (Show)
 
-queryElm' :: forall r hi effs a. (a -> Text) -> Stack Text -> SuiteItem r hi effs [a] -> [AddressedElm a]
-queryElm' getTitle address =
+queryElm' :: forall r hi effs a. (a -> Text) -> Domain -> SuiteItem r hi effs [a] -> [AddressedElm a]
+queryElm' getTitle domain =
   let badCall f = f $ error "Bad param - this param should never be called"
-      newStack ttl = stackPush address ttl
+      newStack = push domain
    in \case
         Group {title = t, gElms} -> gElms >>= queryElm' getTitle (newStack t)
         Tests {tests} -> (\t -> AddressedElm (newStack (getTitle t)) t) <$> tests
-        -- beforeHook, afterHook and root do not contribute to the address
-        BeforeHook {title = t, bhElms} -> bhElms >>= queryElm' getTitle address . badCall
-        AfterHook {title = t, ahElms} -> ahElms >>= queryElm' getTitle address . badCall
-        Root {rootElms} -> rootElms >>= queryElm' getTitle address
+        -- beforeHook, afterHook and root do not contribute to the domain
+        BeforeHook {title = t, bhElms} -> bhElms >>= queryElm' getTitle domain . badCall
+        AfterHook {title = t, ahElms} -> ahElms >>= queryElm' getTitle domain . badCall
+        Root {rootElms} -> rootElms >>= queryElm' getTitle domain
 
 querySuite :: forall hi effs a. (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
-querySuite gt = queryElm' gt stackNew
+querySuite gt = queryElm' gt emptyDomain
 
 -- queryElm :: forall hi effs a. SuiteItem hi effs [a] -> [a]
 -- queryElm =
@@ -109,7 +172,7 @@ groupName = \case
   Tests _ -> Nothing
   BeforeHook {} -> Nothing
   AfterHook {} -> Nothing
-  Root{} -> Nothing
+  Root {} -> Nothing
   Group t _ -> Just t
 
 groupAddresses' :: [Text] -> Text -> SuiteItem r hi effs a -> [Text]

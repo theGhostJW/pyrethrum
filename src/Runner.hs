@@ -73,10 +73,10 @@ import RunElementClasses as C
       mkTestAddress,
       toString,
       ItemClass(..),
-      RunConfigClass,
+      Config,
       TestAddress(..),
-      TestConfigClass(..),
-      TestDisplayInfo(..),
+      Config(..),
+      TestLogInfo(..),
       TestFilterResult(..),
       Titled(..) )
 import OrphanedInstances()
@@ -96,7 +96,7 @@ import RunnerBase as RB
       TestSuite )
 import qualified Prelude as PRL
 
-runTestItems :: forall i as ds hi tc rc e effs. (ToJSON e, Show e, TestConfigClass tc, ToJSON i, ItemClass i ds, Member (Logger e) effs) =>
+runTestItems :: forall i as ds hi tc rc e effs. (ToJSON e, Show e, Config tc, ToJSON i, ItemClass i ds, Member (Logger e) effs) =>
       Maybe (S.Set Int)     -- target Ids
       -> [i]                -- ids
       -> Sem effs hi        --before each
@@ -139,7 +139,7 @@ runTestItems iIds items beforEach afterEach rc test@Test{ config = tc } itemRunn
       [] -> []
       xs -> [startTest >> sequence_ (applyRunner <$> xs) >> endTest]
 
-runTest :: forall i rc hi as ds tc e effs. (ItemClass i ds, TestConfigClass tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
+runTest :: forall i rc hi as ds tc e effs. (ItemClass i ds, Config tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
                    RunParams Maybe e rc tc effs ()    -- Run Params
                    -> Sem effs hi                     -- before each
                    -> (hi -> Sem effs ())             -- after each
@@ -224,7 +224,7 @@ emptyElm si = uu
   --    Tests { tests } -> pure . null $ filter pred tests
   --    BeforeHook { bhElms } -> uu -- [hi -> SuiteItem hi effs t]
 
-mkSem :: forall rc tc e effs. (ToJSON e, Show e, RunConfigClass rc, TestConfigClass tc, MinEffs e effs) =>
+mkSem :: forall rc tc e effs. (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
                     RunParams Maybe e rc tc effs ()
                     -> Sem effs ()
 mkSem rp@RunParams {suite, filters, rc} = uu
@@ -254,7 +254,7 @@ mkSem rp@RunParams {suite, filters, rc} = uu
   --     (toS <$> firstDuplicate (toS @_ @PRL.String <$> groupAddresses root))
 
 
-mkEndpointSem :: forall rc tc e effs. (RunConfigClass rc, TestConfigClass tc, ToJSON e, Show e, MinEffs e effs) =>
+mkEndpointSem :: forall rc tc e effs. (Config rc, Config tc, ToJSON e, Show e, MinEffs e effs) =>
                    RunParams (Either FilterErrorType) e rc tc effs ()
                    -> TestAddress                            -- test address
                    -> Either FilterErrorType (S.Set Int)    -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results

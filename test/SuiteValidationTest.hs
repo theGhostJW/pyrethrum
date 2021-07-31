@@ -9,7 +9,7 @@ import Pyrelude as P
 import Pyrelude.Test ( chk, chk', Assertion, (...) )
 import DSL.LogProtocol ( LogProtocolBase (..))
 import Common  ( FrameworkError, DetailedInfo(DetailedInfo), HookCardinality(..) )
-import Runner (groupAddresses, Titled (title), config, TestFilterResult (TestFilterResult, testInfo, reasonForRejection), TestDisplayInfo (testModAddress), TestAddress (unTestAddress))
+import Runner (groupAddresses, Titled (title), config, TestFilterResult (TestFilterResult, testInfo, reasonForRejection), TestLogInfo (testModAddress), TestAddress (unTestAddress))
 import RunnerBase (querySuite, AddressedElm (AddressedElm, element))
 import TempUtils
 import ItemRunners (runItem)

@@ -40,7 +40,7 @@ inOutFilter =
 instance Titled RunConfig where
   title = cfgHeader
 
-instance RunConfigClass RunConfig
+instance Config RunConfig
 
 type DemoEffs effs = MinEffs Text effs
 
@@ -51,7 +51,7 @@ data TestConfig = TestConfig
   }
   deriving (Show, Eq)
 
-instance TestConfigClass TestConfig where
+instance Config TestConfig where
   moduleAddress = address
 
 instance Titled TestConfig where

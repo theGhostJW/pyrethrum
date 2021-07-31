@@ -29,7 +29,7 @@ data TestConfig = TestConfig {
   enabled :: Bool
 }  deriving (Show ,Eq)
 
-instance TestConfigClass TestConfig where
+instance Config TestConfig where
   moduleAddress = address
 
 instance Titled TestConfig where
@@ -203,7 +203,7 @@ emptiParser a _ = pure a
 -- acceptedTests rc = P.filter acceptFilter $ filterResults rc
 
 -- chkFilters :: [Text] -> RunConfig -> Assertion
--- chkFilters expted rc = chkEq expted $ testTitle . testInfo <$> acceptedTests rc
+-- chkFilters expted rc = chkEq expted $ title . testInfo <$> acceptedTests rc
 
 -- unit_test_filter_expect_empty :: Assertion
 -- unit_test_filter_expect_empty = chkFilters [] $ RunConfig NZ Connectivity

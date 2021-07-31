@@ -14,7 +14,7 @@ acceptFilter = isNothing . reasonForRejection
 rejectFilter :: TestFilterResult -> Bool
 rejectFilter = isJust . reasonForRejection
 
-mkTestFilterResult :: TestConfigClass tc => tc -> Maybe Text -> TestFilterResult
+mkTestFilterResult :: Config tc => tc -> Maybe Text -> TestFilterResult
 mkTestFilterResult tc rejection = TestFilterResult {
                                 testInfo = mkDisplayInfo tc,
                                 reasonForRejection = rejection
@@ -25,7 +25,7 @@ data TestFilter rc tc = TestFilter {
   predicate :: rc -> tc -> Bool
 }
 
-applyFilters :: forall rc tc. TestConfigClass tc => [TestFilter rc tc] -> rc -> tc -> TestFilterResult
+applyFilters :: forall rc tc. Config tc => [TestFilter rc tc] -> rc -> tc -> TestFilterResult
 applyFilters fltrs rc tc = 
  let
   fltrRslt :: Maybe Text -> TestFilterResult
@@ -42,11 +42,11 @@ applyFilters fltrs rc tc =
   fltrRslt firstRejectReason
     
 
-filterTest :: forall i as ds tc hi rc e effs. TestConfigClass tc => [TestFilter rc tc] -> rc -> Test e tc rc hi i as ds effs -> TestFilterResult
+filterTest :: forall i as ds tc hi rc e effs. Config tc => [TestFilter rc tc] -> rc -> Test e tc rc hi i as ds effs -> TestFilterResult
 filterTest fltrs rc Test{ config = tc } = applyFilters fltrs rc tc
 
 
-filterLog :: forall tc rc e effs. TestConfigClass tc =>
+filterLog :: forall tc rc e effs. Config tc =>
               TestSuite e tc rc effs TestFilterResult 
               -> [TestFilter rc tc]
               -> rc
@@ -59,7 +59,7 @@ filterLog suite fltrs rc =
     si :: SuiteItem IsRoot () effs [TestFilterResult]
     si = suite testFilter
   in
-    querySuite (testTitle . testInfo) si
+    querySuite (title . testInfo) si
 
 
 

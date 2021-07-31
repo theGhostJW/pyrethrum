@@ -248,7 +248,7 @@ testItrDelta =
   let clear = (Clear, Clear)
       keep = (Keep, Keep)
    in \case
-        StartTest (TestDisplayInfo mdule _ _) -> (New mdule, Clear)
+        StartTest (TestLogInfo mdule _ _) -> (New mdule, Clear)
         StartIteration iid _ _ _ -> (Keep, New iid)
         EndIteration _ -> keep
         StartRun {} -> clear

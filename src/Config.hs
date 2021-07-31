@@ -62,7 +62,7 @@ type LogProtocol = LogProtocolBase SuiteError
 instance Titled RunConfig where
   title = runTitle
 
-instance RunConfigClass RunConfig
+instance Config RunConfig
 
 allEnvironments :: Set Environment
 allEnvironments = S.fromList enumList
@@ -89,7 +89,7 @@ type TestResult = GenericResult TestConfig
 instance Titled TestConfig where
   title = header
 
-instance TestConfigClass TestConfig where
+instance Config TestConfig where
   moduleAddress = address
 
 testConfig :: TestConfig

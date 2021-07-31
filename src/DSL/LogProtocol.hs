@@ -6,6 +6,7 @@ import Data.Aeson as A
 import Data.Aeson.TH
 import Pyrelude
 import RunElementClasses
+import RunnerBase (Domain)
 
 newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)
 
@@ -35,7 +36,7 @@ newtype WhenClause = WhenClause {unWhenClause :: Text} deriving (Eq, Show, IsStr
 
 newtype ThenClause = ThenClause {unThenClause :: Text} deriving (Eq, Show, IsString)
 
-data ItemId = ItemId {tstModule :: Text, itmId :: Int} deriving (Eq, Ord, Show)
+data ItemId = ItemId {tstModule :: Domain, itmId :: Int} deriving (Eq, Ord, Show)
 
 -- needed because ItemId is used in a map
 instance ToJSONKey ItemId
@@ -74,7 +75,7 @@ data LogProtocolBase e
   | EndGroup GroupTitle
   | StartHook HookCardinality Text
   | EndHook HookCardinality Text
-  | StartTest TestDisplayInfo
+  | StartTest TestLogInfo
   | EndTest Text
   | StartIteration ItemId WhenClause ThenClause Value
   | EndIteration ItemId

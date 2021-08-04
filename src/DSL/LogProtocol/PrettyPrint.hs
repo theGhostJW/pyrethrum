@@ -2,7 +2,6 @@
 module DSL.LogProtocol.PrettyPrint (
   prettyPrintLogProtocol,
   prettyPrintLogProtocolWith,
-  -- prettyPrintLogProtocolSimple,
   LogStyle(..)
 ) where
 
@@ -24,8 +23,9 @@ import DSL.LogProtocol as LP
       DStateJSON(DStateJSON),
       ApStateJSON(ApStateJSON), GroupTitle, unGroupTitle, RunTitle, unRunTitle )
 import Pyrelude as P
+import RunnerBase as RB
 import RunElementClasses as REC
-    ( TestFilterResult, TestLogInfo (TestLogInfo), title, testConfig )
+    ( TestFilterResult, TestLogInfo (TestLogInfo), title, testConfig, logInfoAddress, domainAddress )
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y ( Value )
 
@@ -56,7 +56,7 @@ prettyPrintLogProtocol :: Show e => LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocol = prettyPrintLogProtocolBase Nothing
 
 iterId :: ItemId -> Text
-iterId (ItemId tst iid) = tst <> " / item " <> txt iid
+iterId (ItemId d iid) = domainAddress d <> " / item " <> txt iid
 
 prettyPrintLogProtocolBase :: Show e => Maybe Text -> LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocolBase _mTimeSuffix style =
@@ -124,7 +124,7 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
                                           separator <> "Test Config:" <>
                                           separator <> ppAesonBlock testConfig
 
-        EndTest address -> separator <> tstHeader ("End Test: " <> address)
+        EndTest address -> separator <> tstHeader ("End Test: " <> domainAddress address)
         StartIteration iid  _ _ val -> separator <> subHeader ("Start Iteration: " <> iterId iid) <> 
                                         separator <> "Item:" <> 
                                         separator <> ppAesonBlock val <>

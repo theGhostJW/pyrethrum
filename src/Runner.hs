@@ -69,16 +69,13 @@ import Polysemy.Error as PE ( Error, catch, throw )
 import ItemFilter  (ItemFilter (..), filterredItemIds)
 import qualified Data.Set as S
 import RunElementClasses as C
-    ( mkDisplayInfo,
-      mkTestAddress,
-      toString,
+    ( mkTestLogInfo,
       ItemClass(..),
       Config,
-      TestAddress(..),
       Config(..),
       TestLogInfo(..),
       TestFilterResult(..),
-      Titled(..) )
+      Titled(..), ModuleDomain, ElementDomain, elementDomain )
 import OrphanedInstances()
 import Data.Aeson as A ( ToJSON(toJSON) )
 import qualified TestFilter as F
@@ -95,6 +92,10 @@ import RunnerBase as RB
       Test(..),
       TestSuite )
 import qualified Prelude as PRL
+import GHC.Records ( HasField(getField) )
+
+
+getId =  getField @"id"
 
 runTestItems :: forall i as ds hi tc rc e effs. (ToJSON e, Show e, Config tc, ToJSON i, ItemClass i ds, Member (Logger e) effs) =>
       Maybe (S.Set Int)     -- target Ids
@@ -102,16 +103,17 @@ runTestItems :: forall i as ds hi tc rc e effs. (ToJSON e, Show e, Config tc, To
       -> Sem effs hi        --before each
       -> (hi -> Sem effs ()) -- after each
       -> rc                 -- runcoonfig
+      -> ElementDomain
       -> Test e tc rc hi i as ds effs
       -> ItemRunner e as ds i hi tc rc effs
       -> [Sem effs ()]
-runTestItems iIds items beforEach afterEach rc test@Test{ config = tc } itemRunner =
+runTestItems iIds items beforEach afterEach rc ed test@Test{ config = tc } itemRunner =
   let
     startTest :: Sem effs ()
-    startTest = logItem . StartTest $ mkDisplayInfo tc
+    startTest = logItem . StartTest $ mkTestLogInfo tc
 
     endTest :: Sem effs ()
-    endTest = logItem . EndTest $ moduleAddress tc
+    endTest = logItem $ EndTest ed
 
     filteredItems :: [i]
     filteredItems = filter inTargIds items
@@ -123,17 +125,17 @@ runTestItems iIds items beforEach afterEach rc test@Test{ config = tc } itemRunn
     applyRunner i =  
       let
         iid :: ItemId
-        iid = ItemId (moduleAddress tc) (identifier @_ @ds i)
+        iid = ItemId ed (getId i)
       in
         do
           logItem . StartIteration iid (WhenClause $ whenClause @_ @ds i) (ThenClause $ thenClause @_ @ds  i) $ toJSON i
           hi <- beforEach
-          itemRunner rc hi test i
+          itemRunner rc ed hi test i
           afterEach hi
           logItem $ EndIteration iid
 
     inTargIds :: i -> Bool
-    inTargIds i = maybe True (S.member (identifier @_ @ds i)) iIds
+    inTargIds i = maybe True (S.member $ getId i) iIds
   in
     case filteredItems of
       [] -> []
@@ -141,12 +143,13 @@ runTestItems iIds items beforEach afterEach rc test@Test{ config = tc } itemRunn
 
 runTest :: forall i rc hi as ds tc e effs. (ItemClass i ds, Config tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
                    RunParams Maybe e rc tc effs ()    -- Run Params
+                   -> ModuleDomain 
                    -> Sem effs hi                     -- before each
                    -> (hi -> Sem effs ())             -- after each
                    -> Test e tc rc hi i as ds effs    -- Test Case
                    -> [Sem effs ()]                   -- [Test Iterations]
-runTest RunParams {filters, rc, itemIds, itemRunner} be ae test@Test {config = tc, items}  =
-     F.acceptFilter (F.applyFilters filters rc tc)
+runTest RunParams {filters, rc, itemIds, itemRunner} md be ae test@Test {config = tc, items}  =
+     F.acceptFilter (F.applyFilters filters rc md tc)
         ? runTestItems itemIds (items rc) be ae rc test itemRunner
         $ []
 
@@ -256,12 +259,12 @@ mkSem rp@RunParams {suite, filters, rc} = uu
 
 mkEndpointSem :: forall rc tc e effs. (Config rc, Config tc, ToJSON e, Show e, MinEffs e effs) =>
                    RunParams (Either FilterErrorType) e rc tc effs ()
-                   -> TestAddress                            -- test address
+                   -> ModuleDomain                            -- test address
                    -> Either FilterErrorType (S.Set Int)    -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
                    -> Sem effs ()
 mkEndpointSem runParams@RunParams { filters, itemIds } tstAddress iIds =
   let
-    endpointFilter :: TestAddress -> F.TestFilter rc tc
+    endpointFilter :: ModuleDomain -> F.TestFilter rc tc
     endpointFilter targAddress = F.TestFilter {
       title = "test address does not match endpoint target: " <> toString targAddress,
       predicate = \_ tc -> moduleAddress tc == targAddress

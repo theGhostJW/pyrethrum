@@ -10,7 +10,7 @@ import Data.ByteString.Lazy as B
 import Data.Set as S
 import Pyrelude as P
 import Pyrelude.Test as T
-import RunElementClasses
+import RunElementClasses hiding (element)
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
 
@@ -20,7 +20,6 @@ data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show
 
 data TestConfig = TestConfig
   { header :: Text,
-    address :: TestAddress,
     environments :: Set Environment,
     countries :: Set Country,
     minDepth :: Depth,
@@ -48,47 +47,53 @@ runConfig =
 genJSON :: Gen A.Value
 genJSON = A.toJSON <$> genRunConfig -- using runconfig as easy proxy for random aeson
 
-genStr :: Gen Text
-genStr = text (linear 0 1000) ascii
+genTxt :: Gen Text
+genTxt = text (linear 0 1000) ascii
 
-genTestAddress :: Gen TestAddress
-genTestAddress = TestAddress <$> genStr
+
+modDomain :: ModuleDomain
+modDomain = P.foldl' addLayer rootDomain ["root", "sub 1", "sub 2"]
+
+domainElementSingleton :: Gen ElementDomain
+domainElementSingleton = pure $ elementDomain modDomain "test"
+
+moduleDomainSingleton :: Gen ModuleDomain
+moduleDomainSingleton = pure modDomain
 
 genTestConfig :: Gen TestConfig
 genTestConfig =
   let set' :: (Enum a, Ord a) => Gen (Set a)
       set' = (S.fromList <$>) <$> subsequence $ enumList
    in TestConfig
-        <$> genStr
-        <*> genTestAddress
+        <$> genTxt
         <*> set'
         <*> set'
-        <*> element enumList
+        <*> T.element enumList
         <*> T.bool
 
 genRunConfig :: Gen RunConfig
 genRunConfig =
   RunConfig
-    <$> genStr
+    <$> genTxt
     <*> element enumList
     <*> element enumList
     <*> element enumList
 
 genDetailedInfo :: Gen DetailedInfo
-genDetailedInfo = DetailedInfo <$> genStr <*> genStr
+genDetailedInfo = DetailedInfo <$> genTxt <*> genTxt
 
 genTestDisplayInfo :: Gen TestLogInfo
 genTestDisplayInfo =
   TestLogInfo
-    <$> genTestAddress
-    <*> genStr
+    <$>  genTxt
+    <*>  moduleDomainSingleton
     <*> (A.toJSON <$> genTestConfig)
 
 genTestFilterResult :: Gen TestFilterResult
 genTestFilterResult =
   TestFilterResult
     <$> genTestDisplayInfo
-    <*> T.maybe genStr
+    <*> T.maybe genTxt
 
 genTestFilterResults :: Gen [TestFilterResult]
 genTestFilterResults =
@@ -98,17 +103,17 @@ genInt :: Gen Int
 genInt = integral $ T.linear 0 1000
 
 genItemId :: Gen ItemId
-genItemId = ItemId <$> genTestAddress <*> genInt
+genItemId = ItemId <$> domainElementSingleton <*> genInt
 
 genError :: Gen (FrameworkError Int)
-genError = Common.Error <$> genStr
+genError = Common.Error <$> genTxt
 
 genResultExpectation :: Gen C.ResultExpectation
 genResultExpectation =
   choice
     [ pure C.ExpectPass,
-      C.ExpectFailure C.Inactive <$> genStr,
-      C.ExpectFailure C.Active <$> genStr
+      C.ExpectFailure C.Inactive <$> genTxt,
+      C.ExpectFailure C.Active <$> genTxt
     ]
 
 genGateStatus :: Gen C.GateStatus
@@ -121,24 +126,24 @@ genGateStatus =
 genLogProtocol :: Gen (LogProtocolBase Int)
 genLogProtocol =
   choice
-    [ StartRun <$> (RunTitle <$> genStr) <*> genInt <*> (A.toJSON <$> genRunConfig),
-      StartGroup <$> (GroupTitle <$> genStr),
-      EndGroup <$> (GroupTitle <$> genStr),
+    [ StartRun <$> (RunTitle <$> genTxt) <*> genInt <*> (A.toJSON <$> genRunConfig),
+      StartGroup <$> (GroupTitle <$> genTxt),
+      EndGroup <$> (GroupTitle <$> genTxt),
       StartTest <$> genTestDisplayInfo,
-      EndTest <$> genTestAddress,
-      StartIteration <$> genItemId <*> (WhenClause <$> genStr) <*> (ThenClause <$> genStr) <*> (A.toJSON <$> genRunConfig), --- using runconfig as an easy proxy for item
+      EndTest <$> domainElementSingleton,
+      StartIteration <$> genItemId <*> (WhenClause <$> genTxt) <*> (ThenClause <$> genTxt) <*> (A.toJSON <$> genRunConfig), --- using runconfig as an easy proxy for item
       EndIteration <$> genItemId,
       FilterLog <$> genTestFilterResults,
       pure EndRun,
-      IOAction <$> genStr,
-      IOAction' <$> (DetailedInfo <$> genStr <*> genStr),
+      IOAction <$> genTxt,
+      IOAction' <$> (DetailedInfo <$> genTxt <*> genTxt),
       InteractorSuccess <$> genItemId <*> (ApStateJSON <$> genJSON),
       InteractorFailure <$> genItemId <*> genError,
       ParserSuccess <$> genItemId <*> (DStateJSON <$> genJSON),
       ParserFailure <$> genItemId <*> genError,
-      Message <$> genStr,
+      Message <$> genTxt,
       Message' <$> genDetailedInfo,
-      Warning <$> genStr,
+      Warning <$> genTxt,
       Warning' <$> genDetailedInfo,
       LP.Error <$> genError
     ]

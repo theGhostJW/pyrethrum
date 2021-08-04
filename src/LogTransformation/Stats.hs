@@ -2,7 +2,7 @@ module LogTransformation.Stats where
 
 import Pyrelude as P hiding (phase)
 import qualified Data.Map.Strict as M
-import RunElementClasses
+import RunElementClasses as RC
 import DSL.LogProtocol
 import LogTransformation.Common
 import Data.Aeson.TH
@@ -93,10 +93,10 @@ statsStep statsAccum eithLP =
       (statsStepFromDeserialisationError statsAccum)
       (statsStepFromLogProtocol statsAccum)
 
-testExStatus :: IterationResults -> M.Map TestAddress ExecutionStatus
-testExStatus ir = executionStatus <$> M.mapKeysWith max tstModule ir
+testExStatus :: IterationResults -> M.Map ElementDomain ExecutionStatus
+testExStatus ir = executionStatus <$> M.mapKeysWith max (domain :: ItemId -> ElementDomain) ir
 
-listTestStatus :: RunResults -> M.Map TestAddress ExecutionStatus 
+listTestStatus :: RunResults -> M.Map ElementDomain ExecutionStatus 
 listTestStatus = testExStatus . iterationResults 
 
 testStatusCounts :: RunResults -> StatusCount
@@ -105,23 +105,20 @@ testStatusCounts = countValues . listTestStatus
 listIterationStatus :: RunResults -> M.Map ItemId ExecutionStatus 
 listIterationStatus runResults = executionStatus <$> iterationResults runResults
 
-itrStatusesGroupedByTest :: RunResults -> M.Map TestAddress (M.Map ItemId ExecutionStatus)
+itrStatusesGroupedByTest :: RunResults -> M.Map ElementDomain (M.Map ItemId ExecutionStatus)
 itrStatusesGroupedByTest rr = 
   let 
-    step :: M.Map TestAddress (M.Map ItemId ExecutionStatus) -> ItemId -> ExecutionStatus -> M.Map TestAddress (M.Map ItemId ExecutionStatus) 
-    step accum iid status = 
+    step :: M.Map ElementDomain (M.Map ItemId ExecutionStatus) -> ItemId -> ExecutionStatus -> M.Map ElementDomain (M.Map ItemId ExecutionStatus) 
+    step accum iid@ItemId {domain} status = 
        let 
-         tstMod :: TestAddress
-         tstMod = tstModule iid
-
          tstMap :: M.Map ItemId ExecutionStatus
-         tstMap = M.findWithDefault M.empty tstMod accum 
+         tstMap = M.findWithDefault M.empty domain accum 
        in 
-        M.insert tstMod (M.insert iid status tstMap) accum
+        M.insert domain (M.insert iid status tstMap) accum
   in 
     M.foldlWithKey' step M.empty $ listIterationStatus rr
 
-testIterationStatusCounts :: RunResults -> M.Map TestAddress StatusCount
+testIterationStatusCounts :: RunResults -> M.Map ElementDomain StatusCount
 testIterationStatusCounts rr = countValues <$> itrStatusesGroupedByTest rr
 
 iterationStatusCounts :: RunResults -> StatusCount

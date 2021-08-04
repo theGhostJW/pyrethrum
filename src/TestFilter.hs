@@ -14,25 +14,25 @@ acceptFilter = isNothing . reasonForRejection
 rejectFilter :: TestFilterResult -> Bool
 rejectFilter = isJust . reasonForRejection
 
-mkTestFilterResult :: Config tc => tc -> Maybe Text -> TestFilterResult
-mkTestFilterResult tc rejection = TestFilterResult {
-                                testInfo = mkDisplayInfo tc,
+mkTestFilterResult :: Config tc => ModuleDomain -> tc -> Maybe Text -> TestFilterResult
+mkTestFilterResult d tc rejection = TestFilterResult {
+                                testInfo = mkTestLogInfo d tc,
                                 reasonForRejection = rejection
                               }
 
 data TestFilter rc tc = TestFilter {
   title :: Text,
-  predicate :: rc -> tc -> Bool
+  predicate :: rc -> ModuleDomain -> tc -> Bool
 }
 
-applyFilters :: forall rc tc. Config tc => [TestFilter rc tc] -> rc -> tc -> TestFilterResult
-applyFilters fltrs rc tc = 
+applyFilters :: forall rc tc. Config tc => [TestFilter rc tc] -> rc -> ModuleDomain -> tc -> TestFilterResult
+applyFilters fltrs rc d tc = 
  let
   fltrRslt :: Maybe Text -> TestFilterResult
-  fltrRslt = mkTestFilterResult tc 
+  fltrRslt = mkTestFilterResult d tc 
 
   applyFilter :: TestFilter rc tc -> TestFilterResult
-  applyFilter fltr = fltrRslt $ predicate fltr rc tc 
+  applyFilter fltr = fltrRslt $ predicate fltr rc d tc 
                                             ? Nothing 
                                             $ Just $ TestFilter.title fltr
 
@@ -42,8 +42,8 @@ applyFilters fltrs rc tc =
   fltrRslt firstRejectReason
     
 
-filterTest :: forall i as ds tc hi rc e effs. Config tc => [TestFilter rc tc] -> rc -> Test e tc rc hi i as ds effs -> TestFilterResult
-filterTest fltrs rc Test{ config = tc } = applyFilters fltrs rc tc
+filterTest :: forall i as ds tc hi rc e effs. Config tc => [TestFilter rc tc] -> rc -> ModuleDomain -> Test e tc rc hi i as ds effs -> TestFilterResult
+filterTest fltrs rc d Test{ config = tc } = applyFilters fltrs rc d tc
 
 
 filterLog :: forall tc rc e effs. Config tc =>
@@ -53,13 +53,13 @@ filterLog :: forall tc rc e effs. Config tc =>
               -> [AddressedElm TestFilterResult]
 filterLog suite fltrs rc =
   let
-    testFilter :: hi -> Test e tc rc hi i as ds effs -> TestFilterResult
-    testFilter _ = filterTest fltrs rc
+    testFilter :: ModuleDomain -> hi -> Test e tc rc hi i as ds effs -> TestFilterResult
+    testFilter d _ = filterTest fltrs rc d
 
     si :: SuiteItem IsRoot () effs [TestFilterResult]
     si = suite testFilter
   in
-    querySuite (title . testInfo) si
+    querySuite (C.title . testInfo) si
 
 
 

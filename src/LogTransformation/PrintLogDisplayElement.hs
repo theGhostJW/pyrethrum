@@ -29,6 +29,49 @@ import LogTransformation.Common as LC
 import LogTransformation.Stats
 import PrettyPrintCommon
 import Pyrelude as P
+    ( fst,
+      otherwise,
+      ($),
+      Eq((==)),
+      Monad((>>=)),
+      Ord(compare),
+      Show,
+      Foldable(sum),
+      Semigroup((<>)),
+      Bool(..),
+      Int,
+      Maybe(..),
+      Ordering,
+      Either,
+      txtPretty,
+      (<$>),
+      (?),
+      txt,
+      Category((.)),
+      ConvertString(convertString),
+      Listy(null, empty, filter, snoc, foldl'),
+      Text,
+      sortBy,
+      const,
+      Down(Down),
+      Bifunctor(bimap),
+      (&&),
+      (||),
+      not,
+      (\\),
+      sort,
+      fromMaybe,
+      isJust,
+      isNothing,
+      isRight,
+      eitherf,
+      enumList,
+      firstJust,
+      maybef,
+      toLower,
+      toTitle,
+      unlines,
+      Lenient(getLenient) )
 import RunElementClasses
 
 -- TODO: creation relational records
@@ -56,7 +99,7 @@ data PrintLogDisplayElement
 
     StartTest
       { tstTitle :: Text,
-        modAddress :: TestAddress,
+        modDomain :: ElementDomain,
         notes :: Maybe Text,
         config :: A.Value, -- test Config as Json
         status :: ExecutionStatus, -- test Config as Json
@@ -151,7 +194,7 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
       _normalStep :: (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
       _normalStep@(nxtItAccum@(IterationAccum _nxtMRec _nxtStepInfo _nxtMFltrLg), mDisplayElement) = printLogDisplayStep runResults lineNo itAccum eithLp
 
-      testStatus' :: TestAddress -> ExecutionStatus
+      testStatus' :: ElementDomain -> ExecutionStatus
       testStatus' = testStatus $ testExStatus iterationResults
 
       _skipFlags :: (Bool, Bool) -- (newAccum, err / result)
@@ -161,7 +204,7 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
           (const (skipItt, skipTst))
           ( \LogProtocolOut {logInfo = lp} ->
               case lp of
-                LP.StartTest (TestLogInfo tstMod _ _) -> (False, LC.Pass == testStatus' tstMod)
+                LP.StartTest (TestLogInfo ttl domain _) -> (False, LC.Pass == testStatus' (elementDomain domain ttl))
                 StartIteration iid _ _ _ -> (LC.Pass == executionStatus (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
                 _ -> (skipItt, skipTst)
           )
@@ -176,10 +219,10 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
    in (nxtAccum, isRight eithLp && (nxtSkipItt || nxtSkipTst) ? Nothing $ mDisplayElement)
 
 -- itrOutcome ItemId -> Maybe IterationOutcome
-testStatusMap :: RunResults -> M.Map TestAddress ExecutionStatus
+testStatusMap :: RunResults -> M.Map ElementDomain ExecutionStatus
 testStatusMap = testExStatus . iterationResults
 
-testStatus :: M.Map TestAddress ExecutionStatus -> TestAddress -> ExecutionStatus
+testStatus :: M.Map ElementDomain ExecutionStatus -> ElementDomain -> ExecutionStatus
 testStatus tstStatusMap tm = fromMaybe LC.Fail $ M.lookup tm tstStatusMap
 
 printLogDisplay :: 
@@ -194,16 +237,16 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
 
     RunResults outOfTest iterationResults = runResults
 
-    testStatuses :: M.Map TestAddress ExecutionStatus
+    testStatuses :: M.Map ElementDomain ExecutionStatus
     testStatuses = testStatusMap runResults
 
-    testStatus' :: TestAddress -> ExecutionStatus
+    testStatus' :: ElementDomain -> ExecutionStatus
     testStatus' = testStatus testStatuses
 
-    tstIterationStatusCounts :: M.Map TestAddress StatusCount
+    tstIterationStatusCounts :: M.Map ElementDomain StatusCount
     tstIterationStatusCounts = testIterationStatusCounts runResults
 
-    testItrStats :: TestAddress -> StatusCount
+    testItrStats :: ElementDomain -> StatusCount
     testItrStats tm = M.findWithDefault M.empty tm tstIterationStatusCounts
 
     elOut :: a -> Maybe [a]
@@ -273,24 +316,27 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
     LP.EndGroup _ -> skipLog
     StartHook {} -> skipLog
     EndHook {}  -> skipLog
-    LP.StartTest (TestLogInfo testModAddress title testConfig) ->
+    LP.StartTest (TestLogInfo ttl domain testConfig) ->
+        let 
+          elemDomain = elementDomain domain ttl
+        in
         ( accum,
           elOut $
             LogTransformation.PrintLogDisplayElement.StartTest
-              title
-              testModAddress
+              ttl
+              elemDomain
               (getNotes testConfig)
               testConfig
-              (testStatus' testModAddress)
-              (testItrStats testModAddress)
+              (testStatus' elemDomain)
+              (testItrStats elemDomain)
         )
     LP.EndTest _ -> skipLog
-    StartIteration iid@(ItemId tstModule itmId) (WhenClause whn) (ThenClause thn) jsonItmVal ->
+    StartIteration iid@(ItemId domain itmId) (WhenClause whn) (ThenClause thn) jsonItmVal ->
         ( accum
             { rec =
                 Just $
                   IterationRecord
-                    { modulePath = unTestAddress tstModule,
+                    { modulePath = domainAddress domain,
                       itmId = itmId,
                       notes = getNotes jsonItmVal,
                       pre = whn,
@@ -408,7 +454,7 @@ prettyPrintDisplayElement pde =
                       rejectedItems = fltrItems isJust
 
                       address :: TestFilterResult -> Text
-                      address = unTestAddress . testModAddress . testInfo
+                      address = logInfoAddress . testInfo
 
                       rejectText :: TestFilterResult -> Text
                       rejectText fr =
@@ -437,12 +483,12 @@ prettyPrintDisplayElement pde =
                         <> rejected
               )
             <> newLn
-        LogTransformation.PrintLogDisplayElement.StartTest titl tstMod _notes _cfg status itrStats ->
+        LogTransformation.PrintLogDisplayElement.StartTest titl domain _notes _cfg status itrStats ->
           majorHeader False (header' titl status)
             <> newLn
             <> "module:"
             <> newLn
-            <> indent2 (unTestAddress tstMod)
+            <> indent2 (domainAddress domain)
             <> newLn2
             <> "stats:"
             <> newLn

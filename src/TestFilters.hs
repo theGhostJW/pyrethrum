@@ -11,15 +11,15 @@ import Control.Applicative
 import Pyrelude ( ($), Text, Listy(filter), Category((.)) )
 
 
-applyTestFilters :: forall i tc rc. Config tc => [TestFilter rc tc] -> rc -> (i -> tc) -> [i] -> [i]
-applyTestFilters fltrs rc cvtr itms = 
-    fst <$> filter (isNothing . snd) (applyTestFiltersToItemsShowReason fltrs rc cvtr itms) 
+applyTestFilters :: forall i tc rc. Config tc => [TestFilter rc tc] -> rc -> ModuleDomain -> (i -> tc) -> [i] -> [i]
+applyTestFilters fltrs rc md cvtr itms = 
+    fst <$> filter (isNothing . snd) (applyTestFiltersToItemsShowReason fltrs rc md cvtr itms) 
 
--- de bugging
-applyTestFiltersToItemsShowReason :: forall i tc rc. Config tc => [TestFilter rc tc] -> rc -> (i -> tc) -> [i] -> [(i, Maybe Text)]
-applyTestFiltersToItemsShowReason fltrs rc cvtr itms = 
+-- debugging
+applyTestFiltersToItemsShowReason :: forall i tc rc. Config tc => [TestFilter rc tc] -> rc -> ModuleDomain -> (i -> tc) -> [i] -> [(i, Maybe Text)]
+applyTestFiltersToItemsShowReason fltrs rc md cvtr itms = 
   let 
     fltrItm :: i -> (i, Maybe Text)
-    fltrItm i = (i, reasonForRejection . applyFilters fltrs rc $ cvtr i)
+    fltrItm i = (i, reasonForRejection . applyFilters fltrs rc md $ cvtr i)
   in 
     fltrItm <$> itms

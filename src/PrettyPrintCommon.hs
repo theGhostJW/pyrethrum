@@ -24,7 +24,7 @@ prettyPrintFilterItem :: TestFilterResult -> Text
 prettyPrintFilterItem TestFilterResult{..} =
   let
     description :: Text
-    description = toString (testModAddress testInfo) <> " - " <> title testInfo
+    description = logInfoAddress testInfo <> " - " <> title testInfo
   in
     maybef reasonForRejection
       ("accepted: " <> description)

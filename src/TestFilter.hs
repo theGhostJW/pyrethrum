@@ -14,7 +14,7 @@ acceptFilter = isNothing . reasonForRejection
 rejectFilter :: TestFilterResult -> Bool
 rejectFilter = isJust . reasonForRejection
 
-mkTestFilterResult :: Config tc => ModuleDomain -> tc -> Maybe Text -> TestFilterResult
+mkTestFilterResult :: Config tc => Address -> tc -> Maybe Text -> TestFilterResult
 mkTestFilterResult d tc rejection = TestFilterResult {
                                 testInfo = mkTestLogInfo d tc,
                                 reasonForRejection = rejection
@@ -22,17 +22,17 @@ mkTestFilterResult d tc rejection = TestFilterResult {
 
 data TestFilter rc tc = TestFilter {
   title :: Text,
-  predicate :: rc -> ModuleDomain -> tc -> Bool
+  predicate :: rc -> Address -> tc -> Bool
 }
 
-applyFilters :: forall rc tc. Config tc => [TestFilter rc tc] -> rc -> ModuleDomain -> tc -> TestFilterResult
-applyFilters fltrs rc d tc = 
+applyFilters :: forall rc tc. Config tc => [TestFilter rc tc] -> rc -> Address -> tc -> TestFilterResult
+applyFilters fltrs rc adrs tc = 
  let
   fltrRslt :: Maybe Text -> TestFilterResult
-  fltrRslt = mkTestFilterResult d tc 
+  fltrRslt = mkTestFilterResult adrs tc 
 
   applyFilter :: TestFilter rc tc -> TestFilterResult
-  applyFilter fltr = fltrRslt $ predicate fltr rc d tc 
+  applyFilter fltr = fltrRslt $ predicate fltr rc adrs tc 
                                             ? Nothing 
                                             $ Just $ TestFilter.title fltr
 
@@ -42,7 +42,7 @@ applyFilters fltrs rc d tc =
   fltrRslt firstRejectReason
     
 
-filterTest :: forall i as ds tc hi rc e effs. Config tc => [TestFilter rc tc] -> rc -> ModuleDomain -> Test e tc rc hi i as ds effs -> TestFilterResult
+filterTest :: forall i as ds tc hi rc e effs. Config tc => [TestFilter rc tc] -> rc -> Address -> Test e tc rc hi i as ds effs -> TestFilterResult
 filterTest fltrs rc d Test{ config = tc } = applyFilters fltrs rc d tc
 
 
@@ -53,7 +53,7 @@ filterLog :: forall tc rc e effs. Config tc =>
               -> [AddressedElm TestFilterResult]
 filterLog suite fltrs rc =
   let
-    testFilter :: ModuleDomain -> hi -> Test e tc rc hi i as ds effs -> TestFilterResult
+    testFilter :: Address -> hi -> Test e tc rc hi i as ds effs -> TestFilterResult
     testFilter d _ = filterTest fltrs rc d
 
     si :: SuiteItem IsRoot () effs [TestFilterResult]

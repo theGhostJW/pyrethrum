@@ -12,7 +12,7 @@ module Check (
               ResultExpectation(..),
               GateStatus(..),
               Check(..),
-              CheckDList,
+              Checks,
               CheckReportList,
               CheckReport(..),
               CheckResult(..),
@@ -84,7 +84,7 @@ expectFailureFixed :: Text -> DList (Check ds) -> DList (Check ds)
 expectFailureFixed = expectFailurePriv Inactive
 
 type CheckReportList = DList CheckReport
-type CheckDList a = DList (Check a)
+type Checks a = DList (Check a)
 
 data CheckResult = Pass |
                    Fail |

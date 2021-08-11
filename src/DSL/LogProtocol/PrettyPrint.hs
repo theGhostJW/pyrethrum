@@ -25,7 +25,7 @@ import DSL.LogProtocol as LP
 import Pyrelude as P
 import RunnerBase as RB
 import RunElementClasses as REC
-    ( TestFilterResult, TestLogInfo (TestLogInfo), title, testConfig, logInfoAddress, domainAddress )
+    ( TestFilterResult, TestLogInfo (TestLogInfo), title, testConfig, rootAddress, render )
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y ( Value )
 
@@ -56,7 +56,7 @@ prettyPrintLogProtocol :: Show e => LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocol = prettyPrintLogProtocolBase Nothing
 
 iterId :: ItemId -> Text
-iterId (ItemId d iid) = domainAddress d <> " / item " <> txt iid
+iterId (ItemId d iid) = render d <> " / item " <> txt iid
 
 prettyPrintLogProtocolBase :: Show e => Maybe Text -> LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocolBase _mTimeSuffix style =
@@ -124,8 +124,8 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
                                           separator <> "Test Config:" <>
                                           separator <> ppAesonBlock testConfig
 
-        EndTest address -> separator <> tstHeader ("End Test: " <> domainAddress address)
-        StartIteration iid  _ _ val -> separator <> subHeader ("Start Iteration: " <> iterId iid) <> 
+        EndTest address -> separator <> tstHeader ("End Test: " <> render address)
+        StartIteration iid _ val -> separator <> subHeader ("Start Iteration: " <> iterId iid) <> 
                                         separator <> "Item:" <> 
                                         separator <> ppAesonBlock val <>
                                         (style == Doc ? "" $ separator)

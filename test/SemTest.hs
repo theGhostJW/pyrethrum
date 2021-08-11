@@ -4,11 +4,12 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import Data.Yaml
 import Polysemy
-import Pyrelude as P
-import Pyrelude.Test hiding (Group)
+import Pyrelude as P hiding (Group, Item)
+import Pyrelude.Test hiding (Group, Item)
 import Runner as R
 import RunnerBase (Test)
 import TestFilter
+import Check
 
 data Include = In | Out deriving (Eq, Ord, Show)
 
@@ -17,40 +18,38 @@ $(deriveJSON defaultOptions ''Include)
 newtype RunConfig = RunConfig Include
 
 data TestConfig = TestConfig
-  { header :: Text,
-    address :: TestAddress,
+  { title :: Text,
     include :: Include
   }
   deriving (Show, Eq)
 
-instance Config TestConfig where
-  moduleAddress = address
-
-instance Titled TestConfig where
-  title = header
+instance Config TestConfig
 
 $(deriveJSON defaultOptions ''TestConfig)
 
 --    e      tc        rc       hi i as ds effs
-type MockTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi i as ds effs
+type MockTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi (i ds) as ds effs
 
-newtype MyInt = MyInt Int deriving (Show, Generic)
+data Item ds = Item
+  { id :: Int,
+    title :: Text,
+    val :: Int,
+    checks :: Checks ds
+  }
+  deriving (Show, Generic)
 
-newtype MyText = MyText Text deriving (Show, Generic, ToJSON)
 
-instance ItemClass MyInt MyInt where
-  identifier _ = -999
-  whenClause _ = "pre"
-  thenClause _ = "post"
-  checkList = mempty
 
-instance ItemClass MyText MyText where
-  identifier _ = -999
-  whenClause _ = "pre"
-  thenClause _ = "post"
-  checkList = mempty
+data TextItem ds = TextItem
+  { id :: Int,
+    title :: Text,
+    val :: Int,
+    checks :: Checks ds
+  }
+  deriving (Show, Generic)
 
-instance ToJSON MyInt where
+
+instance ToJSON (Item ds) where
   toEncoding = genericToEncoding defaultOptions
 
 empti :: a -> [b]
@@ -60,84 +59,79 @@ empti = const ([] :: [b])
 emptiInteractor :: as -> RunConfig -> hi -> i -> Sem effs as
 emptiInteractor as _ _ _ = pure as
 
-emptiParser :: a -> as -> Sem effs a
-emptiParser a _ = pure a
+constParser :: a -> as -> Sem effs a
+constParser a _ = pure a
 
-test1Txt :: MockTest Text MyInt Text MyInt effs
+test1Txt :: MockTest Text Item Text Int effs
 test1Txt =
   Test
     { config =
         TestConfig
-          { header = "test1",
-            address = TestAddress "test1",
+          { title = "test1",
             include = In
           },
       items = empti,
       interactor = emptiInteractor "Hello",
-      parse = emptiParser (MyInt 1)
+      parse = constParser 1
     }
 
-test2Int :: MockTest Int MyInt MyInt MyInt effs
+test2Int :: MockTest Int Item Text Text effs
 test2Int =
   Test
     { config =
         TestConfig
-          { header = "test2",
-            address = TestAddress "test2 address",
+          { title = "test2",
             include = In
           },
       items = empti,
-      interactor = emptiInteractor (MyInt 1),
-      parse = pure
+      interactor = emptiInteractor "Hi",
+      parse = constParser "Hello"
     }
 
-test3Bool :: MockTest Bool MyInt MyInt MyInt effs
+test3Bool :: MockTest Bool Item Text Int effs
 test3Bool =
   Test
     { config =
         TestConfig
-          { header = "test3",
-            address = TestAddress "test3 address",
+          { title = "test3",
             include = Out
           },
       items = empti,
-      interactor = emptiInteractor (MyInt 3),
-      parse = pure
+      interactor = emptiInteractor "Hi",
+      parse = constParser 2
     }
 
-test4Txt :: MockTest Text Text Text Text effs
+test4Txt :: MockTest Text Item Text Text effs
 test4Txt =
   Test
     { config =
         TestConfig
-          { header = "test4",
-            address = TestAddress "test4 address",
+          { title = "test4",
             include = In
           },
       items = empti,
       interactor = emptiInteractor "Hello",
-      parse = pure
+      parse = constParser "hi"
     }
 
-test5Int :: MockTest Int MyInt MyInt MyInt effs
+test5Int :: MockTest Int Item Int Int effs
 test5Int =
   Test
     { config =
         TestConfig
-          { header = "test5",
-            address = TestAddress "test5 address",
+          { title = "test5",
             include = Out
           },
       items = empti,
-      interactor = emptiInteractor (MyInt 1),
-      parse = pure
+      interactor = emptiInteractor 1,
+      parse = constParser 99
     }
 
 includeFilter :: TestFilter RunConfig TestConfig
 includeFilter =
   TestFilter
     { title = "test include must match run",
-      predicate = \(RunConfig inc) tc -> include tc == inc
+      predicate = \(RunConfig inc) _ tc -> include tc == inc
     }
 
 filters' :: [TestFilter RunConfig TestConfig]
@@ -193,12 +187,12 @@ filters' = [includeFilter]
 --         }
 --         -- ,
 
-        -- R.Group "Sub Group" [
-        --   Tests [
-        --     r test4,
-        --     r test5
-        --   ]
-        -- ],
-    -- ]
+-- R.Group "Sub Group" [
+--   Tests [
+--     r test4,
+--     r test5
+--   ]
+-- ],
+-- ]
 
 -- unit_test_filter_expect_empty

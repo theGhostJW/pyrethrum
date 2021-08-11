@@ -43,7 +43,7 @@ data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
 data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
 
 data RunConfig = RunConfig {
-  runTitle    :: Text,
+  title    :: Text,
   environment :: Environment,
   country     :: Country,
   depth       :: Depth
@@ -59,8 +59,7 @@ type FullIOEffects = FullIOMembersBase SuiteError
 type FullIOMembers = FullIOMembersBase SuiteError
 type LogProtocol = LogProtocolBase SuiteError
 
-instance Titled RunConfig where
-  title = runTitle
+instance HasTitle RunConfig
 
 instance Config RunConfig
 
@@ -75,8 +74,7 @@ auOnly = S.singleton AU
 nzOnly = S.singleton NZ
 
 data TestConfig = TestConfig {
-  header       :: Text,
-  address      :: TestAddress,
+  title       :: Text,
   environments :: Set Environment,
   countries    :: Set Country,
   minDepth     :: Depth,
@@ -86,16 +84,13 @@ data TestConfig = TestConfig {
 type Test = R.Test SuiteError TestConfig RunConfig
 type TestResult = GenericResult TestConfig
 
-instance Titled TestConfig where
-  title = header
+instance HasTitle TestConfig
 
-instance Config TestConfig where
-  moduleAddress = address
+instance Config TestConfig
 
 testConfig :: TestConfig
 testConfig = TestConfig {
-  header    = "Configuration Error ~ No Title Assigned",
-  address = TestAddress "Configuration Error ~ No Address Assigned",
+  title    = "Configuration Error ~ No Title Assigned",
   environments = allNonProdEnvironments,
   countries    = auOnly,
   minDepth     = DeepRegression,
@@ -104,7 +99,7 @@ testConfig = TestConfig {
 
 runConfig :: RunConfig
 runConfig = RunConfig {
-  runTitle = "Sample RunConfig",
+  title = "Sample RunConfig",
   environment = TST,
   country = AU,
   depth = DeepRegression
@@ -113,25 +108,25 @@ runConfig = RunConfig {
 countryFilter :: TestFilter RunConfig TestConfig
 countryFilter = TestFilter {
      title = "country must match test run",
-     predicate = \rc tc -> P.elem (country rc) $ countries tc
+     predicate = \rc _ tc -> P.elem (country rc) $ countries tc
    }
 
 levelFilter :: TestFilter RunConfig TestConfig
 levelFilter = TestFilter {
      title = "minDepth must be at least depth of test run (e.g. regression test will not be executed in connectivity run)",
-     predicate = \rc tc -> minDepth tc <= depth rc
+     predicate = \rc _ tc -> minDepth tc <= depth rc
    }
 
 isActiveFilter :: TestFilter RunConfig TestConfig
 isActiveFilter = TestFilter {
     title = "test must be is active",
-    predicate = \_ tc -> active tc
+    predicate = \_ _ tc -> active tc
   }
 
 filterList :: [TestFilter RunConfig TestConfig]
 filterList = [isActiveFilter, countryFilter, levelFilter]
 
-applyTestFiltersToItems :: RunConfig -> (i -> TestConfig) -> [i] -> [i]
+applyTestFiltersToItems :: RunConfig -> Address -> (i -> TestConfig) -> [i] -> [i]
 applyTestFiltersToItems = F.applyTestFilters filterList
 
 type TestPlan effs a = R.TestSuite SuiteError TestConfig RunConfig effs a
@@ -139,7 +134,7 @@ type TestPlan effs a = R.TestSuite SuiteError TestConfig RunConfig effs a
 testEndpointPriv :: forall effs. MinEffs SuiteError effs =>
       (forall as ds i hi. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON ds) => 
         ItemRunner SuiteError as ds i hi TestConfig RunConfig effs)  
-     -> TestAddress
+     -> Address
      -> RunConfig
      -> Either FilterErrorType (Set Int)
      -> (forall a. TestPlan effs a)
@@ -157,7 +152,7 @@ testEndpointPriv itmRunner testAddress rc itemIds suite =
     mkEndpointSem runParams testAddress itemIds
 
 testEndpoint ::
-     TestAddress
+     Address
      -> RunConfig
      -> Either FilterErrorType (Set Int)
      -> (forall a. TestPlan FullIOMembers a)
@@ -165,7 +160,7 @@ testEndpoint ::
 testEndpoint = testEndpointPriv runItem
 
 testEndpointDoc ::
-     TestAddress
+     Address
      -> RunConfig
      -> Either FilterErrorType (Set Int)
      -> (forall a. TestPlan (FullDocEffects SuiteError) a)

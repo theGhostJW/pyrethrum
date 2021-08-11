@@ -93,10 +93,10 @@ statsStep statsAccum eithLP =
       (statsStepFromDeserialisationError statsAccum)
       (statsStepFromLogProtocol statsAccum)
 
-testExStatus :: IterationResults -> M.Map ElementDomain ExecutionStatus
-testExStatus ir = executionStatus <$> M.mapKeysWith max (domain :: ItemId -> ElementDomain) ir
+testExStatus :: IterationResults -> M.Map Address ExecutionStatus
+testExStatus ir = executionStatus <$> M.mapKeysWith max (address :: ItemId -> Address) ir
 
-listTestStatus :: RunResults -> M.Map ElementDomain ExecutionStatus 
+listTestStatus :: RunResults -> M.Map Address ExecutionStatus 
 listTestStatus = testExStatus . iterationResults 
 
 testStatusCounts :: RunResults -> StatusCount
@@ -105,20 +105,20 @@ testStatusCounts = countValues . listTestStatus
 listIterationStatus :: RunResults -> M.Map ItemId ExecutionStatus 
 listIterationStatus runResults = executionStatus <$> iterationResults runResults
 
-itrStatusesGroupedByTest :: RunResults -> M.Map ElementDomain (M.Map ItemId ExecutionStatus)
+itrStatusesGroupedByTest :: RunResults -> M.Map Address (M.Map ItemId ExecutionStatus)
 itrStatusesGroupedByTest rr = 
   let 
-    step :: M.Map ElementDomain (M.Map ItemId ExecutionStatus) -> ItemId -> ExecutionStatus -> M.Map ElementDomain (M.Map ItemId ExecutionStatus) 
-    step accum iid@ItemId {domain} status = 
+    step :: M.Map Address (M.Map ItemId ExecutionStatus) -> ItemId -> ExecutionStatus -> M.Map Address (M.Map ItemId ExecutionStatus) 
+    step accum iid@ItemId {address} status = 
        let 
          tstMap :: M.Map ItemId ExecutionStatus
-         tstMap = M.findWithDefault M.empty domain accum 
+         tstMap = M.findWithDefault M.empty address accum 
        in 
-        M.insert domain (M.insert iid status tstMap) accum
+        M.insert address (M.insert iid status tstMap) accum
   in 
     M.foldlWithKey' step M.empty $ listIterationStatus rr
 
-testIterationStatusCounts :: RunResults -> M.Map ElementDomain StatusCount
+testIterationStatusCounts :: RunResults -> M.Map Address StatusCount
 testIterationStatusCounts rr = countValues <$> itrStatusesGroupedByTest rr
 
 iterationStatusCounts :: RunResults -> StatusCount

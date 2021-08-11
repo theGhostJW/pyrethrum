@@ -11,12 +11,12 @@ import Control.Applicative
 import Pyrelude ( ($), Text, Listy(filter), Category((.)) )
 
 
-applyTestFilters :: forall i tc rc. Config tc => [TestFilter rc tc] -> rc -> ModuleDomain -> (i -> tc) -> [i] -> [i]
+applyTestFilters :: forall i tc rc. Config tc => [TestFilter rc tc] -> rc -> Address -> (i -> tc) -> [i] -> [i]
 applyTestFilters fltrs rc md cvtr itms = 
     fst <$> filter (isNothing . snd) (applyTestFiltersToItemsShowReason fltrs rc md cvtr itms) 
 
 -- debugging
-applyTestFiltersToItemsShowReason :: forall i tc rc. Config tc => [TestFilter rc tc] -> rc -> ModuleDomain -> (i -> tc) -> [i] -> [(i, Maybe Text)]
+applyTestFiltersToItemsShowReason :: forall i tc rc. Config tc => [TestFilter rc tc] -> rc -> Address -> (i -> tc) -> [i] -> [(i, Maybe Text)]
 applyTestFiltersToItemsShowReason fltrs rc md cvtr itms = 
   let 
     fltrItm :: i -> (i, Maybe Text)

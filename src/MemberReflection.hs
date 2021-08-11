@@ -27,15 +27,13 @@ data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
 data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
 
 data RunConfig = RunConfig {
-  runTitle    :: Text,
+  title    :: Text,
   environment :: Environment,
   country     :: Country,
   depth       :: Depth
 } deriving (Eq, Show)
 
-instance Titled RunConfig where
-  title = runTitle
-
+instance HasTitle RunConfig 
 instance Config RunConfig
 
 allEnvironments :: Set Environment
@@ -49,8 +47,7 @@ auOnly = S.singleton AU
 nzOnly = S.singleton NZ
 
 data TestConfig = TestConfig {
-  header       :: Text,
-  address      :: TestAddress,
+  title       :: Text,
   environments :: Set Environment,
   countries    :: Set Country,
   minDepth     :: Depth,
@@ -73,16 +70,12 @@ data Test e tc rc hi i as ds effs = Test {
 type Test hi = R.Test SuiteError TestConfig RunConfig hi
 type TestResult = GenericResult TestConfig
 
-instance Titled TestConfig where
-  title = header
-
-instance Config TestConfig where
-  moduleAddress = address
+instance HasTitle TestConfig 
+instance Config TestConfig 
 
 testConfig :: TestConfig
 testConfig = TestConfig {
-  header    = "Configuration Error ~ No Title Assigned",
-  address = TestAddress "Configuration Error ~ No Address Assigned",
+  title    = "Configuration Error ~ No Title Assigned",
   environments = allNonProdEnvironments,
   countries    = auOnly,
   minDepth     = DeepRegression,
@@ -118,17 +111,16 @@ data Item = Item {
   pre    :: Text,
   post   :: Text,
   path   :: Path Abs File,
-  checks :: CheckDList DState
+  checks :: Checks DState
 } deriving (Show, Generic)
 
 items :: RunConfig -> [Item]
 items _ = []
   
-nameOfModule :: TestAddress
-nameOfModule = mkTestAddress ''ApState
+
 
 test :: forall effs. Members (Effects SuiteError) effs => MemberReflection.Test () Item ApState DState effs
-test = Test MemberReflection.testConfig {address = nameOfModule}
+test = Test MemberReflection.testConfig 
             MemberReflection.items
             MemberReflection.interactor
             MemberReflection.parse

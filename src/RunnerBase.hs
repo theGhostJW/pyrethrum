@@ -49,10 +49,10 @@ import Pyrelude
 import RunElementClasses
 
 type ItemRunner e as ds i hi tc rc effs =
-  rc -> ModuleDomain -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
+  rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
 type TestSuite e tc rc effs a =
-  (forall hi i as ds. (Show i, Show as, Show ds) => ModuleDomain -> hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
+  (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
 
 --  (forall hi i as ds. (ItemClass i ds, ToJSON as, ToJSON ds, Show as, Show ds, Show i, ToJSON i) => Test e tc rc hi i as ds effs -> a) -> SuiteItem () effs [a]
 
@@ -62,28 +62,25 @@ data GenericResult tc rslt = TestResult
   }
   deriving (Show)
 
-queryElm' :: forall r hi effs a. (a -> Text) -> ModuleDomain -> SuiteItem r hi effs [a] -> [AddressedElm a]
-queryElm' getItemTitle domain =
-  let badCall f = f $ error "Bad param - this param should never be called"
+queryElm' :: forall r hi effs a. (a -> Text) -> Address -> SuiteItem r hi effs [a] -> [AddressedElm a]
+queryElm' getItemTitle address =
+  let 
+    badCall :: (Address -> o -> SuiteItem NotRoot o effs [a]) -> SuiteItem NotRoot o effs [a]
+    badCall f = f address $ error "Bad param - this param should never be accessed when querying for element data"
   in \case
-        Group {title = t, gElms} -> gElms >>= queryElm' getItemTitle (addLayer domain t)
-        Tests {tests} -> (\t -> AddressedElm (elementDomain domain (getItemTitle t)) t) <$> tests
-        -- beforeHook, afterHook and root do not contribute to the domain
-        BeforeHook {title = t, bhElms} -> bhElms >>= queryElm' getItemTitle domain . badCall
-        AfterHook {title = t, ahElms} -> ahElms >>= queryElm' getItemTitle domain . badCall
-        Root {rootElms} -> rootElms >>= queryElm' getItemTitle domain
+        Group {title = t, gElms} -> gElms >>= queryElm' getItemTitle (push t address)
+        Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) address) i) <$> tests
+      
+        -- beforeHook, afterHook and root do not contribute to the address
+        -- Expected type: (Address -> hi -> SuiteItem NotRoot hi effs [a]) -> [AddressedElm a]
+        -- Actual type: (Address -> SuiteItem r1 hi1 effs1 [a]) -> [AddressedElm a]
+        BeforeHook {title = t, bhElms} -> bhElms >>= queryElm' getItemTitle address . badCall
+        AfterHook {title = t, ahElms} -> ahElms >>= queryElm' getItemTitle address . badCall
+        Root {rootElms} -> rootElms >>= queryElm' getItemTitle address
 
 querySuite :: forall hi effs a. (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
-querySuite getItemTitle = queryElm' getItemTitle rootDomain
+querySuite getItemTitle = queryElm' getItemTitle rootAddress 
 
--- queryElm :: forall hi effs a. SuiteItem hi effs [a] -> [a]
--- queryElm =
---   let hkElms = (queryElm . (\f -> f $ error "Bad param - this param should never be accessed") =<<)
---    in \case
---         Tests {tests} -> tests
---         BeforeHook {bhElms} -> hkElms bhElms
---         AfterHook {ahElms} -> hkElms ahElms
---         Group {gElms} -> queryElm =<< gElms
 
 {-
 TODO

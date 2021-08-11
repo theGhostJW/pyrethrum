@@ -28,14 +28,14 @@ data SuiteItem r hi effs t where
     { title :: Text,
       cardinality :: HookCardinality,
       bHook :: Sem effs o,
-      bhElms :: [o -> SuiteItem NotRoot o effs t]
+      bhElms :: [Address -> o -> SuiteItem NotRoot o effs t]
     } ->
     SuiteItem NotRoot hi effs t
   AfterHook ::
     { title :: Text,
       cardinality :: HookCardinality,
       aHook :: Sem effs (),
-      ahElms :: [hi -> SuiteItem NotRoot hi effs t]
+      ahElms :: [Address ->hi -> SuiteItem NotRoot hi effs t]
     } ->
     SuiteItem NotRoot hi effs t
   Group ::
@@ -47,10 +47,10 @@ data SuiteItem r hi effs t where
 instance Functor (SuiteItem r hi effs) where
   fmap :: (a -> b) -> SuiteItem r hi effs a -> SuiteItem r hi effs b
   fmap f si =
-    let f''' :: (a' -> b') -> (c -> SuiteItem r hi' effs a') -> (c -> SuiteItem r hi' effs b')
-        f''' f1 f2 = (f1 <$>) . f2
+    let f''' :: (a' -> b') -> (Address -> c -> SuiteItem r hi' effs a') -> (Address -> c -> SuiteItem r hi' effs b')
+        f''' f1 f2 = \a -> (f1 <$>) . f2 a
 
-        f'' :: (a' -> b') -> [c -> SuiteItem r hi' effs a'] -> [c -> SuiteItem r hi' effs b']
+        f'' :: (a' -> b') -> [Address -> c -> SuiteItem r hi' effs a'] -> [Address -> c -> SuiteItem r hi' effs b']
         f'' fi l = f''' fi <$> l
      in case si of
           Tests a -> Tests $ f a

@@ -30,7 +30,7 @@ unit_chk_outcomes_inlined_gate = chkOutcomes [Pass, GateFail, Skip] 42 $ chk "Mo
                                                                     gate (chk "Odd" P.odd) <>
                                                                     chk "Even" P.even
 
-unit_chk_with_with_gate_fail = chkOutcomes [Pass, Pass, GateFail, Skip]   42 $ isBig
+unit_chk_with_with_gate_fail = chkOutcomes [Pass, Pass, GateFail, Skip] 42 $ isBig
                                                                            <> isEven
                                                                            <> gate isOdd
                                                                            <> isEven

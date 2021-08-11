@@ -1,13 +1,13 @@
 module RunElementClasses
   ( 
     Address,
-    ItemClass(..),
     TestLogInfo (..),
     TestFilterResult (..),
     AddressedElm (..),
-    HasId,
-    Titled,
     Config,
+    HasId,
+    HasTitle,
+    ItemClass,
     rootAddress,
     push,
     toList,
@@ -37,8 +37,11 @@ push t = Address . (t :) . un
 toList :: Address -> [Text]
 toList = reverse . un
 
-render :: Text -> Address -> Text
-render delim = intercalate delim . un
+render :: Address -> Text
+render = render' " > "
+
+render' :: Text -> Address -> Text
+render' delim = intercalate delim . un
 
 instance Ord Address where
    v1 <= v2 = RunElementClasses.toList v1 <= RunElementClasses.toList v2
@@ -62,21 +65,12 @@ data TestFilterResult = TestFilterResult
   }
   deriving (Eq, Ord, Show)
 
-class HasField "title" a Text => Titled a
+
+class HasField "title" a Text => HasTitle a
 class HasField "id" a Int => HasId a
+class (HasField "title" a Text, Show a, FromJSON a, ToJSON a, Eq a) => Config a
 
-class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => Config a
-
-class HasId i => ItemClass i ds where
-  whenClause :: i -> Text
-  thenClause :: i -> Text
-  checkList :: i -> CheckDList ds
-
-  whenThen :: i -> Text
-  whenThen i =
-    "When: " <> whenClause @i @ds i <> "\n"
-      <> "Then: "
-      <> thenClause @i @ds i
+type ItemClass i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds))
 
 mkTestLogInfo :: Config tc => Address -> tc -> TestLogInfo
 mkTestLogInfo a tc = TestLogInfo (getField @"title" tc) (push (getField @"title" tc) a) $ toJSON tc

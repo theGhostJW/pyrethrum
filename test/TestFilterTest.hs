@@ -9,6 +9,7 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import TestFilter
 import RunnerBase ( Test )
+import Check (Checks)
 
 data TestDepth = Connectivity | Regression | DeepRegression deriving (Eq, Ord, Show)
 data Country = Au | NZ deriving (Eq, Ord, Show)
@@ -22,41 +23,36 @@ data RunConfig = RunConfig {
 }
 
 data TestConfig = TestConfig {
-  header :: Text,
-  address :: TestAddress,
+  title :: Text,
   countries :: [Country],
   level :: TestDepth,
   enabled :: Bool
 }  deriving (Show ,Eq)
 
-instance Config TestConfig where
-  moduleAddress = address
-
-instance Titled TestConfig where
-  title = header
 
 $(deriveJSON defaultOptions ''TestConfig)
 
 type MockTest i as ds effs = RunnerBase.Test Int TestConfig RunConfig i as ds effs
 
-newtype MyInt = MyInt Int deriving (Show, Generic)
+data IntItem = IntItem {
+  id :: Int,
+  val :: Int,
+  checks :: Checks Int
+} deriving (Show, Generic)
 
-newtype MyText = MyText Text deriving (Show, Generic, ToJSON)
-
-instance ItemClass MyInt MyInt where
-  identifier _ =  -999
-  whenClause _ =  "pre"
-  thenClause _ =  "post"
-  checkList = mempty
-
-instance ItemClass MyText MyText  where
-  identifier _ =  -999
-  whenClause _ =  "pre"
-  thenClause _ =  "post"
-  checkList = mempty
+data TextItem = TextItem {
+  id :: Int,
+  val :: Text,
+  checks :: Checks Text
+} deriving (Show, Generic)
 
 
-instance ToJSON MyInt where
+-- instance ItemClass IntItem IntItem 
+
+-- instance ItemClass TextItem TextItem
+
+
+instance ToJSON IntItem where
   toEncoding = genericToEncoding defaultOptions
 
 au :: [Country]
@@ -75,7 +71,7 @@ emptiParser:: a -> as -> Sem effs a
 emptiParser a _ = pure a
 
 {- TODO
--- test1 :: MockTest MyInt Text MyInt effs
+-- test1 :: MockTest IntItem Text IntItem effs
 -- test1 = Test {
 --               config = TestConfig {
 --                 header = "test1",
@@ -86,10 +82,10 @@ emptiParser a _ = pure a
 --               },
 --               items = empti,
 --               interactor = emptiInteractor "Hello",
---               parse = emptiParser (MyInt 1)
+--               parse = emptiParser (IntItem1)
 --             }
 
--- test2 :: MockTest MyInt MyInt MyInt effs
+-- test2 :: MockTest IntItem IntItemIntItemeffs
 -- test2 = Test {
 --               config = TestConfig {
 --                 header = "test2",
@@ -99,11 +95,11 @@ emptiParser a _ = pure a
 --                 enabled = True
 --               },
 --               items = empti,
---               interactor = emptiInteractor (MyInt 1),
+--               interactor = emptiInteractor (IntItem1),
 --               parse = pure
 --             }
 
--- test3 :: MockTest MyInt MyInt MyInt effs
+-- test3 :: MockTest IntItem IntItemIntItemeffs
 -- test3 = Test {
 --                 config = TestConfig {
 --                   header = "test3",
@@ -113,7 +109,7 @@ emptiParser a _ = pure a
 --                   enabled = True
 --                 },
 --               items = empti,
---               interactor = emptiInteractor (MyInt 3),
+--               interactor = emptiInteractor (IntItem3),
 --               parse = pure
 --             }
 
@@ -131,7 +127,7 @@ emptiParser a _ = pure a
 --               parse = pure
 --             }
 
--- test5 :: MockTest MyInt MyInt MyInt effs
+-- test5 :: MockTest IntItem IntItemIntItemeffs
 -- test5 = Test {
 --               config = TestConfig {
 --                   header = "test5",
@@ -141,7 +137,7 @@ emptiParser a _ = pure a
 --                   enabled = False
 --                 },
 --               items = empti,
---               interactor = emptiInteractor (MyInt 1),
+--               interactor = emptiInteractor (IntItem1),
 --               parse = pure
 --             }
 

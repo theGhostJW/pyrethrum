@@ -19,7 +19,7 @@ data Include = In | Out deriving (Eq, Ord, Show)
 $(deriveJSON defaultOptions ''Include)
 
 data RunConfig = RunConfig
-  { cfgHeader :: Text,
+  { title :: Text,
     inFilter :: Bool
   }
   deriving (Eq, Show)
@@ -34,51 +34,50 @@ inOutFilter :: TestFilter RunConfig TestConfig
 inOutFilter =
   TestFilter
     { title = "in out filter state must match",
-      predicate = \rc tc -> inFilter rc == (include tc == In)
+      predicate = \rc _ tc -> inFilter rc == (include tc == In)
     }
 
-instance Titled RunConfig where
-  title = cfgHeader
+instance HasTitle RunConfig
 
 instance Config RunConfig
 
 type DemoEffs effs = MinEffs Text effs
 
 data TestConfig = TestConfig
-  { header :: Text,
-    address :: TestAddress,
+  { title :: Text,
     include :: Include
   }
   deriving (Show, Eq)
 
-instance Config TestConfig where
-  moduleAddress = address
+instance Config TestConfig
 
-instance Titled TestConfig where
-  title = header
+instance HasTitle TestConfig
 
 $(deriveJSON defaultOptions ''TestConfig)
 
 --    e      tc        rc       hi i as ds effs
 type MockTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi i as ds effs
 
-newtype MyInt = MyInt Int deriving (Show, Generic)
+data IntItem = IntItem {
+  id :: Int,
+  title :: Text,
+  checks :: C.Checks Text
+} deriving (Show, Generic)
 
-newtype MyText = MyText Text deriving (Show, Generic, ToJSON)
+data TextItem = TextItem {
+  id :: Int,
+  title :: Text,
+  checks :: C.Checks Int
+} deriving (Show, Generic)
 
-instance ItemClass MyInt MyInt where
-  identifier _ = -999
-  whenClause _ = "pre"
-  thenClause _ = "post"
-  checkList = mempty
+instance ToJSON TextItem where
+  toEncoding = genericToEncoding defaultOptions
 
-instance ItemClass MyText MyText where
-  identifier _ = -999
-  whenClause _ = "pre"
-  thenClause _ = "post"
-  checkList = mempty
+instance ItemClass IntItem 
 
-instance ToJSON MyInt where
+instance ItemClass TextItem TextItem
+
+instance ToJSON IntItem where
   toEncoding = genericToEncoding defaultOptions
 
 empti :: a -> [b]
@@ -91,45 +90,42 @@ emptiInteractor as _ _ _ = pure as
 emptiParser :: a -> as -> Sem effs a
 emptiParser a _ = pure a
 
-test1Txt :: MockTest Text MyInt Text MyInt effs
+test1Txt :: MockTest Text IntItem Text IntItem effs
 test1Txt =
   Test
     { config =
         TestConfig
-          { header = "test1",
-            address = TestAddress "test1",
+          { title = "test1",
             include = In
           },
       items = empti,
       interactor = emptiInteractor "Hello",
-      parse = emptiParser (MyInt 1)
+      parse = emptiParser $ IntItem 1 1
     }
 
-test2Int :: MockTest Int MyInt MyInt MyInt effs
+test2Int :: MockTest Int IntItem IntItemIntItemeffs
 test2Int =
   Test
     { config =
         TestConfig
-          { header = "test2",
-            address = TestAddress "test2 address",
+          { title = "test2",
             include = In
           },
       items = empti,
-      interactor = emptiInteractor (MyInt 1),
+      interactor = emptiInteractor $ IntItem 2 1,
       parse = pure
     }
 
-test3Bool :: MockTest Bool MyInt MyInt MyInt effs
+test3Bool :: MockTest Bool IntItem IntItemIntItemeffs
 test3Bool =
   Test
     { config =
         TestConfig
-          { header = "test3",
-            address = TestAddress "test3 address",
+          { title = "test3",
             include = Out
           },
       items = empti,
-      interactor = emptiInteractor (MyInt 3),
+      interactor = emptiInteractor $ IntItem 3 2,
       parse = pure
     }
 
@@ -138,8 +134,7 @@ test4Txt =
   Test
     { config =
         TestConfig
-          { header = "test4",
-            address = TestAddress "test4 address",
+          { title = "test4",
             include = In
           },
       items = empti,
@@ -147,17 +142,29 @@ test4Txt =
       parse = pure
     }
 
-test5Int :: MockTest Int MyInt MyInt MyInt effs
+test6Txt :: MockTest Text Text Text Text effs
+test6Txt =
+  Test
+    { config =
+        TestConfig
+          { title = "test4",
+            include = In
+          },
+      items = empti,
+      interactor = emptiInteractor "Hello",
+      parse = pure
+    }
+
+test5Int :: MockTest Int IntItem IntItemIntItemeffs
 test5Int =
   Test
     { config =
         TestConfig
-          { header = "test5",
-            address = TestAddress "test5 address",
+          { title = "test5",
             include = Out
           },
       items = empti,
-      interactor = emptiInteractor (MyInt 1),
+      interactor = emptiInteractor (IntItem4 1),
       parse = pure
     }
 
@@ -165,13 +172,13 @@ includeFilter :: TestFilter RunConfig TestConfig
 includeFilter =
   TestFilter
     { title = "test include must match run",
-      predicate = \(RunConfig _ inc) tc -> (include tc == In) == inc
+      predicate = \(RunConfig _ inc) _ tc -> (include tc == In) == inc
     }
 
 filters' :: [TestFilter RunConfig TestConfig]
 filters' = [includeFilter]
 
-mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
+mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
 mockSuite r =
   R.Root
     [ R.Group
@@ -181,16 +188,28 @@ mockSuite r =
               cardinality = ExeOnce,
               bHook = pure "hello",
               bhElms =
-                [ \t ->
+                [ \a o ->
                     Tests
-                      [ r t test1Txt,
-                        r t test4Txt
+                      [ r a o test1Txt,
+                        r a o test4Txt
                       ],
-                  const
+                  \a o ->
                     R.Group
                       { title = "Empty Group",
                         gElms =
                           [ Tests []
+                          ]
+                      },
+                  \a o ->
+                    BeforeHook
+                      { title = "Before Inner",
+                        cardinality = ExeOnce,
+                        bHook = pure o,
+                        bhElms =
+                          [ \a' o' ->
+                              Tests
+                                [ r a' o' test6Txt
+                                ]
                           ]
                       }
                 ]
@@ -203,16 +222,16 @@ mockSuite r =
                       cardinality = ExeForEach,
                       bHook = pure 23,
                       bhElms =
-                        [ \t ->
+                        [ \a t ->
                             AfterHook
                               { title = "After Exch Int",
                                 cardinality = ExeForEach,
                                 aHook = t == 23 ? pure () $ pure (),
                                 ahElms =
-                                  [ \i ->
+                                  [ \a2 i ->
                                       Tests
-                                        [ r i test5Int,
-                                          r i test2Int
+                                        [ r a2 i test5Int,
+                                          r a2 i test2Int
                                         ]
                                   ]
                               }

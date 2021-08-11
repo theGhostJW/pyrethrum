@@ -3,13 +3,13 @@
 
 module SuiteValidationTest where
 
-import MockSuite ( happyRun, MyText, MockTest, mockSuite, inOutFilter, inFilterRunConfig, TestConfig (TestConfig), RunConfig (RunConfig), outOfFilterRunConfig)
+import MockSuite ( happyRun, TextItem, MockTest, mockSuite, inOutFilter, inFilterRunConfig, TestConfig (TestConfig), RunConfig (RunConfig), outOfFilterRunConfig)
 import DSL.Interpreter ( minInterpret )
 import Pyrelude as P
 import Pyrelude.Test ( chk, chk', Assertion, (...) )
 import DSL.LogProtocol ( LogProtocolBase (..))
 import Common  ( FrameworkError, DetailedInfo(DetailedInfo), HookCardinality(..) )
-import Runner (groupAddresses, Titled (title), config, TestFilterResult (TestFilterResult, testInfo, reasonForRejection), TestLogInfo (testModAddress), TestAddress (unTestAddress))
+import Runner (groupAddresses, config, TestFilterResult (TestFilterResult, testInfo, reasonForRejection))
 import RunnerBase (querySuite, AddressedElm (AddressedElm, element))
 import TempUtils
 import ItemRunners (runItem)

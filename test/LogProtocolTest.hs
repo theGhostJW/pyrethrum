@@ -51,14 +51,14 @@ genTxt :: Gen Text
 genTxt = text (linear 0 1000) ascii
 
 
-modDomain :: ModuleDomain
-modDomain = P.foldl' addLayer rootDomain ["root", "sub 1", "sub 2"]
+modDomain :: Address
+modDomain = P.foldl' (flip push) rootAddress ["root", "sub 1", "sub 2"]
 
-domainElementSingleton :: Gen ElementDomain
-domainElementSingleton = pure $ elementDomain modDomain "test"
+domainElementSingleton :: Gen Address
+domainElementSingleton = pure $ push "test" modDomain
 
-moduleDomainSingleton :: Gen ModuleDomain
-moduleDomainSingleton = pure modDomain
+addressSingleton :: Gen Address
+addressSingleton = pure modDomain
 
 genTestConfig :: Gen TestConfig
 genTestConfig =
@@ -86,7 +86,7 @@ genTestDisplayInfo :: Gen TestLogInfo
 genTestDisplayInfo =
   TestLogInfo
     <$>  genTxt
-    <*>  moduleDomainSingleton
+    <*>  addressSingleton
     <*> (A.toJSON <$> genTestConfig)
 
 genTestFilterResult :: Gen TestFilterResult
@@ -131,7 +131,7 @@ genLogProtocol =
       EndGroup <$> (GroupTitle <$> genTxt),
       StartTest <$> genTestDisplayInfo,
       EndTest <$> domainElementSingleton,
-      StartIteration <$> genItemId <*> (WhenClause <$> genTxt) <*> (ThenClause <$> genTxt) <*> (A.toJSON <$> genRunConfig), --- using runconfig as an easy proxy for item
+      StartIteration <$> genItemId <*> genTxt <*> (A.toJSON <$> genRunConfig), --- using runconfig as an easy proxy for item
       EndIteration <$> genItemId,
       FilterLog <$> genTestFilterResults,
       pure EndRun,

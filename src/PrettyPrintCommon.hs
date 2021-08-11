@@ -30,6 +30,9 @@ prettyPrintFilterItem TestFilterResult{..} =
       ("accepted: " <> description)
       (\reason -> "rejected: " <> description <> " - Reason: " <> reason)
 
+logInfoAddress :: TestLogInfo -> Text
+logInfoAddress = error "not implemented"
+
 headerLine ::  Bool -> Int -> Bool -> Char -> Text -> Text
 headerLine isOutline len wantPrcntChar padChr hdrTxt = 
   let 

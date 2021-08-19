@@ -150,9 +150,3 @@ executable:
 #     - test
 #     dependencies: *testdependencies
   
-#   pyrethrum-test-Integration:
-#     main:                driver.hs
-#     source-dirs:         
-#     - testIntegration
-#     dependencies: 
-#       *testdependencies

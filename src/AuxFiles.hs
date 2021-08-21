@@ -50,6 +50,8 @@ import Pyrelude as F
       Time,
       Timespan(getTimespan),
       Year(getYear),
+      Dir,
+      File,
       Path,
       Abs,
       Rel,
@@ -59,7 +61,7 @@ import Pyrelude as F
       RelDir,
       RelFile,
       Text )
-import Pyrelude.IO ( now, subDirFromBaseDir, putStrLn, writeFile )
+import Pyrelude.IO ( now, subDirFromBaseDir, putStrLn, writeFile)
 import qualified Prelude as P
 import qualified System.IO as S
 import qualified Data.Char as C

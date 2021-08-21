@@ -33,7 +33,7 @@ data RunConfig = RunConfig {
   depth       :: Depth
 } deriving (Eq, Show)
 
-instance HasTitle RunConfig 
+
 instance Config RunConfig
 
 allEnvironments :: Set Environment
@@ -70,7 +70,7 @@ data Test e tc rc hi i as ds effs = Test {
 type Test hi = R.Test SuiteError TestConfig RunConfig hi
 type TestResult = GenericResult TestConfig
 
-instance HasTitle TestConfig 
+
 instance Config TestConfig 
 
 testConfig :: TestConfig

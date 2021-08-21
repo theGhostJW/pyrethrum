@@ -13,6 +13,7 @@ import Pyrelude.Test hiding (Group)
 import Runner as R
 import RunnerBase (IsRoot, Test)
 import TestFilter
+import qualified Check as C
 
 data Include = In | Out deriving (Eq, Ord, Show)
 
@@ -37,7 +38,6 @@ inOutFilter =
       predicate = \rc _ tc -> inFilter rc == (include tc == In)
     }
 
-instance HasTitle RunConfig
 
 instance Config RunConfig
 
@@ -51,11 +51,10 @@ data TestConfig = TestConfig
 
 instance Config TestConfig
 
-instance HasTitle TestConfig
 
 $(deriveJSON defaultOptions ''TestConfig)
 
---    e      tc        rc       hi i as ds effs
+-- |A standard test
 type MockTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi i as ds effs
 
 data IntItem = IntItem {
@@ -73,9 +72,6 @@ data TextItem = TextItem {
 instance ToJSON TextItem where
   toEncoding = genericToEncoding defaultOptions
 
-instance ItemClass IntItem 
-
-instance ItemClass TextItem TextItem
 
 instance ToJSON IntItem where
   toEncoding = genericToEncoding defaultOptions
@@ -87,10 +83,10 @@ empti = const ([] :: [b])
 emptiInteractor :: as -> RunConfig -> hi -> i -> Sem effs as
 emptiInteractor as _ _ _ = pure as
 
-emptiParser :: a -> as -> Sem effs a
-emptiParser a _ = pure a
+emptiParser :: ds -> as -> Sem effs ds
+emptiParser ds _ = pure ds
 
-test1Txt :: MockTest Text IntItem Text IntItem effs
+test1Txt :: MockTest Text IntItem Text Text effs
 test1Txt =
   Test
     { config =
@@ -100,10 +96,10 @@ test1Txt =
           },
       items = empti,
       interactor = emptiInteractor "Hello",
-      parse = emptiParser $ IntItem 1 1
+      parse = emptiParser  "Blahh"
     }
 
-test2Int :: MockTest Int IntItem IntItemIntItemeffs
+test2Int :: MockTest Int IntItem Int Int effs
 test2Int =
   Test
     { config =
@@ -112,11 +108,11 @@ test2Int =
             include = In
           },
       items = empti,
-      interactor = emptiInteractor $ IntItem 2 1,
+      interactor = emptiInteractor 44,
       parse = pure
     }
 
-test3Bool :: MockTest Bool IntItem IntItemIntItemeffs
+test3Bool :: MockTest Int IntItem Int Int effs
 test3Bool =
   Test
     { config =
@@ -125,7 +121,7 @@ test3Bool =
             include = Out
           },
       items = empti,
-      interactor = emptiInteractor $ IntItem 3 2,
+      interactor = emptiInteractor 3,
       parse = pure
     }
 
@@ -155,7 +151,7 @@ test6Txt =
       parse = pure
     }
 
-test5Int :: MockTest Int IntItem IntItemIntItemeffs
+test5Int :: MockTest Int IntItem Int Int effs
 test5Int =
   Test
     { config =
@@ -164,7 +160,7 @@ test5Int =
             include = Out
           },
       items = empti,
-      interactor = emptiInteractor (IntItem4 1),
+      interactor = emptiInteractor 22,
       parse = pure
     }
 

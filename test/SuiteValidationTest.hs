@@ -3,14 +3,15 @@
 
 module SuiteValidationTest where
 
-import MockSuite ( happyRun, TextItem, MockTest, mockSuite, inOutFilter, inFilterRunConfig, TestConfig (TestConfig), RunConfig (RunConfig), outOfFilterRunConfig)
+import MockSuite as M ( happyRun, TextItem, MockTest, mockSuite, inOutFilter, inFilterRunConfig, TestConfig (..), RunConfig (RunConfig), outOfFilterRunConfig)
 import DSL.Interpreter ( minInterpret )
 import Pyrelude as P
 import Pyrelude.Test ( chk, chk', Assertion, (...) )
 import DSL.LogProtocol ( LogProtocolBase (..))
 import Common  ( FrameworkError, DetailedInfo(DetailedInfo), HookCardinality(..) )
-import Runner (groupAddresses, config, TestFilterResult (TestFilterResult, testInfo, reasonForRejection))
-import RunnerBase (querySuite, AddressedElm (AddressedElm, element))
+import Runner (groupAddresses, config, TestFilterResult (TestFilterResult, testInfo, reasonForRejection), title)
+import RunnerBase (querySuite, AddressedElm (..))
+import RunElementClasses as REC (Address(..))
 import TempUtils
 import ItemRunners (runItem)
 import Data.Foldable (Foldable(length))
@@ -18,15 +19,16 @@ import Data.Text ( Text )
 import DSL.LogProtocol.PrettyPrint (prettyPrintLogProtocol, LogStyle(..))
 import qualified Data.Text as Text
 import TestFilter
+import GHC.Records
 
 -- >>> demoQueryElem
--- [AddressedElm {address = Stack 2 ["test1","Filter TestSuite"], element = "test1"},AddressedElm {address = Stack 2 ["test4","Filter TestSuite"], element = "test4"},AddressedElm {address = Stack 3 ["test5","Nested Int Group","Filter TestSuite"], element = "test5"},AddressedElm {address = Stack 3 ["test2","Nested Int Group","Filter TestSuite"], element = "test2"}]
+-- [AddressedElm {address = Address {unAddress = ["test1","Filter TestSuite"]}, element = "test1"},AddressedElm {address = Address {unAddress = ["test4","Filter TestSuite"]}, element = "test4"},AddressedElm {address = Address {unAddress = ["test4","Filter TestSuite"]}, element = "test4"},AddressedElm {address = Address {unAddress = ["test5","Nested Int Group","Filter TestSuite"]}, element = "test5"},AddressedElm {address = Address {unAddress = ["test2","Nested Int Group","Filter TestSuite"]}, element = "test2"}]
 -- 
 demoQueryElem :: [AddressedElm Text]
 demoQueryElem =
   let
-    getTitle :: a -> MockTest hi i as ds effs -> Text
-    getTitle _ mt = Runner.title $ config mt
+    getTitle :: a -> b -> MockTest hi i as ds effs -> Text
+    getTitle _ _ mt = M.title $ config mt
 
     root = mockSuite getTitle
   in
@@ -37,7 +39,7 @@ applyFilterLog fltr = filterLog mockSuite [fltr]
 
 listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
-   unTestAddress . testModAddress . testInfo . element <$> filter (isNothing . reasonForRejection . element) (applyFilterLog fltr rc)
+   headDef "" . unAddress . address <$> filter (isNothing . reasonForRejection . element) (applyFilterLog fltr rc)
 
 -- $> inFilterTests
 inFilterTests :: [Text]

@@ -59,7 +59,6 @@ type FullIOEffects = FullIOMembersBase SuiteError
 type FullIOMembers = FullIOMembersBase SuiteError
 type LogProtocol = LogProtocolBase SuiteError
 
-instance HasTitle RunConfig
 
 instance Config RunConfig
 
@@ -84,7 +83,6 @@ data TestConfig = TestConfig {
 type Test = R.Test SuiteError TestConfig RunConfig
 type TestResult = GenericResult TestConfig
 
-instance HasTitle TestConfig
 
 instance Config TestConfig
 

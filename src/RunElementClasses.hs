@@ -1,6 +1,6 @@
 module RunElementClasses
-  ( 
-    Address,
+  (
+    Address(..),
     TestLogInfo (..),
     TestFilterResult (..),
     AddressedElm (..),
@@ -21,27 +21,27 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import GHC.Records
 import Language.Haskell.TH.Syntax
-import Pyrelude hiding (toList)
+import Pyrelude as P hiding (toList)
 import Test.Tasty.Providers (IsTest)
 import Test.Tasty.Runners (FailureReason (TestDepFailed))
 
 
-newtype Address = Address { un :: [Text] } deriving (Show, Eq)
+newtype Address = Address { unAddress :: [Text] } deriving (Show, Eq)
 
 rootAddress :: Address
 rootAddress = Address []
 
 push :: Text -> Address -> Address
-push t = Address . (t :) . un
+push t = Address . (t :) . unAddress
 
 toList :: Address -> [Text]
-toList = reverse . un
+toList = reverse . unAddress
 
 render :: Address -> Text
 render = render' " > "
 
 render' :: Text -> Address -> Text
-render' delim = intercalate delim . un
+render' delim = intercalate delim . unAddress
 
 instance Ord Address where
    v1 <= v2 = RunElementClasses.toList v1 <= RunElementClasses.toList v2
@@ -66,8 +66,8 @@ data TestFilterResult = TestFilterResult
   deriving (Eq, Ord, Show)
 
 
-class HasField "title" a Text => HasTitle a
-class HasField "id" a Int => HasId a
+type HasTitle a = HasField "title" a Text
+type HasId a = HasField "id" a Int
 class (HasField "title" a Text, Show a, FromJSON a, ToJSON a, Eq a) => Config a
 
 type ItemClass i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds))
@@ -81,6 +81,10 @@ data AddressedElm a = AddressedElm
     element :: a
   }
   deriving (Show)
+
+addressTitle :: AddressedElm a -> Text
+addressTitle = P.headDef  "" . unAddress . (address :: AddressedElm a -> Address)
+
 
 instance Eq (AddressedElm a) where
   v1 == v2 = (address :: AddressedElm a -> Address) v1 == (address :: AddressedElm a -> Address) v2

@@ -18,6 +18,7 @@ import Common
     FileSystemErrorType (..),
     FilterErrorType (..),
     FrameworkError (..),
+    HookType,
     OutputDListText,
     dList,
     indentText,
@@ -193,57 +194,51 @@ exeElm ::
   SuiteItem NonRoot hi effs [a] ->
   Sem effs ()
 exeElm runner address hi si =
-  do
-    mt <- emptyElm si
-    mt
-      ? pure ()
-      $ case si of
-        Tests {tests} -> sequence_ $ runner address hi <$> tests
-        BeforeAll {title = ttl, bHook, bhElms} ->
-          let exeHook = do
-                logItem $ StartHook C.BeforeAll ttl
-                o <- bHook
-                logItem $ EndHook C.BeforeAll ttl
-                pure o
-           in do
-                o <- exeHook
-                sequence_ $ (\f -> exeElm runner address o $ f address o) <$> bhElms
-        BeforeEach {title = ttl, bHook, bhElms} ->
-          let exeHook = do
-                logItem $ StartHook C.BeforeEach ttl
-                o <- bHook
-                logItem $ EndHook C.BeforeEach ttl
-                pure o
-              runElm f = do
-                o <- exeHook
-                exeElm runner address o $ f address o
-           in sequence_ $ runElm <$> bhElms
-        AfterEach {title = ttl, aHook, ahElms} ->
-          let logRun = do
-                logItem $ StartHook C.AfterEach ttl
-                o <- aHook
-                logItem $ EndHook C.AfterEach ttl
-           in sequence_ $ (\f -> exeElm runner address hi (f address hi) >> logRun) <$> ahElms
-        AfterAll {title = ttl, aHook, ahElms} ->
-          let logRun = do
-                logItem $ StartHook C.BeforeEach ttl
-                o <- aHook
-                logItem $ EndHook C.BeforeEach ttl
-           in do
-                sequence_ $ (\f -> exeElm runner address hi $ f address hi) <$> ahElms
-                logRun
-        Group {title = ttl, gElms} ->
-          do
-            logItem . StartGroup . GroupTitle $ ttl
-            sequence_ $ exeElm runner (push ttl address) hi <$> gElms
-            logItem . EndGroup . GroupTitle $ ttl
+  let log' :: LogProtocolBase e -> Sem effs ()
+      log' = logItem
+      exeHook :: HookType -> Text -> Sem effs o -> Sem effs o
+      exeHook hookType ttl hook = do
+        log' $ StartHook hookType ttl
+        o <- hook
+        log' $ EndHook hookType ttl
+        pure o
+   in do
+        mt <- emptyElm si
+        mt
+          ? pure ()
+          $ case si of
+            Tests {tests} -> sequence_ $ runner address hi <$> tests
+
+            BeforeAll {title = ttl, bHook, bhElms} -> do
+              o <- exeHook C.BeforeAll ttl bHook
+              sequence_ $ (\f -> exeElm runner address o $ f address o) <$> bhElms
+
+            BeforeEach {title = ttl, bHook, bhElms} ->
+              let runElm f = do
+                    o <- exeHook C.BeforeEach ttl bHook
+                    exeElm runner address o $ f address o
+               in sequence_ $ runElm <$> bhElms
+
+            AfterEach {title = ttl, aHook, ahElms} ->
+              sequence_ $ (\f -> exeElm runner address hi (f address hi) >> exeHook C.AfterEach ttl aHook) <$> ahElms
+
+            AfterAll {title = ttl, aHook, ahElms} -> do
+              sequence_ $ (\f -> exeElm runner address hi $ f address hi) <$> ahElms
+              exeHook C.BeforeEach ttl aHook
+
+            Group {title = ttl, gElms} ->
+              do
+                logItem . StartGroup . GroupTitle $ ttl
+                sequence_ $ exeElm runner (push ttl address) hi <$> gElms
+                logItem . EndGroup . GroupTitle $ ttl
 
 emptyElm :: forall ir hi a effs. SuiteItem ir hi effs [a] -> Sem effs Bool
-emptyElm si = uu
+emptyElm si = uu 
+-- \case
+--                  Tests { tests } -> pure . null $ filter pred tests
+--                  BeforeAll 
+   
 
--- case si of
---    Tests { tests } -> pure . null $ filter pred tests
---    BeforeHook { bhElms } -> uu -- [hi -> SuiteItem hi effs t]
 
 mkSem ::
   forall rc tc e effs.

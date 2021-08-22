@@ -1,7 +1,7 @@
 module DSL.LogProtocol where
 
 import Check
-import Common (DetailedInfo, FrameworkError, HookCardinality)
+import Common (DetailedInfo, FrameworkError, HookType)
 import Data.Aeson as A
 import Data.Aeson.TH
 import Pyrelude
@@ -72,8 +72,8 @@ data LogProtocolBase e
   | EndRun
   | StartGroup GroupTitle
   | EndGroup GroupTitle
-  | StartHook HookCardinality Text
-  | EndHook HookCardinality Text
+  | StartHook HookType Text
+  | EndHook HookType Text
   | StartTest TestLogInfo
   | EndTest Address
   | StartIteration ItemId Text Value

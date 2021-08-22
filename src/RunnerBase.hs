@@ -4,7 +4,7 @@ module RunnerBase
     TestSuite,
     LRB.SuiteItem (..),
     LRB.IsRoot,
-    LRB.NotRoot,
+    LRB.NonRoot,
     Test (..),
     GenericResult (..),
     concatTests,
@@ -14,7 +14,7 @@ module RunnerBase
   )
 where
 
-import Common (FilterErrorType, FrameworkError, HookCardinality (..))
+import Common (FilterErrorType, FrameworkError)
 import Data.Aeson
 import Data.Aeson.TH
 import Internal.RunnerBaseLazy as LRB
@@ -65,17 +65,19 @@ data GenericResult tc rslt = TestResult
 queryElm' :: forall r hi effs a. (a -> Text) -> Address -> SuiteItem r hi effs [a] -> [AddressedElm a]
 queryElm' getItemTitle address =
   let 
-    badCall :: (Address -> o -> SuiteItem NotRoot o effs [a]) -> SuiteItem NotRoot o effs [a]
+    badCall :: (Address -> o -> SuiteItem NonRoot o effs [a]) -> SuiteItem NonRoot o effs [a]
     badCall f = f address $ error "Bad param - this param should never be accessed when querying for element data"
   in \case
         Group {title = t, gElms} -> gElms >>= queryElm' getItemTitle (push t address)
         Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) address) i) <$> tests
       
         -- beforeHook, afterHook and root do not contribute to the address
-        -- Expected type: (Address -> hi -> SuiteItem NotRoot hi effs [a]) -> [AddressedElm a]
+        -- Expected type: (Address -> hi -> SuiteItem NonRoot hi effs [a]) -> [AddressedElm a]
         -- Actual type: (Address -> SuiteItem r1 hi1 effs1 [a]) -> [AddressedElm a]
-        BeforeHook {title = t, bhElms} -> bhElms >>= queryElm' getItemTitle address . badCall
-        AfterHook {title = t, ahElms} -> ahElms >>= queryElm' getItemTitle address . badCall
+        BeforeAll {title = t, bhElms} -> bhElms >>= queryElm' getItemTitle address . badCall
+        BeforeEach {title = t, bhElms} -> bhElms >>= queryElm' getItemTitle address . badCall
+        AfterAll {title = t, ahElms} -> ahElms >>= queryElm' getItemTitle address . badCall
+        AfterEach {title = t, ahElms} -> ahElms >>= queryElm' getItemTitle address . badCall
         Root {rootElms} -> rootElms >>= queryElm' getItemTitle address
 
 querySuite :: forall hi effs a. (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
@@ -122,8 +124,10 @@ concatTests = uu
 groupName :: SuiteItem r hi effs a -> Maybe Text
 groupName = \case
   Tests _ -> Nothing
-  BeforeHook {} -> Nothing
-  AfterHook {} -> Nothing
+  BeforeAll {} -> Nothing
+  BeforeEach {} -> Nothing
+  AfterAll {} -> Nothing
+  AfterEach {} -> Nothing
   Root {} -> Nothing
   Group t _ -> Just t
 

@@ -4,8 +4,7 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import Data.Yaml
 import Polysemy
-import Pyrelude as P hiding (Group, Item)
-import Pyrelude.Test hiding (Group, Item)
+import Pyrelude as P hiding (Item)
 import Runner as R
 import RunnerBase (Test)
 import TestFilter

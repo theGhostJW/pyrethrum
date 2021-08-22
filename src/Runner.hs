@@ -13,15 +13,17 @@ module Runner
   )
 where
 
-import Common as C
+import Common
   ( DetailedInfo (..),
     FileSystemErrorType (..),
     FilterErrorType (..),
     FrameworkError (..),
-    HookCardinality (..),
     OutputDListText,
     dList,
     indentText,
+  )
+import qualified Common as C
+  ( HookType (..),
   )
 import DSL.CurrentTime (utcOffset)
 import DSL.Interpreter (MinEffs)
@@ -78,6 +80,7 @@ import Pyrelude as P
     (&),
     (<$>),
     (>>),
+    (>>=),
     (?),
   )
 import RunElementClasses as C
@@ -95,7 +98,7 @@ import RunElementClasses as C
 import RunnerBase as RB
   ( GenericResult (..),
     ItemRunner,
-    NotRoot,
+    NonRoot,
     SuiteItem (..),
     Test (..),
     TestSuite,
@@ -187,7 +190,7 @@ exeElm ::
   (forall hii. Address -> hii -> a -> Sem effs ()) ->
   Address ->
   hi ->
-  SuiteItem NotRoot hi effs [a] ->
+  SuiteItem NonRoot hi effs [a] ->
   Sem effs ()
 exeElm runner address hi si =
   do
@@ -196,32 +199,39 @@ exeElm runner address hi si =
       ? pure ()
       $ case si of
         Tests {tests} -> sequence_ $ runner address hi <$> tests
-        BeforeHook {cardinality, title = ttl, bHook, bhElms} ->
-          let logRun = do
-                logItem $ StartHook cardinality ttl
+        BeforeAll {title = ttl, bHook, bhElms} ->
+          let exeHook = do
+                logItem $ StartHook C.BeforeAll ttl
                 o <- bHook
-                logItem $ EndHook cardinality ttl
+                logItem $ EndHook C.BeforeAll ttl
                 pure o
-           in case cardinality of
-                ExeOnce ->
-                  do
-                    o <- logRun
-                    sequence_ $ (\f -> exeElm runner address o $ f address o) <$> bhElms
-                ExeForEach ->
-                  let runElm f = do
-                        o <- logRun
-                        exeElm runner address o $ f address o
-                   in sequence_ $ runElm <$> bhElms
-        AfterHook {cardinality, title = ttl, aHook, ahElms} ->
+           in do
+                o <- exeHook
+                sequence_ $ (\f -> exeElm runner address o $ f address o) <$> bhElms
+        BeforeEach {title = ttl, bHook, bhElms} ->
+          let exeHook = do
+                logItem $ StartHook C.BeforeEach ttl
+                o <- bHook
+                logItem $ EndHook C.BeforeEach ttl
+                pure o
+              runElm f = do
+                o <- exeHook
+                exeElm runner address o $ f address o
+           in sequence_ $ runElm <$> bhElms
+        AfterEach {title = ttl, aHook, ahElms} ->
           let logRun = do
-                logItem $ StartHook cardinality ttl
+                logItem $ StartHook C.AfterEach ttl
                 o <- aHook
-                logItem $ EndHook cardinality ttl
-           in case cardinality of
-                ExeOnce -> do
-                  sequence_ $ (\f -> exeElm runner address hi $ f address hi) <$> ahElms
-                  logRun
-                ExeForEach -> sequence_ $ (\f -> exeElm runner address hi (f address hi) >> logRun) <$> ahElms
+                logItem $ EndHook C.AfterEach ttl
+           in sequence_ $ (\f -> exeElm runner address hi (f address hi) >> logRun) <$> ahElms
+        AfterAll {title = ttl, aHook, ahElms} ->
+          let logRun = do
+                logItem $ StartHook C.BeforeEach ttl
+                o <- aHook
+                logItem $ EndHook C.BeforeEach ttl
+           in do
+                sequence_ $ (\f -> exeElm runner address hi $ f address hi) <$> ahElms
+                logRun
         Group {title = ttl, gElms} ->
           do
             logItem . StartGroup . GroupTitle $ ttl

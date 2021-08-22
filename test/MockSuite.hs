@@ -179,9 +179,8 @@ mockSuite r =
   R.Root
     [ R.Group
         "Filter TestSuite"
-        [ BeforeHook
+        [ BeforeAll
             { title = "Before All",
-              cardinality = ExeOnce,
               bHook = pure "hello",
               bhElms =
                 [ \a o ->
@@ -197,9 +196,8 @@ mockSuite r =
                           ]
                       },
                   \a o ->
-                    BeforeHook
+                    BeforeEach
                       { title = "Before Inner",
-                        cardinality = ExeOnce,
                         bHook = pure o,
                         bhElms =
                           [ \a' o' ->
@@ -213,15 +211,13 @@ mockSuite r =
           R.Group
             { title = "Nested Int Group",
               gElms =
-                [ BeforeHook
+                [ BeforeEach
                     { title = "Int Group",
-                      cardinality = ExeForEach,
                       bHook = pure 23,
                       bhElms =
                         [ \a t ->
-                            AfterHook
+                            AfterEach
                               { title = "After Exch Int",
-                                cardinality = ExeForEach,
                                 aHook = t == 23 ? pure () $ pure (),
                                 ahElms =
                                   [ \a2 i ->

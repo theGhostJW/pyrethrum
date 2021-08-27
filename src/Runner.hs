@@ -94,7 +94,7 @@ import RunElementClasses as C
     TestLogInfo (..),
     mkTestLogInfo,
     push,
-    render,
+    render, AddressedElm (AddressedElm)
   )
 import RunnerBase as RB
   ( GenericResult (..),
@@ -238,6 +238,11 @@ emptyElm si = uu
 --                  Tests { tests } -> pure . null $ filter pred tests
 --                  BeforeAll 
    
+-- filterLog :: forall tc rc e effs. Config tc =>
+--               TestSuite e tc rc effs TestFilterResult 
+--               -> [TestFilter rc tc]
+--               -> rc
+--               -> [AddressedElm TestFilterResult]
 
 
 mkSem ::

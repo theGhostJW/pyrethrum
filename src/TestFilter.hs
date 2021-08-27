@@ -54,7 +54,7 @@ filterLog :: forall tc rc e effs. Config tc =>
 filterLog suite fltrs rc =
   let
     testFilter :: Address -> hi -> Test e tc rc hi i as ds effs -> TestFilterResult
-    testFilter d _ = filterTest fltrs rc d
+    testFilter adr _ = filterTest fltrs rc adr
 
     si :: SuiteItem IsRoot () effs [TestFilterResult]
     si = suite testFilter

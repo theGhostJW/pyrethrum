@@ -15,8 +15,8 @@ import Check (Checks)
 
 
 -- $> filterResults
-filterResults :: [AddressedElm TestFilterResult]
-filterResults rc = filterLog (mockSuite filterTest)
+-- filterResults :: [AddressedElm TestFilterResult]
+-- filterResults rc = filterLog (mockSuite filterTest)
 
 -- acceptedTests :: RunConfig -> [TestFilterResult]
 -- acceptedTests rc = P.filter acceptFilter $ filterResults rc

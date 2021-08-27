@@ -162,7 +162,7 @@ runTestItems iIds items beforEach afterEach rc add test@Test {config = tc} itemR
 runTest ::
   forall i rc hi as ds tc e effs.
   (ItemClass i ds, Config tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
-  RunParams Maybe e rc tc effs () -> -- Run Params
+  RunParams Maybe e rc tc effs  -> -- Run Params
   Address ->
   Sem effs hi -> -- before each
   (hi -> Sem effs ()) -> -- after each
@@ -176,8 +176,8 @@ runTest RunParams {filters, rc, itemIds, itemRunner} add be ae test@Test {config
 logLPError :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
 logLPError = logItem . LP.Error
 
-data RunParams m e rc tc effs a = RunParams
-  { suite :: TestSuite e tc rc effs a,
+data RunParams m e rc tc effs = RunParams
+  { suite :: forall a. TestSuite e tc rc effs a,
     filters :: [F.TestFilter rc tc],
     itemIds :: m (S.Set Int),
     itemRunner :: forall hi as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON i, ToJSON ds) => ItemRunner e as ds i hi tc rc effs,
@@ -245,11 +245,16 @@ emptyElm si = uu
 --               -> [AddressedElm TestFilterResult]
 
 
+-- applyFilterLog :: Config tc => RunParams Maybe e rc tc effs a -> [AddressedElm TestFilterResult]
+applyFilterLog :: Config tc => RunParams m e rc tc effs -> [AddressedElm TestFilterResult]
+applyFilterLog RunParams { suite, filters, rc  } = F.filterLog suite filters rc
+
+
 mkSem ::
-  forall rc tc e effs.
+  forall rc tc e a effs.
   (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
-  RunParams Maybe e rc tc effs () ->
-  Sem effs ()
+  RunParams Maybe e rc tc effs  ->
+  Sem effs a
 mkSem rp@RunParams {suite, filters, rc} = uu
 
 -- let
@@ -279,7 +284,7 @@ mkSem rp@RunParams {suite, filters, rc} = uu
 mkEndpointSem ::
   forall rc tc e effs.
   (Config rc, Config tc, ToJSON e, Show e, MinEffs e effs) =>
-  RunParams (Either FilterErrorType) e rc tc effs () ->
+  RunParams (Either FilterErrorType) e rc tc effs  ->
   Address -> -- test address
   Either FilterErrorType (S.Set Int) -> -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
   Sem effs ()

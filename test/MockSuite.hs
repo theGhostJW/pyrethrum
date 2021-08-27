@@ -239,7 +239,7 @@ mockSuite r =
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
 filters' ttl = [includeFilter, hasTitle ttl]
 
-runParams :: forall a effs. DemoEffs effs => Maybe Text -> RunParams Maybe Text RunConfig TestConfig effs a
+runParams :: forall effs. DemoEffs effs => Maybe Text -> RunParams Maybe Text RunConfig TestConfig effs
 runParams nameTxt =
   RunParams
     { suite = mockSuite,

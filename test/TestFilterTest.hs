@@ -9,17 +9,29 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import TestFilter
 import MockSuite
-import RunnerBase ( Test, AddressedElm (AddressedElm) )
+import RunnerBase as RB ( Test, AddressedElm (..) )
 import Check (Checks)
 
 
 
--- $> filterResults
--- filterResults :: [AddressedElm TestFilterResult]
--- filterResults rc = filterLog (mockSuite filterTest)
+filterResults :: RunConfig -> [AddressedElm TestFilterResult]
+filterResults = filterLog mockSuite (filters' Nothing)
 
--- acceptedTests :: RunConfig -> [TestFilterResult]
--- acceptedTests rc = P.filter acceptFilter $ filterResults rc
+acceptedTests :: RunConfig -> [TestFilterResult]
+acceptedTests rc = RB.element <$> filterResults rc
+
+includeCfg :: RunConfig
+includeCfg =
+  RunConfig
+    { title = "Include Flag",
+      includeFlag = Just True,
+      testTitle = Nothing
+    }
+
+
+-- $> infilter
+infilter :: [TestFilterResult]
+infilter = acceptedTests includeCfg
 
 -- chkFilters :: [Text] -> RunConfig -> Assertion
 -- chkFilters expted rc = chkEq expted $ title . testInfo <$> acceptedTests rc

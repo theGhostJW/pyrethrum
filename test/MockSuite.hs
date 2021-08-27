@@ -2,6 +2,7 @@
 
 module MockSuite where
 
+import qualified Check as C
 import DSL.Interpreter (MinEffs)
 import Data.Aeson.TH
 import Data.Aeson.Types
@@ -9,11 +10,10 @@ import Data.Yaml
 import ItemRunners (runItem)
 import Polysemy
 import Pyrelude as P
-import Pyrelude.Test hiding (Group)
+import Pyrelude.Test hiding (Group, maybe)
 import Runner as R
 import RunnerBase (IsRoot, Test)
 import TestFilter
-import qualified Check as C
 
 data Include = In | Out deriving (Eq, Ord, Show)
 
@@ -21,21 +21,25 @@ $(deriveJSON defaultOptions ''Include)
 
 data RunConfig = RunConfig
   { title :: Text,
-    inFilter :: Bool
+    includeFlag :: Maybe Bool,
+    testTitle :: Maybe Text
   }
   deriving (Eq, Show)
 
-inFilterRunConfig :: RunConfig
-inFilterRunConfig = RunConfig "In Filter" True
+includeFlagRunConfig :: RunConfig
+includeFlagRunConfig =
+  RunConfig
+    { title = "Include Flag",
+      includeFlag = Just True,
+      testTitle = Nothing
+    }
 
-outOfFilterRunConfig :: RunConfig
-outOfFilterRunConfig = RunConfig "In Filter" False
-
-inOutFilter :: TestFilter RunConfig TestConfig
-inOutFilter =
-  TestFilter
-    { title = "in out filter state must match",
-      predicate = \rc _ tc -> inFilter rc == (include tc == In)
+excludeFlagRunConfig :: RunConfig
+excludeFlagRunConfig =
+  RunConfig
+    { title = "Exclude Flag",
+      includeFlag = Just False,
+       testTitle = Nothing
     }
 
 
@@ -51,27 +55,27 @@ data TestConfig = TestConfig
 
 instance Config TestConfig
 
-
 $(deriveJSON defaultOptions ''TestConfig)
 
--- |A standard test
+-- | A standard test
 type MockTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi i as ds effs
 
-data IntItem = IntItem {
-  id :: Int,
-  title :: Text,
-  checks :: C.Checks Text
-} deriving (Show, Generic)
+data IntItem = IntItem
+  { id :: Int,
+    title :: Text,
+    checks :: C.Checks Text
+  }
+  deriving (Show, Generic)
 
-data TextItem = TextItem {
-  id :: Int,
-  title :: Text,
-  checks :: C.Checks Int
-} deriving (Show, Generic)
+data TextItem = TextItem
+  { id :: Int,
+    title :: Text,
+    checks :: C.Checks Int
+  }
+  deriving (Show, Generic)
 
 instance ToJSON TextItem where
   toEncoding = genericToEncoding defaultOptions
-
 
 instance ToJSON IntItem where
   toEncoding = genericToEncoding defaultOptions
@@ -96,7 +100,7 @@ test1Txt =
           },
       items = empti,
       interactor = emptiInteractor "Hello",
-      parse = emptiParser  "Blahh"
+      parse = emptiParser "Blahh"
     }
 
 test2Int :: MockTest Int IntItem Int Int effs
@@ -143,7 +147,7 @@ test6Txt =
   Test
     { config =
         TestConfig
-          { title = "test4",
+          { title = "test6",
             include = In
           },
       items = empti,
@@ -168,46 +172,43 @@ includeFilter :: TestFilter RunConfig TestConfig
 includeFilter =
   TestFilter
     { title = "test include must match run",
-      predicate = \(RunConfig _ inc) _ tc -> (include tc == In) == inc
+      predicate = \RunConfig {includeFlag} _ tc -> maybe True (\incRc -> (include tc == In) == incRc) includeFlag
     }
 
-filters' :: [TestFilter RunConfig TestConfig]
-filters' = [includeFilter]
+hasTitle :: Maybe Text -> TestFilter RunConfig TestConfig
+hasTitle ttl =
+  TestFilter
+    { title = maybef ttl "test title includes N/A - no test fragmant provided" ("test title includes " <>),
+      predicate = \RunConfig {testTitle} _ tc -> maybe True (\frag -> frag `isInfixOf` toLower ((title :: TestConfig -> Text ) tc)) testTitle
+    }
 
 mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
 mockSuite r =
   R.Root
-    [ R.Group
-        "Filter TestSuite"
-        [ BeforeAll
-            { title = "Before All",
-              bHook = pure "hello",
-              bhElms =
-                [ \a o ->
-                    Tests
-                      [ r a o test1Txt,
-                        r a o test4Txt
-                      ],
-                  \a o ->
-                    R.Group
-                      { title = "Empty Group",
-                        gElms =
-                          [ Tests []
-                          ]
-                      },
-                  \a o ->
-                    BeforeEach
-                      { title = "Before Inner",
-                        bHook = pure o,
-                        bhElms =
-                          [ \a' o' ->
-                              Tests
-                                [ r a' o' test6Txt
-                                ]
-                          ]
-                      }
-                ]
-            },
+    [ R.Group "Filter TestSuite"
+
+        [ BeforeAll "Before All"
+            (pure "hello")
+            [ \a o ->
+                Tests
+                  [ r a o test1Txt,
+                    r a o test4Txt
+                  ],
+
+              \a o ->
+                R.Group "Empty Group"
+                  [Tests []],
+
+              \a o ->
+                BeforeEach "Before Inner"
+                  ( pure o)
+                  [
+                    \a' o' ->
+                      Tests
+                        [ r a' o' test6Txt
+                        ]
+                  ]
+            ],
           R.Group
             { title = "Nested Int Group",
               gElms =
@@ -234,18 +235,29 @@ mockSuite r =
         ]
     ]
 
-runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs ()
-runParams =
+
+filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
+filters' ttl = [includeFilter, hasTitle ttl]
+
+runParams :: forall a effs. DemoEffs effs => Maybe Text -> RunParams Maybe Text RunConfig TestConfig effs a
+runParams nameTxt =
   RunParams
     { suite = mockSuite,
-      filters = filters',
+      filters = filters' nameTxt,
       itemIds = Nothing,
       itemRunner = runItem,
-      rc = RunConfig "Happy TestSuite" True
+      rc = RunConfig {
+        title = "Happy Test Run",
+        includeFlag = Just True,
+        testTitle = Nothing
+        }
     }
 
+mockRun :: forall effs. DemoEffs effs => Maybe Text -> Sem effs ()
+mockRun nameTxt = mkSem $ runParams nameTxt
+
 happyRun :: forall effs. DemoEffs effs => Sem effs ()
-happyRun = mkSem runParams
+happyRun = mockRun Nothing
 
 $(deriveJSON defaultOptions ''RunConfig)
 

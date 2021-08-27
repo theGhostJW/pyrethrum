@@ -3,7 +3,7 @@
 
 module SuiteValidationTest where
 
-import MockSuite as M ( happyRun, TextItem, MockTest, mockSuite, inOutFilter, inFilterRunConfig, TestConfig (..), RunConfig (RunConfig), outOfFilterRunConfig)
+import MockSuite as M ( happyRun, TextItem, MockTest, mockSuite, includeFilter, excludeFlagRunConfig, TestConfig (..), RunConfig (RunConfig), includeFlagRunConfig)
 import DSL.Interpreter ( minInterpret )
 import Pyrelude as P
 import Pyrelude.Test ( chk, chk', Assertion, (...) )
@@ -43,11 +43,11 @@ listTests fltr rc =
 
 -- $> inFilterTests
 inFilterTests :: [Text]
-inFilterTests = listTests inOutFilter inFilterRunConfig
+inFilterTests = listTests includeFilter includeFlagRunConfig
 
 -- $> outFilterTests
 outFilterTests :: [Text]
-outFilterTests = listTests inOutFilter outOfFilterRunConfig
+outFilterTests = listTests includeFilter excludeFlagRunConfig
 
 -- todo filter out empty items
 

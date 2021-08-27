@@ -62,26 +62,25 @@ data GenericResult tc rslt = TestResult
   }
   deriving (Show)
 
-queryElm' :: forall r hi effs a. (a -> Text) -> Address -> SuiteItem r hi effs [a] -> [AddressedElm a]
-queryElm' getItemTitle address =
+queryElm :: forall r hi effs a. (a -> Text) -> Address -> SuiteItem r hi effs [a] -> [AddressedElm a]
+queryElm getItemTitle address =
   let 
     badCall :: (Address -> o -> SuiteItem NonRoot o effs [a]) -> SuiteItem NonRoot o effs [a]
     badCall f = f address $ error "Bad param - this param should never be accessed when querying for element data"
   in \case
-        Group {title = t, gElms} -> gElms >>= queryElm' getItemTitle (push t address)
+        Group {title = t, gElms} -> gElms >>= queryElm getItemTitle (push t address)
         Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) address) i) <$> tests
       
-        -- beforeHook, afterHook and root do not contribute to the address
-        -- Expected type: (Address -> hi -> SuiteItem NonRoot hi effs [a]) -> [AddressedElm a]
-        -- Actual type: (Address -> SuiteItem r1 hi1 effs1 [a]) -> [AddressedElm a]
-        BeforeAll {title = t, bhElms} -> bhElms >>= queryElm' getItemTitle address . badCall
-        BeforeEach {title = t, bhElms} -> bhElms >>= queryElm' getItemTitle address . badCall
-        AfterAll {title = t, ahElms} -> ahElms >>= queryElm' getItemTitle address . badCall
-        AfterEach {title = t, ahElms} -> ahElms >>= queryElm' getItemTitle address . badCall
-        Root {rootElms} -> rootElms >>= queryElm' getItemTitle address
+        -- Hooks and root do not contribute to the address
+        BeforeAll {title = t, bhElms} -> bhElms >>= queryElm getItemTitle address . badCall
+        BeforeEach {title = t, bhElms} -> bhElms >>= queryElm getItemTitle address . badCall
+        AfterAll {title = t, ahElms} -> ahElms >>= queryElm getItemTitle address . badCall
+        AfterEach {title = t, ahElms} -> ahElms >>= queryElm getItemTitle address . badCall
+        Root {rootElms} -> rootElms >>= queryElm getItemTitle address
 
 querySuite :: forall hi effs a. (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
-querySuite getItemTitle = queryElm' getItemTitle rootAddress 
+querySuite getItemTitle = queryElm getItemTitle rootAddress 
+
 
 
 {-

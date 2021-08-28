@@ -61,80 +61,80 @@ emptiInteractor as _ _ _ = pure as
 constParser :: a -> as -> Sem effs a
 constParser a _ = pure a
 
-test1Txt :: MockTest Text Item Text Int effs
-test1Txt =
-  Test
-    { config =
-        TestConfig
-          { title = "test1",
-            include = In
-          },
-      items = empti,
-      interactor = emptiInteractor "Hello",
-      parse = constParser 1
-    }
+-- test1Txt :: MockTest Text Item Text Int effs
+-- test1Txt =
+--   Test
+--     { config =
+--         TestConfig
+--           { title = "test1",
+--             include = In
+--           },
+--       items = empti,
+--       interactor = emptiInteractor "Hello",
+--       parse = constParser 1
+--     }
 
-test2Int :: MockTest Int Item Text Text effs
-test2Int =
-  Test
-    { config =
-        TestConfig
-          { title = "test2",
-            include = In
-          },
-      items = empti,
-      interactor = emptiInteractor "Hi",
-      parse = constParser "Hello"
-    }
+-- test2Int :: MockTest Int Item Text Text effs
+-- test2Int =
+--   Test
+--     { config =
+--         TestConfig
+--           { title = "test2",
+--             include = In
+--           },
+--       items = empti,
+--       interactor = emptiInteractor "Hi",
+--       parse = constParser "Hello"
+--     }
 
-test3Bool :: MockTest Bool Item Text Int effs
-test3Bool =
-  Test
-    { config =
-        TestConfig
-          { title = "test3",
-            include = Out
-          },
-      items = empti,
-      interactor = emptiInteractor "Hi",
-      parse = constParser 2
-    }
+-- test3Bool :: MockTest Bool Item Text Int effs
+-- test3Bool =
+--   Test
+--     { config =
+--         TestConfig
+--           { title = "test3",
+--             include = Out
+--           },
+--       items = empti,
+--       interactor = emptiInteractor "Hi",
+--       parse = constParser 2
+--     }
 
-test4Txt :: MockTest Text Item Text Text effs
-test4Txt =
-  Test
-    { config =
-        TestConfig
-          { title = "test4",
-            include = In
-          },
-      items = empti,
-      interactor = emptiInteractor "Hello",
-      parse = constParser "hi"
-    }
+-- test4Txt :: MockTest Text Item Text Text effs
+-- test4Txt =
+--   Test
+--     { config =
+--         TestConfig
+--           { title = "test4",
+--             include = In
+--           },
+--       items = empti,
+--       interactor = emptiInteractor "Hello",
+--       parse = constParser "hi"
+--     }
 
-test5Int :: MockTest Int Item Int Int effs
-test5Int =
-  Test
-    { config =
-        TestConfig
-          { title = "test5",
-            include = Out
-          },
-      items = empti,
-      interactor = emptiInteractor 1,
-      parse = constParser 99
-    }
+-- test5Int :: MockTest Int Item Int Int effs
+-- test5Int =
+--   Test
+--     { config =
+--         TestConfig
+--           { title = "test5",
+--             include = Out
+--           },
+--       items = empti,
+--       interactor = emptiInteractor 1,
+--       parse = constParser 99
+--     }
 
-includeFilter :: TestFilter RunConfig TestConfig
-includeFilter =
-  TestFilter
-    { title = "test include must match run",
-      predicate = \(RunConfig inc) _ tc -> include tc == inc
-    }
+-- includeFilter :: TestFilter RunConfig TestConfig
+-- includeFilter =
+--   TestFilter
+--     { title = "test include must match run",
+--       predicate = \(RunConfig inc) _ tc -> include tc == inc
+--     }
 
-filters' :: [TestFilter RunConfig TestConfig]
-filters' = [includeFilter]
+-- filters' :: [TestFilter RunConfig TestConfig]
+-- filters' = [includeFilter]
 
 -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
 -- mockSuite r =

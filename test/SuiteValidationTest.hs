@@ -3,7 +3,7 @@
 
 module SuiteValidationTest where
 
-import MockSuite as M ( happyRun, TextItem, MockTest, mockSuite, includeFilter, excludeFlagRunConfig, TestConfig (..), RunConfig (RunConfig), includeFlagRunConfig)
+import MockSuite as M ( happyRun, TextItem, MockTest, mockSuite, tossFilter, TestConfig (..), RunConfig (RunConfig))
 import DSL.Interpreter ( minInterpret )
 import Pyrelude as P
 import Pyrelude.Test ( chk, chk', Assertion, (...) )
@@ -21,7 +21,7 @@ import qualified Data.Text as Text
 import TestFilter
 import GHC.Records
 
--- $> demoQueryElem
+-- $ > demoQueryElem
 -- [AddressedElm {address = Address {unAddress = ["test1","Filter TestSuite"]}, element = "test1"},AddressedElm {address = Address {unAddress = ["test4","Filter TestSuite"]}, element = "test4"},AddressedElm {address = Address {unAddress = ["test4","Filter TestSuite"]}, element = "test4"},AddressedElm {address = Address {unAddress = ["test5","Nested Int Group","Filter TestSuite"]}, element = "test5"},AddressedElm {address = Address {unAddress = ["test2","Nested Int Group","Filter TestSuite"]}, element = "test2"}]
 -- 
 demoQueryElem :: [AddressedElm Text]
@@ -39,18 +39,11 @@ demoQueryElem =
 applyFilterLog :: TestFilter RunConfig TestConfig -> RunConfig -> [RunnerBase.AddressedElm TestFilterResult]
 applyFilterLog fltr = filterLog mockSuite [fltr]
 
--- $> listTests
+-- $ > listTests
 listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
    headDef "" . unAddress . address <$> filter (isNothing . reasonForRejection . element) (applyFilterLog fltr rc)
 
--- $> inFilterTests
-inFilterTests :: [Text]
-inFilterTests = listTests includeFilter includeFlagRunConfig
-
--- $> outFilterTests
-outFilterTests :: [Text]
-outFilterTests = listTests includeFilter excludeFlagRunConfig
 
 -- todo filter out empty items
 

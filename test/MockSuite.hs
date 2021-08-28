@@ -12,36 +12,27 @@ import Polysemy
 import Pyrelude as P
 import Pyrelude.Test hiding (Group, maybe)
 import Runner as R
+    ( Config,
+      Address,
+      SuiteItem(Tests, Root, BeforeAll, Group, BeforeEach, AfterEach,
+                gElms, bHook, bhElms, title, aHook, ahElms),
+      Test(Test, config, items, interactor, parse),
+      mkSem,
+      RunParams(..) )
 import RunnerBase (IsRoot, Test)
 import TestFilter
 
-data Include = In | Out deriving (Eq, Ord, Show)
+data TossCall =  Heads | Tails deriving (Eq, Ord, Show)
 
-$(deriveJSON defaultOptions ''Include)
+data TossResult = RcHeads | RcTails | RcAll deriving (Eq, Ord, Show)
+
 
 data RunConfig = RunConfig
-  { title :: Text,
-    includeFlag :: Maybe Bool,
-    testTitle :: Maybe Text
+  {
+    title :: Text,
+    toss :: TossResult
   }
   deriving (Eq, Show)
-
-includeFlagRunConfig :: RunConfig
-includeFlagRunConfig =
-  RunConfig
-    { title = "Include Flag",
-      includeFlag = Just True,
-      testTitle = Nothing
-    }
-
-excludeFlagRunConfig :: RunConfig
-excludeFlagRunConfig =
-  RunConfig
-    { title = "Exclude Flag",
-      includeFlag = Just False,
-       testTitle = Nothing
-    }
-
 
 instance Config RunConfig
 
@@ -49,7 +40,7 @@ type DemoEffs effs = MinEffs Text effs
 
 data TestConfig = TestConfig
   { title :: Text,
-    include :: Include
+    tossCall :: TossCall
   }
   deriving (Show, Eq)
 
@@ -96,7 +87,7 @@ test1Txt =
     { config =
         TestConfig
           { title = "test1",
-            include = In
+            tossCall = Heads
           },
       items = empti,
       interactor = emptiInteractor "Hello",
@@ -109,7 +100,7 @@ test2Int =
     { config =
         TestConfig
           { title = "test2",
-            include = In
+            tossCall = Heads
           },
       items = empti,
       interactor = emptiInteractor 44,
@@ -122,7 +113,7 @@ test3Bool =
     { config =
         TestConfig
           { title = "test3",
-            include = Out
+            tossCall = Tails
           },
       items = empti,
       interactor = emptiInteractor 3,
@@ -135,7 +126,7 @@ test4Txt =
     { config =
         TestConfig
           { title = "test4",
-            include = In
+            tossCall = Heads
           },
       items = empti,
       interactor = emptiInteractor "Hello",
@@ -148,7 +139,7 @@ test6Txt =
     { config =
         TestConfig
           { title = "test6",
-            include = In
+            tossCall = Heads
           },
       items = empti,
       interactor = emptiInteractor "Hello",
@@ -161,49 +152,56 @@ test5Int =
     { config =
         TestConfig
           { title = "test5",
-            include = Out
+            tossCall = Tails
           },
       items = empti,
       interactor = emptiInteractor 22,
       parse = pure
     }
 
-includeFilter :: TestFilter RunConfig TestConfig
-includeFilter =
+tossFilter :: TestFilter RunConfig TestConfig
+tossFilter =
   TestFilter
-    { title = "test include must match run",
-      predicate = \RunConfig {includeFlag} _ tc -> maybe True (\incRc -> (include tc == In) == incRc) includeFlag
+    { title = \RunConfig { toss } _ TestConfig { tossCall } -> "toss call: " <>  txt tossCall <> " must match run: " <> txt toss,
+      predicate = \RunConfig {toss} _ TestConfig{ tossCall } -> case toss of
+                                                      RcAll -> True
+                                                      RcHeads -> tossCall == Heads
+                                                      RcTails -> tossCall == Tails
     }
 
 hasTitle :: Maybe Text -> TestFilter RunConfig TestConfig
 hasTitle ttl =
   TestFilter
-    { title = maybef ttl "test title includes N/A - no test fragmant provided" ("test title includes " <>),
-      predicate = \RunConfig {testTitle} _ tc -> maybe True (\frag -> frag `isInfixOf` toLower ((title :: TestConfig -> Text ) tc)) testTitle
+    { title = \_ _ _ -> maybef ttl "test title N/A - no test fragmant provided" ("test title must include: " <>),
+      predicate = \_ _ TestConfig {title = testTtl} ->
+        maybef
+          ttl
+          True
+          \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
 
 mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
 mockSuite r =
   R.Root
-    [ R.Group "Filter TestSuite"
-
-        [ BeforeAll "Before All"
+    [ R.Group
+        "Filter TestSuite"
+        [ BeforeAll
+            "Before All"
             (pure "hello")
             [ \a o ->
                 Tests
                   [ r a o test1Txt,
                     r a o test4Txt
                   ],
-
               \a o ->
-                R.Group "Empty Group"
+                R.Group
+                  "Empty Group"
                   [Tests []],
-
               \a o ->
-                BeforeEach "Before Inner"
-                  ( pure o)
-                  [
-                    \a' o' ->
+                BeforeEach
+                  "Before Inner"
+                  (pure o)
+                  [ \a' o' ->
                       Tests
                         [ r a' o' test6Txt
                         ]
@@ -235,9 +233,8 @@ mockSuite r =
         ]
     ]
 
-
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
-filters' ttl = [includeFilter, hasTitle ttl]
+filters' ttl = [tossFilter, hasTitle ttl]
 
 runParams :: forall effs. DemoEffs effs => Maybe Text -> RunParams Maybe Text RunConfig TestConfig effs
 runParams nameTxt =
@@ -246,11 +243,11 @@ runParams nameTxt =
       filters = filters' nameTxt,
       itemIds = Nothing,
       itemRunner = runItem,
-      rc = RunConfig {
-        title = "Happy Test Run",
-        includeFlag = Just True,
-        testTitle = Nothing
-        }
+      rc =
+        RunConfig
+          { title = "Happy Test Run",
+            toss = RcHeads
+          }
     }
 
 mockRun :: forall effs. DemoEffs effs => Maybe Text -> Sem effs ()
@@ -259,6 +256,8 @@ mockRun nameTxt = mkSem $ runParams nameTxt
 happyRun :: forall effs. DemoEffs effs => Sem effs ()
 happyRun = mockRun Nothing
 
+$(deriveJSON defaultOptions ''TossCall)
+$(deriveJSON defaultOptions ''TossResult)
 $(deriveJSON defaultOptions ''RunConfig)
 
 -- unit_test_filter_expect_empty

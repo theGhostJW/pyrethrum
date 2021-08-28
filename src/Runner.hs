@@ -292,7 +292,7 @@ mkEndpointSem runParams@RunParams {filters, itemIds} tstAddress iIds =
   let endpointFilter :: Address -> F.TestFilter rc tc
       endpointFilter targAddress =
         F.TestFilter
-          { title = "test address does not match endpoint target: " <> render targAddress,
+          { title = \_ _ _ -> "test address does not match endpoint target: " <> render targAddress,
             predicate = \_ address' _ -> address' == targAddress
           }
 

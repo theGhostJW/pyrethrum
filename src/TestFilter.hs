@@ -21,7 +21,7 @@ mkTestFilterResult d tc rejection = TestFilterResult {
                               }
 
 data TestFilter rc tc = TestFilter {
-  title :: Text,
+  title :: rc -> Address -> tc -> Text,
   predicate :: rc -> Address -> tc -> Bool
 }
 
@@ -34,7 +34,7 @@ applyFilters fltrs rc adrs tc =
   applyFilter :: TestFilter rc tc -> TestFilterResult
   applyFilter fltr = fltrRslt $ predicate fltr rc adrs tc 
                                             ? Nothing 
-                                            $ Just $ TestFilter.title fltr
+                                            $ Just $ TestFilter.title fltr rc adrs tc 
 
   firstRejectReason :: Maybe Text
   firstRejectReason = L.find rejectFilter (applyFilter <$> fltrs) >>= reasonForRejection

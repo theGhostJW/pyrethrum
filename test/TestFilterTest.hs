@@ -19,16 +19,12 @@ filterResults = filterLog mockSuite
 
 data Status = Accepted | Rejected
 
-tests :: RunConfig -> [TestFilter RunConfig TestConfig] ->  Status -> [ShowFilter]
+tests :: RunConfig -> [TestFilter RunConfig TestConfig] -> Status -> [ShowFilter]
 tests rc fltrs s = 
   let 
-    matchStatus sf = 
-      let 
-        m = rejection sf 
-      in
-       s == Accepted ? isNothing  m $ isJust m
+    matchStatus sf = (s == Accepted ? isNothing $ isJust) $ rejection sf 
   in
-   P.filter matchStatus $ showIt . RB.element <$> filterResults fltrs rc
+    P.filter matchStatus $ showIt . RB.element <$> filterResults fltrs rc
 
 
 data ShowFilter = ShowFilter {

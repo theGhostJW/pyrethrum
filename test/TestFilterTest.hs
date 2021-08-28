@@ -1,52 +1,79 @@
 module TestFilterTest where
 
-import Pyrelude         as P
-import Polysemy
-import           Runner as R
-import           Pyrelude.Test hiding (Group)
-import Data.Yaml
+import Check (Checks)
 import Data.Aeson.TH
 import Data.Aeson.Types
+import Data.Yaml
+import MockSuite hiding (filters')
+import Polysemy
+import Pyrelude as P
+import Pyrelude.Test hiding (Group)
+import Runner as R
+import RunnerBase as RB (AddressedElm (..), Test, querySuite)
 import TestFilter
-import MockSuite
-import RunnerBase as RB ( Test, AddressedElm (..) )
-import Check (Checks)
+import Text.Show.Pretty
 
+-- $> view allTossCalls
 
+allTossCalls :: [(Text, TossCall)]
+allTossCalls =
+  let titleAndCall :: a -> b -> MockTest hi i as ds effs -> (Text, TossCall)
+      titleAndCall _ _ (Test (TestConfig ttl call) _ _ _) = (ttl, call)
 
-filterResults :: [TestFilter RunConfig TestConfig] -> RunConfig ->  [AddressedElm TestFilterResult]
-filterResults = filterLog mockSuite 
+      root = mockSuite titleAndCall
+   in RB.element <$> querySuite fst root
 
-data Status = Accepted | Rejected
-
-tests :: RunConfig -> [TestFilter RunConfig TestConfig] -> Status -> [ShowFilter]
-tests rc fltrs s = 
-  let 
-    matchStatus sf = (s == Accepted ? isNothing $ isJust) $ rejection sf 
-  in
-    P.filter matchStatus $ showIt . RB.element <$> filterResults fltrs rc
-
-
-data ShowFilter = ShowFilter {
-  name :: Text,
-  rejection :: Maybe Text
-} deriving Show
-
-showIt :: TestFilterResult -> ShowFilter
-showIt r = ShowFilter ( (title :: TestLogInfo -> Text) $ testInfo r) (reasonForRejection  r)
-
-includeCfg :: RunConfig
-includeCfg =
+baseCfg :: TossResult -> RunConfig
+baseCfg tr =
   RunConfig
-    { title = "Include Flag",
-      includeFlag = Just True,
-      testTitle = Nothing
+    { title = "Unit Test Config",
+      toss = tr
     }
 
+filterResults :: [TestFilter RunConfig TestConfig] -> RunConfig -> [AddressedElm TestFilterResult]
+filterResults = filterLog mockSuite
 
--- $> infilter
-infilter :: [TestFilterResult]
-infilter = acceptedTests includeCfg
+data Status = Accepted | Rejected | AnyResult deriving (Eq)
+
+type ShowFilter = (Text, Maybe Text)
+
+tests' :: RunConfig -> [TestFilter RunConfig TestConfig] -> Status -> [ShowFilter]
+tests' rc fltrs s =
+  let matchStatus sf = s == AnyResult || (s == Accepted ? isNothing $ isJust) (snd sf)
+   in P.filter matchStatus $ showIt . RB.element <$> filterResults fltrs rc
+
+showIt :: TestFilterResult -> ShowFilter
+showIt r = ((title :: TestLogInfo -> Text) $ testInfo r, reasonForRejection r)
+
+filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
+filters' ttl = [tossFilter, hasTitle ttl]
+
+view :: Show a => [a] -> IO ()
+view = pPrintList
+
+-- $> view allTests
+
+allTests :: [ShowFilter]
+allTests = tests' (baseCfg RcAll) (filters' Nothing) Accepted
+
+-- $> view heads
+
+heads :: [ShowFilter]
+heads = tests' (baseCfg RcHeads) (filters' Nothing) AnyResult
+
+-- $> view headsRejected
+
+headsRejected :: [ShowFilter]
+headsRejected = tests' (baseCfg RcHeads) (filters' Nothing) Rejected
+
+-- $> view headsWith6
+
+headsWith6 :: [ShowFilter]
+headsWith6 = tests' (baseCfg RcHeads) (filters' $ Just "6") Accepted
+
+-- $> view headsWith6Rejects
+headsWith6Rejects :: [ShowFilter]
+headsWith6Rejects = tests' (baseCfg RcHeads) (filters' $ Just "6") Rejected
 
 -- chkFilters :: [Text] -> RunConfig -> Assertion
 -- chkFilters expted rc = chkEq expted $ title . testInfo <$> acceptedTests rc
@@ -62,7 +89,6 @@ infilter = acceptedTests includeCfg
 
 -- unit_test_filter_country_au_deep_regression :: Assertion
 -- unit_test_filter_country_au_deep_regression = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
-
 
 -- filtersExcludeReasons :: RunConfig -> [Text]
 -- filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> P.filter rejectFilter (filterResults rc)

@@ -14,11 +14,30 @@ import Check (Checks)
 
 
 
-filterResults :: RunConfig -> [AddressedElm TestFilterResult]
-filterResults = filterLog mockSuite (filters' Nothing)
+filterResults :: [TestFilter RunConfig TestConfig] -> RunConfig ->  [AddressedElm TestFilterResult]
+filterResults = filterLog mockSuite 
 
-acceptedTests :: RunConfig -> [TestFilterResult]
-acceptedTests rc = RB.element <$> filterResults rc
+data Status = Accepted | Rejected
+
+tests :: RunConfig -> [TestFilter RunConfig TestConfig] ->  Status -> [ShowFilter]
+tests rc fltrs s = 
+  let 
+    matchStatus sf = 
+      let 
+        m = rejection sf 
+      in
+       s == Accepted ? isNothing  m $ isJust m
+  in
+   P.filter matchStatus $ showIt . RB.element <$> filterResults fltrs rc
+
+
+data ShowFilter = ShowFilter {
+  name :: Text,
+  rejection :: Maybe Text
+} deriving Show
+
+showIt :: TestFilterResult -> ShowFilter
+showIt r = ShowFilter ( (title :: TestLogInfo -> Text) $ testInfo r) (reasonForRejection  r)
 
 includeCfg :: RunConfig
 includeCfg =

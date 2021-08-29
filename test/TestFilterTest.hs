@@ -13,8 +13,7 @@ import RunnerBase as RB (AddressedElm (..), Test, querySuite)
 import TestFilter
 import Text.Show.Pretty
 
--- $> view allTossCalls
-
+-- $ > view allTossCalls
 allTossCalls :: [(Text, TossCall)]
 allTossCalls =
   let titleAndCall :: a -> b -> MockTest hi i as ds effs -> (Text, TossCall)
@@ -51,38 +50,48 @@ filters' ttl = [tossFilter, hasTitle ttl]
 view :: Show a => [a] -> IO ()
 view = pPrintList
 
--- $> view allTests
-
+-- $ > view allTests
 allTests :: [ShowFilter]
 allTests = tests' (baseCfg RcAll) (filters' Nothing) Accepted
 
--- $> view heads
+-- $ > unit_test_any_result_has_all
+unit_test_any_result_has_all :: Assertion
+unit_test_any_result_has_all = chkEq (length allTests) (length headsAll)
 
-heads :: [ShowFilter]
-heads = tests' (baseCfg RcHeads) (filters' Nothing) AnyResult
 
--- $> view headsRejected
+-- $ > view headsAll
+headsAll :: [ShowFilter]
+headsAll = tests' (baseCfg RcHeads) (filters' Nothing) AnyResult
 
+-- $ > view headsRejected
 headsRejected :: [ShowFilter]
 headsRejected = tests' (baseCfg RcHeads) (filters' Nothing) Rejected
 
--- $> view headsWith6
+-- $ > view headsRejected
+headsAccepted :: [ShowFilter]
+headsAccepted = tests' (baseCfg RcHeads) (filters' Nothing) Accepted
 
+-- $ > unit_test_all_heads
+unit_test_all_heads :: Assertion
+unit_test_all_heads = chkEq ( fst <$> headsAccepted) ["test1", "test4", "test6"]
+
+-- $ > view headsWith6
 headsWith6 :: [ShowFilter]
 headsWith6 = tests' (baseCfg RcHeads) (filters' $ Just "6") Accepted
 
--- $> view headsWith6Rejects
+-- $ > view headsWith6Rejects
 headsWith6Rejects :: [ShowFilter]
 headsWith6Rejects = tests' (baseCfg RcHeads) (filters' $ Just "6") Rejected
 
--- chkFilters :: [Text] -> RunConfig -> Assertion
--- chkFilters expted rc = chkEq expted $ title . testInfo <$> acceptedTests rc
+-- $ > unit_check_rejection_messages
+unit_check_rejection_messages :: Assertion
+unit_check_rejection_messages = chkEq headsWith6Rejects [ ( "test1" , Just "test title must include: 6" )
+                                                        , ( "test4" , Just "test title must include: 6" )
+                                                        , ( "test5" , Just "toss call: Tails must match run: RcHeads" )
+                                                        , ( "test2" , Just "toss call: Tails must match run: RcHeads" )
+                                                        , ( "test3" , Just "toss call: Tails must match run: RcHeads" )
+                                                        ]
 
--- unit_test_filter_expect_empty :: Assertion
--- unit_test_filter_expect_empty = chkFilters [] $ RunConfig NZ Connectivity
-
--- unit_test_filter_country :: Assertion
--- unit_test_filter_country = chkFilters ["test1", "test3"] $ RunConfig Au Regression
 
 -- unit_test_filter_country_nz :: Assertion
 -- unit_test_filter_country_nz = chkFilters ["test1", "test2"] $ RunConfig NZ Regression

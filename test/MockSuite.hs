@@ -100,15 +100,15 @@ test2Int =
     { config =
         TestConfig
           { title = "test2",
-            tossCall = Heads
+            tossCall = Tails
           },
       items = empti,
       interactor = emptiInteractor 44,
       parse = pure
     }
 
-test3Bool :: MockTest Int IntItem Int Int effs
-test3Bool =
+test3Int :: MockTest Int IntItem Int Int effs
+test3Int =
   Test
     { config =
         TestConfig
@@ -222,7 +222,8 @@ mockSuite r =
                                   [ \a2 i ->
                                       Tests
                                         [ r a2 i test5Int,
-                                          r a2 i test2Int
+                                          r a2 i test2Int,
+                                          r a2 i test3Int
                                         ]
                                   ]
                               }

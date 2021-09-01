@@ -29,7 +29,7 @@ baseCfg tr =
       toss = tr
     }
 
-filterResults :: [TestFilter RunConfig TestConfig] -> RunConfig -> [AddressedElm TestFilterResult]
+filterResults :: [TestFilter RunConfig TestConfig] -> RunConfig -> [TestFilterResult]
 filterResults = filterLog mockSuite
 
 data Status = Accepted | Rejected | AnyResult deriving (Eq)
@@ -39,7 +39,7 @@ type ShowFilter = (Text, Maybe Text)
 tests' :: RunConfig -> [TestFilter RunConfig TestConfig] -> Status -> [ShowFilter]
 tests' rc fltrs s =
   let matchStatus sf = s == AnyResult || (s == Accepted ? isNothing $ isJust) (snd sf)
-   in P.filter matchStatus $ showIt . RB.element <$> filterResults fltrs rc
+   in P.filter matchStatus $ showIt <$> filterResults fltrs rc
 
 showIt :: TestFilterResult -> ShowFilter
 showIt r = ((title :: TestLogInfo -> Text) $ testInfo r, reasonForRejection r)

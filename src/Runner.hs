@@ -82,7 +82,7 @@ import Pyrelude as P
     (<$>),
     (>>),
     (>>=),
-    (?),
+    (?), id
   )
 import RunElementClasses as C
   ( Address,
@@ -94,7 +94,7 @@ import RunElementClasses as C
     TestLogInfo (..),
     mkTestLogInfo,
     push,
-    render, AddressedElm (AddressedElm)
+    render, AddressedElm (AddressedElm, element), rootAddress
   )
 import RunnerBase as RB
   ( GenericResult (..),
@@ -104,7 +104,7 @@ import RunnerBase as RB
     Test (..),
     TestSuite,
     groupAddresses,
-    groupName,
+    groupName, queryElm, queryElmIncHookAddress
   )
 import qualified TestFilter as F
   ( TestFilter (..),
@@ -203,7 +203,7 @@ exeElm runner address hi si =
         log' $ EndHook hookType ttl
         pure o
    in do
-        mt <- emptyElm si
+        mt <- uu --emptyElm si
         mt
           ? pure ()
           $ case si of
@@ -232,30 +232,37 @@ exeElm runner address hi si =
                 sequence_ $ exeElm runner (push ttl address) hi <$> gElms
                 logItem . EndGroup . GroupTitle $ ttl
 
-emptyElm :: forall ir hi a effs. SuiteItem ir hi effs [a] -> Sem effs Bool
-emptyElm si = uu 
--- \case
---                  Tests { tests } -> pure . null $ filter pred tests
---                  BeforeAll 
-   
--- filterLog :: forall tc rc e effs. Config tc =>
---               TestSuite e tc rc effs TestFilterResult 
---               -> [TestFilter rc tc]
---               -> rc
---               -> [AddressedElm TestFilterResult]
+
+anyElm :: forall ir hi a effs. (a -> Bool) -> SuiteItem ir hi effs [a] -> Bool
+anyElm aPred si = 
+  let 
+    bs = (aPred <$>) <$> si 
+  in 
+    any id $ element <$> queryElm (const "NA") rootAddress bs
 
 
--- applyFilterLog :: Config tc => RunParams Maybe e rc tc effs a -> [AddressedElm TestFilterResult]
-applyFilterLog :: Config tc => RunParams m e rc tc effs -> [AddressedElm TestFilterResult]
-applyFilterLog RunParams { suite, filters, rc  } = F.filterLog suite filters rc
+activeAddresses ::  forall rc tc e a effs.
+  (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
+  RunParams Maybe e rc tc effs  -> S.Set Address
+activeAddresses = queryElmIncHookAddress
 
+-- filterRun :: forall rc tc e a effs.
+--   (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) => RunParams Maybe e rc tc effs  -> RunParams Maybe e rc tc effs  = uu
 
 mkSem ::
   forall rc tc e a effs.
   (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
   RunParams Maybe e rc tc effs  ->
   Sem effs a
-mkSem rp@RunParams {suite, filters, rc} = uu
+mkSem rp@RunParams {suite, filters, rc} = 
+  let 
+    filterInfo :: [TestFilterResult]
+    filterInfo = F.filterLog suite filters rc
+
+
+
+  in
+  uu
 
 -- let
 
@@ -263,8 +270,6 @@ mkSem rp@RunParams {suite, filters, rc} = uu
 --   root :: forall hii. SuiteItem hii effs [[Sem effs hii -> Sem effs () -> Sem effs ()]]
 --   root = (runTest rp) suite  -- Test e tc rc () i0 as0 ds0 effs -> [Sem effs ()]
 
---   filterInfo :: [TestFilterResult]
---   filterInfo = filterSuite suite filters rc
 
 --   run' :: Sem effs ()
 --   run' = do

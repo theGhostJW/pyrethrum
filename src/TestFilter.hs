@@ -50,7 +50,7 @@ filterLog :: forall tc rc e effs. Config tc =>
               TestSuite e tc rc effs TestFilterResult 
               -> [TestFilter rc tc]
               -> rc
-              -> [AddressedElm TestFilterResult]
+              -> [TestFilterResult]
 filterLog suite fltrs rc =
   let
     testFilter :: Address -> hi -> Test e tc rc hi i as ds effs -> TestFilterResult
@@ -59,7 +59,7 @@ filterLog suite fltrs rc =
     si :: SuiteItem IsRoot () effs [TestFilterResult]
     si = suite testFilter
   in
-    querySuite (C.title . testInfo) si
+    element <$> querySuite (C.title . testInfo) si
 
 
 

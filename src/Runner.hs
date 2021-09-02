@@ -241,10 +241,10 @@ anyElm aPred si =
     any id $ element <$> queryElm (const "NA") rootAddress bs
 
 
-activeAddresses ::  forall rc tc e a effs.
-  (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
-  RunParams Maybe e rc tc effs  -> S.Set Address
-activeAddresses = queryElmIncHookAddress
+-- activeAddresses ::  forall rc tc e a effs.
+--   (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
+--   RunParams Maybe e rc tc effs  -> S.Set Address
+-- activeAddresses = queryElmIncHookAddress
 
 -- filterRun :: forall rc tc e a effs.
 --   (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) => RunParams Maybe e rc tc effs  -> RunParams Maybe e rc tc effs  = uu

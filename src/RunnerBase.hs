@@ -96,7 +96,13 @@ queryElm' incHks getItemTitle address =
         AfterEach {title = t, ahElms = e} -> hkQuery t e
 
 querySuite :: forall hi effs a. (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
-querySuite getItemTitle = queryElm getItemTitle rootAddress
+querySuite = querySuite' ExcludeHooks
+
+querySuiteIncHooks :: forall hi effs a. (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
+querySuiteIncHooks = querySuite' IncludeHooks
+
+querySuite' :: forall hi effs a. AddressIncludeHoooks -> (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
+querySuite' incHks getItemTitle = queryElm' incHks getItemTitle rootAddress
 
 {-
 TODO

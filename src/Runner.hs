@@ -66,6 +66,7 @@ import Pyrelude as P
     firstDuplicate,
     fold,
     fst,
+    id,
     join,
     maybe,
     not,
@@ -82,10 +83,11 @@ import Pyrelude as P
     (<$>),
     (>>),
     (>>=),
-    (?), id
+    (?),
   )
 import RunElementClasses as C
   ( Address,
+    AddressedElm (AddressedElm, element),
     Config,
     HasId,
     HasTitle,
@@ -94,8 +96,10 @@ import RunElementClasses as C
     TestLogInfo (..),
     mkTestLogInfo,
     push,
-    render, AddressedElm (AddressedElm, element), rootAddress
+    render,
+    rootAddress,
   )
+import qualified RunElementClasses as RC
 import RunnerBase as RB
   ( GenericResult (..),
     ItemRunner,
@@ -104,7 +108,8 @@ import RunnerBase as RB
     Test (..),
     TestSuite,
     groupAddresses,
-    groupName, queryElm, queryElmIncHookAddress
+    groupName,
+    queryElm,
   )
 import qualified TestFilter as F
   ( TestFilter (..),
@@ -114,7 +119,6 @@ import qualified TestFilter as F
     filterLog,
   )
 import qualified Prelude as PRL
-import qualified RunElementClasses as RC
 
 getId :: HasField "id" i Int => i -> Int
 getId = getField @"id"
@@ -163,7 +167,7 @@ runTestItems iIds items beforEach afterEach rc add test@Test {config = tc} itemR
 runTest ::
   forall i rc hi as ds tc e effs.
   (ItemClass i ds, Config tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
-  RunParams Maybe e rc tc effs  -> -- Run Params
+  RunParams Maybe e rc tc effs -> -- Run Params
   Address ->
   Sem effs hi -> -- before each
   (hi -> Sem effs ()) -> -- after each
@@ -209,38 +213,29 @@ exeElm runner address hi si =
           ? pure ()
           $ case si of
             Tests {tests} -> sequence_ $ runner address hi <$> tests
-
             BeforeAll {title = ttl, bHook, bhElms} -> do
               o <- exeHook C.BeforeAll ttl bHook
               sequence_ $ (\f -> exeElm runner address o $ f address o) <$> bhElms
-
             BeforeEach {title = ttl, bHook, bhElms} ->
               let runElm f = do
                     o <- exeHook C.BeforeEach ttl bHook
                     exeElm runner address o $ f address o
                in sequence_ $ runElm <$> bhElms
-
             AfterEach {title = ttl, aHook, ahElms} ->
               sequence_ $ (\f -> exeElm runner address hi (f address hi) >> exeHook C.AfterEach ttl aHook) <$> ahElms
-
             AfterAll {title = ttl, aHook, ahElms} -> do
               sequence_ $ (\f -> exeElm runner address hi $ f address hi) <$> ahElms
               exeHook C.BeforeEach ttl aHook
-
             Group {title = ttl, gElms} ->
               do
                 logItem . StartGroup . GroupTitle $ ttl
                 sequence_ $ exeElm runner (push ttl RC.Group address) hi <$> gElms
                 logItem . EndGroup . GroupTitle $ ttl
 
-
 anyElm :: forall ir hi a effs. (a -> Bool) -> SuiteItem ir hi effs [a] -> Bool
-anyElm aPred si = 
-  let 
-    bs = (aPred <$>) <$> si 
-  in 
-    any id $ element <$> queryElm (const "NA") rootAddress bs
-
+anyElm aPred si =
+  let bs = (aPred <$>) <$> si
+   in any id $ element <$> queryElm (const "NA") rootAddress bs
 
 -- activeAddresses ::  forall rc tc e a effs.
 --   (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
@@ -253,24 +248,18 @@ anyElm aPred si =
 mkSem ::
   forall rc tc e a effs.
   (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
-  RunParams Maybe e rc tc effs  ->
+  RunParams Maybe e rc tc effs ->
   Sem effs a
-mkSem rp@RunParams {suite, filters, rc} = 
-  let 
-    filterInfo :: [TestFilterResult]
-    filterInfo = F.filterLog suite filters rc
-
-
-
-  in
-  uu
+mkSem rp@RunParams {suite, filters, rc} =
+  let filterInfo :: [TestFilterResult]
+      filterInfo = F.filterLog suite filters rc
+   in uu
 
 -- let
 
 --   -- forall i as ds. Test e tc rc hi i as ds effs -> a) -> SuiteItem hi effs [a]
 --   root :: forall hii. SuiteItem hii effs [[Sem effs hii -> Sem effs () -> Sem effs ()]]
 --   root = (runTest rp) suite  -- Test e tc rc () i0 as0 ds0 effs -> [Sem effs ()]
-
 
 --   run' :: Sem effs ()
 --   run' = do
@@ -290,7 +279,7 @@ mkSem rp@RunParams {suite, filters, rc} =
 mkEndpointSem ::
   forall rc tc e effs.
   (Config rc, Config tc, ToJSON e, Show e, MinEffs e effs) =>
-  RunParams (Either FilterErrorType) e rc tc effs  ->
+  RunParams (Either FilterErrorType) e rc tc effs ->
   Address -> -- test address
   Either FilterErrorType (S.Set Int) -> -- a set of item Ids used for test case endpoints                                               -- test case processor function is applied to a hard coded list of test goups and returns a list of results
   Sem effs ()

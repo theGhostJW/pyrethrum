@@ -11,7 +11,6 @@ module RunnerBase
     groupAddresses,
     groupName,
     queryElm,
-    queryElmIncHookAddress,
     querySuite,
   )
 where
@@ -63,33 +62,21 @@ data GenericResult tc rslt = TestResult
   }
   deriving (Show)
 
-data AddressIncludeHoooks = IncludeHooks | ExcludeHooks deriving (Eq)
 
-queryElmIncHookAddress :: forall r hi effs a. (a -> Text) -> Address -> SuiteItem r hi effs [a] -> [AddressedElm a]
-queryElmIncHookAddress = queryElm' ExcludeHooks
 
 queryElm :: forall r hi effs a. (a -> Text) -> Address -> SuiteItem r hi effs [a] -> [AddressedElm a]
-queryElm = queryElm' IncludeHooks
-
-queryElm' :: forall r hi effs a. AddressIncludeHoooks -> (a -> Text) -> Address -> SuiteItem r hi effs [a] -> [AddressedElm a]
-queryElm' incHks getItemTitle address =
+queryElm getItemTitle address =
   let badCall :: forall o. (Address -> o -> SuiteItem NonRoot o effs [a]) -> SuiteItem NonRoot o effs [a]
       badCall f = f address $ error "Bad param - this param should never be accessed when querying for element data"
 
       nextAddress :: Text -> RC.AddressElemType ->Address
       nextAddress ttl et = push ttl et address
 
-      nextHookAddress :: Text -> Address
-      nextHookAddress ttl = incHks == IncludeHooks ? nextAddress ttl RC.Hook $ address
-
-      queryElm'' :: forall r' hi' a'. (a' -> Text) -> Address -> SuiteItem r' hi' effs [a'] -> [AddressedElm a']
-      queryElm'' = queryElm' incHks
-
       hkQuery :: forall hi'. Text -> [Address -> hi' -> SuiteItem NonRoot hi' effs [a]] -> [AddressedElm a]
-      hkQuery ttl elms = elms >>= queryElm'' getItemTitle (nextHookAddress ttl) . badCall
+      hkQuery ttl elms = elms >>= queryElm getItemTitle (nextAddress ttl RC.Hook) . badCall
    in \case
-        Root {rootElms} -> rootElms >>= queryElm'' getItemTitle address
-        Group {title = t, gElms} -> gElms >>= queryElm'' getItemTitle (nextAddress t RC.Group)
+        Root {rootElms} -> rootElms >>= queryElm getItemTitle address
+        Group {title = t, gElms} -> gElms >>= queryElm getItemTitle (nextAddress t RC.Group)
         Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
         BeforeAll {title = t, bhElms = e} -> hkQuery t e
         BeforeEach {title = t, bhElms = e} -> hkQuery t e
@@ -97,13 +84,7 @@ queryElm' incHks getItemTitle address =
         AfterEach {title = t, ahElms = e} -> hkQuery t e
 
 querySuite :: forall hi effs a. (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
-querySuite = querySuite' ExcludeHooks
-
-querySuiteIncHooks :: forall hi effs a. (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
-querySuiteIncHooks = querySuite' IncludeHooks
-
-querySuite' :: forall hi effs a. AddressIncludeHoooks -> (a -> Text) -> SuiteItem IsRoot hi effs [a] -> [AddressedElm a]
-querySuite' incHks getItemTitle = queryElm' incHks getItemTitle rootAddress
+querySuite getItemTitle = queryElm getItemTitle rootAddress
 
 {-
 TODO

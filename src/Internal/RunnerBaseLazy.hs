@@ -7,7 +7,7 @@ import Data.Aeson
 import Polysemy
 import Polysemy.Error
 import Pyrelude
-import RunElementClasses
+import RunElementClasses (Address(..))
 
 data IsRoot
 

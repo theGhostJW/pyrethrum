@@ -15,7 +15,7 @@ import qualified Data.Set as S
 import Data.Yaml as Y
 import OrphanedInstances ()
 import Pyrelude as P hiding (phase)
-import RunElementClasses
+import RunElementClasses as RC
 import RunnerBase
 
 newtype LineNo = LineNo {unLineNo :: Int} deriving (Show, Eq)
@@ -249,7 +249,7 @@ testItrDelta =
   let clear = (Clear, Clear)
       keep = (Keep, Keep)
    in \case
-        StartTest (TestLogInfo ttl domain _) -> (New $ push ttl domain, Clear)
+        StartTest (TestLogInfo ttl domain _) -> (New $ push ttl RC.Test domain, Clear)
         StartIteration iid _ _ -> (Keep, New iid)
         EndIteration _ -> keep
         StartRun {} -> clear

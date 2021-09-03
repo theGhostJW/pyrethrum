@@ -26,7 +26,7 @@ import DSL.LogProtocol as LP
 import Pyrelude as P
 import RunnerBase as RB
 import RunElementClasses as REC
-    ( TestFilterResult, TestLogInfo (TestLogInfo), title, testConfig, rootAddress, render )
+    ( TestFilterResult, TestLogInfo(..), title, testConfig, rootAddress, render )
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y ( Value )
 
@@ -123,7 +123,7 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
         LP.StartHook loc title -> "Start " <> describeLoc loc <> " Hook: " <> title
         LP.EndHook loc title ->   "End " <> describeLoc loc <> " Hook: "  <> title
 
-        LP.StartTest TestLogInfo{ title, testConfig  } -> separator <> tstHeader ("Start Test: " <> title <> " - " <> title) <> 
+        LP.StartTest TestLogInfo{title, testConfig} -> separator <> tstHeader ("Start Test: " <> title <> " - " <> title) <> 
                                           separator <> "Test Config:" <>
                                           separator <> ppAesonBlock testConfig
 

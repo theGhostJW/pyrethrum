@@ -114,6 +114,7 @@ import qualified TestFilter as F
     filterLog,
   )
 import qualified Prelude as PRL
+import qualified RunElementClasses as RC
 
 getId :: HasField "id" i Int => i -> Int
 getId = getField @"id"
@@ -229,7 +230,7 @@ exeElm runner address hi si =
             Group {title = ttl, gElms} ->
               do
                 logItem . StartGroup . GroupTitle $ ttl
-                sequence_ $ exeElm runner (push ttl address) hi <$> gElms
+                sequence_ $ exeElm runner (push ttl RC.Group address) hi <$> gElms
                 logItem . EndGroup . GroupTitle $ ttl
 
 

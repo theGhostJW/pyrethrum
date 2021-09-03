@@ -48,7 +48,8 @@ import Pyrelude
     (?),
     (||),
   )
-import RunElementClasses
+import RunElementClasses ( rootAddress, push, AddressedElm(..), Address )
+import qualified RunElementClasses as RC
 
 type ItemRunner e as ds i hi tc rc effs =
   rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
@@ -75,11 +76,11 @@ queryElm' incHks getItemTitle address =
   let badCall :: forall o. (Address -> o -> SuiteItem NonRoot o effs [a]) -> SuiteItem NonRoot o effs [a]
       badCall f = f address $ error "Bad param - this param should never be accessed when querying for element data"
 
-      nextAddress :: Text -> Address
-      nextAddress ttl = push ttl address
+      nextAddress :: Text -> RC.AddressElemType ->Address
+      nextAddress ttl et = push ttl et address
 
       nextHookAddress :: Text -> Address
-      nextHookAddress ttl = incHks == IncludeHooks ? nextAddress ttl $ address
+      nextHookAddress ttl = incHks == IncludeHooks ? nextAddress ttl RC.Hook $ address
 
       queryElm'' :: forall r' hi' a'. (a' -> Text) -> Address -> SuiteItem r' hi' effs [a'] -> [AddressedElm a']
       queryElm'' = queryElm' incHks
@@ -88,8 +89,8 @@ queryElm' incHks getItemTitle address =
       hkQuery ttl elms = elms >>= queryElm'' getItemTitle (nextHookAddress ttl) . badCall
    in \case
         Root {rootElms} -> rootElms >>= queryElm'' getItemTitle address
-        Group {title = t, gElms} -> gElms >>= queryElm'' getItemTitle (nextAddress t)
-        Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) address) i) <$> tests
+        Group {title = t, gElms} -> gElms >>= queryElm'' getItemTitle (nextAddress t RC.Group)
+        Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
         BeforeAll {title = t, bhElms = e} -> hkQuery t e
         BeforeEach {title = t, bhElms = e} -> hkQuery t e
         AfterAll {title = t, ahElms = e} -> hkQuery t e

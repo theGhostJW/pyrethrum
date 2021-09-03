@@ -3,7 +3,8 @@ module TestFilter where
 import           Pyrelude as P
 import OrphanedInstances()
 import RunnerBase as RB
-import RunElementClasses as C
+import RunElementClasses (TestFilterResult(..), Config, Address, TestLogInfo, mkTestLogInfo)
+import qualified RunElementClasses as C
 import qualified Data.List as L 
 import Internal.RunnerBaseLazy (IsRoot)
 import RunnerBase (AddressedElm(..))
@@ -59,7 +60,7 @@ filterLog suite fltrs rc =
     si :: SuiteItem IsRoot () effs [TestFilterResult]
     si = suite testFilter
   in
-    element <$> querySuite (C.title . testInfo) si
+    element <$> querySuite ((C.title :: TestLogInfo -> Text) . testInfo) si
 
 
 

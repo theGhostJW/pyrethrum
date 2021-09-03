@@ -11,7 +11,7 @@ import DSL.LogProtocol ( LogProtocolBase (..))
 import Common  ( FrameworkError, DetailedInfo(DetailedInfo), HookType(..) )
 import Runner (groupAddresses, config, TestFilterResult (TestFilterResult, testInfo, reasonForRejection), title)
 import RunnerBase (querySuite, AddressedElm (..))
-import RunElementClasses as REC (Address(..), TestLogInfo (..))
+import RunElementClasses as REC (Address(..), TestLogInfo (..), AddressElem(..))
 import TempUtils
 import ItemRunners (runItem)
 import Data.Foldable (Foldable(length))
@@ -42,7 +42,7 @@ applyFilterLog fltr = filterLog mockSuite [fltr]
 -- $ > listTests
 listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
-   headDef "" . unAddress  . (address :: TestLogInfo -> Address) . testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
+   headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress  . (address :: TestLogInfo -> Address) . testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
 
 
 -- todo filter out empty items

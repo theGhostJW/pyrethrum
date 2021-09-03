@@ -10,7 +10,7 @@ import Data.ByteString.Lazy as B
 import Data.Set as S
 import Pyrelude as P
 import Pyrelude.Test as T
-import RunElementClasses hiding (element)
+import RunElementClasses as RC hiding (element)
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
 
@@ -51,14 +51,17 @@ genTxt :: Gen Text
 genTxt = text (linear 0 1000) ascii
 
 
-modDomain :: Address
-modDomain = P.foldl' (flip push) rootAddress ["root", "sub 1", "sub 2"]
+moduleDomain :: Address
+moduleDomain = Address [
+                    AddressElem "sub 1" RC.Group, 
+                    AddressElem "sub 2" RC.Group
+                    ]
 
 domainElementSingleton :: Gen Address
-domainElementSingleton = pure $ push "test" modDomain
+domainElementSingleton = pure $ push "test" RC.Test moduleDomain
 
 addressSingleton :: Gen Address
-addressSingleton = pure modDomain
+addressSingleton = pure moduleDomain
 
 genTestConfig :: Gen TestConfig
 genTestConfig =

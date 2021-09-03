@@ -27,10 +27,10 @@ import RunElementClasses as C
 import RunnerBase as RB (ItemRunner, Test (Test))
 import GHC.Records
 import Check (Checks)
-import RunElementClasses (ItemClass)
+import qualified RunElementClasses as R
 
 mkId :: forall tc i. (HasId i, Config tc) => Address -> tc -> i -> ItemId
-mkId md tc i = ItemId (push (getField @"title" tc) md) (getField @"id" i)
+mkId md tc i = ItemId (push (getField @"title" tc) R.Test md) (getField @"id" i)
 
 runItem ::
   forall e effs rc tc hi i as ds.

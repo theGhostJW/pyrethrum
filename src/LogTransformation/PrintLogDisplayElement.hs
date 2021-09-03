@@ -203,7 +203,7 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
           (const (skipItt, skipTst))
           ( \LogProtocolOut {logInfo = lp} ->
               case lp of
-                LP.StartTest (TestLogInfo ttl domain _) -> (False, LC.Pass == testStatus' (push ttl domain))
+                LP.StartTest (TestLogInfo ttl domain _) -> (False, LC.Pass == testStatus' (push ttl Test domain))
                 StartIteration iid _ _ -> (LC.Pass == executionStatus (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
                 _ -> (skipItt, skipTst)
           )
@@ -317,7 +317,7 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
     EndHook {}  -> skipLog
     LP.StartTest (TestLogInfo ttl domain testConfig) ->
         let 
-          elmAddress = push ttl domain
+          elmAddress = push ttl Test domain
         in
         ( accum,
           elOut $

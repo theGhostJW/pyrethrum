@@ -69,7 +69,7 @@ queryElm getItemTitle address =
   let badCall :: forall o. (Address -> o -> SuiteItem NonRoot o effs [a]) -> SuiteItem NonRoot o effs [a]
       badCall f = f address $ error "Bad param - this param should never be accessed when querying for element data"
 
-      nextAddress :: Text -> RC.AddressElemType ->Address
+      nextAddress :: Text -> RC.AddressElemType -> Address
       nextAddress ttl et = push ttl et address
 
       hkQuery :: forall hi'. Text -> [Address -> hi' -> SuiteItem NonRoot hi' effs [a]] -> [AddressedElm a]

@@ -181,7 +181,7 @@ hasTitle ttl =
     }
 
 mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
-mockSuite r =
+mockSuite runTest =
   R.Root
     [ R.Group
         "Filter TestSuite"
@@ -190,8 +190,8 @@ mockSuite r =
             (pure "hello")
             [ \a o ->
                 Tests
-                  [ r a o test1Txt,
-                    r a o test4Txt
+                  [ runTest a o test1Txt,
+                    runTest a o test4Txt
                   ],
               \a o ->
                 R.Group
@@ -203,7 +203,7 @@ mockSuite r =
                   (pure o)
                   [ \a' o' ->
                       Tests
-                        [ r a' o' test6Txt
+                        [runTest a' o' test6Txt
                         ]
                   ]
             ],
@@ -221,9 +221,9 @@ mockSuite r =
                                 ahElms =
                                   [ \a2 i ->
                                       Tests
-                                        [ r a2 i test5Int,
-                                          r a2 i test2Int,
-                                          r a2 i test3Int
+                                        [ runTest a2 i test5Int,
+                                          runTest a2 i test2Int,
+                                          runTest a2 i test3Int
                                         ]
                                   ]
                               }

@@ -50,7 +50,7 @@ filters' ttl = [tossFilter, hasTitle ttl]
 view :: Show a => [a] -> IO ()
 view = pPrintList
 
--- $ > view allTests
+-- $> view allTests
 allTests :: [ShowFilter]
 allTests = tests' (baseCfg RcAll) (filters' Nothing) Accepted
 

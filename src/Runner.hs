@@ -133,14 +133,13 @@ runTestItems ::
   (ToJSON e, Show e, Config tc, ToJSON i, ItemClass i ds, Member (Logger e) effs) =>
   Maybe (S.Set Int) -> -- target Ids
   [i] -> -- ids
-  Sem effs hi -> --before each item
-  (hi -> Sem effs ()) -> -- after each item
+  ItemHooks hi effs -> -- after each item
   rc -> -- runcoonfig
   Address ->
   Test e tc rc hi i as ds effs ->
   ItemRunner e as ds i hi tc rc effs ->
   [Sem effs ()]
-runTestItems iIds items beforEach afterEach rc add test@Test {config = tc} itemRunner =
+runTestItems iIds items ItemHooks {beforeItem, afterItem} rc add test@Test {config = tc} itemRunner =
   let startTest :: Sem effs ()
       startTest = logItem . StartTest $ mkTestLogInfo add tc
 
@@ -156,9 +155,9 @@ runTestItems iIds items beforEach afterEach rc add test@Test {config = tc} itemR
             iid = ItemId add (getId i)
          in do
               logItem . StartIteration iid (getField @"title" i) $ toJSON i
-              hi <- beforEach
+              hi <- beforeItem
               itemRunner rc add hi test i
-              afterEach hi
+              afterItem hi
               logItem $ EndIteration iid
 
       inTargIds :: i -> Bool
@@ -168,7 +167,7 @@ runTestItems iIds items beforEach afterEach rc add test@Test {config = tc} itemR
         xs -> [startTest >> sequence_ (applyRunner <$> xs) >> endTest]
 
 data ItemHooks hi effs = ItemHooks {
-  beforeItem :: hi -> Sem effs (),
+  beforeItem :: Sem effs hi,
   afterItem :: hi -> Sem effs ()
 }
 
@@ -177,13 +176,12 @@ runTest ::
   (ItemClass i ds, Config tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
   RunParams Maybe e rc tc effs -> -- Run Params
   Address ->
-  Sem effs hi -> -- before each item
-  (hi -> Sem effs ()) -> -- after each item
+  ItemHooks hi effs -> 
   Test e tc rc hi i as ds effs -> -- Test Case
   [Sem effs ()] -- [Test Iterations]
-runTest RunParams {filters, rc, itemIds, itemRunner} add be ae test@Test {config = tc, items} =
+runTest RunParams {filters, rc, itemIds, itemRunner} add itemHooks test@Test {config = tc, items} =
   F.acceptFilter (F.applyFilters filters rc add tc)
-    ? runTestItems itemIds (items rc) be ae rc add test itemRunner
+    ? runTestItems itemIds (items rc) itemHooks rc add test itemRunner
     $ []
 
 logLPError :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
@@ -270,27 +268,27 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
       dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . address . testInfo <$> filterInfo)
 
        
-      runTestRequiredForSuite :: (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test hi i as ds effs -> a) 
+      -- runTestRequiredForSuite :: (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test hi i as ds effs -> a) 
 
-      mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
+      -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
 
-      exeElmRunner:: forall hii. Address -> hii -> a -> Sem effs ()
+      -- exeElmRunner:: forall hii. Address -> hii -> a -> Sem effs ()
 
 
-      itemRunner ::  rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
+      -- itemRunner ::  rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
       
-      runTest ::
-        forall i rc hi as ds tc e effs.
-        (ItemClass i ds, Config tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
-        RunParams Maybe e rc tc effs -> -- Run Params
-        Address ->
-        Sem effs hi -> -- before each item
-        (hi -> Sem effs ()) -> -- after each item
-        Test e tc rc hi i as ds effs -> -- Test Case
-        [Sem effs ()] -- [Test Iterations]
+      -- runTest ::
+      --   forall i rc hi as ds tc e effs.
+      --   (ItemClass i ds, Config tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
+      --   RunParams Maybe e rc tc effs -> -- Run Params
+      --   Address ->
+      --   Sem effs hi -> -- before each item
+      --   (hi -> Sem effs ()) -> -- after each item
+      --   Test e tc rc hi i as ds effs -> -- Test Case
+      --   [Sem effs ()] -- [Test Iterations]
 
 
-        itemRunner -> runtest include hooks -> exceute elems threads each hooks
+      --   itemRunner -> runtest include hooks -> exceute elems threads each hooks
 
 --       root :: forall hii. SuiteItem IsRoot hii effs [[Sem effs hii -> Sem effs () -> Sem effs ()]]
       -- root = suite itemRunner -- Test e tc rc () i0 as0 ds0 effs -> [Sem effs ()]

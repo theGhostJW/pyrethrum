@@ -20,9 +20,13 @@ import DSL.LogProtocol.PrettyPrint (prettyPrintLogProtocol, LogStyle(..))
 import qualified Data.Text as Text
 import TestFilter
 import GHC.Records
+import Text.Show.Pretty (pPrintList)
 
--- $ > demoQueryElem
--- [AddressedElm {address = Address {unAddress = ["test1","Filter TestSuite"]}, element = "test1"},AddressedElm {address = Address {unAddress = ["test4","Filter TestSuite"]}, element = "test4"},AddressedElm {address = Address {unAddress = ["test4","Filter TestSuite"]}, element = "test4"},AddressedElm {address = Address {unAddress = ["test5","Nested Int Group","Filter TestSuite"]}, element = "test5"},AddressedElm {address = Address {unAddress = ["test2","Nested Int Group","Filter TestSuite"]}, element = "test2"}]
+
+view' :: Show a => [a] -> IO ()
+view' = pPrintList
+
+-- $> view' demoQueryElem
 -- 
 demoQueryElem :: [AddressedElm Text]
 demoQueryElem =
@@ -35,11 +39,11 @@ demoQueryElem =
     querySuite id root
 
 
-
 applyFilterLog :: TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]
 applyFilterLog fltr = filterLog mockSuite [fltr]
 
--- $ > listTests
+
+
 listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
    headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress  . (address :: TestLogInfo -> Address) . testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)

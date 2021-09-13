@@ -180,7 +180,7 @@ hasTitle ttl =
           \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
 
-mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
+mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () () effs [a]
 mockSuite runTest =
   R.Root
     [ R.Group

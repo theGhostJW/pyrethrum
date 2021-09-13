@@ -13,52 +13,52 @@ data IsRoot
 
 data NonRoot
 
-data SuiteItem r hi effs t where
+data SuiteItem r hi ho effs t where
   Root ::
-    { rootElms :: [SuiteItem NonRoot hi effs t]
+    { rootElms :: [SuiteItem NonRoot hi ho effs t]
     } ->
-    SuiteItem IsRoot hi effs t
+    SuiteItem IsRoot hi ho effs t
   Tests ::
     { tests :: t
     } ->
-    SuiteItem NonRoot hi effs t
+    SuiteItem NonRoot hi ho effs t
   BeforeAll ::
     { title :: Text,
-      bHook :: Sem effs o,
-      bhElms :: [Address -> o -> SuiteItem NonRoot o effs t]
+      bHook :: hi -> Sem effs ho,
+      bhElms :: [Address -> ho -> SuiteItem NonRoot ho ho2 effs t]
     } ->
-    SuiteItem NonRoot hi effs t
+    SuiteItem NonRoot hi ho effs t
   BeforeEach ::
     { title :: Text,
-      bHook :: Sem effs o,
-      bhElms :: [Address -> o -> SuiteItem NonRoot o effs t]
+      bHook :: hi -> Sem effs ho,
+      bhElms :: [Address -> ho -> SuiteItem NonRoot ho ho2 effs t]
     } ->
-    SuiteItem NonRoot hi effs t
+    SuiteItem NonRoot hi ho effs t
   AfterAll ::
     { title :: Text,
-      aHook :: Sem effs (),
-      ahElms :: [Address -> hi -> SuiteItem NonRoot hi effs t]
+      aHook :: hi -> Sem effs (),
+      ahElms :: [Address -> hi -> SuiteItem NonRoot hi ho effs t]
     } ->
-    SuiteItem NonRoot hi effs t
+    SuiteItem NonRoot hi ho effs t
   AfterEach ::
     { title :: Text,
-      aHook :: Sem effs (),
-      ahElms :: [Address -> hi -> SuiteItem NonRoot hi effs t]
+      aHook :: hi -> Sem effs (),
+      ahElms :: [Address -> hi -> SuiteItem NonRoot hi ho effs t]
     } ->
-    SuiteItem NonRoot hi effs t
+    SuiteItem NonRoot hi ho effs t
   Group ::
     { title :: Text,
-      gElms :: [SuiteItem NonRoot hi effs t]
+      gElms :: [SuiteItem NonRoot hi ho effs t]
     } ->
-    SuiteItem NonRoot hi effs t
+    SuiteItem NonRoot hi ho effs t
 
-instance Functor (SuiteItem r hi effs) where
-  fmap :: (a -> b) -> SuiteItem r hi effs a -> SuiteItem r hi effs b
+instance Functor (SuiteItem r hi ho effs) where
+  fmap :: (a -> b) -> SuiteItem r hi ho effs a -> SuiteItem r hi ho effs b
   fmap f si =
-    let f''' :: (a' -> b') -> (Address -> c -> SuiteItem r hi' effs a') -> (Address -> c -> SuiteItem r hi' effs b')
+    let f''' :: (a' -> b') -> (Address -> c -> SuiteItem r hi' ho' effs a') -> (Address -> c -> SuiteItem r hi' ho' effs b')
         f''' f1 f2 = \a -> (f1 <$>) . f2 a
 
-        f'' :: (a' -> b') -> [Address -> c -> SuiteItem r hi' effs a'] -> [Address -> c -> SuiteItem r hi' effs b']
+        f'' :: (a' -> b') -> [Address -> c -> SuiteItem r hi' ho' effs a'] -> [Address -> c -> SuiteItem r hi' ho' effs b']
         f'' fi l = f''' fi <$> l
      in case si of
           Tests a -> Tests $ f a

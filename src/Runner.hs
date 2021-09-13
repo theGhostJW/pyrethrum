@@ -197,13 +197,13 @@ data RunParams m e rc tc effs = RunParams
 
 -- TODO - Error handling especially outside tests eg. in hooks
 exeElm ::
-  forall hi e effs a.
+  forall hi ho e effs a.
   (ToJSON e, Show e, Member (Logger e) effs) =>
   S.Set Address ->
   (forall hii. Address -> hii -> a -> Sem effs ()) ->
   Address ->
   hi ->
-  SuiteItem NonRoot hi effs [a] ->
+  SuiteItem NonRoot hi ho effs [a] ->
   Sem effs ()
 exeElm targAddresses runner address hi si =
   let log' :: LogProtocolBase e -> Sem effs ()
@@ -216,7 +216,7 @@ exeElm targAddresses runner address hi si =
         log' $ EndHook hookType ttl
         pure o
 
-      exeNxt :: forall hin. Address -> hin -> SuiteItem NonRoot hin effs [a] -> Sem effs ()
+      exeNxt :: forall hin hout. Address -> hin -> SuiteItem NonRoot hin hout effs [a] -> Sem effs ()
       exeNxt = exeElm targAddresses runner 
 
    in do
@@ -225,18 +225,18 @@ exeElm targAddresses runner address hi si =
           $ case si of
             Tests {tests} -> sequence_ $ runner address hi <$> tests
             BeforeAll {title = ttl, bHook, bhElms} -> do
-              o <- exeHook C.BeforeAll ttl bHook
+              o <- exeHook C.BeforeAll ttl (bHook hi)
               sequence_ $ (\f -> exeNxt address o $ f address o) <$> bhElms
             BeforeEach {title = ttl, bHook, bhElms} ->
               let runElm f = do
-                    o <- exeHook C.BeforeEach ttl bHook
+                    o <- exeHook C.BeforeEach ttl (bHook hi)
                     exeNxt address o $ f address o
                in sequence_ $ runElm <$> bhElms
             AfterEach {title = ttl, aHook, ahElms} ->
-              sequence_ $ (\f -> exeNxt address hi (f address hi) >> exeHook C.AfterEach ttl aHook) <$> ahElms
+              sequence_ $ (\f -> exeNxt address hi (f address hi) >> exeHook C.AfterEach ttl (aHook hi)) <$> ahElms
             AfterAll {title = ttl, aHook, ahElms} -> do
               sequence_ $ (\f -> exeNxt address hi $ f address hi) <$> ahElms
-              exeHook C.BeforeEach ttl aHook
+              exeHook C.BeforeEach ttl $ aHook hi
             Group {title = ttl, gElms} ->
               do
                 logItem . StartGroup . GroupTitle $ ttl

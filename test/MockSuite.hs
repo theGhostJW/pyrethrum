@@ -19,7 +19,7 @@ import Runner as R
       Test(Test, config, items, interactor, parse),
       mkSem,
       RunParams(..) )
-import RunnerBase (IsRoot, Test)
+import RunnerBase (Test)
 import TestFilter
 
 data TossCall =  Heads | Tails deriving (Eq, Ord, Show)
@@ -180,7 +180,7 @@ hasTitle ttl =
           \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
 
-mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () () effs [a]
+mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem () () effs [a]
 mockSuite runTest =
   R.Root
     [ R.Group
@@ -200,7 +200,7 @@ mockSuite runTest =
               \a o ->
                 BeforeEach
                   "Before Inner"
-                  (pure o)
+                  (\t -> pure o)
                   [ \a' o' ->
                       Tests
                         [runTest a' o' test6Txt
@@ -217,7 +217,7 @@ mockSuite runTest =
                         [ \a t ->
                             AfterEach
                               { title = "After Exch Int",
-                                aHook = t == 23 ? pure () $ pure (),
+                                aHook = \_ -> t == 23 ? pure () $ pure (),
                                 ahElms =
                                   [ \a2 i ->
                                       Tests

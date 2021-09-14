@@ -9,56 +9,54 @@ import Polysemy.Error
 import Pyrelude
 import RunElementClasses (Address(..))
 
-data IsRoot
 
-data NonRoot
-
-data SuiteItem r hi ho effs t where
+data SuiteItem hi ho effs t where
   Root ::
-    { rootElms :: [SuiteItem NonRoot hi ho effs t]
+    { rootElms :: [SuiteItem hi ho effs t]
     } ->
-    SuiteItem IsRoot hi ho effs t
+    SuiteItem () () effs t
   Tests ::
     { tests :: t
     } ->
-    SuiteItem NonRoot hi ho effs t
+    SuiteItem hi ho effs t
   BeforeAll ::
     { title :: Text,
       bHook :: hi -> Sem effs ho,
-      bhElms :: [Address -> ho -> SuiteItem NonRoot ho ho2 effs t]
+      bhElms :: [Address -> ho -> SuiteItem ho ho2 effs t]
     } ->
-    SuiteItem NonRoot hi ho effs t
+    SuiteItem hi ho effs t
   BeforeEach ::
     { title :: Text,
       bHook :: hi -> Sem effs ho,
-      bhElms :: [Address -> ho -> SuiteItem NonRoot ho ho2 effs t]
+      bhElms :: [Address -> ho -> SuiteItem ho ho2 effs t]
     } ->
-    SuiteItem NonRoot hi ho effs t
+    SuiteItem hi ho effs t
   AfterAll ::
     { title :: Text,
       aHook :: hi -> Sem effs (),
-      ahElms :: [Address -> hi -> SuiteItem NonRoot hi ho effs t]
+      ahElms :: [Address -> hi -> SuiteItem hi ho effs t]
     } ->
-    SuiteItem NonRoot hi ho effs t
+    SuiteItem hi ho effs t
   AfterEach ::
     { title :: Text,
       aHook :: hi -> Sem effs (),
-      ahElms :: [Address -> hi -> SuiteItem NonRoot hi ho effs t]
+      ahElms :: [Address -> hi -> SuiteItem hi ho effs t]
     } ->
-    SuiteItem NonRoot hi ho effs t
+    SuiteItem hi ho effs t
   Group ::
     { title :: Text,
-      gElms :: [SuiteItem NonRoot hi ho effs t]
+      gElms :: [Address -> hi -> SuiteItem hi ho effs t]
     } ->
-    SuiteItem NonRoot hi ho effs t
+    SuiteItem hi ho effs t
 
-instance Functor (SuiteItem r hi ho effs) where
-  fmap :: (a -> b) -> SuiteItem r hi ho effs a -> SuiteItem r hi ho effs b
+{-
+instance Functor (SuiteItem hi ho effs) where
+  fmap :: (a -> b) -> SuiteItem hi ho effs a -> SuiteItem hi ho effs b
   fmap f si =
-    let f''' :: (a' -> b') -> (Address -> c -> SuiteItem r hi' ho' effs a') -> (Address -> c -> SuiteItem r hi' ho' effs b')
+    let f''' :: (a' -> b') -> (Address -> c -> SuiteItem hi' ho' effs a') -> (Address -> c -> SuiteItem hi' ho' effs b')
         f''' f1 f2 = \a -> (f1 <$>) . f2 a
 
-        f'' :: (a' -> b') -> [Address -> c -> SuiteItem r hi' ho' effs a'] -> [Address -> c -> SuiteItem r hi' ho' effs b']
+        f'' :: (a' -> b') -> [Address -> c -> SuiteItem hi' ho' effs a'] -> [Address -> c -> SuiteItem hi' ho' effs b']
         f'' fi l = f''' fi <$> l
      in case si of
           Tests a -> Tests $ f a
@@ -66,5 +64,6 @@ instance Functor (SuiteItem r hi ho effs) where
           BeforeEach title' bHook bhElms -> BeforeEach title' bHook (f'' f bhElms)
           AfterAll title' aHook ahElms -> AfterAll title' aHook (f'' f ahElms)
           AfterEach title' aHook ahElms -> AfterEach title' aHook (f'' f ahElms)
-          Group {title = t, gElms} -> Group t $ (f <$>) <$> gElms
+          Group {title = t, gElms} -> Group t $ f'' f gElms
           Root elms' -> Root $ (f <$>) <$> elms'
+-}

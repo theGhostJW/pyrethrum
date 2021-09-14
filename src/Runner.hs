@@ -108,13 +108,12 @@ import qualified RunElementClasses as RC
 import RunnerBase as RB
   ( GenericResult (..),
     ItemRunner,
-    NonRoot,
     SuiteItem (..),
     Test (..),
     TestSuite,
     groupAddresses,
     groupName,
-    queryElm, IsRoot
+    queryElm
   )
 import qualified TestFilter as F
   ( TestFilter (..),
@@ -203,7 +202,7 @@ exeElm ::
   (forall hii. Address -> hii -> a -> Sem effs ()) ->
   Address ->
   hi ->
-  SuiteItem NonRoot hi ho effs [a] ->
+  SuiteItem hi ho effs [a] ->
   Sem effs ()
 exeElm targAddresses runner address hi si =
   let log' :: LogProtocolBase e -> Sem effs ()
@@ -216,7 +215,7 @@ exeElm targAddresses runner address hi si =
         log' $ EndHook hookType ttl
         pure o
 
-      exeNxt :: forall hin hout. Address -> hin -> SuiteItem NonRoot hin hout effs [a] -> Sem effs ()
+      exeNxt :: forall hin hout. Address -> hin -> SuiteItem hin hout effs [a] -> Sem effs ()
       exeNxt = exeElm targAddresses runner 
 
    in do
@@ -270,7 +269,7 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
        
       -- runTestRequiredForSuite :: (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test hi i as ds effs -> a) 
 
-      -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem IsRoot () effs [a]
+      -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
 
       -- exeElmRunner:: forall hii. Address -> hii -> a -> Sem effs ()
 
@@ -290,7 +289,7 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
 
       --   itemRunner -> runtest include hooks -> exceute elems threads each hooks
 
---       root :: forall hii. SuiteItem IsRoot hii effs [[Sem effs hii -> Sem effs () -> Sem effs ()]]
+--       root :: forall hii. SuiteItem hii effs [[Sem effs hii -> Sem effs () -> Sem effs ()]]
       -- root = suite itemRunner -- Test e tc rc () i0 as0 ds0 effs -> [Sem effs ()]
 
       -- run' :: Sem effs ()

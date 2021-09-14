@@ -6,7 +6,6 @@ import RunnerBase as RB
 import RunElementClasses (TestFilterResult(..), Config, Address, TestLogInfo, mkTestLogInfo)
 import qualified RunElementClasses as C
 import qualified Data.List as L 
-import Internal.RunnerBaseLazy (IsRoot)
 import RunnerBase (AddressedElm(..))
 
 acceptFilter :: TestFilterResult -> Bool
@@ -57,7 +56,7 @@ filterLog suite fltrs rc =
     testFilter :: Address -> hi -> Test e tc rc hi i as ds effs -> TestFilterResult
     testFilter adr _ = filterTest fltrs rc adr
 
-    si :: SuiteItem IsRoot () () effs [TestFilterResult]
+    si :: SuiteItem () () effs [TestFilterResult]
     si = suite testFilter
   in
     element <$> querySuite ((C.title :: TestLogInfo -> Text) . testInfo) si

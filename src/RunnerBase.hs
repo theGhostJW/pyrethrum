@@ -3,8 +3,6 @@ module RunnerBase
     ItemRunner,
     TestSuite,
     LRB.SuiteItem (..),
-    LRB.IsRoot,
-    LRB.NonRoot,
     Test (..),
     GenericResult (..),
     concatTests,
@@ -54,7 +52,7 @@ type ItemRunner e as ds i hi tc rc effs =
   rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
 type TestSuite e tc rc effs a =
-  (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem IsRoot () () effs [a]
+  (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem () () effs [a]
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
@@ -64,26 +62,26 @@ data GenericResult tc rslt = TestResult
 
 
 
-queryElm :: forall r hi ho effs a. (a -> Text) -> Address -> SuiteItem r hi ho effs [a] -> [AddressedElm a]
+queryElm :: forall hi ho effs a. (a -> Text) -> Address -> SuiteItem hi ho effs [a] -> [AddressedElm a]
 queryElm getItemTitle address =
-  let badCall :: forall o o1. (Address -> o -> SuiteItem NonRoot o o1 effs [a]) -> SuiteItem NonRoot o o1 effs [a]
+  let badCall :: forall o o1. (Address -> o -> SuiteItem o o1 effs [a]) -> SuiteItem o o1 effs [a]
       badCall f = f address $ error "Bad param - this param should never be accessed when querying for element data"
 
       nextAddress :: Text -> RC.AddressElemType -> Address
       nextAddress ttl et = push ttl et address
 
-      hkQuery :: forall hi' ho'. Text -> [Address -> hi' -> SuiteItem NonRoot hi' ho' effs [a]] -> [AddressedElm a]
+      hkQuery :: forall hi' ho'. Text -> [Address -> hi' -> SuiteItem hi' ho' effs [a]] -> [AddressedElm a]
       hkQuery ttl elms = elms >>= queryElm getItemTitle (nextAddress ttl RC.Hook) . badCall
    in \case
         Root {rootElms} -> rootElms >>= queryElm getItemTitle address
-        Group {title = t, gElms} -> gElms >>= queryElm getItemTitle (nextAddress t RC.Group)
+        Group {title = t, gElms = e} -> hkQuery t e
         Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
         BeforeAll {title = t, bhElms = e} -> hkQuery t e
         BeforeEach {title = t, bhElms = e} -> hkQuery t e
         AfterAll {title = t, ahElms = e} -> hkQuery t e
         AfterEach {title = t, ahElms = e} -> hkQuery t e
 
-querySuite :: forall hi ho effs a. (a -> Text) -> SuiteItem IsRoot hi ho effs [a] -> [AddressedElm a]
+querySuite :: forall hi ho effs a. (a -> Text) -> SuiteItem hi ho effs [a] -> [AddressedElm a]
 querySuite getItemTitle = queryElm getItemTitle rootAddress
 
 {-
@@ -111,7 +109,7 @@ TODO
   Update Demo
 -}
 
-concatTests :: SuiteItem r hi ho effs t -> [t]
+concatTests :: SuiteItem hi ho effs t -> [t]
 concatTests = uu
 
 -- let
@@ -123,7 +121,7 @@ concatTests = uu
 --     (AfterHook _ _ _ ts) -> concat' ts
 --     (Group _ ts) -> concat' ts
 
-groupName :: SuiteItem r hi ho effs a -> Maybe Text
+groupName :: SuiteItem hi ho effs a -> Maybe Text
 groupName = \case
   Tests _ -> Nothing
   BeforeAll {} -> Nothing
@@ -133,7 +131,7 @@ groupName = \case
   Root {} -> Nothing
   Group t _ -> Just t
 
-groupAddresses' :: [Text] -> Text -> SuiteItem r hi ho effs a -> [Text]
+groupAddresses' :: [Text] -> Text -> SuiteItem hi ho effs a -> [Text]
 groupAddresses' accum root el = uu
 
 -- let
@@ -158,7 +156,7 @@ groupAddresses' accum root el = uu
 --       in
 --         address : mconcat (groupAddresses' accum address <$> subElems)
 
-groupAddresses :: SuiteItem r hi ho effs a -> [Text]
+groupAddresses :: SuiteItem hi ho effs a -> [Text]
 groupAddresses = groupAddresses' [] ""
 
 -- data up to here want items to have title and validations

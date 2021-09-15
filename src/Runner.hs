@@ -234,12 +234,12 @@ exeElm targAddresses runner address hi si =
             AfterEach {title = ttl, aHook, ahElms} ->
               sequence_ $ (\f -> exeNxt address hi (f address hi) >> exeHook C.AfterEach ttl (aHook hi)) <$> ahElms
             AfterAll {title = ttl, aHook, ahElms} -> do
-              sequence_ $ (\f -> exeNxt address hi $ f address hi) <$> ahElms
-              exeHook C.BeforeEach ttl $ aHook hi
+              sequence_ $ (\f -> exeNxt address hi (f address hi)) <$> ahElms
+              exeHook C.AfterAll ttl $ aHook hi
             Group {title = ttl, gElms} ->
               do
                 logItem . StartGroup . GroupTitle $ ttl
-                sequence_ $ exeNxt (push ttl RC.Group address) hi <$> gElms
+                sequence_ $ (\f -> exeNxt address hi $ f address hi) <$> gElms
                 logItem . EndGroup . GroupTitle $ ttl
 
 activeAddresses :: [TestFilterResult] -> S.Set Address

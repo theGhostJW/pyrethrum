@@ -21,14 +21,14 @@ data SuiteItem hi ho effs t where
     SuiteItem hi ho effs t
   BeforeAll ::
     { title :: Text,
-      bHook :: hi -> Sem effs ho,
-      bhElms :: [Address -> ho -> SuiteItem ho ho2 effs t]
+      bHook :: hi -> Sem effs ho1,
+      bhElms :: [Address -> ho1 -> SuiteItem ho1 ho2 effs t]
     } ->
     SuiteItem hi ho effs t
   BeforeEach ::
     { title :: Text,
-      bHook :: hi -> Sem effs ho,
-      bhElms :: [Address -> ho -> SuiteItem ho ho2 effs t]
+      bHook :: hi -> Sem effs ho1,
+      bhElms :: [Address -> ho1 -> SuiteItem ho1 ho2 effs t]
     } ->
     SuiteItem hi ho effs t
   AfterAll ::

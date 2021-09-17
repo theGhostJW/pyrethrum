@@ -12,24 +12,35 @@ import Polysemy
 import Pyrelude as P
 import Pyrelude.Test hiding (Group, maybe)
 import Runner as R
-    ( Config,
-      Address,
-      SuiteItem(Tests, Root, BeforeAll, Group, BeforeEach, AfterEach,
-                gElms, bHook, bhElms, title, aHook, ahElms),
-      Test(Test, config, items, interactor, parse),
-      mkSem,
-      RunParams(..) )
+  ( Address,
+    Config,
+    RunParams (..),
+    SuiteItem
+      ( AfterEach,
+        BeforeAll,
+        BeforeEach,
+        Group,
+        Root,
+        Tests,
+        aHook,
+        ahElms,
+        bHook,
+        bhElms,
+        gElms,
+        title
+      ),
+    Test (Test, config, interactor, items, parse),
+    mkSem,
+  )
 import RunnerBase (Test)
 import TestFilter
 
-data TossCall =  Heads | Tails deriving (Eq, Ord, Show)
+data TossCall = Heads | Tails deriving (Eq, Ord, Show)
 
 data TossResult = RcHeads | RcTails | RcAll deriving (Eq, Ord, Show)
 
-
 data RunConfig = RunConfig
-  {
-    title :: Text,
+  { title :: Text,
     toss :: TossResult
   }
   deriving (Eq, Show)
@@ -162,11 +173,11 @@ test5Int =
 tossFilter :: TestFilter RunConfig TestConfig
 tossFilter =
   TestFilter
-    { title = \RunConfig { toss } _ TestConfig { tossCall } -> "toss call: " <>  txt tossCall <> " must match run: " <> txt toss,
-      predicate = \RunConfig {toss} _ TestConfig{ tossCall } -> case toss of
-                                                      RcAll -> True
-                                                      RcHeads -> tossCall == Heads
-                                                      RcTails -> tossCall == Tails
+    { title = \RunConfig {toss} _ TestConfig {tossCall} -> "toss call: " <> txt tossCall <> " must match run: " <> txt toss,
+      predicate = \RunConfig {toss} _ TestConfig {tossCall} -> case toss of
+        RcAll -> True
+        RcHeads -> tossCall == Heads
+        RcTails -> tossCall == Tails
     }
 
 hasTitle :: Maybe Text -> TestFilter RunConfig TestConfig
@@ -185,50 +196,53 @@ mockSuite runTest =
   R.Root
     [ R.Group
         "Filter TestSuite"
-        [ BeforeAll
-            "Before All"
-            (pure "hello")
-            [ \a o ->
-                Tests
-                  [ runTest a o test1Txt,
-                    runTest a o test4Txt
-                  ],
-              \a o ->
-                R.Group
-                  "Empty Group"
-                  [Tests []],
-              \a o ->
-                BeforeEach
-                  "Before Inner"
-                  (\t -> pure o)
-                  [ \a' o' ->
-                      Tests
-                        [runTest a' o' test6Txt
-                        ]
-                  ]
-            ],
-          R.Group
+        [ \a () ->
+            BeforeAll
+              "Before All"
+              (\() -> pure "hello")
+              [ \a1 o ->
+                  Tests
+                    [ runTest a1 o test1Txt,
+                      runTest a1 o test4Txt
+                    ],
+                \a1 o ->
+                  R.Group
+                    "Empty Group"
+                    [\_ _ -> Tests []],
+                \a1 o ->
+                  BeforeEach
+                    "Before Inner"
+                    (\t -> pure o)
+                    [ \a' o' ->
+                        Tests
+                          [ runTest a' o' test6Txt
+                          ]
+                    ]
+              ],
+
+         \a () -> R.Group
             { title = "Nested Int Group",
               gElms =
-                [ BeforeEach
-                    { title = "Int Group",
-                      bHook = pure 23,
-                      bhElms =
-                        [ \a t ->
-                            AfterEach
-                              { title = "After Exch Int",
-                                aHook = \_ -> t == 23 ? pure () $ pure (),
-                                ahElms =
-                                  [ \a2 i ->
-                                      Tests
-                                        [ runTest a2 i test5Int,
-                                          runTest a2 i test2Int,
-                                          runTest a2 i test3Int
-                                        ]
-                                  ]
-                              }
-                        ]
-                    }
+                [ \a1 s ->
+                    BeforeEach
+                      { title = "Int Group",
+                        bHook = \() -> pure 23,
+                        bhElms =
+                          [ \a2 t ->
+                              AfterEach
+                                { title = "After Exch Int",
+                                  aHook = \_ -> t == 23 ? pure () $ pure (),
+                                  ahElms =
+                                    [ \a3 i ->
+                                        Tests
+                                          [ runTest a3 i test5Int,
+                                            runTest a3 i test2Int,
+                                            runTest a3 i test3Int
+                                          ]
+                                    ]
+                                }
+                          ]
+                      }
                 ]
             }
         ]

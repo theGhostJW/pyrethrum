@@ -30,7 +30,7 @@ import Pyrelude
     Monad ((>>=)),
     Ord (..),
     Ordering (..),
-    Show,
+    Show (show),
     Text,
     error,
     fromJust,
@@ -38,14 +38,16 @@ import Pyrelude
     isNothing,
     not,
     otherwise,
+    toS,
     uu,
     ($),
     (&&),
     (<$>),
+    (<>),
     (?),
     (||),
   )
-import RunElementClasses ( rootAddress, push, AddressedElm(..), Address )
+import RunElementClasses (Address, AddressedElm (..), push, rootAddress)
 import qualified RunElementClasses as RC
 
 type ItemRunner e as ds i hi tc rc effs =
@@ -60,12 +62,10 @@ data GenericResult tc rslt = TestResult
   }
   deriving (Show)
 
-
-
 queryElm :: forall hi ho effs a. (a -> Text) -> Address -> SuiteItem hi ho effs [a] -> [AddressedElm a]
 queryElm getItemTitle address =
   let badCall :: forall o o1. (Address -> o -> SuiteItem o o1 effs [a]) -> SuiteItem o o1 effs [a]
-      badCall f = f address $ error "Bad param - this param should never be accessed when querying for element data"
+      badCall f = f address . error $ "Framework Defect - this param should never be accessed when querying for element data: " <> show address
 
       nextAddress :: Text -> RC.AddressElemType -> Address
       nextAddress ttl et = push ttl et address
@@ -74,8 +74,8 @@ queryElm getItemTitle address =
       hkQuery ttl elms = elms >>= queryElm getItemTitle (nextAddress ttl RC.Hook) . badCall
    in \case
         Root {rootElms} -> rootElms >>= queryElm getItemTitle address
-        Group {title = t, gElms = e} -> hkQuery t e
         Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
+        Group {title = t, gElms = e} -> hkQuery t e
         BeforeAll {title = t, bhElms = e} -> hkQuery t e
         BeforeEach {title = t, bhElms = e} -> hkQuery t e
         AfterAll {title = t, ahElms = e} -> hkQuery t e

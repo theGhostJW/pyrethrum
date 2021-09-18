@@ -7,8 +7,7 @@ import Data.Aeson
 import Polysemy
 import Polysemy.Error
 import Pyrelude
-import RunElementClasses (Address(..))
-
+import RunElementClasses (Address (..))
 
 data SuiteItem hi ho effs t where
   Root ::

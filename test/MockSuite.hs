@@ -196,10 +196,10 @@ mockSuite runTest =
   R.Root
     [ R.Group
         "Filter TestSuite"
-        [ \a () ->
+        [ \a i ->
             BeforeAll
               "Before All"
-              (\() -> pure "hello")
+              (\i' -> pure "hello")
               [ \a1 o ->
                   Tests
                     [ runTest a1 o test1Txt,
@@ -219,32 +219,32 @@ mockSuite runTest =
                           ]
                     ]
               ],
-
-         \a () -> R.Group
-            { title = "Nested Int Group",
-              gElms =
-                [ \a1 s ->
-                    BeforeEach
-                      { title = "Int Group",
-                        bHook = \() -> pure 23,
-                        bhElms =
-                          [ \a2 t ->
-                              AfterEach
-                                { title = "After Exch Int",
-                                  aHook = \_ -> t == 23 ? pure () $ pure (),
-                                  ahElms =
-                                    [ \a3 i ->
-                                        Tests
-                                          [ runTest a3 i test5Int,
-                                            runTest a3 i test2Int,
-                                            runTest a3 i test3Int
-                                          ]
-                                    ]
-                                }
-                          ]
-                      }
-                ]
-            }
+          \a i ->
+            R.Group
+              { title = "Nested Int Group",
+                gElms =
+                  [ \a1 s ->
+                      BeforeEach
+                        { title = "Int Group",
+                          bHook = \i' -> pure 23,
+                          bhElms =
+                            [ \a2 t ->
+                                AfterEach
+                                  { title = "After Exch Int",
+                                    aHook = \_ -> t == 23 ? pure () $ pure (),
+                                    ahElms =
+                                      [ \a3 i' ->
+                                          Tests
+                                            [ runTest a3 i' test5Int,
+                                              runTest a3 i' test2Int,
+                                              runTest a3 i' test3Int
+                                            ]
+                                      ]
+                                  }
+                            ]
+                        }
+                  ]
+              }
         ]
     ]
 

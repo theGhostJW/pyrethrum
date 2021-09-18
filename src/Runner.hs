@@ -222,6 +222,7 @@ exeElm targAddresses runner address hi si =
         S.notMember address targAddresses
           ? pure ()
           $ case si of
+            Root subElms -> sequence_ $ exeNxt address () <$> subElms
             Tests {tests} -> sequence_ $ runner address hi <$> tests
             BeforeAll {title = ttl, bHook, bhElms} -> do
               o <- exeHook C.BeforeAll ttl (bHook hi)

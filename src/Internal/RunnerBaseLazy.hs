@@ -11,7 +11,7 @@ import RunElementClasses (Address (..))
 
 data SuiteItem hi ho effs t where
   Root ::
-    { rootElms :: [SuiteItem hi ho effs t]
+    { rootElms :: [SuiteItem () ho effs t]
     } ->
     SuiteItem () () effs t
   Tests ::

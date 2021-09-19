@@ -252,6 +252,7 @@ activeAddresses r =
       subSet add = S.fromList $ RC.Address <$> (reverse . P.dropWhile null . subsequences . reverse $ unAddress add)
    in foldl' S.union S.empty $ subSet <$> includedAddresses
 
+
 mkSem ::
   forall rc tc e effs.
   (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>

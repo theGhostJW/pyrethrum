@@ -14,7 +14,7 @@ import ItemRunners (runItem)
 import MockSuite as M (MockTest, RunConfig (RunConfig), TestConfig (..), TextItem, happyRun, mockSuite, tossFilter)
 import Pyrelude as P
 import Pyrelude.Test (Assertion, chk, chk', (...))
-import RunElementClasses as REC (Address (..), AddressElem (..), TestLogInfo (..))
+import RunElementClasses as REC (Address (..), AddressElem (..), TestLogInfo (..), toStrElm, AddresStringElm)
 import Runner (TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, groupAddresses, title)
 import RunnerBase (AddressedElm (..), querySuite)
 import TempUtils
@@ -25,12 +25,11 @@ view' :: Show a => [a] -> IO ()
 view' = pPrintList
 
 -- $> view' demoQueryElem
-
 demoQueryElem :: [AddressedElm Text]
 demoQueryElem =
   let getTitle :: adrs -> hi -> MockTest hi i as ds effs -> Text
       getTitle _ _ mt = M.title $ config mt
-   in querySuite id $ mockSuite getTitle
+   in querySuite id (mockSuite getTitle)
 
 applyFilterLog :: TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]
 applyFilterLog fltr = filterLog mockSuite [fltr]

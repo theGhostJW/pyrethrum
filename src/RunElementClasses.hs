@@ -2,6 +2,7 @@ module RunElementClasses
   ( AddressElemType(..),
     Address (..),
     AddressElem(..),
+    AddresStringElm(..),
     TestLogInfo (..),
     TestFilterResult (..),
     AddressedElm (..),
@@ -10,9 +11,11 @@ module RunElementClasses
     HasTitle,
     ItemClass,
     rootAddress,
+    toStrElm,
     push,
     toTitleList,
     render,
+    render',
     mkTestLogInfo,
   )
 where
@@ -49,7 +52,7 @@ render :: Address -> Text
 render = render' " > "
 
 render' :: Text -> Address -> Text
-render' delim add = intercalate delim $ (title :: AddressElem -> Text) <$> unAddress add
+render' delim add = intercalate delim $ reverse $ (title :: AddressElem -> Text) <$> unAddress add
 
 instance Ord Address where
   v1 <= v2 = toTitleList v1 <= toTitleList v2
@@ -86,7 +89,15 @@ data AddressedElm a = AddressedElm
   { address :: Address,
     element :: a
   }
-  deriving (Show)
+  deriving Show
+data AddresStringElm a = AddresStringElm
+  { address :: Text,
+    el :: a
+  }
+  deriving Show
+
+toStrElm :: AddressedElm a -> AddresStringElm a
+toStrElm AddressedElm {address, element} = AddresStringElm (render address) element
 
 addressTitle :: AddressedElm a -> Text
 addressTitle (AddressedElm (Address add) _) = P.headDef "" $ getField @"title" <$> add

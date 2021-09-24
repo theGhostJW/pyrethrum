@@ -3,50 +3,55 @@
 module Internal.RunnerBaseLazy where
 
 import Common (FilterErrorType, FrameworkError)
-import Data.Aeson
+import Data.Aeson hiding (One)
 import Polysemy
 import Polysemy.Error
 import Pyrelude
 import RunElementClasses (Address (..))
 
-data SuiteItem hi ho effs t where
+
+--  node cardinality
+data One
+data Many
+
+data SuiteItem c hi ho effs t where
   Root ::
-    { rootElms :: [SuiteItem () ho effs t]
+    { rootElms :: [SuiteItem c' () ho effs t]
     } ->
-    SuiteItem () () effs t
+    SuiteItem One () () effs t
   Tests ::
     { tests :: t
     } ->
-    SuiteItem hi ho effs t
+    SuiteItem Many hi ho effs t
   BeforeAll ::
     { title :: Text,
       bHook :: hi -> Sem effs ho1,
-      bhElms :: [Address -> ho1 -> SuiteItem ho1 ho2 effs t]
+      bhElms :: [Address -> ho1 -> SuiteItem c' ho1 ho2 effs t]
     } ->
-    SuiteItem hi ho effs t
+    SuiteItem One hi ho effs t
   BeforeEach ::
-    { title :: Text,
-      bHook :: hi -> Sem effs ho1,
-      bhElms :: [Address -> ho1 -> SuiteItem ho1 ho2 effs t]
+    { title' :: Text,
+      bHook' :: hi -> Sem effs ho1,
+      bhElms' :: [Address -> ho1 -> SuiteItem Many ho1 ho2 effs t]
     } ->
-    SuiteItem hi ho effs t
+    SuiteItem Many hi ho effs t
   AfterAll ::
     { title :: Text,
       aHook :: hi -> Sem effs (),
-      ahElms :: [Address -> hi -> SuiteItem hi ho effs t]
+      ahElms :: [Address -> hi -> SuiteItem c' hi ho effs t]
     } ->
-    SuiteItem hi ho effs t
+    SuiteItem One hi ho effs t
   AfterEach ::
-    { title :: Text,
-      aHook :: hi -> Sem effs (),
-      ahElms :: [Address -> hi -> SuiteItem hi ho effs t]
+    { title' :: Text,
+      aHook' :: hi -> Sem effs (),
+      ahElms' :: [Address -> hi -> SuiteItem Many hi ho effs t]
     } ->
-    SuiteItem hi ho effs t
+    SuiteItem Many hi ho effs t
   Group ::
     { title :: Text,
-      gElms :: [Address -> hi -> SuiteItem hi ho effs t]
+      gElms :: [Address -> hi -> SuiteItem c' hi ho effs t]
     } ->
-    SuiteItem hi ho effs t
+    SuiteItem One hi ho effs t
 
 {-
 instance Functor (SuiteItem hi ho effs) where

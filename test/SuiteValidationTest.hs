@@ -15,7 +15,7 @@ import MockSuite as M (MockTest, RunConfig (RunConfig), TestConfig (..), TextIte
 import Pyrelude as P
 import Pyrelude.Test (Assertion, chk, chk', (...))
 import RunElementClasses as REC (Address (..), AddressElem (..), TestLogInfo (..), toStrElm, AddresStringElm)
-import Runner (TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, groupAddresses, title)
+import Runner (TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, title)
 import RunnerBase (AddressedElm (..), querySuite)
 import TempUtils
 import TestFilter

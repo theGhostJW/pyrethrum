@@ -2,21 +2,20 @@ module RunnerBase
   ( AddressedElm (..),
     ItemRunner,
     TestSuite,
-    LRB.SuiteItem (..),
+    RBL.SuiteItem (..),
+    RBL.One,
+    RBL.Many,
     Test (..),
     GenericResult (..),
-    concatTests,
-    groupAddresses,
-    groupName,
     queryElm,
     querySuite,
   )
 where
 
 import Common (FilterErrorType, FrameworkError)
-import Data.Aeson
+import Data.Aeson hiding (One)
 import Data.Aeson.TH
-import Internal.RunnerBaseLazy as LRB
+import Internal.RunnerBaseLazy as RBL
 import Polysemy
 import Polysemy.Error
 import Pyrelude
@@ -54,7 +53,7 @@ type ItemRunner e as ds i hi tc rc effs =
   rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
 type TestSuite e tc rc effs a =
-  (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem () () effs [a]
+  (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem One () () effs [a]
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
@@ -62,26 +61,26 @@ data GenericResult tc rslt = TestResult
   }
   deriving (Show)
 
-queryElm :: forall hi ho effs a. (a -> Text) -> Address -> SuiteItem hi ho effs [a] -> [AddressedElm a]
+queryElm :: forall hi ho effs c a. (a -> Text) -> Address -> SuiteItem c hi ho effs [a] -> [AddressedElm a]
 queryElm getItemTitle address =
-  let badCall :: forall o o1. (Address -> o -> SuiteItem o o1 effs [a]) -> SuiteItem o o1 effs [a]
+  let badCall :: forall c1 o o1. (Address -> o -> SuiteItem c1 o o1 effs [a]) -> SuiteItem c1 o o1 effs [a]
       badCall f = f address . error $ "Framework Defect - this param should never be accessed when querying for element data: " <> show address
 
       nextAddress :: Text -> RC.AddressElemType -> Address
       nextAddress ttl et = push ttl et address
 
-      hkQuery :: forall hi' ho'. Text -> [Address -> hi' -> SuiteItem hi' ho' effs [a]] -> [AddressedElm a]
+      hkQuery :: forall hi' ho' c1. Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
       hkQuery ttl elms = elms >>= queryElm getItemTitle (nextAddress ttl RC.Hook) . badCall
    in \case
         Root {rootElms} -> rootElms >>= queryElm getItemTitle address
         Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
         Group {title = t, gElms = e} -> hkQuery t e
         BeforeAll {title = t, bhElms = e} -> hkQuery t e
-        BeforeEach {title = t, bhElms = e} -> hkQuery t e
+        BeforeEach {title' = t, bhElms' = e} -> hkQuery t e
         AfterAll {title = t, ahElms = e} -> hkQuery t e
-        AfterEach {title = t, ahElms = e} -> hkQuery t e
+        AfterEach {title' = t, ahElms' = e} -> hkQuery t e
 
-querySuite :: forall hi ho effs a. (a -> Text) -> SuiteItem hi ho effs [a] -> [AddressedElm a]
+querySuite :: forall hi ho effs a. (a -> Text) -> SuiteItem One hi ho effs [a] -> [AddressedElm a]
 querySuite getItemTitle = queryElm getItemTitle rootAddress
 
 {-
@@ -109,8 +108,8 @@ TODO
   Update Demo
 -}
 
-concatTests :: SuiteItem hi ho effs t -> [t]
-concatTests = uu
+-- concatTests :: SuiteItem hi ho effs t -> [t]
+-- concatTests = uu
 
 -- let
 --   concat' ts = mconcat $ concatTests <$> ts
@@ -121,18 +120,18 @@ concatTests = uu
 --     (AfterHook _ _ _ ts) -> concat' ts
 --     (Group _ ts) -> concat' ts
 
-groupName :: SuiteItem hi ho effs a -> Maybe Text
-groupName = \case
-  Tests _ -> Nothing
-  BeforeAll {} -> Nothing
-  BeforeEach {} -> Nothing
-  AfterAll {} -> Nothing
-  AfterEach {} -> Nothing
-  Root {} -> Nothing
-  Group t _ -> Just t
+-- groupName :: SuiteItem hi ho effs a -> Maybe Text
+-- groupName = \case
+--   Tests _ -> Nothing
+--   BeforeAll {} -> Nothing
+--   BeforeEach {} -> Nothing
+--   AfterAll {} -> Nothing
+--   AfterEach {} -> Nothing
+--   Root {} -> Nothing
+--   Group t _ -> Just t
 
-groupAddresses' :: [Text] -> Text -> SuiteItem hi ho effs a -> [Text]
-groupAddresses' accum root el = uu
+-- groupAddresses' :: [Text] -> Text -> SuiteItem hi ho effs a -> [Text]
+-- groupAddresses' accum root el = uu
 
 -- let
 --   delim = "."
@@ -156,8 +155,8 @@ groupAddresses' accum root el = uu
 --       in
 --         address : mconcat (groupAddresses' accum address <$> subElems)
 
-groupAddresses :: SuiteItem hi ho effs a -> [Text]
-groupAddresses = groupAddresses' [] ""
+-- groupAddresses :: SuiteItem hi ho effs a -> [Text]
+-- groupAddresses = groupAddresses' [] ""
 
 -- data up to here want items to have title and validations
 -- and config

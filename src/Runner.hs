@@ -111,8 +111,8 @@ import RunnerBase as RB
     SuiteItem (..),
     Test (..),
     TestSuite,
-    groupAddresses,
-    groupName,
+    One,
+    Many,
     queryElm
   )
 import qualified TestFilter as F
@@ -196,13 +196,13 @@ data RunParams m e rc tc effs = RunParams
 
 -- TODO - Error handling especially outside tests eg. in hooks
 exeElm ::
-  forall hi ho e effs a.
+  forall c hi ho e effs a.
   (ToJSON e, Show e, Member (Logger e) effs) =>
   S.Set Address ->
   (forall hii. Address -> hii -> a -> Sem effs ()) ->
   Address ->
   hi ->
-  SuiteItem hi ho effs [a] ->
+  SuiteItem c hi ho effs [a] ->
   Sem effs ()
 exeElm targAddresses runner address hi si =
   let log' :: LogProtocolBase e -> Sem effs ()
@@ -215,7 +215,7 @@ exeElm targAddresses runner address hi si =
         log' $ EndHook hookType ttl
         pure o
 
-      exeNxt :: forall hin hout. Address -> hin -> SuiteItem hin hout effs [a] -> Sem effs ()
+      exeNxt :: forall c' hin hout. Address -> hin -> SuiteItem c' hin hout effs [a] -> Sem effs ()
       exeNxt = exeElm targAddresses runner 
 
    in do
@@ -227,13 +227,13 @@ exeElm targAddresses runner address hi si =
             BeforeAll {title = ttl, bHook, bhElms} -> do
               o <- exeHook C.BeforeAll ttl (bHook hi)
               sequence_ $ (\f -> exeNxt address o $ f address o) <$> bhElms
-            BeforeEach {title = ttl, bHook, bhElms} ->
+            BeforeEach {title' = ttl, bHook', bhElms'} ->
               let runElm f = do
-                    o <- exeHook C.BeforeEach ttl (bHook hi)
+                    o <- exeHook C.BeforeEach ttl (bHook' hi)
                     exeNxt address o $ f address o
-               in sequence_ $ runElm <$> bhElms
-            AfterEach {title = ttl, aHook, ahElms} ->
-              sequence_ $ (\f -> exeNxt address hi (f address hi) >> exeHook C.AfterEach ttl (aHook hi)) <$> ahElms
+               in sequence_ $ runElm <$> bhElms'
+            AfterEach {RB.title' = ttl, aHook', ahElms'} ->
+              sequence_ $ (\f -> exeNxt address hi (f address hi) >> exeHook C.AfterEach ttl (aHook' hi)) <$> ahElms'
             AfterAll {title = ttl, aHook, ahElms} -> do
               sequence_ $ (\f -> exeNxt address hi (f address hi)) <$> ahElms
               exeHook C.AfterAll ttl $ aHook hi

@@ -5,34 +5,22 @@ module MockSuite where
 import qualified Check as C
 import DSL.Interpreter (MinEffs)
 import Data.Aeson.TH
-import Data.Aeson.Types
+import Data.Aeson.Types hiding (One)
 import Data.Yaml
 import ItemRunners (runItem)
 import Polysemy
 import Pyrelude as P
-import Pyrelude.Test hiding (Group, maybe)
+-- import Pyrelude.Test hiding (Group, maybe)
+-- import Pyrelude.Test hiding (Group, maybe)
 import Runner as R
   ( Address,
     Config,
+    One,
     RunParams (..),
-    SuiteItem
-      ( AfterEach,
-        BeforeAll,
-        BeforeEach,
-        Group,
-        Root,
-        Tests,
-        aHook,
-        ahElms,
-        bHook,
-        bhElms,
-        gElms,
-        title
-      ),
-    Test (Test, config, interactor, items, parse),
+    SuiteItem (..),
+    Test (..),
     mkSem,
   )
-import RunnerBase (Test)
 import TestFilter
 
 data TossCall = Heads | Tails deriving (Eq, Ord, Show)
@@ -60,7 +48,7 @@ instance Config TestConfig
 $(deriveJSON defaultOptions ''TestConfig)
 
 -- | A standard test
-type MockTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi i as ds effs
+type MockTest hi i as ds effs = Test Text TestConfig RunConfig hi i as ds effs
 
 data IntItem = IntItem
   { id :: Int,
@@ -88,6 +76,18 @@ empti = const ([] :: [b])
 --                 as ->    rc     -> hi -> i -> Sem effs as
 emptiInteractor :: as -> RunConfig -> hi -> i -> Sem effs as
 emptiInteractor as _ _ _ = pure as
+
+beforAll :: Int -> Sem effs Text
+beforAll = uu
+
+-- demo manual beforeAll hooks
+testInteractor :: RunConfig -> Text -> i -> Sem effs as
+testInteractor _ _ _ = uu
+
+implementedInteractor :: RunConfig -> Int -> i -> Sem effs as
+implementedInteractor rc int' i = beforAll int' >>= \t -> testInteractor rc t i
+
+-- end demo
 
 emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
@@ -191,7 +191,7 @@ hasTitle ttl =
           \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
 
-mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem () () effs [a]
+mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem One () () effs [a]
 mockSuite runTest =
   R.Root
     [ R.Group
@@ -201,51 +201,58 @@ mockSuite runTest =
               "Before All"
               (\i' -> pure "hello")
               [ \a1 o ->
-                  Tests
-                    [ runTest a1 o test1Txt,
-                      runTest a1 o test4Txt
+                  R.Group
+                    "Divider"
+                    [ \a1' o' ->
+                        Tests
+                          [ runTest a1' o' test1Txt,
+                            runTest a1' o' test4Txt
+                          ]
                     ],
                 \a1 o ->
                   R.Group
                     "Empty Group"
                     [\_ _ -> Tests []],
                 \a1 o ->
-                  BeforeEach
-                    "Before Inner"
-                    (\t -> pure o)
-                    [ \a' o' ->
-                        Tests
-                          [ runTest a' o' test6Txt
+                  R.Group
+                    "Divider"
+                    [ \a1' o' ->
+                        BeforeEach
+                          "Before Inner"
+                          (\t -> pure o)
+                          [ \a'' o'' ->
+                              Tests
+                                [ runTest a'' o'' test6Txt
+                                ]
                           ]
                     ]
-              ],
-          \a i ->
-            R.Group
-              { title = "Nested Int Group",
-                gElms =
-                  [ \a1 s ->
-                      BeforeEach
-                        { title = "Int Group",
-                          bHook = \i' -> pure 23,
-                          bhElms =
-                            [ \a2 t ->
-                                AfterEach
-                                  { title = "After Exch Int",
-                                    aHook = \_ -> t == 23 ? pure () $ pure (),
-                                    ahElms =
-                                      [ \a3 i' ->
-                                          Tests
-                                            [ runTest a3 i' test5Int,
-                                              runTest a3 i' test2Int,
-                                              runTest a3 i' test3Int
-                                            ]
+              ]
+        ],
+      R.Group
+        { title = "Nested Int Group",
+          gElms =
+            [ \a1 s ->
+                BeforeEach
+                  { title' = "Int Group",
+                    bHook' = \i' -> pure 23,
+                    bhElms' =
+                      [ \a2 t ->
+                          AfterEach
+                            { title' = "After Exch Int",
+                              aHook' = \_ -> t == 23 ? pure () $ pure (),
+                              ahElms' =
+                                [ \a3 i' ->
+                                    Tests
+                                      [ runTest a3 i' test5Int,
+                                        runTest a3 i' test2Int,
+                                        runTest a3 i' test3Int
                                       ]
-                                  }
-                            ]
-                        }
-                  ]
-              }
-        ]
+                                ]
+                            }
+                      ]
+                  }
+            ]
+        }
     ]
 
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]

@@ -7,6 +7,7 @@ import RunElementClasses (TestFilterResult(..), Config, Address, TestLogInfo, mk
 import qualified RunElementClasses as C
 import qualified Data.List as L 
 import RunnerBase (AddressedElm(..))
+import Internal.RunnerBaseLazy (One)
 
 acceptFilter :: TestFilterResult -> Bool
 acceptFilter = isNothing . reasonForRejection
@@ -56,7 +57,7 @@ filterLog suite fltrs rc =
     testFilter :: Address -> hi -> Test e tc rc hi i as ds effs -> TestFilterResult
     testFilter adr _ = filterTest fltrs rc adr
 
-    si :: SuiteItem () () effs [TestFilterResult]
+    si :: SuiteItem One () () effs [TestFilterResult]
     si = suite testFilter
   in
     element <$> querySuite ((C.title :: TestLogInfo -> Text) . testInfo) si

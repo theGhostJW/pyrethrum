@@ -269,14 +269,17 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
       dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . address . testInfo <$> filterInfo)
 
        
+      -- itemRunner ::  rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
+
       -- runTestRequiredForSuite :: (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test hi i as ds effs -> a) 
+      testRunner :: forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test e tc rc hi i as ds effs -> ()
+      testRunner = uu --runTest rc
 
       -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
 
       -- exeElmRunner:: forall hii. Address -> hii -> a -> Sem effs ()
 
 
-      -- itemRunner ::  rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
       
       -- runTest ::
       --   forall i rc hi as ds tc e effs.

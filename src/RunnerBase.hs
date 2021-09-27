@@ -44,16 +44,18 @@ import Pyrelude
     (<$>),
     (<>),
     (?),
-    (||),
+    (||), Int
   )
-import RunElementClasses (Address, AddressedElm (..), push, rootAddress)
+import RunElementClasses (Address, AddressElemType, AddressedElm (..), push, rootAddress)
 import qualified RunElementClasses as RC
+import GHC.Records (HasField)
+import qualified Check
 
 type ItemRunner e as ds i hi tc rc effs =
   rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
 type TestSuite e tc rc effs a =
-  (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem One () () effs [a]
+  (forall hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (Check.Checks ds), HasField "id" i Int, HasField "title" i Text) => Address -> hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem One () () effs [a]
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
@@ -69,12 +71,15 @@ queryElm getItemTitle address =
       nextAddress :: Text -> RC.AddressElemType -> Address
       nextAddress ttl et = push ttl et address
 
+      elmQuery :: forall hi' ho' c1. AddressElemType -> Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
+      elmQuery et ttl elms = elms >>= queryElm getItemTitle (nextAddress ttl et) . badCall
+
       hkQuery :: forall hi' ho' c1. Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
-      hkQuery ttl elms = elms >>= queryElm getItemTitle (nextAddress ttl RC.Hook) . badCall
+      hkQuery = elmQuery RC.Hook
    in \case
         Root {rootElms} -> rootElms >>= queryElm getItemTitle address
         Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
-        Group {title = t, gElms = e} -> hkQuery t e
+        Group {title = t, gElms = e} -> elmQuery RC.Group t e
         BeforeAll {title = t, bhElms = e} -> hkQuery t e
         BeforeEach {title' = t, bhElms' = e} -> hkQuery t e
         AfterAll {title = t, ahElms = e} -> hkQuery t e

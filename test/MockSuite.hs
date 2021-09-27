@@ -12,6 +12,8 @@ import Polysemy
 import Pyrelude as P
 -- import Pyrelude.Test hiding (Group, maybe)
 -- import Pyrelude.Test hiding (Group, maybe)
+-- import Pyrelude.Test hiding (Group, maybe)
+-- import Pyrelude.Test hiding (Group, maybe)
 import Runner as R
   ( Address,
     Config,
@@ -19,9 +21,11 @@ import Runner as R
     RunParams (..),
     SuiteItem (..),
     Test (..),
-    mkSem,
+    mkSem, ItemClass
   )
 import TestFilter
+import GHC.Records (HasField)
+import qualified Check
 
 data TossCall = Heads | Tails deriving (Eq, Ord, Show)
 
@@ -191,7 +195,8 @@ hasTitle ttl =
           \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
 
-mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem One () () effs [a]
+
+mockSuite :: forall effs a. (forall hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem One () () effs [a]
 mockSuite runTest =
   R.Root
     [ R.Group

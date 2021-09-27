@@ -196,7 +196,71 @@ hasTitle ttl =
     }
 
 
-mockSuite :: forall effs a. (forall hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem One () () effs [a]
+mockSuiteNew :: forall effs a. (forall hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "id" i Int, HasField "title" i Text) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem One () () effs [a]
+mockSuiteNew runTest =
+  R.Root
+    [ R.Group
+        "Filter TestSuite"
+        [ \a i ->
+            BeforeAll
+              "Before All"
+              (\i' -> pure "hello")
+              [ \a1 o ->
+                  R.Group
+                    "Divider"
+                    [ \a1' o' ->
+                        Tests
+                          [ runTest a1' o' test1Txt,
+                            runTest a1' o' test4Txt
+                          ]
+                    ],
+                \a1 o ->
+                  R.Group
+                    "Empty Group"
+                    [\_ _ -> Tests []],
+                \a1 o ->
+                  R.Group
+                    "Divider"
+                    [ \a1' o' ->
+                        BeforeEach
+                          "Before Inner"
+                          (\t -> pure o)
+                          [ \a'' o'' ->
+                              Tests
+                                [ runTest a'' o'' test6Txt
+                                ]
+                          ]
+                    ]
+              ]
+        ],
+      R.Group
+        { title = "Nested Int Group",
+          gElms =
+            [ \a1 s ->
+                BeforeEach
+                  { title' = "Int Group",
+                    bHook' = \i' -> pure 23,
+                    bhElms' =
+                      [ \a2 t ->
+                          AfterEach
+                            { title' = "After Exch Int",
+                              aHook' = \_ -> t == 23 ? pure () $ pure (),
+                              ahElms' =
+                                [ \a3 i' ->
+                                    Tests
+                                      [ runTest a3 i' test5Int,
+                                        runTest a3 i' test2Int,
+                                        runTest a3 i' test3Int
+                                      ]
+                                ]
+                            }
+                      ]
+                  }
+            ]
+        }
+    ]
+
+mockSuite :: forall effs a. (forall hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "id" i Int, HasField "title" i Text, HasField "checks" i (Check.Checks ds)) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem One () () effs [a]
 mockSuite runTest =
   R.Root
     [ R.Group

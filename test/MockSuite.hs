@@ -196,7 +196,7 @@ hasTitle ttl =
     }
 
 
-mockSuite :: forall effs a. (forall hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "id" i Int, HasField "title" i Text, HasField "checks" i (Check.Checks ds)) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem One () () effs [a]
+mockSuite :: forall effs a. (forall hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem One () () effs [a]
 mockSuite runTest =
   R.Root
     [ 

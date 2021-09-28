@@ -180,6 +180,8 @@ runTest RunParams {filters, rc, itemIds, itemRunner} add hi test@Test {config = 
 logLPError :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
 logLPError = logItem . LP.Error
 
+
+
 data RunParams m e rc tc effs = RunParams
   { suite :: forall a. TestSuite e tc rc effs a,
     filters :: [F.TestFilter rc tc],
@@ -237,6 +239,31 @@ exeElm targAddresses runner address hi si =
                 sequence_ $ (\f -> exeNxt address hi $ f address hi) <$> gElms
                 logItem . EndGroup . GroupTitle $ ttl
 
+-- exeElm' ::
+--   forall c hi ho e effs a.
+--   (ToJSON e, Show e, Member (Logger e) effs) =>
+--   S.Set Address ->
+--   Address ->
+--   hi ->
+--   SuiteItem c hi ho effs [[Sem effs ()]] ->
+--   Sem effs ()
+-- exeElm' targAddresses address hi si = 
+--    let log' :: LogProtocolBase e -> Sem effs ()
+--        log' = logItem
+
+--        exeHook :: HookType -> Text -> Sem effs o -> Sem effs o
+--        exeHook hookType ttl hook = do
+--         log' $ StartHook hookType ttl
+--         o <- hook
+--         log' $ EndHook hookType ttl
+--         pure o
+--    in
+--         S.notMember address targAddresses
+--           ? pure ()
+--           $ case si of
+--               Tests {tests} -> sequence_ $ join tests --sequence_ $ runner address hi <$> tests
+--               _ ->  pure ()
+
 activeAddresses :: [TestFilterResult] -> S.Set Address
 activeAddresses r =
   let includedAddresses :: [Address]
@@ -262,15 +289,11 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
       dupeAddress :: Maybe Text
       dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . address . testInfo <$> filterInfo)
 
-       
-      -- itemRunner ::  rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
-
-      -- runTestRequiredForSuite :: (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> Test hi i as ds effs -> a) 
       testRunner :: forall hi i as ds. ( Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (Check.Checks ds), HasField "id" i Int, HasField "title" i Text, ToJSON i) => Address -> hi -> Test e tc rc hi i as ds effs -> [Sem effs ()] 
       testRunner = runTest rp
 
       semTree :: SuiteItem One () () effs [[Sem effs ()]]
-      semTree = suite testRunner
+      semTree = suite $ runTest rp
 
       -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
       -- mockSuite = suite $ runTest rp

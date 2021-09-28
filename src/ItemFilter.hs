@@ -6,7 +6,7 @@ import GHC.Records (HasField (getField))
 import Pyrelude
 import RunElementClasses
 import qualified Prelude as P
-import Check (Checks)
+import Check (Checks, un)
 
 data ItemFilter a
   = ID Int
@@ -29,7 +29,7 @@ filterredItemIds filtr items =
       filterredItems =
         let pass = Right . pure
             fail' = Left . InvalidItemFilter
-            hasChecks i = not $ nullFoldable $ getField @"checks" i
+            hasChecks i = not $ nullFoldable $ un $ getField @"checks" i
             lastWithChecks = findFoldable hasChecks $ reverse items
             listOrFail lst msg =
               null lst

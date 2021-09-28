@@ -87,10 +87,10 @@ unit_chk_with_gate_on_list = chkOutcomes [Pass, Pass, Fail, Fail, Pass, Pass] 42
                                                                   <> isEven
 
 
-unit_chk_with_gate_on_list_only_gates_first = [GateCheck, StandardCheck, StandardCheck, StandardCheck] ... D.toList (gateStatus <$> gate evenOddEven)
+unit_chk_with_gate_on_list_only_gates_first = [GateCheck, StandardCheck, StandardCheck, StandardCheck] ... D.toList (gateStatus <$> un (gate evenOddEven))
 
-unit_chk_with_gateAll_on_list_gates_all = [GateCheck, GateCheck, GateCheck, GateCheck] ... D.toList (gateStatus <$> gateAll evenOddEven)
+unit_chk_with_gateAll_on_list_gates_all = [GateCheck, GateCheck, GateCheck, GateCheck] ... D.toList (gateStatus <$> un (gateAll evenOddEven))
 
-unit_chk_expect_defect_only_affects_first = [False, True, True, True] ... D.toList ((ExpectPass ==) F.. expectation <$> expectFailure "Failed" evenOddEven)
+unit_chk_expect_defect_only_affects_first = [False, True, True, True] ... D.toList $ ((ExpectPass ==) F.. expectation <$> un (expectFailure "Failed" evenOddEven))
 
-unit_chk_expect_defect_fixed_only_affects_first = [True, False, False, False] ... D.toList ((ExpectFailure Inactive "Failed" ==) F.. expectation <$> expectFailureFixed "Failed" evenOddEven)
+unit_chk_expect_defect_fixed_only_affects_first = [True, False, False, False] ... D.toList ((ExpectFailure Inactive "Failed" ==) F.. expectation <$> un (expectFailureFixed "Failed" evenOddEven))

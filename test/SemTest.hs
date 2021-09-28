@@ -48,7 +48,7 @@ data TextItem ds = TextItem
   deriving (Show, Generic)
 
 
-instance ToJSON (Item ds) where
+instance (ToJSON ds) => ToJSON (Item ds) where
   toEncoding = genericToEncoding defaultOptions
 
 empti :: a -> [b]

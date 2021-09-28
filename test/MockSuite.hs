@@ -57,14 +57,14 @@ type MockTest hi i as ds effs = Test Text TestConfig RunConfig hi i as ds effs
 data IntItem = IntItem
   { id :: Int,
     title :: Text,
-    checks :: C.Checks Text
+    checks :: C.Checks Int
   }
   deriving (Show, Generic)
 
 data TextItem = TextItem
   { id :: Int,
     title :: Text,
-    checks :: C.Checks Int
+    checks :: C.Checks Text
   }
   deriving (Show, Generic)
 
@@ -96,7 +96,7 @@ implementedInteractor rc int' i = beforAll int' >>= \t -> testInteractor rc t i
 emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
 
-test1Txt :: MockTest Text IntItem Text Text effs
+test1Txt :: MockTest Text TextItem Text Text effs
 test1Txt =
   Test
     { config =
@@ -135,7 +135,7 @@ test3Int =
       parse = pure
     }
 
-test4Txt :: MockTest Text Text Text Text effs
+test4Txt :: MockTest Text TextItem Text Text effs
 test4Txt =
   Test
     { config =
@@ -148,7 +148,7 @@ test4Txt =
       parse = pure
     }
 
-test6Txt :: MockTest Text Text Text Text effs
+test6Txt :: MockTest Text TextItem Text Text effs
 test6Txt =
   Test
     { config =
@@ -196,74 +196,11 @@ hasTitle ttl =
     }
 
 
-mockSuiteNew :: forall effs a. (forall hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "id" i Int, HasField "title" i Text) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem One () () effs [a]
-mockSuiteNew runTest =
-  R.Root
-    [ R.Group
-        "Filter TestSuite"
-        [ \a i ->
-            BeforeAll
-              "Before All"
-              (\i' -> pure "hello")
-              [ \a1 o ->
-                  R.Group
-                    "Divider"
-                    [ \a1' o' ->
-                        Tests
-                          [ runTest a1' o' test1Txt,
-                            runTest a1' o' test4Txt
-                          ]
-                    ],
-                \a1 o ->
-                  R.Group
-                    "Empty Group"
-                    [\_ _ -> Tests []],
-                \a1 o ->
-                  R.Group
-                    "Divider"
-                    [ \a1' o' ->
-                        BeforeEach
-                          "Before Inner"
-                          (\t -> pure o)
-                          [ \a'' o'' ->
-                              Tests
-                                [ runTest a'' o'' test6Txt
-                                ]
-                          ]
-                    ]
-              ]
-        ],
-      R.Group
-        { title = "Nested Int Group",
-          gElms =
-            [ \a1 s ->
-                BeforeEach
-                  { title' = "Int Group",
-                    bHook' = \i' -> pure 23,
-                    bhElms' =
-                      [ \a2 t ->
-                          AfterEach
-                            { title' = "After Exch Int",
-                              aHook' = \_ -> t == 23 ? pure () $ pure (),
-                              ahElms' =
-                                [ \a3 i' ->
-                                    Tests
-                                      [ runTest a3 i' test5Int,
-                                        runTest a3 i' test2Int,
-                                        runTest a3 i' test3Int
-                                      ]
-                                ]
-                            }
-                      ]
-                  }
-            ]
-        }
-    ]
-
 mockSuite :: forall effs a. (forall hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "id" i Int, HasField "title" i Text, HasField "checks" i (Check.Checks ds)) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem One () () effs [a]
 mockSuite runTest =
   R.Root
-    [ R.Group
+    [ 
+      R.Group
         "Filter TestSuite"
         [ \a i ->
             BeforeAll
@@ -312,7 +249,8 @@ mockSuite runTest =
                               ahElms' =
                                 [ \a3 i' ->
                                     Tests
-                                      [ runTest a3 i' test5Int,
+                                      [
+                                        runTest a3 i' test5Int,
                                         runTest a3 i' test2Int,
                                         runTest a3 i' test3Int
                                       ]

@@ -26,7 +26,7 @@ import RunElementClasses as C
   )
 import RunnerBase as RB (ItemRunner, Test (Test))
 import GHC.Records
-import Check (Checks)
+import Check (Checks, un)
 import qualified RunElementClasses as R
 
 mkId :: forall tc i. (HasId i, Config tc) => Address -> tc -> i -> ItemId
@@ -53,7 +53,7 @@ runItem rc md hi (Test tc _items interactor parse) i =
       recordSkippedChecks :: Sem effs ()
       recordSkippedChecks = do
         logItem StartChecks
-        F.traverse_ logChk $ D.toList $ CK.skipChecks (getField @"checks" i)
+        F.traverse_ logChk . D.toList . CK.skipChecks . un $ getField @"checks" i
 
       parseErrorHandler :: FrameworkError e -> Sem effs ds
       parseErrorHandler e =
@@ -69,7 +69,7 @@ runItem rc md hi (Test tc _items interactor parse) i =
       runItem' :: Sem effs ()
       runItem' =
         let runChecks :: ds -> Sem effs ()
-            runChecks ds = F.traverse_ logChk $ D.toList $ CK.calcChecks ds (getField @"checks" i)
+            runChecks ds = F.traverse_ logChk . D.toList . CK.calcChecks ds $ getField @"checks" i
          in do
               logItem StartInteraction
               -- TODO: check for io exceptions / SomeException - use throw from test
@@ -113,7 +113,7 @@ documentItem rc md hi (Test tc _items interactor _parse) i =
           $ DetailedInfo (CK.header (chk :: CK.Check ds) <> " - " <> txt (CK.expectation chk)) ""
 
       logChecks :: Sem effs ()
-      logChecks = P.sequence_ $ lgChk <$> D.toList (getField @"checks" i)
+      logChecks = P.sequence_ $ lgChk <$> un (getField @"checks" i)
    in do
         logItem StartInteraction
         interactor rc hi i

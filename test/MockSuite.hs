@@ -208,7 +208,7 @@ mockSuite ::
     MockTest ho i as ds effs ->
     a
   ) ->
-  SuiteItem One () () effs a
+  SuiteItem One () effs a
 mockSuite runTest =
   R.Root
     [ R.Group

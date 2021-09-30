@@ -204,7 +204,7 @@ exeElm ::
   (forall hii. Address -> hii -> a -> Sem effs ()) ->
   Address ->
   hi ->
-  SuiteItem c hi ho effs [a] ->
+  SuiteItem c hi effs [a] ->
   Sem effs ()
 exeElm targAddresses runner address hi si = uu
   -- let log' :: LogProtocolBase e -> Sem effs ()

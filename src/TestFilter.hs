@@ -58,7 +58,7 @@ filterLog suite fltrs rc =
   let testFilter :: Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> Test e tc rc ho i as ds effs -> TestFilterResult
       testFilter adr _ _ _ = filterTest fltrs rc adr
 
-      si :: SuiteItem One () () effs TestFilterResult
+      si :: SuiteItem One () effs TestFilterResult
       si = suite testFilter
    in element <$> querySuite ((C.title :: TestLogInfo -> Text) . testInfo) si
 

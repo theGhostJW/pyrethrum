@@ -15,44 +15,44 @@ data One
 data Many
 
 
-data SuiteItem c hi ho effs t where
+data SuiteItem c hi effs t where
   Root ::
-    { rootElms :: [SuiteItem c' () ho effs t]
+    { rootElms :: [SuiteItem c' () effs t]
     } ->
-    SuiteItem One () () effs t
+    SuiteItem One () effs t
   Tests ::
     { tests :: Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> [t]
     } ->
-    SuiteItem Many hi ho effs t
+    SuiteItem Many hi effs t
   BeforeAll ::
     { title :: Text,
       bHook :: hi -> Sem effs ho,
-      bhElms :: [SuiteItem c' ho ho2 effs t]
+      bhElms :: [SuiteItem c' ho effs t]
     } ->
-    SuiteItem One hi ho effs t
+    SuiteItem One hi effs t
   BeforeEach ::
     { title' :: Text,
       bHook' :: hi -> Sem effs ho,
-      bhElms' :: [SuiteItem c' ho ho2 effs t]
+      bhElms' :: [SuiteItem c' ho effs t]
     } ->
-    SuiteItem Many hi ho effs t
+    SuiteItem Many hi effs t
   AfterAll ::
     { title :: Text,
       aHook :: ho -> Sem effs (),
-      ahElms :: [SuiteItem c' hi ho effs t]
+      ahElms :: [SuiteItem c' ho effs t]
     } ->
-    SuiteItem One hi ho effs t
+    SuiteItem One hi effs t
   AfterEach ::
     { title' :: Text,
       aHook' :: ho -> Sem effs (),
-      ahElms' :: [SuiteItem Many hi ho effs t]
+      ahElms' :: [SuiteItem Many ho effs t]
     } ->
-    SuiteItem Many hi ho effs t
+    SuiteItem Many hi effs t
   Group ::
     { title :: Text,
-      gElms :: [SuiteItem c' hi ho effs t]
+      gElms :: [SuiteItem c' hi effs t]
     } ->
-    SuiteItem One hi ho effs t
+    SuiteItem One hi effs t
 
 {-
 instance Functor (SuiteItem hi ho effs) where

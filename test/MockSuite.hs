@@ -215,61 +215,54 @@ mockSuite runTest =
         "Filter TestSuite"
         [ BeforeAll
             "Before All"
-            (\i' -> pure "hello")
+            (\i -> pure @_ @Text "hello")
             [ R.Group
                 "Divider"
                 [ Tests
-                    \a1' o' be2 ae2 ->
-                      [ runTest a1' o' be2 ae2 test1Txt,
-                        runTest a1' o' be2 ae2 test4Txt
+                    \a o be ae ->
+                      [ runTest a o be ae test1Txt,
+                        runTest a o be ae test4Txt
                       ]
                 ],
               ----
               R.Group
                 "Empty Group"
-                [Tests \_ _ _ _ -> []] --,
-                -- \a1 o be ae ->
-                --   R.Group
-                --     "Divider"
-                --     [ \a1' o' be' ae' ->
-                --         BeforeEach
-                --           "Before Inner"
-                --           (\t -> pure o)
-                --           [ \a'' o'' be' ae' ->
-                --               Tests
-                --                 [ runTest a'' o'' be' ae' test6Txt
-                --                 ]
-                --           ]
-                --     ]
+                [Tests \_ _ _ _ -> []],
+              ----
+              R.Group
+                "Divider"
+                [ BeforeEach
+                    "Before Inner"
+                    (\t -> pure "HI")
+                    [ Tests \a o be ae ->
+                        [ runTest a o be ae test6Txt
+                        ]
+                    ]
+                ]
             ]
-        ] --,
-        -- R.Group
-        --   { title = "Nested Int Group",
-        --     gElms =
-        --       [ \a1 s ->
-        --           BeforeEach
-        --             { title' = "Int Group",
-        --               bHook' = \i' -> pure 23,
-        --               bhElms' =
-        --                 [ \a2 t ->
-        --                     AfterEach
-        --                       { title' = "After Exch Int",
-        --                         aHook' = \_ -> t == 23 ? pure () $ pure (),
-        --                         ahElms' =
-        --                           [ \a3 i' ->
-        --                               Tests
-        --                                 [
-        --                                   runTest a3 i' test5Int,
-        --                                   runTest a3 i' test2Int,
-        --                                   runTest a3 i' test3Int
-        --                                 ]
-        --                           ]
-        --                       }
-        --                 ]
-        --             }
-        --       ]
-        --   }
-        -- ]
+        ],
+      R.Group
+        { title = "Nested Int Group",
+          gElms =
+            [ BeforeEach
+                { title' = "Int Group",
+                  bHook' = \i -> pure @_ @Int 23,
+                  bhElms' =
+                    [ AfterEach
+                        { title' = "After Exch Int",
+                          aHook' = \i -> i == 23 ? pure () $ pure (),
+                          ahElms' =
+                            [ Tests \a o be ae ->
+                                [ runTest a o be ae test5Int,
+                                  runTest a o be ae test2Int,
+                                  runTest a o be ae test3Int
+                                ]
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     ]
 
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]

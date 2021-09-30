@@ -21,7 +21,7 @@ import Runner as R
   ( Address,
     Config,
     ItemClass,
-    One,
+    Root',
     RunParams (..),
     SuiteItem (..),
     Test (..),
@@ -208,7 +208,7 @@ mockSuite ::
     MockTest ho i as ds effs ->
     a
   ) ->
-  SuiteItem One () effs a
+  SuiteItem Root' () effs a
 mockSuite runTest =
   R.Root
     [ R.Group

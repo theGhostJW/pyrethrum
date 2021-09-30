@@ -13,13 +13,14 @@ import RunElementClasses (Address (..))
 --  node cardinality
 data One
 data Many
+data Root'
 
 
 data SuiteItem c hi effs t where
   Root ::
-    { rootElms :: [SuiteItem c' () effs t]
+    { rootElms :: [SuiteItem One () effs t]
     } ->
-    SuiteItem One () effs t
+    SuiteItem Root' () effs t
   Tests ::
     { tests :: Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> [t]
     } ->
@@ -33,7 +34,7 @@ data SuiteItem c hi effs t where
   BeforeEach ::
     { title' :: Text,
       bHook' :: hi -> Sem effs ho,
-      bhElms' :: [SuiteItem c' ho effs t]
+      bhElms' :: [SuiteItem Many ho effs t]
     } ->
     SuiteItem Many hi effs t
   AfterAll ::

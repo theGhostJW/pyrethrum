@@ -113,6 +113,7 @@ import RunnerBase as RB
     TestSuite,
     One,
     Many,
+    Root',
     queryElm
   )
 import qualified TestFilter as F

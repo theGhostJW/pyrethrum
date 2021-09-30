@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3d9ca724b4f23436bbce2d377a73ea7534610c7f87a5bb066b902d7172d64abc
+-- hash: 0c926cf926a48f099d27121a6c06446b5cc177d3663f24ffcc8abf2f1d1fffc3
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -25,9 +25,8 @@ source-repository head
   type: git
   location: https://github.com/githubuser/simple-hpack
 
-executable pyrethrum
-  main-is: driver.hs
-  other-modules:
+library
+  exposed-modules:
       AuxFiles
       Check
       Common
@@ -78,6 +77,7 @@ executable pyrethrum
       EndToEndSanityTest
       LogTransformationIntegrationTest
       RunnerRestartGoHomeIOTest
+  other-modules:
       Paths_pyrethrum
   hs-source-dirs:
       src

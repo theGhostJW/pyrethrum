@@ -196,7 +196,12 @@ hasTitle ttl =
     }
 
 
-mockSuite :: forall effs a. (forall hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem One () () effs [a]
+mockSuite :: forall effs a. (forall hi ho i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) => 
+                                                                                                                Address -> 
+                                                                                                                hi -> 
+                                                                                                                (hi -> Sem effs ho) -> -- beforeEach
+                                                                                                                (ho -> Sem effs ()) -> -- AfterEach
+                                                                                                                MockTest ho i as ds effs -> a) -> SuiteItem One () () effs [a]
 mockSuite runTest =
   R.Root
     [ 
@@ -209,10 +214,10 @@ mockSuite runTest =
               [ \a1 o ->
                   R.Group
                     "Divider"
-                    [ \a1' o' ->
+                    [ \a1' o' be ae ->
                         Tests
-                          [ runTest a1' o' test1Txt,
-                            runTest a1' o' test4Txt
+                          [ runTest a1' o' be ae test1Txt,
+                            runTest a1' o' be ae test4Txt
                           ]
                     ],
                 \a1 o ->

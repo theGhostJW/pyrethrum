@@ -14,6 +14,7 @@ import RunElementClasses (Address (..))
 data One
 data Many
 
+
 data SuiteItem c hi ho effs t where
   Root ::
     { rootElms :: [SuiteItem c' () ho effs t]
@@ -25,31 +26,31 @@ data SuiteItem c hi ho effs t where
     SuiteItem Many hi ho effs t
   BeforeAll ::
     { title :: Text,
-      bHook :: hi -> Sem effs ho1,
-      bhElms :: [Address -> ho1 -> SuiteItem c' ho1 ho2 effs t]
+      bHook :: hi -> Sem effs ho,
+      bhElms :: [Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> SuiteItem c' ho ho2 effs t]
     } ->
     SuiteItem One hi ho effs t
   BeforeEach ::
     { title' :: Text,
-      bHook' :: hi -> Sem effs ho1,
-      bhElms' :: [Address -> ho1 -> SuiteItem Many ho1 ho2 effs t]
+      bHook' :: hi -> Sem effs ho,
+      bhElms' :: [Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> SuiteItem c' ho ho2 effs t]
     } ->
     SuiteItem Many hi ho effs t
   AfterAll ::
     { title :: Text,
-      aHook :: hi -> Sem effs (),
-      ahElms :: [Address -> hi -> SuiteItem c' hi ho effs t]
+      aHook :: ho -> Sem effs (),
+      ahElms :: [Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> SuiteItem c' hi ho effs t]
     } ->
     SuiteItem One hi ho effs t
   AfterEach ::
     { title' :: Text,
-      aHook' :: hi -> Sem effs (),
-      ahElms' :: [Address -> hi -> SuiteItem Many hi ho effs t]
+      aHook' :: ho -> Sem effs (),
+      ahElms' :: [Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> SuiteItem Many hi ho effs t]
     } ->
     SuiteItem Many hi ho effs t
   Group ::
     { title :: Text,
-      gElms :: [Address -> hi -> SuiteItem c' hi ho effs t]
+      gElms :: [Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> SuiteItem c' hi ho effs t]
     } ->
     SuiteItem One hi ho effs t
 

@@ -20,6 +20,7 @@ import RunnerBase (AddressedElm (..), querySuite)
 import TempUtils
 import TestFilter
 import Text.Show.Pretty (pPrintList)
+import Polysemy
 
 view' :: Show a => [a] -> IO ()
 view' = pPrintList
@@ -27,8 +28,8 @@ view' = pPrintList
 -- $> view' demoQueryElem
 demoQueryElem :: [AddressedElm Text]
 demoQueryElem =
-  let getTitle :: adrs -> hi -> MockTest hi i as ds effs -> Text
-      getTitle _ _ mt = M.title $ config mt
+  let getTitle :: adrs -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ())  -> MockTest ho i as ds effs -> Text
+      getTitle _ _ _ _ mt = M.title $ config mt
    in querySuite id (mockSuite getTitle)
 
 applyFilterLog :: TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]

@@ -16,8 +16,8 @@ import Text.Show.Pretty
 -- $ > view allTossCalls
 allTossCalls :: [(Text, TossCall)]
 allTossCalls =
-  let titleAndCall :: a -> b -> MockTest hi i as ds effs -> (Text, TossCall)
-      titleAndCall _ _ (Test (TestConfig ttl call) _ _ _) = (ttl, call)
+  let titleAndCall :: a -> hi -> (hi -> Sem effs ho)  -> (ho -> Sem effs ()) -> MockTest ho i as ds effs -> (Text, TossCall)
+      titleAndCall _ _ _ _ (Test (TestConfig ttl call) _ _ _) = (ttl, call)
 
       root = mockSuite titleAndCall
    in RB.element <$> querySuite fst root

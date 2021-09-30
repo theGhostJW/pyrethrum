@@ -2,30 +2,32 @@
 
 module MockSuite where
 
+-- import Pyrelude.Test hiding (Group, maybe)
+-- import Pyrelude.Test hiding (Group, maybe)
+-- import Pyrelude.Test hiding (Group, maybe)
+-- import Pyrelude.Test hiding (Group, maybe)
+
+import qualified Check
 import qualified Check as C
 import DSL.Interpreter (MinEffs)
 import Data.Aeson.TH
 import Data.Aeson.Types hiding (One)
 import Data.Yaml
+import GHC.Records (HasField)
 import ItemRunners (runItem)
 import Polysemy
 import Pyrelude as P
--- import Pyrelude.Test hiding (Group, maybe)
--- import Pyrelude.Test hiding (Group, maybe)
--- import Pyrelude.Test hiding (Group, maybe)
--- import Pyrelude.Test hiding (Group, maybe)
 import Runner as R
   ( Address,
     Config,
+    ItemClass,
     One,
     RunParams (..),
     SuiteItem (..),
     Test (..),
-    mkSem, ItemClass
+    mkSem,
   )
 import TestFilter
-import GHC.Records (HasField)
-import qualified Check
 
 data TossCall = Heads | Tails deriving (Eq, Ord, Show)
 
@@ -195,23 +197,27 @@ hasTitle ttl =
           \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
 
-
-mockSuite :: forall effs a. (forall hi ho i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) => 
-                                                                                                                Address -> 
-                                                                                                                hi -> 
-                                                                                                                (hi -> Sem effs ho) -> -- beforeEach
-                                                                                                                (ho -> Sem effs ()) -> -- AfterEach
-                                                                                                                MockTest ho i as ds effs -> a) -> SuiteItem One () () effs [a]
+mockSuite ::
+  forall effs a.
+  ( forall hi ho i as ds.
+    (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) =>
+    Address ->
+    hi ->
+    (hi -> Sem effs ho) -> -- beforeEach
+    (ho -> Sem effs ()) -> -- AfterEach
+    MockTest ho i as ds effs ->
+    a
+  ) ->
+  SuiteItem One () () effs [a]
 mockSuite runTest =
   R.Root
-    [ 
-      R.Group
+    [ R.Group
         "Filter TestSuite"
-        [ \a i ->
+        [ \a i be ae ->
             BeforeAll
               "Before All"
               (\i' -> pure "hello")
-              [ \a1 o ->
+              [ \a1 o be ae ->
                   R.Group
                     "Divider"
                     [ \a1' o' be ae ->
@@ -219,52 +225,53 @@ mockSuite runTest =
                           [ runTest a1' o' be ae test1Txt,
                             runTest a1' o' be ae test4Txt
                           ]
-                    ],
-                \a1 o ->
-                  R.Group
-                    "Empty Group"
-                    [\_ _ -> Tests []],
-                \a1 o ->
-                  R.Group
-                    "Divider"
-                    [ \a1' o' ->
-                        BeforeEach
-                          "Before Inner"
-                          (\t -> pure o)
-                          [ \a'' o'' ->
-                              Tests
-                                [ runTest a'' o'' test6Txt
-                                ]
-                          ]
-                    ]
-              ]
-        ],
-      R.Group
-        { title = "Nested Int Group",
-          gElms =
-            [ \a1 s ->
-                BeforeEach
-                  { title' = "Int Group",
-                    bHook' = \i' -> pure 23,
-                    bhElms' =
-                      [ \a2 t ->
-                          AfterEach
-                            { title' = "After Exch Int",
-                              aHook' = \_ -> t == 23 ? pure () $ pure (),
-                              ahElms' =
-                                [ \a3 i' ->
-                                    Tests
-                                      [
-                                        runTest a3 i' test5Int,
-                                        runTest a3 i' test2Int,
-                                        runTest a3 i' test3Int
-                                      ]
-                                ]
-                            }
-                      ]
-                  }
-            ]
-        }
+                    ] --,
+                    --   \a1 o be ae ->
+                    --     R.Group
+                    --       "Empty Group"
+                    --       [\_ _ -> Tests []],
+                    --   \a1 o be ae ->
+                    --     R.Group
+                    --       "Divider"
+                    --       [ \a1' o' be' ae' ->
+                    --           BeforeEach
+                    --             "Before Inner"
+                    --             (\t -> pure o)
+                    --             [ \a'' o'' ->
+                    --                 Tests
+                    --                   [ runTest a'' o'' be' ae' test6Txt
+                    --                   ]
+                    --             ]
+                    --       ]
+                    -- ]
+              ] --,
+              -- R.Group
+              --   { title = "Nested Int Group",
+              --     gElms =
+              --       [ \a1 s ->
+              --           BeforeEach
+              --             { title' = "Int Group",
+              --               bHook' = \i' -> pure 23,
+              --               bhElms' =
+              --                 [ \a2 t ->
+              --                     AfterEach
+              --                       { title' = "After Exch Int",
+              --                         aHook' = \_ -> t == 23 ? pure () $ pure (),
+              --                         ahElms' =
+              --                           [ \a3 i' ->
+              --                               Tests
+              --                                 [
+              --                                   runTest a3 i' test5Int,
+              --                                   runTest a3 i' test2Int,
+              --                                   runTest a3 i' test3Int
+              --                                 ]
+              --                           ]
+              --                       }
+              --                 ]
+              --             }
+              --       ]
+              --   }
+        ]
     ]
 
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]

@@ -206,44 +206,44 @@ exeElm ::
   hi ->
   SuiteItem c hi ho effs [a] ->
   Sem effs ()
-exeElm targAddresses runner address hi si =
-  let log' :: LogProtocolBase e -> Sem effs ()
-      log' = logItem
+exeElm targAddresses runner address hi si = uu
+  -- let log' :: LogProtocolBase e -> Sem effs ()
+  --     log' = logItem
 
-      exeHook :: HookType -> Text -> Sem effs o -> Sem effs o
-      exeHook hookType ttl hook = do
-        log' $ StartHook hookType ttl
-        o <- hook
-        log' $ EndHook hookType ttl
-        pure o
+  --     exeHook :: HookType -> Text -> Sem effs o -> Sem effs o
+  --     exeHook hookType ttl hook = do
+  --       log' $ StartHook hookType ttl
+  --       o <- hook
+  --       log' $ EndHook hookType ttl
+  --       pure o
 
-      exeNxt :: forall c' hin hout. Address -> hin -> SuiteItem c' hin hout effs [a] -> Sem effs ()
-      exeNxt = exeElm targAddresses runner 
+  --     exeNxt :: forall c' hin hout. Address -> hin -> SuiteItem c' hin hout effs [a] -> Sem effs ()
+  --     exeNxt = exeElm targAddresses runner 
 
-   in do
-        S.notMember address targAddresses
-          ? pure ()
-          $ case si of
-            Root subElms -> sequence_ $ exeNxt address () <$> subElms
-            Tests {tests} -> sequence_ $ runner address hi <$> tests
-            BeforeAll {title = ttl, bHook, bhElms} -> do
-              o <- exeHook C.BeforeAll ttl (bHook hi)
-              sequence_ $ (\f -> exeNxt address o $ f address o) <$> bhElms
-            BeforeEach {title' = ttl, bHook', bhElms'} ->
-              let runElm f = do
-                    o <- exeHook C.BeforeEach ttl (bHook' hi)
-                    exeNxt address o $ f address o
-               in sequence_ $ runElm <$> bhElms'
-            AfterEach {RB.title' = ttl, aHook', ahElms'} ->
-              sequence_ $ (\f -> exeNxt address hi (f address hi) >> exeHook C.AfterEach ttl (aHook' hi)) <$> ahElms'
-            AfterAll {title = ttl, aHook, ahElms} -> do
-              sequence_ $ (\f -> exeNxt address hi (f address hi)) <$> ahElms
-              exeHook C.AfterAll ttl $ aHook hi
-            Group {title = ttl, gElms} ->
-              do
-                logItem . StartGroup . GroupTitle $ ttl
-                sequence_ $ (\f -> exeNxt address hi $ f address hi) <$> gElms
-                logItem . EndGroup . GroupTitle $ ttl
+  --  in do
+  --       S.notMember address targAddresses
+  --         ? pure ()
+  --         $ case si of
+  --           Root subElms -> sequence_ $ exeNxt address () <$> subElms
+  --           Tests {tests} -> sequence_ $ runner address hi <$> tests
+  --           BeforeAll {title = ttl, bHook, bhElms} -> do
+  --             o <- exeHook C.BeforeAll ttl (bHook hi)
+  --             sequence_ $ (\f -> exeNxt address o $ f address o) <$> bhElms
+  --           BeforeEach {title' = ttl, bHook', bhElms'} ->
+  --             let runElm f = do
+  --                   o <- exeHook C.BeforeEach ttl (bHook' hi)
+  --                   exeNxt address o $ f address o
+  --              in sequence_ $ runElm <$> bhElms'
+  --           AfterEach {RB.title' = ttl, aHook', ahElms'} ->
+  --             sequence_ $ (\f -> exeNxt address hi (f address hi) >> exeHook C.AfterEach ttl (aHook' hi)) <$> ahElms'
+  --           AfterAll {title = ttl, aHook, ahElms} -> do
+  --             sequence_ $ (\f -> exeNxt address hi (f address hi)) <$> ahElms
+  --             exeHook C.AfterAll ttl $ aHook hi
+  --           Group {title = ttl, gElms} ->
+  --             do
+  --               logItem . StartGroup . GroupTitle $ ttl
+  --               sequence_ $ (\f -> exeNxt address hi $ f address hi) <$> gElms
+  --               logItem . EndGroup . GroupTitle $ ttl
 
 -- exeElm' ::
 --   forall c hi ho e effs a.

@@ -55,7 +55,7 @@ type ItemRunner e as ds i hi tc rc effs =
   rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
 type TestSuite e tc rc effs a =
-  (forall hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (Check.Checks ds), HasField "id" i Int, HasField "title" i Text) => Address -> hi -> Test e tc rc hi i as ds effs -> a) -> SuiteItem One () () effs [a]
+  (forall ho hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (Check.Checks ds), HasField "id" i Int, HasField "title" i Text) => Address -> hi -> (hi -> Sem effs ho) ->  (ho -> Sem effs ()) -> Test e tc rc ho i as ds effs -> a) -> SuiteItem One () () effs [a]
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
@@ -64,29 +64,30 @@ data GenericResult tc rslt = TestResult
   deriving (Show)
 
 queryElm :: forall hi ho effs c a. (a -> Text) -> Address -> SuiteItem c hi ho effs [a] -> [AddressedElm a]
-queryElm getItemTitle address =
-  let badCall :: forall c1 o o1. (Address -> o -> SuiteItem c1 o o1 effs [a]) -> SuiteItem c1 o o1 effs [a]
-      badCall f = f address . error $ "Framework Defect - this param should never be accessed when querying for element data: " <> show address
+queryElm getItemTitle address = uu
+  -- let badCall :: forall c1 o o1. (Address -> o -> SuiteItem c1 o o1 effs [a]) -> SuiteItem c1 o o1 effs [a]
+  --     badCall f = f address . error $ "Framework Defect - this param should never be accessed when querying for element data: " <> show address
 
-      nextAddress :: Text -> RC.AddressElemType -> Address
-      nextAddress ttl et = push ttl et address
+  --     nextAddress :: Text -> RC.AddressElemType -> Address
+  --     nextAddress ttl et = push ttl et address
 
-      elmQuery :: forall hi' ho' c1. AddressElemType -> Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
-      elmQuery et ttl elms = elms >>= queryElm getItemTitle (nextAddress ttl et) . badCall
+  --     elmQuery :: forall hi' ho' c1. AddressElemType -> Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
+  --     elmQuery et ttl elms = elms >>= queryElm getItemTitle (nextAddress ttl et) . badCall
 
-      hkQuery :: forall hi' ho' c1. Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
-      hkQuery = elmQuery RC.Hook
-   in \case
-        Root {rootElms} -> rootElms >>= queryElm getItemTitle address
-        Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
-        Group {title = t, gElms = e} -> elmQuery RC.Group t e
-        BeforeAll {title = t, bhElms = e} -> hkQuery t e
-        BeforeEach {title' = t, bhElms' = e} -> hkQuery t e
-        AfterAll {title = t, ahElms = e} -> hkQuery t e
-        AfterEach {title' = t, ahElms' = e} -> hkQuery t e
+  --     hkQuery :: forall hi' ho' c1. Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
+  --     hkQuery = elmQuery RC.Hook
+  --  in \case
+  --       Root {rootElms} -> rootElms >>= queryElm getItemTitle address
+  --       Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
+  --       Group {title = t, gElms = e} -> elmQuery RC.Group t e
+  --       BeforeAll {title = t, bhElms = e} -> hkQuery t e
+  --       BeforeEach {title' = t, bhElms' = e} -> hkQuery t e
+  --       AfterAll {title = t, ahElms = e} -> hkQuery t e
+  --       AfterEach {title' = t, ahElms' = e} -> hkQuery t e
 
 querySuite :: forall hi ho effs a. (a -> Text) -> SuiteItem One hi ho effs [a] -> [AddressedElm a]
-querySuite getItemTitle = queryElm getItemTitle rootAddress
+querySuite getItemTitle = uu --queryElm getItemTitle rootAddress
+-- querySuite getItemTitle = queryElm getItemTitle rootAddress
 
 {-
 TODO

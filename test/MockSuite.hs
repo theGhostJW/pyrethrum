@@ -217,61 +217,62 @@ mockSuite runTest =
             BeforeAll
               "Before All"
               (\i' -> pure "hello")
-              [ \a1 o be ae ->
+              [ \a1 o be1 ae1 ->
                   R.Group
                     "Divider"
-                    [ \a1' o' be ae ->
+                    [ \a1' o' be2 ae2 ->
                         Tests
-                          [ runTest a1' o' be ae test1Txt,
-                            runTest a1' o' be ae test4Txt
+                          [ runTest a1' o' be2 ae2 test1Txt,
+                            runTest a1' o' be2 ae2 test4Txt
                           ]
-                    ] --,
-                    --   \a1 o be ae ->
-                    --     R.Group
-                    --       "Empty Group"
-                    --       [\_ _ -> Tests []],
-                    --   \a1 o be ae ->
-                    --     R.Group
-                    --       "Divider"
-                    --       [ \a1' o' be' ae' ->
-                    --           BeforeEach
-                    --             "Before Inner"
-                    --             (\t -> pure o)
-                    --             [ \a'' o'' ->
-                    --                 Tests
-                    --                   [ runTest a'' o'' be' ae' test6Txt
-                    --                   ]
-                    --             ]
-                    --       ]
-                    -- ]
-              ] --,
-              -- R.Group
-              --   { title = "Nested Int Group",
-              --     gElms =
-              --       [ \a1 s ->
-              --           BeforeEach
-              --             { title' = "Int Group",
-              --               bHook' = \i' -> pure 23,
-              --               bhElms' =
-              --                 [ \a2 t ->
-              --                     AfterEach
-              --                       { title' = "After Exch Int",
-              --                         aHook' = \_ -> t == 23 ? pure () $ pure (),
-              --                         ahElms' =
-              --                           [ \a3 i' ->
-              --                               Tests
-              --                                 [
-              --                                   runTest a3 i' test5Int,
-              --                                   runTest a3 i' test2Int,
-              --                                   runTest a3 i' test3Int
-              --                                 ]
-              --                           ]
-              --                       }
-              --                 ]
-              --             }
-              --       ]
-              --   }
-        ]
+                    ],
+                ----
+                \a1 o be1 ae1 ->
+                  R.Group
+                    "Empty Group"
+                    [\_ _ _ _ -> Tests []] --,
+                    -- \a1 o be ae ->
+                    --   R.Group
+                    --     "Divider"
+                    --     [ \a1' o' be' ae' ->
+                    --         BeforeEach
+                    --           "Before Inner"
+                    --           (\t -> pure o)
+                    --           [ \a'' o'' be' ae' ->
+                    --               Tests
+                    --                 [ runTest a'' o'' be' ae' test6Txt
+                    --                 ]
+                    --           ]
+                    --     ]
+              ]
+        ] --,
+        -- R.Group
+        --   { title = "Nested Int Group",
+        --     gElms =
+        --       [ \a1 s ->
+        --           BeforeEach
+        --             { title' = "Int Group",
+        --               bHook' = \i' -> pure 23,
+        --               bhElms' =
+        --                 [ \a2 t ->
+        --                     AfterEach
+        --                       { title' = "After Exch Int",
+        --                         aHook' = \_ -> t == 23 ? pure () $ pure (),
+        --                         ahElms' =
+        --                           [ \a3 i' ->
+        --                               Tests
+        --                                 [
+        --                                   runTest a3 i' test5Int,
+        --                                   runTest a3 i' test2Int,
+        --                                   runTest a3 i' test3Int
+        --                                 ]
+        --                           ]
+        --                       }
+        --                 ]
+        --             }
+        --       ]
+        --   }
+        -- ]
     ]
 
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]

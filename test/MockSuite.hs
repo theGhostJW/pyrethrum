@@ -245,8 +245,8 @@ mockSuite runTest =
         { title = "Nested Int Group",
           gElms =
             [ BeforeEach
-                { title' = "Int Group",
-                  bHook' = \i -> pure @_ @Int 23,
+                { title' = "Int BE",
+                  bHook' = (\i -> pure 23) :: () -> Sem effs Int,
                   bhElms' =
                     [ AfterEach
                         { title' = "After Exch Int",

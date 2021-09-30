@@ -21,36 +21,36 @@ data SuiteItem c hi ho effs t where
     } ->
     SuiteItem One () () effs t
   Tests ::
-    { tests :: t
+    { tests :: Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> [t]
     } ->
     SuiteItem Many hi ho effs t
   BeforeAll ::
     { title :: Text,
       bHook :: hi -> Sem effs ho,
-      bhElms :: [Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> SuiteItem c' ho ho2 effs t]
+      bhElms :: [SuiteItem c' ho ho2 effs t]
     } ->
     SuiteItem One hi ho effs t
   BeforeEach ::
     { title' :: Text,
       bHook' :: hi -> Sem effs ho,
-      bhElms' :: [Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> SuiteItem c' ho ho2 effs t]
+      bhElms' :: [SuiteItem c' ho ho2 effs t]
     } ->
     SuiteItem Many hi ho effs t
   AfterAll ::
     { title :: Text,
       aHook :: ho -> Sem effs (),
-      ahElms :: [Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> SuiteItem c' hi ho effs t]
+      ahElms :: [SuiteItem c' hi ho effs t]
     } ->
     SuiteItem One hi ho effs t
   AfterEach ::
     { title' :: Text,
       aHook' :: ho -> Sem effs (),
-      ahElms' :: [Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> SuiteItem Many hi ho effs t]
+      ahElms' :: [SuiteItem Many hi ho effs t]
     } ->
     SuiteItem Many hi ho effs t
   Group ::
     { title :: Text,
-      gElms :: [Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> SuiteItem c' hi ho effs t]
+      gElms :: [SuiteItem c' hi ho effs t]
     } ->
     SuiteItem One hi ho effs t
 

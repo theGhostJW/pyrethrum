@@ -13,9 +13,11 @@ module RunnerBase
   )
 where
 
+import qualified Check
 import Common (FilterErrorType, FrameworkError)
 import Data.Aeson hiding (One)
 import Data.Aeson.TH
+import GHC.Records (HasField)
 import Internal.RunnerBaseLazy as RBL
 import Polysemy
 import Polysemy.Error
@@ -25,6 +27,7 @@ import Pyrelude
     Category ((.)),
     Either,
     Eq (..),
+    Int,
     Listy (null),
     Maybe (..),
     Monad ((>>=)),
@@ -45,18 +48,16 @@ import Pyrelude
     (<$>),
     (<>),
     (?),
-    (||), Int
+    (||),
   )
 import RunElementClasses (Address, AddressElemType, AddressedElm (..), push, rootAddress)
 import qualified RunElementClasses as RC
-import GHC.Records (HasField)
-import qualified Check
 
 type ItemRunner e as ds i hi tc rc effs =
   rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
 type TestSuite e tc rc effs a =
-  (forall ho hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (Check.Checks ds), HasField "id" i Int, HasField "title" i Text) => Address -> hi -> (hi -> Sem effs ho) ->  (ho -> Sem effs ()) -> Test e tc rc ho i as ds effs -> a) -> SuiteItem Root' () effs a
+  (forall ho hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (Check.Checks ds), HasField "id" i Int, HasField "title" i Text) => Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> Test e tc rc ho i as ds effs -> a) -> SuiteItem Root' () effs a
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
@@ -85,10 +86,29 @@ queryElm getItemTitle address = uu
   --       BeforeEach {title' = t, bhElms' = e} -> hkQuery t e
   --       AfterAll {title = t, ahElms = e} -> hkQuery t e
   --       AfterEach {title' = t, ahElms' = e} -> hkQuery t e
+  \case
+    Root {rootElms} -> uu --rootElms >>= queryElm getItemTitle address
+    --  Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> [t]
+    Tests {tests} -> uu -- (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
+    Group {title = t, gElms = e} -> uu --elmQuery RC.Group t e
+    BeforeAll {title = t, bhElms = e} -> uu --hkQuery t e
+    BeforeEach {title' = t, bhElms' = e} -> uu --hkQuery t e
+    AfterAll {title = t, ahElms = e} -> uu --hkQuery t e
+    AfterEach {title' = t, ahElms' = e} -> uu --hkQuery t e
 
 querySuite :: forall hi effs a. (a -> Text) -> SuiteItem Root' hi effs a -> [AddressedElm a]
 querySuite getItemTitle = uu --queryElm getItemTitle rootAddress
 -- querySuite getItemTitle = queryElm getItemTitle rootAddress
+
+queryTest ::
+  (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
+  Address ->
+  hi ->
+  (hi -> Sem effs ho) -> -- beforeEach
+  (ho -> Sem effs ()) -> -- AfterEach
+  Test e tc rc hi i as ds effs ->
+  a
+queryTest = uu
 
 {-
 TODO

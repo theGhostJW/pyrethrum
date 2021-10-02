@@ -90,6 +90,7 @@ data AddressedElm a = AddressedElm
     element :: a
   }
   deriving Show
+  
 data AddresStringElm a = AddresStringElm
   { address :: Text,
     el :: a

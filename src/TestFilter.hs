@@ -54,7 +54,7 @@ filterLog ::
   [TestFilter rc tc] ->
   rc ->
   [TestFilterResult]
-filterLog suite fltrs rc =
+filterLog suite fltrs rc = uu
   let testFilter :: Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> Test e tc rc ho i as ds effs -> TestFilterResult
       testFilter adr _ _ _ = filterTest fltrs rc adr
 

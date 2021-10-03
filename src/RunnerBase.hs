@@ -13,11 +13,11 @@ module RunnerBase
   )
 where
 
-import qualified Check
+import qualified Check as C
 import Common (FilterErrorType, FrameworkError)
 import Data.Aeson hiding (One)
 import Data.Aeson.TH
-import GHC.Records (HasField)
+import GHC.Records (HasField, getField)
 import Internal.RunnerBaseLazy as RBL
 import Polysemy
 import Polysemy.Error
@@ -41,6 +41,7 @@ import Pyrelude
     isNothing,
     not,
     otherwise,
+    toList,
     toS,
     uu,
     ($),
@@ -50,14 +51,14 @@ import Pyrelude
     (?),
     (||),
   )
-import RunElementClasses (Address, AddressElemType, AddressedElm (..), push, rootAddress)
+import RunElementClasses (Address, AddressElemType, AddressedElm (..), push, rootAddress, Config)
 import qualified RunElementClasses as RC
 
 type ItemRunner e as ds i hi tc rc effs =
   rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
 type TestSuite e tc rc effs a =
-  (forall ho hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (Check.Checks ds), HasField "id" i Int, HasField "title" i Text) => Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> Test e tc rc ho i as ds effs -> a) -> SuiteItem Root' () effs a
+  (forall ho hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (C.Checks ds), HasField "id" i Int, HasField "title" i Text) => Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> Test e tc rc ho i as ds effs -> a) -> SuiteItem Root' () effs a
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
@@ -100,15 +101,20 @@ querySuite :: forall hi effs a. (a -> Text) -> SuiteItem Root' hi effs a -> [Add
 querySuite getItemTitle = uu --queryElm getItemTitle rootAddress
 -- querySuite getItemTitle = queryElm getItemTitle rootAddress
 
-queryTest ::
-  (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
-  Address ->
-  hi ->
-  (hi -> Sem effs ho) -> -- beforeEach
-  (ho -> Sem effs ()) -> -- AfterEach
-  Test e tc rc hi i as ds effs ->
-  a
-queryTest = uu
+-- queryTest ::
+--   (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
+--   Address ->
+--   hi ->
+--   (hi -> Sem effs ho) -> -- beforeEach
+--   (ho -> Sem effs ()) -> -- AfterEach
+--   Test e tc rc hi i as ds effs ->
+--   a
+-- queryTest = uu
+
+
+-- querySuite :: (RC.Config rc, RC.Config tc) => (forall ho hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (C.Checks ds), HasField "id" i Int, HasField "title" i Text) => rc -> tc -> i -> a) -> TestSuite e tc rc effs a
+-- querySuite = uu
+-- forall ho hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (Check.Checks ds), HasField "id" i Int, HasField "title" i Text) => Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> Test e tc rc ho i as ds effs -> a
 
 {-
 TODO
@@ -187,6 +193,46 @@ TODO
 
 -- data up to here want items to have title and validations
 -- and config
+
+data CheckInfo = CheckInfo {
+  header :: Text,
+  expectation :: C.ResultExpectation
+}
+
+data ItemInfo = ItemInfo {
+  id :: Int,
+  title :: Text,
+  checks :: [CheckInfo]
+}
+
+data TestInfo tc = TestInfo {
+  title :: Text,
+  config :: tc,
+  itemInfo :: [ItemInfo]
+}
+
+info :: forall e tc rc hi i as ds effs. (RC.ItemClass i ds, RC.Config tc) => rc -> Test e tc rc hi i as ds effs -> TestInfo tc 
+info rc t = 
+  let 
+    ckInfo :: C.Check ds -> CheckInfo
+    ckInfo c = CheckInfo (C.header c) (C.expectation c)
+
+    iinfo :: i -> ItemInfo
+    iinfo i = ItemInfo {   
+      id = getField @"id" i,
+      title = getField @"title" i,
+      checks = ckInfo <$> (toList . C.un $ getField @"checks" i )
+      }
+
+    cfg :: tc
+    cfg = (config :: Test e tc rc hi i as ds effs -> tc) t
+
+  in
+    TestInfo {
+      title = getField @"title" cfg,
+      config = cfg,
+      itemInfo = iinfo <$> (items t) rc
+    }
 
 data Test e tc rc hi i as ds effs = Test
   { config :: tc,

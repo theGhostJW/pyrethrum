@@ -9,6 +9,7 @@ module RunnerBase
     Test (..),
     GenericResult (..),
     queryElm,
+    querySuite',
     querySuite,
   )
 where
@@ -97,8 +98,32 @@ queryElm getItemTitle address = uu
     AfterAll {title = t, ahElms = e} -> uu --hkQuery t e
     AfterEach {title' = t, ahElms' = e} -> uu --hkQuery t e
 
+
+querySuite' :: forall e tc rc effs a. (a -> Text) ->  
+  ( forall hi ho i as ds.
+    (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
+    Address ->
+    hi ->
+    (hi -> Sem effs ho) -> -- beforeEach
+    (ho -> Sem effs ()) -> -- AfterEach
+    Test e tc rc ho i as ds effs ->
+    a
+  ) 
+  -> TestSuite e tc rc effs a 
+  -> [AddressedElm a]
+querySuite' testTitle extractor suite = 
+  let 
+    root :: SuiteItem Root' () effs a
+    root = suite extractor
+  in 
+    uu
+
+
 querySuite :: forall hi effs a. (a -> Text) -> SuiteItem Root' hi effs a -> [AddressedElm a]
 querySuite getItemTitle = uu --queryElm getItemTitle rootAddress
+
+  
+  -- uu --queryElm getItemTitle rootAddress
 -- querySuite getItemTitle = queryElm getItemTitle rootAddress
 
 -- queryTest ::

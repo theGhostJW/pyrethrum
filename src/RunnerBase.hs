@@ -103,9 +103,6 @@ querySuite' :: forall e tc rc effs a. (a -> Text) ->
   ( forall hi ho i as ds.
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
     Address ->
-    hi ->
-    (hi -> Sem effs ho) -> -- beforeEach
-    (ho -> Sem effs ()) -> -- AfterEach
     Test e tc rc ho i as ds effs ->
     a
   ) 
@@ -113,8 +110,23 @@ querySuite' :: forall e tc rc effs a. (a -> Text) ->
   -> [AddressedElm a]
 querySuite' testTitle extractor suite = 
   let 
+    -- nullHi = Error "hi in query should not be referenced" 
+    -- nullBe = Error "be in query should not be referenced" 
+    -- nullAe = Error "ae in query should not be referenced"
+    -- rootAd = rootAddress 
+
+    fullQuery :: (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
+      Address ->
+      hi ->
+      (hi -> Sem effs ho) -> -- beforeEach
+      (ho -> Sem effs ()) -> -- AfterEach
+      Test e tc rc ho i as ds effs ->
+      a
+    fullQuery a _hi _be _ae t = extractor a t
+
+
     root :: SuiteItem Root' () effs a
-    root = suite extractor
+    root = suite fullQuery
   in 
     uu
 

@@ -67,27 +67,15 @@ data GenericResult tc rslt = TestResult
   }
   deriving (Show)
 
-queryElm :: forall hi effs c a. (a -> Text) -> Address -> SuiteItem c hi effs [a] -> [AddressedElm a]
-queryElm getItemTitle address = uu
-  -- let badCall :: forall c1 o o1. (Address -> o -> SuiteItem c1 o o1 effs [a]) -> SuiteItem c1 o o1 effs [a]
-  --     badCall f = f address . error $ "Framework Defect - this param should never be accessed when querying for element data: " <> show address
+queryElm :: Address -> SuiteItem c hi effs a -> [AddressedElm a]
+queryElm adr = 
+  let 
+    -- nullHi = Error "hi in query should not be referenced" 
+    -- nullBe = Error "be in query should not be referenced" 
+    -- nullAe = Error "ae in query should not be referenced"
+    -- rootAd = rootAddress 
 
-  --     nextAddress :: Text -> RC.AddressElemType -> Address
-  --     nextAddress ttl et = push ttl et address
-
-  --     elmQuery :: forall hi' ho' c1. AddressElemType -> Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
-  --     elmQuery et ttl elms = elms >>= queryElm getItemTitle (nextAddress ttl et) . badCall
-
-  --     hkQuery :: forall hi' ho' c1. Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
-  --     hkQuery = elmQuery RC.Hook
-  --  in \case
-  --       Root {rootElms} -> rootElms >>= queryElm getItemTitle address
-  --       Tests {tests} -> (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
-  --       Group {title = t, gElms = e} -> elmQuery RC.Group t e
-  --       BeforeAll {title = t, bhElms = e} -> hkQuery t e
-  --       BeforeEach {title' = t, bhElms' = e} -> hkQuery t e
-  --       AfterAll {title = t, ahElms = e} -> hkQuery t e
-  --       AfterEach {title' = t, ahElms' = e} -> hkQuery t e
+  in
   \case
     Root {rootElms} -> uu --rootElms >>= queryElm getItemTitle address
     --  Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> [t]
@@ -99,22 +87,20 @@ queryElm getItemTitle address = uu
     AfterEach {title' = t, ahElms' = e} -> uu --hkQuery t e
 
 
-querySuite' :: forall e tc rc effs a. (a -> Text) ->  
-  ( forall hi ho i as ds.
+querySuite' :: forall e tc rc effs a. 
+  rc ->
+  (a -> Text) ->  -- get title
+  ( forall ho i as ds. -- data extractor
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
+    rc ->
     Address ->
     Test e tc rc ho i as ds effs ->
     a
   ) 
-  -> TestSuite e tc rc effs a 
+  -> TestSuite e tc rc effs a -- suiite
   -> [AddressedElm a]
-querySuite' testTitle extractor suite = 
+querySuite' rc testTitle extractor suite = 
   let 
-    -- nullHi = Error "hi in query should not be referenced" 
-    -- nullBe = Error "be in query should not be referenced" 
-    -- nullAe = Error "ae in query should not be referenced"
-    -- rootAd = rootAddress 
-
     fullQuery :: (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
       Address ->
       hi ->
@@ -122,13 +108,13 @@ querySuite' testTitle extractor suite =
       (ho -> Sem effs ()) -> -- AfterEach
       Test e tc rc ho i as ds effs ->
       a
-    fullQuery a _hi _be _ae t = extractor a t
+    fullQuery a _hi _be _ae t = extractor rc a t
 
 
     root :: SuiteItem Root' () effs a
     root = suite fullQuery
   in 
-    uu
+    queryElm rootAddress root
 
 
 querySuite :: forall hi effs a. (a -> Text) -> SuiteItem Root' hi effs a -> [AddressedElm a]

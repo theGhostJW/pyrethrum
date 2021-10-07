@@ -67,17 +67,28 @@ data GenericResult tc rslt = TestResult
   }
   deriving (Show)
 
-queryElm :: Address -> SuiteItem c hi effs a -> [AddressedElm a]
-queryElm adr = 
+queryElm :: (a -> Text) -> Address -> SuiteItem c hi effs a -> [AddressedElm a]
+queryElm getTitle address = 
   let 
-    -- nullHi = Error "hi in query should not be referenced" 
-    -- nullBe = Error "be in query should not be referenced" 
-    -- nullAe = Error "ae in query should not be referenced"
-    -- rootAd = rootAddress 
+    hiNull= Error "hi in query should not be referenced" 
+    beNull = Error "be in query should not be referenced" 
+    aeNull = Error "ae in query should not be referenced"
+    {- 
+      --     nextAddress :: Text -> RC.AddressElemType -> Address
+  --     nextAddress ttl et = push ttl et address
+
+  --     elmQuery :: forall hi' ho' c1. AddressElemType -> Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
+  --     elmQuery et ttl elms = elms >>= queryElm getItemTitle (nextAddress ttl et) . badCall
+
+  --     hkQuery :: forall hi' ho' c1. Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
+  --     hkQuery = elmQuery RC.Hook
+  --  in \case
+  --       Root {rootElms} -> rootElms >>= queryElm getItemTitle address
+  -}
 
   in
   \case
-    Root {rootElms} -> uu --rootElms >>= queryElm getItemTitle address
+    Root {rootElms} -> rootElms >>= queryElm getTitle address
     --  Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> [t]
     Tests {tests} -> uu -- (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
     Group {title = t, gElms = e} -> uu --elmQuery RC.Group t e
@@ -99,7 +110,7 @@ querySuite' :: forall e tc rc effs a.
   ) 
   -> TestSuite e tc rc effs a -- suiite
   -> [AddressedElm a]
-querySuite' rc testTitle extractor suite = 
+querySuite' rc getTitle extractor suite = 
   let 
     fullQuery :: (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
       Address ->
@@ -114,7 +125,7 @@ querySuite' rc testTitle extractor suite =
     root :: SuiteItem Root' () effs a
     root = suite fullQuery
   in 
-    queryElm rootAddress root
+    queryElm getTitle rootAddress root
 
 
 querySuite :: forall hi effs a. (a -> Text) -> SuiteItem Root' hi effs a -> [AddressedElm a]

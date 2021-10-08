@@ -67,8 +67,8 @@ data GenericResult tc rslt = TestResult
   }
   deriving (Show)
 
-queryElm :: (a -> Text) -> Address -> SuiteItem c hi effs a -> [AddressedElm a]
-queryElm getTitle address = 
+queryElm :: forall c hi effs a. (a -> Text) -> Address -> SuiteItem c hi effs a -> [AddressedElm a]
+queryElm title' address = 
   let 
     hiNull= Error "hi in query should not be referenced" 
     beNull = Error "be in query should not be referenced" 
@@ -85,10 +85,12 @@ queryElm getTitle address =
   --  in \case
   --       Root {rootElms} -> rootElms >>= queryElm getItemTitle address
   -}
-
+  
+    nxtAddress :: a -> AddressElemType -> Address
+    nxtAddress a et = push (title' a) et address
   in
   \case
-    Root {rootElms} -> rootElms >>= queryElm getTitle address
+    Root {rootElms} -> rootElms >>= queryElm title' address
     --  Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> [t]
     Tests {tests} -> uu -- (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
     Group {title = t, gElms = e} -> uu --elmQuery RC.Group t e

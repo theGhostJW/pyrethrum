@@ -84,18 +84,20 @@ queryElm title' address =
     tstAddress :: a -> Address
     tstAddress a = push (title' a) RC.Test address
 
-    -- elmQuery :: a -> AddressElemType -> SuiteItem c hi effs a -> [AddressedElm a]
-    -- elmQuery = queryElm title' address
+    grpAddress' :: AddressElemType -> Text -> Address
+    grpAddress' et ttl = push ttl et address
+
+    hkQuery t e = e >>= queryElm title' (grpAddress' RC.Hook t) 
   in
   \case
     Root {rootElms} -> rootElms >>= queryElm title' address
     Tests {tests} -> (\a -> AddressedElm (tstAddress a) a) <$> tests address hiUndefined beUndefined aeUndefined 
-    -- SuiteItem c' hi effs a -> [AddressedElm  a]
-    Group {title = t, gElms = e} -> uu -- e >>= _
-    BeforeAll {title = t, bhElms = e} -> uu --hkQuery t e
-    BeforeEach {title' = t, bhElms' = e} -> uu --hkQuery t e
-    AfterAll {title = t, ahElms = e} -> uu --hkQuery t e
-    AfterEach {title' = t, ahElms' = e} -> uu --hkQuery t e
+    Group {title = t, gElms = e} -> e >>= queryElm title' (grpAddress' RC.Group t) 
+    -- BeforeAll {title = t, bhElms = e} -> e >>= queryElm title' (grpAddress' RC.Hook t) 
+    BeforeAll {title = t, bhElms = e} -> hkQuery t e
+    BeforeEach {title' = t, bhElms' = e} -> e >>= queryElm title' (grpAddress' RC.Hook t) 
+    AfterAll {title = t, ahElms = e} -> e >>= queryElm title' (grpAddress' RC.Hook t) 
+    AfterEach {title' = t, ahElms' = e} -> e >>= queryElm title' (grpAddress' RC.Hook t) 
 
 
 querySuite' :: forall e tc rc effs a. 
@@ -168,7 +170,7 @@ info rc t =
     TestInfo {
       title = getField @"title" cfg,
       config = cfg,
-      itemInfo = iinfo <$> (items t) rc
+      itemInfo = iinfo <$> items t rc
     }
 
 data Test e tc rc hi i as ds effs = Test

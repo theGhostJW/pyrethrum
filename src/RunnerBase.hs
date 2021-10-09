@@ -72,14 +72,14 @@ data GenericResult tc rslt = TestResult
 queryElm :: forall c hi effs a. (a -> Text) -> Address -> SuiteItem c hi effs a -> [AddressedElm a]
 queryElm title' address = 
   let 
-    hiNull :: hi
-    hiNull = undefined
+    hiUndefined :: hi
+    hiUndefined = undefined
 
-    beNull :: hi -> Sem effs ho
-    beNull hi = undefined
+    beUndefined :: hi -> Sem effs ho
+    beUndefined hi = undefined
 
-    aeNull :: ho -> Sem effs ()
-    aeNull ho = undefined
+    aeUndefined :: ho -> Sem effs ()
+    aeUndefined ho = undefined
     {- 
       --     nextAddress :: Text -> RC.AddressElemType -> Address
   --     nextAddress ttl et = push ttl et address
@@ -90,6 +90,7 @@ queryElm title' address =
   --     hkQuery :: forall hi' ho' c1. Text -> [Address -> hi' -> SuiteItem c1 hi' ho' effs [a]] -> [AddressedElm a]
   --     hkQuery = elmQuery RC.Hook
   --  in \case
+
   --       Root {rootElms} -> rootElms >>= queryElm getItemTitle address
   -}
   
@@ -98,7 +99,7 @@ queryElm title' address =
   in
   \case
     Root {rootElms} -> rootElms >>= queryElm title' address
-    Tests {tests} -> (\a -> AddressedElm (nxtAddress a RC.Test) a) <$> tests address hiNull beNull aeNull 
+    Tests {tests} -> (\a -> AddressedElm (nxtAddress a RC.Test) a) <$> tests address hiUndefined beUndefined aeUndefined 
     Group {title = t, gElms = e} -> uu --elmQuery RC.Group t e
     BeforeAll {title = t, bhElms = e} -> uu --hkQuery t e
     BeforeEach {title' = t, bhElms' = e} -> uu --hkQuery t e

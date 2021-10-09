@@ -23,7 +23,8 @@ import Internal.RunnerBaseLazy as RBL
 import Polysemy
 import Polysemy.Error
 import Pyrelude
-  ( Applicative ((<*>)),
+  ( pure,
+    Applicative ((<*>)),
     Bool (..),
     Category ((.)),
     Either,
@@ -45,6 +46,7 @@ import Pyrelude
     toList,
     toS,
     uu,
+    undefined,
     ($),
     (&&),
     (<$>),
@@ -70,9 +72,14 @@ data GenericResult tc rslt = TestResult
 queryElm :: forall c hi effs a. (a -> Text) -> Address -> SuiteItem c hi effs a -> [AddressedElm a]
 queryElm title' address = 
   let 
-    hiNull= Error "hi in query should not be referenced" 
-    beNull = Error "be in query should not be referenced" 
-    aeNull = Error "ae in query should not be referenced"
+    hiNull :: hi
+    hiNull = undefined
+
+    beNull :: hi -> Sem effs ho
+    beNull hi = undefined
+
+    aeNull :: ho -> Sem effs ()
+    aeNull ho = undefined
     {- 
       --     nextAddress :: Text -> RC.AddressElemType -> Address
   --     nextAddress ttl et = push ttl et address
@@ -91,8 +98,7 @@ queryElm title' address =
   in
   \case
     Root {rootElms} -> rootElms >>= queryElm title' address
-    --  Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> [t]
-    Tests {tests} -> uu -- (\i -> AddressedElm (push (getItemTitle i) RC.Test address) i) <$> tests
+    Tests {tests} -> (\a -> AddressedElm (nxtAddress a RC.Test) a) <$> tests address hiNull beNull aeNull 
     Group {title = t, gElms = e} -> uu --elmQuery RC.Group t e
     BeforeAll {title = t, bhElms = e} -> uu --hkQuery t e
     BeforeEach {title' = t, bhElms' = e} -> uu --hkQuery t e

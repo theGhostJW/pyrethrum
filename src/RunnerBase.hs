@@ -7,10 +7,12 @@ module RunnerBase
     RBL.Many,
     RBL.Root',
     Test (..),
+    TestInfo(..),
     GenericResult (..),
     queryElm,
     querySuite',
     querySuite,
+    testQueryInfo,
   )
 where
 
@@ -87,24 +89,27 @@ queryElm title' address =
     grpAddress' :: AddressElemType -> Text -> Address
     grpAddress' et ttl = push ttl et address
 
-    hkQuery t e = e >>= queryElm title' (grpAddress' RC.Hook t) 
+    hkQuery' :: forall hii cc. AddressElemType -> Text -> [SuiteItem cc hii effs a] -> [AddressedElm a]
+    hkQuery' et t e = e >>= queryElm title' (grpAddress' et t) 
+
+    hkQuery :: forall hii cc. Text -> [SuiteItem cc hii effs a] -> [AddressedElm a]
+    hkQuery = hkQuery' RC.Hook
   in
   \case
     Root {rootElms} -> rootElms >>= queryElm title' address
     Tests {tests} -> (\a -> AddressedElm (tstAddress a) a) <$> tests address hiUndefined beUndefined aeUndefined 
-    Group {title = t, gElms = e} -> e >>= queryElm title' (grpAddress' RC.Group t) 
-    -- BeforeAll {title = t, bhElms = e} -> e >>= queryElm title' (grpAddress' RC.Hook t) 
+    Group {title = t, gElms = e} -> hkQuery' RC.Group t e
     BeforeAll {title = t, bhElms = e} -> hkQuery t e
-    BeforeEach {title' = t, bhElms' = e} -> e >>= queryElm title' (grpAddress' RC.Hook t) 
-    AfterAll {title = t, ahElms = e} -> e >>= queryElm title' (grpAddress' RC.Hook t) 
-    AfterEach {title' = t, ahElms' = e} -> e >>= queryElm title' (grpAddress' RC.Hook t) 
+    BeforeEach {title' = t, bhElms' = e} -> hkQuery t e
+    AfterAll {title = t, ahElms = e} -> hkQuery t e
+    AfterEach {title' = t, ahElms' = e} -> hkQuery t e
 
 
-querySuite' :: forall e tc rc effs a. 
+querySuite' :: forall e tc rc effs a. RC.Config tc =>
   rc ->
   (a -> Text) ->  -- get title
   ( forall ho i as ds. -- data extractor
-    (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
+    (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.Config tc, RC.ItemClass i ds) =>
     rc ->
     Address ->
     Test e tc rc ho i as ds effs ->
@@ -112,7 +117,7 @@ querySuite' :: forall e tc rc effs a.
   ) 
   -> TestSuite e tc rc effs a -- suiite
   -> [AddressedElm a]
-querySuite' rc getTitle extractor suite = 
+querySuite' rc title' extractor suite = 
   let 
     fullQuery :: (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
       Address ->
@@ -127,11 +132,20 @@ querySuite' rc getTitle extractor suite =
     root :: SuiteItem Root' () effs a
     root = suite fullQuery
   in 
-    queryElm getTitle rootAddress root
+    queryElm title' rootAddress root
 
 
-querySuite :: forall hi effs a. (a -> Text) -> SuiteItem Root' hi effs a -> [AddressedElm a]
-querySuite getItemTitle = uu --queryElm getItemTitle rootAddress
+querySuite :: forall rc e tc effs. Config tc => rc -> TestSuite e tc rc effs (TestInfo tc) -> [AddressedElm (TestInfo tc)]
+querySuite rc suite = 
+  let
+    extractor :: forall ho i as ds. RC.ItemClass i ds => rc -> Address -> Test e tc rc ho i as ds effs -> TestInfo tc 
+    extractor rc' _add t = testQueryInfo rc' t
+
+    title' :: TestInfo tc -> Text
+    title' = getField @"title" 
+  in
+    querySuite' rc title' extractor suite
+
 
 data CheckInfo = CheckInfo {
   header :: Text,
@@ -150,8 +164,8 @@ data TestInfo tc = TestInfo {
   itemInfo :: [ItemInfo]
 } deriving Show
 
-info :: forall e tc rc hi i as ds effs. (RC.ItemClass i ds, RC.Config tc) => rc -> Test e tc rc hi i as ds effs -> TestInfo tc 
-info rc t = 
+testQueryInfo :: forall e tc rc hi i as ds effs. (RC.ItemClass i ds, RC.Config tc) => rc -> Test e tc rc hi i as ds effs -> TestInfo tc 
+testQueryInfo rc t = 
   let 
     ckInfo :: C.Check ds -> CheckInfo
     ckInfo c = CheckInfo (C.header c) (C.expectation c)

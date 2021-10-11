@@ -2,6 +2,7 @@ module TestFilter where
 
 import qualified Data.List as L
 import Internal.RunnerBaseLazy (One)
+import GHC.Records (HasField (getField))
 import OrphanedInstances ()
 import Pyrelude as P
 import RunElementClasses (Address, Config, TestFilterResult (..), TestLogInfo, mkTestLogInfo)
@@ -55,12 +56,30 @@ filterLog ::
   rc ->
   [TestFilterResult]
 filterLog suite fltrs rc = uu
-  let testFilter :: Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> Test e tc rc ho i as ds effs -> TestFilterResult
-      testFilter adr _ _ _ = filterTest fltrs rc adr
+  let testFilter :: rc -> Address -> Test e tc rc ho i as ds effs -> TestFilterResult
+      testFilter rc' adr = filterTest fltrs rc' adr
 
-      si :: SuiteItem Root' () effs TestFilterResult
-      si = suite testFilter
-   in element <$> querySuite ((C.title :: TestLogInfo -> Text) . testInfo) si
+      title' :: TestFilterResult -> Text
+      title' = getField @"title" . testInfo 
+
+      filterResults :: [AddressedElm TestFilterResult]
+      filterResults = querySuite' rc title' testFilter suite
+
+   in element <$> filterResults
+
+{-
+  rc ->
+  (a -> Text) ->  -- get title
+  ( forall ho i as ds. -- data extractor
+    (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.Config tc, RC.ItemClass i ds) =>
+    rc ->
+    Address ->
+    Test e tc rc ho i as ds effs ->
+    a
+  ) 
+  -> TestSuite e tc rc effs a -- suiite
+  -> [AddressedElm a]
+-}
 
 acceptAnyFilter :: [TestFilterResult] -> Bool
 acceptAnyFilter = P.any acceptFilter

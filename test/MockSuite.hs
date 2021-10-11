@@ -33,6 +33,8 @@ data TossCall = Heads | Tails deriving (Eq, Ord, Show)
 
 data TossResult = RcHeads | RcTails | RcAll deriving (Eq, Ord, Show)
 
+rcRunAll = RunConfig "Run Everything" RcAll
+
 data RunConfig = RunConfig
   { title :: Text,
     toss :: TossResult

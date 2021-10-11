@@ -11,26 +11,28 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Records
 import ItemRunners (runItem)
-import MockSuite as M (MockTest, RunConfig (RunConfig), TestConfig (..), TextItem, happyRun, mockSuite, tossFilter)
+import MockSuite as M (MockTest, RunConfig (RunConfig), TestConfig (..), TextItem, happyRun, mockSuite, tossFilter, rcRunAll)
 import Pyrelude as P
 import Pyrelude.Test (Assertion, chk, chk', (...))
 import RunElementClasses as REC (Address (..), AddressElem (..), TestLogInfo (..), toStrElm, AddresStringElm)
 import Runner (TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, title)
-import RunnerBase (AddressedElm (..), querySuite)
+import RunnerBase (AddressedElm (..), querySuite, testQueryInfo, TestInfo)
 import TempUtils
 import TestFilter
-import Text.Show.Pretty (pPrintList)
+import Text.Show.Pretty (pPrintList, pPrint)
 import Polysemy
 
+
+
 view' :: Show a => [a] -> IO ()
-view' = pPrintList
+view' = print . show
+-- view' = pPrint . unsafeHead
+-- view' = pPrintList
 
 -- $> view' demoQueryElem
-demoQueryElem :: [AddressedElm Text]
-demoQueryElem =
-  let getTitle :: adrs -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ())  -> MockTest ho i as ds effs -> Text
-      getTitle _ _ _ _ mt = M.title $ config mt
-   in querySuite id (mockSuite getTitle)
+
+demoQueryElem :: [AddressedElm (RunnerBase.TestInfo TestConfig)]
+demoQueryElem = querySuite rcRunAll mockSuite 
 
 applyFilterLog :: TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]
 applyFilterLog fltr = filterLog mockSuite [fltr]

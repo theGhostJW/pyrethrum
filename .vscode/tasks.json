@@ -7,7 +7,7 @@
       "label": "ghcid inc test",
       "type": "shell",
       "command": "ghcid",
-      "args": ["--command", "'stack ghci --test'", "--allow-eval"],
+      "args": ["--command", "'stack ghci --test'", "--allow-eval", "--clear", "--no-height-limit"],
       "presentation": {
         "reveal": "always",
         "panel": "new"
@@ -18,7 +18,7 @@
       "label": "ghcid",
       "type": "shell",
       "command": "ghcid",
-      "args": ["--command", "'stack ghci'", "--allow-eval"],
+      "args": ["--command", "'stack ghci'", "--allow-eval", "--clear", "--no-height-limit"],
       "presentation": {
         "reveal": "always",
         "panel": "new"

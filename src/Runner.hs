@@ -296,11 +296,8 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
       dupeAddress :: Maybe Text
       dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . address . testInfo <$> filterInfo)
 
-      -- testRunner :: forall hi i as ds. ( Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (Check.Checks ds), HasField "id" i Int, HasField "title" i Text, ToJSON i) => Address -> hi -> Test e tc rc hi i as ds effs -> [Sem effs ()] 
-      -- testRunner = runTest rp
-
-      -- semTree :: SuiteItem One () () effs [[Sem effs ()]]
-      -- semTree = suite $ runTest rp
+      root :: SuiteItem Root' () effs [Sem effs ()]
+      root = suite $ runTest rp
 
       -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
       -- mockSuite = suite $ runTest rp

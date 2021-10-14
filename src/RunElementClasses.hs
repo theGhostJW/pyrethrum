@@ -89,7 +89,7 @@ data AddressedElm a = AddressedElm
   { address :: Address,
     element :: a
   }
-  deriving Show
+  deriving (Show)
   
 data AddresStringElm a = AddresStringElm
   { address :: Text,

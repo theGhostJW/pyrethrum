@@ -27,10 +27,9 @@ view' :: Show a => [a] -> IO ()
 view' = pPrintList
 
 -- $> view' demoQueryElem
-showDemo = for_ (txt <$> [1..100]) putStrLn
 
-demoQueryElem :: [AddressedElm (RunnerBase.TestInfo TestConfig)]
-demoQueryElem = querySuite rcRunAll mockSuite
+demoQueryElem :: [AddresStringElm (TestInfo TestConfig)]
+demoQueryElem = toStrElm <$> querySuite rcRunAll mockSuite
 
 applyFilterLog :: TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]
 applyFilterLog fltr = filterLog mockSuite [fltr]
@@ -39,8 +38,8 @@ listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
   headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress . (address :: TestLogInfo -> Address) . testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
 
--- todo filter out empty items
 
+-- $> expectedDemoGroupNames
 expectedDemoGroupNames :: [Text]
 expectedDemoGroupNames = ["Happy TestSuite", "Happy TestSuite.Sub Group", "Happy TestSuite.Empty Group"]
 

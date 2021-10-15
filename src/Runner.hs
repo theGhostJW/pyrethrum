@@ -121,10 +121,11 @@ import qualified TestFilter as F
     acceptAnyFilter,
     acceptFilter,
     applyFilters,
-    filterLog,
+    filterLog, FilterLog
   )
 import qualified Prelude as PRL
 import qualified Check
+import TestFilter (filterSuite)
 
 getId :: HasField "id" i Int => i -> Int
 getId = getField @"id"
@@ -271,30 +272,14 @@ exeElm targAddresses runner address hi si = uu
 --               Tests {tests} -> sequence_ $ join tests --sequence_ $ runner address hi <$> tests
 --               _ ->  pure ()
 
-activeAddresses :: [TestFilterResult] -> S.Set Address
-activeAddresses r =
-  let includedAddresses :: [Address]
-      includedAddresses = address . testInfo <$> filter (isNothing . reasonForRejection) r
-
-      subSet :: Address -> S.Set Address
-      subSet add = S.fromList $ RC.Address <$> (reverse . P.dropWhile null . subsequences . reverse $ unAddress add)
-   in foldl' S.union S.empty $ subSet <$> includedAddresses
-
-
 mkSem ::
   forall rc tc e effs.
   (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
   RunParams Maybe e rc tc effs ->
   Sem effs ()
 mkSem rp@RunParams {suite, filters, rc, itemRunner} =
-  let filterInfo :: [TestFilterResult]
-      filterInfo = F.filterLog suite filters rc
-
-      includedAddresses :: S.Set Address
-      includedAddresses = activeAddresses filterInfo
-
-      dupeAddress :: Maybe Text
-      dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . address . testInfo <$> filterInfo)
+  let filterInfo :: Either Text F.FilterLog
+      filterInfo = filterSuite rc suite filters
 
       root :: SuiteItem Root' () effs [Sem effs ()]
       root = suite $ runTest rp

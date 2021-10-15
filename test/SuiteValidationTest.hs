@@ -18,7 +18,8 @@ import Pyrelude.IO (putStrLn)
 import Pyrelude.Test (Assertion, chk, chk', (...))
 import RunElementClasses as REC (AddresStringElm, Address (..), AddressElem (..), TestLogInfo (..), toStrElm)
 import Runner (TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, title)
-import RunnerBase (AddressedElm (..), TestInfo, querySuite, testQueryInfo)
+import RunnerBase as RB (AddressedElm (..), TestInfo, querySuite, testInfo) 
+import qualified RunElementClasses as C
 import TempUtils
 import TestFilter
 import Text.Show.Pretty (pPrint, pPrintList, ppShowList)
@@ -36,8 +37,7 @@ applyFilterLog fltr = filterLog mockSuite [fltr]
 
 listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
-  headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress . (address :: TestLogInfo -> Address) . testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
-
+  headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress . (address :: TestLogInfo -> Address) . C.testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
 
 -- $> expectedDemoGroupNames
 expectedDemoGroupNames :: [Text]

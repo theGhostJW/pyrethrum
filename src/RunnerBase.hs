@@ -12,7 +12,7 @@ module RunnerBase
     queryElm,
     querySuite',
     querySuite,
-    testQueryInfo,
+    testInfo,
   )
 where
 
@@ -56,7 +56,7 @@ import Pyrelude
     (?),
     (||),
   )
-import RunElementClasses (Address, AddressElemType, AddressedElm (..), push, rootAddress, Config)
+import RunElementClasses (Address, AddressElemType, AddressedElm (..), push, rootAddress, Config, TestFilterResult (TestFilterResult))
 import qualified RunElementClasses as RC
 
 type ItemRunner e as ds i hi tc rc effs =
@@ -139,7 +139,7 @@ querySuite :: forall rc e tc effs. Config tc => rc -> TestSuite e tc rc effs (Te
 querySuite rc suite = 
   let
     extractor :: forall ho i as ds. RC.ItemClass i ds => rc -> Address -> Test e tc rc ho i as ds effs -> TestInfo tc 
-    extractor rc' _add t = testQueryInfo rc' t
+    extractor rc' _add t = testInfo rc' t
 
     title' :: TestInfo tc -> Text
     title' = getField @"title" 
@@ -164,8 +164,8 @@ data TestInfo tc = TestInfo {
   itemInfo :: [ItemInfo]
 } deriving Show
 
-testQueryInfo :: forall e tc rc hi i as ds effs. (RC.ItemClass i ds, RC.Config tc) => rc -> Test e tc rc hi i as ds effs -> TestInfo tc 
-testQueryInfo rc t = 
+testInfo :: forall e tc rc hi i as ds effs. (RC.ItemClass i ds, RC.Config tc) => rc -> Test e tc rc hi i as ds effs -> TestInfo tc 
+testInfo rc t = 
   let 
     ckInfo :: C.Check ds -> CheckInfo
     ckInfo c = CheckInfo (C.header c) (C.expectation c)

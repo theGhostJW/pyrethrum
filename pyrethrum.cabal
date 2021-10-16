@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0c926cf926a48f099d27121a6c06446b5cc177d3663f24ffcc8abf2f1d1fffc3
+-- hash: ccff070ba448a9399ba0cb5914ebe9d69d4246ea3aa95eb7e60a39be869384af
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -39,6 +39,7 @@ library
       DSL.Logger
       DSL.LogProtocol
       DSL.LogProtocol.PrettyPrint
+      EvalHelp
       FileLogging
       Internal.RunnerBaseLazy
       ItemFilter

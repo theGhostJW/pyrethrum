@@ -16,7 +16,7 @@ module RunElementClasses
     toTitleList,
     render,
     render',
-    mkTestLogInfo,
+    mkTestLogInfo
   )
 where
 

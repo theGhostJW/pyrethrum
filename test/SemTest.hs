@@ -61,8 +61,8 @@ emptiInteractor as _ _ _ = pure as
 constParser :: a -> as -> Sem effs a
 constParser a _ = pure a
 
--- test1Txt :: MockTest Text Item Text Int effs
--- test1Txt =
+-- test1HeadsTxt :: MockTest Text Item Text Int effs
+-- test1HeadsTxt =
 --   Test
 --     { config =
 --         TestConfig
@@ -74,8 +74,8 @@ constParser a _ = pure a
 --       parse = constParser 1
 --     }
 
--- test2Int :: MockTest Int Item Text Text effs
--- test2Int =
+-- test2TailsInt  :: MockTest Int Item Text Text effs
+-- test2TailsInt  =
 --   Test
 --     { config =
 --         TestConfig
@@ -100,8 +100,8 @@ constParser a _ = pure a
 --       parse = constParser 2
 --     }
 
--- test4Txt :: MockTest Text Item Text Text effs
--- test4Txt =
+-- test4HeadsTxt :: MockTest Text Item Text Text effs
+-- test4HeadsTxt =
 --   Test
 --     { config =
 --         TestConfig
@@ -113,8 +113,8 @@ constParser a _ = pure a
 --       parse = constParser "hi"
 --     }
 
--- test5Int :: MockTest Int Item Int Int effs
--- test5Int =
+-- test5TailsInt :: MockTest Int Item Int Int effs
+-- test5TailsInt =
 --   Test
 --     { config =
 --         TestConfig
@@ -147,8 +147,8 @@ constParser a _ = pure a
 --           bhElms =
 --             [ \t ->
 --                 Tests
---                   [ r t test1Txt,
---                     r t test4Txt
+--                   [ r t test1HeadsTxt,
+--                     r t test4HeadsTxt
 --                   ],
 --               const
 --                 R.Group
@@ -175,8 +175,8 @@ constParser a _ = pure a
 --                             ahElms =
 --                               [ \i ->
 --                                   Tests
---                                     [ r i test5Int,
---                                       r i test2Int
+--                                     [ r i test5TailsInt,
+--                                       r i test2TailsInt 
 --                                     ]
 --                               ]
 --                           }

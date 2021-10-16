@@ -8,13 +8,15 @@ import MockSuite hiding (filters')
 import Polysemy
 import Pyrelude as P
 import Pyrelude.Test hiding (Group)
+import RunElementClasses
 import Runner as R
-import RunnerBase as RB (AddressedElm (..), Test, querySuite, querySuite', TestInfo (TestInfo))
+import RunnerBase as RB (AddressedElm (..), Test, TestInfo (..), querySuite, querySuite')
 import TestFilter
 import Text.Show.Pretty
-import RunElementClasses
+import GHC.Records
 
 -- $ > view allTossCalls
+
 allTossCalls :: [(Text, TossCall)]
 allTossCalls =
   let titleAndCall :: rc -> Address -> MockTest ho i as ds effs -> (Text, TossCall)
@@ -22,17 +24,60 @@ allTossCalls =
 
       title' :: (Text, TossCall) -> Text
       title' _ = "Not Used"
-
    in RB.element <$> querySuite' (baseCfg RcAll) title' titleAndCall mockSuite
 
 baseCfg :: TossResult -> RunConfig
 baseCfg = RunConfig "Unit Test Config"
 
+demoFilter :: TossResult -> [AddresStringElm (TestInfo TestConfig)]
+demoFilter tr = toStrElm <$> fromRight' (queryFilterSuite (filters' Nothing) (baseCfg tr) mockSuite)
 
--- $> view' demoQueryFilterElem
--- demoQueryFilterElem :: [AddresStringElm (TestInfo TestConfig)]
-demoQueryFilterElem :: [AddresStringElm (TestInfo TestConfig)]
-demoQueryFilterElem = toStrElm <$> fromRight' (queryFilterSuite (filters' Nothing) (baseCfg RcAll) mockSuite)
+-- $ > view demoFilterAll
+-- demoFilterAll :: [AddresStringElm (TestInfo TestConfig)]
+
+demoFilterAll :: [AddresStringElm (TestInfo TestConfig)]
+demoFilterAll = demoFilter RcAll
+
+chkTitles :: [Text] -> TossResult -> Assertion
+chkTitles expected tossResult =   
+  let 
+    title'' :: AddresStringElm (TestInfo TestConfig) -> Text
+    title'' = (title :: TestInfo TestConfig -> Text) . el 
+  in
+   chkEq expected $ title'' <$> demoFilter tossResult
+
+-- $> unit_filter_all_has_all
+unit_filter_all_has_all :: Assertion
+unit_filter_all_has_all = chkTitles allMockTestTitles RcAll
+
+allMockTestTitles :: [Text]
+allMockTestTitles = ["test1HeadsTxt", "test4HeadsTxt", "test6HeadsTxt", "test5TailsInt", "test2TailsInt", "test3TailsInt"]
+
+heads :: [Text]
+heads = ["test1HeadsTxt", "test4HeadsTxt", "test6HeadsTxt"]
+
+tails' :: [Text]
+tails' = ["test5TailsInt", "test2TailsInt", "test3TailsInt"]
+
+-- $> unit_filter_heads_has_heads
+unit_filter_heads_has_heads :: Assertion
+unit_filter_heads_has_heads = chkTitles heads RcHeads
+
+-- $> unit_filter_tails_has_tails
+unit_filter_tails_has_tails :: Assertion
+unit_filter_tails_has_tails = chkTitles tails' RcTails
+
+-- $ > view demoFilterHeads
+-- demoFilterAll :: [AddresStringElm (TestInfo TestConfig)]
+
+demoFilterHeads :: [AddresStringElm (TestInfo TestConfig)]
+demoFilterHeads = demoFilter RcHeads
+
+-- $ > view demoFilterTails
+-- demoFilterAll :: [AddresStringElm (TestInfo TestConfig)]
+
+demoFilterTails :: [AddresStringElm (TestInfo TestConfig)]
+demoFilterTails = demoFilter RcTails
 
 filterResults :: [TestFilter RunConfig TestConfig] -> RunConfig -> [TestFilterResult]
 filterResults = filterLog mockSuite
@@ -52,69 +97,45 @@ showIt r = ((title :: TestLogInfo -> Text) $ testInfo r, reasonForRejection r)
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
 filters' ttl = [tossFilter, hasTitle ttl]
 
-view :: Show a => [a] -> IO ()
-view = pPrintList
-
 -- $ > view allTests
+
 allTests :: [ShowFilter]
 allTests = tests' (baseCfg RcAll) (filters' Nothing) Accepted
 
 -- $ > unit_test_any_result_has_all
+
 unit_test_any_result_has_all :: Assertion
 unit_test_any_result_has_all = chkEq (length allTests) (length headsAll)
 
-
 -- $ > view headsAll
+
 headsAll :: [ShowFilter]
 headsAll = tests' (baseCfg RcHeads) (filters' Nothing) AnyResult
 
 -- $ > view headsRejected
+
 headsRejected :: [ShowFilter]
 headsRejected = tests' (baseCfg RcHeads) (filters' Nothing) Rejected
 
--- $ > view headsRejected
+-- $ > view headsAccepted
+
 headsAccepted :: [ShowFilter]
 headsAccepted = tests' (baseCfg RcHeads) (filters' Nothing) Accepted
 
--- $ > unit_test_all_heads
-unit_test_all_heads :: Assertion
-unit_test_all_heads = chkEq ( fst <$> headsAccepted) ["test1", "test4", "test6"]
-
--- $ > view headsWith6
-headsWith6 :: [ShowFilter]
-headsWith6 = tests' (baseCfg RcHeads) (filters' $ Just "6") Accepted
-
 -- $ > view headsWith6Rejects
+
 headsWith6Rejects :: [ShowFilter]
 headsWith6Rejects = tests' (baseCfg RcHeads) (filters' $ Just "6") Rejected
 
--- $ > unit_check_rejection_messages
+-- $> unit_check_rejection_messages
+
 unit_check_rejection_messages :: Assertion
-unit_check_rejection_messages = chkEq headsWith6Rejects [ ( "test1" , Just "test title must include: 6" )
-                                                        , ( "test4" , Just "test title must include: 6" )
-                                                        , ( "test5" , Just "toss call: Tails must match run: RcHeads" )
-                                                        , ( "test2" , Just "toss call: Tails must match run: RcHeads" )
-                                                        , ( "test3" , Just "toss call: Tails must match run: RcHeads" )
-                                                        ]
-
-
--- unit_test_filter_country_nz :: Assertion
--- unit_test_filter_country_nz = chkFilters ["test1", "test2"] $ RunConfig NZ Regression
-
--- unit_test_filter_country_au_deep_regression :: Assertion
--- unit_test_filter_country_au_deep_regression = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
-
--- filtersExcludeReasons :: RunConfig -> [Text]
--- filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> P.filter rejectFilter (filterResults rc)
-
--- unit_test_filter_exclude_reasons :: Assertion
--- unit_test_filter_exclude_reasons = chkEq [
---                                           "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
---                                           "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
---                                           "country must match test run",
---                                           "country must match test run",
---                                           "test must be is enabled"
---                                           ]
---                                           $ filtersExcludeReasons $ RunConfig NZ Connectivity
-
---}
+unit_check_rejection_messages =
+  chkEq
+    headsWith6Rejects
+    [ ("test1HeadsTxt", Just "test title must include: 6"),
+      ("test4HeadsTxt", Just "test title must include: 6"),
+      ("test5TailsInt", Just "toss call: Tails must match run: RcHeads"),
+      ("test2TailsInt", Just "toss call: Tails must match run: RcHeads"),
+      ("test3TailsInt", Just "toss call: Tails must match run: RcHeads")
+    ]

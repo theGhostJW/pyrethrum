@@ -100,12 +100,12 @@ implementedInteractor rc int' i = beforAll int' >>= \t -> testInteractor rc t i
 emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
 
-test1Txt :: MockTest Text TextItem Text Text effs
-test1Txt =
+test1HeadsTxt :: MockTest Text TextItem Text Text effs
+test1HeadsTxt =
   Test
     { config =
         TestConfig
-          { title = "test1",
+          { title = "test1HeadsTxt",
             tossCall = Heads
           },
       items = empti,
@@ -113,12 +113,12 @@ test1Txt =
       parse = emptiParser "Blahh"
     }
 
-test2Int :: MockTest Int IntItem Int Int effs
-test2Int =
+test2TailsInt  :: MockTest Int IntItem Int Int effs
+test2TailsInt  =
   Test
     { config =
         TestConfig
-          { title = "test2",
+          { title = "test2TailsInt",
             tossCall = Tails
           },
       items = empti,
@@ -126,12 +126,12 @@ test2Int =
       parse = pure
     }
 
-test3Int :: MockTest Int IntItem Int Int effs
-test3Int =
+test3TailsInt :: MockTest Int IntItem Int Int effs
+test3TailsInt =
   Test
     { config =
         TestConfig
-          { title = "test3",
+          { title = "test3TailsInt",
             tossCall = Tails
           },
       items = empti,
@@ -139,12 +139,12 @@ test3Int =
       parse = pure
     }
 
-test4Txt :: MockTest Text TextItem Text Text effs
-test4Txt =
+test4HeadsTxt :: MockTest Text TextItem Text Text effs
+test4HeadsTxt =
   Test
     { config =
         TestConfig
-          { title = "test4",
+          { title = "test4HeadsTxt",
             tossCall = Heads
           },
       items = empti,
@@ -152,12 +152,12 @@ test4Txt =
       parse = pure
     }
 
-test6Txt :: MockTest Text TextItem Text Text effs
-test6Txt =
+test6HeadsTxt :: MockTest Text TextItem Text Text effs
+test6HeadsTxt =
   Test
     { config =
         TestConfig
-          { title = "test6",
+          { title = "test6HeadsTxt",
             tossCall = Heads
           },
       items = empti,
@@ -165,12 +165,12 @@ test6Txt =
       parse = pure
     }
 
-test5Int :: MockTest Int IntItem Int Int effs
-test5Int =
+test5TailsInt :: MockTest Int IntItem Int Int effs
+test5TailsInt =
   Test
     { config =
         TestConfig
-          { title = "test5",
+          { title = "test5TailsInt",
             tossCall = Tails
           },
       items = empti,
@@ -222,8 +222,8 @@ mockSuite runTest =
                 "Divider"
                 [ Tests
                     \a o be ae ->
-                      [ runTest a o be ae test1Txt,
-                        runTest a o be ae test4Txt
+                      [ runTest a o be ae test1HeadsTxt,
+                        runTest a o be ae test4HeadsTxt
                       ]
                 ],
               ----
@@ -237,7 +237,7 @@ mockSuite runTest =
                     "Before Inner"
                     (\t -> pure "HI")
                     [ Tests \a o be ae ->
-                        [ runTest a o be ae test6Txt
+                        [ runTest a o be ae test6HeadsTxt
                         ]
                     ]
                 ]
@@ -255,9 +255,9 @@ mockSuite runTest =
                           aHook' = \i -> i == 23 ? pure () $ pure (),
                           ahElms' =
                             [ Tests \a o be ae ->
-                                [ runTest a o be ae test5Int,
-                                  runTest a o be ae test2Int,
-                                  runTest a o be ae test3Int
+                                [ runTest a o be ae test5TailsInt,
+                                  runTest a o be ae test2TailsInt ,
+                                  runTest a o be ae test3TailsInt
                                 ]
                             ]
                         }

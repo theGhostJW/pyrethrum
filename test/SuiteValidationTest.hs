@@ -24,10 +24,7 @@ import TempUtils
 import TestFilter
 import Text.Show.Pretty (pPrint, pPrintList, ppShowList)
 
-view' :: Show a => [a] -> IO ()
-view' = pPrintList
-
--- $ > view' demoQueryElem
+-- $ > view demoQueryElem
 
 demoQueryElem :: [AddresStringElm (TestInfo TestConfig)]
 demoQueryElem = toStrElm <$> querySuite rcRunAll mockSuite

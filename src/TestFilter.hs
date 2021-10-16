@@ -1,16 +1,17 @@
 module TestFilter where
 
 import qualified Data.List as L
+import Data.Set (Set, member)
+import qualified Data.Set as S
 import GHC.Records (HasField (getField))
 import Internal.RunnerBaseLazy (One)
 import OrphanedInstances ()
 import Pyrelude as P
-import qualified Prelude as PRL
 import RunElementClasses (Address (unAddress), Config, TestFilterResult (..), TestLogInfo, mkTestLogInfo, render)
 import qualified RunElementClasses as C
 import RunnerBase (AddressedElm (..))
 import RunnerBase as RB
-import qualified Data.Set as S
+import qualified Prelude as PRL
 
 acceptFilter :: TestFilterResult -> Bool
 acceptFilter = isNothing . reasonForRejection
@@ -70,24 +71,24 @@ filterLog suite fltrs rc =
       filterResults = querySuite' rc title' testFilter suite
    in element <$> filterResults
 
-data FilterLog = FilterLog {
-  log :: [TestFilterResult],
-  included ::  S.Set Address
-}
+data FilterLog = FilterLog
+  { log :: [TestFilterResult],
+    included :: S.Set Address
+  }
+  deriving (Show)
 
 activeAddresses :: [TestFilterResult] -> S.Set Address
 activeAddresses r =
   let includedAddresses :: [Address]
-      includedAddresses = (C.address :: TestLogInfo -> Address). C.testInfo <$> filter (isNothing . reasonForRejection) r
+      includedAddresses = (C.address :: TestLogInfo -> Address) . C.testInfo <$> filter (isNothing . reasonForRejection) r
 
       subSet :: Address -> S.Set Address
-      subSet add = S.fromList $ C.Address <$> (reverse . P.dropWhile null . subsequences . reverse $ unAddress add)
+      subSet add = S.fromList $ C.Address <$> ((reverse <$>) <$> P.dropWhile null . inits . reverse $ unAddress add)
    in foldl' S.union S.empty $ subSet <$> includedAddresses
-
 
 filterSuite :: Config tc => rc -> (forall a. TestSuite e tc rc effs a) -> [TestFilter rc tc] -> Either Text FilterLog
 filterSuite rc suite filters =
-  let log ::  [TestFilterResult]
+  let log :: [TestFilterResult]
       log = filterLog suite filters rc
 
       includedAddresses :: S.Set Address
@@ -95,8 +96,19 @@ filterSuite rc suite filters =
 
       dupeAddress :: Maybe Text
       dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . (C.address :: TestLogInfo -> Address) . C.testInfo <$> log)
-  in 
-    maybe (Right $ FilterLog log includedAddresses) Left dupeAddress
+   in maybe (Right $ FilterLog log includedAddresses) Left dupeAddress
+
+queryFilterSuite :: forall rc e tc effs. Config tc => [TestFilter rc tc] -> rc -> (forall a. TestSuite e tc rc effs a) -> Either Text [AddressedElm (TestInfo tc)]
+queryFilterSuite fltrs rc s =
+  let unfiltered :: [AddressedElm (TestInfo tc)]
+      unfiltered = querySuite rc s
+
+      include :: Either Text (Set Address)
+      include = included <$> filterSuite rc s fltrs
+
+      pred' :: Set Address -> AddressedElm (TestInfo tc) -> Bool
+      pred' inc add = member (address add) inc
+   in include >>= \s' -> Right $ filter (pred' s') unfiltered
 
 {-
   rc ->

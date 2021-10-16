@@ -188,8 +188,6 @@ runTest RunParams {filters, rc, itemIds, itemRunner} add hi beforeEach afterEach
 logLPError :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
 logLPError = logItem . LP.Error
 
-
-
 data RunParams m e rc tc effs = RunParams
   { suite :: forall a. TestSuite e tc rc effs a,
     filters :: [F.TestFilter rc tc],

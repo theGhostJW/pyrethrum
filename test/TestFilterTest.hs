@@ -9,15 +9,16 @@ import Polysemy
 import Pyrelude as P
 import Pyrelude.Test hiding (Group)
 import Runner as R
-import RunnerBase as RB (AddressedElm (..), Test, querySuite, querySuite')
+import RunnerBase as RB (AddressedElm (..), Test, querySuite, querySuite', TestInfo (TestInfo))
 import TestFilter
 import Text.Show.Pretty
+import RunElementClasses
 
 -- $ > view allTossCalls
 allTossCalls :: [(Text, TossCall)]
 allTossCalls =
   let titleAndCall :: rc -> Address -> MockTest ho i as ds effs -> (Text, TossCall)
-      titleAndCall _ _ (Test (TestConfig ttl call) _ _ _) = (ttl, call)
+      titleAndCall _ _ (R.Test (TestConfig ttl call) _ _ _) = (ttl, call)
 
       title' :: (Text, TossCall) -> Text
       title' _ = "Not Used"
@@ -25,11 +26,13 @@ allTossCalls =
    in RB.element <$> querySuite' (baseCfg RcAll) title' titleAndCall mockSuite
 
 baseCfg :: TossResult -> RunConfig
-baseCfg tr =
-  RunConfig
-    { title = "Unit Test Config",
-      toss = tr
-    }
+baseCfg = RunConfig "Unit Test Config"
+
+
+-- $> view' demoQueryFilterElem
+-- demoQueryFilterElem :: [AddresStringElm (TestInfo TestConfig)]
+demoQueryFilterElem :: [AddresStringElm (TestInfo TestConfig)]
+demoQueryFilterElem = toStrElm <$> fromRight' (queryFilterSuite (filters' Nothing) (baseCfg RcAll) mockSuite)
 
 filterResults :: [TestFilter RunConfig TestConfig] -> RunConfig -> [TestFilterResult]
 filterResults = filterLog mockSuite

@@ -11,7 +11,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Records
 import ItemRunners (runItem)
-import MockSuite as M (MockTest, RunConfig (RunConfig), TestConfig (..), TextItem, happyRun, mockSuite, rcRunAll, tossFilter)
+import MockSuite as M (MockTest, RunConfig (RunConfig), TestConfig (..), TextItem, happyRun, mockSuite, rcRunAll, tossFilter, TossResult (RcHeads))
 import Polysemy
 import Pyrelude as P
 import Pyrelude.IO (putStrLn)
@@ -27,7 +27,7 @@ import Text.Show.Pretty (pPrint, pPrintList, ppShowList)
 view' :: Show a => [a] -> IO ()
 view' = pPrintList
 
--- $> view' demoQueryElem
+-- $ > view' demoQueryElem
 
 demoQueryElem :: [AddresStringElm (TestInfo TestConfig)]
 demoQueryElem = toStrElm <$> querySuite rcRunAll mockSuite
@@ -39,7 +39,7 @@ listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
   headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress . (address :: TestLogInfo -> Address) . C.testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
 
--- $> expectedDemoGroupNames
+-- $ > expectedDemoGroupNames
 expectedDemoGroupNames :: [Text]
 expectedDemoGroupNames = ["Happy TestSuite", "Happy TestSuite.Sub Group", "Happy TestSuite.Empty Group"]
 

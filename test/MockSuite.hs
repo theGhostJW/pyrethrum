@@ -205,8 +205,7 @@ mockSuite ::
   ( forall hi ho i as ds.
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) =>
     Address ->
-    hi ->
-    (hi -> Sem effs ho) -> -- beforeEach
+    Sem effs ho -> -- beforeEach
     (ho -> Sem effs ()) -> -- AfterEach
     MockTest ho i as ds effs ->
     a
@@ -222,23 +221,23 @@ mockSuite runTest =
             [ R.Group
                 "Divider"
                 [ Tests
-                    \a o be ae ->
-                      [ runTest a o be ae test1HeadsTxt,
-                        runTest a o be ae test4HeadsTxt
+                    \a be ae ->
+                      [ runTest a be ae test1HeadsTxt,
+                        runTest a be ae test4HeadsTxt
                       ]
                 ],
               ----
               R.Group
                 "Empty Group"
-                [Tests \_ _ _ _ -> []],
+                [Tests \_ _ _ -> []],
               ----
               R.Group
                 "Divider"
                 [ BeforeEach
                     "Before Inner"
                     (\t -> pure "HI")
-                    [ Tests \a o be ae ->
-                        [ runTest a o be ae test6HeadsTxt
+                    [ Tests \a be ae ->
+                        [ runTest a be ae test6HeadsTxt
                         ]
                     ]
                 ]
@@ -255,17 +254,17 @@ mockSuite runTest =
                         { title' = "After Exch Int",
                           aHook' = \i -> i == 23 ? pure () $ pure (),
                           ahElms' =
-                            [ Tests \a o be ae ->
-                                [ runTest a o be ae test5TailsInt,
-                                  runTest a o be ae test2TailsInt,
-                                  runTest a o be ae test3TailsInt
+                            [ Tests \a be ae ->
+                                [ runTest a be ae test5TailsInt,
+                                  runTest a be ae test2TailsInt,
+                                  runTest a be ae test3TailsInt
                                 ],
                               BeforeEach
                                 { title' = "Before Inner 2",
                                   bHook' = \t -> pure "HI",
                                   bhElms' =
-                                    [ Tests \a o be ae ->
-                                        [ runTest a o be ae test6HeadsTxt
+                                    [ Tests \a be ae ->
+                                        [ runTest a be ae test6HeadsTxt
                                         ]
                                     ]
                                 }

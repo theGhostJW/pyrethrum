@@ -51,10 +51,10 @@ unit_filter_all_has_all :: Assertion
 unit_filter_all_has_all = chkTitles allMockTestTitles RcAll
 
 allMockTestTitles :: [Text]
-allMockTestTitles = ["test1HeadsTxt", "test4HeadsTxt", "test6HeadsTxt", "test5TailsInt", "test2TailsInt", "test3TailsInt"]
+allMockTestTitles = ["test1HeadsTxt", "test4HeadsTxt", "test6HeadsTxt", "test5TailsInt", "test2TailsInt", "test3TailsInt", "test6HeadsTxt"]
 
 heads :: [Text]
-heads = ["test1HeadsTxt", "test4HeadsTxt", "test6HeadsTxt"]
+heads = ["test1HeadsTxt", "test4HeadsTxt", "test6HeadsTxt", "test6HeadsTxt"]
 
 tails' :: [Text]
 tails' = ["test5TailsInt", "test2TailsInt", "test3TailsInt"]

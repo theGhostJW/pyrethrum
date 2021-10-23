@@ -113,6 +113,7 @@ import RunnerBase as RB
     ItemRunner,
     Branch,
     Root',
+    Suite(..),
     SuiteItem (..),
     Test (..),
     TestSuite,
@@ -323,7 +324,7 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
   let filterInfo :: Either Text F.FilterLog
       filterInfo = filterSuite rc suite filters
 
-      root :: SuiteItem Root' () effs [Sem effs ()]
+      root :: Suite Root' () effs [Sem effs ()]
       root = suite $ runTest rp
    in -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
       -- mockSuite = suite $ runTest rp

@@ -2,6 +2,7 @@ module RunnerBase
   ( AddressedElm (..),
     ItemRunner,
     TestSuite,
+    RBL.Suite (..),
     RBL.SuiteItem (..),
     RBL.Branch,
     RBL.Root',
@@ -70,7 +71,7 @@ type TestSuite e tc rc effs a =
     Test e tc rc ho i as ds effs ->
     a
   ) ->
-  SuiteItem Root' () effs a
+  Suite Root' () effs a
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
@@ -103,6 +104,11 @@ queryElm title' address =
         AfterAll {title = t, ahElms = e} -> hkQuery t e
         AfterEach {title' = t, ahElms' = e} -> hkQuery t e
 
+
+querySuiteElms :: forall c hi effs a. (a -> Text) -> Address -> Suite c hi effs a -> [AddressedElm a]
+querySuiteElms title' address suite = un suite >>= queryElm title' address
+
+
 querySuite' ::
   forall e tc rc effs a.
   RC.Config tc =>
@@ -127,9 +133,9 @@ querySuite' rc title' extractor suite =
         a
       fullQuery a _be _ae t = extractor rc a t
 
-      root :: SuiteItem Root' () effs a
+      root :: Suite Root' () effs a
       root = suite fullQuery
-   in queryElm title' rootAddress root
+   in querySuiteElms title' rootAddress root
 
 querySuite :: forall rc e tc effs. Config tc => rc -> TestSuite e tc rc effs (TestInfo tc) -> [AddressedElm (TestInfo tc)]
 querySuite rc suite =

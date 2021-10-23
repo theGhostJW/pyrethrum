@@ -14,6 +14,10 @@ import RunElementClasses (Address (..))
 data Branch
 data Root'
 
+newtype Suite c hi effs t = Suite {
+  un :: [SuiteItem c hi effs t ]
+}
+
 data SuiteItem c hi effs t where
   Root ::
     { rootElms :: [SuiteItem Branch () effs t]

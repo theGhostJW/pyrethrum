@@ -24,6 +24,7 @@ import Runner as R
     Root',
     RunParams (..),
     SuiteItem (..),
+    Suite(..),
     Test (..),
     mkSem,
   )
@@ -210,9 +211,9 @@ mockSuite ::
     MockTest ho i as ds effs ->
     a
   ) ->
-  SuiteItem Root' () effs a
+  Suite Root' () effs a
 mockSuite runTest =
-  R.Root
+  R.Suite
     [ R.Group
         "Filter TestSuite"
         [ BeforeAll

@@ -71,22 +71,17 @@ type TestSuite e tc rc effs a =
     Test e tc rc ho i as ds effs ->
     a
   ) ->
-  SuiteItem Root' () () effs a
+  SuiteItem Root' () effs a
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
     results :: Either FilterErrorType [rslt]
   }  deriving (Show)
 
-queryElm :: forall c hi ho effs a. (a -> Text) -> Address -> SuiteItem c hi ho effs a -> [AddressedElm a]
+queryElm :: forall c hi effs a. (a -> Text) -> Address -> SuiteItem c hi effs a -> [AddressedElm a]
 queryElm title' address =
-  let hiUndefined :: hi
-      hiUndefined = undefined
+  let beUndefined = undefined
 
-      beUndefined :: Sem effs ho
-      beUndefined = undefined
-
-      aeUndefined :: ho -> Sem effs ()
       aeUndefined ho = undefined
 
       tstAddress :: a -> Address
@@ -95,10 +90,10 @@ queryElm title' address =
       grpAddress' :: AddressElemType -> Text -> Address
       grpAddress' et ttl = push ttl et address
 
-      hkQuery' :: forall hii hoo cc. AddressElemType -> Text -> [SuiteItem cc hii hoo effs a] -> [AddressedElm a]
+      hkQuery' :: forall hii cc. AddressElemType -> Text -> [SuiteItem cc hii effs a] -> [AddressedElm a]
       hkQuery' et t e = e >>= queryElm title' (grpAddress' et t)
 
-      hkQuery :: forall hii hoo cc. Text -> [SuiteItem cc hii hoo effs a] -> [AddressedElm a]
+      hkQuery :: forall hii cc. Text -> [SuiteItem cc hii effs a] -> [AddressedElm a]
       hkQuery = hkQuery' RC.Hook
    in \case
         Root {rootElms} -> rootElms >>= queryElm title' address
@@ -133,7 +128,7 @@ querySuite' rc title' extractor suite =
         a
       fullQuery a _be _ae t = extractor rc a t
 
-      root :: SuiteItem Root' () () effs a
+      root :: SuiteItem Root' () effs a
       root = suite fullQuery
    in queryElm title' rootAddress root
 

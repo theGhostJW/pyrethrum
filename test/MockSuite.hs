@@ -200,7 +200,6 @@ hasTitle ttl =
           \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
 
-
 mockSuite ::
   forall effs a.
   ( forall ho i as ds.
@@ -266,7 +265,11 @@ mockSuite runTest =
                                   bhElms' =
                                     [ Tests \a be ae ->
                                         [ runTest a be ae test6HeadsTxt
-                                        ]
+                                        ],
+                                      R.Group
+                                        { title = "Double Nested Empty Group",
+                                          gElms = []
+                                        }
                                     ]
                                 }
                             ]

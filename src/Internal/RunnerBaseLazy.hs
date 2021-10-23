@@ -23,7 +23,7 @@ data SuiteItem c hi effs t where
     SuiteItem Root' () effs t
   Group ::
     { title :: Text,
-      gElms :: [SuiteItem c' hi' effs t]
+      gElms :: [SuiteItem c' hi effs t]
     } ->
     SuiteItem One hi effs t
   Tests ::
@@ -50,7 +50,7 @@ data SuiteItem c hi effs t where
     SuiteItem One hi effs t
   AfterEach ::
     { title' :: Text,
-      aHook' :: ho -> Sem effs (),
+      aHook' :: hi -> Sem effs (),
       ahElms' :: [SuiteItem Many hi effs t]
     } ->
     SuiteItem Many hi effs t

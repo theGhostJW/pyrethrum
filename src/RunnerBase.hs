@@ -63,7 +63,8 @@ type ItemRunner e as ds i hi tc rc effs =
   rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
 
 type TestSuite e tc rc effs a =
-  (forall ho hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (C.Checks ds), HasField "id" i Int, HasField "title" i Text) => Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> Test e tc rc ho i as ds effs -> a) -> SuiteItem Root' () effs a
+  (forall ho hi i as ds. (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (C.Checks ds), HasField "id" i Int, HasField "title" i Text) => 
+      Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> Test e tc rc ho i as ds effs -> a) -> SuiteItem Root' () () effs a
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
@@ -71,7 +72,7 @@ data GenericResult tc rslt = TestResult
   }
   deriving (Show)
 
-queryElm :: forall c hi effs a. (a -> Text) -> Address -> SuiteItem c hi effs a -> [AddressedElm a]
+queryElm :: forall c hi ho effs a. (a -> Text) -> Address -> SuiteItem c hi ho effs a -> [AddressedElm a]
 queryElm title' address = 
   let 
     hiUndefined :: hi
@@ -89,10 +90,10 @@ queryElm title' address =
     grpAddress' :: AddressElemType -> Text -> Address
     grpAddress' et ttl = push ttl et address
 
-    hkQuery' :: forall hii cc. AddressElemType -> Text -> [SuiteItem cc hii effs a] -> [AddressedElm a]
+    hkQuery' :: forall hii hoo cc. AddressElemType -> Text -> [SuiteItem cc hii hoo effs a] -> [AddressedElm a]
     hkQuery' et t e = e >>= queryElm title' (grpAddress' et t) 
 
-    hkQuery :: forall hii cc. Text -> [SuiteItem cc hii effs a] -> [AddressedElm a]
+    hkQuery :: forall hii hoo cc. Text -> [SuiteItem cc hii hoo effs a] -> [AddressedElm a]
     hkQuery = hkQuery' RC.Hook
   in
   \case
@@ -129,7 +130,7 @@ querySuite' rc title' extractor suite =
     fullQuery a _hi _be _ae t = extractor rc a t
 
 
-    root :: SuiteItem Root' () effs a
+    root :: SuiteItem Root' () () effs a
     root = suite fullQuery
   in 
     queryElm title' rootAddress root

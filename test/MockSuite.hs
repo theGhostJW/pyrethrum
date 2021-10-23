@@ -200,7 +200,7 @@ hasTitle ttl =
     }
 
 mockSuite ::
-  forall effs a.
+  forall effs hi' ho' a.
   ( forall hi ho i as ds.
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) =>
     Address ->
@@ -210,7 +210,7 @@ mockSuite ::
     MockTest ho i as ds effs ->
     a
   ) ->
-  SuiteItem Root' () effs a
+  SuiteItem Root' () () effs a
 mockSuite runTest =
   R.Root
     [ R.Group
@@ -243,6 +243,7 @@ mockSuite runTest =
                 ]
             ]
         ],
+        
       R.Group
         { title = "Nested Int Group",
           gElms =

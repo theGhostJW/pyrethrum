@@ -205,18 +205,18 @@ exeElm ::
   hi ->
   (hi -> Sem effs ho) -> 
   (ho -> Sem effs ()) ->
-  SuiteItem c hi effs [Sem effs ()] ->
+  SuiteItem c hi ho effs [Sem effs ()] ->
   Sem effs ()
 exeElm includedAddresses parentAddress hi be ae si = 
   let 
-    exElm' :: forall c' hi' ho'. Address -> hi' -> (hi' -> Sem effs ho') -> (ho' -> Sem effs ()) -> SuiteItem c' hi' effs [Sem effs ()] -> Sem effs ()
+    exElm' :: forall c' hi' ho'. Address -> hi' -> (hi' -> Sem effs ho') -> (ho' -> Sem effs ()) -> SuiteItem c' hi' ho' effs [Sem effs ()] -> Sem effs ()
     exElm' = exeElm includedAddresses
 
 
   in
   case si of
     Root {rootElms} -> sequence_ $ exElm' rootAddress hi be ae <$> rootElms
-    Tests {tests} -> uu --sequence_ . join $ tests parentAddress hi be ae
+    Tests {tests} -> sequence_ . join $ tests parentAddress hi be ae
       
     BeforeEach {title' = t, bHook' = bh, bhElms' = elms} -> uu
       -- exElm' hi   <$> elms
@@ -311,7 +311,7 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
   let filterInfo :: Either Text F.FilterLog
       filterInfo = filterSuite rc suite filters
 
-      root :: SuiteItem Root' () effs [Sem effs ()]
+      root :: SuiteItem Root' () () effs [Sem effs ()]
       root = suite $ runTest rp
 
       -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]

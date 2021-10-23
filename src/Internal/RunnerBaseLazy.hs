@@ -27,7 +27,7 @@ data SuiteItem c hi effs t where
     } ->
     SuiteItem One hi effs t
   Tests ::
-    { tests :: forall ho. Address -> Sem effs ho -> (ho -> Sem effs ()) -> [t]
+    { tests :: Address -> Sem effs hi -> (hi -> Sem effs ()) -> [t]
     } ->
     SuiteItem Many hi effs t
   BeforeAll ::

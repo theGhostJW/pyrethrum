@@ -200,9 +200,10 @@ hasTitle ttl =
           \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
 
+
 mockSuite ::
   forall effs a.
-  ( forall hi ho i as ds.
+  ( forall ho i as ds.
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) =>
     Address ->
     Sem effs ho -> -- beforeEach
@@ -210,7 +211,7 @@ mockSuite ::
     MockTest ho i as ds effs ->
     a
   ) ->
-  SuiteItem Root' () () effs a
+  SuiteItem Root' () effs a
 mockSuite runTest =
   R.Root
     [ R.Group

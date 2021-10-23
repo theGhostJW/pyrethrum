@@ -134,7 +134,7 @@ getId :: HasField "id" i Int => i -> Int
 getId = getField @"id"
 
 runTestItems ::
-  forall i as ds hi ho tc rc e effs.
+  forall i as ds ho tc rc e effs.
   (ToJSON e, Show e, Config tc, ToJSON i, ItemClass i ds, Member (Logger e) effs) =>
   Maybe (S.Set Int) -> -- target Ids
   [i] -> -- ids
@@ -173,7 +173,7 @@ runTestItems iIds items rc add beforeEach afterEach itemRunner test@Test {config
         xs -> [startTest >> sequence_ (applyRunner <$> xs) >> endTest]
 
 runTest ::
-  forall i rc hi ho as ds tc e effs.
+  forall i rc ho as ds tc e effs.
   (ItemClass i ds, Config tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
   RunParams Maybe e rc tc effs -> -- Run Params
   Address ->
@@ -199,7 +199,7 @@ data RunParams m e rc tc effs = RunParams
 
 -- TODO - Error handling especially outside tests eg. in hooks
 exeElm ::
-  forall c hi ho e effs.
+  forall c ho e effs.
   (ToJSON e, Show e, Member (Logger e) effs) =>
   S.Set Address ->
   Address ->

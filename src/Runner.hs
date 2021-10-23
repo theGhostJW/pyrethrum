@@ -93,8 +93,8 @@ import Pyrelude as P
 import RunElementClasses as C
   ( Address,
     AddressElem,
-    AddressedElm (AddressedElm, element),
     AddressElemType,
+    AddressedElm (AddressedElm, element),
     Config,
     HasId,
     HasTitle,
@@ -111,7 +111,7 @@ import qualified RunElementClasses as RC
 import RunnerBase as RB
   ( GenericResult (..),
     ItemRunner,
-    Suite(..),
+    Suite (..),
     SuiteItem (..),
     Test (..),
     TestSuite,
@@ -197,7 +197,7 @@ data RunParams m e rc tc effs = RunParams
 
 -- TODO - Error handling especially outside tests eg. in hooks
 exeElm ::
-  forall c ho e effs.
+  forall ho e effs.
   (ToJSON e, Show e, Member (Logger e) effs) =>
   S.Set Address ->
   Address ->
@@ -206,35 +206,45 @@ exeElm ::
   SuiteItem ho effs [Sem effs ()] ->
   Sem effs ()
 exeElm includedAddresses parentAddress be ae si =
-  let exElm' :: forall ho'. Address ->  Sem effs ho' -> (ho' -> Sem effs ()) -> SuiteItem ho' effs [Sem effs ()] -> Sem effs ()
+  let exElm' :: forall ho'. Address -> Sem effs ho' -> (ho' -> Sem effs ()) -> SuiteItem ho' effs [Sem effs ()] -> Sem effs ()
       exElm' = exeElm includedAddresses
 
       nxtAddress :: Text -> AddressElemType -> Address
       nxtAddress ttl at = push ttl at parentAddress
-      
+
       nxtHookAddress :: Text -> Address
       nxtHookAddress ttl = push ttl RC.Hook parentAddress
 
       exclude :: Text -> AddressElemType -> Bool
       exclude title at = S.notMember (nxtAddress title at) includedAddresses
    in case si of
-        Root {rootElms} -> sequence_ $ exElm' rootAddress be ae <$> rootElms
         Tests {tests} -> sequence_ . join $ tests parentAddress be ae
         BeforeEach {title' = t, bHook' = bh, bhElms' = elms} ->
           let sem = exElm' (nxtHookAddress t)
-          in exclude t RC.Hook ? pure () $ uu --sem
-        -- exeHook :: [SuiteItem Many ho ho' effs t] Sem effs o -> Sem effs o
-        --        exeHook hookType ttl hook = do
-        --         log' $ StartHook hookType ttl
-        --         o <- hook
-        --         log' $ EndHook hookType ttl
-        --         pure o
-        -- exElm' hi   <$> elms
+           in exclude t RC.Hook ? pure () $ uu --sem
+          -- exeHook :: [SuiteItem Many ho ho' effs t] Sem effs o -> Sem effs o
+          --        exeHook hookType ttl hook = do
+          --         log' $ StartHook hookType ttl
+          --         o <- hook
+          --         log' $ EndHook hookType ttl
+          --         pure o
+          -- exElm' hi   <$> elms
 
         -- AfterEach {title' = t, ahElms' = e} -> hkQuery t e
 
         --  (\a -> AddressedElm (tstAddress a) a) <$> tests address hiUndefined beUndefined aeUndefined
         _ -> uu
+
+exeSuite ::
+  forall ho e effs.
+  (ToJSON e, Show e, Member (Logger e) effs) =>
+  S.Set Address ->
+  Sem effs ho ->
+  (ho -> Sem effs ()) ->
+  Suite ho effs [Sem effs ()] ->
+  Sem effs ()
+exeSuite includedAddresses be ae si =
+  sequence_ $ exeElm includedAddresses rootAddress be ae <$> un si
 
 -- Group {title = t, gElms = e} -> hkQuery' RC.Group t e
 -- BeforeAll {title = t, bhElms = e} -> hkQuery t e
@@ -311,7 +321,7 @@ exeElm includedAddresses parentAddress be ae si =
 --           ? pure ()
 --           $ case si of
 --               Tests {tests} -> sequence_ $ join tests --sequence_ $ runner address hi <$> tests
---               _ ->  pure () 
+--               _ ->  pure ()
 
 mkSem ::
   forall rc tc e effs.

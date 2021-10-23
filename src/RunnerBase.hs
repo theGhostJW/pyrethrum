@@ -95,7 +95,6 @@ queryElm title' address =
       hkQuery :: forall hii cc. Text -> [SuiteItem hii effs a] -> [AddressedElm a]
       hkQuery = hkQuery' RC.Hook
    in \case
-        Root {rootElms} -> rootElms >>= queryElm title' address
         Tests {tests} -> (\a -> AddressedElm (tstAddress a) a) <$> tests address beUndefined aeUndefined
         Group {title = t, gElms = e} -> hkQuery' RC.Group t e
         BeforeAll {title = t, bhElms = e} -> hkQuery t e

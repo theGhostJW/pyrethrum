@@ -15,10 +15,6 @@ newtype Suite hi effs t = Suite {
 }
 
 data SuiteItem hi effs t where
-  Root ::
-    { rootElms :: [SuiteItem () effs t]
-    } ->
-    SuiteItem () effs t
   Group ::
     { title :: Text,
       gElms :: [SuiteItem hi effs t]
@@ -69,5 +65,4 @@ instance Functor (SuiteItem hi ho effs) where
           AfterAll title' aHook ahElms -> AfterAll title' aHook (f'' f ahElms)
           AfterEach title' aHook ahElms -> AfterEach title' aHook (f'' f ahElms)
           Group {title = t, gElms} -> Group t $ f'' f gElms
-          Root elms' -> Root $ (f <$>) <$> elms'
 -}

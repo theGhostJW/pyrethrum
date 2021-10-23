@@ -86,7 +86,7 @@ import Pyrelude as P
     (<$>),
     (>>),
     (>>=),
-    (?),
+    (?), parent
   )
 import RunElementClasses as C
   ( Address,
@@ -198,15 +198,47 @@ data RunParams m e rc tc effs = RunParams
 
 -- TODO - Error handling especially outside tests eg. in hooks
 exeElm ::
-  forall c hi ho e effs a.
+  forall c hi ho e effs.
   (ToJSON e, Show e, Member (Logger e) effs) =>
   S.Set Address ->
-  (forall hii. Address -> hii -> a -> Sem effs ()) ->
   Address ->
   hi ->
-  SuiteItem c hi effs [a] ->
+  (hi -> Sem effs ho) -> 
+  (ho -> Sem effs ()) ->
+  SuiteItem c hi effs [Sem effs ()] ->
   Sem effs ()
-exeElm targAddresses runner address hi si = uu
+exeElm includedAddresses parentAddress hi be ae si = 
+  let 
+    exElm' :: forall c' hi' ho'. Address -> hi' -> (hi' -> Sem effs ho') -> (ho' -> Sem effs ()) -> SuiteItem c' hi' effs [Sem effs ()] -> Sem effs ()
+    exElm' = exeElm includedAddresses
+
+
+  in
+  case si of
+    Root {rootElms} -> sequence_ $ exElm' rootAddress hi be ae <$> rootElms
+    Tests {tests} -> uu --sequence_ . join $ tests parentAddress hi be ae
+      
+    BeforeEach {title' = t, bHook' = bh, bhElms' = elms} -> uu
+      -- exElm' hi   <$> elms
+
+    -- AfterEach {title' = t, ahElms' = e} -> hkQuery t e
+      
+      --  (\a -> AddressedElm (tstAddress a) a) <$> tests address hiUndefined beUndefined aeUndefined 
+    _ -> uu
+    -- Group {title = t, gElms = e} -> hkQuery' RC.Group t e
+    -- BeforeAll {title = t, bhElms = e} -> hkQuery t e
+    -- AfterAll {title = t, ahElms = e} -> hkQuery t e
+    
+-- exeElm ::
+--   forall c hi ho e effs a.
+--   (ToJSON e, Show e, Member (Logger e) effs) =>
+--   S.Set Address ->
+--   (forall hii. Address -> hii -> a -> Sem effs ()) ->
+--   Address ->
+--   hi ->
+--   SuiteItem c hi effs [a] ->
+--   Sem effs ()
+-- exeElm targAddresses runner address hi si = uu
   -- let log' :: LogProtocolBase e -> Sem effs ()
   --     log' = logItem
 

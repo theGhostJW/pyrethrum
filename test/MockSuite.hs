@@ -99,7 +99,7 @@ implementedInteractor rc int' i = beforAll int' >>= \t -> testInteractor rc t i
 
 emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
-
+                ---        hi  itm       as   ds
 test1HeadsTxt :: MockTest Text TextItem Text Text effs
 test1HeadsTxt =
   Test

@@ -46,7 +46,7 @@ chkTitles expected tossResult =
   in
    chkEq expected $ title'' <$> demoFilter tossResult
 
--- $> unit_filter_all_has_all
+-- $ > unit_filter_all_has_all
 unit_filter_all_has_all :: Assertion
 unit_filter_all_has_all = chkTitles allMockTestTitles RcAll
 
@@ -59,11 +59,11 @@ heads = ["test1HeadsTxt", "test4HeadsTxt", "test6HeadsTxt"]
 tails' :: [Text]
 tails' = ["test5TailsInt", "test2TailsInt", "test3TailsInt"]
 
--- $> unit_filter_heads_has_heads
+-- $ > unit_filter_heads_has_heads
 unit_filter_heads_has_heads :: Assertion
 unit_filter_heads_has_heads = chkTitles heads RcHeads
 
--- $> unit_filter_tails_has_tails
+-- $ > unit_filter_tails_has_tails
 unit_filter_tails_has_tails :: Assertion
 unit_filter_tails_has_tails = chkTitles tails' RcTails
 
@@ -127,7 +127,7 @@ headsAccepted = tests' (baseCfg RcHeads) (filters' Nothing) Accepted
 headsWith6Rejects :: [ShowFilter]
 headsWith6Rejects = tests' (baseCfg RcHeads) (filters' $ Just "6") Rejected
 
--- $> unit_check_rejection_messages
+-- $ > unit_check_rejection_messages
 
 unit_check_rejection_messages :: Assertion
 unit_check_rejection_messages =

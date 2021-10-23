@@ -140,13 +140,12 @@ runTestItems ::
   [i] -> -- ids
   rc -> -- runcoonfig
   Address ->
-  hi ->
-  (hi -> Sem effs ho) -> -- beforeEach
+  Sem effs ho -> -- beforeEach
   (ho -> Sem effs ()) -> -- AfterEach
   ItemRunner e as ds i ho tc rc effs -> --rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
   Test e tc rc ho i as ds effs ->
   [Sem effs ()]
-runTestItems iIds items rc add hi beforeEach afterEach itemRunner test@Test {config = tc} =
+runTestItems iIds items rc add beforeEach afterEach itemRunner test@Test {config = tc} =
   let startTest :: Sem effs ()
       startTest = logItem . StartTest $ mkTestLogInfo add tc
 
@@ -162,7 +161,7 @@ runTestItems iIds items rc add hi beforeEach afterEach itemRunner test@Test {con
             iid = ItemId add (getId i)
          in do
               logItem . StartIteration iid (getField @"title" i) $ toJSON i
-              ho <- beforeEach hi
+              ho <- beforeEach
               itemRunner rc add ho test i
               afterEach ho
               logItem $ EndIteration iid
@@ -178,14 +177,13 @@ runTest ::
   (ItemClass i ds, Config tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
   RunParams Maybe e rc tc effs -> -- Run Params
   Address ->
-  hi ->
-  (hi -> Sem effs ho) -> -- beforeEach
+  Sem effs ho -> -- beforeEach
   (ho -> Sem effs ()) -> -- AfterEach
   Test e tc rc ho i as ds effs -> -- Test Case
   [Sem effs ()] -- [Test Iterations]
-runTest RunParams {filters, rc, itemIds, itemRunner} add hi beforeEach afterEach test@Test {config = tc, items} =
+runTest RunParams {filters, rc, itemIds, itemRunner} add beforeEach afterEach test@Test {config = tc, items} =
   F.acceptFilter (F.applyFilters filters rc add tc)
-    ? runTestItems itemIds (items rc) rc add hi beforeEach afterEach itemRunner test
+    ? runTestItems itemIds (items rc) rc add beforeEach afterEach itemRunner test
     $ []
 
 logLPError :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => FrameworkError e -> Sem effs ()
@@ -205,13 +203,12 @@ exeElm ::
   (ToJSON e, Show e, Member (Logger e) effs) =>
   S.Set Address ->
   Address ->
-  hi ->
-  (hi -> Sem effs ho) ->
+  Sem effs ho ->
   (ho -> Sem effs ()) ->
   SuiteItem c hi ho effs [Sem effs ()] ->
   Sem effs ()
-exeElm includedAddresses parentAddress hi be ae si =
-  let exElm' :: forall c' hi' ho'. Address -> hi' -> (hi' -> Sem effs ho') -> (ho' -> Sem effs ()) -> SuiteItem c' hi' ho' effs [Sem effs ()] -> Sem effs ()
+exeElm includedAddresses parentAddress be ae si =
+  let exElm' :: forall c' hi' ho'. Address ->  Sem effs ho' -> (ho' -> Sem effs ()) -> SuiteItem c' hi' ho' effs [Sem effs ()] -> Sem effs ()
       exElm' = exeElm includedAddresses
 
       nxtAddress :: Text -> AddressElemType -> Address
@@ -223,8 +220,8 @@ exeElm includedAddresses parentAddress hi be ae si =
       exclude :: Text -> AddressElemType -> Bool
       exclude title at = S.notMember (nxtAddress title at) includedAddresses
    in case si of
-        Root {rootElms} -> sequence_ $ exElm' rootAddress hi be ae <$> rootElms
-        Tests {tests} -> sequence_ . join $ tests parentAddress hi be ae
+        Root {rootElms} -> sequence_ $ exElm' rootAddress be ae <$> rootElms
+        Tests {tests} -> sequence_ . join $ tests parentAddress be ae
         BeforeEach {title' = t, bHook' = bh, bhElms' = elms} ->
           let sem = exElm' (nxtHookAddress t)
           in exclude t RC.Hook ? pure () $ uu --sem

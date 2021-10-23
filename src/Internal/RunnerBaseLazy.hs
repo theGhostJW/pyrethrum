@@ -27,7 +27,7 @@ data SuiteItem c hi ho effs t where
     } ->
     SuiteItem One hi ho effs t
   Tests ::
-    { tests :: Address -> hi -> (hi -> Sem effs ho) -> (ho -> Sem effs ()) -> [t]
+    { tests :: Address -> Sem effs ho -> (ho -> Sem effs ()) -> [t]
     } ->
     SuiteItem Many hi ho effs t
   BeforeAll ::
@@ -39,9 +39,9 @@ data SuiteItem c hi ho effs t where
   BeforeEach ::
     { title' :: Text,
       bHook' :: hi -> Sem effs ho,
-      bhElms' :: [SuiteItem Many hi ho' effs t]
+      bhElms' :: [SuiteItem Many ho ho' effs t]
     } ->
-    SuiteItem Many hi ho' effs t
+    SuiteItem Many hi ho effs t
   AfterAll ::
     { title :: Text,
       aHook :: ho -> Sem effs (),

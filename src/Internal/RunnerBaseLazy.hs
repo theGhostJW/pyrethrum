@@ -10,52 +10,48 @@ import Pyrelude
 import RunElementClasses (Address (..))
 
 
---  node cardinality
-data Branch
-data Root'
-
-newtype Suite c hi effs t = Suite {
-  un :: [SuiteItem c hi effs t ]
+newtype Suite hi effs t = Suite {
+  un :: [SuiteItem hi effs t ]
 }
 
-data SuiteItem c hi effs t where
+data SuiteItem hi effs t where
   Root ::
-    { rootElms :: [SuiteItem Branch () effs t]
+    { rootElms :: [SuiteItem () effs t]
     } ->
-    SuiteItem Root' () effs t
+    SuiteItem () effs t
   Group ::
     { title :: Text,
-      gElms :: [SuiteItem c' hi effs t]
+      gElms :: [SuiteItem hi effs t]
     } ->
-    SuiteItem Branch hi effs t
+    SuiteItem hi effs t
   Tests ::
     { tests :: Address -> Sem effs hi -> (hi -> Sem effs ()) -> [t]
     } ->
-    SuiteItem Branch hi effs t
+    SuiteItem hi effs t
   BeforeAll ::
     { title :: Text,
       bHook :: hi -> Sem effs ho,
-      bhElms :: [SuiteItem c' ho effs t]
+      bhElms :: [SuiteItem ho effs t]
     } ->
-    SuiteItem Branch hi effs t
+    SuiteItem hi effs t
   BeforeEach ::
     { title' :: Text,
       bHook' :: hi -> Sem effs ho,
-      bhElms' :: [SuiteItem Branch ho effs t]
+      bhElms' :: [SuiteItem ho effs t]
     } ->
-    SuiteItem Branch hi effs t
+    SuiteItem hi effs t
   AfterAll ::
     { title :: Text,
       aHook :: ho -> Sem effs (),
-      ahElms :: [SuiteItem c' hi effs t]
+      ahElms :: [SuiteItem hi effs t]
     } ->
-    SuiteItem Branch hi effs t
+    SuiteItem hi effs t
   AfterEach ::
     { title' :: Text,
       aHook' :: hi -> Sem effs (),
-      ahElms' :: [SuiteItem Branch hi effs t]
+      ahElms' :: [SuiteItem hi effs t]
     } ->
-    SuiteItem Branch hi effs t
+    SuiteItem hi effs t
 
 {-
 instance Functor (SuiteItem hi ho effs) where

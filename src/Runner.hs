@@ -111,8 +111,6 @@ import qualified RunElementClasses as RC
 import RunnerBase as RB
   ( GenericResult (..),
     ItemRunner,
-    Branch,
-    Root',
     Suite(..),
     SuiteItem (..),
     Test (..),
@@ -205,10 +203,10 @@ exeElm ::
   Address ->
   Sem effs ho ->
   (ho -> Sem effs ()) ->
-  SuiteItem c ho effs [Sem effs ()] ->
+  SuiteItem ho effs [Sem effs ()] ->
   Sem effs ()
 exeElm includedAddresses parentAddress be ae si =
-  let exElm' :: forall c' ho'. Address ->  Sem effs ho' -> (ho' -> Sem effs ()) -> SuiteItem c' ho' effs [Sem effs ()] -> Sem effs ()
+  let exElm' :: forall ho'. Address ->  Sem effs ho' -> (ho' -> Sem effs ()) -> SuiteItem ho' effs [Sem effs ()] -> Sem effs ()
       exElm' = exeElm includedAddresses
 
       nxtAddress :: Text -> AddressElemType -> Address
@@ -324,7 +322,7 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
   let filterInfo :: Either Text F.FilterLog
       filterInfo = filterSuite rc suite filters
 
-      root :: Suite Root' () effs [Sem effs ()]
+      root :: Suite () effs [Sem effs ()]
       root = suite $ runTest rp
    in -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
       -- mockSuite = suite $ runTest rp

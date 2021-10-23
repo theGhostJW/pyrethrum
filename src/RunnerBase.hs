@@ -4,8 +4,6 @@ module RunnerBase
     TestSuite,
     RBL.Suite (..),
     RBL.SuiteItem (..),
-    RBL.Branch,
-    RBL.Root',
     Test (..),
     TestInfo (..),
     GenericResult (..),
@@ -71,14 +69,15 @@ type TestSuite e tc rc effs a =
     Test e tc rc ho i as ds effs ->
     a
   ) ->
-  Suite Root' () effs a
+  Suite () effs a
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
     results :: Either FilterErrorType [rslt]
-  }  deriving (Show)
+  }
+  deriving (Show)
 
-queryElm :: forall c hi effs a. (a -> Text) -> Address -> SuiteItem c hi effs a -> [AddressedElm a]
+queryElm :: forall c hi effs a. (a -> Text) -> Address -> SuiteItem hi effs a -> [AddressedElm a]
 queryElm title' address =
   let beUndefined = undefined
 
@@ -90,10 +89,10 @@ queryElm title' address =
       grpAddress' :: AddressElemType -> Text -> Address
       grpAddress' et ttl = push ttl et address
 
-      hkQuery' :: forall hii cc. AddressElemType -> Text -> [SuiteItem cc hii effs a] -> [AddressedElm a]
+      hkQuery' :: forall hii cc. AddressElemType -> Text -> [SuiteItem hii effs a] -> [AddressedElm a]
       hkQuery' et t e = e >>= queryElm title' (grpAddress' et t)
 
-      hkQuery :: forall hii cc. Text -> [SuiteItem cc hii effs a] -> [AddressedElm a]
+      hkQuery :: forall hii cc. Text -> [SuiteItem hii effs a] -> [AddressedElm a]
       hkQuery = hkQuery' RC.Hook
    in \case
         Root {rootElms} -> rootElms >>= queryElm title' address
@@ -104,10 +103,8 @@ queryElm title' address =
         AfterAll {title = t, ahElms = e} -> hkQuery t e
         AfterEach {title' = t, ahElms' = e} -> hkQuery t e
 
-
-querySuiteElms :: forall c hi effs a. (a -> Text) -> Address -> Suite c hi effs a -> [AddressedElm a]
+querySuiteElms :: forall c hi effs a. (a -> Text) -> Address -> Suite hi effs a -> [AddressedElm a]
 querySuiteElms title' address suite = un suite >>= queryElm title' address
-
 
 querySuite' ::
   forall e tc rc effs a.
@@ -133,7 +130,7 @@ querySuite' rc title' extractor suite =
         a
       fullQuery a _be _ae t = extractor rc a t
 
-      root :: Suite Root' () effs a
+      root :: Suite () effs a
       root = suite fullQuery
    in querySuiteElms title' rootAddress root
 

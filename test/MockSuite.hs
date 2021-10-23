@@ -99,7 +99,8 @@ implementedInteractor rc int' i = beforAll int' >>= \t -> testInteractor rc t i
 
 emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
-                ---        hi  itm       as   ds
+
+---        hi  itm       as   ds
 test1HeadsTxt :: MockTest Text TextItem Text Text effs
 test1HeadsTxt =
   Test
@@ -113,8 +114,8 @@ test1HeadsTxt =
       parse = emptiParser "Blahh"
     }
 
-test2TailsInt  :: MockTest Int IntItem Int Int effs
-test2TailsInt  =
+test2TailsInt :: MockTest Int IntItem Int Int effs
+test2TailsInt =
   Test
     { config =
         TestConfig
@@ -200,7 +201,7 @@ hasTitle ttl =
     }
 
 mockSuite ::
-  forall effs hi' ho' a.
+  forall effs a.
   ( forall hi ho i as ds.
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) =>
     Address ->
@@ -243,7 +244,6 @@ mockSuite runTest =
                 ]
             ]
         ],
-        
       R.Group
         { title = "Nested Int Group",
           gElms =
@@ -257,9 +257,18 @@ mockSuite runTest =
                           ahElms' =
                             [ Tests \a o be ae ->
                                 [ runTest a o be ae test5TailsInt,
-                                  runTest a o be ae test2TailsInt ,
+                                  runTest a o be ae test2TailsInt,
                                   runTest a o be ae test3TailsInt
-                                ]
+                                ],
+                              BeforeEach
+                                { title' = "Before Inner 2",
+                                  bHook' = \t -> pure "HI",
+                                  bhElms' =
+                                    [ Tests \a o be ae ->
+                                        [ runTest a o be ae test6HeadsTxt
+                                        ]
+                                    ]
+                                }
                             ]
                         }
                     ]

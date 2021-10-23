@@ -13,6 +13,7 @@ module Runner
   )
 where
 
+import qualified Check
 import Common
   ( DetailedInfo (..),
     FileSystemErrorType (..),
@@ -72,6 +73,7 @@ import Pyrelude as P
     join,
     maybe,
     not,
+    parent,
     sequence_,
     snd,
     subsequences,
@@ -86,12 +88,13 @@ import Pyrelude as P
     (<$>),
     (>>),
     (>>=),
-    (?), parent
+    (?),
   )
 import RunElementClasses as C
   ( Address,
     AddressElem,
     AddressedElm (AddressedElm, element),
+    AddressElemType,
     Config,
     HasId,
     HasTitle,
@@ -108,24 +111,24 @@ import qualified RunElementClasses as RC
 import RunnerBase as RB
   ( GenericResult (..),
     ItemRunner,
+    Many,
+    One,
+    Root',
     SuiteItem (..),
     Test (..),
     TestSuite,
-    One,
-    Many,
-    Root',
-    queryElm
+    queryElm,
   )
+import TestFilter (filterSuite)
 import qualified TestFilter as F
-  ( TestFilter (..),
+  ( FilterLog,
+    TestFilter (..),
     acceptAnyFilter,
     acceptFilter,
     applyFilters,
-    filterLog, FilterLog
+    filterLog,
   )
 import qualified Prelude as PRL
-import qualified Check
-import TestFilter (filterSuite)
 
 getId :: HasField "id" i Int => i -> Int
 getId = getField @"id"
@@ -143,7 +146,7 @@ runTestItems ::
   ItemRunner e as ds i ho tc rc effs -> --rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
   Test e tc rc ho i as ds effs ->
   [Sem effs ()]
-runTestItems iIds items rc add hi beforeEach afterEach itemRunner test@Test {config = tc}  =
+runTestItems iIds items rc add hi beforeEach afterEach itemRunner test@Test {config = tc} =
   let startTest :: Sem effs ()
       startTest = logItem . StartTest $ mkTestLogInfo add tc
 
@@ -175,7 +178,7 @@ runTest ::
   (ItemClass i ds, Config tc, ToJSON e, ToJSON as, ToJSON ds, Show e, Show as, Show ds, Member (Logger e) effs, ToJSON i) =>
   RunParams Maybe e rc tc effs -> -- Run Params
   Address ->
-  hi -> 
+  hi ->
   (hi -> Sem effs ho) -> -- beforeEach
   (ho -> Sem effs ()) -> -- AfterEach
   Test e tc rc ho i as ds effs -> -- Test Case
@@ -203,32 +206,45 @@ exeElm ::
   S.Set Address ->
   Address ->
   hi ->
-  (hi -> Sem effs ho) -> 
+  (hi -> Sem effs ho) ->
   (ho -> Sem effs ()) ->
   SuiteItem c hi ho effs [Sem effs ()] ->
   Sem effs ()
-exeElm includedAddresses parentAddress hi be ae si = 
-  let 
-    exElm' :: forall c' hi' ho'. Address -> hi' -> (hi' -> Sem effs ho') -> (ho' -> Sem effs ()) -> SuiteItem c' hi' ho' effs [Sem effs ()] -> Sem effs ()
-    exElm' = exeElm includedAddresses
+exeElm includedAddresses parentAddress hi be ae si =
+  let exElm' :: forall c' hi' ho'. Address -> hi' -> (hi' -> Sem effs ho') -> (ho' -> Sem effs ()) -> SuiteItem c' hi' ho' effs [Sem effs ()] -> Sem effs ()
+      exElm' = exeElm includedAddresses
 
-
-  in
-  case si of
-    Root {rootElms} -> sequence_ $ exElm' rootAddress hi be ae <$> rootElms
-    Tests {tests} -> sequence_ . join $ tests parentAddress hi be ae
+      nxtAddress :: Text -> AddressElemType -> Address
+      nxtAddress ttl at = push ttl at parentAddress
       
-    BeforeEach {title' = t, bHook' = bh, bhElms' = elms} -> uu
-      -- exElm' hi   <$> elms
+      nxtHookAddress :: Text -> Address
+      nxtHookAddress ttl = push ttl RC.Hook parentAddress
 
-    -- AfterEach {title' = t, ahElms' = e} -> hkQuery t e
-      
-      --  (\a -> AddressedElm (tstAddress a) a) <$> tests address hiUndefined beUndefined aeUndefined 
-    _ -> uu
-    -- Group {title = t, gElms = e} -> hkQuery' RC.Group t e
-    -- BeforeAll {title = t, bhElms = e} -> hkQuery t e
-    -- AfterAll {title = t, ahElms = e} -> hkQuery t e
-    
+      exclude :: Text -> AddressElemType -> Bool
+      exclude title at = S.notMember (nxtAddress title at) includedAddresses
+   in case si of
+        Root {rootElms} -> sequence_ $ exElm' rootAddress hi be ae <$> rootElms
+        Tests {tests} -> sequence_ . join $ tests parentAddress hi be ae
+        BeforeEach {title' = t, bHook' = bh, bhElms' = elms} ->
+          let sem = exElm' (nxtHookAddress t)
+          in exclude t RC.Hook ? pure () $ uu --sem
+        -- exeHook :: [SuiteItem Many ho ho' effs t] Sem effs o -> Sem effs o
+        --        exeHook hookType ttl hook = do
+        --         log' $ StartHook hookType ttl
+        --         o <- hook
+        --         log' $ EndHook hookType ttl
+        --         pure o
+        -- exElm' hi   <$> elms
+
+        -- AfterEach {title' = t, ahElms' = e} -> hkQuery t e
+
+        --  (\a -> AddressedElm (tstAddress a) a) <$> tests address hiUndefined beUndefined aeUndefined
+        _ -> uu
+
+-- Group {title = t, gElms = e} -> hkQuery' RC.Group t e
+-- BeforeAll {title = t, bhElms = e} -> hkQuery t e
+-- AfterAll {title = t, ahElms = e} -> hkQuery t e
+
 -- exeElm ::
 --   forall c hi ho e effs a.
 --   (ToJSON e, Show e, Member (Logger e) effs) =>
@@ -239,43 +255,43 @@ exeElm includedAddresses parentAddress hi be ae si =
 --   SuiteItem c hi effs [a] ->
 --   Sem effs ()
 -- exeElm targAddresses runner address hi si = uu
-  -- let log' :: LogProtocolBase e -> Sem effs ()
-  --     log' = logItem
+-- let log' :: LogProtocolBase e -> Sem effs ()
+--     log' = logItem
 
-  --     exeHook :: HookType -> Text -> Sem effs o -> Sem effs o
-  --     exeHook hookType ttl hook = do
-  --       log' $ StartHook hookType ttl
-  --       o <- hook
-  --       log' $ EndHook hookType ttl
-  --       pure o
+--     exeHook :: HookType -> Text -> Sem effs o -> Sem effs o
+--     exeHook hookType ttl hook = do
+--       log' $ StartHook hookType ttl
+--       o <- hook
+--       log' $ EndHook hookType ttl
+--       pure o
 
-  --     exeNxt :: forall c' hin hout. Address -> hin -> SuiteItem c' hin hout effs [a] -> Sem effs ()
-  --     exeNxt = exeElm targAddresses runner 
+--     exeNxt :: forall c' hin hout. Address -> hin -> SuiteItem c' hin hout effs [a] -> Sem effs ()
+--     exeNxt = exeElm targAddresses runner
 
-  --  in do
-  --       S.notMember address targAddresses
-  --         ? pure ()
-  --         $ case si of
-  --           Root subElms -> sequence_ $ exeNxt address () <$> subElms
-  --           Tests {tests} -> sequence_ $ runner address hi <$> tests
-  --           BeforeAll {title = ttl, bHook, bhElms} -> do
-  --             o <- exeHook C.BeforeAll ttl (bHook hi)
-  --             sequence_ $ (\f -> exeNxt address o $ f address o) <$> bhElms
-  --           BeforeEach {title' = ttl, bHook', bhElms'} ->
-  --             let runElm f = do
-  --                   o <- exeHook C.BeforeEach ttl (bHook' hi)
-  --                   exeNxt address o $ f address o
-  --              in sequence_ $ runElm <$> bhElms'
-  --           AfterEach {RB.title' = ttl, aHook', ahElms'} ->
-  --             sequence_ $ (\f -> exeNxt address hi (f address hi) >> exeHook C.AfterEach ttl (aHook' hi)) <$> ahElms'
-  --           AfterAll {title = ttl, aHook, ahElms} -> do
-  --             sequence_ $ (\f -> exeNxt address hi (f address hi)) <$> ahElms
-  --             exeHook C.AfterAll ttl $ aHook hi
-  --           Group {title = ttl, gElms} ->
-  --             do
-  --               logItem . StartGroup . GroupTitle $ ttl
-  --               sequence_ $ (\f -> exeNxt address hi $ f address hi) <$> gElms
-  --               logItem . EndGroup . GroupTitle $ ttl
+--  in do
+--       S.notMember address targAddresses
+--         ? pure ()
+--         $ case si of
+--           Root subElms -> sequence_ $ exeNxt address () <$> subElms
+--           Tests {tests} -> sequence_ $ runner address hi <$> tests
+--           BeforeAll {title = ttl, bHook, bhElms} -> do
+--             o <- exeHook C.BeforeAll ttl (bHook hi)
+--             sequence_ $ (\f -> exeNxt address o $ f address o) <$> bhElms
+--           BeforeEach {title' = ttl, bHook', bhElms'} ->
+--             let runElm f = do
+--                   o <- exeHook C.BeforeEach ttl (bHook' hi)
+--                   exeNxt address o $ f address o
+--              in sequence_ $ runElm <$> bhElms'
+--           AfterEach {RB.title' = ttl, aHook', ahElms'} ->
+--             sequence_ $ (\f -> exeNxt address hi (f address hi) >> exeHook C.AfterEach ttl (aHook' hi)) <$> ahElms'
+--           AfterAll {title = ttl, aHook, ahElms} -> do
+--             sequence_ $ (\f -> exeNxt address hi (f address hi)) <$> ahElms
+--             exeHook C.AfterAll ttl $ aHook hi
+--           Group {title = ttl, gElms} ->
+--             do
+--               logItem . StartGroup . GroupTitle $ ttl
+--               sequence_ $ (\f -> exeNxt address hi $ f address hi) <$> gElms
+--               logItem . EndGroup . GroupTitle $ ttl
 
 -- exeElm' ::
 --   forall c hi ho e effs a.
@@ -285,7 +301,7 @@ exeElm includedAddresses parentAddress hi be ae si =
 --   hi ->
 --   SuiteItem c hi ho effs [[Sem effs ()]] ->
 --   Sem effs ()
--- exeElm' targAddresses address hi si = 
+-- exeElm' targAddresses address hi si =
 --    let log' :: LogProtocolBase e -> Sem effs ()
 --        log' = logItem
 
@@ -313,24 +329,20 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
 
       root :: SuiteItem Root' () () effs [Sem effs ()]
       root = suite $ runTest rp
-
-      -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
+   in -- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => Address -> hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
       -- mockSuite = suite $ runTest rp
       -- exeElmRunner:: forall hii. Address -> hii -> a -> Sem effs ()
 
-
-      
--- runTest ::
---   RunParams Maybe e rc tc effs -> -- Run Params
---   Address ->
---   hi -> 
---   Test e tc rc hi i as ds effs -> -- Test Case
---   [Sem effs ()] -- [Test Iterations]
-
+      -- runTest ::
+      --   RunParams Maybe e rc tc effs -> -- Run Params
+      --   Address ->
+      --   hi ->
+      --   Test e tc rc hi i as ds effs -> -- Test Case
+      --   [Sem effs ()] -- [Test Iterations]
 
       --   itemRunner -> runtest include hooks -> exceute elems threads each hooks
 
---       root :: forall hii. SuiteItem hii effs [[Sem effs hii -> Sem effs () -> Sem effs ()]]
+      --       root :: forall hii. SuiteItem hii effs [[Sem effs hii -> Sem effs () -> Sem effs ()]]
       -- root = suite itemRunner -- Test e tc rc () i0 as0 ds0 effs -> [Sem effs ()]
 
       -- run' :: Sem effs ()
@@ -341,7 +353,7 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
       --         exeElm includedAddresses itemRunner pure root
       --         logItem EndRun
 
-   in uu
+      uu
 
 -- let
 

@@ -111,8 +111,7 @@ import qualified RunElementClasses as RC
 import RunnerBase as RB
   ( GenericResult (..),
     ItemRunner,
-    Many,
-    One,
+    Branch,
     Root',
     SuiteItem (..),
     Test (..),

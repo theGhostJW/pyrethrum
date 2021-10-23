@@ -3,7 +3,7 @@
 module Internal.RunnerBaseLazy where
 
 import Common (FilterErrorType, FrameworkError, HookType)
-import Data.Aeson hiding (One)
+import Data.Aeson
 import Polysemy
 import Polysemy.Error
 import Pyrelude
@@ -11,49 +11,47 @@ import RunElementClasses (Address (..))
 
 
 --  node cardinality
-data One
-data Many
+data Branch
 data Root'
-
 
 data SuiteItem c hi effs t where
   Root ::
-    { rootElms :: [SuiteItem One () effs t]
+    { rootElms :: [SuiteItem Branch () effs t]
     } ->
     SuiteItem Root' () effs t
   Group ::
     { title :: Text,
       gElms :: [SuiteItem c' hi effs t]
     } ->
-    SuiteItem One hi effs t
+    SuiteItem Branch hi effs t
   Tests ::
     { tests :: Address -> Sem effs hi -> (hi -> Sem effs ()) -> [t]
     } ->
-    SuiteItem Many hi effs t
+    SuiteItem Branch hi effs t
   BeforeAll ::
     { title :: Text,
       bHook :: hi -> Sem effs ho,
       bhElms :: [SuiteItem c' ho effs t]
     } ->
-    SuiteItem One hi effs t
+    SuiteItem Branch hi effs t
   BeforeEach ::
     { title' :: Text,
       bHook' :: hi -> Sem effs ho,
-      bhElms' :: [SuiteItem Many ho effs t]
+      bhElms' :: [SuiteItem Branch ho effs t]
     } ->
-    SuiteItem Many hi effs t
+    SuiteItem Branch hi effs t
   AfterAll ::
     { title :: Text,
       aHook :: ho -> Sem effs (),
       ahElms :: [SuiteItem c' hi effs t]
     } ->
-    SuiteItem One hi effs t
+    SuiteItem Branch hi effs t
   AfterEach ::
     { title' :: Text,
       aHook' :: hi -> Sem effs (),
-      ahElms' :: [SuiteItem Many hi effs t]
+      ahElms' :: [SuiteItem Branch hi effs t]
     } ->
-    SuiteItem Many hi effs t
+    SuiteItem Branch hi effs t
 
 {-
 instance Functor (SuiteItem hi ho effs) where

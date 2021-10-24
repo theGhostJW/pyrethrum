@@ -140,7 +140,7 @@ runTestItems ::
   rc -> -- runcoonfig
   Address ->
   Sem effs ho -> -- beforeEach
-  (ho -> Sem effs ()) -> -- AfterEach
+  Sem effs () -> -- AfterEach
   ItemRunner e as ds i ho tc rc effs -> --rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
   Test e tc rc ho i as ds effs ->
   [Sem effs ()]
@@ -162,7 +162,7 @@ runTestItems iIds items rc add beforeEach afterEach itemRunner test@Test {config
               logItem . StartIteration iid (getField @"title" i) $ toJSON i
               ho <- beforeEach
               itemRunner rc add ho test i
-              afterEach ho
+              afterEach
               logItem $ EndIteration iid
 
       inTargIds :: i -> Bool
@@ -177,7 +177,7 @@ runTest ::
   RunParams Maybe e rc tc effs -> -- Run Params
   Address ->
   Sem effs ho -> -- beforeEach
-  (ho -> Sem effs ()) -> -- AfterEach
+  Sem effs () -> -- AfterEach
   Test e tc rc ho i as ds effs -> -- Test Case
   [Sem effs ()] -- [Test Iterations]
 runTest RunParams {filters, rc, itemIds, itemRunner} add beforeEach afterEach test@Test {config = tc, items} =

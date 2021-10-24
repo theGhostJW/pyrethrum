@@ -65,7 +65,7 @@ type TestSuite e tc rc effs a =
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (C.Checks ds), HasField "id" i Int, HasField "title" i Text) =>
     Address ->
     Sem effs ho ->
-    (ho -> Sem effs ()) ->
+    Sem effs () ->
     Test e tc rc ho i as ds effs ->
     a
   ) ->
@@ -80,8 +80,7 @@ data GenericResult tc rslt = TestResult
 queryElm :: forall c hi effs a. (a -> Text) -> Address -> SuiteItem hi effs a -> [AddressedElm a]
 queryElm title' address =
   let beUndefined = undefined
-
-      aeUndefined ho = undefined
+      aeUndefined = undefined
 
       tstAddress :: a -> Address
       tstAddress a = push (title' a) RC.Test address
@@ -124,7 +123,7 @@ querySuite' rc title' extractor suite =
         (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
         Address ->
         Sem effs ho -> -- beforeEach
-        (ho -> Sem effs ()) -> -- AfterEach
+        Sem effs () -> -- AfterEach
         Test e tc rc ho i as ds effs ->
         a
       fullQuery a _be _ae t = extractor rc a t

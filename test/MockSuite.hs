@@ -206,7 +206,7 @@ mockSuite ::
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) =>
     Address ->
     Sem effs ho -> -- beforeEach
-    (ho -> Sem effs ()) -> -- AfterEach
+    Sem effs () -> -- AfterEach
     MockTest ho i as ds effs ->
     a
   ) ->

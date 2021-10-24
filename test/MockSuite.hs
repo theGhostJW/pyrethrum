@@ -217,7 +217,7 @@ mockSuite runTest =
         "Filter TestSuite"
         [ BeforeAll
             "Before All"
-            (\i -> pure @_ @Text "hello")
+            (pure @_ @Text "hello")
             [ R.Group
                 "Divider"
                 [ Tests

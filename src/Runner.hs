@@ -43,6 +43,7 @@ import Data.Either.Extra (Either, eitherToMaybe)
 import Data.List (dropWhile)
 import qualified Data.Set as S
 import GHC.Records (HasField (getField))
+import Internal.RunnerBaseLazy (SuiteItem (..))
 import ItemFilter (ItemFilter (..), filterredItemIds)
 import OrphanedInstances ()
 import Polysemy (Member, Sem)
@@ -127,7 +128,6 @@ import qualified TestFilter as F
     filterLog,
   )
 import qualified Prelude as PRL
-import Internal.RunnerBaseLazy (SuiteItem(..))
 
 getId :: HasField "id" i Int => i -> Int
 getId = getField @"id"
@@ -196,15 +196,14 @@ data RunParams m e rc tc effs = RunParams
     rc :: rc
   }
 
-
 -- TODO - Error handling especially outside tests eg. in hooks
 exeElm ::
   forall hi e effs.
   (ToJSON e, Show e, Member (Logger e) effs) =>
   S.Set Address ->
   Address ->
-  Sem effs hi ->
-  Sem effs () ->
+  Sem effs hi -> -- beforeEach
+  Sem effs () -> -- afterEach
   SuiteItem hi effs [Sem effs ()] ->
   Sem effs ()
 exeElm includedAddresses parentAddress be ae si =
@@ -220,36 +219,40 @@ exeElm includedAddresses parentAddress be ae si =
       exclude :: Text -> AddressElemType -> Bool
       exclude title at = S.notMember (nxtAddress title at) includedAddresses
    in case si of
-        Tests {tests} -> uu --sequence_ . join $ tests parentAddress be ae
-        BeforeEach {title' = t, bHook' = bh, bhElms' = elms} -> uu
+        Tests {tests} -> sequence_ . join $ tests parentAddress be ae
+        BeforeEach {title' = t, bHook', bhElms'} ->
+          let runElm si' = exElm' (nxtHookAddress t) (be >>= bHook') ae si'
+           in sequence_ $ runElm <$> bhElms'
+        BeforeAll {title = t, bHook, bhElms} -> uu
         _ -> uu
-          -- let sem = exElm' (nxtHookAddress t)
 
-          --     -- runElm :: forall ho. SuiteItem ho effs [Sem effs ()] -> Sem effs ()
-          --     runElm si' = do 
-          --             hi <- be
-          --             ho <- bh hi
-          --             exElm' (nxtHookAddress t) (pure ho) _ si'
+-- let sem = exElm' (nxtHookAddress t)
+
+--     -- runElm :: forall ho. SuiteItem ho effs [Sem effs ()] -> Sem effs ()
+--     runElm si' = do
+--             hi <- be
+--             ho <- bh hi
+--             exElm' (nxtHookAddress t) (pure ho) _ si'
 --                   o <- exeHook C.BeforeEach ttl (bHook' hi)
 --                   exeNxt address o $ f address o
 -- let runElm f = do
 
 --                   o <- exeHook C.BeforeEach ttl (bHook' hi)
 --                   exeNxt address o $ f address o
-             -- exElm' (nxtHookAddress t)
-              --be' = be >>= bh
-          --  in exclude t RC.Hook ? pure () $ uu -- _ <$> elms
-          -- exeHook :: [SuiteItem Many ho ho' effs t] Sem effs o -> Sem effs o
-          --        exeHook hookType ttl hook = do
-          --         log' $ StartHook hookType ttl
-          --         o <- hook
-          --         log' $ EndHook hookType ttl
-          --         pure o
-          -- exElm' hi   <$> elms
+-- exElm' (nxtHookAddress t)
+--be' = be >>= bh
+--  in exclude t RC.Hook ? pure () $ uu -- _ <$> elms
+-- exeHook :: [SuiteItem Many ho ho' effs t] Sem effs o -> Sem effs o
+--        exeHook hookType ttl hook = do
+--         log' $ StartHook hookType ttl
+--         o <- hook
+--         log' $ EndHook hookType ttl
+--         pure o
+-- exElm' hi   <$> elms
 
-        -- AfterEach {title' = t, ahElms' = e} -> hkQuery t e
+-- AfterEach {title' = t, ahElms' = e} -> hkQuery t e
 
-        --  (\a -> AddressedElm (tstAddress a) a) <$> tests address hiUndefined beUndefined aeUndefined
+--  (\a -> AddressedElm (tstAddress a) a) <$> tests address hiUndefined beUndefined aeUndefined
 
 exeSuite ::
   forall ho e effs.
@@ -260,7 +263,8 @@ exeSuite ::
   Suite ho effs [Sem effs ()] ->
   Sem effs ()
 exeSuite includedAddresses be ae si = uu
-  -- sequence_ $ exeElm includedAddresses rootAddress be ae <$> un si
+
+-- sequence_ $ exeElm includedAddresses rootAddress be ae <$> un si
 
 -- Group {title = t, gElms = e} -> hkQuery' RC.Group t e
 -- BeforeAll {title = t, bhElms = e} -> hkQuery t e

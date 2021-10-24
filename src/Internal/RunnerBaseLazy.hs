@@ -26,7 +26,7 @@ data SuiteItem hi effs t where
     SuiteItem hi effs t
   BeforeAll ::
     { title :: Text,
-      bHook :: hi -> Sem effs ho,
+      bHook :: Sem effs ho,
       bhElms :: [SuiteItem ho effs t]
     } ->
     SuiteItem hi effs t
@@ -38,7 +38,7 @@ data SuiteItem hi effs t where
     SuiteItem hi effs t
   AfterAll ::
     { title :: Text,
-      aHook :: ho -> Sem effs (),
+      aHook :: Sem effs (),
       ahElms :: [SuiteItem hi effs t]
     } ->
     SuiteItem hi effs t

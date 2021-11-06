@@ -22,8 +22,8 @@ import Runner as R
     Config,
     ItemClass,
     RunParams (..),
+    Suite (..),
     SuiteItem (..),
-    Suite(..),
     Test (..),
     mkSem,
   )
@@ -100,7 +100,7 @@ implementedInteractor rc int' i = beforAll int' >>= \t -> testInteractor rc t i
 emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
 
----        hi  itm       as   ds
+---                           hi  itm     as   ds
 test1HeadsTxt :: MockTest Text TextItem Text Text effs
 test1HeadsTxt =
   Test
@@ -202,12 +202,11 @@ hasTitle ttl =
 
 mockSuite ::
   forall effs a.
-  ( forall ho i as ds.
+  ( forall hd i as ds.
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) =>
     Address ->
-    Sem effs ho -> -- beforeEach
-    Sem effs () -> -- AfterEach
-    MockTest ho i as ds effs ->
+    hd ->
+    MockTest hd i as ds effs ->
     a
   ) ->
   Suite () effs a
@@ -217,27 +216,27 @@ mockSuite runTest =
         "Filter TestSuite"
         [ BeforeAll
             "Before All"
-            (pure @_ @Text "hello")
+            (\_ -> pure "hello")
             [ R.Group
                 "Divider"
                 [ Tests
-                    \a be ae ->
-                      [ runTest a be ae test1HeadsTxt,
-                        runTest a be ae test4HeadsTxt
+                    \a hd ->
+                      [ runTest a hd test1HeadsTxt,
+                        runTest a hd test4HeadsTxt
                       ]
                 ],
               ----
               R.Group
                 "Empty Group"
-                [Tests \_ _ _ -> []],
+                [Tests \_ _ -> []],
               ----
               R.Group
                 "Divider"
-                [ BeforeEach
+                [ BeforeAll
                     "Before Inner"
-                    (\t -> pure "HI")
-                    [ Tests \a be ae ->
-                        [ runTest a be ae test6HeadsTxt
+                    (\_ -> pure "HI")
+                    [ Tests \a hd  ->
+                        [ runTest a hd test6HeadsTxt
                         ]
                     ]
                 ]
@@ -246,31 +245,25 @@ mockSuite runTest =
       R.Group
         { title = "Nested Int Group",
           gElms =
-            [ BeforeEach
-                { title' = "Int BE",
-                  bHook' = (\i -> pure 23) :: () -> Sem effs Int,
-                  bhElms' =
-                    [ AfterEach
-                        { title' = "After Exch Int",
-                          aHook' = \i -> i == 23 ? pure () $ pure (),
-                          ahElms' =
-                            [ Tests \a be ae ->
-                                [ runTest a be ae test5TailsInt,
-                                  runTest a be ae test2TailsInt,
-                                  runTest a be ae test3TailsInt
+            [ BeforeAll
+                { title = "Int BE",
+                  bHook = (\i -> pure 23) :: () -> Sem effs Int,
+                  bhElms =
+                    [ Tests \a hd ->
+                        [ runTest a hd test5TailsInt,
+                          runTest a hd test2TailsInt,
+                          runTest a hd test3TailsInt
+                        ],
+                      BeforeAll
+                        { title = "Before Inner 2",
+                          bHook = \t -> pure "HI",
+                          bhElms =
+                            [ Tests \a hd ->
+                                [ runTest a hd test6HeadsTxt
                                 ],
-                              BeforeEach
-                                { title' = "Before Inner 2",
-                                  bHook' = \t -> pure "HI",
-                                  bhElms' =
-                                    [ Tests \a be ae ->
-                                        [ runTest a be ae test6HeadsTxt
-                                        ],
-                                      R.Group
-                                        { title = "Double Nested Empty Group",
-                                          gElms = []
-                                        }
-                                    ]
+                              R.Group
+                                { title = "Double Nested Empty Group",
+                                  gElms = []
                                 }
                             ]
                         }

@@ -10,53 +10,40 @@ import Pyrelude
 import RunElementClasses (Address (..))
 
 
-newtype Suite hi effs t = Suite {
-  un :: [SuiteItem hi effs t ]
+newtype Suite hd effs t = Suite {
+  un :: [SuiteItem hd effs t ]
 }
 
-data SuiteItem hi effs t where
+data SuiteItem hd effs t where
   Group ::
     { title :: Text,
-      gElms :: [SuiteItem hi effs t]
+      gElms :: [SuiteItem hd effs t]
     } ->
-    SuiteItem hi effs t
+    SuiteItem hd effs t
   Tests ::
-    { tests :: Address -> Sem effs hi -> Sem effs () -> [t]
+    { tests :: Address -> hd -> [t]
     } ->
-    SuiteItem hi effs t
+    SuiteItem hd effs t
   BeforeAll ::
     { title :: Text,
-      bHook :: Sem effs ho,
-      bhElms :: [SuiteItem ho effs t]
+      bHook :: hd -> Sem effs hd2,
+      bhElms :: [SuiteItem hd2 effs t]
     } ->
-    SuiteItem hi effs t
-  BeforeEach ::
-    { title' :: Text,
-      bHook' :: hi -> Sem effs ho,
-      bhElms' :: [SuiteItem ho effs t]
-    } ->
-    SuiteItem hi effs t
+    SuiteItem hd effs t
   AfterAll ::
     { title :: Text,
-      aHook :: Sem effs (),
-      ahElms :: [SuiteItem hi effs t]
+      aHook :: hd -> Sem effs (),
+      ahElms :: [SuiteItem hd effs t]
     } ->
-    SuiteItem hi effs t
-  AfterEach ::
-    { title' :: Text,
-      aHook' :: hi -> Sem effs (),
-      ahElms' :: [SuiteItem hi effs t]
-    } ->
-    SuiteItem hi effs t
-
+    SuiteItem hd effs t
 {-
-instance Functor (SuiteItem hi ho effs) where
-  fmap :: (a -> b) -> SuiteItem hi ho effs a -> SuiteItem hi ho effs b
+instance Functor (SuiteItem hd ho effs) where
+  fmap :: (a -> b) -> SuiteItem hd ho effs a -> SuiteItem hd ho effs b
   fmap f si =
-    let f''' :: (a' -> b') -> (Address -> c -> SuiteItem hi' ho' effs a') -> (Address -> c -> SuiteItem hi' ho' effs b')
+    let f''' :: (a' -> b') -> (Address -> c -> SuiteItem hd' ho' effs a') -> (Address -> c -> SuiteItem hd' ho' effs b')
         f''' f1 f2 = \a -> (f1 <$>) . f2 a
 
-        f'' :: (a' -> b') -> [Address -> c -> SuiteItem hi' ho' effs a'] -> [Address -> c -> SuiteItem hi' ho' effs b']
+        f'' :: (a' -> b') -> [Address -> c -> SuiteItem hd' ho' effs a'] -> [Address -> c -> SuiteItem hd' ho' effs b']
         f'' fi l = f''' fi <$> l
      in case si of
           Tests a -> Tests $ f a

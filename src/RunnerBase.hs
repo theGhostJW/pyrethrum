@@ -29,7 +29,7 @@ import Pyrelude
     Either,
     Eq (..),
     Int,
-    Listy (null),
+    Listy (null, length),
     Maybe (..),
     Monad ((>>=)),
     Ord (..),
@@ -57,16 +57,15 @@ import Pyrelude
 import RunElementClasses (Address, AddressElemType, AddressedElm (..), Config, TestFilterResult (TestFilterResult), push, rootAddress)
 import qualified RunElementClasses as RC
 
-type ItemRunner e as ds i hi tc rc effs =
-  rc -> Address -> hi -> Test e tc rc hi i as ds effs -> i -> Sem effs ()
+type ItemRunner e as ds i hd tc rc effs =
+  rc -> Address -> hd -> Test e tc rc hd i as ds effs -> i -> Sem effs ()
 
 type TestSuite e tc rc effs a =
-  ( forall ho i as ds.
+  ( forall hd i as ds.
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (C.Checks ds), HasField "id" i Int, HasField "title" i Text) =>
     Address ->
-    Sem effs ho ->
-    Sem effs () ->
-    Test e tc rc ho i as ds effs ->
+    hd ->
+    Test e tc rc hd i as ds effs ->
     a
   ) ->
   Suite () effs a
@@ -77,10 +76,9 @@ data GenericResult tc rslt = TestResult
   }
   deriving (Show)
 
-queryElm :: forall c hi effs a. (a -> Text) -> Address -> SuiteItem hi effs a -> [AddressedElm a]
+queryElm :: forall hi effs a. (a -> Text) -> Address -> SuiteItem hi effs a -> [AddressedElm a]
 queryElm title' address =
-  let beUndefined = undefined
-      aeUndefined = undefined
+  let hdUndefined = undefined
 
       tstAddress :: a -> Address
       tstAddress a = push (title' a) RC.Test address
@@ -88,20 +86,18 @@ queryElm title' address =
       grpAddress' :: AddressElemType -> Text -> Address
       grpAddress' et ttl = push ttl et address
 
-      hkQuery' :: forall hii cc. AddressElemType -> Text -> [SuiteItem hii effs a] -> [AddressedElm a]
+      hkQuery' :: forall hii. AddressElemType -> Text -> [SuiteItem hii effs a] -> [AddressedElm a]
       hkQuery' et t e = e >>= queryElm title' (grpAddress' et t)
 
-      hkQuery :: forall hii cc. Text -> [SuiteItem hii effs a] -> [AddressedElm a]
+      hkQuery :: forall hii. Text -> [SuiteItem hii effs a] -> [AddressedElm a]
       hkQuery = hkQuery' RC.Hook
    in \case
-        Tests {tests} -> (\a -> AddressedElm (tstAddress a) a) <$> tests address beUndefined aeUndefined
+        Tests {tests} -> (\a -> AddressedElm (tstAddress a) a) <$> tests address hdUndefined
         Group {title = t, gElms = e} -> hkQuery' RC.Group t e
         BeforeAll {title = t, bhElms = e} -> hkQuery t e
-        BeforeEach {title' = t, bhElms' = e} -> hkQuery t e
         AfterAll {title = t, ahElms = e} -> hkQuery t e
-        AfterEach {title' = t, ahElms' = e} -> hkQuery t e
 
-querySuiteElms :: forall c hi effs a. (a -> Text) -> Address -> Suite hi effs a -> [AddressedElm a]
+querySuiteElms :: forall hi effs a. (a -> Text) -> Address -> Suite hi effs a -> [AddressedElm a]
 querySuiteElms title' address suite = un suite >>= queryElm title' address
 
 querySuite' ::
@@ -122,11 +118,10 @@ querySuite' rc title' extractor suite =
   let fullQuery ::
         (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, RC.ItemClass i ds) =>
         Address ->
-        Sem effs ho -> -- beforeEach
-        Sem effs () -> -- AfterEach
-        Test e tc rc ho i as ds effs ->
+        hd ->
+        Test e tc rc hd i as ds effs ->
         a
-      fullQuery a _be _ae t = extractor rc a t
+      fullQuery a hd t = extractor rc a t
 
       root :: Suite () effs a
       root = suite fullQuery
@@ -182,9 +177,48 @@ testInfo rc t =
           itemInfo = iinfo <$> items t rc
         }
 
-data Test e tc rc hi i as ds effs = Test
+data Test e tc rc hd i as ds effs = Test
   { config :: tc,
     items :: rc -> [i],
-    interactor :: rc -> hi -> i -> Sem effs as,
+    interactor :: rc -> hd -> i -> Sem effs as,
     parse :: forall psEffs. (Member (Error (FrameworkError e)) psEffs) => as -> Sem psEffs ds
   }
+
+
+
+{-
+The following demos that before and after could be implemented  via a bracket / resource like function
+and partially applied / shared. This seems to be a much simplerer approach than trying to impement these
+hooks via a SuiteItem data constructors which would end up haeing pretty arbitary semantics for the end user
+
+defer as needs to be written in terms of resource
+-}
+
+demoBeforeAll:: hd -> Sem effs Text
+demoBeforeAll hd = pure "Hello"
+
+demoAfterAll:: Text -> Sem effs ()
+demoAfterAll t = pure ()
+
+--  bracket for 
+bracket :: Sem effs a   -- computation to run first ("acquire resource")
+          -> (a -> Sem effs ()) -- computation to run last ("release resource")
+          -> (a -> Sem effs c)  -- computation to run in-between
+          -> Sem effs c
+bracket = uu
+
+hookBa :: hd -> Sem effs b
+hookBa = uu
+
+demoInteractor1 :: rc -> hd -> i -> Sem effs Int
+demoInteractor1 rc hd i =
+    bracket
+      (demoBeforeAll hd)
+      (\_ -> pure ())
+      (pure . length {- can refer to: rc, hd, i  here-})
+
+-- helpers 
+-- withBeforeAfter 
+-- withBefore
+-- withAfter
+

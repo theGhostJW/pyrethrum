@@ -11,7 +11,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Records
 import ItemRunners (runItem)
-import MockSuite as M (MockTest, RunConfig (RunConfig), TestConfig (..), TextItem, happyRun, mockSuite, rcRunAll, tossFilter, TossResult (RcHeads))
+import MockSuite as M (MockTest, RunConfig (RunConfig), TestConfig (..), TextItem, happyRun, mockSuite, rcRunAll, tossFilter, TossResult (RcHeads), DemoEffs)
 import Polysemy
 import Pyrelude as P
 import Pyrelude.IO (putStrLn)
@@ -23,18 +23,20 @@ import qualified RunElementClasses as C
 import TempUtils
 import TestFilter
 import Text.Show.Pretty (pPrint, pPrintList, ppShowList)
+import Polysemy.Internal.Union (Member)
+import DSL.Logger
 
 -- $ > view demoQueryElem
 
-demoQueryElem :: [AddresStringElm (TestInfo TestConfig)]
-demoQueryElem = toStrElm <$> querySuite rcRunAll mockSuite
+demoQueryElem :: forall effs. DemoEffs effs => [AddresStringElm (TestInfo TestConfig)]
+demoQueryElem = toStrElm <$> querySuite rcRunAll (mockSuite @effs)
 
-applyFilterLog :: TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]
-applyFilterLog fltr = filterLog mockSuite [fltr]
+applyFilterLog :: forall effs. DemoEffs effs => TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]
+applyFilterLog fltr = filterLog (mockSuite @effs) [fltr]
 
-listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
+listTests :: forall effs. DemoEffs effs => TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
-  headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress . (address :: TestLogInfo -> Address) . C.testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
+  headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress . (address :: TestLogInfo -> Address) . C.testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog @effs fltr rc)
 
 -- $ > expectedDemoGroupNames
 expectedDemoGroupNames :: [Text]

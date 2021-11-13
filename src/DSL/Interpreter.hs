@@ -43,7 +43,7 @@ type Failure e = Error (FrameworkError e)
 type MinEffs e effs = Members '[Logger e, Failure e, CurrentTime] effs
 
 type EFFEnsureLog e effs = (Members '[Logger e, Failure e] effs)
-type EFFAllEffectsBase e effs = Members (FullEffects e) effs
+type AllEffects e effs = Members (FullEffects e) effs
 type FullEffects e = '[FileSystem, ArbitraryIO, Logger e, CurrentTime, Failure e]
 
 -- TODO is there a type level <> DRY out

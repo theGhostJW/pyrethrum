@@ -14,10 +14,12 @@ import RunnerBase as RB (AddressedElm (..), Test, TestInfo (..), querySuite, que
 import TestFilter
 import Text.Show.Pretty
 import GHC.Records
+import DSL.Interpreter
+import DSL.Logger
 
 -- $ > view allTossCalls
 
-allTossCalls :: [(Text, TossCall)]
+allTossCalls :: forall effs. DemoEffs effs => [(Text, TossCall)]
 allTossCalls =
   let titleAndCall :: rc -> Address -> MockTest ho i as ds effs -> (Text, TossCall)
       titleAndCall _ _ (R.Test (TestConfig ttl call) _ _ _) = (ttl, call)
@@ -29,26 +31,26 @@ allTossCalls =
 baseCfg :: TossResult -> RunConfig
 baseCfg = RunConfig "Unit Test Config"
 
-demoFilter :: TossResult -> [AddresStringElm (TestInfo TestConfig)]
-demoFilter tr = toStrElm <$> fromRight' (queryFilterSuite (filters' Nothing) (baseCfg tr) mockSuite)
+demoFilter  :: forall effs. DemoEffs effs => TossResult -> [AddresStringElm (TestInfo TestConfig)]
+demoFilter tr = toStrElm <$> fromRight' (queryFilterSuite (filters' Nothing) (baseCfg tr) (mockSuite @effs))
 
 -- $ > view demoFilterAll
 -- demoFilterAll :: [AddresStringElm (TestInfo TestConfig)]
 
-demoFilterAll :: [AddresStringElm (TestInfo TestConfig)]
-demoFilterAll = demoFilter RcAll
+demoFilterAll :: forall effs. DemoEffs effs => [AddresStringElm (TestInfo TestConfig)]
+demoFilterAll = demoFilter @effs RcAll
 
-chkTitles :: [Text] -> TossResult -> Assertion
+chkTitles :: forall effs. DemoEffs effs => [Text] -> TossResult -> Assertion
 chkTitles expected tossResult =   
   let 
     title'' :: AddresStringElm (TestInfo TestConfig) -> Text
     title'' = (title :: TestInfo TestConfig -> Text) . el 
   in
-   chkEq expected $ title'' <$> demoFilter tossResult
+   chkEq expected $ title'' <$> demoFilter @effs tossResult
 
 -- $ > unit_filter_all_has_all
-unit_filter_all_has_all :: Assertion
-unit_filter_all_has_all = chkTitles allMockTestTitles RcAll
+unit_filter_all_has_all :: forall effs. DemoEffs effs => Assertion
+unit_filter_all_has_all = chkTitles @effs allMockTestTitles RcAll
 
 allMockTestTitles :: [Text]
 allMockTestTitles = ["test1HeadsTxt", "test4HeadsTxt", "test6HeadsTxt", "test5TailsInt", "test2TailsInt", "test3TailsInt", "test6HeadsTxt"]
@@ -60,36 +62,42 @@ tails' :: [Text]
 tails' = ["test5TailsInt", "test2TailsInt", "test3TailsInt"]
 
 -- $ > unit_filter_heads_has_heads
-unit_filter_heads_has_heads :: Assertion
-unit_filter_heads_has_heads = chkTitles heads RcHeads
+unit_filter_heads_has_heads :: forall effs. DemoEffs effs => Assertion
+unit_filter_heads_has_heads = chkTitles @effs heads RcHeads
 
 -- $ > unit_filter_tails_has_tails
-unit_filter_tails_has_tails :: Assertion
-unit_filter_tails_has_tails = chkTitles tails' RcTails
+unit_filter_tails_has_tails :: forall effs. DemoEffs effs => Assertion
+unit_filter_tails_has_tails = chkTitles @effs tails' RcTails
 
 -- $ > view demoFilterHeads
 -- demoFilterAll :: [AddresStringElm (TestInfo TestConfig)]
 
-demoFilterHeads :: [AddresStringElm (TestInfo TestConfig)]
-demoFilterHeads = demoFilter RcHeads
+demoFilterHeads :: forall effs. DemoEffs effs => [AddresStringElm (TestInfo TestConfig)]
+demoFilterHeads = demoFilter @effs RcHeads
 
 -- $ > view demoFilterTails
 -- demoFilterAll :: [AddresStringElm (TestInfo TestConfig)]
 
-demoFilterTails :: [AddresStringElm (TestInfo TestConfig)]
-demoFilterTails = demoFilter RcTails
+demoFilterTails :: forall effs. DemoEffs effs => [AddresStringElm (TestInfo TestConfig)]
+demoFilterTails = demoFilter @effs RcTails
 
-filterResults :: [TestFilter RunConfig TestConfig] -> RunConfig -> [TestFilterResult]
-filterResults = filterLog mockSuite
+
+filterResults :: forall effs. DemoEffs effs =>  [TestFilter RunConfig TestConfig] -> RunConfig -> [TestFilterResult]
+filterResults = filterLog (mockSuite @effs)
 
 data Status = Accepted | Rejected | AnyResult deriving (Eq)
 
 type ShowFilter = (Text, Maybe Text)
 
-tests' :: RunConfig -> [TestFilter RunConfig TestConfig] -> Status -> [ShowFilter]
+tests' :: forall effs. DemoEffs effs => RunConfig -> [TestFilter RunConfig TestConfig] -> Status -> [ShowFilter]
 tests' rc fltrs s =
-  let matchStatus sf = s == AnyResult || (s == Accepted ? isNothing $ isJust) (snd sf)
-   in P.filter matchStatus $ showIt <$> filterResults fltrs rc
+  let matchStatus :: (Text, Maybe Text) -> Bool
+      matchStatus sf = s == AnyResult || (s == Accepted ? isNothing $ isJust) (snd sf)
+      
+      frslts ::  [TestFilterResult]
+      frslts = (filterResults @effs) fltrs rc
+
+   in P.filter matchStatus $ showIt <$> frslts
 
 showIt :: TestFilterResult -> ShowFilter
 showIt r = ((title :: TestLogInfo -> Text) $ testInfo r, reasonForRejection r)
@@ -99,40 +107,40 @@ filters' ttl = [tossFilter, hasTitle ttl]
 
 -- $ > view allTests
 
-allTests :: [ShowFilter]
-allTests = tests' (baseCfg RcAll) (filters' Nothing) Accepted
+allTests :: forall effs. DemoEffs effs => [ShowFilter]
+allTests = tests' @effs (baseCfg RcAll) (filters' Nothing) Accepted
 
 -- $ > unit_test_any_result_has_all
 
-unit_test_any_result_has_all :: Assertion
-unit_test_any_result_has_all = chkEq (length allTests) (length headsAll)
+unit_test_any_result_has_all :: forall effs. DemoEffs effs => Assertion
+unit_test_any_result_has_all = chkEq (length (allTests @effs)) (length (headsAll @effs))
 
 -- $ > view headsAll
 
-headsAll :: [ShowFilter]
-headsAll = tests' (baseCfg RcHeads) (filters' Nothing) AnyResult
+headsAll :: forall effs. DemoEffs effs => [ShowFilter]
+headsAll = tests' @effs (baseCfg RcHeads) (filters' Nothing) AnyResult
 
 -- $ > view headsRejected
 
-headsRejected :: [ShowFilter]
-headsRejected = tests' (baseCfg RcHeads) (filters' Nothing) Rejected
+headsRejected :: forall effs. DemoEffs effs => [ShowFilter]
+headsRejected = tests' @effs (baseCfg RcHeads) (filters' Nothing) Rejected
 
 -- $ > view headsAccepted
 
-headsAccepted :: [ShowFilter]
-headsAccepted = tests' (baseCfg RcHeads) (filters' Nothing) Accepted
+headsAccepted :: forall effs. DemoEffs effs => [ShowFilter]
+headsAccepted = tests' @effs (baseCfg RcHeads) (filters' Nothing) Accepted
 
 -- $ > view headsWith6Rejects
 
-headsWith6Rejects :: [ShowFilter]
-headsWith6Rejects = tests' (baseCfg RcHeads) (filters' $ Just "6") Rejected
+headsWith6Rejects :: forall effs. DemoEffs effs => [ShowFilter]
+headsWith6Rejects = tests' @effs (baseCfg RcHeads) (filters' $ Just "6") Rejected
 
 -- $ > unit_check_rejection_messages
 
-unit_check_rejection_messages :: Assertion
+unit_check_rejection_messages :: forall effs. DemoEffs effs => Assertion
 unit_check_rejection_messages =
   chkEq
-    headsWith6Rejects
+    (headsWith6Rejects @effs)
     [ ("test1HeadsTxt", Just "test title must include: 6"),
       ("test4HeadsTxt", Just "test title must include: 6"),
       ("test5TailsInt", Just "toss call: Tails must match run: RcHeads"),

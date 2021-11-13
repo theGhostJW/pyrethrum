@@ -9,7 +9,7 @@ module MockSuite where
 
 import qualified Check
 import qualified Check as C
-import DSL.Interpreter (MinEffs)
+import DSL.Interpreter (AllEffects, MinEffs, Failure)
 import Data.Aeson.TH
 import Data.Aeson.Types hiding (One)
 import Data.Yaml
@@ -25,9 +25,13 @@ import Runner as R
     Suite (..),
     SuiteItem (..),
     Test (..),
-    mkSem,
+    mkSem, TestSuite
   )
 import TestFilter
+import DSL.Logger as L
+import DSL.FileSystem
+import DSL.ArbitraryIO
+import DSL.CurrentTime
 
 data TossCall = Heads | Tails deriving (Eq, Ord, Show)
 
@@ -43,7 +47,8 @@ data RunConfig = RunConfig
 
 instance Config RunConfig
 
-type DemoEffs effs = MinEffs Text effs
+-- type DemoEffs effs = MinEffs Text effs
+type DemoEffs effs = AllEffects Text effs
 
 data TestConfig = TestConfig
   { title :: Text,
@@ -101,7 +106,7 @@ emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
 
 ---                           hi  itm     as   ds
-test1HeadsTxt :: MockTest Text TextItem Text Text effs
+test1HeadsTxt :: forall effs. Member (Logger Text) effs =>  MockTest Text TextItem Text Text effs
 test1HeadsTxt =
   Test
     { config =
@@ -110,7 +115,7 @@ test1HeadsTxt =
             tossCall = Heads
           },
       items = empti,
-      interactor = emptiInteractor "Hello",
+      interactor = \_ _ _  ->  L.log "Hello" >> pure "Hi",
       parse = emptiParser "Blahh"
     }
 
@@ -201,7 +206,7 @@ hasTitle ttl =
     }
 
 mockSuite ::
-  forall effs a.
+  forall effs a. Members '[FileSystem, ArbitraryIO, Logger Text, CurrentTime, Failure Text] effs => 
   ( forall hd i as ds.
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) =>
     Address ->
@@ -214,9 +219,12 @@ mockSuite runTest =
   R.Suite
     [ R.Group
         "Filter TestSuite"
-        [ BeforeAll
+        [ BeforeAll 
             "Before All"
-            (\_ -> pure "hello")
+            (\_ -> do 
+               L.log "hello"
+               pure "hello" 
+            )
             [ R.Group
                 "Divider"
                 [ Tests
@@ -235,7 +243,7 @@ mockSuite runTest =
                 [ BeforeAll
                     "Before Inner"
                     (\_ -> pure "HI")
-                    [ Tests \a hd  ->
+                    [ Tests \a hd ->
                         [ runTest a hd test6HeadsTxt
                         ]
                     ]
@@ -254,16 +262,22 @@ mockSuite runTest =
                           runTest a hd test2TailsInt,
                           runTest a hd test3TailsInt
                         ],
-                      BeforeAll
-                        { title = "Before Inner 2",
-                          bHook = \t -> pure "HI",
-                          bhElms =
-                            [ Tests \a hd ->
-                                [ runTest a hd test6HeadsTxt
-                                ],
-                              R.Group
-                                { title = "Double Nested Empty Group",
-                                  gElms = []
+                      AfterAll
+                        { title = "Clean up",
+                          aHook = \_ -> L.log "Clean Up",
+                          ahElms =
+                            [ BeforeAll
+                                { title = "Before Inner 2",
+                                  bHook = \t -> pure "HI",
+                                  bhElms =
+                                    [ Tests \a hd ->
+                                        [ runTest a hd test6HeadsTxt
+                                        ],
+                                      R.Group
+                                        { title = "Double Nested Empty Group",
+                                          gElms = []
+                                        }
+                                    ]
                                 }
                             ]
                         }

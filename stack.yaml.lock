@@ -16,12 +16,33 @@ packages:
     git: https://github.com/theGhostJW/pyrelude
     commit: 90c3f560699b1bd5c7b025ae67bd557b8be2204d
 - completed:
-    hackage: discrimination-0.4@sha256:d42ae36c97ea9c0c8844b47ee162c5530f3daf708636f01010f58dcf52602876,2571
+    hackage: polysemy-1.7.0.0@sha256:c972f33191113e2fe6809ea1cda24a6cabfeed2f115b3be0137dee7c65d08293,5977
     pantry-tree:
-      size: 923
-      sha256: db40bc66d2b3832989ccf5f5dce94a76dbb8a211c855c953475a741e592b904d
+      size: 4577
+      sha256: 78c733f5dde13340e880bbb883dc64af948f6449da3a4025811cdc79c204dfde
   original:
-    hackage: discrimination-0.4@sha256:d42ae36c97ea9c0c8844b47ee162c5530f3daf708636f01010f58dcf52602876,2571
+    hackage: polysemy-1.7.0.0
+- completed:
+    hackage: polysemy-plugin-0.4.2.0@sha256:1dbcb892bb866926994dadafeb93e76ae4a6625dc3ae9ca0f4f419ee85cb2f7b,3154
+    pantry-tree:
+      size: 1229
+      sha256: ee75425b00b0f1c80207c3c4d5df86a94d892de229b75fb23e0380ec2526a626
+  original:
+    hackage: polysemy-plugin-0.4.2.0
+- completed:
+    hackage: Stack-0.4.0@sha256:ada69a23ed9bbaf97260397f6b39b7a1f4e22a11bcac3fe2e8f23f1513f59fd8,1092
+    pantry-tree:
+      size: 355
+      sha256: 4a0e8d5c268b9d19cb472ac94f0e2291afbb899ce4f5878bbbe86effeba36c6f
+  original:
+    hackage: Stack-0.4.0@sha256:ada69a23ed9bbaf97260397f6b39b7a1f4e22a11bcac3fe2e8f23f1513f59fd8,1092
+- completed:
+    hackage: discrimination-0.4.1@sha256:2edd04588e9ecadcc283d602fe9cc89190fc5b0e2ac834433da1c5f9a3dbe2c7,3620
+    pantry-tree:
+      size: 1050
+      sha256: 52f68831d7b90dbd98c6afd940031883a5dccc201f10018d22a115c301f765d9
+  original:
+    hackage: discrimination-0.4.1@sha256:2edd04588e9ecadcc283d602fe9cc89190fc5b0e2ac834433da1c5f9a3dbe2c7,3620
 - completed:
     hackage: encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce,1864
     pantry-tree:
@@ -30,36 +51,15 @@ packages:
   original:
     hackage: encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce,1864
 - completed:
-    hackage: polysemy-1.4.0.0@sha256:0245a046eaf936557d4208b5a355df1a20799c9e274f91fa889ab2644ecbabae,6541
+    hackage: transformers-either-0.1.2@sha256:e2ba24af49df7fa09794dcff6cb203d086d5c18e35b3cf10a8ecf7eb465fdedf,1677
     pantry-tree:
-      size: 4379
-      sha256: babfd86f145bc6017f7b8c20e46266ab3a3bb5d5d415d8cf651036b11e57465a
+      size: 270
+      sha256: 9c3388ec26e91b6f5115ddeafee991a3589b76b67ea15e333af5946706be374c
   original:
-    hackage: polysemy-1.4.0.0
-- completed:
-    hackage: polysemy-plugin-0.2.5.2@sha256:649cea55749c38af841e9f3750ccf65be351e597f3085234e28e3491e78d1f78,3155
-    pantry-tree:
-      size: 1162
-      sha256: 20b462f8095a8108ef4d920f0d494ba1299821403ad30169168f4b1968b06c2a
-  original:
-    hackage: polysemy-plugin-0.2.5.2
-- completed:
-    hackage: transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
-    pantry-tree:
-      size: 317
-      sha256: a69c9cbc1d8340c63cc8a9bbd718e13a41869d30a7c84d27be94bbc04ad73a69
-  original:
-    hackage: transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
-- completed:
-    hackage: Stack-0.4.0@sha256:ada69a23ed9bbaf97260397f6b39b7a1f4e22a11bcac3fe2e8f23f1513f59fd8,1092
-    pantry-tree:
-      size: 355
-      sha256: 4a0e8d5c268b9d19cb472ac94f0e2291afbb899ce4f5878bbbe86effeba36c6f
-  original:
-    hackage: Stack-0.4.0@sha256:ada69a23ed9bbaf97260397f6b39b7a1f4e22a11bcac3fe2e8f23f1513f59fd8,1092
+    hackage: transformers-either-0.1.2@sha256:e2ba24af49df7fa09794dcff6cb203d086d5c18e35b3cf10a8ecf7eb465fdedf,1677
 snapshots:
 - completed:
-    size: 585393
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/0.yaml
-    sha256: c632012da648385b9fa3c29f4e0afd56ead299f1c5528ee789058be410e883c0
-  original: lts-18.0
+    size: 586292
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/17.yaml
+    sha256: e66e70a7f998036025e8f40abc89b8eeb79c88f57727020cba1b54f375aa7ca0
+  original: lts-18.17

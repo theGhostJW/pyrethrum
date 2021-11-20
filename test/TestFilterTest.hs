@@ -16,6 +16,7 @@ import Text.Show.Pretty
 import GHC.Records
 import DSL.Interpreter
 import DSL.Logger
+import MemberReflection (showEffs)
 
 -- $ > view allTossCalls
 
@@ -110,8 +111,14 @@ filters' ttl = [tossFilter, hasTitle ttl]
 allTests :: forall effs. DemoEffs effs => [ShowFilter]
 allTests = tests' @effs (baseCfg RcAll) (filters' Nothing) Accepted
 
--- $ > unit_test_any_result_has_all
 
+{- $>
+import Pyrelude as P
+unit_test_any_result_has_all :: forall effs. DemoEffs effs => IO ()
+unit_test_any_result_has_all = chkEq (length (allTests @effs)) (length (headsAll @effs))
+<$ -}
+
+-- $> unit_test_any_result_has_all
 unit_test_any_result_has_all :: forall effs. DemoEffs effs => Assertion
 unit_test_any_result_has_all = chkEq (length (allTests @effs)) (length (headsAll @effs))
 

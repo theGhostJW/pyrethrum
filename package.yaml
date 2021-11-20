@@ -31,7 +31,7 @@ dependencies:
   - pretty-show
   - dlist
   - raw-strings-qq
-  - polysemy
+  - polysemy 
   - polysemy-plugin
   - Stack
 

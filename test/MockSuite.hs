@@ -206,7 +206,7 @@ hasTitle ttl =
     }
 
 mockSuite ::
-  forall effs a. Members '[FileSystem, ArbitraryIO, Logger Text, CurrentTime, Failure Text] effs => 
+  forall effs a. DemoEffs effs => 
   ( forall hd i as ds.
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) =>
     Address ->

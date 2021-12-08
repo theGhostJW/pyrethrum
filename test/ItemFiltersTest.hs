@@ -27,7 +27,7 @@ i = TestItem
 
 isOne = C.chk "is One" (== 1)
 
-items =
+itemsNoChks =
   [ i 100 "Title" mempty,
     i 110 "Title" mempty,
     i 120 "Title" mempty,
@@ -51,17 +51,17 @@ blahh :: IO ()
 blahh = undefined
 
 --
-unit_item_filter_iid = chkFilter' (ID 120) 120 items
+unit_item_filter_iid = chkFilter' (ID 120) 120 itemsNoChks
 
-unit_item_filter_iid_first = chkFilter' (ID 100) 100 items
+unit_item_filter_iid_first = chkFilter' (ID 100) 100 itemsNoChks
 
-unit_item_filter_iid_last = chkFilter' (ID 150) 150 items
+unit_item_filter_iid_last = chkFilter' (ID 150) 150 itemsNoChks
 
-unit_item_filter_iid_missing = chkFilterError (ID 1200) "not in item list" items
+unit_item_filter_iid_missing = chkFilterError (ID 1200) "not in item list" itemsNoChks
 
 --
 -- -- Last
-unit_item_filter_last = chkFilter' Last 150 items
+unit_item_filter_last = chkFilter' Last 150 itemsNoChks
 
 unit_item_filter_last_empty = chkFilterError Last "is empty" []
 
@@ -104,7 +104,7 @@ items4 =
   ]
 
 unit_item_filter_lastVal_no_items_with_vals = 
-    chkFilterError Last "There is no item in the list with checks assigned" items
+    chkFilterError LastWithCheck "There is no item in the list with checks assigned" itemsNoChks
 
 chkLastVal = chkFilter' LastWithCheck 
 
@@ -119,14 +119,14 @@ unit_item_filter_lastVal_middle = chkLastVal 130 items4
 id' = ItemFiltersTest.id
 
 -- Pred (a -> Bool)
-unit_item_filter_pred = chkFilter' (Pred $ \i' -> 150 == id' i') 150 items
+unit_item_filter_pred = chkFilter' (Pred $ \i' -> 150 == id' i') 150 itemsNoChks
 
-unit_item_filter_pred_toList = chkFilter (Pred $ \i' -> 110 < id' i') [120, 130, 140, 150] items
+unit_item_filter_pred_toList = chkFilter (Pred $ \i' -> 110 < id' i') [120, 130, 140, 150] itemsNoChks
 
-unit_item_filter_pred_missing = chkFilterError (Pred $ \i' -> 190 == id' i') "No test items match filter function" items
+unit_item_filter_pred_missing = chkFilterError (Pred $ \i' -> 190 == id' i') "No test items match filter function" itemsNoChks
 
 -- All
-unit_item_filter_all = chkFilter All [100, 110, 120, 130, 140, 150] items
+unit_item_filter_all = chkFilter All [100, 110, 120, 130, 140, 150] itemsNoChks
 
 unit_item_filter_all_empty = chkFilterError All "is empty" []
 
@@ -162,5 +162,5 @@ sampleItems = P.take 99 [1 ..]
 -- -- expect 1/3 of the 99 nzOnly to be filterred out due to country filter
 -- unit_filter_items_length = 66 ... length auTestItems
 
--- -- no items mapped to NZ only should be present
+-- -- no itemsNoChks mapped to NZ only should be present
 -- unit_filter_items = Nothing ... find (\i' -> i' `mod` 3 == 1) auTestItems

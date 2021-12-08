@@ -114,10 +114,10 @@ import qualified RunElementClasses as RC
 import RunnerBase as RB
   ( GenericResult (..),
     ItemRunner,
-    Suite (..),
+    TestSuite (..),
     SuiteItem (..),
     Test (..),
-    TestSuite,
+    SuiteSource,
     queryElm,
   )
 import TestFilter (activeAddresses, filterSuite)
@@ -187,7 +187,7 @@ logLPError :: forall e effs. (ToJSON e, Show e, Member (Logger e) effs) => Frame
 logLPError = logItem . LP.Error
 
 data RunParams m e rc tc effs = RunParams
-  { suite :: forall a. TestSuite e tc rc effs a,
+  { suite :: forall a. SuiteSource e tc rc effs a,
     filters :: [F.TestFilter rc tc],
     itemIds :: m (S.Set Int),
     itemRunner :: forall hi as ds i. (ItemClass i ds, Show as, Show ds, ToJSON as, ToJSON i, ToJSON ds) => ItemRunner e as ds i hi tc rc effs,

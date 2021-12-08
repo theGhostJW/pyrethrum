@@ -2,7 +2,7 @@ module RunElementClasses
   ( AddressElemType(..),
     Address (..),
     AddressElem(..),
-    AddresStringElm(..),
+    AddressTxtElm(..),
     TestLogInfo (..),
     TestFilterResult (..),
     AddressedElm (..),
@@ -91,14 +91,14 @@ data AddressedElm a = AddressedElm
   }
   deriving (Show)
   
-data AddresStringElm a = AddresStringElm
+data AddressTxtElm a = AddressTxtElm
   { address :: Text,
     el :: a
   }
   deriving Show
 
-toStrElm :: AddressedElm a -> AddresStringElm a
-toStrElm AddressedElm {address, element} = AddresStringElm (render address) element
+toStrElm :: AddressedElm a -> AddressTxtElm a
+toStrElm AddressedElm {address, element} = AddressTxtElm (render address) element
 
 addressTitle :: AddressedElm a -> Text
 addressTitle (AddressedElm (Address add) _) = P.headDef "" $ getField @"title" <$> add

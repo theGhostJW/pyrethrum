@@ -9,7 +9,11 @@ module MockSuite where
 
 import qualified Check
 import qualified Check as C
-import DSL.Interpreter (AllEffects, MinEffs, Failure)
+import DSL.ArbitraryIO
+import DSL.CurrentTime
+import DSL.FileSystem
+import DSL.Interpreter (AllEffects, Failure, MinEffs)
+import DSL.Logger as L
 import Data.Aeson.TH
 import Data.Aeson.Types hiding (One)
 import Data.Yaml
@@ -22,16 +26,13 @@ import Runner as R
     Config,
     ItemClass,
     RunParams (..),
-    Suite (..),
     SuiteItem (..),
+    SuiteSource,
     Test (..),
-    mkSem, TestSuite
+    TestSuite (..),
+    mkSem,
   )
 import TestFilter
-import DSL.Logger as L
-import DSL.FileSystem
-import DSL.ArbitraryIO
-import DSL.CurrentTime
 
 data TossCall = Heads | Tails deriving (Eq, Ord, Show)
 
@@ -106,7 +107,7 @@ emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
 
 ---                           hi  itm     as   ds
-test1HeadsTxt :: forall effs. Member (Logger Text) effs =>  MockTest Text TextItem Text Text effs
+test1HeadsTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
 test1HeadsTxt =
   Test
     { config =
@@ -115,7 +116,7 @@ test1HeadsTxt =
             tossCall = Heads
           },
       items = empti,
-      interactor = \_ _ _  ->  L.log "Hello" >> pure "Hi",
+      interactor = \_ _ _ -> L.log "Hello" >> pure "Hi",
       parse = emptiParser "Blahh"
     }
 
@@ -205,25 +206,16 @@ hasTitle ttl =
           \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
 
-mockSuite ::
-  forall effs a. DemoEffs effs => 
-  ( forall hd i as ds.
-    (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, ItemClass i ds) =>
-    Address ->
-    hd ->
-    MockTest hd i as ds effs ->
-    a
-  ) ->
-  Suite () effs a
+mockSuite :: forall effs a. DemoEffs effs => SuiteSource Text TestConfig RunConfig effs a
 mockSuite runTest =
-  R.Suite
+  R.TestSuite
     [ R.Group
-        "Filter TestSuite"
-        [ BeforeAll 
+        "Filter SuiteSource"
+        [ BeforeAll
             "Before All"
-            (\_ -> do 
-               L.log "hello"
-               pure "hello" 
+            ( \_ -> do
+                L.log "hello"
+                pure "hello"
             )
             [ R.Group
                 "Divider"

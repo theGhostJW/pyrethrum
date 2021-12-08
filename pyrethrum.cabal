@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ccff070ba448a9399ba0cb5914ebe9d69d4246ea3aa95eb7e60a39be869384af
+-- hash: 98e427650bb0c657858c7859ca259370b58a8a422826fa82de0bc8bf204724b9
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -56,7 +56,6 @@ library
       Runner
       RunnerBase
       RunnerConsoleAndFile
-      RunPlan
       TempUtils
       TestFilter
       TestFilters
@@ -132,7 +131,7 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
   build-depends:
       Stack
     , aeson

@@ -32,19 +32,19 @@ allTossCalls =
 baseCfg :: TossResult -> RunConfig
 baseCfg = RunConfig "Unit Test Config"
 
-demoFilter  :: forall effs. DemoEffs effs => TossResult -> [AddresStringElm (TestInfo TestConfig)]
+demoFilter :: forall effs. DemoEffs effs => TossResult -> [AddressTxtElm (TestInfo TestConfig)]
 demoFilter tr = toStrElm <$> fromRight' (queryFilterSuite (filters' Nothing) (baseCfg tr) (mockSuite @effs))
 
 -- $ > view demoFilterAll
--- demoFilterAll :: [AddresStringElm (TestInfo TestConfig)]
+-- demoFilterAll :: [AddressTxtElm (TestInfo TestConfig)]
 
-demoFilterAll :: forall effs. DemoEffs effs => [AddresStringElm (TestInfo TestConfig)]
+demoFilterAll :: forall effs. DemoEffs effs => [AddressTxtElm (TestInfo TestConfig)]
 demoFilterAll = demoFilter @effs RcAll
 
 chkTitles :: forall effs. DemoEffs effs => [Text] -> TossResult -> Assertion
 chkTitles expected tossResult =   
   let 
-    title'' :: AddresStringElm (TestInfo TestConfig) -> Text
+    title'' :: AddressTxtElm (TestInfo TestConfig) -> Text
     title'' = (title :: TestInfo TestConfig -> Text) . el 
   in
    chkEq expected $ title'' <$> demoFilter @effs tossResult
@@ -71,15 +71,15 @@ unit_filter_tails_has_tails :: forall effs. DemoEffs effs => Assertion
 unit_filter_tails_has_tails = chkTitles @effs tails' RcTails
 
 -- $ > view demoFilterHeads
--- demoFilterAll :: [AddresStringElm (TestInfo TestConfig)]
+-- demoFilterAll :: [AddressTxtElm (TestInfo TestConfig)]
 
-demoFilterHeads :: forall effs. DemoEffs effs => [AddresStringElm (TestInfo TestConfig)]
+demoFilterHeads :: forall effs. DemoEffs effs => [AddressTxtElm (TestInfo TestConfig)]
 demoFilterHeads = demoFilter @effs RcHeads
 
 -- $ > view demoFilterTails
--- demoFilterAll :: [AddresStringElm (TestInfo TestConfig)]
+-- demoFilterAll :: [AddressTxtElm (TestInfo TestConfig)]
 
-demoFilterTails :: forall effs. DemoEffs effs => [AddresStringElm (TestInfo TestConfig)]
+demoFilterTails :: forall effs. DemoEffs effs => [AddressTxtElm (TestInfo TestConfig)]
 demoFilterTails = demoFilter @effs RcTails
 
 
@@ -112,11 +112,11 @@ allTests :: forall effs. DemoEffs effs => [ShowFilter]
 allTests = tests' @effs (baseCfg RcAll) (filters' Nothing) Accepted
 
 
-{- $>
+{- $ >
 import Pyrelude as P
 unit_test_any_result_has_all :: forall effs. DemoEffs effs => IO ()
 unit_test_any_result_has_all = chkEq (length (allTests @effs)) (length (headsAll @effs))
-<$ -}
+< $ -}
 
 -- $> unit_test_any_result_has_all
 unit_test_any_result_has_all :: forall effs. DemoEffs effs => Assertion

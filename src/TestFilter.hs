@@ -56,7 +56,7 @@ filterTest fltrs rc d Test {config = tc} = applyFilters fltrs rc d tc
 filterLog ::
   forall tc rc e effs.
   Config tc =>
-  TestSuite e tc rc effs TestFilterResult ->
+  SuiteSource e tc rc effs TestFilterResult ->
   [TestFilter rc tc] ->
   rc ->
   [TestFilterResult]
@@ -86,7 +86,7 @@ activeAddresses r =
       subSet add = S.fromList $ C.Address <$> ((reverse <$>) <$> P.dropWhile null . inits . reverse $ unAddress add)
    in foldl' S.union S.empty $ subSet <$> includedAddresses
 
-filterSuite :: Config tc => rc -> (forall a. TestSuite e tc rc effs a) -> [TestFilter rc tc] -> Either Text FilterLog
+filterSuite :: Config tc => rc -> (forall a. SuiteSource e tc rc effs a) -> [TestFilter rc tc] -> Either Text FilterLog
 filterSuite rc suite filters =
   let log :: [TestFilterResult]
       log = filterLog suite filters rc
@@ -98,7 +98,7 @@ filterSuite rc suite filters =
       dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . (C.address :: TestLogInfo -> Address) . C.testInfo <$> log)
    in maybe (Right $ FilterLog log includedAddresses) Left dupeAddress
 
-queryFilterSuite :: forall rc e tc effs. Config tc => [TestFilter rc tc] -> rc -> (forall a. TestSuite e tc rc effs a) -> Either Text [AddressedElm (TestInfo tc)]
+queryFilterSuite :: forall rc e tc effs. Config tc => [TestFilter rc tc] -> rc -> (forall a. SuiteSource e tc rc effs a) -> Either Text [AddressedElm (TestInfo tc)]
 queryFilterSuite fltrs rc s =
   let unfiltered :: [AddressedElm (TestInfo tc)]
       unfiltered = querySuite rc s
@@ -120,6 +120,6 @@ queryFilterSuite fltrs rc s =
     Test e tc rc ho i as ds effs ->
     a
   )
-  -> TestSuite e tc rc effs a -- suiite
+  -> SuiteSource e tc rc effs a -- suiite
   -> [AddressedElm a]
 -}

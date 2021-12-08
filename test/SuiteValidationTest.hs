@@ -16,7 +16,7 @@ import Polysemy
 import Pyrelude as P
 import Pyrelude.IO (putStrLn)
 import Pyrelude.Test (Assertion, chk, chk', (...))
-import RunElementClasses as REC (AddresStringElm, Address (..), AddressElem (..), TestLogInfo (..), toStrElm)
+import RunElementClasses as REC (AddressTxtElm, Address (..), AddressElem (..), TestLogInfo (..), toStrElm)
 import Runner (TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, title)
 import RunnerBase as RB (AddressedElm (..), TestInfo, querySuite, testInfo) 
 import qualified RunElementClasses as C
@@ -28,7 +28,7 @@ import DSL.Logger
 
 -- $ > view demoQueryElem
 
-demoQueryElem :: forall effs. DemoEffs effs => [AddresStringElm (TestInfo TestConfig)]
+demoQueryElem :: forall effs. DemoEffs effs => [AddressTxtElm (TestInfo TestConfig)]
 demoQueryElem = toStrElm <$> querySuite rcRunAll (mockSuite @effs)
 
 applyFilterLog :: forall effs. DemoEffs effs => TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]
@@ -40,7 +40,7 @@ listTests fltr rc =
 
 -- $ > expectedDemoGroupNames
 expectedDemoGroupNames :: [Text]
-expectedDemoGroupNames = ["Happy TestSuite", "Happy TestSuite.Sub Group", "Happy TestSuite.Empty Group"]
+expectedDemoGroupNames = ["Happy SuiteSource", "Happy SuiteSource.Sub Group", "Happy SuiteSource.Empty Group"]
 
 -- unit_demo_group_addresses_count :: Assertion
 -- unit_demo_group_addresses_count =

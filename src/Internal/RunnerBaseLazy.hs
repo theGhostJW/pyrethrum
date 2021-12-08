@@ -10,7 +10,7 @@ import Pyrelude
 import RunElementClasses (Address (..))
 
 
-newtype Suite hd effs t = Suite {
+newtype TestSuite hd effs t = TestSuite {
   un :: [SuiteItem hd effs t ]
 }
 

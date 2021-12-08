@@ -1,8 +1,8 @@
 module RunnerBase
   ( AddressedElm (..),
     ItemRunner,
-    TestSuite,
-    RBL.Suite (..),
+    SuiteSource,
+    RBL.TestSuite (..),
     RBL.SuiteItem (..),
     Test (..),
     TestInfo (..),
@@ -60,7 +60,9 @@ import qualified RunElementClasses as RC
 type ItemRunner e as ds i hd tc rc effs =
   rc -> Address -> hd -> Test e tc rc hd i as ds effs -> i -> Sem effs ()
 
-type TestSuite e tc rc effs a =
+
+-- (address -> hookData -> test -> a) -> TestSuite () effs a
+type SuiteSource e tc rc effs a =
   ( forall hd i as ds.
     (Show i, ToJSON i, Show as, ToJSON as, Show ds, ToJSON ds, HasField "checks" i (C.Checks ds), HasField "id" i Int, HasField "title" i Text) =>
     Address ->
@@ -68,7 +70,7 @@ type TestSuite e tc rc effs a =
     Test e tc rc hd i as ds effs ->
     a
   ) ->
-  Suite () effs a
+  TestSuite () effs a
 
 data GenericResult tc rslt = TestResult
   { configuration :: tc,
@@ -97,7 +99,7 @@ queryElm title' address =
         BeforeAll {title = t, bhElms = e} -> hkQuery t e
         AfterAll {title = t, ahElms = e} -> hkQuery t e
 
-querySuiteElms :: forall hi effs a. (a -> Text) -> Address -> Suite hi effs a -> [AddressedElm a]
+querySuiteElms :: forall hi effs a. (a -> Text) -> Address -> TestSuite hi effs a -> [AddressedElm a]
 querySuiteElms title' address suite = un suite >>= queryElm title' address
 
 querySuite' ::
@@ -112,7 +114,7 @@ querySuite' ::
     Test e tc rc ho i as ds effs ->
     a
   ) ->
-  TestSuite e tc rc effs a -> -- suiite
+  SuiteSource e tc rc effs a -> -- suiite
   [AddressedElm a]
 querySuite' rc title' extractor suite =
   let fullQuery ::
@@ -123,11 +125,11 @@ querySuite' rc title' extractor suite =
         a
       fullQuery a hd t = extractor rc a t
 
-      root :: Suite () effs a
+      root :: TestSuite () effs a
       root = suite fullQuery
    in querySuiteElms title' rootAddress root
 
-querySuite :: forall rc e tc effs. Config tc => rc -> TestSuite e tc rc effs (TestInfo tc) -> [AddressedElm (TestInfo tc)]
+querySuite :: forall rc e tc effs. Config tc => rc -> SuiteSource e tc rc effs (TestInfo tc) -> [AddressedElm (TestInfo tc)]
 querySuite rc suite =
   let extractor :: forall ho i as ds. RC.ItemClass i ds => rc -> Address -> Test e tc rc ho i as ds effs -> TestInfo tc
       extractor rc' _add t = testInfo rc' t

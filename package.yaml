@@ -38,6 +38,7 @@ dependencies:
 ghc-options:
   - -fmax-pmcheck-models=10000000
   - -ferror-spans
+  - -fprint-potential-instances
   # - -dth-dec-file -- generate template haskell
 
   - -O0

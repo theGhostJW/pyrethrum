@@ -56,6 +56,7 @@ type FullDocEffects e = '[FileSystem, ArbitraryIO, Reader ThreadInfo, State LogI
 handleIOException :: IO (Either (FrameworkError e) a) -> IO (Either (FrameworkError e) a)
 handleIOException = handle $ pure . Left . C.IOError
 
+
 -- todo find a type level <> and replace cons with list
 baseEffExecute :: forall effs a e. (Show e, A.ToJSON e, Member (Embed IO) effs) => 
       (forall effs0. Members [CurrentTime, Reader ThreadInfo, State LogIndex, Embed IO] effs0 => Sem (Logger e ': effs0) a -> Sem effs0 a) 

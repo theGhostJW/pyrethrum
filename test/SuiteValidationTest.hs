@@ -17,7 +17,7 @@ import Pyrelude as P
 import Pyrelude.IO (putStrLn)
 import Pyrelude.Test (Assertion, chk, chk', (...))
 import RunElementClasses as REC (AddressTxtElm, Address (..), AddressElem (..), TestLogInfo (..), toStrElm)
-import Runner (TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, title)
+import Runner (TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, title, SuiteSource)
 import RunnerBase as RB (AddressedElm (..), TestInfo, querySuite, testInfo) 
 import qualified RunElementClasses as C
 import TempUtils
@@ -25,18 +25,23 @@ import TestFilter
 import Text.Show.Pretty (pPrint, pPrintList, ppShowList)
 import Polysemy.Internal.Union (Member)
 import DSL.Logger
+import EvalHelp
+
+
+
+mockSuit' :: SuiteSource Text TestConfig RunConfig FixedEffs a
+mockSuit' = mockSuite @FixedEffs
 
 -- $ > view demoQueryElem
+demoQueryElem :: [AddressTxtElm (TestInfo TestConfig)]
+demoQueryElem = toStrElm <$> querySuite rcRunAll (mockSuite @FixedEffs)
 
-demoQueryElem :: forall effs. DemoEffs effs => [AddressTxtElm (TestInfo TestConfig)]
-demoQueryElem = toStrElm <$> querySuite rcRunAll (mockSuite @effs)
+applyFilterLog :: TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]
+applyFilterLog fltr = filterLog mockSuit' [fltr]
 
-applyFilterLog :: forall effs. DemoEffs effs => TestFilter RunConfig TestConfig -> RunConfig -> [TestFilterResult]
-applyFilterLog fltr = filterLog (mockSuite @effs) [fltr]
-
-listTests :: forall effs. DemoEffs effs => TestFilter RunConfig TestConfig -> RunConfig -> [Text]
+listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
-  headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress . (address :: TestLogInfo -> Address) . C.testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog @effs fltr rc)
+  headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress . (address :: TestLogInfo -> Address) . C.testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
 
 -- $ > expectedDemoGroupNames
 expectedDemoGroupNames :: [Text]

@@ -27,8 +27,23 @@ import Data.Aeson.Types as AT hiding (Error)
 import Data.DList as D
 import Data.Function
 import qualified Data.List as L
-import Hedgehog.Internal.Prelude (Foldable)
 import Pyrelude as P hiding ((.))
+
+{-
+Remove defect expectation and create a new type and module 
+that deals with 
+  id: 
+  title: 
+  status:
+  specifiers: 
+    RunConfig, 
+    TestConfig, 
+    ItemJSON 
+
+  predicate (log):
+    json fieldContains
+
+-}
 
 -- generate a check from a predicate
 chk :: Text -> (v -> Bool) -> Checks v

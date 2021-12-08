@@ -26,8 +26,6 @@ import Data.Aeson.Types
 import GHC.Records
 import Language.Haskell.TH.Syntax
 import Pyrelude as P hiding (toList)
-import Test.Tasty.Providers (IsTest)
-import Test.Tasty.Runners (FailureReason (TestDepFailed))
 
 data AddressElemType = Hook | Group | Test deriving (Show, Eq)
 

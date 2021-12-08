@@ -16,4 +16,11 @@ import DSL.Interpreter
 view :: Show a => a -> IO ()
 view = pPrint
 
-type FixedEffs = FileSystem ': ArbitraryIO ': Logger Text ': Reader ThreadId ': State LogIndex ': CurrentTime ': Failure Text ': '[]
+type FixedEffs = FileSystem ': 
+                  ArbitraryIO ': 
+                  Logger Text ': 
+                  Reader ThreadId ': 
+                  State LogIndex ': 
+                  CurrentTime ': 
+                  Failure Text ': 
+                  '[]

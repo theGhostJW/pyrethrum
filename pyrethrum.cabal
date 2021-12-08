@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 47d33dc1995567c4c9f2dc6afdc80eedf5bb7fc93efbca1ad8cf0701eb3f5c88
+-- hash: 24d633036eabf8ca60af83cef5fae3ee883c830b8a1218616c848846d01c590f
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -39,7 +39,6 @@ library
       DSL.Logger
       DSL.LogProtocol
       DSL.LogProtocol.PrettyPrint
-      EvalHelp
       FileLogging
       Internal.RunnerBaseLazy
       ItemFilter
@@ -64,6 +63,7 @@ library
       CheckTest
       DemoConfig
       EndpointTest
+      EvalHelp
       ItemFiltersTest
       LogListCheck
       LogProtocolTest
@@ -142,17 +142,12 @@ library
     , dlist
     , extra
     , fmt
-    , hedgehog
     , mtl
     , polysemy
     , polysemy-plugin
     , pretty-show
     , pyrelude
     , raw-strings-qq
-    , tasty
-    , tasty-discover
-    , tasty-hedgehog
-    , tasty-hunit
     , template-haskell
     , text
     , transformers-either
@@ -169,6 +164,7 @@ test-suite pyrethrum-test
       CheckTest
       DemoConfig
       EndpointTest
+      EvalHelp
       ItemFiltersTest
       LogListCheck
       LogProtocolTest

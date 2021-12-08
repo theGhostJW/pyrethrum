@@ -30,6 +30,7 @@ dependencies:
   - yaml
   - pretty-show
   - dlist
+  - mtl
   - raw-strings-qq
   - polysemy 
   - polysemy-plugin
@@ -123,14 +124,7 @@ library:
     - unordered-containers
     - template-haskell
     - bytestring
-    - mtl
     - fmt
-    # test modules
-    - tasty
-    - tasty-hunit
-    - tasty-hedgehog
-    - tasty-discover
-    - hedgehog
 
 #  reinstate when LHS can live load multiple modules
 # use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
@@ -142,7 +136,6 @@ _testDep: &testdependencies
   - hedgehog
   - pyrethrum
   - bytestring
-  - mtl
 
 tests:
   pyrethrum-test:

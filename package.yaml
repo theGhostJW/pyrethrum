@@ -134,20 +134,20 @@ library:
 
 #  reinstate when LHS can live load multiple modules
 # use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
-# _testDep: &testdependencies
-# - tasty
-# - tasty-hunit
-# - tasty-hedgehog
-# - tasty-discover
-# - hedgehog
-# - pyrethrum
-# - bytestring
-# - mtl
+_testDep: &testdependencies
+  - tasty
+  - tasty-hunit
+  - tasty-hedgehog
+  - tasty-discover
+  - hedgehog
+  - pyrethrum
+  - bytestring
+  - mtl
 
-# tests:
-#   pyrethrum-test:
-#     main:                driver.hs
-#     source-dirs:        
-#     - test
-#     dependencies: *testdependencies
+tests:
+  pyrethrum-test:
+    main:                driver.hs
+    source-dirs:        
+    - test
+    dependencies: *testdependencies
   

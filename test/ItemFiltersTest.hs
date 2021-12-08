@@ -103,7 +103,8 @@ items4 =
     i 150 "Title" mempty
   ]
 
-unit_item_filter_lastVal_no_items_with_vals = chkFilterError Last "There is no item in the list with checks assigned" items
+unit_item_filter_lastVal_no_items_with_vals = 
+    chkFilterError Last "There is no item in the list with checks assigned" items
 
 chkLastVal = chkFilter' LastWithCheck 
 

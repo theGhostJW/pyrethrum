@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 98e427650bb0c657858c7859ca259370b58a8a422826fa82de0bc8bf204724b9
+-- hash: 47d33dc1995567c4c9f2dc6afdc80eedf5bb7fc93efbca1ad8cf0701eb3f5c88
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -157,5 +157,101 @@ library
     , text
     , transformers-either
     , unordered-containers
+    , yaml
+  default-language: Haskell2010
+
+test-suite pyrethrum-test
+  type: exitcode-stdio-1.0
+  main-is: driver.hs
+  other-modules:
+      ArbitraryIOTest
+      AuxFilesTest
+      CheckTest
+      DemoConfig
+      EndpointTest
+      ItemFiltersTest
+      LogListCheck
+      LogProtocolTest
+      LogTransformationTest
+      MockSuite
+      PrettyPrintTest
+      RunnerTest
+      SemTest
+      SuiteValidationTest
+      TestFilterTest
+      Paths_pyrethrum
+  hs-source-dirs:
+      test
+  default-extensions:
+      AllowAmbiguousTypes
+      BangPatterns
+      BlockArguments
+      ConstrainedClassMethods
+      ConstraintKinds
+      DisambiguateRecordFields
+      DuplicateRecordFields
+      DataKinds
+      DefaultSignatures
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      ExtendedDefaultRules
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      LiberalTypeSynonyms
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      NoImplicitPrelude
+      OverloadedStrings
+      PartialTypeSignatures
+      PatternSynonyms
+      PolyKinds
+      QuasiQuotes
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      StrictData
+      TemplateHaskell
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
+  build-depends:
+      Stack
+    , aeson
+    , base
+    , bytestring
+    , containers
+    , dlist
+    , extra
+    , hedgehog
+    , mtl
+    , polysemy
+    , polysemy-plugin
+    , pretty-show
+    , pyrelude
+    , pyrethrum
+    , raw-strings-qq
+    , tasty
+    , tasty-discover
+    , tasty-hedgehog
+    , tasty-hunit
+    , text
+    , transformers-either
     , yaml
   default-language: Haskell2010

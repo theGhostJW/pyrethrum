@@ -2,7 +2,7 @@
 
 module Internal.RunnerBaseLazy where
 
-import Common (FilterErrorType, FrameworkError, HookType)
+import Common (FilterErrorType, FrameworkError)
 import Data.Aeson
 import Polysemy
 import Polysemy.Error

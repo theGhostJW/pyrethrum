@@ -22,27 +22,27 @@ import EvalHelp
 
 
 -- $ > view allTossCalls
-allTossCalls :: [(Text, TossCall)]
+allTossCalls :: [(Text, Channel)]
 allTossCalls =
-  let titleAndCall :: rc -> Address -> MockTest ho i as ds effs -> (Text, TossCall)
+  let titleAndCall :: rc -> Address -> MockTest ho i as ds effs -> (Text, Channel)
       titleAndCall _ _ (R.Test (TestConfig ttl call) _ _ _) = (ttl, call)
 
-      title' :: (Text, TossCall) -> Text
+      title' :: (Text, Channel) -> Text
       title' _ = "Not Used"
-   in RB.element <$> querySuite' (baseCfg RcAll) title' titleAndCall (mockSuite @FixedEffs)
+   in RB.element <$> querySuite' (baseCfg AllChannels) title' titleAndCall (mockSuite @FixedEffs)
 
-baseCfg :: TossResult -> RunConfig
+baseCfg :: ChannelSelect -> RunConfig
 baseCfg = RunConfig "Unit Test Config"
 
-demoFilter :: TossResult -> [AddressTxtElm (TestInfo TestConfig)]
+demoFilter :: ChannelSelect -> [AddressTxtElm (TestInfo TestConfig)]
 demoFilter tr = toStrElm <$> fromRight' (queryFilterSuite (filters' Nothing) (baseCfg tr) (mockSuite @FixedEffs))
 
 -- $ > view demoFilterAll
 -- demoFilterAll :: [AddressTxtElm (TestInfo TestConfig)
 demoFilterAll :: [AddressTxtElm (TestInfo TestConfig)]
-demoFilterAll = demoFilter RcAll
+demoFilterAll = demoFilter AllChannels
 
-chkTitles :: [Text] -> TossResult -> Assertion
+chkTitles :: [Text] -> ChannelSelect -> Assertion
 chkTitles expected tossResult =   
   let 
     title'' :: AddressTxtElm (TestInfo TestConfig) -> Text
@@ -52,32 +52,32 @@ chkTitles expected tossResult =
 
 -- $ > unit_filter_all_has_all
 unit_filter_all_has_all :: Assertion
-unit_filter_all_has_all = chkTitles allMockTestTitles RcAll
+unit_filter_all_has_all = chkTitles allMockTestTitles AllChannels
 
 allMockTestTitles :: [Text]
-allMockTestTitles = ["test1HeadsTxt", "test4HeadsTxt", "test6HeadsTxt", "test5TailsInt", "test2TailsInt", "test3TailsInt", "test6HeadsTxt"]
+allMockTestTitles = ["test1WebTxt", "test4WebTxt", "test6WebTxt", "test5RESTTxt", "test2RESTInt", "test3RESTInt", "test6WebTxt"]
 
-heads :: [Text]
-heads = ["test1HeadsTxt", "test4HeadsTxt", "test6HeadsTxt", "test6HeadsTxt"]
+webTests :: [Text]
+webTests = ["test1WebTxt", "test4WebTxt", "test6WebTxt", "test6WebTxt"]
 
-tails' :: [Text]
-tails' = ["test5TailsInt", "test2TailsInt", "test3TailsInt"]
+rest' :: [Text]
+rest' = ["test5RESTTxt", "test2RESTInt", "test3RESTInt"]
 
--- $ > unit_filter_heads_has_heads
-unit_filter_heads_has_heads :: Assertion
-unit_filter_heads_has_heads = chkTitles heads RcHeads
+-- $ > unit_filter_Web_has_Web
+unit_filter_Web_has_Web :: Assertion
+unit_filter_Web_has_Web = chkTitles webTests WebOnly
 
--- $ > unit_filter_tails_has_tails
-unit_filter_tails_has_tails :: Assertion
-unit_filter_tails_has_tails = chkTitles tails' RcTails
+-- $ > unit_filter_REST_has_REST
+unit_filter_REST_has_REST :: Assertion
+unit_filter_REST_has_REST = chkTitles rest' RESTOnly
 
--- $ > view demoFilterHeads
-demoFilterHeads :: [AddressTxtElm (TestInfo TestConfig)]
-demoFilterHeads = demoFilter RcHeads
+-- $ > view demoFilterWeb
+demoFilterWeb :: [AddressTxtElm (TestInfo TestConfig)]
+demoFilterWeb = demoFilter WebOnly
 
--- $ > view demoFilterTails
-demoFilterTails :: [AddressTxtElm (TestInfo TestConfig)]
-demoFilterTails = demoFilter RcTails
+-- $ > view demoFilterREST
+demoFilterREST :: [AddressTxtElm (TestInfo TestConfig)]
+demoFilterREST = demoFilter RESTOnly
 
 
 filterResults :: [TestFilter RunConfig TestConfig] -> RunConfig -> [TestFilterResult]
@@ -106,40 +106,40 @@ filters' ttl = [tossFilter, hasTitle ttl]
 
 -- $ > view allTests
 allTests :: [ShowFilter]
-allTests = tests' (baseCfg RcAll) (filters' Nothing) Accepted
+allTests = tests' (baseCfg AllChannels) (filters' Nothing) Accepted
 
 
 -- $ > unit_test_any_result_has_all
 unit_test_any_result_has_all :: Assertion
-unit_test_any_result_has_all = chkEq (length allTests) (length headsAll)
+unit_test_any_result_has_all = chkEq (length allTests) (length webAll)
 
--- $ > view headsAll
+-- $ > view webAll
 
-headsAll :: [ShowFilter]
-headsAll = tests' (baseCfg RcHeads) (filters' Nothing) AnyResult
+webAll :: [ShowFilter]
+webAll = tests' (baseCfg WebOnly) (filters' Nothing) AnyResult
 
--- $ > view headsRejected
-headsRejected :: [ShowFilter]
-headsRejected = tests' (baseCfg RcHeads) (filters' Nothing) Rejected
+-- $ > view webRejected
+webRejected :: [ShowFilter]
+webRejected = tests' (baseCfg WebOnly) (filters' Nothing) Rejected
 
--- $ > view headsAccepted
+-- $ > view webAccepted
 
-headsAccepted ::  [ShowFilter]
-headsAccepted = tests' (baseCfg RcHeads) (filters' Nothing) Accepted
+webAccepted ::  [ShowFilter]
+webAccepted = tests' (baseCfg WebOnly) (filters' Nothing) Accepted
 
--- $ > view headsWith6Rejects
-headsWith6Rejects ::  [ShowFilter]
-headsWith6Rejects = tests' (baseCfg RcHeads) (filters' $ Just "6") Rejected
+-- $ > view webWith6Rejects
+webWith6Rejects ::  [ShowFilter]
+webWith6Rejects = tests' (baseCfg WebOnly) (filters' $ Just "6") Rejected
 
 -- $ > unit_check_rejection_messages
 
 unit_check_rejection_messages :: Assertion
 unit_check_rejection_messages =
   chkEq
-    headsWith6Rejects
-    [ ("test1HeadsTxt", Just "test title must include: 6"),
-      ("test4HeadsTxt", Just "test title must include: 6"),
-      ("test5TailsInt", Just "toss call: Tails must match run: RcHeads"),
-      ("test2TailsInt", Just "toss call: Tails must match run: RcHeads"),
-      ("test3TailsInt", Just "toss call: Tails must match run: RcHeads")
+    webWith6Rejects
+    [ ("test1WebTxt", Just "test title must include: 6"),
+      ("test4WebTxt", Just "test title must include: 6"),
+      ("test5RESTTxt", Just "toss call: REST must match run: WebOnly"),
+      ("test2RESTInt", Just "toss call: REST must match run: WebOnly"),
+      ("test3RESTInt", Just "toss call: REST must match run: WebOnly")
     ]

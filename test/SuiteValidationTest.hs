@@ -3,7 +3,7 @@
 module SuiteValidationTest where
 
 import Common (DetailedInfo (DetailedInfo), FrameworkError, HookType (..))
-import DSL.Interpreter (minInterpret)
+import DSL.Interpreter (minInterpret, effExecuteLog)
 import DSL.LogProtocol (LogProtocolBase (..))
 import DSL.LogProtocol.PrettyPrint (LogStyle (..), prettyPrintLogProtocol)
 import Data.Foldable (Foldable (length))
@@ -11,7 +11,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Records
 import ItemRunners (runItem)
-import MockSuite as M (MockTest, RunConfig (RunConfig), TestConfig (..), TextItem, happyRun, mockSuite, rcRunAll, tossFilter, TossResult (RcHeads), DemoEffs)
+import MockSuite as M (MockTest, RunConfig (RunConfig), TestConfig (..), TextItem, mockSuite, rcRunAll, tossFilter, ChannelSelect (WebOnly), DemoEffs, mockRun, everythingRun)
 import Polysemy
 import Pyrelude as P
 import Pyrelude.IO (putStrLn)
@@ -42,6 +42,17 @@ applyFilterLog fltr = filterLog mockSuit' [fltr]
 listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
   headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress . (address :: TestLogInfo -> Address) . C.testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
+
+
+display :: Either (FrameworkError Text) ([LogProtocolBase Text], ()) -> IO ()
+display eth = eitherf eth view view
+
+-- $> showAll
+showAll :: IO ()
+showAll =  rslt >>= display
+
+rslt :: IO (Either (FrameworkError Text) ([LogProtocolBase Text], ()))
+rslt = effExecuteLog everythingRun
 
 -- $ > expectedDemoGroupNames
 expectedDemoGroupNames :: [Text]

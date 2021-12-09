@@ -12,12 +12,14 @@ import Polysemy.State
 import DSL.LogProtocol
 import DSL.CurrentTime
 import DSL.Interpreter
+import Polysemy
 
 view :: Show a => a -> IO ()
 view = pPrint
 
 type FixedEffs = FileSystem ': 
                   ArbitraryIO ': 
+                  Embed IO:
                   Logger Text ': 
                   Reader ThreadId ': 
                   State LogIndex ': 

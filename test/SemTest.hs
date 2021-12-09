@@ -113,8 +113,8 @@ constParser a _ = pure a
 --       parse = constParser "hi"
 --     }
 
--- test5TailsInt :: MockTest Int Item Int Int effs
--- test5TailsInt =
+-- test5TailsTxt :: MockTest Int Item Int Int effs
+-- test5TailsTxt =
 --   Test
 --     { config =
 --         TestConfig
@@ -175,7 +175,7 @@ constParser a _ = pure a
 --                             ahElms =
 --                               [ \i ->
 --                                   Tests
---                                     [ r i test5TailsInt,
+--                                     [ r i test5TailsTxt,
 --                                       r i test2TailsInt 
 --                                     ]
 --                               ]

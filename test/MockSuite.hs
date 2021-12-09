@@ -33,16 +33,17 @@ import Runner as R
     mkSem,
   )
 import TestFilter
+import Check
 
-data TossCall = Heads | Tails deriving (Eq, Ord, Show)
+data Channel = Web | REST deriving (Eq, Ord, Show)
 
-data TossResult = RcHeads | RcTails | RcAll deriving (Eq, Ord, Show)
+data ChannelSelect = WebOnly | RESTOnly | AllChannels deriving (Eq, Ord, Show)
 
-rcRunAll = RunConfig "Run Everything" RcAll
+rcRunAll = RunConfig "Run Everything" AllChannels
 
 data RunConfig = RunConfig
   { title :: Text,
-    toss :: TossResult
+    target :: ChannelSelect
   }
   deriving (Eq, Show)
 
@@ -53,7 +54,7 @@ type DemoEffs effs = AllEffects Text effs
 
 data TestConfig = TestConfig
   { title :: Text,
-    tossCall :: TossCall
+    channel :: Channel
   }
   deriving (Show, Eq)
 
@@ -70,6 +71,16 @@ data IntItem = IntItem
     checks :: C.Checks Int
   }
   deriving (Show, Generic)
+
+mkIntItem :: Int -> IntItem
+mkIntItem i = IntItem i ("Int Test Id" <> txt i) $ chk "Always Pass" $ const True
+
+mkTxtItem :: Int -> TextItem
+mkTxtItem i = TextItem i ("Int Test Id" <> txt i) $ chk "Always Pass" $ const True
+
+intItems i rc = mkIntItem <$> take i [1..]
+
+txtItems i rc = mkTxtItem <$> take i [1..]
 
 data TextItem = TextItem
   { id :: Int,
@@ -107,101 +118,101 @@ emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
 
 ---                           hi  itm     as   ds
-test1HeadsTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
-test1HeadsTxt =
+test1WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test1WebTxt =
   Test
     { config =
         TestConfig
-          { title = "test1HeadsTxt",
-            tossCall = Heads
+          { title = "test1WebTxt",
+            channel = Web
           },
-      items = empti,
+      items = txtItems 5,
       interactor = \_ _ _ -> L.log "Hello" >> pure "Hi",
       parse = emptiParser "Blahh"
     }
 
-test2TailsInt :: MockTest Int IntItem Int Int effs
-test2TailsInt =
+test2RESTInt :: MockTest Int IntItem Int Int effs
+test2RESTInt =
   Test
     { config =
         TestConfig
-          { title = "test2TailsInt",
-            tossCall = Tails
+          { title = "test2RESTInt",
+            channel = REST
           },
       items = empti,
       interactor = emptiInteractor 44,
       parse = pure
     }
 
-test3TailsInt :: MockTest Int IntItem Int Int effs
-test3TailsInt =
+test3RESTInt :: MockTest Int IntItem Int Int effs
+test3RESTInt =
   Test
     { config =
         TestConfig
-          { title = "test3TailsInt",
-            tossCall = Tails
+          { title = "test3RESTInt",
+            channel = REST
           },
       items = empti,
       interactor = emptiInteractor 3,
       parse = pure
     }
 
-test4HeadsTxt :: MockTest Text TextItem Text Text effs
-test4HeadsTxt =
+test4WebTxt :: MockTest Text TextItem Text Text effs
+test4WebTxt =
   Test
     { config =
         TestConfig
-          { title = "test4HeadsTxt",
-            tossCall = Heads
+          { title = "test4WebTxt",
+            channel = Web
           },
       items = empti,
       interactor = emptiInteractor "Hello",
       parse = pure
     }
 
-test6HeadsTxt :: MockTest Text TextItem Text Text effs
-test6HeadsTxt =
+test6WebTxt :: MockTest Text TextItem Text Text effs
+test6WebTxt =
   Test
     { config =
         TestConfig
-          { title = "test6HeadsTxt",
-            tossCall = Heads
+          { title = "test6WebTxt",
+            channel = Web
           },
       items = empti,
       interactor = emptiInteractor "Hello",
       parse = pure
     }
 
-test5TailsInt :: MockTest Int IntItem Int Int effs
-test5TailsInt =
+test5RESTTxt :: MockTest Text TextItem Text Text effs
+test5RESTTxt =
   Test
     { config =
         TestConfig
-          { title = "test5TailsInt",
-            tossCall = Tails
+          { title = "test5RESTTxt",
+            channel = REST
           },
       items = empti,
-      interactor = emptiInteractor 22,
+      interactor = emptiInteractor "Hello for REST 5",
       parse = pure
     }
 
 tossFilter :: TestFilter RunConfig TestConfig
 tossFilter =
   TestFilter
-    { title = \RunConfig {toss} _ TestConfig {tossCall} -> "toss call: " <> txt tossCall <> " must match run: " <> txt toss,
-      predicate = \RunConfig {toss} _ TestConfig {tossCall} -> case toss of
-        RcAll -> True
-        RcHeads -> tossCall == Heads
-        RcTails -> tossCall == Tails
+    { title = \RunConfig {target} _ TestConfig {channel} -> "toss call: " <> txt channel <> " must match run: " <> txt target,
+      predicate = \RunConfig {target} _ TestConfig {channel} -> case target of
+        AllChannels -> True
+        WebOnly -> channel == Web
+        RESTOnly -> channel == REST
     }
 
 hasTitle :: Maybe Text -> TestFilter RunConfig TestConfig
-hasTitle ttl =
+hasTitle mbTtl =
   TestFilter
-    { title = \_ _ _ -> maybef ttl "test title N/A - no test fragmant provided" ("test title must include: " <>),
+    { title = \_ _ _ -> maybef mbTtl "test title N/A - no test fragmant provided" ("test title must include: " <>),
       predicate = \_ _ TestConfig {title = testTtl} ->
         maybef
-          ttl
+          mbTtl
           True
           \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
@@ -221,8 +232,8 @@ mockSuite runTest =
                 "Divider"
                 [ Tests
                     \a hd ->
-                      [ runTest a hd test1HeadsTxt,
-                        runTest a hd test4HeadsTxt
+                      [ runTest a hd test1WebTxt,
+                        runTest a hd test4WebTxt
                       ]
                 ],
               ----
@@ -236,7 +247,8 @@ mockSuite runTest =
                     "Before Inner"
                     (\_ -> pure "HI")
                     [ Tests \a hd ->
-                        [ runTest a hd test6HeadsTxt
+                        [ runTest a hd test6WebTxt,
+                          runTest a hd test5RESTTxt
                         ]
                     ]
                 ]
@@ -250,9 +262,9 @@ mockSuite runTest =
                   bHook = (\i -> pure 23) :: () -> Sem effs Int,
                   bhElms =
                     [ Tests \a hd ->
-                        [ runTest a hd test5TailsInt,
-                          runTest a hd test2TailsInt,
-                          runTest a hd test3TailsInt
+                        [ 
+                          runTest a hd test2RESTInt,
+                          runTest a hd test3RESTInt
                         ],
                       AfterAll
                         { title = "Clean up",
@@ -263,7 +275,7 @@ mockSuite runTest =
                                   bHook = \t -> pure "HI",
                                   bhElms =
                                     [ Tests \a hd ->
-                                        [ runTest a hd test6HeadsTxt
+                                        [ runTest a hd test6WebTxt
                                         ],
                                       R.Group
                                         { title = "Double Nested Empty Group",
@@ -282,28 +294,36 @@ mockSuite runTest =
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
 filters' ttl = [tossFilter, hasTitle ttl]
 
-runParams :: forall effs. DemoEffs effs => Maybe Text -> RunParams Maybe Text RunConfig TestConfig effs
-runParams nameTxt =
-  RunParams
-    { suite = mockSuite,
-      filters = filters' nameTxt,
-      itemIds = Nothing,
-      itemRunner = runItem,
-      rc =
-        RunConfig
-          { title = "Happy Test Run",
-            toss = RcHeads
-          }
-    }
+mockRun :: forall effs. DemoEffs effs => Text -> ChannelSelect -> Maybe Text -> Sem effs ()
+mockRun runTitle targChannel testTitleFilterFragment =
+  mkSem $
+    RunParams
+      { suite = mockSuite,
+        filters = filters' testTitleFilterFragment,
+        itemIds = Nothing,
+        itemRunner = runItem,
+        rc =
+          RunConfig
+            { title = runTitle,
+              target = targChannel
+            }
+      }
 
-mockRun :: forall effs. DemoEffs effs => Maybe Text -> Sem effs ()
-mockRun nameTxt = mkSem $ runParams nameTxt
+everythingRun :: forall effs. DemoEffs effs => Sem effs ()
+everythingRun = mockRun "Run All" AllChannels Nothing
 
-happyRun :: forall effs. DemoEffs effs => Sem effs ()
-happyRun = mockRun Nothing
+webRun :: forall effs. DemoEffs effs => Sem effs ()
+webRun = mockRun "Web Tests" WebOnly Nothing
 
-$(deriveJSON defaultOptions ''TossCall)
-$(deriveJSON defaultOptions ''TossResult)
+restRun :: forall effs. DemoEffs effs => Sem effs ()
+restRun = mockRun "Web Tests" RESTOnly Nothing
+
+txtRun :: forall effs. DemoEffs effs => Sem effs ()
+txtRun = mockRun "Run REST" AllChannels $ Just "txt"
+
+
+$(deriveJSON defaultOptions ''Channel)
+$(deriveJSON defaultOptions ''ChannelSelect)
 $(deriveJSON defaultOptions ''RunConfig)
 
 -- unit_test_filter_expect_empty

@@ -7,6 +7,7 @@ module MockSuite where
 -- import Pyrelude.Test hiding (Group, maybe)
 -- import Pyrelude.Test hiding (Group, maybe)
 
+import Check
 import qualified Check
 import qualified Check as C
 import DSL.ArbitraryIO
@@ -33,7 +34,6 @@ import Runner as R
     mkSem,
   )
 import TestFilter
-import Check
 
 data Channel = Web | REST deriving (Eq, Ord, Show)
 
@@ -79,10 +79,10 @@ mkTxtItem :: Int -> TextItem
 mkTxtItem i = TextItem i ("Int Test Id" <> txt i) $ chk "Always Pass" $ const True
 
 intItems :: Int -> p -> [IntItem]
-intItems i rc = mkIntItem <$> take i [1..]
+intItems i rc = mkIntItem <$> take i [1 ..]
 
 txtItems :: Int -> p -> [TextItem]
-txtItems i rc = mkTxtItem <$> take i [1..]
+txtItems i rc = mkTxtItem <$> take i [1 ..]
 
 data TextItem = TextItem
   { id :: Int,
@@ -223,59 +223,71 @@ mockSuite :: forall effs a. DemoEffs effs => SuiteSource Text TestConfig RunConf
 mockSuite runTest =
   R.TestSuite
     [ R.Group
-        "Filter SuiteSource"
-        [ BeforeAll
-            "Before All"
-            ( \_ -> do
-                L.log "hello"
-                pure "hello"
-            )
-            [ R.Group
-                "Divider"
-                [ Tests
-                    \a hd ->
-                      [ runTest a hd test1WebTxt,
-                        runTest a hd test4WebTxt
-                      ]
-                ],
-              ----
-              R.Group
-                "Empty Group"
-                [Tests \_ _ -> []],
-              ----
-              R.Group
-                "Divider"
-                [ BeforeAll
-                    "Before Inner"
-                    (\_ -> pure "HI")
-                    [ Tests \a hd ->
-                        [ runTest a hd test6WebTxt,
-                          runTest a hd test5RESTTxt
-                        ]
-                    ]
-                ]
-            ]
-        ],
-      R.Group
-        { title = "Nested Int Group",
+        { title = "Filter SuiteSource",
           gElms =
-            [ BeforeAll
-                { title = "Int BE",
-                  bHook = (\i -> pure 23) :: () -> Sem effs Int,
-                  bhElms =
-                    [ Tests \a hd ->
-                        [ 
-                          runTest a hd test2RESTInt,
-                          runTest a hd test3RESTInt
-                        ],
-                      AfterAll
-                        { title = "Clean up",
-                          aHook = \_ -> L.log "Clean Up",
-                          ahElms =
-                            [ BeforeAll
-                                { title = "Before Inner 2",
-                                  bHook = \t -> pure "HI",
-                                  bhElms =
+            [ OnceHook
+                { title = "Before All",
+                  bHook = \_ -> do
+                    L.log "hello"
+                    pure "hello",
+                  hkElms =
+                    [ R.Group
+                        { title = "Divider",
+                          gElms =
+                            [ Tests
+                                \a hd ->
+                                  [ runTest a hd test1WebTxt,
+                                    runTest a hd test4WebTxt
+                                  ]
+                            ]
+                        },
+                      ----
+                      R.Group
+                        { title = "Empty Group",
+                          gElms = [Tests \_ _ -> []]
+                        },
+                      ----
+                      R.Group
+                        { title = "Divider",
+                          gElms =
+                            [ OnceHook
+                                { title = "Before Inner",
+                                  bHook = \_ -> pure "HI",
+                                  hkElms =
+                                    [ Tests \a hd ->
+                                        [ runTest a hd test6WebTxt,
+                                          runTest a hd test5RESTTxt
+                                        ]
+                                    ],
+                                  aHook = \s -> L.log $ "After Hook Action " <> s
+                                }
+                            ]
+                        }
+                    ],
+                  aHook = \_ -> pure ()
+                },
+              R.Group
+                { title = "Nested Int Group",
+                  gElms =
+                    [ OnceHook
+                        { title = "Int BE",
+                          bHook = \i -> pure 23,
+                          hkElms =
+                            [ Tests \a hd ->
+                                [ runTest a hd test2RESTInt,
+                                  runTest a hd test3RESTInt
+                                ]
+                            ],
+                          aHook = \i -> L.log $ "After Hook Action " <> txt i
+                        },
+                      OnceHook
+                        { title = "Another Hook",
+                          bHook = \_ -> pure "Hello",
+                          hkElms =
+                            [ OnceHook
+                                { title = "OneceHook Inner 2",
+                                  bHook = pure,
+                                  hkElms =
                                     [ Tests \a hd ->
                                         [ runTest a hd test6WebTxt
                                         ],
@@ -283,9 +295,11 @@ mockSuite runTest =
                                         { title = "Double Nested Empty Group",
                                           gElms = []
                                         }
-                                    ]
+                                    ],
+                                  aHook = L.log
                                 }
-                            ]
+                            ],
+                          aHook = \s -> L.log $ "Clean Up - " <> s
                         }
                     ]
                 }
@@ -322,7 +336,6 @@ restRun = mockRun "Web Tests" RESTOnly Nothing
 
 txtRun :: forall effs. DemoEffs effs => Sem effs ()
 txtRun = mockRun "Run REST" AllChannels $ Just "txt"
-
 
 $(deriveJSON defaultOptions ''Channel)
 $(deriveJSON defaultOptions ''ChannelSelect)

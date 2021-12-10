@@ -24,18 +24,14 @@ data SuiteItem hd effs t where
     { tests :: Address -> hd -> [t]
     } ->
     SuiteItem hd effs t
-  BeforeAll ::
+  OnceHook ::
     { title :: Text,
       bHook :: hd -> Sem effs hd2,
-      bhElms :: [SuiteItem hd2 effs t]
+      hkElms :: [SuiteItem hd2 effs t],
+      aHook :: hd2 -> Sem effs ()
     } ->
     SuiteItem hd effs t
-  AfterAll ::
-    { title :: Text,
-      aHook :: hd -> Sem effs (),
-      ahElms :: [SuiteItem hd effs t]
-    } ->
-    SuiteItem hd effs t
+
 {-
 instance Functor (SuiteItem hd ho effs) where
   fmap :: (a -> b) -> SuiteItem hd ho effs a -> SuiteItem hd ho effs b

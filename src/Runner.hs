@@ -37,7 +37,7 @@ import DSL.LogProtocol as LP
     ThenClause (ThenClause),
     WhenClause (WhenClause),
   )
-import DSL.Logger (Logger (LogError), log, logItem, logError)
+import DSL.Logger (Logger (LogError), log, logError, logItem)
 import Data.Aeson as A (ToJSON (toJSON), Value (Bool))
 import Data.Either.Extra (Either, eitherToMaybe)
 import Data.List (dropWhile)
@@ -65,6 +65,7 @@ import Pyrelude as P
     catMaybes,
     const,
     debug,
+    debug',
     either,
     eitherf,
     error,
@@ -91,7 +92,7 @@ import Pyrelude as P
     (<$>),
     (>>),
     (>>=),
-    (?), debug'
+    (?),
   )
 import RunElementClasses as C
   ( Address,
@@ -114,10 +115,10 @@ import qualified RunElementClasses as RC
 import RunnerBase as RB
   ( GenericResult (..),
     ItemRunner,
-    TestSuite (..),
     SuiteItem (..),
-    Test (..),
     SuiteSource,
+    Test (..),
+    TestSuite (..),
     queryElm,
   )
 import TestFilter (activeAddresses, filterSuite)
@@ -220,29 +221,23 @@ exeElm includedAddresses parentAddress hi =
       \case
         Tests {tests} ->
           sequence_ . join $ tests (debug' "Parent Address" parentAddress) hi
-        BeforeAll {title = t, bHook, bhElms} ->
+        OnceHook {title = t, bHook, aHook, hkElms} ->
           let adr = nxtAddress t hook
            in exclude t hook ? pure () $
                 do
                   logItem $ StartHook C.BeforeAll t
                   ho <- bHook hi
                   logItem $ EndHook C.BeforeAll t
-                  sequence_ $ exElm' adr ho <$> bhElms
+                  sequence_ $ exElm' adr ho <$> hkElms
+                  logItem $ StartHook C.AfterAll t
+                  aHook ho
+                  logItem $ EndHook C.AfterAll t
         Group {title = t, gElms} ->
           exclude t group' ? pure () $
             do
               logItem $ StartGroup $ GroupTitle t
               sequence_ $ exElm' (nxtAddress t group') hi <$> gElms
               logItem $ EndGroup $ GroupTitle t
-        AfterAll {title = t, aHook, ahElms} ->
-          let adr = nxtAddress t hook
-           in exclude t hook ? pure () $
-                do
-                  sequence_ $ exElm' adr hi <$> ahElms
-                  logItem $ StartHook C.AfterAll t
-                  aHook hi
-                  logItem $ EndHook C.AfterAll t
-                  pure ()
 
 mkSem ::
   forall rc tc e effs.

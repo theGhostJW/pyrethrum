@@ -97,8 +97,7 @@ queryElm title' address =
    in \case
         Tests {tests} -> (\a -> AddressedElm (tstAddress a) a) <$> tests address hdUndefined
         Group {title = t, gElms = e} -> hkQuery' RC.Group t e
-        BeforeAll {title = t, bhElms = e} -> hkQuery t e
-        AfterAll {title = t, ahElms = e} -> hkQuery t e
+        OnceHook {title = t, hkElms = e} -> hkQuery t e
 
 querySuiteElms :: forall hi effs a. (a -> Text) -> Address -> TestSuite hi effs a -> [AddressedElm a]
 querySuiteElms title' address suite = un suite >>= queryElm title' address

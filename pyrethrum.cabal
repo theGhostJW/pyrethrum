@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 24d633036eabf8ca60af83cef5fae3ee883c830b8a1218616c848846d01c590f
+-- hash: 0043097aacca1e9088561a7abd52452ccfa21c7805ce5eb64659b87e6de7dc44
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -74,15 +74,11 @@ library
       SemTest
       SuiteValidationTest
       TestFilterTest
-      EndToEndSanityTest
-      LogTransformationIntegrationTest
-      RunnerRestartGoHomeIOTest
   other-modules:
       Paths_pyrethrum
   hs-source-dirs:
       src
       test
-      testIntegration
   default-extensions:
       AllowAmbiguousTypes
       BangPatterns

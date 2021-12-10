@@ -37,6 +37,12 @@ baseCfg = RunConfig "Unit Test Config"
 demoFilter :: ChannelSelect -> [AddressTxtElm (TestInfo TestConfig)]
 demoFilter tr = toStrElm <$> fromRight' (queryFilterSuite (filters' Nothing) (baseCfg tr) (mockSuite @FixedEffs))
 
+-- $ > view showFilters
+showFilters :: Either Text FilterLog
+showFilters = filterSuite (baseCfg AllChannels)  (mockSuite @FixedEffs) (filters' Nothing)
+
+
+
 -- $ > view demoFilterAll
 -- demoFilterAll :: [AddressTxtElm (TestInfo TestConfig)
 demoFilterAll :: [AddressTxtElm (TestInfo TestConfig)]
@@ -55,13 +61,27 @@ unit_filter_all_has_all :: Assertion
 unit_filter_all_has_all = chkTitles allMockTestTitles AllChannels
 
 allMockTestTitles :: [Text]
-allMockTestTitles = ["test1WebTxt", "test4WebTxt", "test6WebTxt", "test5RESTTxt", "test2RESTInt", "test3RESTInt", "test6WebTxt"]
+allMockTestTitles = [
+                      "test1WebTxt", 
+                      -- "test4WebTxt", no test items
+                      "test61WebTxt", 
+                      "test5RESTTxt", 
+                      "test2RESTInt" --, 
+                      -- "test3RESTInt", no test items
+                      -- "test6WebTxt" no test items
+                      ]
 
 webTests :: [Text]
-webTests = ["test1WebTxt", "test4WebTxt", "test6WebTxt", "test6WebTxt"]
+webTests = ["test1WebTxt", 
+            --  "test4WebTxt", no test items
+            "test61WebTxt"]
 
 rest' :: [Text]
-rest' = ["test5RESTTxt", "test2RESTInt", "test3RESTInt"]
+rest' = [
+        "test5RESTTxt", 
+        "test2RESTInt" 
+        -- "test3RESTInt" no test items
+        ]
 
 -- $ > unit_filter_Web_has_Web
 unit_filter_Web_has_Web :: Assertion
@@ -87,13 +107,13 @@ data Status = Accepted | Rejected | AnyResult deriving (Eq)
 
 type ShowFilter = (Text, Maybe Text)
 
-tests' :: RunConfig -> [TestFilter RunConfig TestConfig] -> Status -> [ShowFilter]
-tests' rc fltrs s =
+testFilterSummary :: RunConfig -> [TestFilter RunConfig TestConfig] -> Status -> [ShowFilter]
+testFilterSummary rc fltrs s =
   let matchStatus :: (Text, Maybe Text) -> Bool
       matchStatus sf = s == AnyResult || (s == Accepted ? isNothing $ isJust) (snd sf)
       
       frslts ::  [TestFilterResult]
-      frslts = filterResults  fltrs rc
+      frslts = filterResults fltrs rc
 
    in P.filter matchStatus $ showIt <$> frslts
 
@@ -106,30 +126,26 @@ filters' ttl = [tossFilter, hasTitle ttl]
 
 -- $ > view allTests
 allTests :: [ShowFilter]
-allTests = tests' (baseCfg AllChannels) (filters' Nothing) Accepted
+allTests = testFilterSummary (baseCfg AllChannels) (filters' Nothing) Accepted
 
-
--- $ > unit_test_any_result_has_all
-unit_test_any_result_has_all :: Assertion
-unit_test_any_result_has_all = chkEq (length allTests) (length webAll)
 
 -- $ > view webAll
 
 webAll :: [ShowFilter]
-webAll = tests' (baseCfg WebOnly) (filters' Nothing) AnyResult
+webAll = testFilterSummary (baseCfg WebOnly) (filters' Nothing) AnyResult
 
 -- $ > view webRejected
 webRejected :: [ShowFilter]
-webRejected = tests' (baseCfg WebOnly) (filters' Nothing) Rejected
+webRejected = testFilterSummary (baseCfg WebOnly) (filters' Nothing) Rejected
 
 -- $ > view webAccepted
 
 webAccepted ::  [ShowFilter]
-webAccepted = tests' (baseCfg WebOnly) (filters' Nothing) Accepted
+webAccepted = testFilterSummary (baseCfg WebOnly) (filters' Nothing) Accepted
 
 -- $ > view webWith6Rejects
 webWith6Rejects ::  [ShowFilter]
-webWith6Rejects = tests' (baseCfg WebOnly) (filters' $ Just "6") Rejected
+webWith6Rejects = testFilterSummary (baseCfg WebOnly) (filters' $ Just "6") Rejected
 
 -- $ > unit_check_rejection_messages
 
@@ -138,8 +154,9 @@ unit_check_rejection_messages =
   chkEq
     webWith6Rejects
     [ ("test1WebTxt", Just "test title must include: 6"),
-      ("test4WebTxt", Just "test title must include: 6"),
-      ("test5RESTTxt", Just "toss call: REST must match run: WebOnly"),
-      ("test2RESTInt", Just "toss call: REST must match run: WebOnly"),
-      ("test3RESTInt", Just "toss call: REST must match run: WebOnly")
+      ("test4WebTxt", Just "Empty test items - Test items are empty under this run configuration"),
+      ("test5RESTTxt", Just "channel: REST must match run: WebOnly"),
+      ("test2RESTInt", Just "channel: REST must match run: WebOnly"),
+      ("test3RESTInt", Just "Empty test items - Test items are empty under this run configuration"),
+      ( "test6WebTxt", Just "Empty test items - Test items are empty under this run configuration")
     ]

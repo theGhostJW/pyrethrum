@@ -141,7 +141,7 @@ test2RESTInt =
           { title = "test2RESTInt",
             channel = REST
           },
-      items = empti,
+      items = intItems 2,
       interactor = emptiInteractor 44,
       parse = pure
     }
@@ -185,6 +185,17 @@ test6WebTxt =
       parse = pure
     }
 
+
+
+test61WebTxt :: MockTest Text TextItem Text Text effs
+test61WebTxt =
+ test6WebTxt {
+   config = (config test6WebTxt) {
+        title = "test61WebTxt"
+   } :: TestConfig,
+   items = txtItems 1
+ }
+
 test5RESTTxt :: MockTest Text TextItem Text Text effs
 test5RESTTxt =
   Test
@@ -193,7 +204,7 @@ test5RESTTxt =
           { title = "test5RESTTxt",
             channel = REST
           },
-      items = empti,
+      items = txtItems 2,
       interactor = emptiInteractor "Hello for REST 5",
       parse = pure
     }
@@ -201,7 +212,7 @@ test5RESTTxt =
 tossFilter :: TestFilter RunConfig TestConfig
 tossFilter =
   TestFilter
-    { title = \RunConfig {target} _ TestConfig {channel} -> "toss call: " <> txt channel <> " must match run: " <> txt target,
+    { title = \RunConfig {target} _ TestConfig {channel} -> "channel: " <> txt channel <> " must match run: " <> txt target,
       predicate = \RunConfig {target} _ TestConfig {channel} -> case target of
         AllChannels -> True
         WebOnly -> channel == Web
@@ -237,6 +248,7 @@ mockSuite runTest =
                             [ Tests
                                 \a hd ->
                                   [ runTest a hd test1WebTxt,
+                                    -- no test items
                                     runTest a hd test4WebTxt
                                   ]
                             ]
@@ -255,7 +267,7 @@ mockSuite runTest =
                                   bHook = \_ -> pure "HI",
                                   hkElms =
                                     [ Tests \a hd ->
-                                        [ runTest a hd test6WebTxt,
+                                        [ runTest a hd test61WebTxt,
                                           runTest a hd test5RESTTxt
                                         ]
                                     ],
@@ -275,6 +287,7 @@ mockSuite runTest =
                           hkElms =
                             [ Tests \a hd ->
                                 [ runTest a hd test2RESTInt,
+                                  -- no test items
                                   runTest a hd test3RESTInt
                                 ]
                             ],
@@ -289,7 +302,8 @@ mockSuite runTest =
                                   bHook = pure,
                                   hkElms =
                                     [ Tests \a hd ->
-                                        [ runTest a hd test6WebTxt
+                                        [ -- no test items
+                                          runTest a hd test6WebTxt
                                         ],
                                       R.Group
                                         { title = "Double Nested Empty Group",

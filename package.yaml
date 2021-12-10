@@ -117,8 +117,8 @@ library:
   # main: driver.hs
   source-dirs: 
     - src
+    # this enables eval in ghcid
     - test
-    - testIntegration
   dependencies:
     - deepseq
     - unordered-containers

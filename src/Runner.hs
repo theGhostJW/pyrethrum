@@ -216,11 +216,11 @@ exeElm includedAddresses parentAddress hi =
       nxtAddress ttl at = push ttl at parentAddress
 
       exclude :: Text -> AddressElemType -> Bool
-      exclude title at = debug $ S.notMember (debug $ nxtAddress title at) includedAddresses
+      exclude title at = S.notMember (debug $ nxtAddress title at) includedAddresses
    in --  TODO exceptions - run in terms of bracket / resource
       \case
         Tests {tests} ->
-          sequence_ . join $ tests (debug' "Parent Address" parentAddress) hi
+          sequence_ . join $ tests parentAddress hi
         OnceHook {title = t, bHook, aHook, hkElms} ->
           let adr = nxtAddress t hook
            in exclude t hook ? pure () $
@@ -253,12 +253,12 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
 
       run :: F.FilterLog -> Sem effs ()
       run flg =
-        let lg = F.log flg
+        let lg = F.log $ debug flg
          in do
               offset' <- utcOffset
               logItem . StartRun (RunTitle $ getField @"title" rc) offset' $ toJSON rc
               logItem $ FilterLog lg
-              sequence_ $ exeElm (debug $ activeAddresses lg) rootAddress () <$> sitms
+              sequence_ $ exeElm (activeAddresses lg) rootAddress () <$> sitms
               logItem EndRun
 
       lgError :: Text -> Sem effs ()

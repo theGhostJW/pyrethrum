@@ -91,7 +91,7 @@ import Pyrelude as P
     (<$>),
     (>>),
     (>>=),
-    (?),
+    (?), debug'
   )
 import RunElementClasses as C
   ( Address,
@@ -208,35 +208,35 @@ exeElm includedAddresses parentAddress hi =
   let exElm' :: forall hi'. Address -> hi' -> SuiteItem hi' effs [Sem effs ()] -> Sem effs ()
       exElm' = exeElm includedAddresses
 
+      hook = RC.Hook
+      group' = RC.Group
+
       nxtAddress :: Text -> AddressElemType -> Address
       nxtAddress ttl at = push ttl at parentAddress
 
-      nxtHookAddress :: Text -> Address
-      nxtHookAddress ttl = push ttl RC.Hook parentAddress
-
       exclude :: Text -> AddressElemType -> Bool
-      exclude title at = S.notMember (nxtAddress title at) includedAddresses
+      exclude title at = debug $ S.notMember (debug $ nxtAddress title at) includedAddresses
    in --  TODO exceptions - run in terms of bracket / resource
       \case
         Tests {tests} ->
-          sequence_ . join $ tests parentAddress hi
+          sequence_ . join $ tests (debug' "Parent Address" parentAddress) hi
         BeforeAll {title = t, bHook, bhElms} ->
-          let adr = nxtHookAddress t
-           in exclude t RC.Hook ? pure () $
+          let adr = nxtAddress t hook
+           in exclude t hook ? pure () $
                 do
                   logItem $ StartHook C.BeforeAll t
                   ho <- bHook hi
                   logItem $ EndHook C.BeforeAll t
                   sequence_ $ exElm' adr ho <$> bhElms
         Group {title = t, gElms} ->
-          exclude t RC.Hook ? pure () $
+          exclude t group' ? pure () $
             do
               logItem $ StartGroup $ GroupTitle t
-              sequence_ $ exElm' (nxtHookAddress t) hi <$> gElms
+              sequence_ $ exElm' (nxtAddress t group') hi <$> gElms
               logItem $ EndGroup $ GroupTitle t
         AfterAll {title = t, aHook, ahElms} ->
-          let adr = nxtHookAddress t
-           in exclude t RC.Hook ? pure () $
+          let adr = nxtAddress t hook
+           in exclude t hook ? pure () $
                 do
                   sequence_ $ exElm' adr hi <$> ahElms
                   logItem $ StartHook C.AfterAll t

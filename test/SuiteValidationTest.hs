@@ -44,12 +44,18 @@ listTests fltr rc =
   headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress . (address :: TestLogInfo -> Address) . C.testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
 
 
-display :: Either (FrameworkError Text) ([LogProtocolBase Text], ()) -> IO ()
+printLines :: [Text] -> IO ()
+printLines lg = traverse_ print (lg >>= lines) 
+
+
+display :: (Show a1, Show a2) => Either a1 a2 -> IO ()
 display eth = eitherf eth view view
 
 -- $> showAll
+-- $ > rslt *> view "Done"
 showAll :: IO ()
-showAll =  rslt >>= display
+showAll =  rslt >>= display 
+
 
 rslt :: IO (Either (FrameworkError Text) ([LogProtocolBase Text], ()))
 rslt = effExecuteLog everythingRun

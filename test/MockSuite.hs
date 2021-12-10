@@ -78,8 +78,10 @@ mkIntItem i = IntItem i ("Int Test Id" <> txt i) $ chk "Always Pass" $ const Tru
 mkTxtItem :: Int -> TextItem
 mkTxtItem i = TextItem i ("Int Test Id" <> txt i) $ chk "Always Pass" $ const True
 
+intItems :: Int -> p -> [IntItem]
 intItems i rc = mkIntItem <$> take i [1..]
 
+txtItems :: Int -> p -> [TextItem]
 txtItems i rc = mkTxtItem <$> take i [1..]
 
 data TextItem = TextItem

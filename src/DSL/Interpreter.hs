@@ -17,7 +17,7 @@ import DSL.Logger
       logConsolePrettyInterpreter,
       logRunRawInterpreter,
       logDocInterpreter,
-      logDocPrettyInterpreter, consListLog )
+      logDocPrettyInterpreter, consListLog, consListLogPretty )
 import DSL.ArbitraryIO
     ( arbitraryIODocInterpreter, arbitraryIOInterpreter, ArbitraryIO )
 import DSL.CurrentTime

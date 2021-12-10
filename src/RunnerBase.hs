@@ -10,6 +10,7 @@ module RunnerBase
     queryElm,
     querySuite',
     querySuite,
+    nullItems,
     testInfo,
   )
 where
@@ -185,6 +186,9 @@ data Test e tc rc hd i as ds effs = Test
     interactor :: rc -> hd -> i -> Sem effs as,
     parse :: forall psEffs. (Member (Error (FrameworkError e)) psEffs) => as -> Sem psEffs ds
   }
+
+nullItems :: Test e tc rc hd i as ds effs -> rc -> Bool
+nullItems t rc = null $ items t rc
 
 
 

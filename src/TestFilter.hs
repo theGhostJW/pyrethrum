@@ -4,10 +4,10 @@ import qualified Data.List as L
 import Data.Set (Set, member)
 import qualified Data.Set as S
 import GHC.Records (HasField (getField))
-import Internal.RunnerBaseLazy 
+import Internal.RunnerBaseLazy
 import OrphanedInstances ()
 import Pyrelude as P
-import RunElementClasses (Address (unAddress), Config, TestFilterResult (..), TestLogInfo, mkTestLogInfo, render)
+import RunElementClasses (Address (unAddress), Config, TestFilterResult (..), TestLogInfo (TestLogInfo), mkTestLogInfo, render)
 import qualified RunElementClasses as C
 import RunnerBase (AddressedElm (..))
 import RunnerBase as RB
@@ -51,7 +51,10 @@ applyFilters fltrs rc adrs tc =
    in fltrRslt firstRejectReason
 
 filterTest :: forall i as ds tc hi rc e effs. Config tc => [TestFilter rc tc] -> rc -> Address -> Test e tc rc hi i as ds effs -> TestFilterResult
-filterTest fltrs rc d Test {config = tc} = applyFilters fltrs rc d tc
+filterTest fltrs rc adrs t@Test {config = tc} =
+  nullItems t rc
+    ? mkTestFilterResult adrs tc (Just "Empty test items - Test items are empty under this run configuration")
+    $ applyFilters fltrs rc adrs tc
 
 filterLog ::
   forall tc rc e effs.

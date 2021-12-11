@@ -216,7 +216,7 @@ exeElm includedAddresses parentAddress hi =
       nxtAddress ttl at = push ttl at parentAddress
 
       exclude :: Text -> AddressElemType -> Bool
-      exclude title at = S.notMember (debug $ nxtAddress title at) includedAddresses
+      exclude title at = S.notMember (nxtAddress title at) includedAddresses
    in --  TODO exceptions - run in terms of bracket / resource
       \case
         Tests {tests} ->
@@ -253,7 +253,7 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
 
       run :: F.FilterLog -> Sem effs ()
       run flg =
-        let lg = F.log $ debug flg
+        let lg = F.log flg
          in do
               offset' <- utcOffset
               logItem . StartRun (RunTitle $ getField @"title" rc) offset' $ toJSON rc

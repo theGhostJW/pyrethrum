@@ -3,36 +3,35 @@
 module SuiteValidationTest where
 
 import Common (DetailedInfo (DetailedInfo), FrameworkError, HookType (..))
-import DSL.Interpreter (minInterpret, effExecuteLog)
+import DSL.Interpreter (effExecuteLog, minInterpret)
 import DSL.LogProtocol (LogProtocolBase (..))
 import DSL.LogProtocol.PrettyPrint (LogStyle (..), prettyPrintLogProtocol)
+import DSL.Logger
 import Data.Foldable (Foldable (length))
 import Data.Text (Text)
 import qualified Data.Text as Text
+import EvalHelp
 import GHC.Records
 import ItemRunners (runItem)
-import MockSuite as M (MockTest, RunConfig (RunConfig), TestConfig (..), TextItem, mockSuite, rcRunAll, tossFilter, ChannelSelect (WebOnly), DemoEffs, mockRun, everythingRun)
+import MockSuite as M (ChannelSelect (WebOnly), DemoEffs, MockTest, RunConfig (RunConfig), TestConfig (..), TextItem, everythingRun, mockRun, mockSuite, rcRunAll, tossFilter)
 import Polysemy
+import Polysemy.Internal.Union (Member)
 import Pyrelude as P
 import Pyrelude.IO (putStrLn)
 import Pyrelude.Test (Assertion, chk, chk', (...))
-import RunElementClasses as REC (AddressTxtElm, Address (..), AddressElem (..), TestLogInfo (..), toStrElm)
-import Runner (TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, title, SuiteSource)
-import RunnerBase as RB (AddressedElm (..), TestInfo, querySuite, testInfo) 
+import RunElementClasses as REC (Address (..), AddressElem (..), AddressTxtElm, TestLogInfo (..), toStrElm)
 import qualified RunElementClasses as C
+import Runner (SuiteSource, TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, title)
+import RunnerBase as RB (AddressedElm (..), TestInfo, querySuite, testInfo)
 import TempUtils
 import TestFilter
 import Text.Show.Pretty (pPrint, pPrintList, ppShowList)
-import Polysemy.Internal.Union (Member)
-import DSL.Logger
-import EvalHelp
-
-
 
 mockSuit' :: SuiteSource Text TestConfig RunConfig FixedEffs a
 mockSuit' = mockSuite @FixedEffs
 
 -- $ > view demoQueryElem
+
 demoQueryElem :: [AddressTxtElm (TestInfo TestConfig)]
 demoQueryElem = toStrElm <$> querySuite rcRunAll (mockSuite @FixedEffs)
 
@@ -43,24 +42,35 @@ listTests :: TestFilter RunConfig TestConfig -> RunConfig -> [Text]
 listTests fltr rc =
   headDef "" . ((title :: AddressElem -> Text) <$>) . unAddress . (address :: TestLogInfo -> Address) . C.testInfo <$> filter (isNothing . reasonForRejection) (applyFilterLog fltr rc)
 
-
 printLines :: [Text] -> IO ()
-printLines lg = traverse_ print (lg >>= lines) 
-
+printLines lg = traverse_ print (lg >>= lines)
 
 display :: (Show a1, Show a2) => Either a1 a2 -> IO ()
 display eth = eitherf eth view view
 
--- $> showAll
--- $ > rslt *> view "Done"
-showAll :: IO ()
-showAll =  rslt >>= display 
 
+-- $ > rslt *> view "Done"
+
+showAll :: IO ()
+showAll = rslt >>= display
+
+-- the test suite just logs messages
+logMessages :: LogProtocolBase Text -> Maybe Text
+logMessages = \case
+  Message t -> Just t
+  _ -> Nothing
+
+-- $> showSuiteMessages
+showSuiteMessages = suitMessages >>= view
+
+-- $ > suitMessages
+suitMessages = fromRight' . (catMaybes . (logMessages <$>) . fst <$>) <$> rslt
 
 rslt :: IO (Either (FrameworkError Text) ([LogProtocolBase Text], ()))
 rslt = effExecuteLog everythingRun
 
 -- $ > expectedDemoGroupNames
+
 expectedDemoGroupNames :: [Text]
 expectedDemoGroupNames = ["Happy SuiteSource", "Happy SuiteSource.Sub Group", "Happy SuiteSource.Empty Group"]
 

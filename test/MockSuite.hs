@@ -18,13 +18,14 @@ import DSL.Logger as L
 import Data.Aeson.TH
 import Data.Aeson.Types hiding (One)
 import Data.Yaml
-import GHC.Records (HasField)
+import GHC.Records (HasField (getField))
 import ItemRunners (runItem)
 import Polysemy
 import Pyrelude as P
 import Runner as R
   ( Address,
     Config,
+    HasId,
     ItemClass,
     RunParams (..),
     SuiteItem (..),
@@ -91,6 +92,9 @@ data TextItem = TextItem
   }
   deriving (Show, Generic)
 
+interact :: (HasId itm, Member (Logger e0) effs) => Text -> rc -> hi -> itm -> Sem effs hi
+interact lgText rc hi itm = L.log (lgText <> " " <> txt (getField @"id" itm)) >> pure hi
+
 instance ToJSON TextItem where
   toEncoding = genericToEncoding defaultOptions
 
@@ -129,11 +133,11 @@ test1WebTxt =
             channel = Web
           },
       items = txtItems 5,
-      interactor = \_ _ _ -> L.log "Hello" >> pure "Hi",
+      interactor = interact "test1WebTxt",
       parse = emptiParser "Blahh"
     }
 
-test2RESTInt :: MockTest Int IntItem Int Int effs
+test2RESTInt :: forall effs. Member (Logger Text) effs => MockTest Int IntItem Int Int effs
 test2RESTInt =
   Test
     { config =
@@ -142,11 +146,11 @@ test2RESTInt =
             channel = REST
           },
       items = intItems 2,
-      interactor = emptiInteractor 44,
+      interactor = interact "test2RESTInt",
       parse = pure
     }
 
-test3RESTInt :: MockTest Int IntItem Int Int effs
+test3RESTInt :: forall effs. Member (Logger Text) effs => MockTest Int IntItem Int Int effs
 test3RESTInt =
   Test
     { config =
@@ -155,11 +159,11 @@ test3RESTInt =
             channel = REST
           },
       items = empti,
-      interactor = emptiInteractor 3,
+      interactor = interact "test3RESTInt",
       parse = pure
     }
 
-test4WebTxt :: MockTest Text TextItem Text Text effs
+test4WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
 test4WebTxt =
   Test
     { config =
@@ -168,11 +172,11 @@ test4WebTxt =
             channel = Web
           },
       items = empti,
-      interactor = emptiInteractor "Hello",
+      interactor = interact "test4WebTxt",
       parse = pure
     }
 
-test6WebTxt :: MockTest Text TextItem Text Text effs
+test6WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
 test6WebTxt =
   Test
     { config =
@@ -181,22 +185,26 @@ test6WebTxt =
             channel = Web
           },
       items = empti,
-      interactor = emptiInteractor "Hello",
+      interactor = interact "test6WebTxt",
+      parse = pure
+    }
+
+test61WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test61WebTxt =
+  Test
+    { config =
+        TestConfig
+          { title = "test61WebTxt",
+            channel = Web
+          },
+      items = txtItems 1,
+      interactor = interact "test61WebTxt",
       parse = pure
     }
 
 
 
-test61WebTxt :: MockTest Text TextItem Text Text effs
-test61WebTxt =
- test6WebTxt {
-   config = (config test6WebTxt) {
-        title = "test61WebTxt"
-   } :: TestConfig,
-   items = txtItems 1
- }
-
-test5RESTTxt :: MockTest Text TextItem Text Text effs
+test5RESTTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
 test5RESTTxt =
   Test
     { config =
@@ -205,7 +213,7 @@ test5RESTTxt =
             channel = REST
           },
       items = txtItems 2,
-      interactor = emptiInteractor "Hello for REST 5",
+      interactor = interact "test5RESTTxt",
       parse = pure
     }
 
@@ -234,16 +242,16 @@ mockSuite :: forall effs a. DemoEffs effs => SuiteSource Text TestConfig RunConf
 mockSuite runTest =
   R.TestSuite
     [ R.Group
-        { title = "Filter SuiteSource",
+        { title = "Group 1",
           gElms =
             [ OnceHook
-                { title = "Before All",
+                { title = "Group 1 >> Before 1",
                   bHook = \_ -> do
-                    L.log "hello"
+                    L.log "Group 1 >> Before 1"
                     pure "hello",
                   hkElms =
                     [ R.Group
-                        { title = "Divider",
+                        { title = "Group 1 >> Before 1 >> Group 1",
                           gElms =
                             [ Tests
                                 \a hd ->
@@ -255,35 +263,35 @@ mockSuite runTest =
                         },
                       ----
                       R.Group
-                        { title = "Empty Group",
+                        { title = "Group 1 >> Empty Group 2",
                           gElms = [Tests \_ _ -> []]
                         },
                       ----
                       R.Group
-                        { title = "Divider",
+                        { title = "Group 1 >> Group 3",
                           gElms =
                             [ OnceHook
-                                { title = "Before Inner",
-                                  bHook = \_ -> pure "HI",
+                                { title = "Group 1 >> Group 3 >> Before 1.1",
+                                  bHook = \_ -> L.log "Group 1 >> Group 3 >> Before 1.1" $> "Hello",
                                   hkElms =
                                     [ Tests \a hd ->
                                         [ runTest a hd test61WebTxt,
                                           runTest a hd test5RESTTxt
                                         ]
                                     ],
-                                  aHook = \s -> L.log $ "After Hook Action " <> s
+                                  aHook = \_ -> L.log "Group 1 >> Group 3 >> After 1.1"
                                 }
                             ]
                         }
                     ],
-                  aHook = \_ -> pure ()
+                  aHook = \_ -> L.log "Group 1 >> After 1"
                 },
               R.Group
-                { title = "Nested Int Group",
+                { title = "Group 1 >> Group 2",
                   gElms =
                     [ OnceHook
-                        { title = "Int BE",
-                          bHook = \i -> pure 23,
+                        { title = "Group 1 >> Group 2 >> Hook 1",
+                          bHook = \i -> L.log "Group 1 >> Group 2 >> Before Hook 1" $> 23,
                           hkElms =
                             [ Tests \a hd ->
                                 [ runTest a hd test2RESTInt,
@@ -291,15 +299,16 @@ mockSuite runTest =
                                   runTest a hd test3RESTInt
                                 ]
                             ],
-                          aHook = \i -> L.log $ "After Hook Action " <> txt i
+                          aHook = \i -> L.log $ "Group 1 >> Group 2 >> After Hook 1"
                         },
-                      OnceHook
-                        { title = "Another Hook",
-                          bHook = \_ -> pure "Hello",
+                      OnceHook 
+                        -- this is an empty hook should not run
+                        { title = "Group 1 >> Group 2 >> Hook 2",
+                          bHook = \_ -> L.log "Group 1 >> Group 2 >> Hook 2 Before" $> "Hello",
                           hkElms =
                             [ OnceHook
-                                { title = "OneceHook Inner 2",
-                                  bHook = pure,
+                                { title = "Group 1 >> Group 2 >> Hook 2 >> Hook 3",
+                                  bHook = \i -> L.log "Group 1 >> Group 2 >> Hook 2 >> Hook 3 Before" $> "Hi",
                                   hkElms =
                                     [ Tests \a hd ->
                                         [ -- no test items
@@ -310,10 +319,10 @@ mockSuite runTest =
                                           gElms = []
                                         }
                                     ],
-                                  aHook = L.log
+                                  aHook = \_ -> L.log "Group 1 >> Group 2 >> Hook 2 >> Hook 3 After" 
                                 }
                             ],
-                          aHook = \s -> L.log $ "Clean Up - " <> s
+                          aHook = \s ->  L.log "Group 1 >> Group 2 >> Hook 2 After" 
                         }
                     ]
                 }

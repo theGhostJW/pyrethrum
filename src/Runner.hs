@@ -12,7 +12,6 @@ module Runner
     module C,
   )
 where
-
 import qualified Check
 import Common
   ( DetailedInfo (..),

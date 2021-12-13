@@ -217,8 +217,8 @@ test5RESTTxt =
       parse = pure
     }
 
-tossFilter :: TestFilter RunConfig TestConfig
-tossFilter =
+channelFilter :: TestFilter RunConfig TestConfig
+channelFilter =
   TestFilter
     { title = \RunConfig {target} _ TestConfig {channel} -> "channel: " <> txt channel <> " must match run: " <> txt target,
       predicate = \RunConfig {target} _ TestConfig {channel} -> case target of
@@ -246,9 +246,7 @@ mockSuite runTest =
           gElms =
             [ OnceHook
                 { title = "Group 1 >> Before 1",
-                  bHook = \_ -> do
-                    L.log "Group 1 >> Before 1"
-                    pure "hello",
+                  bHook = \_ -> L.log "BH - Group 1 >> Before Hook 1" $> "hello",
                   hkElms =
                     [ R.Group
                         { title = "Group 1 >> Before 1 >> Group 1",
@@ -272,26 +270,26 @@ mockSuite runTest =
                           gElms =
                             [ OnceHook
                                 { title = "Group 1 >> Group 3 >> Before 1.1",
-                                  bHook = \_ -> L.log "Group 1 >> Group 3 >> Before 1.1" $> "Hello",
+                                  bHook = \_ -> L.log "BH - Group 1 >> Group 3 >> Before Hook 1.1" $> "Hello",
                                   hkElms =
                                     [ Tests \a hd ->
                                         [ runTest a hd test61WebTxt,
                                           runTest a hd test5RESTTxt
                                         ]
                                     ],
-                                  aHook = \_ -> L.log "Group 1 >> Group 3 >> After 1.1"
+                                  aHook = \_ -> L.log "AH - Group 1 >> Group 3 >> After Hook 1.1"
                                 }
                             ]
                         }
                     ],
-                  aHook = \_ -> L.log "Group 1 >> After 1"
+                  aHook = \_ -> L.log "AH - Group 1 >> After Hook 1"
                 },
               R.Group
                 { title = "Group 1 >> Group 2",
                   gElms =
                     [ OnceHook
                         { title = "Group 1 >> Group 2 >> Hook 1",
-                          bHook = \i -> L.log "Group 1 >> Group 2 >> Before Hook 1" $> 23,
+                          bHook = \i -> L.log "BH - Group 1 >> Group 2 >> Before Hook 1" $> 23,
                           hkElms =
                             [ Tests \a hd ->
                                 [ runTest a hd test2RESTInt,
@@ -299,16 +297,16 @@ mockSuite runTest =
                                   runTest a hd test3RESTInt
                                 ]
                             ],
-                          aHook = \i -> L.log $ "Group 1 >> Group 2 >> After Hook 1"
+                          aHook = \i -> L.log "AH - Group 1 >> Group 2 >> After Hook 1"
                         },
                       OnceHook 
                         -- this is an empty hook should not run
                         { title = "Group 1 >> Group 2 >> Hook 2",
-                          bHook = \_ -> L.log "Group 1 >> Group 2 >> Hook 2 Before" $> "Hello",
+                          bHook = \_ -> L.log "BH - Group 1 >> Group 2 >> Before Hook 2" $> "Hello",
                           hkElms =
                             [ OnceHook
                                 { title = "Group 1 >> Group 2 >> Hook 2 >> Hook 3",
-                                  bHook = \i -> L.log "Group 1 >> Group 2 >> Hook 2 >> Hook 3 Before" $> "Hi",
+                                  bHook = \i -> L.log "BH - Group 1 >> Group 2 >> Hook 2 >> Hook 3 Before" $> "Hi",
                                   hkElms =
                                     [ Tests \a hd ->
                                         [ -- no test items
@@ -319,10 +317,10 @@ mockSuite runTest =
                                           gElms = []
                                         }
                                     ],
-                                  aHook = \_ -> L.log "Group 1 >> Group 2 >> Hook 2 >> Hook 3 After" 
+                                  aHook = \_ -> L.log "AH - Group 1 >> Group 2 >> Hook 2 >> After Hook 3" 
                                 }
                             ],
-                          aHook = \s ->  L.log "Group 1 >> Group 2 >> Hook 2 After" 
+                          aHook = \s ->  L.log "AH - Group 1 >> Group 2 >> After Hook 2" 
                         }
                     ]
                 }
@@ -330,8 +328,10 @@ mockSuite runTest =
         }
     ]
 
+
+
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
-filters' ttl = [tossFilter, hasTitle ttl]
+filters' ttl = [channelFilter, hasTitle ttl]
 
 mockRun :: forall effs. DemoEffs effs => Text -> ChannelSelect -> Maybe Text -> Sem effs ()
 mockRun runTitle targChannel testTitleFilterFragment =

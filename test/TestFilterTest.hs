@@ -121,7 +121,7 @@ showIt :: TestFilterResult -> ShowFilter
 showIt r = ((title :: TestLogInfo -> Text) $ testInfo r, reasonForRejection r)
 
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
-filters' ttl = [tossFilter, hasTitle ttl]
+filters' ttl = [channelFilter, hasTitle ttl]
 
 
 -- $ > view allTests

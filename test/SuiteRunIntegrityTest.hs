@@ -14,19 +14,19 @@ import EvalHelp
 import GHC.Records
 import ItemRunners (runItem)
 import MockSuite as M (
-  ChannelSelect (WebOnly), 
-  DemoEffs, 
-  MockTest, 
-  RunConfig (RunConfig), 
-  TestConfig (..), 
-  TextItem, 
-  everythingRun, 
-  mockRun, 
-  mockSuite, 
-  rcRunAll, 
-  channelFilter, 
-  webRun, 
-  restRun, 
+  ChannelSelect (WebOnly),
+  DemoEffs,
+  MockTest,
+  RunConfig (RunConfig),
+  TestConfig (..),
+  TextItem,
+  everythingRun,
+  mockRun,
+  mockSuite,
+  rcRunAll,
+  channelFilter,
+  webRun,
+  restRun,
   txtRun)
 import Polysemy
 import Polysemy.Internal.Union (Member)
@@ -62,7 +62,7 @@ display eth = eitherf eth view view
 -- $ > rslt *> view "Done"
 
 showAll :: IO ()
-showAll = (effExecuteLog everythingRun) >>= display
+showAll = effExecuteLog everythingRun >>= display
 
 -- the test suite just logs messages
 logMessages :: LogProtocolBase Text -> Maybe Text

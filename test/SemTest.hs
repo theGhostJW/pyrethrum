@@ -27,7 +27,7 @@ instance Config TestConfig
 $(deriveJSON defaultOptions ''TestConfig)
 
 --    e      tc        rc       hi i as ds effs
-type MockTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi (i ds) as ds effs
+type DemoTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi (i ds) as ds effs
 
 data Item ds = Item
   { id :: Int,
@@ -61,7 +61,7 @@ emptiInteractor as _ _ _ = pure as
 constParser :: a -> as -> Sem effs a
 constParser a _ = pure a
 
--- test1HeadsTxt :: MockTest Text Item Text Int effs
+-- test1HeadsTxt :: DemoTest Text Item Text Int effs
 -- test1HeadsTxt =
 --   Test
 --     { config =
@@ -74,7 +74,7 @@ constParser a _ = pure a
 --       parse = constParser 1
 --     }
 
--- test2TailsInt  :: MockTest Int Item Text Text effs
+-- test2TailsInt  :: DemoTest Int Item Text Text effs
 -- test2TailsInt  =
 --   Test
 --     { config =
@@ -87,7 +87,7 @@ constParser a _ = pure a
 --       parse = constParser "Hello"
 --     }
 
--- test3Bool :: MockTest Bool Item Text Int effs
+-- test3Bool :: DemoTest Bool Item Text Int effs
 -- test3Bool =
 --   Test
 --     { config =
@@ -100,7 +100,7 @@ constParser a _ = pure a
 --       parse = constParser 2
 --     }
 
--- test4HeadsTxt :: MockTest Text Item Text Text effs
+-- test4HeadsTxt :: DemoTest Text Item Text Text effs
 -- test4HeadsTxt =
 --   Test
 --     { config =
@@ -113,7 +113,7 @@ constParser a _ = pure a
 --       parse = constParser "hi"
 --     }
 
--- test5TailsTxt :: MockTest Int Item Int Int effs
+-- test5TailsTxt :: DemoTest Int Item Int Int effs
 -- test5TailsTxt =
 --   Test
 --     { config =
@@ -136,8 +136,8 @@ constParser a _ = pure a
 -- filters' :: [TestFilter RunConfig TestConfig]
 -- filters' = [includeFilter]
 
--- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
--- mockSuite r =
+-- demoSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => hi -> DemoTest hi i as ds effs -> a) -> SuiteItem () effs [a]
+-- demoSuite r =
 --   R.Group
 --     "Filter SuiteSource"
 --     [ BeforeHook

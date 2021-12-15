@@ -13,16 +13,15 @@ import qualified Data.Text as Text
 import EvalHelp
 import GHC.Records
 import ItemRunners (runItem)
-import MockSuite as M (
+import DemoSuite as M (
   ChannelSelect (WebOnly),
   DemoEffs,
-  MockTest,
   RunConfig (RunConfig),
   TestConfig (..),
   TextItem,
   everythingRun,
-  mockRun,
-  mockSuite,
+  demoRun,
+  demoSuite,
   rcRunAll,
   channelFilter,
   webRun,
@@ -48,12 +47,12 @@ import Text.Show.Pretty (pPrint, pPrintList, ppShowList)
 -}
 
 -- mockSuit' :: SuiteSource Text TestConfig RunConfig FixedEffs a
--- mockSuit' = mockSuite @FixedEffs
+-- mockSuit' = demoSuite @FixedEffs
 
 -- -- $ > view demoQueryElem
 
 -- demoQueryElem :: [AddressTxtElm (TestInfo TestConfig)]
--- demoQueryElem = toStrElm <$> querySuite rcRunAll (mockSuite @FixedEffs)
+-- demoQueryElem = toStrElm <$> querySuite rcRunAll (demoSuite @FixedEffs)
 
 
 display :: (Show a1, Show a2) => Either a1 a2 -> IO ()

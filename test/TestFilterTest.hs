@@ -4,7 +4,7 @@ import Check (Checks)
 import Data.Aeson.TH
 import Data.Aeson.Types
 import Data.Yaml
-import MockSuite hiding (filters')
+import DemoSuite hiding (filters')
 import Polysemy
 import Pyrelude as P
 import Pyrelude.Test hiding (Group)
@@ -24,22 +24,22 @@ import EvalHelp
 -- $ > view allTossCalls
 allTossCalls :: [(Text, Channel)]
 allTossCalls =
-  let titleAndCall :: rc -> Address -> MockTest ho i as ds effs -> (Text, Channel)
+  let titleAndCall :: rc -> Address -> DemoTest ho i as ds effs -> (Text, Channel)
       titleAndCall _ _ (R.Test (TestConfig ttl call) _ _ _) = (ttl, call)
 
       title' :: (Text, Channel) -> Text
       title' _ = "Not Used"
-   in RB.element <$> querySuite' (baseCfg AllChannels) title' titleAndCall (mockSuite @FixedEffs)
+   in RB.element <$> querySuite' (baseCfg AllChannels) title' titleAndCall (demoSuite @FixedEffs)
 
 baseCfg :: ChannelSelect -> RunConfig
 baseCfg = RunConfig "Unit Test Config"
 
 demoFilter :: ChannelSelect -> [AddressTxtElm (TestInfo TestConfig)]
-demoFilter tr = toStrElm <$> fromRight' (queryFilterSuite (filters' Nothing) (baseCfg tr) (mockSuite @FixedEffs))
+demoFilter tr = toStrElm <$> fromRight' (queryFilterSuite (filters' Nothing) (baseCfg tr) (demoSuite @FixedEffs))
 
 -- $ > view showFilters
 showFilters :: Either Text FilterLog
-showFilters = filterSuite (baseCfg AllChannels)  (mockSuite @FixedEffs) (filters' Nothing)
+showFilters = filterSuite (baseCfg AllChannels)  (demoSuite @FixedEffs) (filters' Nothing)
 
 
 
@@ -58,10 +58,10 @@ chkTitles expected tossResult =
 
 -- $ > unit_filter_all_has_all
 unit_filter_all_has_all :: Assertion
-unit_filter_all_has_all = chkTitles allMockTestTitles AllChannels
+unit_filter_all_has_all = chkTitles allDemoTestTitles AllChannels
 
-allMockTestTitles :: [Text]
-allMockTestTitles = [
+allDemoTestTitles :: [Text]
+allDemoTestTitles = [
                       "test1WebTxt", 
                       -- "test4WebTxt", no test items
                       "test61WebTxt", 
@@ -101,7 +101,7 @@ demoFilterREST = demoFilter RESTOnly
 
 
 filterResults :: [TestFilter RunConfig TestConfig] -> RunConfig -> [TestFilterResult]
-filterResults = filterLog (mockSuite @FixedEffs)
+filterResults = filterLog (demoSuite @FixedEffs)
 
 data Status = Accepted | Rejected | AnyResult deriving (Eq)
 

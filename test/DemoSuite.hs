@@ -1,6 +1,6 @@
 -- {-# LANGUAGE NoStrictData #-}
 
-module MockSuite where
+module DemoSuite where
 
 -- import Pyrelude.Test hiding (Group, maybe)
 -- import Pyrelude.Test hiding (Group, maybe)
@@ -64,7 +64,7 @@ instance Config TestConfig
 $(deriveJSON defaultOptions ''TestConfig)
 
 -- | A standard test
-type MockTest hi i as ds effs = Test Text TestConfig RunConfig hi i as ds effs
+type DemoTest hi i as ds effs = Test Text TestConfig RunConfig hi i as ds effs
 
 data IntItem = IntItem
   { id :: Int,
@@ -124,7 +124,7 @@ emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
 
 ---                           hi  itm     as   ds
-test1WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test1WebTxt :: forall effs. Member (Logger Text) effs => DemoTest Text TextItem Text Text effs
 test1WebTxt =
   Test
     { config =
@@ -137,7 +137,7 @@ test1WebTxt =
       parse = emptiParser "Blahh"
     }
 
-test2RESTInt :: forall effs. Member (Logger Text) effs => MockTest Int IntItem Int Int effs
+test2RESTInt :: forall effs. Member (Logger Text) effs => DemoTest Int IntItem Int Int effs
 test2RESTInt =
   Test
     { config =
@@ -150,7 +150,7 @@ test2RESTInt =
       parse = pure
     }
 
-test3RESTInt :: forall effs. Member (Logger Text) effs => MockTest Int IntItem Int Int effs
+test3RESTInt :: forall effs. Member (Logger Text) effs => DemoTest Int IntItem Int Int effs
 test3RESTInt =
   Test
     { config =
@@ -163,7 +163,7 @@ test3RESTInt =
       parse = pure
     }
 
-test4WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test4WebTxt :: forall effs. Member (Logger Text) effs => DemoTest Text TextItem Text Text effs
 test4WebTxt =
   Test
     { config =
@@ -176,7 +176,7 @@ test4WebTxt =
       parse = pure
     }
 
-test6WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test6WebTxt :: forall effs. Member (Logger Text) effs => DemoTest Text TextItem Text Text effs
 test6WebTxt =
   Test
     { config =
@@ -189,7 +189,7 @@ test6WebTxt =
       parse = pure
     }
 
-test61WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test61WebTxt :: forall effs. Member (Logger Text) effs => DemoTest Text TextItem Text Text effs
 test61WebTxt =
   Test
     { config =
@@ -204,7 +204,7 @@ test61WebTxt =
 
 
 
-test5RESTTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test5RESTTxt :: forall effs. Member (Logger Text) effs => DemoTest Text TextItem Text Text effs
 test5RESTTxt =
   Test
     { config =
@@ -238,8 +238,8 @@ hasTitle mbTtl =
           \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
 
-mockSuite :: forall effs a. DemoEffs effs => SuiteSource Text TestConfig RunConfig effs a
-mockSuite runTest =
+demoSuite :: forall effs a. DemoEffs effs => SuiteSource Text TestConfig RunConfig effs a
+demoSuite runTest =
   R.TestSuite
     [ R.Group
         { title = "Group 1",
@@ -333,11 +333,11 @@ mockSuite runTest =
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
 filters' ttl = [channelFilter, hasTitle ttl]
 
-mockRun :: forall effs. DemoEffs effs => Text -> ChannelSelect -> Maybe Text -> Sem effs ()
-mockRun runTitle targChannel testTitleFilterFragment =
+demoRun :: forall effs. DemoEffs effs => Text -> ChannelSelect -> Maybe Text -> Sem effs ()
+demoRun runTitle targChannel testTitleFilterFragment =
   mkSem $
     RunParams
-      { suite = mockSuite,
+      { suite = demoSuite,
         filters = filters' testTitleFilterFragment,
         itemIds = Nothing,
         itemRunner = runItem,
@@ -349,16 +349,16 @@ mockRun runTitle targChannel testTitleFilterFragment =
       }
 
 everythingRun :: forall effs. DemoEffs effs => Sem effs ()
-everythingRun = mockRun "Run All" AllChannels Nothing
+everythingRun = demoRun "Run All" AllChannels Nothing
 
 webRun :: forall effs. DemoEffs effs => Sem effs ()
-webRun = mockRun "Web Tests" WebOnly Nothing
+webRun = demoRun "Web Tests" WebOnly Nothing
 
 restRun :: forall effs. DemoEffs effs => Sem effs ()
-restRun = mockRun "Web Tests" RESTOnly Nothing
+restRun = demoRun "Web Tests" RESTOnly Nothing
 
 txtRun :: forall effs. DemoEffs effs => Sem effs ()
-txtRun = mockRun "Run REST" AllChannels $ Just "txt"
+txtRun = demoRun "Run REST" AllChannels $ Just "txt"
 
 $(deriveJSON defaultOptions ''Channel)
 $(deriveJSON defaultOptions ''ChannelSelect)

@@ -37,6 +37,7 @@ dependencies:
   - Stack
 
 ghc-options:
+  - -threaded
   - -fmax-pmcheck-models=10000000
   - -ferror-spans
   - -fprint-potential-instances

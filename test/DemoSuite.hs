@@ -2,11 +2,6 @@
 
 module DemoSuite where
 
--- import Pyrelude.Test hiding (Group, maybe)
--- import Pyrelude.Test hiding (Group, maybe)
--- import Pyrelude.Test hiding (Group, maybe)
--- import Pyrelude.Test hiding (Group, maybe)
-
 import Check
 import qualified Check
 import qualified Check as C

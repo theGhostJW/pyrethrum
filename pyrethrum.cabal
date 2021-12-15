@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8747dd47cf665b4cc1bbf3edf82a4e9dc0acd33709aa70df5afa5a1b30d7effc
+-- hash: bd94be03859edc9d3bdd6ec62c837cd9d2aa68553e137c7302625a590db06a66
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -61,6 +61,7 @@ library
       ArbitraryIOTest
       AuxFilesTest
       CheckTest
+      ConcurrentSuiteSimple
       DemoConfig
       DemoSuite
       EndpointTest
@@ -158,6 +159,7 @@ test-suite pyrethrum-test
       ArbitraryIOTest
       AuxFilesTest
       CheckTest
+      ConcurrentSuiteSimple
       DemoConfig
       DemoSuite
       EndpointTest

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1d94746315b9906078df2fce52a1962b6677e2a2d7958c9991c0c3779e865d38
+-- hash: be291ff202b72b339e833f5a72ae4a09ad9bfac917ce9aebf68208c2d734adfa
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -25,13 +25,11 @@ source-repository head
   type: git
   location: https://github.com/githubuser/simple-hpack
 
-executable pyrethrum
-  main-is: driver.hs
-  other-modules:
+library
+  exposed-modules:
       AuxFiles
       Check
       Common
-      Config
       DSL
       DSL.ArbitraryIO
       DSL.CurrentTime
@@ -42,6 +40,7 @@ executable pyrethrum
       DSL.LogProtocol
       DSL.LogProtocol.PrettyPrint
       FileLogging
+      Internal.RunnerBaseLazy
       ItemFilter
       ItemRunners
       LogTransformation
@@ -56,7 +55,6 @@ executable pyrethrum
       Runner
       RunnerBase
       RunnerConsoleAndFile
-      RunPlan
       TempUtils
       TestFilter
       TestFilters
@@ -65,6 +63,7 @@ executable pyrethrum
       CheckTest
       DemoConfig
       EndpointTest
+      EvalHelp
       ItemFiltersTest
       LogListCheck
       LogProtocolTest
@@ -73,16 +72,13 @@ executable pyrethrum
       PrettyPrintTest
       RunnerTest
       SemTest
-      SuiteValidationTest
+      SuiteRunIntegrityTest
       TestFilterTest
-      EndToEndSanityTest
-      LogTransformationIntegrationTest
-      RunnerRestartGoHomeIOTest
+  other-modules:
       Paths_pyrethrum
   hs-source-dirs:
       src
       test
-      testIntegration
   default-extensions:
       AllowAmbiguousTypes
       BangPatterns
@@ -131,9 +127,10 @@ executable pyrethrum
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
+  ghc-options: -threaded -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
   build-depends:
-      aeson
+      Stack
+    , aeson
     , base
     , bytestring
     , containers
@@ -141,20 +138,112 @@ executable pyrethrum
     , dlist
     , extra
     , fmt
-    , hedgehog
     , mtl
     , polysemy
     , polysemy-plugin
     , pretty-show
     , pyrelude
     , raw-strings-qq
-    , tasty
-    , tasty-discover
-    , tasty-hedgehog
-    , tasty-hunit
     , template-haskell
     , text
     , transformers-either
     , unordered-containers
+    , yaml
+  default-language: Haskell2010
+
+test-suite pyrethrum-test
+  type: exitcode-stdio-1.0
+  main-is: driver.hs
+  other-modules:
+      ArbitraryIOTest
+      AuxFilesTest
+      CheckTest
+      DemoConfig
+      EndpointTest
+      EvalHelp
+      ItemFiltersTest
+      LogListCheck
+      LogProtocolTest
+      LogTransformationTest
+      MockSuite
+      PrettyPrintTest
+      RunnerTest
+      SemTest
+      SuiteRunIntegrityTest
+      TestFilterTest
+      Paths_pyrethrum
+  hs-source-dirs:
+      test
+  default-extensions:
+      AllowAmbiguousTypes
+      BangPatterns
+      BlockArguments
+      ConstrainedClassMethods
+      ConstraintKinds
+      DisambiguateRecordFields
+      DuplicateRecordFields
+      DataKinds
+      DefaultSignatures
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      ExtendedDefaultRules
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      LiberalTypeSynonyms
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      NoImplicitPrelude
+      OverloadedStrings
+      PartialTypeSignatures
+      PatternSynonyms
+      PolyKinds
+      QuasiQuotes
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      StrictData
+      TemplateHaskell
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+  ghc-options: -threaded -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
+  build-depends:
+      Stack
+    , aeson
+    , base
+    , bytestring
+    , containers
+    , dlist
+    , extra
+    , hedgehog
+    , mtl
+    , polysemy
+    , polysemy-plugin
+    , pretty-show
+    , pyrelude
+    , pyrethrum
+    , raw-strings-qq
+    , tasty
+    , tasty-discover
+    , tasty-hedgehog
+    , tasty-hunit
+    , text
+    , transformers-either
     , yaml
   default-language: Haskell2010

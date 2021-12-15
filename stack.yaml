@@ -7,7 +7,10 @@
 # Resolver to choose a 'specific' stackage snapshot or a compiler version.
 # A snapshot resolver dictates the compiler version and the set of packages
 # to be used for project dependencies. For example:
-#
+
+ghc-options:
+  '$everything': -haddock
+  
 # resolver: lts-3.5
 # resolver: nightly-2015-09-21
 # resolver: ghc-7.10.2
@@ -18,7 +21,8 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-17.4
+   
+resolver: lts-18.17  # remove mintty flags whn changing the resolver
 #  -- ghc-8.10.4
 # nightly-2018-05-30 # last nightly for GHC 8.4.2
 # ghc-8.4.2
@@ -45,21 +49,28 @@ packages:
 # extra-deps: []
 
 # Override default flag values for local packages and extra-deps
-# flags: {}
-#
-allow-newer: true
+#  Remove when fixed or move to a new resolver
+#  https://www.reddit.com/r/haskell/comments/qksh4o/monthly_hask_anything_november_2021/hlee653/?context=3
+flags: 
+   mintty:
+    Win32-2-13-1: false
+
+allow-newer: false
 
 # Extra package databases containing global packages
 # extra-package-dbs: []
 extra-deps:
 # mine
 - git: https://github.com/theGhostJW/pyrelude
-  commit: "36fffcb758ebf73b7fcf3c7e38519ad0e9e38d96"
-- discrimination-0.4@sha256:d42ae36c97ea9c0c8844b47ee162c5530f3daf708636f01010f58dcf52602876,2571
+  commit: "90c3f560699b1bd5c7b025ae67bd557b8be2204d"
+# - git: https://github.com/RyanGlScott/mintty
+#   commit: "28fe58c9927ceff2d636a14b780642092d734bf3"
+- polysemy-1.7.0.0
+- polysemy-plugin-0.4.2.0
+- Stack-0.4.0@sha256:ada69a23ed9bbaf97260397f6b39b7a1f4e22a11bcac3fe2e8f23f1513f59fd8,1092
+- discrimination-0.4.1@sha256:2edd04588e9ecadcc283d602fe9cc89190fc5b0e2ac834433da1c5f9a3dbe2c7,3620
 - encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce,1864
-- polysemy-1.4.0.0
-- polysemy-plugin-0.2.5.2
-- transformers-either-0.1.1@sha256:ec3d6fefd90e243b51aecebfc0ebc5db6381c261d473ea2df7ed7b501a8fb961,1501
+- transformers-either-0.1.2@sha256:e2ba24af49df7fa09794dcff6cb203d086d5c18e35b3cf10a8ecf7eb465fdedf,1677
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true

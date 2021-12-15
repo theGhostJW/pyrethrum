@@ -1,14 +1,14 @@
 module SemTest where
 
-import Pyrelude         as P
-import Polysemy
-import           Runner as R
-import           Pyrelude.Test hiding (Group)
-import Data.Yaml
 import Data.Aeson.TH
 import Data.Aeson.Types
+import Data.Yaml
+import Polysemy
+import Pyrelude as P hiding (Item)
+import Runner as R
+import RunnerBase (Test)
 import TestFilter
-import RunnerBase ( Test )
+import Check
 
 data Include = In | Out deriving (Eq, Ord, Show)
 
@@ -16,150 +16,182 @@ $(deriveJSON defaultOptions ''Include)
 
 newtype RunConfig = RunConfig Include
 
+data TestConfig = TestConfig
+  { title :: Text,
+    include :: Include
+  }
+  deriving (Show, Eq)
 
-data TestConfig = TestConfig {
-  header :: Text,
-  address :: TestAddress,
-  include :: Include
-}  deriving (Show ,Eq)
-
-instance TestConfigClass TestConfig where
-  moduleAddress = address
-
-instance Titled TestConfig where
-  title = header
+instance Config TestConfig
 
 $(deriveJSON defaultOptions ''TestConfig)
 
-type MockTest i as ds effs = RunnerBase.Test Int TestConfig RunConfig i as ds effs
+--    e      tc        rc       hi i as ds effs
+type MockTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi (i ds) as ds effs
 
-newtype MyInt = MyInt Int deriving (Show, Generic)
-
-newtype MyText = MyText Text deriving (Show, Generic, ToJSON)
-
-instance ItemClass MyInt MyInt where
-  identifier _ =  -999
-  whenClause _ =  "pre"
-  thenClause _ =  "post"
-  checkList = mempty
-
-instance ItemClass MyText MyText  where
-  identifier _ =  -999
-  whenClause _ =  "pre"
-  thenClause _ =  "post"
-  checkList = mempty
+data Item ds = Item
+  { id :: Int,
+    title :: Text,
+    val :: Int,
+    checks :: Checks ds
+  }
+  deriving (Show, Generic)
 
 
-instance ToJSON MyInt where
+
+data TextItem ds = TextItem
+  { id :: Int,
+    title :: Text,
+    val :: Int,
+    checks :: Checks ds
+  }
+  deriving (Show, Generic)
+
+
+instance (ToJSON ds) => ToJSON (Item ds) where
   toEncoding = genericToEncoding defaultOptions
-
 
 empti :: a -> [b]
 empti = const ([] :: [b])
 
-emptiInteractor :: b -> RunConfig -> a -> Sem effs b
-emptiInteractor b _ _ = pure b
+--                 as ->    rc     -> hi -> i -> Sem effs as
+emptiInteractor :: as -> RunConfig -> hi -> i -> Sem effs as
+emptiInteractor as _ _ _ = pure as
 
-emptiParser:: a -> as -> Sem effs a
-emptiParser a _ = pure a
+constParser :: a -> as -> Sem effs a
+constParser a _ = pure a
 
-test1 :: MockTest MyInt Text MyInt effs
-test1 = Test {
-              config = TestConfig {
-                header = "test1",
-                address = TestAddress "test1",
-                include = In
-              },
-              items = empti,
-              interactor = emptiInteractor "Hello",
-              parse = emptiParser (MyInt 1)
-            }
+-- test1HeadsTxt :: MockTest Text Item Text Int effs
+-- test1HeadsTxt =
+--   Test
+--     { config =
+--         TestConfig
+--           { title = "test1",
+--             include = In
+--           },
+--       items = empti,
+--       interactor = emptiInteractor "Hello",
+--       parse = constParser 1
+--     }
 
-test2 :: MockTest MyInt MyInt MyInt effs
-test2 = Test {
-              config = TestConfig {
-                header = "test2",
-                address = TestAddress "test2 address",
-                include = In
-              },
-              items = empti,
-              interactor = emptiInteractor (MyInt 1),
-              parse = pure
-            }
+-- test2TailsInt  :: MockTest Int Item Text Text effs
+-- test2TailsInt  =
+--   Test
+--     { config =
+--         TestConfig
+--           { title = "test2",
+--             include = In
+--           },
+--       items = empti,
+--       interactor = emptiInteractor "Hi",
+--       parse = constParser "Hello"
+--     }
 
-test3 :: MockTest MyInt MyInt MyInt effs
-test3 = Test {
-                config = TestConfig {
-                header = "test3",
-                address = TestAddress "test3 address",
-                include = Out
-            },
-              items = empti,
-              interactor = emptiInteractor (MyInt 3),
-              parse = pure
-            }
+-- test3Bool :: MockTest Bool Item Text Int effs
+-- test3Bool =
+--   Test
+--     { config =
+--         TestConfig
+--           { title = "test3",
+--             include = Out
+--           },
+--       items = empti,
+--       interactor = emptiInteractor "Hi",
+--       parse = constParser 2
+--     }
 
-test4 :: MockTest Text Text Text effs 
-test4 = Test {
-              config = TestConfig {
-                  header = "test4",
-                  address = TestAddress "test4 address",
-                  include = In
-              },
-              items = empti,
-              interactor = emptiInteractor "Hello",
-              parse = pure
-            }
+-- test4HeadsTxt :: MockTest Text Item Text Text effs
+-- test4HeadsTxt =
+--   Test
+--     { config =
+--         TestConfig
+--           { title = "test4",
+--             include = In
+--           },
+--       items = empti,
+--       interactor = emptiInteractor "Hello",
+--       parse = constParser "hi"
+--     }
 
-test5 :: MockTest MyInt MyInt MyInt effs
-test5 = Test {
-              config = TestConfig {
-                  header = "test5",
-                  address = TestAddress "test5 address",
-                  include = Out
-                },
-              items = empti,
-              interactor = emptiInteractor (MyInt 1),
-              parse = pure
-            }
+-- test5TailsTxt :: MockTest Int Item Int Int effs
+-- test5TailsTxt =
+--   Test
+--     { config =
+--         TestConfig
+--           { title = "test5",
+--             include = Out
+--           },
+--       items = empti,
+--       interactor = emptiInteractor 1,
+--       parse = constParser 99
+--     }
 
+-- includeFilter :: TestFilter RunConfig TestConfig
+-- includeFilter =
+--   TestFilter
+--     { title = "test include must match run",
+--       predicate = \(RunConfig inc) _ tc -> include tc == inc
+--     }
 
-includeFilter :: TestFilter RunConfig TestConfig
-includeFilter = TestFilter {
-     title = "test include must match run",
-     predicate = \(RunConfig inc) tc -> include tc == inc
-   }
+-- filters' :: [TestFilter RunConfig TestConfig]
+-- filters' = [includeFilter]
 
-filters' :: [TestFilter RunConfig TestConfig]
-filters' = [includeFilter]
+-- mockSuite :: forall effs a. (forall hi i as ds. (Show i, Show as, Show ds) => hi -> MockTest hi i as ds effs -> a) -> SuiteItem () effs [a]
+-- mockSuite r =
+--   R.Group
+--     "Filter SuiteSource"
+--     [ BeforeHook
+--         { title = "Before All",
+--           cardinality = ExeOnce,
+--           bHook = pure "hello",
+--           bhElms =
+--             [ \t ->
+--                 Tests
+--                   [ r t test1HeadsTxt,
+--                     r t test4HeadsTxt
+--                   ],
+--               const
+--                 R.Group
+--                   { title = "Empty Group",
+--                     gElms =
+--                       [ Tests []
+--                       ]
+--                   }
+--             ]
+--         },
+--       R.Group
+--         { title = "Empty Group",
+--           gElms =
+--             [ BeforeHook
+--                 { title = "Int Group",
+--                   cardinality = ExeForEach,
+--                   bHook = pure 23,
+--                   bhElms =
+--                     [ \t ->
+--                         AfterHook
+--                           { title = "After Exch Int",
+--                             cardinality = ExeForEach,
+--                             aHook = t == 23 ? pure () $ pure (),
+--                             ahElms =
+--                               [ \i ->
+--                                   Tests
+--                                     [ r i test5TailsTxt,
+--                                       r i test2TailsInt 
+--                                     ]
+--                               ]
+--                           }
+--                     ]
+--                 }
+--             ]
+--         }
+--         -- ,
 
-
-mockSuite :: forall effs a. (forall i as ds. (Show i, Show as, Show ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
-mockSuite r = 
-  R.Group "Filter Suite" [
-    Hook 
-    "Before All" 
-     BeforeAll 
-     (pure ()) [
-      Tests [
-        r test1,
-        r test2,
-        r test3
-      ]
-    ],
-
-    R.Group "Sub Group" [
-      Tests [
-        r test4,
-        r test5
-      ]
-    ],
-
-    R.Group "Empty Group" [
-      Tests []
-    ]
-      
-  ]
-
+-- R.Group "Sub Group" [
+--   Tests [
+--     r test4,
+--     r test5
+--   ]
+-- ],
+-- ]
 
 -- unit_test_filter_expect_empty

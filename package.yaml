@@ -30,13 +30,17 @@ dependencies:
   - yaml
   - pretty-show
   - dlist
+  - mtl
   - raw-strings-qq
-  - polysemy
+  - polysemy 
   - polysemy-plugin
+  - Stack
 
 ghc-options:
+  - -threaded
   - -fmax-pmcheck-models=10000000
   - -ferror-spans
+  - -fprint-potential-instances
   # - -dth-dec-file -- generate template haskell
 
   - -O0
@@ -110,48 +114,34 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
-executable:
-  main: driver.hs
+library:
+  # main: driver.hs
   source-dirs: 
     - src
+    # this enables eval in ghcid
     - test
-    - testIntegration
   dependencies:
     - deepseq
     - unordered-containers
     - template-haskell
     - bytestring
-    - mtl
     - fmt
-    # test modules
-    - tasty
-    - tasty-hunit
-    - tasty-hedgehog
-    - tasty-discover
-    - hedgehog
 
 #  reinstate when LHS can live load multiple modules
 # use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
-# _testDep: &testdependencies
-# - tasty
-# - tasty-hunit
-# - tasty-hedgehog
-# - tasty-discover
-# - hedgehog
-# - pyrethrum
-# - bytestring
-# - mtl
+_testDep: &testdependencies
+  - tasty
+  - tasty-hunit
+  - tasty-hedgehog
+  - tasty-discover
+  - hedgehog
+  - pyrethrum
+  - bytestring
 
-# tests:
-#   pyrethrum-test:
-#     main:                driver.hs
-#     source-dirs:        
-#     - test
-#     dependencies: *testdependencies
+tests:
+  pyrethrum-test:
+    main:                driver.hs
+    source-dirs:        
+    - test
+    dependencies: *testdependencies
   
-#   pyrethrum-test-Integration:
-#     main:                driver.hs
-#     source-dirs:         
-#     - testIntegration
-#     dependencies: 
-#       *testdependencies

@@ -149,6 +149,10 @@ logToHandles convertersHandles =
 consListLog :: forall effs a e. (Show e, Member (Output (LogProtocolBase e)) effs, A.ToJSON e) => Sem (Logger e ': effs) a -> Sem effs a
 consListLog = logWithSink output
 
+-- used for testing ~ cons to a list (so log is in reverse order)
+consListLogPretty :: forall effs a e. (Show e, Member (Output Text) effs, A.ToJSON e) => Sem (Logger e ': effs) a -> Sem effs a
+consListLogPretty = logWithSink (output . prettyPrintLogProtocol Run)
+
 logDocInterpreter :: forall effs a e. (Show e, Member OutputDListText effs, A.ToJSON e) => Sem (Logger e ': effs) a -> Sem effs a
 logDocInterpreter = logWithSink (output . dList)
                                                      

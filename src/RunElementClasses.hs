@@ -1,64 +1,114 @@
-module RunElementClasses where
+module RunElementClasses
+  ( AddressElemType(..),
+    Address (..),
+    AddressElem(..),
+    AddressTxtElm(..),
+    TestLogInfo (..),
+    TestFilterResult (..),
+    AddressedElm (..),
+    Config,
+    HasId,
+    HasTitle,
+    ItemClass,
+    rootAddress,
+    toStrElm,
+    push,
+    toTitleList,
+    render,
+    render',
+    mkTestLogInfo
+  )
+where
 
-import           Pyrelude
+import Check
 import Data.Aeson.TH
-import Language.Haskell.TH.Syntax
 import Data.Aeson.Types
-import           Check
+import GHC.Records
+import Language.Haskell.TH.Syntax
+import Pyrelude as P hiding (toList)
 
-newtype TestAddress = TestAddress {unTestAddress :: Text} deriving (Eq, Ord, Show, IsString)
+data AddressElemType = Hook | Group | Test deriving (Show, Eq)
 
--- this result is ultimately serialsed to JSON as part of the log protocol data  
--- type and can't serialise with custom typeclass constraints so forced to
--- have the redundant testModAddress and testTitle even though this
--- data is available via TestConfigClass
-data TestDisplayInfo = TestDisplayInfo {
-  testModAddress :: TestAddress,
-  testTitle :: Text,
-  testConfig :: Value -- test Config as Json
-}  deriving (Eq, Show)
+data AddressElem = AddressElem
+  { title :: Text,
+    elemType :: AddressElemType
+  }
+  deriving (Show, Eq)
 
-instance Ord TestDisplayInfo where 
-  (<=) v1 v2 = testModAddress v1 <= testModAddress v2
+newtype Address = Address {unAddress :: [AddressElem]} deriving (Show, Eq)
 
-$(deriveJSON defaultOptions ''TestDisplayInfo)
+rootAddress :: Address
+rootAddress = Address []
 
-data TestFilterResult = TestFilterResult {
-  testInfo  :: TestDisplayInfo, 
-  reasonForRejection :: Maybe Text
-}  deriving (Eq, Ord, Show)
+push :: Text -> AddressElemType -> Address -> Address
+push t et add = Address $ AddressElem t et : unAddress add
 
+toTitleList :: Address -> [Text]
+toTitleList a = (title :: AddressElem -> Text) <$> reverse (unAddress a)
+
+render :: Address -> Text
+render = render' " > "
+
+render' :: Text -> Address -> Text
+render' delim add = intercalate delim $ reverse $ (title :: AddressElem -> Text) <$> unAddress add
+
+instance Ord Address where
+  v1 <= v2 = toTitleList v1 <= toTitleList v2
+
+-- this result is ultimately serialsed to JSON as part of the log protocol data
+data TestLogInfo = TestLogInfo
+  { title :: Text,
+    address :: Address,
+    testConfig :: Value -- test Config as Json
+  }
+  deriving (Eq, Show)
+
+instance Ord TestLogInfo where
+  v1 <= v2 = (address :: TestLogInfo -> Address) v1 <= (address :: TestLogInfo -> Address) v2
+
+data TestFilterResult = TestFilterResult
+  { testInfo :: TestLogInfo,
+    reasonForRejection :: Maybe Text
+  }
+  deriving (Eq, Ord, Show)
+
+type HasTitle a = HasField "title" a Text
+
+type HasId a = HasField "id" a Int
+
+class (HasField "title" a Text, Show a, FromJSON a, ToJSON a, Eq a) => Config a
+
+type ItemClass i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds))
+
+mkTestLogInfo :: Config tc => Address -> tc -> TestLogInfo
+mkTestLogInfo a tc = TestLogInfo (getField @"title" tc) (push (getField @"title" tc) Test a) $ toJSON tc
+
+data AddressedElm a = AddressedElm
+  { address :: Address,
+    element :: a
+  }
+  deriving (Show)
+  
+data AddressTxtElm a = AddressTxtElm
+  { address :: Text,
+    el :: a
+  }
+  deriving Show
+
+toStrElm :: AddressedElm a -> AddressTxtElm a
+toStrElm AddressedElm {address, element} = AddressTxtElm (render address) element
+
+addressTitle :: AddressedElm a -> Text
+addressTitle (AddressedElm (Address add) _) = P.headDef "" $ getField @"title" <$> add
+
+instance Eq (AddressedElm a) where
+  v1 == v2 = (address :: AddressedElm a -> Address) v1 == (address :: AddressedElm a -> Address) v2
+
+instance Ord (AddressedElm a) where
+  v1 <= v2 = (address :: AddressedElm a -> Address) v1 <= (address :: AddressedElm a -> Address) v2
+
+$(deriveJSON defaultOptions ''AddressElemType)
+$(deriveJSON defaultOptions ''AddressElem)
+$(deriveJSON defaultOptions ''Address)
+$(deriveJSON defaultOptions ''TestLogInfo)
 $(deriveJSON defaultOptions ''TestFilterResult)
-
-mkTestAddress :: Name -> TestAddress
-mkTestAddress = TestAddress . moduleOf
-
-$(deriveJSON defaultOptions ''TestAddress)
-
-toString :: TestAddress -> Text
-toString (TestAddress s) = s
-
-class Titled a where
-  title :: a -> Text
-
-class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => TestConfigClass a where
-  moduleAddress:: a -> TestAddress
-
-class (Titled a, Show a, FromJSON a, ToJSON a, Eq a) => RunConfigClass a
-
-class ItemClass i ds  where
-  identifier :: i -> Int
-  whenClause :: i -> Text
-  thenClause :: i -> Text
-  checkList :: i -> CheckDList ds
-
-  whenThen :: i -> Text
-  whenThen i = "When: " <> whenClause @i @ds i  <> "\n" <>
-               "Then: " <> thenClause @i @ds i
-
-mkDisplayInfo :: TestConfigClass tc => tc -> TestDisplayInfo
-mkDisplayInfo tc = TestDisplayInfo {
-                                    testModAddress = moduleAddress tc,
-                                    testTitle = title tc,
-                                    testConfig = toJSON tc
-                                  }

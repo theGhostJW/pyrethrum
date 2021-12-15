@@ -1,231 +1,162 @@
 module TestFilterTest where
 
-import Pyrelude         as P
-import Polysemy
-import           Runner as R
-import           Pyrelude.Test hiding (Group)
-import Data.Yaml
+import Check (Checks)
 import Data.Aeson.TH
 import Data.Aeson.Types
+import Data.Yaml
+import MockSuite hiding (filters')
+import Polysemy
+import Pyrelude as P
+import Pyrelude.Test hiding (Group)
+import RunElementClasses
+import Runner as R
+import RunnerBase as RB (AddressedElm (..), Test, TestInfo (..), querySuite, querySuite')
 import TestFilter
-import RunnerBase ( Test )
+import Text.Show.Pretty
+import GHC.Records
+import DSL.Interpreter
+import DSL.Logger
+import MemberReflection (showEffs)
 
-data TestDepth = Connectivity | Regression | DeepRegression deriving (Eq, Ord, Show)
-data Country = Au | NZ deriving (Eq, Ord, Show)
-
-$(deriveJSON defaultOptions ''Country)
-$(deriveJSON defaultOptions ''TestDepth)
-
-data RunConfig = RunConfig {
-  country :: Country,
-  level :: TestDepth
-}
-
-data TestConfig = TestConfig {
-  header :: Text,
-  address :: TestAddress,
-  countries :: [Country],
-  level :: TestDepth,
-  enabled :: Bool
-}  deriving (Show ,Eq)
-
-instance TestConfigClass TestConfig where
-  moduleAddress = address
-
-instance Titled TestConfig where
-  title = header
-
-$(deriveJSON defaultOptions ''TestConfig)
-
-type MockTest i as ds effs = RunnerBase.Test Int TestConfig RunConfig i as ds effs
-
-newtype MyInt = MyInt Int deriving (Show, Generic)
-
-newtype MyText = MyText Text deriving (Show, Generic, ToJSON)
-
-instance ItemClass MyInt MyInt where
-  identifier _ =  -999
-  whenClause _ =  "pre"
-  thenClause _ =  "post"
-  checkList = mempty
-
-instance ItemClass MyText MyText  where
-  identifier _ =  -999
-  whenClause _ =  "pre"
-  thenClause _ =  "post"
-  checkList = mempty
+import EvalHelp
 
 
-instance ToJSON MyInt where
-  toEncoding = genericToEncoding defaultOptions
+-- $ > view allTossCalls
+allTossCalls :: [(Text, Channel)]
+allTossCalls =
+  let titleAndCall :: rc -> Address -> MockTest ho i as ds effs -> (Text, Channel)
+      titleAndCall _ _ (R.Test (TestConfig ttl call) _ _ _) = (ttl, call)
 
-au :: [Country]
-au = [Au]
+      title' :: (Text, Channel) -> Text
+      title' _ = "Not Used"
+   in RB.element <$> querySuite' (baseCfg AllChannels) title' titleAndCall (mockSuite @FixedEffs)
 
-nz :: [Country]
-nz = [NZ]
+baseCfg :: ChannelSelect -> RunConfig
+baseCfg = RunConfig "Unit Test Config"
 
-empti :: a -> [b]
-empti = const ([] :: [b])
+demoFilter :: ChannelSelect -> [AddressTxtElm (TestInfo TestConfig)]
+demoFilter tr = toStrElm <$> fromRight' (queryFilterSuite (filters' Nothing) (baseCfg tr) (mockSuite @FixedEffs))
 
-emptiInteractor :: b -> RunConfig -> a -> Sem effs b
-emptiInteractor b _ _ = pure b
-
-emptiParser:: a -> as -> Sem effs a
-emptiParser a _ = pure a
-
-test1 :: MockTest MyInt Text MyInt effs
-test1 = Test {
-              config = TestConfig {
-                header = "test1",
-                address = TestAddress "test1",
-                countries = au <> nz,
-                level = Regression,
-                enabled = True
-              },
-              items = empti,
-              interactor = emptiInteractor "Hello",
-              parse = emptiParser (MyInt 1)
-            }
-
-test2 :: MockTest MyInt MyInt MyInt effs
-test2 = Test {
-              config = TestConfig {
-                header = "test2",
-                address = TestAddress "test2 address",
-                countries = nz,
-                level = Regression,
-                enabled = True
-              },
-              items = empti,
-              interactor = emptiInteractor (MyInt 1),
-              parse = pure
-            }
-
-test3 :: MockTest MyInt MyInt MyInt effs
-test3 = Test {
-                config = TestConfig {
-                  header = "test3",
-                  address = TestAddress "test3 address",
-                  countries = au,
-                  level = Connectivity,
-                  enabled = True
-                },
-              items = empti,
-              interactor = emptiInteractor (MyInt 3),
-              parse = pure
-            }
-
-test4 :: MockTest Text Text Text effs 
-test4 = Test {
-              config = TestConfig {
-                  header = "test4",
-                  address = TestAddress "test4 address",
-                  countries = au,
-                  level = DeepRegression,
-                  enabled = True
-                },
-              items = empti,
-              interactor = emptiInteractor "Hello",
-              parse = pure
-            }
-
-test5 :: MockTest MyInt MyInt MyInt effs
-test5 = Test {
-              config = TestConfig {
-                  header = "test5",
-                  address = TestAddress "test5 address",
-                  countries = au,
-                  level = DeepRegression,
-                  enabled = False
-                },
-              items = empti,
-              interactor = emptiInteractor (MyInt 1),
-              parse = pure
-            }
+-- $ > view showFilters
+showFilters :: Either Text FilterLog
+showFilters = filterSuite (baseCfg AllChannels)  (mockSuite @FixedEffs) (filters' Nothing)
 
 
-enabledFilter :: TestFilter RunConfig TestConfig
-enabledFilter = TestFilter {
-     title = "test must be is enabled",
-     predicate = \_ tc -> enabled tc
-   }
 
-countryFilter :: TestFilter RunConfig TestConfig
-countryFilter = TestFilter {
-     title = "country must match test run",
-     predicate = \rc tc -> P.elem (country rc) $ countries tc
-   }
+-- $ > view demoFilterAll
+-- demoFilterAll :: [AddressTxtElm (TestInfo TestConfig)
+demoFilterAll :: [AddressTxtElm (TestInfo TestConfig)]
+demoFilterAll = demoFilter AllChannels
 
-levelFilter :: TestFilter RunConfig TestConfig
-levelFilter = TestFilter {
-     title = "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
-     predicate = \rc tc -> (level :: TestConfig -> TestDepth) tc <= (level :: RunConfig -> TestDepth) rc
-   }
+chkTitles :: [Text] -> ChannelSelect -> Assertion
+chkTitles expected tossResult =   
+  let 
+    title'' :: AddressTxtElm (TestInfo TestConfig) -> Text
+    title'' = (title :: TestInfo TestConfig -> Text) . el 
+  in
+   chkEq expected $ title'' <$> demoFilter tossResult
 
-filters' :: [TestFilter RunConfig TestConfig]
-filters' = [enabledFilter, countryFilter, levelFilter]
+-- $ > unit_filter_all_has_all
+unit_filter_all_has_all :: Assertion
+unit_filter_all_has_all = chkTitles allMockTestTitles AllChannels
+
+allMockTestTitles :: [Text]
+allMockTestTitles = [
+                      "test1WebTxt", 
+                      -- "test4WebTxt", no test items
+                      "test61WebTxt", 
+                      "test5RESTTxt", 
+                      "test2RESTInt" --, 
+                      -- "test3RESTInt", no test items
+                      -- "test6WebTxt" no test items
+                      ]
+
+webTests :: [Text]
+webTests = ["test1WebTxt", 
+            --  "test4WebTxt", no test items
+            "test61WebTxt"]
+
+rest' :: [Text]
+rest' = [
+        "test5RESTTxt", 
+        "test2RESTInt" 
+        -- "test3RESTInt" no test items
+        ]
+
+-- $ > unit_filter_Web_has_Web
+unit_filter_Web_has_Web :: Assertion
+unit_filter_Web_has_Web = chkTitles webTests WebOnly
+
+-- $ > unit_filter_REST_has_REST
+unit_filter_REST_has_REST :: Assertion
+unit_filter_REST_has_REST = chkTitles rest' RESTOnly
+
+-- $ > view demoFilterWeb
+demoFilterWeb :: [AddressTxtElm (TestInfo TestConfig)]
+demoFilterWeb = demoFilter WebOnly
+
+-- $ > view demoFilterREST
+demoFilterREST :: [AddressTxtElm (TestInfo TestConfig)]
+demoFilterREST = demoFilter RESTOnly
 
 
-mockSuite :: forall effs a. (forall i as ds. (Show i, Show as, Show ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
-mockSuite r = 
-  R.Group "Filter Suite" [
-    Hook 
-      "Before All" 
-      BeforeAll 
-      (pure ()) [
-      Tests [
-        r test1,
-        r test2,
-        r test3
-      ]
-    ],
+filterResults :: [TestFilter RunConfig TestConfig] -> RunConfig -> [TestFilterResult]
+filterResults = filterLog (mockSuite @FixedEffs)
 
-    R.Group "Sub Group" [
-      Tests [
-        r test4,
-        r test5
-      ]
-    ],
+data Status = Accepted | Rejected | AnyResult deriving (Eq)
 
-    R.Group "Empty Group" [
-      Tests []
-    ]
+type ShowFilter = (Text, Maybe Text)
+
+testFilterSummary :: RunConfig -> [TestFilter RunConfig TestConfig] -> Status -> [ShowFilter]
+testFilterSummary rc fltrs s =
+  let matchStatus :: (Text, Maybe Text) -> Bool
+      matchStatus sf = s == AnyResult || (s == Accepted ? isNothing $ isJust) (snd sf)
       
-  ]
+      frslts ::  [TestFilterResult]
+      frslts = filterResults fltrs rc
+
+   in P.filter matchStatus $ showIt <$> frslts
+
+showIt :: TestFilterResult -> ShowFilter
+showIt r = ((title :: TestLogInfo -> Text) $ testInfo r, reasonForRejection r)
+
+filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
+filters' ttl = [channelFilter, hasTitle ttl]
 
 
-filterResults :: RunConfig -> [TestFilterResult]
-filterResults = filterSuite mockSuite filters'
-
-acceptedTests :: RunConfig -> [TestFilterResult]
-acceptedTests rc = P.filter acceptFilter $ filterResults rc
-
-chkFilters :: [Text] -> RunConfig -> Assertion
-chkFilters expted rc = chkEq expted $ testTitle . testInfo <$> acceptedTests rc
-
-unit_test_filter_expect_empty :: Assertion
-unit_test_filter_expect_empty = chkFilters [] $ RunConfig NZ Connectivity
-
-unit_test_filter_country :: Assertion
-unit_test_filter_country = chkFilters ["test1", "test3"] $ RunConfig Au Regression
-
-unit_test_filter_country_nz :: Assertion
-unit_test_filter_country_nz = chkFilters ["test1", "test2"] $ RunConfig NZ Regression
-
-unit_test_filter_country_au_deep_regression :: Assertion
-unit_test_filter_country_au_deep_regression = chkFilters ["test1", "test3", "test4"] $ RunConfig Au DeepRegression
+-- $ > view allTests
+allTests :: [ShowFilter]
+allTests = testFilterSummary (baseCfg AllChannels) (filters' Nothing) Accepted
 
 
-filtersExcludeReasons :: RunConfig -> [Text]
-filtersExcludeReasons rc = catMaybes $ reasonForRejection <$> P.filter rejectFilter (filterResults rc)
+-- $ > view webAll
 
-unit_test_filter_exclude_reasons :: Assertion
-unit_test_filter_exclude_reasons = chkEq [
-                                          "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
-                                          "depth must be within run parameters (e.g. regression test will not be run in connectiviity run)",
-                                          "country must match test run",
-                                          "country must match test run",
-                                          "test must be is enabled"
-                                          ]
-                                          $ filtersExcludeReasons $ RunConfig NZ Connectivity
+webAll :: [ShowFilter]
+webAll = testFilterSummary (baseCfg WebOnly) (filters' Nothing) AnyResult
+
+-- $ > view webRejected
+webRejected :: [ShowFilter]
+webRejected = testFilterSummary (baseCfg WebOnly) (filters' Nothing) Rejected
+
+-- $ > view webAccepted
+
+webAccepted ::  [ShowFilter]
+webAccepted = testFilterSummary (baseCfg WebOnly) (filters' Nothing) Accepted
+
+-- $ > view webWith6Rejects
+webWith6Rejects ::  [ShowFilter]
+webWith6Rejects = testFilterSummary (baseCfg WebOnly) (filters' $ Just "6") Rejected
+
+-- $ > unit_check_rejection_messages
+
+unit_check_rejection_messages :: Assertion
+unit_check_rejection_messages =
+  chkEq
+    webWith6Rejects
+    [ ("test1WebTxt", Just "test title must include: 6"),
+      ("test4WebTxt", Just "Empty test items - Test items are empty under this run configuration"),
+      ("test5RESTTxt", Just "channel: REST must match run: WebOnly"),
+      ("test2RESTInt", Just "channel: REST must match run: WebOnly"),
+      ("test3RESTInt", Just "Empty test items - Test items are empty under this run configuration"),
+      ( "test6WebTxt", Just "Empty test items - Test items are empty under this run configuration")
+    ]

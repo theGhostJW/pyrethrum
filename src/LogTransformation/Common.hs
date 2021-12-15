@@ -15,7 +15,8 @@ import qualified Data.Set as S
 import Data.Yaml as Y
 import OrphanedInstances ()
 import Pyrelude as P hiding (phase)
-import RunElementClasses
+import RunElementClasses as RC
+import RunnerBase
 
 newtype LineNo = LineNo {unLineNo :: Int} deriving (Show, Eq)
 
@@ -243,13 +244,13 @@ nxtValue mCurrent = \case
   Keep -> mCurrent
   New val -> Just val
 
-testItrDelta :: LogProtocolBase e -> (DeltaAction TestAddress, DeltaAction ItemId)
+testItrDelta :: LogProtocolBase e -> (DeltaAction Address, DeltaAction ItemId)
 testItrDelta =
   let clear = (Clear, Clear)
       keep = (Keep, Keep)
    in \case
-        StartTest (TestDisplayInfo mdule _ _) -> (New mdule, Clear)
-        StartIteration iid _ _ _ -> (Keep, New iid)
+        StartTest (TestLogInfo ttl domain _) -> (New $ push ttl RC.Test domain, Clear)
+        StartIteration iid _ _ -> (Keep, New iid)
         EndIteration _ -> keep
         StartRun {} -> clear
         EndRun -> clear
@@ -262,7 +263,7 @@ testItrDelta =
 
 nxtIteration :: Maybe (ItemId, IterationOutcome) -> LogProtocolBase e -> Maybe (ItemId, IterationOutcome)
 nxtIteration current lp =
-  let ( modAction :: DeltaAction TestAddress,
+  let ( modAction :: DeltaAction Address,
         idAction :: DeltaAction ItemId
         ) = testItrDelta lp
    in case modAction of

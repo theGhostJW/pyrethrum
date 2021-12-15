@@ -29,6 +29,49 @@ import LogTransformation.Common as LC
 import LogTransformation.Stats
 import PrettyPrintCommon
 import Pyrelude as P
+    ( fst,
+      otherwise,
+      ($),
+      Eq((==)),
+      Monad((>>=)),
+      Ord(compare),
+      Show,
+      Foldable(sum),
+      Semigroup((<>)),
+      Bool(..),
+      Int,
+      Maybe(..),
+      Ordering,
+      Either,
+      txtPretty,
+      (<$>),
+      (?),
+      txt,
+      Category((.)),
+      ConvertString(convertString),
+      Listy(null, empty, filter, snoc, foldl'),
+      Text,
+      sortBy,
+      const,
+      Down(Down),
+      Bifunctor(bimap),
+      (&&),
+      (||),
+      not,
+      (\\),
+      sort,
+      fromMaybe,
+      isJust,
+      isNothing,
+      isRight,
+      eitherf,
+      enumList,
+      firstJust,
+      maybef,
+      toLower,
+      toTitle,
+      unlines,
+      Lenient(getLenient) )
 import RunElementClasses
 
 -- TODO: creation relational records
@@ -56,7 +99,7 @@ data PrintLogDisplayElement
 
     StartTest
       { tstTitle :: Text,
-        modAddress :: TestAddress,
+        address :: Address,
         notes :: Maybe Text,
         config :: A.Value, -- test Config as Json
         status :: ExecutionStatus, -- test Config as Json
@@ -101,11 +144,10 @@ data ParserStatus
   deriving (Eq, Show)
 
 data IterationRecord = IterationRecord
-  { modulePath :: Text,
+  { address :: Address,
     itmId :: Int,
+    title :: Text, 
     notes :: Maybe Text,
-    pre :: Text,
-    post :: Text,
     outcome :: IterationOutcome,
     validation :: [CheckReport],
     otherErrors :: [IterationError],
@@ -151,7 +193,7 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
       _normalStep :: (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
       _normalStep@(nxtItAccum@(IterationAccum _nxtMRec _nxtStepInfo _nxtMFltrLg), mDisplayElement) = printLogDisplayStep runResults lineNo itAccum eithLp
 
-      testStatus' :: TestAddress -> ExecutionStatus
+      testStatus' :: Address -> ExecutionStatus
       testStatus' = testStatus $ testExStatus iterationResults
 
       _skipFlags :: (Bool, Bool) -- (newAccum, err / result)
@@ -161,8 +203,8 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
           (const (skipItt, skipTst))
           ( \LogProtocolOut {logInfo = lp} ->
               case lp of
-                LP.StartTest (TestDisplayInfo tstMod _ _) -> (False, LC.Pass == testStatus' tstMod)
-                StartIteration iid _ _ _ -> (LC.Pass == executionStatus (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
+                LP.StartTest (TestLogInfo ttl domain _) -> (False, LC.Pass == testStatus' (push ttl Test domain))
+                StartIteration iid _ _ -> (LC.Pass == executionStatus (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
                 _ -> (skipItt, skipTst)
           )
 
@@ -176,10 +218,10 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
    in (nxtAccum, isRight eithLp && (nxtSkipItt || nxtSkipTst) ? Nothing $ mDisplayElement)
 
 -- itrOutcome ItemId -> Maybe IterationOutcome
-testStatusMap :: RunResults -> M.Map TestAddress ExecutionStatus
+testStatusMap :: RunResults -> M.Map Address ExecutionStatus
 testStatusMap = testExStatus . iterationResults
 
-testStatus :: M.Map TestAddress ExecutionStatus -> TestAddress -> ExecutionStatus
+testStatus :: M.Map Address ExecutionStatus -> Address -> ExecutionStatus
 testStatus tstStatusMap tm = fromMaybe LC.Fail $ M.lookup tm tstStatusMap
 
 printLogDisplay :: 
@@ -194,16 +236,16 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
 
     RunResults outOfTest iterationResults = runResults
 
-    testStatuses :: M.Map TestAddress ExecutionStatus
+    testStatuses :: M.Map Address ExecutionStatus
     testStatuses = testStatusMap runResults
 
-    testStatus' :: TestAddress -> ExecutionStatus
+    testStatus' :: Address -> ExecutionStatus
     testStatus' = testStatus testStatuses
 
-    tstIterationStatusCounts :: M.Map TestAddress StatusCount
+    tstIterationStatusCounts :: M.Map Address StatusCount
     tstIterationStatusCounts = testIterationStatusCounts runResults
 
-    testItrStats :: TestAddress -> StatusCount
+    testItrStats :: Address -> StatusCount
     testItrStats tm = M.findWithDefault M.empty tm tstIterationStatusCounts
 
     elOut :: a -> Maybe [a]
@@ -273,28 +315,30 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
     LP.EndGroup _ -> skipLog
     StartHook {} -> skipLog
     EndHook {}  -> skipLog
-    LP.StartTest (TestDisplayInfo testModAddress testTitle testConfig) ->
+    LP.StartTest (TestLogInfo ttl domain testConfig) ->
+        let 
+          elmAddress = push ttl Test domain
+        in
         ( accum,
           elOut $
             LogTransformation.PrintLogDisplayElement.StartTest
-              testTitle
-              testModAddress
+              ttl
+              elmAddress
               (getNotes testConfig)
               testConfig
-              (testStatus' testModAddress)
-              (testItrStats testModAddress)
+              (testStatus' elmAddress)
+              (testItrStats elmAddress)
         )
     LP.EndTest _ -> skipLog
-    StartIteration iid@(ItemId tstModule itmId) (WhenClause whn) (ThenClause thn) jsonItmVal ->
+    StartIteration iid@(ItemId address itmId) ttle jsonItmVal ->
         ( accum
             { rec =
                 Just $
                   IterationRecord
-                    { modulePath = unTestAddress tstModule,
+                    { address = address,
                       itmId = itmId,
+                      title = ttle,
                       notes = getNotes jsonItmVal,
-                      pre = whn,
-                      post = thn,
                       outcome = M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults,
                       validation = P.empty,
                       otherErrors = P.empty,
@@ -408,7 +452,7 @@ prettyPrintDisplayElement pde =
                       rejectedItems = fltrItems isJust
 
                       address :: TestFilterResult -> Text
-                      address = unTestAddress . testModAddress . testInfo
+                      address = logInfoAddress . testInfo
 
                       rejectText :: TestFilterResult -> Text
                       rejectText fr =
@@ -437,23 +481,22 @@ prettyPrintDisplayElement pde =
                         <> rejected
               )
             <> newLn
-        LogTransformation.PrintLogDisplayElement.StartTest titl tstMod _notes _cfg status itrStats ->
+        LogTransformation.PrintLogDisplayElement.StartTest titl address _notes _cfg status itrStats ->
           majorHeader False (header' titl status)
             <> newLn
             <> "module:"
             <> newLn
-            <> indent2 (unTestAddress tstMod)
+            <> indent2 (render address)
             <> newLn2
             <> "stats:"
             <> newLn
             <> alignKeyValues True 2 RightJustify (statusCountTupleText False itrStats)
         LogTransformation.PrintLogDisplayElement.Iteration
           ( IterationRecord
-              modulePath
+              address
               itmId
+              ttle
               notes
-              when'
-              then'
               (IterationOutcome status phse)
               validation
               _otherErrors
@@ -465,8 +508,7 @@ prettyPrintDisplayElement pde =
             let hdrLines :: [(Text, Text)]
                 hdrLines =
                   let baseLines =
-                        [ ("when", when'),
-                          ("then", then'),
+                        [ ("title", ttle),
                           ("status", statusLabel False status <> (status == LC.Pass ? "" $ " - " <> txt phse))
                         ]
                    in maybef
@@ -479,9 +521,8 @@ prettyPrintDisplayElement pde =
                   let pos :: Text -> Int
                       pos k
                         | "iid" == k = 0
-                        | "pre" == k = 1
-                        | "post" == k = 2
-                        | "notes" == k = 3
+                        | "title" == k = 1
+                        | "notes" == k = 2
                         | "checks" == k = 100
                         | otherwise = 10
                    in compare (pos k1) (pos k2)
@@ -533,7 +574,7 @@ prettyPrintDisplayElement pde =
                    in \case
                         SucceededInteractor val -> mkTxt $ unApStateJSON val
                         FailedInteractor err -> mkTxt $ Y.toJSON err
-             in iterationHeader False (header' (modulePath <> " - " <> txt itmId) status)
+             in iterationHeader False (header' (render address <> " - " <> txt itmId) status)
                   <> newLn
                   <> alignKeyValues True 0 LeftJustify hdrLines
                   <> newLn
@@ -603,9 +644,9 @@ statusCountTupleText outOfTest sc =
         ? statusTuples
         $ ("total", txt . sum $ M.elems sc) : statusTuples
 
-$(deriveJSON defaultOptions ''PrintLogDisplayElement)
 $(deriveJSON defaultOptions ''IterationRecord)
 $(deriveJSON defaultOptions ''ApStateInfo)
 $(deriveJSON defaultOptions ''IterationWarning)
 $(deriveJSON defaultOptions ''IterationError)
 $(deriveJSON defaultOptions ''ParserStatus)
+$(deriveJSON defaultOptions ''PrintLogDisplayElement)

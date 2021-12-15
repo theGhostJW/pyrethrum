@@ -56,7 +56,7 @@ module LogTransformation.Test where
 --                                             e@I.EndRun -> Nothing
 --                                             I.StartGroup gt -> Nothing
 --                                             I.EndGroup gt -> Nothing
---                                             I.StartTest (RC.TestDisplayInfo address title config) -> Just $ emptyRecord {
+--                                             I.StartTest (RC.TestLogInfo address title config) -> Just $ emptyRecord {
 --                                                                                                               title = title,
 --                                                                                                               address = RC.unTestAddress address,
 --                                                                                                               config = config

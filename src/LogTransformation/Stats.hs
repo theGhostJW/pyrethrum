@@ -2,7 +2,7 @@ module LogTransformation.Stats where
 
 import Pyrelude as P hiding (phase)
 import qualified Data.Map.Strict as M
-import RunElementClasses
+import RunElementClasses as RC
 import DSL.LogProtocol
 import LogTransformation.Common
 import Data.Aeson.TH
@@ -93,10 +93,10 @@ statsStep statsAccum eithLP =
       (statsStepFromDeserialisationError statsAccum)
       (statsStepFromLogProtocol statsAccum)
 
-testExStatus :: IterationResults -> M.Map TestAddress ExecutionStatus
-testExStatus ir = executionStatus <$> M.mapKeysWith max tstModule ir
+testExStatus :: IterationResults -> M.Map Address ExecutionStatus
+testExStatus ir = executionStatus <$> M.mapKeysWith max (address :: ItemId -> Address) ir
 
-listTestStatus :: RunResults -> M.Map TestAddress ExecutionStatus 
+listTestStatus :: RunResults -> M.Map Address ExecutionStatus 
 listTestStatus = testExStatus . iterationResults 
 
 testStatusCounts :: RunResults -> StatusCount
@@ -105,23 +105,20 @@ testStatusCounts = countValues . listTestStatus
 listIterationStatus :: RunResults -> M.Map ItemId ExecutionStatus 
 listIterationStatus runResults = executionStatus <$> iterationResults runResults
 
-itrStatusesGroupedByTest :: RunResults -> M.Map TestAddress (M.Map ItemId ExecutionStatus)
+itrStatusesGroupedByTest :: RunResults -> M.Map Address (M.Map ItemId ExecutionStatus)
 itrStatusesGroupedByTest rr = 
   let 
-    step :: M.Map TestAddress (M.Map ItemId ExecutionStatus) -> ItemId -> ExecutionStatus -> M.Map TestAddress (M.Map ItemId ExecutionStatus) 
-    step accum iid status = 
+    step :: M.Map Address (M.Map ItemId ExecutionStatus) -> ItemId -> ExecutionStatus -> M.Map Address (M.Map ItemId ExecutionStatus) 
+    step accum iid@ItemId {address} status = 
        let 
-         tstMod :: TestAddress
-         tstMod = tstModule iid
-
          tstMap :: M.Map ItemId ExecutionStatus
-         tstMap = M.findWithDefault M.empty tstMod accum 
+         tstMap = M.findWithDefault M.empty address accum 
        in 
-        M.insert tstMod (M.insert iid status tstMap) accum
+        M.insert address (M.insert iid status tstMap) accum
   in 
     M.foldlWithKey' step M.empty $ listIterationStatus rr
 
-testIterationStatusCounts :: RunResults -> M.Map TestAddress StatusCount
+testIterationStatusCounts :: RunResults -> M.Map Address StatusCount
 testIterationStatusCounts rr = countValues <$> itrStatusesGroupedByTest rr
 
 iterationStatusCounts :: RunResults -> StatusCount

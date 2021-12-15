@@ -1,304 +1,367 @@
+-- {-# LANGUAGE NoStrictData #-}
+
 module MockSuite where
 
-import AuxFiles ()
-import Common (HookLocation (..))
-import DSL.Interpreter (MinEffs, executeForTest, minInterpret)
-import DSL.LogProtocol (LogProtocolBase)
-import DSL.LogProtocol.PrettyPrint ()
-import DSL.Logger
-import Data.Aeson
-  ( FromJSON,
-    ToJSON (toEncoding),
-    defaultOptions,
-    genericToEncoding,
-  )
+-- import Pyrelude.Test hiding (Group, maybe)
+-- import Pyrelude.Test hiding (Group, maybe)
+-- import Pyrelude.Test hiding (Group, maybe)
+-- import Pyrelude.Test hiding (Group, maybe)
+
+import Check
+import qualified Check
+import qualified Check as C
+import DSL.ArbitraryIO
+import DSL.CurrentTime
+import DSL.FileSystem
+import DSL.Interpreter (AllEffects, Failure, MinEffs)
+import DSL.Logger as L
 import Data.Aeson.TH
-import ItemRunners
-import LogTransformation.Common ()
+import Data.Aeson.Types hiding (One)
+import Data.Yaml
+import GHC.Records (HasField (getField))
+import ItemRunners (runItem)
 import Polysemy
-import Pyrelude
-import qualified Pyrelude as P
-import Pyrelude.IO ()
-import Pyrelude.Test as T ()
-import RunElementClasses
-  ( ItemClass (checkList, identifier, thenClause, whenClause),
-    RunConfigClass,
-    TestAddress (TestAddress),
-    TestConfigClass (..),
-    Titled (..),
-  )
+import Pyrelude as P
 import Runner as R
-  ( FrameworkError,
+  ( Address,
+    Config,
+    HasId,
+    ItemClass,
     RunParams (..),
-    SuiteItem (Group, Hook, Tests),
-    Test (Test, config, interactor, items, parse),
+    SuiteItem (..),
+    SuiteSource,
+    Test (..),
+    TestSuite (..),
     mkSem,
   )
-import qualified RunnerBase
-import TestFilter (TestFilter (..))
+import TestFilter
 
-type AppError = FrameworkError Text
+data Channel = Web | REST deriving (Eq, Ord, Show)
 
-type LogProtocol = LogProtocolBase AppError
+data ChannelSelect = WebOnly | RESTOnly | AllChannels deriving (Eq, Ord, Show)
 
-type LogProtocolWithTextError = LogProtocolBase Text
+rcRunAll = RunConfig "Run Everything" AllChannels
 
 data RunConfig = RunConfig
-  { cfgHeader :: Text,
-    include :: Bool
+  { title :: Text,
+    target :: ChannelSelect
   }
   deriving (Eq, Show)
 
-$(deriveJSON defaultOptions ''RunConfig)
+instance Config RunConfig
 
-instance RunConfigClass RunConfig
-
-instance Titled RunConfig where
-  title rc = cfgHeader rc
+-- type DemoEffs effs = MinEffs Text effs
+type DemoEffs effs = AllEffects Text effs
 
 data TestConfig = TestConfig
-  { header :: Text,
-    address :: TestAddress,
-    include :: Bool
+  { title :: Text,
+    channel :: Channel
   }
   deriving (Show, Eq)
 
+instance Config TestConfig
+
 $(deriveJSON defaultOptions ''TestConfig)
 
-instance TestConfigClass TestConfig where
-  moduleAddress = address
+-- | A standard test
+type MockTest hi i as ds effs = Test Text TestConfig RunConfig hi i as ds effs
 
-instance Titled TestConfig where
-  title = header
+data IntItem = IntItem
+  { id :: Int,
+    title :: Text,
+    checks :: C.Checks Int
+  }
+  deriving (Show, Generic)
 
-type MockTest i as ds effs = RunnerBase.Test Text TestConfig RunConfig i as ds effs
+mkIntItem :: Int -> IntItem
+mkIntItem i = IntItem i ("Int Test Id" <> txt i) $ chk "Always Pass" $ const True
 
-newtype MyInt = MyInt Int deriving (Show, Generic)
+mkTxtItem :: Int -> TextItem
+mkTxtItem i = TextItem i ("Int Test Id" <> txt i) $ chk "Always Pass" $ const True
 
-instance ToJSON MyInt where
+intItems :: Int -> p -> [IntItem]
+intItems i rc = mkIntItem <$> take i [1 ..]
+
+txtItems :: Int -> p -> [TextItem]
+txtItems i rc = mkTxtItem <$> take i [1 ..]
+
+data TextItem = TextItem
+  { id :: Int,
+    title :: Text,
+    checks :: C.Checks Text
+  }
+  deriving (Show, Generic)
+
+interact :: (HasId itm, Member (Logger e0) effs) => Text -> rc -> hi -> itm -> Sem effs hi
+interact lgText rc hi itm = L.log (lgText <> " " <> txt (getField @"id" itm)) >> pure hi
+
+instance ToJSON TextItem where
   toEncoding = genericToEncoding defaultOptions
 
-newtype MyText = MyText Text deriving (Show, Generic, ToJSON)
-
-instance ItemClass Int MyText where
-  identifier i = i
-  whenClause _ = "pre"
-  thenClause _ = "post"
-  checkList = mempty
-
-instance ItemClass MyInt MyText where
-  identifier _ = -999
-  whenClause _ = "pre"
-  thenClause _ = "post"
-  checkList = mempty
-
-instance ItemClass MyText MyText where
-  identifier _ = -999
-  whenClause _ = "pre"
-  thenClause _ = "post"
-  checkList = mempty
+instance ToJSON IntItem where
+  toEncoding = genericToEncoding defaultOptions
 
 empti :: a -> [b]
 empti = const ([] :: [b])
 
-logInteractor :: forall i as effs. (Member (Logger Text) effs, Show i) => as -> RunConfig -> i -> Sem effs as
-logInteractor as (RunConfig t' _) i = log (t' <> " - Hello from item " <> txt i) >> pure as
+--                 as ->    rc     -> hi -> i -> Sem effs as
+emptiInteractor :: as -> RunConfig -> hi -> i -> Sem effs as
+emptiInteractor as _ _ _ = pure as
 
-emptiParser :: a -> i -> as -> Sem effs a
-emptiParser a _ _ = pure a
+beforAll :: Int -> Sem effs Text
+beforAll = uu
 
-type Lgrffs effs = Member (Logger Text) effs
+-- demo manual beforeAll hooks
+testInteractor :: RunConfig -> Text -> i -> Sem effs as
+testInteractor _ _ _ = uu
 
-type DemoEffs effs = MinEffs Text effs
+implementedInteractor :: RunConfig -> Int -> i -> Sem effs as
+implementedInteractor rc int' i = beforAll int' >>= \t -> testInteractor rc t i
 
-test1 :: forall effs. Lgrffs effs => MockTest Int Text MyText effs
-test1 =
-  RunnerBase.Test
-    { config =
-        TestConfig
-          { header = "test1",
-            address = TestAddress "test1",
-            include = True
-          },
-      items = const [1, 2],
-      interactor = logInteractor "test1: ",
-      parse = pure . MyText . txt
-    }
+-- end demo
 
-test2 :: forall effs. Lgrffs effs => MockTest MyInt Int MyText effs
-test2 =
+emptiParser :: ds -> as -> Sem effs ds
+emptiParser ds _ = pure ds
+
+---                           hi  itm     as   ds
+test1WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test1WebTxt =
   Test
     { config =
         TestConfig
-          { header = "test2",
-            address = TestAddress "test2 address",
-            include = True
+          { title = "test1WebTxt",
+            channel = Web
           },
-      items = empti,
-      interactor = logInteractor 2,
-      parse = pure . MyText . txt
+      items = txtItems 5,
+      interactor = interact "test1WebTxt",
+      parse = emptiParser "Blahh"
     }
 
-test3 :: forall effs. Lgrffs effs => MockTest MyInt Int MyText effs
-test3 =
+test2RESTInt :: forall effs. Member (Logger Text) effs => MockTest Int IntItem Int Int effs
+test2RESTInt =
   Test
     { config =
         TestConfig
-          { header = "test3",
-            address = TestAddress "test3 address",
-            include = True
+          { title = "test2RESTInt",
+            channel = REST
           },
-      items = empti,
-      interactor = logInteractor 5,
-      parse = pure . MyText . txt
+      items = intItems 2,
+      interactor = interact "test2RESTInt",
+      parse = pure
     }
 
-test4 :: forall effs. Lgrffs effs => MockTest MyText Text MyText effs
-test4 =
+test3RESTInt :: forall effs. Member (Logger Text) effs => MockTest Int IntItem Int Int effs
+test3RESTInt =
   Test
     { config =
         TestConfig
-          { header = "test4",
-            address = TestAddress "test4 address",
-            include = True
+          { title = "test3RESTInt",
+            channel = REST
           },
       items = empti,
-      interactor = logInteractor "4",
-      parse = pure . MyText . txt
+      interactor = interact "test3RESTInt",
+      parse = pure
     }
 
-test5 :: forall effs. Lgrffs effs => MockTest MyInt Int MyText effs
-test5 =
+test4WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test4WebTxt =
   Test
     { config =
         TestConfig
-          { header = "test5",
-            address = TestAddress "test 5",
-            include = True
+          { title = "test4WebTxt",
+            channel = Web
           },
       items = empti,
-      interactor = logInteractor 5,
-      parse = pure . MyText . txt
+      interactor = interact "test4WebTxt",
+      parse = pure
     }
 
-includeFilter :: TestFilter RunConfig TestConfig
-includeFilter =
+test6WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test6WebTxt =
+  Test
+    { config =
+        TestConfig
+          { title = "test6WebTxt",
+            channel = Web
+          },
+      items = empti,
+      interactor = interact "test6WebTxt",
+      parse = pure
+    }
+
+test61WebTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test61WebTxt =
+  Test
+    { config =
+        TestConfig
+          { title = "test61WebTxt",
+            channel = Web
+          },
+      items = txtItems 1,
+      interactor = interact "test61WebTxt",
+      parse = pure
+    }
+
+
+
+test5RESTTxt :: forall effs. Member (Logger Text) effs => MockTest Text TextItem Text Text effs
+test5RESTTxt =
+  Test
+    { config =
+        TestConfig
+          { title = "test5RESTTxt",
+            channel = REST
+          },
+      items = txtItems 2,
+      interactor = interact "test5RESTTxt",
+      parse = pure
+    }
+
+channelFilter :: TestFilter RunConfig TestConfig
+channelFilter =
   TestFilter
-    { title = "test must be is enabled",
-      predicate = \rc tc -> (include :: TestConfig -> Bool) tc == (include :: RunConfig -> Bool) rc
+    { title = \RunConfig {target} _ TestConfig {channel} -> "channel: " <> txt channel <> " must match run: " <> txt target,
+      predicate = \RunConfig {target} _ TestConfig {channel} -> case target of
+        AllChannels -> True
+        WebOnly -> channel == Web
+        RESTOnly -> channel == REST
     }
 
-filters' :: [TestFilter RunConfig TestConfig]
-filters' = [includeFilter]
-
-demoSuit :: SuiteItem effs [Text]
-demoSuit =
-  R.Group
-    "Happy Suite"
-    [ Hook
-        "Hook 1"
-        BeforeAll
-        (pure ())
-        [ Tests
-            [ "test 1",
-              "test 2",
-              "test 3"
-            ]
-        ],
-      R.Group
-        "Sub Group"
-        [ Tests
-            [ "test 4",
-              "test 5"
-            ]
-        ],
-      R.Group
-        "Empty Group"
-        [ Tests []
-        ]
-    ]
-
-happySuite :: forall a effs. Lgrffs effs => (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest i as ds effs -> a) -> SuiteItem effs [a]
-happySuite r =
-  R.Group
-    "Filter Suite"
-    [ Hook
-        "Before All"
-        BeforeAll
-        (pure ())
-        [ Tests
-            [ r test1,
-              r test2,
-              r test3
-            ]
-        ],
-      R.Group
-        "Sub Group"
-        [ Tests
-            [ r test4,
-              r test5
-            ]
-        ],
-      R.Group
-        "Empty Group"
-        [ Tests []
-        ]
-    ]
-
-doNothing :: forall a. Applicative a => a ()
-doNothing = pure ()
-
-hookSuite ::
-  forall a effs.
-  Lgrffs effs =>
-  -- | test runner
-  (forall i as ds. (Show i, Show as, Show ds, ToJSON as, ToJSON ds, ToJSON i, ItemClass i ds) => MockTest i as ds effs -> a) ->
-  SuiteItem effs [a]
-hookSuite r =
-  R.Group
-    "Hook Suite"
-    [ Hook
-        "After Each Outer"
-        AfterEach
-        doNothing
-        [ Hook
-            "After All Outer"
-            AfterAll
-            doNothing
-            [ Hook
-                "Before Each Outer"
-                BeforeEach
-                doNothing
-                [ Hook
-                    "Before All Inner"
-                    BeforeAll
-                    doNothing
-                    [Tests [r test1]]
-                ]
-            ]
-        ]
-    ]
-
-runParams :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs
-runParams =
-  RunParams
-    { suite = happySuite,
-      filters = filters',
-      itemIds = Nothing,
-      itemRunner = runItem,
-      rc = RunConfig "Happy Suite" True
+hasTitle :: Maybe Text -> TestFilter RunConfig TestConfig
+hasTitle mbTtl =
+  TestFilter
+    { title = \_ _ _ -> maybef mbTtl "test title N/A - no test fragmant provided" ("test title must include: " <>),
+      predicate = \_ _ TestConfig {title = testTtl} ->
+        maybef
+          mbTtl
+          True
+          \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }
 
-happyRun :: forall effs. DemoEffs effs => Sem effs ()
-happyRun = mkSem runParams
+mockSuite :: forall effs a. DemoEffs effs => SuiteSource Text TestConfig RunConfig effs a
+mockSuite runTest =
+  R.TestSuite
+    [ R.Group
+        { title = "Group 1",
+          gElms =
+            [ OnceHook
+                { title = "Group 1 >> Before 1",
+                  bHook = \_ -> L.log "BH - Group 1 >> Before Hook 1" $> "hello",
+                  hkElms =
+                    [ R.Group
+                        { title = "Group 1 >> Before 1 >> Group 1",
+                          gElms =
+                            [ Tests
+                                \a hd ->
+                                  [ runTest a hd test1WebTxt,
+                                    -- no test items
+                                    runTest a hd test4WebTxt
+                                  ]
+                            ]
+                        },
+                      ----
+                      R.Group
+                        { title = "Group 1 >> Empty Group 2",
+                          gElms = [Tests \_ _ -> []]
+                        },
+                      ----
+                      R.Group
+                        { title = "Group 1 >> Group 3",
+                          gElms =
+                            [ OnceHook
+                                { title = "Group 1 >> Group 3 >> Before 1.1",
+                                  bHook = \_ -> L.log "BH - Group 1 >> Group 3 >> Before Hook 1.1" $> "Hello",
+                                  hkElms =
+                                    [ Tests \a hd ->
+                                        [ runTest a hd test61WebTxt,
+                                          runTest a hd test5RESTTxt
+                                        ]
+                                    ],
+                                  aHook = \_ -> L.log "AH - Group 1 >> Group 3 >> After Hook 1.1"
+                                }
+                            ]
+                        }
+                    ],
+                  aHook = \_ -> L.log "AH - Group 1 >> After Hook 1"
+                },
+              R.Group
+                { title = "Group 1 >> Group 2",
+                  gElms =
+                    [ OnceHook
+                        { title = "Group 1 >> Group 2 >> Hook 1",
+                          bHook = \i -> L.log "BH - Group 1 >> Group 2 >> Before Hook 1" $> 23,
+                          hkElms =
+                            [ Tests \a hd ->
+                                [ runTest a hd test2RESTInt,
+                                  -- no test items
+                                  runTest a hd test3RESTInt
+                                ]
+                            ],
+                          aHook = \i -> L.log "AH - Group 1 >> Group 2 >> After Hook 1"
+                        },
+                      OnceHook 
+                        -- this is an empty hook should not run
+                        { title = "Group 1 >> Group 2 >> Hook 2",
+                          bHook = \_ -> L.log "BH - Group 1 >> Group 2 >> Before Hook 2" $> "Hello",
+                          hkElms =
+                            [ OnceHook
+                                { title = "Group 1 >> Group 2 >> Hook 2 >> Hook 3",
+                                  bHook = \i -> L.log "BH - Group 1 >> Group 2 >> Hook 2 >> Hook 3 Before" $> "Hi",
+                                  hkElms =
+                                    [ Tests \a hd ->
+                                        [ -- no test items
+                                          runTest a hd test6WebTxt
+                                        ],
+                                      R.Group
+                                        { title = "Double Nested Empty Group",
+                                          gElms = []
+                                        }
+                                    ],
+                                  aHook = \_ -> L.log "AH - Group 1 >> Group 2 >> Hook 2 >> After Hook 3" 
+                                }
+                            ],
+                          aHook = \s ->  L.log "AH - Group 1 >> Group 2 >> After Hook 2" 
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
 
-hookRun :: forall effs. DemoEffs effs => Sem effs ()
-hookRun =
+
+
+filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
+filters' ttl = [channelFilter, hasTitle ttl]
+
+mockRun :: forall effs. DemoEffs effs => Text -> ChannelSelect -> Maybe Text -> Sem effs ()
+mockRun runTitle targChannel testTitleFilterFragment =
   mkSem $
     RunParams
-      { suite = hookSuite,
-        filters = [],
+      { suite = mockSuite,
+        filters = filters' testTitleFilterFragment,
         itemIds = Nothing,
         itemRunner = runItem,
-        rc = RunConfig "Hook Suite" True
+        rc =
+          RunConfig
+            { title = runTitle,
+              target = targChannel
+            }
       }
+
+everythingRun :: forall effs. DemoEffs effs => Sem effs ()
+everythingRun = mockRun "Run All" AllChannels Nothing
+
+webRun :: forall effs. DemoEffs effs => Sem effs ()
+webRun = mockRun "Web Tests" WebOnly Nothing
+
+restRun :: forall effs. DemoEffs effs => Sem effs ()
+restRun = mockRun "Web Tests" RESTOnly Nothing
+
+txtRun :: forall effs. DemoEffs effs => Sem effs ()
+txtRun = mockRun "Run REST" AllChannels $ Just "txt"
+
+$(deriveJSON defaultOptions ''Channel)
+$(deriveJSON defaultOptions ''ChannelSelect)
+$(deriveJSON defaultOptions ''RunConfig)
+
+-- unit_test_filter_expect_empty

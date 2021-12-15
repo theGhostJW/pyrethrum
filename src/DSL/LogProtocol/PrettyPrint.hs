@@ -2,11 +2,11 @@
 module DSL.LogProtocol.PrettyPrint (
   prettyPrintLogProtocol,
   prettyPrintLogProtocolWith,
-  -- prettyPrintLogProtocolSimple,
   LogStyle(..)
 ) where
 
-import Common as C ( DetailedInfo(DetailedInfo), HookLocation(..) )
+import Common as C ( DetailedInfo(DetailedInfo))
+import qualified Common as C ( HookType(..) )
 import PrettyPrintCommon as PC
     ( Justification(LeftJustify)
      , newLn
@@ -24,11 +24,9 @@ import DSL.LogProtocol as LP
       DStateJSON(DStateJSON),
       ApStateJSON(ApStateJSON), GroupTitle, unGroupTitle, RunTitle, unRunTitle )
 import Pyrelude as P
+import RunnerBase as RB
 import RunElementClasses as REC
-    ( TestDisplayInfo(TestDisplayInfo, testConfig, testTitle,
-                      testModAddress),
-      TestAddress(TestAddress),
-      toString, TestFilterResult )
+    ( TestFilterResult, TestLogInfo(..), title, testConfig, rootAddress, render )
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y ( Value )
 
@@ -40,12 +38,13 @@ separator' = \case
                 Doc -> newLn
                 Outline -> ""
 
-describeLoc :: HookLocation -> Text
+describeLoc :: C.HookType -> Text
 describeLoc = \case 
-                 BeforeAll -> "Before All"
-                 AfterAll -> "After All"
-                 BeforeEach -> "Before Each"
-                 AfterEach -> "After Each"
+                 C.BeforeAll -> "Before All"
+                 C.BeforeEach -> "Before Each"
+                 C.AfterAll -> "After All"
+                 C.AfterEach -> "After Each"
+    
 
 prettyPrintLogProtocolWith :: Show e => LogStyle -> ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text
 prettyPrintLogProtocolWith style ThreadInfo{runId, threadIndex} (LogIndex idx) time lgProtocol = 
@@ -60,7 +59,7 @@ prettyPrintLogProtocol :: Show e => LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocol = prettyPrintLogProtocolBase Nothing
 
 iterId :: ItemId -> Text
-iterId (ItemId tst iid) = toString tst <> " / item " <> txt iid
+iterId (ItemId d iid) = render d <> " / item " <> txt iid
 
 prettyPrintLogProtocolBase :: Show e => Maybe Text -> LogStyle -> LogProtocolBase e -> Text
 prettyPrintLogProtocolBase _mTimeSuffix style =
@@ -124,12 +123,12 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
         LP.StartHook loc title -> "Start " <> describeLoc loc <> " Hook: " <> title
         LP.EndHook loc title ->   "End " <> describeLoc loc <> " Hook: "  <> title
 
-        LP.StartTest TestDisplayInfo{..} -> separator <> tstHeader ("Start Test: " <> toString testModAddress <> " - " <> testTitle) <> 
+        LP.StartTest TestLogInfo{title, testConfig} -> separator <> tstHeader ("Start Test: " <> title <> " - " <> title) <> 
                                           separator <> "Test Config:" <>
                                           separator <> ppAesonBlock testConfig
 
-        EndTest (TestAddress address) -> separator <> tstHeader ("End Test: " <> address)
-        StartIteration iid  _ _ val -> separator <> subHeader ("Start Iteration: " <> iterId iid) <> 
+        EndTest address -> separator <> tstHeader ("End Test: " <> render address)
+        StartIteration iid _ val -> separator <> subHeader ("Start Iteration: " <> iterId iid) <> 
                                         separator <> "Item:" <> 
                                         separator <> ppAesonBlock val <>
                                         (style == Doc ? "" $ separator)

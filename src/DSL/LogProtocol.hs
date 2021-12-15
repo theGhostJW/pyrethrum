@@ -1,7 +1,7 @@
 module DSL.LogProtocol where
 
 import Check
-import Common (DetailedInfo, FrameworkError, HookLocation)
+import Common (DetailedInfo, FrameworkError, HookType)
 import Data.Aeson as A
 import Data.Aeson.TH
 import Pyrelude
@@ -35,7 +35,7 @@ newtype WhenClause = WhenClause {unWhenClause :: Text} deriving (Eq, Show, IsStr
 
 newtype ThenClause = ThenClause {unThenClause :: Text} deriving (Eq, Show, IsString)
 
-data ItemId = ItemId {tstModule :: TestAddress, itmId :: Int} deriving (Eq, Ord, Show)
+data ItemId = ItemId { address :: Address, itmId :: Int} deriving (Eq, Ord, Show)
 
 -- needed because ItemId is used in a map
 instance ToJSONKey ItemId
@@ -72,11 +72,11 @@ data LogProtocolBase e
   | EndRun
   | StartGroup GroupTitle
   | EndGroup GroupTitle
-  | StartHook HookLocation Text
-  | EndHook HookLocation Text
-  | StartTest TestDisplayInfo
-  | EndTest TestAddress
-  | StartIteration ItemId WhenClause ThenClause Value
+  | StartHook HookType Text
+  | EndHook HookType Text
+  | StartTest TestLogInfo
+  | EndTest Address
+  | StartIteration ItemId Text Value
   | EndIteration ItemId
   
   | IOAction Text

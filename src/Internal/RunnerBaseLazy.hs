@@ -9,10 +9,9 @@ import Polysemy.Error
 import Pyrelude
 import RunElementClasses (Address (..))
 
-
-newtype TestSuite hd effs t = TestSuite {
-  un :: [SuiteItem hd effs t ]
-}
+newtype TestSuite hd effs t = TestSuite
+  { un :: [SuiteItem hd effs t]
+  }
 
 data SuiteItem hd effs t where
   Group ::
@@ -20,10 +19,12 @@ data SuiteItem hd effs t where
       gElms :: [SuiteItem hd effs t]
     } ->
     SuiteItem hd effs t
+  --
   Tests ::
     { tests :: Address -> hd -> [t]
     } ->
     SuiteItem hd effs t
+  --
   OnceHook ::
     { title :: Text,
       bHook :: hd -> Sem effs hd2,
@@ -31,6 +32,14 @@ data SuiteItem hd effs t where
       aHook :: hd2 -> Sem effs ()
     } ->
     SuiteItem hd effs t
+
+data RunFixture effs = RunFixture
+  { testItems :: [Sem effs ()],
+    dummy :: Bool
+  }
+
+mkRunFixture :: [Sem effs ()] -> RunFixture effs
+mkRunFixture i = RunFixture i True
 
 {-
 instance Functor (SuiteItem hd ho effs) where

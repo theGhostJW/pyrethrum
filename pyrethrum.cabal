@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5ecc1c0cbec4060c48ac7516a9aac7c9c8af1e159e77edac53b8968c1cc25f91
+-- hash: da82fa09ef740e4ae6f149719024dd61d989bbaaa634e9c95c9c7a7e6f800d4a
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -63,6 +63,7 @@ library
       CheckTest
       ConcurrencyTest
       ConcurrentSuiteSimple
+      ConcurrentSuiteTestOnly
       DemoConfig
       DemoSuite
       EndpointTest
@@ -71,6 +72,7 @@ library
       LogListCheck
       LogProtocolTest
       LogTransformationTest
+      Main
       PrettyPrintTest
       RunnerTest
       SemTest
@@ -129,7 +131,7 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -threaded -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
   build-depends:
       Stack
     , aeson
@@ -153,15 +155,15 @@ library
     , yaml
   default-language: Haskell2010
 
-test-suite pyrethrum-test
-  type: exitcode-stdio-1.0
-  main-is: driver.hs
+executable pyrethrum
+  main-is: Main.hs
   other-modules:
       ArbitraryIOTest
       AuxFilesTest
       CheckTest
       ConcurrencyTest
       ConcurrentSuiteSimple
+      ConcurrentSuiteTestOnly
       DemoConfig
       DemoSuite
       EndpointTest
@@ -226,7 +228,7 @@ test-suite pyrethrum-test
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -threaded -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
   build-depends:
       Stack
     , aeson

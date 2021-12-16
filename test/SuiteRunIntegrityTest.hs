@@ -3,7 +3,7 @@
 module SuiteRunIntegrityTest where
 
 import Common (DetailedInfo (DetailedInfo), FrameworkError, HookType (..))
-import DSL.Interpreter (effExecuteLog, minInterpret)
+import DSL.Interpreter (effExecuteLog, minInterpret, executeInIOConsolePretty)
 import DSL.LogProtocol (LogProtocolBase (..))
 import DSL.LogProtocol.PrettyPrint (LogStyle (..), prettyPrintLogProtocol)
 import DSL.Logger
@@ -190,9 +190,6 @@ unit_tests_hooks_run_as_expected_rest_suite :: IO ()
 unit_tests_hooks_run_as_expected_rest_suite =
   suitMessages (effExecuteLog restRun) >>= chkEq restResult
 
-
-
-
 -- expected suite messages will probably fail / need reworking 
 -- when concurrency implemented
 txtExpectedResult :: [Text]
@@ -232,5 +229,11 @@ txtExpectedResult =
 unit_tests_hooks_run_as_expected_text_suite :: IO ()
 unit_tests_hooks_run_as_expected_text_suite =
   suitMessages (effExecuteLog txtRun) >>= chkEq txtExpectedResult
+
+-- $ > consoleRunDemo
+consoleRunDemo :: IO (Either (FrameworkError Text) ())
+consoleRunDemo = executeInIOConsolePretty everythingRun
+
+
 
 

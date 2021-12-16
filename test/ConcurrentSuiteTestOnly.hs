@@ -1,6 +1,6 @@
 -- {-# LANGUAGE NoStrictData #-}
 
-module ConcurrentSuiteSimple where
+module ConcurrentSuiteTestOnly where
 
 import Check
 import qualified Check
@@ -53,9 +53,9 @@ $(deriveJSON defaultOptions ''TestConfig)
 -- | A standard test
 type DemoTest hi i as ds effs = Test Text TestConfig RunConfig hi i as ds effs
 
-
 mkTxtItem :: Int -> TextItem
 mkTxtItem i = TextItem i ("Int Test Id" <> txt i) $ chk "Always Pass" $ const True
+
 
 txtItems :: Int -> p -> [TextItem]
 txtItems i rc = mkTxtItem <$> take i [1 ..]
@@ -67,8 +67,9 @@ data TextItem = TextItem
   }
   deriving (Show, Generic)
 
-interact :: (HasId itm, Member (Logger e0) effs) => Text -> rc -> hi -> itm -> Sem effs hi
-interact lgText rc hi itm = L.log (lgText <> " " <> txt (getField @"id" itm)) >> pure hi
+
+interactConst :: (HasId itm, Member (Logger e0) effs) => Text -> a -> rc -> hi -> itm -> Sem effs a
+interactConst lgText a rc _hi itm = L.log (lgText <> " " <> txt (getField @"id" itm)) >> pure a
 
 instance ToJSON TextItem where
   toEncoding = genericToEncoding defaultOptions
@@ -79,76 +80,57 @@ instance ToJSON TextItem where
 emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
 
-
 ---                           hi  itm     as   ds
-test1WebTxt :: forall effs. Member (Logger Text) effs => DemoTest Text TextItem Text Text effs
-test1WebTxt =
+testVoidIn1 :: forall effs. Member (Logger Text) effs => DemoTest () TextItem Text Text effs
+testVoidIn1 =
   Test
     { config =
         TestConfig
-          { title = "test1WebTxt",
+          { title = "testVoidIn1",
             dummy = True
           },
       items = txtItems 5,
-      interactor = interact "test1WebTxt",
+      interactor = interactConst "testVoidIn1" "testVoidIn1 result",
       parse = emptiParser "Blahh"
     }
 
-test4WebTxt :: forall effs. Member (Logger Text) effs => DemoTest Text TextItem Text Text effs
-test4WebTxt =
+testVoidIn2 :: forall effs. Member (Logger Text) effs => DemoTest () TextItem Text Text effs
+testVoidIn2 =
   Test
     { config =
         TestConfig
-          { title = "test4WebTxt",
+          { title = "testVoidIn2",
             dummy = True
           },
       items = txtItems 5,
-      interactor = interact "test4WebTxt",
+      interactor = interactConst "testVoidIn2" "testVoidIn2 Result",
       parse = pure
     }
 
-demoSuiteConcurrentSimple :: forall effs a. DemoEffs effs => SuiteSource Text TestConfig RunConfig effs a
-demoSuiteConcurrentSimple runTest =
+
+demoSuiteConcurrentTestsOnly :: forall effs a. DemoEffs effs => SuiteSource Text TestConfig RunConfig effs a
+demoSuiteConcurrentTestsOnly runTest =
   R.TestSuite
-    [ R.Group
-        { title = "Group 1",
-          gElms =
-            [ OnceHook
-                { title = "Group 1 >> Before 1",
-                  bHook = \_ -> L.log "BH - Group 1 >> Before Hook 1" $> "hello",
-                  hkElms =
-                    [ R.Group
-                        { title = "Group 1 >> Before 1 >> Group 1",
-                          gElms =
-                            [ Tests
-                                \a hd ->
-                                  [ runTest a hd test1WebTxt,
-                                    runTest a hd test4WebTxt
-                                  ]
-                            ]
-                        }
-                    ],
-                  aHook = \_ -> L.log "AH - Group 1 >> After Hook 1"
-                }
-            ]
-        }
+    [ Tests
+        \a hd ->
+          [ runTest a hd testVoidIn1,
+            runTest a hd testVoidIn2
+          ]
     ]
 
-concurrentPrms :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs
-concurrentPrms =
+concurrentTestOnlyPrms :: forall effs. DemoEffs effs => RunParams Maybe Text RunConfig TestConfig effs
+concurrentTestOnlyPrms =
   RunParams
-    { suite = demoSuiteConcurrentSimple,
+    { suite = demoSuiteConcurrentTestsOnly,
       filters = [],
       itemIds = Nothing,
       itemRunner = runItem,
       rc =
         RunConfig
-          { title = "Concurrent",
+          { title = "Concurrent Test Only",
             dummy = True
           }
     }
 
-concurrentRun :: forall effs. DemoEffs effs => Sem effs ()
-concurrentRun = mkSem concurrentPrms
 
 $(deriveJSON defaultOptions ''RunConfig)

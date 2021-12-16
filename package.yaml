@@ -37,13 +37,13 @@ dependencies:
   - Stack
 
 ghc-options:
-  - -threaded
+  # - -threaded
   - -fmax-pmcheck-models=10000000
   - -ferror-spans
   - -fprint-potential-instances
   # - -dth-dec-file -- generate template haskell
 
-  - -O0
+  # - -O2
   # TODO: prgma to turn optimisations on for non-dev build
   # - -O2
   # - -flate-specialise # reqiuired for polysemy
@@ -138,10 +138,16 @@ _testDep: &testdependencies
   - pyrethrum
   - bytestring
 
-tests:
-  pyrethrum-test:
-    main:                driver.hs
+executable:
+    main:                Main.hs
     source-dirs:        
     - test
     dependencies: *testdependencies
+
+# tests:
+#   pyrethrum-test:
+#     main:                driver.hs
+#     source-dirs:        
+#     - test
+#     dependencies: *testdependencies
   

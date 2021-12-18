@@ -137,17 +137,10 @@ _testDep: &testdependencies
   - pyrethrum
   - bytestring
 
-executable:
-  ghc-options:
-    - -threaded
-  main: Main.hs
-  source-dirs:
+tests:
+  pyrethrum-test:
+    main:                driver.hs
+    source-dirs:
     - test
-  dependencies: *testdependencies
-# tests:
-#   pyrethrum-test:
-#     main:                driver.hs
-#     source-dirs:
-#     - test
-#     dependencies: *testdependencies
+    dependencies: *testdependencies
 

@@ -25,7 +25,7 @@ data TestConfig = TestConfig
 $(deriveJSON defaultOptions ''TestConfig)
 
 instance Config TestConfig
-q
+
 --    e      tc        rc       hi i as ds effs
 type DemoTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi (i ds) as ds effs
 

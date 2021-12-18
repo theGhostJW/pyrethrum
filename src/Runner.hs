@@ -12,6 +12,7 @@ module Runner
     module C,
   )
 where
+
 import qualified Check
 import Common
   ( DetailedInfo (..),
@@ -43,7 +44,7 @@ import Data.List (dropWhile)
 import qualified Data.Set as S
 import GHC.IO.Encoding.Types (TextEncoding (textEncodingName))
 import GHC.Records (HasField (getField))
-import Internal.RunnerBaseLazy (SuiteItem (..))
+import Internal.RunnerBaseLazy (SuiteItem (..), RunFixture (RunFixture), mkRunFixture)
 import ItemFilter (ItemFilter (..), filterredItemIds)
 import OrphanedInstances ()
 import Polysemy (Member, Sem)
@@ -91,7 +92,7 @@ import Pyrelude as P
     (<$>),
     (>>),
     (>>=),
-    (?),
+    (?), IO
   )
 import RunElementClasses as C
   ( Address,
@@ -120,7 +121,7 @@ import RunnerBase as RB
     TestSuite (..),
     queryElm,
   )
-import TestFilter (activeAddresses, filterSuite)
+import TestFilter (activeAddresses, filterSuite, included)
 import qualified TestFilter as F
   ( FilterLog (..),
     TestFilter (..),
@@ -196,6 +197,52 @@ data RunParams m e rc tc effs = RunParams
 
 -- TODO - Error handling especially outside tests eg. in hooks
 -- separate
+runElm ::
+  forall hi e effs.
+  (ToJSON e, Show e, Member (Logger e) effs) =>
+  S.Set Address ->
+  Address ->
+  hi ->
+  SuiteItem hi effs [Sem effs ()] ->
+  [RunFixture effs]
+runElm includedAddresses parentAddress hi =
+  let exElm' :: forall hi'. Address -> hi' -> SuiteItem hi' effs [Sem effs ()] -> Sem effs ()
+      exElm' = exeElm includedAddresses
+
+      hook = RC.Hook
+      group' = RC.Group
+
+      nxtAddress :: Text -> AddressElemType -> Address
+      nxtAddress ttl at = push ttl at parentAddress
+
+      exclude :: Text -> AddressElemType -> Bool
+      exclude title at = S.notMember (nxtAddress title at) includedAddresses
+   in --  TODO exceptions - run in terms of bracket / resource
+      \case
+        Tests {tests} ->
+          mkRunFixture <$> tests parentAddress hi
+        --
+        OnceHook {title = t, bHook, aHook, hkElms} -> uu
+          -- let adr = nxtAddress t hook
+          --  in exclude t hook ? pure () $
+          --       do
+          --         logItem $ StartHook C.BeforeAll t
+          --         ho <- bHook hi
+          --         logItem $ EndHook C.BeforeAll t
+          --         sequence_ $ exElm' adr ho <$> hkElms
+          --         logItem $ StartHook C.AfterAll t
+          --         aHook ho
+          --         logItem $ EndHook C.AfterAll t
+        --
+        Group {title = t, gElms} -> uu
+          -- exclude t group' ? pure () $
+          --   do
+          --     logItem $ StartGroup $ GroupTitle t
+          --     sequence_ $ exElm' (nxtAddress t group') hi <$> gElms
+          --     logItem $ EndGroup $ GroupTitle t
+
+-- TODO - Error handling especially outside tests eg. in hooks
+-- separate
 exeElm ::
   forall hi e effs.
   (ToJSON e, Show e, Member (Logger e) effs) =>
@@ -220,6 +267,7 @@ exeElm includedAddresses parentAddress hi =
       \case
         Tests {tests} ->
           sequence_ . join $ tests parentAddress hi
+        --
         OnceHook {title = t, bHook, aHook, hkElms} ->
           let adr = nxtAddress t hook
            in exclude t hook ? pure () $
@@ -231,6 +279,7 @@ exeElm includedAddresses parentAddress hi =
                   logItem $ StartHook C.AfterAll t
                   aHook ho
                   logItem $ EndHook C.AfterAll t
+        --
         Group {title = t, gElms} ->
           exclude t group' ? pure () $
             do
@@ -238,31 +287,69 @@ exeElm includedAddresses parentAddress hi =
               sequence_ $ exElm' (nxtAddress t group') hi <$> gElms
               logItem $ EndGroup $ GroupTitle t
 
+data RunComponents effs = RunComponents
+  { suitItems :: [SuiteItem () effs [Sem effs ()]],
+    filterLog :: F.FilterLog
+  }
+
+calcComponents ::
+  forall rc tc e effs.
+  (ToJSON e, Show e, Config tc, MinEffs e effs) =>
+  RunParams Maybe e rc tc effs ->
+  Either Text (RunComponents effs)
+calcComponents runPrms@RunParams {suite, filters, rc, itemRunner} =
+  do
+    fl <- filterSuite rc suite filters
+    Right $
+      RunComponents
+        { suitItems = un $ suite $ runTest runPrms,
+          filterLog = fl
+        }
+
+runSuite ::
+  forall rc tc e effs.
+  (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
+  RunParams Maybe e rc tc effs ->
+  IO ()
+runSuite rp@RunParams {suite, filters, rc, itemRunner} =
+  let ethRunComponents :: Either Text (RunComponents effs)
+      ethRunComponents = calcComponents rp
+
+      run :: RunComponents effs -> IO ()
+      run rCmp = uu
+        -- do
+        -- let flg = filterLog rCmp
+        -- offset' <- utcOffset
+        -- logItem . StartRun (RunTitle $ getField @"title" rc) offset' $ toJSON rc
+        -- logItem . FilterLog . F.log $ flg
+        -- sequence_ $ exeElm (included flg) rootAddress () <$> suitItems rCmp
+        -- logItem EndRun
+
+      lgError :: Text -> Sem effs ()
+      lgError t = logError $ "Test Run Configuration Error. Duplicate Group Names: " <> t
+   in uu
+
 mkSem ::
   forall rc tc e effs.
   (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
   RunParams Maybe e rc tc effs ->
   Sem effs ()
 mkSem rp@RunParams {suite, filters, rc, itemRunner} =
-  let filterInfo :: Either Text F.FilterLog
-      filterInfo = filterSuite rc suite filters
+  let ethRunComponents :: Either Text (RunComponents effs)
+      ethRunComponents = calcComponents rp
 
-      sitms :: [SuiteItem () effs [Sem effs ()]]
-      sitms = un $ suite $ runTest rp
-
-      run :: F.FilterLog -> Sem effs ()
-      run flg =
-        let lg = F.log flg
-         in do
-              offset' <- utcOffset
-              logItem . StartRun (RunTitle $ getField @"title" rc) offset' $ toJSON rc
-              logItem $ FilterLog lg
-              sequence_ $ exeElm (activeAddresses lg) rootAddress () <$> sitms
-              logItem EndRun
+      run :: RunComponents effs -> Sem effs ()
+      run rCmp = do
+        let flg = filterLog rCmp
+        offset' <- utcOffset
+        logItem . StartRun (RunTitle $ getField @"title" rc) offset' $ toJSON rc
+        logItem . FilterLog . F.log $ flg
+        sequence_ $ exeElm (included flg) rootAddress () <$> suitItems rCmp
+        logItem EndRun
 
       lgError :: Text -> Sem effs ()
       lgError t = logError $ "Test Run Configuration Error. Duplicate Group Names: " <> t
-   in either lgError run filterInfo
+   in either lgError run ethRunComponents
 
 mkEndpointSem ::
   forall rc tc e effs.

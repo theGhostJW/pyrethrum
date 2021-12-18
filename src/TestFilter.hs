@@ -94,12 +94,12 @@ filterSuite rc suite filters =
   let log :: [TestFilterResult]
       log = filterLog suite filters rc
 
-      includedAddresses :: S.Set Address
-      includedAddresses = activeAddresses log
+      activeAddresses' :: S.Set Address
+      activeAddresses' = activeAddresses log
 
       dupeAddress :: Maybe Text
       dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . (C.address :: TestLogInfo -> Address) . C.testInfo <$> log)
-   in maybe (Right $ FilterLog log includedAddresses) Left dupeAddress
+   in maybe (Right $ FilterLog log activeAddresses') Left dupeAddress
 
 queryFilterSuite :: forall rc e tc effs. Config tc => [TestFilter rc tc] -> rc -> (forall a. SuiteSource e tc rc effs a) -> Either Text [AddressedElm (TestInfo tc)]
 queryFilterSuite fltrs rc s =

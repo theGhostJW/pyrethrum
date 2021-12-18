@@ -3,7 +3,7 @@
 module SuiteRunIntegrityTest where
 
 import Common (DetailedInfo (DetailedInfo), FrameworkError, HookType (..))
-import DSL.Interpreter (effExecuteLog, minInterpret)
+import DSL.Interpreter (effExecuteLog, minInterpret, executeInIOConsolePretty)
 import DSL.LogProtocol (LogProtocolBase (..))
 import DSL.LogProtocol.PrettyPrint (LogStyle (..), prettyPrintLogProtocol)
 import DSL.Logger
@@ -13,16 +13,15 @@ import qualified Data.Text as Text
 import EvalHelp
 import GHC.Records
 import ItemRunners (runItem)
-import MockSuite as M (
+import DemoSuite as M (
   ChannelSelect (WebOnly),
   DemoEffs,
-  MockTest,
   RunConfig (RunConfig),
   TestConfig (..),
   TextItem,
   everythingRun,
-  mockRun,
-  mockSuite,
+  demoRun,
+  demoSuite,
   rcRunAll,
   channelFilter,
   webRun,
@@ -48,12 +47,12 @@ import Text.Show.Pretty (pPrint, pPrintList, ppShowList)
 -}
 
 -- mockSuit' :: SuiteSource Text TestConfig RunConfig FixedEffs a
--- mockSuit' = mockSuite @FixedEffs
+-- mockSuit' = demoSuite @FixedEffs
 
 -- -- $ > view demoQueryElem
 
 -- demoQueryElem :: [AddressTxtElm (TestInfo TestConfig)]
--- demoQueryElem = toStrElm <$> querySuite rcRunAll (mockSuite @FixedEffs)
+-- demoQueryElem = toStrElm <$> querySuite rcRunAll (demoSuite @FixedEffs)
 
 
 display :: (Show a1, Show a2) => Either a1 a2 -> IO ()
@@ -191,9 +190,6 @@ unit_tests_hooks_run_as_expected_rest_suite :: IO ()
 unit_tests_hooks_run_as_expected_rest_suite =
   suitMessages (effExecuteLog restRun) >>= chkEq restResult
 
-
-
-
 -- expected suite messages will probably fail / need reworking 
 -- when concurrency implemented
 txtExpectedResult :: [Text]
@@ -233,5 +229,11 @@ txtExpectedResult =
 unit_tests_hooks_run_as_expected_text_suite :: IO ()
 unit_tests_hooks_run_as_expected_text_suite =
   suitMessages (effExecuteLog txtRun) >>= chkEq txtExpectedResult
+
+-- $ > consoleRunDemo
+consoleRunDemo :: IO (Either (FrameworkError Text) ())
+consoleRunDemo = executeInIOConsolePretty everythingRun
+
+
 
 

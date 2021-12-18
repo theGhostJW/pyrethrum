@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: be291ff202b72b339e833f5a72ae4a09ad9bfac917ce9aebf68208c2d734adfa
+-- hash: f0e7953499b4d0b17b33d7bd26565f048596be8a7ecb1e0ed7d3d08c9612953b
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -61,14 +61,17 @@ library
       ArbitraryIOTest
       AuxFilesTest
       CheckTest
+      ConcurrencyTest
+      ConcurrentSuiteSimple
+      ConcurrentSuiteTestOnly
       DemoConfig
+      DemoSuite
       EndpointTest
       EvalHelp
       ItemFiltersTest
       LogListCheck
       LogProtocolTest
       LogTransformationTest
-      MockSuite
       PrettyPrintTest
       RunnerTest
       SemTest
@@ -127,10 +130,9 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -threaded -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
   build-depends:
-      Stack
-    , aeson
+      aeson
     , base
     , bytestring
     , containers
@@ -158,14 +160,17 @@ test-suite pyrethrum-test
       ArbitraryIOTest
       AuxFilesTest
       CheckTest
+      ConcurrencyTest
+      ConcurrentSuiteSimple
+      ConcurrentSuiteTestOnly
       DemoConfig
+      DemoSuite
       EndpointTest
       EvalHelp
       ItemFiltersTest
       LogListCheck
       LogProtocolTest
       LogTransformationTest
-      MockSuite
       PrettyPrintTest
       RunnerTest
       SemTest
@@ -222,10 +227,9 @@ test-suite pyrethrum-test
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -threaded -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
   build-depends:
-      Stack
-    , aeson
+      aeson
     , base
     , bytestring
     , containers

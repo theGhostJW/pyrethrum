@@ -1,14 +1,14 @@
-name:                pyrethrum
-version:             0.1.0.0
-github:              "githubuser/simple-hpack"
-license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2018 Author name here"
+name: pyrethrum
+version: 0.1.0.0
+github: "githubuser/simple-hpack"
+license: BSD3
+author: "Author name here"
+maintainer: "example@example.com"
+copyright: "2018 Author name here"
 
 extra-source-files:
-- README.md
-- ChangeLog.md
+  - README.md
+  - ChangeLog.md
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -17,7 +17,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/simple-hpack#readme>
+description: Please see the README on GitHub at <https://github.com/githubuser/simple-hpack#readme>
 
 dependencies:
   - base
@@ -32,18 +32,17 @@ dependencies:
   - dlist
   - mtl
   - raw-strings-qq
-  - polysemy 
+  - polysemy
   - polysemy-plugin
-  - Stack
-
+  
 ghc-options:
-  - -threaded
+  # - -threaded
   - -fmax-pmcheck-models=10000000
   - -ferror-spans
   - -fprint-potential-instances
   # - -dth-dec-file -- generate template haskell
 
-  - -O0
+  # - -O2
   # TODO: prgma to turn optimisations on for non-dev build
   # - -O2
   # - -flate-specialise # reqiuired for polysemy
@@ -116,7 +115,7 @@ default-extensions:
 
 library:
   # main: driver.hs
-  source-dirs: 
+  source-dirs:
     - src
     # this enables eval in ghcid
     - test
@@ -141,7 +140,7 @@ _testDep: &testdependencies
 tests:
   pyrethrum-test:
     main:                driver.hs
-    source-dirs:        
+    source-dirs:
     - test
     dependencies: *testdependencies
-  
+

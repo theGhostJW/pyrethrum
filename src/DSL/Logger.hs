@@ -115,7 +115,7 @@ logToHandles convertersHandles =
                       threadInfo :: ThreadInfo <- ask
                       modify incIdx
                       idx <- get
-                      now' <- now
+                      now' <- CT.now
                       let 
                         simpleConvertersHandles :: [(LogProtocolBase e -> Text, Handle)]
                         simpleConvertersHandles = (\(f , h) -> (f threadInfo idx now', h)) <$> convertersHandles

@@ -8,6 +8,7 @@ import Pyrelude
 import RunElementClasses
 
 newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)
+$(deriveJSON defaultOptions ''RunTitle)
 
 -- newtype LogTimeZone = LogTimeZone {unLogTimeZone :: TimeZone}
 --     deriving (Eq,
@@ -20,22 +21,29 @@ newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)
 --               Typeable
 --     )
 newtype GroupTitle = GroupTitle {unGroupTitle :: Text} deriving (Eq, Show, IsString)
+$(deriveJSON defaultOptions ''GroupTitle)
 
 newtype TestTitle = TestTitle {unTestTitle :: Text} deriving (Eq, Show, IsString)
+$(deriveJSON defaultOptions ''TestTitle)
 
 newtype ApStateJSON = ApStateJSON {unApStateJSON :: A.Value} deriving (Eq, Show, IsString)
+$(deriveJSON defaultOptions ''ApStateJSON)
 
 newtype DStateJSON = DStateJSON {unDStateJSON :: A.Value} deriving (Eq, Show, IsString)
+$(deriveJSON defaultOptions ''DStateJSON)
 
 newtype DTestConfig = DTestConfig {unDTestConfig :: Text} deriving (Eq, Show, IsString)
 
 newtype DRunConfig = DRunConfig {unDRunConfig :: Text} deriving (Eq, Show, IsString)
 
 newtype WhenClause = WhenClause {unWhenClause :: Text} deriving (Eq, Show, IsString)
+$(deriveJSON defaultOptions ''WhenClause)
 
 newtype ThenClause = ThenClause {unThenClause :: Text} deriving (Eq, Show, IsString)
+$(deriveJSON defaultOptions ''ThenClause)
 
 data ItemId = ItemId { address :: Address, itmId :: Int} deriving (Eq, Ord, Show)
+$(deriveJSON defaultOptions ''ItemId)
 
 -- needed because ItemId is used in a map
 instance ToJSONKey ItemId
@@ -47,6 +55,7 @@ instance FromJSONKey ItemId
 -- default implementation
 
 newtype LogIndex = LogIndex {unLogIndex :: Int} deriving (Eq, Ord, Show)
+$(deriveJSON defaultOptions ''LogIndex)
 
 data LogEventInfo = LogEventInfo
   { rnId :: Text,
@@ -55,6 +64,7 @@ data LogEventInfo = LogEventInfo
     idx :: LogIndex
   }
   deriving (Eq, Ord, Show)
+$(deriveJSON defaultOptions ''LogEventInfo)
 
 data ThreadInfo = ThreadInfo
   { runId :: Text,
@@ -96,22 +106,20 @@ data LogProtocolBase e
   | Warning' DetailedInfo
   | Error (FrameworkError e)
   deriving (Eq, Show, Functor)
+$(deriveJSON defaultOptions ''LogProtocolBase)
 
 data LogProtocolOut = LogProtocolOut
   { logIndex :: LogEventInfo,
     logInfo :: LogProtocolBase Text
   }
   deriving (Eq, Show)
-
-$(deriveJSON defaultOptions ''LogEventInfo)
-$(deriveJSON defaultOptions ''LogIndex)
 $(deriveJSON defaultOptions ''LogProtocolOut)
-$(deriveJSON defaultOptions ''LogProtocolBase)
-$(deriveJSON defaultOptions ''RunTitle)
-$(deriveJSON defaultOptions ''GroupTitle)
-$(deriveJSON defaultOptions ''TestTitle)
-$(deriveJSON defaultOptions ''ApStateJSON)
-$(deriveJSON defaultOptions ''DStateJSON)
-$(deriveJSON defaultOptions ''ItemId)
-$(deriveJSON defaultOptions ''WhenClause)
-$(deriveJSON defaultOptions ''ThenClause)
+
+
+
+
+
+
+
+
+

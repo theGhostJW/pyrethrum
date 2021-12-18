@@ -23,8 +23,11 @@ import DSL.Interpreter (Failure)
 
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
+$(deriveJSON defaultOptions ''Environment)
 data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
+$(deriveJSON defaultOptions ''Country)
 data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
+$(deriveJSON defaultOptions ''Depth)
 
 data RunConfig = RunConfig {
   title    :: Text,
@@ -32,6 +35,8 @@ data RunConfig = RunConfig {
   country     :: Country,
   depth       :: Depth
 } deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''RunConfig)
 
 
 instance Config RunConfig
@@ -53,6 +58,8 @@ data TestConfig = TestConfig {
   minDepth     :: Depth,
   active       :: Bool
 }  deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''TestConfig)
 
 data SuiteError = MyError1 | 
                   MyError2 
@@ -160,8 +167,5 @@ demo2 :: [Text]
 demo2 = removeKindSuffix <$> showInteractorEffs (WrappedInteractor MemberReflection.interactor :: InteractorFuncWrapper (Effects SuiteError) effs (RunConfig -> () -> Item -> Sem effs ApState))
 
 
-$(deriveJSON defaultOptions ''TestConfig)
-$(deriveJSON defaultOptions ''Environment)
-$(deriveJSON defaultOptions ''Country)
-$(deriveJSON defaultOptions ''Depth)
-$(deriveJSON defaultOptions ''RunConfig)
+
+

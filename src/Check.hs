@@ -243,7 +243,7 @@ calcChecks ds chkLst =
 
 $(deriveJSON defaultOptions ''CheckResult)
 $(deriveJSON defaultOptions ''CheckReport)
-$(deriveJSON defaultOptions ''ResultExpectation)
 $(deriveJSON defaultOptions ''ExpectationActive)
+$(deriveJSON defaultOptions ''ResultExpectation)
 $(deriveJSON defaultOptions ''GateStatus)
 $(deriveToJSON defaultOptions ''Checks)

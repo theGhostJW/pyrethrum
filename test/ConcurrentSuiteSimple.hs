@@ -35,6 +35,8 @@ data RunConfig = RunConfig
   }
   deriving (Eq, Show)
 
+$(deriveJSON defaultOptions ''RunConfig)
+
 instance Config RunConfig
 
 -- type DemoEffs effs = MinEffs Text effs
@@ -46,13 +48,12 @@ data TestConfig = TestConfig
   }
   deriving (Show, Eq)
 
-instance Config TestConfig
-
 $(deriveJSON defaultOptions ''TestConfig)
+
+instance Config TestConfig
 
 -- | A standard test
 type DemoTest hi i as ds effs = Test Text TestConfig RunConfig hi i as ds effs
-
 
 mkTxtItem :: Int -> TextItem
 mkTxtItem i = TextItem i ("Int Test Id" <> txt i) $ chk "Always Pass" $ const True
@@ -73,12 +74,10 @@ interact lgText rc hi itm = L.log (lgText <> " " <> txt (getField @"id" itm)) >>
 instance ToJSON TextItem where
   toEncoding = genericToEncoding defaultOptions
 
-
 -- end demo
 
 emptiParser :: ds -> as -> Sem effs ds
 emptiParser ds _ = pure ds
-
 
 ---                           hi  itm     as   ds
 test1WebTxt :: forall effs. Member (Logger Text) effs => DemoTest Text TextItem Text Text effs
@@ -150,5 +149,3 @@ concurrentPrms =
 
 concurrentRun :: forall effs. DemoEffs effs => Sem effs ()
 concurrentRun = mkSem concurrentPrms
-
-$(deriveJSON defaultOptions ''RunConfig)

@@ -35,6 +35,8 @@ data RunConfig = RunConfig
   }
   deriving (Eq, Show)
 
+$(deriveJSON defaultOptions ''RunConfig)
+
 instance Config RunConfig
 
 -- type DemoEffs effs = MinEffs Text effs
@@ -46,9 +48,10 @@ data TestConfig = TestConfig
   }
   deriving (Show, Eq)
 
+$(deriveJSON defaultOptions ''TestConfig)
+
 instance Config TestConfig
 
-$(deriveJSON defaultOptions ''TestConfig)
 
 -- | A standard test
 type DemoTest hi i as ds effs = Test Text TestConfig RunConfig hi i as ds effs
@@ -131,6 +134,3 @@ concurrentTestOnlyPrms =
             dummy = True
           }
     }
-
-
-$(deriveJSON defaultOptions ''RunConfig)

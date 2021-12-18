@@ -20,6 +20,17 @@ import RunnerBase
 
 newtype LineNo = LineNo {unLineNo :: Int} deriving (Show, Eq)
 
+$(deriveJSON defaultOptions ''LineNo)
+
+data DeserialisationError = DeserialisationError
+  { linNo :: LineNo,
+    errorTxt :: Text,
+    line :: Either UnicodeException Text -- the type for decode UTF8
+  }
+  deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''DeserialisationError)
+
 data LogTransformError
   = LogDeserialisationError DeserialisationError
   | LogIOError
@@ -33,12 +44,9 @@ data LogTransformError
       }
   deriving (Eq, Show)
 
-data DeserialisationError = DeserialisationError
-  { linNo :: LineNo,
-    errorTxt :: Text,
-    line :: Either UnicodeException Text -- the type for decode UTF8
-  }
-  deriving (Eq, Show)
+$(deriveJSON defaultOptions ''LogTransformError)
+
+
 
 -- Raw Data Types - no totalling
 
@@ -50,6 +58,7 @@ data ExecutionStatus
   | Fail
   | Regression
   deriving (Show, Eq, Ord, Enum)
+$(deriveJSON defaultOptions ''ExecutionStatus)
 
 instance A.ToJSONKey ExecutionStatus
 
@@ -109,7 +118,7 @@ logProtocolStatus chkEncountered = \case
   StartGroup _ -> Pass
   EndGroup _ -> Pass
   StartHook {} -> Pass
-  EndHook {}  -> Pass
+  EndHook {} -> Pass
   StartTest _ -> Pass
   EndTest _ -> Pass
   StartIteration {} -> Pass
@@ -154,11 +163,15 @@ data IterationPhase
   | PreInteractor
   deriving (Eq, Ord, Show)
 
+$(deriveJSON defaultOptions ''IterationPhase)
+
 data IterationOutcome = IterationOutcome
   { executionStatus :: ExecutionStatus,
     iterationPhase :: IterationPhase
   }
   deriving (Eq, Ord, Show)
+  
+$(deriveJSON defaultOptions ''IterationOutcome)
 
 type IterationResults = M.Map ItemId IterationOutcome
 
@@ -169,6 +182,8 @@ data RunResults = RunResults
     iterationResults :: IterationResults
   }
   deriving (Show)
+
+$(deriveJSON defaultOptions ''RunResults)
 
 data PhaseSwitch = PhaseSwitch
   { legalFromPhases :: S.Set IterationPhase,
@@ -195,7 +210,7 @@ phaseSwitch LogProtocolOut {logInfo = lp} mFailedPhase =
         StartGroup _ -> outToOut
         EndGroup _ -> outToOut
         StartHook {} -> outToOut
-        EndHook {}  -> outToOut
+        EndHook {} -> outToOut
         StartTest _ -> outToOut
         -- if test is empty state will be OutOfIteration else Checks
         EndTest _ -> Just $ PhaseSwitch (S.fromList [Checks, OutOfIteration]) OutOfIteration
@@ -285,36 +300,33 @@ resetCheck =
   \case
     EndIteration _ -> False
     lp' -> not $ isCheck lp'
-          
+
 logProtocolStep :: LPStep -> LogProtocolOut -> LPStep
 logProtocolStep (LPStep _phaseValid failStage phase _logItemStatus activeIteration checkEncountered) lpOut@LogProtocolOut {logInfo = lp} =
-  let 
-    PhaseChangeValidation {toPhase = nxtPhase, valid = nxtPhaseValid} = phaseChange phase failStage lpOut
+  let PhaseChangeValidation {toPhase = nxtPhase, valid = nxtPhaseValid} = phaseChange phase failStage lpOut
 
-    nxtActiveItr :: Maybe (ItemId, IterationOutcome)
-    nxtActiveItr = nxtIteration activeIteration lp
+      nxtActiveItr :: Maybe (ItemId, IterationOutcome)
+      nxtActiveItr = nxtIteration activeIteration lp
 
-    nxtCheckEncountered :: Bool
-    nxtCheckEncountered =
-      isNothing nxtActiveItr || resetCheck lp
-        ? False
-        $ checkEncountered || isCheck lp
+      nxtCheckEncountered :: Bool
+      nxtCheckEncountered =
+        isNothing nxtActiveItr || resetCheck lp
+          ? False
+          $ checkEncountered || isCheck lp
 
-    lgStatus :: ExecutionStatus
-    lgStatus = max (logProtocolStatus checkEncountered lp) (nxtPhaseValid ? Pass $ Fail)
+      lgStatus :: ExecutionStatus
+      lgStatus = max (logProtocolStatus checkEncountered lp) (nxtPhaseValid ? Pass $ Fail)
 
-    nxtFailStage :: Maybe IterationPhase
-    nxtFailStage = calcNextIterationFailStage failStage lgStatus nxtPhase $ Just lp
-  in 
-    LPStep
-      { 
-        phaseValid = nxtPhaseValid,
-        faileStage = nxtFailStage,
-        phase = nxtPhase,
-        logItemStatus = lgStatus,
-        activeIteration = nxtActiveItr,
-        checkEncountered = nxtCheckEncountered
-      }
+      nxtFailStage :: Maybe IterationPhase
+      nxtFailStage = calcNextIterationFailStage failStage lgStatus nxtPhase $ Just lp
+   in LPStep
+        { phaseValid = nxtPhaseValid,
+          faileStage = nxtFailStage,
+          phase = nxtPhase,
+          logItemStatus = lgStatus,
+          activeIteration = nxtActiveItr,
+          checkEncountered = nxtCheckEncountered
+        }
 
 data LPStep = LPStep
   { phaseValid :: Bool,
@@ -325,6 +337,8 @@ data LPStep = LPStep
     checkEncountered :: Bool
   }
   deriving (Show)
+
+$(deriveJSON defaultOptions ''LPStep)
 
 emptyLPStep = LPStep True Nothing OutOfIteration Pass Nothing False
 
@@ -384,12 +398,3 @@ textToByteString = toS
 
 showToByteString :: Show a => a -> ByteString
 showToByteString = textToByteString . txt
-
-$(deriveJSON defaultOptions ''LogTransformError)
-$(deriveJSON defaultOptions ''LineNo)
-$(deriveJSON defaultOptions ''DeserialisationError)
-$(deriveJSON defaultOptions ''IterationPhase)
-$(deriveJSON defaultOptions ''ExecutionStatus)
-$(deriveJSON defaultOptions ''IterationOutcome)
-$(deriveJSON defaultOptions ''RunResults)
-$(deriveJSON defaultOptions ''LPStep)

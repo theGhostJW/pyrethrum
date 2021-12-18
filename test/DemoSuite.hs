@@ -33,7 +33,11 @@ import TestFilter
 
 data Channel = Web | REST deriving (Eq, Ord, Show)
 
+$(deriveJSON defaultOptions ''Channel)
+
 data ChannelSelect = WebOnly | RESTOnly | AllChannels deriving (Eq, Ord, Show)
+
+$(deriveJSON defaultOptions ''ChannelSelect)
 
 rcRunAll = RunConfig "Run Everything" AllChannels
 
@@ -42,6 +46,8 @@ data RunConfig = RunConfig
     target :: ChannelSelect
   }
   deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''RunConfig)
 
 instance Config RunConfig
 
@@ -54,9 +60,9 @@ data TestConfig = TestConfig
   }
   deriving (Show, Eq)
 
-instance Config TestConfig
-
 $(deriveJSON defaultOptions ''TestConfig)
+
+instance Config TestConfig
 
 -- | A standard test
 type DemoTest hi i as ds effs = Test Text TestConfig RunConfig hi i as ds effs
@@ -197,8 +203,6 @@ test61WebTxt =
       parse = pure
     }
 
-
-
 test5RESTTxt :: forall effs. Member (Logger Text) effs => DemoTest Text TextItem Text Text effs
 test5RESTTxt =
   Test
@@ -294,9 +298,9 @@ demoSuite runTest =
                             ],
                           aHook = \i -> L.log "AH - Group 1 >> Group 2 >> After Hook 1"
                         },
-                      OnceHook 
-                        -- this is an empty hook should not run
-                        { title = "Group 1 >> Group 2 >> Hook 2",
+                      OnceHook
+                        { -- this is an empty hook should not run
+                          title = "Group 1 >> Group 2 >> Hook 2",
                           bHook = \_ -> L.log "BH - Group 1 >> Group 2 >> Before Hook 2" $> "Hello",
                           hkElms =
                             [ OnceHook
@@ -312,18 +316,16 @@ demoSuite runTest =
                                           gElms = []
                                         }
                                     ],
-                                  aHook = \_ -> L.log "AH - Group 1 >> Group 2 >> Hook 2 >> After Hook 3" 
+                                  aHook = \_ -> L.log "AH - Group 1 >> Group 2 >> Hook 2 >> After Hook 3"
                                 }
                             ],
-                          aHook = \s ->  L.log "AH - Group 1 >> Group 2 >> After Hook 2" 
+                          aHook = \s -> L.log "AH - Group 1 >> Group 2 >> After Hook 2"
                         }
                     ]
                 }
             ]
         }
     ]
-
-
 
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
 filters' ttl = [channelFilter, hasTitle ttl]
@@ -354,9 +356,5 @@ restRun = demoRun "Web Tests" RESTOnly Nothing
 
 txtRun :: forall effs. DemoEffs effs => Sem effs ()
 txtRun = demoRun "Run REST" AllChannels $ Just "txt"
-
-$(deriveJSON defaultOptions ''Channel)
-$(deriveJSON defaultOptions ''ChannelSelect)
-$(deriveJSON defaultOptions ''RunConfig)
 
 -- unit_test_filter_expect_empty

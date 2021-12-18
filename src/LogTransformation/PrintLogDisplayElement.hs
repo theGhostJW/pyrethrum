@@ -29,49 +29,50 @@ import LogTransformation.Common as LC
 import LogTransformation.Stats
 import PrettyPrintCommon
 import Pyrelude as P
-    ( fst,
-      otherwise,
-      ($),
-      Eq((==)),
-      Monad((>>=)),
-      Ord(compare),
-      Show,
-      Foldable(sum),
-      Semigroup((<>)),
-      Bool(..),
-      Int,
-      Maybe(..),
-      Ordering,
-      Either,
-      txtPretty,
-      (<$>),
-      (?),
-      txt,
-      Category((.)),
-      ConvertString(convertString),
-      Listy(null, empty, filter, snoc, foldl'),
-      Text,
-      sortBy,
-      const,
-      Down(Down),
-      Bifunctor(bimap),
-      (&&),
-      (||),
-      not,
-      (\\),
-      sort,
-      fromMaybe,
-      isJust,
-      isNothing,
-      isRight,
-      eitherf,
-      enumList,
-      firstJust,
-      maybef,
-      toLower,
-      toTitle,
-      unlines,
-      Lenient(getLenient) )
+  ( Bifunctor (bimap),
+    Bool (..),
+    Category ((.)),
+    ConvertString (convertString),
+    Down (Down),
+    Either,
+    Eq ((==)),
+    Foldable (sum),
+    Int,
+    Lenient (getLenient),
+    Listy (empty, filter, foldl', null, snoc),
+    Maybe (..),
+    Monad ((>>=)),
+    Ord (compare),
+    Ordering,
+    Semigroup ((<>)),
+    Show,
+    Text,
+    const,
+    eitherf,
+    enumList,
+    firstJust,
+    fromMaybe,
+    fst,
+    isJust,
+    isNothing,
+    isRight,
+    maybef,
+    not,
+    otherwise,
+    sort,
+    sortBy,
+    toLower,
+    toTitle,
+    txt,
+    txtPretty,
+    unlines,
+    ($),
+    (&&),
+    (<$>),
+    (?),
+    (\\),
+    (||),
+  )
 import RunElementClasses
 
 -- TODO: creation relational records
@@ -82,6 +83,88 @@ import RunElementClasses
 --------------------------------------------------------
 ----------------- Iteration Aggregation ----------------
 --------------------------------------------------------
+
+data IterationSummary = IterationSummary
+  { modulePath :: Text,
+    itmId :: Int,
+    notes :: Maybe Text,
+    pre :: Text,
+    post :: Text,
+    status :: ExecutionStatus
+  }
+  deriving (Eq, Show)
+
+data IterationError = IterationError
+  { phase :: IterationPhase,
+    error :: LogProtocolOut
+  }
+  deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''IterationError)
+
+data IterationWarning = IterationWarning
+  { phase :: IterationPhase,
+    warning :: LogProtocolOut
+  }
+  deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''IterationWarning)
+
+data ApStateInfo
+  = SucceededInteractor ApStateJSON
+  | FailedInteractor (FrameworkError Text)
+  deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''ApStateInfo)
+
+data ParserStatus
+  = ParserSuccess DStateJSON
+  | ParserSkipped ItemId
+  | ParserFailed (FrameworkError Text)
+  deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''ParserStatus)
+
+data IterationRecord = IterationRecord
+  { address :: Address,
+    itmId :: Int,
+    title :: Text,
+    notes :: Maybe Text,
+    outcome :: IterationOutcome,
+    validation :: [CheckReport],
+    otherErrors :: [IterationError],
+    otherWarnings :: [IterationWarning],
+    item :: Maybe A.Value,
+    apState :: Maybe ApStateInfo,
+    domainState :: Maybe ParserStatus
+  }
+  deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''IterationRecord)
+
+data IterationAccum = IterationAccum
+  { rec :: Maybe IterationRecord,
+    stepInfo :: LPStep,
+    filterLog :: Maybe [TestFilterResult]
+  }
+  deriving (Show)
+
+emptyIterationAccum :: IterationAccum
+emptyIterationAccum =
+  IterationAccum
+    { rec = Nothing,
+      stepInfo = emptyLPStep,
+      filterLog = Nothing
+    }
+
+data ProblemIterationAccum = ProblemIterationAccum
+  { accum :: IterationAccum,
+    skipIteration :: Bool,
+    skipTest :: Bool
+  }
+
+emptyProbleIterationAccum :: ProblemIterationAccum
+emptyProbleIterationAccum = ProblemIterationAccum emptyIterationAccum False False
 
 data PrintLogDisplayElement
   = FilterLog [TestFilterResult]
@@ -110,77 +193,7 @@ data PrintLogDisplayElement
   | LineError LogTransformError
   deriving (Show, Eq)
 
-data IterationSummary = IterationSummary
-  { modulePath :: Text,
-    itmId :: Int,
-    notes :: Maybe Text,
-    pre :: Text,
-    post :: Text,
-    status :: ExecutionStatus
-  }
-  deriving (Eq, Show)
-
-data IterationError = IterationError
-  { phase :: IterationPhase,
-    error :: LogProtocolOut
-  }
-  deriving (Eq, Show)
-
-data IterationWarning = IterationWarning
-  { phase :: IterationPhase,
-    warning :: LogProtocolOut
-  }
-  deriving (Eq, Show)
-
-data ApStateInfo
-  = SucceededInteractor ApStateJSON
-  | FailedInteractor (FrameworkError Text)
-  deriving (Eq, Show)
-
-data ParserStatus
-  = ParserSuccess DStateJSON
-  | ParserSkipped ItemId
-  | ParserFailed (FrameworkError Text)
-  deriving (Eq, Show)
-
-data IterationRecord = IterationRecord
-  { address :: Address,
-    itmId :: Int,
-    title :: Text, 
-    notes :: Maybe Text,
-    outcome :: IterationOutcome,
-    validation :: [CheckReport],
-    otherErrors :: [IterationError],
-    otherWarnings :: [IterationWarning],
-    item :: Maybe A.Value,
-    apState :: Maybe ApStateInfo,
-    domainState :: Maybe ParserStatus
-  }
-  deriving (Eq, Show)
-
-data IterationAccum = IterationAccum
-  { rec :: Maybe IterationRecord,
-    stepInfo :: LPStep,
-    filterLog :: Maybe [TestFilterResult]
-  }
-  deriving (Show)
-
-emptyIterationAccum :: IterationAccum
-emptyIterationAccum =
-  IterationAccum
-    { rec = Nothing,
-      stepInfo = emptyLPStep,
-      filterLog = Nothing
-    }
-
-data ProblemIterationAccum = ProblemIterationAccum
-  { accum :: IterationAccum,
-    skipIteration :: Bool,
-    skipTest :: Bool
-  }
-
-emptyProbleIterationAccum :: ProblemIterationAccum
-emptyProbleIterationAccum = ProblemIterationAccum emptyIterationAccum False False
+$(deriveJSON defaultOptions ''PrintLogDisplayElement)
 
 printProblemsDisplayStep ::
   RunResults -> -- RunResults
@@ -224,168 +237,163 @@ testStatusMap = testExStatus . iterationResults
 testStatus :: M.Map Address ExecutionStatus -> Address -> ExecutionStatus
 testStatus tstStatusMap tm = fromMaybe LC.Fail $ M.lookup tm tstStatusMap
 
-printLogDisplay :: 
+printLogDisplay ::
   RunResults -> -- RunResults
   LineNo -> -- lineNo
   IterationAccum -> -- accum
   LogProtocolOut -> -- source   -- parse error or FrameworkError
   (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
-printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProtocolOut {logInfo = lp}  =
-  let 
-    skipLog = (oldAccum, Nothing)
+printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProtocolOut {logInfo = lp} =
+  let skipLog = (oldAccum, Nothing)
 
-    RunResults outOfTest iterationResults = runResults
+      RunResults outOfTest iterationResults = runResults
 
-    testStatuses :: M.Map Address ExecutionStatus
-    testStatuses = testStatusMap runResults
+      testStatuses :: M.Map Address ExecutionStatus
+      testStatuses = testStatusMap runResults
 
-    testStatus' :: Address -> ExecutionStatus
-    testStatus' = testStatus testStatuses
+      testStatus' :: Address -> ExecutionStatus
+      testStatus' = testStatus testStatuses
 
-    tstIterationStatusCounts :: M.Map Address StatusCount
-    tstIterationStatusCounts = testIterationStatusCounts runResults
+      tstIterationStatusCounts :: M.Map Address StatusCount
+      tstIterationStatusCounts = testIterationStatusCounts runResults
 
-    testItrStats :: Address -> StatusCount
-    testItrStats tm = M.findWithDefault M.empty tm tstIterationStatusCounts
+      testItrStats :: Address -> StatusCount
+      testItrStats tm = M.findWithDefault M.empty tm tstIterationStatusCounts
 
-    elOut :: a -> Maybe [a]
-    elOut a = Just [a]
+      elOut :: a -> Maybe [a]
+      elOut a = Just [a]
 
-    nxtStepInfo :: LPStep
-    nxtStepInfo@( LPStep
-                    _nxtPhaseValid
-                    _nxtFailStage
-                    nxtPhase
-                    _logItemStatus
-                    _nxtActiveItr
-                    _nxtCheckEncountered
-                  ) = logProtocolStep stepInfo lpo
+      nxtStepInfo :: LPStep
+      nxtStepInfo@( LPStep
+                      _nxtPhaseValid
+                      _nxtFailStage
+                      nxtPhase
+                      _logItemStatus
+                      _nxtActiveItr
+                      _nxtCheckEncountered
+                    ) = logProtocolStep stepInfo lpo
 
-    accum :: IterationAccum
-    accum = oldAccum {stepInfo = nxtStepInfo}
+      accum :: IterationAccum
+      accum = oldAccum {stepInfo = nxtStepInfo}
 
-    lineError :: Text -> Maybe [PrintLogDisplayElement]
-    lineError txt' = Just [LineError $ LogTransformError lineNo lpo txt']
+      lineError :: Text -> Maybe [PrintLogDisplayElement]
+      lineError txt' = Just [LineError $ LogTransformError lineNo lpo txt']
 
-    txtOf :: Y.Value -> Maybe Text
-    txtOf =
-      \case
-        Y.Object _ -> Nothing
-        Y.Array _ -> Nothing
-        Y.String txt' -> Just txt'
-        Y.Number _ -> Nothing
-        Y.Bool _ -> Nothing
-        Y.Null -> Nothing
+      txtOf :: Y.Value -> Maybe Text
+      txtOf =
+        \case
+          Y.Object _ -> Nothing
+          Y.Array _ -> Nothing
+          Y.String txt' -> Just txt'
+          Y.Number _ -> Nothing
+          Y.Bool _ -> Nothing
+          Y.Null -> Nothing
 
-    getNotes :: Y.Value -> Maybe Text
-    getNotes =
-      \case
-        Y.Object obj -> firstJust [HM.lookup "notes" obj, HM.lookup "note" obj] >>= txtOf
-        Y.Array _ -> Nothing
-        Y.String _ -> Nothing
-        Y.Number _ -> Nothing
-        Y.Bool _ -> Nothing
-        Y.Null -> Nothing
+      getNotes :: Y.Value -> Maybe Text
+      getNotes =
+        \case
+          Y.Object obj -> firstJust [HM.lookup "notes" obj, HM.lookup "note" obj] >>= txtOf
+          Y.Array _ -> Nothing
+          Y.String _ -> Nothing
+          Y.Number _ -> Nothing
+          Y.Bool _ -> Nothing
+          Y.Null -> Nothing
 
-    updateItrRec :: (IterationRecord -> IterationRecord) -> (IterationAccum, Maybe [PrintLogDisplayElement])
-    updateItrRec func =
-      let mIrec :: Maybe IterationRecord
-          mIrec = rec accum
-        in maybef
-            mIrec
-            (accum, lineError "An iteration event has been encounterred before the start iteration event - possible loss of log event - check raw logs")
-            (\irec -> (accum {rec = Just $ func irec}, Nothing))
+      updateItrRec :: (IterationRecord -> IterationRecord) -> (IterationAccum, Maybe [PrintLogDisplayElement])
+      updateItrRec func =
+        let mIrec :: Maybe IterationRecord
+            mIrec = rec accum
+         in maybef
+              mIrec
+              (accum, lineError "An iteration event has been encounterred before the start iteration event - possible loss of log event - check raw logs")
+              (\irec -> (accum {rec = Just $ func irec}, Nothing))
+   in case lp of
+        LP.FilterLog flgs -> (accum {filterLog = Just flgs}, Nothing)
+        LP.StartRun runTitle _offset jsonCfg ->
+          ( accum,
+            elOut $
+              LogTransformation.PrintLogDisplayElement.StartRun
+                { title = runTitle,
+                  config = jsonCfg,
+                  runStatus = worstStatus runResults,
+                  testStats = testStatusCounts runResults,
+                  iterationStats = iterationStatusCounts runResults,
+                  outOfTest = outOfTest
+                }
+          )
+        LP.EndRun -> (accum, elOut . LogTransformation.PrintLogDisplayElement.EndRun $ filterLog accum)
+        LP.StartGroup _ -> skipLog
+        LP.EndGroup _ -> skipLog
+        StartHook {} -> skipLog
+        EndHook {} -> skipLog
+        LP.StartTest (TestLogInfo ttl domain testConfig) ->
+          let elmAddress = push ttl Test domain
+           in ( accum,
+                elOut $
+                  LogTransformation.PrintLogDisplayElement.StartTest
+                    ttl
+                    elmAddress
+                    (getNotes testConfig)
+                    testConfig
+                    (testStatus' elmAddress)
+                    (testItrStats elmAddress)
+              )
+        LP.EndTest _ -> skipLog
+        StartIteration iid@(ItemId address itmId) ttle jsonItmVal ->
+          ( accum
+              { rec =
+                  Just $
+                    IterationRecord
+                      { address = address,
+                        itmId = itmId,
+                        title = ttle,
+                        notes = getNotes jsonItmVal,
+                        outcome = M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults,
+                        validation = P.empty,
+                        otherErrors = P.empty,
+                        otherWarnings = P.empty,
+                        item = Just jsonItmVal,
+                        apState = Nothing,
+                        domainState = Nothing
+                      }
+              },
+            Nothing
+          )
+        EndIteration _ ->
+          let severityDesc :: CheckReport -> CheckReport -> Ordering
+              severityDesc (CheckReport rslt1 _) (CheckReport rslt2 _) = compare (Down rslt1) (Down rslt2)
 
-  in case lp of
-    LP.FilterLog flgs -> (accum {filterLog = Just flgs}, Nothing)
-    LP.StartRun runTitle _offset jsonCfg ->
-      ( accum,
-        elOut $
-          LogTransformation.PrintLogDisplayElement.StartRun
-            { title = runTitle,
-              config = jsonCfg,
-              runStatus = worstStatus runResults,
-              testStats = testStatusCounts runResults,
-              iterationStats = iterationStatusCounts runResults,
-              outOfTest = outOfTest
-            }
-      )
-    LP.EndRun -> (accum, elOut . LogTransformation.PrintLogDisplayElement.EndRun $ filterLog accum)
-    LP.StartGroup _ -> skipLog
-    LP.EndGroup _ -> skipLog
-    StartHook {} -> skipLog
-    EndHook {}  -> skipLog
-    LP.StartTest (TestLogInfo ttl domain testConfig) ->
-        let 
-          elmAddress = push ttl Test domain
-        in
-        ( accum,
-          elOut $
-            LogTransformation.PrintLogDisplayElement.StartTest
-              ttl
-              elmAddress
-              (getNotes testConfig)
-              testConfig
-              (testStatus' elmAddress)
-              (testItrStats elmAddress)
-        )
-    LP.EndTest _ -> skipLog
-    StartIteration iid@(ItemId address itmId) ttle jsonItmVal ->
-        ( accum
-            { rec =
-                Just $
-                  IterationRecord
-                    { address = address,
-                      itmId = itmId,
-                      title = ttle,
-                      notes = getNotes jsonItmVal,
-                      outcome = M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults,
-                      validation = P.empty,
-                      otherErrors = P.empty,
-                      otherWarnings = P.empty,
-                      item = Just jsonItmVal,
-                      apState = Nothing,
-                      domainState = Nothing
-                    }
-            },
-          Nothing
-        )
-    EndIteration _ ->
-        let severityDesc :: CheckReport -> CheckReport -> Ordering
-            severityDesc (CheckReport rslt1 _) (CheckReport rslt2 _) = compare (Down rslt1) (Down rslt2)
-
-            sortChecks :: IterationRecord -> IterationRecord
-            sortChecks ir = ir {validation = sortBy severityDesc $ validation ir}
-          in ( accum {rec = Nothing},
-              elOut $
-                maybef
-                  (rec accum)
-                  ( LineError $
-                      LogTransformError
-                        { linNo = lineNo,
-                          logItem = lpo,
-                          info = "Error end iteration message encountered when the before start iteration - check raw logs"
-                        }
-                  )
-                  (Iteration . sortChecks)
-            )
-    IOAction _ -> skipLog
-    IOAction' _ -> skipLog
-    StartParser -> skipLog
-    StartInteraction -> skipLog
-    InteractorSuccess _iid apStateJSON -> updateItrRec (\ir -> ir {apState = Just $ SucceededInteractor apStateJSON})
-    InteractorFailure _iid err -> updateItrRec (\ir -> ir {apState = Just $ FailedInteractor err})
-    LP.ParserSuccess _iid dStateJSON -> updateItrRec (\ir -> ir {domainState = Just $ LogTransformation.PrintLogDisplayElement.ParserSuccess dStateJSON})
-    LP.ParserSkipped iid -> updateItrRec (\ir -> ir {domainState = Just $ LogTransformation.PrintLogDisplayElement.ParserSkipped iid})
-    ParserFailure _iid err -> updateItrRec (\ir -> ir {domainState = Just $ ParserFailed err})
-    StartChecks -> skipLog
-    CheckOutcome _itmId chkReport -> updateItrRec (\ir -> ir {validation = chkReport : validation ir})
-    Message _ -> skipLog
-    Message' _ -> skipLog
-    LP.Warning _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : otherWarnings ir})
-    Warning' _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : otherWarnings ir})
-    LP.Error _ -> updateItrRec (\ir -> ir {otherErrors = IterationError nxtPhase lpo : otherErrors ir})
-  
+              sortChecks :: IterationRecord -> IterationRecord
+              sortChecks ir = ir {validation = sortBy severityDesc $ validation ir}
+           in ( accum {rec = Nothing},
+                elOut $
+                  maybef
+                    (rec accum)
+                    ( LineError $
+                        LogTransformError
+                          { linNo = lineNo,
+                            logItem = lpo,
+                            info = "Error end iteration message encountered when the before start iteration - check raw logs"
+                          }
+                    )
+                    (Iteration . sortChecks)
+              )
+        IOAction _ -> skipLog
+        IOAction' _ -> skipLog
+        StartParser -> skipLog
+        StartInteraction -> skipLog
+        InteractorSuccess _iid apStateJSON -> updateItrRec (\ir -> ir {apState = Just $ SucceededInteractor apStateJSON})
+        InteractorFailure _iid err -> updateItrRec (\ir -> ir {apState = Just $ FailedInteractor err})
+        LP.ParserSuccess _iid dStateJSON -> updateItrRec (\ir -> ir {domainState = Just $ LogTransformation.PrintLogDisplayElement.ParserSuccess dStateJSON})
+        LP.ParserSkipped iid -> updateItrRec (\ir -> ir {domainState = Just $ LogTransformation.PrintLogDisplayElement.ParserSkipped iid})
+        ParserFailure _iid err -> updateItrRec (\ir -> ir {domainState = Just $ ParserFailed err})
+        StartChecks -> skipLog
+        CheckOutcome _itmId chkReport -> updateItrRec (\ir -> ir {validation = chkReport : validation ir})
+        Message _ -> skipLog
+        Message' _ -> skipLog
+        LP.Warning _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : otherWarnings ir})
+        Warning' _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : otherWarnings ir})
+        LP.Error _ -> updateItrRec (\ir -> ir {otherErrors = IterationError nxtPhase lpo : otherErrors ir})
 
 printLogDisplayStep ::
   RunResults -> -- RunResults
@@ -397,14 +405,11 @@ printLogDisplayStep runResults lineNo oldAccum@IterationAccum {stepInfo} eithLp 
   eitherf
     eithLp
     ( \err ->
-        let 
-            nxtFailStage = calcNextIterationFailStage (faileStage stepInfo) LC.Fail (LC.phase stepInfo) Nothing
+        let nxtFailStage = calcNextIterationFailStage (faileStage stepInfo) LC.Fail (LC.phase stepInfo) Nothing
             nxtStepInfo = stepInfo {faileStage = nxtFailStage}
-         in 
-            ( oldAccum {stepInfo = nxtStepInfo} :: IterationAccum, Just [LineError $ LogDeserialisationError err])
+         in (oldAccum {stepInfo = nxtStepInfo} :: IterationAccum, Just [LineError $ LogDeserialisationError err])
     )
     (printLogDisplay runResults lineNo oldAccum)
-    
 
 prettyPrintDisplayElement :: PrintLogDisplayElement -> Text
 prettyPrintDisplayElement pde =
@@ -643,10 +648,3 @@ statusCountTupleText outOfTest sc =
    in outOfTest
         ? statusTuples
         $ ("total", txt . sum $ M.elems sc) : statusTuples
-
-$(deriveJSON defaultOptions ''IterationRecord)
-$(deriveJSON defaultOptions ''ApStateInfo)
-$(deriveJSON defaultOptions ''IterationWarning)
-$(deriveJSON defaultOptions ''IterationError)
-$(deriveJSON defaultOptions ''ParserStatus)
-$(deriveJSON defaultOptions ''PrintLogDisplayElement)

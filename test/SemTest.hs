@@ -1,5 +1,6 @@
 module SemTest where
 
+import Check
 import Data.Aeson.TH
 import Data.Aeson.Types
 import Data.Yaml
@@ -8,7 +9,6 @@ import Pyrelude as P hiding (Item)
 import Runner as R
 import RunnerBase (Test)
 import TestFilter
-import Check
 
 data Include = In | Out deriving (Eq, Ord, Show)
 
@@ -22,10 +22,10 @@ data TestConfig = TestConfig
   }
   deriving (Show, Eq)
 
-instance Config TestConfig
-
 $(deriveJSON defaultOptions ''TestConfig)
 
+instance Config TestConfig
+q
 --    e      tc        rc       hi i as ds effs
 type DemoTest hi i as ds effs = RunnerBase.Test Text TestConfig RunConfig hi (i ds) as ds effs
 
@@ -37,8 +37,6 @@ data Item ds = Item
   }
   deriving (Show, Generic)
 
-
-
 data TextItem ds = TextItem
   { id :: Int,
     title :: Text,
@@ -46,7 +44,6 @@ data TextItem ds = TextItem
     checks :: Checks ds
   }
   deriving (Show, Generic)
-
 
 instance (ToJSON ds) => ToJSON (Item ds) where
   toEncoding = genericToEncoding defaultOptions
@@ -176,7 +173,7 @@ constParser a _ = pure a
 --                               [ \i ->
 --                                   Tests
 --                                     [ r i test5TailsTxt,
---                                       r i test2TailsInt 
+--                                       r i test2TailsInt
 --                                     ]
 --                               ]
 --                           }

@@ -14,9 +14,15 @@ import RunElementClasses as RC hiding (element)
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
 
+$(deriveJSON defaultOptions ''Environment)
+
 data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
 
+$(deriveJSON defaultOptions ''Country)
+
 data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
+
+$(deriveJSON defaultOptions ''Depth)
 
 data TestConfig = TestConfig
   { header :: Text,
@@ -27,6 +33,8 @@ data TestConfig = TestConfig
   }
   deriving (Eq, Show)
 
+$(deriveJSON defaultOptions ''TestConfig)
+
 data RunConfig = RunConfig
   { runTitle :: Text,
     environment :: Environment,
@@ -34,6 +42,8 @@ data RunConfig = RunConfig
     depth :: Depth
   }
   deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''RunConfig)
 
 runConfig :: RunConfig
 runConfig =
@@ -50,12 +60,12 @@ genJSON = A.toJSON <$> genRunConfig -- using runconfig as easy proxy for random 
 genTxt :: Gen Text
 genTxt = text (linear 0 1000) ascii
 
-
 moduleDomain :: Address
-moduleDomain = Address [
-                    AddressElem "sub 1" RC.Group, 
-                    AddressElem "sub 2" RC.Group
-                    ]
+moduleDomain =
+  Address
+    [ AddressElem "sub 1" RC.Group,
+      AddressElem "sub 2" RC.Group
+    ]
 
 domainElementSingleton :: Gen Address
 domainElementSingleton = pure $ push "test" RC.Test moduleDomain
@@ -88,8 +98,8 @@ genDetailedInfo = DetailedInfo <$> genTxt <*> genTxt
 genTestDisplayInfo :: Gen TestLogInfo
 genTestDisplayInfo =
   TestLogInfo
-    <$>  genTxt
-    <*>  addressSingleton
+    <$> genTxt
+    <*> addressSingleton
     <*> (A.toJSON <$> genTestConfig)
 
 genTestFilterResult :: Gen TestFilterResult
@@ -164,9 +174,3 @@ hprop_log_protocol_round_trip = property $ do
     unserialised
     (\s -> footnote (toS s) *> failure)
     (lp ===)
-
-$(deriveJSON defaultOptions ''TestConfig)
-$(deriveJSON defaultOptions ''Environment)
-$(deriveJSON defaultOptions ''Country)
-$(deriveJSON defaultOptions ''Depth)
-$(deriveJSON defaultOptions ''RunConfig)

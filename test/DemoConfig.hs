@@ -1,53 +1,61 @@
 module DemoConfig where
 
-import           Pyrelude as P
-import RunElementClasses
-import Data.Set as S
-import qualified Data.Aeson as A
-import Data.ByteString.Lazy as B
-import Data.Aeson.TH
-import DSL.LogProtocol
 import Common
+import DSL.LogProtocol
+import qualified Data.Aeson as A
+import Data.Aeson.TH
+import Data.ByteString.Lazy as B
+import Data.Set as S
+import Pyrelude as P
+import RunElementClasses
 
-
-data SuiteError = MyError Text | 
-                  MyOtherError 
-                  deriving (Show, Typeable)
+data SuiteError
+  = MyError Text
+  | MyOtherError
+  deriving (Show, Typeable)
 
 type AppError = FrameworkError SuiteError
 
 type LogProtocol = LogProtocolBase SuiteError
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
+
+$(deriveJSON defaultOptions ''Environment)
+
 data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
+
+$(deriveJSON defaultOptions ''Country)
+
 data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
 
-data TestConfig = TestConfig {
-  header       :: Text,
-  environments :: Set Environment,
-  countries    :: Set Country,
-  minDepth     :: Depth,
-  active       :: Bool
-}  deriving (Eq, Show)
+$(deriveJSON defaultOptions ''Depth)
 
-data RunConfig = RunConfig {
-  runTitle    :: Text,
-  environment :: Environment,
-  country     :: Country,
-  depth       :: Depth
-} deriving (Eq, Show)
-
-runConfig :: RunConfig
-runConfig = RunConfig {
-  runTitle = "Sample RunConfig",
-  environment = TST,
-  country = AU,
-  depth = DeepRegression
-}
-
+data TestConfig = TestConfig
+  { header :: Text,
+    environments :: Set Environment,
+    countries :: Set Country,
+    minDepth :: Depth,
+    active :: Bool
+  }
+  deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''TestConfig)
-$(deriveJSON defaultOptions ''Environment)
-$(deriveJSON defaultOptions ''Country)
-$(deriveJSON defaultOptions ''Depth)
+
+data RunConfig = RunConfig
+  { runTitle :: Text,
+    environment :: Environment,
+    country :: Country,
+    depth :: Depth
+  }
+  deriving (Eq, Show)
+
+runConfig :: RunConfig
+runConfig =
+  RunConfig
+    { runTitle = "Sample RunConfig",
+      environment = TST,
+      country = AU,
+      depth = DeepRegression
+    }
+
 $(deriveJSON defaultOptions ''RunConfig)

@@ -33,14 +33,6 @@ data SuiteItem hd effs t where
     } ->
     SuiteItem hd effs t
 
-data RunFixture effs = RunFixture
-  { testItems :: [Sem effs ()],
-    dummy :: Bool
-  }
-
-mkRunFixture :: [Sem effs ()] -> RunFixture effs
-mkRunFixture i = RunFixture i True
-
 {-
 instance Functor (SuiteItem hd ho effs) where
   fmap :: (a -> b) -> SuiteItem hd ho effs a -> SuiteItem hd ho effs b

@@ -8,6 +8,7 @@ import UnliftIO
 import UnliftIO.Concurrent
 import UnliftIO.STM
 import Prelude
+import Data.Function
 
 data CompletionStatus = Normal | Fault | Murdered deriving (Eq, Show)
 
@@ -96,7 +97,7 @@ launch =
         branchChildren,
         branchRelease
       } -> do
-        input <- output branchParent
+        input <- outputWithLaunch branchParent
         bracket
           (hook input)
           (branchRelease 1 {- TODO implemnt pass through timeout for release -})

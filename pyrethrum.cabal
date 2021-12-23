@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a47891436e87d3fadda52f7daa876d4034c99c10d8360b16eb4c2d11d450b779
+-- hash: aa5eded3c2c50a3f9483342238b28d9431ae78568f4e4aa5c32c49345ed66c57
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -116,6 +116,7 @@ library
       MultiWayIf
       NamedFieldPuns
       NoImplicitPrelude
+      NumericUnderscores
       OverloadedStrings
       PartialTypeSignatures
       PatternSynonyms
@@ -151,6 +152,7 @@ library
     , template-haskell
     , text
     , transformers-either
+    , unliftio
     , unordered-containers
     , yaml
   default-language: Haskell2010
@@ -213,6 +215,7 @@ test-suite pyrethrum-test
       MultiWayIf
       NamedFieldPuns
       NoImplicitPrelude
+      NumericUnderscores
       OverloadedStrings
       PartialTypeSignatures
       PatternSynonyms

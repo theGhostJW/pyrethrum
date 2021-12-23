@@ -26,9 +26,11 @@ import RunElementClasses as C
     unAddress,
   )
 
+
+{-
 -- TODO - Error handling especially outside tests eg. in hooks
 -- separate
-runElm ::
+loadNode ::
   forall hi e effs.
   (ToJSON e, Show e, Member (Logger e) effs) =>
   S.Set Address ->
@@ -36,9 +38,9 @@ runElm ::
   hi ->
   SuiteItem hi effs [Sem effs ()] ->
   [RunFixture effs]
-runElm includedAddresses parentAddress hi =
+loadNode includedAddresses parentAddress hi =
   let exElm' :: forall hi'. Address -> hi' -> SuiteItem hi' effs [Sem effs ()] -> [RunFixture effs]
-      exElm' = runElm includedAddresses
+      exElm' = loadNode includedAddresses
 
       hook = RC.Hook
       group' = RC.Group
@@ -71,5 +73,6 @@ runElm includedAddresses parentAddress hi =
           --     logItem $ StartGroup $ GroupTitle t
           --     sequence_ $ exElm' (nxtAddress t group') hi <$> gElms
           --     logItem $ EndGroup $ GroupTitle t
+-}
 
 

@@ -96,6 +96,7 @@ default-extensions:
   - MultiWayIf
   - NamedFieldPuns
   - NoImplicitPrelude
+  - NumericUnderscores
   - OverloadedStrings
   - PartialTypeSignatures
   - PatternSynonyms
@@ -124,6 +125,7 @@ library:
     - unordered-containers
     - template-haskell
     - bytestring
+    - unliftio
     - fmt
 
 #  reinstate when LHS can live load multiple modules

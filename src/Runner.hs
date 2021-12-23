@@ -1,7 +1,3 @@
-{-# LANGUAGE NoPolyKinds #-}
-
--- TODO: work out why this is needed - investigate polykinds
--- {-# LANGUAGE NoStrictData #-}
 
 module Runner
   ( mkEndpointSem,

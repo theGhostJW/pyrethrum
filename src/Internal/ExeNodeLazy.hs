@@ -49,14 +49,16 @@ data Node i o where
     Node i o
   Fixture ::
     MonadUnliftIO m =>
-    { fixParent :: Node i0 i,
-      iterations :: [i -> IO ()]
+    { 
+      logStart :: IO (),
+      fixParent :: Node i0 i,
+      iterations :: [i -> IO ()],
+      logEnd :: IO ()
     } ->
     Node i ()
 
 data LoadedFixture = LoadedFixture
   { 
-    started :: IO (TVar Bool),
     fixStatus :: IO (TVar FixtureStatus),
     iterations :: IO (TVar [IO ()]),
     activeThreads :: IO [IO ThreadId]
@@ -143,7 +145,6 @@ loadFixture :: Node i o -> [o -> IO ()] -> IO LoadedFixture
 loadFixture parent iterations = do
   input <- outputWithLaunch parent
   pure $ LoadedFixture { 
-    started = newTVarIO False,
     fixStatus = newTVarIO Pending,
     iterations = newTVarIO ((input &) <$> iterations),
     activeThreads = pure []
@@ -154,7 +155,7 @@ fixtures :: Node i o -> [IO LoadedFixture]
 fixtures = \case
   Root {rootChildren} -> rootChildren >>= fixtures
   Branch {branchChildren} -> branchChildren >>= fixtures
-  Fixture parent iterations -> [loadFixture parent iterations]
+  Fixture logStart parent iterations logEnd -> [loadFixture parent iterations]
 
 -- mkRunFixture :: [Sem effs ()] -> RunFixture effs
 -- mkRunFixture i = RunFixture i True

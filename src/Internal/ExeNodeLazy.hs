@@ -3,8 +3,9 @@
 module Internal.ExeNodeLazy where
 
 import Data.Function
+import Data.Sequence (Seq (Empty))
 import Polysemy
-import Pyrelude (Text, fromMaybe, isJust, maybef, throw, traverse_, unlessJust, uu, void, when, (?))
+import Pyrelude (Listy (unsafeHead, unsafeTail), Text, bool, fromMaybe, isJust, maybef, throw, traverse_, unless, unlessJust, uu, void, when, (?))
 import UnliftIO
 import UnliftIO.Concurrent
 import UnliftIO.STM
@@ -18,6 +19,13 @@ data FixtureStatus
   | Done CompletionStatus
   | BeingKilled
   deriving (Eq, Show)
+
+isDone :: FixtureStatus -> Bool
+isDone = \case
+  Pending -> False
+  Active -> False
+  Done _ -> True
+  BeingKilled -> False
 
 data BranchStatus
   = Unintitalised
@@ -58,8 +66,8 @@ data Node i o where
 
 data LoadedFixture = LoadedFixture
   { logStart :: IO (),
-    fixStatus :: IO (TVar FixtureStatus),
-    iterations :: IO (TVar [IO ()]),
+    fixStatus :: TVar FixtureStatus,
+    iterations :: TVar [IO ()],
     activeThreads :: IO [IO ThreadId],
     logEnd :: IO ()
   }
@@ -76,7 +84,7 @@ data IndexedFixture = IndexedFixture
   ~ log start and end fixture (generate form test suite)
   ~ exceptions
   ~ killing
-
+  ~ test with null iterations
 -}
 
 setReadyForLaunch :: TVar BranchStatus -> STM Bool
@@ -146,11 +154,13 @@ outputWithLaunch = \case
 loadFixture :: Node i o -> [o -> IO ()] -> IO () -> IO () -> IO LoadedFixture
 loadFixture parent iterations logStart logEnd = do
   input <- outputWithLaunch parent
+  fixStatus <- newTVarIO Pending
+  iterations' <- newTVarIO ((input &) <$> iterations)
   pure $
     LoadedFixture
       { logStart = logStart,
-        fixStatus = newTVarIO Pending,
-        iterations = newTVarIO ((input &) <$> iterations),
+        fixStatus = fixStatus,
+        iterations = iterations',
         activeThreads = pure [],
         logEnd = logEnd
       }
@@ -166,7 +176,8 @@ mkFixtures = \case
 data Executor = Executor
   { maxThreads :: Int,
     threadsInUse :: TVar Int,
-    fixtures :: TQueue IndexedFixture
+    fixturesPending :: TQueue IndexedFixture,
+    fixturesStarted :: TQueue IndexedFixture
   }
 
 data Fork
@@ -174,26 +185,76 @@ data Fork
   | Pend
   | RunComplete
 
-fixtureActive :: LoadedFixture -> IO Bool
-fixtureActive fx = do
-  fsv <- fixStatus fx
-  fs <- readTVarIO fsv
-  pure $ fs == Active
+-- fixtureActive :: LoadedFixture -> STM Bool
+-- fixtureActive fx =
+--   (==) Active <$> readTVar (fixStatus fx)
 
-firstActive :: [IO LoadedFixture] -> IO (Maybe LoadedFixture)
-firstActive = \case
-  [] -> pure Nothing
-  x : xs -> do
-    lf <- x
-    active <- fixtureActive lf
-    active
-      ? pure (Just lf)
-      $ firstActive xs
+-- firstActive :: [IO LoadedFixture] -> IO (Maybe LoadedFixture)
+-- firstActive = \case
+--   [] -> pure Nothing
+--   x : xs -> do
+--     lf <- x
+--     active <- fixtureActive lf
+--     active
+--       ? pure (Just lf)
+--       $ firstActive xs
 
-pruneQueReturnNextReady :: TQueue LoadedFixture -> IO (Maybe LoadedFixture)
-pruneQueReturnNextReady q = do
-  let nxt = readTQueue q
-  uu
+data NoCandidate = EmptyQueue | CantUseAnyMoreThreads
+
+data IterationRun = IterationRun IndexedFixture (IO ())
+
+nextActiveReady :: Maybe Int -> TQueue IndexedFixture -> STM (Maybe IterationRun)
+nextActiveReady mInitilIndex activeQ = do
+  fx' <- readTQueue activeQ
+  let thisIdx = index fx'
+      fx = fixture fx'
+      exausted = maybef mInitilIndex False $ (==) thisIdx
+      nxtInitial = maybef mInitilIndex (pure thisIdx) pure
+  exausted
+    ? pure Nothing
+    $ do
+      status <- readTVar $ fixStatus fx
+      let itrsVar = (iterations :: LoadedFixture -> TVar [IO ()]) fx
+      itrs <- readTVar itrsVar
+      -- write fixtures back to end of queue unless complete
+      unless (isDone status) $
+        writeTQueue activeQ fx'
+
+      -- when (status == Pending)
+      --   throw "Framework Error - this should not happen - no fixtures should be pending by the time this is run"
+
+      bool
+        (nextActiveReady nxtInitial activeQ)
+        ( do
+            let nxtItrs = unsafeTail itrs
+                nxtIO = unsafeHead itrs
+
+            writeTVar itrsVar nxtItrs
+            pure (Just $ IterationRun fx' nxtIO)
+        )
+        (status == Active && not (null itrs))
+
+pruneQueReturnNextReady :: TQueue IndexedFixture -> TQueue IndexedFixture -> STM (Either NoCandidate IterationRun)
+pruneQueReturnNextReady pendingQ activeQ =
+  let notEmpty q = not <$> isEmptyTQueue q
+   in do
+        hasPending <- notEmpty pendingQ
+        hasActive <- notEmpty activeQ
+        if
+            | hasPending ->
+              do
+                fx <- readTQueue pendingQ
+                writeTQueue activeQ fx
+                pure $ Right fx
+            | hasActive ->
+              do
+                mbNxt <- nextActiveReady Nothing activeQ
+                pure $
+                  maybef
+                    mbNxt
+                    (Left CantUseAnyMoreThreads)
+                    Right
+            | otherwise -> pure $ Left EmptyQueue
 
 -- nextFork' :: Executor -> IO (Maybe LoadedFixture)
 -- nextFork' ep = do
@@ -208,24 +269,26 @@ pruneQueReturnNextReady q = do
 --         pure Nothing
 --       else pure Nothing
 
-qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()
-qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture
-
 execute' :: Executor -> IO ()
 execute'
   exe@Executor
     { maxThreads,
       threadsInUse,
-      fixtures = fixQ
+      fixturesPending,
+      fixturesStarted
     } = uu
+
+qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()
+qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture
 
 execute :: Int -> Node i o -> IO ()
 execute maxThreads root = do
   fxs <- sequence $ mkFixtures root
   let idxFxs = zip [0 ..] fxs
   -- create queue
-  q <- newTQueueIO
+  pendingQ <- newTQueueIO
+  runningQ <- newTQueueIO
   -- load queue
-  atomically $ traverse_ (qFixture q) idxFxs
+  atomically $ traverse_ (qFixture pendingQ) idxFxs
   initialThreadsInUse <- newTVarIO 0
-  execute' $ Executor maxThreads initialThreadsInUse q
+  execute' $ Executor maxThreads initialThreadsInUse pendingQ runningQ

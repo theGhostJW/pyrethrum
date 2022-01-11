@@ -5,7 +5,7 @@ module Internal.ExeNodeLazy where
 import Data.Function
 import Data.Sequence (Seq (Empty))
 import Polysemy
-import Pyrelude (Listy (unsafeHead, unsafeTail), Text, bool, fromMaybe, isJust, maybef, throw, traverse_, unless, unlessJust, uu, void, when, (?))
+import Pyrelude (Listy (unsafeHead, unsafeTail), Text, bool, fromMaybe, isJust, maybef, throw, traverse_, unless, unlessJust, uu, void, when, (?), Alternative ((<|>)))
 import UnliftIO
 import UnliftIO.Concurrent
 import UnliftIO.STM
@@ -199,40 +199,39 @@ data Fork
 --       ? pure (Just lf)
 --       $ firstActive xs
 
-data NoCandidate = EmptyQueue | CantUseAnyMoreThreads
+data NoCandidate = EmptyQueue | CantUseAnyMoreThreads | InvalidFixtureInPendingList
 
 data IterationRun = IterationRun IndexedFixture (IO ())
 
+takeIteration :: IndexedFixture -> STM (Maybe IterationRun)
+takeIteration ifx = do
+  let fx = fixture ifx
+  status <- readTVar $ fixStatus fx
+  let itrsVar = (iterations :: LoadedFixture -> TVar [IO ()]) fx
+  itrs <- readTVar itrsVar
+  status `elem` [Active, Pending] || null itrs
+    ? pure Nothing
+    $ do
+      let nxtItrs = unsafeTail itrs
+          nxtIO = unsafeHead itrs
+      writeTVar itrsVar nxtItrs
+      pure (Just $ IterationRun ifx nxtIO)
+
 nextActiveReady :: Maybe Int -> TQueue IndexedFixture -> STM (Maybe IterationRun)
 nextActiveReady mInitilIndex activeQ = do
-  fx' <- readTQueue activeQ
-  let thisIdx = index fx'
-      fx = fixture fx'
+  ifx <- readTQueue activeQ
+  let fx = fixture ifx
+      thisIdx = index ifx
       exausted = maybef mInitilIndex False $ (==) thisIdx
-      nxtInitial = maybef mInitilIndex (pure thisIdx) pure
+      nxtInitial = mInitilIndex <|> Just thisIdx 
   exausted
     ? pure Nothing
     $ do
       status <- readTVar $ fixStatus fx
-      let itrsVar = (iterations :: LoadedFixture -> TVar [IO ()]) fx
-      itrs <- readTVar itrsVar
       -- write fixtures back to end of queue unless complete
       unless (isDone status) $
-        writeTQueue activeQ fx'
-
-      -- when (status == Pending)
-      --   throw "Framework Error - this should not happen - no fixtures should be pending by the time this is run"
-
-      bool
-        (nextActiveReady nxtInitial activeQ)
-        ( do
-            let nxtItrs = unsafeTail itrs
-                nxtIO = unsafeHead itrs
-
-            writeTVar itrsVar nxtItrs
-            pure (Just $ IterationRun fx' nxtIO)
-        )
-        (status == Active && not (null itrs))
+        writeTQueue activeQ ifx
+      takeIteration ifx
 
 pruneQueReturnNextReady :: TQueue IndexedFixture -> TQueue IndexedFixture -> STM (Either NoCandidate IterationRun)
 pruneQueReturnNextReady pendingQ activeQ =
@@ -243,9 +242,16 @@ pruneQueReturnNextReady pendingQ activeQ =
         if
             | hasPending ->
               do
-                fx <- readTQueue pendingQ
-                writeTQueue activeQ fx
-                pure $ Right fx
+                ifx <- readTQueue pendingQ
+                writeTQueue activeQ ifx
+                mNxtIt <- takeIteration ifx
+                maybef
+                  mNxtIt
+                  ( -- this can only happen if a non-pending fixture has somehow got into the pending queue
+                    -- or a pending fixture has empty iteratations
+                    pure $ Left InvalidFixtureInPendingList
+                  )
+                  (pure . Right)
             | hasActive ->
               do
                 mbNxt <- nextActiveReady Nothing activeQ

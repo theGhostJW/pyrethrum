@@ -30,7 +30,7 @@ import Pyrelude
     Either,
     Eq (..),
     Int,
-    Listy (null, length),
+    ListLike (null, length),
     Maybe (..),
     Monad ((>>=)),
     Ord (..),

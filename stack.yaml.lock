@@ -16,12 +16,12 @@ packages:
     version: 0.1.0.0
     git: https://github.com/theGhostJW/pyrelude
     pantry-tree:
-      size: 2368
-      sha256: 9ba2c198bb9addd51146f9f444b48bcaeaf8c194cb0d605da33b6a78a5a70c0a
-    commit: b286b4a3af7dd60397208b800298ea791695b1a4
+      size: 2377
+      sha256: 6a110f6f5e40f0f19c5ce7b587409a244a1c5b2c001617df8653c2829534a513
+    commit: 9844a923d473e7dabb7e947b8471214def47bab3
   original:
     git: https://github.com/theGhostJW/pyrelude
-    commit: b286b4a3af7dd60397208b800298ea791695b1a4
+    commit: 9844a923d473e7dabb7e947b8471214def47bab3
 - completed:
     hackage: chronos-1.1.3@sha256:6e817a0e265c9f7a4451404597e010ad7b4aebfe38762c6ab2cb514fb5b455d2,3933
     pantry-tree:
@@ -73,7 +73,7 @@ packages:
     hackage: run-st-0.1.1.0@sha256:a43245bb23984089016772481bf52bfe63eaff0c5040303f69c9b15e80872fdc,883
 snapshots:
 - completed:
-    size: 611461
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2021/12/16.yaml
-    sha256: 49c66c033e37b259f86219619c27394fa462d1ab18d31e85fbaedfb40262aa28
-  original: nightly-2021-12-16
+    size: 621914
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2022/1/15.yaml
+    sha256: da9648bb5bf30143b3b45c0daeb2c06ee09fa2af08d362672acf318c6eac1724
+  original: nightly-2022-01-15

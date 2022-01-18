@@ -52,7 +52,7 @@ import Pyrelude as P
     Either (..),
     Eq ((==)),
     Int,
-    Listy (..),
+    ListLike (..),
     Maybe (..),
     Semigroup ((<>)),
     Show,

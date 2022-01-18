@@ -5,7 +5,7 @@ module Internal.ExeNodeLazy where
 import Data.Function
 import Data.Sequence (Seq (Empty))
 import Polysemy
-import Pyrelude (Listy (unsafeHead, unsafeTail), Text, bool, fromMaybe, isJust, maybef, throw, traverse_, unless, unlessJust, uu, void, when, (?), Alternative ((<|>)))
+import Pyrelude (ListLike (unsafeHead, unsafeTail), Text, bool, fromMaybe, isJust, maybef, throw, traverse_, unless, unlessJust, uu, void, when, (?), Alternative ((<|>)))
 import UnliftIO
 import UnliftIO.Concurrent
 import UnliftIO.STM
@@ -275,6 +275,7 @@ pruneQueReturnNextReady pendingQ activeQ =
 --         pure Nothing
 --       else pure Nothing
 
+
 execute' :: Executor -> IO ()
 execute'
   exe@Executor
@@ -283,6 +284,10 @@ execute'
       fixturesPending,
       fixturesStarted
     } = uu
+      -- do 
+      --     ethNxt <- atomically $ pruneQueReturnNextReady fixturesPending fixturesStarted
+      --     eitherf ethNxt
+         
 
 qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()
 qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture
@@ -294,7 +299,7 @@ execute maxThreads root = do
   -- create queue
   pendingQ <- newTQueueIO
   runningQ <- newTQueueIO
-  -- load queue
+  -- load all fixtures to pending queue
   atomically $ traverse_ (qFixture pendingQ) idxFxs
   initialThreadsInUse <- newTVarIO 0
   execute' $ Executor maxThreads initialThreadsInUse pendingQ runningQ

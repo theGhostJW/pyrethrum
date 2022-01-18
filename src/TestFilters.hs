@@ -8,7 +8,7 @@ import TestFilter
 import Data.Maybe
 import Data.Tuple
 import Control.Applicative
-import Pyrelude ( ($), Text, Listy(filter), (.) )
+import Pyrelude ( ($), Text, ListLike(filter), (.) )
 
 
 applyTestFilters :: forall i tc rc. Config tc => [TestFilter rc tc] -> rc -> Address -> (i -> tc) -> [i] -> [i]

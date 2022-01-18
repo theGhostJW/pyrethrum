@@ -39,7 +39,7 @@ import Pyrelude as P
     Foldable (sum),
     Int,
     Lenient (getLenient),
-    Listy (empty, filter, foldl', null, snoc),
+    ListLike (empty, filter, foldl', null, snoc),
     Maybe (..),
     Monad ((>>=)),
     Ord (compare),

@@ -262,19 +262,13 @@ pruneQueReturnNextReady pendingQ activeQ =
                     Right
             | otherwise -> pure $ Left EmptyQueue
 
--- nextFork' :: Executor -> IO (Maybe LoadedFixture)
--- nextFork' ep = do
---   atomically $ do
---     let fxs = fixtures ep
---     used <- readTVar $ threadsInUse ep
---     let wantFork = used < maxThreads ep
---     if wantFork
---       then do
---         fx <- readTQueue fxs
---         let status = fixStatus fx
---         pure Nothing
---       else pure Nothing
-
+wantFork :: Executor
+    { maxThreads,
+      threadsInUse
+    }  -> STM Bool
+wantFork ep = do
+    used <- readTVar $ threadsInUse
+    pure $ used < maxThreads
 
 execute' :: Executor -> IO ()
 execute'
@@ -283,10 +277,10 @@ execute'
       threadsInUse,
       fixturesPending,
       fixturesStarted
-    } = uu
-      -- do 
-      --     ethNxt <- atomically $ pruneQueReturnNextReady fixturesPending fixturesStarted
-      --     eitherf ethNxt
+    } = 
+      do 
+        ethNxt <- atomically $ pruneQueReturnNextReady fixturesPending fixturesStarted
+        eitherf ethNxt
          
 
 qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()

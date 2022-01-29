@@ -5,7 +5,7 @@ module Internal.ExeNodeLazy where
 import Data.Function
 import Data.Sequence (Seq (Empty))
 import Polysemy
-import Pyrelude (ListLike (unsafeHead, unsafeTail), Text, bool, fromMaybe, isJust, maybef, throw, traverse_, unless, unlessJust, uu, void, when, (?), Alternative ((<|>)))
+import Pyrelude (Alternative ((<|>)), ListLike (unsafeHead, unsafeTail), Text, bool, fromMaybe, isJust, maybef, throw, traverse_, unless, unlessJust, uu, void, when, (?), eitherf)
 import UnliftIO
 import UnliftIO.Concurrent
 import UnliftIO.STM
@@ -28,7 +28,7 @@ isDone = \case
   BeingKilled -> False
 
 data BranchStatus
-  = Unintitalised
+  = Unintialised
   | Intitialising
   | Running
   | Complete CompletionStatus
@@ -90,7 +90,7 @@ data IndexedFixture = IndexedFixture
 setReadyForLaunch :: TVar BranchStatus -> STM Bool
 setReadyForLaunch status = do
   s <- readTVar status
-  s == Unintitalised
+  s == Unintialised
     ? do
       writeTVar status Intitialising
       pure True
@@ -185,21 +185,12 @@ data Fork
   | Pend
   | RunComplete
 
--- fixtureActive :: LoadedFixture -> STM Bool
--- fixtureActive fx =
---   (==) Active <$> readTVar (fixStatus fx)
 
--- firstActive :: [IO LoadedFixture] -> IO (Maybe LoadedFixture)
--- firstActive = \case
---   [] -> pure Nothing
---   x : xs -> do
---     lf <- x
---     active <- fixtureActive lf
---     active
---       ? pure (Just lf)
---       $ firstActive xs
-
-data NoCandidate = EmptyQueue | CantUseAnyMoreThreads | InvalidFixtureInPendingList
+data NoCandidate = MaxThreadsInUse |
+                   EmptyQueue |
+                   CantUseAnyMoreThreads |
+                   InvalidFixtureInPendingList |
+                   Finished
 
 data IterationRun = IterationRun IndexedFixture (IO ())
 
@@ -209,7 +200,7 @@ takeIteration ifx = do
   status <- readTVar $ fixStatus fx
   let itrsVar = (iterations :: LoadedFixture -> TVar [IO ()]) fx
   itrs <- readTVar itrsVar
-  status `elem` [Active, Pending] || null itrs
+  notElem status [Active, Pending] || null itrs
     ? pure Nothing
     $ do
       let nxtItrs = unsafeTail itrs
@@ -217,21 +208,30 @@ takeIteration ifx = do
       writeTVar itrsVar nxtItrs
       pure (Just $ IterationRun ifx nxtIO)
 
-nextActiveReady :: Maybe Int -> TQueue IndexedFixture -> STM (Maybe IterationRun)
-nextActiveReady mInitilIndex activeQ = do
+nextTargetFixture :: Maybe Int -> TQueue IndexedFixture -> STM (Maybe LoadedFixture)
+nextTargetFixture mInitilIndex activeQ = do
   ifx <- readTQueue activeQ
   let fx = fixture ifx
       thisIdx = index ifx
-      exausted = maybef mInitilIndex False $ (==) thisIdx
-      nxtInitial = mInitilIndex <|> Just thisIdx 
-  exausted
+      nxtInitial = mInitilIndex <|> Just thisIdx
+      nxtResult = nextTargetFixture nxtInitial activeQ 
+  -- if we are back where we started we are done
+  mInitilIndex == Just thisIdx
     ? pure Nothing
     $ do
       status <- readTVar $ fixStatus fx
-      -- write fixtures back to end of queue unless complete
-      unless (isDone status) $
-        writeTQueue activeQ ifx
-      takeIteration ifx
+      isDone status ?
+          nxtResult $
+          do 
+            -- write fixtures that are not done 
+            -- back to end of queue unless complete
+            writeTQueue activeQ ifx
+            pure $ Just fx
+
+
+            -- nxt <- takeIteration ifx
+            -- fromMaybe (takeIteration ifx) nxtResult
+
 
 pruneQueReturnNextReady :: TQueue IndexedFixture -> TQueue IndexedFixture -> STM (Either NoCandidate IterationRun)
 pruneQueReturnNextReady pendingQ activeQ =
@@ -254,20 +254,22 @@ pruneQueReturnNextReady pendingQ activeQ =
                   (pure . Right)
             | hasActive ->
               do
-                mbNxt <- nextActiveReady Nothing activeQ
+                mbNxt <- nextTargetFixture Nothing activeQ
                 pure $
                   maybef
                     mbNxt
                     (Left CantUseAnyMoreThreads)
                     Right
-            | otherwise -> pure $ Left EmptyQueue
+            | otherwise ->
+                pure $ Left EmptyQueue
 
-wantFork :: Executor -> STM Bool
-wantFork Executor { 
-      maxThreads,
+threadsAvailable :: Executor -> STM Bool
+threadsAvailable
+  Executor
+    { maxThreads,
       threadsInUse
-     } = do
-    used <- readTVar $ threadsInUse
+    } = do
+    used <- readTVar threadsInUse
     pure $ used < maxThreads
 
 execute' :: Executor -> IO ()
@@ -277,11 +279,25 @@ execute'
       threadsInUse,
       fixturesPending,
       fixturesStarted
-    } = uu
-      -- do 
-      --   ethNxt <- atomically $ pruneQueReturnNextReady fixturesPending fixturesStarted
-      --   eitherf ethNxt
-         
+    } = do
+    ethNxt <- atomically $ do
+        haveThrds <- threadsAvailable exe
+        haveThrds ?
+          pruneQueReturnNextReady fixturesPending fixturesStarted $
+          pure $ Left MaxThreadsInUse
+
+    eitherf ethNxt
+     (\case
+         MaxThreadsInUse -> uu
+         EmptyQueue -> uu
+         CantUseAnyMoreThreads -> uu
+         InvalidFixtureInPendingList -> uu
+            -- Error "Framework Defect - This should not happen InvalidFixtureInPendingList"
+         Finished -> pure ()
+     )
+     (\ir -> uu
+
+     )
 
 qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()
 qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture

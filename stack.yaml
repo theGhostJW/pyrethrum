@@ -23,7 +23,7 @@ ghc-options:
 # resolver: https://example.com/snapshots/2018-01-01.yaml
    
 #### -> initial av resolver: lts-18.17  # remove mintty flags whn changing the resolver
-resolver: nightly-2022-01-06
+resolver: nightly-2022-01-27
 # -- compiled but no hls version nightly-2022-01-15 # remove mintty flags whn changing the resolver
 #  -- ghc-8.10.4
 # nightly-2018-05-30 # last nightly for GHC 8.4.2
@@ -65,7 +65,7 @@ extra-deps:
 # mine
 - primitive-unlifted-0.1.3.1
 - git: https://github.com/theGhostJW/pyrelude
-  commit: "02f222a3fa052ff1481a2473f5a1c93299a2fa3b"
+  commit: "1dd5c04c16abcc758aa69ba0efbca5a54e16487a"
 - chronos-1.1.3@sha256:6e817a0e265c9f7a4451404597e010ad7b4aebfe38762c6ab2cb514fb5b455d2,3933
 - encode-string-0.1.0.0@sha256:b960508cede9547f5af3ade3d07ed79cbdb575ed128fcac1d7cff0a1162260ce,1864
 - bytebuild-0.3.9.0@sha256:8639f2640dc5905d6d57d74d391cdff47b16218aa80420fa6ef35e344fe1b134,3196

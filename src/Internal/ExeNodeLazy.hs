@@ -5,7 +5,7 @@ module Internal.ExeNodeLazy where
 import Data.Function
 import Data.Sequence (Seq (Empty))
 import Polysemy
-import Pyrelude (Alternative ((<|>)), ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, isJust, mapLeft, maybef, newTVar, throw, traverse_, unless, unlessJust, uu, void, when, ($>), (?))
+import Pyrelude (Alternative ((<|>)), ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, isJust, mapLeft, maybef, newTVar, throw, traverse_, unless, unlessJust, uu, void, when, ($>), (?), threadDelay)
 import UnliftIO
   ( MonadUnliftIO,
     STM,
@@ -95,7 +95,8 @@ data Node i o where
     Node i ()
 
 data ThreadStatus
-  = ThreadRunning
+  = ThreadInitialising
+  | ThreadRunning
   | ThreadDone
   deriving (Eq, Show)
 
@@ -283,29 +284,6 @@ updateStatusReturnCompleted
           writeTVar fixStatus newStatus
           pure completed
 
--- forkIteration :: IterationRun -> IO ()
--- forkIteration
---   IterationRun
---     { parentFixture =
---         LoadedFixture
---           { fixStatus,
---             iterations,
---             activeThreads,
---             logEnd
---           },
---       iteration
---     } = do
---       atomically $
-
---   let
---   action :: IO ()
---   action = do
-
---   forkFinally iteration (either
---     uu uu)
-
--- uu
-
 canForkThread :: FixtureStatus -> Bool
 canForkThread = \case
   Pending -> True
@@ -363,6 +341,7 @@ nextActiveFixtureRemoveDone activeQ =
                       BeingKilled -> reQuGetNxt
    in getNxt Nothing
 
+-- returns the next fixture and puts on end of active fixture queue
 nextFixture :: TQueue IndexedFixture -> TQueue IndexedFixture -> STM (Either NoFixture LoadedFixture)
 nextFixture pendingQ activeQ =
   let notEmpty q = not <$> isEmptyTQueue q
@@ -420,18 +399,22 @@ removeFinishedThreads rthds =
             $ removeFinishedThreads' accum rts
    in removeFinishedThreads' [] rthds
 
-runFixture :: LoadedFixture -> IO ()
+runFixture ::  STM (TVar ThreadStatus) -> LoadedFixture -> IO ()
 runFixture
+  threadStatus
   fx@LoadedFixture
     { logStart,
       fixStatus,
       iterations,
       activeThreads,
       logEnd
-    } = do
-    wantLogStart <- atomically $ setToStartedIfPending fixStatus
-    wantLogStart
-      ? ( do
+    } = 
+    let 
+      runIterations :: IO ()
+      runIterations = do 
+        wantLogStart <- atomically $ setToStartedIfPending fixStatus
+        wantLogStart
+        ? ( do
             elst <- tryAny logStart
             eitherf
               elst
@@ -443,28 +426,50 @@ runFixture
               )
         ) $
         uu
+    in
+      do
+        s' <- atomically threadStatus
+        s <- readTVarIO s'
+        case s of
+          ThreadInitialising -> C.threadDelay 1_000 >> runFixture threadStatus fx
+          ThreadRunning -> runIterations
+          ThreadDone -> pure ()
+
+    -- let runThread = finally (
+    --   -- runiteration and update use subfuncrtion above
+    -- )
+    -- (
+    --   -- update status
+    -- )
+    -- -- check status 
+
+
+    -- wantLogStart <- atomically $ setToStartedIfPending fixStatus
+
 
 forkFixtureThread :: TVar Int -> LoadedFixture -> IO ()
 forkFixtureThread
   threadsInUse
   fx@LoadedFixture {activeThreads} = do
-    let thrdStatus = newTVar ThreadRunning
+    let thrdStatus = newTVar ThreadInitialising
         tfx = forkFinally
-          (runFixture fx)
+          (runFixture thrdStatus fx)
+          -- finally clean up
           \_ -> atomically $ do
-            -- decrement global threads in use
-            modifyTVar threadsInUse (-1)
             -- set this threadstatus to done
             ts <- thrdStatus
             writeTVar ts ThreadDone
-            -- now remove all finished threads from active threads
+            -- remove all finished threads from active threads list
             ats <- readTVar activeThreads
             newAts <- removeFinishedThreads ats
             writeTVar activeThreads newAts
+            -- decrement global threads in use
+            modifyTVar threadsInUse (1 -)
 
     atomically $ do
-      ts' <- thrdStatus
-      modifyTVar activeThreads (RunningThread tfx ts' :)
+      ts <- thrdStatus
+      modifyTVar activeThreads (RunningThread tfx ts :)
+      writeTVar ts ThreadRunning
 
 execute' :: Executor -> IO ()
 execute'
@@ -497,7 +502,7 @@ execute'
           -- all threads in use wait try again
           NoThreadsAvailable -> waitRecurse
       )
-      (forkFixtureThread threadsInUse)
+      (\f -> forkFixtureThread threadsInUse f >> recurse)
 
 qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()
 qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture

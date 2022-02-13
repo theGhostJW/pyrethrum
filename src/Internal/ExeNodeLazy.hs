@@ -5,7 +5,7 @@ module Internal.ExeNodeLazy where
 import Data.Function
 import Data.Sequence (Seq (Empty))
 import Polysemy
-import Pyrelude (Alternative ((<|>)), ListLike, Text, bool, eitherf, fromMaybe, isJust, mapLeft, maybef, throw, traverse_, unless, unlessJust, uu, void, when, ($>), (?))
+import Pyrelude (Alternative ((<|>)), ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, isJust, mapLeft, maybef, newTVar, throw, traverse_, unless, unlessJust, uu, void, when, ($>), (?))
 import UnliftIO
   ( MonadUnliftIO,
     STM,
@@ -23,9 +23,9 @@ import UnliftIO
     readTVar,
     readTVarIO,
     writeTQueue,
-    writeTVar,
+    writeTVar, tryAny,
   )
-import UnliftIO.Concurrent as C (ThreadId, forkIO, threadDelay)
+import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, threadDelay)
 import UnliftIO.STM
   ( STM,
     TMVar,
@@ -33,6 +33,7 @@ import UnliftIO.STM
     TVar,
     atomically,
     isEmptyTQueue,
+    modifyTVar,
     newTQueueIO,
     newTVarIO,
     putTMVar,
@@ -46,14 +47,15 @@ import UnliftIO.STM
   )
 import Prelude
 
-data CompletionStatus = Normal | Fault | Murdered deriving (Eq, Show)
+data CompletionStatus = Normal | Fault Text SomeException | Murdered deriving (Show)
 
 data FixtureStatus
   = Pending
+  | Starting
   | Active
   | Done CompletionStatus
   | BeingKilled
-  deriving (Eq, Show)
+  deriving (Show)
 
 data BranchStatus
   = Unintialised
@@ -61,7 +63,7 @@ data BranchStatus
   | Running
   | Complete CompletionStatus
   | BeingMurdered
-  deriving (Eq, Show)
+  deriving (Show)
 
 isComplete :: BranchStatus -> Bool
 isComplete = \case
@@ -92,11 +94,21 @@ data Node i o where
     } ->
     Node i ()
 
+data ThreadStatus
+  = ThreadRunning
+  | ThreadDone
+  deriving (Eq, Show)
+
+data RunningThread = RunningThread
+  { thread :: IO ThreadId,
+    status :: TVar ThreadStatus
+  }
+
 data LoadedFixture = LoadedFixture
   { logStart :: IO (),
     fixStatus :: TVar FixtureStatus,
     iterations :: TVar [IO ()],
-    activeThreads :: TVar [IO ThreadId],
+    activeThreads :: TVar [RunningThread],
     logEnd :: IO ()
   }
 
@@ -115,14 +127,21 @@ data IndexedFixture = IndexedFixture
   ~ test with null iterations
 -}
 
+isUninitialised :: BranchStatus -> Bool
+isUninitialised = \case
+  Unintialised -> True
+  Intitialising -> False
+  Running -> False
+  Complete cs -> False
+  BeingMurdered -> False
+
 setReadyForLaunch :: TVar BranchStatus -> STM Bool
-setReadyForLaunch status = do
-  s <- readTVar status
-  s == Unintialised
-    ? do
-      writeTVar status Intitialising
-      pure True
-    $ pure False
+setReadyForLaunch status =
+  readTVar status
+    >>= bool
+      (pure False)
+      (writeTVar status Intitialising >> pure True)
+      . isUninitialised
 
 -- launch only to be run when want launch has set
 -- staus to initalising should only ever run once per branch
@@ -184,12 +203,13 @@ loadFixture parent iterations logStart logEnd = do
   input <- outputWithLaunch parent
   fixStatus <- newTVarIO Pending
   iterations' <- newTVarIO ((input &) <$> iterations)
+  activeThreads' <- newTVarIO []
   pure $
     LoadedFixture
       { logStart = logStart,
         fixStatus = fixStatus,
         iterations = iterations',
-        activeThreads = pure [],
+        activeThreads = activeThreads',
         logEnd = logEnd
       }
 
@@ -229,82 +249,119 @@ data IterationRun = IterationRun
     iteration :: IO ()
   }
 
-updateStatus :: LoadedFixture -> IO Bool
-updateStatus
+updateStatusReturnCompleted :: LoadedFixture -> STM Bool
+updateStatusReturnCompleted
   LoadedFixture
     { fixStatus,
       iterations,
       activeThreads
     } =
-    let canComplete :: FixtureStatus -> Bool
-        canComplete = \case
-          Pending -> True
-          Active -> True
-          Done cs -> True
-          BeingKilled -> False
-        doneAlready :: FixtureStatus -> Bool
-        doneAlready = \case
+    let completionBlocked :: FixtureStatus -> Bool
+        completionBlocked = \case
           Pending -> False
+          Starting -> True
           Active -> False
-          Done cs -> True
+          Done _ -> False
+          BeingKilled -> True
+        isDone :: FixtureStatus -> Bool
+        isDone = \case
+          Pending -> False
+          Starting -> False
+          Active -> False
+          Done _ -> True
           BeingKilled -> False
-     in atomically $ do
+     in do
           i <- readTVar iterations
           a <- readTVar activeThreads
           s <- readTVar fixStatus
-          let isDone = null i && null a && canComplete s
-              newStatus = isDone && not (doneAlready s) ? Done Normal $ s
+          let done = null i && null a && not (completionBlocked s)
+              doneAlready = isDone s
+              completed = done && not doneAlready
+              newStatus = completed ? Done Normal $ s
           writeTVar iterations i
           writeTVar activeThreads a
           writeTVar fixStatus newStatus
-          pure isDone
+          pure completed
 
-forkIteration :: IterationRun -> IO ()
-forkIteration IterationRun { fixture = LoadedFixture {fixStatus,
-    iterations,
-    activeThreads,
-    logEnd }, iteration } = uu
-      do
-       let
-         updateStatus :: ThreadId -> IO Bool
-         updateStatus = atomically $ do
-            activeThreads
+-- forkIteration :: IterationRun -> IO ()
+-- forkIteration
+--   IterationRun
+--     { parentFixture =
+--         LoadedFixture
+--           { fixStatus,
+--             iterations,
+--             activeThreads,
+--             logEnd
+--           },
+--       iteration
+--     } = do
+--       atomically $
+
+--   let
+--   action :: IO ()
+--   action = do
+
+--   forkFinally iteration (either
+--     uu uu)
+
+-- uu
+
+canForkThread :: FixtureStatus -> Bool
+canForkThread = \case
+  Pending -> True
+  Starting -> False
+  Active -> True
+  Done cs -> False
+  BeingKilled -> False
 
 takeIteration :: LoadedFixture -> STM (Maybe IterationRun)
-takeIteration fixture = do
-  status <- readTVar $ fixStatus fixture
-  let itrsVar = (iterations :: LoadedFixture -> TVar [IO ()]) fixture
-  itrs <- readTVar itrsVar
-  notElem status [Active, Pending]
+takeIteration fixture@LoadedFixture {iterations, activeThreads, fixStatus} = do
+  itrs <- readTVar iterations
+  activ <- readTVar activeThreads
+  status <- readTVar fixStatus
+  canForkThread status
     ? pure Nothing
     $ case itrs of
       [] -> pure Nothing
       x : xs -> do
-        writeTVar itrsVar xs
+        writeTVar iterations xs
         pure (Just $ IterationRun fixture x)
 
-nextReadyFixtureInQ :: Maybe Int -> TQueue IndexedFixture -> STM (Maybe LoadedFixture)
-nextReadyFixtureInQ mInitilIndex activeQ = do
-  mfx <- tryReadTQueue activeQ
-  maybef
-    mfx
-    (pure Nothing)
-    \ifx@IndexedFixture {index, fixture} ->
-      let nxtInitial = mInitilIndex <|> Just index
-          reQu = writeTQueue activeQ ifx
-          reQReturnThisFixture = reQu $> Just fixture
-          tryNextFixture = nextReadyFixtureInQ nxtInitial activeQ
-       in -- if we are back where we started we are done
-          mInitilIndex == Just index
-            ? pure Nothing
-            $ do
-              status <- readTVar $ fixStatus fixture
-              case status of
-                Pending -> reQReturnThisFixture
-                Active -> reQReturnThisFixture
-                -- done fixtures are not added to the back of the q
-                Done cs -> tryNextFixture
-                BeingKilled -> reQu >> tryNextFixture
+nextActiveFixtureRemoveDone :: TQueue IndexedFixture -> STM (Maybe LoadedFixture)
+nextActiveFixtureRemoveDone activeQ =
+  let getNxt :: Maybe Int -> STM (Maybe LoadedFixture)
+      getNxt mInitilIndex = do
+        mfx <- tryReadTQueue activeQ
+        maybef
+          mfx
+          (pure Nothing)
+          \ifx@IndexedFixture {index, fixture = fixture@LoadedFixture {fixStatus}} ->
+            let nxtInitial :: Maybe Int
+                nxtInitial = mInitilIndex <|> Just index
+
+                reQu :: STM ()
+                reQu = writeTQueue activeQ ifx
+
+                reQuGetNxt :: STM (Maybe LoadedFixture)
+                reQuGetNxt = reQu >> getNxt nxtInitial
+
+                reQReturnThisFixture :: STM (Maybe LoadedFixture)
+                reQReturnThisFixture = reQu $> Just fixture
+             in -- if we are back where we started we are done
+                mInitilIndex == Just index
+                  ? pure Nothing
+                  $ do
+                    status <- readTVar fixStatus
+                    case status of
+                      Pending -> reQReturnThisFixture
+                      Starting -> reQuGetNxt
+                      Active -> reQReturnThisFixture
+                      -- done fixtures are not added to the back of the q
+                      Done cs -> getNxt nxtInitial
+                      -- just put at end of q and continue eventually this fixture
+                      -- will become done and get kicked out of the queue above
+                      BeingKilled -> reQuGetNxt
+   in getNxt Nothing
 
 nextFixture :: TQueue IndexedFixture -> TQueue IndexedFixture -> STM (Either NoFixture LoadedFixture)
 nextFixture pendingQ activeQ =
@@ -319,24 +376,95 @@ nextFixture pendingQ activeQ =
                 writeTQueue activeQ ifx
                 pure . Right $ fixture ifx
             | hasActive ->
-              do
-                mbNxt <- nextReadyFixtureInQ Nothing activeQ
-                pure $
-                  maybef
-                    mbNxt
-                    (Left NoFixturesReady)
-                    Right
+              maybe (Left NoFixturesReady) Right
+                <$> nextActiveFixtureRemoveDone activeQ
             | otherwise ->
               pure $ Left EmptyQueues
 
-threadsAvailable :: Executor -> STM Bool
-threadsAvailable
+reserveThread :: Executor -> STM Bool
+reserveThread
   Executor
     { maxThreads,
       threadsInUse
     } = do
     used <- readTVar threadsInUse
-    pure $ used < maxThreads
+    let reserved = used < maxThreads
+    writeTVar threadsInUse $ reserved ? used + 1 $ used
+    pure reserved
+
+isPending :: FixtureStatus -> Bool
+isPending = \case
+  Pending -> True
+  Starting -> False
+  Active -> False
+  Done cs -> False
+  BeingKilled -> False
+
+setToStartedIfPending :: TVar FixtureStatus -> STM Bool
+setToStartedIfPending fixStatus =
+  do
+    s <- readTVar fixStatus
+    let ip = isPending s
+    writeTVar fixStatus $ ip ? Starting $ s
+    pure ip
+
+removeFinishedThreads :: [RunningThread] -> STM [RunningThread]
+removeFinishedThreads rthds =
+  let removeFinishedThreads' :: [RunningThread] -> [RunningThread] -> STM [RunningThread]
+      removeFinishedThreads' accum = \case
+        [] -> pure accum
+        rt@RunningThread {status} : rts -> do
+          s <- readTVar status
+          s == ThreadRunning
+            ? removeFinishedThreads' (rt : accum) rts
+            $ removeFinishedThreads' accum rts
+   in removeFinishedThreads' [] rthds
+
+runFixture :: LoadedFixture -> IO ()
+runFixture
+  fx@LoadedFixture
+    { logStart,
+      fixStatus,
+      iterations,
+      activeThreads,
+      logEnd
+    } = do
+    wantLogStart <- atomically $ setToStartedIfPending fixStatus
+    wantLogStart
+      ? ( do
+            elst <- tryAny logStart
+            eitherf
+              elst
+              ( \e -> do
+                  atomically $ writeTVar fixStatus $ Done (Fault "Failed logging fixture start" e)
+                  pure ()
+              )
+              ( \_ -> uu
+              )
+        ) $
+        uu
+
+forkFixtureThread :: TVar Int -> LoadedFixture -> IO ()
+forkFixtureThread
+  threadsInUse
+  fx@LoadedFixture {activeThreads} = do
+    let thrdStatus = newTVar ThreadRunning
+        tfx = forkFinally
+          (runFixture fx)
+          \_ -> atomically $ do
+            -- decrement global threads in use
+            modifyTVar threadsInUse (-1)
+            -- set this threadstatus to done
+            ts <- thrdStatus
+            writeTVar ts ThreadDone
+            -- now remove all finished threads from active threads
+            ats <- readTVar activeThreads
+            newAts <- removeFinishedThreads ats
+            writeTVar activeThreads newAts
+
+    atomically $ do
+      ts' <- thrdStatus
+      modifyTVar activeThreads (RunningThread tfx ts' :)
 
 execute' :: Executor -> IO ()
 execute'
@@ -346,17 +474,18 @@ execute'
       fixturesPending,
       fixturesStarted
     } = do
-    ethNxt <- atomically $ do
-      haveThrds <- threadsAvailable exe
-      haveThrds
-        ? nextFixture fixturesPending fixturesStarted
-        $ pure (Left NoThreadsAvailable)
+    eNxtFx <-
+      atomically $
+        reserveThread exe
+          >>= bool
+            (pure (Left NoThreadsAvailable))
+            (nextFixture fixturesPending fixturesStarted)
 
-    let waitReexecute :: IO ()
-        waitReexecute = C.threadDelay 10_000 >> execute' exe
+    let recurse = execute' exe
+        waitRecurse = C.threadDelay 10_000 >> recurse
 
     eitherf
-      nxtfx
+      eNxtFx
       ( \case
           -- both the pending and active que of fixtures
           -- are empty so we are done
@@ -364,20 +493,11 @@ execute'
           -- all the fixtures are not in a state to run any more threads
           -- eg being killed. We expect they may become available later of be finished
           -- and removed from the active que leading to empty ques we wait and try again
-          NoFixturesReady -> waitReexecute
+          NoFixturesReady -> waitRecurse
           -- all threads in use wait try again
-          NoThreadsAvailable -> waitReexecute
+          NoThreadsAvailable -> waitRecurse
       )
-      ( \fx ->
-          do
-            mbi <- atomically $ takeIteration fx
-            maybef
-              mbi
-              waitReexecute
-              ( \ir ->
-                  uu
-              )
-      )
+      (forkFixtureThread threadsInUse)
 
 qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()
 qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture

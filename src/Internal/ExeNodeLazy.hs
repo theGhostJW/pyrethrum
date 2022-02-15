@@ -2,18 +2,20 @@
 
 module Internal.ExeNodeLazy where
 
-import Data.Function
+import Data.Function ( ($), (&), (.), const )
 import Data.Sequence (Seq (Empty))
-import Polysemy
-import Pyrelude (Alternative ((<|>)), ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, isJust, mapLeft, maybef, newTVar, throw, traverse_, unless, unlessJust, uu, void, when, ($>), (?), threadDelay)
+
+import Pyrelude (Alternative ((<|>)), ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, isJust, mapLeft, maybef, newTVar, threadDelay, throw, toS, traverse_, unless, unlessJust, uu, void, when, ($>), (?))
 import UnliftIO
-  ( MonadUnliftIO,
+  ( Exception (displayException),
+    MonadUnliftIO,
     STM,
     TMVar,
     TQueue,
     TVar,
     atomically,
     bracket,
+    catchAny,
     isEmptyTQueue,
     newTQueueIO,
     newTVarIO,
@@ -22,8 +24,9 @@ import UnliftIO
     readTQueue,
     readTVar,
     readTVarIO,
+    tryAny,
     writeTQueue,
-    writeTVar, tryAny,
+    writeTVar,
   )
 import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, threadDelay)
 import UnliftIO.STM
@@ -399,7 +402,10 @@ removeFinishedThreads rthds =
             $ removeFinishedThreads' accum rts
    in removeFinishedThreads' [] rthds
 
-runFixture ::  STM (TVar ThreadStatus) -> LoadedFixture -> IO ()
+logError :: Text -> IO ()
+logError t = print $ "Something went wrong with the runtime: " <> t
+
+runFixture :: STM (TVar ThreadStatus) -> LoadedFixture -> IO ()
 runFixture
   threadStatus
   fx@LoadedFixture
@@ -408,44 +414,38 @@ runFixture
       iterations,
       activeThreads,
       logEnd
-    } = 
-    let 
-      runIterations :: IO ()
-      runIterations = do 
-        wantLogStart <- atomically $ setToStartedIfPending fixStatus
-        wantLogStart
-        ? ( do
-            elst <- tryAny logStart
-            eitherf
-              elst
-              ( \e -> do
-                  atomically $ writeTVar fixStatus $ Done (Fault "Failed logging fixture start" e)
-                  pure ()
-              )
-              ( \_ -> uu
-              )
-        ) $
-        uu
-    in
-      do
-        s' <- atomically threadStatus
-        s <- readTVarIO s'
-        case s of
-          ThreadInitialising -> C.threadDelay 1_000 >> runFixture threadStatus fx
-          ThreadRunning -> runIterations
-          ThreadDone -> pure ()
+    } =
+    let runIterations :: IO ()
+        runIterations = do
+          wantLogStart <- atomically $ setToStartedIfPending fixStatus
+          if wantLogStart
+            then do
+              elst <- tryAny logStart
+              eitherf
+                elst
+                ( \e -> do
+                    atomically $ writeTVar fixStatus $ Done (Fault "Failed logging fixture start" e)
+                    -- if we get here things have really screwed up ye old terminal as a last resort
+                    logError $ "Failed logging fixture start\n" <> toS (displayException e)
 
-    -- let runThread = finally (
-    --   -- runiteration and update use subfuncrtion above
-    -- )
-    -- (
-    --   -- update status
-    -- )
-    -- -- check status 
-
-
-    -- wantLogStart <- atomically $ setToStartedIfPending fixStatus
-
+                    catchAny
+                      logEnd
+                      (\e' -> logError $ "Failed logging fixture end\n" <> toS (displayException e'))
+                )
+                (const runIterations)
+            else do
+              mi <- atomically $ takeIteration fx
+              maybe
+                (pure ())
+                (\IterationRun {iteration} -> iteration >> runIterations)
+                mi
+     in do
+          s' <- atomically threadStatus
+          s <- readTVarIO s'
+          case s of
+            ThreadInitialising -> C.threadDelay 1_000 >> runFixture threadStatus fx
+            ThreadRunning -> runIterations
+            ThreadDone -> pure ()
 
 forkFixtureThread :: TVar Int -> LoadedFixture -> IO ()
 forkFixtureThread

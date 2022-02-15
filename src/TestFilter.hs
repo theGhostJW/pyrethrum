@@ -65,7 +65,7 @@ filterLog ::
   [TestFilterResult]
 filterLog suite fltrs rc =
   let testFilter :: rc -> Address -> Test e tc rc ho i as ds effs -> TestFilterResult
-      testFilter rc' adr = filterTest fltrs rc' adr
+      testFilter = filterTest fltrs
 
       title' :: TestFilterResult -> Text
       title' = getField @"title" . C.testInfo

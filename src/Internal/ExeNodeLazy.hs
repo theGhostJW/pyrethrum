@@ -139,19 +139,19 @@ isUninitialised = \case
   Complete cs -> False
   BeingMurdered -> False
 
-setReadyForLaunch :: TVar BranchStatus -> STM Bool
-setReadyForLaunch status =
+tryLock :: TVar BranchStatus -> STM Bool
+tryLock status =
   readTVar status
     >>= bool
       (pure False)
       (writeTVar status Intitialising >> pure True)
       . isUninitialised
 
--- launch only to be run when want launch has set
+-- executeHook only to be run when want executeHook has set
 -- staus to initalising should only ever run once per branch
 -- TODO - test exception on output of branch parent and in resource aquisition
-launch :: Node i o -> IO ()
-launch =
+executeHook :: Node i o -> IO ()
+executeHook =
   \case
     Root {} -> error "Not Implemented - Change types later"
     Fixture {} -> error "Not Implemented - Change types later"
@@ -163,7 +163,7 @@ launch =
         hookChildren,
         branchRelease
       } -> do
-        input <- outputWithLaunch branchParent
+        input <- lockExecuteHook branchParent
         bracket
           (hook input)
           (branchRelease 1 {- TODO implemnt pass through timeout for release -})
@@ -182,8 +182,8 @@ launch =
                     $ C.threadDelay 2_000_000 >> recheck
             recheck
 
-outputWithLaunch :: Node i o -> IO o
-outputWithLaunch = \case
+lockExecuteHook :: Node i o -> IO o
+lockExecuteHook = \case
   Root {} -> pure ()
   Fixture {} -> pure ()
   branch@Hook
@@ -195,16 +195,16 @@ outputWithLaunch = \case
       branchRelease
     } -> do
       bs <- branchStatus
-      wantLaunch <- atomically $ setReadyForLaunch bs
+      wantLaunch <- atomically $ tryLock bs
       when
         wantLaunch
-        (void $ forkIO $ launch branch)
+        (void $ forkIO $ executeHook branch)
       hc' <- hookResult
       atomically $ readTMVar hc'
 
 loadFixture :: Node i o -> [o -> IO ()] -> IO () -> IO () -> IO LoadedFixture
 loadFixture parent iterations logStart logEnd = do
-  input <- outputWithLaunch parent
+  input <- lockExecuteHook parent
   fixStatus <- newTVarIO Pending
   iterations' <- newTVarIO ((input &) <$> iterations)
   activeThreads' <- newTVarIO []

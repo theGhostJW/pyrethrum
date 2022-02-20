@@ -2,9 +2,8 @@
 
 module Internal.ExeNodeLazy where
 
-import Data.Function ( ($), (&), (.), const )
+import Data.Function (const, ($), (&), (.))
 import Data.Sequence (Seq (Empty))
-
 import Pyrelude (Alternative ((<|>)), ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, isJust, mapLeft, maybef, newTVar, threadDelay, throw, toS, traverse_, unless, unlessJust, uu, void, when, ($>), (?))
 import UnliftIO
   ( Exception (displayException),
@@ -153,8 +152,8 @@ tryLock status =
 executeHook :: Node i o -> IO ()
 executeHook =
   \case
-    Root {} -> error "Not Implemented - Change types later"
-    Fixture {} -> error "Not Implemented - Change types later"
+    Root {} -> pure ()
+    Fixture {} -> pure ()
     Hook
       { branchParent,
         branchStatus,
@@ -167,20 +166,13 @@ executeHook =
         bracket
           (hook input)
           (branchRelease 1 {- TODO implemnt pass through timeout for release -})
-          -- we need to loop here to stop the branch releasing before the
-          -- fixture has run to completion
           \hookOut -> do
             hkVal <- hookResult
             status <- branchStatus
             atomically $ do
               putTMVar hkVal hookOut
+              -- Initialising -> Running
               writeTVar status Running
-            let recheck = do
-                  s <- readTVarIO status
-                  isComplete s
-                    ? pure ()
-                    $ C.threadDelay 2_000_000 >> recheck
-            recheck
 
 lockExecuteHook :: Node i o -> IO o
 lockExecuteHook = \case
@@ -195,18 +187,23 @@ lockExecuteHook = \case
       branchRelease
     } -> do
       bs <- branchStatus
+      -- set status to initialising if not already running (tryLock)
       wantLaunch <- atomically $ tryLock bs
       when
         wantLaunch
-        (void $ forkIO $ executeHook branch)
+        --  this writes hook result to the TVar
+        (void $ executeHook branch) -- forkIO
       hc' <- hookResult
       atomically $ readTMVar hc'
 
 loadFixture :: Node i o -> [o -> IO ()] -> IO () -> IO () -> IO LoadedFixture
 loadFixture parent iterations logStart logEnd = do
-  input <- lockExecuteHook parent
+  let loadIteration itr = do
+        input <- lockExecuteHook parent
+        itr input
+
   fixStatus <- newTVarIO Pending
-  iterations' <- newTVarIO ((input &) <$> iterations)
+  iterations' <- newTVarIO (loadIteration <$> iterations)
   activeThreads' <- newTVarIO []
   pure $
     LoadedFixture

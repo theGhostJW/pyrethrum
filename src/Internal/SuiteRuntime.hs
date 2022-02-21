@@ -1,6 +1,6 @@
-{-# LANGUAGE NoStrictData #-}
+-- {-# LANGUAGE NoStrictData #-}
 
-module Internal.ExeNodeLazy where
+module Internal.SuiteRuntime where
 
 import Data.Function (const, ($), (&), (.))
 import Data.Sequence (Seq (Empty))
@@ -59,7 +59,7 @@ data FixtureStatus
   | BeingKilled
   deriving (Show)
 
-data BranchStatus
+data HookStatus
   = Unintialised
   | Intitialising
   | Running
@@ -67,24 +67,25 @@ data BranchStatus
   | BeingMurdered
   deriving (Show)
 
-isComplete :: BranchStatus -> Bool
+isComplete :: HookStatus -> Bool
 isComplete = \case
   Complete _ -> True
   _ -> False
 
 data Node i o where
   Root ::
-    { rootStatus :: IO (TMVar BranchStatus),
+    { 
+      rootStatus :: IO (TVar hookStatus),
       rootChildren :: [Node () o]
     } ->
     Node () ()
   Hook ::
-    { branchParent :: Node i0 i,
-      branchStatus :: IO (TVar BranchStatus),
+    { hookParent :: Node i0 i,
+      hookStatus :: IO (TVar HookStatus),
       hook :: i -> IO o,
       hookResult :: IO (TMVar o),
       hookChildren :: [Node o o2],
-      branchRelease :: Int -> o -> IO ()
+      hookRelease :: Int -> o -> IO ()
     } ->
     Node i o
   Fixture ::
@@ -130,7 +131,7 @@ data IndexedFixture = IndexedFixture
   ~ test with null iterations
 -}
 
-isUninitialised :: BranchStatus -> Bool
+isUninitialised :: HookStatus -> Bool
 isUninitialised = \case
   Unintialised -> True
   Intitialising -> False
@@ -138,7 +139,7 @@ isUninitialised = \case
   Complete cs -> False
   BeingMurdered -> False
 
-tryLock :: TVar BranchStatus -> STM Bool
+tryLock :: TVar HookStatus -> STM Bool
 tryLock status =
   readTVar status
     >>= bool
@@ -155,20 +156,20 @@ executeHook =
     Root {} -> pure ()
     Fixture {} -> pure ()
     Hook
-      { branchParent,
-        branchStatus,
+      { hookParent,
+        hookStatus,
         hook,
         hookResult,
         hookChildren,
-        branchRelease
+        hookRelease
       } -> do
-        input <- lockExecuteHook branchParent
+        input <- lockExecuteHook hookParent
         bracket
           (hook input)
-          (branchRelease 1 {- TODO implemnt pass through timeout for release -})
+          (hookRelease 1 {- TODO implemnt pass through timeout for release -})
           \hookOut -> do
             hkVal <- hookResult
-            status <- branchStatus
+            status <- hookStatus
             atomically $ do
               putTMVar hkVal hookOut
               -- Initialising -> Running
@@ -179,14 +180,14 @@ lockExecuteHook = \case
   Root {} -> pure ()
   Fixture {} -> pure ()
   branch@Hook
-    { branchParent,
-      branchStatus,
+    { hookParent,
+      hookStatus,
       hook,
       hookResult,
       hookChildren,
-      branchRelease
+      hookRelease
     } -> do
-      bs <- branchStatus
+      bs <- hookStatus
       -- set status to initialising if not already running (tryLock)
       wantLaunch <- atomically $ tryLock bs
       when

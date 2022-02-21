@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: aa5eded3c2c50a3f9483342238b28d9431ae78568f4e4aa5c32c49345ed66c57
+-- hash: 05c4e57123568e2a45f798c80e24bae1a3f2491973a4f0599056a9c119cea6b6
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -41,8 +41,8 @@ library
       DSL.LogProtocol.PrettyPrint
       FileLogging
       Internal.ExeNode
-      Internal.ExeNodeLazy
       Internal.RunnerBaseLazy
+      Internal.SuiteRuntime
       ItemFilter
       ItemRunners
       LogTransformation
@@ -63,7 +63,6 @@ library
       ArbitraryIOTest
       AuxFilesTest
       CheckTest
-      ConcurrencyTest
       ConcurrentSuiteSimple
       ConcurrentSuiteTestOnly
       DemoConfig
@@ -78,6 +77,7 @@ library
       RunnerTest
       SemTest
       SuiteRunIntegrityTest
+      SuiteRuntimeTest
       TestFilterTest
   other-modules:
       Paths_pyrethrum
@@ -164,7 +164,6 @@ test-suite pyrethrum-test
       ArbitraryIOTest
       AuxFilesTest
       CheckTest
-      ConcurrencyTest
       ConcurrentSuiteSimple
       ConcurrentSuiteTestOnly
       DemoConfig
@@ -179,6 +178,7 @@ test-suite pyrethrum-test
       RunnerTest
       SemTest
       SuiteRunIntegrityTest
+      SuiteRuntimeTest
       TestFilterTest
       Paths_pyrethrum
   hs-source-dirs:

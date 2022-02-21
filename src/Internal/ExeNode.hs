@@ -1,6 +1,6 @@
 module Internal.ExeNode where
 
-import Internal.ExeNodeLazy
+import Internal.SuiteRuntime
 import DSL.Logger (Logger (LogError), log, logError, logItem)
 import Internal.RunnerBaseLazy
 import qualified RunElementClasses as RC

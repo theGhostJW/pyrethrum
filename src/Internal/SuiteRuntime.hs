@@ -4,7 +4,12 @@ module Internal.SuiteRuntime where
 
 import Data.Function (const, ($), (&), (.))
 import Data.Sequence (Seq (Empty))
-import Pyrelude (Alternative ((<|>)), ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, isJust, mapLeft, maybef, newTVar, threadDelay, throw, toS, traverse_, unless, unlessJust, uu, void, when, ($>), (?))
+import Internal.PreNode
+  ( CompletionStatus (Fault, Normal),
+    HookStatus (..), PreNode,
+  )
+import qualified Internal.PreNode as PN
+import Pyrelude (Alternative ((<|>)), Identity, ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, isJust, mapLeft, maybef, newTVar, threadDelay, throw, toS, traverse_, unless, unlessJust, uu, void, when, ($>), (?))
 import UnliftIO
   ( Exception (displayException),
     MonadUnliftIO,
@@ -49,8 +54,6 @@ import UnliftIO.STM
   )
 import Prelude
 
-data CompletionStatus = Normal | Fault Text SomeException | Murdered deriving (Show)
-
 data FixtureStatus
   = Pending
   | Starting
@@ -59,23 +62,24 @@ data FixtureStatus
   | BeingKilled
   deriving (Show)
 
-data HookStatus
-  = Unintialised
-  | Intitialising
-  | Running
-  | Complete CompletionStatus
-  | BeingMurdered
-  deriving (Show)
-
 isComplete :: HookStatus -> Bool
 isComplete = \case
   Complete _ -> True
   _ -> False
 
+data HookExe i o where 
+  HookExe ::  { 
+     hookParent :: HookExe i0 i,
+      hookStatus :: IO (TVar HookStatus),
+      hook :: i -> IO o,
+      hookResult :: IO (TMVar o),
+      hookRelease :: Int -> o -> IO ()
+    }
+    -> HookExe i o 
+
 data Node i o where
   Root ::
-    { 
-      rootStatus :: IO (TVar hookStatus),
+    { rootStatus :: IO (TVar hookStatus),
       rootChildren :: [Node () o]
     } ->
     Node () ()
@@ -130,6 +134,22 @@ data IndexedFixture = IndexedFixture
   ~ killing
   ~ test with null iterations
 -}
+
+linkParents :: Node i o -> PreNode pi i -> Node i o
+linkParents parent = \case
+  root@PN.Root rootChildren -> 
+    let
+        status = newTVarIO Intitialising 
+        unusedParent = Root status []
+    in
+      Root status (linkParents root <$> rootChildren)
+  Hook { hookParent, hookStatus, hook, hookResult, hookChildren, hookRelease } ->
+    Hook parent hookStatus hook hookResult hookChildren hookRelease
+  Fixture { logStart,
+      fixParent,
+      iterations,
+      logEnd
+    } -> Fixture
 
 isUninitialised :: HookStatus -> Bool
 isUninitialised = \case

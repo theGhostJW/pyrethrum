@@ -9,14 +9,14 @@ import Data.Yaml
 import GHC.Records
 import Internal.SuiteRuntime
 import Polysemy
-import Pyrelude (Text, IO)
+import Pyrelude (IO, Text, pure, ($))
 import Pyrelude.Test
 import Text.Show.Pretty
 import UnliftIO.Concurrent as C
   ( ThreadId,
     forkFinally,
     forkIO,
-    threadDelay,
+    threadDelay, myThreadId,
   )
 import UnliftIO.STM
 
@@ -53,21 +53,28 @@ fixtureEnd' :: STM (TQueue RunEvent) -> Text -> IO ()
 fixtureEnd' = boundary FixtureEnd
 
 unit_happy_path :: IO ()
-unit_happy_path = do
+unit_happy_path =
   let logQ = newTQueue
       hookStart = hookStart' logQ
       hookEnd = hookEnd' logQ
       fixtureStart = fixtureStart' logQ
       fixtureEnd = fixtureEnd' logQ
+   in 
+     pure ()
 
-  execute $
-    Root
-      { rootStatus = newTVarIO Pending,
-        rootChildren =
-          [
-            Hook {
-              
+-- execute $
+--   Root
+--     { rootStatus = newTVarIO Pending,
+--       rootChildren =
+--         [
+--           Hook {
+--             hookParent :: Node i0 i,
+--     hookStatus :: IO (TVar HookStatus),
+--     hook :: i -> IO o,
+--     hookResult :: IO (TMVar o),
+--     hookChildren :: [Node o o2],
+--     hookRelease :: Int -> o -> IO ()
 
-            }
-          ]
-      }
+--           }
+--         ]
+--     }

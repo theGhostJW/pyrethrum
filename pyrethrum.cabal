@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 54154ab010fc22edebfb934ee6ddb3ce5a95ffcb225986f974d758df29889428
+-- hash: 97eefb26251ed5f6ba7391b50f5cdd2c92bb79c37e7076adfdd7befd0ca5d896
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -255,5 +255,6 @@ test-suite pyrethrum-test
     , tasty-hunit
     , text
     , transformers-either
+    , unliftio
     , yaml
   default-language: Haskell2010

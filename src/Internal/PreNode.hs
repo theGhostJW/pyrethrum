@@ -22,7 +22,6 @@ data PreNode i o where
     } ->
     PreNode i o
   Fixture ::
-    MonadUnliftIO m =>
     { logStart :: IO (),
       iterations :: [i -> IO ()],
       logEnd :: IO ()

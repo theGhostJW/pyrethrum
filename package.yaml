@@ -33,6 +33,7 @@ dependencies:
   - mtl
   - raw-strings-qq
   - polysemy
+  - unliftio
   - polysemy-plugin
   
 ghc-options:
@@ -125,7 +126,6 @@ library:
     - unordered-containers
     - template-haskell
     - bytestring
-    - unliftio
     - fmt
 
 #  reinstate when LHS can live load multiple modules

@@ -1,80 +1,78 @@
 module SuiteRuntimeTest where
 
 import Check (Checks)
+import Control.Monad.Reader (ReaderT (runReaderT), ask)
 import DSL.Interpreter
-import DSL.Logger
 import Data.Aeson.TH
 import Data.Aeson.Types
 import Data.Yaml
 import GHC.Records
-import Internal.SuiteRuntime
+import Internal.PreNode
+import qualified Internal.SuiteRuntime as S
 import Polysemy
-import Pyrelude (IO, Text, pure, ($))
+import Pyrelude (IO, Show, Text, const, debug_, debugf, pure, txtPretty, ($), (.))
 import Pyrelude.Test
 import Text.Show.Pretty
 import UnliftIO.Concurrent as C
   ( ThreadId,
     forkFinally,
     forkIO,
-    threadDelay, myThreadId,
+    myThreadId,
+    threadDelay,
   )
 import UnliftIO.STM
+import Language.Haskell.TH (pprint)
+import qualified Pyrelude as System.IO
 
 data RunEventType
   = HookStart
   | HookEnd
   | FixtureStart
   | FixtureEnd
+  deriving (Show)
 
 data RunEvent
-  = Boundary RunEventType ThreadId Text
-  | Message ThreadId Text
+  = Boundary RunEventType Text ThreadId
+  | Message Text ThreadId
+  deriving (Show)
 
-logEvent :: STM (TQueue RunEvent) -> RunEvent -> IO ()
+logEvent :: STM (TQueue RunEvent) -> (ThreadId -> RunEvent) -> IO ()
 logEvent q ev = do
   q' <- atomically q
-  atomically $ writeTQueue q' ev
-
-boundary :: RunEventType -> STM (TQueue RunEvent) -> Text -> IO ()
-boundary evType q msg = do
   i <- myThreadId
-  logEvent q $ Boundary evType i msg
+  atomically . writeTQueue q' $ debugf txtPretty (ev i)
 
-hookStart' :: STM (TQueue RunEvent) -> Text -> IO ()
-hookStart' = boundary HookStart
+logBoundary :: STM (TQueue RunEvent) -> RunEventType -> Text -> IO ()
+logBoundary q et msg =
+  logEvent q (Boundary et msg)
 
-hookEnd' :: STM (TQueue RunEvent) -> Text -> IO ()
-hookEnd' = boundary HookEnd
+hookStart :: STM (TQueue RunEvent) -> Text -> IO ()
+hookStart q = logBoundary q HookStart
 
-fixtureStart' :: STM (TQueue RunEvent) -> Text -> IO ()
-fixtureStart' = boundary FixtureStart
+hookEnd :: STM (TQueue RunEvent) -> Text -> IO ()
+hookEnd q = logBoundary q HookEnd
 
-fixtureEnd' :: STM (TQueue RunEvent) -> Text -> IO ()
-fixtureEnd' = boundary FixtureEnd
+fixtureStart :: STM (TQueue RunEvent) -> Text -> IO ()
+fixtureStart q = logBoundary q FixtureStart
 
-unit_happy_path :: IO ()
-unit_happy_path =
-  let logQ = newTQueue
-      hookStart = hookStart' logQ
-      hookEnd = hookEnd' logQ
-      fixtureStart = fixtureStart' logQ
-      fixtureEnd = fixtureEnd' logQ
-   in 
-     pure ()
+fixtureEnd :: STM (TQueue RunEvent) -> Text -> IO ()
+fixtureEnd q = logBoundary q FixtureEnd
 
--- execute $
---   Root
---     { rootStatus = newTVarIO Pending,
---       rootChildren =
---         [
---           Hook {
---             hookParent :: Node i0 i,
---     hookStatus :: IO (TVar HookStatus),
---     hook :: i -> IO o,
---     hookResult :: IO (TMVar o),
---     hookChildren :: [Node o o2],
---     hookRelease :: Int -> o -> IO ()
+logMessage :: STM (TQueue RunEvent) -> Text -> IO ()
+logMessage q txt = logEvent q (Message txt)
 
---           }
---         ]
---     }
+superSimplSuite :: STM (TQueue RunEvent) -> PreNode () ()
+superSimplSuite q =
+  Root
+    [ Fixture
+        { logStart = fixtureStart q "started",
+          iterations = [const (logMessage q "iteration")],
+          logEnd = fixtureEnd q "ended"
+        }
+    ]
+
+-- $> unit_simple_single
+unit_simple_single :: IO ()
+unit_simple_single = do
+  System.IO.print "AND WE'RE OFF!"
+  S.execute 1 . S.linkParents $ superSimplSuite newTQueue

@@ -6,7 +6,8 @@ import Data.Function (const, ($), (&), (.))
 import Data.Sequence (Seq (Empty))
 import Internal.PreNode
   ( CompletionStatus (Fault, Normal),
-    HookStatus (..), PreNode,
+    HookStatus (..),
+    PreNode (hookChildren, rootChildren),
   )
 import qualified Internal.PreNode as PN
 import Pyrelude (Alternative ((<|>)), Identity, ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, isJust, mapLeft, maybef, newTVar, threadDelay, throw, toS, traverse_, unless, unlessJust, uu, void, when, ($>), (?))
@@ -21,6 +22,7 @@ import UnliftIO
     bracket,
     catchAny,
     isEmptyTQueue,
+    newEmptyTMVarIO,
     newTQueueIO,
     newTVarIO,
     putTMVar,
@@ -67,15 +69,15 @@ isComplete = \case
   Complete _ -> True
   _ -> False
 
-data HookExe i o where 
-  HookExe ::  { 
-     hookParent :: HookExe i0 i,
+data HookExe i o where
+  HookExe ::
+    { hookParent :: HookExe i0 i,
       hookStatus :: IO (TVar HookStatus),
       hook :: i -> IO o,
       hookResult :: IO (TMVar o),
       hookRelease :: Int -> o -> IO ()
-    }
-    -> HookExe i o 
+    } ->
+    HookExe i o
 
 data Node i o where
   Root ::
@@ -93,7 +95,6 @@ data Node i o where
     } ->
     Node i o
   Fixture ::
-    MonadUnliftIO m =>
     { logStart :: IO (),
       fixParent :: Node i0 i,
       iterations :: [i -> IO ()],
@@ -135,21 +136,33 @@ data IndexedFixture = IndexedFixture
   ~ test with null iterations
 -}
 
-linkParents :: Node i o -> PreNode pi i -> Node i o
+linkParents :: Node i o -> PreNode o o' -> Node o o'
 linkParents parent = \case
-  root@PN.Root rootChildren -> 
-    let
-        status = newTVarIO Intitialising 
-        unusedParent = Root status []
-    in
-      Root status (linkParents root <$> rootChildren)
-  Hook { hookParent, hookStatus, hook, hookResult, hookChildren, hookRelease } ->
-    Hook parent hookStatus hook hookResult hookChildren hookRelease
-  Fixture { logStart,
-      fixParent,
-      iterations,
-      logEnd
-    } -> Fixture
+  PN.Root {rootChildren} ->
+    let r =
+          Internal.SuiteRuntime.Root
+            { rootStatus = newTVarIO Intitialising,
+              rootChildren = linkParents r <$> rootChildren
+            }
+     in r
+  PN.Hook {hookStatus, hook, hookChildren, hookRelease} ->
+    let h =
+          Internal.SuiteRuntime.Hook
+            { hookParent = parent,
+              hookStatus = newTVarIO Intitialising,
+              hook = hook,
+              hookResult = newEmptyTMVarIO,
+              hookChildren = linkParents h <$> hookChildren,
+              hookRelease = hookRelease
+            }
+     in h
+  PN.Fixture {logStart, iterations, logEnd} ->
+    Internal.SuiteRuntime.Fixture
+      { logStart = logStart,
+        fixParent = parent,
+        iterations = iterations,
+        logEnd = logEnd
+      }
 
 isUninitialised :: HookStatus -> Bool
 isUninitialised = \case

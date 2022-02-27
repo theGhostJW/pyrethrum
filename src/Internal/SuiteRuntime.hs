@@ -310,7 +310,7 @@ data NoCandidate
   | CantUseAnyMoreThreads
   | InvalidFixtureInPendingList
   | Finished
-  
+
 
 data IterationRun = IterationRun
   { parentFixture :: LoadedFixture,
@@ -540,9 +540,9 @@ forkFixtureThread
   fx@LoadedFixture {activeThreads}
   db = do
     db "III forkFixtureThread started"
-    thrdStatus <- atomically $ newTVar $ ThreadInitialising 999
+    thrdStatus <- newTVarIO (ThreadInitialising 999)
     let tfx = forkFinally
-          (db "III runFixture started" >> (db $ "FORKED THREAD POINTER IS: " <> unsafeAddr thrdStatus) >> runFixture thrdStatus fx db)
+          (db "III runFixture started" >> db ("FORKED THREAD POINTER IS: " <> unsafeAddr thrdStatus) >> runFixture thrdStatus fx db)
           -- finally clean up
           \_ -> atomically $ do
             -- set this threadstatus to done
@@ -553,9 +553,11 @@ forkFixtureThread
             newAts <- removeFinishedThreads ats
             writeTVar activeThreads newAts
             -- decrement global threads in use
+            upre <- readTVar threadsInUse
+            unsafeIOToSTM (db $ "III TBD: " <> txt upre)
             modifyTVar threadsInUse (\i -> i - 1)
             u <- readTVar threadsInUse
-            unsafeIOToSTM (db $ "III forkFixtureThread ended - threads in use is: " <> txt u)
+            unsafeIOToSTM (db $ "III TAD: " <> txt u)
 
     db "III ABove Atomically"
     atomically $ do

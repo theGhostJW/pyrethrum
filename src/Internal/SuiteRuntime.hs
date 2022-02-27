@@ -1,39 +1,46 @@
 -- {-# LANGUAGE NoStrictData #-}
-{-# LANGUAGE MagicHash, BangPatterns #-}
+{-# LANGUAGE BangPatterns #-}
+-- {-# LANGUAGE NoStrictData #-}
+{-# LANGUAGE MagicHash #-}
 
 module Internal.SuiteRuntime where
 
 import Data.Function (const, ($), (&), (.))
 import Data.Sequence (Seq (Empty))
+--     MonadUnliftIO,
+--     STM,
+--     TMVar,
+--     TQueue,
+--     TVar,
+--     atomically,
+
+--     isEmptyTQueue,
+--     newEmptyTMVarIO,
+--     newTQueueIO,
+--     newTVarIO,
+--     putTMVar,
+--     readTMVar,
+--     readTQueue,
+--     readTVar,
+--     readTVarIO,
+
+--     writeTQueue,
+--     writeTVar, newTMVarIO, isEmptyTMVar,
+
+import GHC.Exts
 import Internal.PreNode
   ( CompletionStatus (Fault, Normal),
     HookStatus (..),
     PreNode (hookChildren, rootChildren),
   )
 import qualified Internal.PreNode as PN
-import Pyrelude (Alternative ((<|>)), Handle, IOMode (WriteMode), Identity, ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, isEmptyMVar, isJust, mapLeft, maybef, newEmptyMVar, newTVar, openFile, threadDelay, throw, toS, traverse_, unless, unlessJust, uu, void, when, ($>), (?), hSetBuffering, BufferMode (NoBuffering), hClose, unsafeIOToSTM, txt, setEnv, getEnv, stdout, Any)
+import Pyrelude (Alternative ((<|>)), Any, BufferMode (NoBuffering), Handle, IOMode (WriteMode), Identity, ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, getEnv, hClose, hSetBuffering, isEmptyMVar, isJust, mapLeft, maybef, newEmptyMVar, newTVar, openFile, setEnv, stdout, threadDelay, throw, toS, traverse_, txt, txtPretty, unless, unlessJust, unsafeIOToSTM, uu, void, when, ($>), (?))
+import Pyrelude.IO (hPutStrLn)
 import UnliftIO
   ( Exception (displayException),
-    --     MonadUnliftIO,
-    --     STM,
-    --     TMVar,
-    --     TQueue,
-    --     TVar,
-    --     atomically,
     bracket,
     catchAny,
-    --     isEmptyTQueue,
-    --     newEmptyTMVarIO,
-    --     newTQueueIO,
-    --     newTVarIO,
-    --     putTMVar,
-    --     readTMVar,
-    --     readTQueue,
-    --     readTVar,
-    --     readTVarIO,
     tryAny,
-    --     writeTQueue,
-    --     writeTVar, newTMVarIO, isEmptyTMVar,
   )
 import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, threadDelay)
 import UnliftIO.STM
@@ -42,9 +49,12 @@ import UnliftIO.STM
     TQueue,
     TVar,
     atomically,
+    isEmptyTMVar,
     isEmptyTQueue,
     modifyTVar,
+    newEmptyTMVar,
     newEmptyTMVarIO,
+    newTMVarIO,
     newTQueueIO,
     newTVarIO,
     putTMVar,
@@ -52,13 +62,12 @@ import UnliftIO.STM
     readTQueue,
     readTVar,
     readTVarIO,
+    takeTMVar,
     tryReadTQueue,
     writeTQueue,
-    writeTVar, isEmptyTMVar, newEmptyTMVar, newTMVarIO, takeTMVar,
+    writeTVar,
   )
 import Prelude
-import Pyrelude.IO (hPutStrLn)
-import GHC.Exts
 
 data FixtureStatus
   = Pending
@@ -284,16 +293,24 @@ data Fork
   | Pend
   | RunComplete
 
+data ThreadStats = ThreadStats
+  { maxThreads :: Int,
+    inUse :: Int
+  }
+  deriving Show
+
 data NoFixture
   = EmptyQueues
   | NoFixturesReady
-  | NoThreadsAvailable
+  | NoThreadsAvailable ThreadStats
+  deriving Show
 
 data NoCandidate
   = EmptyQueue
   | CantUseAnyMoreThreads
   | InvalidFixtureInPendingList
   | Finished
+  
 
 data IterationRun = IterationRun
   { parentFixture :: LoadedFixture,
@@ -410,16 +427,21 @@ nextFixture pendingQ activeQ =
             | otherwise ->
               pure $ Left EmptyQueues
 
-reserveThread :: Executor -> STM Bool
+reserveThread :: Executor -> STM (Either ThreadStats ThreadStats)
 reserveThread
-  Executor
+  exe@Executor
     { maxThreads,
       threadsInUse
     } = do
     used <- readTVar threadsInUse
     let reserved = used < maxThreads
-    writeTVar threadsInUse $ reserved ? used + 1 $ used
-    pure reserved
+        newUsed = reserved ? used + 1 $ used
+        stats = ThreadStats {maxThreads = maxThreads, inUse = newUsed}
+    --
+    when reserved do
+      writeTVar threadsInUse newUsed
+
+    pure $ (reserved ? Right $ Left) stats
 
 isPending :: FixtureStatus -> Bool
 isPending = \case
@@ -461,7 +483,8 @@ runFixture
       iterations,
       activeThreads,
       logEnd
-    } db =
+    }
+  db =
     let runIterations :: IO ()
         runIterations = do
           wantLogStart <- atomically $ setToStartedIfPending fixStatus
@@ -490,17 +513,14 @@ runFixture
                 (\IterationRun {iteration} -> db "RF - Running Iteration" >> iteration >> runIterations)
                 mi
      in do
-          db "RF - BODY" 
+          db "RF - BODY"
           db $ "RF - BODY THREAD POINTER IS: " <> unsafeAddr threadStatus
           s <- readTVarIO threadStatus
-          db $ "RF - BODY THREAD STATUS: " <> txt s 
+          db $ "RF - BODY THREAD STATUS: " <> txt s
           case s of
             ThreadInitialising _ -> C.threadDelay 1_000 >> runFixture threadStatus fx db
             ThreadRunning -> runIterations
             ThreadDone -> pure ()
-
-
-
 
 -- Any is a type to which any type can be safely unsafeCoerced to.
 
@@ -514,11 +534,11 @@ aToWord# a = let !mb = Ptr' a in case unsafeCoerce# mb :: Word of W# addr -> add
 unsafeAddr :: a -> Text
 unsafeAddr a = txt $ I# (word2Int# (aToWord# (unsafeCoerce# a)))
 
-
 forkFixtureThread :: TVar Int -> LoadedFixture -> (Text -> IO ()) -> IO ()
 forkFixtureThread
   threadsInUse
-  fx@LoadedFixture {activeThreads} db = do
+  fx@LoadedFixture {activeThreads}
+  db = do
     db "III forkFixtureThread started"
     thrdStatus <- atomically $ newTVar $ ThreadInitialising 999
     let tfx = forkFinally
@@ -554,56 +574,53 @@ forkFixtureThread
     id' <- tfx
     db $ "III DONE forkFixtureThread: " <> txt id'
 
-
-execute' :: Executor -> Handle -> IO ()
+execute' :: Executor -> (Text -> IO ()) -> IO ()
 execute'
   exe@Executor
     { maxThreads,
       threadsInUse,
       fixturesPending,
       fixturesStarted
-    } h = do
+    }
+  db = do
+    eNxtFx <-
+      atomically $ do
+        eStats <- reserveThread exe
+        eitherf eStats
+            (pure . Left . NoThreadsAvailable )
+            (const $ unsafeIOToSTM (db "III Execute Nxt Fixture") >> nextFixture fixturesPending fixturesStarted)
 
+    let recurse = execute' exe db
+        waitRecurse = C.threadDelay 10_000 >> recurse
 
-
-          hSetBuffering h NoBuffering
-          hSetBuffering stdout NoBuffering
-
-          let db s = do
-              putStrLn $ toS s
-              -- hPutStrLn h s
-
-          eNxtFx <-
-            atomically $
-              reserveThread exe
-                >>= bool
-                  (pure (Left NoThreadsAvailable))
-                  (unsafeIOToSTM (db "III Execute Nxt Fixture") >> nextFixture fixturesPending fixturesStarted)
-
-          let recurse = execute' exe h
-              waitRecurse = C.threadDelay 10_000 >> recurse
-
-          eitherf
-            eNxtFx
-            ( \case
-                -- both the pending and active que of fixtures
-                -- are empty so we are done
-                EmptyQueues -> db "EmptyQ" >> pure ()
-                -- all the fixtures are not in a state to run any more threads
-                -- eg being killed. We expect they may become available later of be finished
-                -- and removed from the active que leading to empty ques we wait and try again
-                NoFixturesReady -> db "NoFixturesReady" >> waitRecurse
-                -- all threads in use wait try again
-                NoThreadsAvailable -> db "NoThreadsAvailable" >> waitRecurse
-            )
-            (\f -> forkFixtureThread threadsInUse f db >> recurse)
-
+    eitherf
+      eNxtFx
+      ( \case
+          -- both the pending and active que of fixtures
+          -- are empty so we are done
+          EmptyQueues -> db "EmptyQ" >> pure ()
+          -- all the fixtures are not in a state to run any more threads
+          -- eg being killed. We expect they may become available later of be finished
+          -- and removed from the active que leading to empty ques we wait and try again
+          NoFixturesReady -> db "NoFixturesReady" >> waitRecurse
+          -- all threads in use wait try again
+          nt@NoThreadsAvailable {} -> db (txtPretty nt) >> waitRecurse
+      )
+      (\f -> forkFixtureThread threadsInUse f db >> recurse)
 
 qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()
 qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture
 
 execute :: Int -> Node i o -> IO ()
 execute maxThreads root = do
+  hSetBuffering stdout NoBuffering
+  -- h <- openFile "C:\\Pyrethrum\\log.log" WriteMode
+  -- hSetBuffering h NoBuffering
+
+  let db s = do
+        putStrLn $ toS s
+  -- hPutStrLn h s
+
   fxs <- sequence $ mkFixtures root
   let idxFxs = zip [0 ..] fxs
   -- create queue
@@ -612,7 +629,7 @@ execute maxThreads root = do
   -- load all fixtures to pending queue
   atomically $ traverse_ (qFixture pendingQ) idxFxs
   initialThreadsInUse <- newTVarIO 0
-  bracket
-    (openFile "C:\\Pyrethrum\\log.log" WriteMode)
-    hClose
-    (execute' (Executor maxThreads initialThreadsInUse pendingQ runningQ))
+  -- finally
+  execute' (Executor maxThreads initialThreadsInUse pendingQ runningQ) db
+
+-- (hClose h)

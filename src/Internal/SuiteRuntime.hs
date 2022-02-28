@@ -34,15 +34,15 @@ import Internal.PreNode
     PreNode (hookChildren, rootChildren),
   )
 import qualified Internal.PreNode as PN
-import Pyrelude (Alternative ((<|>)), Any, BufferMode (NoBuffering), Handle, IOMode (WriteMode), Identity, ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, getEnv, hClose, hSetBuffering, isEmptyMVar, isJust, mapLeft, maybef, newEmptyMVar, newTVar, openFile, setEnv, stdout, threadDelay, throw, toS, traverse_, txt, txtPretty, unless, unlessJust, unsafeIOToSTM, uu, void, when, ($>), (?))
+import Pyrelude (Alternative ((<|>)), Any, BufferMode (NoBuffering), Handle, IOMode (WriteMode), Identity, ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, getEnv, hClose, hSetBuffering, isEmptyMVar, isJust, mapLeft, maybef, newEmptyMVar, newTVar, openFile, setEnv, stdout, threadDelay, throw, toS, traverse_, txt, txtPretty, unless, unlessJust, unsafeIOToSTM, uu, void, when, ($>), (?), unsafePerformIO)
 import Pyrelude.IO (hPutStrLn)
 import UnliftIO
   ( Exception (displayException),
     bracket,
     catchAny,
-    tryAny,
+    tryAny, newTMVar, newMVar, putMVar,
   )
-import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, threadDelay)
+import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, threadDelay, takeMVar)
 import UnliftIO.STM
   ( STM,
     TMVar,
@@ -427,20 +427,26 @@ nextFixture pendingQ activeQ =
             | otherwise ->
               pure $ Left EmptyQueues
 
-reserveThread :: Executor -> STM (Either ThreadStats ThreadStats)
+reserveThread :: Executor -> (Text -> IO ()) -> STM (Either ThreadStats ThreadStats)
 reserveThread
   exe@Executor
     { maxThreads,
       threadsInUse
-    } = do
+    }
+    db = do
     used <- readTVar threadsInUse
     let reserved = used < maxThreads
         newUsed = reserved ? used + 1 $ used
         stats = ThreadStats {maxThreads = maxThreads, inUse = newUsed}
     --
+    unsafeIOToSTM (db $ "RB USED: " <> txt used)
+    --
     when reserved do
       writeTVar threadsInUse newUsed
-
+      --
+    used2 <- readTVar threadsInUse
+    unsafeIOToSTM (db $ "RB USED2: " <> txt used)
+    --
     pure $ (reserved ? Right $ Left) stats
 
 isPending :: FixtureStatus -> Bool
@@ -509,8 +515,8 @@ runFixture
             else do
               mi <- atomically $ takeIteration fx
               maybe
-                (db "RF - No Iterations Returning Pure" >> pure ())
-                (\IterationRun {iteration} -> db "RF - Running Iteration" >> iteration >> runIterations)
+                (db "RF - No IT" >> pure ())
+                (\IterationRun {iteration} -> db "RF - Run IT" >> iteration >> runIterations)
                 mi
      in do
           db "RF - BODY"
@@ -546,7 +552,7 @@ forkFixtureThread
           -- finally clean up
           \_ -> atomically $ do
             -- set this threadstatus to done
-            unsafeIOToSTM (db "III forkFixtureThread ended")
+            unsafeIOToSTM (db "III FFE")
             writeTVar thrdStatus ThreadDone
             -- remove all finished threads from active threads list
             ats <- readTVar activeThreads
@@ -554,10 +560,10 @@ forkFixtureThread
             writeTVar activeThreads newAts
             -- decrement global threads in use
             upre <- readTVar threadsInUse
-            unsafeIOToSTM (db $ "III TBD: " <> txt upre)
+            unsafeIOToSTM (db $ "TBD: " <> txt upre)
             modifyTVar threadsInUse (\i -> i - 1)
             u <- readTVar threadsInUse
-            unsafeIOToSTM (db $ "III TAD: " <> txt u)
+            unsafeIOToSTM (db $ "TAD: " <> txt u)
 
     db "III ABove Atomically"
     atomically $ do
@@ -587,7 +593,7 @@ execute'
   db = do
     eNxtFx <-
       atomically $ do
-        eStats <- reserveThread exe
+        eStats <- reserveThread exe db
         eitherf eStats
             (pure . Left . NoThreadsAvailable )
             (const $ unsafeIOToSTM (db "III Execute Nxt Fixture") >> nextFixture fixturesPending fixturesStarted)
@@ -619,8 +625,18 @@ execute maxThreads root = do
   -- h <- openFile "C:\\Pyrethrum\\log.log" WriteMode
   -- hSetBuffering h NoBuffering
 
-  let db s = do
-        putStrLn $ toS s
+  lock <- newMVar ()
+  let
+
+
+    printer :: Text -> IO ()
+    printer msg = do
+     () <- takeMVar lock
+     let atomicPutStrLn str =  putStrLn str >> putMVar lock ()
+     atomicPutStrLn $ toS msg
+
+  let db = printer
+        -- putStrLn $ toS s
   -- hPutStrLn h s
 
   fxs <- sequence $ mkFixtures root

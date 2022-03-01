@@ -34,15 +34,18 @@ import Internal.PreNode
     PreNode (hookChildren, rootChildren),
   )
 import qualified Internal.PreNode as PN
-import Pyrelude (Alternative ((<|>)), Any, BufferMode (NoBuffering), Handle, IOMode (WriteMode), Identity, ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, getEnv, hClose, hSetBuffering, isEmptyMVar, isJust, mapLeft, maybef, newEmptyMVar, newTVar, openFile, setEnv, stdout, threadDelay, throw, toS, traverse_, txt, txtPretty, unless, unlessJust, unsafeIOToSTM, uu, void, when, ($>), (?), unsafePerformIO)
+import Pyrelude (Alternative ((<|>)), Any, BufferMode (NoBuffering), Handle, IOMode (WriteMode), Identity, ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, getEnv, hClose, hSetBuffering, isEmptyMVar, isJust, mapLeft, maybef, newEmptyMVar, newTVar, openFile, setEnv, stdout, threadDelay, throw, toS, traverse_, txt, txtPretty, unless, unlessJust, unsafeIOToSTM, unsafePerformIO, uu, void, when, ($>), (?))
 import Pyrelude.IO (hPutStrLn)
 import UnliftIO
   ( Exception (displayException),
     bracket,
     catchAny,
-    tryAny, newTMVar, newMVar, putMVar,
+    newMVar,
+    newTMVar,
+    putMVar,
+    tryAny,
   )
-import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, threadDelay, takeMVar)
+import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, takeMVar, threadDelay, withMVar)
 import UnliftIO.STM
   ( STM,
     TMVar,
@@ -297,20 +300,19 @@ data ThreadStats = ThreadStats
   { maxThreads :: Int,
     inUse :: Int
   }
-  deriving Show
+  deriving (Show)
 
 data NoFixture
   = EmptyQueues
   | NoFixturesReady
   | NoThreadsAvailable ThreadStats
-  deriving Show
+  deriving (Show)
 
 data NoCandidate
   = EmptyQueue
   | CantUseAnyMoreThreads
   | InvalidFixtureInPendingList
   | Finished
-
 
 data IterationRun = IterationRun
   { parentFixture :: LoadedFixture,
@@ -427,26 +429,28 @@ nextFixture pendingQ activeQ =
             | otherwise ->
               pure $ Left EmptyQueues
 
+releaseThread :: TVar Int -> STM ()
+releaseThread = flip modifyTVar (\i -> i - 1)
+
 reserveThread :: Executor -> (Text -> IO ()) -> STM (Either ThreadStats ThreadStats)
 reserveThread
   exe@Executor
     { maxThreads,
       threadsInUse
     }
-    db = do
+  db = do
     used <- readTVar threadsInUse
     let reserved = used < maxThreads
         newUsed = reserved ? used + 1 $ used
         stats = ThreadStats {maxThreads = maxThreads, inUse = newUsed}
     --
-    unsafeIOToSTM (db $ "RB USED: " <> txt used)
-    --
     when reserved do
+      unsafeIOToSTM (db "THREAD RESERVED")
       writeTVar threadsInUse newUsed
-      --
-    used2 <- readTVar threadsInUse
-    unsafeIOToSTM (db $ "RB USED2: " <> txt used)
     --
+    unless reserved do
+      unsafeIOToSTM (db "NO THREADS AVAILABLE NONE RESERVED")
+
     pure $ (reserved ? Right $ Left) stats
 
 isPending :: FixtureStatus -> Bool
@@ -515,7 +519,7 @@ runFixture
             else do
               mi <- atomically $ takeIteration fx
               maybe
-                (db "RF - No IT" >> pure ())
+                (db "RF - No Iterations Left" >> pure ())
                 (\IterationRun {iteration} -> db "RF - Run IT" >> iteration >> runIterations)
                 mi
      in do
@@ -548,11 +552,10 @@ forkFixtureThread
     db "III forkFixtureThread started"
     thrdStatus <- newTVarIO (ThreadInitialising 999)
     let tfx = forkFinally
-          (db "III runFixture started" >> db ("FORKED THREAD POINTER IS: " <> unsafeAddr thrdStatus) >> runFixture thrdStatus fx db)
+          (db "III FIXTURE START" >> runFixture thrdStatus fx db)
           -- finally clean up
           \_ -> atomically $ do
             -- set this threadstatus to done
-            unsafeIOToSTM (db "III FFE")
             writeTVar thrdStatus ThreadDone
             -- remove all finished threads from active threads list
             ats <- readTVar activeThreads
@@ -560,10 +563,11 @@ forkFixtureThread
             writeTVar activeThreads newAts
             -- decrement global threads in use
             upre <- readTVar threadsInUse
-            unsafeIOToSTM (db $ "TBD: " <> txt upre)
-            modifyTVar threadsInUse (\i -> i - 1)
+            unsafeIOToSTM (db "III FIXTURE DONE")
+            unsafeIOToSTM (db $ "BEFORE DECREMENT THREAD: " <> txt upre)
+            releaseThread threadsInUse
             u <- readTVar threadsInUse
-            unsafeIOToSTM (db $ "TAD: " <> txt u)
+            unsafeIOToSTM (db $ "AFTER DECREMENT THREAD: " <> txt u)
 
     db "III ABove Atomically"
     atomically $ do
@@ -594,24 +598,32 @@ execute'
     eNxtFx <-
       atomically $ do
         eStats <- reserveThread exe db
-        eitherf eStats
-            (pure . Left . NoThreadsAvailable )
-            (const $ unsafeIOToSTM (db "III Execute Nxt Fixture") >> nextFixture fixturesPending fixturesStarted)
+        eitherf
+          eStats
+          (pure . Left . NoThreadsAvailable)
+          (const $ unsafeIOToSTM (db "III Execute Nxt Fixture") >> nextFixture fixturesPending fixturesStarted)
 
     let recurse = execute' exe db
         waitRecurse = C.threadDelay 10_000 >> recurse
+        threadRelease = db "THREAD RELEASE" >> atomically (releaseThread threadsInUse)
 
     eitherf
       eNxtFx
       ( \case
           -- both the pending and active que of fixtures
           -- are empty so we are done
-          EmptyQueues -> db "EmptyQ" >> pure ()
+          -- thread was reserved so release thread
+          -- has no effect because app is about to end but may
+          -- later if multi-process runs are implemented and thread release implementation
+          -- is changed
+          EmptyQueues -> threadRelease >> db "EmptyQ - EXECUTION DONE" >> pure ()
           -- all the fixtures are not in a state to run any more threads
           -- eg being killed. We expect they may become available later of be finished
           -- and removed from the active que leading to empty ques we wait and try again
-          NoFixturesReady -> db "NoFixturesReady" >> waitRecurse
+          -- thread was reserved so release thread
+          NoFixturesReady -> threadRelease >> db "NoFixturesReady" >> waitRecurse
           -- all threads in use wait try again
+          -- no threads reserved so none need to be released
           nt@NoThreadsAvailable {} -> db (txtPretty nt) >> waitRecurse
       )
       (\f -> forkFixtureThread threadsInUse f db >> recurse)
@@ -626,17 +638,13 @@ execute maxThreads root = do
   -- hSetBuffering h NoBuffering
 
   lock <- newMVar ()
-  let
+  
+  let wantDebug = False
+      db :: Text -> IO ()
+      db msg = wantDebug ? withMVar lock (const $ putStrLn (toS msg)) $ pure ()
 
-
-    printer :: Text -> IO ()
-    printer msg = do
-     () <- takeMVar lock
-     let atomicPutStrLn str =  putStrLn str >> putMVar lock ()
-     atomicPutStrLn $ toS msg
-
-  let db = printer
-        -- putStrLn $ toS s
+  -- let db = printer
+  -- putStrLn $ toS s
   -- hPutStrLn h s
 
   fxs <- sequence $ mkFixtures root

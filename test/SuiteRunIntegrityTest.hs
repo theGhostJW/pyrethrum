@@ -122,7 +122,7 @@ fullExpectedResult =
     "AH - Group 1 >> Group 2 >> After Hook 1"
   ]
 
--- $> unit_tests_hooks_run_as_expected_full_suite
+-- $ > unit_tests_hooks_run_as_expected_full_suite
 unit_tests_hooks_run_as_expected_full_suite :: IO ()
 unit_tests_hooks_run_as_expected_full_suite =
   suitMessages (effExecuteLog everythingRun) >>= chkEq fullExpectedResult
@@ -155,7 +155,7 @@ webResult =
     , "AH - Group 1 >> After Hook 1"
   ]
 
--- $> unit_tests_hooks_run_as_expected_web_suite
+-- $ > unit_tests_hooks_run_as_expected_web_suite
 unit_tests_hooks_run_as_expected_web_suite :: IO ()
 unit_tests_hooks_run_as_expected_web_suite =
   suitMessages (effExecuteLog webRun) >>= chkEq webResult
@@ -185,7 +185,7 @@ restResult =
     "AH - Group 1 >> Group 2 >> After Hook 1"
   ]
 
--- $> unit_tests_hooks_run_as_expected_rest_suite
+-- $ > unit_tests_hooks_run_as_expected_rest_suite
 unit_tests_hooks_run_as_expected_rest_suite :: IO ()
 unit_tests_hooks_run_as_expected_rest_suite =
   suitMessages (effExecuteLog restRun) >>= chkEq restResult
@@ -225,7 +225,7 @@ txtExpectedResult =
   ]
 
 
--- $> unit_tests_hooks_run_as_expected_text_suite
+-- $ > unit_tests_hooks_run_as_expected_text_suite
 unit_tests_hooks_run_as_expected_text_suite :: IO ()
 unit_tests_hooks_run_as_expected_text_suite =
   suitMessages (effExecuteLog txtRun) >>= chkEq txtExpectedResult

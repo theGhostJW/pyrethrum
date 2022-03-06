@@ -11,10 +11,11 @@ import Internal.PreNode
 import qualified Internal.SuiteRuntime as S
 import Language.Haskell.TH (pprint)
 import Polysemy
-import Pyrelude (IO, Int, Show, Text, const, debug_, debugf, maybe, maybef, pure, reverse, txtPretty, uu, ($), (.), (<$>), (>>=), ListLike (unsafeHead))
+import Pyrelude (IO, Int, ListLike (unsafeHead), Show, Text, const, debug_, debugf, maybe, maybef, pure, reverse, txtPretty, uu, ($), (.), (<$>), (>>=))
 import qualified Pyrelude as System.IO
 import qualified Pyrelude.Test
-import Text.Show.Pretty (pPrint, pPrintList, ppShowList, ppShow)
+import TempUtils (debugLines)
+import Text.Show.Pretty (pPrint, pPrintList, ppShow, ppShowList)
 import UnliftIO.Concurrent as C
   ( ThreadId,
     forkFinally,
@@ -23,7 +24,6 @@ import UnliftIO.Concurrent as C
     threadDelay,
   )
 import UnliftIO.STM
-import TempUtils (debugLines)
 
 data RunEventType
   = HookStart
@@ -61,6 +61,9 @@ fixtureEnd q = logBoundary q FixtureEnd
 logMessage :: TQueue RunEvent -> Text -> IO ()
 logMessage q txt = logEvent q (Message txt)
 
+mkFixture :: Text -> Int -> PreNode () ()
+mkFixture = 
+
 superSimplSuite :: TQueue RunEvent -> PreNode () ()
 superSimplSuite q =
   Root
@@ -71,24 +74,26 @@ superSimplSuite q =
         }
     ]
 
-tQToList :: [a] -> TQueue a -> IO [a]
-tQToList l q =
-  reverse
-    <$> ( atomically (tryReadTQueue q)
-            >>= maybe
-              (pure l)
-              (\a -> tQToList (a : l) q)
-        )
+tQToList :: TQueue a -> IO [a]
+tQToList q =
+  reverse <$> recurse [] q
+  where
+    recurse :: [a] -> TQueue a -> IO [a]
+    recurse l q =
+      atomically (tryReadTQueue q)
+        >>= maybe
+          (pure l)
+          (\a -> recurse (a : l) q)
 
 exeSuiteTests :: (TQueue RunEvent -> PreNode () ()) -> Int -> IO ()
 exeSuiteTests preSuite threadCount = do
   q <- atomically newTQueue
   S.execute threadCount . S.linkParents $ preSuite q
-  C.threadDelay 1_000_000
-  l <- tQToList [] q
+  l <- tQToList q
   pPrint l
 
 -- $> unit_simple_single
+
 unit_simple_single :: IO ()
 unit_simple_single = do
   exeSuiteTests superSimplSuite 1

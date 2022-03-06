@@ -369,7 +369,7 @@ takeIteration fixture@LoadedFixture {iterations, activeThreads, fixStatus} = do
   itrs <- readTVar iterations
   activ <- readTVar activeThreads
   status <- readTVar fixStatus
-  canForkThread status
+  not (canForkThread status)
     ? pure Nothing
     $ case itrs of
       [] -> pure Nothing
@@ -464,6 +464,14 @@ isPending = \case
   Done cs -> False
   BeingKilled -> False
 
+isStarting :: FixtureStatus -> Bool
+isStarting = \case
+  Pending -> False
+  Starting -> True
+  Active -> False
+  Done cs -> False
+  BeingKilled -> False
+
 setToStartedIfPending :: TVar FixtureStatus -> STM Bool
 setToStartedIfPending fixStatus =
   do
@@ -471,6 +479,14 @@ setToStartedIfPending fixStatus =
     let ip = isPending s
     writeTVar fixStatus $ ip ? Starting $ s
     pure ip
+
+setActiveIfStarting :: TVar FixtureStatus -> STM Bool
+setActiveIfStarting fixStatus =
+  do
+    s <- readTVar fixStatus
+    let is = isStarting s
+    writeTVar fixStatus $ is ? Active $ s
+    pure is
 
 removeFinishedThreads :: [RunningThread] -> STM [RunningThread]
 removeFinishedThreads rthds =
@@ -518,7 +534,11 @@ runFixture
                       (db "RF - Loging Log End" >> logEnd)
                       (\e' -> logError $ "Failed logging fixture end\n" <> toS (displayException e'))
                 )
-                (const $ db "RF - Rerun Iterations" >> runIterations)
+                ( const $ do
+                    db "RF - Rerun Iterations"
+                    atomically $ setActiveIfStarting fixStatus
+                    runIterations
+                )
             else do
               mi <- atomically $ takeIteration fx
               maybe
@@ -567,7 +587,7 @@ forkFixtureThread
               writeTVar activeThreads newAts
               -- decrement global threads in use
               upre <- readTVar threadsInUse
-              unsafeIOToSTM (db "III FIXTURE DONE")
+              unsafeIOToSTM (db "THREAD DONE")
               unsafeIOToSTM (db $ "BEFORE DECREMENT THREAD: " <> txt upre)
               releaseThread threadsInUse
               u <- readTVar threadsInUse

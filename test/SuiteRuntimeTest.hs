@@ -9,10 +9,12 @@ import Data.Yaml
 import GHC.Records
 import Internal.PreNode
 import qualified Internal.SuiteRuntime as S
+import Language.Haskell.TH (pprint)
 import Polysemy
-import Pyrelude (IO, Show, Text, const, debug_, debugf, pure, txtPretty, ($), (.))
-import Pyrelude.Test
-import Text.Show.Pretty
+import Pyrelude (IO, Int, Show, Text, const, debug_, debugf, maybe, maybef, pure, reverse, txtPretty, uu, ($), (.), (<$>), (>>=), ListLike (unsafeHead))
+import qualified Pyrelude as System.IO
+import qualified Pyrelude.Test
+import Text.Show.Pretty (pPrint, pPrintList, ppShowList, ppShow)
 import UnliftIO.Concurrent as C
   ( ThreadId,
     forkFinally,
@@ -21,8 +23,7 @@ import UnliftIO.Concurrent as C
     threadDelay,
   )
 import UnliftIO.STM
-import Language.Haskell.TH (pprint)
-import qualified Pyrelude as System.IO
+import TempUtils (debugLines)
 
 data RunEventType
   = HookStart
@@ -36,32 +37,31 @@ data RunEvent
   | Message Text ThreadId
   deriving (Show)
 
-logEvent :: STM (TQueue RunEvent) -> (ThreadId -> RunEvent) -> IO ()
+logEvent :: TQueue RunEvent -> (ThreadId -> RunEvent) -> IO ()
 logEvent q ev = do
-  q' <- atomically q
   i <- myThreadId
-  atomically . writeTQueue q' $ debugf txtPretty (ev i)
+  atomically . writeTQueue q $ ev i
 
-logBoundary :: STM (TQueue RunEvent) -> RunEventType -> Text -> IO ()
+logBoundary :: TQueue RunEvent -> RunEventType -> Text -> IO ()
 logBoundary q et msg =
   logEvent q (Boundary et msg)
 
-hookStart :: STM (TQueue RunEvent) -> Text -> IO ()
+hookStart :: TQueue RunEvent -> Text -> IO ()
 hookStart q = logBoundary q HookStart
 
-hookEnd :: STM (TQueue RunEvent) -> Text -> IO ()
+hookEnd :: TQueue RunEvent -> Text -> IO ()
 hookEnd q = logBoundary q HookEnd
 
-fixtureStart :: STM (TQueue RunEvent) -> Text -> IO ()
+fixtureStart :: TQueue RunEvent -> Text -> IO ()
 fixtureStart q = logBoundary q FixtureStart
 
-fixtureEnd :: STM (TQueue RunEvent) -> Text -> IO ()
+fixtureEnd :: TQueue RunEvent -> Text -> IO ()
 fixtureEnd q = logBoundary q FixtureEnd
 
-logMessage :: STM (TQueue RunEvent) -> Text -> IO ()
+logMessage :: TQueue RunEvent -> Text -> IO ()
 logMessage q txt = logEvent q (Message txt)
 
-superSimplSuite :: STM (TQueue RunEvent) -> PreNode () ()
+superSimplSuite :: TQueue RunEvent -> PreNode () ()
 superSimplSuite q =
   Root
     [ Fixture
@@ -71,8 +71,24 @@ superSimplSuite q =
         }
     ]
 
+tQToList :: [a] -> TQueue a -> IO [a]
+tQToList l q =
+  reverse
+    <$> ( atomically (tryReadTQueue q)
+            >>= maybe
+              (pure l)
+              (\a -> tQToList (a : l) q)
+        )
+
+exeSuiteTests :: (TQueue RunEvent -> PreNode () ()) -> Int -> IO ()
+exeSuiteTests preSuite threadCount = do
+  q <- atomically newTQueue
+  S.execute threadCount . S.linkParents $ preSuite q
+  C.threadDelay 1_000_000
+  l <- tQToList [] q
+  pPrint l
+
 -- $> unit_simple_single
 unit_simple_single :: IO ()
 unit_simple_single = do
-  System.IO.print "AND WE'RE OFF!"
-  S.execute 1 . S.linkParents $ superSimplSuite newTQueue
+  exeSuiteTests superSimplSuite 1

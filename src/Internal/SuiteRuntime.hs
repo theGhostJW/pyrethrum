@@ -211,8 +211,8 @@ tryLock status =
 -- executeHook only to be run when want executeHook has set
 -- staus to initalising should only ever run once per branch
 -- TODO - test exception on output of branch parent and in resource aquisition
-executeHook :: Node i o -> IO ()
-executeHook =
+executeHook :: (Text -> IO ()) -> Node i o -> IO ()
+executeHook db =
   \case
     Root {} -> pure ()
     Fixture {} -> pure ()
@@ -224,10 +224,10 @@ executeHook =
         hookChildren,
         hookRelease
       } -> do
-        input <- lockExecuteHook hookParent
+        input <- db "CALL PARENT LOCK EXECUTe hook" >> lockExecuteHook db hookParent
         bracket
           (hook input)
-          (hookRelease 1 {- TODO implemnt pass through timeout for release -})
+          (\o -> db "START HOOK RELEASE" >> hookRelease 1 o >> db "END HOOK RELEASE" {- TODO implemnt pass through timeout for release -})
           \hookOut -> do
             hkVal <- hookResult
             status <- hookStatus
@@ -236,8 +236,8 @@ executeHook =
               -- Initialising -> Running
               writeTVar status Running
 
-lockExecuteHook :: Node i o -> IO o
-lockExecuteHook = \case
+lockExecuteHook :: (Text -> IO ()) -> Node i o -> IO o
+lockExecuteHook db = \case
   Root {} -> pure ()
   Fixture {} -> pure ()
   branch@Hook
@@ -251,17 +251,18 @@ lockExecuteHook = \case
       bs <- hookStatus
       -- set status to initialising if not already running (tryLock)
       wantLaunch <- atomically $ tryLock bs
+      db $ "HOOK LOCK >>> " <> txt wantLaunch
       when
         wantLaunch
         --  this writes hook result to the TVar
-        (void $ executeHook branch) -- forkIO
+        (void $ executeHook db branch) -- forkIO
       hc' <- hookResult
       atomically $ readTMVar hc'
 
-loadFixture :: Node i o -> [o -> IO ()] -> IO () -> IO () -> IO LoadedFixture
-loadFixture parent iterations logStart logEnd = do
+loadFixture :: (Text -> IO ()) -> Node i o -> [o -> IO ()] -> IO () -> IO () -> IO LoadedFixture
+loadFixture db parent iterations logStart logEnd = do
   let loadIteration itr = do
-        input <- lockExecuteHook parent
+        input <- lockExecuteHook db parent
         itr input
 
   fixStatus <- newTVarIO Pending
@@ -278,11 +279,11 @@ loadFixture parent iterations logStart logEnd = do
 
 --
 
-mkFixtures :: Node i o -> [IO LoadedFixture]
-mkFixtures = \case
-  Root {rootChildren} -> rootChildren >>= mkFixtures
-  Hook {hookChildren} -> hookChildren >>= mkFixtures
-  Fixture logStart parent iterations logEnd -> [loadFixture parent iterations logStart logEnd]
+mkFixtures :: (Text -> IO ()) -> Node i o -> [IO LoadedFixture]
+mkFixtures db = \case
+  Root {rootChildren} -> rootChildren >>= mkFixtures db
+  Hook {hookChildren} -> hookChildren >>= mkFixtures db
+  Fixture logStart parent iterations logEnd -> [loadFixture db parent iterations logStart logEnd]
 
 data Executor = Executor
   { maxThreads :: Int,
@@ -319,8 +320,9 @@ data IterationRun = IterationRun
     iteration :: IO ()
   }
 
-updateStatusReturnCompleted :: LoadedFixture -> STM Bool
+updateStatusReturnCompleted :: (Text -> IO ()) -> LoadedFixture -> STM Bool
 updateStatusReturnCompleted
+  db
   LoadedFixture
     { fixStatus,
       iterations,
@@ -342,14 +344,15 @@ updateStatusReturnCompleted
           BeingKilled -> False
      in do
           i <- readTVar iterations
+          unsafeIOToSTM . db $ "EMPTY ITERATIONS: " <> txt (null i)
           a <- readTVar activeThreads
+          unsafeIOToSTM . db $ "EMPTY ACTIVE THREADS: " <> txt (null a)
           s <- readTVar fixStatus
+          unsafeIOToSTM . db $ "FIXTURE STATUS: " <> txt s
           let done = null i && null a && not (completionBlocked s)
               doneAlready = isDone s
               completed = done && not doneAlready
               newStatus = completed ? Done Normal $ s
-          writeTVar iterations i
-          writeTVar activeThreads a
           writeTVar fixStatus newStatus
           pure completed
 
@@ -547,27 +550,33 @@ unsafeAddr a = txt $ I# (word2Int# (aToWord# (unsafeCoerce# a)))
 forkFixtureThread :: TVar Int -> LoadedFixture -> (Text -> IO ()) -> IO ()
 forkFixtureThread
   threadsInUse
-  fx@LoadedFixture {activeThreads}
+  fx@LoadedFixture {activeThreads, logEnd}
   db = do
     db "III forkFixtureThread started"
     thrdStatus <- newTVarIO (ThreadInitialising 999)
     let tfx = forkFinally
           (db "III FIXTURE START" >> runFixture thrdStatus fx db)
           -- finally clean up
-          \_ -> atomically $ do
-            -- set this threadstatus to done
-            writeTVar thrdStatus ThreadDone
-            -- remove all finished threads from active threads list
-            ats <- readTVar activeThreads
-            newAts <- removeFinishedThreads ats
-            writeTVar activeThreads newAts
-            -- decrement global threads in use
-            upre <- readTVar threadsInUse
-            unsafeIOToSTM (db "III FIXTURE DONE")
-            unsafeIOToSTM (db $ "BEFORE DECREMENT THREAD: " <> txt upre)
-            releaseThread threadsInUse
-            u <- readTVar threadsInUse
-            unsafeIOToSTM (db $ "AFTER DECREMENT THREAD: " <> txt u)
+          \_ -> do
+            fxDone <- atomically $ do
+              -- set this threadstatus to done
+              writeTVar thrdStatus ThreadDone
+              -- remove all finished threads from active threads list
+              ats <- readTVar activeThreads
+              newAts <- removeFinishedThreads ats
+              writeTVar activeThreads newAts
+              -- decrement global threads in use
+              upre <- readTVar threadsInUse
+              unsafeIOToSTM (db "III FIXTURE DONE")
+              unsafeIOToSTM (db $ "BEFORE DECREMENT THREAD: " <> txt upre)
+              releaseThread threadsInUse
+              u <- readTVar threadsInUse
+              unsafeIOToSTM (db $ "AFTER DECREMENT THREAD: " <> txt u)
+              updateStatusReturnCompleted db fx
+            db $ "FIXTURE DONE: " <> txt fxDone
+            when
+              fxDone
+              logEnd
 
     db "III ABove Atomically"
     atomically $ do
@@ -638,8 +647,8 @@ execute maxThreads root = do
   -- hSetBuffering h NoBuffering
 
   lock <- newMVar ()
-  
-  let wantDebug = False
+
+  let wantDebug = True
       db :: Text -> IO ()
       db msg = wantDebug ? withMVar lock (const $ putStrLn (toS msg)) $ pure ()
 
@@ -647,7 +656,7 @@ execute maxThreads root = do
   -- putStrLn $ toS s
   -- hPutStrLn h s
 
-  fxs <- sequence $ mkFixtures root
+  fxs <- sequence $ mkFixtures db root
   let idxFxs = zip [0 ..] fxs
   -- create queue
   pendingQ <- newTQueueIO

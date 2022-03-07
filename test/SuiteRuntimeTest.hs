@@ -11,7 +11,7 @@ import Internal.PreNode
 import qualified Internal.SuiteRuntime as S
 import Language.Haskell.TH (pprint)
 import Polysemy
-import Pyrelude (IO, Int, ListLike (unsafeHead), Show, Text, const, debug_, debugf, maybe, maybef, pure, reverse, txtPretty, uu, ($), (.), (<$>), (>>=))
+import Pyrelude (IO, Int, ListLike (unsafeHead), Show, Text, const, debug_, debugf, maybe, maybef, pure, reverse, txt, txtPretty, uu, ($), (-), (.), (<$>), (<>), (>>=))
 import qualified Pyrelude as System.IO
 import qualified Pyrelude.Test
 import TempUtils (debugLines)
@@ -25,15 +25,23 @@ import UnliftIO.Concurrent as C
   )
 import UnliftIO.STM
 
-data RunEventType
-  = HookStart
-  | HookEnd
-  | FixtureStart
-  | FixtureEnd
+data BoundaryType
+  = Start
+  | End
+  deriving (Show)
+data BranchType
+  = Hook
+  | Fixture
   deriving (Show)
 
 data RunEvent
-  = Boundary RunEventType Text ThreadId
+  = Boundary BranchType BoundaryType Text ThreadId
+  | IterationMessage
+      { parentFix :: Text,
+        index :: Int,
+        message :: Text,
+        threadId :: ThreadId
+      }
   | Message Text ThreadId
   deriving (Show)
 
@@ -42,7 +50,7 @@ logEvent q ev = do
   i <- myThreadId
   atomically . writeTQueue q $ ev i
 
-logBoundary :: TQueue RunEvent -> RunEventType -> Text -> IO ()
+logBoundary :: TQueue RunEvent -> BranchType -> Text -> IO ()
 logBoundary q et msg =
   logEvent q (Boundary et msg)
 
@@ -58,32 +66,42 @@ fixtureStart q = logBoundary q FixtureStart
 fixtureEnd :: TQueue RunEvent -> Text -> IO ()
 fixtureEnd q = logBoundary q FixtureEnd
 
-logMessage :: TQueue RunEvent -> Text -> IO ()
-logMessage q txt = logEvent q (Message txt)
+logIteration :: TQueue RunEvent -> Text -> Int -> Text -> IO ()
+logIteration q fxTxt iidx itMsg = logEvent q (IterationMessage fxTxt iidx itMsg)
 
-mkFixture :: Text -> Int -> PreNode () ()
-mkFixture = 
+logMessage :: TQueue RunEvent -> Text -> IO ()
+logMessage q txt' = logEvent q (Message txt')
+
+mkFixture :: TQueue RunEvent -> Text -> Int -> PreNode () ()
+mkFixture q fxprefix itCount =
+  Fixture
+    { logStart = fixtureStart q fxprefix,
+      iterations = mkIterations q fxprefix itCount,
+      logEnd = fixtureEnd q fxprefix
+    }
+
+iterationMessage :: Int -> Text
+iterationMessage i = "iteration " <> txt i
+
+mkIterations :: TQueue RunEvent -> Text -> Int -> [() -> IO ()]
+mkIterations q fixId count =
+  let mkIt :: Int -> (() -> IO ())
+      mkIt idx = const (logIteration q fixId idx $ iterationMessage idx)
+   in mkIt <$> [0 .. count - 1]
 
 superSimplSuite :: TQueue RunEvent -> PreNode () ()
 superSimplSuite q =
   Root
-    [ Fixture
-        { logStart = fixtureStart q "started",
-          iterations = [const (logMessage q "iteration")],
-          logEnd = fixtureEnd q "ended"
-        }
+    [ mkFixture q "fixture 0" 1
     ]
 
 tQToList :: TQueue a -> IO [a]
 tQToList q =
-  reverse <$> recurse [] q
+  reverse <$> recurse []
   where
-    recurse :: [a] -> TQueue a -> IO [a]
-    recurse l q =
+    recurse l =
       atomically (tryReadTQueue q)
-        >>= maybe
-          (pure l)
-          (\a -> recurse (a : l) q)
+        >>= maybe (pure l) (\a -> recurse (a : l))
 
 exeSuiteTests :: (TQueue RunEvent -> PreNode () ()) -> Int -> IO ()
 exeSuiteTests preSuite threadCount = do

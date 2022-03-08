@@ -7,11 +7,11 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import Data.Yaml
 import GHC.Records
-import Internal.PreNode
+import Internal.PreNode as PN
 import qualified Internal.SuiteRuntime as S
 import Language.Haskell.TH (pprint)
 import Polysemy
-import Pyrelude (IO, Int, ListLike (unsafeHead), Show, Text, const, debug_, debugf, maybe, maybef, pure, reverse, txt, txtPretty, uu, ($), (-), (.), (<$>), (<>), (>>=))
+import Pyrelude (IO, Int, ListLike (unsafeHead), Maybe (Nothing), Show, Text, const, debug_, debugf, maybe, maybef, pure, reverse, txt, txtPretty, uu, ($), (-), (.), (<$>), (<>), (>>=))
 import qualified Pyrelude as System.IO
 import qualified Pyrelude.Test
 import TempUtils (debugLines)
@@ -29,13 +29,20 @@ data BoundaryType
   = Start
   | End
   deriving (Show)
+
 data BranchType
   = Hook
   | Fixture
   deriving (Show)
 
 data RunEvent
-  = Boundary BranchType BoundaryType Text ThreadId
+  = Boundary
+      { branchType :: BranchType,
+        boundaryType :: BoundaryType,
+        boundaryParentFix :: Text,
+        threadId :: ThreadId,
+        id :: Text
+      }
   | IterationMessage
       { parentFix :: Text,
         index :: Int,
@@ -50,21 +57,34 @@ logEvent q ev = do
   i <- myThreadId
   atomically . writeTQueue q $ ev i
 
-logBoundary :: TQueue RunEvent -> BranchType -> Text -> IO ()
-logBoundary q et msg =
-  logEvent q (Boundary et msg)
+logBoundary :: TQueue RunEvent -> BranchType -> BoundaryType -> Text -> Text -> IO ()
+logBoundary q brt bdt parentId id' =
+  logEvent q $ \thrd ->
+    Boundary
+      { branchType = brt,
+        boundaryType = bdt,
+        boundaryParentFix = parentId,
+        threadId = thrd,
+        id = id'
+      }
 
-hookStart :: TQueue RunEvent -> Text -> IO ()
-hookStart q = logBoundary q HookStart
+hook :: TQueue RunEvent -> BoundaryType -> Text -> Text -> IO ()
+hook q = logBoundary q SuiteRuntimeTest.Hook 
 
-hookEnd :: TQueue RunEvent -> Text -> IO ()
-hookEnd q = logBoundary q HookEnd
+hookStart :: TQueue RunEvent -> Text -> Text -> IO ()
+hookStart q = SuiteRuntimeTest.hook q Start
 
-fixtureStart :: TQueue RunEvent -> Text -> IO ()
-fixtureStart q = logBoundary q FixtureStart
+hookEnd :: TQueue RunEvent -> Text -> Text -> IO ()
+hookEnd q = SuiteRuntimeTest.hook q End
 
-fixtureEnd :: TQueue RunEvent -> Text -> IO ()
-fixtureEnd q = logBoundary q FixtureEnd
+fixture :: TQueue RunEvent -> BoundaryType -> Text -> Text -> IO ()
+fixture q = logBoundary q SuiteRuntimeTest.Fixture
+
+fixtureStart :: TQueue RunEvent -> Text -> Text -> IO ()
+fixtureStart q = SuiteRuntimeTest.fixture q Start
+
+fixtureEnd :: TQueue RunEvent -> Text -> Text -> IO ()
+fixtureEnd q =  SuiteRuntimeTest.fixture q End
 
 logIteration :: TQueue RunEvent -> Text -> Int -> Text -> IO ()
 logIteration q fxTxt iidx itMsg = logEvent q (IterationMessage fxTxt iidx itMsg)
@@ -72,12 +92,12 @@ logIteration q fxTxt iidx itMsg = logEvent q (IterationMessage fxTxt iidx itMsg)
 logMessage :: TQueue RunEvent -> Text -> IO ()
 logMessage q txt' = logEvent q (Message txt')
 
-mkFixture :: TQueue RunEvent -> Text -> Int -> PreNode () ()
-mkFixture q fxprefix itCount =
-  Fixture
-    { logStart = fixtureStart q fxprefix,
-      iterations = mkIterations q fxprefix itCount,
-      logEnd = fixtureEnd q fxprefix
+mkFixture :: TQueue RunEvent -> Text -> Text -> Int -> PreNode () ()
+mkFixture q parentId fxId itCount =
+  PN.Fixture
+    { logStart = fixtureStart q parentId fxId,
+      iterations = mkIterations q fxId itCount,
+      logEnd = fixtureEnd q parentId fxId
     }
 
 iterationMessage :: Int -> Text
@@ -92,7 +112,7 @@ mkIterations q fixId count =
 superSimplSuite :: TQueue RunEvent -> PreNode () ()
 superSimplSuite q =
   Root
-    [ mkFixture q "fixture 0" 1
+    [ mkFixture q "Root" "fixture 0" 1
     ]
 
 tQToList :: TQueue a -> IO [a]
@@ -111,7 +131,6 @@ exeSuiteTests preSuite threadCount = do
   pPrint l
 
 -- $> unit_simple_single
-
 unit_simple_single :: IO ()
 unit_simple_single = do
   exeSuiteTests superSimplSuite 1

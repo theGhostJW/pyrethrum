@@ -7,12 +7,12 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import Data.Yaml
 import GHC.Records
+import Internal.PreNode (PreNode (iterations))
 import Internal.PreNode as PN
 import qualified Internal.SuiteRuntime as S
 import Language.Haskell.TH (pprint)
 import Polysemy
-import Pyrelude (IO, Int, ListLike (unsafeHead), Maybe (Nothing), Show, Text, const, debug_, debugf, maybe, maybef, pure, reverse, txt, txtPretty, uu, ($), (-), (.), (<$>), (<>), (>>=))
-import qualified Pyrelude as System.IO
+import Pyrelude (Bool (..), Eq, IO, Int, ListLike (unsafeHead), Maybe (Nothing), Show, Text, const, count, debug_, debugf, error, length, maybe, maybef, pure, reverse, txt, txtPretty, uncurry, uu, zip, ($), (-), (.), (<$>), (<>), (>>=))
 import qualified Pyrelude.Test
 import TempUtils (debugLines)
 import Text.Show.Pretty (pPrint, pPrintList, ppShow, ppShowList)
@@ -33,7 +33,66 @@ data BoundaryType
 data BranchType
   = Hook
   | Fixture
+  deriving (Show, Eq)
+
+data NodeStats
+  = HookStats
+      { id :: Text,
+        parent :: Text,
+        fixtureCount :: Int,
+        hookCount :: Int
+      }
+  | FixtureStats
+      { id :: Text,
+        parent :: Text,
+        iterationCount :: Int
+      }
   deriving (Show)
+
+getStats :: PreNode a b -> [NodeStats]
+getStats =
+  let isFixture :: PreNode a b -> Bool
+      isFixture = \case
+        Root _ -> False
+        PN.Hook {} -> False
+        PN.Fixture {} -> True
+
+      isHook :: PreNode a b -> Bool
+      isHook = \case
+        Root _ -> False
+        PN.Hook {} -> True
+        PN.Fixture {} -> False
+
+      getStats' :: Text -> Int -> PreNode a b -> [NodeStats]
+      getStats' parentId subIndex =
+        \case
+          Root _ -> error "should not be called"
+          PN.Hook {hookChildren} ->
+            let thisId = parentId <> ".Hook" <> txt subIndex
+                thisNode =
+                  HookStats
+                    { id = thisId,
+                      parent = parentId,
+                      fixtureCount = count isFixture hookChildren,
+                      hookCount = count isHook hookChildren
+                    }
+             in thisNode : (zip [0 ..] hookChildren >>= uncurry (getStats' thisId))
+          PN.Fixture {iterations} ->
+            [ FixtureStats
+                { id = parentId <> ".Fixture" <> txt subIndex,
+                  parent = parentId,
+                  iterationCount = length iterations
+                }
+            ]
+   in \case
+        Root children -> (zip [0 ..] children >>= uncurry (getStats' "Root"))
+        PN.Hook {} -> error "should not be called"
+        PN.Fixture {} -> error "should not be called"
+
+data BoundaryInfo = BoundaryInfo
+  { id :: Text,
+    childCount :: Int
+  }
 
 data RunEvent
   = Boundary
@@ -69,7 +128,7 @@ logBoundary q brt bdt parentId id' =
       }
 
 hook :: TQueue RunEvent -> BoundaryType -> Text -> Text -> IO ()
-hook q = logBoundary q SuiteRuntimeTest.Hook 
+hook q = logBoundary q SuiteRuntimeTest.Hook
 
 hookStart :: TQueue RunEvent -> Text -> Text -> IO ()
 hookStart q = SuiteRuntimeTest.hook q Start
@@ -84,7 +143,7 @@ fixtureStart :: TQueue RunEvent -> Text -> Text -> IO ()
 fixtureStart q = SuiteRuntimeTest.fixture q Start
 
 fixtureEnd :: TQueue RunEvent -> Text -> Text -> IO ()
-fixtureEnd q =  SuiteRuntimeTest.fixture q End
+fixtureEnd q = SuiteRuntimeTest.fixture q End
 
 logIteration :: TQueue RunEvent -> Text -> Int -> Text -> IO ()
 logIteration q fxTxt iidx itMsg = logEvent q (IterationMessage fxTxt iidx itMsg)
@@ -95,7 +154,8 @@ logMessage q txt' = logEvent q (Message txt')
 mkFixture :: TQueue RunEvent -> Text -> Text -> Int -> PreNode () ()
 mkFixture q parentId fxId itCount =
   PN.Fixture
-    { logStart = fixtureStart q parentId fxId,
+    { fixtureAdddress = fxId,
+      logStart = fixtureStart q parentId fxId,
       iterations = mkIterations q fxId itCount,
       logEnd = fixtureEnd q parentId fxId
     }
@@ -104,10 +164,10 @@ iterationMessage :: Int -> Text
 iterationMessage i = "iteration " <> txt i
 
 mkIterations :: TQueue RunEvent -> Text -> Int -> [() -> IO ()]
-mkIterations q fixId count =
+mkIterations q fixId count' =
   let mkIt :: Int -> (() -> IO ())
       mkIt idx = const (logIteration q fixId idx $ iterationMessage idx)
-   in mkIt <$> [0 .. count - 1]
+   in mkIt <$> [0 .. count' - 1]
 
 superSimplSuite :: TQueue RunEvent -> PreNode () ()
 superSimplSuite q =
@@ -126,8 +186,10 @@ tQToList q =
 exeSuiteTests :: (TQueue RunEvent -> PreNode () ()) -> Int -> IO ()
 exeSuiteTests preSuite threadCount = do
   q <- atomically newTQueue
-  S.execute threadCount . S.linkParents $ preSuite q
+  let preSuite' = preSuite q
+  S.execute threadCount $ S.linkParents preSuite'
   l <- tQToList q
+  pPrint $ getStats preSuite'
   pPrint l
 
 -- $> unit_simple_single

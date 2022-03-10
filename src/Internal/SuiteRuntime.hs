@@ -558,7 +558,7 @@ runFixture
 -- Any is a type to which any type can be safely unsafeCoerced to.
 
 -- A datatype that has the same layout as Word and so can be casted to it.
-data Ptr' a = Ptr' a
+newtype Ptr' a = Ptr' a
 
 -- Any is a type to which any type can be safely unsafeCoerced to.
 aToWord# :: GHC.Exts.Any -> Word#

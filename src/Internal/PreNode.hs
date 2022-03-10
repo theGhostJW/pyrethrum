@@ -15,6 +15,7 @@ data PreNode i o where
     PreNode () ()
   Hook ::
     { 
+      hookAdddress :: Text, -- used in testing
       hookStatus :: IO (TVar HookStatus),
       hook :: i -> IO o,
       hookChildren :: [PreNode o o2],
@@ -22,7 +23,10 @@ data PreNode i o where
     } ->
     PreNode i o
   Fixture ::
-    { logStart :: IO (),
+    { 
+      -- used in testing
+      fixtureAdddress :: Text,
+      logStart :: IO (),
       iterations :: [i -> IO ()],
       logEnd :: IO ()
     } ->

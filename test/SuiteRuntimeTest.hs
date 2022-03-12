@@ -329,7 +329,6 @@ exeSuiteTests preSuite threadCount = do
   chkFixtures stats l
 
 -- $> unit_simple_single
-
 unit_simple_single :: IO ()
 unit_simple_single = do
   exeSuiteTests superSimplSuite 1

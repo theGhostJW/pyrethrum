@@ -1,21 +1,17 @@
-
-
 module Internal.PreNode where
 
-import Pyrelude ( Show, Int, IO, TVar, SomeException, Text )
-import UnliftIO ( MonadUnliftIO )
+import Pyrelude (IO, Int, Show, SomeException, TVar, Text)
+import UnliftIO (MonadUnliftIO)
 
 data CompletionStatus = Normal | Fault Text SomeException | Murdered deriving (Show)
 
 data PreNode i o where
   Root ::
-    { 
-      rootChildren :: [PreNode () o]
+    { rootChildren :: [PreNode () o]
     } ->
     PreNode () ()
   Hook ::
-    { 
-      hookAdddress :: Text, -- used in testing
+    { hookAddress :: Text, -- used in testing
       hookStatus :: IO (TVar HookStatus),
       hook :: i -> IO o,
       hookChildren :: [PreNode o o2],
@@ -23,9 +19,7 @@ data PreNode i o where
     } ->
     PreNode i o
   Fixture ::
-    { 
-      -- used in testing
-      fixtureAdddress :: Text,
+    { fixtureAddress :: Text, -- used in testing
       logStart :: IO (),
       iterations :: [i -> IO ()],
       logEnd :: IO ()
@@ -39,4 +33,3 @@ data HookStatus
   | Complete CompletionStatus
   | BeingMurdered
   deriving (Show)
-  

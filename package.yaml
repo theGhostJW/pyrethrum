@@ -42,6 +42,12 @@ ghc-options:
   - -ferror-spans
   - -fprint-potential-instances
   # - -dth-dec-file -- generate template haskell
+  - -j3 #number of cores used by ghc in compiling
+
+  # threading related options only has an effect for exes
+  # - -threaded 
+  # - -rtsopts 
+  # - -with-rtsopts=-N
 
   # - -O2
   # TODO: prgma to turn optimisations on for non-dev build

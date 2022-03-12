@@ -5,7 +5,7 @@
 
 module Internal.SuiteRuntime where
 
-import Data.Function (const, ($), (&), (.))
+import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty))
 --     MonadUnliftIO,
 --     STM,
@@ -28,20 +28,21 @@ import Data.Sequence (Seq (Empty))
 --     writeTVar, newTMVarIO, isEmptyTMVar,
 
 import GHC.Exts
-import Internal.PreNode
+import qualified Internal.PreNode as PN
   ( CompletionStatus (Fault, Normal),
     HookStatus (..),
-    PreNode (hookChildren, rootChildren),
+    PreNode (..),
+    PreNodeRoot (..),
   )
-import qualified Internal.PreNode as PN
-import Pyrelude (Alternative ((<|>)), Any, BufferMode (NoBuffering), Handle, IOMode (WriteMode), Identity, ListLike, SomeException, Text, bool, eitherf, finally, fromMaybe, getEnv, hClose, hSetBuffering, isEmptyMVar, isJust, mapLeft, maybef, newEmptyMVar, newTVar, openFile, setEnv, stdout, threadDelay, throw, toS, traverse_, txt, txtPretty, unless, unlessJust, unsafeIOToSTM, unsafePerformIO, uu, void, when, ($>), (?))
-import Pyrelude.IO (hPutStrLn)
+import Pyrelude hiding (threadStatus, parent, ThreadRunning, ThreadStatus, atomically, bracket, forkFinally, newMVar, newTVarIO, readTVarIO, withMVar)
+import Pyrelude.IO (hPutStrLn, putStrLn)
 import UnliftIO
   ( Exception (displayException),
     bracket,
     catchAny,
     newMVar,
     newTMVar,
+    pureTry,
     putMVar,
     tryAny,
   )
@@ -70,40 +71,40 @@ import UnliftIO.STM
     writeTQueue,
     writeTVar,
   )
-import Prelude
+import qualified Prelude as PRL
 
 data FixtureStatus
   = Pending
   | Starting
   | Active
-  | Done CompletionStatus
+  | Done PN.CompletionStatus
   | BeingKilled
   deriving (Show)
 
-isComplete :: HookStatus -> Bool
+isComplete :: PN.HookStatus -> Bool
 isComplete = \case
-  Complete _ -> True
+  PN.Complete _ -> True
   _ -> False
 
 data HookExe i o where
   HookExe ::
     { hookParent :: HookExe i0 i,
-      hookStatus :: IO (TVar HookStatus),
+      hookStatus :: IO (TVar PN.HookStatus),
       hook :: i -> IO o,
       hookResult :: IO (TMVar o),
       hookRelease :: Int -> o -> IO ()
     } ->
     HookExe i o
 
+data NodeRoot o = NodeRoot
+  { rootStatus :: IO (TVar PN.HookStatus),
+    children :: [Node () o]
+  }
+
 data Node i o where
-  Root ::
-    { rootStatus :: IO (TVar hookStatus),
-      rootChildren :: [Node () o]
-    } ->
-    Node () ()
   Hook ::
-    { hookParent :: Node i0 i,
-      hookStatus :: IO (TVar HookStatus),
+    { hookParent :: Either i (Node i0 i),
+      hookStatus :: IO (TVar PN.HookStatus),
       hook :: i -> IO o,
       hookResult :: IO (TMVar o),
       hookChildren :: [Node o o2],
@@ -112,7 +113,7 @@ data Node i o where
     Node i o
   Fixture ::
     { logStart :: IO (),
-      fixParent :: Node i0 i,
+      fixParent :: Either i (Node i0 i),
       iterations :: [i -> IO ()],
       logEnd :: IO ()
     } ->
@@ -152,35 +153,23 @@ data IndexedFixture = IndexedFixture
   ~ test with null iterations
 -}
 
-linkParents :: PreNode () () -> Node () ()
-linkParents =
-  let emptyRoot :: Node () ()
-      emptyRoot =
-        Root
-          { rootStatus = newTVarIO Unintialised,
-            rootChildren = []
-          }
-   in \case
-        r@PN.Root {} -> linkParents' emptyRoot r
-        _ -> error "Bad call this internal function can only be Called on Root"
+linkParents :: PN.PreNodeRoot o -> NodeRoot o
+linkParents PN.PreNodeRoot {children} =
+  NodeRoot
+    { rootStatus = newTVarIO PN.Intitialising,
+      children = linkParents' (Left ()) <$> children
+    }
 
-linkParents' :: Node i o -> PreNode o o' -> Node o o'
+linkParents' :: Either o (Node i o) -> PN.PreNode o o' -> Node o o'
 linkParents' parent = \case
-  PN.Root {rootChildren} ->
-    let r =
-          Internal.SuiteRuntime.Root
-            { rootStatus = newTVarIO Intitialising,
-              rootChildren = linkParents' r <$> rootChildren
-            }
-     in r
   PN.Hook {hookStatus, hook, hookChildren, hookRelease} ->
     let h =
           Internal.SuiteRuntime.Hook
             { hookParent = parent,
-              hookStatus = newTVarIO Intitialising,
+              hookStatus = newTVarIO PN.Intitialising,
               hook = hook,
               hookResult = newEmptyTMVarIO,
-              hookChildren = linkParents' h <$> hookChildren,
+              hookChildren = linkParents' (Right h) <$> hookChildren,
               hookRelease = hookRelease
             }
      in h
@@ -192,20 +181,20 @@ linkParents' parent = \case
         logEnd = logEnd
       }
 
-isUninitialised :: HookStatus -> Bool
+isUninitialised :: PN.HookStatus -> Bool
 isUninitialised = \case
-  Unintialised -> True
-  Intitialising -> False
-  Running -> False
-  Complete cs -> False
-  BeingMurdered -> False
+  PN.Unintialised -> True
+  PN.Intitialising -> False
+  PN.Running -> False
+  PN.Complete cs -> False
+  PN.BeingMurdered -> False
 
-tryLock :: TVar HookStatus -> STM Bool
+tryLock :: TVar PN.HookStatus -> STM Bool
 tryLock status =
   readTVar status
     >>= bool
       (pure False)
-      (writeTVar status Intitialising >> pure True)
+      (writeTVar status PN.Intitialising >> pure True)
       . isUninitialised
 
 -- executeHook only to be run when want executeHook has set
@@ -214,7 +203,6 @@ tryLock status =
 executeHook :: (Text -> IO ()) -> Node i o -> IO ()
 executeHook db =
   \case
-    Root {} -> pure ()
     Fixture {} -> pure ()
     Hook
       { hookParent,
@@ -234,32 +222,36 @@ executeHook db =
             atomically $ do
               putTMVar hkVal hookOut
               -- Initialising -> Running
-              writeTVar status Running
+              writeTVar status PN.Running
 
-lockExecuteHook :: (Text -> IO ()) -> Node i o -> IO o
-lockExecuteHook db = \case
-  Root {} -> pure ()
-  Fixture {} -> pure ()
-  branch@Hook
-    { hookParent,
-      hookStatus,
-      hook,
-      hookResult,
-      hookChildren,
-      hookRelease
-    } -> do
-      bs <- hookStatus
-      -- set status to initialising if not already running (tryLock)
-      wantLaunch <- atomically $ tryLock bs
-      db $ "HOOK LOCK >>> " <> txt wantLaunch
-      when
-        wantLaunch
-        --  this writes hook result to the TVar
-        (void $ executeHook db branch) -- forkIO
-      hc' <- hookResult
-      atomically $ readTMVar hc'
+lockExecuteHook :: (Text -> IO ()) -> Either o (Node i o) -> IO o
+lockExecuteHook db parent =
+  eitherf
+    parent
+    pure
+    ( \case
+        Fixture {} -> pure ()
+        branch@Hook
+          { hookParent,
+            hookStatus,
+            hook,
+            hookResult,
+            hookChildren,
+            hookRelease
+          } -> do
+            bs <- hookStatus
+            -- set status to initialising if not already running (tryLock)
+            wantLaunch <- atomically $ tryLock bs
+            db $ "HOOK LOCK >>> " <> txt wantLaunch
+            when
+              wantLaunch
+              --  this writes hook result to the TVar
+              (void $ executeHook db branch) -- forkIO
+            hc' <- hookResult
+            atomically $ readTMVar hc'
+    )
 
-loadFixture :: (Text -> IO ()) -> Node i o -> [o -> IO ()] -> IO () -> IO () -> IO LoadedFixture
+loadFixture :: (Text -> IO ()) -> Either o (Node i o) -> [o -> IO ()] -> IO () -> IO () -> IO LoadedFixture
 loadFixture db parent iterations logStart logEnd = do
   let loadIteration itr = do
         input <- lockExecuteHook db parent
@@ -281,7 +273,6 @@ loadFixture db parent iterations logStart logEnd = do
 
 mkFixtures :: (Text -> IO ()) -> Node i o -> [IO LoadedFixture]
 mkFixtures db = \case
-  Root {rootChildren} -> rootChildren >>= mkFixtures db
   Hook {hookChildren} -> hookChildren >>= mkFixtures db
   Fixture logStart parent iterations logEnd -> [loadFixture db parent iterations logStart logEnd]
 
@@ -352,7 +343,7 @@ updateStatusReturnCompleted
           let done = null i && null a && not (completionBlocked s)
               doneAlready = isDone s
               completed = done && not doneAlready
-              newStatus = completed ? Done Normal $ s
+              newStatus = completed ? Done PN.Normal $ s
           writeTVar fixStatus newStatus
           pure completed
 
@@ -385,9 +376,9 @@ nextActiveFixtureRemoveDone activeQ =
         maybef
           mfx
           (pure Nothing)
-          \ifx@IndexedFixture {index, fixture = fixture@LoadedFixture {fixStatus}} ->
+          \ifx@IndexedFixture {index = index', fixture = fixture@LoadedFixture {fixStatus}} ->
             let nxtInitial :: Maybe Int
-                nxtInitial = mInitilIndex <|> Just index
+                nxtInitial = mInitilIndex <|> Just index'
 
                 reQu :: STM ()
                 reQu = writeTQueue activeQ ifx
@@ -398,7 +389,7 @@ nextActiveFixtureRemoveDone activeQ =
                 reQReturnThisFixture :: STM (Maybe LoadedFixture)
                 reQReturnThisFixture = reQu $> Just fixture
              in -- if we are back where we started we are done
-                mInitilIndex == Just index
+                mInitilIndex == Just index'
                   ? pure Nothing
                   $ do
                     status <- readTVar fixStatus
@@ -526,7 +517,7 @@ runFixture
                 elst
                 ( \e -> do
                     db "RF - LogStartleft"
-                    atomically $ writeTVar fixStatus $ Done (Fault "Failed logging fixture start" e)
+                    atomically $ writeTVar fixStatus $ Done (PN.Fault "Failed logging fixture start" e)
                     -- if we get here things have really screwed up ye old terminal as a last resort
                     logError $ "Failed logging fixture start\n" <> toS (displayException e)
 
@@ -660,8 +651,8 @@ execute'
 qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()
 qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture
 
-execute :: Int -> Node i o -> IO ()
-execute maxThreads root = do
+execute :: Int -> NodeRoot o -> IO ()
+execute maxThreads NodeRoot{rootStatus, children} = do
   hSetBuffering stdout NoBuffering
   -- h <- openFile "C:\\Pyrethrum\\log.log" WriteMode
   -- hSetBuffering h NoBuffering
@@ -676,7 +667,7 @@ execute maxThreads root = do
   -- putStrLn $ toS s
   -- hPutStrLn h s
 
-  fxs <- sequence $ mkFixtures db root
+  fxs <- sequence $ children >>= mkFixtures db 
   let idxFxs = zip [0 ..] fxs
   -- create queue
   pendingQ <- newTQueueIO

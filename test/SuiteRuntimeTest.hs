@@ -98,24 +98,21 @@ isFixtureStats = \case
   HookStats {} -> False
   FixtureStats {} -> True
 
-getStats :: PreNode a b -> [NodeStats]
-getStats =
+getStats :: PreNodeRoot a -> [NodeStats]
+getStats PreNodeRoot {children} =
   let isFixture :: PreNode a b -> Bool
       isFixture = \case
-        Root _ -> False
         PN.Hook {} -> False
         PN.Fixture {} -> True
 
       isHook :: PreNode a b -> Bool
       isHook = \case
-        Root _ -> False
         PN.Hook {} -> True
         PN.Fixture {} -> False
 
       getStats' :: Text -> Int -> PreNode a b -> [NodeStats]
       getStats' parentId subIndex =
         \case
-          Root _ -> error "should not be called"
           PN.Hook {hookChildren} ->
             let thisId = parentId <> ".Hook " <> txt subIndex
                 thisNode =
@@ -133,10 +130,7 @@ getStats =
                   iterationCount = length iterations
                 }
             ]
-   in \case
-        Root children -> (zip [0 ..] children >>= uncurry (getStats' "Root"))
-        PN.Hook {} -> error "should not be called"
-        PN.Fixture {} -> error "should not be called"
+   in zip [0 ..] children >>= uncurry (getStats' "Root")
 
 data BoundaryInfo = BoundaryInfo
   { id :: Text,
@@ -226,9 +220,9 @@ mkIterations q fixFullId count' =
       mkIt idx = const (logIteration q fixFullId idx $ iterationMessage idx)
    in mkIt <$> [0 .. count' - 1]
 
-superSimplSuite :: TQueue RunEvent -> PreNode () ()
+superSimplSuite :: TQueue RunEvent -> PreNodeRoot ()
 superSimplSuite q =
-  Root
+  PreNodeRoot
     [ mkFixture q "Root" "Fixture 0" 1
     ]
 
@@ -317,7 +311,7 @@ chkFixtures stats lstRE =
         chkEq' "expected fixture end count" fixStatCount $ length fixEnds
         for_ stats chkFixture
 
-exeSuiteTests :: (TQueue RunEvent -> PreNode () ()) -> Int -> IO ()
+exeSuiteTests :: (TQueue RunEvent -> PreNodeRoot ()) -> Int -> IO ()
 exeSuiteTests preSuite threadCount = do
   q <- atomically newTQueue
   let preSuite' = preSuite q

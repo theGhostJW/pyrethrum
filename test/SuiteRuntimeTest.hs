@@ -211,6 +211,19 @@ mkFixture q parentId fxId itCount =
   where
     fid = fullId parentId fxId
 
+mkHook :: TQueue RunEvent -> Text -> Text -> Int -> PreNode () ()
+mkHook q parentId hkId itCount =
+  PN.Hook
+    { 
+      hookAddress = hid, -- used in testing
+      hookStatus =  newTVarIO Unintialised,
+      hook = hookStart parentId hid,
+      hookChildren = [],
+      hookRelease = hookEnd parentId hid
+    }
+  where
+    hid = fullId parentId hkId
+
 iterationMessage :: Int -> Text
 iterationMessage i = "iteration " <> txt i
 
@@ -224,6 +237,13 @@ superSimplSuite :: TQueue RunEvent -> PreNodeRoot ()
 superSimplSuite q =
   PreNodeRoot
     [ mkFixture q "Root" "Fixture 0" 1
+    ]
+
+simpleSuiteWithHook :: TQueue RunEvent -> PreNodeRoot ()
+simpleSuiteWithHook q =
+  PreNodeRoot
+    [ mkHoo
+      mkFixture q "Root" "Fixture 0" 1
     ]
 
 tQToList :: TQueue a -> IO [a]

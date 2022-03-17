@@ -62,7 +62,8 @@ import UnliftIO.Concurrent as C
     threadDelay,
   )
 import UnliftIO.STM
-import Prelude (Ord)
+import Prelude (Ord, putStrLn)
+import Data.Aeson.Encoding (quarter)
 
 data BoundaryType
   = Start
@@ -192,7 +193,9 @@ fixtureEnd :: TQueue RunEvent -> Text -> Text -> IO ()
 fixtureEnd q = SuiteRuntimeTest.fixture q End
 
 logIteration :: TQueue RunEvent -> Text -> Int -> Text -> IO ()
-logIteration q fxTxt iidx itMsg = logEvent q (IterationMessage fxTxt iidx itMsg)
+logIteration q fxTxt iidx itMsg = 
+  error "Iteration Run"
+  logEvent q (IterationMessage fxTxt iidx itMsg)
 
 logMessage :: TQueue RunEvent -> Text -> IO ()
 logMessage q txt' = logEvent q (Message txt')
@@ -211,15 +214,15 @@ mkFixture q parentId fxId itCount =
   where
     fid = fullId parentId fxId
 
-mkHook :: TQueue RunEvent -> Text -> Text -> Int -> PreNode () ()
-mkHook q parentId hkId itCount =
+mkHook :: TQueue RunEvent -> Text -> Text -> [PreNode () ()] -> PreNode () ()
+mkHook q parentId hkId nodeChildren =
   PN.Hook
     { 
       hookAddress = hid, -- used in testing
       hookStatus =  newTVarIO Unintialised,
-      hook = hookStart parentId hid,
-      hookChildren = [],
-      hookRelease = hookEnd parentId hid
+      hook = const $ hookStart q parentId hid,
+      hookChildren = nodeChildren,
+      hookRelease = \_ _ -> hookEnd q parentId hid
     }
   where
     hid = fullId parentId hkId
@@ -242,8 +245,8 @@ superSimplSuite q =
 simpleSuiteWithHook :: TQueue RunEvent -> PreNodeRoot ()
 simpleSuiteWithHook q =
   PreNodeRoot
-    [ mkHoo
-      mkFixture q "Root" "Fixture 0" 1
+    [ 
+      mkHook q "Root" "Hook 0" [mkFixture q "Root" "Fixture 0" 1]
     ]
 
 tQToList :: TQueue a -> IO [a]
@@ -336,13 +339,21 @@ exeSuiteTests preSuite threadCount = do
   q <- atomically newTQueue
   let preSuite' = preSuite q
       stats = getStats preSuite'
+  pPrint stats
+  pPrint "OFF LIKE A ROCKET"
   S.execute threadCount $ S.linkParents preSuite'
   l <- tQToList q
-  pPrint $ getStats preSuite'
+  pPrint stats
   pPrint l
   chkFixtures stats l
 
--- $> unit_simple_single
+-- $ > unit_simple_single
 unit_simple_single :: IO ()
 unit_simple_single = do
   exeSuiteTests superSimplSuite 1
+
+
+-- $> unit_simple_with_hook
+unit_simple_with_hook :: IO ()
+unit_simple_with_hook = do
+  exeSuiteTests simpleSuiteWithHook 1

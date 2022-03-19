@@ -2,6 +2,9 @@
 {-# LANGUAGE BangPatterns #-}
 -- {-# LANGUAGE NoStrictData #-}
 {-# LANGUAGE MagicHash #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Move brackets to avoid $" #-}
 
 module Internal.SuiteRuntime where
 
@@ -30,12 +33,13 @@ import Data.Sequence (Seq (Empty))
 import GHC.Exts
 import Internal.PreNode (HookStatus (Finalised, Finalising), finalised)
 import qualified Internal.PreNode as PN
-  ( CompletionStatus (Fault, Normal),
+  ( CompletionStatus (Fault, Murdered, Normal),
     HookStatus (..),
     PreNode (..),
     PreNodeRoot (..),
   )
-import Pyrelude hiding (ThreadRunning, ThreadStatus, atomically, bracket, forkFinally, newMVar, newTVarIO, parent, readTVarIO, threadStatus, withMVar)
+import Pyrelude (bool)
+import Pyrelude hiding (ThreadRunning, ThreadStatus, atomically, bool, bracket, forkFinally, newMVar, newTVarIO, parent, readTVarIO, threadStatus, withMVar)
 import Pyrelude.IO (hPutStrLn, putStrLn)
 import UnliftIO
   ( Exception (displayException),
@@ -97,7 +101,6 @@ data NodeRoot o = NodeRoot
     children :: [Node () o]
   }
 
-
 data Node i o where
   Hook ::
     { hookParent :: Either i (Node i0 i),
@@ -110,29 +113,26 @@ data Node i o where
     Node i o
   Fixture ::
     { logStart :: IO (),
-      fixStatus :: TVar FixtureStatus,
+      fixStatus :: IO (TVar FixtureStatus),
       fixParent :: Either i (Node i0 i),
       iterations :: [i -> IO ()],
       logEnd :: IO ()
     } ->
     Node i ()
 
-data LoadedHook = LoadedHook {
-  hookRelease :: IO (),
-  parentLoadedHook :: LoadedHook
-}
+data LoadedHook = LoadedHook
+  { hookRelease :: IO (),
+    parentLoadedHook :: LoadedHook
+  }
 
 data LoadedFixture = LoadedFixture
-  {
-    logStart :: IO (),
+  { logStart :: IO (),
     fixStatus :: TVar FixtureStatus,
     iterations :: TVar [IO ()],
     activeThreads :: TVar [RunningThread],
     logEnd :: IO (),
     releaseParentHook :: IO ()
   }
-
-
 
 isDone :: FixtureStatus -> Bool
 isDone = \case
@@ -142,19 +142,58 @@ isDone = \case
   Done _ -> True
   BeingKilled -> False
 
-
-nodeFinished ::  Node i o -> IO Bool
+nodeFinished :: Node i o -> IO Bool
 nodeFinished = \case
-  Fixture { fixStatus } -> isDone <$> atomically (readTVar fixStatus)
+  Fixture {fixStatus} -> isDone <$> (fixStatus >>= atomically . readTVar)
   Hook {hookStatus} -> finalised <$> (hookStatus >>= atomically . readTVar)
 
-recurseHookRelease :: Node i o -> IO ()
-recurseHookRelease = \case
-  Fixture {} -> pure ()
-  Hook {hookResult, hookChildren, hookRelease} -> uu
+data CanFinaliseHook = NotReady | CanBeFinalised | FinalisedAlready deriving (Eq)
 
+trySetFinalising :: TVar HookStatus -> STM CanFinaliseHook
+trySetFinalising hs' =
+  let nr = pure NotReady
+      fa = pure FinalisedAlready
+   in readTVar hs'
+        >>= ( \case
+                PN.Unintialised -> nr
+                PN.Intitialising -> nr
+                PN.Running -> nr
+                PN.Complete cs -> case cs of
+                  PN.Normal ->
+                    writeTVar hs' PN.Finalising $> CanBeFinalised
+                  PN.Fault _ _ -> fa
+                  PN.Murdered -> fa
+                PN.BeingMurdered -> nr
+                PN.Finalising -> nr
+                PN.Finalised -> fa
+            )
 
-loadFixture :: (Text -> IO ()) -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> IO LoadedFixture
+recurseHookRelease :: (Text -> IO ()) -> Node i o -> IO ()
+recurseHookRelease db =
+  let 
+    recurseParent :: Either b (Node a b) -> IO ()
+    recurseParent = either (const $ pure ()) (recurseHookRelease db)
+   in \case
+        Fixture {} -> pure ()
+        hk@Hook {hookResult, hookStatus, hookChildren, hookRelease, hookParent = parent} -> do
+          s' <- hookStatus
+          (atomically $ trySetFinalising s') >>= \case
+            NotReady -> pure ()
+            CanBeFinalised -> do
+              childrenDone <- traverse nodeFinished hookChildren
+              when
+                (all id childrenDone)
+                do
+                  db "READING HOOK RESULT"
+                  hr <- hookResult >>= atomically . readTMVar
+                  ethr <- tryAny (hookRelease 1 hr)
+                  eitherf
+                    ethr
+                    (\e -> putStrLn ("Hook Release Threw and Exception\n" <> txt e) >> recurseParent parent)
+                    (const $ recurseParent parent)
+            FinalisedAlready -> recurseParent parent
+
+loadFixture :: (Text -> IO ()) -> Either o (Node i o) -> [o -> IO ()] -> IO (TVar FixtureStatus) -> IO () -> IO () -> IO LoadedFixture
 loadFixture db parent iterations fixStatus logStart logEnd = do
   let hookVal = db "LOCK EXECUTE HOOK" >> lockExecuteHook db parent
       loadIteration itr = do
@@ -164,15 +203,16 @@ loadFixture db parent iterations fixStatus logStart logEnd = do
   db "CALL LOAD FIXTURE"
   iterations' <- newTVarIO (loadIteration <$> iterations)
   activeThreads' <- newTVarIO []
+  fixStatus' <- fixStatus
   pure $
     LoadedFixture
       { logStart = logStart,
         -- fixture status TVar is now common to loaded fixture and source fixture
-        fixStatus = fixStatus,
+        fixStatus = fixStatus',
         iterations = iterations',
         activeThreads = activeThreads',
         logEnd = logEnd,
-        releaseParentHook = tryReleaseParentHook
+        releaseParentHook = either (void . pure) (recurseHookRelease db) parent
       }
 
 data ThreadStatus
@@ -225,7 +265,7 @@ linkParents' parent = \case
     Internal.SuiteRuntime.Fixture
       { logStart = logStart,
         fixParent = parent,
-        fixStatus = newTVar Pending,
+        fixStatus = newTVarIO Pending,
         iterations = iterations,
         logEnd = logEnd
       }
@@ -236,6 +276,7 @@ isUninitialised = \case
   PN.Intitialising -> False
   PN.Running -> False
   PN.Complete cs -> False
+  PN.Finalising -> False
   PN.Finalised -> False
   PN.BeingMurdered -> False
 
@@ -263,22 +304,12 @@ executeHook db =
         hookStatus,
         hook,
         hookResult,
-        hookChildren,
-        hookRelease
+        hookChildren
       } -> do
-        let setHkStatus status = do
-              writeTVarIO hookStatus status
-        input <- db "CALL PARENT LOCK EXECUTe hook" >> lockExecuteHook db hookParent
-        bracket {- aquire, release, use -}
-          ( do
-              setHkStatus PN.Running
-              tryAny $ hook input
-          )
-          (\o -> db "START HOOK RELEASE" >> hookRelease 1 o >> db "END HOOK RELEASE" {- TODO implemnt pass through timeout for release -})
-          ( either
-              (\e -> setHkStatus $ PN.Complete $ PN.Fault e)
-              (\ho -> db "Hook Succeeded")
-          )
+        input <- db "CALL PARENT LOCK EXECUTE HOOK" >> lockExecuteHook db hookParent
+        result <- hook input
+        hr <- hookResult
+        atomically $ putTMVar hr result
 
 lockExecuteHook :: (Text -> IO ()) -> Either o (Node i o) -> IO o
 lockExecuteHook db parent =
@@ -287,7 +318,7 @@ lockExecuteHook db parent =
     pure
     ( \case
         Fixture {} -> pure ()
-        branch@Hook
+        hk@Hook
           { hookParent,
             hookStatus,
             hook,
@@ -303,59 +334,15 @@ lockExecuteHook db parent =
             when
               wantLaunch
               --  this writes hook result to the TVar
-              (void $ executeHook db branch) -- forkIO
+              (void $ executeHook db hk)
             hc' <- hookResult
             atomically $ readTMVar hc'
     )
 
-
-tryHookRelease' :: (Text -> IO ()) -> Node i o -> IO ()
-tryHookRelease' db  =
-  let
-      childrenFinalised' :: Bool -> Node i o -> IO ()
-      childrenFinalised' accum = \case
-        Hook {hookStatus} -> uu
-        Fixture {} -> uu
-
-      setReturnInitalStatus :: IO (TVar HookStatus ) -> HookStatus -> IO HookStatus
-      setReturnInitalStatus hookStatus newStatus =
-        do
-          hs' <- hookStatus
-          atomically $ do
-           hs <- readTVar hs'
-           writeTVar hs' newStatus
-           pure hs
-
-      recurse = finaliseHooksReturnDone' db
-   in \case
-        hk@Hook {hookChildren, hookParent, hookStatus} -> do
-          -- first set to finalising and return current status 
-          -- to avoid other threads interfering with this process
-          hs <- setReturnInitalStatus hookStatus Finalising
-          let restoreStatus = setReturnInitalStatus hookStatus hs
-          -- if it has finished finalised or failed to start
-          -- the hook is done
-          uu
-          -- if normalCompletion hs then
-          --   | any (hs & ) [finalised , faulted , cleaningUp] -> void restoreStatus 
-          --   else do
-          --     childDoneList <- traverse (finaliseHooksReturnDone' db True) hookChildren
-          --     let allChidrenDone = foldl' (&&) True childDoneList 
-          --     when (requiresFinalising hs && allChidrenDone) 
-          --       do
-          --         uu
-
-              pure False
-        Fixture {logStart, fixParent, iterations, logEnd} -> [loadFixture db fixParent iterations logStart logEnd]
-
-finaliseHooksReturnDone :: (Text -> IO ()) -> Node i o -> Bool
-finaliseHooksReturnDone db =
-  finaliseHooksReturnDone' db True
-
 mkFixtures :: (Text -> IO ()) -> Node i o -> [IO LoadedFixture]
 mkFixtures db = \case
   Hook {hookChildren} -> hookChildren >>= mkFixtures db
-  Fixture {logStart, fixParent, iterations, fixStatus, logEnd}-> [loadFixture db fixParent iterations fixStatus logStart logEnd]
+  Fixture {logStart, fixParent, iterations, fixStatus, logEnd} -> [loadFixture db fixParent iterations fixStatus logStart logEnd]
 
 data Executor = Executor
   { maxThreads :: Int,
@@ -608,7 +595,7 @@ runFixture
               mi <- atomically $ takeIteration fx
               maybe
                 (db "RF - No Iterations Left" >> pure ())
-                (\IterationRun {iteration} -> db "RF - Run ITERATION" >> iteration >> runIterations)
+                (\IterationRun {iteration} -> db "RF - Run ITERATION" >> iteration >> db "RF - Run ITERATION DONE" >> runIterations)
                 mi
      in do
           db "RF - BODY"
@@ -635,33 +622,40 @@ unsafeAddr a = txt $ I# (word2Int# (aToWord# (unsafeCoerce# a)))
 forkFixtureThread :: TVar Int -> LoadedFixture -> (Text -> IO ()) -> IO ()
 forkFixtureThread
   threadsInUse
-  fx@LoadedFixture {activeThreads, logEnd}
+  fx@LoadedFixture {activeThreads, logEnd, releaseParentHook}
   db = do
     db "III forkFixtureThread started"
     thrdStatus <- newTVarIO (ThreadInitialising 999)
-    let tfx = forkFinally
+    let releaseThread' :: IO ()
+        releaseThread' =
+          atomically $ do
+            -- set this threadstatus to done
+            writeTVar thrdStatus ThreadDone
+            -- remove all finished threads from active threads list
+            ats <- readTVar activeThreads
+            newAts <- removeFinishedThreads ats
+            writeTVar activeThreads newAts
+            -- decrement global threads in use
+            upre <- readTVar threadsInUse
+            unsafeIOToSTM (db "THREAD DONE")
+            unsafeIOToSTM (db $ "BEFORE DECREMENT THREAD: " <> txt upre)
+            releaseThread threadsInUse
+            u <- readTVar threadsInUse
+            unsafeIOToSTM (db $ "AFTER DECREMENT THREAD: " <> txt u)
+
+        tfx = forkFinally
           (db "III FIXTURE START" >> runFixture thrdStatus fx db)
           -- finally clean up
-          \_ -> do
-            fxDone <- atomically $ do
-              -- set this threadstatus to done
-              writeTVar thrdStatus ThreadDone
-              -- remove all finished threads from active threads list
-              ats <- readTVar activeThreads
-              newAts <- removeFinishedThreads ats
-              writeTVar activeThreads newAts
-              -- decrement global threads in use
-              upre <- readTVar threadsInUse
-              unsafeIOToSTM (db "THREAD DONE")
-              unsafeIOToSTM (db $ "BEFORE DECREMENT THREAD: " <> txt upre)
-              releaseThread threadsInUse
-              u <- readTVar threadsInUse
-              unsafeIOToSTM (db $ "AFTER DECREMENT THREAD: " <> txt u)
-              updateStatusReturnCompleted db fx
-            db $ "FIXTURE DONE: " <> txt fxDone
-            when
-              fxDone
-              logEnd
+          \_ ->
+            finally
+              releaseThread'
+              ( do
+                  fxDone <- atomically $ updateStatusReturnCompleted db fx
+                  db $ "FIXTURE DONE: " <> txt fxDone
+                  when
+                    fxDone
+                    $ logEnd >> releaseParentHook
+              )
 
     db "III ABove Atomically"
     atomically $ do
@@ -729,6 +723,7 @@ execute maxThreads NodeRoot {rootStatus, children} = do
   -- hSetBuffering h NoBuffering
 
   lock <- newMVar ()
+
   hSetBuffering stdout NoBuffering
   let wantDebug = True
       db :: Text -> IO ()

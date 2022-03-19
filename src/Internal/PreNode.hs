@@ -1,14 +1,13 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use newtype instead of data" #-}
+
 module Internal.PreNode where
 
 import Pyrelude (IO, Int, Show, SomeException, TVar, Text, Eq, Bool (False, True), (&&), not)
-import UnliftIO (MonadUnliftIO)
+import UnliftIO (MonadUnliftIO, STM)
 import Language.Haskell.TH (ExpQ)
 
 data CompletionStatus = Normal | Fault Text SomeException | Murdered deriving (Show)
 
-data PreNodeRoot o =
+newtype PreNodeRoot o =
   PreNodeRoot 
     { children :: [PreNode () o]
     }
@@ -16,7 +15,7 @@ data PreNodeRoot o =
 data PreNode i o where
   Hook ::
     { hookAddress :: Text, -- used in testing
-      hookStatus :: IO (TVar HookStatus),
+      hookStatus :: STM (TVar HookStatus),
       hook :: i -> IO o,
       hookChildren :: [PreNode o o2],
       hookRelease :: Int -> o -> IO ()

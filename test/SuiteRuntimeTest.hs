@@ -48,7 +48,7 @@ import Pyrelude as P
     (<$>),
     (<>),
     (>>=),
-    (?),
+    (?), (>>),
   )
 import Pyrelude.Test (chk', chkFail)
 import Pyrelude.Test as T hiding (maybe)
@@ -193,8 +193,7 @@ fixtureEnd :: TQueue RunEvent -> Text -> Text -> IO ()
 fixtureEnd q = SuiteRuntimeTest.fixture q End
 
 logIteration :: TQueue RunEvent -> Text -> Int -> Text -> IO ()
-logIteration q fxTxt iidx itMsg = 
-  error "Iteration Run"
+logIteration q fxTxt iidx itMsg =
   logEvent q (IterationMessage fxTxt iidx itMsg)
 
 logMessage :: TQueue RunEvent -> Text -> IO ()
@@ -217,9 +216,9 @@ mkFixture q parentId fxId itCount =
 mkHook :: TQueue RunEvent -> Text -> Text -> [PreNode () ()] -> PreNode () ()
 mkHook q parentId hkId nodeChildren =
   PN.Hook
-    { 
+    {
       hookAddress = hid, -- used in testing
-      hookStatus =  newTVarIO Unintialised,
+      hookStatus =  newTVar Unintialised,
       hook = const $ hookStart q parentId hid,
       hookChildren = nodeChildren,
       hookRelease = \_ _ -> hookEnd q parentId hid
@@ -233,7 +232,7 @@ iterationMessage i = "iteration " <> txt i
 mkIterations :: TQueue RunEvent -> Text -> Int -> [() -> IO ()]
 mkIterations q fixFullId count' =
   let mkIt :: Int -> (() -> IO ())
-      mkIt idx = const (logIteration q fixFullId idx $ iterationMessage idx)
+      mkIt idx = const $ logIteration q fixFullId idx (iterationMessage idx)
    in mkIt <$> [0 .. count' - 1]
 
 superSimplSuite :: TQueue RunEvent -> PreNodeRoot ()
@@ -245,7 +244,7 @@ superSimplSuite q =
 simpleSuiteWithHook :: TQueue RunEvent -> PreNodeRoot ()
 simpleSuiteWithHook q =
   PreNodeRoot
-    [ 
+    [
       mkHook q "Root" "Hook 0" [mkFixture q "Root" "Fixture 0" 1]
     ]
 
@@ -347,13 +346,13 @@ exeSuiteTests preSuite threadCount = do
   pPrint l
   chkFixtures stats l
 
--- $ > unit_simple_single
+-- $> unit_simple_single
 unit_simple_single :: IO ()
 unit_simple_single = do
   exeSuiteTests superSimplSuite 1
 
 
--- $> unit_simple_with_hook
+-- $ > unit_simple_with_hook
 unit_simple_with_hook :: IO ()
 unit_simple_with_hook = do
   exeSuiteTests simpleSuiteWithHook 1

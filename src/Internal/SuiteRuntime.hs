@@ -108,18 +108,18 @@ data NodeRoot o = NodeRoot
 
 data Node i o where
   Hook ::
-    { hookParent :: IO i,
+    { hookParent :: Either i (Node i0 i),
       hookStatus :: TVar PN.HookStatus,
       hook :: i -> IO o,
       hookResult :: TMVar o,
-      hookChildren :: [Node o o2],
+      hookChildren :: IO [Node o o2],
       hookRelease :: Int -> o -> IO ()
     } ->
     Node i o
   Fixture ::
     { logStart :: IO (),
       fixStatus :: TVar FixtureStatus,
-      fixParent :: IO i,
+      fixParent :: Either i (Node i0 i),
       iterations :: [i -> IO ()],
       logEnd :: IO ()
     } ->
@@ -149,8 +149,8 @@ isDone = \case
 
 nodeFinished :: Node i o -> IO Bool
 nodeFinished = \case
-  Fixture {fixStatus} -> atomically (isDone <$> (fixStatus >>= readTVar))
-  Hook {hookStatus} -> atomically (finalised <$> (hookStatus >>= readTVar))
+  Fixture {fixStatus} -> atomically $ isDone <$> readTVar fixStatus
+  Hook {hookStatus} -> atomically $ finalised <$> readTVar hookStatus
 
 data CanFinaliseHook = NotReady | CanBeFinalised | FinalisedAlready deriving (Eq)
 
@@ -180,15 +180,15 @@ recurseHookRelease db =
    in \case
         Fixture {} -> pure ()
         hk@Hook {hookResult, hookStatus, hookChildren, hookRelease, hookParent = parent} -> do
-          (atomically $ hookStatus >>= trySetFinalising) >>= \case
+          (atomically $ trySetFinalising hookStatus) >>= \case
             NotReady -> pure ()
             CanBeFinalised -> do
-              childrenDone <- traverse nodeFinished hookChildren
+              childrenDone <- hookChildren >>= traverse nodeFinished
               when
                 (all id childrenDone)
                 do
                   db "READING HOOK RESULT"
-                  hr <- atomically $ hookResult >>= readTMVar
+                  hr <- atomically $ readTMVar hookResult
                   ethr <- tryAny (hookRelease 1 hr)
                   eitherf
                     ethr
@@ -249,36 +249,38 @@ linkParents :: PN.PreNodeRoot o -> IO (NodeRoot o)
 linkParents PN.PreNodeRoot {children} =
   do
     status <- newTVarIO PN.Unintialised
-    children' <- traverse (linkParents' $ pure ()) children
+    children' <- children >>= traverse (linkParents' $ Left ())
     pure $
       NodeRoot
         { rootStatus = status,
           children = children'
         }
 
-linkParents' :: IO o -> PN.PreNode o o' -> IO (Node o o')
-linkParents' parentOut = \case
+linkParents' :: Either o (Node i o) -> PN.PreNode o o' -> IO (Node o o')
+linkParents' parent = \case
   PN.Hook {hookStatus, hook, hookChildren, hookRelease} -> do
     do
-      hookChildren' <- traverse (linkParents' $ parentOut >>= hook) hookChildren
+      -- hookChildren' <- linkParents' (Right h) <$> hookChildren
       mtRslt <- newEmptyTMVarIO
       status <- newTVarIO PN.Unintialised
-      pure $
-        Internal.SuiteRuntime.Hook
-          { hookParent = parentOut,
-            hookStatus = status,
-            hook = hook,
-            hookResult = mtRslt,
-            hookChildren = hookChildren',
-            hookRelease = hookRelease
-          }
+      let mkChildren h' = traverse (linkParents' $ Right h') hookChildren
+          h =
+            Internal.SuiteRuntime.Hook
+              { hookParent = parent,
+                hookStatus = status,
+                hook = hook,
+                hookResult = mtRslt,
+                hookChildren = mkChildren h,
+                hookRelease = hookRelease
+              }
+      pure h
   PN.Fixture {logStart, iterations, logEnd} ->
     do
       fs <- atomically $ newTVar Pending
       pure $
         Internal.SuiteRuntime.Fixture
           { logStart = logStart,
-            fixParent = parentOut,
+            fixParent = parent,
             fixStatus = fs,
             iterations = iterations,
             logEnd = logEnd
@@ -294,17 +296,16 @@ isUninitialised = \case
   PN.Finalised -> False
   PN.BeingMurdered -> False
 
-tryLock :: (Text -> IO ()) -> STM (TVar PN.HookStatus) -> STM Bool
+tryLock :: (Text -> IO ()) -> TVar PN.HookStatus -> STM Bool
 tryLock db status =
   do
-    hs' <- status
-    hs <- readTVar hs'
+    hs <- readTVar status
     unsafeIOToSTM . db $ "tryLock HOOK STATUS: " <> txt hs
     -----
-    readTVar hs'
+    readTVar status
       >>= bool
         (pure False)
-        (writeTVar hs' PN.Intitialising >> pure True)
+        (writeTVar status PN.Intitialising >> pure True)
         . isUninitialised
 
 -- executeHook only to be run when want executeHook has set
@@ -323,12 +324,12 @@ executeHook db =
       } -> do
         input <- db "CALL PARENT LOCK EXECUTE HOOK" >> lockExecuteHook db hookParent
         result <- hook input
-        mtb <- atomically $ hookResult >>= isEmptyTMVar
+        mtb <- atomically $ isEmptyTMVar hookResult
         db $ "HOOK RESULT PUT EMPTY BEFORE: " <> txt mtb
-        atomically $ hookResult >>= flip putTMVar result -- writes hook result to the TMVar
-        mt <- atomically $ hookResult >>= isEmptyTMVar
+        atomically $ putTMVar hookResult result -- writes hook result to the TMVar
+        mt <- atomically $ isEmptyTMVar hookResult
         db $ "HOOK RESULT PUT EMPTY AFTER: " <> txt mt
-        mt2 <- atomically $ hookResult >>= isEmptyTMVar
+        mt2 <- atomically $ isEmptyTMVar hookResult
         db $ "HOOK RESULT SECOND: " <> txt mt2
 
 lockExecuteHook :: (Text -> IO ()) -> Either o (Node i o) -> IO o
@@ -351,16 +352,18 @@ lockExecuteHook db parent =
             when
               wantLaunch
               $ executeHook db hk --  this writes hook result to the TMVar
-            mt <- atomically $ hookResult >>= isEmptyTMVar
+            mt <- atomically $ isEmptyTMVar hookResult
             db $ "READING HOOK !!!!!!!!!!!!!!!!!!!!!!!!!! EMPTY: " <> txt mt
-            r <- atomically $ hookResult >>= readTMVar
+            r <- atomically $ readTMVar hookResult
             db "RETURNING FROM LOCK EXECUTE HOOK " >> pure r
     )
 
-mkFixtures :: (Text -> IO ()) -> Node i o -> [IO LoadedFixture]
+mkFixtures :: (Text -> IO ()) -> Node i o -> IO [LoadedFixture]
 mkFixtures db = \case
-  Hook {hookChildren} -> hookChildren >>= mkFixtures db
-  Fixture {logStart, fixParent, iterations, fixStatus, logEnd} -> [loadFixture db fixParent iterations fixStatus logStart logEnd]
+  Hook {hookChildren} -> do
+    hc <- hookChildren
+    join <$> traverse (mkFixtures db) hc
+  Fixture {logStart, fixParent, iterations, fixStatus, logEnd} -> singleton <$> loadFixture db fixParent iterations fixStatus logStart logEnd
 
 data Executor = Executor
   { maxThreads :: Int,
@@ -763,8 +766,8 @@ execute maxThreads NodeRoot {rootStatus, children} = do
   -- putStrLn $ toS s
   -- hPutStrLn h s
 
-  fxs <- sequence $ children >>= mkFixtures db
-  let idxFxs = zip [0 ..] fxs
+  fxs <- traverse (mkFixtures db) children
+  let idxFxs = zip [0 ..] $ concat fxs
   -- create queue
   pendingQ <- newTQueueIO
   runningQ <- newTQueueIO

@@ -3,6 +3,7 @@ module SuiteRuntimeTest where
 import Check (Checks)
 import Control.Monad.Reader (ReaderT (runReaderT), ask)
 import DSL.Interpreter
+import Data.Aeson.Encoding (quarter)
 import Data.Aeson.TH
 import Data.Aeson.Types
 import qualified Data.Set as ST
@@ -47,8 +48,9 @@ import Pyrelude as P
     (.),
     (<$>),
     (<>),
+    (>>),
     (>>=),
-    (?), (>>),
+    (?), Traversable (traverse),
   )
 import Pyrelude.Test (chk', chkFail)
 import Pyrelude.Test as T hiding (maybe)
@@ -63,7 +65,6 @@ import UnliftIO.Concurrent as C
   )
 import UnliftIO.STM
 import Prelude (Ord, putStrLn)
-import Data.Aeson.Encoding (quarter)
 
 data BoundaryType
   = Start
@@ -99,7 +100,7 @@ isFixtureStats = \case
   HookStats {} -> False
   FixtureStats {} -> True
 
-getStats :: PreNodeRoot a -> [NodeStats]
+getStats :: PreNodeRoot a -> IO [NodeStats]
 getStats PreNodeRoot {children} =
   let isFixture :: PreNode a b -> Bool
       isFixture = \case
@@ -131,7 +132,9 @@ getStats PreNodeRoot {children} =
                   iterationCount = length iterations
                 }
             ]
-   in zip [0 ..] children >>= uncurry (getStats' "Root")
+   in do 
+        children' <- children
+        pure $ zip [0 ..] children' >>= uncurry (getStats' "Root")
 
 data BoundaryInfo = BoundaryInfo
   { id :: Text,
@@ -213,16 +216,19 @@ mkFixture q parentId fxId itCount =
   where
     fid = fullId parentId fxId
 
-mkHook :: TQueue RunEvent -> Text -> Text -> [PreNode () ()] -> PreNode () ()
+
+mkHook :: TQueue RunEvent -> Text -> Text -> [PreNode () o2] -> IO (PreNode i ())
 mkHook q parentId hkId nodeChildren =
-  PN.Hook
-    {
-      hookAddress = hid, -- used in testing
-      hookStatus =  newTVar Unintialised,
-      hook = const $ hookStart q parentId hid,
-      hookChildren = nodeChildren,
-      hookRelease = \_ _ -> hookEnd q parentId hid
-    }
+  do
+    status <- atomically $ newTVar Unintialised
+    pure
+      PN.Hook
+        { hookAddress = hid, -- used in testing
+          hookStatus = status,
+          hook = const $ hookStart q parentId hid,
+          hookChildren = nodeChildren,
+          hookRelease = \_ _ -> hookEnd q parentId hid
+        }
   where
     hid = fullId parentId hkId
 
@@ -237,16 +243,17 @@ mkIterations q fixFullId count' =
 
 superSimplSuite :: TQueue RunEvent -> PreNodeRoot ()
 superSimplSuite q =
-  PreNodeRoot
-    [ mkFixture q "Root" "Fixture 0" 1
-    ]
+  PreNodeRoot $ 
+    pure [ mkFixture q "Root" "Fixture 0" 1]
 
 simpleSuiteWithHook :: TQueue RunEvent -> PreNodeRoot ()
 simpleSuiteWithHook q =
-  PreNodeRoot
-    [
-      mkHook q "Root" "Hook 0" [mkFixture q "Root" "Fixture 0" 1]
-    ]
+  let 
+    fx = mkFixture q "Root" "Fixture 0" 1
+  in
+    PreNodeRoot $ pure [fx]
+     
+    
 
 tQToList :: TQueue a -> IO [a]
 tQToList q =
@@ -337,22 +344,24 @@ exeSuiteTests :: (TQueue RunEvent -> PreNodeRoot ()) -> Int -> IO ()
 exeSuiteTests preSuite threadCount = do
   q <- atomically newTQueue
   let preSuite' = preSuite q
-      stats = getStats preSuite'
+      
+  stats <- getStats preSuite'
   pPrint stats
   pPrint "OFF LIKE A ROCKET"
-  S.execute threadCount $ S.linkParents preSuite'
+  S.linkParents preSuite' >>= S.execute threadCount
   l <- tQToList q
   pPrint stats
   pPrint l
   chkFixtures stats l
 
 -- $> unit_simple_single
+
 unit_simple_single :: IO ()
 unit_simple_single = do
   exeSuiteTests superSimplSuite 1
 
-
 -- $ > unit_simple_with_hook
+
 unit_simple_with_hook :: IO ()
 unit_simple_with_hook = do
   exeSuiteTests simpleSuiteWithHook 1

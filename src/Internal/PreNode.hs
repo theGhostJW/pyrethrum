@@ -9,7 +9,7 @@ data CompletionStatus = Normal | Fault Text SomeException | Murdered deriving (S
 
 newtype PreNodeRoot o =
   PreNodeRoot 
-    { children :: [PreNode () o]
+    { children :: IO [PreNode () o]
     }
 
 data PreNode i o where

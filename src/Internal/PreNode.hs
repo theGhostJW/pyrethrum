@@ -15,7 +15,7 @@ newtype PreNodeRoot o =
 data PreNode i o where
   Hook ::
     { hookAddress :: Text, -- used in testing
-      hookStatus :: STM (TVar HookStatus),
+      hookStatus :: TVar HookStatus,
       hook :: i -> IO o,
       hookChildren :: [PreNode o o2],
       hookRelease :: Int -> o -> IO ()

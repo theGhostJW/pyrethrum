@@ -46,11 +46,12 @@ import Pyrelude hiding
     bool,
     bracket,
     forkFinally,
-    putMVar,
     newMVar,
     newTVarIO,
     parent,
+    putMVar,
     readTVarIO,
+    threadDelay,
     threadStatus,
     withMVar,
   )
@@ -101,24 +102,24 @@ data FixtureStatus
   deriving (Show)
 
 data NodeRoot o = NodeRoot
-  { rootStatus :: STM (TVar PN.HookStatus),
+  { rootStatus :: TVar PN.HookStatus,
     children :: [Node () o]
   }
 
 data Node i o where
   Hook ::
-    { hookParent :: Either i (Node i0 i),
-      hookStatus :: STM (TVar PN.HookStatus),
+    { hookParent :: IO i,
+      hookStatus :: TVar PN.HookStatus,
       hook :: i -> IO o,
-      hookResult :: STM (TMVar o),
+      hookResult :: TMVar o,
       hookChildren :: [Node o o2],
       hookRelease :: Int -> o -> IO ()
     } ->
     Node i o
   Fixture ::
     { logStart :: IO (),
-      fixStatus :: STM (TVar FixtureStatus),
-      fixParent :: Either i (Node i0 i),
+      fixStatus :: TVar FixtureStatus,
+      fixParent :: IO i,
       iterations :: [i -> IO ()],
       logEnd :: IO ()
     } ->
@@ -131,7 +132,7 @@ data LoadedHook = LoadedHook
 
 data LoadedFixture = LoadedFixture
   { logStart :: IO (),
-    fixStatus :: STM (TVar FixtureStatus),
+    fixStatus :: TVar FixtureStatus,
     iterations :: TVar [IO ()],
     activeThreads :: TVar [RunningThread],
     logEnd :: IO (),
@@ -148,7 +149,7 @@ isDone = \case
 
 nodeFinished :: Node i o -> IO Bool
 nodeFinished = \case
-  Fixture {fixStatus} -> atomically (isDone <$> (fixStatus >>= readTVar)) 
+  Fixture {fixStatus} -> atomically (isDone <$> (fixStatus >>= readTVar))
   Hook {hookStatus} -> atomically (finalised <$> (hookStatus >>= readTVar))
 
 data CanFinaliseHook = NotReady | CanBeFinalised | FinalisedAlready deriving (Eq)
@@ -195,7 +196,7 @@ recurseHookRelease db =
                     (const $ recurseParent parent)
             FinalisedAlready -> recurseParent parent
 
-loadFixture :: (Text -> IO ()) -> Either o (Node i o) -> [o -> IO ()] -> STM (TVar FixtureStatus) -> IO () -> IO () -> IO LoadedFixture
+loadFixture :: (Text -> IO ()) -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> IO LoadedFixture
 loadFixture db parent iterations fixStatus logStart logEnd = do
   let hookVal = db "LOCK EXECUTE HOOK" >> lockExecuteHook db parent
       loadIteration itr = do
@@ -244,34 +245,44 @@ data IndexedFixture = IndexedFixture
   ~ test with null iterations
 -}
 
-linkParents :: PN.PreNodeRoot o -> NodeRoot o
+linkParents :: PN.PreNodeRoot o -> IO (NodeRoot o)
 linkParents PN.PreNodeRoot {children} =
-  NodeRoot
-    { rootStatus = newTVar PN.Unintialised,
-      children = linkParents' (Left ()) <$> children
-    }
+  do
+    status <- newTVarIO PN.Unintialised
+    children' <- traverse (linkParents' $ pure ()) children
+    pure $
+      NodeRoot
+        { rootStatus = status,
+          children = children'
+        }
 
-linkParents' :: Either o (Node i o) -> PN.PreNode o o' -> Node o o'
-linkParents' parent = \case
-  PN.Hook {hookStatus, hook, hookChildren, hookRelease} ->
-    let h =
-          Internal.SuiteRuntime.Hook
-            { hookParent = parent,
-              hookStatus = newTVar PN.Unintialised,
-              hook = hook,
-              hookResult = newEmptyTMVar,
-              hookChildren = linkParents' (Right h) <$> hookChildren,
-              hookRelease = hookRelease
-            }
-     in h
+linkParents' :: IO o -> PN.PreNode o o' -> IO (Node o o')
+linkParents' parentOut = \case
+  PN.Hook {hookStatus, hook, hookChildren, hookRelease} -> do
+    do
+      hookChildren' <- traverse (linkParents' $ parentOut >>= hook) hookChildren
+      mtRslt <- newEmptyTMVarIO
+      status <- newTVarIO PN.Unintialised
+      pure $
+        Internal.SuiteRuntime.Hook
+          { hookParent = parentOut,
+            hookStatus = status,
+            hook = hook,
+            hookResult = mtRslt,
+            hookChildren = hookChildren',
+            hookRelease = hookRelease
+          }
   PN.Fixture {logStart, iterations, logEnd} ->
-    Internal.SuiteRuntime.Fixture
-      { logStart = logStart,
-        fixParent = parent,
-        fixStatus = newTVar Pending,
-        iterations = iterations,
-        logEnd = logEnd
-      }
+    do
+      fs <- atomically $ newTVar Pending
+      pure $
+        Internal.SuiteRuntime.Fixture
+          { logStart = logStart,
+            fixParent = parentOut,
+            fixStatus = fs,
+            iterations = iterations,
+            logEnd = logEnd
+          }
 
 isUninitialised :: PN.HookStatus -> Bool
 isUninitialised = \case
@@ -406,13 +417,13 @@ updateStatusReturnCompleted
           unsafeIOToSTM . db $ "EMPTY ITERATIONS: " <> txt (null i)
           a <- readTVar activeThreads
           unsafeIOToSTM . db $ "EMPTY ACTIVE THREADS: " <> txt (null a)
-          s <- fixStatus >>= readTVar
+          s <- readTVar fixStatus
           unsafeIOToSTM . db $ "FIXTURE STATUS: " <> txt s
           let done = null i && null a && not (completionBlocked s)
               doneAlready = isDone s
               completed = done && not doneAlready
               newStatus = completed ? Done PN.Normal $ s
-          fixStatus >>= \fs -> writeTVar fs newStatus
+          writeTVar fixStatus newStatus
           pure completed
 
 canForkThread :: FixtureStatus -> Bool
@@ -427,7 +438,7 @@ takeIteration :: LoadedFixture -> STM (Maybe IterationRun)
 takeIteration fixture@LoadedFixture {iterations, activeThreads, fixStatus} = do
   itrs <- readTVar iterations
   activ <- readTVar activeThreads
-  status <- fixStatus >>= readTVar
+  status <- readTVar fixStatus
   not (canForkThread status)
     ? pure Nothing
     $ case itrs of
@@ -460,7 +471,7 @@ nextActiveFixtureRemoveDone activeQ =
                 mInitilIndex == Just index'
                   ? pure Nothing
                   $ do
-                    status <- fixStatus >>= readTVar
+                    status <- readTVar fixStatus
                     case status of
                       Pending -> reQReturnThisFixture
                       Starting -> reQuGetNxt
@@ -535,17 +546,18 @@ setToStartedIfPending :: TVar FixtureStatus -> STM Bool
 setToStartedIfPending fixStatus =
   do
     s <- readTVar fixStatus
-    let ip = isPending s
-    writeTVar fixStatus $ ip ? Starting $ s
-    pure ip
+    let pending = isPending s
+    when pending $
+      writeTVar fixStatus Starting
+    pure pending
 
-setActiveIfStarting :: STM (TVar FixtureStatus) -> STM Bool
+setActiveIfStarting :: TVar FixtureStatus -> STM Bool
 setActiveIfStarting fixStatus =
   do
-    s' <- fixStatus
-    s <- readTVar s'
+    s <- readTVar fixStatus
     let is = isStarting s
-    writeTVar s' $ is ? Active $ s
+    when is $
+      writeTVar fixStatus Active
     pure is
 
 removeFinishedThreads :: [RunningThread] -> STM [RunningThread]
@@ -576,9 +588,16 @@ runFixture
   db =
     let runIterations :: IO ()
         runIterations = do
-          fs <- atomically fixStatus
-          wantLogStart <- atomically $ setToStartedIfPending fs
+          wantLogStart <- atomically $ setToStartedIfPending fixStatus
+
+          fs2' <- atomically $ readTVar fixStatus
+          db $ "RF - RE-READ STARTED fs TVAR: " <> txt fs2'
+
+          fs2 <- atomically $ readTVar fixStatus
+          db $ "RF - REREAD STARTED fixStatus STM: " <> txt fs2
+
           db $ "RF - WantLogStart " <> txt wantLogStart
+          threadDelay 10_000_00
           if wantLogStart
             then do
               db "RF - Top WantLogStart"
@@ -587,7 +606,7 @@ runFixture
                 elst
                 ( \e -> do
                     db "RF - LogStartleft"
-                    atomically $ writeTVar fs $ Done (PN.Fault "Failed logging fixture start" e)
+                    atomically $ writeTVar fixStatus $ Done (PN.Fault "Failed logging fixture start" e)
                     -- if we get here things have really screwed up ye old terminal as a last resort
                     logError $ "Failed logging fixture start\n" <> toS (displayException e)
 
@@ -699,7 +718,7 @@ execute'
           (const $ unsafeIOToSTM (db "III Execute Nxt Fixture") >> nextFixture fixturesPending fixturesStarted)
 
     let recurse = execute' exe db
-        waitRecurse = C.threadDelay 10_000 >> recurse
+        waitRecurse = C.threadDelay 10_000_000 >> recurse
         threadRelease = db "THREAD RELEASE" >> atomically (releaseThread threadsInUse)
 
     eitherf

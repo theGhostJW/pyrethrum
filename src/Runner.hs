@@ -258,26 +258,26 @@ calcComponents runPrms@RunParams {suite, filters, rc, itemRunner} =
 
 runSuite ::
   forall rc tc e effs.
-  (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
+  -- (ToJSON e, Show e, Config rc, Config tc, MinEffs e effs) =>
   RunParams Maybe e rc tc effs ->
   IO ()
-runSuite rp@RunParams {suite, filters, rc, itemRunner} =
-  let ethRunComponents :: Either Text (RunComponents effs)
-      ethRunComponents = calcComponents rp
+runSuite rp@RunParams {suite, filters, rc, itemRunner} = uu
+  -- let ethRunComponents :: Either Text (RunComponents effs)
+  --     ethRunComponents = calcComponents rp
 
-      run :: RunComponents effs -> IO ()
-      run rCmp = uu
-        -- do
-        -- let flg = filterLog rCmp
-        -- offset' <- utcOffset
-        -- logItem . StartRun (RunTitle $ getField @"title" rc) offset' $ toJSON rc
-        -- logItem . FilterLog . F.log $ flg
-        -- sequence_ $ exeElm (included flg) rootAddress () <$> suitItems rCmp
-        -- logItem EndRun
+  --     run :: RunComponents effs -> IO ()
+  --     run rCmp = uu
+  --       -- do
+  --       -- let flg = filterLog rCmp
+  --       -- offset' <- utcOffset
+  --       -- logItem . StartRun (RunTitle $ getField @"title" rc) offset' $ toJSON rc
+  --       -- logItem . FilterLog . F.log $ flg
+  --       -- sequence_ $ exeElm (included flg) rootAddress () <$> suitItems rCmp
+  --       -- logItem EndRun
 
-      lgError :: Text -> Sem effs ()
-      lgError t = logError $ "Test Run Configuration Error. Duplicate Group Names: " <> t
-   in uu
+  --     lgError :: Text -> Sem effs ()
+  --     lgError t = logError $ "Test Run Configuration Error. Duplicate Group Names: " <> t
+  --  in uu
 
 mkSem ::
   forall rc tc e effs.

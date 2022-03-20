@@ -50,10 +50,10 @@ import Pyrelude as P
     (<>),
     (>>),
     (>>=),
-    (?), Traversable (traverse),
+    (?), Traversable (traverse), singleton,
   )
 import Pyrelude.Test (chk', chkFail)
-import Pyrelude.Test as T hiding (maybe)
+import Pyrelude.Test as T hiding (maybe, singleton)
 import TempUtils (debugLines)
 import Text.Show.Pretty (pPrint, pPrintList, ppShow, ppShowList)
 import UnliftIO.Concurrent as C
@@ -250,8 +250,13 @@ simpleSuiteWithHook :: TQueue RunEvent -> PreNodeRoot ()
 simpleSuiteWithHook q =
   let 
     fx = mkFixture q "Root" "Fixture 0" 1
+    hk0 = mkHook q "Root" "Hook 0" [fx]
+    hk :: IO  [PreNode () ()]
+    hk = singleton <$> hk0
   in
-    PreNodeRoot $ pure [fx]
+    PreNodeRoot hk
+    
+  
      
     
 

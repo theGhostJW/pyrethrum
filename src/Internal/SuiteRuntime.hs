@@ -136,6 +136,7 @@ data LoadedFixture = LoadedFixture
     iterations :: TVar [IO ()],
     activeThreads :: TVar [RunningThread],
     logEnd :: IO (),
+    executeParentHook :: IO (),
     releaseParentHook :: IO ()
   }
 
@@ -216,6 +217,7 @@ loadFixture db parent iterations fixStatus logStart logEnd = do
         iterations = iterations',
         activeThreads = activeThreads',
         logEnd = logEnd,
+        executeParentHook = void $ db "LOCK EXECUTE HOOK" >> lockExecuteHook db parent,
         releaseParentHook = either (void . pure) (recurseHookRelease db) parent
       }
 
@@ -299,6 +301,7 @@ isUninitialised = \case
 tryLock :: (Text -> IO ()) -> TVar PN.HookStatus -> STM Bool
 tryLock db status =
   do
+
     hs <- readTVar status
     unsafeIOToSTM . db $ "tryLock HOOK STATUS: " <> txt hs
     -----
@@ -338,7 +341,7 @@ lockExecuteHook db parent =
     parent
     (\o -> db "NO PARENT HOOK RETURNING VALUE" >> pure o)
     ( \case
-        Fixture {} -> pure ()
+        Fixture {} -> db "hook lock - FIXTURE RETURNING PURE" >> pure ()
         hk@Hook
           { hookParent,
             hookStatus,
@@ -586,6 +589,7 @@ runFixture
       fixStatus,
       iterations,
       activeThreads,
+      executeParentHook,
       logEnd
     }
   db =
@@ -600,9 +604,11 @@ runFixture
           db $ "RF - REREAD STARTED fixStatus STM: " <> txt fs2
 
           db $ "RF - WantLogStart " <> txt wantLogStart
-          threadDelay 10_000_00
+          -- threadDelay 10_000_00
           if wantLogStart
             then do
+              -- need to run hooks before 
+              executeParentHook
               db "RF - Top WantLogStart"
               elst <- tryAny logStart
               eitherf
@@ -721,7 +727,7 @@ execute'
           (const $ unsafeIOToSTM (db "III Execute Nxt Fixture") >> nextFixture fixturesPending fixturesStarted)
 
     let recurse = execute' exe db
-        waitRecurse = C.threadDelay 10_000_000 >> recurse
+        waitRecurse = {-C.threadDelay 10_000_000 >> -} recurse
         threadRelease = db "THREAD RELEASE" >> atomically (releaseThread threadsInUse)
 
     eitherf
@@ -758,7 +764,10 @@ execute maxThreads NodeRoot {rootStatus, children} = do
   hSetBuffering stdout NoBuffering
   let wantDebug = True
       db :: Text -> IO ()
-      db msg = wantDebug ? withMVar lock (const $ putStrLn (toS msg)) $ pure ()
+      db msg = wantDebug ?
+          -- withMVar lock (const $ putStrLn (toS msg)) $ 
+          putStrLn (toS msg) $
+          pure ()
 
   when wantDebug $
     hSetBuffering stdout NoBuffering

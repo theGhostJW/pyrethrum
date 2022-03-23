@@ -249,7 +249,7 @@ superSimplSuite q =
 simpleSuiteWithHook :: TQueue RunEvent -> PreNodeRoot ()
 simpleSuiteWithHook q =
   let 
-    fx = mkFixture q "Root" "Fixture 0" 1
+    fx = mkFixture q "Root.Hook 0" "Fixture 0" 1
     hk0 = mkHook q "Root" "Hook 0" [fx]
     hk :: IO  [PreNode () ()]
     hk = singleton <$> hk0
@@ -359,13 +359,13 @@ exeSuiteTests preSuite threadCount = do
   pPrint l
   chkFixtures stats l
 
--- $> unit_simple_single
+-- $ > unit_simple_single
 
 unit_simple_single :: IO ()
 unit_simple_single = do
   exeSuiteTests superSimplSuite 1
 
--- $ > unit_simple_with_hook
+-- $> unit_simple_with_hook
 
 unit_simple_with_hook :: IO ()
 unit_simple_with_hook = do

@@ -4,32 +4,10 @@
 {-# LANGUAGE MagicHash #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Move brackets to avoid $" #-}
-
 module Internal.SuiteRuntime where
 
 import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty))
---     MonadUnliftIO,
---     STM,
---     TMVar,
---     TQueue,
---     TVar,
---     atomically,
-
---     isEmptyTQueue,
---     newEmptyTMVarIO,
---     newTQueueIO,
---     newTVarIO,
---     putTMVar,
---     readTMVar,
---     readTQueue,
---     readTVar,
---     readTVarIO,
-
---     writeTQueue,
---     writeTVar, newTMVarIO, isEmptyTMVar,
-
 import GHC.Exts
 import Internal.PreNode (HookStatus (Finalised, Finalising), finalised)
 import qualified Internal.PreNode as PN
@@ -38,7 +16,7 @@ import qualified Internal.PreNode as PN
     PreNode (..),
     PreNodeRoot (..),
   )
-import Pyrelude (bool)
+import Pyrelude (bool, threadDelay)
 import Pyrelude hiding
   ( ThreadRunning,
     ThreadStatus,
@@ -49,7 +27,6 @@ import Pyrelude hiding
     newMVar,
     newTVarIO,
     parent,
-    putMVar,
     readTVarIO,
     threadDelay,
     threadStatus,
@@ -63,7 +40,6 @@ import UnliftIO
     newMVar,
     newTMVar,
     pureTry,
-    putMVar,
     tryAny,
   )
 import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, takeMVar, threadDelay, withMVar)
@@ -92,6 +68,7 @@ import UnliftIO.STM
     writeTVar,
   )
 import qualified Prelude as PRL
+import Polysemy.Bundle (subsumeBundle)
 
 data FixtureStatus
   = Pending
@@ -125,10 +102,36 @@ data Node i o where
     } ->
     Node i ()
 
-data LoadedHook = LoadedHook
-  { hookRelease :: IO (),
-    parentLoadedHook :: LoadedHook
+data HookRunTime = HookRunTime
+  { address :: Text,
+    currentStatus :: TVar HookStatus
   }
+
+hookInfo :: Node i o -> [HookRunTime]
+hookInfo = uu
+  -- hookInfo' "" [] 0
+  -- where
+  --   hookInfo' :: Text -> [HookRunTime] -> Int -> Node Pyrelude.Any Pyrelude.Any -> [HookRunTime]
+  --   hookInfo' parentAddress idx accum =
+  --     \case
+  --       Hook { 
+  --         hookParent,
+  --         hookStatus,
+  --         hook,
+  --         hookResult,
+  --         hookChildren,
+  --         hookRelease
+  --        } -> let 
+  --               address = parentAddress <> txt idx
+  --               me = HookRunTime address hookStatus
+              
+  --               subs = zip [0..] <$> hookChildren
+
+  --               r = uncurry . hookInfo' address (me : accum) <$> subs
+  --         in
+  --           me : ()
+
+  --       Fixture {} -> accum
 
 data LoadedFixture = LoadedFixture
   { logStart :: IO (),
@@ -181,7 +184,7 @@ recurseHookRelease db =
    in \case
         Fixture {} -> pure ()
         hk@Hook {hookResult, hookStatus, hookChildren, hookRelease, hookParent = parent} -> do
-          (atomically $ trySetFinalising hookStatus) >>= \case
+          atomically (trySetFinalising hookStatus) >>= \case
             NotReady -> pure ()
             CanBeFinalised -> do
               childrenDone <- hookChildren >>= traverse nodeFinished
@@ -193,8 +196,15 @@ recurseHookRelease db =
                   ethr <- tryAny (hookRelease 1 hr)
                   eitherf
                     ethr
-                    (\e -> putStrLn ("Hook Release Threw and Exception\n" <> txt e) >> recurseParent parent)
-                    (const $ recurseParent parent)
+                    ( \e -> do
+                        putStrLn ("Hook release threw an exception\n" <> txt e)
+                        atomically . writeTVar hookStatus . PN.Complete $ PN.Fault "Hook release threw an exception" e
+                        recurseParent parent
+                    )
+                    ( const $ do
+                        atomically . writeTVar hookStatus $ PN.Complete PN.Normal
+                        recurseParent parent
+                    )
             FinalisedAlready -> recurseParent parent
 
 loadFixture :: (Text -> IO ()) -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> IO LoadedFixture
@@ -301,7 +311,6 @@ isUninitialised = \case
 tryLock :: (Text -> IO ()) -> TVar PN.HookStatus -> STM Bool
 tryLock db status =
   do
-
     hs <- readTVar status
     unsafeIOToSTM . db $ "tryLock HOOK STATUS: " <> txt hs
     -----
@@ -607,7 +616,7 @@ runFixture
           -- threadDelay 10_000_00
           if wantLogStart
             then do
-              -- need to run hooks before 
+              -- need to run hooks before
               executeParentHook
               db "RF - Top WantLogStart"
               elst <- tryAny logStart
@@ -691,7 +700,11 @@ forkFixtureThread
                   db $ "FIXTURE DONE: " <> txt fxDone
                   when
                     fxDone
-                    $ logEnd >> releaseParentHook
+                    do
+                      logEnd
+                      db "PRE HOOK RELEASE"
+                      releaseParentHook
+                      db "POST HOOK RELEASE"
               )
 
     db "III ABove Atomically"
@@ -756,24 +769,20 @@ qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture
 
 execute :: Int -> NodeRoot o -> IO ()
 execute maxThreads NodeRoot {rootStatus, children} = do
-  -- h <- openFile "C:\\Pyrethrum\\log.log" WriteMode
-  -- hSetBuffering h NoBuffering
-
-  lock <- newMVar ()
-
-  hSetBuffering stdout NoBuffering
-  let wantDebug = True
-      db :: Text -> IO ()
-      db msg = wantDebug ?
-          -- withMVar lock (const $ putStrLn (toS msg)) $ 
-          putStrLn (toS msg) $
-          pure ()
-
+  -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
+  let wantDebug = False
   when wantDebug $
     hSetBuffering stdout NoBuffering
-  -- let db = printer
-  -- putStrLn $ toS s
-  -- hPutStrLn h s
+
+  lock <- newMVar ()
+  let db msg =
+        if wantDebug
+          then
+            bracket_
+              (C.takeMVar lock)
+              (putMVar lock ())
+              (putStrLn (toS msg))
+          else pure ()
 
   fxs <- traverse (mkFixtures db) children
   let idxFxs = zip [0 ..] $ concat fxs
@@ -785,5 +794,8 @@ execute maxThreads NodeRoot {rootStatus, children} = do
   initialThreadsInUse <- newTVarIO 0
   -- finally
   execute' (Executor maxThreads initialThreadsInUse pendingQ runningQ) db
+  db "ALLL DONE !!!!!!!"
+
+-- C.threadDelay 5_000_000
 
 -- (hClose h)

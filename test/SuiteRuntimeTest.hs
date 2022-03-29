@@ -256,9 +256,6 @@ simpleSuiteWithHook q =
   in
     PreNodeRoot hk
     
-  
-     
-    
 
 tQToList :: TQueue a -> IO [a]
 tQToList q =

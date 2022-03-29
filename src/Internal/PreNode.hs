@@ -1,15 +1,18 @@
 module Internal.PreNode where
 
-import Pyrelude (IO, Int, Show, SomeException, TVar, Text, Eq, Bool (False, True), (&&), not)
-import UnliftIO (MonadUnliftIO, STM)
 import Language.Haskell.TH (ExpQ)
+import Pyrelude (Bool (False, True), Eq, IO, Int, Show, SomeException, TVar, Text, not, (&&))
+import UnliftIO (MonadUnliftIO, STM)
 
-data CompletionStatus = Normal | Fault Text SomeException | Murdered deriving (Show)
+data CompletionStatus
+  = Normal
+  | Fault Text SomeException
+  | Murdered
+  deriving (Show)
 
-newtype PreNodeRoot o =
-  PreNodeRoot 
-    { children :: IO [PreNode () o]
-    }
+newtype PreNodeRoot o = PreNodeRoot
+  { children :: IO [PreNode () o]
+  }
 
 data PreNode i o where
   Hook ::
@@ -38,7 +41,7 @@ data HookStatus
   | Finalised
   deriving (Show)
 
-cleaningUp :: HookStatus -> Bool 
+cleaningUp :: HookStatus -> Bool
 cleaningUp = \case
   Unintialised -> False
   Intitialising -> False
@@ -48,7 +51,7 @@ cleaningUp = \case
   Finalising -> True
   Finalised -> False
 
-finalised :: HookStatus -> Bool 
+finalised :: HookStatus -> Bool
 finalised = \case
   Unintialised -> False
   Intitialising -> False
@@ -58,7 +61,7 @@ finalised = \case
   Finalising -> False
   Finalised -> True
 
-complete :: HookStatus -> Bool 
+complete :: HookStatus -> Bool
 complete = \case
   Unintialised -> False
   Intitialising -> False
@@ -68,7 +71,7 @@ complete = \case
   Finalising -> False
   Finalised -> False
 
-normalCompletion :: HookStatus -> Bool 
+normalCompletion :: HookStatus -> Bool
 normalCompletion = \case
   Unintialised -> False
   Intitialising -> False
@@ -80,5 +83,3 @@ normalCompletion = \case
   Finalising -> False
   BeingMurdered -> False
   Finalised -> False
-
-

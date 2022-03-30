@@ -4,6 +4,8 @@
 {-# LANGUAGE MagicHash #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use lambda-case" #-}
+
 module Internal.SuiteRuntime where
 
 import Data.Function (const, ($), (&))
@@ -218,19 +220,17 @@ recurseHookRelease db =
               FinalisedAlready -> recurse
 
 loadFixture :: (Text -> IO ()) -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> IO LoadedFixture
-loadFixture db parent iterations fixStatus logStart logEnd = 
+loadFixture db parent iterations fixStatus logStart logEnd =
   do
     hookVal <- db "LOCK EXECUTE HOOK" >> lockExecuteHook db parent
-    let
-      loadedIterations :: Either SomeException [IO ()]
-      loadedIterations =
-        let apply :: [a -> IO ()] -> a -> [IO ()]
-            apply fios i =
-              let f :: a -> (a -> IO ()) -> IO ()
-                  f a ff = ff a
-               in f i <$> fios
-         in 
-           apply iterations <$> hookVal
+    let loadedIterations :: Either SomeException [IO ()]
+        loadedIterations =
+          let apply :: [a -> IO ()] -> a -> [IO ()]
+              apply fios i =
+                let f :: a -> (a -> IO ()) -> IO ()
+                    f a ff = ff a
+                 in f i <$> fios
+           in apply iterations <$> hookVal
     db "CALL LOAD FIXTURE"
     iterations' <- newTVarIO loadedIterations
     activeThreads' <- newTVarIO []
@@ -355,6 +355,7 @@ executeHook db =
         hookResult,
         hookChildren
       } -> do
+        up to here need stus update pre and post execute hook
         eInput <- db "CALL PARENT LOCK EXECUTE HOOK" >> lockExecuteHook db hookParent
         result <-
           eitherf
@@ -455,19 +456,26 @@ updateStatusReturnCompleted
           Done _ -> False
           BeingKilled -> True
      in do
-          i <- readTVar iterations
-          uu
-          -- unsafeIOToSTM . db $ "EMPTY ITERATIONS: " <> txt (null i)
-          -- a <- readTVar activeThreads
-          -- unsafeIOToSTM . db $ "EMPTY ACTIVE THREADS: " <> txt (null a)
-          -- s <- readTVar fixStatus
-          -- unsafeIOToSTM . db $ "FIXTURE STATUS: " <> txt s
-          -- let done = null i && null a && not (completionBlocked s)
-          --     doneAlready = isDone s
-          --     completed = done && not doneAlready
-          --     newStatus = completed ? Done PN.Normal $ s
-          -- writeTVar fixStatus newStatus
-          -- pure completed
+          ethits <- readTVar iterations
+          s <- readTVar fixStatus
+          let doneAlready = isDone s
+          unsafeIOToSTM . db $ "FIXTURE STATUS: " <> txt s
+          eitherf
+            ethits
+            ( \e -> do
+                unless doneAlready $
+                  writeTVar fixStatus (Done $ PN.Fault "Parent hook failed" e)
+                pure $ not doneAlready
+            )
+            ( \i -> do
+                unsafeIOToSTM . db $ "EMPTY ITERATIONS: " <> txt (null i)
+                a <- readTVar activeThreads
+                unsafeIOToSTM . db $ "EMPTY ACTIVE THREADS: " <> txt (null a)
+                let completed = not doneAlready && (null i && null a && not (completionBlocked s))
+                when completed $
+                  writeTVar fixStatus (Done PN.Normal)
+                pure completed
+            )
 
 canForkThread :: FixtureStatus -> Bool
 canForkThread = \case
@@ -484,12 +492,15 @@ takeIteration fixture@LoadedFixture {iterations, activeThreads, fixStatus} = do
   status <- readTVar fixStatus
   not (canForkThread status)
     ? pure Nothing
-    $ uu
-    -- $ case itrs of
-    --   [] -> pure Nothing
-    --   x : xs -> do
-    --     writeTVar iterations xs
-    --     pure (Just $ IterationRun fixture x)
+    $ eitherf
+      itrs
+      (const $ pure Nothing)
+      ( \case
+          [] -> pure Nothing
+          x : xs -> do
+            writeTVar iterations $ Right xs
+            pure . Just $ IterationRun fixture x
+      )
 
 nextActiveFixtureRemoveDone :: TQueue IndexedFixture -> STM (Maybe LoadedFixture)
 nextActiveFixtureRemoveDone activeQ =

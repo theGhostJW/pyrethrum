@@ -158,7 +158,12 @@ nodeFinished = \case
   Fixture {fixStatus} -> atomically $ isDone <$> readTVar fixStatus
   Hook {hookStatus} -> atomically $ finalised <$> readTVar hookStatus
 
-data CanFinaliseHook = NotReady | CanBeFinalised | FinalisedAlready deriving (Eq)
+data CanFinaliseHook
+  = NotReady
+  | CanBeFinalised {
+        oldHookStatus :: HookStatus
+      }
+  | FinalisedAlready
 
 trySetFinalising :: TVar HookStatus -> STM CanFinaliseHook
 trySetFinalising hs' =
@@ -169,14 +174,15 @@ trySetFinalising hs' =
                 PN.Unintialised -> nr
                 PN.Intitialising -> nr
                 PN.Running -> nr
-                PN.Complete cs -> case cs of
-                  PN.Normal ->
-                    writeTVar hs' PN.Finalising $> CanBeFinalised
-                  PN.Fault _ _ -> fa
-                  PN.Murdered -> fa
+                hs@(PN.Complete cs) -> case cs of
+                  s@PN.Normal ->
+                    writeTVar hs' PN.Finalising $> CanBeFinalised hs
+                  s@PN.Fault {} -> writeTVar hs' (PN.FinalisedFault "Pre hook faulted" s) >> fa
+                  s@PN.Murdered -> writeTVar hs' (PN.FinalisedFault "Pre hook murdered" s) >> fa
                 PN.BeingMurdered -> nr
                 PN.Finalising -> nr
                 PN.Finalised -> fa
+                PN.FinalisedFault _ _ -> fa
             )
 
 recurseHookRelease :: (Text -> IO ()) -> Node i o -> IO ()
@@ -186,22 +192,24 @@ recurseHookRelease db =
     hk@Hook {hookResult, hookStatus, hookChildren, hookRelease, hookParent = parent} ->
       let --
           recurse = either (const $ pure ()) (recurseHookRelease db) parent
+          setStatusRecurse s = atomically (writeTVar hookStatus s) >> recurse
        in do
-            atomically (trySetFinalising hookStatus) >>= \case
+            hs <- atomically (trySetFinalising hookStatus)
+            case hs of
               NotReady -> pure ()
-              CanBeFinalised -> do
+              FinalisedAlready -> recurse
+              CanBeFinalised oldStatus -> do
                 childrenDone <- hookChildren >>= traverse nodeFinished
-                when
-                  (all id childrenDone)
-                  do
+                not (all id childrenDone)
+                  ? setStatusRecurse oldStatus
+                  $ do
                     db "READING HOOK RESULT"
-                    ethHr <- atomically $ readTMVar hookResult
+                    ehr <- atomically $ readTMVar hookResult
                     eitherf
-                      ethHr
+                      ehr
                       ( \e -> do
                           putStrLn ("Hook release not executed - this code should never run\n" <> txt e)
-                          atomically . writeTVar hookStatus . PN.Complete $ PN.Fault "Hook execution failed" e
-                          recurse
+                          setStatusRecurse . PN.Complete $ PN.Fault "Hook execution failed" e
                       )
                       ( \hr -> do
                           ethr <- tryAny $ hookRelease 1 hr
@@ -209,15 +217,12 @@ recurseHookRelease db =
                             ethr
                             ( \e -> do
                                 putStrLn ("Hook release threw an exception\n" <> txt e)
-                                atomically . writeTVar hookStatus . PN.Complete $ PN.Fault "Hook release threw an exception" e
-                                recurse
+                                setStatusRecurse . PN.Complete $ PN.Fault "Hook release threw an exception" e
                             )
                             ( const $ do
-                                atomically . writeTVar hookStatus $ PN.Complete PN.Normal
-                                recurse
+                                setStatusRecurse $ PN.Complete PN.Normal
                             )
                       )
-              FinalisedAlready -> recurse
 
 loadFixture :: (Text -> IO ()) -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> IO LoadedFixture
 loadFixture db parent iterations fixStatus logStart logEnd =

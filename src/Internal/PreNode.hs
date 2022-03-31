@@ -39,6 +39,7 @@ data HookStatus
   | BeingMurdered
   | Finalising
   | Finalised
+  | FinalisedFault Text CompletionStatus
   deriving (Show)
 
 cleaningUp :: HookStatus -> Bool
@@ -50,6 +51,7 @@ cleaningUp = \case
   BeingMurdered -> True
   Finalising -> True
   Finalised -> False
+  FinalisedFault _ _ -> False
 
 finalised :: HookStatus -> Bool
 finalised = \case
@@ -60,6 +62,7 @@ finalised = \case
   BeingMurdered -> False
   Finalising -> False
   Finalised -> True
+  FinalisedFault _ _ -> True
 
 complete :: HookStatus -> Bool
 complete = \case
@@ -70,6 +73,7 @@ complete = \case
   BeingMurdered -> False
   Finalising -> False
   Finalised -> False
+  FinalisedFault _ _ -> False
 
 normalCompletion :: HookStatus -> Bool
 normalCompletion = \case
@@ -83,3 +87,4 @@ normalCompletion = \case
   Finalising -> False
   BeingMurdered -> False
   Finalised -> False
+  FinalisedFault _ _ -> False

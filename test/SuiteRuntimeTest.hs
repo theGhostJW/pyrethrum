@@ -350,7 +350,7 @@ exeSuiteTests preSuite threadCount = do
   stats <- getStats preSuite'
   pPrint stats
   pPrint "OFF LIKE A ROCKET"
-  S.linkParents preSuite' >>= S.execute threadCount
+  S.execute threadCount preSuite'
   l <- tQToList q
   pPrint stats
   pPrint l

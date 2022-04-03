@@ -9,8 +9,10 @@
 module Internal.SuiteRuntime where
 
 import Check (CheckReport (result))
+import Control.DeepSeq (NFData, deepseq, force, ($!!))
 import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty))
+import Data.Tuple.Extra (both)
 import GHC.Exts
 import Internal.PreNode (HookStatus (Finalised, Finalising), finalised)
 import qualified Internal.PreNode as PN
@@ -131,8 +133,7 @@ hookInfo =
           } ->
             let me = HookRunTime hookLabel hookStatus
              in do
-                  hc <- hookChildren
-                  c <- traverse (hookInfo' accum) hc
+                  c <- hookChildren >>= traverse (hookInfo' accum)
                   pure $ me : concat c
         Fixture {} -> accum
 
@@ -215,6 +216,7 @@ recurseHookRelease db n =
                 NotReady -> db "!!!!!!!! recurseHookRelease: NOT READY !!!!!!!!" >> pure ()
                 FinalisedAlready -> db "!!!!!!!! recurseHookRelease: FinalisedAlready !!!!!!!!" >> recurse
                 CanBeFinalised oldStatus -> do
+                  db "draw children"
                   hc <- hookChildren
                   db $ "hookChildren count: " <> txt (length hc)
                   childrenDone <- hookChildren >>= traverse (nodeFinished db)
@@ -239,9 +241,7 @@ recurseHookRelease db n =
                                   putStrLn ("Hook release threw an exception\n" <> txt e)
                                   setStatusRecurse . PN.Complete $ PN.Fault "Hook release threw an exception" e
                               )
-                              ( const $ do
-                                  setStatusRecurse $ PN.Complete PN.Normal
-                              )
+                              (const $ setStatusRecurse $ PN.Complete PN.Normal)
                         )
 
 loadFixture :: (Text -> IO ()) -> Text -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> IO LoadedFixture
@@ -301,22 +301,24 @@ data IndexedFixture = IndexedFixture
 linkParents :: (Text -> IO ()) -> PN.PreNodeRoot o -> IO (NodeRoot o)
 linkParents db PN.PreNodeRoot {children} =
   do
+    db "CALLING LINKED PARENTS"
     status <- newTVarIO PN.Unintialised
-    children' <- children >>= traverse (linkParents' db $ Left ())
+    children' <- children
+    !childNodes <- traverse (linkParents' db $ Left ()) children'
     pure $
       NodeRoot
         { rootStatus = status,
-          children = children'
+          children = childNodes
         }
 
 linkParents' :: (Text -> IO ()) -> Either o (Node i o) -> PN.PreNode o o' -> IO (Node o o')
 linkParents' db parent preNode =
   do
-    db "CALLING LINKED PARENTS"
+    db "!!!!!!!! CALLING linkParents' (PRIME) !!!!! "
     case preNode of
       PN.Hook {hookAddress, hook, hookStatus, hookChildren, hookRelease} -> do
         mtRslt <- newEmptyTMVarIO
-        status <- newTVarIO PN.Unintialised
+        !status <- newTVarIO PN.Unintialised
         let mkChildren h' = traverse (linkParents' db $ Right h') hookChildren
             h =
               Internal.SuiteRuntime.Hook
@@ -330,7 +332,7 @@ linkParents' db parent preNode =
                 }
         pure h
       PN.Fixture {fixtureAddress, logStart, iterations, logEnd} -> do
-        fs <- newTVarIO Pending
+        !fs <- newTVarIO Pending
         db $ "!!!!!!!! NEW FIXTURE STATUS !!!!! " <> fixtureAddress
         pure $
           Internal.SuiteRuntime.Fixture
@@ -437,24 +439,50 @@ lockExecuteHook db parent =
             db "RETURNING FROM LOCK EXECUTE HOOK " >> pure r
     )
 
-mkFixtures :: (Text -> IO ()) -> Node i o -> IO [LoadedFixture]
-mkFixtures db = \case
-  Hook {hookChildren} -> do
-    hc <- hookChildren
-    join <$> traverse (mkFixtures db) hc
-  Fixture {fixtureLabel, logStart, fixParent, iterations, fixStatus = fs, logEnd} -> do
-    r <- singleton <$> loadFixture db fixtureLabel fixParent iterations fs logStart logEnd
+-- mkFixtures :: (Text -> IO ()) -> Node i o -> IO [LoadedFixture]
+-- mkFixtures db = \case
+--   Hook {hookChildren} -> do
+--     hc <- hookChildren
+--     join <$> traverse (mkFixtures db) hc
+--   Fixture {fixtureLabel, logStart, fixParent, iterations, fixStatus = fs, logEnd} -> do
+--     r <- singleton <$> loadFixture db fixtureLabel fixParent iterations fs logStart logEnd
 
-    --- debug code
-    -- let lf = unsafeHead r
-    -- do
-    --   atomically $ writeTVar ((fixStatus :: LoadedFixture -> TVar FixtureStatus) lf) (Done PN.Normal)
-    --   lffs <- atomically $ readTVar ((fixStatus :: LoadedFixture -> TVar FixtureStatus) lf)
-    --   db $ txt lffs
-    --   fs' <- atomically $ readTVar fs
-    --   db $ txt fs'
+--     --- debug code
+--     -- let lf = unsafeHead r
+--     -- do
+--     --   atomically $ writeTVar ((fixStatus :: LoadedFixture -> TVar FixtureStatus) lf) (Done PN.Normal)
+--     --   lffs <- atomically $ readTVar ((fixStatus :: LoadedFixture -> TVar FixtureStatus) lf)
+--     --   db $ txt lffs
+--     --   fs' <- atomically $ readTVar fs
+--     --   db $ txt fs'
 
-    pure r
+--     pure r
+
+mkFixturesHooks :: (Text -> IO ()) -> Node i o -> IO ([LoadedFixture], [HookRunTime])
+mkFixturesHooks db =
+  recurse $ pure ([], [])
+  where
+    recurse :: IO ([LoadedFixture], [HookRunTime]) -> Node i o -> IO ([LoadedFixture], [HookRunTime])
+    recurse accum node = do
+      (!fxs, !hks) <- accum
+      case node of
+        Hook
+          { hookLabel,
+            hookStatus,
+            hookChildren
+          } ->
+            let !acmNxt = pure (fxs, HookRunTime hookLabel hookStatus : hks)
+             in hookChildren >>= foldl' recurse acmNxt
+        Fixture
+          { fixtureLabel,
+            logStart,
+            fixParent,
+            iterations,
+            fixStatus,
+            logEnd
+          } -> do
+            !fx <- loadFixture db fixtureLabel fixParent iterations fixStatus logStart logEnd
+            pure (fx : fxs, hks)
 
 data Executor = Executor
   { maxThreads :: Int,
@@ -864,41 +892,46 @@ qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()
 qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture
 
 executeLinked :: (Text -> IO ()) -> Int -> NodeRoot o -> IO ()
-executeLinked db maxThreads NodeRoot {rootStatus, children} = do
-  db "Before fxs"
-  fxs <- traverse (mkFixtures db) children
-  db "After fks"
-  let idxFxs = zip [0 ..] $ concat fxs
+executeLinked db maxThreads NodeRoot {rootStatus, children} =
+  let reveseConcat :: [([LoadedFixture], [HookRunTime])] -> ([LoadedFixture], [HookRunTime])
+      reveseConcat hfxs =
+        foldl' (\(!fxs, !hks) (!fx, !hk) -> (fx <> fxs, hk <> hks)) ([], []) $ (reverse *** reverse) <$> hfxs
+   in do
+        db "Before fxs"
+        !fxsHksArr <- traverse (mkFixturesHooks db) children
+        let (!fxs, !hks) = reveseConcat fxsHksArr
+        db "After fks"
+        let idxFxs = zip [0 ..] fxs
 
-  -- create queue
-  pendingQ <- newTQueueIO
-  runningQ <- newTQueueIO
-  -- load all fixtures to pending queue
-  atomically $ traverse_ (qFixture pendingQ) idxFxs
-  initialThreadsInUse <- newTVarIO 0
-  db "Before hks"
-  hks <- concat <$> traverse hookInfo children
-  db "After hks"
+        -- create queue
+        pendingQ <- newTQueueIO
+        runningQ <- newTQueueIO
+        -- load all fixtures to pending queue
+        atomically . traverse_ (qFixture pendingQ) $ zip [0 ..] fxs
+        initialThreadsInUse <- newTVarIO 0
+        -- db "Before hks"
+        -- hks <- concat <$> traverse hookInfo children
+        -- db "After hks"
 
-  db "Executing"
-  execute' (Executor maxThreads initialThreadsInUse pendingQ runningQ) db
-  db "ALLL DONE !!!!!!!"
+        db "Executing"
+        execute' (Executor maxThreads initialThreadsInUse pendingQ runningQ) db
+        db "ALLL DONE !!!!!!!"
 
-  db "Waiting on Hooks"
+        db "Waiting on Hooks"
 
-  let hookWait :: IO [HookRunTime] -> IO ()
-      hookWait hrt' =
-        do
-          hrt <- hrt'
-          case hrt of
-            [] -> pure ()
-            (HookRunTime {currentStatus} : hrts) -> do
-              headStatus <- atomically $ readTVar currentStatus
-              db $ "HOOK HEAD STATUS: " <> txt headStatus
-              finalised headStatus
-                ? hookWait (pure hrts)
-                $ C.threadDelay 1_000_000 >> hookWait hrt'
-  hookWait $ pure hks
+        let hookWait :: IO [HookRunTime] -> IO ()
+            hookWait hrt' =
+              do
+                hrt <- hrt'
+                case hrt of
+                  [] -> pure ()
+                  (HookRunTime {currentStatus} : hrts) -> do
+                    headStatus <- atomically $ readTVar currentStatus
+                    db $ "HOOK HEAD STATUS: " <> txt headStatus
+                    finalised headStatus
+                      ? hookWait (pure hrts)
+                      $ C.threadDelay 1_000_000 >> hookWait hrt'
+        hookWait $ pure hks
 
 execute :: Int -> PN.PreNodeRoot o -> IO ()
 execute maxThreads preRoot = do

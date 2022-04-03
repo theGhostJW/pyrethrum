@@ -303,6 +303,9 @@ linkParents db PN.PreNodeRoot {children} =
   do
     db "CALLING LINKED PARENTS"
     status <- newTVarIO PN.Unintialised
+
+    here make 2 arrays of statuses hook and fixture and feed in to linkParents'
+    
     children' <- children
     !childNodes <- traverse (linkParents' db $ Left ()) children'
     pure $

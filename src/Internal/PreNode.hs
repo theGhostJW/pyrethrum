@@ -1,8 +1,9 @@
 module Internal.PreNode where
 
 import Language.Haskell.TH (ExpQ)
-import Pyrelude (Bool (False, True), Eq, IO, Int, Show, SomeException, TVar, Text, not, (&&))
+import Pyrelude (Bool (False, True), Eq, IO, Int, Show, SomeException, TVar, Text, not, (&&), Generic)
 import UnliftIO (MonadUnliftIO, STM)
+import Control.DeepSeq (NFData)
 
 data CompletionStatus
   = Normal
@@ -13,6 +14,7 @@ data CompletionStatus
 newtype PreNodeRoot o = PreNodeRoot
   { children :: IO [PreNode () o]
   }
+
 
 data PreNode i o where
   Hook ::
@@ -30,6 +32,7 @@ data PreNode i o where
       logEnd :: IO ()
     } ->
     PreNode i ()
+
 
 data HookStatus
   = Unintialised

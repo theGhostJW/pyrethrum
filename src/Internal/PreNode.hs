@@ -1,14 +1,22 @@
 module Internal.PreNode where
 
 import Language.Haskell.TH (ExpQ)
-import Pyrelude (Bool (False, True), Eq, IO, Int, Show, SomeException, TVar, Text, not, (&&), Generic)
-import UnliftIO (MonadUnliftIO, STM)
+import Pyrelude (Bool (False, True), Eq, IO, Int, Show, SomeException, TVar, Text, not, (&&), Generic, Either)
+import UnliftIO (MonadUnliftIO, STM, TMVar)
 import Control.DeepSeq (NFData)
 
 data CompletionStatus
   = Normal
   | Fault Text SomeException
   | Murdered
+  deriving (Show)
+
+data FixtureStatus
+  = Pending
+  | Starting
+  | Active
+  | Done CompletionStatus
+  | BeingKilled
   deriving (Show)
 
 newtype PreNodeRoot o = PreNodeRoot
@@ -22,11 +30,13 @@ data PreNode i o where
       hookStatus :: TVar HookStatus,
       hook :: i -> IO o,
       hookChildren :: [PreNode o o2],
+      hookResult :: TMVar (Either SomeException o),
       hookRelease :: Int -> o -> IO ()
     } ->
     PreNode i o
   Fixture ::
     { fixtureAddress :: Text, -- used in testing
+      fixtureStatus :: TVar FixtureStatus, 
       logStart :: IO (),
       iterations :: [i -> IO ()],
       logEnd :: IO ()

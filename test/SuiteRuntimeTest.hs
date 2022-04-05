@@ -22,6 +22,7 @@ import Pyrelude as P
     Ord (..),
     Show,
     Text,
+    Traversable (traverse),
     catMaybes,
     const,
     count,
@@ -36,6 +37,7 @@ import Pyrelude as P
     maybef,
     pure,
     reverse,
+    singleton,
     toS,
     txt,
     txtPretty,
@@ -50,7 +52,7 @@ import Pyrelude as P
     (<>),
     (>>),
     (>>=),
-    (?), Traversable (traverse), singleton,
+    (?),
   )
 import Pyrelude.Test (chk', chkFail)
 import Pyrelude.Test as T hiding (maybe, singleton)
@@ -132,7 +134,7 @@ getStats PreNodeRoot {children} =
                   iterationCount = length iterations
                 }
             ]
-   in do 
+   in do
         children' <- children
         pure $ zip [0 ..] children' >>= uncurry (getStats' "Root")
 
@@ -205,26 +207,30 @@ logMessage q txt' = logEvent q (Message txt')
 -- remove when pyrelude updated
 chkEq' t = assertEqual (toS t)
 
-mkFixture :: TQueue RunEvent -> Text -> Text -> Int -> PreNode () ()
-mkFixture q parentId fxId itCount =
-  PN.Fixture
-    { fixtureAddress = fid,
-      logStart = fixtureStart q parentId fid,
-      iterations = mkIterations q fid itCount,
-      logEnd = fixtureEnd q parentId fid
-    }
+mkFixture :: TQueue RunEvent -> Text -> Text -> Int -> IO (PreNode () ())
+mkFixture q parentId fxId itCount = do
+  fs <- newTVarIO Pending
+  pure $
+    PN.Fixture
+      { fixtureAddress = fid,
+        fixtureStatus = fs,
+        logStart = fixtureStart q parentId fid,
+        iterations = mkIterations q fid itCount,
+        logEnd = fixtureEnd q parentId fid
+      }
   where
     fid = fullId parentId fxId
-
 
 mkHook :: TQueue RunEvent -> Text -> Text -> [PreNode () o2] -> IO (PreNode i ())
 mkHook q parentId hkId nodeChildren =
   do
     status <- atomically $ newTVar Unintialised
+    rslt <- newEmptyTMVarIO
     pure
       PN.Hook
         { hookAddress = hid, -- used in testing
           hookStatus = status,
+          hookResult = rslt,
           hook = const $ hookStart q parentId hid,
           hookChildren = nodeChildren,
           hookRelease = \_ _ -> hookEnd q parentId hid
@@ -241,21 +247,15 @@ mkIterations q fixFullId count' =
       mkIt idx = const $ logIteration q fixFullId idx (iterationMessage idx)
    in mkIt <$> [0 .. count' - 1]
 
-superSimplSuite :: TQueue RunEvent -> PreNodeRoot ()
+superSimplSuite :: TQueue RunEvent -> IO (PreNodeRoot ())
 superSimplSuite q =
-  PreNodeRoot $ 
-    pure [ mkFixture q "Root" "Fixture 0" 1]
+  pure . PreNodeRoot $ (: []) <$> mkFixture q "Root" "Fixture 0" 1
 
-simpleSuiteWithHook :: TQueue RunEvent -> PreNodeRoot ()
-simpleSuiteWithHook q =
-  let 
-    fx = mkFixture q "Root.Hook 0" "Fixture 0" 1
-    hk0 = mkHook q "Root" "Hook 0" [fx]
-    hk :: IO  [PreNode () ()]
-    hk = singleton <$> hk0
-  in
-    PreNodeRoot hk
-    
+
+simpleSuiteWithHook :: TQueue RunEvent -> IO (PreNodeRoot ())
+simpleSuiteWithHook q = do
+      fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
+      pure . PreNodeRoot $ (: []) <$> mkHook q "Root" "Hook 0" [fx]
 
 tQToList :: TQueue a -> IO [a]
 tQToList q =
@@ -342,11 +342,10 @@ chkFixtures stats lstRE =
         chkEq' "expected fixture end count" fixStatCount $ length fixEnds
         for_ stats chkFixture
 
-exeSuiteTests :: (TQueue RunEvent -> PreNodeRoot ()) -> Int -> IO ()
+exeSuiteTests :: (TQueue RunEvent -> IO (PreNodeRoot ())) -> Int -> IO ()
 exeSuiteTests preSuite threadCount = do
   q <- atomically newTQueue
-  let preSuite' = preSuite q
-      
+  preSuite' <- preSuite q
   stats <- getStats preSuite'
   pPrint stats
   pPrint "OFF LIKE A ROCKET"

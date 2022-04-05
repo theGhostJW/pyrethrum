@@ -14,7 +14,11 @@ import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty))
 import Data.Tuple.Extra (both)
 import GHC.Exts
-import Internal.PreNode (HookStatus (Finalised, Finalising), finalised)
+import Internal.PreNode
+  ( FixtureStatus (..),
+    HookStatus (Finalised, Finalising),
+    finalised,
+  )
 import qualified Internal.PreNode as PN
   ( CompletionStatus (Fault, Murdered, Normal),
     HookStatus (..),
@@ -47,6 +51,7 @@ import UnliftIO
     newTMVar,
     pureTry,
     tryAny,
+    unGetTBQueue,
   )
 import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, takeMVar, threadDelay, withMVar)
 import UnliftIO.STM
@@ -74,14 +79,6 @@ import UnliftIO.STM
     writeTVar,
   )
 import qualified Prelude as PRL
-
-data FixtureStatus
-  = Pending
-  | Starting
-  | Active
-  | Done PN.CompletionStatus
-  | BeingKilled
-  deriving (Show)
 
 data NodeRoot o = NodeRoot
   { rootStatus :: TVar PN.HookStatus,
@@ -304,8 +301,6 @@ linkParents db PN.PreNodeRoot {children} =
     db "CALLING LINKED PARENTS"
     status <- newTVarIO PN.Unintialised
 
-    here make 2 arrays of statuses hook and fixture and feed in to linkParents'
-    
     children' <- children
     !childNodes <- traverse (linkParents' db $ Left ()) children'
     pure $
@@ -319,30 +314,27 @@ linkParents' db parent preNode =
   do
     db "!!!!!!!! CALLING linkParents' (PRIME) !!!!! "
     case preNode of
-      PN.Hook {hookAddress, hook, hookStatus, hookChildren, hookRelease} -> do
-        mtRslt <- newEmptyTMVarIO
-        !status <- newTVarIO PN.Unintialised
+      PN.Hook {hookAddress, hook, hookStatus, hookResult, hookChildren, hookRelease} -> do
         let mkChildren h' = traverse (linkParents' db $ Right h') hookChildren
             h =
               Internal.SuiteRuntime.Hook
                 { hookLabel = hookAddress,
                   hookParent = parent,
-                  hookStatus = status,
+                  hookStatus = hookStatus,
                   hook = hook,
-                  hookResult = mtRslt,
+                  hookResult = hookResult,
                   hookChildren = mkChildren h,
                   hookRelease = hookRelease
                 }
         pure h
-      PN.Fixture {fixtureAddress, logStart, iterations, logEnd} -> do
-        !fs <- newTVarIO Pending
+      PN.Fixture {fixtureAddress, fixtureStatus, logStart, iterations, logEnd} -> do
         db $ "!!!!!!!! NEW FIXTURE STATUS !!!!! " <> fixtureAddress
         pure $
           Internal.SuiteRuntime.Fixture
             { fixtureLabel = fixtureAddress,
               logStart = logStart,
               fixParent = parent,
-              fixStatus = fs,
+              fixStatus = fixtureStatus,
               iterations = iterations,
               logEnd = logEnd
             }

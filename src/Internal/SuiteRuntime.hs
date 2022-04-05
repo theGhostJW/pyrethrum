@@ -11,7 +11,7 @@ module Internal.SuiteRuntime where
 import Check (CheckReport (result))
 import Control.DeepSeq (NFData, deepseq, force, ($!!))
 import Data.Function (const, ($), (&))
-import Data.Sequence (Seq (Empty))
+import Data.Sequence (Seq (Empty), empty)
 import Data.Tuple.Extra (both)
 import GHC.Exts
 import Internal.PreNode
@@ -189,12 +189,11 @@ trySetFinalising db hs' =
             case cs of
               s@PN.Normal ->
                 writeTVar hs' PN.Finalising $> CanBeFinalised hs
-              s@PN.Fault {} -> writeTVar hs' (PN.FinalisedFault "Pre hook faulted" s) >> fa
-              s@PN.Murdered -> writeTVar hs' (PN.FinalisedFault "Pre hook murdered" s) >> fa
+              PN.Fault txt' ex -> writeTVar hs' (PN.Finalised $ PN.Fault ("Pre hook faulted: " <> txt') ex) >> fa
+              m@(PN.Murdered _) -> writeTVar hs' (PN.Finalised m) >> fa
           PN.BeingMurdered -> nr
           PN.Finalising -> nr
-          PN.Finalised -> fa
-          PN.FinalisedFault _ _ -> fa
+          PN.Finalised _ -> fa
 
 recurseHookRelease :: (Text -> IO ()) -> Node i o -> IO ()
 recurseHookRelease db n =
@@ -206,7 +205,7 @@ recurseHookRelease db n =
         let --
             recurse = either (const $ pure ()) (recurseHookRelease db) parent
             setStatus = atomically . writeTVar hookStatus
-            setStatusRecurse s = setStatus s >> recurse
+            finaliseRecurse s = setStatus (PN.Finalised s) >> recurse
          in do
               hs <- atomically (trySetFinalising db hookStatus)
               case hs of
@@ -227,18 +226,18 @@ recurseHookRelease db n =
                       eitherf
                         ehr
                         ( \e -> do
-                            putStrLn ("Hook release not executed - this code should never run\n" <> txt e)
-                            setStatusRecurse . PN.Complete $ PN.Fault "Hook execution failed" e
+                            db ("Hook release not executed - this code should never run\n" <> txt e)
+                            finaliseRecurse $ PN.Fault "Hook execution failed" e
                         )
                         ( \hr -> do
                             ethr <- tryAny $ hookRelease 1 hr
                             eitherf
                               ethr
                               ( \e -> do
-                                  putStrLn ("Hook release threw an exception\n" <> txt e)
-                                  setStatusRecurse . PN.Complete $ PN.Fault "Hook release threw an exception" e
+                                  db ("Hook release threw an exception\n" <> txt e)
+                                  finaliseRecurse $ PN.Fault "Hook release threw an exception" e
                               )
-                              (const $ setStatusRecurse $ PN.Complete PN.Normal)
+                              (const $ finaliseRecurse PN.Normal)
                         )
 
 loadFixture :: (Text -> IO ()) -> Text -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> IO LoadedFixture
@@ -328,7 +327,6 @@ linkParents' db parent preNode =
                 }
         pure h
       PN.Fixture {fixtureAddress, fixtureStatus, logStart, iterations, logEnd} -> do
-        db $ "!!!!!!!! NEW FIXTURE STATUS !!!!! " <> fixtureAddress
         pure $
           Internal.SuiteRuntime.Fixture
             { fixtureLabel = fixtureAddress,
@@ -346,8 +344,7 @@ isUninitialised = \case
   PN.Running -> False
   PN.Complete cs -> False
   PN.Finalising -> False
-  PN.Finalised -> False
-  PN.FinalisedFault _ _ -> False
+  PN.Finalised _ -> False
   PN.BeingMurdered -> False
 
 tryLock :: (Text -> IO ()) -> TVar PN.HookStatus -> STM Bool
@@ -910,7 +907,7 @@ executeLinked db maxThreads NodeRoot {rootStatus, children} =
 
         db "Executing"
         execute' (Executor maxThreads initialThreadsInUse pendingQ runningQ) db
-        db "ALLL DONE !!!!!!!"
+        db "EXECUTION DONE !!!!!!!"
 
         db "Waiting on Hooks"
 
@@ -927,6 +924,15 @@ executeLinked db maxThreads NodeRoot {rootStatus, children} =
                       ? hookWait (pure hrts)
                       $ C.threadDelay 1_000_000 >> hookWait hrt'
         hookWait $ pure hks
+        db "RUN COMPLETE !!!!!!!"
+
+
+waitEmpty :: Chan a -> IO ()
+waitEmpty c = do 
+  emty <- newChan
+  emty == c ? 
+    pure () $
+    C.threadDelay 10_1000 >> putStrLn "EMPTING CHANNEL" >> waitEmpty c
 
 execute :: Int -> PN.PreNodeRoot o -> IO ()
 execute maxThreads preRoot = do
@@ -949,3 +955,5 @@ execute maxThreads preRoot = do
   root <- linkParents db preRoot
   db "Linking Done"
   executeLinked db maxThreads root
+  -- waitEmpty chn
+  putStrLn "Run Complete"

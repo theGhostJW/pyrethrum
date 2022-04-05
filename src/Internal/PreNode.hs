@@ -8,7 +8,7 @@ import Control.DeepSeq (NFData)
 data CompletionStatus
   = Normal
   | Fault Text SomeException
-  | Murdered
+  | Murdered Text
   deriving (Show)
 
 data FixtureStatus
@@ -51,8 +51,7 @@ data HookStatus
   | Complete CompletionStatus
   | BeingMurdered
   | Finalising
-  | Finalised
-  | FinalisedFault Text CompletionStatus
+  | Finalised CompletionStatus
   deriving (Show)
 
 cleaningUp :: HookStatus -> Bool
@@ -63,8 +62,7 @@ cleaningUp = \case
   Complete cs -> False
   BeingMurdered -> True
   Finalising -> True
-  Finalised -> False
-  FinalisedFault _ _ -> False
+  Finalised _ -> False
 
 finalised :: HookStatus -> Bool
 finalised = \case
@@ -74,8 +72,7 @@ finalised = \case
   Complete cs -> False
   BeingMurdered -> False
   Finalising -> False
-  Finalised -> True
-  FinalisedFault _ _ -> True
+  Finalised _ -> True
 
 complete :: HookStatus -> Bool
 complete = \case
@@ -85,8 +82,7 @@ complete = \case
   Complete cs -> True
   BeingMurdered -> False
   Finalising -> False
-  Finalised -> False
-  FinalisedFault _ _ -> False
+  Finalised _ -> False
 
 normalCompletion :: HookStatus -> Bool
 normalCompletion = \case
@@ -96,8 +92,7 @@ normalCompletion = \case
   Complete cs -> case cs of
     Normal -> True
     Fault {} -> False
-    Murdered -> False
+    Murdered _ -> False
   Finalising -> False
   BeingMurdered -> False
-  Finalised -> False
-  FinalisedFault _ _ -> False
+  Finalised _ -> False

@@ -365,5 +365,5 @@ unit_simple_single = do
 
 unit_simple_with_hook :: IO ()
 unit_simple_with_hook =
-  replicateM_ 1 $
+  replicateM_ 100 $
     exeSuiteTests simpleSuiteWithHook 1

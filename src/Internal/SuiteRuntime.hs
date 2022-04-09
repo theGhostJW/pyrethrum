@@ -46,11 +46,14 @@ import UnliftIO
   ( Exception (displayException),
     bracket,
     catchAny,
+    concurrently_,
     newMVar,
     newTMVar,
     pureTry,
     tryAny,
     unGetTBQueue,
+    wait,
+    withAsync,
   )
 import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, killThread, takeMVar, threadDelay, withMVar)
 import UnliftIO.STM
@@ -944,29 +947,24 @@ execute maxThreads preRoot = do
           $ pure ()
       logger = db False
 
-  chanEmpty <- newEmptyMVar
-  t <-
-    wantDebug
-      ? Just
-        <$> C.forkIO
-          ( let doPrint = do
-                  (terminate, msg) <- readChan chn
-                  putStrLn msg
-                  terminate
-                    ? (putStrLn "Exit Print Loop" >> putMVar chanEmpty () >> pure ())
-                    $ doPrint
-             in doPrint
-          )
-      $ pure Nothing
 
-  logger "Linking Parents"
-  root <- linkParents logger preRoot
-  i <- myThreadId
-  logger $ "Linking Done " <> txt i
 
-  executeLinked logger maxThreads root
-  db True $ "Execution Done " <> txt i
-  when wantDebug $
-    readMVar chanEmpty
-  traverse_ C.killThread t
-  putStrLn "We are here !!!!"
+  concurrently_
+    ( let doPrint = do
+            (terminate, msg) <- readChan chn
+            putStrLn msg
+            terminate
+              ? (putStrLn "Exit Print Loop" >> pure ())
+              $ doPrint
+       in doPrint
+    )
+    $ do
+      logger "Linking Parents"
+      root <- linkParents logger preRoot
+      i <- myThreadId
+      logger $ "Linking Done " <> txt i
+
+      executeLinked logger maxThreads root
+      db True $ "Execution Done " <> txt i
+      -- traverse_ C.killThread t
+      putStrLn "We are here !!!!"

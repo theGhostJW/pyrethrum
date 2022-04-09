@@ -1,10 +1,5 @@
--- {-# LANGUAGE NoStrictData #-}
 {-# LANGUAGE BangPatterns #-}
--- {-# LANGUAGE NoStrictData #-}
 {-# LANGUAGE MagicHash #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use lambda-case" #-}
 
 module Internal.SuiteRuntime where
 
@@ -248,17 +243,17 @@ recurseHookRelease db n =
 loadFixture :: Logger -> Text -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> IO LoadedFixture
 loadFixture db fixtureLabel parent iterations fixStatus logStart logEnd =
   do
-    hookVal <- db "LOCK EXECUTE HOOK" >> lockExecuteHook db parent
-    let loadedIterations :: Either SomeException [IO ()]
+    let loadedIterations :: IO (Either SomeException [IO ()])
         loadedIterations =
           let apply :: [a -> IO ()] -> a -> [IO ()]
               apply fios i =
                 let f :: a -> (a -> IO ()) -> IO ()
                     f a ff = ff a
                  in f i <$> fios
-           in apply iterations <$> hookVal
+           in (apply iterations <$>) <$> lockExecuteHook db parent 
     db "CALL LOAD FIXTURE"
-    iterations' <- newTVarIO loadedIterations
+    loadedIterations' <- loadedIterations
+    iterations' <- newTVarIO loadedIterations'
     activeThreads' <- newTVarIO []
     pure $
       LoadedFixture

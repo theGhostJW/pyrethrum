@@ -52,7 +52,7 @@ import Pyrelude as P
     (<>),
     (>>),
     (>>=),
-    (?),
+    (?), replicateM_,
   )
 import Pyrelude.Test (chk', chkFail)
 import Pyrelude.Test as T hiding (maybe, singleton)
@@ -347,12 +347,12 @@ exeSuiteTests preSuite threadCount = do
   q <- atomically newTQueue
   preSuite' <- preSuite q
   stats <- getStats preSuite'
-  pPrint stats
-  pPrint "OFF LIKE A ROCKET"
+  -- pPrint stats
+  -- pPrint "OFF LIKE A ROCKET"
   S.execute threadCount preSuite'
   l <- tQToList q
-  pPrint stats
-  pPrint l
+  -- pPrint stats
+  -- pPrint l
   chkFixtures stats l
 
 -- $ > unit_simple_single
@@ -364,5 +364,6 @@ unit_simple_single = do
 -- $> unit_simple_with_hook
 
 unit_simple_with_hook :: IO ()
-unit_simple_with_hook = do
-  exeSuiteTests simpleSuiteWithHook 1
+unit_simple_with_hook =
+  replicateM_ 100 $
+    exeSuiteTests simpleSuiteWithHook 1

@@ -33,7 +33,6 @@ import Pyrelude hiding
     atomically,
     bool,
     bracket,
-    forkFinally,
     newMVar,
     newTVarIO,
     parent,
@@ -53,7 +52,7 @@ import UnliftIO
     tryAny,
     unGetTBQueue,
   )
-import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, takeMVar, threadDelay, withMVar)
+import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, takeMVar, threadDelay, withMVar, killThread)
 import UnliftIO.STM
   ( STM,
     TMVar,
@@ -145,6 +144,9 @@ data LoadedFixture = LoadedFixture
     releaseParentHook :: IO ()
   }
 
+
+type Logger = Text -> IO ()
+
 isDone :: FixtureStatus -> Bool
 isDone = \case
   Pending -> False
@@ -153,13 +155,13 @@ isDone = \case
   Done _ -> True
   BeingKilled -> False
 
-logVal :: Show a => (Text -> IO ()) -> Text -> IO a -> IO a
+logVal :: Show a => Logger -> Text -> IO a -> IO a
 logVal db pfx val = val >>= \a -> db (pfx <> " Value: " <> txt a) >> val
 
-logSTMVal :: Show a => (Text -> IO ()) -> Text -> STM a -> STM a
-logSTMVal db pfx val = val >>= \a -> stmLog db (pfx <> " Value: " <> txt a) >> val
+logSTMVal :: Show a => Logger -> Text -> STM a -> STM a
+logSTMVal db pfx val = val >>= \a -> dbStm db (pfx <> " Value: " <> txt a) >> val
 
-nodeFinished :: (Text -> IO ()) -> Node i o -> IO Bool
+nodeFinished :: Logger -> Node i o -> IO Bool
 nodeFinished db =
   let log :: Show a => Text -> STM a -> STM a
       log = logSTMVal db
@@ -174,13 +176,13 @@ data CanFinaliseHook
       }
   | FinalisedAlready
 
-trySetFinalising :: (Text -> IO ()) -> TVar HookStatus -> STM CanFinaliseHook
+trySetFinalising :: Logger -> TVar HookStatus -> STM CanFinaliseHook
 trySetFinalising db hs' =
   let nr = pure NotReady
       fa = pure FinalisedAlready
    in do
         hs <- readTVar hs'
-        stmLog db $ "HOOK STATUS: trySetFinalising " <> txt hs
+        dbStm db $ "HOOK STATUS: trySetFinalising " <> txt hs
         case hs of
           PN.Unintialised -> nr
           PN.Intitialising -> nr
@@ -195,7 +197,7 @@ trySetFinalising db hs' =
           PN.Finalising -> nr
           PN.Finalised _ -> fa
 
-recurseHookRelease :: (Text -> IO ()) -> Node i o -> IO ()
+recurseHookRelease :: Logger -> Node i o -> IO ()
 recurseHookRelease db n =
   do
     db "!!!!!!!! recurseHookRelease !!!!!!!!"
@@ -223,6 +225,7 @@ recurseHookRelease db n =
                     $ do
                       db "READING HOOK RESULT"
                       ehr <- atomically $ readTMVar hookResult
+                      db "FINISHED READING HOOK RESULT"
                       eitherf
                         ehr
                         ( \e -> do
@@ -240,7 +243,7 @@ recurseHookRelease db n =
                               (const $ finaliseRecurse PN.Normal)
                         )
 
-loadFixture :: (Text -> IO ()) -> Text -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> IO LoadedFixture
+loadFixture :: Logger -> Text -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> IO LoadedFixture
 loadFixture db fixtureLabel parent iterations fixStatus logStart logEnd =
   do
     hookVal <- db "LOCK EXECUTE HOOK" >> lockExecuteHook db parent
@@ -294,7 +297,7 @@ data IndexedFixture = IndexedFixture
   ~ test with null iterations
 -}
 
-linkParents :: (Text -> IO ()) -> PN.PreNodeRoot o -> IO (NodeRoot o)
+linkParents :: Logger -> PN.PreNodeRoot o -> IO (NodeRoot o)
 linkParents db PN.PreNodeRoot {children} =
   do
     db "CALLING LINKED PARENTS"
@@ -308,7 +311,7 @@ linkParents db PN.PreNodeRoot {children} =
           children = childNodes
         }
 
-linkParents' :: (Text -> IO ()) -> Either o (Node i o) -> PN.PreNode o o' -> IO (Node o o')
+linkParents' :: Logger -> Either o (Node i o) -> PN.PreNode o o' -> IO (Node o o')
 linkParents' db parent preNode =
   do
     db "!!!!!!!! CALLING linkParents' (PRIME) !!!!! "
@@ -347,11 +350,11 @@ isUninitialised = \case
   PN.Finalised _ -> False
   PN.BeingMurdered -> False
 
-tryLock :: (Text -> IO ()) -> TVar PN.HookStatus -> STM Bool
+tryLock :: Logger -> TVar PN.HookStatus -> STM Bool
 tryLock db status =
   do
     hs <- readTVar status
-    stmLog db $ "tryLock HOOK STATUS: " <> txt hs
+    dbStm db $ "tryLock HOOK STATUS: " <> txt hs
     -----
     readTVar status
       >>= bool
@@ -364,13 +367,16 @@ data SkippedException = SkippedException Text SomeException
 
 instance Exception SkippedException
 
-stmLog :: (Text -> IO ()) -> Text -> STM ()
-stmLog db = unsafeIOToSTM . db
+dbStm :: Logger -> Text -> STM ()
+dbStm db = unsafeIOToSTM . db
+
+-- dbStm :: Logger -> Text -> STM ()
+-- dbStm db t = pure ()
 
 -- executeHook only to be run when want executeHook has set
 -- staus to initalising should only ever run once per branch
 -- TODO - test exception on output of branch parent and in resource aquisition
-executeHook :: (Text -> IO ()) -> Node i o -> IO ()
+executeHook :: Logger -> Node i o -> IO ()
 executeHook db =
   \case
     Fixture {} -> pure ()
@@ -392,12 +398,12 @@ executeHook db =
         -- set hook result and status
         atomically do
           mtb <- isEmptyTMVar hookResult
-          stmLog db $ "HOOK RESULT PUT EMPTY BEFORE: " <> txt mtb
+          dbStm db $ "HOOK RESULT PUT EMPTY BEFORE: " <> txt mtb
           putTMVar hookResult result -- writes hook result to the TMVar
           mt <- isEmptyTMVar hookResult
-          stmLog db $ "HOOK RESULT PUT EMPTY AFTER: " <> txt mt
+          dbStm db $ "HOOK RESULT PUT EMPTY AFTER: " <> txt mt
           mt2 <- isEmptyTMVar hookResult
-          stmLog db $ "HOOK RESULT SECOND: " <> txt mt2
+          dbStm db $ "HOOK RESULT SECOND: " <> txt mt2
           writeTVar hookStatus
             . PN.Complete
             . either
@@ -405,7 +411,7 @@ executeHook db =
               (const PN.Normal)
             $ result
 
-lockExecuteHook :: (Text -> IO ()) -> Either o (Node i o) -> IO (Either SomeException o)
+lockExecuteHook :: Logger -> Either o (Node i o) -> IO (Either SomeException o)
 lockExecuteHook db parent =
   eitherf
     parent
@@ -431,7 +437,7 @@ lockExecuteHook db parent =
             db "RETURNING FROM LOCK EXECUTE HOOK " >> pure r
     )
 
--- mkFixtures :: (Text -> IO ()) -> Node i o -> IO [LoadedFixture]
+-- mkFixtures :: Logger -> Node i o -> IO [LoadedFixture]
 -- mkFixtures db = \case
 --   Hook {hookChildren} -> do
 --     hc <- hookChildren
@@ -450,7 +456,7 @@ lockExecuteHook db parent =
 
 --     pure r
 
-mkFixturesHooks :: (Text -> IO ()) -> Node i o -> IO ([LoadedFixture], [HookRunTime])
+mkFixturesHooks :: Logger -> Node i o -> IO ([LoadedFixture], [HookRunTime])
 mkFixturesHooks db =
   recurse $ pure ([], [])
   where
@@ -511,7 +517,7 @@ data IterationRun = IterationRun
     iteration :: IO ()
   }
 
-updateStatusReturnCompleted :: (Text -> IO ()) -> LoadedFixture -> STM Bool
+updateStatusReturnCompleted :: Logger -> LoadedFixture -> STM Bool
 updateStatusReturnCompleted
   db
   LoadedFixture
@@ -531,7 +537,7 @@ updateStatusReturnCompleted
           ethits <- readTVar iterations
           s <- readTVar fixStatus
           let doneAlready = isDone s
-          stmLog db $ "FIXTURE STATUS: updateStatusReturnCompleted (before) - " <> txt fixtureLabel <> " " <> txt s
+          dbStm db $ "FIXTURE STATUS: updateStatusReturnCompleted (before) - " <> txt fixtureLabel <> " " <> txt s
           eitherf
             ethits
             ( \e -> do
@@ -540,14 +546,14 @@ updateStatusReturnCompleted
                 pure $ not doneAlready
             )
             ( \i -> do
-                stmLog db $ "EMPTY ITERATIONS: " <> txt (null i)
+                dbStm db $ "EMPTY ITERATIONS: " <> txt (null i)
                 a <- readTVar activeThreads
-                stmLog db $ "EMPTY ACTIVE THREADS: " <> txt (null a)
+                dbStm db $ "EMPTY ACTIVE THREADS: " <> txt (null a)
                 let completed = not doneAlready && (null i && null a && not (completionBlocked s))
                 when completed $
                   writeTVar fixStatus (Done PN.Normal)
                 s' <- readTVar fixStatus
-                stmLog db $ "FIXTURE STATUS: updateStatusReturnCompleted (after) - " <> fixtureLabel <> " " <> txt s'
+                dbStm db $ "FIXTURE STATUS: updateStatusReturnCompleted (after) - " <> fixtureLabel <> " " <> txt s'
                 pure completed
             )
 
@@ -576,8 +582,8 @@ takeIteration fixture@LoadedFixture {iterations, activeThreads, fixStatus} = do
             pure . Just $ IterationRun fixture x
       )
 
-nextActiveFixtureRemoveDone :: TQueue IndexedFixture -> STM (Maybe LoadedFixture)
-nextActiveFixtureRemoveDone activeQ =
+nextActiveFixtureRemoveDone :: Logger -> TQueue IndexedFixture -> STM (Maybe LoadedFixture)
+nextActiveFixtureRemoveDone db activeQ =
   let getNxt :: Maybe Int -> STM (Maybe LoadedFixture)
       getNxt mInitilIndex = do
         mfx <- tryReadTQueue activeQ
@@ -600,6 +606,7 @@ nextActiveFixtureRemoveDone activeQ =
                 mInitilIndex == Just index'
                   ? pure Nothing
                   $ do
+                    dbStm db "nextActiveFixtureRemoveDone"
                     status <- readTVar fixStatus
                     case status of
                       Pending -> reQReturnThisFixture
@@ -613,8 +620,8 @@ nextActiveFixtureRemoveDone activeQ =
    in getNxt Nothing
 
 -- returns the next fixture and puts on end of active fixture queue
-nextFixture :: TQueue IndexedFixture -> TQueue IndexedFixture -> STM (Either NoFixture LoadedFixture)
-nextFixture pendingQ activeQ =
+nextFixture :: Logger -> TQueue IndexedFixture -> TQueue IndexedFixture -> STM (Either NoFixture LoadedFixture)
+nextFixture db pendingQ activeQ =
   let notEmpty q = not <$> isEmptyTQueue q
    in do
         hasPending <- notEmpty pendingQ
@@ -627,14 +634,14 @@ nextFixture pendingQ activeQ =
                 pure . Right $ fixture ifx
             | hasActive ->
               maybe (Left NoFixturesReady) Right
-                <$> nextActiveFixtureRemoveDone activeQ
+                <$> nextActiveFixtureRemoveDone db activeQ
             | otherwise ->
               pure $ Left EmptyQueues
 
 releaseThread :: TVar Int -> STM ()
 releaseThread = flip modifyTVar (\i -> i - 1)
 
-reserveThread :: Executor -> (Text -> IO ()) -> STM (Either ThreadStats ThreadStats)
+reserveThread :: Executor -> Logger -> STM (Either ThreadStats ThreadStats)
 reserveThread
   exe@Executor
     { maxThreads,
@@ -647,11 +654,11 @@ reserveThread
         stats = ThreadStats {maxThreads = maxThreads, inUse = newUsed}
     --
     when reserved do
-      stmLog db "THREAD RESERVED"
+      dbStm db "THREAD RESERVED"
       writeTVar threadsInUse newUsed
     --
     unless reserved do
-      stmLog db "NO THREADS AVAILABLE NONE RESERVED"
+      dbStm db "NO THREADS AVAILABLE NONE RESERVED"
 
     pure $ (reserved ? Right $ Left) stats
 
@@ -704,7 +711,7 @@ removeFinishedThreads rthds =
 logError :: Text -> IO ()
 logError t = print $ "Something went wrong with the runtime: " <> t
 
-runFixture :: TVar ThreadStatus -> LoadedFixture -> (Text -> IO ()) -> IO ()
+runFixture :: TVar ThreadStatus -> LoadedFixture -> Logger -> IO ()
 runFixture
   threadStatus
   fx@LoadedFixture
@@ -779,7 +786,7 @@ aToWord# a = let !mb = Ptr' a in case unsafeCoerce# mb :: Word of W# addr -> add
 unsafeAddr :: a -> Text
 unsafeAddr a = txt $ I# (word2Int# (aToWord# (unsafeCoerce# a)))
 
-forkFixtureThread :: TVar Int -> LoadedFixture -> (Text -> IO ()) -> IO ()
+forkFixtureThread :: TVar Int -> LoadedFixture -> Logger -> IO ()
 forkFixtureThread
   threadsInUse
   fx@LoadedFixture {activeThreads, logEnd, releaseParentHook, fixtureLabel, fixStatus}
@@ -797,18 +804,18 @@ forkFixtureThread
             writeTVar activeThreads newAts
             -- decrement global threads in use
             upre <- readTVar threadsInUse
-            stmLog db "THREAD DONE"
-            stmLog db $ "BEFORE DECREMENT THREAD: " <> txt upre
+            dbStm db "THREAD DONE"
+            dbStm db $ "BEFORE DECREMENT THREAD: " <> txt upre
             releaseThread threadsInUse
             u <- readTVar threadsInUse
-            stmLog db $ "AFTER DECREMENT THREAD: " <> txt u
+            dbStm db $ "AFTER DECREMENT THREAD: " <> txt u
 
-        tfx = forkFinally
-          (db "III FIXTURE START" >> runFixture thrdStatus fx db)
+        tfx = C.forkFinally
+          (db "@@@@ FIXTURE START" >> runFixture thrdStatus fx db >> db "@@@@@ FIXTURE END !!!!!!!!!!!!!!!!!!!" )
           -- finally clean up
           \_ ->
             finally
-              releaseThread'
+              (db "THREAD RELEASE START " >> releaseThread' >> db  "THREAD RELEASE END")
               ( do
                   fxCompleted <- atomically $ updateStatusReturnCompleted db fx
                   db $ "FIXTURE COMPLETED: " <> txt fxCompleted
@@ -818,27 +825,27 @@ forkFixtureThread
                     fxCompleted
                     do
                       logEnd
-                      db "PRE HOOK RELEASE"
+                      db "PRE PARENT HOOK RELEASE"
                       releaseParentHook
-                      db "POST HOOK RELEASE"
+                      db "POST PARENT HOOK RELEASE"
               )
 
     db "III ABove Atomically"
     atomically $ do
-      stmLog db "III Read thread status"
-      stmLog db "III Adding thread status"
+      dbStm db "III Read thread status"
+      dbStm db "III Adding thread status"
       modifyTVar activeThreads (RunningThread tfx thrdStatus :)
       sinitial <- readTVar thrdStatus
-      stmLog db $ "III Thread BEFORE RUNNING SET: " <> txt sinitial
+      dbStm db $ "III Thread BEFORE RUNNING SET: " <> txt sinitial
       writeTVar thrdStatus ThreadRunning
       s <- readTVar thrdStatus
-      stmLog db $ "III Thread RUNNING SET I: " <> txt s
-      stmLog db $ "MAIN FORK THREAD POINTER IS: " <> unsafeAddr thrdStatus
-      stmLog db $ "MAIN FORK THREAD POINTER II IS: " <> unsafeAddr thrdStatus
+      dbStm db $ "III Thread RUNNING SET I: " <> txt s
+      dbStm db $ "MAIN FORK THREAD POINTER IS: " <> unsafeAddr thrdStatus
+      dbStm db $ "MAIN FORK THREAD POINTER II IS: " <> unsafeAddr thrdStatus
     id' <- tfx
     db $ "III DONE forkFixtureThread: " <> txt id'
 
-execute' :: Executor -> (Text -> IO ()) -> IO ()
+execute' :: Executor -> Logger -> IO ()
 execute'
   exe@Executor
     { maxThreads,
@@ -853,7 +860,7 @@ execute'
         eitherf
           eStats
           (pure . Left . NoThreadsAvailable)
-          (const $ stmLog db "III Execute Nxt Fixture" >> nextFixture fixturesPending fixturesStarted)
+          (const $ dbStm db "III Execute Nxt Fixture" >> nextFixture db fixturesPending fixturesStarted)
 
     let recurse = execute' exe db
         waitRecurse = {-C.threadDelay 10_000_000 >> -} recurse
@@ -883,7 +890,7 @@ execute'
 qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()
 qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture
 
-executeLinked :: (Text -> IO ()) -> Int -> NodeRoot o -> IO ()
+executeLinked :: Logger -> Int -> NodeRoot o -> IO ()
 executeLinked db maxThreads NodeRoot {rootStatus, children} =
   let reveseConcat :: [([LoadedFixture], [HookRunTime])] -> ([LoadedFixture], [HookRunTime])
       reveseConcat hfxs =
@@ -916,7 +923,7 @@ executeLinked db maxThreads NodeRoot {rootStatus, children} =
               do
                 hrt <- hrt'
                 case hrt of
-                  [] -> pure ()
+                  [] -> db "HOOKS DONE" >> pure ()
                   (HookRunTime {currentStatus} : hrts) -> do
                     headStatus <- atomically $ readTVar currentStatus
                     db $ "HOOK HEAD STATUS: " <> txt headStatus
@@ -926,34 +933,40 @@ executeLinked db maxThreads NodeRoot {rootStatus, children} =
         hookWait $ pure hks
         db "RUN COMPLETE !!!!!!!"
 
-
-waitEmpty :: Chan a -> IO ()
-waitEmpty c = do 
-  emty <- newChan
-  emty == c ? 
-    pure () $
-    C.threadDelay 10_1000 >> putStrLn "EMPTING CHANNEL" >> waitEmpty c
-
 execute :: Int -> PN.PreNodeRoot o -> IO ()
 execute maxThreads preRoot = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   chn <- newChan
   let wantDebug = True
-      doPrint = do
-        msg <- readChan chn
-        putStrLn msg
-        doPrint
-      db msg =
+      db :: Bool -> Text -> IO ()
+      db terminate msg = -- pure ()
         wantDebug
-          ? writeChan chn msg
+          ? writeChan chn (terminate, msg)
           $ pure ()
+      logger = db False
 
-  when wantDebug do
-    void $ C.forkIO doPrint
+  chanEmpty <- newEmptyMVar 
+  t <- wantDebug ?
+          Just <$> C.forkIO (
+                    let doPrint = do
+                          (terminate, msg) <- readChan chn
+                          putStrLn msg
+                          terminate
+                            ? (putStrLn "Exit Print Loop" >> putMVar chanEmpty () >> pure ())
+                            $ doPrint
+                      in doPrint)
+                  $ pure Nothing
 
-  db "Linking Parents"
-  root <- linkParents db preRoot
-  db "Linking Done"
-  executeLinked db maxThreads root
-  -- waitEmpty chn
-  putStrLn "Run Complete"
+
+  logger "Linking Parents"
+  root <- linkParents logger preRoot
+  i <- myThreadId
+  logger $ "Linking Done " <> txt i
+
+
+  executeLinked logger maxThreads root
+  db True $ "Execution Done " <> txt i
+  when wantDebug $
+    readMVar chanEmpty
+  traverse_ C.killThread  t
+  putStrLn "We are here !!!!"

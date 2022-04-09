@@ -939,7 +939,6 @@ execute maxThreads preRoot = do
   let wantDebug = True
       db :: Bool -> Text -> IO ()
       db terminate msg =
-        -- pure ()
         wantDebug
           ? writeChan chn (terminate, msg)
           $ pure ()

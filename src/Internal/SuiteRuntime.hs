@@ -939,32 +939,33 @@ execute :: Int -> PN.PreNodeRoot o -> IO ()
 execute maxThreads preRoot = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   chn <- newChan
-  let wantDebug = True
-      db :: Bool -> Text -> IO ()
+  let db :: Bool -> Text -> IO ()
       db terminate msg =
         wantDebug
           ? writeChan chn (terminate, msg)
           $ pure ()
+
+      logger :: Text -> IO ()
       logger = db False
 
-
-
-  concurrently_
-    ( let doPrint = do
+      printDebugLogs :: IO ()
+      printDebugLogs = printDebugLogs'
+        where
+          printDebugLogs' = do
             (terminate, msg) <- readChan chn
             putStrLn msg
             terminate
-              ? (putStrLn "Exit Print Loop" >> pure ())
-              $ doPrint
-       in doPrint
-    )
-    $ do
-      logger "Linking Parents"
-      root <- linkParents logger preRoot
-      i <- myThreadId
-      logger $ "Linking Done " <> txt i
+              ? pure ()
+              $ printDebugLogs'
 
-      executeLinked logger maxThreads root
-      db True $ "Execution Done " <> txt i
-      -- traverse_ C.killThread t
-      putStrLn "We are here !!!!"
+      linkExecute :: IO ()
+      linkExecute = do
+        root <- linkParents logger preRoot
+        executeLinked logger maxThreads root
+        when wantDebug $
+         db True "Execution Complete"
+
+      wantDebug = True
+   in wantDebug
+        ? concurrently_ printDebugLogs linkExecute
+        $ linkExecute

@@ -347,8 +347,6 @@ exeSuiteTests preSuite threadCount = do
   q <- atomically newTQueue
   preSuite' <- preSuite q
   stats <- getStats preSuite'
-  -- pPrint stats
-  -- pPrint "OFF LIKE A ROCKET"
   S.execute threadCount preSuite'
   l <- tQToList q
   pPrint stats
@@ -365,5 +363,5 @@ unit_simple_single = do
 
 unit_simple_with_hook :: IO ()
 unit_simple_with_hook =
-  replicateM_ 100 $
+  replicateM_ 1 $
     exeSuiteTests simpleSuiteWithHook 1

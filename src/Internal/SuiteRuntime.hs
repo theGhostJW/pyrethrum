@@ -52,7 +52,7 @@ import UnliftIO
     tryAny,
     unGetTBQueue,
   )
-import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, takeMVar, threadDelay, withMVar, killThread)
+import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, killThread, takeMVar, threadDelay, withMVar)
 import UnliftIO.STM
   ( STM,
     TMVar,
@@ -143,7 +143,6 @@ data LoadedFixture = LoadedFixture
     executeParentHook :: IO (),
     releaseParentHook :: IO ()
   }
-
 
 type Logger = Text -> IO ()
 
@@ -653,12 +652,12 @@ reserveThread
         newUsed = reserved ? used + 1 $ used
         stats = ThreadStats {maxThreads = maxThreads, inUse = newUsed}
     --
-    when reserved do
-      dbStm db "THREAD RESERVED"
-      writeTVar threadsInUse newUsed
-    --
-    unless reserved do
-      dbStm db "NO THREADS AVAILABLE NONE RESERVED"
+    if reserved
+      then do
+        dbStm db "THREAD RESERVED"
+        writeTVar threadsInUse newUsed
+      else --
+        dbStm db "NO THREADS AVAILABLE NONE RESERVED"
 
     pure $ (reserved ? Right $ Left) stats
 
@@ -811,11 +810,11 @@ forkFixtureThread
             dbStm db $ "AFTER DECREMENT THREAD: " <> txt u
 
         tfx = C.forkFinally
-          (db "@@@@ FIXTURE START" >> runFixture thrdStatus fx db >> db "@@@@@ FIXTURE END !!!!!!!!!!!!!!!!!!!" )
+          (db "@@@@ FIXTURE START" >> runFixture thrdStatus fx db >> db "@@@@@ FIXTURE END !!!!!!!!!!!!!!!!!!!")
           -- finally clean up
           \_ ->
             finally
-              (db "THREAD RELEASE START " >> releaseThread' >> db  "THREAD RELEASE END")
+              (db "THREAD RELEASE START " >> releaseThread' >> db "THREAD RELEASE END")
               ( do
                   fxCompleted <- atomically $ updateStatusReturnCompleted db fx
                   db $ "FIXTURE COMPLETED: " <> txt fxCompleted
@@ -863,7 +862,7 @@ execute'
           (const $ dbStm db "III Execute Nxt Fixture" >> nextFixture db fixturesPending fixturesStarted)
 
     let recurse = execute' exe db
-        waitRecurse = {-C.threadDelay 10_000_000 >> -} recurse
+        waitRecurse = C.threadDelay 10_000 >> recurse
         threadRelease = db "THREAD RELEASE" >> atomically (releaseThread threadsInUse)
 
     eitherf
@@ -939,34 +938,36 @@ execute maxThreads preRoot = do
   chn <- newChan
   let wantDebug = True
       db :: Bool -> Text -> IO ()
-      db terminate msg = -- pure ()
+      db terminate msg =
+        -- pure ()
         wantDebug
           ? writeChan chn (terminate, msg)
           $ pure ()
       logger = db False
 
-  chanEmpty <- newEmptyMVar 
-  t <- wantDebug ?
-          Just <$> C.forkIO (
-                    let doPrint = do
-                          (terminate, msg) <- readChan chn
-                          putStrLn msg
-                          terminate
-                            ? (putStrLn "Exit Print Loop" >> putMVar chanEmpty () >> pure ())
-                            $ doPrint
-                      in doPrint)
-                  $ pure Nothing
-
+  chanEmpty <- newEmptyMVar
+  t <-
+    wantDebug
+      ? Just
+        <$> C.forkIO
+          ( let doPrint = do
+                  (terminate, msg) <- readChan chn
+                  putStrLn msg
+                  terminate
+                    ? (putStrLn "Exit Print Loop" >> putMVar chanEmpty () >> pure ())
+                    $ doPrint
+             in doPrint
+          )
+      $ pure Nothing
 
   logger "Linking Parents"
   root <- linkParents logger preRoot
   i <- myThreadId
   logger $ "Linking Done " <> txt i
 
-
   executeLinked logger maxThreads root
   db True $ "Execution Done " <> txt i
   when wantDebug $
     readMVar chanEmpty
-  traverse_ C.killThread  t
+  traverse_ C.killThread t
   putStrLn "We are here !!!!"

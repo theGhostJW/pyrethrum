@@ -476,7 +476,7 @@ mkFixturesHooks db =
             fixStatus,
             logEnd
           } -> do
-            !fx <- loadFixture db fixtureLabel fixParent iterations fixStatus logStart logEnd
+            fx <- loadFixture db fixtureLabel fixParent iterations fixStatus logStart logEnd
             pure (fx : fxs, hks)
 
 data Executor = Executor
@@ -723,13 +723,6 @@ runFixture
     let runIterations :: IO ()
         runIterations = do
           wantLogStart <- atomically $ setToStartedIfPending fixStatus
-
-          fs2' <- atomically $ readTVar fixStatus
-          db $ "RF - RE-READ STARTED fs TVAR: " <> txt fs2'
-
-          fs2 <- atomically $ readTVar fixStatus
-          db $ "RF - REREAD STARTED fixStatus STM: " <> txt fs2
-
           db $ "RF - WantLogStart " <> txt wantLogStart
           -- threadDelay 10_000_00
           if wantLogStart

@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
 
 module Internal.SuiteRuntime where
@@ -10,9 +9,9 @@ import Data.Sequence (Seq (Empty), empty)
 import Data.Tuple.Extra (both)
 import GHC.Exts
 import Internal.PreNode
-  ( FixtureStatus (..),
+  ( CompletionStatus (Fault),
     HookStatus (Finalised, Finalising),
-    finalised,
+    finalised, FixtureStatus(..),
   )
 import qualified Internal.PreNode as PN
   ( CompletionStatus (Fault, Murdered, Normal),
@@ -131,14 +130,28 @@ hookInfo =
                   pure $ me : concat c
         Fixture {} -> accum
 
-data LoadedFixture = LoadedFixture
-  { fixtureLabel :: Text, -- for debugging
+data AvailableFixture
+  = FixPending PendingFixture
+  | FixInitialised InitialisedFixture
+
+data PendingFixture = PendingFixture
+  { pIndex :: Int,
+    pFixtureLabel :: Text, -- for debugging
+    pLogStart :: IO (),
+    pFixStatus :: TVar FixtureStatus,
+    pIterations :: IO (TVar (Either SomeException [IO ()])),
+    pLogEnd :: IO (),
+    pReleaseParentHook :: IO ()
+  }
+
+data InitialisedFixture = InitialisedFixture
+  { index :: Int,
+    fixtureLabel :: Text, -- for debugging
     logStart :: IO (),
     fixStatus :: TVar FixtureStatus,
     iterations :: TVar (Either SomeException [IO ()]),
     activeThreads :: TVar [RunningThread],
     logEnd :: IO (),
-    executeParentHook :: IO (),
     releaseParentHook :: IO ()
   }
 
@@ -240,33 +253,28 @@ recurseHookRelease db n =
                               (const $ finaliseRecurse PN.Normal)
                         )
 
-loadFixture :: Logger -> Text -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> IO LoadedFixture
+loadFixture :: forall i o. Logger -> Text -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> (Int -> IO PendingFixture)
 loadFixture db fixtureLabel parent iterations fixStatus logStart logEnd =
   do
-    let loadedIterations :: IO (Either SomeException [IO ()])
-        loadedIterations =
-          let apply :: [a -> IO ()] -> a -> [IO ()]
-              apply fios i =
-                let f :: a -> (a -> IO ()) -> IO ()
-                    f a ff = ff a
-                 in f i <$> fios
-           in (apply iterations <$>) <$> lockExecuteHook db parent 
-    db "CALL LOAD FIXTURE"
-    loadedIterations' <- loadedIterations
-    iterations' <- newTVarIO loadedIterations'
-    activeThreads' <- newTVarIO []
-    pure $
-      LoadedFixture
-        { fixtureLabel = fixtureLabel,
-          logStart = logStart,
-          -- fixture status TVar is now common to loaded fixture and source fixture
-          fixStatus = fixStatus,
-          iterations = iterations',
-          activeThreads = activeThreads',
-          logEnd = logEnd,
-          executeParentHook = void $ db "LOCK EXECUTE HOOK" >> lockExecuteHook db parent,
-          releaseParentHook = either (void . pure) (recurseHookRelease db) parent
-        }
+    let loadedIterations :: Either SomeException o -> Either SomeException [IO ()]
+        loadedIterations hookVal = do
+          hv <- hookVal
+          Right $ (\f -> f hv) <$> iterations
+    \i ->
+      pure $
+        PendingFixture
+          { pIndex = i,
+            pFixtureLabel = fixtureLabel,
+            pLogStart = logStart,
+            -- fixture status TVar is now common to pending fixture and source fixture
+            pFixStatus = fixStatus,
+            pIterations =
+              do
+                hookVal <- db "LOCK EXECUTE HOOK" >> lockExecuteHook db parent
+                newTVarIO $ loadedIterations hookVal,
+            pLogEnd = logEnd,
+            pReleaseParentHook = either (void . pure) (recurseHookRelease db) parent
+          }
 
 data ThreadStatus
   = ThreadInitialising Int
@@ -277,11 +285,6 @@ data ThreadStatus
 data RunningThread = RunningThread
   { thread :: IO ThreadId,
     status :: TVar ThreadStatus
-  }
-
-data IndexedFixture = IndexedFixture
-  { index :: Int,
-    fixture :: LoadedFixture
   }
 
 {- TODO
@@ -301,7 +304,7 @@ linkParents db PN.PreNodeRoot {children} =
     status <- newTVarIO PN.Unintialised
 
     children' <- children
-    !childNodes <- traverse (linkParents' db $ Left ()) children'
+    childNodes <- traverse (linkParents' db $ Left ()) children'
     pure $
       NodeRoot
         { rootStatus = status,
@@ -434,39 +437,20 @@ lockExecuteHook db parent =
             db "RETURNING FROM LOCK EXECUTE HOOK " >> pure r
     )
 
--- mkFixtures :: Logger -> Node i o -> IO [LoadedFixture]
--- mkFixtures db = \case
---   Hook {hookChildren} -> do
---     hc <- hookChildren
---     join <$> traverse (mkFixtures db) hc
---   Fixture {fixtureLabel, logStart, fixParent, iterations, fixStatus = fs, logEnd} -> do
---     r <- singleton <$> loadFixture db fixtureLabel fixParent iterations fs logStart logEnd
-
---     --- debug code
---     -- let lf = unsafeHead r
---     -- do
---     --   atomically $ writeTVar ((fixStatus :: LoadedFixture -> TVar FixtureStatus) lf) (Done PN.Normal)
---     --   lffs <- atomically $ readTVar ((fixStatus :: LoadedFixture -> TVar FixtureStatus) lf)
---     --   db $ txt lffs
---     --   fs' <- atomically $ readTVar fs
---     --   db $ txt fs'
-
---     pure r
-
-mkFixturesHooks :: Logger -> Node i o -> IO ([LoadedFixture], [HookRunTime])
+mkFixturesHooks :: Logger -> Node i o -> IO ([Int -> IO PendingFixture], [HookRunTime])
 mkFixturesHooks db =
   recurse $ pure ([], [])
   where
-    recurse :: IO ([LoadedFixture], [HookRunTime]) -> Node i o -> IO ([LoadedFixture], [HookRunTime])
+    recurse :: IO ([Int -> IO PendingFixture], [HookRunTime]) -> Node i o -> IO ([Int -> IO PendingFixture], [HookRunTime])
     recurse accum node = do
-      (!fxs, !hks) <- accum
+      (fxs, hks) <- accum
       case node of
         Hook
           { hookLabel,
             hookStatus,
             hookChildren
           } ->
-            let !acmNxt = pure (fxs, HookRunTime hookLabel hookStatus : hks)
+            let acmNxt = pure (fxs, HookRunTime hookLabel hookStatus : hks)
              in hookChildren >>= foldl' recurse acmNxt
         Fixture
           { fixtureLabel,
@@ -476,20 +460,16 @@ mkFixturesHooks db =
             fixStatus,
             logEnd
           } -> do
-            fx <- loadFixture db fixtureLabel fixParent iterations fixStatus logStart logEnd
+            let fx = loadFixture db fixtureLabel fixParent iterations fixStatus logStart logEnd
             pure (fx : fxs, hks)
 
 data Executor = Executor
   { maxThreads :: Int,
     threadsInUse :: TVar Int,
-    fixturesPending :: TQueue IndexedFixture,
-    fixturesStarted :: TQueue IndexedFixture
+    fixturesPending :: TQueue PendingFixture,
+    fixturesStartNext :: TVar [PendingFixture],
+    fixturesStarted :: TQueue InitialisedFixture
   }
-
-data Fork
-  = Fork LoadedFixture
-  | Pend
-  | RunComplete
 
 data ThreadStats = ThreadStats
   { maxThreads :: Int,
@@ -499,6 +479,7 @@ data ThreadStats = ThreadStats
 
 data NoFixture
   = EmptyQueues
+  | FixtureStarting
   | NoFixturesReady
   | NoThreadsAvailable ThreadStats
   deriving (Show)
@@ -510,14 +491,14 @@ data NoCandidate
   | Finished
 
 data IterationRun = IterationRun
-  { parentFixture :: LoadedFixture,
+  { parentFixture :: InitialisedFixture,
     iteration :: IO ()
   }
 
-updateStatusReturnCompleted :: Logger -> LoadedFixture -> STM Bool
+updateStatusReturnCompleted :: Logger -> InitialisedFixture -> STM Bool
 updateStatusReturnCompleted
   db
-  LoadedFixture
+  InitialisedFixture
     { fixStatus,
       iterations,
       activeThreads,
@@ -556,51 +537,50 @@ updateStatusReturnCompleted
 
 canForkThread :: FixtureStatus -> Bool
 canForkThread = \case
-  Pending -> True
+  Pending -> False
   Starting -> False
   Active -> True
   Done cs -> False
   BeingKilled -> False
 
-takeIteration :: LoadedFixture -> STM (Maybe IterationRun)
-takeIteration fixture@LoadedFixture {iterations, activeThreads, fixStatus} = do
-  itrs <- readTVar iterations
-  activ <- readTVar activeThreads
+takeIteration :: InitialisedFixture -> STM (Maybe IterationRun)
+takeIteration fixture@InitialisedFixture {iterations, fixStatus} = do
   status <- readTVar fixStatus
-  not (canForkThread status)
-    ? pure Nothing
-    $ eitherf
-      itrs
-      (const $ pure Nothing)
-      ( \case
-          [] -> pure Nothing
-          x : xs -> do
-            writeTVar iterations $ Right xs
-            pure . Just $ IterationRun fixture x
-      )
+  if canForkThread status
+    then
+      readTVar iterations
+        >>= either
+          (const $ pure Nothing)
+          ( \case
+              [] -> pure Nothing
+              x : xs -> do
+                writeTVar iterations $ Right xs
+                pure . Just $ IterationRun fixture x
+          )
+    else pure Nothing
 
-nextActiveFixtureRemoveDone :: Logger -> TQueue IndexedFixture -> STM (Maybe LoadedFixture)
+nextActiveFixtureRemoveDone :: Logger -> TQueue InitialisedFixture -> STM (Maybe InitialisedFixture)
 nextActiveFixtureRemoveDone db activeQ =
-  let getNxt :: Maybe Int -> STM (Maybe LoadedFixture)
+  let getNxt :: Maybe Int -> STM (Maybe InitialisedFixture)
       getNxt mInitilIndex = do
         mfx <- tryReadTQueue activeQ
         maybef
           mfx
           (pure Nothing)
-          \ifx@IndexedFixture {index = index', fixture = fixture@LoadedFixture {fixStatus}} ->
+          \ifx@InitialisedFixture {index = currentIdx, fixStatus} ->
             let nxtInitial :: Maybe Int
-                nxtInitial = mInitilIndex <|> Just index'
+                nxtInitial = mInitilIndex <|> Just currentIdx
 
                 reQu :: STM ()
                 reQu = writeTQueue activeQ ifx
 
-                reQuGetNxt :: STM (Maybe LoadedFixture)
+                reQuGetNxt :: STM (Maybe InitialisedFixture)
                 reQuGetNxt = reQu >> getNxt nxtInitial
 
-                reQReturnThisFixture :: STM (Maybe LoadedFixture)
-                reQReturnThisFixture = reQu $> Just fixture
+                reQReturnThisFixture :: STM (Maybe InitialisedFixture)
+                reQReturnThisFixture = reQu $> Just ifx
              in -- if we are back where we started we are done
-                mInitilIndex == Just index'
+                mInitilIndex == Just currentIdx
                   ? pure Nothing
                   $ do
                     dbStm db "nextActiveFixtureRemoveDone"
@@ -609,7 +589,7 @@ nextActiveFixtureRemoveDone db activeQ =
                       Pending -> reQReturnThisFixture
                       Starting -> reQuGetNxt
                       Active -> reQReturnThisFixture
-                      -- done fixtures are not added to the back of the q
+                      -- done fixtures are not (reQued) added to the back of the q
                       Done cs -> getNxt nxtInitial
                       -- just put at end of q and continue eventually this fixture
                       -- will become done and get kicked out of the queue above
@@ -617,21 +597,26 @@ nextActiveFixtureRemoveDone db activeQ =
    in getNxt Nothing
 
 -- returns the next fixture and puts on end of active fixture queue
-nextFixture :: Logger -> TQueue IndexedFixture -> TQueue IndexedFixture -> STM (Either NoFixture LoadedFixture)
-nextFixture db pendingQ activeQ =
+nextFixture :: Logger -> TQueue PendingFixture -> TVar [PendingFixture] -> TQueue InitialisedFixture -> STM (Either NoFixture AvailableFixture)
+nextFixture db pendingQ nxtLst activeQ =
   let notEmpty q = not <$> isEmptyTQueue q
    in do
         hasPending <- notEmpty pendingQ
         hasActive <- notEmpty activeQ
+        nxtLst' <- readTVar nxtLst
+        let fixturesStarting = not . null $ nxtLst'
         if
             | hasPending ->
               do
-                ifx <- readTQueue pendingQ
-                writeTQueue activeQ ifx
-                pure . Right $ fixture ifx
+                pfx <- readTQueue pendingQ
+                writeTVar nxtLst (pfx : nxtLst')
+                pure . Right . FixPending $ pfx
             | hasActive ->
-              maybe (Left NoFixturesReady) Right
+              maybe
+                (Left NoFixturesReady)
+                (Right . FixInitialised)
                 <$> nextActiveFixtureRemoveDone db activeQ
+            | fixturesStarting -> pure $ Left NoFixturesReady
             | otherwise ->
               pure $ Left EmptyQueues
 
@@ -708,15 +693,14 @@ removeFinishedThreads rthds =
 logError :: Text -> IO ()
 logError t = print $ "Something went wrong with the runtime: " <> t
 
-runFixture :: TVar ThreadStatus -> LoadedFixture -> Logger -> IO ()
+runFixture :: TVar ThreadStatus -> InitialisedFixture -> Logger -> IO ()
 runFixture
   threadStatus
-  fx@LoadedFixture
+  fx@InitialisedFixture
     { logStart,
       fixStatus,
       iterations,
       activeThreads,
-      executeParentHook,
       logEnd
     }
   db =
@@ -727,9 +711,6 @@ runFixture
           -- threadDelay 10_000_00
           if wantLogStart
             then do
-              -- need to run hooks before
-              executeParentHook
-              db "RF - Top WantLogStart"
               elst <- tryAny logStart
               eitherf
                 elst
@@ -776,64 +757,100 @@ aToWord# a = let !mb = Ptr' a in case unsafeCoerce# mb :: Word of W# addr -> add
 unsafeAddr :: a -> Text
 unsafeAddr a = txt $ I# (word2Int# (aToWord# (unsafeCoerce# a)))
 
-forkFixtureThread :: TVar Int -> LoadedFixture -> Logger -> IO ()
+forkFixtureThread :: Logger -> TVar Int -> InitialisedFixture -> IO ()
 forkFixtureThread
+  db
   threadsInUse
-  fx@LoadedFixture {activeThreads, logEnd, releaseParentHook, fixtureLabel, fixStatus}
-  db = do
-    db "III forkFixtureThread started"
-    thrdStatus <- newTVarIO (ThreadInitialising 999)
-    let releaseThread' :: IO ()
-        releaseThread' =
-          atomically $ do
-            -- set this threadstatus to done
-            writeTVar thrdStatus ThreadDone
-            -- remove all finished threads from active threads list
-            ats <- readTVar activeThreads
-            newAts <- removeFinishedThreads ats
-            writeTVar activeThreads newAts
-            -- decrement global threads in use
-            upre <- readTVar threadsInUse
-            dbStm db "THREAD DONE"
-            dbStm db $ "BEFORE DECREMENT THREAD: " <> txt upre
-            releaseThread threadsInUse
-            u <- readTVar threadsInUse
-            dbStm db $ "AFTER DECREMENT THREAD: " <> txt u
+  fx@InitialisedFixture {activeThreads, logEnd, releaseParentHook, fixtureLabel, fixStatus} =
+    do
+      db "III forkFixtureThread started"
+      thrdStatus <- newTVarIO (ThreadInitialising 999)
 
-        tfx = C.forkFinally
-          (db "@@@@ FIXTURE START" >> runFixture thrdStatus fx db >> db "@@@@@ FIXTURE END !!!!!!!!!!!!!!!!!!!")
-          -- finally clean up
-          \_ ->
-            finally
-              (db "THREAD RELEASE START " >> releaseThread' >> db "THREAD RELEASE END")
-              ( do
-                  fxCompleted <- atomically $ updateStatusReturnCompleted db fx
-                  db $ "FIXTURE COMPLETED: " <> txt fxCompleted
-                  fs <- atomically $ readTVar fixStatus
-                  db $ "FIXTURE STATUS (forkFixtureThread): " <> fixtureLabel <> " " <> txt fs
-                  when
-                    fxCompleted
-                    do
-                      logEnd
-                      db "PRE PARENT HOOK RELEASE"
-                      releaseParentHook
-                      db "POST PARENT HOOK RELEASE"
-              )
+      let releaseThread' :: IO ()
+          releaseThread' =
+            atomically $ do
+              -- set this threadstatus to done
+              writeTVar thrdStatus ThreadDone
+              -- remove all finished threads from active threads list
+              ats <- readTVar activeThreads
+              newAts <- removeFinishedThreads ats
+              writeTVar activeThreads newAts
+              -- decrement global threads in use
+              upre <- readTVar threadsInUse
+              dbStm db "THREAD DONE"
+              dbStm db $ "BEFORE DECREMENT THREAD: " <> txt upre
+              releaseThread threadsInUse
+              u <- readTVar threadsInUse
+              dbStm db $ "AFTER DECREMENT THREAD: " <> txt u
 
-    db "III ABove Atomically"
-    atomically $ do
-      dbStm db "III Read thread status"
-      dbStm db "III Adding thread status"
-      modifyTVar activeThreads (RunningThread tfx thrdStatus :)
-      sinitial <- readTVar thrdStatus
-      dbStm db $ "III Thread BEFORE RUNNING SET: " <> txt sinitial
-      writeTVar thrdStatus ThreadRunning
-      s <- readTVar thrdStatus
-      dbStm db $ "III Thread RUNNING SET I: " <> txt s
-      dbStm db $ "MAIN FORK THREAD POINTER IS: " <> unsafeAddr thrdStatus
-      dbStm db $ "MAIN FORK THREAD POINTER II IS: " <> unsafeAddr thrdStatus
-    id' <- tfx
-    db $ "III DONE forkFixtureThread: " <> txt id'
+          tfx = C.forkFinally
+            (db "@@@@ FIXTURE START" >> runFixture thrdStatus fx db >> db "@@@@@ FIXTURE END !!!!!!!!!!!!!!!!!!!")
+            -- finally clean up
+            \_ ->
+              finally
+                (db "THREAD RELEASE START " >> releaseThread' >> db "THREAD RELEASE END")
+                ( do
+                    fxCompleted <- atomically $ updateStatusReturnCompleted db fx
+                    db $ "FIXTURE COMPLETED: " <> txt fxCompleted
+                    fs <- atomically $ readTVar fixStatus
+                    db $ "FIXTURE STATUS (forkFixtureThread): " <> fixtureLabel <> " " <> txt fs
+                    when
+                      fxCompleted
+                      do
+                        logEnd
+                        db "PRE PARENT HOOK RELEASE"
+                        releaseParentHook
+                        db "POST PARENT HOOK RELEASE"
+                )
+
+      db "III ABove Atomically"
+      atomically $ do
+        dbStm db "III Read thread status"
+        dbStm db "III Adding thread status"
+        modifyTVar activeThreads (RunningThread tfx thrdStatus :)
+        sinitial <- readTVar thrdStatus
+        dbStm db $ "III Thread BEFORE RUNNING SET: " <> txt sinitial
+        writeTVar thrdStatus ThreadRunning
+        s <- readTVar thrdStatus
+        dbStm db $ "III Thread RUNNING SET I: " <> txt s
+        dbStm db $ "MAIN FORK THREAD POINTER IS: " <> unsafeAddr thrdStatus
+        dbStm db $ "MAIN FORK THREAD POINTER II IS: " <> unsafeAddr thrdStatus
+      id' <- tfx
+      db $ "III DONE forkFixtureThread: " <> txt id'
+
+setFixtureInitialised :: Int -> TVar [PendingFixture] -> TQueue InitialisedFixture -> InitialisedFixture -> STM ()
+setFixtureInitialised idx fixturesStartNext fixturesStarted newInitFixture = do
+  nxtStart <- readTVar fixturesStartNext
+  writeTVar fixturesStartNext $ filter (\PendingFixture {pIndex} -> pIndex /= idx) nxtStart
+  writeTQueue fixturesStarted newInitFixture
+
+runHooks :: PendingFixture -> IO InitialisedFixture
+runHooks
+  PendingFixture
+    { pIndex,
+      pFixtureLabel,
+      pFixStatus,
+      pLogStart,
+      pIterations,
+      pLogEnd,
+      pReleaseParentHook
+    } =
+    do
+      i <- pIterations
+      t <- newTVarIO []
+      atomically $
+        readTVar i >>= writeTVar pFixStatus . either (Done . Fault "Pre-hooks failed") (const Active)
+      pure $
+        InitialisedFixture
+          { index = pIndex,
+            fixtureLabel = pFixtureLabel,
+            logStart = pLogStart,
+            fixStatus = pFixStatus,
+            iterations = i,
+            activeThreads = t,
+            logEnd = pLogEnd,
+            releaseParentHook = pReleaseParentHook
+          }
 
 execute' :: Executor -> Logger -> IO ()
 execute'
@@ -841,23 +858,24 @@ execute'
     { maxThreads,
       threadsInUse,
       fixturesPending,
+      fixturesStartNext,
       fixturesStarted
     }
   db = do
-    eNxtFx <-
+    eAvailFx <-
       atomically $ do
         eStats <- reserveThread exe db
         eitherf
           eStats
           (pure . Left . NoThreadsAvailable)
-          (const $ dbStm db "III Execute Nxt Fixture" >> nextFixture db fixturesPending fixturesStarted)
+          (const $ nextFixture db fixturesPending fixturesStartNext fixturesStarted)
 
     let recurse = execute' exe db
         waitRecurse = C.threadDelay 10_000 >> recurse
         threadRelease = db "THREAD RELEASE" >> atomically (releaseThread threadsInUse)
 
     eitherf
-      eNxtFx
+      eAvailFx
       ( \case
           -- both the pending and active que of fixtures
           -- are empty so we are done
@@ -871,39 +889,48 @@ execute'
           -- and removed from the active que leading to empty ques we wait and try again
           -- thread was reserved so release thread
           NoFixturesReady -> threadRelease >> db "NoFixturesReady" >> waitRecurse
+          FixtureStarting -> threadRelease >> db "FixtureStarting" >> waitRecurse
           -- all threads in use wait try again
           -- no threads reserved so none need to be released
           nt@NoThreadsAvailable {} -> db (txtPretty nt) >> waitRecurse
       )
-      (\f -> forkFixtureThread threadsInUse f db >> recurse)
+      ( \case
+          FixPending pfx@PendingFixture {pIndex} -> do
+            db "@@@@ Running Hooks"
+            fx <- runHooks pfx
+            atomically $ setFixtureInitialised pIndex fixturesStartNext fixturesStarted fx
+            forkFixtureThread db threadsInUse fx >> recurse
+          FixInitialised fxInit -> forkFixtureThread db threadsInUse fxInit >> recurse
+      )
 
-qFixture :: TQueue IndexedFixture -> (Int, LoadedFixture) -> STM ()
-qFixture q (idx, fixture) = writeTQueue q $ IndexedFixture idx fixture
+qFixture :: TQueue PendingFixture -> (Int, Int -> IO PendingFixture) -> IO ()
+qFixture q (idx, mkFix) = mkFix idx >>= atomically . writeTQueue q
 
 executeLinked :: Logger -> Int -> NodeRoot o -> IO ()
 executeLinked db maxThreads NodeRoot {rootStatus, children} =
-  let reveseConcat :: [([LoadedFixture], [HookRunTime])] -> ([LoadedFixture], [HookRunTime])
+  let reveseConcat :: [([a], [b])] -> ([a], [b])
       reveseConcat hfxs =
-        foldl' (\(!fxs, !hks) (!fx, !hk) -> (fx <> fxs, hk <> hks)) ([], []) $ (reverse *** reverse) <$> hfxs
+        foldl' (\(fxs, hks) (fx, hk) -> (fx <> fxs, hk <> hks)) ([], []) $ (reverse *** reverse) <$> hfxs
    in do
         db "Before fxs"
-        !fxsHksArr <- traverse (mkFixturesHooks db) children
-        let (!fxs, !hks) = reveseConcat fxsHksArr
+        fxsHksArr <- traverse (mkFixturesHooks db) children
+        let (fxs, hks) = reveseConcat fxsHksArr
         db "After fks"
         let idxFxs = zip [0 ..] fxs
 
         -- create queue
         pendingQ <- newTQueueIO
+        startNextQ <- newTVarIO []
         runningQ <- newTQueueIO
         -- load all fixtures to pending queue
-        atomically . traverse_ (qFixture pendingQ) $ zip [0 ..] fxs
+        traverse_ (qFixture pendingQ) $ zip [0 ..] fxs
         initialThreadsInUse <- newTVarIO 0
         -- db "Before hks"
         -- hks <- concat <$> traverse hookInfo children
         -- db "After hks"
 
         db "Executing"
-        execute' (Executor maxThreads initialThreadsInUse pendingQ runningQ) db
+        execute' (Executor maxThreads initialThreadsInUse pendingQ startNextQ runningQ) db
         db "EXECUTION DONE !!!!!!!"
 
         db "Waiting on Hooks"
@@ -951,7 +978,7 @@ execute maxThreads preRoot = do
         root <- linkParents logger preRoot
         executeLinked logger maxThreads root
         when wantDebug $
-         db True "Execution Complete"
+          db True "Execution Complete"
 
       wantDebug = True
    in wantDebug

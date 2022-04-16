@@ -10,19 +10,17 @@ data CompletionStatus
   | Fault Text SomeException
   | Murdered Text
   deriving (Show)
+newtype PreNodeRoot o = PreNodeRoot
+  { children :: IO [PreNode () o]
+  }
 
 data FixtureStatus
-  = Pending
+  = Pending 
   | Starting
   | Active
   | Done CompletionStatus
   | BeingKilled
   deriving (Show)
-
-newtype PreNodeRoot o = PreNodeRoot
-  { children :: IO [PreNode () o]
-  }
-
 
 data PreNode i o where
   Hook ::
@@ -36,7 +34,7 @@ data PreNode i o where
     PreNode i o
   Fixture ::
     { fixtureAddress :: Text, -- used in testing
-      fixtureStatus :: TVar FixtureStatus, 
+      fixtureStatus :: TVar FixtureStatus,
       logStart :: IO (),
       iterations :: [i -> IO ()],
       logEnd :: IO ()

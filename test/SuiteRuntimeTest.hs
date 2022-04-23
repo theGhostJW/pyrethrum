@@ -271,9 +271,12 @@ boundaryId brt bnt = \case
   IterationMessage {} -> Nothing
   Message {} -> Nothing
 
+chkHooks :: [NodeStats] -> [RunEvent] -> IO ()
+chkHooks stats evntLst = uu
+
 chkFixtures :: [NodeStats] -> [RunEvent] -> IO ()
-chkFixtures stats lstRE =
-  let fixIds bt = catMaybes $ boundaryId SuiteRuntimeTest.Fixture bt <$> lstRE
+chkFixtures stats evntLst =
+  let fixIds bt = catMaybes $ boundaryId SuiteRuntimeTest.Fixture bt <$> evntLst
       fixStarts = fixIds Start
       fixEnds = fixIds End
 
@@ -290,7 +293,7 @@ chkFixtures stats lstRE =
                 Message {} -> False
 
               evntsToChk :: [RunEvent]
-              evntsToChk = P.filter matchesFix lstRE
+              evntsToChk = P.filter matchesFix evntLst
 
               emptyFix = iterationCount == 0
 
@@ -349,9 +352,14 @@ exeSuiteTests preSuite threadCount = do
   stats <- getStats preSuite'
   S.execute threadCount preSuite'
   l <- tQToList q
+  putStrLn ""
+  putStrLn "============ Stats ============"
   pPrint stats
+  putStrLn ""
+  putStrLn "============ Logs ============"
   pPrint l
   chkFixtures stats l
+  chkHooks stats l
 
 -- $> unit_simple_single
 unit_simple_single :: IO ()

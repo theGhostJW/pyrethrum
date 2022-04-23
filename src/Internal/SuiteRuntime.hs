@@ -10,8 +10,9 @@ import Data.Tuple.Extra (both)
 import GHC.Exts
 import Internal.PreNode
   ( CompletionStatus (Fault),
+    FixtureStatus (..),
     HookStatus (Finalised, Finalising),
-    finalised, FixtureStatus(..),
+    finalised,
   )
 import qualified Internal.PreNode as PN
   ( CompletionStatus (Fault, Murdered, Normal),
@@ -757,14 +758,15 @@ aToWord# a = let !mb = Ptr' a in case unsafeCoerce# mb :: Word of W# addr -> add
 unsafeAddr :: a -> Text
 unsafeAddr a = txt $ I# (word2Int# (aToWord# (unsafeCoerce# a)))
 
-forkFixtureThread :: Logger -> TVar Int -> InitialisedFixture -> IO ()
+forkFixtureThread :: Logger -> TVar Int -> IO InitialisedFixture -> IO ()
 forkFixtureThread
   db
   threadsInUse
-  fx@InitialisedFixture {activeThreads, logEnd, releaseParentHook, fixtureLabel, fixStatus} =
+  iofx =
     do
       db "III forkFixtureThread started"
       thrdStatus <- newTVarIO (ThreadInitialising 999)
+      fx@InitialisedFixture {activeThreads, logEnd, releaseParentHook, fixtureLabel, fixStatus} <- iofx
 
       let releaseThread' :: IO ()
           releaseThread' =
@@ -818,8 +820,8 @@ forkFixtureThread
       id' <- tfx
       db $ "III DONE forkFixtureThread: " <> txt id'
 
-setFixtureInitialised :: Int -> TVar [PendingFixture] -> TQueue InitialisedFixture -> InitialisedFixture -> STM ()
-setFixtureInitialised idx fixturesStartNext fixturesStarted newInitFixture = do
+updateFixtureQus :: Int -> TVar [PendingFixture] -> TQueue InitialisedFixture -> InitialisedFixture -> STM ()
+updateFixtureQus idx fixturesStartNext fixturesStarted newInitFixture = do
   nxtStart <- readTVar fixturesStartNext
   writeTVar fixturesStartNext $ filter (\PendingFixture {pIndex} -> pIndex /= idx) nxtStart
   writeTQueue fixturesStarted newInitFixture
@@ -836,10 +838,13 @@ runHooks
       pReleaseParentHook
     } =
     do
+      -- implicitly runs hyooks
       i <- pIterations
       t <- newTVarIO []
-      atomically $
-        readTVar i >>= writeTVar pFixStatus . either (Done . Fault "Pre-hooks failed") (const Active)
+      atomically $ 
+        -- reset the status to pending if iterations have been loaded successfully it will be set to running
+        -- it will be set to running when the first iteration is run
+        readTVar i >>= writeTVar pFixStatus . either (Done . Fault "Pre-hooks failed") (const Pending)
       pure $
         InitialisedFixture
           { index = pIndex,
@@ -895,12 +900,16 @@ execute'
           nt@NoThreadsAvailable {} -> db (txtPretty nt) >> waitRecurse
       )
       ( \case
-          FixPending pfx@PendingFixture {pIndex} -> do
-            db "@@@@ Running Hooks"
-            fx <- runHooks pfx
-            atomically $ setFixtureInitialised pIndex fixturesStartNext fixturesStarted fx
-            forkFixtureThread db threadsInUse fx >> recurse
-          FixInitialised fxInit -> forkFixtureThread db threadsInUse fxInit >> recurse
+          FixPending pfx@PendingFixture {pIndex} ->
+            let loadHook :: IO InitialisedFixture
+                loadHook = do
+                  db "@@@@ Running Hooks"
+                  -- TODO: this needs to be forked on a separate thread
+                  fx <- runHooks pfx
+                  atomically $ updateFixtureQus pIndex fixturesStartNext fixturesStarted fx
+                  pure fx
+             in forkFixtureThread db threadsInUse loadHook >> recurse
+          FixInitialised fxInit -> forkFixtureThread db threadsInUse (pure fxInit) >> recurse
       )
 
 qFixture :: TQueue PendingFixture -> (Int, Int -> IO PendingFixture) -> IO ()

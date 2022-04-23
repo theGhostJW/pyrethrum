@@ -353,14 +353,12 @@ exeSuiteTests preSuite threadCount = do
   pPrint l
   chkFixtures stats l
 
--- $ > unit_simple_single
-
+-- $> unit_simple_single
 unit_simple_single :: IO ()
 unit_simple_single = do
   exeSuiteTests superSimplSuite 1
 
 -- $> unit_simple_with_hook
-
 unit_simple_with_hook :: IO ()
 unit_simple_with_hook =
   replicateM_ 1 $

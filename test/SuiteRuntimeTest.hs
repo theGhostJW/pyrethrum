@@ -52,12 +52,12 @@ import Pyrelude as P
     (<>),
     (>>),
     (>>=),
-    (?), replicateM_,
+    (?), replicateM_, (||), not, traverse_, nub, (\\),
   )
 import Pyrelude.Test (chk', chkFail)
-import Pyrelude.Test as T hiding (maybe, singleton)
+import Pyrelude.Test as T hiding (filter, maybe, singleton)
 import TempUtils (debugLines)
-import Text.Show.Pretty (pPrint, pPrintList, ppShow, ppShowList)
+import Text.Show.Pretty (pPrint, pPrintList, ppShow, ppShowList, PrettyVal (prettyVal))
 import UnliftIO.Concurrent as C
   ( ThreadId,
     forkFinally,
@@ -104,14 +104,14 @@ isFixtureStats = \case
 
 getStats :: PreNodeRoot a -> IO [NodeStats]
 getStats PreNodeRoot {children} =
-  let isFixture :: PreNode a b -> Bool
-      isFixture = \case
+  let nonEmptyFixture :: PreNode a b -> Bool
+      nonEmptyFixture = \case
         PN.Hook {} -> False
-        PN.Fixture {} -> True
+        f@PN.Fixture {} -> not $ nodeEmpty f
 
-      isHook :: PreNode a b -> Bool
-      isHook = \case
-        PN.Hook {} -> True
+      nonEmptyHook :: PreNode a b -> Bool
+      nonEmptyHook = \case
+        h@PN.Hook {} -> not $ nodeEmpty h
         PN.Fixture {} -> False
 
       getStats' :: Text -> Int -> PreNode a b -> [NodeStats]
@@ -123,8 +123,8 @@ getStats PreNodeRoot {children} =
                   HookStats
                     { id = thisId,
                       parent = parentId,
-                      fixtureCount = count isFixture hookChildren,
-                      hookCount = count isHook hookChildren
+                      fixtureCount = count nonEmptyFixture hookChildren,
+                      hookCount = count nonEmptyHook hookChildren
                     }
              in thisNode : (zip [0 ..] hookChildren >>= uncurry (getStats' thisId))
           PN.Fixture {iterations} ->
@@ -159,6 +159,7 @@ data RunEvent
       }
   | Message Text ThreadId
   deriving (Show, Eq, Ord)
+
 
 logEvent :: TQueue RunEvent -> (ThreadId -> RunEvent) -> IO ()
 logEvent q ev = do
@@ -271,8 +272,58 @@ boundaryId brt bnt = \case
   IterationMessage {} -> Nothing
   Message {} -> Nothing
 
+boundaryId' :: RunEvent -> Maybe Text
+boundaryId' = \case
+  Boundary {id} -> Just id
+  IterationMessage {} -> Nothing
+  Message {} -> Nothing
+
+isBoundary :: RunEvent -> Bool
+isBoundary = \case
+  Boundary {} -> True
+  IterationMessage {} -> False
+  Message {} -> False
+
+mboundaryType :: RunEvent -> Maybe BoundaryType
+mboundaryType = \case
+  Boundary {boundaryType = bt} -> Just bt
+  IterationMessage {} -> Nothing
+  Message {} -> Nothing
+
 chkHooks :: [NodeStats] -> [RunEvent] -> IO ()
-chkHooks stats evntLst = uu
+chkHooks stats evntLst = 
+  let 
+    hks = filter isHookStats stats
+    expectedHkIds = (id :: NodeStats -> Text) <$> hks
+    bndrys = filter isBoundary evntLst
+
+    chkHkExists ::  Text -> IO ()
+    chkHkExists id' = 
+      let 
+        hkbds = filter (
+                        \n -> boundaryId SuiteRuntimeTest.Hook Start n == Just id' || 
+                              boundaryId SuiteRuntimeTest.Hook End n == Just id'
+                        ) bndrys
+      in do
+        case hkbds of 
+          [] -> chkFail $ "Expected start and end for hook id: " <> id' <> " but no hook boundary was found"
+          [bnd] -> chkFail $ "Expected start and end for hook id: " <> id' <> " but only single boundary found: " <> txt bnd
+          [start, end] -> do 
+            -- hook should log a start before it ends
+            Just Start ... mboundaryType start
+            Just End ... mboundaryType end
+          a -> chkFail $ "Too many boundary events for hook id: " <> id' <> txt a
+
+    chkUnexpectedHooks :: IO ()
+    chkUnexpectedHooks = let 
+      actualHkIds = nub . catMaybes $ boundaryId' <$> bndrys
+     in 
+       chkEq' "Unexpected or empty hooks in actual" [] (actualHkIds \\ expectedHkIds) 
+  in 
+    do 
+      traverse_ chkHkExists expectedHkIds
+      chkUnexpectedHooks
+
 
 chkFixtures :: [NodeStats] -> [RunEvent] -> IO ()
 chkFixtures stats evntLst =
@@ -312,20 +363,14 @@ chkFixtures stats evntLst =
               expectedIterationIdxs :: ST.Set Int
               expectedIterationIdxs = emptyFix ? ST.empty $ ST.fromList [0 .. iterationCount - 1]
 
-              boundaryType :: RunEvent -> Maybe BoundaryType
-              boundaryType = \case
-                Boundary {boundaryType = bt} -> Just bt
-                IterationMessage {} -> Nothing
-                Message {} -> Nothing
-
               isIteration :: RunEvent -> Bool
               isIteration = \case
                 Boundary {} -> False
                 IterationMessage {} -> True
                 Message {} -> False
 
-              firstEv = head evntsToChk >>= boundaryType
-              lastEv = last evntsToChk >>= boundaryType
+              firstEv = head evntsToChk >>= mboundaryType
+              lastEv = last evntsToChk >>= mboundaryType
            in emptyFix
                 ? chk' ("Fixture: " <> id <> " has no iterations - no related run events should be logged") (null evntsToChk)
                 $ do
@@ -371,3 +416,24 @@ unit_simple_with_hook :: IO ()
 unit_simple_with_hook =
   replicateM_ 1 $
     exeSuiteTests simpleSuiteWithHook 1
+
+{- TODO
+  ~ chkHks
+  ~ thread level hooks - should be easy just execute once on fork fixture thread
+  ~ test with empty:
+    ~ fixtures
+    ~ hooks 
+      ~ singleton
+      ~ thread-level
+  ~ simple multiple hooks / iterations / threads
+  ~ simple exceptions
+    ~ iteration
+    ~ singleton hook
+    ~ thread-level hook
+    ~ update stats expectations
+  ~ simple exceptions
+  ~ property based - inc differening times / hook types / hook fixture counts 
+   ~ write genrators
+   ~ update stats expectations
+  ~ killing run
+-}

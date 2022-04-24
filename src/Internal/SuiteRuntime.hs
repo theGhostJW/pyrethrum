@@ -288,16 +288,6 @@ data RunningThread = RunningThread
     status :: TVar ThreadStatus
   }
 
-{- TODO
-  ~ gather fixtures
-  ~ simple
-  ~ fixture address
-  ~ log start and end fixture (generate form test suite)
-  ~ exceptions
-  ~ killing
-  ~ test with null iterations
--}
-
 linkParents :: Logger -> PN.PreNodeRoot o -> IO (NodeRoot o)
 linkParents db PN.PreNodeRoot {children} =
   do

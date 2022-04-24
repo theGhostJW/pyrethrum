@@ -1,21 +1,22 @@
 module Internal.PreNode where
 
-import Language.Haskell.TH (ExpQ)
-import Pyrelude (Bool (False, True), Eq, IO, Int, Show, SomeException, TVar, Text, not, (&&), Generic, Either)
-import UnliftIO (MonadUnliftIO, STM, TMVar)
 import Control.DeepSeq (NFData)
+import Language.Haskell.TH (ExpQ)
+import Pyrelude (Bool (False, True), Either, Eq, Generic, IO, Int, ListLike (any, filter, null), Show, SomeException, TVar, Text, not, ($), (&&))
+import UnliftIO (MonadUnliftIO, STM, TMVar)
 
 data CompletionStatus
   = Normal
   | Fault Text SomeException
   | Murdered Text
   deriving (Show)
+
 newtype PreNodeRoot o = PreNodeRoot
   { children :: IO [PreNode () o]
   }
 
 data FixtureStatus
-  = Pending 
+  = Pending
   | Starting
   | Active
   | Done CompletionStatus
@@ -41,6 +42,10 @@ data PreNode i o where
     } ->
     PreNode i ()
 
+nodeEmpty :: PreNode a b -> Bool
+nodeEmpty = \case
+  Hook {hookChildren} -> not $ any nodeEmpty hookChildren
+  Fixture {iterations} -> null iterations
 
 data HookStatus
   = Unintialised

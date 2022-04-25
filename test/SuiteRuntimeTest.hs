@@ -14,7 +14,7 @@ import qualified Internal.SuiteRuntime as S
 import Polysemy
 import Pyrelude as P
   ( Bool (..),
-    Eq ((==)),
+    Eq (..),
     IO,
     Int,
     ListLike (foldl', head, null, unsafeHead, unsafeLast),
@@ -28,17 +28,27 @@ import Pyrelude as P
     count,
     debug_,
     debugf,
+    dropWhile,
+    dropWhileEnd,
     error,
     filter,
+    find,
     for_,
+    fromJust,
+    groupBy,
+    isPrefixOf,
     last,
     length,
     maybe,
     maybef,
+    not,
+    nub,
     pure,
+    replicateM_,
     reverse,
     singleton,
     toS,
+    traverse_,
     txt,
     txtPretty,
     uncurry,
@@ -52,12 +62,14 @@ import Pyrelude as P
     (<>),
     (>>),
     (>>=),
-    (?), replicateM_, (||), not, traverse_, nub, (\\),
+    (?),
+    (\\),
+    (||),
   )
 import Pyrelude.Test (chk', chkFail)
 import Pyrelude.Test as T hiding (filter, maybe, singleton)
 import TempUtils (debugLines)
-import Text.Show.Pretty (pPrint, pPrintList, ppShow, ppShowList, PrettyVal (prettyVal))
+import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppShow, ppShowList)
 import UnliftIO.Concurrent as C
   ( ThreadId,
     forkFinally,
@@ -102,7 +114,7 @@ isFixtureStats = \case
   HookStats {} -> False
   FixtureStats {} -> True
 
-getStats :: PreNodeRoot a -> IO [NodeStats]
+getStats :: PN.PreNodeRoot a -> IO [NodeStats]
 getStats PreNodeRoot {children} =
   let nonEmptyFixture :: PreNode a b -> Bool
       nonEmptyFixture = \case
@@ -159,7 +171,6 @@ data RunEvent
       }
   | Message Text ThreadId
   deriving (Show, Eq, Ord)
-
 
 logEvent :: TQueue RunEvent -> (ThreadId -> RunEvent) -> IO ()
 logEvent q ev = do
@@ -252,11 +263,10 @@ superSimplSuite :: TQueue RunEvent -> IO (PreNodeRoot ())
 superSimplSuite q =
   pure . PreNodeRoot $ (: []) <$> mkFixture q "Root" "Fixture 0" 1
 
-
 simpleSuiteWithHook :: TQueue RunEvent -> IO (PreNodeRoot ())
 simpleSuiteWithHook q = do
-      fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
-      pure . PreNodeRoot $ (: []) <$> mkHook q "Root" "Hook 0" [fx]
+  fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
+  pure . PreNodeRoot $ (: []) <$> mkHook q "Root" "Hook 0" [fx]
 
 tQToList :: TQueue a -> IO [a]
 tQToList q =
@@ -284,6 +294,9 @@ isBoundary = \case
   IterationMessage {} -> False
   Message {} -> False
 
+isHook :: RunEvent -> Bool
+isHook re = isBoundary re && branchType re == SuiteRuntimeTest.Hook
+
 mboundaryType :: RunEvent -> Maybe BoundaryType
 mboundaryType = \case
   Boundary {boundaryType = bt} -> Just bt
@@ -291,39 +304,57 @@ mboundaryType = \case
   Message {} -> Nothing
 
 chkHooks :: [NodeStats] -> [RunEvent] -> IO ()
-chkHooks stats evntLst = 
-  let 
-    hks = filter isHookStats stats
-    expectedHkIds = (id :: NodeStats -> Text) <$> hks
-    bndrys = filter isBoundary evntLst
+chkHooks stats evntLst =
+  let hks = filter isHookStats stats
+      expectedHkIds = (id :: NodeStats -> Text) <$> hks
+      bndrys = filter isBoundary evntLst
+      actualHooks = filter isHook bndrys
+      actualHkIds = nub . catMaybes $ boundaryId' <$> actualHooks
 
-    chkHkExists ::  Text -> IO ()
-    chkHkExists id' = 
-      let 
-        hkbds = filter (
-                        \n -> boundaryId SuiteRuntimeTest.Hook Start n == Just id' || 
-                              boundaryId SuiteRuntimeTest.Hook End n == Just id'
-                        ) bndrys
-      in do
-        case hkbds of 
-          [] -> chkFail $ "Expected start and end for hook id: " <> id' <> " but no hook boundary was found"
-          [bnd] -> chkFail $ "Expected start and end for hook id: " <> id' <> " but only single boundary found: " <> txt bnd
-          [start, end] -> do 
-            -- hook should log a start before it ends
-            Just Start ... mboundaryType start
-            Just End ... mboundaryType end
-          a -> chkFail $ "Too many boundary events for hook id: " <> id' <> txt a
+      chkStartAndEnd :: Text -> [RunEvent] -> IO ()
+      chkStartAndEnd msg = \case
+        [] -> chkFail $ msg <> " - expected start and end boundary but no boundarry found"
+        [bnd] -> chkFail $ msg <> " - expected start and end boundary but only one boundarry found " <> txt bnd
+        [start, end] -> do
+          -- hook should log a start before it ends
+          chkEq' (msg <> " " <> txt start) (Just Start) (mboundaryType start)
+          chkEq' (msg <> " " <> txt end) (Just End) (mboundaryType end)
+        a -> chkFail $ msg <> " too many boundary events" <> txt a
 
-    chkUnexpectedHooks :: IO ()
-    chkUnexpectedHooks = let 
-      actualHkIds = nub . catMaybes $ boundaryId' <$> bndrys
-     in 
-       chkEq' "Unexpected or empty hooks in actual" [] (actualHkIds \\ expectedHkIds) 
-  in 
-    do 
-      traverse_ chkHkExists expectedHkIds
-      chkUnexpectedHooks
+      chkHkExists :: Text -> IO ()
+      chkHkExists id' =
+        let hkbds =
+              filter
+                ( \n ->
+                    boundaryId SuiteRuntimeTest.Hook Start n == Just id'
+                      || boundaryId SuiteRuntimeTest.Hook End n == Just id'
+                )
+                bndrys
+         in chkStartAndEnd ("hook: " <> id') hkbds
 
+      chkUnexpectedHooks :: IO ()
+      chkUnexpectedHooks = chkEq' "Unexpected or empty hooks in actual" [] (actualHkIds \\ expectedHkIds)
+
+      chkSubElements :: Text -> IO ()
+      chkSubElements nId =
+        let hooksStats = fromJust $ find (\s -> nId == (id :: NodeStats -> Text) s) hks
+            actualSubElms =
+              groupBy (\e1 e2 -> boundaryId' e1 == boundaryId' e2)
+                . filter (\re -> ((\id' -> isPrefixOf nId id' && nId /= id') <$> boundaryId' re) == Just True)
+                . dropWhileEnd (\re -> boundaryId' re /= Just nId)
+                . dropWhile (\re -> boundaryId' re /= Just nId)
+                $ bndrys
+            actualSubHooks = filter (\g -> Just True == ((SuiteRuntimeTest.Hook ==) . branchType <$> head g)) actualSubElms
+            actualSubFixtures = filter (\g -> Just True == ((SuiteRuntimeTest.Fixture ==) . branchType <$> head g)) actualSubElms
+         in do
+              chkEq' "expected hook count" (hookCount hooksStats) (length actualSubHooks)
+              chkEq' "expected fixture count" (fixtureCount hooksStats) (length actualSubFixtures)
+              traverse_ (chkStartAndEnd "sub-hooks") actualSubHooks
+              traverse_ (chkStartAndEnd "sub-fixture") actualSubFixtures
+   in do
+        traverse_ chkHkExists expectedHkIds
+        chkUnexpectedHooks
+        traverse_ chkSubElements expectedHkIds
 
 chkFixtures :: [NodeStats] -> [RunEvent] -> IO ()
 chkFixtures stats evntLst =
@@ -407,22 +438,24 @@ exeSuiteTests preSuite threadCount = do
   chkHooks stats l
 
 -- $> unit_simple_single
+
 unit_simple_single :: IO ()
 unit_simple_single = do
   exeSuiteTests superSimplSuite 1
 
 -- $> unit_simple_with_hook
+
 unit_simple_with_hook :: IO ()
 unit_simple_with_hook =
   replicateM_ 1 $
     exeSuiteTests simpleSuiteWithHook 1
 
 {- TODO
-  ~ chkHks
+  ~ DONE: chkHks
   ~ thread level hooks - should be easy just execute once on fork fixture thread
   ~ test with empty:
     ~ fixtures
-    ~ hooks 
+    ~ hooks
       ~ singleton
       ~ thread-level
   ~ simple multiple hooks / iterations / threads
@@ -432,8 +465,9 @@ unit_simple_with_hook =
     ~ thread-level hook
     ~ update stats expectations
   ~ simple exceptions
-  ~ property based - inc differening times / hook types / hook fixture counts 
-   ~ write genrators
+  ~ property based - inc differening times / hook types / hook fixture counts
+   ~ write generators
    ~ update stats expectations
   ~ killing run
+  ~ fixture thread limits
 -}

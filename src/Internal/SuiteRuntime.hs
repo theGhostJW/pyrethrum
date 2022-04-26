@@ -90,7 +90,7 @@ data Node i o where
       hook :: i -> IO o,
       hookResult :: TMVar (Either SomeException o),
       hookChildren :: IO [Node o o2],
-      hookRelease :: Int -> o -> IO ()
+      hookRelease :: o -> IO ()
     } ->
     Node i o
   Fixture ::
@@ -244,7 +244,7 @@ recurseHookRelease db n =
                             finaliseRecurse $ PN.Fault "Hook execution failed" e
                         )
                         ( \hr -> do
-                            ethr <- tryAny $ hookRelease 1 hr
+                            ethr <- tryAny $ hookRelease hr
                             eitherf
                               ethr
                               ( \e -> do

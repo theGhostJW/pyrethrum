@@ -28,7 +28,7 @@ data PreNode i o where
       hook :: i -> IO o,
       hookChildren :: [PreNode o o2],
       hookResult :: TMVar (Either SomeException o),
-      hookRelease :: Int -> o -> IO ()
+      hookRelease :: o -> IO ()
     } ->
     PreNode i o
   Fixture ::

@@ -2,7 +2,7 @@ module Internal.PreNode where
 
 import Control.DeepSeq (NFData)
 import Language.Haskell.TH (ExpQ)
-import Pyrelude (Bool (False, True), Either, Eq, Generic, IO, Int, ListLike (any, filter, null), Show, SomeException, TVar, Text, not, ($), (&&))
+import Pyrelude (Bool (False, True), Either, Eq, Generic, IO, Int, ListLike (any, filter, null, all), Show, SomeException, TVar, Text, not, ($), (&&))
 import UnliftIO (MonadUnliftIO, STM, TMVar)
 
 data CompletionStatus
@@ -22,7 +22,7 @@ data FixtureStatus
   deriving (Show)
 
 data PreNode i o where
-  Hook ::
+  AnyHook ::
     { hookAddress :: Text, -- used in testing
       hookStatus :: TVar HookStatus,
       hook :: i -> IO o,
@@ -42,7 +42,7 @@ data PreNode i o where
 
 nodeEmpty :: PreNode a b -> Bool
 nodeEmpty = \case
-  Hook {hookChildren} -> not $ any nodeEmpty hookChildren
+  AnyHook {hookChildren} -> all nodeEmpty hookChildren
   Fixture {iterations} -> null iterations
 
 data HookStatus

@@ -307,7 +307,7 @@ linkParents' db parent preNode =
   do
     db "!!!!!!!! CALLING linkParents' (PRIME) !!!!! "
     case preNode of
-      PN.Hook {hookAddress, hook, hookStatus, hookResult, hookChildren, hookRelease} -> do
+      PN.AnyHook {hookAddress, hook, hookStatus, hookResult, hookChildren, hookRelease} -> do
         let mkChildren h' = traverse (linkParents' db $ Right h') hookChildren
             h =
               Internal.SuiteRuntime.Hook

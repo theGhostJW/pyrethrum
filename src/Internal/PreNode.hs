@@ -22,11 +22,16 @@ data FixtureStatus
   deriving (Show)
 
 data PreNode i o where
+  Branch :: {
+    branchAddress :: Text, -- used in testing
+    subElems :: [PreNode i o]
+   } ->
+   PreNode i o
   AnyHook ::
     { hookAddress :: Text, -- used in testing
       hookStatus :: TVar HookStatus,
       hook :: i -> IO o,
-      hookChildren :: [PreNode o o2],
+      hookChild :: PreNode o o2,
       hookResult :: TMVar (Either SomeException o),
       hookRelease :: o -> IO ()
     } ->
@@ -42,7 +47,8 @@ data PreNode i o where
 
 nodeEmpty :: PreNode a b -> Bool
 nodeEmpty = \case
-  AnyHook {hookChildren} -> all nodeEmpty hookChildren
+  AnyHook {hookChild} -> nodeEmpty hookChild
+  Branch {subElems} -> all nodeEmpty subElems
   Fixture {iterations} -> null iterations
 
 data HookStatus

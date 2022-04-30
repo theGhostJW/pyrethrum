@@ -118,18 +118,18 @@ getStats :: PN.PreNodeRoot a -> IO [NodeStats]
 getStats PreNodeRoot {children} =
   let nonEmptyFixture :: PreNode a b -> Bool
       nonEmptyFixture = \case
-        PN.Hook {} -> False
+        PN.AnyHook {} -> False
         f@PN.Fixture {} -> not $ nodeEmpty f
 
       nonEmptyHook :: PreNode a b -> Bool
       nonEmptyHook = \case
-        h@PN.Hook {} -> not $ nodeEmpty h
+        h@PN.AnyHook {} -> not $ nodeEmpty h
         PN.Fixture {} -> False
 
       getStats' :: Text -> Int -> PreNode a b -> [NodeStats]
       getStats' parentId subIndex =
         \case
-          PN.Hook {hookChildren} ->
+          PN.AnyHook {hookChildren} ->
             let thisId = parentId <> ".Hook " <> txt subIndex
                 thisNode =
                   HookStats
@@ -239,13 +239,13 @@ mkHook q parentId hkId nodeChildren =
     status <- atomically $ newTVar Unintialised
     rslt <- newEmptyTMVarIO
     pure
-      PN.Hook
+      PN.AnyHook
         { hookAddress = hid, -- used in testing
           hookStatus = status,
           hookResult = rslt,
           hook = const $ hookStart q parentId hid,
           hookChildren = nodeChildren,
-          hookRelease = \_ _ -> hookEnd q parentId hid
+          hookRelease = \_ -> hookEnd q parentId hid
         }
   where
     hid = fullId parentId hkId

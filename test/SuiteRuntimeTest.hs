@@ -64,7 +64,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||),
+    (||), Num ((+)),
   )
 import Pyrelude.Test (chk', chkFail)
 import Pyrelude.Test as T hiding (filter, maybe, singleton)
@@ -79,6 +79,8 @@ import UnliftIO.Concurrent as C
   )
 import UnliftIO.STM
 import Prelude (Ord, putStrLn)
+import Internal.PreNode (PreNode(hookChild))
+
 
 data BoundaryType
   = Start
@@ -114,32 +116,48 @@ isFixtureStats = \case
   HookStats {} -> False
   FixtureStats {} -> True
 
-{-
+countSubNodes :: (forall a b. PreNode a b -> Bool) -> PreNode c d -> Int
+countSubNodes pred node = let
+  countSubNodes' accum = \case
+    b@Branch {subElms} -> 
+      foldl' countSubNodes' (pred b ? accum + 1 $ accum) subElms
+    ah@AnyHook {} -> pred ah ? accum + 1 $ accum
+    fx@PN.Fixture {} -> pred fx ? accum + 1 $ accum
+  in 
+         countSubNodes' 0 node
+
 getStats :: PN.PreNodeRoot a -> IO [NodeStats]
 getStats PreNodeRoot {children} =
   let nonEmptyFixture :: PreNode a b -> Bool
       nonEmptyFixture = \case
         PN.AnyHook {} -> False
+        PN.Branch {} -> False
         f@PN.Fixture {} -> not $ nodeEmpty f
 
       nonEmptyHook :: PreNode a b -> Bool
       nonEmptyHook = \case
         h@PN.AnyHook {} -> not $ nodeEmpty h
+        PN.Branch {} -> False
         PN.Fixture {} -> False
+
 
       getStats' :: Text -> Int -> PreNode a b -> [NodeStats]
       getStats' parentId subIndex =
         \case
+          PN.Branch {subElms} -> 
+            let thisId = parentId <> ".Branch " <> txt subIndex
+            in
+            (zip [0 ..] subElms >>= uncurry (getStats' thisId))
           PN.AnyHook {hookChild} ->
             let thisId = parentId <> ".Hook " <> txt subIndex
                 thisNode =
                   HookStats
                     { id = thisId,
                       parent = parentId,
-                      fixtureCount = count nonEmptyFixture hookChild,
-                      hookCount = count nonEmptyHook hookChild
+                      fixtureCount = countSubNodes nonEmptyFixture hookChild,
+                      hookCount = countSubNodes nonEmptyHook hookChild
                     }
-             in thisNode : (zip [0 ..] hookChild >>= uncurry (getStats' thisId))
+             in thisNode : getStats' thisId 0 hookChild
           PN.Fixture {iterations} ->
             [ FixtureStats
                 { id = parentId <> ".Fixture " <> txt subIndex,
@@ -234,8 +252,8 @@ mkFixture q parentId fxId itCount = do
   where
     fid = fullId parentId fxId
 
-mkHook :: TQueue RunEvent -> Text -> Text -> [PreNode () o2] -> IO (PreNode i ())
-mkHook q parentId hkId nodeChildren =
+mkHook :: TQueue RunEvent -> Text -> Text -> PreNode () o2 -> IO (PreNode i ())
+mkHook q parentId hkId nodeChild =
   do
     status <- atomically $ newTVar Unintialised
     rslt <- newEmptyTMVarIO
@@ -245,7 +263,7 @@ mkHook q parentId hkId nodeChildren =
           hookStatus = status,
           hookResult = rslt,
           hook = const $ hookStart q parentId hid,
-          hookChild = nodeChildren,
+          hookChild = nodeChild,
           hookRelease = \_ -> hookEnd q parentId hid
         }
   where
@@ -267,7 +285,7 @@ superSimplSuite q =
 simpleSuiteWithHook :: TQueue RunEvent -> IO (PreNodeRoot ())
 simpleSuiteWithHook q = do
   fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
-  pure . PreNodeRoot $ (: []) <$> mkHook q "Root" "Hook 0" [fx]
+  pure . PreNodeRoot $ (: []) <$> mkHook q "Root" "Hook 0" fx
 
 tQToList :: TQueue a -> IO [a]
 tQToList q =
@@ -450,15 +468,23 @@ unit_simple_with_hook :: IO ()
 unit_simple_with_hook =
   replicateM_ 1 $
     exeSuiteTests simpleSuiteWithHook 1
--}
+
+
 {- TODO
   ~ DONE: chkHks
-  ~ thread level hooks - should be easy just execute once on fork fixture thread
+  ~ thread level hooks 
+    ~ add branch constructor
+    ~ update tests
+    ~ add thread level 
+    ~ update tests 
+    ~ add iteration level
+    ~ update tests
   ~ test with empty:
     ~ fixtures
     ~ hooks
       ~ singleton
       ~ thread-level
+      ~ iteration level
   ~ simple multiple hooks / iterations / threads
   ~ simple exceptions
     ~ iteration

@@ -24,7 +24,7 @@ data FixtureStatus
 data PreNode i o where
   Branch :: {
     branchAddress :: Text, -- used in testing
-    subElems :: [PreNode i o]
+    subElms :: [PreNode i o]
    } ->
    PreNode i o
   AnyHook ::
@@ -48,7 +48,7 @@ data PreNode i o where
 nodeEmpty :: PreNode a b -> Bool
 nodeEmpty = \case
   AnyHook {hookChild} -> nodeEmpty hookChild
-  Branch {subElems} -> all nodeEmpty subElems
+  Branch {subElms} -> all nodeEmpty subElms
   Fixture {iterations} -> null iterations
 
 data HookStatus

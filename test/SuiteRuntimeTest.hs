@@ -114,6 +114,7 @@ isFixtureStats = \case
   HookStats {} -> False
   FixtureStats {} -> True
 
+{-
 getStats :: PN.PreNodeRoot a -> IO [NodeStats]
 getStats PreNodeRoot {children} =
   let nonEmptyFixture :: PreNode a b -> Bool
@@ -129,16 +130,16 @@ getStats PreNodeRoot {children} =
       getStats' :: Text -> Int -> PreNode a b -> [NodeStats]
       getStats' parentId subIndex =
         \case
-          PN.AnyHook {hookChildren} ->
+          PN.AnyHook {hookChild} ->
             let thisId = parentId <> ".Hook " <> txt subIndex
                 thisNode =
                   HookStats
                     { id = thisId,
                       parent = parentId,
-                      fixtureCount = count nonEmptyFixture hookChildren,
-                      hookCount = count nonEmptyHook hookChildren
+                      fixtureCount = count nonEmptyFixture hookChild,
+                      hookCount = count nonEmptyHook hookChild
                     }
-             in thisNode : (zip [0 ..] hookChildren >>= uncurry (getStats' thisId))
+             in thisNode : (zip [0 ..] hookChild >>= uncurry (getStats' thisId))
           PN.Fixture {iterations} ->
             [ FixtureStats
                 { id = parentId <> ".Fixture " <> txt subIndex,
@@ -244,7 +245,7 @@ mkHook q parentId hkId nodeChildren =
           hookStatus = status,
           hookResult = rslt,
           hook = const $ hookStart q parentId hid,
-          hookChildren = nodeChildren,
+          hookChild = nodeChildren,
           hookRelease = \_ -> hookEnd q parentId hid
         }
   where
@@ -449,7 +450,7 @@ unit_simple_with_hook :: IO ()
 unit_simple_with_hook =
   replicateM_ 1 $
     exeSuiteTests simpleSuiteWithHook 1
-
+-}
 {- TODO
   ~ DONE: chkHks
   ~ thread level hooks - should be easy just execute once on fork fixture thread

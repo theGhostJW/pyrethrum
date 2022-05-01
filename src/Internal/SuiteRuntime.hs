@@ -76,6 +76,7 @@ import UnliftIO.STM
     writeTVar,
   )
 import qualified Prelude as PRL
+import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement(tstTitle))
 
 data NodeRoot o = NodeRoot
   { rootStatus :: TVar PN.HookStatus,
@@ -83,13 +84,20 @@ data NodeRoot o = NodeRoot
   }
 
 data Node i o where
+  Branch ::
+    { 
+      branchLabel :: Text, 
+      branchParent :: Either i (Node pi i),
+      subElms :: IO [Node i o]
+    } ->
+    Node i o
   Hook ::
     { hookLabel :: Text,
-      hookParent :: Either i (Node i0 i),
+      hookParent :: Either i (Node pi i),
       hookStatus :: TVar PN.HookStatus,
       hook :: i -> IO o,
       hookResult :: TMVar (Either SomeException o),
-      hookChildren :: IO [Node o o2],
+      hookChild :: IO (Node o co),
       hookRelease :: o -> IO ()
     } ->
     Node i o
@@ -97,7 +105,7 @@ data Node i o where
     { fixtureLabel :: Text,
       logStart :: IO (),
       fixStatus :: TVar FixtureStatus,
-      fixParent :: Either i (Node i0 i),
+      fixParent :: Either i (Node pi i),
       iterations :: [i -> IO ()],
       logEnd :: IO ()
     } ->
@@ -116,13 +124,16 @@ hookInfo =
     hookInfo' accum node = do
       accum' <- accum
       case node of
+        Branch {subElms} -> do 
+          c <- subElms >>= traverse (hookInfo' accum)
+          c
         Hook
           { hookLabel,
             hookParent,
             hookStatus,
             hook,
             hookResult,
-            hookChildren,
+            hookChild,
             hookRelease
           } ->
             let me = HookRunTime hookLabel hookStatus
@@ -214,7 +225,7 @@ recurseHookRelease db n =
     db "!!!!!!!! recurseHookRelease !!!!!!!!"
     case n of
       Fixture {} -> db "!!!!!!!! recurseHookRelease: Fixture !!!!!!!!" >> pure ()
-      hk@Hook {hookResult, hookStatus, hookChildren, hookRelease, hookParent = parent} ->
+      hk@Hook {hookResult, hookStatus, hookChild, hookRelease, hookParent = parent} ->
         let --
             recurse = either (const $ pure ()) (recurseHookRelease db) parent
             setStatus = atomically . writeTVar hookStatus
@@ -307,7 +318,7 @@ linkParents' db parent preNode =
   do
     db "!!!!!!!! CALLING linkParents' (PRIME) !!!!! "
     case preNode of
-      PN.AnyHook {hookAddress, hook, hookStatus, hookResult, hookChildren, hookRelease} -> do
+      PN.AnyHook {hookAddress, hook, hookStatus, hookResult, hookChild, hookRelease} -> do
         let mkChildren h' = traverse (linkParents' db $ Right h') hookChildren
             h =
               Internal.SuiteRuntime.Hook
@@ -316,7 +327,7 @@ linkParents' db parent preNode =
                   hookStatus = hookStatus,
                   hook = hook,
                   hookResult = hookResult,
-                  hookChildren = mkChildren h,
+                  hookChild = mkChildren h,
                   hookRelease = hookRelease
                 }
         pure h
@@ -376,7 +387,7 @@ executeHook db =
         hookStatus,
         hook,
         hookResult,
-        hookChildren
+        hookChild
       } -> do
         -- up to here need stus update pre and post execute hook
         eInput <- db "CALL PARENT LOCK EXECUTE HOOK" >> lockExecuteHook db hookParent
@@ -414,7 +425,7 @@ lockExecuteHook db parent =
             hookStatus,
             hookResult,
             hook,
-            hookChildren,
+            hookChild,
             hookRelease
           } -> do
             wantLaunch <- atomically $ tryLock db hookStatus
@@ -439,7 +450,7 @@ mkFixturesHooks db =
         Hook
           { hookLabel,
             hookStatus,
-            hookChildren
+            hookChild
           } ->
             let acmNxt = pure (fxs, HookRunTime hookLabel hookStatus : hks)
              in hookChildren >>= foldl' recurse acmNxt

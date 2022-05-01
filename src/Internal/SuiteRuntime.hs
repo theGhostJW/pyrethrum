@@ -20,6 +20,7 @@ import qualified Internal.PreNode as PN
     PreNode (..),
     PreNodeRoot (..),
   )
+import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
 import Pyrelude (bool, threadDelay)
 import Pyrelude hiding
@@ -76,7 +77,6 @@ import UnliftIO.STM
     writeTVar,
   )
 import qualified Prelude as PRL
-import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement(tstTitle))
 
 data NodeRoot o = NodeRoot
   { rootStatus :: TVar PN.HookStatus,
@@ -85,12 +85,11 @@ data NodeRoot o = NodeRoot
 
 data Node i o where
   Branch ::
-    { 
-      branchLabel :: Text, 
+    { branchLabel :: Text,
       branchParent :: Either i (Node pi i),
       subElms :: IO [Node i o]
     } ->
-    Node i o
+    Node i ()
   Hook ::
     { hookLabel :: Text,
       hookParent :: Either i (Node pi i),
@@ -124,9 +123,9 @@ hookInfo =
     hookInfo' accum node = do
       accum' <- accum
       case node of
-        Branch {subElms} -> do 
+        Branch {subElms} -> do
           c <- subElms >>= traverse (hookInfo' accum)
-          c
+          pure $ concat c
         Hook
           { hookLabel,
             hookParent,
@@ -138,8 +137,8 @@ hookInfo =
           } ->
             let me = HookRunTime hookLabel hookStatus
              in do
-                  c <- hookChildren >>= traverse (hookInfo' accum)
-                  pure $ me : concat c
+                  c <- hookChild >>= hookInfo' accum
+                  pure $ me : c
         Fixture {} -> accum
 
 data AvailableFixture
@@ -188,8 +187,11 @@ nodeFinished db =
   let log :: Show a => Text -> STM a -> STM a
       log = logSTMVal db
    in \case
-        Fixture {fixStatus, fixtureLabel} -> atomically $ isDone <$> log ("FIXTURE STATUS: (nodeFinished): - " <> fixtureLabel <> " ") (readTVar fixStatus)
+        Branch {subElms} -> do
+          allDone <- subElms >>= traverse (nodeFinished db)
+          pure $ all id allDone
         Hook {hookStatus} -> atomically $ finalised <$> log "Hook Finished Status" (readTVar hookStatus)
+        Fixture {fixStatus, fixtureLabel} -> atomically $ isDone <$> log ("FIXTURE STATUS: (nodeFinished): - " <> fixtureLabel <> " ") (readTVar fixStatus)
 
 data CanFinaliseHook
   = NotReady
@@ -224,6 +226,10 @@ recurseHookRelease db n =
   do
     db "!!!!!!!! recurseHookRelease !!!!!!!!"
     case n of
+      Branch {branchLabel, branchParent, subElms} -> do
+        se <- subElms
+        seDone <- subElms >>= traverse (nodeFinished db)
+        uu
       Fixture {} -> db "!!!!!!!! recurseHookRelease: Fixture !!!!!!!!" >> pure ()
       hk@Hook {hookResult, hookStatus, hookChild, hookRelease, hookParent = parent} ->
         let --
@@ -237,10 +243,9 @@ recurseHookRelease db n =
                 FinalisedAlready -> db "!!!!!!!! recurseHookRelease: FinalisedAlready !!!!!!!!" >> recurse
                 CanBeFinalised oldStatus -> do
                   db "draw children"
-                  hc <- hookChildren
-                  db $ "hookChildren count: " <> txt (length hc)
-                  childrenDone <- hookChildren >>= traverse (nodeFinished db)
-                  not (all id childrenDone)
+                  hc <- hookChild
+                  done <- nodeFinished db hc
+                  not done
                     ? do
                       db "!!!!!!!! recurseHookRelease: oldStatus children not done !!!!!!!!"
                       setStatus oldStatus
@@ -319,28 +324,34 @@ linkParents' db parent preNode =
     db "!!!!!!!! CALLING linkParents' (PRIME) !!!!! "
     case preNode of
       PN.AnyHook {hookAddress, hook, hookStatus, hookResult, hookChild, hookRelease} -> do
-        let mkChildren h' = traverse (linkParents' db $ Right h') hookChildren
-            h =
+        let h =
               Internal.SuiteRuntime.Hook
                 { hookLabel = hookAddress,
                   hookParent = parent,
                   hookStatus = hookStatus,
                   hook = hook,
                   hookResult = hookResult,
-                  hookChild = mkChildren h,
+                  hookChild = linkParents' db (Right h) hookChild,
                   hookRelease = hookRelease
                 }
-        pure h
-      PN.Fixture {fixtureAddress, fixtureStatus, logStart, iterations, logEnd} -> do
-        pure $
-          Internal.SuiteRuntime.Fixture
-            { fixtureLabel = fixtureAddress,
-              logStart = logStart,
-              fixParent = parent,
-              fixStatus = fixtureStatus,
-              iterations = iterations,
-              logEnd = logEnd
-            }
+         in pure h
+      PN.Branch {} -> uu
+      PN.Fixture
+        { fixtureAddress,
+          fixtureStatus,
+          logStart,
+          iterations,
+          logEnd
+        } ->
+          pure $
+            Internal.SuiteRuntime.Fixture
+              { fixtureLabel = fixtureAddress,
+                logStart = logStart,
+                fixParent = parent,
+                fixStatus = fixtureStatus,
+                iterations = iterations,
+                logEnd = logEnd
+              }
 
 isUninitialised :: PN.HookStatus -> Bool
 isUninitialised = \case
@@ -381,6 +392,7 @@ dbStm db = unsafeIOToSTM . db
 executeHook :: Logger -> Node i o -> IO ()
 executeHook db =
   \case
+    Branch {} -> pure ()
     Fixture {} -> pure ()
     Hook
       { hookParent,
@@ -419,6 +431,7 @@ lockExecuteHook db parent =
     parent
     (\o -> db "NO PARENT HOOK RETURNING VALUE" >> pure (Right o))
     ( \case
+        Branch {} -> db "hook lock - Branch RETURNING PURE" >> pure (Right ())
         Fixture {} -> db "hook lock - FIXTURE RETURNING PURE" >> pure (Right ())
         hk@Hook
           { hookParent,
@@ -447,13 +460,12 @@ mkFixturesHooks db =
     recurse accum node = do
       (fxs, hks) <- accum
       case node of
+        Branch {subElms} -> subElms >>= foldl' recurse accum
         Hook
           { hookLabel,
             hookStatus,
             hookChild
-          } ->
-            let acmNxt = pure (fxs, HookRunTime hookLabel hookStatus : hks)
-             in hookChildren >>= foldl' recurse acmNxt
+          } -> pure (fxs, HookRunTime hookLabel hookStatus : hks)
         Fixture
           { fixtureLabel,
             logStart,

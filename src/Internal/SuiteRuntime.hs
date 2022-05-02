@@ -80,7 +80,7 @@ import qualified Prelude as PRL
 
 data NodeRoot o = NodeRoot
   { rootStatus :: TVar PN.HookStatus,
-    children :: [Node () o]
+    rootNode :: Node () o
   }
 
 data Node i o where
@@ -305,17 +305,17 @@ data RunningThread = RunningThread
   }
 
 linkParents :: Logger -> PN.PreNodeRoot o -> IO (NodeRoot o)
-linkParents db PN.PreNodeRoot {children} =
+linkParents db PN.PreNodeRoot {rootNode} =
   do
     db "CALLING LINKED PARENTS"
     status <- newTVarIO PN.Unintialised
 
-    children' <- children
-    childNodes <- traverse (linkParents' db $ Left ()) children'
+    rootNode' <- rootNode
+    root <- (linkParents' db $ Left ()) rootNode'
     pure $
       NodeRoot
         { rootStatus = status,
-          children = childNodes
+          rootNode = root
         }
 
 linkParents' :: Logger -> Either o (Node i o) -> PN.PreNode o o' -> IO (Node o o')
@@ -453,9 +453,12 @@ lockExecuteHook db parent =
     )
 
 mkFixturesHooks :: Logger -> Node i o -> IO ([Int -> IO PendingFixture], [HookRunTime])
-mkFixturesHooks db =
-  recurse $ pure ([], [])
+mkFixturesHooks db n =
+  reveseBoth <$> recurse (pure ([], [])) n
   where
+    reveseBoth :: ([a], [b]) -> ([a], [b])
+    reveseBoth (fxs, hks)  = (reverse fxs, reverse hks)
+
     recurse :: IO ([Int -> IO PendingFixture], [HookRunTime]) -> Node i o -> IO ([Int -> IO PendingFixture], [HookRunTime])
     recurse accum node = do
       (fxs, hks) <- accum
@@ -934,14 +937,12 @@ qFixture :: TQueue PendingFixture -> (Int, Int -> IO PendingFixture) -> IO ()
 qFixture q (idx, mkFix) = mkFix idx >>= atomically . writeTQueue q
 
 executeLinked :: Logger -> Int -> NodeRoot o -> IO ()
-executeLinked db maxThreads NodeRoot {rootStatus, children} =
-  let reveseConcat :: [([a], [b])] -> ([a], [b])
-      reveseConcat hfxs =
-        foldl' (\(fxs, hks) (fx, hk) -> (fx <> fxs, hk <> hks)) ([], []) $ (reverse *** reverse) <$> hfxs
+executeLinked db maxThreads NodeRoot {rootStatus, rootNode} =
+  let reveseBoth :: ([a], [b]) -> ([a], [b])
+      reveseBoth (fxs, hks)  = (reverse fxs, reverse hks)
    in do
         db "Before fxs"
-        fxsHksArr <- traverse (mkFixturesHooks db) children
-        let (fxs, hks) = reveseConcat fxsHksArr
+        (fxs, hks) <- mkFixturesHooks db rootNode
         db "After fks"
 
         -- create queue

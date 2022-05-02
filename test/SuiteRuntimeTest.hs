@@ -9,6 +9,7 @@ import Data.Aeson.Types
 import qualified Data.Set as ST
 import Data.Yaml
 import GHC.Records
+import Internal.PreNode (PreNode (hookChild))
 import Internal.PreNode as PN
 import qualified Internal.SuiteRuntime as S
 import Polysemy
@@ -19,6 +20,7 @@ import Pyrelude as P
     Int,
     ListLike (foldl', head, null, unsafeHead, unsafeLast),
     Maybe (Just, Nothing),
+    Num ((+)),
     Ord (..),
     Show,
     Text,
@@ -64,7 +66,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||), Num ((+)),
+    (||),
   )
 import Pyrelude.Test (chk', chkFail)
 import Pyrelude.Test as T hiding (filter, maybe, singleton)
@@ -79,8 +81,6 @@ import UnliftIO.Concurrent as C
   )
 import UnliftIO.STM
 import Prelude (Ord, putStrLn)
-import Internal.PreNode (PreNode(hookChild))
-
 
 data BoundaryType
   = Start
@@ -117,57 +117,53 @@ isFixtureStats = \case
   FixtureStats {} -> True
 
 countSubNodes :: (forall a b. PreNode a b -> Bool) -> PreNode c d -> Int
-countSubNodes pred node = let
-  countSubNodes' accum = \case
-    b@Branch {subElms} -> 
-      foldl' countSubNodes' (pred b ? accum + 1 $ accum) subElms
-    ah@AnyHook {} -> pred ah ? accum + 1 $ accum
-    fx@PN.Fixture {} -> pred fx ? accum + 1 $ accum
-  in 
-         countSubNodes' 0 node
+countSubNodes pred node =
+  let countSubNodes' accum = \case
+        b@Branch {subElms} ->
+          foldl' countSubNodes' (pred b ? accum + 1 $ accum) subElms
+        ah@AnyHook {} -> pred ah ? accum + 1 $ accum
+        fx@PN.Fixture {} -> pred fx ? accum + 1 $ accum
+   in countSubNodes' 0 node
 
 getStats :: PN.PreNodeRoot a -> IO [NodeStats]
-getStats PreNodeRoot {children} =
-  let nonEmptyFixture :: PreNode a b -> Bool
-      nonEmptyFixture = \case
-        PN.AnyHook {} -> False
-        PN.Branch {} -> False
-        f@PN.Fixture {} -> not $ nodeEmpty f
+getStats PreNodeRoot {rootNode} =
+  getStats' "Root" 0 <$> rootNode
+  where
+    nonEmptyFixture :: PreNode a b -> Bool
+    nonEmptyFixture = \case
+      PN.AnyHook {} -> False
+      PN.Branch {} -> False
+      f@PN.Fixture {} -> not $ nodeEmpty f
 
-      nonEmptyHook :: PreNode a b -> Bool
-      nonEmptyHook = \case
-        h@PN.AnyHook {} -> not $ nodeEmpty h
-        PN.Branch {} -> False
-        PN.Fixture {} -> False
+    nonEmptyHook :: PreNode a b -> Bool
+    nonEmptyHook = \case
+      h@PN.AnyHook {} -> not $ nodeEmpty h
+      PN.Branch {} -> False
+      PN.Fixture {} -> False
 
-
-      getStats' :: Text -> Int -> PreNode a b -> [NodeStats]
-      getStats' parentId subIndex =
-        \case
-          PN.Branch {subElms} -> 
-            let thisId = parentId <> ".Branch " <> txt subIndex
-            in
-            (zip [0 ..] subElms >>= uncurry (getStats' thisId))
-          PN.AnyHook {hookChild} ->
-            let thisId = parentId <> ".Hook " <> txt subIndex
-                thisNode =
-                  HookStats
-                    { id = thisId,
-                      parent = parentId,
-                      fixtureCount = countSubNodes nonEmptyFixture hookChild,
-                      hookCount = countSubNodes nonEmptyHook hookChild
-                    }
-             in thisNode : getStats' thisId 0 hookChild
-          PN.Fixture {iterations} ->
-            [ FixtureStats
-                { id = parentId <> ".Fixture " <> txt subIndex,
-                  parent = parentId,
-                  iterationCount = length iterations
-                }
-            ]
-   in do
-        children' <- children
-        pure $ zip [0 ..] children' >>= uncurry (getStats' "Root")
+    getStats' :: Text -> Int -> PreNode a b -> [NodeStats]
+    getStats' parentId subIndex =
+      \case
+        PN.Branch {subElms} ->
+          let thisId = parentId <> ".Branch " <> txt subIndex
+           in (zip [0 ..] subElms >>= uncurry (getStats' thisId))
+        PN.AnyHook {hookChild} ->
+          let thisId = parentId <> ".Hook " <> txt subIndex
+              thisNode =
+                HookStats
+                  { id = thisId,
+                    parent = parentId,
+                    fixtureCount = countSubNodes nonEmptyFixture hookChild,
+                    hookCount = countSubNodes nonEmptyHook hookChild
+                  }
+           in thisNode : getStats' thisId 0 hookChild
+        PN.Fixture {iterations} ->
+          [ FixtureStats
+              { id = parentId <> ".Fixture " <> txt subIndex,
+                parent = parentId,
+                iterationCount = length iterations
+              }
+          ]
 
 data BoundaryInfo = BoundaryInfo
   { id :: Text,
@@ -280,12 +276,12 @@ mkIterations q fixFullId count' =
 
 superSimplSuite :: TQueue RunEvent -> IO (PreNodeRoot ())
 superSimplSuite q =
-  pure . PreNodeRoot $ (: []) <$> mkFixture q "Root" "Fixture 0" 1
+  pure . PreNodeRoot $ mkFixture q "Root" "Fixture 0" 1
 
 simpleSuiteWithHook :: TQueue RunEvent -> IO (PreNodeRoot ())
 simpleSuiteWithHook q = do
   fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
-  pure . PreNodeRoot $ (: []) <$> mkHook q "Root" "Hook 0" fx
+  pure . PreNodeRoot $ mkHook q "Root" "Hook 0" fx
 
 -- simpleBranchedSuiteWithHook :: TQueue RunEvent -> IO (PreNodeRoot ())
 -- simpleBranchedSuiteWithHook q = do
@@ -474,14 +470,13 @@ unit_simple_with_hook =
   replicateM_ 1 $
     exeSuiteTests simpleSuiteWithHook 1
 
-
 {- TODO
   ~ DONE: chkHks
-  ~ thread level hooks 
+  ~ thread level hooks
     ~ add branch constructor
     ~ update tests
-    ~ add thread level 
-    ~ update tests 
+    ~ add thread level
+    ~ update tests
     ~ add iteration level
     ~ update tests
   ~ test with empty:

@@ -11,7 +11,7 @@ data CompletionStatus
   | Murdered Text
   deriving (Show)
 
-newtype PreNodeRoot o = PreNodeRoot { children :: IO [PreNode () o] }
+newtype PreNodeRoot o = PreNodeRoot { rootNode :: IO (PreNode () o) }
 
 data FixtureStatus
   = Pending

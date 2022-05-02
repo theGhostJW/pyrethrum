@@ -465,7 +465,7 @@ mkFixturesHooks db =
           { hookLabel,
             hookStatus,
             hookChild
-          } -> pure (fxs, HookRunTime hookLabel hookStatus : hks)
+          } -> hookChild >>= recurse (pure (fxs, HookRunTime hookLabel hookStatus : hks))
         Fixture
           { fixtureLabel,
             logStart,
@@ -943,18 +943,16 @@ executeLinked db maxThreads NodeRoot {rootStatus, children} =
         fxsHksArr <- traverse (mkFixturesHooks db) children
         let (fxs, hks) = reveseConcat fxsHksArr
         db "After fks"
-        let idxFxs = zip [0 ..] fxs
 
         -- create queue
         pendingQ <- newTQueueIO
         startNextQ <- newTVarIO []
         runningQ <- newTQueueIO
+
         -- load all fixtures to pending queue
         traverse_ (qFixture pendingQ) $ zip [0 ..] fxs
         initialThreadsInUse <- newTVarIO 0
-        -- db "Before hks"
-        -- hks <- concat <$> traverse hookInfo children
-        -- db "After hks"
+
 
         db "Executing"
         execute' (Executor maxThreads initialThreadsInUse pendingQ startNextQ runningQ) db

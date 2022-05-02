@@ -287,6 +287,11 @@ simpleSuiteWithHook q = do
   fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
   pure . PreNodeRoot $ (: []) <$> mkHook q "Root" "Hook 0" fx
 
+-- simpleBranchedSuiteWithHook :: TQueue RunEvent -> IO (PreNodeRoot ())
+-- simpleBranchedSuiteWithHook q = do
+--   fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
+--   pure . PreNodeRoot $ (: []) <$> mkHook q "Root" "Hook 0" fx
+
 tQToList :: TQueue a -> IO [a]
 tQToList q =
   reverse <$> recurse []

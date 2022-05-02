@@ -457,7 +457,7 @@ mkFixturesHooks db n =
   reveseBoth <$> recurse (pure ([], [])) n
   where
     reveseBoth :: ([a], [b]) -> ([a], [b])
-    reveseBoth (fxs, hks)  = (reverse fxs, reverse hks)
+    reveseBoth (fxs, hks) = (reverse fxs, reverse hks)
 
     recurse :: IO ([Int -> IO PendingFixture], [HookRunTime]) -> Node i o -> IO ([Int -> IO PendingFixture], [HookRunTime])
     recurse accum node = do
@@ -938,43 +938,40 @@ qFixture q (idx, mkFix) = mkFix idx >>= atomically . writeTQueue q
 
 executeLinked :: Logger -> Int -> NodeRoot o -> IO ()
 executeLinked db maxThreads NodeRoot {rootStatus, rootNode} =
-  let reveseBoth :: ([a], [b]) -> ([a], [b])
-      reveseBoth (fxs, hks)  = (reverse fxs, reverse hks)
-   in do
-        db "Before fxs"
-        (fxs, hks) <- mkFixturesHooks db rootNode
-        db "After fks"
+  do
+    db "Before fxs"
+    (fxs, hks) <- mkFixturesHooks db rootNode
+    db "After fks"
 
-        -- create queue
-        pendingQ <- newTQueueIO
-        startNextQ <- newTVarIO []
-        runningQ <- newTQueueIO
+    -- create queue
+    pendingQ <- newTQueueIO
+    startNextQ <- newTVarIO []
+    runningQ <- newTQueueIO
 
-        -- load all fixtures to pending queue
-        traverse_ (qFixture pendingQ) $ zip [0 ..] fxs
-        initialThreadsInUse <- newTVarIO 0
+    -- load all fixtures to pending queue
+    traverse_ (qFixture pendingQ) $ zip [0 ..] fxs
+    initialThreadsInUse <- newTVarIO 0
 
+    db "Executing"
+    execute' (Executor maxThreads initialThreadsInUse pendingQ startNextQ runningQ) db
+    db "EXECUTION DONE !!!!!!!"
 
-        db "Executing"
-        execute' (Executor maxThreads initialThreadsInUse pendingQ startNextQ runningQ) db
-        db "EXECUTION DONE !!!!!!!"
+    db "Waiting on Hooks"
 
-        db "Waiting on Hooks"
-
-        let hookWait :: IO [HookRunTime] -> IO ()
-            hookWait hrt' =
-              do
-                hrt <- hrt'
-                case hrt of
-                  [] -> db "HOOKS DONE" >> pure ()
-                  (HookRunTime {currentStatus} : hrts) -> do
-                    headStatus <- atomically $ readTVar currentStatus
-                    db $ "HOOK HEAD STATUS: " <> txt headStatus
-                    finalised headStatus
-                      ? hookWait (pure hrts)
-                      $ C.threadDelay 1_000_000 >> hookWait hrt'
-        hookWait $ pure hks
-        db "RUN COMPLETE !!!!!!!"
+    let hookWait :: IO [HookRunTime] -> IO ()
+        hookWait hrt' =
+          do
+            hrt <- hrt'
+            case hrt of
+              [] -> db "HOOKS DONE" >> pure ()
+              (HookRunTime {currentStatus} : hrts) -> do
+                headStatus <- atomically $ readTVar currentStatus
+                db $ "HOOK HEAD STATUS: " <> txt headStatus
+                finalised headStatus
+                  ? hookWait (pure hrts)
+                  $ C.threadDelay 1_000_000 >> hookWait hrt'
+    hookWait $ pure hks
+    db "RUN COMPLETE !!!!!!!"
 
 execute :: Int -> PN.PreNodeRoot o -> IO ()
 execute maxThreads preRoot = do

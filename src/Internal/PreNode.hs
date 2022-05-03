@@ -21,29 +21,29 @@ data FixtureStatus
   | BeingKilled
   deriving (Show)
 
-data PreNode i o where
+data PreNode si so where
   Branch :: {
     branchAddress :: Text, -- used in testing
-    subElms :: [PreNode i o]
+    subElms :: [PreNode si so]
    } ->
-   PreNode i o
+   PreNode si so
   AnyHook ::
     { hookAddress :: Text, -- used in testing
       hookStatus :: TVar HookStatus,
-      hook :: i -> IO o,
-      hookChild :: PreNode o o2,
-      hookResult :: TMVar (Either SomeException o),
-      hookRelease :: o -> IO ()
+      hook :: si -> IO so,
+      hookChild :: PreNode so so2,
+      hookResult :: TMVar (Either SomeException so),
+      hookRelease :: so -> IO ()
     } ->
-    PreNode i o
+    PreNode si so
   Fixture ::
     { fixtureAddress :: Text, -- used in testing
       fixtureStatus :: TVar FixtureStatus,
       logStart :: IO (),
-      iterations :: [i -> IO ()],
+      iterations :: [si -> IO ()],
       logEnd :: IO ()
     } ->
-    PreNode i ()
+    PreNode si ()
 
 nodeEmpty :: PreNode a b -> Bool
 nodeEmpty = \case

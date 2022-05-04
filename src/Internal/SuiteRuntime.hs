@@ -89,7 +89,7 @@ data Node i o where
       branchParent :: Either i (Node pi i),
       subElms :: IO [Node i o]
     } ->
-    Node i ()
+    Node i o
   Hook ::
     { hookLabel :: Text,
       hookParent :: Either i (Node pi i),
@@ -304,7 +304,7 @@ data RunningThread = RunningThread
     status :: TVar ThreadStatus
   }
 
-linkParents :: Logger -> PN.PreNodeRoot o -> IO (NodeRoot o)
+linkParents :: Logger -> PN.PreNodeRoot o to -> IO (NodeRoot o)
 linkParents db PN.PreNodeRoot {rootNode} =
   do
     db "CALLING LINKED PARENTS"
@@ -318,7 +318,7 @@ linkParents db PN.PreNodeRoot {rootNode} =
           rootNode = root
         }
 
-linkParents' :: Logger -> Either o (Node i o) -> PN.PreNode o o' -> IO (Node o o')
+linkParents' :: Logger -> Either o (Node i o) -> PN.PreNode o o' ti to -> IO (Node o o')
 linkParents' db parent preNode =
   do
     db "!!!!!!!! CALLING linkParents' (PRIME) !!!!! "
@@ -335,7 +335,17 @@ linkParents' db parent preNode =
                   hookRelease = hookRelease
                 }
          in pure h
-      PN.Branch {} -> uu
+      PN.ThreadHook { 
+        threadHookAddress, -- used in testing
+        threadHook,
+        threadHookChild,
+        threadHookRelease
+      } -> uu
+      PN.Branch {branchAddress, subElms} -> pure $ Branch {
+                                              branchLabel = branchAddress,
+                                              branchParent = parent,
+                                              subElms = traverse (linkParents' db parent) subElms
+                                            }
       PN.Fixture
         { fixtureAddress,
           fixtureStatus,
@@ -349,7 +359,7 @@ linkParents' db parent preNode =
                 logStart = logStart,
                 fixParent = parent,
                 fixStatus = fixtureStatus,
-                iterations = iterations,
+                iterations = uu, -- iterations,
                 logEnd = logEnd
               }
 
@@ -973,7 +983,7 @@ executeLinked db maxThreads NodeRoot {rootStatus, rootNode} =
     hookWait $ pure hks
     db "RUN COMPLETE !!!!!!!"
 
-execute :: Int -> PN.PreNodeRoot o -> IO ()
+execute :: Int -> PN.PreNodeRoot o to -> IO ()
 execute maxThreads preRoot = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   chn <- newChan

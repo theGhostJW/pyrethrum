@@ -89,7 +89,7 @@ data Node i o where
       branchParent :: Either i (Node pi i),
       subElms :: IO [Node i o]
     } ->
-    Node i ()
+    Node i o
   Hook ::
     { hookLabel :: Text,
       hookParent :: Either i (Node pi i),
@@ -441,7 +441,7 @@ lockExecuteHook db parent =
     parent
     (\o -> db "NO PARENT HOOK RETURNING VALUE" >> pure (Right o))
     ( \case
-        Branch {} -> db "hook lock - Branch RETURNING PURE" >> pure (Right ())
+        Branch { branchParent } -> uu --db "hook lock - Branch RETURNING parent" >> lockExecuteHook db branchParent
         Fixture {} -> db "hook lock - FIXTURE RETURNING PURE" >> pure (Right ())
         hk@Hook
           { hookParent,

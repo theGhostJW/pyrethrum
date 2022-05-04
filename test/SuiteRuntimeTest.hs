@@ -473,7 +473,7 @@ unit_simple_with_hook =
 {- TODO
   ~ DONE: chkHks
   ~ thread level hooks
-    ~ add branch constructor
+    ~ DONE: add branch constructor
     ~ update tests
     ~ add thread level
     ~ update tests

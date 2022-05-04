@@ -89,7 +89,7 @@ data Node i o where
       branchParent :: Either i (Node pi i),
       subElms :: IO [Node i o]
     } ->
-    Node i o
+    Node i ()
   Hook ::
     { hookLabel :: Text,
       hookParent :: Either i (Node pi i),

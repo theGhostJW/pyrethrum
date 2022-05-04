@@ -11,7 +11,7 @@ data CompletionStatus
   | Murdered Text
   deriving (Show)
 
-newtype PreNodeRoot o = PreNodeRoot { rootNode :: IO (PreNode () o) }
+newtype PreNodeRoot o to = PreNodeRoot { rootNode :: IO (PreNode () o () to) }
 
 data FixtureStatus
   = Pending
@@ -21,33 +21,41 @@ data FixtureStatus
   | BeingKilled
   deriving (Show)
 
-data PreNode si so where
+data PreNode si so ti to where
   Branch :: {
     branchAddress :: Text, -- used in testing
-    subElms :: [PreNode si so]
+    subElms :: [PreNode si so ti to]
    } ->
-   PreNode si so
+   PreNode si so ti to 
   AnyHook ::
     { hookAddress :: Text, -- used in testing
       hookStatus :: TVar HookStatus,
       hook :: si -> IO so,
-      hookChild :: PreNode so so2,
+      hookChild :: PreNode so so2 ti to ,
       hookResult :: TMVar (Either SomeException so),
       hookRelease :: so -> IO ()
     } ->
-    PreNode si so
+    PreNode si so ti to 
+  ThreadHook ::
+    { threadHookAddress :: Text, -- used in testing
+      threadHook :: ti -> IO to,
+      threadHookChild :: PreNode si so to to2,
+      threadHookRelease :: to -> IO ()
+    } ->
+    PreNode si so ti to 
   Fixture ::
     { fixtureAddress :: Text, -- used in testing
       fixtureStatus :: TVar FixtureStatus,
       logStart :: IO (),
-      iterations :: [si -> IO ()],
+      iterations :: [si -> ti -> IO ()],
       logEnd :: IO ()
     } ->
-    PreNode si ()
+    PreNode si () ti ()
 
-nodeEmpty :: PreNode a b -> Bool
+nodeEmpty :: PreNode a b c d -> Bool
 nodeEmpty = \case
   AnyHook {hookChild} -> nodeEmpty hookChild
+  ThreadHook {threadHookChild} -> nodeEmpty threadHookChild
   Branch {subElms} -> all nodeEmpty subElms
   Fixture {iterations} -> null iterations
 

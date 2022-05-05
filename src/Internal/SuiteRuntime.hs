@@ -86,10 +86,10 @@ data NodeRoot o = NodeRoot
 data Node i o where
   Branch ::
     { branchLabel :: Text,
-      branchParent :: Either i (Node pi i),
+      branchParent :: Either po (Node pi i),
       subElms :: IO [Node i o]
     } ->
-    Node i o
+    Node pi po
   Hook ::
     { hookLabel :: Text,
       hookParent :: Either i (Node pi i),
@@ -341,7 +341,8 @@ linkParents' db parent preNode =
         threadHookChild,
         threadHookRelease
       } -> uu
-      PN.Branch {branchAddress, subElms} -> pure $ Branch {
+      PN.Branch {branchAddress, subElms} -> 
+         pure $ Branch {
                                               branchLabel = branchAddress,
                                               branchParent = parent,
                                               subElms = traverse (linkParents' db parent) subElms
@@ -435,13 +436,22 @@ executeHook db =
               (const PN.Normal)
             $ result
 
+
+{-
+ Branch ::
+    { branchLabel :: Text,
+      branchParent :: Either i (Node pi i),
+      subElms :: IO [Node i o]
+    } ->
+    Node i o
+-}
 lockExecuteHook :: Logger -> Either o (Node i o) -> IO (Either SomeException o)
 lockExecuteHook db parent =
   eitherf
     parent
     (\o -> db "NO PARENT HOOK RETURNING VALUE" >> pure (Right o))
     ( \case
-        Branch { branchParent } -> uu --db "hook lock - Branch RETURNING parent" >> lockExecuteHook db branchParent
+        Branch { branchParent } -> db "hook lock - Branch RETURNING parent" >> lockExecuteHook db branchParent
         Fixture {} -> db "hook lock - FIXTURE RETURNING PURE" >> pure (Right ())
         hk@Hook
           { hookParent,

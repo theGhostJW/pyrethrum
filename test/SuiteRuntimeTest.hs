@@ -478,25 +478,35 @@ unit_simple_with_hook =
 
 {- TODO
   ~ DONE: chkHks
-  ~ branches 
-    ~ implement types - stub
-    ~ nested structures - construct 
-      ~ simple branch
-      ~ nested hook 
-      ~ nested branch hook
-      ~ nested hook - type changing
-      ~ nested branch hook - type changing
-      ~ nested hooks multiple - type changing
-      ~ nested branches multiple - type changing
-    ~ reinstate test
-    ~ test
-  ~ thread level hooks
-    ~ DONE: add branch constructor
-    ~ update tests
-    ~ add thread level
-    ~ update tests
+
+  ~ branching / thread level
+    ~ new constructors
+      ~ DONE: add branch constructor
+      ~ DONE: add thread level hook constructor
+    ~ structure 
+      ~ nested structures - construct 
+        ~ simple branch
+        ~ nested hook 
+        ~ nested branch hook
+        ~ nested hook - type changing
+        ~ nested branch hook - type changing
+        ~ nested hooks multiple - type changing
+        ~ nested branches multiple - type changing
+    ~ implemntation
+      ~ update runtime ~ remove uu completing implementation of thread level hooks
+      ~ reinstate existing tests
+      ~ update validation to include thread level hooks
+      ~ add thread level tests
+
   ~ add iteration level
-    ~ update tests
+    ~ constructors
+    ~ structure
+    ~ implementation
+    ~ reinstate existing tests
+    ~ update validation
+    ~ tests
+
+  ~ advnced tests
   ~ test with empty:
     ~ fixtures
     ~ hooks
@@ -504,15 +514,25 @@ unit_simple_with_hook =
       ~ thread-level
       ~ iteration level
   ~ simple multiple hooks / iterations / threads
+
   ~ simple exceptions
+    ~ update stats expectations
     ~ iteration
     ~ singleton hook
     ~ thread-level hook
-    ~ update stats expectations
-  ~ simple exceptions
+  ~ simple multi threaded
+
   ~ property based - inc differening times / hook types / hook fixture counts
+   ~ import validation
    ~ write generators
-   ~ update stats expectations
+   ~ write shrinkers
+
   ~ killing run
+    ~ implement
+    ~ test
+
   ~ fixture thread limits
+    ~ update constructors 
+    ~ runtime
+    ~ update validations 
 -}

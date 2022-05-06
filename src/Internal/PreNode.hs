@@ -11,7 +11,8 @@ data CompletionStatus
   | Murdered Text
   deriving (Show)
 
-newtype PreNodeRoot o to = PreNodeRoot { rootNode :: IO (PreNode () o () to) }
+newtype PreNodeRoot = 
+  PreNodeRoot { rootNode :: IO (PreNode () () () ()) }
 
 data FixtureStatus
   = Pending
@@ -26,7 +27,7 @@ data PreNode si so ti to where
     branchAddress :: Text, -- used in testing
     subElms :: [PreNode si so ti to]
    } ->
-   PreNode si so ti to 
+   PreNode si () ti () 
   AnyHook ::
     { hookAddress :: Text, -- used in testing
       hookStatus :: TVar HookStatus,

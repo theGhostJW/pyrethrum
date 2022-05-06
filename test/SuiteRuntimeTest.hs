@@ -116,7 +116,6 @@ isFixtureStats = \case
   HookStats {} -> False
   FixtureStats {} -> True
 
-{- 
 countSubNodes :: (forall a b. PreNode a b -> Bool) -> PreNode c d -> Int
 countSubNodes pred node =
   let countSubNodes' accum = \case
@@ -471,9 +470,13 @@ unit_simple_with_hook =
   replicateM_ 1 $
     exeSuiteTests simpleSuiteWithHook 1
 
--}
 {- TODO
   ~ DONE: chkHks
+  ~ branches 
+    ~ implement types 
+    ~ reinstate test
+    ~ nested structures
+    ~ test
   ~ thread level hooks
     ~ DONE: add branch constructor
     ~ update tests

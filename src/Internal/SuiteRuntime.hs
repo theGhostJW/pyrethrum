@@ -78,18 +78,18 @@ import UnliftIO.STM
   )
 import qualified Prelude as PRL
 
-data NodeRoot o = NodeRoot
+data NodeRoot = NodeRoot
   { rootStatus :: TVar PN.HookStatus,
-    rootNode :: Node () o
+    rootNode :: Node () ()
   }
 
 data Node i o where
   Branch ::
     { branchLabel :: Text,
-      branchParent :: Either po (Node pi i),
+      branchParent :: Either i (Node pi i),
       subElms :: IO [Node i o]
     } ->
-    Node pi po
+    Node i ()
   Hook ::
     { hookLabel :: Text,
       hookParent :: Either i (Node pi i),
@@ -304,7 +304,7 @@ data RunningThread = RunningThread
     status :: TVar ThreadStatus
   }
 
-linkParents :: Logger -> PN.PreNodeRoot o to -> IO (NodeRoot o)
+linkParents :: Logger -> PN.PreNodeRoot -> IO NodeRoot
 linkParents db PN.PreNodeRoot {rootNode} =
   do
     db "CALLING LINKED PARENTS"
@@ -335,18 +335,19 @@ linkParents' db parent preNode =
                   hookRelease = hookRelease
                 }
          in pure h
-      PN.ThreadHook { 
-        threadHookAddress, -- used in testing
-        threadHook,
-        threadHookChild,
-        threadHookRelease
-      } -> uu
-      PN.Branch {branchAddress, subElms} -> 
-         pure $ Branch {
-                                              branchLabel = branchAddress,
-                                              branchParent = parent,
-                                              subElms = traverse (linkParents' db parent) subElms
-                                            }
+      PN.ThreadHook
+        { threadHookAddress, -- used in testing
+          threadHook,
+          threadHookChild,
+          threadHookRelease
+        } -> uu
+      PN.Branch {branchAddress, subElms} ->
+        pure $
+          Branch
+            { branchLabel = branchAddress,
+              branchParent = parent,
+              subElms = traverse (linkParents' db parent) subElms
+            }
       PN.Fixture
         { fixtureAddress,
           fixtureStatus,
@@ -436,7 +437,6 @@ executeHook db =
               (const PN.Normal)
             $ result
 
-
 {-
  Branch ::
     { branchLabel :: Text,
@@ -451,13 +451,11 @@ lockExecuteHook db parent =
     parent
     (\o -> db "NO PARENT HOOK RETURNING VALUE" >> pure (Right o))
     ( \case
-        Branch { branchParent } -> db "hook lock - Branch RETURNING parent" >> lockExecuteHook db branchParent
+        Branch {branchParent} -> db "hook lock - Branch RETURNING parent" >> pure (Right ())
         Fixture {} -> db "hook lock - FIXTURE RETURNING PURE" >> pure (Right ())
         hk@Hook
-          { hookParent,
-            hookStatus,
+          { hookStatus,
             hookResult,
-            hook,
             hookChild,
             hookRelease
           } -> do
@@ -956,7 +954,7 @@ execute'
 qFixture :: TQueue PendingFixture -> (Int, Int -> IO PendingFixture) -> IO ()
 qFixture q (idx, mkFix) = mkFix idx >>= atomically . writeTQueue q
 
-executeLinked :: Logger -> Int -> NodeRoot o -> IO ()
+executeLinked :: Logger -> Int -> NodeRoot -> IO ()
 executeLinked db maxThreads NodeRoot {rootStatus, rootNode} =
   do
     db "Before fxs"
@@ -993,7 +991,7 @@ executeLinked db maxThreads NodeRoot {rootStatus, rootNode} =
     hookWait $ pure hks
     db "RUN COMPLETE !!!!!!!"
 
-execute :: Int -> PN.PreNodeRoot o to -> IO ()
+execute :: Int -> PN.PreNodeRoot -> IO ()
 execute maxThreads preRoot = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   chn <- newChan

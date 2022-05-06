@@ -116,32 +116,37 @@ isFixtureStats = \case
   HookStats {} -> False
   FixtureStats {} -> True
 
-countSubNodes :: (forall a b. PreNode a b -> Bool) -> PreNode c d -> Int
+countSubNodes :: (forall a b c d. PreNode a b c d -> Bool) -> PreNode e f g h -> Int
 countSubNodes pred node =
-  let countSubNodes' accum = \case
+  let 
+    countSubNodes' :: forall h i j k. Int -> PreNode h i j k -> Int
+    countSubNodes' accum = \case
         b@Branch {subElms} ->
           foldl' countSubNodes' (pred b ? accum + 1 $ accum) subElms
         ah@AnyHook {} -> pred ah ? accum + 1 $ accum
+        ThreadHook {} -> uu
         fx@PN.Fixture {} -> pred fx ? accum + 1 $ accum
    in countSubNodes' 0 node
 
-getStats :: PN.PreNodeRoot a -> IO [NodeStats]
+getStats :: PN.PreNodeRoot -> IO [NodeStats]
 getStats PreNodeRoot {rootNode} =
   getStats' "Root" 0 <$> rootNode
   where
-    nonEmptyFixture :: PreNode a b -> Bool
+    nonEmptyFixture :: PreNode a b c d -> Bool
     nonEmptyFixture = \case
       PN.AnyHook {} -> False
       PN.Branch {} -> False
+      ThreadHook {} -> False
       f@PN.Fixture {} -> not $ nodeEmpty f
 
-    nonEmptyHook :: PreNode a b -> Bool
+    nonEmptyHook :: PreNode a b c d -> Bool
     nonEmptyHook = \case
       h@PN.AnyHook {} -> not $ nodeEmpty h
       PN.Branch {} -> False
+      ThreadHook {} -> False
       PN.Fixture {} -> False
 
-    getStats' :: Text -> Int -> PreNode a b -> [NodeStats]
+    getStats' :: Text -> Int -> PreNode a b c d -> [NodeStats]
     getStats' parentId subIndex =
       \case
         PN.Branch {subElms} ->
@@ -157,6 +162,7 @@ getStats PreNodeRoot {rootNode} =
                     hookCount = countSubNodes nonEmptyHook hookChild
                   }
            in thisNode : getStats' thisId 0 hookChild
+        ThreadHook {} -> uu
         PN.Fixture {iterations} ->
           [ FixtureStats
               { id = parentId <> ".Fixture " <> txt subIndex,
@@ -234,7 +240,7 @@ logMessage q txt' = logEvent q (Message txt')
 -- remove when pyrelude updated
 chkEq' t = assertEqual (toS t)
 
-mkFixture :: TQueue RunEvent -> Text -> Text -> Int -> IO (PreNode () ())
+mkFixture :: TQueue RunEvent -> Text -> Text -> Int -> IO (PreNode () () () ())
 mkFixture q parentId fxId itCount = do
   fs <- newTVarIO Pending
   pure $
@@ -248,7 +254,7 @@ mkFixture q parentId fxId itCount = do
   where
     fid = fullId parentId fxId
 
-mkHook :: TQueue RunEvent -> Text -> Text -> PreNode () o2 -> IO (PreNode i ())
+mkHook :: TQueue RunEvent -> Text -> Text -> PreNode () o2 ti to -> IO (PreNode i () ti to)
 mkHook q parentId hkId nodeChild =
   do
     status <- atomically $ newTVar Unintialised
@@ -268,22 +274,22 @@ mkHook q parentId hkId nodeChild =
 iterationMessage :: Int -> Text
 iterationMessage i = "iteration " <> txt i
 
-mkIterations :: TQueue RunEvent -> Text -> Int -> [() -> IO ()]
+mkIterations :: TQueue RunEvent -> Text -> Int -> [() -> () -> IO ()]
 mkIterations q fixFullId count' =
-  let mkIt :: Int -> (() -> IO ())
-      mkIt idx = const $ logIteration q fixFullId idx (iterationMessage idx)
+  let mkIt :: Int -> (() -> () -> IO ())
+      mkIt idx itidx = const $ logIteration q fixFullId idx (iterationMessage idx)
    in mkIt <$> [0 .. count' - 1]
 
-superSimplSuite :: TQueue RunEvent -> IO (PreNodeRoot ())
+superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
 superSimplSuite q =
   pure . PreNodeRoot $ mkFixture q "Root" "Fixture 0" 1
 
-simpleSuiteWithHook :: TQueue RunEvent -> IO (PreNodeRoot ())
+simpleSuiteWithHook :: TQueue RunEvent -> IO PreNodeRoot
 simpleSuiteWithHook q = do
   fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
   pure . PreNodeRoot $ mkHook q "Root" "Hook 0" fx
 
--- simpleBranchedSuiteWithHook :: TQueue RunEvent -> IO (PreNodeRoot ())
+-- simpleBranchedSuiteWithHook :: TQueue RunEvent -> IO PreNodeRoot
 -- simpleBranchedSuiteWithHook q = do
 --   fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
 --   pure . PreNodeRoot $ (: []) <$> mkHook q "Root" "Hook 0" fx
@@ -441,7 +447,7 @@ chkFixtures stats evntLst =
         chkEq' "expected fixture end count" fixStatCount $ length fixEnds
         for_ stats chkFixture
 
-exeSuiteTests :: (TQueue RunEvent -> IO (PreNodeRoot ())) -> Int -> IO ()
+exeSuiteTests :: (TQueue RunEvent -> IO PreNodeRoot) -> Int -> IO ()
 exeSuiteTests preSuite threadCount = do
   q <- atomically newTQueue
   preSuite' <- preSuite q
@@ -473,16 +479,23 @@ unit_simple_with_hook =
 {- TODO
   ~ DONE: chkHks
   ~ branches 
-    ~ implement types 
+    ~ implement types - stub
+    ~ nested structures - construct 
+      ~ simple branch
+      ~ nested hook 
+      ~ nested branch hook
+      ~ nested hook - type changing
+      ~ nested branch hook - type changing
+      ~ nested hooks multiple - type changing
+      ~ nested branches multiple - type changing
     ~ reinstate test
-    ~ nested structures
     ~ test
   ~ thread level hooks
     ~ DONE: add branch constructor
     ~ update tests
     ~ add thread level
     ~ update tests
-    ~ add iteration level
+  ~ add iteration level
     ~ update tests
   ~ test with empty:
     ~ fixtures

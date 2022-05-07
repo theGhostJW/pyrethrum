@@ -15,6 +15,7 @@ import qualified Internal.SuiteRuntime as S
 import Polysemy
 import Pyrelude as P
   ( Bool (..),
+    Either,
     Eq (..),
     IO,
     Int,
@@ -23,6 +24,7 @@ import Pyrelude as P
     Num ((+)),
     Ord (..),
     Show,
+    SomeException,
     Text,
     Traversable (traverse),
     catMaybes,
@@ -57,6 +59,7 @@ import Pyrelude as P
     uu,
     zip,
     ($),
+    (&),
     (&&),
     (-),
     (.),
@@ -66,7 +69,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||), Either, SomeException,
+    (||),
   )
 import Pyrelude.Test (chk', chkFail)
 import Pyrelude.Test as T hiding (filter, maybe, singleton)
@@ -118,9 +121,8 @@ isFixtureStats = \case
 
 countSubNodes :: (forall a b c d. PreNode a b c d -> Bool) -> PreNode e f g h -> Int
 countSubNodes pred node =
-  let
-    countSubNodes' :: forall h i j k. Int -> PreNode h i j k -> Int
-    countSubNodes' accum = \case
+  let countSubNodes' :: forall h i j k. Int -> PreNode h i j k -> Int
+      countSubNodes' accum = \case
         b@Branch {subElms} ->
           foldl' countSubNodes' (pred b ? accum + 1 $ accum) subElms
         ah@AnyHook {} -> pred ah ? accum + 1 $ accum
@@ -240,8 +242,19 @@ logMessage q txt' = logEvent q (Message txt')
 -- remove when pyrelude updated
 chkEq' t = assertEqual (toS t)
 
-mkFixture :: TQueue RunEvent -> Text -> Text -> Int -> IO (PreNode i () ti ())
-mkFixture q parentId fxId itCount = do
+mkBranch :: Text -> [TQueue RunEvent -> IO (PreNode si so ti to)] -> TQueue RunEvent -> IO (PreNode si () ti ())
+mkBranch branchId subElmsF q =
+  do
+    let ses = traverse (q &) subElmsF
+    ses' <- ses
+    pure $
+      PN.Branch
+        { branchAddress = branchId, -- used in testing
+          subElms = ses'
+        }
+
+mkFixture :: Text -> Text -> Int -> TQueue RunEvent -> IO (PreNode i () ti ())
+mkFixture parentId fxId itCount q = do
   fs <- newTVarIO Pending
   pure $
     PN.Fixture
@@ -254,8 +267,8 @@ mkFixture q parentId fxId itCount = do
   where
     fid = fullId parentId fxId
 
-mkHook :: TQueue RunEvent -> Text -> Text -> o -> PreNode o o2 ti to -> IO (PreNode i o ti to)
-mkHook q parentId hkId hko nodeChild =
+mkHook :: Text -> Text -> o -> PreNode o o2 ti to -> TQueue RunEvent -> IO (PreNode i o ti to)
+mkHook parentId hkId hko nodeChild q =
   do
     status <- atomically $ newTVar Unintialised
     rslt <- (newEmptyTMVarIO :: IO (TMVar (Either SomeException o)))
@@ -282,12 +295,12 @@ mkIterations q fixFullId count' =
 
 superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
 superSimplSuite q =
-  pure . PreNodeRoot $ mkFixture q "Root" "Fixture 0" 1
+  pure . PreNodeRoot $ mkFixture "Root" "Fixture 0" 1 q
 
 simpleSuiteWithHook :: TQueue RunEvent -> IO PreNodeRoot
 simpleSuiteWithHook q = do
-  fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
-  pure . PreNodeRoot $ mkHook q "Root" "Hook 0" () fx
+  fx <- mkFixture "Root.Hook 0" "Fixture 0" 1 q
+  pure . PreNodeRoot $ mkHook "Root" "Hook 0" () fx q
 
 -- simpleBranchedSuiteWithHook :: TQueue RunEvent -> IO PreNodeRoot
 -- simpleBranchedSuiteWithHook q = do
@@ -476,6 +489,37 @@ unit_simple_with_hook =
   replicateM_ 1 $
     exeSuiteTests simpleSuiteWithHook 1
 
+-- ~ simple branch
+simpleSuiteWithBranch :: TQueue RunEvent -> IO PreNodeRoot
+simpleSuiteWithBranch q =
+  let subElms =
+        [ mkFixture "Root.Branch 0" "Fixture 0" 2 :: TQueue RunEvent -> IO (PreNode () () () ()),
+          mkFixture "Root.Branch 0" "Fixture 1" 2 :: TQueue RunEvent -> IO (PreNode () () () ())
+        ]
+   in pure . PreNodeRoot $ mkBranch "Root.Branch 0" subElms q
+
+simpleSuiteBranchInHook :: TQueue RunEvent -> IO PreNodeRoot
+simpleSuiteBranchInHook  q =
+  do 
+    let
+     subElms =
+        [ mkFixture "Root.Branch 0" "Fixture 0" 2 :: TQueue RunEvent -> IO (PreNode Int () Text ()),
+          mkFixture "Root.Branch 0" "Fixture 1" 2 :: TQueue RunEvent -> IO (PreNode Int () Text ())
+        ]
+    branch <- mkBranch "Root.Hook 0.Branch 0" subElms q
+    let
+     hk :: IO (PreNode () Int () Text)
+     hk = mkHook "Root.Hook 0" "Root.Hook 0" 7 branch q
+    uu --pure . PreNodeRoot $ mkBranch "Root.Branch 0" subElms q
+
+-- ~ nested hook
+-- ~ nested branch hook
+-- ~ nested hook - type changing
+-- ~ nested branch hook - type changing
+-- ~ nested hooks multiple - type changing
+-- ~ nested branches multiple - type changing
+-- ~ check for simplifications
+
 {- TODO
   ~ DONE: chkHks
 
@@ -483,15 +527,16 @@ unit_simple_with_hook =
     ~ new constructors
       ~ DONE: add branch constructor
       ~ DONE: add thread level hook constructor
-    ~ structure 
-      ~ nested structures - construct 
+    ~ structure
+      ~ nested structures - construct
         ~ simple branch
-        ~ nested hook 
+        ~ nested hook
         ~ nested branch hook
         ~ nested hook - type changing
         ~ nested branch hook - type changing
         ~ nested hooks multiple - type changing
         ~ nested branches multiple - type changing
+        ~ check for simplifications
     ~ implemntation
       ~ update runtime ~ remove uu completing implementation of thread level hooks
       ~ reinstate existing tests
@@ -532,7 +577,7 @@ unit_simple_with_hook =
     ~ test
 
   ~ fixture thread limits
-    ~ update constructors 
+    ~ update constructors
     ~ runtime
-    ~ update validations 
+    ~ update validations
 -}

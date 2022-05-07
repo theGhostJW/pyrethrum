@@ -66,7 +66,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||),
+    (||), Either, SomeException,
   )
 import Pyrelude.Test (chk', chkFail)
 import Pyrelude.Test as T hiding (filter, maybe, singleton)
@@ -118,7 +118,7 @@ isFixtureStats = \case
 
 countSubNodes :: (forall a b c d. PreNode a b c d -> Bool) -> PreNode e f g h -> Int
 countSubNodes pred node =
-  let 
+  let
     countSubNodes' :: forall h i j k. Int -> PreNode h i j k -> Int
     countSubNodes' accum = \case
         b@Branch {subElms} ->
@@ -212,14 +212,14 @@ logBoundary q brt bdt parentId fullChildId =
         id = fullChildId
       }
 
-hook :: TQueue RunEvent -> BoundaryType -> Text -> Text -> IO ()
-hook q = logBoundary q SuiteRuntimeTest.Hook
+hook :: TQueue RunEvent -> BoundaryType -> Text -> Text -> o -> IO o
+hook q bdt parentId fullChildId hko = logBoundary q SuiteRuntimeTest.Hook bdt parentId fullChildId >> pure hko
 
-hookStart :: TQueue RunEvent -> Text -> Text -> IO ()
+hookStart :: TQueue RunEvent -> Text -> Text -> o -> IO o
 hookStart q = SuiteRuntimeTest.hook q Start
 
 hookEnd :: TQueue RunEvent -> Text -> Text -> IO ()
-hookEnd q = SuiteRuntimeTest.hook q End
+hookEnd q parentId fullChildId = SuiteRuntimeTest.hook q End parentId fullChildId ()
 
 fixture :: TQueue RunEvent -> BoundaryType -> Text -> Text -> IO ()
 fixture q = logBoundary q SuiteRuntimeTest.Fixture
@@ -240,7 +240,7 @@ logMessage q txt' = logEvent q (Message txt')
 -- remove when pyrelude updated
 chkEq' t = assertEqual (toS t)
 
-mkFixture :: TQueue RunEvent -> Text -> Text -> Int -> IO (PreNode () () () ())
+mkFixture :: TQueue RunEvent -> Text -> Text -> Int -> IO (PreNode i () ti ())
 mkFixture q parentId fxId itCount = do
   fs <- newTVarIO Pending
   pure $
@@ -254,17 +254,17 @@ mkFixture q parentId fxId itCount = do
   where
     fid = fullId parentId fxId
 
-mkHook :: TQueue RunEvent -> Text -> Text -> PreNode () o2 ti to -> IO (PreNode i () ti to)
-mkHook q parentId hkId nodeChild =
+mkHook :: TQueue RunEvent -> Text -> Text -> o -> PreNode o o2 ti to -> IO (PreNode i o ti to)
+mkHook q parentId hkId hko nodeChild =
   do
     status <- atomically $ newTVar Unintialised
-    rslt <- newEmptyTMVarIO
+    rslt <- (newEmptyTMVarIO :: IO (TMVar (Either SomeException o)))
     pure
       PN.AnyHook
         { hookAddress = hid, -- used in testing
           hookStatus = status,
           hookResult = rslt,
-          hook = const $ hookStart q parentId hid,
+          hook = const $ hookStart q parentId hid hko,
           hookChild = nodeChild,
           hookRelease = \_ -> hookEnd q parentId hid
         }
@@ -274,9 +274,9 @@ mkHook q parentId hkId nodeChild =
 iterationMessage :: Int -> Text
 iterationMessage i = "iteration " <> txt i
 
-mkIterations :: TQueue RunEvent -> Text -> Int -> [() -> () -> IO ()]
+mkIterations :: TQueue RunEvent -> Text -> Int -> [i -> thi -> IO ()]
 mkIterations q fixFullId count' =
-  let mkIt :: Int -> (() -> () -> IO ())
+  let mkIt :: Int -> (a -> b -> IO ())
       mkIt idx itidx = const $ logIteration q fixFullId idx (iterationMessage idx)
    in mkIt <$> [0 .. count' - 1]
 
@@ -287,7 +287,7 @@ superSimplSuite q =
 simpleSuiteWithHook :: TQueue RunEvent -> IO PreNodeRoot
 simpleSuiteWithHook q = do
   fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
-  pure . PreNodeRoot $ mkHook q "Root" "Hook 0" fx
+  pure . PreNodeRoot $ mkHook q "Root" "Hook 0" () fx
 
 -- simpleBranchedSuiteWithHook :: TQueue RunEvent -> IO PreNodeRoot
 -- simpleBranchedSuiteWithHook q = do

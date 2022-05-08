@@ -503,14 +503,15 @@ simpleSuiteBranchInHook  q =
   do 
     let
      subElms =
-        [ mkFixture "Root.Branch 0" "Fixture 0" 2 :: TQueue RunEvent -> IO (PreNode Int () Text ()),
-          mkFixture "Root.Branch 0" "Fixture 1" 2 :: TQueue RunEvent -> IO (PreNode Int () Text ())
+        [ mkFixture "Root.Branch 0" "Fixture 0" 2 :: TQueue RunEvent -> IO (PreNode Int () () ()),
+          mkFixture "Root.Branch 0" "Fixture 1" 2 :: TQueue RunEvent -> IO (PreNode Int () () ())
         ]
-    branch <- mkBranch "Root.Hook 0.Branch 0" subElms q
+    branch <- mkBranch "Root.Branch 0.Hook 0.Branch 1" subElms q
     let
-     hk :: IO (PreNode () Int () Text)
-     hk = mkHook "Root.Hook 0" "Root.Hook 0" 7 branch q
-    uu --pure . PreNodeRoot $ mkBranch "Root.Branch 0" subElms q
+  -- hk :: IO (PreNode () Int () Text)
+     hk :: TQueue RunEvent -> IO (PreNode () Int () ())
+     hk = mkHook "Root.Hook 0" "Root.Hook 0" 7 branch
+    pure . PreNodeRoot $ mkBranch "Root.Branch 0.Hook 0.Branch 1" [hk] q
 
 -- ~ nested hook
 -- ~ nested branch hook

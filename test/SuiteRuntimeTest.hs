@@ -499,19 +499,18 @@ simpleSuiteWithBranch q =
    in pure . PreNodeRoot $ mkBranch "Root.Branch 0" subElms q
 
 simpleSuiteBranchInHook :: TQueue RunEvent -> IO PreNodeRoot
-simpleSuiteBranchInHook  q =
-  do 
-    let
-     subElms =
+simpleSuiteBranchInHook q =
+  do
+    branch <-
+      mkBranch
+        "Root.Branch 0.Hook 0.Branch 1"
         [ mkFixture "Root.Branch 0" "Fixture 0" 2 :: TQueue RunEvent -> IO (PreNode Int () () ()),
           mkFixture "Root.Branch 0" "Fixture 1" 2 :: TQueue RunEvent -> IO (PreNode Int () () ())
         ]
-    branch <- mkBranch "Root.Branch 0.Hook 0.Branch 1" subElms q
-    let
-  -- hk :: IO (PreNode () Int () Text)
-     hk :: TQueue RunEvent -> IO (PreNode () Int () ())
-     hk = mkHook "Root.Hook 0" "Root.Hook 0" 7 branch
-    pure . PreNodeRoot $ mkBranch "Root.Branch 0.Hook 0.Branch 1" [hk] q
+        q
+    let hk :: TQueue RunEvent -> IO (PreNode () Int () ())
+        hk = mkHook "Root.Hook 0" "Root.Hook 0" 7 branch
+    pure . PreNodeRoot $ mkBranch "Root.Branch 0.Hook 0" [hk] q
 
 -- ~ nested hook
 -- ~ nested branch hook

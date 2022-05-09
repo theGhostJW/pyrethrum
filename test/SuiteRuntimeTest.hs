@@ -26,7 +26,7 @@ import Pyrelude as P
     Show,
     SomeException,
     Text,
-    Traversable (traverse),
+    Traversable (sequenceA, traverse),
     catMaybes,
     const,
     count,
@@ -242,10 +242,10 @@ logMessage q txt' = logEvent q (Message txt')
 -- remove when pyrelude updated
 chkEq' t = assertEqual (toS t)
 
-mkBranch :: Text -> [TQueue RunEvent -> IO (PreNode si so ti to)] -> TQueue RunEvent -> IO (PreNode si () ti ())
-mkBranch branchId subElmsF q =
+mkBranch :: TQueue RunEvent -> Text -> [IO (PreNode si so ti to)] -> IO (PreNode si () ti ())
+mkBranch q branchId subElmsF =
   do
-    let ses = traverse (q &) subElmsF
+    let ses = sequenceA subElmsF
     ses' <- ses
     pure $
       PN.Branch
@@ -253,8 +253,8 @@ mkBranch branchId subElmsF q =
           subElms = ses'
         }
 
-mkFixture :: Text -> Text -> Int -> TQueue RunEvent -> IO (PreNode i () ti ())
-mkFixture parentId fxId itCount q = do
+mkFixture :: TQueue RunEvent -> Text -> Text -> Int -> IO (PreNode i () ti ())
+mkFixture q parentId fxId itCount = do
   fs <- newTVarIO Pending
   pure $
     PN.Fixture
@@ -267,18 +267,19 @@ mkFixture parentId fxId itCount q = do
   where
     fid = fullId parentId fxId
 
-mkHook :: Text -> Text -> o -> PreNode o o2 ti to -> TQueue RunEvent -> IO (PreNode i o ti to)
-mkHook parentId hkId hko nodeChild q =
+mkHook :: TQueue RunEvent -> Text -> Text -> o -> IO (PreNode o o2 ti to) -> IO (PreNode i o ti to)
+mkHook q parentId hkId hko nodeChild =
   do
     status <- atomically $ newTVar Unintialised
     rslt <- (newEmptyTMVarIO :: IO (TMVar (Either SomeException o)))
+    nc <- nodeChild
     pure
       PN.AnyHook
         { hookAddress = hid, -- used in testing
           hookStatus = status,
           hookResult = rslt,
           hook = const $ hookStart q parentId hid hko,
-          hookChild = nodeChild,
+          hookChild = nc,
           hookRelease = \_ -> hookEnd q parentId hid
         }
   where
@@ -293,19 +294,23 @@ mkIterations q fixFullId count' =
       mkIt idx itidx = const $ logIteration q fixFullId idx (iterationMessage idx)
    in mkIt <$> [0 .. count' - 1]
 
+root :: IO (PreNode () () () ()) -> IO PreNodeRoot
+root = pure . PreNodeRoot
+
 superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
 superSimplSuite q =
-  pure . PreNodeRoot $ mkFixture "Root" "Fixture 0" 1 q
+  root $ mkFixture q "Root" "Fixture 0" 1
 
 simpleSuiteWithHook :: TQueue RunEvent -> IO PreNodeRoot
 simpleSuiteWithHook q = do
-  fx <- mkFixture "Root.Hook 0" "Fixture 0" 1 q
-  pure . PreNodeRoot $ mkHook "Root" "Hook 0" () fx q
+  root
+    . mkHook q "Root" "Hook 0" ()
+    $ mkFixture q "Root.Hook 0" "Fixture 0" 1
 
 -- simpleBranchedSuiteWithHook :: TQueue RunEvent -> IO PreNodeRoot
 -- simpleBranchedSuiteWithHook q = do
 --   fx <- mkFixture q "Root.Hook 0" "Fixture 0" 1
---   pure . PreNodeRoot $ (: []) <$> mkHook q "Root" "Hook 0" fx
+--   root $ (: []) <$> mkHook q "Root" "Hook 0" fx
 
 tQToList :: TQueue a -> IO [a]
 tQToList q =
@@ -493,31 +498,40 @@ unit_simple_with_hook =
 simpleSuiteWithBranch :: TQueue RunEvent -> IO PreNodeRoot
 simpleSuiteWithBranch q =
   let subElms =
-        [ mkFixture "Root.Branch 0" "Fixture 0" 2 :: TQueue RunEvent -> IO (PreNode () () () ()),
-          mkFixture "Root.Branch 0" "Fixture 1" 2 :: TQueue RunEvent -> IO (PreNode () () () ())
+        [ mkFixture q "Root.Branch 0" "Fixture 0" 2 :: IO (PreNode () () () ()),
+          mkFixture q "Root.Branch 0" "Fixture 1" 2 :: IO (PreNode () () () ())
         ]
-   in pure . PreNodeRoot $ mkBranch "Root.Branch 0" subElms q
+   in root $ mkBranch q "Root.Branch 0" subElms
 
+simpleSuiteBranchInHook :: TQueue RunEvent -> IO PreNodeRoot
+simpleSuiteBranchInHook q =
+  root $
+    mkBranch
+      q
+      "Root.Branch 0.Hook 0"
+      [ mkHook q "Root.Hook 0" "Root.Hook 0" 7 $
+          mkBranch
+            q
+            "Root.Branch 0.Hook 0.Branch 1"
+            [ mkFixture q "Root.Branch 0.Hook 0.Branch 1" "Fixture 0" 2,
+              mkFixture q "Root.Branch 0.Hook 0.Branch 1" "Fixture 1" 2
+            ]
+      ]
 
-siBranch :: Text ->  TQueue RunEvent -> IO (PreNode si () () ())
-siBranch branchId =
-  mkBranch
-    branchId
-    [ mkFixture branchId "Fixture 0" 2 :: TQueue RunEvent -> IO (PreNode si () () ()),
-      mkFixture branchId "Fixture 1" 2 :: TQueue RunEvent -> IO (PreNode si () () ())
-    ]
-
-
-simpleSuiteBranchInHook' :: TQueue RunEvent -> IO PreNodeRoot
-simpleSuiteBranchInHook' q =
-  do
-    branch <- siBranch "Root.Branch 0.Hook 0.Branch 1" q
-    let hk :: TQueue RunEvent -> IO (PreNode () Int () ())
-        hk = mkHook "Root.Hook 0" "Root.Hook 0" 7 branch
-    pure . PreNodeRoot $ mkBranch "Root.Branch 0.Hook 0" [hk] q
-
-
-
+moderatelyNested :: TQueue RunEvent -> IO PreNodeRoot
+moderatelyNested q =
+  root $
+    mkBranch
+      q
+      "Root.Branch 0.Hook 0"
+      [ mkHook q "Root.Hook 0" "Root.Hook 0" 7 $
+          mkBranch
+            q
+            "Root.Branch 0.Hook 0.Branch 1"
+            [ mkFixture q "Root.Branch 0.Hook 0.Branch 1" "Fixture 0" 2,
+              mkFixture q "Root.Branch 0.Hook 0.Branch 1" "Fixture 1" 2
+            ]
+      ]
 
 -- ~ nested hook
 -- ~ nested branch hook

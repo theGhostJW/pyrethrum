@@ -224,12 +224,18 @@ trySetFinalising db hs' =
 recurseHookRelease :: Logger -> Node i o -> IO ()
 recurseHookRelease db n =
   do
+    -- crawls up tree releasing all AnyHooks for which sub- elements have been completed
     db "!!!!!!!! recurseHookRelease !!!!!!!!"
     case n of
-      Branch {branchLabel, branchParent, subElms} -> do
+      b@Branch {branchLabel, branchParent, subElms} -> do
         se <- subElms
-        seDone <- subElms >>= traverse (nodeFinished db)
-        uu
+        seDone <- nodeFinished db b
+        seDone
+          ? pure ()
+          $ eitherf
+            branchParent
+            (const $ pure ())
+            (recurseHookRelease db)
       Fixture {} -> db "!!!!!!!! recurseHookRelease: Fixture !!!!!!!!" >> pure ()
       hk@Hook {hookResult, hookStatus, hookChild, hookRelease, hookParent = parent} ->
         let --
@@ -245,18 +251,18 @@ recurseHookRelease db n =
                   db "draw children"
                   hc <- hookChild
                   done <- nodeFinished db hc
-                  not done
-                    ? do
+                  if not done
+                    then do
                       db "!!!!!!!! recurseHookRelease: oldStatus children not done !!!!!!!!"
                       setStatus oldStatus
-                    $ do
+                    else do
                       db "READING HOOK RESULT"
                       ehr <- atomically $ readTMVar hookResult
                       db "FINISHED READING HOOK RESULT"
                       eitherf
                         ehr
                         ( \e -> do
-                            db ("Hook release not executed - this code should never run\n" <> txt e)
+                            db ("Hook release not executed because hook execution failed - this code should never run\n" <> txt e)
                             finaliseRecurse $ PN.Fault "Hook execution failed" e
                         )
                         ( \hr -> do

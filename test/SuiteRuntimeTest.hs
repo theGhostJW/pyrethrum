@@ -518,28 +518,36 @@ simpleSuiteBranchInHook q =
             ]
       ]
 
-moderatelyNested :: TQueue RunEvent -> IO PreNodeRoot
-moderatelyNested q =
-  root $
-    mkBranch
-      q
-      "Root.Branch 0.Hook 0"
-      [ mkHook q "Root.Hook 0" "Root.Hook 0" 7 $
-          mkBranch
-            q
-            "Root.Branch 0.Hook 0.Branch 1"
-            [ mkFixture q "Root.Branch 0.Hook 0.Branch 1" "Fixture 0" 2,
-              mkFixture q "Root.Branch 0.Hook 0.Branch 1" "Fixture 1" 2
-            ]
-      ]
+deeplyNested :: TQueue RunEvent -> IO PreNodeRoot
+deeplyNested q =
+  let hk :: Text -> o -> IO (PreNode o o2 ti to) -> IO (PreNode i o ti to)
+      hk title = mkHook q title title
 
--- ~ nested hook
--- ~ nested branch hook
--- ~ nested hook - type changing
--- ~ nested branch hook - type changing
--- ~ nested hooks multiple - type changing
--- ~ nested branches multiple - type changing
--- ~ check for simplifications
+      branch :: Text -> [IO (PreNode si so ti to)] -> IO (PreNode si () ti ())
+      branch = mkBranch q
+
+      fx :: Text -> Int -> IO (PreNode i () ti ())
+      fx title = mkFixture q title title
+   in root $
+        branch
+          "Root.Branch 0"
+          [ hk "Root.Branch 0.Hook 0" "out Str" $
+              hk "Root.Branch 0.Hook 0.Hook 0" 88 $
+                branch
+                  "Root.Branch 0.Hook 0.Hook 0.Branch 0"
+                  [ fx "Root.Branch 0.Hook 0.Hook 0.Branch 0.Fixture 0" 2 :: IO (PreNode Int () ti ()),
+                    fx "Root.Branch 0.Hook 0.Hook 0.Branch 0.Fixture 1" 2,
+                    branch
+                      "Root.Branch 0.Hook 0.Hook 0.Branch 0.Branch 0"
+                      [ hk "Root.Branch 0.Hook 0.Hook 0.Branch 0.Branch 0.Hook 0" "out Str" $
+                          fx "Root.Branch 0.Hook 0.Hook 0.Branch 0.Branch 0.Hook 0.Fixture 0" 2
+                      ],
+                    branch
+                      "Root.Branch 0.Hook 0.Hook 0.Branch 0.Branch 1"
+                      [ fx "Root.Branch 0.Hook 0.Hook 0.Branch 0.Branch 1.Fixture 0" 2
+                      ]
+                  ]
+          ]
 
 {- TODO
   ~ DONE: chkHks
@@ -550,16 +558,17 @@ moderatelyNested q =
       ~ DONE: add thread level hook constructor
     ~ structure
       ~ nested structures - construct
-        ~ simple branch
-        ~ nested hook
-        ~ nested branch hook
-        ~ nested hook - type changing
-        ~ nested branch hook - type changing
-        ~ nested hooks multiple - type changing
-        ~ nested branches multiple - type changing
-        ~ check for simplifications
+        ~ DONE: simple branch
+        ~ DONE: nested hook
+        ~ DONE: nested branch hook
+        ~ DONE: nested hook - type changing
+        ~ DONE: nested branch hook - type changing
+        ~ DONE: nested hooks multiple - type changing
+        ~ DONE: nested branches multiple - type changing
+        ~ DONE: check for simplifications
     ~ implemntation
       ~ update runtime ~ remove uu completing implementation of thread level hooks
+      ~ add thread level hooks to deep nested structure
       ~ reinstate existing tests
       ~ update validation to include thread level hooks
       ~ add thread level tests

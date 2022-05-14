@@ -80,46 +80,54 @@ import qualified Prelude as PRL
 
 data NodeRoot = NodeRoot
   { rootStatus :: TVar PN.HookStatus,
-    rootNode :: Node () ()
+    rootNode :: Node () () () ()
   }
 
-data Node si so where
+data Node si so ti to where
   Branch ::
     { branchLabel :: Text,
-      branchParent :: Either si (Node pi si),
-      subElms :: IO [Node si so]
+      branchIn :: Either si (Node pi si tpi ti),
+      subElms :: IO [Node si so ti to]
     } ->
-    Node si ()
+    Node si () ti ()
   SingletonHook ::
     { hookLabel :: Text,
-      hookParent :: Either si (Node pi si),
+      singletonHookIn :: Either si (Node pi si tpi ti),
       hookStatus :: TVar PN.HookStatus,
       hook :: si -> IO so,
       hookResult :: TMVar (Either SomeException so),
-      hookChild :: IO (Node so co),
-      hookRelease :: so -> IO ()
+      singletonHookChild :: IO (Node so co to cto),
+      singletonHookRelease :: so -> IO ()
     } ->
-    Node si so
+    Node si so ti to
+  ThreadHook ::
+    { hookLabel :: Text,
+      threadHook:: ti -> IO to,
+      threadHookIn :: Either si (Node pi si tpi ti),
+      hookChild :: IO (Node si so to to2),
+      threadHookRelease :: to -> IO ()
+    } ->
+    Node si so ti to
   Fixture ::
     { fixtureLabel :: Text,
       logStart :: IO (),
       fixStatus :: TVar FixtureStatus,
-      fixParent :: Either si (Node pi si),
-      iterations :: [si -> IO ()],
+      singletonIn :: Either si (Node pi si tpi ti),
+      iterations :: [si -> ti -> IO ()],
       logEnd :: IO ()
     } ->
-    Node si ()
+    Node si () ti ()
 
 data HookRunTime = HookRunTime
   { address :: Text,
     currentStatus :: TVar HookStatus
   }
 
-hookInfo :: Node i o -> IO [HookRunTime]
+hookInfo :: Node i o e f -> IO [HookRunTime]
 hookInfo =
   hookInfo' (pure [])
   where
-    hookInfo' :: IO [HookRunTime] -> Node a b -> IO [HookRunTime]
+    hookInfo' :: IO [HookRunTime] -> Node a b c d -> IO [HookRunTime]
     hookInfo' accum node = do
       accum' <- accum
       case node of
@@ -128,16 +136,16 @@ hookInfo =
           pure $ concat c
         SingletonHook
           { hookLabel,
-            hookParent,
+            singletonHookIn,
             hookStatus,
             hook,
             hookResult,
-            hookChild,
-            hookRelease
+            singletonHookChild,
+            singletonHookRelease
           } ->
             let me = HookRunTime hookLabel hookStatus
              in do
-                  c <- hookChild >>= hookInfo' accum
+                  c <- singletonHookChild >>= hookInfo' accum
                   pure $ me : c
         Fixture {} -> accum
 
@@ -182,7 +190,7 @@ logVal db pfx val = val >>= \a -> db (pfx <> " Value: " <> txt a) >> val
 logSTMVal :: Show a => Logger -> Text -> STM a -> STM a
 logSTMVal db pfx val = val >>= \a -> dbStm db (pfx <> " Value: " <> txt a) >> val
 
-nodeFinished :: Logger -> Node i o -> IO Bool
+nodeFinished :: Logger -> Node i o c d -> IO Bool
 nodeFinished db =
   let log :: Show a => Text -> STM a -> STM a
       log = logSTMVal db
@@ -221,23 +229,23 @@ trySetFinalising db hs' =
           PN.Finalising -> nr
           PN.Finalised _ -> fa
 
-recurseHookRelease :: Logger -> Node i o -> IO ()
+recurseHookRelease :: Logger -> Node i o c d -> IO ()
 recurseHookRelease db n =
   do
     -- crawls up tree releasing all AnyHooks for which sub- elements have been completed
     db "!!!!!!!! recurseHookRelease !!!!!!!!"
     case n of
-      b@Branch {branchLabel, branchParent, subElms} -> do
+      b@Branch {branchLabel, branchIn, subElms} -> do
         se <- subElms
         seDone <- nodeFinished db b
         seDone
           ? pure ()
           $ eitherf
-            branchParent
+            branchIn
             (const $ pure ())
             (recurseHookRelease db)
       Fixture {} -> db "!!!!!!!! recurseHookRelease: Fixture !!!!!!!!" >> pure ()
-      hk@SingletonHook {hookResult, hookStatus, hookChild, hookRelease, hookParent = parent} ->
+      hk@SingletonHook {hookResult, hookStatus, singletonHookChild, singletonHookRelease, singletonHookIn = parent} ->
         let --
             recurse = either (const $ pure ()) (recurseHookRelease db) parent
             setStatus = atomically . writeTVar hookStatus
@@ -249,7 +257,7 @@ recurseHookRelease db n =
                 FinalisedAlready -> db "!!!!!!!! recurseHookRelease: FinalisedAlready !!!!!!!!" >> recurse
                 CanBeFinalised oldStatus -> do
                   db "draw children"
-                  hc <- hookChild
+                  hc <- singletonHookChild
                   done <- nodeFinished db hc
                   if not done
                     then do
@@ -266,7 +274,7 @@ recurseHookRelease db n =
                             finaliseRecurse $ PN.Fault "SingletonHook execution failed" e
                         )
                         ( \hr -> do
-                            ethr <- tryAny $ hookRelease hr
+                            ethr <- tryAny $ singletonHookRelease hr
                             eitherf
                               ethr
                               ( \e -> do
@@ -276,7 +284,7 @@ recurseHookRelease db n =
                               (const $ finaliseRecurse PN.Normal)
                         )
 
-loadFixture :: forall i o. Logger -> Text -> Either o (Node i o) -> [o -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> (Int -> IO PendingFixture)
+loadFixture :: forall i o ti to. Logger -> Text -> Either o (Node i o ti to) -> [o -> to -> IO ()] -> TVar FixtureStatus -> IO () -> IO () -> (Int -> IO PendingFixture)
 loadFixture db fixtureLabel parent iterations fixStatus logStart logEnd =
   do
     let loadedIterations :: Either SomeException o -> Either SomeException [IO ()]
@@ -324,21 +332,21 @@ linkParents db PN.PreNodeRoot {rootNode} =
           rootNode = root
         }
 
-linkParents' :: Logger -> Either o (Node i o) -> PN.PreNode o o' ti to -> IO (Node o o')
+linkParents' :: forall o i ti to o' to'. Logger -> Either o (Node i o ti to) -> PN.PreNode o o' to to' -> IO (Node o o' to to')
 linkParents' db parent preNode =
   do
     db "!!!!!!!! CALLING linkParents' (PRIME) !!!!! "
     case preNode of
       PN.AnyHook {hookAddress, hook, hookStatus, hookResult, hookChild, hookRelease} -> do
-        let h =
-              Internal.SuiteRuntime.SingletonHook
+        let h :: Node o o' to to'
+            h =  Internal.SuiteRuntime.SingletonHook
                 { hookLabel = hookAddress,
-                  hookParent = parent,
+                  singletonHookIn = parent,
                   hookStatus = hookStatus,
                   hook = hook,
                   hookResult = hookResult,
-                  hookChild = linkParents' db (Right h) hookChild,
-                  hookRelease = hookRelease
+                  singletonHookChild = linkParents' db (Right h) hookChild,
+                  singletonHookRelease = hookRelease
                 }
          in pure h
       PN.ThreadHook
@@ -351,7 +359,7 @@ linkParents' db parent preNode =
         pure $
           Branch
             { branchLabel = branchAddress,
-              branchParent = parent,
+              branchIn = parent,
               subElms = traverse (linkParents' db parent) subElms
             }
       PN.Fixture
@@ -365,7 +373,7 @@ linkParents' db parent preNode =
             Internal.SuiteRuntime.Fixture
               { fixtureLabel = fixtureAddress,
                 logStart = logStart,
-                fixParent = parent,
+                singletonIn = parent,
                 fixStatus = fixtureStatus,
                 iterations = uu, -- iterations,
                 logEnd = logEnd
@@ -407,20 +415,20 @@ dbStm db = unsafeIOToSTM . db
 -- executeHook only to be run when want executeHook has set
 -- staus to initalising should only ever run once per branch
 -- TODO - test exception on output of branch parent and in resource aquisition
-executeHook :: Logger -> Node i o -> IO ()
+executeHook :: Logger -> Node i o ti to -> IO ()
 executeHook db =
   \case
     Branch {} -> pure ()
     Fixture {} -> pure ()
     SingletonHook
-      { hookParent,
+      { singletonHookIn,
         hookStatus,
         hook,
         hookResult,
-        hookChild
+        singletonHookChild 
       } -> do
         -- up to here need stus update pre and post execute hook
-        eInput <- db "CALL PARENT LOCK EXECUTE HOOK" >> lockExecuteHook db hookParent
+        eInput <- db "CALL PARENT LOCK EXECUTE HOOK" >> lockExecuteHook db singletonHookIn
         result <-
           eitherf
             eInput
@@ -446,24 +454,23 @@ executeHook db =
 {-
  Branch ::
     { branchLabel :: Text,
-      branchParent :: Either i (Node pi i),
+      singletonIn :: Either i (Node pi i),
       subElms :: IO [Node i o]
     } ->
     Node i o
 -}
-lockExecuteHook :: Logger -> Either o (Node i o) -> IO (Either SomeException o)
+lockExecuteHook :: Logger -> Either o (Node i o ti to) -> IO (Either SomeException o)
 lockExecuteHook db parent =
   eitherf
     parent
     (\o -> db "NO PARENT HOOK RETURNING VALUE" >> pure (Right o))
     ( \case
-        Branch {branchParent} -> db "hook lock - Branch RETURNING parent" >> pure (Right ())
+        Branch {} -> db "hook lock - Branch RETURNING parent" >> pure (Right ())
         Fixture {} -> db "hook lock - FIXTURE RETURNING PURE" >> pure (Right ())
         hk@SingletonHook
           { hookStatus,
             hookResult,
-            hookChild,
-            hookRelease
+            singletonHookRelease
           } -> do
             wantLaunch <- atomically $ tryLock db hookStatus
             db $ "HOOK LOCK >>> " <> txt wantLaunch
@@ -476,14 +483,14 @@ lockExecuteHook db parent =
             db "RETURNING FROM LOCK EXECUTE HOOK " >> pure r
     )
 
-mkFixturesHooks :: Logger -> Node i o -> IO ([Int -> IO PendingFixture], [HookRunTime])
+mkFixturesHooks :: Logger -> Node i o ti to -> IO ([Int -> IO PendingFixture], [HookRunTime])
 mkFixturesHooks db n =
   reveseBoth <$> recurse (pure ([], [])) n
   where
     reveseBoth :: ([a], [b]) -> ([a], [b])
     reveseBoth (fxs, hks) = (reverse fxs, reverse hks)
 
-    recurse :: IO ([Int -> IO PendingFixture], [HookRunTime]) -> Node i o -> IO ([Int -> IO PendingFixture], [HookRunTime])
+    recurse :: IO ([Int -> IO PendingFixture], [HookRunTime]) -> Node i o ti to -> IO ([Int -> IO PendingFixture], [HookRunTime])
     recurse accum node = do
       (fxs, hks) <- accum
       case node of
@@ -491,17 +498,17 @@ mkFixturesHooks db n =
         SingletonHook
           { hookLabel,
             hookStatus,
-            hookChild
-          } -> hookChild >>= recurse (pure (fxs, HookRunTime hookLabel hookStatus : hks))
+            singletonHookChild 
+          } -> singletonHookChild >>= recurse (pure (fxs, HookRunTime hookLabel hookStatus : hks))
         Fixture
           { fixtureLabel,
             logStart,
-            fixParent,
+            singletonIn,
             iterations,
             fixStatus,
             logEnd
           } -> do
-            let fx = loadFixture db fixtureLabel fixParent iterations fixStatus logStart logEnd
+            let fx = loadFixture db fixtureLabel singletonIn iterations fixStatus logStart logEnd
             pure (fx : fxs, hks)
 
 data Executor = Executor

@@ -267,7 +267,7 @@ mkFixture q parentId fxId itCount = do
   where
     fid = fullId parentId fxId
 
-mkHook :: TQueue RunEvent -> Text -> Text -> o -> IO (PreNode o o2 ti to) -> IO (PreNode i o ti to)
+mkHook :: TQueue RunEvent -> Text -> Text -> o -> IO (PreNode o o2 to to2) -> IO (PreNode i o ti to)
 mkHook q parentId hkId hko nodeChild =
   do
     status <- atomically $ newTVar Unintialised
@@ -520,7 +520,7 @@ simpleSuiteBranchInHook q =
 
 deeplyNested :: TQueue RunEvent -> IO PreNodeRoot
 deeplyNested q =
-  let hk :: Text -> o -> IO (PreNode o o2 ti to) -> IO (PreNode i o ti to)
+  let hk :: Text -> o -> IO (PreNode o o2 to to2) -> IO (PreNode i o ti to)
       hk title = mkHook q title title
 
       branch :: Text -> [IO (PreNode si so ti to)] -> IO (PreNode si () ti ())
@@ -587,6 +587,13 @@ shk - t1
 2. prioritise adjacent fixtures when continuing thread
 3. hook finalise when crossing thread hook boundary
 4. prioritise distant fixtures when launching new thread
+  % constuct breath first list of thread hooks
+  % test with no thread hooks 
+  % test fixtures before thread hooks
+  % ensure wait for thread hooks to finish
+  % test run time of singleton hooks vs thread hooks 
+    - will not follow tree structure
+    - n threads
 
 
 -}

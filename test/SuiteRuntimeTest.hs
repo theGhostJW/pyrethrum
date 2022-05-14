@@ -549,6 +549,48 @@ deeplyNested q =
                   ]
           ]
 
+
+{-
+ISSUE
+
+3 threads
+
+shk
+  thk
+    shk 
+      fx
+      fx
+      fx
+    thk
+      fx
+      fx
+      fx
+
+3 threads
+
+shk - t1
+  thk - t1 t2 t3
+    shk - t1 
+      fx - t1 
+      fx - t2
+      fx - t3
+      thk
+       fx
+       fx
+       fx
+  thk
+    fx
+    fx
+    fx
+
+1. thread must live longer than one fixture 
+2. prioritise adjacent fixtures when continuing thread
+3. hook finalise when crossing thread hook boundary
+4. prioritise distant fixtures when launching new thread
+
+
+-}
+
 {- TODO
   ~ DONE: chkHks
 
@@ -566,6 +608,7 @@ deeplyNested q =
         ~ DONE: nested hooks multiple - type changing
         ~ DONE: nested branches multiple - type changing
         ~ DONE: check for simplifications
+    ~ !!!!! MISDESIGN FIX
     ~ implemntation
       ~ update runtime ~ remove uu completing implementation of thread level hooks
       ~ add thread level hooks to deep nested structure

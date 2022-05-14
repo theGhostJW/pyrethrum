@@ -83,32 +83,32 @@ data NodeRoot = NodeRoot
     rootNode :: Node () ()
   }
 
-data Node i o where
+data Node si so where
   Branch ::
     { branchLabel :: Text,
-      branchParent :: Either i (Node pi i),
-      subElms :: IO [Node i o]
+      branchParent :: Either si (Node pi si),
+      subElms :: IO [Node si so]
     } ->
-    Node i ()
-  Hook ::
+    Node si ()
+  SingletonHook ::
     { hookLabel :: Text,
-      hookParent :: Either i (Node pi i),
+      hookParent :: Either si (Node pi si),
       hookStatus :: TVar PN.HookStatus,
-      hook :: i -> IO o,
-      hookResult :: TMVar (Either SomeException o),
-      hookChild :: IO (Node o co),
-      hookRelease :: o -> IO ()
+      hook :: si -> IO so,
+      hookResult :: TMVar (Either SomeException so),
+      hookChild :: IO (Node so co),
+      hookRelease :: so -> IO ()
     } ->
-    Node i o
+    Node si so
   Fixture ::
     { fixtureLabel :: Text,
       logStart :: IO (),
       fixStatus :: TVar FixtureStatus,
-      fixParent :: Either i (Node pi i),
-      iterations :: [i -> IO ()],
+      fixParent :: Either si (Node pi si),
+      iterations :: [si -> IO ()],
       logEnd :: IO ()
     } ->
-    Node i ()
+    Node si ()
 
 data HookRunTime = HookRunTime
   { address :: Text,
@@ -126,7 +126,7 @@ hookInfo =
         Branch {subElms} -> do
           c <- subElms >>= traverse (hookInfo' accum)
           pure $ concat c
-        Hook
+        SingletonHook
           { hookLabel,
             hookParent,
             hookStatus,
@@ -190,7 +190,7 @@ nodeFinished db =
         Branch {subElms} -> do
           allDone <- subElms >>= traverse (nodeFinished db)
           pure $ all id allDone
-        Hook {hookStatus} -> atomically $ finalised <$> log "Hook Finished Status" (readTVar hookStatus)
+        SingletonHook {hookStatus} -> atomically $ finalised <$> log "SingletonHook Finished Status" (readTVar hookStatus)
         Fixture {fixStatus, fixtureLabel} -> atomically $ isDone <$> log ("FIXTURE STATUS: (nodeFinished): - " <> fixtureLabel <> " ") (readTVar fixStatus)
 
 data CanFinaliseHook
@@ -237,7 +237,7 @@ recurseHookRelease db n =
             (const $ pure ())
             (recurseHookRelease db)
       Fixture {} -> db "!!!!!!!! recurseHookRelease: Fixture !!!!!!!!" >> pure ()
-      hk@Hook {hookResult, hookStatus, hookChild, hookRelease, hookParent = parent} ->
+      hk@SingletonHook {hookResult, hookStatus, hookChild, hookRelease, hookParent = parent} ->
         let --
             recurse = either (const $ pure ()) (recurseHookRelease db) parent
             setStatus = atomically . writeTVar hookStatus
@@ -262,16 +262,16 @@ recurseHookRelease db n =
                       eitherf
                         ehr
                         ( \e -> do
-                            db ("Hook release not executed because hook execution failed - this code should never run\n" <> txt e)
-                            finaliseRecurse $ PN.Fault "Hook execution failed" e
+                            db ("SingletonHook release not executed because hook execution failed - this code should never run\n" <> txt e)
+                            finaliseRecurse $ PN.Fault "SingletonHook execution failed" e
                         )
                         ( \hr -> do
                             ethr <- tryAny $ hookRelease hr
                             eitherf
                               ethr
                               ( \e -> do
-                                  db ("Hook release threw an exception\n" <> txt e)
-                                  finaliseRecurse $ PN.Fault "Hook release threw an exception" e
+                                  db ("SingletonHook release threw an exception\n" <> txt e)
+                                  finaliseRecurse $ PN.Fault "SingletonHook release threw an exception" e
                               )
                               (const $ finaliseRecurse PN.Normal)
                         )
@@ -331,7 +331,7 @@ linkParents' db parent preNode =
     case preNode of
       PN.AnyHook {hookAddress, hook, hookStatus, hookResult, hookChild, hookRelease} -> do
         let h =
-              Internal.SuiteRuntime.Hook
+              Internal.SuiteRuntime.SingletonHook
                 { hookLabel = hookAddress,
                   hookParent = parent,
                   hookStatus = hookStatus,
@@ -412,7 +412,7 @@ executeHook db =
   \case
     Branch {} -> pure ()
     Fixture {} -> pure ()
-    Hook
+    SingletonHook
       { hookParent,
         hookStatus,
         hook,
@@ -439,7 +439,7 @@ executeHook db =
           writeTVar hookStatus
             . PN.Complete
             . either
-              (PN.Fault "Hook execution failed")
+              (PN.Fault "SingletonHook execution failed")
               (const PN.Normal)
             $ result
 
@@ -459,7 +459,7 @@ lockExecuteHook db parent =
     ( \case
         Branch {branchParent} -> db "hook lock - Branch RETURNING parent" >> pure (Right ())
         Fixture {} -> db "hook lock - FIXTURE RETURNING PURE" >> pure (Right ())
-        hk@Hook
+        hk@SingletonHook
           { hookStatus,
             hookResult,
             hookChild,
@@ -488,7 +488,7 @@ mkFixturesHooks db n =
       (fxs, hks) <- accum
       case node of
         Branch {subElms} -> subElms >>= foldl' recurse accum
-        Hook
+        SingletonHook
           { hookLabel,
             hookStatus,
             hookChild

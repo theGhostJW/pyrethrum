@@ -32,7 +32,7 @@ data PreNode si so ti to where
     { hookAddress :: Text, -- used in testing
       hookStatus :: TVar HookStatus,
       hook :: si -> IO so,
-      hookChild :: PreNode so so2 ti to ,
+      hookChild :: PreNode so so2 ti to,
       hookResult :: TMVar (Either SomeException so),
       hookRelease :: so -> IO ()
     } ->

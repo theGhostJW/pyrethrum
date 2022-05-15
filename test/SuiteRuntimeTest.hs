@@ -583,14 +583,27 @@ shk - t1
     fx
     fx
 
+-- allow for no thread hooks
+shk - t1
+      fx - t1 
+      fx - t2
+      fx - t3
+       fx
+       fx
+       fx
+      shk
+    fx
+    fx
+    fx
+
 1. thread must live longer than one fixture 
 2. prioritise adjacent fixtures when continuing thread
 3. hook finalise when crossing thread hook boundary
 4. prioritise distant fixtures when launching new thread
   % constuct breath first list of thread hooks
+  % ensure wait for thread hooks to finish
   % test with no thread hooks 
   % test fixtures before thread hooks
-  % ensure wait for thread hooks to finish
   % test run time of singleton hooks vs thread hooks 
     - will not follow tree structure
     - n threads

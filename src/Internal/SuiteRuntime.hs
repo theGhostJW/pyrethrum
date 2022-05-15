@@ -153,7 +153,7 @@ data AvailableFixture
   = FixPending PendingFixture
   | FixInitialised InitialisedFixture
 
-data PendingFixture = PendingFixture
+data PendingFixture = PendingFixture 
   { pIndex :: Int,
     pFixtureLabel :: Text, -- for debugging
     pLogStart :: IO (),

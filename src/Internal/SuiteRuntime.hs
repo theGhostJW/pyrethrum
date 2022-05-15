@@ -86,13 +86,13 @@ data NodeRoot = NodeRoot
 data Node si so ti to where
   Branch ::
     { branchLabel :: Text,
+      branchStatus :: TVar FixtureStatus,
       branchIn :: Either si (Node pi si tpi ti),
       subElms :: IO [Node si so ti to]
     } ->
     Node si () ti ()
   SingletonHook ::
     { hookLabel :: Text,
-      singletonHookIn :: Either si (Node pi si tpi ti),
       hookStatus :: TVar PN.HookStatus,
       hook :: si -> IO so,
       hookResult :: TMVar (Either SomeException so),
@@ -103,7 +103,6 @@ data Node si so ti to where
   ThreadHook ::
     { hookLabel :: Text,
       threadHook:: ti -> IO to,
-      threadHookIn :: Either si (Node pi si tpi ti),
       hookChild :: IO (Node si so to to2),
       threadHookRelease :: to -> IO ()
     } ->
@@ -112,7 +111,6 @@ data Node si so ti to where
     { fixtureLabel :: Text,
       logStart :: IO (),
       fixStatus :: TVar FixtureStatus,
-      singletonIn :: Either si (Node pi si tpi ti),
       iterations :: [si -> ti -> IO ()],
       logEnd :: IO ()
     } ->

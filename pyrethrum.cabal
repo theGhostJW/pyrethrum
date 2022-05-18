@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c88e486519f83b1b33efbd8b317c9b1c72fd69e3439dc2fb9f551b8407bb3a37
+-- hash: 425ecd1c05989c9bb993d254c5644cf6454fcf20711ee5f77369de0ab0086da9
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -43,7 +43,7 @@ library
       Internal.ExeNode
       Internal.PreNode
       Internal.RunnerBaseLazy
-      Internal.SuiteRuntime
+      Internal.SuiteRuntimeOld
       ItemFilter
       ItemRunners
       LogTransformation

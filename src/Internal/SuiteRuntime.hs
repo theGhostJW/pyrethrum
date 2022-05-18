@@ -116,6 +116,23 @@ data Node si so ti to where
     } ->
     Node si () ti ()
 
+
+data RTFix s t = RTFix {
+    fixtureLabel :: Text,
+    logStart :: IO (),
+    fixStatus :: TVar FixtureStatus,
+    iterations :: [s -> t -> IO ()],
+    logEnd :: IO ()
+}
+data RTNode si so ti to = RTNode {
+  fixtureLabel :: Text,
+  status :: TVar PN.HookStatus,
+  maxIdx :: Int,
+  lastIdx :: TVar Int,
+  fxs :: [RTFix so to],
+  subNodes :: forall cso cto. [RTNode so cso to cto]
+} 
+
 data HookRunTime = HookRunTime
   { address :: Text,
     currentStatus :: TVar HookStatus
@@ -134,7 +151,6 @@ hookInfo =
           pure $ concat c
         SingletonHook
           { hookLabel,
-            singletonHookIn,
             hookStatus,
             hook,
             hookResult,

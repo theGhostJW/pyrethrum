@@ -583,6 +583,65 @@ shk - t1
     fx
     fx
 
+3 threads
+
+shk - t1
+  thk - t1 t2 t3
+    fx
+    shk - t1 
+      fx - t1 
+      fx - t2
+      fx - t3
+      thk
+       thk
+        fx
+        fx
+        fx
+  thk'
+    fx
+    fx
+    fx
+
+- has fixtures
+ - shk - thk
+ - shk - thk'
+ - shk - thk - shk 
+ - shk - thk - shk - thk - thk
+
+ exeBranch:
+    [
+      sk 2 v0 s [] [
+        thk [fx] [
+          shk [fx fx fx] [
+            thk [] [
+                thk [fx fx fx] [],
+                thk [fx fx fx] [],
+                thk [fx fx fx] []
+              ]
+          ]
+        ],
+        thk [
+          fx fx fx
+        ]
+      ]
+    ]
+
+    RuntimeElement 
+
+   1. run fixture set 
+    - thread will not escape fixture set until all fixtures run
+    - thread will not escape sub hooks until all fixtures run
+   2. atomically 
+    - find subelem not running
+    - find sub-elem partially not running 
+    - next index
+   3. run thread
+
+- issues 
+  % initial distribution
+  % tracking state - pending / running / complete
+  % 
+
 -- allow for no thread hooks
 shk - t1
       fx - t1 

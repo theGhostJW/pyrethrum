@@ -1,5 +1,3 @@
-{-# LANGUAGE MagicHash #-}
-
 module Internal.SuiteRuntime where
 
 import Check (CheckReport (result))

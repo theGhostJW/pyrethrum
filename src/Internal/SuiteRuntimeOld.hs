@@ -1,4 +1,5 @@
 {-# LANGUAGE MagicHash #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module Internal.SuiteRuntimeOld where
 
@@ -243,9 +244,9 @@ recurseHookRelease db n =
             (const $ pure ())
             (recurseHookRelease db)
       Fixture {} -> db "!!!!!!!! recurseHookRelease: Fixture !!!!!!!!" >> pure ()
-      hk@SingletonHook {hookResult, hookStatus, singletonHookChild, singletonHookRelease, singletonHookIn = parent} ->
+      hk@SingletonHook {hookResult, hookStatus, singletonHookChild, singletonHookRelease} ->
         let --
-            recurse = either (const $ pure ()) (recurseHookRelease db) parent
+            recurse = uu --either (const $ pure ()) (recurseHookRelease db) parent
             setStatus = atomically . writeTVar hookStatus
             finaliseRecurse s = setStatus (PN.Finalised s) >> recurse
          in do
@@ -288,7 +289,8 @@ loadFixture db fixtureLabel parent iterations fixStatus logStart logEnd =
     let loadedIterations :: Either SomeException o -> Either SomeException [IO ()]
         loadedIterations hookVal = do
           hv <- hookVal
-          Right $ (\f -> f hv) <$> iterations
+          uu
+          -- Right $ (\f -> f hv) <$> iterations
     \i ->
       pure $
         PendingFixture
@@ -337,9 +339,8 @@ linkParents' db parent preNode =
     case preNode of
       PN.AnyHook {hookAddress, hook, hookStatus, hookResult, hookChild, hookRelease} -> do
         let h :: Node o o' to to'
-            h =  Internal.SuiteRuntime.SingletonHook
+            h =  Internal.SuiteRuntimeOld.SingletonHook
                 { hookLabel = hookAddress,
-                  singletonHookIn = parent,
                   hookStatus = hookStatus,
                   hook = hook,
                   hookResult = hookResult,
@@ -353,13 +354,13 @@ linkParents' db parent preNode =
           threadHookChild,
           threadHookRelease
         } -> uu
-      PN.Branch {branchAddress, subElms} ->
-        pure $
-          Branch
-            { branchLabel = branchAddress,
-              branchIn = parent,
-              subElms = traverse (linkParents' db parent) subElms
-            }
+      PN.Branch {branchAddress, subElms} -> uu
+        -- pure $
+        --   Branch
+        --     { branchLabel = branchAddress,
+        --       branchIn = parent,
+        --       subElms = traverse (linkParents' db parent) subElms
+        --     }
       PN.Fixture
         { fixtureAddress,
           fixtureStatus,
@@ -368,10 +369,9 @@ linkParents' db parent preNode =
           logEnd
         } ->
           pure $
-            Internal.SuiteRuntime.Fixture
+            Internal.SuiteRuntimeOld.Fixture
               { fixtureLabel = fixtureAddress,
                 logStart = logStart,
-                singletonIn = parent,
                 fixStatus = fixtureStatus,
                 iterations = uu, -- iterations,
                 logEnd = logEnd
@@ -419,14 +419,14 @@ executeHook db =
     Branch {} -> pure ()
     Fixture {} -> pure ()
     SingletonHook
-      { singletonHookIn,
+      { 
         hookStatus,
         hook,
         hookResult,
         singletonHookChild 
       } -> do
         -- up to here need stus update pre and post execute hook
-        eInput <- db "CALL PARENT LOCK EXECUTE HOOK" >> lockExecuteHook db singletonHookIn
+        eInput <- db "CALL PARENT LOCK EXECUTE HOOK" >> lockExecuteHook db uu
         result <-
           eitherf
             eInput
@@ -501,12 +501,11 @@ mkFixturesHooks db n =
         Fixture
           { fixtureLabel,
             logStart,
-            singletonIn,
             iterations,
             fixStatus,
             logEnd
           } -> do
-            let fx = loadFixture db fixtureLabel singletonIn iterations fixStatus logStart logEnd
+            let fx = loadFixture db fixtureLabel uu iterations fixStatus logStart logEnd
             pure (fx : fxs, hks)
 
 data Executor = Executor

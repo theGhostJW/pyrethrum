@@ -2,7 +2,7 @@ module Internal.PreNode where
 
 import Control.DeepSeq (NFData)
 import Language.Haskell.TH (ExpQ)
-import Pyrelude (Bool (False, True), Either, Eq, Generic, IO, Int, ListLike (any, filter, null, all), Show, SomeException, TVar, Text, not, ($), (&&))
+import Pyrelude (Bool (False, True), Either, Eq, Generic, IO, Int, ListLike (any, filter, null, all), Show, SomeException, TVar, Text, not, ($), (&&), Ord)
 import UnliftIO (MonadUnliftIO, STM, TMVar)
 
 data CompletionStatus
@@ -22,34 +22,35 @@ data FixtureStatus
   | BeingKilled
   deriving (Show)
 
+newtype Loc = Loc { unLoc :: Text} deriving (Show, Eq, Ord)
+
 data PreNode si so ti to where
   Branch :: {
-    branchAddress :: Text, -- used in testing
     subElms :: [PreNode si so ti to]
    } ->
    PreNode si () ti () 
   AnyHook ::
-    { hookAddress :: Text, -- used in testing
+    { 
       hookStatus :: TVar HookStatus,
-      hook :: si -> IO so,
+      hook :: Loc -> si -> IO so,
       hookChild :: PreNode so so2 to to2,
       hookResult :: TMVar (Either SomeException so),
-      hookRelease :: so -> IO ()
+      hookRelease :: Loc -> so -> IO ()
     } ->
     PreNode si so ti to 
   ThreadHook ::
-    { threadHookAddress :: Text, -- used in testing
-      threadHook :: ti -> IO to,
+    { 
+      threadHook :: Loc -> ti -> IO to,
       threadHookChild :: PreNode so so2 to to2,
-      threadHookRelease :: to -> IO ()
+      threadHookRelease :: Loc -> to -> IO ()
     } ->
     PreNode si so ti to 
   Fixture ::
-    { fixtureAddress :: Text, -- used in testing
+    { 
       fixtureStatus :: TVar FixtureStatus,
-      logStart :: IO (),
-      iterations :: [si -> ti -> IO ()],
-      logEnd :: IO ()
+      logStart :: Loc -> IO (),
+      iterations :: [Loc -> si -> ti -> IO ()],
+      logEnd :: Loc -> IO ()
     } ->
     PreNode si () ti ()
 

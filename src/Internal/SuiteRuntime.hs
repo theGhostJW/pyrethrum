@@ -7,16 +7,12 @@ import Data.Sequence (Seq (Empty), empty)
 import Data.Tuple.Extra (both)
 import GHC.Exts
 import Internal.PreNode
-  ( CompletionStatus (Fault),
-    FixtureStatus (..),
-    HookStatus (Finalised, Finalising),
-    finalised,
-  )
-import qualified Internal.PreNode as PN
-  ( CompletionStatus (Fault, Murdered, Normal),
+  ( CompletionStatus (..),
     HookStatus (..),
     PreNode (..),
     PreNodeRoot (..),
+    FixtureStatus(..),
+
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
@@ -85,17 +81,50 @@ data RTFix s t = RTFix {
     logEnd :: IO ()
 }
 
+data IdxLst a = IdxLst {
+  maxIndex :: Int,
+  list :: [a],
+  currIdx :: TVar Int
+}
+
+mkIdxLst :: [a] -> STM (IdxLst a)
+mkIdxLst lst = IdxLst  (length lst - 1) lst <$> newTVar 0
+
 data RTNode si so ti to = RTNode {
   fixtureLabel :: Text,
-  status :: TVar PN.HookStatus,
-  maxIdx :: Int,
-  lastIdx :: TVar Int,
-  fxs :: [RTFix so to],
-  subNodes :: forall cso cto. [RTNode so cso to cto]
-} 
+  status :: TVar HookStatus,
+  sHook :: si -> IO so,
+  sHookVal :: TVar (Either SomeException so),
+  tHook:: ti -> IO to,
+  fxs :: IdxLst [RTFix so to],
+  subNodes :: forall cso cto. IdxLst [RTNode so cso to cto]
+}
+
+-- fixsNodes :: PreNode si so ti to -> (IdxLst [RTFix so to], IdxLst [RTNode so cso to cto])
+-- fixsNodes = \case
+--   Branch txt pns -> _
+--   AnyHook txt tv f pn tv' g -> _
+--   ThreadHook txt f pn g -> _
+--   Fixture txt tv io fs io' -> _
 
 
-execute :: Int -> PN.PreNodeRoot -> IO ()
+-- prepare :: PreNode () () () () -> IO (RTNode () () () ())
+-- prepare pn = 
+--   do 
+--     s <- newTVarIO Unintialised
+--     v <- newTVarIO 
+--     prepare' pn
+--   where 
+--     prepare' :: RTNode si so ti to -> PreNode so sci to sco -> RTNode si so ti to 
+--     prepare' parent pn =  
+--   \case
+--   Branch txt pns -> _
+--   AnyHook txt tv f pn tv' g -> _
+--   ThreadHook txt f pn g -> _
+--   Fixture txt tv io fs io' -> _
+
+
+execute :: Int -> PreNodeRoot -> IO ()
 execute maxThreads preRoot = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   chn <- newChan

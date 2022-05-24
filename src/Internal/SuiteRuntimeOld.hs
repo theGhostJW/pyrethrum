@@ -1,5 +1,4 @@
-{-# LANGUAGE MagicHash #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+-- {-# LANGUAGE MagicHash #-}
 
 module Internal.SuiteRuntimeOld where
 
@@ -78,6 +77,8 @@ import UnliftIO.STM
     writeTVar,
   )
 import qualified Prelude as PRL
+
+{-
 
 data NodeRoot = NodeRoot
   { rootStatus :: TVar PN.HookStatus,
@@ -1035,3 +1036,4 @@ execute maxThreads preRoot = do
    in wantDebug
         ? concurrently_ printDebugLogs linkExecute
         $ linkExecute
+-}

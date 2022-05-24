@@ -9,7 +9,7 @@ import Data.Aeson.Types
 import qualified Data.Set as ST
 import Data.Yaml
 import GHC.Records
-import Internal.PreNode (PreNode (hookChild))
+import Internal.PreNode (Loc (unLoc), PreNode (hookChild))
 import Internal.PreNode as PN
 import qualified Internal.SuiteRuntime as S
 import Polysemy
@@ -174,7 +174,7 @@ getStats PreNodeRoot {rootNode} =
           ]
 
 data BoundaryInfo = BoundaryInfo
-  { id :: Text,
+  { id :: Loc,
     childCount :: Int
   }
 
@@ -182,14 +182,13 @@ data RunEvent
   = Boundary
       { branchType :: BranchType,
         boundaryType :: BoundaryType,
-        boundaryParentFix :: Text,
         threadId :: ThreadId,
-        id :: Text
+        id :: Loc
       }
   | IterationMessage
-      { parentFix :: Text,
+      { parentFix :: Loc,
         index :: Int,
-        message :: Text,
+        message :: Maybe Text,
         threadId :: ThreadId
       }
   | Message Text ThreadId
@@ -200,41 +199,37 @@ logEvent q ev = do
   i <- myThreadId
   atomically . writeTQueue q $ ev i
 
-fullId :: Text -> Text -> Text
-fullId parentId childId = parentId <> "." <> childId
-
-logBoundary :: TQueue RunEvent -> BranchType -> BoundaryType -> Text -> Text -> IO ()
-logBoundary q brt bdt parentId fullChildId =
+logBoundary :: TQueue RunEvent -> BranchType -> BoundaryType -> Loc -> IO ()
+logBoundary q brt bdt loc =
   logEvent q $ \thrd ->
     Boundary
       { branchType = brt,
         boundaryType = bdt,
-        boundaryParentFix = parentId,
         threadId = thrd,
-        id = fullChildId
+        id = loc
       }
 
-hook :: TQueue RunEvent -> BoundaryType -> Text -> Text -> o -> IO o
-hook q bdt parentId fullChildId hko = logBoundary q SuiteRuntimeTest.Hook bdt parentId fullChildId >> pure hko
+hook :: TQueue RunEvent -> BoundaryType -> Loc -> o -> IO o
+hook q bdt loc hko = logBoundary q SuiteRuntimeTest.Hook bdt loc >> pure hko
 
-hookStart :: TQueue RunEvent -> Text -> Text -> o -> IO o
+hookStart :: TQueue RunEvent -> Loc -> o -> IO o
 hookStart q = SuiteRuntimeTest.hook q Start
 
-hookEnd :: TQueue RunEvent -> Text -> Text -> IO ()
-hookEnd q parentId fullChildId = SuiteRuntimeTest.hook q End parentId fullChildId ()
+hookEnd :: TQueue RunEvent -> Loc -> IO ()
+hookEnd q loc = SuiteRuntimeTest.hook q End loc ()
 
-fixture :: TQueue RunEvent -> BoundaryType -> Text -> Text -> IO ()
+fixture :: TQueue RunEvent -> BoundaryType -> Loc -> IO ()
 fixture q = logBoundary q SuiteRuntimeTest.Fixture
 
-fixtureStart :: TQueue RunEvent -> Text -> Text -> IO ()
+fixtureStart :: TQueue RunEvent -> Loc -> IO ()
 fixtureStart q = SuiteRuntimeTest.fixture q Start
 
-fixtureEnd :: TQueue RunEvent -> Text -> Text -> IO ()
+fixtureEnd :: TQueue RunEvent -> Loc -> IO ()
 fixtureEnd q = SuiteRuntimeTest.fixture q End
 
-logIteration :: TQueue RunEvent -> Text -> Int -> Text -> IO ()
-logIteration q fxTxt iidx itMsg =
-  logEvent q (IterationMessage fxTxt iidx itMsg)
+logIteration :: TQueue RunEvent -> Maybe Text -> Int -> Loc -> IO ()
+logIteration q itMsg iidx loc =
+  logEvent q (IterationMessage loc iidx itMsg)
 
 logMessage :: TQueue RunEvent -> Text -> IO ()
 logMessage q txt' = logEvent q (Message txt')
@@ -242,70 +237,56 @@ logMessage q txt' = logEvent q (Message txt')
 -- remove when pyrelude updated
 chkEq' t = assertEqual (toS t)
 
-mkBranch :: TQueue RunEvent -> Text -> [IO (PreNode si so ti to)] -> IO (PreNode si () ti ())
-mkBranch q branchId subElmsF =
-  do
-    let ses = sequenceA subElmsF
-    ses' <- ses
-    pure $
-      PN.Branch
-        { branchAddress = branchId, -- used in testing
-          subElms = ses'
-        }
+mkBranch :: TQueue RunEvent -> [IO (PreNode si so ti to)] -> IO (PreNode si () ti ())
+mkBranch q subElms = PN.Branch <$> sequenceA subElms
 
-mkFixture :: TQueue RunEvent -> Text -> Text -> Int -> IO (PreNode i () ti ())
-mkFixture q parentId fxId itCount = do
+mkFixture :: TQueue RunEvent -> Int -> IO (PreNode i () ti ())
+mkFixture q itCount = do
   fs <- newTVarIO Pending
   pure $
     PN.Fixture
-      { fixtureAddress = fid,
-        fixtureStatus = fs,
-        logStart = fixtureStart q parentId fid,
-        iterations = mkIterations q fid itCount,
-        logEnd = fixtureEnd q parentId fid
+      { fixtureStatus = fs,
+        logStart = fixtureStart q,
+        iterations = mkIterations q itCount,
+        logEnd = fixtureEnd q
       }
-  where
-    fid = fullId parentId fxId
 
-mkHook :: TQueue RunEvent -> Text -> Text -> o -> IO (PreNode o o2 to to2) -> IO (PreNode i o ti to)
-mkHook q parentId hkId hko nodeChild =
+mkHook :: TQueue RunEvent -> o -> IO (PreNode o o2 to to2) -> IO (PreNode i o ti to)
+mkHook q hko nodeChild =
   do
     status <- atomically $ newTVar Unintialised
     rslt <- (newEmptyTMVarIO :: IO (TMVar (Either SomeException o)))
     nc <- nodeChild
     pure
       PN.AnyHook
-        { hookAddress = hid, -- used in testing
-          hookStatus = status,
+        { hookStatus = status,
           hookResult = rslt,
-          hook = const $ hookStart q parentId hid hko,
+          hook = \loc _ -> hookStart q loc hko,
           hookChild = nc,
-          hookRelease = \_ -> hookEnd q parentId hid
+          hookRelease = \loc _ -> hookEnd q loc
         }
-  where
-    hid = fullId parentId hkId
 
 iterationMessage :: Int -> Text
 iterationMessage i = "iteration " <> txt i
 
-mkIterations :: TQueue RunEvent -> Text -> Int -> [i -> thi -> IO ()]
-mkIterations q fixFullId count' =
-  let mkIt :: Int -> (a -> b -> IO ())
-      mkIt idx itidx = const $ logIteration q fixFullId idx (iterationMessage idx)
-   in mkIt <$> [0 .. count' - 1]
+mkIterations :: TQueue RunEvent -> Int -> [Loc -> i -> ti -> IO ()]
+mkIterations q size' =
+  let mkIt :: Int -> Loc -> i' -> ti' -> IO ()
+      mkIt idx loc i ti = logIteration q Nothing idx loc
+   in mkIt <$> [0 .. size' - 1]
 
 root :: IO (PreNode () () () ()) -> IO PreNodeRoot
 root = pure . PreNodeRoot
 
 superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
 superSimplSuite q =
-  root $ mkFixture q "Root" "Fixture 0" 1
+  root $ mkFixture q 1
 
 simpleSuiteWithHook :: TQueue RunEvent -> IO PreNodeRoot
 simpleSuiteWithHook q = do
   root
-    . mkHook q "Root" "Hook 0" ()
-    $ mkFixture q "Root.Hook 0" "Fixture 0" 1
+    . mkHook q ()
+    $ mkFixture q 1
 
 -- simpleBranchedSuiteWithHook :: TQueue RunEvent -> IO PreNodeRoot
 -- simpleBranchedSuiteWithHook q = do
@@ -322,13 +303,13 @@ tQToList q =
 
 boundaryId :: BranchType -> BoundaryType -> RunEvent -> Maybe Text
 boundaryId brt bnt = \case
-  Boundary {branchType, boundaryType, id} -> branchType == brt && boundaryType == bnt ? Just id $ Nothing
+  Boundary {branchType, boundaryType, id} -> branchType == brt && boundaryType == bnt ? (Just . unLoc $ id) $ Nothing
   IterationMessage {} -> Nothing
   Message {} -> Nothing
 
 boundaryId' :: RunEvent -> Maybe Text
 boundaryId' = \case
-  Boundary {id} -> Just id
+  Boundary {id} -> Just . unLoc $ id
   IterationMessage {} -> Nothing
   Message {} -> Nothing
 
@@ -414,8 +395,8 @@ chkFixtures stats evntLst =
         FixtureStats {id, parent, iterationCount} ->
           let matchesFix :: RunEvent -> Bool
               matchesFix = \case
-                Boundary {branchType, id = id'} -> branchType == SuiteRuntimeTest.Fixture && id' == id
-                IterationMessage {parentFix} -> parentFix == id
+                Boundary {branchType, id = id'} -> branchType == SuiteRuntimeTest.Fixture && id' == Loc id
+                IterationMessage {parentFix} -> parentFix == Loc id
                 Message {} -> False
 
               evntsToChk :: [RunEvent]
@@ -498,57 +479,50 @@ unit_simple_with_hook =
 simpleSuiteWithBranch :: TQueue RunEvent -> IO PreNodeRoot
 simpleSuiteWithBranch q =
   let subElms =
-        [ mkFixture q "Root.Branch 0" "Fixture 0" 2 :: IO (PreNode () () () ()),
-          mkFixture q "Root.Branch 0" "Fixture 1" 2 :: IO (PreNode () () () ())
+        [ mkFixture q 2 :: IO (PreNode () () () ()),
+          mkFixture q 2 :: IO (PreNode () () () ())
         ]
-   in root $ mkBranch q "Root.Branch 0" subElms
+   in root $ mkBranch q subElms
 
 simpleSuiteBranchInHook :: TQueue RunEvent -> IO PreNodeRoot
 simpleSuiteBranchInHook q =
   root $
     mkBranch
       q
-      "Root.Branch 0.Hook 0"
-      [ mkHook q "Root.Hook 0" "Root.Hook 0" 7 $
+      [ mkHook q 7 $
           mkBranch
             q
-            "Root.Branch 0.Hook 0.Branch 1"
-            [ mkFixture q "Root.Branch 0.Hook 0.Branch 1" "Fixture 0" 2,
-              mkFixture q "Root.Branch 0.Hook 0.Branch 1" "Fixture 1" 2
+            [ mkFixture q 2,
+              mkFixture q 2
             ]
       ]
 
 deeplyNested :: TQueue RunEvent -> IO PreNodeRoot
 deeplyNested q =
-  let hk :: Text -> o -> IO (PreNode o o2 to to2) -> IO (PreNode i o ti to)
-      hk title = mkHook q title title
+  let hk :: o -> IO (PreNode o o2 to to2) -> IO (PreNode i o ti to)
+      hk = mkHook q
 
-      branch :: Text -> [IO (PreNode si so ti to)] -> IO (PreNode si () ti ())
+      branch :: [IO (PreNode si so ti to)] -> IO (PreNode si () ti ())
       branch = mkBranch q
 
-      fx :: Text -> Int -> IO (PreNode i () ti ())
-      fx title = mkFixture q title title
+      fx :: Int -> IO (PreNode i () ti ())
+      fx = mkFixture q
    in root $
         branch
-          "Root.Branch 0"
-          [ hk "Root.Branch 0.Hook 0" "out Str" $
-              hk "Root.Branch 0.Hook 0.Hook 0" 88 $
+          [ hk "hkOut" $
+              hk 88 $
                 branch
-                  "Root.Branch 0.Hook 0.Hook 0.Branch 0"
-                  [ fx "Root.Branch 0.Hook 0.Hook 0.Branch 0.Fixture 0" 2 :: IO (PreNode Int () ti ()),
-                    fx "Root.Branch 0.Hook 0.Hook 0.Branch 0.Fixture 1" 2,
+                  [ fx 2 :: IO (PreNode Int () ti ()),
+                    fx 2,
                     branch
-                      "Root.Branch 0.Hook 0.Hook 0.Branch 0.Branch 0"
-                      [ hk "Root.Branch 0.Hook 0.Hook 0.Branch 0.Branch 0.Hook 0" "out Str" $
-                          fx "Root.Branch 0.Hook 0.Hook 0.Branch 0.Branch 0.Hook 0.Fixture 0" 2
+                      [ hk "Out Str" $
+                          fx 2
                       ],
                     branch
-                      "Root.Branch 0.Hook 0.Hook 0.Branch 0.Branch 1"
-                      [ fx "Root.Branch 0.Hook 0.Hook 0.Branch 0.Branch 1.Fixture 0" 2
+                      [ fx 2
                       ]
                   ]
           ]
-
 
 {-
 ISSUE
@@ -557,7 +531,7 @@ ISSUE
 
 shk
   thk
-    shk 
+    shk
       fx
       fx
       fx
@@ -570,8 +544,8 @@ shk
 
 shk - t1
   thk - t1 t2 t3
-    shk - t1 
-      fx - t1 
+    shk - t1
+      fx - t1
       fx - t2
       fx - t3
       thk
@@ -588,8 +562,8 @@ shk - t1
 shk - t1
   thk - t1 t2 t3
     fx
-    shk - t1 
-      fx - t1 
+    shk - t1
+      fx - t1
       fx - t2
       fx - t3
       thk
@@ -605,7 +579,7 @@ shk - t1
 - has fixtures
  - shk - thk
  - shk - thk'
- - shk - thk - shk 
+ - shk - thk - shk
  - shk - thk - shk - thk - thk
 
  exeBranch:
@@ -626,25 +600,25 @@ shk - t1
       ]
     ]
 
-    RuntimeElement 
+    RuntimeElement
 
-   1. run fixture set 
+   1. run fixture set
     - thread will not escape fixture set until all fixtures run
     - thread will not escape sub hooks until all fixtures run
-   2. atomically 
+   2. atomically
     - find subelem not running
-    - find sub-elem partially not running 
+    - find sub-elem partially not running
     - next index
    3. run thread
 
-- issues 
+- issues
   % initial distribution
   % tracking state - pending / running / complete
-  % 
+  %
 
 -- allow for no thread hooks
 shk - t1
-      fx - t1 
+      fx - t1
       fx - t2
       fx - t3
        fx
@@ -655,18 +629,17 @@ shk - t1
     fx
     fx
 
-1. thread must live longer than one fixture 
+1. thread must live longer than one fixture
 2. prioritise adjacent fixtures when continuing thread
 3. hook finalise when crossing thread hook boundary
 4. prioritise distant fixtures when launching new thread
   % constuct breath first list of thread hooks
   % ensure wait for thread hooks to finish
-  % test with no thread hooks 
+  % test with no thread hooks
   % test fixtures before thread hooks
-  % test run time of singleton hooks vs thread hooks 
+  % test run time of singleton hooks vs thread hooks
     - will not follow tree structure
     - n threads
-
 
 -}
 

@@ -257,8 +257,7 @@ mkHook q hko nodeChild =
     nc <- nodeChild
     pure
       PN.AnyHook
-        { hookStatus = status,
-          hookResult = rslt,
+        { hookResult = rslt,
           hook = \loc _ -> hookStart q loc hko,
           hookChild = nc,
           hookRelease = \loc _ -> hookEnd q loc

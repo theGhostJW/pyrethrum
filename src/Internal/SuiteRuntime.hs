@@ -10,8 +10,10 @@ import Internal.PreNode
   ( CompletionStatus (..),
     FixtureStatus (..),
     HookStatus (..),
+    Loc (Loc),
     PreNode (..),
     PreNodeRoot (..),
+    unLoc,
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
@@ -70,7 +72,7 @@ import UnliftIO.STM
 import qualified Prelude as PRL
 
 data RTFix s t = RTFix
-  { label :: Text,
+  { label :: Loc,
     logStart :: IO (),
     fixStatus :: TVar FixtureStatus,
     iterations :: [s -> t -> IO ()],
@@ -87,7 +89,7 @@ mkIdxLst :: [a] -> STM (IdxLst a)
 mkIdxLst lst = IdxLst (length lst - 1) lst <$> newTVar 0
 
 data RTNode si so ti to = RTNode
-  { label :: Text,
+  { label :: Loc,
     status :: TVar HookStatus,
     sHook :: si -> IO so,
     sHookVal :: TVar (Either SomeException so),
@@ -111,9 +113,9 @@ prepare prn =
     v <- newTVarIO $ Right ()
     sni <- newTVarIO 0
     fxi <- newTVarIO 0
-    let r =
+    let root =
           RTNode
-            { label = "Root",
+            { label = Loc "Root",
               status = s,
               sHook = const $ pure (),
               sHookVal = v,
@@ -121,9 +123,8 @@ prepare prn =
               fxs = IdxLst 0 [] fxi,
               subNodes = IdxLst 0 [] sni
             }
-    correctSubElms <$> prepare' r 0 prn
+    correctSubElms <$> prepare' root 0 prn
   where
-    placeholder = "placeholder"
     correctSubElms :: RTNode a1 a2 a3 a4 -> RTNode a1 a2 a3 a4
     correctSubElms = uu
     -- reverse lists that were generated with cons
@@ -131,28 +132,51 @@ prepare prn =
     consNoMxIdx :: IdxLst a -> a -> IdxLst a
     consNoMxIdx l@IdxLst {lst} i = l {lst = i : lst}
 
+    mkLoc :: Maybe Text -> Text -> Loc -> Int -> Loc
+    mkLoc childlabel elmType parentLoc@Loc {unLoc = pTitle} childIndex =
+      Loc . prfx $
+        maybef
+          childlabel
+          ( elmType <> "[" <> txt childIndex <> "]"
+          )
+          id
+      where
+        prfx = ((pTitle <> " . ") <>)
+
     prepare' :: RTNode psi si pti ti -> Int -> PreNode si sci ti sco -> IO (RTNode psi si pti ti)
-    prepare' rt@RTNode {fxs, subNodes} subElmFxIdx pn = case pn of
+    prepare' rt@RTNode {fxs, subNodes, label} subElmFxIdx pn = case pn of
       Branch {subElms} -> uu
       AnyHook
-        { hook,
+        { hookTag,
+          hook,
           hookChild,
           hookResult,
           hookRelease
         } -> uu
       ThreadHook
-        { threadHook,
+        { threadTag,
+          threadHook,
           threadHookChild,
           threadHookRelease
         } -> uu
-      fx@Fixture {logStart, iterations, logEnd} -> uu
-      -- do
-      --     s <- newTVarIO Pending
-      --     let fx = consNoMxIdx fxs $ RTFix {
-      --     label = placeholder,
-      --     }
-      --     where 
-
+      fx@Fixture
+        { fxTag,
+          logStart,
+          iterations,
+          logEnd
+        } -> do
+          s <- newTVarIO Pending
+          let loc = mkLoc fxTag "Fixture" label subElmFxIdx
+              fxs' =
+                consNoMxIdx fxs $
+                  RTFix
+                    { label = loc,
+                      fixStatus = s,
+                      iterations = (loc &) <$> iterations,
+                      logStart = logStart loc,
+                      logEnd = logEnd loc
+                    }
+          pure $ rt {fxs = fxs'}
 
 -- fixsNodes :: Either (IdxLst [RTFix so to]) (IdxLst [RTNode so cso to cto])
 -- fixsNodes = \case

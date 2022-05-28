@@ -113,7 +113,7 @@ prepare prn =
     fxi <- newTVarIO 0
     let r =
           RTNode
-            { label = "Root",
+            { label = placeholder,
               status = s,
               sHook = const $ pure (),
               sHookVal = v,
@@ -121,10 +121,12 @@ prepare prn =
               fxs = IdxLst 0 [] fxi,
               subNodes = IdxLst 0 [] sni
             }
-    reverseSubElmsSetMaxIdx <$> prepare' r prn
+    correctSubElms <$> prepare' r prn
   where
-    reverseSubElmsSetMaxIdx :: RTNode a1 a2 a3 a4 -> RTNode a1 a2 a3 a4
-    reverseSubElmsSetMaxIdx = uu
+    placeholder = "placeholder"
+    correctSubElms :: RTNode a1 a2 a3 a4 -> RTNode a1 a2 a3 a4
+    correctSubElms = uu
+      -- reverse lists that were generated with cons
 
     consNoMxIdx :: IdxLst a -> a -> IdxLst a 
     consNoMxIdx l@IdxLst { lst } i = l { lst = i : lst }
@@ -135,6 +137,12 @@ prepare prn =
       AnyHook tv f pn' tv' g -> uu
       ThreadHook f pn' g -> uu
       fx@Fixture {logStart, iterations, logEnd} -> uu
+        -- do 
+        -- s <- newTVarIO Pending
+        -- let fx = consNoMxIdx fxs $ RTFix { 
+        --   label = placeholder,
+
+        -- } 
   
           -- fixsNodes :: Either (IdxLst [RTFix so to]) (IdxLst [RTNode so cso to cto])
           -- fixsNodes = \case

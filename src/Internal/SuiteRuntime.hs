@@ -8,26 +8,23 @@ import Data.Tuple.Extra (both)
 import GHC.Exts
 import Internal.PreNode
   ( CompletionStatus (..),
+    FixtureStatus (..),
     HookStatus (..),
     PreNode (..),
     PreNodeRoot (..),
-    FixtureStatus(..),
-
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
-import Pyrelude (bool, threadDelay)
 import Pyrelude hiding
   ( ThreadRunning,
     ThreadStatus,
     atomically,
-    bool,
     bracket,
     newMVar,
     newTVarIO,
     parent,
+    pi,
     readTVarIO,
-    threadDelay,
     threadStatus,
     withMVar,
   )
@@ -72,57 +69,87 @@ import UnliftIO.STM
   )
 import qualified Prelude as PRL
 
-
-data RTFix s t = RTFix {
-    fixtureLabel :: Text,
+data RTFix s t = RTFix
+  { label :: Text,
     logStart :: IO (),
     fixStatus :: TVar FixtureStatus,
     iterations :: [s -> t -> IO ()],
     logEnd :: IO ()
-}
+  }
 
-data IdxLst a = IdxLst {
-  maxIndex :: Int,
-  list :: [a],
-  currIdx :: TVar Int
-}
+data IdxLst a = IdxLst
+  { maxIndex :: Int,
+    lst :: [a],
+    currIdx :: TVar Int
+  }
 
 mkIdxLst :: [a] -> STM (IdxLst a)
-mkIdxLst lst = IdxLst  (length lst - 1) lst <$> newTVar 0
+mkIdxLst lst = IdxLst (length lst - 1) lst <$> newTVar 0
 
-data RTNode si so ti to = RTNode {
-  fixtureLabel :: Text,
-  status :: TVar HookStatus,
-  sHook :: si -> IO so,
-  sHookVal :: TVar (Either SomeException so),
-  tHook:: ti -> IO to,
-  fxs :: IdxLst [RTFix so to],
-  subNodes :: forall cso cto. IdxLst [RTNode so cso to cto]
-}
+data RTNode si so ti to = RTNode
+  { label :: Text,
+    status :: TVar HookStatus,
+    sHook :: si -> IO so,
+    sHookVal :: TVar (Either SomeException so),
+    tHook :: ti -> IO to,
+    fxs :: IdxLst (RTFix so to),
+    subNodes :: forall cso cto. IdxLst (RTNode so cso to cto)
+  }
 
--- fixsNodes :: PreNode si so ti to -> (IdxLst [RTFix so to], IdxLst [RTNode so cso to cto])
--- fixsNodes = \case
---   Branch txt pns -> _
---   AnyHook txt tv f pn tv' g -> _
---   ThreadHook txt f pn g -> _
---   Fixture txt tv io fs io' -> _
+-- data ParentInfo si so ti to = ParentInfo
+--   { pilabel :: Text,
+--     pistatus :: TVar HookStatus,
+--     pisHook :: si -> IO so,
+--     pisHookVal :: TVar (Either SomeException so),
+--     pitHook :: ti -> IO to
+--   }
 
+prepare :: PreNode () () () () -> IO (RTNode () () () ())
+prepare prn =
+  do
+    s <- newTVarIO Unintialised
+    v <- newTVarIO $ Right ()
+    sni <- newTVarIO 0
+    fxi <- newTVarIO 0
+    let r =
+          RTNode
+            { label = "Root",
+              status = s,
+              sHook = const $ pure (),
+              sHookVal = v,
+              tHook = const $ pure (),
+              fxs = IdxLst 0 [] fxi,
+              subNodes = IdxLst 0 [] sni
+            }
+    reverseSubElmsSetMaxIdx <$> prepare' r prn
+  where
+    reverseSubElmsSetMaxIdx :: RTNode a1 a2 a3 a4 -> RTNode a1 a2 a3 a4
+    reverseSubElmsSetMaxIdx = uu
 
--- prepare :: PreNode () () () () -> IO (RTNode () () () ())
--- prepare pn = 
---   do 
---     s <- newTVarIO Unintialised
---     v <- newTVarIO 
---     prepare' pn
---   where 
---     prepare' :: RTNode si so ti to -> PreNode so sci to sco -> RTNode si so ti to 
---     prepare' parent pn =  
---   \case
---   Branch txt pns -> _
---   AnyHook txt tv f pn tv' g -> _
---   ThreadHook txt f pn g -> _
---   Fixture txt tv io fs io' -> _
+    consNoMxIdx :: IdxLst a -> a -> IdxLst a 
+    consNoMxIdx l@IdxLst { lst } i = l { lst = i : lst }
 
+    prepare' :: RTNode psi si pti ti -> PreNode si sci ti sco -> IO (RTNode psi si pti ti)
+    prepare' rt@RTNode{fxs, subNodes} pn = case pn of
+      Branch pns -> uu
+      AnyHook tv f pn' tv' g -> uu
+      ThreadHook f pn' g -> uu
+      fx@Fixture {} -> uu
+
+        
+          -- fixsNodes :: Either (IdxLst [RTFix so to]) (IdxLst [RTNode so cso to cto])
+          -- fixsNodes = \case
+          --   Branch { subElms } -> uu
+          --   AnyHook {hookStatus, hook, hookChild, hookResult, hookRelease} -> uu
+          --   ThreadHook f pn g -> uu
+          --   Fixture tv f fs g -> uu
+          -- uu
+
+--  \case
+--       Branch { subElms } -> uu
+--       AnyHook {hookStatus, hook, hookChild, hookResult, hookRelease} -> uu
+--       ThreadHook {threadHook, threadHookChild, threadHookRelease} -> uu
+--       Fixture {fixtureStatus, logStart, iterations, logEnd} -> uu
 
 execute :: Int -> PreNodeRoot -> IO ()
 execute maxThreads preRoot = do

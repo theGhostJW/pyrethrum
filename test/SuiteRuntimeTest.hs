@@ -238,13 +238,15 @@ logMessage q txt' = logEvent q (Message txt')
 chkEq' t = assertEqual (toS t)
 
 mkBranch :: TQueue RunEvent -> [IO (PreNode si so ti to)] -> IO (PreNode si () ti ())
-mkBranch q subElms = PN.Branch <$> sequenceA subElms
+mkBranch q subElms = PN.Branch Nothing <$> sequenceA subElms
 
 mkFixture :: TQueue RunEvent -> Int -> IO (PreNode i () ti ())
 mkFixture q itCount = do
   pure $
     PN.Fixture
-      { logStart = fixtureStart q,
+      { 
+        fxTag = Nothing,
+        logStart = fixtureStart q,
         iterations = mkIterations q itCount,
         logEnd = fixtureEnd q
       }
@@ -257,7 +259,9 @@ mkHook q hko nodeChild =
     nc <- nodeChild
     pure
       PN.AnyHook
-        { hookResult = rslt,
+        { 
+          hookTag = Nothing,
+          hookResult = rslt,
           hook = \loc _ -> hookStart q loc hko,
           hookChild = nc,
           hookRelease = \loc _ -> hookEnd q loc

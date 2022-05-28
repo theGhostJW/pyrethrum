@@ -242,11 +242,9 @@ mkBranch q subElms = PN.Branch <$> sequenceA subElms
 
 mkFixture :: TQueue RunEvent -> Int -> IO (PreNode i () ti ())
 mkFixture q itCount = do
-  fs <- newTVarIO Pending
   pure $
     PN.Fixture
-      { fixtureStatus = fs,
-        logStart = fixtureStart q,
+      { logStart = fixtureStart q,
         iterations = mkIterations q itCount,
         logEnd = fixtureEnd q
       }

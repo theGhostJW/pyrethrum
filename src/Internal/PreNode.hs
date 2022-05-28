@@ -47,7 +47,6 @@ data PreNode si so ti to where
     PreNode si so ti to 
   Fixture ::
     { 
-      fixtureStatus :: TVar FixtureStatus,
       logStart :: Loc -> IO (),
       iterations :: [Loc -> si -> ti -> IO ()],
       logEnd :: Loc -> IO ()

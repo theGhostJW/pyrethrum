@@ -134,9 +134,8 @@ prepare prn =
       Branch pns -> uu
       AnyHook tv f pn' tv' g -> uu
       ThreadHook f pn' g -> uu
-      fx@Fixture {} -> uu
-
-        
+      fx@Fixture {logStart, iterations, logEnd} -> uu
+  
           -- fixsNodes :: Either (IdxLst [RTFix so to]) (IdxLst [RTNode so cso to cto])
           -- fixsNodes = \case
           --   Branch { subElms } -> uu

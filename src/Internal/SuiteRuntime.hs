@@ -132,51 +132,60 @@ prepare prn =
     consNoMxIdx :: IdxLst a -> a -> IdxLst a
     consNoMxIdx l@IdxLst {lst} i = l {lst = i : lst}
 
-    mkLoc :: Maybe Text -> Text -> Loc -> Int -> Loc
-    mkLoc childlabel elmType parentLoc@Loc {unLoc = pTitle} childIndex =
-      Loc . prfx $
-        maybef
-          childlabel
-          ( elmType <> "[" <> txt childIndex <> "]"
-          )
-          id
-      where
-        prfx = ((pTitle <> " . ") <>)
-
     prepare' :: RTNode psi si pti ti -> Int -> PreNode si sci ti sco -> IO (RTNode psi si pti ti)
-    prepare' rt@RTNode {fxs, subNodes, label} subElmFxIdx pn = case pn of
-      Branch {subElms} -> uu
-      AnyHook
-        { hookTag,
-          hook,
-          hookChild,
-          hookResult,
-          hookRelease
-        } -> uu
-      ThreadHook
-        { threadTag,
-          threadHook,
-          threadHookChild,
-          threadHookRelease
-        } -> uu
-      fx@Fixture
-        { fxTag,
-          logStart,
-          iterations,
-          logEnd
-        } -> do
-          s <- newTVarIO Pending
-          let loc = mkLoc fxTag "Fixture" label subElmFxIdx
-              fxs' =
-                consNoMxIdx fxs $
-                  RTFix
-                    { label = loc,
-                      fixStatus = s,
-                      iterations = (loc &) <$> iterations,
-                      logStart = logStart loc,
-                      logEnd = logEnd loc
-                    }
-          pure $ rt {fxs = fxs'}
+    prepare' rt@RTNode {fxs, sHook, subNodes, label = Loc {unLoc = parentLabel}} subElmIdx pn =
+      let mkLoc :: Maybe Text -> Text -> Loc
+          mkLoc childlabel elmType =
+            Loc . prfx $
+              maybef
+                childlabel
+                (elmType <> "[" <> txt subElmIdx <> "]")
+                id
+            where
+              prfx = ((parentLabel <> " . ") <>)
+       in case pn of
+            Branch {subElms} -> uu
+            AnyHook
+              { hookTag,
+                hook,
+                hookChild,
+                hookResult,
+                hookRelease
+              } -> uu
+            ThreadHook
+              { threadTag,
+                threadHook,
+                threadHookChild,
+                threadHookRelease
+              } -> do
+                s <- newTVarIO Unintialised
+                pure $ RTNode { 
+                  label = mkLoc threadTag "ThreadHook",
+                  status = s,
+                  sHook = const $ pure (),
+                  sHookVal = v,
+                  tHook = const $ pure (),
+                  fxs = IdxLst 0 [] fxi,
+                  subNodes = IdxLst 0 [] sni
+              }
+            Fixture
+              { fxTag,
+                logStart,
+                iterations,
+                logEnd
+              } -> do
+                s <- newTVarIO Pending
+                let loc = mkLoc fxTag "Fixture"
+                    fxs' =
+                      consNoMxIdx fxs $
+                        RTFix
+                          { label = loc,
+                            fixStatus = s,
+                            iterations = (loc &) <$> iterations,
+                            logStart = logStart loc,
+                            logEnd = logEnd loc
+                          }
+                pure $ rt {fxs = fxs'}
 
 -- fixsNodes :: Either (IdxLst [RTFix so to]) (IdxLst [RTNode so cso to cto])
 -- fixsNodes = \case

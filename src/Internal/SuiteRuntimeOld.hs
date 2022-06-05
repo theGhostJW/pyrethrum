@@ -17,8 +17,7 @@ import Internal.PreNode
 import qualified Internal.PreNode as PN
   ( CompletionStatus (Fault, Murdered, Normal),
     HookStatus (..),
-    PreNode (..),
-    PreNodeRoot (..),
+    PreNode (..)
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)

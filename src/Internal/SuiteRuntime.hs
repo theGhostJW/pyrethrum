@@ -12,8 +12,7 @@ import Internal.PreNode
     HookStatus (..),
     Loc (Loc),
     PreNode (..),
-    PreNodeRoot (..),
-    unLoc,
+    unLoc, A,
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
@@ -85,55 +84,85 @@ data IdxLst a = IdxLst
     currIdx :: TVar Int
   }
 
-mkIdxLst :: [a] -> STM (IdxLst a)
-mkIdxLst lst = IdxLst (length lst - 1) lst <$> newTVar 0
+mkIdxLst :: a -> STM (IdxLst a)
+mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
-data RTNode si so ti to = RTNode
-  { label :: Loc,
-    status :: TVar HookStatus,
-    sHook :: si -> IO so,
-    sHookVal :: TVar (Either SomeException so),
-    tHook :: ti -> IO to,
-    fxs :: IdxLst (RTFix so to),
-    subNodes :: forall cso cto. IdxLst (RTNode so cso to cto)
-  }
 
--- data ParentInfo si so ti to = ParentInfo
---   { pilabel :: Text,
---     pistatus :: TVar HookStatus,
---     pisHook :: si -> IO so,
---     pisHookVal :: TVar (Either SomeException so),
---     pitHook :: ti -> IO to
---   }
+data RTNode si so ti to where
+  RTNodeS ::
+    { label :: Loc,
+      status :: TVar HookStatus,
+      sHook :: si -> IO so,
+      sHookRelease :: so -> IO (),
+      sHookVal :: TMVar (Either SomeException so),
+      childNodeS :: RTNode so cs ti to
+    } ->
+    RTNode si so ti to
+  RTNodeT ::
+    { label :: Loc,
+      status :: TVar HookStatus,
+      tHook :: si -> ti -> IO to,
+      tHookRelease :: to -> IO (),
+      childNodeT :: RTNode si so to tc
+    } ->
+    RTNode si so ti to
+  RTNodeM ::
+    { label :: Loc,
+      status :: TVar HookStatus,
+      fxsM :: IdxLst (RTFix so to),
+      childNodesM :: IdxLst (RTNode si so ti to)
+    } ->
+    RTNode si so ti to
 
-prepare :: PreNode () () () () -> IO (RTNode () () () ())
-prepare prn =
-  do
-    s <- newTVarIO Unintialised
-    v <- newTVarIO $ Right ()
-    sni <- newTVarIO 0
-    fxi <- newTVarIO 0
-    let root =
-          RTNode
-            { label = Loc "Root",
-              status = s,
-              sHook = const $ pure (),
-              sHookVal = v,
-              tHook = const $ pure (),
-              fxs = IdxLst 0 [] fxi,
-              subNodes = IdxLst 0 [] sni
-            }
-    correctSubElms <$> prepare' root 0 prn
+isUninitialised :: HookStatus -> Bool
+isUninitialised = \case
+  Unintialised -> True
+  Intitialising -> False
+  Running -> False
+  Complete cs -> False
+  Finalising -> False
+  Finalised _ -> False
+  BeingMurdered -> False
+
+lockCache :: TVar HookStatus -> STM Bool
+lockCache hs = do
+  s <- readTVar hs
+  isUninitialised s
+    ? (writeTVar hs Intitialising >> pure True)
+    $ pure False
+
+getHookVal :: TVar HookStatus -> TMVar (Either SomeException s) -> IO s -> IO (Either SomeException s)
+getHookVal hs mv ios = do
+  locked <- atomically $ lockCache hs
+  if locked
+    then
+      catchAll
+        ( do
+            s <- ios
+            let r = Right s
+            atomically $ putTMVar mv r
+            pure r
+        )
+        ( \e -> do
+            let r = Left e
+            atomically $ putTMVar mv r
+            pure r
+        )
+    else atomically $ readTMVar mv
+
+prepare :: PreNode A () () () () -> IO (RTNode () () () ())
+prepare =
+  prepare' "ROOT" 0
   where
-    correctSubElms :: RTNode a1 a2 a3 a4 -> RTNode a1 a2 a3 a4
-    correctSubElms = uu
     -- reverse lists that were generated with cons
+    correctSubElms :: forall s so t to. RTNode s so t to -> RTNode s so t to
+    correctSubElms = uu
 
     consNoMxIdx :: IdxLst a -> a -> IdxLst a
     consNoMxIdx l@IdxLst {lst} i = l {lst = i : lst}
 
-    prepare' :: RTNode psi si pti ti -> Int -> PreNode si sci ti sco -> IO (RTNode psi si pti ti)
-    prepare' rt@RTNode {fxs, sHook, subNodes, label = Loc {unLoc = parentLabel}} subElmIdx pn =
+    prepare' :: Loc -> Int -> PreNode a s so t to -> IO (RTNode s so t to)
+    prepare' parentLoc subElmIdx pn =
       let mkLoc :: Maybe Text -> Text -> Loc
           mkLoc childlabel elmType =
             Loc . prfx $
@@ -142,7 +171,7 @@ prepare prn =
                 (elmType <> "[" <> txt subElmIdx <> "]")
                 id
             where
-              prfx = ((parentLabel <> " . ") <>)
+              prfx = ((unLoc parentLoc <> " . ") <>)
        in case pn of
             Branch {subElms} -> uu
             AnyHook
@@ -151,41 +180,85 @@ prepare prn =
                 hookChild,
                 hookResult,
                 hookRelease
-              } -> uu
+              } -> do
+                s <- newTVarIO Unintialised
+                v <- newEmptyTMVarIO
+                sni <- newTVarIO 0
+                let loc = mkLoc hookTag "SingletonHook"
+                child <- prepare' loc 0 hookChild
+                pure $
+                  RTNodeS
+                    { label = loc,
+                      status = s,
+                      sHook = hook loc,
+                      sHookRelease = hookRelease loc,
+                      sHookVal = v,
+                      childNodeS = child
+                    }
             ThreadHook
               { threadTag,
                 threadHook,
                 threadHookChild,
                 threadHookRelease
-              } -> do
-                s <- newTVarIO Unintialised
-                pure $ RTNode { 
-                  label = mkLoc threadTag "ThreadHook",
-                  status = s,
-                  sHook = const $ pure (),
-                  sHookVal = v,
-                  tHook = const $ pure (),
-                  fxs = IdxLst 0 [] fxi,
-                  subNodes = IdxLst 0 [] sni
-              }
+              } -> do 
+            -- let loc = mkLoc threadTag "ThreadHook"
+            --  in do
+            --       s <- newTVarIO Unintialised
+            --       v <- newEmptyTMVarIO
+            --       sni <- newTVarIO 0
+            --       fxi <- newTVarIO 0
+            --       let nxtSubNode :: RTNode s so t cti
+            --           nxtSubNode =
+            --             RTNode
+            --               { label = loc,
+            --                 status = s,
+            --                 sHook = sHook,
+            --                 sHookRelease = sHookRelease,
+            --                 sHookVal = v,
+            --                 tHook = \ti -> tHook ti >>= threadHook loc,
+            --                 tHookRelease = threadHookRelease loc,
+            --                 fxs = IdxLst 0 [] fxi,
+            --                 subNodes = IdxLst 0 [] sni
+            --               }
+            --       {-
+            --         • Couldn't match type ‘cs’ with ‘s’
+            --           Expected: PreNode s so2 ct to2
+            --             Actual: PreNode cs so2 ct to2
+            --           ‘cs’ is a rigid type variable bound by
+            --       -}
+            --       -- RTNode s t -> Int -> PreNode s cs t ct -> IO (RTNode s t)
+            --       -- RTNode s ct      --  PreNode cs so2 ct to2
+            --       sn <- prepare' nxtSubNode (subElmIdx + 1) threadHookChild
+            --       il <- atomically $ mkIdxLst sn
+            --       {-
+            --           • Couldn't match type ‘s’ with ‘so’
+            --             Expected: IdxLst (RTNode so cs1 to ct1)
+            --             Actual:   IdxLst (RTNode s so t ct)
+            --       -}
+            --       pure $
+            --         rt
+            --           { subNodes = il
+            --           }
             Fixture
               { fxTag,
                 logStart,
                 iterations,
                 logEnd
-              } -> do
-                s <- newTVarIO Pending
-                let loc = mkLoc fxTag "Fixture"
-                    fxs' =
-                      consNoMxIdx fxs $
-                        RTFix
-                          { label = loc,
-                            fixStatus = s,
-                            iterations = (loc &) <$> iterations,
-                            logStart = logStart loc,
-                            logEnd = logEnd loc
-                          }
-                pure $ rt {fxs = fxs'}
+              } -> uu
+
+-- do
+-- s <- newTVarIO Pending
+-- let loc = mkLoc fxTag "Fixture"
+--     fxs' =
+--       consNoMxIdx fxs $
+--         RTFix
+--           { label = loc,
+--             fixStatus = s,
+--             iterations = (loc &) <$> iterations,
+--             logStart = logStart loc,
+--             logEnd = logEnd loc
+--           }
+-- pure $ rt {fxs = fxs'}
 
 -- fixsNodes :: Either (IdxLst [RTFix so to]) (IdxLst [RTNode so cso to cto])
 -- fixsNodes = \case
@@ -201,7 +274,7 @@ prepare prn =
 --       ThreadHook {threadHook, threadHookChild, threadHookRelease} -> uu
 --       Fixture {fixtureStatus, logStart, iterations, logEnd} -> uu
 
-execute :: Int -> PreNodeRoot -> IO ()
+execute :: Int -> PreNode A () () () () -> IO ()
 execute maxThreads preRoot = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   chn <- newChan

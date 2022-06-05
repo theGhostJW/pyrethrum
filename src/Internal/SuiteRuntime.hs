@@ -7,12 +7,13 @@ import Data.Sequence (Seq (Empty), empty)
 import Data.Tuple.Extra (both)
 import GHC.Exts
 import Internal.PreNode
-  ( CompletionStatus (..),
+  ( A,
+    CompletionStatus (..),
     FixtureStatus (..),
     HookStatus (..),
     Loc (Loc),
     PreNode (..),
-    unLoc, A,
+    unLoc,
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
@@ -70,14 +71,6 @@ import UnliftIO.STM
   )
 import qualified Prelude as PRL
 
-data RTFix s t = RTFix
-  { label :: Loc,
-    logStart :: IO (),
-    fixStatus :: TVar FixtureStatus,
-    iterations :: [s -> t -> IO ()],
-    logEnd :: IO ()
-  }
-
 data IdxLst a = IdxLst
   { maxIndex :: Int,
     lst :: [a],
@@ -86,7 +79,6 @@ data IdxLst a = IdxLst
 
 mkIdxLst :: a -> STM (IdxLst a)
 mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
-
 
 data RTNode si so ti to where
   RTNodeS ::
@@ -109,8 +101,15 @@ data RTNode si so ti to where
   RTNodeM ::
     { mlabel :: Loc,
       mstatus :: TVar HookStatus,
-      fxsM :: IdxLst (RTFix so to),
       childNodesM :: IdxLst (RTNode si so ti to)
+    } ->
+    RTNode si () ti ()
+  RTFix ::
+    { fxlabel :: Loc,
+      logStart :: IO (),
+      fixStatus :: TVar FixtureStatus,
+      iterations :: [si -> ti -> IO ()],
+      logEnd :: IO ()
     } ->
     RTNode si () ti ()
 
@@ -173,7 +172,18 @@ prepare =
             where
               prfx = ((unLoc parentLoc <> " . ") <>)
        in case pn of
-            Branch {subElms} -> uu
+            Branch {
+              bTag,
+              subElms} -> do 
+              let loc = mkLoc bTag "Branch"
+              s <- newTVarIO Unintialised
+              idx <- newTVarIO  0
+              c <- traverse (prepare' loc 0) subElms
+              pure $  RTNodeM {
+                mlabel = loc,
+                mstatus = s,
+                childNodesM = IdxLst (length c - 1) c idx
+              }
             AnyHook
               { hookTag,
                 hook,
@@ -183,7 +193,6 @@ prepare =
               } -> do
                 s <- newTVarIO Unintialised
                 v <- newEmptyTMVarIO
-                sni <- newTVarIO 0
                 let loc = mkLoc hookTag "SingletonHook"
                 child <- prepare' loc 0 hookChild
                 pure $
@@ -200,30 +209,39 @@ prepare =
                 threadHook,
                 threadHookChild,
                 threadHookRelease
-              } -> 
-              let loc = mkLoc threadTag "ThreadHook"
-              in do
-                  s <- newTVarIO Unintialised
-                  v <- newEmptyTMVarIO
-                  sni <- newTVarIO 0
-                  fxi <- newTVarIO 0
-                  child <- prepare' loc 0 threadHookChild
-                  pure $
-                    RTNodeT
-                    { 
-                      label = loc,
-                      status = s,
-                      tHook = threadHook loc,
-                      tHookRelease = threadHookRelease loc,
-                      childNodeT = child
-                    }
-                  
+              } ->
+                let loc = mkLoc threadTag "ThreadHook"
+                 in do
+                      s <- newTVarIO Unintialised
+                      v <- newEmptyTMVarIO
+                      sni <- newTVarIO 0
+                      fxi <- newTVarIO 0
+                      child <- prepare' loc 0 threadHookChild
+                      pure $
+                        RTNodeT
+                          { label = loc,
+                            status = s,
+                            tHook = threadHook loc,
+                            tHookRelease = threadHookRelease loc,
+                            childNodeT = child
+                          }
             Fixture
               { fxTag,
                 logStart,
                 iterations,
                 logEnd
-              } -> uu
+              } ->
+                do
+                  let loc = mkLoc fxTag "ThreadHook"
+                  s <- newTVarIO Pending
+                  pure $
+                    RTFix
+                      { fxlabel = loc,
+                        logStart = logStart loc,
+                        fixStatus = s,
+                        iterations = (loc &) <$> iterations,
+                        logEnd = logEnd loc
+                      }
 
 -- do
 -- s <- newTVarIO Pending

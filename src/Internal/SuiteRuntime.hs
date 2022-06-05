@@ -3,7 +3,7 @@ module Internal.SuiteRuntime where
 import Check (CheckReport (result))
 import Control.DeepSeq (NFData, deepseq, force, ($!!))
 import Data.Function (const, ($), (&))
-import Data.Sequence (Seq (Empty), empty)
+import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both)
 import GHC.Exts
 import Internal.PreNode
@@ -12,6 +12,8 @@ import Internal.PreNode
     HookStatus (..),
     Loc (Loc),
     PreNode (..),
+    PreNodeRoot,
+    rootNode,
     unLoc,
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
@@ -79,38 +81,38 @@ data IdxLst a = IdxLst
 mkIdxLst :: a -> STM (IdxLst a)
 mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
-data RTNode si so ti to where
+data RunGraph si so ti to where
   RTNodeS ::
     { label :: Loc,
       status :: TVar HookStatus,
       sHook :: si -> IO so,
       sHookRelease :: so -> IO (),
       sHookVal :: TMVar (Either SomeException so),
-      childNodeS :: RTNode so cs ti to
+      childNodeS :: RunGraph so cs ti to
     } ->
-    RTNode si so ti to
+    RunGraph si so ti to
   RTNodeT ::
     { label :: Loc,
       status :: TVar HookStatus,
       tHook :: si -> ti -> IO to,
       tHookRelease :: to -> IO (),
-      childNodeT :: RTNode si so to tc
+      childNodeT :: RunGraph si so to tc
     } ->
-    RTNode si so ti to
+    RunGraph si so ti to
   RTNodeM ::
     { mlabel :: Loc,
       mstatus :: TVar HookStatus,
-      childNodesM :: IdxLst (RTNode si so ti to)
+      childNodesM :: IdxLst (RunGraph si so ti to)
     } ->
-    RTNode si () ti ()
+    RunGraph si () ti ()
   RTFix ::
     { fxlabel :: Loc,
       logStart :: IO (),
       fixStatus :: TVar FixtureStatus,
-      iterations :: [si -> ti -> IO ()],
+      iterations :: TQueue (si -> ti -> IO ()),
       logEnd :: IO ()
     } ->
-    RTNode si () ti ()
+    RunGraph si () ti ()
 
 isUninitialised :: HookStatus -> Bool
 isUninitialised = \case
@@ -148,18 +150,18 @@ getHookVal hs mv ios = do
         )
     else atomically $ readTMVar mv
 
-prepare :: PreNode () () () () -> IO (RTNode () () () ())
+prepare :: PreNode () () () () -> IO (RunGraph () () () ())
 prepare =
   prepare' (Loc "ROOT") 0
   where
     -- reverse lists that were generated with cons
-    correctSubElms :: forall s so t to. RTNode s so t to -> RTNode s so t to
+    correctSubElms :: forall s so t to. RunGraph s so t to -> RunGraph s so t to
     correctSubElms = uu
 
     consNoMxIdx :: IdxLst a -> a -> IdxLst a
     consNoMxIdx l@IdxLst {lst} i = l {lst = i : lst}
 
-    prepare' :: Loc -> Int -> PreNode s so t to -> IO (RTNode s so t to)
+    prepare' :: Loc -> Int -> PreNode s so t to -> IO (RunGraph s so t to)
     prepare' parentLoc subElmIdx pn =
       let mkLoc :: Maybe Text -> Text -> Loc
           mkLoc childlabel elmType =
@@ -171,18 +173,20 @@ prepare =
             where
               prfx = ((unLoc parentLoc <> " . ") <>)
        in case pn of
-            Branch {
-              bTag,
-              subElms} -> do 
-              let loc = mkLoc bTag "Branch"
-              s <- newTVarIO Unintialised
-              idx <- newTVarIO  0
-              c <- traverse (prepare' loc 0) subElms
-              pure $  RTNodeM {
-                mlabel = loc,
-                mstatus = s,
-                childNodesM = IdxLst (length c - 1) c idx
-              }
+            Branch
+              { bTag,
+                subElms
+              } -> do
+                let loc = mkLoc bTag "Branch"
+                s <- newTVarIO Unintialised
+                idx <- newTVarIO 0
+                c <- traverse (prepare' loc 0) subElms
+                pure $
+                  RTNodeM
+                    { mlabel = loc,
+                      mstatus = s,
+                      childNodesM = IdxLst (length c - 1) c idx
+                    }
             AnyHook
               { hookTag,
                 hook,
@@ -233,18 +237,49 @@ prepare =
                 do
                   let loc = mkLoc fxTag "ThreadHook"
                   s <- newTVarIO Pending
+                  q <- newTQueueIO
+                  atomically $ traverse_ (writeTQueue q ) $ (loc &) <$> iterations
                   pure $
                     RTFix
                       { fxlabel = loc,
                         logStart = logStart loc,
                         fixStatus = s,
-                        iterations = (loc &) <$> iterations,
+                        iterations = q,
                         logEnd = logEnd loc
                       }
 
+type Logger = Text -> IO ()
 
+{-
+takeIteration :: InitialisedFixture -> STM (Maybe IterationRun)
+takeIteration fixture@InitialisedFixture {iterations, fixStatus} = do
+  status <- readTVar fixStatus
+  if canForkThread status
+    then
+      readTVar iterations
+        >>= either
+          (const $ pure Nothing)
+          ( \case
+              [] -> pure Nothing
+              x : xs -> do
+                writeTVar iterations $ Right xs
+                pure . Just $ IterationRun fixture x
+          )
+    else pure Nothing
+-}
 
-execute :: Int -> PreNode () () () () -> IO ()
+unify status
+runThread :: maxStatus -> Logger -> RunGraph s so t to -> Int -> IO ()
+runThread maxStatus db rg maxThreads = case rg of
+  RTNodeS loc tv f g tv' rg' -> _
+  RTNodeT loc tv f g rg' -> _
+  RTNodeM loc tv il -> _
+  RTFix loc io tv tq io' -> _
+
+executeGraph :: Logger -> RunGraph s so t to -> Int -> IO ()
+executeGraph db rg maxThreads = uu
+
+execute :: Int -> PreNodeRoot -> IO ()
 execute maxThreads preRoot = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   chn <- newChan
@@ -269,6 +304,9 @@ execute maxThreads preRoot = do
 
       linkExecute :: IO ()
       linkExecute = do
+        rn <- rootNode preRoot
+        runGraph <- prepare rn
+        executeGraph logger runGraph maxThreads
         -- root <- linkParents logger preRoot
         -- executeLinked logger maxThreads root
         when wantDebug $
@@ -278,3 +316,101 @@ execute maxThreads preRoot = do
    in wantDebug
         ? concurrently_ printDebugLogs linkExecute
         $ linkExecute
+
+{-
+execute' :: Executor -> Logger -> IO ()
+execute'
+  exe@Executor
+    { maxThreads,
+      threadsInUse,
+      fixturesPending,
+      fixturesStartNext,
+      fixturesStarted
+    }
+  db = do
+    eAvailFx <-
+      atomically $ do
+        eStats <- reserveThread exe db
+        eitherf
+          eStats
+          (pure . Left . NoThreadsAvailable)
+          (const $ nextFixture db fixturesPending fixturesStartNext fixturesStarted)
+
+    let recurse = execute' exe db
+        waitRecurse = C.threadDelay 10_000 >> recurse
+        threadRelease = db "THREAD RELEASE" >> atomically (releaseThread threadsInUse)
+
+    eitherf
+      eAvailFx
+      ( \case
+          -- both the pending and active que of fixtures
+          -- are empty so we are done
+          -- thread was reserved so release thread
+          -- has no effect because app is about to end but may
+          -- later if multi-process runs are implemented and thread release implementation
+          -- is changed
+          EmptyQueues -> threadRelease >> db "EmptyQ - EXECUTION DONE" >> pure ()
+          -- all the fixtures are not in a state to run any more threads
+          -- eg being killed. We expect they may become available later of be finished
+          -- and removed from the active que leading to empty ques we wait and try again
+          -- thread was reserved so release thread
+          NoFixturesReady -> threadRelease >> db "NoFixturesReady" >> waitRecurse
+          FixtureStarting -> threadRelease >> db "FixtureStarting" >> waitRecurse
+          -- all threads in use wait try again
+          -- no threads reserved so none need to be released
+          nt@NoThreadsAvailable {} -> db (txtPretty nt) >> waitRecurse
+      )
+      ( \case
+          FixPending pfx@PendingFixture {pIndex} ->
+            do
+              activThrds <- newTVarIO []
+              let loadHook :: IO InitialisedFixture
+                  loadHook = do
+                    db "@@@@ Running Hooks"
+                    fx <- runHooks pfx activThrds
+                    atomically $ updateFixtureQus pIndex fixturesStartNext fixturesStarted fx
+                    pure fx
+              forkFixtureThread db activThrds threadsInUse loadHook >> recurse
+          FixInitialised fxInit@InitialisedFixture {activeThreads} -> forkFixtureThread db activeThreads threadsInUse (pure fxInit) >> recurse
+      )
+
+qFixture :: TQueue PendingFixture -> (Int, Int -> IO PendingFixture) -> IO ()
+qFixture q (idx, mkFix) = mkFix idx >>= atomically . writeTQueue q
+
+executeLinked :: Logger -> Int -> NodeRoot -> IO ()
+executeLinked db maxThreads NodeRoot {rootStatus, rootNode} =
+  do
+    db "Before fxs"
+    (fxs, hks) <- mkFixturesHooks db rootNode
+    db "After fks"
+
+    -- create queue
+    pendingQ <- newTQueueIO
+    startNextQ <- newTVarIO []
+    runningQ <- newTQueueIO
+
+    -- load all fixtures to pending queue
+    traverse_ (qFixture pendingQ) $ zip [0 ..] fxs
+    initialThreadsInUse <- newTVarIO 0
+
+    db "Executing"
+    execute' (Executor maxThreads initialThreadsInUse pendingQ startNextQ runningQ) db
+    db "EXECUTION DONE !!!!!!!"
+
+    db "Waiting on Hooks"
+
+    let hookWait :: IO [HookRunTime] -> IO ()
+        hookWait hrt' =
+          do
+            hrt <- hrt'
+            case hrt of
+              [] -> db "HOOKS DONE" >> pure ()
+              (HookRunTime {currentStatus} : hrts) -> do
+                headStatus <- atomically $ readTVar currentStatus
+                db $ "HOOK HEAD STATUS: " <> txt headStatus
+                finalised headStatus
+                  ? hookWait (pure hrts)
+                  $ C.threadDelay 1_000_000 >> hookWait hrt'
+    hookWait $ pure hks
+    db "RUN COMPLETE !!!!!!!"
+-}

@@ -85,7 +85,7 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM
 import Prelude (Ord, putStrLn)
 
-{- 
+
 data BoundaryType
   = Start
   | End
@@ -710,5 +710,4 @@ shk - t1
     ~ update constructors
     ~ runtime
     ~ update validations
--}
 -}

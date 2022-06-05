@@ -12,7 +12,7 @@ data CompletionStatus
   deriving (Show)
 
 newtype PreNodeRoot = 
-  PreNodeRoot { rootNode :: IO (PreNode A () () () ()) }
+  PreNodeRoot { rootNode :: IO (PreNode () () () ()) }
 
 data FixtureStatus
   = Pending
@@ -24,33 +24,29 @@ data FixtureStatus
 
 newtype Loc = Loc { unLoc :: Text} deriving (Show, Eq, Ord)
 
-data A
-data T
-data F
-data B
-data PreNode a si so ti to where
+data PreNode si so ti to where
   Branch :: {
     bTag :: Maybe Text,
-    subElms :: forall a. [PreNode a si so ti to]
+    subElms :: [PreNode si so ti to]
    } ->
-   PreNode B si () ti () 
+   PreNode si () ti () 
   AnyHook ::
     { 
       hookTag :: Maybe Text,
       hook :: Loc -> si -> IO so,
-      hookChild :: forall a. PreNode a so cso ti to,
+      hookChild :: PreNode so cso ti to,
       hookResult :: TMVar (Either SomeException so),
       hookRelease :: Loc -> so -> IO ()
     } ->
-    PreNode A si so ti to 
+    PreNode si so ti to 
   ThreadHook ::
     { 
       threadTag :: Maybe Text,
       threadHook :: Loc -> si -> ti -> IO to,
-      threadHookChild :: forall a. PreNode a si so to cto,
+      threadHookChild :: PreNode si so to cto,
       threadHookRelease :: Loc -> to -> IO ()
     } ->
-    PreNode T si so ti to 
+    PreNode si so ti to 
   Fixture ::
     { 
       fxTag :: Maybe Text,
@@ -58,9 +54,9 @@ data PreNode a si so ti to where
       iterations :: [Loc -> si -> ti -> IO ()],
       logEnd :: Loc -> IO ()
     } ->
-    PreNode F si () ti ()
+    PreNode si () ti ()
 
-nodeEmpty :: PreNode a' a b c d -> Bool
+nodeEmpty :: PreNode a b c d -> Bool
 nodeEmpty = \case
   AnyHook {hookChild} -> nodeEmpty hookChild
   ThreadHook {threadHookChild} -> nodeEmpty threadHookChild

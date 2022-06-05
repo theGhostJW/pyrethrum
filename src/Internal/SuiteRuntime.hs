@@ -7,8 +7,7 @@ import Data.Sequence (Seq (Empty), empty)
 import Data.Tuple.Extra (both)
 import GHC.Exts
 import Internal.PreNode
-  ( A,
-    CompletionStatus (..),
+  ( CompletionStatus (..),
     FixtureStatus (..),
     HookStatus (..),
     Loc (Loc),
@@ -149,7 +148,7 @@ getHookVal hs mv ios = do
         )
     else atomically $ readTMVar mv
 
-prepare :: PreNode A () () () () -> IO (RTNode () () () ())
+prepare :: PreNode () () () () -> IO (RTNode () () () ())
 prepare =
   prepare' (Loc "ROOT") 0
   where
@@ -160,7 +159,7 @@ prepare =
     consNoMxIdx :: IdxLst a -> a -> IdxLst a
     consNoMxIdx l@IdxLst {lst} i = l {lst = i : lst}
 
-    prepare' :: Loc -> Int -> PreNode a s so t to -> IO (RTNode s so t to)
+    prepare' :: Loc -> Int -> PreNode s so t to -> IO (RTNode s so t to)
     prepare' parentLoc subElmIdx pn =
       let mkLoc :: Maybe Text -> Text -> Loc
           mkLoc childlabel elmType =
@@ -243,35 +242,9 @@ prepare =
                         logEnd = logEnd loc
                       }
 
--- do
--- s <- newTVarIO Pending
--- let loc = mkLoc fxTag "Fixture"
---     fxs' =
---       consNoMxIdx fxs $
---         RTFix
---           { label = loc,
---             fixStatus = s,
---             iterations = (loc &) <$> iterations,
---             logStart = logStart loc,
---             logEnd = logEnd loc
---           }
--- pure $ rt {fxs = fxs'}
 
--- fixsNodes :: Either (IdxLst [RTFix so to]) (IdxLst [RTNode so cso to cto])
--- fixsNodes = \case
---   Branch { subElms } -> uu
---   AnyHook {hookStatus, hook, hookChild, hookResult, hookRelease} -> uu
---   ThreadHook f pn g -> uu
---   Fixture tv f fs g -> uu
--- uu
 
---  \case
---       Branch { subElms } -> uu
---       AnyHook {hookStatus, hook, hookChild, hookResult, hookRelease} -> uu
---       ThreadHook {threadHook, threadHookChild, threadHookRelease} -> uu
---       Fixture {fixtureStatus, logStart, iterations, logEnd} -> uu
-
-execute :: Int -> PreNode A () () () () -> IO ()
+execute :: Int -> PreNode () () () () -> IO ()
 execute maxThreads preRoot = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   chn <- newChan

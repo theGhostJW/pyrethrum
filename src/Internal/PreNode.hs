@@ -46,7 +46,7 @@ data PreNode a si so ti to where
   ThreadHook ::
     { 
       threadTag :: Maybe Text,
-      threadHook :: Loc -> ti -> IO to,
+      threadHook :: Loc -> si -> ti -> IO to,
       threadHookChild :: forall a. PreNode a si so to cto,
       threadHookRelease :: Loc -> to -> IO ()
     } ->

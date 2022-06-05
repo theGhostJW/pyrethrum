@@ -251,7 +251,8 @@ mkFixture q itCount = do
         logEnd = fixtureEnd q
       }
 
-mkHook :: TQueue RunEvent -> o -> IO (PreNode o o2 to to2) -> IO (PreNode i o ti to)
+
+-- mkHook :: TQueue RunEvent -> so -> IO (PreNode so so2 ti to) -> IO (PreNode si so ti to)
 mkHook q hko nodeChild =
   do
     status <- atomically $ newTVar Unintialised
@@ -500,7 +501,8 @@ simpleSuiteBranchInHook q =
 
 deeplyNested :: TQueue RunEvent -> IO PreNodeRoot
 deeplyNested q =
-  let hk :: o -> IO (PreNode o o2 to to2) -> IO (PreNode i o ti to)
+  let 
+      hk :: o -> IO (PreNode o o2 to to2) -> IO (PreNode i o to to2)
       hk = mkHook q
 
       branch :: [IO (PreNode si so ti to)] -> IO (PreNode si () ti ())
@@ -513,7 +515,7 @@ deeplyNested q =
           [ hk "hkOut" $
               hk 88 $
                 branch
-                  [ fx 2 :: IO (PreNode Int () ti ()),
+                  [ fx 2,
                     fx 2,
                     branch
                       [ hk "Out Str" $
@@ -678,6 +680,7 @@ shk - t1
     ~ tests
 
   ~ advnced tests
+  ~ hook timeout
   ~ test with empty:
     ~ fixtures
     ~ hooks

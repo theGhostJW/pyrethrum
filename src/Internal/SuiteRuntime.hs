@@ -107,12 +107,12 @@ data RTNode si so ti to where
     } ->
     RTNode si so ti to
   RTNodeM ::
-    { label :: Loc,
-      status :: TVar HookStatus,
+    { mlabel :: Loc,
+      mstatus :: TVar HookStatus,
       fxsM :: IdxLst (RTFix so to),
       childNodesM :: IdxLst (RTNode si so ti to)
     } ->
-    RTNode si so ti to
+    RTNode si () ti ()
 
 isUninitialised :: HookStatus -> Bool
 isUninitialised = \case
@@ -152,7 +152,7 @@ getHookVal hs mv ios = do
 
 prepare :: PreNode A () () () () -> IO (RTNode () () () ())
 prepare =
-  prepare' "ROOT" 0
+  prepare' (Loc "ROOT") 0
   where
     -- reverse lists that were generated with cons
     correctSubElms :: forall s so t to. RTNode s so t to -> RTNode s so t to
@@ -200,45 +200,24 @@ prepare =
                 threadHook,
                 threadHookChild,
                 threadHookRelease
-              } -> do 
-            -- let loc = mkLoc threadTag "ThreadHook"
-            --  in do
-            --       s <- newTVarIO Unintialised
-            --       v <- newEmptyTMVarIO
-            --       sni <- newTVarIO 0
-            --       fxi <- newTVarIO 0
-            --       let nxtSubNode :: RTNode s so t cti
-            --           nxtSubNode =
-            --             RTNode
-            --               { label = loc,
-            --                 status = s,
-            --                 sHook = sHook,
-            --                 sHookRelease = sHookRelease,
-            --                 sHookVal = v,
-            --                 tHook = \ti -> tHook ti >>= threadHook loc,
-            --                 tHookRelease = threadHookRelease loc,
-            --                 fxs = IdxLst 0 [] fxi,
-            --                 subNodes = IdxLst 0 [] sni
-            --               }
-            --       {-
-            --         • Couldn't match type ‘cs’ with ‘s’
-            --           Expected: PreNode s so2 ct to2
-            --             Actual: PreNode cs so2 ct to2
-            --           ‘cs’ is a rigid type variable bound by
-            --       -}
-            --       -- RTNode s t -> Int -> PreNode s cs t ct -> IO (RTNode s t)
-            --       -- RTNode s ct      --  PreNode cs so2 ct to2
-            --       sn <- prepare' nxtSubNode (subElmIdx + 1) threadHookChild
-            --       il <- atomically $ mkIdxLst sn
-            --       {-
-            --           • Couldn't match type ‘s’ with ‘so’
-            --             Expected: IdxLst (RTNode so cs1 to ct1)
-            --             Actual:   IdxLst (RTNode s so t ct)
-            --       -}
-            --       pure $
-            --         rt
-            --           { subNodes = il
-            --           }
+              } -> 
+              let loc = mkLoc threadTag "ThreadHook"
+              in do
+                  s <- newTVarIO Unintialised
+                  v <- newEmptyTMVarIO
+                  sni <- newTVarIO 0
+                  fxi <- newTVarIO 0
+                  child <- prepare' loc 0 threadHookChild
+                  pure $
+                    RTNodeT
+                    { 
+                      label = loc,
+                      status = s,
+                      tHook = threadHook loc,
+                      tHookRelease = threadHookRelease loc,
+                      childNodeT = child
+                    }
+                  
             Fixture
               { fxTag,
                 logStart,

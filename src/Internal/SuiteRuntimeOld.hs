@@ -8,15 +8,9 @@ import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty), empty)
 import Data.Tuple.Extra (both)
 import GHC.Exts
-import Internal.PreNode
-  ( CompletionStatus (Fault),
-    FixtureStatus (..),
-    HookStatus (Finalised, Finalising),
-    finalised,
-  )
+
 import qualified Internal.PreNode as PN
-  ( CompletionStatus (Fault, Murdered, Normal),
-    HookStatus (..),
+  ( 
     PreNode (..)
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))

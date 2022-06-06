@@ -131,7 +131,7 @@ countSubNodes pred node =
         fx@PN.Fixture {} -> pred fx ? accum + 1 $ accum
    in countSubNodes' 0 node
 
-getStats :: PN.PreNodeRoot -> IO [NodeStats]
+getStats :: PreNodeRoot -> IO [NodeStats]
 getStats PreNodeRoot {rootNode} =
   getStats' "Root" 0 <$> rootNode
   where
@@ -256,7 +256,7 @@ mkFixture q itCount = do
 -- mkHook :: TQueue RunEvent -> so -> IO (PreNode so so2 ti to) -> IO (PreNode si so ti to)
 mkHook q hko nodeChild =
   do
-    status <- atomically $ newTVar Unintialised
+    status <- atomically $ newTVar S.Unintialised
     rslt <- (newEmptyTMVarIO :: IO (TMVar (Either SomeException o)))
     nc <- nodeChild
     pure

@@ -7,14 +7,10 @@ import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both)
 import GHC.Exts
 import Internal.PreNode
-  ( CompletionStatus (..),
-    FixtureStatus (..),
-    HookStatus (..),
+  (
     Loc (Loc),
     PreNode (..),
-    PreNodeRoot,
-    rootNode,
-    unLoc,
+    unLoc, PreNodeRoot, rootNode,
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
@@ -71,6 +67,73 @@ import UnliftIO.STM
     writeTVar,
   )
 import qualified Prelude as PRL
+
+data CompletionStatus
+  = Normal
+  | Fault Text SomeException
+  | Murdered Text
+  deriving (Show)
+
+data FixtureStatus
+  = Pending
+  | Starting
+  | Active
+  | Done CompletionStatus
+  | BeingKilled
+  deriving (Show)
+data HookStatus
+  = Unintialised
+  | Intitialising
+  | Running
+  | Complete CompletionStatus
+  | BeingMurdered
+  | Finalising
+  | Finalised CompletionStatus
+  deriving (Show)
+
+
+cleaningUp :: HookStatus -> Bool
+cleaningUp = \case
+  Unintialised -> False
+  Intitialising -> False
+  Running -> False
+  Complete cs -> False
+  BeingMurdered -> True
+  Finalising -> True
+  Finalised _ -> False
+
+finalised :: HookStatus -> Bool
+finalised = \case
+  Unintialised -> False
+  Intitialising -> False
+  Running -> False
+  Complete cs -> False
+  BeingMurdered -> False
+  Finalising -> False
+  Finalised _ -> True
+
+complete :: HookStatus -> Bool
+complete = \case
+  Unintialised -> False
+  Intitialising -> False
+  Running -> False
+  Complete cs -> True
+  BeingMurdered -> False
+  Finalising -> False
+  Finalised _ -> False
+
+normalCompletion :: HookStatus -> Bool
+normalCompletion = \case
+  Unintialised -> False
+  Intitialising -> False
+  Running -> False
+  Complete cs -> case cs of
+    Normal -> True
+    Fault {} -> False
+    Murdered _ -> False
+  Finalising -> False
+  BeingMurdered -> False
+  Finalised _ -> False
 
 data IdxLst a = IdxLst
   { maxIndex :: Int,
@@ -268,13 +331,13 @@ takeIteration fixture@InitialisedFixture {iterations, fixStatus} = do
     else pure Nothing
 -}
 
-unify status
-runThread :: maxStatus -> Logger -> RunGraph s so t to -> Int -> IO ()
-runThread maxStatus db rg maxThreads = case rg of
-  RTNodeS loc tv f g tv' rg' -> _
-  RTNodeT loc tv f g rg' -> _
-  RTNodeM loc tv il -> _
-  RTFix loc io tv tq io' -> _
+-- -- unify status
+-- runThread :: maxStatus -> Logger -> RunGraph s so t to -> Int -> IO ()
+-- runThread maxStatus db rg maxThreads = case rg of
+--   RTNodeS loc tv f g tv' rg' -> _
+--   RTNodeT loc tv f g rg' -> _
+--   RTNodeM loc tv il -> _
+--   RTFix loc io tv tq io' -> _
 
 executeGraph :: Logger -> RunGraph s so t to -> Int -> IO ()
 executeGraph db rg maxThreads = uu

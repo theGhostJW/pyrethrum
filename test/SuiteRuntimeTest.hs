@@ -672,6 +672,9 @@ shk - t1
       ~ update validation to include thread level hooks
       ~ add thread level tests
 
+    ~ update prepare to not add empty nodes
+      ~ update tests to include empty nodes
+
   ~ add iteration level
     ~ constructors
     ~ structure
@@ -681,6 +684,7 @@ shk - t1
     ~ tests
 
   ~ advnced tests
+  
   ~ hook timeout
   ~ test with empty:
     ~ fixtures
@@ -705,6 +709,8 @@ shk - t1
   ~ killing run
     ~ implement
     ~ test
+      ~ make sure tests killed in finalisation don't keep running
+      ~ must not handle async exceptions
 
   ~ fixture thread limits
     ~ update constructors

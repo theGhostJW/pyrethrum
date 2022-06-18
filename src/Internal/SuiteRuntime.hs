@@ -6,6 +6,7 @@ import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both)
 import GHC.Exts
+import GHC.IO.FD (release)
 import Internal.PreNode
   ( Loc (Loc),
     PreNode (..),
@@ -93,18 +94,17 @@ data HookStatus
   | Complete CompletionStatus
   | Finalising
   | Finalised CompletionStatus
-  deriving (Eq, Show)
+  deriving (Show)
 
 data NodeStatus
   = NodePending
   | NodeStarted
   | NodeFullyRunning
-  | NodeFinalising
   | NodeComplete
-  deriving (Show, Eq, Ord, Bounded)
+  deriving (Show, Eq, Ord, Bounded, Enum)
 
-cachedNodeStatus :: RunGraph si so ti to -> TVar NodeStatus
-cachedNodeStatus = \case
+getNodeStatus :: RunGraph si so ti to -> TVar NodeStatus
+getNodeStatus = \case
   RTNodeS {nodeStatus} -> nodeStatus
   RTNodeT {nodeStatus} -> nodeStatus
   RTNodeM {mNodeStatus} -> mNodeStatus
@@ -179,7 +179,7 @@ data RunGraph si so ti to where
       sHook :: si -> IO so,
       sHookRelease :: so -> IO (),
       sHookVal :: TMVar (Either SomeException so),
-      childNodeS :: RunGraph so cs ti to
+      sChildNode :: RunGraph so cs ti to
     } ->
     RunGraph si so ti to
   RTNodeT ::
@@ -194,7 +194,8 @@ data RunGraph si so ti to where
   RTNodeM ::
     { mlabel :: Loc,
       mNodeStatus :: TVar NodeStatus,
-      childNodesM :: TQueue (RunGraph si so ti to)
+      childNodes :: TQueue (RunGraph si so ti to),
+      fullyRunning :: TQueue (RunGraph si so ti to)
     } ->
     RunGraph si () ti ()
   RTFix ::
@@ -247,94 +248,95 @@ prepare =
     prepare' :: Loc -> Int -> PreNode s so t to -> IO (RunGraph s so t to)
     prepare' parentLoc subElmIdx pn = do
       ns <- newTVarIO NodePending
-      let mkLoc :: Maybe Text -> Text -> Loc
-          mkLoc childlabel elmType =
-            Loc . prfx $
-              maybef
-                childlabel
-                (elmType <> "[" <> txt subElmIdx <> "]")
-                id
-            where
-              prfx = ((unLoc parentLoc <> " . ") <>)
-       in case pn of
-            Branch
-              { bTag,
-                subElms
-              } -> do
-                let loc = mkLoc bTag "Branch"
-                idx <- newTVarIO 0
-                c <- traverse (prepare' loc 0) subElms
-                q <- newTQueueIO
-                atomically $ traverse_ (writeTQueue q) c
-                pure $
-                  RTNodeM
-                    { mlabel = loc,
-                      mNodeStatus = ns,
-                      childNodesM = q
-                    }
-            AnyHook
-              { hookTag,
-                hook,
-                hookChild,
-                hookResult,
-                hookRelease
-              } -> do
-                s <- newTVarIO Unintialised
-                v <- newEmptyTMVarIO
-                let loc = mkLoc hookTag "SingletonHook"
-                child <- prepare' loc 0 hookChild
-                pure $
-                  RTNodeS
-                    { label = loc,
-                      status = s,
-                      nodeStatus = ns,
-                      sHook = hook loc,
-                      sHookRelease = hookRelease loc,
-                      sHookVal = v,
-                      childNodeS = child
-                    }
-            ThreadHook
-              { threadTag,
-                threadHook,
-                threadHookChild,
-                threadHookRelease
-              } ->
-                let loc = mkLoc threadTag "ThreadHook"
-                 in do
-                      s <- newTVarIO Unintialised
-                      v <- newEmptyTMVarIO
-                      sni <- newTVarIO 0
-                      fxi <- newTVarIO 0
-                      child <- prepare' loc 0 threadHookChild
-                      pure $
-                        RTNodeT
-                          { label = loc,
-                            status = s,
-                            nodeStatus = ns,
-                            tHook = threadHook loc,
-                            tHookRelease = threadHookRelease loc,
-                            childNodeT = child
-                          }
-            Fixture
-              { fxTag,
-                logStart,
-                iterations,
-                logEnd
-              } ->
-                do
-                  let loc = mkLoc fxTag "ThreadHook"
-                  s <- newTVarIO Pending
-                  q <- newTQueueIO
-                  atomically $ traverse_ (writeTQueue q) $ (loc &) <$> iterations
+      case pn of
+        Branch
+          { bTag,
+            subElms
+          } -> do
+            let loc = mkLoc bTag "Branch"
+            idx <- newTVarIO 0
+            c <- traverse (prepare' loc 0) subElms
+            fr <- newTQueueIO
+            q <- newTQueueIO
+            atomically $ traverse_ (writeTQueue q) c
+            pure $
+              RTNodeM
+                { mlabel = loc,
+                  mNodeStatus = ns,
+                  childNodes = q,
+                  fullyRunning = fr
+                }
+        AnyHook
+          { hookTag,
+            hook,
+            hookChild,
+            hookResult,
+            hookRelease
+          } -> do
+            s <- newTVarIO Unintialised
+            v <- newEmptyTMVarIO
+            let loc = mkLoc hookTag "SingletonHook"
+            child <- prepare' loc 0 hookChild
+            pure $
+              RTNodeS
+                { label = loc,
+                  status = s,
+                  nodeStatus = ns,
+                  sHook = hook loc,
+                  sHookRelease = hookRelease loc,
+                  sHookVal = v,
+                  sChildNode = child
+                }
+        ThreadHook
+          { threadTag,
+            threadHook,
+            threadHookChild,
+            threadHookRelease
+          } ->
+            let loc = mkLoc threadTag "ThreadHook"
+             in do
+                  s <- newTVarIO Unintialised
+                  v <- newEmptyTMVarIO
+                  sni <- newTVarIO 0
+                  fxi <- newTVarIO 0
+                  child <- prepare' loc 0 threadHookChild
                   pure $
-                    RTFix
-                      { fxlabel = loc,
-                        logStart = logStart loc,
-                        fixStatus = s,
-                        fixNodeStatus = ns,
-                        iterations = q,
-                        logEnd = logEnd loc
+                    RTNodeT
+                      { label = loc,
+                        status = s,
+                        nodeStatus = ns,
+                        tHook = threadHook loc,
+                        tHookRelease = threadHookRelease loc,
+                        childNodeT = child
                       }
+        Fixture
+          { fxTag,
+            logStart,
+            iterations,
+            logEnd
+          } ->
+            do
+              let loc = mkLoc fxTag "ThreadHook"
+              s <- newTVarIO Pending
+              q <- newTQueueIO
+              atomically $ traverse_ (writeTQueue q) $ (loc &) <$> iterations
+              pure $
+                RTFix
+                  { fxlabel = loc,
+                    logStart = logStart loc,
+                    fixStatus = s,
+                    fixNodeStatus = ns,
+                    iterations = q,
+                    logEnd = logEnd loc
+                  }
+      where
+        mkLoc :: Maybe Text -> Text -> Loc
+        mkLoc childlabel elmType =
+          Loc . ((unLoc parentLoc <> " . ") <>) $
+            maybef
+              childlabel
+              (elmType <> "[" <> txt subElmIdx <> "]")
+              id
 
 type Logger = Text -> IO ()
 
@@ -364,37 +366,41 @@ takeIteration fixture@InitialisedFixture {iterations, fixStatus} = do
 --   RTNodeM loc tv il -> _
 --   RTFix loc io tv tq io' -> _
 
-data Cached = Cached | Executed deriving (Eq, Show)
+data Cached = Cached | CacheMiss deriving (Eq, Show)
 
--- returns Nothing
-getSHookVal :: forall si so. (si -> IO so) -> si -> TVar HookStatus -> TVar NodeStatus -> TMVar (Either SomeException so) -> Loc -> IO (Cached, Either SomeException so)
+data HookResult so = HookResult
+  { cached :: Cached,
+    value :: Either SomeException so
+  }
+
+-- returns Hookresult from cache or by executing hook,
+-- updating hook and node status and storing result in cache
+getSHookVal :: forall si so. (si -> IO so) -> si -> TVar HookStatus -> TVar NodeStatus -> TMVar (Either SomeException so) -> Loc -> IO (HookResult so)
 getSHookVal sHook si hs ns sHookVal label = do
-  locOrVal <- atomically readOrLock
+  mCache <- atomically readOrLock
   maybef
-    locOrVal
+    mCache
     ( catchAll
         (sHook si >>= atomically . recordHookCompletion . Right)
         (atomically . recordHookCompletion . Left)
-        >>= pure . (Executed,)
+        >>= pure . HookResult CacheMiss
     )
-    (pure . (Cached,))
+    (pure . HookResult Cached)
   where
     readOrLock :: STM (Maybe (Either SomeException so))
-    readOrLock = atomically $ do
-      s <- readTVar hs
-      if s == Unintialised
-        then do
-          writeTVar hs Intitialising
-          writeTVar ns NodeStarted
-          pure Nothing
-        else do
-          hv <- tryReadTMVar sHookVal
-          isJust hv
-            ? pure hv
-            $ retry
+    readOrLock =
+      do
+        s <- readTVar hs
+        if isUninitialised s
+          then do
+            writeTVar hs Intitialising
+            writeTVar ns NodeStarted
+            pure Nothing
+          else do
+            Just <$> readTMVar sHookVal
 
     recordHookCompletion :: Either SomeException so -> STM (Either SomeException so)
-    recordHookCompletion eso = atomically $ do
+    recordHookCompletion eso = do
       putTMVar sHookVal eso
       eitherf
         eso
@@ -408,61 +414,112 @@ getSHookVal sHook si hs ns sHookVal label = do
         )
       pure eso
 
-data HasExecuted = Execution | NoExecution deriving (Eq, Show)
-executeNode :: NodeStatus -> si -> IO ti -> RunGraph si so ti to -> IO HasExecuted
-executeNode maxStatus si ioti rg = case rg of
-  RTNodeS
-    { label,
-      status,
-      nodeStatus,
-      sHook,
-      sHookRelease,
-      sHookVal,
-      childNodeS
-    } -> do
-      (cached, result) <- getSHookVal sHook si status nodeStatus sHookVal label
-      eitherf result (const $ pure NoExecution) $ \so -> do
-        cached == Cached ? 
-         executeNode maxStatus so ioti childNodeS $
-         (uu)
+data HasExecuted = Executed | NotExecuted deriving (Eq, Show)
 
-      
-  RTNodeT
-    { label,
-      status,
-      nodeStatus,
-      tHook,
-      tHookRelease,
-      childNodeT
-    } -> uu
-  RTNodeM
-    { childNodesM
-    } -> uu
-  --  do atomically $ do
-  --   ns <- readTVar nodeStatus
-  --   qmt <- isEmptyTQueue childNodesM
-  --   -- assume subnodes only evicted from q when done so and
-  --   -- empty q means sub nodes are done hence parent node is deemed complete
-  --   qmt ? pure NodeComplete $ do
-  --      -- fixtures shuffled to back of queue when started so if any subnode
-  --      -- is pending the status will be pending
-  --      sn <- peekTQueue childNodesM
+data CycleState = Continue | Wait | Stop deriving (Eq, Show)
 
-  -- atomically $ do
-  --   qmt <- atomically $ isEmptyTQueue iterations
-  RTFix
-    { fixStatus,
-      iterations
-    } -> uu
+executeNode :: si -> IO ti -> RunGraph si so ti to -> NodeStatus -> IO HasExecuted
+executeNode si ioti rg maxStatus =
+  case rg of
+    RTNodeS
+      { label,
+        status,
+        nodeStatus,
+        sHook,
+        sHookRelease,
+        sHookVal,
+        sChildNode
+      } -> do
+        canRun nodeStatus
+          >>= bool
+            (pure NotExecuted)
+            ( do
+                -- getSHookVal handles exceptions and updates status of node and hook
+                HookResult {cached, value} <- getSHookVal sHook si status nodeStatus sHookVal label
+                let hkExecuted = cached == CacheMiss
+                eitherf
+                  value
+                  ( const . pure $ hkExecuted ? Executed $ NotExecuted
+                  )
+                  ( \so ->
+                      finally
+                        ( do
+                            childRun <- executeFully so ioti sChildNode maxStatus
+                            -- not expected that hook would ever run and child would not execute
+                            -- as hook is run on first pass but maybe ethere could be a race condition
+                            -- when this happens
+                            pure $ hkExecuted ? Executed $ childRun
+                        )
+                        ( when hkExecuted $
+                            releaseHook so status nodeStatus label sHookRelease
+                        )
+                  )
+            )
+    RTNodeT
+      { label,
+        status,
+        nodeStatus,
+        tHook,
+        tHookRelease,
+        childNodeT
+      } -> uu
+    RTNodeM
+      { childNodes
+      } -> uu
+    --  do atomically $ do
+    --   ns <- readTVar nodeStatus
+    --   qmt <- isEmptyTQueue childNodesM
+    --   -- assume subnodes only evicted from q when done so and
+    --   -- empty q means sub nodes are done hence parent node is deemed complete
+    --   qmt ? pure NodeComplete $ do
+    --      -- fixtures shuffled to back of queue when started so if any subnode
+    --      -- is pending the status will be pending
+    --      sn <- peekTQueue childNodesM
 
---  atomically $ do
--- fs <- readTVar fixStatus
--- qmt <- isEmptyTQueue iterations
--- pure $ case fs of
---   Pending -> qmt ? NodeFinalising $ NodePending
---   Active -> qmt ? NodeFinalising $ NodeStarted
---   -- NodeFullyRunning will be used when fixture thread limits introduced
---   Done cs -> NodeComplete
+    -- atomically $ do
+    --   qmt <- atomically $ isEmptyTQueue iterations
+    RTFix
+      { fixStatus,
+        iterations
+      } -> uu
+  where
+    releaseHook :: so -> TVar HookStatus -> TVar NodeStatus -> Loc -> (so -> IO ()) -> IO ()
+    releaseHook so hs ns label aftrHk =
+      catchAny
+        ( do
+            aftrHk so
+            atomically $ do
+              writeTVar hs . Finalised $ Normal
+              writeTVar ns NodeComplete
+        )
+        ( \e -> do
+            atomically $ do
+              writeTVar hs . Finalised $ Fault ("singleton after hook failed: " <> unLoc label) e
+              writeTVar ns NodeComplete
+        )
+
+    canRun :: TVar NodeStatus -> IO Bool
+    canRun ns = atomically $ (maxStatus <=) <$> readTVar ns
+
+    executeFully :: si -> IO ti -> RunGraph si so ti to -> NodeStatus -> IO HasExecuted
+    executeFully si' ioti' rg' maxStatus' =
+      case cycleState maxStatus' of
+        Continue ->
+          executeNode si' ioti' rg' maxStatus' >>= \case
+            Executed -> recurse maxStatus'
+            NotExecuted -> recurse (succ maxStatus')
+        Wait -> uu
+        Stop -> uu
+      where
+        recurse :: NodeStatus -> IO HasExecuted
+        recurse = executeNode si' ioti' rg'
+
+        cycleState :: NodeStatus -> CycleState
+        cycleState = \case
+          NodePending -> Continue
+          NodeStarted -> Continue
+          NodeFullyRunning -> Wait
+          NodeComplete -> Stop
 
 executeGraph :: Logger -> RunGraph s so t to -> Int -> IO ()
 executeGraph db rg maxThreads = uu

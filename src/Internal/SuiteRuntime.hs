@@ -100,6 +100,7 @@ data NodeStatus
   = NodePending
   | NodeStarted
   | NodeFullyRunning
+  | NodeFinalising
   | NodeComplete
   deriving (Show, Eq, Ord, Bounded, Enum)
 
@@ -420,69 +421,89 @@ data CycleState = Continue | Wait | Stop deriving (Eq, Show)
 
 executeNode :: si -> IO ti -> RunGraph si so ti to -> NodeStatus -> IO HasExecuted
 executeNode si ioti rg maxStatus =
-  case rg of
-    RTNodeS
-      { label,
-        status,
-        nodeStatus,
-        sHook,
-        sHookRelease,
-        sHookVal,
-        sChildNode
-      } -> do
-        canRun nodeStatus
-          >>= bool
-            (pure NotExecuted)
-            ( do
-                -- getSHookVal handles exceptions and updates status of node and hook
-                HookResult {cached, value} <- getSHookVal sHook si status nodeStatus sHookVal label
-                let hkExecuted = cached == CacheMiss
-                eitherf
-                  value
-                  ( const . pure $ hkExecuted ? Executed $ NotExecuted
-                  )
-                  ( \so ->
-                      finally
-                        ( do
-                            childRun <- executeFully so ioti sChildNode maxStatus
-                            -- not expected that hook would ever run and child would not execute
-                            -- as hook is run on first pass but maybe ethere could be a race condition
-                            -- when this happens
-                            pure $ hkExecuted ? Executed $ childRun
-                        )
-                        ( when hkExecuted $
-                            releaseHook so status nodeStatus label sHookRelease
-                        )
-                  )
-            )
-    RTNodeT
-      { label,
-        status,
-        nodeStatus,
-        tHook,
-        tHookRelease,
-        childNodeT
-      } -> uu
-    RTNodeM
-      { childNodes
-      } -> uu
-    --  do atomically $ do
-    --   ns <- readTVar nodeStatus
-    --   qmt <- isEmptyTQueue childNodesM
-    --   -- assume subnodes only evicted from q when done so and
-    --   -- empty q means sub nodes are done hence parent node is deemed complete
-    --   qmt ? pure NodeComplete $ do
-    --      -- fixtures shuffled to back of queue when started so if any subnode
-    --      -- is pending the status will be pending
-    --      sn <- peekTQueue childNodesM
+  do
+    let ns = getNodeStatus rg
+    nsv <- atomically $ readTVar ns
+    nsv > maxStatus
+      ? pure NotExecuted
+      $ case rg of
+        RTNodeS
+          { label,
+            status,
+            sHook,
+            sHookRelease,
+            sHookVal,
+            sChildNode
+          } -> do
+            -- getSHookVal handles exceptions and updates status of node and hook
+            HookResult {cached, value} <- getSHookVal sHook si status ns sHookVal label
+            let hkExecuted = cached == CacheMiss
+            eitherf
+              value
+              (const . pure $ hkExecuted ? Executed $ NotExecuted)
+              \so ->
+                finally
+                  (executeFully (hkExecuted ? Executed $ NotExecuted) so ioti sChildNode maxStatus)
+                  (when hkExecuted $ releaseHook so status ns label sHookRelease)
+        RTNodeT
+          { label,
+            status,
+            nodeStatus,
+            tHook,
+            tHookRelease,
+            childNodeT
+          } -> uu
+        RTNodeM
+          { childNodes
+          } -> uu
+        --  do atomically $ do
+        --   ns <- readTVar nodeStatus
+        --   qmt <- isEmptyTQueue childNodesM
+        --   -- assume subnodes only evicted from q when done so and
+        --   -- empty q means sub nodes are done hence parent node is deemed complete
+        --   qmt ? pure NodeComplete $ do
+        --      -- fixtures shuffled to back of queue when started so if any subnode
+        --      -- is pending the status will be pending
+        --      sn <- peekTQueue childNodesM
 
-    -- atomically $ do
-    --   qmt <- atomically $ isEmptyTQueue iterations
-    RTFix
-      { fixStatus,
-        iterations
-      } -> uu
+        -- atomically $ do
+        --   qmt <- atomically $ isEmptyTQueue iterations
+        RTFix
+          { fixStatus,
+            iterations
+          } -> uu
   where
+    executeFully :: HasExecuted -> si -> IO ti -> RunGraph si so ti to -> NodeStatus -> IO HasExecuted
+    executeFully alreadyExecuted si' ioti' rg' maxStatus' =
+      case cycleState maxStatus' of
+        Continue ->
+          executeNode si' ioti' rg' maxStatus' >>= \case
+            Executed -> recurse Executed maxStatus'
+            NotExecuted -> recurse NotExecuted (succ maxStatus')
+        Wait -> do
+          -- just keep looping until node status 
+          -- is at least finalising / updating on the basis
+          -- of child status on each loop
+          atomically $ do
+            let ns = getNodeStatus rg'
+            nsv <- readTVar ns
+            let cs = cycleState nsv
+            unless (cs == Stop) $
+              updateStatusFromChild ns rg' >> retry
+          pure alreadyExecuted
+        Stop -> pure alreadyExecuted
+      where
+        recurse :: HasExecuted -> NodeStatus -> IO HasExecuted
+        recurse hasEx = executeNode si' ioti' rg'
+
+        cycleState :: NodeStatus -> CycleState
+        cycleState = \case
+          NodePending -> Continue
+          NodeStarted -> Continue
+          NodeFullyRunning -> Wait
+          NodeFinalising -> Stop
+          NodeComplete -> Stop
+
     releaseHook :: so -> TVar HookStatus -> TVar NodeStatus -> Loc -> (so -> IO ()) -> IO ()
     releaseHook so hs ns label aftrHk =
       catchAny
@@ -498,28 +519,19 @@ executeNode si ioti rg maxStatus =
               writeTVar ns NodeComplete
         )
 
-    canRun :: TVar NodeStatus -> IO Bool
-    canRun ns = atomically $ (maxStatus <=) <$> readTVar ns
-
-    executeFully :: si -> IO ti -> RunGraph si so ti to -> NodeStatus -> IO HasExecuted
-    executeFully si' ioti' rg' maxStatus' =
-      case cycleState maxStatus' of
-        Continue ->
-          executeNode si' ioti' rg' maxStatus' >>= \case
-            Executed -> recurse maxStatus'
-            NotExecuted -> recurse (succ maxStatus')
-        Wait -> uu
-        Stop -> uu
-      where
-        recurse :: NodeStatus -> IO HasExecuted
-        recurse = executeNode si' ioti' rg'
-
-        cycleState :: NodeStatus -> CycleState
-        cycleState = \case
-          NodePending -> Continue
-          NodeStarted -> Continue
-          NodeFullyRunning -> Wait
-          NodeComplete -> Stop
+    updateStatusFromChild :: TVar NodeStatus -> RunGraph si1 so1 ti1 to1 -> STM ()
+    updateStatusFromChild parentStatus child = do
+      cs <- readTVar $ getNodeStatus child
+      let updateParentStatus ns = modifyTVar parentStatus (\s -> s < ns ? ns $ s)
+      case cs of
+        NodePending -> pure ()
+        NodeStarted -> pure ()
+        -- if children are fully running then parent is fully running
+        NodeFullyRunning -> updateParentStatus NodeFullyRunning
+        NodeFinalising -> pure ()
+        -- if children are complete then parent is ready to be finalised but wont be
+        -- be completed until finalisation
+        NodeComplete -> updateParentStatus NodeFinalising
 
 executeGraph :: Logger -> RunGraph s so t to -> Int -> IO ()
 executeGraph db rg maxThreads = uu
@@ -552,8 +564,6 @@ execute maxThreads preRoot = do
         rn <- rootNode preRoot
         runGraph <- prepare rn
         executeGraph logger runGraph maxThreads
-        -- root <- linkParents logger preRoot
-        -- executeLinked logger maxThreads root
         when wantDebug $
           db True "Execution Complete"
 

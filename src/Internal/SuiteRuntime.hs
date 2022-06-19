@@ -185,11 +185,10 @@ data RunGraph si so ti to where
     RunGraph si so ti to
   RTNodeT ::
     { label :: Loc,
-      status :: TVar HookStatus,
       nodeStatus :: TVar NodeStatus,
       tHook :: si -> ti -> IO to,
       tHookRelease :: to -> IO (),
-      childNodeT :: RunGraph si so to tc
+      tChildNode :: RunGraph si so to tc
     } ->
     RunGraph si so ti to
   RTNodeM ::
@@ -308,7 +307,7 @@ prepare =
                         nodeStatus = ns,
                         tHook = threadHook loc,
                         tHookRelease = threadHookRelease loc,
-                        childNodeT = child
+                        tChildNode = child
                       }
         Fixture
           { fxTag,
@@ -419,6 +418,31 @@ data HasExecuted = Executed | NotExecuted deriving (Eq, Show)
 
 data CycleState = Continue | Wait | Stop deriving (Eq, Show)
 
+data Memoized to = Memoized {
+  loading :: TVar Bool,
+  parentStatus :: TVar NodeStatus,
+  value :: MTVar (Either SomeException to)
+} 
+
+threadSource :: Memoized to -> (si -> ti -> IO to) -> IO ti -> IO to
+threadSource Memoized {loading, parentStatus, value} = do 
+  here
+ where
+   getOrLock :: STM (Maybe (Either SomeException to))
+   getOrLock = do 
+     c <- tryReadMVar value
+     pure $ maybef c (
+       do 
+        l <- readTVar loading
+        if l then
+          Just <$> readMTVar value
+        else 
+          do 
+            writeTVar loading True
+            pure Nothing
+      ) pure
+     
+
 executeNode :: si -> IO ti -> RunGraph si so ti to -> NodeStatus -> IO HasExecuted
 executeNode si ioti rg maxStatus =
   do
@@ -451,8 +475,11 @@ executeNode si ioti rg maxStatus =
             nodeStatus,
             tHook,
             tHookRelease,
-            childNodeT
-          } -> uu
+            tChildNode
+          } -> do 
+
+            
+
         RTNodeM
           { childNodes
           } -> uu

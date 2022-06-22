@@ -295,7 +295,6 @@ prepare =
           } ->
             let loc = mkLoc threadTag "ThreadHook"
              in do
-                  s <- newTVarIO Unintialised
                   v <- newEmptyTMVarIO
                   sni <- newTVarIO 0
                   fxi <- newTVarIO 0
@@ -303,7 +302,6 @@ prepare =
                   pure $
                     RTNodeT
                       { label = loc,
-                        status = s,
                         nodeStatus = ns,
                         tHook = threadHook loc,
                         tHookRelease = threadHookRelease loc,
@@ -418,30 +416,42 @@ data HasExecuted = Executed | NotExecuted deriving (Eq, Show)
 
 data CycleState = Continue | Wait | Stop deriving (Eq, Show)
 
-data Memoized to = Memoized {
-  loading :: TVar Bool,
-  parentStatus :: TVar NodeStatus,
-  value :: MTVar (Either SomeException to)
-} 
+data Memoized to = Memoized
+  { loading :: TVar Bool,
+    -- parentStatus :: TVar NodeStatus, ?? why did I have this ?
+    value :: TMVar (Either SomeException to)
+  }
 
-threadSource :: Memoized to -> (si -> ti -> IO to) -> IO ti -> IO to
-threadSource Memoized {loading, parentStatus, value} = do 
-  here
- where
-   getOrLock :: STM (Maybe (Either SomeException to))
-   getOrLock = do 
-     c <- tryReadMVar value
-     pure $ maybef c (
-       do 
-        l <- readTVar loading
-        if l then
-          Just <$> readMTVar value
-        else 
-          do 
-            writeTVar loading True
-            pure Nothing
-      ) pure
-     
+threadSource :: forall to si ti. Memoized to -> si -> IO ti -> (si -> ti -> IO to) -> IO (Either SomeException to)
+threadSource Memoized {loading {- parentStatus,-}, value} si ti hk = do
+  to <- atomically getOrLock
+  case to of
+    Just to' -> pure to'
+    Nothing ->
+      finally
+        ( catchAll
+            ( do
+                ti' <- ti
+                to' <- hk si ti'
+                let r = Right to'
+                atomically (putTMVar value r) >> pure r
+            )
+            ( \e ->
+                let r = Left e
+                 in atomically (putTMVar value r) >> pure r
+            )
+        )
+        (atomically $ writeTVar loading False)
+  where
+    getOrLock :: STM (Maybe (Either SomeException to))
+    getOrLock = do
+      c <- tryReadTMVar value
+      isJust c
+        ? pure c
+        $ readTVar loading
+          >>= bool
+            (writeTVar loading True >> pure Nothing)
+            (Just <$> readTMVar value)
 
 executeNode :: si -> IO ti -> RunGraph si so ti to -> NodeStatus -> IO HasExecuted
 executeNode si ioti rg maxStatus =
@@ -471,15 +481,11 @@ executeNode si ioti rg maxStatus =
                   (when hkExecuted $ releaseHook so status ns label sHookRelease)
         RTNodeT
           { label,
-            status,
             nodeStatus,
             tHook,
             tHookRelease,
             tChildNode
-          } -> do 
-
-            
-
+          } -> uu
         RTNodeM
           { childNodes
           } -> uu
@@ -508,7 +514,7 @@ executeNode si ioti rg maxStatus =
             Executed -> recurse Executed maxStatus'
             NotExecuted -> recurse NotExecuted (succ maxStatus')
         Wait -> do
-          -- just keep looping until node status 
+          -- just keep looping until node status
           -- is at least finalising / updating on the basis
           -- of child status on each loop
           atomically $ do

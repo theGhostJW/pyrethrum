@@ -417,13 +417,14 @@ data HasExecuted = Executed | NotExecuted deriving (Eq, Show)
 data CycleState = Continue | Wait | Stop deriving (Eq, Show)
 
 data Memoized to = Memoized
-  { 
+  { loading :: TVar Bool,
     threadHookStatus :: TVar NodeStatus, 
     value :: TMVar (Either SomeException to)
   }
 
 threadSource :: forall to si ti. Memoized to -> si -> IO ti -> (si -> ti -> IO to) -> IO (Either SomeException to)
-threadSource Memoized {threadHookStatus, value} si ti hk = do
+threadSource Memoized {loading, threadHookStatus, value} si ti hk = do
+  update threadHookStatus
   to <- atomically getOrLock
   case to of
     Just to' -> pure to'

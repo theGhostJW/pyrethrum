@@ -431,8 +431,7 @@ threadSource Memoized {loading {- parentStatus,-}, value} si ti hk = do
       finally
         ( catchAll
             ( do
-                ti' <- ti
-                to' <- hk si ti'
+                to' <- ti >>= hk si
                 let r = Right to'
                 atomically (putTMVar value r) >> pure r
             )

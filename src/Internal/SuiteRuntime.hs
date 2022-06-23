@@ -418,13 +418,14 @@ data CycleState = Continue | Wait | Stop deriving (Eq, Show)
 
 data Memoized to = Memoized
   { loading :: TVar Bool,
-    threadHookStatus :: TVar NodeStatus, 
+    threadHookStatus :: TVar NodeStatus,
     value :: TMVar (Either SomeException to)
   }
 
+-- need to pass in and update the threadHookStatus because we don't know if
+-- when this will be called, it is set up then passed down to the child fixtures
 threadSource :: forall to si ti. Memoized to -> si -> IO ti -> (si -> ti -> IO to) -> IO (Either SomeException to)
 threadSource Memoized {loading, threadHookStatus, value} si ti hk = do
-  update threadHookStatus
   to <- atomically getOrLock
   case to of
     Just to' -> pure to'
@@ -432,13 +433,17 @@ threadSource Memoized {loading, threadHookStatus, value} si ti hk = do
       finally
         ( catchAll
             ( do
+                atomically $ writeTVar threadHookStatus NodeStarted
                 to' <- ti >>= hk si
                 let r = Right to'
-                atomically (putTMVar value r) >> pure r
+                atomically $ putTMVar value r >> pure r
             )
             ( \e ->
                 let r = Left e
-                 in atomically (putTMVar value r) >> pure r
+                 in atomically $ do
+                      writeTVar threadHookStatus NodeComplete
+                      putTMVar value r
+                      pure r
             )
         )
         (atomically $ writeTVar loading False)
@@ -453,58 +458,63 @@ threadSource Memoized {loading, threadHookStatus, value} si ti hk = do
             (writeTVar loading True >> pure Nothing)
             (Just <$> readTMVar value)
 
-executeNode :: si -> IO ti -> RunGraph si so ti to -> NodeStatus -> IO HasExecuted
-executeNode si ioti rg maxStatus =
+executeNode :: Either SomeException si -> IO (Either SomeException ti) -> RunGraph si so ti to -> NodeStatus -> IO HasExecuted
+executeNode esi ioti rg maxStatus =
   do
     let ns = getNodeStatus rg
     nsv <- atomically $ readTVar ns
-    nsv > maxStatus
-      ? pure NotExecuted
-      $ case rg of
-        RTNodeS
-          { label,
-            status,
-            sHook,
-            sHookRelease,
-            sHookVal,
-            sChildNode
-          } -> do
-            -- getSHookVal handles exceptions and updates status of node and hook
-            HookResult {cached, value} <- getSHookVal sHook si status ns sHookVal label
-            let hkExecuted = cached == CacheMiss
-            eitherf
-              value
-              (const . pure $ hkExecuted ? Executed $ NotExecuted)
-              \so ->
-                finally
-                  (executeFully (hkExecuted ? Executed $ NotExecuted) so ioti sChildNode maxStatus)
-                  (when hkExecuted $ releaseHook so status ns label sHookRelease)
-        RTNodeT
-          { label,
-            nodeStatus,
-            tHook,
-            tHookRelease,
-            tChildNode
-          } -> uu
-        RTNodeM
-          { childNodes
-          } -> uu
-        --  do atomically $ do
-        --   ns <- readTVar nodeStatus
-        --   qmt <- isEmptyTQueue childNodesM
-        --   -- assume subnodes only evicted from q when done so and
-        --   -- empty q means sub nodes are done hence parent node is deemed complete
-        --   qmt ? pure NodeComplete $ do
-        --      -- fixtures shuffled to back of queue when started so if any subnode
-        --      -- is pending the status will be pending
-        --      sn <- peekTQueue childNodesM
+    if nsv > maxStatus
+      then pure NotExecuted
+      else
+        eitherf
+          esi
+          (\e -> faillChildren rg)
+          ( \si -> case rg of
+              RTNodeS
+                { label,
+                  status,
+                  sHook,
+                  sHookRelease,
+                  sHookVal,
+                  sChildNode
+                } -> do
+                  -- getSHookVal handles exceptions and updates status of node and hook
+                  HookResult {cached, value} <- getSHookVal sHook si status ns sHookVal label
+                  let hkExecuted = cached == CacheMiss
+                  eitherf
+                    value
+                    (const . pure $ hkExecuted ? Executed $ NotExecuted)
+                    \so ->
+                      finally
+                        (executeFully (hkExecuted ? Executed $ NotExecuted) so ioti sChildNode maxStatus)
+                        (when hkExecuted $ releaseHook so status ns label sHookRelease)
+              RTNodeT
+                { label,
+                  nodeStatus,
+                  tHook,
+                  tHookRelease,
+                  tChildNode
+                } -> uu
+              RTNodeM
+                { childNodes
+                } -> uu
+              --  do atomically $ do
+              --   ns <- readTVar nodeStatus
+              --   qmt <- isEmptyTQueue childNodesM
+              --   -- assume subnodes only evicted from q when done so and
+              --   -- empty q means sub nodes are done hence parent node is deemed complete
+              --   qmt ? pure NodeComplete $ do
+              --      -- fixtures shuffled to back of queue when started so if any subnode
+              --      -- is pending the status will be pending
+              --      sn <- peekTQueue childNodesM
 
-        -- atomically $ do
-        --   qmt <- atomically $ isEmptyTQueue iterations
-        RTFix
-          { fixStatus,
-            iterations
-          } -> uu
+              -- atomically $ do
+              --   qmt <- atomically $ isEmptyTQueue iterations
+              RTFix
+                { fixStatus,
+                  iterations
+                } -> uu
+          )
   where
     executeFully :: HasExecuted -> si -> IO ti -> RunGraph si so ti to -> NodeStatus -> IO HasExecuted
     executeFully alreadyExecuted si' ioti' rg' maxStatus' =
@@ -565,6 +575,9 @@ executeNode si ioti rg maxStatus =
         -- if children are complete then parent is ready to be finalised but wont be
         -- be completed until finalisation
         NodeComplete -> updateParentStatus NodeFinalising
+
+faillChildren :: t0 -> IO HasExecuted
+faillChildren = _
 
 executeGraph :: Logger -> RunGraph s so t to -> Int -> IO ()
 executeGraph db rg maxThreads = uu

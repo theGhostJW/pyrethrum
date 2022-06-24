@@ -87,6 +87,11 @@ data FixtureStatus
   | Done CompletionStatus
   deriving (Show)
 
+
+-- all nodes get completion ststus 
+-- hookstsatus is producttype 
+-- fixstatus is removed
+
 data HookStatus
   = Unintialised
   | Intitialising
@@ -110,6 +115,9 @@ getNodeStatus = \case
   RTNodeT {nodeStatus} -> nodeStatus
   RTNodeM {mNodeStatus} -> mNodeStatus
   RTFix {fixNodeStatus} -> fixNodeStatus
+
+
+ 
 
 -- cleaningUp :: HookStatus -> Bool
 -- cleaningUp = \case
@@ -468,7 +476,7 @@ executeNode esi ioti rg maxStatus =
       else
         eitherf
           esi
-          (\e -> faillChildren rg)
+          (\e -> failChildren rg)
           ( \si -> case rg of
               RTNodeS
                 { label,
@@ -576,8 +584,9 @@ executeNode esi ioti rg maxStatus =
         -- be completed until finalisation
         NodeComplete -> updateParentStatus NodeFinalising
 
-faillChildren :: t0 -> IO HasExecuted
-faillChildren = _
+    failChildren :: Text -> Loc -> RunGraph si1 so1 ti1 to1 -> STM ()
+    failChildren msg loc child = do
+      cs <- readTVar $ getNodeStatus child
 
 executeGraph :: Logger -> RunGraph s so t to -> Int -> IO ()
 executeGraph db rg maxThreads = uu

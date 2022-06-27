@@ -78,17 +78,37 @@ data CompletionStatus
   = Normal
   | Murdered Text
   | Error Text SomeException
-  deriving Show
+  deriving (Show)
 
 data Status
   = Pending
   | HookExecuting -- only relevant to hooks
-  | HookExecutionComplete -- only relevant to hooks
   | Running
   | FullyRunning
   | HookFinalising -- only relevant to hooks
   | Done CompletionStatus
-  deriving Show
+  deriving (Show)
+
+-- I don't want to create misleading Eq, Ord typeclasses on Status
+-- where Completion status does not have a meaningful Eq, Ord
+-- so use StatusEnum for comparison
+data StatusEnum
+  = EnumPending
+  | EnumHookExecuting -- only relevant to hooks
+  | EnumRunning
+  | EnumFullyRunning
+  | EnumHookFinalising -- only relevant to hooks
+  | EnumDone
+  deriving (Show, Eq, Ord)
+
+asEnum :: Status -> StatusEnum
+asEnum = \case
+  Pending -> EnumPending
+  HookExecuting -> EnumHookExecuting
+  Running -> EnumRunning
+  FullyRunning -> EnumFullyRunning
+  HookFinalising -> EnumHookFinalising
+  Done cs -> EnumDone
 
 -- setCompletion :: CompletionStatus -> RunGraph si so ti to -> STM ()
 -- setCompletion cs rg =
@@ -199,31 +219,31 @@ data RunGraph si so ti to where
     } ->
     RunGraph si () ti ()
 
-lockHook :: TVar Status -> STM Bool
-lockHook hs = do
-  s <- readTVar hs
-  s == Pending
-    ? (writeTVar hs HookExecuting >> pure True)
-    $ pure False
+-- lockHook :: TVar Status -> STM Bool
+-- lockHook hs = do
+--   s <- readTVar hs
+--   s == Pending
+--     ? (writeTVar hs HookExecuting >> pure True)
+--     $ pure False
 
-getHookVal :: TVar Status -> TMVar (Either SomeException s) -> IO s -> IO (Either SomeException s)
-getHookVal hs mv ios = do
-  locked <- atomically $ lockHook hs
-  if locked
-    then
-      catchAll
-        ( do
-            s <- ios
-            let r = Right s
-            atomically $ putTMVar mv r
-            pure r
-        )
-        ( \e -> do
-            let r = Left e
-            atomically $ putTMVar mv r
-            pure r
-        )
-    else atomically $ readTMVar mv
+-- getHookVal :: TVar Status -> TMVar (Either SomeException s) -> IO s -> IO (Either SomeException s)
+-- getHookVal hs mv ios = do
+--   locked <- atomically $ lockHook hs
+--   if locked
+--     then
+--       catchAll
+--         ( do
+--             s <- ios
+--             let r = Right s
+--             atomically $ putTMVar mv r
+--             pure r
+--         )
+--         ( \e -> do
+--             let r = Left e
+--             atomically $ putTMVar mv r
+--             pure r
+--         )
+--     else atomically $ readTMVar mv
 
 prepare :: PreNode () () () () -> IO (RunGraph () () () ())
 prepare =
@@ -238,7 +258,7 @@ prepare =
 
     prepare' :: Loc -> Int -> PreNode s so t to -> IO (RunGraph s so t to)
     prepare' parentLoc subElmIdx pn = do
-      ns <- newTVarIO NodePending
+      ns <- newTVarIO Pending
       done :: TMVar CompletionStatus <- newEmptyTMVarIO
       case pn of
         Branch
@@ -340,7 +360,7 @@ takeIteration fixture@InitialisedFixture {iterations, fixStatus} = do
         >>= either
           (const $ pure Nothing)
           ( \case
-              [] -> pure Nothing
+              [] -> pure Nothinghook
               x : xs -> do
                 writeTVar iterations $ Right xs
                 pure . Just $ IterationRun fixture x
@@ -363,89 +383,46 @@ data HookResult so = HookResult
     value :: Either SomeException so
   }
 
-getSHookVal :: forall si so. (si -> IO so) -> si -> TVar Status -> TMVar (Either SomeException so) -> Loc -> IO (HookResult so)
-getSHookVal sHook si hs sHookVal loc = do
+hookVal :: forall hi ho. (hi -> IO ho) -> hi -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
+hookVal hook hi hs hkVal loc = do
   mCache <- atomically readOrLock
   maybef
     mCache
-    ( catchAll
-        (sHook si >>= atomically . recordHookCompletion . Right)
-        (atomically . recordHookCompletion . Left)
+    ( (hook hi >>= atomically . recordHookCompletion . Right)
+        `catchAll` (atomically . recordHookCompletion . Left)
         >>= pure . HookResult CacheMiss
     )
     (pure . HookResult Cached)
   where
-    readOrLock :: STM (Maybe (Either SomeException so))
+    readOrLock :: STM (Maybe (Either SomeException ho))
     readOrLock =
       do
         s <- readTVar hs
         if s == Pending
           then do
-            writeTVar hs Executing
+            writeTVar hs HookExecuting
             pure Nothing
           else do
-            Just <$> readTMVar sHookVal
+            Just <$> readTMVar hkVal
 
-    recordHookCompletion :: Either SomeException so -> STM (Either SomeException so)
+    recordHookCompletion :: Either SomeException ho -> STM (Either SomeException ho)
     recordHookCompletion eso = do
-      putTMVar sHookVal eso
+      putTMVar hkVal eso
       eitherf
         eso
-        ( \e -> do
-            writeTVar hs Finalised
-            setCompletionStatus completionStatus $ Fault ("Hook failed " <> unLoc loc) e
-        )
-        ( \_ -> do
-            writeTVar hs ExecutionComplete
-            -- compltion status is set after children run
-        )
+        (writeTVar hs . Done . Error ("Hook failed " <> unLoc loc))
+        (const $ writeTVar hs Running)
       pure eso
 
 data HasExecuted = Executed | NotExecuted deriving (Eq, Show)
 
 data CycleState = Continue | Wait | Stop deriving (Eq, Show)
 
-data Memoized to = Memoized
-  { 
-    threadHookStatus :: TVar Status,
-    value :: TMVar (Either SomeException to)
-  }
-
--- need to pass in and update the threadHookStatus because we don't know if
--- when this will be called, it is set up then passed down to the child nodes
-threadSource :: forall to si ti. Memoized to -> si -> IO ti -> (si -> ti -> IO to) -> IO (Either SomeException to)
-threadSource Memoized {threadHookStatus, value} si ti hk = do
-  to <- atomically getOrLock
-  case to of
-    Just to' -> pure to'
-    Nothing ->
-      finally
-        ( catchAll
-            ( do
-                atomically $ writeTVar threadHookStatus NodeStarted
-                to' <- ti >>= hk si
-                let r = Right to'
-                atomically $ putTMVar value r >> pure r
-            )
-            ( \e ->
-                let r = Left e
-                 in atomically $ do
-                      writeTVar threadHookStatus NodeComplete
-                      putTMVar value r
-                      pure r
-            )
-        )
-        (atomically $ writeTVar loading False)
-  where
-    getOrLock :: STM (Maybe (Either SomeException to))
-    getOrLock = do
-      c <- tryReadTMVar value
-      isJust c
-        ? pure c
-        $ readTVar loading
-          >>= bool
-            (writeTVar loading True >> pure Nothing)
-            (Just <$> readTMVar value)
+threadSource :: forall to si ti. TMVar (Either SomeException to) -> TVar Status -> si -> IO ti -> (si -> ti -> IO to) -> Loc -> IO (Either SomeException to)
+threadSource mHkVal hkStatus si tio hk loc =
+  do
+    ti <- tio
+    value <$> hookVal (hk si) ti hkStatus mHkVal loc
 
 failRecursively :: forall si so ti to. Text -> SomeException -> RunGraph si so ti to -> STM ()
 failRecursively msg e rg =
@@ -483,26 +460,28 @@ executeFully alreadyExecuted si ioti rg maxStatus' =
     recurse hasEx = executeNode si ioti rg
 
     cycleState :: Status -> CycleState
-    cycleState = \case
-      -- NodePending -> Continue
-      -- NodeStarted -> Continue
-      -- NodeFullyRunning -> Wait
-      -- NodeComplete -> Stop
+    cycleState = \case {}
+
+-- NodePending -> Continue
+-- NodeStarted -> Continue
+-- NodeFullyRunning -> Wait
+-- NodeComplete -> Stop
 
 updateHookStatusFromChild :: TVar Status -> RunGraph si1 so1 ti1 to1 -> STM ()
 updateHookStatusFromChild parentStatus child = uu
-  -- do
-  -- cs <- getStatus child
-  -- let updateParentStatus ns = modifyTVar parentStatus (\s -> s < ns ? ns $ s)
-  -- case cs of
-  --   NodePending -> pure ()
-  --   NodeStarted -> pure ()
-  --   -- if children are fully running then parent is fully running
-  --   NodeFullyRunning -> updateParentStatus FullyRunningChildren
-  --   -- NodeFinalising -> pure ()?
-  --   -- if children are complete then parent is ready to be finalised but wont be
-  --   -- be completed until finalisation
-  --   NodeComplete -> updateParentStatus Finalising
+
+-- do
+-- cs <- getStatus child
+-- let updateParentStatus ns = modifyTVar parentStatus (\s -> s < ns ? ns $ s)
+-- case cs of
+--   NodePending -> pure ()
+--   NodeStarted -> pure ()
+--   -- if children are fully running then parent is fully running
+--   NodeFullyRunning -> updateParentStatus FullyRunningChildren
+--   -- NodeFinalising -> pure ()?
+--   -- if children are complete then parent is ready to be finalised but wont be
+--   -- be completed until finalisation
+--   NodeComplete -> updateParentStatus Finalising
 
 executeNode :: si -> IO (Either SomeException ti) -> RunGraph si so ti to -> Status -> IO HasExecuted
 executeNode si ioti rg maxStatus =

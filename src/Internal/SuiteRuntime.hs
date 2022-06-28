@@ -110,70 +110,22 @@ asEnum = \case
   HookFinalising -> EnumHookFinalising
   Done cs -> EnumDone
 
--- setCompletion :: CompletionStatus -> RunGraph si so ti to -> STM ()
--- setCompletion cs rg =
---   setCompletionStatus completionStatus cs
---   where
---     completionStatus = case rg of
---       RTNodeS {done} -> done
---       RTNodeT {done} -> done
---       RTNodeM {mDone} -> mDone
---       RTFix {fDone} -> fDone
+getStatusTVar :: RunGraph si so ti to -> TVar Status
+getStatusTVar = \case
+  RTNodeS {status} -> status
+  RTNodeT {status} -> status
+  RTNodeM {nStatus} -> nStatus
+  RTFix {nStatus} -> nStatus
 
--- setCompletionStatus :: TMVar CompletionStatus -> CompletionStatus -> STM ()
--- setCompletionStatus mOldval new =
---   isEmptyTMVar mOldval
---     >>= bool
---       ( readTMVar mOldval
---           >>= \case
---             Normal -> void $ swapTMVar mOldval new
---             Murdered _ -> pure ()
---             Fault _ _ -> pure ()
---       )
---       (putTMVar mOldval new)
+getStatus :: RunGraph si so ti to -> STM Status
+getStatus = readTVar . getStatusTVar
 
--- cleaningUp :: Status -> Bool
--- cleaningUp = \case
---   Unintialised -> False
---   Intitialising -> False
---   Running -> False
---   Complete cs -> False
---   BeingMurdered -> True
---   Finalising -> True
---   Finalised _ -> False
+getEnumStatus :: RunGraph si so ti to -> STM StatusEnum
+getEnumStatus = fmap asEnum . getStatus
 
--- finalised :: Status -> Bool
--- finalised = \case
---   Unintialised -> False
---   Intitialising -> False
---   Running -> False
---   Complete cs -> False
---   BeingMurdered -> False
---   Finalising -> False
---   Finalised _ -> True
-
--- complete :: Status -> Bool
--- complete = \case
---   Unintialised -> False
---   Intitialising -> False
---   Running -> False
---   Complete cs -> True
---   BeingMurdered -> False
---   Finalising -> False
---   Finalised _ -> False
-
--- normalCompletion :: Status -> Bool
--- normalCompletion = \case
---   Unintialised -> False
---   Intitialising -> False
---   Running -> False
---   Complete cs -> case cs of
---     Normal -> True
---     Fault {} -> False
---     Murdered _ -> False
---   Finalising -> False
---   BeingMurdered -> False
---   Finalised _ -> False
+setStatus :: RunGraph si so ti to -> Status -> STM ()
+setStatus rg s =
+  modifyTVar (getStatusTVar rg) (\oldStatus -> asEnum oldStatus < asEnum s ? s $ oldStatus)
 
 data IdxLst a = IdxLst
   { maxIndex :: Int,
@@ -196,7 +148,7 @@ data RunGraph si so ti to where
     RunGraph si so ti to
   RTNodeT ::
     { label :: Loc,
-      nodeStatus :: TVar Status,
+      status :: TVar Status,
       tHook :: si -> ti -> IO to,
       tHookRelease :: to -> IO (),
       tChildNode :: RunGraph si so to tc
@@ -204,7 +156,7 @@ data RunGraph si so ti to where
     RunGraph si so ti to
   RTNodeM ::
     { mlabel :: Loc,
-      mNodeStatus :: TVar Status,
+      nStatus :: TVar Status,
       childNodes :: TQueue (RunGraph si so ti to),
       fullyRunning :: TQueue (RunGraph si so ti to)
     } ->
@@ -213,7 +165,7 @@ data RunGraph si so ti to where
     { fxlabel :: Loc,
       logStart :: IO (),
       -- fixStatus :: TVar FixtureStatus,
-      fixNodeStatus :: TVar Status,
+      nStatus :: TVar Status,
       iterations :: TQueue (si -> ti -> IO ()),
       logEnd :: IO ()
     } ->
@@ -275,7 +227,7 @@ prepare =
             pure $
               RTNodeM
                 { mlabel = loc,
-                  mNodeStatus = ns,
+                  nStatus = ns,
                   childNodes = q,
                   fullyRunning = fr
                 }
@@ -314,7 +266,7 @@ prepare =
                   pure $
                     RTNodeT
                       { label = loc,
-                        nodeStatus = ns,
+                        status = ns,
                         tHook = threadHook loc,
                         tHookRelease = threadHookRelease loc,
                         tChildNode = child
@@ -335,7 +287,7 @@ prepare =
                   { fxlabel = loc,
                     logStart = logStart loc,
                     -- fixStatus = s,
-                    fixNodeStatus = ns,
+                    nStatus = ns,
                     iterations = q,
                     logEnd = logEnd loc
                   }
@@ -425,17 +377,18 @@ threadSource mHkVal hkStatus si tio hk loc =
     value <$> hookVal (hk si) ti hkStatus mHkVal loc
 
 failRecursively :: forall si so ti to. Text -> SomeException -> RunGraph si so ti to -> STM ()
-failRecursively msg e rg =
-  let cs = Fault msg e
-      fail' :: RunGraph si' so' ti' to' -> STM ()
-      fail' = failRecursively msg e
-   in do
-        setCompletion cs rg
-        case rg of
-          RTNodeS {sChildNode} -> fail' sChildNode
-          RTNodeT {tChildNode} -> fail' tChildNode
-          RTNodeM {childNodes} -> traverse_ fail' childNodes
-          RTFix {} -> pure ()
+failRecursively msg e = recurse
+  where
+    failure = Done $ Error msg e
+    recurse :: RunGraph si' so' ti' to' -> STM ()
+    recurse rg = do
+      setStatus rg failure
+      case rg of
+        RTNodeS {sChildNode} -> recurse sChildNode
+        RTNodeT {tChildNode} -> recurse tChildNode
+        RTNodeM {childNodes} -> traverse_ recurse childNodes
+        RTFix {} -> pure ()
+
 
 executeFully :: HasExecuted -> si -> IO ti -> RunGraph si so ti to -> Status -> IO HasExecuted
 executeFully alreadyExecuted si ioti rg maxStatus' =
@@ -460,7 +413,13 @@ executeFully alreadyExecuted si ioti rg maxStatus' =
     recurse hasEx = executeNode si ioti rg
 
     cycleState :: Status -> CycleState
-    cycleState = \case {}
+    cycleState = \case
+      Pending -> _
+      HookExecuting -> _
+      Running -> _
+      FullyRunning -> _
+      HookFinalising -> _
+      Done cs -> _
 
 -- NodePending -> Continue
 -- NodeStarted -> Continue
@@ -510,7 +469,7 @@ executeNode si ioti rg maxStatus =
                   (when hkExecuted $ releaseHook so status ns label sHookRelease)
         RTNodeT
           { label,
-            nodeStatus,
+            status,
             tHook,
             tHookRelease,
             tChildNode
@@ -531,7 +490,7 @@ executeNode si ioti rg maxStatus =
         -- atomically $ do
         --   qmt <- atomically $ isEmptyTQueue iterations
         RTFix
-          { fixNodeStatus,
+          { nStatus,
             iterations
           } -> uu
   where

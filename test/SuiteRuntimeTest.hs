@@ -256,7 +256,7 @@ mkFixture q itCount = do
 -- mkHook :: TQueue RunEvent -> so -> IO (PreNode so so2 ti to) -> IO (PreNode si so ti to)
 mkHook q hko nodeChild =
   do
-    status <- atomically $ newTVar S.Unintialised
+    status <- atomically $ newTVar S.Pending
     rslt <- (newEmptyTMVarIO :: IO (TMVar (Either SomeException o)))
     nc <- nodeChild
     pure

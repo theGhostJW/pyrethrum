@@ -82,10 +82,10 @@ data CompletionStatus
 
 data Status
   = Pending
-  | HookExecuting -- only relevant to hooks
+  | SingletonHookExecuting -- only relevant to hooks
   | Running
   | FullyRunning
-  | HookFinalising -- only relevant to hooks
+  | SingletonHookFinalising -- only relevant to hooks
   | Done CompletionStatus
   deriving (Show)
 
@@ -94,20 +94,20 @@ data Status
 -- so use StatusEnum for comparison
 data StatusEnum
   = EnumPending
-  | EnumHookExecuting -- only relevant to hooks
+  | EnumSingletonHookExecuting -- only relevant to hooks
   | EnumRunning
   | EnumFullyRunning
-  | EnumHookFinalising -- only relevant to hooks
+  | EnumSingletonHookFinalising -- only relevant to hooks
   | EnumDone
   deriving (Show, Eq, Ord)
 
 asEnum :: Status -> StatusEnum
 asEnum = \case
   Pending -> EnumPending
-  HookExecuting -> EnumHookExecuting
+  SingletonHookExecuting -> EnumSingletonHookExecuting
   Running -> EnumRunning
   FullyRunning -> EnumFullyRunning
-  HookFinalising -> EnumHookFinalising
+  SingletonHookFinalising -> EnumSingletonHookFinalising
   Done cs -> EnumDone
 
 getStatusTVar :: RunGraph si so ti to -> TVar Status
@@ -123,9 +123,38 @@ getStatus = readTVar . getStatusTVar
 getEnumStatus :: RunGraph si so ti to -> STM StatusEnum
 getEnumStatus = fmap asEnum . getStatus
 
+canRun :: RunGraph si so ti to -> STM Bool
+canRun rg =
+  canRun' <$> getStatus rg
+  where
+    canRun' = \case
+      Pending -> True
+      SingletonHookExecuting -> True
+      Running -> True
+      FullyRunning -> False
+      SingletonHookFinalising -> False
+      Done _ -> False
+
 setStatus :: RunGraph si so ti to -> Status -> STM ()
-setStatus rg s =
-  modifyTVar (getStatusTVar rg) (\oldStatus -> asEnum oldStatus < asEnum s ? s $ oldStatus)
+setStatus rg = writeTVar (getStatusTVar rg)
+
+waitSetStatusFromChild :: RunGraph si so ti to -> RunGraph si' so' ti' to' -> STM ()
+waitSetStatusFromChild parent child = do
+  childStatus <- getStatus child
+  case childStatus of
+    Pending -> retry
+    SingletonHookExecuting -> retry
+    Running -> retry
+    FullyRunning -> retry
+    SingletonHookFinalising -> retry
+    Done cs ->
+      setStatus parent $
+        Done
+          ( case cs of
+              Normal -> Normal
+              m@Murdered {} -> m
+              Error msg e -> Error ("child failed:\n" <> msg) e
+          )
 
 data IdxLst a = IdxLst
   { maxIndex :: Int,
@@ -164,7 +193,6 @@ data RunGraph si so ti to where
   RTFix ::
     { fxlabel :: Loc,
       logStart :: IO (),
-      -- fixStatus :: TVar FixtureStatus,
       nStatus :: TVar Status,
       iterations :: TQueue (si -> ti -> IO ()),
       logEnd :: IO ()
@@ -175,7 +203,7 @@ data RunGraph si so ti to where
 -- lockHook hs = do
 --   s <- readTVar hs
 --   s == Pending
---     ? (writeTVar hs HookExecuting >> pure True)
+--     ? (writeTVar hs SingletonHookExecuting >> pure True)
 --     $ pure False
 
 -- getHookVal :: TVar Status -> TMVar (Either SomeException s) -> IO s -> IO (Either SomeException s)
@@ -328,47 +356,37 @@ takeIteration fixture@InitialisedFixture {iterations, fixStatus} = do
 --   RTNodeM loc tv il -> _
 --   RTFix loc io tv tq io' -> _
 
-data Cached = Cached | CacheMiss deriving (Eq, Show)
-
 data HookResult so = HookResult
-  { cached :: Cached,
+  { hasExecuted :: Bool,
     value :: Either SomeException so
   }
 
 hookVal :: forall hi ho. (hi -> IO ho) -> hi -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
-hookVal hook hi hs hkVal loc = do
-  mCache <- atomically readOrLock
-  maybef
-    mCache
-    ( (hook hi >>= atomically . recordHookCompletion . Right)
-        `catchAll` (atomically . recordHookCompletion . Left)
-        >>= pure . HookResult CacheMiss
-    )
-    (pure . HookResult Cached)
+hookVal hook hi hs hkVal loc =
+  atomically readOrLock
+    >>= maybe
+      ( catchAll
+          (hook hi >>= atomically . setHookStatus . Right)
+          (atomically . setHookStatus . Left)
+          >>= pure . HookResult True
+      )
+      (pure . HookResult False)
   where
     readOrLock :: STM (Maybe (Either SomeException ho))
-    readOrLock =
-      do
-        s <- readTVar hs
-        if s == Pending
-          then do
-            writeTVar hs HookExecuting
-            pure Nothing
-          else do
-            Just <$> readTMVar hkVal
+    readOrLock = do
+      s <- readTVar hs
+      asEnum s == EnumPending ?
+        (writeTVar hs SingletonHookExecuting >> pure Nothing) $
+        (Just <$> readTMVar hkVal)
 
-    recordHookCompletion :: Either SomeException ho -> STM (Either SomeException ho)
-    recordHookCompletion eso = do
+    setHookStatus :: Either SomeException ho -> STM (Either SomeException ho)
+    setHookStatus eso = do
       putTMVar hkVal eso
-      eitherf
-        eso
-        (writeTVar hs . Done . Error ("Hook failed " <> unLoc loc))
-        (const $ writeTVar hs Running)
+      eso
+        & either
+          (writeTVar hs . Done . Error ("Hook failed " <> unLoc loc))
+          (const $ writeTVar hs Running)
       pure eso
-
-data HasExecuted = Executed | NotExecuted deriving (Eq, Show)
-
-data CycleState = Continue | Wait | Stop deriving (Eq, Show)
 
 threadSource :: forall to si ti. TMVar (Either SomeException to) -> TVar Status -> si -> IO ti -> (si -> ti -> IO to) -> Loc -> IO (Either SomeException to)
 threadSource mHkVal hkStatus si tio hk loc =
@@ -386,40 +404,29 @@ failRecursively msg e = recurse
       case rg of
         RTNodeS {sChildNode} -> recurse sChildNode
         RTNodeT {tChildNode} -> recurse tChildNode
-        RTNodeM {childNodes} -> traverse_ recurse childNodes
-        RTFix {} -> pure ()
+        up to here
+        RTNodeM {childNodes} -> uu -- think what to do with thread hooks and runnin g/ fully running children traverse_ recurse childNodes
+        RTFix {nStatus} -> uu
 
-
-executeFully :: HasExecuted -> si -> IO ti -> RunGraph si so ti to -> Status -> IO HasExecuted
-executeFully alreadyExecuted si ioti rg maxStatus' =
-  case cycleState maxStatus' of
-    Continue ->
-      executeNode si ioti rg maxStatus' >>= \case
-        Executed -> recurse Executed maxStatus'
-        NotExecuted -> recurse NotExecuted (succ maxStatus')
-    Wait -> do
-      -- just keep looping until node status
-      -- is at least finalising / updating on the basis
-      -- of child status on each loop
-      atomically $ do
-        nsv <- getStatus rg
-        let cs = cycleState nsv
-        unless (cs == Stop) $
-          updateHookStatusFromChild ns rg >> retry
-      pure alreadyExecuted
-    Stop -> pure alreadyExecuted
-  where
-    recurse :: HasExecuted -> Status -> IO HasExecuted
-    recurse hasEx = executeNode si ioti rg
-
-    cycleState :: Status -> CycleState
-    cycleState = \case
-      Pending -> _
-      HookExecuting -> _
-      Running -> _
-      FullyRunning -> _
-      HookFinalising -> _
-      Done cs -> _
+-- case cycleState maxStatus' of
+--   Continue ->
+--     executeNode si ioti rg maxStatus' >>= \case
+--       Executed -> recurse Executed maxStatus'
+--       NotExecuted -> recurse NotExecuted (succ maxStatus')
+--   Wait -> do
+--     -- just keep looping until node status
+--     -- is at least finalising / updating on the basis
+--     -- of child status on each loop
+--     atomically $ do
+--       nsv <- getStatus rg
+--       let cs = cycleState nsv
+--       unless (cs == Stop) $
+--         updateHookStatusFromChild ns rg >> retry
+--     pure alreadyExecuted
+--   Stop -> pure alreadyExecuted
+-- where
+--   recurse :: HasExecuted -> Status -> IO HasExecuted
+--   recurse hasEx = executeNode si ioti rg
 
 -- NodePending -> Continue
 -- NodeStarted -> Continue
@@ -442,13 +449,13 @@ updateHookStatusFromChild parentStatus child = uu
 --   -- be completed until finalisation
 --   NodeComplete -> updateParentStatus Finalising
 
-executeNode :: si -> IO (Either SomeException ti) -> RunGraph si so ti to -> Status -> IO HasExecuted
-executeNode si ioti rg maxStatus =
+executeNode :: si -> IO ti -> RunGraph si so ti to -> IO ()
+executeNode si ioti rg =
   do
-    nsv <- atomically $ getStatus rg
-    nsv > maxStatus
-      ? pure NotExecuted
-      $ case rg of
+    wantRun <- atomically $ canRun rg
+    when
+      wantRun
+      case rg of
         RTNodeS
           { label,
             status,
@@ -456,17 +463,36 @@ executeNode si ioti rg maxStatus =
             sHookRelease,
             sHookVal,
             sChildNode
-          } -> do
-            -- getSHookVal handles exceptions and updates status of node and hook
-            HookResult {cached, value} <- getSHookVal sHook si status sHookVal done label
-            let hkExecuted = cached == CacheMiss
-            eitherf
-              value
-              (const . pure $ hkExecuted ? Executed $ NotExecuted)
-              \so ->
-                finally
-                  (executeFully (hkExecuted ? Executed $ NotExecuted) so ioti sChildNode maxStatus)
-                  (when hkExecuted $ releaseHook so status ns label sHookRelease)
+          } ->
+            do
+              -- hookVal:
+              --  1. runs hook if required
+              --  2. waits if hook is running
+              --  3. updates hook status
+              --  4. returns hook result
+              HookResult {hasExecuted, value} <- hookVal sHook si status sHookVal label
+              if hasExecuted
+                then
+                  value -- the hook that executes waits for child completion and sets status
+                    & either
+                      ( \e ->
+                          atomically $
+                            -- status already set by hookVal
+                            failRecursively ("Parent hook failed: " <> unLoc label) e sChildNode
+                      )
+                      ( \so ->
+                          finally
+                            (executeNode so ioti sChildNode)
+                            ( do
+                                atomically $ waitSetStatusFromChild rg sChildNode
+                                releaseHook so status label sHookRelease
+                            )
+                      )
+                else
+                  value
+                    & either
+                      (const $ pure ())
+                      (\so -> executeNode so ioti sChildNode)
         RTNodeT
           { label,
             status,
@@ -494,20 +520,41 @@ executeNode si ioti rg maxStatus =
             iterations
           } -> uu
   where
-    releaseHook :: so -> TVar Status -> TVar Status -> Loc -> (so -> IO ()) -> IO ()
-    releaseHook so hs ns label aftrHk =
-      catchAny
-        ( do
-            aftrHk so
-            atomically $ do
-              writeTVar hs . Finalised $ Normal
-              writeTVar ns NodeComplete
-        )
-        ( \e -> do
-            atomically $ do
-              writeTVar hs . Finalised $ Fault ("singleton after hook failed: " <> unLoc label) e
-              writeTVar ns NodeComplete
-        )
+    releaseHook :: so -> TVar Status -> Loc -> (so -> IO ()) -> IO ()
+    releaseHook so ns label hkRelease =
+      catchAll
+        (hkRelease so >> atomically (writeTVar ns $ Done Normal))
+        $ atomically . writeTVar ns . Done . Error ("singleton after hook failed: " <> unLoc label)
+
+-- -- keeps execuitng a node until it is complete
+-- completeChildren :: HasExecuted -> si -> IO ti -> RunGraph si so ti to -> Status -> IO HasExecuted
+-- completeChildren alreadyExecuted si ioti rg maxStatus =
+--   case maxStatus of
+--     Pending -> uu
+--     SingletonHookExecuting -> uu
+--     Running -> uu
+--     FullyRunning -> uu
+--     SingletonHookFinalising -> uu
+--     Done cs -> pure alreadyExecuted
+--   where
+--     wantContinue :: STM Bool
+--     wantContinue = do
+--       st <- readTVar status
+--       case st of
+--         Pending -> pure True
+--         SingletonHookExecuting -> retry
+--         Running -> pure True
+--         FullyRunning -> retry
+--         SingletonHookFinalising -> pure True
+--         Done _ -> pure False
+
+--     continueExecuting =
+--       executeNode si ioti rg maxStatus >>= \case
+--         Executed -> recurse Executed maxStatus
+--         NotExecuted -> recurse NotExecuted (succ maxStatus)
+
+-- recurse :: HasExecuted -> Status -> IO HasExecuted
+-- recurse hasEx = executeNode si ioti rg
 
 executeGraph :: Logger -> RunGraph s so t to -> Int -> IO ()
 executeGraph db rg maxThreads = uu

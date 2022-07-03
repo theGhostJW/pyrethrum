@@ -138,23 +138,16 @@ canRun rg =
 setStatus :: RunGraph si so ti to -> Status -> STM ()
 setStatus rg = writeTVar (getStatusTVar rg)
 
-waitSetStatusFromChild :: RunGraph si so ti to -> RunGraph si' so' ti' to' -> STM ()
-waitSetStatusFromChild parent child = do
-  childStatus <- getStatus child
-  case childStatus of
-    Pending -> retry
-    SingletonHookExecuting -> retry
-    Running -> retry
-    FullyRunning -> retry
-    SingletonHookFinalising -> retry
-    Done cs ->
-      setStatus parent $
-        Done
-          ( case cs of
-              Normal -> Normal
-              m@Murdered {} -> m
-              Error msg e -> Error ("child failed:\n" <> msg) e
-          )
+waitDone :: RunGraph si so ti to -> STM ()
+waitDone rg =
+  getStatus rg
+    >>= \case
+      Pending -> retry
+      SingletonHookExecuting -> retry
+      Running -> retry
+      FullyRunning -> retry
+      SingletonHookFinalising -> retry
+      Done _ -> pure ()
 
 data IdxLst a = IdxLst
   { maxIndex :: Int,
@@ -336,11 +329,26 @@ hookVal hook hi hs hkVal loc =
           (const $ writeTVar hs Running)
       pure eso
 
-threadSource :: forall to si ti. TMVar (Either SomeException to) -> TVar Status -> si -> IO ti -> (si -> ti -> IO to) -> Loc -> IO (Either SomeException to)
+threadSource ::
+  forall si ti to.
+  -- | cached value
+  TMVar (Either SomeException to) ->
+  -- | status
+  TVar Status ->
+  -- | singleton in
+  si ->
+  -- | thread hook in
+  IO (Either SomeException ti) ->
+  -- | thread hook
+  (si -> ti -> IO to) ->
+  -- | hook location
+  Loc ->
+  IO (Either SomeException to)
 threadSource mHkVal hkStatus si tio hk loc =
-  do
-    ti <- tio
-    value <$> hookVal (hk si) ti hkStatus mHkVal loc
+  tio
+    >>= either
+      (pure . Left)
+      (\ti -> value <$> hookVal (hk si) ti hkStatus mHkVal loc)
 
 failRecursively :: forall si so ti to. Text -> SomeException -> RunGraph si so ti to -> STM ()
 failRecursively msg e = recurse
@@ -373,8 +381,7 @@ failRecursively msg e = recurse
           failQ fullyRunning
         RTFix {iterations} -> emptyQ iterations
 
-
-executeNode :: si -> IO ti -> RunGraph si so ti to -> IO ()
+executeNode :: si -> IO (Either SomeException ti) -> RunGraph si so ti to -> IO ()
 executeNode si ioti rg =
   do
     wantRun <- atomically $ canRun rg
@@ -395,10 +402,10 @@ executeNode si ioti rg =
               --  2. waits if hook is running
               --  3. updates hook status
               --  4. returns hook result
-              HookResult {hasExecuted, value} <- hookVal sHook si status sHookVal label
+              HookResult {hasExecuted, value = ethHkRslt} <- hookVal sHook si status sHookVal label
               if hasExecuted
                 then
-                  value -- the hook that executes waits for child completion and sets status
+                  ethHkRslt -- the hook that executes waits for child completion and sets status
                     & either
                       ( \e ->
                           atomically $
@@ -409,12 +416,12 @@ executeNode si ioti rg =
                           finally
                             (executeNode so ioti sChildNode)
                             ( do
-                                atomically $ waitSetStatusFromChild rg sChildNode
+                                atomically $ waitDone sChildNode
                                 releaseHook so status label sHookRelease
                             )
                       )
                 else
-                  value
+                  ethHkRslt
                     & either
                       (const $ pure ())
                       (\so -> executeNode so ioti sChildNode)
@@ -424,13 +431,22 @@ executeNode si ioti rg =
             tHook,
             tHookRelease,
             tChildNode
-          } -> 
-            do 
+          } ->
+            do
               toVal <- newEmptyTMVarIO
               let ts = threadSource toVal status si ioti tHook label
-              uu
-        
-        
+              finally
+                (executeNode si ts tChildNode)
+                ( do
+                    -- do NOT wait DONE - by the time I get here I'm already done
+                    if isEmptyMVar toVal
+                      --- deal with no iterations run
+                      -- no need to releasew hook 
+                      -- update status to done
+                    else 
+
+                    releaseHook ts status label tHookRelease
+                )
         RTNodeM
           { childNodes
           } -> uu
@@ -451,7 +467,7 @@ executeNode si ioti rg =
             iterations
           } -> uu
   where
-    releaseHook :: so -> TVar Status -> Loc -> (so -> IO ()) -> IO ()
+    releaseHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
     releaseHook so ns label hkRelease =
       catchAll
         (hkRelease so >> atomically (writeTVar ns $ Done Normal))

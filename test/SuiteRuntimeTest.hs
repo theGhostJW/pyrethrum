@@ -680,9 +680,11 @@ shk - t1
     ~ structure
     ~ implementation
     ~ reinstate existing tests
+    
     ~ update validation
     ~ tests
 
+  ~ thread through logging
   ~ advnced tests
   
   ~ hook timeout

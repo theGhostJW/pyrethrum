@@ -82,7 +82,7 @@ data CompletionStatus
 
 data Status
   = Pending
-  | SingletonHookExecuting -- only relevant to hooks
+  | HookExecuting -- only relevant to hooks
   | Running
   | FullyRunning
   | SingletonHookFinalising -- only relevant to hooks
@@ -94,7 +94,7 @@ data Status
 -- so use StatusEnum for comparison
 data StatusEnum
   = EnumPending
-  | EnumSingletonHookExecuting -- only relevant to hooks
+  | EnumHookExecuting -- only relevant to hooks
   | EnumRunning
   | EnumFullyRunning
   | EnumSingletonHookFinalising -- only relevant to hooks
@@ -104,7 +104,7 @@ data StatusEnum
 asEnum :: Status -> StatusEnum
 asEnum = \case
   Pending -> EnumPending
-  SingletonHookExecuting -> EnumSingletonHookExecuting
+  HookExecuting -> EnumHookExecuting
   Running -> EnumRunning
   FullyRunning -> EnumFullyRunning
   SingletonHookFinalising -> EnumSingletonHookFinalising
@@ -129,7 +129,7 @@ canRun rg =
   where
     canRun' = \case
       Pending -> True
-      SingletonHookExecuting -> True
+      HookExecuting -> True
       Running -> True
       FullyRunning -> False
       SingletonHookFinalising -> False
@@ -138,17 +138,20 @@ canRun rg =
 setStatus :: RunGraph si so ti to -> Status -> STM ()
 setStatus rg = writeTVar (getStatusTVar rg)
 
-waitDone :: RunGraph si so ti to -> STM ()
-waitDone rg =
-  getStatus rg
-    >>= \case
-      Pending -> retry
-      SingletonHookExecuting -> retry
-      Running -> retry
-      FullyRunning -> retry
-      SingletonHookFinalising -> retry
-      Done _ -> pure ()
+isDone :: Status -> Bool
+isDone = \case
+      Pending -> False
+      HookExecuting -> False
+      Running -> False
+      FullyRunning -> False
+      SingletonHookFinalising -> False
+      Done _ -> True
 
+waitDone :: RunGraph si so ti to -> STM ()
+waitDone rg = do
+  s <- getStatus rg
+  unless (isDone s) retry
+  
 data IdxLst a = IdxLst
   { maxIndex :: Int,
     lst :: [a],
@@ -317,7 +320,7 @@ hookVal hook hi hs hkVal loc =
     readOrLock = do
       s <- readTVar hs
       asEnum s == EnumPending
-        ? (writeTVar hs SingletonHookExecuting >> pure Nothing)
+        ? (writeTVar hs HookExecuting >> pure Nothing)
         $ (Just <$> readTMVar hkVal)
 
     setHookStatus :: Either SomeException ho -> STM (Either SomeException ho)
@@ -433,19 +436,29 @@ executeNode si ioti rg =
             tChildNode
           } ->
             do
+              -- create a new instance of cache for every thread
               toVal <- newEmptyTMVarIO
               let ts = threadSource toVal status si ioti tHook label
               finally
                 (executeNode si ts tChildNode)
                 ( do
-                    -- do NOT wait DONE - by the time I get here I'm already done
-                    if isEmptyMVar toVal
-                      --- deal with no iterations run
+                    -- only run clean up if hook has run
+                    notRun <- atomically $ isEmptyTMVar toVal
+                    unless notRun $ do
+                      ethHkVal <- atomically $ readTMVar toVal
+                      whenRight ethHkVal $
+                         \to -> releaseThredHook to status label tHookRelease
+
+                    atomically $ do 
+
+                      
+                      
+                      -- releaseHook cachedHookResult status label tHookRelease
+                      -- deal with no iterations run
                       -- no need to releasew hook 
                       -- update status to done
-                    else 
 
-                    releaseHook ts status label tHookRelease
+
                 )
         RTNodeM
           { childNodes
@@ -468,10 +481,17 @@ executeNode si ioti rg =
           } -> uu
   where
     releaseHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
-    releaseHook so ns label hkRelease =
+    releaseHook ho ns label hkRelease =
       catchAll
-        (hkRelease so >> atomically (writeTVar ns $ Done Normal))
+        (hkRelease ho >> atomically (writeTVar ns $ Done Normal))
         $ atomically . writeTVar ns . Done . Error ("singleton after hook failed: " <> unLoc label)
+
+    releaseThreadHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
+    releaseThreadHook ho ns label hkRelease =
+      catchAll
+        (hkRelease ho) -- don't update status might be another thread running
+        -- if clean up fails branch is deemed done even if other threads are running
+        $ atomically . writeTVar ns . Done . Error ("thread after hook failed: " <> unLoc label) 
 
 executeGraph :: Logger -> RunGraph s so t to -> Int -> IO ()
 executeGraph db rg maxThreads = uu

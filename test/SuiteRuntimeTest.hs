@@ -668,6 +668,13 @@ shk - t1
     ~ implemntation
       ~ update runtime ~ remove uu completing implementation of thread level hooks
       ~ add thread level hooks to deep nested structure
+
+
+      ~ thread through logging
+        ~ start by deleting logEnd and logStart on fixture 
+        ~ add a sink parameter 
+        ~ log start end of everything ~ include thread Id
+
       ~ reinstate existing tests
       ~ update validation to include thread level hooks
       ~ add thread level tests
@@ -680,11 +687,10 @@ shk - t1
     ~ structure
     ~ implementation
     ~ reinstate existing tests
-    
+
     ~ update validation
     ~ tests
 
-  ~ thread through logging
   ~ advnced tests
   
   ~ hook timeout

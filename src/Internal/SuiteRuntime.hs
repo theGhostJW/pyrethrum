@@ -21,6 +21,7 @@ import Pyrelude hiding
     ThreadStatus,
     atomically,
     bracket,
+    finally,
     newMVar,
     newTVarIO,
     parent,
@@ -35,6 +36,7 @@ import UnliftIO
     bracket,
     catchAny,
     concurrently_,
+    finally,
     isEmptyTBQueue,
     newMVar,
     newTMVar,
@@ -74,54 +76,24 @@ import UnliftIO.STM
   )
 import qualified Prelude as PRL
 
-data CompletionStatus
-  = Normal
-  | Murdered Text
-  | Error Text SomeException
-  deriving (Show)
-
 data Status
   = Pending
   | HookExecuting -- only relevant to hooks
   | Running
   | FullyRunning
-  | SingletonHookFinalising -- only relevant to hooks
-  | Done CompletionStatus
-  deriving (Show)
-
--- I don't want to create misleading Eq, Ord typeclasses on Status
--- where Completion status does not have a meaningful Eq, Ord
--- so use StatusEnum for comparison
-data StatusEnum
-  = EnumPending
-  | EnumHookExecuting -- only relevant to hooks
-  | EnumRunning
-  | EnumFullyRunning
-  | EnumSingletonHookFinalising -- only relevant to hooks
-  | EnumDone
+  | HookFinalising -- only relevant to hooks
+  | Done
   deriving (Show, Eq, Ord)
-
-asEnum :: Status -> StatusEnum
-asEnum = \case
-  Pending -> EnumPending
-  HookExecuting -> EnumHookExecuting
-  Running -> EnumRunning
-  FullyRunning -> EnumFullyRunning
-  SingletonHookFinalising -> EnumSingletonHookFinalising
-  Done cs -> EnumDone
 
 getStatusTVar :: RunGraph si so ti to -> TVar Status
 getStatusTVar = \case
   RTNodeS {status} -> status
-  RTNodeT {status} -> status
+  RTNodeT {tChildNode} -> getStatusTVar tChildNode
   RTNodeM {nStatus} -> nStatus
   RTFix {nStatus} -> nStatus
 
 getStatus :: RunGraph si so ti to -> STM Status
 getStatus = readTVar . getStatusTVar
-
-getEnumStatus :: RunGraph si so ti to -> STM StatusEnum
-getEnumStatus = fmap asEnum . getStatus
 
 canRun :: RunGraph si so ti to -> STM Bool
 canRun rg =
@@ -132,26 +104,17 @@ canRun rg =
       HookExecuting -> True
       Running -> True
       FullyRunning -> False
-      SingletonHookFinalising -> False
-      Done _ -> False
+      HookFinalising -> False
+      Done -> False
 
 setStatus :: RunGraph si so ti to -> Status -> STM ()
 setStatus rg = writeTVar (getStatusTVar rg)
 
-isDone :: Status -> Bool
-isDone = \case
-      Pending -> False
-      HookExecuting -> False
-      Running -> False
-      FullyRunning -> False
-      SingletonHookFinalising -> False
-      Done _ -> True
-
 waitDone :: RunGraph si so ti to -> STM ()
 waitDone rg = do
   s <- getStatus rg
-  unless (isDone s) retry
-  
+  unless (s == Done) retry
+
 data IdxLst a = IdxLst
   { maxIndex :: Int,
     lst :: [a],
@@ -173,7 +136,6 @@ data RunGraph si so ti to where
     RunGraph si so ti to
   RTNodeT ::
     { label :: Loc,
-      status :: TVar Status,
       tHook :: si -> ti -> IO to,
       tHookRelease :: to -> IO (),
       tChildNode :: RunGraph si so to tc
@@ -209,7 +171,6 @@ prepare =
     prepare' :: Loc -> Int -> PreNode s so t to -> IO (RunGraph s so t to)
     prepare' parentLoc subElmIdx pn = do
       ns <- newTVarIO Pending
-      done :: TMVar CompletionStatus <- newEmptyTMVarIO
       case pn of
         Branch
           { bTag,
@@ -264,7 +225,6 @@ prepare =
                   pure $
                     RTNodeT
                       { label = loc,
-                        status = ns,
                         tHook = threadHook loc,
                         tHookRelease = threadHookRelease loc,
                         tChildNode = child
@@ -319,7 +279,7 @@ hookVal hook hi hs hkVal loc =
     readOrLock :: STM (Maybe (Either SomeException ho))
     readOrLock = do
       s <- readTVar hs
-      asEnum s == EnumPending
+      s == Pending
         ? (writeTVar hs HookExecuting >> pure Nothing)
         $ (Just <$> readTMVar hkVal)
 
@@ -328,7 +288,7 @@ hookVal hook hi hs hkVal loc =
       putTMVar hkVal eso
       eso
         & either
-          (writeTVar hs . Done . Error ("Hook failed " <> unLoc loc))
+          (const $ writeTVar hs Done)
           (const $ writeTVar hs Running)
       pure eso
 
@@ -357,7 +317,7 @@ failRecursively :: forall si so ti to. Text -> SomeException -> RunGraph si so t
 failRecursively msg e = recurse
   where
     failure :: Status
-    failure = Done $ Error msg e
+    failure = Done
 
     failQ :: TQueue (RunGraph si' so' ti' to') -> STM ()
     failQ q =
@@ -430,7 +390,6 @@ executeNode si ioti rg =
                       (\so -> executeNode so ioti sChildNode)
         RTNodeT
           { label,
-            status,
             tHook,
             tHookRelease,
             tChildNode
@@ -438,28 +397,17 @@ executeNode si ioti rg =
             do
               -- create a new instance of cache for every thread
               toVal <- newEmptyTMVarIO
+              status <- newTVarIO Pending
               let ts = threadSource toVal status si ioti tHook label
               finally
                 (executeNode si ts tChildNode)
-                ( do
-                    -- only run clean up if hook has run
-                    notRun <- atomically $ isEmptyTMVar toVal
-                    unless notRun $ do
-                      ethHkVal <- atomically $ readTMVar toVal
-                      whenRight ethHkVal $
-                         \to -> releaseThredHook to status label tHookRelease
-
-                    atomically $ do 
-
-                      
-                      
-                      -- releaseHook cachedHookResult status label tHookRelease
-                      -- deal with no iterations run
-                      -- no need to releasew hook 
-                      -- update status to done
-
-
-                )
+                do
+                  -- only run clean up if hook has run
+                  notRun <- atomically $ isEmptyTMVar toVal
+                  unless notRun $ do
+                    ethHkVal <- atomically $ readTMVar toVal
+                    whenRight ethHkVal $
+                      \to -> releaseHook to status label tHookRelease
         RTNodeM
           { childNodes
           } -> uu
@@ -482,16 +430,9 @@ executeNode si ioti rg =
   where
     releaseHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
     releaseHook ho ns label hkRelease =
-      catchAll
-        (hkRelease ho >> atomically (writeTVar ns $ Done Normal))
-        $ atomically . writeTVar ns . Done . Error ("singleton after hook failed: " <> unLoc label)
-
-    releaseThreadHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
-    releaseThreadHook ho ns label hkRelease =
-      catchAll
-        (hkRelease ho) -- don't update status might be another thread running
-        -- if clean up fails branch is deemed done even if other threads are running
-        $ atomically . writeTVar ns . Done . Error ("thread after hook failed: " <> unLoc label) 
+      finally
+        (hkRelease ho)
+        (atomically $ writeTVar ns Done)
 
 executeGraph :: Logger -> RunGraph s so t to -> Int -> IO ()
 executeGraph db rg maxThreads = uu

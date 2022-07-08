@@ -120,13 +120,13 @@ isFixtureStats = \case
   HookStats {} -> False
   FixtureStats {} -> True
 
-countSubNodes :: (forall a b c d. PreNode a b c d -> Bool) -> PreNode e f g h -> Int
+countSubNodes :: (forall a b c d e f. PreNode a b c d e f -> Bool) -> PreNode g h i j k l -> Int
 countSubNodes pred node =
-  let countSubNodes' :: forall h i j k. Int -> PreNode h i j k -> Int
+  let countSubNodes' :: forall h i j k l m. Int -> PreNode h i j k l m -> Int
       countSubNodes' accum = \case
         b@Branch {subElms} ->
           foldl' countSubNodes' (pred b ? accum + 1 $ accum) subElms
-        ah@AnyHook {} -> pred ah ? accum + 1 $ accum
+        ah@OnceHook {} -> pred ah ? accum + 1 $ accum
         ThreadHook {} -> uu
         fx@PN.Fixture {} -> pred fx ? accum + 1 $ accum
    in countSubNodes' 0 node
@@ -135,27 +135,27 @@ getStats :: PreNodeRoot -> IO [NodeStats]
 getStats PreNodeRoot {rootNode} =
   getStats' "Root" 0 <$> rootNode
   where
-    nonEmptyFixture :: PreNode a b c d -> Bool
+    nonEmptyFixture :: PreNode a b c d e f -> Bool
     nonEmptyFixture = \case
-      PN.AnyHook {} -> False
+      PN.OnceHook {} -> False
       PN.Branch {} -> False
       ThreadHook {} -> False
       f@PN.Fixture {} -> not $ nodeEmpty f
 
-    nonEmptyHook :: PreNode a b c d -> Bool
+    nonEmptyHook :: PreNode a b c d e f -> Bool
     nonEmptyHook = \case
-      h@PN.AnyHook {} -> not $ nodeEmpty h
+      h@PN.OnceHook {} -> not $ nodeEmpty h
       PN.Branch {} -> False
       ThreadHook {} -> False
       PN.Fixture {} -> False
 
-    getStats' :: Text -> Int -> PreNode a b c d -> [NodeStats]
+    getStats' :: Text -> Int -> PreNode a b c d e f -> [NodeStats]
     getStats' parentId subIndex =
       \case
         PN.Branch {subElms} ->
           let thisId = parentId <> ".Branch " <> txt subIndex
            in (zip [0 ..] subElms >>= uncurry (getStats' thisId))
-        PN.AnyHook {hookChild} ->
+        PN.OnceHook {hookChild} ->
           let thisId = parentId <> ".Hook " <> txt subIndex
               thisNode =
                 HookStats
@@ -238,10 +238,10 @@ logMessage q txt' = logEvent q (Message txt')
 -- remove when pyrelude updated
 chkEq' t = assertEqual (toS t)
 
-mkBranch :: TQueue RunEvent -> [IO (PreNode si so ti to)] -> IO (PreNode si () ti ())
+mkBranch :: TQueue RunEvent -> [IO (PreNode si so ti to ii io)] -> IO (PreNode si () ti ()  ii ())
 mkBranch q subElms = PN.Branch Nothing <$> sequenceA subElms
 
-mkFixture :: TQueue RunEvent -> Int -> IO (PreNode i () ti ())
+mkFixture :: TQueue RunEvent -> Int -> IO (PreNode i () ti () ii ())
 mkFixture q itCount = do
   pure $
     PN.Fixture
@@ -260,7 +260,7 @@ mkHook q hko nodeChild =
     rslt <- (newEmptyTMVarIO :: IO (TMVar (Either SomeException o)))
     nc <- nodeChild
     pure
-      PN.AnyHook
+      PN.OnceHook
         { 
           hookTag = Nothing,
           hookResult = rslt,
@@ -278,7 +278,7 @@ mkIterations q size' =
       mkIt idx loc i ti = logIteration q Nothing idx loc
    in mkIt <$> [0 .. size' - 1]
 
-root :: IO (PreNode () () () ()) -> IO PreNodeRoot
+root :: IO (PreNode () () () () () ()) -> IO PreNodeRoot
 root = pure . PreNodeRoot
 
 superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
@@ -482,8 +482,8 @@ unit_simple_with_hook =
 simpleSuiteWithBranch :: TQueue RunEvent -> IO PreNodeRoot
 simpleSuiteWithBranch q =
   let subElms =
-        [ mkFixture q 2 :: IO (PreNode () () () ()),
-          mkFixture q 2 :: IO (PreNode () () () ())
+        [ mkFixture q 2 :: IO (PreNode () () () () () ()),
+          mkFixture q 2 :: IO (PreNode () () () () () ())
         ]
    in root $ mkBranch q subElms
 
@@ -503,13 +503,13 @@ simpleSuiteBranchInHook q =
 deeplyNested :: TQueue RunEvent -> IO PreNodeRoot
 deeplyNested q =
   let 
-      hk :: o -> IO (PreNode o o2 to to2) -> IO (PreNode i o to to2)
+      hk :: o -> IO (PreNode o o2 to to2 io io2) -> IO (PreNode i o to to2 io io2)
       hk = mkHook q
 
-      branch :: [IO (PreNode si so ti to)] -> IO (PreNode si () ti ())
+      branch :: [IO (PreNode si so ti to ii io)] -> IO (PreNode si () ti () ii ())
       branch = mkBranch q
 
-      fx :: Int -> IO (PreNode i () ti ())
+      fx :: Int -> IO (PreNode i () ti () ii ())
       fx = mkFixture q
    in root $
         branch
@@ -674,6 +674,7 @@ shk - t1
         ~ start by deleting logEnd and logStart on fixture 
         ~ add a sink parameter 
         ~ log start end of everything ~ include thread Id
+        ~ update validation
 
       ~ reinstate existing tests
       ~ update validation to include thread level hooks

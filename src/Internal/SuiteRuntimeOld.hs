@@ -225,7 +225,7 @@ trySetFinalising db hs' =
 recurseHookRelease :: Logger -> Node i o c d -> IO ()
 recurseHookRelease db n =
   do
-    -- crawls up tree releasing all AnyHooks for which sub- elements have been completed
+    -- crawls up tree releasing all OnceHooks for which sub- elements have been completed
     db "!!!!!!!! recurseHookRelease !!!!!!!!"
     case n of
       b@Branch {branchLabel, branchIn, subElms} -> do
@@ -331,7 +331,7 @@ linkParents' db parent preNode =
   do
     db "!!!!!!!! CALLING linkParents' (PRIME) !!!!! "
     case preNode of
-      PN.AnyHook {hookAddress, hook, hookStatus, hookResult, hookChild, hookRelease} -> do
+      PN.OnceHook {hookAddress, hook, hookStatus, hookResult, hookChild, hookRelease} -> do
         let h :: Node o o' to to'
             h =  Internal.SuiteRuntimeOld.SingletonHook
                 { hookLabel = hookAddress,

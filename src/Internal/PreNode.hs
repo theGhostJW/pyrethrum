@@ -4,49 +4,51 @@ import Control.DeepSeq (NFData)
 import Language.Haskell.TH (ExpQ)
 import Pyrelude (Bool (False, True), Either, Eq, Generic, IO, Int, ListLike (any, filter, null, all), Show, SomeException, TVar, Text, not, ($), (&&), Ord, Maybe)
 import UnliftIO (MonadUnliftIO, STM, TMVar)
+import Data.Map.Strict as M
 
 newtype PreNodeRoot = 
-  PreNodeRoot { rootNode :: IO (PreNode () () () ()) }
+  PreNodeRoot { rootNode :: IO (PreNode () () () () () ()) }
 
 newtype Loc = Loc { unLoc :: Text} deriving (Show, Eq, Ord)
 
-data PreNode si so ti to where
+data PreNode oi oo ti to ii io where
   Branch :: {
     bTag :: Maybe Text,
-    subElms :: [PreNode si so ti to]
+    subElms :: [PreNode oi oo ti to ii io]
    } ->
-   PreNode si () ti () 
-  AnyHook ::
+   PreNode oi () ti () ii ()
+  OnceHook ::
     { 
       hookTag :: Maybe Text,
-      hook :: Loc -> si -> IO so,
-      hookChild :: PreNode so cso ti to,
-      hookResult :: TMVar (Either SomeException so),
-      hookRelease :: Loc -> so -> IO ()
+      hook :: Loc -> oi -> IO oo,
+      hookChild :: PreNode oo coo ti to ii io,
+      hookResult :: TMVar (Either oomeException oo),
+      hookRelease :: Loc -> oo -> IO ()
     } ->
-    PreNode si so ti to 
+    PreNode oi oo ti to ii io  
   ThreadHook ::
     { 
       threadTag :: Maybe Text,
-      threadHook :: Loc -> si -> ti -> IO to,
-      threadHookChild :: PreNode si so to cto,
+      threadHook :: Loc -> oi -> ti -> IO to,
+      threadHookChild :: PreNode oi oo to cto ii io,
       threadHookRelease :: Loc -> to -> IO ()
     } ->
-    PreNode si so ti to 
+    PreNode oi oo ti to ii io
   Fixture ::
     { 
       fxTag :: Maybe Text,
       logStart :: Loc -> IO (),
-      iterations :: [Loc -> si -> ti -> IO ()],
+      iterations :: Map Text (oi -> ti -> ii -> IO ()),
       logEnd :: Loc -> IO ()
     } ->
-    PreNode si () ti ()
+    PreNode oi () ti () ii ()
 
-nodeEmpty :: PreNode a b c d -> Bool
+
+nodeEmpty :: PreNode a b c d e f -> Bool
 nodeEmpty = \case
-  AnyHook {hookChild} -> nodeEmpty hookChild
+  OnceHook {hookChild} -> nodeEmpty hookChild
   ThreadHook {threadHookChild} -> nodeEmpty threadHookChild
   Branch {subElms} -> all nodeEmpty subElms
-  Fixture {iterations} -> null iterations
+  Fixture {iterations} -> M.null iterations
 
 

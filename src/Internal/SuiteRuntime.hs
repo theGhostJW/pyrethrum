@@ -16,7 +16,7 @@ import Internal.PreNode
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
-import Pyrelude hiding
+import Pyrelude as P hiding
   ( ThreadRunning,
     ThreadStatus,
     atomically,
@@ -75,6 +75,7 @@ import UnliftIO.STM
     writeTVar,
   )
 import qualified Prelude as PRL
+import Data.Map.Strict as M ( foldrWithKey, toList )
 
 data Status
   = Pending
@@ -85,17 +86,17 @@ data Status
   | Done
   deriving (Show, Eq, Ord)
 
-getStatusTVar :: RunGraph si so ti to -> TVar Status
+getStatusTVar :: ExeTree si so ti to ii io -> TVar Status
 getStatusTVar = \case
   RTNodeS {status} -> status
   RTNodeT {tChildNode} -> getStatusTVar tChildNode
   RTNodeM {nStatus} -> nStatus
   RTFix {nStatus} -> nStatus
 
-getStatus :: RunGraph si so ti to -> STM Status
+getStatus :: ExeTree si so ti to ii io -> STM Status
 getStatus = readTVar . getStatusTVar
 
-canRun :: RunGraph si so ti to -> STM Bool
+canRun :: ExeTree si so ti to ii io -> STM Bool
 canRun rg =
   canRun' <$> getStatus rg
   where
@@ -107,10 +108,10 @@ canRun rg =
       HookFinalising -> False
       Done -> False
 
-setStatus :: RunGraph si so ti to -> Status -> STM ()
+setStatus :: ExeTree si so ti to ii io -> Status -> STM ()
 setStatus rg = writeTVar (getStatusTVar rg)
 
-waitDone :: RunGraph si so ti to -> STM ()
+waitDone :: ExeTree si so ti to ii io -> STM ()
 waitDone rg = do
   s <- getStatus rg
   unless (s == Done) retry
@@ -124,51 +125,53 @@ data IdxLst a = IdxLst
 mkIdxLst :: a -> STM (IdxLst a)
 mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
-data RunGraph si so ti to where
+data Iteration si ti ii = Iteration
+  { id :: Text,
+    loc :: Loc,
+    action :: si -> ti -> ii -> IO ()
+  }
+
+data ExeTree si so ti to ii io where
   RTNodeS ::
     { label :: Loc,
       status :: TVar Status,
       sHook :: si -> IO so,
       sHookRelease :: so -> IO (),
       sHookVal :: TMVar (Either SomeException so),
-      sChildNode :: RunGraph so cs ti to
+      sChildNode :: ExeTree so cs ti to ii io
     } ->
-    RunGraph si so ti to
+    ExeTree si so ti to ii io
   RTNodeT ::
     { label :: Loc,
       tHook :: si -> ti -> IO to,
       tHookRelease :: to -> IO (),
-      tChildNode :: RunGraph si so to tc
+      tChildNode :: ExeTree si so to tc ii io
     } ->
-    RunGraph si so ti to
+    ExeTree si so ti to ii io
   RTNodeM ::
     { mlabel :: Loc,
       nStatus :: TVar Status,
-      childNodes :: TQueue (RunGraph si so ti to),
-      fullyRunning :: TQueue (RunGraph si so ti to)
+      childNodes :: TQueue (ExeTree si so ti to ii io),
+      fullyRunning :: TQueue (ExeTree si so ti to ii io)
     } ->
-    RunGraph si () ti ()
+    ExeTree si () ti () ii ()
   RTFix ::
     { fxlabel :: Loc,
       logStart :: IO (),
       nStatus :: TVar Status,
-      iterations :: TQueue (si -> ti -> IO ()),
+      iterations :: TQueue (Iteration si ti ii),
       logEnd :: IO ()
     } ->
-    RunGraph si () ti ()
+    ExeTree si () ti () ii ()
 
-prepare :: PreNode () () () () -> IO (RunGraph () () () ())
+prepare :: PreNode () () () () () () -> IO (ExeTree () () () () () ())
 prepare =
   prepare' (Loc "ROOT") 0
   where
-    -- reverse lists that were generated with cons
-    correctSubElms :: forall s so t to. RunGraph s so t to -> RunGraph s so t to
-    correctSubElms = uu
-
     consNoMxIdx :: IdxLst a -> a -> IdxLst a
     consNoMxIdx l@IdxLst {lst} i = l {lst = i : lst}
 
-    prepare' :: Loc -> Int -> PreNode s so t to -> IO (RunGraph s so t to)
+    prepare' :: Loc -> Int -> PreNode o oo t to i io -> IO (ExeTree o oo t to i io)
     prepare' parentLoc subElmIdx pn = do
       ns <- newTVarIO Pending
       case pn of
@@ -190,7 +193,7 @@ prepare =
                   childNodes = q,
                   fullyRunning = fr
                 }
-        AnyHook
+        OnceHook
           { hookTag,
             hook,
             hookChild,
@@ -239,12 +242,11 @@ prepare =
               let loc = mkLoc fxTag "ThreadHook"
               s <- newTVarIO Pending
               q <- newTQueueIO
-              atomically $ traverse_ (writeTQueue q) $ (loc &) <$> iterations
+              atomically $ traverse_ (writeTQueue q) $ (\(id', action) -> Iteration id' loc action) <$> M.toList iterations
               pure $
                 RTFix
                   { fxlabel = loc,
                     logStart = logStart loc,
-                    -- fixStatus = s,
                     nStatus = ns,
                     iterations = q,
                     logEnd = logEnd loc
@@ -256,7 +258,7 @@ prepare =
             maybef
               childlabel
               (elmType <> "[" <> txt subElmIdx <> "]")
-              id
+              P.id
 
 type Logger = Text -> IO ()
 
@@ -313,13 +315,13 @@ threadSource mHkVal hkStatus si tio hk loc =
       (pure . Left)
       (\ti -> value <$> hookVal (hk si) ti hkStatus mHkVal loc)
 
-failRecursively :: forall si so ti to. Text -> SomeException -> RunGraph si so ti to -> STM ()
+failRecursively :: forall si so ti to ii io. Text -> SomeException -> ExeTree si so ti to ii io -> STM ()
 failRecursively msg e = recurse
   where
     failure :: Status
     failure = Done
 
-    failQ :: TQueue (RunGraph si' so' ti' to') -> STM ()
+    failQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> STM ()
     failQ q =
       tryReadTQueue q
         >>= maybe
@@ -333,7 +335,7 @@ failRecursively msg e = recurse
           (pure ())
           (const retry)
 
-    recurse :: RunGraph si' so' ti' to' -> STM ()
+    recurse :: ExeTree si' so' ti' to' ii' io' -> STM ()
     recurse rg = do
       setStatus rg failure
       case rg of
@@ -344,7 +346,7 @@ failRecursively msg e = recurse
           failQ fullyRunning
         RTFix {iterations} -> emptyQ iterations
 
-executeNode :: si -> IO (Either SomeException ti) -> RunGraph si so ti to -> IO ()
+executeNode :: si -> IO (Either SomeException ti) -> ExeTree si so ti to ii io -> IO ()
 executeNode si ioti rg =
   do
     wantRun <- atomically $ canRun rg
@@ -434,7 +436,7 @@ executeNode si ioti rg =
         (hkRelease ho)
         (atomically $ writeTVar ns Done)
 
-executeGraph :: Logger -> RunGraph s so t to -> Int -> IO ()
+executeGraph :: Logger -> ExeTree o oo t to ii io -> Int -> IO ()
 executeGraph db rg maxThreads = uu
 
 execute :: Int -> PreNodeRoot -> IO ()
@@ -463,8 +465,8 @@ execute maxThreads preRoot = do
       linkExecute :: IO ()
       linkExecute = do
         rn <- rootNode preRoot
-        runGraph <- prepare rn
-        executeGraph logger runGraph maxThreads
+        exeTree <- prepare rn
+        executeGraph logger exeTree maxThreads
         when wantDebug $
           db True "Execution Complete"
 

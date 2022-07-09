@@ -148,6 +148,13 @@ data ExeTree si so ti to ii io where
       tChildNode :: ExeTree si so to tc ii io
     } ->
     ExeTree si so ti to ii io
+  RTNodeI ::
+    { label :: Loc,
+      iHook :: si -> ti -> ii -> IO io,
+      iHookRelease :: io -> IO (),
+      iChildNode :: ExeTree si so to tc io iic
+    } ->
+    ExeTree si so ti to ii io
   RTNodeM ::
     { mlabel :: Loc,
       nStatus :: TVar Status,

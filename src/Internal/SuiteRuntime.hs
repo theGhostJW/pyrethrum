@@ -3,6 +3,7 @@ module Internal.SuiteRuntime where
 import Check (CheckReport (result))
 import Control.DeepSeq (NFData, deepseq, force, ($!!))
 import Data.Function (const, ($), (&))
+import Data.Map.Strict as M (foldrWithKey, toList)
 import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both)
 import GHC.Exts
@@ -75,7 +76,6 @@ import UnliftIO.STM
     writeTVar,
   )
 import qualified Prelude as PRL
-import Data.Map.Strict as M ( foldrWithKey, toList )
 
 data Status
   = Pending
@@ -232,6 +232,12 @@ prepare =
                         tHookRelease = threadHookRelease loc,
                         tChildNode = child
                       }
+        TestHook
+          { testTag,
+            testHook,
+            testHookChild,
+            testHookRelease
+          } -> uu
         Fixture
           { fxTag,
             logStart,

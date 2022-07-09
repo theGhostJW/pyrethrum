@@ -84,6 +84,7 @@ import UnliftIO.Concurrent as C
   )
 import UnliftIO.STM
 import Prelude (Ord, putStrLn)
+import qualified Data.Map.Strict as M 
 
 
 data BoundaryType
@@ -170,7 +171,7 @@ getStats PreNodeRoot {rootNode} =
           [ FixtureStats
               { id = parentId <> ".Fixture " <> txt subIndex,
                 parent = parentId,
-                iterationCount = length iterations
+                iterationCount = M.size iterations
               }
           ]
 
@@ -187,7 +188,7 @@ data RunEvent
         id :: Loc
       }
   | IterationMessage
-      { parentFix :: Loc,
+      { 
         index :: Int,
         message :: Maybe Text,
         threadId :: ThreadId
@@ -228,9 +229,9 @@ fixtureStart q = SuiteRuntimeTest.fixture q Start
 fixtureEnd :: TQueue RunEvent -> Loc -> IO ()
 fixtureEnd q = SuiteRuntimeTest.fixture q End
 
-logIteration :: TQueue RunEvent -> Maybe Text -> Int -> Loc -> IO ()
-logIteration q itMsg iidx loc =
-  logEvent q (IterationMessage loc iidx itMsg)
+logIteration :: TQueue RunEvent -> Maybe Text -> Int -> IO ()
+logIteration q itMsg iidx =
+  logEvent q (IterationMessage iidx itMsg)
 
 logMessage :: TQueue RunEvent -> Text -> IO ()
 logMessage q txt' = logEvent q (Message txt')
@@ -248,7 +249,7 @@ mkFixture q itCount = do
       { 
         fxTag = Nothing,
         logStart = fixtureStart q,
-        iterations = mkIterations q itCount,
+        iterations = M.fromList $ zip (txt <$> [1..]) $ mkIterations q itCount,
         logEnd = fixtureEnd q
       }
 
@@ -272,10 +273,10 @@ mkHook q hko nodeChild =
 iterationMessage :: Int -> Text
 iterationMessage i = "iteration " <> txt i
 
-mkIterations :: TQueue RunEvent -> Int -> [Loc -> i -> ti -> IO ()]
+mkIterations :: TQueue RunEvent -> Int -> [oi -> ti -> ii -> IO ()]
 mkIterations q size' =
-  let mkIt :: Int -> Loc -> i' -> ti' -> IO ()
-      mkIt idx loc i ti = logIteration q Nothing idx loc
+  let mkIt :: Int -> oi' -> ti' -> ii' -> IO ()
+      mkIt idx oi ti ii = logIteration q Nothing idx 
    in mkIt <$> [0 .. size' - 1]
 
 root :: IO (PreNode () () () () () ()) -> IO PreNodeRoot
@@ -399,7 +400,8 @@ chkFixtures stats evntLst =
           let matchesFix :: RunEvent -> Bool
               matchesFix = \case
                 Boundary {branchType, id = id'} -> branchType == SuiteRuntimeTest.Fixture && id' == Loc id
-                IterationMessage {parentFix} -> parentFix == Loc id
+                -- IterationMessage {parentFix} -> parentFix == Loc id
+                IterationMessage {} -> uu
                 Message {} -> False
 
               evntsToChk :: [RunEvent]

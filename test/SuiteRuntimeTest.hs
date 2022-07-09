@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wdeferred-type-errors #-} 
+
 module SuiteRuntimeTest where
 
 import Check (Checks)
@@ -83,7 +85,7 @@ import UnliftIO.Concurrent as C
     threadDelay,
   )
 import UnliftIO.STM
-import Prelude (Ord, putStrLn)
+import Prelude (Ord, putStrLn, String)
 import qualified Data.Map.Strict as M 
 
 
@@ -174,6 +176,7 @@ getStats PreNodeRoot {rootNode} =
                 iterationCount = M.size iterations
               }
           ]
+
 
 data BoundaryInfo = BoundaryInfo
   { id :: Loc,

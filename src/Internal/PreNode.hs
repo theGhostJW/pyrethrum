@@ -34,6 +34,14 @@ data PreNode oi oo ti to ii io where
       threadHookRelease :: Loc -> to -> IO ()
     } ->
     PreNode oi oo ti to ii io
+  TestHook ::
+    { 
+      threadTag :: Maybe Text,
+      testHook :: Loc -> oi -> ti -> ii -> IO io,
+      testHookChild :: PreNode oi oo ti to io cii,
+      testHookRelease :: Loc -> io -> IO ()
+    } ->
+    PreNode oi oo ti to ii io
   Fixture ::
     { 
       fxTag :: Maybe Text,

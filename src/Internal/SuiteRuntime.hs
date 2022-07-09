@@ -252,7 +252,18 @@ prepare =
             testHook,
             testHookChild,
             testHookRelease
-          } -> uu
+          } -> 
+            let loc = mkLoc testTag "TestHook"
+            in
+              do
+                child <- prepare' loc 0 testHookChild
+                pure $
+                    RTNodeI
+                      { label = loc,
+                        iHook = testHook loc,
+                        iHookRelease = testHookRelease loc,
+                        iChildNode = child
+                      }
         Fixture
           { fxTag,
             logStart,
@@ -498,101 +509,3 @@ execute maxThreads preRoot = do
    in wantDebug
         ? concurrently_ printDebugLogs linkExecute
         $ linkExecute
-
-{-
-execute' :: Executor -> Logger -> IO ()
-execute'
-  exe@Executor
-    { maxThreads,
-      threadsInUse,
-      fixturesPending,
-      fixturesStartNext,
-      fixturesStarted
-    }
-  db = do
-    eAvailFx <-
-      atomically $ do
-        eStats <- reserveThread exe db
-        eitherf
-          eStats
-          (pure . Left . NoThreadsAvailable)
-          (const $ nextFixture db fixturesPending fixturesStartNext fixturesStarted)
-
-    let recurse = execute' exe db
-        waitRecurse = C.threadDelay 10_000 >> recurse
-        threadRelease = db "THREAD RELEASE" >> atomically (releaseThread threadsInUse)
-
-    eitherf
-      eAvailFx
-      ( \case
-          -- both the pending and active que of fixtures
-          -- are empty so we are done
-          -- thread was reserved so release thread
-          -- has no effect because app is about to end but may
-          -- later if multi-process runs are implemented and thread release implementation
-          -- is changed
-          EmptyQueues -> threadRelease >> db "EmptyQ - EXECUTION DONE" >> pure ()
-          -- all the fixtures are not in a state to run any more threads
-          -- eg being killed. We expect they may become available later of be finished
-          -- and removed from the active que leading to empty ques we wait and try again
-          -- thread was reserved so release thread
-          NoFixturesReady -> threadRelease >> db "NoFixturesReady" >> waitRecurse
-          FixtureStarting -> threadRelease >> db "FixtureStarting" >> waitRecurse
-          -- all threads in use wait try again
-          -- no threads reserved so none need to be released
-          nt@NoThreadsAvailable {} -> db (txtPretty nt) >> waitRecurse
-      )
-      ( \case
-          FixPending pfx@PendingFixture {pIndex} ->
-            do
-              activThrds <- newTVarIO []
-              let loadHook :: IO InitialisedFixture
-                  loadHook = do
-                    db "@@@@ Running Hooks"
-                    fx <- runHooks pfx activThrds
-                    atomically $ updateFixtureQus pIndex fixturesStartNext fixturesStarted fx
-                    pure fx
-              forkFixtureThread db activThrds threadsInUse loadHook >> recurse
-          FixInitialised fxInit@InitialisedFixture {activeThreads} -> forkFixtureThread db activeThreads threadsInUse (pure fxInit) >> recurse
-      )
-
-qFixture :: TQueue PendingFixture -> (Int, Int -> IO PendingFixture) -> IO ()
-qFixture q (idx, mkFix) = mkFix idx >>= atomically . writeTQueue q
-
-executeLinked :: Logger -> Int -> NodeRoot -> IO ()
-executeLinked db maxThreads NodeRoot {rootStatus, rootNode} =
-  do
-    db "Before fxs"
-    (fxs, hks) <- mkFixturesHooks db rootNode
-    db "After fks"
-
-    -- create queue
-    pendingQ <- newTQueueIO
-    startNextQ <- newTVarIO []
-    runningQ <- newTQueueIO
-
-    -- load all fixtures to pending queue
-    traverse_ (qFixture pendingQ) $ zip [0 ..] fxs
-    initialThreadsInUse <- newTVarIO 0
-
-    db "Executing"
-    execute' (Executor maxThreads initialThreadsInUse pendingQ startNextQ runningQ) db
-    db "EXECUTION DONE !!!!!!!"
-
-    db "Waiting on Hooks"
-
-    let hookWait :: IO [HookRunTime] -> IO ()
-        hookWait hrt' =
-          do
-            hrt <- hrt'
-            case hrt of
-              [] -> db "HOOKS DONE" >> pure ()
-              (HookRunTime {currentStatus} : hrts) -> do
-                headStatus <- atomically $ readTVar currentStatus
-                db $ "HOOK HEAD STATUS: " <> txt headStatus
-                finalised headStatus
-                  ? hookWait (pure hrts)
-                  $ C.threadDelay 1_000_000 >> hookWait hrt'
-    hookWait $ pure hks
-    db "RUN COMPLETE !!!!!!!"
--}

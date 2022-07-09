@@ -86,15 +86,17 @@ data Status
   | Done
   deriving (Show, Eq, Ord)
 
-getStatusTVar :: ExeTree si so ti to ii io -> TVar Status
-getStatusTVar = \case
-  RTNodeS {status} -> status
-  RTNodeT {tChildNode} -> getStatusTVar tChildNode
-  RTNodeM {nStatus} -> nStatus
-  RTFix {nStatus} -> nStatus
-
 getStatus :: ExeTree si so ti to ii io -> STM Status
-getStatus = readTVar . getStatusTVar
+getStatus =
+  readTVar . getStatusTVar
+  where
+    getStatusTVar :: ExeTree si so ti to ii io -> TVar Status
+    getStatusTVar = \case
+      RTNodeS {status} -> status
+      RTNodeT {tChildNode} -> getStatusTVar tChildNode
+      RTNodeI {iChildNode} -> getStatusTVar iChildNode
+      RTNodeM {nStatus} -> nStatus
+      RTFix {nStatus} -> nStatus
 
 canRun :: ExeTree si so ti to ii io -> STM Bool
 canRun rg =
@@ -108,8 +110,14 @@ canRun rg =
       HookFinalising -> False
       Done -> False
 
-setStatus :: ExeTree si so ti to ii io -> Status -> STM ()
-setStatus rg = writeTVar (getStatusTVar rg)
+setStatusIfApplicable :: ExeTree si so ti to ii io -> Status -> STM ()
+setStatusIfApplicable et s =
+  case et of
+    RTNodeS {status} -> writeTVar status s
+    RTNodeT {} -> pure ()
+    RTNodeI {} -> pure ()
+    RTNodeM {nStatus} -> writeTVar nStatus s
+    RTFix {nStatus} -> writeTVar nStatus s
 
 waitDone :: ExeTree si so ti to ii io -> STM ()
 waitDone rg = do
@@ -350,10 +358,11 @@ failRecursively msg e = recurse
 
     recurse :: ExeTree si' so' ti' to' ii' io' -> STM ()
     recurse rg = do
-      setStatus rg failure
+      setStatusIfApplicable rg failure
       case rg of
         RTNodeS {sChildNode} -> recurse sChildNode
         RTNodeT {tChildNode} -> recurse tChildNode
+        RTNodeI {iChildNode} -> recurse iChildNode
         RTNodeM {childNodes, fullyRunning} -> do
           failQ childNodes
           failQ fullyRunning
@@ -423,6 +432,8 @@ executeNode si ioti rg =
                     ethHkVal <- atomically $ readTMVar toVal
                     whenRight ethHkVal $
                       \to -> releaseHook to status label tHookRelease
+
+        RTNodeI {iChildNode} -> uu
         RTNodeM
           { childNodes
           } -> uu

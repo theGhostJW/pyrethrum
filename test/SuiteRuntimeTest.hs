@@ -131,6 +131,7 @@ countSubNodes pred node =
           foldl' countSubNodes' (pred b ? accum + 1 $ accum) subElms
         ah@OnceHook {} -> pred ah ? accum + 1 $ accum
         ThreadHook {} -> uu
+        TestHook {} -> uu
         fx@PN.Fixture {} -> pred fx ? accum + 1 $ accum
    in countSubNodes' 0 node
 
@@ -143,6 +144,7 @@ getStats PreNodeRoot {rootNode} =
       PN.OnceHook {} -> False
       PN.Branch {} -> False
       ThreadHook {} -> False
+      TestHook {} -> False
       f@PN.Fixture {} -> not $ nodeEmpty f
 
     nonEmptyHook :: PreNode a b c d e f -> Bool
@@ -150,6 +152,7 @@ getStats PreNodeRoot {rootNode} =
       h@PN.OnceHook {} -> not $ nodeEmpty h
       PN.Branch {} -> False
       ThreadHook {} -> False
+      TestHook {} -> False
       PN.Fixture {} -> False
 
     getStats' :: Text -> Int -> PreNode a b c d e f -> [NodeStats]
@@ -169,6 +172,7 @@ getStats PreNodeRoot {rootNode} =
                   }
            in thisNode : getStats' thisId 0 hookChild
         ThreadHook {} -> uu
+        TestHook {} -> uu
         PN.Fixture {iterations} ->
           [ FixtureStats
               { id = parentId <> ".Fixture " <> txt subIndex,

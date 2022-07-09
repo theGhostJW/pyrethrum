@@ -36,7 +36,7 @@ data PreNode oi oo ti to ii io where
     PreNode oi oo ti to ii io
   TestHook ::
     { 
-      threadTag :: Maybe Text,
+      testTag :: Maybe Text,
       testHook :: Loc -> oi -> ti -> ii -> IO io,
       testHookChild :: PreNode oi oo ti to io cii,
       testHookRelease :: Loc -> io -> IO ()
@@ -56,6 +56,7 @@ nodeEmpty :: PreNode a b c d e f -> Bool
 nodeEmpty = \case
   OnceHook {hookChild} -> nodeEmpty hookChild
   ThreadHook {threadHookChild} -> nodeEmpty threadHookChild
+  TestHook {testHookChild} -> nodeEmpty testHookChild
   Branch {subElms} -> all nodeEmpty subElms
   Fixture {iterations} -> M.null iterations
 

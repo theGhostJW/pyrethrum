@@ -160,7 +160,7 @@ data ExeTree si so ti to ii io where
     { label :: Loc,
       iHook :: si -> ti -> ii -> IO io,
       iHookRelease :: io -> IO (),
-      iChildNode :: ExeTree si so to tc io iic
+      iChildNode :: ExeTree si so ti to io iic
     } ->
     ExeTree si so ti to ii io
   RTNodeM ::
@@ -252,12 +252,11 @@ prepare =
             testHook,
             testHookChild,
             testHookRelease
-          } -> 
+          } ->
             let loc = mkLoc testTag "TestHook"
-            in
-              do
-                child <- prepare' loc 0 testHookChild
-                pure $
+             in do
+                  child <- prepare' loc 0 testHookChild
+                  pure $
                     RTNodeI
                       { label = loc,
                         iHook = testHook loc,
@@ -443,7 +442,6 @@ executeNode si ioti rg =
                     ethHkVal <- atomically $ readTMVar toVal
                     whenRight ethHkVal $
                       \to -> releaseHook to status label tHookRelease
-
         RTNodeI {iChildNode} -> uu
         RTNodeM
           { childNodes

@@ -378,8 +378,51 @@ failRecursively msg e = recurse
           failQ fullyRunning
         RTFix {iterations} -> emptyQ iterations
 
-executeNode :: si -> IO (Either SomeException ti) -> ExeTree si so ti to ii io -> IO ()
-executeNode si ioti rg =
+data TestHk io = TestHk
+  { 
+    tstHkLoc :: Loc,
+    tstHkHook ::  IO io,
+    tstHkRelease :: io -> IO ()
+  }
+
+runHookWith :: TestHk ii -> (ii -> IO ()) -> IO ()
+runHookWith TestHk {
+  tstHkLoc,
+  tstHkHook,
+  tstHkRelease
+} iteration = do
+  hkRslt <- tryAny tstHkHook
+  hkRslt & either 
+    (\e -> do 
+      -- TODO: log error
+      error "hook failed\n" <> displayException e
+    )
+    (\io -> finally 
+      (
+       do 
+         catchAll 
+          (iteration tstHkHook) 
+          (\e -> do 
+            -- TODO: log error
+            error $ "hook failed\n" <> displayException e
+          )
+      )
+      (
+        tstHkRelease io
+      )
+      
+    )
+  
+    
+  -- hkRslt & either 
+
+   
+  -- tstHkRelease res
+  -- pure res
+
+
+executeNode :: si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
+executeNode si ioti tstHk rg =
   do
     wantRun <- atomically $ canRun rg
     when
@@ -411,7 +454,7 @@ executeNode si ioti rg =
                       )
                       ( \so ->
                           finally
-                            (executeNode so ioti sChildNode)
+                            (executeNode so ioti tstHk sChildNode)
                             ( do
                                 atomically $ waitDone sChildNode
                                 releaseHook so status label sHookRelease
@@ -421,7 +464,7 @@ executeNode si ioti rg =
                   ethHkRslt
                     & either
                       (const $ pure ())
-                      (\so -> executeNode so ioti sChildNode)
+                      (\so -> executeNode so ioti tstHk sChildNode)
         RTNodeT
           { label,
             tHook,
@@ -434,7 +477,7 @@ executeNode si ioti rg =
               status <- newTVarIO Pending
               let ts = threadSource toVal status si ioti tHook label
               finally
-                (executeNode si ts tChildNode)
+                (executeNode si ts tstHk tChildNode)
                 do
                   -- only run clean up if hook has run
                   notRun <- atomically $ isEmptyTMVar toVal
@@ -442,7 +485,12 @@ executeNode si ioti rg =
                     ethHkVal <- atomically $ readTMVar toVal
                     whenRight ethHkVal $
                       \to -> releaseHook to status label tHookRelease
-        RTNodeI {iChildNode} -> uu
+        RTNodeI
+          { label,
+            iHook,
+            iHookRelease,
+            iChildNode
+          } ->  uu
         RTNodeM
           { childNodes
           } -> uu

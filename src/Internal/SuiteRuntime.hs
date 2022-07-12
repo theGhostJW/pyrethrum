@@ -141,7 +141,7 @@ data Iteration si ti ii = Iteration
 
 data ExeTree si so ti to ii io where
   RTNodeS ::
-    { label :: Loc,
+    { loc :: Loc,
       status :: TVar Status,
       sHook :: si -> IO so,
       sHookRelease :: so -> IO (),
@@ -150,28 +150,28 @@ data ExeTree si so ti to ii io where
     } ->
     ExeTree si so ti to ii io
   RTNodeT ::
-    { label :: Loc,
+    { loc :: Loc,
       tHook :: si -> ti -> IO to,
       tHookRelease :: to -> IO (),
       tChildNode :: ExeTree si so to tc ii io
     } ->
     ExeTree si so ti to ii io
   RTNodeI ::
-    { label :: Loc,
+    { loc :: Loc,
       iHook :: si -> ti -> ii -> IO io,
       iHookRelease :: io -> IO (),
       iChildNode :: ExeTree si so ti to io iic
     } ->
     ExeTree si so ti to ii io
   RTNodeM ::
-    { mlabel :: Loc,
+    { leafloc :: Loc,
       nStatus :: TVar Status,
       childNodes :: TQueue (ExeTree si so ti to ii io),
       fullyRunning :: TQueue (ExeTree si so ti to ii io)
     } ->
     ExeTree si () ti () ii ()
   RTFix ::
-    { fxlabel :: Loc,
+    { leafloc :: Loc,
       logStart :: IO (),
       nStatus :: TVar Status,
       iterations :: TQueue (Iteration si ti ii),
@@ -186,15 +186,24 @@ prepare =
     consNoMxIdx :: IdxLst a -> a -> IdxLst a
     consNoMxIdx l@IdxLst {lst} i = l {lst = i : lst}
 
+    mkLoc :: Loc -> Int -> Maybe Text -> Text -> Loc
+    mkLoc parentLoc subElmIdx childlabel elmType =
+      Loc . ((unLoc parentLoc <> " . ") <>) $
+        childlabel
+          & maybe
+            (elmType <> "[" <> txt subElmIdx <> "]")
+            P.id
+
     prepare' :: Loc -> Int -> PreNode o oo t to i io -> IO (ExeTree o oo t to i io)
     prepare' parentLoc subElmIdx pn = do
+      let mkLoc' = mkLoc parentLoc subElmIdx
       ns <- newTVarIO Pending
       case pn of
         Branch
           { bTag,
             subElms
           } -> do
-            let loc = mkLoc bTag "Branch"
+            let loc = mkLoc' bTag "Branch"
             idx <- newTVarIO 0
             fr <- newTQueueIO
             q <- newTQueueIO
@@ -203,7 +212,7 @@ prepare =
             atomically $ traverse_ (writeTQueue q) c
             pure $
               RTNodeM
-                { mlabel = loc,
+                { leafloc = loc,
                   nStatus = ns,
                   childNodes = q,
                   fullyRunning = fr
@@ -217,11 +226,11 @@ prepare =
           } -> do
             s <- newTVarIO Pending
             v <- newEmptyTMVarIO
-            let loc = mkLoc hookTag "SingletonHook"
+            let loc = mkLoc' hookTag "SingletonHook"
             child <- prepare' loc 0 hookChild
             pure $
               RTNodeS
-                { label = loc,
+                { loc,
                   status = s,
                   sHook = hook loc,
                   sHookRelease = hookRelease loc,
@@ -234,7 +243,7 @@ prepare =
             threadHookChild,
             threadHookRelease
           } ->
-            let loc = mkLoc threadTag "ThreadHook"
+            let loc = mkLoc' threadTag "ThreadHook"
              in do
                   v <- newEmptyTMVarIO
                   sni <- newTVarIO 0
@@ -242,7 +251,7 @@ prepare =
                   child <- prepare' loc 0 threadHookChild
                   pure $
                     RTNodeT
-                      { label = loc,
+                      { loc,
                         tHook = threadHook loc,
                         tHookRelease = threadHookRelease loc,
                         tChildNode = child
@@ -253,12 +262,12 @@ prepare =
             testHookChild,
             testHookRelease
           } ->
-            let loc = mkLoc testTag "TestHook"
+            let loc = mkLoc' testTag "TestHook"
              in do
                   child <- prepare' loc 0 testHookChild
                   pure $
                     RTNodeI
-                      { label = loc,
+                      { loc,
                         iHook = testHook loc,
                         iHookRelease = testHookRelease loc,
                         iChildNode = child
@@ -270,26 +279,18 @@ prepare =
             logEnd
           } ->
             do
-              let loc = mkLoc fxTag "ThreadHook"
+              let loc = mkLoc' fxTag "ThreadHook"
               s <- newTVarIO Pending
               q <- newTQueueIO
               atomically $ traverse_ (writeTQueue q) $ (\(id', action) -> Iteration id' loc action) <$> M.toList iterations
               pure $
                 RTFix
-                  { fxlabel = loc,
+                  { leafloc = loc,
                     logStart = logStart loc,
                     nStatus = ns,
                     iterations = q,
                     logEnd = logEnd loc
                   }
-      where
-        mkLoc :: Maybe Text -> Text -> Loc
-        mkLoc childlabel elmType =
-          Loc . ((unLoc parentLoc <> " . ") <>) $
-            maybef
-              childlabel
-              (elmType <> "[" <> txt subElmIdx <> "]")
-              P.id
 
 type Logger = Text -> IO ()
 
@@ -379,47 +380,48 @@ failRecursively msg e = recurse
         RTFix {iterations} -> emptyQ iterations
 
 data TestHk io = TestHk
-  { 
-    tstHkLoc :: Loc,
-    tstHkHook ::  IO io,
+  { tstHkLoc :: Loc,
+    tstHkHook :: IO (Either SomeException io),
     tstHkRelease :: io -> IO ()
   }
 
-runHookWith :: TestHk ii -> (ii -> IO ()) -> IO ()
-runHookWith TestHk {
-  tstHkLoc,
-  tstHkHook,
-  tstHkRelease
-} iteration = do
-  hkRslt <- tryAny tstHkHook
-  hkRslt & either 
-    (\e -> do 
-      -- TODO: log error
-      error "hook failed\n" <> displayException e
-    )
-    (\io -> finally 
-      (
-       do 
-         catchAll 
-          (iteration tstHkHook) 
-          (\e -> do 
+runHookWith :: TestHk ii -> (ii -> IO io) -> IO (Either SomeException io)
+runHookWith
+  TestHk
+    { tstHkLoc,
+      tstHkHook,
+      tstHkRelease
+    }
+  iteration = do
+    hkRslt <- tstHkHook
+    hkRslt
+      & either
+        ( \e -> do
             -- TODO: log error
             error $ "hook failed\n" <> displayException e
-          )
-      )
-      (
-        tstHkRelease io
-      )
-      
-    )
-  
-    
-  -- hkRslt & either 
+        )
+        ( \io ->
+            finally
+              ( catchAll
+                  (Right <$> iteration io)
+                  ( \e -> --do
+                  -- TODO: log error
+                      error $ "test iteration failed failed\n" <> displayException e
+                  )
+              )
+              ( catchAll
+                  (tstHkRelease io)
+                  ( \e -> --do
+                  -- TODO: log error
+                      error $ "test iteration hook release\n" <> displayException e
+                  )
+              )
+        )
 
-   
-  -- tstHkRelease res
-  -- pure res
+-- hkRslt & either
 
+-- tstHkRelease res
+-- pure res
 
 executeNode :: si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
 executeNode si ioti tstHk rg =
@@ -429,7 +431,7 @@ executeNode si ioti tstHk rg =
       wantRun
       case rg of
         RTNodeS
-          { label,
+          { loc,
             status,
             sHook,
             sHookRelease,
@@ -442,7 +444,7 @@ executeNode si ioti tstHk rg =
               --  2. waits if hook is running
               --  3. updates hook status
               --  4. returns hook result
-              HookResult {hasExecuted, value = ethHkRslt} <- hookVal sHook si status sHookVal label
+              HookResult {hasExecuted, value = ethHkRslt} <- hookVal sHook si status sHookVal loc
               if hasExecuted
                 then
                   ethHkRslt -- the hook that executes waits for child completion and sets status
@@ -450,14 +452,14 @@ executeNode si ioti tstHk rg =
                       ( \e ->
                           atomically $
                             -- status already set by hookVal
-                            failRecursively ("Parent hook failed: " <> unLoc label) e sChildNode
+                            failRecursively ("Parent hook failed: " <> unLoc loc) e sChildNode
                       )
                       ( \so ->
                           finally
                             (executeNode so ioti tstHk sChildNode)
                             ( do
                                 atomically $ waitDone sChildNode
-                                releaseHook so status label sHookRelease
+                                releaseHook so status loc sHookRelease
                             )
                       )
                 else
@@ -466,7 +468,7 @@ executeNode si ioti tstHk rg =
                       (const $ pure ())
                       (\so -> executeNode so ioti tstHk sChildNode)
         RTNodeT
-          { label,
+          { loc,
             tHook,
             tHookRelease,
             tChildNode
@@ -475,7 +477,7 @@ executeNode si ioti tstHk rg =
               -- create a new instance of cache for every thread
               toVal <- newEmptyTMVarIO
               status <- newTVarIO Pending
-              let ts = threadSource toVal status si ioti tHook label
+              let ts = threadSource toVal status si ioti tHook loc
               finally
                 (executeNode si ts tstHk tChildNode)
                 do
@@ -484,13 +486,34 @@ executeNode si ioti tstHk rg =
                   unless notRun $ do
                     ethHkVal <- atomically $ readTMVar toVal
                     whenRight ethHkVal $
-                      \to -> releaseHook to status label tHookRelease
+                      \to -> releaseHook to status loc tHookRelease
         RTNodeI
-          { label,
+          { loc,
             iHook,
             iHookRelease,
             iChildNode
-          } ->  uu
+          } -> do 
+
+            let 
+              -- preTest :: ii -> IO io
+              -- preTest ii = do 
+              --   eti <- ioti
+
+              
+              TestHk
+                  { tstHkLoc,
+                    tstHkHook,
+                    tstHkRelease
+                  } = 
+                    tstHk
+
+              -- newHook =
+              --     TestHk
+              --       { tstHkLoc,
+              --         runWithHook tstHkHook,
+              --         tstHkRelease
+              --       }
+             in uu
         RTNodeM
           { childNodes
           } -> uu

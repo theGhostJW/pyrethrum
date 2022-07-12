@@ -450,7 +450,7 @@ executeNode si ioti tstHk rg =
                   ethHkRslt -- the hook that executes waits for child completion and sets status
                     & either
                       ( \e ->
-                          atomically $
+                          atomically $ 
                             -- status already set by hookVal
                             failRecursively ("Parent hook failed: " <> unLoc loc) e sChildNode
                       )
@@ -487,33 +487,47 @@ executeNode si ioti tstHk rg =
                     ethHkVal <- atomically $ readTMVar toVal
                     whenRight ethHkVal $
                       \to -> releaseHook to status loc tHookRelease
+        
         RTNodeI
           { loc,
             iHook,
             iHookRelease,
             iChildNode
-          } -> do 
-
-            let 
-              -- preTest :: ii -> IO io
-              -- preTest ii = do 
-              --   eti <- ioti
-
+          } -> uu
+        -- ihk@RTNodeI
+        --   { loc,
+        --     iHook,
+        --     iHookRelease,
+        --     iChildNode
+        --   } -> 
+        --    do 
+        --     eti <- ioti
+        --     let 
+        --       -- preTest :: ii -> IO io
+        --       -- preTest ii = do 
+        --       --   eti <- ioti
+        --       TestHk
+        --           { tstHkLoc,
+        --             tstHkHook,
+        --             tstHkRelease
+        --           } = 
+        --             tstHk
               
-              TestHk
-                  { tstHkLoc,
-                    tstHkHook,
-                    tstHkRelease
-                  } = 
-                    tstHk
-
-              -- newHook =
-              --     TestHk
-              --       { tstHkLoc,
-              --         runWithHook tstHkHook,
-              --         tstHkRelease
-              --       }
-             in uu
+        --       --- tstHkHook :: IO (Either SomeException ii)
+        --       -- runHookWith :: TestHk ii -> (ii -> IO io) -> IO (Either SomeException io)
+        --       newHk = tstHkHook >>= \eii -> do 
+        --         let f = do
+        --           ti <- eti
+        --           ii <- eii
+        --           iHook si ti ii
+        --         runHookWith tstHk (iHook ti ii)
+        --       -- newHook =
+        --       --     TestHk
+        --       --       { tstHkLoc,
+        --       --         runWithHook tstHkHook,
+        --       --         tstHkRelease
+        --       --       }
+        --     uu
         RTNodeM
           { childNodes
           } -> uu

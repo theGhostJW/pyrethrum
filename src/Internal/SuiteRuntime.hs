@@ -450,7 +450,7 @@ executeNode si ioti tstHk rg =
                   ethHkRslt -- the hook that executes waits for child completion and sets status
                     & either
                       ( \e ->
-                          atomically $ 
+                          atomically $
                             -- status already set by hookVal
                             failRecursively ("Parent hook failed: " <> unLoc loc) e sChildNode
                       )
@@ -487,62 +487,22 @@ executeNode si ioti tstHk rg =
                     ethHkVal <- atomically $ readTMVar toVal
                     whenRight ethHkVal $
                       \to -> releaseHook to status loc tHookRelease
-        
-        RTNodeI
+        ihk@RTNodeI
           { loc,
             iHook,
             iHookRelease,
             iChildNode
-          } -> uu
-        -- ihk@RTNodeI
-        --   { loc,
-        --     iHook,
-        --     iHookRelease,
-        --     iChildNode
-        --   } -> 
-        --    do 
-        --     eti <- ioti
-        --     let 
-        --       -- preTest :: ii -> IO io
-        --       -- preTest ii = do 
-        --       --   eti <- ioti
-        --       TestHk
-        --           { tstHkLoc,
-        --             tstHkHook,
-        --             tstHkRelease
-        --           } = 
-        --             tstHk
-              
-        --       --- tstHkHook :: IO (Either SomeException ii)
-        --       -- runHookWith :: TestHk ii -> (ii -> IO io) -> IO (Either SomeException io)
-        --       newHk = tstHkHook >>= \eii -> do 
-        --         let f = do
-        --           ti <- eti
-        --           ii <- eii
-        --           iHook si ti ii
-        --         runHookWith tstHk (iHook ti ii)
-        --       -- newHook =
-        --       --     TestHk
-        --       --       { tstHkLoc,
-        --       --         runWithHook tstHkHook,
-        --       --         tstHkRelease
-        --       --       }
-        --     uu
+          } ->
+            let newTstHk =
+                  TestHk
+                    { tstHkLoc = loc,
+                      tstHkHook = ioti >>= either (pure . Left) (runHookWith tstHk . iHook si),
+                      tstHkRelease = iHookRelease
+                    }
+             in executeNode si ioti newTstHk iChildNode
         RTNodeM
           { childNodes
           } -> uu
-        --  do atomically $ do
-        --   ns <- readTVar nodeStatus
-        --   qmt <- isEmptyTQueue childNodesM
-        --   -- assume subnodes only evicted from q when done so and
-        --   -- empty q means sub nodes are done hence parent node is deemed complete
-        --   qmt ? pure NodeComplete $ do
-        --      -- fixtures shuffled to back of queue when started so if any subnode
-        --      -- is pending the status will be pending
-        --      sn <- peekTQueue childNodesM
-
-        -- atomically $ do
-        --   qmt <- atomically $ isEmptyTQueue iterations
         RTFix
           { nStatus,
             iterations

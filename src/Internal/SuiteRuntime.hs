@@ -135,7 +135,6 @@ mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
 data Iteration si ti ii = Iteration
   { id :: Text,
-    loc :: Loc,
     action :: si -> ti -> ii -> IO ()
   }
 
@@ -175,7 +174,7 @@ data ExeTree si so ti to ii io where
       logStart :: IO (),
       nStatus :: TVar Status,
       iterations :: TQueue (Iteration si ti ii),
-      logEnd :: IO ()
+      running :: TVar Int
     } ->
     ExeTree si () ti () ii ()
 
@@ -282,14 +281,15 @@ prepare =
               let loc = mkLoc' fxTag "ThreadHook"
               s <- newTVarIO Pending
               q <- newTQueueIO
-              atomically $ traverse_ (writeTQueue q) $ (\(id', action) -> Iteration id' loc action) <$> M.toList iterations
+              running <- newTVarIO 0
+              atomically $ traverse_ (writeTQueue q) $ PRL.uncurry Iteration <$> M.toList iterations
               pure $
                 RTFix
                   { leafloc = loc,
                     logStart = logStart loc,
                     nStatus = ns,
                     iterations = q,
-                    logEnd = logEnd loc
+                    running
                   }
 
 type Logger = Text -> IO ()
@@ -503,10 +503,40 @@ executeNode si ioti tstHk rg =
         RTNodeM
           { childNodes
           } -> uu
-        RTFix
+        fx@RTFix
           { nStatus,
-            iterations
-          } -> uu
+            iterations,
+            running
+          } ->
+            recurse
+            where
+              recurse = do
+                test <-
+                  atomically $
+                    tryReadTQueue iterations
+                      >>= maybe
+                        ( do
+                            r <- readTVar running
+                            when (r < 1) $
+                              writeTVar nStatus Done
+                            pure Nothing
+                        )
+                        ( \i -> do
+                            atomically $ modifyTVar running succ
+                            pure $ Just i
+                        )
+                whenJust test $ 
+                 \t -> do
+                  finally $
+                      (catchAll 
+                        (\e -> pure ()) -- TODO logging
+                        (do 
+                          runHookWith
+                        ))
+                      ( do
+                          atomically $ modifyTVar running pred
+                          recurse
+                      )
   where
     releaseHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
     releaseHook ho ns label hkRelease =

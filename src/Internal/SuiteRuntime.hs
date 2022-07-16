@@ -423,7 +423,7 @@ runHookWith
 -- tstHkRelease res
 -- pure res
 
-executeNode :: si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
+executeNode :: forall si so ti to ii io. si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
 executeNode si ioti tstHk rg =
   do
     wantRun <- atomically $ canRun rg
@@ -510,6 +510,7 @@ executeNode si ioti tstHk rg =
           } ->
             recurse
             where
+              recurse :: IO ()
               recurse = do
                 test <-
                   atomically $
@@ -522,21 +523,25 @@ executeNode si ioti tstHk rg =
                             pure Nothing
                         )
                         ( \i -> do
-                            atomically $ modifyTVar running succ
+                            modifyTVar running succ
                             pure $ Just i
                         )
-                whenJust test $ 
-                 \t -> do
-                  finally $
-                      (catchAll 
-                        (\e -> pure ()) -- TODO logging
-                        (do 
-                          runHookWith
-                        ))
-                      ( do
-                          atomically $ modifyTVar running pred
-                          recurse
-                      )
+                whenJust test $
+                  \i ->
+                    do
+                      ethti <- ioti
+                      let tst :: ii -> IO ()
+                          tst =
+                            ethti
+                              & either
+                                (const . const $ pure ()) 
+                                (action i si) -- TODO log parent hook failure
+                      finally
+                        ( catchAll
+                            (void $ runHookWith tstHk tst)
+                            (print . displayException)
+                        )
+                        (atomically (modifyTVar running pred) >> recurse)
   where
     releaseHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
     releaseHook ho ns label hkRelease =

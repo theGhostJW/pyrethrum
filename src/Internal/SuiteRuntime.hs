@@ -174,7 +174,7 @@ data ExeTree si so ti to ii io where
       logStart :: IO (),
       nStatus :: TVar Status,
       iterations :: TQueue (Iteration si ti ii),
-      running :: TVar Int
+      runningCount :: TVar Int
     } ->
     ExeTree si () ti () ii ()
 
@@ -281,7 +281,7 @@ prepare =
               let loc = mkLoc' fxTag "ThreadHook"
               s <- newTVarIO Pending
               q <- newTQueueIO
-              running <- newTVarIO 0
+              runningCount <- newTVarIO 0
               atomically $ traverse_ (writeTQueue q) $ PRL.uncurry Iteration <$> M.toList iterations
               pure $
                 RTFix
@@ -289,7 +289,7 @@ prepare =
                     logStart = logStart loc,
                     nStatus = ns,
                     iterations = q,
-                    running
+                    runningCount
                   }
 
 type Logger = Text -> IO ()
@@ -501,32 +501,66 @@ executeNode si ioti tstHk rg =
                     }
              in executeNode si ioti newTstHk iChildNode
         RTNodeM
-          { childNodes
-          } -> uu
+          { leafloc,
+            nStatus,
+            childNodes,
+            fullyRunning
+          } -> 
+            atomically (readTVar nStatus)
+              >>= bool (pure ()) recurse . (< FullyRunning)
+            where
+               recurse :: IO ()
+               recurse = do
+                child <- atomically nxtChild
+                pure ()
+                where 
+                nxtChild = do 
+                   c <- tryReadTQueue childNodes
+                   c & maybe (pure Nothing) (
+                    \cld -> do 
+                      let thisChild = pure $ Just cld
+                      s <- getStatus cld
+                      case s of
+                        Pending -> setRunning nStatus >> thisChild
+                        HookExecuting -> 
+                          -- just plonk on the end of the q and go around again
+                          -- may pick up same node if htere is only one node running but that is ok 
+                          -- it just turns into a wait
+                          writeTQueue childNodes cld >> nxtChild
+                        Running -> uu
+                        FullyRunning -> uu
+                        HookFinalising -> uu
+                        Done -> uu
+                    )
+
+
         fx@RTFix
           { nStatus,
             iterations,
-            running
+            runningCount
           } ->
-            recurse
+            atomically (readTVar nStatus)
+              >>= bool (pure ()) recurse . (Running <)
             where
               recurse :: IO ()
               recurse = do
-                test <-
+                mtest <-
                   atomically $
                     tryReadTQueue iterations
                       >>= maybe
                         ( do
-                            r <- readTVar running
-                            when (r < 1) $
-                              writeTVar nStatus Done
+                            r <- readTVar runningCount
+                            (r < 1) ?
+                              writeTVar nStatus Done $
+                              writeTVar nStatus FullyRunning 
                             pure Nothing
                         )
                         ( \i -> do
-                            modifyTVar running succ
+                            modifyTVar runningCount succ
+                            setRunning nStatus
                             pure $ Just i
                         )
-                whenJust test $
+                whenJust mtest $
                   \i ->
                     do
                       ethti <- ioti
@@ -534,15 +568,18 @@ executeNode si ioti tstHk rg =
                           tst =
                             ethti
                               & either
-                                (const . const $ pure ()) 
-                                (action i si) -- TODO log parent hook failure
+                                (const . const $ pure ()) -- TODO log parent hook failure
+                                (action i si)
                       finally
                         ( catchAll
                             (void $ runHookWith tstHk tst)
-                            (print . displayException)
+                            (print . displayException) -- TODO log parent iteration failure
                         )
-                        (atomically (modifyTVar running pred) >> recurse)
+                        (atomically (modifyTVar runningCount pred) >> recurse)
   where
+    setRunning :: TVar Status -> STM ()
+    setRunning status = modifyTVar status \s -> s < Running ? Running $ s
+    
     releaseHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
     releaseHook ho ns label hkRelease =
       finally

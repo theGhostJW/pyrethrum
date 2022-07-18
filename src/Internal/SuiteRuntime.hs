@@ -45,6 +45,7 @@ import UnliftIO
     pureTry,
     swapTMVar,
     tryAny,
+    tryPeekTQueue,
     tryReadTMVar,
     unGetTBQueue,
     wait,
@@ -97,6 +98,12 @@ getStatus =
       RTNodeI {iChildNode} -> getStatusTVar iChildNode
       RTNodeM {nStatus} -> nStatus
       RTFix {nStatus} -> nStatus
+
+isDone :: Status -> Bool
+isDone = (== Done)
+
+nodeDone :: ExeTree si so ti to ii io -> STM Bool
+nodeDone t = (== Done) <$> getStatus t
 
 canRun :: ExeTree si so ti to ii io -> STM Bool
 canRun rg =
@@ -505,42 +512,89 @@ executeNode si ioti tstHk rg =
             nStatus,
             childNodes,
             fullyRunning
-          } -> 
-            atomically (readTVar nStatus)
-              >>= bool (pure ()) recurse . (< FullyRunning)
+          } ->
+            runIfCan nStatus recurse
             where
-               recurse :: IO ()
-               recurse = do
-                child <- atomically nxtChild
-                pure ()
-                where 
-                nxtChild = do 
-                   c <- tryReadTQueue childNodes
-                   c & maybe (pure Nothing) (
-                    \cld -> do 
-                      let thisChild = pure $ Just cld
-                      s <- getStatus cld
-                      case s of
-                        Pending -> setRunning nStatus >> thisChild
-                        HookExecuting -> 
-                          -- just plonk on the end of the q and go around again
-                          -- may pick up same node if htere is only one node running but that is ok 
-                          -- it just turns into a wait
-                          writeTQueue childNodes cld >> nxtChild
-                        Running -> uu
-                        FullyRunning -> uu
-                        HookFinalising -> uu
-                        Done -> uu
+              recurse :: IO ()
+              recurse =
+                atomically nxtChild
+                  >>= maybe
+                    updateStatusFromQs
+                    ( \c ->
+                        finally
+                          ( catchAll
+                              (executeNode si ioti tstHk c)
+                              ( \e -> -- TODO: log error - exceptions should be handled
+                                  error $ "this should not happen\n" <> displayException e
+                              )
+                          )
+                          recurse
                     )
 
+              updateStatusFromQs = atomically $ do
+                s <- readTVar nStatus
+                isDone s
+                  ? pure ()
+                  $ do
+                    discardDone fullyRunning
+                    discardDoneMoveFullyRunning childNodes
+                    mtChilds <- isEmptyTQueue childNodes
+                    mtFullyRunning <- isEmptyTQueue fullyRunning
+                    mtChilds && mtFullyRunning
+                      ? writeTVar nStatus Done
+                      $ mtChilds && s /= FullyRunning
+                        ? writeTVar nStatus FullyRunning
+                        $ pure ()
 
+              discardDoneMoveFullyRunning =
+                processWhile
+                  ( \n ->
+                      getStatus n >>= \s ->
+                        if
+                            | s == Done -> pure True
+                            | s > Running -> writeTQueue fullyRunning n >> pure True
+                            | otherwise -> pure False
+                  )
+
+              discardDone = processWhile nodeDone
+
+              processWhile :: forall a b c d e f. (ExeTree a b c d e f -> STM Bool) -> TQueue (ExeTree a b c d e f) -> STM ()
+              processWhile p q =
+                tryPeekTQueue q
+                  >>= maybe
+                    (pure ())
+                    (\n -> p n >>= bool (pure ()) (readTQueue q >> processWhile p q))
+
+              nxtChild =
+                tryReadTQueue childNodes
+                  >>= maybe
+                    (pure Nothing)
+                    ( \cld ->
+                        let thisChild = pure $ Just cld
+                            enqChild = writeTQueue childNodes cld
+                            enqChildReturn = enqChild >> thisChild
+                         in getStatus cld
+                              >>= \case
+                                Pending ->
+                                  setStatusRunning nStatus >> enqChildReturn
+                                HookExecuting ->
+                                  -- just plonk on the end of the q and go around again
+                                  -- may pick up same node if htere is only one node running but that is ok
+                                  -- it just turns into a wait
+                                  enqChild >> nxtChild
+                                Running -> enqChildReturn
+                                FullyRunning ->
+                                  writeTQueue fullyRunning cld >> nxtChild
+                                HookFinalising ->
+                                  writeTQueue fullyRunning cld >> nxtChild
+                                Done -> nxtChild
+                    )
         fx@RTFix
           { nStatus,
             iterations,
             runningCount
           } ->
-            atomically (readTVar nStatus)
-              >>= bool (pure ()) recurse . (Running <)
+            runIfCan nStatus recurse
             where
               recurse :: IO ()
               recurse = do
@@ -550,14 +604,14 @@ executeNode si ioti tstHk rg =
                       >>= maybe
                         ( do
                             r <- readTVar runningCount
-                            (r < 1) ?
-                              writeTVar nStatus Done $
-                              writeTVar nStatus FullyRunning 
+                            (r < 1)
+                              ? writeTVar nStatus Done
+                              $ writeTVar nStatus FullyRunning
                             pure Nothing
                         )
                         ( \i -> do
                             modifyTVar runningCount succ
-                            setRunning nStatus
+                            setStatusRunning nStatus
                             pure $ Just i
                         )
                 whenJust mtest $
@@ -577,9 +631,14 @@ executeNode si ioti tstHk rg =
                         )
                         (atomically (modifyTVar runningCount pred) >> recurse)
   where
-    setRunning :: TVar Status -> STM ()
-    setRunning status = modifyTVar status \s -> s < Running ? Running $ s
-    
+    runIfCan :: TVar Status -> IO () -> IO ()
+    runIfCan s action =
+      atomically (readTVar s)
+        >>= bool (pure ()) action . (< FullyRunning)
+
+    setStatusRunning :: TVar Status -> STM ()
+    setStatusRunning status = modifyTVar status \s -> s < Running ? Running $ s
+
     releaseHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
     releaseHook ho ns label hkRelease =
       finally

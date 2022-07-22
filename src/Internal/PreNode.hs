@@ -5,11 +5,10 @@ import Language.Haskell.TH (ExpQ)
 import Pyrelude (Bool (False, True), Either, Eq, Generic, IO, Int, ListLike (any, filter, null, all), Show, SomeException, TVar, Text, not, ($), (&&), Ord, Maybe)
 import UnliftIO (MonadUnliftIO, STM, TMVar)
 import Data.Map.Strict as M
+import Internal.RunTimeLogging (Loc)
 
 newtype PreNodeRoot = 
   PreNodeRoot { rootNode :: IO (PreNode () () () () () ()) }
-
-newtype Loc = Loc { unLoc :: Text} deriving (Show, Eq, Ord)
 
 data PreNode oi oo ti to ii io where
   Branch :: {

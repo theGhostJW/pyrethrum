@@ -11,7 +11,7 @@ import Data.Aeson.Types
 import qualified Data.Set as ST
 import Data.Yaml
 import GHC.Records
-import Internal.PreNode (Loc (unLoc), PreNode (hookChild))
+import Internal.PreNode (PreNode (hookChild))
 import Internal.PreNode as PN
 import qualified Internal.SuiteRuntime as S
 import Polysemy
@@ -87,6 +87,7 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM
 import Prelude (Ord, putStrLn, String)
 import qualified Data.Map.Strict as M 
+import Internal.RunTimeLogging (Loc (Loc), unLoc)
 
 
 data BoundaryType

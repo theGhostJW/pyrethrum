@@ -9,11 +9,10 @@ import Data.Tuple.Extra (both)
 import GHC.Exts
 import GHC.IO.FD (release)
 import Internal.PreNode
-  ( Loc (Loc),
+  ( 
     PreNode (..),
     PreNodeRoot,
     rootNode,
-    unLoc,
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
@@ -77,6 +76,7 @@ import UnliftIO.STM
     writeTVar,
   )
 import qualified Prelude as PRL
+import Internal.RunTimeLogging (Loc (..), Sink)
 
 data Status
   = Pending
@@ -648,8 +648,8 @@ executeNode si ioti tstHk rg =
 executeGraph :: Logger -> ExeTree o oo t to ii io -> Int -> IO ()
 executeGraph db rg maxThreads = uu
 
-execute :: Int -> PreNodeRoot -> IO ()
-execute maxThreads preRoot = do
+execute :: Int -> Sink -> PreNodeRoot -> IO ()
+execute maxThreads sink preRoot = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   chn <- newChan
   let db :: Bool -> Text -> IO ()

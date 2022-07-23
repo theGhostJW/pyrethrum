@@ -25,7 +25,7 @@ import Internal.RunTimeLogging
     sink,
     stopWorker,
   )
-import qualified Internal.RunTimeLogging as L ( ExeEventType (TestHook))
+import qualified Internal.RunTimeLogging as L (ExeEventType (TestHook))
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
 import Pyrelude as P hiding
@@ -56,13 +56,14 @@ import UnliftIO
     newTMVar,
     peekTQueue,
     pureTry,
+    replicateConcurrently_,
     swapTMVar,
     tryAny,
     tryPeekTQueue,
     tryReadTMVar,
     unGetTBQueue,
     wait,
-    withAsync, replicateConcurrently_,
+    withAsync,
   )
 import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, killThread, takeMVar, threadDelay, withMVar)
 import UnliftIO.STM
@@ -668,21 +669,20 @@ executeGraph sink xtri maxThreads = do
   logger <- newLogger sink
   logger StartExecution
   finally
-    ( replicateConcurrently_ 
-          maxThreads
-          ( do
-              logger' <- newLogger sink
-              executeNode 
-                logger' 
-                () 
-                (pure $ Right ()) 
-                (TestHk {
-                  tstHkLoc  = Loc "Root",
-                  tstHkHook = pure $ Right (),
-                  tstHkRelease = const $ pure ()
-                }) 
-                xtri
-          )
+    ( replicateConcurrently_
+        maxThreads
+        do
+          logger' <- newLogger sink
+          executeNode
+            logger'
+            ()
+            (pure $ Right ())
+            TestHk
+              { tstHkLoc = Loc "Root",
+                tstHkHook = pure $ Right (),
+                tstHkRelease = const $ pure ()
+              }
+            xtri
     )
     (logger EndExecution)
 

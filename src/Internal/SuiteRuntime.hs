@@ -437,6 +437,27 @@ releaseHook ho ns label hkRelease =
     (hkRelease ho)
     (atomically $ writeTVar ns Done)
 
+discardDone :: TQueue (ExeTree a b c d e f) -> STM ()
+discardDone = processWhile nodeDone
+
+processWhile :: forall a b c d e f. (ExeTree a b c d e f -> STM Bool) -> TQueue (ExeTree a b c d e f) -> STM ()
+processWhile p q =
+  tryPeekTQueue q
+    >>= maybe
+      (pure ())
+      (\n -> p n >>= bool (pure ()) (readTQueue q >> processWhile p q))
+
+discardDoneMoveFullyRunning :: TQueue (ExeTree si so ti to ii io) -> TQueue (ExeTree si so ti to ii io) -> STM ()
+discardDoneMoveFullyRunning fullyRunningQ =
+  processWhile
+    ( \n ->
+        getStatus n >>= \s ->
+          if
+              | s == Done -> pure True
+              | s > Running -> writeTQueue fullyRunningQ n >> pure True
+              | otherwise -> pure False
+    )
+
 executeNode :: forall si so ti to ii io. Sink -> si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
 executeNode sink si ioti tstHk rg =
   do
@@ -547,7 +568,7 @@ executeNode sink si ioti tstHk rg =
                   ? pure ()
                   $ do
                     discardDone fullyRunning
-                    discardDoneMoveFullyRunning childNodes
+                    discardDoneMoveFullyRunning fullyRunning childNodes
                     mtChilds <- isEmptyTQueue childNodes
                     mtFullyRunning <- isEmptyTQueue fullyRunning
                     mtChilds && mtFullyRunning
@@ -555,25 +576,6 @@ executeNode sink si ioti tstHk rg =
                       $ mtChilds && s /= FullyRunning
                         ? writeTVar nStatus FullyRunning
                         $ pure ()
-
-              discardDoneMoveFullyRunning =
-                processWhile
-                  ( \n ->
-                      getStatus n >>= \s ->
-                        if
-                            | s == Done -> pure True
-                            | s > Running -> writeTQueue fullyRunning n >> pure True
-                            | otherwise -> pure False
-                  )
-
-              discardDone = processWhile nodeDone
-
-              processWhile :: forall a b c d e f. (ExeTree a b c d e f -> STM Bool) -> TQueue (ExeTree a b c d e f) -> STM ()
-              processWhile p q =
-                tryPeekTQueue q
-                  >>= maybe
-                    (pure ())
-                    (\n -> p n >>= bool (pure ()) (readTQueue q >> processWhile p q))
 
               nxtChild =
                 tryReadTQueue childNodes

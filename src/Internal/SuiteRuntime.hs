@@ -13,7 +13,7 @@ import Internal.PreNode
     PreNodeRoot,
     rootNode,
   )
-import Internal.RunTimeLogging (ExeEvent, Index, Loc (..), LogControls (LogControls), PThreadId, Sink, logWorker, sink, stopWorker)
+import Internal.RunTimeLogging (ExeEvent (EndExecution, StartExecution), Index (Index), Loc (..), LogControls (LogControls), PThreadId, Sink, logWorker, mkLogger, sink, stopWorker)
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
 import Pyrelude as P hiding
@@ -38,6 +38,7 @@ import UnliftIO
     concurrently_,
     finally,
     isEmptyTBQueue,
+    newIORef,
     newMVar,
     newTMVar,
     peekTQueue,
@@ -298,8 +299,6 @@ prepare =
                     runningCount
                   }
 
-type EventLogger = (Index -> PThreadId -> ExeEvent) -> IO ()
-
 data HookResult so = HookResult
   { hasExecuted :: Bool,
     value :: Either SomeException so
@@ -424,14 +423,26 @@ runHookWith
               )
         )
 
--- hkRslt & either
+runIfCan :: TVar Status -> IO () -> IO ()
+runIfCan s action =
+  atomically (readTVar s)
+    >>= bool (pure ()) action . (< FullyRunning)
 
--- tstHkRelease res
--- pure res
+setStatusRunning :: TVar Status -> STM ()
+setStatusRunning status = modifyTVar status \s -> s < Running ? Running $ s
 
-executeNode :: forall si so ti to ii io. si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
-executeNode si ioti tstHk rg =
+releaseHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
+releaseHook ho ns label hkRelease =
+  finally
+    (hkRelease ho)
+    (atomically $ writeTVar ns Done)
+
+executeNode :: forall si so ti to ii io. Sink -> si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
+executeNode sink si ioti tstHk rg =
   do
+    let exeNxt :: forall si' so' ti' to' ii' io'. si' -> IO (Either SomeException ti') -> TestHk ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
+        exeNxt = executeNode sink
+
     wantRun <- atomically $ canRun rg
     when
       wantRun
@@ -462,7 +473,7 @@ executeNode si ioti tstHk rg =
                       )
                       ( \so ->
                           finally
-                            (executeNode so ioti tstHk sChildNode)
+                            (exeNxt so ioti tstHk sChildNode)
                             ( do
                                 atomically $ waitDone sChildNode
                                 releaseHook so status loc sHookRelease
@@ -472,7 +483,7 @@ executeNode si ioti tstHk rg =
                   ethHkRslt
                     & either
                       (const $ pure ())
-                      (\so -> executeNode so ioti tstHk sChildNode)
+                      (\so -> exeNxt so ioti tstHk sChildNode)
         RTNodeT
           { loc,
             tHook,
@@ -485,7 +496,7 @@ executeNode si ioti tstHk rg =
               status <- newTVarIO Pending
               let ts = threadSource toVal status si ioti tHook loc
               finally
-                (executeNode si ts tstHk tChildNode)
+                (exeNxt si ts tstHk tChildNode)
                 do
                   -- only run clean up if hook has run
                   notRun <- atomically $ isEmptyTMVar toVal
@@ -505,7 +516,7 @@ executeNode si ioti tstHk rg =
                       tstHkHook = ioti >>= either (pure . Left) (runHookWith tstHk . iHook si),
                       tstHkRelease = iHookRelease
                     }
-             in executeNode si ioti newTstHk iChildNode
+             in exeNxt si ioti newTstHk iChildNode
         RTNodeM
           { leafloc,
             nStatus,
@@ -522,7 +533,7 @@ executeNode si ioti tstHk rg =
                     ( \c ->
                         finally
                           ( catchAll
-                              (executeNode si ioti tstHk c)
+                              (exeNxt si ioti tstHk c)
                               ( \e -> -- TODO: log error - exceptions should be handled
                                   error $ "this should not happen\n" <> displayException e
                               )
@@ -629,29 +640,34 @@ executeNode si ioti tstHk rg =
                             (print . displayException) -- TODO log parent iteration failure
                         )
                         (atomically (modifyTVar runningCount pred) >> recurse)
-  where
-    runIfCan :: TVar Status -> IO () -> IO ()
-    runIfCan s action =
-      atomically (readTVar s)
-        >>= bool (pure ()) action . (< FullyRunning)
 
-    setStatusRunning :: TVar Status -> STM ()
-    setStatusRunning status = modifyTVar status \s -> s < Running ? Running $ s
+type EventLogger = (Index -> PThreadId -> ExeEvent) -> IO ()
 
-    releaseHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
-    releaseHook ho ns label hkRelease =
-      finally
-        (hkRelease ho)
-        (atomically $ writeTVar ns Done)
+newLogger :: Sink -> IO EventLogger
+newLogger sink = do
+  r <- UnliftIO.newIORef (Index 0)
+  pure $ mkLogger sink r
 
-executeGraph :: LogControls -> ExeTree () () () () () () -> Int -> IO ()
-executeGraph lc xtri maxThreads = uu
+executeGraph :: Sink -> ExeTree () () () () () () -> Int -> IO ()
+executeGraph sink xtri maxThreads = do
+  logger <- newLogger sink
+  logger StartExecution
+  finally
+    ( replicateM_
+        maxThreads
+        ( C.forkIO $ do
+            logger' <- newLogger sink
+            uu
+        )
+    )
+    (logger EndExecution)
 
 execute :: Int -> LogControls -> PreNodeRoot -> IO ()
 execute
   maxThreads
-  lc@LogControls
-    { logWorker,
+  LogControls
+    { sink,
+      logWorker,
       stopWorker
     }
   preRoot =
@@ -663,6 +679,6 @@ execute
           ( do
               rn <- rootNode preRoot
               exeTree <- prepare rn
-              executeGraph lc exeTree maxThreads
+              executeGraph sink exeTree maxThreads
           )
           stopWorker

@@ -76,7 +76,7 @@ import UnliftIO.STM
     writeTVar,
   )
 import qualified Prelude as PRL
-import Internal.RunTimeLogging (Loc (..), Sink)
+import Internal.RunTimeLogging (Loc (..), Sink, LogControls (LogControls), sink, logWorker, stopWorker)
 
 data Status
   = Pending
@@ -648,38 +648,17 @@ executeNode si ioti tstHk rg =
 executeGraph :: Logger -> ExeTree o oo t to ii io -> Int -> IO ()
 executeGraph db rg maxThreads = uu
 
-execute :: Int -> Sink -> PreNodeRoot -> IO ()
-execute maxThreads sink preRoot = do
+execute :: Int -> LogControls -> PreNodeRoot -> IO ()
+execute maxThreads LogControls {sink, logWorker, stopWorker
+} preRoot = 
+  concurrently_ logWorker linkExecute
+  where 
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
-  chn <- newChan
-  let db :: Bool -> Text -> IO ()
-      db terminate msg =
-        wantDebug
-          ? writeChan chn (terminate, msg)
-          $ pure ()
-
-      logger :: Text -> IO ()
-      logger = db False
-
-      printDebugLogs :: IO ()
-      printDebugLogs = printDebugLogs'
-        where
-          printDebugLogs' = do
-            (terminate, msg) <- readChan chn
-            putStrLn msg
-            terminate
-              ? pure ()
-              $ printDebugLogs'
-
       linkExecute :: IO ()
       linkExecute = do
         rn <- rootNode preRoot
         exeTree <- prepare rn
         executeGraph logger exeTree maxThreads
-        when wantDebug $
-          db True "Execution Complete"
+        stopWorker
 
-      wantDebug = True
-   in wantDebug
-        ? concurrently_ printDebugLogs linkExecute
-        $ linkExecute
+

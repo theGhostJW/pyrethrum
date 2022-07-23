@@ -1,9 +1,11 @@
 module Internal.RunTimeLogging where
 
-import Control.Concurrent (ThreadId, myThreadId)
 import Control.Monad.State
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
-import Pyrelude (Applicative (pure), Enum (succ), Eq, Exception (displayException), IO, IORef, Int, Num ((+)), Ord, Show, SomeException, Text, coerce, modifyIORef, readIORef, txt, uu, writeIORef, ($), (.))
+import Pyrelude (Applicative (pure), Enum (succ), Eq, Exception (displayException), IO, IORef, Int, Maybe (..), Num ((+)), Ord, Show, SomeException, Text, coerce, maybe, modifyIORef, readIORef, txt, uu, writeIORef, ($), (.))
+import Text.Show.Pretty (pPrint)
+import UnliftIO (TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
+import UnliftIO.Concurrent (myThreadId)
 
 mkStart :: Loc -> ExeEventType -> Index -> PThreadId -> ExeEvent
 mkStart l e i t = Start i t l e
@@ -53,6 +55,37 @@ logger sink threadCounter fEvnt = do
   tid <- myThreadId
   sink $ fEvnt nxt (PThreadId $ txt tid)
   writeIORef threadCounter nxt
+
+data LogControls = LogControls
+  { sink :: Sink,
+    logWorker :: IO (),
+    stopWorker :: IO (),
+    log :: Maybe (TQueue ExeEvent)
+  }
+
+testLogControls :: IO LogControls
+testLogControls = do
+  -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
+  chn <- newTChanIO
+  log <- newTQueueIO
+
+  let logWorker :: IO ()
+      logWorker =
+        atomically (readTChan chn)
+          >>= maybe
+            (pure ())
+            (\evnt -> pPrint evnt >> logWorker)
+
+      stopWorker :: IO ()
+      stopWorker = atomically $ writeTChan chn Nothing
+
+      sink :: ExeEvent -> IO ()
+      sink evnt = do
+        atomically $ do
+          writeTChan chn $ Just evnt
+          writeTQueue log evnt
+
+  pure $ LogControls sink logWorker stopWorker $ Just log
 
 $(deriveJSON defaultOptions ''ExeEventType)
 $(deriveToJSON defaultOptions ''PThreadId)

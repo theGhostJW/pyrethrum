@@ -464,7 +464,7 @@ exeSuiteTests preSuite threadCount = do
   q <- atomically newTQueue
   preSuite' <- preSuite q
   stats <- getStats preSuite'
-  S.execute threadCount preSuite'
+  S.execute threadCount uu preSuite'
   l <- tQToList q
   putStrLn ""
   putStrLn "============ Stats ============"

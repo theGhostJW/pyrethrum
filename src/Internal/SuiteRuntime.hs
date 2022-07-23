@@ -9,11 +9,11 @@ import Data.Tuple.Extra (both)
 import GHC.Exts
 import GHC.IO.FD (release)
 import Internal.PreNode
-  ( 
-    PreNode (..),
+  ( PreNode (..),
     PreNodeRoot,
     rootNode,
   )
+import Internal.RunTimeLogging (ExeEvent, Index, Loc (..), LogControls (LogControls), PThreadId, Sink, logWorker, sink, stopWorker)
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
 import Pyrelude as P hiding
@@ -76,7 +76,6 @@ import UnliftIO.STM
     writeTVar,
   )
 import qualified Prelude as PRL
-import Internal.RunTimeLogging (Loc (..), Sink, LogControls (LogControls), sink, logWorker, stopWorker)
 
 data Status
   = Pending
@@ -299,7 +298,7 @@ prepare =
                     runningCount
                   }
 
-type Logger = Text -> IO ()
+type EventLogger = (Index -> PThreadId -> ExeEvent) -> IO ()
 
 data HookResult so = HookResult
   { hasExecuted :: Bool,
@@ -645,20 +644,25 @@ executeNode si ioti tstHk rg =
         (hkRelease ho)
         (atomically $ writeTVar ns Done)
 
-executeGraph :: Logger -> ExeTree o oo t to ii io -> Int -> IO ()
-executeGraph db rg maxThreads = uu
+executeGraph :: LogControls -> ExeTree () () () () () () -> Int -> IO ()
+executeGraph lc xtri maxThreads = uu
 
 execute :: Int -> LogControls -> PreNodeRoot -> IO ()
-execute maxThreads LogControls {sink, logWorker, stopWorker
-} preRoot = 
-  concurrently_ logWorker linkExecute
-  where 
-  -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
+execute
+  maxThreads
+  lc@LogControls
+    { logWorker,
+      stopWorker
+    }
+  preRoot =
+    concurrently_ logWorker linkExecute
+    where
       linkExecute :: IO ()
-      linkExecute = do
-        rn <- rootNode preRoot
-        exeTree <- prepare rn
-        executeGraph logger exeTree maxThreads
-        stopWorker
-
-
+      linkExecute =
+        finally
+          ( do
+              rn <- rootNode preRoot
+              exeTree <- prepare rn
+              executeGraph lc exeTree maxThreads
+          )
+          stopWorker

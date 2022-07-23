@@ -48,8 +48,8 @@ type Sink = ExeEvent -> IO ()
 
 -- not used in concurrent code ie. one IORef per thread
 -- this approach means I can't write a pure logger but I can live with that for now
-logger :: Sink -> IORef Index -> (Index -> PThreadId -> ExeEvent) -> IO ()
-logger sink threadCounter fEvnt = do
+mkLogger :: Sink -> IORef Index -> (Index -> PThreadId -> ExeEvent) -> IO ()
+mkLogger sink threadCounter fEvnt = do
   iOld <- readIORef threadCounter
   let nxt = Index . succ $ idx iOld
   tid <- myThreadId
@@ -86,6 +86,7 @@ testLogControls = do
           writeTQueue log evnt
 
   pure $ LogControls sink logWorker stopWorker $ Just log
+
 
 $(deriveJSON defaultOptions ''ExeEventType)
 $(deriveToJSON defaultOptions ''PThreadId)

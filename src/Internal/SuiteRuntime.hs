@@ -13,7 +13,19 @@ import Internal.PreNode
     PreNodeRoot,
     rootNode,
   )
-import Internal.RunTimeLogging (ExeEvent (EndExecution, StartExecution), Index (Index), Loc (..), LogControls (LogControls), PThreadId, Sink, logWorker, mkLogger, sink, stopWorker)
+import Internal.RunTimeLogging
+  ( ExeEvent (EndExecution, StartExecution),
+    Index (Index),
+    Loc (..),
+    LogControls (LogControls),
+    PThreadId,
+    Sink,
+    logWorker,
+    mkLogger,
+    sink,
+    stopWorker,
+  )
+import qualified Internal.RunTimeLogging as L ( ExeEventType (TestHook))
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
 import Pyrelude as P hiding
@@ -37,6 +49,7 @@ import UnliftIO
     catchAny,
     concurrently_,
     finally,
+    forConcurrently_,
     isEmptyTBQueue,
     newIORef,
     newMVar,
@@ -49,7 +62,7 @@ import UnliftIO
     tryReadTMVar,
     unGetTBQueue,
     wait,
-    withAsync,
+    withAsync, replicateConcurrently_,
   )
 import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, killThread, takeMVar, threadDelay, withMVar)
 import UnliftIO.STM
@@ -458,11 +471,11 @@ discardDoneMoveFullyRunning fullyRunningQ =
               | otherwise -> pure False
     )
 
-executeNode :: forall si so ti to ii io. Sink -> si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
-executeNode sink si ioti tstHk rg =
+executeNode :: forall si so ti to ii io. EventLogger -> si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
+executeNode logger si ioti tstHk rg =
   do
     let exeNxt :: forall si' so' ti' to' ii' io'. si' -> IO (Either SomeException ti') -> TestHk ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
-        exeNxt = executeNode sink
+        exeNxt = executeNode logger
 
     wantRun <- atomically $ canRun rg
     when
@@ -655,12 +668,21 @@ executeGraph sink xtri maxThreads = do
   logger <- newLogger sink
   logger StartExecution
   finally
-    ( replicateM_
-        maxThreads
-        ( C.forkIO $ do
-            logger' <- newLogger sink
-            uu
-        )
+    ( replicateConcurrently_ 
+          maxThreads
+          ( do
+              logger' <- newLogger sink
+              executeNode 
+                logger' 
+                () 
+                (pure $ Right ()) 
+                (TestHk {
+                  tstHkLoc  = Loc "Root",
+                  tstHkHook = pure $ Right (),
+                  tstHkRelease = const $ pure ()
+                }) 
+                xtri
+          )
     )
     (logger EndExecution)
 

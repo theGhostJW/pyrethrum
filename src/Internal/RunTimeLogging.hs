@@ -2,10 +2,11 @@ module Internal.RunTimeLogging where
 
 import Control.Monad.State
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
-import Pyrelude (Applicative (pure), Enum (succ), Eq, Exception (displayException), IO, IORef, Int, Maybe (..), Num ((+)), Ord, Show, SomeException, Text, coerce, maybe, modifyIORef, readIORef, txt, uu, writeIORef, ($), (.))
+import Pyrelude (Applicative (pure), Enum (succ), Eq, Exception (displayException), IO, IORef, Int, Maybe (..), Num ((+)), Ord, Show, SomeException, Text, coerce, maybe, modifyIORef, readIORef, txt, uu, writeIORef, ($), (.), Bool)
 import Text.Show.Pretty (pPrint)
 import UnliftIO (TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
 import UnliftIO.Concurrent (myThreadId)
+import GHC.Show (show)
 
 mkStart :: Loc -> ExeEventType -> Index -> PThreadId -> ExeEvent
 mkStart l e i t = Start i t l e
@@ -16,8 +17,18 @@ mkDebug t i p = Debug i p t
 mkFailure :: Loc -> Text -> SomeException -> Index -> PThreadId -> ExeEvent
 mkFailure loc desc e idx trdId = Failure idx trdId loc desc (PException . txt $ displayException e)
 
-newtype Loc = Loc {unLoc :: Text} deriving (Show, Eq, Ord)
+data Iteration
 
+data Loc t where 
+  Root :: () -> Loc ()
+  Node :: Loc () -> Text -> Loc ()
+  Test :: Loc () -> Text -> Loc Iteration
+
+instance Show (Loc t) where
+  show = \case 
+            Root -> "root"
+            Node parent lbl -> show parent <> "." lbl
+            Test parent lbl -> show parent <> "." lbl
 data ExeEventType
   = OnceHook
   | OnceHookRelease
@@ -37,11 +48,19 @@ newtype Index = Index {idx :: Int} deriving (Show, Eq, Ord)
 
 data ExeEvent
   = StartExecution Index PThreadId
-  | Start Index PThreadId Loc ExeEventType
-  | Failure Index PThreadId Loc Text PException
+  | forall a. Start Index PThreadId (Loc a) ExeEventType
+  | forall a. Failure Index PThreadId (Loc a)Text PException
   | Debug Index PThreadId Text
   | EndExecution Index PThreadId
-  deriving (Show)
+
+instance Show ExeEvent where
+  show = \case here 
+    StartExecution Index PThreadId
+forall a. Start Index PThreadId (Loc a) ExeEventType
+forall a. Failure Index PThreadId (Loc a)Text PException
+Debug Index PThreadId Text
+EndExecution Index PThreadId 
+ 
 
 -------  IO Logging --------
 type Sink = ExeEvent -> IO ()

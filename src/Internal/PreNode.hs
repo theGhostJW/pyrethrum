@@ -4,7 +4,6 @@ import Control.DeepSeq (NFData)
 import Language.Haskell.TH (ExpQ)
 import Pyrelude (Bool (False, True), Either, Eq, Generic, IO, Int, ListLike (any, filter, null, all), Show, SomeException, TVar, Text, not, ($), (&&), Ord, Maybe)
 import UnliftIO (MonadUnliftIO, STM, TMVar)
-import Data.Map.Strict as M
 import Internal.RunTimeLogging (Loc)
 
 newtype PreNodeRoot = 
@@ -45,7 +44,7 @@ data PreNode oi oo ti to ii io where
     { 
       fxTag :: Maybe Text,
       logStart :: Loc -> IO (),
-      iterations :: Map Text (oi -> ti -> ii -> IO ()),
+      iterations :: [oi -> ti -> ii -> IO ()],
       logEnd :: Loc -> IO ()
     } ->
     PreNode oi () ti () ii ()
@@ -57,6 +56,6 @@ nodeEmpty = \case
   ThreadHook {threadHookChild} -> nodeEmpty threadHookChild
   TestHook {testHookChild} -> nodeEmpty testHookChild
   Branch {subElms} -> all nodeEmpty subElms
-  Fixture {iterations} -> M.null iterations
+  Fixture {iterations} -> null iterations
 
 

@@ -3,11 +3,9 @@ module Internal.SuiteRuntime where
 import Check (CheckReport (result))
 import Control.DeepSeq (NFData, deepseq, force, ($!!))
 import Data.Function (const, ($), (&))
-import Data.Map.Strict as M (foldrWithKey, toList)
 import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both)
 import GHC.Exts
-import GHC.IO.FD (release)
 import Internal.PreNode
   ( PreNode (..),
     PreNodeRoot,
@@ -21,11 +19,13 @@ import Internal.RunTimeLogging
     PThreadId,
     Sink,
     logWorker,
+    mkFailure,
     mkLogger,
+    mkStart,
     sink,
     stopWorker,
   )
-import qualified Internal.RunTimeLogging as L (ExeEventType (TestHook))
+import qualified Internal.RunTimeLogging as L (ExeEventType (OnceHook, OnceHookRelease, TestHook, ThreadHook, ThreadHookRelease))
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
 import Pyrelude as P hiding
@@ -154,11 +154,6 @@ data IdxLst a = IdxLst
 mkIdxLst :: a -> STM (IdxLst a)
 mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
-data Iteration si ti ii = Iteration
-  { id :: Text,
-    action :: si -> ti -> ii -> IO ()
-  }
-
 data ExeTree si so ti to ii io where
   RTNodeS ::
     { loc :: Loc,
@@ -194,7 +189,7 @@ data ExeTree si so ti to ii io where
     { leafloc :: Loc,
       logStart :: IO (),
       nStatus :: TVar Status,
-      iterations :: TQueue (Iteration si ti ii),
+      iterations :: TQueue (si -> ti -> ii -> IO ()),
       runningCount :: TVar Int
     } ->
     ExeTree si () ti () ii ()
@@ -303,7 +298,7 @@ prepare =
               s <- newTVarIO Pending
               q <- newTQueueIO
               runningCount <- newTVarIO 0
-              atomically $ traverse_ (writeTQueue q) $ PRL.uncurry Iteration <$> M.toList iterations
+              atomically $ traverse_ (writeTQueue q) iterations
               pure $
                 RTFix
                   { leafloc = loc,
@@ -318,14 +313,28 @@ data HookResult so = HookResult
     value :: Either SomeException so
   }
 
-hookVal :: forall hi ho. (hi -> IO ho) -> hi -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
-hookVal hook hi hs hkVal loc =
+data HookLogging = HookLogging
+  { start :: L.ExeEventType,
+    logger :: EventLogger
+  }
+
+hookVal :: forall hi ho. HookLogging -> (hi -> IO ho) -> hi -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
+hookVal HookLogging {start, logger} hook hi hs hkVal loc =
   atomically readOrLock
     >>= maybe
-      ( catchAll
-          (hook hi >>= atomically . setHookStatus . Right)
-          (atomically . setHookStatus . Left)
-          >>= pure . HookResult True
+      ( do
+          eho <-
+            catchAll
+              ( do
+                  logger (mkStart loc start)
+                  ho <- hook hi
+                  atomically . setHookStatus $ Right ho
+              )
+              ( \e -> do
+                  logger (mkFailure loc ("Hook Failed: " <> txt start <> " " <> unLoc loc) e)
+                  atomically . setHookStatus $ Left e
+              )
+          pure $ HookResult True eho
       )
       (pure . HookResult False)
   where
@@ -347,6 +356,7 @@ hookVal hook hi hs hkVal loc =
 
 threadSource ::
   forall si ti to.
+  EventLogger ->
   -- | cached value
   TMVar (Either SomeException to) ->
   -- | status
@@ -360,49 +370,54 @@ threadSource ::
   -- | hook location
   Loc ->
   IO (Either SomeException to)
-threadSource mHkVal hkStatus si tio hk loc =
-  tio
-    >>= either
-      (pure . Left)
-      (\ti -> value <$> hookVal (hk si) ti hkStatus mHkVal loc)
+threadSource logger mHkVal hkStatus si tio hk loc =
+  let hl =
+        HookLogging
+          { start = L.ThreadHook,
+            logger
+          }
+   in tio
+        >>= either
+          (pure . Left)
+          (\ti -> value <$> hookVal hl (hk si) ti hkStatus mHkVal loc)
 
-failRecursively :: forall si so ti to ii io. Text -> SomeException -> ExeTree si so ti to ii io -> STM ()
-failRecursively msg e = recurse
+failRecursively :: forall si so ti to ii io. SomeException -> ExeTree si so ti to ii io -> STM [Loc]
+failRecursively e = reverse <$> recurse []
   where
     failure :: Status
     failure = Done
 
-    failQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> STM ()
-    failQ q =
+    failQ :: [Text] -> TQueue (ExeTree si' so' ti' to' ii' io') -> STM [Text] 
+    failQ accum q =
       tryReadTQueue q
         >>= maybe
-          (pure ())
-          \rg -> recurse rg >> retry
+          (pure accum)
+          \rg -> recurse accum rg >>= flip failQ q
 
-    emptyQ :: TQueue a -> STM ()
+    emptyQ :: [Text] -> TQueue a -> STM [Text] 
     emptyQ q =
       tryReadTQueue q
         >>= maybe
           (pure ())
           (const retry)
 
-    recurse :: ExeTree si' so' ti' to' ii' io' -> STM ()
-    recurse rg = do
+    recurse :: [Text] -> ExeTree si' so' ti' to' ii' io' -> STM [Text] 
+    recurse accum rg  = do
       setStatusIfApplicable rg failure
       case rg of
-        RTNodeS {sChildNode} -> recurse sChildNode
-        RTNodeT {tChildNode} -> recurse tChildNode
-        RTNodeI {iChildNode} -> recurse iChildNode
-        RTNodeM {childNodes, fullyRunning} -> do
+        RTNodeS {loc, sChildNode} -> recurse sChildNode
+        RTNodeT {loc, tChildNode} -> recurse tChildNode
+        RTNodeI {loc, iChildNode} -> recurse iChildNode
+        RTNodeM {leafloc, childNodes, fullyRunning} -> do
           failQ childNodes
-          failQ fullyRunning
-        RTFix {iterations} -> emptyQ iterations
+        RTFix {leafloc, iterations} -> emptyQ iterations
 
 data TestHk io = TestHk
   { tstHkLoc :: Loc,
     tstHkHook :: IO (Either SomeException io),
     tstHkRelease :: io -> IO ()
   }
+
 
 runHookWith :: TestHk ii -> (ii -> IO io) -> IO (Either SomeException io)
 runHookWith
@@ -491,20 +506,25 @@ executeNode logger si ioti tstHk rg =
             sChildNode
           } ->
             do
+              let hl =
+                    HookLogging
+                      { start = L.OnceHook,
+                        logger
+                      }
+
               -- hookVal:
               --  1. runs hook if required
               --  2. waits if hook is running
               --  3. updates hook status
               --  4. returns hook result
-              HookResult {hasExecuted, value = ethHkRslt} <- hookVal sHook si status sHookVal loc
+              HookResult {hasExecuted, value = ethHkRslt} <- hookVal hl sHook si status sHookVal loc
               if hasExecuted
                 then
-                  ethHkRslt -- the hook that executes waits for child completion and sets status
+                  ethHkRslt -- the thread executes waits for child completion and sets status
                     & either
                       ( \e ->
-                          atomically $
-                            -- status already set by hookVal
-                            failRecursively ("Parent hook failed: " <> unLoc loc) e sChildNode
+                          -- status already set by hookVal
+                          failRecursively ("Parent hook failed: " <> unLoc loc) e sChildNode
                       )
                       ( \so ->
                           finally

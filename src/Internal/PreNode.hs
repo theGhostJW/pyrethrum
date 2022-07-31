@@ -9,6 +9,8 @@ import Internal.RunTimeLogging (Loc)
 newtype PreNodeRoot = 
   PreNodeRoot { rootNode :: IO (PreNode () () () () () ()) }
 
+data Test si ti ii = Test Text (si -> ti -> ii -> IO ())
+
 data PreNode oi oo ti to ii io where
   Branch :: {
     bTag :: Maybe Text,
@@ -44,7 +46,7 @@ data PreNode oi oo ti to ii io where
     { 
       fxTag :: Maybe Text,
       logStart :: Loc -> IO (),
-      iterations :: [oi -> ti -> ii -> IO ()],
+      iterations :: [Test oi ti ii],
       logEnd :: Loc -> IO ()
     } ->
     PreNode oi () ti () ii ()

@@ -9,7 +9,8 @@ import GHC.Exts
 import Internal.PreNode
   ( PreNode (..),
     PreNodeRoot,
-    rootNode,
+    Test(..),
+    rootNode
   )
 import Internal.RunTimeLogging
   ( ExeEvent (EndExecution, StartExecution),
@@ -189,21 +190,21 @@ data ExeTree si so ti to ii io where
     { leafloc :: Loc,
       logStart :: IO (),
       nStatus :: TVar Status,
-      iterations :: TQueue (si -> ti -> ii -> IO ()),
+      iterations :: TQueue (Test si ti ii),
       runningCount :: TVar Int
     } ->
     ExeTree si () ti () ii ()
 
 prepare :: PreNode () () () () () () -> IO (ExeTree () () () () () ())
 prepare =
-  prepare' (Loc "ROOT") 0
+  prepare' Root 0
   where
     consNoMxIdx :: IdxLst a -> a -> IdxLst a
     consNoMxIdx l@IdxLst {lst} i = l {lst = i : lst}
 
     mkLoc :: Loc -> Int -> Maybe Text -> Text -> Loc
     mkLoc parentLoc subElmIdx childlabel elmType =
-      Loc . ((unLoc parentLoc <> " . ") <>) $
+      Node parentLoc $
         childlabel
           & maybe
             (elmType <> "[" <> txt subElmIdx <> "]")
@@ -331,7 +332,7 @@ hookVal HookLogging {start, logger} hook hi hs hkVal loc =
                   atomically . setHookStatus $ Right ho
               )
               ( \e -> do
-                  logger (mkFailure loc ("Hook Failed: " <> txt start <> " " <> unLoc loc) e)
+                  logger (mkFailure loc ("Hook Failed: " <> txt start <> " " <> txt loc) e)
                   atomically . setHookStatus $ Left e
               )
           pure $ HookResult True eho
@@ -387,21 +388,14 @@ failRecursively e = reverse <$> recurse []
     failure :: Status
     failure = Done
 
-    failQ :: [Text] -> TQueue (ExeTree si' so' ti' to' ii' io') -> STM [Text] 
+    failQ :: [Loc] -> TQueue (ExeTree si' so' ti' to' ii' io') -> STM [Loc] 
     failQ accum q =
       tryReadTQueue q
         >>= maybe
           (pure accum)
           \rg -> recurse accum rg >>= flip failQ q
 
-    emptyQ :: [Text] -> TQueue a -> STM [Text] 
-    emptyQ q =
-      tryReadTQueue q
-        >>= maybe
-          (pure ())
-          (const retry)
-
-    recurse :: [Text] -> ExeTree si' so' ti' to' ii' io' -> STM [Text] 
+    recurse :: [Loc] -> ExeTree si' so' ti' to' ii' io' -> STM [Loc] 
     recurse accum rg  = do
       setStatusIfApplicable rg failure
       case rg of
@@ -411,6 +405,13 @@ failRecursively e = reverse <$> recurse []
         RTNodeM {leafloc, childNodes, fullyRunning} -> do
           failQ childNodes
         RTFix {leafloc, iterations} -> emptyQ iterations
+        
+        emptyQ :: [Loc] -> TQueue a -> STM [Loc] 
+        emptyQ accum q =
+          tryReadTQueue q
+            >>= maybe
+              (pure accum)
+              (\n ->  retry)
 
 data TestHk io = TestHk
   { tstHkLoc :: Loc,

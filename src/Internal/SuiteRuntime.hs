@@ -13,18 +13,16 @@ import Internal.PreNode
     rootNode,
   )
 import Internal.RunTimeLogging
-  ( ExeEvent (EndExecution, StartExecution),
+  ( ExeEvent (..),
     Index (Index),
     Loc (..),
     LogControls (LogControls),
     PThreadId,
     Sink,
     logWorker,
-    mkFailure,
     mkLogger,
-    mkStart,
     sink,
-    stopWorker,
+    stopWorker, mkFailure,
   )
 import qualified Internal.RunTimeLogging as L (ExeEventType (OnceHook, OnceHookRelease, TestHook, ThreadHook, ThreadHookRelease))
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
@@ -316,7 +314,7 @@ data HookResult so = HookResult
 
 data HookLogging = HookLogging
   { start :: L.ExeEventType,
-    logger :: EventLogger
+    logger :: Logger
   }
 
 hookVal :: forall hi ho. HookLogging -> (hi -> IO ho) -> hi -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
@@ -327,7 +325,7 @@ hookVal HookLogging {start, logger} hook hi hs hkVal loc =
           eho <-
             catchAll
               ( do
-                  logger (mkStart loc start)
+                  logger $ Start loc start
                   ho <- hook hi
                   atomically . setHookStatus $ Right ho
               )
@@ -357,7 +355,7 @@ hookVal HookLogging {start, logger} hook hi hs hkVal loc =
 
 threadSource ::
   forall si ti to.
-  EventLogger ->
+  Logger ->
   -- | cached value
   TMVar (Either SomeException to) ->
   -- | status
@@ -501,7 +499,7 @@ discardDoneMoveFullyRunning fullyRunningQ =
               | otherwise -> pure False
     )
 
-executeNode :: forall si so ti to ii io. EventLogger -> si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
+executeNode :: forall si so ti to ii io. Logger -> si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
 executeNode logger si ioti tstHk rg =
   do
     let exeNxt :: forall si' so' ti' to' ii' io'. si' -> IO (Either SomeException ti') -> TestHk ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
@@ -685,9 +683,9 @@ executeNode logger si ioti tstHk rg =
                         )
                         (atomically (modifyTVar runningCount pred) >> recurse)
 
-type EventLogger = (Index -> PThreadId -> ExeEvent) -> IO ()
+type Logger = (Index -> PThreadId -> ExeEvent) -> IO ()
 
-newLogger :: Sink -> IO EventLogger
+newLogger :: Sink -> IO Logger
 newLogger sink = do
   r <- UnliftIO.newIORef (Index 0)
   pure $ mkLogger sink r

@@ -9,8 +9,8 @@ import GHC.Exts
 import Internal.PreNode
   ( PreNode (..),
     PreNodeRoot,
-    Test(..),
-    rootNode
+    Test (..),
+    rootNode,
   )
 import Internal.RunTimeLogging
   ( ExeEvent (EndExecution, StartExecution),
@@ -382,43 +382,56 @@ threadSource logger mHkVal hkStatus si tio hk loc =
           (pure . Left)
           (\ti -> value <$> hookVal hl (hk si) ti hkStatus mHkVal loc)
 
-failRecursively :: forall si so ti to ii io. SomeException -> ExeTree si so ti to ii io -> STM [Loc]
-failRecursively e = reverse <$> recurse []
+setDoneRecursively :: ExeTree si so ti to ii io -> STM ()
+setDoneRecursively n = do
+  setStatusIfApplicable n Done
+  case n of
+    RTNodeS {loc, sChildNode} -> setDoneRecursively sChildNode
+    RTNodeT {loc, tChildNode} -> setDoneRecursively tChildNode
+    RTNodeI {loc, iChildNode} -> setDoneRecursively iChildNode
+    RTNodeM {leafloc, childNodes, fullyRunning} -> failQ childNodes
+    RTFix {leafloc, iterations} -> pure ()
   where
-    failure :: Status
-    failure = Done
-
-    failQ :: [Loc] -> TQueue (ExeTree si' so' ti' to' ii' io') -> STM [Loc] 
-    failQ accum q =
+    failQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> STM ()
+    failQ q =
       tryReadTQueue q
         >>= maybe
-          (pure accum)
-          \rg -> recurse accum rg >>= flip failQ q
+          (pure ())
+          \rg -> setDoneRecursively rg >> failQ q
 
-    recurse :: [Loc] -> ExeTree si' so' ti' to' ii' io' -> STM [Loc] 
-    recurse accum rg  = do
-      setStatusIfApplicable rg failure
-      case rg of
-        RTNodeS {loc, sChildNode} -> recurse sChildNode
-        RTNodeT {loc, tChildNode} -> recurse tChildNode
-        RTNodeI {loc, iChildNode} -> recurse iChildNode
-        RTNodeM {leafloc, childNodes, fullyRunning} -> do
-          failQ childNodes
-        RTFix {leafloc, iterations} -> emptyQ iterations
-        
-        emptyQ :: [Loc] -> TQueue a -> STM [Loc] 
-        emptyQ accum q =
-          tryReadTQueue q
-            >>= maybe
-              (pure accum)
-              (\n ->  retry)
+logFailureRecursively :: forall si so ti to ii io. SomeException -> ExeTree si so ti to ii io -> IO ()
+logFailureRecursively e = uu
+-- reverse <$> recurse []
+--   where
+--     failure :: Status
+--     failure = Done
+
+--     failQ :: [Loc] -> TQueue (ExeTree si' so' ti' to' ii' io') -> STM [Loc]
+--     failQ accum q =
+--       tryReadTQueue q
+--         >>= maybe
+--           (pure accum)
+--           \rg -> recurse accum rg >>= flip failQ q
+
+--     recurse :: [Loc] -> ExeTree si' so' ti' to' ii' io' -> STM [Loc]
+--     recurse accum rg = do
+--       setStatusIfApplicable rg failure
+--       case rg of
+--         RTNodeS {loc, sChildNode} -> recurse (loc : accum) sChildNode
+--         RTNodeT {loc, tChildNode} -> recurse (loc : accum) tChildNode
+--         RTNodeI {loc, iChildNode} -> recurse (loc : accum) iChildNode
+--         RTNodeM {leafloc, childNodes, fullyRunning} -> failQ (leafloc : accum) childNodes
+--         RTFix {leafloc, iterations} ->
+--           tryReadTQueue iterations
+--             >>= maybe
+--               (pure accum)
+--               (\t -> retry)
 
 data TestHk io = TestHk
   { tstHkLoc :: Loc,
     tstHkHook :: IO (Either SomeException io),
     tstHkRelease :: io -> IO ()
   }
-
 
 runHookWith :: TestHk ii -> (ii -> IO io) -> IO (Either SomeException io)
 runHookWith
@@ -507,25 +520,19 @@ executeNode logger si ioti tstHk rg =
             sChildNode
           } ->
             do
-              let hl =
-                    HookLogging
-                      { start = L.OnceHook,
-                        logger
-                      }
-
               -- hookVal:
               --  1. runs hook if required
               --  2. waits if hook is running
               --  3. updates hook status
               --  4. returns hook result
-              HookResult {hasExecuted, value = ethHkRslt} <- hookVal hl sHook si status sHookVal loc
+              HookResult {hasExecuted, value = ethHkRslt} <- hookVal (HookLogging L.OnceHook logger) sHook si status sHookVal loc
               if hasExecuted
                 then
                   ethHkRslt -- the thread executes waits for child completion and sets status
                     & either
-                      ( \e ->
-                          -- status already set by hookVal
-                          failRecursively ("Parent hook failed: " <> unLoc loc) e sChildNode
+                      ( \e -> do
+                          atomically $ setDoneRecursively sChildNode
+                          logFailureRecursively e sChildNode
                       )
                       ( \so ->
                           finally

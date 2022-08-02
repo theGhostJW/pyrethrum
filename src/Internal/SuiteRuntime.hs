@@ -22,7 +22,7 @@ import Internal.RunTimeLogging
     logWorker,
     mkLogger,
     sink,
-    stopWorker, mkFailure,
+    stopWorker, mkFailure, mkParentFailure,
   )
 import qualified Internal.RunTimeLogging as L (ExeEventType (OnceHook, OnceHookRelease, TestHook, ThreadHook, ThreadHookRelease))
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
@@ -40,6 +40,7 @@ import Pyrelude as P hiding
     readTVarIO,
     threadStatus,
     withMVar,
+    fail
   )
 import Pyrelude.IO (hPutStrLn, putStrLn)
 import UnliftIO
@@ -397,19 +398,32 @@ setDoneRecursively n = do
           (pure ())
           \rg -> setDoneRecursively rg >> failQ q
 
-logFailureRecursively :: forall si so ti to ii io. SomeException -> ExeTree si so ti to ii io -> IO ()
-logFailureRecursively e = uu
+logFailureRecursively :: forall si so ti to ii io. Logger -> Loc -> SomeException -> ExeTree si so ti to ii io -> IO ()
+logFailureRecursively logger parentLoc e = \case
+  RTNodeS {loc, sChildNode} -> recurse loc sChildNode
+  RTNodeT {loc, tChildNode} -> recurse loc tChildNode
+  RTNodeI {loc, iChildNode} -> recurse loc iChildNode
+  RTNodeM {leafloc, childNodes} ->  lgFail leafloc >> failQ childNodes
+  RTFix {leafloc, iterations} -> here - need start and end and different state for parent fail 
+  where
+    lgFail loc = logger (mkParentFailure parentLoc loc e)
+
+    recurse :: forall si' so' ti' to' ii' io'.  Loc -> ExeTree si' so' ti' to' ii' io' -> IO ()
+    recurse loc cld = lgFail loc >> logFailureRecursively logger parentLoc e cld
+
+    failQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> IO ()
+    failQ q =
+      atomically (tryReadTQueue q)
+        >>= maybe
+          (pure ())
+          (logFailureRecursively logger parentLoc e) >> failQ q
+
 -- reverse <$> recurse []
 --   where
 --     failure :: Status
 --     failure = Done
 
---     failQ :: [Loc] -> TQueue (ExeTree si' so' ti' to' ii' io') -> STM [Loc]
---     failQ accum q =
---       tryReadTQueue q
---         >>= maybe
---           (pure accum)
---           \rg -> recurse accum rg >>= flip failQ q
+
 
 --     recurse :: [Loc] -> ExeTree si' so' ti' to' ii' io' -> STM [Loc]
 --     recurse accum rg = do
@@ -420,10 +434,7 @@ logFailureRecursively e = uu
 --         RTNodeI {loc, iChildNode} -> recurse (loc : accum) iChildNode
 --         RTNodeM {leafloc, childNodes, fullyRunning} -> failQ (leafloc : accum) childNodes
 --         RTFix {leafloc, iterations} ->
---           tryReadTQueue iterations
---             >>= maybe
---               (pure accum)
---               (\t -> retry)
+--           failQ
 
 data TestHk io = TestHk
   { tstHkLoc :: Loc,
@@ -530,7 +541,7 @@ executeNode logger si ioti tstHk rg =
                     & either
                       ( \e -> do
                           atomically $ setDoneRecursively sChildNode
-                          logFailureRecursively e sChildNode
+                          logFailureRecursively loc e sChildNode
                       )
                       ( \so ->
                           finally

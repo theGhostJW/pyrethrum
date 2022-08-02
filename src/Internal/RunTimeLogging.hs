@@ -9,15 +9,6 @@ import UnliftIO.Concurrent (myThreadId)
 import GHC.Show (show)
 import Prelude (String)
 
-mkStart :: Loc -> ExeEventType -> Index -> PThreadId -> ExeEvent
-mkStart l e i t = Start i t l e
-
-mkDebug :: Text -> Index -> PThreadId -> ExeEvent
-mkDebug t i p = Debug i p t
-
-mkFailure :: Loc -> Text -> SomeException -> Index -> PThreadId -> ExeEvent
-mkFailure loc desc e idx trdId = Failure idx trdId loc desc (PException . txt $ displayException e)
-
 data Loc = 
   Root |
   Node Loc Text |
@@ -35,6 +26,16 @@ data ExeEventType
   | Fixture
   deriving (Show, Eq)
 
+
+exceptionTxt :: SomeException -> PException
+exceptionTxt = PException . txt . displayException
+
+mkFailure :: Loc -> Text -> SomeException -> Index -> PThreadId -> ExeEvent
+mkFailure l t = Failure l t . exceptionTxt
+
+mkParentFailure :: Loc -> Loc -> SomeException -> Index -> PThreadId -> ExeEvent
+mkParentFailure p l = ParentFailure p l . exceptionTxt
+
 newtype PThreadId = PThreadId {threadId :: Text} deriving (Show, Eq)
 
 newtype PException = PException {displayText :: Text} deriving (Show, Eq)
@@ -43,20 +44,14 @@ newtype Index = Index {idx :: Int} deriving (Show, Eq, Ord)
 
 data ExeEvent
   = StartExecution Index PThreadId
-  | Start Index PThreadId Loc ExeEventType
-  | Failure Index PThreadId Loc Text PException
-  | Debug Index PThreadId Text
+  | Start Loc ExeEventType Index PThreadId 
+  | End Loc ExeEventType Index PThreadId 
+  | Failure Loc Text PException Index PThreadId 
+  | ParentFailure Loc Loc PException Index PThreadId 
+  | Debug Text Index PThreadId 
   | EndExecution Index PThreadId
+  deriving Show
 
-instance Show ExeEvent where
-  show = uu
---   \case here 
---     StartExecution Index PThreadId
--- forall a. Start Index PThreadId (Loc a) ExeEventType
--- forall a. Failure Index PThreadId (Loc a)Text PException
--- Debug Index PThreadId Text
--- EndExecution Index PThreadId 
- 
 
 -------  IO Logging --------
 type Sink = ExeEvent -> IO ()

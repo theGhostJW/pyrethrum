@@ -20,9 +20,11 @@ import Internal.RunTimeLogging
     PThreadId,
     Sink,
     logWorker,
+    mkFailure,
     mkLogger,
+    mkParentFailure,
     sink,
-    stopWorker, mkFailure, mkParentFailure,
+    stopWorker,
   )
 import qualified Internal.RunTimeLogging as L (ExeEventType (OnceHook, OnceHookRelease, TestHook, ThreadHook, ThreadHookRelease))
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
@@ -32,6 +34,7 @@ import Pyrelude as P hiding
     ThreadStatus,
     atomically,
     bracket,
+    fail,
     finally,
     newMVar,
     newTVarIO,
@@ -40,7 +43,6 @@ import Pyrelude as P hiding
     readTVarIO,
     threadStatus,
     withMVar,
-    fail
   )
 import Pyrelude.IO (hPutStrLn, putStrLn)
 import UnliftIO
@@ -98,6 +100,7 @@ data Status
   | Running
   | FullyRunning
   | HookFinalising -- only relevant to hooks
+  | Abandon
   | Done
   deriving (Show, Eq, Ord)
 
@@ -129,16 +132,19 @@ canRun rg =
       Running -> True
       FullyRunning -> False
       HookFinalising -> False
+      Abandon -> False
       Done -> False
 
-setStatusIfApplicable :: ExeTree si so ti to ii io -> Status -> STM ()
-setStatusIfApplicable et s =
+modifyStatus :: (Status -> Status) -> ExeTree si so ti to ii io -> STM ()
+modifyStatus f et =
   case et of
-    RTNodeS {status} -> writeTVar status s
+    RTNodeS {status} -> update status
     RTNodeT {} -> pure ()
     RTNodeI {} -> pure ()
-    RTNodeM {nStatus} -> writeTVar nStatus s
-    RTFix {nStatus} -> writeTVar nStatus s
+    RTNodeM {nStatus} -> update nStatus
+    RTFix {nStatus} -> update nStatus
+  where
+    update = flip modifyTVar f
 
 waitDone :: ExeTree si so ti to ii io -> STM ()
 waitDone rg = do
@@ -381,53 +387,69 @@ threadSource logger mHkVal hkStatus si tio hk loc =
           (pure . Left)
           (\ti -> value <$> hookVal hl (hk si) ti hkStatus mHkVal loc)
 
-setDoneRecursively :: ExeTree si so ti to ii io -> STM ()
-setDoneRecursively n = do
-  setStatusIfApplicable n Done
-  case n of
-    RTNodeS {loc, sChildNode} -> setDoneRecursively sChildNode
-    RTNodeT {loc, tChildNode} -> setDoneRecursively tChildNode
-    RTNodeI {loc, iChildNode} -> setDoneRecursively iChildNode
-    RTNodeM {leafloc, childNodes, fullyRunning} -> failQ childNodes
-    RTFix {leafloc, iterations} -> pure ()
+modifyStatusRecursively :: (Status -> Status) -> ExeTree si so ti to ii io -> STM ()
+modifyStatusRecursively f n =
+  modifyStatus f n
+    >> case n of
+      RTNodeS {loc, sChildNode} -> recurse sChildNode
+      RTNodeT {loc, tChildNode} -> recurse tChildNode
+      RTNodeI {loc, iChildNode} -> recurse iChildNode
+      RTNodeM {leafloc, childNodes, fullyRunning} -> failQ childNodes
+      RTFix {leafloc, iterations} -> pure ()
   where
+    recurse :: ExeTree si' so' ti' to' ii' io' -> STM ()
+    recurse = modifyStatusRecursively f
+
     failQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> STM ()
     failQ q =
       tryReadTQueue q
         >>= maybe
           (pure ())
-          \rg -> setDoneRecursively rg >> failQ q
+          \rg -> recurse rg >> failQ q
 
-logFailureRecursively :: forall si so ti to ii io. Logger -> Loc -> SomeException -> ExeTree si so ti to ii io -> IO ()
-logFailureRecursively logger parentLoc e = \case
-  RTNodeS {loc, sChildNode} -> recurse loc sChildNode
+logAbandonRecursively :: forall si so ti to ii io. Logger -> Loc -> SomeException -> ExeTree si so ti to ii io -> IO ()
+logAbandonRecursively logger parentLoc e = \case
+  n@RTNodeS {loc, sChildNode} -> do 
+    s <- atomically $ getStatus n
+    when s == Abandon $
+      
+    case s of
+      Pending -> _
+      HookExecuting -> _
+      Running -> _
+      FullyRunning -> _
+      HookFinalising -> _
+      Abandon -> _
+      Done -> _
+
   RTNodeT {loc, tChildNode} -> recurse loc tChildNode
   RTNodeI {loc, iChildNode} -> recurse loc iChildNode
-  RTNodeM {leafloc, childNodes} ->  lgFail leafloc >> failQ childNodes
-  RTFix {leafloc, iterations} -> here - need start and end and different state for parent fail 
+  RTNodeM {leafloc, childNodes} -> lgAbandon leafloc >> failQ childNodes
+  RTFix {leafloc, iterations} -> uu --here - need start and end and different state for parent fail
   where
-    lgFail loc = logger (mkParentFailure parentLoc loc e)
+    lgAbandon loc = logger (mkParentFailure parentLoc loc e)
 
-    recurse :: forall si' so' ti' to' ii' io'.  Loc -> ExeTree si' so' ti' to' ii' io' -> IO ()
-    recurse loc cld = lgFail loc >> logFailureRecursively logger parentLoc e cld
+    recurse :: forall si' so' ti' to' ii' io'. Loc -> ExeTree si' so' ti' to' ii' io' -> IO ()
+    recurse loc cld = do 
+      s <- getStatus
+      lgAbandon loc >> logAbandonRecursively logger parentLoc e cld
 
     failQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> IO ()
     failQ q =
       atomically (tryReadTQueue q)
         >>= maybe
           (pure ())
-          (logFailureRecursively logger parentLoc e) >> failQ q
+          (logAbandonRecursively logger parentLoc e)
+          >> failQ q
 
 -- reverse <$> recurse []
 --   where
 --     failure :: Status
 --     failure = Done
 
-
-
 --     recurse :: [Loc] -> ExeTree si' so' ti' to' ii' io' -> STM [Loc]
 --     recurse accum rg = do
---       setStatusIfApplicable rg failure
+--       modifyStatus rg failure
 --       case rg of
 --         RTNodeS {loc, sChildNode} -> recurse (loc : accum) sChildNode
 --         RTNodeT {loc, tChildNode} -> recurse (loc : accum) tChildNode
@@ -540,8 +562,8 @@ executeNode logger si ioti tstHk rg =
                   ethHkRslt -- the thread executes waits for child completion and sets status
                     & either
                       ( \e -> do
-                          atomically $ setDoneRecursively sChildNode
-                          logFailureRecursively loc e sChildNode
+                          atomically $ modifyStatusRecursively (const Abandon) sChildNode
+                          logAbandonRecursively loc e sChildNode
                       )
                       ( \so ->
                           finally

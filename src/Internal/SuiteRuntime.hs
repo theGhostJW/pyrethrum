@@ -12,8 +12,9 @@ import Internal.PreNode
     Test (..),
     rootNode,
   )
-import Internal.RunTimeLogging
+import Internal.RunTimeLogging as L
   ( ExeEvent (..),
+    ExeEventType,
     Index (Index),
     Loc (..),
     LogControls (LogControls),
@@ -407,40 +408,42 @@ modifyStatusRecursively f n =
           (pure ())
           \rg -> recurse rg >> failQ q
 
-logAbandonRecursively :: forall si so ti to ii io. Logger -> Loc -> SomeException -> ExeTree si so ti to ii io -> IO ()
-logAbandonRecursively logger parentLoc e = \case
-  n@RTNodeS {loc, sChildNode} -> do 
-    s <- atomically $ getStatus n
-    when s == Abandon $
-      
-    case s of
-      Pending -> _
-      HookExecuting -> _
-      Running -> _
-      FullyRunning -> _
-      HookFinalising -> _
-      Abandon -> _
-      Done -> _
-
-  RTNodeT {loc, tChildNode} -> recurse loc tChildNode
+logAbandonRecursively :: forall si so ti to ii io. Logger -> Loc -> SomeException -> ExeTree si so ti to ii io -> (IO () -> IO ()) -> IO ()
+logAbandonRecursively logger parentLoc e iLogger = \case
+  n@RTNodeS {loc, sChildNode} -> loggedRecurse loc n sChildNode L.OnceHook iLogger
+  n@RTNodeT {loc, tChildNode} -> loggedRecurse loc n tChildNode L.ThreadHook
   RTNodeI {loc, iChildNode} -> recurse loc iChildNode
   RTNodeM {leafloc, childNodes} -> lgAbandon leafloc >> failQ childNodes
   RTFix {leafloc, iterations} -> uu --here - need start and end and different state for parent fail
   where
     lgAbandon loc = logger (mkParentFailure parentLoc loc e)
 
-    recurse :: forall si' so' ti' to' ii' io'. Loc -> ExeTree si' so' ti' to' ii' io' -> IO ()
-    recurse loc cld = do 
-      s <- getStatus
-      lgAbandon loc >> logAbandonRecursively logger parentLoc e cld
+    loggedRecurse :: Loc -> ExeTree si' so' ti' to' ii' io' -> ExeTree si'' so'' ti'' to'' ii'' io'' -> ExeEventType -> (IO () -> IO ()) -> IO ()
+    loggedRecurse loc node childNode et ilgr = do
+      s <- atomically $ getStatus node
+      if s == Abandon
+        then
+          finally
+            ( do
+                logger (Start loc et)
+                lgAbandon loc
+                recurse childNode ilgr
+            )
+            $ logger (End loc et)
+        else recurse childNode ilgr
 
-    failQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> IO ()
-    failQ q =
+    recurse :: forall si' so' ti' to' ii' io'. ExeTree si' so' ti' to' ii' io' -> (IO () -> IO ()) -> IO ()
+    recurse cld ilgr = do
+      s <- atomically $ getStatus cld
+      logAbandonRecursively logger parentLoc e cld ilgr
+
+    failQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> (IO () -> IO ()) -> IO ()
+    failQ q ilgr =
       atomically (tryReadTQueue q)
         >>= maybe
           (pure ())
-          (logAbandonRecursively logger parentLoc e)
-          >> failQ q
+          (\n -> logAbandonRecursively logger parentLoc e n ilgr)
+          >> failQ q ilgr
 
 -- reverse <$> recurse []
 --   where

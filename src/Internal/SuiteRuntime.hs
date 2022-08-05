@@ -6,7 +6,7 @@ import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both)
 import GHC.Exts
-import Internal.PreNode
+import Internal.PreNode as PN
   ( PreNode (..),
     PreNodeRoot,
     Test (..),
@@ -14,7 +14,7 @@ import Internal.PreNode
   )
 import Internal.RunTimeLogging as L
   ( ExeEvent (..),
-    ExeEventType,
+    ExeEventType (..),
     Index (Index),
     Loc (..),
     LogControls (LogControls),
@@ -197,7 +197,8 @@ data ExeTree si so ti to ii io where
       logStart :: IO (),
       nStatus :: TVar Status,
       iterations :: TQueue (Test si ti ii),
-      runningCount :: TVar Int
+      runningCount :: TVar Int,
+      abandonning :: TVar Bool
     } ->
     ExeTree si () ti () ii ()
 
@@ -239,7 +240,7 @@ prepare =
                   childNodes = q,
                   fullyRunning = fr
                 }
-        OnceHook
+        PN.OnceHook
           { hookTag,
             hook,
             hookChild,
@@ -259,7 +260,7 @@ prepare =
                   sHookVal = v,
                   sChildNode = child
                 }
-        ThreadHook
+        PN.ThreadHook
           { threadTag,
             threadHook,
             threadHookChild,
@@ -278,7 +279,7 @@ prepare =
                         tHookRelease = threadHookRelease loc,
                         tChildNode = child
                       }
-        TestHook
+        PN.TestHook
           { testTag,
             testHook,
             testHookChild,
@@ -294,7 +295,7 @@ prepare =
                         iHookRelease = testHookRelease loc,
                         iChildNode = child
                       }
-        Fixture
+        PN.Fixture
           { fxTag,
             logStart,
             iterations,
@@ -304,6 +305,7 @@ prepare =
               let loc = mkLoc' fxTag "ThreadHook"
               s <- newTVarIO Pending
               q <- newTQueueIO
+              abandonning <- newTVarIO False
               runningCount <- newTVarIO 0
               atomically $ traverse_ (writeTQueue q) iterations
               pure $
@@ -312,7 +314,8 @@ prepare =
                     logStart = logStart loc,
                     nStatus = ns,
                     iterations = q,
-                    runningCount
+                    runningCount,
+                    abandonning
                   }
 
 data HookResult so = HookResult
@@ -395,71 +398,85 @@ modifyStatusRecursively f n =
       RTNodeS {loc, sChildNode} -> recurse sChildNode
       RTNodeT {loc, tChildNode} -> recurse tChildNode
       RTNodeI {loc, iChildNode} -> recurse iChildNode
-      RTNodeM {leafloc, childNodes, fullyRunning} -> failQ childNodes
+      RTNodeM {leafloc, childNodes, fullyRunning} -> abandonQ childNodes
       RTFix {leafloc, iterations} -> pure ()
   where
     recurse :: ExeTree si' so' ti' to' ii' io' -> STM ()
     recurse = modifyStatusRecursively f
 
-    failQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> STM ()
-    failQ q =
+    abandonQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> STM ()
+    abandonQ q =
       tryReadTQueue q
         >>= maybe
           (pure ())
-          \rg -> recurse rg >> failQ q
+          \rg -> recurse rg >> abandonQ q
 
-logAbandonRecursively :: forall si so ti to ii io. Logger -> Loc -> SomeException -> ExeTree si so ti to ii io -> (IO () -> IO ()) -> IO ()
+logAbandonRecursively :: forall si so ti to ii io. Logger -> Loc -> SomeException -> (IO () -> IO ()) -> ExeTree si so ti to ii io -> IO ()
 logAbandonRecursively logger parentLoc e iLogger = \case
-  n@RTNodeS {loc, sChildNode} -> loggedRecurse loc n sChildNode L.OnceHook iLogger
-  n@RTNodeT {loc, tChildNode} -> loggedRecurse loc n tChildNode L.ThreadHook
-  RTNodeI {loc, iChildNode} -> recurse loc iChildNode
-  RTNodeM {leafloc, childNodes} -> lgAbandon leafloc >> failQ childNodes
-  RTFix {leafloc, iterations} -> uu --here - need start and end and different state for parent fail
+  n@RTNodeS {loc, sChildNode} -> hkRecurse loc n sChildNode L.OnceHook OnceHookRelease iLogger
+  n@RTNodeT {loc, tChildNode} -> hkRecurse loc n tChildNode L.ThreadHook ThreadHookRelease iLogger
+  n@RTNodeI {loc, iChildNode} ->
+    let nxtIlogger = wrapAction loc L.TestHook TestHookRelease
+     in logAbandonRecursively logger parentLoc e nxtIlogger iChildNode
+  RTNodeM {leafloc, childNodes, nStatus} ->
+    let abandonChildren = abandonQ childNodes iLogger
+     in isAbandonned nStatus
+          >>= bool
+            abandonChildren
+            (logAbandonnedWithAction abandonChildren leafloc Group)
+  RTFix {leafloc, iterations, abandonning, nStatus} -> do
+    finally
+      ( do
+          atomically $ writeTVar abandonning True
+      )
+      (atomically $ writeTVar abandonning False)
   where
-    lgAbandon loc = logger (mkParentFailure parentLoc loc e)
+    abandonned :: STM Status -> IO Bool
+    abandonned s = atomically $ (== Abandon) <$> s
 
-    loggedRecurse :: Loc -> ExeTree si' so' ti' to' ii' io' -> ExeTree si'' so'' ti'' to'' ii'' io'' -> ExeEventType -> (IO () -> IO ()) -> IO ()
-    loggedRecurse loc node childNode et ilgr = do
-      s <- atomically $ getStatus node
-      if s == Abandon
-        then
-          finally
-            ( do
-                logger (Start loc et)
-                lgAbandon loc
-                recurse childNode ilgr
-            )
-            $ logger (End loc et)
-        else recurse childNode ilgr
+    isAbandonned :: TVar Status -> IO Bool
+    isAbandonned = abandonned . readTVar
+
+    nodeAbandonned :: ExeTree si' so' ti' to' ii' io' -> IO Bool
+    nodeAbandonned = abandonned . getStatus
+
+    mkAbaondonLogEntry :: Loc -> IO ()
+    mkAbaondonLogEntry loc = logger (mkParentFailure parentLoc loc e)
+
+    logAbandonnedWithAction :: IO () -> Loc -> ExeEventType -> IO ()
+    logAbandonnedWithAction action loc ev = do
+      logger $ Start loc ev
+      mkAbaondonLogEntry loc
+      finally
+        action
+        (logger $ End loc ev)
+
+    logAbandonned :: Loc -> ExeEventType -> IO ()
+    logAbandonned = logAbandonnedWithAction (pure ())
+
+    wrapAction :: Loc -> ExeEventType -> ExeEventType -> IO () -> IO ()
+    wrapAction loc hkEvnt releaseHkEvnt childAction =
+      finally
+        (logAbandonned loc hkEvnt >> childAction)
+        $ logAbandonned loc releaseHkEvnt
+
+    hkRecurse :: Loc -> ExeTree si' so' ti' to' ii' io' -> ExeTree si'' so'' ti'' to'' ii'' io'' -> ExeEventType -> ExeEventType -> (IO () -> IO ()) -> IO ()
+    hkRecurse loc node childNode hkEvnt releaseHkEvnt ilgr = do
+      nodeAbandonned node
+        >>= bool
+          (recurse childNode ilgr)
+          (wrapAction loc hkEvnt releaseHkEvnt (recurse childNode ilgr))
 
     recurse :: forall si' so' ti' to' ii' io'. ExeTree si' so' ti' to' ii' io' -> (IO () -> IO ()) -> IO ()
-    recurse cld ilgr = do
-      s <- atomically $ getStatus cld
-      logAbandonRecursively logger parentLoc e cld ilgr
+    recurse cld ilgr = logAbandonRecursively logger parentLoc e ilgr cld
 
-    failQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> (IO () -> IO ()) -> IO ()
-    failQ q ilgr =
+    abandonQ :: TQueue (ExeTree si' so' ti' to' ii' io') -> (IO () -> IO ()) -> IO ()
+    abandonQ q ilgr =
       atomically (tryReadTQueue q)
         >>= maybe
           (pure ())
-          (\n -> logAbandonRecursively logger parentLoc e n ilgr)
-          >> failQ q ilgr
-
--- reverse <$> recurse []
---   where
---     failure :: Status
---     failure = Done
-
---     recurse :: [Loc] -> ExeTree si' so' ti' to' ii' io' -> STM [Loc]
---     recurse accum rg = do
---       modifyStatus rg failure
---       case rg of
---         RTNodeS {loc, sChildNode} -> recurse (loc : accum) sChildNode
---         RTNodeT {loc, tChildNode} -> recurse (loc : accum) tChildNode
---         RTNodeI {loc, iChildNode} -> recurse (loc : accum) iChildNode
---         RTNodeM {leafloc, childNodes, fullyRunning} -> failQ (leafloc : accum) childNodes
---         RTFix {leafloc, iterations} ->
---           failQ
+          (logAbandonRecursively logger parentLoc e ilgr)
+          >> abandonQ q ilgr
 
 data TestHk io = TestHk
   { tstHkLoc :: Loc,

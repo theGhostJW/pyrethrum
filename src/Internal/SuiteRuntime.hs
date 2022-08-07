@@ -392,11 +392,14 @@ abandonnedHookVal hkEvent logger Abandon {sourceLoc, exception} hs hkVal loc =
         pure $ HookResult True $ Left exception
     )
 
-hookVal :: forall hi ho. HookLogging -> (hi -> IO ho) -> hi -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
+hookVal :: forall hi ho. HookLogging -> (hi -> IO ho) -> Either SomeException hi -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
 hookVal HookLogging {hkEvent, logger, mAbandon} hook hi hs hkVal loc =
   mAbandon
     & maybe
-      (normalHookVal hkEvent logger hook hi hs hkVal loc)
+      (hi & either 
+          (\e -> abandonnedHookVal hkEvent logger abandon hs hkVal loc)
+          (\hi' -> normalHookVal hkEvent logger hook hi' hs hkVal loc)
+      )
       (\abandon -> abandonnedHookVal hkEvent logger abandon hs hkVal loc)
 
 threadSource ::
@@ -508,11 +511,19 @@ data Abandon = Abandon
   }
   deriving (Show)
 
-executeNode :: forall si so ti to ii io. Logger -> Maybe Abandon -> si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
-executeNode logger mode si ioti tstHk rg =
+data ExeIn si ti = ExeIn {
+  singletonIn :: si,
+  threadIn :: ti
+}
+
+executeNode :: forall si so ti to ii io. Logger -> Maybe Abandon -> Either SomeException si -> IO (Either SomeException ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
+executeNode logger mAbandon si ioti tstHk rg =
   do
-    let exeNxt :: forall si' so' ti' to' ii' io'. Maybe Abandon -> si' -> IO (Either SomeException ti') -> TestHk ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
-        exeNxt = executeNode logger
+    let 
+      exeNxt :: forall si' so' ti' to' ii' io'. Maybe Abandon -> Either SomeException si' -> IO (Either SomeException ti') -> TestHk ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
+      exeNxt = executeNode logger
+
+      abandonned = isJust mAbandon
 
     wantRun <- atomically $ canRun rg
     when
@@ -532,28 +543,27 @@ executeNode logger mode si ioti tstHk rg =
               --  2. waits if hook is running
               --  3. updates hook status
               --  4. returns hook result
-              HookResult {hasExecuted, value = ethHkRslt} <- hookVal (HookLogging L.OnceHook logger mode) sHook si status sHookVal loc
+              HookResult {hasExecuted, value} <- hookVal (HookLogging L.OnceHook logger mAbandon) sHook si status sHookVal loc
               if hasExecuted
                 then
-                  ethHkRslt -- the thread executes waits for child completion -> releases -> sets status
+                  value -- the thread executes waits for child completion -> releases -> sets status
                     & either
-                      ( \e -> do
-                          atomically $ modifyStatusRecursively (const Abandon) sChildNode
-                          logAbandonRecursively loc e sChildNode
-                      )
-                      ( \so ->
-                          finally
-                            (exeNxt so ioti tstHk sChildNode)
-                            ( do
-                                atomically $ waitDone sChildNode
-                                releaseHook so status loc sHookRelease
-                            )
-                      )
+                      ( \e -> exeNxt (abandonned ? mAbandon $ Just $ Abandon loc e) (Left e) ioti tstHk sChildNode )
+                      uu
+                      -- ( \so ->
+                      --     finally
+                      --       (exeNxt so ioti tstHk sChildNode)
+                      --       ( do
+                      --           atomically $ waitDone sChildNode
+                      --           releaseHook so status loc sHookRelease
+                      --       )
+                      -- )
                 else
-                  ethHkRslt
+                  value
                     & either
                       (const $ pure ())
-                      (\so -> exeNxt so ioti tstHk sChildNode)
+                      uu
+                      -- (\so -> exeNxt so ioti tstHk sChildNode)
         RTNodeT
           { loc,
             tHook,

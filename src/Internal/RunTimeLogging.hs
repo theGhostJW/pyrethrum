@@ -24,6 +24,7 @@ data ExeEventType
   | TestHookRelease
   | Group
   | Fixture
+  | TestIteration
   deriving (Show, Eq)
 
 

@@ -475,10 +475,10 @@ runIfCan s action =
 setStatusRunning :: TVar Status -> STM ()
 setStatusRunning status = modifyTVar status \s -> s < Running ? Running $ s
 
-releaseHook :: ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
-releaseHook ho ns label hkRelease =
+releaseHook :: Logger -> ExeEventType -> Either Abandon ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
+releaseHook lgr evt eho ns label hkRelease =
   finally
-    (hkRelease ho)
+    (eho & either hkRelease uu)
     (atomically $ writeTVar ns Done)
 
 discardDone :: TQueue (ExeTree a b c d e f) -> STM ()
@@ -538,30 +538,22 @@ executeNode logger hkIn tstHk rg =
               --  3. updates hook status to running
               --  4. returns hook result
               -- must run for logging even if hkIn is Left
-              HookResult {hasExecuted, value} <- hookVal logger L.OnceHook (traverse (singletonIn <$>) hkIn) sHook status sHookVal loc
-              let nxtHkIn = hkIn & either
-                    Left
-                    ()
-              if hasExecuted
-                then
-                  value -- the thread executes waits for child completion -> releases -> sets status
-                    & either
-                      (\e -> exeNxt (abandonned ? mAbandon $ Just $ Abandon loc e) (Left e) ioti tstHk sChildNode)
-                      uu
-                else -- ( \so ->
-                --     finally
-                --       (exeNxt so ioti tstHk sChildNode)
-                --       ( do
-                --           atomically $ waitDone sChildNode
-                --           releaseHook so status loc sHookRelease
-                --       )
-                -- )
-
-                  value
-                    & either
-                      (const $ pure ())
-                      uu
-        -- (\so -> exeNxt so ioti tstHk sChildNode)
+              HookResult {hasExecuted, value = eso} <- hookVal logger L.OnceHook (traverse (singletonIn <$>) hkIn) sHook status sHookVal loc
+              let nxtHkIn so = ((\exi -> exi {singletonIn = so}) <$>) <$> hkIn
+                  recurse so = exeNxt (nxtHkIn so) tstHk sChildNode
+                  nxtAbandon e = either id (const $ Abandon loc e) hkIn
+                  recurseAbandon e = exeNxt (Left $ nxtAbandon e) tstHk sChildNode
+               in finally
+                    ( either
+                        recurseAbandon
+                        recurse
+                        eso
+                    )
+                    ( do
+                        s <- atomically $ getStatus sChildNode
+                        when (s == Done) $
+                          releaseHook logger L.OnceHook (mapLeft nxtAbandon eso) status loc sHookRelease
+                    )
         RTNodeT
           { loc,
             tHook,

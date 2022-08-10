@@ -325,8 +325,8 @@ data HookLogging = HookLogging
     mAbandon :: Maybe Abandon
   }
 
-logAbandonned :: Logger -> SomeException -> Loc -> Loc -> IO ()
-logAbandonned lgr e parentLoc loc = lgr (mkParentFailure parentLoc loc e)
+logAbandonned :: Logger -> Loc -> Abandon -> IO ()
+logAbandonned lgr loc Abandon {sourceLoc, exception} = lgr (mkParentFailure sourceLoc loc exception)
 
 -- logAbandonnedWithAction :: IO () -> Loc -> ExeEventType -> IO ()
 -- logAbandonnedWithAction action loc ev = do
@@ -364,30 +364,33 @@ normalHookVal hkEvent logger hook hi hs hkVal loc =
     hkVal
     ( do
         let setValStatus = setHookValStatus hs hkVal
-        logger $ Start loc hkEvent
         eho <-
-          catchAll
-            ( do
-                ho <- hook hi
-                atomically . setValStatus $ Right ho
-            )
-            ( \e -> do
-                logger (mkFailure loc ("Hook Failed: " <> txt hkEvent <> " " <> txt loc) e)
-                atomically . setValStatus $ Left e
-            )
-        logger $ End loc hkEvent
+          withStartEnd logger loc hkEvent $
+            catchAll
+              ( do
+                  ho <- hook hi
+                  atomically . setValStatus $ Right ho
+              )
+              ( \e -> do
+                  logger (mkFailure loc ("Hook Failed: " <> txt hkEvent <> " " <> txt loc) e)
+                  atomically . setValStatus $ Left e
+              )
         pure $ HookResult True eho
     )
 
+withStartEnd :: Logger -> Loc -> ExeEventType -> IO a -> IO a
+withStartEnd lgr loc evt io = do
+  lgr $ Start loc evt
+  finally io $ lgr $ End loc evt
+
 abandonnedHookVal :: forall ho. ExeEventType -> Logger -> Abandon -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
-abandonnedHookVal hkEvent logger Abandon {sourceLoc, exception} hs hkVal loc =
+abandonnedHookVal hkEvent logger abandon@Abandon {exception} hs hkVal loc =
   runOrReturn
     hs
     hkVal
     ( do
-        logger $ Start loc hkEvent
-        logAbandonned logger exception sourceLoc loc
-        logger $ End loc hkEvent
+        withStartEnd logger loc hkEvent $
+          logAbandonned logger loc abandon
         atomically $ setHookValStatus hs hkVal $ Left exception
         pure $ HookResult True $ Left exception
     )
@@ -476,9 +479,9 @@ setStatusRunning :: TVar Status -> STM ()
 setStatusRunning status = modifyTVar status \s -> s < Running ? Running $ s
 
 releaseHook :: Logger -> ExeEventType -> Either Abandon ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
-releaseHook lgr evt eho ns label hkRelease =
+releaseHook lgr evt eho ns loc hkRelease =
   finally
-    (eho & either hkRelease uu)
+    (withStartEnd lgr loc evt $ either (logAbandonned lgr loc) hkRelease eho)
     (atomically $ writeTVar ns Done)
 
 discardDone :: TQueue (ExeTree a b c d e f) -> STM ()

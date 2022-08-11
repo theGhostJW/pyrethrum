@@ -314,17 +314,6 @@ prepare =
                     runningCount
                   }
 
-data HookResult so = HookResult
-  { hasExecuted :: Bool,
-    value :: Either SomeException so
-  }
-
-data HookLogging = HookLogging
-  { hkEvent :: L.ExeEventType,
-    logger :: Logger,
-    mAbandon :: Maybe Abandon
-  }
-
 logAbandonned :: Logger -> Loc -> Abandon -> IO ()
 logAbandonned lgr loc Abandon {sourceLoc, exception} = lgr (mkParentFailure sourceLoc loc exception)
 
@@ -350,22 +339,21 @@ setHookValStatus hs hVal eso = do
   writeTVar hs Running
   pure eso
 
-runOrReturn :: TVar Status -> TMVar (Either SomeException ho) -> IO (HookResult ho) -> IO (HookResult ho)
+runOrReturn :: TVar Status -> TMVar (Either SomeException ho) -> IO (Either SomeException ho) -> IO (Either SomeException ho)
 runOrReturn hkStatus hkVal hkAction =
   atomically (readOrLockHook hkStatus hkVal)
     >>= maybe
       hkAction
-      (pure . HookResult False)
+      pure
 
-normalHookVal :: forall hi ho. ExeEventType -> Logger -> (hi -> IO ho) -> hi -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
+normalHookVal :: forall hi ho. ExeEventType -> Logger -> (hi -> IO ho) -> hi -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (Either SomeException ho)
 normalHookVal hkEvent logger hook hi hs hkVal loc =
   runOrReturn
     hs
     hkVal
     ( do
         let setValStatus = setHookValStatus hs hkVal
-        eho <-
-          withStartEnd logger loc hkEvent $
+        withStartEnd logger loc hkEvent $
             catchAll
               ( do
                   ho <- hook hi
@@ -375,7 +363,6 @@ normalHookVal hkEvent logger hook hi hs hkVal loc =
                   logger (mkFailure loc ("Hook Failed: " <> txt hkEvent <> " " <> txt loc) e)
                   atomically . setValStatus $ Left e
               )
-        pure $ HookResult True eho
     )
 
 withStartEnd :: Logger -> Loc -> ExeEventType -> IO a -> IO a
@@ -383,7 +370,7 @@ withStartEnd lgr loc evt io = do
   lgr $ Start loc evt
   finally io $ lgr $ End loc evt
 
-abandonnedHookVal :: forall ho. ExeEventType -> Logger -> Abandon -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
+abandonnedHookVal :: forall ho. ExeEventType -> Logger -> Abandon -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (Either SomeException ho)
 abandonnedHookVal hkEvent logger abandon@Abandon {exception} hs hkVal loc =
   runOrReturn
     hs
@@ -392,11 +379,11 @@ abandonnedHookVal hkEvent logger abandon@Abandon {exception} hs hkVal loc =
         withStartEnd logger loc hkEvent $
           logAbandonned logger loc abandon
         atomically $ setHookValStatus hs hkVal $ Left exception
-        pure $ HookResult True $ Left exception
+        pure $ Left exception
     )
 
 
-hookVal :: forall hi ho. Logger -> ExeEventType -> IO (Either Abandon (hi, hi -> IO ho)) -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
+hookVal :: forall hi ho. Logger -> ExeEventType -> IO (Either Abandon (hi, hi -> IO ho)) -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (Either SomeException ho)
 hookVal logger hkEvent ehi  hs hkVal loc =
   ehi
     >>= either
@@ -547,7 +534,7 @@ executeNode logger hkIn tstHk rg =
               --  4. returns hook result
               -- must run for logging even if hkIn is Left
               let siIn =  traverse ((, sHook)  . singletonIn <$>) hkIn
-              HookResult {value = eso} <- hookVal logger L.OnceHook siIn status sHookVal loc
+              eso <- hookVal logger L.OnceHook siIn status sHookVal loc
               let nxtHkIn so = ((\exi -> exi {singletonIn = so}) <$>) <$> hkIn
                   recurse so = exeNxt (nxtHkIn so) tstHk sChildNode
                   nxtAbandon e = either id (const $ Abandon loc e) hkIn
@@ -574,7 +561,7 @@ executeNode logger hkIn tstHk rg =
               toVal <- newEmptyTMVarIO
               status <- newTVarIO Pending
               let tiIn = traverse ((\(ExeIn si ti) -> (ti, tHook si) ) <$>) hkIn
-              HookResult {value = eto} <- hookVal logger L.ThreadHook tiIn status toVal loc
+              eto <- hookVal logger L.ThreadHook tiIn status toVal loc
               finally
                 (exeNxt si ts tstHk tChildNode)
                 do

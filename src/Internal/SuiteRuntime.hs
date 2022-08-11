@@ -395,17 +395,19 @@ abandonnedHookVal hkEvent logger abandon@Abandon {exception} hs hkVal loc =
         pure $ HookResult True $ Left exception
     )
 
-hookVal :: forall hi ho. Logger -> ExeEventType -> IO (Either Abandon hi) -> (hi -> IO ho) -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
-hookVal logger hkEvent ehi hook hs hkVal loc =
+
+hookVal :: forall hi ho. Logger -> ExeEventType -> IO (Either Abandon (hi, hi -> IO ho)) -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (HookResult ho)
+hookVal logger hkEvent ehi  hs hkVal loc =
   ehi
     >>= either
       (\abandon -> abandonnedHookVal hkEvent logger abandon hs hkVal loc)
-      (\hi' -> normalHookVal hkEvent logger hook hi' hs hkVal loc)
+      (\(hi', hook) -> normalHookVal hkEvent logger hook hi' hs hkVal loc)
 
 threadSource ::
   forall si ti to.
   Logger ->
-  Maybe Abandon ->
+
+  IO (Either Abandon ti)  ->
   -- | cached value
   TMVar (Either SomeException to) ->
   -- | status
@@ -419,14 +421,8 @@ threadSource ::
   -- | hook location
   Loc ->
   IO (Either SomeException to)
-threadSource logger mAbandon mHkVal hkStatus si tio hk loc =
-  let hl =
-        HookLogging
-          { hkEvent = L.ThreadHook,
-            logger,
-            mAbandon
-          }
-   in tio
+threadSource logger ethIn mHkVal hkStatus si hk loc =
+      ethIn
         >>= either
           (pure . Left)
           (\ti -> value <$> hookVal hl (hk si) ti hkStatus mHkVal loc)
@@ -481,7 +477,16 @@ setStatusRunning status = modifyTVar status \s -> s < Running ? Running $ s
 releaseHook :: Logger -> ExeEventType -> Either Abandon ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
 releaseHook lgr evt eho ns loc hkRelease =
   finally
-    (withStartEnd lgr loc evt $ either (logAbandonned lgr loc) hkRelease eho)
+    (withStartEnd lgr loc evt $
+      eho & either
+        (logAbandonned lgr loc)
+        (
+          \so -> catchAll
+            (hkRelease so)
+            (lgr . mkFailure loc ("Hook Release Failed: " <> txt evt <> " " <> txt loc))
+        )
+
+    )
     (atomically $ writeTVar ns Done)
 
 discardDone :: TQueue (ExeTree a b c d e f) -> STM ()
@@ -541,7 +546,8 @@ executeNode logger hkIn tstHk rg =
               --  3. updates hook status to running
               --  4. returns hook result
               -- must run for logging even if hkIn is Left
-              HookResult {hasExecuted, value = eso} <- hookVal logger L.OnceHook (traverse (singletonIn <$>) hkIn) sHook status sHookVal loc
+              let siIn =  traverse ((, sHook)  . singletonIn <$>) hkIn
+              HookResult {value = eso} <- hookVal logger L.OnceHook siIn status sHookVal loc
               let nxtHkIn so = ((\exi -> exi {singletonIn = so}) <$>) <$> hkIn
                   recurse so = exeNxt (nxtHkIn so) tstHk sChildNode
                   nxtAbandon e = either id (const $ Abandon loc e) hkIn
@@ -567,7 +573,8 @@ executeNode logger hkIn tstHk rg =
               -- create a new instance of cache for every thread
               toVal <- newEmptyTMVarIO
               status <- newTVarIO Pending
-              let ts = threadSource toVal status si ioti tHook loc
+              let tiIn = traverse ((\(ExeIn si ti) -> (ti, tHook si) ) <$>) hkIn
+              HookResult {value = eto} <- hookVal logger L.ThreadHook tiIn status toVal loc
               finally
                 (exeNxt si ts tstHk tChildNode)
                 do

@@ -114,7 +114,7 @@ getStatus =
       RTNodeS {status} -> status
       RTNodeT {tChildNode} -> getStatusTVar tChildNode
       RTNodeI {iChildNode} -> getStatusTVar iChildNode
-      RTNodeM {nStatus} -> nStatus
+      RTGroup {nStatus} -> nStatus
       RTFix {nStatus} -> nStatus
 
 isDone :: Status -> Bool
@@ -141,7 +141,7 @@ modifyStatus f et =
     RTNodeS {status} -> update status
     RTNodeT {} -> pure ()
     RTNodeI {} -> pure ()
-    RTNodeM {nStatus} -> update nStatus
+    RTGroup {nStatus} -> update nStatus
     RTFix {nStatus} -> update nStatus
   where
     update = flip modifyTVar f
@@ -184,7 +184,7 @@ data ExeTree si so ti to ii io where
       iChildNode :: ExeTree si so ti to io iic
     } ->
     ExeTree si so ti to ii io
-  RTNodeM ::
+  RTGroup ::
     { leafloc :: Loc,
       nStatus :: TVar Status,
       childNodes :: TQueue (ExeTree si so ti to ii io),
@@ -232,7 +232,7 @@ prepare =
             c <- traverse (prepare' loc 0) subElms
             atomically $ traverse_ (writeTQueue q) c
             pure $
-              RTNodeM
+              RTGroup
                 { leafloc = loc,
                   nStatus = ns,
                   childNodes = q,
@@ -346,23 +346,23 @@ runOrReturn hkStatus hkVal hkAction =
       hkAction
       pure
 
+runLogHook :: forall hi ho. ExeEventType -> Logger -> (hi -> IO ho) -> hi -> Loc -> IO (Either SomeException ho)
+runLogHook hkEvent logger hook hi loc =
+  withStartEnd logger loc hkEvent $
+    catchAll
+      ( Right <$> hook hi
+      )
+      ( \e ->
+          logger (mkFailure loc ("Hook Failed: " <> txt hkEvent <> " " <> txt loc) e) >> pure (Left e)
+      )
+
 normalHookVal :: forall hi ho. ExeEventType -> Logger -> (hi -> IO ho) -> hi -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (Either SomeException ho)
 normalHookVal hkEvent logger hook hi hs hkVal loc =
   runOrReturn
     hs
     hkVal
-    ( do
-        let setValStatus = setHookValStatus hs hkVal
-        withStartEnd logger loc hkEvent $
-            catchAll
-              ( do
-                  ho <- hook hi
-                  atomically . setValStatus $ Right ho
-              )
-              ( \e -> do
-                  logger (mkFailure loc ("Hook Failed: " <> txt hkEvent <> " " <> txt loc) e)
-                  atomically . setValStatus $ Left e
-              )
+    ( runLogHook hkEvent logger hook hi loc
+        >>= atomically . setHookValStatus hs hkVal
     )
 
 withStartEnd :: Logger -> Loc -> ExeEventType -> IO a -> IO a
@@ -370,21 +370,31 @@ withStartEnd lgr loc evt io = do
   lgr $ Start loc evt
   finally io $ lgr $ End loc evt
 
+abandonLogHook :: ExeEventType -> Logger -> Abandon -> Loc -> IO (Either SomeException a)
+abandonLogHook hkEvent logger abandon@Abandon {exception} loc =
+  do
+    withStartEnd logger loc hkEvent $
+      logAbandonned logger loc abandon
+    pure $ Left exception
+
 abandonnedHookVal :: forall ho. ExeEventType -> Logger -> Abandon -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (Either SomeException ho)
-abandonnedHookVal hkEvent logger abandon@Abandon {exception} hs hkVal loc =
+abandonnedHookVal hkEvent logger abandon hs hkVal loc =
   runOrReturn
     hs
     hkVal
-    ( do
-        withStartEnd logger loc hkEvent $
-          logAbandonned logger loc abandon
-        atomically $ setHookValStatus hs hkVal $ Left exception
-        pure $ Left exception
+    ( abandonLogHook hkEvent logger abandon loc
+        >>= atomically . setHookValStatus hs hkVal
     )
 
+threadHookVal :: forall hi ho. Logger -> ExeEventType -> IO (Either Abandon (hi, hi -> IO ho)) -> Loc -> IO (Either SomeException ho)
+threadHookVal logger hkEvent ehi loc =
+  ehi
+    >>= either
+      (\abandon -> abandonLogHook hkEvent logger abandon loc)
+      (\(hi', hook) -> runLogHook hkEvent logger hook hi' loc)
 
-hookVal :: forall hi ho. Logger -> ExeEventType -> IO (Either Abandon (hi, hi -> IO ho)) -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (Either SomeException ho)
-hookVal logger hkEvent ehi  hs hkVal loc =
+singletonHookVal :: forall hi ho. Logger -> ExeEventType -> IO (Either Abandon (hi, hi -> IO ho)) -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (Either SomeException ho)
+singletonHookVal logger hkEvent ehi hs hkVal loc =
   ehi
     >>= either
       (\abandon -> abandonnedHookVal hkEvent logger abandon hs hkVal loc)
@@ -393,8 +403,7 @@ hookVal logger hkEvent ehi  hs hkVal loc =
 threadSource ::
   forall si ti to.
   Logger ->
-
-  IO (Either Abandon ti)  ->
+  IO (Either Abandon ti) ->
   -- | cached value
   TMVar (Either SomeException to) ->
   -- | status
@@ -409,10 +418,10 @@ threadSource ::
   Loc ->
   IO (Either SomeException to)
 threadSource logger ethIn mHkVal hkStatus si hk loc =
-      ethIn
-        >>= either
-          (pure . Left)
-          (\ti -> value <$> hookVal hl (hk si) ti hkStatus mHkVal loc)
+  ethIn
+    >>= either
+      (pure . Left)
+      (\ti -> value <$> singletonHookVal hl (hk si) ti hkStatus mHkVal loc)
 
 data TestHk io = TestHk
   { tstHkLoc :: Loc,
@@ -461,18 +470,18 @@ runIfCan s action =
 setStatusRunning :: TVar Status -> STM ()
 setStatusRunning status = modifyTVar status \s -> s < Running ? Running $ s
 
-releaseHook :: Logger -> ExeEventType -> Either Abandon ho -> TVar Status -> Loc -> (ho -> IO ()) -> IO ()
-releaseHook lgr evt eho ns loc hkRelease =
+releaseHookUpdateStatus :: Logger -> ExeEventType -> TVar Status -> Either Abandon ho -> Loc -> (ho -> IO ()) -> IO ()
+releaseHookUpdateStatus lgr evt ns eho loc hkRelease =
   finally
-    (withStartEnd lgr loc evt $
-      eho & either
-        (logAbandonned lgr loc)
-        (
-          \so -> catchAll
-            (hkRelease so)
-            (lgr . mkFailure loc ("Hook Release Failed: " <> txt evt <> " " <> txt loc))
-        )
-
+    ( withStartEnd lgr loc evt $
+        eho
+          & either
+            (logAbandonned lgr loc)
+            ( \so ->
+                catchAll
+                  (hkRelease so)
+                  (lgr . mkFailure loc ("Hook Release Failed: " <> txt evt <> " " <> txt loc))
+            )
     )
     (atomically $ writeTVar ns Done)
 
@@ -508,11 +517,15 @@ data ExeIn si ti = ExeIn
     threadIn :: ti
   }
 
+-- TODO SCENARIO: T1 - Pending; T2 - Running
 executeNode :: forall si so ti to ii io. Logger -> Either Abandon (IO (ExeIn si ti)) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
 executeNode logger hkIn tstHk rg =
   do
     let exeNxt :: forall si' so' ti' to' ii' io'. Either Abandon (IO (ExeIn si' ti')) -> TestHk ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
         exeNxt = executeNode logger
+
+        nxtAbandon :: Loc -> SomeException -> Abandon
+        nxtAbandon loc' e = either id (const $ Abandon loc' e) hkIn
 
     wantRun <- atomically $ canRun rg
     when
@@ -527,28 +540,30 @@ executeNode logger hkIn tstHk rg =
             sChildNode
           } ->
             do
-              -- hookVal:
+              -- singletonHookVal:
               --  1. runs hook if required
               --  2. waits if hook is running
               --  3. updates hook status to running
               --  4. returns hook result
               -- must run for logging even if hkIn is Left
-              let siIn =  traverse ((, sHook)  . singletonIn <$>) hkIn
-              eso <- hookVal logger L.OnceHook siIn status sHookVal loc
+              let siIn = traverse ((,sHook) . singletonIn <$>) hkIn
+              eso <- singletonHookVal logger L.OnceHook siIn status sHookVal loc
               let nxtHkIn so = ((\exi -> exi {singletonIn = so}) <$>) <$> hkIn
-                  recurse so = exeNxt (nxtHkIn so) tstHk sChildNode
-                  nxtAbandon e = either id (const $ Abandon loc e) hkIn
-                  recurseAbandon e = exeNxt (Left $ nxtAbandon e) tstHk sChildNode
+                  nxtAbandon' = nxtAbandon loc
+                  recurse a = exeNxt a tstHk sChildNode
                in finally
                     ( either
-                        recurseAbandon
-                        recurse
+                        (recurse . Left . nxtAbandon')
+                        (recurse . nxtHkIn)
                         eso
                     )
                     ( do
-                        s <- atomically $ getStatus sChildNode
-                        when (s == Done) $
-                          releaseHook logger L.OnceHook (mapLeft nxtAbandon eso) status loc sHookRelease
+                        wantRelease <- atomically $ do
+                          cs <- getStatus sChildNode
+                          s <- readTVar status
+                          pure $ cs == Done && s < HookFinalising
+                        when wantRelease $
+                          releaseHookUpdateStatus logger L.OnceHook status (mapLeft nxtAbandon' eso) loc sHookRelease
                     )
         RTNodeT
           { loc,
@@ -557,20 +572,19 @@ executeNode logger hkIn tstHk rg =
             tChildNode
           } ->
             do
-              -- create a new instance of cache for every thread
-              toVal <- newEmptyTMVarIO
-              status <- newTVarIO Pending
-              let tiIn = traverse ((\(ExeIn si ti) -> (ti, tHook si) ) <$>) hkIn
-              eto <- hookVal logger L.ThreadHook tiIn status toVal loc
+              let tiIn = traverse ((\(ExeIn si ti) -> (ti, tHook si)) <$>) hkIn
+              eto <- threadHookVal logger L.ThreadHook tiIn loc
+              let nxtHkIn ti = ((\exi -> exi {threadIn = ti}) <$>) <$> hkIn
+                  nxtAbandon' = nxtAbandon loc
+                  recurse a = exeNxt a tstHk tChildNode
               finally
-                (exeNxt si ts tstHk tChildNode)
-                do
-                  -- only run clean up if hook has run
-                  notRun <- atomically $ isEmptyTMVar toVal
-                  unless notRun $ do
-                    ethHkVal <- atomically $ readTMVar toVal
-                    whenRight ethHkVal $
-                      \to -> releaseHook to status loc tHookRelease
+                ( either
+                    (recurse . Left . nxtAbandon')
+                    (recurse . nxtHkIn)
+                    eto
+                )
+                (releaseHookUpdateStatus to status loc tHookRelease)
+                
         ihk@RTNodeI
           { loc,
             iHook,
@@ -584,7 +598,7 @@ executeNode logger hkIn tstHk rg =
                       tstHkRelease = iHookRelease
                     }
              in exeNxt si ioti newTstHk iChildNode
-        RTNodeM
+        RTGroup
           { leafloc,
             nStatus,
             childNodes,
@@ -746,7 +760,7 @@ execute
 --       RTNodeS {loc, sChildNode} -> recurse sChildNode
 --       RTNodeT {loc, tChildNode} -> recurse tChildNode
 --       RTNodeI {loc, iChildNode} -> recurse iChildNode
---       RTNodeM {leafloc, childNodes, fullyRunning} -> abandonQ childNodes
+--       RTGroup {leafloc, childNodes, fullyRunning} -> abandonQ childNodes
 --       RTFix {leafloc, iterations} -> pure ()
 --   where
 --     recurse :: ExeTree si' so' ti' to' ii' io' -> STM ()
@@ -766,7 +780,7 @@ execute
 --   n@RTNodeI {loc, iChildNode} ->
 --     let nxtIlogger = wrapAction loc L.TestHook TestHookRelease
 --      in logAbandonRecursively logger parentLoc e nxtIlogger iChildNode
---   RTNodeM {leafloc, childNodes, nStatus} ->
+--   RTGroup {leafloc, childNodes, nStatus} ->
 --     let abandonChildren = abandonQ childNodes iLogger
 --      in isAbandonned nStatus
 --           >>= bool

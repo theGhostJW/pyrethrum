@@ -470,19 +470,22 @@ runIfCan s action =
 setStatusRunning :: TVar Status -> STM ()
 setStatusRunning status = modifyTVar status \s -> s < Running ? Running $ s
 
+releaseHook :: Logger -> ExeEventType -> Either Abandon ho -> Loc -> (ho -> IO ()) -> IO ()
+releaseHook lgr evt eho loc hkRelease =
+  withStartEnd lgr loc evt $
+    eho
+      & either
+        (logAbandonned lgr loc)
+        ( \so ->
+            catchAll
+              (hkRelease so)
+              (lgr . mkFailure loc ("Hook Release Failed: " <> txt evt <> " " <> txt loc))
+        )
+
 releaseHookUpdateStatus :: Logger -> ExeEventType -> TVar Status -> Either Abandon ho -> Loc -> (ho -> IO ()) -> IO ()
 releaseHookUpdateStatus lgr evt ns eho loc hkRelease =
   finally
-    ( withStartEnd lgr loc evt $
-        eho
-          & either
-            (logAbandonned lgr loc)
-            ( \so ->
-                catchAll
-                  (hkRelease so)
-                  (lgr . mkFailure loc ("Hook Release Failed: " <> txt evt <> " " <> txt loc))
-            )
-    )
+    (releaseHook lgr evt eho loc hkRelease)
     (atomically $ writeTVar ns Done)
 
 discardDone :: TQueue (ExeTree a b c d e f) -> STM ()
@@ -583,8 +586,7 @@ executeNode logger hkIn tstHk rg =
                     (recurse . nxtHkIn)
                     eto
                 )
-                (releaseHookUpdateStatus to status loc tHookRelease)
-                
+                (releaseHook logger L.OnceHook (mapLeft nxtAbandon' eto) loc tHookRelease)
         ihk@RTNodeI
           { loc,
             iHook,

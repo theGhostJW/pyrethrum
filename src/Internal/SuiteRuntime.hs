@@ -265,18 +265,8 @@ prepare =
             threadHookRelease
           } ->
             let loc = mkLoc' threadTag "ThreadHook"
-             in do
-                  v <- newEmptyTMVarIO
-                  sni <- newTVarIO 0
-                  fxi <- newTVarIO 0
-                  child <- prepare' loc 0 threadHookChild
-                  pure $
-                    RTNodeT
-                      { loc,
-                        tHook = threadHook loc,
-                        tHookRelease = threadHookRelease loc,
-                        tChildNode = child
-                      }
+             in RTNodeT loc (threadHook loc) (threadHookRelease loc)
+                  <$> prepare' loc 0 threadHookChild
         PN.TestHook
           { testTag,
             testHook,
@@ -284,15 +274,8 @@ prepare =
             testHookRelease
           } ->
             let loc = mkLoc' testTag "TestHook"
-             in do
-                  child <- prepare' loc 0 testHookChild
-                  pure $
-                    RTNodeI
-                      { loc,
-                        iHook = testHook loc,
-                        iHookRelease = testHookRelease loc,
-                        iChildNode = child
-                      }
+             in RTNodeI loc (testHook loc) (testHookRelease loc)
+                  <$> prepare' loc 0 testHookChild
         PN.Fixture
           { fxTag,
             logStart,
@@ -317,13 +300,8 @@ prepare =
 logAbandonned :: Logger -> Loc -> Abandon -> IO ()
 logAbandonned lgr loc Abandon {sourceLoc, exception} = lgr (mkParentFailure sourceLoc loc exception)
 
--- logAbandonnedWithAction :: IO () -> Loc -> ExeEventType -> IO ()
--- logAbandonnedWithAction action loc ev = do
---   logger $ Start loc ev
---   mkAbaondonLogEntry loc
---   finally
---     action
---     (logger $ End loc ev)
+logFailure :: Logger -> Loc -> ExeEventType -> SomeException -> IO ()
+logFailure lgr loc et e = lgr (mkFailure loc (txt et <> "Failed at: " txt loc) e) 
 
 readOrLockHook :: TVar Status -> TMVar (Either SomeException ho) -> STM (Maybe (Either SomeException ho))
 readOrLockHook hs hVal = do
@@ -352,8 +330,8 @@ runLogHook hkEvent logger hook hi loc =
     catchAll
       ( Right <$> hook hi
       )
-      ( \e ->
-          logger (mkFailure loc ("Hook Failed: " <> txt hkEvent <> " " <> txt loc) e) >> pure (Left e)
+      ( \e -> logFailure logger loc hkEvent e
+                >> pure (Left e)
       )
 
 normalHookVal :: forall hi ho. ExeEventType -> Logger -> (hi -> IO ho) -> hi -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (Either SomeException ho)
@@ -400,44 +378,86 @@ singletonHookVal logger hkEvent ehi hs hkVal loc =
     (\(hi', hook) -> normalHookVal hkEvent logger hook hi' hs hkVal loc)
     ehi
 
-data TestHk io = TestHk
+data TestHkSrc hi = TestHkSrc
   { tstHkLoc :: Loc,
-    tstHkHook :: IO (Either SomeException io),
-    tstHkRelease :: io -> IO ()
+    tstHkHook :: IO (Either Abandon hi),
+    tstHkRelease :: hi -> IO ()
   }
 
-runHookWith :: TestHk ii -> (ii -> IO io) -> IO (Either SomeException io)
-runHookWith
-  TestHk
+runTestHook :: Logger -> Either Abandon (ExeIn si ti) -> TestHkSrc hi -> (si -> ti -> hi -> IO io) -> IO (Either Abandon io)
+runTestHook
+  logger
+  aExIn
+  TestHkSrc
     { tstHkLoc,
       tstHkHook,
       tstHkRelease
     }
-  iteration = do
-    hkRslt <- tstHkHook
-    hkRslt
-      & either
-        ( \e -> do
-            -- TODO: log error
-            error $ "hook failed\n" <> displayException e
-        )
-        ( \io ->
-            finally
-              ( catchAll
-                  (Right <$> iteration io)
-                  ( \e -> --do
-                  -- TODO: log error
-                      error $ "test iteration failed failed\n" <> displayException e
-                  )
-              )
-              ( catchAll
-                  (tstHkRelease io)
-                  ( \e -> --do
-                  -- TODO: log error
-                      error $ "test iteration hook release\n" <> displayException e
-                  )
-              )
-        )
+  testHk =
+    do 
+      ehki <- tstHkHook
+      let 
+        logReturnAbandonned a =
+           logAbandonned logger tstHkLoc a >>
+                pure (Left a)
+        
+        inputs = do
+          ii <- ehki 
+          (ExeIn si ti) <- aExIn
+          pure (si, ti, ii)
+
+        runHook si ti ii = catchAll 
+          (testHk si ti ii) 
+          (\e -> do 
+            mkFailure Loc Text SomeException Index PThreadId
+          )
+
+     withStartEnd logger loc L.TestHook $
+        either 
+          logReturnAbandonned
+          (uncurry3 runHook)
+          inputs
+         
+      
+
+    -- aExIn & either
+    --         logReturnAbandonned
+    --         (\(ExeIn si ti) -> )
+
+        -- withStartEnd logger loc L.TestHook $
+        --                   either
+        --                     ( \abandon@Abandon {exception} -> do
+        --                         logAbandonned logger loc abandon
+        --                         pure $ Left exception
+        --                     )
+        --                     ( \(ExeIn si ti) ->
+
+        --                     )
+        --                     hkIn,
+    -- hkRslt <- tstHkHook
+    -- hkRslt
+    --   & either
+    --     ( \e -> do
+    --         -- TODO: log error
+    --         error $ "hook failed\n" <> displayException e
+    --     )
+    --     ( \io ->
+    --         finally
+    --           ( catchAll
+    --               (Right <$> test io)
+    --               ( \e -> --do
+    --               -- TODO: log error
+    --                   error $ "test iteration failed failed\n" <> displayException e
+    --               )
+    --           )
+    --           ( catchAll
+    --               (tstHkRelease io)
+    --               ( \e -> --do
+    --               -- TODO: log error
+    --                   error $ "test iteration hook release\n" <> displayException e
+    --               )
+    --           )
+    --     )
 
 runIfCan :: TVar Status -> IO () -> IO ()
 runIfCan s action =
@@ -498,10 +518,10 @@ data ExeIn si ti = ExeIn
   }
 
 -- TODO SCENARIO: T1 - Pending; T2 - Running
-executeNode :: forall si so ti to ii io. Logger -> Either Abandon (ExeIn si ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
+executeNode :: forall si so ti to ii io. Logger -> Either Abandon (ExeIn si ti) -> TestHkSrc ii -> ExeTree si so ti to ii io -> IO ()
 executeNode logger hkIn tstHk rg =
   do
-    let exeNxt :: forall si' so' ti' to' ii' io'. Either Abandon (ExeIn si' ti') -> TestHk ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
+    let exeNxt :: forall si' so' ti' to' ii' io'. Either Abandon (ExeIn si' ti') -> TestHkSrc ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
         exeNxt = executeNode logger
 
         nxtAbandon :: Loc -> SomeException -> Abandon
@@ -571,12 +591,13 @@ executeNode logger hkIn tstHk rg =
             iChildNode
           } ->
             let newTstHk =
-                  TestHk
+                  TestHkSrc
                     { tstHkLoc = loc,
-                      tstHkHook = ioti >>= either (pure . Left) (runHookWith tstHk . iHook si),
-                      tstHkRelease = iHookRelease
+                      tstHkHook = runTestHook hkIn tstHk iHook,
+
+                      tstHkRelease = withStartEnd logger loc TestHookRelease . iHookRelease
                     }
-             in exeNxt si ioti newTstHk iChildNode
+             in exeNxt hkIn newTstHk iChildNode
         RTGroup
           { leafloc,
             nStatus,
@@ -677,7 +698,7 @@ executeNode logger hkIn tstHk rg =
                                 (action i si)
                       finally
                         ( catchAll
-                            (void $ runHookWith tstHk tst)
+                            (void $ runTestHook tstHk tst)
                             (print . displayException) -- TODO log parent iteration failure
                         )
                         (atomically (modifyTVar runningCount pred) >> recurse)
@@ -702,7 +723,7 @@ executeGraph sink xtri maxThreads = do
             logger'
             ()
             (pure $ Right ())
-            TestHk
+            TestHkSrc
               { tstHkLoc = Loc "Root",
                 tstHkHook = pure $ Right (),
                 tstHkRelease = const $ pure ()

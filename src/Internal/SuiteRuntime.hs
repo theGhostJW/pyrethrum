@@ -386,42 +386,19 @@ abandonnedHookVal hkEvent logger abandon hs hkVal loc =
         >>= atomically . setHookValStatus hs hkVal
     )
 
-threadHookVal :: forall hi ho. Logger -> ExeEventType -> IO (Either Abandon (hi, hi -> IO ho)) -> Loc -> IO (Either SomeException ho)
+threadHookVal :: forall hi ho. Logger -> ExeEventType -> Either Abandon (hi, hi -> IO ho) -> Loc -> IO (Either SomeException ho)
 threadHookVal logger hkEvent ehi loc =
-  ehi
-    >>= either
-      (\abandon -> abandonLogHook hkEvent logger abandon loc)
-      (\(hi', hook) -> runLogHook hkEvent logger hook hi' loc)
+  either
+    (\abandon -> abandonLogHook hkEvent logger abandon loc)
+    (\(hi', hook) -> runLogHook hkEvent logger hook hi' loc)
+    ehi
 
-singletonHookVal :: forall hi ho. Logger -> ExeEventType -> IO (Either Abandon (hi, hi -> IO ho)) -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (Either SomeException ho)
+singletonHookVal :: forall hi ho. Logger -> ExeEventType -> Either Abandon (hi, hi -> IO ho) -> TVar Status -> TMVar (Either SomeException ho) -> Loc -> IO (Either SomeException ho)
 singletonHookVal logger hkEvent ehi hs hkVal loc =
-  ehi
-    >>= either
-      (\abandon -> abandonnedHookVal hkEvent logger abandon hs hkVal loc)
-      (\(hi', hook) -> normalHookVal hkEvent logger hook hi' hs hkVal loc)
-
-threadSource ::
-  forall si ti to.
-  Logger ->
-  IO (Either Abandon ti) ->
-  -- | cached value
-  TMVar (Either SomeException to) ->
-  -- | status
-  TVar Status ->
-  -- | singleton in
-  si ->
-  -- | thread hook in
-  IO (Either SomeException ti) ->
-  -- | thread hook
-  (si -> ti -> IO to) ->
-  -- | hook location
-  Loc ->
-  IO (Either SomeException to)
-threadSource logger ethIn mHkVal hkStatus si hk loc =
-  ethIn
-    >>= either
-      (pure . Left)
-      (\ti -> value <$> singletonHookVal hl (hk si) ti hkStatus mHkVal loc)
+  either
+    (\abandon -> abandonnedHookVal hkEvent logger abandon hs hkVal loc)
+    (\(hi', hook) -> normalHookVal hkEvent logger hook hi' hs hkVal loc)
+    ehi
 
 data TestHk io = TestHk
   { tstHkLoc :: Loc,
@@ -521,10 +498,10 @@ data ExeIn si ti = ExeIn
   }
 
 -- TODO SCENARIO: T1 - Pending; T2 - Running
-executeNode :: forall si so ti to ii io. Logger -> Either Abandon (IO (ExeIn si ti)) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
+executeNode :: forall si so ti to ii io. Logger -> Either Abandon (ExeIn si ti) -> TestHk ii -> ExeTree si so ti to ii io -> IO ()
 executeNode logger hkIn tstHk rg =
   do
-    let exeNxt :: forall si' so' ti' to' ii' io'. Either Abandon (IO (ExeIn si' ti')) -> TestHk ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
+    let exeNxt :: forall si' so' ti' to' ii' io'. Either Abandon (ExeIn si' ti') -> TestHk ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
         exeNxt = executeNode logger
 
         nxtAbandon :: Loc -> SomeException -> Abandon
@@ -549,9 +526,9 @@ executeNode logger hkIn tstHk rg =
               --  3. updates hook status to running
               --  4. returns hook result
               -- must run for logging even if hkIn is Left
-              let siIn = traverse ((,sHook) . singletonIn <$>) hkIn
+              let siIn = (,sHook) . singletonIn <$> hkIn
               eso <- singletonHookVal logger L.OnceHook siIn status sHookVal loc
-              let nxtHkIn so = ((\exi -> exi {singletonIn = so}) <$>) <$> hkIn
+              let nxtHkIn so = (\exi -> exi {singletonIn = so}) <$> hkIn
                   nxtAbandon' = nxtAbandon loc
                   recurse a = exeNxt a tstHk sChildNode
                in finally
@@ -575,9 +552,9 @@ executeNode logger hkIn tstHk rg =
             tChildNode
           } ->
             do
-              let tiIn = traverse ((\(ExeIn si ti) -> (ti, tHook si)) <$>) hkIn
+              let tiIn = (\(ExeIn si ti) -> (ti, tHook si)) <$> hkIn
               eto <- threadHookVal logger L.ThreadHook tiIn loc
-              let nxtHkIn ti = ((\exi -> exi {threadIn = ti}) <$>) <$> hkIn
+              let nxtHkIn ti = (\exi -> exi {threadIn = ti}) <$> hkIn
                   nxtAbandon' = nxtAbandon loc
                   recurse a = exeNxt a tstHk tChildNode
               finally

@@ -5,20 +5,19 @@ import Control.DeepSeq (NFData, deepseq, force, ($!!))
 import DSL.Logger (logMessage)
 import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty), empty, replicateM)
-import Data.Tuple.Extra (both)
-import Extra (uncurry3)
+import Data.Tuple.Extra (both, uncurry3)
 import GHC.Exts
-import Internal.PreNode as PN
+import qualified Internal.PreNode as PN
   ( PreNode (..),
     PreNodeRoot,
     Test (..),
     rootNode,
   )
-import Internal.RunTimeLogging as L
+import Internal.RunTimeLogging
   ( ExeEvent (..),
     ExeEventType (..),
     Index (Index),
-    Loc (..),
+    Loc (Node, Root),
     LogControls (LogControls),
     PThreadId,
     Sink,
@@ -29,7 +28,7 @@ import Internal.RunTimeLogging as L
     sink,
     stopWorker,
   )
-import qualified Internal.RunTimeLogging as L (ExeEventType (OnceHook, OnceHookRelease, TestHook, ThreadHook, ThreadHookRelease))
+import qualified Internal.RunTimeLogging as L
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
 import Pyrelude as P hiding
@@ -201,31 +200,31 @@ data ExeTree si so ti to ii io where
     } ->
     ExeTree si () ti () ii ()
 
-prepare :: PreNode () () () () () () -> IO (ExeTree () () () () () ())
+data Test si ti ii = Test
+  { tstLoc :: Loc,
+    tst :: si -> ti -> ii -> IO ()
+  }
+
+prepare :: PN.PreNode () () () () () () -> IO (ExeTree () () () () () ())
 prepare =
   prepare' Root 0
   where
     consNoMxIdx :: IdxLst a -> a -> IdxLst a
     consNoMxIdx l@IdxLst {lst} i = l {lst = i : lst}
 
-    mkLoc :: Loc -> Int -> Maybe Text -> Text -> Loc
-    mkLoc parentLoc subElmIdx childlabel elmType =
-      Node parentLoc $
-        childlabel
-          & maybe
-            (elmType <> "[" <> txt subElmIdx <> "]")
-            P.id
+    testLoc :: Loc -> Text -> Loc
+    testLoc = L.Test
 
-    prepare' :: Loc -> Int -> PreNode o oo t to i io -> IO (ExeTree o oo t to i io)
+    prepare' :: Loc -> Int -> PN.PreNode o oo t to i io -> IO (ExeTree o oo t to i io)
     prepare' parentLoc subElmIdx pn = do
-      let mkLoc' = mkLoc parentLoc subElmIdx
+      let nodeLoc elmType mtag = Node parentLoc $ elmType <> "[" <> txt subElmIdx <> "]" <> maybe "" (" - " <>) mtag
       ns <- newTVarIO Pending
       case pn of
-        Branch
+        PN.Branch
           { bTag,
             subElms
           } -> do
-            let loc = mkLoc' bTag "Branch"
+            let loc = nodeLoc "Branch" bTag
             idx <- newTVarIO 0
             fr <- newTQueueIO
             q <- newTQueueIO
@@ -248,7 +247,7 @@ prepare =
           } -> do
             s <- newTVarIO Pending
             v <- newEmptyTMVarIO
-            let loc = mkLoc' hookTag "SingletonHook"
+            let loc = nodeLoc "SingletonHook" hookTag
             child <- prepare' loc 0 hookChild
             pure $
               RTNodeS
@@ -265,7 +264,7 @@ prepare =
             threadHookChild,
             threadHookRelease
           } ->
-            let loc = mkLoc' threadTag "ThreadHook"
+            let loc = nodeLoc "ThreadHook" threadTag
              in RTNodeT loc (threadHook loc) (threadHookRelease loc)
                   <$> prepare' loc 0 threadHookChild
         PN.TestHook
@@ -274,7 +273,7 @@ prepare =
             testHookChild,
             testHookRelease
           } ->
-            let loc = mkLoc' testTag "TestHook"
+            let loc = nodeLoc "TestHook" testTag
              in RTNodeI loc (testHook loc) (testHookRelease loc)
                   <$> prepare' loc 0 testHookChild
         PN.Fixture
@@ -284,11 +283,13 @@ prepare =
             logEnd
           } ->
             do
-              let loc = mkLoc' fxTag "ThreadHook"
+              let loc = nodeLoc "Fixture" fxTag
+                  tLoc = testLoc loc
+                  converTest PN.Test {tstId, tst} = Test (testLoc loc tstId) tst
               s <- newTVarIO Pending
               q <- newTQueueIO
               runningCount <- newTVarIO 0
-              atomically $ traverse_ (writeTQueue q) iterations
+              atomically $ traverse_ (writeTQueue q . converTest) iterations
               pure $
                 RTFix
                   { leafloc = loc,
@@ -311,8 +312,8 @@ readOrLockHook hs hVal = do
     ? (writeTVar hs HookExecuting >> pure Nothing)
     $ (Just <$> readTMVar hVal)
 
-setHookValStatus :: TVar Status -> TMVar (Either SomeException ho) -> Either SomeException ho -> STM (Either SomeException ho)
-setHookValStatus hs hVal eso = do
+setRunningVal :: TVar Status -> TMVar (Either SomeException ho) -> Either SomeException ho -> STM (Either SomeException ho)
+setRunningVal hs hVal eso = do
   putTMVar hVal eso
   -- success or failure always running will be set done by closing hook
   writeTVar hs Running
@@ -342,13 +343,13 @@ normalHookVal hkEvent logger hook hi hs hkVal loc =
     hs
     hkVal
     ( runLogHook hkEvent logger hook hi loc
-        >>= atomically . setHookValStatus hs hkVal
+        >>= atomically . setRunningVal hs hkVal
     )
 
 withStartEnd :: Logger -> Loc -> ExeEventType -> IO a -> IO a
 withStartEnd lgr loc evt io = do
   lgr $ Start loc evt
-  finally io $ lgr $ End loc evt
+  finally io . lgr $ End loc evt
 
 abandonLogHook :: ExeEventType -> Logger -> Abandon -> Loc -> IO (Either SomeException a)
 abandonLogHook hkEvent logger abandon@Abandon {exception} loc =
@@ -363,7 +364,7 @@ abandonnedHookVal hkEvent logger abandon hs hkVal loc =
     hs
     hkVal
     ( abandonLogHook hkEvent logger abandon loc
-        >>= atomically . setHookValStatus hs hkVal
+        >>= atomically . setRunningVal hs hkVal
     )
 
 threadHookVal :: forall hi ho. Logger -> ExeEventType -> Either Abandon (hi, hi -> IO ho) -> Loc -> IO (Either SomeException ho)
@@ -382,11 +383,18 @@ singletonHookVal logger hkEvent ehi hs hkVal loc =
 
 data TestHkSrc hi = TestHkSrc
   { tstHkLoc :: Loc,
-    tstHkHook :: IO (Either Abandon hi),
-    tstHkRelease :: hi -> IO ()
+    tstHkHook :: Maybe Abandon -> IO (Either Abandon hi),
+    tstHkRelease :: Maybe Abandon -> hi -> IO ()
   }
 
-runTestHook :: Logger -> Either Abandon (ExeIn si ti) -> TestHkSrc hi -> (si -> ti -> hi -> IO io) -> IO (Either Abandon io)
+unpackInputs :: Either Abandon ii -> Either Abandon (ExeIn si ti) -> Either Abandon (si, ti, ii)
+unpackInputs ehki aExIn =
+  do
+    ii <- ehki
+    (ExeIn si ti) <- aExIn
+    Right (si, ti, ii)
+
+runTestHook :: Logger -> Either Abandon (ExeIn si ti) -> TestHkSrc hi -> (si -> ti -> hi -> IO io) -> Maybe Abandon -> IO (Either Abandon io)
 runTestHook
   logger
   aExIn
@@ -395,9 +403,10 @@ runTestHook
       tstHkHook,
       tstHkRelease
     }
-  testHk =
+  testHk
+  inPlaceAbandon =
     do
-      ehki <- tstHkHook
+      ehki <- tstHkHook inPlaceAbandon
       withStartEnd logger tstHkLoc L.TestHook $
         either
           logReturnAbandonned
@@ -416,18 +425,24 @@ runTestHook
               pure . Left $ Abandon tstHkLoc e
           )
 
-      inputs ehki = do
-        ii <- ehki
-        (ExeIn si ti) <- aExIn
-        pure (si, ti, ii)
+      inputs ehki =
+        inPlaceAbandon
+          & maybe
+            (unpackInputs ehki aExIn)
+            Left
 
 runIfCan :: TVar Status -> IO () -> IO ()
 runIfCan s action =
   atomically (readTVar s)
     >>= bool (pure ()) action . (< FullyRunning)
 
-setStatusRunning :: TVar Status -> STM ()
-setStatusRunning status = modifyTVar status \s -> s < Running ? Running $ s
+setStatusRunning :: TVar Status -> STM Bool
+setStatusRunning status = atomically $ do
+  s <- readTVar status
+  let change = s < Running
+  when change $
+    writeTVar status Running
+  pure change
 
 releaseHook :: Logger -> ExeEventType -> Either Abandon ho -> Loc -> (ho -> IO ()) -> IO ()
 releaseHook lgr evt eho loc hkRelease =
@@ -488,6 +503,9 @@ executeNode logger hkIn tstHk rg =
 
         nxtAbandon :: Loc -> SomeException -> Abandon
         nxtAbandon loc' e = either id (const $ Abandon loc' e) hkIn
+
+        logAbandonned' = logAbandonned logger
+        logFailure' = logFailure logger
 
     wantRun <- atomically $ canRun rg
     when
@@ -556,10 +574,15 @@ executeNode logger hkIn tstHk rg =
                   TestHkSrc
                     { tstHkLoc = loc,
                       tstHkHook = runTestHook logger hkIn tstHk iHook,
-                      tstHkRelease =
-                        withStartEnd logger loc TestHookRelease
-                          . handleAll (logFailure logger loc L.TestHookRelease)
-                          . iHookRelease
+                      tstHkRelease = \ma io ->
+                        withStartEnd logger loc TestHookRelease $
+                          ma
+                            & maybe
+                              ( catchAll
+                                  (iHookRelease io)
+                                  (logFailure logger loc L.TestHookRelease)
+                              )
+                              (logAbandonned' loc)
                     }
              in exeNxt hkIn newTstHk iChildNode
         self@RTGroup
@@ -582,7 +605,7 @@ executeNode logger hkIn tstHk rg =
                           logger (Start leafloc Group)
                           whenLeft
                             hkIn
-                            (logAbandonned logger leafloc)
+                            (logAbandonned' leafloc)
 
                         exeNxt hkIn tstHk c
                         recurse
@@ -636,45 +659,65 @@ executeNode logger hkIn tstHk rg =
                     )
         fx@RTFix
           { nStatus,
+            leafloc,
             iterations,
             runningCount
-          } ->
-            runIfCan nStatus recurse
+          } -> do
+            runIfCan nStatus $ recurse True
             where
-              recurse :: IO ()
-              recurse = do
-                mtest <-
+              recurse :: Bool -> IO ()
+              recurse initial = do
+                etest <-
                   atomically $
                     tryReadTQueue iterations
                       >>= maybe
                         ( do
                             r <- readTVar runningCount
-                            (r < 1)
-                              ? writeTVar nStatus Done
-                              $ writeTVar nStatus FullyRunning
-                            pure Nothing
+                            Left
+                              <$> if
+                                  | r < 0 -> error "framework error - this should not happen - running count below zero"
+                                  | r == 0 -> pure True
+                                  | otherwise -> writeTVar nStatus FullyRunning >> pure False
                         )
                         ( \i -> do
                             modifyTVar runningCount succ
-                            setStatusRunning nStatus
-                            pure $ Just i
+                            wantLogStart <- setStatusRunning nStatus
+                            pure $ Right (wantLogStart, i)
                         )
-                whenJust mtest $
-                  \i ->
-                    do
-                      ethti <- ioti
-                      let tst :: ii -> IO ()
-                          tst =
-                            ethti
-                              & either
-                                (const . const $ pure ()) -- TODO log parent hook failure
-                                (action i si)
-                      finally
-                        ( catchAll
-                            (void $ runTestHook tstHk tst)
-                            (print . displayException) -- TODO log parent iteration failure
-                        )
-                        (atomically (modifyTVar runningCount pred) >> recurse)
+                etest
+                  & either
+                    ( \done ->
+                        when done $ do
+                          logger $ End leafloc L.Fixture
+                          atomically $ writeTVar nStatus Done
+                    )
+                    ( \(wantLogStart, Test tstLoc test) -> do
+                        --  fixture logging
+                        when wantLogStart $ do
+                          logger $ Start leafloc L.Fixture
+                          whenLeft hkIn (logAbandonned' leafloc)
+                        --  run the test
+                        let TestHkSrc
+                              { tstHkLoc,
+                                tstHkHook,
+                                tstHkRelease
+                              } = tstHk
+
+                        ho <- tstHkHook $ leftToMaybe hkIn
+                        let ethInputs = unpackInputs ho hkIn
+
+                        finally
+                          ( withStartEnd logger tstLoc TestIteration $
+                              do
+                                ethInputs & either
+                                  (logAbandonned' tstLoc)
+                                  \i ->
+                                    catchAll
+                                      (uncurry3 test i)
+                                      (logFailure' tstLoc TestIteration)
+                          )
+                          (atomically (modifyTVar runningCount pred) >> recurse False)
+                    )
 
 type Logger = (Index -> PThreadId -> ExeEvent) -> IO ()
 
@@ -705,7 +748,7 @@ executeGraph sink xtri maxThreads = do
     )
     (logger EndExecution)
 
-execute :: Int -> LogControls -> PreNodeRoot -> IO ()
+execute :: Int -> LogControls -> PN.PreNodeRoot -> IO ()
 execute
   maxThreads
   LogControls

@@ -110,10 +110,10 @@ q2List qu = reverse <$> recurse [] qu
         >>= P.maybe (pure l) (\e -> recurse (e : l) q)
 
 chkLaws :: [ExeEvent] -> IO ()
-chkLaws = uu
+chkLaws evts = putStrLn "No Laws"
 
-runTest :: Int -> PreNodeRoot -> IO ()
-runTest threadCount root = do
+testSuite :: Int -> PreNodeRoot -> IO ()
+testSuite threadCount root = do
   lc@LogControls {log} <- logControls
   execute threadCount lc root
   maybe (chkFail "No Events Log") (\evts -> atomically (q2List evts) >>= chkLaws) log
@@ -123,6 +123,15 @@ mkTest s = PN.Test s (\a b c -> putStrLn $ toS s)
 
 mkFixture :: Text -> [PN.Test oi ti ii] -> PreNode oi () ti () ii ()
 mkFixture tag = Fixture (Just tag)
+
+superSimplSuite :: PreNodeRoot
+superSimplSuite =
+  mkFixture "Fx 0" [mkTest "Test 0"]
+
+
+-- $> unit_simple_single
+unit_simple_single :: IO ()
+unit_simple_single = testSuite 1 superSimplSuite
 
 -- superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
 -- superSimplSuite q =

@@ -11,8 +11,7 @@ import Prelude (String)
 
 data Loc = 
   Root |
-  Node Loc Text |
-  Test Loc Text 
+  Node Loc Text
   deriving Show
 
 data ExeEventType

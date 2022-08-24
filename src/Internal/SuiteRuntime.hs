@@ -211,9 +211,6 @@ prepare =
     consNoMxIdx :: IdxLst a -> a -> IdxLst a
     consNoMxIdx l@IdxLst {lst} i = l {lst = i : lst}
 
-    testLoc :: Loc -> Text -> Loc
-    testLoc = L.Test
-
     prepare' :: Loc -> Int -> PN.PreNode o oo t to i io -> IO (ExeTree o oo t to i io)
     prepare' parentLoc subElmIdx pn = do
       let nodeLoc elmType mtag = Node parentLoc $ elmType <> "[" <> txt subElmIdx <> "]" <> maybe "" (" - " <>) mtag
@@ -281,8 +278,7 @@ prepare =
           } ->
             do
               let loc = nodeLoc "Fixture" fxTag
-                  tLoc = testLoc loc
-                  converTest PN.Test {tstId, tst} = Test (testLoc loc tstId) tst
+                  converTest PN.Test {tstId, tst} = Test (Node loc tstId) tst
               s <- newTVarIO Pending
               q <- newTQueueIO
               runningCount <- newTVarIO 0
@@ -731,6 +727,7 @@ executeGraph sink xtri maxThreads =
           }
    in do
         logger <- newLogger sink
+        logger StartExecution
         logger StartExecution
         finally
           ( replicateConcurrently_

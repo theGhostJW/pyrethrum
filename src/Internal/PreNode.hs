@@ -6,7 +6,7 @@ import Language.Haskell.TH (ExpQ)
 import Pyrelude (Bool (False, True), Either, Eq, Generic, IO, Int, ListLike (all, any, filter, null), Maybe, Ord, Show, SomeException, TVar, Text, not, ($), (&&))
 import UnliftIO (MonadUnliftIO, STM, TMVar)
 
-newtype PreNodeRoot = PreNodeRoot {rootNode :: IO (PreNode () () () () () ())}
+type PreNodeRoot = PreNode () () () () () ()
 
 data Test si ti ii = Test
   { tstId :: Text,
@@ -43,9 +43,7 @@ data PreNode oi oo ti to ii io where
     PreNode oi oo ti to ii io
   Fixture ::
     { fxTag :: Maybe Text,
-      logStart :: Loc -> IO (),
-      iterations :: [Test oi ti ii],
-      logEnd :: Loc -> IO ()
+      iterations :: [Test oi ti ii]
     } ->
     PreNode oi () ti () ii ()
 

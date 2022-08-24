@@ -15,6 +15,7 @@ import GHC.Records
 import Internal.PreNode (PreNode (hookChild))
 import Internal.PreNode as PN
 import Internal.RunTimeLogging as L (ExeEvent (..), Loc (..), LogControls (..), testLogControls)
+import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
 import Pyrelude as P
@@ -55,6 +56,7 @@ import Pyrelude as P
     replicateM_,
     reverse,
     singleton,
+    throw,
     toS,
     traverse_,
     txt,
@@ -75,7 +77,6 @@ import Pyrelude as P
     (\\),
     (||),
   )
-import Pyrelude.Test (chk', chkFail, maybe)
 import Pyrelude.Test as T hiding (filter, maybe, singleton)
 import TempUtils (debugLines)
 import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppShow, ppShowList)
@@ -97,7 +98,7 @@ import Prelude (Ord, String, putStrLn)
 5. generate
 -}
 
-logControls :: IO LogControls
+logControls :: IO (LogControls Maybe)
 logControls = testLogControls
 
 q2List :: TQueue ExeEvent -> STM [ExeEvent]
@@ -111,11 +112,21 @@ q2List qu = reverse <$> recurse [] qu
 chkLaws :: [ExeEvent] -> IO ()
 chkLaws = uu
 
-runTest :: IO ()
-runTest = do
-  LogControls{log}  <- logControls
-  
-  fromJust
+runTest :: Int -> PreNodeRoot -> IO ()
+runTest threadCount root = do
+  lc@LogControls {log} <- logControls
+  execute threadCount lc root
+  maybe (chkFail "No Events Log") (\evts -> atomically (q2List evts) >>= chkLaws) log
+
+mkTest :: Text -> PN.Test si ti ii
+mkTest s = PN.Test s (\a b c -> putStrLn $ toS s)
+
+mkFixture :: Text -> [PN.Test oi ti ii] -> PreNode oi () ti () ii ()
+mkFixture tag = Fixture (Just tag)
+
+-- superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
+-- superSimplSuite q =
+--   root $ mkFixture q 1
 
 -- data BoundaryType
 --   = Start
@@ -314,10 +325,6 @@ runTest = do
 
 -- root :: IO (PreNode () () () () () ()) -> IO PreNodeRoot
 -- root = pure . PreNodeRoot
-
--- superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
--- superSimplSuite q =
---   root $ mkFixture q 1
 
 -- simpleSuiteWithHook :: TQueue RunEvent -> IO PreNodeRoot
 -- simpleSuiteWithHook q = do

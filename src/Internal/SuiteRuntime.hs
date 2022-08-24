@@ -7,12 +7,11 @@ import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both, uncurry3)
 import GHC.Exts
-import Internal.PreNode (PreNodeRoot (..))
+import Internal.PreNode (PreNodeRoot)
 import qualified Internal.PreNode as PN
   ( PreNode (..),
     PreNodeRoot,
     Test (..),
-    rootNode,
   )
 import Internal.RunTimeLogging
   ( ExeEvent (..),
@@ -194,7 +193,6 @@ data ExeTree si so ti to ii io where
     ExeTree si () ti () ii ()
   RTFix ::
     { leafloc :: Loc,
-      logStart :: IO (),
       nStatus :: TVar Status,
       iterations :: TQueue (Test si ti ii),
       runningCount :: TVar Int
@@ -279,9 +277,7 @@ prepare =
                   <$> prepare' loc 0 testHookChild
         PN.Fixture
           { fxTag,
-            logStart,
-            iterations,
-            logEnd
+            iterations
           } ->
             do
               let loc = nodeLoc "Fixture" fxTag
@@ -294,7 +290,6 @@ prepare =
               pure $
                 RTFix
                   { leafloc = loc,
-                    logStart = logStart loc,
                     nStatus = ns,
                     iterations = q,
                     runningCount
@@ -749,7 +744,7 @@ executeGraph sink xtri maxThreads =
               logger EndExecution
           )
 
-execute :: Int -> LogControls -> PN.PreNodeRoot -> IO ()
+execute :: Int -> LogControls m -> PN.PreNodeRoot -> IO ()
 execute
   maxThreads
   LogControls
@@ -764,8 +759,7 @@ execute
       linkExecute =
         finally
           ( do
-              rn <- rootNode preRoot
-              exeTree <- prepare rn
+              exeTree <- prepare preRoot
               executeGraph sink exeTree maxThreads
           )
           stopWorker

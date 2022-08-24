@@ -67,14 +67,14 @@ mkLogger sink threadCounter fEvnt = do
   sink $ fEvnt nxt (PThreadId $ txt tid)
   writeIORef threadCounter nxt
 
-data LogControls = LogControls
+data LogControls m = LogControls
   { sink :: Sink,
     logWorker :: IO (),
     stopWorker :: IO (),
-    log :: Maybe (TQueue ExeEvent)
+    log :: m (TQueue ExeEvent)
   }
 
-testLogControls :: IO LogControls
+testLogControls :: IO (LogControls Maybe)
 testLogControls = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   chn <- newTChanIO

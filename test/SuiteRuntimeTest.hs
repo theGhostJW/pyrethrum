@@ -106,35 +106,33 @@ data IOProps = IOProps
     delayms :: Int,
     fail :: Bool
   }
+  deriving (Show)
 
 data Template
   = TBranch [Template]
   | TOnceHook
-      { 
-        ttag :: Text,
+      { ttag :: Text,
         thook :: IOProps,
         trelease :: IOProps,
         tChild :: Template
       }
   | TThreadHook
-      { 
-        ttag :: Text,
+      { ttag :: Text,
         thook :: IOProps,
         trelease :: IOProps,
         tChild :: Template
       }
   | TTestHook
-      { 
-        ttag :: Text,
+      { ttag :: Text,
         thook :: IOProps,
         trelease :: IOProps,
         tChild :: Template
       }
   | TFixture
-      { 
-        ttag :: Text,
+      { ttag :: Text,
         tTests :: [IOProps]
       }
+  deriving (Show)
 
 type TextLogger = Text -> IO ()
 
@@ -165,7 +163,7 @@ runTest threadCount root = do
   execute threadCount lc (root lggr)
   maybe (chkFail "No Events Log") (\evts -> atomically (q2List evts) >>= chkLaws) log
 
-ioAction :: TextLogger-> IOProps -> IO ()
+ioAction :: TextLogger -> IOProps -> IO ()
 ioAction log (IOProps {message, delayms, fail}) = do
   log message
   P.threadDelay delayms

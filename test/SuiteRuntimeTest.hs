@@ -136,6 +136,29 @@ data Template
 
 type TextLogger = Text -> IO ()
 
+
+mkPrenode l = \case
+  TBranch tems -> uu
+  TOnceHook { ttag,
+        thook,
+        trelease,
+        tChild
+      } -> uu
+  TThreadHook { ttag,
+        thook,
+        trelease,
+        tChild
+      } -> uu
+  TTestHook { ttag,
+        thook,
+        trelease,
+        tChild
+      }-> uu
+  TFixture  { 
+        ttag,
+        tTests
+      } -> mkFixture l ttag tTests
+
 q2List :: TQueue ExeEvent -> STM [ExeEvent]
 q2List qu = reverse <$> recurse [] qu
   where
@@ -147,20 +170,20 @@ q2List qu = reverse <$> recurse [] qu
 chkLaws :: [ExeEvent] -> IO ()
 chkLaws evts = do
   putStrLn "No Laws"
-  putStrLn "========="
-  traverse_ pPrint evts
 
 debug :: Text -> (L.Index -> PThreadId -> ExeEvent)
 debug = Debug
 
-runTest :: Int -> ((Text -> IO ()) -> PreNodeRoot) -> IO ()
-runTest threadCount root = do
+runTest :: Int -> Template -> IO ()
+runTest threadCount template = do
+  pPrint template
+  putStrLn "========="
   chan <- newTChanIO
   q <- newTQueueIO
   ior <- newIORef (L.Index 0)
   lc@LogControls {sink, log} <- testLogControls chan q
-  let lggr msg = mkLogger sink ior (Debug msg)
-  execute threadCount lc (root lggr)
+  let lgr msg = mkLogger sink ior (Debug msg)
+  execute threadCount lc $ mkPrenode lgr template
   maybe (chkFail "No Events Log") (\evts -> atomically (q2List evts) >>= chkLaws) log
 
 ioAction :: TextLogger -> IOProps -> IO ()
@@ -176,12 +199,12 @@ mkTest log iop@IOProps {message, delayms, fail} = PN.Test message \a b c -> ioAc
 mkFixture :: TextLogger -> Text -> [IOProps] -> PreNode oi () ti () ii ()
 mkFixture log tag props = Fixture (Just tag) $ mkTest log <$> props
 
-superSimplSuite :: TextLogger -> PreNodeRoot
-superSimplSuite l =
-  mkFixture l "Fx 0" [IOProps "0" 0 False]
+superSimplSuite :: Template
+superSimplSuite =
+  TFixture "Fx 0" [IOProps "0" 0 False]
+
 
 -- $> unit_simple_single
-
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 

@@ -15,7 +15,7 @@ import qualified Internal.PreNode as PN
   )
 import Internal.RunTimeLogging
   ( ExeEvent (..),
-    ExeEventType (..),
+    ExeEventType (TestHookRelease, Group),
     Index (Index),
     Loc (Node, Root),
     LogControls (LogControls),
@@ -495,7 +495,10 @@ executeNode logger hkIn tstHk rg =
       nxtAbandon :: Loc -> SomeException -> Abandon
       nxtAbandon loc' e = either id (const $ Abandon loc' e) hkIn
 
+      logAbandonned' :: Loc -> Abandon -> IO ()
       logAbandonned' = logAbandonned logger
+
+      logFailure' :: Loc -> ExeEventType -> SomeException -> IO ()
       logFailure' = logFailure logger
    in do
         wantRun <- atomically $ canRun rg
@@ -571,7 +574,7 @@ executeNode logger hkIn tstHk rg =
                                 & maybe
                                   ( catchAll
                                       (iHookRelease io)
-                                      (logFailure logger loc L.TestHookRelease)
+                                      (logFailure logger loc TestHookRelease)
                                   )
                                   (logAbandonned' loc)
                         }
@@ -697,14 +700,14 @@ executeNode logger hkIn tstHk rg =
                             let ethInputs = unpackInputs ho hkIn
 
                             finally
-                              ( withStartEnd logger tstLoc TestIteration $
+                              ( withStartEnd logger tstLoc L.Test $
                                   do
                                     ethInputs & either
                                       (logAbandonned' tstLoc)
                                       \i ->
                                         catchAll
                                           (uncurry3 test i)
-                                          (logFailure' tstLoc TestIteration)
+                                          (logFailure' tstLoc L.Test)
                               )
                               (atomically (modifyTVar runningCount pred) >> recurse False)
                         )
@@ -727,7 +730,6 @@ executeGraph sink xtri maxThreads =
           }
    in do
         logger <- newLogger sink
-        logger StartExecution
         logger StartExecution
         finally
           ( replicateConcurrently_

@@ -14,7 +14,7 @@ import Data.Yaml
 import GHC.Records
 import Internal.PreNode (PreNode (hookChild))
 import Internal.PreNode as PN
-import Internal.RunTimeLogging as L (ExeEvent (..), Loc (..), LogControls (..), testLogControls)
+import Internal.RunTimeLogging as L (ExeEvent (..), Index (Index), Loc (..), LogControls (..), PThreadId, Sink, mkLogger, testLogControls)
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
@@ -50,12 +50,14 @@ import Pyrelude as P
     length,
     maybe,
     maybef,
+    newIORef,
     not,
     nub,
     pure,
     replicateM_,
     reverse,
     singleton,
+    threadDelay,
     throw,
     toS,
     traverse_,
@@ -63,6 +65,7 @@ import Pyrelude as P
     txtPretty,
     uncurry,
     uu,
+    when,
     zip,
     ($),
     (&),
@@ -92,14 +95,48 @@ import Prelude (Ord, String, putStrLn)
 
 {-
 1. create logger pretty print + list :: Done
-2. run most basic
+2. run most basic :: Done* * - need to fix index in debbug logging - deferred
 3. stats gather
 4. laws
 5. generate
 -}
 
-logControls :: IO (LogControls Maybe)
-logControls = testLogControls
+data IOProps = IOProps
+  { message :: Text,
+    delayms :: Int,
+    fail :: Bool
+  }
+
+data Template
+  = TBranch [Template]
+  | TOnceHook
+      { 
+        ttag :: Text,
+        thook :: IOProps,
+        trelease :: IOProps,
+        tChild :: Template
+      }
+  | TThreadHook
+      { 
+        ttag :: Text,
+        thook :: IOProps,
+        trelease :: IOProps,
+        tChild :: Template
+      }
+  | TTestHook
+      { 
+        ttag :: Text,
+        thook :: IOProps,
+        trelease :: IOProps,
+        tChild :: Template
+      }
+  | TFixture
+      { 
+        ttag :: Text,
+        tTests :: [IOProps]
+      }
+
+type TextLogger = Text -> IO ()
 
 q2List :: TQueue ExeEvent -> STM [ExeEvent]
 q2List qu = reverse <$> recurse [] qu
@@ -110,28 +147,45 @@ q2List qu = reverse <$> recurse [] qu
         >>= P.maybe (pure l) (\e -> recurse (e : l) q)
 
 chkLaws :: [ExeEvent] -> IO ()
-chkLaws evts = putStrLn "No Laws"
+chkLaws evts = do
+  putStrLn "No Laws"
+  putStrLn "========="
+  traverse_ pPrint evts
 
-testSuite :: Int -> PreNodeRoot -> IO ()
-testSuite threadCount root = do
-  lc@LogControls {log} <- logControls
-  execute threadCount lc root
+debug :: Text -> (L.Index -> PThreadId -> ExeEvent)
+debug = Debug
+
+runTest :: Int -> ((Text -> IO ()) -> PreNodeRoot) -> IO ()
+runTest threadCount root = do
+  chan <- newTChanIO
+  q <- newTQueueIO
+  ior <- newIORef (L.Index 0)
+  lc@LogControls {sink, log} <- testLogControls chan q
+  let lggr msg = mkLogger sink ior (Debug msg)
+  execute threadCount lc (root lggr)
   maybe (chkFail "No Events Log") (\evts -> atomically (q2List evts) >>= chkLaws) log
 
-mkTest :: Text -> PN.Test si ti ii
-mkTest s = PN.Test s (\a b c -> putStrLn $ toS s)
+ioAction :: TextLogger-> IOProps -> IO ()
+ioAction log (IOProps {message, delayms, fail}) = do
+  log message
+  P.threadDelay delayms
+  when fail $
+    error . toS $ "exception thrown " <> message
 
-mkFixture :: Text -> [PN.Test oi ti ii] -> PreNode oi () ti () ii ()
-mkFixture tag = Fixture (Just tag)
+mkTest :: TextLogger -> IOProps -> PN.Test si ti ii
+mkTest log iop@IOProps {message, delayms, fail} = PN.Test message \a b c -> ioAction log iop
 
-superSimplSuite :: PreNodeRoot
-superSimplSuite =
-  mkFixture "Fx 0" [mkTest "Test 0"]
+mkFixture :: TextLogger -> Text -> [IOProps] -> PreNode oi () ti () ii ()
+mkFixture log tag props = Fixture (Just tag) $ mkTest log <$> props
 
+superSimplSuite :: TextLogger -> PreNodeRoot
+superSimplSuite l =
+  mkFixture l "Fx 0" [IOProps "0" 0 False]
 
 -- $> unit_simple_single
+
 unit_simple_single :: IO ()
-unit_simple_single = testSuite 1 superSimplSuite
+unit_simple_single = runTest 1 superSimplSuite
 
 -- superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
 -- superSimplSuite q =

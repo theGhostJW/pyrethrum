@@ -23,7 +23,7 @@ data PreNode oi oo ti to ii io where
     { hookTag :: Maybe Text,
       hook :: Loc -> oi -> IO oo,
       hookChild :: PreNode oo coo ti to ii io,
-      hookResult :: TMVar (Either oomeException oo),
+      hookResult :: TMVar (Either SomeException oo),
       hookRelease :: Loc -> oo -> IO ()
     } ->
     PreNode oi oo ti to ii io

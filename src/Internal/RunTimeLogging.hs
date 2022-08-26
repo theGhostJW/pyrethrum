@@ -2,14 +2,14 @@ module Internal.RunTimeLogging where
 
 import Control.Monad.State
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
-import Pyrelude (Applicative (pure), Enum (succ), Eq, Exception (displayException), IO, IORef, Int, Maybe (..), Num ((+)), Ord, Show, SomeException, Text, coerce, maybe, modifyIORef, readIORef, txt, uu, writeIORef, ($), (.), Bool, Semigroup ((<>)), unpack)
+import Pyrelude (Applicative (pure), Enum (succ), Eq, Exception (displayException), IO, IORef, Int, Maybe (..), Num ((+)), Ord, Show, SomeException, Text, coerce, maybe, modifyIORef, readIORef, txt, uu, writeIORef, ($), (.), Bool, Semigroup ((<>)), unpack, print, const)
 import Text.Show.Pretty (pPrint)
-import UnliftIO (TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
+import UnliftIO (TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue, TChan)
 import UnliftIO.Concurrent (myThreadId)
 import GHC.Show (show)
 import Prelude (String)
 
-data Loc = 
+data Loc =
   Root |
   Node Loc Text
   deriving Show
@@ -23,7 +23,7 @@ data ExeEventType
   | TestHookRelease
   | Group
   | Fixture
-  | TestIteration
+  | Test
   deriving (Show, Eq)
 
 
@@ -44,11 +44,11 @@ newtype Index = Index {idx :: Int} deriving (Show, Eq, Ord)
 
 data ExeEvent
   = StartExecution Index PThreadId
-  | Start Loc ExeEventType Index PThreadId 
-  | End Loc ExeEventType Index PThreadId 
-  | Failure Loc Text PException Index PThreadId 
-  | ParentFailure Loc Loc PException Index PThreadId 
-  | Debug Text Index PThreadId 
+  | Start Loc ExeEventType Index PThreadId
+  | End Loc ExeEventType Index PThreadId
+  | Failure Loc Text PException Index PThreadId
+  | ParentFailure Loc Loc PException Index PThreadId
+  | Debug Text Index PThreadId
   | EndExecution Index PThreadId
   deriving Show
 
@@ -73,18 +73,15 @@ data LogControls m = LogControls
     log :: m (TQueue ExeEvent)
   }
 
-testLogControls :: IO (LogControls Maybe)
-testLogControls = do
+testLogControls :: TChan (Maybe ExeEvent) -> TQueue ExeEvent -> IO (LogControls Maybe)
+testLogControls chn log = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
-  chn <- newTChanIO
-  log <- newTQueueIO
-
   let logWorker :: IO ()
       logWorker =
         atomically (readTChan chn)
           >>= maybe
             (pure ())
-            (\evnt -> pPrint evnt >> logWorker)
+            (\evt -> pPrint evt >> logWorker)
 
       stopWorker :: IO ()
       stopWorker = atomically $ writeTChan chn Nothing

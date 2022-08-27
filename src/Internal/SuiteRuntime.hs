@@ -15,7 +15,7 @@ import qualified Internal.PreNode as PN
   )
 import Internal.RunTimeLogging
   ( ExeEvent (..),
-    ExeEventType (TestHookRelease, Group),
+    ExeEventType (Group, TestHookRelease),
     Loc (Node, Root),
     LogControls (LogControls),
     Sink,
@@ -45,6 +45,7 @@ import Pyrelude as P hiding
     withMVar,
   )
 import Pyrelude.IO (hPutStrLn, putStrLn)
+import Text.Show.Pretty (pPrint)
 import UnliftIO
   ( Exception (displayException),
     bracket,
@@ -58,6 +59,7 @@ import UnliftIO
     newTMVar,
     peekTQueue,
     pureTry,
+    replicateConcurrently,
     replicateConcurrently_,
     swapTMVar,
     tryAny,
@@ -712,10 +714,11 @@ executeNode logger hkIn tstHk rg =
 
 type Logger = (Int -> Text -> ExeEvent) -> IO ()
 
-newLogger :: Sink -> IO Logger
-newLogger sink = do
-  r <- UnliftIO.newIORef 0
-  pure $ mkLogger sink r
+newLogger :: Sink -> ThreadId -> IO Logger
+newLogger sink tid =
+  do
+    ir <- UnliftIO.newIORef 0
+    pure $ mkLogger sink ir tid
 
 executeGraph :: Sink -> ExeTree () () () () () () -> Int -> IO ()
 executeGraph sink xtri maxThreads =
@@ -727,14 +730,29 @@ executeGraph sink xtri maxThreads =
             tstHkRelease = const . const $ pure ()
           }
    in do
-        logger <- newLogger sink
-        logger StartExecution
+        tid <- myThreadId
+        logger <- newLogger sink tid
+
+        lc <- newTMVarIO True
+        let wantStarts = True : replicate (pred maxThreads) False
+
         finally
-          ( replicateConcurrently_
-              maxThreads
-              do
-                logger' <- newLogger sink
-                executeNode logger' hkIn tstHk xtri
+          ( forConcurrently_
+              wantStarts
+              ( bool
+                  ( do
+                      tid' <- myThreadId
+                      logger' <- newLogger sink tid'
+                      executeNode logger' hkIn tstHk xtri
+                  )
+                  ( do
+                      tid' <- myThreadId
+                      logger' <- newLogger sink tid'
+                      finally
+                        (logger' StartExecution >> executeNode logger' hkIn tstHk xtri)
+                        (logger' StartExecution)
+                  )
+              )
           )
           ( do
               waitDone xtri

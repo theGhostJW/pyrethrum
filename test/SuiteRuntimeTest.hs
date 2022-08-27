@@ -21,10 +21,11 @@ import Polysemy
 import Pyrelude as P
   ( Bool (..),
     Either,
+    Enum (succ),
     Eq (..),
     IO,
     Int,
-    ListLike (foldl', head, null, unsafeHead, unsafeLast, drop),
+    ListLike (drop, foldl', head, null, unsafeHead, unsafeLast),
     Maybe (Just, Nothing),
     Num ((+)),
     Ord (..),
@@ -78,9 +79,9 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||),
+    (||), myThreadId,
   )
-import Pyrelude.Test as T hiding (filter, maybe, singleton, chkEq)
+import Pyrelude.Test as T hiding (chkEq, filter, maybe, singleton)
 import TempUtils (debugLines)
 import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppShow, ppShowList)
 import UnliftIO.Concurrent as C
@@ -169,31 +170,32 @@ q2List qu = reverse <$> recurse [] qu
       tryReadTQueue q
         >>= P.maybe (pure l) (\e -> recurse (e : l) q)
 
--- chkThreadLogsInOrder :: Template -> [ExeEvent] -> IO ()
--- chkThreadLogsInOrder _t evts = 
---    let threads = groupBy 
---                  (\ev1 ev2 -> threadId ev1 == threadId ev2) 
---                  evts
---        chkIds evts' = for_  
---                         (zip evts' (drop 1 evts')) 
---                         (\(ev1, ev2) -> 
---                           let idx1 = idx ev1
---                               idx2 = idx ev2
---                           in
---                             chkEq'(
---                               succ idx1, 
---                               idx2, 
---                               "Events out of order\n" <> 
---                                 ppShow ev1 <> 
---                                 ppShow ev2)
-                          
---                           )
---    in 
---     for_ threads
+chkThreadLogsInOrder :: Template -> [ExeEvent] -> IO ()
+chkThreadLogsInOrder _t evts =
+  let threads =
+        groupBy
+          (\ev1 ev2 -> threadId ev1 == threadId ev2)
+          evts
+      chkIds evts' =
+        for_
+          (zip evts' (drop 1 evts'))
+          ( \(ev1, ev2) ->
+              let idx1 = idx ev1
+                  idx2 = idx ev2
+               in chkEq'
+                    ( "Events out of order\n"
+                        <> toS (ppShow ev1)
+                        <> "\n"
+                        <> toS (ppShow ev2)
+                    )
+                    (succ idx1)
+                    idx2
+          )
+   in for_ threads chkIds
 
 chkLaws :: Template -> [ExeEvent] -> IO ()
 chkLaws t evts = do
-  putStrLn "No Laws"
+  chkThreadLogsInOrder t evts
 
 debug :: Text -> Int -> Text -> ExeEvent
 debug = Debug
@@ -205,10 +207,15 @@ runTest threadCount template = do
   chan <- newTChanIO
   q <- newTQueueIO
   ior <- newIORef 0
+  tid <- C.myThreadId
   lc@LogControls {sink, log} <- testLogControls chan q
-  let lgr msg = mkLogger sink ior (Debug msg)
+  let 
+    lgr :: Text -> IO ()
+    lgr msg = mkLogger sink ior tid (Debug msg)
   execute threadCount lc $ mkPrenode lgr template
-  maybe (chkFail "No Events Log") (\evts -> atomically (q2List evts) >>= chkLaws template) log
+  log & maybe 
+    (chkFail "No Events Log") 
+    (\evts -> atomically (q2List evts) >>= chkLaws template)
 
 ioAction :: TextLogger -> IOProps -> IO ()
 ioAction log (IOProps {message, delayms, fail}) = do
@@ -228,7 +235,6 @@ superSimplSuite =
   TFixture "Fx 0" [IOProps "0" 0 False]
 
 -- $> unit_simple_single
-
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 

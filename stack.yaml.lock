@@ -17,11 +17,11 @@ packages:
     git: https://github.com/theGhostJW/pyrelude
     pantry-tree:
       size: 2377
-      sha256: 199ee93937b7186984a801000c5d27b5c6810e5aacb0993bb90992d7d32640d9
-    commit: 1dd5c04c16abcc758aa69ba0efbca5a54e16487a
+      sha256: 77e716c5f2eba68dc6237345131a49064dc5ae0a26f542d9da540bf87bb02e3d
+    commit: 4c7196461914f8cab994356f9359e00e76a1c842
   original:
     git: https://github.com/theGhostJW/pyrelude
-    commit: 1dd5c04c16abcc758aa69ba0efbca5a54e16487a
+    commit: 4c7196461914f8cab994356f9359e00e76a1c842
 - completed:
     hackage: chronos-1.1.3@sha256:6e817a0e265c9f7a4451404597e010ad7b4aebfe38762c6ab2cb514fb5b455d2,3933
     pantry-tree:

@@ -16,7 +16,6 @@ import qualified Internal.PreNode as PN
 import Internal.RunTimeLogging
   ( ExeEvent (..),
     ExeEventType (TestHookRelease, Group),
-    Index (Index),
     Loc (Node, Root),
     LogControls (LogControls),
     PThreadId,
@@ -712,11 +711,11 @@ executeNode logger hkIn tstHk rg =
                               (atomically (modifyTVar runningCount pred) >> recurse False)
                         )
 
-type Logger = (Index -> PThreadId -> ExeEvent) -> IO ()
+type Logger = (Int -> PThreadId -> ExeEvent) -> IO ()
 
 newLogger :: Sink -> IO Logger
 newLogger sink = do
-  r <- UnliftIO.newIORef (Index 0)
+  r <- UnliftIO.newIORef 0
   pure $ mkLogger sink r
 
 executeGraph :: Sink -> ExeTree () () () () () () -> Int -> IO ()

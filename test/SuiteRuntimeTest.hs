@@ -14,7 +14,7 @@ import Data.Yaml
 import GHC.Records
 import Internal.PreNode (PreNode (hookChild))
 import Internal.PreNode as PN
-import Internal.RunTimeLogging as L (ExeEvent (..), Index (Index), Loc (..), LogControls (..), PThreadId, Sink, mkLogger, testLogControls)
+import Internal.RunTimeLogging as L (ExeEvent (..), Loc (..), LogControls (..), PThreadId, Sink, mkLogger, testLogControls)
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
@@ -167,11 +167,11 @@ q2List qu = reverse <$> recurse [] qu
       tryReadTQueue q
         >>= P.maybe (pure l) (\e -> recurse (e : l) q)
 
-chkLaws :: [ExeEvent] -> IO ()
-chkLaws evts = do
+chkLaws :: Template -> [ExeEvent] -> IO ()
+chkLaws t evts = do
   putStrLn "No Laws"
 
-debug :: Text -> (L.Index -> PThreadId -> ExeEvent)
+debug :: Text -> (Int -> PThreadId -> ExeEvent)
 debug = Debug
 
 runTest :: Int -> Template -> IO ()
@@ -180,11 +180,11 @@ runTest threadCount template = do
   putStrLn "========="
   chan <- newTChanIO
   q <- newTQueueIO
-  ior <- newIORef (L.Index 0)
+  ior <- newIORef 0
   lc@LogControls {sink, log} <- testLogControls chan q
   let lgr msg = mkLogger sink ior (Debug msg)
   execute threadCount lc $ mkPrenode lgr template
-  maybe (chkFail "No Events Log") (\evts -> atomically (q2List evts) >>= chkLaws) log
+  maybe (chkFail "No Events Log") (\evts -> atomically (q2List evts) >>= chkLaws template) log
 
 ioAction :: TextLogger -> IOProps -> IO ()
 ioAction log (IOProps {message, delayms, fail}) = do

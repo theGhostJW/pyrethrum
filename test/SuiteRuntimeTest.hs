@@ -14,7 +14,7 @@ import Data.Yaml
 import GHC.Records
 import Internal.PreNode (PreNode (hookChild))
 import Internal.PreNode as PN
-import Internal.RunTimeLogging as L (ExeEvent (..), Loc (..), LogControls (..), PThreadId, Sink, mkLogger, testLogControls)
+import Internal.RunTimeLogging as L (ExeEvent (..), Loc (..), LogControls (..), Sink, mkLogger, testLogControls)
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
@@ -24,7 +24,7 @@ import Pyrelude as P
     Eq (..),
     IO,
     Int,
-    ListLike (foldl', head, null, unsafeHead, unsafeLast),
+    ListLike (foldl', head, null, unsafeHead, unsafeLast, drop),
     Maybe (Just, Nothing),
     Num ((+)),
     Ord (..),
@@ -80,7 +80,7 @@ import Pyrelude as P
     (\\),
     (||),
   )
-import Pyrelude.Test as T hiding (filter, maybe, singleton)
+import Pyrelude.Test as T hiding (filter, maybe, singleton, chkEq)
 import TempUtils (debugLines)
 import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppShow, ppShowList)
 import UnliftIO.Concurrent as C
@@ -169,11 +169,33 @@ q2List qu = reverse <$> recurse [] qu
       tryReadTQueue q
         >>= P.maybe (pure l) (\e -> recurse (e : l) q)
 
+-- chkThreadLogsInOrder :: Template -> [ExeEvent] -> IO ()
+-- chkThreadLogsInOrder _t evts = 
+--    let threads = groupBy 
+--                  (\ev1 ev2 -> threadId ev1 == threadId ev2) 
+--                  evts
+--        chkIds evts' = for_  
+--                         (zip evts' (drop 1 evts')) 
+--                         (\(ev1, ev2) -> 
+--                           let idx1 = idx ev1
+--                               idx2 = idx ev2
+--                           in
+--                             chkEq'(
+--                               succ idx1, 
+--                               idx2, 
+--                               "Events out of order\n" <> 
+--                                 ppShow ev1 <> 
+--                                 ppShow ev2)
+                          
+--                           )
+--    in 
+--     for_ threads
+
 chkLaws :: Template -> [ExeEvent] -> IO ()
 chkLaws t evts = do
   putStrLn "No Laws"
 
-debug :: Text -> Int -> PThreadId -> ExeEvent
+debug :: Text -> Int -> Text -> ExeEvent
 debug = Debug
 
 runTest :: Int -> Template -> IO ()

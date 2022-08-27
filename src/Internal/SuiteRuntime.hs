@@ -18,7 +18,6 @@ import Internal.RunTimeLogging
     ExeEventType (TestHookRelease, Group),
     Loc (Node, Root),
     LogControls (LogControls),
-    PThreadId,
     Sink,
     logWorker,
     mkFailure,
@@ -711,7 +710,7 @@ executeNode logger hkIn tstHk rg =
                               (atomically (modifyTVar runningCount pred) >> recurse False)
                         )
 
-type Logger = (Int -> PThreadId -> ExeEvent) -> IO ()
+type Logger = (Int -> Text -> ExeEvent) -> IO ()
 
 newLogger :: Sink -> IO Logger
 newLogger sink = do

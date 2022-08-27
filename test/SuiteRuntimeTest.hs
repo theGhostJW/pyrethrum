@@ -136,28 +136,30 @@ data Template
 
 type TextLogger = Text -> IO ()
 
-
 mkPrenode l = \case
   TBranch tems -> uu
-  TOnceHook { ttag,
-        thook,
-        trelease,
-        tChild
-      } -> uu
-  TThreadHook { ttag,
-        thook,
-        trelease,
-        tChild
-      } -> uu
-  TTestHook { ttag,
-        thook,
-        trelease,
-        tChild
-      }-> uu
-  TFixture  { 
-        ttag,
-        tTests
-      } -> mkFixture l ttag tTests
+  TOnceHook
+    { ttag,
+      thook,
+      trelease,
+      tChild
+    } -> uu
+  TThreadHook
+    { ttag,
+      thook,
+      trelease,
+      tChild
+    } -> uu
+  TTestHook
+    { ttag,
+      thook,
+      trelease,
+      tChild
+    } -> uu
+  TFixture
+    { ttag,
+      tTests
+    } -> mkFixture l ttag tTests
 
 q2List :: TQueue ExeEvent -> STM [ExeEvent]
 q2List qu = reverse <$> recurse [] qu
@@ -171,7 +173,7 @@ chkLaws :: Template -> [ExeEvent] -> IO ()
 chkLaws t evts = do
   putStrLn "No Laws"
 
-debug :: Text -> (Int -> PThreadId -> ExeEvent)
+debug :: Text -> Int -> PThreadId -> ExeEvent
 debug = Debug
 
 runTest :: Int -> Template -> IO ()
@@ -203,8 +205,8 @@ superSimplSuite :: Template
 superSimplSuite =
   TFixture "Fx 0" [IOProps "0" 0 False]
 
-
 -- $> unit_simple_single
+
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 

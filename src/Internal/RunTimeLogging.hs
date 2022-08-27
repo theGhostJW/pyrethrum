@@ -42,42 +42,42 @@ newtype PException = PException {displayText :: Text} deriving (Show, Eq)
 data ExeEvent
   = StartExecution
       { idx :: Int,
-        trdIdx :: PThreadId
+        threadId :: PThreadId
       }
   | Start
       { loc :: Loc,
         event :: ExeEventType,
         idx :: Int,
-        trdIdx :: PThreadId
+        threadId :: PThreadId
       }
   | End
       { loc :: Loc,
         event :: ExeEventType,
         idx :: Int,
-        trdIdx :: PThreadId
+        threadId :: PThreadId
       }
   | Failure
       { loc :: Loc,
         msg :: Text,
         exception :: PException,
         idx :: Int,
-        trdIdx :: PThreadId
+        threadId :: PThreadId
       }
   | ParentFailure
       { loc :: Loc,
         parentLoc :: Loc,
         exception :: PException,
         idx :: Int,
-        trdIdx :: PThreadId
+        threadId :: PThreadId
       }
   | Debug
       { msg :: Text,
         idx :: Int,
-        trdIdx :: PThreadId
+        threadId :: PThreadId
       }
   | EndExecution
       { idx :: Int,
-        trdIdx :: PThreadId
+        threadId :: PThreadId
       }
   deriving (Show)
 

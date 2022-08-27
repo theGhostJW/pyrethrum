@@ -51,6 +51,7 @@ import Pyrelude as P
     length,
     maybe,
     maybef,
+    myThreadId,
     newIORef,
     not,
     nub,
@@ -79,7 +80,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||), myThreadId,
+    (||),
   )
 import Pyrelude.Test as T hiding (chkEq, filter, maybe, singleton)
 import TempUtils (debugLines)
@@ -209,13 +210,13 @@ runTest threadCount template = do
   ior <- newIORef 0
   tid <- C.myThreadId
   lc@LogControls {sink, log} <- testLogControls chan q
-  let 
-    lgr :: Text -> IO ()
-    lgr msg = mkLogger sink ior tid (Debug msg)
+  let lgr :: Text -> IO ()
+      lgr msg = mkLogger sink ior tid (Debug msg)
   execute threadCount lc $ mkPrenode lgr template
-  log & maybe 
-    (chkFail "No Events Log") 
-    (\evts -> atomically (q2List evts) >>= chkLaws template)
+  log
+    & maybe
+      (chkFail "No Events Log")
+      (\evts -> atomically (q2List evts) >>= chkLaws template)
 
 ioAction :: TextLogger -> IOProps -> IO ()
 ioAction log (IOProps {message, delayms, fail}) = do
@@ -235,6 +236,7 @@ superSimplSuite =
   TFixture "Fx 0" [IOProps "0" 0 False]
 
 -- $> unit_simple_single
+
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 

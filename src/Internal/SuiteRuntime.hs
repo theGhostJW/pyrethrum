@@ -729,35 +729,24 @@ executeGraph sink xtri maxThreads =
             tstHkHook = const . pure $ Right (),
             tstHkRelease = const . const $ pure ()
           }
+      wantStarts = True : replicate (pred maxThreads) False
    in do
-        tid <- myThreadId
-        logger <- newLogger sink tid
-
-        lc <- newTMVarIO True
-        let wantStarts = True : replicate (pred maxThreads) False
-
         finally
           ( forConcurrently_
               wantStarts
-              ( bool
-                  ( do
-                      tid' <- myThreadId
-                      logger' <- newLogger sink tid'
-                      executeNode logger' hkIn tstHk xtri
-                  )
-                  ( do
-                      tid' <- myThreadId
-                      logger' <- newLogger sink tid'
-                      finally
-                        (logger' StartExecution >> executeNode logger' hkIn tstHk xtri)
-                        (logger' StartExecution)
-                  )
+              ( \wantStart -> do
+                  tid' <- myThreadId
+                  logger' <- newLogger sink tid'
+                  wantStart
+                    & bool
+                      (executeNode logger' hkIn tstHk xtri)
+                      ( finally
+                          (logger' StartExecution >> executeNode logger' hkIn tstHk xtri)
+                          (logger' EndExecution)
+                      )
               )
           )
-          ( do
-              waitDone xtri
-              logger EndExecution
-          )
+          (waitDone xtri)
 
 execute :: Int -> LogControls m -> PN.PreNodeRoot -> IO ()
 execute

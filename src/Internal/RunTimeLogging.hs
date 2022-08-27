@@ -3,7 +3,7 @@ module Internal.RunTimeLogging where
 import Control.Monad.State
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import GHC.Show (show)
-import Pyrelude (Applicative (pure), Bool, Enum (succ), Eq, Exception (displayException), IO, IORef, Int, Maybe (..), Num ((+)), Ord, Semigroup ((<>)), Show, SomeException, Text, coerce, const, maybe, modifyIORef, print, readIORef, txt, unpack, uu, writeIORef, ($), (.), ThreadId, (<$>))
+import Pyrelude (Applicative (pure), Bool, Enum (succ), Eq, Exception (displayException), IO, IORef, Int, Maybe (..), Num ((+)), Ord, Semigroup ((<>)), Show, SomeException, Text, ThreadId, coerce, const, maybe, modifyIORef, print, readIORef, txt, unpack, uu, writeIORef, ($), (.), (<$>))
 import Text.Show.Pretty (pPrint)
 import UnliftIO (TChan, TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
 import UnliftIO.Concurrent (myThreadId)
@@ -87,9 +87,8 @@ type Sink = ExeEvent -> IO ()
 mkLogger :: Sink -> IORef Int -> ThreadId -> (Int -> Text -> ExeEvent) -> IO ()
 mkLogger sink threadCounter thrdId fEvnt = do
   tc <- readIORef threadCounter
-  let tid = txt thrdId
-      nxt = succ tc
-  sink $ fEvnt nxt (txt tid)
+  let nxt = succ tc
+  sink . fEvnt nxt $ txt thrdId
   writeIORef threadCounter nxt
 
 data LogControls m = LogControls
@@ -113,7 +112,7 @@ testLogControls chn log = do
       stopWorker = atomically $ writeTChan chn Nothing
 
       sink :: ExeEvent -> IO ()
-      sink evnt = 
+      sink evnt =
         atomically $ do
           writeTChan chn $ Just evnt
           writeTQueue log evnt

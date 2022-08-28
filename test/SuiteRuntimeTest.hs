@@ -29,26 +29,30 @@ import Pyrelude as P
     Maybe (Just, Nothing),
     Num ((+)),
     Ord (..),
-    Show,
+    Show (show),
     SomeException,
     Text,
     Traversable (sequenceA, traverse),
     catMaybes,
+    catchAll,
     const,
     count,
     debug_,
     debugf,
+    displayException,
     dropWhile,
     dropWhileEnd,
     error,
     filter,
     find,
+    first,
     for_,
     fromJust,
     groupBy,
     isPrefixOf,
     last,
     length,
+    lines,
     maybe,
     maybef,
     myThreadId,
@@ -59,6 +63,8 @@ import Pyrelude as P
     replicateM_,
     reverse,
     singleton,
+    snd,
+    sortOn,
     threadDelay,
     throw,
     toS,
@@ -68,6 +74,7 @@ import Pyrelude as P
     uncurry,
     uu,
     when,
+    whenJust,
     zip,
     ($),
     (&),
@@ -82,9 +89,9 @@ import Pyrelude as P
     (\\),
     (||),
   )
-import Pyrelude.Test as T hiding (chkEq, filter, maybe, singleton)
+import Pyrelude.Test as T hiding (chkEq, chkEq', filter, maybe, singleton)
 import TempUtils (debugLines)
-import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppShow, ppShowList)
+import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
 import UnliftIO.Concurrent as C
   ( ThreadId,
     forkFinally,
@@ -171,32 +178,65 @@ q2List qu = reverse <$> recurse [] qu
       tryReadTQueue q
         >>= P.maybe (pure l) (\e -> recurse (e : l) q)
 
+-- TODO - add tests add to pyrelude
+groupOn :: (Ord b) => (a -> b) -> [a] -> [[a]]
+groupOn f =
+  let unpack = (snd <$>) . M.toList
+      fld m a = case M.lookup (f a) m of
+        Nothing -> M.insert (f a) [a] m
+        Just as -> M.insert (f a) (a : as) m
+   in unpack . foldl' fld M.empty . reverse
+
+-- TODO - better formatting chkEq pyrelude
+chkEq' :: (Eq a, Show a) => a -> a -> Text -> IO ()
+chkEq' a b msg =
+  when (a /= b) $
+    error $
+      "Equality check failed\n"
+        <> "  "
+        <> toS (ppShow a)
+        <> "\nDoes not Equal:\n"
+        <> "  "
+        <> toS (ppShow b)
+        <> "\n"
+        <> toS msg
+
 chkThreadLogsInOrder :: Template -> [ExeEvent] -> IO ()
 chkThreadLogsInOrder _t evts =
   let threads =
-        groupBy
-          (\ev1 ev2 -> threadId ev1 == threadId ev2)
+        groupOn
+          threadId
           evts
+
       chkIds evts' =
         for_
-          (zip evts' (drop 1 evts'))
+          (zip evts' $ drop 1 evts')
           ( \(ev1, ev2) ->
               let idx1 = idx ev1
                   idx2 = idx ev2
-               in chkEq'
-                    ( "Events out of order\n"
-                        <> toS (ppShow ev1)
-                        <> "\n"
-                        <> toS (ppShow ev2)
-                    )
-                    (succ idx1)
-                    idx2
+               in -- TODO - better formatting chkEq pyrelude
+                  chkEq' (succ idx1) idx2 $
+                    "Event idx not consecutive\n"
+                      <> toS (ppShow ev1)
+                      <> "\n"
+                      <> toS (ppShow ev2)
           )
-   in for_ threads chkIds
+   in do
+        for_
+          threads
+          ( \l ->
+              let ck evt = chkEq' 1 (idx evt) "first index of thread should be 1"
+                  ev = unsafeHead l
+               in ck ev
+          )
+        for_ threads chkIds
 
 chkLaws :: Template -> [ExeEvent] -> IO ()
-chkLaws t evts = do
-  chkThreadLogsInOrder t evts
+chkLaws t evts =
+  traverse_
+    (\f -> f t evts)
+    [ chkThreadLogsInOrder
+    ]
 
 debug :: Text -> Int -> Text -> ExeEvent
 debug = Debug

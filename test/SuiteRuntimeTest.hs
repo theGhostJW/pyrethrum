@@ -14,7 +14,7 @@ import Data.Yaml
 import GHC.Records
 import Internal.PreNode (PreNode (hookChild))
 import Internal.PreNode as PN
-import Internal.RunTimeLogging as L (ExeEvent (..), Loc (..), LogControls (..), Sink, mkLogger, testLogControls)
+import Internal.RunTimeLogging as L (ExeEvent (..), ExeEventType (Fixture, Group, OnceHook, OnceHookRelease, Test, TestHook, TestHookRelease, ThreadHook, ThreadHookRelease), Loc (..), LogControls (..), Sink, mkLogger, testLogControls)
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
@@ -23,9 +23,10 @@ import Pyrelude as P
     Either,
     Enum (succ),
     Eq (..),
+    Foldable (foldl),
     IO,
     Int,
-    ListLike (drop, foldl', head, null, unsafeHead, unsafeLast),
+    ListLike (drop, foldl', foldl1, head, null, unsafeHead, unsafeLast),
     Maybe (Just, Nothing),
     Num ((+)),
     Ord (..),
@@ -46,6 +47,7 @@ import Pyrelude as P
     filter,
     find,
     first,
+    foldl1',
     for_,
     fromJust,
     groupBy,
@@ -110,10 +112,18 @@ import Prelude (Ord, String, putStrLn)
 5. generate
 -}
 
+data DocFunc a = DocFunc
+  { doc :: Text,
+    func :: IO a
+  }
+
+instance Show (DocFunc a) where
+  show = toS . doc
+
 data IOProps = IOProps
   { message :: Text,
-    delayms :: Int,
-    fail :: Bool
+    delayms :: DocFunc Int,
+    fail :: DocFunc Bool
   }
   deriving (Show)
 
@@ -194,55 +204,132 @@ chkEq' a b msg =
     error $
       "Equality check failed\n"
         <> "  "
-        <> toS (ppShow a)
+        <> ppShow a
         <> "\nDoes not Equal:\n"
         <> "  "
-        <> toS (ppShow b)
+        <> ppShow b
         <> "\n"
         <> toS msg
 
-chkThreadLogsInOrder :: Template -> [ExeEvent] -> IO ()
-chkThreadLogsInOrder _t evts =
-  let threads =
-        groupOn
-          threadId
-          evts
+chkThreadLogsInOrder :: [ExeEvent] -> IO ()
+chkThreadLogsInOrder evts =
+  do
+    for_
+      threads
+      ( \l ->
+          let ck evt = chkEq' 1 (idx evt) "first index of thread should be 1"
+              ev = unsafeHead l
+           in ck ev
+      )
+    for_ threads chkIds
+  where
+    threads =
+      groupOn
+        threadId
+        evts
 
-      chkIds evts' =
-        for_
-          (zip evts' $ drop 1 evts')
-          ( \(ev1, ev2) ->
-              let idx1 = idx ev1
-                  idx2 = idx ev2
-               in -- TODO - better formatting chkEq pyrelude
-                  chkEq' (succ idx1) idx2 $
-                    "Event idx not consecutive\n"
-                      <> toS (ppShow ev1)
-                      <> "\n"
-                      <> toS (ppShow ev2)
-          )
-   in do
-        for_
-          threads
-          ( \l ->
-              let ck evt = chkEq' 1 (idx evt) "first index of thread should be 1"
-                  ev = unsafeHead l
-               in ck ev
-          )
-        for_ threads chkIds
+    chkIds evts' =
+      for_
+        (zip evts' $ drop 1 evts')
+        ( \(ev1, ev2) ->
+            let idx1 = idx ev1
+                idx2 = idx ev2
+             in -- TODO - better formatting chkEq pyrelude
+                chkEq' (succ idx1) idx2 $
+                  "event idx not consecutive\n"
+                    <> toS (ppShow ev1)
+                    <> "\n"
+                    <> toS (ppShow ev2)
+        )
 
-chkLaws :: Template -> [ExeEvent] -> IO ()
-chkLaws t evts =
-  traverse_
-    (\f -> f t evts)
-    [ chkThreadLogsInOrder
-    ]
+chkStartEndExecution :: [ExeEvent] -> IO ()
+chkStartEndExecution evts =
+  se
+    & maybe
+      (error "no events")
+      ( \(s, e) -> do
+          case s of
+            StartExecution {} -> pure ()
+            _ -> error "first event is not StartExecution"
+          case e of
+            EndExecution {} -> pure ()
+            _ -> error "last event is not EndExecution"
+      )
+  where
+    se = do
+      s <- head evts
+      e <- last evts
+      pure (s, e)
+
+chkFixtures :: Int -> Template -> [[ExeEvent]] -> IO ()
+chkFixtures mxThrds t evts = uu
+  where
+    -- chkEvents :: [ExeEvent] -> IO ()
+    chkEvents = foldl chkEvent
+
+    chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
+    chkEvent fixLoc evt =
+      fixLoc
+        & maybe
+          ( -- outside fixture
+            case evt of
+              StartExecution {} -> fixLoc
+              Start {eventType, loc} -> chkOutOfTestStartEnd True loc eventType
+              End {eventType, loc} -> chkOutOfTestStartEnd False loc eventType
+              Failure {} -> fixLoc
+              ParentFailure {} -> fixLoc
+              Debug {} -> fixLoc
+              EndExecution {} -> fixLoc
+          )
+          ( -- within fixture
+            const $
+              case evt of
+                StartExecution {} -> fixLoc
+                evv@Start {eventType} -> uu
+                evv@End {eventType} -> uu
+                evv@Failure {} -> fixLoc
+                evv@ParentFailure {} -> fixLoc
+                evv@Debug {} -> fixLoc
+                evv@EndExecution {} -> fixLoc
+          )
+      where
+        fail msg = error $ msg <> "\n" <> ppShow evt
+
+        chkOutOfTestStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
+        chkOutOfTestStartEnd isStart evtLoc = \case
+          L.OnceHook -> Nothing
+          OnceHookRelease -> Nothing
+          L.ThreadHook -> Nothing
+          ThreadHookRelease -> Nothing
+          L.TestHook -> fail "TestHook must occur within start / end of fixture"
+          TestHookRelease -> fail "TestHookTestHookRelease occur within start / end of fixture"
+          L.Group -> Nothing
+          L.Fixture ->
+            isStart
+              ? Just evtLoc
+              $ fail "End fixture when fixture not started"
+          L.Test {} -> fail "Test must occur within start / end of fixture"
+
+chkLaws :: Int -> Template -> [ExeEvent] -> IO ()
+chkLaws mxThrds t evts =
+  do
+    traverse_
+      (evts &)
+      [ chkThreadLogsInOrder,
+        chkStartEndExecution
+      ]
+    >> traverse_
+      (\f -> f mxThrds t threadedEvents)
+      [ chkFixtures
+      ]
+  where
+    threadedEvents = groupOn threadId evts
 
 debug :: Text -> Int -> Text -> ExeEvent
 debug = Debug
 
 runTest :: Int -> Template -> IO ()
-runTest threadCount template = do
+runTest maxThreads template = do
   pPrint template
   putStrLn "========="
   chan <- newTChanIO
@@ -252,28 +339,37 @@ runTest threadCount template = do
   lc@LogControls {sink, log} <- testLogControls chan q
   let lgr :: Text -> IO ()
       lgr msg = mkLogger sink ior tid (Debug msg)
-  execute threadCount lc $ mkPrenode lgr template
+  execute maxThreads lc $ mkPrenode lgr template
   log
     & maybe
       (chkFail "No Events Log")
-      (\evts -> atomically (q2List evts) >>= chkLaws template)
+      (\evts -> atomically (q2List evts) >>= chkLaws maxThreads template)
 
 ioAction :: TextLogger -> IOProps -> IO ()
-ioAction log (IOProps {message, delayms, fail}) = do
-  log message
-  P.threadDelay delayms
-  when fail $
-    error . toS $ "exception thrown " <> message
+ioAction log (IOProps {message, delayms = DocFunc {func = getDelay}, fail = DocFunc {func = getFail}}) =
+  do
+    log message
+    delayms <- getDelay
+    fail <- getFail
+    P.threadDelay delayms
+    when fail $
+      error . toS $ "exception thrown " <> message
 
 mkTest :: TextLogger -> IOProps -> PN.Test si ti ii
 mkTest log iop@IOProps {message, delayms, fail} = PN.Test message \a b c -> ioAction log iop
 
 mkFixture :: TextLogger -> Text -> [IOProps] -> PreNode oi () ti () ii ()
-mkFixture log tag props = Fixture (Just tag) $ mkTest log <$> props
+mkFixture log tag props = PN.Fixture (Just tag) $ mkTest log <$> props
+
+noDelay :: DocFunc Int
+noDelay = DocFunc "No Delay" $ pure 0
+
+neverFail :: DocFunc Bool
+neverFail = DocFunc "Never Fail" $ pure False
 
 superSimplSuite :: Template
 superSimplSuite =
-  TFixture "Fx 0" [IOProps "0" 0 False]
+  TFixture "Fx 0" [IOProps "0" noDelay neverFail]
 
 -- $> unit_simple_single
 
@@ -648,11 +744,11 @@ unit_simple_single = runTest 1 superSimplSuite
 --         for_ stats chkFixture
 
 -- exeSuiteTests :: (TQueue RunEvent -> IO PreNodeRoot) -> Int -> IO ()
--- exeSuiteTests preSuite threadCount = do
+-- exeSuiteTests preSuite maxThreads = do
 --   q <- atomically newTQueue
 --   preSuite' <- preSuite q
 --   stats <- getStats preSuite'
---   S.execute threadCount uu preSuite'
+--   S.execute maxThreads uu preSuite'
 --   l <- tQToList q
 --   putStrLn ""
 --   putStrLn "============ Stats ============"

@@ -44,13 +44,13 @@ data ExeEvent
       }
   | Start
       { loc :: Loc,
-        event :: ExeEventType,
+        eventType :: ExeEventType,
         idx :: Int,
         threadId :: Text
       }
   | End
       { loc :: Loc,
-        event :: ExeEventType,
+        eventType :: ExeEventType,
         idx :: Int,
         threadId :: Text
       }

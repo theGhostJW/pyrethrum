@@ -12,7 +12,7 @@ import Prelude (String)
 data Loc
   = Root
   | Node Loc Text
-  deriving (Show)
+  deriving (Show, Eq)
 
 data ExeEventType
   = OnceHook

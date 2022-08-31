@@ -23,7 +23,7 @@ import Pyrelude as P
     Either,
     Enum (succ),
     Eq (..),
-    Foldable (foldl),
+    Foldable (foldl, sum),
     IO,
     Int,
     ListLike (drop, foldl', foldl1, head, null, unsafeHead, unsafeLast),
@@ -52,6 +52,7 @@ import Pyrelude as P
     fromJust,
     groupBy,
     isPrefixOf,
+    join,
     last,
     length,
     lines,
@@ -154,6 +155,18 @@ data Template
   deriving (Show)
 
 type TextLogger = Text -> IO ()
+
+templateTestCount :: Template -> Int
+templateTestCount =
+  templateTestCount' 0
+  where
+    templateTestCount' :: Int -> Template -> Int
+    templateTestCount' ac = \case
+      TBranch branches -> ac + foldl' templateTestCount' 0 branches
+      TOnceHook {tChild} -> templateTestCount' ac tChild
+      TThreadHook {tChild} -> templateTestCount' ac tChild
+      TTestHook {tChild} -> templateTestCount' ac tChild
+      TFixture {tTests} -> ac + length tTests
 
 mkPrenode l = \case
   TBranch tems -> uu
@@ -262,10 +275,28 @@ chkStartEndExecution evts =
       pure (s, e)
 
 chkFixtures :: Int -> Template -> [[ExeEvent]] -> IO ()
-chkFixtures mxThrds t evts = uu
+chkFixtures mxThrds t evts =
+  do
+    traverse_ chkEvents evts
+    chkEq'
+      (templateTestCount t)
+      (countStarts $ join evts)
+      "fixture count not as expected"
   where
-    -- chkEvents :: [ExeEvent] -> IO ()
-    chkEvents = foldl chkEvent
+    chkEvents :: [ExeEvent] -> IO (Maybe Loc)
+    chkEvents = pure . foldl' chkEvent Nothing
+
+    countStarts :: [ExeEvent] -> Int
+    countStarts = count isStart
+      where
+        isStart = \case
+          StartExecution {} -> False
+          Start {eventType} -> eventType == L.Fixture
+          End {} -> False
+          Failure {} -> False
+          ParentFailure {} -> False
+          Debug {} -> False
+          EndExecution {} -> False
 
     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
     chkEvent fixLoc evt =
@@ -282,18 +313,20 @@ chkFixtures mxThrds t evts = uu
               EndExecution {} -> fixLoc
           )
           ( -- within fixture
-            const $
+            \fxLoc ->
               case evt of
-                StartExecution {} -> fixLoc
-                evv@Start {eventType} -> uu
-                evv@End {eventType} -> uu
-                evv@Failure {} -> fixLoc
-                evv@ParentFailure {} -> fixLoc
-                evv@Debug {} -> fixLoc
-                evv@EndExecution {} -> fixLoc
+                StartExecution {} -> failIn "StartExecution"
+                Start {eventType, loc} -> chkInTestStartEnd True fxLoc loc eventType
+                End {eventType, loc} -> chkInTestStartEnd False fxLoc loc eventType
+                Failure {} -> fixLoc
+                ParentFailure {} -> fixLoc
+                Debug {} -> fixLoc
+                EndExecution {} -> failIn "EndExecution"
           )
       where
         fail msg = error $ msg <> "\n" <> ppShow evt
+        failOut et = fail $ et <> " must occur within start / end of fixture in same thread"
+        failIn et = fail $ et <> " must only occur outside a fixture in same thread"
 
         chkOutOfTestStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
         chkOutOfTestStartEnd isStart evtLoc = \case
@@ -301,14 +334,29 @@ chkFixtures mxThrds t evts = uu
           OnceHookRelease -> Nothing
           L.ThreadHook -> Nothing
           ThreadHookRelease -> Nothing
-          L.TestHook -> fail "TestHook must occur within start / end of fixture"
-          TestHookRelease -> fail "TestHookTestHookRelease occur within start / end of fixture"
+          L.TestHook -> failOut "TestHook"
+          TestHookRelease -> failOut "TestHookTestHookRelease"
           L.Group -> Nothing
           L.Fixture ->
             isStart
               ? Just evtLoc
               $ fail "End fixture when fixture not started"
-          L.Test {} -> fail "Test must occur within start / end of fixture"
+          L.Test -> failOut "Test"
+
+        chkInTestStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
+        chkInTestStartEnd isStart fxLoc evtLoc = \case
+          L.OnceHook -> failIn "OnceHook"
+          OnceHookRelease -> failIn "OnceHookRelease"
+          L.ThreadHook -> failIn "ThreadHook"
+          ThreadHookRelease -> failIn "ThreadHookRelease"
+          L.TestHook -> fixLoc
+          TestHookRelease -> fixLoc
+          L.Group -> failIn "Group"
+          L.Fixture ->
+            isStart
+              ? fail "Nested fixtures - fixture started when a fixture is alreeady running in the same thread"
+              $ (fxLoc == evtLoc) ? Nothing $ fail "fixture end loc does not match fixture start loc"
+          L.Test {} -> uu
 
 chkLaws :: Int -> Template -> [ExeEvent] -> IO ()
 chkLaws mxThrds t evts =
@@ -318,10 +366,13 @@ chkLaws mxThrds t evts =
       [ chkThreadLogsInOrder,
         chkStartEndExecution
       ]
-    >> traverse_
+    traverse_
       (\f -> f mxThrds t threadedEvents)
       [ chkFixtures
       ]
+    chk'
+      ("max execution threads: " <> txt mxThrds <> " exceeded: " <> txt (length threadedEvents))
+      $ length threadedEvents <= mxThrds + 1 -- 1 main thread + exe threads
   where
     threadedEvents = groupOn threadId evts
 

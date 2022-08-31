@@ -211,16 +211,18 @@ groupOn f =
    in unpack . foldl' fld M.empty . reverse
 
 -- TODO - better formatting chkEq pyrelude
-chkEq' :: (Eq a, Show a) => a -> a -> Text -> IO ()
-chkEq' a b msg =
-  when (a /= b) $
+chkEqf' :: (Eq a, Show a) => a -> a -> Text -> IO ()
+chkEqf' e a msg = chkEq' msg e a
+
+chkEq' :: (Eq a, Show a) => Text -> a -> a -> IO ()
+chkEq' msg e a =
+  when (e /= a) $
     error $
       "Equality check failed\n"
-        <> "  "
+        <> "Expected:\n  "
+        <> ppShow e
+        <> "\nDoes not Equal:\n  "
         <> ppShow a
-        <> "\nDoes not Equal:\n"
-        <> "  "
-        <> ppShow b
         <> "\n"
         <> toS msg
 
@@ -248,7 +250,7 @@ chkThreadLogsInOrder evts =
             let idx1 = idx ev1
                 idx2 = idx ev2
              in -- TODO - better formatting chkEq pyrelude
-                chkEq' (succ idx1) idx2 $
+                chkEqf' (succ idx1) idx2 $
                   "event idx not consecutive\n"
                     <> toS (ppShow ev1)
                     <> "\n"
@@ -274,29 +276,25 @@ chkStartEndExecution evts =
       e <- last evts
       pure (s, e)
 
+eventTestStarts :: [ExeEvent] -> Int
+eventTestStarts = count isStart
+  where
+    isStart = \case
+      StartExecution {} -> False
+      Start {eventType} -> eventType == L.Test
+      End {} -> False
+      Failure {} -> False
+      ParentFailure {} -> False
+      Debug {} -> False
+      EndExecution {} -> False
+
 chkFixtures :: Int -> Template -> [[ExeEvent]] -> IO ()
 chkFixtures mxThrds t evts =
   do
     traverse_ chkEvents evts
-    chkEq'
-      (templateTestCount t)
-      (countStarts $ join evts)
-      "fixture count not as expected"
   where
     chkEvents :: [ExeEvent] -> IO (Maybe Loc)
     chkEvents = pure . foldl' chkEvent Nothing
-
-    countStarts :: [ExeEvent] -> Int
-    countStarts = count isStart
-      where
-        isStart = \case
-          StartExecution {} -> False
-          Start {eventType} -> eventType == L.Fixture
-          End {} -> False
-          Failure {} -> False
-          ParentFailure {} -> False
-          Debug {} -> False
-          EndExecution {} -> False
 
     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
     chkEvent fixLoc evt =
@@ -364,7 +362,11 @@ chkLaws mxThrds t evts =
     traverse_
       (evts &)
       [ chkThreadLogsInOrder,
-        chkStartEndExecution
+        chkStartEndExecution,
+        chkEq'
+          "test count not as expected"
+          (templateTestCount t)
+          . eventTestStarts
       ]
     traverse_
       (\f -> f mxThrds t threadedEvents)

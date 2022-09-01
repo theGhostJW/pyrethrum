@@ -423,11 +423,6 @@ runTestHook
             (unpackInputs ehki aExIn)
             Left
 
-runIfCan :: TVar Status -> IO () -> IO ()
-runIfCan s action =
-  atomically (readTVar s)
-    >>= bool (pure ()) action . (< FullyRunning)
-
 setStatusRunning :: TVar Status -> STM Bool
 setStatusRunning status =
   do
@@ -489,227 +484,217 @@ data ExeIn si ti = ExeIn
 
 executeNode :: forall si so ti to ii io. Logger -> Either Abandon (ExeIn si ti) -> TestHkSrc ii -> ExeTree si so ti to ii io -> IO ()
 executeNode logger hkIn tstHk rg =
-  let exeNxt :: forall si' so' ti' to' ii' io'. Either Abandon (ExeIn si' ti') -> TestHkSrc ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
-      exeNxt = executeNode logger
-
-      nxtAbandon :: Loc -> SomeException -> Abandon
-      nxtAbandon loc' e = either id (const $ Abandon loc' e) hkIn
-
-      logAbandonned' :: Loc -> Abandon -> IO ()
-      logAbandonned' = logAbandonned logger
-
-      logFailure' :: Loc -> ExeEventType -> SomeException -> IO ()
-      logFailure' = logFailure logger
-   in do
-        wantRun <- atomically $ canRun rg
-        when
-          wantRun
-          case rg of
-            RTNodeS
-              { loc,
-                status,
-                sHook,
-                sHookRelease,
-                sHookVal,
-                sChildNode
-              } ->
-                do
-                  -- singletonHookVal:
-                  --  1. runs hook if required
-                  --  2. waits if hook is running
-                  --  3. updates hook status to running
-                  --  4. returns hook result
-                  -- must run for logging even if hkIn is Left
-                  let siIn = (,sHook) . singletonIn <$> hkIn
-                  eso <- singletonHookVal logger L.OnceHook siIn status sHookVal loc
-                  let nxtHkIn so = (\exi -> exi {singletonIn = so}) <$> hkIn
-                      nxtAbandon' = nxtAbandon loc
-                      recurse a = exeNxt a tstHk sChildNode
-                   in finally
-                        ( either
-                            (recurse . Left . nxtAbandon')
-                            (recurse . nxtHkIn)
-                            eso
-                        )
-                        ( do
-                            wantRelease <- atomically $ do
-                              cs <- getStatus sChildNode
-                              s <- readTVar status
-                              pure $ cs == Done && s < HookFinalising
-                            when wantRelease $
-                              releaseHookUpdateStatus logger L.OnceHook status (mapLeft nxtAbandon' eso) loc sHookRelease
-                        )
-            RTNodeT
-              { loc,
-                tHook,
-                tHookRelease,
-                tChildNode
-              } ->
-                do
-                  let tiIn = (\(ExeIn si ti) -> (ti, tHook si)) <$> hkIn
-                  eto <- threadHookVal logger L.ThreadHook tiIn loc
-                  let nxtHkIn ti = (\exi -> exi {threadIn = ti}) <$> hkIn
-                      nxtAbandon' = nxtAbandon loc
-                      recurse a = exeNxt a tstHk tChildNode
-                  finally
+  do
+    wantRun <- atomically $ canRun rg
+    when
+      wantRun
+      case rg of
+        RTNodeS
+          { loc,
+            status,
+            sHook,
+            sHookRelease,
+            sHookVal,
+            sChildNode
+          } ->
+            do
+              -- singletonHookVal:
+              --  1. runs hook if required
+              --  2. waits if hook is running
+              --  3. updates hook status to running
+              --  4. returns hook result
+              -- must run for logging even if hkIn is Left
+              let siIn = (,sHook) . singletonIn <$> hkIn
+              eso <- singletonHookVal logger L.OnceHook siIn status sHookVal loc
+              let nxtHkIn so = (\exi -> exi {singletonIn = so}) <$> hkIn
+                  nxtAbandon' = nxtAbandon loc
+                  recurse a = exeNxt a tstHk sChildNode
+               in finally
                     ( either
                         (recurse . Left . nxtAbandon')
                         (recurse . nxtHkIn)
-                        eto
+                        eso
                     )
-                    (releaseHook logger L.OnceHook (mapLeft nxtAbandon' eto) loc tHookRelease)
-            ihk@RTNodeI
-              { loc,
-                iHook,
-                iHookRelease,
-                iChildNode
-              } ->
-                let newTstHk =
-                      TestHkSrc
-                        { tstHkLoc = loc,
-                          tstHkHook = runTestHook logger hkIn tstHk iHook,
-                          tstHkRelease = \ma io ->
-                            withStartEnd logger loc TestHookRelease $
-                              ma
-                                & maybe
-                                  ( catchAll
-                                      (iHookRelease io)
-                                      (logFailure logger loc TestHookRelease)
-                                  )
-                                  (logAbandonned' loc)
-                        }
-                 in exeNxt hkIn newTstHk iChildNode
-            self@RTGroup
-              { leafloc,
-                nStatus,
-                childNodes,
-                fullyRunning
-              } ->
-                recurse
-                where
-                  -- when the last thread finishes child nodes and fully running will be done
-                  recurse =
-                    atomically nxtChildStarted
-                      >>= maybe
-                        ( atomically updateStatusFromQs
-                            >>= flip when (logger $ End leafloc Group)
-                        )
-                        ( \(c, wasStarted) -> do
-                            when wasStarted $ do
-                              logger (Start leafloc Group)
-                              whenLeft
-                                hkIn
-                                (logAbandonned' leafloc)
-
-                            exeNxt hkIn tstHk c
-                            recurse
-                        )
-
-                  updateStatusFromQs :: STM Bool
-                  updateStatusFromQs = do
-                    s <- readTVar nStatus
-                    isDone s
-                      ? pure False
-                      $ do
-                        discardDone fullyRunning
-                        discardDoneMoveFullyRunning fullyRunning childNodes
-                        mtChilds <- isEmptyTQueue childNodes
-                        mtFullyRunning <- isEmptyTQueue fullyRunning
-                        let completed = mtChilds && mtFullyRunning
-                        if
-                            | completed -> writeTVar nStatus Done
-                            | mtChilds -> writeTVar nStatus FullyRunning
-                            | otherwise -> pure ()
-                        pure completed
-
-                  nxtChildStarted = do
-                    s <- readTVar nStatus
-                    ((,s == Pending) <$>) <$> nxtChild
-
-                  nxtChild =
-                    tryReadTQueue childNodes
-                      >>= maybe
-                        (pure Nothing)
-                        ( \cld ->
-                            let ioCld = pure $ Just cld
-                                qChld = writeTQueue childNodes cld
-                                qChldReturn = qChld >> ioCld
-                                qFullyRunning = writeTQueue fullyRunning cld >> nxtChild
-                             in getStatus cld
-                                  >>= \case
-                                    Pending ->
-                                      setStatusRunning nStatus >> qChldReturn
-                                    HookExecuting ->
-                                      -- just plonk on the end of the q and go around again
-                                      -- may pick up same node if there is only one node running but that is ok
-                                      -- it just turns into a wait
-                                      qChld >> nxtChild
-                                    Running -> qChldReturn
-                                    FullyRunning -> qFullyRunning
-                                    HookFinalising -> qFullyRunning
-                                    -- discard if done
-                                    Done -> nxtChild
-                        )
-            fx@RTFix
-              { nStatus,
-                leafloc,
-                iterations,
-                runningCount
-              } -> do
-                runIfCan nStatus
-                  . withStartEnd logger leafloc L.Fixture
-                  $ do
-                    whenLeft hkIn (logAbandonned' leafloc)
-                    recurse
-                where
-                  recurse :: IO ()
-                  recurse = do
-                    etest <-
-                      atomically $
-                        tryReadTQueue iterations
-                          >>= maybe
-                            ( do
-                                r <- readTVar runningCount
-                                Left
-                                  <$> if
-                                      | r < 0 -> error "framework error - this should not happen - running count below zero"
-                                      | r == 0 -> pure True
-                                      | otherwise -> writeTVar nStatus FullyRunning >> pure False
-                            )
-                            ( \t -> do
-                                modifyTVar runningCount succ
-                                setStatusRunning nStatus
-                                pure $ Right t
-                            )
-                    etest
-                      & either
-                        ( \done ->
-                            when done $ do
-                              logger $ End leafloc L.Fixture
-                              atomically $ writeTVar nStatus Done
-                        )
-                        ( \(Test tstLoc test) -> do
-                            let TestHkSrc
-                                  { tstHkLoc,
-                                    tstHkHook,
-                                    tstHkRelease
-                                  } = tstHk
-
-                            ho <- tstHkHook $ leftToMaybe hkIn
-                            let ethInputs = unpackInputs ho hkIn
-
-                            finally
-                              ( withStartEnd logger tstLoc L.Test $
-                                  do
-                                    ethInputs & either
-                                      (logAbandonned' tstLoc)
-                                      \i ->
-                                        catchAll
-                                          (uncurry3 test i)
-                                          (logFailure' tstLoc L.Test)
+                    ( do
+                        wantRelease <- atomically $ do
+                          cs <- getStatus sChildNode
+                          s <- readTVar status
+                          pure $ cs == Done && s < HookFinalising
+                        when wantRelease $
+                          releaseHookUpdateStatus logger L.OnceHook status (mapLeft nxtAbandon' eso) loc sHookRelease
+                    )
+        RTNodeT
+          { loc,
+            tHook,
+            tHookRelease,
+            tChildNode
+          } ->
+            do
+              let tiIn = (\(ExeIn si ti) -> (ti, tHook si)) <$> hkIn
+              eto <- threadHookVal logger L.ThreadHook tiIn loc
+              let nxtHkIn ti = (\exi -> exi {threadIn = ti}) <$> hkIn
+                  nxtAbandon' = nxtAbandon loc
+                  recurse a = exeNxt a tstHk tChildNode
+              finally
+                ( either
+                    (recurse . Left . nxtAbandon')
+                    (recurse . nxtHkIn)
+                    eto
+                )
+                (releaseHook logger L.OnceHook (mapLeft nxtAbandon' eto) loc tHookRelease)
+        ihk@RTNodeI
+          { loc,
+            iHook,
+            iHookRelease,
+            iChildNode
+          } ->
+            let newTstHk =
+                  TestHkSrc
+                    { tstHkLoc = loc,
+                      tstHkHook = runTestHook logger hkIn tstHk iHook,
+                      tstHkRelease = \ma io ->
+                        withStartEnd logger loc TestHookRelease $
+                          ma
+                            & maybe
+                              ( catchAll
+                                  (iHookRelease io)
+                                  (logFailure logger loc TestHookRelease)
                               )
-                              $ atomically (modifyTVar runningCount pred) >> recurse
+                              (logAbandonned' loc)
+                    }
+             in exeNxt hkIn newTstHk iChildNode
+        self@RTGroup
+          { leafloc,
+            nStatus,
+            childNodes,
+            fullyRunning
+          } ->
+            withStartEnd logger leafloc L.Group $
+              do
+                whenLeft hkIn (logAbandonned' leafloc)
+                recurse
+            where
+              -- when the last thread finishes child nodes and fully running will be done
+              recurse =
+                atomically nxtChild
+                  >>= maybe
+                    ( atomically updateStatusFromQs
+                        >>= flip when (logger $ End leafloc Group)
+                    )
+                    (\c -> exeNxt hkIn tstHk c >> recurse)
+
+              updateStatusFromQs :: STM Bool
+              updateStatusFromQs = do
+                s <- readTVar nStatus
+                isDone s
+                  ? pure False
+                  $ do
+                    discardDone fullyRunning
+                    discardDoneMoveFullyRunning fullyRunning childNodes
+                    mtChilds <- isEmptyTQueue childNodes
+                    mtFullyRunning <- isEmptyTQueue fullyRunning
+                    let completed = mtChilds && mtFullyRunning
+                    if
+                        | completed -> writeTVar nStatus Done
+                        | mtChilds -> writeTVar nStatus FullyRunning
+                        | otherwise -> pure ()
+                    pure completed
+
+              nxtChild =
+                tryReadTQueue childNodes
+                  >>= maybe
+                    (pure Nothing)
+                    ( \cld ->
+                        let ioCld = pure $ Just cld
+                            qChld = writeTQueue childNodes cld
+                            qChldReturn = qChld >> ioCld
+                            qFullyRunning = writeTQueue fullyRunning cld >> nxtChild
+                         in getStatus cld
+                              >>= \case
+                                Pending ->
+                                  setStatusRunning nStatus >> qChldReturn
+                                HookExecuting ->
+                                  -- just plonk on the end of the q and go around again
+                                  -- may pick up same node if there is only one node running but that is ok
+                                  -- it just turns into a wait
+                                  qChld >> nxtChild
+                                Running -> qChldReturn
+                                FullyRunning -> qFullyRunning
+                                HookFinalising -> qFullyRunning
+                                -- discard if done
+                                Done -> nxtChild
+                    )
+        fx@RTFix
+          { nStatus,
+            leafloc,
+            iterations,
+            runningCount
+          } -> do
+            withStartEnd logger leafloc L.Fixture $
+              do
+                whenLeft hkIn (logAbandonned' leafloc)
+                recurse
+            where
+              recurse :: IO ()
+              recurse = do
+                etest <-
+                  atomically $
+                    tryReadTQueue iterations
+                      >>= maybe
+                        ( do
+                            r <- readTVar runningCount
+                            Left
+                              <$> if
+                                  | r < 0 -> error "framework error - this should not happen - running count below zero"
+                                  | r == 0 -> pure True
+                                  | otherwise -> writeTVar nStatus FullyRunning >> pure False
                         )
+                        ( \t -> do
+                            modifyTVar runningCount succ
+                            setStatusRunning nStatus
+                            pure $ Right t
+                        )
+                etest
+                  & either
+                    ( \done ->
+                        when done $ do
+                          logger $ End leafloc L.Fixture
+                          atomically $ writeTVar nStatus Done
+                    )
+                    ( \(Test tstLoc test) -> do
+                        let TestHkSrc
+                              { tstHkLoc,
+                                tstHkHook,
+                                tstHkRelease
+                              } = tstHk
+
+                        ho <- tstHkHook $ leftToMaybe hkIn
+                        let ethInputs = unpackInputs ho hkIn
+
+                        finally
+                          ( withStartEnd logger tstLoc L.Test $
+                              do
+                                ethInputs & either
+                                  (logAbandonned' tstLoc)
+                                  \i ->
+                                    catchAll
+                                      (uncurry3 test i)
+                                      (logFailure' tstLoc L.Test)
+                          )
+                          $ atomically (modifyTVar runningCount pred) >> recurse
+                    )
+  where
+    exeNxt :: forall si' so' ti' to' ii' io'. Either Abandon (ExeIn si' ti') -> TestHkSrc ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
+    exeNxt = executeNode logger
+
+    nxtAbandon :: Loc -> SomeException -> Abandon
+    nxtAbandon loc' e = either id (const $ Abandon loc' e) hkIn
+
+    logAbandonned' :: Loc -> Abandon -> IO ()
+    logAbandonned' = logAbandonned logger
+
+    logFailure' :: Loc -> ExeEventType -> SomeException -> IO ()
+    logFailure' = logFailure logger
 
 type Logger = (Int -> Text -> ExeEvent) -> IO ()
 

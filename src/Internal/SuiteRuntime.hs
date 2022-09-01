@@ -656,10 +656,14 @@ executeNode logger hkIn tstHk rg =
                 iterations,
                 runningCount
               } -> do
-                runIfCan nStatus $ recurse True
+                runIfCan nStatus
+                  . withStartEnd logger leafloc L.Fixture
+                  $ do
+                    whenLeft hkIn (logAbandonned' leafloc)
+                    recurse
                 where
-                  recurse :: Bool -> IO ()
-                  recurse initial = do
+                  recurse :: IO ()
+                  recurse = do
                     etest <-
                       atomically $
                         tryReadTQueue iterations
@@ -672,10 +676,10 @@ executeNode logger hkIn tstHk rg =
                                       | r == 0 -> pure True
                                       | otherwise -> writeTVar nStatus FullyRunning >> pure False
                             )
-                            ( \i -> do
+                            ( \t -> do
                                 modifyTVar runningCount succ
-                                wantLogStart <- setStatusRunning nStatus
-                                pure $ Right (wantLogStart, i)
+                                setStatusRunning nStatus
+                                pure $ Right t
                             )
                     etest
                       & either
@@ -684,12 +688,7 @@ executeNode logger hkIn tstHk rg =
                               logger $ End leafloc L.Fixture
                               atomically $ writeTVar nStatus Done
                         )
-                        ( \(wantLogStart, Test tstLoc test) -> do
-                            --  fixture logging
-                            when wantLogStart $ do
-                              logger $ Start leafloc L.Fixture
-                              whenLeft hkIn (logAbandonned' leafloc)
-                            --  run the test
+                        ( \(Test tstLoc test) -> do
                             let TestHkSrc
                                   { tstHkLoc,
                                     tstHkHook,
@@ -709,7 +708,7 @@ executeNode logger hkIn tstHk rg =
                                           (uncurry3 test i)
                                           (logFailure' tstLoc L.Test)
                               )
-                              (atomically (modifyTVar runningCount pred) >> recurse False)
+                              $ atomically (modifyTVar runningCount pred) >> recurse
                         )
 
 type Logger = (Int -> Text -> ExeEvent) -> IO ()

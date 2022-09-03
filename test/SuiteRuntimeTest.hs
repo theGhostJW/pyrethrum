@@ -8,6 +8,8 @@ import DSL.Interpreter
 import Data.Aeson.Encoding (quarter)
 import Data.Aeson.TH
 import Data.Aeson.Types
+-- TODO Add to Pyrelude
+import Data.List.Extra (snoc)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as ST
 import qualified Data.Text as Txt
@@ -134,8 +136,8 @@ data IOProps = IOProps
   }
   deriving (Show)
 
-testProps :: Int -> Int -> Bool -> IOProps
-testProps idx = IOProps (txt idx)
+testProps :: Text -> Int -> Int -> Bool -> IOProps
+testProps fxTag idx = IOProps (fxTag <> "." <> txt idx)
 
 data IOPropsNonDet = IOPropsNonDet
   { message' :: Text,
@@ -171,6 +173,28 @@ data Template
   deriving (Show)
 
 type TextLogger = Text -> IO ()
+
+getTag :: Template -> Maybe Text 
+getTag = \case
+            TBranch {} -> Nothing
+            TOnceHook {ttag} -> Just ttag
+            TThreadHook {ttag} -> Just ttag
+            TTestHook {ttag} -> Just ttag
+            TFixture {ttag} -> Just ttag
+
+templateNodeList :: Template -> [Template]
+templateNodeList =
+  tnl []
+  where
+    tnl :: [Template] -> Template -> [Template]
+    tnl ac =
+      let rescurse n = tnl (snoc ac n)
+       in \case
+            n@(TBranch branches) -> branches >>= rescurse n
+            n@TOnceHook {tChild} -> rescurse n tChild
+            n@TThreadHook {tChild} -> rescurse n tChild
+            n@TTestHook {tChild} -> rescurse n tChild
+            n@TFixture {tTests} -> snoc ac n
 
 templateTestCount :: Template -> Int
 templateTestCount =
@@ -329,9 +353,17 @@ startLoc = \case
   Start {loc} -> loc
   _ -> error "BOOM - this should not happen"
 
+startTag :: ExeEvent -> Text
+startTag =
+  ( \case
+      Root -> error "BOOM - Root loc passed to startTag"
+      Node {tag} -> tag
+  )
+    . startLoc
+
 chkTestIdsConsecutive :: [ExeEvent] -> IO ()
 chkTestIdsConsecutive evs =
-  let tstIds = parseTestIndex . txt . startLoc <$> filter (isStart L.Test) evs
+  let tstIds = read . toS . Txt.takeWhileEnd (/= '.') . startTag <$> filter (isStart L.Test) evs
       chkidxless :: Int -> Int -> IO Int
       chkidxless i1 i2 = i1 >= i2 ? error "test index out of order" $ pure i2
    in null tstIds
@@ -503,8 +535,79 @@ chkFxtrCount t =
     . groupOn startLoc
     . filter (isStart L.Fixture)
 
-chkTestHooks :: [[ExeEvent]] -> IO ()
-chkTestHooks = uu
+chkTestHooks :: Template -> [[ExeEvent]] -> IO ()
+chkTestHooks t =
+  traverse_ chkEvents
+  where
+    chkEvents :: [ExeEvent] -> IO ()
+    chkEvents evts' =
+      foldl' chkEvent Nothing evts'
+        & maybe
+          (pure ())
+          (\fx -> error $ "Fixture started not ended in same thread\n" <> ppShow fx)
+
+    -- no need to check called in right part of tree ie. within fixture out of test
+    -- those cases are covered in fixture and test
+    -- we also have check all tests occur in the correct fixture
+    chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
+    chkEvent mfixLoc evt =
+      mfixLoc
+        & maybe
+          ( -- outside fixture
+            case evt of
+              StartExecution {} -> Nothing
+              Start {eventType, loc} -> chkOutOfFixtureStartEnd True loc eventType
+              End {eventType, loc} -> chkOutOfFixtureStartEnd False loc eventType
+              Failure {} -> Nothing
+              ParentFailure {} -> Nothing
+              Debug {} -> Nothing
+              EndExecution {} -> Nothing
+          )
+          ( -- within fixture
+            \fxLoc ->
+              case evt of
+                StartExecution {} -> failIn "StartExecution"
+                Start {eventType, loc} -> chkInFixtureStartEnd True fxLoc loc eventType
+                End {eventType, loc} -> chkInFixtureStartEnd False fxLoc loc eventType
+                Failure {} -> mfixLoc
+                ParentFailure {} -> mfixLoc
+                Debug {} -> mfixLoc
+                EndExecution {} -> failIn "EndExecution"
+          )
+      where
+        fail msg = error $ msg <> "\n" <> ppShow evt
+        failOut et = fail $ et <> " must occur within start / end of fixture in same thread"
+        failIn et = fail $ et <> " must only occur outside a fixture in same thread"
+
+        chkOutOfFixtureStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
+        chkOutOfFixtureStartEnd isStart' evtLoc = \case
+          L.OnceHook -> Nothing
+          OnceHookRelease -> Nothing
+          L.ThreadHook -> Nothing
+          ThreadHookRelease -> Nothing
+          L.Group -> Nothing
+          L.TestHook -> failOut "TestHook"
+          TestHookRelease -> failOut "TestHookTestHookRelease"
+          L.Fixture ->
+            isStart'
+              ? Just evtLoc
+              $ fail "End fixture when fixture not started"
+          L.Test -> failOut "Test"
+
+        chkInFixtureStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
+        chkInFixtureStartEnd isStart' fxLoc evtLoc = \case
+          L.OnceHook -> failIn "OnceHook"
+          OnceHookRelease -> failIn "OnceHookRelease"
+          L.ThreadHook -> failIn "ThreadHook"
+          ThreadHookRelease -> failIn "ThreadHookRelease"
+          L.TestHook -> mfixLoc
+          TestHookRelease -> mfixLoc
+          L.Group -> failIn "Group"
+          L.Fixture ->
+            isStart'
+              ? fail "Nested fixtures - fixture started when a fixture is alreeady running in the same thread"
+              $ (fxLoc == evtLoc) ? Nothing $ fail "fixture end loc does not match fixture start loc"
+          L.Test {} -> mfixLoc
 
 chkLaws :: Int -> Template -> [ExeEvent] -> IO ()
 chkLaws mxThrds t evts =
@@ -520,10 +623,12 @@ chkLaws mxThrds t evts =
       (\f -> f threadedEvents)
       [ chkFixtures,
         chkTests,
-        chkTestHooks
+        chkTestHooks t
       ]
     chk'
-      ( "max execution threads + 2: " -- 1 main thread + exe threads TODO: fix this to + 1 when phatom test debug thread is sorted
+      ( "max execution threads + 2: "
+          -- 1 main thread + exe threads
+          -- TODO: fix this to + 1 when phatom test debug thread is sorted
           <> txt (mxThrds + 2)
           <> " exceeded: "
           <> txt (length threadedEvents)
@@ -537,8 +642,19 @@ chkLaws mxThrds t evts =
 debug :: Text -> Int -> Text -> ExeEvent
 debug = Debug
 
+validateTemplate :: Template -> IO ()
+validateTemplate t =
+  let tl = (catMaybes $ getTag <$> templateNodeList t) 
+      utl = nub tl
+   in 
+     when (length tl /= length utl) $
+      error $ "template must be such that tags are unique: \n" <> ppShow tl
+
+
 runTest :: Int -> Template -> IO ()
 runTest maxThreads template = do
+  validateTemplate template
+  putStrLn ""
   pPrint template
   putStrLn "========="
   chan <- newTChanIO
@@ -586,12 +702,7 @@ alwaysFail = DocFunc "Always Fail" $ pure True
 
 superSimplSuite :: Template
 superSimplSuite =
-  TFixture "Fx 0" [IOProps "0" 0 False]
-
--- $> parseTestIndex "Node (Node Root \"Fixture[0] - Fx 0\") \"0\""
-
-parseTestIndex :: Text -> Int
-parseTestIndex t = read $ toS . replace "\"" "" $ Txt.takeWhileEnd (/= ' ') t
+  TFixture "Fx 0" [testProps "Fx 0" 0 0 False]
 
 -- $> unit_simple_single
 
@@ -601,7 +712,7 @@ unit_simple_single = runTest 1 superSimplSuite
 -- $ > unit_simple_single_failure
 
 unit_simple_single_failure :: IO ()
-unit_simple_single_failure = runTest 1 $ TFixture "Fx 0" [testProps 0 0 True]
+unit_simple_single_failure = runTest 1 $ TFixture "Fx 0" [testProps "Fx 0" 0 0 True]
 
 -- superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
 -- superSimplSuite q =

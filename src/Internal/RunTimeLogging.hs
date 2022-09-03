@@ -11,7 +11,10 @@ import Prelude (String, lines)
 
 data Loc
   = Root
-  | Node Loc Text
+  | Node
+      { parent :: Loc,
+        tag :: Text
+      }
   deriving (Show, Eq, Ord)
 
 data ExeEventType
@@ -36,7 +39,6 @@ mkParentFailure :: Loc -> Loc -> SomeException -> Int -> Text -> ExeEvent
 mkParentFailure p l = ParentFailure p l . exceptionTxt
 
 newtype PException = PException {displayText :: [Text]} deriving (Show, Eq)
-
 
 data ExeEvent
   = StartExecution

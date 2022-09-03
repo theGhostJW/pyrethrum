@@ -396,16 +396,16 @@ chkTestCount t evs =
     $ count (isStart L.Test) evs
 
 chkFxtrCount :: Template -> [ExeEvent] -> IO ()
-chkFxtrCount t evs =
+chkFxtrCount t =
   chkEq'
     "test count not as expected"
     (templateTestCount t)
     . length
     . groupOn startLoc
-    $ filter (isStart L.Fixture) evs
+    . filter (isStart L.Fixture)
   where
-    -- in concurrent runs the same fixture can be 
-    -- triggered in multiple threads so 
+    -- in concurrent runs the same fixture can be
+    -- triggered in multiple threads so
     startLoc = \case
       Start {loc} -> loc
       _ -> error "BOOM - this should not happen"

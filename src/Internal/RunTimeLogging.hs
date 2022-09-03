@@ -7,12 +7,12 @@ import Pyrelude (Applicative (pure), Bool, Enum (succ), Eq, Exception (displayEx
 import Text.Show.Pretty (pPrint)
 import UnliftIO (TChan, TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
 import UnliftIO.Concurrent (myThreadId)
-import Prelude (String)
+import Prelude (String, lines)
 
 data Loc
   = Root
   | Node Loc Text
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data ExeEventType
   = OnceHook
@@ -27,7 +27,7 @@ data ExeEventType
   deriving (Show, Eq)
 
 exceptionTxt :: SomeException -> PException
-exceptionTxt = PException . txt . displayException
+exceptionTxt e = PException $ txt <$> lines (displayException e)
 
 mkFailure :: Loc -> Text -> SomeException -> Int -> Text -> ExeEvent
 mkFailure l t = Failure l t . exceptionTxt
@@ -35,7 +35,8 @@ mkFailure l t = Failure l t . exceptionTxt
 mkParentFailure :: Loc -> Loc -> SomeException -> Int -> Text -> ExeEvent
 mkParentFailure p l = ParentFailure p l . exceptionTxt
 
-newtype PException = PException {displayText :: Text} deriving (Show, Eq)
+newtype PException = PException {displayText :: [Text]} deriving (Show, Eq)
+
 
 data ExeEvent
   = StartExecution

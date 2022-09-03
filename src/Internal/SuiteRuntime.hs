@@ -578,16 +578,14 @@ executeNode logger hkIn tstHk rg =
               recurse =
                 atomically nxtChild
                   >>= maybe
-                    ( atomically updateStatusFromQs
-                        >>= flip when (logger $ End leafloc Group)
-                    )
+                    (atomically updateStatusFromQs)
                     (\c -> exeNxt hkIn tstHk c >> recurse)
 
-              updateStatusFromQs :: STM Bool
+              updateStatusFromQs :: STM ()
               updateStatusFromQs = do
                 s <- readTVar nStatus
                 isDone s
-                  ? pure False
+                  ? pure ()
                   $ do
                     discardDone fullyRunning
                     discardDoneMoveFullyRunning fullyRunning childNodes
@@ -598,7 +596,6 @@ executeNode logger hkIn tstHk rg =
                         | completed -> writeTVar nStatus Done
                         | mtChilds -> writeTVar nStatus FullyRunning
                         | otherwise -> pure ()
-                    pure completed
 
               nxtChild =
                 tryReadTQueue childNodes
@@ -657,8 +654,7 @@ executeNode logger hkIn tstHk rg =
                 etest
                   & either
                     ( \done ->
-                        when done $ do
-                          logger $ End leafloc L.Fixture
+                        when done $
                           atomically $ writeTVar nStatus Done
                     )
                     ( \(Test tstLoc test) -> do

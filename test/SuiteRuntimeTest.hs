@@ -38,6 +38,8 @@ import Pyrelude as P
     catchAll,
     const,
     count,
+    debug,
+    debug',
     debug_,
     debugf,
     displayException,
@@ -168,6 +170,18 @@ templateTestCount =
       TTestHook {tChild} -> templateTestCount' ac tChild
       TFixture {tTests} -> ac + length tTests
 
+templateFixCount :: Template -> Int
+templateFixCount =
+  fxCount' 0
+  where
+    fxCount' :: Int -> Template -> Int
+    fxCount' ac = \case
+      TBranch branches -> ac + foldl' fxCount' 0 branches
+      TOnceHook {tChild} -> fxCount' ac tChild
+      TThreadHook {tChild} -> fxCount' ac tChild
+      TTestHook {tChild} -> fxCount' ac tChild
+      TFixture {tTests} -> ac + 1
+
 mkPrenode l = \case
   TBranch tems -> uu
   TOnceHook
@@ -276,47 +290,53 @@ chkStartEndExecution evts =
       e <- last evts
       pure (s, e)
 
-eventTestStarts :: [ExeEvent] -> Int
-eventTestStarts = count isStart
-  where
-    isStart = \case
-      StartExecution {} -> False
-      Start {eventType} -> eventType == L.Test
-      End {} -> False
-      Failure {} -> False
-      ParentFailure {} -> False
-      Debug {} -> False
-      EndExecution {} -> False
+isStart :: ExeEventType -> ExeEvent -> Bool
+isStart et = \case
+  StartExecution {} -> False
+  Start {eventType} -> eventType == et
+  End {} -> False
+  Failure {} -> False
+  ParentFailure {} -> False
+  Debug {} -> False
+  EndExecution {} -> False
 
 chkMaxThreads :: Int -> [[ExeEvent]] -> IO ()
 chkMaxThreads mxThrds threadedEvents =
   -- TODO: this should be 1 but is a workaround for debug using the base thread when set up in the test
   -- fix when logging is fully integrated with test
-  let 
-    baseThrds = 2 -- should be 1
-    allowed = mxThrds + baseThrds
-  in
-  chk' --TODO: chk' formatting
-    ("max execution threads + " <> txt baseThrds <>": " <> txt allowed <> " exceeded: " <> txt (length threadedEvents) <> "\n" <> txt (ppShow ((threadId <$>) <$> threadedEvents)))
-    $ length threadedEvents <= allowed -- baseThrds + exe threads
+  let baseThrds = 2 -- should be 1
+      allowed = mxThrds + baseThrds
+   in chk' --TODO: chk' formatting
+        ("max execution threads + " <> txt baseThrds <> ": " <> txt allowed <> " exceeded: " <> txt (length threadedEvents) <> "\n" <> txt (ppShow ((threadId <$>) <$> threadedEvents)))
+        $ length threadedEvents <= allowed -- baseThrds + exe threads
 
-chkFixtures :: Int -> Template -> [[ExeEvent]] -> IO ()
-chkFixtures mxThrds t evts =
+chkFixtures :: [[ExeEvent]] -> IO ()
+chkFixtures evts =
   do
     traverse_ chkEvents evts
   where
-    chkEvents :: [ExeEvent] -> IO (Maybe Loc)
-    chkEvents = pure . foldl' chkEvent Nothing
+    chkEvents :: [ExeEvent] -> IO ()
+    chkEvents evts' =
+      do
+        -- putStrLn ""
+        -- putStrLn "=============================="
+        -- putStrLn ""
+        foldl' chkEvent Nothing evts'
+          & maybe
+            (pure ())
+            (\fx -> error $ "Fixture started not ended in same thread\n" <> ppShow fx)
 
     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
     chkEvent fixLoc evt =
+      -- TODO: format on debug'
+      -- P.debug' (txt $ ppShow evt) $
       fixLoc
         & maybe
           ( -- outside fixture
             case evt of
               StartExecution {} -> fixLoc
-              Start {eventType, loc} -> chkOutOfTestStartEnd True loc eventType
-              End {eventType, loc} -> chkOutOfTestStartEnd False loc eventType
+              Start {eventType, loc} -> chkOutOfFixtureStartEnd True loc eventType
+              End {eventType, loc} -> chkOutOfFixtureStartEnd False loc eventType
               Failure {} -> fixLoc
               ParentFailure {} -> fixLoc
               Debug {} -> fixLoc
@@ -326,8 +346,8 @@ chkFixtures mxThrds t evts =
             \fxLoc ->
               case evt of
                 StartExecution {} -> failIn "StartExecution"
-                Start {eventType, loc} -> chkInTestStartEnd True fxLoc loc eventType
-                End {eventType, loc} -> chkInTestStartEnd False fxLoc loc eventType
+                Start {eventType, loc} -> chkInFixtureStartEnd True fxLoc loc eventType
+                End {eventType, loc} -> chkInFixtureStartEnd False fxLoc loc eventType
                 Failure {} -> fixLoc
                 ParentFailure {} -> fixLoc
                 Debug {} -> fixLoc
@@ -338,8 +358,8 @@ chkFixtures mxThrds t evts =
         failOut et = fail $ et <> " must occur within start / end of fixture in same thread"
         failIn et = fail $ et <> " must only occur outside a fixture in same thread"
 
-        chkOutOfTestStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
-        chkOutOfTestStartEnd isStart evtLoc = \case
+        chkOutOfFixtureStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
+        chkOutOfFixtureStartEnd isStart' evtLoc = \case
           L.OnceHook -> Nothing
           OnceHookRelease -> Nothing
           L.ThreadHook -> Nothing
@@ -348,13 +368,13 @@ chkFixtures mxThrds t evts =
           TestHookRelease -> failOut "TestHookTestHookRelease"
           L.Group -> Nothing
           L.Fixture ->
-            isStart
+            isStart'
               ? Just evtLoc
               $ fail "End fixture when fixture not started"
           L.Test -> failOut "Test"
 
-        chkInTestStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
-        chkInTestStartEnd isStart fxLoc evtLoc = \case
+        chkInFixtureStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
+        chkInFixtureStartEnd isStart' fxLoc evtLoc = \case
           L.OnceHook -> failIn "OnceHook"
           OnceHookRelease -> failIn "OnceHookRelease"
           L.ThreadHook -> failIn "ThreadHook"
@@ -363,10 +383,32 @@ chkFixtures mxThrds t evts =
           TestHookRelease -> fixLoc
           L.Group -> failIn "Group"
           L.Fixture ->
-            isStart
+            isStart'
               ? fail "Nested fixtures - fixture started when a fixture is alreeady running in the same thread"
               $ (fxLoc == evtLoc) ? Nothing $ fail "fixture end loc does not match fixture start loc"
-          L.Test {} -> uu
+          L.Test {} -> fixLoc
+
+chkTestCount :: Template -> [ExeEvent] -> IO ()
+chkTestCount t evs =
+  chkEq'
+    "test count not as expected"
+    (templateTestCount t)
+    $ count (isStart L.Test) evs
+
+chkFxtrCount :: Template -> [ExeEvent] -> IO ()
+chkFxtrCount t evs =
+  chkEq'
+    "test count not as expected"
+    (templateTestCount t)
+    . length
+    . groupOn startLoc
+    $ filter (isStart L.Fixture) evs
+  where
+    -- in concurrent runs the same fixture can be 
+    -- triggered in multiple threads so 
+    startLoc = \case
+      Start {loc} -> loc
+      _ -> error "BOOM - this should not happen"
 
 chkLaws :: Int -> Template -> [ExeEvent] -> IO ()
 chkLaws mxThrds t evts =
@@ -375,13 +417,11 @@ chkLaws mxThrds t evts =
       (evts &)
       [ chkThreadLogsInOrder,
         chkStartEndExecution,
-        chkEq'
-          "test count not as expected"
-          (templateTestCount t)
-          . eventTestStarts
+        chkTestCount t,
+        chkFxtrCount t
       ]
     traverse_
-      (\f -> f mxThrds t threadedEvents)
+      (\f -> f threadedEvents)
       [ chkFixtures
       ]
     chk'
@@ -432,6 +472,9 @@ noDelay = DocFunc "No Delay" $ pure 0
 neverFail :: DocFunc Bool
 neverFail = DocFunc "Never Fail" $ pure False
 
+alwaysFail :: DocFunc Bool
+alwaysFail = DocFunc "Always Fail" $ pure True
+
 superSimplSuite :: Template
 superSimplSuite =
   TFixture "Fx 0" [IOProps "0" noDelay neverFail]
@@ -440,6 +483,11 @@ superSimplSuite =
 
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
+
+-- $> unit_simple_single_failure
+
+unit_simple_single_failure :: IO ()
+unit_simple_single_failure = runTest 1 $ TFixture "Fx 0" [IOProps "0" noDelay alwaysFail]
 
 -- superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
 -- superSimplSuite q =

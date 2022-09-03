@@ -669,13 +669,12 @@ executeNode logger hkIn tstHk rg =
 
                         finally
                           ( withStartEnd logger tstLoc L.Test $
-                              do
-                                ethInputs & either
-                                  (logAbandonned' tstLoc)
-                                  \i ->
-                                    catchAll
-                                      (uncurry3 test i)
-                                      (logFailure' tstLoc L.Test)
+                              ethInputs & either
+                                (logAbandonned' tstLoc)
+                                \i ->
+                                  catchAll
+                                    (uncurry3 test i)
+                                    (logFailure' tstLoc L.Test)
                           )
                           $ atomically (modifyTVar runningCount pred) >> recurse
                     )

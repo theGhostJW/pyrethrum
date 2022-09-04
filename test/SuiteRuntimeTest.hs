@@ -17,7 +17,15 @@ import Data.Yaml
 import GHC.Records
 import Internal.PreNode (PreNode (hookChild))
 import Internal.PreNode as PN
-import Internal.RunTimeLogging as L (ExeEvent (..), ExeEventType (Fixture, Group, OnceHook, OnceHookRelease, Test, TestHook, TestHookRelease, ThreadHook, ThreadHookRelease), Loc (..), LogControls (..), Sink, mkLogger, testLogControls)
+import Internal.RunTimeLogging as L
+  ( ExeEvent (..),
+    ExeEventType (Fixture, Group, OnceHook, OnceHookRelease, Test, TestHook, TestHookRelease, ThreadHook, ThreadHookRelease),
+    Loc (..),
+    LogControls (..),
+    Sink,
+    mkLogger,
+    testLogControls,
+  )
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
@@ -147,7 +155,10 @@ data IOPropsNonDet = IOPropsNonDet
   deriving (Show)
 
 data Template
-  = TBranch [Template]
+  = TGroup
+      { ttag :: Text,
+        tChilds :: [Template]
+      }
   | TOnceHook
       { ttag :: Text,
         shook :: IOProps,
@@ -174,39 +185,43 @@ data Template
 
 type TextLogger = Text -> IO ()
 
-getTag :: Template -> Maybe Text 
-getTag = \case
-            TBranch {} -> Nothing
-            TOnceHook {ttag} -> Just ttag
-            TThreadHook {ttag} -> Just ttag
-            TTestHook {ttag} -> Just ttag
-            TFixture {ttag} -> Just ttag
-
-templateNodeList :: Template -> [Template]
-templateNodeList =
-  tnl []
+parentMap :: Template -> M.Map Text (Maybe Template)
+parentMap =
+  pm M.empty Nothing
   where
-    tnl :: [Template] -> Template -> [Template]
-    tnl ac =
-      let rescurse n = tnl (snoc ac n)
+    pm :: M.Map Text (Maybe Template) -> Maybe Template -> Template -> M.Map Text (Maybe Template)
+    pm acc mp c = 
+      let ctag = ttag c 
+          next =  pm (M.insert (ttag c) mp acc) (Just c)
+      in case c of
+        TGroup txt tems -> _
+        TOnceHook txt ip ip' tem -> _
+        TThreadHook txt ipnd ipnd' tem -> _
+        TTestHook txt ipnd ipnd' tem -> _
+        TFixture txt ips -> _
+      
+
+templateList :: Template -> [Template]
+templateList =
+  tl []
+  where
+    tl :: [Template] -> Template -> [Template]
+    tl ac =
+      let rescurse n = tl (snoc ac n)
        in \case
-            n@(TBranch branches) -> branches >>= rescurse n
+            n@(TGroup {tChilds}) -> tChilds >>= rescurse n
             n@TOnceHook {tChild} -> rescurse n tChild
             n@TThreadHook {tChild} -> rescurse n tChild
             n@TTestHook {tChild} -> rescurse n tChild
             n@TFixture {tTests} -> snoc ac n
 
-templateTestCount :: Template -> Int
-templateTestCount =
-  templateTestCount' 0
+templateTestCount :: [Template] -> Int
+templateTestCount ts =
+  length . catMaybes $ tests <$> ts
   where
-    templateTestCount' :: Int -> Template -> Int
-    templateTestCount' ac = \case
-      TBranch branches -> ac + foldl' templateTestCount' 0 branches
-      TOnceHook {tChild} -> templateTestCount' ac tChild
-      TThreadHook {tChild} -> templateTestCount' ac tChild
-      TTestHook {tChild} -> templateTestCount' ac tChild
-      TFixture {tTests} -> ac + length tTests
+    tests = \case
+      TFixture {tTests} -> Just tTests
+      _ -> Nothing
 
 templateFixCount :: Template -> Int
 templateFixCount =
@@ -214,14 +229,18 @@ templateFixCount =
   where
     fxCount' :: Int -> Template -> Int
     fxCount' ac = \case
-      TBranch branches -> ac + foldl' fxCount' 0 branches
+      TGroup {tChilds} -> ac + foldl' fxCount' 0 tChilds
       TOnceHook {tChild} -> fxCount' ac tChild
       TThreadHook {tChild} -> fxCount' ac tChild
       TTestHook {tChild} -> fxCount' ac tChild
       TFixture {tTests} -> ac + 1
 
+mkPrenode :: TextLogger -> Template -> PreNode oi () ti () ii ()
 mkPrenode l = \case
-  TBranch tems -> uu
+  TGroup
+    { ttag,
+      tChilds
+    } -> uu
   TOnceHook
     { ttag,
       shook,
@@ -281,15 +300,15 @@ chkEq' msg e a =
 chkThreadLogsInOrder :: [ExeEvent] -> IO ()
 chkThreadLogsInOrder evts =
   do
-    for_
-      threads
+    eachThread
       ( \l ->
           let ck = chkEq' "first index of thread should be 1" 1 . idx
               ev = unsafeHead l
            in ck ev
       )
-    for_ threads chkIds
+    eachThread chkIds
   where
+    eachThread = for_ threads
     threads =
       groupOn
         threadId
@@ -517,14 +536,14 @@ chkFixtures =
               $ (fxLoc == evtLoc) ? Nothing $ fail "fixture end loc does not match fixture start loc"
           L.Test {} -> mfixLoc
 
-chkTestCount :: Template -> [ExeEvent] -> IO ()
+chkTestCount :: [Template] -> [ExeEvent] -> IO ()
 chkTestCount t evs =
   chkEq'
     "test count not as expected"
     (templateTestCount t)
     $ count (isStart L.Test) evs
 
-chkFxtrCount :: Template -> [ExeEvent] -> IO ()
+chkFxtrCount :: [Template] -> [ExeEvent] -> IO ()
 chkFxtrCount t =
   chkEq'
     "test count not as expected"
@@ -616,8 +635,8 @@ chkLaws mxThrds t evts =
       (evts &)
       [ chkThreadLogsInOrder,
         chkStartEndExecution,
-        chkTestCount t,
-        chkFxtrCount t
+        chkTestCount templateAsList,
+        chkFxtrCount
       ]
     traverse_
       (\f -> f threadedEvents)
@@ -638,18 +657,17 @@ chkLaws mxThrds t evts =
       $ length threadedEvents <= mxThrds + 2
   where
     threadedEvents = groupOn threadId evts
+    templateAsList = templateList t
 
 debug :: Text -> Int -> Text -> ExeEvent
 debug = Debug
 
 validateTemplate :: Template -> IO ()
 validateTemplate t =
-  let tl = (catMaybes $ getTag <$> templateNodeList t) 
+  let tl = (ttag <$> templateList t)
       utl = nub tl
-   in 
-     when (length tl /= length utl) $
-      error $ "template must be such that tags are unique: \n" <> ppShow tl
-
+   in when (length tl /= length utl) $
+        error $ "template must be such that tags are unique: \n" <> ppShow tl
 
 runTest :: Int -> Template -> IO ()
 runTest maxThreads template = do

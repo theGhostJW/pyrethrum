@@ -60,6 +60,7 @@ import Pyrelude as P
     filter,
     find,
     first,
+    flip,
     fmap,
     foldM_,
     foldl1',
@@ -187,19 +188,18 @@ type TextLogger = Text -> IO ()
 
 parentMap :: Template -> M.Map Text (Maybe Template)
 parentMap =
-  pm M.empty Nothing
+  pm M.empty
   where
-    pm :: M.Map Text (Maybe Template) -> Maybe Template -> Template -> M.Map Text (Maybe Template)
-    pm acc mp c = 
-      let ctag = ttag c 
-          next =  pm (M.insert (ttag c) mp acc) (Just c)
-      in case c of
-        TGroup txt tems -> _
-        TOnceHook txt ip ip' tem -> _
-        TThreadHook txt ipnd ipnd' tem -> _
-        TTestHook txt ipnd ipnd' tem -> _
-        TFixture txt ips -> _
-      
+    pm :: M.Map Text (Maybe Template) -> Template -> M.Map Text (Maybe Template)
+    pm acc t =
+      let recurse :: Template -> M.Map Text (Maybe Template)
+          recurse child = pm (M.insert (ttag child) (Just t) acc) child
+       in case t of
+            TGroup {tChilds} -> foldl' pm acc tChilds
+            TOnceHook {tChild} -> recurse tChild
+            TThreadHook {tChild} -> recurse tChild
+            TTestHook {tChild} -> recurse tChild
+            TFixture {ttag} -> acc
 
 templateList :: Template -> [Template]
 templateList =
@@ -1262,7 +1262,7 @@ shk - t1
    2. atomically
     - find subelem not running
     - find sub-elem partially not running
-    - next index
+    - nxt index
    3. run thread
 
 - issues

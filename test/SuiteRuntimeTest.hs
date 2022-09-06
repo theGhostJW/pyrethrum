@@ -186,14 +186,14 @@ data Template
 
 type TextLogger = Text -> IO ()
 
-parentMap :: Template -> M.Map Text (Maybe Template)
-parentMap =
-  pm M.empty
+foldTemplate :: forall a. a -> (Template -> Template -> a -> a) -> Template -> a
+foldTemplate seed combine =
+  pm seed
   where
-    pm :: M.Map Text (Maybe Template) -> Template -> M.Map Text (Maybe Template)
+    pm :: a -> Template -> a
     pm acc t =
-      let recurse :: Template -> M.Map Text (Maybe Template)
-          recurse child = pm (M.insert (ttag child) (Just t) acc) child
+      let recurse :: Template -> a
+          recurse child = combine t child acc
        in case t of
             TGroup {tChilds} -> foldl' pm acc tChilds
             TOnceHook {tChild} -> recurse tChild
@@ -201,19 +201,11 @@ parentMap =
             TTestHook {tChild} -> recurse tChild
             TFixture {ttag} -> acc
 
+parentMap :: Template -> M.Map Text (Maybe Template)
+parentMap = foldTemplate M.empty (\p c m -> M.insert (ttag c) (Just p) m)
+
 templateList :: Template -> [Template]
-templateList =
-  tl []
-  where
-    tl :: [Template] -> Template -> [Template]
-    tl ac =
-      let rescurse n = tl (snoc ac n)
-       in \case
-            n@(TGroup {tChilds}) -> tChilds >>= rescurse n
-            n@TOnceHook {tChild} -> rescurse n tChild
-            n@TThreadHook {tChild} -> rescurse n tChild
-            n@TTestHook {tChild} -> rescurse n tChild
-            n@TFixture {tTests} -> snoc ac n
+templateList t = foldTemplate [t] (\_p c l -> c : l) t
 
 templateTestCount :: [Template] -> Int
 templateTestCount ts =
@@ -367,10 +359,17 @@ chkMaxThreads mxThrds threadedEvents =
         ("max execution threads + " <> txt baseThrds <> ": " <> txt allowed <> " exceeded: " <> txt (length threadedEvents) <> "\n" <> txt (ppShow ((threadId <$>) <$> threadedEvents)))
         $ length threadedEvents <= allowed -- baseThrds + exe threads
 
-startLoc :: ExeEvent -> Loc
-startLoc = \case
+partialLoc :: ExeEvent -> Loc
+partialLoc = \case
+  StartExecution {} -> boom "StartExecution"
   Start {loc} -> loc
-  _ -> error "BOOM - this should not happen"
+  End {loc} -> loc
+  Failure {loc} -> loc
+  ParentFailure {loc} -> loc
+  Debug {} -> boom "Debug"
+  EndExecution {} -> boom "EndExecution"
+  where
+    boom msg = error "BOOM - partialLoc called on: " <> msg <> " which does not have a loc property"
 
 startTag :: ExeEvent -> Text
 startTag =
@@ -378,7 +377,7 @@ startTag =
       Root -> error "BOOM - Root loc passed to startTag"
       Node {tag} -> tag
   )
-    . startLoc
+    . partialLoc
 
 chkTestIdsConsecutive :: [ExeEvent] -> IO ()
 chkTestIdsConsecutive evs =
@@ -551,82 +550,98 @@ chkFxtrCount t =
     . length
     -- in concurrent runs the same fixture can be
     -- triggered in multiple threads so
-    . groupOn startLoc
+    . groupOn partialLoc
     . filter (isStart L.Fixture)
 
-chkTestHooks :: Template -> [[ExeEvent]] -> IO ()
-chkTestHooks t =
-  traverse_ chkEvents
+-- chkTestHooks :: Template -> [[ExeEvent]] -> IO ()
+-- chkTestHooks t =
+--   traverse_ chkEvents
+--   where
+--     chkEvents :: [ExeEvent] -> IO ()
+--     chkEvents evts' =
+--       foldl' chkEvent Nothing evts'
+--         & maybe
+--           (pure ())
+--           (\fx -> error $ "Fixture started not ended in same thread\n" <> ppShow fx)
+
+--     -- no need to check called in right part of tree ie. within fixture out of test
+--     -- those cases are covered in fixture and test
+--     -- we also have check all tests occur in the correct fixture
+--     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
+--     chkEvent mfixLoc evt =
+--       mfixLoc
+--         & maybe
+--           ( -- outside fixture
+--             case evt of
+--               StartExecution {} -> Nothing
+--               Start {eventType, loc} -> chkOutOfFixtureStartEnd True loc eventType
+--               End {eventType, loc} -> chkOutOfFixtureStartEnd False loc eventType
+--               Failure {} -> Nothing
+--               ParentFailure {} -> Nothing
+--               Debug {} -> Nothing
+--               EndExecution {} -> Nothing
+--           )
+--           ( -- within fixture
+--             \fxLoc ->
+--               case evt of
+--                 StartExecution {} -> failIn "StartExecution"
+--                 Start {eventType, loc} -> chkInFixtureStartEnd True fxLoc loc eventType
+--                 End {eventType, loc} -> chkInFixtureStartEnd False fxLoc loc eventType
+--                 Failure {} -> mfixLoc
+--                 ParentFailure {} -> mfixLoc
+--                 Debug {} -> mfixLoc
+--                 EndExecution {} -> failIn "EndExecution"
+--           )
+--       where
+--         fail msg = error $ msg <> "\n" <> ppShow evt
+--         failOut et = fail $ et <> " must occur within start / end of fixture in same thread"
+--         failIn et = fail $ et <> " must only occur outside a fixture in same thread"
+
+--         chkOutOfFixtureStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
+--         chkOutOfFixtureStartEnd isStart' evtLoc = \case
+--           L.OnceHook -> Nothing
+--           OnceHookRelease -> Nothing
+--           L.ThreadHook -> Nothing
+--           ThreadHookRelease -> Nothing
+--           L.Group -> Nothing
+--           L.TestHook -> failOut "TestHook"
+--           TestHookRelease -> failOut "TestHookTestHookRelease"
+--           L.Fixture ->
+--             isStart'
+--               ? Just evtLoc
+--               $ fail "End fixture when fixture not started"
+--           L.Test -> failOut "Test"
+
+--         chkInFixtureStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
+--         chkInFixtureStartEnd isStart' fxLoc evtLoc = \case
+--           L.OnceHook -> failIn "OnceHook"
+--           OnceHookRelease -> failIn "OnceHookRelease"
+--           L.ThreadHook -> failIn "ThreadHook"
+--           ThreadHookRelease -> failIn "ThreadHookRelease"
+--           L.TestHook -> mfixLoc
+--           TestHookRelease -> mfixLoc
+--           L.Group -> failIn "Group"
+--           L.Fixture ->
+--             isStart'
+--               ? fail "Nested fixtures - fixture started when a fixture is alreeady running in the same thread"
+--               $ (fxLoc == evtLoc) ? Nothing $ fail "fixture end loc does not match fixture start loc"
+--           L.Test {} -> mfixLoc
+
+chkStartEndIntegrity :: [[ExeEvent]] -> IO ()
+chkStartEndIntegrity =
+  traverse_ chkThread
   where
-    chkEvents :: [ExeEvent] -> IO ()
-    chkEvents evts' =
-      foldl' chkEvent Nothing evts'
-        & maybe
-          (pure ())
-          (\fx -> error $ "Fixture started not ended in same thread\n" <> ppShow fx)
+    chkThread :: [ExeEvent] -> IO ()
+    chkThread = uu
 
-    -- no need to check called in right part of tree ie. within fixture out of test
-    -- those cases are covered in fixture and test
-    -- we also have check all tests occur in the correct fixture
-    chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
-    chkEvent mfixLoc evt =
-      mfixLoc
-        & maybe
-          ( -- outside fixture
-            case evt of
-              StartExecution {} -> Nothing
-              Start {eventType, loc} -> chkOutOfFixtureStartEnd True loc eventType
-              End {eventType, loc} -> chkOutOfFixtureStartEnd False loc eventType
-              Failure {} -> Nothing
-              ParentFailure {} -> Nothing
-              Debug {} -> Nothing
-              EndExecution {} -> Nothing
-          )
-          ( -- within fixture
-            \fxLoc ->
-              case evt of
-                StartExecution {} -> failIn "StartExecution"
-                Start {eventType, loc} -> chkInFixtureStartEnd True fxLoc loc eventType
-                End {eventType, loc} -> chkInFixtureStartEnd False fxLoc loc eventType
-                Failure {} -> mfixLoc
-                ParentFailure {} -> mfixLoc
-                Debug {} -> mfixLoc
-                EndExecution {} -> failIn "EndExecution"
-          )
-      where
-        fail msg = error $ msg <> "\n" <> ppShow evt
-        failOut et = fail $ et <> " must occur within start / end of fixture in same thread"
-        failIn et = fail $ et <> " must only occur outside a fixture in same thread"
+    chkStart :: M.Map Loc (ST.Set Loc) -> ExeEvent -> M.Map Loc (ST.Set Loc)
+    chkStart m s =
+      M.member (partialLoc s) m
+        ? error ("Duplicate start events in same thread\n " <> ppShow s)
+        $ here
 
-        chkOutOfFixtureStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
-        chkOutOfFixtureStartEnd isStart' evtLoc = \case
-          L.OnceHook -> Nothing
-          OnceHookRelease -> Nothing
-          L.ThreadHook -> Nothing
-          ThreadHookRelease -> Nothing
-          L.Group -> Nothing
-          L.TestHook -> failOut "TestHook"
-          TestHookRelease -> failOut "TestHookTestHookRelease"
-          L.Fixture ->
-            isStart'
-              ? Just evtLoc
-              $ fail "End fixture when fixture not started"
-          L.Test -> failOut "Test"
-
-        chkInFixtureStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
-        chkInFixtureStartEnd isStart' fxLoc evtLoc = \case
-          L.OnceHook -> failIn "OnceHook"
-          OnceHookRelease -> failIn "OnceHookRelease"
-          L.ThreadHook -> failIn "ThreadHook"
-          ThreadHookRelease -> failIn "ThreadHookRelease"
-          L.TestHook -> mfixLoc
-          TestHookRelease -> mfixLoc
-          L.Group -> failIn "Group"
-          L.Fixture ->
-            isStart'
-              ? fail "Nested fixtures - fixture started when a fixture is alreeady running in the same thread"
-              $ (fxLoc == evtLoc) ? Nothing $ fail "fixture end loc does not match fixture start loc"
-          L.Test {} -> mfixLoc
+    chkEnd :: M.Map Loc (ST.Set Loc) -> Loc -> M.Map Loc (ST.Set Loc)
+    chkEnd = uu
 
 chkLaws :: Int -> Template -> [ExeEvent] -> IO ()
 chkLaws mxThrds t evts =
@@ -636,13 +651,14 @@ chkLaws mxThrds t evts =
       [ chkThreadLogsInOrder,
         chkStartEndExecution,
         chkTestCount templateAsList,
-        chkFxtrCount
+        chkFxtrCount templateAsList
       ]
     traverse_
       (\f -> f threadedEvents)
-      [ chkFixtures,
-        chkTests,
-        chkTestHooks t
+      [ chkStartEndIntegrity,
+        chkFixtures,
+        chkTests --,
+        -- chkTestHooks t
       ]
     chk'
       ( "max execution threads + 2: "

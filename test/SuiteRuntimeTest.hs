@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wdeferred-type-errors #-}
-
 module SuiteRuntimeTest where
 
 import Check (Checks)
@@ -45,6 +43,7 @@ import Pyrelude as P
     SomeException,
     Text,
     Traversable (sequenceA, traverse),
+    bool,
     catMaybes,
     catchAll,
     const,
@@ -627,21 +626,75 @@ chkFxtrCount t =
 --               $ (fxLoc == evtLoc) ? Nothing $ fail "fixture end loc does not match fixture start loc"
 --           L.Test {} -> mfixLoc
 
+(~) = (+) 5
+
+threadedBoundary :: ExeEventType -> Bool
+threadedBoundary = \case
+  L.OnceHook -> False
+  OnceHookRelease -> False
+  L.ThreadHook -> True
+  ThreadHookRelease -> True
+  L.TestHook -> True
+  TestHookRelease -> True
+  L.Group -> True
+  L.Fixture -> True
+  L.Test -> True
+
 chkStartEndIntegrity :: [[ExeEvent]] -> IO ()
 chkStartEndIntegrity =
   traverse_ chkThread
   where
     chkThread :: [ExeEvent] -> IO ()
-    chkThread = uu
+    chkThread evts = 
+      here
+       uu
+      where
+       r = foldl' chkEvent M.empty evts
+
+    chkEvent :: M.Map Loc (ST.Set Loc) -> ExeEvent -> M.Map Loc (ST.Set Loc)
+    chkEvent acc evt = case evt of
+      StartExecution {} -> acc
+      Start {eventType} ->
+        threadedBoundary eventType
+          ? chkStart acc evt
+          $ acc
+      End {eventType} ->
+        threadedBoundary eventType
+          ? chkEnd acc evt
+          $ acc
+      Failure {} -> acc
+      ParentFailure {} -> acc
+      Debug {} -> acc
+      EndExecution {} -> acc
 
     chkStart :: M.Map Loc (ST.Set Loc) -> ExeEvent -> M.Map Loc (ST.Set Loc)
-    chkStart m s =
-      M.member (partialLoc s) m
-        ? error ("Duplicate start events in same thread\n " <> ppShow s)
-        $ here
+    chkStart m e =
+      M.member eLoc m
+        ? error ("Duplicate start events in same thread\n " <> ppShow e)
+        $ M.insert eLoc ST.empty $ ST.insert eLoc <$> m
+      where
+        eLoc = partialLoc e
 
-    chkEnd :: M.Map Loc (ST.Set Loc) -> Loc -> M.Map Loc (ST.Set Loc)
-    chkEnd = uu
+    -- TODO - change uu to error
+    -- TODO chkFalse'
+    chkEnd :: M.Map Loc (ST.Set Loc) -> ExeEvent -> M.Map Loc (ST.Set Loc)
+    chkEnd m e =
+      M.lookup eLoc m
+        & maybe
+          (error $ "Event end where event not started in same thread\n " <> ppShow e)
+          ( \s ->
+              ST.null s
+                & P.bool
+                  ( error $
+                      "Event ended before child events finished\n Event: \n"
+                        <> ppShow e
+                        <> "\nOpen child locs\n"
+                        <> ppShow s
+                  )
+                  (M.delete eLoc m)
+          )
+      where
+        eLoc = partialLoc e
 
 chkLaws :: Int -> Template -> [ExeEvent] -> IO ()
 chkLaws mxThrds t evts =

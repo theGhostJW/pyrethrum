@@ -91,6 +91,7 @@ import Pyrelude as P
     txt,
     txtPretty,
     uncurry,
+    unless,
     uu,
     when,
     whenJust,
@@ -368,7 +369,7 @@ partialLoc = \case
   Debug {} -> boom "Debug"
   EndExecution {} -> boom "EndExecution"
   where
-    boom msg = error "BOOM - partialLoc called on: " <> msg <> " which does not have a loc property"
+    boom msg = error $ "BOOM - partialLoc called on: " <> msg <> " which does not have a loc property"
 
 startTag :: ExeEvent -> Text
 startTag =
@@ -640,16 +641,18 @@ threadedBoundary = \case
   L.Fixture -> True
   L.Test -> True
 
+-- TODO: Error -> txt
 chkStartEndIntegrity :: [[ExeEvent]] -> IO ()
 chkStartEndIntegrity =
   traverse_ chkThread
   where
     chkThread :: [ExeEvent] -> IO ()
-    chkThread evts = 
-      here
-       uu
+    chkThread evts =
+      unless (M.null r)
+        . error
+        $ "events still open when thread finalised\n" <> ppShow r
       where
-       r = foldl' chkEvent M.empty evts
+        r = foldl' chkEvent M.empty evts
 
     chkEvent :: M.Map Loc (ST.Set Loc) -> ExeEvent -> M.Map Loc (ST.Set Loc)
     chkEvent acc evt = case evt of

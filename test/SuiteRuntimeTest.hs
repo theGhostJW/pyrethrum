@@ -694,7 +694,7 @@ chkStartEndIntegrity =
                         <> "\nOpen child locs\n"
                         <> ppShow s
                   )
-                  (M.delete eLoc m)
+                  (M.delete eLoc $ ST.delete eLoc <$> m)
           )
       where
         eLoc = partialLoc e
@@ -799,7 +799,7 @@ superSimplSuite =
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 
--- $ > unit_simple_single_failure
+-- $> unit_simple_single_failure
 
 unit_simple_single_failure :: IO ()
 unit_simple_single_failure = runTest 1 $ TFixture "Fx 0" [testProps "Fx 0" 0 0 True]

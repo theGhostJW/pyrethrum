@@ -107,7 +107,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||),
+    (||), Applicative ((<*>)), sequenceA_,
   )
 import Pyrelude.Test as T hiding (chkEq, chkEq', filter, maybe, singleton)
 import TempUtils (debugLines)
@@ -392,13 +392,15 @@ chkLeafEvents :: ExeEventType -> [[ExeEvent]] -> IO ()
 chkLeafEvents targetEventType =
   traverse_ chkEvents
   where
-    targStr= show targetEventType
+    targStr = show targetEventType
+    matchesTarg = (targetEventType ==)
+
     chkEvents :: [ExeEvent] -> IO ()
     chkEvents evts' = do
       foldl' chkEvent Nothing evts'
         & maybe
           (pure ())
-          (\fx -> error $ targStr <>" started not ended in same thread\n" <> ppShow fx)
+          (\fx -> error $ targStr <> " started not ended in same thread\n" <> ppShow fx)
       chkTestIdsConsecutive evts'
 
     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
@@ -410,9 +412,8 @@ chkLeafEvents targetEventType =
           ( -- outside fixture
             case evt of
               StartExecution {} -> Nothing
-              here
-              Start {eventType, loc} -> chkOutTestStartEnd True loc eventType
-              End {eventType, loc} -> chkOutTestStartEnd False loc eventType
+              Start {eventType, loc} -> chkOutEventStartEnd True loc eventType
+              End {eventType, loc} -> chkOutEventStartEnd False loc eventType
               Failure {} -> Nothing
               ParentFailure {} -> Nothing
               Debug {} -> Nothing
@@ -422,8 +423,8 @@ chkLeafEvents targetEventType =
             \tstLoc ->
               case evt of
                 StartExecution {} -> failIn "StartExecution"
-                Start {eventType, loc} -> chkInTestStartEnd True tstLoc loc eventType
-                End {eventType, loc} -> chkInTestStartEnd False tstLoc loc eventType
+                Start {eventType, loc} -> chkInEventStartEnd True tstLoc loc eventType
+                End {eventType, loc} -> chkInEventStartEnd False tstLoc loc eventType
                 Failure {} -> mTstLoc
                 ParentFailure {} -> mTstLoc
                 Debug {} -> mTstLoc
@@ -431,116 +432,44 @@ chkLeafEvents targetEventType =
           )
       where
         fail msg = error $ msg <> "\n" <> ppShow evt
-        failOut et = fail $ et <> " must occur within start / end of test in same thread"
-        failIn et = fail $ et <> " must only occur outside a test in same thread"
+        strTrg = show targetEventType
+        failIn s = fail $ s <> " must only occur outside a " <> strTrg <> " in same thread"
 
-        chkOutTestStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
-        chkOutTestStartEnd isStart' evtLoc = \case
-          L.OnceHook -> Nothing
-          OnceHookRelease -> Nothing
-          L.ThreadHook -> Nothing
-          ThreadHookRelease -> Nothing
-          L.TestHook -> Nothing
-          TestHookRelease -> Nothing
-          L.Group -> Nothing
-          L.Fixture -> Nothing
-          L.Test ->
-            isStart'
-              ? Just evtLoc
-              $ fail "End test when test not started"
+        chkOutEventStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
+        chkOutEventStartEnd isStart' evtLoc =
+          P.bool
+            Nothing
+            ( isStart'
+                ? Just evtLoc
+                $ fail $ "End " <> strTrg <> " when not started"
+            )
+            . matchesTarg
 
-        chkInTestStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
-        chkInTestStartEnd isStart' fxLoc evtLoc = \case
-          L.OnceHook -> failIn "OnceHook"
-          OnceHookRelease -> failIn "OnceHookRelease"
-          L.ThreadHook -> failIn "ThreadHook"
-          ThreadHookRelease -> failIn "ThreadHookRelease"
-          L.TestHook -> failIn "TestHook"
-          TestHookRelease -> failIn "TestHookRelease"
-          L.Group -> failIn "Group"
-          L.Fixture -> failIn "Fixture"
-          L.Test {} ->
-            isStart'
-              ? fail "Nested tests - test started when a test is alreeady running in the same thread"
-              $ (fxLoc == evtLoc)
-                ? Nothing
-                $ fail "test end loc does not match test start loc"
+        chkInEventStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
+        chkInEventStartEnd isStart' fxLoc evtLoc evt' =
+          let sevt = show evt'
+           in matchesTarg evt'
+                ? ( isStart'
+                      ? fail ("Nested " <> sevt <> " - " <> sevt <> " started when a " <> sevt <> " is alreeady running in the same thread")
+                      $ fxLoc == evtLoc
+                        ? Nothing
+                        $ fail (strTrg <> " end loc does not match " <> strTrg <> " start loc")
+                  )
+                $ failIn sevt
 
-chkTests :: [[ExeEvent]] -> IO ()
-chkTests =
-  traverse_ chkEvents
-  where
-    chkEvents :: [ExeEvent] -> IO ()
-    chkEvents evts' = do
-      foldl' chkEvent Nothing evts'
-        & maybe
-          (pure ())
-          (\fx -> error $ "Test started not ended in same thread\n" <> ppShow fx)
-      chkTestIdsConsecutive evts'
-
-    chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
-    chkEvent mTstLoc evt =
-      -- TODO: format on debug'
-      -- P.debug' (txt $ ppShow evt) $
-      mTstLoc
-        & maybe
-          ( -- outside fixture
-            case evt of
-              StartExecution {} -> Nothing
-              Start {eventType, loc} -> chkOutTestStartEnd True loc eventType
-              End {eventType, loc} -> chkOutTestStartEnd False loc eventType
-              Failure {} -> Nothing
-              ParentFailure {} -> Nothing
-              Debug {} -> Nothing
-              EndExecution {} -> Nothing
-          )
-          ( -- within fixture
-            \tstLoc ->
-              case evt of
-                StartExecution {} -> failIn "StartExecution"
-                Start {eventType, loc} -> chkInTestStartEnd True tstLoc loc eventType
-                End {eventType, loc} -> chkInTestStartEnd False tstLoc loc eventType
-                Failure {} -> mTstLoc
-                ParentFailure {} -> mTstLoc
-                Debug {} -> mTstLoc
-                EndExecution {} -> failIn "EndExecution"
-          )
-      where
-        fail msg = error $ msg <> "\n" <> ppShow evt
-        failOut et = fail $ et <> " must occur within start / end of test in same thread"
-        failIn et = fail $ et <> " must only occur outside a test in same thread"
-
-        chkOutTestStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
-        chkOutTestStartEnd isStart' evtLoc = \case
-          L.OnceHook -> Nothing
-          OnceHookRelease -> Nothing
-          L.ThreadHook -> Nothing
-          ThreadHookRelease -> Nothing
-          L.TestHook -> Nothing
-          TestHookRelease -> Nothing
-          L.Group -> Nothing
-          L.Fixture -> Nothing
-          L.Test ->
-            isStart'
-              ? Just evtLoc
-              $ fail "End test when test not started"
-
-        chkInTestStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
-        chkInTestStartEnd isStart' fxLoc evtLoc = \case
-          L.OnceHook -> failIn "OnceHook"
-          OnceHookRelease -> failIn "OnceHookRelease"
-          L.ThreadHook -> failIn "ThreadHook"
-          ThreadHookRelease -> failIn "ThreadHookRelease"
-          L.TestHook -> failIn "TestHook"
-          TestHookRelease -> failIn "TestHookRelease"
-          L.Group -> failIn "Group"
-          L.Fixture -> failIn "Fixture"
-          L.Test {} ->
-            isStart'
-              ? fail "Nested tests - test started when a test is alreeady running in the same thread"
-              $ (fxLoc == evtLoc)
-                ? Nothing
-                $ fail "test end loc does not match test start loc"
+chkAllLeafEvents :: [[ExeEvent]] -> IO ()
+chkAllLeafEvents evts = 
+  traverse_ 
+    (`chkLeafEvents` evts) 
+    [
+      L.OnceHook,
+      L.OnceHookRelease,
+      L.ThreadHook,
+      L.ThreadHookRelease,
+      L.TestHook,
+      L.TestHookRelease,
+      L.Test
+    ]
 
 chkFixtures :: [[ExeEvent]] -> IO ()
 chkFixtures =
@@ -792,8 +721,7 @@ chkLaws mxThrds t evts =
       [ chkStartEndIntegrity,
         chkFixtures,
         traverse_ chkTestIdsConsecutive,
-        chkTests --,
-        -- chkTestHooks t
+        chkAllLeafEvents
       ]
     chk'
       ( "max execution threads + 2: "

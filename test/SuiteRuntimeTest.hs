@@ -207,43 +207,49 @@ foldTemplate seed combine =
 parentMap :: Template -> M.Map Text (Maybe Template)
 parentMap = foldTemplate M.empty (\p c m -> M.insert (ttag c) (Just p) m)
 
-threadParentMap :: Template -> M.Map Text []
-
-threadParents :: M.Map Text (Maybe Template) -> Template -> [Template]
-threadParents rootmap tmp =
-  reverse (prnts isTstHk [] tmp) <> reverse (prnts isThrdHkorGrp [] tmp)
-  where
-    prnts :: (Template -> Bool) -> [Template] -> Template -> [Template]
-    prnts pred acc chld =
-      (rootmap M.! ttag chld)
-        & maybe
-          acc
-          ( \t ->
-              prnts
-                pred
-                ( pred t ? t : acc $ acc
-                )
-                t
-          )
-
-    isTstHk :: Template -> Bool
-    isTstHk = \case
-      TGroup {} -> False
-      TOnceHook {} -> False
-      TThreadHook {} -> False
-      TTestHook {} -> True
-      TFixture {} -> False
-
-    isThrdHkorGrp :: Template -> Bool
-    isThrdHkorGrp  = \case
-      TGroup {} -> True
-      TOnceHook {} -> False
-      TThreadHook {} -> True
-      TTestHook {} -> False
-      TFixture {} -> False
-
 templateList :: Template -> [Template]
 templateList t = foldTemplate [t] (\_p c l -> c : l) t
+
+threadParentMap :: Template -> M.Map Text [Text]
+threadParentMap root =
+  (ttag <$>) <$> (threadParents rootMap <$> M.fromList ((\t -> (ttag t, t)) <$> templateList root))
+  where
+    rootMap :: M.Map Text (Maybe Template)
+    rootMap = parentMap root
+
+    threadParents :: M.Map Text (Maybe Template) -> Template -> [Template]
+    threadParents rootmap tmp =
+      reverse (prnts isTstHk [] tmp) <> reverse (prnts isThrdHkorGrp [] tmp)
+      where
+        prnts :: (Template -> Bool) -> [Template] -> Template -> [Template]
+        prnts pred acc chld =
+          (rootmap M.! ttag chld)
+            & maybe
+              acc
+              (\t -> prnts pred (pred t ? t : acc $ acc) t)
+
+        isTstHk :: Template -> Bool
+        isTstHk = \case
+          TGroup {} -> False
+          TOnceHook {} -> False
+          TThreadHook {} -> False
+          TTestHook {} -> True
+          TFixture {} -> False
+
+        isThrdHkorGrp :: Template -> Bool
+        isThrdHkorGrp = \case
+          TGroup {} -> True
+          TOnceHook {} -> False
+          TThreadHook {} -> True
+          TTestHook {} -> False
+          TFixture {} -> False
+
+chkParentOrder :: Template -> [ExeEvent]
+chkParentOrder root = 
+  uu 
+  where 
+    tpm = threadParentMap root 
+    here ALso check there is a chk for fix contains all tests
 
 templateTestCount :: [Template] -> Int
 templateTestCount ts =

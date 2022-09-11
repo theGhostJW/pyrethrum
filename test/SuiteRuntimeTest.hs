@@ -7,7 +7,8 @@ import Data.Aeson.Encoding (quarter)
 import Data.Aeson.TH
 import Data.Aeson.Types
 -- TODO Add to Pyrelude
-import Data.List.Extra (snoc)
+-- TODO Add to Pyrelude
+import Data.List.Extra (lookup, snoc)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as ST
 import qualified Data.Text as Txt
@@ -28,7 +29,8 @@ import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
 import Pyrelude as P
-  ( Bool (..),
+  ( Applicative ((<*>)),
+    Bool (..),
     Either,
     Enum (succ),
     Eq (..),
@@ -81,6 +83,7 @@ import Pyrelude as P
     replace,
     replicateM_,
     reverse,
+    sequenceA_,
     singleton,
     snd,
     sortOn,
@@ -107,7 +110,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||), Applicative ((<*>)), sequenceA_,
+    (||),
   )
 import Pyrelude.Test as T hiding (chkEq, chkEq', filter, maybe, singleton)
 import TempUtils (debugLines)
@@ -199,10 +202,45 @@ foldTemplate seed combine =
             TOnceHook {tChild} -> recurse tChild
             TThreadHook {tChild} -> recurse tChild
             TTestHook {tChild} -> recurse tChild
-            TFixture {ttag} -> acc
+            TFixture {} -> acc
 
 parentMap :: Template -> M.Map Text (Maybe Template)
 parentMap = foldTemplate M.empty (\p c m -> M.insert (ttag c) (Just p) m)
+
+threadParentMap :: Template -> M.Map Text []
+
+threadParents :: M.Map Text (Maybe Template) -> Template -> [Template]
+threadParents rootmap tmp =
+  reverse (prnts isTstHk [] tmp) <> reverse (prnts isThrdHkorGrp [] tmp)
+  where
+    prnts :: (Template -> Bool) -> [Template] -> Template -> [Template]
+    prnts pred acc chld =
+      (rootmap M.! ttag chld)
+        & maybe
+          acc
+          ( \t ->
+              prnts
+                pred
+                ( pred t ? t : acc $ acc
+                )
+                t
+          )
+
+    isTstHk :: Template -> Bool
+    isTstHk = \case
+      TGroup {} -> False
+      TOnceHook {} -> False
+      TThreadHook {} -> False
+      TTestHook {} -> True
+      TFixture {} -> False
+
+    isThrdHkorGrp :: Template -> Bool
+    isThrdHkorGrp  = \case
+      TGroup {} -> True
+      TOnceHook {} -> False
+      TThreadHook {} -> True
+      TTestHook {} -> False
+      TFixture {} -> False
 
 templateList :: Template -> [Template]
 templateList t = foldTemplate [t] (\_p c l -> c : l) t
@@ -458,11 +496,10 @@ chkLeafEvents targetEventType =
                 $ failIn sevt
 
 chkAllLeafEvents :: [[ExeEvent]] -> IO ()
-chkAllLeafEvents evts = 
-  traverse_ 
-    (`chkLeafEvents` evts) 
-    [
-      L.OnceHook,
+chkAllLeafEvents evts =
+  traverse_
+    (`chkLeafEvents` evts)
+    [ L.OnceHook,
       L.OnceHookRelease,
       L.ThreadHook,
       L.ThreadHookRelease,
@@ -471,6 +508,7 @@ chkAllLeafEvents evts =
       L.Test
     ]
 
+-- # TODO replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
 chkFixtures :: [[ExeEvent]] -> IO ()
 chkFixtures =
   traverse_ chkEvents
@@ -717,7 +755,7 @@ chkLaws mxThrds t evts =
         chkFxtrCount templateAsList
       ]
     traverse_
-      (\f -> f threadedEvents)
+      (threadedEvents &)
       [ chkStartEndIntegrity,
         chkFixtures,
         traverse_ chkTestIdsConsecutive,

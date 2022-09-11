@@ -244,12 +244,28 @@ threadParentMap root =
           TTestHook {} -> False
           TFixture {} -> False
 
-chkParentOrder :: Template -> [ExeEvent]
-chkParentOrder root = 
+chkParentOrder :: Template -> [ExeEvent] -> IO ()
+chkParentOrder rootTpl thrdEvts = 
   uu 
   where 
-    tpm = threadParentMap root 
-    here ALso check there is a chk for fix contains all tests
+    tpm = threadParentMap rootTpl
+
+    chkParentEndEvents :: [ExeEvent] -> IO ()
+    chkParentEndEvents = \case
+      [] -> pure ()
+      e : es -> 
+        let 
+         nxt = chkParentEndEvents es
+        in
+        case e of
+          StartExecution {} -> nxt
+          Start loc eet n txt -> _
+          End {loc} -> here >> nxt
+          Failure {} -> nxt
+          ParentFailure {} -> nxt
+          Debug {} -> nxt
+          EndExecution {}  -> nxt
+
 
 templateTestCount :: [Template] -> Int
 templateTestCount ts =
@@ -363,6 +379,7 @@ chkThreadLogsInOrder evts =
                     <> "\n"
                     <> toS (ppShow ev2)
         )
+
 
 chkStartEndExecution :: [ExeEvent] -> IO ()
 chkStartEndExecution evts =
@@ -753,6 +770,7 @@ chkStartEndIntegrity =
 chkLaws :: Int -> Template -> [ExeEvent] -> IO ()
 chkLaws mxThrds t evts =
   do
+    -- TODO check there is a chk for fix contains all tests
     traverse_
       (evts &)
       [ chkThreadLogsInOrder,

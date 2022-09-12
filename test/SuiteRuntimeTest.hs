@@ -22,6 +22,7 @@ import Internal.RunTimeLogging as L
     Loc (..),
     LogControls (..),
     Sink,
+    getTag,
     mkLogger,
     testLogControls,
   )
@@ -37,7 +38,7 @@ import Pyrelude as P
     Foldable (foldl, sum),
     IO,
     Int,
-    ListLike (drop, foldl', foldl1, head, null, takeWhileEnd, unsafeHead, unsafeLast),
+    ListLike (all, drop, foldl', foldl1, head, null, takeWhileEnd, unsafeHead, unsafeLast),
     Maybe (Just, Nothing),
     Num ((+)),
     Ord (..),
@@ -185,7 +186,7 @@ data Template
       { ttag :: Text,
         tTests :: [IOProps]
       }
-  deriving (Show)
+  deriving Show
 
 type TextLogger = Text -> IO ()
 
@@ -210,6 +211,7 @@ parentMap = foldTemplate M.empty (\p c m -> M.insert (ttag c) (Just p) m)
 templateList :: Template -> [Template]
 templateList t = foldTemplate [t] (\_p c l -> c : l) t
 
+-- map fo child loc => parent locs (only: TTestHook, TThreadHook, TGroup)
 threadParentMap :: Template -> M.Map Text [Text]
 threadParentMap root =
   (ttag <$>) <$> (threadParents rootMap <$> M.fromList ((\t -> (ttag t, t)) <$> templateList root))
@@ -223,7 +225,7 @@ threadParentMap root =
       where
         prnts :: (Template -> Bool) -> [Template] -> Template -> [Template]
         prnts pred acc chld =
-          (rootmap M.! ttag chld)
+          P.debug' "threadParents" (rootmap M.! ttag chld)
             & maybe
               acc
               (\t -> prnts pred (pred t ? t : acc $ acc) t)
@@ -245,27 +247,43 @@ threadParentMap root =
           TFixture {} -> False
 
 chkParentOrder :: Template -> [ExeEvent] -> IO ()
-chkParentOrder rootTpl thrdEvts = 
-  uu 
-  where 
+chkParentOrder rootTpl thrdEvts =
+  chkParents "Parent start events (working back from child)" revEvntStartLocs
+    >> chkParents "Parent end events (working forward from child)" evntEndLocs
+  where
     tpm = threadParentMap rootTpl
+    revEvntStartLocs = catMaybes $ boundryLoc True <$> reverse thrdEvts
+    evntEndLocs = catMaybes $ boundryLoc False <$> thrdEvts
 
-    chkParentEndEvents :: [ExeEvent] -> IO ()
-    chkParentEndEvents = \case
+    chkParents :: Text -> [Loc] -> IO ()
+    chkParents errPrefix = \case
       [] -> pure ()
-      e : es -> 
-        let 
-         nxt = chkParentEndEvents es
-        in
-        case e of
-          StartExecution {} -> nxt
-          Start loc eet n txt -> _
-          End {loc} -> here >> nxt
-          Failure {} -> nxt
-          ParentFailure {} -> nxt
-          Debug {} -> nxt
-          EndExecution {}  -> nxt
+      l : ls ->
+        getTag l
+          & maybe
+            (pure ())
+            ( \t ->
+                let expected = Just <$> P.debug' "chkParents" (tpm M.! t)
+                    eaTags = zip expected ls
+                    actual = getTag . snd <$> eaTags
+                 in when (length eaTags < length expected || expected /= actual) $
+                      error $
+                        toS errPrefix
+                          <> " not as expected"
+                          <> "\n expected:\n"
+                          <> ppShow expected
+                          <> "\n got:\n"
+                          <> ppShow actual
+            )
 
+    boundryLoc useStart = \case
+      StartExecution {} -> Nothing
+      Start {loc} -> useStart ? Just loc $ Nothing
+      End {loc} -> useStart ? Nothing $ Just loc
+      Failure {} -> Nothing
+      ParentFailure {} -> Nothing
+      Debug {} -> Nothing
+      EndExecution {} -> Nothing
 
 templateTestCount :: [Template] -> Int
 templateTestCount ts =
@@ -380,7 +398,6 @@ chkThreadLogsInOrder evts =
                     <> toS (ppShow ev2)
         )
 
-
 chkStartEndExecution :: [ExeEvent] -> IO ()
 chkStartEndExecution evts =
   se
@@ -417,7 +434,13 @@ chkMaxThreads mxThrds threadedEvents =
   let baseThrds = 2 -- should be 1
       allowed = mxThrds + baseThrds
    in chk' --TODO: chk' formatting
-        ("max execution threads + " <> txt baseThrds <> ": " <> txt allowed <> " exceeded: " <> txt (length threadedEvents) <> "\n" <> txt (ppShow ((threadId <$>) <$> threadedEvents)))
+        ( "max execution threads + " <> txt baseThrds <> ": "
+            <> txt allowed
+            <> " exceeded: "
+            <> txt (length threadedEvents)
+            <> "\n"
+            <> txt (ppShow ((threadId <$>) <$> threadedEvents))
+        )
         $ length threadedEvents <= allowed -- baseThrds + exe threads
 
 partialLoc :: ExeEvent -> Loc
@@ -783,7 +806,8 @@ chkLaws mxThrds t evts =
       [ chkStartEndIntegrity,
         chkFixtures,
         traverse_ chkTestIdsConsecutive,
-        chkAllLeafEvents
+        chkAllLeafEvents,
+        traverse_ (chkParentOrder t)
       ]
     chk'
       ( "max execution threads + 2: "

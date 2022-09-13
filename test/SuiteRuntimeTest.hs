@@ -111,7 +111,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||),
+    (||), Category (id),
   )
 import Pyrelude.Test as T hiding (chkEq, chkEq', filter, maybe, singleton)
 import TempUtils (debugLines)
@@ -186,13 +186,13 @@ data Template
       { ttag :: Text,
         tTests :: [IOProps]
       }
-  deriving Show
+  deriving (Show)
 
 type TextLogger = Text -> IO ()
 
 foldTemplate :: forall a. a -> (Template -> Template -> a -> a) -> Template -> a
 foldTemplate seed combine =
-  pm seed
+  pm seed . P.debug' "****** Template"
   where
     pm :: a -> Template -> a
     pm acc t =
@@ -206,7 +206,9 @@ foldTemplate seed combine =
             TFixture {} -> acc
 
 parentMap :: Template -> M.Map Text (Maybe Template)
-parentMap = foldTemplate M.empty (\p c m -> M.insert (ttag c) (Just p) m)
+parentMap t = 
+  here add tests to parent map
+  P.debug' "****** parentMap" $ foldTemplate (M.singleton (ttag t) Nothing) (\p c m -> M.insert (ttag c) (Just p) m) t
 
 templateList :: Template -> [Template]
 templateList t = foldTemplate [t] (\_p c l -> c : l) t
@@ -214,10 +216,10 @@ templateList t = foldTemplate [t] (\_p c l -> c : l) t
 -- map fo child loc => parent locs (only: TTestHook, TThreadHook, TGroup)
 threadParentMap :: Template -> M.Map Text [Text]
 threadParentMap root =
-  (ttag <$>) <$> (threadParents rootMap <$> M.fromList ((\t -> (ttag t, t)) <$> templateList root))
+  (ttag <$>) <$> (threadParents rootMap <$> M.fromList ((\t -> (ttag t, t)) <$> templateList root)) & debug' "PARENT MAP"
   where
     rootMap :: M.Map Text (Maybe Template)
-    rootMap = parentMap root
+    rootMap = parentMap root & P.debug' "****** threadParents"
 
     threadParents :: M.Map Text (Maybe Template) -> Template -> [Template]
     threadParents rootmap tmp =
@@ -225,7 +227,7 @@ threadParentMap root =
       where
         prnts :: (Template -> Bool) -> [Template] -> Template -> [Template]
         prnts pred acc chld =
-          P.debug' "threadParents" (rootmap M.! ttag chld)
+          (getValThrow rootmap (ttag chld & P.debug' "SEEKING TAG: ")) & P.debug' "!!!!!!! threadParents  !!!!!!"
             & maybe
               acc
               (\t -> prnts pred (pred t ? t : acc $ acc) t)
@@ -246,15 +248,24 @@ threadParentMap root =
           TTestHook {} -> False
           TFixture {} -> False
 
+
+getValThrow :: (Ord k, Show k, Show v) => M.Map k v -> k -> v
+getValThrow m k =
+  (m M.!? k) & maybe
+    (error $ show k <> " not found in " <> ppShow m)
+    id
+
+
 chkParentOrder :: Template -> [ExeEvent] -> IO ()
 chkParentOrder rootTpl thrdEvts =
   chkParents "Parent start events (working back from child)" revEvntStartLocs
     >> chkParents "Parent end events (working forward from child)" evntEndLocs
   where
-    tpm = threadParentMap rootTpl
+    tpm = threadParentMap rootTpl & P.debug' "tpm"
     revEvntStartLocs = catMaybes $ boundryLoc True <$> reverse thrdEvts
     evntEndLocs = catMaybes $ boundryLoc False <$> thrdEvts
 
+    -- TODO: Update exception handling with debug info
     chkParents :: Text -> [Loc] -> IO ()
     chkParents errPrefix = \case
       [] -> pure ()
@@ -263,8 +274,8 @@ chkParentOrder rootTpl thrdEvts =
           & maybe
             (pure ())
             ( \t ->
-                let expected = Just <$> P.debug' "chkParents" (tpm M.! t)
-                    eaTags = zip expected ls
+                let expected = Just <$> P.debug' "chkParents" (getValThrow tpm (t & P.debug' "SEEKING (chkParents) TAG: "))
+                    eaTags = P.debug' "eaTags" $ zip expected ls
                     actual = getTag . snd <$> eaTags
                  in when (length eaTags < length expected || expected /= actual) $
                       error $
@@ -892,7 +903,7 @@ superSimplSuite =
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 
--- $> unit_simple_single_failure
+-- $ > unit_simple_single_failure
 
 unit_simple_single_failure :: IO ()
 unit_simple_single_failure = runTest 1 $ TFixture "Fx 0" [testProps "Fx 0" 0 0 True]

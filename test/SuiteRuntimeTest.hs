@@ -206,31 +206,57 @@ foldTemplate seed combine =
             TFixture {} -> acc
 
 parentMap :: Template -> M.Map Text (Maybe Template)
-parentMap t = 
-  here add tests to parent map
-  P.debug' "****** parentMap" $ foldTemplate (M.singleton (ttag t) Nothing) (\p c m -> M.insert (ttag c) (Just p) m) t
+parentMap t =
+   P.debug' "****** parentMap" $
+    foldTemplate
+      (insertTests (M.singleton (ttag t) Nothing) t)
+      (\p c m -> insertTests (M.insert (ttag c) (Just p) m) c) t
+    where
+      insertTests :: M.Map Text (Maybe Template) -> Template -> M.Map Text (Maybe Template)
+      insertTests m = \case
+        TGroup {} -> m
+        TOnceHook {} -> m
+        TThreadHook {}-> m
+        TTestHook {}-> m
+        -- add an element for each test
+        fx@TFixture {tTests, ttag} ->
+          foldl'
+            (\m3 (idx, _t) -> M.insert (ttag <> "." <> txt idx) (Just fx) m3)
+            m
+            (zip [0..] tTests)
+
 
 templateList :: Template -> [Template]
 templateList t = foldTemplate [t] (\_p c l -> c : l) t
 
--- map fo child loc => parent locs (only: TTestHook, TThreadHook, TGroup)
+-- map fo child loc => parent locs (only: Fixture (parent of tests), TTestHook, TThreadHook, TGroup - NOT Singleton hook)
 threadParentMap :: Template -> M.Map Text [Text]
 threadParentMap root =
-  (ttag <$>) <$> (threadParents rootMap <$> M.fromList ((\t -> (ttag t, t)) <$> templateList root)) & debug' "PARENT MAP"
+  (ttag <$>) <$> (threadParents <$> M.fromList ((\t -> (ttag t, t)) <$> templateList root)) & debug' "THREADED PARENT MAP - ISSUE HERE"
   where
     rootMap :: M.Map Text (Maybe Template)
-    rootMap = parentMap root & P.debug' "****** threadParents"
+    rootMap = parentMap root & P.debug' "****** ROOT MAP"
 
-    threadParents :: M.Map Text (Maybe Template) -> Template -> [Template]
-    threadParents rootmap tmp =
-      reverse (prnts isTstHk [] tmp) <> reverse (prnts isThrdHkorGrp [] tmp)
+    threadParents :: Template -> [Template]
+    threadParents tmp =
+      reverse (prnts isFixture [] tmp) <> 
+      reverse (prnts isTstHk [] tmp) <> 
+      reverse (prnts isThrdHkorGrp [] tmp)
       where
         prnts :: (Template -> Bool) -> [Template] -> Template -> [Template]
         prnts pred acc chld =
-          (getValThrow rootmap (ttag chld & P.debug' "SEEKING TAG: ")) & P.debug' "!!!!!!! threadParents  !!!!!!"
+          getValThrow rootMap (ttag chld & P.debug' "SEEKING TAG: ") & P.debug' "!!!!!!! threadParents ~  !!!!!!"
             & maybe
               acc
               (\t -> prnts pred (pred t ? t : acc $ acc) t)
+
+        isFixture :: Template -> Bool
+        isFixture = \case
+          TGroup {} -> False
+          TOnceHook {} -> False
+          TThreadHook {} -> False
+          TTestHook {} -> False
+          TFixture {} -> True
 
         isTstHk :: Template -> Bool
         isTstHk = \case
@@ -261,7 +287,8 @@ chkParentOrder rootTpl thrdEvts =
   chkParents "Parent start events (working back from child)" revEvntStartLocs
     >> chkParents "Parent end events (working forward from child)" evntEndLocs
   where
-    tpm = threadParentMap rootTpl & P.debug' "tpm"
+    here
+    tpm = threadParentMap rootTpl & P.debug' "threadParentMap OUTPUT"
     revEvntStartLocs = catMaybes $ boundryLoc True <$> reverse thrdEvts
     evntEndLocs = catMaybes $ boundryLoc False <$> thrdEvts
 

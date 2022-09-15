@@ -205,6 +205,10 @@ foldTemplate seed combine =
             TTestHook {tChild} -> recurse tChild
             TFixture {} -> acc
 
+here 
+  - parent map => Template -> template
+  - make threaded parent map tag -> tag not tag -> [] recursive so only need to check immediate parent 
+  - move test gen logic to threaded parent map 
 parentMap :: Template -> M.Map Text (Maybe Template)
 parentMap t =
    P.debug' "****** parentMap" $
@@ -239,13 +243,12 @@ threadParentMap root =
 
     threadParents :: Template -> [Template]
     threadParents tmp =
-      reverse (prnts isFixture [] tmp) <> 
       reverse (prnts isTstHk [] tmp) <> 
-      reverse (prnts isThrdHkorGrp [] tmp)
+      reverse (prnts isThrdHkorGrp [] tmp) & P.debug' "!!!!!!! threadParents ~  !!!!!!"
       where
         prnts :: (Template -> Bool) -> [Template] -> Template -> [Template]
         prnts pred acc chld =
-          getValThrow rootMap (ttag chld & P.debug' "SEEKING TAG: ") & P.debug' "!!!!!!! threadParents ~  !!!!!!"
+          getValThrow rootMap (ttag chld) 
             & maybe
               acc
               (\t -> prnts pred (pred t ? t : acc $ acc) t)
@@ -287,7 +290,6 @@ chkParentOrder rootTpl thrdEvts =
   chkParents "Parent start events (working back from child)" revEvntStartLocs
     >> chkParents "Parent end events (working forward from child)" evntEndLocs
   where
-    here
     tpm = threadParentMap rootTpl & P.debug' "threadParentMap OUTPUT"
     revEvntStartLocs = catMaybes $ boundryLoc True <$> reverse thrdEvts
     evntEndLocs = catMaybes $ boundryLoc False <$> thrdEvts

@@ -113,7 +113,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||),
+    (||), fst,
   )
 import Pyrelude.Test as T hiding (chkEq, chkEq', filter, maybe, singleton)
 import TempUtils (debugLines)
@@ -194,7 +194,7 @@ type TextLogger = Text -> IO ()
 
 foldTemplate :: forall a. a -> (Template -> Template -> a -> a) -> Template -> a
 foldTemplate seed combine =
-  pm seed . P.debug' "****** Template"
+  pm seed
   where
     pm :: a -> Template -> a
     pm acc t =
@@ -207,14 +207,8 @@ foldTemplate seed combine =
             TTestHook {tChild} -> recurse tChild
             TFixture {} -> acc
 
-tagMap :: Template -> M.Map Text Template
-tagMap t =
-  let insert t' = M.insert (ttag t') t'
-   in foldTemplate (insert t M.empty) (\_p c m -> insert c m) t
-
 parentMap :: Template -> M.Map Text (Maybe Template)
 parentMap t =
-  P.debug' "****** parentMap" $
     foldTemplate
       (M.singleton (ttag t) Nothing)
       (\p c m -> M.insert (ttag c) (Just p) m)
@@ -223,12 +217,16 @@ parentMap t =
 templateList :: Template -> [Template]
 templateList t = foldTemplate [t] (\_p c l -> c : l) t
 
+testTags :: Text -> [IOProps] -> [Text]
+testTags fxTag tsts = 
+  (\it -> fxTag <> "." <> txt (fst it)) <$>  zip [0 ..] tsts
+
 threadParentMap :: Template -> M.Map Text (Maybe Text)
 threadParentMap root =
   (ttag <$>) <$> foldl' insertTests ((>>= threadParent) <$> rootMap) (templateList root)
   where
     rootMap :: M.Map Text (Maybe Template)
-    rootMap = parentMap root & P.debug' "****** ROOT MAP"
+    rootMap = parentMap root
 
     insertTests :: M.Map Text (Maybe Template) -> Template -> M.Map Text (Maybe Template)
     insertTests m = \case
@@ -239,9 +237,9 @@ threadParentMap root =
       -- add an element for each test
       fx@TFixture {tTests, ttag} ->
         foldl'
-          (\m3 (idx, _t) -> M.insert (ttag <> "." <> txt idx) (Just fx) m3)
+          (\m' tsttg -> M.insert tsttg (Just fx) m')
           m
-          (zip [0 ..] tTests)
+          (testTags ttag tTests)
 
     threadParent :: Template -> Maybe Template
     threadParent tmp =
@@ -281,15 +279,46 @@ data EvInfo = EvInfo
     et :: ExeEventType
   }
 
+chkFixturesContainTests :: Template -> [Template] -> [[ExeEvent]] -> IO ()
+chkFixturesContainTests root tList tevts =
+  uu
+  here use groupOn 
+  where 
+    pm = threadParentMap root
+    actual = revStartEvents
+    getTests = \case 
+      TGroup {} -> Nothing
+      TOnceHook {} -> Nothing
+      TThreadHook{} -> Nothing
+      TTestHook {}-> Nothing
+      TFixture {} -> Nothing
+
+
+actualParentIgnoreTests :: ListLike m EvInfo i => m -> Maybe Text
+actualParentIgnoreTests evs = find (\EvInfo {et = et'} -> et' /= L.Test) evs >>= eitag
+
+revStartEvents :: [ExeEvent] -> [EvInfo]
+revStartEvents thrdEvts = catMaybes $ boundryLoc True <$> reverse thrdEvts
+
+boundryLoc :: Bool -> ExeEvent -> Maybe EvInfo
+boundryLoc useStart = \case
+  StartExecution {} -> Nothing
+  Start {loc, eventType} -> useStart ? Just (EvInfo (getTag loc) eventType) $ Nothing
+  End {loc, eventType} -> useStart ? Nothing $ Just (EvInfo (getTag loc) eventType)
+  Failure {} -> Nothing
+  ParentFailure {} -> Nothing
+  Debug {} -> Nothing
+  EndExecution {} -> Nothing
+
 -- check immediate parent (preceeding start or foollowing end) of each thread element 
 -- ignoring non threaded events when checking tests ignore other test start / ends
 chkParentOrder :: Template -> [ExeEvent] -> IO ()
 chkParentOrder rootTpl thrdEvts =
-  chkParents "Parent start event (working back from child)" revStartEvents
+  chkParents "Parent start event (working back from child)" revStartEvents'
     >> chkParents "Parent end event (working forward from child)" evntEndLocs
   where
-    tpm = threadParentMap rootTpl & P.debug' "threadParentMap OUTPUT"
-    revStartEvents = catMaybes $ boundryLoc True <$> reverse thrdEvts
+    tpm = threadParentMap rootTpl
+    revStartEvents' = revStartEvents thrdEvts
     evntEndLocs = catMaybes $ boundryLoc False <$> thrdEvts
 
     chkParents :: Text -> [EvInfo] -> IO ()
@@ -299,13 +328,13 @@ chkParentOrder rootTpl thrdEvts =
         EvInfo {eitag = tg, et} : evs ->
           let expected = tg >>= \t -> lookupThrow tpm t
               next = chkParents errPrefix evs
-              actualParentIgnoreTests = find (\EvInfo {et = et'} -> et' /= L.Test) evs >>= eitag
+              actualParentIgnoreTests' = actualParentIgnoreTests evs
               actualParent = head evs >>= eitag
               fail =
                 error . toS $
                   toS errPrefix <> "\n  expected (tag): " <> txt expected <> "  \ngot (tag): " <> txt actualParent
               chkParentIncTests = (expected /= actualParent) ? fail $ next
-              chkParentExclTests = (expected /= actualParentIgnoreTests) ? fail $ next
+              chkParentExclTests = (expected /= actualParentIgnoreTests') ? fail $ next
            in case et of
                 L.OnceHook -> next
                 L.OnceHookRelease -> next
@@ -317,14 +346,7 @@ chkParentOrder rootTpl thrdEvts =
                 L.Fixture -> chkParentIncTests
                 L.Test -> chkParentExclTests
 
-    boundryLoc useStart = \case
-      StartExecution {} -> Nothing
-      Start {loc, eventType} -> useStart ? Just (EvInfo (getTag loc) eventType) $ Nothing
-      End {loc, eventType} -> useStart ? Nothing $ Just (EvInfo (getTag loc) eventType)
-      Failure {} -> Nothing
-      ParentFailure {} -> Nothing
-      Debug {} -> Nothing
-      EndExecution {} -> Nothing
+
 
 templateTestCount :: [Template] -> Int
 templateTestCount ts =
@@ -533,7 +555,6 @@ chkLeafEvents targetEventType =
     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
     chkEvent mTstLoc evt =
       -- TODO: format on debug'
-      -- P.debug' (txt $ ppShow evt) $
       mTstLoc
         & maybe
           ( -- outside fixture
@@ -586,12 +607,19 @@ chkLeafEvents targetEventType =
                   )
                 $ failIn sevt
 
-chkAllLeafEvents :: [[ExeEvent]] -> IO ()
-chkAllLeafEvents evts =
+chkSingletonLeafEvents :: [ExeEvent] -> IO ()
+chkSingletonLeafEvents evts =
+  traverse_
+    (`chkLeafEvents` [evts])
+    [ L.OnceHook,
+      L.OnceHookRelease
+    ]
+
+chkThreadLeafEvents :: [[ExeEvent]] -> IO ()
+chkThreadLeafEvents evts =
   traverse_
     (`chkLeafEvents` evts)
-    [ L.OnceHook,
-      L.OnceHookRelease,
+    [ 
       L.ThreadHook,
       L.ThreadHookRelease,
       L.TestHook,
@@ -600,8 +628,8 @@ chkAllLeafEvents evts =
     ]
 
 -- # TODO replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
-chkFixtures :: [[ExeEvent]] -> IO ()
-chkFixtures =
+chkFixtureChildren :: [[ExeEvent]] -> IO ()
+chkFixtureChildren =
   traverse_ chkEvents
   where
     chkEvents :: [ExeEvent] -> IO ()
@@ -690,82 +718,6 @@ chkFxtrCount t =
     . groupOn partialLoc
     . filter (isStart L.Fixture)
 
--- chkTestHooks :: Template -> [[ExeEvent]] -> IO ()
--- chkTestHooks t =
---   traverse_ chkEvents
---   where
---     chkEvents :: [ExeEvent] -> IO ()
---     chkEvents evts' =
---       foldl' chkEvent Nothing evts'
---         & maybe
---           (pure ())
---           (\fx -> error $ "Fixture started not ended in same thread\n" <> ppShow fx)
-
---     -- no need to check called in right part of tree ie. within fixture out of test
---     -- those cases are covered in fixture and test
---     -- we also have check all tests occur in the correct fixture
---     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
---     chkEvent mfixLoc evt =
---       mfixLoc
---         & maybe
---           ( -- outside fixture
---             case evt of
---               StartExecution {} -> Nothing
---               Start {eventType, loc} -> chkOutOfFixtureStartEnd True loc eventType
---               End {eventType, loc} -> chkOutOfFixtureStartEnd False loc eventType
---               Failure {} -> Nothing
---               ParentFailure {} -> Nothing
---               Debug {} -> Nothing
---               EndExecution {} -> Nothing
---           )
---           ( -- within fixture
---             \fxLoc ->
---               case evt of
---                 StartExecution {} -> failIn "StartExecution"
---                 Start {eventType, loc} -> chkInFixtureStartEnd True fxLoc loc eventType
---                 End {eventType, loc} -> chkInFixtureStartEnd False fxLoc loc eventType
---                 Failure {} -> mfixLoc
---                 ParentFailure {} -> mfixLoc
---                 Debug {} -> mfixLoc
---                 EndExecution {} -> failIn "EndExecution"
---           )
---       where
---         fail msg = error $ msg <> "\n" <> ppShow evt
---         failOut et = fail $ et <> " must occur within start / end of fixture in same thread"
---         failIn et = fail $ et <> " must only occur outside a fixture in same thread"
-
---         chkOutOfFixtureStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
---         chkOutOfFixtureStartEnd isStart' evtLoc = \case
---           L.OnceHook -> Nothing
---           OnceHookRelease -> Nothing
---           L.ThreadHook -> Nothing
---           ThreadHookRelease -> Nothing
---           L.Group -> Nothing
---           L.TestHook -> failOut "TestHook"
---           TestHookRelease -> failOut "TestHookTestHookRelease"
---           L.Fixture ->
---             isStart'
---               ? Just evtLoc
---               $ fail "End fixture when fixture not started"
---           L.Test -> failOut "Test"
-
---         chkInFixtureStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
---         chkInFixtureStartEnd isStart' fxLoc evtLoc = \case
---           L.OnceHook -> failIn "OnceHook"
---           OnceHookRelease -> failIn "OnceHookRelease"
---           L.ThreadHook -> failIn "ThreadHook"
---           ThreadHookRelease -> failIn "ThreadHookRelease"
---           L.TestHook -> mfixLoc
---           TestHookRelease -> mfixLoc
---           L.Group -> failIn "Group"
---           L.Fixture ->
---             isStart'
---               ? fail "Nested fixtures - fixture started when a fixture is alreeady running in the same thread"
---               $ (fxLoc == evtLoc) ? Nothing $ fail "fixture end loc does not match fixture start loc"
---           L.Test {} -> mfixLoc
-
-(~) = (+) 5
-
 threadedBoundary :: ExeEventType -> Bool
 threadedBoundary = \case
   L.OnceHook -> False
@@ -846,14 +798,16 @@ chkLaws mxThrds t evts =
       [ chkThreadLogsInOrder,
         chkStartEndExecution,
         chkTestCount templateAsList,
-        chkFxtrCount templateAsList
+        chkFxtrCount templateAsList,
+        chkSingletonLeafEvents
       ]
     traverse_
       (threadedEvents &)
       [ chkStartEndIntegrity,
-        chkFixtures,
+        chkFixtureChildren,
+        chkFixturesContainTests t templateAsList,
         traverse_ chkTestIdsConsecutive,
-        chkAllLeafEvents,
+        chkThreadLeafEvents,
         traverse_ (chkParentOrder t)
       ]
     chk'
@@ -1247,8 +1201,8 @@ unit_simple_single_failure = runTest 1 $ TFixture "Fx 0" [testProps "Fx 0" 0 0 T
 --         chkUnexpectedHooks
 --         traverse_ chkSubElements expectedHkIds
 
--- chkFixtures :: [NodeStats] -> [RunEvent] -> IO ()
--- chkFixtures stats evntLst =
+-- CHildren :: [NodeStats] -> [RunEvent] -> IO ()
+-- CHildren stats evntLst =
 --   let fixIds bt = catMaybes $ boundaryId SuiteRuntimeTest.Fixture bt <$> evntLst
 --       fixStarts = fixIds Start
 --       fixEnds = fixIds End
@@ -1326,7 +1280,7 @@ unit_simple_single_failure = runTest 1 $ TFixture "Fx 0" [testProps "Fx 0" 0 0 T
 --   putStrLn ""
 --   putStrLn "============ Logs ============"
 --   pPrint l
---   chkFixtures stats l
+--   CHildren stats l
 --   chkHooks stats l
 
 -- -- $> unit_simple_single

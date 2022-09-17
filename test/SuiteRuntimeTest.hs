@@ -30,8 +30,10 @@ import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
 import Pyrelude as P
-  ( Applicative ((<*>)),
+  ( Alternative ((<|>)),
+    Applicative ((<*>)),
     Bool (..),
+    Category (id),
     Either,
     Enum (succ),
     Eq (..),
@@ -111,7 +113,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||), Category (id),
+    (||),
   )
 import Pyrelude.Test as T hiding (chkEq, chkEq', filter, maybe, singleton)
 import TempUtils (debugLines)
@@ -205,61 +207,51 @@ foldTemplate seed combine =
             TTestHook {tChild} -> recurse tChild
             TFixture {} -> acc
 
-here 
-  - parent map => Template -> template
-  - make threaded parent map tag -> tag not tag -> [] recursive so only need to check immediate parent 
-  - move test gen logic to threaded parent map 
+tagMap :: Template -> M.Map Text Template
+tagMap t =
+  let insert t' = M.insert (ttag t') t'
+   in foldTemplate (insert t M.empty) (\_p c m -> insert c m) t
+
 parentMap :: Template -> M.Map Text (Maybe Template)
 parentMap t =
-   P.debug' "****** parentMap" $
+  P.debug' "****** parentMap" $
     foldTemplate
-      (insertTests (M.singleton (ttag t) Nothing) t)
-      (\p c m -> insertTests (M.insert (ttag c) (Just p) m) c) t
-    where
-      insertTests :: M.Map Text (Maybe Template) -> Template -> M.Map Text (Maybe Template)
-      insertTests m = \case
-        TGroup {} -> m
-        TOnceHook {} -> m
-        TThreadHook {}-> m
-        TTestHook {}-> m
-        -- add an element for each test
-        fx@TFixture {tTests, ttag} ->
-          foldl'
-            (\m3 (idx, _t) -> M.insert (ttag <> "." <> txt idx) (Just fx) m3)
-            m
-            (zip [0..] tTests)
-
+      (M.singleton (ttag t) Nothing)
+      (\p c m -> M.insert (ttag c) (Just p) m)
+      t
 
 templateList :: Template -> [Template]
 templateList t = foldTemplate [t] (\_p c l -> c : l) t
 
--- map fo child loc => parent locs (only: Fixture (parent of tests), TTestHook, TThreadHook, TGroup - NOT Singleton hook)
-threadParentMap :: Template -> M.Map Text [Text]
+threadParentMap :: Template -> M.Map Text (Maybe Text)
 threadParentMap root =
-  (ttag <$>) <$> (threadParents <$> M.fromList ((\t -> (ttag t, t)) <$> templateList root)) & debug' "THREADED PARENT MAP - ISSUE HERE"
+  (ttag <$>) <$> foldl' insertTests ((>>= threadParent) <$> rootMap) (templateList root)
   where
     rootMap :: M.Map Text (Maybe Template)
     rootMap = parentMap root & P.debug' "****** ROOT MAP"
 
-    threadParents :: Template -> [Template]
-    threadParents tmp =
-      reverse (prnts isTstHk [] tmp) <> 
-      reverse (prnts isThrdHkorGrp [] tmp) & P.debug' "!!!!!!! threadParents ~  !!!!!!"
-      where
-        prnts :: (Template -> Bool) -> [Template] -> Template -> [Template]
-        prnts pred acc chld =
-          getValThrow rootMap (ttag chld) 
-            & maybe
-              acc
-              (\t -> prnts pred (pred t ? t : acc $ acc) t)
+    insertTests :: M.Map Text (Maybe Template) -> Template -> M.Map Text (Maybe Template)
+    insertTests m = \case
+      TGroup {} -> m
+      TOnceHook {} -> m
+      TThreadHook {} -> m
+      TTestHook {} -> m
+      -- add an element for each test
+      fx@TFixture {tTests, ttag} ->
+        foldl'
+          (\m3 (idx, _t) -> M.insert (ttag <> "." <> txt idx) (Just fx) m3)
+          m
+          (zip [0 ..] tTests)
 
-        isFixture :: Template -> Bool
-        isFixture = \case
-          TGroup {} -> False
-          TOnceHook {} -> False
-          TThreadHook {} -> False
-          TTestHook {} -> False
-          TFixture {} -> True
+    threadParent :: Template -> Maybe Template
+    threadParent tmp =
+      fstPrnt isTstHk tmp <|> fstPrnt isThrdHkorGrp tmp
+      where
+        fstPrnt :: (Template -> Bool) -> Template -> Maybe Template
+        fstPrnt pred t =
+          pred t
+            ? Just t
+            $ lookupThrow rootMap (ttag t) >>= fstPrnt pred
 
         isTstHk :: Template -> Bool
         isTstHk = \case
@@ -277,49 +269,58 @@ threadParentMap root =
           TTestHook {} -> False
           TFixture {} -> False
 
+lookupThrow :: (Ord k, Show k, Show v) => M.Map k v -> k -> v
+lookupThrow m k =
+  (m M.!? k)
+    & maybe
+      (error $ show k <> " not found in " <> ppShow m)
+      id
 
-getValThrow :: (Ord k, Show k, Show v) => M.Map k v -> k -> v
-getValThrow m k =
-  (m M.!? k) & maybe
-    (error $ show k <> " not found in " <> ppShow m)
-    id
+data EvInfo = EvInfo
+  { eitag :: Maybe Text,
+    et :: ExeEventType
+  }
 
-
+-- check immediate parent (preceeding start or foollowing end) of each thread element 
+-- ignoring non threaded events when checking tests ignore other test start / ends
 chkParentOrder :: Template -> [ExeEvent] -> IO ()
 chkParentOrder rootTpl thrdEvts =
-  chkParents "Parent start events (working back from child)" revEvntStartLocs
-    >> chkParents "Parent end events (working forward from child)" evntEndLocs
+  chkParents "Parent start event (working back from child)" revStartEvents
+    >> chkParents "Parent end event (working forward from child)" evntEndLocs
   where
     tpm = threadParentMap rootTpl & P.debug' "threadParentMap OUTPUT"
-    revEvntStartLocs = catMaybes $ boundryLoc True <$> reverse thrdEvts
+    revStartEvents = catMaybes $ boundryLoc True <$> reverse thrdEvts
     evntEndLocs = catMaybes $ boundryLoc False <$> thrdEvts
 
-    -- TODO: Update exception handling with debug info
-    chkParents :: Text -> [Loc] -> IO ()
-    chkParents errPrefix = \case
-      [] -> pure ()
-      l : ls ->
-        getTag l
-          & maybe
-            (pure ())
-            ( \t ->
-                let expected = Just <$> P.debug' "chkParents" (getValThrow tpm (t & P.debug' "SEEKING (chkParents) TAG: "))
-                    eaTags = P.debug' "eaTags" $ zip expected ls
-                    actual = getTag . snd <$> eaTags
-                 in when (length eaTags < length expected || expected /= actual) $
-                      error $
-                        toS errPrefix
-                          <> " not as expected"
-                          <> "\n expected:\n"
-                          <> ppShow expected
-                          <> "\n got:\n"
-                          <> ppShow actual
-            )
+    chkParents :: Text -> [EvInfo] -> IO ()
+    chkParents errPrefix =
+      \case
+        [] -> pure ()
+        EvInfo {eitag = tg, et} : evs ->
+          let expected = tg >>= \t -> lookupThrow tpm t
+              next = chkParents errPrefix evs
+              actualParentIgnoreTests = find (\EvInfo {et = et'} -> et' /= L.Test) evs >>= eitag
+              actualParent = head evs >>= eitag
+              fail =
+                error . toS $
+                  toS errPrefix <> "\n  expected (tag): " <> txt expected <> "  \ngot (tag): " <> txt actualParent
+              chkParentIncTests = (expected /= actualParent) ? fail $ next
+              chkParentExclTests = (expected /= actualParentIgnoreTests) ? fail $ next
+           in case et of
+                L.OnceHook -> next
+                L.OnceHookRelease -> next
+                L.ThreadHook -> chkParentIncTests
+                L.ThreadHookRelease -> chkParentIncTests
+                L.TestHook -> chkParentIncTests
+                L.TestHookRelease -> chkParentIncTests
+                L.Group -> chkParentIncTests
+                L.Fixture -> chkParentIncTests
+                L.Test -> chkParentExclTests
 
     boundryLoc useStart = \case
       StartExecution {} -> Nothing
-      Start {loc} -> useStart ? Just loc $ Nothing
-      End {loc} -> useStart ? Nothing $ Just loc
+      Start {loc, eventType} -> useStart ? Just (EvInfo (getTag loc) eventType) $ Nothing
+      End {loc, eventType} -> useStart ? Nothing $ Just (EvInfo (getTag loc) eventType)
       Failure {} -> Nothing
       ParentFailure {} -> Nothing
       Debug {} -> Nothing
@@ -473,8 +474,10 @@ chkMaxThreads mxThrds threadedEvents =
   -- fix when logging is fully integrated with test
   let baseThrds = 2 -- should be 1
       allowed = mxThrds + baseThrds
-   in chk' --TODO: chk' formatting
-        ( "max execution threads + " <> txt baseThrds <> ": "
+   in chk' -- TODO: chk' formatting
+        ( "max execution threads + "
+            <> txt baseThrds
+            <> ": "
             <> txt allowed
             <> " exceeded: "
             <> txt (length threadedEvents)
@@ -565,7 +568,8 @@ chkLeafEvents targetEventType =
             Nothing
             ( isStart'
                 ? Just evtLoc
-                $ fail $ "End " <> strTrg <> " when not started"
+                $ fail
+                $ "End " <> strTrg <> " when not started"
             )
             . matchesTarg
 
@@ -575,9 +579,10 @@ chkLeafEvents targetEventType =
            in matchesTarg evt'
                 ? ( isStart'
                       ? fail ("Nested " <> sevt <> " - " <> sevt <> " started when a " <> sevt <> " is alreeady running in the same thread")
-                      $ fxLoc == evtLoc
+                      $ fxLoc
+                        == evtLoc
                         ? Nothing
-                        $ fail (strTrg <> " end loc does not match " <> strTrg <> " start loc")
+                      $ fail (strTrg <> " end loc does not match " <> strTrg <> " start loc")
                   )
                 $ failIn sevt
 
@@ -663,7 +668,8 @@ chkFixtures =
           L.Fixture ->
             isStart'
               ? fail "Nested fixtures - fixture started when a fixture is alreeady running in the same thread"
-              $ (fxLoc == evtLoc) ? Nothing $ fail "fixture end loc does not match fixture start loc"
+              $ (fxLoc == evtLoc) ? Nothing
+              $ fail "fixture end loc does not match fixture start loc"
           L.Test {} -> mfixLoc
 
 chkTestCount :: [Template] -> [ExeEvent] -> IO ()
@@ -805,7 +811,8 @@ chkStartEndIntegrity =
     chkStart m e =
       M.member eLoc m
         ? error ("Duplicate start events in same thread\n " <> ppShow e)
-        $ M.insert eLoc ST.empty $ ST.insert eLoc <$> m
+        $ M.insert eLoc ST.empty
+        $ ST.insert eLoc <$> m
       where
         eLoc = partialLoc e
 
@@ -872,7 +879,8 @@ validateTemplate t =
   let tl = (ttag <$> templateList t)
       utl = nub tl
    in when (length tl /= length utl) $
-        error $ "template must be such that tags are unique: \n" <> ppShow tl
+        error $
+          "template must be such that tags are unique: \n" <> ppShow tl
 
 runTest :: Int -> Template -> IO ()
 runTest maxThreads template = do
@@ -906,7 +914,8 @@ ioAction log (IOProps {message, delayms, fail}) =
     log message
     P.threadDelay delayms
     when fail $
-      error . toS $ "exception thrown " <> message
+      error . toS $
+        "exception thrown " <> message
 
 mkTest :: TextLogger -> IOProps -> PN.Test si ti ii
 mkTest log iop@IOProps {message, delayms, fail} = PN.Test message \a b c -> ioAction log iop

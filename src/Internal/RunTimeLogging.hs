@@ -17,11 +17,6 @@ data Loc
       }
   deriving (Show, Eq, Ord)
 
-getTag :: Loc -> Maybe Text
-getTag = \case
-  Root -> Nothing
-  Node {tag = t} -> Just t
-
 data ExeEventType
   = OnceHook
   | OnceHookRelease

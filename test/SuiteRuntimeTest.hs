@@ -8,6 +8,8 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 -- TODO Add to Pyrelude
 -- TODO Add to Pyrelude
+
+import qualified Data.IntMap.Merge.Lazy as ST
 import Data.List.Extra (lookup, snoc)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as ST
@@ -22,7 +24,6 @@ import Internal.RunTimeLogging as L
     Loc (..),
     LogControls (..),
     Sink,
-    getTag,
     mkLogger,
     testLogControls,
   )
@@ -70,6 +71,8 @@ import Pyrelude as P
     foldl1',
     for_,
     fromJust,
+    fromMaybe,
+    fst,
     groupBy,
     isPrefixOf,
     join,
@@ -113,7 +116,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||), fst,
+    (||),
   )
 import Pyrelude.Test as T hiding (chkEq, chkEq', filter, maybe, singleton)
 import TempUtils (debugLines)
@@ -209,17 +212,17 @@ foldTemplate seed combine =
 
 parentMap :: Template -> M.Map Text (Maybe Template)
 parentMap t =
-    foldTemplate
-      (M.singleton (ttag t) Nothing)
-      (\p c m -> M.insert (ttag c) (Just p) m)
-      t
+  foldTemplate
+    (M.singleton (ttag t) Nothing)
+    (\p c m -> M.insert (ttag c) (Just p) m)
+    t
 
 templateList :: Template -> [Template]
 templateList t = foldTemplate [t] (\_p c l -> c : l) t
 
 testTags :: Text -> [IOProps] -> [Text]
-testTags fxTag tsts = 
-  (\it -> fxTag <> "." <> txt (fst it)) <$>  zip [0 ..] tsts
+testTags fxTag tsts =
+  (\it -> fxTag <> "." <> txt (fst it)) <$> zip [0 ..] tsts
 
 threadParentMap :: Template -> M.Map Text (Maybe Text)
 threadParentMap root =
@@ -274,28 +277,74 @@ lookupThrow m k =
       (error $ show k <> " not found in " <> ppShow m)
       id
 
+getTag :: Loc -> Text
+getTag = \case
+  Root -> "ROOT"
+  Node {tag = t} -> t
+
 data EvInfo = EvInfo
-  { eitag :: Maybe Text,
+  { eiTag :: Text,
     et :: ExeEventType
-  }
+  } deriving Show
 
 chkFixturesContainTests :: Template -> [Template] -> [[ExeEvent]] -> IO ()
 chkFixturesContainTests root tList tevts =
-  uu
-  here use groupOn 
-  where 
+  chkEq'
+    ( "fixtures do not contain all expected tests\nExpected:\n"
+        <> toS (ppShow expected)
+        <> "\nActual:\n"
+        <> toS (ppShow actual)
+    )
+    expected
+    actual
+  where
     pm = threadParentMap root
-    actual = revStartEvents
-    getTests = \case 
+    templateFixTags = M.fromList $ (,ST.empty) <$> catMaybes (fixTag <$> tList)
+    expected =
+      foldl'
+        ( \m (c, mp) ->
+            mp
+              & maybe
+                m
+                ( \p -> M.alter (maybe (Just $ ST.singleton c) (Just . ST.insert c)) p m
+                )
+        )
+        templateFixTags
+        $ M.toList pm
+
+    actual = threadActual $ join tevts
+
+    threadActual :: [ExeEvent] -> M.Map Text (ST.Set Text)
+    threadActual evts =
+      let (openTests, fixAccum) = foldl' step (ST.empty, M.empty) (revStartEvents evts & debug' "Fucked")
+
+          step acc'@(st, mp) EvInfo {eiTag, et} =
+            case et of
+              L.OnceHook -> acc'
+              L.OnceHookRelease -> acc'
+              L.ThreadHook -> acc'
+              L.ThreadHookRelease -> acc'
+              L.TestHook -> acc'
+              L.TestHookRelease -> acc'
+              L.Group -> acc'
+              L.Fixture ->
+                let updateSet = fmap (ST.union st)
+                 in (ST.empty, M.alter updateSet eiTag mp)
+              L.Test -> (ST.insert eiTag st, mp)
+       in ST.null openTests
+            ? fixAccum
+            $ error
+            $ "tests still open at end of thread" <> ppShow openTests
+
+    fixTag = \case
       TGroup {} -> Nothing
       TOnceHook {} -> Nothing
-      TThreadHook{} -> Nothing
-      TTestHook {}-> Nothing
-      TFixture {} -> Nothing
-
+      TThreadHook {} -> Nothing
+      TTestHook {} -> Nothing
+      TFixture {ttag} -> Just ttag
 
 actualParentIgnoreTests :: ListLike m EvInfo i => m -> Maybe Text
-actualParentIgnoreTests evs = find (\EvInfo {et = et'} -> et' /= L.Test) evs >>= eitag
+actualParentIgnoreTests evs = eiTag <$> find (\EvInfo {et = et'} -> et' /= L.Test) evs
 
 revStartEvents :: [ExeEvent] -> [EvInfo]
 revStartEvents thrdEvts = catMaybes $ boundryLoc True <$> reverse thrdEvts
@@ -310,7 +359,7 @@ boundryLoc useStart = \case
   Debug {} -> Nothing
   EndExecution {} -> Nothing
 
--- check immediate parent (preceeding start or foollowing end) of each thread element 
+-- check immediate parent (preceeding start or foollowing end) of each thread element
 -- ignoring non threaded events when checking tests ignore other test start / ends
 chkParentOrder :: Template -> [ExeEvent] -> IO ()
 chkParentOrder rootTpl thrdEvts =
@@ -325,11 +374,11 @@ chkParentOrder rootTpl thrdEvts =
     chkParents errPrefix =
       \case
         [] -> pure ()
-        EvInfo {eitag = tg, et} : evs ->
-          let expected = tg >>= \t -> lookupThrow tpm t
+        EvInfo {eiTag = tg, et} : evs ->
+          let expected = lookupThrow tpm tg
               next = chkParents errPrefix evs
               actualParentIgnoreTests' = actualParentIgnoreTests evs
-              actualParent = head evs >>= eitag
+              actualParent = eiTag <$> head evs
               fail =
                 error . toS $
                   toS errPrefix <> "\n  expected (tag): " <> txt expected <> "  \ngot (tag): " <> txt actualParent
@@ -345,8 +394,6 @@ chkParentOrder rootTpl thrdEvts =
                 L.Group -> chkParentIncTests
                 L.Fixture -> chkParentIncTests
                 L.Test -> chkParentExclTests
-
-
 
 templateTestCount :: [Template] -> Int
 templateTestCount ts =
@@ -619,8 +666,7 @@ chkThreadLeafEvents :: [[ExeEvent]] -> IO ()
 chkThreadLeafEvents evts =
   traverse_
     (`chkLeafEvents` evts)
-    [ 
-      L.ThreadHook,
+    [ L.ThreadHook,
       L.ThreadHookRelease,
       L.TestHook,
       L.TestHookRelease,

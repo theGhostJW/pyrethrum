@@ -74,7 +74,7 @@ isBoundaryLog =
     FilterLog _ -> True
     StartRun {} -> True
     EndRun -> True
-    StartGroup _ -> True
+    StaXTGroup _ -> True
     EndGroup _ -> True
     StartTest _ -> True
     EndTest _ -> True
@@ -115,7 +115,7 @@ logProtocolStatus chkEncountered = \case
   FilterLog _ -> Pass
   StartRun {} -> Pass
   EndRun -> Pass
-  StartGroup _ -> Pass
+  StaXTGroup _ -> Pass
   EndGroup _ -> Pass
   StartHook {} -> Pass
   EndHook {} -> Pass
@@ -207,7 +207,7 @@ phaseSwitch LogProtocolOut {logInfo = lp} mFailedPhase =
         StartRun {} -> outToOut
         EndRun -> outToOut
         FilterLog _ -> outToOut
-        StartGroup _ -> outToOut
+        StaXTGroup _ -> outToOut
         EndGroup _ -> outToOut
         StartHook {} -> outToOut
         EndHook {} -> outToOut
@@ -270,7 +270,7 @@ testItrDelta =
         StartRun {} -> clear
         EndRun -> clear
         FilterLog _ -> clear
-        StartGroup _ -> clear
+        StaXTGroup _ -> clear
         EndGroup _ -> clear
         EndTest _ -> clear
         -- non-boundry logs

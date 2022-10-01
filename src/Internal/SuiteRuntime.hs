@@ -110,11 +110,11 @@ getStatus =
   where
     getStatusTVar :: ExeTree si so ti to ii io -> TVar Status
     getStatusTVar = \case
-      RTNodeS {status} -> status
-      RTNodeT {tChildNode} -> getStatusTVar tChildNode
-      RTNodeI {iChildNode} -> getStatusTVar iChildNode
-      RTGroup {nStatus} -> nStatus
-      RTFix {nStatus} -> nStatus
+      XTSHook {status} -> status
+      XTTHook {tChildNode} -> getStatusTVar tChildNode
+      XTIHook {iChildNode} -> getStatusTVar iChildNode
+      XTGroup {nStatus} -> nStatus
+      XTFix {nStatus} -> nStatus
 
 isDone :: Status -> Bool
 isDone = (== Done)
@@ -137,11 +137,11 @@ canRun rg =
 modifyStatus :: (Status -> Status) -> ExeTree si so ti to ii io -> STM ()
 modifyStatus f et =
   case et of
-    RTNodeS {status} -> update status
-    RTNodeT {} -> pure ()
-    RTNodeI {} -> pure ()
-    RTGroup {nStatus} -> update nStatus
-    RTFix {nStatus} -> update nStatus
+    XTSHook {status} -> update status
+    XTTHook {} -> pure ()
+    XTIHook {} -> pure ()
+    XTGroup {nStatus} -> update nStatus
+    XTFix {nStatus} -> update nStatus
   where
     update = flip modifyTVar f
 
@@ -160,7 +160,7 @@ mkIdxLst :: a -> STM (IdxLst a)
 mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
 data ExeTree si so ti to ii io where
-  RTNodeS ::
+  XTSHook ::
     { loc :: Loc,
       status :: TVar Status,
       sHook :: si -> IO so,
@@ -169,28 +169,28 @@ data ExeTree si so ti to ii io where
       sChildNode :: ExeTree so cs ti to ii io
     } ->
     ExeTree si so ti to ii io
-  RTNodeT ::
+  XTTHook ::
     { loc :: Loc,
       tHook :: si -> ti -> IO to,
       tHookRelease :: to -> IO (),
       tChildNode :: ExeTree si so to tc ii io
     } ->
     ExeTree si so ti to ii io
-  RTNodeI ::
+  XTIHook ::
     { loc :: Loc,
       iHook :: si -> ti -> ii -> IO io,
       iHookRelease :: io -> IO (),
       iChildNode :: ExeTree si so ti to io iic
     } ->
     ExeTree si so ti to ii io
-  RTGroup ::
+  XTGroup ::
     { leafloc :: Loc,
       nStatus :: TVar Status,
       childNodes :: TQueue (ExeTree si so ti to ii io),
       fullyRunning :: TQueue (ExeTree si so ti to ii io)
     } ->
     ExeTree si () ti () ii ()
-  RTFix ::
+  XTFix ::
     { leafloc :: Loc,
       nStatus :: TVar Status,
       iterations :: TQueue (Test si ti ii),
@@ -230,7 +230,7 @@ prepare =
             c <- traverse (prepare' loc 0) subElms
             atomically $ traverse_ (writeTQueue q) c
             pure $
-              RTGroup
+              XTGroup
                 { leafloc = loc,
                   nStatus = ns,
                   childNodes = q,
@@ -248,7 +248,7 @@ prepare =
             let loc = nodeLoc "SingletonHook" hookTag
             child <- prepare' loc 0 hookChild
             pure $
-              RTNodeS
+              XTSHook
                 { loc,
                   status = s,
                   sHook = hook loc,
@@ -263,7 +263,7 @@ prepare =
             threadHookRelease
           } ->
             let loc = nodeLoc "ThreadHook" threadTag
-             in RTNodeT loc (threadHook loc) (threadHookRelease loc)
+             in XTTHook loc (threadHook loc) (threadHookRelease loc)
                   <$> prepare' loc 0 threadHookChild
         PN.TestHook
           { testTag,
@@ -272,7 +272,7 @@ prepare =
             testHookRelease
           } ->
             let loc = nodeLoc "TestHook" testTag
-             in RTNodeI loc (testHook loc) (testHookRelease loc)
+             in XTIHook loc (testHook loc) (testHookRelease loc)
                   <$> prepare' loc 0 testHookChild
         PN.Fixture
           { fxTag,
@@ -286,7 +286,7 @@ prepare =
               runningCount <- newTVarIO 0
               atomically $ traverse_ (writeTQueue q . converTest) iterations
               pure $
-                RTFix
+                XTFix
                   { leafloc = loc,
                     nStatus = ns,
                     iterations = q,
@@ -294,7 +294,8 @@ prepare =
                   }
 
 logAbandonned :: Logger -> Loc -> Abandon -> IO ()
-logAbandonned lgr loc Abandon {sourceLoc, exception} = lgr (mkParentFailure sourceLoc loc exception)
+logAbandonned lgr loc Abandon {sourceLoc, sourceEventType, exception} =
+  lgr (mkParentFailure sourceLoc loc sourceEventType exception)
 
 logFailure :: Logger -> Loc -> ExeEventType -> SomeException -> IO ()
 logFailure lgr loc et e = lgr (mkFailure loc (txt et <> "Failed at: " <> txt loc) e)
@@ -416,7 +417,7 @@ runTestHook
           (Right <$> testHk si ti ii)
           ( \e -> do
               logFailure logger tstHkLoc L.TestHook e
-              pure . Left $ Abandon tstHkLoc e
+              pure . Left $ Abandon tstHkLoc L.TestHook e
           )
 
       inputs ehki =
@@ -475,6 +476,7 @@ discardDoneMoveFullyRunning fullyRunningQ =
 
 data Abandon = Abandon
   { sourceLoc :: Loc,
+    sourceEventType :: ExeEventType,
     exception :: SomeException
   }
   deriving (Show)
@@ -491,7 +493,7 @@ executeNode logger hkIn tstHk rg =
     when
       wantRun
       case rg of
-        RTNodeS
+        XTSHook
           { loc,
             status,
             sHook,
@@ -509,7 +511,7 @@ executeNode logger hkIn tstHk rg =
               let siIn = (,sHook) . singletonIn <$> hkIn
               eso <- singletonHookVal logger L.OnceHook siIn status sHookVal loc
               let nxtHkIn so = (\exi -> exi {singletonIn = so}) <$> hkIn
-                  nxtAbandon' = nxtAbandon loc
+                  nxtAbandon' = nxtAbandon loc L.OnceHook
                   recurse a = exeNxt a tstHk sChildNode
                in finally
                     ( either
@@ -525,7 +527,7 @@ executeNode logger hkIn tstHk rg =
                         when wantRelease $
                           releaseHookUpdateStatus logger L.OnceHook status (mapLeft nxtAbandon' eso) loc sHookRelease
                     )
-        RTNodeT
+        XTTHook
           { loc,
             tHook,
             tHookRelease,
@@ -535,7 +537,7 @@ executeNode logger hkIn tstHk rg =
               let tiIn = (\(ExeIn si ti) -> (ti, tHook si)) <$> hkIn
               eto <- threadHookVal logger L.ThreadHook tiIn loc
               let nxtHkIn ti = (\exi -> exi {threadIn = ti}) <$> hkIn
-                  nxtAbandon' = nxtAbandon loc
+                  nxtAbandon' = nxtAbandon loc L.ThreadHook
                   recurse a = exeNxt a tstHk tChildNode
               finally
                 ( either
@@ -544,7 +546,7 @@ executeNode logger hkIn tstHk rg =
                     eto
                 )
                 (releaseHook logger L.OnceHook (mapLeft nxtAbandon' eto) loc tHookRelease)
-        ihk@RTNodeI
+        ihk@XTIHook
           { loc,
             iHook,
             iHookRelease,
@@ -565,7 +567,7 @@ executeNode logger hkIn tstHk rg =
                               (logAbandonned' loc)
                     }
              in exeNxt hkIn newTstHk iChildNode
-        self@RTGroup
+        self@XTGroup
           { leafloc,
             nStatus,
             childNodes,
@@ -623,7 +625,7 @@ executeNode logger hkIn tstHk rg =
                                 -- discard if done
                                 Done -> nxtChild
                     )
-        fx@RTFix
+        fx@XTFix
           { nStatus,
             leafloc,
             iterations,
@@ -684,8 +686,8 @@ executeNode logger hkIn tstHk rg =
     exeNxt :: forall si' so' ti' to' ii' io'. Either Abandon (ExeIn si' ti') -> TestHkSrc ii' -> ExeTree si' so' ti' to' ii' io' -> IO ()
     exeNxt = executeNode logger
 
-    nxtAbandon :: Loc -> SomeException -> Abandon
-    nxtAbandon loc' e = fromLeft (Abandon loc' e) hkIn
+    nxtAbandon :: Loc -> ExeEventType ->  SomeException ->  Abandon
+    nxtAbandon loc' et e = fromLeft (Abandon loc' et e) hkIn
 
     logAbandonned' :: Loc -> Abandon -> IO ()
     logAbandonned' = logAbandonned logger

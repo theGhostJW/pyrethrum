@@ -177,7 +177,7 @@ data PrintLogDisplayElement
         outOfTest :: StatusCount
       }
   | EndRun (Maybe [TestFilterResult])
-  | -- StartGroup GroupTitle |
+  | -- StaXTGroup GroupTitle |
     -- EndGroup GroupTitle |
 
     StartTest
@@ -322,7 +322,7 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
                 }
           )
         LP.EndRun -> (accum, elOut . LogTransformation.PrintLogDisplayElement.EndRun $ filterLog accum)
-        LP.StartGroup _ -> skipLog
+        LP.StaXTGroup _ -> skipLog
         LP.EndGroup _ -> skipLog
         StartHook {} -> skipLog
         EndHook {} -> skipLog

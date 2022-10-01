@@ -233,7 +233,7 @@ exeElm includedAddresses parentAddress hi =
         Group {title = t, gElms} ->
           exclude t group' ? pure () $
             do
-              logItem $ StartGroup $ GroupTitle t
+              logItem $ StaXTGroup $ GroupTitle t
               sequence_ $ exElm' (nxtAddress t group') hi <$> gElms
               logItem $ EndGroup $ GroupTitle t
 

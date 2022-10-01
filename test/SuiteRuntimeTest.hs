@@ -881,101 +881,107 @@ chkLaws mxThrds t evts =
 
 data ChkErrAccum = ChkErrAccum
   { initialised :: Bool,
-    lastStart :: Maybe Loc,
-    lastFailure :: Maybe (Loc, PException),
+    lastStart :: Maybe (Loc, ExeEventType),
+    lastFailure :: Maybe (Loc, PException, ExeEventType),
     matchedFails :: ST.Set Loc
   }
+
+errorStep :: ChkErrAccum -> ExeEvent -> ChkErrAccum
+errorStep accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} =
+  \case
+    StartExecution {} -> accum
+    Start {loc, eventType} -> accum {lastStart = Just (loc, eventType)}
+    ed@End {loc} ->
+      lastFailure
+        & maybe
+          accum
+          ( \lf@(lfLoc, _e, _et) ->
+              ST.member loc matchedFails
+                ? accum
+                  { matchedFails = ST.delete loc matchedFails,
+                    lastFailure = lfLoc == loc ? Nothing $ lastFailure
+                  }
+                $ error
+                  ( "parent failure was not logged as expected within event ending with:\n"
+                      <> ppShow ed
+                      <> "\nexpected last failure"
+                      <> ppShow lf
+                  )
+          )
+    f@Failure
+      { loc,
+        msg,
+        exception,
+        idx,
+        threadId
+      } ->
+        lastFailure
+          & maybe
+            ( lastStart
+                & maybe
+                  (error ("failure logged when outside of any event\n" <> ppShow f))
+                  ( \(loc', et) ->
+                      (==) loc loc'
+                        ? accum
+                          { lastFailure = Just (loc, exception, et),
+                            matchedFails = ST.insert loc matchedFails
+                          }
+                        $ error
+                          ( "failure loc does not equal loc of parent event:\nfailure loc\n"
+                              <> ppShow loc'
+                              <> "\nparent event:\n"
+                              <> ppShow loc
+                          )
+                  )
+            )
+            ( \parentFail ->
+                error $
+                  "failure logged when expected a parent failure (ie. in the child of a partent event that failed):\nfailure:\n"
+                    <> ppShow f
+                    <> "\nunder parent failure:\n"
+                    <> ppShow parentFail
+            )
+    pf@ParentFailure
+      { loc,
+        parentLoc,
+        parentEventType,
+        exception,
+        idx,
+        threadId
+      } ->
+        lastFailure
+          & maybe
+            ( initialised
+                ? error ("parent failure logged when parent hasn't failed:\n" <> ppShow pf)
+                $ accum
+                  { lastFailure = Just (parentLoc, exception, parentEventType),
+                    matchedFails = ST.insert loc matchedFails
+                  }
+            )
+            ( \lf@(ploc, ex, _et) ->
+                (==) parentLoc ploc
+                  ? accum {matchedFails = ST.insert loc matchedFails}
+                  $ error
+                    ( "parent failure logged in child does not match parent failure in parent:\nparent failure logged:\n"
+                        <> ppShow lf
+                        <> "actual parent failure:\n"
+                        <> ppShow pf
+                    )
+            )
+    Debug {} -> accum
+    EndExecution {} -> accum
 
 chkThreadErrs :: [ExeEvent] -> IO ()
 chkThreadErrs evts =
   -- assumes nesting correct - all nodes have unique locs
-  lastFailure (foldl' nxt (ChkErrAccum False Nothing Nothing ST.empty) evts)
+  lastFailure (foldl' errorStep (ChkErrAccum False Nothing Nothing ST.empty) evts)
     & maybe
       (pure ())
-      (\l -> error $ "chkErrs error loc still open at end of thread: " <> show l)
-  where
-    nxt :: ChkErrAccum -> ExeEvent -> ChkErrAccum
-    nxt accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} =
-      \case
-        StartExecution {} -> accum
-        Start {loc} -> accum {lastStart = Just loc}
-        ed@End {loc} ->
-          lastFailure
-            & maybe
-              accum
-              ( \lf@(lfLoc, _e) ->
-                  ST.member loc matchedFails
-                    ? accum
-                      { matchedFails = ST.delete loc matchedFails,
-                        lastFailure = lfLoc == loc ? Nothing $ lastFailure
-                      }
-                    $ error
-                      ( "parent failure was not logged as expected within event ending with:\n"
-                          <> ppShow ed
-                          <> "\nexpected last failure"
-                          <> ppShow lf
-                      )
-              )
-        f@Failure
-          { loc,
-            msg,
-            exception,
-            idx,
-            threadId
-          } ->
-            lastFailure
-              & maybe
-                ( lastStart
-                    & maybe
-                      (error ("failure logged when outside of any event\n" <> ppShow f))
-                      ( \loc' ->
-                          (==) loc loc'
-                            ? accum
-                              { lastFailure = Just (loc, exception),
-                                matchedFails = ST.insert loc matchedFails
-                              }
-                            $ error
-                              ( "failure loc does not equal loc of parent event:\nfailure loc\n"
-                                  <> ppShow loc'
-                                  <> "\nparent event:\n"
-                                  <> ppShow loc
-                              )
-                      )
-                )
-                ( \parentFail ->
-                    error $
-                      "failure logged when expected a parent failure (ie. in the child of a partent event that failed):\nfailure:\n"
-                        <> ppShow f
-                        <> "\nunder parent failure:\n"
-                        <> ppShow parentFail
-                )
-        pf@ParentFailure
-          { loc,
-            parentLoc,
-            exception,
-            idx,
-            threadId
-          } ->
-            lastFailure
-              & maybe
-                ( initialised
-                    ? error ("parent failure logged when parent hasn't failed:\n" <> ppShow pf)
-                    $ accum
-                      { lastFailure = Just (parentLoc, exception),
-                        matchedFails = ST.insert loc matchedFails
-                      }
-                )
-                ( \lf@(ploc, ex) ->
-                    (==) parentLoc ploc
-                      ? accum {matchedFails = ST.insert loc matchedFails}
-                      $ error
-                        ("parent failure logged in child does not match parent failure in parent:\nparent failure logged:\n"
-                        <> ppShow lf
-                        <> "actual parent failure:\n"
-                        <> ppShow pf)
-                )
-        Debug {} -> accum
-        EndExecution {} -> accum
+      ( \(l, _ex, et) ->
+          (==) et L.OnceHook
+            ? pure ()
+            $ error ("chkErrs error loc still open at end of thread: " <> show l)
+      )
 
 chkThreadErrorPropagation :: [[ExeEvent]] -> IO ()
 chkThreadErrorPropagation = traverse_ chkThreadErrs

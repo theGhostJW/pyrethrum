@@ -140,7 +140,7 @@ genLogProtocol :: Gen (LogProtocolBase Int)
 genLogProtocol =
   choice
     [ StartRun <$> (RunTitle <$> genTxt) <*> genInt <*> (A.toJSON <$> genRunConfig),
-      StartGroup <$> (GroupTitle <$> genTxt),
+      StaXTGroup <$> (GroupTitle <$> genTxt),
       EndGroup <$> (GroupTitle <$> genTxt),
       StartTest <$> genTestDisplayInfo,
       EndTest <$> domainElementSingleton,

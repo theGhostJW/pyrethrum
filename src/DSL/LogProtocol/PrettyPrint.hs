@@ -117,7 +117,7 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
         LP.FilterLog fltrInfos -> ppFilterLog fltrInfos
         LP.StartRun ttle _offset rc -> ppStartRun ttle rc
 
-        LP.StartGroup gt -> groupHeader gt
+        LP.StaXTGroup gt -> groupHeader gt
         LP.EndGroup gt -> groupFooter gt
 
         LP.StartHook loc title -> "Start " <> describeLoc loc <> " Hook: " <> title

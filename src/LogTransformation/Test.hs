@@ -54,7 +54,7 @@ module LogTransformation.Test where
 --                                             I.FilterLog fl -> Nothing
 --                                             I.StartRun title val -> Nothing
 --                                             e@I.EndRun -> Nothing
---                                             I.StartGroup gt -> Nothing
+--                                             I.StaXTGroup gt -> Nothing
 --                                             I.EndGroup gt -> Nothing
 --                                             I.StartTest (RC.TestLogInfo address title config) -> Just $ emptyRecord {
 --                                                                                                               title = title,
@@ -73,7 +73,7 @@ module LogTransformation.Test where
 --                                             I.StartRun title val -> Just $ LogTransformation.Test.StartRun title val
 --                                             e@I.EndRun -> Just $ LogTransformation.Test.EndRun runStats
                                           
---                                             I.StartGroup gt -> Just $ LogTransformation.Test.StartGroup gt
+--                                             I.StaXTGroup gt -> Just $ LogTransformation.Test.StaXTGroup gt
 --                                             I.EndGroup gt -> Just $ LogTransformation.Test.EndGroup gt
                                           
 --                                             I.StartTest{} -> Nothing
@@ -99,7 +99,7 @@ module LogTransformation.Test where
 --                                               I.FilterLog _ -> newStats
 --                                               I.StartRun{} -> newStats
 --                                               I.EndRun -> newStats
---                                               I.StartGroup _ -> newStats
+--                                               I.StaXTGroup _ -> newStats
 --                                               I.EndGroup _ -> newStats
 --                                               I.StartTest{} -> newStats
 --                                               I.EndTest tm -> newStats <> stats thisRec
@@ -113,7 +113,7 @@ module LogTransformation.Test where
 --                             I.FilterLog{} -> Nothing
 --                             I.StartRun{} -> Nothing
 --                             I.EndRun -> Nothing
---                             I.StartGroup gt -> Just $ unGroupTitle gt
+--                             I.StaXTGroup gt -> Just $ unGroupTitle gt
 --                             I.EndGroup{} ->  Nothing
 
 --                             I.StartTest{} -> mGroup
@@ -145,7 +145,7 @@ module LogTransformation.Test where
 --                   I.FilterLog{} -> Nothing
 --                   I.StartRun{} -> Nothing
 --                   I.EndRun -> chkBothEmpty "End of run encountered before end of test" "End of run encountered before end of group" 
---                   I.StartGroup _ -> chkBothEmpty "Start of group encountered before end of test" "Start of group encountered before end of previous group"
+--                   I.StaXTGroup _ -> chkBothEmpty "Start of group encountered before end of test" "Start of group encountered before end of previous group"
 --                   I.EndGroup _ -> isJust mThisRec 
 --                                     ? err "End of group encountered before end of test"
 --                                     $ isNothing mGroup 
@@ -259,7 +259,7 @@ module LogTransformation.Test where
 --             StartRun RunTitle A.Value | 
 --             EndRun TestStats |
 
---             StartGroup GroupTitle |
+--             StaXTGroup GroupTitle |
 --             EndGroup GroupTitle |
 
 --             TransError TestTransformError 
@@ -315,7 +315,7 @@ module LogTransformation.Test where
 -- prettyPrintTestLogElement = \case 
 --                                 LogTransformation.Test.StartRun ttle rc -> ppStartRun ttle rc
 --                                 LogTransformation.Test.FilterLog arFltrRslt -> ppFilterLog arFltrRslt
---                                 LogTransformation.Test.StartGroup gt -> groupHeader gt <> newLn
+--                                 LogTransformation.Test.StaXTGroup gt -> groupHeader gt <> newLn
 --                                 Test tr@(TestRecord titl address config status stats iterationsDesc) -> 
 --                                   PC.header (address <> " - " <> titl <> " - " <> txt status) <> newLn <>
 --                                   "Config:" <> newLn <> ppAsYaml (removeHeaderAndAddress config) <> newLn <> newLn <>

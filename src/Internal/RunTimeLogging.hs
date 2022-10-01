@@ -35,8 +35,8 @@ exceptionTxt e = PException $ txt <$> lines (displayException e)
 mkFailure :: Loc -> Text -> SomeException -> Int -> Text -> ExeEvent
 mkFailure l t = Failure l t . exceptionTxt
 
-mkParentFailure :: Loc -> Loc -> SomeException -> Int -> Text -> ExeEvent
-mkParentFailure p l = ParentFailure p l . exceptionTxt
+mkParentFailure :: Loc -> Loc -> ExeEventType -> SomeException -> Int -> Text -> ExeEvent
+mkParentFailure p l et = ParentFailure p l et . exceptionTxt
 
 newtype PException = PException {displayText :: [Text]} deriving (Show, Eq)
 
@@ -67,6 +67,7 @@ data ExeEvent
   | ParentFailure
       { loc :: Loc,
         parentLoc :: Loc,
+        parentEventType :: ExeEventType,
         exception :: PException,
         idx :: Int,
         threadId :: Text

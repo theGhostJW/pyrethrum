@@ -94,7 +94,6 @@ import UnliftIO.STM
     writeTQueue,
     writeTVar,
   )
-import qualified Prelude as PRL
 
 data Status
   = Pending
@@ -461,7 +460,7 @@ processWhile p q =
   tryPeekTQueue q
     >>= maybe
       (pure ())
-      (\n -> p n >>= bool (pure ()) (readTQueue q >> processWhile p q))
+      (p >=> bool (pure ()) (readTQueue q >> processWhile p q))
 
 discardDoneMoveFullyRunning :: TQueue (ExeTree si so ti to ii io) -> TQueue (ExeTree si so ti to ii io) -> STM ()
 discardDoneMoveFullyRunning fullyRunningQ =
@@ -686,7 +685,7 @@ executeNode logger hkIn tstHk rg =
     exeNxt = executeNode logger
 
     nxtAbandon :: Loc -> SomeException -> Abandon
-    nxtAbandon loc' e = either id (const $ Abandon loc' e) hkIn
+    nxtAbandon loc' e = fromLeft (Abandon loc' e) hkIn
 
     logAbandonned' :: Loc -> Abandon -> IO ()
     logAbandonned' = logAbandonned logger

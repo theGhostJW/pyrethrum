@@ -23,6 +23,7 @@ import Internal.RunTimeLogging as L
     ExeEventType (Fixture, Group, OnceHook, OnceHookRelease, Test, TestHook, TestHookRelease, ThreadHook, ThreadHookRelease),
     Loc (..),
     LogControls (..),
+    PException,
     Sink,
     mkLogger,
     testLogControls,
@@ -30,12 +31,13 @@ import Internal.RunTimeLogging as L
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
+import Pyrelude (either)
 import Pyrelude as P
   ( Alternative ((<|>)),
     Applicative ((<*>)),
     Bool (..),
     Category (id),
-    Either,
+    Either (Left, Right),
     Enum (succ),
     Eq (..),
     Foldable (foldl, sum),
@@ -89,6 +91,7 @@ import Pyrelude as P
     replace,
     replicateM_,
     reverse,
+    sequence,
     sequenceA_,
     singleton,
     snd,
@@ -118,7 +121,7 @@ import Pyrelude as P
     (\\),
     (||),
   )
-import Pyrelude.Test as T hiding (chkEq, chkEq', filter, maybe, singleton)
+import qualified Pyrelude.Test as T
 import TempUtils (debugLines)
 import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
 import UnliftIO.Concurrent as C
@@ -285,7 +288,8 @@ getTag = \case
 data EvInfo = EvInfo
   { eiTag :: Text,
     et :: ExeEventType
-  } deriving Show
+  }
+  deriving (Show)
 
 chkFixturesContainTests :: Template -> [Template] -> [[ExeEvent]] -> IO ()
 chkFixturesContainTests root tList tevts =
@@ -316,7 +320,7 @@ chkFixturesContainTests root tList tevts =
 
     threadActual :: [ExeEvent] -> M.Map Text (ST.Set Text)
     threadActual evts =
-      let (openTests, fixAccum) = foldl' step (ST.empty, M.empty) (revStartEvents evts & debug' "Fucked")
+      let (openTests, fixAccum) = foldl' step (ST.empty, M.empty) (revStartEvents evts)
 
           step acc'@(st, mp) EvInfo {eiTag, et} =
             case et of
@@ -328,7 +332,7 @@ chkFixturesContainTests root tList tevts =
               L.TestHookRelease -> acc'
               L.Group -> acc'
               L.Fixture ->
-                let updateSet = fmap (ST.union st)
+                let updateSet = Just . maybe st (ST.union st)
                  in (ST.empty, M.alter updateSet eiTag mp)
               L.Test -> (ST.insert eiTag st, mp)
        in ST.null openTests
@@ -359,7 +363,7 @@ boundryLoc useStart = \case
   Debug {} -> Nothing
   EndExecution {} -> Nothing
 
--- check immediate parent (preceeding start or foollowing end) of each thread element
+-- check immediate parent (preceeding start or following end) of each thread element
 -- ignoring non threaded events when checking tests ignore other test start / ends
 chkParentOrder :: Template -> [ExeEvent] -> IO ()
 chkParentOrder rootTpl thrdEvts =
@@ -543,7 +547,7 @@ chkMaxThreads mxThrds threadedEvents =
   -- fix when logging is fully integrated with test
   let baseThrds = 2 -- should be 1
       allowed = mxThrds + baseThrds
-   in chk' -- TODO: chk' formatting
+   in T.chk' -- TODO: chk' formatting
         ( "max execution threads + "
             <> txt baseThrds
             <> ": "
@@ -845,7 +849,10 @@ chkLaws mxThrds t evts =
         chkStartEndExecution,
         chkTestCount templateAsList,
         chkFxtrCount templateAsList,
-        chkSingletonLeafEvents
+        chkSingletonLeafEvents,
+        chkOnceEventCount,
+        chkOnceEventParentOrder,
+        chkOnceEventErrorPropagation
       ]
     traverse_
       (threadedEvents &)
@@ -854,12 +861,13 @@ chkLaws mxThrds t evts =
         chkFixturesContainTests t templateAsList,
         traverse_ chkTestIdsConsecutive,
         chkThreadLeafEvents,
-        traverse_ (chkParentOrder t)
+        traverse_ (chkParentOrder t),
+        chkThreadErrorPropagation
       ]
-    chk'
+    T.chk'
       ( "max execution threads + 2: "
           -- 1 main thread + exe threads
-          -- TODO: fix this to + 1 when phatom test debug thread is sorted
+          -- TODO: fix this to + 1 when phantom test debug thread is sorted
           <> txt (mxThrds + 2)
           <> " exceeded: "
           <> txt (length threadedEvents)
@@ -870,6 +878,116 @@ chkLaws mxThrds t evts =
   where
     threadedEvents = groupOn threadId evts
     templateAsList = templateList t
+
+data ChkErrAccum = ChkErrAccum
+  { initialised :: Bool,
+    lastStart :: Maybe Loc,
+    lastFailure :: Maybe (Loc, PException),
+    matchedFails :: ST.Set Loc
+  }
+
+chkThreadErrs :: [ExeEvent] -> IO ()
+chkThreadErrs evts =
+  -- assumes nesting correct - all nodes have unique locs
+  lastFailure (foldl' nxt (ChkErrAccum False Nothing Nothing ST.empty) evts)
+    & maybe
+      (pure ())
+      (\l -> error $ "chkErrs error loc still open at end of thread: " <> show l)
+  where
+    nxt :: ChkErrAccum -> ExeEvent -> ChkErrAccum
+    nxt accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} =
+      \case
+        StartExecution {} -> accum
+        Start {loc} -> accum {lastStart = Just loc}
+        ed@End {loc} ->
+          lastFailure
+            & maybe
+              accum
+              ( \lf@(lfLoc, _e) ->
+                  ST.member loc matchedFails
+                    ? accum
+                      { matchedFails = ST.delete loc matchedFails,
+                        lastFailure = lfLoc == loc ? Nothing $ lastFailure
+                      }
+                    $ error
+                      ( "parent failure was not logged as expected within event ending with:\n"
+                          <> ppShow ed
+                          <> "\nexpected last failure"
+                          <> ppShow lf
+                      )
+              )
+        f@Failure
+          { loc,
+            msg,
+            exception,
+            idx,
+            threadId
+          } ->
+            lastFailure
+              & maybe
+                ( lastStart
+                    & maybe
+                      (error ("failure logged when outside of any event\n" <> ppShow f))
+                      ( \loc' ->
+                          (==) loc loc'
+                            ? accum
+                              { lastFailure = Just (loc, exception),
+                                matchedFails = ST.insert loc matchedFails
+                              }
+                            $ error
+                              ( "failure loc does not equal loc of parent event:\nfailure loc\n"
+                                  <> ppShow loc'
+                                  <> "\nparent event:\n"
+                                  <> ppShow loc
+                              )
+                      )
+                )
+                ( \parentFail ->
+                    error $
+                      "failure logged when expected a parent failure (ie. in the child of a partent event that failed):\nfailure:\n"
+                        <> ppShow f
+                        <> "\nunder parent failure:\n"
+                        <> ppShow parentFail
+                )
+        pf@ParentFailure
+          { loc,
+            parentLoc,
+            exception,
+            idx,
+            threadId
+          } ->
+            lastFailure
+              & maybe
+                ( initialised
+                    ? error ("parent failure logged when parent hasn't failed:\n" <> ppShow pf)
+                    $ accum
+                      { lastFailure = Just (parentLoc, exception),
+                        matchedFails = ST.insert loc matchedFails
+                      }
+                )
+                ( \lf@(ploc, ex) ->
+                    (==) parentLoc ploc
+                      ? accum {matchedFails = ST.insert loc matchedFails}
+                      $ error
+                        ("parent failure logged in child does not match parent failure in parent:\nparent failure logged:\n"
+                        <> ppShow lf
+                        <> "actual parent failure:\n"
+                        <> ppShow pf)
+                )
+        Debug {} -> accum
+        EndExecution {} -> accum
+
+chkThreadErrorPropagation :: [[ExeEvent]] -> IO ()
+chkThreadErrorPropagation = traverse_ chkThreadErrs
+
+chkOnceEventErrorPropagation :: [ExeEvent] -> IO ()
+chkOnceEventErrorPropagation _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"
+
+chkOnceEventParentOrder :: [ExeEvent] -> IO ()
+chkOnceEventParentOrder _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"
+
+chkOnceEventCount :: [ExeEvent] -> IO ()
+chkOnceEventCount _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"
 
 debug :: Text -> Int -> Text -> ExeEvent
 debug = Debug
@@ -898,7 +1016,7 @@ runTest maxThreads template = do
   execute maxThreads lc $ mkPrenode lgr template
   log
     & maybe
-      (chkFail "No Events Log")
+      (T.chkFail "No Events Log")
       (\evts -> atomically (q2List evts) >>= chkLaws maxThreads template)
 
 ioActionNonDet :: TextLogger -> IOPropsNonDet -> IO ()
@@ -936,12 +1054,12 @@ superSimplSuite :: Template
 superSimplSuite =
   TFixture "Fx 0" [testProps "Fx 0" 0 0 False]
 
--- $> unit_simple_single
+-- $ > unit_simple_single
 
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 
--- $ > unit_simple_single_failure
+-- $> unit_simple_single_failure
 
 unit_simple_single_failure :: IO ()
 unit_simple_single_failure = runTest 1 $ TFixture "Fx 0" [testProps "Fx 0" 0 0 True]

@@ -25,6 +25,7 @@ import Internal.RunTimeLogging as L
     LogControls (..),
     PException,
     Sink,
+    endIsTerminal,
     mkLogger,
     testLogControls,
   )
@@ -891,7 +892,7 @@ errorStep accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} 
   \case
     StartExecution {} -> accum
     Start {loc, eventType} -> accum {lastStart = Just (loc, eventType)}
-    ed@End {loc} ->
+    ed@End {loc, eventType} ->
       lastFailure
         & maybe
           accum
@@ -899,7 +900,10 @@ errorStep accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} 
               ST.member loc matchedFails
                 ? accum
                   { matchedFails = ST.delete loc matchedFails,
-                    lastFailure = lfLoc == loc ? Nothing $ lastFailure
+                    lastFailure =
+                      (lfLoc == loc && endIsTerminal eventType)
+                        ? Nothing
+                        $ lastFailure
                   }
                 $ error
                   ( "parent failure was not logged as expected within event ending with:\n"
@@ -980,14 +984,78 @@ chkThreadErrs evts =
       ( \(l, _ex, et) ->
           (==) et L.OnceHook
             ? pure ()
-            $ error ("chkErrs error loc still open at end of thread: " <> show l)
+            $ error ("chkThreadErrs error loc still open at end of thread: " <> show l)
       )
 
 chkThreadErrorPropagation :: [[ExeEvent]] -> IO ()
 chkThreadErrorPropagation = traverse_ chkThreadErrs
 
+data OEAccum = OEAccum
+  { oLastStart :: Maybe Loc,
+    oLastFailure :: Maybe (Loc, PException),
+    oMatchedFails :: ST.Set Loc
+  }
+
 chkOnceEventErrorPropagation :: [ExeEvent] -> IO ()
-chkOnceEventErrorPropagation _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"
+chkOnceEventErrorPropagation evts =
+  oLastFailure (foldl' chkSingltonErrs (OEAccum Nothing Nothing ST.empty) evts)
+    & maybe
+      (pure ())
+      ( \(l, _ex) ->
+          error ("chkOnceEventErrorPropagation - OnceHook error loc still open at end of run: " <> show l)
+      )
+  where
+    chkSingltonErrs :: OEAccum -> ExeEvent -> OEAccum
+    chkSingltonErrs
+      accum@OEAccum
+        { oLastStart,
+          oLastFailure,
+          oMatchedFails
+        } = \case
+        StartExecution {} -> accum
+        Start {loc, eventType} ->
+          case eventType of
+            L.OnceHook -> accum {oLastStart = Just loc}
+            OnceHookRelease -> accum
+            L.ThreadHook -> accum
+            ThreadHookRelease -> accum
+            L.TestHook -> accum
+            TestHookRelease -> accum
+            Group -> accum
+            L.Fixture -> accum
+            L.Test -> accum
+        End {loc, eventType} ->
+          case eventType of
+            L.OnceHook -> accum
+            L.OnceHookRelease -> 
+              oLastFailure
+                & maybe
+                  accum
+                  (\(eLoc, _e) -> eLoc == loc ? accum {oLastFailure = Nothing} $ accum)
+            L.ThreadHook -> accum
+            L.ThreadHookRelease -> accum
+            L.TestHook -> accum
+            L.TestHookRelease -> accum
+            L.Group -> accum
+            L.Fixture -> accum
+            L.Test -> accum
+        f@Failure {
+          loc,
+          msg,
+          exception,
+          idx,
+          threadId
+        } -> uu -- need singletonOpen property oLastFailure
+        ParentFailure
+          { loc,
+            parentLoc,
+            parentEventType
+          } -> uu
+        Debug {} -> accum
+        EndExecution {} -> accum
+
+chkOnceEventsAreBlocking :: [ExeEvent] -> IO ()
+chkOnceEventsAreBlocking _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"
 
 chkOnceEventParentOrder :: [ExeEvent] -> IO ()
 chkOnceEventParentOrder _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"

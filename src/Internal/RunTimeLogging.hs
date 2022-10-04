@@ -3,7 +3,37 @@ module Internal.RunTimeLogging where
 import Control.Monad.State
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import GHC.Show (show)
-import Pyrelude (Applicative (pure), Bool, Enum (succ), Eq, Exception (displayException), IO, IORef, Int, Maybe (..), Num ((+)), Ord, Semigroup ((<>)), Show, SomeException, Text, ThreadId, coerce, const, maybe, modifyIORef, print, readIORef, txt, unpack, uu, writeIORef, ($), (.), (<$>))
+import Pyrelude
+  ( Applicative (pure),
+    Bool(..),
+    Enum (succ),
+    Eq,
+    Exception (displayException),
+    IO,
+    IORef,
+    Int,
+    Maybe (..),
+    Num ((+)),
+    Ord,
+    Semigroup ((<>)),
+    Show,
+    SomeException,
+    Text,
+    ThreadId,
+    coerce,
+    const,
+    maybe,
+    modifyIORef,
+    print,
+    readIORef,
+    txt,
+    unpack,
+    uu,
+    writeIORef,
+    ($),
+    (.),
+    (<$>),
+  )
 import Text.Show.Pretty (pPrint)
 import UnliftIO (TChan, TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
 import UnliftIO.Concurrent (myThreadId)
@@ -28,6 +58,18 @@ data ExeEventType
   | Fixture
   | Test
   deriving (Show, Eq)
+
+endIsTerminal :: ExeEventType -> Bool
+endIsTerminal = \case
+  OnceHook -> False
+  ThreadHook -> False
+  TestHook -> False
+  OnceHookRelease -> True
+  ThreadHookRelease -> True
+  TestHookRelease -> True
+  Group -> True
+  Fixture -> True
+  Test -> True
 
 exceptionTxt :: SomeException -> PException
 exceptionTxt e = PException $ txt <$> lines (displayException e)

@@ -52,6 +52,8 @@ data ExeEventType
   | OnceHookRelease
   | ThreadHook
   | ThreadHookRelease
+  | FixtureHook
+  | FixtureHookRelease
   | TestHook
   | TestHookRelease
   | Group
@@ -64,6 +66,8 @@ endIsTerminal = \case
   OnceHook -> False
   ThreadHook -> False
   TestHook -> False
+  FixtureHook -> False
+  FixtureHookRelease -> True
   OnceHookRelease -> True
   ThreadHookRelease -> True
   TestHookRelease -> True

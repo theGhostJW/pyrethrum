@@ -23,7 +23,6 @@ data PreNode oi oo ti to  where
     { hookTag :: Maybe Text,
       hook :: Loc -> oi -> IO oo,
       hookChild :: PreNode oo coo ti to ,
-      hookResult :: TMVar (Either SomeException oo),
       hookRelease :: Loc -> oo -> IO ()
     } ->
     PreNode oi oo ti to 
@@ -34,13 +33,15 @@ data PreNode oi oo ti to  where
       threadHookRelease :: Loc -> to -> IO ()
     } ->
     PreNode oi oo ti to 
-  Fixture ::
-    { fxTag :: Maybe Text,
-      fxHook :: Loc -> oi -> ti -> IO to,
-      fxHookRelease :: Loc -> to -> IO (),
+  Fixture :: { 
+      onceFxHook :: Loc -> oi -> IO oo,
+      onceFxHookRelease :: Loc -> oo -> IO (),
+      threadFxHook :: Loc -> oi -> ti -> IO to,
+      threadFxHookRelease :: Loc -> to -> IO (),
       testHook :: Loc -> oi -> ti -> IO io,
       testHookRelease :: Loc -> io -> IO (),
-      iterations :: [Test oi ti ii]
+      fxTag :: Maybe Text,
+      iterations :: [Test oo to io]
     } ->
     PreNode oi () ti () 
 

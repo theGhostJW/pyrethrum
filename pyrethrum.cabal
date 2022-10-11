@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5fd53e0e7abf6e27d6a3ee74e9dd63072b9629656074ec6febc44aff25b3c5e2
+-- hash: 829ba3bb2b3c93a37f1e4723b734acfc93a535982df48a0e0fa1a7c3cc825a37
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -80,7 +80,6 @@ library
       RunnerTest
       SemTest
       SuiteRunIntegrityTest
-      SuiteRuntimeTest
       TestFilterTest
   other-modules:
       Paths_pyrethrum
@@ -181,7 +180,6 @@ test-suite pyrethrum-test
       RunnerTest
       SemTest
       SuiteRunIntegrityTest
-      SuiteRuntimeTest
       TestFilterTest
       Paths_pyrethrum
   hs-source-dirs:

@@ -36,7 +36,7 @@ data PreNode oi oo ti to  where
   Fixture :: { 
       onceFxHook :: Loc -> oi -> IO oo,
       onceFxHookRelease :: Loc -> oo -> IO (),
-      threadFxHook :: Loc -> oi -> ti -> IO to,
+      threadFxHook :: Loc -> oo -> ti -> IO to,
       threadFxHookRelease :: Loc -> to -> IO (),
       testHook :: Loc -> oi -> ti -> IO io,
       testHookRelease :: Loc -> io -> IO (),

@@ -594,10 +594,10 @@ executeNode logger hkIn rg =
               let fxIpts = liftA2 ExeIn eso fxIn
               withStartEnd logger leafloc L.Fixture $ do
                 whenLeft fxIn (logAbandonned' leafloc)
-                recurse
+                recurse fxIpts
             where
-              recurse :: IO ()
-              recurse = do
+              recurse :: forall so' to'. Either Abandon (ExeIn so' to') -> IO ()
+              recurse fxIpts = do
                 etest <- atomically $ do
                   mtest <- tryReadTQueue iterations
                   mtest
@@ -623,7 +623,7 @@ executeNode logger hkIn rg =
                               writeTVar nStatus Done
                       )
                       ( \(Test tstLoc test) -> do
-                          ho <- tstHkHook $ leftToMaybe fxIn
+                          ho <- runTestHook fxIpts tHook
                           let ethInputs = unpackInputs ho fxIn
 
                           finally
@@ -635,31 +635,29 @@ executeNode logger hkIn rg =
                                       (uncurry3 test i)
                                       (logFailure' tstLoc L.Test)
                             )
-                            $ atomically (modifyTVar runningCount pred) >> recurse
+                            $ atomically (modifyTVar runningCount pred) >> recurse fxIpts
                        )
-              runTestHook :: (si -> ti -> hi -> IO io) -> IO (Either Abandon io)
-              runTestHook
-                testHk =
+              
+              runTestHook :: forall io' so' to'. Either Abandon (ExeIn so' to') -> (so' -> to' -> IO io') -> IO (Either Abandon io')
+              runTestHook fxIpts testHk =
                   do
                     withStartEnd logger leafloc L.TestHook $
                       either
                         logReturnAbandonned
-                        (uncurry3 runHook)
+                        runHook
                         fxIpts
                   where
                     logReturnAbandonned a =
-                      logAbandonned logger tstHkLoc a
+                      logAbandonned logger leafloc a
                         >> pure (Left a)
+
+                    runHook (ExeIn si ti) =
                       catchAll
-                        (Right <$> testHk si ti ii)
+                        (Right <$> testHk si ti )
                         ( \e -> do
-                            logFailure logger tstHkLoc L.TestHook e
-                            pure . Left $ Abandon tstHkLoc L.TestHook e
+                            logFailure logger leafloc L.TestHook e
+                            pure . Left $ Abandon leafloc L.TestHook e
                         )
-                      inPlaceAbandon
-                        & maybe
-                          (unpackInputs ehki aExIn)
-                          Left
 
   where
    

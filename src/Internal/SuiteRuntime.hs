@@ -188,14 +188,14 @@ data ExeTree si so ti to where
       -- a IO const funtion that logs Empty which can be filtered
       -- out of the log
       fxSHookStatus :: TVar Status,
-      fxSHookVal :: TMVar (Either Abandon so),
-      fxSHook :: si -> IO so,
-      fxSHookRelease :: so -> IO (),
-      fxTHook :: so -> ti -> IO to,
-      fxTHookRelease :: to -> IO (),
-      tHook :: so -> to -> IO io,
+      fxSHookVal :: TMVar (Either Abandon so2),
+      fxSHook :: si -> IO so2,
+      fxSHookRelease :: so2 -> IO (),
+      fxTHook :: so2 -> ti -> IO to2,
+      fxTHookRelease :: to2 -> IO (),
+      tHook :: so2 -> to2 -> IO io,
       tHookRelease :: io -> IO (),
-      iterations :: TQueue (Test so to io),
+      iterations :: TQueue (Test so2 to2 io),
       runningCount :: TVar Int
     } ->
     ExeTree si () ti ()
@@ -596,7 +596,7 @@ executeNode logger hkIn rg =
                 whenLeft fxIn (logAbandonned' leafloc)
                 recurse fxIpts
             where
-              recurse :: forall so' to'. Either Abandon (ExeIn so' to') -> IO ()
+              -- recurse :: forall so' to'. Either Abandon (ExeIn so' to') -> IO ()
               recurse fxIpts = do
                 etest <- atomically $ do
                   mtest <- tryReadTQueue iterations
@@ -616,74 +616,71 @@ executeNode logger hkIn rg =
                           pure $ Right t
                       )
                 etest
-                    & either
-                      ( \done ->
-                          when done $
-                            atomically $
-                              writeTVar nStatus Done
-                      )
-                      ( \(Test tstLoc test) -> do
-                          ho <- runTestHook fxIpts tHook
-                          let ethInputs = unpackInputs ho fxIn
+                  & either
+                    ( \done ->
+                        when done $
+                          atomically $
+                            writeTVar nStatus Done
+                    )
+                    ( \(Test tstLoc test) -> do
+                        io <- runTestHook fxIpts tHook
+                        let unpak io' (ExeIn so2 to2) = (so2, to2, io')
+                            ethInputs = liftA2 unpak io fxIpts
 
-                          finally
-                            ( withStartEnd logger tstLoc L.Test $
-                                ethInputs & either
-                                  (logAbandonned' tstLoc)
-                                  \i ->
-                                    catchAll
-                                      (uncurry3 test i)
-                                      (logFailure' tstLoc L.Test)
-                            )
-                            $ atomically (modifyTVar runningCount pred) >> recurse fxIpts
-                       )
-              
+                        finally
+                          ( withStartEnd logger tstLoc L.Test $
+                              ethInputs & either
+                                (logAbandonned' tstLoc)
+                                \(so2, to2, io') ->
+                                  catchAll
+                                    (test so2 to2 io')
+                                    (logFailure' tstLoc L.Test)
+                          )
+                          $ atomically (modifyTVar runningCount pred) >> recurse fxIpts
+                    )
+
               runTestHook :: forall io' so' to'. Either Abandon (ExeIn so' to') -> (so' -> to' -> IO io') -> IO (Either Abandon io')
               runTestHook fxIpts testHk =
-                  do
-                    withStartEnd logger leafloc L.TestHook $
-                      either
-                        logReturnAbandonned
-                        runHook
-                        fxIpts
-                  where
-                    logReturnAbandonned a =
-                      logAbandonned logger leafloc a
-                        >> pure (Left a)
+                do
+                  withStartEnd logger leafloc L.TestHook $
+                    either
+                      logReturnAbandonned
+                      runHook
+                      fxIpts
+                where
+                  logReturnAbandonned a =
+                    logAbandonned logger leafloc a
+                      >> pure (Left a)
 
-                    runHook (ExeIn si ti) =
-                      catchAll
-                        (Right <$> testHk si ti )
-                        ( \e -> do
-                            logFailure logger leafloc L.TestHook e
-                            pure . Left $ Abandon leafloc L.TestHook e
-                        )
-
+                  runHook (ExeIn si ti) =
+                    catchAll
+                      (Right <$> testHk si ti)
+                      ( \e -> do
+                          logFailure logger leafloc L.TestHook e
+                          pure . Left $ Abandon leafloc L.TestHook e
+                      )
   where
-   
-
-     -- ihk@XTIHook
-     --   { loc,
-     --     iHook,
-     --     iHookRelease,
-     --     iChildNode
-     --   } ->
-     --     let newTstHk =
-     --           TestHkSrc
-     --             { tstHkLoc = loc,
-     --               tstHkHook = runTestHook logger hkIn tstHk iHook,
-     --               tstHkRelease = \ma io ->
-     --                 withStartEnd logger loc TestHookRelease $
-     --                   ma
-     --                     & maybe
-     --                       ( catchAll
-     --                           (iHookRelease io)
-     --                           (logFailure logger loc TestHookRelease)
-     --                       )
-     --                       (logAbandonned' loc)
-     --             }
-     --      in exeNxt hkIn newTstHk iChildNode
-
+    -- ihk@XTIHook
+    --   { loc,
+    --     iHook,
+    --     iHookRelease,
+    --     iChildNode
+    --   } ->
+    --     let newTstHk =
+    --           TestHkSrc
+    --             { tstHkLoc = loc,
+    --               tstHkHook = runTestHook logger hkIn tstHk iHook,
+    --               tstHkRelease = \ma io ->
+    --                 withStartEnd logger loc TestHookRelease $
+    --                   ma
+    --                     & maybe
+    --                       ( catchAll
+    --                           (iHookRelease io)
+    --                           (logFailure logger loc TestHookRelease)
+    --                       )
+    --                       (logAbandonned' loc)
+    --             }
+    --      in exeNxt hkIn newTstHk iChildNode
 
     siHkIn :: Either Abandon si
     siHkIn = singletonIn <$> hkIn

@@ -187,10 +187,10 @@ data ExeTree si so ti to where
       -- in the next layer out these will default to
       -- a IO const funtion that logs Empty which can be filtered
       -- out of the log
-      fxSHookStatus :: TVar Status,
-      fxSHookVal :: TMVar (Either Abandon so2),
-      fxSHook :: si -> IO so2,
-      fxSHookRelease :: so2 -> IO (),
+      fxOHookStatus :: TVar Status,
+      fxOHookVal :: TMVar (Either Abandon so2),
+      fxOHook :: si -> IO so2,
+      fxOHookRelease :: so2 -> IO (),
       fxTHook :: so2 -> ti -> IO to2,
       fxTHookRelease :: to2 -> IO (),
       tHook :: so2 -> to2 -> IO io,
@@ -292,10 +292,10 @@ prepare =
                     nStatus = ns,
                     iterations = q,
                     runningCount,
-                    fxSHookStatus = ohs,
-                    fxSHookVal = v,
-                    fxSHook = onceFxHook loc,
-                    fxSHookRelease = onceFxHookRelease loc,
+                    fxOHookStatus = ohs,
+                    fxOHookVal = v,
+                    fxOHook = onceFxHook loc,
+                    fxOHookRelease = onceFxHookRelease loc,
                     fxTHook = threadFxHook loc,
                     fxTHookRelease = threadFxHookRelease loc,
                     tHook = uu,
@@ -579,17 +579,17 @@ executeNode logger hkIn rg =
             leafloc,
             iterations,
             runningCount,
-            fxSHookStatus,
-            fxSHookVal,
-            fxSHook,
-            fxSHookRelease,
+            fxOHookStatus,
+            fxOHookVal,
+            fxOHook,
+            fxOHookRelease,
             fxTHook,
             fxTHookRelease,
             tHook,
             tHookRelease
           } ->
             do
-              eso <- onceHookVal logger L.FixtureOnceHook siHkIn fxSHook fxSHookStatus fxSHookVal leafloc
+              eso <- onceHookVal logger L.FixtureOnceHook siHkIn fxOHook fxOHookStatus fxOHookVal leafloc
               fxIn <- threadHookVal logger (liftA2 ExeIn eso $ threadIn <$> hkIn) L.FixtureThreadHook fxTHook leafloc
               let fxIpts = liftA2 ExeIn eso fxIn
               withStartEnd logger leafloc L.Fixture $ do
@@ -620,6 +620,8 @@ executeNode logger hkIn rg =
                         when done $
                           atomically (writeTVar nStatus Done)
                         releaseHook logger L.FixtureThreadHook (threadIn <$> fxIpts) leafloc fxTHookRelease
+                        when done $
+                          releaseHookUpdateStatus logger L.FixtureOnceHook fxOHookStatus (singletonIn <$> fxIpts) leafloc fxOHookRelease
                     )
                     ( \(Test tstLoc test) -> do
                         io <- runTestHook fxIpts tHook

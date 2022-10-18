@@ -38,7 +38,7 @@ data PreNode oi oo ti to  where
       onceFxHookRelease :: Loc -> oo -> IO (),
       threadFxHook :: Loc -> oo -> ti -> IO to,
       threadFxHookRelease :: Loc -> to -> IO (),
-      testHook :: Loc -> oi -> ti -> IO io,
+      testHook :: Loc -> oo -> to -> IO io,
       testHookRelease :: Loc -> io -> IO (),
       fxTag :: Maybe Text,
       iterations :: [Test oo to io]

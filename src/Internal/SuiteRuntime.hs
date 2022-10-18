@@ -7,7 +7,7 @@ import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both, uncurry3)
 import GHC.Exts
-import Internal.PreNode (PreNodeRoot)
+import Internal.PreNode (PreNodeRoot, PreNode (testHook))
 import qualified Internal.PreNode as PN
   ( PreNode (..),
     PreNodeRoot,
@@ -298,7 +298,7 @@ prepare =
                     fxOHookRelease = onceFxHookRelease loc,
                     fxTHook = threadFxHook loc,
                     fxTHookRelease = threadFxHookRelease loc,
-                    tHook = uu,
+                    tHook = testHook loc,
                     tHookRelease = testHookRelease loc
                   }
 
@@ -385,19 +385,6 @@ onceHookVal logger hkEvent ehi hook hs hkVal loc =
     (\abandon -> abandonnedHookVal hkEvent logger abandon hs hkVal loc)
     (\hi' -> normalHookVal hkEvent logger hook hi' hs hkVal loc)
     ehi
-
--- data TestHkSrc hi = TestHkSrc
---   { tstHkLoc :: Loc,
---     tstHkHook :: Maybe Abandon -> IO (Either Abandon hi),
---     tstHkRelease :: Maybe Abandon -> hi -> IO ()
---   }
-
-unpackInputs :: Either Abandon ii -> Either Abandon (ExeIn si ti) -> Either Abandon (si, ti, ii)
-unpackInputs ehki aExIn =
-  do
-    ii <- ehki
-    (ExeIn si ti) <- aExIn
-    Right (si, ti, ii)
 
 setStatusRunning :: TVar Status -> STM Bool
 setStatusRunning status =

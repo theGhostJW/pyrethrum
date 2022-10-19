@@ -11,5 +11,7 @@
   "cSpell.enabled": true,
   "cSpell.enableFiletypes": [
     "log"
-  ]
+  ],
+  "git.closeDiffOnOperation": true,
+  "git.postCommitCommand": "push"
 }

@@ -20,7 +20,7 @@ import Internal.PreNode (PreNode (hookChild))
 import Internal.PreNode as PN
 import Internal.RunTimeLogging as L
   ( ExeEvent (..),
-    ExeEventType (Fixture, Group, OnceHook, OnceHookRelease, Test, TestHook, TestHookRelease, ThreadHook, ThreadHookRelease),
+    ExeEventType (..),
     Loc (..),
     LogControls (..),
     PException,
@@ -185,12 +185,6 @@ data Template
         trelease :: IOPropsNonDet,
         tChild :: Template
       }
-  | TTestHook
-      { ttag :: Text,
-        thook :: IOPropsNonDet,
-        trelease :: IOPropsNonDet,
-        tChild :: Template
-      }
   | TFixture
       { ttag :: Text,
         tTests :: [IOProps]
@@ -211,7 +205,6 @@ foldTemplate seed combine =
             TGroup {tChilds} -> foldl' pm acc tChilds
             TOnceHook {tChild} -> recurse tChild
             TThreadHook {tChild} -> recurse tChild
-            TTestHook {tChild} -> recurse tChild
             TFixture {} -> acc
 
 parentMap :: Template -> M.Map Text (Maybe Template)
@@ -240,7 +233,6 @@ threadParentMap root =
       TGroup {} -> m
       TOnceHook {} -> m
       TThreadHook {} -> m
-      TTestHook {} -> m
       -- add an element for each test
       fx@TFixture {tTests, ttag} ->
         foldl'
@@ -263,7 +255,6 @@ threadParentMap root =
           TGroup {} -> False
           TOnceHook {} -> False
           TThreadHook {} -> False
-          TTestHook {} -> True
           TFixture {} -> False
 
         isThrdHkorGrp :: Template -> Bool
@@ -271,7 +262,6 @@ threadParentMap root =
           TGroup {} -> True
           TOnceHook {} -> False
           TThreadHook {} -> True
-          TTestHook {} -> False
           TFixture {} -> False
 
 lookupThrow :: (Ord k, Show k, Show v) => M.Map k v -> k -> v
@@ -336,6 +326,10 @@ chkFixturesContainTests root tList tevts =
                 let updateSet = Just . maybe st (ST.union st)
                  in (ST.empty, M.alter updateSet eiTag mp)
               L.Test -> (ST.insert eiTag st, mp)
+              L.FixtureOnceHook -> uu       
+              L.FixtureOnceHookRelease -> uu
+              L.FixtureThreadHook  -> uu   
+              L.FixtureThreadHookRelease -> uu
        in ST.null openTests
             ? fixAccum
             $ error
@@ -345,7 +339,6 @@ chkFixturesContainTests root tList tevts =
       TGroup {} -> Nothing
       TOnceHook {} -> Nothing
       TThreadHook {} -> Nothing
-      TTestHook {} -> Nothing
       TFixture {ttag} -> Just ttag
 
 actualParentIgnoreTests :: ListLike m EvInfo i => m -> Maybe Text
@@ -399,6 +392,10 @@ chkParentOrder rootTpl thrdEvts =
                 L.Group -> chkParentIncTests
                 L.Fixture -> chkParentIncTests
                 L.Test -> chkParentExclTests
+                L.FixtureOnceHook -> uu       
+                L.FixtureOnceHookRelease -> uu
+                L.FixtureThreadHook  -> uu   
+                L.FixtureThreadHookRelease -> uu
 
 templateTestCount :: [Template] -> Int
 templateTestCount ts =
@@ -417,10 +414,9 @@ templateFixCount =
       TGroup {tChilds} -> ac + foldl' fxCount' 0 tChilds
       TOnceHook {tChild} -> fxCount' ac tChild
       TThreadHook {tChild} -> fxCount' ac tChild
-      TTestHook {tChild} -> fxCount' ac tChild
       TFixture {tTests} -> ac + 1
 
-mkPrenode :: TextLogger -> Template -> PreNode oi () ti () ii ()
+mkPrenode :: TextLogger -> Template -> PreNode oi () ti ()
 mkPrenode l = \case
   TGroup
     { ttag,
@@ -438,16 +434,20 @@ mkPrenode l = \case
       trelease,
       tChild
     } -> uu
-  TTestHook
-    { ttag,
-      thook,
-      trelease,
-      tChild
-    } -> uu
   TFixture
     { ttag,
       tTests
-    } -> mkFixture l ttag tTests
+    } -> uu
+    -- PN.Fixture { 
+    --   onceFxHook :: Loc -> oi -> IO oo,
+    --   onceFxHookRelease :: Loc -> oo -> IO (),
+    --   threadFxHook :: Loc -> oo -> ti -> IO to,
+    --   threadFxHookRelease :: Loc -> to -> IO (),
+    --   testHook :: Loc -> oo -> to -> IO io,
+    --   testHookRelease :: Loc -> io -> IO (),
+    --   fxTag = Just tag,
+    --   iterations = mkTest log <$> iop
+    -- }
 
 q2List :: TQueue ExeEvent -> STM [ExeEvent]
 q2List qu = reverse <$> recurse [] qu
@@ -463,9 +463,10 @@ groupOn f =
   unpack . foldl' fld M.empty . reverse
   where
     unpack = (snd <$>) . M.toList
-    fld m a = case M.lookup (f a) m of
-      Nothing -> M.insert (f a) [a] m
-      Just as -> M.insert (f a) (a : as) m
+    fld m a = M.lookup (f a) m & 
+      maybe
+       (M.insert (f a) [a] m)
+       (\as -> M.insert (f a) (a : as) m)
 
 -- TODO - better formatting chkEq pyrelude
 chkEqf' :: (Eq a, Show a) => a -> a -> Text -> IO ()
@@ -735,6 +736,10 @@ chkFixtureChildren =
               ? Just evtLoc
               $ fail "End fixture when fixture not started"
           L.Test -> failOut "Test"
+          L.FixtureOnceHook -> uu       
+          L.FixtureOnceHookRelease -> uu
+          L.FixtureThreadHook  -> uu   
+          L.FixtureThreadHookRelease -> uu
 
         chkInFixtureStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
         chkInFixtureStartEnd isStart' fxLoc evtLoc = \case
@@ -751,6 +756,10 @@ chkFixtureChildren =
               $ (fxLoc == evtLoc) ? Nothing
               $ fail "fixture end loc does not match fixture start loc"
           L.Test {} -> mfixLoc
+          L.FixtureOnceHook -> uu       
+          L.FixtureOnceHookRelease -> uu
+          L.FixtureThreadHook  -> uu   
+          L.FixtureThreadHookRelease -> uu
 
 chkTestCount :: [Template] -> [ExeEvent] -> IO ()
 chkTestCount t evs =
@@ -781,6 +790,10 @@ threadedBoundary = \case
   L.Group -> True
   L.Fixture -> True
   L.Test -> True
+  L.FixtureOnceHook -> uu       
+  L.FixtureOnceHookRelease -> uu
+  L.FixtureThreadHook  -> uu   
+  L.FixtureThreadHookRelease -> uu
 
 -- TODO: Error -> txt
 chkStartEndIntegrity :: [[ExeEvent]] -> IO ()
@@ -1131,9 +1144,6 @@ ioAction log (IOProps {message, delayms, fail}) =
 
 mkTest :: TextLogger -> IOProps -> PN.Test si ti ii
 mkTest log iop@IOProps {message, delayms, fail} = PN.Test message \a b c -> ioAction log iop
-
-mkFixture :: TextLogger -> Text -> [IOProps] -> PreNode oi () ti () ii ()
-mkFixture log tag = PN.Fixture (Just tag) . fmap (mkTest log)
 
 noDelay :: DocFunc Int
 noDelay = DocFunc "No Delay" $ pure 0

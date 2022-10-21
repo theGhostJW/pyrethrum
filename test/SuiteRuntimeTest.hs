@@ -163,27 +163,27 @@ testProps fxTag idx = IOProps (fxTag <> "." <> txt idx)
 
 data Template
   = TGroup
-      { ttag :: Text,
+      { tTag :: Text,
         tChilds :: [Template]
       }
   | TOnceHook
-      { ttag :: Text,
+      { tTag :: Text,
         shook :: IOProps,
-        srelease :: IOProps,
+        sRelease :: IOProps,
         tChild :: Template
       }
   | TThreadHook
-      { ttag :: Text,
-        thook :: [IOProps],
-        trelease :: [IOProps],
+      { tTag :: Text,
+        tHook :: [IOProps],
+        tRelease :: [IOProps],
         tChild :: Template
       }
   | TFixture
-      { ttag :: Text,
-        shook :: IOProps,
-        srelease :: IOProps,
-        thook :: [IOProps],
-        trelease :: [IOProps],
+      { tTag :: Text,
+        sHook :: IOProps,
+        sRelease :: IOProps,
+        tHook :: [IOProps],
+        tRelease :: [IOProps],
         tTests :: [IOProps]
       }
   deriving (Show)
@@ -207,8 +207,8 @@ foldTemplate seed combine =
 parentMap :: Template -> M.Map Text (Maybe Template)
 parentMap t =
   foldTemplate
-    (M.singleton (ttag t) Nothing)
-    (\p c m -> M.insert (ttag c) (Just p) m)
+    (M.singleton (tTag t) Nothing)
+    (\p c m -> M.insert (tTag c) (Just p) m)
     t
 
 templateList :: Template -> [Template]
@@ -220,7 +220,7 @@ testTags fxTag tsts =
 
 threadParentMap :: Template -> M.Map Text (Maybe Text)
 threadParentMap root =
-  (ttag <$>) <$> foldl' insertTests ((>>= threadParent) <$> rootMap) (templateList root)
+  (tTag <$>) <$> foldl' insertTests ((>>= threadParent) <$> rootMap) (templateList root)
   where
     rootMap :: M.Map Text (Maybe Template)
     rootMap = parentMap root
@@ -231,11 +231,11 @@ threadParentMap root =
       TOnceHook {} -> m
       TThreadHook {} -> m
       -- add an element for each test
-      fx@TFixture {tTests, ttag} ->
+      fx@TFixture {tTests, tTag} ->
         foldl'
           (\m' tsttg -> M.insert tsttg (Just fx) m')
           m
-          (testTags ttag tTests)
+          (testTags tTag tTests)
 
     threadParent :: Template -> Maybe Template
     threadParent tmp =
@@ -245,7 +245,7 @@ threadParentMap root =
         fstPrnt pred t =
           pred t
             ? Just t
-            $ lookupThrow rootMap (ttag t) >>= fstPrnt pred
+            $ lookupThrow rootMap (tTag t) >>= fstPrnt pred
 
         isTstHk :: Template -> Bool
         isTstHk = \case
@@ -336,7 +336,7 @@ chkFixturesContainTests root tList tevts =
       TGroup {} -> Nothing
       TOnceHook {} -> Nothing
       TThreadHook {} -> Nothing
-      TFixture {ttag} -> Just ttag
+      TFixture {tTag} -> Just tTag
 
 actualParentIgnoreTests :: ListLike m EvInfo i => m -> Maybe Text
 actualParentIgnoreTests evs = eiTag <$> find (\EvInfo {et = et'} -> et' /= L.Test) evs
@@ -416,23 +416,23 @@ templateFixCount =
 mkPrenode :: Int ->  TextLogger -> Template -> IO (PreNode oi () ti ())
 mkPrenode maxThreads l = \case
   TGroup
-    { ttag,
+    { tTag,
       tChilds
     } -> uu
   TOnceHook
-    { ttag,
+    { tTag,
       shook,
-      srelease,
+      sRelease,
       tChild
     } -> uu
   TThreadHook
-    { ttag,
-      thook,
-      trelease,
+    { tTag,
+      tHook,
+      tRelease,
       tChild
     } -> uu
   TFixture
-    { ttag,
+    { tTag,
       tTests
     } -> uu 
   --   do 
@@ -1097,7 +1097,7 @@ debug = Debug
 
 validateTemplate :: Template -> IO ()
 validateTemplate t =
-  let tl = (ttag <$> templateList t)
+  let tl = (tTag <$> templateList t)
       utl = nub tl
    in when (length tl /= length utl) $
         error $
@@ -1147,11 +1147,11 @@ alwaysFail = DocFunc "Always Fail" $ pure True
 superSimplSuite :: Template
 superSimplSuite =
   TFixture {
-    ttag = "FX 0",
-    shook = testProps "Fx 0 - SH" 0 0 False,
-    srelease = testProps "Fx 0 - SHR" 0 0 False,
-    thook = [testProps "Fx 0" 0 0 False],
-    trelease = [testProps "Fx 0" 0 0 False],
+    tTag = "FX 0",
+    sHook = testProps "Fx 0 - SH" 0 0 False,
+    sRelease = testProps "Fx 0 - SHR" 0 0 False,
+    tHook = [testProps "Fx 0" 0 0 False],
+    tRelease = [testProps "Fx 0" 0 0 False],
     tTests = [testProps "Fx 0" 0 0 False]
     }
 
@@ -1164,11 +1164,11 @@ unit_simple_single = runTest 1 superSimplSuite
 
 unit_simple_single_failure :: IO ()
 unit_simple_single_failure = runTest 1 $ TFixture {
-    ttag = "FX 0",
-    shook = testProps "Fx 0 - SH" 0 0 False,
-    srelease = testProps "Fx 0 - SHR" 0 0 False,
-    thook = [testProps "Fx 0" 0 0 False],
-    trelease = [testProps "Fx 0" 0 0 False],
+    tTag = "FX 0",
+    sHook = testProps "Fx 0 - SH" 0 0 False,
+    sRelease = testProps "Fx 0 - SHR" 0 0 False,
+    tHook = [testProps "Fx 0" 0 0 False],
+    tRelease = [testProps "Fx 0" 0 0 False],
     tTests = [testProps "Fx 0" 0 0 True]
     }
 

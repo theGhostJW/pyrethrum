@@ -55,6 +55,7 @@ ghc-options:
   # - -flate-specialise # reqiuired for polysemy
   # - -fspecialise-aggressively # reqiuired for polysemy
   # - -Werror
+  - -O0
   - -Wall
   - -Wcompat
   - -Wincomplete-record-updates

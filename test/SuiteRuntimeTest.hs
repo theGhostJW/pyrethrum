@@ -161,13 +161,6 @@ data IOProps = IOProps
 testProps :: Text -> Int -> Int -> Bool -> IOProps
 testProps fxTag idx = IOProps (fxTag <> "." <> txt idx)
 
-data IOPropsNonDet = IOPropsNonDet
-  { message' :: Text,
-    delayms' :: DocFunc Int,
-    fail' :: DocFunc Bool
-  }
-  deriving (Show)
-
 data Template
   = TGroup
       { ttag :: Text,
@@ -181,12 +174,16 @@ data Template
       }
   | TThreadHook
       { ttag :: Text,
-        thook :: IOPropsNonDet,
-        trelease :: IOPropsNonDet,
+        thook :: [IOProps],
+        trelease :: [IOProps],
         tChild :: Template
       }
   | TFixture
       { ttag :: Text,
+        shook :: IOProps,
+        srelease :: IOProps,
+        thook :: [IOProps],
+        trelease :: [IOProps],
         tTests :: [IOProps]
       }
   deriving (Show)
@@ -326,10 +323,10 @@ chkFixturesContainTests root tList tevts =
                 let updateSet = Just . maybe st (ST.union st)
                  in (ST.empty, M.alter updateSet eiTag mp)
               L.Test -> (ST.insert eiTag st, mp)
-              L.FixtureOnceHook -> uu       
-              L.FixtureOnceHookRelease -> uu
-              L.FixtureThreadHook  -> uu   
-              L.FixtureThreadHookRelease -> uu
+              L.FixtureOnceHook -> acc'
+              L.FixtureOnceHookRelease -> acc'
+              L.FixtureThreadHook -> acc'
+              L.FixtureThreadHookRelease -> acc'
        in ST.null openTests
             ? fixAccum
             $ error
@@ -380,8 +377,8 @@ chkParentOrder rootTpl thrdEvts =
               fail =
                 error . toS $
                   toS errPrefix <> "\n  expected (tag): " <> txt expected <> "  \ngot (tag): " <> txt actualParent
-              chkParentIncTests = (expected /= actualParent) ? fail $ next
-              chkParentExclTests = (expected /= actualParentIgnoreTests') ? fail $ next
+              chkParentIncTests = expected == actualParent ? next $ fail
+              chkParentExclTests = expected == actualParentIgnoreTests' ? next $ fail
            in case et of
                 L.OnceHook -> next
                 L.OnceHookRelease -> next
@@ -392,10 +389,10 @@ chkParentOrder rootTpl thrdEvts =
                 L.Group -> chkParentIncTests
                 L.Fixture -> chkParentIncTests
                 L.Test -> chkParentExclTests
-                L.FixtureOnceHook -> uu       
-                L.FixtureOnceHookRelease -> uu
-                L.FixtureThreadHook  -> uu   
-                L.FixtureThreadHookRelease -> uu
+                L.FixtureOnceHook -> next
+                L.FixtureOnceHookRelease -> next
+                L.FixtureThreadHook -> chkParentIncTests
+                L.FixtureThreadHookRelease -> chkParentIncTests
 
 templateTestCount :: [Template] -> Int
 templateTestCount ts =
@@ -416,8 +413,8 @@ templateFixCount =
       TThreadHook {tChild} -> fxCount' ac tChild
       TFixture {tTests} -> ac + 1
 
-mkPrenode :: TextLogger -> Template -> PreNode oi () ti ()
-mkPrenode l = \case
+mkPrenode :: Int ->  TextLogger -> Template -> IO (PreNode oi () ti ())
+mkPrenode maxThreads l = \case
   TGroup
     { ttag,
       tChilds
@@ -437,17 +434,19 @@ mkPrenode l = \case
   TFixture
     { ttag,
       tTests
-    } -> uu
-    -- PN.Fixture { 
-    --   onceFxHook :: Loc -> oi -> IO oo,
-    --   onceFxHookRelease :: Loc -> oo -> IO (),
-    --   threadFxHook :: Loc -> oo -> ti -> IO to,
-    --   threadFxHookRelease :: Loc -> to -> IO (),
-    --   testHook :: Loc -> oo -> to -> IO io,
-    --   testHookRelease :: Loc -> io -> IO (),
-    --   fxTag = Just tag,
-    --   iterations = mkTest log <$> iop
-    -- }
+    } -> uu 
+  --   do 
+      
+  --     pure PN.Fixture {
+  --        onceFxHook = uu, -- :: Loc -> oi -> IO oo,
+  --        onceFxHookRelease = uu, -- Loc -> oo -> IO (),
+  --        threadFxHook = uu, --  Loc -> oo -> ti -> IO to,
+  --        threadFxHookRelease = uu, --  Loc -> to -> IO (),
+  --        testHook = uu, --  Loc -> oo -> to -> IO io,
+  --        testHookRelease = uu, --  Loc -> io -> IO (),
+  --        fxTag = Just tag,
+  --        iterations = mkTest log <$> iop
+  -- }
 
 q2List :: TQueue ExeEvent -> STM [ExeEvent]
 q2List qu = reverse <$> recurse [] qu
@@ -463,10 +462,11 @@ groupOn f =
   unpack . foldl' fld M.empty . reverse
   where
     unpack = (snd <$>) . M.toList
-    fld m a = M.lookup (f a) m & 
-      maybe
-       (M.insert (f a) [a] m)
-       (\as -> M.insert (f a) (a : as) m)
+    fld m a =
+      M.lookup (f a) m
+        & maybe
+          (M.insert (f a) [a] m)
+          (\as -> M.insert (f a) (a : as) m)
 
 -- TODO - better formatting chkEq pyrelude
 chkEqf' :: (Eq a, Show a) => a -> a -> Text -> IO ()
@@ -736,9 +736,9 @@ chkFixtureChildren =
               ? Just evtLoc
               $ fail "End fixture when fixture not started"
           L.Test -> failOut "Test"
-          L.FixtureOnceHook -> uu       
+          L.FixtureOnceHook -> uu
           L.FixtureOnceHookRelease -> uu
-          L.FixtureThreadHook  -> uu   
+          L.FixtureThreadHook -> uu
           L.FixtureThreadHookRelease -> uu
 
         chkInFixtureStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
@@ -756,9 +756,9 @@ chkFixtureChildren =
               $ (fxLoc == evtLoc) ? Nothing
               $ fail "fixture end loc does not match fixture start loc"
           L.Test {} -> mfixLoc
-          L.FixtureOnceHook -> uu       
+          L.FixtureOnceHook -> uu
           L.FixtureOnceHookRelease -> uu
-          L.FixtureThreadHook  -> uu   
+          L.FixtureThreadHook -> uu
           L.FixtureThreadHookRelease -> uu
 
 chkTestCount :: [Template] -> [ExeEvent] -> IO ()
@@ -790,9 +790,9 @@ threadedBoundary = \case
   L.Group -> True
   L.Fixture -> True
   L.Test -> True
-  L.FixtureOnceHook -> uu       
+  L.FixtureOnceHook -> uu
   L.FixtureOnceHookRelease -> uu
-  L.FixtureThreadHook  -> uu   
+  L.FixtureThreadHook -> uu
   L.FixtureThreadHookRelease -> uu
 
 -- TODO: Error -> txt
@@ -1022,7 +1022,7 @@ chkOnceEventErrorPropagation evts =
           error ("chkOnceEventErrorPropagation - OnceHook error loc still open at end of run: " <> show l)
       )
   where
-    onceHk = (==) L.OnceHook 
+    onceHk = (==) L.OnceHook
     chkSingltonErrs :: OEAccum -> ExeEvent -> OEAccum
     chkSingltonErrs
       accum@OEAccum
@@ -1034,43 +1034,39 @@ chkOnceEventErrorPropagation evts =
           StartExecution {} -> accum
           Start {loc, eventType, threadId} ->
             let onceStart = onceHk eventType
-            in
-            oLastSHkFailure & maybe 
-              (
-                onceStart
-                  ? accum {oOpenSHk = Just loc}
-                  $ accum 
-              )
-              (
-                const $ accum {
-                        oOpenChldElms = 
-                          ST.insert (ThrdLoc loc $ onceStart ? Nothing  $ Just threadId) oOpenChldElms
-                    }
-              )
-           
+             in oLastSHkFailure
+                  & maybe
+                    ( onceStart
+                        ? accum {oOpenSHk = Just loc}
+                        $ accum
+                    )
+                    ( const $
+                        accum
+                          { oOpenChldElms =
+                              ST.insert (ThrdLoc loc $ onceStart ? Nothing $ Just threadId) oOpenChldElms
+                          }
+                    )
           ed@End {loc, eventType, threadId} -> uu
+          -- make sure singletoon failure is matched
+          -- reset open shk
+          -- remov    oOpenChldElms
+          -- let
+          --   oncEnd = onceHk eventType
+          --   thrdLoc = ThrdLoc loc (oncEnd ? Nothing $ Just threadId)
+          --   ensureNotOpen er =
+          --     ST.member thrdLoc oOpenChldElms ?
+          --       error ("parent exception not logged in:\n" <> ppShow ed <> "although parent singleton hook failed:\n" <> ppShow er) $
+          --       accum
+          -- in
+          --   oLastSHkFailure
+          --             & maybe
+          --               accum
+          --               ( \er ->
+          --                   ST.member thrdLoc oOpenChldElms
+          --                     ? accum {oMatchedFails = ST.delete thrdLoc oMatchedFails}
+          --                     $ ensureNotOpen er
+          --               )
 
-            -- make sure singletoon failure is matched
-            -- reset open shk
-            -- remov    oOpenChldElms 
-            -- let 
-            --   oncEnd = onceHk eventType
-            --   thrdLoc = ThrdLoc loc (oncEnd ? Nothing $ Just threadId)
-            --   ensureNotOpen er = 
-            --     ST.member thrdLoc oOpenChldElms ? 
-            --       error ("parent exception not logged in:\n" <> ppShow ed <> "although parent singleton hook failed:\n" <> ppShow er) $
-            --       accum
-            -- in
-            --   oLastSHkFailure
-            --             & maybe
-            --               accum
-            --               ( \er ->
-            --                   ST.member thrdLoc oOpenChldElms
-            --                     ? accum {oMatchedFails = ST.delete thrdLoc oMatchedFails}
-            --                     $ ensureNotOpen er 
-            --               )
-
-  
           f@Failure
             { loc,
               msg,
@@ -1120,18 +1116,12 @@ runTest maxThreads template = do
   lc@LogControls {sink, log} <- testLogControls chan q
   let lgr :: Text -> IO ()
       lgr msg = mkLogger sink ior tid (Debug msg)
-  execute maxThreads lc $ mkPrenode lgr template
+  pn <- mkPrenode maxThreads lgr template
+  execute maxThreads lc pn
   log
     & maybe
       (T.chkFail "No Events Log")
       (\evts -> atomically (q2List evts) >>= chkLaws maxThreads template)
-
-ioActionNonDet :: TextLogger -> IOPropsNonDet -> IO ()
-ioActionNonDet log (IOPropsNonDet {message', delayms' = DocFunc {func = getDelay}, fail' = DocFunc {func = getFail}}) =
-  do
-    delayms <- getDelay
-    fail <- getFail
-    ioAction log $ IOProps message' delayms fail
 
 ioAction :: TextLogger -> IOProps -> IO ()
 ioAction log (IOProps {message, delayms, fail}) =
@@ -1156,9 +1146,16 @@ alwaysFail = DocFunc "Always Fail" $ pure True
 
 superSimplSuite :: Template
 superSimplSuite =
-  TFixture "Fx 0" [testProps "Fx 0" 0 0 False]
+  TFixture {
+    ttag = "FX 0",
+    shook = testProps "Fx 0 - SH" 0 0 False,
+    srelease = testProps "Fx 0 - SHR" 0 0 False,
+    thook = [testProps "Fx 0" 0 0 False],
+    trelease = [testProps "Fx 0" 0 0 False],
+    tTests = [testProps "Fx 0" 0 0 False]
+    }
 
--- $ > unit_simple_single
+-- $> unit_simple_single
 
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
@@ -1166,7 +1163,15 @@ unit_simple_single = runTest 1 superSimplSuite
 -- $> unit_simple_single_failure
 
 unit_simple_single_failure :: IO ()
-unit_simple_single_failure = runTest 1 $ TFixture "Fx 0" [testProps "Fx 0" 0 0 True]
+unit_simple_single_failure = runTest 1 $ TFixture {
+    ttag = "FX 0",
+    shook = testProps "Fx 0 - SH" 0 0 False,
+    srelease = testProps "Fx 0 - SHR" 0 0 False,
+    thook = [testProps "Fx 0" 0 0 False],
+    trelease = [testProps "Fx 0" 0 0 False],
+    tTests = [testProps "Fx 0" 0 0 True]
+    }
+
 
 -- superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
 -- superSimplSuite q =

@@ -1,14 +1,15 @@
 module SuiteRuntimeTest where
 
 import Check (Checks)
+-- TODO Add to Pyrelude
+-- TODO Add to Pyrelude
+
+import Control.Monad (Functor ((<$)))
 import Control.Monad.Reader (ReaderT (runReaderT), ask)
 import DSL.Interpreter
 import Data.Aeson.Encoding (quarter)
 import Data.Aeson.TH
 import Data.Aeson.Types
--- TODO Add to Pyrelude
--- TODO Add to Pyrelude
-
 import qualified Data.IntMap.Merge.Lazy as ST
 import Data.List.Extra (lookup, snoc)
 import qualified Data.Map.Strict as M
@@ -184,6 +185,8 @@ data Template
         sRelease :: IOProps,
         tHook :: [IOProps],
         tRelease :: [IOProps],
+        tTestHook :: [IOProps],
+        tTestRelease :: [IOProps],
         tTests :: [IOProps]
       }
   deriving (Show)
@@ -413,7 +416,7 @@ templateFixCount =
       TThreadHook {tChild} -> fxCount' ac tChild
       TFixture {tTests} -> ac + 1
 
-mkPrenode :: Int ->  TextLogger -> Template -> IO (PreNode oi () ti ())
+mkPrenode :: Int -> TextLogger -> Template -> IO (PreNode oi () ti ())
 mkPrenode maxThreads l = \case
   TGroup
     { tTag,
@@ -433,20 +436,37 @@ mkPrenode maxThreads l = \case
     } -> uu
   TFixture
     { tTag,
+      sHook,
+      sRelease,
+      tHook,
+      tRelease,
+      tTestHook,
+      tTestRelease,
       tTests
-    } -> uu 
-  --   do 
-      
-  --     pure PN.Fixture {
-  --        onceFxHook = uu, -- :: Loc -> oi -> IO oo,
-  --        onceFxHookRelease = uu, -- Loc -> oo -> IO (),
-  --        threadFxHook = uu, --  Loc -> oo -> ti -> IO to,
-  --        threadFxHookRelease = uu, --  Loc -> to -> IO (),
-  --        testHook = uu, --  Loc -> oo -> to -> IO io,
-  --        testHookRelease = uu, --  Loc -> io -> IO (),
-  --        fxTag = Just tag,
-  --        iterations = mkTest log <$> iop
-  -- }
+    } ->
+      do
+        thrdHks <- newTVarIO tHook
+        thrdHkRs <- newTVarIO tRelease
+        tstHks <- newTVarIO tHook
+        tstHkRs <- newTVarIO tRelease
+        let runThreaded propsLst = do
+              prps <- atomically $ do
+                plst <- readTVar propsLst
+                case plst of
+                  [] -> error "test config or test utils wrong - more calls to tHook or tRelease function than configured"
+                  x : xs -> writeTVar propsLst xs >> pure x
+              ioAction l prps
+         in pure
+              PN.Fixture
+                { onceFxHook = \_loc _in -> ioAction l sHook,
+                  onceFxHookRelease = \_loc _in -> ioAction l sRelease,
+                  threadFxHook = \_loc _oo _ti -> runThreaded thrdHks,
+                  threadFxHookRelease = \_loc _to -> runThreaded thrdHkRs,
+                  testHook = \_loc _oo _to -> runThreaded tstHks,
+                  testHookRelease = \_loc _tsto -> runThreaded tstHkRs,
+                  fxTag = Just tTag,
+                  iterations = mkTest l <$> tTests
+                }
 
 q2List :: TQueue ExeEvent -> STM [ExeEvent]
 q2List qu = reverse <$> recurse [] qu
@@ -1146,13 +1166,15 @@ alwaysFail = DocFunc "Always Fail" $ pure True
 
 superSimplSuite :: Template
 superSimplSuite =
-  TFixture {
-    tTag = "FX 0",
-    sHook = testProps "Fx 0 - SH" 0 0 False,
-    sRelease = testProps "Fx 0 - SHR" 0 0 False,
-    tHook = [testProps "Fx 0" 0 0 False],
-    tRelease = [testProps "Fx 0" 0 0 False],
-    tTests = [testProps "Fx 0" 0 0 False]
+  TFixture
+    { tTag = "FX 0",
+      sHook = testProps "Fx 0 - SH" 0 0 False,
+      sRelease = testProps "Fx 0 - SHR" 0 0 False,
+      tHook = [testProps "Fx 0" 0 0 False],
+      tRelease = [testProps "Fx 0" 0 0 False],
+      tTestHook = [testProps "Fx 0" 0 0 False],
+      tTestRelease = [testProps "Fx 0" 0 0 False],
+      tTests = [testProps "Fx 0" 0 0 False]
     }
 
 -- $> unit_simple_single
@@ -1163,15 +1185,18 @@ unit_simple_single = runTest 1 superSimplSuite
 -- $> unit_simple_single_failure
 
 unit_simple_single_failure :: IO ()
-unit_simple_single_failure = runTest 1 $ TFixture {
-    tTag = "FX 0",
-    sHook = testProps "Fx 0 - SH" 0 0 False,
-    sRelease = testProps "Fx 0 - SHR" 0 0 False,
-    tHook = [testProps "Fx 0" 0 0 False],
-    tRelease = [testProps "Fx 0" 0 0 False],
-    tTests = [testProps "Fx 0" 0 0 True]
-    }
-
+unit_simple_single_failure =
+  runTest 1 $
+    TFixture
+      { tTag = "FX 0",
+        sHook = testProps "Fx 0 - SH" 0 0 False,
+        sRelease = testProps "Fx 0 - SHR" 0 0 False,
+        tHook = [testProps "Fx 0" 0 0 False],
+        tRelease = [testProps "Fx 0" 0 0 False],
+        tTestHook = [testProps "Fx 0" 0 0 False],
+        tTestRelease = [testProps "Fx 0" 0 0 False],
+        tTests = [testProps "Fx 0" 0 0 True]
+      }
 
 -- superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot
 -- superSimplSuite q =

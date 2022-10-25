@@ -33,7 +33,6 @@ import Internal.RunTimeLogging as L
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
-import Pyrelude (either)
 import Pyrelude as P
   ( Alternative ((<|>)),
     Applicative ((<*>)),
@@ -45,7 +44,7 @@ import Pyrelude as P
     Foldable (foldl, sum),
     IO,
     Int,
-    ListLike (all, drop, foldl', foldl1, head, null, takeWhileEnd, unsafeHead, unsafeLast),
+    ListLike (all, drop, foldl', foldl1, head, null, takeWhileEnd, unsafeHead, unsafeLast, elem),
     Maybe (Just, Nothing),
     Num ((+)),
     Ord (..),
@@ -65,12 +64,14 @@ import Pyrelude as P
     displayException,
     dropWhile,
     dropWhileEnd,
+    either, 
     error,
     filter,
     find,
     first,
     flip,
     fmap,
+    foldr',
     foldM_,
     foldl1',
     for_,
@@ -213,6 +214,7 @@ parentMap t =
     (M.singleton (tTag t) Nothing)
     (\p c m -> M.insert (tTag c) (Just p) m)
     t
+  
 
 templateList :: Template -> [Template]
 templateList t = foldTemplate [t] (\_p c l -> c : l) t
@@ -602,14 +604,14 @@ startTag =
   )
     . partialLoc
 
-chkTestIdsConsecutive :: [ExeEvent] -> IO ()
-chkTestIdsConsecutive evs =
-  let tstIds = read . toS . Txt.takeWhileEnd (/= '.') . startTag <$> filter (isStart L.Test) evs
+chkTesmevtsConsecutive :: [ExeEvent] -> IO ()
+chkTesmevtsConsecutive evs =
+  let tsmevts = read . toS . Txt.takeWhileEnd (/= '.') . startTag <$> filter (isStart L.Test) evs
       chkidxless :: Int -> Int -> IO Int
       chkidxless i1 i2 = i1 >= i2 ? error "test index out of order" $ pure i2
-   in null tstIds
+   in null tsmevts
         ? pure ()
-        $ foldM_ chkidxless (-1) tstIds
+        $ foldM_ chkidxless (-1) tsmevts
 
 chkLeafEvents :: ExeEventType -> [[ExeEvent]] -> IO ()
 chkLeafEvents targetEventType =
@@ -624,7 +626,7 @@ chkLeafEvents targetEventType =
         & maybe
           (pure ())
           (\fx -> error $ targStr <> " started not ended in same thread\n" <> ppShow fx)
-      chkTestIdsConsecutive evts'
+      chkTesmevtsConsecutive evts'
 
     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
     chkEvent mTstLoc evt =
@@ -888,14 +890,14 @@ chkLaws mxThrds t evts =
         chkSingletonLeafEvents,
         chkOnceEventCount,
         chkOnceEventParentOrder,
-        chkOnceEventErrorPropagation
+        chkErrorPropagation
       ]
     traverse_
       (threadedEvents &)
       [ chkStartEndIntegrity,
         chkFixtureChildren,
         chkFixturesContainTests t templateAsList,
-        traverse_ chkTestIdsConsecutive,
+        traverse_ chkTesmevtsConsecutive,
         chkThreadLeafEvents,
         traverse_ (chkParentOrder t),
         chkThreadErrorPropagation
@@ -1017,7 +1019,7 @@ chkThreadErrs evts =
     & maybe
       (pure ())
       ( \(l, _ex, et) ->
-          (==) et L.OnceHook
+          et `elem` [L.OnceHook, L.FixtureOnceHook]
             ? pure ()
             $ error ("chkThreadErrs error loc still open at end of thread: " <> show l)
       )
@@ -1033,75 +1035,89 @@ data OEAccum = OEAccum
 
 data ThrdLoc = ThrdLoc Loc (Maybe Text) deriving (Eq, Ord) -- thread id or nothing for singleton
 
-chkOnceEventErrorPropagation :: [ExeEvent] -> IO ()
-chkOnceEventErrorPropagation evts =
-  oLastSHkFailure (foldl' chkSingltonErrs (OEAccum Nothing Nothing ST.empty) evts)
-    & maybe
-      (pure ())
-      ( \(l, _ex) ->
-          error ("chkOnceEventErrorPropagation - OnceHook error loc still open at end of run: " <> show l)
-      )
-  where
-    onceHk = (==) L.OnceHook
-    chkSingltonErrs :: OEAccum -> ExeEvent -> OEAccum
-    chkSingltonErrs
-      accum@OEAccum
-        { oOpenSHk,
-          oLastSHkFailure,
-          oOpenChldElms
-        } =
-        \case
-          StartExecution {} -> accum
-          Start {loc, eventType, threadId} ->
-            let onceStart = onceHk eventType
-             in oLastSHkFailure
-                  & maybe
-                    ( onceStart
-                        ? accum {oOpenSHk = Just loc}
-                        $ accum
-                    )
-                    ( const $
-                        accum
-                          { oOpenChldElms =
-                              ST.insert (ThrdLoc loc $ onceStart ? Nothing $ Just threadId) oOpenChldElms
-                          }
-                    )
-          ed@End {loc, eventType, threadId} -> uu
-          -- make sure singletoon failure is matched
-          -- reset open shk
-          -- remov    oOpenChldElms
-          -- let
-          --   oncEnd = onceHk eventType
-          --   thrdLoc = ThrdLoc loc (oncEnd ? Nothing $ Just threadId)
-          --   ensureNotOpen er =
-          --     ST.member thrdLoc oOpenChldElms ?
-          --       error ("parent exception not logged in:\n" <> ppShow ed <> "although parent singleton hook failed:\n" <> ppShow er) $
-          --       accum
-          -- in
-          --   oLastSHkFailure
-          --             & maybe
-          --               accum
-          --               ( \er ->
-          --                   ST.member thrdLoc oOpenChldElms
-          --                     ? accum {oMatchedFails = ST.delete thrdLoc oMatchedFails}
-          --                     $ ensureNotOpen er
-          --               )
+chkErrorPropagation :: [ExeEvent] -> IO ()
+chkErrorPropagation evts =
+  uu
+  -- where
+  --   threadedEvents =
+  --     let
+  --       mevts = M.fromList $ (,[]) <$> nub (threadId <$> evts)
+  --       addThreaded evt = M.adjust (evt :) (threadId evt)
+  --       addSingleton
+  --     in
+  --       foldr' addThreaded mevts evts
 
-          f@Failure
-            { loc,
-              msg,
-              exception,
-              idx,
-              threadId
-            } -> uu -- need singletonOpen property oLastSHkFailure
-          ParentFailure
-            { loc,
-              parentLoc,
-              parentEventType,
-              threadId
-            } -> uu
-          Debug {} -> accum
-          EndExecution {} -> accum
+    
+  -- oLastSHkFailure (foldl' chkGlobalSingltonErrs (OEAccum Nothing Nothing ST.empty) evts)
+  --   & maybe
+  --     (pure ())
+  --     ( \(l, _ex) ->
+  --         error ("chkErrorPropagation - OnceHook error loc still open at end of run: " <> show l)
+  --     )
+  -- where
+  --   chkGlobalSingltonErrs :: OEAccum -> ExeEvent -> OEAccum
+  --   chkGlobalSingltonErrs
+  --     accum@OEAccum
+  --       { oOpenSHk,
+  --         oLastSHkFailure,
+  --         oOpenChldElms
+  --       } =
+  --       \case
+  --         StartExecution {} -> accum
+  --         Start {loc, eventType, threadId} ->
+  --               let isOnceHk = onceHook eventType  
+  --               in
+  --               oLastSHkFailure
+  --                 & maybe
+  --                   ( isOnceHk 
+  --                       ? accum {oOpenSHk = Just loc}
+  --                       $ accum
+  --                   )
+  --                   ( const $
+  --                       accum
+  --                         { oOpenChldElms =
+  --                             ST.insert (ThrdLoc loc $ isOnceHk ? Nothing $ Just threadId) oOpenChldElms
+  --                         }
+  --                   )
+  --         ed@End {loc, eventType, threadId} -> 
+  --         -- make sure singletoon failure is matched
+  --         -- reset open shk
+  --         -- remove oOpenChldElms
+  --           oLastSHkFailure
+  --                     & maybe
+  --                       accum
+  --                       ( \(failLoc, pException) ->
+  --                           let matched = 
+  --                           ST.member thrdLoc oOpenChldElms
+  --                             ? accum 
+  --                             $ ensureNotOpen lhf
+  --                       )
+  --           where
+  --             thrdLoc = ThrdLoc loc (
+  --               onceHook eventType  ? 
+  --                 Nothing $ 
+  --                 Just threadId
+  --                 )
+  --             ensureNotOpen er =
+  --               ST.member thrdLoc oOpenChldElms ?
+  --                 error ("parent exception not logged in:\n" <> ppShow ed <> "although parent singleton hook failed:\n" <> ppShow er) $
+  --                 accum
+
+  --         f@Failure
+  --           { loc,
+  --             msg,
+  --             exception,
+  --             idx,
+  --             threadId
+  --           } -> uu -- need singletonOpen property oLastSHkFailure
+  --         ParentFailure
+  --           { loc,
+  --             parentLoc,
+  --             parentEventType,
+  --             threadId
+  --           } -> uu
+  --         Debug {} -> accum
+  --         EndExecution {} -> accum
 
 chkOnceEventsAreBlocking :: [ExeEvent] -> IO ()
 chkOnceEventsAreBlocking _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"

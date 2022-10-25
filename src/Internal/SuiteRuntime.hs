@@ -606,9 +606,9 @@ executeNode logger hkIn rg =
                     ( \done -> do
                         when done $
                           atomically (writeTVar nStatus Done)
-                        releaseHook logger L.FixtureThreadHook (threadIn <$> fxIpts) leafloc fxTHookRelease
+                        releaseHook logger L.FixtureThreadHookRelease (threadIn <$> fxIpts) leafloc fxTHookRelease
                         when done $
-                          releaseHookUpdateStatus logger L.FixtureOnceHook fxOHookStatus (singletonIn <$> fxIpts) leafloc fxOHookRelease
+                          releaseHookUpdateStatus logger L.FixtureOnceHookRelease fxOHookStatus (singletonIn <$> fxIpts) leafloc fxOHookRelease
                     )
                     ( \(Test tstLoc test) -> do
                         io <- runTestHook fxIpts tHook

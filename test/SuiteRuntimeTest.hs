@@ -25,7 +25,6 @@ import Internal.RunTimeLogging as L
     Loc (..),
     LogControls (..),
     PException,
-    Sink,
     endIsTerminal,
     mkLogger,
     testLogControls,
@@ -356,7 +355,7 @@ boundryLoc useStart = \case
   End {loc, eventType} -> useStart ? Nothing $ Just (EvInfo (getTag loc) eventType)
   Failure {} -> Nothing
   ParentFailure {} -> Nothing
-  Debug {} -> Nothing
+  ApEvent {} -> Nothing
   EndExecution {} -> Nothing
 
 -- check immediate parent (preceeding start or following end) of each thread element
@@ -491,8 +490,8 @@ groupOn f =
           (\as -> M.insert (f a) (a : as) m)
 
 -- TODO - better formatting chkEq pyrelude
-chkEqf' :: (Eq a, Show a) => a -> a -> Text -> IO ()
-chkEqf' e a msg = chkEq' msg e a
+chkEqfmt' :: (Eq a, Show a) => a -> a -> Text -> IO ()
+chkEqfmt' e a msg = chkEq' msg e a
 
 chkEq' :: (Eq a, Show a) => Text -> a -> a -> IO ()
 chkEq' msg e a =
@@ -530,7 +529,7 @@ chkThreadLogsInOrder evts =
             let idx1 = idx ev1
                 idx2 = idx ev2
              in -- TODO - better formatting chkEq pyrelude
-                chkEqf' (succ idx1) idx2 $
+                chkEqfmt' (succ idx1) idx2 $
                   "event idx not consecutive\n"
                     <> toS (ppShow ev1)
                     <> "\n"
@@ -563,7 +562,7 @@ isStart et = \case
   End {} -> False
   Failure {} -> False
   ParentFailure {} -> False
-  Debug {} -> False
+  ApEvent {} -> False
   EndExecution {} -> False
 
 chkMaxThreads :: Int -> [[ExeEvent]] -> IO ()
@@ -591,7 +590,7 @@ partialLoc = \case
   End {loc} -> loc
   Failure {loc} -> loc
   ParentFailure {loc} -> loc
-  Debug {} -> boom "Debug"
+  ApEvent {} -> boom "ApEvent"
   EndExecution {} -> boom "EndExecution"
   where
     boom msg = error $ "BOOM - partialLoc called on: " <> msg <> " which does not have a loc property"
@@ -640,7 +639,7 @@ chkLeafEvents targetEventType =
               End {eventType, loc} -> chkOutEventStartEnd False loc eventType
               Failure {} -> Nothing
               ParentFailure {} -> Nothing
-              Debug {} -> Nothing
+              ApEvent {} -> Nothing
               EndExecution {} -> Nothing
           )
           ( -- within fixture
@@ -651,7 +650,7 @@ chkLeafEvents targetEventType =
                 End {eventType, loc} -> chkInEventStartEnd False tstLoc loc eventType
                 Failure {} -> mTstLoc
                 ParentFailure {} -> mTstLoc
-                Debug {} -> mTstLoc
+                ApEvent {} -> mTstLoc
                 EndExecution {} -> failIn "EndExecution"
           )
       where
@@ -725,7 +724,7 @@ chkFixtureChildren =
               End {eventType, loc} -> chkOutOfFixtureStartEnd False loc eventType
               Failure {} -> Nothing
               ParentFailure {} -> Nothing
-              Debug {} -> Nothing
+              ApEvent {} -> Nothing
               EndExecution {} -> Nothing
           )
           ( -- within fixture
@@ -736,7 +735,7 @@ chkFixtureChildren =
                 End {eventType, loc} -> chkInFixtureStartEnd False fxLoc loc eventType
                 Failure {} -> mfixLoc
                 ParentFailure {} -> mfixLoc
-                Debug {} -> mfixLoc
+                ApEvent {} -> mfixLoc
                 EndExecution {} -> failIn "EndExecution"
           )
       where
@@ -843,7 +842,7 @@ chkStartEndIntegrity =
           $ acc
       Failure {} -> acc
       ParentFailure {} -> acc
-      Debug {} -> acc
+      ApEvent {} -> acc
       EndExecution {} -> acc
 
     chkStart :: M.Map Loc (ST.Set Loc) -> ExeEvent -> M.Map Loc (ST.Set Loc)
@@ -904,9 +903,7 @@ chkLaws mxThrds t evts =
       ]
     T.chk'
       ( "max execution threads + 2: "
-          -- 1 main thread + exe threads
-          -- TODO: fix this to + 1 when phantom test debug thread is sorted
-          <> txt (mxThrds + 2)
+          <> txt (mxThrds + 1)
           <> " exceeded: "
           <> txt (length threadedEvents)
           <> "\n"
@@ -1009,7 +1006,7 @@ errorStep accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} 
                         <> ppShow pf
                     )
             )
-    Debug {} -> accum
+    ApEvent {} -> accum
     EndExecution {} -> accum
 
 chkThreadErrs :: [ExeEvent] -> IO ()
@@ -1116,7 +1113,7 @@ chkErrorPropagation evts =
   --             parentEventType,
   --             threadId
   --           } -> uu
-  --         Debug {} -> accum
+  --         ApEvent {} -> accum
   --         EndExecution {} -> accum
 
 chkOnceEventsAreBlocking :: [ExeEvent] -> IO ()
@@ -1127,9 +1124,6 @@ chkOnceEventParentOrder _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"
 
 chkOnceEventCount :: [ExeEvent] -> IO ()
 chkOnceEventCount _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"
-
-debug :: Text -> Int -> Text -> ExeEvent
-debug = Debug
 
 validateTemplate :: Template -> IO ()
 validateTemplate t =
@@ -1164,7 +1158,7 @@ ioAction log (IOProps {message, delayms, fail}) =
   do
     log message
     P.threadDelay delayms
-    when fail $
+    when fail .
       error . toS $
         "exception thrown " <> message
 
@@ -1193,7 +1187,7 @@ superSimplSuite =
       tTests = [testProps "Fx 0" 0 0 False]
     }
 
--- $> unit_simple_single
+-- $ > unit_simple_single
 
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite

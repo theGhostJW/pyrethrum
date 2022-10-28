@@ -18,7 +18,7 @@ import Internal.RunTimeLogging
     ExeEventType (Group, TestHookRelease),
     Loc (Node, Root),
     LogControls (LogControls),
-    Sink,
+    EventSink,
     logWorker,
     mkFailure,
     mkLogger,
@@ -665,13 +665,13 @@ executeNode logger hkIn rg =
 
 type Logger = (Int -> Text -> ExeEvent) -> IO ()
 
-newLogger :: Sink -> ThreadId -> IO Logger
+newLogger :: EventSink -> ThreadId -> IO Logger
 newLogger sink tid =
   do
     ir <- UnliftIO.newIORef 0
     pure $ mkLogger sink ir tid
 
-executeGraph :: Sink -> ExeTree () () () () -> Int -> IO ()
+executeGraph :: EventSink -> ExeTree () () () () -> Int -> IO ()
 executeGraph sink xtri maxThreads =
   let hkIn = Right (ExeIn () ())
       thrdTokens = replicate maxThreads True

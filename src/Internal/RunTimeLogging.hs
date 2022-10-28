@@ -122,7 +122,7 @@ data ExeEvent
         idx :: Int,
         threadId :: Text
       }
-  | Debug
+  | ApEvent
       { msg :: Text,
         idx :: Int,
         threadId :: Text
@@ -134,11 +134,11 @@ data ExeEvent
   deriving (Show)
 
 -------  IO Logging --------
-type Sink = ExeEvent -> IO ()
+type EventSink = ExeEvent -> IO ()
 
 -- not used in concurrent code ie. one IORef per thread
 -- this approach means I can't write a pure logger but I can live with that for now
-mkLogger :: Sink -> IORef Int -> ThreadId -> (Int -> Text -> ExeEvent) -> IO ()
+mkLogger :: EventSink -> IORef Int -> ThreadId -> (Int -> Text -> ExeEvent) -> IO ()
 mkLogger sink threadCounter thrdId fEvnt = do
   tc <- readIORef threadCounter
   let nxt = succ tc
@@ -146,7 +146,7 @@ mkLogger sink threadCounter thrdId fEvnt = do
   writeIORef threadCounter nxt
 
 data LogControls m = LogControls
-  { sink :: Sink,
+  { sink :: EventSink,
     logWorker :: IO (),
     stopWorker :: IO (),
     log :: m (TQueue ExeEvent)

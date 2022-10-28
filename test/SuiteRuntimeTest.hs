@@ -1145,7 +1145,7 @@ runTest maxThreads template = do
   tid <- C.myThreadId
   lc@LogControls {sink, log} <- testLogControls chan q
   let lgr :: Text -> IO ()
-      lgr msg = mkLogger sink ior tid (Debug msg)
+      lgr msg = mkLogger sink ior tid (ApEvent msg)
   pn <- mkPrenode maxThreads lgr template
   execute maxThreads lc pn
   log

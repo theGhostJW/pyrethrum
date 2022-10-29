@@ -122,7 +122,7 @@ data ExeEvent
         idx :: Int,
         threadId :: Text
       }
-  | ApEvent
+  | ApLog
       { msg :: Text,
         idx :: Int,
         threadId :: Text

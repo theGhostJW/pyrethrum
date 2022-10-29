@@ -355,7 +355,7 @@ boundryLoc useStart = \case
   End {loc, eventType} -> useStart ? Nothing $ Just (EvInfo (getTag loc) eventType)
   Failure {} -> Nothing
   ParentFailure {} -> Nothing
-  ApEvent {} -> Nothing
+  ApLog {} -> Nothing
   EndExecution {} -> Nothing
 
 -- check immediate parent (preceeding start or following end) of each thread element
@@ -562,7 +562,7 @@ isStart et = \case
   End {} -> False
   Failure {} -> False
   ParentFailure {} -> False
-  ApEvent {} -> False
+  ApLog {} -> False
   EndExecution {} -> False
 
 chkMaxThreads :: Int -> [[ExeEvent]] -> IO ()
@@ -590,7 +590,7 @@ partialLoc = \case
   End {loc} -> loc
   Failure {loc} -> loc
   ParentFailure {loc} -> loc
-  ApEvent {} -> boom "ApEvent"
+  ApLog {} -> boom "ApLog"
   EndExecution {} -> boom "EndExecution"
   where
     boom msg = error $ "BOOM - partialLoc called on: " <> msg <> " which does not have a loc property"
@@ -639,7 +639,7 @@ chkLeafEvents targetEventType =
               End {eventType, loc} -> chkOutEventStartEnd False loc eventType
               Failure {} -> Nothing
               ParentFailure {} -> Nothing
-              ApEvent {} -> Nothing
+              ApLog {} -> Nothing
               EndExecution {} -> Nothing
           )
           ( -- within fixture
@@ -650,7 +650,7 @@ chkLeafEvents targetEventType =
                 End {eventType, loc} -> chkInEventStartEnd False tstLoc loc eventType
                 Failure {} -> mTstLoc
                 ParentFailure {} -> mTstLoc
-                ApEvent {} -> mTstLoc
+                ApLog {} -> mTstLoc
                 EndExecution {} -> failIn "EndExecution"
           )
       where
@@ -724,7 +724,7 @@ chkFixtureChildren =
               End {eventType, loc} -> chkOutOfFixtureStartEnd False loc eventType
               Failure {} -> Nothing
               ParentFailure {} -> Nothing
-              ApEvent {} -> Nothing
+              ApLog {} -> Nothing
               EndExecution {} -> Nothing
           )
           ( -- within fixture
@@ -735,7 +735,7 @@ chkFixtureChildren =
                 End {eventType, loc} -> chkInFixtureStartEnd False fxLoc loc eventType
                 Failure {} -> mfixLoc
                 ParentFailure {} -> mfixLoc
-                ApEvent {} -> mfixLoc
+                ApLog {} -> mfixLoc
                 EndExecution {} -> failIn "EndExecution"
           )
       where
@@ -842,7 +842,7 @@ chkStartEndIntegrity =
           $ acc
       Failure {} -> acc
       ParentFailure {} -> acc
-      ApEvent {} -> acc
+      ApLog {} -> acc
       EndExecution {} -> acc
 
     chkStart :: M.Map Loc (ST.Set Loc) -> ExeEvent -> M.Map Loc (ST.Set Loc)
@@ -1006,7 +1006,7 @@ errorStep accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} 
                         <> ppShow pf
                     )
             )
-    ApEvent {} -> accum
+    ApLog {} -> accum
     EndExecution {} -> accum
 
 chkThreadErrs :: [ExeEvent] -> IO ()
@@ -1113,7 +1113,7 @@ chkErrorPropagation evts =
   --             parentEventType,
   --             threadId
   --           } -> uu
-  --         ApEvent {} -> accum
+  --         ApLog {} -> accum
   --         EndExecution {} -> accum
 
 chkOnceEventsAreBlocking :: [ExeEvent] -> IO ()
@@ -1145,7 +1145,7 @@ runTest maxThreads template = do
   tid <- C.myThreadId
   lc@LogControls {sink, log} <- testLogControls chan q
   let lgr :: Text -> IO ()
-      lgr msg = mkLogger sink ior tid (ApEvent msg)
+      lgr msg = mkLogger sink ior tid (ApLog msg)
   pn <- mkPrenode maxThreads lgr template
   execute maxThreads lc pn
   log

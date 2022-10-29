@@ -303,11 +303,11 @@ prepare =
                   }
 
 logAbandonned :: Logger -> Loc -> Abandon -> IO ()
-logAbandonned lgr loc Abandon {sourceLoc, sourceEventType, exception} =
-  lgr (mkParentFailure sourceLoc loc sourceEventType exception)
+logAbandonned logger loc Abandon {sourceLoc, sourceEventType, exception} =
+  logger (mkParentFailure sourceLoc loc sourceEventType exception)
 
 logFailure :: Logger -> Loc -> ExeEventType -> SomeException -> IO ()
-logFailure lgr loc et e = lgr (mkFailure loc (txt et <> "Failed at: " <> txt loc) e)
+logFailure logger loc et e = logger (mkFailure loc (txt et <> "Failed at: " <> txt loc) e)
 
 readOrLockHook :: TVar Status -> TMVar (Either Abandon ho) -> STM (Maybe (Either Abandon ho))
 readOrLockHook hs hVal = do
@@ -352,9 +352,9 @@ normalHookVal hkEvent logger hook hi hs hkVal loc =
     )
 
 withStartEnd :: Logger -> Loc -> ExeEventType -> IO a -> IO a
-withStartEnd lgr loc evt io = do
-  lgr $ Start loc evt
-  finally io . lgr $ End loc evt
+withStartEnd logger loc evt io = do
+  logger $ Start loc evt
+  finally io . logger $ End loc evt
 
 abandonLogHook :: ExeEventType -> Logger -> Abandon -> Loc -> IO (Either Abandon a)
 abandonLogHook hkEvent logger abandon loc =
@@ -396,21 +396,21 @@ setStatusRunning status =
     pure change
 
 releaseHook :: Logger -> ExeEventType -> Either Abandon ho -> Loc -> (ho -> IO ()) -> IO ()
-releaseHook lgr evt eho loc hkRelease =
-  withStartEnd lgr loc evt $
+releaseHook logger evt eho loc hkRelease =
+  withStartEnd logger loc evt $
     eho
       & either
-        (logAbandonned lgr loc)
+        (logAbandonned logger loc)
         ( \so ->
             catchAll
               (hkRelease so)
-              (lgr . mkFailure loc ("Hook Release Failed: " <> txt evt <> " " <> txt loc))
+              (logger . mkFailure loc ("Hook Release Failed: " <> txt evt <> " " <> txt loc))
         )
 
 releaseHookUpdateStatus :: Logger -> ExeEventType -> TVar Status -> Either Abandon ho -> Loc -> (ho -> IO ()) -> IO ()
-releaseHookUpdateStatus lgr evt ns eho loc hkRelease =
+releaseHookUpdateStatus logger evt ns eho loc hkRelease =
   finally
-    (releaseHook lgr evt eho loc hkRelease)
+    (releaseHook logger evt eho loc hkRelease)
     (atomically $ writeTVar ns Done)
 
 discardDone :: TQueue (ExeTree a b c d) -> STM ()

@@ -25,7 +25,7 @@ import Internal.RunTimeLogging
     mkLogger,
     mkParentFailure,
     sink,
-    stopWorker,
+    stopWorker, ApLogger,
   )
 import qualified Internal.RunTimeLogging as L
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
@@ -162,16 +162,16 @@ data ExeTree si so ti to where
   XTSHook ::
     { loc :: Loc,
       status :: TVar Status,
-      sHook :: si -> IO so,
-      sHookRelease :: so -> IO (),
+      sHook :: ApLogger -> si -> IO so,
+      sHookRelease :: ApLogger -> so -> IO (),
       sHookVal :: TMVar (Either Abandon so),
       sChildNode :: ExeTree so cs ti to
     } ->
     ExeTree si so ti to
   XTTHook ::
     { loc :: Loc,
-      thHook :: si -> ti -> IO to,
-      thHookRelease :: to -> IO (),
+      thHook :: ApLogger -> si -> ti -> IO to,
+      thHookRelease :: ApLogger -> to -> IO (),
       thChildNode :: ExeTree si so to tc
     } ->
     ExeTree si so ti to
@@ -190,12 +190,12 @@ data ExeTree si so ti to where
       -- out of the log
       fxOHookStatus :: TVar Status,
       fxOHookVal :: TMVar (Either Abandon so2),
-      fxOHook :: si -> IO so2,
-      fxOHookRelease :: so2 -> IO (),
-      fxTHook :: so2 -> ti -> IO to2,
-      fxTHookRelease :: to2 -> IO (),
-      tHook :: so2 -> to2 -> IO io,
-      tHookRelease :: io -> IO (),
+      fxOHook :: ApLogger -> si -> IO so2,
+      fxOHookRelease :: ApLogger -> so2 -> IO (),
+      fxTHook :: ApLogger -> so2 -> ti -> IO to2,
+      fxTHookRelease :: ApLogger -> to2 -> IO (),
+      tHook :: ApLogger -> so2 -> to2 -> IO io,
+      tHookRelease :: ApLogger -> io -> IO (),
       iterations :: TQueue (Test so2 to2 io),
       runningCount :: TVar Int
     } ->

@@ -1,7 +1,7 @@
 module Internal.PreNode where
 
 import Control.DeepSeq (NFData)
-import Internal.RunTimeLogging (Loc)
+import Internal.RunTimeLogging (Loc, ApLogger)
 import Language.Haskell.TH (ExpQ)
 import Pyrelude (Bool (False, True), Either, Eq, Generic, IO, Int, ListLike (all, any, filter, null), Maybe, Ord, Show, SomeException, TVar, Text, not, ($), (&&))
 import UnliftIO (MonadUnliftIO, STM, TMVar)
@@ -10,7 +10,7 @@ type PreNodeRoot = PreNode () () () ()
 
 data Test si ti ii = Test
   { tstId :: Text,
-    tst :: si -> ti -> ii -> IO ()
+    tst :: ApLogger -> si -> ti -> ii -> IO ()
   }
 
 data PreNode oi oo ti to  where
@@ -21,25 +21,25 @@ data PreNode oi oo ti to  where
     PreNode oi () ti () 
   OnceHook ::
     { hookTag :: Maybe Text,
-      hook :: Loc -> oi -> IO oo,
+      hook :: Loc -> ApLogger -> oi -> IO oo,
       hookChild :: PreNode oo coo ti to ,
-      hookRelease :: Loc -> oo -> IO ()
+      hookRelease :: Loc -> ApLogger -> oo -> IO ()
     } ->
     PreNode oi oo ti to 
   ThreadHook ::
     { threadTag :: Maybe Text,
-      threadHook :: Loc -> oi -> ti -> IO to,
+      threadHook :: Loc -> ApLogger -> oi -> ti -> IO to,
       threadHookChild :: PreNode oi oo to cto ,
-      threadHookRelease :: Loc -> to -> IO ()
+      threadHookRelease :: Loc -> ApLogger -> to -> IO ()
     } ->
     PreNode oi oo ti to 
   Fixture :: { 
-      onceFxHook :: Loc -> oi -> IO oo,
-      onceFxHookRelease :: Loc -> oo -> IO (),
-      threadFxHook :: Loc -> oo -> ti -> IO to,
-      threadFxHookRelease :: Loc -> to -> IO (),
-      testHook :: Loc -> oo -> to -> IO io,
-      testHookRelease :: Loc -> io -> IO (),
+      onceFxHook :: Loc -> ApLogger -> oi -> IO oo,
+      onceFxHookRelease :: Loc -> ApLogger -> oo -> IO (),
+      threadFxHook :: Loc -> ApLogger -> oo -> ti -> IO to,
+      threadFxHookRelease :: Loc -> ApLogger -> to -> IO (),
+      testHook :: Loc -> ApLogger -> oo -> to -> IO io,
+      testHookRelease :: Loc -> ApLogger -> io -> IO (),
       fxTag :: Maybe Text,
       iterations :: [Test oo to io]
     } ->

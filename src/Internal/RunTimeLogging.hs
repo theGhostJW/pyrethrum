@@ -82,37 +82,38 @@ endIsTerminal = \case
 exceptionTxt :: SomeException -> PException
 exceptionTxt e = PException $ txt <$> lines (displayException e)
 
-mkFailure :: Loc -> Text -> SomeException -> Int -> Text -> ExeEvent
+mkFailure :: Loc -> Text -> SomeException -> Int -> SThreadId -> ExeEvent
 mkFailure l t = Failure l t . exceptionTxt
 
-mkParentFailure :: Loc -> Loc -> ExeEventType -> SomeException -> Int -> Text -> ExeEvent
+mkParentFailure :: Loc -> Loc -> ExeEventType -> SomeException -> Int -> SThreadId -> ExeEvent
 mkParentFailure p l et = ParentFailure p l et . exceptionTxt
 
 newtype PException = PException {displayText :: [Text]} deriving (Show, Eq)
+newtype SThreadId = SThreadId { display :: Text} deriving (Show, Eq, Ord)
 
 data ExeEvent
   = StartExecution
       { idx :: Int,
-        threadId :: Text
+        threadId :: SThreadId
       }
   | Start
       { loc :: Loc,
         eventType :: ExeEventType,
         idx :: Int,
-        threadId :: Text
+        threadId :: SThreadId
       }
   | End
       { loc :: Loc,
         eventType :: ExeEventType,
         idx :: Int,
-        threadId :: Text
+        threadId :: SThreadId
       }
   | Failure
       { loc :: Loc,
         msg :: Text,
         exception :: PException,
         idx :: Int,
-        threadId :: Text
+        threadId :: SThreadId
       }
   | ParentFailure
       { loc :: Loc,
@@ -120,29 +121,30 @@ data ExeEvent
         parentEventType :: ExeEventType,
         exception :: PException,
         idx :: Int,
-        threadId :: Text
+        threadId :: SThreadId
       }
   | ApLog
       { msg :: Text,
         idx :: Int,
-        threadId :: Text
+        threadId :: SThreadId
       }
   | EndExecution
       { idx :: Int,
-        threadId :: Text
+        threadId :: SThreadId
       }
   deriving (Show)
 
 -------  IO Logging --------
 type EventSink = ExeEvent -> IO ()
+type ApLogger = Text -> IO ()
 
 -- not used in concurrent code ie. one IORef per thread
 -- this approach means I can't write a pure logger but I can live with that for now
-mkLogger :: EventSink -> IORef Int -> ThreadId -> (Int -> Text -> ExeEvent) -> IO ()
+mkLogger :: EventSink -> IORef Int -> ThreadId -> (Int -> SThreadId -> ExeEvent) -> IO ()
 mkLogger sink threadCounter thrdId fEvnt = do
   tc <- readIORef threadCounter
   let nxt = succ tc
-  sink . fEvnt nxt $ txt thrdId
+  sink . fEvnt nxt . SThreadId $ txt thrdId
   writeIORef threadCounter nxt
 
 data LogControls m = LogControls
@@ -173,6 +175,7 @@ testLogControls chn log = do
 
   pure . LogControls sink logWorker stopWorker $ Just log
 
+$(deriveToJSON defaultOptions ''SThreadId)
 $(deriveJSON defaultOptions ''ExeEventType)
 $(deriveToJSON defaultOptions ''Loc)
 $(deriveToJSON defaultOptions ''PException)

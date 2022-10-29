@@ -7,18 +7,19 @@ import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both, uncurry3)
 import GHC.Exts
-import Internal.PreNode (PreNodeRoot, PreNode (testHook))
+import Internal.PreNode (PreNode (testHook), PreNodeRoot)
 import qualified Internal.PreNode as PN
   ( PreNode (..),
     PreNodeRoot,
     Test (..),
   )
 import Internal.RunTimeLogging
-  ( ExeEvent (..),
+  ( EventSink,
+    ExeEvent (..),
     ExeEventType (Group, TestHookRelease),
     Loc (Node, Root),
     LogControls (LogControls),
-    EventSink,
+    SThreadId,
     logWorker,
     mkFailure,
     mkLogger,
@@ -663,7 +664,15 @@ executeNode logger hkIn rg =
     logFailure' :: Loc -> ExeEventType -> SomeException -> IO ()
     logFailure' = logFailure logger
 
-type Logger = (Int -> Text -> ExeEvent) -> IO ()
+    apLog :: Text -> IO ()
+    apLog msg = logger $ \idx trdId ->
+      ApLog
+        { idx = idx,
+          threadId = trdId,
+          msg = msg
+        }
+
+type Logger = (Int -> SThreadId -> ExeEvent) -> IO ()
 
 newLogger :: EventSink -> ThreadId -> IO Logger
 newLogger sink tid =

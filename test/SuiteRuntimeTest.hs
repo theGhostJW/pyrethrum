@@ -417,8 +417,8 @@ templateFixCount =
       TThreadHook {tChild} -> fxCount' ac tChild
       TFixture {tTests} -> ac + 1
 
-mkPrenode :: Int -> TextLogger -> Template -> IO (PreNode oi () ti ())
-mkPrenode maxThreads l = \case
+mkPrenode :: Int -> Template -> IO (PreNode oi () ti ())
+mkPrenode maxThreads = \case
   TGroup
     { tTag,
       tChilds
@@ -450,23 +450,23 @@ mkPrenode maxThreads l = \case
         thrdHkRs <- newTVarIO tRelease
         tstHks <- newTVarIO tHook
         tstHkRs <- newTVarIO tRelease
-        let runThreaded propsLst = do
+        let runThreaded lggr propsLst = do
               prps <- atomically $ do
                 plst <- readTVar propsLst
                 case plst of
                   [] -> error "test config or test utils wrong - more calls to tHook or tRelease function than configured"
                   x : xs -> writeTVar propsLst xs >> pure x
-              ioAction l prps
+              ioAction lggr prps
          in pure
               PN.Fixture
-                { onceFxHook = \_loc _in -> ioAction l sHook,
-                  onceFxHookRelease = \_loc _in -> ioAction l sRelease,
-                  threadFxHook = \_loc _oo _ti -> runThreaded thrdHks,
-                  threadFxHookRelease = \_loc _to -> runThreaded thrdHkRs,
-                  testHook = \_loc _oo _to -> runThreaded tstHks,
-                  testHookRelease = \_loc _tsto -> runThreaded tstHkRs,
+                { onceFxHook = \_loc lg _in -> ioAction lg sHook,
+                  onceFxHookRelease = \_loc lg _in -> ioAction lg sRelease,
+                  threadFxHook = \_loc lg _oo _ti -> runThreaded lg thrdHks,
+                  threadFxHookRelease = \_loc lg _to -> runThreaded lg thrdHkRs,
+                  testHook = \_loc lg _oo _to -> runThreaded lg tstHks,
+                  testHookRelease = \_loc lg _tsto -> runThreaded lg tstHkRs,
                   fxTag = Just tTag,
-                  iterations = mkTest l <$> tTests
+                  iterations = mkTest <$> tTests
                 }
 
 q2List :: TQueue ExeEvent -> STM [ExeEvent]
@@ -1144,9 +1144,7 @@ runTest maxThreads template = do
   ior <- newIORef 0
   tid <- C.myThreadId
   lc@LogControls {sink, log} <- testLogControls chan q
-  let lgr :: Text -> IO ()
-      lgr msg = mkLogger sink ior tid (ApLog msg)
-  pn <- mkPrenode maxThreads lgr template
+  pn <- mkPrenode maxThreads template
   execute maxThreads lc pn
   log
     & maybe
@@ -1162,8 +1160,8 @@ ioAction log (IOProps {message, delayms, fail}) =
       error . toS $
         "exception thrown " <> message
 
-mkTest :: TextLogger -> IOProps -> PN.Test si ti ii
-mkTest log iop@IOProps {message, delayms, fail} = PN.Test message \a b c -> ioAction log iop
+mkTest :: IOProps -> PN.Test si ti ii
+mkTest iop@IOProps {message, delayms, fail} = PN.Test message \log a b c -> ioAction log iop
 
 noDelay :: DocFunc Int
 noDelay = DocFunc "No Delay" $ pure 0

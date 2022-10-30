@@ -203,7 +203,7 @@ data ExeTree si so ti to where
 
 data Test si ti ii = Test
   { tstLoc :: Loc,
-    tst :: si -> ti -> ii -> IO ()
+    tst :: ApLogger -> si -> ti -> ii -> IO ()
   }
 
 prepare :: PN.PreNode () () () () -> IO (ExeTree () () () ())
@@ -332,23 +332,23 @@ runOrReturn hkStatus hkVal hkAction =
       hkAction
       pure
 
-runLogHook :: forall hi ho. ExeEventType -> Logger -> (hi -> IO ho) -> hi -> Loc -> IO (Either Abandon ho)
-runLogHook hkEvent logger hook hi loc =
-  withStartEnd logger loc hkEvent $
+runLogHook :: forall hi ho. ExeEventType -> Logger -> (ApLogger -> hi -> IO ho) -> hi -> Context -> IO (Either Abandon ho)
+runLogHook hkEvent logger hook hi ctx@Context {cloc, apLogger} =
+  withStartEnd logger cloc hkEvent $
     catchAll
-      ( Right <$> hook hi
+      ( Right <$> hook apLogger hi
       )
       ( \e ->
-          logFailure logger loc hkEvent e
-            >> pure (Left $ Abandon loc hkEvent e)
+          logFailure logger cloc hkEvent e
+            >> pure (Left $ Abandon cloc hkEvent e)
       )
 
-normalHookVal :: forall hi ho. ExeEventType -> Logger -> (hi -> IO ho) -> hi -> TVar Status -> TMVar (Either Abandon ho) -> Loc -> IO (Either Abandon ho)
-normalHookVal hkEvent logger hook hi hs hkVal loc =
+normalHookVal :: forall hi ho. ExeEventType -> Logger -> (ApLogger -> hi -> IO ho) -> hi -> TVar Status -> TMVar (Either Abandon ho) -> Context -> IO (Either Abandon ho)
+normalHookVal hkEvent logger hook hi hs hkVal ctx =
   runOrReturn
     hs
     hkVal
-    ( runLogHook hkEvent logger hook hi loc
+    ( runLogHook hkEvent logger hook hi ctx
         >>= atomically . setRunningVal hs hkVal
     )
 
@@ -373,18 +373,18 @@ abandonnedHookVal hkEvent logger abandon hs hkVal loc =
         >>= atomically . setRunningVal hs hkVal
     )
 
-threadHookVal :: forall so hi ho. Logger -> Either Abandon (ExeIn so hi) -> ExeEventType -> (so -> hi -> IO ho) -> Loc -> IO (Either Abandon ho)
-threadHookVal logger hkIn hkEvent hook loc =
+threadHookVal :: forall so hi ho. Logger -> Either Abandon (ExeIn so hi) -> ExeEventType -> (ApLogger -> so -> hi -> IO ho) -> Context -> IO (Either Abandon ho)
+threadHookVal logger hkIn hkEvent hook ctx@Context {cloc, apLogger} =
   hkIn
     & either
-      (\abandon -> abandonLogHook hkEvent logger abandon loc)
-      (\(ExeIn si ti) -> runLogHook hkEvent logger (hook si) ti loc)
+      (\abandon -> abandonLogHook hkEvent logger abandon cloc)
+      (\(ExeIn si ti) -> runLogHook hkEvent logger (`hook` si) ti ctx)
 
-onceHookVal :: forall hi ho. Logger -> ExeEventType -> Either Abandon hi -> (hi -> IO ho) -> TVar Status -> TMVar (Either Abandon ho) -> Loc -> IO (Either Abandon ho)
-onceHookVal logger hkEvent ehi hook hs hkVal loc =
+onceHookVal :: forall hi ho. Logger -> ExeEventType -> Either Abandon hi -> (ApLogger -> hi -> IO ho) -> TVar Status -> TMVar (Either Abandon ho) -> Context -> IO (Either Abandon ho)
+onceHookVal logger hkEvent ehi hook hs hkVal ctx =
   either
-    (\abandon -> abandonnedHookVal hkEvent logger abandon hs hkVal loc)
-    (\hi' -> normalHookVal hkEvent logger hook hi' hs hkVal loc)
+    (\abandon -> abandonnedHookVal hkEvent logger abandon hs hkVal $ cloc ctx)
+    (\hi' -> normalHookVal hkEvent logger hook hi' hs hkVal ctx)
     ehi
 
 setStatusRunning :: TVar Status -> STM Bool
@@ -396,22 +396,22 @@ setStatusRunning status =
       writeTVar status Running
     pure change
 
-releaseHook :: Logger -> ExeEventType -> Either Abandon ho -> Loc -> (ho -> IO ()) -> IO ()
-releaseHook logger evt eho loc hkRelease =
-  withStartEnd logger loc evt $
+releaseHook :: Logger -> ExeEventType -> Either Abandon ho -> Context -> (ApLogger -> ho -> IO ()) -> IO ()
+releaseHook logger evt eho ctx@Context{cloc, apLogger} hkRelease =
+  withStartEnd logger cloc evt $
     eho
       & either
-        (logAbandonned logger loc)
+        (logAbandonned logger cloc)
         ( \so ->
             catchAll
-              (hkRelease so)
-              (logger . mkFailure loc ("Hook Release Failed: " <> txt evt <> " " <> txt loc))
+              (hkRelease apLogger so)
+              (logger . mkFailure cloc ("Hook Release Failed: " <> txt evt <> " " <> txt cloc))
         )
 
-releaseHookUpdateStatus :: Logger -> ExeEventType -> TVar Status -> Either Abandon ho -> Loc -> (ho -> IO ()) -> IO ()
-releaseHookUpdateStatus logger evt ns eho loc hkRelease =
+releaseHookUpdateStatus :: Logger -> ExeEventType -> TVar Status -> Either Abandon ho -> Context -> (ApLogger -> ho -> IO ()) -> IO ()
+releaseHookUpdateStatus logger evt ns eho ctx hkRelease =
   finally
-    (releaseHook logger evt eho loc hkRelease)
+    (releaseHook logger evt eho ctx hkRelease)
     (atomically $ writeTVar ns Done)
 
 discardDone :: TQueue (ExeTree a b c d) -> STM ()
@@ -447,6 +447,11 @@ data ExeIn si ti = ExeIn
     threadIn :: ti
   }
 
+data Context = Context {
+  cloc :: Loc,
+  apLogger :: ApLogger
+}
+
 executeNode :: forall si so ti to. Logger -> Either Abandon (ExeIn si ti) -> ExeTree si so ti to -> IO ()
 executeNode logger hkIn rg =
   do
@@ -469,11 +474,12 @@ executeNode logger hkIn rg =
               --  3. updates hook status to running
               --  4. returns hook result
               -- must run for logging even if hkIn is Left
-              eso <- onceHookVal logger L.OnceHook siHkIn sHook status sHookVal loc
               let nxtHkIn so = (\exi -> exi {singletonIn = so}) <$> hkIn
                   -- nxtAbandon' = nxtAbandon loc L.OnceHook
                   recurse a = exeNxt a sChildNode
-               in finally
+                  ctx = context loc
+              eso <- onceHookVal logger L.OnceHook siHkIn sHook status sHookVal ctx
+              finally
                     ( either
                         (recurse . Left)
                         (recurse . nxtHkIn)
@@ -485,7 +491,7 @@ executeNode logger hkIn rg =
                           s <- readTVar status
                           pure $ cs == Done && s < HookFinalising
                         when wantRelease $
-                          releaseHookUpdateStatus logger L.OnceHook status eso loc sHookRelease
+                          releaseHookUpdateStatus logger L.OnceHook status eso ctx sHookRelease
                     )
         XTTHook
           { loc,
@@ -494,16 +500,17 @@ executeNode logger hkIn rg =
             thChildNode
           } ->
             do
-              eto <- threadHookVal logger hkIn L.ThreadHook thHook loc
               let nxtHkIn ti = (\exi -> exi {threadIn = ti}) <$> hkIn
                   recurse a = exeNxt a thChildNode
+                  ctx = context loc
+              eto <- threadHookVal logger hkIn L.ThreadHook thHook ctx
               finally
                 ( either
                     (recurse . Left)
                     (recurse . nxtHkIn)
                     eto
                 )
-                (releaseHook logger L.ThreadHookRelease eto loc thHookRelease)
+                (releaseHook logger L.ThreadHookRelease eto ctx thHookRelease)
         self@XTGroup
           { leafloc,
             nStatus,
@@ -577,13 +584,14 @@ executeNode logger hkIn rg =
             tHookRelease
           } ->
             do
-              eso <- onceHookVal logger L.FixtureOnceHook siHkIn fxOHook fxOHookStatus fxOHookVal leafloc
-              fxIn <- threadHookVal logger (liftA2 ExeIn eso $ threadIn <$> hkIn) L.FixtureThreadHook fxTHook leafloc
+              eso <- onceHookVal logger L.FixtureOnceHook siHkIn fxOHook fxOHookStatus fxOHookVal ctx
+              fxIn <- threadHookVal logger (liftA2 ExeIn eso $ threadIn <$> hkIn) L.FixtureThreadHook fxTHook ctx
               let fxIpts = liftA2 ExeIn eso fxIn
               withStartEnd logger leafloc L.Fixture $ do
                 whenLeft fxIn (logAbandonned' leafloc)
                 recurse fxIpts
             where
+              ctx = context leafloc
               recurse fxIpts = do
                 etest <- atomically $ do
                   mtest <- tryReadTQueue iterations
@@ -607,9 +615,9 @@ executeNode logger hkIn rg =
                     ( \done -> do
                         when done $
                           atomically (writeTVar nStatus Done)
-                        releaseHook logger L.FixtureThreadHookRelease (threadIn <$> fxIpts) leafloc fxTHookRelease
+                        releaseHook logger L.FixtureThreadHookRelease (threadIn <$> fxIpts) ctx fxTHookRelease
                         when done $
-                          releaseHookUpdateStatus logger L.FixtureOnceHookRelease fxOHookStatus (singletonIn <$> fxIpts) leafloc fxOHookRelease
+                          releaseHookUpdateStatus logger L.FixtureOnceHookRelease fxOHookStatus (singletonIn <$> fxIpts) ctx fxOHookRelease
                     )
                     ( \(Test tstLoc test) -> do
                         io <- runTestHook fxIpts tHook
@@ -622,13 +630,13 @@ executeNode logger hkIn rg =
                                 (logAbandonned' tstLoc)
                                 \(so2, to2, io') ->
                                   catchAll
-                                    (test so2 to2 io')
+                                    (test apLog so2 to2 io')
                                     (logFailure' tstLoc L.Test)
                           )
                           $ atomically (modifyTVar runningCount pred) >> recurse fxIpts
                     )
 
-              runTestHook :: forall io' so' to'. Either Abandon (ExeIn so' to') -> (so' -> to' -> IO io') -> IO (Either Abandon io')
+              runTestHook :: forall io' so' to'. Either Abandon (ExeIn so' to') -> (ApLogger -> so' -> to' -> IO io') -> IO (Either Abandon io')
               runTestHook fxIpts testHk =
                 do
                   withStartEnd logger leafloc L.TestHook $
@@ -643,7 +651,7 @@ executeNode logger hkIn rg =
 
                   runHook (ExeIn si ti) =
                     catchAll
-                      (Right <$> testHk si ti)
+                      (Right <$> testHk apLog si ti)
                       ( \e -> do
                           logFailure logger leafloc L.TestHook e
                           pure . Left $ Abandon leafloc L.TestHook e
@@ -663,6 +671,9 @@ executeNode logger hkIn rg =
 
     logFailure' :: Loc -> ExeEventType -> SomeException -> IO ()
     logFailure' = logFailure logger
+
+    context :: Loc -> Context
+    context l = Context l apLog
 
     apLog :: Text -> IO ()
     apLog msg = logger $ \idx trdId ->

@@ -25,6 +25,7 @@ import Internal.RunTimeLogging as L
     Loc (..),
     LogControls (..),
     PException,
+    SThreadId (..),
     endIsTerminal,
     mkLogger,
     testLogControls,
@@ -43,7 +44,7 @@ import Pyrelude as P
     Foldable (foldl, sum),
     IO,
     Int,
-    ListLike (all, drop, foldl', foldl1, head, null, takeWhileEnd, unsafeHead, unsafeLast, elem),
+    ListLike (all, drop, elem, foldl', foldl1, head, null, takeWhileEnd, unsafeHead, unsafeLast),
     Maybe (Just, Nothing),
     Num ((+)),
     Ord (..),
@@ -63,16 +64,16 @@ import Pyrelude as P
     displayException,
     dropWhile,
     dropWhileEnd,
-    either, 
+    either,
     error,
     filter,
     find,
     first,
     flip,
     fmap,
-    foldr',
     foldM_,
     foldl1',
+    foldr',
     for_,
     fromJust,
     fromMaybe,
@@ -160,7 +161,7 @@ data IOProps = IOProps
   deriving (Show)
 
 testProps :: Text -> Int -> Int -> Bool -> IOProps
-testProps fxTag idx = IOProps (fxTag <> "." <> txt idx)
+testProps prefix idx = IOProps (prefix == "" ? txt idx $ prefix <> "." <> txt idx)
 
 data Template
   = TGroup
@@ -213,7 +214,6 @@ parentMap t =
     (M.singleton (tTag t) Nothing)
     (\p c m -> M.insert (tTag c) (Just p) m)
     t
-  
 
 templateList :: Template -> [Template]
 templateList t = foldTemplate [t] (\_p c l -> c : l) t
@@ -510,7 +510,7 @@ chkThreadLogsInOrder evts =
   do
     eachThread
       ( \l ->
-          let ck = chkEq' "first index of thread should be 1" 1 . idx
+          let ck = chkEq' "first index of thread should be 0" 0 . idx
               ev = unsafeHead l
            in ck ev
       )
@@ -888,8 +888,7 @@ chkLaws mxThrds t evts =
         chkFxtrCount templateAsList,
         chkSingletonLeafEvents,
         chkOnceEventCount,
-        chkOnceEventParentOrder,
-        chkErrorPropagation
+        chkOnceEventParentOrder
       ]
     traverse_
       (threadedEvents &)
@@ -899,7 +898,8 @@ chkLaws mxThrds t evts =
         traverse_ chkTesmevtsConsecutive,
         chkThreadLeafEvents,
         traverse_ (chkParentOrder t),
-        chkThreadErrorPropagation
+        chkThreadErrorPropagation,
+        chkErrorPropagation
       ]
     T.chk'
       ( "max execution threads + 2: "
@@ -1016,7 +1016,8 @@ chkThreadErrs evts =
     & maybe
       (pure ())
       ( \(l, _ex, et) ->
-          et `elem` [L.OnceHook, L.FixtureOnceHook]
+          et
+            `elem` [L.OnceHook, L.FixtureOnceHook]
             ? pure ()
             $ error ("chkThreadErrs error loc still open at end of thread: " <> show l)
       )
@@ -1032,89 +1033,140 @@ data OEAccum = OEAccum
 
 data ThrdLoc = ThrdLoc Loc (Maybe Text) deriving (Eq, Ord) -- thread id or nothing for singleton
 
-chkErrorPropagation :: [ExeEvent] -> IO ()
+data FixtureSubComponent = 
+  FxOnceHook | 
+  FxThreadHook | 
+  FxTest | 
+  NotFxChild deriving (Show, Eq, Ord)
+data ElemId
+  = ThreadedId
+      { rLoc :: Loc,
+        rThreadId :: SThreadId,
+        rEventType :: ExeEventType,
+        fxChild :: FixtureSubComponent
+      }
+  | OnceId
+      { rLoc :: Loc,
+        rEventType :: ExeEventType, 
+        fxChild :: FixtureSubComponent
+      }
+  deriving (Show, Eq, Ord)
+
+data ElmResult
+  = Pass
+      { rId :: ElemId
+      }
+  | Fail
+      { rId :: ElemId
+      }
+  | Abondonned
+      { rId :: ElemId,
+        parentId :: ElemId
+      }
+  | Grouping
+      { rId :: ElemId
+      }
+  deriving (Show, Eq, Ord)
+
+chkErrorPropagation :: [[ExeEvent]] -> IO ()
 chkErrorPropagation evts =
   uu
-  -- where
-  --   threadedEvents =
-  --     let
-  --       mevts = M.fromList $ (,[]) <$> nub (threadId <$> evts)
-  --       addThreaded evt = M.adjust (evt :) (threadId evt)
-  --       addSingleton
-  --     in
-  --       foldr' addThreaded mevts evts
+  where
+    allThreadIds = catMaybes $ head <$> evts
 
-    
-  -- oLastSHkFailure (foldl' chkGlobalSingltonErrs (OEAccum Nothing Nothing ST.empty) evts)
-  --   & maybe
-  --     (pure ())
-  --     ( \(l, _ex) ->
-  --         error ("chkErrorPropagation - OnceHook error loc still open at end of run: " <> show l)
-  --     )
-  -- where
-  --   chkGlobalSingltonErrs :: OEAccum -> ExeEvent -> OEAccum
-  --   chkGlobalSingltonErrs
-  --     accum@OEAccum
-  --       { oOpenSHk,
-  --         oLastSHkFailure,
-  --         oOpenChldElms
-  --       } =
-  --       \case
-  --         StartExecution {} -> accum
-  --         Start {loc, eventType, threadId} ->
-  --               let isOnceHk = onceHook eventType  
-  --               in
-  --               oLastSHkFailure
-  --                 & maybe
-  --                   ( isOnceHk 
-  --                       ? accum {oOpenSHk = Just loc}
-  --                       $ accum
-  --                   )
-  --                   ( const $
-  --                       accum
-  --                         { oOpenChldElms =
-  --                             ST.insert (ThrdLoc loc $ isOnceHk ? Nothing $ Just threadId) oOpenChldElms
-  --                         }
-  --                   )
-  --         ed@End {loc, eventType, threadId} -> 
-  --         -- make sure singletoon failure is matched
-  --         -- reset open shk
-  --         -- remove oOpenChldElms
-  --           oLastSHkFailure
-  --                     & maybe
-  --                       accum
-  --                       ( \(failLoc, pException) ->
-  --                           let matched = 
-  --                           ST.member thrdLoc oOpenChldElms
-  --                             ? accum 
-  --                             $ ensureNotOpen lhf
-  --                       )
-  --           where
-  --             thrdLoc = ThrdLoc loc (
-  --               onceHook eventType  ? 
-  --                 Nothing $ 
-  --                 Just threadId
-  --                 )
-  --             ensureNotOpen er =
-  --               ST.member thrdLoc oOpenChldElms ?
-  --                 error ("parent exception not logged in:\n" <> ppShow ed <> "although parent singleton hook failed:\n" <> ppShow er) $
-  --                 accum
+    step ::  ExeEvent -> [ElmResult] -> [ElmResult]
+    step ev acc = 
+      case ev of
+        StartExecution {} -> acc
+        Start loc eet n sti -> uu
+        End loc eet n sti -> uu
+        Failure loc txt pe n sti -> uu
+        ParentFailure loc loc' eet pe n sti -> uu
+        ApLog {}-> acc
+        EndExecution {} -> acc
 
-  --         f@Failure
-  --           { loc,
-  --             msg,
-  --             exception,
-  --             idx,
-  --             threadId
-  --           } -> uu -- need singletonOpen property oLastSHkFailure
-  --         ParentFailure
-  --           { loc,
-  --             parentLoc,
-  --             parentEventType,
-  --             threadId
-  --           } -> uu
-  --         ApLog {} -> accum
-  --         EndExecution {} -> accum
+-- childMap :: [ExeEvent] -> M.Map ElmResult (ST.Set ElmResult)
+-- childMap = uu
+
+-- where
+--   threadedEvents =
+--     let
+--       mevts = M.fromList $ (,[]) <$> nub (threadId <$> evts)
+--       addThreaded evt = M.adjust (evt :) (threadId evt)
+--       addSingleton
+--     in
+--       foldr' addThreaded mevts evts
+
+-- oLastSHkFailure (foldl' chkGlobalSingltonErrs (OEAccum Nothing Nothing ST.empty) evts)
+--   & maybe
+--     (pure ())
+--     ( \(l, _ex) ->
+--         error ("chkErrorPropagation - OnceHook error loc still open at end of run: " <> show l)
+--     )
+-- where
+--   chkGlobalSingltonErrs :: OEAccum -> ExeEvent -> OEAccum
+--   chkGlobalSingltonErrs
+--     accum@OEAccum
+--       { oOpenSHk,
+--         oLastSHkFailure,
+--         oOpenChldElms
+--       } =
+--       \case
+--         StartExecution {} -> accum
+--         Start {loc, eventType, threadId} ->
+--               let isOnceHk = onceHook eventType
+--               in
+--               oLastSHkFailure
+--                 & maybe
+--                   ( isOnceHk
+--                       ? accum {oOpenSHk = Just loc}
+--                       $ accum
+--                   )
+--                   ( const $
+--                       accum
+--                         { oOpenChldElms =
+--                             ST.insert (ThrdLoc loc $ isOnceHk ? Nothing $ Just threadId) oOpenChldElms
+--                         }
+--                   )
+--         ed@End {loc, eventType, threadId} ->
+--         -- make sure singletoon failure is matched
+--         -- reset open shk
+--         -- remove oOpenChldElms
+--           oLastSHkFailure
+--                     & maybe
+--                       accum
+--                       ( \(failLoc, pException) ->
+--                           let matched =
+--                           ST.member thrdLoc oOpenChldElms
+--                             ? accum
+--                             $ ensureNotOpen lhf
+--                       )
+--           where
+--             thrdLoc = ThrdLoc loc (
+--               onceHook eventType  ?
+--                 Nothing $
+--                 Just threadId
+--                 )
+--             ensureNotOpen er =
+--               ST.member thrdLoc oOpenChldElms ?
+--                 error ("parent exception not logged in:\n" <> ppShow ed <> "although parent singleton hook failed:\n" <> ppShow er) $
+--                 accum
+
+--         f@Failure
+--           { loc,
+--             msg,
+--             exception,
+--             idx,
+--             threadId
+--           } -> uu -- need singletonOpen property oLastSHkFailure
+--         ParentFailure
+--           { loc,
+--             parentLoc,
+--             parentEventType,
+--             threadId
+--           } -> uu
+--         ApLog {} -> accum
+--         EndExecution {} -> accum
 
 chkOnceEventsAreBlocking :: [ExeEvent] -> IO ()
 chkOnceEventsAreBlocking _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"
@@ -1156,9 +1208,10 @@ ioAction log (IOProps {message, delayms, fail}) =
   do
     log message
     P.threadDelay delayms
-    when fail .
-      error . toS $
-        "exception thrown " <> message
+    when fail
+      . error
+      . toS
+      $ "exception thrown " <> message
 
 mkTest :: IOProps -> PN.Test si ti ii
 mkTest iop@IOProps {message, delayms, fail} = PN.Test message \log a b c -> ioAction log iop
@@ -1182,7 +1235,7 @@ superSimplSuite =
       tRelease = [testProps "Fx 0" 0 0 False],
       tTestHook = [testProps "Fx 0" 0 0 False],
       tTestRelease = [testProps "Fx 0" 0 0 False],
-      tTests = [testProps "Fx 0" 0 0 False]
+      tTests = [testProps "" 0 0 False]
     }
 
 -- $ > unit_simple_single
@@ -1203,7 +1256,7 @@ unit_simple_single_failure =
         tRelease = [testProps "Fx 0" 0 0 False],
         tTestHook = [testProps "Fx 0" 0 0 False],
         tTestRelease = [testProps "Fx 0" 0 0 False],
-        tTests = [testProps "Fx 0" 0 0 True]
+        tTests = [testProps "" 0 0 True]
       }
 
 -- superSimplSuite :: TQueue RunEvent -> IO PreNodeRoot

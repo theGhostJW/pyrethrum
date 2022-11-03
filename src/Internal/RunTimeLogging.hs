@@ -61,7 +61,7 @@ data ExeEventType
   | Group
   | Fixture
   | Test
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 endIsTerminal :: ExeEventType -> Bool
 endIsTerminal = \case
@@ -83,10 +83,10 @@ exceptionTxt :: SomeException -> PException
 exceptionTxt e = PException $ txt <$> lines (displayException e)
 
 mkFailure :: Loc -> Text -> SomeException -> Int -> SThreadId -> ExeEvent
-mkFailure l t = Failure l t . exceptionTxt
+mkFailure l t e = Failure t (exceptionTxt e) l 
 
 mkParentFailure :: Loc -> Loc -> ExeEventType -> SomeException -> Int -> SThreadId -> ExeEvent
-mkParentFailure p l et = ParentFailure p l et . exceptionTxt
+mkParentFailure p l et ex = ParentFailure (exceptionTxt ex) p l et 
 
 newtype PException = PException {displayText :: [Text]} deriving (Show, Eq)
 newtype SThreadId = SThreadId { display :: Text} deriving (Show, Eq, Ord)
@@ -97,29 +97,33 @@ data ExeEvent
         threadId :: SThreadId
       }
   | Start
-      { loc :: Loc,
+      { 
         eventType :: ExeEventType,
+        loc :: Loc,
         idx :: Int,
         threadId :: SThreadId
       }
   | End
-      { loc :: Loc,
+      { 
         eventType :: ExeEventType,
+        loc :: Loc,
         idx :: Int,
         threadId :: SThreadId
       }
   | Failure
-      { loc :: Loc,
+      { 
         msg :: Text,
         exception :: PException,
+        loc :: Loc,
         idx :: Int,
         threadId :: SThreadId
       }
   | ParentFailure
-      { loc :: Loc,
+      { 
+        exception :: PException,
+        loc :: Loc,
         parentLoc :: Loc,
         parentEventType :: ExeEventType,
-        exception :: PException,
         idx :: Int,
         threadId :: SThreadId
       }

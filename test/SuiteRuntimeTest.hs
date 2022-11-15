@@ -117,6 +117,7 @@ import Pyrelude as P
     (-),
     (.),
     (<$>),
+    (<&>),
     (<>),
     (>>),
     (>>=),
@@ -888,7 +889,8 @@ chkLaws mxThrds t evts =
         chkFxtrCount templateAsList,
         chkSingletonLeafEvents,
         chkOnceEventCount,
-        chkOnceEventParentOrder
+        chkOnceEventParentOrder,
+        chkErrorPropagation
       ]
     traverse_
       (threadedEvents &)
@@ -898,8 +900,7 @@ chkLaws mxThrds t evts =
         traverse_ chkTesmevtsConsecutive,
         chkThreadLeafEvents,
         traverse_ (chkParentOrder t),
-        chkThreadErrorPropagation,
-        chkErrorPropagation
+        chkThreadErrorPropagation
       ]
     T.chk'
       ( "max execution threads + 2: "
@@ -1025,65 +1026,226 @@ chkThreadErrs evts =
 chkThreadErrorPropagation :: [[ExeEvent]] -> IO ()
 chkThreadErrorPropagation = traverse_ chkThreadErrs
 
-data OEAccum = OEAccum
-  { oOpenSHk :: Maybe Loc,
-    oLastSHkFailure :: Maybe (Loc, PException),
-    oOpenChldElms :: ST.Set ThrdLoc
-  }
+-- data OEAccum = OEAccum
+--   { oOpenSHk :: Maybe Loc,
+--     oLastSHkFailure :: Maybe (Loc, PException),
+--     oOpenChldElms :: ST.Set ThrdLoc
+--   }
 
-data ThrdLoc = ThrdLoc Loc (Maybe Text) deriving (Eq, Ord) -- thread id or nothing for singleton
+-- data FixtureSubComponent =
+--   FxOnceHook |
+--   FxThreadHook |
+--   FxTest |
+--   NotFxChild deriving (Show, Eq, Ord)
+-- data ElemId
+--   = ThreadedId
+--       { rLoc :: Loc,
+--         rThreadId :: SThreadId,
+--         rEventType :: ExeEventType,
+--         fxChild :: FixtureSubComponent
+--       }
+--   | OnceId
+--       { rLoc :: Loc,
+--         rEventType :: ExeEventType,
+--         fxChild :: FixtureSubComponent
+--       }
+--   deriving (Show, Eq, Ord)
 
-data FixtureSubComponent = 
-  FxOnceHook | 
-  FxThreadHook | 
-  FxTest | 
-  NotFxChild deriving (Show, Eq, Ord)
-data ElemId
-  = ThreadedId
-      { rLoc :: Loc,
-        rThreadId :: SThreadId,
-        rEventType :: ExeEventType,
-        fxChild :: FixtureSubComponent
-      }
-  | OnceId
-      { rLoc :: Loc,
-        rEventType :: ExeEventType, 
-        fxChild :: FixtureSubComponent
-      }
+-- data ElmResult
+--   = Pass
+--       { rId :: ElemId
+--       }
+--   | Fail
+--       { rId :: ElemId
+--       }
+--   | Abondonned
+--       { rId :: ElemId,
+--         parentId :: ElemId
+--       }
+--   | Grouping
+--       { rId :: ElemId
+--       }
+--   deriving (Show, Eq, Ord)
+
+data NodeType
+  = Singleton
+  | Theaded SThreadId
   deriving (Show, Eq, Ord)
 
-data ElmResult
-  = Pass
-      { rId :: ElemId
-      }
-  | Fail
-      { rId :: ElemId
-      }
-  | Abondonned
-      { rId :: ElemId,
-        parentId :: ElemId
-      }
-  | Grouping
-      { rId :: ElemId
-      }
+data RTLoc = RTLoc Loc NodeType
   deriving (Show, Eq, Ord)
 
-chkErrorPropagation :: [[ExeEvent]] -> IO ()
+chkErrorPropagation :: [ExeEvent] -> IO ()
 chkErrorPropagation evts =
   uu
   where
-    allThreadIds = catMaybes $ head <$> evts
+    -- Hooks release must be skipped if hk fails
+    -- what if thread hook fails on second pass which parents a singleton hook
+    -- validating in same thread should work
+    -- if threaded propagates to thread
+    -- if once propagates to all
+    nodeTypes :: M.Map Loc ExeEventType
+    nodeTypes =
+      foldl'
+        ( \accum ->
+            \case
+              StartExecution {} -> accum
+              End {} -> accum
+              Failure {} -> accum
+              ParentFailure {} -> accum
+              ApLog {} -> accum
+              EndExecution {} -> accum
+              Start {eventType, loc, threadId} -> M.insert loc eventType accum
+        )
+        M.empty
+        evts
 
-    step ::  ExeEvent -> [ElmResult] -> [ElmResult]
-    step ev acc = 
-      case ev of
-        StartExecution {} -> acc
-        Start loc eet n sti -> uu
-        End loc eet n sti -> uu
-        Failure loc txt pe n sti -> uu
-        ParentFailure loc loc' eet pe n sti -> uu
-        ApLog {}-> acc
-        EndExecution {} -> acc
+    -- Start {eventType, loc, threadId} ->
+    --   let single = M.insert loc Singleton accum
+    --       threaded = M.insert loc (Theaded threadId) accum
+    --       group = M.insert loc SuiteRuntimeTest.Group accum
+    --    in case eventType of
+    --         L.OnceHook -> single
+    --         L.OnceHookRelease -> single
+    --         L.ThreadHook -> threaded
+    --         L.ThreadHookRelease -> threaded
+    --         L.FixtureOnceHook -> single
+    --         L.FixtureOnceHookRelease -> single
+    --         L.FixtureThreadHook -> threaded
+    --         L.FixtureThreadHookRelease -> threaded
+    --         L.TestHook -> threaded
+    --         L.TestHookRelease -> threaded
+    --         L.Group -> group
+    --         L.Fixture -> group
+    --         L.Test -> threaded
+
+    {-
+       structural parent is:
+       group, fixture        -> failureParent of group, fixture
+       hook closure          -> hook
+       otherwise             -> structural parent
+    -}
+    failureParent loc thrdId =
+      fParent loc
+      where
+        fParent childLoc =
+          childLoc & \case
+            Root -> Nothing
+            n@Node {parent} ->
+              let thisThread = Theaded $ SThreadId thrdId
+                  parentType = nodeTypes M.! parent
+                  selfType = nodeTypes M.! n
+                  taggedParentThreaded et = Just $ RTLoc (Node parent $ txt et) thisThread
+                  taggedParentSingleton et = Just $ RTLoc (Node parent $ txt et) Singleton
+                  threadedParent = Just $ RTLoc parent thisThread
+                  onceParent = Just $ RTLoc parent Singleton
+                  groupParent = failureParent parent thrdId
+                  -- WIP this wont work need to use both self and parent
+               in selfType & \case
+                    L.OnceHook -> onceParent
+                    L.OnceHookRelease -> taggedParentSingleton L.OnceHook
+                    L.ThreadHook -> threadedParent
+                    L.ThreadHookRelease -> taggedParentThreaded L.ThreadHook
+                    L.FixtureOnceHook -> onceParent
+                    L.FixtureOnceHookRelease -> taggedParentSingleton L.FixtureOnceHook
+                    L.FixtureThreadHook -> threadedParent
+                    L.FixtureThreadHookRelease -> taggedParentThreaded L.FixtureThreadHookRelease
+                    L.TestHook -> threadedParent
+                    L.TestHookRelease -> taggedParentThreaded L.TestHookRelease
+                    L.Group -> groupParent
+                    L.Fixture -> groupParent
+                    L.Test -> threadedParent
+
+    -- childList :: M.Map RTLoc [RTLoc]
+    -- childList =
+    --   foldl'
+    --     ( \accum -> \case
+    --         StartExecution {} -> accum
+    --         Start
+    --           { eventType,
+    --             loc,
+    --             threadId
+    --           } ->
+    --             loc & \case
+    --               Root -> Nothing
+    --               Node {parent} ->
+    --                 eventType & \case
+    --                   L.OnceHook -> uu -- M.insert k a (Map k a)
+    --                   L.OnceHookRelease -> uu
+    --                   L.ThreadHook -> uu
+    --                   L.ThreadHookRelease -> uu
+    --                   L.FixtureOnceHook -> uu
+    --                   L.FixtureOnceHookRelease -> uu
+    --                   L.FixtureThreadHook -> uu
+    --                   L.FixtureThreadHookRelease -> uu
+    --                   L.TestHook -> uu
+    --                   L.TestHookRelease -> uu
+    --                   L.Group -> uu
+    --                   L.Fixture -> uu
+    --                   L.Test -> uu
+    --                 where
+    --                   parentRT ploc =
+    --                     \case
+    --                       Root -> Nothing
+    --                       Node {parent} ->
+    --                         (nodeTypes M.\\ ploc) & \case
+    --                           SuiteRuntimeTest.Group -> parentRT parent -- skip Groups
+    --                           Singleton -> RTLoc parent Singleton
+    --                           Theaded {} -> RTLoc parent (Threaded trdid)
+    --                   insertChild rtLoc =
+    --                     parentRT loc
+    --                       & maybe
+    --                         accum
+    --                         (\p -> M.adjust (rtLoc :) p accum)
+    --         End {} -> accum
+    --         Failure {} -> accum
+    --         ParentFailure {} -> accum
+    --         ApLog {} -> accum
+    --         EndExecution {} -> accum
+    --     )
+    --     M.empty
+    --     evts
+
+    fails :: ST.Set Loc
+    fails =
+      ST.fromList . catMaybes $
+        evts <&> \case
+          StartExecution {} -> Nothing
+          Start {} -> Nothing
+          End {} -> Nothing
+          Failure {loc} -> Just loc
+          ParentFailure {} -> Nothing
+          ApLog {} -> Nothing
+          EndExecution {} -> Nothing
+
+    parentFails :: ST.Set Loc
+    parentFails =
+      ST.fromList . catMaybes $
+        evts <&> \case
+          StartExecution {} -> Nothing
+          Start {} -> Nothing
+          End {} -> Nothing
+          Failure {} -> Nothing
+          ParentFailure {loc} -> Just loc
+          ApLog {} -> Nothing
+          EndExecution {} -> Nothing
+
+-- get rusults
+-- group with special rules around hk start hk release
+
+-- where
+--   allThreadIds = catMaybes $ head <$> evts
+
+--   step ::  ExeEvent -> [ElmResult] -> [ElmResult]
+--   step ev acc =
+--     case ev of
+--       StartExecution {} -> acc
+--       Start loc eet n sti -> uu
+--       End loc eet n sti -> uu
+--       Failure loc txt pe n sti -> uu
+--       ParentFailure loc loc' eet pe n sti -> uu
+--       ApLog {}-> acc
+--       EndExecution {} -> acc
 
 -- childMap :: [ExeEvent] -> M.Map ElmResult (ST.Set ElmResult)
 -- childMap = uu

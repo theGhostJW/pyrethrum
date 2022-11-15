@@ -1,4 +1,5 @@
 .stack-work/
+.stack-hls-work/
 simple-hpack.cabal
 *~
 *.hie

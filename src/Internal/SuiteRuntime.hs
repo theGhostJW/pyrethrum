@@ -96,6 +96,7 @@ import UnliftIO.STM
     writeTQueue,
     writeTVar,
   )
+import qualified Internal.RunTimeLogging as L.L
 
 data Status
   = Pending
@@ -112,7 +113,7 @@ getStatus =
   where
     getStatusTVar :: ExeTree si so ti to -> TVar Status
     getStatusTVar = \case
-      XTSHook {status} -> status
+      XTOHook {status} -> status
       XTTHook {thChildNode} -> getStatusTVar thChildNode
       XTGroup {nStatus} -> nStatus
       XTFix {nStatus} -> nStatus
@@ -138,7 +139,7 @@ canRun rg =
 modifyStatus :: (Status -> Status) -> ExeTree si so ti to -> STM ()
 modifyStatus f et =
   case et of
-    XTSHook {status} -> update status
+    XTOHook {status} -> update status
     XTTHook {} -> pure ()
     XTGroup {nStatus} -> update nStatus
     XTFix {nStatus} -> update nStatus
@@ -160,7 +161,7 @@ mkIdxLst :: a -> STM (IdxLst a)
 mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
 data ExeTree si so ti to where
-  XTSHook ::
+  XTOHook ::
     { loc :: Loc,
       status :: TVar Status,
       sHook :: ApLogger -> si -> IO so,
@@ -252,7 +253,7 @@ prepare =
             let loc = nodeLoc "SingletonHook" hookTag
             child <- prepare' loc 0 hookChild
             pure $
-              XTSHook
+              XTOHook
                 { loc,
                   status = s,
                   sHook = hook loc,
@@ -462,7 +463,8 @@ executeNode logger hkIn rg =
     when
       wantRun
       case rg of
-        XTSHook
+        -- TODO - FIX LOC TO INCLUDE HK / HKRelease
+        XTOHook
           { loc,
             status,
             sHook,
@@ -478,7 +480,6 @@ executeNode logger hkIn rg =
               --  4. returns hook result
               -- must run for logging even if hkIn is Left
               let nxtHkIn so = (\exi -> exi {singletonIn = so}) <$> hkIn
-                  -- nxtAbandon' = nxtAbandon loc L.OnceHook
                   recurse a = exeNxt a sChildNode
                   ctx = context loc
               eso <- onceHookVal logger L.OnceHook siHkIn sHook status sHookVal ctx
@@ -494,7 +495,7 @@ executeNode logger hkIn rg =
                       s <- readTVar status
                       pure $ cs == Done && s < HookFinalising
                     when wantRelease $
-                      releaseHookUpdateStatus logger L.OnceHook status eso ctx sHookRelease
+                      releaseHookUpdateStatus logger L.OnceHookRelease status eso ctx sHookRelease
                 )
         XTTHook
           { loc,
@@ -502,6 +503,7 @@ executeNode logger hkIn rg =
             thHookRelease,
             thChildNode
           } ->
+            -- TODO - FIX LOC TO INCLUDE HK / HKRelease
             do
               let nxtHkIn ti = (\exi -> exi {threadIn = ti}) <$> hkIn
                   recurse a = exeNxt a thChildNode
@@ -591,7 +593,9 @@ executeNode logger hkIn rg =
               ctx = context leafloc
               onceHkLoc = Node leafloc $ txt L.FixtureOnceHook
               onceHkCtx = context onceHkLoc
+              onceHkReleaseCtx = context . Node leafloc $ txt L.FixtureOnceHookRelease
               threadHkCtx = context . Node onceHkLoc $ txt L.FixtureThreadHook
+              threadHkReleaseCtx = context . Node onceHkLoc $ txt L.FixtureOnceHookRelease
               recurse fxIpts = do
                 etest <- atomically $ do
                   mtest <- tryReadTQueue iterations
@@ -615,9 +619,9 @@ executeNode logger hkIn rg =
                     ( \done -> do
                         when done $
                           atomically (writeTVar nStatus Done)
-                        releaseHook logger L.FixtureThreadHookRelease (threadIn <$> fxIpts) threadHkCtx fxTHookRelease
+                        releaseHook logger L.FixtureThreadHookRelease (threadIn <$> fxIpts) threadHkReleaseCtx fxTHookRelease
                         when done $
-                          releaseHookUpdateStatus logger L.FixtureOnceHookRelease fxOHookStatus (singletonIn <$> fxIpts) onceHkCtx fxOHookRelease
+                          releaseHookUpdateStatus logger L.FixtureOnceHookRelease fxOHookStatus (singletonIn <$> fxIpts) onceHkReleaseCtx fxOHookRelease
                     )
                     ( \(Test tstLoc test) -> do
                         io <- runTestHook fxIpts tHook

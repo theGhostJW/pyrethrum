@@ -1100,31 +1100,6 @@ chkErrorPropagation evts =
         M.empty
         evts
 
-    -- Start {eventType, loc, threadId} ->
-    --   let single = M.insert loc Singleton accum
-    --       threaded = M.insert loc (Theaded threadId) accum
-    --       group = M.insert loc SuiteRuntimeTest.Group accum
-    --    in case eventType of
-    --         L.OnceHook -> single
-    --         L.OnceHookRelease -> single
-    --         L.ThreadHook -> threaded
-    --         L.ThreadHookRelease -> threaded
-    --         L.FixtureOnceHook -> single
-    --         L.FixtureOnceHookRelease -> single
-    --         L.FixtureThreadHook -> threaded
-    --         L.FixtureThreadHookRelease -> threaded
-    --         L.TestHook -> threaded
-    --         L.TestHookRelease -> threaded
-    --         L.Group -> group
-    --         L.Fixture -> group
-    --         L.Test -> threaded
-
-    {-
-       structural parent is:
-       group, fixture        -> failureParent of group, fixture
-       hook closure          -> hook
-       otherwise             -> structural parent
-    -}
     failureParent loc thrdId =
       fParent loc
       where
@@ -1140,71 +1115,52 @@ chkErrorPropagation evts =
                   threadedParent = Just $ RTLoc parent thisThread
                   onceParent = Just $ RTLoc parent Singleton
                   groupParent = failureParent parent thrdId
-                  -- WIP this wont work need to use both self and parent
+                  failureParent' = 
+                    let 
+                      badParentError = error $ show parentType <> " should not be a structural parent"
+                      unexpectedParentCall = error "parent should already be set"
+                    in
+                    parentType & \case
+                     L.OnceHook -> onceParent
+                     L.OnceHookRelease -> badParentError
+                     L.ThreadHook -> threadedParent
+                     L.ThreadHookRelease -> badParentError
+                     L.FixtureOnceHook -> unexpectedParentCall
+                     L.FixtureOnceHookRelease ->  badParentError
+                     L.FixtureThreadHook -> unexpectedParentCall
+                     L.FixtureThreadHookRelease -> badParentError
+                     L.TestHook -> unexpectedParentCall
+                     L.TestHookRelease -> badParentError
+                     L.Group -> groupParent
+                     L.Fixture -> groupParent
+                     L.Test -> error "test cannot be a parent"
                in selfType & \case
-                    L.OnceHook -> onceParent
+                    L.OnceHook -> failureParent' 
                     L.OnceHookRelease -> taggedParentSingleton L.OnceHook
-                    L.ThreadHook -> threadedParent
+                    L.ThreadHook -> failureParent'
                     L.ThreadHookRelease -> taggedParentThreaded L.ThreadHook
-                    L.FixtureOnceHook -> onceParent
+
+                    L.FixtureOnceHook -> threadedParent --- fixture
                     L.FixtureOnceHookRelease -> taggedParentSingleton L.FixtureOnceHook
-                    L.FixtureThreadHook -> threadedParent
-                    L.FixtureThreadHookRelease -> taggedParentThreaded L.FixtureThreadHookRelease
-                    L.TestHook -> threadedParent
-                    L.TestHookRelease -> taggedParentThreaded L.TestHookRelease
+                    L.FixtureThreadHook -> threadedParent -- fixture
+                    L.FixtureThreadHookRelease -> taggedParentThreaded L.FixtureThreadHook
+                    L.TestHook -> taggedParentThreaded L.FixtureThreadHook
+                    L.TestHookRelease -> taggedParentThreaded L.TestHook
                     L.Group -> groupParent
                     L.Fixture -> groupParent
-                    L.Test -> threadedParent
+                    L.Test -> taggedParentThreaded L.TestHook
 
-    -- childList :: M.Map RTLoc [RTLoc]
-    -- childList =
-    --   foldl'
-    --     ( \accum -> \case
-    --         StartExecution {} -> accum
-    --         Start
-    --           { eventType,
-    --             loc,
-    --             threadId
-    --           } ->
-    --             loc & \case
-    --               Root -> Nothing
-    --               Node {parent} ->
-    --                 eventType & \case
-    --                   L.OnceHook -> uu -- M.insert k a (Map k a)
-    --                   L.OnceHookRelease -> uu
-    --                   L.ThreadHook -> uu
-    --                   L.ThreadHookRelease -> uu
-    --                   L.FixtureOnceHook -> uu
-    --                   L.FixtureOnceHookRelease -> uu
-    --                   L.FixtureThreadHook -> uu
-    --                   L.FixtureThreadHookRelease -> uu
-    --                   L.TestHook -> uu
-    --                   L.TestHookRelease -> uu
-    --                   L.Group -> uu
-    --                   L.Fixture -> uu
-    --                   L.Test -> uu
-    --                 where
-    --                   parentRT ploc =
-    --                     \case
-    --                       Root -> Nothing
-    --                       Node {parent} ->
-    --                         (nodeTypes M.\\ ploc) & \case
-    --                           SuiteRuntimeTest.Group -> parentRT parent -- skip Groups
-    --                           Singleton -> RTLoc parent Singleton
-    --                           Theaded {} -> RTLoc parent (Threaded trdid)
-    --                   insertChild rtLoc =
-    --                     parentRT loc
-    --                       & maybe
-    --                         accum
-    --                         (\p -> M.adjust (rtLoc :) p accum)
-    --         End {} -> accum
-    --         Failure {} -> accum
-    --         ParentFailure {} -> accum
-    --         ApLog {} -> accum
-    --         EndExecution {} -> accum
-    --     )
-    --     M.empty
-    --     evts
+    childList :: M.Map RTLoc [RTLoc]
+    childList =
+      foldl'
+        ( \accum evt -> 
+          let 
+            loc' = 
+          in 
+
+        )
+        M.empty
+        evts
 
     fails :: ST.Set Loc
     fails =

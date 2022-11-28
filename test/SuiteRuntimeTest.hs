@@ -1084,8 +1084,27 @@ chkErrorPropagation evts =
     -- validating in same thread should work
     -- if threaded propagates to thread
     -- if once propagates to all
-    nodeTypes :: M.Map Loc ExeEventType
-    nodeTypes =
+    nodeType :: SThreadId -> ExeEventType -> NodeType
+    nodeType tid = \case 
+      L.OnceHook -> Singleton
+      L.OnceHookRelease -> Singleton
+      L.ThreadHook -> threaded
+      L.ThreadHookRelease -> threaded
+      L.FixtureOnceHook -> Singleton
+      L.FixtureOnceHookRelease -> Singleton
+      L.FixtureThreadHook -> threaded
+      L.FixtureThreadHookRelease -> threaded
+      L.TestHook -> threaded
+      L.TestHookRelease -> threaded
+      L.Group -> threaded
+      L.Fixture -> threaded
+      L.Test -> threaded
+     where 
+      threaded = Theaded tid 
+
+
+    evntTypes :: M.Map Loc ExeEventType
+    evntTypes =
       foldl'
         ( \accum ->
             \case
@@ -1107,9 +1126,9 @@ chkErrorPropagation evts =
           childLoc & \case
             Root -> Nothing
             n@Node {parent} ->
-              let thisThread = Theaded $ SThreadId thrdId
-                  parentType = nodeTypes M.! parent
-                  selfType = nodeTypes M.! n
+              let thisThread = Theaded thrdId
+                  parentType = evntTypes M.! parent
+                  selfType = evntTypes M.! n
                   taggedParentThreaded et = Just $ RTLoc (Node parent $ txt et) thisThread
                   taggedParentSingleton et = Just $ RTLoc (Node parent $ txt et) Singleton
                   threadedParent = Just $ RTLoc parent thisThread
@@ -1153,11 +1172,28 @@ chkErrorPropagation evts =
     childList :: M.Map RTLoc [RTLoc]
     childList =
       foldl'
-        ( \accum evt -> 
-          let 
-            loc' = 
-          in 
-
+        ( \accum -> \case
+            StartExecution {} -> accum
+            Start {
+               eventType,
+               loc,
+               idx,
+               threadId 
+            } -> 
+              let 
+                nt = nodeType threadId $ evntTypes M.! loc
+                this = RTLoc loc nt
+                basemap = M.alter (maybe (Just []) Just) this accum
+                mParent = failureParent loc threadId
+              in
+               mParent & maybe 
+                basemap
+                (\p -> M.alter ((this :) <$>) p basemap)
+            End  {} -> accum
+            Failure  {}  -> accum
+            ParentFailure {} -> accum
+            ApLog {}  -> accum
+            EndExecution {} -> accum
         )
         M.empty
         evts

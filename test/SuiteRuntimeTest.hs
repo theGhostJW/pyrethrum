@@ -123,7 +123,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||),
+    (||), otherwise,
   )
 import qualified Pyrelude.Test as T
 import TempUtils (debugLines)
@@ -137,6 +137,7 @@ import UnliftIO.Concurrent as C
   )
 import UnliftIO.STM
 import Prelude (Ord, String, putStrLn, read)
+import Pyrelude (ListLike(..))
 
 {-
 1. create logger pretty print + list :: Done
@@ -1072,12 +1073,27 @@ data NodeType
   | Theaded SThreadId
   deriving (Show, Eq, Ord)
 
-data RTLoc = RTLoc Loc NodeType
+data RTLoc = RTLoc{
+  et :: ExeEventType,
+  loc :: Loc,
+  nodeType :: NodeType}
   deriving (Show, Eq, Ord)
 
 chkErrorPropagation :: [ExeEvent] -> IO ()
 chkErrorPropagation evts =
-  uu
+    for_ (M.toList childList) (
+      \(p, c) ->
+        if
+          | isFail p -> T.chk'
+                        ( "parent has failed but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
+                        $ all isParentFail c
+          | isParentFail p -> T.chk'
+                        ( "parent is parent failure but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
+                        $ all isParentFail c
+          | otherwise -> T.chk'
+                        ( "parent is not a parent failure or failure but child node(s) exist that are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
+                        . not $ any isParentFail c
+          )
   where
     -- Hooks release must be skipped if hk fails
     -- what if thread hook fails on second pass which parents a singleton hook
@@ -1085,7 +1101,7 @@ chkErrorPropagation evts =
     -- if threaded propagates to thread
     -- if once propagates to all
     nodeType :: SThreadId -> ExeEventType -> NodeType
-    nodeType tid = \case 
+    nodeType tid = \case
       L.OnceHook -> Singleton
       L.OnceHookRelease -> Singleton
       L.ThreadHook -> threaded
@@ -1099,9 +1115,11 @@ chkErrorPropagation evts =
       L.Group -> threaded
       L.Fixture -> threaded
       L.Test -> threaded
-     where 
-      threaded = Theaded tid 
+      where
+        threaded = Theaded tid
 
+    evntType :: Loc -> Maybe ExeEventType
+    evntType = (M.!?) evntTypes 
 
     evntTypes :: M.Map Loc ExeEventType
     evntTypes =
@@ -1127,38 +1145,35 @@ chkErrorPropagation evts =
             Root -> Nothing
             n@Node {parent} ->
               let thisThread = Theaded thrdId
-                  parentType = evntTypes M.! parent
-                  selfType = evntTypes M.! n
-                  taggedParentThreaded et = Just $ RTLoc (Node parent $ txt et) thisThread
-                  taggedParentSingleton et = Just $ RTLoc (Node parent $ txt et) Singleton
-                  threadedParent = Just $ RTLoc parent thisThread
-                  onceParent = Just $ RTLoc parent Singleton
+                  parentType = evntType parent
+                  selfType = evntType n
+                  taggedParentThreaded et = rtLocf (Node parent $ txt et) thisThread <$> parentType 
+                  taggedParentSingleton et = rtLocf (Node parent $ txt et) Singleton <$> parentType
+                  threadedParent = rtLocf parent thisThread <$> parentType
+                  onceParent = rtLocf parent Singleton  <$> parentType
                   groupParent = failureParent parent thrdId
-                  failureParent' = 
-                    let 
-                      badParentError = error $ show parentType <> " should not be a structural parent"
-                      unexpectedParentCall = error "parent should already be set"
-                    in
-                    parentType & \case
-                     L.OnceHook -> onceParent
-                     L.OnceHookRelease -> badParentError
-                     L.ThreadHook -> threadedParent
-                     L.ThreadHookRelease -> badParentError
-                     L.FixtureOnceHook -> unexpectedParentCall
-                     L.FixtureOnceHookRelease ->  badParentError
-                     L.FixtureThreadHook -> unexpectedParentCall
-                     L.FixtureThreadHookRelease -> badParentError
-                     L.TestHook -> unexpectedParentCall
-                     L.TestHookRelease -> badParentError
-                     L.Group -> groupParent
-                     L.Fixture -> groupParent
-                     L.Test -> error "test cannot be a parent"
-               in selfType & \case
-                    L.OnceHook -> failureParent' 
+                  failureParent' =
+                    let badParentError = error $ show parentType <> " should not be a structural parent"
+                        unexpectedParentCall = error "parent should already be set"
+                     in parentType >>= \case
+                          L.OnceHook -> onceParent
+                          L.OnceHookRelease -> badParentError
+                          L.ThreadHook -> threadedParent
+                          L.ThreadHookRelease -> badParentError
+                          L.FixtureOnceHook -> unexpectedParentCall
+                          L.FixtureOnceHookRelease -> badParentError
+                          L.FixtureThreadHook -> unexpectedParentCall
+                          L.FixtureThreadHookRelease -> badParentError
+                          L.TestHook -> unexpectedParentCall
+                          L.TestHookRelease -> badParentError
+                          L.Group -> groupParent
+                          L.Fixture -> groupParent
+                          L.Test -> error "test cannot be a parent"
+               in selfType >>= \case
+                    L.OnceHook -> failureParent'
                     L.OnceHookRelease -> taggedParentSingleton L.OnceHook
                     L.ThreadHook -> failureParent'
                     L.ThreadHookRelease -> taggedParentThreaded L.ThreadHook
-
                     L.FixtureOnceHook -> threadedParent --- fixture
                     L.FixtureOnceHookRelease -> taggedParentSingleton L.FixtureOnceHook
                     L.FixtureThreadHook -> threadedParent -- fixture
@@ -1167,60 +1182,72 @@ chkErrorPropagation evts =
                     L.TestHookRelease -> taggedParentThreaded L.TestHook
                     L.Group -> groupParent
                     L.Fixture -> groupParent
-                    L.Test -> taggedParentThreaded L.TestHook
+                    L.Test -> taggedParentThreaded L.TestHook -- & debug' "TEST !!!"
 
     childList :: M.Map RTLoc [RTLoc]
     childList =
-      foldl'
+      debug' "!!!!!!!!!!!!!!!!!" $ foldl'
         ( \accum -> \case
             StartExecution {} -> accum
-            Start {
-               eventType,
-               loc,
-               idx,
-               threadId 
-            } -> 
-              let 
-                nt = nodeType threadId $ evntTypes M.! loc
-                this = RTLoc loc nt
-                basemap = M.alter (maybe (Just []) Just) this accum
-                mParent = failureParent loc threadId
-              in
-               mParent & maybe 
-                basemap
-                (\p -> M.alter ((this :) <$>) p basemap)
-            End  {} -> accum
-            Failure  {}  -> accum
+            Start
+              { eventType,
+                loc,
+                idx,
+                threadId
+              } ->
+                let nt = nodeType threadId $ evntTypes M.! loc
+                    this = RTLoc eventType loc nt
+                    basemap = M.alter (maybe (Just []) Just) this accum
+                    mParent = failureParent loc threadId & debugf (\p -> "FAIL PARENT FOR LOC: " <> txt loc <> " \n " <> txt p)
+                 in mParent
+                      & maybe
+                         basemap
+                         (\p -> 
+                            basemap M.!? p & maybe 
+                             (error $ "Parent not in map: \nparent\n" 
+                                  <> ppShow p <> "\nnot in map\n" 
+                                  <> ppShow basemap
+                                  <> "\nwhen inserting child\n" 
+                                  <> ppShow this)
+                             (\_v -> M.alter ((this :) <$>) p basemap & debug' "!!!!!! ALTER   !!!")
+                         )
+            End {} -> accum
+            Failure {} -> accum
             ParentFailure {} -> accum
-            ApLog {}  -> accum
+            ApLog {} -> accum
             EndExecution {} -> accum
         )
         M.empty
         evts
 
-    fails :: ST.Set Loc
-    fails =
-      ST.fromList . catMaybes $
-        evts <&> \case
-          StartExecution {} -> Nothing
-          Start {} -> Nothing
-          End {} -> Nothing
-          Failure {loc} -> Just loc
-          ParentFailure {} -> Nothing
-          ApLog {} -> Nothing
-          EndExecution {} -> Nothing
+    rtLocf loc' nt et = RTLoc et loc' nt
+    rtLocSet f = ST.fromList . catMaybes $ f <$> evts
 
-    parentFails :: ST.Set Loc
+    isFail = flip ST.member fails
+    isParentFail = flip ST.member parentFails
+
+    fails :: ST.Set RTLoc
+    fails =
+      rtLocSet \case
+        StartExecution {} -> Nothing
+        Start {} -> Nothing
+        End {} -> Nothing
+        Failure {loc, threadId} -> rtLocf loc (Theaded threadId) <$> evntType loc
+        ParentFailure {} -> Nothing
+        ApLog {} -> Nothing
+        EndExecution {} -> Nothing
+
+
+    parentFails :: ST.Set RTLoc
     parentFails =
-      ST.fromList . catMaybes $
-        evts <&> \case
-          StartExecution {} -> Nothing
-          Start {} -> Nothing
-          End {} -> Nothing
-          Failure {} -> Nothing
-          ParentFailure {loc} -> Just loc
-          ApLog {} -> Nothing
-          EndExecution {} -> Nothing
+      rtLocSet \case
+        StartExecution {} -> Nothing
+        Start {} -> Nothing
+        End {} -> Nothing
+        Failure {loc, threadId} -> Nothing
+        ParentFailure {loc, threadId} -> rtLocf loc (Theaded threadId) <$> evntType loc
+        ApLog {} -> Nothing
+        EndExecution {} -> Nothing
 
 -- get rusults
 -- group with special rules around hk start hk release

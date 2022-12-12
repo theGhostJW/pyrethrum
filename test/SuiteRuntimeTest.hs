@@ -33,6 +33,7 @@ import Internal.RunTimeLogging as L
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
+import Pyrelude (ListLike (..))
 import Pyrelude as P
   ( Alternative ((<|>)),
     Applicative ((<*>)),
@@ -90,6 +91,7 @@ import Pyrelude as P
     newIORef,
     not,
     nub,
+    otherwise,
     pure,
     replace,
     replicateM_,
@@ -123,7 +125,7 @@ import Pyrelude as P
     (>>=),
     (?),
     (\\),
-    (||), otherwise,
+    (||),
   )
 import qualified Pyrelude.Test as T
 import TempUtils (debugLines)
@@ -137,7 +139,6 @@ import UnliftIO.Concurrent as C
   )
 import UnliftIO.STM
 import Prelude (Ord, String, putStrLn, read)
-import Pyrelude (ListLike(..))
 
 {-
 1. create logger pretty print + list :: Done
@@ -172,7 +173,7 @@ data Template
       }
   | TOnceHook
       { tTag :: Text,
-        shook :: IOProps,
+        sHook :: IOProps,
         sRelease :: IOProps,
         tChild :: Template
       }
@@ -204,7 +205,7 @@ foldTemplate seed combine =
     pm acc t =
       let recurse :: Template -> a
           recurse child = combine t child acc
-       in case t of
+       in t & \case
             TGroup {tChilds} -> foldl' pm acc tChilds
             TOnceHook {tChild} -> recurse tChild
             TThreadHook {tChild} -> recurse tChild
@@ -420,56 +421,83 @@ templateFixCount =
       TFixture {tTests} -> ac + 1
 
 mkPrenode :: Int -> Template -> IO (PreNode oi () ti ())
-mkPrenode maxThreads = \case
-  TGroup
-    { tTag,
-      tChilds
-    } -> uu
-  TOnceHook
-    { tTag,
-      shook,
-      sRelease,
-      tChild
-    } -> uu
-  TThreadHook
-    { tTag,
-      tHook,
-      tRelease,
-      tChild
-    } -> uu
-  TFixture
-    { tTag,
-      sHook,
-      sRelease,
-      tHook,
-      tRelease,
-      tTestHook,
-      tTestRelease,
-      tTests
-    } ->
-      do
-        thrdHks <- newTVarIO tHook
-        thrdHkRs <- newTVarIO tRelease
-        tstHks <- newTVarIO tHook
-        tstHkRs <- newTVarIO tRelease
-        let runThreaded lggr propsLst = do
-              prps <- atomically $ do
-                plst <- readTVar propsLst
-                case plst of
-                  [] -> error "test config or test utils wrong - more calls to tHook or tRelease function than configured"
-                  x : xs -> writeTVar propsLst xs >> pure x
-              ioAction lggr prps
-         in pure
-              PN.Fixture
-                { onceFxHook = \_loc lg _in -> ioAction lg sHook,
-                  onceFxHookRelease = \_loc lg _in -> ioAction lg sRelease,
-                  threadFxHook = \_loc lg _oo _ti -> runThreaded lg thrdHks,
-                  threadFxHookRelease = \_loc lg _to -> runThreaded lg thrdHkRs,
-                  testHook = \_loc lg _oo _to -> runThreaded lg tstHks,
-                  testHookRelease = \_loc lg _tsto -> runThreaded lg tstHkRs,
-                  fxTag = Just tTag,
-                  iterations = mkTest <$> tTests
+mkPrenode maxThreads =
+  let runThreaded lggr propsLst = do
+        prps <- atomically $ do
+          plst <- readTVar propsLst
+          case plst of
+            [] -> error "test config or test utils wrong - more calls to tHook or tRelease function than configured"
+            x : xs -> writeTVar propsLst xs >> pure x
+        ioAction lggr prps
+   in \case
+        TGroup
+          { tTag,
+            tChilds
+          } -> uu
+        TOnceHook
+          { tTag,
+            sHook,
+            sRelease,
+            tChild
+          } -> do
+            chld <- mkPrenode maxThreads tChild
+            pure $
+              PN.OnceHook
+                { hookTag = Just tTag,
+                  hook = \_loc lg _in -> ioAction lg sHook,
+                  hookChild = chld,
+                  hookRelease = \_loc lg _in -> ioAction lg sHook
                 }
+        TThreadHook
+          { tTag,
+            tHook,
+            tRelease,
+            tChild
+          } -> do
+            chld <- mkPrenode maxThreads tChild
+            thrdHks <- newTVarIO tHook
+            thrdHkRs <- newTVarIO tRelease
+            pure $
+              PN.ThreadHook
+                { threadTag = Just tTag,
+                  threadHook = \_loc lg _in _ti -> runThreaded lg thrdHks, -- :: Loc -> ApLogger -> oi -> ti -> IO to,
+                  threadHookChild = chld,
+                  threadHookRelease = \_loc lg _tsto -> runThreaded lg thrdHkRs
+                }
+        TFixture
+          { tTag,
+            sHook,
+            sRelease,
+            tHook,
+            tRelease,
+            tTestHook,
+            tTestRelease,
+            tTests
+          } ->
+            do
+              thrdHks <- newTVarIO tHook
+              thrdHkRs <- newTVarIO tRelease
+              tstHks <- newTVarIO tHook
+              tstHkRs <- newTVarIO tRelease
+              -- let runThreaded lggr propsLst = do
+              --       prps <- atomically $ do
+              --         plst <- readTVar propsLst
+              --         case plst of
+              --           [] -> error "test config or test utils wrong - more calls to tHook or tRelease function than configured"
+              --           x : xs -> writeTVar propsLst xs >> pure x
+              --       ioAction lggr prps
+              --  in
+              pure
+                PN.Fixture
+                  { onceFxHook = \_loc lg _in -> ioAction lg sHook,
+                    onceFxHookRelease = \_loc lg _in -> ioAction lg sRelease,
+                    threadFxHook = \_loc lg _oo _ti -> runThreaded lg thrdHks,
+                    threadFxHookRelease = \_loc lg _to -> runThreaded lg thrdHkRs,
+                    testHook = \_loc lg _oo _to -> runThreaded lg tstHks,
+                    testHookRelease = \_loc lg _tsto -> runThreaded lg tstHkRs,
+                    fxTag = Just tTag,
+                    iterations = mkTest <$> tTests
+                  }
 
 q2List :: TQueue ExeEvent -> STM [ExeEvent]
 q2List qu = reverse <$> recurse [] qu
@@ -891,7 +919,7 @@ chkLaws mxThrds t evts =
         chkSingletonLeafEvents,
         chkOnceEventCount,
         chkOnceEventParentOrder,
-        chkErrorPropagation
+        chkErrorPropagation t
       ]
     traverse_
       (threadedEvents &)
@@ -1073,28 +1101,53 @@ data NodeType
   | Theaded SThreadId
   deriving (Show, Eq, Ord)
 
-data RTLoc = RTLoc{
-  et :: ExeEventType,
-  loc :: Loc,
-  nodeType :: NodeType}
+data RTLoc = RTLoc
+  { et :: ExeEventType,
+    loc :: Loc,
+    nodeType :: NodeType
+  }
   deriving (Show, Eq, Ord)
 
-chkErrorPropagation :: [ExeEvent] -> IO ()
-chkErrorPropagation evts =
-    for_ (M.toList childList) (
-      \(p, c) ->
-        if
-          | isFail p -> T.chk'
-                        ( "parent has failed but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
-                        $ all isParentFail c
-          | isParentFail p -> T.chk'
-                        ( "parent is parent failure but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
-                        $ all isParentFail c
-          | otherwise -> T.chk'
-                        ( "parent is not a parent failure or failure but child node(s) exist that are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
-                        . not $ any isParentFail c
-          )
+--  \case child of
+--         L.OnceHook -> threadedParent
+--         L.OnceHookRelease -> OnceHook Singleton
+--         L.ThreadHook -> threadedParent
+--         L.ThreadHookRelease -> ThreadHook
+--         L.FixtureOnceHook -> Fixture
+--         L.FixtureOnceHookRelease -> FixtureOnceHook
+--         L.FixtureThreadHook -> FixtureOnceHookRelease
+--         L.FixtureThreadHookRelease -> FixtureThreadHook
+--         L.TestHook -> FixtureThreadHookRelease
+--         L.TestHookRelease -> TestHook
+--         L.Group -> threadedParent
+--         L.Fixture -> threadedParent
+--         L.Test -> TestHookRelease
+
+chkErrorPropagation :: Template -> [ExeEvent] -> IO ()
+chkErrorPropagation t evts =
+  do
+    when (M.null pmap) $
+      putStrLn "Template Map Empty"
+    for_
+      (M.toList childList)
+      ( \(p, c) ->
+          if
+              | isFail p ->
+                  T.chk'
+                    ("parent has failed but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
+                    $ all isParentFail c
+              | isParentFail p ->
+                  T.chk'
+                    ("parent is parent failure but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
+                    $ all isParentFail c
+              | otherwise ->
+                  T.chk'
+                    ("parent is not a parent failure or failure but child node(s) exist that are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
+                    . not
+                    $ any isParentFail c
+      )
   where
+    pmap = parentMap t & debug' "########~ TEMPLATE PARENT MAP ~#######"
     -- Hooks release must be skipped if hk fails
     -- what if thread hook fails on second pass which parents a singleton hook
     -- validating in same thread should work
@@ -1119,7 +1172,7 @@ chkErrorPropagation evts =
         threaded = Theaded tid
 
     evntType :: Loc -> Maybe ExeEventType
-    evntType = (M.!?) evntTypes 
+    evntType = (M.!?) evntTypes
 
     evntTypes :: M.Map Loc ExeEventType
     evntTypes =
@@ -1136,6 +1189,7 @@ chkErrorPropagation evts =
         )
         M.empty
         evts
+        & debug' "$$$$$$$$$$$$$$$$ event types $$$$$$$$$$$$$$$$$"
 
     failureParent loc thrdId =
       fParent loc
@@ -1147,10 +1201,10 @@ chkErrorPropagation evts =
               let thisThread = Theaded thrdId
                   parentType = evntType parent
                   selfType = evntType n
-                  taggedParentThreaded et = rtLocf (Node parent $ txt et) thisThread <$> parentType 
+                  taggedParentThreaded et = rtLocf (Node parent $ txt et) thisThread <$> parentType
                   taggedParentSingleton et = rtLocf (Node parent $ txt et) Singleton <$> parentType
                   threadedParent = rtLocf parent thisThread <$> parentType
-                  onceParent = rtLocf parent Singleton  <$> parentType
+                  onceParent = rtLocf parent Singleton <$> parentType
                   groupParent = failureParent parent thrdId
                   failureParent' =
                     let badParentError = error $ show parentType <> " should not be a structural parent"
@@ -1174,7 +1228,7 @@ chkErrorPropagation evts =
                     L.OnceHookRelease -> taggedParentSingleton L.OnceHook
                     L.ThreadHook -> failureParent'
                     L.ThreadHookRelease -> taggedParentThreaded L.ThreadHook
-                    L.FixtureOnceHook -> threadedParent --- fixture
+                    L.FixtureOnceHook -> threadedParent & debug' "##### FIXTRUE ONCE HOOK PARENT" --- fixture
                     L.FixtureOnceHookRelease -> taggedParentSingleton L.FixtureOnceHook
                     L.FixtureThreadHook -> threadedParent -- fixture
                     L.FixtureThreadHookRelease -> taggedParentThreaded L.FixtureThreadHook
@@ -1183,42 +1237,46 @@ chkErrorPropagation evts =
                     L.Group -> groupParent
                     L.Fixture -> groupParent
                     L.Test -> taggedParentThreaded L.TestHook -- & debug' "TEST !!!"
-
     childList :: M.Map RTLoc [RTLoc]
     childList =
-      debug' "!!!!!!!!!!!!!!!!!" $ foldl'
-        ( \accum -> \case
-            StartExecution {} -> accum
-            Start
-              { eventType,
-                loc,
-                idx,
-                threadId
-              } ->
-                let nt = nodeType threadId $ evntTypes M.! loc
-                    this = RTLoc eventType loc nt
-                    basemap = M.alter (maybe (Just []) Just) this accum
-                    mParent = failureParent loc threadId & debugf (\p -> "FAIL PARENT FOR LOC: " <> txt loc <> " \n " <> txt p)
-                 in mParent
-                      & maybe
-                         basemap
-                         (\p -> 
-                            basemap M.!? p & maybe 
-                             (error $ "Parent not in map: \nparent\n" 
-                                  <> ppShow p <> "\nnot in map\n" 
-                                  <> ppShow basemap
-                                  <> "\nwhen inserting child\n" 
-                                  <> ppShow this)
-                             (\_v -> M.alter ((this :) <$>) p basemap & debug' "!!!!!! ALTER   !!!")
-                         )
-            End {} -> accum
-            Failure {} -> accum
-            ParentFailure {} -> accum
-            ApLog {} -> accum
-            EndExecution {} -> accum
-        )
-        M.empty
-        evts
+      debug' "!!!!!!!!!!!!!!!!!" $
+        foldl'
+          ( \accum -> \case
+              StartExecution {} -> accum
+              Start
+                { eventType,
+                  loc,
+                  idx,
+                  threadId
+                } ->
+                  let nt = nodeType threadId $ evntTypes M.! loc
+                      this = RTLoc eventType loc nt
+                      basemap = M.alter (maybe (Just []) Just) this accum
+                      mParent = failureParent loc threadId & debugf (\p -> "FAIL PARENT FOR LOC: " <> txt loc <> " IS " <> txt p)
+                   in mParent
+                        & maybe
+                          basemap
+                          ( \p ->
+                              basemap M.!? p
+                                & maybe
+                                  ( error $
+                                      "Parent not in map: \nparent\n"
+                                        <> ppShow p
+                                        <> "\nnot found when inserting child\n"
+                                        <> ppShow this
+                                        <> "\ninto parent map:\n"
+                                        <> ppShow basemap
+                                  )
+                                  (\_v -> M.alter ((this :) <$>) p basemap & debug' "!!!!!! ALTER   !!!")
+                          )
+              End {} -> accum
+              Failure {} -> accum
+              ParentFailure {} -> accum
+              ApLog {} -> accum
+              EndExecution {} -> accum
+          )
+          M.empty
+          evts
 
     rtLocf loc' nt et = RTLoc et loc' nt
     rtLocSet f = ST.fromList . catMaybes $ f <$> evts
@@ -1236,7 +1294,6 @@ chkErrorPropagation evts =
         ParentFailure {} -> Nothing
         ApLog {} -> Nothing
         EndExecution {} -> Nothing
-
 
     parentFails :: ST.Set RTLoc
     parentFails =
@@ -1408,23 +1465,57 @@ alwaysFail = DocFunc "Always Fail" $ pure True
 
 superSimplSuite :: Template
 superSimplSuite =
-  TFixture
-    { tTag = "FX 0",
-      sHook = testProps "Fx 0 - SH" 0 0 False,
-      sRelease = testProps "Fx 0 - SHR" 0 0 False,
-      tHook = [testProps "Fx 0" 0 0 False],
-      tRelease = [testProps "Fx 0" 0 0 False],
-      tTestHook = [testProps "Fx 0" 0 0 False],
-      tTestRelease = [testProps "Fx 0" 0 0 False],
-      tTests = [testProps "" 0 0 False]
+  TThreadHook
+    { tTag = "TThreadHook",
+      tHook =
+        [ IOProps
+            { message = "TThreadHook",
+              delayms = 1,
+              fail = True
+            }
+        ],
+      tRelease =
+        [ IOProps
+            { message = "TThreadHook",
+              delayms = 1,
+              fail = False
+            }
+        ],
+      tChild =
+        TOnceHook
+          { tTag = "TOnceHook",
+            sHook =
+              IOProps
+                { message = "Once Hook",
+                  delayms = 1,
+                  fail = False
+                },
+            sRelease =
+              IOProps
+                { message = "Once Hook Release",
+                  delayms = 1,
+                  fail = False
+                },
+            tChild =
+              TFixture
+                { tTag = "FX 0",
+                  sHook = testProps "Fx 0 - SH" 0 0 False,
+                  sRelease = testProps "Fx 0 - SHR" 0 0 False,
+                  tHook = [testProps "Fx 0" 0 0 False],
+                  tRelease = [testProps "Fx 0" 0 0 False],
+                  tTestHook = [testProps "Fx 0" 0 0 False],
+                  tTestRelease = [testProps "Fx 0" 0 0 False],
+                  tTests = [testProps "" 0 0 False]
+                }
+          }
     }
 
--- $ > unit_simple_single
+-- $> unit_simple_single
 
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 
--- $> unit_simple_single_failure
+-- $ > unit_simple_single_failure
 
 unit_simple_single_failure :: IO ()
 unit_simple_single_failure =

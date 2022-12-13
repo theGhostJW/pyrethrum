@@ -139,6 +139,7 @@ import UnliftIO.Concurrent as C
   )
 import UnliftIO.STM
 import Prelude (Ord, String, putStrLn, read)
+import Control.Monad (void)
 
 {-
 1. create logger pretty print + list :: Done
@@ -912,14 +913,15 @@ chkLaws mxThrds t evts =
     -- TODO OnceFixtureHook, ThreadFixtureHook -- don't use
     traverse_
       (evts &)
-      [ chkThreadLogsInOrder,
-        chkStartEndExecution,
-        chkTestCount templateAsList,
-        chkFxtrCount templateAsList,
-        chkSingletonLeafEvents,
-        chkOnceEventCount,
-        chkOnceEventParentOrder,
-        chkErrorPropagation t
+      [ 
+        -- chkThreadLogsInOrder,
+        -- chkStartEndExecution,
+        -- chkTestCount templateAsList,
+        -- chkFxtrCount templateAsList,
+        -- chkSingletonLeafEvents,
+        -- chkOnceEventCount,
+        -- chkOnceEventParentOrder,
+        chkErrorPropagation 
       ]
     traverse_
       (threadedEvents &)
@@ -1102,8 +1104,7 @@ data NodeType
   deriving (Show, Eq, Ord)
 
 data RTLoc = RTLoc
-  { et :: ExeEventType,
-    loc :: Loc,
+  { loc :: Loc,
     nodeType :: NodeType
   }
   deriving (Show, Eq, Ord)
@@ -1123,188 +1124,226 @@ data RTLoc = RTLoc
 --         L.Fixture -> threadedParent
 --         L.Test -> TestHookRelease
 
-chkErrorPropagation :: Template -> [ExeEvent] -> IO ()
-chkErrorPropagation t evts =
-  do
-    when (M.null pmap) $
-      putStrLn "Template Map Empty"
-    for_
-      (M.toList childList)
-      ( \(p, c) ->
-          if
-              | isFail p ->
-                  T.chk'
-                    ("parent has failed but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
-                    $ all isParentFail c
-              | isParentFail p ->
-                  T.chk'
-                    ("parent is parent failure but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
-                    $ all isParentFail c
-              | otherwise ->
-                  T.chk'
-                    ("parent is not a parent failure or failure but child node(s) exist that are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
-                    . not
-                    $ any isParentFail c
-      )
+chkErrorPropagation :: [ExeEvent] -> IO ()
+chkErrorPropagation evts = 
+    M.null initMap ? error "NULL" $ error "NOT NULL!!"
   where
-    pmap = parentMap t & debug' "########~ TEMPLATE PARENT MAP ~#######"
-    -- Hooks release must be skipped if hk fails
-    -- what if thread hook fails on second pass which parents a singleton hook
-    -- validating in same thread should work
-    -- if threaded propagates to thread
-    -- if once propagates to all
-    nodeType :: SThreadId -> ExeEventType -> NodeType
-    nodeType tid = \case
-      L.OnceHook -> Singleton
-      L.OnceHookRelease -> Singleton
-      L.ThreadHook -> threaded
-      L.ThreadHookRelease -> threaded
-      L.FixtureOnceHook -> Singleton
-      L.FixtureOnceHookRelease -> Singleton
-      L.FixtureThreadHook -> threaded
-      L.FixtureThreadHookRelease -> threaded
-      L.TestHook -> threaded
-      L.TestHookRelease -> threaded
-      L.Group -> threaded
-      L.Fixture -> threaded
-      L.Test -> threaded
-      where
-        threaded = Theaded tid
+    -- do
+    --   when (M.null pmap) $
+    --     putStrLn "Template Map Empty"
+    --   for_
+    --     (M.toList childList)
+    --     ( \(p, c) ->
+    --         if
+    --             | isFail p ->
+    --                 T.chk'
+    --                   ("parent has failed but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
+    --                   $ all isParentFail c
+    --             | isParentFail p ->
+    --                 T.chk'
+    --                   ("parent is parent failure but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
+    --                   $ all isParentFail c
+    --             | otherwise ->
+    --                 T.chk'
+    --                   ("parent is not a parent failure or failure but child node(s) exist that are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
+    --                   . not
+    --                   $ any isParentFail c
+    --     )
+    isSingleton :: ExeEventType -> Bool 
+    isSingleton = \case
+      L.OnceHook -> True
+      L.OnceHookRelease -> True
+      L.ThreadHook -> False
+      L.ThreadHookRelease -> False
+      L.FixtureOnceHook -> True
+      L.FixtureOnceHookRelease -> True
+      L.FixtureThreadHook -> False
+      L.FixtureThreadHookRelease -> False
+      L.TestHook -> False
+      L.TestHookRelease -> False
+      L.Group -> False
+      L.Fixture -> False
+      L.Test -> False
 
-    evntType :: Loc -> Maybe ExeEventType
-    evntType = (M.!?) evntTypes
+    mkRTLoc :: Loc -> ExeEventType -> SThreadId -> RTLoc
+    mkRTLoc l et t = 
+      RTLoc l $ isSingleton et ?
+                Singleton $
+                Theaded t
 
-    evntTypes :: M.Map Loc ExeEventType
-    evntTypes =
-      foldl'
-        ( \accum ->
-            \case
-              StartExecution {} -> accum
-              End {} -> accum
-              Failure {} -> accum
-              ParentFailure {} -> accum
-              ApLog {} -> accum
-              EndExecution {} -> accum
-              Start {eventType, loc, threadId} -> M.insert loc eventType accum
-        )
-        M.empty
-        evts
-        & debug' "$$$$$$$$$$$$$$$$ event types $$$$$$$$$$$$$$$$$"
+    initMap :: M.Map RTLoc [RTLoc]
+    initMap =  foldl'
+      ( \accum ->
+          \case
+            StartExecution {} -> accum
+            End {} -> accum
+            Failure {} -> accum
+            ParentFailure {} -> accum
+            ApLog {} -> accum
+            EndExecution {} -> accum
+            Start {eventType, loc, threadId} -> M.insert (mkRTLoc loc eventType threadId) [] accum
+      )
+      M.empty
+      evts & debug'  "########~ PARENT MAP ~#######"
 
-    failureParent loc thrdId =
-      fParent loc
-      where
-        fParent childLoc =
-          childLoc & \case
-            Root -> Nothing
-            n@Node {parent} ->
-              let thisThread = Theaded thrdId
-                  parentType = evntType parent
-                  selfType = evntType n
-                  taggedParentThreaded et = rtLocf (Node parent $ txt et) thisThread <$> parentType
-                  taggedParentSingleton et = rtLocf (Node parent $ txt et) Singleton <$> parentType
-                  threadedParent = rtLocf parent thisThread <$> parentType
-                  onceParent = rtLocf parent Singleton <$> parentType
-                  groupParent = failureParent parent thrdId
-                  failureParent' =
-                    let badParentError = error $ show parentType <> " should not be a structural parent"
-                        unexpectedParentCall = error "parent should already be set"
-                     in parentType >>= \case
-                          L.OnceHook -> onceParent
-                          L.OnceHookRelease -> badParentError
-                          L.ThreadHook -> threadedParent
-                          L.ThreadHookRelease -> badParentError
-                          L.FixtureOnceHook -> unexpectedParentCall
-                          L.FixtureOnceHookRelease -> badParentError
-                          L.FixtureThreadHook -> unexpectedParentCall
-                          L.FixtureThreadHookRelease -> badParentError
-                          L.TestHook -> unexpectedParentCall
-                          L.TestHookRelease -> badParentError
-                          L.Group -> groupParent
-                          L.Fixture -> groupParent
-                          L.Test -> error "test cannot be a parent"
-               in selfType >>= \case
-                    L.OnceHook -> failureParent'
-                    L.OnceHookRelease -> taggedParentSingleton L.OnceHook
-                    L.ThreadHook -> failureParent'
-                    L.ThreadHookRelease -> taggedParentThreaded L.ThreadHook
-                    L.FixtureOnceHook -> threadedParent & debug' "##### FIXTRUE ONCE HOOK PARENT" --- fixture
-                    L.FixtureOnceHookRelease -> taggedParentSingleton L.FixtureOnceHook
-                    L.FixtureThreadHook -> threadedParent -- fixture
-                    L.FixtureThreadHookRelease -> taggedParentThreaded L.FixtureThreadHook
-                    L.TestHook -> taggedParentThreaded L.FixtureThreadHook
-                    L.TestHookRelease -> taggedParentThreaded L.TestHook
-                    L.Group -> groupParent
-                    L.Fixture -> groupParent
-                    L.Test -> taggedParentThreaded L.TestHook -- & debug' "TEST !!!"
-    childList :: M.Map RTLoc [RTLoc]
-    childList =
-      debug' "!!!!!!!!!!!!!!!!!" $
-        foldl'
-          ( \accum -> \case
-              StartExecution {} -> accum
-              Start
-                { eventType,
-                  loc,
-                  idx,
-                  threadId
-                } ->
-                  let nt = nodeType threadId $ evntTypes M.! loc
-                      this = RTLoc eventType loc nt
-                      basemap = M.alter (maybe (Just []) Just) this accum
-                      mParent = failureParent loc threadId & debugf (\p -> "FAIL PARENT FOR LOC: " <> txt loc <> " IS " <> txt p)
-                   in mParent
-                        & maybe
-                          basemap
-                          ( \p ->
-                              basemap M.!? p
-                                & maybe
-                                  ( error $
-                                      "Parent not in map: \nparent\n"
-                                        <> ppShow p
-                                        <> "\nnot found when inserting child\n"
-                                        <> ppShow this
-                                        <> "\ninto parent map:\n"
-                                        <> ppShow basemap
-                                  )
-                                  (\_v -> M.alter ((this :) <$>) p basemap & debug' "!!!!!! ALTER   !!!")
-                          )
-              End {} -> accum
-              Failure {} -> accum
-              ParentFailure {} -> accum
-              ApLog {} -> accum
-              EndExecution {} -> accum
-          )
-          M.empty
-          evts
+--   pmap = parentMap & debug' "########~ TEMPLATE PARENT MAP ~#######"
+--   -- Hooks release must be skipped if hk fails
+--   -- what if thread hook fails on second pass which parents a singleton hook
+--   -- validating in same thread should work
+--   -- if threaded propagates to thread
+--   -- if once propagates to all
+--   nodeType :: SThreadId -> ExeEventType -> NodeType
+--   nodeType tid = \case
+--     L.OnceHook -> Singleton
+--     L.OnceHookRelease -> Singleton
+--     L.ThreadHook -> threaded
+--     L.ThreadHookRelease -> threaded
+--     L.FixtureOnceHook -> Singleton
+--     L.FixtureOnceHookRelease -> Singleton
+--     L.FixtureThreadHook -> threaded
+--     L.FixtureThreadHookRelease -> threaded
+--     L.TestHook -> threaded
+--     L.TestHookRelease -> threaded
+--     L.Group -> threaded
+--     L.Fixture -> threaded
+--     L.Test -> threaded
+--     where
+--       threaded = Theaded tid
 
-    rtLocf loc' nt et = RTLoc et loc' nt
-    rtLocSet f = ST.fromList . catMaybes $ f <$> evts
+--   evntType :: Loc -> Maybe ExeEventType
+--   evntType = (M.!?) evntTypes
 
-    isFail = flip ST.member fails
-    isParentFail = flip ST.member parentFails
+--   evntTypes :: M.Map Loc ExeEventType
+--   evntTypes =
+--     foldl'
+--       ( \accum ->
+--           \case
+--             StartExecution {} -> accum
+--             End {} -> accum
+--             Failure {} -> accum
+--             ParentFailure {} -> accum
+--             ApLog {} -> accum
+--             EndExecution {} -> accum
+--             Start {eventType, loc, threadId} -> M.insert loc eventType accum
+--       )
+--       M.empty
+--       evts
+--       & debug' "$$$$$$$$$$$$$$$$ event types $$$$$$$$$$$$$$$$$"
 
-    fails :: ST.Set RTLoc
-    fails =
-      rtLocSet \case
-        StartExecution {} -> Nothing
-        Start {} -> Nothing
-        End {} -> Nothing
-        Failure {loc, threadId} -> rtLocf loc (Theaded threadId) <$> evntType loc
-        ParentFailure {} -> Nothing
-        ApLog {} -> Nothing
-        EndExecution {} -> Nothing
+--   failureParent loc thrdId =
+--     fParent loc
+--     where
+--       fParent childLoc =
+--         childLoc & \case
+--           Root -> Nothing
+--           n@Node {parent} ->
+--             let thisThread = Theaded thrdId
+--                 parentType = evntType parent
+--                 selfType = evntType n
+--                 taggedParentThreaded et = rtLocf (Node parent $ txt et) thisThread <$> parentType
+--                 taggedParentSingleton et = rtLocf (Node parent $ txt et) Singleton <$> parentType
+--                 threadedParent = rtLocf parent thisThread <$> parentType
+--                 onceParent = rtLocf parent Singleton <$> parentType
+--                 groupParent = failureParent parent thrdId
+--                 failureParent' =
+--                   let badParentError = error $ show parentType <> " should not be a structural parent"
+--                       unexpectedParentCall = error "parent should already be set"
+--                    in parentType >>= \case
+--                         L.OnceHook -> onceParent
+--                         L.OnceHookRelease -> badParentError
+--                         L.ThreadHook -> threadedParent
+--                         L.ThreadHookRelease -> badParentError
+--                         L.FixtureOnceHook -> unexpectedParentCall
+--                         L.FixtureOnceHookRelease -> badParentError
+--                         L.FixtureThreadHook -> unexpectedParentCall
+--                         L.FixtureThreadHookRelease -> badParentError
+--                         L.TestHook -> unexpectedParentCall
+--                         L.TestHookRelease -> badParentError
+--                         L.Group -> groupParent
+--                         L.Fixture -> groupParent
+--                         L.Test -> error "test cannot be a parent"
+--              in selfType >>= \case
+--                   L.OnceHook -> failureParent'
+--                   L.OnceHookRelease -> taggedParentSingleton L.OnceHook
+--                   L.ThreadHook -> failureParent'
+--                   L.ThreadHookRelease -> taggedParentThreaded L.ThreadHook
+--                   L.FixtureOnceHook -> threadedParent & debug' "##### FIXTRUE ONCE HOOK PARENT" --- fixture
+--                   L.FixtureOnceHookRelease -> taggedParentSingleton L.FixtureOnceHook
+--                   L.FixtureThreadHook -> threadedParent -- fixture
+--                   L.FixtureThreadHookRelease -> taggedParentThreaded L.FixtureThreadHook
+--                   L.TestHook -> taggedParentThreaded L.FixtureThreadHook
+--                   L.TestHookRelease -> taggedParentThreaded L.TestHook
+--                   L.Group -> groupParent
+--                   L.Fixture -> groupParent
+--                   L.Test -> taggedParentThreaded L.TestHook -- & debug' "TEST !!!"
+--   childList :: M.Map RTLoc [RTLoc]
+--   childList =
+--     debug' "!!!!!!!!!!!!!!!!!" $
+--       foldl'
+--         ( \accum -> \case
+--             StartExecution {} -> accum
+--             Start
+--               { eventType,
+--                 loc,
+--                 idx,
+--                 threadId
+--               } ->
+--                 let nt = nodeType threadId $ evntTypes M.! loc
+--                     this = RTLoc eventType loc nt
+--                     basemap = M.alter (maybe (Just []) Just) this accum
+--                     mParent = failureParent loc threadId & debugf (\p -> "FAIL PARENT FOR LOC: " <> txt loc <> " IS " <> txt p)
+--                  in mParent
+--                       & maybe
+--                         basemap
+--                         ( \p ->
+--                             basemap M.!? p
+--                               & maybe
+--                                 ( error $
+--                                     "Parent not in map: \nparent\n"
+--                                       <> ppShow p
+--                                       <> "\nnot found when inserting child\n"
+--                                       <> ppShow this
+--                                       <> "\ninto parent map:\n"
+--                                       <> ppShow basemap
+--                                 )
+--                                 (\_v -> M.alter ((this :) <$>) p basemap & debug' "!!!!!! ALTER   !!!")
+--                         )
+--             End {} -> accum
+--             Failure {} -> accum
+--             ParentFailure {} -> accum
+--             ApLog {} -> accum
+--             EndExecution {} -> accum
+--         )
+--         M.empty
+--         evts
 
-    parentFails :: ST.Set RTLoc
-    parentFails =
-      rtLocSet \case
-        StartExecution {} -> Nothing
-        Start {} -> Nothing
-        End {} -> Nothing
-        Failure {loc, threadId} -> Nothing
-        ParentFailure {loc, threadId} -> rtLocf loc (Theaded threadId) <$> evntType loc
-        ApLog {} -> Nothing
-        EndExecution {} -> Nothing
+--   rtLocf loc' nt et = RTLoc et loc' nt
+--   rtLocSet f = ST.fromList . catMaybes $ f <$> evts
+
+--   isFail = flip ST.member fails
+--   isParentFail = flip ST.member parentFails
+
+--   fails :: ST.Set RTLoc
+--   fails =
+--     rtLocSet \case
+--       StartExecution {} -> Nothing
+--       Start {} -> Nothing
+--       End {} -> Nothing
+--       Failure {loc, threadId} -> rtLocf loc (Theaded threadId) <$> evntType loc
+--       ParentFailure {} -> Nothing
+--       ApLog {} -> Nothing
+--       EndExecution {} -> Nothing
+
+--   parentFails :: ST.Set RTLoc
+--   parentFails =
+--     rtLocSet \case
+--       StartExecution {} -> Nothing
+--       Start {} -> Nothing
+--       End {} -> Nothing
+--       Failure {loc, threadId} -> Nothing
+--       ParentFailure {loc, threadId} -> rtLocf loc (Theaded threadId) <$> evntType loc
+--       ApLog {} -> Nothing
+--       EndExecution {} -> Nothing
 
 -- get rusults
 -- group with special rules around hk start hk release

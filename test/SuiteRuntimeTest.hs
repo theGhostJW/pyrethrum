@@ -4,7 +4,7 @@ import Check (Checks)
 -- TODO Add to Pyrelude
 -- TODO Add to Pyrelude
 
-import Control.Monad (Functor ((<$)))
+import Control.Monad (Functor ((<$)), void)
 import Control.Monad.Reader (ReaderT (runReaderT), ask)
 import DSL.Interpreter
 import Data.Aeson.Encoding (quarter)
@@ -139,7 +139,6 @@ import UnliftIO.Concurrent as C
   )
 import UnliftIO.STM
 import Prelude (Ord, String, putStrLn, read)
-import Control.Monad (void)
 
 {-
 1. create logger pretty print + list :: Done
@@ -913,15 +912,14 @@ chkLaws mxThrds t evts =
     -- TODO OnceFixtureHook, ThreadFixtureHook -- don't use
     traverse_
       (evts &)
-      [ 
-        -- chkThreadLogsInOrder,
+      [ -- chkThreadLogsInOrder,
         -- chkStartEndExecution,
         -- chkTestCount templateAsList,
         -- chkFxtrCount templateAsList,
         -- chkSingletonLeafEvents,
         -- chkOnceEventCount,
         -- chkOnceEventParentOrder,
-        chkErrorPropagation 
+        chkErrorPropagation
       ]
     traverse_
       (threadedEvents &)
@@ -1100,7 +1098,7 @@ chkThreadErrorPropagation = traverse_ chkThreadErrs
 
 data NodeType
   = Singleton
-  | Theaded SThreadId
+  | Threaded SThreadId
   deriving (Show, Eq, Ord)
 
 data RTLoc = RTLoc
@@ -1108,25 +1106,16 @@ data RTLoc = RTLoc
     nodeType :: NodeType
   }
   deriving (Show, Eq, Ord)
+data RTLocEvt = RTLocEvt
+  { rtLoc :: RTLoc,
+    eventType :: ExeEventType
+  }
+  deriving (Show, Eq, Ord)
 
---  \case child of
---         L.OnceHook -> threadedParent
---         L.OnceHookRelease -> OnceHook Singleton
---         L.ThreadHook -> threadedParent
---         L.ThreadHookRelease -> ThreadHook
---         L.FixtureOnceHook -> Fixture
---         L.FixtureOnceHookRelease -> FixtureOnceHook
---         L.FixtureThreadHook -> FixtureOnceHookRelease
---         L.FixtureThreadHookRelease -> FixtureThreadHook
---         L.TestHook -> FixtureThreadHookRelease
---         L.TestHookRelease -> TestHook
---         L.Group -> threadedParent
---         L.Fixture -> threadedParent
---         L.Test -> TestHookRelease
 
 chkErrorPropagation :: [ExeEvent] -> IO ()
-chkErrorPropagation evts = 
-    M.null initMap ? error "NULL" $ error "NOT NULL!!"
+chkErrorPropagation evts =
+  M.null parentChildMap ? error "NULL" $ error "NOT NULL!!"
   where
     -- do
     --   when (M.null pmap) $
@@ -1149,7 +1138,7 @@ chkErrorPropagation evts =
     --                   . not
     --                   $ any isParentFail c
     --     )
-    isSingleton :: ExeEventType -> Bool 
+    isSingleton :: ExeEventType -> Bool
     isSingleton = \case
       L.OnceHook -> True
       L.OnceHookRelease -> True
@@ -1166,25 +1155,63 @@ chkErrorPropagation evts =
       L.Test -> False
 
     mkRTLoc :: Loc -> ExeEventType -> SThreadId -> RTLoc
-    mkRTLoc l et t = 
-      RTLoc l $ isSingleton et ?
-                Singleton $
-                Theaded t
+    mkRTLoc l et t =
+      RTLoc l
+        $ isSingleton et
+          ? Singleton
+        $ Threaded t
 
-    initMap :: M.Map RTLoc [RTLoc]
-    initMap =  foldl'
-      ( \accum ->
-          \case
-            StartExecution {} -> accum
-            End {} -> accum
-            Failure {} -> accum
-            ParentFailure {} -> accum
-            ApLog {} -> accum
-            EndExecution {} -> accum
-            Start {eventType, loc, threadId} -> M.insert (mkRTLoc loc eventType threadId) [] accum
-      )
-      M.empty
-      evts & debug'  "########~ PARENT MAP ~#######"
+    initMap :: M.Map RTLoc [RTLocEvt]
+    initMap =
+      foldl'
+        ( \accum ->
+            \case
+              StartExecution {} -> accum
+              End {} -> accum
+              Failure {} -> accum
+              ParentFailure {} -> accum
+              ApLog {} -> accum
+              EndExecution {} -> accum
+              Start {eventType, loc, threadId} -> M.insert (mkRTLoc loc eventType threadId) [] accum
+        )
+        M.empty
+        evts
+
+    parentChildMap :: M.Map RTLoc [RTLocEvt]
+    parentChildMap =
+      foldl'
+        ( \accum ->
+            \case
+              StartExecution {} -> accum
+              End {} -> accum
+              Failure {} -> accum
+              ParentFailure {} -> accum
+              ApLog {} -> accum
+              EndExecution {} -> accum
+              ev@Start {eventType, loc, threadId} ->
+                loc & \case
+                  Root -> accum
+                  Node {parent = prnt} ->
+                    let pt =
+                          RTLoc
+                            { loc = prnt,
+                              nodeType = Threaded threadId
+                            }
+                        ps = pt {nodeType = Singleton}
+                        p = M.member pt accum ? pt $ ps
+                        c = RTLocEvt (mkRTLoc loc eventType threadId) eventType
+                     in prnt & \case
+                          Root -> accum
+                          Node {} ->
+                            accum M.!? p
+                              & maybe
+                                (error $ "parent not found for\n"
+                                  <> ppShow ev <> "\nin\n" <> ppShow p)
+                                (\clst -> M.alter (fmap (c :)) p accum)
+        )
+        initMap
+        evts
+        & debug' "########~ PARENT MAP ~#######"
 
 --   pmap = parentMap & debug' "########~ TEMPLATE PARENT MAP ~#######"
 --   -- Hooks release must be skipped if hk fails
@@ -1208,7 +1235,7 @@ chkErrorPropagation evts =
 --     L.Fixture -> threaded
 --     L.Test -> threaded
 --     where
---       threaded = Theaded tid
+--       threaded = Threaded tid
 
 --   evntType :: Loc -> Maybe ExeEventType
 --   evntType = (M.!?) evntTypes
@@ -1237,7 +1264,7 @@ chkErrorPropagation evts =
 --         childLoc & \case
 --           Root -> Nothing
 --           n@Node {parent} ->
---             let thisThread = Theaded thrdId
+--             let thisThread = Threaded thrdId
 --                 parentType = evntType parent
 --                 selfType = evntType n
 --                 taggedParentThreaded et = rtLocf (Node parent $ txt et) thisThread <$> parentType
@@ -1329,7 +1356,7 @@ chkErrorPropagation evts =
 --       StartExecution {} -> Nothing
 --       Start {} -> Nothing
 --       End {} -> Nothing
---       Failure {loc, threadId} -> rtLocf loc (Theaded threadId) <$> evntType loc
+--       Failure {loc, threadId} -> rtLocf loc (Threaded threadId) <$> evntType loc
 --       ParentFailure {} -> Nothing
 --       ApLog {} -> Nothing
 --       EndExecution {} -> Nothing
@@ -1341,7 +1368,7 @@ chkErrorPropagation evts =
 --       Start {} -> Nothing
 --       End {} -> Nothing
 --       Failure {loc, threadId} -> Nothing
---       ParentFailure {loc, threadId} -> rtLocf loc (Theaded threadId) <$> evntType loc
+--       ParentFailure {loc, threadId} -> rtLocf loc (Threaded threadId) <$> evntType loc
 --       ApLog {} -> Nothing
 --       EndExecution {} -> Nothing
 
@@ -1505,24 +1532,24 @@ alwaysFail = DocFunc "Always Fail" $ pure True
 superSimplSuite :: Template
 superSimplSuite =
   TThreadHook
-    { tTag = "TThreadHook",
+    { tTag = "ThreadHook",
       tHook =
         [ IOProps
-            { message = "TThreadHook",
+            { message = "ThreadHook",
               delayms = 1,
               fail = True
             }
         ],
       tRelease =
         [ IOProps
-            { message = "TThreadHook",
+            { message = "ThreadHookRelease",
               delayms = 1,
               fail = False
             }
         ],
       tChild =
         TOnceHook
-          { tTag = "TOnceHook",
+          { tTag = "OnceHook",
             sHook =
               IOProps
                 { message = "Once Hook",
@@ -1537,13 +1564,16 @@ superSimplSuite =
                 },
             tChild =
               TFixture
-                { tTag = "FX 0",
-                  sHook = testProps "Fx 0 - SH" 0 0 False,
-                  sRelease = testProps "Fx 0 - SHR" 0 0 False,
-                  tHook = [testProps "Fx 0" 0 0 False],
-                  tRelease = [testProps "Fx 0" 0 0 False],
-                  tTestHook = [testProps "Fx 0" 0 0 False],
-                  tTestRelease = [testProps "Fx 0" 0 0 False],
+                { tTag = "Fixture 0",
+                  -- 
+                  sHook = testProps "Fixture 0 - Fixture Once Hook" 0 0 False,
+                  sRelease = testProps "Fixture 0 - Fixture Once Hook Release" 0 0 False,
+                  -- 
+                  tHook = [testProps "Fixture 0 - Fixture Thread Hook" 0 0 False],
+                  tRelease = [testProps "Fixture 0 - Fixture Hook Release" 0 0 False],
+                  -- 
+                  tTestHook = [testProps "Fixture 0 - Test Hook" 0 0 False],
+                  tTestRelease = [testProps "Fixture 0 - Test Hook Release" 0 0 False],
                   tTests = [testProps "" 0 0 False]
                 }
           }

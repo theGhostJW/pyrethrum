@@ -1106,12 +1106,12 @@ data RTLoc = RTLoc
     nodeType :: NodeType
   }
   deriving (Show, Eq, Ord)
+
 data RTLocEvt = RTLocEvt
   { rtLoc :: RTLoc,
     eventType :: ExeEventType
   }
   deriving (Show, Eq, Ord)
-
 
 chkErrorPropagation :: [ExeEvent] -> IO ()
 chkErrorPropagation evts =
@@ -1177,6 +1177,22 @@ chkErrorPropagation evts =
         M.empty
         evts
 
+    childParentMap :: M.Map RTLoc RTLoc
+    childParentMap =
+      foldl'
+        ( \accum (p, cs) ->
+            let childMap = M.fromList $ (\c -> (rtLoc c, p)) <$> cs
+                common = M.intersection accum childMap
+             in M.null common
+                  & bool
+                    ( error $
+                        "child has more than one parent:\n" <> ppShow common <> "\nin parent map:\n" <> ppShow accum
+                    )
+                    (M.union accum common)
+        )
+        M.empty
+        $ M.toList parentChildMap
+
     parentChildMap :: M.Map RTLoc [RTLocEvt]
     parentChildMap =
       foldl'
@@ -1205,272 +1221,17 @@ chkErrorPropagation evts =
                           Node {} ->
                             accum M.!? p
                               & maybe
-                                (error $ "parent not found for\n"
-                                  <> ppShow ev <> "\nin\n" <> ppShow p)
+                                ( error $
+                                    "parent not found for\n"
+                                      <> ppShow ev
+                                      <> "\nin\n"
+                                      <> ppShow p
+                                )
                                 (\clst -> M.alter (fmap (c :)) p accum)
         )
         initMap
         evts
         & debug' "########~ PARENT MAP ~#######"
-
---   pmap = parentMap & debug' "########~ TEMPLATE PARENT MAP ~#######"
---   -- Hooks release must be skipped if hk fails
---   -- what if thread hook fails on second pass which parents a singleton hook
---   -- validating in same thread should work
---   -- if threaded propagates to thread
---   -- if once propagates to all
---   nodeType :: SThreadId -> ExeEventType -> NodeType
---   nodeType tid = \case
---     L.OnceHook -> Singleton
---     L.OnceHookRelease -> Singleton
---     L.ThreadHook -> threaded
---     L.ThreadHookRelease -> threaded
---     L.FixtureOnceHook -> Singleton
---     L.FixtureOnceHookRelease -> Singleton
---     L.FixtureThreadHook -> threaded
---     L.FixtureThreadHookRelease -> threaded
---     L.TestHook -> threaded
---     L.TestHookRelease -> threaded
---     L.Group -> threaded
---     L.Fixture -> threaded
---     L.Test -> threaded
---     where
---       threaded = Threaded tid
-
---   evntType :: Loc -> Maybe ExeEventType
---   evntType = (M.!?) evntTypes
-
---   evntTypes :: M.Map Loc ExeEventType
---   evntTypes =
---     foldl'
---       ( \accum ->
---           \case
---             StartExecution {} -> accum
---             End {} -> accum
---             Failure {} -> accum
---             ParentFailure {} -> accum
---             ApLog {} -> accum
---             EndExecution {} -> accum
---             Start {eventType, loc, threadId} -> M.insert loc eventType accum
---       )
---       M.empty
---       evts
---       & debug' "$$$$$$$$$$$$$$$$ event types $$$$$$$$$$$$$$$$$"
-
---   failureParent loc thrdId =
---     fParent loc
---     where
---       fParent childLoc =
---         childLoc & \case
---           Root -> Nothing
---           n@Node {parent} ->
---             let thisThread = Threaded thrdId
---                 parentType = evntType parent
---                 selfType = evntType n
---                 taggedParentThreaded et = rtLocf (Node parent $ txt et) thisThread <$> parentType
---                 taggedParentSingleton et = rtLocf (Node parent $ txt et) Singleton <$> parentType
---                 threadedParent = rtLocf parent thisThread <$> parentType
---                 onceParent = rtLocf parent Singleton <$> parentType
---                 groupParent = failureParent parent thrdId
---                 failureParent' =
---                   let badParentError = error $ show parentType <> " should not be a structural parent"
---                       unexpectedParentCall = error "parent should already be set"
---                    in parentType >>= \case
---                         L.OnceHook -> onceParent
---                         L.OnceHookRelease -> badParentError
---                         L.ThreadHook -> threadedParent
---                         L.ThreadHookRelease -> badParentError
---                         L.FixtureOnceHook -> unexpectedParentCall
---                         L.FixtureOnceHookRelease -> badParentError
---                         L.FixtureThreadHook -> unexpectedParentCall
---                         L.FixtureThreadHookRelease -> badParentError
---                         L.TestHook -> unexpectedParentCall
---                         L.TestHookRelease -> badParentError
---                         L.Group -> groupParent
---                         L.Fixture -> groupParent
---                         L.Test -> error "test cannot be a parent"
---              in selfType >>= \case
---                   L.OnceHook -> failureParent'
---                   L.OnceHookRelease -> taggedParentSingleton L.OnceHook
---                   L.ThreadHook -> failureParent'
---                   L.ThreadHookRelease -> taggedParentThreaded L.ThreadHook
---                   L.FixtureOnceHook -> threadedParent & debug' "##### FIXTRUE ONCE HOOK PARENT" --- fixture
---                   L.FixtureOnceHookRelease -> taggedParentSingleton L.FixtureOnceHook
---                   L.FixtureThreadHook -> threadedParent -- fixture
---                   L.FixtureThreadHookRelease -> taggedParentThreaded L.FixtureThreadHook
---                   L.TestHook -> taggedParentThreaded L.FixtureThreadHook
---                   L.TestHookRelease -> taggedParentThreaded L.TestHook
---                   L.Group -> groupParent
---                   L.Fixture -> groupParent
---                   L.Test -> taggedParentThreaded L.TestHook -- & debug' "TEST !!!"
---   childList :: M.Map RTLoc [RTLoc]
---   childList =
---     debug' "!!!!!!!!!!!!!!!!!" $
---       foldl'
---         ( \accum -> \case
---             StartExecution {} -> accum
---             Start
---               { eventType,
---                 loc,
---                 idx,
---                 threadId
---               } ->
---                 let nt = nodeType threadId $ evntTypes M.! loc
---                     this = RTLoc eventType loc nt
---                     basemap = M.alter (maybe (Just []) Just) this accum
---                     mParent = failureParent loc threadId & debugf (\p -> "FAIL PARENT FOR LOC: " <> txt loc <> " IS " <> txt p)
---                  in mParent
---                       & maybe
---                         basemap
---                         ( \p ->
---                             basemap M.!? p
---                               & maybe
---                                 ( error $
---                                     "Parent not in map: \nparent\n"
---                                       <> ppShow p
---                                       <> "\nnot found when inserting child\n"
---                                       <> ppShow this
---                                       <> "\ninto parent map:\n"
---                                       <> ppShow basemap
---                                 )
---                                 (\_v -> M.alter ((this :) <$>) p basemap & debug' "!!!!!! ALTER   !!!")
---                         )
---             End {} -> accum
---             Failure {} -> accum
---             ParentFailure {} -> accum
---             ApLog {} -> accum
---             EndExecution {} -> accum
---         )
---         M.empty
---         evts
-
---   rtLocf loc' nt et = RTLoc et loc' nt
---   rtLocSet f = ST.fromList . catMaybes $ f <$> evts
-
---   isFail = flip ST.member fails
---   isParentFail = flip ST.member parentFails
-
---   fails :: ST.Set RTLoc
---   fails =
---     rtLocSet \case
---       StartExecution {} -> Nothing
---       Start {} -> Nothing
---       End {} -> Nothing
---       Failure {loc, threadId} -> rtLocf loc (Threaded threadId) <$> evntType loc
---       ParentFailure {} -> Nothing
---       ApLog {} -> Nothing
---       EndExecution {} -> Nothing
-
---   parentFails :: ST.Set RTLoc
---   parentFails =
---     rtLocSet \case
---       StartExecution {} -> Nothing
---       Start {} -> Nothing
---       End {} -> Nothing
---       Failure {loc, threadId} -> Nothing
---       ParentFailure {loc, threadId} -> rtLocf loc (Threaded threadId) <$> evntType loc
---       ApLog {} -> Nothing
---       EndExecution {} -> Nothing
-
--- get rusults
--- group with special rules around hk start hk release
-
--- where
---   allThreadIds = catMaybes $ head <$> evts
-
---   step ::  ExeEvent -> [ElmResult] -> [ElmResult]
---   step ev acc =
---     case ev of
---       StartExecution {} -> acc
---       Start loc eet n sti -> uu
---       End loc eet n sti -> uu
---       Failure loc txt pe n sti -> uu
---       ParentFailure loc loc' eet pe n sti -> uu
---       ApLog {}-> acc
---       EndExecution {} -> acc
-
--- childMap :: [ExeEvent] -> M.Map ElmResult (ST.Set ElmResult)
--- childMap = uu
-
--- where
---   threadedEvents =
---     let
---       mevts = M.fromList $ (,[]) <$> nub (threadId <$> evts)
---       addThreaded evt = M.adjust (evt :) (threadId evt)
---       addSingleton
---     in
---       foldr' addThreaded mevts evts
-
--- oLastSHkFailure (foldl' chkGlobalSingltonErrs (OEAccum Nothing Nothing ST.empty) evts)
---   & maybe
---     (pure ())
---     ( \(l, _ex) ->
---         error ("chkErrorPropagation - OnceHook error loc still open at end of run: " <> show l)
---     )
--- where
---   chkGlobalSingltonErrs :: OEAccum -> ExeEvent -> OEAccum
---   chkGlobalSingltonErrs
---     accum@OEAccum
---       { oOpenSHk,
---         oLastSHkFailure,
---         oOpenChldElms
---       } =
---       \case
---         StartExecution {} -> accum
---         Start {loc, eventType, threadId} ->
---               let isOnceHk = onceHook eventType
---               in
---               oLastSHkFailure
---                 & maybe
---                   ( isOnceHk
---                       ? accum {oOpenSHk = Just loc}
---                       $ accum
---                   )
---                   ( const $
---                       accum
---                         { oOpenChldElms =
---                             ST.insert (ThrdLoc loc $ isOnceHk ? Nothing $ Just threadId) oOpenChldElms
---                         }
---                   )
---         ed@End {loc, eventType, threadId} ->
---         -- make sure singletoon failure is matched
---         -- reset open shk
---         -- remove oOpenChldElms
---           oLastSHkFailure
---                     & maybe
---                       accum
---                       ( \(failLoc, pException) ->
---                           let matched =
---                           ST.member thrdLoc oOpenChldElms
---                             ? accum
---                             $ ensureNotOpen lhf
---                       )
---           where
---             thrdLoc = ThrdLoc loc (
---               onceHook eventType  ?
---                 Nothing $
---                 Just threadId
---                 )
---             ensureNotOpen er =
---               ST.member thrdLoc oOpenChldElms ?
---                 error ("parent exception not logged in:\n" <> ppShow ed <> "although parent singleton hook failed:\n" <> ppShow er) $
---                 accum
-
---         f@Failure
---           { loc,
---             msg,
---             exception,
---             idx,
---             threadId
---           } -> uu -- need singletonOpen property oLastSHkFailure
---         ParentFailure
---           { loc,
---             parentLoc,
---             parentEventType,
---             threadId
---           } -> uu
---         ApLog {} -> accum
---         EndExecution {} -> accum
 
 chkOnceEventsAreBlocking :: [ExeEvent] -> IO ()
 chkOnceEventsAreBlocking _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"
@@ -1565,13 +1326,13 @@ superSimplSuite =
             tChild =
               TFixture
                 { tTag = "Fixture 0",
-                  -- 
+                  --
                   sHook = testProps "Fixture 0 - Fixture Once Hook" 0 0 False,
                   sRelease = testProps "Fixture 0 - Fixture Once Hook Release" 0 0 False,
-                  -- 
+                  --
                   tHook = [testProps "Fixture 0 - Fixture Thread Hook" 0 0 False],
                   tRelease = [testProps "Fixture 0 - Fixture Hook Release" 0 0 False],
-                  -- 
+                  --
                   tTestHook = [testProps "Fixture 0 - Test Hook" 0 0 False],
                   tTestRelease = [testProps "Fixture 0 - Test Hook Release" 0 0 False],
                   tTests = [testProps "" 0 0 False]

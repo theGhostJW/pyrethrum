@@ -510,9 +510,8 @@ q2List qu = reverse <$> recurse [] qu
 -- TODO - add tests add to pyrelude
 groupOn :: (Ord b) => (a -> b) -> [a] -> [[a]]
 groupOn f =
-  unpack . foldl' fld M.empty . reverse
+  M.elems . foldl' fld M.empty . reverse
   where
-    unpack = (snd <$>) . M.toList
     fld m a =
       M.lookup (f a) m
         & maybe
@@ -1027,7 +1026,8 @@ errorStep accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} 
                   }
             )
             ( \lf@(ploc, ex, _et) ->
-                (==) parentLoc ploc
+                parentLoc
+                  == ploc
                   ? accum {matchedFails = ST.insert loc matchedFails}
                   $ error
                     ( "parent failure logged in child does not match parent failure in parent:\nparent failure logged:\n"
@@ -1103,20 +1103,41 @@ data NodeType
 
 data RTLoc = RTLoc
   { loc :: Loc,
+    eventType :: ExeEventType,
     nodeType :: NodeType
   }
   deriving (Show, Eq, Ord)
 
-data RTLocEvt = RTLocEvt
-  { rtLoc :: RTLoc,
-    eventType :: ExeEventType
-  }
-  deriving (Show, Eq, Ord)
+data Fail = Fail {floc :: Loc} | ParentFail {floc :: Loc, ploc :: Loc} deriving (Show, Eq, Ord)
 
 chkErrorPropagation :: [ExeEvent] -> IO ()
 chkErrorPropagation evts =
-  M.null parentChildMap ? error "NULL" $ error "NOT NULL!!"
+  traverse_
+    ( \(p, cs) ->
+        fails M.!? p
+          & maybe
+            (chkChildrenOfPassedParent cs)
+            (chkChildrenOfFailedParent cs)
+    )
+    (M.toList parentChildMapGroupsRemoved)
   where
+    chkChildrenOfPassedParent :: [RTLoc] -> IO ()
+    chkChildrenOfPassedParent = uu
+    --  let
+    --       wrong = find (
+    --           \c ->
+    --             fails M.!? c & maybe
+    --              True
+    --              (\fail -> \case
+    --              ) cs
+    --        )
+    --     in
+    --       do
+    --         pure (0)
+    --    )
+    chkChildrenOfFailedParent :: [RTLoc] -> Fail -> IO ()
+    chkChildrenOfFailedParent = uu
+
     -- do
     --   when (M.null pmap) $
     --     putStrLn "Template Map Empty"
@@ -1138,6 +1159,22 @@ chkErrorPropagation evts =
     --                   . not
     --                   $ any isParentFail c
     --     )
+    fails :: M.Map RTLoc Fail
+    fails =
+      foldl'
+        ( \acc -> \case
+            StartExecution {} -> acc
+            Start {} -> acc
+            End {} -> acc
+            Failure {loc, parentEventType, threadId} -> M.insert (mkRTLoc loc parentEventType threadId) (Fail loc) acc
+            ParentFailure {parentLoc, parentEventType, loc, threadId} -> M.insert (mkRTLoc parentLoc parentEventType threadId) (ParentFail parentLoc loc) acc
+            ApLog {} -> acc
+            EndExecution {} -> acc
+        )
+        M.empty
+        evts
+        & debug' "!!!!!!! R E S U L T S  !!!!!!!!"
+
     isSingleton :: ExeEventType -> Bool
     isSingleton = \case
       L.OnceHook -> True
@@ -1156,12 +1193,12 @@ chkErrorPropagation evts =
 
     mkRTLoc :: Loc -> ExeEventType -> SThreadId -> RTLoc
     mkRTLoc l et t =
-      RTLoc l
+      RTLoc l et
         $ isSingleton et
           ? Singleton
         $ Threaded t
 
-    initMap :: M.Map RTLoc [RTLocEvt]
+    initMap :: M.Map RTLoc [a]
     initMap =
       foldl'
         ( \accum ->
@@ -1177,23 +1214,100 @@ chkErrorPropagation evts =
         M.empty
         evts
 
+    lookUpMsg msg m k =
+      m M.!? k
+        & fromMaybe
+          ( error $
+              toS msg
+                <> ": key not found for\n"
+                <> ppShow k
+                <> "\nin map\n"
+                <> ppShow m
+          )
+
+    evntType = lookUpMsg "event type" evntTypeMap
+
+    evntTypeMap :: M.Map Loc ExeEventType
+    evntTypeMap =
+      foldl'
+        ( \accum ->
+            \case
+              StartExecution {} -> accum
+              End {} -> accum
+              Failure {} -> accum
+              ParentFailure {} -> accum
+              ApLog {} -> accum
+              EndExecution {} -> accum
+              Start {eventType, loc, threadId} ->
+                M.alter
+                  ( maybe
+                      (Just eventType)
+                      ( \et ->
+                          et
+                            == eventType
+                            ? Just et
+                            $ error
+                            $ "same loc encountered with different event type\nloc:\n"
+                              <> ppShow loc
+                              <> "\nevent types\n"
+                              <> ppShow et
+                              <> "\n"
+                              <> ppShow eventType
+                      )
+                  )
+                  loc
+                  accum
+        )
+        M.empty
+        evts
+
     childParentMap :: M.Map RTLoc RTLoc
     childParentMap =
-      foldl'
-        ( \accum (p, cs) ->
-            let childMap = M.fromList $ (\c -> (rtLoc c, p)) <$> cs
+      M.foldlWithKey
+        ( \accum p cs ->
+            let childMap = M.fromList $ (,p) <$> cs
                 common = M.intersection accum childMap
              in M.null common
                   & bool
                     ( error $
                         "child has more than one parent:\n" <> ppShow common <> "\nin parent map:\n" <> ppShow accum
                     )
-                    (M.union accum common)
+                    (M.union accum childMap)
         )
         M.empty
-        $ M.toList parentChildMap
+        parentChildMap
 
-    parentChildMap :: M.Map RTLoc [RTLocEvt]
+    parentChildMapGroupsRemoved :: M.Map RTLoc [RTLoc]
+    parentChildMapGroupsRemoved =
+      M.foldlWithKey
+        ( \acc p cs ->
+            let step acc' p'@RTLoc {loc, eventType} cs' =
+                  let simple = M.insert p' cs' acc'
+                      merged =
+                        let p'' = lookUpMsg "parent's parent" childParentMap p'
+                            cs'' = lookUpMsg "parent's children" parentChildMap p'' <> cs'
+                         in step acc' p'' cs''
+                   in evntType loc & \case
+                        L.OnceHook -> simple
+                        L.OnceHookRelease -> simple
+                        L.ThreadHook -> simple
+                        L.ThreadHookRelease -> simple
+                        L.FixtureOnceHook -> simple
+                        L.FixtureOnceHookRelease -> simple
+                        L.FixtureThreadHook -> simple
+                        L.FixtureThreadHookRelease -> simple
+                        L.TestHook -> simple
+                        L.TestHookRelease -> simple
+                        L.Group -> merged
+                        L.Fixture -> merged
+                        L.Test -> simple
+             in step acc p cs
+        )
+        M.empty
+        parentChildMap
+    -- & debug' "########~ PARENT MAP No Group ~#######"
+
+    parentChildMap :: M.Map RTLoc [RTLoc]
     parentChildMap =
       foldl'
         ( \accum ->
@@ -1211,27 +1325,41 @@ chkErrorPropagation evts =
                     let pt =
                           RTLoc
                             { loc = prnt,
+                              eventType = evntType prnt,
                               nodeType = Threaded threadId
                             }
                         ps = pt {nodeType = Singleton}
-                        p = M.member pt accum ? pt $ ps
-                        c = RTLocEvt (mkRTLoc loc eventType threadId) eventType
+                        p =
+                          if
+                              | M.member pt accum -> pt
+                              | M.member ps accum -> ps
+                              | otherwise ->
+                                  error $
+                                    "neither threaded or singleton parent in map\n"
+                                      <> ppShow pt
+                                      <> "\n\n"
+                                      <> ppShow ps
+                                      <> "\nnot found in\n"
+                                      <> ppShow accum
+                        c = mkRTLoc loc eventType threadId
                      in prnt & \case
                           Root -> accum
                           Node {} ->
-                            accum M.!? p
-                              & maybe
-                                ( error $
-                                    "parent not found for\n"
-                                      <> ppShow ev
-                                      <> "\nin\n"
-                                      <> ppShow p
+                            M.member p accum
+                              ? M.alter ((c :) <$>) p accum
+                              $ error
+                                ( "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\nparent not found for child event:\n"
+                                    <> ppShow ev
+                                    <> "\nlooking for\n"
+                                    <> ppShow p
+                                    <> "\nin\n"
+                                    <> ppShow accum
                                 )
-                                (\clst -> M.alter (fmap (c :)) p accum)
         )
         initMap
         evts
-        & debug' "########~ PARENT MAP ~#######"
+
+-- & debug' "########~ PARENT MAP ~#######"
 
 chkOnceEventsAreBlocking :: [ExeEvent] -> IO ()
 chkOnceEventsAreBlocking _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"

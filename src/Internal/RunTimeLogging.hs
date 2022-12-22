@@ -63,6 +63,22 @@ data ExeEventType
   | Test
   deriving (Show, Eq, Ord)
 
+isGrouping :: ExeEventType -> Bool
+isGrouping = \case
+  OnceHook -> False
+  ThreadHook -> False
+  TestHook -> False
+  FixtureThreadHook -> False
+  FixtureOnceHook -> False
+  FixtureThreadHookRelease -> False
+  FixtureOnceHookRelease -> False
+  OnceHookRelease -> False
+  ThreadHookRelease -> False
+  TestHookRelease -> False
+  Group -> True
+  Fixture -> True
+  Test -> False
+
 endIsTerminal :: ExeEventType -> Bool
 endIsTerminal = \case
   OnceHook -> False
@@ -82,8 +98,8 @@ endIsTerminal = \case
 exceptionTxt :: SomeException -> PException
 exceptionTxt e = PException $ txt <$> lines (displayException e)
 
-mkFailure :: Loc -> Text -> SomeException -> Int -> SThreadId -> ExeEvent
-mkFailure l t e = Failure t (exceptionTxt e) l 
+mkFailure :: Loc -> ExeEventType -> Text -> SomeException -> Int -> SThreadId -> ExeEvent
+mkFailure l et t e = Failure t (exceptionTxt e) et l
 
 mkParentFailure :: Loc -> Loc -> ExeEventType -> SomeException -> Int -> SThreadId -> ExeEvent
 mkParentFailure p l et ex = ParentFailure (exceptionTxt ex) p l et 
@@ -114,6 +130,7 @@ data ExeEvent
       { 
         msg :: Text,
         exception :: PException,
+        parentEventType :: ExeEventType,
         loc :: Loc,
         idx :: Int,
         threadId :: SThreadId

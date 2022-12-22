@@ -307,12 +307,12 @@ prepare =
                     tHookRelease = testHookRelease
                   }
 
-logAbandonned :: Logger -> Loc -> Abandon -> IO ()
+logAbandonned :: Logger -> Loc  -> Abandon -> IO ()
 logAbandonned logger loc Abandon {sourceLoc, sourceEventType, exception} =
   logger (mkParentFailure sourceLoc loc sourceEventType exception)
 
 logFailure :: Logger -> Loc -> ExeEventType -> SomeException -> IO ()
-logFailure logger loc et e = logger (mkFailure loc (txt et <> "Failed at: " <> txt loc) e)
+logFailure logger loc et e = logger (mkFailure loc et (txt et <> "Failed at: " <> txt loc) e)
 
 readOrLockHook :: TVar Status -> TMVar (Either Abandon ho) -> STM (Maybe (Either Abandon ho))
 readOrLockHook hs hVal = do
@@ -413,7 +413,7 @@ releaseHook logger evt eho ctx@Context {cloc, apLogger} hkRelease =
         ( \so ->
             catchAll
               (hkRelease cloc apLogger so)
-              (logger . mkFailure cloc ("Hook Release Failed: " <> txt evt <> " " <> txt cloc))
+              (logger . mkFailure cloc evt ("Hook Release Failed: " <> txt evt <> " " <> txt cloc))
         )
 
 releaseHookUpdateStatus :: Logger -> ExeEventType -> TVar Status -> Either Abandon ho -> Context -> (Loc -> ApLogger -> ho -> IO ()) -> IO ()

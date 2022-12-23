@@ -307,9 +307,9 @@ prepare =
                     tHookRelease = testHookRelease
                   }
 
-logAbandonned :: Logger -> Loc  -> Abandon -> IO ()
-logAbandonned logger loc Abandon {sourceLoc, sourceEventType, exception} =
-  logger (mkParentFailure sourceLoc loc sourceEventType exception)
+logAbandonned :: Logger -> Loc -> ExeEventType -> Abandon -> IO ()
+logAbandonned logger floc fet Abandon {sourceLoc, sourceEventType, exception} =
+  logger (mkParentFailure floc fet sourceLoc sourceEventType exception)
 
 logFailure :: Logger -> Loc -> ExeEventType -> SomeException -> IO ()
 logFailure logger loc et e = logger (mkFailure loc et (txt et <> "Failed at: " <> txt loc) e)
@@ -362,10 +362,10 @@ withStartEnd logger loc evt io = do
   finally io . logger $ End evt loc
 
 abandonLogHook :: ExeEventType -> Logger -> Abandon -> Loc -> IO (Either Abandon a)
-abandonLogHook hkEvent logger abandon loc =
+abandonLogHook hkEvent logger abandon floc =
   do
-    withStartEnd logger loc hkEvent $
-      logAbandonned logger loc abandon
+    withStartEnd logger floc hkEvent $
+      logAbandonned logger floc hkEvent abandon
     pure $ Left abandon
 
 abandonnedHookVal :: forall ho. ExeEventType -> Logger -> Abandon -> TVar Status -> TMVar (Either Abandon ho) -> Loc -> IO (Either Abandon ho)
@@ -409,7 +409,7 @@ releaseHook logger evt eho ctx@Context {cloc, apLogger} hkRelease =
   withStartEnd logger cloc evt $
     eho
       & either
-        (logAbandonned logger cloc)
+        (logAbandonned logger cloc evt)
         ( \so ->
             catchAll
               (hkRelease cloc apLogger so)
@@ -644,7 +644,7 @@ executeNode logger hkIn rg =
                         finally
                           ( withStartEnd logger testLoc L.Test $
                               ethInputs & either
-                                (logAbandonned' testLoc)
+                                (logAbandonned' testLoc L.Test)
                                 \(so2, to2, io') ->
                                   catchAll
                                     (tst apLog so2 to2 io')
@@ -666,7 +666,7 @@ executeNode logger hkIn rg =
                       fxIpts
                 where
                   logReturnAbandonned a =
-                    logAbandonned logger hkLoc a
+                    logAbandonned logger hkLoc L.TestHook a
                       >> pure (Left a)
 
                   runHook (ExeIn si ti) =
@@ -686,7 +686,7 @@ executeNode logger hkIn rg =
     nxtAbandon :: Loc -> ExeEventType -> SomeException -> Abandon
     nxtAbandon loc' et e = fromLeft (Abandon loc' et e) hkIn
 
-    logAbandonned' :: Loc -> Abandon -> IO ()
+    logAbandonned' :: Loc -> ExeEventType -> Abandon -> IO ()
     logAbandonned' = logAbandonned logger
 
     logFailure' :: Loc -> ExeEventType -> SomeException -> IO ()

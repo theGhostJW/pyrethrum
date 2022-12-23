@@ -1,6 +1,6 @@
 module Internal.RunTimeLogging where
 
-import Control.Monad.State
+import Control.Monad.State ( Monad((>>=), (>>)) )
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import GHC.Show (show)
 import Pyrelude
@@ -101,8 +101,17 @@ exceptionTxt e = PException $ txt <$> lines (displayException e)
 mkFailure :: Loc -> ExeEventType -> Text -> SomeException -> Int -> SThreadId -> ExeEvent
 mkFailure l et t e = Failure t (exceptionTxt e) et l
 
-mkParentFailure :: Loc -> Loc -> ExeEventType -> SomeException -> Int -> SThreadId -> ExeEvent
-mkParentFailure p l et ex = ParentFailure (exceptionTxt ex) p l et 
+mkParentFailure :: Loc -> ExeEventType -> Loc -> ExeEventType -> SomeException -> Int -> SThreadId -> ExeEvent
+mkParentFailure fl fet pl pet ex idx trd = ParentFailure  { 
+        exception = exceptionTxt ex,
+        loc = fl,
+        fEventType = fet,
+        parentLoc = pl,
+        parentEventType = pet,
+        idx = idx,
+        threadId = trd
+      } 
+
 
 newtype PException = PException {displayText :: [Text]} deriving (Show, Eq)
 newtype SThreadId = SThreadId { display :: Text} deriving (Show, Eq, Ord)
@@ -139,6 +148,7 @@ data ExeEvent
       { 
         exception :: PException,
         loc :: Loc,
+        fEventType :: ExeEventType,
         parentLoc :: Loc,
         parentEventType :: ExeEventType,
         idx :: Int,

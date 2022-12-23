@@ -11,7 +11,7 @@ import Data.Aeson.Encoding (quarter)
 import Data.Aeson.TH
 import Data.Aeson.Types
 import qualified Data.IntMap.Merge.Lazy as ST
-import Data.List.Extra (lookup, snoc)
+import Data.List.Extra (lookup, snoc, notElem)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as ST
 import qualified Data.Text as Txt
@@ -29,6 +29,7 @@ import Internal.RunTimeLogging as L
     endIsTerminal,
     mkLogger,
     testLogControls,
+    isGrouping
   )
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
@@ -1116,49 +1117,68 @@ chkErrorPropagation evts =
     ( \(p, cs) ->
         fails M.!? p
           & maybe
-            (chkChildrenOfPassedParent cs)
-            (chkChildrenOfFailedParent cs)
+            (chkChildrenOfPassedParent p cs)
+            (chkChildrenOfFailedParent p cs)
     )
     (M.toList parentChildMapGroupsRemoved)
   where
-    chkChildrenOfPassedParent :: [RTLoc] -> IO ()
-    chkChildrenOfPassedParent = uu
-    --  let
-    --       wrong = find (
-    --           \c ->
-    --             fails M.!? c & maybe
-    --              True
-    --              (\fail -> \case
-    --              ) cs
-    --        )
-    --     in
-    --       do
-    --         pure (0)
-    --    )
-    chkChildrenOfFailedParent :: [RTLoc] -> Fail -> IO ()
-    chkChildrenOfFailedParent = uu
+    chkChildrenOfPassedParent :: RTLoc -> [RTLoc] -> IO ()
+    chkChildrenOfPassedParent p cs =
+      let mErr =
+            find
+              ( \c ->
+                  fails M.!? c
+                    & maybe
+                      False
+                      ( \case
+                          Fail {} -> False
+                          ParentFail {} -> True
+                      )
+              )
+              cs
+       in mErr
+            & maybe
+              (pure ())
+              ( \c ->
+                  error $
+                    "child loc is parent fail but parent loc is a pass:\n"
+                      <> "\nchild:\n"
+                      <> ppShow c
+                      <> "\nparent:\n"
+                      <> ppShow p
+              )
 
-    -- do
-    --   when (M.null pmap) $
-    --     putStrLn "Template Map Empty"
-    --   for_
-    --     (M.toList childList)
-    --     ( \(p, c) ->
-    --         if
-    --             | isFail p ->
-    --                 T.chk'
-    --                   ("parent has failed but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
-    --                   $ all isParentFail c
-    --             | isParentFail p ->
-    --                 T.chk'
-    --                   ("parent is parent failure but not all child nodes are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
-    --                   $ all isParentFail c
-    --             | otherwise ->
-    --                 T.chk'
-    --                   ("parent is not a parent failure or failure but child node(s) exist that are parent failures\nparent:\n " <> txt p <> "\nchild nodes:\n " <> txt c)
-    --                   . not
-    --                   $ any isParentFail c
-    --     )
+    chkChildrenOfFailedParent :: RTLoc -> [RTLoc] -> Fail -> IO ()
+    chkChildrenOfFailedParent p cs pf =
+      find (not . childFailHasParent) cs
+        & maybe
+          (pure ())
+          ( \c ->
+              error $
+                "expect child to be parent fail staus with same parent fail loc as parent (ie loc of error source):\n"
+                  <> "\nchild loc:\n"
+                  <> ppShow c
+                  <> "\nchild failure:\n"
+                  <> ppShow (fails M.!? c)
+                  <> "\nparent loc:\n"
+                  <> ppShow p
+                  <> "\nparent fail:\n"
+                  <> ppShow pf
+          )
+      where
+        pFailLoc =
+          pf & \case
+            Fail loc -> loc
+            ParentFail {ploc} -> ploc
+        childFailHasParent c =
+          fails M.!? c
+            & maybe
+              False
+              ( \case
+                  Fail {} -> False
+                  ParentFail {ploc} -> pFailLoc == ploc
+              )
+
     fails :: M.Map RTLoc Fail
     fails =
       foldl'
@@ -1167,13 +1187,12 @@ chkErrorPropagation evts =
             Start {} -> acc
             End {} -> acc
             Failure {loc, parentEventType, threadId} -> M.insert (mkRTLoc loc parentEventType threadId) (Fail loc) acc
-            ParentFailure {parentLoc, parentEventType, loc, threadId} -> M.insert (mkRTLoc parentLoc parentEventType threadId) (ParentFail parentLoc loc) acc
+            ParentFailure {parentLoc = ploc, fEventType, parentEventType, loc = floc, threadId} -> M.insert (mkRTLoc floc fEventType threadId) (ParentFail {floc, ploc }) acc
             ApLog {} -> acc
             EndExecution {} -> acc
         )
         M.empty
         evts
-        & debug' "!!!!!!! R E S U L T S  !!!!!!!!"
 
     isSingleton :: ExeEventType -> Bool
     isSingleton = \case
@@ -1281,31 +1300,21 @@ chkErrorPropagation evts =
     parentChildMapGroupsRemoved =
       M.foldlWithKey
         ( \acc p cs ->
-            let step acc' p'@RTLoc {loc, eventType} cs' =
-                  let simple = M.insert p' cs' acc'
+            let step acc' p'@RTLoc {loc} cs' =
+                  let csNoGrps = filter (\RTLoc {eventType} -> notElem eventType [L.Group, L.Fixture] ) cs'
+                      simple = M.insert p' csNoGrps acc'
                       merged =
-                        let p'' = lookUpMsg "parent's parent" childParentMap p'
+                        let 
+                            p'' = lookUpMsg "parent's parent" childParentMap p'
                             cs'' = lookUpMsg "parent's children" parentChildMap p'' <> cs'
-                         in step acc' p'' cs''
-                   in evntType loc & \case
-                        L.OnceHook -> simple
-                        L.OnceHookRelease -> simple
-                        L.ThreadHook -> simple
-                        L.ThreadHookRelease -> simple
-                        L.FixtureOnceHook -> simple
-                        L.FixtureOnceHookRelease -> simple
-                        L.FixtureThreadHook -> simple
-                        L.FixtureThreadHookRelease -> simple
-                        L.TestHook -> simple
-                        L.TestHookRelease -> simple
-                        L.Group -> merged
-                        L.Fixture -> merged
-                        L.Test -> simple
+                         in step acc' p'' csNoGrps
+                   in isGrouping (evntType loc)  
+                        ? merged
+                        $ simple
              in step acc p cs
         )
         M.empty
         parentChildMap
-    -- & debug' "########~ PARENT MAP No Group ~#######"
 
     parentChildMap :: M.Map RTLoc [RTLoc]
     parentChildMap =
@@ -1359,7 +1368,6 @@ chkErrorPropagation evts =
         initMap
         evts
 
--- & debug' "########~ PARENT MAP ~#######"
 
 chkOnceEventsAreBlocking :: [ExeEvent] -> IO ()
 chkOnceEventsAreBlocking _ = putStrLn "!!!!!!!!!!!!!! TODO !!!!!!!!!"

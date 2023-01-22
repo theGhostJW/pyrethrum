@@ -1,5 +1,7 @@
 ## Suit runtime tests
 * check fixture hooks are not firing on empty fixtures
+* check release
+* try validity??
 
 
 * move TestHook and TestHookRelease to bracket
@@ -15,12 +17,14 @@
 
 
 ## Pyrelude
+* relude
 * chkFalse'
 * change uu to error
 * remove 
   * maybef
   * eitherf
 * upgrade ghc
+* Error -> txt
 
 
 

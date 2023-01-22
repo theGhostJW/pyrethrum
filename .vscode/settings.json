@@ -10,6 +10,7 @@
   "cSpell.language": "en-GB",
   "cSpell.enabled": true,
   "cSpell.enableFiletypes": [
+    "!markdown",
     "log"
   ],
   "git.closeDiffOnOperation": true,

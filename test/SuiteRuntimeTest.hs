@@ -844,7 +844,7 @@ threadedBoundary = \case
   L.FixtureThreadHook -> True
   L.FixtureThreadHookRelease -> True
 
--- TODO: Error -> txt
+
 chkStartEndIntegrity :: [[ExeEvent]] -> IO ()
 chkStartEndIntegrity =
   traverse_ chkThread
@@ -904,8 +904,6 @@ chkStartEndIntegrity =
 chkLaws :: Int -> Template -> [ExeEvent] -> IO ()
 chkLaws mxThrds t evts =
   do
-    -- TODO check there is a chk for fix contains all tests
-    -- TODO OnceFixtureHook, ThreadFixtureHook -- don't use
     traverse_
       (evts &)
       [ chkThreadLogsInOrder,
@@ -1052,9 +1050,32 @@ chkThreadErrs evts =
 chkThreadErrorPropagation :: [[ExeEvent]] -> IO ()
 chkThreadErrorPropagation = traverse_ chkThreadErrs
 
+chkHkReleased :: [ExeEvent] -> ExeEventType -> ExeEventType -> IO ()
+chkHkReleased evs hkType relType = 
+  -- hook releases are always parented by hook
+  uu
+
 chkThreadHksReleased = error "not implemented chkThreadHksReleased"
+  -- | ThreadHook
+  -- | ThreadHookRelease
+
+  -- | FixtureThreadHook
+  -- | FixtureThreadHookRelease
+
+  -- | TestHook
+  -- | TestHookRelease
 
 chkOnceHksReleased = error "not implemented chkOnceHksReleased"
+  -- data ExeEventType
+  -- = OnceHook
+  -- | OnceHookRelease
+
+  -- | FixtureOnceHook
+  -- | FixtureOnceHookRelease
+
+
+
+
 
 -- data OEAccum = OEAccum
 --   { oOpenSHk :: Maybe Loc,
@@ -1421,7 +1442,7 @@ chkEventCounts t evs = do
   chkEq' "Fixture Once Hook Count" expectedFixtureCount $ countStarts L.FixtureOnceHook evs
   -- tests number of start events
   chkEq' "Test Count" expectedTestCount $ countStarts L.Test evs
-  chkEq' "Test Count" expectedTestCount $ countStarts L.TestHook evs
+  chkEq' "Test Hooks" expectedTestCount $ countStarts L.TestHook evs
 
   -- threaded events check nuber of unique locs of type
   -- one event could occur n times due to running in more than

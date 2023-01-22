@@ -28,13 +28,15 @@ import Internal.RunTimeLogging as L
     SThreadId (..),
     endIsTerminal,
     isGrouping,
+    isOnceEvent,
+    isThreadedEvent,
     mkLogger,
     testLogControls,
   )
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
-import Pyrelude (ListLike (..))
+import Pyrelude (Any, ListLike (..), enumList)
 import Pyrelude as P
   ( Alternative ((<|>)),
     Applicative ((<*>)),
@@ -322,7 +324,7 @@ chkFixturesContainTests root tList tevts =
       let (openTests, fixAccum) = foldl' step (ST.empty, M.empty) (revStartEvents evts)
 
           step acc'@(st, mp) EvInfo {eiTag, et} =
-            case et of
+            et & \case
               L.OnceHook -> acc'
               L.OnceHookRelease -> acc'
               L.ThreadHook -> acc'
@@ -405,28 +407,8 @@ chkParentOrder rootTpl thrdEvts =
                 L.FixtureThreadHook -> chkParentIncTests
                 L.FixtureThreadHookRelease -> chkParentIncTests
 
-templateTestCount :: Template -> Int
-templateTestCount =
-  foldTemplate
-    0
-    ( \acc c ->
-        acc
-          + ( c & \case
-                TFixture {tTests} -> length tTests
-                _ -> 0
-            )
-    )
-
-templateFixCount :: Template -> Int
-templateFixCount =
-  fxCount' 0
-  where
-    fxCount' :: Int -> Template -> Int
-    fxCount' ac = \case
-      TGroup {tChilds} -> ac + foldl' fxCount' 0 tChilds
-      TOnceHook {tChild} -> fxCount' ac tChild
-      TThreadHook {tChild} -> fxCount' ac tChild
-      TFixture {tTests} -> ac + 1
+templateCount :: Template -> (Template -> Int) -> Int
+templateCount t templateInc = foldTemplate 0 (\c t' -> c + templateInc t') t
 
 mkPrenode :: Int -> Template -> IO (PreNode oi () ti ())
 mkPrenode maxThreads =
@@ -651,13 +633,10 @@ chkTestEvtsConsecutive evs =
         ? pure ()
         $ foldM_ chkidxless (-1) tsmevts
 
-chkLeafEvents :: ExeEventType -> [[ExeEvent]] -> IO ()
-chkLeafEvents targetEventType =
+chkLeafEventsStartEnd :: ExeEventType -> [[ExeEvent]] -> IO ()
+chkLeafEventsStartEnd targetEventType =
   traverse_ chkEvents
   where
-    targStr = show targetEventType
-    matchesTarg = (targetEventType ==)
-
     chkEvents :: [ExeEvent] -> IO ()
     chkEvents evts' = do
       foldl' chkEvent Nothing evts'
@@ -665,6 +644,9 @@ chkLeafEvents targetEventType =
           (pure ())
           (\fx -> error $ targStr <> " started not ended in same thread\n" <> ppShow fx)
       chkTestEvtsConsecutive evts'
+
+    targStr = show targetEventType
+    matchesTarg = (targetEventType ==)
 
     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
     chkEvent mTstLoc evt =
@@ -693,52 +675,45 @@ chkLeafEvents targetEventType =
                 EndExecution {} -> failIn "EndExecution"
           )
       where
-        fail msg = error $ msg <> "\n" <> ppShow evt
-        strTrg = show targetEventType
-        failIn s = fail $ s <> " must only occur outside a " <> strTrg <> " in same thread"
-
         chkOutEventStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
-        chkOutEventStartEnd isStart' evtLoc =
-          P.bool
-            Nothing
-            ( isStart'
-                ? Just evtLoc
-                $ fail
-                $ "End " <> strTrg <> " when not started"
-            )
-            . matchesTarg
+        chkOutEventStartEnd isStart' evtLoc evtp =
+          matchesTarg evtp
+            ? ( isStart'
+                  ? Just evtLoc
+                  $ fail ("End " <> strTrg <> " when not started")
+              )
+            $ Nothing
 
         chkInEventStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
-        chkInEventStartEnd isStart' fxLoc evtLoc evt' =
+        chkInEventStartEnd isStart' activeFxLoc evtLoc evt' =
           let sevt = show evt'
            in matchesTarg evt'
                 ? ( isStart'
                       ? fail ("Nested " <> sevt <> " - " <> sevt <> " started when a " <> sevt <> " is alreeady running in the same thread")
-                      $ fxLoc
+                      $ activeFxLoc
                         == evtLoc
                         ? Nothing
                       $ fail (strTrg <> " end loc does not match " <> strTrg <> " start loc")
                   )
                 $ failIn sevt
 
+        fail msg = error $ msg <> "\n" <> ppShow evt
+        strTrg = show targetEventType
+        failIn s = fail $ s <> " must only occur outside a " <> strTrg <> " in same thread"
+
+onceEventTypes :: [ExeEventType]
+onceEventTypes = filter L.isOnceEvent enumList
+
+threadedEventTypes :: [ExeEventType]
+threadedEventTypes = filter L.isThreadedEvent enumList
+
 chkSingletonLeafEvents :: [ExeEvent] -> IO ()
 chkSingletonLeafEvents evts =
-  traverse_
-    (`chkLeafEvents` [evts])
-    [ L.OnceHook,
-      L.OnceHookRelease
-    ]
+  traverse_ (`chkLeafEventsStartEnd` [evts]) onceEventTypes
 
 chkThreadLeafEvents :: [[ExeEvent]] -> IO ()
 chkThreadLeafEvents evts =
-  traverse_
-    (`chkLeafEvents` evts)
-    [ L.ThreadHook,
-      L.ThreadHookRelease,
-      L.TestHook,
-      L.TestHookRelease,
-      L.Test
-    ]
+  traverse_ (`chkLeafEventsStartEnd` evts) threadedEventTypes
 
 -- # TODO replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
 chkFixtureChildren :: [[ExeEvent]] -> IO ()
@@ -753,11 +728,11 @@ chkFixtureChildren =
           (\fx -> error $ "Fixture started not ended in same thread\n" <> ppShow fx)
 
     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
-    chkEvent mfixLoc evt =
-      mfixLoc
+    chkEvent mActiveFixLoc evt =
+      mActiveFixLoc
         & maybe
           ( -- outside fixture
-            case evt of
+            evt & \case
               StartExecution {} -> Nothing
               Start {eventType, loc} -> chkOutOfFixtureStartEnd True loc eventType
               End {eventType, loc} -> chkOutOfFixtureStartEnd False loc eventType
@@ -767,90 +742,91 @@ chkFixtureChildren =
               EndExecution {} -> Nothing
           )
           ( -- within fixture
-            \fxLoc ->
-              case evt of
+            \activeFxLoc ->
+              evt & \case
                 StartExecution {} -> failIn "StartExecution"
-                Start {eventType, loc} -> chkInFixtureStartEnd True fxLoc loc eventType
-                End {eventType, loc} -> chkInFixtureStartEnd False fxLoc loc eventType
-                Failure {} -> mfixLoc
-                ParentFailure {} -> mfixLoc
-                ApLog {} -> mfixLoc
+                Start {eventType, loc} -> chkInFixtureStartEnd True activeFxLoc loc eventType
+                End {eventType, loc} -> chkInFixtureStartEnd False activeFxLoc loc eventType
+                Failure {} -> mActiveFixLoc
+                ParentFailure {} -> mActiveFixLoc
+                ApLog {} -> mActiveFixLoc
                 EndExecution {} -> failIn "EndExecution"
           )
       where
         fail msg = error $ msg <> "\n" <> ppShow evt
-        failOut et = fail $ et <> " must occur within start / end of fixture in same thread"
-        failIn et = fail $ et <> " must only occur outside a fixture in same thread"
+        failOut et = fail $ show et <> " must occur within start / end of fixture in same thread"
+
+        failIn :: Show a => a -> Maybe Loc
+        failIn et = fail $ show et <> " must only occur outside a fixture in same thread"
 
         chkOutOfFixtureStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
-        chkOutOfFixtureStartEnd isStart' evtLoc = \case
-          L.OnceHook -> Nothing
-          OnceHookRelease -> Nothing
-          L.ThreadHook -> Nothing
-          ThreadHookRelease -> Nothing
-          L.Group -> Nothing
-          L.TestHook -> failOut "TestHook"
-          TestHookRelease -> failOut "TestHookTestHookRelease"
-          L.Fixture ->
-            isStart'
-              ? Just evtLoc
-              $ fail "End fixture when fixture not started"
-          L.Test -> failOut "Test"
-          L.FixtureOnceHook -> uu
-          L.FixtureOnceHookRelease -> uu
-          L.FixtureThreadHook -> uu
-          L.FixtureThreadHookRelease -> uu
+        chkOutOfFixtureStartEnd isStart' evtLoc et =
+          -- the err events should not occur unless a fixture is running in the same thread
+          et & \case
+            L.OnceHook -> Nothing
+            OnceHookRelease -> Nothing
+            L.ThreadHook -> Nothing
+            ThreadHookRelease -> Nothing
+            L.Group -> Nothing
+            L.TestHook -> err
+            TestHookRelease -> err
+            L.Fixture ->
+              isStart'
+                ? Just evtLoc
+                $ fail "End fixture when fixture not started"
+            L.Test -> err
+            L.FixtureOnceHook -> err
+            L.FixtureOnceHookRelease -> err
+            L.FixtureThreadHook -> err
+            L.FixtureThreadHookRelease -> err
+          where
+            err = failOut et
 
         chkInFixtureStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
-        chkInFixtureStartEnd isStart' fxLoc evtLoc = \case
-          L.OnceHook -> failIn "OnceHook"
-          OnceHookRelease -> failIn "OnceHookRelease"
-          L.ThreadHook -> failIn "ThreadHook"
-          ThreadHookRelease -> failIn "ThreadHookRelease"
-          L.TestHook -> mfixLoc
-          TestHookRelease -> mfixLoc
-          L.Group -> failIn "Group"
-          L.Fixture ->
-            isStart'
-              ? fail "Nested fixtures - fixture started when a fixture is alreeady running in the same thread"
-              $ (fxLoc == evtLoc) ? Nothing
-              $ fail "fixture end loc does not match fixture start loc"
-          L.Test {} -> mfixLoc
-          L.FixtureOnceHook -> uu
-          L.FixtureOnceHookRelease -> uu
-          L.FixtureThreadHook -> uu
-          L.FixtureThreadHookRelease -> uu
+        chkInFixtureStartEnd isStart' activeFxLoc evtLoc et =
+          -- the err events should not occur when a fixture is running in the same thread
+          et & \case
+            L.OnceHook -> err
+            OnceHookRelease -> err
+            L.ThreadHook -> err
+            ThreadHookRelease -> err
+            L.TestHook -> mActiveFixLoc
+            TestHookRelease -> mActiveFixLoc
+            L.Group -> err
+            L.Fixture ->
+              if isStart'
+                then fail "Nested fixtures - fixture started when a fixture is alreeady running in the same thread"
+                else
+                  (activeFxLoc == evtLoc)
+                    ? Nothing
+                    $ fail "fixture end loc does not match fixture start loc"
+            L.Test {} -> mActiveFixLoc
+            L.FixtureOnceHook -> mActiveFixLoc
+            L.FixtureOnceHookRelease -> mActiveFixLoc
+            L.FixtureThreadHook -> mActiveFixLoc
+            L.FixtureThreadHookRelease -> mActiveFixLoc
+          where
+            err = failIn et
 
-chkTestCount :: Template -> [ExeEvent] -> IO ()
-chkTestCount t evs =
-  chkEq'
-    "test count not as expected"
-    (templateTestCount t)
-    $ count (isStart L.Test) evs
+countStarts :: ExeEventType -> [ExeEvent] -> Int
+countStarts et = count (isStart et)
 
-chkFxtrCount :: Template -> [ExeEvent] -> IO ()
-chkFxtrCount t evs =
-  let fxCount =
-        foldTemplate
-          0
-          ( \acc -> \case
-              TFixture {} -> succ acc
-              _ -> acc
-          )
-          t
-   in chkEq'
-        "fixture count not as expected"
-        fxCount
-        $ count (isStart L.Fixture) evs
 
--- chkEq'
---   "fixture count not as expected"
---   (templateTestCount t)
---   . length
---   -- in concurrent runs the same fixture can be
---   -- triggered in multiple threads so
---   . groupOn partialLoc
---   . filter (isStart L.Fixture)
+countLocSets :: [ExeEvent] -> ExeEventType -> Int
+countLocSets evs et =
+  -- for threaded events ie. not Once* events the number of occurances
+  -- is non-determiistic because it may occur on 1..n threads (e.g. the same fixture starts
+  -- on 3 threads) but we can count the number of different locs and compare that to
+  -- the run template
+  ST.size $
+    foldl'
+      (\s ev -> isStart et ev ? ST.insert (L.loc ev) s $ s)
+      ST.empty
+      evs
+
+chkLocCount :: Template -> [ExeEvent] -> (Template -> Int) -> ExeEventType -> IO ()
+chkLocCount t evs templateCounter et =
+  chkEq' (txt et) (templateCount t templateCounter) (countLocSets evs et)
 
 threadedBoundary :: ExeEventType -> Bool
 threadedBoundary = \case
@@ -863,10 +839,10 @@ threadedBoundary = \case
   L.Group -> True
   L.Fixture -> True
   L.Test -> True
-  L.FixtureOnceHook -> uu
-  L.FixtureOnceHookRelease -> uu
-  L.FixtureThreadHook -> uu
-  L.FixtureThreadHookRelease -> uu
+  L.FixtureOnceHook -> False
+  L.FixtureOnceHookRelease -> False
+  L.FixtureThreadHook -> True
+  L.FixtureThreadHookRelease -> True
 
 -- TODO: Error -> txt
 chkStartEndIntegrity :: [[ExeEvent]] -> IO ()
@@ -902,13 +878,10 @@ chkStartEndIntegrity =
     chkStart m e =
       M.member eLoc m
         ? error ("Duplicate start events in same thread\n " <> ppShow e)
-        $ M.insert eLoc ST.empty
-        $ ST.insert eLoc <$> m
+        $ M.insert eLoc ST.empty (ST.insert eLoc <$> m)
       where
         eLoc = partialLoc e
 
-    -- TODO - change uu to error
-    -- TODO chkFalse'
     chkEnd :: M.Map Loc (ST.Set Loc) -> ExeEvent -> M.Map Loc (ST.Set Loc)
     chkEnd m e =
       M.lookup eLoc m
@@ -937,12 +910,11 @@ chkLaws mxThrds t evts =
       (evts &)
       [ chkThreadLogsInOrder,
         chkStartEndExecution,
-        chkTestCount t,
-        chkFxtrCount t,
         chkSingletonLeafEvents,
         chkOnceEventsAreBlocking,
-        chkOnceEventCount,
-        chkErrorPropagation
+        chkEventCounts t,
+        chkErrorPropagation,
+        chkOnceHksReleased
       ]
     traverse_
       (threadedEvents &)
@@ -952,7 +924,8 @@ chkLaws mxThrds t evts =
         traverse_ chkTestEvtsConsecutive,
         chkThreadLeafEvents,
         traverse_ (chkParentOrder t),
-        chkThreadErrorPropagation
+        chkThreadErrorPropagation,
+        chkThreadHksReleased
       ]
     T.chk'
       ( "max execution threads + 2: "
@@ -1079,6 +1052,10 @@ chkThreadErrs evts =
 chkThreadErrorPropagation :: [[ExeEvent]] -> IO ()
 chkThreadErrorPropagation = traverse_ chkThreadErrs
 
+chkThreadHksReleased = error "not implemented chkThreadHksReleased"
+
+chkOnceHksReleased = error "not implemented chkOnceHksReleased"
+
 -- data OEAccum = OEAccum
 --   { oOpenSHk :: Maybe Loc,
 --     oLastSHkFailure :: Maybe (Loc, PException),
@@ -1133,22 +1110,6 @@ data RTLoc = RTLoc
   deriving (Show, Eq, Ord)
 
 data Fail = Fail {floc :: Loc} | ParentFail {floc :: Loc, ploc :: Loc} deriving (Show, Eq, Ord)
-
-isOnceEventType :: ExeEventType -> Bool
-isOnceEventType = \case
-  L.OnceHook -> True
-  L.OnceHookRelease -> True
-  L.ThreadHook -> False
-  L.ThreadHookRelease -> False
-  L.FixtureOnceHook -> True
-  L.FixtureOnceHookRelease -> True
-  L.FixtureThreadHook -> False
-  L.FixtureThreadHookRelease -> False
-  L.TestHook -> False
-  L.TestHookRelease -> False
-  L.Group -> False
-  L.Fixture -> False
-  L.Test -> False
 
 chkErrorPropagation :: [ExeEvent] -> IO ()
 chkErrorPropagation evts =
@@ -1236,7 +1197,7 @@ chkErrorPropagation evts =
     mkRTLoc :: Loc -> ExeEventType -> SThreadId -> RTLoc
     mkRTLoc l et t =
       RTLoc l et
-        $ isOnceEventType et
+        $ isOnceEvent et
           ? Singleton
         $ Threaded t
 
@@ -1394,55 +1355,55 @@ chkOnceEventsAreBlocking :: [ExeEvent] -> IO ()
 chkOnceEventsAreBlocking evts =
   T.chk' ("event started not closed:\n" <> toS (ppShow openEvnt)) $ isNothing openEvnt
   where
-    openEvnt :: Maybe (Loc, ExeEventType) 
+    openEvnt :: Maybe (Loc, ExeEventType)
     openEvnt = foldl' chkStartEndIntegrity' Nothing evts
 
-    chkStartEndIntegrity' :: Maybe (Loc, ExeEventType) -> ExeEvent -> Maybe (Loc, ExeEventType) 
+    chkStartEndIntegrity' :: Maybe (Loc, ExeEventType) -> ExeEvent -> Maybe (Loc, ExeEventType)
     chkStartEndIntegrity' mLcEt evt =
       evt & \case
         StartExecution {} -> mLcEt
         Start {eventType, loc} ->
-             mLcEt
-                & maybe
-                  (isOnceEventType eventType ? Just (loc, eventType) $ mLcEt)
-                  ( \activeEvt ->
-                      error $
-                        "event started while once event still open\nevent:\n"
-                          <> ppShow evt
-                          <> "open once event"
-                          <> ppShow activeEvt
-                  )
-        End {eventType, loc} -> 
-         if isOnceEventType eventType then
-            mLcEt
-             & maybe 
-              (
-                error $
-                        "once event ended when once event not open\nevent:\n"
-                          <> ppShow evt
-              )
-              (
-                \locEt -> locEt == (loc, eventType) ?
-                  Nothing $
-                  error $ 
-                    "end once event does not correspond to start loc / event type\nstart:\n" 
-                    <> ppShow locEt <> "\n"
-                    <> "end:\n"
-                    <> ppShow (loc, eventType) 
-              )
-              
-         else
           mLcEt
             & maybe
-              mLcEt 
-               ( \activeEvt ->
+              (isOnceEvent eventType ? Just (loc, eventType) $ mLcEt)
+              ( \activeEvt ->
+                  error $
+                    "event started while once event still open\nevent:\n"
+                      <> ppShow evt
+                      <> "open once event"
+                      <> ppShow activeEvt
+              )
+        End {eventType, loc} ->
+          if isOnceEvent eventType
+            then
+              mLcEt
+                & maybe
+                  ( error $
+                      "once event ended when once event not open\nevent:\n"
+                        <> ppShow evt
+                  )
+                  ( \locEt ->
+                      locEt
+                        == (loc, eventType)
+                        ? Nothing
+                        $ error
+                        $ "end once event does not correspond to start loc / event type\nstart:\n"
+                          <> ppShow locEt
+                          <> "\n"
+                          <> "end:\n"
+                          <> ppShow (loc, eventType)
+                  )
+            else
+              mLcEt
+                & maybe
+                  mLcEt
+                  ( \activeEvt ->
                       error $
                         "event ended while once event still open\nevent:\n"
                           <> ppShow evt
                           <> "open once event"
                           <> ppShow activeEvt
-                )
-
+                  )
         Failure {} -> mLcEt
         ParentFailure {} -> mLcEt
         ApLog {} -> mLcEt
@@ -1452,8 +1413,58 @@ chkOnceEventsAreBlocking evts =
 -- after start only oe should end
 -- no event parented by oe should occur beefore oe
 
-chkOnceEventCount :: [ExeEvent] -> IO ()
-chkOnceEventCount _ = error "!!!!!!!!!!!!!! TODO !!!!!!!!!"
+chkEventCounts :: Template -> [ExeEvent] -> IO ()
+chkEventCounts t evs = do
+  -- another check checks hook release matches hook so only checking hook starts
+  -- once event check number of start events
+  chkEq' "Once Hook Count" expectedOnceHkCount $ countStarts L.OnceHook evs
+  chkEq' "Fixture Once Hook Count" expectedFixtureCount $ countStarts L.FixtureOnceHook evs
+  -- tests number of start events
+  chkEq' "Test Count" expectedTestCount $ countStarts L.Test evs
+  chkEq' "Test Count" expectedTestCount $ countStarts L.TestHook evs
+
+  -- threaded events check nuber of unique locs of type
+  -- one event could occur n times due to running in more than
+  -- one thread
+  -- fixture
+  chkLocCount' fixtureCounter L.Fixture
+
+   -- group
+  chkLocCount'( \case
+        TGroup {} -> 1
+        _ -> 0
+     )
+     L.Group
+
+   -- threadHook
+  chkLocCount'( \case
+        TThreadHook {} -> 1
+        _ -> 0
+     )
+     L.ThreadHook
+
+   -- FixtureThreadHook
+  chkLocCount' fixtureCounter L.FixtureThreadHook
+
+  where
+    chkLocCount' = chkLocCount t evs
+    templateCount' = templateCount t
+    fixtureCounter = \case
+        TFixture {} -> 1
+        _ -> 0
+    expectedTestCount =
+      templateCount'
+        ( \case
+            TFixture {tTests} -> length tTests
+            _ -> 0
+        )
+    expectedFixtureCount = templateCount' fixtureCounter
+    expectedOnceHkCount =
+      templateCount'
+        ( \case
+            TOnceHook {} -> 1
+            _ -> 0
+        )
 
 validateTemplate :: Template -> IO ()
 validateTemplate t =

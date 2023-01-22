@@ -32,7 +32,7 @@ import Pyrelude
     writeIORef,
     ($),
     (.),
-    (<$>),
+    (<$>), not,
   )
 import Text.Show.Pretty (pPrint)
 import UnliftIO (TChan, TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
@@ -61,7 +61,27 @@ data ExeEventType
   | Group
   | Fixture
   | Test
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Enum)
+
+isThreadedEvent :: ExeEventType -> Bool
+isThreadedEvent = not . isOnceEvent
+
+isOnceEvent :: ExeEventType -> Bool
+isOnceEvent = \case
+  OnceHook -> True
+  OnceHookRelease -> True
+  ThreadHook -> False
+  ThreadHookRelease -> False
+  FixtureOnceHook -> True
+  FixtureOnceHookRelease -> True
+  FixtureThreadHook -> False
+  FixtureThreadHookRelease -> False
+  TestHook -> False
+  TestHookRelease -> False
+  Group -> False
+  Fixture -> False
+  Test -> False
+
 
 isGrouping :: ExeEventType -> Bool
 isGrouping = \case

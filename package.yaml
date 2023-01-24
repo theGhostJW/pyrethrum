@@ -122,13 +122,32 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
+# _testDep: &testdependencies
+#   - tasty
+#   - tasty-hunit
+#   - tasty-hedgehog
+#   - tasty-discover
+#   - hedgehog
+#   # - pyrethrum
+#   - bytestring
+
 library:
-  # main: driver.hs
+  when:
+    - condition: false
+      other-modules: Paths_pyrethrum
   source-dirs:
     - src
-    # this enables eval in ghcid
+    # this enables eval in ghcid - remove test when finally compiling
     - test
   dependencies:
+    # test dependencies remove in split config 
+    - tasty
+    - tasty-hunit
+    - tasty-hedgehog
+    - tasty-discover
+    - hedgehog
+    - bytestring
+    # end test dependencies remove in split config 
     - deepseq
     - unordered-containers
     - template-haskell
@@ -137,19 +156,11 @@ library:
 
 #  reinstate when LHS can live load multiple modules
 # use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
-_testDep: &testdependencies
-  - tasty
-  - tasty-hunit
-  - tasty-hedgehog
-  - tasty-discover
-  - hedgehog
-  - pyrethrum
-  - bytestring
 
-tests:
-  pyrethrum-test:
-    main:                driver.hs
-    source-dirs:
-    - test
-    dependencies: *testdependencies
+# tests:
+#   pyrethrum-test:
+#     main:                driver.hs
+#     source-dirs:
+#     - test
+#     dependencies: *testdependencies
 

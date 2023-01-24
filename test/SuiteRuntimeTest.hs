@@ -144,6 +144,7 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM
 import Prelude (Ord, String, putStrLn, read)
 
+
 {-
 1. create logger pretty print + list :: Done
 2. run most basic :: Done* * - need to fix index in debbug logging - deferred
@@ -945,8 +946,8 @@ data ChkErrAccum = ChkErrAccum
     matchedFails :: ST.Set Loc
   }
 
-errorStep :: ChkErrAccum -> ExeEvent -> ChkErrAccum
-errorStep accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} =
+errorPropagationStep :: ChkErrAccum -> ExeEvent -> ChkErrAccum
+errorPropagationStep accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} =
   \case
     StartExecution {} -> accum
     Start {loc, eventType} -> accum {lastStart = Just (loc, eventType)}
@@ -1037,12 +1038,16 @@ errorStep accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} 
 chkThreadErrs :: [ExeEvent] -> IO ()
 chkThreadErrs evts =
   -- assumes nesting correct - all nodes have unique locs
-  lastFailure (foldl' errorStep (ChkErrAccum False Nothing Nothing ST.empty) evts)
+  lastFailure (foldl' errorPropagationStep (ChkErrAccum False Nothing Nothing ST.empty) evts)
     & maybe
       (pure ())
       ( \(l, _ex, et) ->
           et
-            `elem` [L.OnceHook, L.FixtureOnceHook]
+            `elem` [
+              -- once errors could occur 
+              L.OnceHook, 
+              L.FixtureOnceHook
+            ]
             ? pure ()
             $ error ("chkThreadErrs error loc still open at end of thread: " <> show l)
       )
@@ -1053,7 +1058,12 @@ chkThreadErrorPropagation = traverse_ chkThreadErrs
 chkHkReleased :: [ExeEvent] -> ExeEventType -> ExeEventType -> IO ()
 chkHkReleased evs hkType relType = 
   -- hook releases are always parented by hook
-  uu
+  ST.null openHooks ? 
+    pure () $
+    error ("Hooks executed without release: " <> ppShow openHooks)
+  where
+    openHooks = foldl' step ST.empty evs 
+    step ev openHks = uu --ev & \case
 
 chkThreadHksReleased = error "not implemented chkThreadHksReleased"
   -- | ThreadHook

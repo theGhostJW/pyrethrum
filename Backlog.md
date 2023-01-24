@@ -25,8 +25,21 @@
   * eitherf
 * upgrade ghc
 * Error -> txt
+* switch to cabal
+* try removing crazy cradal (pyrethrum)
 
-
+```haskell
+-- TODO - add tests add to pyrelude
+groupOn :: (Ord b) => (a -> b) -> [a] -> [[a]]
+groupOn f =
+  M.elems . foldl' fld M.empty . reverse
+  where
+    fld m a =
+      M.lookup (f a) m
+        & maybe
+          (M.insert (f a) [a] m)
+          (\as -> M.insert (f a) (a : as) m)
+```
 
 ----
 Introduction:

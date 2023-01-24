@@ -3,22 +3,22 @@
   // for the documentation about the tasks.json format
   "version": "2.0.0",
   "tasks": [
-    {
-      "label": "ghcid inc test",
-      "type": "shell",
-      "command": "ghcid",
-      "args": ["--command", "'stack ghci --test'", "--allow-eval", "--clear", "--no-height-limit"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "problemMatcher": []
-    },
+    // {
+    //   "label": "ghcid inc test",
+    //   "type": "shell",
+    //   "command": "ghcid",
+    //   "args": ["--command", "'stack ghci --test'", "--allow-eval", "--clear", "--no-height-limit"],
+    //   "presentation": {
+    //     "reveal": "always",
+    //     "panel": "new"
+    //   },
+    //   "problemMatcher": []
+    // },
     {
       "label": "ghcid",
       "type": "shell",
       "command": "ghcid",
-      "args": ["--command", "'stack ghci'", "--allow-eval", "--clear", "--no-height-limit"],
+      "args": ["--command", "'stack ghci --test'", "--allow-eval", "--clear", "--no-height-limit"],
       "presentation": {
         "reveal": "always",
         "panel": "new"

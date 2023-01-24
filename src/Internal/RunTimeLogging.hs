@@ -82,7 +82,6 @@ isOnceEvent = \case
   Fixture -> False
   Test -> False
 
-
 isGrouping :: ExeEventType -> Bool
 isGrouping = \case
   OnceHook -> False

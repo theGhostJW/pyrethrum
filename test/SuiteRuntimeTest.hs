@@ -144,15 +144,6 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM
 import Prelude (Ord, String, putStrLn, read)
 
-
-{-
-1. create logger pretty print + list :: Done
-2. run most basic :: Done* * - need to fix index in debbug logging - deferred
-3. stats gather
-4. laws
-5. generate
--}
-
 data DocFunc a = DocFunc
   { doc :: Text,
     func :: IO a

@@ -4,5 +4,5 @@ cradle:
     components:
      - path: "./src"
        component: "pyrethrum:lib"
-     - path: "./test"
-       component: "pyrethrum:test:pyrethrum-test"
+    #  - path: "./test"
+    #    component: "pyrethrum:test:pyrethrum-test"

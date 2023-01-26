@@ -287,18 +287,14 @@ data EvInfo = EvInfo
 chkFixturesContainTests :: Template -> [Template] -> [[ExeEvent]] -> IO ()
 chkFixturesContainTests root tList tevts =
   chkEq'
-    ( "fixtures do not contain all expected tests\nExpected:\n"
-        <> toS (ppShow expected)
-        <> "\nActual:\n"
-        <> toS (ppShow actual)
-    )
+    "fixtures do not contain all expected tests:"
     expected
     actual
   where
     pm = threadParentMap root
     templateFixTags = M.fromList $ (,ST.empty) <$> catMaybes (fixTag <$> tList)
     expected =
-      foldl'
+      debug $ foldl'
         ( \m (c, mp) ->
             mp
               & maybe
@@ -803,7 +799,6 @@ chkFixtureChildren =
 countStarts :: ExeEventType -> [ExeEvent] -> Int
 countStarts et = count (isStart et)
 
-
 countLocSets :: [ExeEvent] -> ExeEventType -> Int
 countLocSets evs et =
   -- for threaded events ie. not Once* events the number of occurances
@@ -835,7 +830,6 @@ threadedBoundary = \case
   L.FixtureOnceHookRelease -> False
   L.FixtureThreadHook -> True
   L.FixtureThreadHookRelease -> True
-
 
 chkStartEndIntegrity :: [[ExeEvent]] -> IO ()
 chkStartEndIntegrity =
@@ -915,7 +909,7 @@ chkLaws mxThrds t evts =
         chkThreadLeafEvents,
         traverse_ (chkParentOrder t),
         chkThreadErrorPropagation,
-        chkThreadHksReleased
+        traverse_ chkThreadHksReleased
       ]
     T.chk'
       ( "max execution threads + 2: "
@@ -1035,10 +1029,10 @@ chkThreadErrs evts =
       ( \(l, _ex, et) ->
           et
             `elem` [
-              -- once errors could occur 
-              L.OnceHook, 
-              L.FixtureOnceHook
-            ]
+                     -- once errors could occur
+                     L.OnceHook,
+                     L.FixtureOnceHook
+                   ]
             ? pure ()
             $ error ("chkThreadErrs error loc still open at end of thread: " <> show l)
       )
@@ -1047,77 +1041,54 @@ chkThreadErrorPropagation :: [[ExeEvent]] -> IO ()
 chkThreadErrorPropagation = traverse_ chkThreadErrs
 
 chkHkReleased :: [ExeEvent] -> ExeEventType -> ExeEventType -> IO ()
-chkHkReleased evs hkType relType = 
-  -- hook releases are always parented by hook
-  ST.null openHooks ? 
-    pure () $
-    error ("Hooks executed without release: " <> ppShow openHooks)
+chkHkReleased evs hkType relType =
+  {-
+    * integrity of start / end and overlapping events tested in other tests
+    * this just tests that every star hook has a corresponding release
+  -}
+  ST.null openHooks
+    ? pure ()
+    $ error ("Hooks executed without release: " <> ppShow openHooks)
   where
-    openHooks = foldl' step ST.empty evs 
-    step ev openHks = uu --ev & \case
+    openHooks = foldl' step ST.empty evs
 
-chkThreadHksReleased = error "not implemented chkThreadHksReleased"
-  -- | ThreadHook
-  -- | ThreadHookRelease
+    step :: ST.Set Loc -> ExeEvent -> ST.Set Loc
+    step openHks ev =
+      ev
+        & ( \case
+              StartExecution {} -> openHks
+              Start {eventType, loc} ->
+                if
+                    | eventType == hkType ->
+                        ST.member loc openHks
+                          ? error ("the same hook is openned twice" <> ppShow loc)
+                          $ ST.insert loc openHks
+                    | eventType == relType ->
+                        let -- hook releases are always parented by hook
+                            parent' = parent loc
+                         in ST.member parent' openHks
+                              ? ST.delete parent' openHks
+                              $ error ("hook is released that has not been run" <> ppShow loc)
+                    | otherwise -> openHks
+              End {eventType, loc} -> openHks
+              Failure {} -> openHks
+              ParentFailure {} -> openHks
+              ApLog {} -> openHks
+              EndExecution {} -> openHks
+          )
 
-  -- | FixtureThreadHook
-  -- | FixtureThreadHookRelease
+chkThreadHksReleased :: [ExeEvent] -> IO ()
+chkThreadHksReleased evs = do
+  let ckr = chkHkReleased evs
+  ckr L.ThreadHook ThreadHookRelease
+  ckr FixtureThreadHook FixtureThreadHookRelease
+  ckr TestHook TestHookRelease
 
-  -- | TestHook
-  -- | TestHookRelease
-
-chkOnceHksReleased = error "not implemented chkOnceHksReleased"
-  -- data ExeEventType
-  -- = OnceHook
-  -- | OnceHookRelease
-
-  -- | FixtureOnceHook
-  -- | FixtureOnceHookRelease
-
-
-
-
-
--- data OEAccum = OEAccum
---   { oOpenSHk :: Maybe Loc,
---     oLastSHkFailure :: Maybe (Loc, PException),
---     oOpenChldElms :: ST.Set ThrdLoc
---   }
-
--- data FixtureSubComponent =
---   FxOnceHook |
---   FxThreadHook |
---   FxTest |
---   NotFxChild deriving (Show, Eq, Ord)
--- data ElemId
---   = ThreadedId
---       { rLoc :: Loc,
---         rThreadId :: SThreadId,
---         rEventType :: ExeEventType,
---         fxChild :: FixtureSubComponent
---       }
---   | OnceId
---       { rLoc :: Loc,
---         rEventType :: ExeEventType,
---         fxChild :: FixtureSubComponent
---       }
---   deriving (Show, Eq, Ord)
-
--- data ElmResult
---   = Pass
---       { rId :: ElemId
---       }
---   | Fail
---       { rId :: ElemId
---       }
---   | Abondonned
---       { rId :: ElemId,
---         parentId :: ElemId
---       }
---   | Grouping
---       { rId :: ElemId
---       }
---   deriving (Show, Eq, Ord)
+chkOnceHksReleased :: [ExeEvent] -> IO ()
+chkOnceHksReleased evs = do
+  let ckr = chkHkReleased evs
+  ckr L.OnceHook OnceHookRelease
+  ckr FixtureOnceHook FixtureOnceHookRelease
 
 data NodeType
   = Singleton
@@ -1451,29 +1422,30 @@ chkEventCounts t evs = do
   -- fixture
   chkLocCount' fixtureCounter L.Fixture
 
-   -- group
-  chkLocCount'( \case
+  -- group
+  chkLocCount'
+    ( \case
         TGroup {} -> 1
         _ -> 0
-     )
-     L.Group
+    )
+    L.Group
 
-   -- threadHook
-  chkLocCount'( \case
+  -- threadHook
+  chkLocCount'
+    ( \case
         TThreadHook {} -> 1
         _ -> 0
-     )
-     L.ThreadHook
+    )
+    L.ThreadHook
 
-   -- FixtureThreadHook
+  -- FixtureThreadHook
   chkLocCount' fixtureCounter L.FixtureThreadHook
-
   where
     chkLocCount' = chkLocCount t evs
     templateCount' = templateCount t
     fixtureCounter = \case
-        TFixture {} -> 1
-        _ -> 0
+      TFixture {} -> 1
+      _ -> 0
     expectedTestCount =
       templateCount'
         ( \case

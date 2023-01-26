@@ -1,6 +1,10 @@
 ## Suit runtime tests
+### laws
 * check fixture hooks are not firing on empty fixtures
 * check release
+* check for overlapping events - may already be done
+
+
 * try validity??
 
 
@@ -15,6 +19,22 @@
 * generate run
   * ux type errors
 
+## Checks and Known Errors
+### PostHoc Error 
+* runConfig selector
+* fixture selector
+* test selector
+  * parsed item id \i @ItemType -> bool
+  * or untyped AESON - use seekOpt -> false if nothing
+* errorStatus
+  * \rc fx tst -> Active | Inactive | Intermittent | Ignore
+* matcher
+  * \rc fx tst fullResult err -> Active | Inactive | Intermittent | Ignore
+* reconcile multiple files
+
+### Checks
+* remove all concepts of error reconcilliation
+* change guard to Assert
 
 ## Pyrelude
 * relude

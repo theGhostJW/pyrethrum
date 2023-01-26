@@ -280,7 +280,7 @@ getTag = \case
 
 data EvInfo = EvInfo
   { eiTag :: Text,
-    et :: ExeEventType
+    evtp :: ExeEventType
   }
   deriving (Show)
 
@@ -311,8 +311,9 @@ chkFixturesContainTests root tList tevts =
     threadActual evts =
       let (openTests, fixAccum) = foldl' step (ST.empty, M.empty) (revStartEvents evts)
 
-          step acc'@(st, mp) EvInfo {eiTag, et} =
-            et & \case
+          step :: (ST.Set Text, M.Map Text (ST.Set  Text)) -> EvInfo -> (ST.Set Text, M.Map Text (ST.Set  Text))
+          step acc'@(st, mp) EvInfo {eiTag, evtp} =
+            evtp & \case
               L.OnceHook -> acc'
               L.OnceHookRelease -> acc'
               L.ThreadHook -> acc'
@@ -340,7 +341,7 @@ chkFixturesContainTests root tList tevts =
       TFixture {tTag} -> Just tTag
 
 actualParentIgnoreTests :: ListLike m EvInfo i => m -> Maybe Text
-actualParentIgnoreTests evs = eiTag <$> find (\EvInfo {et = et'} -> et' /= L.Test) evs
+actualParentIgnoreTests evs = eiTag <$> find (\EvInfo {evtp = et'} -> et' /= L.Test) evs
 
 revStartEvents :: [ExeEvent] -> [EvInfo]
 revStartEvents thrdEvts = catMaybes $ boundryLoc True <$> reverse thrdEvts
@@ -370,7 +371,7 @@ chkParentOrder rootTpl thrdEvts =
     chkParents errPrefix =
       \case
         [] -> pure ()
-        EvInfo {eiTag = tg, et} : evs ->
+        EvInfo {eiTag = tg, evtp} : evs ->
           let expected = lookupThrow tpm tg
               next = chkParents errPrefix evs
               actualParentIgnoreTests' = actualParentIgnoreTests evs
@@ -380,7 +381,7 @@ chkParentOrder rootTpl thrdEvts =
                   toS errPrefix <> "\n  expected (tag): " <> txt expected <> "  \ngot (tag): " <> txt actualParent
               chkParentIncTests = expected == actualParent ? next $ fail
               chkParentExclTests = expected == actualParentIgnoreTests' ? next $ fail
-           in case et of
+           in evtp & \case 
                 L.OnceHook -> next
                 L.OnceHookRelease -> next
                 L.ThreadHook -> chkParentIncTests

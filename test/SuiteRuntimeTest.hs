@@ -294,19 +294,19 @@ chkFixturesContainTests root tList tevts =
     (actual tevts)
   where
     pm = threadParentMap root
+    fix this get rid of tList
     templateFixTags = M.fromList $ (,ST.empty) <$> catMaybes (fixTag <$> tList)
     expected =
-      debug
-        $ foldl'
-          ( \m (c, mp) ->
-              mp
-                & maybe
-                  m
-                  ( \p -> M.alter (maybe (Just $ ST.singleton c) (Just . ST.insert c)) p m
-                  )
-          )
-          templateFixTags
-        $ M.toList pm
+      foldl'
+        ( \m (c, mp) ->
+            mp
+              & maybe
+                m
+                ( \p -> M.alter (maybe (Just $ ST.singleton c) (Just . ST.insert c)) p m
+                )
+        )
+        templateFixTags
+        $ M.toList pm & debug
 
     fixTag = \case
       TGroup {} -> Nothing

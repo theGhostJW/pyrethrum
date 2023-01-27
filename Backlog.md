@@ -1,10 +1,17 @@
 ## Suit runtime tests
+
+### pyrethrum platform 
+* cicd
+* libraries and methodology
+  * pyrelude
+  * deferred validation
+  * posthoc failure analysis and defect reconciliation 
 ### laws
 * check fixture hooks are not firing on empty fixtures
 * check release
 * check for overlapping events - may already be done
 * check tests strat inside the right fixture
-
+* think about locs
 
 * try validity??
 
@@ -13,6 +20,12 @@
 * hasCallStack see lib posted on reddit saved to pocket
 * REST
 * UI connect to PlaWRIGHT
+* defecto
+* trojan
+  * data
+  * shrinker
+* explain
+  * show workings
 
 ## Run Construction
 * switch to effectful
@@ -45,7 +58,8 @@
   * maybef
   * eitherf
 * upgrade ghc
-* Error -> txt
+* uu Error -> txt
+* format on debug'
 * switch to cabal
 * try removing crazy cradal (pyrethrum)
 

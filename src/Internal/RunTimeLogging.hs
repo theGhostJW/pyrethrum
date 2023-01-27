@@ -32,12 +32,13 @@ import Pyrelude
     writeIORef,
     ($),
     (.),
-    (<$>), not,
+    (<$>), not, enumList,
   )
 import Text.Show.Pretty (pPrint)
 import UnliftIO (TChan, TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
 import UnliftIO.Concurrent (myThreadId)
 import Prelude (String, lines)
+import Data.Set
 
 data Loc
   = Root
@@ -97,6 +98,22 @@ isGrouping = \case
   Group -> True
   Fixture -> True
   Test -> False
+
+isFixtureChild :: ExeEventType -> Bool
+isFixtureChild = \case
+  OnceHook -> False
+  ThreadHook -> False
+  TestHook -> True
+  FixtureThreadHook -> True
+  FixtureOnceHook -> True
+  FixtureThreadHookRelease -> True
+  FixtureOnceHookRelease -> True
+  OnceHookRelease -> False
+  ThreadHookRelease -> False
+  TestHookRelease -> True
+  Group -> False
+  Fixture -> False
+  Test -> True
 
 endIsTerminal :: ExeEventType -> Bool
 endIsTerminal = \case

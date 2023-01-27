@@ -32,13 +32,17 @@ import Internal.RunTimeLogging as L
     isThreadedEvent,
     mkLogger,
     testLogControls,
+    isFixtureChild
   )
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
-import Polysemy
-import Pyrelude (Any, ListLike (..), enumList, ($>))
 import Pyrelude as P
-  ( Alternative ((<|>)),
+  ( 
+    Any, 
+    ListLike (..),
+     enumList, 
+     ($>),
+    Alternative ((<|>)),
     Applicative ((<*>)),
     Bool (..),
     Category (id),
@@ -250,7 +254,7 @@ threadParentMap root =
         fstPrnt pred t =
           pred t
             ? Just t
-            $ lookupThrow rootMap (tTag t) >>= fstPrnt pred
+            $ lookupThrow "Can't find thread parent" rootMap (tTag t) >>= fstPrnt pred
 
         isTstHk :: Template -> Bool
         isTstHk = \case
@@ -266,11 +270,11 @@ threadParentMap root =
           TThreadHook {} -> True
           TFixture {} -> False
 
-lookupThrow :: (Ord k, Show k, Show v) => M.Map k v -> k -> v
-lookupThrow m k =
+lookupThrow :: (Ord k, Show k, Show v) => Text -> M.Map k v -> k -> v
+lookupThrow msg m k =
   (m M.!? k)
     & maybe
-      (error $ show k <> " not found in " <> ppShow m)
+      (error $ toS msg <> "\n" <> ppShow k <> " not found in " <> ppShow m)
       id
 
 getTag :: Loc -> Text
@@ -412,8 +416,8 @@ chkParentOrder rootTpl thrdEvts =
     chkParents errPrefix =
       \case
         [] -> pure ()
-        EvInfo {eiTag = tg, eiEventType} : evs ->
-          let expected = lookupThrow tpm tg
+        EvInfo {eiTag = tg, eiEventType, eiLoc} : evs ->
+          let expected = lookupThrow "parent order lookup" tpm tg
               next = chkParents errPrefix evs
               actualParentIgnoreTests' = actualParentIgnoreTests evs
               actualParent = eiTag <$> head evs
@@ -672,7 +676,6 @@ chkLeafEventsStartEnd targetEventType =
 
     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
     chkEvent mTstLoc evt =
-      -- TODO: format on debug'
       mTstLoc
         & maybe
           ( -- outside fixture
@@ -709,15 +712,18 @@ chkLeafEventsStartEnd targetEventType =
         chkInEventStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
         chkInEventStartEnd isStart' activeFxLoc evtLoc evt' =
           let sevt = show evt'
-           in matchesTarg evt'
-                ? ( isStart'
-                      ? fail ("Nested " <> sevt <> " - " <> sevt <> " started when a " <> sevt <> " is alreeady running in the same thread")
+          in
+           if 
+            | matchesTarg evt' ->
+                ( isStart'
+                      ? fail ("Nested " <> sevt <> " - " <> sevt <> " started when a " <> sevt <> " is already running in the same thread")
                       $ activeFxLoc
                         == evtLoc
                         ? Nothing
                       $ fail (strTrg <> " end loc does not match " <> strTrg <> " start loc")
                   )
-                $ failIn sevt
+             | isFixtureChild evt' -> Just activeFxLoc
+             | otherwise -> failIn sevt
 
         fail msg = error $ msg <> "\n" <> ppShow evt
         strTrg = show targetEventType

@@ -3,6 +3,7 @@
 * check fixture hooks are not firing on empty fixtures
 * check release
 * check for overlapping events - may already be done
+* check tests strat inside the right fixture
 
 
 * try validity??

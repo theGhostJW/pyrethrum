@@ -280,7 +280,9 @@ getTag = \case
 
 data EvInfo = EvInfo
   { eiTag :: Text,
-    evtp :: ExeEventType
+    eiEventType :: ExeEventType,
+    eiStartEnd :: StartEnd,
+    eiLoc :: Loc
   }
   deriving (Show)
 
@@ -289,50 +291,22 @@ chkFixturesContainTests root tList tevts =
   chkEq'
     "fixtures do not contain all expected tests:"
     expected
-    actual
+    (actual tevts)
   where
     pm = threadParentMap root
     templateFixTags = M.fromList $ (,ST.empty) <$> catMaybes (fixTag <$> tList)
     expected =
-      debug $ foldl'
-        ( \m (c, mp) ->
-            mp
-              & maybe
-                m
-                ( \p -> M.alter (maybe (Just $ ST.singleton c) (Just . ST.insert c)) p m
-                )
-        )
-        templateFixTags
+      debug
+        $ foldl'
+          ( \m (c, mp) ->
+              mp
+                & maybe
+                  m
+                  ( \p -> M.alter (maybe (Just $ ST.singleton c) (Just . ST.insert c)) p m
+                  )
+          )
+          templateFixTags
         $ M.toList pm
-
-    actual = threadActual $ join tevts
-
-    threadActual :: [ExeEvent] -> M.Map Text (ST.Set Text)
-    threadActual evts =
-      let (openTests, fixAccum) = foldl' step (ST.empty, M.empty) (revStartEvents evts)
-
-          step :: (ST.Set Text, M.Map Text (ST.Set  Text)) -> EvInfo -> (ST.Set Text, M.Map Text (ST.Set  Text))
-          step acc'@(st, mp) EvInfo {eiTag, evtp} =
-            evtp & \case
-              L.OnceHook -> acc'
-              L.OnceHookRelease -> acc'
-              L.ThreadHook -> acc'
-              L.ThreadHookRelease -> acc'
-              L.TestHook -> acc'
-              L.TestHookRelease -> acc'
-              L.Group -> acc'
-              L.Fixture ->
-                let updateSet = Just . maybe st (ST.union st)
-                 in (ST.empty, M.alter updateSet eiTag mp)
-              L.Test -> (ST.insert eiTag st, mp)
-              L.FixtureOnceHook -> acc'
-              L.FixtureOnceHookRelease -> acc'
-              L.FixtureThreadHook -> acc'
-              L.FixtureThreadHookRelease -> acc'
-       in ST.null openTests
-            ? fixAccum
-            $ error
-            $ "tests still open at end of thread" <> ppShow openTests
 
     fixTag = \case
       TGroup {} -> Nothing
@@ -340,17 +314,117 @@ chkFixturesContainTests root tList tevts =
       TThreadHook {} -> Nothing
       TFixture {tTag} -> Just tTag
 
+    actual :: [[ExeEvent]] -> M.Map Text (ST.Set Text)
+    actual evts =
+      snd $
+        foldl'
+          ( \(mFxTag, fxTstMap) EvInfo {eiEventType = et, eiTag, eiStartEnd, eiLoc} ->
+              et
+                & ( \case
+                      L.Fixture ->
+                        eiStartEnd & \case
+                          IsStart ->
+                            mFxTag
+                              & maybe
+                                ( Just eiTag,
+                                  M.member eiTag fxTstMap
+                                    ? fxTstMap
+                                    $ M.insert eiTag ST.empty fxTstMap
+                                )
+                                ( \fxTag ->
+                                    error $
+                                      "overlapping fixtures in same thread. Starting fixture with loc: "
+                                        <> ppShow eiLoc
+                                        <> " while fixture with tag is still running"
+                                        <> toS fxTag
+                                )
+                          IsEnd ->
+                            mFxTag
+                              & maybe
+                                (error $ "fixture end found when no fixture is open - fixture end with loc: " <> ppShow eiLoc)
+                                ( \startTag' ->
+                                    (startTag' == eiTag)
+                                      ? (Nothing, fxTstMap)
+                                      $ error
+                                        ( "fixture start and end tags don't match for start tag: "
+                                            <> toS startTag'
+                                            <> "and end tag: "
+                                            <> toS eiTag
+                                            <> "at loc:\n"
+                                            <> ppShow eiLoc
+                                        )
+                                        -- check parent contains tag
+                                        --  (Nothing, fxTstMap)
+                                )
+                      L.Test ->
+                        mFxTag
+                          & maybe
+                            (error "test encountered when fuixture not open")
+                            ( \fxtag ->
+                                (mFxTag, M.insert fxtag (ST.insert eiTag (fxTstMap M.! fxtag)) fxTstMap)
+                            )
+                      _ -> error "this event should have been filtered out"
+                  )
+          )
+          (Nothing, M.empty)
+          serialisedTestFixInfo
+
+    serialisedTestFixInfo =
+      -- filter for fixture start & ends and test starts
+      filter
+        ( \EvInfo {eiEventType = et, eiStartEnd} ->
+            et `elem` [L.Test, L.Fixture]
+              && not (et == L.Test && eiStartEnd == IsEnd)
+        )
+        (boundaryEvents Nothing $ join tevts)
+
+-- (openFixtures, fixAccum) = foldl' step (ST.empty, M.empty) (revStartEvents evts)
+
+--     step :: (ST.Set Text, M.Map Text (ST.Set  Text)) -> EvInfo -> (ST.Set Text, M.Map Text (ST.Set  Text))
+--     step acc'@(st, mp) EvInfo {eiTag, eiEventType} =
+--       eiEventType & \case
+--         L.OnceHook -> acc'
+--         L.OnceHookRelease -> acc'
+--         L.ThreadHook -> acc'
+--         L.ThreadHookRelease -> acc'
+--         L.TestHook -> acc'
+--         L.TestHookRelease -> acc'
+--         L.Group -> acc'
+--         L.Fixture ->
+--           let updateSet = Just . maybe st (ST.union st)
+--            in (ST.empty, M.alter updateSet eiTag mp)
+--         L.Test -> (ST.insert eiTag st, mp)
+--         L.FixtureOnceHook -> acc'
+--         L.FixtureOnceHookRelease -> acc'
+--         L.FixtureThreadHook -> acc'
+--         L.FixtureThreadHookRelease -> acc'
+--  in ST.null openFixtures
+--       ? fixAccum
+--       $ error
+--       $ "fixtures still open at end of thread" <> ppShow openFixtures
+
 actualParentIgnoreTests :: ListLike m EvInfo i => m -> Maybe Text
-actualParentIgnoreTests evs = eiTag <$> find (\EvInfo {evtp = et'} -> et' /= L.Test) evs
+actualParentIgnoreTests evs = eiTag <$> find (\EvInfo {eiEventType = et'} -> et' /= L.Test) evs
+
+data StartEnd = IsStart | IsEnd deriving (Show, Eq)
 
 revStartEvents :: [ExeEvent] -> [EvInfo]
-revStartEvents thrdEvts = catMaybes $ boundryLoc True <$> reverse thrdEvts
+revStartEvents = reverse . boundaryEvents (Just IsStart)
 
-boundryLoc :: Bool -> ExeEvent -> Maybe EvInfo
-boundryLoc useStart = \case
+boundaryEvents :: Maybe StartEnd -> [ExeEvent] -> [EvInfo]
+boundaryEvents startEndFilter thrdEvts = catMaybes $ boundaryInfo startEndFilter <$> thrdEvts
+
+boundaryInfo :: Maybe StartEnd -> ExeEvent -> Maybe EvInfo
+boundaryInfo startEndFilter = \case
   StartExecution {} -> Nothing
-  Start {loc, eventType} -> useStart ? Just (EvInfo (getTag loc) eventType) $ Nothing
-  End {loc, eventType} -> useStart ? Nothing $ Just (EvInfo (getTag loc) eventType)
+  Start {loc, eventType} ->
+    (fromMaybe IsStart startEndFilter == IsStart)
+      ? Just (EvInfo (getTag loc) eventType IsStart loc)
+      $ Nothing
+  End {loc, eventType} ->
+    (fromMaybe IsEnd startEndFilter == IsEnd)
+      ? Just (EvInfo (getTag loc) eventType IsEnd loc)
+      $ Nothing
   Failure {} -> Nothing
   ParentFailure {} -> Nothing
   ApLog {} -> Nothing
@@ -365,13 +439,13 @@ chkParentOrder rootTpl thrdEvts =
   where
     tpm = threadParentMap rootTpl
     revStartEvents' = revStartEvents thrdEvts
-    evntEndLocs = catMaybes $ boundryLoc False <$> thrdEvts
+    evntEndLocs = catMaybes $ boundaryInfo (Just IsEnd) <$> thrdEvts
 
     chkParents :: Text -> [EvInfo] -> IO ()
     chkParents errPrefix =
       \case
         [] -> pure ()
-        EvInfo {eiTag = tg, evtp} : evs ->
+        EvInfo {eiTag = tg, eiEventType} : evs ->
           let expected = lookupThrow tpm tg
               next = chkParents errPrefix evs
               actualParentIgnoreTests' = actualParentIgnoreTests evs
@@ -381,7 +455,7 @@ chkParentOrder rootTpl thrdEvts =
                   toS errPrefix <> "\n  expected (tag): " <> txt expected <> "  \ngot (tag): " <> txt actualParent
               chkParentIncTests = expected == actualParent ? next $ fail
               chkParentExclTests = expected == actualParentIgnoreTests' ? next $ fail
-           in evtp & \case 
+           in eiEventType & \case
                 L.OnceHook -> next
                 L.OnceHookRelease -> next
                 L.ThreadHook -> chkParentIncTests
@@ -665,8 +739,8 @@ chkLeafEventsStartEnd targetEventType =
           )
       where
         chkOutEventStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
-        chkOutEventStartEnd isStart' evtLoc evtp =
-          matchesTarg evtp
+        chkOutEventStartEnd isStart' evtLoc eiEventType =
+          matchesTarg eiEventType
             ? ( isStart'
                   ? Just evtLoc
                   $ fail ("End " <> strTrg <> " when not started")

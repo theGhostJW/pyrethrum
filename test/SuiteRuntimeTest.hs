@@ -36,7 +36,7 @@ import Internal.RunTimeLogging as L
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Polysemy
-import Pyrelude (Any, ListLike (..), enumList)
+import Pyrelude (Any, ListLike (..), enumList, ($>))
 import Pyrelude as P
   ( Alternative ((<|>)),
     Applicative ((<*>)),
@@ -286,33 +286,25 @@ data EvInfo = EvInfo
   }
   deriving (Show)
 
-chkFixturesContainTests :: Template -> [Template] -> [[ExeEvent]] -> IO ()
-chkFixturesContainTests root tList tevts =
+chkFixturesContainTests :: Template -> [[ExeEvent]] -> IO ()
+chkFixturesContainTests root tevts =
   chkEq'
     "fixtures do not contain all expected tests:"
     expected
     (actual tevts)
   where
     pm = threadParentMap root
-    fix this get rid of tList
-    templateFixTags = M.fromList $ (,ST.empty) <$> catMaybes (fixTag <$> tList)
     expected =
-      foldl'
-        ( \m (c, mp) ->
-            mp
-              & maybe
-                m
-                ( \p -> M.alter (maybe (Just $ ST.singleton c) (Just . ST.insert c)) p m
-                )
-        )
-        templateFixTags
-        $ M.toList pm & debug
-
-    fixTag = \case
-      TGroup {} -> Nothing
-      TOnceHook {} -> Nothing
-      TThreadHook {} -> Nothing
-      TFixture {tTag} -> Just tTag
+      foldTemplate
+        M.empty
+        ( \acc -> \case
+            TGroup {} -> acc
+            TOnceHook {} -> acc
+            TThreadHook {} -> acc
+            TFixture {tTag, tTests} ->
+              M.insert tTag (ST.fromList $ (\t -> fst t <> txt (snd t))  <$>
+                zip ("Test :: " <$ tTests) [0..]) acc)
+        root
 
     actual :: [[ExeEvent]] -> M.Map Text (ST.Set Text)
     actual evts =
@@ -377,31 +369,6 @@ chkFixturesContainTests root tList tevts =
               && not (et == L.Test && eiStartEnd == IsEnd)
         )
         (boundaryEvents Nothing $ join tevts)
-
--- (openFixtures, fixAccum) = foldl' step (ST.empty, M.empty) (revStartEvents evts)
-
---     step :: (ST.Set Text, M.Map Text (ST.Set  Text)) -> EvInfo -> (ST.Set Text, M.Map Text (ST.Set  Text))
---     step acc'@(st, mp) EvInfo {eiTag, eiEventType} =
---       eiEventType & \case
---         L.OnceHook -> acc'
---         L.OnceHookRelease -> acc'
---         L.ThreadHook -> acc'
---         L.ThreadHookRelease -> acc'
---         L.TestHook -> acc'
---         L.TestHookRelease -> acc'
---         L.Group -> acc'
---         L.Fixture ->
---           let updateSet = Just . maybe st (ST.union st)
---            in (ST.empty, M.alter updateSet eiTag mp)
---         L.Test -> (ST.insert eiTag st, mp)
---         L.FixtureOnceHook -> acc'
---         L.FixtureOnceHookRelease -> acc'
---         L.FixtureThreadHook -> acc'
---         L.FixtureThreadHookRelease -> acc'
---  in ST.null openFixtures
---       ? fixAccum
---       $ error
---       $ "fixtures still open at end of thread" <> ppShow openFixtures
 
 actualParentIgnoreTests :: ListLike m EvInfo i => m -> Maybe Text
 actualParentIgnoreTests evs = eiTag <$> find (\EvInfo {eiEventType = et'} -> et' /= L.Test) evs
@@ -532,14 +499,6 @@ mkPrenode maxThreads =
               thrdHkRs <- newTVarIO tRelease
               tstHks <- newTVarIO tHook
               tstHkRs <- newTVarIO tRelease
-              -- let runThreaded lggr propsLst = do
-              --       prps <- atomically $ do
-              --         plst <- readTVar propsLst
-              --         case plst of
-              --           [] -> error "test config or test utils wrong - more calls to tHook or tRelease function than configured"
-              --           x : xs -> writeTVar propsLst xs >> pure x
-              --       ioAction lggr prps
-              --  in
               pure
                 PN.Fixture
                   { onceFxHook = \_loc lg _in -> ioAction lg sHook,
@@ -979,7 +938,7 @@ chkLaws mxThrds t evts =
       (threadedEvents &)
       [ chkStartEndIntegrity,
         chkFixtureChildren,
-        chkFixturesContainTests t templateAsList,
+        chkFixturesContainTests t,
         traverse_ chkTestEvtsConsecutive,
         chkThreadLeafEvents,
         traverse_ (chkParentOrder t),
@@ -997,7 +956,6 @@ chkLaws mxThrds t evts =
       $ length threadedEvents <= mxThrds + 2
   where
     threadedEvents = groupOn threadId evts
-    templateAsList = templateList t
 
 data ChkErrAccum = ChkErrAccum
   { initialised :: Bool,

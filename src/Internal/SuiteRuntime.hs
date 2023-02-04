@@ -532,7 +532,7 @@ executeNode logger hkIn rg =
             where
               -- when the last thread finishes child nodes and fully running will be done
               recurse =
-                atomically nxtChild
+                atomically nxtChildNode
                   >>= maybe
                     (atomically updateStatusFromQs)
                     (\c -> exeNxt hkIn c >> recurse)
@@ -553,7 +553,7 @@ executeNode logger hkIn rg =
                         | mtChilds -> writeTVar nStatus FullyRunning
                         | otherwise -> pure ()
 
-              nxtChild =
+              nxtChildNode =
                 tryReadTQueue childNodes
                   >>= maybe
                     (pure Nothing)
@@ -561,7 +561,7 @@ executeNode logger hkIn rg =
                         let ioCld = pure $ Just cld
                             qChld = writeTQueue childNodes cld
                             qChldReturn = qChld >> ioCld
-                            qFullyRunning = writeTQueue fullyRunning cld >> nxtChild
+                            qFullyRunning = writeTQueue fullyRunning cld >> nxtChildNode
                          in getStatus cld
                               >>= \case
                                 Pending ->
@@ -570,12 +570,12 @@ executeNode logger hkIn rg =
                                   -- just plonk on the end of the q and go around again
                                   -- may pick up same node if there is only one node running but that is ok
                                   -- it just turns into a wait
-                                  qChld >> nxtChild
+                                  qChld >> nxtChildNode
                                 Running -> qChldReturn
                                 FullyRunning -> qFullyRunning
                                 HookFinalising -> qFullyRunning
                                 -- discard if done
-                                Done -> nxtChild
+                                Done -> nxtChildNode
                     )
         fx@XTFix
           { nStatus,

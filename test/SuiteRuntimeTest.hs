@@ -27,22 +27,18 @@ import Internal.RunTimeLogging as L
     PException,
     SThreadId (..),
     endIsTerminal,
+    isFixtureChild,
     isGrouping,
     isOnceEvent,
     isThreadedEvent,
     mkLogger,
     testLogControls,
-    isFixtureChild
   )
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
 import Pyrelude as P
-  ( 
-    Any, 
-    ListLike (..),
-     enumList, 
-     ($>),
-    Alternative ((<|>)),
+  ( Alternative ((<|>)),
+    Any,
     Applicative ((<*>)),
     Bool (..),
     Category (id),
@@ -52,7 +48,7 @@ import Pyrelude as P
     Foldable (foldl, sum),
     IO,
     Int,
-    ListLike (all, drop, elem, foldl', foldl1, head, null, takeWhileEnd, unsafeHead, unsafeLast),
+    ListLike (..),
     Maybe (Just, Nothing),
     Num ((+)),
     Ord (..),
@@ -73,6 +69,7 @@ import Pyrelude as P
     dropWhile,
     dropWhileEnd,
     either,
+    enumList,
     error,
     filter,
     find,
@@ -122,6 +119,7 @@ import Pyrelude as P
     whenJust,
     zip,
     ($),
+    ($>),
     (&),
     (&&),
     (-),
@@ -223,52 +221,77 @@ parentMap t =
 templateList :: Template -> [Template]
 templateList = foldTemplate [] (flip (:))
 
-testTags :: Text -> [IOProps] -> [Text]
-testTags fxTag tsts =
-  (\it -> fxTag <> "." <> txt (fst it)) <$> zip [0 ..] tsts
-
-threadParentMap :: Template -> M.Map Text (Maybe Text)
-threadParentMap root =
-  (tTag <$>) <$> foldl' insertTests ((>>= threadParent) <$> rootMap) (templateList root)
+childToParentMap :: Template -> M.Map Loc Loc
+childToParentMap =
+  snd . cpm Root M.empty
   where
-    rootMap :: M.Map Text (Maybe Template)
-    rootMap = parentMap root
+    cpm :: Loc -> M.Map Loc Loc -> Template -> (Loc, M.Map Loc Loc)
+    cpm pLoc accMap =
+      foldTemplate
+        (pLoc, accMap)
+        ( \(pl, m) t ->
+            let cl = Node pl (tTag t)
+                accm = M.insert cl pl m
+                accm' =
+                  t & \case
+                    TGroup {} -> accm
+                    TOnceHook {} -> accm
+                       -- OnceHook release
+                    TThreadHook {} -> 
+                      -- threadHook release
+                      accm
+                    TFixture {tTag} ->
+                      -- one fix hook 
+                      -- one fix hook release
+                      -- fix hook
+                      -- fix hook release
+                      -- use  testTags
+                      -- test hook
+                      -- test hook release
+                      accm
+             in (cl, accm')
+        )
 
-    insertTests :: M.Map Text (Maybe Template) -> Template -> M.Map Text (Maybe Template)
-    insertTests m = \case
-      TGroup {} -> m
-      TOnceHook {} -> m
-      TThreadHook {} -> m
-      -- add an element for each test
-      fx@TFixture {tTests, tTag} ->
-        foldl'
-          (\m' tsttg -> M.insert tsttg (Just fx) m')
-          m
-          (testTags tTag tTests)
+-- (tTag <$>) <$> foldl' insertTests ((>>= threadParent) <$> rootMap) (templateList root)
+-- where
+--   rootMap :: M.Map Text (Maybe Template)
+--   rootMap = parentMap root
 
-    threadParent :: Template -> Maybe Template
-    threadParent tmp =
-      fstPrnt isTstHk tmp <|> fstPrnt isThrdHkorGrp tmp
-      where
-        fstPrnt :: (Template -> Bool) -> Template -> Maybe Template
-        fstPrnt pred t =
-          pred t
-            ? Just t
-            $ lookupThrow "Can't find thread parent" rootMap (tTag t) >>= fstPrnt pred
+--   insertTests :: M.Map Text (Maybe Template) -> Template -> M.Map Text (Maybe Template)
+--   insertTests m = \case
+--     TGroup {} -> m
+--     TOnceHook {} -> m
+--     TThreadHook {} -> m
+--     -- add an element for each test
+--     fx@TFixture {tTests, tTag} ->
+--       foldl'
+--         (\m' tsttg -> M.insert tsttg (Just fx) m')
+--         m
+--         (test-Tags tTag tTests)
 
-        isTstHk :: Template -> Bool
-        isTstHk = \case
-          TGroup {} -> False
-          TOnceHook {} -> False
-          TThreadHook {} -> False
-          TFixture {} -> False
+--   threadParent :: Template -> Maybe Template
+--   threadParent tmp =
+--     fstPrnt isTstHk tmp <|> fstPrnt isThrdHkorGrp tmp
+--     where
+--       fstPrnt :: (Template -> Bool) -> Template -> Maybe Template
+--       fstPrnt pred t =
+--         pred t
+--           ? Just t
+--           $ lookupThrow "Can't find thread parent" rootMap (tTag t) >>= fstPrnt pred
 
-        isThrdHkorGrp :: Template -> Bool
-        isThrdHkorGrp = \case
-          TGroup {} -> True
-          TOnceHook {} -> False
-          TThreadHook {} -> True
-          TFixture {} -> False
+--       isTstHk :: Template -> Bool
+--       isTstHk = \case
+--         TGroup {} -> False
+--         TOnceHook {} -> False
+--         TThreadHook {} -> False
+--         TFixture {} -> False
+
+--       isThrdHkorGrp :: Template -> Bool
+--       isThrdHkorGrp = \case
+--         TGroup {} -> True
+--         TOnceHook {} -> False
+--         TThreadHook {} -> True
+--         TFixture {} -> False
 
 lookupThrow :: (Ord k, Show k, Show v) => Text -> M.Map k v -> k -> v
 lookupThrow msg m k =
@@ -290,6 +313,9 @@ data EvInfo = EvInfo
   }
   deriving (Show)
 
+testTags :: [IOProps] -> [Text]
+testTags tTests = (\idx -> "Test :: " <> txt idx) <$> take (length tTests) [0 ..]
+
 chkFixturesContainTests :: Template -> [[ExeEvent]] -> IO ()
 chkFixturesContainTests root tevts =
   chkEq'
@@ -297,7 +323,6 @@ chkFixturesContainTests root tevts =
     expected
     (actual tevts)
   where
-    pm = threadParentMap root
     expected =
       foldTemplate
         M.empty
@@ -306,8 +331,11 @@ chkFixturesContainTests root tevts =
             TOnceHook {} -> acc
             TThreadHook {} -> acc
             TFixture {tTag, tTests} ->
-              M.insert tTag (ST.fromList $ (\t -> fst t <> txt (snd t))  <$>
-                zip ("Test :: " <$ tTests) [0..]) acc)
+              M.insert
+                tTag
+                (ST.fromList $ testTags tTests)
+                acc
+        )
         root
 
     actual :: [[ExeEvent]] -> M.Map Text (ST.Set Text)
@@ -408,7 +436,7 @@ chkParentOrder rootTpl thrdEvts =
   chkParents "Parent start event (working back from child)" revStartEvents'
     >> chkParents "Parent end event (working forward from child)" evntEndLocs
   where
-    tpm = threadParentMap rootTpl
+    tpm = debug' "CPM" $ childToParentMap rootTpl
     revStartEvents' = revStartEvents thrdEvts
     evntEndLocs = catMaybes $ boundaryInfo (Just IsEnd) <$> thrdEvts
 
@@ -417,15 +445,15 @@ chkParentOrder rootTpl thrdEvts =
       \case
         [] -> pure ()
         EvInfo {eiTag = tg, eiEventType, eiLoc} : evs ->
-          let expected = lookupThrow "parent order lookup" tpm tg
+          let expected = lookupThrow "parent order lookup" tpm eiLoc
               next = chkParents errPrefix evs
               actualParentIgnoreTests' = actualParentIgnoreTests evs
               actualParent = eiTag <$> head evs
               fail =
                 error . toS $
-                  toS errPrefix <> "\n  expected (tag): " <> txt expected <> "  \ngot (tag): " <> txt actualParent
-              chkParentIncTests = expected == actualParent ? next $ fail
-              chkParentExclTests = expected == actualParentIgnoreTests' ? next $ fail
+                  errPrefix <> "\n  expected (tag): " <> txt expected <> "  \ngot (tag): " <> txt actualParent
+              chkParentIncTests = uu -- expected == actualParent ? next $ fail
+              chkParentExclTests = uu -- expected == actualParentIgnoreTests' ? next $ fail
            in eiEventType & \case
                 L.OnceHook -> next
                 L.OnceHookRelease -> next
@@ -712,18 +740,17 @@ chkLeafEventsStartEnd targetEventType =
         chkInEventStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
         chkInEventStartEnd isStart' activeFxLoc evtLoc evt' =
           let sevt = show evt'
-          in
-           if 
-            | matchesTarg evt' ->
-                ( isStart'
-                      ? fail ("Nested " <> sevt <> " - " <> sevt <> " started when a " <> sevt <> " is already running in the same thread")
-                      $ activeFxLoc
-                        == evtLoc
-                        ? Nothing
-                      $ fail (strTrg <> " end loc does not match " <> strTrg <> " start loc")
-                  )
-             | isFixtureChild evt' -> Just activeFxLoc
-             | otherwise -> failIn sevt
+           in if
+                  | matchesTarg evt' ->
+                      ( isStart'
+                          ? fail ("Nested " <> sevt <> " - " <> sevt <> " started when a " <> sevt <> " is already running in the same thread")
+                          $ activeFxLoc
+                            == evtLoc
+                            ? Nothing
+                          $ fail (strTrg <> " end loc does not match " <> strTrg <> " start loc")
+                      )
+                  | isFixtureChild evt' -> Just activeFxLoc
+                  | otherwise -> failIn sevt
 
         fail msg = error $ msg <> "\n" <> ppShow evt
         strTrg = show targetEventType

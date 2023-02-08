@@ -231,67 +231,27 @@ childToParentMap =
         (pLoc, accMap)
         ( \(pl, m) t ->
             let cl = Node pl (tTag t)
+                subMap :: ExeEventType -> M.Map Loc Loc -> M.Map Loc Loc
+                subMap et = M.insert (Node cl $ txt et) cl
+                subMap' et = subMap et m
                 accm = M.insert cl pl m
                 accm' =
                   t & \case
                     TGroup {} -> accm
-                    TOnceHook {} -> accm
-                       -- OnceHook release
-                    TThreadHook {} -> 
-                      -- threadHook release
-                      accm
+                    TOnceHook {} ->
+                      subMap' L.OnceHookRelease
+                    TThreadHook {} ->
+                      subMap' L.ThreadHookRelease
                     TFixture {tTag} ->
-                      -- one fix hook 
-                      -- one fix hook release
-                      -- fix hook
-                      -- fix hook release
-                      -- use  testTags
-                      -- test hook
-                      -- test hook release
-                      accm
+                      subMap L.FixtureOnceHook
+                        . subMap L.FixtureOnceHookRelease
+                        . subMap L.FixtureThreadHookRelease
+                        . subMap L.FixtureThreadHook
+                        . subMap L.TestHook
+                        $ subMap' L.TestHookRelease
              in (cl, accm')
         )
 
--- (tTag <$>) <$> foldl' insertTests ((>>= threadParent) <$> rootMap) (templateList root)
--- where
---   rootMap :: M.Map Text (Maybe Template)
---   rootMap = parentMap root
-
---   insertTests :: M.Map Text (Maybe Template) -> Template -> M.Map Text (Maybe Template)
---   insertTests m = \case
---     TGroup {} -> m
---     TOnceHook {} -> m
---     TThreadHook {} -> m
---     -- add an element for each test
---     fx@TFixture {tTests, tTag} ->
---       foldl'
---         (\m' tsttg -> M.insert tsttg (Just fx) m')
---         m
---         (test-Tags tTag tTests)
-
---   threadParent :: Template -> Maybe Template
---   threadParent tmp =
---     fstPrnt isTstHk tmp <|> fstPrnt isThrdHkorGrp tmp
---     where
---       fstPrnt :: (Template -> Bool) -> Template -> Maybe Template
---       fstPrnt pred t =
---         pred t
---           ? Just t
---           $ lookupThrow "Can't find thread parent" rootMap (tTag t) >>= fstPrnt pred
-
---       isTstHk :: Template -> Bool
---       isTstHk = \case
---         TGroup {} -> False
---         TOnceHook {} -> False
---         TThreadHook {} -> False
---         TFixture {} -> False
-
---       isThrdHkorGrp :: Template -> Bool
---       isThrdHkorGrp = \case
---         TGroup {} -> True
---         TOnceHook {} -> False
---         TThreadHook {} -> True
---         TFixture {} -> False
 
 lookupThrow :: (Ord k, Show k, Show v) => Text -> M.Map k v -> k -> v
 lookupThrow msg m k =

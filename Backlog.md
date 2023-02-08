@@ -62,6 +62,7 @@
 * format on debug'
 * switch to cabal
 * try removing crazy cradal (pyrethrum)
+* profiling
 
 ```haskell
 -- TODO - add tests add to pyrelude

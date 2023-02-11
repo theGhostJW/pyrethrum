@@ -12,7 +12,7 @@
 * check for overlapping events - may already be done
 * check tests strat inside the right fixture
 * think about locs
-
+* verify treeshake
 * try validity??
 
 
@@ -54,6 +54,7 @@
 * relude
 * chkFalse'
 * change uu to error
+* message serialisation
 * remove 
   * maybef
   * eitherf

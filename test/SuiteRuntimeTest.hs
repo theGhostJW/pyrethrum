@@ -65,6 +65,7 @@ import Pyrelude as P
     debug',
     debug_,
     debugf,
+    debugf',
     displayException,
     dropWhile,
     dropWhileEnd,
@@ -101,6 +102,7 @@ import Pyrelude as P
     replace,
     replicateM_,
     reverse,
+    scanl,
     sequence,
     sequenceA_,
     singleton,
@@ -231,10 +233,10 @@ childToParentMap =
         (pLoc, accMap)
         ( \(pl, m) t ->
             let cl = Node pl (tTag t)
+                accm = M.insert cl pl m
                 subMap :: ExeEventType -> M.Map Loc Loc -> M.Map Loc Loc
                 subMap et = M.insert (Node cl $ txt et) cl
-                subMap' et = subMap et m
-                accm = M.insert cl pl m
+                subMap' et = subMap et accm
                 accm' =
                   t & \case
                     TGroup {} -> accm
@@ -251,7 +253,6 @@ childToParentMap =
                         $ subMap' L.TestHookRelease
              in (cl, accm')
         )
-
 
 lookupThrow :: (Ord k, Show k, Show v) => Text -> M.Map k v -> k -> v
 lookupThrow msg m k =
@@ -362,13 +363,136 @@ chkFixturesContainTests root tevts =
         )
         (boundaryEvents Nothing $ join tevts)
 
-actualParentIgnoreTests :: ListLike m EvInfo i => m -> Maybe Text
-actualParentIgnoreTests evs = eiTag <$> find (\EvInfo {eiEventType = et'} -> et' /= L.Test) evs
+actualChildParentMap :: [ExeEvent] -> SThreadId -> M.Map Loc Loc
+actualChildParentMap evs tid =
+  let (_, _, result) =
+        foldl'
+          ( \(openParents, openEvents, mp) (i, e) ->
+              e
+                & ( \case
+                      se@(Start eet childLoc n sti) ->
+                        let etLoc = (eet, childLoc)
+                            oevts = etLoc : (openEvents & debug' ("\n++!!!!!!!!!!!!!!!!!!!! BEFORE ADD " <> txt i <> "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!++\n"))
+                            nxtparents =
+                              releaseEventType eet
+                                & maybe
+                                  openParents
+                                  (const $ etLoc : openParents)
+                            parentLoc =
+                              openParents & \case
+                                [] -> Root
+                                (_, ploc) : ps -> ploc
+                         in ( 
+                              nxtparents,
+                              debug'
+                                ( toS $
+                                    "!!!! ADDED !!!!\n"
+                                      <> ppShow se
+                                      <> "\n++!!!!!!!!!!!!!!!!!!!! AFTER ADD "<> show i <> "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!++\n"
+                                )
+                                oevts,
+                              M.insert childLoc parentLoc mp
+                            )
+                      --
+                      ev@End
+                        { eventType,
+                          loc = endLoc,
+                          idx,
+                          threadId
+                        } ->
+                          let nxtOpenParents =
+                                openEventType eventType
+                                  & maybe
+                                    openParents
+                                    ( \oet ->
+                                        openParents
+                                          & \case
+                                            [] -> error $ "event does not have parent:\n" <> ppShow ev
+                                            p@(pet, ploc) : ps ->
+                                              (oet == pet)
+                                                ? ps
+                                                $ error
+                                                  ( "child event type does not match parent:\nchild loc is:\n "
+                                                      <> ppShow endLoc
+                                                      <> "\nparent loc is\n"
+                                                      <> ppShow ploc
+                                                  )
+                                    )
+                           in openEvents
+                                & \case
+                                  [] -> error $ "event ended without start:\n" <> ppShow e
+                                  (evtt, evLoc) : oevs ->
+                                    (endLoc == evLoc)
+                                      ? ( nxtOpenParents,
+                                          debug'
+                                            ( toS $
+                                                ("--!!!!!!!!!!!!!!!!!!!! BEFORE SUBTRACT " <> show i <> "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--\n")
+                                                  <> ppShow openEvents
+                                                  <> "!!!! SUBTRACTED !!!!\n"
+                                                  <> ppShow ev
+                                                  <> "\n--!!!!!!!!!!!!!!!!!!!! AFTER SUBTRACT " <> show i <> "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--\n"
+                                            )
+                                            oevs,
+                                          mp
+                                        )
+                                      $ error
+                                        ( "end event out of order - end event was\n"
+                                            <> ppShow e
+                                            <> "\nbut start event loc was:\n"
+                                            <> ppShow evLoc
+                                        )
+                      e' -> error $ "this event should be a Start or End threadStartEnds hasn't worked: " <> show e'
+                  )
+          )
+          ([], [], M.empty)
+          (zip [0..] threadStartEnds & debug' "@@@@@@@ ALL START ENDS @@@@@")
+   in result
+  where
+    threadStartEnds =
+      filter
+        ( \case
+            StartExecution {} -> False
+            Start {threadId, eventType} -> include threadId eventType
+            End {threadId, eventType} -> include threadId eventType
+            Failure {} -> False
+            ParentFailure {} -> False
+            ApLog {} -> False
+            EndExecution n sti -> False
+        )
+        evs
+    include thisTid evtt = isOnceEvent evtt || thisTid == tid
+
+    openEventType = \case
+      L.FixtureThreadHookRelease -> Just L.FixtureThreadHook
+      L.FixtureOnceHookRelease -> Just L.FixtureOnceHook
+      L.OnceHookRelease -> Just L.OnceHook
+      L.ThreadHookRelease -> Just L.ThreadHook
+      L.TestHookRelease -> Just L.TestHook
+      L.Fixture -> Just L.Fixture
+      L.Group -> Just L.Group
+      L.OnceHook -> Nothing
+      L.ThreadHook -> Nothing
+      L.TestHook -> Nothing
+      L.FixtureThreadHook -> Nothing
+      L.FixtureOnceHook -> Nothing
+      L.Test -> Nothing
+
+    releaseEventType = \case
+      L.OnceHook -> Just L.OnceHookRelease
+      L.ThreadHook -> Just L.ThreadHookRelease
+      L.TestHook -> Just L.TestHookRelease
+      L.FixtureThreadHook -> Just L.FixtureThreadHookRelease
+      L.FixtureOnceHook -> Just L.OnceHookRelease
+      L.Fixture -> Just L.Fixture
+      L.Group -> Just L.Group
+      L.FixtureThreadHookRelease -> Nothing
+      L.FixtureOnceHookRelease -> Nothing
+      L.OnceHookRelease -> Nothing
+      L.ThreadHookRelease -> Nothing
+      L.TestHookRelease -> Nothing
+      L.Test -> Nothing
 
 data StartEnd = IsStart | IsEnd deriving (Show, Eq)
-
-revStartEvents :: [ExeEvent] -> [EvInfo]
-revStartEvents = reverse . boundaryEvents (Just IsStart)
 
 boundaryEvents :: Maybe StartEnd -> [ExeEvent] -> [EvInfo]
 boundaryEvents startEndFilter thrdEvts = catMaybes $ boundaryInfo startEndFilter <$> thrdEvts
@@ -393,41 +517,22 @@ boundaryInfo startEndFilter = \case
 -- ignoring non threaded events when checking tests ignore other test start / ends
 chkParentOrder :: Template -> [ExeEvent] -> IO ()
 chkParentOrder rootTpl thrdEvts =
-  chkParents "Parent start event (working back from child)" revStartEvents'
-    >> chkParents "Parent end event (working forward from child)" evntEndLocs
+  traverse_
+    ( \threadid ->
+        let actual = actualCPMap threadid
+         in M.traverseWithKey
+              ( \c p ->
+                  chkEq'
+                    ("actual parent child differs for child loc: " <> toS (ppShow c))
+                    (lookupThrow "child not found in expected map" expectedCPMap c)
+                    p
+              )
+              $ debug' (toS $ "ACTUAL MAP\n" <> ppShow actual ) actual
+    )
+    (nub (threadId <$> thrdEvts))
   where
-    tpm = debug' "CPM" $ childToParentMap rootTpl
-    revStartEvents' = revStartEvents thrdEvts
-    evntEndLocs = catMaybes $ boundaryInfo (Just IsEnd) <$> thrdEvts
-
-    chkParents :: Text -> [EvInfo] -> IO ()
-    chkParents errPrefix =
-      \case
-        [] -> pure ()
-        EvInfo {eiTag = tg, eiEventType, eiLoc} : evs ->
-          let expected = lookupThrow "parent order lookup" tpm eiLoc
-              next = chkParents errPrefix evs
-              actualParentIgnoreTests' = actualParentIgnoreTests evs
-              actualParent = eiTag <$> head evs
-              fail =
-                error . toS $
-                  errPrefix <> "\n  expected (tag): " <> txt expected <> "  \ngot (tag): " <> txt actualParent
-              chkParentIncTests = uu -- expected == actualParent ? next $ fail
-              chkParentExclTests = uu -- expected == actualParentIgnoreTests' ? next $ fail
-           in eiEventType & \case
-                L.OnceHook -> next
-                L.OnceHookRelease -> next
-                L.ThreadHook -> chkParentIncTests
-                L.ThreadHookRelease -> chkParentIncTests
-                L.TestHook -> chkParentIncTests
-                L.TestHookRelease -> chkParentIncTests
-                L.Group -> chkParentIncTests
-                L.Fixture -> chkParentIncTests
-                L.Test -> chkParentExclTests
-                L.FixtureOnceHook -> next
-                L.FixtureOnceHookRelease -> next
-                L.FixtureThreadHook -> chkParentIncTests
-                L.FixtureThreadHookRelease -> chkParentIncTests
+    actualCPMap = actualChildParentMap thrdEvts
+    expectedCPMap = childToParentMap rootTpl
 
 templateCount :: Template -> (Template -> Int) -> Int
 templateCount t templateInc = foldTemplate 0 (\c t' -> c + templateInc t') t

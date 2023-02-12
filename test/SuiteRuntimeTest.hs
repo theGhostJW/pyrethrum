@@ -98,6 +98,7 @@ import Pyrelude as P
     not,
     nub,
     otherwise,
+    pred,
     pure,
     replace,
     replicateM_,
@@ -234,8 +235,13 @@ childToParentMap =
         ( \(pl, m) t ->
             let cl = Node pl (tTag t)
                 accm = M.insert cl pl m
+
+                mkLoc loc et = (Node loc $ txt et) 
+                mkLocIdxed loc et idx = (Node loc $ txt et <> " :: " <> txt idx) 
+
                 subMap :: ExeEventType -> M.Map Loc Loc -> M.Map Loc Loc
-                subMap et = M.insert (Node cl $ txt et) cl
+                subMap et = M.insert (mkLoc cl et) cl
+
                 subMap' et = subMap et accm
                 accm' =
                   t & \case
@@ -244,15 +250,170 @@ childToParentMap =
                       subMap' L.OnceHookRelease
                     TThreadHook {} ->
                       subMap' L.ThreadHookRelease
-                    TFixture {tTag} ->
-                      subMap L.FixtureOnceHook
-                        . subMap L.FixtureOnceHookRelease
-                        . subMap L.FixtureThreadHookRelease
-                        . subMap L.FixtureThreadHook
-                        . subMap L.TestHook
-                        $ subMap' L.TestHookRelease
+                    TFixture {tTag, tTests} ->
+                      let 
+                        fxloc = cl
+                        fxOnceHkloc = mkLoc fxloc L.FixtureOnceHook
+                        fxOnceHkReleaseloc = mkLoc fxOnceHkloc L.FixtureOnceHookRelease
+                        fxThrdHkloc = mkLoc fxOnceHkloc L.FixtureThreadHook
+                        fxThrdhkReleaseloc = mkLoc fxThrdHkloc L.FixtureThreadHookRelease
+
+                        insertTstTstHkRelease mp = 
+                          foldl' (\mp' i -> 
+                            let 
+                              tsthkLoc = mkLocIdxed fxThrdHkloc L.TestHook i
+                              tstLoc = mkLocIdxed tsthkLoc L.Test i
+                              tsthkRloc =  mkLocIdxed tsthkLoc L.TestHookRelease i
+                            in 
+                              M.insert tstLoc tsthkLoc .
+                              M.insert tsthkRloc tsthkLoc $
+                              M.insert tsthkLoc fxThrdHkloc mp'
+                            ) 
+                           mp 
+                           [0..(pred $ length tTests)]
+
+                        testhkloc = mkLoc fxThrdHkloc L.TestHook
+                        testhkReleaseLoc = mkLoc fxThrdHkloc L.TestHook
+                      in
+                        -- M.insert child parent testhkloc .
+                        insertTstTstHkRelease .
+                        M.insert fxThrdhkReleaseloc fxThrdHkloc .
+                        M.insert fxThrdHkloc fxOnceHkloc .
+                        M.insert fxOnceHkReleaseloc fxOnceHkloc .
+                        M.insert fxOnceHkloc fxloc $
+                         accm {--- fixture loc added-} 
              in (cl, accm')
         )
+
+        {- EXPECTED
+
+  --- ACTUAL
+ Node
+  { parent =
+      Node
+        { parent =
+            Node
+              { parent =
+                  Node
+                    { parent =
+                        Node
+                          { parent = Node { parent = Root , tag = "ThreadHook" }
+                          , tag = "OnceHook"
+                          }
+                    , tag = "Fixture 0"
+                    }
+              , tag = "FixtureOnceHook"
+              }
+        , tag = "FixtureThreadHook"
+        }
+  , tag = "FixtureThreadHookRelease"
+  }
+
+  --- EXPECTED (wrong)
+    , ( Node
+        { parent =
+            Node
+              { parent =
+                  Node
+                    { parent =
+                        Node
+                          { parent = Node { parent = Root , tag = "ThreadHook" }
+                          , tag = "OnceHook"
+                          }
+                    , tag = "Fixture 0"
+                    }
+              , tag = "FixtureThreadHook"
+              }
+        , tag = "FixtureThreadHookRelease"
+        }
+  ----
+
+
+        Actual::
+        Start
+  { eventType = FixtureOnceHook
+  , loc =
+      Node
+        { parent =
+            Node
+              { parent =
+                  Node
+                    { parent = Node { parent = Root , tag = "ThreadHook" }
+                    , tag = "OnceHook"
+                    }
+              , tag = "Fixture 0"
+              }
+        , tag = "FixtureOnceHook"
+        }
+  , idx = 8
+  , threadId = SThreadId { display = "ThreadId 10775" }
+  }
+
+
+  Start
+  { eventType = TestHookRelease
+  , loc =
+      Node
+        { parent =
+            Node
+              { parent =
+                  Node
+                    { parent =
+                        Node
+                          { parent =
+                              Node
+                                { parent =
+                                    Node
+                                      { parent = Node { parent = Root , tag = "ThreadHook" }
+                                      , tag = "OnceHook"
+                                      }
+                                , tag = "Fixture 0"
+                                }
+                          , tag = "FixtureOnceHook"
+                          }
+                    , tag = "FixtureThreadHook"
+                    }
+              , tag = "TestHook :: 0"
+              }
+        , tag = "TestHookRelease :: 0"
+        }
+  , idx = 20
+  , threadId = SThreadId { display = "ThreadId 10775" }
+  }
+
+
+  End
+  { eventType = Test
+  , loc =
+      Node
+        { parent =
+            Node
+              { parent =
+                  Node
+                    { parent =
+                        Node
+                          { parent =
+                              Node
+                                { parent =
+                                    Node
+                                      { parent = Node { parent = Root , tag = "ThreadHook" }
+                                      , tag = "OnceHook"
+                                      }
+                                , tag = "Fixture 0"
+                                }
+                          , tag = "FixtureOnceHook"
+                          }
+                    , tag = "FixtureThreadHook"
+                    }
+              , tag = "TestHook :: 0"
+              }
+        , tag = "Test :: 0"
+        }
+  , idx = 19
+  , threadId = SThreadId { display = "ThreadId 10775" }
+  }
+        
+        -}
 
 lookupThrow :: (Ord k, Show k, Show v) => Text -> M.Map k v -> k -> v
 lookupThrow msg m k =
@@ -372,7 +533,7 @@ actualChildParentMap evs tid =
                 & ( \case
                       se@(Start eet childLoc n sti) ->
                         let etLoc = (eet, childLoc)
-                            oevts = etLoc : (openEvents & debug' ("\n++!!!!!!!!!!!!!!!!!!!! BEFORE ADD " <> txt i <> "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!++\n"))
+                            oevts = etLoc : openEvents
                             nxtparents =
                               releaseEventType eet
                                 & maybe
@@ -382,15 +543,8 @@ actualChildParentMap evs tid =
                               openParents & \case
                                 [] -> Root
                                 (_, ploc) : ps -> ploc
-                         in ( 
-                              nxtparents,
-                              debug'
-                                ( toS $
-                                    "!!!! ADDED !!!!\n"
-                                      <> ppShow se
-                                      <> "\n++!!!!!!!!!!!!!!!!!!!! AFTER ADD "<> show i <> "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!++\n"
-                                )
-                                oevts,
+                         in ( nxtparents,
+                              oevts,
                               M.insert childLoc parentLoc mp
                             )
                       --
@@ -424,15 +578,7 @@ actualChildParentMap evs tid =
                                   (evtt, evLoc) : oevs ->
                                     (endLoc == evLoc)
                                       ? ( nxtOpenParents,
-                                          debug'
-                                            ( toS $
-                                                ("--!!!!!!!!!!!!!!!!!!!! BEFORE SUBTRACT " <> show i <> "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--\n")
-                                                  <> ppShow openEvents
-                                                  <> "!!!! SUBTRACTED !!!!\n"
-                                                  <> ppShow ev
-                                                  <> "\n--!!!!!!!!!!!!!!!!!!!! AFTER SUBTRACT " <> show i <> "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--\n"
-                                            )
-                                            oevs,
+                                          oevs,
                                           mp
                                         )
                                       $ error
@@ -445,7 +591,7 @@ actualChildParentMap evs tid =
                   )
           )
           ([], [], M.empty)
-          (zip [0..] threadStartEnds & debug' "@@@@@@@ ALL START ENDS @@@@@")
+          (zip [0 ..] threadStartEnds)
    in result
   where
     threadStartEnds =
@@ -524,10 +670,10 @@ chkParentOrder rootTpl thrdEvts =
               ( \c p ->
                   chkEq'
                     ("actual parent child differs for child loc: " <> toS (ppShow c))
-                    (lookupThrow "child not found in expected map" expectedCPMap c)
+                    (lookupThrow "actual child not found in expected map" expectedCPMap c)
                     p
               )
-              $ debug' (toS $ "ACTUAL MAP\n" <> ppShow actual ) actual
+              $ debug' (toS $ "ACTUAL MAP\n" <> ppShow actual) actual
     )
     (nub (threadId <$> thrdEvts))
   where
@@ -1072,15 +1218,17 @@ errorPropagationStep accum@ChkErrAccum {initialised, lastStart, lastFailure, mat
         & maybe
           accum
           ( \lf@(lfLoc, _e, _et) ->
-              ST.member loc matchedFails
-                ? accum
+            if 
+              | isGrouping eventType -> accum
+              | ST.member loc matchedFails ->
+                 accum
                   { matchedFails = ST.delete loc matchedFails,
                     lastFailure =
                       (lfLoc == loc && endIsTerminal eventType)
                         ? Nothing
                         $ lastFailure
                   }
-                $ error
+              | otherwise -> error
                   ( "parent failure was not logged as expected within event ending with:\n"
                       <> ppShow ed
                       <> "\nexpected last failure"

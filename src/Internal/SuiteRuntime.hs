@@ -602,7 +602,7 @@ executeNode logger hkIn rg =
               thrdHkLoc = Node onceHkLoc $ txt L.FixtureThreadHook
               onceHkReleaseCtx = context . Node onceHkLoc $ txt L.FixtureOnceHookRelease
               threadHkCtx = context thrdHkLoc
-              threadHkReleaseCtx = context . Node thrdHkLoc $ txt L.FixtureOnceHookRelease
+              threadHkReleaseCtx = context . Node thrdHkLoc $ txt L.FixtureThreadHookRelease
               
               (<<::>>) t i = t <> " :: " <> i
               tstHkloc tstid = Node thrdHkLoc $ txt L.TestHook <<::>> tstid

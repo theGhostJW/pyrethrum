@@ -54,7 +54,7 @@
 * relude
 * chkFalse'
 * change uu to error
-* message serialisation
+
 * remove 
   * maybef
   * eitherf

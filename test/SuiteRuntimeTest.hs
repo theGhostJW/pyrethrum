@@ -285,136 +285,6 @@ childToParentMap =
              in (cl, accm')
         )
 
-        {- EXPECTED
-
-  --- ACTUAL
- Node
-  { parent =
-      Node
-        { parent =
-            Node
-              { parent =
-                  Node
-                    { parent =
-                        Node
-                          { parent = Node { parent = Root , tag = "ThreadHook" }
-                          , tag = "OnceHook"
-                          }
-                    , tag = "Fixture 0"
-                    }
-              , tag = "FixtureOnceHook"
-              }
-        , tag = "FixtureThreadHook"
-        }
-  , tag = "FixtureThreadHookRelease"
-  }
-
-  --- EXPECTED (wrong)
-    , ( Node
-        { parent =
-            Node
-              { parent =
-                  Node
-                    { parent =
-                        Node
-                          { parent = Node { parent = Root , tag = "ThreadHook" }
-                          , tag = "OnceHook"
-                          }
-                    , tag = "Fixture 0"
-                    }
-              , tag = "FixtureThreadHook"
-              }
-        , tag = "FixtureThreadHookRelease"
-        }
-  ----
-
-
-        Actual::
-        Start
-  { eventType = FixtureOnceHook
-  , loc =
-      Node
-        { parent =
-            Node
-              { parent =
-                  Node
-                    { parent = Node { parent = Root , tag = "ThreadHook" }
-                    , tag = "OnceHook"
-                    }
-              , tag = "Fixture 0"
-              }
-        , tag = "FixtureOnceHook"
-        }
-  , idx = 8
-  , threadId = SThreadId { display = "ThreadId 10775" }
-  }
-
-
-  Start
-  { eventType = TestHookRelease
-  , loc =
-      Node
-        { parent =
-            Node
-              { parent =
-                  Node
-                    { parent =
-                        Node
-                          { parent =
-                              Node
-                                { parent =
-                                    Node
-                                      { parent = Node { parent = Root , tag = "ThreadHook" }
-                                      , tag = "OnceHook"
-                                      }
-                                , tag = "Fixture 0"
-                                }
-                          , tag = "FixtureOnceHook"
-                          }
-                    , tag = "FixtureThreadHook"
-                    }
-              , tag = "TestHook :: 0"
-              }
-        , tag = "TestHookRelease :: 0"
-        }
-  , idx = 20
-  , threadId = SThreadId { display = "ThreadId 10775" }
-  }
-
-
-  End
-  { eventType = Test
-  , loc =
-      Node
-        { parent =
-            Node
-              { parent =
-                  Node
-                    { parent =
-                        Node
-                          { parent =
-                              Node
-                                { parent =
-                                    Node
-                                      { parent = Node { parent = Root , tag = "ThreadHook" }
-                                      , tag = "OnceHook"
-                                      }
-                                , tag = "Fixture 0"
-                                }
-                          , tag = "FixtureOnceHook"
-                          }
-                    , tag = "FixtureThreadHook"
-                    }
-              , tag = "TestHook :: 0"
-              }
-        , tag = "Test :: 0"
-        }
-  , idx = 19
-  , threadId = SThreadId { display = "ThreadId 10775" }
-  }
-        
-        -}
-
 lookupThrow :: (Ord k, Show k, Show v) => Text -> M.Map k v -> k -> v
 lookupThrow msg m k =
   (m M.!? k)
@@ -598,15 +468,15 @@ actualChildParentMap evs tid =
       filter
         ( \case
             StartExecution {} -> False
-            Start {threadId, eventType} -> include threadId eventType
-            End {threadId, eventType} -> include threadId eventType
+            Start {threadId, eventType} -> include' threadId eventType
+            End {threadId, eventType} -> include' threadId eventType
             Failure {} -> False
             ParentFailure {} -> False
             ApLog {} -> False
             EndExecution n sti -> False
         )
         evs
-    include thisTid evtt = isOnceEvent evtt || thisTid == tid
+    include' = eventBelongsToThread tid
 
     openEventType = \case
       L.FixtureThreadHookRelease -> Just L.FixtureThreadHook
@@ -659,6 +529,9 @@ boundaryInfo startEndFilter = \case
   ApLog {} -> Nothing
   EndExecution {} -> Nothing
 
+threadIds :: [ExeEvent] -> [SThreadId]
+threadIds thrdEvts = nub $ threadId <$> thrdEvts
+
 -- check immediate parent (preceeding start or following end) of each thread element
 -- ignoring non threaded events when checking tests ignore other test start / ends
 chkParentOrder :: Template -> [ExeEvent] -> IO ()
@@ -675,7 +548,7 @@ chkParentOrder rootTpl thrdEvts =
               )
               $ debug' (toS $ "ACTUAL MAP\n" <> ppShow actual) actual
     )
-    (nub (threadId <$> thrdEvts))
+    (threadIds thrdEvts)
   where
     actualCPMap = actualChildParentMap thrdEvts
     expectedCPMap = childToParentMap rootTpl
@@ -1175,8 +1048,8 @@ chkLaws mxThrds t evts =
         chkSingletonLeafEvents,
         chkOnceEventsAreBlocking,
         chkEventCounts t,
-        chkErrorPropagation,
-        chkOnceHksReleased
+        chkOnceHksReleased,
+        chkErrorPropagation2
       ]
     traverse_
       (threadedEvents &)
@@ -1186,7 +1059,7 @@ chkLaws mxThrds t evts =
         traverse_ chkTestEvtsConsecutive,
         chkThreadLeafEvents,
         traverse_ (chkParentOrder t),
-        chkThreadErrorPropagation,
+        chkErrorPropagationt_depricate,
         traverse_ chkThreadHksReleased
       ]
     T.chk'
@@ -1236,7 +1109,7 @@ errorPropagationStep accum@ChkErrAccum {initialised, lastStart, lastFailure, mat
                   )
           )
     f@Failure
-      { loc,
+      { loc = failLoc,
         msg,
         exception,
         idx,
@@ -1247,17 +1120,17 @@ errorPropagationStep accum@ChkErrAccum {initialised, lastStart, lastFailure, mat
             ( lastStart
                 & maybe
                   (error ("failure logged when outside of any event\n" <> ppShow f))
-                  ( \(loc', et) ->
-                      (==) loc loc'
+                  ( \(lastStartLoc, et) ->
+                      (==) failLoc lastStartLoc
                         ? accum
-                          { lastFailure = Just (loc, exception, et),
-                            matchedFails = ST.insert loc matchedFails
+                          { lastFailure = Just (failLoc, exception, et),
+                            matchedFails = ST.insert failLoc matchedFails
                           }
                         $ error
                           ( "failure loc does not equal loc of parent event:\nfailure loc\n"
-                              <> ppShow loc'
+                              <> ppShow lastStartLoc
                               <> "\nparent event:\n"
-                              <> ppShow loc
+                              <> ppShow failLoc
                           )
                   )
             )
@@ -1316,8 +1189,8 @@ chkThreadErrs evts =
             $ error ("chkThreadErrs error loc still open at end of thread: " <> show l)
       )
 
-chkThreadErrorPropagation :: [[ExeEvent]] -> IO ()
-chkThreadErrorPropagation = traverse_ chkThreadErrs
+chkErrorPropagationt_depricate :: [[ExeEvent]] -> IO ()
+chkErrorPropagationt_depricate = traverse_ chkThreadErrs
 
 chkHkReleased :: [ExeEvent] -> ExeEventType -> ExeEventType -> IO ()
 chkHkReleased evs hkType relType =
@@ -1383,8 +1256,50 @@ data RTLoc = RTLoc
 
 data Fail = Fail {floc :: Loc} | ParentFail {floc :: Loc, ploc :: Loc} deriving (Show, Eq, Ord)
 
-chkErrorPropagation :: [ExeEvent] -> IO ()
-chkErrorPropagation evts =
+eventBelongsToThread :: SThreadId -> SThreadId -> ExeEventType -> Bool
+eventBelongsToThread targetId eventId =  (||) (eventId == targetId) . isOnceEvent
+
+chkErrorPropagation2 :: [ExeEvent] -> IO ()
+chkErrorPropagation2 evts = 
+  traverse_ chkEvt evts
+  where 
+    chkEvt = uu
+
+    fails :: M.Map RTLoc Fail
+    fails =
+      foldl'
+        ( \acc -> \case
+            StartExecution {} -> acc
+            Start {} -> acc
+            End {} -> acc
+            Failure {loc, parentEventType, threadId} -> M.insert (mkRTLoc loc parentEventType threadId) (Fail loc) acc
+            ParentFailure {parentLoc = ploc, fEventType, parentEventType, loc = floc, threadId} -> 
+              M.insert (mkRTLoc floc fEventType threadId) (ParentFail {floc, ploc}) acc
+            ApLog {} -> acc
+            EndExecution {} -> acc
+        )
+        M.empty
+        evts
+
+
+    mkRTLoc :: Loc -> ExeEventType -> SThreadId -> RTLoc
+    mkRTLoc l et t =
+      RTLoc l et
+        $ isOnceEvent et
+          ? Singleton
+        $ Threaded t
+
+    
+  -- get actual parent map - done
+  -- get loc pass | failed | prent failed of actual - ignore groups - fixture / group
+  -- loc / thread / Nothing  to result to result
+  -- for each thread id include once in all threads and events of same thread
+  -- traverse parent tree and validate
+
+{-
+
+chkErrorPropagation_depricate :: [ExeEvent] -> IO ()
+chkErrorPropagation_depricate evts =
   traverse_
     ( \(p, cs) ->
         fails M.!? p
@@ -1459,7 +1374,8 @@ chkErrorPropagation evts =
             Start {} -> acc
             End {} -> acc
             Failure {loc, parentEventType, threadId} -> M.insert (mkRTLoc loc parentEventType threadId) (Fail loc) acc
-            ParentFailure {parentLoc = ploc, fEventType, parentEventType, loc = floc, threadId} -> M.insert (mkRTLoc floc fEventType threadId) (ParentFail {floc, ploc}) acc
+            ParentFailure {parentLoc = ploc, fEventType, parentEventType, loc = floc, threadId} -> 
+              M.insert (mkRTLoc floc fEventType threadId) (ParentFail {floc, ploc}) acc
             ApLog {} -> acc
             EndExecution {} -> acc
         )
@@ -1622,7 +1538,7 @@ chkErrorPropagation evts =
         )
         initMap
         evts
-
+-}
 chkOnceEventsAreBlocking :: [ExeEvent] -> IO ()
 chkOnceEventsAreBlocking evts =
   T.chk' ("event started not closed:\n" <> toS (ppShow openEvnt)) $ isNothing openEvnt

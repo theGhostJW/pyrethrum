@@ -7,25 +7,18 @@
   * deferred validation
   * posthoc failure analysis and defect reconciliation 
 ### laws
-* check fixture hooks are not firing on empty fixtures
-* check release
-* check for overlapping events - may already be done
-* check tests strat inside the right fixture
-* think about locs
+* check count of errors vs expected
 * verify treeshake
+* make hooks maybes
+* check release - may be done
+* check for overlapping events - may already be done
+* check tests strat inside the right fixture - may be done
+* think about locs
+* generalise hooks - nodeBracket frequency (Every | Thread | Once) (acc)
 * try validity??
 
 
-* move TestHook and TestHookRelease to bracket
-* hasCallStack see lib posted on reddit saved to pocket
-* REST
-* UI connect to PlaWRIGHT
-* defecto
-* trojan
-  * data
-  * shrinker
-* explain
-  * show workings
+
 
 ## Run Construction
 * switch to effectful
@@ -54,16 +47,28 @@
 * relude
 * chkFalse'
 * change uu to error
+  * uu Error -> txt 
 
 * remove 
   * maybef
   * eitherf
 * upgrade ghc
-* uu Error -> txt
 * format on debug'
 * switch to cabal
 * try removing crazy cradal (pyrethrum)
 * profiling
+
+## Other
+* move TestHook and TestHookRelease to bracket
+* hasCallStack see lib posted on reddit saved to pocket
+* REST
+* UI connect to PlaWRIGHT
+* defecto
+* trojan
+  * data
+  * shrinker
+* explain
+  * show workings
 
 ```haskell
 -- TODO - add tests add to pyrelude

@@ -467,7 +467,6 @@ executeNode logger hkIn rg =
     when
       wantRun
       case rg of
-        -- TODO - FIX LOC TO INCLUDE HK / HKRelease
         XTOHook
           { loc = hookLoc,
             status,
@@ -508,7 +507,6 @@ executeNode logger hkIn rg =
             thHookRelease,
             thChildNode
           } ->
-            -- TODO - FIX LOC TO INCLUDE HK / HKRelease
             do
               let nxtHkIn ti = (\exi -> exi {threadIn = ti}) <$> hkIn
                   recurse a = exeNxt a thChildNode

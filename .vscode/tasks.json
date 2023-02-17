@@ -22,11 +22,27 @@
       "problemMatcher": []
     },
     {
-      "label": "stack build inc test",
+      "label": "stack build",
       "type": "shell",
       "command": "stack",
       "args": [
-        "test",
+        "build",
+        "--fast",
+        "--ghc-options",
+        "-j4 +RTS -A128m -n2m -RTS"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "stack build watch",
+      "type": "shell",
+      "command": "stack",
+      "args": [
+        "build",
         "--file-watch",
         "--fast",
         "--ghc-options",
@@ -39,11 +55,27 @@
       "problemMatcher": []
     },
     {
-      "label": "stack build",
+      "label": "stack test",
       "type": "shell",
       "command": "stack",
       "args": [
-        "build",
+        "test",
+        "--fast",
+        "--ghc-options",
+        "-j4 +RTS -A128m -n2m -RTS"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "stack test watch",
+      "type": "shell",
+      "command": "stack",
+      "args": [
+        "test",
         "--file-watch",
         "--fast",
         "--ghc-options",

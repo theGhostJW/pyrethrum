@@ -149,7 +149,7 @@ mkParentFailure fl fet pl pet ex idx trd = ParentFailure  {
       } 
 
 
-newtype PException = PException {displayText :: [Text]} deriving (Show, Eq)
+newtype PException = PException {displayText :: [Text]} deriving (Show, Eq, Ord)
 newtype SThreadId = SThreadId { display :: Text} deriving (Show, Eq, Ord)
 
 data ExeEvent

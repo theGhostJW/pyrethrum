@@ -1,6 +1,6 @@
 cradle:
   stack:
-    stackYaml: "./stack.hls.yaml"
+    stackYaml: "./stack.yaml"
     components:
      - path: "./src"
        component: "pyrethrum:lib"

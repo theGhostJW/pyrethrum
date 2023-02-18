@@ -315,12 +315,12 @@ logFailure :: Logger -> Loc -> ExeEventType -> SomeException -> IO ()
 logFailure logger loc et e = logger (mkFailure loc et (txt et <> "Failed at: " <> txt loc) e)
 
 readOrLockHook :: TVar Status -> TMVar (Either Abandon ho) -> STM (Maybe (Either Abandon ho))
-readOrLockHook hs hVal = do
-  s <- readTVar hs
-  s
-    == Pending
-    ? (writeTVar hs HookExecuting >> pure Nothing)
-    $ (Just <$> readTMVar hVal)
+readOrLockHook hs hVal =
+  do
+    s <- readTVar hs
+    (==) s Pending
+      ? (writeTVar hs HookExecuting >> pure Nothing)
+      $ (Just <$> readTMVar hVal)
 
 setRunningVal :: TVar Status -> TMVar (Either Abandon ho) -> Either Abandon ho -> STM (Either Abandon ho)
 setRunningVal hs hVal eso = do
@@ -382,11 +382,10 @@ threadHookVal logger hkIn hkEvent hook ctx@Context {cloc, apLogger} =
   hkIn
     & either
       (\abandon -> abandonLogHook hkEvent logger abandon cloc)
-      (\(ExeIn si ti) -> 
-        let 
-          thrdHk loc aplgr = hook loc aplgr si
-        in
-         runLogHook hkEvent logger thrdHk ti ctx)
+      ( \(ExeIn si ti) ->
+          let thrdHk loc aplgr = hook loc aplgr si
+           in runLogHook hkEvent logger thrdHk ti ctx
+      )
 
 onceHookVal :: forall hi ho. Logger -> ExeEventType -> Either Abandon hi -> (Loc -> ApLogger -> hi -> IO ho) -> TVar Status -> TMVar (Either Abandon ho) -> Context -> IO (Either Abandon ho)
 onceHookVal logger hkEvent ehi hook hs hkVal ctx =
@@ -601,7 +600,7 @@ executeNode logger hkIn rg =
               onceHkReleaseCtx = context . Node onceHkLoc $ txt L.FixtureOnceHookRelease
               threadHkCtx = context thrdHkLoc
               threadHkReleaseCtx = context . Node thrdHkLoc $ txt L.FixtureThreadHookRelease
-              
+
               (<<::>>) t i = t <> " :: " <> i
               tstHkloc tstid = Node thrdHkLoc $ txt L.TestHook <<::>> tstid
               tstHkReleaseloc tstid = Node (tstHkloc tstid) $ txt L.TestHookRelease <<::>> tstid

@@ -13189,3 +13189,1690 @@ Launching haskell-language-server exe at:C:\ghcup\tmp\ghcup-ghc-9.0.2_cabal-3.6.
 
 ```
 # 18-02-2023
+* ghcid running
+
+```
+Error during compileC:\Users\thegh\AppData\Local\ghcide\main-c70615d89a7a639097b386336e61e4aed219e86e\Internal\ext806E: 
+renameFile:renamePath:MoveFileEx "\\\\?\\C:\\Users\\thegh\\AppData\\Local\\ghcide\\main-c70615d89a7a639097b386336e61e4aed219e86e\\Internal\\ext806E" Just "\\\\?\\C:\\Users\\thegh\\AppData\\Local\\ghcide\\main-c70615d89a7a639097b386336e61e4aed219e86e\\Internal\\SuiteRuntime.hi.core": permission denied (Access is denied.)
+
+2023-02-18 04:55:31.0110000 [client] INFO Finding haskell-language-server
+2023-02-18 04:55:31.0200000 [client] INFO Checking for ghcup installation
+2023-02-18 04:55:31.9920000 [client] INFO found ghcup at ghcup
+2023-02-18 04:55:31.9970000 [client] INFO Executing 'ghcup --no-verbose upgrade' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:55:41.6430000 [client] INFO Checking for ghcup installation
+2023-02-18 04:55:42.6510000 [client] INFO found ghcup at ghcup
+2023-02-18 04:55:42.6560000 [client] INFO Executing 'ghcup --no-verbose list -t hls -c installed -r' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:55:44.9190000 [client] INFO Checking for ghcup installation
+2023-02-18 04:55:45.7330000 [client] INFO found ghcup at ghcup
+2023-02-18 04:55:45.7380000 [client] INFO Executing 'ghcup --no-verbose list -t cabal -c installed -r' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:55:47.9950000 [client] INFO Checking for ghcup installation
+2023-02-18 04:55:49.3420000 [client] INFO found ghcup at ghcup
+2023-02-18 04:55:49.3470000 [client] INFO Executing 'ghcup --no-verbose list -t stack -c installed -r' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:55:54.2150000 [client] INFO Checking for ghcup installation
+2023-02-18 04:55:54.9900000 [client] INFO found ghcup at ghcup
+2023-02-18 04:55:54.9960000 [client] INFO Executing 'ghcup --no-verbose whereis hls 1.9.1.0' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:55:56.5390000 [client] INFO Checking for ghcup installation
+2023-02-18 04:55:57.4250000 [client] INFO found ghcup at ghcup
+2023-02-18 04:55:57.4280000 [client] INFO Executing 'ghcup --no-verbose whereis cabal 3.6.2.0' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:55:58.0000000 [client] INFO Checking for ghcup installation
+2023-02-18 04:55:58.7680000 [client] INFO found ghcup at ghcup
+2023-02-18 04:55:58.7730000 [client] INFO Executing 'ghcup --no-verbose whereis stack 2.9.1' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:56:00.0580000 [client] INFO Executing 'ghc.exe --numeric-version' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:56:00.6950000 [client] INFO Checking for ghcup installation
+2023-02-18 04:56:01.4480000 [client] INFO found ghcup at ghcup
+2023-02-18 04:56:01.4510000 [client] INFO Executing 'ghcup --no-verbose run --hls 1.9.1.0 --cabal 3.6.2.0 --stack 2.9.1 --install' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:56:04.7220000 [client] INFO Working out the project GHC version. This might take a while...
+2023-02-18 04:56:04.7280000 [client] INFO Executing 'haskell-language-server-wrapper --project-ghc-version' in cwd 'c:\Pyrethrum'
+2023-02-18 04:56:35.7100000 [client] INFO The GHC version for the project or file: 9.0.2
+2023-02-18 04:56:36.4060000 [client] INFO Platform constants: Windows, A_64
+2023-02-18 04:56:36.4080000 [client] INFO Checking for ghcup installation
+2023-02-18 04:56:37.3170000 [client] INFO found ghcup at ghcup
+2023-02-18 04:56:37.3200000 [client] INFO Executing 'ghcup --no-verbose list -t hls -c installed -r' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:56:37.8730000 [client] INFO Checking for ghcup installation
+2023-02-18 04:56:38.7170000 [client] INFO found ghcup at ghcup
+2023-02-18 04:56:38.7210000 [client] INFO Executing 'ghcup --no-verbose whereis bindir' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:56:39.0190000 [client] INFO Checking for ghcup installation
+2023-02-18 04:56:39.6700000 [client] INFO found ghcup at ghcup
+2023-02-18 04:56:39.6730000 [client] INFO Executing 'ghcup --no-verbose whereis hls 1.9.1.0' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:56:39.9480000 [client] INFO Checking for ghcup installation
+2023-02-18 04:56:40.6020000 [client] INFO found ghcup at ghcup
+2023-02-18 04:56:40.6050000 [client] INFO Executing 'ghcup --no-verbose whereis ghc 9.0.2' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:56:40.9170000 [client] INFO Checking for ghcup installation
+2023-02-18 04:56:42.2310000 [client] INFO found ghcup at ghcup
+2023-02-18 04:56:42.2350000 [client] INFO Executing 'ghcup --no-verbose run --hls 1.9.1.0 --cabal 3.6.2.0 --stack 2.9.1 --ghc 9.0.2 --install' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 04:56:46.5790000 [client] INFO Activating the language server in working dir: c:\Pyrethrum (the workspace folder)
+2023-02-18 04:56:46.5850000 [client] INFO run command: C:\ghcup\tmp\ghcup-ghc-9.0.2_cabal-3.6.2.0_hls-1.9.1.0_stack-2.9.1\haskell-language-server-wrapper.exe --lsp
+2023-02-18 04:56:46.5850000 [client] INFO debug command: C:\ghcup\tmp\ghcup-ghc-9.0.2_cabal-3.6.2.0_hls-1.9.1.0_stack-2.9.1\haskell-language-server-wrapper.exe --lsp
+2023-02-18 04:56:46.5850000 [client] INFO server environment variables:
+2023-02-18 04:56:46.5850000 [client] INFO   PATH=C:\ghcup\tmp\ghcup-ghc-9.0.2_cabal-3.6.2.0_hls-1.9.1.0_stack-2.9.1;C:\Python39\Scripts\;C:\Python39\;C:\Python27\;C:\Python27\Scripts;C:\ProgramData\Oracle\Java\javapath;C:\Program Files\Dell\DW WLAN Card;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files\WIDCOMM\Bluetooth Software\;C:\Program Files\WIDCOMM\Bluetooth Software\syswow64;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\TortoiseHg\;C:\Users\thegh\.dnx\bin;C:\Program Files\Microsoft DNX\Dnvm\;C:\Program Files\Microsoft SQL Server\130\Tools\Binn\;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\Program Files (x86)\scala\bin;C:\Users\thegh\AppData\Roaming\npm;C:\Program Files (x86)\Pandoc\;C:\Program Files (x86)\sbt\bin;C:\ProgramData\chocolatey\bin;C:\ProgramData\osquery;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\Program Files\Java\jdk1.8.0_131\bin;C:\Program Files\watchman;C:\Android\android-sdk\tools;C:\Android\android-sdk\platform-tools;C:\WINDOWS\System32\OpenSSH\;C:\Program Files\Microsoft VS Code\bin;C:\Program Files (x86)\Yarn\bin\;C:\Program Files\nodejs\;C:\Program Files\PowerShell\6\;C:\Program Files\TortoiseGit\bin;C:\Program Files\dotnet\;C:\Program Files (x86)\dotnet\;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files\PuTTY\;C:\Program Files\Graphviz\bin;C:\Program Files\Docker\Docker\resources\bin;C:\ProgramData\DockerDesktop\version-bin;C:\Program Files\NVIDIA Corporation\NVIDIA NvDLISR;C:\Program Files\Git\cmd;C:\ghcup\bin;C:\Users\thegh\.dotnet\tools;C:\Program Files\dotnet\;C:\Program Files\dotnet\dotnet.exe;C:\Ruby25-x64\bin;C:\Users\thegh\AppData\Roaming\local\bin\stack.exe;C:\Users\thegh\AppData\Local\atom\bin;C:\Users\thegh\AppData\Roaming\local\bin\;C:\Users\thegh\AppData\Local\Microsoft\WindowsApps;C:\Program Files\Git\bin;C:\Program Files\Git\cmd;C:\Program Files\gheckoWebDriver;C:\Users\thegh\AppData\Local\Programs\stack\x86_64-windows\ghc-8.2.2\bin;C:\Program Files\Hasktags;C:\Program Files\Microsoft VS Code\bin;C:\Program Files (x86)\Oni;C:\Users\thegh\AppData\Local\Yarn\bin;C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\thegh\AppData\Roaming\npm;C:\Users\thegh\AppData\Roaming\npm\node_modules\typescript\bin;C:\Users\thegh\AppData\Local\GitHubDesktop\bin;C:\Users\thegh\AppData\Local\Pandoc\;
+2023-02-18 04:56:46.6330000 [client] INFO Starting language server
+Found "c:\Pyrethrum\hie.yaml" for "c:\Pyrethrum\a"
+Run entered for haskell-language-server-wrapper(haskell-language-server-wrapper-1.9.1.0.exe) Version 1.9.1.0 x86_64 ghc-9.2.6
+Current directory: c:\Pyrethrum
+Operating system: mingw32
+Arguments: ["--lsp"]
+Cradle directory: c:\Pyrethrum
+Cradle type: Stack
+
+Tool versions found on the $PATH
+cabal:          3.6.2.0
+stack:          2.9.1
+ghc:            9.0.1
+
+
+Consulting the cradle to get project GHC version...
+Project GHC version: 9.0.2
+haskell-language-server exe candidates: ["haskell-language-server-9.0.2.exe","haskell-language-server.exe"]
+Launching haskell-language-server exe at:C:\ghcup\tmp\ghcup-ghc-9.0.2_cabal-3.6.2.0_hls-1.9.1.0_stack-2.9.1\haskell-language-server-9.0.2.exe
+2023-02-18T04:57:16.667272Z | Info | No log file specified; using stderr.
+2023-02-18T04:57:16.682861Z | Info | haskell-language-server version: 1.9.1.0 (GHC: 9.0.2) (PATH: C:\ghcup\bin\haskell-language-server-9.0.2~1.9.1.0.exe)
+2023-02-18T04:57:16.682861Z | Info | Directory: c:\Pyrethrum
+2023-02-18T04:57:16.682861Z | Info | Starting (haskell-language-server) LSP server...
+  GhcideArguments {argsCommand = LSP, argsCwd = Nothing, argsShakeProfiling = Nothing, argsTesting = False, argsExamplePlugin = False, argsDebugOn = False, argsLogFile = Nothing, argsThreads = 0, argsProjectGhcVersion = False}
+  PluginIds: [ pragmas
+             , LSPRecorderCallback
+             , rename
+             , ghcide-completions
+             , class
+             , refineImports
+             , splice
+             , cabal
+             , changeTypeSignature
+             , qualifyImportedNames
+             , alternateNumberFormat
+             , hlint
+             , cabalfmt
+             , explicit-fields
+             , ghcide-code-actions-fill-holes
+             , floskell
+             , ghcide-extend-import-action
+             , codeRange
+             , haddockComments
+             , importLens
+             , retrie
+             , ghcide-type-lenses
+             , ghcide-code-actions-imports-exports
+             , ghcide-hover-and-symbols
+             , eval
+             , gadt
+             , fourmolu
+             , tactics
+             , callHierarchy
+             , stylish-haskell
+             , ghcide-code-actions-type-signatures
+             , ghcide-code-actions-bindings
+             , moduleName
+             , ormolu
+             , ghcide-core
+             , explicit-fixity ]
+2023-02-18T04:57:16.705044Z | Info | Logging heap statistics every 60.00s
+ 2023-02-18T04:57:16.737471Z | Info | Starting LSP server...
+  If you are seeing this in a terminal, you probably should have run WITHOUT the --lsp option!
+  PluginIds: [ pragmas
+             , LSPRecorderCallback
+             , rename
+             , ghcide-completions
+             , class
+             , refineImports
+             , splice
+             , cabal
+             , changeTypeSignature
+             , qualifyImportedNames
+             , alternateNumberFormat
+             , hlint
+             , cabalfmt
+             , explicit-fields
+             , ghcide-code-actions-fill-holes
+             , floskell
+             , ghcide-extend-import-action
+             , codeRange
+             , haddockComments
+             , importLens
+             , retrie
+             , ghcide-type-lenses
+             , ghcide-code-actions-imports-exports
+             , ghcide-hover-and-symbols
+             , eval
+             , gadt
+             , fourmolu
+             , tactics
+             , callHierarchy
+             , stylish-haskell
+             , ghcide-code-actions-type-signatures
+             , ghcide-code-actions-bindings
+             , moduleName
+             , ormolu
+             , ghcide-core
+             , explicit-fixity ]
+2023-02-18T04:57:16.739469Z | Info | Starting server
+2023-02-18T04:57:16.764465Z | Info | Started LSP server in 0.03s
+2023-02-18T04:57:59.759729Z | Info | Registering IDE configuration: IdeConfiguration {workspaceFolders = fromList [NormalizedUri 577147563957033084 "file:///C:/Pyrethrum"], clientSettings = hashed Nothing}
+[Info  - 3:57:59 PM] haskell-language-server version: 1.9.1.0 (GHC: 9.0.2) (PATH: C:\ghcup\bin\haskell-language-server-9.0.2~1.9.1.0.exe)
+[Info  - 3:57:59 PM] Directory: c:\Pyrethrum
+[Info  - 3:57:59 PM] Starting (haskell-language-server) LSP server...
+  GhcideArguments {argsCommand = LSP, argsCwd = Nothing, argsShakeProfiling = Nothing, argsTesting = False, argsExamplePlugin = False, argsDebugOn = False, argsLogFile = Nothing, argsThreads = 0, argsProjectGhcVersion = False}
+  PluginIds: [ pragmas
+             , LSPRecorderCallback
+             , rename
+             , ghcide-completions
+             , class
+             , refineImports
+             , splice
+             , cabal
+             , changeTypeSignature
+             , qualifyImportedNames
+             , alternateNumberFormat
+             , hlint
+             , cabalfmt
+             , explicit-fields
+             , ghcide-code-actions-fill-holes
+             , floskell
+             , ghcide-extend-import-action
+             , codeRange
+             , haddockComments
+             , importLens
+             , retrie
+             , ghcide-type-lenses
+             , ghcide-code-actions-imports-exports
+             , ghcide-hover-and-symbols
+             , eval
+             , gadt
+             , fourmolu
+             , tactics
+             , callHierarchy
+             , stylish-haskell
+             , ghcide-code-actions-type-signatures
+             , ghcide-code-actions-bindings
+             , moduleName
+             , ormolu
+             , ghcide-core
+             , explicit-fixity ]
+[Info  - 3:57:59 PM] Logging heap statistics every 60.00s
+[Info  - 3:57:59 PM] Starting LSP server...
+  If you are seeing this in a terminal, you probably should have run WITHOUT the --lsp option!
+  PluginIds: [ pragmas
+             , LSPRecorderCallback
+             , rename
+             , ghcide-completions
+             , class
+             , refineImports
+             , splice
+             , cabal
+             , changeTypeSignature
+             , qualifyImportedNames
+             , alternateNumberFormat
+             , hlint
+             , cabalfmt
+             , explicit-fields
+             , ghcide-code-actions-fill-holes
+             , floskell
+             , ghcide-extend-import-action
+             , codeRange
+             , haddockComments
+             , importLens
+             , retrie
+             , ghcide-type-lenses
+             , ghcide-code-actions-imports-exports
+             , ghcide-hover-and-symbols
+             , eval
+             , gadt
+             , fourmolu
+             , tactics
+             , callHierarchy
+             , stylish-haskell
+             , ghcide-code-actions-type-signatures
+             , ghcide-code-actions-bindings
+             , moduleName
+             , ormolu
+             , ghcide-core
+             , explicit-fixity ]
+[Info  - 3:57:59 PM] Starting server
+[Info  - 3:57:59 PM] Started LSP server in 0.03s
+[Info  - 3:57:59 PM] Registering IDE configuration: IdeConfiguration {workspaceFolders = fromList [NormalizedUri 577147563957033084 "file:///C:/Pyrethrum"], clientSettings = hashed Nothing}
+2023-02-18T04:57:59.975176Z | Info | Cradle path: test\SuiteRuntimeTest.hs
+[Info  - 3:57:59 PM] Cradle path: test\SuiteRuntimeTest.hs
+2023-02-18T04:57:59.992180Z | Info | Cradle path: src\Internal\SuiteRuntime.hs
+[Info  - 3:58:00 PM] Cradle path: src\Internal\SuiteRuntime.hs
+2023-02-18T04:58:00.163006Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T04:58:00.164008Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T04:58:00.164008Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T04:58:00.165007Z | Warning | retrie: InternalError: typecheck
+2023-02-18T04:58:00.165007Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 3:58:00 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 3:58:00 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 3:58:00 PM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 3:58:00 PM] retrie: InternalError: typecheck
+[Warn  - 3:58:00 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T04:58:00.289342Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 3:58:00 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T04:58:00.536584Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T04:58:00.536584Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T04:58:00.536584Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T04:58:00.537588Z | Warning | retrie: InternalError: typecheck
+2023-02-18T04:58:00.537588Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 3:58:00 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 3:58:00 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 3:58:00 PM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 3:58:00 PM] retrie: InternalError: typecheck
+[Warn  - 3:58:00 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T04:58:01.364960Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T04:58:01.364960Z | Warning | eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+2023-02-18T04:58:01.364960Z | Warning | moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+[Warn  - 3:58:01 PM] class: InternalError: Unable to typecheck
+[Warn  - 3:58:01 PM] eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+[Warn  - 3:58:01 PM] moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+2023-02-18T04:58:14.808779Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T04:58:14.808779Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T04:58:14.808779Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T04:58:14.809779Z | Warning | retrie: InternalError: typecheck
+2023-02-18T04:58:14.809779Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 3:58:14 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 3:58:14 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 3:58:14 PM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 3:58:14 PM] retrie: InternalError: typecheck
+[Warn  - 3:58:14 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T04:58:15.931584Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T04:58:15.931584Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T04:58:15.932588Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T04:58:15.932588Z | Warning | retrie: InternalError: typecheck
+2023-02-18T04:58:15.932588Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 3:58:15 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 3:58:15 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 3:58:15 PM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 3:58:15 PM] retrie: InternalError: typecheck
+[Warn  - 3:58:16 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T04:58:16.724826Z | Info | Live bytes: 24.06MB Heap size: 577.77MB
+[Info  - 3:58:16 PM] Live bytes: 24.06MB Heap size: 577.77MB
+2023-02-18T04:58:16.753817Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 3:58:16 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T04:58:16.830748Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T04:58:16.831745Z | Warning | eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+2023-02-18T04:58:16.831745Z | Warning | moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+[Warn  - 3:58:16 PM] class: InternalError: Unable to typecheck
+[Warn  - 3:58:16 PM] eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+[Warn  - 3:58:16 PM] moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+2023-02-18T04:58:16.864762Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T04:58:16.864762Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T04:58:16.865745Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T04:58:16.865745Z | Warning | retrie: InternalError: typecheck
+2023-02-18T04:58:16.865745Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 3:58:16 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 3:58:16 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 3:58:16 PM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 3:58:16 PM] retrie: InternalError: typecheck
+[Warn  - 3:58:16 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T04:58:36.885552Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T04:58:36.886551Z | Warning | eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+2023-02-18T04:58:36.886551Z | Warning | moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+[Warn  - 3:58:36 PM] class: InternalError: Unable to typecheck
+[Warn  - 3:58:36 PM] eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+[Warn  - 3:58:36 PM] moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+2023-02-18T04:58:36.901563Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T04:58:36.902559Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T04:58:36.902559Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 3:58:36 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T04:58:36.902559Z | Warning | retrie: InternalError: typecheck
+2023-02-18T04:58:36.902559Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 3:58:36 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 3:58:36 PM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 3:58:36 PM] retrie: InternalError: typecheck
+[Warn  - 3:58:36 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T04:59:12.047387Z | Info | Interface files cache directory: C:\Users\thegh\AppData\Local\ghcide\main-c70615d89a7a639097b386336e61e4aed219e86e
+2023-02-18T04:59:12.049339Z | Info | Making new HscEnv. In-place unit ids: [main]
+[Info  - 3:59:12 PM] Interface files cache directory: C:\Users\thegh\AppData\Local\ghcide\main-c70615d89a7a639097b386336e61e4aed219e86e
+[Info  - 3:59:12 PM] Making new HscEnv. In-place unit ids: [main]
+2023-02-18T04:59:16.739665Z | Info | Live bytes: 52.31MB Heap size: 657.46MB
+[Info  - 3:59:16 PM] Live bytes: 52.31MB Heap size: 657.46MB
+2023-02-18T05:00:16.754523Z | Info | Live bytes: 234.45MB Heap size: 898.63MB
+[Info  - 4:00:16 PM] Live bytes: 234.45MB Heap size: 898.63MB
+2023-02-18T05:01:16.769050Z | Info | Live bytes: 249.75MB Heap size: 898.63MB
+[Info  - 4:01:16 PM] Live bytes: 249.75MB Heap size: 898.63MB
+2023-02-18T05:02:16.770696Z | Info | Live bytes: 249.75MB Heap size: 898.63MB
+[Info  - 4:02:16 PM] Live bytes: 249.75MB Heap size: 898.63MB
+2023-02-18T05:03:16.795797Z | Info | Live bytes: 282.17MB Heap size: 898.63MB
+[Info  - 4:03:16 PM] Live bytes: 282.17MB Heap size: 898.63MB
+2023-02-18T05:04:16.797187Z | Info | Live bytes: 280.74MB Heap size: 898.63MB
+[Info  - 4:04:16 PM] Live bytes: 280.74MB Heap size: 898.63MB
+2023-02-18T05:05:04.300319Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:05:04 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-18T05:05:16.805619Z | Info | Live bytes: 290.35MB Heap size: 1118.83MB
+[Info  - 4:05:16 PM] Live bytes: 290.35MB Heap size: 1118.83MB
+2023-02-18T05:06:16.813572Z | Info | Live bytes: 290.35MB Heap size: 1118.83MB
+[Info  - 4:06:16 PM] Live bytes: 290.35MB Heap size: 1118.83MB
+2023-02-18T05:07:16.817191Z | Info | Live bytes: 290.35MB Heap size: 1118.83MB
+[Info  - 4:07:16 PM] Live bytes: 290.35MB Heap size: 1118.83MB
+2023-02-18T05:08:16.829633Z | Info | Live bytes: 290.35MB Heap size: 1118.83MB
+[Info  - 4:08:16 PM] Live bytes: 290.35MB Heap size: 1118.83MB
+2023-02-18T05:09:16.831965Z | Info | Live bytes: 290.35MB Heap size: 1118.83MB
+[Info  - 4:09:16 PM] Live bytes: 290.35MB Heap size: 1118.83MB
+2023-02-18T05:10:16.839922Z | Info | Live bytes: 290.35MB Heap size: 1118.83MB
+[Info  - 4:10:16 PM] Live bytes: 290.35MB Heap size: 1118.83MB
+2023-02-18T05:11:16.855883Z | Info | Live bytes: 310.74MB Heap size: 1118.83MB
+[Info  - 4:11:16 PM] Live bytes: 310.74MB Heap size: 1118.83MB
+2023-02-18T05:12:16.870703Z | Info | Live bytes: 310.74MB Heap size: 1118.83MB
+[Info  - 4:12:16 PM] Live bytes: 310.74MB Heap size: 1118.83MB
+2023-02-18T05:13:16.878129Z | Info | Live bytes: 310.74MB Heap size: 1118.83MB
+[Info  - 4:13:16 PM] Live bytes: 310.74MB Heap size: 1118.83MB
+2023-02-18T05:14:16.885614Z | Info | Live bytes: 310.74MB Heap size: 1118.83MB
+[Info  - 4:14:16 PM] Live bytes: 310.74MB Heap size: 1118.83MB
+2023-02-18T05:15:16.890471Z | Info | Live bytes: 305.81MB Heap size: 1118.83MB
+[Info  - 4:15:16 PM] Live bytes: 305.81MB Heap size: 1118.83MB
+2023-02-18T05:16:16.897007Z | Info | Live bytes: 305.81MB Heap size: 1118.83MB
+[Info  - 4:16:16 PM] Live bytes: 305.81MB Heap size: 1118.83MB
+2023-02-18T05:16:21.561493Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:16:21 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:16:21.607489Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:16:21 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:16:21.616487Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:21.617487Z | Warning | retrie: InternalError: pos
+[Warn  - 4:16:21 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:21 PM] retrie: InternalError: pos
+2023-02-18T05:16:21.941492Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:21.942498Z | Warning | retrie: InternalError: pos
+[Warn  - 4:16:21 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:21 PM] retrie: InternalError: pos
+2023-02-18T05:16:23.751806Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:23 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:26.646185Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:16:26 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:16:27.300691Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:27 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:28.684505Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:16:28 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:16:28.712498Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:28 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:28.925501Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:16:28 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:16:29.011505Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:29 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:31.081448Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\ExeNode.hs"
+                                                                                                          , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+[Info  - 4:16:31 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\ExeNode.hs"
+                                                                                                          , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+2023-02-18T05:16:31.945700Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:16:31 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:16:37.026381Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:16:37 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:16:37.142310Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:37 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:37.293056Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:16:37 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:16:37.494540Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:37 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:42.303319Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:16:42 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:16:49.467569Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:49 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:51.033320Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:16:51 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:16:51.061118Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:51 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:51.648043Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:16:51 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:16:51.695540Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:51 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:52.366746Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:16:52 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:16:52.903642Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:52 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:54.181432Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:16:54 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:16:54.562828Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:54 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:16:54.845501Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:16:54 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:16:56.691603Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:16:56 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:17:16.907390Z | Info | Live bytes: 310.99MB Heap size: 1224.74MB
+[Info  - 4:17:16 PM] Live bytes: 310.99MB Heap size: 1224.74MB
+2023-02-18T05:17:24.683661Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\ExeNode.hs"
+                                                                                                          , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+[Info  - 4:17:24 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\ExeNode.hs"
+                                                                                                          , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+2023-02-18T05:17:43.270186Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\ExeNode.hs"
+                                                                                                          , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+[Info  - 4:17:43 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\ExeNode.hs"
+                                                                                                          , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+2023-02-18T05:18:08.862007Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\ExeNode.hs"
+                                                                                                          , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+[Info  - 4:18:08 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\ExeNode.hs"
+                                                                                                          , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+2023-02-18T05:18:16.922188Z | Info | Live bytes: 412.69MB Heap size: 1238.37MB
+[Info  - 4:18:16 PM] Live bytes: 412.69MB Heap size: 1238.37MB
+2023-02-18T05:19:16.931543Z | Info | Live bytes: 412.69MB Heap size: 1238.37MB
+[Info  - 4:19:16 PM] Live bytes: 412.69MB Heap size: 1238.37MB
+2023-02-18T05:20:16.937118Z | Info | Live bytes: 412.69MB Heap size: 1238.37MB
+[Info  - 4:20:16 PM] Live bytes: 412.69MB Heap size: 1238.37MB
+2023-02-18T05:21:16.950131Z | Info | Live bytes: 412.69MB Heap size: 1238.37MB
+[Info  - 4:21:16 PM] Live bytes: 412.69MB Heap size: 1238.37MB
+2023-02-18T05:22:16.963288Z | Info | Live bytes: 448.90MB Heap size: 1238.37MB
+[Info  - 4:22:16 PM] Live bytes: 448.90MB Heap size: 1238.37MB
+2023-02-18T05:22:57.872801Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:22:57.872801Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:22:57.873800Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:22:57.873800Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:22:57 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:22:57 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:22:57 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:22:57 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:22:58.485264Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:22:58.486268Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:22:58.486268Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:22:58.486268Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:22:58 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:22:58 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:22:58 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:22:58 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:22:59.975005Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:22:59.976006Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:22:59.976006Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:22:59.976006Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:00 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:00 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:00 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:00 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:00.114061Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:00.114061Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:00.114061Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:00.114061Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:00 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:00 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:00 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:00 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:00.405553Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:00 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:00.527133Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:00 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:01.687003Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:01 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:01.928592Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:01 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:02.915454Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:02.915454Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:02.915454Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:02.915454Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:02 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:02 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:02 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:02 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:03.620083Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:03 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:03.813427Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:03 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:04.833270Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:04.833270Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:04.833270Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:04.834262Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:04 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:04 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:04 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:04 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:06.044199Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:06 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:06.222310Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:06 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:06.948234Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:06 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:07.043543Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:07 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:09.480396Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:09 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:09.642113Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:09 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:09.938293Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:09 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:10.030840Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:10.030840Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:10.031837Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:10.031837Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:10 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:10 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:10 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:10 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:10.071840Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:10 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:10.831756Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:10 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:10.980927Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:10 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:11.706409Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:11 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:11.929864Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:11 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:12.166059Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:12 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:14.601042Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:14.601042Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:14.601042Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:14.601042Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:14 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:14 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:14 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:14 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:14.835492Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:14 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:14.841489Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:14 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:15.001378Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:15 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:15.052990Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:15.052990Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:15.062063Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:15.062063Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:15 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:15 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:15 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:15 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:15.073469Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:15 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:15.317531Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:15 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:15.442689Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:15 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:15.446699Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:15.446699Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:15.446699Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:15.446699Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:15 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:15 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:15 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:15 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:16.021862Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:16 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:16.216178Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:16 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:16.485045Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:16 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:16.562041Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:16 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:16.720049Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:16 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:16.800959Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:16.801955Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:16.801955Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:16.801955Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:16 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:16 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:16 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:16 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:16.821244Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:16.821244Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:16.821244Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:16.821244Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:16 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:16 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:16 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:16 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:16.861970Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:16 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:16.976954Z | Info | Live bytes: 489.45MB Heap size: 1238.37MB
+[Info  - 4:23:16 PM] Live bytes: 489.45MB Heap size: 1238.37MB
+2023-02-18T05:23:17.322763Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:17 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:17.502170Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:17 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:18.415879Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:18 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:18.502886Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:18 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:18.870701Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:18.870701Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:18.870701Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:18.870701Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:18 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:18 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:18 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:18 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:21.082080Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:21 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:21.135064Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:21 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:21.912810Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:21 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:21.991809Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:21 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:23.542818Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:23 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:23.648820Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:23 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:27.342357Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:27 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:27.601858Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:27 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:27.871163Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:27 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:27.991931Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:27 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:33.244755Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:33 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:33.288751Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:33.289822Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:33.289822Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:33.290754Z | Warning | retrie: InternalError: pos
+2023-02-18T05:23:33.290754Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:33 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:33 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:33 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:33 PM] retrie: InternalError: pos
+[Warn  - 4:23:33 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:33.324750Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:33 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:33.836755Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:33.881750Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:33.881750Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:33.881750Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:33.882750Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:33 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:33 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:33 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:33 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:33 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:34.368883Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:34 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:34.785434Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:34 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:34.900670Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:34.900670Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:34.900670Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:34.901654Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:34 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:34 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:34 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:34 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:34.924642Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:34 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:35.803693Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:35 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:36.050061Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:36 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:36.214211Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:36 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:37.052633Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:37 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:37.102972Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:37.103973Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:37.103973Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:37.103973Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:37 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:37 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:37 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:37 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:37.109961Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:37.110965Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:37.110965Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:37.110965Z | Warning | retrie: InternalError: pos
+2023-02-18T05:23:37.110965Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:37 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:37 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:37 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:37 PM] retrie: InternalError: pos
+[Warn  - 4:23:37 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:37.192273Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:37 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:39.243241Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:39.243241Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:39 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:39.243241Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:39.244245Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:39 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:39 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:39 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:40.434977Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:40 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:40.610008Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:40.610008Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:40.611006Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:40.611006Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:40 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:40 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:40 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:40 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:41.175811Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:41 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:41.296644Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:41.297643Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:41.297643Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:41.297643Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:41 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:41 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:41 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:41 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:41.520003Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:41 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:41.635458Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:41.635458Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:41.636436Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:41.636436Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:41 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:41 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:41 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:41.674997Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:41 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:41 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:46.732126Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:46 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:52.156387Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:52.157371Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:52.157371Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:52 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:52.157371Z | Warning | retrie: InternalError: pos
+2023-02-18T05:23:52.157371Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:52 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:52 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:52 PM] retrie: InternalError: pos
+[Warn  - 4:23:52 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:23:53.188858Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:23:53 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:23:53.358857Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:53 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:58.306608Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:23:58 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:23:59.818463Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:23:59.818463Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:23:59.818463Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:23:59.818463Z | Warning | retrie: InternalError: pos
+2023-02-18T05:23:59.818463Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:23:59 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:23:59 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:23:59 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:23:59 PM] retrie: InternalError: pos
+[Warn  - 4:23:59 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:02.056787Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:02.090782Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:02.090782Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:02.091787Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:02.091787Z | Warning | retrie: InternalError: pos
+2023-02-18T05:24:02.091787Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:02 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:02 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:02 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:02 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:02 PM] retrie: InternalError: pos
+[Warn  - 4:24:02 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:02.752615Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:02 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:02.835919Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:02.836915Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:02.836915Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:02.836915Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:02.877925Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:02 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:02 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:02 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:02 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:02 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:03.132262Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:03.132262Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:03.132262Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:03.133260Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:03 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:03 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:03 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:03 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:07.664317Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:07 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:09.919605Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:09.920603Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:09.920603Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:09.920603Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:09 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:09 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:09 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:09 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:11.531171Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:11 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:11.557172Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:11.557172Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:11.558173Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:11.558173Z | Warning | retrie: InternalError: pos
+2023-02-18T05:24:11.558173Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:11 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:11 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:11 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:11 PM] retrie: InternalError: pos
+[Warn  - 4:24:11 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:11.870161Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:11 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:12.192759Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:12.192759Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:12.192759Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:12.193745Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:12 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:12 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:12 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:12 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:12.753741Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:12 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:13.143988Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:13 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:13.702165Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:13 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:14.314015Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:14 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:15.283453Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:15 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:15.323465Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:15.323465Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:15 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:15.323465Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:15.324452Z | Warning | retrie: InternalError: pos
+2023-02-18T05:24:15.324452Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:15 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:15 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:15 PM] retrie: InternalError: pos
+[Warn  - 4:24:15 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:15.355468Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:15 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:16.712643Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:16 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:16.979527Z | Info | Live bytes: 243.42MB Heap size: 1320.16MB
+[Info  - 4:24:16 PM] Live bytes: 243.42MB Heap size: 1320.16MB
+2023-02-18T05:24:17.914272Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:17.915274Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:17.915274Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:17.915274Z | Warning | retrie: InternalError: pos
+2023-02-18T05:24:17.916273Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:17 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:17 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:17 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:17 PM] retrie: InternalError: pos
+[Warn  - 4:24:17 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:18.131273Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:18 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:18.251858Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:18.252846Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:18.252846Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:18.252846Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:18 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:18 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:18 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:18 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:18.399133Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:18 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:22.837896Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:22 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:22.921908Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:22 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:23.349990Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:23 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:23.407986Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:23.407986Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:23.407986Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:23.407986Z | Warning | retrie: InternalError: pos
+2023-02-18T05:24:23.408986Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:23 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:23 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:23 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:23 PM] retrie: InternalError: pos
+[Warn  - 4:24:23 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:23.575291Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:23 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:23.992015Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:23.992015Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:23.992015Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:23 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:23.993012Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:23 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:23 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:23 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:24.416544Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:24 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:24.679122Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:24 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:24.773616Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:24 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:24.788613Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:24.788613Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:24.788613Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:24.789607Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:24 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:24 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:24 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:24 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:25.373361Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:25 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:25.911356Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:25 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:25.981351Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:25 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:26.338719Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:26 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:26.420760Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:26 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:28.069085Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:28 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:28.118632Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:28 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:28.385653Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:28.385653Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:28.385653Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:28.386646Z | Warning | retrie: InternalError: pos
+2023-02-18T05:24:28.386646Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:28 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:28 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:28 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:28 PM] retrie: InternalError: pos
+[Warn  - 4:24:28 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:28.824434Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:28 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:31.211427Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:31.212308Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:31.212308Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:31 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:31 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:31 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:31.255014Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:31.256005Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:31.256005Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:31.256005Z | Warning | retrie: InternalError: pos
+2023-02-18T05:24:31.256005Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:31 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:31 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:31 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:31 PM] retrie: InternalError: pos
+[Warn  - 4:24:31 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:31.377008Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T05:24:31.377008Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T05:24:31.377008Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:31 PM] class: InternalError: Unable to typecheck
+[Warn  - 4:24:31 PM] class: InternalError: Unable to typecheck
+[Warn  - 4:24:31 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:31.413820Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:31.413820Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:31.413820Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:31.413820Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:31 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:31 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:31 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:31 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:31.417815Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:31.417815Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:31.417815Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:31.417815Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:31 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:31 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:31 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:31 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:35.270187Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:35.271175Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:35.271175Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:35.271175Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:35 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:35 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:35 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:35 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:35.276183Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:35 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:36.967133Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:36 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:37.528669Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:37.529669Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:37.529669Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:37.529669Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:37 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:37 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:37 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:37 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:39.225592Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:39.225592Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:39.226605Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:39.226605Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:39 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:39 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:39 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:39 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:39.755721Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:39 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:40.527831Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:40 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:40.546817Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:40.546817Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:40.546817Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:40.547820Z | Warning | retrie: InternalError: pos
+2023-02-18T05:24:40.547820Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:40 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:40 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:40 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:40 PM] retrie: InternalError: pos
+[Warn  - 4:24:40 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:40.961817Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:40 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:41.587644Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:41 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:41.805633Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:41 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:44.227661Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:44.227661Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:44.228677Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:44 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:44.228677Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:44 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:44 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:44 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:44.259674Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:44 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:45.029264Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:45 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:45.284259Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:45 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:45.371259Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:45.372260Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:45.372260Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:45 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:45.372260Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:45 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:45 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:45 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:47.817114Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:24:47 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:24:48.077791Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:48 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:53.101297Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:53 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:24:55.453893Z | Warning | LSP: no handler for: SCustomMethod "$/setTrace"
+[Warn  - 4:24:55 PM] LSP: no handler for: SCustomMethod "$/setTrace"
+2023-02-18T05:24:57.819513Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:24:57.820511Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:24:57.820511Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:24:57.820511Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:24:57 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:24:57 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:24:57 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:24:57 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:24:58.189109Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:24:58 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:25:16.999539Z | Info | Live bytes: 248.36MB Heap size: 1320.16MB
+[Info  - 4:25:17 PM] Live bytes: 248.36MB Heap size: 1320.16MB
+2023-02-18T05:25:25.016758Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:25:25 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:25:25.103804Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:25:25 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:25:30.110395Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:25:30 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:26:17.004713Z | Info | Live bytes: 248.36MB Heap size: 1320.16MB
+[Info  - 4:26:17 PM] Live bytes: 248.36MB Heap size: 1320.16MB
+2023-02-18T05:27:17.009496Z | Info | Live bytes: 248.36MB Heap size: 1320.16MB
+[Info  - 4:27:17 PM] Live bytes: 248.36MB Heap size: 1320.16MB
+2023-02-18T05:28:17.015532Z | Info | Live bytes: 248.36MB Heap size: 1320.16MB
+[Info  - 4:28:17 PM] Live bytes: 248.36MB Heap size: 1320.16MB
+2023-02-18T05:29:17.030091Z | Info | Live bytes: 251.02MB Heap size: 1320.16MB
+[Info  - 4:29:17 PM] Live bytes: 251.02MB Heap size: 1320.16MB
+2023-02-18T05:29:17.476165Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:29:17 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:29:17.642264Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:29:17.671252Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:29:17 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:29:17 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:29:18.731410Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:29:18 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:29:18.812536Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:29:18 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:29:18.848538Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:29:18 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:29:20.637753Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:29:20 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:29:20.697303Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:29:20 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:29:20.768784Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:29:20 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:29:21.938098Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:29:21 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:29:22.050837Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:29:22 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:29:23.607714Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:29:23.607714Z | Warning | retrie: InternalError: pos
+2023-02-18T05:29:23.706711Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:29:23.730709Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:29:23.731712Z | Warning | retrie: InternalError: pos
+[Warn  - 4:29:23 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:29:23 PM] retrie: InternalError: pos
+[Warn  - 4:29:23 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:29:23 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:29:23 PM] retrie: InternalError: pos
+2023-02-18T05:29:23.846011Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:29:23 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:29:24.726551Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:29:24.727562Z | Warning | retrie: InternalError: pos
+2023-02-18T05:29:24.728552Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:29:24 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:29:24 PM] retrie: InternalError: pos
+[Warn  - 4:29:24 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:29:24.878860Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:29:24 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:29:29.704453Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:29:29 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:30:09.449364Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:09.449364Z | Warning | retrie: InternalError: pos
+[Warn  - 4:30:09 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:30:09 PM] retrie: InternalError: pos
+2023-02-18T05:30:10.888975Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:10.888975Z | Warning | retrie: InternalError: pos
+[Warn  - 4:30:10 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:30:10 PM] retrie: InternalError: pos
+2023-02-18T05:30:12.337109Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:30:12.398131Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:12.398131Z | Warning | retrie: InternalError: pos
+2023-02-18T05:30:12.490114Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:30:12 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:30:12 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:30:12 PM] retrie: InternalError: pos
+[Warn  - 4:30:12 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:30:13.611842Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:13.611842Z | Warning | retrie: InternalError: pos
+2023-02-18T05:30:13.617841Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:30:13 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:13.751187Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:30:13 PM] retrie: InternalError: pos
+[Warn  - 4:30:13 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:30:13 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:30:14.083162Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:30:14 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:30:14.115882Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:14.115882Z | Warning | retrie: InternalError: pos
+[Warn  - 4:30:14 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:30:14 PM] retrie: InternalError: pos
+2023-02-18T05:30:14.260210Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:30:14 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:30:16.912981Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:30:16 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:30:16.938811Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:16.938811Z | Warning | retrie: InternalError: pos
+[Warn  - 4:30:16 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:30:16 PM] retrie: InternalError: pos
+2023-02-18T05:30:16.976059Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:17.042739Z | Info | Live bytes: 373.66MB Heap size: 1320.16MB
+[Warn  - 4:30:17 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Info  - 4:30:17 PM] Live bytes: 373.66MB Heap size: 1320.16MB
+2023-02-18T05:30:17.450666Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:30:17 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:30:17.516668Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:30:17 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:17.930306Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:30:17 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:30:17.966120Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:17.967118Z | Warning | retrie: InternalError: pos
+[Warn  - 4:30:17 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:30:17 PM] retrie: InternalError: pos
+2023-02-18T05:30:18.317988Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:30:18 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:30:23.200049Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:30:23 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:30:31.292858Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:30:31 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:30:31.317654Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:30:31 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:31.553702Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:30:31 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:30:36.556681Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:30:36 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:30:49.243315Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:30:49.243315Z | Warning | retrie: InternalError: pos
+[Warn  - 4:30:49 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:30:49 PM] retrie: InternalError: pos
+2023-02-18T05:31:17.051397Z | Info | Live bytes: 420.96MB Heap size: 1320.16MB
+[Info  - 4:31:17 PM] Live bytes: 420.96MB Heap size: 1320.16MB
+2023-02-18T05:31:23.903146Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:23 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:30.280739Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:31:30 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:31:30.324739Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:30 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:30.491954Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:31:30 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:31:31.988490Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:31 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:38.360134Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:38 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:39.255293Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:31:39 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:31:39.333428Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:39 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:39.385968Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:31:39 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:31:41.681561Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:41 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:43.691872Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:43 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:44.860570Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:31:44 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:31:46.271985Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:31:46.271985Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:31:46.271985Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:31:46 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:31:46 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:31:46 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:31:46.361984Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:46.368980Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:46.378985Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T05:31:46.394984Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:46 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:46 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:46 PM] class: InternalError: Unable to typecheck
+[Warn  - 4:31:46 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:49.358651Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:49 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:49.891272Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:49 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:50.240252Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:50 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:50.797742Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:50 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:31:51.397906Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:31:51 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:31:54.331654Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:31:54 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:17.055270Z | Info | Live bytes: 274.51MB Heap size: 1320.16MB
+[Info  - 4:32:17 PM] Live bytes: 274.51MB Heap size: 1320.16MB
+2023-02-18T05:32:17.852166Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:17.853169Z | Warning | retrie: InternalError: pos
+[Warn  - 4:32:17 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:17 PM] retrie: InternalError: pos
+2023-02-18T05:32:18.892682Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:18.892682Z | Warning | retrie: InternalError: pos
+[Warn  - 4:32:18 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:18 PM] retrie: InternalError: pos
+2023-02-18T05:32:19.308548Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:19.308548Z | Warning | retrie: InternalError: pos
+[Warn  - 4:32:19 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:19 PM] retrie: InternalError: pos
+2023-02-18T05:32:26.806073Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:26 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:27.569352Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:27 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:27.756347Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:32:27.756347Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:32:27.756347Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:27.756347Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:32:27 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:32:27 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:32:27 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:27 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:32:27.774362Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:32:27 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:32:28.280562Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:28 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:28.693567Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:28 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:29.062660Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:32:29 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:32:31.567257Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:31.567257Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:31 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:31 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:31.721738Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:32:31.722734Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:32:31.723736Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:31.723736Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:32:31 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:32:31 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:32:31 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:31 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:32:31.732735Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:32:31.732735Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:32:31.732735Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:31.733740Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:32:31 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:32:31 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:32:31 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:31 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:32:31.805733Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:32:31 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:32:32.162321Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:32 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:32.452894Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:32 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:32.486905Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:32:32.486905Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:32:32.486905Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:32.487909Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:32:32 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:32:32 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:32:32 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:32 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:32:32.515899Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:32:32.515899Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:32:32.515899Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:32.515899Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:32:32 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:32:32 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:32:32 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:32 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:32:32.868371Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:32 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:33.009590Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:32:33.010590Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:32:33.010590Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:33.010590Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:32:33 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:32:33 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:32:33 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:33 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:32:33.134797Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:32:33 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:32:38.134670Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:32:38 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:32:51.607386Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:51 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:51.636369Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:32:51.637369Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:32:51.637369Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:51.637369Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:32:51 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:32:51 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:32:51 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:51 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:32:51.889431Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:32:51 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:32:51.994328Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:32:51.994328Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:32:51.994328Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:51.994328Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:32:52 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:32:52 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:32:52 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:52 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:32:52.944214Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:52 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:53.102232Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:32:53 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:32:54.064246Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:54 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:54.218826Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:32:54 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:32:55.600967Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:32:55 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:32:55.674957Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:32:55 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:32:55.919136Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:32:55.919136Z | Warning | retrie: InternalError: pos
+[Warn  - 4:32:55 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:56 PM] retrie: InternalError: pos
+2023-02-18T05:32:56.789821Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:32:56 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:00.679786Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:00 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:03.921601Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:03 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:06.085922Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:06 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:06.143797Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:06 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:06.753628Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:06 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:06.828631Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:06 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:06.871631Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:06 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:08.207820Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:08 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:08.309127Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:08 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:08.341145Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:08 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:09.787784Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:09 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:09.918014Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:09 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:12.161280Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:12 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:12.225282Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:12 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:12.266282Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:12 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:17.062442Z | Info | Live bytes: 408.65MB Heap size: 1320.16MB
+[Info  - 4:33:17 PM] Live bytes: 408.65MB Heap size: 1320.16MB
+2023-02-18T05:33:17.724104Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:17 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:17.786117Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:17 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:18.737872Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:18.737872Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:18.776868Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:18.786885Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T05:33:18.793873Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:18 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:18 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:18 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:18 PM] class: InternalError: Unable to typecheck
+[Warn  - 4:33:18 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:19.314944Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:19 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:19.357948Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:19 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:19.413956Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:19 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:24.239006Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:24 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:24.523596Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:24 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:25.463670Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:25 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:28.634797Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:28 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:29.316639Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:29 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:29.381640Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:29.381640Z | Warning | retrie: InternalError: pos
+2023-02-18T05:33:29.424637Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:29 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:29 PM] retrie: InternalError: pos
+[Warn  - 4:33:29 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:30.640058Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:30 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:30.665041Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:33:30.665041Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:33:30.665041Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:30.665041Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:33:30 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:33:30 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:33:30 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:30 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:33:30.724046Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:30 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:30.961644Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:33:30.961644Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:33:30.961644Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:30.961644Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:33:30 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:33:30 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:33:30 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:30 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:33:32.584946Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:32 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:32.659222Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:32.659222Z | Warning | retrie: InternalError: pos
+[Warn  - 4:33:32 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:32 PM] retrie: InternalError: pos
+2023-02-18T05:33:32.709223Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:32 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:33.104480Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:33 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:33.138481Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:33:33.138481Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:33:33 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:33:33.138481Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:33.138481Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:33:33 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:33:33 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:33 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:33:33.294524Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:33 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:33.442473Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T05:33:33.442473Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T05:33:33.442473Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:33.442473Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:33:33 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:33:33 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:33:33 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:33 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T05:33:35.687589Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:35.741134Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:35 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:35 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:35.796417Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:35 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:36.424619Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:36 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:36.510029Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:36 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:36.576042Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:36 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:37.256429Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:37 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:37.259430Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:37 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:37.347424Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:37 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:42.316715Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:42 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:54.844519Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:33:54 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:33:54.942741Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:54 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:33:55.056047Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:33:55 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:33:58.995811Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:33:59 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:00.294666Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:00 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:34:00.751199Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:00 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:01.402262Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:01 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:01.947284Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:01 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:03.267868Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:03 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:03.333836Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:03 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:03.348238Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:03 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:34:03.914228Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:03 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:03.972122Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:03 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:04.200845Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:04 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:34:05.757869Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:05 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:05.805869Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:05 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:05.876868Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:05 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:34:07.353208Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:07 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:08.413699Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:08 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:10.573785Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:10 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:10.650234Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:10 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:34:13.453970Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:13 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:14.786811Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:14 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:15.592825Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T05:34:15.593818Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:15 PM] class: InternalError: Unable to typecheck
+[Warn  - 4:34:15 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:15.657819Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:15 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:15.676817Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:15.683833Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T05:34:15.685814Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:15 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:15 PM] class: InternalError: Unable to typecheck
+[Warn  - 4:34:15 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:17.083558Z | Info | Live bytes: 377.62MB Heap size: 1320.16MB
+[Info  - 4:34:17 PM] Live bytes: 377.62MB Heap size: 1320.16MB
+2023-02-18T05:34:20.164071Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:20.164071Z | Warning | retrie: InternalError: pos
+[Warn  - 4:34:20 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:20 PM] retrie: InternalError: pos
+2023-02-18T05:34:20.712574Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:20 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:34:23.510551Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:23.510551Z | Warning | retrie: InternalError: pos
+[Warn  - 4:34:23 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:23 PM] retrie: InternalError: pos
+2023-02-18T05:34:23.877569Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:23 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:26.799078Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:26 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:28.870040Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:28 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:28.954810Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:28.966811Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:29 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:29 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:34:31.327199Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:31 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:32.546820Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:32 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:32.588742Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:32.588742Z | Warning | retrie: InternalError: pos
+[Warn  - 4:34:32 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:32 PM] retrie: InternalError: pos
+2023-02-18T05:34:32.688738Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:32 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:34:37.740254Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:37 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:34:43.640330Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:43.641344Z | Warning | retrie: InternalError: pos
+[Warn  - 4:34:43 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:43 PM] retrie: InternalError: pos
+2023-02-18T05:34:45.035510Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:45 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:47.667195Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:47.667195Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:47.668199Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:47 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:47 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 4:34:47 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:34:47.710918Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:47 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:47.744923Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:47 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:47.748917Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T05:34:47.748917Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:47 PM] class: InternalError: Unable to typecheck
+[Warn  - 4:34:47 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:34:47.782925Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:47 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:52.598302Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:52 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:34:52.963514Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:52 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:53.534640Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:34:53.534640Z | Warning | retrie: InternalError: pos
+[Warn  - 4:34:53 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:34:53 PM] retrie: InternalError: pos
+2023-02-18T05:34:55.094944Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:34:55 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-18T05:34:55.967647Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:34:55 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:35:08.444568Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:35:08 PM] codeRange: bad dependency: GetCodeRange
+2023-02-18T05:35:08.799436Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:35:08 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:35:12.148819Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-18T05:35:12.149871Z | Warning | retrie: InternalError: pos
+[Warn  - 4:35:12 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:35:12 PM] retrie: InternalError: pos
+2023-02-18T05:35:13.755958Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:35:13 PM] class: InternalError: Unable to typecheck
+2023-02-18T05:35:17.092703Z | Info | Live bytes: 405.79MB Heap size: 1376.78MB
+[Info  - 4:35:17 PM] Live bytes: 405.79MB Heap size: 1376.78MB
+2023-02-18T05:36:17.095750Z | Info | Live bytes: 405.79MB Heap size: 1376.78MB
+[Info  - 4:36:18 PM] Live bytes: 405.79MB Heap size: 1376.78MB
+
+```
+
+16:40 - restart everyting
+16:55 - fix type error 
+16:55 - start ghcid
+
+```
+Executing task: ghcid --command 'stack ghci --test' --allow-eval --clear --no-height-limit '-o ghcid.log' 
+
+```

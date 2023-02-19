@@ -1437,12 +1437,10 @@ superSimplSuite =
     }
 
 -- $> unit_simple_single
-
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 
--- $ > unit_simple_single_failure
-
+-- $> unit_simple_single_failure
 unit_simple_single_failure :: IO ()
 unit_simple_single_failure =
   runTest 1 $

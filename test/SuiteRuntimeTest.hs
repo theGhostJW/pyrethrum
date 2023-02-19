@@ -1044,7 +1044,6 @@ chkLaws mxThrds t evts =
         traverse_ chkTestEvtsConsecutive,
         chkThreadLeafEvents,
         traverse_ (chkParentOrder t),
-        chkErrorPropagationt_depricate,
         traverse_ chkThreadHksReleased
       ]
     T.chk'
@@ -1066,117 +1065,6 @@ data ChkErrAccum = ChkErrAccum
     matchedFails :: ST.Set Loc
   }
 
-errorPropagationStep :: ChkErrAccum -> ExeEvent -> ChkErrAccum
-errorPropagationStep accum@ChkErrAccum {initialised, lastStart, lastFailure, matchedFails} =
-  \case
-    StartExecution {} -> accum
-    Start {loc, eventType} -> accum {lastStart = Just (loc, eventType)}
-    ed@End {loc, eventType} ->
-      lastFailure
-        & maybe
-          accum
-          ( \lf@(lfLoc, _e, _et) ->
-              if
-                  | isGrouping eventType -> accum
-                  | ST.member loc matchedFails ->
-                      accum
-                        { matchedFails = ST.delete loc matchedFails,
-                          lastFailure =
-                            (lfLoc == loc && endIsTerminal eventType)
-                              ? Nothing
-                              $ lastFailure
-                        }
-                  | otherwise ->
-                      error
-                        ( "parent failure was not logged as expected within event ending with:\n"
-                            <> ppShow ed
-                            <> "\nexpected last failure"
-                            <> ppShow lf
-                        )
-          )
-    f@Failure
-      { loc = failLoc,
-        msg,
-        exception,
-        idx,
-        threadId
-      } ->
-        lastFailure
-          & maybe
-            ( lastStart
-                & maybe
-                  (error ("failure logged when outside of any event\n" <> ppShow f))
-                  ( \(lastStartLoc, et) ->
-                      (==) failLoc lastStartLoc
-                        ? accum
-                          { lastFailure = Just (failLoc, exception, et),
-                            matchedFails = ST.insert failLoc matchedFails
-                          }
-                        $ error
-                          ( "failure loc does not equal loc of parent event:\nfailure loc\n"
-                              <> ppShow lastStartLoc
-                              <> "\nparent event:\n"
-                              <> ppShow failLoc
-                          )
-                  )
-            )
-            ( \parentFail ->
-                error $
-                  "failure logged when expected a parent failure (ie. in the child of a partent event that failed):\nfailure:\n"
-                    <> ppShow f
-                    <> "\nunder parent failure:\n"
-                    <> ppShow parentFail
-            )
-    pf@ParentFailure
-      { loc,
-        parentLoc,
-        parentEventType,
-        exception,
-        idx,
-        threadId
-      } ->
-        lastFailure
-          & maybe
-            ( initialised
-                ? error ("parent failure logged when parent hasn't failed:\n" <> ppShow pf)
-                $ accum
-                  { lastFailure = Just (parentLoc, exception, parentEventType),
-                    matchedFails = ST.insert loc matchedFails
-                  }
-            )
-            ( \lf@(ploc, ex, _et) ->
-                parentLoc
-                  == ploc
-                  ? accum {matchedFails = ST.insert loc matchedFails}
-                  $ error
-                    ( "parent failure logged in child does not match parent failure in parent:\nparent failure logged:\n"
-                        <> ppShow lf
-                        <> "actual parent failure:\n"
-                        <> ppShow pf
-                    )
-            )
-    ApLog {} -> accum
-    EndExecution {} -> accum
-
-chkThreadErrs :: [ExeEvent] -> IO ()
-chkThreadErrs evts =
-  -- assumes nesting correct - all nodes have unique locs
-  lastFailure (foldl' errorPropagationStep (ChkErrAccum False Nothing Nothing ST.empty) evts)
-    & maybe
-      (pure ())
-      ( \(l, _ex, et) ->
-          et
-            `elem` [
-                     -- once errors could occur
-                     L.OnceHook,
-                     L.FixtureOnceHook
-                   ]
-            ? pure ()
-            $ error ("chkThreadErrs error loc still open at end of thread: " <> show l)
-      )
-
-chkErrorPropagationt_depricate :: [[ExeEvent]] -> IO ()
-chkErrorPropagationt_depricate = traverse_ chkThreadErrs
 
 chkHkReleased :: [ExeEvent] -> ExeEventType -> ExeEventType -> IO ()
 chkHkReleased evs hkType relType =

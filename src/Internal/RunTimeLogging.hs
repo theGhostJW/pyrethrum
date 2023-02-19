@@ -117,11 +117,6 @@ isFixtureChild = \case
 
 endIsTerminal :: ExeEventType -> Bool
 endIsTerminal = \case
-  OnceHook -> False
-  ThreadHook -> False
-  TestHook -> False
-  FixtureThreadHook -> False
-  FixtureOnceHook -> False
   FixtureThreadHookRelease -> True
   FixtureOnceHookRelease -> True
   OnceHookRelease -> True
@@ -130,6 +125,11 @@ endIsTerminal = \case
   Group -> True
   Fixture -> True
   Test -> True
+  OnceHook -> False
+  ThreadHook -> False
+  TestHook -> False
+  FixtureThreadHook -> False
+  FixtureOnceHook -> False
 
 exceptionTxt :: SomeException -> PException
 exceptionTxt e = PException $ txt <$> lines (displayException e)

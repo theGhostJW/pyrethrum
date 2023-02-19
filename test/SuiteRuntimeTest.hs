@@ -158,14 +158,16 @@ data DocFunc a = DocFunc
 instance Show (DocFunc a) where
   show = toS . doc
 
+data ExeOutcome = PassResult | FailResult deriving (Show, Eq)
+
 data IOProps = IOProps
   { message :: Text,
     delayms :: Int,
-    fail :: Bool
+    outcome :: ExeOutcome
   }
   deriving (Show)
 
-testProps :: Text -> Int -> Int -> Bool -> IOProps
+testProps :: Text -> Int -> Int -> ExeOutcome -> IOProps
 testProps prefix idx = IOProps (prefix == "" ? txt idx $ prefix <> "." <> txt idx)
 
 data Template
@@ -831,15 +833,15 @@ onceEventTypes = filter L.isOnceEvent enumList
 threadedEventTypes :: [ExeEventType]
 threadedEventTypes = filter L.isThreadedEvent enumList
 
-chkSingletonLeafEvents :: [ExeEvent] -> IO ()
-chkSingletonLeafEvents evts =
+chkSingletonLeafEventsStartEnd :: [ExeEvent] -> IO ()
+chkSingletonLeafEventsStartEnd evts =
   traverse_ (`chkLeafEventsStartEnd` [evts]) onceEventTypes
 
-chkThreadLeafEvents :: [[ExeEvent]] -> IO ()
-chkThreadLeafEvents evts =
+chkThreadLeafEventsStartEnd :: [[ExeEvent]] -> IO ()
+chkThreadLeafEventsStartEnd evts =
   traverse_ (`chkLeafEventsStartEnd` evts) threadedEventTypes
 
--- # TODO replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
+
 chkFixtureChildren :: [[ExeEvent]] -> IO ()
 chkFixtureChildren =
   traverse_ chkEvents
@@ -919,7 +921,7 @@ chkFixtureChildren =
             L.Group -> err
             L.Fixture ->
               if isStart'
-                then fail "Nested fixtures - fixture started when a fixture is alreeady running in the same thread"
+                then fail "Nested fixtures - fixture started when a fixture is already running in the same thread"
                 else
                   (activeFxLoc == evtLoc)
                     ? Nothing
@@ -1023,14 +1025,14 @@ chkStartEndIntegrity =
       where
         eLoc = partialLoc e
 
-chkLaws :: Int -> Template -> [ExeEvent] -> IO ()
-chkLaws mxThrds t evts =
+chkProperties :: Int -> Template -> [ExeEvent] -> IO ()
+chkProperties mxThrds t evts =
   do
     traverse_
       (evts &)
       [ chkThreadLogsInOrder,
         chkStartEndExecution,
-        chkSingletonLeafEvents,
+        chkSingletonLeafEventsStartEnd,
         chkOnceEventsAreBlocking,
         chkEventCounts t,
         chkOnceHksReleased,
@@ -1042,7 +1044,7 @@ chkLaws mxThrds t evts =
         chkFixtureChildren,
         chkFixturesContainTests t,
         traverse_ chkTestEvtsConsecutive,
-        chkThreadLeafEvents,
+        chkThreadLeafEventsStartEnd,
         traverse_ (chkParentOrder t),
         traverse_ chkThreadHksReleased
       ]
@@ -1362,20 +1364,20 @@ runTest maxThreads template = do
   log
     & maybe
       (T.chkFail "No Events Log")
-      (\evts -> atomically (q2List evts) >>= chkLaws maxThreads template)
+      (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
 
 ioAction :: TextLogger -> IOProps -> IO ()
-ioAction log (IOProps {message, delayms, fail}) =
+ioAction log (IOProps {message, delayms, outcome}) =
   do
     log message
     P.threadDelay delayms
-    when fail
+    when (outcome == FailResult)
       . error
       . toS
       $ "exception thrown " <> message
 
 mkTest :: IOProps -> PN.Test si ti ii
-mkTest iop@IOProps {message, delayms, fail} = PN.Test message \log a b c -> ioAction log iop
+mkTest iop@IOProps {message} = PN.Test message \log a b c -> ioAction log iop
 
 noDelay :: DocFunc Int
 noDelay = DocFunc "No Delay" $ pure 0
@@ -1394,14 +1396,14 @@ superSimplSuite =
         [ IOProps
             { message = "ThreadHook",
               delayms = 1,
-              fail = True
+              outcome = FailResult
             }
         ],
       tRelease =
         [ IOProps
             { message = "ThreadHookRelease",
               delayms = 1,
-              fail = False
+              outcome = PassResult
             }
         ],
       tChild =
@@ -1411,32 +1413,32 @@ superSimplSuite =
               IOProps
                 { message = "Once Hook",
                   delayms = 1,
-                  fail = False
+                  outcome = PassResult
                 },
             sRelease =
               IOProps
                 { message = "Once Hook Release",
                   delayms = 1,
-                  fail = False
+                  outcome = PassResult
                 },
             tChild =
               TFixture
                 { tTag = "Fixture 0",
                   --
-                  sHook = testProps "Fixture 0 - Fixture Once Hook" 0 0 False,
-                  sRelease = testProps "Fixture 0 - Fixture Once Hook Release" 0 0 False,
+                  sHook = testProps "Fixture 0 - Fixture Once Hook" 0 0 PassResult,
+                  sRelease = testProps "Fixture 0 - Fixture Once Hook Release" 0 0 PassResult,
                   --
-                  tHook = [testProps "Fixture 0 - Fixture Thread Hook" 0 0 False],
-                  tRelease = [testProps "Fixture 0 - Fixture Hook Release" 0 0 False],
+                  tHook = [testProps "Fixture 0 - Fixture Thread Hook" 0 0 PassResult],
+                  tRelease = [testProps "Fixture 0 - Fixture Hook Release" 0 0 PassResult],
                   --
-                  tTestHook = [testProps "Fixture 0 - Test Hook" 0 0 False],
-                  tTestRelease = [testProps "Fixture 0 - Test Hook Release" 0 0 False],
-                  tTests = [testProps "" 0 0 False]
+                  tTestHook = [testProps "Fixture 0 - Test Hook" 0 0 PassResult],
+                  tTestRelease = [testProps "Fixture 0 - Test Hook Release" 0 0 PassResult],
+                  tTests = [testProps "" 0 0 PassResult]
                 }
           }
     }
 
--- $> unit_simple_single
+-- $> unit_simple_singlelaw
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 
@@ -1446,13 +1448,13 @@ unit_simple_single_failure =
   runTest 1 $
     TFixture
       { tTag = "FX 0",
-        sHook = testProps "Fx 0 - SH" 0 0 False,
-        sRelease = testProps "Fx 0 - SHR" 0 0 False,
-        tHook = [testProps "Fx 0" 0 0 False],
-        tRelease = [testProps "Fx 0" 0 0 False],
-        tTestHook = [testProps "Fx 0" 0 0 False],
-        tTestRelease = [testProps "Fx 0" 0 0 False],
-        tTests = [testProps "" 0 0 True]
+        sHook = testProps "Fx 0 - SH" 0 0 PassResult,
+        sRelease = testProps "Fx 0 - SHR" 0 0 PassResult,
+        tHook = [testProps "Fx 0" 0 0 PassResult],
+        tRelease = [testProps "Fx 0" 0 0 PassResult],
+        tTestHook = [testProps "Fx 0" 0 0 PassResult],
+        tTestRelease = [testProps "Fx 0" 0 0 PassResult],
+        tTests = [testProps "" 0 0 FailResult]
       }
 
 {-

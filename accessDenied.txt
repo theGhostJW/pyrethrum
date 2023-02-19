@@ -14876,3 +14876,1223 @@ Launching haskell-language-server exe at:C:\ghcup\tmp\ghcup-ghc-9.0.2_cabal-3.6.
 Executing task: ghcid --command 'stack ghci --test' --allow-eval --clear --no-height-limit '-o ghcid.log' 
 
 ```
+# hibernate
+
+# 19-02-2023
+# restart 
+# ~ 2 hrs later
+```
+rror during compileC:\Users\thegh\AppData\Local\ghcide\main-c70615d89a7a639097b386336e61e4aed219e86e\Internal\ext7192: renameFile:renamePath:MoveFileEx "\\\\?\\C:\\Users\\thegh\\AppData\\Local\\ghcide\\main-c70615d89a7a639097b386336e61e4aed219e86e\\Internal\\ext7192" Just "\\\\?\\C:\\Users\\thegh\\AppData\\Local\\ghcide\\main-c70615d89a7a639097b386336e61e4aed219e86e\\Internal\\RunTimeLogging.hi.core": permission denied (Access is denied.)compile
+
+2023-02-18 20:04:58.7100000 [client] INFO Finding haskell-language-server
+2023-02-18 20:04:58.7170000 [client] INFO Checking for ghcup installation
+2023-02-18 20:04:59.9730000 [client] INFO found ghcup at ghcup
+2023-02-18 20:04:59.9770000 [client] INFO Executing 'ghcup --no-verbose upgrade' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:05:05.7400000 [client] INFO Checking for ghcup installation
+2023-02-18 20:05:06.5280000 [client] INFO found ghcup at ghcup
+2023-02-18 20:05:06.5330000 [client] INFO Executing 'ghcup --no-verbose list -t hls -c installed -r' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:05:07.4060000 [client] INFO Checking for ghcup installation
+2023-02-18 20:05:08.1600000 [client] INFO found ghcup at ghcup
+2023-02-18 20:05:08.1640000 [client] INFO Executing 'ghcup --no-verbose list -t cabal -c installed -r' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:05:08.9250000 [client] INFO Checking for ghcup installation
+2023-02-18 20:05:09.7970000 [client] INFO found ghcup at ghcup
+2023-02-18 20:05:09.8020000 [client] INFO Executing 'ghcup --no-verbose list -t stack -c installed -r' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:05:11.0710000 [client] INFO Checking for ghcup installation
+2023-02-18 20:05:11.7520000 [client] INFO found ghcup at ghcup
+2023-02-18 20:05:11.7560000 [client] INFO Executing 'ghcup --no-verbose whereis hls 1.9.1.0' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:05:12.0160000 [client] INFO Checking for ghcup installation
+2023-02-18 20:05:12.6670000 [client] INFO found ghcup at ghcup
+2023-02-18 20:05:12.6700000 [client] INFO Executing 'ghcup --no-verbose whereis cabal 3.6.2.0' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:05:12.9160000 [client] INFO Checking for ghcup installation
+2023-02-18 20:05:13.6400000 [client] INFO found ghcup at ghcup
+2023-02-18 20:05:13.6440000 [client] INFO Executing 'ghcup --no-verbose whereis stack 2.9.1' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:05:14.5610000 [client] INFO Executing 'ghc.exe --numeric-version' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:05:15.1290000 [client] INFO Checking for ghcup installation
+2023-02-18 20:05:15.8530000 [client] INFO found ghcup at ghcup
+2023-02-18 20:05:15.8570000 [client] INFO Executing 'ghcup --no-verbose run --hls 1.9.1.0 --cabal 3.6.2.0 --stack 2.9.1 --install' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:05:17.6640000 [client] INFO Working out the project GHC version. This might take a while...
+2023-02-18 20:05:17.6690000 [client] INFO Executing 'haskell-language-server-wrapper --project-ghc-version' in cwd 'c:\Pyrethrum'
+2023-02-18 20:06:06.2810000 [client] INFO The GHC version for the project or file: 9.0.2
+2023-02-18 20:06:06.5640000 [client] INFO Reading cached release data at c:\Users\thegh\AppData\Roaming\Code\User\globalStorage\haskell.haskell\ghcupReleases.cache.json
+2023-02-18 20:06:06.5770000 [client] INFO Platform constants: Windows, A_64
+2023-02-18 20:06:06.5780000 [client] INFO Checking for ghcup installation
+2023-02-18 20:06:07.7350000 [client] INFO found ghcup at ghcup
+2023-02-18 20:06:07.7390000 [client] INFO Executing 'ghcup --no-verbose list -t hls -c installed -r' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:06:08.4920000 [client] INFO Checking for ghcup installation
+2023-02-18 20:06:09.3700000 [client] INFO found ghcup at ghcup
+2023-02-18 20:06:09.3740000 [client] INFO Executing 'ghcup --no-verbose whereis bindir' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:06:09.6570000 [client] INFO Checking for ghcup installation
+2023-02-18 20:06:10.3500000 [client] INFO found ghcup at ghcup
+2023-02-18 20:06:10.3550000 [client] INFO Executing 'ghcup --no-verbose whereis hls 1.9.1.0' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:06:10.6590000 [client] INFO Checking for ghcup installation
+2023-02-18 20:06:11.4990000 [client] INFO found ghcup at ghcup
+2023-02-18 20:06:11.5020000 [client] INFO Executing 'ghcup --no-verbose whereis ghc 9.0.2' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:06:11.7650000 [client] INFO Checking for ghcup installation
+2023-02-18 20:06:12.4570000 [client] INFO found ghcup at ghcup
+2023-02-18 20:06:12.4620000 [client] INFO Executing 'ghcup --no-verbose run --hls 1.9.1.0 --cabal 3.6.2.0 --stack 2.9.1 --ghc 9.0.2 --install' in cwd 'C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code'
+2023-02-18 20:06:15.5520000 [client] INFO Activating the language server in working dir: c:\Pyrethrum (the workspace folder)
+2023-02-18 20:06:15.5560000 [client] INFO run command: C:\ghcup\tmp\ghcup-ghc-9.0.2_cabal-3.6.2.0_hls-1.9.1.0_stack-2.9.1\haskell-language-server-wrapper.exe --lsp
+2023-02-18 20:06:15.5560000 [client] INFO debug command: C:\ghcup\tmp\ghcup-ghc-9.0.2_cabal-3.6.2.0_hls-1.9.1.0_stack-2.9.1\haskell-language-server-wrapper.exe --lsp
+2023-02-18 20:06:15.5560000 [client] INFO server environment variables:
+2023-02-18 20:06:15.5570000 [client] INFO   PATH=C:\ghcup\tmp\ghcup-ghc-9.0.2_cabal-3.6.2.0_hls-1.9.1.0_stack-2.9.1;C:\Python39\Scripts\;C:\Python39\;C:\Python27\;C:\Python27\Scripts;C:\ProgramData\Oracle\Java\javapath;C:\Program Files\Dell\DW WLAN Card;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files\WIDCOMM\Bluetooth Software\;C:\Program Files\WIDCOMM\Bluetooth Software\syswow64;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\TortoiseHg\;C:\Users\thegh\.dnx\bin;C:\Program Files\Microsoft DNX\Dnvm\;C:\Program Files\Microsoft SQL Server\130\Tools\Binn\;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\Program Files (x86)\scala\bin;C:\Users\thegh\AppData\Roaming\npm;C:\Program Files (x86)\Pandoc\;C:\Program Files (x86)\sbt\bin;C:\ProgramData\chocolatey\bin;C:\ProgramData\osquery;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\Program Files\Java\jdk1.8.0_131\bin;C:\Program Files\watchman;C:\Android\android-sdk\tools;C:\Android\android-sdk\platform-tools;C:\WINDOWS\System32\OpenSSH\;C:\Program Files\Microsoft VS Code\bin;C:\Program Files (x86)\Yarn\bin\;C:\Program Files\nodejs\;C:\Program Files\PowerShell\6\;C:\Program Files\TortoiseGit\bin;C:\Program Files\dotnet\;C:\Program Files (x86)\dotnet\;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files\PuTTY\;C:\Program Files\Graphviz\bin;C:\Program Files\Docker\Docker\resources\bin;C:\ProgramData\DockerDesktop\version-bin;C:\Program Files\NVIDIA Corporation\NVIDIA NvDLISR;C:\Program Files\Git\cmd;C:\ghcup\bin;C:\Users\thegh\.dotnet\tools;C:\Program Files\dotnet\;C:\Program Files\dotnet\dotnet.exe;C:\Ruby25-x64\bin;C:\Users\thegh\AppData\Roaming\local\bin\stack.exe;C:\Users\thegh\AppData\Local\atom\bin;C:\Users\thegh\AppData\Roaming\local\bin\;C:\Users\thegh\AppData\Local\Microsoft\WindowsApps;C:\Program Files\Git\bin;C:\Program Files\Git\cmd;C:\Program Files\gheckoWebDriver;C:\Users\thegh\AppData\Local\Programs\stack\x86_64-windows\ghc-8.2.2\bin;C:\Program Files\Hasktags;C:\Program Files\Microsoft VS Code\bin;C:\Program Files (x86)\Oni;C:\Users\thegh\AppData\Local\Yarn\bin;C:\Users\thegh\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\thegh\AppData\Roaming\npm;C:\Users\thegh\AppData\Roaming\npm\node_modules\typescript\bin;C:\Users\thegh\AppData\Local\GitHubDesktop\bin;C:\Users\thegh\AppData\Local\Pandoc\;
+2023-02-18 20:06:15.5900000 [client] INFO Starting language server
+Found "c:\Pyrethrum\hie.yaml" for "c:\Pyrethrum\a"
+Run entered for haskell-language-server-wrapper(haskell-language-server-wrapper-1.9.1.0.exe) Version 1.9.1.0 x86_64 ghc-9.2.6
+Current directory: c:\Pyrethrum
+Operating system: mingw32
+Arguments: ["--lsp"]
+Cradle directory: c:\Pyrethrum
+Cradle type: Stack
+
+Tool versions found on the $PATH
+cabal:          3.6.2.0
+stack:          2.9.1
+ghc:            9.0.1
+
+
+Consulting the cradle to get project GHC version...
+Project GHC version: 9.0.2
+haskell-language-server exe candidates: ["haskell-language-server-9.0.2.exe","haskell-language-server.exe"]
+Launching haskell-language-server exe at:C:\ghcup\tmp\ghcup-ghc-9.0.2_cabal-3.6.2.0_hls-1.9.1.0_stack-2.9.1\haskell-language-server-9.0.2.exe
+2023-02-18T20:07:14.749606Z | Info | No log file specified; using stderr.
+2023-02-18T20:07:14.759635Z | Info | haskell-language-server version: 1.9.1.0 (GHC: 9.0.2) (PATH: C:\ghcup\bin\haskell-language-server-9.0.2~1.9.1.0.exe)
+2023-02-18T20:07:14.761760Z | Info | Directory: c:\Pyrethrum
+2023-02-18T20:07:14.761760Z | Info | Starting (haskell-language-server) LSP server...
+  GhcideArguments {argsCommand = LSP, argsCwd = Nothing, argsShakeProfiling = Nothing, argsTesting = False, argsExamplePlugin = False, argsDebugOn = False, argsLogFile = Nothing, argsThreads = 0, argsProjectGhcVersion = False}
+  PluginIds: [ pragmas
+             , LSPRecorderCallback
+             , rename
+             , ghcide-completions
+             , class
+             , refineImports
+             , splice
+             , cabal
+             , changeTypeSignature
+             , qualifyImportedNames
+             , alternateNumberFormat
+             , hlint
+             , cabalfmt
+             , explicit-fields
+             , ghcide-code-actions-fill-holes
+             , floskell
+             , ghcide-extend-import-action
+             , codeRange
+             , haddockComments
+             , importLens
+             , retrie
+             , ghcide-type-lenses
+             , ghcide-code-actions-imports-exports
+             , ghcide-hover-and-symbols
+             , eval
+             , gadt
+             , fourmolu
+             , tactics
+             , callHierarchy
+             , stylish-haskell
+             , ghcide-code-actions-type-signatures
+             , ghcide-code-actions-bindings
+             , moduleName
+             , ormolu
+             , ghcide-core
+             , explicit-fixity ]
+2023-02-18T20:07:14.796709Z | Info | Logging heap statistics every 60.00s
+ 2023-02-18T20:07:14.831707Z | Info | Starting LSP server...
+  If you are seeing this in a terminal, you probably should have run WITHOUT the --lsp option!
+  PluginIds: [ pragmas
+             , LSPRecorderCallback
+             , rename
+             , ghcide-completions
+             , class
+             , refineImports
+             , splice
+             , cabal
+             , changeTypeSignature
+             , qualifyImportedNames
+             , alternateNumberFormat
+             , hlint
+             , cabalfmt
+             , explicit-fields
+             , ghcide-code-actions-fill-holes
+             , floskell
+             , ghcide-extend-import-action
+             , codeRange
+             , haddockComments
+             , importLens
+             , retrie
+             , ghcide-type-lenses
+             , ghcide-code-actions-imports-exports
+             , ghcide-hover-and-symbols
+             , eval
+             , gadt
+             , fourmolu
+             , tactics
+             , callHierarchy
+             , stylish-haskell
+             , ghcide-code-actions-type-signatures
+             , ghcide-code-actions-bindings
+             , moduleName
+             , ormolu
+             , ghcide-core
+             , explicit-fixity ]
+2023-02-18T20:07:14.834711Z | Info | Starting server
+2023-02-18T20:07:14.893712Z | Info | Started LSP server in 0.06s
+2023-02-18T20:08:05.852544Z | Info | Registering IDE configuration: IdeConfiguration {workspaceFolders = fromList [NormalizedUri 577147563957033084 "file:///C:/Pyrethrum"], clientSettings = hashed Nothing}
+[Info  - 7:08:06 AM] haskell-language-server version: 1.9.1.0 (GHC: 9.0.2) (PATH: C:\ghcup\bin\haskell-language-server-9.0.2~1.9.1.0.exe)
+[Info  - 7:08:06 AM] Directory: c:\Pyrethrum
+[Info  - 7:08:06 AM] Starting (haskell-language-server) LSP server...
+  GhcideArguments {argsCommand = LSP, argsCwd = Nothing, argsShakeProfiling = Nothing, argsTesting = False, argsExamplePlugin = False, argsDebugOn = False, argsLogFile = Nothing, argsThreads = 0, argsProjectGhcVersion = False}
+  PluginIds: [ pragmas
+             , LSPRecorderCallback
+             , rename
+             , ghcide-completions
+             , class
+             , refineImports
+             , splice
+             , cabal
+             , changeTypeSignature
+             , qualifyImportedNames
+             , alternateNumberFormat
+             , hlint
+             , cabalfmt
+             , explicit-fields
+             , ghcide-code-actions-fill-holes
+             , floskell
+             , ghcide-extend-import-action
+             , codeRange
+             , haddockComments
+             , importLens
+             , retrie
+             , ghcide-type-lenses
+             , ghcide-code-actions-imports-exports
+             , ghcide-hover-and-symbols
+             , eval
+             , gadt
+             , fourmolu
+             , tactics
+             , callHierarchy
+             , stylish-haskell
+             , ghcide-code-actions-type-signatures
+             , ghcide-code-actions-bindings
+             , moduleName
+             , ormolu
+             , ghcide-core
+             , explicit-fixity ]
+[Info  - 7:08:06 AM] Logging heap statistics every 60.00s
+[Info  - 7:08:06 AM] Starting LSP server...
+  If you are seeing this in a terminal, you probably should have run WITHOUT the --lsp option!
+  PluginIds: [ pragmas
+             , LSPRecorderCallback
+             , rename
+             , ghcide-completions
+             , class
+             , refineImports
+             , splice
+             , cabal
+             , changeTypeSignature
+             , qualifyImportedNames
+             , alternateNumberFormat
+             , hlint
+             , cabalfmt
+             , explicit-fields
+             , ghcide-code-actions-fill-holes
+             , floskell
+             , ghcide-extend-import-action
+             , codeRange
+             , haddockComments
+             , importLens
+             , retrie
+             , ghcide-type-lenses
+             , ghcide-code-actions-imports-exports
+             , ghcide-hover-and-symbols
+             , eval
+             , gadt
+             , fourmolu
+             , tactics
+             , callHierarchy
+             , stylish-haskell
+             , ghcide-code-actions-type-signatures
+             , ghcide-code-actions-bindings
+             , moduleName
+             , ormolu
+             , ghcide-core
+             , explicit-fixity ]
+[Info  - 7:08:06 AM] Starting server
+[Info  - 7:08:06 AM] Started LSP server in 0.06s
+[Info  - 7:08:06 AM] Registering IDE configuration: IdeConfiguration {workspaceFolders = fromList [NormalizedUri 577147563957033084 "file:///C:/Pyrethrum"], clientSettings = hashed Nothing}
+2023-02-18T20:08:06.224172Z | Info | Cradle path: test\SuiteRuntimeTest.hs
+[Info  - 7:08:06 AM] Cradle path: test\SuiteRuntimeTest.hs
+2023-02-18T20:08:06.524084Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T20:08:06.525174Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T20:08:06.525174Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T20:08:06.525174Z | Warning | retrie: InternalError: typecheck
+2023-02-18T20:08:06.526836Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 7:08:06 AM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 7:08:06 AM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 7:08:06 AM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 7:08:06 AM] retrie: InternalError: typecheck
+[Warn  - 7:08:06 AM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T20:08:06.767785Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 7:08:06 AM] codeRange: bad dependency: GetCodeRange
+2023-02-18T20:08:07.025031Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T20:08:07.097604Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T20:08:07.098602Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T20:08:07.098602Z | Warning | retrie: InternalError: typecheck
+2023-02-18T20:08:07.099601Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 7:08:07 AM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 7:08:07 AM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 7:08:07 AM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 7:08:07 AM] retrie: InternalError: typecheck
+[Warn  - 7:08:07 AM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T20:08:09.253132Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T20:08:09.253132Z | Warning | eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+2023-02-18T20:08:09.254132Z | Warning | moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+[Warn  - 7:08:09 AM] class: InternalError: Unable to typecheck
+[Warn  - 7:08:09 AM] eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+[Warn  - 7:08:09 AM] moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+2023-02-18T20:08:14.804875Z | Info | Live bytes: 23.05MB Heap size: 575.67MB
+[Info  - 7:08:14 AM] Live bytes: 23.05MB Heap size: 575.67MB
+2023-02-18T20:09:14.807973Z | Info | Live bytes: 23.05MB Heap size: 575.67MB
+[Info  - 7:09:14 AM] Live bytes: 23.05MB Heap size: 575.67MB
+2023-02-18T20:09:23.960099Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T20:09:23.960099Z | Warning | eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+2023-02-18T20:09:23.961102Z | Warning | moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+[Warn  - 7:09:23 AM] class: InternalError: Unable to typecheck
+[Warn  - 7:09:23 AM] eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+[Warn  - 7:09:23 AM] moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+2023-02-18T20:09:24.093464Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T20:09:24.093464Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T20:09:24.093464Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T20:09:24.094457Z | Warning | retrie: InternalError: typecheck
+[Warn  - 7:09:24 AM] changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T20:09:24.094457Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 7:09:24 AM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 7:09:24 AM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 7:09:24 AM] retrie: InternalError: typecheck
+[Warn  - 7:09:24 AM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T20:10:14.829907Z | Info | Live bytes: 23.05MB Heap size: 575.67MB
+[Info  - 7:10:14 AM] Live bytes: 23.05MB Heap size: 575.67MB
+2023-02-18T20:11:14.832234Z | Info | Live bytes: 23.05MB Heap size: 575.67MB
+[Info  - 7:11:14 AM] Live bytes: 23.05MB Heap size: 575.67MB
+2023-02-18T20:11:58.574485Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T20:11:58.576491Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T20:11:58.577495Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T20:11:58.577495Z | Warning | retrie: InternalError: typecheck
+2023-02-18T20:11:58.577495Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 7:11:58 AM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 7:11:58 AM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 7:11:58 AM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 7:11:58 AM] retrie: InternalError: typecheck
+[Warn  - 7:11:58 AM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T20:11:59.840719Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 7:11:59 AM] codeRange: bad dependency: GetCodeRange
+2023-02-18T20:11:59.854720Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T20:11:59.854720Z | Warning | eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+2023-02-18T20:11:59.854720Z | Warning | moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+[Warn  - 7:11:59 AM] class: InternalError: Unable to typecheck
+[Warn  - 7:11:59 AM] eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+[Warn  - 7:11:59 AM] moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+2023-02-18T20:11:59.889047Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T20:11:59.889047Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T20:11:59.890048Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 7:11:59 AM] changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T20:11:59.890048Z | Warning | retrie: InternalError: typecheck
+2023-02-18T20:11:59.890048Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 7:11:59 AM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 7:11:59 AM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 7:11:59 AM] retrie: InternalError: typecheck
+[Warn  - 7:11:59 AM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T20:12:00.655207Z | Warning | class: InternalError: Unable to typecheck
+2023-02-18T20:12:00.656209Z | Warning | eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+[Warn  - 7:12:00 AM] class: InternalError: Unable to typecheck
+2023-02-18T20:12:00.656209Z | Warning | moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+[Warn  - 7:12:00 AM] eval: InternalError: Exception in plugin PluginId "eval" while processing STextDocumentCodeLens: BadDependency "GetEvalComments"
+[Warn  - 7:12:00 AM] moduleName: InternalError: Exception in plugin PluginId "moduleName" while processing STextDocumentCodeLens: BadDependency "GhcSession"
+2023-02-18T20:12:00.990637Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T20:12:00.990637Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T20:12:00.991635Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T20:12:00.991635Z | Warning | retrie: InternalError: typecheck
+2023-02-18T20:12:00.991635Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 7:12:00 AM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 7:12:00 AM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 7:12:00 AM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 7:12:00 AM] retrie: InternalError: typecheck
+[Warn  - 7:12:00 AM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T20:12:06.783402Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T20:12:06.783402Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T20:12:06.783402Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T20:12:06.784406Z | Warning | retrie: InternalError: typecheck
+2023-02-18T20:12:06.784406Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 7:12:06 AM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 7:12:06 AM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 7:12:06 AM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 7:12:06 AM] retrie: InternalError: typecheck
+[Warn  - 7:12:06 AM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T20:12:07.549847Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T20:12:07.549847Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T20:12:07.549847Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T20:12:07.549847Z | Warning | retrie: InternalError: typecheck
+2023-02-18T20:12:07.550854Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 7:12:07 AM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 7:12:07 AM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 7:12:07 AM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 7:12:07 AM] retrie: InternalError: typecheck
+[Warn  - 7:12:07 AM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T20:12:14.837065Z | Info | Live bytes: 23.05MB Heap size: 575.67MB
+[Info  - 7:12:14 AM] Live bytes: 23.05MB Heap size: 575.67MB
+2023-02-18T20:12:59.482520Z | Info | Cradle path: src\Internal\RunTimeLogging.hs
+[Info  - 7:12:59 AM] Cradle path: src\Internal\RunTimeLogging.hs
+2023-02-18T20:13:14.846260Z | Info | Live bytes: 23.05MB Heap size: 575.67MB
+[Info  - 7:13:14 AM] Live bytes: 23.05MB Heap size: 575.67MB
+2023-02-18T20:13:16.233267Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-18T20:13:16.233267Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-18T20:13:16.234264Z | Warning | explicit-fields: InternalError: Could not get NextPragmaInfo
+2023-02-18T20:13:16.234264Z | Warning | retrie: InternalError: typecheck
+2023-02-18T20:13:16.234264Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 7:13:16 AM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 7:13:16 AM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 7:13:16 AM] explicit-fields: InternalError: Could not get NextPragmaInfo
+[Warn  - 7:13:16 AM] retrie: InternalError: typecheck
+[Warn  - 7:13:16 AM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-18T20:13:58.912724Z | Info | Interface files cache directory: C:\Users\thegh\AppData\Local\ghcide\main-c70615d89a7a639097b386336e61e4aed219e86e
+2023-02-18T20:13:58.912724Z | Info | Making new HscEnv. In-place unit ids: [main]
+[Info  - 7:13:58 AM] Interface files cache directory: C:\Users\thegh\AppData\Local\ghcide\main-c70615d89a7a639097b386336e61e4aed219e86e
+[Info  - 7:13:58 AM] Making new HscEnv. In-place unit ids: [main]
+2023-02-18T20:14:14.850902Z | Info | Live bytes: 68.73MB Heap size: 660.60MB
+[Info  - 7:14:14 AM] Live bytes: 68.73MB Heap size: 660.60MB
+2023-02-18T20:15:14.869608Z | Info | Live bytes: 182.79MB Heap size: 848.30MB
+[Info  - 7:15:14 AM] Live bytes: 182.79MB Heap size: 848.30MB
+2023-02-18T20:16:14.881122Z | Info | Live bytes: 182.79MB Heap size: 848.30MB
+[Info  - 7:16:14 AM] Live bytes: 182.79MB Heap size: 848.30MB
+2023-02-18T20:17:14.890293Z | Info | Live bytes: 182.79MB Heap size: 848.30MB
+[Info  - 7:17:14 AM] Live bytes: 182.79MB Heap size: 848.30MB
+2023-02-18T20:18:14.899130Z | Info | Live bytes: 182.79MB Heap size: 848.30MB
+[Info  - 7:18:14 AM] Live bytes: 182.79MB Heap size: 848.30MB
+2023-02-18T20:19:14.908453Z | Info | Live bytes: 182.79MB Heap size: 848.30MB
+[Info  - 7:19:14 AM] Live bytes: 182.79MB Heap size: 848.30MB
+2023-02-18T20:20:15.292077Z | Info | Live bytes: 182.79MB Heap size: 848.30MB
+[Info  - 7:20:15 AM] Live bytes: 182.79MB Heap size: 848.30MB
+2023-02-18T20:21:15.296009Z | Info | Live bytes: 182.79MB Heap size: 848.30MB
+[Info  - 7:21:15 AM] Live bytes: 182.79MB Heap size: 848.30MB
+2023-02-18T20:22:15.304173Z | Info | Live bytes: 182.79MB Heap size: 848.30MB
+[Info  - 7:22:15 AM] Live bytes: 182.79MB Heap size: 848.30MB
+2023-02-18T20:23:15.328405Z | Info | Live bytes: 182.79MB Heap size: 848.30MB
+[Info  - 7:23:15 AM] Live bytes: 182.79MB Heap size: 848.30MB
+2023-02-18T20:24:15.344691Z | Info | Live bytes: 211.63MB Heap size: 848.30MB
+[Info  - 7:24:15 AM] Live bytes: 211.63MB Heap size: 848.30MB
+2023-02-18T20:25:00.787224Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\RunTimeLogging.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\PreNode.hs"
+                                                                                                            , NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs"
+                                                                                                            , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+[Info  - 7:25:00 AM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\RunTimeLogging.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\PreNode.hs"
+                                                                                                            , NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs"
+                                                                                                            , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+2023-02-18T20:25:04.135362Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\RunTimeLogging.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\PreNode.hs"
+                                                                                                            , NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs"
+                                                                                                            , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+[Info  - 7:25:04 AM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\RunTimeLogging.hs": [ NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\PreNode.hs"
+                                                                                                            , NormalizedFilePath "C:\\Pyrethrum\\src\\Internal\\SuiteRuntime.hs"
+                                                                                                            , NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs" ]
+2023-02-18T20:25:15.358642Z | Info | Live bytes: 226.00MB Heap size: 848.30MB
+[Info  - 7:25:15 AM] Live bytes: 226.00MB Heap size: 848.30MB
+2023-02-19T02:18:35.874068Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:18:35 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:19:36.221236Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:19:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:20:36.228524Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:20:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:21:36.237414Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:21:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:22:36.324963Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:22:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:23:36.341768Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:23:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:24:36.352076Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:24:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:25:36.361582Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:25:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:26:36.369748Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:26:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:27:36.381592Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:27:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:28:36.395701Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:28:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:29:36.398834Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:29:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:30:36.410239Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:30:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:31:36.420874Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:31:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:32:36.431317Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:32:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:33:36.439949Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:33:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:34:36.449575Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:34:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:35:36.459032Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:35:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:36:36.467910Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:36:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:37:36.480138Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:37:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:38:36.490387Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:38:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:39:36.499775Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:39:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:40:36.509118Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:40:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:41:36.518457Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:41:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:42:36.529674Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:42:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:43:36.539689Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:43:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:44:36.550188Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:44:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:45:36.558826Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:45:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:46:36.568257Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:46:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:47:36.579511Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:47:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:48:36.589339Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:48:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:49:36.599832Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:49:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:50:36.608551Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:50:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:51:36.613999Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:51:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:52:36.629487Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:52:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T02:53:36.641973Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 1:53:36 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:09:59.698444Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:09:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:10:59.700160Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:10:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:11:59.712153Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:11:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:12:59.723985Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:12:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:13:59.731408Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:13:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:14:59.742625Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:14:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:15:59.752544Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:15:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:16:59.763051Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:16:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:17:59.771946Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:17:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:18:59.780233Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:18:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:19:59.787675Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:19:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:20:59.803563Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:20:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:21:59.812808Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:21:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:22:59.821743Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:22:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:23:59.833415Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:23:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:24:59.842749Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:24:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:25:59.854408Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:25:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:26:59.860798Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:26:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:27:59.871677Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:27:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:28:59.876857Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:28:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:29:59.892579Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:29:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:30:59.903227Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:30:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:31:59.919616Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:31:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:32:59.929501Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:32:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:33:59.931797Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:33:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:34:59.943062Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:34:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:35:59.953133Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:35:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:36:59.961320Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:36:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:37:59.971364Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:37:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:38:59.974778Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:38:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:39:59.976226Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:39:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:40:59.982908Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:40:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:41:59.995291Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:41:59 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:43:00.007319Z | Info | Live bytes: 239.71MB Heap size: 848.30MB
+[Info  - 3:43:00 PM] Live bytes: 239.71MB Heap size: 848.30MB
+2023-02-19T04:43:53.362514Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 3:43:53 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T04:44:00.012354Z | Info | Live bytes: 249.42MB Heap size: 848.30MB
+[Info  - 3:44:00 PM] Live bytes: 249.42MB Heap size: 848.30MB
+2023-02-19T04:45:00.024821Z | Info | Live bytes: 250.76MB Heap size: 848.30MB
+[Info  - 3:45:00 PM] Live bytes: 250.76MB Heap size: 848.30MB
+2023-02-19T04:46:00.032677Z | Info | Live bytes: 250.76MB Heap size: 848.30MB
+[Info  - 3:46:00 PM] Live bytes: 250.76MB Heap size: 848.30MB
+2023-02-19T04:47:00.046102Z | Info | Live bytes: 304.30MB Heap size: 869.27MB
+[Info  - 3:47:00 PM] Live bytes: 304.30MB Heap size: 869.27MB
+2023-02-19T04:48:00.058314Z | Info | Live bytes: 304.30MB Heap size: 869.27MB
+[Info  - 3:48:00 PM] Live bytes: 304.30MB Heap size: 869.27MB
+2023-02-19T04:48:06.811350Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-19T04:48:06.811350Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-19T04:48:06.811350Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T04:48:06.811350Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 3:48:06 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 3:48:06 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 3:48:06 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 3:48:06 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-19T04:48:06.986978Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 3:48:06 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T04:48:07.199436Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 3:48:07 PM] class: InternalError: Unable to typecheck
+2023-02-19T04:48:07.549029Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-19T04:48:07.560674Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 3:48:07 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 3:48:07 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-19T04:48:07.560674Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T04:48:07.580830Z | Warning | retrie: InternalError: pos
+2023-02-19T04:48:07.581832Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 3:48:07 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 3:48:07 PM] retrie: InternalError: pos
+[Warn  - 3:48:07 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-19T04:48:07.963241Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 3:48:07 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T04:48:08.360299Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 3:48:08 PM] class: InternalError: Unable to typecheck
+2023-02-19T04:48:12.349287Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 3:48:12 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T04:48:20.883122Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-19T04:48:20.883122Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-19T04:48:20.883122Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T04:48:20.884124Z | Warning | retrie: InternalError: pos
+2023-02-19T04:48:20.884124Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-19T04:48:20.889122Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-19T04:48:20.890124Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-19T04:48:20.890124Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T04:48:20.890124Z | Warning | retrie: InternalError: pos
+2023-02-19T04:48:20.890124Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-19T04:48:20.918838Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-19T04:48:20.918838Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-19T04:48:20.918838Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T04:48:20.919837Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 3:48:31 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 3:48:31 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 3:48:31 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 3:48:31 PM] retrie: InternalError: pos
+[Warn  - 3:48:31 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 3:48:31 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 3:48:31 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 3:48:31 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 3:48:31 PM] retrie: InternalError: pos
+[Warn  - 3:48:31 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 3:48:31 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 3:48:31 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 3:48:31 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 3:48:31 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-19T04:49:00.075651Z | Info | Live bytes: 413.32MB Heap size: 1263.53MB
+[Info  - 3:49:00 PM] Live bytes: 413.32MB Heap size: 1263.53MB
+2023-02-19T04:50:00.094231Z | Info | Live bytes: 413.32MB Heap size: 1263.53MB
+[Info  - 3:50:00 PM] Live bytes: 413.32MB Heap size: 1263.53MB
+2023-02-19T04:51:00.099646Z | Info | Live bytes: 413.32MB Heap size: 1263.53MB
+[Info  - 3:51:00 PM] Live bytes: 413.32MB Heap size: 1263.53MB
+2023-02-19T04:52:00.108012Z | Info | Live bytes: 413.32MB Heap size: 1263.53MB
+[Info  - 3:52:00 PM] Live bytes: 413.32MB Heap size: 1263.53MB
+2023-02-19T04:53:00.121044Z | Info | Live bytes: 413.32MB Heap size: 1263.53MB
+[Info  - 3:53:00 PM] Live bytes: 413.32MB Heap size: 1263.53MB
+2023-02-19T04:54:00.123110Z | Info | Live bytes: 413.32MB Heap size: 1263.53MB
+[Info  - 3:54:00 PM] Live bytes: 413.32MB Heap size: 1263.53MB
+2023-02-19T04:55:00.125777Z | Info | Live bytes: 413.32MB Heap size: 1263.53MB
+[Info  - 3:55:00 PM] Live bytes: 413.32MB Heap size: 1263.53MB
+2023-02-19T04:56:00.134475Z | Info | Live bytes: 413.32MB Heap size: 1263.53MB
+[Info  - 3:56:00 PM] Live bytes: 413.32MB Heap size: 1263.53MB
+2023-02-19T04:57:00.142824Z | Info | Live bytes: 413.32MB Heap size: 1263.53MB
+[Info  - 3:57:00 PM] Live bytes: 413.32MB Heap size: 1263.53MB
+2023-02-19T04:58:00.155811Z | Info | Live bytes: 436.68MB Heap size: 1263.53MB
+[Info  - 3:58:00 PM] Live bytes: 436.68MB Heap size: 1263.53MB
+2023-02-19T04:59:00.163188Z | Info | Live bytes: 436.68MB Heap size: 1263.53MB
+[Info  - 3:59:00 PM] Live bytes: 436.68MB Heap size: 1263.53MB
+2023-02-19T05:00:00.173802Z | Info | Live bytes: 436.68MB Heap size: 1263.53MB
+[Info  - 4:00:00 PM] Live bytes: 436.68MB Heap size: 1263.53MB
+2023-02-19T05:01:00.182352Z | Info | Live bytes: 436.68MB Heap size: 1263.53MB
+[Info  - 4:01:00 PM] Live bytes: 436.68MB Heap size: 1263.53MB
+2023-02-19T05:02:00.194906Z | Info | Live bytes: 436.68MB Heap size: 1263.53MB
+[Info  - 4:02:00 PM] Live bytes: 436.68MB Heap size: 1263.53MB
+2023-02-19T05:03:00.204490Z | Info | Live bytes: 436.68MB Heap size: 1263.53MB
+[Info  - 4:03:00 PM] Live bytes: 436.68MB Heap size: 1263.53MB
+2023-02-19T05:04:00.212203Z | Info | Live bytes: 436.68MB Heap size: 1263.53MB
+[Info  - 4:04:00 PM] Live bytes: 436.68MB Heap size: 1263.53MB
+2023-02-19T05:05:00.223221Z | Info | Live bytes: 436.68MB Heap size: 1263.53MB
+[Info  - 4:05:00 PM] Live bytes: 436.68MB Heap size: 1263.53MB
+2023-02-19T05:05:37.003486Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-19T05:05:37.004484Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-19T05:05:37.004484Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:37.004484Z | Warning | retrie: InternalError: pos
+2023-02-19T05:05:37.004484Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:05:37 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:05:37 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:05:37 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:37 PM] retrie: InternalError: pos
+[Warn  - 4:05:37 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-19T05:05:37.277476Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-19T05:05:37.278476Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-19T05:05:37.278476Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:37.278476Z | Warning | retrie: InternalError: pos
+2023-02-19T05:05:37.278476Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:05:37 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:05:37 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:05:37 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:37 PM] retrie: InternalError: pos
+[Warn  - 4:05:37 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-19T05:05:37.486460Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:05:37 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T05:05:40.237100Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:05:40 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T05:05:40.285097Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:40 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:40.334729Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:05:40 PM] class: InternalError: Unable to typecheck
+2023-02-19T05:05:40.630892Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:40 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:41.707062Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:41 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:42.977118Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:42 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:45.161343Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:05:45 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T05:05:45.218752Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:45.222479Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:45 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:45 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:45.275478Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:05:45 PM] class: InternalError: Unable to typecheck
+2023-02-19T05:05:45.524033Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:45 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:46.488382Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:46 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:46.888413Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:47 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:48.945913Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:05:48 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T05:05:48.971909Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:48 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:49.022915Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:05:49 PM] class: InternalError: Unable to typecheck
+2023-02-19T05:05:49.342294Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:49 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:05:49.948449Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:05:49 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:06:00.231167Z | Info | Live bytes: 256.45MB Heap size: 1436.55MB
+[Info  - 4:06:00 PM] Live bytes: 256.45MB Heap size: 1436.55MB
+2023-02-19T05:07:00.244315Z | Info | Live bytes: 256.45MB Heap size: 1436.55MB
+[Info  - 4:07:00 PM] Live bytes: 256.45MB Heap size: 1436.55MB
+2023-02-19T05:08:00.254563Z | Info | Live bytes: 256.45MB Heap size: 1436.55MB
+[Info  - 4:08:00 PM] Live bytes: 256.45MB Heap size: 1436.55MB
+2023-02-19T05:09:00.263241Z | Info | Live bytes: 256.45MB Heap size: 1436.55MB
+[Info  - 4:09:00 PM] Live bytes: 256.45MB Heap size: 1436.55MB
+2023-02-19T05:10:00.272133Z | Info | Live bytes: 256.45MB Heap size: 1436.55MB
+[Info  - 4:10:00 PM] Live bytes: 256.45MB Heap size: 1436.55MB
+2023-02-19T05:11:00.284042Z | Info | Live bytes: 256.45MB Heap size: 1436.55MB
+[Info  - 4:11:00 PM] Live bytes: 256.45MB Heap size: 1436.55MB
+2023-02-19T05:12:00.291328Z | Info | Live bytes: 256.45MB Heap size: 1436.55MB
+[Info  - 4:12:00 PM] Live bytes: 256.45MB Heap size: 1436.55MB
+2023-02-19T05:13:00.305303Z | Info | Live bytes: 256.45MB Heap size: 1436.55MB
+[Info  - 4:13:00 PM] Live bytes: 256.45MB Heap size: 1436.55MB
+2023-02-19T05:13:03.240597Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-19T05:13:03.241591Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-19T05:13:03.241591Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:13:03.241591Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:13:03 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:13:03 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:13:03 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:13:03 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-19T05:13:06.987662Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:13:06.987662Z | Warning | retrie: InternalError: pos
+2023-02-19T05:13:07.003673Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:13:07 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:13:07 PM] retrie: InternalError: pos
+[Warn  - 4:13:07 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T05:13:07.074368Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:13:07 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:13:07.085760Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:13:07 PM] class: InternalError: Unable to typecheck
+2023-02-19T05:13:07.112757Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:13:07.113753Z | Warning | retrie: InternalError: pos
+[Warn  - 4:13:07 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:13:07 PM] retrie: InternalError: pos
+2023-02-19T05:13:07.402005Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:13:07.402999Z | Warning | retrie: InternalError: pos
+[Warn  - 4:13:07 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:13:07 PM] retrie: InternalError: pos
+2023-02-19T05:13:07.777423Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:13:07 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:13:08.880454Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:13:08 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:13:10.847076Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:13:10 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T05:13:10.894870Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:13:10 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:13:10.900264Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:13:10 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:13:10.950266Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:13:10 PM] class: InternalError: Unable to typecheck
+2023-02-19T05:13:11.263594Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:13:11 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:13:12.617678Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:13:12 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:13:20.392597Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:13:20 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T05:14:00.313698Z | Info | Live bytes: 372.90MB Heap size: 1438.65MB
+[Info  - 4:14:00 PM] Live bytes: 372.90MB Heap size: 1438.65MB
+2023-02-19T05:15:00.322404Z | Info | Live bytes: 416.55MB Heap size: 1438.65MB
+[Info  - 4:15:00 PM] Live bytes: 416.55MB Heap size: 1438.65MB
+2023-02-19T05:16:00.332195Z | Info | Live bytes: 416.55MB Heap size: 1438.65MB
+[Info  - 4:16:00 PM] Live bytes: 416.55MB Heap size: 1438.65MB
+2023-02-19T05:17:00.344447Z | Info | Live bytes: 416.55MB Heap size: 1438.65MB
+[Info  - 4:17:00 PM] Live bytes: 416.55MB Heap size: 1438.65MB
+2023-02-19T05:17:28.287090Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:17:28 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T05:18:00.351190Z | Info | Live bytes: 548.98MB Heap size: 1438.65MB
+[Info  - 4:18:00 PM] Live bytes: 548.98MB Heap size: 1438.65MB
+2023-02-19T05:18:41.569403Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:18:41 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T05:18:58.492940Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:18:58 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T05:19:00.360399Z | Info | Live bytes: 647.94MB Heap size: 1438.65MB
+[Info  - 4:19:00 PM] Live bytes: 647.94MB Heap size: 1438.65MB
+2023-02-19T05:20:00.374470Z | Info | Live bytes: 655.41MB Heap size: 1438.65MB
+[Info  - 4:20:00 PM] Live bytes: 655.41MB Heap size: 1438.65MB
+2023-02-19T05:21:00.386793Z | Info | Live bytes: 703.75MB Heap size: 1438.65MB
+[Info  - 4:21:00 PM] Live bytes: 703.75MB Heap size: 1438.65MB
+2023-02-19T05:21:35.354442Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:21:35 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T05:22:00.390866Z | Info | Live bytes: 494.58MB Heap size: 1523.58MB
+[Info  - 4:22:00 PM] Live bytes: 494.58MB Heap size: 1523.58MB
+2023-02-19T05:22:23.028986Z | Warning | LSP: no handler for: SCustomMethod "$/setTrace"
+[Warn  - 4:22:23 PM] LSP: no handler for: SCustomMethod "$/setTrace"
+2023-02-19T05:23:00.444734Z | Info | Live bytes: 494.58MB Heap size: 1523.58MB
+[Info  - 4:23:00 PM] Live bytes: 494.58MB Heap size: 1523.58MB
+2023-02-19T05:24:00.446264Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:24:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:25:00.455098Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:25:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:26:00.466015Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:26:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:27:00.477327Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:27:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:28:00.485812Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:28:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:29:00.496690Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:29:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:30:00.504024Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:30:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:31:00.515267Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:31:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:32:00.527435Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:32:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:33:00.537197Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:33:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:34:00.545498Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:34:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:35:00.556707Z | Info | Live bytes: 503.41MB Heap size: 1523.58MB
+[Info  - 4:35:00 PM] Live bytes: 503.41MB Heap size: 1523.58MB
+2023-02-19T05:35:54.376144Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:35:54 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T05:36:00.595799Z | Info | Live bytes: 285.54MB Heap size: 1523.58MB
+[Info  - 4:36:00 PM] Live bytes: 285.54MB Heap size: 1523.58MB
+2023-02-19T05:37:00.606867Z | Info | Live bytes: 297.12MB Heap size: 1523.58MB
+[Info  - 4:37:00 PM] Live bytes: 297.12MB Heap size: 1523.58MB
+2023-02-19T05:37:05.412552Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:37:05 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T05:38:00.613743Z | Info | Live bytes: 318.29MB Heap size: 1523.58MB
+[Info  - 4:38:00 PM] Live bytes: 318.29MB Heap size: 1523.58MB
+2023-02-19T05:39:00.629958Z | Info | Live bytes: 318.29MB Heap size: 1523.58MB
+[Info  - 4:39:00 PM] Live bytes: 318.29MB Heap size: 1523.58MB
+2023-02-19T05:40:00.638664Z | Info | Live bytes: 318.29MB Heap size: 1523.58MB
+[Info  - 4:40:00 PM] Live bytes: 318.29MB Heap size: 1523.58MB
+2023-02-19T05:41:00.662928Z | Info | Live bytes: 318.29MB Heap size: 1523.58MB
+[Info  - 4:41:00 PM] Live bytes: 318.29MB Heap size: 1523.58MB
+2023-02-19T05:42:00.681488Z | Info | Live bytes: 369.70MB Heap size: 1523.58MB
+[Info  - 4:42:00 PM] Live bytes: 369.70MB Heap size: 1523.58MB
+2023-02-19T05:43:00.703981Z | Info | Live bytes: 369.70MB Heap size: 1523.58MB
+[Info  - 4:43:00 PM] Live bytes: 369.70MB Heap size: 1523.58MB
+2023-02-19T05:44:00.725189Z | Info | Live bytes: 407.78MB Heap size: 1523.58MB
+[Info  - 4:44:00 PM] Live bytes: 407.78MB Heap size: 1523.58MB
+2023-02-19T05:44:52.231670Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-19T05:44:52.231670Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-19T05:44:52.232674Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T05:44:52.232674Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 4:44:52 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 4:44:52 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 4:44:52 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 4:44:52 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-19T05:44:52.396739Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 4:44:52 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T05:44:52.516974Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 4:44:52 PM] class: InternalError: Unable to typecheck
+2023-02-19T05:44:55.917714Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:44:55 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T05:45:00.753967Z | Info | Live bytes: 255.67MB Heap size: 1523.58MB
+[Info  - 4:45:00 PM] Live bytes: 255.67MB Heap size: 1523.58MB
+2023-02-19T05:46:00.780620Z | Info | Live bytes: 255.85MB Heap size: 1523.58MB
+[Info  - 4:46:00 PM] Live bytes: 255.85MB Heap size: 1523.58MB
+2023-02-19T05:47:00.800296Z | Info | Live bytes: 295.06MB Heap size: 1523.58MB
+[Info  - 4:47:00 PM] Live bytes: 295.06MB Heap size: 1523.58MB
+2023-02-19T05:48:00.827112Z | Info | Live bytes: 295.17MB Heap size: 1523.58MB
+[Info  - 4:48:00 PM] Live bytes: 295.17MB Heap size: 1523.58MB
+2023-02-19T05:49:00.842541Z | Info | Live bytes: 295.17MB Heap size: 1523.58MB
+[Info  - 4:49:00 PM] Live bytes: 295.17MB Heap size: 1523.58MB
+2023-02-19T05:50:00.869227Z | Info | Live bytes: 295.17MB Heap size: 1523.58MB
+[Info  - 4:50:00 PM] Live bytes: 295.17MB Heap size: 1523.58MB
+2023-02-19T05:51:00.939761Z | Info | Live bytes: 346.83MB Heap size: 1523.58MB
+[Info  - 4:51:03 PM] Live bytes: 346.83MB Heap size: 1523.58MB
+2023-02-19T05:51:09.806922Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:51:09 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T05:52:00.962009Z | Info | Live bytes: 420.24MB Heap size: 1523.58MB
+[Info  - 4:52:00 PM] Live bytes: 420.24MB Heap size: 1523.58MB
+2023-02-19T05:53:00.977291Z | Info | Live bytes: 277.07MB Heap size: 1523.58MB
+[Info  - 4:53:01 PM] Live bytes: 277.07MB Heap size: 1523.58MB
+2023-02-19T05:53:17.814201Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 4:53:17 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T05:54:01.002842Z | Info | Live bytes: 328.55MB Heap size: 1523.58MB
+[Info  - 4:54:00 PM] Live bytes: 328.55MB Heap size: 1523.58MB
+2023-02-19T05:55:01.023478Z | Info | Live bytes: 328.55MB Heap size: 1523.58MB
+[Info  - 4:55:01 PM] Live bytes: 328.55MB Heap size: 1523.58MB
+2023-02-19T05:56:01.044800Z | Info | Live bytes: 328.55MB Heap size: 1523.58MB
+[Info  - 4:56:01 PM] Live bytes: 328.55MB Heap size: 1523.58MB
+2023-02-19T05:57:01.069271Z | Info | Live bytes: 328.55MB Heap size: 1523.58MB
+[Info  - 4:57:01 PM] Live bytes: 328.55MB Heap size: 1523.58MB
+2023-02-19T05:58:01.085976Z | Info | Live bytes: 328.55MB Heap size: 1523.58MB
+[Info  - 4:58:01 PM] Live bytes: 328.55MB Heap size: 1523.58MB
+2023-02-19T05:59:01.105036Z | Info | Live bytes: 328.55MB Heap size: 1523.58MB
+[Info  - 4:59:01 PM] Live bytes: 328.55MB Heap size: 1523.58MB
+2023-02-19T06:00:01.121239Z | Info | Live bytes: 328.55MB Heap size: 1523.58MB
+[Info  - 5:00:01 PM] Live bytes: 328.55MB Heap size: 1523.58MB
+2023-02-19T06:01:01.140333Z | Info | Live bytes: 367.19MB Heap size: 1523.58MB
+[Info  - 5:01:01 PM] Live bytes: 367.19MB Heap size: 1523.58MB
+2023-02-19T06:02:01.159743Z | Info | Live bytes: 367.19MB Heap size: 1523.58MB
+[Info  - 5:02:01 PM] Live bytes: 367.19MB Heap size: 1523.58MB
+2023-02-19T06:03:01.177242Z | Info | Live bytes: 367.19MB Heap size: 1523.58MB
+[Info  - 5:03:01 PM] Live bytes: 367.19MB Heap size: 1523.58MB
+2023-02-19T06:04:01.195155Z | Info | Live bytes: 367.19MB Heap size: 1523.58MB
+[Info  - 5:04:01 PM] Live bytes: 367.19MB Heap size: 1523.58MB
+2023-02-19T06:05:01.210492Z | Info | Live bytes: 367.19MB Heap size: 1523.58MB
+[Info  - 5:05:01 PM] Live bytes: 367.19MB Heap size: 1523.58MB
+2023-02-19T06:05:23.449653Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:23.449653Z | Warning | retrie: InternalError: pos
+[Warn  - 5:05:23 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:23 PM] retrie: InternalError: pos
+2023-02-19T06:05:24.073099Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:24 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:24.362208Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:24 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:24.421249Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:24 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:35.204476Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:35 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:35.265483Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:35.266500Z | Warning | retrie: InternalError: pos
+[Warn  - 5:05:35 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:35.267480Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:35.267480Z | Warning | retrie: InternalError: pos
+[Warn  - 5:05:35 PM] retrie: InternalError: pos
+[Warn  - 5:05:35 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:35.271749Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:35.271749Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:35.272753Z | Warning | retrie: InternalError: pos
+2023-02-19T06:05:35.272753Z | Warning | retrie: InternalError: pos
+[Warn  - 5:05:35 PM] retrie: InternalError: pos
+[Warn  - 5:05:35 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:35 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:35 PM] retrie: InternalError: pos
+[Warn  - 5:05:35 PM] retrie: InternalError: pos
+2023-02-19T06:05:35.364169Z | Warning | class: InternalError: Unable to typecheck
+2023-02-19T06:05:35.364169Z | Warning | class: InternalError: Unable to typecheck
+2023-02-19T06:05:35.365172Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:35 PM] class: InternalError: Unable to typecheck
+[Warn  - 5:05:35 PM] class: InternalError: Unable to typecheck
+[Warn  - 5:05:35 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:35.420181Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:35 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:35.427185Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:35 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:35.894677Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:35 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:37.409907Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:37 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:37.431907Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:37.432907Z | Warning | retrie: InternalError: pos
+[Warn  - 5:05:37 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:37 PM] retrie: InternalError: pos
+2023-02-19T06:05:37.442909Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:37 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:37.823223Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:37.824219Z | Warning | retrie: InternalError: pos
+[Warn  - 5:05:37 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:37 PM] retrie: InternalError: pos
+2023-02-19T06:05:40.320255Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:40 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:40.330365Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:40 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:40.439199Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:40 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:40.870070Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:40.870070Z | Warning | retrie: InternalError: pos
+2023-02-19T06:05:40.901814Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:40 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:40 PM] retrie: InternalError: pos
+[Warn  - 5:05:40 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:41.519177Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:41.519177Z | Warning | retrie: InternalError: pos
+[Warn  - 5:05:41 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:41 PM] retrie: InternalError: pos
+2023-02-19T06:05:41.562902Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:41 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:41.656620Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:41 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:42.668086Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:42 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:42.690088Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:42 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:42.729239Z | Warning | changeTypeSignature: InternalError: Could not get Parsed Module
+2023-02-19T06:05:42.729239Z | Warning | alternateNumberFormat: InternalError: Could not Collect Literals
+2023-02-19T06:05:42.730240Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:42.730240Z | Warning | gadt: InternalError: Unable to get ParsedModuleWithComments
+[Warn  - 5:05:42 PM] changeTypeSignature: InternalError: Could not get Parsed Module
+[Warn  - 5:05:42 PM] alternateNumberFormat: InternalError: Could not Collect Literals
+[Warn  - 5:05:42 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:42 PM] gadt: InternalError: Unable to get ParsedModuleWithComments
+2023-02-19T06:05:45.972882Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:45 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:45.979841Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:45 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:46.813752Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:46 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:46.893764Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:46 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:46.993788Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:46 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:47.227340Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:47 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:48.607145Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:48.608142Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:48 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:48 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:48.642609Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:48 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:49.042991Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:49.079993Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:49 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:49 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:49.465204Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:49 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:49.477213Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:49 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:49.523224Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:49 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:49.633793Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:49 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:49.963417Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:50 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:50.467225Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-19T06:05:50.523221Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:50 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 5:05:50 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:50.965575Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:50 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:53.729270Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:05:53.729270Z | Warning | retrie: InternalError: pos
+[Warn  - 5:05:53 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:53 PM] retrie: InternalError: pos
+2023-02-19T06:05:55.430731Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:05:55 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:05:55.473731Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:05:55 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:01.229299Z | Info | Live bytes: 400.60MB Heap size: 1523.58MB
+[Info  - 5:06:01 PM] Live bytes: 400.60MB Heap size: 1523.58MB
+2023-02-19T06:06:01.453337Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:06:01 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:06:01.540379Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:01 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:01.582497Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:06:02 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:06:03.706764Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:03 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:06.024046Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:06:06 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:06:06.099725Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:06 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:06.264283Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:06:06 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:06:11.410000Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:06:11 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:06:16.899724Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:16 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:17.496193Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:17 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:25.501034Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:25 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:25.751192Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:06:25 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:06:27.564376Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:27 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:30.133218Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:30 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:32.559997Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:32 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:37.481236Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:06:37 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:06:38.723283Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:06:38 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:06:38.759283Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:38 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:45.475616Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:45 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:53.878637Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:06:53 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:06:53.909625Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:06:53 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:07:01.248251Z | Info | Live bytes: 479.06MB Heap size: 1523.58MB
+[Info  - 5:07:01 PM] Live bytes: 479.06MB Heap size: 1523.58MB
+2023-02-19T06:07:28.193402Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:07:28 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:07:28.224395Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:07:28 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:07:28.483958Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:07:28.483958Z | Warning | retrie: InternalError: pos
+[Warn  - 5:07:28 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:07:28 PM] retrie: InternalError: pos
+2023-02-19T06:07:40.607618Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:07:40 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:07:40.675566Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:07:40.675566Z | Warning | retrie: InternalError: pos
+[Warn  - 5:07:40 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:07:40 PM] retrie: InternalError: pos
+2023-02-19T06:08:00.957676Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:00.957676Z | Warning | retrie: InternalError: pos
+[Warn  - 5:08:00 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:00 PM] retrie: InternalError: pos
+2023-02-19T06:08:01.268454Z | Info | Live bytes: 294.06MB Heap size: 1523.58MB
+[Info  - 5:08:01 PM] Live bytes: 294.06MB Heap size: 1523.58MB
+2023-02-19T06:08:05.793310Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:05 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:06.887765Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:06.888758Z | Warning | retrie: InternalError: pos
+[Warn  - 5:08:06 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:06 PM] retrie: InternalError: pos
+2023-02-19T06:08:08.579882Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:08 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:11.504611Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-19T06:08:11.583623Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-19T06:08:11.613626Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:11.613626Z | Warning | retrie: InternalError: pos
+2023-02-19T06:08:11.654629Z | Warning | class: InternalError: Unable to typecheck
+2023-02-19T06:08:11.664635Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:11 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 5:08:11 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 5:08:11 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:11 PM] retrie: InternalError: pos
+[Warn  - 5:08:11 PM] class: InternalError: Unable to typecheck
+[Warn  - 5:08:11 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:11.705642Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:08:11 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:08:11.912665Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:08:11 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:08:11.984677Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:08:11 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:08:12.159699Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:12.159699Z | Warning | retrie: InternalError: pos
+[Warn  - 5:08:12 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:12 PM] retrie: InternalError: pos
+2023-02-19T06:08:12.642766Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:08:12 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:08:12.775784Z | Warning | class: InternalError: Unable to typecheck
+2023-02-19T06:08:12.848794Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:12 PM] class: InternalError: Unable to typecheck
+[Warn  - 5:08:12 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:13.115835Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:13 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:15.194272Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:15.195266Z | Warning | retrie: InternalError: pos
+[Warn  - 5:08:15 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:15 PM] retrie: InternalError: pos
+2023-02-19T06:08:42.895751Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:42 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:43.091832Z | Warning | codeRange: bad dependency: GetCodeRange
+2023-02-19T06:08:43.199144Z | Warning | class: InternalError: Unable to typecheck
+2023-02-19T06:08:43.405366Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:08:43 PM] codeRange: bad dependency: GetCodeRange
+[Warn  - 5:08:43 PM] class: InternalError: Unable to typecheck
+[Warn  - 5:08:43 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:08:48.308482Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:08:48 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:09:01.280022Z | Info | Live bytes: 525.72MB Heap size: 1523.58MB
+[Info  - 5:09:01 PM] Live bytes: 525.72MB Heap size: 1523.58MB
+2023-02-19T06:10:01.300453Z | Info | Live bytes: 526.66MB Heap size: 1523.58MB
+[Info  - 5:10:01 PM] Live bytes: 526.66MB Heap size: 1523.58MB
+2023-02-19T06:11:01.314432Z | Info | Live bytes: 526.66MB Heap size: 1523.58MB
+[Info  - 5:11:01 PM] Live bytes: 526.66MB Heap size: 1523.58MB
+2023-02-19T06:11:21.784472Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:11:21 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:11:21.867494Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:11:21 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:12:01.331170Z | Info | Live bytes: 374.25MB Heap size: 1523.58MB
+[Info  - 5:12:01 PM] Live bytes: 374.25MB Heap size: 1523.58MB
+2023-02-19T06:12:14.929671Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:12:14 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:12:39.760472Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:12:39 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:12:41.029323Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:12:41 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:12:41.316361Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:12:41 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:12:41.638773Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:12:41 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:12:44.263690Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:12:44 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:12:44.458713Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:12:44 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:12:44.710688Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:12:44 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:12:48.600892Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:12:48.601875Z | Warning | retrie: InternalError: pos
+[Warn  - 5:12:48 PM] explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:12:48 PM] retrie: InternalError: pos
+2023-02-19T06:12:49.640720Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:12:49 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:12:49.890756Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:12:49 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:12:52.315178Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:12:52 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:12:52.541642Z | Warning | codeRange: bad dependency: GetCodeRange
+[Warn  - 5:12:52 PM] codeRange: bad dependency: GetCodeRange
+2023-02-19T06:12:52.672609Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:12:52 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:12:54.215100Z | Warning | explicit-fields: InternalError: Unable to TypeCheck
+[Warn  - 5:12:54 PM] explicit-fields: InternalError: Unable to TypeCheck
+2023-02-19T06:12:55.952998Z | Info | Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+[Info  - 5:12:55 PM] Typechecking reverse dependencies for NormalizedFilePath "C:\\Pyrethrum\\test\\SuiteRuntimeTest.hs": [  ]
+2023-02-19T06:12:56.882084Z | Warning | class: InternalError: Unable to typecheck
+[Warn  - 5:12:56 PM] class: InternalError: Unable to typecheck
+2023-02-19T06:13:01.361531Z | Info | Live bytes: 410.67MB Heap size: 1523.58MB
+[Info  - 5:13:01 PM] Live bytes: 410.67MB Heap size: 1523.58MB
+2023-02-19T06:14:01.375626Z | Info | Live bytes: 415.98MB Heap size: 1523.58MB
+[Info  - 5:14:01 PM] Live bytes: 415.98MB Heap size: 1523.58MB
+2023-02-19T06:15:01.387526Z | Info | Live bytes: 415.98MB Heap size: 1523.58MB
+[Info  - 5:15:01 PM] Live bytes: 415.98MB Heap size: 1523.58MB
+2023-02-19T06:16:01.396007Z | Info | Live bytes: 452.05MB Heap size: 1523.58MB
+[Info  - 5:16:01 PM] Live bytes: 452.05MB Heap size: 1523.58MB
+
+
+```

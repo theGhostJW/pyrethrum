@@ -9,13 +9,13 @@
 ### laws
 * check count of errors vs expected
 * verify treeshake
-* make hooks maybes
 * check release - may be done
 * check for overlapping events - may already be done
 * check tests strat inside the right fixture - may be done
 * think about locs
+* make hooks maybes
 * generalise hooks - nodeBracket frequency (Every | Thread | Once) (acc)
-* try validity??
+* genrative tests - try validity??
 
 
 
@@ -82,6 +82,8 @@ groupOn f =
           (M.insert (f a) [a] m)
           (\as -> M.insert (f a) (a : as) m)
 ```
+
+-- # TODO replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
 
 ----
 Introduction:

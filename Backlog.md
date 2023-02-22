@@ -6,7 +6,7 @@
   * pyrelude
   * deferred validation
   * posthoc failure analysis and defect reconciliation 
-### laws
+### Properties
 * check count of errors vs expected
 * verify treeshake
 * check release - may be done
@@ -14,10 +14,23 @@
 * check tests strat inside the right fixture - may be done
 * think about locs
 * make hooks maybes
-* generalise hooks - nodeBracket frequency (Every | Thread | Once) (acc)
+* onceHookReleases must block otherwise:
+  ```
+   2 threads oh 0.2 could be execute in thread 2 before 
+   ohr 0.1 is released, if they use the same resource this 
+   could be a problem
+   oh
+     oh  0.1
+     ohr 0.1
+     oh  0.2
+     ohr 0.2
+   ohr
+  ```
+* hooks / hookrelease should be Maybe - want to do after withou before
+  * how would nesting work?
+
+* generalise hooks? - might not work  nodeBracket frequency (Every | Thread | Once) (acc)
 * genrative tests - try validity??
-
-
 
 
 ## Run Construction

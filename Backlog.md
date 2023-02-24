@@ -1,3 +1,16 @@
+## switch to cabal
+1. hpack
+1. stackage / freeze files
+   1. [How can I have a reproducible set of versions for my dependencies?](https://cabal.readthedocs.io/en/stable/nix-local-build.html#how-can-i-have-a-reproducible-set-of-versions-for-my-dependencies)
+   2. https://www.stackage.org/lts-19.2/cabal.config 
+   3. https://github.com/haskell/cabal/issues/7556#issuecomment-1120433903
+   4. https://github.com/haskell/cabal/issues/8047
+2. build
+3. regen hie.yaml
+4. ghcid
+5. watch
+
+
 ## Suit runtime tests
 
 ### pyrethrum platform 
@@ -67,7 +80,6 @@
   * eitherf
 * upgrade ghc
 * format on debug'
-* switch to cabal
 * try removing crazy cradal (pyrethrum)
 * profiling
 

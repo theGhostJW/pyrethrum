@@ -1,14 +1,108 @@
 ## switch to cabal
 1. hpack
-1. stackage / freeze files
+   - run hpack needs exe
+   - clone rep and build with stack - blew up
+   - try with cabal - built for ages => blew up with ambiguous occurance exception
+   - asn1-types > Access violation in generated code when writing 0x0
+   - try download release 0.34.2 
+     - try build with stack and cabal => same result
+     - try run script in get Hpackhpack gaild
+     - download cabal.config from stackage
+       - comment try remote-repo line 
+       - try cabal-build - cabal-3.6.2.0.exe: Failed to build yaml-0.11.10.0 (which is required by
+exe:hpack from hpack-0.34.2) contraint in cabal file seems to be overriding cabal.config  yaml ==0.11.3.0
+       - delete yaml contraint from hpack.cabal
+         - yaml >=0.10.0 => yaml 
+           - Preprocessing library for yaml-0.11.10.0 still ignoring: cabal.config
+       - cabal clean
+       - cabal build
+       - => same result still tryoing to build yaml-0.11.10.0 
+     - rename cabal.config => hpack.freeze
+       - !! found 3 other instnaces of yaml >=0.10.0 in cabal file
+       - looks like freez file needs a project file ?? come back later <-wrong see below>
+       - search github for .freeze didnt find any haskell projects 
+       - set all yaml veriosion occurances in cabal file
+       - failed
+         - src\Hpack\Syntax\DependencyVersion.hs:169:11: error:
+           Not in scope: data constructor `AnyVersionF'
+           Perhaps you meant one of these:
+             `AnyVersion' (line 50),
+               variable `D.anyVersion' (imported from Distribution.Version),
+               variable `any Version' (line 64)
+          |
+          |           AnyVersionF -> AnyVersionF
+      - rename freeze file => cabal.project.freeze
+      - ```
+          PS C:\hpack-0.34.2> cabal build 
+          Warning: C:\hpack-0.34.2\cabal.project.freeze: Unrecognized field
+          'remote-repo' on line 7
+          cabal-3.6.2.0.exe: Cannot find the program 'ghc'. User-specified path
+          'ghc-8.8.3' does not refer to an executable and the program is not on the
+          system path.
+
+          PS C:\hpack-0.34.2> cabal build 
+          cabal-3.6.2.0.exe: Cannot find the program 'ghc'. User-specified path
+          'ghc-8.8.3' does not refer to an executable and the program is not on the
+          system path.
+
+      ```
+      - fix by commenting out - top 2 lines
+      ```
+        -- remote-repo: stackage-lts-15.11:http://www.stackage.org/lts-15.11
+        -- with-compiler: ghc-8.8.3
+      ```
+      - cabal build failed 
+      ```
+       - After searching the rest of the dependency tree exhaustively, these were the
+        goals I've had most trouble fulfilling: hpack
+      ```
+      - comment out hpack from freeze file
+      - solver still failing 
+      - remove all constraints from .cabal
+      - still failing give up - is hpack installed with stack? search for hpack
+      - remove bounds in package.yaml run stack2cabal
+      - cabal-build
+      - could't find compiler
+      - remove with-compiler \
+      - cabal build => seemed to hang
+      - fork master 
+      - remove all constraints and set resolver to nightly-2023-02-23
+      - stack build => Compiles
+      - stack test => runs single failure 
+      ```
+        Failures:
+
+  test\HpackSpec.hs:55:40: 
+  1) Hpack.renderCabalFile is inverse to readCabalFile
+       expected: ["../../hpack.cabal"]
+        but got: ["../../hpack.cabal", "-- This file has been generated from package.yaml by hpack.", "--", "-- see: https://github.com/sol/hpack", ""]
+
+       To rerun use: --match "/Hpack/renderCabalFile/is inverse to readCabalFile/"
+
+       Randomized with seed 927868982
+
+       Finished in 11.7191 seconds
+       546 examples, 1 failure, 3 pending
+      ```
+        
+
+1. convert package 
+   1. https://github.com/hasufell/stack2cabal/releases/tag/v1.0.13 
+   2. rename windows binary => add .exe
+   3. copy to pyrethrum
+   4. generated cabal.project and cabal.project.freeze
+   5. put stack2cabal.exe in folder and add to path
+
+2. stackage / freeze files
    1. [How can I have a reproducible set of versions for my dependencies?](https://cabal.readthedocs.io/en/stable/nix-local-build.html#how-can-i-have-a-reproducible-set-of-versions-for-my-dependencies)
    2. https://www.stackage.org/lts-19.2/cabal.config 
    3. https://github.com/haskell/cabal/issues/7556#issuecomment-1120433903
    4. https://github.com/haskell/cabal/issues/8047
-2. build
-3. regen hie.yaml
-4. ghcid
-5. watch
+   5. 
+3. build
+4. regen hie.yaml
+5. ghcid
+6. watch
 
 
 ## Suit runtime tests

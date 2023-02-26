@@ -99,8 +99,9 @@ exe:hpack from hpack-0.34.2) contraint in cabal file seems to be overriding caba
    3. https://github.com/haskell/cabal/issues/7556#issuecomment-1120433903
    4. https://github.com/haskell/cabal/issues/8047
    5. 
-3. build
-4. regen hie.yaml
+3. build => first cabal build success !!!
+4. regen hie.yaml : https://github.com/Avi-D-coder/implicit-hie
+   1. cabal install implicit-hie - gen-hie > hie.yaml
 5. ghcid
 6. watch
 

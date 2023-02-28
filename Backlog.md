@@ -103,9 +103,66 @@ exe:hpack from hpack-0.34.2) contraint in cabal file seems to be overriding caba
 4. regen hie.yaml : https://github.com/Avi-D-coder/implicit-hie
    1. cabal install implicit-hie - gen-hie > hie.yaml
 5. ghcid
-6. watch
+   was ::
+      "label": "ghcid",
+      "type": "shell",
+      "command": "ghcid",
+      "args": [
+        "--command",
+        "'stack ghci --test'",
+        "--allow-eval",
+        "--clear",
+        "--no-height-limit",
+        "-o ghcid.log"
+      ],
+
+      org:
+       ghcid --command 'stack ghci --test' --allow-eval --clear --no-height-limit '-o ghcid.log' 
+      
+
+      ghcid --command 'cabal ghci --test' --allow-eval --clear --no-height-limit '-o ghcid.log'
+        - fail 
+
+      ghcid --command 'cabal repl' --allow-eval --clear --no-height-limit '-o ghcid.log'
+        -     Variable not in scope: unit_simple_single_failure
+
+      ghcid --command 'cabal repl ' --allow-eval --clear --no-height-limit '-o ghcid.log'
+       - introduce type error - fails     
+      
+      ghcid --command 'cabal repl' --allow-eval --clear --no-height-limit '-o ghcid.log'
+        - also fails
+       
+      ghcid --allow-eval --clear --no-height-limit '-o ghcid.log'
+ 
+
+    update .ghci file
+      :load did not work 
+        $> unit_simple_single_failure
 
 
+:module failed
+<interactive>:32:1-26: error:
+    Variable not in scope: unit_simple_single_failure
+        <no location info>: error:
+        Could not load module `AuxFiles'
+        Loaded GHCi configuration from C:\Pyrethrum\.ghci
+        It is a member of the hidden package `pyrethrum-0.1.0.0'.
+        Perhaps you need to add `pyrethrum' to the build-depends in your .cabal file.    
+        [55 of 55] Compiling SuiteRuntimeTest ( test\SuiteRuntimeTest.hs, interpreted )
+        Ok, 55 modules loaded.
+          ghcid.exe: C:\Pyrethrum\<unknown>: openFile: invalid argument (Invalid argument)
+
+ -try prefix  Pyrethrum
+      
+1. watch
+
+
+### Questions 
+* lock file vs config stacktoCabal
+* ghcid eval
+* how lock file works with other libs
+* v2 / cabal new
+* hpack
 ## Suit runtime tests
 
 ### pyrethrum platform 
@@ -189,6 +246,8 @@ exe:hpack from hpack-0.34.2) contraint in cabal file seems to be overriding caba
   * shrinker
 * explain
   * show workings
+* look into Stan
+* PyGuts
 
 ```haskell
 -- TODO - add tests add to pyrelude
@@ -203,6 +262,7 @@ groupOn f =
           (\as -> M.insert (f a) (a : as) m)
 ```
 
+-
 -- # TODO replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
 
 ----

@@ -1170,16 +1170,14 @@ chkErrorPropagation evts =
                                 let prntFail = trueParentFailure
                                  in prntFail
                                       & maybe
-                                        ( 
-                                        {- 
-                                          allow for special condition where onceHook has been failed due to failure in a 
-                                          concurrent thread which means onceHook will have propagated failure but parent
-                                          in this thread wont
-                                        -}
-                                          if isOnceEvent $ lookupThrow "eventType not found" evtTypeMap childloc then
-                                            error "Not implemented"
-                                          else
-                                          error $ "Child event has propagated parent failure when parent has not failed\n" <> ppShow childloc
+                                        ( {-
+                                            allow for special condition where onceHook has been failed due to failure in a
+                                            concurrent thread which means onceHook will have propagated failure but parent
+                                            in this thread wont
+                                          -}
+                                          isOnceEvent (lookupThrow "eventType not found" evtTypeMap childloc)
+                                            ? error "Not implemented"
+                                            $ error ("Child event has propagated parent failure when parent has not failed\n" <> ppShow childloc)
                                         )
                                         ( \p ->
                                             let pexcpt = SuiteRuntimeTest.exception p
@@ -1450,12 +1448,12 @@ superSimplSuite =
           }
     }
 
--- $> unit_simple_singlelaw
+-- $> unit_simple_single
 
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 
--- $> unit_simple_single_failure
+-- $ > unit_simple_single_failure
 
 unit_simple_single_failure :: IO ()
 unit_simple_single_failure =

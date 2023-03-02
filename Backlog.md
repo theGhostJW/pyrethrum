@@ -1,160 +1,23 @@
 ## switch to cabal
-1. hpack
-   - run hpack needs exe
-   - clone rep and build with stack - blew up
-   - try with cabal - built for ages => blew up with ambiguous occurance exception
-   - asn1-types > Access violation in generated code when writing 0x0
-   - try download release 0.34.2 
-     - try build with stack and cabal => same result
-     - try run script in get Hpackhpack gaild
-     - download cabal.config from stackage
-       - comment try remote-repo line 
-       - try cabal-build - cabal-3.6.2.0.exe: Failed to build yaml-0.11.10.0 (which is required by
-exe:hpack from hpack-0.34.2) contraint in cabal file seems to be overriding cabal.config  yaml ==0.11.3.0
-       - delete yaml contraint from hpack.cabal
-         - yaml >=0.10.0 => yaml 
-           - Preprocessing library for yaml-0.11.10.0 still ignoring: cabal.config
-       - cabal clean
-       - cabal build
-       - => same result still tryoing to build yaml-0.11.10.0 
-     - rename cabal.config => hpack.freeze
-       - !! found 3 other instnaces of yaml >=0.10.0 in cabal file
-       - looks like freez file needs a project file ?? come back later <-wrong see below>
-       - search github for .freeze didnt find any haskell projects 
-       - set all yaml veriosion occurances in cabal file
-       - failed
-         - src\Hpack\Syntax\DependencyVersion.hs:169:11: error:
-           Not in scope: data constructor `AnyVersionF'
-           Perhaps you meant one of these:
-             `AnyVersion' (line 50),
-               variable `D.anyVersion' (imported from Distribution.Version),
-               variable `any Version' (line 64)
-          |
-          |           AnyVersionF -> AnyVersionF
-      - rename freeze file => cabal.project.freeze
-      - ```
-          PS C:\hpack-0.34.2> cabal build 
-          Warning: C:\hpack-0.34.2\cabal.project.freeze: Unrecognized field
-          'remote-repo' on line 7
-          cabal-3.6.2.0.exe: Cannot find the program 'ghc'. User-specified path
-          'ghc-8.8.3' does not refer to an executable and the program is not on the
-          system path.
-
-          PS C:\hpack-0.34.2> cabal build 
-          cabal-3.6.2.0.exe: Cannot find the program 'ghc'. User-specified path
-          'ghc-8.8.3' does not refer to an executable and the program is not on the
-          system path.
-
-      ```
-      - fix by commenting out - top 2 lines
-      ```
-        -- remote-repo: stackage-lts-15.11:http://www.stackage.org/lts-15.11
-        -- with-compiler: ghc-8.8.3
-      ```
-      - cabal build failed 
-      ```
-       - After searching the rest of the dependency tree exhaustively, these were the
-        goals I've had most trouble fulfilling: hpack
-      ```
-      - comment out hpack from freeze file
-      - solver still failing 
-      - remove all constraints from .cabal
-      - still failing give up - is hpack installed with stack? search for hpack
-      - remove bounds in package.yaml run stack2cabal
-      - cabal-build
-      - could't find compiler
-      - remove with-compiler \
-      - cabal build => seemed to hang
-      - fork master 
-      - remove all constraints and set resolver to nightly-2023-02-23
-      - stack build => Compiles
-      - stack test => runs single failure 
-      ```
-        Failures:
-
-  test\HpackSpec.hs:55:40: 
-  1) Hpack.renderCabalFile is inverse to readCabalFile
-       expected: ["../../hpack.cabal"]
-        but got: ["../../hpack.cabal", "-- This file has been generated from package.yaml by hpack.", "--", "-- see: https://github.com/sol/hpack", ""]
-
-       To rerun use: --match "/Hpack/renderCabalFile/is inverse to readCabalFile/"
-
-       Randomized with seed 927868982
-
-       Finished in 11.7191 seconds
-       546 examples, 1 failure, 3 pending
-      ```
-        
-
-1. convert package 
+1. hpack - had to dowload change resolver and build and install in path
+2. convert package 
    1. https://github.com/hasufell/stack2cabal/releases/tag/v1.0.13 
    2. rename windows binary => add .exe
    3. copy to pyrethrum
    4. generated cabal.project and cabal.project.freeze
    5. put stack2cabal.exe in folder and add to path
 
-2. stackage / freeze files
+3. stackage / freeze files
    1. [How can I have a reproducible set of versions for my dependencies?](https://cabal.readthedocs.io/en/stable/nix-local-build.html#how-can-i-have-a-reproducible-set-of-versions-for-my-dependencies)
    2. https://www.stackage.org/lts-19.2/cabal.config 
    3. https://github.com/haskell/cabal/issues/7556#issuecomment-1120433903
    4. https://github.com/haskell/cabal/issues/8047
    5. 
-3. build => first cabal build success !!!
-4. regen hie.yaml : https://github.com/Avi-D-coder/implicit-hie
+4. build => first cabal build success !!!
+5. regen hie.yaml : https://github.com/Avi-D-coder/implicit-hie
    1. cabal install implicit-hie - gen-hie > hie.yaml
-5. ghcid
-   was ::
-      "label": "ghcid",
-      "type": "shell",
-      "command": "ghcid",
-      "args": [
-        "--command",
-        "'stack ghci --test'",
-        "--allow-eval",
-        "--clear",
-        "--no-height-limit",
-        "-o ghcid.log"
-      ],
-
-      org:
-       ghcid --command 'stack ghci --test' --allow-eval --clear --no-height-limit '-o ghcid.log' 
-      
-
-      ghcid --command 'cabal ghci --test' --allow-eval --clear --no-height-limit '-o ghcid.log'
-        - fail 
-
-      ghcid --command 'cabal repl' --allow-eval --clear --no-height-limit '-o ghcid.log'
-        -     Variable not in scope: unit_simple_single_failure
-
-      ghcid --command 'cabal repl ' --allow-eval --clear --no-height-limit '-o ghcid.log'
-       - introduce type error - fails     
-      
-      ghcid --command 'cabal repl' --allow-eval --clear --no-height-limit '-o ghcid.log'
-        - also fails
-       
-      ghcid --allow-eval --clear --no-height-limit '-o ghcid.log'
- 
-
-    update .ghci file
-      :load did not work 
-        $> unit_simple_single_failure
-
-
-:module failed
-<interactive>:32:1-26: error:
-    Variable not in scope: unit_simple_single_failure
-        <no location info>: error:
-        Could not load module `AuxFiles'
-        Loaded GHCi configuration from C:\Pyrethrum\.ghci
-        It is a member of the hidden package `pyrethrum-0.1.0.0'.
-        Perhaps you need to add `pyrethrum' to the build-depends in your .cabal file.    
-        [55 of 55] Compiling SuiteRuntimeTest ( test\SuiteRuntimeTest.hs, interpreted )
-        Ok, 55 modules loaded.
-          ghcid.exe: C:\Pyrethrum\<unknown>: openFile: invalid argument (Invalid argument)
-
- -try prefix  Pyrethrum
-      
-1. watch
+6. ghcid - https://stackoverflow.com/questions/75600985/how-can-i-use-ghcid-allow-eval-with-cabal - took days :-(
+7. watch
 
 
 ### Questions 
@@ -264,35 +127,3 @@ groupOn f =
 
 -
 -- # TODO replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
-
-----
-Introduction:
-
-End-to-end testing is an essential part of software development, as it ensures that all aspects of an application work together as expected. However, current test automation frameworks can be complex and difficult to use, and often require extensive knowledge of multiple programming languages. To address this issue, we propose a new end-to-end test automation framework that integrates with Playwright using Haskell.
-
-Background:
-
-Playwright is a powerful tool for automating web browsers, and it allows developers to write tests in multiple languages, including JavaScript, Python, and C#. Haskell, on the other hand, is a functional programming language that is known for its strong type system and expressive syntax. By combining these two technologies, we can create a test automation framework that is both powerful and easy to use.
-
-Objective:
-
-The goal of this proposal is to create an end-to-end test automation framework that utilizes the strengths of both Playwright and Haskell. The framework will provide a simple and intuitive interface for writing tests, while also taking advantage of Haskell's powerful type system to ensure that tests are accurate and reliable.
-
-Features:
-
-    Utilize Playwright for automating web browsers
-    Leverage Haskell's strong type system to prevent errors
-    Provide a simple and intuitive interface for writing tests
-    Support for parallel test execution
-    Detailed test reporting
-    Integration with popular CI/CD pipeline
-
-Implementation:
-
-The framework will be implemented using Haskell and will utilize the Playwright library for automating web browsers. The framework will provide a simple and intuitive interface for writing tests, and will use Haskell's powerful type system to ensure that tests are accurate and reliable. To support parallel test execution, the framework will use Haskell's parallelism and concurrency features, and will provide detailed test reporting.
-
-The framework will be open-source and will be made available on GitHub for developers to use and contribute to. The framework will be well-documented and will include examples of how to use it. The framework will also integrate with popular CI/CD pipeline.
-
-Conclusion:
-
-By combining the power of Playwright and Haskell, we can create a test automation framework that is both powerful and easy to use. This framework will provide a simple and intuitive interface for writing tests, while also taking advantage of Haskell's strong type system to ensure that tests are accurate and reliable. With the integration with popular CI/CD pipeline, this framework will be a great asset for developers looking to automate their end-to-end testing process.

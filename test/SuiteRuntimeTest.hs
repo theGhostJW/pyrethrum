@@ -1449,7 +1449,6 @@ superSimplSuite =
     }
 
 -- $> unit_simple_single
-
 unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 

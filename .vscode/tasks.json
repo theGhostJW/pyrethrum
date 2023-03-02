@@ -9,7 +9,7 @@
       "command": "ghcid",
       "args": [
         "--command",
-        "'stack ghci --test'",
+        "'cabal repl'",
         "--allow-eval",
         "--clear",
         "--no-height-limit",

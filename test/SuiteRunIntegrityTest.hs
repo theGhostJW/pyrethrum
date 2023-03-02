@@ -60,6 +60,7 @@ display eth = eitherf eth view view
 
 -- $ > rslt *> view "Done"
 
+
 showAll :: IO ()
 showAll = effExecuteLog everythingRun >>= display
 

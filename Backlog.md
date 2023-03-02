@@ -93,6 +93,7 @@
 * PyGuts
 * use flags in cabal file https://github.com/hasura/graphql-engine/blob/master/server/graphql-engine.cabal - optimisation , include test files etc, 
 * add testing ghcid task
+* add refreeze task => https://github.com/haskell/cabal/issues/8047#issuecomment-1069647944
 
 ```haskell
 -- TODO - add tests add to pyrelude
@@ -121,7 +122,8 @@ groupOn f =
    2. https://www.stackage.org/lts-19.2/cabal.config 
    3. https://github.com/haskell/cabal/issues/7556#issuecomment-1120433903
    4. https://github.com/haskell/cabal/issues/8047
-   5. 
+   5. https://github.com/haskell/cabal/issues/8059#issuecomment-1076892558
+   6. 
 4. build => first cabal build success !!!
 5. regen hie.yaml : https://github.com/Avi-D-coder/implicit-hie
    1. cabal install implicit-hie - gen-hie > hie.yaml

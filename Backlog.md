@@ -1,24 +1,3 @@
-## switch to cabal
-1. hpack - had to dowload change resolver and build and install in path
-2. convert package 
-   1. https://github.com/hasufell/stack2cabal/releases/tag/v1.0.13 
-   2. rename windows binary => add .exe
-   3. copy to pyrethrum
-   4. generated cabal.project and cabal.project.freeze
-   5. put stack2cabal.exe in folder and add to path
-
-3. stackage / freeze files
-   1. [How can I have a reproducible set of versions for my dependencies?](https://cabal.readthedocs.io/en/stable/nix-local-build.html#how-can-i-have-a-reproducible-set-of-versions-for-my-dependencies)
-   2. https://www.stackage.org/lts-19.2/cabal.config 
-   3. https://github.com/haskell/cabal/issues/7556#issuecomment-1120433903
-   4. https://github.com/haskell/cabal/issues/8047
-   5. 
-4. build => first cabal build success !!!
-5. regen hie.yaml : https://github.com/Avi-D-coder/implicit-hie
-   1. cabal install implicit-hie - gen-hie > hie.yaml
-6. ghcid - https://stackoverflow.com/questions/75600985/how-can-i-use-ghcid-allow-eval-with-cabal - took days :-(
-7. watch
-
 
 ### Questions 
 * lock file vs config stacktoCabal
@@ -99,6 +78,7 @@
 * profiling
 
 ## Other
+* replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
 * move TestHook and TestHookRelease to bracket
 * hasCallStack see lib posted on reddit saved to pocket
 * REST
@@ -111,6 +91,8 @@
   * show workings
 * look into Stan
 * PyGuts
+* use flags in cabal file https://github.com/hasura/graphql-engine/blob/master/server/graphql-engine.cabal - optimisation , include test files etc, 
+* add testing ghcid task
 
 ```haskell
 -- TODO - add tests add to pyrelude
@@ -125,5 +107,24 @@ groupOn f =
           (\as -> M.insert (f a) (a : as) m)
 ```
 
--
--- # TODO replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
+## switch to cabal - done
+1. hpack - had to dowload change resolver and build and install in path
+2. convert package 
+   1. https://github.com/hasufell/stack2cabal/releases/tag/v1.0.13 
+   2. rename windows binary => add .exe
+   3. copy to pyrethrum
+   4. generated cabal.project and cabal.project.freeze
+   5. put stack2cabal.exe in folder and add to path
+
+3. stackage / freeze files
+   1. [How can I have a reproducible set of versions for my dependencies?](https://cabal.readthedocs.io/en/stable/nix-local-build.html#how-can-i-have-a-reproducible-set-of-versions-for-my-dependencies)
+   2. https://www.stackage.org/lts-19.2/cabal.config 
+   3. https://github.com/haskell/cabal/issues/7556#issuecomment-1120433903
+   4. https://github.com/haskell/cabal/issues/8047
+   5. 
+4. build => first cabal build success !!!
+5. regen hie.yaml : https://github.com/Avi-D-coder/implicit-hie
+   1. cabal install implicit-hie - gen-hie > hie.yaml
+6. ghcid - https://stackoverflow.com/questions/75600985/how-can-i-use-ghcid-allow-eval-with-cabal - took days :-(
+7. watch - not needed at this stage
+

@@ -22,14 +22,22 @@
       "problemMatcher": []
     },
     {
-      "label": "stack build",
+      "label": "hpack",
+      "type": "process",
+      "command": "hpack",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "close": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "cabal build",
       "type": "shell",
-      "command": "stack",
+      "command": "cabal",
       "args": [
-        "build",
-        "--fast",
-        "--ghc-options",
-        "-j4 +RTS -A128m -n2m -RTS"
+        "build"
       ],
       "presentation": {
         "reveal": "always",
@@ -38,47 +46,11 @@
       "problemMatcher": []
     },
     {
-      "label": "stack build watch",
+      "label": "cabal test",
       "type": "shell",
-      "command": "stack",
-      "args": [
-        "build",
-        "--file-watch",
-        "--fast",
-        "--ghc-options",
-        "-j4 +RTS -A128m -n2m -RTS"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "stack test",
-      "type": "shell",
-      "command": "stack",
+      "command": "cabal",
       "args": [
         "test",
-        "--fast",
-        "--ghc-options",
-        "-j4 +RTS -A128m -n2m -RTS"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "stack test watch",
-      "type": "shell",
-      "command": "stack",
-      "args": [
-        "test",
-        "--file-watch",
-        "--fast",
-        "--ghc-options",
         "-j4 +RTS -A128m -n2m -RTS"
       ],
       "presentation": {

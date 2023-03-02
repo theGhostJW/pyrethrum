@@ -35,7 +35,7 @@ dependencies:
   - polysemy
   - unliftio
   - polysemy-plugin
-  
+
 ghc-options:
   # - -threaded
   - -fmax-pmcheck-models=10000000
@@ -45,8 +45,8 @@ ghc-options:
   - -j3 #number of cores used by ghc in compiling
 
   # threading related options only has an effect for exes
-  # - -threaded 
-  # - -rtsopts 
+  # - -threaded
+  # - -rtsopts
   # - -with-rtsopts=-N
 
   # - -O2
@@ -141,14 +141,14 @@ library:
     # this enables eval in ghcid - remove test when finally compiling
     - test
   dependencies:
-    # test dependencies remove in split config 
+    # test dependencies remove in split config
     - tasty
     - tasty-hunit
     - tasty-hedgehog
     - tasty-discover
     - hedgehog
     - bytestring
-    # end test dependencies remove in split config 
+    # end test dependencies remove in split config
     - deepseq
     - unordered-containers
     - template-haskell
@@ -158,10 +158,17 @@ library:
 #  reinstate when LHS can live load multiple modules
 # use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
 
-# tests:
-#   pyrethrum-test:
-#     main:                driver.hs
-#     source-dirs:
-#     - test
-#     dependencies: *testdependencies
-
+tests:
+  pyrethrum-test:
+    main: driver.hs
+    source-dirs:
+      - test
+    dependencies:
+      - pyrethrum
+      # test dependencies remove in split config
+      - tasty
+      - tasty-hunit
+      - tasty-hedgehog
+      - tasty-discover
+      - hedgehog
+      - bytestring

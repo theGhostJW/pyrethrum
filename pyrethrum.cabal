@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.5.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 83e7e854ce6792f49fd9b9a3b29b8c53c839f35e0013bb2489c8e65523f76a40
+-- hash: 72d4b9c12f401aa508f2fe1f2d9685d356fa175d13e3d2f2f7f3a8078aae87e7
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -160,5 +160,106 @@ library
     , transformers-either
     , unliftio
     , unordered-containers
+    , yaml
+  default-language: Haskell2010
+
+test-suite pyrethrum-test
+  type: exitcode-stdio-1.0
+  main-is: driver.hs
+  other-modules:
+      ArbitraryIOTest
+      AuxFilesTest
+      CheckTest
+      ConcurrentSuiteSimple
+      ConcurrentSuiteTestOnly
+      DemoConfig
+      DemoSuite
+      EndpointTest
+      EvalHelp
+      ItemFiltersTest
+      LogListCheck
+      LogProtocolTest
+      LogTransformationTest
+      PrettyPrintTest
+      RunnerTest
+      SemTest
+      SuiteRunIntegrityTest
+      SuiteRuntimeTest
+      TestFilterTest
+      Paths_pyrethrum
+  hs-source-dirs:
+      test
+  default-extensions:
+      AllowAmbiguousTypes
+      BangPatterns
+      BlockArguments
+      ConstrainedClassMethods
+      ConstraintKinds
+      DisambiguateRecordFields
+      DuplicateRecordFields
+      DataKinds
+      DefaultSignatures
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      ExtendedDefaultRules
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      LiberalTypeSynonyms
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      NoImplicitPrelude
+      NumericUnderscores
+      OverloadedStrings
+      PartialTypeSignatures
+      PatternSynonyms
+      PolyKinds
+      QuasiQuotes
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      StrictData
+      TemplateHaskell
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , containers
+    , dlist
+    , extra
+    , hedgehog
+    , mtl
+    , polysemy
+    , polysemy-plugin
+    , pretty-show
+    , pyrelude
+    , pyrethrum
+    , raw-strings-qq
+    , tasty
+    , tasty-discover
+    , tasty-hedgehog
+    , tasty-hunit
+    , text
+    , transformers-either
+    , unliftio
     , yaml
   default-language: Haskell2010

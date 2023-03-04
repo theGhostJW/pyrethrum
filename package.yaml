@@ -71,6 +71,7 @@ ghc-options:
   - -fno-warn-unused-do-bind
   - -fwrite-ide-info
   # - -fdefer-type-errors
+  - -Wno-overlapping-patterns
 
 default-extensions:
   - AllowAmbiguousTypes
@@ -106,6 +107,7 @@ default-extensions:
   - NoImplicitPrelude
   - NumericUnderscores
   - OverloadedStrings
+  - OverloadedRecordDot
   - PartialTypeSignatures
   - PatternSynonyms
   - PolyKinds

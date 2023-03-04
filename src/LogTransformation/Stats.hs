@@ -94,7 +94,7 @@ statsStep statsAccum eithLP =
       (statsStepFromLogProtocol statsAccum)
 
 testExStatus :: IterationResults -> M.Map Address ExecutionStatus
-testExStatus ir = executionStatus <$> M.mapKeysWith max (address :: ItemId -> Address) ir
+testExStatus ir = executionStatus <$> M.mapKeysWith max (getField @"address") ir
 
 listTestStatus :: RunResults -> M.Map Address ExecutionStatus 
 listTestStatus = testExStatus . iterationResults 

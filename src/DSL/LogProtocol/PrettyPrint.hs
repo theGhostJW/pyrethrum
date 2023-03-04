@@ -26,7 +26,7 @@ import DSL.LogProtocol as LP
 import Pyrelude as P
 import RunnerBase as RB
 import RunElementClasses as REC
-    ( TestFilterResult, TestLogInfo(..), title, testConfig, rootAddress, render )
+    ( TestFilterResult, TestLogInfo(..), testConfig, rootAddress, render )
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y ( Value )
 

@@ -83,7 +83,7 @@ data FilterLog = FilterLog
 activeAddresses :: [TestFilterResult] -> S.Set Address
 activeAddresses r =
   let includedAddresses :: [Address]
-      includedAddresses = (C.address :: TestLogInfo -> Address) . C.testInfo <$> filter (isNothing . reasonForRejection) r
+      includedAddresses = getField @"address" . C.testInfo <$> filter (isNothing . reasonForRejection) r
 
       subSet :: Address -> S.Set Address
       subSet add = S.fromList $ C.Address <$> ((reverse <$>) <$> P.dropWhile null . inits . reverse $ unAddress add)
@@ -98,7 +98,7 @@ filterSuite rc suite filters =
       activeAddresses' = activeAddresses log
 
       dupeAddress :: Maybe Text
-      dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . (C.address :: TestLogInfo -> Address) . C.testInfo <$> log)
+      dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . getField @"address" . C.testInfo <$> log)
    in maybe (Right $ FilterLog log activeAddresses') Left dupeAddress
 
 queryFilterSuite :: forall rc e tc effs. Config tc => [TestFilter rc tc] -> rc -> (forall a. SuiteSource e tc rc effs a) -> Either Text [AddressedElm (TestInfo tc)]

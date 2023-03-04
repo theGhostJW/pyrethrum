@@ -43,14 +43,15 @@ rootAddress = Address []
 push :: Text -> AddressElemType -> Address -> Address
 push t et add = Address $ AddressElem t et : unAddress add
 
+
 toTitleList :: Address -> [Text]
-toTitleList a = (title :: AddressElem -> Text) <$> reverse (unAddress a)
+toTitleList a = getField @"title" <$> reverse (unAddress a)
 
 render :: Address -> Text
 render = render' " > "
 
 render' :: Text -> Address -> Text
-render' delim add = intercalate delim $ reverse $ (title :: AddressElem -> Text) <$> unAddress add
+render' delim add = intercalate delim . reverse $ getField @"title" <$> unAddress add
 
 instance Ord Address where
   v1 <= v2 = toTitleList v1 <= toTitleList v2
@@ -64,7 +65,7 @@ data TestLogInfo = TestLogInfo
   deriving (Eq, Show)
 
 instance Ord TestLogInfo where
-  v1 <= v2 = (address :: TestLogInfo -> Address) v1 <= (address :: TestLogInfo -> Address) v2
+  v1 <= v2 = getField @"address"  v1 <= getField @"address" v2
 
 data TestFilterResult = TestFilterResult
   { testInfo :: TestLogInfo,
@@ -101,11 +102,12 @@ toStrElm AddressedElm {address, element} = AddressTxtElm (render address) elemen
 addressTitle :: AddressedElm a -> Text
 addressTitle (AddressedElm (Address add) _) = P.headDef "" $ getField @"title" <$> add
 
+
 instance Eq (AddressedElm a) where
-  v1 == v2 = (address :: AddressedElm a -> Address) v1 == (address :: AddressedElm a -> Address) v2
+  v1 == v2 = getField @"address"  v1 == getField @"address" v2
 
 instance Ord (AddressedElm a) where
-  v1 <= v2 = (address :: AddressedElm a -> Address) v1 <= (address :: AddressedElm a -> Address) v2
+  v1 <= v2 = getField @"address" v1 <= getField @"address" v2
 
 $(deriveJSON defaultOptions ''AddressElemType)
 $(deriveJSON defaultOptions ''AddressElem)

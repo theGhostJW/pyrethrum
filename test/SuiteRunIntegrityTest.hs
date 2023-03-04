@@ -34,7 +34,7 @@ import Pyrelude.IO (putStrLn)
 import Pyrelude.Test (Assertion, chk, chk', (...), chkEq)
 import RunElementClasses as REC (Address (..), AddressElem (..), AddressTxtElm, TestLogInfo (..), toStrElm)
 import qualified RunElementClasses as C
-import Runner (SuiteSource, TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, title)
+import Runner (SuiteSource, TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config)
 import RunnerBase as RB (AddressedElm (..), TestInfo, querySuite, testInfo)
 import TempUtils
 import TestFilter
@@ -78,7 +78,7 @@ showSuiteMessages sm = suitMessages sm >>= view
 -- $ > suitMessages
 
 suitMessages :: IO (Either (FrameworkError Text) ([LogProtocolBase Text], ())) -> IO [Text]
-suitMessages rslt = fromRight' . (catMaybes . (logMessages <$>) . fst <$>) <$> rslt
+suitMessages rslt = fromRight' . ((mapMaybe logMessages . fst) <$>) <$> rslt
 
 
 -- expected suite messages will probably fail / need reworking 

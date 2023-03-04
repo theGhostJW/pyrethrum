@@ -15,6 +15,7 @@ chkErrorPropagation evts =
           truParent parentLoc =
             let nxtParent = truParent $ lookupThrow "parent not found in child parent map" cpMap' parentLoc
                 parentIsGrouping = isGrouping $ lookupThrow "loc not found in event map" etMap parentLoc
+             -- here 
              in (parentLoc == Root)
                   ? Root
                   $ (parentIsGrouping ? nxtParent $ parentLoc)
@@ -79,3 +80,12 @@ chkErrorPropagation evts =
     cpMap = actualChildParentMap evts
 
     ```
+
+https://www.reddit.com/r/haskell/comments/11eutc9/comment/javi1jm/?utm_source=share&utm_medium=web2x&context=3
+```Haskell
+  addressTitle = getField @"title" :: AddressElem -> Text
+```
+
+```
+https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0366-no-ambiguous-field-access.rst#migration-strategy
+```

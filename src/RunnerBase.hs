@@ -172,7 +172,7 @@ testInfo rc t =
           }
 
       cfg :: tc
-      cfg = (config :: Test e tc rc hi i as ds effs -> tc) t
+      cfg = getField @"config" t
    in TestInfo
         { title = getField @"title" cfg,
           config = cfg,

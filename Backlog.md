@@ -76,6 +76,10 @@
 * format on debug'
 * try removing crazy cradal (pyrethrum)
 * profiling
+* -- TODO - reinstate
+-- unit_subDirFromBaseDir_finds_test_dir :: Assertion
+unit_subDirFromBaseDir_finds_correct_temp :: Assertion
+-- 
 
 ## Other
 * replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
@@ -94,6 +98,7 @@
 * use flags in cabal file https://github.com/hasura/graphql-engine/blob/master/server/graphql-engine.cabal - optimisation , include test files etc, 
 * add testing ghcid task
 * add refreeze task => https://github.com/haskell/cabal/issues/8047#issuecomment-1069647944
+* weeder analysis
 
 ```haskell
 -- TODO - add tests add to pyrelude

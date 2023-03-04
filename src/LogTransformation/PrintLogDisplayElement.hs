@@ -74,6 +74,7 @@ import Pyrelude as P
     (||),
   )
 import RunElementClasses
+import Data.Aeson.KeyMap
 
 -- TODO: creation relational records
 -- relational records from Iteration records and use reporting service
@@ -292,7 +293,7 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
       getNotes :: Y.Value -> Maybe Text
       getNotes =
         \case
-          Y.Object obj -> firstJust [HM.lookup "notes" obj, HM.lookup "note" obj] >>= txtOf
+          Y.Object obj -> firstJust [lookup "notes" obj, lookup "note" obj] >>= txtOf
           Y.Array _ -> Nothing
           Y.String _ -> Nothing
           Y.Number _ -> Nothing
@@ -542,7 +543,7 @@ prettyPrintDisplayElement pde =
                         hder <> ": "
                           <> toLower
                             ( txt result
-                                <> ( null extrInfo
+                                <> ( P.null extrInfo
                                        ? " - no additional info "
                                        $ newLn <> indentText 2 extrInfo
                                    )
@@ -551,7 +552,7 @@ prettyPrintDisplayElement pde =
                       vdStep :: ([Text], Bool) -> CheckReport -> ([Text], Bool)
                       vdStep (rsltLines, separatorNeeded) ckRpt@(CheckReport _result (DetailedInfo _hder extrInfo)) =
                         ( P.snoc rsltLines $ (separatorNeeded ? newLn $ "") <> detailValLine ckRpt,
-                          not $ null extrInfo
+                          not $ P.null extrInfo
                         )
                    in P.unlines . fst $ P.foldl' vdStep ([], False) validation
 

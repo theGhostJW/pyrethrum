@@ -96,9 +96,10 @@ unit_subDirFromBaseDir_finds_correct_temp :: Assertion
 * look into Stan
 * PyGuts
 * use flags in cabal file https://github.com/hasura/graphql-engine/blob/master/server/graphql-engine.cabal - optimisation , include test files etc, 
-* add testing ghcid task
+* add testing ghcid task :: added not working exit after first test
 * add refreeze task => https://github.com/haskell/cabal/issues/8047#issuecomment-1069647944
 * weeder analysis
+* flags for context specific optimisation - eg optomise in CI
 
 ```haskell
 -- TODO - add tests add to pyrelude

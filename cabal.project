@@ -20,8 +20,8 @@ source-repository-package
   location: https://github.com/theGhostJW/pyrelude
   tag: 6680168f4d9ca0b6f0134212dc4e86373489b8df
 
--- allow-older: yaml, time
--- allow-newer: yaml, text, encode-string, bytestring, time
+
+optimization: 0
 
 package *
  ghc-options: -haddock

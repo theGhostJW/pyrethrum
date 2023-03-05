@@ -1,4 +1,6 @@
 .stack-work/
+.stack-hls-work/
+dist-newstyle/
 simple-hpack.cabal
 *~
 *.hie

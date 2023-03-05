@@ -39,7 +39,7 @@ import Pyrelude as P
     Foldable (sum),
     Int,
     Lenient (getLenient),
-    Listy (empty, filter, foldl', null, snoc),
+    ListLike (empty, filter, foldl', null, snoc),
     Maybe (..),
     Monad ((>>=)),
     Ord (compare),
@@ -74,6 +74,7 @@ import Pyrelude as P
     (||),
   )
 import RunElementClasses
+import Data.Aeson.KeyMap
 
 -- TODO: creation relational records
 -- relational records from Iteration records and use reporting service
@@ -177,7 +178,7 @@ data PrintLogDisplayElement
         outOfTest :: StatusCount
       }
   | EndRun (Maybe [TestFilterResult])
-  | -- StartGroup GroupTitle |
+  | -- StaXTGroup GroupTitle |
     -- EndGroup GroupTitle |
 
     StartTest
@@ -243,7 +244,7 @@ printLogDisplay ::
   IterationAccum -> -- accum
   LogProtocolOut -> -- source   -- parse error or FrameworkError
   (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
-printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProtocolOut {logInfo = lp} =
+printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo = si} lpo@LogProtocolOut {logInfo = lp} =
   let skipLog = (oldAccum, Nothing)
 
       RunResults outOfTest iterationResults = runResults
@@ -271,10 +272,11 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
                       _logItemStatus
                       _nxtActiveItr
                       _nxtCheckEncountered
-                    ) = logProtocolStep stepInfo lpo
+                    ) = logProtocolStep si lpo
+
 
       accum :: IterationAccum
-      accum = oldAccum {stepInfo = nxtStepInfo}
+      accum = oldAccum {LogTransformation.PrintLogDisplayElement.stepInfo = nxtStepInfo}
 
       lineError :: Text -> Maybe [PrintLogDisplayElement]
       lineError txt' = Just [LineError $ LogTransformError lineNo lpo txt']
@@ -292,7 +294,7 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
       getNotes :: Y.Value -> Maybe Text
       getNotes =
         \case
-          Y.Object obj -> firstJust [HM.lookup "notes" obj, HM.lookup "note" obj] >>= txtOf
+          Y.Object obj -> firstJust [lookup "notes" obj, lookup "note" obj] >>= txtOf
           Y.Array _ -> Nothing
           Y.String _ -> Nothing
           Y.Number _ -> Nothing
@@ -322,7 +324,7 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
                 }
           )
         LP.EndRun -> (accum, elOut . LogTransformation.PrintLogDisplayElement.EndRun $ filterLog accum)
-        LP.StartGroup _ -> skipLog
+        LP.StaXTGroup _ -> skipLog
         LP.EndGroup _ -> skipLog
         StartHook {} -> skipLog
         EndHook {} -> skipLog
@@ -407,7 +409,7 @@ printLogDisplayStep runResults lineNo oldAccum@IterationAccum {stepInfo} eithLp 
     ( \err ->
         let nxtFailStage = calcNextIterationFailStage (faileStage stepInfo) LC.Fail (LC.phase stepInfo) Nothing
             nxtStepInfo = stepInfo {faileStage = nxtFailStage}
-         in (oldAccum {stepInfo = nxtStepInfo} :: IterationAccum, Just [LineError $ LogDeserialisationError err])
+         in (oldAccum {LogTransformation.PrintLogDisplayElement.stepInfo = nxtStepInfo} :: IterationAccum, Just [LineError $ LogDeserialisationError err])
     )
     (printLogDisplay runResults lineNo oldAccum)
 
@@ -542,7 +544,7 @@ prettyPrintDisplayElement pde =
                         hder <> ": "
                           <> toLower
                             ( txt result
-                                <> ( null extrInfo
+                                <> ( P.null extrInfo
                                        ? " - no additional info "
                                        $ newLn <> indentText 2 extrInfo
                                    )
@@ -551,7 +553,7 @@ prettyPrintDisplayElement pde =
                       vdStep :: ([Text], Bool) -> CheckReport -> ([Text], Bool)
                       vdStep (rsltLines, separatorNeeded) ckRpt@(CheckReport _result (DetailedInfo _hder extrInfo)) =
                         ( P.snoc rsltLines $ (separatorNeeded ? newLn $ "") <> detailValLine ckRpt,
-                          not $ null extrInfo
+                          not $ P.null extrInfo
                         )
                    in P.unlines . fst $ P.foldl' vdStep ([], False) validation
 

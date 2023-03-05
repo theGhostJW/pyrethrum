@@ -1,6 +1,3 @@
-
-
-
 module FileLogging where 
 
 import Common as C

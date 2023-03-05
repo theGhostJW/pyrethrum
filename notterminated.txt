@@ -1,0 +1,167 @@
+"OFF LIKE A ROCKET"
+Linking Parents
+CALLING LINKED PARENTS
+!!!!!!!! CALLING linkParents' (PRIME) !!!!! 
+Linking Done ThreadId 695
+Before fxs
+!!!!!!!! CALLING linkParents' (PRIME) !!!!!
+LOCK EXECUTE HOOK
+tryLock HOOK STATUS: Unintialised
+HOOK LOCK >>> True
+CALL PARENT LOCK EXECUTE HOOK
+NO PARENT HOOK RETURNING VALUE
+HOOK RESULT PUT EMPTY BEFORE: True
+HOOK RESULT PUT EMPTY AFTER: False
+HOOK RESULT SECOND: False
+READING HOOK !!!!!!!!!!!!!!!!!!!!!!!!!! EMPTY: False
+RETURNING FROM LOCK EXECUTE HOOK 
+CALL LOAD FIXTURE
+After fks
+Executing
+THREAD RESERVED
+III Execute Nxt Fixture
+III forkFixtureThread started
+III ABove Atomically
+III Read thread status
+III Adding thread status
+III Thread BEFORE RUNNING SET: ThreadInitialising 999
+III Thread RUNNING SET I: ThreadRunning
+MAIN FORK THREAD POINTER IS: 139590709342856
+MAIN FORK THREAD POINTER II IS: 139590709342856
+III DONE forkFixtureThread: ThreadId 698
+NO THREADS AVAILABLE NONE RESERVED
+III FIXTURE START
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+RF - BODY
+NO THREADS AVAILABLE NONE RESERVED
+RF - BODY THREAD POINTER IS: 139590709342856
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+RF - BODY THREAD STATUS: ThreadRunning
+NO THREADS AVAILABLE NONE RESERVED
+RF - RE-READ STARTED fs TVAR: Starting
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+RF - REREAD STARTED fixStatus STM: Starting
+NO THREADS AVAILABLE NONE RESERVED
+RF - WantLogStart True
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+LOCK EXECUTE HOOK
+NO THREADS AVAILABLE NONE RESERVED
+tryLock HOOK STATUS: Complete Normal
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+HOOK LOCK >>> False
+NO THREADS AVAILABLE NONE RESERVED
+READING HOOK !!!!!!!!!!!!!!!!!!!!!!!!!! EMPTY: False
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+RETURNING FROM LOCK EXECUTE HOOK 
+NO THREADS AVAILABLE NONE RESERVED
+RF - Top WantLogStart
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+RF - Rerun Iterations
+NO THREADS AVAILABLE NONE RESERVED
+RF - RE-READ STARTED fs TVAR: Active
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+RF - REREAD STARTED fixStatus STM: Active
+NO THREADS AVAILABLE NONE RESERVED
+RF - WantLogStart False
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+RF - Run ITERATION
+NO THREADS AVAILABLE NONE RESERVED
+RF - Run ITERATION DONE
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+RF - RE-READ STARTED fs TVAR: Active
+NO THREADS AVAILABLE NONE RESERVED
+RF - REREAD STARTED fixStatus STM: Active
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+RF - WantLogStart False
+NO THREADS AVAILABLE NONE RESERVED
+RF - No Iterations Left
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+III FIXTURE END !!!!!!!!!!!!!!!!!!!
+NO THREADS AVAILABLE NONE RESERVED
+THREAD RELEASE START 
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+THREAD DONE
+NO THREADS AVAILABLE NONE RESERVED
+BEFORE DECREMENT THREAD: 1
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+AFTER DECREMENT THREAD: 0
+NO THREADS AVAILABLE NONE RESERVED
+THREAD RELEASE END
+THREAD RESERVED
+FIXTURE STATUS: updateStatusReturnCompleted (before) - "Root.Hook 0.Fixture 0" Active
+III Execute Nxt Fixture
+EMPTY ITERATIONS: True
+III forkFixtureThread started
+EMPTY ACTIVE THREADS: True
+III ABove Atomically
+FIXTURE ST*A*T*U SE:x cueppdtaitoenS:t aWteu saRreet uhrenrCeo m!p!l!e!t
+eCda l(alfSttearc)k  -( fRrooomt .HHaosoCka l0l.SFtiaxctku)r:e
+  0  eDrornoer ,No rcmaalll
+eIdI Ia tR eCa:d\ Ptyhrretehardu ms\tsartcu\sI
+nFtIeXrTnUaRlE\ CSOuMiPtLeERTuEnDt:i mTer.uhes
+:I9I6I1 :A3d diinn gm atihnr:eIand tsetrantauls.
+SFuIiXteTRUuRnEt iSmTeA
+TUS fghci> okFixtureThread): Root.Hook 0.Fixture 0 Done Normal
+III Thread BEFORE RUNNING SET: ThreadInitialising 999
+PRE PARENT HOOK RELEASE
+III Thread RUNNING SET I: ThreadRunning
+!!!!!!!! recurseHookRelease !!!!!!!!
+MAIN FORK THREAD POINTER IS: 139590796079056
+HOOK STATUS: trySetFinalising Complete Normal
+MAIN FORK THREAD POINTER II IS: 139590796079056
+draw children
+III DONE forkFixtureThread: ThreadId 699
+!!!!!!!! CALLING linkParents' (PRIME) !!!!!
+III FIXTURE START
+NO THREADS AVAILABLE NONE RESERVED
+hookChildren count: 1
+RF - BODY
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+!!!!!!!! CALLING linkParents' (PRIME) !!!!! 
+RF - BODY THREAD POINTER IS: 139590796079056
+FIXTURE STATUS: (nodeFinished): - Root.Hook 0.Fixture 0  Value: Done Normal
+NO THREADS AVAILABLE NONE RESERVED
+RF - BODY THREAD STATUS: ThreadRunning
+READING HOOK RESULT
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+RF - RE-READ STARTED fs TVAR: Done Normal
+POST PARENT HOOK RELEASE
+NO THREADS AVAILABLE NONE RESERVED
+RF - REREAD STARTED fixStatus STM: Done Normal
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+RF - WantLogStart False
+NO THREADS AVAILABLE NONE RESERVED
+RF - No Iterations Left
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+III FIXTURE END !!!!!!!!!!!!!!!!!!!
+NO THREADS AVAILABLE NONE RESERVED
+THREAD RELEASE START 
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+THREAD DONE
+NO THREADS AVAILABLE NONE RESERVED
+BEFORE DECREMENT THREAD: 1
+NoThreadsAvailable ThreadStats { maxThreads = 1 , inUse = 1 }
+AFTER DECREMENT THREAD: 0
+NO THREADS AVAILABLE NONE RESERVED
+THREAD RELEASE END
+THREAD RESERVED
+FIXTURE STATUS: updateStatusReturnCompleted (before) - "Root.Hook 0.Fixture 0" Done Normal
+III Execute Nxt Fixture
+EMPTY ITERATIONS: True
+THREAD RELEASE
+EMPTY ACTIVE THREADS: True
+NoFixturesReady
+FIXTURE STATUS: updateStatusReturnCompleted (after) - Root.Hook 0.Fixture 0 Done Normal
+THREAD RESERVED
+FIXTURE COMPLETED: False
+III Execute Nxt Fixture
+FIXTURE STATUS (forkFixtureThread): Root.Hook 0.Fixture 0 Done Normal
+THREAD RELEASE
+EmptyQ - EXECUTION DONE
+EXECUTION DONE !!!!!!!
+Waiting on Hooks
+HOOK HEAD STATUS: Finalised Normal
+HOOKS DONE
+RUN COMPLETE !!!!!!!
+Execution Done ThreadId 695
+Exit Print Loop

@@ -33,14 +33,21 @@ dependencies:
   - mtl
   - raw-strings-qq
   - polysemy
+  - unliftio
   - polysemy-plugin
-  
+
 ghc-options:
   # - -threaded
   - -fmax-pmcheck-models=10000000
   - -ferror-spans
   - -fprint-potential-instances
   # - -dth-dec-file -- generate template haskell
+  - -j3 #number of cores used by ghc in compiling
+
+  # threading related options only has an effect for exes
+  # - -threaded
+  # - -rtsopts
+  # - -with-rtsopts=-N
 
   # - -O2
   # TODO: prgma to turn optimisations on for non-dev build
@@ -48,6 +55,7 @@ ghc-options:
   # - -flate-specialise # reqiuired for polysemy
   # - -fspecialise-aggressively # reqiuired for polysemy
   # - -Werror
+  - -O0
   - -Wall
   - -Wcompat
   - -Wincomplete-record-updates
@@ -63,6 +71,7 @@ ghc-options:
   - -fno-warn-unused-do-bind
   - -fwrite-ide-info
   # - -fdefer-type-errors
+  - -Wno-overlapping-patterns
 
 default-extensions:
   - AllowAmbiguousTypes
@@ -96,7 +105,9 @@ default-extensions:
   - MultiWayIf
   - NamedFieldPuns
   - NoImplicitPrelude
+  - NumericUnderscores
   - OverloadedStrings
+  - OverloadedRecordDot
   - PartialTypeSignatures
   - PatternSynonyms
   - PolyKinds
@@ -113,13 +124,33 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
+# _testDep: &testdependencies
+#   - tasty
+#   - tasty-hunit
+#   - tasty-hedgehog
+#   - tasty-discover
+#   - hedgehog
+#   # - pyrethrum
+#   - bytestring
+
 library:
-  # main: driver.hs
+  when:
+    # https://github.com/sol/hpack#handling-of-paths_-modules
+    - condition: false
+      other-modules: Paths_pyrethrum
   source-dirs:
     - src
-    # this enables eval in ghcid
+    # this enables eval in ghcid - remove test when finally compiling
     - test
   dependencies:
+    # test dependencies remove in split config
+    - tasty
+    - tasty-hunit
+    - tasty-hedgehog
+    - tasty-discover
+    - hedgehog
+    - bytestring
+    # end test dependencies remove in split config
     - deepseq
     - unordered-containers
     - template-haskell
@@ -128,19 +159,18 @@ library:
 
 #  reinstate when LHS can live load multiple modules
 # use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
-_testDep: &testdependencies
-  - tasty
-  - tasty-hunit
-  - tasty-hedgehog
-  - tasty-discover
-  - hedgehog
-  - pyrethrum
-  - bytestring
 
 tests:
   pyrethrum-test:
-    main:                driver.hs
+    main: driver.hs
     source-dirs:
-    - test
-    dependencies: *testdependencies
-
+      - test
+    dependencies:
+      - pyrethrum
+      # test dependencies remove in split config
+      - tasty
+      - tasty-hunit
+      - tasty-hedgehog
+      - tasty-discover
+      - hedgehog
+      - bytestring

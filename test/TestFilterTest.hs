@@ -52,7 +52,7 @@ chkTitles :: [Text] -> ChannelSelect -> Assertion
 chkTitles expected tossResult =   
   let 
     title'' :: AddressTxtElm (TestInfo TestConfig) -> Text
-    title'' = (title :: TestInfo TestConfig -> Text) . el 
+    title'' = getField @"title" . el 
   in
    chkEq expected $ title'' <$> demoFilter tossResult
 
@@ -118,7 +118,7 @@ testFilterSummary rc fltrs s =
    in P.filter matchStatus $ showIt <$> frslts
 
 showIt :: TestFilterResult -> ShowFilter
-showIt r = ((title :: TestLogInfo -> Text) $ testInfo r, reasonForRejection r)
+showIt r = (getField @"title" $ testInfo r, reasonForRejection r)
 
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
 filters' ttl = [channelFilter, hasTitle ttl]

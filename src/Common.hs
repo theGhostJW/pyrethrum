@@ -11,7 +11,7 @@ import Pyrelude as P
     IOError,
     IOException,
     Int,
-    Listy (all, init, last),
+    ListLike (all, init, last),
     Maybe (Just),
     Semigroup ((<>)),
     Show,

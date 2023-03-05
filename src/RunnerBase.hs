@@ -30,7 +30,7 @@ import Pyrelude
     Either,
     Eq (..),
     Int,
-    Listy (null, length),
+    ListLike (null, length),
     Maybe (..),
     Monad ((>>=)),
     Ord (..),
@@ -123,7 +123,7 @@ querySuite' rc title' extractor suite =
         hd ->
         Test e tc rc hd i as ds effs ->
         a
-      fullQuery a hd t = extractor rc a t
+      fullQuery a hd = extractor rc a
 
       root :: TestSuite () effs a
       root = suite fullQuery
@@ -132,7 +132,7 @@ querySuite' rc title' extractor suite =
 querySuite :: forall rc e tc effs. Config tc => rc -> SuiteSource e tc rc effs (TestInfo tc) -> [AddressedElm (TestInfo tc)]
 querySuite rc suite =
   let extractor :: forall ho i as ds. RC.ItemClass i ds => rc -> Address -> Test e tc rc ho i as ds effs -> TestInfo tc
-      extractor rc' _add t = testInfo rc' t
+      extractor rc' _add = testInfo rc'
 
       title' :: TestInfo tc -> Text
       title' = getField @"title"
@@ -172,7 +172,7 @@ testInfo rc t =
           }
 
       cfg :: tc
-      cfg = (config :: Test e tc rc hi i as ds effs -> tc) t
+      cfg = getField @"config" t
    in TestInfo
         { title = getField @"title" cfg,
           config = cfg,

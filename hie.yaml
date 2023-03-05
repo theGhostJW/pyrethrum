@@ -1,7 +1,7 @@
 cradle:
-  stack:
+  cabal:
     - path: "./src"
-      component: "pyrethrum:lib"
+      component: "lib:pyrethrum"
 
     - path: "./test"
-      component: "pyrethrum:test:pyrethrum-test"
+      component: "lib:pyrethrum"

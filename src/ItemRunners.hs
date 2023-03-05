@@ -1,9 +1,6 @@
-{-# LANGUAGE NoPolyKinds #-}
-
--- TODO: work out why this is needed - investigate polykinds
-
 module ItemRunners where
 
+import Check (Checks, un)
 import qualified Check as CK
 import Common as C
 import DSL.Interpreter
@@ -12,6 +9,7 @@ import DSL.Logger
 import Data.Aeson (ToJSON (toJSON))
 import qualified Data.DList as D
 import qualified Data.Foldable as F
+import GHC.Records
 import OrphanedInstances ()
 import Polysemy
 import Polysemy.Error as PE (Error, catch, throw)
@@ -24,10 +22,8 @@ import RunElementClasses as C
     ItemClass,
     push,
   )
-import RunnerBase as RB (ItemRunner, Test (Test))
-import GHC.Records
-import Check (Checks, un)
 import qualified RunElementClasses as R
+import RunnerBase as RB (ItemRunner, Test (Test))
 
 mkId :: forall tc i. (HasId i, Config tc) => Address -> tc -> i -> ItemId
 mkId md tc i = ItemId (push (getField @"title" tc) R.Test md) (getField @"id" i)

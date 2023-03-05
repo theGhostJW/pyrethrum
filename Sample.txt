@@ -1,0 +1,225 @@
+StartExecution
+  { idx = 0 , threadId = SThreadId { display = "ThreadId 633" } }
+Start
+  { eventType = Fixture
+  , loc = Node { parent = Root , tag = "FX 0" }
+  , idx = 0
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+Start
+  { eventType = FixtureOnceHook
+  , loc =
+      Node
+        { parent = Node { parent = Root , tag = "FX 0" }
+        , tag = "FixtureOnceHook"
+        }
+  , idx = 1
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+ApLog
+  { msg = "Fx 0 - SH.0"
+  , idx = 2
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+End
+  { eventType = FixtureOnceHook
+  , loc =
+      Node
+        { parent = Node { parent = Root , tag = "FX 0" }
+        , tag = "FixtureOnceHook"
+        }
+  , idx = 3
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+Start
+  { eventType = FixtureThreadHook
+  , loc =
+      Node
+        { parent =
+            Node
+              { parent = Node { parent = Root , tag = "FX 0" }
+              , tag = "FixtureOnceHook"
+              }
+        , tag = "FixtureThreadHook"
+        }
+  , idx = 4
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+ApLog
+  { msg = "Fx 0.0"
+  , idx = 5
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+End
+  { eventType = FixtureThreadHook
+  , loc =
+      Node
+        { parent =
+            Node
+              { parent = Node { parent = Root , tag = "FX 0" }
+              , tag = "FixtureOnceHook"
+              }
+        , tag = "FixtureThreadHook"
+        }
+  , idx = 6
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+Start
+  { eventType = TestHook
+  , loc = Node { parent = Root , tag = "FX 0" }
+  , idx = 7
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+ApLog
+  { msg = "Fx 0.0"
+  , idx = 8
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+End
+  { eventType = TestHook
+  , loc = Node { parent = Root , tag = "FX 0" }
+  , idx = 9
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+Start
+  { eventType = Test
+  , loc =
+      Node
+        { parent =
+            Node
+              { parent =
+                  Node
+                    { parent = Node { parent = Root , tag = "FX 0" }
+                    , tag = "FixtureOnceHook"
+                    }
+              , tag = "FixtureThreadHook"
+              }
+        , tag = "0"
+        }
+  , idx = 10
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+ApLog
+  { msg = "0"
+  , idx = 11
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+Failure
+  { msg =
+      "TestFailed at: Node {parent = Node {parent = Node {parent = Node      
+{parent = Root, tag = \"FX 0\"}, tag = \"FixtureOnceHook\"}, tag =
+\"FixtureThreadHook\"}, tag = \"0\"}"
+  , exception =
+      PException
+        { displayText =
+            [ "\"exception thrown 0\""
+            , "\"CallStack (from HasCallStack):\""
+            , "\"  error, called at C:\\\\Pyrethrum\\\\test\\\\SuiteRuntimeTest.hs:1212:9 in main:SuiteRuntimeTest\""
+            ]
+        }
+  , loc =
+      Node
+        { parent =
+            Node
+              { parent =
+                  Node
+                    { parent = Node { parent = Root , tag = "FX 0" }
+                    , tag = "FixtureOnceHook"
+                    }
+              , tag = "FixtureThreadHook"
+              }
+        , tag = "0"
+        }
+  , idx = 12
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+End
+  { eventType = Test
+  , loc =
+      Node
+        { parent =
+            Node
+              { parent =
+                  Node
+                    { parent = Node { parent = Root , tag = "FX 0" }
+                    , tag = "FixtureOnceHook"
+                    }
+              , tag = "FixtureThreadHook"
+              }
+        , tag = "0"
+        }
+  , idx = 13
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+Start
+  { eventType = FixtureThreadHookRelease
+  , loc =
+      Node
+        { parent =
+            Node
+              { parent = Node { parent = Root , tag = "FX 0" }
+              , tag = "FixtureOnceHook"
+              }
+        , tag = "FixtureThreadHook"
+        }
+  , idx = 14
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+ApLog
+  { msg = "Fx 0.0"
+  , idx = 15
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+End
+  { eventType = FixtureThreadHookRelease
+  , loc =
+      Node
+        { parent =
+            Node
+              { parent = Node { parent = Root , tag = "FX 0" }
+              , tag = "FixtureOnceHook"
+              }
+        , tag = "FixtureThreadHook"
+        }
+  , idx = 16
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+Start
+  { eventType = FixtureOnceHookRelease
+  , loc =
+      Node
+        { parent = Node { parent = Root , tag = "FX 0" }
+        , tag = "FixtureOnceHook"
+        }
+  , idx = 17
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+ApLog
+  { msg = "Fx 0 - SHR.0"
+  , idx = 18
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+End
+  { eventType = FixtureOnceHookRelease
+  , loc =
+      Node
+        { parent = Node { parent = Root , tag = "FX 0" }
+        , tag = "FixtureOnceHook"
+        }
+  , idx = 19
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+End
+  { eventType = Fixture
+  , loc = Node { parent = Root , tag = "FX 0" }
+  , idx = 20
+  , threadId = SThreadId { display = "ThreadId 634" }
+  }
+EndExecution
+  { idx = 1 , threadId = SThreadId { display = "ThreadId 633" } }
+!!!!!!!!!!!!!! TODO !!!!!!!!!
+!!!!!!!!!!!!!! TODO !!!!!!!!!
+*** Exception: Prelude.undefined
+CallStack (from HasCallStack):
+  error, called at libraries\base\GHC\Err.hs:75:14 in base:GHC.Err
+  undefined, called at src\Pyrelude.hs:346:6 in pyrelude-0.1.0.0-1lfUi90NyNnR5ZfsHBCr8:Pyrelude

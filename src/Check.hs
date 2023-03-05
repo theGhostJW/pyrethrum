@@ -94,7 +94,7 @@ gateAll :: forall ds. Checks ds -> Checks ds
 gateAll fck = Checks $ (\ck -> (ck :: Check ds) {gateStatus = GateCheck}) <$> un fck
 
 expectFailurePriv :: forall ds. ExpectationActive -> Text -> Checks ds -> Checks ds 
-expectFailurePriv isActive msg = applyToFirst (\c -> (c :: Check ds) {expectation = ExpectFailure isActive msg})
+expectFailurePriv isActive msg = applyToFirst (\(Check h r m _ g) -> Check h r m (ExpectFailure isActive msg) g)
 
 expectFailure :: Text -> Checks ds -> Checks ds 
 expectFailure = expectFailurePriv Active

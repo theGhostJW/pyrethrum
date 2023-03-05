@@ -1,0 +1,249 @@
+module Internal.RunTimeLogging where
+
+import Control.Monad.State ( Monad((>>=), (>>)) )
+import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
+import GHC.Show (show)
+import Pyrelude
+  ( Applicative (pure),
+    Bool(..),
+    Enum (succ),
+    Eq,
+    Exception (displayException),
+    IO,
+    IORef,
+    Int,
+    Maybe (..),
+    Num ((+)),
+    Ord,
+    Semigroup ((<>)),
+    Show,
+    SomeException,
+    Text,
+    ThreadId,
+    coerce,
+    const,
+    maybe,
+    modifyIORef,
+    print,
+    readIORef,
+    txt,
+    unpack,
+    uu,
+    writeIORef,
+    ($),
+    (.),
+    (<$>), not, enumList,
+  )
+import Text.Show.Pretty (pPrint)
+import UnliftIO (TChan, TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
+import UnliftIO.Concurrent (myThreadId)
+import Prelude (String, lines)
+import Data.Set
+
+data Loc
+  = Root
+  | Node
+      { parent :: Loc,
+        tag :: Text
+      }
+  deriving (Show, Eq, Ord)
+
+data ExeEventType
+  = OnceHook
+  | OnceHookRelease
+  | ThreadHook
+  | ThreadHookRelease
+  | FixtureOnceHook
+  | FixtureOnceHookRelease
+  | FixtureThreadHook
+  | FixtureThreadHookRelease
+  | TestHook
+  | TestHookRelease
+  | Group
+  | Fixture
+  | Test
+  deriving (Show, Eq, Ord, Enum)
+
+isThreadedEvent :: ExeEventType -> Bool
+isThreadedEvent = not . isOnceEvent
+
+isOnceEvent :: ExeEventType -> Bool
+isOnceEvent = \case
+  OnceHook -> True
+  OnceHookRelease -> True
+  ThreadHook -> False
+  ThreadHookRelease -> False
+  FixtureOnceHook -> True
+  FixtureOnceHookRelease -> True
+  FixtureThreadHook -> False
+  FixtureThreadHookRelease -> False
+  TestHook -> False
+  TestHookRelease -> False
+  Group -> False
+  Fixture -> False
+  Test -> False
+
+isGrouping :: ExeEventType -> Bool
+isGrouping = \case
+  OnceHook -> False
+  ThreadHook -> False
+  TestHook -> False
+  FixtureThreadHook -> False
+  FixtureOnceHook -> False
+  FixtureThreadHookRelease -> False
+  FixtureOnceHookRelease -> False
+  OnceHookRelease -> False
+  ThreadHookRelease -> False
+  TestHookRelease -> False
+  Group -> True
+  Fixture -> True
+  Test -> False
+
+isFixtureChild :: ExeEventType -> Bool
+isFixtureChild = \case
+  OnceHook -> False
+  ThreadHook -> False
+  TestHook -> True
+  FixtureThreadHook -> True
+  FixtureOnceHook -> True
+  FixtureThreadHookRelease -> True
+  FixtureOnceHookRelease -> True
+  OnceHookRelease -> False
+  ThreadHookRelease -> False
+  TestHookRelease -> True
+  Group -> False
+  Fixture -> False
+  Test -> True
+
+endIsTerminal :: ExeEventType -> Bool
+endIsTerminal = \case
+  FixtureThreadHookRelease -> True
+  FixtureOnceHookRelease -> True
+  OnceHookRelease -> True
+  ThreadHookRelease -> True
+  TestHookRelease -> True
+  Group -> True
+  Fixture -> True
+  Test -> True
+  OnceHook -> False
+  ThreadHook -> False
+  TestHook -> False
+  FixtureThreadHook -> False
+  FixtureOnceHook -> False
+
+exceptionTxt :: SomeException -> PException
+exceptionTxt e = PException $ txt <$> lines (displayException e)
+
+mkFailure :: Loc -> ExeEventType -> Text -> SomeException -> Int -> SThreadId -> ExeEvent
+mkFailure l et t e = Failure t (exceptionTxt e) et l
+
+mkParentFailure :: Loc -> ExeEventType -> Loc -> ExeEventType -> SomeException -> Int -> SThreadId -> ExeEvent
+mkParentFailure fl fet pl pet ex idx trd = ParentFailure  { 
+        exception = exceptionTxt ex,
+        loc = fl,
+        fEventType = fet,
+        parentLoc = pl,
+        parentEventType = pet,
+        idx = idx,
+        threadId = trd
+      } 
+
+
+newtype PException = PException {displayText :: [Text]} deriving (Show, Eq, Ord)
+newtype SThreadId = SThreadId { display :: Text} deriving (Show, Eq, Ord)
+
+data ExeEvent
+  = StartExecution
+      { idx :: Int,
+        threadId :: SThreadId
+      }
+  | Start
+      { 
+        eventType :: ExeEventType,
+        loc :: Loc,
+        idx :: Int,
+        threadId :: SThreadId
+      }
+  | End
+      { 
+        eventType :: ExeEventType,
+        loc :: Loc,
+        idx :: Int,
+        threadId :: SThreadId
+      }
+  | Failure
+      { 
+        msg :: Text,
+        exception :: PException,
+        parentEventType :: ExeEventType,
+        loc :: Loc,
+        idx :: Int,
+        threadId :: SThreadId
+      }
+  | ParentFailure
+      { 
+        exception :: PException,
+        loc :: Loc,
+        fEventType :: ExeEventType,
+        parentLoc :: Loc,
+        parentEventType :: ExeEventType,
+        idx :: Int,
+        threadId :: SThreadId
+      }
+  | ApLog
+      { msg :: Text,
+        idx :: Int,
+        threadId :: SThreadId
+      }
+  | EndExecution
+      { idx :: Int,
+        threadId :: SThreadId
+      }
+  deriving (Show)
+
+-------  IO Logging --------
+type EventSink = ExeEvent -> IO ()
+type ApLogger = Text -> IO ()
+
+-- not used in concurrent code ie. one IORef per thread
+-- this approach means I can't write a pure logger but I can live with that for now
+mkLogger :: EventSink -> IORef Int -> ThreadId -> (Int -> SThreadId -> ExeEvent) -> IO ()
+mkLogger sink threadCounter thrdId fEvnt = do
+  tc <- readIORef threadCounter
+  let nxt = succ tc
+  sink . fEvnt nxt . SThreadId $ txt thrdId
+  writeIORef threadCounter nxt
+
+data LogControls m = LogControls
+  { sink :: EventSink,
+    logWorker :: IO (),
+    stopWorker :: IO (),
+    log :: m (TQueue ExeEvent)
+  }
+
+testLogControls :: TChan (Maybe ExeEvent) -> TQueue ExeEvent -> IO (LogControls Maybe)
+testLogControls chn log = do
+  -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
+  let logWorker :: IO ()
+      logWorker =
+        atomically (readTChan chn)
+          >>= maybe
+            (pure ())
+            (\evt -> pPrint evt >> logWorker)
+
+      stopWorker :: IO ()
+      stopWorker = atomically $ writeTChan chn Nothing
+
+      sink :: ExeEvent -> IO ()
+      sink evnt =
+        atomically $ do
+          writeTChan chn $ Just evnt
+          writeTQueue log evnt
+
+  pure . LogControls sink logWorker stopWorker $ Just log
+
+$(deriveToJSON defaultOptions ''SThreadId)
+$(deriveJSON defaultOptions ''ExeEventType)
+$(deriveToJSON defaultOptions ''Loc)
+$(deriveToJSON defaultOptions ''PException)
+$(deriveToJSON defaultOptions ''ExeEvent)

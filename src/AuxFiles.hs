@@ -55,7 +55,7 @@ import Pyrelude as F
       Path,
       Abs,
       Rel,
-      Listy(foldr, length),
+      ListLike(foldr, length),
       AbsDir,
       AbsFile,
       RelDir,

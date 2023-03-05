@@ -4,21 +4,17 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "ghcid inc test",
-      "type": "shell",
-      "command": "ghcid",
-      "args": ["--command", "'stack ghci --test'", "--allow-eval", "--clear", "--no-height-limit"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "problemMatcher": []
-    },
-    {
       "label": "ghcid",
       "type": "shell",
       "command": "ghcid",
-      "args": ["--command", "'stack ghci'", "--allow-eval", "--clear", "--no-height-limit"],
+      "args": [
+        "--command",
+        "'cabal repl'",
+        "--allow-eval",
+        "--clear",
+        "--no-height-limit",
+        "-o ghcid.log"
+      ],
       "presentation": {
         "reveal": "always",
         "panel": "new"
@@ -26,10 +22,18 @@
       "problemMatcher": []
     },
     {
-      "label": "stack build inc test",
+      // Not working - exits after first run
+      "label": "ghcid test",
       "type": "shell",
-      "command": "stack",
-      "args": ["test", "--file-watch", "--fast", "--ghc-options", "-j4 +RTS -A128m -n2m -RTS"],
+      "command": "ghcid",
+      "args": [
+        "--command",
+        "'cabal test --test-show-details=streaming'",
+        "--allow-eval",
+        "--clear",
+        "--no-height-limit",
+        "-o ghcid.log"
+      ],
       "presentation": {
         "reveal": "always",
         "panel": "new"
@@ -37,10 +41,37 @@
       "problemMatcher": []
     },
     {
-      "label": "stack build",
+      "label": "hpack",
+      "type": "process",
+      "command": "hpack",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "close": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "cabal build",
       "type": "shell",
-      "command": "stack",
-      "args": ["build", "--file-watch", "--fast", "--ghc-options", "-j4 +RTS -A128m -n2m -RTS"],
+      "command": "cabal",
+      "args": [
+        "build"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "cabal test",
+      "type": "shell",
+      "command": "cabal",
+      "args": [
+        "test",
+        "--test-show-details=streaming"
+      ],
       "presentation": {
         "reveal": "always",
         "panel": "new"

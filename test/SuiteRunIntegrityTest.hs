@@ -34,7 +34,7 @@ import Pyrelude.IO (putStrLn)
 import Pyrelude.Test (Assertion, chk, chk', (...), chkEq)
 import RunElementClasses as REC (Address (..), AddressElem (..), AddressTxtElm, TestLogInfo (..), toStrElm)
 import qualified RunElementClasses as C
-import Runner (SuiteSource, TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config, title)
+import Runner (SuiteSource, TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config)
 import RunnerBase as RB (AddressedElm (..), TestInfo, querySuite, testInfo)
 import TempUtils
 import TestFilter
@@ -60,6 +60,7 @@ display eth = eitherf eth view view
 
 -- $ > rslt *> view "Done"
 
+
 showAll :: IO ()
 showAll = effExecuteLog everythingRun >>= display
 
@@ -77,7 +78,7 @@ showSuiteMessages sm = suitMessages sm >>= view
 -- $ > suitMessages
 
 suitMessages :: IO (Either (FrameworkError Text) ([LogProtocolBase Text], ())) -> IO [Text]
-suitMessages rslt = fromRight' . (catMaybes . (logMessages <$>) . fst <$>) <$> rslt
+suitMessages rslt = fromRight' . ((mapMaybe logMessages . fst) <$>) <$> rslt
 
 
 -- expected suite messages will probably fail / need reworking 
@@ -122,7 +123,7 @@ fullExpectedResult =
     "AH - Group 1 >> Group 2 >> After Hook 1"
   ]
 
--- $> unit_tests_hooks_run_as_expected_full_suite
+-- $ > unit_tests_hooks_run_as_expected_full_suite
 unit_tests_hooks_run_as_expected_full_suite :: IO ()
 unit_tests_hooks_run_as_expected_full_suite =
   suitMessages (effExecuteLog everythingRun) >>= chkEq fullExpectedResult
@@ -155,7 +156,7 @@ webResult =
     , "AH - Group 1 >> After Hook 1"
   ]
 
--- $> unit_tests_hooks_run_as_expected_web_suite
+-- $ > unit_tests_hooks_run_as_expected_web_suite
 unit_tests_hooks_run_as_expected_web_suite :: IO ()
 unit_tests_hooks_run_as_expected_web_suite =
   suitMessages (effExecuteLog webRun) >>= chkEq webResult
@@ -185,7 +186,7 @@ restResult =
     "AH - Group 1 >> Group 2 >> After Hook 1"
   ]
 
--- $> unit_tests_hooks_run_as_expected_rest_suite
+-- $ > unit_tests_hooks_run_as_expected_rest_suite
 unit_tests_hooks_run_as_expected_rest_suite :: IO ()
 unit_tests_hooks_run_as_expected_rest_suite =
   suitMessages (effExecuteLog restRun) >>= chkEq restResult
@@ -225,7 +226,7 @@ txtExpectedResult =
   ]
 
 
--- $> unit_tests_hooks_run_as_expected_text_suite
+-- $ > unit_tests_hooks_run_as_expected_text_suite
 unit_tests_hooks_run_as_expected_text_suite :: IO ()
 unit_tests_hooks_run_as_expected_text_suite =
   suitMessages (effExecuteLog txtRun) >>= chkEq txtExpectedResult

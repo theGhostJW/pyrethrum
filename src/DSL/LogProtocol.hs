@@ -80,7 +80,7 @@ data LogProtocolBase e
         runConfig :: Value
       }
   | EndRun
-  | StartGroup GroupTitle
+  | StaXTGroup GroupTitle
   | EndGroup GroupTitle
   | StartHook HookType Text
   | EndHook HookType Text

@@ -1,0 +1,8 @@
+cradle:
+  stack:
+    stackYaml: "./stack.yaml"
+    components:
+     - path: "./src"
+       component: "pyrethrum:lib"
+    #  - path: "./test"
+    #    component: "pyrethrum:test:pyrethrum-test"

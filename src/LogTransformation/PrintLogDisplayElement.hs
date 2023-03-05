@@ -244,7 +244,7 @@ printLogDisplay ::
   IterationAccum -> -- accum
   LogProtocolOut -> -- source   -- parse error or FrameworkError
   (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
-printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProtocolOut {logInfo = lp} =
+printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo = si} lpo@LogProtocolOut {logInfo = lp} =
   let skipLog = (oldAccum, Nothing)
 
       RunResults outOfTest iterationResults = runResults
@@ -272,10 +272,11 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo} lpo@LogProt
                       _logItemStatus
                       _nxtActiveItr
                       _nxtCheckEncountered
-                    ) = logProtocolStep stepInfo lpo
+                    ) = logProtocolStep si lpo
+
 
       accum :: IterationAccum
-      accum = oldAccum {stepInfo = nxtStepInfo}
+      accum = oldAccum {LogTransformation.PrintLogDisplayElement.stepInfo = nxtStepInfo}
 
       lineError :: Text -> Maybe [PrintLogDisplayElement]
       lineError txt' = Just [LineError $ LogTransformError lineNo lpo txt']
@@ -408,7 +409,7 @@ printLogDisplayStep runResults lineNo oldAccum@IterationAccum {stepInfo} eithLp 
     ( \err ->
         let nxtFailStage = calcNextIterationFailStage (faileStage stepInfo) LC.Fail (LC.phase stepInfo) Nothing
             nxtStepInfo = stepInfo {faileStage = nxtFailStage}
-         in (oldAccum {stepInfo = nxtStepInfo} :: IterationAccum, Just [LineError $ LogDeserialisationError err])
+         in (oldAccum {LogTransformation.PrintLogDisplayElement.stepInfo = nxtStepInfo} :: IterationAccum, Just [LineError $ LogDeserialisationError err])
     )
     (printLogDisplay runResults lineNo oldAccum)
 

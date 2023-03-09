@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 72d4b9c12f401aa508f2fe1f2d9685d356fa175d13e3d2f2f7f3a8078aae87e7
+-- hash: 1030e5329760838263e34d04eb7703e19c98893a96c9668f988c212617801773
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -76,6 +76,7 @@ library
       LogListCheck
       LogProtocolTest
       LogTransformationTest
+      Main
       PrettyPrintTest
       RunnerTest
       SemTest
@@ -119,6 +120,7 @@ library
       NoImplicitPrelude
       NumericUnderscores
       OverloadedStrings
+      OverloadedRecordDot
       PartialTypeSignatures
       PatternSynonyms
       PolyKinds
@@ -134,7 +136,9 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info -Wno-overlapping-patterns
+  build-tool-depends:
+      tasty-discover:tasty-discover
   build-depends:
       aeson
     , base
@@ -165,7 +169,7 @@ library
 
 test-suite pyrethrum-test
   type: exitcode-stdio-1.0
-  main-is: driver.hs
+  main-is: Main.hs
   other-modules:
       ArbitraryIOTest
       AuxFilesTest
@@ -223,6 +227,7 @@ test-suite pyrethrum-test
       NoImplicitPrelude
       NumericUnderscores
       OverloadedStrings
+      OverloadedRecordDot
       PartialTypeSignatures
       PatternSynonyms
       PolyKinds
@@ -238,7 +243,9 @@ test-suite pyrethrum-test
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info -Wno-overlapping-patterns
+  build-tool-depends:
+      tasty-discover:tasty-discover
   build-depends:
       aeson
     , base

@@ -162,7 +162,7 @@ library:
 
 tests:
   pyrethrum-test:
-    main: driver.hs
+    main: Main.hs
     source-dirs:
       - test
     dependencies:
@@ -174,3 +174,5 @@ tests:
       - tasty-discover
       - hedgehog
       - bytestring
+
+build-tools: tasty-discover:tasty-discover

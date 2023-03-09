@@ -521,8 +521,18 @@ boundaryInfo startEndFilter = \case
 threadIds :: [ExeEvent] -> [SThreadId]
 threadIds thrdEvts = nub $ threadId <$> thrdEvts
 
+
+
+
+
+
+
+
+
+
+
 -- check immediate parent (preceeding start or following end) of each thread element
--- ignoring non threaded events when checking tests ignore other test start / ends
+-- ignoring non threaded events when checking tests ignore other test start / ends 
 chkParentOrder :: Template -> [ExeEvent] -> IO ()
 chkParentOrder rootTpl thrdEvts =
   traverse_
@@ -541,6 +551,7 @@ chkParentOrder rootTpl thrdEvts =
   where
     actualCPMap = actualChildParentMap thrdEvts
     expectedCPMap = childToParentMap rootTpl
+
 
 templateCount :: Template -> (Template -> Int) -> Int
 templateCount t templateInc = foldTemplate 0 (\c t' -> c + templateInc t') t
@@ -1452,7 +1463,7 @@ superSimplSuite =
 
 -- $> unit_simple_single
 unit_simple_single :: IO ()
-unit_simple_single = runTest 1 superSimplSuite
+unit_simple_single = error "Blahh" --runTest 1 superSimplSuite
 
 -- $ > unit_simple_single_failure
 

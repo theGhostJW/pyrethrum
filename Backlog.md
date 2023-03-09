@@ -63,16 +63,29 @@
 * remove all concepts of error reconcilliation
 * change guard to Assert
 
+
+
 ## Pyrelude
-* relude
-* chkFalse'
-* change uu to error
-  * uu Error -> txt 
+* upgrade ghc :: Done
+* stack -> cabal :: Done
 
 * remove 
   * maybef
   * eitherf
-* upgrade ghc
+* change uu to error
+  * uu Error -> txt 
+
+-- compile pyrethrum
+
+* remove listlike 
+
+-- compile pyrethrum
+
+* relude
+
+-- compile pyrethrum
+
+* chkFalse'
 * format on debug'
 * try removing crazy cradal (pyrethrum)
 * profiling
@@ -82,6 +95,7 @@ unit_subDirFromBaseDir_finds_correct_temp :: Assertion
 -- 
 
 ## Other
+* update tastydiscover should not search dist-newstyle
 * replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
 * move TestHook and TestHookRelease to bracket
 * hasCallStack see lib posted on reddit saved to pocket

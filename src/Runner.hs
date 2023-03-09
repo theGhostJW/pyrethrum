@@ -252,7 +252,7 @@ calcComponents runPrms@RunParams {suite, filters, rc, itemRunner} =
     fl <- filterSuite rc suite filters
     Right $
       RunComponents
-        { suitItems = un $ suite $ runTest runPrms,
+        { suitItems = (.un) $ suite $ runTest runPrms,
           filterLog = fl
         }
 
@@ -290,11 +290,11 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
 
       run :: RunComponents effs -> Sem effs ()
       run rCmp = do
-        let flg = filterLog rCmp
+        let  F.FilterLog {included, log=lg} = rCmp.filterLog
         offset' <- utcOffset
         logItem . StartRun (RunTitle $ getField @"title" rc) offset' $ toJSON rc
-        logItem . FilterLog . F.log $ flg
-        sequence_ $ exeElm (included flg) rootAddress () <$> suitItems rCmp
+        logItem $ FilterLog lg
+        sequence_ $ exeElm included rootAddress () <$> rCmp.suitItems
         logItem EndRun
 
       lgError :: Text -> Sem effs ()

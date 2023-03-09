@@ -100,7 +100,7 @@ queryElm title' address =
         OnceHook {title = t, hkElms = e} -> hkQuery t e
 
 querySuiteElms :: forall hi effs a. (a -> Text) -> Address -> TestSuite hi effs a -> [AddressedElm a]
-querySuiteElms title' address suite = un suite >>= queryElm title' address
+querySuiteElms title' address suite = suite.un >>= queryElm title' address
 
 querySuite' ::
   forall e tc rc effs a.
@@ -161,22 +161,22 @@ data TestInfo tc = TestInfo
 testInfo :: forall e tc rc hi i as ds effs. (RC.ItemClass i ds, RC.Config tc) => rc -> Test e tc rc hi i as ds effs -> TestInfo tc
 testInfo rc t =
   let ckInfo :: C.Check ds -> CheckInfo
-      ckInfo c = CheckInfo (C.header c) (C.expectation c)
+      ckInfo C.Check {header, expectation}= CheckInfo header expectation
 
       iinfo :: i -> ItemInfo
       iinfo i =
         ItemInfo
           { id = getField @"id" i,
             title = getField @"title" i,
-            checks = ckInfo <$> (toList . C.un $ getField @"checks" i)
+            checks = ckInfo <$> toList i.checks.un
           }
 
       cfg :: tc
-      cfg = getField @"config" t
+      cfg = t.config
    in TestInfo
-        { title = getField @"title" cfg,
+        { title = cfg.title,
           config = cfg,
-          itemInfo = iinfo <$> items t rc
+          itemInfo = iinfo <$> t.items rc
         }
 
 data Test e tc rc hd i as ds effs = Test
@@ -187,7 +187,7 @@ data Test e tc rc hd i as ds effs = Test
   }
 
 nullItems :: Test e tc rc hd i as ds effs -> rc -> Bool
-nullItems t rc = null $ items t rc
+nullItems t rc = null $ t.items rc
 
 
 

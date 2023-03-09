@@ -29,7 +29,7 @@ allTossCalls =
 
       title' :: (Text, Channel) -> Text
       title' _ = "Not Used"
-   in RB.element <$> querySuite' (baseCfg AllChannels) title' titleAndCall (demoSuite @FixedEffs)
+   in (.element) <$> querySuite' (baseCfg AllChannels) title' titleAndCall (demoSuite @FixedEffs)
 
 baseCfg :: ChannelSelect -> RunConfig
 baseCfg = RunConfig "Unit Test Config"
@@ -52,7 +52,7 @@ chkTitles :: [Text] -> ChannelSelect -> Assertion
 chkTitles expected tossResult =   
   let 
     title'' :: AddressTxtElm (TestInfo TestConfig) -> Text
-    title'' = getField @"title" . el 
+    title'' = (.el.title)
   in
    chkEq expected $ title'' <$> demoFilter tossResult
 
@@ -118,7 +118,7 @@ testFilterSummary rc fltrs s =
    in P.filter matchStatus $ showIt <$> frslts
 
 showIt :: TestFilterResult -> ShowFilter
-showIt r = (getField @"title" $ testInfo r, reasonForRejection r)
+showIt r = (r.testInfo.title, r.reasonForRejection)
 
 filters' :: Maybe Text -> [TestFilter RunConfig TestConfig]
 filters' ttl = [channelFilter, hasTitle ttl]

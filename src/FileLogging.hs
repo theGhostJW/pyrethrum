@@ -70,7 +70,7 @@ logFileHandles projRoot suffixExtensionMap =
         (
           \((sfx, _ext), fstErr') -> 
             do 
-              traverse_ (hClose . fileHandle . snd) openHndls
+              traverse_ (hClose . (.fileHandle) . snd) openHndls
               pure . Left $ AnnotatedError 
                               ("Failed to create log file with suffix: " <> sfx) 
                               $ fromLeft (C.Error "won't happen") fstErr'

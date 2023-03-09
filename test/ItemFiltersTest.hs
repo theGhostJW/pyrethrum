@@ -116,7 +116,7 @@ unit_item_filter_lastVal_bottom = chkLastVal 150 items3
 
 unit_item_filter_lastVal_middle = chkLastVal 130 items4
 
-id' = ItemFiltersTest.id
+id' = (.id)
 
 -- Pred (a -> Bool)
 unit_item_filter_pred = chkFilter' (Pred $ \i' -> 150 == id' i') 150 itemsNoChks

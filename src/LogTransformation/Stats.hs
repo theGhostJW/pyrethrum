@@ -67,7 +67,7 @@ statsStepFromLogProtocol (StatsAccum (RunResults outOfTest itrRslts) stepInfo) l
 statsStepFromDeserialisationError :: StatsAccum -> DeserialisationError -> StatsAccum
 statsStepFromDeserialisationError statsAccum@(StatsAccum (RunResults outOfTest itrRslts) stepInfo) _lp = 
   let 
-    activeItr = activeIteration stepInfo
+    activeItr = stepInfo.activeIteration
 
     nxtOutOfTest :: StatusCount
     nxtOutOfTest = isJust activeItr
@@ -77,7 +77,7 @@ statsStepFromDeserialisationError statsAccum@(StatsAccum (RunResults outOfTest i
     nxtItrRslts :: IterationResults
     nxtItrRslts = maybef activeItr
                     itrRslts
-                    (\(iid, _) -> M.insertWith max iid (IterationOutcome Fail (phase stepInfo)) itrRslts)
+                    (\(iid, _) -> M.insertWith max iid (IterationOutcome Fail stepInfo.phase) itrRslts)
   in 
     statsAccum {
       runResults = RunResults {
@@ -94,16 +94,17 @@ statsStep statsAccum eithLP =
       (statsStepFromLogProtocol statsAccum)
 
 testExStatus :: IterationResults -> M.Map Address ExecutionStatus
-testExStatus ir = executionStatus <$> M.mapKeysWith max (getField @"address") ir
+testExStatus ir = (.executionStatus) <$> M.mapKeysWith max (.address) ir
+
 
 listTestStatus :: RunResults -> M.Map Address ExecutionStatus 
-listTestStatus = testExStatus . iterationResults 
+listTestStatus = testExStatus . (.iterationResults)
 
 testStatusCounts :: RunResults -> StatusCount
 testStatusCounts = countValues . listTestStatus
 
 listIterationStatus :: RunResults -> M.Map ItemId ExecutionStatus 
-listIterationStatus runResults = executionStatus <$> iterationResults runResults
+listIterationStatus runResults = (.executionStatus) <$> runResults.iterationResults
 
 itrStatusesGroupedByTest :: RunResults -> M.Map Address (M.Map ItemId ExecutionStatus)
 itrStatusesGroupedByTest rr = 

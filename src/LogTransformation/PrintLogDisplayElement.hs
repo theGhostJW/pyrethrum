@@ -71,10 +71,11 @@ import Pyrelude as P
     (<$>),
     (?),
     (\\),
-    (||),
+    (||), (&), maybe,
   )
 import RunElementClasses
 import Data.Aeson.KeyMap
+import qualified LogTransformation.Stats as Results
 
 -- TODO: creation relational records
 -- relational records from Iteration records and use reporting service
@@ -218,7 +219,7 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
           ( \LogProtocolOut {logInfo = lp} ->
               case lp of
                 LP.StartTest (TestLogInfo ttl domain _) -> (False, LC.Pass == testStatus' (push ttl Test domain))
-                StartIteration iid _ _ -> (LC.Pass == executionStatus (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
+                StartIteration iid _ _ -> (LC.Pass == (.executionStatus) (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
                 _ -> (skipItt, skipTst)
           )
 
@@ -233,7 +234,7 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
 
 -- itrOutcome ItemId -> Maybe IterationOutcome
 testStatusMap :: RunResults -> M.Map Address ExecutionStatus
-testStatusMap = testExStatus . iterationResults
+testStatusMap RunResults {iterationResults} = testExStatus iterationResults
 
 testStatus :: M.Map Address ExecutionStatus -> Address -> ExecutionStatus
 testStatus tstStatusMap tm = fromMaybe LC.Fail $ M.lookup tm tstStatusMap
@@ -304,12 +305,12 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo = si} lpo@Lo
       updateItrRec :: (IterationRecord -> IterationRecord) -> (IterationAccum, Maybe [PrintLogDisplayElement])
       updateItrRec func =
         let mIrec :: Maybe IterationRecord
-            mIrec = rec accum
+            mIrec = accum.rec
          in maybef
               mIrec
               (accum, lineError "An iteration event has been encounterred before the start iteration event - possible loss of log event - check raw logs")
               (\irec -> (accum {rec = Just $ func irec}, Nothing))
-   in case lp of
+   in lp & \case
         LP.FilterLog flgs -> (accum {filterLog = Just flgs}, Nothing)
         LP.StartRun runTitle _offset jsonCfg ->
           ( accum,
@@ -323,7 +324,7 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo = si} lpo@Lo
                   outOfTest = outOfTest
                 }
           )
-        LP.EndRun -> (accum, elOut . LogTransformation.PrintLogDisplayElement.EndRun $ filterLog accum)
+        LP.EndRun -> (accum, elOut $ LogTransformation.PrintLogDisplayElement.EndRun accum.filterLog )
         LP.StaXTGroup _ -> skipLog
         LP.EndGroup _ -> skipLog
         StartHook {} -> skipLog
@@ -366,11 +367,10 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo = si} lpo@Lo
               severityDesc (CheckReport rslt1 _) (CheckReport rslt2 _) = compare (Down rslt1) (Down rslt2)
 
               sortChecks :: IterationRecord -> IterationRecord
-              sortChecks ir = ir {validation = sortBy severityDesc $ validation ir}
+              sortChecks ir = ir {validation = sortBy severityDesc ir.validation}
            in ( accum {rec = Nothing},
                 elOut $
-                  maybef
-                    (rec accum)
+                    accum.rec & maybe
                     ( LineError $
                         LogTransformError
                           { linNo = lineNo,
@@ -390,12 +390,12 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo = si} lpo@Lo
         LP.ParserSkipped iid -> updateItrRec (\ir -> ir {domainState = Just $ LogTransformation.PrintLogDisplayElement.ParserSkipped iid})
         ParserFailure _iid err -> updateItrRec (\ir -> ir {domainState = Just $ ParserFailed err})
         StartChecks -> skipLog
-        CheckOutcome _itmId chkReport -> updateItrRec (\ir -> ir {validation = chkReport : validation ir})
+        CheckOutcome _itmId chkReport -> updateItrRec (\ir -> ir {validation = chkReport : ir.validation})
         Message _ -> skipLog
         Message' _ -> skipLog
-        LP.Warning _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : otherWarnings ir})
-        Warning' _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : otherWarnings ir})
-        LP.Error _ -> updateItrRec (\ir -> ir {otherErrors = IterationError nxtPhase lpo : otherErrors ir})
+        LP.Warning _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : ir.otherWarnings})
+        Warning' _ -> updateItrRec (\ir -> ir {otherWarnings = IterationWarning nxtPhase lpo : ir.otherWarnings})
+        LP.Error _ -> updateItrRec (\ir -> ir {otherErrors = IterationError nxtPhase lpo : ir.otherErrors})
 
 printLogDisplayStep ::
   RunResults -> -- RunResults
@@ -407,7 +407,7 @@ printLogDisplayStep runResults lineNo oldAccum@IterationAccum {stepInfo} eithLp 
   eitherf
     eithLp
     ( \err ->
-        let nxtFailStage = calcNextIterationFailStage (faileStage stepInfo) LC.Fail (LC.phase stepInfo) Nothing
+        let nxtFailStage = calcNextIterationFailStage stepInfo.faileStage LC.Fail stepInfo.phase Nothing
             nxtStepInfo = stepInfo {faileStage = nxtFailStage}
          in (oldAccum {LogTransformation.PrintLogDisplayElement.stepInfo = nxtStepInfo} :: IterationAccum, Just [LineError $ LogDeserialisationError err])
     )
@@ -450,7 +450,7 @@ prettyPrintDisplayElement pde =
               "  No Filter Log Available"
               ( \fltrs ->
                   let fltrItems :: (Maybe Text -> Bool) -> [TestFilterResult]
-                      fltrItems f = P.filter (f . reasonForRejection) fltrs
+                      fltrItems f = P.filter (f . (.reasonForRejection)) fltrs
 
                       acceptedItems :: [TestFilterResult]
                       acceptedItems = fltrItems isNothing
@@ -459,12 +459,12 @@ prettyPrintDisplayElement pde =
                       rejectedItems = fltrItems isJust
 
                       address :: TestFilterResult -> Text
-                      address = logInfoAddress . testInfo
+                      address = logInfoAddress . (.testInfo) 
 
                       rejectText :: TestFilterResult -> Text
                       rejectText fr =
                         maybef
-                          (reasonForRejection fr)
+                          fr.reasonForRejection
                           "ACCEPTED" -- should never happen
                           (\rtxt -> address fr <> " - " <> rtxt)
 
@@ -563,7 +563,7 @@ prettyPrintDisplayElement pde =
                     domainState
                     ("  Domain State is Empty" <> newLn)
                     ( \case
-                        LogTransformation.PrintLogDisplayElement.ParserSuccess dsDisplay -> prettyYamlKeyValues 2 LeftJustify $ unDStateJSON dsDisplay
+                        LogTransformation.PrintLogDisplayElement.ParserSuccess dsDisplay -> prettyYamlKeyValues 2 LeftJustify $ dsDisplay.unDStateJSON
                         LogTransformation.PrintLogDisplayElement.ParserSkipped _iid -> "  Domain State is Empty - Execution Skipped" <> newLn
                         ParserFailed err ->
                           indent2
@@ -579,7 +579,7 @@ prettyPrintDisplayElement pde =
                   let mkTxt :: Y.Value -> Text
                       mkTxt = indent2 . getLenient . convertString . encodePretty defConfig
                    in \case
-                        SucceededInteractor val -> mkTxt $ unApStateJSON val
+                        SucceededInteractor val -> mkTxt $ val.unApStateJSON
                         FailedInteractor err -> mkTxt $ Y.toJSON err
              in iterationHeader False (header' (render address <> " - " <> txt itmId) status)
                   <> newLn

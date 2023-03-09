@@ -150,7 +150,7 @@ logFilePath projRoot mNamePrefix suffix fileExt =
     pfx <- maybef mNamePrefix
               (logFilePrefix <$> now)
               pure
-    relPath <- parseRelFileSafe $ pfx <> "_" <> suffix <> unFileExt fileExt
+    relPath <- parseRelFileSafe $ pfx <> "_" <> suffix <> fileExt.unFileExt
     eitherf relPath
       (pure . Left . P.userError . toS . show)
       (\relFle -> ((pfx,) <$>) <$> logFile projRoot relFle)

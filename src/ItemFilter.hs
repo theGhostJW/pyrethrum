@@ -29,7 +29,7 @@ filterredItemIds filtr items =
       filterredItems =
         let pass = Right . pure
             fail' = Left . InvalidItemFilter
-            hasChecks i = not $ nullFoldable $ un $ getField @"checks" i
+            hasChecks i = not $ nullFoldable i.checks.un
             lastWithChecks = findFoldable hasChecks $ reverse items
             listOrFail lst msg =
               null lst

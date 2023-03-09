@@ -49,7 +49,7 @@ runItem rc md hi (Test tc _items interactor parse) i =
       recordSkippedChecks :: Sem effs ()
       recordSkippedChecks = do
         logItem StartChecks
-        F.traverse_ logChk . D.toList . CK.skipChecks . un $ getField @"checks" i
+        F.traverse_ logChk . D.toList . CK.skipChecks $ i.checks.un
 
       parseErrorHandler :: FrameworkError e -> Sem effs ds
       parseErrorHandler e =
@@ -106,10 +106,10 @@ documentItem rc md hi (Test tc _items interactor _parse) i =
       lgChk chk =
         logItem . CheckOutcome iid
           . CK.CheckReport CK.Skip
-          $ DetailedInfo (CK.header (chk :: CK.Check ds) <> " - " <> txt (CK.expectation chk)) ""
+          $ DetailedInfo ((.header) (chk :: CK.Check ds) <> " - " <> txt (chk.expectation)) ""
 
       logChecks :: Sem effs ()
-      logChecks = P.sequence_ $ lgChk <$> un (getField @"checks" i)
+      logChecks = P.sequence_ $ lgChk <$> i.checks.un
    in do
         logItem StartInteraction
         interactor rc hi i

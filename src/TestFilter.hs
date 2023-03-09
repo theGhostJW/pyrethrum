@@ -14,10 +14,10 @@ import RunnerBase as RB
 import qualified Prelude as PRL
 
 acceptFilter :: TestFilterResult -> Bool
-acceptFilter = isNothing . reasonForRejection
+acceptFilter = isNothing . (.reasonForRejection)
 
 rejectFilter :: TestFilterResult -> Bool
-rejectFilter = isJust . reasonForRejection
+rejectFilter = isJust . (.reasonForRejection)
 
 acceptAnyFilter :: [TestFilterResult] -> Bool
 acceptAnyFilter = P.any acceptFilter
@@ -40,14 +40,14 @@ applyFilters fltrs rc adrs tc =
       fltrRslt = mkTestFilterResult adrs tc
 
       applyFilter :: TestFilter rc tc -> TestFilterResult
-      applyFilter fltr =
+      applyFilter TestFilter {predicate, title} =
         fltrRslt $
-          predicate fltr rc adrs tc
+           predicate rc adrs tc
             ? Nothing
-            $ Just $ TestFilter.title fltr rc adrs tc
+            $ Just $ title rc adrs tc
 
       firstRejectReason :: Maybe Text
-      firstRejectReason = L.find rejectFilter (applyFilter <$> fltrs) >>= reasonForRejection
+      firstRejectReason = L.find rejectFilter (applyFilter <$> fltrs) >>= (.reasonForRejection)
    in fltrRslt firstRejectReason
 
 filterTest :: forall i as ds tc hi rc e effs. Config tc => [TestFilter rc tc] -> rc -> Address -> Test e tc rc hi i as ds effs -> TestFilterResult
@@ -68,11 +68,11 @@ filterLog suite fltrs rc =
       testFilter = filterTest fltrs
 
       title' :: TestFilterResult -> Text
-      title' = getField @"title" . C.testInfo
+      title' = getField @"title" . (.testInfo)
 
       filterResults :: [AddressedElm TestFilterResult]
       filterResults = querySuite' rc title' testFilter suite
-   in element <$> filterResults
+   in (.element) <$> filterResults
 
 data FilterLog = FilterLog
   { log :: [TestFilterResult],
@@ -83,10 +83,10 @@ data FilterLog = FilterLog
 activeAddresses :: [TestFilterResult] -> S.Set Address
 activeAddresses r =
   let includedAddresses :: [Address]
-      includedAddresses = getField @"address" . C.testInfo <$> filter (isNothing . reasonForRejection) r
+      includedAddresses = (.testInfo.address) <$> filter (isNothing . (.reasonForRejection)) r
 
       subSet :: Address -> S.Set Address
-      subSet add = S.fromList $ C.Address <$> ((reverse <$>) <$> P.dropWhile null . inits . reverse $ unAddress add)
+      subSet add = S.fromList $ C.Address <$> ((reverse <$>) <$> P.dropWhile null . inits . reverse $ add.unAddress)
    in foldl' S.union S.empty $ subSet <$> includedAddresses
 
 filterSuite :: Config tc => rc -> (forall a. SuiteSource e tc rc effs a) -> [TestFilter rc tc] -> Either Text FilterLog
@@ -98,7 +98,7 @@ filterSuite rc suite filters =
       activeAddresses' = activeAddresses log
 
       dupeAddress :: Maybe Text
-      dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . getField @"address" . C.testInfo <$> log)
+      dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . getField @"address" . (.testInfo) <$> log)
    in maybe (Right $ FilterLog log activeAddresses') Left dupeAddress
 
 queryFilterSuite :: forall rc e tc effs. Config tc => [TestFilter rc tc] -> rc -> (forall a. SuiteSource e tc rc effs a) -> Either Text [AddressedElm (TestInfo tc)]
@@ -107,10 +107,10 @@ queryFilterSuite fltrs rc s =
       unfiltered = querySuite rc s
 
       include :: Either Text (Set Address)
-      include = included <$> filterSuite rc s fltrs
+      include = (.included) <$> filterSuite rc s fltrs
 
       pred' :: Set Address -> AddressedElm (TestInfo tc) -> Bool
-      pred' inc add = member (address add) inc
+      pred' inc add = member (add.address) inc
    in include >>= \s' -> Right $ filter (pred' s') unfiltered
 
 {-

@@ -44,7 +44,7 @@ ioRunToFile projRoot wantConsole docMode interpreter app =
                                 putStrLn ""
                           
     fileHandles :: IO (Either (FrameworkError e) [(Maybe AbsFile, ThreadInfo -> LogIndex -> Time -> LogProtocolBase e -> Text, S.Handle)])
-    fileHandles = (((\(fn, fh) -> (Just $ A.path fh, fn, fileHandle fh)) <$>) <$>) <$> fileHandleInfo
+    fileHandles = (((\(fn, HandleInfo {path, fileHandle}) -> (Just path, fn, fileHandle)) <$>) <$>) <$> fileHandleInfo
 
     closeFileHandles :: [S.Handle] -> IO ()
     closeFileHandles  = traverse_ S.hClose

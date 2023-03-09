@@ -20,6 +20,6 @@ applyTestFiltersToItemsShowReason :: forall i tc rc. Config tc => [TestFilter rc
 applyTestFiltersToItemsShowReason fltrs rc md cvtr itms = 
   let 
     fltrItm :: i -> (i, Maybe Text)
-    fltrItm i = (i, reasonForRejection . applyFilters fltrs rc md $ cvtr i)
+    fltrItm i = (i, (.reasonForRejection) . applyFilters fltrs rc md $ cvtr i)
   in 
     fltrItm <$> itms

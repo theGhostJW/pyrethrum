@@ -104,6 +104,7 @@ default-extensions:
   - MultiParamTypeClasses
   - MultiWayIf
   - NamedFieldPuns
+  - NoFieldSelectors
   - NoImplicitPrelude
   - NumericUnderscores
   - OverloadedStrings

@@ -50,7 +50,7 @@ logTransform (LogTransformParams src snk step idser rsltSersr lineNo accum) =
             in
               do
                 maybe (pure ()) rsltSink result
-                localLoop (LineNo $ unLineNo lineNo + 1) nxtAccum
+                localLoop (LineNo $ (.unLineNo) lineNo + 1) nxtAccum
           )
           
 ------------------------------------------------------
@@ -148,7 +148,7 @@ fileStats srcJsonIniPath =
                                               accumulator = emptyStatsAccum
                                             }
   in
-    (runResults <$>) <$> withInputFile srcJsonIniPath processLines
+    ((.runResults) <$>) <$> withInputFile srcJsonIniPath processLines
 
 
 prepareFinalLogs :: AbsFile -> IO ()

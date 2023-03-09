@@ -95,9 +95,16 @@ unit_subDirFromBaseDir_finds_correct_temp :: Assertion
 -- 
 
 ## Other
-* update tastydiscover should not search dist-newstyle
+* update tastydiscover should not search dist-newstyle :: not needed wasn't taking in when reran
 * replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
 * move TestHook and TestHookRelease to bracket
+* think about hooks
+  * mismatch between logical location and tests that need hook
+  * eg. taxcalc tests - how to use
+  * some ui - need driver
+  * some need mysql rolled over
+  * tests inseparate demographics folder need same mysql rolled over
+  * same folder
 * hasCallStack see lib posted on reddit saved to pocket
 * REST
 * UI connect to PlaWRIGHT

@@ -70,8 +70,8 @@ logStrJSONWith :: A.ToJSON e => ThreadInfo -> LogIndex -> Time -> LogProtocolBas
 logStrJSONWith thrdInfo lgIdx time lp = 
   utfEncode LogProtocolOut {
                         logIndex = LogEventInfo {
-                          rnId = runId thrdInfo, 
-                          threadIdx = threadIndex thrdInfo,
+                          rnId = thrdInfo.runId, 
+                          threadIdx =  thrdInfo.threadIndex,
                           time = time,
                           idx = lgIdx
                         },

@@ -73,7 +73,7 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
     itrHeader = hdr "=="
 
     ppStartRun :: RunTitle -> Y.Value -> Text
-    ppStartRun ttle rc = majorHeader isOutline (unRunTitle ttle) <> 
+    ppStartRun ttle rc = majorHeader isOutline ttle.unRunTitle <> 
                           newLn <> newLn <> "Run Config:" <>
                           newLn <> ppAesonBlock rc
 
@@ -84,7 +84,7 @@ prettyPrintLogProtocolBase _mTimeSuffix style =
     groupFooter = groupTitle "End Group"
 
     groupTitle :: Text -> GroupTitle -> Text
-    groupTitle hdr' gt = header $ hdr' <> " - " <> unGroupTitle gt
+    groupTitle hdr' gt = header $ hdr' <> " - " <> gt.unGroupTitle
 
     ppFilterLog :: [TestFilterResult] -> Text
     ppFilterLog fltrInfos = newLn <> header "Filter Log" <> newLn <>

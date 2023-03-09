@@ -156,7 +156,7 @@ data DocFunc a = DocFunc
   }
 
 instance Show (DocFunc a) where
-  show = toS . doc
+  show = toS . (.doc)
 
 data ExeOutcome = PassResult | FailResult deriving (Show, Eq)
 
@@ -225,7 +225,7 @@ childToParentMap =
       foldTemplate
         (pLoc, accMap)
         ( \(pl, m) t ->
-            let cl = Node pl (tTag t)
+            let cl = Node pl t.tTag
                 accm = M.insert cl pl m
 
                 mkLoc loc et = (Node loc $ txt et)
@@ -519,7 +519,7 @@ boundaryInfo startEndFilter = \case
   EndExecution {} -> Nothing
 
 threadIds :: [ExeEvent] -> [SThreadId]
-threadIds thrdEvts = nub $ threadId <$> thrdEvts
+threadIds thrdEvts = nub $ (.threadId) <$> thrdEvts
 
 
 
@@ -669,7 +669,7 @@ chkThreadLogsInOrder evts =
   do
     eachThread
       ( \l ->
-          let ck = chkEq' "first index of thread should be 0" 0 . idx
+          let ck = chkEq' "first index of thread should be 0" 0 . (.idx)
               ev = unsafeHead l
            in ck ev
       )
@@ -678,15 +678,15 @@ chkThreadLogsInOrder evts =
     eachThread = for_ threads
     threads =
       groupOn
-        threadId
+        (.threadId)
         evts
 
     chkIds evts' =
       for_
         (zip evts' $ drop 1 evts')
         ( \(ev1, ev2) ->
-            let idx1 = idx ev1
-                idx2 = idx ev2
+            let idx1 = ev1.idx
+                idx2 = ev2.idx
              in -- TODO - better formatting chkEq pyrelude
                 chkEqfmt' (succ idx1) idx2 $
                   "event idx not consecutive\n"
@@ -738,7 +738,7 @@ chkMaxThreads mxThrds threadedEvents =
             <> " exceeded: "
             <> txt (length threadedEvents)
             <> "\n"
-            <> txt (ppShow ((threadId <$>) <$> threadedEvents))
+            <> txt (ppShow (((.threadId) <$>) <$> threadedEvents))
         )
         $ length threadedEvents <= allowed -- baseThrds + exe threads
 
@@ -957,7 +957,7 @@ countLocSets evs et =
   -- the run template
   ST.size $
     foldl'
-      (\s ev -> isStart et ev ? ST.insert (L.loc ev) s $ s)
+      (\s ev -> isStart et ev ? ST.insert ev.loc s $ s)
       ST.empty
       evs
 
@@ -1066,11 +1066,11 @@ chkProperties mxThrds t evts =
           <> " exceeded: "
           <> txt (length threadedEvents)
           <> "\n"
-          <> txt (ppShow ((threadId <$>) <$> threadedEvents))
+          <> txt (ppShow (((.threadId) <$>) <$> threadedEvents))
       )
       $ length threadedEvents <= mxThrds + 2
   where
-    threadedEvents = groupOn threadId evts
+    threadedEvents = groupOn (.threadId) evts
 
 data ChkErrAccum = ChkErrAccum
   { initialised :: Bool,
@@ -1104,7 +1104,7 @@ chkHkReleased evs hkType relType =
                           $ ST.insert loc openHks
                     | eventType == relType ->
                         let -- hook releases are always parented by hook
-                            parent' = parent loc
+                            parent' = loc.parent
                          in ST.member parent' openHks
                               ? ST.delete parent' openHks
                               $ error ("hook is released that has not been run" <> ppShow loc)
@@ -1193,7 +1193,7 @@ chkErrorPropagation evts =
                                             $ error ("Child event has propagated parent failure when parent has not failed\n" <> ppShow childloc)
                                         )
                                         ( \p ->
-                                            let pexcpt = SuiteRuntimeTest.exception p
+                                            let pexcpt = p.exception
                                              in chkEq'
                                                   ( toS $
                                                       "Propagated excption does not equal parent exception for loc:\n"
@@ -1365,7 +1365,7 @@ chkEventCounts t evs = do
 
 validateTemplate :: Template -> IO ()
 validateTemplate t =
-  let tl = (tTag <$> templateList t)
+  let tl = (.tTag) <$> templateList t
       utl = nub tl
    in when (length tl /= length utl) $
         error $
@@ -1463,7 +1463,7 @@ superSimplSuite =
 
 -- $> unit_simple_single
 unit_simple_single :: IO ()
-unit_simple_single = error "Blahh" --runTest 1 superSimplSuite
+unit_simple_single = runTest 1 superSimplSuite
 
 -- $ > unit_simple_single_failure
 

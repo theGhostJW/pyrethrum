@@ -41,17 +41,17 @@ rootAddress :: Address
 rootAddress = Address []
 
 push :: Text -> AddressElemType -> Address -> Address
-push t et add = Address $ AddressElem t et : unAddress add
+push t et add = Address $ AddressElem t et : add.unAddress
 
 
 toTitleList :: Address -> [Text]
-toTitleList a = getField @"title" <$> reverse (unAddress a)
+toTitleList a = getField @"title" <$> reverse a.unAddress
 
 render :: Address -> Text
 render = render' " > "
 
 render' :: Text -> Address -> Text
-render' delim add = intercalate delim . reverse $ getField @"title" <$> unAddress add
+render' delim add = intercalate delim . reverse $ (.title) <$> add.unAddress
 
 instance Ord Address where
   v1 <= v2 = toTitleList v1 <= toTitleList v2

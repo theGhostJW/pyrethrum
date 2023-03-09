@@ -91,7 +91,7 @@ gate :: forall ds. Checks ds -> Checks ds
 gate = applyToFirst (\c -> (c :: Check ds) {gateStatus = GateCheck})
 
 gateAll :: forall ds. Checks ds -> Checks ds
-gateAll fck = Checks $ (\ck -> (ck :: Check ds) {gateStatus = GateCheck}) <$> un fck
+gateAll fck = Checks $ (\ck -> (ck :: Check ds) {gateStatus = GateCheck}) <$> fck.un
 
 expectFailurePriv :: forall ds. ExpectationActive -> Text -> Checks ds -> Checks ds 
 expectFailurePriv isActive msg = applyToFirst (\(Check h r m _ g) -> Check h r m (ExpectFailure isActive msg) g)
@@ -185,7 +185,7 @@ instance P.Show (Check v) where
         $ txt $ toDisplay ck
 
 instance ToJSON (Check v) where
-  toJSON = String . toS . (header :: Check v -> Text)
+  toJSON = String . toS . (.header)
 
 reverseDList :: DList a -> DList a
 reverseDList = D.fromList . reverse . D.toList
@@ -238,8 +238,8 @@ calcChecks ds chkLst =
       foldfunc (wantSkip, lstCr) ck =
         let thisChkR :: CheckReport
             thisChkR = applyCheck wantSkip ck
-         in (wantSkip || isGateFail (result thisChkR), D.cons thisChkR lstCr)
-   in reverseDList . snd $ L.foldl' foldfunc (False, mempty) $ un chkLst
+         in (wantSkip || isGateFail (thisChkR.result), D.cons thisChkR lstCr)
+   in reverseDList . snd $ L.foldl' foldfunc (False, mempty) $ chkLst.un
 
 $(deriveJSON defaultOptions ''CheckResult)
 $(deriveJSON defaultOptions ''CheckReport)

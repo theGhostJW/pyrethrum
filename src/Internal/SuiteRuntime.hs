@@ -390,7 +390,7 @@ threadHookVal logger hkIn hkEvent hook ctx@Context {cloc, apLogger} =
 onceHookVal :: forall hi ho. Logger -> ExeEventType -> Either Abandon hi -> (Loc -> ApLogger -> hi -> IO ho) -> TVar Status -> TMVar (Either Abandon ho) -> Context -> IO (Either Abandon ho)
 onceHookVal logger hkEvent ehi hook hs hkVal ctx =
   either
-    (\abandon -> abandonnedHookVal hkEvent logger abandon hs hkVal $ cloc ctx)
+    (\abandon -> abandonnedHookVal hkEvent logger abandon hs hkVal $ ctx.cloc)
     (\hi' -> normalHookVal hkEvent logger hook hi' hs hkVal ctx)
     ehi
 
@@ -590,7 +590,7 @@ executeNode logger hkIn rg =
           } ->
             withStartEnd logger leafloc L.Fixture $ do
               eso <- onceHookVal logger L.FixtureOnceHook siHkIn fxOHook fxOHookStatus fxOHookVal onceHkCtx
-              fxIn <- threadHookVal logger (liftA2 ExeIn eso $ threadIn <$> hkIn) L.FixtureThreadHook fxTHook threadHkCtx
+              fxIn <- threadHookVal logger (liftA2 ExeIn eso $ (.threadIn) <$> hkIn) L.FixtureThreadHook fxTHook threadHkCtx
               recurse $ liftA2 ExeIn eso fxIn
             where
               ctx = context leafloc
@@ -628,9 +628,9 @@ executeNode logger hkIn rg =
                     ( \done -> do
                         when done $
                           atomically (writeTVar nStatus Done)
-                        releaseHook logger L.FixtureThreadHookRelease (threadIn <$> fxIpts) threadHkReleaseCtx fxTHookRelease
+                        releaseHook logger L.FixtureThreadHookRelease ((.threadIn) <$> fxIpts) threadHkReleaseCtx fxTHookRelease
                         when done $
-                          releaseHookUpdateStatus logger L.FixtureOnceHookRelease fxOHookStatus (singletonIn <$> fxIpts) onceHkReleaseCtx fxOHookRelease
+                          releaseHookUpdateStatus logger L.FixtureOnceHookRelease fxOHookStatus ((.singletonIn) <$> fxIpts) onceHkReleaseCtx fxOHookRelease
                     )
                     ( \Test {tstId, tst} -> do
                         io <- runTestHook (tstHkloc tstId) fxIpts tHook
@@ -675,7 +675,7 @@ executeNode logger hkIn rg =
                       )
   where
     siHkIn :: Either Abandon si
-    siHkIn = singletonIn <$> hkIn
+    siHkIn = (.singletonIn) <$> hkIn
 
     exeNxt :: forall si' so' ti' to'. Either Abandon (ExeIn si' ti') -> ExeTree si' so' ti' to' -> IO ()
     exeNxt = executeNode logger

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1030e5329760838263e34d04eb7703e19c98893a96c9668f988c212617801773
+-- hash: d643b1e49124aac3d20b27751a06384b9a820cac44f06f8fe9171dfc9bdc6cf0
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -117,6 +117,7 @@ library
       MultiParamTypeClasses
       MultiWayIf
       NamedFieldPuns
+      NoFieldSelectors
       NoImplicitPrelude
       NumericUnderscores
       OverloadedStrings
@@ -224,6 +225,7 @@ test-suite pyrethrum-test
       MultiParamTypeClasses
       MultiWayIf
       NamedFieldPuns
+      NoFieldSelectors
       NoImplicitPrelude
       NumericUnderscores
       OverloadedStrings

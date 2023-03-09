@@ -95,6 +95,9 @@ unit_subDirFromBaseDir_finds_correct_temp :: Assertion
 -- 
 
 ## Other
+* OverloadedRecordDot / NoRecordSelectors
+  * Pyrert5hrum :: Done
+  * Pyrelude :: Done
 * update tastydiscover should not search dist-newstyle :: not needed wasn't taking in when reran
 * replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
 * move TestHook and TestHookRelease to bracket

@@ -603,8 +603,7 @@ nextActiveFixtureRemoveDone db activeQ =
   let getNxt :: Maybe Int -> STM (Maybe InitialisedFixture)
       getNxt mInitilIndex = do
         mfx <- tryReadTQueue activeQ
-        maybef
-          mfx
+        mfx & maybe 
           (pure Nothing)
           \ifx@InitialisedFixture {index = currentIdx, fixStatus} ->
             let nxtInitial :: Maybe Int

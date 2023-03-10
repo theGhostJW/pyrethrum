@@ -48,7 +48,7 @@ import Pyrelude as P
     Show,
     Text,
     const,
-    eitherf,
+    either,
     enumList,
     firstJust,
     fromMaybe,
@@ -56,7 +56,6 @@ import Pyrelude as P
     isJust,
     isNothing,
     isRight,
-    maybef,
     not,
     otherwise,
     sort,
@@ -213,15 +212,14 @@ printProblemsDisplayStep runResults@(RunResults _outOfTest iterationResults) lin
 
       _skipFlags :: (Bool, Bool) -- (newAccum, err / result)
       _skipFlags@(nxtSkipItt, nxtSkipTst) =
-        eitherf
-          eithLp
-          (const (skipItt, skipTst))
-          ( \LogProtocolOut {logInfo = lp} ->
+          eithLp & either
+           (const (skipItt, skipTst))
+           ( \LogProtocolOut {logInfo = lp} ->
               case lp of
                 LP.StartTest (TestLogInfo ttl domain _) -> (False, LC.Pass == testStatus' (push ttl Test domain))
                 StartIteration iid _ _ -> (LC.Pass == (.executionStatus) (M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults), skipTst)
                 _ -> (skipItt, skipTst)
-          )
+           )
 
       nxtAccum :: ProblemIterationAccum
       nxtAccum =
@@ -306,8 +304,8 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo = si} lpo@Lo
       updateItrRec func =
         let mIrec :: Maybe IterationRecord
             mIrec = accum.rec
-         in maybef
-              mIrec
+         in 
+              mIrec & maybe 
               (accum, lineError "An iteration event has been encounterred before the start iteration event - possible loss of log event - check raw logs")
               (\irec -> (accum {rec = Just $ func irec}, Nothing))
    in lp & \case
@@ -404,8 +402,7 @@ printLogDisplayStep ::
   Either DeserialisationError LogProtocolOut -> -- source   -- parse error or FrameworkError
   (IterationAccum, Maybe [PrintLogDisplayElement]) -- (newAccum, err / result)
 printLogDisplayStep runResults lineNo oldAccum@IterationAccum {stepInfo} eithLp =
-  eitherf
-    eithLp
+   eithLp & either
     ( \err ->
         let nxtFailStage = calcNextIterationFailStage stepInfo.faileStage LC.Fail stepInfo.phase Nothing
             nxtStepInfo = stepInfo {faileStage = nxtFailStage}
@@ -445,8 +442,8 @@ prettyPrintDisplayElement pde =
             <> newLn
             <> fullHeader False '-' False "Filter Log"
             <> newLn
-            <> maybef
-              mFltrLog
+            <> (
+              mFltrLog & maybe
               "  No Filter Log Available"
               ( \fltrs ->
                   let fltrItems :: (Maybe Text -> Bool) -> [TestFilterResult]
@@ -463,10 +460,9 @@ prettyPrintDisplayElement pde =
 
                       rejectText :: TestFilterResult -> Text
                       rejectText fr =
-                        maybef
-                          fr.reasonForRejection
-                          "ACCEPTED" -- should never happen
-                          (\rtxt -> address fr <> " - " <> rtxt)
+                          fr.reasonForRejection & maybe 
+                            "ACCEPTED" -- should never happen
+                            (\rtxt -> address fr <> " - " <> rtxt)
 
                       accepted :: Text
                       accepted =
@@ -487,6 +483,7 @@ prettyPrintDisplayElement pde =
                         <> newLn
                         <> rejected
               )
+            )
             <> newLn
         LogTransformation.PrintLogDisplayElement.StartTest titl address _notes _cfg status itrStats ->
           majorHeader False (header' titl status)
@@ -518,8 +515,7 @@ prettyPrintDisplayElement pde =
                         [ ("title", ttle),
                           ("status", statusLabel False status <> (status == LC.Pass ? "" $ " - " <> txt phse))
                         ]
-                   in maybef
-                        notes
+                   in notes & maybe 
                         baseLines
                         (\n -> P.snoc baseLines ("notes:", n))
 
@@ -559,8 +555,7 @@ prettyPrintDisplayElement pde =
 
                 dsText :: Text
                 dsText =
-                  maybef
-                    domainState
+                    domainState & maybe 
                     ("  Domain State is Empty" <> newLn)
                     ( \case
                         LogTransformation.PrintLogDisplayElement.ParserSuccess dsDisplay -> prettyYamlKeyValues 2 LeftJustify $ dsDisplay.unDStateJSON
@@ -602,11 +597,11 @@ prettyPrintDisplayElement pde =
                      )
                   <> "application state:"
                   <> newLn
-                  <> maybef apStateInfo "  No ApState Recorded" displayApState
+                  <> maybe "  No ApState Recorded" displayApState apStateInfo
                   <> newLn2
                   <> "full item:"
                   <> newLn
-                  <> maybef item "  No Item Recorded" (indent2 . getLenient . convertString . encodePretty (setConfCompare keyOrdering defConfig))
+                  <> maybe "  No Item Recorded" (indent2 . getLenient . convertString . encodePretty (setConfCompare keyOrdering defConfig)) item
                   <> newLn
         LineError err ->
           fullHeader False '!' True "ERROR"

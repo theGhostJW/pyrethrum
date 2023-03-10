@@ -229,10 +229,9 @@ channelFilter =
 hasTitle :: Maybe Text -> TestFilter RunConfig TestConfig
 hasTitle mbTtl =
   TestFilter
-    { title = \_ _ _ -> maybef mbTtl "test title N/A - no test fragmant provided" ("test title must include: " <>),
+    { title = \_ _ _ -> maybe "test title N/A - no test fragmant provided" ("test title must include: " <>) mbTtl,
       predicate = \_ _ TestConfig {title = testTtl} ->
-        maybef
-          mbTtl
+        mbTtl & maybe
           True
           \ttl' -> toLower ttl' `isInfixOf` toLower testTtl
     }

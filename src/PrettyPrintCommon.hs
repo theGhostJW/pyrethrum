@@ -26,7 +26,7 @@ prettyPrintFilterItem (TestFilterResult TestLogInfo {title=ttl, address=add} rea
     description :: Text
     description = render add <> " - " <> ttl
   in
-    maybef reasonForRejection
+    reasonForRejection & maybe 
       ("accepted: " <> description)
       (\reason -> "rejected: " <> description <> " - Reason: " <> reason)
 

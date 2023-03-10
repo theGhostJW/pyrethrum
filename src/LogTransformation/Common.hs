@@ -104,10 +104,10 @@ calcNextIterationFailStage mCurrentFailPhase lgStatus currPhase mLp =
   currPhase == OutOfIteration || maybe False isBoundaryLog mLp
     ? Nothing
     $ lgStatus > LogTransformation.Common.Warning
-      ? maybef
-        mCurrentFailPhase
-        (Just currPhase)
-        (\fs -> Just $ max fs currPhase)
+      ? maybe 
+         (Just currPhase)
+         (\fs -> Just $ max fs currPhase)
+         mCurrentFailPhase
       $ mCurrentFailPhase
 
 logProtocolStatus :: Bool -> LogProtocolBase e -> ExecutionStatus
@@ -246,10 +246,9 @@ data PhaseChangeValidation = PhaseChangeValidation
 
 phaseChange :: IterationPhase -> Maybe IterationPhase -> LogProtocolOut -> PhaseChangeValidation
 phaseChange lastPhase stageFailure lp =
-  maybef
-    (phaseSwitch lp stageFailure)
-    (PhaseChangeValidation lastPhase lastPhase True)
-    (\(PhaseSwitch legalFromPhases to) -> PhaseChangeValidation lastPhase to $ lastPhase `S.member` legalFromPhases)
+    phaseSwitch lp stageFailure & maybe 
+      (PhaseChangeValidation lastPhase lastPhase True)
+      (\(PhaseSwitch legalFromPhases to) -> PhaseChangeValidation lastPhase to $ lastPhase `S.member` legalFromPhases)
 
 data DeltaAction a = Clear | Keep | New a
 
@@ -378,8 +377,7 @@ logProtocolPrettyPrintReducer ::
 logProtocolPrettyPrintReducer _ _ ethLp =
   ( (),
     Just . pure $
-      eitherf
-        ethLp
+      ethLp & either
         txtPretty
         (prettyPrintLogProtocol Run)
   )

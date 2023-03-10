@@ -28,7 +28,7 @@ module LogTransformation.Test where
 --     thisRec = fromMaybe emptyRecord mThisRec
 
 --     defaultProp :: a -> (TestRecord -> a) -> a
---     defaultProp = maybef mThisRec
+--     defaultProp = mThisRec & maybe
 
 --     nxtRec :: Maybe TestRecord                   
 --     nxtRec = case itr of

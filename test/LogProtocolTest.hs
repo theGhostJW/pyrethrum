@@ -170,7 +170,7 @@ hprop_log_protocol_round_trip = property $ do
       unserialised :: Either Text (LogProtocolBase Int)
       unserialised = mapLeft txt $ A.eitherDecode serialised
 
-  eitherf
-    unserialised
+  P.either
     (\s -> footnote (toS s) *> failure)
     (lp ===)
+    unserialised

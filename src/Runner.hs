@@ -63,7 +63,6 @@ import Pyrelude as P
     debug,
     debug',
     either,
-    eitherf,
     error,
     firstDuplicate,
     fold,
@@ -318,7 +317,7 @@ mkEndpointSem runParams@RunParams {filters, itemIds} tstAddress iIds =
 
       allFilters :: [F.TestFilter rc tc]
       allFilters = endpointFilter tstAddress : filters
-   in eitherf
-        itemIds
+   in either
         (logItem . LP.Error . FilterError)
         (\idSet -> mkSem runParams {filters = allFilters, itemIds = eitherToMaybe itemIds})
+        itemIds

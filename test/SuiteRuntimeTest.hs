@@ -93,7 +93,6 @@ import Pyrelude as P
     length,
     lines,
     maybe,
-    maybef,
     myThreadId,
     newIORef,
     not,

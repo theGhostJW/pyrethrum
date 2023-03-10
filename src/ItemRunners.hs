@@ -71,8 +71,7 @@ runItem rc md hi (Test tc _items interactor parse) i =
               -- TODO: check for io exceptions / SomeException - use throw from test
               log "interact start"
               ethApState <- try' $ interactor rc hi i
-              eitherf
-                ethApState
+              ethApState & either
                 ( \e -> do
                     logItem $ InteractorFailure iid e
                     logItem $ ParserSkipped iid

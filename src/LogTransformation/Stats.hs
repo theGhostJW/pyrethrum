@@ -26,8 +26,8 @@ statsStepForReducer :: LineNo                                       -- lineNo
 statsStepForReducer _ accum lp = (statsStep accum lp, Nothing)
 
 statsStepFromLogProtocol :: StatsAccum -> LogProtocolOut -> StatsAccum
-statsStepFromLogProtocol (StatsAccum (RunResults outOfTest itrRslts) stepInfo) lpo@LogProtocolOut{ logInfo = lp } = 
-  let 
+statsStepFromLogProtocol (StatsAccum (RunResults outOfTest itrRslts) stepInfo) lpo@LogProtocolOut{ logInfo = lp } =
+  let
     nxtStepInfo@(LPStep _nxtPhaseValid _nxtFailStage nxtPhase
                     logItemStatus nxtActiveItr nxtCheckEncountered) = logProtocolStep stepInfo lpo
 
@@ -36,26 +36,26 @@ statsStepFromLogProtocol (StatsAccum (RunResults outOfTest itrRslts) stepInfo) l
 
     nxtOutOfTest :: StatusCount
     nxtOutOfTest = inIteration || logItemStatus == Pass --only count out of iteration messages that have not passed 
-                                  ? outOfTest 
+                                  ? outOfTest
                                   $ M.insertWith (+) logItemStatus 1 outOfTest
 
     nxtItrRslts :: IterationResults
-    nxtItrRslts = 
-        maybef nxtActiveItr
+    nxtItrRslts =
+        nxtActiveItr & maybe
             itrRslts
-            (\(iid, _) -> 
-              let 
+            (\(iid, _) ->
+              let
                 missingChecksOutcome = IterationOutcome (
                                             isEndIteration lp && not nxtCheckEncountered
                                             ? Fail
-                                            $  Pass  
+                                            $  Pass
                                       ) Checks
                 normalOutcome = IterationOutcome logItemStatus nxtPhase
               in
                 M.insertWith max iid (max normalOutcome missingChecksOutcome) itrRslts
             )
 
-  in 
+  in
     StatsAccum {
       runResults = RunResults {
         outOfTest = nxtOutOfTest,
@@ -65,20 +65,20 @@ statsStepFromLogProtocol (StatsAccum (RunResults outOfTest itrRslts) stepInfo) l
     }
 
 statsStepFromDeserialisationError :: StatsAccum -> DeserialisationError -> StatsAccum
-statsStepFromDeserialisationError statsAccum@(StatsAccum (RunResults outOfTest itrRslts) stepInfo) _lp = 
-  let 
+statsStepFromDeserialisationError statsAccum@(StatsAccum (RunResults outOfTest itrRslts) stepInfo) _lp =
+  let
     activeItr = stepInfo.activeIteration
 
     nxtOutOfTest :: StatusCount
     nxtOutOfTest = isJust activeItr
-                         ?  outOfTest 
+                         ?  outOfTest
                          $  M.insertWith (+) Fail 1 outOfTest
 
     nxtItrRslts :: IterationResults
-    nxtItrRslts = maybef activeItr
+    nxtItrRslts = activeItr & maybe
                     itrRslts
                     (\(iid, _) -> M.insertWith max iid (IterationOutcome Fail stepInfo.phase) itrRslts)
-  in 
+  in
     statsAccum {
       runResults = RunResults {
         outOfTest = nxtOutOfTest,
@@ -88,8 +88,7 @@ statsStepFromDeserialisationError statsAccum@(StatsAccum (RunResults outOfTest i
 
 
 statsStep :: StatsAccum -> Either DeserialisationError LogProtocolOut -> StatsAccum
-statsStep statsAccum eithLP = 
-    eitherf eithLP
+statsStep statsAccum = either
       (statsStepFromDeserialisationError statsAccum)
       (statsStepFromLogProtocol statsAccum)
 
@@ -97,26 +96,26 @@ testExStatus :: IterationResults -> M.Map Address ExecutionStatus
 testExStatus ir = (.executionStatus) <$> M.mapKeysWith max (.address) ir
 
 
-listTestStatus :: RunResults -> M.Map Address ExecutionStatus 
+listTestStatus :: RunResults -> M.Map Address ExecutionStatus
 listTestStatus = testExStatus . (.iterationResults)
 
 testStatusCounts :: RunResults -> StatusCount
 testStatusCounts = countValues . listTestStatus
 
-listIterationStatus :: RunResults -> M.Map ItemId ExecutionStatus 
+listIterationStatus :: RunResults -> M.Map ItemId ExecutionStatus
 listIterationStatus runResults = (.executionStatus) <$> runResults.iterationResults
 
 itrStatusesGroupedByTest :: RunResults -> M.Map Address (M.Map ItemId ExecutionStatus)
-itrStatusesGroupedByTest rr = 
-  let 
-    step :: M.Map Address (M.Map ItemId ExecutionStatus) -> ItemId -> ExecutionStatus -> M.Map Address (M.Map ItemId ExecutionStatus) 
-    step accum iid@ItemId {address} status = 
-       let 
+itrStatusesGroupedByTest rr =
+  let
+    step :: M.Map Address (M.Map ItemId ExecutionStatus) -> ItemId -> ExecutionStatus -> M.Map Address (M.Map ItemId ExecutionStatus)
+    step accum iid@ItemId {address} status =
+       let
          tstMap :: M.Map ItemId ExecutionStatus
-         tstMap = M.findWithDefault M.empty address accum 
-       in 
+         tstMap = M.findWithDefault M.empty address accum
+       in
         M.insert address (M.insert iid status tstMap) accum
-  in 
+  in
     M.foldlWithKey' step M.empty $ listIterationStatus rr
 
 testIterationStatusCounts :: RunResults -> M.Map Address StatusCount
@@ -126,14 +125,14 @@ iterationStatusCounts :: RunResults -> StatusCount
 iterationStatusCounts = countValues . listIterationStatus
 
 worstStatus :: RunResults -> ExecutionStatus
-worstStatus rr@(RunResults outOfTest _) = 
-  let 
+worstStatus rr@(RunResults outOfTest _) =
+  let
     nonZero :: StatusCount -> [ExecutionStatus]
     nonZero = M.keys . M.filter (> 0) -- should not be in map anyway
 
     testStatuses :: [ExecutionStatus]
     testStatuses = nonZero $ testStatusCounts rr
-  in 
+  in
     null testStatuses
       ? Fail -- empty test statuses is deemed fail
       $ fromMaybe Fail $ maximum $ nonZero outOfTest <> testStatuses

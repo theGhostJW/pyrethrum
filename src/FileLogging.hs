@@ -1,4 +1,4 @@
-module FileLogging where 
+module FileLogging where
 
 import Common as C
 import DSL.Logger
@@ -14,8 +14,8 @@ showAndLogItems :: Show a => IO AbsDir -> [a] -> IO ()
 showAndLogItems projRoot = showAndLogList projRoot "items"
 
 showAndLogList :: Show a => IO AbsDir -> Text -> [a] -> IO ()
-showAndLogList projRoot logSuffix items = 
-      let 
+showAndLogList projRoot logSuffix items =
+      let
         logSpec :: M.Map (Text, FileExt) ()
         logSpec = M.singleton (logSuffix, FileExt ".log") ()
 
@@ -27,17 +27,17 @@ showAndLogList projRoot logSuffix items =
                       (Left $ C.Error "showAndLogList - no Handle returned")
                       (Right . snd)
                     . head
-                  ) 
+                  )
                 <$> logFileHandles projRoot logSpec
 
         log2Both :: SIO.Handle -> Text -> IO ()
         log2Both fileHndl lgStr = putLines SIO.stdout lgStr *> putLines fileHndl lgStr
 
         listItems :: SIO.Handle -> IO ()
-        listItems h = sequence_ $ log2Both h . txtPretty <$> items
+        listItems h = mapM_ (log2Both h . txtPretty) items
       in
         hndle >>=
-                either pPrint (\HandleInfo{path, fileHandle} -> 
+                either pPrint (\HandleInfo{path, fileHandle} ->
                                   listItems fileHandle `finally` SIO.hClose fileHandle
                                   *> putStrLn ""
                                   *> putStrLn "--- Log Files ---"
@@ -47,31 +47,31 @@ showAndLogList projRoot logSuffix items =
 
 
 logFileHandles :: forall a e. IO AbsDir -> M.Map (Text, FileExt) a -> IO (Either (FrameworkError e) [(a, HandleInfo)])
-logFileHandles projRoot suffixExtensionMap = 
+logFileHandles projRoot suffixExtensionMap =
   let
     openHandle :: (Text, FileExt) -> a -> IO (Either (FrameworkError e) (a, HandleInfo))
-    openHandle (suff, ext) a = 
-      do 
+    openHandle (suff, ext) a =
+      do
         eHandInfo <- logFileHandle projRoot suff ext
-        pure $ eitherf eHandInfo
+        pure $ eHandInfo & either
                 (Left . IOError' "Error creating log file" )
                 (\hInfo -> Right (a, hInfo))
 
     openHandles :: IO [((Text, FileExt), Either (FrameworkError e) (a, HandleInfo))]
     openHandles = M.toList <$> M.traverseWithKey openHandle suffixExtensionMap
-  in 
-    do 
+  in
+    do
       hlst <- openHandles
-      let 
+      let
         fstErr = find (isLeft . snd) hlst
         openHndls = rights (snd <$> hlst)
-      maybef fstErr
+      fstErr & maybe
         (pure $ Right openHndls)
         (
-          \((sfx, _ext), fstErr') -> 
-            do 
+          \((sfx, _ext), fstErr') ->
+            do
               traverse_ (hClose . (.fileHandle) . snd) openHndls
-              pure . Left $ AnnotatedError 
-                              ("Failed to create log file with suffix: " <> sfx) 
+              pure . Left $ AnnotatedError
+                              ("Failed to create log file with suffix: " <> sfx)
                               $ fromLeft (C.Error "won't happen") fstErr'
         )

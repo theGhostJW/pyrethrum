@@ -56,7 +56,7 @@ import Text.Show.Pretty (pPrint, pPrintList, ppShowList)
 
 
 display :: (Show a1, Show a2) => Either a1 a2 -> IO ()
-display eth = eitherf eth view view
+display = either view view
 
 -- $ > rslt *> view "Done"
 

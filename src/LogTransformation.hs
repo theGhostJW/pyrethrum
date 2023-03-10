@@ -26,33 +26,33 @@ data LogTransformParams accum itm rsltItem m srcFmt snkFmt = LogTransformParams 
   sink :: [snkFmt] -> m (),
   reducer:: LineNo -> accum -> Either DeserialisationError itm -> (accum, Maybe [rsltItem]),
   itemDesrialiser :: LineNo -> srcFmt -> Either DeserialisationError itm,
-  resultSerialiser :: rsltItem -> snkFmt,    
+  resultSerialiser :: rsltItem -> snkFmt,
   linNo :: LineNo,
   accumulator :: accum
 }
 
 logTransform :: forall accum itm rsltItem m src snk. Monad m => LogTransformParams accum itm rsltItem m src snk -> m accum
 logTransform (LogTransformParams src snk step idser rsltSersr lineNo accum) =
-    let 
+    let
       localLoop :: LineNo -> accum -> m accum
       localLoop ln accum' = logTransform (LogTransformParams src snk step idser rsltSersr ln accum')
 
       rsltSink :: [rsltItem] -> m ()
       rsltSink lst = snk $ rsltSersr <$> lst
     in
-      do 
+      do
         lg <- src
-        maybef lg
+        lg & maybe
           (pure accum) -- EOF
-          (\bs -> 
-            let 
+          (\bs ->
+            let
               (nxtAccum, result) = step lineNo accum $ idser lineNo bs
             in
               do
                 maybe (pure ()) rsltSink result
                 localLoop (LineNo $ (.unLineNo) lineNo + 1) nxtAccum
           )
-          
+
 ------------------------------------------------------
 --------------- DList Test Transformation ------------
 ------------------------------------------------------
@@ -68,21 +68,21 @@ transformDList sourceList = runToList sourceList . logTransform
 ----------------- File Transformation ----------------
 ------------------------------------------------------
 
-sourceFromHandle :: Handle -> IO (Maybe ByteString) 
+sourceFromHandle :: Handle -> IO (Maybe ByteString)
 sourceFromHandle h = hIsEOF h >>= bool (Just <$> B.hGetLine h) (pure Nothing)
 
-sinkFromHandle :: Handle -> [ByteString] -> IO () 
-sinkFromHandle h bs = sequence_ $ B.hPutStrLn h <$> bs
+sinkFromHandle :: Handle -> [ByteString] -> IO ()
+sinkFromHandle h = mapM_ (B.hPutStrLn h)
 
 withInputFile :: AbsFile -> (Handle -> IO (Either LogTransformError a)) -> IO (Either LogTransformError a)
-withInputFile srcPth fLinesProcessor = 
+withInputFile srcPth fLinesProcessor =
   do
     hSrc <- safeOpenFile srcPth ReadMode
-    eitherf hSrc
+    hSrc & either
       (pure . Left . LogIOError "Openning Source File")
       (\hIn -> fLinesProcessor hIn `finally` hClose hIn)
 
-transformToFile :: forall itm rslt accum.    
+transformToFile :: forall itm rslt accum.
                   (LineNo -> accum -> Either DeserialisationError itm -> (accum, Maybe [rslt]))  -- line stepper
                   -> (LineNo -> ByteString -> Either DeserialisationError itm)                   -- a deserialiser for the item
                   -> (rslt -> ByteString)                                                        -- a serialiser for the result
@@ -98,22 +98,22 @@ transformToFile step idser rser seed srcPth destPthFunc =
                                             sink = sinkFromHandle hOut,
                                             reducer = step,
                                             itemDesrialiser = idser,
-                                            resultSerialiser = rser,    
+                                            resultSerialiser = rser,
                                             linNo = LineNo 1,
                                             accumulator = seed
                                           }
 
     writeLines :: Handle -> IO (Either LogTransformError AbsFile)
-    writeLines hIn = 
+    writeLines hIn =
       do
         rsltFile <- destPthFunc srcPth
-        outHndle <- safeOpenFile rsltFile S.WriteMode 
-        eitherf outHndle
+        outHndle <- safeOpenFile rsltFile S.WriteMode
+        outHndle & either
           (pure . Left . LogIOError "Openning Output File")
           (\hOut -> processLines hIn hOut `finally` S.hClose hOut $> Right rsltFile)
   in
     withInputFile srcPth writeLines
-                  
+
 prettyPrintLogprotocolReducer :: forall e. (Show e) => LineNo                 -- lineNo
           -> ()                                         -- accum
           -> Either DeserialisationError (LogProtocolBase e)    -- Logprotocol
@@ -126,16 +126,16 @@ prettyPrintLogprotocolReducer _ _ ethLp = ((), Just [either txtPretty (prettyPri
 ---------------------------------------------------------
 
 prettyPrintTestRun :: RunResults -> AbsFile -> IO (Either LogTransformError AbsFile)
-prettyPrintTestRun rr srcJsonIniPath = transformToFile 
+prettyPrintTestRun rr srcJsonIniPath = transformToFile
                                           (printLogDisplayStep rr)
                                           jsonDeserialiser
                                           (toS . prettyPrintDisplayElement)
                                           emptyIterationAccum
                                           srcJsonIniPath
-                                          $ replaceExtension ".full" >=> addExtension ".yaml" 
+                                          $ replaceExtension ".full" >=> addExtension ".yaml"
 
 fileStats :: AbsFile -> IO (Either LogTransformError RunResults)
-fileStats srcJsonIniPath = 
+fileStats srcJsonIniPath =
   let
     processLines :: Handle -> IO (Either LogTransformError StatsAccum)
     processLines hIn = Right <$> logTransform LogTransformParams {
@@ -143,7 +143,7 @@ fileStats srcJsonIniPath =
                                               sink = const $ pure (),
                                               reducer = statsStepForReducer,
                                               itemDesrialiser = jsonDeserialiser,
-                                              resultSerialiser = yamlSerialiser,    
+                                              resultSerialiser = yamlSerialiser,
                                               linNo = LineNo 1,
                                               accumulator = emptyStatsAccum
                                             }
@@ -152,22 +152,23 @@ fileStats srcJsonIniPath =
 
 
 prepareFinalLogs :: AbsFile -> IO ()
-prepareFinalLogs srcJsonIniPath = 
-  do 
-    let 
+prepareFinalLogs srcJsonIniPath =
+  do
+    let
       fileStats' :: AbsFile -> IO (Either LogTransformError RunResults)
       fileStats' = fileStats
 
     putStrLn "=== Preparing Final Report ==="
     putStrLn "--- Calculating Stats ---"
     runResults <- fileStats' srcJsonIniPath
-    eitherf runResults 
+    runResults & either
       (const $ putStrLn "Error - Problem Encountered Calculating Run Stats - Final Report Cannot Be Generated")
       (
-        \rr -> do 
+        \rr -> do
                 putStrLn "--- Generating Final Report ---"
                 ethFile <- prettyPrintTestRun rr srcJsonIniPath
-                putStrLn $ eitherf ethFile
+                putStrLn $ either
                   (\err ->  "Error - Problem Encountered Generating Report" <> newLn <> txt err)
                   (\rsltPth -> "Report Generated: " <> txt (toFilePath rsltPth) <> newLn)
+                  ethFile
       )

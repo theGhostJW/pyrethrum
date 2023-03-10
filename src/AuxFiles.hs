@@ -36,8 +36,6 @@ import Pyrelude as F
       relfile,
       parseRelFileSafe,
       (....),
-      eitherf,
-      maybef,
       txt,
       toS,
       (?),
@@ -60,7 +58,7 @@ import Pyrelude as F
       AbsFile,
       RelDir,
       RelFile,
-      Text )
+      Text, (&), either, maybe, (>>=) )
 import Pyrelude.IO ( now, subDirFromBaseDir, putStrLn, writeFile)
 import qualified Prelude as P
 import qualified System.IO as S
@@ -99,7 +97,7 @@ dataFile projRoot = subPath (dataDirBase projRoot)
 dumpTxt :: IO AbsDir -> Text -> RelFile -> IO ()
 dumpTxt projRoot txt' file = do 
                       ePth <- tempFileBase projRoot file
-                      eitherf ePth
+                      ePth & either
                         throw
                         (\p -> writeFile (toFilePath p) txt')
 
@@ -147,11 +145,11 @@ logFilePrefix currentTime =
 logFilePath :: IO AbsDir -> Maybe Text -> Text -> FileExt -> IO (Either P.IOError (Text, AbsFile))
 logFilePath projRoot mNamePrefix suffix fileExt = 
   do
-    pfx <- maybef mNamePrefix
+    pfx <- mNamePrefix & maybe
               (logFilePrefix <$> now)
               pure
     relPath <- parseRelFileSafe $ pfx <> "_" <> suffix <> fileExt.unFileExt
-    eitherf relPath
+    relPath & either
       (pure . Left . P.userError . toS . show)
       (\relFle -> ((pfx,) <$>) <$> logFile projRoot relFle)
 
@@ -167,11 +165,11 @@ data HandleInfo = HandleInfo {
 }
 
 logFileHandle :: IO AbsDir -> Text -> FileExt -> IO (Either P.IOError HandleInfo)
-logFileHandle projRoot fileNameSuffix fileExt = do
-                                        ethPth <- logFilePath projRoot Nothing fileNameSuffix fileExt
-                                        eitherf ethPth 
-                                          (pure . Left)
-                                          (\(pfx, pth) -> (HandleInfo pfx pth <$>) <$> safeOpenFile pth S.WriteMode)
+logFileHandle projRoot fileNameSuffix fileExt = 
+                                        logFilePath projRoot Nothing fileNameSuffix fileExt >>=
+                                         either 
+                                           (pure . Left)
+                                           (\(pfx, pth) -> (HandleInfo pfx pth <$>) <$> safeOpenFile pth S.WriteMode)
 
 
 -- Writing temp files used mostly used for de bugging 
@@ -185,7 +183,7 @@ toTempBase' :: IO AbsDir -> WantConsole -> Text -> RelFile -> IO ()
 toTempBase' projRoot wantConsole txt' fileName = 
   do 
     ethQPth <- tempFileBase projRoot fileName
-    eitherf ethQPth
+    ethQPth & either
       (\e -> putStrLn $ "failed to generate path: " <> txt e)
       (\adsPath ->
         do 

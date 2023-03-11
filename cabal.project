@@ -17,8 +17,8 @@ source-repository-package
 
 source-repository-package
   type: git
-  location: https://github.com/theGhostJW/pyrelude
-  tag: 822ffb92f8dabe626339e6ac564151d138e8d29e
+  location: https://github.com/theGhostJW/pyrethrum-extras
+  tag: da21731c94fccfdd821b619ecb39c92d33187fa5
 
 
 optimization: 0

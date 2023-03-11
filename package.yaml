@@ -20,8 +20,8 @@ extra-source-files:
 description: Please see the README on GitHub at <https://github.com/githubuser/simple-hpack#readme>
 
 dependencies:
-  - base
-  - pyrelude
+  - base-noprelude
+  - pyrethrum-extras
   - containers
   - extra
   - text
@@ -35,6 +35,7 @@ dependencies:
   - polysemy
   - unliftio
   - polysemy-plugin
+  - relude
 
 ghc-options:
   # - -threaded
@@ -157,6 +158,12 @@ library:
     - template-haskell
     - bytestring
     - fmt
+    - name: &common-mixin base
+      mixin:
+        - hiding (Prelude)
+    - name: relude
+      mixin:
+        - (Relude as Prelude , PyrethrumExtras, Data.Text)
 
 #  reinstate when LHS can live load multiple modules
 # use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
@@ -175,5 +182,6 @@ tests:
       - tasty-discover
       - hedgehog
       - bytestring
+      - name: *common-mixin
 
 build-tools: tasty-discover:tasty-discover

@@ -70,9 +70,9 @@
 * stack -> cabal :: Done
 
 * remove 
-  * maybef
-  * eitherf
-* change uu to error
+  * maybef :: Done
+  * eitherf :: Done
+* change uu to error :: Done
   * uu Error -> txt 
 
 -- compile pyrethrum
@@ -103,6 +103,29 @@ unit_subDirFromBaseDir_finds_correct_temp :: Assertion
 * move TestHook and TestHookRelease to bracket
 * think about hooks
   * mismatch between logical location and tests that need hook
+    * its a monad
+    * hooks and fixtures
+    * hook types
+      * instance
+      * thread
+      * singleton
+      * ----
+      * once
+      * onceThread
+      * instance
+      * ----
+      * suite
+      * fixture
+      * test
+      * ----
+      * some combos will not be valid or redudundant
+      * what to do when hooks are out of order?
+        * instanceTestHook
+          * fixtureOnceThread
+            * onceHook
+              * instanceTestHook
+        * consider making hook data a single value?
+          * patch - pure function reads patches data from onceContext and ThreadContext into instance context
   * eg. taxcalc tests - how to use
   * some ui - need driver
   * some need mysql rolled over

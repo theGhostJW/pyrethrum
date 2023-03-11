@@ -14,7 +14,6 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Yaml as Y
 import OrphanedInstances ()
-import Pyrelude as P hiding (phase)
 import RunElementClasses as RC
 import RunnerBase
 

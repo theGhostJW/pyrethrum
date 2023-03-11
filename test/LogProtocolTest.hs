@@ -8,8 +8,6 @@ import qualified Data.Aeson as A
 import Data.Aeson.TH
 import Data.ByteString.Lazy as B
 import Data.Set as S
-import Pyrelude as P
-import Pyrelude.Test as T
 import RunElementClasses as RC hiding (element)
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)

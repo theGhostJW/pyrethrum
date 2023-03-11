@@ -15,7 +15,6 @@ import Data.Aeson.Types hiding (One)
 import GHC.Records (HasField (getField))
 import ItemRunners (runItem)
 import Polysemy
-import Pyrelude as P
 import Runner as R
   ( Address,
     Config,

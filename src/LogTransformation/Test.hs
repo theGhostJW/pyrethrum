@@ -6,8 +6,7 @@ module LogTransformation.Test where
 -- import LogTransformation.Iteration as I
 -- import RunElementClasses (TestFilterResult, unTestAddress)
 -- import Check as CK
--- import Pyrelude as P hiding (fail)
--- import Pyrelude.IO
+-- import PyrethrumExtras.IO
 -- import qualified Data.DList as D
 -- import DSL.LogProtocol as LP
 -- import qualified Data.Aeson as A

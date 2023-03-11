@@ -9,7 +9,7 @@ import           DSL.CurrentTime
 import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
 import           Pyrelude as P hiding (app)
-import           Pyrelude.IO as PIO
+import           PyrethrumExtras.IO as PIO
 import           FileLogging
 import qualified System.IO as S
 import AuxFiles as A

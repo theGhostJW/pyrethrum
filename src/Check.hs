@@ -27,7 +27,6 @@ import Data.Aeson.Types as AT hiding (Error)
 import Data.DList as D
 import Data.Function
 import qualified Data.List as L
-import Pyrelude as P hiding ((.))
 
 {-
 Remove defect expectation and create a new type and module 

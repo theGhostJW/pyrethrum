@@ -13,7 +13,6 @@ import GHC.Records
 import OrphanedInstances ()
 import Polysemy
 import Polysemy.Error as PE (Error, catch, throw)
-import Pyrelude as P
 import RunElementClasses as C
   ( Address,
     Config,

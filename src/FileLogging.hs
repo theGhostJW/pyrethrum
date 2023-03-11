@@ -2,8 +2,7 @@ module FileLogging where
 
 import Common as C
 import DSL.Logger
-import Pyrelude as P
-import Pyrelude.IO
+import PyrethrumExtras.IO
 import Text.Show.Pretty
 import AuxFiles
 import OrphanedInstances()

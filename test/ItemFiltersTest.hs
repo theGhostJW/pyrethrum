@@ -5,8 +5,6 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import Data.Set as S
 import ItemFilter
-import Pyrelude as P
-import Pyrelude.Test
 import Runner as R hiding (items)
 
 -- import           DemoProject.Config as CFG

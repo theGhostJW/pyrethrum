@@ -4,9 +4,8 @@ module LogTransformationTest where
 
 import Text.RawString.QQ
 import           Pyrelude as P
-import           Pyrelude.IO as PIO
+import           PyrethrumExtras.IO as PIO
 import           Data.DList as DL
-import Pyrelude.Test       as T
 import AuxFiles
 import LogTransformation
 import LogTransformation.PrintLogDisplayElement as LTPDE

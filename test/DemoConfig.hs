@@ -6,7 +6,6 @@ import qualified Data.Aeson as A
 import Data.Aeson.TH
 import Data.ByteString.Lazy as B
 import Data.Set as S
-import Pyrelude as P
 import RunElementClasses
 
 data SuiteError

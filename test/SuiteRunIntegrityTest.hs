@@ -29,9 +29,7 @@ import DemoSuite as M (
   txtRun)
 import Polysemy
 import Polysemy.Internal.Union (Member)
-import Pyrelude as P
-import Pyrelude.IO (putStrLn)
-import Pyrelude.Test (Assertion, chk, chk', (...), chkEq)
+import PyrethrumExtras.IO (putStrLn)
 import RunElementClasses as REC (Address (..), AddressElem (..), AddressTxtElm, TestLogInfo (..), toStrElm)
 import qualified RunElementClasses as C
 import Runner (SuiteSource, TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config)

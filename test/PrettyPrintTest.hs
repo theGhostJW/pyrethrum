@@ -1,8 +1,6 @@
 module PrettyPrintTest where 
 
-import           Pyrelude as P
-import           Pyrelude.IO as PIO
-import Pyrelude.Test       as T
+import           PyrethrumExtras.IO as PIO
 import AuxFiles
 import Data.Aeson.TH
 import PrettyPrintCommon

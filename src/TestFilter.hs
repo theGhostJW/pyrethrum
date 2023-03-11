@@ -6,7 +6,6 @@ import qualified Data.Set as S
 import GHC.Records (HasField (getField))
 import Internal.RunnerBaseLazy
 import OrphanedInstances ()
-import Pyrelude as P
 import RunElementClasses (Address (unAddress), Config, TestFilterResult (..), TestLogInfo (TestLogInfo), mkTestLogInfo, render)
 import qualified RunElementClasses as C
 import RunnerBase (AddressedElm (..))

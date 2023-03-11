@@ -5,7 +5,6 @@ import DSL.Logger (Logger (LogError), log, logError, logItem)
 import Internal.RunnerBaseLazy
 import qualified RunElementClasses as RC
 import Polysemy (Member, Sem)
-import Pyrelude
 import Data.Set as S
 import Data.Aeson as A (ToJSON (toJSON), Value (Bool))
 import RunElementClasses as C

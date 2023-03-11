@@ -15,22 +15,7 @@ import qualified Internal.PreNode as PN
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
-import Pyrelude (bool, threadDelay)
-import Pyrelude hiding
-  ( ThreadRunning,
-    ThreadStatus,
-    atomically,
-    bool,
-    bracket,
-    newMVar,
-    newTVarIO,
-    parent,
-    readTVarIO,
-    threadDelay,
-    threadStatus,
-    withMVar,
-  )
-import Pyrelude.IO (hPutStrLn, putStrLn)
+import PyrethrumExtras.IO (hPutStrLn, putStrLn)
 import UnliftIO
   ( Exception (displayException),
     bracket,

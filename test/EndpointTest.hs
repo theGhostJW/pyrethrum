@@ -6,7 +6,7 @@ module EndpointTest where
 import           LogListCheck
 import           Runner                 as R
 import           Pyrelude
-import           Pyrelude.IO
+import           PyrethrumExtras.IO
 import           DSL.Interpreter
 import           Common
 import           DSL.Logger

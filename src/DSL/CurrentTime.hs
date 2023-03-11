@@ -1,8 +1,8 @@
 
 module DSL.CurrentTime where
 
-import           Pyrelude as P
-import qualified Pyrelude.IO as PIO
+import           PyrethrumExtras as P
+import qualified PyrethrumExtras.IO as PIO
 import Polysemy
 
 data CurrentTime m a where

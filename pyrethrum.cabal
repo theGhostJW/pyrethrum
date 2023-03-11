@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 97e3102224aa0f26bb17ad5bc6a0f9ac546e621a52647a743217bf84cde85702
+-- hash: b57eb5e7454a53ce3345f99364dbb96e2d39d040e1982157662cc4bb3a503118
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -118,7 +118,6 @@ library
       MultiWayIf
       NamedFieldPuns
       NoFieldSelectors
-      NoImplicitPrelude
       NumericUnderscores
       OverloadedStrings
       OverloadedRecordDot
@@ -143,7 +142,6 @@ library
   build-depends:
       aeson
     , base
-    , base-noprelude
     , bytestring
     , containers
     , deepseq
@@ -170,7 +168,8 @@ library
     , yaml
   mixins:
       base hiding (Prelude)
-    , relude (Relude as Prelude , PyrethrumExtras, Data.Text)
+    , relude hiding (Relude.Lifted.Concurrent)
+    , relude (Relude as Prelude, Data.Text)
   default-language: Haskell2010
 
 test-suite pyrethrum-test
@@ -233,7 +232,6 @@ test-suite pyrethrum-test
       MultiWayIf
       NamedFieldPuns
       NoFieldSelectors
-      NoImplicitPrelude
       NumericUnderscores
       OverloadedStrings
       OverloadedRecordDot
@@ -258,7 +256,6 @@ test-suite pyrethrum-test
   build-depends:
       aeson
     , base
-    , base-noprelude
     , bytestring
     , containers
     , dlist
@@ -282,5 +279,6 @@ test-suite pyrethrum-test
     , yaml
   mixins:
       base hiding (Prelude)
-    , relude (Relude as Prelude , PyrethrumExtras, Data.Text)
+    , relude hiding (Relude.Lifted.Concurrent)
+    , relude (Relude as Prelude, Data.Text)
   default-language: Haskell2010

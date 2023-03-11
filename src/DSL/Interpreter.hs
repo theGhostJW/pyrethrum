@@ -28,16 +28,6 @@ import DSL.CurrentTimeDocLogger ( currentTimeDocInterpreter )
 import DSL.LogProtocol
     ( LogIndex(LogIndex), LogProtocolBase, ThreadInfo )
 import Data.DList as D ( DList )
-import Pyrelude as P
-    ( ($),
-      Show,
-      Applicative(pure),
-      IO,
-      Either(Left),
-      Text,
-      Category((.), id),
-      handle, (&) )
-
 
 type Failure e = Error (FrameworkError e)
 type MinEffs e effs = Members '[Logger e, Failure e, CurrentTime] effs

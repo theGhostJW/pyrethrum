@@ -1,7 +1,4 @@
 module AuxFilesTest where
-
-import Pyrelude
-import Pyrelude.Test
 import AuxFiles
 
 unit_a_file_prefix_generated_at_a_later_date_will_be_smaller =

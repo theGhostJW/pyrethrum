@@ -3,7 +3,6 @@ module ItemFilter where
 import Common
 import qualified Data.Set as S
 import GHC.Records (HasField (getField))
-import Pyrelude
 import RunElementClasses
 import qualified Prelude as P
 import Check (Checks, un)

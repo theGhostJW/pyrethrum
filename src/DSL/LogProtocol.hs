@@ -4,7 +4,6 @@ import Check
 import Common (DetailedInfo, FrameworkError, HookType)
 import Data.Aeson as A
 import Data.Aeson.TH
-import Pyrelude
 import RunElementClasses
 
 newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)

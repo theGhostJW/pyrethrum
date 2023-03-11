@@ -1,8 +1,7 @@
 module LogTransformationIntegrationTest where 
 
 import           Pyrelude as E
-import           Pyrelude.IO
-import Pyrelude.Test      as T
+import           PyrethrumExtras.IO
 import AuxFiles
 import LogTransformation.Common
 

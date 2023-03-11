@@ -3,7 +3,7 @@ module DSL.CurrentTimeDocLogger where
 
 import qualified Data.Aeson as A
 import           Pyrelude as P
-import           Pyrelude.IO as PIO
+import           PyrethrumExtras.IO as PIO
 import Polysemy
 import DSL.CurrentTime as CT
 import DSL.Logger

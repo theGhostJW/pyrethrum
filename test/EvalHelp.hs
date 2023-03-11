@@ -2,7 +2,6 @@ module EvalHelp (
   view,
   FixedEffs
 ) where
-import Pyrelude
 import Text.Show.Pretty
 import DSL.FileSystem
 import DSL.ArbitraryIO

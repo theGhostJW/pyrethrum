@@ -2,8 +2,7 @@ module LogTransformation where
 
 import LogTransformation.Common
 import LogTransformation.Stats
-import Pyrelude as P
-import Pyrelude.IO as PIO
+import PyrethrumExtras.IO as PIO
 import Data.DList as D
 import AuxFiles
 import DSL.LogProtocol as LP

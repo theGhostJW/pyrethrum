@@ -1,6 +1,5 @@
 module LogTransformation.Stats where
 
-import Pyrelude as P hiding (phase)
 import qualified Data.Map.Strict as M
 import RunElementClasses as RC
 import DSL.LogProtocol

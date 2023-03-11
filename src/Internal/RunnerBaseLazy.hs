@@ -6,7 +6,6 @@ import Common (FilterErrorType, FrameworkError)
 import Data.Aeson
 import Polysemy
 import Polysemy.Error
-import Pyrelude
 import RunElementClasses (Address (..))
 
 newtype TestSuite hd effs t = TestSuite

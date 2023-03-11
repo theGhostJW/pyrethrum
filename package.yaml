@@ -20,7 +20,6 @@ extra-source-files:
 description: Please see the README on GitHub at <https://github.com/githubuser/simple-hpack#readme>
 
 dependencies:
-  - base-noprelude
   - pyrethrum-extras
   - containers
   - extra
@@ -41,7 +40,7 @@ dependencies:
       - hiding (Prelude)
   - name: relude
     mixin:
-      - (Relude as Prelude , PyrethrumExtras, Data.Text)
+      - (Relude as Prelude, Data.Text) 
 
 ghc-options:
   # - -threaded
@@ -112,7 +111,6 @@ default-extensions:
   - MultiWayIf
   - NamedFieldPuns
   - NoFieldSelectors
-  - NoImplicitPrelude
   - NumericUnderscores
   - OverloadedStrings
   - OverloadedRecordDot

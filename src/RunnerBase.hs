@@ -23,38 +23,6 @@ import GHC.Records (HasField, getField)
 import Internal.RunnerBaseLazy as RBL
 import Polysemy
 import Polysemy.Error
-import Pyrelude
-  ( Applicative ((<*>)),
-    Bool (..),
-    Category ((.)),
-    Either,
-    Eq (..),
-    Int,
-    ListLike (null, length),
-    Maybe (..),
-    Monad ((>>=)),
-    Ord (..),
-    Ordering (..),
-    Show (show),
-    Text,
-    error,
-    fromJust,
-    fromMaybe,
-    isNothing,
-    not,
-    otherwise,
-    pure,
-    toList,
-    toS,
-    undefined,
-    uu,
-    ($),
-    (&&),
-    (<$>),
-    (<>),
-    (?),
-    (||),
-  )
 import RunElementClasses (Address, AddressElemType, AddressedElm (..), Config, TestFilterResult (TestFilterResult), push, rootAddress)
 import qualified RunElementClasses as RC
 

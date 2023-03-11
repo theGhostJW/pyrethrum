@@ -32,22 +32,7 @@ import qualified Internal.RunTimeLogging as L
 import qualified Internal.RunTimeLogging as L.L
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
-import Pyrelude as P hiding
-  ( ThreadRunning,
-    ThreadStatus,
-    atomically,
-    bracket,
-    fail,
-    finally,
-    newMVar,
-    newTVarIO,
-    parent,
-    pi,
-    readTVarIO,
-    threadStatus,
-    withMVar,
-  )
-import Pyrelude.IO (hPutStrLn, putStrLn)
+import PyrethrumExtras.IO (hPutStrLn, putStrLn)
 import Text.Show.Pretty (pPrint)
 import UnliftIO
   ( Exception (displayException),

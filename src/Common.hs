@@ -4,33 +4,6 @@ import Data.Aeson.TH (defaultOptions, deriveJSON)
 import qualified Data.DList as D
 import OrphanedInstances ()
 import Polysemy.Output as O (Output)
-import Pyrelude as P
-  ( Category (id, (.)),
-    Eq (..),
-    Functor,
-    IOError,
-    IOException,
-    Int,
-    ListLike (all, init, last),
-    Maybe (Just),
-    Semigroup ((<>)),
-    Show,
-    Text,
-    breakEnd,
-    debug'_,
-    fromMaybe,
-    fst,
-    lines,
-    maybe,
-    not,
-    replicateText,
-    toS,
-    txt,
-    unlines,
-    ($),
-    (<$>),
-    (?),
-  )
 
 data HookType
   = BeforeAll

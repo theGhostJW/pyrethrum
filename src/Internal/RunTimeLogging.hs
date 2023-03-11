@@ -3,42 +3,11 @@ module Internal.RunTimeLogging where
 import Control.Monad.State ( Monad((>>=), (>>)) )
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import GHC.Show (show)
-import Pyrelude
-  ( Applicative (pure),
-    Bool(..),
-    Enum (succ),
-    Eq,
-    Exception (displayException),
-    IO,
-    IORef,
-    Int,
-    Maybe (..),
-    Num ((+)),
-    Ord,
-    Semigroup ((<>)),
-    Show,
-    SomeException,
-    Text,
-    ThreadId,
-    coerce,
-    const,
-    maybe,
-    modifyIORef,
-    print,
-    readIORef,
-    txt,
-    unpack,
-    uu,
-    writeIORef,
-    ($),
-    (.),
-    (<$>), not, enumList,
-  )
 import Text.Show.Pretty (pPrint)
 import UnliftIO (TChan, TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
-import UnliftIO.Concurrent (myThreadId)
-import Prelude (String, lines)
+import UnliftIO.Concurrent (myThreadId) 
 import Data.Set
+import Prelude hiding (atomically)
 
 data Loc
   = Root

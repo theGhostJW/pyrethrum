@@ -25,7 +25,6 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import GHC.Records
 import Language.Haskell.TH.Syntax
-import Pyrelude as P hiding (toList)
 
 data AddressElemType = Hook | Group | Test deriving (Show, Eq)
 

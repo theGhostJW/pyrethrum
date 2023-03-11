@@ -23,7 +23,6 @@ import DSL.LogProtocol as LP
       ItemId(ItemId),
       DStateJSON(DStateJSON),
       ApStateJSON(ApStateJSON), GroupTitle, unGroupTitle, RunTitle, unRunTitle )
-import Pyrelude as P
 import RunnerBase as RB
 import RunElementClasses as REC
     ( TestFilterResult, TestLogInfo(..), testConfig, rootAddress, render )

@@ -1,6 +1,5 @@
 module TempUtils where
 
-import Pyrelude
 import Debug.Trace
 
 -- functions that will be moved to pyrelude

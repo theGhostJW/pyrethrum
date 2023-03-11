@@ -3,7 +3,6 @@ module Internal.PreNode where
 import Control.DeepSeq (NFData)
 import Internal.RunTimeLogging (Loc, ApLogger)
 import Language.Haskell.TH (ExpQ)
-import Pyrelude (Bool (False, True), Either, Eq, Generic, IO, Int, ListLike (all, any, filter, null), Maybe, Ord, Show, SomeException, TVar, Text, not, ($), (&&))
 import UnliftIO (MonadUnliftIO, STM, TMVar)
 
 type PreNodeRoot = PreNode () () () ()

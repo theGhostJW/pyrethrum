@@ -36,6 +36,12 @@ dependencies:
   - unliftio
   - polysemy-plugin
   - relude
+  - name: base
+    mixin:
+      - hiding (Prelude)
+  - name: relude
+    mixin:
+      - (Relude as Prelude , PyrethrumExtras, Data.Text)
 
 ghc-options:
   # - -threaded
@@ -158,12 +164,6 @@ library:
     - template-haskell
     - bytestring
     - fmt
-    - name: &common-mixin base
-      mixin:
-        - hiding (Prelude)
-    - name: relude
-      mixin:
-        - (Relude as Prelude , PyrethrumExtras, Data.Text)
 
 #  reinstate when LHS can live load multiple modules
 # use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
@@ -182,6 +182,5 @@ tests:
       - tasty-discover
       - hedgehog
       - bytestring
-      - name: *common-mixin
 
 build-tools: tasty-discover:tasty-discover

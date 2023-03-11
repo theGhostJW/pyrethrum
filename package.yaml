@@ -34,6 +34,11 @@ dependencies:
   - polysemy
   - unliftio
   - polysemy-plugin
+  # since removing pyrelude
+  - chronos
+  - time # need for timezone which is missing from chronos
+  - path # - version set in extra deps - until can roll forward
+  - path-io # -
   - relude
   - name: base
     mixin:

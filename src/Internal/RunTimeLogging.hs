@@ -5,9 +5,10 @@ import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import GHC.Show (show)
 import Text.Show.Pretty (pPrint)
 import UnliftIO (TChan, TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
-import UnliftIO.Concurrent (myThreadId) 
+import UnliftIO.Concurrent (myThreadId, ThreadId) 
 import Data.Set
 import Prelude hiding (atomically)
+import PyrethrumExtras
 
 data Loc
   = Root

@@ -1,38 +1,41 @@
 module AuxFiles where
   
-import PyrethrumExtras.IO ( now, subDirFromBaseDir, putStrLn, writeFile)
-import qualified Prelude as P
+import PyrethrumExtras.IO as PIO ( subDirFromBaseDir) 
 import qualified System.IO as S
 import qualified Data.Char as C
+import Path.Extended
+import System.IO.Error as E
+import Chronos as C
+
 
 data WantConsole = Console | NoConsole deriving Eq
 
-auxBase :: IO AbsDir -> IO (Either P.IOError AbsDir)
+auxBase :: IO AbsDir -> IO (IOError AbsDir)
 auxBase projRoot = subDirFromBaseDir projRoot [reldir|auxFiles|]
 
-subPath :: IO (Either P.IOError AbsDir) -> Path Rel a -> IO (Either P.IOError (Path Abs a))
+subPath :: IO (IOError AbsDir) -> Path Rel a -> IO (Either IOError (Path Abs a))
 subPath prent chld = ((</> chld) <$>) <$> prent
 
-auxDir :: IO AbsDir -> RelDir -> IO (Either P.IOError AbsDir)
+auxDir :: IO AbsDir -> RelDir -> IO (Either IOError AbsDir)
 auxDir projRoot = subPath (auxBase projRoot)
 
 -- local temp not OS
-tempDirBase :: IO AbsDir -> IO (Either P.IOError AbsDir)
+tempDirBase :: IO AbsDir -> IO (Either IOError AbsDir)
 tempDirBase projRoot = auxDir projRoot [reldir|temp|]
 
-logDirBase :: IO AbsDir -> IO (Either P.IOError AbsDir)
+logDirBase :: IO AbsDir -> IO (Either IOError AbsDir)
 logDirBase projRoot = auxDir projRoot [reldir|logs|]
 
-dataDirBase :: IO AbsDir -> IO (Either P.IOError AbsDir)
+dataDirBase :: IO AbsDir -> IO (Either IOError AbsDir)
 dataDirBase projRoot = auxDir projRoot [reldir|data|]
 
-tempFileBase :: IO AbsDir -> RelFile -> IO (Either P.IOError AbsFile)
+tempFileBase :: IO AbsDir -> RelFile -> IO (Either IOError AbsFile)
 tempFileBase projRoot = subPath (tempDirBase projRoot)
 
-logFile :: IO AbsDir -> RelFile -> IO (Either P.IOError AbsFile)
+logFile :: IO AbsDir -> RelFile -> IO (Either IOError AbsFile)
 logFile projRoot = subPath (logDirBase projRoot)
 
-dataFile :: IO AbsDir -> RelFile -> IO (Either P.IOError AbsFile)
+dataFile :: IO AbsDir -> RelFile -> IO (Either IOError AbsFile)
 dataFile projRoot = subPath (dataDirBase projRoot)
 
 dumpTxt :: IO AbsDir -> Text -> RelFile -> IO ()
@@ -40,7 +43,7 @@ dumpTxt projRoot txt' file = do
                       ePth <- tempFileBase projRoot file
                       ePth & either
                         throw
-                        (\p -> writeFile (toFilePath p) txt')
+                        (\p -> PIO.writeFile (toFilePath p) txt')
 
 _tempFile = tempFileBase (parent <$> (parseAbsFile =<< getExecutablePath)) [relfile|demoTemp.txt|]
 
@@ -53,7 +56,7 @@ logFileExt = FileExt ".log"
 base36 :: Integer -> Int -> Text
 base36 num minWidth =
   let 
-    conv :: Int -> P.String -> P.String
+    conv :: Int -> String -> String
     conv n s = C.chr (n + 48 + ((n-9) `div` (-27) * (-7))) : s
 
     units :: Integer -> [Int]
@@ -61,13 +64,13 @@ base36 num minWidth =
       | n < (36 :: Integer) = [fromIntegral n] 
       | otherwise = units (n `div` (36 :: Integer)) <> [fromIntegral n `P.rem` 36]
 
-    unpadded :: P.String
+    unpadded :: String
     unpadded = foldr conv [] $ units num
 
     len :: Int
     len = length unpadded
 
-    prefix :: P.String
+    prefix :: String
     prefix = fromIntegral len < minWidth ? replicate (minWidth - len) '0' $ []
   in
     toS $ prefix <> foldr conv [] (units num)
@@ -83,7 +86,7 @@ logFilePrefix currentTime =
         base36 msLeftInYear 7 <> "_" <> toS (encode_YmdHMS SubsecondPrecisionAuto (DatetimeFormat (Just '_') (Just '_') (Just '-')) (timeToDatetime  currentTime))
  
 
-logFilePath :: IO AbsDir -> Maybe Text -> Text -> FileExt -> IO (Either P.IOError (Text, AbsFile))
+logFilePath :: IO AbsDir -> Maybe Text -> Text -> FileExt -> IO (Either IOError (Text, AbsFile))
 logFilePath projRoot mNamePrefix suffix fileExt = 
   do
     pfx <- mNamePrefix & maybe
@@ -95,9 +98,9 @@ logFilePath projRoot mNamePrefix suffix fileExt =
       (\relFle -> ((pfx,) <$>) <$> logFile projRoot relFle)
 
 -- toDo  - move to extended
-safeOpenFile :: AbsFile -> S.IOMode -> IO (Either P.IOError S.Handle)
+safeOpenFile :: AbsFile -> S.IOMode -> IO (Either IOError S.Handle)
 safeOpenFile pth mode = 
-  catchIOError (Right <$> S.openFile (toFilePath pth) mode) (pure . Left)
+  IOError (Right <$> S.openFile (toFilePath pth) mode) (pure . Left)
 
 data HandleInfo = HandleInfo {
   prefix :: Text,
@@ -105,7 +108,7 @@ data HandleInfo = HandleInfo {
   fileHandle :: S.Handle
 }
 
-logFileHandle :: IO AbsDir -> Text -> FileExt -> IO (Either P.IOError HandleInfo)
+logFileHandle :: IO AbsDir -> Text -> FileExt -> IO (Either IOError HandleInfo)
 logFileHandle projRoot fileNameSuffix fileExt = 
                                         logFilePath projRoot Nothing fileNameSuffix fileExt >>=
                                          either 

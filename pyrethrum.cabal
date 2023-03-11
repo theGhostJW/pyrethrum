@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b57eb5e7454a53ce3345f99364dbb96e2d39d040e1982157662cc4bb3a503118
+-- hash: 8a40792f7a2b02cb7e2a7e76373497869d37c65e978e5fcd19139190e0467c8f
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -143,6 +143,7 @@ library
       aeson
     , base
     , bytestring
+    , chronos
     , containers
     , deepseq
     , dlist
@@ -150,6 +151,8 @@ library
     , fmt
     , hedgehog
     , mtl
+    , path
+    , path-io
     , polysemy
     , polysemy-plugin
     , pretty-show
@@ -162,13 +165,13 @@ library
     , tasty-hunit
     , template-haskell
     , text
+    , time
     , transformers-either
     , unliftio
     , unordered-containers
     , yaml
   mixins:
       base hiding (Prelude)
-    , relude hiding (Relude.Lifted.Concurrent)
     , relude (Relude as Prelude, Data.Text)
   default-language: Haskell2010
 
@@ -257,11 +260,14 @@ test-suite pyrethrum-test
       aeson
     , base
     , bytestring
+    , chronos
     , containers
     , dlist
     , extra
     , hedgehog
     , mtl
+    , path
+    , path-io
     , polysemy
     , polysemy-plugin
     , pretty-show
@@ -274,11 +280,11 @@ test-suite pyrethrum-test
     , tasty-hedgehog
     , tasty-hunit
     , text
+    , time
     , transformers-either
     , unliftio
     , yaml
   mixins:
       base hiding (Prelude)
-    , relude hiding (Relude.Lifted.Concurrent)
     , relude (Relude as Prelude, Data.Text)
   default-language: Haskell2010

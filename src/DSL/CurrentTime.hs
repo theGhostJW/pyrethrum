@@ -4,6 +4,9 @@ module DSL.CurrentTime where
 import           PyrethrumExtras as P
 import qualified PyrethrumExtras.IO as PIO
 import Polysemy
+import Chronos as C
+import Data.Time (getCurrentTimeZone, TimeZone(..), utc)
+
 
 data CurrentTime m a where
   Now :: CurrentTime m Time
@@ -14,9 +17,9 @@ makeSem ''CurrentTime
 
 currentTimeIOInterpreter :: Member (Embed IO) effs => Sem (CurrentTime ': effs) a -> Sem effs a
 currentTimeIOInterpreter = interpret $ embed . \case 
-                                                  Now -> PIO.now
-                                                  GetTimeZone -> PIO.getCurrentTimeZone
-                                                  UtcOffset -> timeZoneMinutes <$> PIO.getCurrentTimeZone
+                                                  Now -> C.now
+                                                  GetTimeZone -> getCurrentTimeZone
+                                                  UtcOffset -> timeZoneMinutes <$> getCurrentTimeZone
 
 
 constTimeInterpreter :: forall effs a. Time -> TimeZone -> Sem (CurrentTime ': effs) a -> Sem effs a

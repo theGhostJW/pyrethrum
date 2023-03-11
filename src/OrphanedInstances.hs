@@ -6,13 +6,14 @@ module OrphanedInstances where
 import           Data.Yaml
 import           Data.Aeson.Types
 import Data.Aeson.TH
-import qualified Prelude as P
+import Control.Exception
+import System.IO.Error
 
 $(deriveJSON defaultOptions ''IOErrorType)
 $(deriveJSON defaultOptions ''UnicodeException)
 
 instance ToJSON IOException where 
-  toJSON IOError {..} =  object [
+  toJSON  System.IO.Error.IOError {..} =  object [
     "ioe_type" .= ioe_type,
     "ioe_location"  .= ioe_location,  
     "ioe_description"  .= ioe_description,  

@@ -12,6 +12,7 @@ import Path.Extended
 import Prelude hiding (head, putStrLn)
 import List.Extra as LE
 import PyrethrumExtras
+import UnliftIO.IO (hClose)
 
 showAndLogItems :: Show a => IO AbsDir -> [a] -> IO ()
 showAndLogItems projRoot = showAndLogList projRoot "items"

@@ -12,6 +12,8 @@ import DSL.LogProtocol
 import DSL.CurrentTime
 import DSL.Interpreter
 import Polysemy
+import Prelude hiding (State, Reader)
+import Control.Concurrent.Extra
 
 view :: Show a => a -> IO ()
 view = pPrint

@@ -29,12 +29,15 @@ import LogTransformation.Common as LC
 import LogTransformation.Stats
 import PrettyPrintCommon
 import RunElementClasses
-import Data.Aeson.KeyMap hiding (null, filter)
+import Data.Aeson.KeyMap hiding (foldl', null, filter)
 import qualified LogTransformation.Stats as Results
 import PyrethrumExtras hiding (firstJust)
 import Data.Text (toTitle)
-import List.Extra hiding (lookup)
-import Prelude hiding (unlines)
+import List.Extra
+    ( filter, sum, foldl', null, sortBy, (\\), sort, snoc, firstJusts )
+import Prelude hiding (sum, unlines)
+import Text.Extra ( toLower, toTitle, unlines ) 
+import qualified Text.Extra as TE
 
 -- TODO: creation relational records
 -- relational records from Iteration records and use reporting service
@@ -253,7 +256,7 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo = si} lpo@Lo
       getNotes :: Y.Value -> Maybe Text
       getNotes =
         \case
-          Y.Object obj -> firstJust [lookup "notes" obj, lookup "note" obj] >>= txtOf
+          Y.Object obj -> firstJusts [lookup "notes" obj, lookup "note" obj] >>= txtOf
           Y.Array _ -> Nothing
           Y.String _ -> Nothing
           Y.Number _ -> Nothing
@@ -500,7 +503,7 @@ prettyPrintDisplayElement pde =
                         hder <> ": "
                           <> toLower
                             ( txt result
-                                <> ( P.null extrInfo
+                                <> ( TE.null extrInfo
                                        ? " - no additional info "
                                        $ newLn <> indentText 2 extrInfo
                                    )
@@ -508,10 +511,10 @@ prettyPrintDisplayElement pde =
 
                       vdStep :: ([Text], Bool) -> CheckReport -> ([Text], Bool)
                       vdStep (rsltLines, separatorNeeded) ckRpt@(CheckReport _result (DetailedInfo _hder extrInfo)) =
-                        ( P.snoc rsltLines $ (separatorNeeded ? newLn $ "") <> detailValLine ckRpt,
-                          not $ P.null extrInfo
+                        ( snoc rsltLines $ (separatorNeeded ? newLn $ "") <> detailValLine ckRpt,
+                          not $ TE.null extrInfo
                         )
-                   in P.unlines . fst $ P.foldl' vdStep ([], False) validation
+                   in unlines . fst $ foldl' vdStep ([], False) validation
 
                 dsText :: Text
                 dsText =
@@ -542,12 +545,12 @@ prettyPrintDisplayElement pde =
                   <> newLn
                   <> "validation:"
                   <> newLn
-                  <> (P.null validation ? "  - Test Design Error - This test has no checks\n" $ alignKeyValues True 2 LeftJustify (valLine <$> validation))
+                  <> (null validation ? "  - Test Design Error - This test has no checks\n" $ alignKeyValues True 2 LeftJustify (valLine <$> validation))
                   <> newLn
                   <> "domain state:"
                   <> newLn
                   <> dsText
-                  <> ( P.null validation
+                  <> ( null validation
                          ? newLn
                          $ newLn
                            <> "validation details:"

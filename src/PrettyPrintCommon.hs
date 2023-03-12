@@ -1,12 +1,14 @@
 module PrettyPrintCommon where
 
-import           Prelude as P
+import           Prelude as P hiding (length, replicate)
 import           Data.Yaml.Pretty as YP
 import           Data.Yaml as Y
 import DSL.LogProtocol
 import RunElementClasses
 import Common
 import Data.Aeson as A
+import PyrethrumExtras
+import Text.Extra as T (singleton, replicate, length, stripPrefix, breakOn, replaceFirst) 
 
 newLn :: Text
 newLn = "\n"
@@ -36,25 +38,25 @@ logInfoAddress = error "not implemented"
 headerLine ::  Bool -> Int -> Bool -> Char -> Text -> Text
 headerLine isOutline len wantPrcntChar padChr hdrTxt =
   let
-    padTxt = P.singleton padChr
-    txtLen = length hdrTxt + 2
+    padTxt = singleton padChr
+    txtLen = T.length hdrTxt + 2
     sfxLen = ceiling $ fromIntegral (len - txtLen) / 2
     pfxLen = txtLen + sfxLen * 2 > len ? pred sfxLen $ sfxLen
-    pfxBase = replicateText pfxLen padTxt
+    pfxBase = replicate pfxLen padTxt
     pfx = wantPrcntChar
                 ? replaceFirst (padTxt <> padTxt) "#%" pfxBase
                 $ replaceFirst padTxt "#" pfxBase
   in
-    pfx <> " " <> hdrTxt <> " " <> replicateText sfxLen padTxt
+    pfx <> " " <> hdrTxt <> " " <> replicate sfxLen padTxt
 
 fullHeader :: Bool -> Char -> Bool -> Text -> Text
 fullHeader isOutline padChr wantPrcntChar hdrTxt =
   let
     headerCharWidth :: Int
-    headerCharWidth = max 80 $ length hdrTxt + 4
+    headerCharWidth = max 80 $ T.length hdrTxt + 4
 
     line :: Text
-    line = "#" <> replicateText (headerCharWidth - 1) (P.singleton padChr) <> newLn
+    line = "#" <> replicate (headerCharWidth - 1) (singleton padChr) <> newLn
   in
     isOutline ?
       hdrTxt $
@@ -85,7 +87,7 @@ prettyYamlKeyValues indentation justification val =
 alignKeyValues :: Bool -> Int -> Justification -> [(Text, Text)] -> Text
 alignKeyValues wantColon indentation justification kvs =
   let
-    spaces = flip replicateText " "
+    spaces = flip replicate " "
     trimmedKvs = bimap strip strip <$> kvs
     (maxLKey, maxLVal) = foldl' (\(kl, vl) -> bimap (max kl . length) (max vl . length)) (0, 0) trimmedKvs
     paddedKvs = (\(k, v) -> (

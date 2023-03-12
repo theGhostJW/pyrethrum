@@ -16,6 +16,9 @@ import Data.Yaml as Y
 import OrphanedInstances ()
 import RunElementClasses as RC
 import RunnerBase
+import GHC.IO.Exception
+import PyrethrumExtras
+import Extra (mapLeft)
 
 newtype LineNo = LineNo {unLineNo :: Int} deriving (Show, Eq)
 
@@ -357,7 +360,7 @@ testSource = do
     Cons x xs -> do
       put $ D.fromList xs
       pure $ Just x
-    _ -> P.error "DList pattern match error this should never happen"
+    _ -> error "DList pattern match error this should never happen"
 
 testSink :: [o] -> WriterState i o ()
 -- testSink = tell . P.fromList

@@ -82,6 +82,10 @@ import UnliftIO.STM
     writeTQueue,
     writeTVar,
   )
+import Prelude hiding (newEmptyTMVarIO, newTVarIO, atomically)
+import PyrethrumExtras hiding (finally)
+import BasePrelude (retry)
+import UnliftIO.Concurrent
 
 data Status
   = Pending

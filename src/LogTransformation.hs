@@ -8,11 +8,14 @@ import AuxFiles
 import DSL.LogProtocol as LP
 import DSL.LogProtocol.PrettyPrint
 import Data.ByteString.Char8 as B hiding (putStrLn)
-import System.IO as S hiding (putStrLn)
+import System.IO as S hiding (hIsEOF, putStrLn)
 import Control.Monad.Writer.Strict
 import Control.Monad.State.Strict
 import PrettyPrintCommon as PC
 import LogTransformation.PrintLogDisplayElement
+import Path.Extended
+import PyrethrumExtras
+import Prelude hiding (putStrLn)
 
 -- TODO: update to use streaming library such as streamly
 

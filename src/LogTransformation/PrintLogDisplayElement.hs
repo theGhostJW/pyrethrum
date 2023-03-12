@@ -29,8 +29,12 @@ import LogTransformation.Common as LC
 import LogTransformation.Stats
 import PrettyPrintCommon
 import RunElementClasses
-import Data.Aeson.KeyMap
+import Data.Aeson.KeyMap hiding (null, filter)
 import qualified LogTransformation.Stats as Results
+import PyrethrumExtras hiding (firstJust)
+import Data.Text (toTitle)
+import List.Extra hiding (lookup)
+import Prelude hiding (unlines)
 
 -- TODO: creation relational records
 -- relational records from Iteration records and use reporting service
@@ -306,9 +310,9 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo = si} lpo@Lo
                         title = ttle,
                         notes = getNotes jsonItmVal,
                         outcome = M.findWithDefault (IterationOutcome LC.Fail OutOfIteration) iid iterationResults,
-                        validation = P.empty,
-                        otherErrors = P.empty,
-                        otherWarnings = P.empty,
+                        validation = [],
+                        otherErrors = [],
+                        otherWarnings = [],
                         item = Just jsonItmVal,
                         apState = Nothing,
                         domainState = Nothing
@@ -403,7 +407,7 @@ prettyPrintDisplayElement pde =
               "  No Filter Log Available"
               ( \fltrs ->
                   let fltrItems :: (Maybe Text -> Bool) -> [TestFilterResult]
-                      fltrItems f = P.filter (f . (.reasonForRejection)) fltrs
+                      fltrItems f = filter (f . (.reasonForRejection)) fltrs
 
                       acceptedItems :: [TestFilterResult]
                       acceptedItems = fltrItems isNothing
@@ -422,15 +426,15 @@ prettyPrintDisplayElement pde =
 
                       accepted :: Text
                       accepted =
-                        P.null acceptedItems
+                        null acceptedItems
                           ? "  No Tests Accepted"
-                          $ indent2 . P.unlines . P.sort $ ("- " <>) . address <$> acceptedItems
+                          $ indent2 . unlines . sort $ ("- " <>) . address <$> acceptedItems
 
                       rejected :: Text
                       rejected =
-                        P.null rejectedItems
+                        null rejectedItems
                           ? "  No Tests Rejected"
-                          $ indent2 . P.unlines . P.sort $ ("- " <>) . rejectText <$> rejectedItems
+                          $ indent2 . unlines . sort $ ("- " <>) . rejectText <$> rejectedItems
                    in "accepted: "
                         <> newLn
                         <> accepted
@@ -473,7 +477,7 @@ prettyPrintDisplayElement pde =
                         ]
                    in notes & maybe 
                         baseLines
-                        (\n -> P.snoc baseLines ("notes:", n))
+                        (\n -> snoc baseLines ("notes:", n))
 
                 keyOrdering :: Text -> Text -> Ordering
                 keyOrdering k1 k2 =

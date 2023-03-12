@@ -23,6 +23,7 @@ import RunElementClasses as C
   )
 import qualified RunElementClasses as R
 import RunnerBase as RB (ItemRunner, Test (Test))
+import PyrethrumExtras
 
 mkId :: forall tc i. (HasId i, Config tc) => Address -> tc -> i -> ItemId
 mkId md tc i = ItemId (push (getField @"title" tc) R.Test md) (getField @"id" i)
@@ -107,7 +108,7 @@ documentItem rc md hi (Test tc _items interactor _parse) i =
           $ DetailedInfo ((.header) (chk :: CK.Check ds) <> " - " <> txt (chk.expectation)) ""
 
       logChecks :: Sem effs ()
-      logChecks = P.sequence_ $ lgChk <$> i.checks.un
+      logChecks = mapM_ lgChk (i.checks.un)
    in do
         logItem StartInteraction
         interactor rc hi i

@@ -5,6 +5,8 @@ import RunElementClasses as RC
 import DSL.LogProtocol
 import LogTransformation.Common
 import Data.Aeson.TH
+import PyrethrumExtras
+import List.Extra
 
 
 data StatsAccum = StatsAccum {

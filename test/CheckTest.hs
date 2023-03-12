@@ -3,18 +3,15 @@ module CheckTest where
 import           Check               as Chk
 import           Data.Function
 import           Data.DList as D
-import           Pyrelude as F
-import qualified Prelude             as P
-import qualified Pyrelude.Test       as UT
-import  Pyrelude.Test  ((...))
+import qualified PyrethrumExtras.Test       as UT
 
 isBig = chk "More than 10" (> 10)
-isEven = chk "Even" P.even
-isOdd = chk "Odd" P.odd
+isEven = chk "Even" even
+isOdd = chk "Odd" odd
 
 isOddGate = gate $ chk' "Odd Test"
                    (\v -> "The value was: " <> txt v <> " and is expected to be odd")
-                   P.odd
+                   odd
 
 _demo = (.result) <$> calcChecks 42 (isOddGate <> isBig <> isEven)
 
@@ -27,8 +24,8 @@ unit_chk_outcomes_fail_and_success2 = chkOutcomes [Pass, Pass, Fail] 42 $ isBig 
 unit_chk_outcomes_gateFail_and_skip_and_success2 = chkOutcomes [Pass, GateFail, Skip] 42 (isBig <> isOddGate <> isEven)
 
 unit_chk_outcomes_inlined_gate = chkOutcomes [Pass, GateFail, Skip] 42 $ chk "More than 10" (> 10)  <>
-                                                                    gate (chk "Odd" P.odd) <>
-                                                                    chk "Even" P.even
+                                                                    gate (chk "Odd" odd) <>
+                                                                    chk "Even" even
 
 unit_chk_with_with_gate_fail = chkOutcomes [Pass, Pass, GateFail, Skip] 42 $ isBig
                                                                            <> isEven

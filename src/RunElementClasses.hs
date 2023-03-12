@@ -99,7 +99,7 @@ toStrElm :: AddressedElm a -> AddressTxtElm a
 toStrElm AddressedElm {address, element} = AddressTxtElm (render address) element
 
 addressTitle :: AddressedElm a -> Text
-addressTitle (AddressedElm (Address add) _) = P.headDef "" $ getField @"title" <$> add
+addressTitle (AddressedElm (Address add) _) = headDef "" $ getField @"title" <$> add
 
 
 instance Eq (AddressedElm a) where

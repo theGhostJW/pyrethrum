@@ -9,7 +9,9 @@ import OrphanedInstances()
 import qualified System.IO as SIO
 import qualified Data.Map.Strict as M
 import Path.Extended
-import Prelude hiding (putStrLn)
+import Prelude hiding (head, putStrLn)
+import List.Extra as LE
+import PyrethrumExtras
 
 showAndLogItems :: Show a => IO AbsDir -> [a] -> IO ()
 showAndLogItems projRoot = showAndLogList projRoot "items"
@@ -27,7 +29,7 @@ showAndLogList projRoot logSuffix items =
                     maybe
                       (Left $ C.Error "showAndLogList - no Handle returned")
                       (Right . snd)
-                    . head
+                    . LE.head
                   )
                 <$> logFileHandles projRoot logSpec
 

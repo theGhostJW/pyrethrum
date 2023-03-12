@@ -5,19 +5,19 @@ module Text.Extra (
 
 --  shims for relude to ultimately be included in a revived pyrelude
 
-import PyrethrumExtras
 import qualified Data.Text as T 
 import Prelude hiding (last, init)
+import PyrethrumExtras ( (?) )
 
 -- other :: default - writefile is not text based
 -- import Data.Text.IO (writeFile, putStrLn)
 
-
-safeM :: (Monoid t, Eq t) => (t -> a) -> t -> Maybe a
-safeM unsafeFunc t = t == mempty ? Nothing $ Just (unsafeFunc t) 
-                                                                
+safet :: (Text -> b) -> Text -> Maybe b
+safet unsafef t = 
+  T.null t ? Nothing $ Just $ unsafef t
+                                                            
 last:: Text -> Maybe Char
-last = safeM T.last  
+last = safet T.last  
 
 init :: Text -> Maybe Text
-init = safeM T.init
+init = safet T.init

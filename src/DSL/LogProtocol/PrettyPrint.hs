@@ -29,6 +29,9 @@ import RunElementClasses as REC
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y ( Value )
 import Chronos (Time)
+import PyrethrumExtras
+import Data.Text (singleton, null)
+import Prelude hiding (null)
 
 data LogStyle = Run | Doc | Outline deriving Eq
 

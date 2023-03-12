@@ -8,6 +8,8 @@ import AuxFiles
 import OrphanedInstances()
 import qualified System.IO as SIO
 import qualified Data.Map.Strict as M
+import Path.Extended
+import Prelude hiding (putStrLn)
 
 showAndLogItems :: Show a => IO AbsDir -> [a] -> IO ()
 showAndLogItems projRoot = showAndLogList projRoot "items"

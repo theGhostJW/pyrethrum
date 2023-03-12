@@ -15,6 +15,7 @@ import Polysemy.Output as O
 import Polysemy.Reader
 import Polysemy.State
 import Chronos
+import PyrethrumExtras
 
 
 data Logger e m a where

@@ -9,6 +9,8 @@ import           DSL.Logger
 import           DSL.LogProtocol
 import Polysemy
 import Polysemy.Error as PE
+import Path
+import PyrethrumExtras
 
 {- File System Lang -}
 

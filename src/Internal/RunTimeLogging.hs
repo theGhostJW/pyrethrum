@@ -7,7 +7,8 @@ import Text.Show.Pretty (pPrint)
 import UnliftIO (TChan, TQueue, atomically, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
 import UnliftIO.Concurrent (myThreadId, ThreadId) 
 import Data.Set
-import Prelude hiding (atomically)
+import Prelude hiding (atomically, lines)
+import qualified BasePrelude as P
 import PyrethrumExtras
 
 data Loc
@@ -102,7 +103,7 @@ endIsTerminal = \case
   FixtureOnceHook -> False
 
 exceptionTxt :: SomeException -> PException
-exceptionTxt e = PException $ txt <$> lines (displayException e)
+exceptionTxt e = PException $ txt <$> P.lines (displayException e)
 
 mkFailure :: Loc -> ExeEventType -> Text -> SomeException -> Int -> SThreadId -> ExeEvent
 mkFailure l et t e = Failure t (exceptionTxt e) et l

@@ -4,6 +4,13 @@ import Data.Aeson.TH (defaultOptions, deriveJSON)
 import qualified Data.DList as D
 import OrphanedInstances ()
 import Polysemy.Output as O (Output)
+import PyrethrumExtras
+import List.Extra as LE (breakEnd, last, init)
+import Text.Extra as TE (init)
+import qualified Text.Extra as TE
+import Data.Text hiding (unlines)
+import Prelude hiding (all, replicate, lines)
+import Control.Exception.Extra (IOException)
 
 data HookType
   = BeforeAll
@@ -15,14 +22,14 @@ data HookType
 indentText :: Int -> Text -> Text
 indentText i s =
   let linesClean :: [Text]
-      linesClean = fst . P.breakEnd (not . all (' ' ==)) $ lines s
+      linesClean = fst . breakEnd (not . all (' ' ==)) $ lines s
 
       unlined :: Text
-      unlined = unlines $ (\s' -> s == "" ? "" $ toS $ replicateText i " " <> s') <$> linesClean
+      unlined = unlines $ (\s' -> s == "" ? "" $ toS $ replicate i " " <> s') <$> linesClean
    in toS $
-        last unlined /= Just '\n'
-          ? unlined
-          $ fromMaybe "" (init unlined)
+        TE.last unlined == Just '\n'
+          ? fromMaybe "" (TE.init unlined)
+          $ unlined
 
 data DetailedInfo = DetailedInfo
   { message :: Text,
@@ -47,7 +54,7 @@ $(deriveJSON defaultOptions ''FileSystemErrorType)
 data FrameworkError e
   = Error Text
   | Error' DetailedInfo
-  | FileSystemError FileSystemErrorType P.IOError
+  | FileSystemError FileSystemErrorType IOException
   | EnsureError Text
   | FilterError FilterErrorType
   | NotImplementedError Text

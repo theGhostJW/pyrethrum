@@ -11,7 +11,7 @@ import Data.Aeson.Encoding (quarter)
 import Data.Aeson.TH
 import Data.Aeson.Types
 import qualified Data.IntMap.Merge.Lazy as ST
-import Data.List.Extra (lookup, notElem, snoc)
+import AltPrelude (lookup, notElem, snoc)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as ST
 import qualified Data.Text as Txt

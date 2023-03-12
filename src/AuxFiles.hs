@@ -1,19 +1,25 @@
 module AuxFiles where
-  
-import PyrethrumExtras.IO as PIO ( subDirFromBaseDir) 
+
+import PyrethrumExtras.IO as PIO ( subDirFromBaseDir)
 import qualified System.IO as S
 import qualified Data.Char as C
 import Path.Extended
-import System.IO.Error as E
 import Chronos as C
+import BasePrelude as P (IOErrorType, IOError, userError, getExecutablePath)
+import Control.Exception (throw)
+import PyrethrumExtras
+import Data.Text.IO (writeFile, putStrLn)
+import Prelude hiding (writeFile, putStrLn)
+
+
 
 
 data WantConsole = Console | NoConsole deriving Eq
 
-auxBase :: IO AbsDir -> IO (IOError AbsDir)
+auxBase :: IO AbsDir -> IO (Either IOError AbsDir)
 auxBase projRoot = subDirFromBaseDir projRoot [reldir|auxFiles|]
 
-subPath :: IO (IOError AbsDir) -> Path Rel a -> IO (Either IOError (Path Abs a))
+subPath :: IO (Either IOError AbsDir) -> Path Rel a -> IO (Either IOError (Path Abs a))
 subPath prent chld = ((</> chld) <$>) <$> prent
 
 auxDir :: IO AbsDir -> RelDir -> IO (Either IOError AbsDir)
@@ -39,11 +45,11 @@ dataFile :: IO AbsDir -> RelFile -> IO (Either IOError AbsFile)
 dataFile projRoot = subPath (dataDirBase projRoot)
 
 dumpTxt :: IO AbsDir -> Text -> RelFile -> IO ()
-dumpTxt projRoot txt' file = do 
+dumpTxt projRoot txt' file = do
                       ePth <- tempFileBase projRoot file
                       ePth & either
                         throw
-                        (\p -> PIO.writeFile (toFilePath p) txt')
+                        (\p -> writeFile (toFilePath p) txt')
 
 _tempFile = tempFileBase (parent <$> (parseAbsFile =<< getExecutablePath)) [relfile|demoTemp.txt|]
 
@@ -55,14 +61,14 @@ logFileExt = FileExt ".log"
 -- based on https://gist.github.com/jdeseno/9501557
 base36 :: Integer -> Int -> Text
 base36 num minWidth =
-  let 
+  let
     conv :: Int -> String -> String
     conv n s = C.chr (n + 48 + ((n-9) `div` (-27) * (-7))) : s
 
     units :: Integer -> [Int]
-    units n 
-      | n < (36 :: Integer) = [fromIntegral n] 
-      | otherwise = units (n `div` (36 :: Integer)) <> [fromIntegral n `P.rem` 36]
+    units n
+      | n < (36 :: Integer) = [fromIntegral n]
+      | otherwise = units (n `div` (36 :: Integer)) <> [fromIntegral n `rem` 36]
 
     unpadded :: String
     unpadded = foldr conv [] $ units num
@@ -81,26 +87,26 @@ logFilePrefix currentTime =
         nextYear =  (getYear . dateYear . datetimeDate . timeToDatetime $ currentTime) + 1
         nyd = timeFromYmdhms nextYear 1 1 0 0 0
         msLeftInYear :: Integer
-        msLeftInYear = fromIntegral (getTimespan . width $ nyd .... currentTime) `div` 1000000
-      in 
+        msLeftInYear = fromIntegral (getTimespan . width $ nyd ... currentTime) `div` 1000000
+      in
         base36 msLeftInYear 7 <> "_" <> toS (encode_YmdHMS SubsecondPrecisionAuto (DatetimeFormat (Just '_') (Just '_') (Just '-')) (timeToDatetime  currentTime))
- 
+
 
 logFilePath :: IO AbsDir -> Maybe Text -> Text -> FileExt -> IO (Either IOError (Text, AbsFile))
-logFilePath projRoot mNamePrefix suffix fileExt = 
+logFilePath projRoot mNamePrefix suffix fileExt =
   do
     pfx <- mNamePrefix & maybe
               (logFilePrefix <$> now)
               pure
     relPath <- parseRelFileSafe $ pfx <> "_" <> suffix <> fileExt.unFileExt
     relPath & either
-      (pure . Left . P.userError . toS . show)
-      (\relFle -> ((pfx,) <$>) <$> logFile projRoot relFle)
+      (pure . Left . userError . toS . show)
+      (fmap ((pfx,) <$>) . logFile projRoot)
 
 -- toDo  - move to extended
 safeOpenFile :: AbsFile -> S.IOMode -> IO (Either IOError S.Handle)
-safeOpenFile pth mode = 
-  IOError (Right <$> S.openFile (toFilePath pth) mode) (pure . Left)
+safeOpenFile pth mode =
+  catchIOError (Right <$> S.openFile (toFilePath pth) mode) (pure . Left)
 
 data HandleInfo = HandleInfo {
   prefix :: Text,
@@ -109,9 +115,9 @@ data HandleInfo = HandleInfo {
 }
 
 logFileHandle :: IO AbsDir -> Text -> FileExt -> IO (Either IOError HandleInfo)
-logFileHandle projRoot fileNameSuffix fileExt = 
+logFileHandle projRoot fileNameSuffix fileExt =
                                         logFilePath projRoot Nothing fileNameSuffix fileExt >>=
-                                         either 
+                                         either
                                            (pure . Left)
                                            (\(pfx, pth) -> (HandleInfo pfx pth <$>) <$> safeOpenFile pth S.WriteMode)
 
@@ -124,20 +130,20 @@ listToText :: Show a => [a] -> Text
 listToText lst = unlines $ txt <$> lst
 
 toTempBase' :: IO AbsDir -> WantConsole -> Text -> RelFile -> IO ()
-toTempBase' projRoot wantConsole txt' fileName = 
-  do 
+toTempBase' projRoot wantConsole txt' fileName =
+  do
     ethQPth <- tempFileBase projRoot fileName
     ethQPth & either
       (\e -> putStrLn $ "failed to generate path: " <> txt e)
       (\adsPath ->
-        do 
-          let 
-            destPath = toFilePath adsPath 
-          when (wantConsole == Console) 
+        do
+          let
+            destPath = toFilePath adsPath
+          when (wantConsole == Console)
             (putStrLn $ "temp file written to: " <> toS destPath)
           writeFile destPath txt'
       )
- 
+
 
 toTemp' :: IO AbsDir -> Text -> RelFile -> IO ()
 toTemp' projRoot = toTempBase' projRoot Console

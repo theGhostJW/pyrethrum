@@ -7,13 +7,16 @@ import           Data.Yaml
 import           Data.Aeson.Types
 import Data.Aeson.TH
 import Control.Exception
-import System.IO.Error
+import BasePrelude as P (IOErrorType, read, IOException(IOError, ioe_handle, ioe_filename, ioe_errno,
+                  ioe_description, ioe_location, ioe_type),
+      IOErrorType)
+
 
 $(deriveJSON defaultOptions ''IOErrorType)
 $(deriveJSON defaultOptions ''UnicodeException)
 
 instance ToJSON IOException where 
-  toJSON  System.IO.Error.IOError {..} =  object [
+  toJSON IOError {..} =  object [
     "ioe_type" .= ioe_type,
     "ioe_location"  .= ioe_location,  
     "ioe_description"  .= ioe_description,  

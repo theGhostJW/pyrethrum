@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8a40792f7a2b02cb7e2a7e76373497869d37c65e978e5fcd19139190e0467c8f
+-- hash: 20be61e030d2f1b83e2e6230ce97924e8aeac8ce0d3f198a5c045fe2e149fadb
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -48,6 +48,7 @@ library
       Internal.SuiteRuntimeOld
       ItemFilter
       ItemRunners
+      List.Extra
       LogTransformation
       LogTransformation.Common
       LogTransformation.PrintLogDisplayElement
@@ -63,6 +64,7 @@ library
       TempUtils
       TestFilter
       TestFilters
+      Text.Extra
       ArbitraryIOTest
       AuxFilesTest
       CheckTest
@@ -142,6 +144,7 @@ library
   build-depends:
       aeson
     , base
+    , base-prelude
     , bytestring
     , chronos
     , containers
@@ -259,6 +262,7 @@ test-suite pyrethrum-test
   build-depends:
       aeson
     , base
+    , base-prelude
     , bytestring
     , chronos
     , containers

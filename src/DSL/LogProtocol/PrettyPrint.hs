@@ -28,6 +28,7 @@ import RunElementClasses as REC
     ( TestFilterResult, TestLogInfo(..), testConfig, rootAddress, render )
 import Check (ResultExpectation(..) , ExpectationActive(..), CheckReport(..), GateStatus(..), classifyResult)
 import Data.Yaml as Y ( Value )
+import Chronos (Time)
 
 data LogStyle = Run | Doc | Outline deriving Eq
 

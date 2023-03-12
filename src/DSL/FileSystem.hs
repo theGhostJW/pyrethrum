@@ -2,7 +2,7 @@ module DSL.FileSystem where
 
 import qualified Data.Aeson as A
 import Common
-import           Pyrelude as P
+import           Prelude as P
 import           PyrethrumExtras.IO as PO
 import           Control.Exception as E
 import           DSL.Logger

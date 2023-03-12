@@ -5,7 +5,7 @@ import  DSL.LogProtocol as LP
 import  DSL.CurrentTime as CT
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList as D
-import           Pyrelude as P
+import           Prelude as P hiding (get, modify, ask, State, runReader, Reader)
 import           PyrethrumExtras.IO as PIO hiding (now)
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
@@ -14,6 +14,7 @@ import Polysemy
 import Polysemy.Output as O
 import Polysemy.Reader
 import Polysemy.State
+import Chronos
 
 
 data Logger e m a where

@@ -5,6 +5,9 @@ import Common (DetailedInfo, FrameworkError, HookType)
 import Data.Aeson as A
 import Data.Aeson.TH
 import RunElementClasses
+import Chronos
+import Data.Time (TimeZone)
+
 
 newtype RunTitle = RunTitle {unRunTitle :: Text} deriving (Eq, Show, IsString)
 $(deriveJSON defaultOptions ''RunTitle)

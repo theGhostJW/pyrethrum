@@ -1,6 +1,6 @@
 module PrettyPrintCommon where
 
-import           Pyrelude as P
+import           Prelude as P
 import           Data.Yaml.Pretty as YP
 import           Data.Yaml as Y
 import DSL.LogProtocol

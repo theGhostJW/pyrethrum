@@ -4,7 +4,6 @@ import qualified Data.Aeson as A
 import Common
 import DSL.LogProtocol
 import DSL.Logger
-import           Pyrelude
 import           Control.Exception as E
 import Polysemy
 import Polysemy.Error as PE

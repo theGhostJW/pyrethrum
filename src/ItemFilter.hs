@@ -4,8 +4,11 @@ import Common
 import qualified Data.Set as S
 import GHC.Records (HasField (getField))
 import RunElementClasses
-import qualified Prelude as P
+import Prelude as P hiding (last, All, Last)
 import Check (Checks, un)
+import GHC.Show
+import PyrethrumExtras
+import List.Extra
 
 data ItemFilter a
   = ID Int
@@ -14,7 +17,8 @@ data ItemFilter a
   | LastWithCheck -- return the last item with non-mempty checks
   | Pred (a -> Bool)
 
-instance P.Show (ItemFilter a) where
+instance Show (ItemFilter a) where
+  show :: ItemFilter a -> String
   show (ID i) = "ID " <> P.show i
   show All = "All"
   show Last = "Last"
@@ -26,10 +30,10 @@ filterredItemIds filtr items =
   let getId = getField @"id"
       filterredItems :: Either FilterErrorType [Int]
       filterredItems =
-        let pass = Right . pure
+        let pass' = Right . pure
             fail' = Left . InvalidItemFilter
-            hasChecks i = not $ nullFoldable i.checks.un
-            lastWithChecks = findFoldable hasChecks $ reverse items
+            hasChecks i = not $ null i.checks.un
+            lastWithChecks = find hasChecks $ reverse items
             listOrFail lst msg =
               null lst
                 ? Left (InvalidItemFilter msg)
@@ -38,8 +42,8 @@ filterredItemIds filtr items =
               <$> case filtr of
                 ID targetId -> listOrFail (filter (\i -> targetId == getId i) items) $ "id: " <> txt targetId <> " not in item list"
                 All -> listOrFail items "Items list is empty"
-                Last -> maybe (fail' "Items list is empty") pass (last items)
-                LastWithCheck -> maybe (fail' "There is no item in the list with checks assigned") pass lastWithChecks
+                Last -> maybe (fail' "Items list is empty") pass' (last items)
+                LastWithCheck -> maybe (fail' "There is no item in the list with checks assigned") pass' lastWithChecks
                 Pred func -> listOrFail (filter func items) "No test items match filter function"
 
       checkIds :: Either FilterErrorType ()

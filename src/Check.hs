@@ -25,8 +25,12 @@ import Common (DetailedInfo (DetailedInfo))
 import Data.Aeson.TH
 import Data.Aeson.Types as AT hiding (Error)
 import Data.DList as D
+import Prelude as P
 import Data.Function
 import qualified Data.List as L
+import PyrethrumExtras
+import Data.Text
+import GHC.Show (Show(..))
 
 {-
 Remove defect expectation and create a new type and module 
@@ -176,7 +180,7 @@ data CheckReport = CheckReport
   }
   deriving (Show, Eq)
 
-instance P.Show (Check v) where
+instance Show (Check v) where
   show ck@Check {..} =
     toS $
       gateStatus == GateCheck && (expectation == ExpectPass)
@@ -187,7 +191,7 @@ instance ToJSON (Check v) where
   toJSON = String . toS . (.header)
 
 reverseDList :: DList a -> DList a
-reverseDList = D.fromList . reverse . D.toList
+reverseDList = D.fromList . P.reverse . D.toList
 
 isGateFail :: CheckResult -> Bool
 isGateFail = \case

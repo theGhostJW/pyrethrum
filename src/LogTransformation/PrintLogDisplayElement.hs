@@ -34,7 +34,7 @@ import qualified LogTransformation.Stats as Results
 import PyrethrumExtras hiding (firstJust)
 import Data.Text (toTitle)
 import List.Extra
-    ( filter, sum, foldl', null, sortBy, (\\), sort, snoc, firstJusts )
+    ( filter, sum, foldl', null, sortBy, (\\), sort, snoc )
 import Prelude hiding (sum, unlines)
 import Text.Extra ( toLower, toTitle, unlines ) 
 import qualified Text.Extra as TE
@@ -256,7 +256,7 @@ printLogDisplay runResults lineNo oldAccum@IterationAccum {stepInfo = si} lpo@Lo
       getNotes :: Y.Value -> Maybe Text
       getNotes =
         \case
-          Y.Object obj -> firstJusts [lookup "notes" obj, lookup "note" obj] >>= txtOf
+          Y.Object obj -> asum [lookup "notes" obj, lookup "note" obj] >>= txtOf
           Y.Array _ -> Nothing
           Y.String _ -> Nothing
           Y.Number _ -> Nothing

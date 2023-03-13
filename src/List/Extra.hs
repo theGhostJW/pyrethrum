@@ -3,14 +3,14 @@ module List.Extra (
   List.Extra.last,
   List.Extra.init,
   List.Extra.maximum,
-  firstJusts
+  List.Extra.head
 ) where 
 
 --  shims for relude to ultimately be included in a revived pyrelude
 
 import Data.List.Extra as L hiding (unlines, lines)
 import Prelude hiding (last)
-import Data.List.Extra hiding (last, init, maximum) 
+import Data.List.Extra hiding (last, init, maximum, head) 
 import qualified Data.List.Extra as DE
 
 -- need to hide in p(relude) too - lines / unlines
@@ -33,5 +33,6 @@ init = safel L.init
 maximum :: Ord a => [a] -> Maybe a
 maximum = safel L.maximum
 
-firstJusts :: [Maybe a] -> Maybe a
-firstJusts = DE.firstJust id
+-- firstJusts :: [Maybe a] -> Maybe a
+-- firstJusts = DE.firstJust id
+-- depricated in favour of asum

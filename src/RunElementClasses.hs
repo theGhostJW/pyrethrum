@@ -25,7 +25,8 @@ import Data.Aeson.TH
 import Data.Aeson.Types
 import GHC.Records
 import Language.Haskell.TH.Syntax
-import Text.Extra
+import Text.Extra as T hiding (reverse)
+import List.Extra as L  (reverse, head)
 import Prelude hiding (reverse, intercalate)
 
 data AddressElemType = Hook | Group | Test deriving (Show, Eq)
@@ -101,7 +102,7 @@ toStrElm :: AddressedElm a -> AddressTxtElm a
 toStrElm AddressedElm {address, element} = AddressTxtElm (render address) element
 
 addressTitle :: AddressedElm a -> Text
-addressTitle (AddressedElm (Address add) _) = headDef "" $ getField @"title" <$> add
+addressTitle (AddressedElm (Address add) _) = fromMaybe "". L.head $ (.title) <$> add
 
 
 instance Eq (AddressedElm a) where

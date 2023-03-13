@@ -8,13 +8,18 @@ import           DSL.Logger
 import           DSL.CurrentTime
 import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
-import           Pyrelude as P hiding (app)
+import           Prelude as P hiding (putStrLn, State, Reader, app)
 import           PyrethrumExtras.IO as PIO
 import           FileLogging
 import qualified System.IO as S
 import AuxFiles as A
 import Data.Aeson (ToJSON(..))
 import Data.Map as M hiding (mapMaybe)
+import Path.Extended
+import Chronos
+import PyrethrumExtras
+import UnliftIO ()
+import PyrethrumExtras
 
 jsonItemLogExt = ".jsoni" :: Text
 
@@ -72,7 +77,7 @@ ioRunToFile projRoot wantConsole docMode interpreter app =
               logger :: Members '[Embed IO, Reader ThreadInfo, State LogIndex, CurrentTime] effs => Sem (Logger e ': effs) a -> Sem effs a
               logger = logToHandles loggerHandles
 
-            runResult <- interpreter logger app `P.finally` closeHandles
+            runResult <- interpreter logger app `finally` closeHandles
 
             either
               (\e -> print ("Error Encountered \n" <> show e) $> Left e)

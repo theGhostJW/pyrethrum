@@ -10,7 +10,7 @@ import RunElementClasses (Address (unAddress), Config, TestFilterResult (..), Te
 import qualified RunElementClasses as C
 import RunnerBase (AddressedElm (..))
 import RunnerBase as RB
-import qualified Prelude as PRL
+import Prelude
 
 acceptFilter :: TestFilterResult -> Bool
 acceptFilter = isNothing . (.reasonForRejection)

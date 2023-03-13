@@ -5,7 +5,6 @@ module EndpointTest where
 -- import           DemoProject.TestCaseList
 import           LogListCheck
 import           Runner                 as R
-import           Pyrelude
 import           PyrethrumExtras.IO
 import           DSL.Interpreter
 import           Common

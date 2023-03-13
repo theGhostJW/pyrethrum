@@ -81,7 +81,7 @@ import qualified TestFilter as F
     applyFilters,
     filterLog,
   )
-import qualified Prelude as PRL
+import PyrethrumExtras
 
 getId :: HasField "id" i Int => i -> Int
 getId = getField @"id"
@@ -120,7 +120,7 @@ runTestItems iIds items rc add hd itemRunner test@Test {config = tc} =
       inTargIds i = maybe True (S.member $ getId i) iIds
    in case filteredItems of
         [] -> []
-        xs -> [startTest >> sequence_ (applyRunner <$> xs) >> endTest]
+        xs -> [startTest >> mapM_ applyRunner xs >> endTest]
 
 runTest ::
   forall i rc hd as ds tc e effs.

@@ -8,7 +8,7 @@ import           DSL.Logger
 import           DSL.CurrentTime
 import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint
-import           Prelude as P hiding (putStrLn, State, Reader, app)
+import           Prelude as P hiding (putStrLn, State, Reader)
 import           PyrethrumExtras.IO as PIO
 import           FileLogging
 import qualified System.IO as S

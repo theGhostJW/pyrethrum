@@ -4,6 +4,7 @@ import           PyrethrumExtras.IO as PIO
 import AuxFiles
 import Data.Aeson.TH
 import PrettyPrintCommon
+import PyrethrumExtras.Test ((...))
 
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Example Config %%%%%%%%%%%%%%%%%%%%%%%%

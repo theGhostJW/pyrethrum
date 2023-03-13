@@ -17,6 +17,9 @@ import DSL.Logger
 import MemberReflection (showEffs)
 
 import EvalHelp
+import PyrethrumExtras.Test hiding (filter)
+import Data.Either.Extra (fromRight')
+import PyrethrumExtras
 
 
 -- $ > view allTossCalls
@@ -113,7 +116,7 @@ testFilterSummary rc fltrs s =
       frslts ::  [TestFilterResult]
       frslts = filterResults fltrs rc
 
-   in P.filter matchStatus $ showIt <$> frslts
+   in filter matchStatus $ showIt <$> frslts
 
 showIt :: TestFilterResult -> ShowFilter
 showIt r = (r.testInfo.title, r.reasonForRejection)

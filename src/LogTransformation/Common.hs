@@ -18,7 +18,8 @@ import RunElementClasses as RC
 import RunnerBase
 import GHC.IO.Exception
 import PyrethrumExtras
-import Extra (mapLeft)
+import Data.Either.Extra (mapLeft)
+
 
 newtype LineNo = LineNo {unLineNo :: Int} deriving (Show, Eq)
 

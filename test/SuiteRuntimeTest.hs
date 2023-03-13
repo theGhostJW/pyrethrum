@@ -11,7 +11,6 @@ import Data.Aeson.Encoding (quarter)
 import Data.Aeson.TH
 import Data.Aeson.Types
 import qualified Data.IntMap.Merge.Lazy as ST
-import AltPrelude (lookup, notElem, snoc)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as ST
 import qualified Data.Text as Txt
@@ -37,7 +36,7 @@ import Internal.RunTimeLogging as L
   )
 import Internal.SuiteRuntime
 import qualified Internal.SuiteRuntime as S
-import qualified Pyrelude.Test as T
+import qualified PyrethrumExtras.Test as T
 import TempUtils (debugLines)
 import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
 import UnliftIO.Concurrent as C
@@ -48,7 +47,10 @@ import UnliftIO.Concurrent as C
     threadDelay,
   )
 import UnliftIO.STM
-import Prelude (Ord, String, putStrLn, read)
+import Prelude as P hiding (newTVarIO, atomically, head, last)
+import GHC.Show (Show(..))
+import PyrethrumExtras
+import List.Extra (head, last, nub)  
 
 data DocFunc a = DocFunc
   { doc :: Text,
@@ -174,12 +176,14 @@ childToParentMap =
              in (cl, accm')
         )
 
+
+errorS = error . toS
+
 lookupThrow :: (Ord k, Show k, Show v) => Text -> M.Map k v -> k -> v
 lookupThrow msg m k =
   (m M.!? k)
-    & maybe
-      (error $ toS msg <> "\n" <> ppShow k <> " not found in " <> ppShow m)
-      id
+    & fromMaybe
+      (errorS $ toS msg <> "\n" <> ppShow k <> " not found in " <> ppShow m)
 
 getTag :: Loc -> Text
 getTag = \case
@@ -237,7 +241,7 @@ chkFixturesContainTests root tevts =
                                     $ M.insert eiTag ST.empty fxTstMap
                                 )
                                 ( \fxTag ->
-                                    error $
+                                    errorS $
                                       "overlapping fixtures in same thread. Starting fixture with loc: "
                                         <> ppShow eiLoc
                                         <> " while fixture with tag is still running"
@@ -246,11 +250,11 @@ chkFixturesContainTests root tevts =
                           IsEnd ->
                             mFxTag
                               & maybe
-                                (error $ "fixture end found when no fixture is open - fixture end with loc: " <> ppShow eiLoc)
+                                (errorS $ "fixture end found when no fixture is open - fixture end with loc: " <> ppShow eiLoc)
                                 ( \startTag' ->
                                     (startTag' == eiTag)
                                       ? (Nothing, fxTstMap)
-                                      $ error
+                                      $ errorS $
                                         ( "fixture start and end tags don't match for start tag: "
                                             <> toS startTag'
                                             <> "and end tag: "
@@ -264,11 +268,11 @@ chkFixturesContainTests root tevts =
                       L.Test ->
                         mFxTag
                           & maybe
-                            (error "test encountered when fuixture not open")
+                            (errorS "test encountered when fuixture not open")
                             ( \fxtag ->
                                 (mFxTag, M.insert fxtag (ST.insert eiTag (fxTstMap M.! fxtag)) fxTstMap)
                             )
-                      _ -> error "this event should have been filtered out"
+                      _ -> errorS "this event should have been filtered out"
                   )
           )
           (Nothing, M.empty)
@@ -320,11 +324,11 @@ actualChildParentMap evs tid =
                                     ( \oet ->
                                         openParents
                                           & \case
-                                            [] -> error $ "event does not have parent:\n" <> ppShow ev
+                                            [] -> errorS $ "event does not have parent:\n" <> ppShow ev
                                             p@(pet, ploc) : ps ->
                                               (oet == pet)
                                                 ? ps
-                                                $ error
+                                                $ errorS $
                                                   ( "child event type does not match parent:\nchild loc is:\n "
                                                       <> ppShow endLoc
                                                       <> "\nparent loc is\n"
@@ -333,20 +337,20 @@ actualChildParentMap evs tid =
                                     )
                            in openEvents
                                 & \case
-                                  [] -> error $ "event ended without start:\n" <> ppShow e
+                                  [] -> errorS $ "event ended without start:\n" <> ppShow e
                                   (evtt, evLoc) : oevs ->
                                     (endLoc == evLoc)
                                       ? ( nxtOpenParents,
                                           oevs,
                                           mp
                                         )
-                                      $ error
+                                      $ errorS
                                         ( "end event out of order - end event was\n"
                                             <> ppShow e
                                             <> "\nbut start event loc was:\n"
                                             <> ppShow evLoc
                                         )
-                      e' -> error $ "this event should be a Start or End threadStartEnds hasn't worked: " <> show e'
+                      e' -> errorS $ "this event should be a Start or End threadStartEnds hasn't worked: " <> P.show e'
                   )
           )
           ([], [], M.empty)
@@ -462,7 +466,7 @@ mkPrenode maxThreads =
         prps <- atomically $ do
           plst <- readTVar propsLst
           case plst of
-            [] -> error "test config or test utils wrong - more calls to tHook or tRelease function than configured"
+            [] -> errorS "test config or test utils wrong - more calls to tHook or tRelease function than configured"
             x : xs -> writeTVar propsLst xs >> pure x
         ioAction lggr prps
    in \case
@@ -553,7 +557,7 @@ chkEqfmt' e a msg = chkEq' msg e a
 chkEq' :: (Eq a, Show a) => Text -> a -> a -> IO ()
 chkEq' msg e a =
   when (e /= a) $
-    error $
+    errorS $
       "\n"
         <> toS msg
         <> "\n"
@@ -570,8 +574,8 @@ chkThreadLogsInOrder evts =
     eachThread
       ( \l ->
           let ck = chkEq' "first index of thread should be 0" 0 . (.idx)
-              ev = unsafeHead l
-           in ck ev
+              ev = head l
+           in fromMaybe (errorS "threadlist empty") ck
       )
     eachThread chkIds
   where
@@ -599,14 +603,14 @@ chkStartEndExecution :: [ExeEvent] -> IO ()
 chkStartEndExecution evts =
   se
     & maybe
-      (error "no events")
+      (errorS "no events")
       ( \(s, e) -> do
           case s of
             StartExecution {} -> pure ()
-            _ -> error "first event is not StartExecution"
+            _ -> errorS "first event is not StartExecution"
           case e of
             EndExecution {} -> pure ()
-            _ -> error "last event is not EndExecution"
+            _ -> errorS "last event is not EndExecution"
       )
   where
     se = do
@@ -652,12 +656,12 @@ partialLoc = \case
   ApLog {} -> boom "ApLog"
   EndExecution {} -> boom "EndExecution"
   where
-    boom msg = error $ "BOOM - partialLoc called on: " <> msg <> " which does not have a loc property"
+    boom msg = errorS $ "BOOM - partialLoc called on: " <> msg <> " which does not have a loc property"
 
 startTag :: ExeEvent -> Text
 startTag =
   ( \case
-      Root -> error "BOOM - Root loc passed to startTag"
+      Root -> errorS "BOOM - Root loc passed to startTag"
       Node {tag} -> tag
   )
     . partialLoc
@@ -666,10 +670,10 @@ chkTestEvtsConsecutive :: [ExeEvent] -> IO ()
 chkTestEvtsConsecutive evs =
   let tsmevts = read . toS . Txt.takeWhileEnd (/= ':') . startTag <$> filter (isStart L.Test) evs
       chkidxless :: Int -> Int -> IO Int
-      chkidxless i1 i2 = i1 >= i2 ? error "test index out of order" $ pure i2
+      chkidxless i1 i2 = i1 >= i2 ? errorS "test index out of order" $ pure i2
    in null tsmevts
         ? pure ()
-        $ foldM_ chkidxless (-1) tsmevts
+        $ M.foldM_ chkidxless (-1) tsmevts
 
 chkLeafEventsStartEnd :: ExeEventType -> [[ExeEvent]] -> IO ()
 chkLeafEventsStartEnd targetEventType =
@@ -680,10 +684,10 @@ chkLeafEventsStartEnd targetEventType =
       foldl' chkEvent Nothing evts'
         & maybe
           (pure ())
-          (\fx -> error $ targStr <> " started not ended in same thread\n" <> ppShow fx)
+          (\fx -> errorS $ targStr <> " started not ended in same thread\n" <> ppShow fx)
       chkTestEvtsConsecutive evts'
 
-    targStr = show targetEventType
+    targStr = P.show targetEventType
     matchesTarg = (targetEventType ==)
 
     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
@@ -723,7 +727,7 @@ chkLeafEventsStartEnd targetEventType =
 
         chkInEventStartEnd :: Bool -> Loc -> Loc -> ExeEventType -> Maybe Loc
         chkInEventStartEnd isStart' activeFxLoc evtLoc evt' =
-          let sevt = show evt'
+          let sevt = P.show evt'
            in if
                   | matchesTarg evt' ->
                       ( isStart'
@@ -736,8 +740,8 @@ chkLeafEventsStartEnd targetEventType =
                   | isFixtureChild evt' -> Just activeFxLoc
                   | otherwise -> failIn sevt
 
-        fail msg = error $ msg <> "\n" <> ppShow evt
-        strTrg = show targetEventType
+        fail msg = errorS $ msg <> "\n" <> ppShow evt
+        strTrg = P.show targetEventType
         failIn s = fail $ s <> " must only occur outside a " <> strTrg <> " in same thread"
 
 onceEventTypes :: [ExeEventType]
@@ -763,7 +767,7 @@ chkFixtureChildren =
       foldl' chkEvent Nothing evts'
         & maybe
           (pure ())
-          (\fx -> error $ "Fixture started not ended in same thread\n" <> ppShow fx)
+          (\fx -> errorS $ "Fixture started not ended in same thread\n" <> ppShow fx)
 
     chkEvent :: Maybe Loc -> ExeEvent -> Maybe Loc
     chkEvent mActiveFixLoc evt =
@@ -791,11 +795,11 @@ chkFixtureChildren =
                 EndExecution {} -> failIn "EndExecution"
           )
       where
-        fail msg = error $ msg <> "\n" <> ppShow evt
-        failOut et = fail $ show et <> " must occur within start / end of fixture in same thread"
+        fail msg = errorS $ msg <> "\n" <> ppShow evt
+        failOut et = fail $ P.show et <> " must occur within start / end of fixture in same thread"
 
         failIn :: Show a => a -> Maybe Loc
-        failIn et = fail $ show et <> " must only occur outside a fixture in same thread"
+        failIn et = fail $ P.show et <> " must only occur outside a fixture in same thread"
 
         chkOutOfFixtureStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
         chkOutOfFixtureStartEnd isStart' evtLoc et =
@@ -913,7 +917,7 @@ chkStartEndIntegrity =
     chkStart :: M.Map Loc (ST.Set Loc) -> ExeEvent -> M.Map Loc (ST.Set Loc)
     chkStart m e =
       M.member eLoc m
-        ? error ("Duplicate start events in same thread\n " <> ppShow e)
+        ? errorS ("Duplicate start events in same thread\n " <> ppShow e)
         $ M.insert eLoc ST.empty (ST.insert eLoc <$> m)
       where
         eLoc = partialLoc e
@@ -922,11 +926,11 @@ chkStartEndIntegrity =
     chkEnd m e =
       M.lookup eLoc m
         & maybe
-          (error $ "Event end where event not started in same thread\n " <> ppShow e)
+          (errorS $ "Event end where event not started in same thread\n " <> ppShow e)
           ( \s ->
               ST.null s
                 & P.bool
-                  ( error $
+                  ( errorS $
                       "Event ended before child events finished\n Event: \n"
                         <> ppShow e
                         <> "\nOpen child locs\n"
@@ -987,7 +991,7 @@ chkHkReleased evs hkType relType =
   -}
   ST.null openHooks
     ? pure ()
-    $ error ("Hooks executed without release: " <> ppShow openHooks)
+    $ errorS ("Hooks executed without release: " <> ppShow openHooks)
   where
     openHooks = foldl' step ST.empty evs
 
@@ -1000,14 +1004,14 @@ chkHkReleased evs hkType relType =
                 if
                     | eventType == hkType ->
                         ST.member loc openHks
-                          ? error ("the same hook is openned twice" <> ppShow loc)
+                          ? errorS ("the same hook is openned twice" <> ppShow loc)
                           $ ST.insert loc openHks
                     | eventType == relType ->
                         let -- hook releases are always parented by hook
                             parent' = loc.parent
                          in ST.member parent' openHks
                               ? ST.delete parent' openHks
-                              $ error ("hook is released that has not been run" <> ppShow loc)
+                              $ errorS ("hook is released that has not been run" <> ppShow loc)
                     | otherwise -> openHks
               End {eventType, loc} -> openHks
               Failure {} -> openHks
@@ -1045,7 +1049,7 @@ chkErrorPropagation evts =
           failsAllThreads = fails Nothing
           -- get the parent or if it is a grouping event
           -- get it's paraent Grouping events (Groups and Fixtures)
-          --  are effectively ignored in the error propagation as they
+          --  are effectively ignored in the errorS propagation as they
           -- themsleves neither pass or fail
           truParent :: Loc -> Loc
           truParent parentLoc =
@@ -1065,8 +1069,8 @@ chkErrorPropagation evts =
                             trueParentFailure
                               & maybe
                                 (pure ())
-                                ( error $
-                                    "Child event passed when parent failed - error should have propagated\nchild\n"
+                                ( errorS $
+                                    "Child event passed when parent failed - errorS should have propagated\nchild\n"
                                       <> ppShow chldLoc
                                       <> "\nparent\n"
                                       <> ppShow (truParent pLoc)
@@ -1078,7 +1082,7 @@ chkErrorPropagation evts =
                                 trueParentFailure
                                   & maybe
                                     (pure ())
-                                    (error $ "Child event failed (not propagated parent failure) when parent failed - parent error should have propagated\n" <> ppShow childLoc)
+                                    (errorS $ "Child event failed (not propagated parent failure) when parent failed - parent errorS should have propagated\n" <> ppShow childLoc)
                               ParentFail {floc = childloc, ploc, exception = childException} ->
                                 let prntFail = trueParentFailure
                                  in prntFail
@@ -1089,8 +1093,8 @@ chkErrorPropagation evts =
                                             in this thread wont
                                           -}
                                           isOnceEvent (lookupThrow "eventType not found" evtTypeMap childloc)
-                                            ? error "Not implemented"
-                                            $ error ("Child event has propagated parent failure when parent has not failed\n" <> ppShow childloc)
+                                            ? errorS "Not implemented"
+                                            $ errorS ("Child event has propagated parent failure when parent has not failed\n" <> ppShow childloc)
                                         )
                                         ( \p ->
                                             let pexcpt = p.exception
@@ -1163,7 +1167,7 @@ chkOnceEventsAreBlocking evts =
             & maybe
               (isOnceEvent eventType ? Just (loc, eventType) $ mLcEt)
               ( \activeEvt ->
-                  error $
+                  errorS $
                     "event started while once event still open\nevent:\n"
                       <> ppShow evt
                       <> "open once event"
@@ -1174,7 +1178,7 @@ chkOnceEventsAreBlocking evts =
             then
               mLcEt
                 & maybe
-                  ( error $
+                  ( errorS $
                       "once event ended when once event not open\nevent:\n"
                         <> ppShow evt
                   )
@@ -1182,7 +1186,7 @@ chkOnceEventsAreBlocking evts =
                       locEt
                         == (loc, eventType)
                         ? Nothing
-                        $ error
+                        $ errorS
                         $ "end once event does not correspond to start loc / event type\nstart:\n"
                           <> ppShow locEt
                           <> "\n"
@@ -1194,7 +1198,7 @@ chkOnceEventsAreBlocking evts =
                 & maybe
                   mLcEt
                   ( \activeEvt ->
-                      error $
+                      errorS $
                         "event ended while once event still open\nevent:\n"
                           <> ppShow evt
                           <> "open once event"
@@ -1268,7 +1272,7 @@ validateTemplate t =
   let tl = (.tTag) <$> templateList t
       utl = nub tl
    in when (length tl /= length utl) $
-        error $
+        errorS $
           "template must be such that tags are unique: \n" <> ppShow tl
 
 runTest :: Int -> Template -> IO ()

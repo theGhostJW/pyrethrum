@@ -29,6 +29,8 @@ import Runner as R
     mkSem,
   )
 import TestFilter
+import PyrethrumExtras
+import Text.Extra hiding (take)
 
 data Channel = Web | REST deriving (Eq, Ord, Show)
 
@@ -93,7 +95,7 @@ data TextItem = TextItem
   deriving (Show, Generic)
 
 interact :: (HasId itm, Member (Logger e0) effs) => Text -> rc -> hi -> itm -> Sem effs hi
-interact lgText rc hi itm = L.log (lgText <> " " <> txt (getField @"id" itm)) >> pure hi
+interact lgText rc hi itm = L.log (lgText <> " " <> txt itm.id) >> pure hi
 
 instance ToJSON TextItem where
   toEncoding = genericToEncoding defaultOptions

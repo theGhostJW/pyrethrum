@@ -6,7 +6,7 @@ import  DSL.CurrentTime as CT
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList as D
 import           Prelude as P hiding (get, modify, ask, State, runReader, Reader)
-import           PyrethrumExtras.IO as PIO hiding (now)
+import           PyrethrumExtras.IO as PIO
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
 import System.IO (stdout)

@@ -37,6 +37,8 @@ import RunnerBase as RB (AddressedElm (..), TestInfo, querySuite, testInfo)
 import TempUtils
 import TestFilter
 import Text.Show.Pretty (pPrint, pPrintList, ppShowList)
+import Data.Either.Extra
+import PyrethrumExtras.Test hiding (either, mapMaybe)
 
 
 {-

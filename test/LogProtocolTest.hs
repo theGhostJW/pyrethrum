@@ -9,6 +9,10 @@ import Data.Aeson.TH
 import Data.ByteString.Lazy as B
 import Data.Set as S
 import RunElementClasses as RC hiding (element)
+import PyrethrumExtras.Test as T hiding (either)
+
+import PyrethrumExtras
+import Data.Either.Extra
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum)
 
@@ -79,7 +83,7 @@ genTestConfig =
         <$> genTxt
         <*> set'
         <*> set'
-        <*> T.element enumList
+        <*> element enumList
         <*> T.bool
 
 genRunConfig :: Gen RunConfig
@@ -168,7 +172,7 @@ hprop_log_protocol_round_trip = property $ do
       unserialised :: Either Text (LogProtocolBase Int)
       unserialised = mapLeft txt $ A.eitherDecode serialised
 
-  P.either
+  either
     (\s -> footnote (toS s) *> failure)
     (lp ===)
     unserialised

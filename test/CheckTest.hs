@@ -90,6 +90,6 @@ unit_chk_with_gate_on_list_only_gates_first = [GateCheck, StandardCheck, Standar
 
 unit_chk_with_gateAll_on_list_gates_all = [GateCheck, GateCheck, GateCheck, GateCheck] ... D.toList ((.gateStatus) <$> (gateAll evenOddEven).un)
 
-unit_chk_expect_defect_only_affects_first = [False, True, True, True] ... D.toList $ ((ExpectPass ==) F.. (.expectation) <$> (expectFailure "Failed" evenOddEven).un)
+unit_chk_expect_defect_only_affects_first = [False, True, True, True] ... D.toList $ ((ExpectPass ==) . (.expectation) <$> (expectFailure "Failed" evenOddEven).un)
 
-unit_chk_expect_defect_fixed_only_affects_first = [True, False, False, False] ... D.toList ((ExpectFailure Inactive "Failed" ==) F.. (.expectation) <$> (expectFailureFixed "Failed" evenOddEven).un)
+unit_chk_expect_defect_fixed_only_affects_first = [True, False, False, False] ... D.toList ((ExpectFailure Inactive "Failed" ==) . (.expectation) <$> (expectFailureFixed "Failed" evenOddEven).un)

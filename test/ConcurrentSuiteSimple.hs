@@ -27,6 +27,7 @@ import Runner as R
     TestSuite (..),
     mkSem,
   )
+import PyrethrumExtras
 
 data RunConfig = RunConfig
   { title :: Text,

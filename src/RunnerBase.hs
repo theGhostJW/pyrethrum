@@ -25,6 +25,8 @@ import Polysemy
 import Polysemy.Error
 import RunElementClasses (Address, AddressElemType, AddressedElm (..), Config, TestFilterResult (TestFilterResult), push, rootAddress)
 import qualified RunElementClasses as RC
+import PyrethrumExtras hiding (bracket)
+import Text.Extra as T (length)
 
 type ItemRunner e as ds i hd tc rc effs =
   rc -> Address -> hd -> Test e tc rc hd i as ds effs -> i -> Sem effs ()
@@ -49,7 +51,7 @@ data GenericResult tc rslt = TestResult
 
 queryElm :: forall hi effs a. (a -> Text) -> Address -> SuiteItem hi effs a -> [AddressedElm a]
 queryElm title' address =
-  let hdUndefined = undefined
+  let hdUndefined = uu
 
       tstAddress :: a -> Address
       tstAddress a = push (title' a) RC.Test address
@@ -188,7 +190,7 @@ demoInteractor1 rc hd i =
     bracket
       (demoBeforeAll hd)
       (\_ -> pure ())
-      (pure . length {- can refer to: rc, hd, i  here-})
+      (pure . T.length {- can refer to: rc, hd, i  here-})
 
 -- helpers 
 -- withBeforeAfter 

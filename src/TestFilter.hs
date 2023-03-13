@@ -11,6 +11,7 @@ import qualified RunElementClasses as C
 import RunnerBase (AddressedElm (..))
 import RunnerBase as RB
 import Prelude
+import PyrethrumExtras
 
 acceptFilter :: TestFilterResult -> Bool
 acceptFilter = isNothing . (.reasonForRejection)
@@ -19,7 +20,7 @@ rejectFilter :: TestFilterResult -> Bool
 rejectFilter = isJust . (.reasonForRejection)
 
 acceptAnyFilter :: [TestFilterResult] -> Bool
-acceptAnyFilter = P.any acceptFilter
+acceptAnyFilter = any acceptFilter
 
 mkTestFilterResult :: Config tc => Address -> tc -> Maybe Text -> TestFilterResult
 mkTestFilterResult d tc rejection =
@@ -85,7 +86,7 @@ activeAddresses r =
       includedAddresses = (.testInfo.address) <$> filter (isNothing . (.reasonForRejection)) r
 
       subSet :: Address -> S.Set Address
-      subSet add = S.fromList $ C.Address <$> ((reverse <$>) <$> P.dropWhile null . inits . reverse $ add.unAddress)
+      subSet add = S.fromList $ C.Address <$> ((reverse <$>) <$> dropWhile null . inits . reverse $ add.unAddress)
    in foldl' S.union S.empty $ subSet <$> includedAddresses
 
 filterSuite :: Config tc => rc -> (forall a. SuiteSource e tc rc effs a) -> [TestFilter rc tc] -> Either Text FilterLog
@@ -97,7 +98,7 @@ filterSuite rc suite filters =
       activeAddresses' = activeAddresses log
 
       dupeAddress :: Maybe Text
-      dupeAddress = toS <$> firstDuplicate (toS @_ @PRL.String . render . getField @"address" . (.testInfo) <$> log)
+      dupeAddress = toS <$> firstDuplicate (toS @_ @String . render . getField @"address" . (.testInfo) <$> log)
    in maybe (Right $ FilterLog log activeAddresses') Left dupeAddress
 
 queryFilterSuite :: forall rc e tc effs. Config tc => [TestFilter rc tc] -> rc -> (forall a. SuiteSource e tc rc effs a) -> Either Text [AddressedElm (TestInfo tc)]

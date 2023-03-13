@@ -13,6 +13,9 @@ import           Data.Set as S
 import Type.Reflection as R
 import Check
 import DSL.Interpreter (Failure)
+import Path.Extended
+import PyrethrumExtras
+import Text.Extra (breakOn)
 
 
 

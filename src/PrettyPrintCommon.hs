@@ -8,7 +8,7 @@ import RunElementClasses
 import Common
 import Data.Aeson as A
 import PyrethrumExtras
-import Text.Extra as T (singleton, replicate, length, stripPrefix, breakOn, replaceFirst) 
+import Text.Extra as T (singleton, replicate, length, stripPrefix, breakOn, replaceFirst, strip, strip) 
 
 newLn :: Text
 newLn = "\n"

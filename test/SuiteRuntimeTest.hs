@@ -4,7 +4,7 @@ import Check (Checks)
 -- TODO Add to Pyrelude
 -- TODO Add to Pyrelude
 
-import Control.Monad (Functor ((<$)), void)
+import Control.Monad (Functor ((<$)), void, foldM_)
 import Control.Monad.Reader (ReaderT (runReaderT), ask)
 import DSL.Interpreter
 import Data.Aeson.Encoding (quarter)
@@ -49,8 +49,10 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM
 import Prelude as P hiding (newTVarIO, atomically, head, last)
 import GHC.Show (Show(..))
-import PyrethrumExtras
-import List.Extra (head, last, nub)  
+import PyrethrumExtras ( count, enumList, txt, uu, toS, (?) )
+import List.Extra (head, last, nub)
+import qualified Unsafe
+
 
 data DocFunc a = DocFunc
   { doc :: Text,
@@ -69,7 +71,7 @@ data IOProps = IOProps
   }
   deriving (Show)
 
-  
+
 
 testProps :: Text -> Int -> Int -> ExeOutcome -> IOProps
 testProps prefix idx = IOProps (prefix == "" ? txt idx $ prefix <> "." <> txt idx)
@@ -254,8 +256,7 @@ chkFixturesContainTests root tevts =
                                 ( \startTag' ->
                                     (startTag' == eiTag)
                                       ? (Nothing, fxTstMap)
-                                      $ errorS $
-                                        ( "fixture start and end tags don't match for start tag: "
+                                      $ errorS ( "fixture start and end tags don't match for start tag: "
                                             <> toS startTag'
                                             <> "and end tag: "
                                             <> toS eiTag
@@ -328,7 +329,7 @@ actualChildParentMap evs tid =
                                             p@(pet, ploc) : ps ->
                                               (oet == pet)
                                                 ? ps
-                                                $ errorS $
+                                                $ errorS
                                                   ( "child event type does not match parent:\nchild loc is:\n "
                                                       <> ppShow endLoc
                                                       <> "\nparent loc is\n"
@@ -404,7 +405,7 @@ actualChildParentMap evs tid =
 data StartEnd = IsStart | IsEnd deriving (Show, Eq)
 
 boundaryEvents :: Maybe StartEnd -> [ExeEvent] -> [EvInfo]
-boundaryEvents startEndFilter thrdEvts = catMaybes $ boundaryInfo startEndFilter <$> thrdEvts
+boundaryEvents startEndFilter = mapMaybe (boundaryInfo startEndFilter)
 
 boundaryInfo :: Maybe StartEnd -> ExeEvent -> Maybe EvInfo
 boundaryInfo startEndFilter = \case
@@ -568,6 +569,18 @@ chkEq' msg e a =
         <> ppShow a
         <> "\n"
 
+
+-- chkThreadLogsInOrder :: [ExeEvent] -> IO ()
+-- chkThreadLogsInOrder evts =
+--   do
+--     eachThread
+--       ( \l ->
+--           let ck = chkEq' "first index of thread should be 0" 0 . (.idx)
+--               ev = unsafeHead l
+--            in ck ev
+--       )
+--     eachThread chkIds
+
 chkThreadLogsInOrder :: [ExeEvent] -> IO ()
 chkThreadLogsInOrder evts =
   do
@@ -575,7 +588,9 @@ chkThreadLogsInOrder evts =
       ( \l ->
           let ck = chkEq' "first index of thread should be 0" 0 . (.idx)
               ev = head l
-           in fromMaybe (errorS "threadlist empty") ck
+           in ev & maybe
+                    (errorS "threadlist empty")
+                    ck
       )
     eachThread chkIds
   where
@@ -668,12 +683,12 @@ startTag =
 
 chkTestEvtsConsecutive :: [ExeEvent] -> IO ()
 chkTestEvtsConsecutive evs =
-  let tsmevts = read . toS . Txt.takeWhileEnd (/= ':') . startTag <$> filter (isStart L.Test) evs
+  let tsmevts = Unsafe.read . toS . Txt.takeWhileEnd (/= ':') . startTag <$> filter (isStart L.Test) evs
       chkidxless :: Int -> Int -> IO Int
       chkidxless i1 i2 = i1 >= i2 ? errorS "test index out of order" $ pure i2
    in null tsmevts
         ? pure ()
-        $ M.foldM_ chkidxless (-1) tsmevts
+        $ foldM_ chkidxless (-1) tsmevts
 
 chkLeafEventsStartEnd :: ExeEventType -> [[ExeEvent]] -> IO ()
 chkLeafEventsStartEnd targetEventType =
@@ -740,9 +755,9 @@ chkLeafEventsStartEnd targetEventType =
                   | isFixtureChild evt' -> Just activeFxLoc
                   | otherwise -> failIn sevt
 
-        fail msg = errorS $ msg <> "\n" <> ppShow evt
+        fail' msg = errorS $ msg <> "\n" <> ppShow evt
         strTrg = P.show targetEventType
-        failIn s = fail $ s <> " must only occur outside a " <> strTrg <> " in same thread"
+        failIn s = fail' $ s <> " must only occur outside a " <> strTrg <> " in same thread"
 
 onceEventTypes :: [ExeEventType]
 onceEventTypes = filter L.isOnceEvent enumList
@@ -795,11 +810,11 @@ chkFixtureChildren =
                 EndExecution {} -> failIn "EndExecution"
           )
       where
-        fail msg = errorS $ msg <> "\n" <> ppShow evt
-        failOut et = fail $ P.show et <> " must occur within start / end of fixture in same thread"
+        fail' msg = errorS $ msg <> "\n" <> ppShow evt
+        failOut et = fail' $ P.show et <> " must occur within start / end of fixture in same thread"
 
         failIn :: Show a => a -> Maybe Loc
-        failIn et = fail $ P.show et <> " must only occur outside a fixture in same thread"
+        failIn et = fail' $ P.show et <> " must only occur outside a fixture in same thread"
 
         chkOutOfFixtureStartEnd :: Bool -> Loc -> ExeEventType -> Maybe Loc
         chkOutOfFixtureStartEnd isStart' evtLoc et =
@@ -892,7 +907,7 @@ chkStartEndIntegrity =
     chkThread :: [ExeEvent] -> IO ()
     chkThread evts =
       unless (M.null r)
-        . error
+        . errorS
         $ "events still open when thread finalised\n" <> ppShow r
       where
         r = foldl' chkEvent M.empty evts
@@ -1297,7 +1312,7 @@ ioAction :: TextLogger -> IOProps -> IO ()
 ioAction log (IOProps {message, delayms, outcome}) =
   do
     log message
-    P.threadDelay delayms
+    C.threadDelay delayms
     when (outcome == FailResult)
       . error
       . toS

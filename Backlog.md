@@ -42,11 +42,17 @@
 
 ## Run Construction
 * switch to effectful
+* replace basic effects
+* prenode to effecful ??
 * connect to suiteruntime
 * generate run
-  * ux type errors
+  * ux test suite maintenance
+  * ux type errors / exceptions
 
 ## Checks and Known Errors
+## Checks
+* remove all concepts of error reconcilliation
+* change guard to ensure 
 ### PostHoc Error 
 * runConfig selector
 * fixture selector
@@ -59,47 +65,24 @@
   * \rc fx tst fullResult err -> Active | Inactive | Intermittent | Ignore
 * reconcile multiple files
 
-### Checks
-* remove all concepts of error reconcilliation
-* change guard to Assert
-
-
 
 ## Pyrelude
-* upgrade ghc :: Done
-* stack -> cabal :: Done
-
-* remove 
-  * maybef :: Done
-  * eitherf :: Done
-* change uu to error :: Done
-  * uu Error -> txt 
-
--- compile pyrethrum
-
-* remove listlike 
-
--- compile pyrethrum
-
-* relude
-
--- compile pyrethrum
-
+* fix unit_subDirFromBaseDir_finds_test_dir :: Assertion
+* fix unit_subDirFromBaseDir_finds_correct_temp :: Assertion
 * chkFalse'
 * format on debug'
-* try removing crazy cradal (pyrethrum)
 * profiling
-* -- TODO - reinstate
--- unit_subDirFromBaseDir_finds_test_dir :: Assertion
-unit_subDirFromBaseDir_finds_correct_temp :: Assertion
+* Reinstate Pyrelude (later)
+  * swap out stm and friends for unlift io
+  * text extra and list extra
+  * reexport other modules such as unsafe
+  * swap out file functions for filepath and filepathIO (check abstract filepath)
+  * default - writefile is not text based
+  * import Data.Text.IO (writeFile, putStrLn)
+  * update cabal in pyrethrum
 -- 
 
 ## Other
-* OverloadedRecordDot / NoRecordSelectors
-  * Pyrert5hrum :: Done
-  * Pyrelude :: Done
-* update tastydiscover should not search dist-newstyle :: not needed wasn't taking in when reran
-* replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
 * move TestHook and TestHookRelease to bracket
 * think about hooks
   * mismatch between logical location and tests that need hook
@@ -161,6 +144,9 @@ groupOn f =
           (\as -> M.insert (f a) (a : as) m)
 ```
 
+
+# DONE 
+
 ## switch to cabal - done
 1. hpack - had to dowload change resolver and build and install in path
 2. convert package 
@@ -182,4 +168,24 @@ groupOn f =
    1. cabal install implicit-hie - gen-hie > hie.yaml
 6. ghcid - https://stackoverflow.com/questions/75600985/how-can-i-use-ghcid-allow-eval-with-cabal - took days :-(
 7. watch - not needed at this stage
+
+## Remove Pyrelude - done
+* upgrade ghc :: Done
+* stack -> cabal :: Done
+* remove 
+  * maybef :: Done
+  * eitherf :: Done
+* change uu to error :: Done
+  * uu Error -> txt 
+-- compile pyrethrum
+* remove listlike :: Done
+-- compile pyrethrum :: Done
+* relude :: Done
+
+## 
+* OverloadedRecordDot / NoRecordSelectors
+  * Pyrert5hrum :: Done
+  * Pyrelude :: Done
+* update tastydiscover should not search dist-newstyle :: not needed wasn't taking in when reran
+* replace prelude: https://github.com/dnikolovv/practical-haskell/blob/main/replace-prelude/README.md
 

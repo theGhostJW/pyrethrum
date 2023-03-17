@@ -12,9 +12,6 @@ import Data.Text hiding (last, init)
 import Prelude hiding (last, init)
 import PyrethrumExtras ( (?) )
 
--- other :: default - writefile is not text based
--- import Data.Text.IO (writeFile, putStrLn)
-
 safet :: (Text -> b) -> Text -> Maybe b
 safet unsafef t = 
   T.null t ? Nothing $ Just $ unsafef t

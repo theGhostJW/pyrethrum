@@ -259,7 +259,7 @@ prepare =
             let loc = nodeLoc threadTag
              in XTTHook loc threadHook threadHookRelease
                   <$> prepare' loc 0 threadHookChild
-        PN.Fixture
+        PN.Fixtures
           { onceFxHook,
             onceFxHookRelease,
             threadFxHook,

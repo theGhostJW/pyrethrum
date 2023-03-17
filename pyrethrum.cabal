@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 20be61e030d2f1b83e2e6230ce97924e8aeac8ce0d3f198a5c045fe2e149fadb
+-- hash: dd013e1095038e724ee65e909ebf942c668fce6ce6822fb88242501fd88477da
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -175,7 +175,7 @@ library
     , yaml
   mixins:
       base hiding (Prelude)
-    , relude (Relude as Prelude, Data.Text)
+    , relude (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
   default-language: Haskell2010
 
 test-suite pyrethrum-test
@@ -290,5 +290,5 @@ test-suite pyrethrum-test
     , yaml
   mixins:
       base hiding (Prelude)
-    , relude (Relude as Prelude, Data.Text)
+    , relude (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
   default-language: Haskell2010

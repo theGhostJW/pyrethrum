@@ -521,7 +521,7 @@ mkPrenode maxThreads =
               tstHks <- newTVarIO tHook
               tstHkRs <- newTVarIO tRelease
               pure
-                PN.Fixture
+                PN.Fixtures
                   { onceFxHook = \_loc lg _in -> ioAction lg sHook,
                     onceFxHookRelease = \_loc lg _in -> ioAction lg sRelease,
                     threadFxHook = \_loc lg _oo _ti -> runThreaded lg thrdHks,
@@ -1385,6 +1385,7 @@ unit_simple_single :: IO ()
 unit_simple_single = runTest 1 superSimplSuite
 
 -- $ > unit_simple_single_failure
+
 
 unit_simple_single_failure :: IO ()
 unit_simple_single_failure =

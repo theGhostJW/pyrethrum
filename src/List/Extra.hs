@@ -38,17 +38,3 @@ maximum = safel L.maximum
 
 count :: Foldable t => (a -> Bool) -> t a -> Int
 count p = foldl' (\n x -> p x ? succ n $ n) 0
-
--- pyrelude ii
-{-
-- add Extras
-- UnitTest
-- head tail => use maybe
-- asum and friends (parser combinators)
-- ppShow abnd friends -. Test
-- add tests
-- unlift IO  
-- path / path IO
-- investigate / document - ‘show’ is not a (visible) method of class ‘Show’typeche
-- copy / modify Hlint
--}

@@ -21,25 +21,25 @@
       },
       "problemMatcher": []
     },
-    {
-      // Not working - exits after first run
-      "label": "ghcid test",
-      "type": "shell",
-      "command": "ghcid",
-      "args": [
-        "--command",
-        "'cabal test --test-show-details=streaming'",
-        "--allow-eval",
-        "--clear",
-        "--no-height-limit",
-        "-o ghcid.log"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "problemMatcher": []
-    },
+    // {
+    //   // Not working - exits after first run
+    //   "label": "ghcid test",
+    //   "type": "shell",
+    //   "command": "ghcid",
+    //   "args": [
+    //     "--command",
+    //     "'cabal test --test-show-details=streaming'",
+    //     "--allow-eval",
+    //     "--clear",
+    //     "--no-height-limit",
+    //     "-o ghcid.log"
+    //   ],
+    //   "presentation": {
+    //     "reveal": "always",
+    //     "panel": "new"
+    //   },
+    //   "problemMatcher": []
+    // },
     {
       "label": "hpack",
       "type": "process",

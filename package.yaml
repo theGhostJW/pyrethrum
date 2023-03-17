@@ -41,13 +41,12 @@ dependencies:
   - path # - version set in extra deps - until can roll forward
   - path-io # -
   - relude
-  - extra
   - name: base
     mixin:
       - hiding (Prelude)
   - name: relude
     mixin:
-      - (Relude as Prelude, Data.Text) 
+      - (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe) 
 
 ghc-options:
   # - -threaded

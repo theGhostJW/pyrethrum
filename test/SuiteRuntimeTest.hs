@@ -461,7 +461,7 @@ chkParentOrder rootTpl thrdEvts =
 templateCount :: Template -> (Template -> Int) -> Int
 templateCount t templateInc = foldTemplate 0 (\c t' -> c + templateInc t') t
 
-mkPrenode :: Int -> Template -> IO (PreNode oi () ti ())
+mkPrenode :: Int -> Template -> IO (PreNode oi ti)
 mkPrenode maxThreads =
   let runThreaded lggr propsLst = do
         prps <- atomically $ do

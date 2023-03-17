@@ -150,11 +150,23 @@ testInfo rc t =
         }
 
 data Test e tc rc hd i as ds effs = Test
-  { config :: tc,
+  { 
+    -- Depricate - See test GADIT BELOW 
+    config :: tc,
     items :: rc -> [i],
     interactor :: rc -> hd -> i -> Sem effs as,
     parse :: forall psEffs. (Member (Error (FrameworkError e)) psEffs) => as -> Sem psEffs ds
   }
+
+data TestGADIT e tc rc hd effs where 
+  TestGADT ::
+   { 
+     -- Replace all with this
+    config :: tc,
+    items :: rc -> [i],
+    interactor :: rc -> hd -> i -> Sem effs as,
+    parse :: forall psEffs. (Member (Error (FrameworkError e)) psEffs) => as -> Sem psEffs ds
+   } -> TestGADIT e tc rc hd effs 
 
 nullItems :: Test e tc rc hd i as ds effs -> rc -> Bool
 nullItems t rc = null $ t.items rc

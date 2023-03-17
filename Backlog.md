@@ -42,6 +42,8 @@
 
 ## Run Construction
 * switch to effectful
+  * data Test e tc rc hd i as ds effs = Test
+  * data TestGADIT e tc rc hd effs where 
 * replace basic effects
 * prenode to effecful ??
 * connect to suiteruntime

@@ -7,7 +7,7 @@ import UnliftIO (MonadUnliftIO, STM, TMVar)
 import PyrethrumExtras ( txt, uu, (?) )
 import qualified Text.Extra as T
 
-type PreNodeRoot = PreNode () () () ()
+type PreNodeRoot = PreNode () ()
 
 data Test si ti ii = Test
   { tstId :: Text,
@@ -40,37 +40,37 @@ f1 = Fixture {
   threadHookRelease = \l i -> print . txt $ i + 1,
   tests = []
 }
-data PreNode oi oo ti to where
+data PreNode oi ti where
   Branch ::
     { title :: Maybe Text,
-      subElms :: [PreNode oi oo ti to ]
+      subElms :: [PreNode oi ti]
     } ->
-    PreNode oi oo ti to 
+    PreNode oi ti
   OnceHook ::
     { title :: Maybe Text,
-      hook :: Loc -> ApLogger -> oi -> IO on,
-      hookChild :: PreNode on coo ti to,
-      hookRelease :: Loc -> ApLogger -> on -> IO ()
+      hook :: Loc -> ApLogger -> oi -> IO oo,
+      hookChild :: PreNode oo ti,
+      hookRelease :: Loc -> ApLogger -> oo -> IO ()
     } ->
-    PreNode oi oo ti to 
+    PreNode oi ti 
   ThreadHook ::
     { title :: Maybe Text,
       threadHook :: Loc -> ApLogger -> oi -> ti -> IO tn,
-      threadHookChild :: PreNode oi oo tn cto ,
+      threadHookChild :: PreNode oi tn,
       threadHookRelease :: Loc -> ApLogger -> tn -> IO ()
     } ->
-    PreNode oi oo ti to 
+    PreNode oi ti
   Fixtures :: { 
-      onceFxHook :: Loc -> ApLogger -> oi -> IO on,
-      threadFxHook :: Loc -> ApLogger -> on -> ti -> IO tn,
-      testHook :: Loc -> ApLogger -> on -> tn -> IO io,
-      onceFxHookRelease :: Loc -> ApLogger -> on -> IO (),
+      onceFxHook :: Loc -> ApLogger -> oi -> IO oo,
+      threadFxHook :: Loc -> ApLogger -> oo -> ti -> IO tn,
+      testHook :: Loc -> ApLogger -> oo -> tn -> IO io,
+      onceFxHookRelease :: Loc -> ApLogger -> oo -> IO (),
       threadFxHookRelease :: Loc -> ApLogger -> tn -> IO (),
       testHookRelease :: Loc -> ApLogger -> io -> IO (),
       title :: Maybe Text,
-      iterations :: [Test on tn io]
+      iterations :: [Test oo tn io]
     } ->
-    PreNode oi oo ti to 
+    PreNode oi ti 
 
 
 data OnceHook oi oo where 
@@ -100,7 +100,7 @@ data ThreadHook oi ti to where
             -- Around a b
     -- should we have branches
 
-nodeEmpty :: PreNode a b c d  -> Bool
+nodeEmpty :: PreNode oi ti  -> Bool
 nodeEmpty = \case
   OnceHook {hookChild} -> nodeEmpty hookChild
   ThreadHook {threadHookChild} -> nodeEmpty threadHookChild

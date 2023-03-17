@@ -96,11 +96,11 @@ data Status
   | Done
   deriving (Show, Eq, Ord)
 
-getStatus :: ExeTree si so ti to -> STM Status
+getStatus :: ExeTree oi ti -> STM Status
 getStatus =
   readTVar . getStatusTVar
   where
-    getStatusTVar :: ExeTree si so ti to -> TVar Status
+    getStatusTVar :: ExeTree oi ti -> TVar Status
     getStatusTVar = \case
       XTOHook {status} -> status
       XTTHook {thChildNode} -> getStatusTVar thChildNode
@@ -110,10 +110,10 @@ getStatus =
 isDone :: Status -> Bool
 isDone = (== Done)
 
-nodeDone :: ExeTree si so ti to -> STM Bool
+nodeDone :: ExeTree oi ti -> STM Bool
 nodeDone t = (== Done) <$> getStatus t
 
-canRun :: ExeTree si so ti to -> STM Bool
+canRun :: ExeTree oi ti -> STM Bool
 canRun rg =
   canRun' <$> getStatus rg
   where
@@ -125,7 +125,7 @@ canRun rg =
       HookFinalising -> False
       Done -> False
 
-modifyStatus :: (Status -> Status) -> ExeTree si so ti to -> STM ()
+modifyStatus :: (Status -> Status) -> ExeTree oi ti -> STM ()
 modifyStatus f et =
   case et of
     XTOHook {status} -> update status
@@ -135,7 +135,7 @@ modifyStatus f et =
   where
     update = flip modifyTVar f
 
-waitDone :: ExeTree si so ti to -> IO ()
+waitDone :: ExeTree oi ti -> IO ()
 waitDone rg = atomically $ do
   s <- getStatus rg
   unless (s == Done) retry
@@ -149,30 +149,30 @@ data IdxLst a = IdxLst
 mkIdxLst :: a -> STM (IdxLst a)
 mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
-data ExeTree si so ti to where
+data ExeTree oi ti where
   XTOHook ::
     { loc :: Loc,
       status :: TVar Status,
-      sHook :: Loc -> ApLogger -> si -> IO n,
-      sHookRelease :: Loc -> ApLogger -> n -> IO (),
-      sHookVal :: TMVar (Either Abandon n),
-      sChildNode :: ExeTree n cs ti to
+      sHook :: Loc -> ApLogger -> oi -> IO oo,
+      sHookRelease :: Loc -> ApLogger -> oo -> IO (),
+      sHookVal :: TMVar (Either Abandon oo),
+      sChildNode :: ExeTree oo ti
     } ->
-    ExeTree si so ti to
+    ExeTree oi ti
   XTTHook ::
     { loc :: Loc,
-      thHook :: Loc -> ApLogger -> si -> ti -> IO n,
-      thHookRelease :: Loc -> ApLogger -> n -> IO (),
-      thChildNode :: ExeTree si so n tc
+      thHook :: Loc -> ApLogger -> oi -> ti -> IO to,
+      thHookRelease :: Loc -> ApLogger -> to -> IO (),
+      thChildNode :: ExeTree oi to
     } ->
-    ExeTree si so ti to
+    ExeTree oi ti
   XTGroup ::
     { leafloc :: Loc,
       nStatus :: TVar Status,
-      childNodes :: TQueue (ExeTree si so ti to),
-      fullyRunning :: TQueue (ExeTree si so ti to)
+      childNodes :: TQueue (ExeTree oi ti),
+      fullyRunning :: TQueue (ExeTree oi ti)
     } ->
-    ExeTree si so ti to
+    ExeTree oi ti
   XTFix ::
     { leafloc :: Loc,
       nStatus :: TVar Status,
@@ -181,7 +181,7 @@ data ExeTree si so ti to where
       -- out of the log
       fxOHookStatus :: TVar Status,
       fxOHookVal :: TMVar (Either Abandon so2),
-      fxOHook :: Loc -> ApLogger -> si -> IO so2,
+      fxOHook :: Loc -> ApLogger -> oi -> IO so2,
       fxOHookRelease :: Loc -> ApLogger -> so2 -> IO (),
       fxTHook :: Loc -> ApLogger -> so2 -> ti -> IO to2,
       fxTHookRelease :: Loc -> ApLogger -> to2 -> IO (),
@@ -190,21 +190,21 @@ data ExeTree si so ti to where
       iterations :: TQueue (Test so2 to2 io),
       runningCount :: TVar Int
     } ->
-    ExeTree si so ti to
+    ExeTree oi ti
 
-data Test si ti ii = Test
+data Test oi ti ii = Test
   { tstId :: Text,
-    tst :: ApLogger -> si -> ti -> ii -> IO ()
+    tst :: ApLogger -> oi -> ti -> ii -> IO ()
   }
 
-prepare :: PreNode o oo t to -> IO (ExeTree o oo t to)
+prepare :: PreNode o t -> IO (ExeTree o t)
 prepare =
   prepare' Root 0
   where
     consNoMxIdx :: IdxLst a -> a -> IdxLst a
     consNoMxIdx l@IdxLst {lst} i = l {lst = i : lst}
 
-    prepare' :: Loc -> Int -> PN.PreNode o oo t to -> IO (ExeTree o oo t to)
+    prepare' :: Loc -> Int -> PN.PreNode oi ti -> IO (ExeTree oi ti)
     prepare' parentLoc subElmIdx pn = do
       let nodeLoc mtag =
             Node
@@ -371,8 +371,8 @@ threadHookVal logger hkIn hkEvent hook ctx@Context {cloc, apLogger} =
   hkIn
     & either
       (\abandon -> abandonLogHook hkEvent logger abandon cloc)
-      ( \(ExeIn si ti) ->
-          let thrdHk loc aplgr = hook loc aplgr si
+      ( \(ExeIn oi ti) ->
+          let thrdHk loc aplgr = hook loc aplgr oi
            in runLogHook hkEvent logger thrdHk ti ctx
       )
 
@@ -410,17 +410,17 @@ releaseHookUpdateStatus logger evt ns eho ctx hkRelease =
     (releaseHook logger evt eho ctx hkRelease)
     (atomically $ writeTVar ns Done)
 
-discardDone :: TQueue (ExeTree a b c d) -> STM ()
+discardDone :: TQueue (ExeTree oi ti) -> STM ()
 discardDone = processWhile nodeDone
 
-processWhile :: forall a b c d. (ExeTree a b c d -> STM Bool) -> TQueue (ExeTree a b c d) -> STM ()
+processWhile :: forall oi ti. (ExeTree oi ti -> STM Bool) -> TQueue (ExeTree oi ti) -> STM ()
 processWhile p q =
   tryPeekTQueue q
     >>= maybe
       (pure ())
       (p >=> bool (pure ()) (readTQueue q >> processWhile p q))
 
-discardDoneMoveFullyRunning :: TQueue (ExeTree si so ti to) -> TQueue (ExeTree si so ti to) -> STM ()
+discardDoneMoveFullyRunning :: TQueue (ExeTree oi ti) -> TQueue (ExeTree oi ti) -> STM ()
 discardDoneMoveFullyRunning fullyRunningQ =
   processWhile
     ( \n ->
@@ -438,8 +438,8 @@ data Abandon = Abandon
   }
   deriving (Show)
 
-data ExeIn si ti = ExeIn
-  { singletonIn :: si,
+data ExeIn oi ti = ExeIn
+  { singletonIn :: oi,
     threadIn :: ti
   }
 
@@ -448,7 +448,7 @@ data Context = Context
     apLogger :: ApLogger
   }
 
-executeNode :: forall si so ti to. Logger -> Either Abandon (ExeIn si ti) -> ExeTree si so ti to -> IO ()
+executeNode :: forall oi ti. Logger -> Either Abandon (ExeIn oi ti) -> ExeTree oi ti -> IO ()
 executeNode logger hkIn rg =
   do
     wantRun <- atomically $ canRun rg
@@ -655,18 +655,18 @@ executeNode logger hkIn rg =
                     logAbandonned logger hkLoc L.TestHook a
                       >> pure (Left a)
 
-                  runHook (ExeIn si ti) =
+                  runHook (ExeIn oi ti) =
                     catchAll
-                      (Right <$> testHk hkLoc apLog si ti)
+                      (Right <$> testHk hkLoc apLog oi ti)
                       ( \e -> do
                           logFailure logger hkLoc L.TestHook e
                           pure . Left $ Abandon hkLoc L.TestHook e
                       )
   where
-    siHkIn :: Either Abandon si
+    siHkIn :: Either Abandon oi
     siHkIn = (.singletonIn) <$> hkIn
 
-    exeNxt :: forall si' so' ti' to'. Either Abandon (ExeIn si' ti') -> ExeTree si' so' ti' to' -> IO ()
+    exeNxt :: forall oi' ti'. Either Abandon (ExeIn oi' ti') -> ExeTree oi' ti'-> IO ()
     exeNxt = executeNode logger
 
     nxtAbandon :: Loc -> ExeEventType -> SomeException -> Abandon
@@ -697,7 +697,7 @@ newLogger sink tid =
     ir <- UnliftIO.newIORef (-1)
     pure $ mkLogger sink ir tid
 
-executeGraph :: EventSink -> ExeTree () () () () -> Int -> IO ()
+executeGraph :: EventSink -> ExeTree () () -> Int -> IO ()
 executeGraph sink xtri maxThreads =
   let hkIn = Right (ExeIn () ())
       thrdTokens = replicate maxThreads True

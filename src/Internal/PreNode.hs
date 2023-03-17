@@ -48,27 +48,27 @@ data PreNode oi oo ti to where
     PreNode oi oo ti to 
   OnceHook ::
     { title :: Maybe Text,
-      hook :: Loc -> ApLogger -> oi -> IO oo,
-      hookChild :: PreNode oo coo ti to,
-      hookRelease :: Loc -> ApLogger -> oo -> IO ()
+      hook :: Loc -> ApLogger -> oi -> IO on,
+      hookChild :: PreNode on coo ti to,
+      hookRelease :: Loc -> ApLogger -> on -> IO ()
     } ->
     PreNode oi oo ti to 
   ThreadHook ::
     { title :: Maybe Text,
-      threadHook :: Loc -> ApLogger -> oi -> ti -> IO to,
-      threadHookChild :: PreNode oi oo to cto ,
-      threadHookRelease :: Loc -> ApLogger -> to -> IO ()
+      threadHook :: Loc -> ApLogger -> oi -> ti -> IO tn,
+      threadHookChild :: PreNode oi oo tn cto ,
+      threadHookRelease :: Loc -> ApLogger -> tn -> IO ()
     } ->
     PreNode oi oo ti to 
   Fixtures :: { 
-      onceFxHook :: Loc -> ApLogger -> oi -> IO oo,
-      threadFxHook :: Loc -> ApLogger -> oo -> ti -> IO to,
-      testHook :: Loc -> ApLogger -> oo -> to -> IO io,
-      onceFxHookRelease :: Loc -> ApLogger -> oo -> IO (),
-      threadFxHookRelease :: Loc -> ApLogger -> to -> IO (),
+      onceFxHook :: Loc -> ApLogger -> oi -> IO on,
+      threadFxHook :: Loc -> ApLogger -> on -> ti -> IO tn,
+      testHook :: Loc -> ApLogger -> on -> tn -> IO io,
+      onceFxHookRelease :: Loc -> ApLogger -> on -> IO (),
+      threadFxHookRelease :: Loc -> ApLogger -> tn -> IO (),
       testHookRelease :: Loc -> ApLogger -> io -> IO (),
       title :: Maybe Text,
-      iterations :: [Test oo to io]
+      iterations :: [Test on tn io]
     } ->
     PreNode oi oo ti to 
 

@@ -153,17 +153,17 @@ data ExeTree si so ti to where
   XTOHook ::
     { loc :: Loc,
       status :: TVar Status,
-      sHook :: Loc -> ApLogger -> si -> IO so,
-      sHookRelease :: Loc -> ApLogger -> so -> IO (),
-      sHookVal :: TMVar (Either Abandon so),
-      sChildNode :: ExeTree so cs ti to
+      sHook :: Loc -> ApLogger -> si -> IO n,
+      sHookRelease :: Loc -> ApLogger -> n -> IO (),
+      sHookVal :: TMVar (Either Abandon n),
+      sChildNode :: ExeTree n cs ti to
     } ->
     ExeTree si so ti to
   XTTHook ::
     { loc :: Loc,
-      thHook :: Loc -> ApLogger -> si -> ti -> IO to,
-      thHookRelease :: Loc -> ApLogger -> to -> IO (),
-      thChildNode :: ExeTree si so to tc
+      thHook :: Loc -> ApLogger -> si -> ti -> IO n,
+      thHookRelease :: Loc -> ApLogger -> n -> IO (),
+      thChildNode :: ExeTree si so n tc
     } ->
     ExeTree si so ti to
   XTGroup ::

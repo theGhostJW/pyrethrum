@@ -242,12 +242,12 @@ chkFixturesContainTests root tevts =
                                     ? fxTstMap
                                     $ M.insert eiTag ST.empty fxTstMap
                                 )
-                                ( \fxTag ->
+                                ( \title ->
                                     errorS $
                                       "overlapping fixtures in same thread. Starting fixture with loc: "
                                         <> ppShow eiLoc
                                         <> " while fixture with tag is still running"
-                                        <> toS fxTag
+                                        <> toS title
                                 )
                           IsEnd ->
                             mFxTag
@@ -270,8 +270,8 @@ chkFixturesContainTests root tevts =
                         mFxTag
                           & maybe
                             (errorS "test encountered when fuixture not open")
-                            ( \fxtag ->
-                                (mFxTag, M.insert fxtag (ST.insert eiTag (fxTstMap M.! fxtag)) fxTstMap)
+                            ( \title ->
+                                (mFxTag, M.insert title (ST.insert eiTag (fxTstMap M.! title)) fxTstMap)
                             )
                       _ -> errorS "this event should have been filtered out"
                   )
@@ -484,7 +484,7 @@ mkPrenode maxThreads =
             chld <- mkPrenode maxThreads tChild
             pure $
               PN.OnceHook
-                { hookTag = Just tTag,
+                { title = Just tTag,
                   hook = \_loc lg _in -> ioAction lg sHook,
                   hookChild = chld,
                   hookRelease = \_loc lg _in -> ioAction lg sHook
@@ -500,7 +500,7 @@ mkPrenode maxThreads =
             thrdHkRs <- newTVarIO tRelease
             pure $
               PN.ThreadHook
-                { threadTag = Just tTag,
+                { title = Just tTag,
                   threadHook = \_loc lg _in _ti -> runThreaded lg thrdHks, -- :: Loc -> ApLogger -> oi -> ti -> IO to,
                   threadHookChild = chld,
                   threadHookRelease = \_loc lg _tsto -> runThreaded lg thrdHkRs
@@ -528,7 +528,7 @@ mkPrenode maxThreads =
                     threadFxHookRelease = \_loc lg _to -> runThreaded lg thrdHkRs,
                     testHook = \_loc lg _oo _to -> runThreaded lg tstHks,
                     testHookRelease = \_loc lg _tsto -> runThreaded lg tstHkRs,
-                    fxTag = Just tTag,
+                    title = Just tTag,
                     iterations = mkTest <$> tTests
                   }
 

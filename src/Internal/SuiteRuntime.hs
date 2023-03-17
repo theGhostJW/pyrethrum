@@ -172,7 +172,7 @@ data ExeTree si so ti to where
       childNodes :: TQueue (ExeTree si so ti to),
       fullyRunning :: TQueue (ExeTree si so ti to)
     } ->
-    ExeTree si () ti ()
+    ExeTree si so ti to
   XTFix ::
     { leafloc :: Loc,
       nStatus :: TVar Status,
@@ -190,14 +190,14 @@ data ExeTree si so ti to where
       iterations :: TQueue (Test so2 to2 io),
       runningCount :: TVar Int
     } ->
-    ExeTree si () ti ()
+    ExeTree si so ti to
 
 data Test si ti ii = Test
   { tstId :: Text,
     tst :: ApLogger -> si -> ti -> ii -> IO ()
   }
 
-prepare :: PN.PreNode () () () () -> IO (ExeTree () () () ())
+prepare :: PreNode o oo t to -> IO (ExeTree o oo t to)
 prepare =
   prepare' Root 0
   where
@@ -214,10 +214,10 @@ prepare =
       ns <- newTVarIO Pending
       case pn of
         PN.Branch
-          { bTag,
+          { title,
             subElms
           } -> do
-            let loc = nodeLoc bTag
+            let loc = nodeLoc title
             idx <- newTVarIO 0
             fr <- newTQueueIO
             q <- newTQueueIO
@@ -232,14 +232,14 @@ prepare =
                   fullyRunning = fr
                 }
         PN.OnceHook
-          { hookTag,
+          { title,
             hook,
             hookChild,
             hookRelease
           } -> do
             s <- newTVarIO Pending
             v <- newEmptyTMVarIO
-            let loc = nodeLoc hookTag
+            let loc = nodeLoc title
             child <- prepare' loc 0 hookChild
             pure $
               XTOHook
@@ -251,12 +251,12 @@ prepare =
                   sChildNode = child
                 }
         PN.ThreadHook
-          { threadTag,
+          { title,
             threadHook,
             threadHookChild,
             threadHookRelease
           } ->
-            let loc = nodeLoc threadTag
+            let loc = nodeLoc title
              in XTTHook loc threadHook threadHookRelease
                   <$> prepare' loc 0 threadHookChild
         PN.Fixtures
@@ -266,11 +266,11 @@ prepare =
             threadFxHookRelease,
             testHook,
             testHookRelease,
-            fxTag,
+            title,
             iterations
           } ->
             do
-              let loc = nodeLoc fxTag
+              let loc = nodeLoc title
                   onceHkLoc = Node loc $ txt L.FixtureOnceHook
                   threadHkLoc = Node onceHkLoc $ txt L.FixtureThreadHook
                   converTest PN.Test {tstId, tst} = Test tstId tst

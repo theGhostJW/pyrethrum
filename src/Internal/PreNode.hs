@@ -40,21 +40,21 @@ f1 = Fixture {
   threadHookRelease = \l i -> print . txt $ i + 1,
   tests = []
 }
-data PreNode oi oo ti to  where
+data PreNode oi oo ti to where
   Branch ::
-    { bTag :: Maybe Text,
+    { title :: Maybe Text,
       subElms :: [PreNode oi oo ti to ]
     } ->
-    PreNode oi () ti () 
+    PreNode oi oo ti to 
   OnceHook ::
-    { hookTag :: Maybe Text,
+    { title :: Maybe Text,
       hook :: Loc -> ApLogger -> oi -> IO oo,
-      hookChild :: PreNode oo coo ti to ,
+      hookChild :: PreNode oo coo ti to,
       hookRelease :: Loc -> ApLogger -> oo -> IO ()
     } ->
     PreNode oi oo ti to 
   ThreadHook ::
-    { threadTag :: Maybe Text,
+    { title :: Maybe Text,
       threadHook :: Loc -> ApLogger -> oi -> ti -> IO to,
       threadHookChild :: PreNode oi oo to cto ,
       threadHookRelease :: Loc -> ApLogger -> to -> IO ()
@@ -67,23 +67,38 @@ data PreNode oi oo ti to  where
       onceFxHookRelease :: Loc -> ApLogger -> oo -> IO (),
       threadFxHookRelease :: Loc -> ApLogger -> to -> IO (),
       testHookRelease :: Loc -> ApLogger -> io -> IO (),
-      fxTag :: Maybe Text,
+      title :: Maybe Text,
       iterations :: [Test oo to io]
     } ->
-    PreNode oi () ti () 
+    PreNode oi oo ti to 
+
+
+data OnceHook oi oo where 
+  OnceNone :: () -> OnceHook oi oo
+  OnceBefore :: Loc -> ApLogger -> oi -> IO oo -> OnceHook oi oo 
+  OnceAround :: {
+    hook :: Loc -> ApLogger -> oi -> IO oo,
+    release :: Loc -> ApLogger -> oo -> IO ()
+  } -> OnceHook oi oo
+data ThreadHook oi ti to where 
+  ThreadNone :: () -> ThreadHook oi ti ti
+  ThreadBefore :: Loc -> ApLogger -> oi -> IO oo -> ThreadHook oi ti to
+  ThreadAround :: Loc -> ApLogger -> oi -> IO oo -> ThreadHook oi ti to
+
 
     -- todo: 
     -- change name of tag
     -- get rid of maybe on tag
     -- change iterations name
     -- change iterations test to fixtures
-    -- add maybe to all hooks?????
+    -- ?? add maybe to all hooks?????
       -- how release without a hook
-      -- data Hook hook release = 
-            -- None |
+      -- data Hook hook release where 
+            -- None |  -- passes through types
             -- Before a | 
-            -- After a | 
+            -- After b | 
             -- Around a b
+    -- should we have branches
 
 nodeEmpty :: PreNode a b c d  -> Bool
 nodeEmpty = \case

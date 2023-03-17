@@ -42,19 +42,19 @@ f1 = Fixture {
 }
 data PreNode oi ti where
   Branch ::
-    { title :: Maybe Text,
+    { title :: Text,
       subElms :: [PreNode oi ti]
     } ->
     PreNode oi ti
   OnceHook ::
-    { title :: Maybe Text,
+    { title :: Text,
       hook :: Loc -> ApLogger -> oi -> IO oo,
       hookChild :: PreNode oo ti,
       hookRelease :: Loc -> ApLogger -> oo -> IO ()
     } ->
     PreNode oi ti 
   ThreadHook ::
-    { title :: Maybe Text,
+    { title :: Text,
       threadHook :: Loc -> ApLogger -> oi -> ti -> IO tn,
       threadHookChild :: PreNode oi tn,
       threadHookRelease :: Loc -> ApLogger -> tn -> IO ()
@@ -67,7 +67,7 @@ data PreNode oi ti where
       onceFxHookRelease :: Loc -> ApLogger -> oo -> IO (),
       threadFxHookRelease :: Loc -> ApLogger -> tn -> IO (),
       testHookRelease :: Loc -> ApLogger -> io -> IO (),
-      title :: Maybe Text,
+      title :: Text,
       iterations :: [Test oo tn io]
     } ->
     PreNode oi ti 

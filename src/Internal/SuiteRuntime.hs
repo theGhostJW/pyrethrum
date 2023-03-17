@@ -206,10 +206,10 @@ prepare =
 
     prepare' :: Loc -> Int -> PN.PreNode oi ti -> IO (ExeTree oi ti)
     prepare' parentLoc subElmIdx pn = do
-      let nodeLoc mtag =
+      let nodeLoc tag =
             Node
               { parent = parentLoc,
-                tag = fromMaybe "" mtag
+                tag = tag
               }
       ns <- newTVarIO Pending
       case pn of

@@ -484,7 +484,7 @@ mkPrenode maxThreads =
             chld <- mkPrenode maxThreads tChild
             pure $
               PN.OnceHook
-                { title = Just tTag,
+                { title = tTag,
                   hook = \_loc lg _in -> ioAction lg sHook,
                   hookChild = chld,
                   hookRelease = \_loc lg _in -> ioAction lg sHook
@@ -500,7 +500,7 @@ mkPrenode maxThreads =
             thrdHkRs <- newTVarIO tRelease
             pure $
               PN.ThreadHook
-                { title = Just tTag,
+                { title = tTag,
                   threadHook = \_loc lg _in _ti -> runThreaded lg thrdHks, -- :: Loc -> ApLogger -> oi -> ti -> IO to,
                   threadHookChild = chld,
                   threadHookRelease = \_loc lg _tsto -> runThreaded lg thrdHkRs
@@ -528,7 +528,7 @@ mkPrenode maxThreads =
                     threadFxHookRelease = \_loc lg _to -> runThreaded lg thrdHkRs,
                     testHook = \_loc lg _oo _to -> runThreaded lg tstHks,
                     testHookRelease = \_loc lg _tsto -> runThreaded lg tstHkRs,
-                    title = Just tTag,
+                    title = tTag,
                     iterations = mkTest <$> tTests
                   }
 

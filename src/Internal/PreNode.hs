@@ -15,7 +15,7 @@ data Test si ti ii = Test
   }
 
 -- this would be genrated by the TH
-data Fixture oi ti ii oo to io where 
+data Fixture oi ti ii where 
   Fixture ::
     {id :: Text,
      onceHook :: ApLogger -> oi -> IO oo,
@@ -26,9 +26,9 @@ data Fixture oi ti ii oo to io where
      testHookRelease :: ApLogger -> io -> IO (),
      tests :: [Test oo to io]
    } -> 
-   Fixture oi ti ii oo to io
+   Fixture oi ti ii
 
-f1 :: Fixture Int Text Bool Text Int Bool
+f1 :: Fixture Int Text Bool
 f1 = Fixture {
   id = "fixture",
   onceHook = \l int -> pure $ txt int,
@@ -49,7 +49,7 @@ data PreNode oi ti where
   OnceHook ::
     { title :: Text,
       hook :: Loc -> ApLogger -> oi -> IO oo,
-      hookChild :: PreNode oo ti,
+      onceSubNodes :: [PreNode oo ti],
       hookRelease :: Loc -> ApLogger -> oo -> IO ()
     } ->
     PreNode oi ti 
@@ -68,13 +68,13 @@ data PreNode oi ti where
       threadFxHookRelease :: Loc -> ApLogger -> tn -> IO (),
       testHookRelease :: Loc -> ApLogger -> io -> IO (),
       title :: Text,
-      iterations :: [Test oo tn io]
+      fixtures :: [Test oo tn io]
     } ->
     PreNode oi ti 
 
 
 data OnceHook oi oo where 
-  OnceNone :: () -> OnceHook oi oo
+  OnceNone :: () -> OnceHook oi oi
   OnceBefore :: Loc -> ApLogger -> oi -> IO oo -> OnceHook oi oo 
   OnceAround :: {
     hook :: Loc -> ApLogger -> oi -> IO oo,
@@ -87,25 +87,28 @@ data ThreadHook oi ti to where
 
 
     -- todo: 
-    -- change name of tag
-    -- get rid of maybe on tag
-    -- change iterations name
-    -- change iterations test to fixtures
-    -- ?? add maybe to all hooks?????
-      -- how release without a hook
+    -- simplify GADTs :: Done
+    -- change name of tag :: Done
+    -- get rid of maybe on tag :: Done
+    -- change iterations name :: Done
+    -- get rid of branches
+    -- remove once / threadHooks from Fixtures
+    -- how release without a hook
       -- data Hook hook release where 
             -- None |  -- passes through types
             -- Before a | 
             -- After b | 
             -- Around a b
-    -- should we have branches
+    -- root becomes ones hook with OnceNone as hook
+    -- change fixtures from test to fixtures
+    -- consider collapsing threadHook and onceHook types
 
 nodeEmpty :: PreNode oi ti  -> Bool
 nodeEmpty = \case
-  OnceHook {hookChild} -> nodeEmpty hookChild
+  OnceHook {onceSubNodes} -> all nodeEmpty onceSubNodes
   ThreadHook {threadHookChild} -> nodeEmpty threadHookChild
   Branch {subElms} -> all nodeEmpty subElms
-  Fixtures {iterations} -> null iterations
+  Fixtures {fixtures} -> null fixtures
 
 
 

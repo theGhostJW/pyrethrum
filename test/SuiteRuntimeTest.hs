@@ -78,23 +78,23 @@ testProps prefix idx = IOProps (prefix == "" ? txt idx $ prefix <> "." <> txt id
 
 data Template
   = TGroup
-      { tTag :: Text,
+      { tag :: Text,
         tChilds :: [Template]
       }
   | TOnceHook
-      { tTag :: Text,
+      { tag :: Text,
         sHook :: IOProps,
         sRelease :: IOProps,
         tChild :: Template
       }
   | TThreadHook
-      { tTag :: Text,
+      { tag :: Text,
         tHook :: [IOProps],
         tRelease :: [IOProps],
         tChild :: Template
       }
   | TFixture
-      { tTag :: Text,
+      { tag :: Text,
         sHook :: IOProps,
         sRelease :: IOProps,
         tHook :: [IOProps],
@@ -129,7 +129,7 @@ childToParentMap =
       foldTemplate
         (pLoc, accMap)
         ( \(pl, m) t ->
-            let cl = Node pl t.tTag
+            let cl = Node pl t.tag
                 accm = M.insert cl pl m
 
                 mkLoc loc et = (Node loc $ txt et)
@@ -146,7 +146,7 @@ childToParentMap =
                       subMap' L.OnceHookRelease
                     TThreadHook {} ->
                       subMap' L.ThreadHookRelease
-                    TFixture {tTag, tTests} ->
+                    TFixture {tag, tTests} ->
                       let fxloc = cl
                           fxOnceHkloc = mkLoc fxloc L.FixtureOnceHook
                           fxOnceHkReleaseloc = mkLoc fxOnceHkloc L.FixtureOnceHookRelease
@@ -217,9 +217,9 @@ chkFixturesContainTests root tevts =
             TGroup {} -> acc
             TOnceHook {} -> acc
             TThreadHook {} -> acc
-            TFixture {tTag, tTests} ->
+            TFixture {tag, tTests} ->
               M.insert
-                tTag
+                tag
                 (ST.fromList $ testTags tTests)
                 acc
         )
@@ -472,11 +472,11 @@ mkPrenode maxThreads =
         ioAction lggr prps
    in \case
         TGroup
-          { tTag,
+          { tag,
             tChilds
           } -> uu
         TOnceHook
-          { tTag,
+          { tag,
             sHook,
             sRelease,
             tChild
@@ -484,13 +484,13 @@ mkPrenode maxThreads =
             chld <- mkPrenode maxThreads tChild
             pure $
               PN.OnceHook
-                { title = tTag,
+                { title = tag,
                   hook = \_loc lg _in -> ioAction lg sHook,
-                  hookChild = chld,
+                  onceSubNodes = chld,
                   hookRelease = \_loc lg _in -> ioAction lg sHook
                 }
         TThreadHook
-          { tTag,
+          { tag,
             tHook,
             tRelease,
             tChild
@@ -500,13 +500,13 @@ mkPrenode maxThreads =
             thrdHkRs <- newTVarIO tRelease
             pure $
               PN.ThreadHook
-                { title = tTag,
+                { title = tag,
                   threadHook = \_loc lg _in _ti -> runThreaded lg thrdHks, -- :: Loc -> ApLogger -> oi -> ti -> IO to,
                   threadHookChild = chld,
                   threadHookRelease = \_loc lg _tsto -> runThreaded lg thrdHkRs
                 }
         TFixture
-          { tTag,
+          { tag,
             sHook,
             sRelease,
             tHook,
@@ -528,8 +528,8 @@ mkPrenode maxThreads =
                     threadFxHookRelease = \_loc lg _to -> runThreaded lg thrdHkRs,
                     testHook = \_loc lg _oo _to -> runThreaded lg tstHks,
                     testHookRelease = \_loc lg _tsto -> runThreaded lg tstHkRs,
-                    title = tTag,
-                    iterations = mkTest <$> tTests
+                    title = tag,
+                    fixtures = mkTest <$> tTests
                   }
 
 q2List :: TQueue ExeEvent -> STM [ExeEvent]
@@ -1284,7 +1284,7 @@ chkEventCounts t evs = do
 
 validateTemplate :: Template -> IO ()
 validateTemplate t =
-  let tl = (.tTag) <$> templateList t
+  let tl = (.tag) <$> templateList t
       utl = nub tl
    in when (length tl /= length utl) $
         errorS $
@@ -1333,7 +1333,7 @@ alwaysFail = DocFunc "Always Fail" $ pure True
 superSimplSuite :: Template
 superSimplSuite =
   TThreadHook
-    { tTag = "ThreadHook",
+    { tag = "ThreadHook",
       tHook =
         [ IOProps
             { message = "ThreadHook",
@@ -1350,7 +1350,7 @@ superSimplSuite =
         ],
       tChild =
         TOnceHook
-          { tTag = "OnceHook",
+          { tag = "OnceHook",
             sHook =
               IOProps
                 { message = "Once Hook",
@@ -1365,7 +1365,7 @@ superSimplSuite =
                 },
             tChild =
               TFixture
-                { tTag = "Fixture 0",
+                { tag = "Fixture 0",
                   --
                   sHook = testProps "Fixture 0 - Fixture Once Hook" 0 0 PassResult,
                   sRelease = testProps "Fixture 0 - Fixture Once Hook Release" 0 0 PassResult,
@@ -1391,7 +1391,7 @@ unit_simple_single_failure :: IO ()
 unit_simple_single_failure =
   runTest 1 $
     TFixture
-      { tTag = "FX 0",
+      { tag = "FX 0",
         sHook = testProps "Fx 0 - SH" 0 0 PassResult,
         sRelease = testProps "Fx 0 - SHR" 0 0 PassResult,
         tHook = [testProps "Fx 0" 0 0 PassResult],

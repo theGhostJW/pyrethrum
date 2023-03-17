@@ -104,8 +104,8 @@ getStatus =
     getStatusTVar = \case
       XTOHook {status} -> status
       XTTHook {thChildNode} -> getStatusTVar thChildNode
-      XTGroup {nStatus} -> nStatus
-      XTFix {nStatus} -> nStatus
+      XTGroup {status} -> status
+      XTFix {status} -> status
 
 isDone :: Status -> Bool
 isDone = (== Done)
@@ -130,8 +130,8 @@ modifyStatus f et =
   case et of
     XTOHook {status} -> update status
     XTTHook {} -> pure ()
-    XTGroup {nStatus} -> update nStatus
-    XTFix {nStatus} -> update nStatus
+    XTGroup {status} -> update status
+    XTFix {status} -> update status
   where
     update = flip modifyTVar f
 
@@ -156,7 +156,7 @@ data ExeTree oi ti where
       sHook :: Loc -> ApLogger -> oi -> IO oo,
       sHookRelease :: Loc -> ApLogger -> oo -> IO (),
       sHookVal :: TMVar (Either Abandon oo),
-      sChildNode :: ExeTree oo ti
+      oSubNodes :: [ExeTree oo ti]
     } ->
     ExeTree oi ti
   XTTHook ::
@@ -167,15 +167,15 @@ data ExeTree oi ti where
     } ->
     ExeTree oi ti
   XTGroup ::
-    { leafloc :: Loc,
-      nStatus :: TVar Status,
+    { loc :: Loc,
+      status :: TVar Status,
       childNodes :: TQueue (ExeTree oi ti),
       fullyRunning :: TQueue (ExeTree oi ti)
     } ->
     ExeTree oi ti
   XTFix ::
-    { leafloc :: Loc,
-      nStatus :: TVar Status,
+    { loc :: Loc,
+      status :: TVar Status,
       -- in the next layer out these will default to
       -- a IO const funtion that logs Empty which can be filtered
       -- out of the log
@@ -187,7 +187,7 @@ data ExeTree oi ti where
       fxTHookRelease :: Loc -> ApLogger -> to2 -> IO (),
       tHook :: Loc -> ApLogger -> so2 -> to2 -> IO io,
       tHookRelease :: Loc -> ApLogger -> io -> IO (),
-      iterations :: TQueue (Test so2 to2 io),
+      fixtures :: TQueue (Test so2 to2 io),
       runningCount :: TVar Int
     } ->
     ExeTree oi ti
@@ -226,21 +226,21 @@ prepare =
             atomically $ traverse_ (writeTQueue q) c
             pure $
               XTGroup
-                { leafloc = loc,
-                  nStatus = ns,
+                { loc = loc,
+                  status = ns,
                   childNodes = q,
                   fullyRunning = fr
                 }
         PN.OnceHook
           { title,
             hook,
-            hookChild,
+            onceSubNodes,
             hookRelease
           } -> do
             s <- newTVarIO Pending
             v <- newEmptyTMVarIO
             let loc = nodeLoc title
-            child <- prepare' loc 0 hookChild
+            child <- prepare' loc 0 <$> onceSubNodes
             pure $
               XTOHook
                 { loc,
@@ -248,7 +248,7 @@ prepare =
                   sHook = hook,
                   sHookRelease = hookRelease,
                   sHookVal = v,
-                  sChildNode = child
+                  oSubNodes = child
                 }
         PN.ThreadHook
           { title,
@@ -267,7 +267,7 @@ prepare =
             testHook,
             testHookRelease,
             title,
-            iterations
+            fixtures
           } ->
             do
               let loc = nodeLoc title
@@ -279,12 +279,12 @@ prepare =
               q <- newTQueueIO
               v <- newEmptyTMVarIO
               runningCount <- newTVarIO 0
-              atomically $ traverse_ (writeTQueue q . converTest) iterations
+              atomically $ traverse_ (writeTQueue q . converTest) fixtures
               pure $
                 XTFix
-                  { leafloc = loc,
-                    nStatus = ns,
-                    iterations = q,
+                  { loc = loc,
+                    status = ns,
+                    fixtures = q,
                     runningCount,
                     fxOHookStatus = ohs,
                     fxOHookVal = v,
@@ -461,7 +461,7 @@ executeNode logger hkIn rg =
             sHook,
             sHookRelease,
             sHookVal,
-            sChildNode
+            oSubNodes
           } ->
             do
               -- onceHookVal:
@@ -471,7 +471,7 @@ executeNode logger hkIn rg =
               --  4. returns hook result
               -- must run for logging even if hkIn is Left
               let nxtHkIn so = (\exi -> exi {singletonIn = so}) <$> hkIn
-                  recurse a = exeNxt a sChildNode
+                  recurse a = exeNxt a oSubNodes
                   ctx = context hookLoc
                   releaseContext = context . Node hookLoc $ txt L.OnceHookRelease
               eso <- onceHookVal logger L.OnceHook siHkIn sHook status sHookVal ctx
@@ -483,7 +483,7 @@ executeNode logger hkIn rg =
                 )
                 ( do
                     wantRelease <- atomically $ do
-                      cs <- getStatus sChildNode
+                      cs <- getStatus oSubNodes
                       s <- readTVar status
                       pure $ cs == Done && s < HookFinalising
                     when wantRelease $
@@ -509,12 +509,12 @@ executeNode logger hkIn rg =
                 )
                 (releaseHook logger L.ThreadHookRelease eto releaseCtx thHookRelease)
         self@XTGroup
-          { leafloc,
-            nStatus,
+          { loc,
+            status,
             childNodes,
             fullyRunning
           } ->
-            withStartEnd logger leafloc L.Group recurse
+            withStartEnd logger loc L.Group recurse
             where
               -- when the last thread finishes child nodes and fully running will be done
               recurse =
@@ -525,7 +525,7 @@ executeNode logger hkIn rg =
 
               updateStatusFromQs :: STM ()
               updateStatusFromQs = do
-                s <- readTVar nStatus
+                s <- readTVar status
                 isDone s
                   ? pure ()
                   $ do
@@ -535,8 +535,8 @@ executeNode logger hkIn rg =
                     mtFullyRunning <- isEmptyTQueue fullyRunning
                     let completed = mtChilds && mtFullyRunning
                     if
-                        | completed -> writeTVar nStatus Done
-                        | mtChilds -> writeTVar nStatus FullyRunning
+                        | completed -> writeTVar status Done
+                        | mtChilds -> writeTVar status FullyRunning
                         | otherwise -> pure ()
 
               nxtChildNode =
@@ -551,7 +551,7 @@ executeNode logger hkIn rg =
                          in getStatus cld
                               >>= \case
                                 Pending ->
-                                  setStatusRunning nStatus >> qChldReturn
+                                  setStatusRunning status >> qChldReturn
                                 HookExecuting ->
                                   -- just plonk on the end of the q and go around again
                                   -- may pick up same node if there is only one node running but that is ok
@@ -564,9 +564,9 @@ executeNode logger hkIn rg =
                                 Done -> nxtChildNode
                     )
         fx@XTFix
-          { nStatus,
-            leafloc,
-            iterations,
+          { status,
+            loc,
+            fixtures,
             runningCount,
             fxOHookStatus,
             fxOHookVal,
@@ -577,13 +577,13 @@ executeNode logger hkIn rg =
             tHook,
             tHookRelease
           } ->
-            withStartEnd logger leafloc L.Fixture $ do
+            withStartEnd logger loc L.Fixture $ do
               eso <- onceHookVal logger L.FixtureOnceHook siHkIn fxOHook fxOHookStatus fxOHookVal onceHkCtx
               fxIn <- threadHookVal logger (liftA2 ExeIn eso $ (.threadIn) <$> hkIn) L.FixtureThreadHook fxTHook threadHkCtx
               recurse $ liftA2 ExeIn eso fxIn
             where
-              ctx = context leafloc
-              onceHkLoc = Node leafloc $ txt L.FixtureOnceHook
+              ctx = context loc
+              onceHkLoc = Node loc $ txt L.FixtureOnceHook
               onceHkCtx = context onceHkLoc
               thrdHkLoc = Node onceHkLoc $ txt L.FixtureThreadHook
               onceHkReleaseCtx = context . Node onceHkLoc $ txt L.FixtureOnceHookRelease
@@ -596,7 +596,7 @@ executeNode logger hkIn rg =
               tstLoc tstid = Node (tstHkloc tstid) $ txt L.Test <<::>> tstid
               recurse fxIpts = do
                 etest <- atomically $ do
-                  mtest <- tryReadTQueue iterations
+                  mtest <- tryReadTQueue fixtures
                   mtest
                     & maybe
                       ( do
@@ -605,18 +605,18 @@ executeNode logger hkIn rg =
                             <$> if
                                 | r < 0 -> error "framework error - this should not happen - running count below zero"
                                 | r == 0 -> pure True
-                                | otherwise -> writeTVar nStatus FullyRunning >> pure False
+                                | otherwise -> writeTVar status FullyRunning >> pure False
                       )
                       ( \t -> do
                           modifyTVar runningCount succ
-                          setStatusRunning nStatus
+                          setStatusRunning status
                           pure $ Right t
                       )
                 etest
                   & either
                     ( \done -> do
                         when done $
-                          atomically (writeTVar nStatus Done)
+                          atomically (writeTVar status Done)
                         releaseHook logger L.FixtureThreadHookRelease ((.threadIn) <$> fxIpts) threadHkReleaseCtx fxTHookRelease
                         when done $
                           releaseHookUpdateStatus logger L.FixtureOnceHookRelease fxOHookStatus ((.singletonIn) <$> fxIpts) onceHkReleaseCtx fxOHookRelease

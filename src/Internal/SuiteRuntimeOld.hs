@@ -83,7 +83,7 @@ data Node si so ti to where
   ThreadHook ::
     { hookLabel :: Text,
       threadHook:: ti -> IO to,
-      hookChild :: IO (Node si so to to2),
+      onceSubNodes :: IO (Node si so to to2),
       threadHookRelease :: to -> IO ()
     } ->
     Node si so ti to
@@ -316,14 +316,14 @@ linkParents' db parent preNode =
   do
     db "!!!!!!!! CALLING linkParents' (PRIME) !!!!! "
     case preNode of
-      PN.OnceHook {hookAddress, hook, hookStatus, hookResult, hookChild, hookRelease} -> do
+      PN.OnceHook {hookAddress, hook, hookStatus, hookResult, onceSubNodes, hookRelease} -> do
         let h :: Node o o' to to'
             h =  Internal.SuiteRuntimeOld.SingletonHook
                 { hookLabel = hookAddress,
                   hookStatus = hookStatus,
                   hook = hook,
                   hookResult = hookResult,
-                  singletonHookChild = linkParents' db (Right h) hookChild,
+                  singletonHookChild = linkParents' db (Right h) onceSubNodes,
                   singletonHookRelease = hookRelease
                 }
          in pure h

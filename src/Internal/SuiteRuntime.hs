@@ -240,7 +240,7 @@ prepare =
             s <- newTVarIO Pending
             v <- newEmptyTMVarIO
             let loc = nodeLoc title
-            child <- prepare' loc 0 <$> onceSubNodes
+            child <- traverse (prepare' loc 0) onceSubNodes
             pure $
               XTOHook
                 { loc,
@@ -476,16 +476,15 @@ executeNode logger hkIn rg =
                   releaseContext = context . Node hookLoc $ txt L.OnceHookRelease
               eso <- onceHookVal logger L.OnceHook siHkIn sHook status sHookVal ctx
               finally
-                ( either
+                ( eso & either
                     (recurse . Left)
                     (recurse . nxtHkIn)
-                    eso
                 )
                 ( do
                     wantRelease <- atomically $ do
-                      cs <- getStatus oSubNodes
+                      childStatuses <- traverse getStatus oSubNodes
                       s <- readTVar status
-                      pure $ cs == Done && s < HookFinalising
+                      pure $ all (== Done) childStatuses && s < HookFinalising
                     when wantRelease $
                       releaseHookUpdateStatus logger L.OnceHookRelease status eso releaseContext sHookRelease
                 )
@@ -666,8 +665,8 @@ executeNode logger hkIn rg =
     siHkIn :: Either Abandon oi
     siHkIn = (.singletonIn) <$> hkIn
 
-    exeNxt :: forall oi' ti'. Either Abandon (ExeIn oi' ti') -> ExeTree oi' ti'-> IO ()
-    exeNxt = executeNode logger
+    exeNxt :: forall oi' ti'. Either Abandon (ExeIn oi' ti') -> [ExeTree oi' ti']-> IO ()
+    exeNxt = traverse (executeNode logger)
 
     nxtAbandon :: Loc -> ExeEventType -> SomeException -> Abandon
     nxtAbandon loc' et e = fromLeft (Abandon loc' et e) hkIn

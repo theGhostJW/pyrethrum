@@ -56,14 +56,10 @@ data PreNode oi ti where
     } ->
     PreNode oi ti
   Fixtures :: { 
-      onceFxHook :: Loc -> ApLogger -> oi -> IO oo,
-      threadFxHook :: Loc -> ApLogger -> oo -> ti -> IO tn,
-      testHook :: Loc -> ApLogger -> oo -> tn -> IO io,
-      onceFxHookRelease :: Loc -> ApLogger -> oo -> IO (),
-      threadFxHookRelease :: Loc -> ApLogger -> tn -> IO (),
+      testHook :: Loc -> ApLogger -> oi -> ti -> IO io,
       testHookRelease :: Loc -> ApLogger -> io -> IO (),
       title :: Text,
-      fixtures :: [Test oo tn io]
+      fixtures :: [Test oi ti io]
     } ->
     PreNode oi ti 
 
@@ -87,14 +83,13 @@ data ThreadHook oi ti to where
     -- get rid of maybe on tag :: Done
     -- change iterations name :: Done
     -- get rid of branches :: Done
-    -- remove once / threadHooks from Fixtures
+    -- remove once / threadHooks from Fixtures :: Done
     -- how release without a hook
       -- data Hook hook release where 
             -- None |  -- passes through types
             -- Before a | 
             -- After b | 
             -- Around a b
-    -- root becomes ones hook with OnceNone as hook
     -- change fixtures from test to fixtures
     -- collapse threadHook and onceHook types
     -- rewrite executeNode
@@ -102,6 +97,7 @@ data ThreadHook oi ti to where
         -- stm bool on once hook executing 
         -- \case direct functions for done / can run
     -- reinstate tests
+    -- root becomes ones hook with OnceNone as hook
 
 nodeEmpty :: PreNode oi ti  -> Bool
 nodeEmpty = \case

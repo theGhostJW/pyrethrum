@@ -7,7 +7,7 @@ import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both, uncurry3)
 import GHC.Exts
-import Internal.PreNode (PreNode (testHook), PreNodeRoot)
+import Internal.PreNode (PreNode (testHook), PreNodeRoot, OnceHook)
 import qualified Internal.PreNode as PN
   ( PreNode (..),
     PreNodeRoot,
@@ -84,7 +84,7 @@ import UnliftIO.STM
   )
 import Prelude hiding (newEmptyTMVarIO, newTVarIO, atomically)
 import PyrethrumExtras hiding (finally)
-import BasePrelude (retry)
+import BasePrelude (retry, NonTermination)
 import UnliftIO.Concurrent
 
 data Status
@@ -150,8 +150,7 @@ data ExeTree oi ti where
   XTOHook ::
     { loc :: Loc,
       status :: TVar Status,
-      sHook :: Loc -> ApLogger -> oi -> IO oo,
-      sHookRelease :: Loc -> ApLogger -> oo -> IO (),
+      sHook :: OnceHook oi oo,
       sHookVal :: TMVar (Either Abandon oo),
       oSubNodes :: XTGroup oo ti
     } ->
@@ -166,18 +165,9 @@ data ExeTree oi ti where
   XTFix ::
     { loc :: Loc,
       status :: TVar Status,
-      -- in the next layer out these will default to
-      -- a IO const funtion that logs Empty which can be filtered
-      -- out of the log
-      fxOHookStatus :: TVar Status,
-      fxOHookVal :: TMVar (Either Abandon so2),
-      fxOHook :: Loc -> ApLogger -> oi -> IO so2,
-      fxOHookRelease :: Loc -> ApLogger -> so2 -> IO (),
-      fxTHook :: Loc -> ApLogger -> so2 -> ti -> IO to2,
-      fxTHookRelease :: Loc -> ApLogger -> to2 -> IO (),
-      tHook :: Loc -> ApLogger -> so2 -> to2 -> IO io,
+      tHook :: Loc -> ApLogger -> oi -> ti -> IO io,
       tHookRelease :: Loc -> ApLogger -> io -> IO (),
-      fixtures :: TQueue (Test so2 to2 io),
+      fixtures :: TQueue (Test oi ti io),
       runningCount :: TVar Int
     } ->
     ExeTree oi ti
@@ -221,8 +211,7 @@ prepare =
         PN.OnceHook
           { title,
             hook,
-            onceSubNodes,
-            hookRelease
+            onceSubNodes
           } -> do
             s <- newTVarIO Pending
             v <- newEmptyTMVarIO
@@ -233,7 +222,6 @@ prepare =
                 { loc,
                   status = s,
                   sHook = hook,
-                  sHookRelease = hookRelease,
                   sHookVal = v,
                   oSubNodes = child
                 }
@@ -253,10 +241,7 @@ prepare =
                thSubNodes = subMods
               }
         PN.Fixtures
-          { onceFxHook,
-            onceFxHookRelease,
-            threadFxHook,
-            threadFxHookRelease,
+          { 
             testHook,
             testHookRelease,
             title,
@@ -264,13 +249,9 @@ prepare =
           } ->
             do
               let loc = nodeLoc title
-                  onceHkLoc = Node loc $ txt L.FixtureOnceHook
-                  threadHkLoc = Node onceHkLoc $ txt L.FixtureThreadHook
                   converTest PN.Test {tstId, tst} = Test tstId tst
               s <- newTVarIO Pending
-              ohs <- newTVarIO Pending
               q <- newTQueueIO
-              v <- newEmptyTMVarIO
               runningCount <- newTVarIO 0
               atomically $ traverse_ (writeTQueue q . converTest) fixtures
               pure $
@@ -279,12 +260,6 @@ prepare =
                     status = s,
                     fixtures = q,
                     runningCount,
-                    fxOHookStatus = ohs,
-                    fxOHookVal = v,
-                    fxOHook = onceFxHook,
-                    fxOHookRelease = onceFxHookRelease,
-                    fxTHook = threadFxHook,
-                    fxTHookRelease = threadFxHookRelease,
                     tHook = testHook,
                     tHookRelease = testHookRelease
                   }
@@ -452,7 +427,6 @@ executeNode logger hkIn rg =
           { loc = hookLoc,
             status,
             sHook,
-            sHookRelease,
             sHookVal,
             oSubNodes = XTGroup {status = childrenStatus}
           } ->
@@ -560,30 +534,18 @@ executeNode logger hkIn rg =
             loc,
             fixtures,
             runningCount,
-            fxOHookStatus,
-            fxOHookVal,
-            fxOHook,
-            fxOHookRelease,
-            fxTHook,
-            fxTHookRelease,
             tHook,
             tHookRelease
           } ->
             withStartEnd logger loc L.Fixture $ do
-              eso <- onceHookVal logger L.FixtureOnceHook siHkIn fxOHook fxOHookStatus fxOHookVal onceHkCtx
-              fxIn <- threadHookVal logger (liftA2 ExeIn eso $ (.threadIn) <$> hkIn) L.FixtureThreadHook fxTHook threadHkCtx
-              recurse $ liftA2 ExeIn eso fxIn
+              -- eso <- onceHookVal logger L.FixtureOnceHook siHkIn fxOHook fxOHookStatus fxOHookVal onceHkCtx
+              -- fxIn <- threadHookVal logger (liftA2 ExeIn eso $ (.threadIn) <$> hkIn) L.FixtureThreadHook fxTHook threadHkCtx
+              recurse hkIn
             where
-              ctx = context loc
-              onceHkLoc = Node loc $ txt L.FixtureOnceHook
-              onceHkCtx = context onceHkLoc
-              thrdHkLoc = Node onceHkLoc $ txt L.FixtureThreadHook
-              onceHkReleaseCtx = context . Node onceHkLoc $ txt L.FixtureOnceHookRelease
-              threadHkCtx = context thrdHkLoc
-              threadHkReleaseCtx = context . Node thrdHkLoc $ txt L.FixtureThreadHookRelease
+              -- ctx = context loc
 
               (<<::>>) t i = t <> " :: " <> i
-              tstHkloc tstid = Node thrdHkLoc $ txt L.TestHook <<::>> tstid
+              tstHkloc tstid = Node loc $ txt L.TestHook <<::>> tstid
               tstHkReleaseloc tstid = Node (tstHkloc tstid) $ txt L.TestHookRelease <<::>> tstid
               tstLoc tstid = Node (tstHkloc tstid) $ txt L.Test <<::>> tstid
               recurse fxIpts = do
@@ -609,9 +571,6 @@ executeNode logger hkIn rg =
                     ( \done -> do
                         when done $
                           atomically (writeTVar status Done)
-                        releaseHook logger L.FixtureThreadHookRelease ((.threadIn) <$> fxIpts) threadHkReleaseCtx fxTHookRelease
-                        when done $
-                          releaseHookUpdateStatus logger L.FixtureOnceHookRelease fxOHookStatus ((.singletonIn) <$> fxIpts) onceHkReleaseCtx fxOHookRelease
                     )
                     ( \Test {tstId, tst} -> do
                         io <- runTestHook (tstHkloc tstId) fxIpts tHook

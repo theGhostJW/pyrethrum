@@ -43,9 +43,8 @@ f1 = Fixture {
 data PreNode oi ti where
   OnceHook ::
     { title :: Text,
-      hook :: Loc -> ApLogger -> oi -> IO oo,
-      onceSubNodes :: [PreNode oo ti],
-      hookRelease :: Loc -> ApLogger -> oo -> IO ()
+      hook :: OnceHook oi oo,
+      onceSubNodes :: [PreNode oo ti]
     } ->
     PreNode oi ti 
   ThreadHook ::
@@ -73,8 +72,25 @@ data OnceHook oi oo where
   } -> OnceHook oi oo
 data ThreadHook oi ti to where 
   ThreadNone :: () -> ThreadHook oi ti ti
-  ThreadBefore :: Loc -> ApLogger -> oi -> IO oo -> ThreadHook oi ti to
-  ThreadAround :: Loc -> ApLogger -> oi -> IO oo -> ThreadHook oi ti to
+  ThreadBefore :: Loc -> ApLogger -> oi -> ti -> IO to -> ThreadHook oi ti to
+  ThreadAround :: {
+    hook :: Loc -> ApLogger -> oi -> ti -> IO to -> ThreadHook oi ti to,
+    release :: Loc -> ApLogger -> to -> IO ()
+  } -> ThreadHook oi ti to
+
+data TestHook oi ti tsto where 
+  TestNone :: () -> TestHook i ti ()
+  TestBefore :: Loc -> ApLogger -> oi -> ti -> IO tsto -> TestHook i ti tsto
+  TestAround :: {
+    hook :: Loc -> ApLogger -> oi -> ti -> IO tsto -> TestHook oi ti tsto,
+    release :: Loc -> ApLogger -> tsto -> IO ()
+   } -> TestHook oi ti tsto
+
+
+-- data ThreadHook oi ti to where 
+--   ThreadNone :: () -> ThreadHook oi ti ti
+--   ThreadBefore :: Loc -> ApLogger -> oi -> IO oo -> ThreadHook oi ti to
+--   ThreadAround :: Loc -> ApLogger -> oi -> IO oo -> ThreadHook oi ti to
 
 
     -- todo: 

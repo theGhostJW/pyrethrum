@@ -41,11 +41,6 @@ f1 = Fixture {
   tests = []
 }
 data PreNode oi ti where
-  Branch ::
-    { title :: Text,
-      subElms :: [PreNode oi ti]
-    } ->
-    PreNode oi ti
   OnceHook ::
     { title :: Text,
       hook :: Loc -> ApLogger -> oi -> IO oo,
@@ -56,7 +51,7 @@ data PreNode oi ti where
   ThreadHook ::
     { title :: Text,
       threadHook :: Loc -> ApLogger -> oi -> ti -> IO tn,
-      threadHookChild :: PreNode oi tn,
+      threadSubNodes :: [PreNode oi tn],
       threadHookRelease :: Loc -> ApLogger -> tn -> IO ()
     } ->
     PreNode oi ti
@@ -91,7 +86,7 @@ data ThreadHook oi ti to where
     -- change name of tag :: Done
     -- get rid of maybe on tag :: Done
     -- change iterations name :: Done
-    -- get rid of branches
+    -- get rid of branches :: Done
     -- remove once / threadHooks from Fixtures
     -- how release without a hook
       -- data Hook hook release where 
@@ -101,13 +96,17 @@ data ThreadHook oi ti to where
             -- Around a b
     -- root becomes ones hook with OnceNone as hook
     -- change fixtures from test to fixtures
-    -- consider collapsing threadHook and onceHook types
+    -- collapse threadHook and onceHook types
+    -- rewrite executeNode
+      -- get rid of getStatus 
+        -- stm bool on once hook executing 
+        -- \case direct functions for done / can run
+    -- reinstate tests
 
 nodeEmpty :: PreNode oi ti  -> Bool
 nodeEmpty = \case
   OnceHook {onceSubNodes} -> all nodeEmpty onceSubNodes
-  ThreadHook {threadHookChild} -> nodeEmpty threadHookChild
-  Branch {subElms} -> all nodeEmpty subElms
+  ThreadHook {threadSubNodes} -> all nodeEmpty threadSubNodes
   Fixtures {fixtures} -> null fixtures
 
 

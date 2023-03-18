@@ -330,7 +330,7 @@ linkParents' db parent preNode =
       PN.ThreadHook
         { threadHookAddress, -- used in testing
           threadHook,
-          threadHookChild,
+          threadSubNodes,
           threadHookRelease
         } -> uu
       PN.Branch {branchAddress, subElms} -> uu

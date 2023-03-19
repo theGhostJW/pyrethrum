@@ -64,8 +64,13 @@ data PreNode oi ti where
 
 
 data OnceHook oi oo where 
-  OnceNone :: () -> OnceHook oi oi
-  OnceBefore :: Loc -> ApLogger -> oi -> IO oo -> OnceHook oi oo 
+  OnceNone :: OnceHook oi oi
+  OnceBefore :: {
+    hook ::Loc -> ApLogger -> oi -> IO oo 
+  } -> OnceHook oi oo 
+  OnceAfter :: {
+   releaseOnly :: Loc -> ApLogger -> oi -> IO ()
+  } -> OnceHook oi oi
   OnceAround :: {
     hook :: Loc -> ApLogger -> oi -> IO oo,
     release :: Loc -> ApLogger -> oo -> IO ()
@@ -73,6 +78,7 @@ data OnceHook oi oo where
 data ThreadHook oi ti to where 
   ThreadNone :: () -> ThreadHook oi ti ti
   ThreadBefore :: Loc -> ApLogger -> oi -> ti -> IO to -> ThreadHook oi ti to
+  here
   ThreadAround :: {
     hook :: Loc -> ApLogger -> oi -> ti -> IO to -> ThreadHook oi ti to,
     release :: Loc -> ApLogger -> to -> IO ()

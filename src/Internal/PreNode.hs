@@ -49,9 +49,8 @@ data PreNode oi ti where
     PreNode oi ti 
   ThreadHook ::
     { title :: Text,
-      threadHook :: Loc -> ApLogger -> oi -> ti -> IO tn,
-      threadSubNodes :: [PreNode oi tn],
-      threadHookRelease :: Loc -> ApLogger -> tn -> IO ()
+      threadHook :: ThreadHook oi ti to,
+      threadSubNodes :: [PreNode oi to]
     } ->
     PreNode oi ti
   Fixtures :: { 
@@ -75,12 +74,17 @@ data OnceHook oi oo where
     hook :: Loc -> ApLogger -> oi -> IO oo,
     release :: Loc -> ApLogger -> oo -> IO ()
   } -> OnceHook oi oo
+
 data ThreadHook oi ti to where 
-  ThreadNone :: () -> ThreadHook oi ti ti
-  ThreadBefore :: Loc -> ApLogger -> oi -> ti -> IO to -> ThreadHook oi ti to
-  here
+  ThreadNone :: ThreadHook oi ti ti
+  ThreadBefore :: { 
+    hook :: Loc -> ApLogger -> oi -> ti -> IO to 
+  } -> ThreadHook oi ti to 
+  ThreadAfter :: {
+    releaseOnly :: Loc -> ApLogger -> ti -> IO ()
+  } -> ThreadHook oi ti ti
   ThreadAround :: {
-    hook :: Loc -> ApLogger -> oi -> ti -> IO to -> ThreadHook oi ti to,
+    hook :: Loc -> ApLogger -> oi -> ti -> IO to,
     release :: Loc -> ApLogger -> to -> IO ()
   } -> ThreadHook oi ti to
 
@@ -112,10 +116,15 @@ data TestHook oi ti tsto where
             -- Before a | 
             -- After b | 
             -- Around a b
-    -- change fixtures from test to fixtures
+            -- OnceHook :: DONE
+            -- ThreadHook :: DONE
+            -- EachHook :: TODO
     -- collapse threadHook and onceHook types
+    -- loc should not  include event type it should be node address
+    -- change fixtures from test to fixtures
     -- rewrite executeNode
-      -- get rid of getStatus 
+      -- reimplement uu
+      -- get rid of getStatus ??
         -- stm bool on once hook executing 
         -- \case direct functions for done / can run
     -- reinstate tests

@@ -8,7 +8,7 @@ import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both, uncurry3)
 import GHC.Exts
-import Internal.PreNode (OnceHook (..), PreNode (testHook), PreNodeRoot)
+import Internal.PreNode (OnceHook (..), PreNode (testHook), PreNodeRoot, ThreadHook (..))
 import qualified Internal.PreNode as PN (
   PreNode (..),
   PreNodeRoot,
@@ -156,8 +156,7 @@ data ExeTree oi ti where
     ExeTree oi ti
   XTTHook ::
     { loc :: Loc
-    , thHook :: Loc -> ApLogger -> oi -> ti -> IO to
-    , thHookRelease :: Loc -> ApLogger -> to -> IO ()
+    , thHook :: ThreadHook oi ti to
     , thSubNodes :: XTGroup oi to
     } ->
     ExeTree oi ti
@@ -227,7 +226,6 @@ prepare =
         { title
         , threadHook
         , threadSubNodes
-        , threadHookRelease
         } ->
           let loc = nodeLoc title
            in do
@@ -236,7 +234,6 @@ prepare =
                   XTTHook
                     { loc = loc
                     , thHook = threadHook
-                    , thHookRelease = threadHookRelease
                     , thSubNodes = subMods
                     }
       PN.Fixtures
@@ -332,14 +329,21 @@ abandonnedHookVal hkEvent logger abandon hs hkVal loc =
         >>= atomically . setRunningVal hs hkVal
     )
 
-threadHookVal :: forall so hi ho. Logger -> Either Abandon (ExeIn so hi) -> ExeEventType -> (Loc -> ApLogger -> so -> hi -> IO ho) -> Context -> IO (Either Abandon ho)
-threadHookVal logger hkIn hkEvent hook ctx@Context{cloc, apLogger} =
+threadHookVal :: forall oi ti to. Logger -> Either Abandon (ExeIn oi ti) -> ThreadHook oi ti to -> Context -> IO (Either Abandon to)
+threadHookVal logger hkIn thook ctx@Context{cloc, apLogger} =
   hkIn
     & either
-      (\abandon -> abandonLogHook hkEvent logger abandon cloc)
+      (\abandon -> abandonLogHook L.ThreadHook logger abandon cloc)
       ( \(ExeIn oi ti) ->
-          let thrdHk loc aplgr = hook loc aplgr oi
-           in runLogHook hkEvent logger thrdHk ti ctx
+          let
+            thrdHk hook'' loc aplgr = hook'' loc aplgr oi
+            runHook hook' = runLogHook L.ThreadHook logger (thrdHk hook') ti ctx
+           in
+            thook & \case
+              ThreadNone -> pure $ Right ti
+              ThreadBefore{hook} -> runHook hook
+              ThreadAfter{} -> pure $ Right ti
+              ThreadAround{hook} -> runHook hook
       )
 
 onceHookVal :: forall hi ho. Logger -> ExeEventType -> Either Abandon hi -> OnceHook hi ho -> TVar Status -> TMVar (Either Abandon ho) -> Context -> IO (Either Abandon ho)
@@ -381,7 +385,14 @@ releaseHook logger evt eho ctx@Context{cloc, apLogger} hkRelease =
               (logger . mkFailure cloc evt ("Hook Release Failed: " <> txt evt <> " " <> txt cloc))
         )
 
--- releaseHookUpdateStatus :: Logger -> ExeEventType -> TVar Status -> Either Abandon oo -> Context -> OnceHook oi oo -> IO ()
+releaseHookUpdateStatus ::
+  Logger ->
+  ExeEventType ->
+  TVar Status ->
+  Either Abandon ho ->
+  Context ->
+  OnceHook oi ho ->
+  IO ()
 releaseHookUpdateStatus logger evt ns eho ctx hk =
   finally
     ( hk & \case
@@ -422,7 +433,7 @@ data Abandon = Abandon
   deriving (Show)
 
 data ExeIn oi ti = ExeIn
-  { singletonIn :: oi
+  { onceIn :: oi
   , threadIn :: ti
   }
 
@@ -452,7 +463,7 @@ executeNode logger hkIn rg =
               --  3. updates hook status to running
               --  4. returns hook result
               -- must run for logging even if hkIn is Left
-              let nxtHkIn so = (\exi -> exi{singletonIn = so}) <$> hkIn
+              let nxtHkIn so = (\exi -> exi{onceIn = so}) <$> hkIn
                   recurse a = uu -- to doexeNxt a oSubNodes
                   ctx = context hookLoc
                   releaseContext = context . Node hookLoc $ txt L.OnceHookRelease
@@ -476,7 +487,6 @@ executeNode logger hkIn rg =
         XTTHook
           { loc = hookLoc
           , thHook
-          , thHookRelease
           , thSubNodes
           } ->
             do
@@ -484,14 +494,22 @@ executeNode logger hkIn rg =
                   recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
                   hkCtx = context hookLoc
                   releaseCtx = context . Node hookLoc $ txt L.ThreadHookRelease
-              eto <- threadHookVal logger hkIn L.ThreadHook thHook hkCtx
+              eto <- threadHookVal logger hkIn thHook hkCtx
               finally
                 ( either
                     (recurse . Left)
                     (recurse . nxtHkIn)
                     eto
                 )
-                (releaseHook logger L.ThreadHookRelease eto releaseCtx thHookRelease)
+                ( let
+                    doRelease = releaseHook logger L.ThreadHookRelease eto releaseCtx
+                   in
+                    thHook & \case
+                      ThreadNone -> pure ()
+                      ThreadBefore{} -> pure ()
+                      ThreadAfter{releaseOnly} -> doRelease releaseOnly
+                      ThreadAround{release} -> doRelease release
+                )
         -- self@XTGroup
         --   { loc,
         --     status,
@@ -633,7 +651,7 @@ executeNode logger hkIn rg =
                   )
  where
   siHkIn :: Either Abandon oi
-  siHkIn = (.singletonIn) <$> hkIn
+  siHkIn = (.onceIn) <$> hkIn
 
   exeNxt :: forall oi' ti'. Either Abandon (ExeIn oi' ti') -> ExeTree oi' ti' -> IO ()
   exeNxt = executeNode logger

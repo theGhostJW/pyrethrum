@@ -132,6 +132,7 @@
 * add refreeze task => https://github.com/haskell/cabal/issues/8047#issuecomment-1069647944
 * weeder analysis
 * flags for context specific optimisation - eg optomise in CI
+* Higher Order Purity with Pyrethrum
 
 ```haskell
 -- TODO - add tests add to pyrelude

@@ -8,7 +8,7 @@ import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty), empty, replicateM)
 import Data.Tuple.Extra (both, uncurry3)
 import GHC.Exts
-import Internal.PreNode (OnceHook (..), PreNode (testHook), PreNodeRoot, ThreadHook (..))
+import Internal.PreNode (OnceHook (..), PreNode (testHook), PreNodeRoot, TestHook (..), ThreadHook (..))
 import qualified Internal.PreNode as PN (
   PreNode (..),
   PreNodeRoot,
@@ -163,9 +163,8 @@ data ExeTree oi ti where
   XTFix ::
     { loc :: Loc
     , status :: TVar Status
-    , tHook :: Loc -> ApLogger -> oi -> ti -> IO io
-    , tHookRelease :: Loc -> ApLogger -> io -> IO ()
-    , fixtures :: TQueue (Test oi ti io)
+    , tHook :: TestHook oi ti tsto
+    , fixtures :: TQueue (Test oi ti tsto)
     , runningCount :: TVar Int
     } ->
     ExeTree oi ti
@@ -238,7 +237,6 @@ prepare =
                     }
       PN.Fixtures
         { testHook
-        , testHookRelease
         , title
         , fixtures
         } ->
@@ -256,7 +254,6 @@ prepare =
                 , fixtures = q
                 , runningCount
                 , tHook = testHook
-                , tHookRelease = testHookRelease
                 }
 
 logAbandonned :: Logger -> Loc -> ExeEventType -> Abandon -> IO ()
@@ -382,6 +379,18 @@ releaseHook logger evt eho ctx@Context{cloc, apLogger} hkRelease =
         ( \so ->
             catchAll
               (hkRelease cloc apLogger so)
+              (logger . mkFailure cloc evt ("Hook Release Failed: " <> txt evt <> " " <> txt cloc))
+        )
+
+releaseHookSimple :: Logger -> ExeEventType -> Either Abandon ho -> Context -> (Loc -> ApLogger -> IO ()) -> IO ()
+releaseHookSimple logger evt eho ctx@Context{cloc, apLogger} hkRelease =
+  withStartEnd logger cloc evt $
+    eho
+      & either
+        (logAbandonned logger cloc evt)
+        ( \so ->
+            catchAll
+              (hkRelease cloc apLogger)
               (logger . mkFailure cloc evt ("Hook Release Failed: " <> txt evt <> " " <> txt cloc))
         )
 
@@ -571,7 +580,6 @@ executeNode logger hkIn rg =
           , fixtures
           , runningCount
           , tHook
-          , tHookRelease
           } ->
             withStartEnd logger loc L.Fixture $ do
               -- eso <- onceHookVal logger L.FixtureOnceHook siHkIn fxOHook fxOHookStatus fxOHookVal onceHkCtx
@@ -609,9 +617,9 @@ executeNode logger hkIn rg =
                         atomically (writeTVar status Done)
                   )
                   ( \Test{tstId, tst} -> do
-                      io <- runTestHook (tstHkloc tstId) fxIpts tHook
+                      to <- runTestHook (tstHkloc tstId) fxIpts tHook
                       let unpak io' (ExeIn so2 to2) = (so2, to2, io')
-                          ethInputs = liftA2 unpak io fxIpts
+                          ethInputs = liftA2 unpak to fxIpts
                           testLoc = tstLoc tstId
 
                       finally
@@ -624,27 +632,52 @@ executeNode logger hkIn rg =
                                   (logFailure' (tstLoc tstId) L.Test)
                         )
                         do
-                          releaseHook logger L.TestHookRelease io (context $ tstHkReleaseloc tstId) tHookRelease
+                          releaseTestHook tstId to tHook
                           atomically (modifyTVar runningCount pred)
                           recurse fxIpts
                   )
 
-            runTestHook :: forall io' so' to'. Loc -> Either Abandon (ExeIn so' to') -> (Loc -> ApLogger -> so' -> to' -> IO io') -> IO (Either Abandon io')
+            releaseTestHook :: forall so' to' tsto'. Text -> Either Abandon tsto' -> TestHook so' to' tsto' -> IO ()
+            releaseTestHook tstId to = \case
+              TestNone -> noRelease
+              TestBefore{} -> noRelease
+              TestAfter{releaseOnly} -> runRelease uu -- releaseOnly
+              TestAround{release} -> runRelease release
+             where
+              noRelease = pure ()
+              runRelease = releaseHook logger L.TestHookRelease to (context $ tstHkReleaseloc tstId)
+
+            runTestHook :: forall io' so' to'. Loc -> Either Abandon (ExeIn so' to') -> TestHook so' to' io' -> IO (Either Abandon io')
             runTestHook hkLoc fxIpts testHk =
               do
-                withStartEnd logger hkLoc L.TestHook $
-                  either
+                fxIpts
+                  & either
                     logReturnAbandonned
                     runHook
-                    fxIpts
              where
               logReturnAbandonned a =
-                logAbandonned logger hkLoc L.TestHook a
-                  >> pure (Left a)
+                let
+                  result = pure (Left a)
+                  loga = logAbandonned logger hkLoc L.TestHook a >> result
+                 in
+                  testHk & \case
+                    TestNone{} -> result
+                    TestBefore{hook} -> loga
+                    TestAfter{} -> result
+                    TestAround{hook} -> loga
 
               runHook (ExeIn oi ti) =
                 catchAll
-                  (Right <$> testHk hkLoc apLog oi ti)
+                  ( let
+                      exHk h = Right <$> withStartEnd logger hkLoc L.TestHook (h hkLoc apLog oi ti)
+                      voidHk = pure @IO $ Right ()
+                     in
+                      testHk & \case
+                        TestNone{} -> voidHk
+                        TestBefore{hook} -> exHk hook
+                        TestAfter{} -> voidHk
+                        TestAround{hook} -> exHk hook
+                  )
                   ( \e -> do
                       logFailure logger hkLoc L.TestHook e
                       pure . Left $ Abandon hkLoc L.TestHook e

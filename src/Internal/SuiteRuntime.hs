@@ -582,12 +582,8 @@ executeNode logger hkIn rg =
           , tHook
           } ->
             withStartEnd logger loc L.Fixture $ do
-              -- eso <- onceHookVal logger L.FixtureOnceHook siHkIn fxOHook fxOHookStatus fxOHookVal onceHkCtx
-              -- fxIn <- threadHookVal logger (liftA2 ExeIn eso $ (.threadIn) <$> hkIn) L.FixtureThreadHook fxTHook threadHkCtx
               recurse hkIn
            where
-            -- ctx = context loc
-
             (<<::>>) t i = t <> " :: " <> i
             tstHkloc tstid = Node loc $ txt L.TestHook <<::>> tstid
             tstHkReleaseloc tstid = Node (tstHkloc tstid) $ txt L.TestHookRelease <<::>> tstid
@@ -641,7 +637,7 @@ executeNode logger hkIn rg =
             releaseTestHook tstId to = \case
               TestNone -> noRelease
               TestBefore{} -> noRelease
-              TestAfter{releaseOnly} -> runRelease uu -- releaseOnly
+              TestAfter{releaseOnly} -> runRelease (\l a _tsto -> releaseOnly l a)
               TestAround{release} -> runRelease release
              where
               noRelease = pure ()

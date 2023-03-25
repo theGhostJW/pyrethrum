@@ -206,7 +206,7 @@ prepare =
     case pn of
       PN.OnceHook
         { title
-        , hook
+        , onceHook
         , onceSubNodes
         } -> do
           s <- newTVarIO Pending
@@ -217,7 +217,7 @@ prepare =
             XTOHook
               { loc
               , status = s
-              , sHook = hook
+              , sHook = onceHook
               , sHookVal = v
               , oSubNodes = child
               }

@@ -43,7 +43,7 @@ f1 =
 data PreNode oi ti where
   OnceHook ::
     { title :: Text
-    , hook :: OnceHook oi oo
+    , onceHook :: OnceHook oi oo
     , onceSubNodes :: [PreNode oo ti]
     } ->
     PreNode oi ti

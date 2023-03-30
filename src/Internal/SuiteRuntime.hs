@@ -103,7 +103,7 @@ getStatus =
   getStatusTVar :: ExeTree oi ti -> TVar Status
   getStatusTVar = \case
     XTOHook{status} -> status
-    XTTHook{thSubNodes = XTGroup{status}} -> status
+    -- XTTHook{thSubNodes = XTGroup{status}} -> status
     -- XTGroup {status} -> status
     XTFix{status} -> status
 
@@ -150,16 +150,17 @@ data ExeTree oi ti where
     { loc :: Loc
     , status :: TVar Status
     , sHook :: OnceHook oi oo
+    , thrdHook :: ThreadHook oo ti to
     , sHookVal :: TMVar (Either Abandon oo)
-    , oSubNodes :: XTGroup oo ti
+    , oSubNodes :: XTGroup oo to
     } ->
     ExeTree oi ti
-  XTTHook ::
-    { loc :: Loc
-    , thHook :: ThreadHook oi ti to
-    , thSubNodes :: XTGroup oi to
-    } ->
-    ExeTree oi ti
+  -- XTTHook ::
+  --   { loc :: Loc
+  --   , thHook :: ThreadHook oi ti to
+  --   , thSubNodes :: XTGroup oi to
+  --   } ->
+  --   ExeTree oi ti
   XTFix ::
     { loc :: Loc
     , status :: TVar Status
@@ -207,6 +208,7 @@ prepare =
       PN.OnceHook
         { title
         , onceHook
+        , threadHooko
         , onceSubNodes
         } -> do
           s <- newTVarIO Pending
@@ -219,22 +221,23 @@ prepare =
               , status = s
               , sHook = onceHook
               , sHookVal = v
+              , thrdHook = threadHooko
               , oSubNodes = child
               }
-      PN.ThreadHook
-        { title
-        , threadHook
-        , threadSubNodes
-        } ->
-          let loc = nodeLoc title
-           in do
-                subMods <- mkGroup loc threadSubNodes
-                pure $
-                  XTTHook
-                    { loc = loc
-                    , thHook = threadHook
-                    , thSubNodes = subMods
-                    }
+      -- PN.ThreadHook
+      --   { title
+      --   , threadHook
+      --   , threadSubNodes
+      --   } ->
+      --     let loc = nodeLoc title
+      --      in do
+      --           subMods <- mkGroup loc threadSubNodes
+      --           pure $
+      --             XTTHook
+      --               { loc = loc
+      --               , thHook = threadHook
+      --               , thSubNodes = subMods
+      --               }
       PN.Fixtures
         { testHook
         , title
@@ -462,6 +465,7 @@ executeNode logger hkIn rg =
           { loc = hookLoc
           , status
           , sHook
+          , thrdHook
           , sHookVal
           , oSubNodes = XTGroup{status = childrenStatus}
           } ->
@@ -481,7 +485,7 @@ executeNode logger hkIn rg =
                 ( eso
                     & either
                       (recurse . Left)
-                      (recurse . nxtHkIn)
+                      (runThreadHook . nxtHkIn)
                 )
                 ( do
                     wantRelease <- atomically $ do
@@ -492,33 +496,53 @@ executeNode logger hkIn rg =
                       releaseHookUpdateStatus logger L.OnceHookRelease status eso releaseContext sHook
                 )
            where
-
-        XTTHook
-          { loc = hookLoc
-          , thHook
-          , thSubNodes
-          } ->
-            do
+             runThreadHook thHkin = 
+              do
               let nxtHkIn ti = (\exi -> exi{threadIn = ti}) <$> hkIn
                   recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
                   hkCtx = context hookLoc
                   releaseCtx = context . Node hookLoc $ txt L.ThreadHookRelease
-              eto <- threadHookVal logger hkIn thHook hkCtx
+              eto <- threadHookVal logger thHkin thrdHook hkCtx
               finally
-                ( either
+                ( eto & either
                     (recurse . Left)
                     (recurse . nxtHkIn)
-                    eto
                 )
                 ( let
                     doRelease = releaseHook logger L.ThreadHookRelease eto releaseCtx
                    in
-                    thHook & \case
+                    thrdHook & \case
                       ThreadNone -> pure ()
                       ThreadBefore{} -> pure ()
                       ThreadAfter{releaseOnly} -> doRelease releaseOnly
                       ThreadAround{release} -> doRelease release
                 )
+        -- XTTHook
+        --   { loc = hookLoc
+        --   , thHook
+        --   , thSubNodes
+        --   } ->
+        --     do
+        --       let nxtHkIn ti = (\exi -> exi{threadIn = ti}) <$> hkIn
+        --           recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
+        --           hkCtx = context hookLoc
+        --           releaseCtx = context . Node hookLoc $ txt L.ThreadHookRelease
+        --       eto <- threadHookVal logger hkIn thHook hkCtx
+        --       finally
+        --         ( either
+        --             (recurse . Left)
+        --             (recurse . nxtHkIn)
+        --             eto
+        --         )
+        --         ( let
+        --             doRelease = releaseHook logger L.ThreadHookRelease eto releaseCtx
+        --            in
+        --             thHook & \case
+        --               ThreadNone -> pure ()
+        --               ThreadBefore{} -> pure ()
+        --               ThreadAfter{releaseOnly} -> doRelease releaseOnly
+        --               ThreadAround{release} -> doRelease release
+        --         )
         -- self@XTGroup
         --   { loc,
         --     status,

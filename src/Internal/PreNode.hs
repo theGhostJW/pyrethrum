@@ -44,15 +44,16 @@ data PreNode oi ti where
   OnceHook ::
     { title :: Text
     , onceHook :: OnceHook oi oo
-    , onceSubNodes :: [PreNode oo ti]
+    , threadHooko :: ThreadHook oo ti to
+    , onceSubNodes :: [PreNode oo to]
     } ->
     PreNode oi ti
-  ThreadHook ::
-    { title :: Text
-    , threadHook :: ThreadHook oi ti to
-    , threadSubNodes :: [PreNode oi to]
-    } ->
-    PreNode oi ti
+  -- ThreadHook ::
+  --   { title :: Text
+  --   , threadHook :: ThreadHook oi ti to
+  --   , threadSubNodes :: [PreNode oi to]
+  --   } ->
+  --   PreNode oi ti
   Fixtures ::
     { title :: Text
     , testHook :: TestHook oi ti tsto
@@ -134,5 +135,8 @@ data TestHook oi ti tsto where
 nodeEmpty :: PreNode oi ti -> Bool
 nodeEmpty = \case
   OnceHook{onceSubNodes} -> all nodeEmpty onceSubNodes
-  ThreadHook{threadSubNodes} -> all nodeEmpty threadSubNodes
+  -- ThreadHook{threadSubNodes} -> all nodeEmpty threadSubNodes
   Fixtures{fixtures} -> null fixtures
+
+
+

@@ -1,6 +1,7 @@
 module Internal.SuiteRuntime where
 
 import BasePrelude (NonTermination, retry)
+import qualified BasePrelude as PN
 import Check (CheckReport (result))
 import Control.DeepSeq (NFData, deepseq, force, ($!!))
 import DSL.Logger (logMessage)
@@ -10,6 +11,7 @@ import Data.Tuple.Extra (both, uncurry3)
 import GHC.Exts
 import Internal.PreNode (Context (..), OnceHook (..), PreNode (testHook), PreNodeRoot, TestHook (..), ThreadHook (..))
 import qualified Internal.PreNode as PN (
+  Fixture (..),
   PreNode (..),
   PreNodeRoot,
   Test (..),
@@ -97,15 +99,16 @@ data Status
   deriving (Show, Eq, Ord)
 
 getStatus :: ExeTree oi ti -> STM Status
-getStatus =
-  readTVar . getStatusTVar
- where
-  getStatusTVar :: ExeTree oi ti -> TVar Status
-  getStatusTVar = \case
-    XGroup{status} -> status
-    -- XTTHook{thSubNodes = XTGroup{status}} -> status
-    -- XTGroup {status} -> status
-    XFixtures{status} -> status
+getStatus = uu
+
+--   readTVar . getStatusTVar
+--  where
+--   getStatusTVar :: ExeTree oi ti -> TVar Status
+--   getStatusTVar = \case
+--     XGroup{status} -> status
+--     -- XTTHook{thSubNodes = XTGroup{status}} -> status
+--     -- XTGroup {status} -> status
+--     XFixtures{status} -> status
 
 isDone :: Status -> Bool
 isDone = (== Done)
@@ -163,27 +166,55 @@ mkXTGroup children = do
 
 data OnceVal oi oo = OnceVal
   { hook :: OnceHook oi oo
+  , status :: TVar Status
   , value :: TMVar (Either Abandon oo)
   }
 
 mkOnceVal :: OnceHook oi oo -> IO (OnceVal oi oo)
-mkOnceVal h = OnceVal h <$> newEmptyTMVarIO
+mkOnceVal h = OnceVal h <$> newTVarIO Pending <*> newEmptyTMVarIO
+
+data XFixture oi ti tsti where
+  XFixture ::
+    { loc :: Loc
+    , status :: TVar Status
+    , onceHook :: OnceVal oi oo
+    , threadHook :: ThreadHook oo ti to
+    , testHook :: TestHook oi ti tsti tsto
+    , tests :: ChildQ (PN.Test oo to io)
+    } ->
+    XFixture oi ti ii
+
+mkXFixture ::
+  Loc ->
+  PN.Fixture oi ti tsti ->
+  IO (XFixture oi ti tsti)
+mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests} = do
+  s <- newTVarIO Pending
+  oh <- mkOnceVal onceHook
+  ts <- mkXTGroup tests
+  pure $
+    XFixture
+      { loc
+      , status = s
+      , onceHook = oh
+      , threadHook = threadHook
+      , testHook = testHook
+      , tests = ts
+      }
 
 data ExeTree oi ti where
   XGroup ::
     { loc :: Loc
-    , status :: TVar Status
     , oHook :: OnceVal oi oo
     , thrdHook :: ThreadHook oo ti to
-    , oSubNodes :: ChildQ (ExeTree oo to)
+    , childQ :: ChildQ (ExeTree oo to)
     } ->
     ExeTree oi ti
   XFixtures ::
     { loc :: Loc
     , status :: TVar Status
     , tHook :: TestHook oi ti () tsto
-    , fixtures :: TQueue (PN.Test oi ti tsto)
-    , runningCount :: TVar Int
+    , fixtures :: ChildQ (XFixture oi ti tsto)
     } ->
     ExeTree oi ti
 
@@ -208,7 +239,6 @@ prepare =
         , threadHooko
         , onceSubNodes
         } -> do
-          s <- newTVarIO Pending
           onceHk <- mkOnceVal onceHook
           let loc = nodeLoc title
           childQ <- traverse (prepare' parentLoc 0) onceSubNodes
@@ -216,10 +246,9 @@ prepare =
           pure $
             XGroup
               { loc
-              , status = s
               , oHook = onceHk
               , thrdHook = threadHooko
-              , oSubNodes = chldgrp
+              , childQ = chldgrp
               }
       PN.Fixtures
         { testHook
@@ -228,17 +257,15 @@ prepare =
         } ->
           do
             let loc = nodeLoc title
-                converTest PN.Test{tstId, tst} = PN.Test tstId tst
             s <- newTVarIO Pending
             q <- newTQueueIO
             runningCount <- newTVarIO 0
-            atomically $ traverse_ (writeTQueue q . converTest) uu -- fixtures
+            atomically $ traverse_ (writeTQueue q . uu) uu -- fixtures
             pure $
               XFixtures
                 { loc = loc
                 , status = s
-                , fixtures = q
-                , runningCount
+                , fixtures = uu
                 , tHook = testHook
                 }
 
@@ -330,15 +357,15 @@ threadHookVal evLgr ctx@Context{loc, logger} hkIn thook =
               ThreadAround{hook} -> runHook hook
       )
 
-onceHookVal :: forall hi ho. EventLogger -> Context -> ExeEventType -> Either Abandon hi -> TVar Status -> OnceVal hi ho -> IO (Either Abandon ho)
-onceHookVal evtLgr ctx@Context{loc, logger} hkEvent ehi hs OnceVal{hook = oHook, value} =
+onceHookVal :: forall hi ho. EventLogger -> Context -> ExeEventType -> Either Abandon hi -> OnceVal hi ho -> IO (Either Abandon ho)
+onceHookVal evtLgr ctx@Context{loc, logger} hkEvent ehi OnceVal{hook = oHook, status, value} =
   ehi
     & either
-      (\abandon -> abandonnedHookVal hkEvent evtLgr abandon hs value loc)
+      (\abandon -> abandonnedHookVal hkEvent evtLgr abandon status value loc)
       ( \hi' ->
           let
             passThrough = pure @IO $ Right @Abandon hi'
-            runHk hk = normalHookVal evtLgr ctx hkEvent hk hi' hs value
+            runHk hk = normalHookVal evtLgr ctx hkEvent hk hi' status value
            in
             oHook & \case
               -- Hmmm may have type issues here later
@@ -369,24 +396,22 @@ releaseHook evtlgr ctx@Context{loc, logger} evt eho hkRelease =
               (evtlgr . mkFailure loc evt ("Hook Release Failed: " <> txt evt <> " " <> txt loc))
         )
 
-releaseHookUpdateStatus ::
+releaseOnceHook ::
   EventLogger ->
-  ExeEventType ->
-  TVar Status ->
   Either Abandon ho ->
   Context ->
-  OnceHook oi ho ->
+  OnceVal oi ho ->
   IO ()
-releaseHookUpdateStatus evtlgr evt ns eho ctx hk =
-  finally
-    ( hk & \case
-        OnceNone -> pure ()
-        OnceBefore{} -> pure ()
-        OnceAfter{releaseOnly} -> releaseHook evtlgr ctx evt eho releaseOnly
-        OnceAround{release} -> releaseHook evtlgr ctx evt eho release
-        -- releaseHook logger evt eho ctx hkRelease
-    )
-    (atomically $ writeTVar ns Done)
+releaseOnceHook evtlgr eho ctx hk =
+  let doRelease = releaseHook evtlgr ctx L.OnceHookRelease eho
+   in finally
+        ( hk.hook & \case
+            OnceNone -> pure ()
+            OnceBefore{} -> pure ()
+            OnceAfter{releaseOnly} -> doRelease releaseOnly
+            OnceAround{release} -> doRelease release
+        )
+        (atomically $ writeTVar hk.status Done)
 
 discardDone :: TQueue (ExeTree oi ti) -> STM ()
 discardDone = processWhile nodeDone
@@ -430,10 +455,9 @@ executeNode eventLogger hkIn rg =
       case rg of
         XGroup
           { loc
-          , status
           , oHook
           , thrdHook
-          , oSubNodes
+          , childQ
           } ->
             do
               -- onceHookVal:
@@ -446,7 +470,7 @@ executeNode eventLogger hkIn rg =
                   recurse a = uu -- to doexeNxt a oSubNodes
                   ctx = context loc
                   releaseContext = context . Node loc $ txt L.OnceHookRelease
-              eso <- onceHookVal eventLogger ctx L.OnceHook siHkIn status oHook
+              eso <- onceHookVal eventLogger ctx L.OnceHook siHkIn oHook
               finally
                 ( eso
                     & either
@@ -455,11 +479,11 @@ executeNode eventLogger hkIn rg =
                 )
                 ( do
                     wantRelease <- atomically $ do
-                      childStatus <- readTVar oSubNodes.status
-                      s <- readTVar status
+                      childStatus <- readTVar childQ.status
+                      s <- readTVar oHook.status
                       pure $ childStatus == Done && s < HookFinalising
                     when wantRelease $
-                      releaseHookUpdateStatus eventLogger L.OnceHookRelease status eso releaseContext oHook.hook
+                      releaseOnceHook eventLogger eso releaseContext oHook
                 )
            where
             runThreadHook thHkin =
@@ -488,7 +512,6 @@ executeNode eventLogger hkIn rg =
           { status
           , loc
           , fixtures
-          , runningCount
           , tHook
           } ->
             withStartEnd eventLogger loc L.Fixture $ do

@@ -139,7 +139,7 @@ data IdxLst a = IdxLst
 mkIdxLst :: a -> STM (IdxLst a)
 mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
-data XTGroup oi ti = XTGroup
+data XGroup oi ti = XTGroup
   { status :: TVar Status
   , childNodes :: TQueue (ExeTree oi ti)
   , fullyRunning :: TQueue (ExeTree oi ti)
@@ -152,19 +152,13 @@ data ExeTree oi ti where
     , sHook :: OnceHook oi oo
     , thrdHook :: ThreadHook oo ti to
     , sHookVal :: TMVar (Either Abandon oo)
-    , oSubNodes :: XTGroup oo to
+    , oSubNodes :: XGroup oo to
     } ->
     ExeTree oi ti
-  -- XTTHook ::
-  --   { loc :: Loc
-  --   , thHook :: ThreadHook oi ti to
-  --   , thSubNodes :: XTGroup oi to
-  --   } ->
-  --   ExeTree oi ti
   XTFix ::
     { loc :: Loc
     , status :: TVar Status
-    , tHook :: TestHook oi ti tsto
+    , tHook :: TestHook oi ti () tsto
     , fixtures :: TQueue (Test oi ti tsto)
     , runningCount :: TVar Int
     } ->
@@ -205,7 +199,7 @@ prepare =
             , tag = tag
             }
     case pn of
-      PN.OnceHook
+      PN.Group
         { title
         , onceHook
         , threadHooko
@@ -224,20 +218,6 @@ prepare =
               , thrdHook = threadHooko
               , oSubNodes = child
               }
-      -- PN.ThreadHook
-      --   { title
-      --   , threadHook
-      --   , threadSubNodes
-      --   } ->
-      --     let loc = nodeLoc title
-      --      in do
-      --           subMods <- mkGroup loc threadSubNodes
-      --           pure $
-      --             XTTHook
-      --               { loc = loc
-      --               , thHook = threadHook
-      --               , thSubNodes = subMods
-      --               }
       PN.Fixtures
         { testHook
         , title
@@ -496,108 +476,29 @@ executeNode logger hkIn rg =
                       releaseHookUpdateStatus logger L.OnceHookRelease status eso releaseContext sHook
                 )
            where
-             runThreadHook thHkin = 
+            runThreadHook thHkin =
               do
-              let nxtHkIn ti = (\exi -> exi{threadIn = ti}) <$> hkIn
-                  recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
-                  hkCtx = context hookLoc
-                  releaseCtx = context . Node hookLoc $ txt L.ThreadHookRelease
-              eto <- threadHookVal logger thHkin thrdHook hkCtx
-              finally
-                ( eto & either
-                    (recurse . Left)
-                    (recurse . nxtHkIn)
-                )
-                ( let
-                    doRelease = releaseHook logger L.ThreadHookRelease eto releaseCtx
-                   in
-                    thrdHook & \case
-                      ThreadNone -> pure ()
-                      ThreadBefore{} -> pure ()
-                      ThreadAfter{releaseOnly} -> doRelease releaseOnly
-                      ThreadAround{release} -> doRelease release
-                )
-        -- XTTHook
-        --   { loc = hookLoc
-        --   , thHook
-        --   , thSubNodes
-        --   } ->
-        --     do
-        --       let nxtHkIn ti = (\exi -> exi{threadIn = ti}) <$> hkIn
-        --           recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
-        --           hkCtx = context hookLoc
-        --           releaseCtx = context . Node hookLoc $ txt L.ThreadHookRelease
-        --       eto <- threadHookVal logger hkIn thHook hkCtx
-        --       finally
-        --         ( either
-        --             (recurse . Left)
-        --             (recurse . nxtHkIn)
-        --             eto
-        --         )
-        --         ( let
-        --             doRelease = releaseHook logger L.ThreadHookRelease eto releaseCtx
-        --            in
-        --             thHook & \case
-        --               ThreadNone -> pure ()
-        --               ThreadBefore{} -> pure ()
-        --               ThreadAfter{releaseOnly} -> doRelease releaseOnly
-        --               ThreadAround{release} -> doRelease release
-        --         )
-        -- self@XTGroup
-        --   { loc,
-        --     status,
-        --     childNodes,
-        --     fullyRunning
-        --   } ->
-        --     withStartEnd logger loc L.Group recurse
-        --     where
-        --       -- when the last thread finishes child nodes and fully running will be done
-        --       recurse =
-        --         atomically nxtChildNode
-        --           >>= maybe
-        --             (atomically updateStatusFromQs)
-        --             (\c -> exeNxt hkIn c >> recurse)
-
-        --       updateStatusFromQs :: STM ()
-        --       updateStatusFromQs = do
-        --         s <- readTVar status
-        --         isDone s
-        --           ? pure ()
-        --           $ do
-        --             discardDone fullyRunning
-        --             discardDoneMoveFullyRunning fullyRunning childNodes
-        --             mtChilds <- isEmptyTQueue childNodes
-        --             mtFullyRunning <- isEmptyTQueue fullyRunning
-        --             let completed = mtChilds && mtFullyRunning
-        --             if
-        --                 | completed -> writeTVar status Done
-        --                 | mtChilds -> writeTVar status FullyRunning
-        --                 | otherwise -> pure ()
-
-        -- nxtChildNode =
-        --   tryReadTQueue childNodes
-        --     >>= maybe
-        --       (pure Nothing)
-        --       ( \cld ->
-        --           let ioCld = pure $ Just cld
-        --               qChld = writeTQueue childNodes cld
-        --               qChldReturn = qChld >> ioCld
-        --               qFullyRunning = writeTQueue fullyRunning cld >> nxtChildNode
-        --            in getStatus cld
-        --                 >>= \case
-        --                   Pending ->
-        --                     setStatusRunning status >> qChldReturn
-        --                   HookExecuting ->
-        --                     -- just plonk on the end of the q and go around again
-        --                     -- may pick up same node if there is only one node running but that is ok
-        --                     -- it just turns into a wait
-        --                     qChld >> nxtChildNode
-        --                   Running -> qChldReturn
-        --                   FullyRunning -> qFullyRunning
-        --                   HookFinalising -> qFullyRunning
-        --                   -- discard if done
-        --                   Done -> nxtChildNode
-        --       )
+                let nxtHkIn ti = (\exi -> exi{threadIn = ti}) <$> hkIn
+                    recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
+                    hkCtx = context hookLoc
+                    releaseCtx = context . Node hookLoc $ txt L.ThreadHookRelease
+                eto <- threadHookVal logger thHkin thrdHook hkCtx
+                finally
+                  ( eto
+                      & either
+                        (recurse . Left)
+                        (recurse . nxtHkIn)
+                  )
+                  ( let
+                      doRelease = releaseHook logger L.ThreadHookRelease eto releaseCtx
+                     in
+                      thrdHook & \case
+                        ThreadNone -> pure ()
+                        ThreadBefore{} -> pure ()
+                        ThreadAfter{releaseOnly} -> doRelease releaseOnly
+                        ThreadAround{release} -> doRelease release
+                  )
+      
         fx@XTFix
           { status
           , loc
@@ -637,7 +538,7 @@ executeNode logger hkIn rg =
                         atomically (writeTVar status Done)
                   )
                   ( \Test{tstId, tst} -> do
-                      to <- runTestHook (tstHkloc tstId) fxIpts tHook
+                      to <- runTestHook (tstHkloc tstId) fxIpts () tHook
                       let unpak io' (ExeIn so2 to2) = (so2, to2, io')
                           ethInputs = liftA2 unpak to fxIpts
                           testLoc = tstLoc tstId
@@ -657,18 +558,18 @@ executeNode logger hkIn rg =
                           recurse fxIpts
                   )
 
-            releaseTestHook :: forall so' to' tsto'. Text -> Either Abandon tsto' -> TestHook so' to' tsto' -> IO ()
-            releaseTestHook tstId to = \case
+            releaseTestHook :: forall so' to' tsti' tsto'. Text -> Either Abandon tsto' -> TestHook so' to' tsti' tsto' -> IO ()
+            releaseTestHook tstId tsti = \case
               TestNone -> noRelease
               TestBefore{} -> noRelease
-              TestAfter{releaseOnly} -> runRelease (\l a _tsto -> releaseOnly l a)
+              TestAfter{releaseOnly} -> runRelease uu --(\l a _tsto -> releaseOnly l a tsti)
               TestAround{release} -> runRelease release
              where
               noRelease = pure ()
-              runRelease = releaseHook logger L.TestHookRelease to (context $ tstHkReleaseloc tstId)
+              runRelease = releaseHook logger L.TestHookRelease tsti (context $ tstHkReleaseloc tstId)
 
-            runTestHook :: forall io' so' to'. Loc -> Either Abandon (ExeIn so' to') -> TestHook so' to' io' -> IO (Either Abandon io')
-            runTestHook hkLoc fxIpts testHk =
+            runTestHook :: forall so' to' tsti' tsto'. Loc -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' tsto' -> IO (Either Abandon tsto')
+            runTestHook hkLoc fxIpts tsti testHk =
               do
                 fxIpts
                   & either
@@ -689,8 +590,8 @@ executeNode logger hkIn rg =
               runHook (ExeIn oi ti) =
                 catchAll
                   ( let
-                      exHk h = Right <$> withStartEnd logger hkLoc L.TestHook (h hkLoc apLog oi ti)
-                      voidHk = pure @IO $ Right ()
+                      exHk h = Right <$> withStartEnd logger hkLoc L.TestHook (h hkLoc apLog oi ti tsti)
+                      voidHk = pure @IO $ Right @Abandon tsti
                      in
                       testHk & \case
                         TestNone{} -> voidHk

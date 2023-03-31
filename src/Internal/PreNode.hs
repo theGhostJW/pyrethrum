@@ -15,48 +15,39 @@ data Test si ti ii = Test
   }
 
 -- this would be genrated by the TH
-data Fixture oi ti ii where
+data Fixture oi ti tsti where
   Fixture ::
     { id :: Text
-    , onceHook :: ApLogger -> oi -> IO oo
-    , onceHookRelease :: ApLogger -> oo -> IO ()
-    , threadHook :: ApLogger -> oo -> ti -> IO to
-    , threadHookRelease :: ApLogger -> to -> IO ()
-    , testHook :: ApLogger -> oo -> to -> ii -> IO io
-    , testHookRelease :: ApLogger -> io -> IO ()
+    , onceHook :: OnceHook oi oo
+    , threadHook :: ThreadHook oo ti to
+    , testHook :: TestHook oi ti tsti tsto 
     , tests :: [Test oo to io]
     } ->
     Fixture oi ti ii
 
-f1 :: Fixture Int Text Bool
-f1 =
-  Fixture
-    { id = "fixture"
-    , onceHook = \l int -> pure $ txt int
-    , threadHook = \l otxt tiTxt -> pure $ T.length otxt + T.length tiTxt
-    , testHook = \l tx int b -> b ? pure b $ error tx
-    , testHookRelease = \l b -> b ? pure () $ error "its false"
-    , onceHookRelease = \l txt' -> putText txt'
-    , threadHookRelease = \l i -> print . txt $ i + 1
-    , tests = []
-    }
+-- f1 :: Fixture Int Text Bool
+-- f1 =
+--   Fixture
+--     { id = "fixture"
+--     , onceHook = \l int -> pure $ txt int
+--     , threadHook = \l otxt tiTxt -> pure $ T.length otxt + T.length tiTxt
+--     , testHook = \l tx int b -> b ? pure b $ error tx
+--     , testHookRelease = \l b -> b ? pure () $ error "its false"
+--     , onceHookRelease = \l txt' -> putText txt'
+--     , threadHookRelease = \l i -> print . txt $ i + 1
+--     , tests = []
+--     }
 data PreNode oi ti where
-  OnceHook ::
+  Group ::
     { title :: Text
     , onceHook :: OnceHook oi oo
     , threadHooko :: ThreadHook oo ti to
     , onceSubNodes :: [PreNode oo to]
     } ->
     PreNode oi ti
-  -- ThreadHook ::
-  --   { title :: Text
-  --   , threadHook :: ThreadHook oi ti to
-  --   , threadSubNodes :: [PreNode oi to]
-  --   } ->
-  --   PreNode oi ti
   Fixtures ::
     { title :: Text
-    , testHook :: TestHook oi ti tsto
+    , testHook :: TestHook oi ti () tsto
     , fixtures :: [Test oi ti tsto]
     } ->
     PreNode oi ti
@@ -93,21 +84,21 @@ data ThreadHook oi ti to where
     } ->
     ThreadHook oi ti to
 
-data TestHook oi ti tsto where
-  TestNone :: TestHook oi ti ()
+data TestHook oi ti tsti tsto where
+  TestNone :: TestHook oi ti tsti tsti
   TestBefore ::
-    { hook :: Loc -> ApLogger -> oi -> ti -> IO tsto
+    { hook :: Loc -> ApLogger -> oi -> ti -> tsti -> IO tsto
     } ->
-    TestHook oi ti tsto
+    TestHook oi ti tsti tsto
   TestAfter ::
-    { releaseOnly :: Loc -> ApLogger -> IO ()
+    { releaseOnly :: Loc -> ApLogger -> tsti -> IO ()
     } ->
-    TestHook oi ti ()
+    TestHook oi ti tsti tsti
   TestAround ::
-    { hook :: Loc -> ApLogger -> oi -> ti -> IO tsto
+    { hook :: Loc -> ApLogger -> oi -> ti -> tsti -> IO tsto
     , release :: Loc -> ApLogger -> tsto -> IO ()
     } ->
-    TestHook oi ti tsto
+    TestHook oi ti tsti tsto
 
 -- data ThreadHook oi ti to where
 --   ThreadNone :: () -> ThreadHook oi ti ti
@@ -121,11 +112,11 @@ data TestHook oi ti tsto where
 -- change iterations name :: Done
 -- get rid of branches :: Done
 -- remove once / threadHooks from Fixtures :: Done
--- collapse threadHook and onceHook types
--- loc should not  include event type it should be node address
+-- collapse threadHook and onceHook types :: Done
 -- change fixtures from test to fixtures
 -- rewrite executeNode
--- reimplement uu
+  -- reimplement uu
+-- loc should not  include event type it should be node address
 -- get rid of getStatus ??
 -- stm bool on once hook executing
 -- \case direct functions for done / can run
@@ -134,8 +125,7 @@ data TestHook oi ti tsto where
 
 nodeEmpty :: PreNode oi ti -> Bool
 nodeEmpty = \case
-  OnceHook{onceSubNodes} -> all nodeEmpty onceSubNodes
-  -- ThreadHook{threadSubNodes} -> all nodeEmpty threadSubNodes
+  Group{onceSubNodes} -> all nodeEmpty onceSubNodes
   Fixtures{fixtures} -> null fixtures
 
 

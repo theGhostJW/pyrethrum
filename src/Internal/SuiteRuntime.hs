@@ -139,14 +139,14 @@ data IdxLst a = IdxLst
 mkIdxLst :: a -> STM (IdxLst a)
 mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
-data XTGroup a = XTGroup
+data ChildQ a = ChildQ
   { status :: TVar Status
   , childNodes :: TQueue a
   , fullyRunning :: TQueue a
   , runningCount :: TVar Int
   }
 
-mkXTGroup :: [a] -> IO (XTGroup a)
+mkXTGroup :: [a] -> IO (ChildQ a)
 mkXTGroup children = do
   s <- newTVarIO Pending
   rc <- newTVarIO 0
@@ -154,7 +154,7 @@ mkXTGroup children = do
   fr <- newTQueueIO
   atomically $ traverse_ (writeTQueue q) children
   pure $
-    XTGroup
+    ChildQ
       { status = s
       , childNodes = q
       , fullyRunning = fr
@@ -175,7 +175,7 @@ data ExeTree oi ti where
     , status :: TVar Status
     , oHook :: OnceVal oi oo
     , thrdHook :: ThreadHook oo ti to
-    , oSubNodes :: XTGroup (ExeTree oo to)
+    , oSubNodes :: ChildQ (ExeTree oo to)
     } ->
     ExeTree oi ti
   XFixtures ::
@@ -429,11 +429,11 @@ executeNode eventLogger hkIn rg =
       wantRun
       case rg of
         XGroup
-          { loc = hookLoc
+          { loc
           , status
-          , oHook = oHook@OnceVal{hook}
+          , oHook
           , thrdHook
-          , oSubNodes = XTGroup{status = childrenStatus}
+          , oSubNodes
           } ->
             do
               -- onceHookVal:
@@ -444,8 +444,8 @@ executeNode eventLogger hkIn rg =
               -- must run for logging even if hkIn is Left
               let nxtHkIn so = (\exi -> exi{onceIn = so}) <$> hkIn
                   recurse a = uu -- to doexeNxt a oSubNodes
-                  ctx = context hookLoc
-                  releaseContext = context . Node hookLoc $ txt L.OnceHookRelease
+                  ctx = context loc
+                  releaseContext = context . Node loc $ txt L.OnceHookRelease
               eso <- onceHookVal eventLogger ctx L.OnceHook siHkIn status oHook
               finally
                 ( eso
@@ -455,19 +455,19 @@ executeNode eventLogger hkIn rg =
                 )
                 ( do
                     wantRelease <- atomically $ do
-                      childStatus <- readTVar childrenStatus
+                      childStatus <- readTVar oSubNodes.status
                       s <- readTVar status
                       pure $ childStatus == Done && s < HookFinalising
                     when wantRelease $
-                      releaseHookUpdateStatus eventLogger L.OnceHookRelease status eso releaseContext hook
+                      releaseHookUpdateStatus eventLogger L.OnceHookRelease status eso releaseContext oHook.hook
                 )
            where
             runThreadHook thHkin =
               do
                 let nxtHkIn ti = (\exi -> exi{threadIn = ti}) <$> hkIn
                     recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
-                    hkCtx = context hookLoc
-                    releaseCtx = context . Node hookLoc $ txt L.ThreadHookRelease
+                    hkCtx = context loc
+                    releaseCtx = context . Node loc $ txt L.ThreadHookRelease
                 eto <- threadHookVal eventLogger hkCtx thHkin thrdHook
                 finally
                   ( eto

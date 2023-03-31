@@ -14,13 +14,18 @@ data Test si ti ii = Test
   , tst :: ApLogger -> si -> ti -> ii -> IO ()
   }
 
+data Context = Context
+  { loc :: Loc
+  , logger :: ApLogger
+  }
+
 -- this would be genrated by the TH
 data Fixture oi ti tsti where
   Fixture ::
     { id :: Text
     , onceHook :: OnceHook oi oo
     , threadHook :: ThreadHook oo ti to
-    , testHook :: TestHook oi ti tsti tsto 
+    , testHook :: TestHook oi ti tsti tsto
     , tests :: [Test oo to io]
     } ->
     Fixture oi ti ii
@@ -55,55 +60,55 @@ data PreNode oi ti where
 data OnceHook oi oo where
   OnceNone :: OnceHook oi oi
   OnceBefore ::
-    { hook :: Loc -> ApLogger -> oi -> IO oo
+    { hook :: Context -> oi -> IO oo
     } ->
     OnceHook oi oo
   OnceAfter ::
-    { releaseOnly :: Loc -> ApLogger -> oi -> IO ()
+    { releaseOnly :: Context -> oi -> IO ()
     } ->
     OnceHook oi oi
   OnceAround ::
-    { hook :: Loc -> ApLogger -> oi -> IO oo
-    , release :: Loc -> ApLogger -> oo -> IO ()
+    { hook :: Context -> oi -> IO oo
+    , release :: Context -> oo -> IO ()
     } ->
     OnceHook oi oo
 
 data ThreadHook oi ti to where
   ThreadNone :: ThreadHook oi ti ti
   ThreadBefore ::
-    { hook :: Loc -> ApLogger -> oi -> ti -> IO to
+    { hook :: Context -> oi -> ti -> IO to
     } ->
     ThreadHook oi ti to
   ThreadAfter ::
-    { releaseOnly :: Loc -> ApLogger -> ti -> IO ()
+    { releaseOnly :: Context -> ti -> IO ()
     } ->
     ThreadHook oi ti ti
   ThreadAround ::
-    { hook :: Loc -> ApLogger -> oi -> ti -> IO to
-    , release :: Loc -> ApLogger -> to -> IO ()
+    { hook :: Context -> oi -> ti -> IO to
+    , release :: Context -> to -> IO ()
     } ->
     ThreadHook oi ti to
 
 data TestHook oi ti tsti tsto where
   TestNone :: TestHook oi ti tsti tsti
   TestBefore ::
-    { hook :: Loc -> ApLogger -> oi -> ti -> tsti -> IO tsto
+    { hook :: Context -> oi -> ti -> tsti -> IO tsto
     } ->
     TestHook oi ti tsti tsto
   TestAfter ::
-    { releaseOnly :: Loc -> ApLogger -> tsti -> IO ()
+    { releaseOnly :: Context -> tsti -> IO ()
     } ->
     TestHook oi ti tsti tsti
   TestAround ::
-    { hook :: Loc -> ApLogger -> oi -> ti -> tsti -> IO tsto
-    , release :: Loc -> ApLogger -> tsto -> IO ()
+    { hook :: Context -> oi -> ti -> tsti -> IO tsto
+    , release :: Context -> tsto -> IO ()
     } ->
     TestHook oi ti tsti tsto
 
 -- data ThreadHook oi ti to where
 --   ThreadNone :: () -> ThreadHook oi ti ti
---   ThreadBefore :: Loc -> ApLogger -> oi -> IO oo -> ThreadHook oi ti to
---   ThreadAround :: Loc -> ApLogger -> oi -> IO oo -> ThreadHook oi ti to
+--   ThreadBefore :: Context-> oi -> IO oo -> ThreadHook oi ti to
+--   ThreadAround :: Context-> oi -> IO oo -> ThreadHook oi ti to
 
 -- todo:
 -- simplify GADTs :: Done
@@ -115,7 +120,7 @@ data TestHook oi ti tsti tsto where
 -- collapse threadHook and onceHook types :: Done
 -- change fixtures from test to fixtures
 -- rewrite executeNode
-  -- reimplement uu
+-- reimplement uu
 -- loc should not  include event type it should be node address
 -- get rid of getStatus ??
 -- stm bool on once hook executing
@@ -127,6 +132,3 @@ nodeEmpty :: PreNode oi ti -> Bool
 nodeEmpty = \case
   Group{onceSubNodes} -> all nodeEmpty onceSubNodes
   Fixtures{fixtures} -> null fixtures
-
-
-

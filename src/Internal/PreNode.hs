@@ -53,7 +53,7 @@ data PreNode oi ti where
   Fixtures ::
     { title :: Text
     , testHook :: TestHook oi ti () tsto
-    , fixtures :: [Test oi ti tsto]
+    , fixtures :: [Fixture oi ti tsto]
     } ->
     PreNode oi ti
 
@@ -118,9 +118,9 @@ data TestHook oi ti tsti tsto where
 -- get rid of branches :: Done
 -- remove once / threadHooks from Fixtures :: Done
 -- collapse threadHook and onceHook types :: Done
+-- reimplement uu
 -- change fixtures from test to fixtures
 -- rewrite executeNode
--- reimplement uu
 -- loc should not  include event type it should be node address
 -- get rid of getStatus ??
 -- stm bool on once hook executing

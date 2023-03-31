@@ -102,10 +102,10 @@ getStatus =
  where
   getStatusTVar :: ExeTree oi ti -> TVar Status
   getStatusTVar = \case
-    XTOHook{status} -> status
+    XGroup{status} -> status
     -- XTTHook{thSubNodes = XTGroup{status}} -> status
     -- XTGroup {status} -> status
-    XTFix{status} -> status
+    XFixtures{status} -> status
 
 isDone :: Status -> Bool
 isDone = (== Done)
@@ -139,35 +139,53 @@ data IdxLst a = IdxLst
 mkIdxLst :: a -> STM (IdxLst a)
 mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
-data XGroup oi ti = XTGroup
+data XTGroup a = XTGroup
   { status :: TVar Status
-  , childNodes :: TQueue (ExeTree oi ti)
-  , fullyRunning :: TQueue (ExeTree oi ti)
+  , childNodes :: TQueue a
+  , fullyRunning :: TQueue a
+  , runningCount :: TVar Int
   }
 
+mkXTGroup :: [a] -> IO (XTGroup a)
+mkXTGroup children = do
+  s <- newTVarIO Pending
+  rc <- newTVarIO 0
+  q <- newTQueueIO
+  fr <- newTQueueIO
+  atomically $ traverse_ (writeTQueue q) children
+  pure $
+    XTGroup
+      { status = s
+      , childNodes = q
+      , fullyRunning = fr
+      , runningCount = rc
+      }
+
+data OnceVal oi oo = OnceVal
+  { hook :: OnceHook oi oo
+  , value :: TMVar (Either Abandon oo)
+  }
+
+mkOnceVal :: OnceHook oi oo -> IO (OnceVal oi oo)
+mkOnceVal h = OnceVal h <$> newEmptyTMVarIO
+
 data ExeTree oi ti where
-  XTOHook ::
+  XGroup ::
     { loc :: Loc
     , status :: TVar Status
-    , sHook :: OnceHook oi oo
+    , oHook :: OnceVal oi oo
     , thrdHook :: ThreadHook oo ti to
-    , sHookVal :: TMVar (Either Abandon oo)
-    , oSubNodes :: XGroup oo to
+    , oSubNodes :: XTGroup (ExeTree oo to)
     } ->
     ExeTree oi ti
-  XTFix ::
+  XFixtures ::
     { loc :: Loc
     , status :: TVar Status
     , tHook :: TestHook oi ti () tsto
-    , fixtures :: TQueue (Test oi ti tsto)
+    , fixtures :: TQueue (PN.Test oi ti tsto)
     , runningCount :: TVar Int
     } ->
     ExeTree oi ti
-
-data Test oi ti ii = Test
-  { tstId :: Text
-  , tst :: ApLogger -> oi -> ti -> ii -> IO ()
-  }
 
 prepare :: PreNode o t -> IO (ExeTree o t)
 prepare =
@@ -175,21 +193,6 @@ prepare =
  where
   consNoMxIdx :: IdxLst a -> a -> IdxLst a
   consNoMxIdx l@IdxLst{lst} i = l{lst = i : lst}
-
-  -- mkGroup :: forall oi ti. Loc -> [PreNode oi ti] -> IO (XTGroup oi ti)
-  mkGroup parentLoc subElms = do
-    fr <- newTQueueIO
-    q <- newTQueueIO
-    s <- newTVarIO Pending
-    -- load the queue
-    c <- traverse (prepare' parentLoc 0) subElms
-    atomically $ traverse_ (writeTQueue q) c
-    pure $
-      XTGroup
-        { status = s
-        , childNodes = q
-        , fullyRunning = fr
-        }
 
   prepare' :: Loc -> Int -> PN.PreNode oi ti -> IO (ExeTree oi ti)
   prepare' parentLoc subElmIdx pn = do
@@ -206,17 +209,17 @@ prepare =
         , onceSubNodes
         } -> do
           s <- newTVarIO Pending
-          v <- newEmptyTMVarIO
+          onceHk <- mkOnceVal onceHook
           let loc = nodeLoc title
-          child <- mkGroup loc onceSubNodes
+          childQ <- traverse (prepare' parentLoc 0) onceSubNodes
+          chldgrp <- mkXTGroup childQ
           pure $
-            XTOHook
+            XGroup
               { loc
               , status = s
-              , sHook = onceHook
-              , sHookVal = v
+              , oHook = onceHk
               , thrdHook = threadHooko
-              , oSubNodes = child
+              , oSubNodes = chldgrp
               }
       PN.Fixtures
         { testHook
@@ -225,13 +228,13 @@ prepare =
         } ->
           do
             let loc = nodeLoc title
-                converTest PN.Test{tstId, tst} = Test tstId tst
+                converTest PN.Test{tstId, tst} = PN.Test tstId tst
             s <- newTVarIO Pending
             q <- newTQueueIO
             runningCount <- newTVarIO 0
-            atomically $ traverse_ (writeTQueue q . converTest) fixtures
+            atomically $ traverse_ (writeTQueue q . converTest) uu -- fixtures
             pure $
-              XTFix
+              XFixtures
                 { loc = loc
                 , status = s
                 , fixtures = q
@@ -327,17 +330,17 @@ threadHookVal evLgr ctx@Context{loc, logger} hkIn thook =
               ThreadAround{hook} -> runHook hook
       )
 
-onceHookVal :: forall hi ho. EventLogger -> Context -> ExeEventType -> Either Abandon hi -> OnceHook hi ho -> TVar Status -> TMVar (Either Abandon ho) -> IO (Either Abandon ho)
-onceHookVal evtLgr ctx@Context{loc, logger} hkEvent ehi onceHk hs hkVal =
+onceHookVal :: forall hi ho. EventLogger -> Context -> ExeEventType -> Either Abandon hi -> TVar Status -> OnceVal hi ho -> IO (Either Abandon ho)
+onceHookVal evtLgr ctx@Context{loc, logger} hkEvent ehi hs OnceVal{hook = oHook, value} =
   ehi
     & either
-      (\abandon -> abandonnedHookVal hkEvent evtLgr abandon hs hkVal loc)
+      (\abandon -> abandonnedHookVal hkEvent evtLgr abandon hs value loc)
       ( \hi' ->
           let
             passThrough = pure @IO $ Right @Abandon hi'
-            runHk hk = normalHookVal evtLgr ctx hkEvent hk hi' hs hkVal
+            runHk hk = normalHookVal evtLgr ctx hkEvent hk hi' hs value
            in
-            onceHk & \case
+            oHook & \case
               -- Hmmm may have type issues here later
               OnceNone -> passThrough
               OnceAfter{} -> passThrough
@@ -425,12 +428,11 @@ executeNode eventLogger hkIn rg =
     when
       wantRun
       case rg of
-        XTOHook
+        XGroup
           { loc = hookLoc
           , status
-          , sHook
+          , oHook = oHook@OnceVal{hook}
           , thrdHook
-          , sHookVal
           , oSubNodes = XTGroup{status = childrenStatus}
           } ->
             do
@@ -444,7 +446,7 @@ executeNode eventLogger hkIn rg =
                   recurse a = uu -- to doexeNxt a oSubNodes
                   ctx = context hookLoc
                   releaseContext = context . Node hookLoc $ txt L.OnceHookRelease
-              eso <- onceHookVal eventLogger ctx L.OnceHook siHkIn sHook status sHookVal 
+              eso <- onceHookVal eventLogger ctx L.OnceHook siHkIn status oHook
               finally
                 ( eso
                     & either
@@ -457,7 +459,7 @@ executeNode eventLogger hkIn rg =
                       s <- readTVar status
                       pure $ childStatus == Done && s < HookFinalising
                     when wantRelease $
-                      releaseHookUpdateStatus eventLogger L.OnceHookRelease status eso releaseContext sHook
+                      releaseHookUpdateStatus eventLogger L.OnceHookRelease status eso releaseContext hook
                 )
            where
             runThreadHook thHkin =
@@ -466,7 +468,7 @@ executeNode eventLogger hkIn rg =
                     recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
                     hkCtx = context hookLoc
                     releaseCtx = context . Node hookLoc $ txt L.ThreadHookRelease
-                eto <- threadHookVal eventLogger hkCtx thHkin thrdHook 
+                eto <- threadHookVal eventLogger hkCtx thHkin thrdHook
                 finally
                   ( eto
                       & either
@@ -474,7 +476,7 @@ executeNode eventLogger hkIn rg =
                         (recurse . nxtHkIn)
                   )
                   ( let
-                      doRelease = releaseHook eventLogger releaseCtx L.ThreadHookRelease eto 
+                      doRelease = releaseHook eventLogger releaseCtx L.ThreadHookRelease eto
                      in
                       thrdHook & \case
                         ThreadNone -> pure ()
@@ -482,7 +484,7 @@ executeNode eventLogger hkIn rg =
                         ThreadAfter{releaseOnly} -> doRelease releaseOnly
                         ThreadAround{release} -> doRelease release
                   )
-        fx@XTFix
+        fx@XFixtures
           { status
           , loc
           , fixtures
@@ -520,7 +522,7 @@ executeNode eventLogger hkIn rg =
                       when done $
                         atomically (writeTVar status Done)
                   )
-                  ( \Test{tstId, tst} -> do
+                  ( \PN.Test{tstId, tst} -> do
                       to <- runTestHook (tstHkloc tstId) fxIpts () tHook
                       let unpak io' (ExeIn so2 to2) = (so2, to2, io')
                           ethInputs = liftA2 unpak to fxIpts
@@ -549,7 +551,7 @@ executeNode eventLogger hkIn rg =
               TestAround{release} -> runRelease release
              where
               noRelease = pure ()
-              runRelease = releaseHook eventLogger (context $ tstHkReleaseloc tstId) L.TestHookRelease tsti 
+              runRelease = releaseHook eventLogger (context $ tstHkReleaseloc tstId) L.TestHookRelease tsti
 
             runTestHook :: forall so' to' tsti' tsto'. Loc -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' tsto' -> IO (Either Abandon tsto')
             runTestHook hkLoc fxIpts tsti testHk =

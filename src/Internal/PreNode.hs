@@ -23,6 +23,7 @@ data Context = Context
 data Fixture oi ti tsti where
   Fixture ::
     { id :: Text
+    , maxThreads :: Maybe Int
     , onceHook :: OnceHook oi oo
     , threadHook :: ThreadHook oo ti to
     , testHook :: TestHook oi ti tsti tsto
@@ -45,13 +46,15 @@ data Fixture oi ti tsti where
 data PreNode oi ti where
   Group ::
     { title :: Text
+    , maxThreads :: Maybe Int
     , onceHook :: OnceHook oi oo
-    , threadHooko :: ThreadHook oo ti to
+    , threadHook :: ThreadHook oo ti to
     , onceSubNodes :: [PreNode oo to]
     } ->
     PreNode oi ti
   Fixtures ::
     { title :: Text
+    , maxThreads :: Maybe Int
     , testHook :: TestHook oi ti () tsto
     , fixtures :: [Fixture oi ti tsto]
     } ->

@@ -208,8 +208,7 @@ runChildQ runner canRun' q@ChildQ{childNodes, fullyRunning, status, runningCount
         )
         ( \a ->
             finally
-              (
-                do
+              ( do
                   cr <- atomically $ canRun' a
                   cr & \case
                     -- runner MUST ensure the integrity of sub element status and handle all exceptions
@@ -291,8 +290,8 @@ runChildQ runner canRun' q@ChildQ{childNodes, fullyRunning, status, runningCount
 
 -}
 
-mkChildQ :: [a] -> Maybe Int -> IO (ChildQ a)
-mkChildQ children maxC = do
+mkChildQ :: Maybe Int -> [a] -> IO (ChildQ a)
+mkChildQ maxC children = do
   s <- newTVarIO Pending
   q <- newTQueueIO
   fr <- newTQueueIO
@@ -331,11 +330,11 @@ mkXFixture ::
   Loc ->
   PN.Fixture oi ti tsti ->
   IO (XFixture oi ti tsti)
-mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests} = do
+mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads} = do
   s <- newTVarIO Pending
   oh <- mkOnceVal onceHook
   xts <- atomically $ traverse mkXTest tests
-  ts <- mkChildQ xts
+  ts <- mkChildQ maxThreads xts
   pure $
     XFixture
       { loc
@@ -379,24 +378,26 @@ prepare =
     case pn of
       PN.Group
         { title
+        , maxThreads
         , onceHook
-        , threadHooko
+        , threadHook
         , onceSubNodes
         } -> do
           onceHk <- mkOnceVal onceHook
           let loc = nodeLoc title
           childQ <- traverse (prepare' parentLoc 0) onceSubNodes
-          chldgrp <- mkChildQ childQ
+          chldgrp <- mkChildQ maxThreads childQ
           pure $
             XGroup
               { loc
               , oHook = onceHk
-              , thrdHook = threadHooko
+              , thrdHook = threadHook
               , childQ = chldgrp
               }
       PN.Fixtures
-        { testHook
-        , title
+        { title
+        , maxThreads
+        , testHook
         , fixtures
         } ->
           do

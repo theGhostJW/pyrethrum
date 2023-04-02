@@ -147,7 +147,7 @@ data ChildQ a = ChildQ
   , childNodes :: TQueue a
   , fullyRunning :: TQueue a
   , runningCount :: TVar Int
-  , maxConcurrent :: Maybe Int
+  , maxThreads :: Maybe Int
   }
 
 data XTest si ti ii = Test
@@ -175,16 +175,16 @@ data CanRun
   | RunDone
 
 runChildQ :: forall a. (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
-runChildQ runner canRun' q@ChildQ{childNodes, fullyRunning, status, runningCount, maxConcurrent} =
+runChildQ runner canRun' q@ChildQ{childNodes, fullyRunning, status, runningCount, maxThreads} =
   do
     eNext <- atomically $ do
       let pop = tryReadTQueue childNodes
       rc <- readTVar runningCount
       mNext <-
-        maxConcurrent
+        maxThreads
           & maybe
             pop
-            (\mc -> rc < mc ? pop $ pure Nothing)
+            (\mt -> rc < mt ? pop $ pure Nothing)
       mNext
         & maybe
           ( do
@@ -222,73 +222,6 @@ runChildQ runner canRun' q@ChildQ{childNodes, fullyRunning, status, runningCount
                 runChildQ runner canRun' q
         )
 
-{-
-
-     do
-    atomically $ do
-      s <- readTVar $ status q
-      unless (s == Running) retry
-      c <- tryReadTQueue $ childNodes q
-      case c of
-        Nothing -> do
-          writeTVar (status q) FullyRunning
-          pure ()
-        Just c' -> do
-          writeTVar (status q) Running
-          writeTQueue (fullyRunning q) c'
-          modifyTVar (runningCount q) (+ 1)
-    case c of
-      Nothing -> pure ()
-      Just c' -> do
-        runner c'
-        recurse
-
- recurse fxIpts = do
-              etest <- atomically $ do
-                mtest <- tryReadTQueue fixtures
-                mtest
-                  & maybe
-                    ( do
-                        r <- readTVar runningCount
-                        Left
-                          <$> if
-                              | r < 0 -> error "framework error - this should not happen - running count below zero"
-                              | r == 0 -> pure True
-                              | otherwise -> writeTVar status FullyRunning >> pure False
-                    )
-                    ( \t -> do
-                        modifyTVar runningCount succ
-                        setStatusRunning status
-                        pure $ Right t
-                    )
-              etest
-                & either
-                  ( \done -> do
-                      when done $
-                        atomically (writeTVar status Done)
-                  )
-                  ( \PN.Test{tstId, tst} -> do
-                      to <- runTestHook (tstHkloc tstId) fxIpts () tHook
-                      let unpak io' (ExeIn so2 to2) = (so2, to2, io')
-                          ethInputs = liftA2 unpak to fxIpts
-                          testLoc = tstLoc tstId
-
-                      finally
-                        ( withStartEnd eventLogger testLoc L.Test $
-                            ethInputs & either
-                              (logAbandonned' testLoc L.Test)
-                              \(so2, to2, io') ->
-                                catchAll
-                                  (tst msgLogger so2 to2 io')
-                                  (logFailure' (tstLoc tstId) L.Test)
-                        )
-                        do
-                          releaseTestHook tstId to tHook
-                          atomically (modifyTVar runningCount pred)
-                          recurse fxIpts
-                  )
-
--}
 
 mkChildQ :: Maybe Int -> [a] -> IO (ChildQ a)
 mkChildQ maxC children = do
@@ -303,7 +236,7 @@ mkChildQ maxC children = do
       , childNodes = q
       , fullyRunning = fr
       , runningCount = rc
-      , maxConcurrent = maxC
+      , maxThreads = maxC
       }
 
 data OnceVal oi oo = OnceVal

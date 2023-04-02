@@ -10,8 +10,8 @@ import UnliftIO (MonadUnliftIO, STM, TMVar)
 type PreNodeRoot = PreNode () ()
 
 data Test si ti ii = Test
-  { tstId :: Text
-  , tst :: ApLogger -> si -> ti -> ii -> IO ()
+  { id :: Text
+  , test :: ApLogger -> si -> ti -> ii -> IO ()
   }
 
 data Context = Context

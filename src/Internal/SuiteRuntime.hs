@@ -87,7 +87,7 @@ import UnliftIO.STM (
   writeTQueue,
   writeTVar,
  )
-import Prelude hiding (atomically, newEmptyTMVarIO, newTVarIO)
+import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO)
 
 data Status
   = Pending
@@ -147,14 +147,156 @@ data ChildQ a = ChildQ
   , childNodes :: TQueue a
   , fullyRunning :: TQueue a
   , runningCount :: TVar Int
+  , maxConcurrent :: Maybe Int
   }
 
-mkXTGroup :: [a] -> IO (ChildQ a)
-mkXTGroup children = do
+data XTest si ti ii = Test
+  { id :: Text
+  , test :: ApLogger -> si -> ti -> ii -> IO ()
+  , status :: TVar Status
+  }
+
+mkXTest :: PN.Test si ti ii -> STM (XTest si ti ii)
+mkXTest PN.Test{id, test} = Test id test <$> newTVar Pending
+
+{-
+getitem ->
+  status done -> discard
+  status pending -> run
+  status running -> run
+  status fully running -> add to fully running queue
+  status hook executing -> run
+  status hook finalising -> run
+-}
+
+data CanRun
+  = Runnable
+  | Saturated
+  | RunDone
+
+runChildQ :: forall a. (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
+runChildQ runner canRun' q@ChildQ{childNodes, fullyRunning, status, runningCount, maxConcurrent} =
+  do
+    eNext <- atomically $ do
+      let pop = tryReadTQueue childNodes
+      rc <- readTVar runningCount
+      mNext <-
+        maxConcurrent
+          & maybe
+            pop
+            (\mc -> rc < mc ? pop $ pure Nothing)
+      mNext
+        & maybe
+          ( do
+              Left
+                <$> if
+                    | rc < 0 -> error "framework error - this should not happen - running count below zero"
+                    | rc == 0 -> pure True
+                    | otherwise -> writeTVar status FullyRunning >> pure False
+          )
+          ( \a -> do
+              modifyTVar runningCount succ
+              setStatusRunning status
+              pure $ Right a
+          )
+    eNext
+      & either
+        ( \done ->
+            when done $
+              atomically $
+                writeTVar status Done
+        )
+        ( \a ->
+            finally
+              (
+                do
+                  cr <- atomically $ canRun' a
+                  cr & \case
+                    -- runner MUST ensure the integrity of sub element status and handle all exceptions
+                    -- element is placed back on the end of the q before running
+                    Runnable -> atomically (writeTQueue childNodes a) >> runner a
+                    Saturated -> atomically $ writeTQueue fullyRunning a
+                    RunDone -> pure ()
+              )
+              do
+                atomically $ modifyTVar runningCount pred
+                runChildQ runner canRun' q
+        )
+
+{-
+
+     do
+    atomically $ do
+      s <- readTVar $ status q
+      unless (s == Running) retry
+      c <- tryReadTQueue $ childNodes q
+      case c of
+        Nothing -> do
+          writeTVar (status q) FullyRunning
+          pure ()
+        Just c' -> do
+          writeTVar (status q) Running
+          writeTQueue (fullyRunning q) c'
+          modifyTVar (runningCount q) (+ 1)
+    case c of
+      Nothing -> pure ()
+      Just c' -> do
+        runner c'
+        recurse
+
+ recurse fxIpts = do
+              etest <- atomically $ do
+                mtest <- tryReadTQueue fixtures
+                mtest
+                  & maybe
+                    ( do
+                        r <- readTVar runningCount
+                        Left
+                          <$> if
+                              | r < 0 -> error "framework error - this should not happen - running count below zero"
+                              | r == 0 -> pure True
+                              | otherwise -> writeTVar status FullyRunning >> pure False
+                    )
+                    ( \t -> do
+                        modifyTVar runningCount succ
+                        setStatusRunning status
+                        pure $ Right t
+                    )
+              etest
+                & either
+                  ( \done -> do
+                      when done $
+                        atomically (writeTVar status Done)
+                  )
+                  ( \PN.Test{tstId, tst} -> do
+                      to <- runTestHook (tstHkloc tstId) fxIpts () tHook
+                      let unpak io' (ExeIn so2 to2) = (so2, to2, io')
+                          ethInputs = liftA2 unpak to fxIpts
+                          testLoc = tstLoc tstId
+
+                      finally
+                        ( withStartEnd eventLogger testLoc L.Test $
+                            ethInputs & either
+                              (logAbandonned' testLoc L.Test)
+                              \(so2, to2, io') ->
+                                catchAll
+                                  (tst msgLogger so2 to2 io')
+                                  (logFailure' (tstLoc tstId) L.Test)
+                        )
+                        do
+                          releaseTestHook tstId to tHook
+                          atomically (modifyTVar runningCount pred)
+                          recurse fxIpts
+                  )
+
+-}
+
+mkChildQ :: [a] -> Maybe Int -> IO (ChildQ a)
+mkChildQ children maxC = do
   s <- newTVarIO Pending
-  rc <- newTVarIO 0
   q <- newTQueueIO
   fr <- newTQueueIO
+  rc <- newTVarIO 0
   atomically $ traverse_ (writeTQueue q) children
   pure $
     ChildQ
@@ -162,6 +304,7 @@ mkXTGroup children = do
       , childNodes = q
       , fullyRunning = fr
       , runningCount = rc
+      , maxConcurrent = maxC
       }
 
 data OnceVal oi oo = OnceVal
@@ -180,7 +323,7 @@ data XFixture oi ti tsti where
     , onceHook :: OnceVal oi oo
     , threadHook :: ThreadHook oo ti to
     , testHook :: TestHook oi ti tsti tsto
-    , tests :: ChildQ (PN.Test oo to io)
+    , tests :: ChildQ (XTest oo to io)
     } ->
     XFixture oi ti ii
 
@@ -191,7 +334,8 @@ mkXFixture ::
 mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests} = do
   s <- newTVarIO Pending
   oh <- mkOnceVal onceHook
-  ts <- mkXTGroup tests
+  xts <- atomically $ traverse mkXTest tests
+  ts <- mkChildQ xts
   pure $
     XFixture
       { loc
@@ -242,7 +386,7 @@ prepare =
           onceHk <- mkOnceVal onceHook
           let loc = nodeLoc title
           childQ <- traverse (prepare' parentLoc 0) onceSubNodes
-          chldgrp <- mkXTGroup childQ
+          chldgrp <- mkChildQ childQ
           pure $
             XGroup
               { loc
@@ -403,8 +547,10 @@ releaseOnceHook ::
   OnceVal oi ho ->
   IO ()
 releaseOnceHook evtlgr eho ctx hk =
-  let doRelease = releaseHook evtlgr ctx L.OnceHookRelease eho
-   in finally
+  do
+    doRealease <- atomically tryLock
+    when doRealease $
+      finally
         ( hk.hook & \case
             OnceNone -> pure ()
             OnceBefore{} -> pure ()
@@ -412,27 +558,37 @@ releaseOnceHook evtlgr eho ctx hk =
             OnceAround{release} -> doRelease release
         )
         (atomically $ writeTVar hk.status Done)
+ where
+  doRelease = releaseHook evtlgr ctx L.OnceHookRelease eho
+  tryLock :: STM Bool
+  tryLock =
+    do
+      s <- readTVar hk.status
+      let result = s < HookFinalising
+      when result $
+        writeTVar hk.status HookFinalising
+      pure result
 
-discardDone :: TQueue (ExeTree oi ti) -> STM ()
-discardDone = processWhile nodeDone
+-- discardDone :: TQueue (ExeTree oi ti) -> STM ()
+-- discardDone = processWhile nodeDone
 
-processWhile :: forall oi ti. (ExeTree oi ti -> STM Bool) -> TQueue (ExeTree oi ti) -> STM ()
-processWhile p q =
-  tryPeekTQueue q
-    >>= maybe
-      (pure ())
-      (p >=> bool (pure ()) (readTQueue q >> processWhile p q))
+-- processWhile :: forall oi ti. (ExeTree oi ti -> STM Bool) -> TQueue (ExeTree oi ti) -> STM ()
+-- processWhile p q =
+--   tryPeekTQueue q
+--     >>= maybe
+--       (pure ())
+--       (p >=> bool (pure ()) (readTQueue q >> processWhile p q))
 
-discardDoneMoveFullyRunning :: TQueue (ExeTree oi ti) -> TQueue (ExeTree oi ti) -> STM ()
-discardDoneMoveFullyRunning fullyRunningQ =
-  processWhile
-    ( \n ->
-        getStatus n >>= \s ->
-          if
-              | s == Done -> pure True
-              | s > Running -> writeTQueue fullyRunningQ n >> pure True
-              | otherwise -> pure False
-    )
+-- discardDoneMoveFullyRunning :: TQueue (ExeTree oi ti) -> TQueue (ExeTree oi ti) -> STM ()
+-- discardDoneMoveFullyRunning fullyRunningQ =
+--   processWhile
+--     ( \n ->
+--         getStatus n >>= \s ->
+--           if
+--               | s == Done -> pure True
+--               | s > Running -> writeTQueue fullyRunningQ n >> pure True
+--               | otherwise -> pure False
+--     )
 
 data Abandon = Abandon
   { sourceLoc :: Loc
@@ -523,11 +679,11 @@ executeNode eventLogger hkIn rg =
             tstLoc tstid = Node (tstHkloc tstid) $ txt L.Test <<::>> tstid
             recurse fxIpts = do
               etest <- atomically $ do
-                mtest <- tryReadTQueue fixtures
+                mtest <- tryReadTQueue uu -- fixtures
                 mtest
                   & maybe
                     ( do
-                        r <- readTVar runningCount
+                        r <- readTVar uu -- runningCount
                         Left
                           <$> if
                               | r < 0 -> error "framework error - this should not happen - running count below zero"
@@ -535,7 +691,7 @@ executeNode eventLogger hkIn rg =
                               | otherwise -> writeTVar status FullyRunning >> pure False
                     )
                     ( \t -> do
-                        modifyTVar runningCount succ
+                        -- modifyTVar runningCount succ
                         setStatusRunning status
                         pure $ Right t
                     )
@@ -545,11 +701,11 @@ executeNode eventLogger hkIn rg =
                       when done $
                         atomically (writeTVar status Done)
                   )
-                  ( \PN.Test{tstId, tst} -> do
-                      to <- runTestHook (tstHkloc tstId) fxIpts () tHook
+                  ( \PN.Test{id, test} -> do
+                      to <- runTestHook (tstHkloc id) fxIpts () tHook
                       let unpak io' (ExeIn so2 to2) = (so2, to2, io')
                           ethInputs = liftA2 unpak to fxIpts
-                          testLoc = tstLoc tstId
+                          testLoc = tstLoc id
 
                       finally
                         ( withStartEnd eventLogger testLoc L.Test $
@@ -557,12 +713,12 @@ executeNode eventLogger hkIn rg =
                               (logAbandonned' testLoc L.Test)
                               \(so2, to2, io') ->
                                 catchAll
-                                  (tst msgLogger so2 to2 io')
-                                  (logFailure' (tstLoc tstId) L.Test)
+                                  (test msgLogger so2 to2 io')
+                                  (logFailure' (tstLoc id) L.Test)
                         )
                         do
-                          releaseTestHook tstId to tHook
-                          atomically (modifyTVar runningCount pred)
+                          releaseTestHook id to tHook
+                          uu -- atomically (modifyTVarrunningCount pred)
                           recurse fxIpts
                   )
 

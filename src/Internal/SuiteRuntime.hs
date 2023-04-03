@@ -6,7 +6,7 @@ import Check (CheckReport (result))
 import Control.DeepSeq (NFData, deepseq, force, ($!!))
 import DSL.Logger (logMessage)
 import Data.Function (const, ($), (&))
-import Data.Sequence (Seq (Empty), empty, replicateM)
+import Data.Sequence (Seq (Empty), empty, replicateM, update)
 import Data.Tuple.Extra (both, uncurry3)
 import GHC.Exts
 import Internal.PreNode (Context (..), OnceHook (..), PreNode (testHook), PreNodeRoot, TestHook (..), ThreadHook (..))
@@ -32,7 +32,6 @@ import Internal.RunTimeLogging (
   stopWorker,
  )
 import qualified Internal.RunTimeLogging as L
-import qualified Internal.RunTimeLogging as L.L
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
 import PyrethrumExtras hiding (finally)
@@ -89,12 +88,19 @@ import UnliftIO.STM (
  )
 import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO)
 
+data HookStatus
+  = HookPending
+  | HookRunning
+  | ChildRunning
+  | ReleaseRunning
+  | HookFinalising
+  | HookDone
+  | HookVoid
+  deriving (Show, Eq)
 data Status
   = Pending
-  | HookExecuting -- only relevant to hooks
   | Running
   | FullyRunning
-  | HookFinalising -- only relevant to hooks
   | Done
   deriving (Show, Eq, Ord)
 
@@ -122,10 +128,10 @@ canRun rg =
  where
   canRun' = \case
     Pending -> True
-    HookExecuting -> True
+    -- HookExecuting -> True
     Running -> True
     FullyRunning -> False
-    HookFinalising -> False
+    -- HookFinalising -> False
     Done -> False
 
 waitDone :: ExeTree oi ti -> IO ()
@@ -145,7 +151,6 @@ mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 data ChildQ a = ChildQ
   { status :: TVar Status
   , childNodes :: TQueue a
-  , fullyRunning :: TQueue a
   , runningCount :: TVar Int
   , maxThreads :: Maybe Int
   }
@@ -159,23 +164,13 @@ data XTest si ti ii = Test
 mkXTest :: PN.Test si ti ii -> STM (XTest si ti ii)
 mkXTest PN.Test{id, test} = Test id test <$> newTVar Pending
 
-{-
-getitem ->
-  status done -> discard
-  status pending -> run
-  status running -> run
-  status fully running -> add to fully running queue
-  status hook executing -> run
-  status hook finalising -> run
--}
-
 data CanRun
   = Runnable
   | Saturated
   | RunDone
 
 runChildQ :: forall a. (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
-runChildQ runner canRun' q@ChildQ{childNodes, fullyRunning, status, runningCount, maxThreads} =
+runChildQ runner canRun' q@ChildQ{childNodes, status, runningCount, maxThreads} =
   do
     eNext <- atomically $ do
       let pop = tryReadTQueue childNodes
@@ -207,46 +202,43 @@ runChildQ runner canRun' q@ChildQ{childNodes, fullyRunning, status, runningCount
                 writeTVar status Done
         )
         ( \a ->
-            finally
-              ( do
+            do
+              finally
+                do
                   cr <- atomically $ canRun' a
                   cr & \case
                     -- runner MUST ensure the integrity of sub element status and handle all exceptions
                     -- element is placed back on the end of the q before running
                     Runnable -> atomically (writeTQueue childNodes a) >> runner a
-                    Saturated -> atomically $ writeTQueue fullyRunning a
+                    Saturated -> pure ()
                     RunDone -> pure ()
-              )
-              do
-                atomically $ modifyTVar runningCount pred
-                runChildQ runner canRun' q
+                do
+                  atomically $ modifyTVar runningCount pred
+              runChildQ runner canRun' q
         )
-
 
 mkChildQ :: Maybe Int -> [a] -> IO (ChildQ a)
 mkChildQ maxC children = do
   s <- newTVarIO Pending
   q <- newTQueueIO
-  fr <- newTQueueIO
   rc <- newTVarIO 0
   atomically $ traverse_ (writeTQueue q) children
   pure $
     ChildQ
       { status = s
       , childNodes = q
-      , fullyRunning = fr
       , runningCount = rc
       , maxThreads = maxC
       }
 
 data OnceVal oi oo = OnceVal
   { hook :: OnceHook oi oo
-  , status :: TVar Status
+  , status :: TVar HookStatus
   , value :: TMVar (Either Abandon oo)
   }
 
 mkOnceVal :: OnceHook oi oo -> IO (OnceVal oi oo)
-mkOnceVal h = OnceVal h <$> newTVarIO Pending <*> newEmptyTMVarIO
+mkOnceVal h = OnceVal h <$> newTVarIO HookPending <*> newEmptyTMVarIO
 
 data XFixture oi ti tsti where
   XFixture ::
@@ -258,6 +250,11 @@ data XFixture oi ti tsti where
     , tests :: ChildQ (XTest oo to io)
     } ->
     XFixture oi ti ii
+
+canRunXFixture :: XFixture oi ti tsti -> STM CanRun
+canRunXFixture XFixture{onceHook, threadHook, testHook, tests} = do
+  ohs <- readTVar onceHook.status
+  uu
 
 mkXFixture ::
   Loc ->
@@ -281,6 +278,7 @@ mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads} = d
 data ExeTree oi ti where
   XGroup ::
     { loc :: Loc
+    , maxThreads :: Maybe Int
     , oHook :: OnceVal oi oo
     , thrdHook :: ThreadHook oo ti to
     , childQ :: ChildQ (ExeTree oo to)
@@ -288,6 +286,7 @@ data ExeTree oi ti where
     ExeTree oi ti
   XFixtures ::
     { loc :: Loc
+    , maxThreads :: Maybe Int
     , status :: TVar Status
     , tHook :: TestHook oi ti () tsto
     , fixtures :: ChildQ (XFixture oi ti tsto)
@@ -323,6 +322,7 @@ prepare =
           pure $
             XGroup
               { loc
+              , maxThreads
               , oHook = onceHk
               , thrdHook = threadHook
               , childQ = chldgrp
@@ -336,14 +336,15 @@ prepare =
           do
             let loc = nodeLoc title
             s <- newTVarIO Pending
-            q <- newTQueueIO
             runningCount <- newTVarIO 0
-            atomically $ traverse_ (writeTQueue q . uu) uu -- fixtures
+            fxs <- traverse (mkXFixture loc) fixtures
+            q <- mkChildQ maxThreads fxs
             pure $
               XFixtures
                 { loc = loc
+                , maxThreads
                 , status = s
-                , fixtures = uu
+                , fixtures = q
                 , tHook = testHook
                 }
 
@@ -354,12 +355,12 @@ logAbandonned logger floc fet Abandon{sourceLoc, sourceEventType, exception} =
 logFailure :: EventLogger -> Loc -> ExeEventType -> SomeException -> IO ()
 logFailure evLogger loc et e = evLogger (mkFailure loc et (txt et <> "Failed at: " <> txt loc) e)
 
-readOrLockHook :: TVar Status -> TMVar (Either Abandon ho) -> STM (Maybe (Either Abandon ho))
+readOrLockHook :: TVar HookStatus -> TMVar (Either Abandon ho) -> STM (Maybe (Either Abandon ho))
 readOrLockHook hs hVal =
   do
     s <- readTVar hs
-    (==) s Pending
-      ? (writeTVar hs HookExecuting >> pure Nothing)
+    (==) s HookPending
+      ? (writeTVar hs HookRunning >> pure Nothing)
       $ (Just <$> readTMVar hVal)
 
 setRunningVal :: TVar Status -> TMVar (Either Abandon ho) -> Either Abandon ho -> STM (Either Abandon ho)
@@ -369,8 +370,8 @@ setRunningVal hs hVal eso = do
   writeTVar hs Running
   pure eso
 
-runOrReturn :: TVar Status -> TMVar (Either Abandon ho) -> IO (Either Abandon ho) -> IO (Either Abandon ho)
-runOrReturn hkStatus hkVal hkAction =
+tryLockRun :: TVar HookStatus -> TMVar (Either Abandon ho) -> IO (Either Abandon ho) -> IO (Either Abandon ho)
+tryLockRun hkStatus hkVal hkAction =
   atomically (readOrLockHook hkStatus hkVal)
     >>= maybe
       hkAction
@@ -387,41 +388,43 @@ runLogHook evtLogger ctx@Context{loc} hkEvent hook hi =
             >> pure (Left $ Abandon loc hkEvent e)
       )
 
-normalHookVal :: forall hi ho. EventLogger -> Context -> ExeEventType -> (Context -> hi -> IO ho) -> hi -> TVar Status -> TMVar (Either Abandon ho) -> IO (Either Abandon ho)
-normalHookVal evtLogger ctx hkEvent hook hi hs hkVal =
-  runOrReturn
-    hs
-    hkVal
-    ( runLogHook evtLogger ctx hkEvent hook hi
-        >>= atomically . setRunningVal hs hkVal
-    )
+-- onceHookVal :: forall hi ho. EventLogger -> Context -> ExeEventType -> (Context -> hi -> IO ho) -> hi -> TVar Status -> TMVar (Either Abandon ho) -> IO (Either Abandon ho)
+-- onceHookVal evtLogger ctx hkEvent hook hi hs hkVal =
+--   runOrReturn
+--     hs
+--     hkVal
+--     ( runLogHook evtLogger ctx hkEvent hook hi
+--         >>= atomically . setRunningVal hs hkVal
+--     )
 
 withStartEnd :: EventLogger -> Loc -> ExeEventType -> IO a -> IO a
 withStartEnd logger loc evt io = do
   logger $ Start evt loc
   finally io . logger $ End evt loc
 
-abandonLogHook :: ExeEventType -> EventLogger -> Abandon -> Loc -> IO (Either Abandon a)
-abandonLogHook hkEvent logger abandon floc =
+abandonLogHook :: EventLogger -> ExeEventType -> Abandon -> Loc -> IO (Either Abandon a)
+abandonLogHook logger evtTp abandon floc =
   do
-    withStartEnd logger floc hkEvent $
-      logAbandonned logger floc hkEvent abandon
+    withStartEnd logger floc evtTp $
+      logAbandonned logger floc evtTp abandon
     pure $ Left abandon
 
-abandonnedHookVal :: forall ho. ExeEventType -> EventLogger -> Abandon -> TVar Status -> TMVar (Either Abandon ho) -> Loc -> IO (Either Abandon ho)
-abandonnedHookVal hkEvent logger abandon hs hkVal loc =
-  runOrReturn
+abandonnedOnceHookVal :: forall ho. EventLogger -> Abandon -> TVar HookStatus -> TMVar (Either Abandon ho) -> Loc -> IO (Either Abandon ho)
+abandonnedOnceHookVal logger abandon hs hkVal loc =
+  tryLockRun
     hs
     hkVal
-    ( abandonLogHook hkEvent logger abandon loc
-        >>= atomically . setRunningVal hs hkVal
+    ( do
+        abandonLogHook logger L.OnceHook abandon loc
+        atomically $ writeTVar hs ChildRunning
+        pure $ Left abandon
     )
 
 threadHookVal :: forall oi ti to. EventLogger -> Context -> Either Abandon (ExeIn oi ti) -> ThreadHook oi ti to -> IO (Either Abandon to)
 threadHookVal evLgr ctx@Context{loc, logger} hkIn thook =
   hkIn
     & either
-      (\abandon -> abandonLogHook L.ThreadHook evLgr abandon loc)
+      (\abandon -> abandonLogHook evLgr L.ThreadHook abandon loc)
       ( \(ExeIn oi ti) ->
           let
             thrdHk :: (Context -> oi -> ti -> IO to) -> Context -> ti -> IO to
@@ -439,12 +442,20 @@ onceHookVal :: forall hi ho. EventLogger -> Context -> ExeEventType -> Either Ab
 onceHookVal evtLgr ctx@Context{loc, logger} hkEvent ehi OnceVal{hook = oHook, status, value} =
   ehi
     & either
-      (\abandon -> abandonnedHookVal hkEvent evtLgr abandon status value loc)
+      (\abandon -> abandonnedOnceHookVal evtLgr abandon status value loc)
       ( \hi' ->
           let
             passThrough = pure @IO $ Right @Abandon hi'
-            runHk hk = normalHookVal evtLgr ctx hkEvent hk hi' status value
+            runHk hk =
+              tryLockRun
+                status
+                value
+                ( runLogHook evtLgr ctx hkEvent hk hi'
+                    >>= atomically . setRunningVal status value
+                )
            in
+            --- onceHookVal evtLgr ctx hkEvent hk hi' status value
+
             oHook & \case
               -- Hmmm may have type issues here later
               OnceNone -> passThrough
@@ -545,6 +556,7 @@ executeNode eventLogger hkIn rg =
       case rg of
         XGroup
           { loc
+          , maxThreads
           , oHook
           , thrdHook
           , childQ

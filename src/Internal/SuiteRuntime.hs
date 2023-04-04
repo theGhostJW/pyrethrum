@@ -17,7 +17,7 @@ import qualified Internal.PreNode as PN (
   Test (..),
  )
 import Internal.RunTimeLogging (
-  ApLogger,
+  MessageLogger,
   EventSink,
   ExeEvent (..),
   ExeEventType (Group, TestHookRelease),
@@ -157,7 +157,7 @@ data ChildQ a = ChildQ
 
 data XTest si ti ii = Test
   { id :: Text
-  , test :: ApLogger -> si -> ti -> ii -> IO ()
+  , test :: MessageLogger -> si -> ti -> ii -> IO ()
   , status :: TVar Status
   }
 
@@ -451,7 +451,7 @@ onceHookVal evtLgr ctx@Context{loc, logger} hkEvent ehi OnceVal{hook = oHook, st
                 status
                 value
                 ( runLogHook evtLgr ctx hkEvent hk hi'
-                    >>= atomically . setRunningVal status value
+                    >>= uu --atomically . setRunningVal status value
                 )
            in
             --- onceHookVal evtLgr ctx hkEvent hk hi' status value
@@ -502,14 +502,14 @@ releaseOnceHook evtlgr eho ctx hk =
             OnceAfter{releaseOnly} -> doRelease releaseOnly
             OnceAround{release} -> doRelease release
         )
-        (atomically $ writeTVar hk.status Done)
+        uu --(atomically $ writeTVar hk.status Done)
  where
   doRelease = releaseHook evtlgr ctx L.OnceHookRelease eho
   tryLock :: STM Bool
   tryLock =
     do
       s <- readTVar hk.status
-      let result = s < HookFinalising
+      let result = uu --s < HookFinalising
       when result $
         writeTVar hk.status HookFinalising
       pure result
@@ -583,7 +583,7 @@ executeNode eventLogger hkIn rg =
                     wantRelease <- atomically $ do
                       childStatus <- readTVar childQ.status
                       s <- readTVar oHook.status
-                      pure $ childStatus == Done && s < HookFinalising
+                      pure $ childStatus == Done && uu --s < HookFinalising
                     when wantRelease $
                       releaseOnceHook eventLogger eso releaseContext oHook
                 )

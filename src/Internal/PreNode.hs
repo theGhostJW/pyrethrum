@@ -1,7 +1,7 @@
 module Internal.PreNode where
 
 import Control.DeepSeq (NFData)
-import Internal.RunTimeLogging (ApLogger, Loc)
+import Internal.RunTimeLogging (MessageLogger, Loc)
 import Language.Haskell.TH (ExpQ)
 import PyrethrumExtras (txt, uu, (?))
 import qualified Text.Extra as T
@@ -11,12 +11,12 @@ type PreNodeRoot = PreNode () ()
 
 data Test si ti ii = Test
   { id :: Text
-  , test :: ApLogger -> si -> ti -> ii -> IO ()
+  , test :: MessageLogger -> si -> ti -> ii -> IO ()
   }
 
 data Context = Context
   { loc :: Loc
-  , logger :: ApLogger
+  , logger :: MessageLogger
   }
 
 -- this would be genrated by the TH

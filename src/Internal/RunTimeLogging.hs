@@ -174,7 +174,7 @@ data ExeEvent
 
 -------  IO Logging --------
 type EventSink = ExeEvent -> IO ()
-type ApLogger = Text -> IO ()
+type MessageLogger = Text -> IO ()
 
 -- not used in concurrent code ie. one IORef per thread
 -- this approach means I can't write a pure logger but I can live with that for now

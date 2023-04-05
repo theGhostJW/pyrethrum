@@ -11,7 +11,7 @@ type PreNodeRoot = PreNode () ()
 
 data Test si ti ii = Test
   { id :: Text
-  , test :: MessageLogger -> si -> ti -> ii -> IO ()
+  , test :: Context -> si -> ti -> ii -> IO ()
   }
 
 data Context = Context

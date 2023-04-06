@@ -710,7 +710,7 @@ executeNode eventLogger hkIn rg =
               runHook (ExeIn oi ti) =
                 catchAll
                   ( let
-                      exHk h = Right <$> withStartEnd eventLogger hkLoc L.TestHook (h (context hkLoc) oi ti tsti)
+                      exHk h = Right <$> withStartEnd eventLogger hkLoc L.TestHook (h (mkCtx $ context hkLoc) oi ti tsti)
                       voidHk = pure @IO $ Right @Abandon tsti
                      in
                       testHk & \case

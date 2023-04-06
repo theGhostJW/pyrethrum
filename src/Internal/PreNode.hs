@@ -121,8 +121,8 @@ data TestHook oi ti tsti tsto where
 -- get rid of branches :: Done
 -- remove once / threadHooks from Fixtures :: Done
 -- collapse threadHook and onceHook types :: Done
+-- change fixtures from test to fixtures :: Done
 -- reimplement uu
--- change fixtures from test to fixtures
 -- rewrite executeNode
 -- loc should not  include event type it should be node address
 -- get rid of getStatus ??

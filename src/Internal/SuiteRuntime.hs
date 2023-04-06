@@ -89,13 +89,13 @@ import UnliftIO.STM (
 import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO)
 
 data HookStatus
-  = HookPending
+  = 
+  HookVoid
+  | HookPending
   | HookRunning
   | ChildRunning
-  | ReleaseRunning
-  | HookFinalising
+  | HookReleaseRunning
   | HookDone
-  | HookVoid
   deriving (Show, Eq)
 data Status
   = Pending
@@ -146,7 +146,8 @@ canRun rg =
   canRun' <$> getStatus rg
  where
   canRun' = \case
-    Pending -> True
+    Pending -> uu --True
+    
     -- HookExecuting -> True
     Running -> True
     FullyRunning -> False
@@ -382,11 +383,11 @@ readOrLockHook hs hVal =
       ? (writeTVar hs HookRunning >> pure Nothing)
       $ (Just <$> readTMVar hVal)
 
-setRunningVal :: TVar Status -> TMVar (Either Abandon ho) -> Either Abandon ho -> STM (Either Abandon ho)
-setRunningVal hs hVal eso = do
+setHookRunning :: TVar HookStatus -> TMVar (Either Abandon ho) -> Either Abandon ho -> STM (Either Abandon ho)
+setHookRunning hs hVal eso = do
   putTMVar hVal eso
   -- success or failure always running will be set done by closing hook
-  writeTVar hs Running
+  writeTVar hs HookRunning
   pure eso
 
 tryLockRun :: TVar HookStatus -> TMVar (Either Abandon ho) -> IO (Either Abandon ho) -> IO (Either Abandon ho)
@@ -461,13 +462,10 @@ onceHookVal ctx@XContext{loc, evtLogger} hkEvent ehi OnceVal{hook = oHook, statu
                 status
                 value
                 ( runLogHook ctx hkEvent hk hi'
-                    >>= uu --atomically . setRunningVal status value
+                    >>= atomically . setHookRunning status value
                 )
            in
-            --- onceHookVal evtLgr ctx hkEvent hk hi' status value
-
             oHook & \case
-              -- Hmmm may have type issues here later
               OnceNone -> passThrough
               OnceAfter{} -> passThrough
               OnceBefore{hook} -> runHk hook
@@ -502,8 +500,8 @@ releaseOnceHook ::
   IO ()
 releaseOnceHook ctx eho hk =
   do
-    doRealease <- atomically tryLock
-    when doRealease $
+    locked <- atomically tryLock
+    when locked $
       finally
         ( hk.hook & \case
             OnceNone -> pure ()
@@ -511,17 +509,27 @@ releaseOnceHook ctx eho hk =
             OnceAfter{releaseOnly} -> doRelease releaseOnly
             OnceAround{release} -> doRelease release
         )
-        uu --(atomically $ writeTVar hk.status Done)
+        (atomically $ writeTVar hk.status HookDone)
  where
   doRelease = releaseHook ctx L.OnceHookRelease eho
   tryLock :: STM Bool
   tryLock =
     do
       s <- readTVar hk.status
-      let result = uu --s < HookFinalising
-      when result $
-        writeTVar hk.status HookFinalising
-      pure result
+      let r = canLock s
+      when r $
+        writeTVar hk.status HookReleaseRunning
+      pure r
+    where 
+      canLock = \case
+        HookVoid -> False
+        HookPending -> False
+        ChildRunning -> False
+        HookRunning -> True
+        HookReleaseRunning -> False 
+        HookDone -> False
+        
+
 
 -- discardDone :: TQueue (ExeTree oi ti) -> STM ()
 -- discardDone = processWhile nodeDone

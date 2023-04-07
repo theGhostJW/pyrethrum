@@ -17,12 +17,12 @@ import qualified Internal.PreNode as PN (
   Test (..),
  )
 import Internal.RunTimeLogging (
-  MessageLogger,
   EventSink,
   ExeEvent (..),
   ExeEventType (Group, TestHookRelease),
   Loc (Node, Root),
   LogControls (LogControls),
+  MessageLogger,
   SThreadId,
   logWorker,
   mkFailure,
@@ -89,8 +89,7 @@ import UnliftIO.STM (
 import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO)
 
 data HookStatus
-  = 
-  HookVoid
+  = HookVoid
   | HookPending
   | HookRunning
   | ChildRunning
@@ -116,25 +115,24 @@ getStatus = uu
 --     -- XTGroup {status} -> status
 --     XFixtures{status} -> status
 
-
 data XContext = XContext
   { loc :: Loc
   , evtLogger :: (Int -> SThreadId -> ExeEvent) -> IO ()
   }
 
 mkCtx :: XContext -> Context
-mkCtx XContext{loc, evtLogger} = 
-  let 
-   msgLogger :: Text -> IO ()
-   msgLogger msg = evtLogger $ \idx trdId ->
-    ApLog
-      { idx = idx
-      , threadId = trdId
-      , msg = msg
-      }
-  in Context loc msgLogger
-  
-  
+mkCtx XContext{loc, evtLogger} =
+  let
+    msgLogger :: Text -> IO ()
+    msgLogger msg = evtLogger $ \idx trdId ->
+      ApLog
+        { idx = idx
+        , threadId = trdId
+        , msg = msg
+        }
+   in
+    Context loc msgLogger
+
 isDone :: Status -> Bool
 isDone = (== Done)
 
@@ -146,8 +144,8 @@ canRun rg =
   canRun' <$> getStatus rg
  where
   canRun' = \case
-    Pending -> uu --True
-    
+    Pending -> uu -- True
+
     -- HookExecuting -> True
     Running -> True
     FullyRunning -> False
@@ -169,28 +167,20 @@ mkIdxLst :: a -> STM (IdxLst a)
 mkIdxLst elm = IdxLst 0 [elm] <$> newTVar 0
 
 data ChildQ a = ChildQ
-  { status :: TVar Status
+  { status :: TVar CanRun
   , childNodes :: TQueue a
   , runningCount :: TVar Int
   , maxThreads :: Maybe Int
   }
 
-data XTest si ti ii = Test
-  { id :: Text
-  , test :: Context -> si -> ti -> ii -> IO ()
-  , status :: TVar Status
-  }
-
-mkXTest :: PN.Test si ti ii -> STM (XTest si ti ii)
-mkXTest PN.Test{id, test} = Test id test <$> newTVar Pending
-
 data CanRun
   = Runnable
   | Saturated
   | RunDone
+  deriving (Show, Eq)
 
-runChildQ :: forall a. (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
-runChildQ runner canRun' q@ChildQ{childNodes, status, runningCount, maxThreads} =
+runChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
+runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCount, maxThreads} =
   do
     eNext <- atomically $ do
       let pop = tryReadTQueue childNodes
@@ -203,43 +193,41 @@ runChildQ runner canRun' q@ChildQ{childNodes, status, runningCount, maxThreads} 
       mNext
         & maybe
           ( do
-              Left
-                <$> if
-                    | rc < 0 -> error "framework error - this should not happen - running count below zero"
-                    | rc == 0 -> pure True
-                    | otherwise -> writeTVar status FullyRunning >> pure False
+              if
+                  | rc < 0 -> error "framework error - this should not happen - running count below zero"
+                  | rc == 0 -> writeTVar status RunDone
+                  | otherwise -> writeTVar status Saturated
+              pure Nothing
           )
           ( \a -> do
               modifyTVar runningCount succ
-              setStatusRunning status
-              pure $ Right a
+              pure $ Just a
           )
+
     eNext
-      & either
-        ( \done ->
-            when done $
-              atomically $
-                writeTVar status Done
-        )
-        ( \a ->
-            do
-              finally
-                do
-                  cr <- atomically $ canRun' a
-                  cr & \case
-                    -- runner MUST ensure the integrity of sub element status and handle all exceptions
-                    -- element is placed back on the end of the q before running
-                    Runnable -> atomically (writeTQueue childNodes a) >> runner a
-                    Saturated -> pure ()
-                    RunDone -> pure ()
-                do
-                  atomically $ modifyTVar runningCount pred
-              runChildQ runner canRun' q
+      & maybe
+        (pure ())
+        ( \a -> do
+            finally
+              do
+                cr <- atomically $ canRun' a
+                cr & \case
+                  -- runner MUST ensure the integrity of sub element status and handle all exceptions
+                  -- when childConcurrent element is placed back on the end of the q before running so 
+                  -- can be picked up by other threads 
+                  Runnable -> do
+                    when childConcurrent $
+                      atomically (writeTQueue childNodes a)
+                    runner a
+                  Saturated -> pure ()
+                  RunDone -> pure ()
+              (atomically $ modifyTVar runningCount pred)
+            runChildQ childConcurrent runner canRun' q
         )
 
 mkChildQ :: Maybe Int -> [a] -> IO (ChildQ a)
 mkChildQ maxC children = do
-  s <- newTVarIO Pending
+  s <- newTVarIO Runnable
   q <- newTQueueIO
   rc <- newTVarIO 0
   atomically $ traverse_ (writeTQueue q) children
@@ -263,35 +251,37 @@ mkOnceVal h = OnceVal h <$> newTVarIO HookPending <*> newEmptyTMVarIO
 data XFixture oi ti tsti where
   XFixture ::
     { loc :: Loc
-    , status :: TVar Status
     , onceHook :: OnceVal oi oo
     , threadHook :: ThreadHook oo ti to
     , testHook :: TestHook oi ti tsti tsto
-    , tests :: ChildQ (XTest oo to io)
+    , tests :: ChildQ (PN.Test oo to io)
     } ->
     XFixture oi ti ii
 
 canRunXFixture :: XFixture oi ti tsti -> STM CanRun
-canRunXFixture XFixture{onceHook, threadHook, testHook, tests} = do
-  ohs <- readTVar onceHook.status
-  uu
+canRunXFixture XFixture{tests} = readTVar tests.status
+
+execXFixture :: XContext -> XFixture oi ti tsti -> IO ()
+execXFixture ctx@XContext{loc, evtLogger} fx@XFixture{onceHook, threadHook, testHook, tests} = uu
+  -- do
+  -- let
+  --   runChildQ' = runChildQ (execXTest ctx testHook) canRunXTest
+  -- runChildQ' tests
+  -- waitDone tests
 
 mkXFixture ::
   Loc ->
   PN.Fixture oi ti tsti ->
   IO (XFixture oi ti tsti)
 mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads} = do
-  s <- newTVarIO Pending
   oh <- mkOnceVal onceHook
-  xts <- atomically $ traverse mkXTest tests
-  ts <- mkChildQ maxThreads xts
+  ts <- mkChildQ maxThreads tests
   pure $
     XFixture
       { loc
-      , status = s
       , onceHook = oh
-      , threadHook = threadHook
-      , testHook = testHook
+      , threadHook
+      , testHook
       , tests = ts
       }
 
@@ -325,7 +315,7 @@ prepare =
     let nodeLoc tag =
           Node
             { parent = parentLoc
-            , tag = tag
+            , tag
             }
     case pn of
       PN.Group
@@ -361,7 +351,7 @@ prepare =
             q <- mkChildQ maxThreads fxs
             pure $
               XFixtures
-                { loc = loc
+                { loc
                 , maxThreads
                 , status = s
                 , fixtures = q
@@ -398,7 +388,7 @@ tryLockRun hkStatus hkVal hkAction =
       pure
 
 runLogHook :: forall hi ho. XContext -> ExeEventType -> (Context -> hi -> IO ho) -> hi -> IO (Either Abandon ho)
-runLogHook  ctx@XContext{loc, evtLogger} hkEvent hook hi =
+runLogHook ctx@XContext{loc, evtLogger} hkEvent hook hi =
   withStartEnd evtLogger loc hkEvent $
     catchAll
       ( Right <$> hook (mkCtx ctx) hi
@@ -431,7 +421,7 @@ abandonnedOnceHookVal logger abandon hs hkVal loc =
         pure $ Left abandon
     )
 
-threadHookVal :: forall oi ti to.  XContext -> Either Abandon (ExeIn oi ti) -> ThreadHook oi ti to -> IO (Either Abandon to)
+threadHookVal :: forall oi ti to. XContext -> Either Abandon (ExeIn oi ti) -> ThreadHook oi ti to -> IO (Either Abandon to)
 threadHookVal ctx@XContext{loc, evtLogger} hkIn thook =
   hkIn
     & either
@@ -520,16 +510,14 @@ releaseOnceHook ctx eho hk =
       when r $
         writeTVar hk.status HookReleaseRunning
       pure r
-    where 
-      canLock = \case
-        HookVoid -> False
-        HookPending -> False
-        ChildRunning -> False
-        HookRunning -> True
-        HookReleaseRunning -> False 
-        HookDone -> False
-        
-
+   where
+    canLock = \case
+      HookVoid -> False
+      HookPending -> False
+      ChildRunning -> False
+      HookRunning -> True
+      HookReleaseRunning -> False
+      HookDone -> False
 
 -- discardDone :: TQueue (ExeTree oi ti) -> STM ()
 -- discardDone = processWhile nodeDone
@@ -600,9 +588,9 @@ executeNode eventLogger hkIn rg =
                     wantRelease <- atomically $ do
                       childStatus <- readTVar childQ.status
                       s <- readTVar oHook.status
-                      pure $ childStatus == Done && uu --s < HookFinalising
+                      pure $ childStatus == RunDone && uu -- s < HookFinalising
                     when wantRelease $
-                      releaseOnceHook releaseContext eso  oHook
+                      releaseOnceHook releaseContext eso oHook
                 )
            where
             runThreadHook thHkin =
@@ -611,7 +599,7 @@ executeNode eventLogger hkIn rg =
                     recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
                     hkCtx = context loc
                     releaseCtx = context . Node loc $ txt L.ThreadHookRelease
-                eto <- threadHookVal  hkCtx thHkin thrdHook
+                eto <- threadHookVal hkCtx thHkin thrdHook
                 finally
                   ( eto
                       & either
@@ -749,7 +737,6 @@ executeNode eventLogger hkIn rg =
 
   context :: Loc -> XContext
   context l = XContext l eventLogger
-
 
 type EventLogger = (Int -> SThreadId -> ExeEvent) -> IO ()
 

@@ -122,8 +122,12 @@ data TestHook oi ti tsti tsto where
 -- remove once / threadHooks from Fixtures :: Done
 -- collapse threadHook and onceHook types :: Done
 -- change fixtures from test to fixtures :: Done
+-- rewrite executeNode:
+  -- XTest
+  -- XFixture
+  -- XFixtures
+  -- XGroup
 -- reimplement uu
--- rewrite executeNode
 -- loc should not  include event type it should be node address
 -- get rid of getStatus ??
 -- stm bool on once hook executing

@@ -301,7 +301,7 @@ data ExeTree oi ti where
     { loc :: Loc
     , maxThreads :: Maybe Int
     , status :: TVar Status
-    , tHook :: TestHook oi ti () tsto
+    , testHook :: TestHook oi ti () tsto
     , fixtures :: ChildQ (XFixture oi ti tsto)
     } ->
     ExeTree oi ti
@@ -358,7 +358,7 @@ prepare =
                 , maxThreads
                 , status = s
                 , fixtures = q
-                , tHook = testHook
+                , testHook = testHook
                 }
 
 logAbandonned :: EventLogger -> Loc -> ExeEventType -> Abandon -> IO ()
@@ -622,7 +622,7 @@ executeNode eventLogger hkIn rg =
           { status
           , loc
           , fixtures
-          , tHook
+          , testHook
           } ->
             withStartEnd eventLogger loc L.Fixture $ do
               recurse hkIn
@@ -656,7 +656,7 @@ executeNode eventLogger hkIn rg =
                         atomically (writeTVar status Done)
                   )
                   ( \PN.Test{id, test} -> do
-                      to <- runTestHook (tstHkloc id) fxIpts () tHook
+                      to <- runTestHook (tstHkloc id) fxIpts () testHook
                       let unpak io' (ExeIn so2 to2) = (so2, to2, io')
                           ethInputs = liftA2 unpak to fxIpts
                           testLoc = tstLoc id
@@ -672,7 +672,7 @@ executeNode eventLogger hkIn rg =
                                   (logFailure' testLoc L.Test)
                         )
                         do
-                          releaseTestHook id to tHook
+                          releaseTestHook id to testHook
                           uu -- atomically (modifyTVarrunningCount pred)
                           recurse fxIpts
                   )

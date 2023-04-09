@@ -49,7 +49,7 @@ data PreNode oi ti where
     , maxThreads :: Maybe Int
     , onceHook :: OnceHook oi oo
     , threadHook :: ThreadHook oo ti to
-    , onceSubNodes :: [PreNode oo to]
+    , subNodes :: [PreNode oo to]
     } ->
     PreNode oi ti
   Fixtures ::
@@ -137,5 +137,5 @@ data TestHook oi ti tsti tsto where
 
 nodeEmpty :: PreNode oi ti -> Bool
 nodeEmpty = \case
-  Group{onceSubNodes} -> all nodeEmpty onceSubNodes
+  Group{subNodes} -> all nodeEmpty subNodes
   Fixtures{fixtures} -> null fixtures

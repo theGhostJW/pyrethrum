@@ -179,8 +179,11 @@ data CanRun
   | RunDone
   deriving (Show, Eq)
 
-runChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
-runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCount, maxThreads} =
+runTest :: PN.Test si ti ii -> IO ()
+runTest = uu
+
+executeChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
+executeChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCount, maxThreads} =
   do
     eNext <- atomically $ do
       let pop = tryReadTQueue childNodes
@@ -222,7 +225,7 @@ runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCou
                   Saturated -> pure ()
                   RunDone -> pure ()
               (atomically $ modifyTVar runningCount pred)
-            runChildQ childConcurrent runner canRun' q
+            executeChildQ childConcurrent runner canRun' q
         )
 
 mkChildQ :: Maybe Int -> [a] -> IO (ChildQ a)
@@ -289,8 +292,8 @@ data ExeTree oi ti where
   XGroup ::
     { loc :: Loc
     , maxThreads :: Maybe Int
-    , oHook :: OnceVal oi oo
-    , thrdHook :: ThreadHook oo ti to
+    , onceHook :: OnceVal oi oo
+    , threadHook :: ThreadHook oo ti to
     , childQ :: ChildQ (ExeTree oo to)
     } ->
     ExeTree oi ti
@@ -323,18 +326,18 @@ prepare =
         , maxThreads
         , onceHook
         , threadHook
-        , onceSubNodes
+        , subNodes
         } -> do
           onceHk <- mkOnceVal onceHook
           let loc = nodeLoc title
-          childQ <- traverse (prepare' parentLoc 0) onceSubNodes
+          childQ <- traverse (prepare' parentLoc 0) subNodes
           chldgrp <- mkChildQ maxThreads childQ
           pure $
             XGroup
               { loc
               , maxThreads
-              , oHook = onceHk
-              , thrdHook = threadHook
+              , onceHook = onceHk
+              , threadHook = threadHook
               , childQ = chldgrp
               }
       PN.Fixtures
@@ -562,8 +565,8 @@ executeNode eventLogger hkIn rg =
         XGroup
           { loc
           , maxThreads
-          , oHook
-          , thrdHook
+          , onceHook
+          , threadHook
           , childQ
           } ->
             do
@@ -577,7 +580,7 @@ executeNode eventLogger hkIn rg =
                   recurse a = uu -- to doexeNxt a oSubNodes
                   ctx = context loc
                   releaseContext = context . Node loc $ txt L.OnceHookRelease
-              eso <- onceHookVal ctx L.OnceHook siHkIn oHook
+              eso <- onceHookVal ctx L.OnceHook siHkIn onceHook
               finally
                 ( eso
                     & either
@@ -587,10 +590,10 @@ executeNode eventLogger hkIn rg =
                 ( do
                     wantRelease <- atomically $ do
                       childStatus <- readTVar childQ.status
-                      s <- readTVar oHook.status
+                      s <- readTVar onceHook.status
                       pure $ childStatus == RunDone && uu -- s < HookFinalising
                     when wantRelease $
-                      releaseOnceHook releaseContext eso oHook
+                      releaseOnceHook releaseContext eso onceHook
                 )
            where
             runThreadHook thHkin =
@@ -599,7 +602,7 @@ executeNode eventLogger hkIn rg =
                     recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
                     hkCtx = context loc
                     releaseCtx = context . Node loc $ txt L.ThreadHookRelease
-                eto <- threadHookVal hkCtx thHkin thrdHook
+                eto <- threadHookVal hkCtx thHkin threadHook
                 finally
                   ( eto
                       & either
@@ -609,7 +612,7 @@ executeNode eventLogger hkIn rg =
                   ( let
                       doRelease = releaseHook releaseCtx L.ThreadHookRelease eto
                      in
-                      thrdHook & \case
+                      threadHook & \case
                         ThreadNone -> pure ()
                         ThreadBefore{} -> pure ()
                         ThreadAfter{releaseOnly} -> doRelease releaseOnly

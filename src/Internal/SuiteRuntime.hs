@@ -315,6 +315,7 @@ prepare =
 
   prepare' :: Loc -> Int -> PN.PreNode oi ti -> IO (ExeTree oi ti)
   prepare' parentLoc subElmIdx pn = do
+    -- uu need to use subElmIdx to create a unique loc
     let nodeLoc tag =
           Node
             { parent = parentLoc
@@ -330,15 +331,15 @@ prepare =
         } -> do
           onceHk <- mkOnceVal onceHook
           let loc = nodeLoc title
-          childQ <- traverse (prepare' parentLoc 0) subNodes
-          chldgrp <- mkChildQ maxThreads childQ
+          childlst <- traverse (prepare' parentLoc 0) subNodes
+          childQ <- mkChildQ maxThreads childlst
           pure $
             XGroup
               { loc
               , maxThreads
               , onceHook = onceHk
-              , threadHook = threadHook
-              , childQ = chldgrp
+              , threadHook
+              , childQ
               }
       PN.Fixtures
         { title

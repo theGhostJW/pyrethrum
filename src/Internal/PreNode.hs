@@ -128,6 +128,9 @@ data TestHook oi ti tsti tsto where
   -- XFixtures
   -- XGroup
 -- reimplement uu
+-- basic tests
+-- FIX :: 
+-- need to use subElmIdx to create a unique loc
 -- loc should not  include event type it should be node address
 -- get rid of getStatus ??
 -- stm bool on once hook executing

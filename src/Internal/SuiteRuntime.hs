@@ -182,8 +182,8 @@ data CanRun
 runTest :: PN.Test si ti ii -> IO ()
 runTest = uu
 
-runTestHook :: forall so' to' tsti' tsto'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' tsto' -> IO (Either Abandon tsto')
-runTestHook ctx@XContext{loc = hkLoc, evtLogger} fxIpts tsti testHk =
+runTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> IO (Either Abandon ho')
+runTestHook ctx@XContext{loc = hkLoc} fxIpts tsti testHk =
               do
                 fxIpts
                   & either
@@ -214,7 +214,7 @@ runTestHook ctx@XContext{loc = hkLoc, evtLogger} fxIpts tsti testHk =
                         TestAround{hook} -> exHk hook
                   )
                   ( \e -> do
-                      logFailure evtLogger hkLoc L.TestHook e
+                      logFailure ctx L.TestHook e
                       pure . Left $ Abandon hkLoc L.TestHook e
                   )
 
@@ -292,7 +292,7 @@ data XFixture oi ti tsti where
     { loc :: Loc
     , onceHook :: OnceVal oi oo
     , threadHook :: ThreadHook oo ti to
-    , testHook :: TestHook oi ti tsti tsto
+    , testHook :: TestHook oi ti tsti ho
     , tests :: ChildQ (PN.Test oo to io)
     } ->
     XFixture oi ti ii
@@ -337,8 +337,8 @@ data ExeTree oi ti where
     { loc :: Loc
     , maxThreads :: Maybe Int
     , status :: TVar Status
-    , testHook :: TestHook oi ti () tsto
-    , fixtures :: ChildQ (XFixture oi ti tsto)
+    , testHook :: TestHook oi ti () ho
+    , fixtures :: ChildQ (XFixture oi ti ho)
     } ->
     ExeTree oi ti
 
@@ -402,8 +402,8 @@ logAbandonned :: XContext -> ExeEventType -> Abandon -> IO ()
 logAbandonned XContext {loc, evtLogger} fet Abandon{sourceLoc, sourceEventType, exception} =
   evtLogger (mkParentFailure loc fet sourceLoc sourceEventType exception)
 
-logFailure :: EventLogger -> Loc -> ExeEventType -> SomeException -> IO ()
-logFailure evLogger loc et e = evLogger (mkFailure loc et (txt et <> "Failed at: " <> txt loc) e)
+logFailure :: XContext -> ExeEventType -> SomeException -> IO ()
+logFailure XContext {loc, evtLogger}  et e = evtLogger (mkFailure loc et (txt et <> "Failed at: " <> txt loc) e)
 
 readOrLockHook :: TVar HookStatus -> TMVar (Either Abandon ho) -> STM (Maybe (Either Abandon ho))
 readOrLockHook hs hVal =
@@ -428,13 +428,13 @@ tryLockRun hkStatus hkVal hkAction =
       pure
 
 runLogHook :: forall hi ho. XContext -> ExeEventType -> (Context -> hi -> IO ho) -> hi -> IO (Either Abandon ho)
-runLogHook ctx@XContext{loc, evtLogger} hkEvent hook hi =
+runLogHook ctx@XContext{loc} hkEvent hook hi =
   withStartEnd ctx hkEvent $
     catchAll
       ( Right <$> hook (mkCtx ctx) hi
       )
       ( \e ->
-          logFailure evtLogger loc hkEvent e
+          logFailure ctx hkEvent e
             >> pure (Left $ Abandon loc hkEvent e)
       )
 
@@ -707,7 +707,7 @@ executeNode eventLogger hkIn rg =
                               \(so2, to2, io') ->
                                 catchAll
                                   (test (mkCtx ctx) so2 to2 io')
-                                  (logFailure' testLoc L.Test)
+                                  (logFailure ctx L.Test)
                         )
                         do
                           releaseTestHook id to testHook
@@ -715,7 +715,7 @@ executeNode eventLogger hkIn rg =
                           recurse fxIpts
                   )
 
-            releaseTestHook :: forall so' to' tsti' tsto'. Text -> Either Abandon tsto' -> TestHook so' to' tsti' tsto' -> IO ()
+            releaseTestHook :: forall so' to' tsti' ho'. Text -> Either Abandon ho' -> TestHook so' to' tsti' ho' -> IO ()
             releaseTestHook tstId tsti = \case
               TestNone -> noRelease
               TestBefore{} -> noRelease
@@ -738,9 +738,6 @@ executeNode eventLogger hkIn rg =
 
   logAbandonned' :: Loc -> ExeEventType -> Abandon -> IO ()
   logAbandonned' l = logAbandonned (context l) 
-
-  logFailure' :: Loc -> ExeEventType -> SomeException -> IO ()
-  logFailure' = logFailure eventLogger
 
   context :: Loc -> XContext
   context l = XContext l eventLogger

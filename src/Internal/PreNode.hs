@@ -127,6 +127,7 @@ data TestHook oi ti tsti tsto where
   -- XFixture
   -- XFixtures
   -- XGroup
+-- check references to status - replace / remove
 -- reimplement uu
 -- basic tests
 -- FIX :: 

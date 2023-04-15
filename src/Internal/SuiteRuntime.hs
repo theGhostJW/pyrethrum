@@ -1,3 +1,7 @@
+--  should be able to remove this in later versions of GHC
+-- https://gitlab.haskell.org/ghc/ghc/-/issues/21443
+{-# OPTIONS_GHC -Wno-ambiguous-fields #-}
+
 module Internal.SuiteRuntime where
 
 import BasePrelude (NonTermination, retry)
@@ -182,13 +186,15 @@ data CanRun
 runTest :: PN.Test si ti ii -> IO ()
 runTest = uu
 
+withTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> (ho' -> IO ()) -> IO ()
+withTestHook ctx fxIpts tsti testHk action = uu
+
 runTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> IO (Either Abandon ho')
 runTestHook ctx@XContext{loc = hkLoc} fxIpts tsti testHk =
-  do
-    fxIpts
-      & either
-        logReturnAbandonned
-        runHook
+  fxIpts
+    & either
+      logReturnAbandonned
+      runHook
  where
   logReturnAbandonned a =
     let
@@ -214,6 +220,19 @@ runTestHook ctx@XContext{loc = hkLoc} fxIpts tsti testHk =
             TestAround{hook} -> exHk hook
       )
       (logFailure ctx L.TestHook)
+
+mkTestChildLoc :: Show a => Loc -> Text -> a -> Loc
+mkTestChildLoc testLoc tstId evt = Node testLoc $ txt evt <> " :: " <> tstId
+
+releaseTestHook :: forall so' to' tsti' ho'. XContext -> Text -> Either Abandon ho' -> TestHook so' to' tsti' ho' -> IO ()
+releaseTestHook ctx@XContext{loc = testLoc} tstId tsti = \case
+  TestNone -> noRelease
+  TestBefore{} -> noRelease
+  TestAfter{releaseOnly} -> runRelease releaseOnly
+  TestAround{release} -> runRelease release
+ where
+  noRelease = pure ()
+  runRelease = releaseHook (ctx{loc = mkTestChildLoc testLoc tstId L.TestHookRelease}) L.TestHookRelease tsti
 
 executeChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
 executeChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCount, maxThreads} =
@@ -710,16 +729,6 @@ executeNode eventLogger hkIn rg =
                           uu -- atomically (modifyTVarrunningCount pred)
                           recurse fxIpts
                   )
-
-            releaseTestHook :: forall so' to' tsti' ho'. Text -> Either Abandon ho' -> TestHook so' to' tsti' ho' -> IO ()
-            releaseTestHook tstId tsti = \case
-              TestNone -> noRelease
-              TestBefore{} -> noRelease
-              TestAfter{releaseOnly} -> runRelease releaseOnly
-              TestAround{release} -> runRelease release
-             where
-              noRelease = pure ()
-              runRelease = releaseHook (context $ tstHkReleaseloc tstId) L.TestHookRelease tsti
  where
   siHkIn :: Either Abandon oi
   siHkIn = (.onceIn) <$> hkIn

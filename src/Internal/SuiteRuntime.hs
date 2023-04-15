@@ -183,23 +183,74 @@ data CanRun
   | RunDone
   deriving (Show, Eq)
 
-runTest :: PN.Test si ti ii -> IO ()
-runTest = uu
+runTest :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> PN.Test so' to' ho' -> IO ()
+runTest ctx@XContext{loc = fxLoc} fxIpts tsti testHk test@PN.Test{id, test = tstAction} =
+  do
+    let tstCtx = ctx{loc = Node fxLoc $ " :: " <> id} :: XContext
+    eho <- runTestHook tstCtx fxIpts tsti testHk
+    eho
+      & either
+        (logAbandonned tstCtx L.Test)
+        ( \(oi, ti, tsti') ->
+            finally
+              ( withStartEnd ctx L.Test $
+                  catchAll
+                    (tstAction (mkCtx ctx) oi ti tsti')
+                    (void . logReturnFailure ctx L.Test)
+              )
+              do
+                releaseTestHook id to testHook
+                uu -- atomically (modifyTVarrunningCount pred)
+                recurse fxIpts
+                {-
 
-withTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> (ho' -> IO ()) -> IO ()
-withTestHook ctx fxIpts tsti testHk action = uu
+                 ( \PN.Test{id, test} -> do
+                              to <- runTestHook (context $ tstHkloc id) fxIpts () testHook
+                              let unpak io' (ExeIn so2 to2) = (so2, to2, io')
+                                  ethInputs = liftA2 unpak to fxIpts
+                                  testLoc = tstLoc id
+                                  ctx = context testLoc
+                              finally
+                                ( withStartEnd ctx L.Test $
+                                    ethInputs & either
+                                      (logAbandonned' testLoc L.Test)
+                                      \(so2, to2, io') ->
+                                        catchAll
+                                          (test (mkCtx ctx) so2 to2 io')
+                                          (void . logReturnFailure ctx L.Test)
+                                )
+                                do
+                                  releaseTestHook id to testHook
+                                  uu -- atomically (modifyTVarrunningCount pred)
+                                  recurse fxIpts
+                          )
 
-runTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> IO (Either Abandon ho')
-runTestHook ctx@XContext{loc = hkLoc} fxIpts tsti testHk =
+                -}
+        )
+
+-- case eho of
+--   Left a -> logAbandonned ctx L.Test a
+--   Right ho -> do
+--     let
+--       tstLog = mkLogger tstCtx
+--       tstLogFailure = mkFailure tstCtx
+--       tstLogParentFailure = mkParentFailure tstCtx
+--       tstLogControls = LogControls tstLog tstLogFailure tstLogParentFailure
+--     tstAction tstLogControls ho
+
+runTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> IO (Either Abandon (so', to', ho'))
+runTestHook ctx@XContext{loc = testLoc} tstId fxIpts tsti testHk =
   fxIpts
     & either
       logReturnAbandonned
       runHook
  where
+  tstCtx :: XContext
+  tstCtx = ctx{loc = mkTestChildLoc testLoc tstId L.TestHook}
   logReturnAbandonned a =
     let
       result = pure (Left a)
-      loga = logAbandonned ctx L.TestHook a >> result
+      loga = logAbandonned tstCtx L.TestHook a >> result
      in
       testHk & \case
         TestNone{} -> result
@@ -210,7 +261,7 @@ runTestHook ctx@XContext{loc = hkLoc} fxIpts tsti testHk =
   runHook (ExeIn oi ti) =
     catchAll
       ( let
-          exHk h = Right <$> withStartEnd ctx L.TestHook (h (mkCtx ctx) oi ti tsti)
+          exHk h = Right <$> withStartEnd tstCtx L.TestHook (h (mkCtx tstCtx) oi ti tsti)
           voidHk = pure @IO $ Right @Abandon tsti
          in
           testHk & \case
@@ -219,10 +270,10 @@ runTestHook ctx@XContext{loc = hkLoc} fxIpts tsti testHk =
             TestAfter{} -> voidHk
             TestAround{hook} -> exHk hook
       )
-      (logFailure ctx L.TestHook)
+      (logReturnFailure tstCtx L.TestHook)
 
-mkTestChildLoc :: Show a => Loc -> Text -> a -> Loc
-mkTestChildLoc testLoc tstId evt = Node testLoc $ txt evt <> " :: " <> tstId
+mkTestChildLoc :: (Show a) => Loc -> a -> Loc
+mkTestChildLoc testLoc evt = Node testLoc $ txt evt
 
 releaseTestHook :: forall so' to' tsti' ho'. XContext -> Text -> Either Abandon ho' -> TestHook so' to' tsti' ho' -> IO ()
 releaseTestHook ctx@XContext{loc = testLoc} tstId tsti = \case
@@ -419,11 +470,11 @@ logAbandonned :: XContext -> ExeEventType -> Abandon -> IO ()
 logAbandonned XContext{loc, evtLogger} fet Abandon{sourceLoc, sourceEventType, exception} =
   evtLogger (mkParentFailure loc fet sourceLoc sourceEventType exception)
 
-logFailure :: XContext -> ExeEventType -> SomeException -> IO (Either Abandon a)
-logFailure XContext{loc, evtLogger} et e =
+logReturnFailure :: XContext -> ExeEventType -> SomeException -> IO (Either Abandon a)
+logReturnFailure XContext{loc, evtLogger} et e =
   do
     evtLogger (mkFailure loc et (txt et <> "Failed at: " <> txt loc) e)
-    pure $ Left $ Abandon loc L.TestHook e
+    pure $ Left $ Abandon loc et e
 
 readOrLockHook :: TVar HookStatus -> TMVar (Either Abandon ho) -> STM (Maybe (Either Abandon ho))
 readOrLockHook hs hVal =
@@ -452,7 +503,7 @@ runLogHook ctx@XContext{loc} hkEvent hook hi =
   withStartEnd ctx hkEvent $
     catchAll
       (Right <$> hook (mkCtx ctx) hi)
-      (logFailure ctx hkEvent)
+      (logReturnFailure ctx hkEvent)
 
 withStartEnd :: XContext -> ExeEventType -> IO a -> IO a
 withStartEnd XContext{loc, evtLogger} evt io = do
@@ -722,7 +773,7 @@ executeNode eventLogger hkIn rg =
                               \(so2, to2, io') ->
                                 catchAll
                                   (test (mkCtx ctx) so2 to2 io')
-                                  (void . logFailure ctx L.Test)
+                                  (void . logReturnFailure ctx L.Test)
                         )
                         do
                           releaseTestHook id to testHook

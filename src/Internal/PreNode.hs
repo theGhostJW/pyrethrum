@@ -26,7 +26,7 @@ data Fixture oi ti tsti where
     , maxThreads :: Maybe Int
     , onceHook :: OnceHook oi oo
     , threadHook :: ThreadHook oo ti to
-    , testHook :: TestHook oi ti tsti tsto
+    , testHook :: TestHook oo to tsti tsto
     , tests :: [Test oo to tsto]
     } ->
     Fixture oi ti tsti

@@ -27,9 +27,9 @@ data Fixture oi ti tsti where
     , onceHook :: OnceHook oi oo
     , threadHook :: ThreadHook oo ti to
     , testHook :: TestHook oi ti tsti tsto
-    , tests :: [Test oo to io]
+    , tests :: [Test oo to tsto]
     } ->
-    Fixture oi ti ii
+    Fixture oi ti tsti
 
 -- f1 :: Fixture Int Text Bool
 -- f1 =

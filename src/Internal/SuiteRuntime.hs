@@ -191,7 +191,7 @@ data XTest si ti ii = XTest
   , test :: XContext -> si -> ti -> ii -> IO ()
   }
 
-runTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to' tsti') -> TestHook so' to' tsti' ho' -> IO (Either Abandon (so', to', ho'))
+runTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to' tsti') -> TestHook so' to' tsti' ho' -> IO (Either Abandon (ExeIn so' to' ho'))
 runTestHook ctx@XContext{loc = testLoc} tstIn testHk =
   tstIn
     & either
@@ -214,8 +214,8 @@ runTestHook ctx@XContext{loc = testLoc} tstIn testHk =
   runHook (ExeIn oi ti tsti) =
     catchAll
       ( let
-          exHk h = (oi,ti,) <<$>> Right <$> withStartEnd tstCtx L.TestHook (h (mkCtx tstCtx) oi ti tsti)
-          voidHk = pure @IO $ Right @Abandon (oi, ti, tsti)
+          exHk h = ExeIn oi ti <<$>> Right <$> withStartEnd tstCtx L.TestHook (h (mkCtx tstCtx) oi ti tsti)
+          voidHk = pure @IO $ Right @Abandon (ExeIn oi ti tsti)
          in
           testHk & \case
             TestNone{} -> voidHk
@@ -312,19 +312,23 @@ data XFixture oi ti tsti where
     { loc :: Loc
     , onceHook :: OnceVal oi oo
     , threadHook :: ThreadHook oo ti to
-    , testHook :: TestHook oi ti tsti ho
-    , tests :: ChildQ (XTest oo to io)
+    , testHook :: TestHook oo to tsti ho
+    , tests :: ChildQ (XTest oo to ho)
     } ->
-    XFixture oi ti ii
+    XFixture oi ti tsti
 
 canRunXFixture :: XFixture oi ti tsti -> STM CanRun
 canRunXFixture XFixture{tests} = readTVar tests.status
 
-withOnceHook :: XContext -> Either Abandon (ExeIn si ti tsti) -> OnceVal si so -> (Either Abandon so -> IO ()) -> IO ()
+withOnceHook :: XContext -> Either Abandon (ExeIn si ti tsti) -> OnceVal si so -> (Either Abandon (ExeIn so ti tsti) -> IO ()) -> IO ()
 withOnceHook ctx hkIn onceHook nxtCalc = do
   eso <- onceHookVal ctx ((.onceIn) <$> hkIn) onceHook
   finally
-    (nxtCalc eso)
+    (nxtCalc $ do 
+       so <- eso 
+       hki <- hkIn
+       Right $ hki{onceIn = so}
+    )
     (releaseOnceHookIfReady ctx eso onceHook)
 
 withThreadHook :: XContext -> Either Abandon (ExeIn oi ti tsti) -> ThreadHook oi ti to -> (Either Abandon (ExeIn oi to tsti) -> IO ()) -> IO ()
@@ -358,12 +362,13 @@ withThreadHook ctx hkIn threadHook nxtAction =
 --         (recurse . nxtHkIn)
 --   )
 
-runXFixture :: XContext -> Either Abandon (ExeIn oi ti tsti) -> Maybe Int -> TestHook oi ti () ii -> XFixture oi ti ii -> IO CanRun
+
+runXFixture :: forall oi ti ii. XContext -> Either Abandon (ExeIn oi ti ()) -> Maybe Int -> TestHook oi ti () ii -> XFixture oi ti ii -> IO CanRun
 runXFixture
   ctx
   exin
   prntMaxThrds
-  pTstHk
+  prntTstHk
   XFixture
     { loc
     , onceHook
@@ -371,15 +376,13 @@ runXFixture
     , testHook
     , tests
     } = uu
-    where  
-      -- here have to track threadcount
-      tstCanRun = const $ pure @STM Runnable
-      tstConcurrent = False
-      -- tstRun :: XTest oo to io -> IO ()
-      tstRun = do 
-        --  XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> IO (Either Abandon (so', to', ho'))
-        -- fxto <- uu -- runTestHook ctx exin () pTstHk
-        uu
+    where
+      tstRun tst = do
+        prntTstOut <- runTestHook ctx exin prntTstHk
+        finally
+         (runXTest ctx prntTstOut testHook tst)
+         (releaseTestHook ctx ((.tstIn) <$> prntTstOut) prntTstHk)
+      runTests = runChildQ False tstRun (const $ pure @STM Runnable) tests
       mxThrds = LE.minimum $ catMaybes [prntMaxThrds, tests.maxThreads]
       {-
        , maxThreads :: Maybe Int
@@ -461,7 +464,7 @@ runXTest ctx@XContext{loc = fxLoc} fxIpts testHk test@XTest{loc = tstLoc, test =
     eho
       & either
         (logAbandonned tstCtx L.Test)
-        ( \(oi, ti, tsti') ->
+        ( \(ExeIn oi ti tsti') ->
             finally
               ( withStartEnd ctx L.Test $
                   catchAll
@@ -474,7 +477,7 @@ runXTest ctx@XContext{loc = fxLoc} fxIpts testHk test@XTest{loc = tstLoc, test =
                     \case
                       (_, _, c) -> c
                  in
-                  releaseTestHook tstCtx (trd <$> eho) testHk
+                  releaseTestHook tstCtx ((.tstIn) <$> eho) testHk
               )
         )
 

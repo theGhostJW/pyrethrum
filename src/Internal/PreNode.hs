@@ -129,6 +129,7 @@ data TestHook oi ti tsti tsto where
   -- XGroup
 -- check references to status - replace / remove
 -- reimplement uu
+-- tree shake / validate - prenodes (unique ids)
 -- basic tests
 -- FIX :: 
 -- need to use subElmIdx to create a unique loc

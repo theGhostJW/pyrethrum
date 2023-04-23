@@ -91,14 +91,17 @@ import UnliftIO.STM (
   writeTVar,
  )
 import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO)
+import List.Extra as LE
 
 data HookStatus
   = HookVoid
   | HookPending
   | HookRunning
+  | HookComplete
   | ChildRunning
+  | ChildComplete
   | HookReleaseRunning
-  | HookDone
+  | HookReleased
   deriving (Show, Eq)
 data Status
   = Pending
@@ -183,34 +186,14 @@ data CanRun
   | RunDone
   deriving (Show, Eq)
 
-runTest :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> PN.Test so' to' ho' -> IO ()
-runTest ctx@XContext{loc = fxLoc} fxIpts tsti testHk test@PN.Test{id, test = tstAction} =
-  do
-    let tstCtx = ctx{loc = Node fxLoc $ " :: " <> id} :: XContext
-    eho <- runTestHook tstCtx fxIpts tsti testHk
-    eho
-      & either
-        (logAbandonned tstCtx L.Test)
-        ( \(oi, ti, tsti') ->
-            finally
-              ( withStartEnd ctx L.Test $
-                  catchAll
-                    (tstAction (mkCtx ctx) oi ti tsti')
-                    (void . logReturnFailure ctx L.Test)
-              )
-              ( let
-                  trd :: (a, b, c) -> c
-                  trd =
-                    \case
-                      (_, _, c) -> c
-                 in
-                  releaseTestHook tstCtx (trd <$> eho) testHk
-              )
-        )
+data XTest si ti ii = XTest
+  { loc :: Loc
+  , test :: XContext -> si -> ti -> ii -> IO ()
+  }
 
-runTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> IO (Either Abandon (so', to', ho'))
-runTestHook ctx@XContext{loc = testLoc} fxIpts tsti testHk =
-  fxIpts
+runTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to' tsti') -> TestHook so' to' tsti' ho' -> IO (Either Abandon (so', to', ho'))
+runTestHook ctx@XContext{loc = testLoc} tstIn testHk =
+  tstIn
     & either
       logReturnAbandonned
       runHook
@@ -228,7 +211,7 @@ runTestHook ctx@XContext{loc = testLoc} fxIpts tsti testHk =
         TestAfter{} -> result
         TestAround{} -> loga
 
-  runHook (ExeIn oi ti) =
+  runHook (ExeIn oi ti tsti) =
     catchAll
       ( let
           exHk h = (oi,ti,) <<$>> Right <$> withStartEnd tstCtx L.TestHook (h (mkCtx tstCtx) oi ti tsti)
@@ -255,8 +238,8 @@ releaseTestHook ctx@XContext{loc = testLoc} tsti = \case
   noRelease = pure ()
   runRelease = releaseHook (ctx{loc = mkTestChildLoc testLoc L.TestHookRelease}) L.TestHookRelease tsti
 
-executeChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
-executeChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCount, maxThreads} =
+runChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
+runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCount, maxThreads} =
   do
     eNext <- atomically $ do
       let pop = tryReadTQueue childNodes
@@ -282,23 +265,23 @@ executeChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runnin
 
     eNext
       & maybe
-        (pure ())
+        (atomically $ readTVar status)
         ( \a -> do
             finally
               do
                 cr <- atomically $ canRun' a
                 cr & \case
                   -- runner MUST ensure the integrity of sub element status and handle all exceptions
-                  -- when childConcurrent element is placed back on the end of the q before running so
-                  -- can be picked up by other threads
                   Runnable -> do
+                    -- when childConcurrent element is placed back on the end of the q before running so
+                    -- can be picked up by other threads
                     when childConcurrent $
                       atomically (writeTQueue childNodes a)
                     runner a
                   Saturated -> pure ()
                   RunDone -> pure ()
               (atomically $ modifyTVar runningCount pred)
-            executeChildQ childConcurrent runner canRun' q
+            runChildQ childConcurrent runner canRun' q
         )
 
 mkChildQ :: Maybe Int -> [a] -> IO (ChildQ a)
@@ -330,15 +313,170 @@ data XFixture oi ti tsti where
     , onceHook :: OnceVal oi oo
     , threadHook :: ThreadHook oo ti to
     , testHook :: TestHook oi ti tsti ho
-    , tests :: ChildQ (PN.Test oo to io)
+    , tests :: ChildQ (XTest oo to io)
     } ->
     XFixture oi ti ii
 
 canRunXFixture :: XFixture oi ti tsti -> STM CanRun
 canRunXFixture XFixture{tests} = readTVar tests.status
 
-execXFixture :: XContext -> XFixture oi ti tsti -> IO ()
-execXFixture ctx@XContext{loc, evtLogger} fx@XFixture{onceHook, threadHook, testHook, tests} = uu
+withOnceHook :: XContext -> Either Abandon (ExeIn si ti tsti) -> OnceVal si so -> (Either Abandon so -> IO ()) -> IO ()
+withOnceHook ctx hkIn onceHook nxtCalc = do
+  eso <- onceHookVal ctx ((.onceIn) <$> hkIn) onceHook
+  finally
+    (nxtCalc eso)
+    (releaseOnceHookIfReady ctx eso onceHook)
+
+withThreadHook :: XContext -> Either Abandon (ExeIn oi ti tsti) -> ThreadHook oi ti to -> (Either Abandon (ExeIn oi to tsti) -> IO ()) -> IO ()
+withThreadHook ctx hkIn threadHook nxtAction =
+  do
+    eto <-
+      threadHookVal
+        ctx
+        hkIn
+        threadHook
+    finally
+      ( nxtAction $ do
+          hi <- hkIn
+          to <- eto
+          Right $ hi{threadIn = to}
+      )
+      ( let
+          doRelease = releaseHook ctx L.ThreadHookRelease eto
+         in
+          threadHook & \case
+            ThreadNone -> pure ()
+            ThreadBefore{} -> pure ()
+            ThreadAfter{releaseOnly} -> doRelease releaseOnly
+            ThreadAround{release} -> doRelease release
+      )
+
+-- finally
+--   ( eto
+--       & either
+--         (recurse . Left)
+--         (recurse . nxtHkIn)
+--   )
+
+runXFixture :: XContext -> Either Abandon (ExeIn oi ti tsti) -> Maybe Int -> TestHook oi ti () ii -> XFixture oi ti ii -> IO CanRun
+runXFixture
+  ctx
+  exin
+  prntMaxThrds
+  pTstHk
+  XFixture
+    { loc
+    , onceHook
+    , threadHook
+    , testHook
+    , tests
+    } = uu
+    where  
+      -- here have to track threadcount
+      tstCanRun = const $ pure @STM Runnable
+      tstConcurrent = False
+      -- tstRun :: XTest oo to io -> IO ()
+      tstRun = do 
+        --  XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> IO (Either Abandon (so', to', ho'))
+        -- fxto <- uu -- runTestHook ctx exin () pTstHk
+        uu
+      mxThrds = LE.minimum $ catMaybes [prntMaxThrds, tests.maxThreads]
+      {-
+       , maxThreads :: Maybe Int
+    , status :: TVar Status
+    , testHook :: TestHook oi ti () ii
+      -}
+      -- runChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
+      -- runXTest :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> XTest so' to' ho' -> IO ()
+
+{-
+do
+   wantRun <- atomically $ canRun rg
+   when
+     wantRun
+     case rg of
+       XGroup
+         { loc
+         , maxThreads
+         , onceHook
+         , threadHook
+         , childQ
+         } ->
+           do
+             -- onceHookVal:
+             --  1. runs hook if required
+             --  2. waits if hook is running
+             --  3. updates hook status to running
+             --  4. returns hook result
+             -- must run for logging even if hkIn is Left
+             let nxtHkIn so = (\exi -> exi{onceIn = so}) <$> hkIn
+                 recurse a = uu -- to doexeNxt a oSubNodes
+                 ctx = context loc
+                 releaseContext = context . Node loc $ txt L.OnceHookRelease
+             eso <- onceHookVal ctx L.OnceHook siHkIn onceHook
+             finally
+               ( eso
+                   & either
+                     (recurse . Left)
+                     (runThreadHook . nxtHkIn)
+               )
+               ( do
+                   wantRelease <- atomically $ do
+                     childStatus <- readTVar childQ.status
+                     s <- readTVar onceHook.status
+                     pure $ childStatus == RunDone && uu -- s < HookFinalising
+                   when wantRelease $
+                     releaseOnceHook releaseContext eso onceHook
+               )
+          where
+           runThreadHook thHkin =
+             do
+               let nxtHkIn ti = (\exi -> exi{threadIn = ti}) <$> hkIn
+                   recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
+                   hkCtx = context loc
+                   releaseCtx = context . Node loc $ txt L.ThreadHookRelease
+               eto <- threadHookVal hkCtx thHkin threadHook
+               finally
+                 ( eto
+                     & either
+                       (recurse . Left)
+                       (recurse . nxtHkIn)
+                 )
+                 ( let
+                     doRelease = releaseHook releaseCtx L.ThreadHookRelease eto
+                    in
+                     threadHook & \case
+                       ThreadNone -> pure ()
+                       ThreadBefore{} -> pure ()
+                       ThreadAfter{releaseOnly} -> doRelease releaseOnly
+                       ThreadAround{release} -> doRelease release
+                 )
+ -}
+
+runXTest :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to' tsti') -> TestHook so' to' tsti' ho' -> XTest so' to' ho' -> IO ()
+runXTest ctx@XContext{loc = fxLoc} fxIpts testHk test@XTest{loc = tstLoc, test = tstAction} =
+  do
+    let tstCtx = ctx{loc = tstLoc} :: XContext
+    eho <- runTestHook tstCtx fxIpts testHk
+    eho
+      & either
+        (logAbandonned tstCtx L.Test)
+        ( \(oi, ti, tsti') ->
+            finally
+              ( withStartEnd ctx L.Test $
+                  catchAll
+                    (tstAction tstCtx oi ti tsti')
+                    (void . logReturnFailure ctx L.Test)
+              )
+              ( let
+                  trd :: (a, b, c) -> c
+                  trd =
+                    \case
+                      (_, _, c) -> c
+                 in
+                  releaseTestHook tstCtx (trd <$> eho) testHk
+              )
+        )
 
 -- do
 -- let
@@ -352,7 +490,7 @@ mkXFixture ::
   IO (XFixture oi ti tsti)
 mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads} = do
   oh <- mkOnceVal onceHook
-  ts <- mkChildQ maxThreads tests
+  ts <- mkChildQ maxThreads $ mkXTest <$> tests
   pure $
     XFixture
       { loc
@@ -360,6 +498,12 @@ mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads} = d
       , threadHook
       , testHook
       , tests = ts
+      }
+ where
+  mkXTest PN.Test{id, test} =
+    XTest
+      { loc = Node loc $ "Test :: " <> id
+      , test = test . mkCtx
       }
 
 data ExeTree oi ti where
@@ -454,11 +598,10 @@ readOrLockHook hs hVal =
       ? (writeTVar hs HookRunning >> pure Nothing)
       $ (Just <$> readTMVar hVal)
 
-setHookRunning :: TVar HookStatus -> TMVar (Either Abandon ho) -> Either Abandon ho -> STM (Either Abandon ho)
-setHookRunning hs hVal eso = do
+setHookComplete :: TVar HookStatus -> TMVar (Either Abandon ho) -> Either Abandon ho -> STM (Either Abandon ho)
+setHookComplete hs hVal eso = do
   putTMVar hVal eso
-  -- success or failure always running will be set done by closing hook
-  writeTVar hs HookRunning
+  writeTVar hs HookComplete
   pure eso
 
 tryLockRun :: TVar HookStatus -> TMVar (Either Abandon ho) -> IO (Either Abandon ho) -> IO (Either Abandon ho)
@@ -498,12 +641,12 @@ abandonnedOnceHookVal ctx abandon hs hkVal =
         pure $ Left abandon
     )
 
-threadHookVal :: forall oi ti to. XContext -> Either Abandon (ExeIn oi ti) -> ThreadHook oi ti to -> IO (Either Abandon to)
+threadHookVal :: forall oi ti tsti to. XContext -> Either Abandon (ExeIn oi ti tsti) -> ThreadHook oi ti to -> IO (Either Abandon to)
 threadHookVal ctx hkIn thook =
   hkIn
     & either
       (abandonLogHook ctx L.ThreadHook)
-      ( \(ExeIn oi ti) ->
+      ( \(ExeIn oi ti _tsti) ->
           let
             thrdHk :: (Context -> oi -> ti -> IO to) -> Context -> ti -> IO to
             thrdHk thHk = flip thHk oi
@@ -517,8 +660,8 @@ threadHookVal ctx hkIn thook =
               ThreadAround{hook} -> runHook hook
       )
 
-onceHookVal :: forall hi ho. XContext -> ExeEventType -> Either Abandon hi -> OnceVal hi ho -> IO (Either Abandon ho)
-onceHookVal ctx hkEvent ehi OnceVal{hook = oHook, status, value} =
+onceHookVal :: forall hi ho. XContext -> Either Abandon hi -> OnceVal hi ho -> IO (Either Abandon ho)
+onceHookVal ctx ehi OnceVal{hook = oHook, status, value} =
   ehi
     & either
       (\abandon -> abandonnedOnceHookVal ctx abandon status value)
@@ -529,8 +672,8 @@ onceHookVal ctx hkEvent ehi OnceVal{hook = oHook, status, value} =
               tryLockRun
                 status
                 value
-                ( runLogHook ctx hkEvent hk hi'
-                    >>= atomically . setHookRunning status value
+                ( runLogHook ctx L.OnceHook hk hi'
+                    >>= atomically . setHookComplete status value
                 )
            in
             oHook & \case
@@ -561,12 +704,12 @@ releaseHook ctx@XContext{evtLogger, loc} evt eho hkRelease =
               (evtLogger . mkFailure loc evt ("Hook Release Failed: " <> txt evt <> " " <> txt loc))
         )
 
-releaseOnceHook ::
+releaseOnceHookIfReady ::
   XContext ->
   Either Abandon ho ->
   OnceVal oi ho ->
   IO ()
-releaseOnceHook ctx eho hk =
+releaseOnceHookIfReady ctx eho hk =
   do
     locked <- atomically tryLock
     when locked $
@@ -577,25 +720,28 @@ releaseOnceHook ctx eho hk =
             OnceAfter{releaseOnly} -> doRelease releaseOnly
             OnceAround{release} -> doRelease release
         )
-        (atomically $ writeTVar hk.status HookDone)
+        (atomically $ writeTVar hk.status HookReleased)
  where
   doRelease = releaseHook ctx L.OnceHookRelease eho
   tryLock :: STM Bool
   tryLock =
     do
       s <- readTVar hk.status
-      let r = canLock s
+      let r = canRelease s
       when r $
         writeTVar hk.status HookReleaseRunning
       pure r
    where
-    canLock = \case
+    -- uu this looks wrong :: check
+    canRelease = \case
       HookVoid -> False
       HookPending -> False
+      HookRunning -> False
+      HookComplete -> False
       ChildRunning -> False
-      HookRunning -> True
+      ChildComplete -> True
       HookReleaseRunning -> False
-      HookDone -> False
+      HookReleased -> False
 
 -- discardDone :: TQueue (ExeTree oi ti) -> STM ()
 -- discardDone = processWhile nodeDone
@@ -625,12 +771,13 @@ data Abandon = Abandon
   }
   deriving (Show)
 
-data ExeIn oi ti = ExeIn
+data ExeIn oi ti tsti = ExeIn
   { onceIn :: oi
   , threadIn :: ti
+  , tstIn :: tsti
   }
 
-executeNode :: forall oi ti. EventLogger -> Either Abandon (ExeIn oi ti) -> ExeTree oi ti -> IO ()
+executeNode :: forall oi ti. EventLogger -> Either Abandon (ExeIn oi ti ()) -> ExeTree oi ti -> IO ()
 executeNode eventLogger hkIn rg =
   do
     wantRun <- atomically $ canRun rg
@@ -655,7 +802,7 @@ executeNode eventLogger hkIn rg =
                   recurse a = uu -- to doexeNxt a oSubNodes
                   ctx = context loc
                   releaseContext = context . Node loc $ txt L.OnceHookRelease
-              eso <- onceHookVal ctx L.OnceHook siHkIn onceHook
+              eso <- uu --onceHookVal ctx L.OnceHook siHkIn onceHook
               finally
                 ( eso
                     & either
@@ -668,7 +815,7 @@ executeNode eventLogger hkIn rg =
                       s <- readTVar onceHook.status
                       pure $ childStatus == RunDone && uu -- s < HookFinalising
                     when wantRelease $
-                      releaseOnceHook releaseContext eso onceHook
+                      releaseOnceHookIfReady releaseContext eso onceHook
                 )
            where
             runThreadHook thHkin =
@@ -731,8 +878,8 @@ executeNode eventLogger hkIn rg =
                         atomically (writeTVar status Done)
                   )
                   ( \PN.Test{id, test} -> do
-                      to <- runTestHook (context $ tstHkloc id) fxIpts () testHook
-                      let unpak io' (ExeIn so2 to2) = (so2, to2, io')
+                      to <- runTestHook (context $ tstHkloc id) fxIpts testHook
+                      let unpak io' ( _tsti) = uu --(so2, to2, io')
                           ethInputs = liftA2 unpak to fxIpts
                           testLoc = tstLoc id
                           ctx = context testLoc
@@ -746,7 +893,7 @@ executeNode eventLogger hkIn rg =
                                   (void . logReturnFailure ctx L.Test)
                         )
                         do
-                          releaseTestHook id to testHook
+                          uu -- releaseTestHook id to testHook
                           uu -- atomically (modifyTVarrunningCount pred)
                           recurse fxIpts
                   )
@@ -754,7 +901,7 @@ executeNode eventLogger hkIn rg =
   siHkIn :: Either Abandon oi
   siHkIn = (.onceIn) <$> hkIn
 
-  exeNxt :: forall oi' ti'. Either Abandon (ExeIn oi' ti') -> ExeTree oi' ti' -> IO ()
+  exeNxt :: forall oi' ti'. Either Abandon (ExeIn oi' ti' ()) -> ExeTree oi' ti' -> IO ()
   exeNxt = executeNode eventLogger
 
   nxtAbandon :: Loc -> ExeEventType -> SomeException -> Abandon
@@ -776,7 +923,7 @@ newLogger sink tid =
 
 executeGraph :: EventSink -> ExeTree () () -> Int -> IO ()
 executeGraph sink xtri maxThreads =
-  let hkIn = Right (ExeIn () ())
+  let hkIn = Right (ExeIn () () ())
       thrdTokens = replicate maxThreads True
    in do
         rootThreadId <- myThreadId

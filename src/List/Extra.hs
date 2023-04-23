@@ -36,5 +36,8 @@ init = safel L.init
 maximum :: Ord a => [a] -> Maybe a
 maximum = safel L.maximum
 
+minimum :: Ord a => [a] -> Maybe a
+minimum = safel L.minimum
+
 count :: Foldable t => (a -> Bool) -> t a -> Int
 count p = foldl' (\n x -> p x ? succ n $ n) 0

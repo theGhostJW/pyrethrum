@@ -273,7 +273,7 @@ runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCou
                 cr & \case
                   -- runner MUST ensure the integrity of sub element status and handle all exceptions
                   Runnable -> do
-                    -- when childConcurrent element is placed back on the end of the q before running so
+                    -- when childConcurrent, the element is placed back on the end of the q before running so
                     -- can be picked up by other threads
                     when childConcurrent $
                       atomically (writeTQueue childNodes a)
@@ -312,8 +312,8 @@ data XFixture oi ti tsti where
     { loc :: Loc
     , onceHook :: OnceVal oi oo
     , threadHook :: ThreadHook oo ti to
-    , testHook :: TestHook oo to tsti ho
-    , tests :: ChildQ (XTest oo to ho)
+    , testHook :: TestHook oo to tsti tsto
+    , tests :: ChildQ (XTest oo to tsto)
     } ->
     XFixture oi ti tsti
 
@@ -363,7 +363,7 @@ withThreadHook ctx hkIn threadHook nxtAction =
 --   )
 
 
-runXFixture :: forall oi ti ii. XContext -> Either Abandon (ExeIn oi ti ()) -> Maybe Int -> TestHook oi ti () ii -> XFixture oi ti ii -> IO CanRun
+runXFixture :: forall oi ti ii oo to. XContext -> Either Abandon (ExeIn oi ti ()) -> Maybe Int -> TestHook oo to () ii -> XFixture oi ti ii -> IO ()
 runXFixture
   ctx
   exin
@@ -375,14 +375,18 @@ runXFixture
     , threadHook
     , testHook
     , tests
-    } = uu
+    } = 
+      withOnceHook ctx exin onceHook $ \trdIn ->
+        withThreadHook ctx trdIn threadHook $ \tstIn ->
+          void $ runTests tstIn
+
     where
-      tstRun tst = do
-        prntTstOut <- runTestHook ctx exin prntTstHk
+      runTst fxIn tst = do
+        prntTstOut <- runTestHook ctx fxIn prntTstHk
         finally
          (runXTest ctx prntTstOut testHook tst)
          (releaseTestHook ctx ((.tstIn) <$> prntTstOut) prntTstHk)
-      runTests = runChildQ False tstRun (const $ pure @STM Runnable) tests
+      runTests fxIn = runChildQ False (runTst fxIn) (const $ pure @STM Runnable) tests
       mxThrds = LE.minimum $ catMaybes [prntMaxThrds, tests.maxThreads]
       {-
        , maxThreads :: Maybe Int
@@ -522,8 +526,8 @@ data ExeTree oi ti where
     { loc :: Loc
     , maxThreads :: Maybe Int
     , status :: TVar Status
-    , testHook :: TestHook oi ti () ho
-    , fixtures :: ChildQ (XFixture oi ti ho)
+    , testHook :: TestHook oi ti () tsto
+    , fixtures :: ChildQ (XFixture oi ti tsto)
     } ->
     ExeTree oi ti
 

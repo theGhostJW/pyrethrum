@@ -36,6 +36,7 @@ import Internal.RunTimeLogging (
   stopWorker,
  )
 import qualified Internal.RunTimeLogging as L
+import List.Extra as LE
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
 import PyrethrumExtras hiding (finally)
@@ -91,7 +92,6 @@ import UnliftIO.STM (
   writeTVar,
  )
 import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO)
-import List.Extra as LE
 
 data HookStatus
   = HookVoid
@@ -177,7 +177,6 @@ data ChildQ a = ChildQ
   { status :: TVar CanRun
   , childNodes :: TQueue a
   , runningCount :: TVar Int
-  , maxThreads :: Maybe Int
   }
 
 data CanRun
@@ -239,16 +238,12 @@ releaseTestHook ctx@XContext{loc = testLoc} tsti = \case
   runRelease = releaseHook (ctx{loc = mkTestChildLoc testLoc L.TestHookRelease}) L.TestHookRelease tsti
 
 runChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
-runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCount, maxThreads} =
+runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCount} =
   do
     eNext <- atomically $ do
       let pop = tryReadTQueue childNodes
       rc <- readTVar runningCount
-      mNext <-
-        maxThreads
-          & maybe
-            pop
-            (\mt -> rc < mt ? pop $ pure Nothing)
+      mNext <- pop
       mNext
         & maybe
           ( do
@@ -284,8 +279,8 @@ runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCou
             runChildQ childConcurrent runner canRun' q
         )
 
-mkChildQ :: Maybe Int -> [a] -> IO (ChildQ a)
-mkChildQ maxC children = do
+mkChildQ :: [a] -> IO (ChildQ a)
+mkChildQ children = do
   s <- newTVarIO Runnable
   q <- newTQueueIO
   rc <- newTVarIO 0
@@ -295,7 +290,6 @@ mkChildQ maxC children = do
       { status = s
       , childNodes = q
       , runningCount = rc
-      , maxThreads = maxC
       }
 
 data OnceVal oi oo = OnceVal
@@ -314,6 +308,7 @@ data XFixture oi ti tsti where
     , threadHook :: ThreadHook oo ti to
     , testHook :: TestHook oo to tsti tsto
     , tests :: ChildQ (XTest oo to tsto)
+    , threadLimit :: Maybe ThreadLimit
     } ->
     XFixture oi ti tsti
 
@@ -324,10 +319,10 @@ withOnceHook :: XContext -> Either Abandon (ExeIn si ti tsti) -> OnceVal si so -
 withOnceHook ctx hkIn onceHook nxtCalc = do
   eso <- onceHookVal ctx ((.onceIn) <$> hkIn) onceHook
   finally
-    (nxtCalc $ do 
-       so <- eso 
-       hki <- hkIn
-       Right $ hki{onceIn = so}
+    ( nxtCalc $ do
+        so <- eso
+        hki <- hkIn
+        Right $ hki{onceIn = so}
     )
     (releaseOnceHookIfReady ctx eso onceHook)
 
@@ -362,8 +357,30 @@ withThreadHook ctx hkIn threadHook nxtAction =
 --         (recurse . nxtHkIn)
 --   )
 
+data ThreadLimit = ThreadLimit
+  { maxThreads :: Int
+  , runningThreads :: TVar Int
+  }
 
-runXFixture :: forall oi ti ii oo to. XContext -> Either Abandon (ExeIn oi ti ()) -> Maybe Int -> TestHook oo to () ii -> XFixture oi ti ii -> IO ()
+withThreadLimit :: Maybe ThreadLimit -> IO () -> IO ()
+withThreadLimit tl action =
+  tl
+    & maybe
+      action
+      ( \ThreadLimit{maxThreads, runningThreads} ->
+          do
+            cr <- atomically $ do
+              rc <- readTVar runningThreads
+              let r = rc < maxThreads
+              when r $ writeTVar runningThreads (succ rc)
+              pure r
+            when cr $
+              finally
+                action
+                (atomically $ modifyTVar runningThreads pred)
+      )
+
+runXFixture :: forall oi ti ii. XContext -> Either Abandon (ExeIn oi ti ()) -> Maybe Int -> TestHook oi ti () ii -> XFixture oi ti ii -> IO ()
 runXFixture
   ctx
   exin
@@ -375,26 +392,32 @@ runXFixture
     , threadHook
     , testHook
     , tests
-    } = 
+    , threadLimit
+    } =
+      -- TODO:  fix check loc
+    withThreadLimit threadLimit $
       withOnceHook ctx exin onceHook $ \trdIn ->
         withThreadHook ctx trdIn threadHook $ \tstIn ->
           void $ runTests tstIn
+   where
+    runTst fxIn tst = do
+      prntTstOut <- runTestHook ctx exin prntTstHk
+      let tstIn' = do
+            ExeIn{onceIn, threadIn} <- fxIn
+            ExeIn{tstIn} <- prntTstOut
+            Right $ ExeIn{onceIn, threadIn, tstIn}
+      finally
+        (runXTest ctx tstIn' testHook tst)
+        (releaseTestHook ctx ((.tstIn) <$> prntTstOut) prntTstHk)
+    runTests fxIn = runChildQ False (runTst fxIn) (const $ pure Runnable) tests
 
-    where
-      runTst fxIn tst = do
-        prntTstOut <- runTestHook ctx fxIn prntTstHk
-        finally
-         (runXTest ctx prntTstOut testHook tst)
-         (releaseTestHook ctx ((.tstIn) <$> prntTstOut) prntTstHk)
-      runTests fxIn = runChildQ False (runTst fxIn) (const $ pure @STM Runnable) tests
-      mxThrds = LE.minimum $ catMaybes [prntMaxThrds, tests.maxThreads]
-      {-
-       , maxThreads :: Maybe Int
-    , status :: TVar Status
-    , testHook :: TestHook oi ti () ii
-      -}
-      -- runChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
-      -- runXTest :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> XTest so' to' ho' -> IO ()
+{-
+   , maxThreads :: Maybe Int
+, status :: TVar Status
+, testHook :: TestHook oi ti () ii
+  -}
+-- runChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
+-- runXTest :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to') -> tsti' -> TestHook so' to' tsti' ho' -> XTest so' to' ho' -> IO ()
 
 {-
 do
@@ -475,14 +498,7 @@ runXTest ctx@XContext{loc = fxLoc} fxIpts testHk test@XTest{loc = tstLoc, test =
                     (tstAction tstCtx oi ti tsti')
                     (void . logReturnFailure ctx L.Test)
               )
-              ( let
-                  trd :: (a, b, c) -> c
-                  trd =
-                    \case
-                      (_, _, c) -> c
-                 in
-                  releaseTestHook tstCtx ((.tstIn) <$> eho) testHk
-              )
+              (releaseTestHook tstCtx ((.tstIn) <$> eho) testHk)
         )
 
 -- do
@@ -497,7 +513,9 @@ mkXFixture ::
   IO (XFixture oi ti tsti)
 mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads} = do
   oh <- mkOnceVal onceHook
-  ts <- mkChildQ maxThreads $ mkXTest <$> tests
+  ts <- mkChildQ $ mkXTest <$> tests
+  rt <- newTVarIO 0
+  -- todo pass on maxThreads
   pure $
     XFixture
       { loc
@@ -505,6 +523,7 @@ mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads} = d
       , threadHook
       , testHook
       , tests = ts
+      , threadLimit = flip ThreadLimit rt <$> maxThreads
       }
  where
   mkXTest PN.Test{id, test} =
@@ -557,7 +576,7 @@ prepare =
           onceHk <- mkOnceVal onceHook
           let loc = nodeLoc title
           childlst <- traverse (prepare' parentLoc 0) subNodes
-          childQ <- mkChildQ maxThreads childlst
+          childQ <- mkChildQ childlst
           pure $
             XGroup
               { loc
@@ -577,7 +596,7 @@ prepare =
             s <- newTVarIO Pending
             runningCount <- newTVarIO 0
             fxs <- traverse (mkXFixture loc) fixtures
-            q <- mkChildQ maxThreads fxs
+            q <- mkChildQ fxs
             pure $
               XFixtures
                 { loc
@@ -809,7 +828,7 @@ executeNode eventLogger hkIn rg =
                   recurse a = uu -- to doexeNxt a oSubNodes
                   ctx = context loc
                   releaseContext = context . Node loc $ txt L.OnceHookRelease
-              eso <- uu --onceHookVal ctx L.OnceHook siHkIn onceHook
+              eso <- uu -- onceHookVal ctx L.OnceHook siHkIn onceHook
               finally
                 ( eso
                     & either
@@ -886,7 +905,7 @@ executeNode eventLogger hkIn rg =
                   )
                   ( \PN.Test{id, test} -> do
                       to <- runTestHook (context $ tstHkloc id) fxIpts testHook
-                      let unpak io' ( _tsti) = uu --(so2, to2, io')
+                      let unpak io' _tsti = uu -- (so2, to2, io')
                           ethInputs = liftA2 unpak to fxIpts
                           testLoc = tstLoc id
                           ctx = context testLoc

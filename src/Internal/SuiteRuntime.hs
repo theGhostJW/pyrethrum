@@ -112,7 +112,6 @@ data Status
 
 getStatus :: ExeTree oi ti -> STM Status
 getStatus = uu
-
 --   readTVar . getStatusTVar
 --  where
 --   getStatusTVar :: ExeTree oi ti -> TVar Status
@@ -372,6 +371,31 @@ withThreadLimit tl action =
                 action
                 (atomically $ modifyTVar runningThreads pred)
       )
+
+data XGroupGeneric oi ti i where
+  XGroupGeneric ::
+    { loc :: Loc
+    , threadLimit :: Maybe ThreadLimit
+    , onceHook :: OnceVal oi oo
+    , threadHook :: ThreadHook oo ti to
+    , child :: i
+    } ->
+    XGroupGeneric oi ti i
+
+runXGroupGeneric :: forall oi ti i. EventLogger -> Either Abandon (ExeIn oi ti ()) -> (i -> IO ()) -> XGroupGeneric oi ti i -> IO ()
+runXGroupGeneric evtLgr exin iAction XGroupGeneric{ 
+    loc
+    , onceHook
+    , threadHook
+    , child
+    , threadLimit
+    }  =
+    withThreadLimit threadLimit $
+      withOnceHook ctx exin onceHook $ \trdIn ->
+        withThreadHook ctx trdIn threadHook $ \tstIn ->
+          iAction child
+   where
+    ctx = XContext loc evtLgr
 
 runXFixture :: forall oi ti ii. EventLogger -> Either Abandon (ExeIn oi ti ()) -> TestHook oi ti () ii -> XFixture oi ti ii -> IO ()
 runXFixture

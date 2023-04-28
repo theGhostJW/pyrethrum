@@ -112,6 +112,7 @@ data Status
 
 getStatus :: ExeTree oi ti -> STM Status
 getStatus = uu
+
 --   readTVar . getStatusTVar
 --  where
 --   getStatusTVar :: ExeTree oi ti -> TVar Status
@@ -238,6 +239,15 @@ releaseTestHook ctx@XContext{loc = testLoc} tsti = \case
   noRelease = pure ()
   runRelease = releaseHook (ctx{loc = mkTestChildLoc testLoc L.TestHookRelease}) L.TestHookRelease tsti
 
+childQRunnable :: ChildQ a -> STM Bool
+childQRunnable cq =
+  runnable <$> readTVar cq.status
+ where
+  runnable = \case
+    Runnable -> True
+    Saturated -> False
+    RunDone -> False
+
 runChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
 runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCount} =
   do
@@ -348,7 +358,6 @@ withThreadHook ctx hkIn threadHook nxtAction =
             ThreadAround{release} -> doRelease release
       )
 
-
 data ThreadLimit = ThreadLimit
   { maxThreads :: Int
   , runningThreads :: TVar Int
@@ -372,37 +381,12 @@ withThreadLimit tl action =
                 (atomically $ modifyTVar runningThreads pred)
       )
 
-data XGroupGeneric oi ti i where
-  XGroupGeneric ::
-    { loc :: Loc
-    , threadLimit :: Maybe ThreadLimit
-    , onceHook :: OnceVal oi oo
-    , threadHook :: ThreadHook oo ti to
-    , child :: i
-    } ->
-    XGroupGeneric oi ti i
-
-runXGroupGeneric :: forall oi ti i. EventLogger -> Either Abandon (ExeIn oi ti ()) -> (i -> IO ()) -> XGroupGeneric oi ti i -> IO ()
-runXGroupGeneric evtLgr exin iAction XGroupGeneric{ 
-    loc
-    , onceHook
-    , threadHook
-    , child
-    , threadLimit
-    }  =
-    withThreadLimit threadLimit $
-      withOnceHook ctx exin onceHook $ \trdIn ->
-        withThreadHook ctx trdIn threadHook $ \tstIn ->
-          iAction child
-   where
-    ctx = XContext loc evtLgr
-
 runXFixture :: forall oi ti ii. EventLogger -> Either Abandon (ExeIn oi ti ()) -> TestHook oi ti () ii -> XFixture oi ti ii -> IO ()
 runXFixture
   evtLgr
   exin
   prntTstHk
-  XFixture
+  fx@XFixture
     { loc
     , onceHook
     , threadHook
@@ -410,10 +394,16 @@ runXFixture
     , tests
     , threadLimit
     } =
-    withThreadLimit threadLimit $
-      withOnceHook ctx exin onceHook $ \trdIn ->
-        withThreadHook ctx trdIn threadHook $ \tstIn ->
-          void $ runTests tstIn
+    do
+      -- very slim possiblity of occasionally running empty thread
+      -- hooks in highly concurrent code if child tests are finished
+      -- while thread hook is running
+      canRun' <- atomically $ childQRunnable tests
+      when canRun' $
+        withThreadLimit threadLimit $
+          withOnceHook ctx exin onceHook $ \trdIn ->
+            withThreadHook ctx trdIn threadHook $ \tstIn ->
+              void $ runTests tstIn
    where
     ctx = XContext loc evtLgr
     runTst fxIn tst = do
@@ -445,6 +435,8 @@ runXTest ctx@XContext{loc = fxLoc} fxIpts testHk test@XTest{loc = tstLoc, test =
               (releaseTestHook tstCtx ((.tstIn) <$> eho) testHk)
         )
 
+mkThreadLimit :: Maybe Int -> IO (Maybe ThreadLimit)
+mkThreadLimit mi = newTVarIO 0 <&> \rt -> ThreadLimit <$> mi <*> pure rt
 
 mkXFixture ::
   Loc ->
@@ -453,7 +445,7 @@ mkXFixture ::
 mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads, id = fxid} = do
   oh <- mkOnceVal onceHook
   ts <- mkChildQ $ mkXTest <$> tests
-  rt <- newTVarIO 0
+  threadLimit <- mkThreadLimit maxThreads
   pure $
     XFixture
       { loc = fxLoc
@@ -461,7 +453,7 @@ mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads, id 
       , threadHook
       , testHook
       , tests = ts
-      , threadLimit = flip ThreadLimit rt <$> maxThreads
+      , threadLimit
       }
  where
   fxLoc = Node loc fxid
@@ -474,15 +466,15 @@ mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads, id 
 data ExeTree oi ti where
   XGroup ::
     { loc :: Loc
-    , threadLimit :: Maybe Int
+    , threadLimit :: Maybe ThreadLimit
     , onceHook :: OnceVal oi oo
     , threadHook :: ThreadHook oo ti to
-    , childQ :: ChildQ (ExeTree oo to)
+    , subNodes :: ChildQ (ExeTree oo to)
     } ->
     ExeTree oi ti
   XFixtures ::
     { loc :: Loc
-    , threadLimit :: Maybe Int
+    , threadLimit :: Maybe ThreadLimit
     , status :: TVar Status
     , testHook :: TestHook oi ti () tsto
     , fixtures :: ChildQ (XFixture oi ti tsto)
@@ -507,26 +499,28 @@ prepare =
     case pn of
       PN.Group
         { title
-        , threadLimit
+        , threadLimit = maxThreads
         , onceHook
         , threadHook
-        , subNodes
+        , subNodes = nodes
         } -> do
           onceHk <- mkOnceVal onceHook
           let loc = nodeLoc title
-          childlst <- traverse (prepare' parentLoc 0) subNodes
-          childQ <- mkChildQ childlst
+          childlst <- traverse (prepare' parentLoc 0) nodes
+          subNodes <- mkChildQ childlst
+          tl <- newTVarIO 0
+          threadLimit <- mkThreadLimit maxThreads
           pure $
             XGroup
               { loc
               , threadLimit
               , onceHook = onceHk
               , threadHook
-              , childQ
+              , subNodes
               }
       PN.Fixtures
         { title
-        , threadLimit
+        , threadLimit = maxThreads
         , testHook
         , fixtures
         } ->
@@ -536,6 +530,7 @@ prepare =
             runningCount <- newTVarIO 0
             fxs <- traverse (mkXFixture loc) fixtures
             q <- mkChildQ fxs
+            threadLimit <- mkThreadLimit maxThreads
             pure $
               XFixtures
                 { loc
@@ -708,27 +703,6 @@ releaseOnceHookIfReady ctx eho hk =
       HookReleaseRunning -> False
       HookReleased -> False
 
--- discardDone :: TQueue (ExeTree oi ti) -> STM ()
--- discardDone = processWhile nodeDone
-
--- processWhile :: forall oi ti. (ExeTree oi ti -> STM Bool) -> TQueue (ExeTree oi ti) -> STM ()
--- processWhile p q =
---   tryPeekTQueue q
---     >>= maybe
---       (pure ())
---       (p >=> bool (pure ()) (readTQueue q >> processWhile p q))
-
--- discardDoneMoveFullyRunning :: TQueue (ExeTree oi ti) -> TQueue (ExeTree oi ti) -> STM ()
--- discardDoneMoveFullyRunning fullyRunningQ =
---   processWhile
---     ( \n ->
---         getStatus n >>= \s ->
---           if
---               | s == Done -> pure True
---               | s > Running -> writeTQueue fullyRunningQ n >> pure True
---               | otherwise -> pure False
---     )
-
 data Abandon = Abandon
   { sourceLoc :: Loc
   , sourceEventType :: ExeEventType
@@ -742,8 +716,8 @@ data ExeIn oi ti tsti = ExeIn
   , tstIn :: tsti
   }
 
-executeNode :: forall oi ti. EventLogger -> Either Abandon (ExeIn oi ti ()) -> ExeTree oi ti -> IO ()
-executeNode eventLogger hkIn rg =
+runNode :: forall oi ti. EventLogger -> Either Abandon (ExeIn oi ti ()) -> ExeTree oi ti -> IO ()
+runNode eventLogger hkIn rg =
   do
     wantRun <- atomically $ canRun rg
     when
@@ -754,130 +728,38 @@ executeNode eventLogger hkIn rg =
           , threadLimit
           , onceHook
           , threadHook
-          , childQ
+          , subNodes
           } ->
-            do
-              -- onceHookVal:
-              --  1. runs hook if required
-              --  2. waits if hook is running
-              --  3. updates hook status to running
-              --  4. returns hook result
-              -- must run for logging even if hkIn is Left
-              let nxtHkIn so = (\exi -> exi{onceIn = so}) <$> hkIn
-                  recurse a = uu -- to doexeNxt a oSubNodes
-                  ctx = context loc
-                  releaseContext = context . Node loc $ txt L.OnceHookRelease
-              eso <- uu -- onceHookVal ctx L.OnceHook siHkIn onceHook
-              finally
-                ( eso
-                    & either
-                      (recurse . Left)
-                      (runThreadHook . nxtHkIn)
-                )
-                ( do
-                    wantRelease <- atomically $ do
-                      childStatus <- readTVar childQ.status
-                      s <- readTVar onceHook.status
-                      pure $ childStatus == RunDone && uu -- s < HookFinalising
-                    when wantRelease $
-                      releaseOnceHookIfReady releaseContext eso onceHook
-                )
-           where
-            runThreadHook thHkin =
-              do
-                let nxtHkIn ti = (\exi -> exi{threadIn = ti}) <$> hkIn
-                    recurse a = uu -- todo exeNxt a thSubNodes -- write exeNxt in terms of XTGroup
-                    hkCtx = context loc
-                    releaseCtx = context . Node loc $ txt L.ThreadHookRelease
-                eto <- threadHookVal hkCtx thHkin threadHook
-                finally
-                  ( eto
-                      & either
-                        (recurse . Left)
-                        (recurse . nxtHkIn)
-                  )
-                  ( let
-                      doRelease = releaseHook releaseCtx L.ThreadHookRelease eto
-                     in
-                      threadHook & \case
-                        ThreadNone -> pure ()
-                        ThreadBefore{} -> pure ()
-                        ThreadAfter{releaseOnly} -> doRelease releaseOnly
-                        ThreadAround{release} -> doRelease release
-                  )
+          do
+            canRun' <- atomically $ childQRunnable subNodes
+            when canRun' $
+             withThreadLimit threadLimit $
+              withOnceHook ctx hkIn onceHook $ \trdIn ->
+                withThreadHook ctx trdIn threadHook $ \tstIn ->
+                  void $ runChildQ True (runNode eventLogger tstIn) canRunNode subNodes
+            where
+              ctx = XContext loc eventLogger
+              canRunNode = readTVar . (\case
+                XGroup{subNodes = s} -> s.status
+                XFixtures{fixtures} -> fixtures.status)
+
         fx@XFixtures
           { status
           , loc
+          , threadLimit
           , fixtures
           , testHook
           } ->
-            withStartEnd (context loc) L.Fixture $ do
-              recurse hkIn
+            do
+              canRun' <- atomically $ childQRunnable fixtures
+              when canRun' $
+                withThreadLimit threadLimit $
+                  void $
+                    runChildQ True runFixture canRunFixture fixtures
            where
-            (<<::>>) t i = t <> " :: " <> i
-            tstHkloc tstid = Node loc $ txt L.TestHook <<::>> tstid
-            tstHkReleaseloc tstid = Node (tstHkloc tstid) $ txt L.TestHookRelease <<::>> tstid
-            tstLoc tstid = Node (tstHkloc tstid) $ txt L.Test <<::>> tstid
-            recurse fxIpts = do
-              etest <- atomically $ do
-                mtest <- tryReadTQueue uu -- fixtures
-                mtest
-                  & maybe
-                    ( do
-                        r <- readTVar uu -- runningCount
-                        Left
-                          <$> if
-                              | r < 0 -> error "framework error - this should not happen - running count below zero"
-                              | r == 0 -> pure True
-                              | otherwise -> writeTVar status FullyRunning >> pure False
-                    )
-                    ( \t -> do
-                        -- modifyTVar runningCount succ
-                        setStatusRunning status
-                        pure $ Right t
-                    )
-              etest
-                & either
-                  ( \done -> do
-                      when done $
-                        atomically (writeTVar status Done)
-                  )
-                  ( \PN.Test{id, test} -> do
-                      to <- runTestHook (context $ tstHkloc id) fxIpts testHook
-                      let unpak io' _tsti = uu -- (so2, to2, io')
-                          ethInputs = liftA2 unpak to fxIpts
-                          testLoc = tstLoc id
-                          ctx = context testLoc
-                      finally
-                        ( withStartEnd ctx L.Test $
-                            ethInputs & either
-                              (logAbandonned' testLoc L.Test)
-                              \(so2, to2, io') ->
-                                catchAll
-                                  (test (mkCtx ctx) so2 to2 io')
-                                  (void . logReturnFailure ctx L.Test)
-                        )
-                        do
-                          uu -- releaseTestHook id to testHook
-                          uu -- atomically (modifyTVarrunningCount pred)
-                          recurse fxIpts
-                  )
- where
-  siHkIn :: Either Abandon oi
-  siHkIn = (.onceIn) <$> hkIn
-
-  exeNxt :: forall oi' ti'. Either Abandon (ExeIn oi' ti' ()) -> ExeTree oi' ti' -> IO ()
-  exeNxt = executeNode eventLogger
-
-  nxtAbandon :: Loc -> ExeEventType -> SomeException -> Abandon
-  nxtAbandon loc' et e = fromLeft (Abandon loc' et e) hkIn
-
-  logAbandonned' :: Loc -> ExeEventType -> Abandon -> IO ()
-  logAbandonned' l = logAbandonned (context l)
-
-  context :: Loc -> XContext
-  context l = XContext l eventLogger
-
+            canRunFixture XFixture{tests} = readTVar tests.status
+            runFixture = runXFixture eventLogger hkIn testHook
+ 
 newLogger :: EventSink -> ThreadId -> IO EventLogger
 newLogger sink tid =
   do
@@ -898,7 +780,7 @@ executeGraph sink xtri maxThreads =
                 ( const do
                     tid' <- myThreadId
                     logger' <- newLogger sink tid'
-                    executeNode logger' hkIn xtri
+                    runNode logger' hkIn xtri
                 )
           )
           (waitDone xtri >> rootLogger EndExecution)

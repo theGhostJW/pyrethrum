@@ -208,7 +208,7 @@ runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCou
             runChildQ childConcurrent runner canRun' q
         )
 
-mkChildQ :: [a] -> IO (ChildQ a)
+mkChildQ :: Foldable m => m a -> IO (ChildQ a)
 mkChildQ children = do
   s <- newTVarIO Runnable
   q <- newTQueueIO

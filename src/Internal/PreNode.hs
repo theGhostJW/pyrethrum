@@ -1,16 +1,16 @@
 module Internal.PreNode (
-  Context(..),
-  Fixture(..),
-  OnceHook(..),
-  PreNode(..),
+  Context (..),
+  Fixture (..),
+  OnceHook (..),
+  PreNode (..),
   PreNodeRoot,
-  Test(..),
-  TestHook(..),
-  ThreadHook(..),
-  nodeEmpty
+  Test (..),
+  TestHook (..),
+  ThreadHook (..),
+  nodeEmpty,
 ) where
 
-import Internal.RunTimeLogging (MessageLogger, Loc)
+import Internal.RunTimeLogging (Loc, MessageLogger)
 
 type PreNodeRoot = PreNode () ()
 
@@ -32,7 +32,7 @@ data Fixture oi ti tsti where
     , onceHook :: OnceHook oi oo
     , threadHook :: ThreadHook oo ti to
     , testHook :: TestHook oo to tsti tsto
-    , tests :: [Test oo to tsto]
+    , tests :: NonEmpty (Test oo to tsto)
     } ->
     Fixture oi ti tsti
 data PreNode oi ti where
@@ -41,14 +41,14 @@ data PreNode oi ti where
     , threadLimit :: Maybe Int
     , onceHook :: OnceHook oi oo
     , threadHook :: ThreadHook oo ti to
-    , subNodes :: [PreNode oo to]
+    , subNodes :: NonEmpty (PreNode oo to)
     } ->
     PreNode oi ti
   Fixtures ::
     { title :: Text
     , threadLimit :: Maybe Int
     , testHook :: TestHook oi ti () tsto
-    , fixtures :: [Fixture oi ti tsto]
+    , fixtures :: NonEmpty (Fixture oi ti tsto)
     } ->
     PreNode oi ti
 
@@ -115,15 +115,15 @@ data TestHook oi ti tsti tsto where
 -- collapse threadHook and onceHook types :: Done
 -- change fixtures from test to fixtures :: Done
 -- rewrite executeNode:
-  -- XTest
-  -- XFixture
-  -- XFixtures
-  -- XGroup
+-- XTest
+-- XFixture
+-- XFixtures
+-- XGroup
 -- check references to status - replace / remove
 -- reimplement uu :: DONE
 -- tree shake / validate - prenodes (unique ids) :: Defer - do when generating prenodes because need to generate filter log anyway
 -- basic tests
--- FIX :: 
+-- FIX ::
 -- need to use subElmIdx to create a unique loc
 -- loc should not  include event type it should be node address
 -- get rid of getStatus ??

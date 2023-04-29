@@ -24,7 +24,6 @@ data Context = Context
   , logger :: MessageLogger
   }
 
--- this would be genrated by the TH
 data Fixture oi ti tsti where
   Fixture ::
     { id :: Text
@@ -99,38 +98,6 @@ data TestHook oi ti tsti tsto where
     , release :: Context -> tsto -> IO ()
     } ->
     TestHook oi ti tsti tsto
-
--- data ThreadHook oi ti to where
---   ThreadNone :: () -> ThreadHook oi ti ti
---   ThreadBefore :: Context-> oi -> IO oo -> ThreadHook oi ti to
---   ThreadAround :: Context-> oi -> IO oo -> ThreadHook oi ti to
-
--- todo:
--- simplify GADTs :: Done
--- change name of tag :: Done
--- get rid of maybe on tag :: Done
--- change iterations name :: Done
--- get rid of branches :: Done
--- remove once / threadHooks from Fixtures :: Done
--- collapse threadHook and onceHook types :: Done
--- change fixtures from test to fixtures :: Done
--- rewrite executeNode:
--- XTest
--- XFixture
--- XFixtures
--- XGroup
--- check references to status - replace / remove
--- reimplement uu :: DONE
--- tree shake / validate - prenodes (unique ids) :: Defer - do when generating prenodes because need to generate filter log anyway
--- basic tests
--- FIX ::
--- need to use subElmIdx to create a unique loc
--- loc should not  include event type it should be node address
--- get rid of getStatus ??
--- stm bool on once hook executing
--- \case direct functions for done / can run
--- reinstate tests
--- root becomes ones hook with OnceNone as hook
 
 nodeEmpty :: PreNode oi ti -> Bool
 nodeEmpty = \case

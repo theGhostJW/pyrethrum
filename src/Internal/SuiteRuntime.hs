@@ -41,6 +41,7 @@ import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitl
 import Polysemy.Bundle (subsumeBundle)
 import PyrethrumExtras hiding (finally)
 import PyrethrumExtras.IO (hPutStrLn, putStrLn)
+import System.Posix.Internals (rtsIsThreaded_)
 import Text.Show.Pretty (pPrint)
 import UnliftIO (
   Exception (displayException),
@@ -284,20 +285,27 @@ data XFixture oi ti tsti where
     } ->
     XFixture oi ti tsti
 
-withOnceHook :: XContext -> TVar Int -> ChildQ a -> Either Abandon (ExeIn si ti tsti) -> OnceVal si so -> (Either Abandon (ExeIn so ti tsti) -> IO ()) -> IO ()
-withOnceHook ctx rCount childq hkIn onceHook childAction = do
-  cr <- atomically $ canRunChildQ childq
+withOnceHook :: XContext -> ThreadLimit -> ChildQ a -> Either Abandon (ExeIn si ti tsti) -> OnceVal si so -> (Either Abandon (ExeIn so ti tsti) -> IO ()) -> IO ()
+withOnceHook ctx tl@ThreadLimit{maxThreads, runningThreads} childq hkIn onceHook childAction = do
+  cr <- atomically canRun
   when cr $ do
     eso <- onceHookVal ctx ((.onceIn) <$> hkIn) onceHook
     finally
-      ( do 
-          atomically $ modifyTVar rCount succ
+      ( do
           childAction $ do
             hi <- hkIn
             so <- eso
             Right $ hi{onceIn = so}
       )
-      (releaseOnceHookIfReady ctx rCount childq eso onceHook)
+      (releaseOnceHookIfReady ctx runningThreads childq eso onceHook)
+ where
+  canRun = do
+    hs <- readTVar onceHook.status
+    cq <- canRunChildQ childq
+    mt <- withinThreadLimit tl
+    let r = hs /= HookReleased && hs /= HookReleaseRunning && cq && mt
+    when r $ modifyTVar runningThreads succ
+    pure r
 
 withThreadHook :: XContext -> Either Abandon (ExeIn oi ti tsti) -> ThreadHook oi ti to -> (Either Abandon (ExeIn oi to tsti) -> IO ()) -> IO ()
 withThreadHook ctx hkIn threadHook childAction =
@@ -328,18 +336,9 @@ data ThreadLimit = ThreadLimit
   , runningThreads :: TVar Int
   }
 
-withThreadLimit :: ThreadLimit -> IO () -> IO ()
-withThreadLimit ThreadLimit{maxThreads, runningThreads} action =
-  do
-    cr <- atomically $ do
-      rc <- readTVar runningThreads
-      let r = maxThreads & maybe True (rc <)
-      when r $ writeTVar runningThreads (succ rc)
-      pure r
-    when cr $
-      finally
-        action
-        (atomically $ modifyTVar runningThreads pred)
+withinThreadLimit :: ThreadLimit -> STM Bool
+withinThreadLimit ThreadLimit{maxThreads, runningThreads} =
+  (\rt -> maybe True (rt <) maxThreads) <$> readTVar runningThreads
 
 runXFixture :: forall oi ti ii. EventLogger -> Either Abandon (ExeIn oi ti ()) -> TestHook oi ti () ii -> XFixture oi ti ii -> IO ()
 runXFixture
@@ -355,15 +354,11 @@ runXFixture
     , threadLimit
     } =
     do
-      -- very slim possiblity of occasionally running empty thread
-      -- hooks in highly concurrent code if child tests are finished
-      -- while thread hook is running
       canRun' <- atomically $ canRunChildQ tests
       when canRun' $
-        withThreadLimit threadLimit $
-          withOnceHook ctx exin onceHook $ \trdIn ->
-            withThreadHook ctx trdIn threadHook $ \tstIn ->
-              void $ runTests tstIn
+        withOnceHook ctx threadLimit tests exin onceHook $ \trdIn ->
+          withThreadHook ctx trdIn threadHook $ \tstIn ->
+            void $ runTests tstIn
    where
     ctx = XContext loc evtLgr
     runTst fxIn tst = do
@@ -395,8 +390,8 @@ runXTest ctx@XContext{loc = fxLoc} fxIpts testHk test@XTest{loc = tstLoc, test =
               (releaseTestHook tstCtx ((.tstIn) <$> eho) testHk)
         )
 
-mkThreadLimit :: Maybe Int -> IO (Maybe ThreadLimit)
-mkThreadLimit mi = newTVarIO 0 <&> \rt -> ThreadLimit <$> mi <*> pure rt
+mkThreadLimit :: Maybe Int -> IO ThreadLimit
+mkThreadLimit mi = ThreadLimit mi <$> newTVarIO 0
 
 mkXFixture ::
   Loc ->
@@ -426,7 +421,7 @@ mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads, id 
 data ExeTree oi ti where
   XGroup ::
     { loc :: Loc
-    , threadLimit :: Maybe ThreadLimit
+    , threadLimit :: ThreadLimit
     , onceHook :: OnceVal oi oo
     , threadHook :: ThreadHook oo ti to
     , subNodes :: ChildQ (ExeTree oo to)
@@ -434,7 +429,7 @@ data ExeTree oi ti where
     ExeTree oi ti
   XFixtures ::
     { loc :: Loc
-    , threadLimit :: Maybe ThreadLimit
+    , threadLimit :: ThreadLimit
     , testHook :: TestHook oi ti () tsto
     , fixtures :: ChildQ (XFixture oi ti tsto)
     } ->
@@ -553,7 +548,7 @@ abandonnedOnceHookVal ctx abandon hs hkVal =
     hkVal
     ( do
         abandonLogHook ctx L.OnceHook abandon
-        atomically $ writeTVar hs ChildRunning
+        atomically $ writeTVar hs HookComplete
         pure $ Left abandon
     )
 
@@ -638,8 +633,12 @@ releaseOnceHookIfReady ctx cntr childq eho hk =
       c <- readTVar cntr
       let nxt = pred c
       writeTVar cntr nxt
-      s <- readTVar hk.status
-      let r = nxt == 0 && canRelease s
+      hks <- readTVar hk.status
+      s <- readTVar childq.status
+      let r =
+            nxt == 0
+              && canRelease hks
+              && s == Done
       when r $
         writeTVar hk.status HookReleaseRunning
       pure r
@@ -686,25 +685,30 @@ runNode eventLogger hkIn =
           let ctx = XContext loc eventLogger
           canRun' <- atomically $ canRunChildQ subNodes
           when canRun' $
-            withThreadLimit threadLimit $
-              withOnceHook ctx hkIn onceHook $ \trdIn ->
-                withThreadHook ctx trdIn threadHook $ \tstIn ->
-                  void $ runChildQ True (runNode eventLogger tstIn) nodeStatus subNodes
+            withOnceHook ctx threadLimit subNodes hkIn onceHook $ \trdIn ->
+              withThreadHook ctx trdIn threadHook $ \tstIn ->
+                void $ runChildQ True (runNode eventLogger tstIn) nodeStatus subNodes
     XFixtures
       { loc
-      , threadLimit
+      , threadLimit = tl@ThreadLimit {maxThreads, runningThreads}
       , fixtures
       , testHook
       } ->
         do
-          canRun' <- atomically $ canRunChildQ fixtures
+          canRun' <- atomically xfxRunnable
           when canRun' $
-            withThreadLimit threadLimit $
-              void $
-                runChildQ True runFixture canRunFixture fixtures
+            finally 
+             (void $ runChildQ True runFixture canRunFixture fixtures)
+             (atomically $ modifyTVar' runningThreads pred)
        where
         canRunFixture XFixture{tests} = readTVar tests.status
         runFixture = runXFixture eventLogger hkIn testHook
+        xfxRunnable = do 
+          t <- withinThreadLimit tl 
+          q <- canRunChildQ fixtures
+          let r = t && q 
+          when r $ modifyTVar' runningThreads succ
+          pure r
 
 newLogger :: EventSink -> ThreadId -> IO EventLogger
 newLogger sink tid =

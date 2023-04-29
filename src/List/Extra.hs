@@ -3,6 +3,7 @@ module List.Extra (
   List.Extra.last,
   List.Extra.init,
   List.Extra.maximum,
+  List.Extra.minimum,
   List.Extra.head, 
   count
 ) where 
@@ -11,8 +12,7 @@ module List.Extra (
 
 import Data.List.Extra as L hiding (unlines, lines)
 import Prelude hiding (last)
-import Data.List.Extra hiding (last, init, maximum, head) 
-import qualified Data.List.Extra as DE
+import Data.List.Extra hiding (last, init, maximum, minimum, head) 
 import PyrethrumExtras ((?))
 
 

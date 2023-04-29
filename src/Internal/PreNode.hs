@@ -1,11 +1,16 @@
-module Internal.PreNode where
+module Internal.PreNode (
+  Context(..),
+  Fixture(..),
+  OnceHook(..),
+  PreNode(..),
+  PreNodeRoot,
+  Test(..),
+  TestHook(..),
+  ThreadHook(..),
+  nodeEmpty
+) where
 
-import Control.DeepSeq (NFData)
 import Internal.RunTimeLogging (MessageLogger, Loc)
-import Language.Haskell.TH (ExpQ)
-import PyrethrumExtras (txt, uu, (?))
-import qualified Text.Extra as T
-import UnliftIO (MonadUnliftIO, STM, TMVar)
 
 type PreNodeRoot = PreNode () ()
 
@@ -30,19 +35,6 @@ data Fixture oi ti tsti where
     , tests :: [Test oo to tsto]
     } ->
     Fixture oi ti tsti
-
--- f1 :: Fixture Int Text Bool
--- f1 =
---   Fixture
---     { id = "fixture"
---     , onceHook = \l int -> pure $ txt int
---     , threadHook = \l otxt tiTxt -> pure $ T.length otxt + T.length tiTxt
---     , testHook = \l tx int b -> b ? pure b $ error tx
---     , testHookRelease = \l b -> b ? pure () $ error "its false"
---     , onceHookRelease = \l txt' -> putText txt'
---     , threadHookRelease = \l i -> print . txt $ i + 1
---     , tests = []
---     }
 data PreNode oi ti where
   Group ::
     { title :: Text
@@ -128,8 +120,8 @@ data TestHook oi ti tsti tsto where
   -- XFixtures
   -- XGroup
 -- check references to status - replace / remove
--- reimplement uu
--- tree shake / validate - prenodes (unique ids)
+-- reimplement uu :: DONE
+-- tree shake / validate - prenodes (unique ids) :: Defer - do when generating prenodes because need to generate filter log anyway
 -- basic tests
 -- FIX :: 
 -- need to use subElmIdx to create a unique loc

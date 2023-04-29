@@ -4,16 +4,9 @@
 
 module Internal.SuiteRuntime where
 
-import BasePrelude (NonTermination, retry)
-import qualified BasePrelude as PN
-import Check (CheckReport (result))
-import Control.DeepSeq (NFData, deepseq, force, ($!!))
-import DSL.Logger (logMessage)
-import Data.Function (const, ($), (&))
-import Data.Sequence (Seq (Empty), empty, replicateM, update)
-import Data.Tuple.Extra (both, uncurry3)
+import BasePrelude (retry)
 import GHC.Exts
-import Internal.PreNode (Context (..), OnceHook (..), PreNode (testHook), PreNodeRoot, TestHook (..), ThreadHook (..))
+import Internal.PreNode (Context (..), OnceHook (..), PreNode (testHook), TestHook (..), ThreadHook (..))
 import qualified Internal.PreNode as PN (
   Fixture (..),
   PreNode (..),
@@ -23,10 +16,9 @@ import qualified Internal.PreNode as PN (
 import Internal.RunTimeLogging (
   EventSink,
   ExeEvent (..),
-  ExeEventType (Group, TestHookRelease),
+  ExeEventType (TestHook, TestHookRelease, ThreadHookRelease),
   Loc (Node, Root),
   LogControls (LogControls),
-  MessageLogger,
   SThreadId,
   logWorker,
   mkFailure,
@@ -35,62 +27,26 @@ import Internal.RunTimeLogging (
   sink,
   stopWorker,
  )
+
 import qualified Internal.RunTimeLogging as L
-import List.Extra as LE
-import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
-import Polysemy.Bundle (subsumeBundle)
-import PyrethrumExtras hiding (finally)
-import PyrethrumExtras.IO (hPutStrLn, putStrLn)
-import System.Posix.Internals (rtsIsThreaded_)
-import Text.Show.Pretty (pPrint)
+
+import PyrethrumExtras (catchAll, txt, (?))
 import UnliftIO (
-  Exception (displayException),
-  bracket,
-  catchAny,
   concurrently_,
   finally,
   forConcurrently_,
-  isEmptyTBQueue,
   newIORef,
-  newMVar,
-  newTMVar,
-  peekTQueue,
-  pureTry,
-  replicateConcurrently,
-  replicateConcurrently_,
-  swapTMVar,
-  tryAny,
-  tryPeekTQueue,
-  tryReadTMVar,
-  unGetTBQueue,
-  wait,
-  withAsync,
  )
 import UnliftIO.Concurrent
-import UnliftIO.Concurrent as C (ThreadId, forkFinally, forkIO, killThread, takeMVar, threadDelay, withMVar)
 import UnliftIO.STM (
-  STM,
-  TMVar,
   TQueue,
-  TVar,
   atomically,
-  isEmptyTMVar,
-  isEmptyTQueue,
   modifyTVar,
-  newEmptyTMVar,
   newEmptyTMVarIO,
-  newTMVarIO,
   newTQueueIO,
   newTVarIO,
-  putTMVar,
-  readTMVar,
-  readTQueue,
-  readTVar,
-  readTVarIO,
-  takeTMVar,
   tryReadTQueue,
   writeTQueue,
-  writeTVar,
  )
 import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO)
 
@@ -162,11 +118,11 @@ runTestHook ctx@XContext{loc = testLoc} tstIn testHk =
       runHook
  where
   tstCtx :: XContext
-  tstCtx = ctx{loc = mkTestChildLoc testLoc L.TestHook}
+  tstCtx = ctx{loc = mkTestChildLoc testLoc TestHook}
   logReturnAbandonned a =
     let
       result = pure (Left a)
-      loga = logAbandonned tstCtx L.TestHook a >> result
+      loga = logAbandonned tstCtx TestHook a >> result
      in
       testHk & \case
         TestNone{} -> result
@@ -177,7 +133,7 @@ runTestHook ctx@XContext{loc = testLoc} tstIn testHk =
   runHook (ExeIn oi ti tsti) =
     catchAll
       ( let
-          exHk h = ExeIn oi ti <<$>> Right <$> withStartEnd tstCtx L.TestHook (h (mkCtx tstCtx) oi ti tsti)
+          exHk h = ExeIn oi ti <<$>> Right <$> withStartEnd tstCtx TestHook (h (mkCtx tstCtx) oi ti tsti)
           voidHk = pure @IO $ Right @Abandon (ExeIn oi ti tsti)
          in
           testHk & \case
@@ -186,7 +142,7 @@ runTestHook ctx@XContext{loc = testLoc} tstIn testHk =
             TestAfter{} -> voidHk
             TestAround{hook} -> exHk hook
       )
-      (logReturnFailure tstCtx L.TestHook)
+      (logReturnFailure tstCtx TestHook)
 
 mkTestChildLoc :: (Show a) => Loc -> a -> Loc
 mkTestChildLoc testLoc evt = Node testLoc $ txt evt
@@ -199,7 +155,7 @@ releaseTestHook ctx@XContext{loc = testLoc} tsti = \case
   TestAround{release} -> runRelease release
  where
   noRelease = pure ()
-  runRelease = releaseHook (ctx{loc = mkTestChildLoc testLoc L.TestHookRelease}) L.TestHookRelease tsti
+  runRelease = releaseHook (ctx{loc = mkTestChildLoc testLoc TestHookRelease}) TestHookRelease tsti
 
 canRunChildQ :: ChildQ a -> STM Bool
 canRunChildQ cq =
@@ -322,7 +278,7 @@ withThreadHook ctx hkIn threadHook childAction =
           Right $ hi{threadIn = to}
       )
       ( let
-          doRelease = releaseHook ctx L.ThreadHookRelease eto
+          doRelease = releaseHook ctx ThreadHookRelease eto
          in
           threadHook & \case
             ThreadNone -> pure ()
@@ -439,16 +395,9 @@ prepare :: PreNode o t -> IO (ExeTree o t)
 prepare =
   prepare' Root 0
  where
-  consNoMxIdx :: IdxLst a -> a -> IdxLst a
-  consNoMxIdx l@IdxLst{lst} i = l{lst = i : lst}
-
   prepare' :: Loc -> Int -> PN.PreNode oi ti -> IO (ExeTree oi ti)
   prepare' parentLoc subElmIdx pn = do
-    let nodeLoc tag =
-          Node
-            { parent = parentLoc
-            , tag
-            }
+    let nodeLoc = Node parentLoc
     case pn of
       PN.Group
         { title
@@ -690,23 +639,23 @@ runNode eventLogger hkIn =
                 void $ runChildQ True (runNode eventLogger tstIn) nodeStatus subNodes
     XFixtures
       { loc
-      , threadLimit = tl@ThreadLimit {maxThreads, runningThreads}
+      , threadLimit = tl@ThreadLimit{maxThreads, runningThreads}
       , fixtures
       , testHook
       } ->
         do
           canRun' <- atomically xfxRunnable
           when canRun' $
-            finally 
-             (void $ runChildQ True runFixture canRunFixture fixtures)
-             (atomically $ modifyTVar' runningThreads pred)
+            finally
+              (void $ runChildQ True runFixture canRunFixture fixtures)
+              (atomically $ modifyTVar' runningThreads pred)
        where
         canRunFixture XFixture{tests} = readTVar tests.status
         runFixture = runXFixture eventLogger hkIn testHook
-        xfxRunnable = do 
-          t <- withinThreadLimit tl 
+        xfxRunnable = do
+          t <- withinThreadLimit tl
           q <- canRunChildQ fixtures
-          let r = t && q 
+          let r = t && q
           when r $ modifyTVar' runningThreads succ
           pure r
 

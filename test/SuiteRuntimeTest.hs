@@ -1,6 +1,7 @@
 module SuiteRuntimeTest where
 
 import Check (Checks)
+
 -- -- TODO Add to Pyrelude
 -- -- TODO Add to Pyrelude
 
@@ -72,7 +73,7 @@ data IOProps = IOProps
   { delayms :: Int
   , outcome :: ExeOutcome
   }
-  deriving Show
+  deriving (Show)
 
 data THook
   = None
@@ -82,7 +83,7 @@ data THook
       { hook :: IOProps
       , release :: IOProps
       }
-  deriving Show
+  deriving (Show)
 
 data Template
   = TGroup
@@ -98,7 +99,7 @@ data Template
       , testHook :: NonEmpty IOProps
       , fixtures :: NonEmpty TFixture
       }
-  deriving Show
+  deriving (Show)
 
 data TFixture = TFixture
   { id :: Text
@@ -108,12 +109,14 @@ data TFixture = TFixture
   , testHook :: THook
   , tests :: NonEmpty IOProps
   }
-  deriving Show
+  deriving (Show)
 
 prepare :: Template -> PreNode Text Text
-prepare = \case
-  TGroup{title, threadLimit, onceHook, threadHook, subNodes} -> uu
-  TFixtures{title, threadLimit, testHook, fixtures} -> uu
+prepare = prepare' 0
+ where
+  prepare' depth = \case
+    TGroup{title, threadLimit, onceHook, threadHook, subNodes} -> uu
+    TFixtures{title, threadLimit, testHook, fixtures} -> uu
 
 -- data Template
 --   = TOnceHook

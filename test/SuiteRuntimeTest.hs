@@ -1,6 +1,6 @@
 module SuiteRuntimeTest where
 
--- import Check (Checks)
+import Check (Checks)
 -- -- TODO Add to Pyrelude
 -- -- TODO Add to Pyrelude
 
@@ -38,7 +38,8 @@ module SuiteRuntimeTest where
 -- import qualified Internal.SuiteRuntime as S
 -- import qualified PyrethrumExtras.Test as T
 -- import TempUtils (debugLines)
--- import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
+import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
+
 -- import UnliftIO.Concurrent as C
 --   ( ThreadId,
 --     forkFinally,
@@ -48,33 +49,71 @@ module SuiteRuntimeTest where
 --   )
 -- import UnliftIO.STM
 -- import Prelude as P hiding (newTVarIO, atomically, head, last)
--- import GHC.Show (Show(..))
+import GHC.Show (Show (..))
+import Internal.PreNode
+import PyrethrumExtras
+
 -- import PyrethrumExtras ( count, enumList, txt, uu, toS, (?) )
 -- import List.Extra (head, last, nub)
 -- import qualified Unsafe
 
+data DocFunc a = DocFunc
+  { doc :: Text
+  , func :: IO a
+  }
 
--- data DocFunc a = DocFunc
---   { doc :: Text,
---     func :: IO a
---   }
+instance Show (DocFunc a) where
+  show :: DocFunc a -> String
+  show = toS . (.doc)
 
--- instance Show (DocFunc a) where
---   show = toS . (.doc)
+data ExeOutcome = PassResult | FailResult deriving (Show, Eq)
 
--- data ExeOutcome = PassResult | FailResult deriving (Show, Eq)
+data IOProps = IOProps
+  { delayms :: Int
+  , outcome :: ExeOutcome
+  }
+  deriving Show
 
--- data IOProps = IOProps
---   { message :: Text,
---     delayms :: Int,
---     outcome :: ExeOutcome
---   }
---   deriving (Show)
+data THook
+  = None
+  | Before IOProps
+  | After IOProps
+  | Around
+      { hook :: IOProps
+      , release :: IOProps
+      }
+  deriving Show
 
+data Template
+  = TGroup
+      { title :: Text
+      , threadLimit :: Maybe Int
+      , onceHook :: IOProps
+      , threadHook :: IOProps
+      , subNodes :: NonEmpty Template
+      }
+  | TFixtures
+      { title :: Text
+      , threadLimit :: Maybe Int
+      , testHook :: NonEmpty IOProps
+      , fixtures :: NonEmpty TFixture
+      }
+  deriving Show
 
+data TFixture = TFixture
+  { id :: Text
+  , maxThreads :: Maybe Int
+  , onceHook :: THook
+  , threadHook :: THook
+  , testHook :: THook
+  , tests :: NonEmpty IOProps
+  }
+  deriving Show
 
--- testProps :: Text -> Int -> Int -> ExeOutcome -> IOProps
--- testProps prefix idx = IOProps (prefix == "" ? txt idx $ prefix <> "." <> txt idx)
+prepare :: Template -> PreNode Text Text
+prepare = \case
+  TGroup{title, threadLimit, onceHook, threadHook, subNodes} -> uu
+  TFixtures{title, threadLimit, testHook, fixtures} -> uu
 
 -- data Template
 --   = TOnceHook
@@ -173,7 +212,6 @@ module SuiteRuntimeTest where
 --                             $ accm {--- fixture loc added-}
 --              in (cl, accm')
 --         )
-
 
 -- errorS = error . toS
 
@@ -422,18 +460,8 @@ module SuiteRuntimeTest where
 -- threadIds :: [ExeEvent] -> [SThreadId]
 -- threadIds thrdEvts = nub $ (.threadId) <$> thrdEvts
 
-
-
-
-
-
-
-
-
-
-
 -- -- check immediate parent (preceeding start or following end) of each thread element
--- -- ignoring non threaded events when checking tests ignore other test start / ends 
+-- -- ignoring non threaded events when checking tests ignore other test start / ends
 -- chkParentOrder :: Template -> [ExeEvent] -> IO ()
 -- chkParentOrder rootTpl thrdEvts =
 --   traverse_
@@ -452,7 +480,6 @@ module SuiteRuntimeTest where
 --   where
 --     actualCPMap = actualChildParentMap thrdEvts
 --     expectedCPMap = childToParentMap rootTpl
-
 
 -- templateCount :: Template -> (Template -> Int) -> Int
 -- templateCount t templateInc = foldTemplate 0 (\c t' -> c + templateInc t') t
@@ -564,7 +591,6 @@ module SuiteRuntimeTest where
 --         <> "\nDoes not Equal:\n  "
 --         <> ppShow a
 --         <> "\n"
-
 
 -- -- chkThreadLogsInOrder :: [ExeEvent] -> IO ()
 -- -- chkThreadLogsInOrder evts =
@@ -1381,7 +1407,6 @@ module SuiteRuntimeTest where
 -- unit_simple_single = runTest 1 superSimplSuite
 
 -- -- $ > unit_simple_single_failure
-
 
 -- unit_simple_single_failure :: IO ()
 -- unit_simple_single_failure =

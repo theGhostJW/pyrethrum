@@ -105,10 +105,10 @@ endIsTerminal = \case
 exceptionTxt :: SomeException -> PException
 exceptionTxt e = PException $ txt <$> P.lines (displayException e)
 
-mkFailure :: Loc -> ExeEventType -> Text -> SomeException -> Int -> SThreadId -> ExeEvent
+mkFailure :: l -> ExeEventType -> Text -> SomeException -> Int -> SThreadId -> ExeEvent l
 mkFailure l et t e = Failure t (exceptionTxt e) et l
 
-mkParentFailure :: Loc -> ExeEventType -> Loc -> ExeEventType -> SomeException -> Int -> SThreadId -> ExeEvent
+mkParentFailure :: l -> ExeEventType -> l -> ExeEventType -> SomeException -> Int -> SThreadId -> ExeEvent l
 mkParentFailure fl fet pl pet ex idx trd = ParentFailure  { 
         exception = exceptionTxt ex,
         loc = fl,
@@ -123,7 +123,7 @@ mkParentFailure fl fet pl pet ex idx trd = ParentFailure  {
 newtype PException = PException {displayText :: [Text]} deriving (Show, Eq, Ord)
 newtype SThreadId = SThreadId { display :: Text} deriving (Show, Eq, Ord)
 
-data ExeEvent
+data ExeEvent l
   = StartExecution
       { idx :: Int,
         threadId :: SThreadId
@@ -131,14 +131,14 @@ data ExeEvent
   | Start
       { 
         eventType :: ExeEventType,
-        loc :: Loc,
+        loc :: l,
         idx :: Int,
         threadId :: SThreadId
       }
   | End
       { 
         eventType :: ExeEventType,
-        loc :: Loc,
+        loc :: l,
         idx :: Int,
         threadId :: SThreadId
       }
@@ -147,16 +147,16 @@ data ExeEvent
         msg :: Text,
         exception :: PException,
         parentEventType :: ExeEventType,
-        loc :: Loc,
+        loc :: l,
         idx :: Int,
         threadId :: SThreadId
       }
   | ParentFailure
       { 
         exception :: PException,
-        loc :: Loc,
+        loc :: l,
         fEventType :: ExeEventType,
-        parentLoc :: Loc,
+        parentLoc :: l,
         parentEventType :: ExeEventType,
         idx :: Int,
         threadId :: SThreadId
@@ -173,26 +173,26 @@ data ExeEvent
   deriving (Show)
 
 -------  IO Logging --------
-type EventSink = ExeEvent -> IO ()
+type EventSink l = ExeEvent l -> IO ()
 type MessageLogger = Text -> IO ()
 
 -- not used in concurrent code ie. one IORef per thread
 -- this approach means I can't write a pure logger but I can live with that for now
-mkLogger :: EventSink -> IORef Int -> ThreadId -> (Int -> SThreadId -> ExeEvent) -> IO ()
+mkLogger :: EventSink l -> IORef Int -> ThreadId -> (Int -> SThreadId -> ExeEvent l) -> IO ()
 mkLogger sink threadCounter thrdId fEvnt = do
   tc <- readIORef threadCounter
   let nxt = succ tc
   sink . fEvnt nxt . SThreadId $ txt thrdId
   writeIORef threadCounter nxt
 
-data LogControls m = LogControls
-  { sink :: EventSink,
+data LogControls m l = LogControls
+  { sink :: EventSink l,
     logWorker :: IO (),
     stopWorker :: IO (),
-    log :: m (TQueue ExeEvent)
+    log :: m (TQueue (ExeEvent l))
   }
 
-testLogControls :: TChan (Maybe ExeEvent) -> TQueue ExeEvent -> IO (LogControls Maybe)
+testLogControls :: forall l. Show l => TChan (Maybe (ExeEvent l)) -> TQueue (ExeEvent l) -> IO (LogControls  Maybe l)
 testLogControls chn log = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   let logWorker :: IO ()
@@ -205,7 +205,7 @@ testLogControls chn log = do
       stopWorker :: IO ()
       stopWorker = atomically $ writeTChan chn Nothing
 
-      sink :: ExeEvent -> IO ()
+      sink :: ExeEvent l -> IO ()
       sink evnt =
         atomically $ do
           writeTChan chn $ Just evnt

@@ -34,6 +34,7 @@ data Fixture oi ti tsti where
     , tests :: NonEmpty (Test oo to tsto)
     } ->
     Fixture oi ti tsti
+    
 data PreNode oi ti where
   Group ::
     { title :: Text

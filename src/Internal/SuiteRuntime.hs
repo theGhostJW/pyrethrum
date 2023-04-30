@@ -64,7 +64,7 @@ data XContext = XContext
   , evtLogger :: EventLogger
   }
 
-type EventLogger = (Int -> SThreadId -> ExeEvent) -> IO ()
+type EventLogger = (Int -> SThreadId -> ExeEvent Loc) -> IO ()
 
 mkCtx :: XContext -> Context
 mkCtx XContext{loc, evtLogger} =
@@ -659,13 +659,13 @@ runNode eventLogger hkIn =
           when r $ modifyTVar' runningThreads succ
           pure r
 
-newLogger :: EventSink -> ThreadId -> IO EventLogger
+newLogger :: EventSink Loc -> ThreadId -> IO EventLogger
 newLogger sink tid =
   do
     ir <- UnliftIO.newIORef (-1)
     pure $ mkLogger sink ir tid
 
-executeGraph :: EventSink -> ExeTree () () -> Int -> IO ()
+executeGraph :: EventSink Loc -> ExeTree () () -> Int -> IO ()
 executeGraph sink xtri maxThreads =
   let hkIn = Right (ExeIn () () ())
       thrdTokens = replicate maxThreads True
@@ -684,7 +684,7 @@ executeGraph sink xtri maxThreads =
           )
           (waitDone xtri >> rootLogger EndExecution)
 
-execute :: Int -> LogControls m -> PN.PreNodeRoot -> IO ()
+execute :: Int -> LogControls m Loc -> PN.PreNodeRoot -> IO ()
 execute
   maxThreads
   LogControls

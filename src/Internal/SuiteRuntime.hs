@@ -353,7 +353,7 @@ mkXFixture ::
   Loc ->
   PN.Fixture oi ti tsti ->
   IO (XFixture oi ti tsti)
-mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads, id = fxid} = do
+mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads, title} = do
   oh <- mkOnceVal onceHook
   ts <- mkChildQ $ mkXTest <$> tests
   threadLimit <- mkThreadLimit maxThreads
@@ -367,7 +367,7 @@ mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads, id 
       , threadLimit
       }
  where
-  fxLoc = Node loc fxid
+  fxLoc = Node loc title
   mkXTest PN.Test{id, test} =
     XTest
       { loc = Node fxLoc $ "Test :: " <> id

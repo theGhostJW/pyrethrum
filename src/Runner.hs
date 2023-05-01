@@ -180,7 +180,7 @@ exeElm includedAddresses parentAddress hi =
                   logItem $ StartHook C.BeforeAll t
                   ho <- bHook hi
                   logItem $ EndHook C.BeforeAll t
-                  sequence_ $ exElm' adr ho <$> hkElms
+                  mapM_ (exElm' adr ho) hkElms
                   logItem $ StartHook C.AfterAll t
                   aHook ho
                   logItem $ EndHook C.AfterAll t
@@ -189,7 +189,7 @@ exeElm includedAddresses parentAddress hi =
           exclude t group' ? pure () $
             do
               logItem $ StaXTGroup $ GroupTitle t
-              sequence_ $ exElm' (nxtAddress t group') hi <$> gElms
+              mapM_ (exElm' (nxtAddress t group') hi) gElms
               logItem $ EndGroup $ GroupTitle t
 
 data RunComponents effs = RunComponents
@@ -249,7 +249,7 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
         offset' <- utcOffset
         logItem . StartRun (RunTitle $ getField @"title" rc) offset' $ toJSON rc
         logItem $ FilterLog lg
-        sequence_ $ exeElm included rootAddress () <$> rCmp.suitItems
+        mapM_ (exeElm included rootAddress ()) (rCmp.suitItems)
         logItem EndRun
 
       lgError :: Text -> Sem effs ()

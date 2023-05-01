@@ -53,6 +53,7 @@ import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, p
 import GHC.Show (Show (..))
 import Internal.PreNode
 import PyrethrumExtras
+import qualified UnliftIO.Concurrent as C
 
 -- import PyrethrumExtras ( count, enumList, txt, uu, toS, (?) )
 -- import List.Extra (head, last, nub)
@@ -89,8 +90,8 @@ data Template
   = TGroup
       { title :: Text
       , threadLimit :: Maybe Int
-      , onceHook :: IOProps
-      , threadHook :: IOProps
+      , onceHook :: THook
+      , threadHook :: THook
       , subNodes :: NonEmpty Template
       }
   | TFixtures
@@ -102,7 +103,7 @@ data Template
   deriving (Show)
 
 data TFixture = TFixture
-  { id :: Text
+  { title :: Text
   , maxThreads :: Maybe Int
   , onceHook :: THook
   , threadHook :: THook
@@ -111,13 +112,43 @@ data TFixture = TFixture
   }
   deriving (Show)
 
-prepare :: Template -> PreNode Text Text
+ioAction :: IOProps -> Text -> IO ()
+ioAction IOProps{delayms, outcome} erMsg =
+  do
+    C.threadDelay delayms
+    when (outcome == FailResult)
+      . error
+      . toS
+      $ "exception thrown " <> erMsg
+
+prepare :: Template -> PreNode () ()
 prepare = prepare' 0
  where
   prepare' depth = \case
-    TGroup{title, threadLimit, onceHook, threadHook, subNodes} -> uu
-    TFixtures{title, threadLimit, testHook, fixtures} -> uu
+    TGroup{title, threadLimit, onceHook, threadHook, subNodes} ->  Group { 
+      title 
+    , threadLimit 
+    , onceHook = onceHk title onceHook
+    , threadHook = uu
+    , subNodes = uu
+    }
+    TFixtures {} -> uu
 
+ 
+  
+
+  onceHk ttl = \case
+                  None -> OnceNone
+                  Before ip -> OnceBefore (\_ctx _a -> ioAction ip ttl)
+                  After ip -> OnceAfter (\_ctx _a -> ioAction ip ttl)
+                  Around ipb ipa -> OnceAround (\_ctx _a -> ioAction ipb ttl) (\_ctx _a -> ioAction ipa ttl)
+
+{-
+ * happy path test
+ * happy path test with hook
+ * simple effefectful
+ * complete tests
+-}
 -- data Template
 --   = TOnceHook
 --       { tag :: Text,
@@ -1332,16 +1363,6 @@ prepare = prepare' 0
 --     & maybe
 --       (T.chkFail "No Events Log")
 --       (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
-
--- ioAction :: TextLogger -> IOProps -> IO ()
--- ioAction log (IOProps {message, delayms, outcome}) =
---   do
---     log message
---     C.threadDelay delayms
---     when (outcome == FailResult)
---       . error
---       . toS
---       $ "exception thrown " <> message
 
 -- mkTest :: IOProps -> PN.Test si ti ii
 -- mkTest iop@IOProps {message} = PN.Test message \log a b c -> ioAction log iop

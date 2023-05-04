@@ -50,17 +50,26 @@ import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, p
 --   )
 -- import UnliftIO.STM
 -- import Prelude as P hiding (newTVarIO, atomically, head, last)
+
+import Data.Traversable (for)
 import GHC.Show (Show (..))
-import Internal.PreNode
-    ( ThreadHook(ThreadAround, ThreadNone, ThreadBefore, ThreadAfter),
-      PreNode(Group, subNodes, title, threadLimit, onceHook,
-              threadHook) )
-import qualified Internal.PreNode as P
-    ( OnceHook(..) )
+import Internal.PreNode (
+  PreNode (
+    Group,
+    onceHook,
+    subNodes,
+    threadHook,
+    threadLimit,
+    title
+  ),
+  ThreadHook (ThreadAfter, ThreadAround, ThreadBefore, ThreadNone),
+ )
+import qualified Internal.PreNode as P (
+  OnceHook (..),
+ )
 import PyrethrumExtras
 import qualified UnliftIO.Concurrent as C
-import UnliftIO.STM (newTQueueIO, writeTQueue, tryReadTQueue, TQueue, newTQueue)
-import Data.Traversable (for)
+import UnliftIO.STM (TQueue, newTQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 
 -- import PyrethrumExtras ( count, enumList, txt, uu, toS, (?) )
 -- import List.Extra (head, last, nub)
@@ -138,21 +147,20 @@ ioAction IOProps{delayms, outcome} erMsg =
       . toS
       $ "exception thrown " <> erMsg
 
-
 loadProps :: NonEmpty IOProps -> STM (TQueue (Int, IOProps))
 loadProps ip = do
   q <- newTQueue
   -- TODO - write generic zipwithindex function for foldable
-  for_ (zip [0..] $ toList ip) (writeTQueue q)
+  for_ (zip [0 ..] $ toList ip) (writeTQueue q)
   pure q
 
 ioActions :: TQueue (Int, IOProps) -> Text -> IO ()
 ioActions q ttl = do
-        m <- atomically $ tryReadTQueue q
-        m & maybe
-          (error $ "queue empty bad test setup: " <> ttl)
-          (\(idx, ip') -> ioAction ip' (ttl <> " [" <> txt idx <> "]"))
-
+  m <- atomically $ tryReadTQueue q
+  m
+    & maybe
+      (error $ "queue empty bad test setup: " <> ttl)
+      (\(idx, ip') -> ioAction ip' (ttl <> " [" <> txt idx <> "]"))
 
 prepare :: Int -> Template -> IO (PreNode () ())
 prepare threadCount = prepare' 0
@@ -161,13 +169,18 @@ prepare threadCount = prepare' 0
     let ttl t = t <> " [" <> txt depth <> "]"
      in \case
           TGroup{title, threadLimit, onceHook, threadHook, subNodes} ->
-            Group
-              { title
-              , threadLimit
-              , onceHook = onceHk title onceHook
-              , threadHook = thrdHk title threadHook
-              , subNodes = prepare' (succ depth) <$> subNodes
-              }
+            do
+              let ittl = ttl title
+              th <- thrdHk ittl threadHook
+              sn <- traverse (prepare' (succ depth)) subNodes
+              pure $
+                Group
+                  { title
+                  , threadLimit
+                  , onceHook = onceHk title onceHook
+                  , threadHook = th
+                  , subNodes = sn
+                  }
           TFixtures
             { title
             , threadLimit
@@ -177,22 +190,24 @@ prepare threadCount = prepare' 0
 
   mkp1 t q c mt = ioActions q t
   mkp2 t q c mt mt2 = ioActions q t
+  mkp1Singleton t q c mt = ioAction q t
 
   thrdHk :: Text -> THook -> IO (ThreadHook () () ())
   thrdHk ttl hk =
-     hk & \case
-      None -> pure ThreadNone
-      Before ip -> atomically $ ThreadBefore . mkp2 ttl <$> loadProps ip 
-      After ip -> atomically $ ThreadAfter . mkp1 ttl <$> loadProps ip
-      Around ipb ipa -> atomically $ ThreadAround . mkp2 ttl <$> loadProps ipb <*> (mkp1 ttl <$> loadProps ipa)
-
+    atomically $
+      hk & \case
+        None -> pure ThreadNone
+        Before ip -> ThreadBefore . mkp2 ttl <$> loadProps ip
+        After ip -> ThreadAfter . mkp1 ttl <$> loadProps ip
+        Around ipb ipa -> ThreadAround . mkp2 ttl <$> loadProps ipb <*> (mkp1 ttl <$> loadProps ipa)
 
   onceHk :: Text -> TOnceHook -> P.OnceHook () ()
-  onceHk ttl = \case
-    OnceNone -> P.OnceNone
-    OnceBefore ip -> P.OnceBefore (mkp1 ip ttl)
-    OnceAfter ip -> P.OnceAfter (mkp1 ip ttl)
-    OnceAround ipb ipa -> P.OnceAround (mkp1 ipb ttl) (mkp1 ipa ttl)
+  onceHk ttl =
+    \case
+      OnceNone -> P.OnceNone
+      OnceBefore ip -> P.OnceBefore (mkp1Singleton ttl ip)
+      OnceAfter ip -> P.OnceAfter (mkp1Singleton ttl ip)
+      OnceAround ipb ipa -> P.OnceAround (mkp1Singleton ttl ipb) (mkp1Singleton ttl ipa)
 
 {-
  * happy path test

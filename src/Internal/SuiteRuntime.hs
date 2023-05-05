@@ -693,6 +693,8 @@ execute
     , stopWorker
     }
   preRoot =
+    -- TODO - Validatte prenode
+      -- fixture titles are unique ?? 
     concurrently_ logWorker linkExecute
    where
     linkExecute :: IO ()

@@ -54,19 +54,16 @@ import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, p
 import Data.Traversable (for)
 import GHC.Show (Show (..))
 import Internal.PreNode (
-  PreNode (
-    Group,
-    onceHook,
-    subNodes,
-    threadHook,
-    threadLimit,
-    title
-  ),
+  Fixture (..),
+  PreNode (..),
+  Test (..),
+  TestHook,
   ThreadHook (ThreadAfter, ThreadAround, ThreadBefore, ThreadNone),
  )
 import qualified Internal.PreNode as P (
   OnceHook (..),
  )
+import List.Extra (zipWithIndex)
 import PyrethrumExtras
 import qualified UnliftIO.Concurrent as C
 import UnliftIO.STM (TQueue, newTQueue, newTQueueIO, tryReadTQueue, writeTQueue)
@@ -123,7 +120,7 @@ data Template
   | TFixtures
       { title :: Text
       , threadLimit :: Maybe Int
-      , testHook :: IOProps
+      , testHook :: THook
       , fixtures :: NonEmpty TFixture
       }
   deriving (Show)
@@ -131,7 +128,7 @@ data Template
 data TFixture = TFixture
   { title :: Text
   , maxThreads :: Maybe Int
-  , onceHook :: THook
+  , onceHook :: TOnceHook
   , threadHook :: THook
   , testHook :: THook
   , tests :: NonEmpty IOProps
@@ -150,56 +147,64 @@ ioAction IOProps{delayms, outcome} erMsg =
 loadProps :: NonEmpty IOProps -> STM (TQueue (Int, IOProps))
 loadProps ip = do
   q <- newTQueue
-  -- TODO - write generic zipwithindex function for foldable
-  for_ (zip [0 ..] $ toList ip) (writeTQueue q)
+  traverse_ (writeTQueue q) (zipWithIndex ip)
   pure q
 
 ioActions :: TQueue (Int, IOProps) -> Text -> IO ()
-ioActions q ttl = do
-  m <- atomically $ tryReadTQueue q
-  m
-    & maybe
+ioActions q ttl =
+  atomically (tryReadTQueue q)
+    >>= maybe
       (error $ "queue empty bad test setup: " <> ttl)
       (\(idx, ip') -> ioAction ip' (ttl <> " [" <> txt idx <> "]"))
 
-prepare :: Int -> Template -> IO (PreNode () ())
+prepare :: Int -> Template -> STM (PreNode () ())
 prepare threadCount = prepare' 0
  where
-  prepare' depth =
-    let ttl t = t <> " [" <> txt depth <> "]"
-     in \case
-          TGroup{title, threadLimit, onceHook, threadHook, subNodes} ->
+  prepare' depth tp =
+    let title = tp.title <> " [" <> txt depth <> "]"
+     in tp & \case
+          TGroup{threadLimit, onceHook, threadHook = th, subNodes = sn} ->
             do
-              let ittl = ttl title
-              th <- thrdHk ittl threadHook
-              sn <- traverse (prepare' (succ depth)) subNodes
+              threadHook <- thrdHk title th
+              subNodes <- traverse (prepare' (succ depth)) sn
               pure $
                 Group
                   { title
                   , threadLimit
                   , onceHook = onceHk title onceHook
-                  , threadHook = th
-                  , subNodes = sn
+                  , threadHook
+                  , subNodes
                   }
           TFixtures
-            { title
-            , threadLimit
-            , testHook
-            , fixtures
-            } -> uu
+            { threadLimit
+            , testHook = th
+            , fixtures = fx
+            } ->
+              do
+                testHook <- tstHk title th
+                fixtures <- mkFixtures fx
+                pure $
+                  Fixtures
+                    { title
+                    , threadLimit
+                    , testHook
+                    , fixtures
+                    }
 
   mkp1 t q c mt = ioActions q t
   mkp2 t q c mt mt2 = ioActions q t
   mkp1Singleton t q c mt = ioAction q t
 
-  thrdHk :: Text -> THook -> IO (ThreadHook () () ())
+  tstHk :: Text -> THook -> STM (TestHook () () () ())
+  tstHk ttl hk = uu
+
+  thrdHk :: Text -> THook -> STM (ThreadHook () () ())
   thrdHk ttl hk =
-    atomically $
-      hk & \case
-        None -> pure ThreadNone
-        Before ip -> ThreadBefore . mkp2 ttl <$> loadProps ip
-        After ip -> ThreadAfter . mkp1 ttl <$> loadProps ip
-        Around ipb ipa -> ThreadAround . mkp2 ttl <$> loadProps ipb <*> (mkp1 ttl <$> loadProps ipa)
+    hk & \case
+      None -> pure ThreadNone
+      Before ip -> ThreadBefore . mkp2 ttl <$> loadProps ip
+      After ip -> ThreadAfter . mkp1 ttl <$> loadProps ip
+      Around ipb ipa -> ThreadAround . mkp2 ttl <$> loadProps ipb <*> (mkp1 ttl <$> loadProps ipa)
 
   onceHk :: Text -> TOnceHook -> P.OnceHook () ()
   onceHk ttl =
@@ -209,36 +214,38 @@ prepare threadCount = prepare' 0
       OnceAfter ip -> P.OnceAfter (mkp1Singleton ttl ip)
       OnceAround ipb ipa -> P.OnceAround (mkp1Singleton ttl ipb) (mkp1Singleton ttl ipa)
 
+  mkFixtures :: NonEmpty TFixture -> STM (NonEmpty (Fixture () () ()))
+  mkFixtures =
+    traverse mkFixture
+   where
+    mkFixture :: TFixture -> STM (Fixture () () ())
+    mkFixture TFixture{title, maxThreads, onceHook = oh, threadHook = th, testHook = tsth, tests = tsts} = do
+      threadHook <- thrdHk title th
+      testHook <- tstHk title tsth
+      tests <- loadProps tsts
+      pure
+        Fixture
+          { title
+          , maxThreads
+          , onceHook = onceHk title oh
+          , threadHook
+          , testHook
+          , tests = mkTest title <$> tsts
+          }
+    mkTest :: Text -> IOProps -> Test () () ()
+    mkTest t p =
+      Test
+        { id = t
+        , test = \_ctx _oi _ti _tsti -> ioAction p t
+        }
+
 {-
  * happy path test
  * happy path test with hook
  * simple effefectful
  * complete tests
 -}
--- data Template
---   = TOnceHook
---       { tag :: Text,
---         sHook :: IOProps,
---         sRelease :: IOProps,
---         tChild :: Template
---       }
---   | TThreadHook
---       { tag :: Text,
---         tHook :: [IOProps],
---         tRelease :: [IOProps],
---         tChild :: Template
---       }
---   | TFixture
---       { tag :: Text,
---         sHook :: IOProps,
---         sRelease :: IOProps,
---         tHook :: [IOProps],
---         tRelease :: [IOProps],
---         tTestHook :: [IOProps],
---         tTestRelease :: [IOProps],
---         tTests :: [IOProps]
---       }
---   deriving (Show)
+
 
 -- type TextLogger = Text -> IO ()
 

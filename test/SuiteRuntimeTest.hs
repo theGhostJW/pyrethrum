@@ -20,24 +20,28 @@ import Check (Checks)
 -- import Hedgehog.Internal.State (Action (actionExecute))
 -- import Internal.PreNode
 -- import qualified Internal.PreNode as PN
--- import Internal.RunTimeLogging as L
---   ( ExeEvent (..),
---     ExeEventType (..),
---     Loc (..),
---     LogControls (..),
---     PException,
---     SThreadId (..),
---     endIsTerminal,
---     isFixtureChild,
---     isGrouping,
---     isOnceEvent,
---     isThreadedEvent,
---     mkLogger,
---     testLogControls,
---   )
+import Internal.RunTimeLogging as L (
+  -- ExeEvent (..),
+  -- ExeEventType (..),
+  -- Loc (..),
+
+  -- PException,
+  -- SThreadId (..),
+  -- endIsTerminal,
+  -- isFixtureChild,
+  -- isGrouping,
+  -- isOnceEvent,
+  -- isThreadedEvent,
+  -- mkLogger,
+  ExeEvent (..),
+  LogControls (..),
+  testLogControls,
+ )
+
 -- import Internal.SuiteRuntime
 -- import qualified Internal.SuiteRuntime as S
--- import qualified PyrethrumExtras.Test as T
+import qualified PyrethrumExtras.Test as T
+
 -- import TempUtils (debugLines)
 import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
 
@@ -57,14 +61,16 @@ import Internal.PreNode (
   Fixture (..),
   PreNode (..),
   Test (..),
-  TestHook,
+  TestHook (..),
   ThreadHook (ThreadAfter, ThreadAround, ThreadBefore, ThreadNone),
  )
 import qualified Internal.PreNode as P (
   OnceHook (..),
  )
-import List.Extra (zipWithIndex)
+import Internal.SuiteRuntime (execute)
+import List.Extra as L (head, last, zipWithIndex)
 import PyrethrumExtras
+import UnliftIO (newTChanIO)
 import qualified UnliftIO.Concurrent as C
 import UnliftIO.STM (TQueue, newTQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 
@@ -111,8 +117,7 @@ data TOnceHook
 
 data Template
   = TGroup
-      {
-        threadLimit :: Maybe Int
+      { threadLimit :: Maybe Int
       , onceHook :: TOnceHook
       , threadHook :: THook
       , subNodes :: NonEmpty Template
@@ -166,7 +171,7 @@ prepare threadCount = prepare' 0 0
  where
   prepare' :: Int -> Int -> Template -> STM (PreNode () ())
   prepare' depth idx tp =
-    let title = name tp <> " [" <> txt depth <> "." <> txt idx  <> "]"
+    let title = name tp <> " [" <> txt depth <> "." <> txt idx <> "]"
      in tp & \case
           TGroup{threadLimit, onceHook, threadHook = th, subNodes = sn} ->
             do
@@ -196,12 +201,19 @@ prepare threadCount = prepare' 0 0
                     , fixtures
                     }
 
-  mkp1 t q c mt = ioActions q t
-  mkp2 t q c mt mt2 = ioActions q t
-  mkp1Singleton t q c mt = ioAction q t
+  mkp1 t q c p1 = ioActions q t
+
+  mkp2 t q c p1 p2 = ioActions q t
+  mkp3 t q c p1 p2 p3 = ioActions q t
+  mkp1Singleton t q c p1 = ioAction q t
 
   tstHk :: Text -> THook -> STM (TestHook () () () ())
-  tstHk ttl hk = uu
+  tstHk ttl hk =
+    hk & \case
+      None -> pure TestNone
+      Before ip -> TestBefore . mkp3 ttl <$> loadProps ip
+      After ip -> TestAfter . mkp1 ttl <$> loadProps ip
+      Around ipb ipa -> TestAround . mkp3 ttl <$> loadProps ipb <*> (mkp1 ttl <$> loadProps ipa)
 
   thrdHk :: Text -> THook -> STM (ThreadHook () () ())
   thrdHk ttl hk =
@@ -244,13 +256,86 @@ prepare threadCount = prepare' 0 0
         , test = \_ctx _oi _ti _tsti -> ioAction p t
         }
 
+q2List :: TQueue (ExeEvent a) -> STM [ExeEvent a]
+q2List qu = reverse <$> recurse [] qu
+ where
+  recurse :: [ExeEvent a] -> TQueue (ExeEvent a) -> STM [ExeEvent a]
+  recurse l q =
+    tryReadTQueue q
+      >>= maybe (pure l) (\e -> recurse (e : l) q)
+
+runTest :: Int -> Template -> IO ()
+runTest maxThreads template = do
+  -- validateTemplate template
+  putStrLn ""
+  pPrint template
+  putStrLn "========="
+  chan <- newTChanIO
+  q <- newTQueueIO
+  ior <- newIORef 0
+  tid <- C.myThreadId
+  lc@LogControls{sink, log} <- testLogControls chan q
+  pn <- atomically $ prepare maxThreads template
+  execute maxThreads lc pn
+  log
+    & maybe
+      (T.chkFail "No Events Log")
+      (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
+
+chkProperties :: Int -> Template -> [ExeEvent a] -> IO ()
+chkProperties mxThrds t evts =
+  do
+    traverse_
+      (evts &)
+      [ chkThreadLogsInOrder
+      , chkStartEndExecution
+      -- chkSingletonLeafEventsStartEnd,
+      -- chkOnceEventsAreBlocking,
+      --         chkEventCounts t,
+      --         chkOnceHksReleased,
+      --         chkErrorPropagation
+      ]
+
+-- chkProperties :: Int -> Template -> [ExeEvent] -> IO ()
+-- chkProperties mxThrds t evts =
+--   do
+--     traverse_
+--       (evts &)
+--       [ chkThreadLogsInOrder,
+--         chkStartEndExecution,
+--         chkSingletonLeafEventsStartEnd,
+--         chkOnceEventsAreBlocking,
+--         chkEventCounts t,
+--         chkOnceHksReleased,
+--         chkErrorPropagation
+--       ]
+--     traverse_
+--       (threadedEvents &)
+--       [ chkStartEndIntegrity,
+--         chkFixtureChildren,
+--         chkFixturesContainTests t,
+--         traverse_ chkTestEvtsConsecutive,
+--         chkThreadLeafEventsStartEnd,
+--         traverse_ (chkParentOrder t),
+--         traverse_ chkThreadHksReleased
+--       ]
+--     T.chk'
+--       ( "max execution threads + 2: "
+--           <> txt (mxThrds + 1)
+--           <> " exceeded: "
+--           <> txt (length threadedEvents)
+--           <> "\n"
+--           <> txt (ppShow (((.threadId) <$>) <$> threadedEvents))
+--       )
+--       $ length threadedEvents <= mxThrds + 2
+--   where
+--     threadedEvents = groupOn (.threadId) evts
 {-
  * happy path test
  * happy path test with hook
  * simple effefectful
  * complete tests
 -}
-
 
 -- type TextLogger = Text -> IO ()
 
@@ -325,7 +410,7 @@ prepare threadCount = prepare' 0 0
 --              in (cl, accm')
 --         )
 
--- errorS = error . toS
+errorS = error . toS
 
 -- lookupThrow :: (Ord k, Show k, Show v) => Text -> M.Map k v -> k -> v
 -- lookupThrow msg m k =
@@ -667,14 +752,6 @@ prepare threadCount = prepare' 0 0
 --                     fixtures = mkTest <$> tTests
 --                   }
 
--- q2List :: TQueue ExeEvent -> STM [ExeEvent]
--- q2List qu = reverse <$> recurse [] qu
---   where
---     recurse :: [ExeEvent] -> TQueue ExeEvent -> STM [ExeEvent]
---     recurse l q =
---       tryReadTQueue q
---         >>= P.maybe (pure l) (\e -> recurse (e : l) q)
-
 -- -- TODO - add tests add to pyrelude
 -- groupOn :: (Ord b) => (a -> b) -> [a] -> [[a]]
 -- groupOn f =
@@ -690,30 +767,30 @@ prepare threadCount = prepare' 0 0
 -- chkEqfmt' :: (Eq a, Show a) => a -> a -> Text -> IO ()
 -- chkEqfmt' e a msg = chkEq' msg e a
 
--- chkEq' :: (Eq a, Show a) => Text -> a -> a -> IO ()
--- chkEq' msg e a =
---   when (e /= a) $
---     errorS $
---       "\n"
---         <> toS msg
---         <> "\n"
---         <> "equality check failed:\n"
---         <> "Expected:\n  "
---         <> ppShow e
---         <> "\nDoes not Equal:\n  "
---         <> ppShow a
---         <> "\n"
+chkEq' :: (Eq a, Show a) => Text -> a -> a -> IO ()
+chkEq' msg e a =
+  when (e /= a) $
+    errorS $
+      "\n"
+        <> toS msg
+        <> "\n"
+        <> "equality check failed:\n"
+        <> "Expected:\n  "
+        <> ppShow e
+        <> "\nDoes not Equal:\n  "
+        <> ppShow a
+        <> "\n"
 
--- -- chkThreadLogsInOrder :: [ExeEvent] -> IO ()
--- -- chkThreadLogsInOrder evts =
--- --   do
--- --     eachThread
--- --       ( \l ->
--- --           let ck = chkEq' "first index of thread should be 0" 0 . (.idx)
--- --               ev = unsafeHead l
--- --            in ck ev
--- --       )
--- --     eachThread chkIds
+chkThreadLogsInOrder :: [ExeEvent a] -> IO ()
+chkThreadLogsInOrder evts =
+  do
+    eachThread
+      ( \l ->
+          let ck = chkEq' "first index of thread should be 0" 0 . (.idx)
+              ev = unsafeHead l
+           in ck ev
+      )
+    eachThread chkIds
 
 -- chkThreadLogsInOrder :: [ExeEvent] -> IO ()
 -- chkThreadLogsInOrder evts =
@@ -748,24 +825,19 @@ prepare threadCount = prepare' 0 0
 --                     <> toS (ppShow ev2)
 --         )
 
--- chkStartEndExecution :: [ExeEvent] -> IO ()
--- chkStartEndExecution evts =
---   se
---     & maybe
---       (errorS "no events")
---       ( \(s, e) -> do
---           case s of
---             StartExecution {} -> pure ()
---             _ -> errorS "first event is not StartExecution"
---           case e of
---             EndExecution {} -> pure ()
---             _ -> errorS "last event is not EndExecution"
---       )
---   where
---     se = do
---       s <- head evts
---       e <- last evts
---       pure (s, e)
+chkStartEndExecution :: [ExeEvent a] -> IO ()
+chkStartEndExecution evts =
+  (,) <$> L.head evts <*> L.last evts
+    & maybe
+      (errorS "no events")
+      ( \(s, e) -> do
+          case s of
+            StartExecution{} -> pure ()
+            _ -> errorS "first event is not StartExecution"
+          case e of
+            EndExecution{} -> pure ()
+            _ -> errorS "last event is not EndExecution"
+      )
 
 -- isStart :: ExeEventType -> ExeEvent -> Bool
 -- isStart et = \case
@@ -1089,41 +1161,6 @@ prepare threadCount = prepare' 0 0
 --           )
 --       where
 --         eLoc = partialLoc e
-
--- chkProperties :: Int -> Template -> [ExeEvent] -> IO ()
--- chkProperties mxThrds t evts =
---   do
---     traverse_
---       (evts &)
---       [ chkThreadLogsInOrder,
---         chkStartEndExecution,
---         chkSingletonLeafEventsStartEnd,
---         chkOnceEventsAreBlocking,
---         chkEventCounts t,
---         chkOnceHksReleased,
---         chkErrorPropagation
---       ]
---     traverse_
---       (threadedEvents &)
---       [ chkStartEndIntegrity,
---         chkFixtureChildren,
---         chkFixturesContainTests t,
---         traverse_ chkTestEvtsConsecutive,
---         chkThreadLeafEventsStartEnd,
---         traverse_ (chkParentOrder t),
---         traverse_ chkThreadHksReleased
---       ]
---     T.chk'
---       ( "max execution threads + 2: "
---           <> txt (mxThrds + 1)
---           <> " exceeded: "
---           <> txt (length threadedEvents)
---           <> "\n"
---           <> txt (ppShow (((.threadId) <$>) <$> threadedEvents))
---       )
---       $ length threadedEvents <= mxThrds + 2
---   where
---     threadedEvents = groupOn (.threadId) evts
 
 -- data ChkErrAccum = ChkErrAccum
 --   { initialised :: Bool,

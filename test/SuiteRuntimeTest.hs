@@ -826,9 +826,19 @@ chkStartEndExecution evts =
             _ -> fail "last event is not EndExecution"
       )
 
--- $> unit_single_fixture
+-- $> unit_group_fixture_with_hooks
+unit_group_fixture_with_hooks :: IO ()
+unit_group_fixture_with_hooks = runTest 1 simpleGroupWithHooks
+
+-- $ > unit_single_fixture
 unit_single_fixture :: IO ()
 unit_single_fixture = runTest 1 singleFixture
+
+passPropsSingleton :: NonEmpty IOProps
+passPropsSingleton = singleton $ IOProps 0 Pass
+
+passProps :: IOProps
+passProps = IOProps 0 Pass
 
 baseFx :: TFixture
 baseFx =
@@ -837,7 +847,18 @@ baseFx =
     , onceHook = OnceNone
     , threadHook = None
     , testHook = None
-    , tests = singleton $ IOProps 0 Pass
+    , tests = passPropsSingleton
+    }
+
+-- TODO - CHeck update works in later GHC version
+fxWithHooks :: TFixture
+fxWithHooks =
+  TFixture { 
+    maxThreads = Just 1
+    ,  onceHook = OnceAround passProps passProps
+    , threadHook = Around passPropsSingleton passPropsSingleton
+    , testHook = Around passPropsSingleton passPropsSingleton
+    , tests = passPropsSingleton
     }
 
 singleFixture :: Template
@@ -848,6 +869,20 @@ singleFixture =
     , fixtures = singleton baseFx
     }
 
+simpleGroupWithHooks :: Template
+simpleGroupWithHooks =
+  TGroup
+    { threadLimit = Just 1
+    , onceHook = OnceAround passProps passProps
+    , threadHook = Around passPropsSingleton passPropsSingleton
+    , subNodes =
+        singleton $
+          TFixtures
+            { threadLimit = Just 1
+            , testHook = Around passPropsSingleton passPropsSingleton
+            , fixtures = singleton fxWithHooks
+            }
+    }
 
 -- isStart :: ExeEventType -> ExeEvent -> Bool
 -- isStart et = \case

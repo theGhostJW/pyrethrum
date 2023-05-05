@@ -111,19 +111,23 @@ data TOnceHook
 
 data Template
   = TGroup
-      { title :: Text
-      , threadLimit :: Maybe Int
+      {
+        threadLimit :: Maybe Int
       , onceHook :: TOnceHook
       , threadHook :: THook
       , subNodes :: NonEmpty Template
       }
   | TFixtures
-      { title :: Text
-      , threadLimit :: Maybe Int
+      { threadLimit :: Maybe Int
       , testHook :: THook
       , fixtures :: NonEmpty TFixture
       }
   deriving (Show)
+
+name :: Template -> Text
+name = \case
+  TGroup{} -> "Group"
+  TFixtures{} -> "Fixture"
 
 data TFixture = TFixture
   { title :: Text
@@ -158,22 +162,23 @@ ioActions q ttl =
       (\(idx, ip') -> ioAction ip' (ttl <> " [" <> txt idx <> "]"))
 
 prepare :: Int -> Template -> STM (PreNode () ())
-prepare threadCount = prepare' 0
+prepare threadCount = prepare' 0 0
  where
-  prepare' depth tp =
-    let title = tp.title <> " [" <> txt depth <> "]"
+  prepare' :: Int -> Int -> Template -> STM (PreNode () ())
+  prepare' depth idx tp =
+    let title = name tp <> " [" <> txt depth <> "." <> txt idx  <> "]"
      in tp & \case
           TGroup{threadLimit, onceHook, threadHook = th, subNodes = sn} ->
             do
               threadHook <- thrdHk title th
-              subNodes <- traverse (prepare' (succ depth)) sn
+              subNodesl <- traverse (uncurry (prepare' (succ depth))) $ zipWithIndex sn
               pure $
                 Group
                   { title
                   , threadLimit
                   , onceHook = onceHk title onceHook
                   , threadHook
-                  , subNodes
+                  , subNodes = fromList subNodesl
                   }
           TFixtures
             { threadLimit

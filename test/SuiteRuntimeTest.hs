@@ -12,7 +12,8 @@ import Check (Checks)
 -- import Data.Aeson.TH
 -- import Data.Aeson.Types
 -- import qualified Data.IntMap.Merge.Lazy as ST
--- import qualified Data.Map.Strict as M
+import qualified Data.Map.Strict as M
+
 -- import qualified Data.Set as ST
 -- import qualified Data.Text as Txt
 -- import Data.Yaml
@@ -53,8 +54,9 @@ import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, p
 --     threadDelay,
 --   )
 -- import UnliftIO.STM
--- import Prelude as P hiding (newTVarIO, atomically, head, last)
+import Prelude as P hiding (atomically, fail, head, last, newTVarIO)
 
+import Data.List.NonEmpty (singleton)
 import Data.Traversable (for)
 import GHC.Show (Show (..))
 import Internal.PreNode (
@@ -72,7 +74,14 @@ import List.Extra as L (head, last, zipWithIndex)
 import PyrethrumExtras
 import UnliftIO (newTChanIO)
 import qualified UnliftIO.Concurrent as C
-import UnliftIO.STM (TQueue, newTQueue, newTQueueIO, tryReadTQueue, writeTQueue)
+import UnliftIO.STM (
+  TQueue,
+  atomically,
+  newTQueue,
+  newTQueueIO,
+  tryReadTQueue,
+  writeTQueue,
+ )
 
 -- import PyrethrumExtras ( count, enumList, txt, uu, toS, (?) )
 -- import List.Extra (head, last, nub)
@@ -87,7 +96,7 @@ instance Show (DocFunc a) where
   show :: DocFunc a -> String
   show = toS . (.doc)
 
-data ExeOutcome = PassResult | FailResult deriving (Show, Eq)
+data ExeOutcome = Pass | Fail deriving (Show, Eq)
 
 data IOProps = IOProps
   { delayms :: Int
@@ -135,8 +144,7 @@ name = \case
   TFixtures{} -> "Fixture"
 
 data TFixture = TFixture
-  { title :: Text
-  , maxThreads :: Maybe Int
+  { maxThreads :: Maybe Int
   , onceHook :: TOnceHook
   , threadHook :: THook
   , testHook :: THook
@@ -148,7 +156,7 @@ ioAction :: IOProps -> Text -> IO ()
 ioAction IOProps{delayms, outcome} erMsg =
   do
     C.threadDelay delayms
-    when (outcome == FailResult)
+    when (outcome == Fail)
       . error
       . toS
       $ "exception thrown " <> erMsg
@@ -192,7 +200,7 @@ prepare threadCount = prepare' 0 0
             } ->
               do
                 testHook <- tstHk title th
-                fixtures <- mkFixtures fx
+                fixtures <- mkFixtures title fx
                 pure $
                   Fixtures
                     { title
@@ -231,18 +239,18 @@ prepare threadCount = prepare' 0 0
       OnceAfter ip -> P.OnceAfter (mkp1Singleton ttl ip)
       OnceAround ipb ipa -> P.OnceAround (mkp1Singleton ttl ipb) (mkp1Singleton ttl ipa)
 
-  mkFixtures :: NonEmpty TFixture -> STM (NonEmpty (Fixture () () ()))
-  mkFixtures =
-    traverse mkFixture
+  mkFixtures :: Text -> NonEmpty TFixture -> STM (NonEmpty (Fixture () () ()))
+  mkFixtures title fxs =
+    traverse (uncurry mkFixture) $ fromList $ zipWithIndex fxs
    where
-    mkFixture :: TFixture -> STM (Fixture () () ())
-    mkFixture TFixture{title, maxThreads, onceHook = oh, threadHook = th, testHook = tsth, tests = tsts} = do
+    mkFixture :: Int -> TFixture -> STM (Fixture () () ())
+    mkFixture idx TFixture{maxThreads, onceHook = oh, threadHook = th, testHook = tsth, tests = tsts} = do
       threadHook <- thrdHk title th
       testHook <- tstHk title tsth
       tests <- loadProps tsts
       pure
         Fixture
-          { title
+          { title = title <> " [" <> txt idx <> "]"
           , maxThreads
           , onceHook = onceHk title oh
           , threadHook
@@ -282,7 +290,7 @@ runTest maxThreads template = do
       (T.chkFail "No Events Log")
       (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
 
-chkProperties :: Int -> Template -> [ExeEvent a] -> IO ()
+chkProperties :: (Show a) => Int -> Template -> [ExeEvent a] -> IO ()
 chkProperties mxThrds t evts =
   do
     traverse_
@@ -410,7 +418,8 @@ chkProperties mxThrds t evts =
 --              in (cl, accm')
 --         )
 
-errorS = error . toS
+fail :: String -> c
+fail = error . toS
 
 -- lookupThrow :: (Ord k, Show k, Show v) => Text -> M.Map k v -> k -> v
 -- lookupThrow msg m k =
@@ -752,25 +761,25 @@ errorS = error . toS
 --                     fixtures = mkTest <$> tTests
 --                   }
 
--- -- TODO - add tests add to pyrelude
--- groupOn :: (Ord b) => (a -> b) -> [a] -> [[a]]
--- groupOn f =
---   M.elems . foldl' fld M.empty . reverse
---   where
---     fld m a =
---       M.lookup (f a) m
---         & maybe
---           (M.insert (f a) [a] m)
---           (\as -> M.insert (f a) (a : as) m)
+-- TODO - add tests add to pyrelude
+groupOn :: (Ord b) => (a -> b) -> [a] -> [[a]]
+groupOn f =
+  M.elems . foldl' fld M.empty . reverse
+ where
+  fld m a =
+    M.lookup (f a) m
+      & maybe
+        (M.insert (f a) [a] m)
+        (\as -> M.insert (f a) (a : as) m)
 
 -- -- TODO - better formatting chkEq pyrelude
--- chkEqfmt' :: (Eq a, Show a) => a -> a -> Text -> IO ()
--- chkEqfmt' e a msg = chkEq' msg e a
+chkEqfmt' :: (Eq a, Show a) => a -> a -> Text -> IO ()
+chkEqfmt' e a msg = chkEq' msg e a
 
 chkEq' :: (Eq a, Show a) => Text -> a -> a -> IO ()
 chkEq' msg e a =
   when (e /= a) $
-    errorS $
+    fail $
       "\n"
         <> toS msg
         <> "\n"
@@ -781,63 +790,64 @@ chkEq' msg e a =
         <> ppShow a
         <> "\n"
 
-chkThreadLogsInOrder :: [ExeEvent a] -> IO ()
+chkThreadLogsInOrder :: (Show a) => [ExeEvent a] -> IO ()
 chkThreadLogsInOrder evts =
   do
-    eachThread
-      ( \l ->
-          let ck = chkEq' "first index of thread should be 0" 0 . (.idx)
-              ev = unsafeHead l
-           in ck ev
+    T.chk' "Nothing found in heads - groupOn error this should not happen" (all isJust heads)
+    traverse_ (chkEq' "first index of thread should be 0" 0 . (.idx)) $ catMaybes heads
+    traverse_ chkIds threads
+ where
+  threads = groupOn (.threadId) evts
+  heads = head <$> threads
+  chkIds evts' =
+    for_
+      (zip evts' $ drop 1 evts')
+      ( \(ev1, ev2) ->
+          let idx1 = ev1.idx
+              idx2 = ev2.idx
+           in chkEqfmt' (succ idx1) idx2 $
+                "event idx not consecutive\n"
+                  <> toS (ppShow ev1)
+                  <> "\n"
+                  <> toS (ppShow ev2)
       )
-    eachThread chkIds
-
--- chkThreadLogsInOrder :: [ExeEvent] -> IO ()
--- chkThreadLogsInOrder evts =
---   do
---     eachThread
---       ( \l ->
---           let ck = chkEq' "first index of thread should be 0" 0 . (.idx)
---               ev = head l
---            in ev & maybe
---                     (errorS "threadlist empty")
---                     ck
---       )
---     eachThread chkIds
---   where
---     eachThread = for_ threads
---     threads =
---       groupOn
---         (.threadId)
---         evts
-
---     chkIds evts' =
---       for_
---         (zip evts' $ drop 1 evts')
---         ( \(ev1, ev2) ->
---             let idx1 = ev1.idx
---                 idx2 = ev2.idx
---              in -- TODO - better formatting chkEq pyrelude
---                 chkEqfmt' (succ idx1) idx2 $
---                   "event idx not consecutive\n"
---                     <> toS (ppShow ev1)
---                     <> "\n"
---                     <> toS (ppShow ev2)
---         )
 
 chkStartEndExecution :: [ExeEvent a] -> IO ()
 chkStartEndExecution evts =
   (,) <$> L.head evts <*> L.last evts
     & maybe
-      (errorS "no events")
+      (fail "no events")
       ( \(s, e) -> do
-          case s of
+          s & \case
             StartExecution{} -> pure ()
-            _ -> errorS "first event is not StartExecution"
-          case e of
+            _ -> fail "first event is not StartExecution"
+          e & \case
             EndExecution{} -> pure ()
-            _ -> errorS "last event is not EndExecution"
+            _ -> fail "last event is not EndExecution"
       )
+
+-- $> unit_single_fixture
+unit_single_fixture :: IO ()
+unit_single_fixture = runTest 1 singleFixture
+
+baseFx :: TFixture
+baseFx =
+  TFixture
+    { maxThreads = Just 1
+    , onceHook = OnceNone
+    , threadHook = None
+    , testHook = None
+    , tests = singleton $ IOProps 0 Pass
+    }
+
+singleFixture :: Template
+singleFixture =
+  TFixtures
+    { threadLimit = Just 1
+    , testHook = None
+    , fixtures = singleton baseFx
+    }
+
 
 -- isStart :: ExeEventType -> ExeEvent -> Bool
 -- isStart et = \case
@@ -882,7 +892,7 @@ chkStartEndExecution evts =
 -- startTag :: ExeEvent -> Text
 -- startTag =
 --   ( \case
---       Root -> errorS "BOOM - Root loc passed to startTag"
+--       Root -> errorS "BOOM - Root loc Passed to startTag"
 --       Node {tag} -> tag
 --   )
 --     . partialLoc
@@ -1236,7 +1246,7 @@ chkStartEndExecution evts =
 --           -- get the parent or if it is a grouping event
 --           -- get it's paraent Grouping events (Groups and Fixtures)
 --           --  are effectively ignored in the errorS propagation as they
---           -- themsleves neither pass or fail
+--           -- themsleves neither Pass or fail
 --           truParent :: Loc -> Loc
 --           truParent parentLoc =
 --             let nxtParent = truParent $ lookupThrow "parent not found in child parent map" cpMap' parentLoc
@@ -1251,12 +1261,12 @@ chkStartEndExecution evts =
 --                       ? pure ()
 --                       $ failMap M.!? chldLoc
 --                         & maybe
---                           ( -- the child event passed so parent must have passed
+--                           ( -- the child event Passed so parent must have Passed
 --                             trueParentFailure
 --                               & maybe
 --                                 (pure ())
 --                                 ( errorS $
---                                     "Child event passed when parent failed - errorS should have propagated\nchild\n"
+--                                     "Child event Passed when parent failed - errorS should have propagated\nchild\n"
 --                                       <> ppShow chldLoc
 --                                       <> "\nparent\n"
 --                                       <> ppShow (truParent pLoc)
@@ -1499,14 +1509,14 @@ chkStartEndExecution evts =
 --         [ IOProps
 --             { message = "ThreadHook",
 --               delayms = 1,
---               outcome = FailResult
+--               outcome = Fail
 --             }
 --         ],
 --       tRelease =
 --         [ IOProps
 --             { message = "ThreadHookRelease",
 --               delayms = 1,
---               outcome = PassResult
+--               outcome = Pass
 --             }
 --         ],
 --       tChild =
@@ -1516,34 +1526,30 @@ chkStartEndExecution evts =
 --               IOProps
 --                 { message = "Once Hook",
 --                   delayms = 1,
---                   outcome = PassResult
+--                   outcome = Pass
 --                 },
 --             sRelease =
 --               IOProps
 --                 { message = "Once Hook Release",
 --                   delayms = 1,
---                   outcome = PassResult
+--                   outcome = Pass
 --                 },
 --             tChild =
 --               TFixture
 --                 { tag = "Fixture 0",
 --                   --
---                   sHook = testProps "Fixture 0 - Fixture Once Hook" 0 0 PassResult,
---                   sRelease = testProps "Fixture 0 - Fixture Once Hook Release" 0 0 PassResult,
+--                   sHook = testProps "Fixture 0 - Fixture Once Hook" 0 0 Pass,
+--                   sRelease = testProps "Fixture 0 - Fixture Once Hook Release" 0 0 Pass,
 --                   --
---                   tHook = [testProps "Fixture 0 - Fixture Thread Hook" 0 0 PassResult],
---                   tRelease = [testProps "Fixture 0 - Fixture Hook Release" 0 0 PassResult],
+--                   tHook = [testProps "Fixture 0 - Fixture Thread Hook" 0 0 Pass],
+--                   tRelease = [testProps "Fixture 0 - Fixture Hook Release" 0 0 Pass],
 --                   --
---                   tTestHook = [testProps "Fixture 0 - Test Hook" 0 0 PassResult],
---                   tTestRelease = [testProps "Fixture 0 - Test Hook Release" 0 0 PassResult],
---                   tTests = [testProps "" 0 0 PassResult]
+--                   tTestHook = [testProps "Fixture 0 - Test Hook" 0 0 Pass],
+--                   tTestRelease = [testProps "Fixture 0 - Test Hook Release" 0 0 Pass],
+--                   tTests = [testProps "" 0 0 Pass]
 --                 }
 --           }
 --     }
-
--- -- $> unit_simple_single
--- unit_simple_single :: IO ()
--- unit_simple_single = runTest 1 superSimplSuite
 
 -- -- $ > unit_simple_single_failure
 
@@ -1552,13 +1558,13 @@ chkStartEndExecution evts =
 --   runTest 1 $
 --     TFixture
 --       { tag = "FX 0",
---         sHook = testProps "Fx 0 - SH" 0 0 PassResult,
---         sRelease = testProps "Fx 0 - SHR" 0 0 PassResult,
---         tHook = [testProps "Fx 0" 0 0 PassResult],
---         tRelease = [testProps "Fx 0" 0 0 PassResult],
---         tTestHook = [testProps "Fx 0" 0 0 PassResult],
---         tTestRelease = [testProps "Fx 0" 0 0 PassResult],
---         tTests = [testProps "" 0 0 FailResult]
+--         sHook = testProps "Fx 0 - SH" 0 0 Pass,
+--         sRelease = testProps "Fx 0 - SHR" 0 0 Pass,
+--         tHook = [testProps "Fx 0" 0 0 Pass],
+--         tRelease = [testProps "Fx 0" 0 0 Pass],
+--         tTestHook = [testProps "Fx 0" 0 0 Pass],
+--         tTestRelease = [testProps "Fx 0" 0 0 Pass],
+--         tTests = [testProps "" 0 0 Fail]
 --       }
 
 -- {-

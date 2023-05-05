@@ -192,7 +192,7 @@ data LogControls m l = LogControls
     log :: m (TQueue (ExeEvent l))
   }
 
-testLogControls :: forall l. Show l => TChan (Maybe (ExeEvent l)) -> TQueue (ExeEvent l) -> IO (LogControls  Maybe l)
+testLogControls :: forall l. Show l => TChan (Maybe (ExeEvent l)) -> TQueue (ExeEvent l) -> IO (LogControls Maybe l)
 testLogControls chn log = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   let logWorker :: IO ()

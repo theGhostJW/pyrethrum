@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: dd013e1095038e724ee65e909ebf942c668fce6ce6822fb88242501fd88477da
+-- hash: c038654a9638363a395f30a5180a885e62ff59a28b3b0b68cce3842a608614cd
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -138,7 +138,7 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info -Wno-overlapping-patterns
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info -Wno-overlapping-patterns
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:
@@ -150,6 +150,10 @@ library
     , containers
     , deepseq
     , dlist
+    , effectful
+    , effectful-core
+    , effectful-plugin
+    , effectful-th
     , extra
     , fmt
     , hedgehog
@@ -256,7 +260,7 @@ test-suite pyrethrum-test
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info -Wno-overlapping-patterns
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -O0 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -fwrite-ide-info -Wno-overlapping-patterns
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:
@@ -267,6 +271,10 @@ test-suite pyrethrum-test
     , chronos
     , containers
     , dlist
+    , effectful
+    , effectful-core
+    , effectful-plugin
+    , effectful-th
     , extra
     , hedgehog
     , mtl

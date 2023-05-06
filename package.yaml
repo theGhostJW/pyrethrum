@@ -33,6 +33,10 @@ dependencies:
   - raw-strings-qq
   - polysemy
   - unliftio
+  - effectful-core
+  - effectful
+  - effectful-plugin
+  - effectful-th
   - polysemy-plugin
   # since removing pyrelude
   - base-prelude # needed for IOError
@@ -46,7 +50,7 @@ dependencies:
       - hiding (Prelude)
   - name: relude
     mixin:
-      - (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe) 
+      - (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
 
 ghc-options:
   # - -threaded
@@ -73,6 +77,7 @@ ghc-options:
   - -Wincomplete-record-updates
   - -Wincomplete-uni-patterns
   - -Wredundant-constraints
+  - -fplugin=Effectful.Plugin
   - -fplugin=Polysemy.Plugin
   - -fwarn-tabs
   - -fno-warn-unused-imports
@@ -179,7 +184,6 @@ tests:
       - test
     dependencies:
       - pyrethrum
-      # test dependencies remove in split config
       - tasty
       - tasty-hunit
       - tasty-hedgehog

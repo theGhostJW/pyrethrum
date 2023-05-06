@@ -1,3 +1,7 @@
+--  should be able to remove this in later versions of GHC
+-- https://gitlab.haskell.org/ghc/ghc/-/issues/21443
+{-# OPTIONS_GHC -Wno-ambiguous-fields #-}
+
 module SuiteRuntimeTest where
 
 import Check (Checks)
@@ -826,6 +830,17 @@ chkStartEndExecution evts =
             _ -> fail "last event is not EndExecution"
       )
 
+{-
+TODO :: 
+  - fix naming of nested test hooks (duplicate names)
+  - flag to turn off in place logging 
+  - make loc a list
+  - map to different object for logging
+  - add test for thread hook
+    - threadid back to int
+    - redisplay loc
+-}
+
 -- $> unit_group_fixture_with_hooks
 unit_group_fixture_with_hooks :: IO ()
 unit_group_fixture_with_hooks = runTest 1 simpleGroupWithHooks
@@ -850,15 +865,12 @@ baseFx =
     , tests = passPropsSingleton
     }
 
--- TODO - CHeck update works in later GHC version
 fxWithHooks :: TFixture
 fxWithHooks =
-  TFixture { 
-    maxThreads = Just 1
-    ,  onceHook = OnceAround passProps passProps
+  baseFx { 
+     onceHook = OnceAround passProps passProps
     , threadHook = Around passPropsSingleton passPropsSingleton
     , testHook = Around passPropsSingleton passPropsSingleton
-    , tests = passPropsSingleton
     }
 
 singleFixture :: Template

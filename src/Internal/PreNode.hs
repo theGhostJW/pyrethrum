@@ -12,95 +12,95 @@ module Internal.PreNode (
 
 import Internal.RunTimeLogging (Loc, MessageLogger)
 
-type PreNodeRoot = PreNode () ()
+type PreNodeRoot a = PreNode a () ()
 
-data Test si ti ii = Test
+data Test a si ti ii = Test
   { id :: Text
-  , test :: Context -> si -> ti -> ii -> IO ()
+  , test :: Context a -> si -> ti -> ii -> IO ()
   }
 
-data Context = Context
+data Context a = Context
   { loc :: Loc
-  , logger :: MessageLogger
+  , logger :: MessageLogger a
   }
 
-data Fixture oi ti tsti where
+data Fixture a oi ti tsti where
   Fixture ::
     { title :: Text
     , maxThreads :: Maybe Int
-    , onceHook :: OnceHook oi oo
-    , threadHook :: ThreadHook oo ti to
-    , testHook :: TestHook oo to tsti tsto
-    , tests :: NonEmpty (Test oo to tsto)
+    , onceHook :: OnceHook a oi oo
+    , threadHook :: ThreadHook a oo ti to
+    , testHook :: TestHook a oo to tsti tsto
+    , tests :: NonEmpty (Test a oo to tsto)
     } ->
-    Fixture oi ti tsti
+    Fixture a oi ti tsti
 
-data PreNode oi ti where
+data PreNode a oi ti where
   Group ::
     { title :: Text
     , threadLimit :: Maybe Int
-    , onceHook :: OnceHook oi oo
-    , threadHook :: ThreadHook oo ti to
-    , subNodes :: NonEmpty (PreNode oo to)
+    , onceHook :: OnceHook a oi oo
+    , threadHook :: ThreadHook a oo ti to
+    , subNodes :: NonEmpty (PreNode a oo to)
     } ->
-    PreNode oi ti
+    PreNode a oi ti
   Fixtures ::
     { title :: Text
     , threadLimit :: Maybe Int
-    , testHook :: TestHook oi ti () tsto
-    , fixtures :: NonEmpty (Fixture oi ti tsto)
+    , testHook :: TestHook a oi ti () tsto
+    , fixtures :: NonEmpty (Fixture a oi ti tsto)
     } ->
-    PreNode oi ti
+    PreNode a oi ti
 
-data OnceHook oi oo where
-  OnceNone :: OnceHook oi oi
+data OnceHook a oi oo where
+  OnceNone :: OnceHook a oi oi
   OnceBefore ::
-    { hook :: Context -> oi -> IO oo
+    { hook :: Context a -> oi -> IO oo
     } ->
-    OnceHook oi oo
+    OnceHook a oi oo
   OnceAfter ::
-    { releaseOnly :: Context -> oi -> IO ()
+    { releaseOnly :: Context a -> oi -> IO ()
     } ->
-    OnceHook oi oi
+    OnceHook a oi oi
   OnceAround ::
-    { hook :: Context -> oi -> IO oo
-    , release :: Context -> oo -> IO ()
+    { hook :: Context a -> oi -> IO oo
+    , release :: Context a -> oo -> IO ()
     } ->
-    OnceHook oi oo
+    OnceHook a oi oo
 
-data ThreadHook oi ti to where
-  ThreadNone :: ThreadHook oi ti ti
+data ThreadHook a oi ti to where
+  ThreadNone :: ThreadHook a oi ti ti
   ThreadBefore ::
-    { hook :: Context -> oi -> ti -> IO to
+    { hook :: Context a -> oi -> ti -> IO to
     } ->
-    ThreadHook oi ti to
+    ThreadHook a oi ti to
   ThreadAfter ::
-    { releaseOnly :: Context -> ti -> IO ()
+    { releaseOnly :: Context a -> ti -> IO ()
     } ->
-    ThreadHook oi ti ti
+    ThreadHook a oi ti ti
   ThreadAround ::
-    { hook :: Context -> oi -> ti -> IO to
-    , release :: Context -> to -> IO ()
+    { hook :: Context a -> oi -> ti -> IO to
+    , release :: Context a -> to -> IO ()
     } ->
-    ThreadHook oi ti to
+    ThreadHook a oi ti to
 
-data TestHook oi ti tsti tsto where
-  TestNone :: TestHook oi ti tsti tsti
+data TestHook a oi ti tsti tsto where
+  TestNone :: TestHook a oi ti tsti tsti
   TestBefore ::
-    { hook :: Context -> oi -> ti -> tsti -> IO tsto
+    { hook :: Context a -> oi -> ti -> tsti -> IO tsto
     } ->
-    TestHook oi ti tsti tsto
+    TestHook a oi ti tsti tsto
   TestAfter ::
-    { releaseOnly :: Context -> tsti -> IO ()
+    { releaseOnly :: Context a -> tsti -> IO ()
     } ->
-    TestHook oi ti tsti tsti
+    TestHook a oi ti tsti tsti
   TestAround ::
-    { hook :: Context -> oi -> ti -> tsti -> IO tsto
-    , release :: Context -> tsto -> IO ()
+    { hook :: Context a -> oi -> ti -> tsti -> IO tsto
+    , release :: Context a -> tsto -> IO ()
     } ->
-    TestHook oi ti tsti tsto
+    TestHook a oi ti tsti tsto
 
-nodeEmpty :: PreNode oi ti -> Bool
+nodeEmpty :: PreNode a oi ti -> Bool
 nodeEmpty = \case
   Group{subNodes} -> all nodeEmpty subNodes
   Fixtures{fixtures} -> null fixtures

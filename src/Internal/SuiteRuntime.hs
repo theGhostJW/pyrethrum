@@ -59,27 +59,27 @@ data HookStatus
   | HookReleased
   deriving (Show, Eq)
 
-data XContext = XContext
+data XContext a = XContext
   { loc :: Loc
-  , evtLogger :: EventLogger
+  , evtLogger :: EventLogger a
   }
 
-type EventLogger = (Int -> SThreadId -> ExeEvent Loc) -> IO ()
+type EventLogger a = (Int -> SThreadId -> ExeEvent Loc a) -> IO ()
 
-mkCtx :: XContext -> Context
+mkCtx :: forall a. XContext a -> Context a
 mkCtx XContext{loc, evtLogger} =
   let
-    msgLogger :: Text -> IO ()
+    msgLogger :: a -> IO ()
     msgLogger msg = evtLogger $ \idx trdId ->
-      ApLog
+      ApEvent
         { idx = idx
         , threadId = trdId
-        , msg = msg
+        , event = msg
         }
    in
     Context loc msgLogger
 
-waitDone :: ExeTree oi ti -> IO ()
+waitDone :: ExeTree a oi ti -> IO ()
 waitDone rg = atomically $ do
   s <- nodeStatus rg
   unless (s == Done) retry
@@ -105,19 +105,19 @@ data CanRun
   | Done
   deriving (Show, Eq)
 
-data XTest si ti ii = XTest
+data XTest a si ti ii = XTest
   { loc :: Loc
-  , test :: XContext -> si -> ti -> ii -> IO ()
+  , test :: XContext a -> si -> ti -> ii -> IO ()
   }
 
-runTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to' tsti') -> TestHook so' to' tsti' ho' -> IO (Either Abandon (ExeIn so' to' ho'))
+runTestHook :: forall so' to' tsti' ho' a. XContext a -> Either Abandon (ExeIn so' to' tsti') -> TestHook a so' to' tsti' ho' -> IO (Either Abandon (ExeIn so' to' ho'))
 runTestHook ctx@XContext{loc = testLoc} tstIn testHk =
   tstIn
     & either
       logReturnAbandonned
       runHook
  where
-  tstCtx :: XContext
+  tstCtx :: XContext a
   tstCtx = ctx{loc = mkTestChildLoc testLoc TestHook}
   logReturnAbandonned a =
     let
@@ -147,7 +147,7 @@ runTestHook ctx@XContext{loc = testLoc} tstIn testHk =
 mkTestChildLoc :: (Show a) => Loc -> a -> Loc
 mkTestChildLoc testLoc evt = Node testLoc $ txt evt
 
-releaseTestHook :: forall so' to' tsti' ho'. XContext -> Either Abandon ho' -> TestHook so' to' tsti' ho' -> IO ()
+releaseTestHook :: forall so' to' tsti' ho' a. XContext a -> Either Abandon ho' -> TestHook a so' to' tsti' ho' -> IO ()
 releaseTestHook ctx@XContext{loc = testLoc} tsti = \case
   TestNone -> noRelease
   TestBefore{} -> noRelease
@@ -221,27 +221,27 @@ mkChildQ children = do
       , runningCount = rc
       }
 
-data OnceVal oi oo = OnceVal
-  { hook :: OnceHook oi oo
+data OnceVal a oi oo = OnceVal
+  { hook :: OnceHook a oi oo
   , status :: TVar HookStatus
   , value :: TMVar (Either Abandon oo)
   }
 
-mkOnceVal :: OnceHook oi oo -> IO (OnceVal oi oo)
+mkOnceVal :: OnceHook a oi oo -> IO (OnceVal a oi oo)
 mkOnceVal h = OnceVal h <$> newTVarIO HookPending <*> newEmptyTMVarIO
 
-data XFixture oi ti tsti where
+data XFixture a oi ti tsti where
   XFixture ::
     { loc :: Loc
-    , onceHook :: OnceVal oi oo
-    , threadHook :: ThreadHook oo ti to
-    , testHook :: TestHook oo to tsti tsto
-    , tests :: ChildQ (XTest oo to tsto)
+    , onceHook :: OnceVal a oi oo
+    , threadHook :: ThreadHook a oo ti to
+    , testHook :: TestHook a oo to tsti tsto
+    , tests :: ChildQ (XTest a oo to tsto)
     , threadLimit :: ThreadLimit
     } ->
-    XFixture oi ti tsti
+    XFixture a oi ti tsti
 
-withOnceHook :: XContext -> ThreadLimit -> ChildQ a -> Either Abandon (ExeIn si ti tsti) -> OnceVal si so -> (Either Abandon (ExeIn so ti tsti) -> IO ()) -> IO ()
+withOnceHook :: XContext a -> ThreadLimit -> ChildQ b -> Either Abandon (ExeIn si ti tsti) -> OnceVal a si so -> (Either Abandon (ExeIn so ti tsti) -> IO ()) -> IO ()
 withOnceHook ctx tl@ThreadLimit{maxThreads, runningThreads} childq hkIn onceHook childAction = do
   cr <- atomically canRun
   when cr $ do
@@ -263,7 +263,7 @@ withOnceHook ctx tl@ThreadLimit{maxThreads, runningThreads} childq hkIn onceHook
     when r $ modifyTVar runningThreads succ
     pure r
 
-withThreadHook :: XContext -> Either Abandon (ExeIn oi ti tsti) -> ThreadHook oi ti to -> (Either Abandon (ExeIn oi to tsti) -> IO ()) -> IO ()
+withThreadHook :: XContext a -> Either Abandon (ExeIn oi ti tsti) -> ThreadHook a oi ti to -> (Either Abandon (ExeIn oi to tsti) -> IO ()) -> IO ()
 withThreadHook ctx hkIn threadHook childAction =
   do
     eto <-
@@ -296,7 +296,7 @@ withinThreadLimit :: ThreadLimit -> STM Bool
 withinThreadLimit ThreadLimit{maxThreads, runningThreads} =
   (\rt -> maybe True (rt <) maxThreads) <$> readTVar runningThreads
 
-runXFixture :: forall oi ti ii. EventLogger -> Either Abandon (ExeIn oi ti ()) -> TestHook oi ti () ii -> XFixture oi ti ii -> IO ()
+runXFixture :: forall oi ti ii a. EventLogger a -> Either Abandon (ExeIn oi ti ()) -> TestHook a oi ti () ii -> XFixture a oi ti ii -> IO ()
 runXFixture
   evtLgr
   exin
@@ -328,10 +328,10 @@ runXFixture
         (releaseTestHook ctx ((.tstIn) <$> prntTstOut) prntTstHk)
     runTests fxIn = runChildQ False (runTst fxIn) (const $ pure Runnable) tests
 
-runXTest :: forall so' to' tsti' ho'. XContext -> Either Abandon (ExeIn so' to' tsti') -> TestHook so' to' tsti' ho' -> XTest so' to' ho' -> IO ()
+runXTest :: forall so' to' tsti' ho' a. XContext a -> Either Abandon (ExeIn so' to' tsti') -> TestHook a so' to' tsti' ho' -> XTest a so' to' ho' -> IO ()
 runXTest ctx@XContext{loc = fxLoc} fxIpts testHk test@XTest{loc = tstLoc, test = tstAction} =
   do
-    let tstCtx = ctx{loc = tstLoc} :: XContext
+    let tstCtx = ctx{loc = tstLoc} :: XContext a
     eho <- runTestHook tstCtx fxIpts testHk
     eho
       & either
@@ -351,8 +351,8 @@ mkThreadLimit mi = ThreadLimit mi <$> newTVarIO 0
 
 mkXFixture ::
   Loc ->
-  PN.Fixture oi ti tsti ->
-  IO (XFixture oi ti tsti)
+  PN.Fixture a oi ti tsti ->
+  IO (XFixture a oi ti tsti)
 mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads, title} = do
   oh <- mkOnceVal onceHook
   ts <- mkChildQ $ mkXTest <$> tests
@@ -374,28 +374,28 @@ mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads, tit
       , test = test . mkCtx
       }
 
-data ExeTree oi ti where
+data ExeTree a oi ti where
   XGroup ::
     { loc :: Loc
     , threadLimit :: ThreadLimit
-    , onceHook :: OnceVal oi oo
-    , threadHook :: ThreadHook oo ti to
-    , subNodes :: ChildQ (ExeTree oo to)
+    , onceHook :: OnceVal a oi oo
+    , threadHook :: ThreadHook a oo ti to
+    , subNodes :: ChildQ (ExeTree a oo to)
     } ->
-    ExeTree oi ti
+    ExeTree a oi ti
   XFixtures ::
     { loc :: Loc
     , threadLimit :: ThreadLimit
-    , testHook :: TestHook oi ti () tsto
-    , fixtures :: ChildQ (XFixture oi ti tsto)
+    , testHook :: TestHook a oi ti () tsto
+    , fixtures :: ChildQ (XFixture a oi ti tsto)
     } ->
-    ExeTree oi ti
+    ExeTree a oi ti
 
-prepare :: PreNode o t -> IO (ExeTree o t)
+prepare :: forall o t a. PreNode a o t -> IO (ExeTree a o t)
 prepare =
   prepare' Root 0
  where
-  prepare' :: Loc -> Int -> PN.PreNode oi ti -> IO (ExeTree oi ti)
+  prepare' :: forall oi ti. Loc -> Int -> PN.PreNode a oi ti -> IO (ExeTree a oi ti)
   prepare' parentLoc subElmIdx pn = do
     let nodeLoc = Node parentLoc
     case pn of
@@ -440,11 +440,11 @@ prepare =
                 , testHook
                 }
 
-logAbandonned :: XContext -> ExeEventType -> Abandon -> IO ()
+logAbandonned :: XContext a -> ExeEventType -> Abandon -> IO ()
 logAbandonned XContext{loc, evtLogger} fet Abandon{sourceLoc, sourceEventType, exception} =
   evtLogger (mkParentFailure loc fet sourceLoc sourceEventType exception)
 
-logReturnFailure :: XContext -> ExeEventType -> SomeException -> IO (Either Abandon a)
+logReturnFailure :: XContext a -> ExeEventType -> SomeException -> IO (Either Abandon b)
 logReturnFailure XContext{loc, evtLogger} et e =
   do
     evtLogger (mkFailure loc et (txt et <> "Failed at: " <> txt loc) e)
@@ -471,26 +471,26 @@ tryLockRun hkStatus hkVal hkAction =
       hkAction
       pure
 
-runLogHook :: forall hi ho. XContext -> ExeEventType -> (Context -> hi -> IO ho) -> hi -> IO (Either Abandon ho)
+runLogHook :: forall hi ho a. XContext a -> ExeEventType -> (Context a -> hi -> IO ho) -> hi -> IO (Either Abandon ho)
 runLogHook ctx@XContext{loc} hkEvent hook hi =
   withStartEnd ctx hkEvent $
     catchAll
       (Right <$> hook (mkCtx ctx) hi)
       (logReturnFailure ctx hkEvent)
 
-withStartEnd :: XContext -> ExeEventType -> IO a -> IO a
+withStartEnd :: XContext a -> ExeEventType -> IO b -> IO b
 withStartEnd XContext{loc, evtLogger} evt io = do
   evtLogger $ Start evt loc
   finally io . evtLogger $ End evt loc
 
-abandonLogHook :: XContext -> ExeEventType -> Abandon -> IO (Either Abandon a)
+abandonLogHook :: XContext a -> ExeEventType -> Abandon -> IO (Either Abandon b)
 abandonLogHook ctx evtTp abandon =
   do
     withStartEnd ctx evtTp $
       logAbandonned ctx evtTp abandon
     pure $ Left abandon
 
-abandonnedOnceHookVal :: forall ho. XContext -> Abandon -> TVar HookStatus -> TMVar (Either Abandon ho) -> IO (Either Abandon ho)
+abandonnedOnceHookVal :: forall ho a. XContext a -> Abandon -> TVar HookStatus -> TMVar (Either Abandon ho) -> IO (Either Abandon ho)
 abandonnedOnceHookVal ctx abandon hs hkVal =
   tryLockRun
     hs
@@ -501,14 +501,14 @@ abandonnedOnceHookVal ctx abandon hs hkVal =
         pure $ Left abandon
     )
 
-threadHookVal :: forall oi ti tsti to. XContext -> Either Abandon (ExeIn oi ti tsti) -> ThreadHook oi ti to -> IO (Either Abandon to)
+threadHookVal :: forall oi ti tsti to a. XContext a -> Either Abandon (ExeIn oi ti tsti) -> ThreadHook a oi ti to -> IO (Either Abandon to)
 threadHookVal ctx hkIn thook =
   hkIn
     & either
       (abandonLogHook ctx L.ThreadHook)
       ( \(ExeIn oi ti _tsti) ->
           let
-            thrdHk :: (Context -> oi -> ti -> IO to) -> Context -> ti -> IO to
+            thrdHk :: (Context a -> oi -> ti -> IO to) -> Context a -> ti -> IO to
             thrdHk thHk = flip thHk oi
             runHook hook' = runLogHook ctx L.ThreadHook (thrdHk hook') ti
             passThrough = pure @IO $ Right @Abandon ti
@@ -520,7 +520,7 @@ threadHookVal ctx hkIn thook =
               ThreadAround{hook} -> runHook hook
       )
 
-onceHookVal :: forall hi ho. XContext -> Either Abandon hi -> OnceVal hi ho -> IO (Either Abandon ho)
+onceHookVal :: forall hi ho a. XContext a -> Either Abandon hi -> OnceVal a hi ho -> IO (Either Abandon ho)
 onceHookVal ctx ehi OnceVal{hook = oHook, status, value} =
   ehi
     & either
@@ -543,7 +543,7 @@ onceHookVal ctx ehi OnceVal{hook = oHook, status, value} =
               OnceAround{hook} -> runHk hook
       )
 
-releaseHook :: XContext -> ExeEventType -> Either Abandon ho -> (Context -> ho -> IO ()) -> IO ()
+releaseHook :: XContext a -> ExeEventType -> Either Abandon ho -> (Context a -> ho -> IO ()) -> IO ()
 releaseHook ctx@XContext{evtLogger, loc} evt eho hkRelease =
   withStartEnd ctx evt $
     eho
@@ -556,11 +556,11 @@ releaseHook ctx@XContext{evtLogger, loc} evt eho hkRelease =
         )
 
 releaseOnceHookIfReady ::
-  XContext ->
+  XContext a ->
   TVar Int ->
-  ChildQ a ->
+  ChildQ b ->
   Either Abandon ho ->
-  OnceVal oi ho ->
+  OnceVal a oi ho ->
   IO ()
 releaseOnceHookIfReady ctx cntr childq eho hk =
   do
@@ -620,7 +620,7 @@ nodeStatus =
           XFixtures{fixtures} -> fixtures.status
       )
 
-runNode :: forall oi ti. EventLogger -> Either Abandon (ExeIn oi ti ()) -> ExeTree oi ti -> IO ()
+runNode :: forall oi ti a. EventLogger a -> Either Abandon (ExeIn oi ti ()) -> ExeTree a oi ti -> IO ()
 runNode eventLogger hkIn =
   \case
     XGroup
@@ -659,14 +659,14 @@ runNode eventLogger hkIn =
           when r $ modifyTVar' runningThreads succ
           pure r
 
-newLogger :: EventSink Loc -> ThreadId -> IO EventLogger
+newLogger :: EventSink Loc a -> ThreadId -> IO (EventLogger a)
 newLogger sink tid =
   do
     ir <- UnliftIO.newIORef (-1)
     pure $ mkLogger sink ir tid
 
-executeGraph :: EventSink Loc -> ExeTree () () -> Int -> IO ()
-executeGraph sink xtri maxThreads =
+runTree :: EventSink Loc a -> ExeTree a () () -> Int -> IO ()
+runTree sink xtri maxThreads =
   let hkIn = Right (ExeIn () () ())
       thrdTokens = replicate maxThreads True
    in do
@@ -684,7 +684,7 @@ executeGraph sink xtri maxThreads =
           )
           (waitDone xtri >> rootLogger EndExecution)
 
-execute :: Int -> LogControls m Loc -> PN.PreNodeRoot -> IO ()
+execute :: Int -> LogControls m Loc a -> PN.PreNodeRoot a -> IO ()
 execute
   maxThreads
   LogControls
@@ -702,6 +702,6 @@ execute
       finally
         ( do
             exeTree <- prepare preRoot
-            executeGraph sink exeTree maxThreads
+            runTree sink exeTree maxThreads
         )
         stopWorker

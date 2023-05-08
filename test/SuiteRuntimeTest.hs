@@ -178,10 +178,10 @@ ioActions q ttl =
       (error $ "queue empty bad test setup: " <> ttl)
       (\(idx, ip') -> ioAction ip' (ttl <> " [" <> txt idx <> "]"))
 
-prepare :: Int -> Template -> STM (PreNode () ())
+prepare :: forall a. Int -> Template -> STM (PreNode a () ())
 prepare threadCount = prepare' 0 0
  where
-  prepare' :: Int -> Int -> Template -> STM (PreNode () ())
+  prepare' :: Int -> Int -> Template -> STM (PreNode a () ())
   prepare' depth idx tp =
     let title = name tp <> " [" <> txt depth <> "." <> txt idx <> "]"
      in tp & \case
@@ -219,7 +219,7 @@ prepare threadCount = prepare' 0 0
   mkp3 t q c p1 p2 p3 = ioActions q t
   mkp1Singleton t q c p1 = ioAction q t
 
-  tstHk :: Text -> THook -> STM (TestHook () () () ())
+  tstHk :: Text -> THook -> STM (TestHook a () () () ())
   tstHk ttl hk =
     hk & \case
       None -> pure TestNone
@@ -227,7 +227,7 @@ prepare threadCount = prepare' 0 0
       After ip -> TestAfter . mkp1 ttl <$> loadProps ip
       Around ipb ipa -> TestAround . mkp3 ttl <$> loadProps ipb <*> (mkp1 ttl <$> loadProps ipa)
 
-  thrdHk :: Text -> THook -> STM (ThreadHook () () ())
+  thrdHk :: Text -> THook -> STM (ThreadHook a () () ())
   thrdHk ttl hk =
     hk & \case
       None -> pure ThreadNone
@@ -235,7 +235,7 @@ prepare threadCount = prepare' 0 0
       After ip -> ThreadAfter . mkp1 ttl <$> loadProps ip
       Around ipb ipa -> ThreadAround . mkp2 ttl <$> loadProps ipb <*> (mkp1 ttl <$> loadProps ipa)
 
-  onceHk :: Text -> TOnceHook -> P.OnceHook () ()
+  onceHk :: Text -> TOnceHook -> P.OnceHook a () ()
   onceHk ttl =
     \case
       OnceNone -> P.OnceNone
@@ -243,11 +243,11 @@ prepare threadCount = prepare' 0 0
       OnceAfter ip -> P.OnceAfter (mkp1Singleton ttl ip)
       OnceAround ipb ipa -> P.OnceAround (mkp1Singleton ttl ipb) (mkp1Singleton ttl ipa)
 
-  mkFixtures :: Text -> NonEmpty TFixture -> STM (NonEmpty (Fixture () () ()))
+  mkFixtures :: Text -> NonEmpty TFixture -> STM (NonEmpty (Fixture a () () ()))
   mkFixtures title fxs =
     traverse (uncurry mkFixture) $ fromList $ zipWithIndex fxs
    where
-    mkFixture :: Int -> TFixture -> STM (Fixture () () ())
+    mkFixture :: Int -> TFixture -> STM (Fixture a () () ())
     mkFixture idx TFixture{maxThreads, onceHook = oh, threadHook = th, testHook = tsth, tests = tsts} = do
       threadHook <- thrdHk title th
       testHook <- tstHk title tsth
@@ -261,17 +261,17 @@ prepare threadCount = prepare' 0 0
           , testHook
           , tests = mkTest title <$> tsts
           }
-    mkTest :: Text -> IOProps -> Test () () ()
+    mkTest :: Text -> IOProps -> Test a () () ()
     mkTest t p =
       Test
         { id = t
         , test = \_ctx _oi _ti _tsti -> ioAction p t
         }
 
-q2List :: TQueue (ExeEvent a) -> STM [ExeEvent a]
+q2List :: forall l a. TQueue (ExeEvent l a) -> STM [ExeEvent l a]
 q2List qu = reverse <$> recurse [] qu
  where
-  recurse :: [ExeEvent a] -> TQueue (ExeEvent a) -> STM [ExeEvent a]
+  recurse :: [ExeEvent l a] -> TQueue (ExeEvent l a) -> STM [ExeEvent l a]
   recurse l q =
     tryReadTQueue q
       >>= maybe (pure l) (\e -> recurse (e : l) q)
@@ -294,7 +294,7 @@ runTest maxThreads template = do
       (T.chkFail "No Events Log")
       (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
 
-chkProperties :: (Show a) => Int -> Template -> [ExeEvent a] -> IO ()
+chkProperties :: (Show a, Show l) => Int -> Template -> [ExeEvent l a] -> IO ()
 chkProperties mxThrds t evts =
   do
     traverse_
@@ -794,7 +794,7 @@ chkEq' msg e a =
         <> ppShow a
         <> "\n"
 
-chkThreadLogsInOrder :: (Show a) => [ExeEvent a] -> IO ()
+chkThreadLogsInOrder :: (Show a, Show l) => [ExeEvent l a] -> IO ()
 chkThreadLogsInOrder evts =
   do
     T.chk' "Nothing found in heads - groupOn error this should not happen" (all isJust heads)
@@ -816,7 +816,7 @@ chkThreadLogsInOrder evts =
                   <> toS (ppShow ev2)
       )
 
-chkStartEndExecution :: [ExeEvent a] -> IO ()
+chkStartEndExecution :: [ExeEvent l a] -> IO ()
 chkStartEndExecution evts =
   (,) <$> L.head evts <*> L.last evts
     & maybe
@@ -839,6 +839,7 @@ TODO ::
   - add test for thread hook
     - threadid back to int
     - redisplay loc
+  - does a log sink have toalways be io?
 -}
 
 -- $> unit_group_fixture_with_hooks

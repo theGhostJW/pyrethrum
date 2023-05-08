@@ -1,4 +1,6 @@
-module DSL.FileSystem where
+module DSL.FileSystemEff (
+
+) where
 
 import Common
 import Control.Exception as E
@@ -20,6 +22,7 @@ import PyrethrumExtras (txt)
 import PyrethrumExtras.IO as PO
 import Prelude as P
 import Effectful
+import Effectful.TH
 
 {- File System Lang -}
 
@@ -29,7 +32,7 @@ data FileSystem m r where
 
 makeSem ''FileSystem
 
--- {- File System IO Interpreter -}
+{- File System IO Interpreter -}
 
 fileSystemIOInterpreter :: forall a e effs. (Members '[Error (FrameworkError e), Embed IO] effs) => Sem (FileSystem ': effs) a -> Sem effs a
 fileSystemIOInterpreter =

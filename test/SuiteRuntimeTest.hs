@@ -831,7 +831,8 @@ chkStartEndExecution evts =
       )
 
 {-
-TODO :: 
+TODO ::
+  - remove end events 
   - fix naming of nested test hooks (duplicate names)
   - flag to turn off in place logging 
   - make loc a list

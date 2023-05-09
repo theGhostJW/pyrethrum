@@ -7,7 +7,7 @@ import qualified Check
 import qualified Check as C
 import DSL.ArbitraryIO
 import DSL.CurrentTime
-import DSL.FileSystem
+import DSL.FileSystemPsy
 import DSL.Interpreter (AllEffects, Failure, MinEffs)
 import DSL.Logger as L
 import Data.Aeson.TH

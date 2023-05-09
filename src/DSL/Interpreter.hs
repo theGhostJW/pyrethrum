@@ -8,7 +8,7 @@ import Polysemy.Output ( Output, runOutputList, runOutputMonoid, runOutputSem )
 import Polysemy.Error as E ( Error, runError )
 import Polysemy.State ( State, evalState )
 import Polysemy.Reader ( Reader )
-import DSL.FileSystem
+import DSL.FileSystemPsy
     ( fileSystemDocInterpreter, fileSystemIOInterpreter, FileSystem )
 import DSL.Logger
     ( Logger,

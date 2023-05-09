@@ -3,7 +3,7 @@ module EvalHelp (
   FixedEffs
 ) where
 import Text.Show.Pretty
-import DSL.FileSystem
+import DSL.FileSystemPsy
 import DSL.ArbitraryIO
 import DSL.Logger
 import Polysemy.Reader

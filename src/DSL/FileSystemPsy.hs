@@ -1,4 +1,4 @@
-module DSL.FileSystem where
+module DSL.FileSystemPsy where
 
 import Common
 import Control.Exception as E
@@ -19,7 +19,6 @@ import Polysemy.Error as PE (Error, throw)
 import PyrethrumExtras (txt)
 import PyrethrumExtras.IO as PO
 import Prelude as P
-import Effectful
 
 {- File System Lang -}
 

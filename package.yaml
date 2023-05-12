@@ -20,31 +20,32 @@ extra-source-files:
 description: Please see the README on GitHub at <https://github.com/githubuser/simple-hpack#readme>
 
 dependencies:
-  - pyrethrum-extras
-  - containers
-  - extra
-  - text
-  - transformers-either
   - aeson
-  - yaml
-  - pretty-show
+  - base-prelude # needed for IOError
+  - chronos
+  - containers
+  - directory
   - dlist
-  - mtl
-  - raw-strings-qq
-  - polysemy
-  - unliftio
   - effectful-core
   - effectful
   - effectful-plugin
   - effectful-th
-  - polysemy-plugin
-  # since removing pyrelude
-  - base-prelude # needed for IOError
-  - chronos
-  - time # need for timezone which is missing from chronos
+  - extra
+  - mtl
   - path # - version set in extra deps - until can roll forward
   - path-io # -
+  - polysemy
+  - polysemy-plugin
+  - pretty-show
+  - pyrethrum-extras
+  # since removing pyrelude
+  - text
+  - time # need for timezone which is missing from chronos
+  - transformers-either
+  - raw-strings-qq
   - relude
+  - unliftio
+  - yaml
   - name: base
     mixin:
       - hiding (Prelude)

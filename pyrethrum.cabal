@@ -1,10 +1,11 @@
+
 cabal-version: 2.0
 
 -- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e864a79f5d9ca3bc3aacf1a81b1998a856a06bfb1f0f38e8df58c4a529df8d91
+-- hash: 4bd3b67e202cfe980d2c489708ce8c44e332ded3c335d5921f85489f86f05eaf
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -34,6 +35,9 @@ library
       DSL.ArbitraryIO
       DSL.CurrentTime
       DSL.CurrentTimeDocLogger
+      DSL.FileSystem.EffectStatic
+      DSL.FileSystem.IO
+      DSL.FileSystem.IO.File
       DSL.FileSystemEff
       DSL.FileSystemPsy
       DSL.Interpreter
@@ -150,6 +154,7 @@ library
     , chronos
     , containers
     , deepseq
+    , directory
     , dlist
     , effectful
     , effectful-core
@@ -271,6 +276,7 @@ test-suite pyrethrum-test
     , bytestring
     , chronos
     , containers
+    , directory
     , dlist
     , effectful
     , effectful-core

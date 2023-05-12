@@ -87,10 +87,6 @@ import UnliftIO.STM (
   writeTQueue,
  )
 
--- import PyrethrumExtras ( count, enumList, txt, uu, toS, (?) )
--- import List.Extra (head, last, nub)
--- import qualified Unsafe
-
 data DocFunc a = DocFunc
   { doc :: Text
   , func :: IO a

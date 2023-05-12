@@ -102,18 +102,12 @@ module DSL.FileSystemEff
 {-
 module Path b t.IO
   ( -- * Actions on directories
-    createDir,
-    createDirIfMissing,
+ 
     ensureDir,
-    removeDir,
-    removeDirRecur,
-    removePathForcibly,
-    renameDir,
-    renamePath,
-    listDir,
     listDirRel,
     listDirRecur,
     listDirRecurRel,
+
     copyDirRecur,
     copyDirRecur',
 
@@ -213,11 +207,11 @@ import Prelude (Bool(..), IO, Maybe(..), Text, (.), ($), (==), (||), Integer)
 import Effectful
 import Effectful.Dispatch.Static
 import DSL.FileSystem.EffectStatic
--- import qualified System.Directory as SD
-import PyrethrumExtras (toS, uu)
+import qualified System.Directory as SD
+import PyrethrumExtras (toS)
 
 exeExtension :: Text
-exeExtension = uu --toS SD.exeExtension
+exeExtension = toS SD.exeExtension
 
 ----------------------------------------
 -- Actions on directories
@@ -321,7 +315,7 @@ copyFile src = unsafeEff_ . D.copyFile src
 
 -- | Lifted 'D.copyFileWithMetadata'.
 copyFileWithMetadata :: FileSystem :> es => Path b File -> Path b File -> Eff es ()
-copyFileWithMetadata src dst = unsafeEff_ $ uu -- SD.copyFileWithMetadata (toFilePath src) (toFilePath dst)
+copyFileWithMetadata src dst = unsafeEff_ $ SD.copyFileWithMetadata (toFilePath src) (toFilePath dst)
 
 -- | Lifted 'D.getFileSize'.
 getFileSize :: FileSystem :> es => Path b File -> Eff es Integer

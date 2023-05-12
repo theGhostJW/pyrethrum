@@ -4,10 +4,46 @@
 {- this is a copy of FileSystem from the Effectful package 
 adapted to use path and path-io instead of filepath and directory
 - functions renamed to be consistent with path-io
+- types changed to path-io types
 - removed 
   - getDirContents not in path-io 
   - findExecutablesInDirectories not in path-io
 
+- added  
+    ensureDir,
+    listDirRel,
+    listDirRecur,
+    listDirRecurRel,
+
+    copyDirRecur,
+    copyDirRecur',
+
+    -- ** Walking directory trees
+    WalkAction (..),
+    walkDir,
+    walkDirRel,
+    walkDirAccum,
+    walkDirAccumRel,
+
+    -- * Path b t transformation
+    resolveFile,
+    resolveFile',
+    resolveDir,
+    resolveDir',
+
+    -- * Temporary files and directories
+    withTempFile,
+    withTempDir,
+    withSystemTempFile,
+    withSystemTempDir,
+    openTempFile,
+    openBinaryTempFile,
+    createTempDir,
+
+    -- * Existence tests
+    isLocationOccupied,
+    forgivingAbsence,
+    ignoringAbsence,
 -}
 module DSL.FileSystemEff
   ( -- * Effect
@@ -97,6 +133,43 @@ module DSL.FileSystemEff
   , D.setOwnerWritable
   , D.setOwnerExecutable
   , D.setOwnerSearchable
+
+  -- from pathIO  
+    , ensureDir
+    , listDirRel
+    , listDirRecur
+    , listDirRecurRel
+
+    , copyDirRecur
+    , copyDirRecur'
+
+    -- ** Walking directory trees
+    , WalkAction (..)
+    , walkDir
+    , walkDirRel
+    , walkDirAccum
+    , walkDirAccumRel
+
+    -- * Path b t transformation
+    , resolveFile
+    , resolveFile'
+
+    , resolveDir
+    , resolveDir'
+
+    -- * Temporary files and directories
+    , withTempFile
+    , withTempDir
+    , withSystemTempFile
+    , withSystemTempDir
+    , openTempFile
+    , openBinaryTempFile
+    , createTempDir
+
+    -- * Existence tests
+    , isLocationOccupied
+    , forgivingAbsence
+    , ignoringAbsence
   ) where
 
 {-
@@ -118,44 +191,11 @@ module Path b t.IO
     walkDirAccum,
     walkDirAccumRel,
 
-    -- ** Current working directory
-    getCurrentDir,
-    setCurrentDir,
-    withCurrentDir,
-
-    -- * Pre-defined directories
-    getHomeDir,
-    getAppUserDataDir,
-    getUserDocsDir,
-    getTempDir,
-    D.XdgDir (..),
-    getXdgDir,
-    D.XdgDirList (..),
-    getXdgDirList,
-
     -- * Path b t transformation
-    AnyPath (..),
     resolveFile,
     resolveFile',
     resolveDir,
     resolveDir',
-
-    -- * Actions on files
-    removeFile,
-    renameFile,
-    copyFile,
-    getFileSize,
-    findExecutable,
-    findFile,
-    findFiles,
-    findFilesWith,
-
-    -- * Symbolic links
-    createFileLink,
-    createDirLink,
-    removeDirLink,
-    getSymlinkTarget,
-    isSymlink,
 
     -- * Temporary files and directories
     withTempFile,
@@ -167,33 +207,9 @@ module Path b t.IO
     createTempDir,
 
     -- * Existence tests
-    doesPathExist,
-    doesFileExist,
-    doesDirExist,
     isLocationOccupied,
     forgivingAbsence,
     ignoringAbsence,
-
-    -- * Permissions
-    D.Permissions,
-    D.emptyPermissions,
-    D.readable,
-    D.writable,
-    D.executable,
-    D.searchable,
-    D.setOwnerReadable,
-    D.setOwnerWritable,
-    D.setOwnerExecutable,
-    D.setOwnerSearchable,
-    getPermissions,
-    setPermissions,
-    copyPermissions,
-
-    -- * Timestamps
-    getAccessTime,
-    setAccessTime,
-    setModificationTime,
-    getModificationTime,
   )
 
 
@@ -209,6 +225,7 @@ import Effectful.Dispatch.Static
 import DSL.FileSystem.EffectStatic
 import qualified System.Directory as SD
 import PyrethrumExtras (toS)
+import Effectful.Error.Static
 
 exeExtension :: Text
 exeExtension = toS SD.exeExtension
@@ -423,6 +440,7 @@ copyPermissions src = unsafeEff_ . D.copyPermissions src
 
 ----------------------------------------
 -- Timestamps
+-- TODO:: change to chronos OffsetTime - note chronos uses minutes for offset
 
 -- | Lifted 'D.getAccessTime'.
 getAccessTime :: FileSystem :> es => Path b t -> Eff es UTCTime
@@ -439,3 +457,178 @@ setAccessTime path = unsafeEff_ . D.setAccessTime path
 -- | Lifted 'D.setModificationTime'.
 setModificationTime :: FileSystem :> es => Path b t -> UTCTime -> Eff es ()
 setModificationTime path = unsafeEff_ . D.setModificationTime path
+
+
+----------------------------------------
+-- path-io only
+
+-- | The same as 'listDir' but returns relative paths.
+--
+-- @since 1.4.0
+listDirRel ::
+  FileSystem :> es =>
+  -- | Directory to list
+  Path b Dir ->
+  -- | Sub-directories and files
+  Eff es ([Path Rel Dir], [Path Rel File])
+listDirRel = unsafeEff_ . D.listDirRel
+
+-- | Similar to 'listDir', but recursively traverses every sub-directory
+-- /excluding symbolic links/, and returns all files and directories found.
+-- This can fail with the same exceptions as 'listDir'.
+--
+-- __Note__: before version /1.3.0/, this function followed symlinks.
+listDirRecur ::
+  FileSystem :> es =>
+  -- | Directory to list
+  Path b Dir ->
+  -- | Sub-directories and files
+  Eff es ([Path Abs Dir], [Path Abs File])
+listDirRecur dir = unsafeEff_ . D.listDirRecur
+
+-- | The same as 'listDirRecur' but returns paths that are relative to the
+-- given directory.
+--
+-- @since 1.4.2
+listDirRecurRel ::
+  FileSystem :> es =>
+  -- | Directory to list
+  Path b Dir ->
+  -- | Sub-directories and files
+  Eff es ([Path Rel Dir], [Path Rel File])
+listDirRecurRel = unsafeEff_ . D.listDirRecurRel
+
+
+-- | Copies a directory recursively. It /does not/ follow symbolic links and
+-- preserves permissions when possible. If the destination directory already
+-- exists, new files and sub-directories complement its structure, possibly
+-- overwriting old files if they happen to have the same name as the new
+-- ones.
+--
+-- __Note__: before version /1.3.0/, this function followed symlinks.
+--
+-- This function now behaves much like the @cp@ utility, not
+-- traversing symlinked directories, but recreating symlinks in the target
+-- directory according to their targets in the source directory.
+-- TODO :: test including errors - static vs dynamic
+-- 2 * 2 implementations required?
+copyDirRecur ::
+  (FileSystem :> es, Error e :> es) =>
+  -- | Source
+  Path b0 Dir ->
+  -- | Destination
+  Path b1 Dir ->
+  Eff es()
+copyDirRecur = unsafeEff_ . D.copyDirRecur
+
+
+-- | The same as 'copyDirRecur', but it /does not/ preserve directory
+-- permissions. This may be useful, for example, if the directory you want
+-- to copy is “read-only”, but you want your copy to be editable.
+--
+-- @since 1.1.0
+--
+-- __Note__: before version /1.3.0/, this function followed symlinks.
+--
+-- __Note__: before version /1.6.0/, the function created empty directories
+-- in the destination directory when the source directory contained
+-- directory symlinks. The symlinked directories were not recursively
+-- traversed. It also copied symlinked files creating normal regular files
+-- in the target directory as the result. This was fixed in the version
+-- /1.6.0/ so that the function now behaves much like the @cp@ utility, not
+-- traversing symlinked directories, but recreating symlinks in the target
+-- directory according to their targets in the source directory.
+copyDirRecur' ::
+  (FileSystem :> es, Error e :> es) =>
+  -- | Source
+  Path b0 Dir ->
+  -- | Destination
+  Path b1 Dir ->
+  Eff es ()
+copyDirRecur' = unsafeEff_ . D.copyDirRecur'
+
+-- Walking directory trees
+-- | Traverse a directory tree using depth first pre-order traversal,
+-- calling a handler function at each directory node traversed. The absolute
+-- paths of the parent directory, sub-directories and the files in the
+-- directory are provided as arguments to the handler.
+--
+-- The function is capable of detecting and avoiding traversal loops in the
+-- directory tree. Note that the traversal follows symlinks by default, an
+-- appropriate traversal handler can be used to avoid that when necessary.
+--
+-- @since 1.2.0
+walkDir ::
+   (FileSystem :> es) =>
+  -- | Handler (@dir -> subdirs -> files -> 'WalkAction'@)
+  (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (D.WalkAction Abs)) ->
+  -- | Directory where traversal begins
+  Path b Dir ->
+  Eff es ()
+walkDir = unsafeEff_ . D.walkDirRel
+
+
+
+-- | Similar to 'walkDir' but accepts a 'Monoid'-returning output writer as
+-- well. Values returned by the output writer invocations are accumulated
+-- and returned.
+--
+-- Both, the descend handler as well as the output writer can be used for
+-- side effects but keep in mind that the output writer runs before the
+-- descend handler.
+--
+-- @since 1.2.0
+walkDirAccum ::
+  (FileSystem :> es, P.Monoid o) =>
+  -- | Descend handler (@dir -> subdirs -> files -> 'WalkAction'@),
+  -- descend the whole tree if omitted
+  Maybe
+    (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (D.WalkAction Abs)) ->
+  -- | Output writer (@dir -> subdirs -> files -> o@)
+  (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m o) ->
+  -- | Directory where traversal begins
+  Path b Dir ->
+  -- | Accumulation of outputs generated by the output writer invocations
+  Eff es o
+walkDirAccum = unsafeEff_ . D.walkDirAccumWith
+
+-- | The same as 'walkDirAccum' but uses relative paths. The handler and
+-- writer are given @dir@, directory relative to the directory where
+-- traversal begins. Sub-directories and files are relative to @dir@.
+--
+-- @since 1.4.2
+walkDirAccumRel ::
+  (FileSystem :> es, P.Monoid o) =>
+  -- | Descend handler (@dir -> subdirs -> files -> 'WalkAction'@),
+  -- descend the whole tree if omitted
+  Maybe
+    (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (D.WalkAction Rel)) ->
+  -- | Output writer (@dir -> subdirs -> files -> o@)
+  (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m o) ->
+  -- | Directory where traversal begins
+  Path b Dir ->
+  -- | Accumulation of outputs generated by the output writer invocations
+  Eff es o
+walkDirAccumRel = walkDirAccumWith walkDirRel
+
+
+ * Path b t transformation
+resolveFile
+resolveFile'
+
+resolveDir
+resolveDir'
+
+ * Temporary files and directories
+withTempFile
+withTempDir
+withSystemTempFile
+withSystemTempDir
+openTempFile
+openBinaryTempFile
+createTempDir
+
+ * Existence tests
+isLocationOccupied
+forgivingAbsence
+ignoringAbsence

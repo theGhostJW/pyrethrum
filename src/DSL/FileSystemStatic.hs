@@ -45,7 +45,7 @@ adapted to use path and path-io instead of Text and directory
     forgivingAbsence,
     ignoringAbsence,
 -}
-module DSL.FileSystemEff
+module DSL.FileSystemStatic
   ( -- * Effect
     FileSystem
 
@@ -562,7 +562,8 @@ copyDirRecur' s = unsafeEff_ . D.copyDirRecur' s
 -- The function is capable of detecting and avoiding traversal loops in the
 -- directory tree. Note that the traversal follows symlinks by default, an
 -- appropriate traversal handler can be used to avoid that when necessary.
--- TODO :: higher order effect ??
+-- TODO :: higher order effect ?? - same issue applies to all effects that use IO or 
+-- return a handle
 walkDir ::
    (IOE :> es, FileSystem :> es) =>
   -- | Handler (@dir -> subdirs -> files -> 'WalkAction'@)

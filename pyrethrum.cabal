@@ -1,11 +1,10 @@
-
 cabal-version: 2.0
 
 -- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4bd3b67e202cfe980d2c489708ce8c44e332ded3c335d5921f85489f86f05eaf
+-- hash: 30c27be94597f34b71a688f169dadf3cde8b171560a94e40e6853b196d412c83
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -38,8 +37,10 @@ library
       DSL.FileSystem.EffectStatic
       DSL.FileSystem.IO
       DSL.FileSystem.IO.File
-      DSL.FileSystemEff
+      DSL.FileSystem.Raw
+      DSL.FileSystemDynamic
       DSL.FileSystemPsy
+      DSL.FileSystemStatic
       DSL.Interpreter
       DSL.Logger
       DSL.LogProtocol

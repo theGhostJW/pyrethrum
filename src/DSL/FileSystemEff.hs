@@ -2,7 +2,7 @@
 
 
 {- this is a copy of FileSystem from the Effectful package 
-adapted to use path and path-io instead of filepath and directory
+adapted to use path and path-io instead of Text and directory
 - functions renamed to be consistent with path-io
 - types changed to path-io types
 - removed 
@@ -144,7 +144,7 @@ module DSL.FileSystemEff
     , copyDirRecur'
 
     -- ** Walking directory trees
-    , WalkAction (..)
+    , D.WalkAction (..)
     , walkDir
     , walkDirRel
     , walkDirAccum
@@ -158,19 +158,19 @@ module DSL.FileSystemEff
     , resolveDir'
 
     -- * Temporary files and directories
-    , withTempFile
-    , withTempDir
-    , withSystemTempFile
-    , withSystemTempDir
-    , openTempFile
-    , openBinaryTempFile
-    , createTempDir
+  --   , withTempFile
+  --   , withTempDir
+  --   , withSystemTempFile
+  --   , withSystemTempDir
+  --   , openTempFile
+  --   , openBinaryTempFile
+  --   , createTempDir
 
-    -- * Existence tests
-    , isLocationOccupied
-    , forgivingAbsence
-    , ignoringAbsence
-  ) where
+  --   -- * Existence tests
+  --   , isLocationOccupied
+  --   , forgivingAbsence
+  --   , ignoringAbsence
+   ) where
 
 {-
 module Path b t.IO
@@ -224,18 +224,28 @@ import Effectful
 import Effectful.Dispatch.Static
 import DSL.FileSystem.EffectStatic
 import qualified System.Directory as SD
-import PyrethrumExtras (toS)
+import PyrethrumExtras (toS, MonadMask)
 import Effectful.Error.Static
 
 exeExtension :: Text
 exeExtension = toS SD.exeExtension
 
+
+-- TODO:: hadock permissions 
+-- full integration tests demos
 ----------------------------------------
 -- Actions on directories
 
 -- | Lifted 'D.createDir '.
 createDir  :: FileSystem :> es => Path b Dir -> Eff es ()
 createDir  = unsafeEff_ . D.createDir 
+
+-- | Ensure that a directory exists creating it and its parent directories
+-- if necessary. This is just a handy shortcut:
+--
+-- > ensureDir = createDirIfMissing True
+ensureDir  :: FileSystem :> es => Path b Dir -> Eff es ()
+ensureDir = unsafeEff_ . D.ensureDir
 
 -- | Lifted 'D.createDirIfMissing'.
 createDirIfMissing :: FileSystem :> es => Bool -> Path b Dir -> Eff es ()
@@ -463,8 +473,6 @@ setModificationTime path = unsafeEff_ . D.setModificationTime path
 -- path-io only
 
 -- | The same as 'listDir' but returns relative paths.
---
--- @since 1.4.0
 listDirRel ::
   FileSystem :> es =>
   -- | Directory to list
@@ -484,12 +492,10 @@ listDirRecur ::
   Path b Dir ->
   -- | Sub-directories and files
   Eff es ([Path Abs Dir], [Path Abs File])
-listDirRecur dir = unsafeEff_ . D.listDirRecur
+listDirRecur = unsafeEff_ . D.listDirRecur
 
 -- | The same as 'listDirRecur' but returns paths that are relative to the
 -- given directory.
---
--- @since 1.4.2
 listDirRecurRel ::
   FileSystem :> es =>
   -- | Directory to list
@@ -510,16 +516,15 @@ listDirRecurRel = unsafeEff_ . D.listDirRecurRel
 -- This function now behaves much like the @cp@ utility, not
 -- traversing symlinked directories, but recreating symlinks in the target
 -- directory according to their targets in the source directory.
--- TODO :: test including errors - static vs dynamic
--- 2 * 2 implementations required?
+-- TODO :: test including errors - static vs dynamic - 2 * 2 implementations required?
 copyDirRecur ::
   (FileSystem :> es, Error e :> es) =>
   -- | Source
   Path b0 Dir ->
   -- | Destination
   Path b1 Dir ->
-  Eff es()
-copyDirRecur = unsafeEff_ . D.copyDirRecur
+  Eff es ()
+copyDirRecur s = unsafeEff_ . D.copyDirRecur s
 
 
 -- | The same as 'copyDirRecur', but it /does not/ preserve directory
@@ -538,6 +543,7 @@ copyDirRecur = unsafeEff_ . D.copyDirRecur
 -- /1.6.0/ so that the function now behaves much like the @cp@ utility, not
 -- traversing symlinked directories, but recreating symlinks in the target
 -- directory according to their targets in the source directory.
+-- TODO :: test including errors - static vs dynamic - 2 * 2 implementations required?
 copyDirRecur' ::
   (FileSystem :> es, Error e :> es) =>
   -- | Source
@@ -545,7 +551,7 @@ copyDirRecur' ::
   -- | Destination
   Path b1 Dir ->
   Eff es ()
-copyDirRecur' = unsafeEff_ . D.copyDirRecur'
+copyDirRecur' s = unsafeEff_ . D.copyDirRecur' s
 
 -- Walking directory trees
 -- | Traverse a directory tree using depth first pre-order traversal,
@@ -556,17 +562,35 @@ copyDirRecur' = unsafeEff_ . D.copyDirRecur'
 -- The function is capable of detecting and avoiding traversal loops in the
 -- directory tree. Note that the traversal follows symlinks by default, an
 -- appropriate traversal handler can be used to avoid that when necessary.
---
--- @since 1.2.0
+-- TODO :: higher order effect ??
 walkDir ::
-   (FileSystem :> es) =>
+   (IOE :> es, FileSystem :> es) =>
   -- | Handler (@dir -> subdirs -> files -> 'WalkAction'@)
-  (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (D.WalkAction Abs)) ->
+  (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> IO (D.WalkAction Abs)) ->
   -- | Directory where traversal begins
   Path b Dir ->
   Eff es ()
-walkDir = unsafeEff_ . D.walkDirRel
+walkDir h  = unsafeEff_ . D.walkDir h 
 
+
+
+-- | The same as 'walkDir' but uses relative paths. The handler is given
+-- @dir@, directory relative to the directory where traversal begins.
+-- Sub-directories and files are relative to @dir@.
+--
+-- @since 1.4.2
+walkDirRel ::
+  ( FileSystem :> es) =>
+  -- | Handler (@dir -> subdirs -> files -> 'WalkAction'@)
+  ( Path Rel Dir ->
+    [Path Rel Dir] ->
+    [Path Rel File] ->
+    IO (D.WalkAction Rel)
+  ) ->
+  -- | Directory where traversal begins
+  Path b Dir ->
+  Eff es ()
+walkDirRel h = unsafeEff_ . D.walkDirRel h
 
 
 -- | Similar to 'walkDir' but accepts a 'Monoid'-returning output writer as
@@ -576,59 +600,227 @@ walkDir = unsafeEff_ . D.walkDirRel
 -- Both, the descend handler as well as the output writer can be used for
 -- side effects but keep in mind that the output writer runs before the
 -- descend handler.
---
--- @since 1.2.0
 walkDirAccum ::
   (FileSystem :> es, P.Monoid o) =>
   -- | Descend handler (@dir -> subdirs -> files -> 'WalkAction'@),
   -- descend the whole tree if omitted
   Maybe
-    (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (D.WalkAction Abs)) ->
+    (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> IO (D.WalkAction Abs)) ->
   -- | Output writer (@dir -> subdirs -> files -> o@)
-  (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m o) ->
+  (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> IO o) ->
   -- | Directory where traversal begins
   Path b Dir ->
   -- | Accumulation of outputs generated by the output writer invocations
   Eff es o
-walkDirAccum = unsafeEff_ . D.walkDirAccumWith
+walkDirAccum h w = unsafeEff_ . D.walkDirAccum h w
 
 -- | The same as 'walkDirAccum' but uses relative paths. The handler and
 -- writer are given @dir@, directory relative to the directory where
 -- traversal begins. Sub-directories and files are relative to @dir@.
---
--- @since 1.4.2
 walkDirAccumRel ::
   (FileSystem :> es, P.Monoid o) =>
   -- | Descend handler (@dir -> subdirs -> files -> 'WalkAction'@),
   -- descend the whole tree if omitted
   Maybe
-    (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (D.WalkAction Rel)) ->
+    (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> IO (D.WalkAction Rel)) ->
   -- | Output writer (@dir -> subdirs -> files -> o@)
-  (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m o) ->
+  (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> IO o) ->
   -- | Directory where traversal begins
   Path b Dir ->
   -- | Accumulation of outputs generated by the output writer invocations
   Eff es o
-walkDirAccumRel = walkDirAccumWith walkDirRel
+walkDirAccumRel h w = unsafeEff_ . D.walkDirAccumRel h w 
 
 
- * Path b t transformation
-resolveFile
-resolveFile'
+-- | Append Textly-typed path to an absolute path and then canonicalize
+-- it.
+resolveFile ::
+  (FileSystem :> es) =>
+  -- | Base directory
+  Path Abs Dir ->
+  -- | Path to resolve
+  Text ->
+  Eff es (Path Abs File)
+resolveFile b = unsafeEff_ . D.resolveFile b . toS
 
-resolveDir
-resolveDir'
+-- | The same as 'resolveFile', but uses current working directory.
+resolveFile' ::
+  (FileSystem :> es) =>
+  -- | Path to resolve
+  Text ->
+  Eff es (Path Abs File)
+resolveFile' = unsafeEff_ . D.resolveFile' . toS
 
- * Temporary files and directories
-withTempFile
-withTempDir
-withSystemTempFile
-withSystemTempDir
-openTempFile
-openBinaryTempFile
-createTempDir
+-- | The same as 'resolveFile', but for directories.
+resolveDir ::
+  (FileSystem :> es) =>
+  -- | Base directory
+  Path Abs Dir ->
+  -- | Path to resolve
+  Text ->
+  Eff es (Path Abs Dir)
+resolveDir b =  unsafeEff_ . D.resolveDir b . toS
 
- * Existence tests
-isLocationOccupied
-forgivingAbsence
-ignoringAbsence
+-- | The same as 'resolveDir', but uses current working directory.
+resolveDir' ::
+  (FileSystem :> es) =>
+  -- | Path to resolve
+  Text ->
+  Eff es (Path Abs Dir)
+resolveDir' =  unsafeEff_ . D.resolveDir' . toS
+
+
+
+----------------------------------------------------------------------------
+-- Temporary files and directories
+
+-- | Use a temporary file that doesn't already exist.
+--
+-- Creates a new temporary file inside the given directory, making use of
+-- the template. The temporary file is deleted after use.
+--
+-- @since 0.2.0
+withTempFile ::
+  (FileSystem :> es) =>
+  -- | Directory to create the file in
+  Path b Dir ->
+  -- | File name template, see 'openTempFile'
+  Text ->
+  -- | Callback that can use the file
+  (Path Abs File -> P.Handle -> IO a) ->
+  Eff es a
+withTempFile path t action = unsafeEff_ $ D.withTempFile  path (toS t) action
+
+-- | Create and use a temporary directory.
+--
+-- Creates a new temporary directory inside the given directory, making use
+-- of the template. The temporary directory is deleted after use.
+--
+-- @since 0.2.0
+withTempDir ::
+  (FileSystem :> es) =>
+  -- | Directory to create the file in
+  Path b Dir ->
+  -- | Directory name template, see 'openTempFile'
+  Text ->
+  -- | Callback that can use the directory
+  (Path Abs Dir -> IO a) ->
+  Eff es a
+withTempDir path t action =  unsafeEff_ $ D.withTempDir  path (toS t) action
+
+-- | Create and use a temporary file in the system standard temporary
+-- directory.
+--
+-- Behaves exactly the same as 'withTempFile', except that the parent
+-- temporary directory will be that returned by 'getTempDir'.
+--
+-- @since 0.2.0
+withSystemTempFile ::
+  (FileSystem :> es) =>
+  -- | File name template, see 'openTempFile'
+  Text ->
+  -- | Callback that can use the file
+  (Path Abs File -> P.Handle -> IO a) ->
+  Eff es a
+withSystemTempFile t action =
+  unsafeEff_ $ D.withSystemTempFile (toS t) action
+
+-- | Create and use a temporary directory in the system standard temporary
+-- directory.
+--
+-- Behaves exactly the same as 'withTempDir', except that the parent
+-- temporary directory will be that returned by 'getTempDir'.
+--
+-- @since 0.2.0
+withSystemTempDir ::
+  (FileSystem :> es) =>
+  -- | Directory name template, see 'openTempFile'
+  Text ->
+  -- | Callback that can use the directory
+  (Path Abs Dir -> IO a) ->
+  Eff es a
+withSystemTempDir t = unsafeEff_ . D.withSystemTempDir (toS t)
+
+-- | The function creates a temporary file in @rw@ mode. The created file
+-- isn't deleted automatically, so you need to delete it manually.
+--
+-- The file is created with permissions such that only the current user can
+-- read\/write it.
+--
+-- With some exceptions (see below), the file will be created securely in
+-- the sense that an attacker should not be able to cause openTempFile to
+-- overwrite another file on the filesystem using your credentials, by
+-- putting symbolic links (on Unix) in the place where the temporary file is
+-- to be created. On Unix the @O_CREAT@ and @O_EXCL@ flags are used to
+-- prevent this attack, but note that @O_EXCL@ is sometimes not supported on
+-- NFS filesystems, so if you rely on this behaviour it is best to use local
+-- filesystems only.
+--
+-- @since 0.2.0
+openTempFile ::
+  (FileSystem :> es) =>
+  -- | Directory to create file in
+  Path b Dir ->
+  -- | File name template; if the template is "foo.ext" then the created
+  -- file will be @\"fooXXX.ext\"@ where @XXX@ is some random number
+  Text ->
+  -- | Name of created file and its 'Handle'
+  Eff es  (Path Abs File, P.Handle)
+openTempFile p = unsafeEff_ . D.openTempFile p . toS
+
+-- | Like 'openTempFile', but opens the file in binary mode. On Windows,
+-- reading a file in text mode (which is the default) will translate @CRLF@
+-- to @LF@, and writing will translate @LF@ to @CRLF@. This is usually what
+-- you want with text files. With binary files this is undesirable; also, as
+-- usual under Microsoft operating systems, text mode treats control-Z as
+-- EOF. Binary mode turns off all special treatment of end-of-line and
+-- end-of-file characters.
+--
+-- @since 0.2.0
+openBinaryTempFile ::
+  (FileSystem :> es) =>
+  -- | Directory to create file in
+  Path b Dir ->
+  -- | File name template, see 'openTempFile'
+  Text ->
+  -- | Name of created file and its 'Handle'
+  Eff es (Path Abs File, P.Handle)
+openBinaryTempFile p = unsafeEff_ . D.openBinaryTempFile p . toS
+
+-- | Create a temporary directory. The created directory isn't deleted
+-- automatically, so you need to delete it manually.
+--
+-- The directory is created with permissions such that only the current user
+-- can read\/write it.
+--
+-- @since 0.2.0
+createTempDir ::
+  (FileSystem :> es) =>
+  -- | Directory to create file in
+  Path b Dir ->
+  -- | Directory name template, see 'openTempFile'
+  Text ->
+  -- | Name of created temporary directory
+  Eff es (Path Abs Dir)
+createTempDir p = unsafeEff_ . D.createTempDir p . toS
+
+--  * Existence tests
+
+-- | Check if there is a file or directory on specified path.
+isLocationOccupied :: (FileSystem :> es) => Path b t -> Eff es Bool
+isLocationOccupied = unsafeEff_ . D.isLocationOccupied
+
+-- | If argument of the function throws a
+-- 'System.IO.Error.doesNotExistErrorType', 'Nothing' is returned (other
+-- exceptions propagate). Otherwise the result is returned inside a 'Just'.
+--
+-- @since 0.3.0
+forgivingAbsence :: (FileSystem :> es ) => IO a -> Eff es (Maybe a)
+forgivingAbsence = unsafeEff_ . D.forgivingAbsence
+
+
+-- | The same as 'forgivingAbsence', but ignores result.
+--
+-- @since 0.3.1
+ignoringAbsence :: (FileSystem :> es) => IO a -> Eff es ()
+ignoringAbsence = unsafeEff_ . D.ignoringAbsence

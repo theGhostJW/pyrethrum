@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
+
 -- | Lifted "UnliftIO.IO.File".
 module DSL.FileSystem.IO.File
   ( writeBinaryFile

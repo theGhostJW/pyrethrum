@@ -19,7 +19,7 @@ module DSL.FileSystem.Raw (
   D.getHomeDir,
   D.getXdgDir,
   D.getXdgDirList,
-  D.getAppUserDataDir,
+  getAppUserDataDir,
   D.getUserDocsDir,
   D.getTempDir,
 
@@ -49,7 +49,7 @@ module DSL.FileSystem.Raw (
   D.createDirLink,
   D.removeDirLink,
   D.isSymlink,
-  D.getSymlinkTarget,
+  getSymlinkTarget,
 
   -- * Permissions
   D.getPermissions,
@@ -98,19 +98,19 @@ module DSL.FileSystem.Raw (
   D.walkDirAccumRel,
 
   -- * Path b t transformation
-  D.resolveFile,
-  D.resolveFile',
-  D.resolveDir,
-  D.resolveDir',
+  resolveFile,
+  resolveFile',
+  resolveDir,
+  resolveDir',
 
   -- * Temporary files and directories
-  D.withTempFile,
-  D.withTempDir,
-  D.withSystemTempFile,
-  D.withSystemTempDir,
-  D.openTempFile,
-  D.openBinaryTempFile,
-  D.createTempDir,
+  withTempFile,
+  withTempDir,
+  withSystemTempFile,
+  withSystemTempDir,
+  openTempFile,
+  openBinaryTempFile,
+  createTempDir,
 
   -- * Existence tests
   D.isLocationOccupied,
@@ -125,7 +125,7 @@ import qualified Path.IO as D
 import Prelude (Bool (..), IO, Integer, Maybe (..), MonadIO, Text, ($), (.), (==), (||))
 import qualified Prelude as P
 
-import PyrethrumExtras (MonadMask, toS, MonadCatch)
+import PyrethrumExtras (MonadCatch, MonadMask, toS)
 import qualified System.Directory as SD
 
 exeExtension :: Text
@@ -217,12 +217,12 @@ exeExtension = toS SD.exeExtension
 --   m [Path Abs Dir]
 -- getXdgDirList = D.getXdgDirList
 
--- getAppUserDataDir ::
---   (MonadIO m) =>
---   -- | Name of application (used in path construction)
---   Text ->
---   m (Path Abs Dir)
--- getAppUserDataDir = D.getAppUserDataDir . toS
+getAppUserDataDir ::
+  (MonadIO m) =>
+  -- | Name of application (used in path construction)
+  Text ->
+  m (Path Abs Dir)
+getAppUserDataDir = D.getAppUserDataDir . toS
 
 -- getUserDocsDir :: (MonadIO m) => m (Path Abs Dir)
 -- getUserDocsDir = D.getUserDocsDir
@@ -273,7 +273,7 @@ copyFileWithMetadata src dst = SD.copyFileWithMetadata (toFilePath src) (toFileP
 -- makeAbsolute = D.makeAbsolute
 
 -- makeRelativeToCurrentDir ::
---  (D.AnyPath path, MonadIO m) 
+--  (D.AnyPath path, MonadIO m)
 --   => path
 --   -> m (D.RelPath path)
 -- makeRelativeToCurrentDir = D.makeRelativeToCurrentDir
@@ -352,13 +352,13 @@ copyFileWithMetadata src dst = SD.copyFileWithMetadata (toFilePath src) (toFileP
 -- isSymlink :: (MonadIO m) => Path b t -> m Bool
 -- isSymlink = D.isSymlink
 
--- -- @since 1.5.0
--- getSymlinkTarget ::
---   (MonadIO m) =>
---   -- | Symlink path
---   Path b t ->
---   m Text
--- getSymlinkTarget = P.fmap toS . D.getSymlinkTarget
+-- @since 1.5.0
+getSymlinkTarget ::
+  (MonadIO m) =>
+  -- | Symlink path
+  Path b t ->
+  m Text
+getSymlinkTarget = P.fmap toS . D.getSymlinkTarget
 
 -- ----------------------------------------
 -- -- Permissions
@@ -476,98 +476,156 @@ setModificationTime = D.setModificationTime
 -- {- | Append Textly-typed path to an absolute path and then canonicalize
 -- it.
 -- -}
--- resolveFile b = D.resolveFile b . toS
+resolveFile :: (MonadIO m) => Path Abs Dir -> Text -> m (Path Abs File)
+resolveFile b = D.resolveFile b . toS
 
--- -- | The same as 'resolveFile', but uses current working directory.
--- resolveFile' = D.resolveFile' . toS
+-- | The same as 'resolveFile', but uses current working directory.
+resolveFile' ::
+  (MonadIO m) =>
+  -- | Path to resolve
+  Text ->
+  m (Path Abs File)
+resolveFile' = D.resolveFile' . toS
 
--- -- | The same as 'resolveFile', but for directories.
--- resolveDir b = D.resolveDir b . toS
+-- | The same as 'resolveFile', but for directories.
+resolveDir ::
+  (MonadIO m) =>
+  -- | Base directory
+  Path Abs Dir ->
+  -- | Path to resolve
+  Text ->
+  m (Path Abs Dir)
+resolveDir b = D.resolveDir b . toS
 
--- -- | The same as 'resolveDir', but uses current working directory.
--- resolveDir' = D.resolveDir' . toS
+-- | The same as 'resolveDir', but uses current working directory.
+resolveDir' ::
+  (MonadIO m) =>
+  -- | Path to resolve
+  Text ->
+  m (Path Abs Dir)
+resolveDir' = D.resolveDir' . toS
 
--- ----------------------------------------------------------------------------
--- -- Temporary files and directories
+----------------------------------------------------------------------------
+-- Temporary files and directories
 
--- {- | Use a temporary file that doesn't already exist.
+{- | Use a temporary file that doesn't already exist.
 
--- Creates a new temporary file inside the given directory, making use of
--- the template. The temporary file is deleted after use.
+Creates a new temporary file inside the given directory, making use of
+the template. The temporary file is deleted after use.
 
--- @since 0.2.0
--- -}
--- withTempFile path t = D.withTempFile path (toS t)
+@since 0.2.0
+-}
+withTempFile ::
+  (MonadIO m, MonadMask m) =>
+  -- | Directory to create the file in
+  Path b Dir ->
+  -- | File name template, see 'openTempFile'
+  Text ->
+  -- | Callback that can use the file
+  (Path Abs File -> P.Handle -> m a) ->
+  m a
+withTempFile path = D.withTempFile path . toS
 
--- {- | Create and use a temporary directory.
+{- | Create and use a temporary directory.
 
--- Creates a new temporary directory inside the given directory, making use
--- of the template. The temporary directory is deleted after use.
+Creates a new temporary directory inside the given directory, making use
+of the template. The temporary directory is deleted after use.
 
--- @since 0.2.0
--- -}
--- withTempDir path t = D.withTempDir path (toS t)
+@since 0.2.0
+-}
+withTempDir ::
+  (MonadIO m, MonadMask m) =>
+  -- | Directory to create the file in
+  Path b Dir ->
+  -- | Directory name template, see 'openTempFile'
+  Text ->
+  -- | Callback that can use the directory
+  (Path Abs Dir -> m a) ->
+  m a
+withTempDir path = D.withTempDir path . toS
 
--- {- | Create and use a temporary file in the system standard temporary
--- directory.
+{- | Create and use a temporary file in the system standard temporary
+directory.
 
--- Behaves exactly the same as 'withTempFile', except that the parent
--- temporary directory will be that returned by 'getTempDir'.
+Behaves exactly the same as 'withTempFile', except that the parent
+temporary directory will be that returned by 'getTempDir'.
 
--- @since 0.2.0
--- -}
--- withSystemTempFile t = D.withSystemTempFile (toS t)
+@since 0.2.0
+-}
+withSystemTempFile ::
+  (MonadIO m, MonadMask m) =>
+  -- | File name template, see 'openTempFile'
+  Text ->
+  -- | Callback that can use the file
+  (Path Abs File -> P.Handle -> m a) ->
+  m a
+withSystemTempFile = D.withSystemTempFile . toS
 
--- {- | Create and use a temporary directory in the system standard temporary
--- directory.
+{- | Create and use a temporary directory in the system standard temporary
+directory.
 
--- Behaves exactly the same as 'withTempDir', except that the parent
--- temporary directory will be that returned by 'getTempDir'.
+Behaves exactly the same as 'withTempDir', except that the parent
+temporary directory will be that returned by 'getTempDir'.
 
--- @since 0.2.0
--- -}
--- withSystemTempDir t = D.withSystemTempDir (toS t)
+@since 0.2.0
+-}
+withSystemTempDir ::
+  (MonadIO m, MonadMask m) =>
+  -- | Directory name template, see 'openTempFile'
+  Text ->
+  -- | Callback that can use the directory
+  (Path Abs Dir -> m a) ->
+  m a
+withSystemTempDir t = D.withSystemTempDir (toS t)
 
--- {- | The function creates a temporary file in @rw@ mode. The created file
--- isn't deleted automatically, so you need to delete it manually.
+openTempFile ::
+  (MonadIO m) =>
+  -- | Directory to create file in
+  Path b Dir ->
+  -- | File name template; if the template is "foo.ext" then the created
+  -- file will be @\"fooXXX.ext\"@ where @XXX@ is some random number
+  Text ->
+  -- | Name of created file and its 'Handle'
+  m (Path Abs File, P.Handle)
+openTempFile p = D.openTempFile p . toS
 
--- The file is created with permissions such that only the current user can
--- read\/write it.
+{- | Like 'openTempFile', but opens the file in binary mode. On Windows,
+reading a file in text mode (which is the default) will translate @CRLF@
+to @LF@, and writing will translate @LF@ to @CRLF@. This is usually what
+you want with text files. With binary files this is undesirable; also, as
+usual under Microsoft operating systems, text mode treats control-Z as
+EOF. Binary mode turns off all special treatment of end-of-line and
+end-of-file characters.
 
--- With some exceptions (see below), the file will be created securely in
--- the sense that an attacker should not be able to cause openTempFile to
--- overwrite another file on the filesystem using your credentials, by
--- putting symbolic links (on Unix) in the place where the temporary file is
--- to be created. On Unix the @O_CREAT@ and @O_EXCL@ flags are used to
--- prevent this attack, but note that @O_EXCL@ is sometimes not supported on
--- NFS filesystems, so if you rely on this behaviour it is best to use local
--- filesystems only.
+@since 0.2.0
+-}
+openBinaryTempFile ::
+  (MonadIO m) =>
+  -- | Directory to create file in
+  Path b Dir ->
+  -- | File name template, see 'openTempFile'
+  Text ->
+  -- | Name of created file and its 'Handle'
+  m (Path Abs File, P.Handle)
+openBinaryTempFile p = D.openBinaryTempFile p . toS
 
--- @since 0.2.0
--- -}
--- openTempFile p = D.openTempFile p . toS
+{- | Create a temporary directory. The created directory isn't deleted
+automatically, so you need to delete it manually.
 
--- {- | Like 'openTempFile', but opens the file in binary mode. On Windows,
--- reading a file in text mode (which is the default) will translate @CRLF@
--- to @LF@, and writing will translate @LF@ to @CRLF@. This is usually what
--- you want with text files. With binary files this is undesirable; also, as
--- usual under Microsoft operating systems, text mode treats control-Z as
--- EOF. Binary mode turns off all special treatment of end-of-line and
--- end-of-file characters.
+The directory is created with permissions such that only the current user
+can read\/write it.
 
--- @since 0.2.0
--- -}
--- openBinaryTempFile p = D.openBinaryTempFile p . toS
-
--- {- | Create a temporary directory. The created directory isn't deleted
--- automatically, so you need to delete it manually.
-
--- The directory is created with permissions such that only the current user
--- can read\/write it.
-
--- @since 0.2.0
--- -}
--- createTempDir p = D.createTempDir p . toS
+@since 0.2.0
+-}
+createTempDir ::
+  (MonadIO m) =>
+  -- | Directory to create file in
+  Path b Dir ->
+  -- | Directory name template, see 'openTempFile'
+  Text ->
+  -- | Name of created temporary directory
+  m (Path Abs Dir)
+createTempDir p = D.createTempDir p . toS
 
 -- --  * Existence tests
 

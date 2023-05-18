@@ -29,3 +29,15 @@ utcToOffsetDateTime UTCTime{utctDay, utctDayTime} =
   secs = realToFrac utctDayTime
   iSecs = floor secs
   mins = iSecs `div` 60
+
+-- TODO :: UnTested Test
+offsetDateTimeToUtc :: OffsetDatetime -> UTCTime
+offsetDateTimeToUtc OffsetDatetime{offsetDatetimeDatetime = Datetime{datetimeDate, datetimeTime}} =
+  UTCTime
+    { utctDay = toEnum $ fromEnum datetimeDate
+    , utctDayTime =
+        fromIntegral (timeOfDayHour datetimeTime * 60 * 60)
+          + fromIntegral (timeOfDayMinute datetimeTime * 60)
+          + fromIntegral (timeOfDayNanoseconds datetimeTime)
+          + 0
+    }

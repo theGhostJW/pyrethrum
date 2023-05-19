@@ -41,7 +41,7 @@ module DSL.FileSystem.Raw (
   D.findExecutable,
   D.findFile,
   D.findFiles,
-  -- , findFileWith
+  findFileWith,
   D.findFilesWith,
 
   -- * Symbolic links
@@ -122,13 +122,24 @@ import Data.Time (UTCTime)
 import Path
 import Path.IO (AnyPath (..))
 import qualified Path.IO as D
-import Prelude (Bool (..), IO, Integer, Maybe (..), MonadIO, Text, fmap, ($), (.), (<$>), (==), (||))
+import Prelude (Bool (..), IO, Integer, Maybe (..), MonadIO, Text, fmap, ($), (.), (<$>), (==), (>>=), (||))
 import qualified Prelude as P
 
 import Chronos (OffsetDatetime)
 import PyrethrumExtras (MonadCatch, MonadMask, toS)
 import qualified System.Directory as SD
 import TempUtils (offsetDateTimeToUtc, utcToOffsetDateTime)
+
+findFileWith ::
+  (Path Abs File -> IO Bool) ->
+  [Path b Dir] ->
+  Path Rel File ->
+  IO (Maybe (Path Abs File))
+findFileWith p dirs n =
+  (>>= parseAbsFile) <$> SD.findFileWith p' (toFilePath <$> dirs) (toFilePath n)
+ where
+  p' :: P.FilePath -> IO Bool
+  p' f = parseAbsFile f >>= p
 
 exeExtension :: Text
 exeExtension = toS SD.exeExtension

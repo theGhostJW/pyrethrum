@@ -150,7 +150,7 @@ getAppUserDataDir ::
   m (Path Abs Dir)
 getAppUserDataDir = D.getAppUserDataDir . toS
 
-copyFileWithMetadata :: Path Dir a -> Path Dir a -> IO ()
+copyFileWithMetadata :: Path b File -> Path b0 File -> IO ()
 copyFileWithMetadata src dst = SD.copyFileWithMetadata (toFilePath src) (toFilePath dst)
 
 getSymlinkTarget ::

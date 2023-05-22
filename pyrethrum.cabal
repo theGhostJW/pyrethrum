@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 30c27be94597f34b71a688f169dadf3cde8b171560a94e40e6853b196d412c83
+-- hash: fdf4bc884130a6d9d1e0886f67247179689e3f57a06c1048d0126456569882cf
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -34,6 +34,7 @@ library
       DSL.ArbitraryIO
       DSL.CurrentTime
       DSL.CurrentTimeDocLogger
+      DSL.FileSystem.EffectDynamic
       DSL.FileSystem.EffectStatic
       DSL.FileSystem.IO
       DSL.FileSystem.IO.File
@@ -161,6 +162,7 @@ library
     , effectful-core
     , effectful-plugin
     , effectful-th
+    , exceptions
     , extra
     , fmt
     , hedgehog
@@ -283,6 +285,7 @@ test-suite pyrethrum-test
     , effectful-core
     , effectful-plugin
     , effectful-th
+    , exceptions
     , extra
     , hedgehog
     , mtl

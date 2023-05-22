@@ -26,6 +26,7 @@ dependencies:
   - containers
   - directory
   - dlist
+  - exceptions
   - effectful-core
   - effectful
   - effectful-plugin

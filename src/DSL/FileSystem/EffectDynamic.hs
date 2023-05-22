@@ -1,4 +1,4 @@
-module DSL.FileSystem.EffectStatic
+module DSL.FileSystem.EffectDynamic
   ( -- * Effect
   --   FileSystem
 

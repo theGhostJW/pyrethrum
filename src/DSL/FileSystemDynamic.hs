@@ -123,7 +123,7 @@ module DSL.FileSystemDynamic (
 import qualified DSL.FileSystem.Raw as R
 import Path
 import qualified Path.IO as PIO
-import Prelude (Bool (..), Either (..), Exception, IO, Integer, Maybe (..), Show, Text, pure, ($), (.), (==), (>>=), (||), IOMode, Handle, ByteString)
+import Prelude (Bool (..), ByteString, Either (..), Exception, Handle, IO, IOMode, Integer, Maybe (..), Show, Text, pure, ($), (.), (=<<), (==), (>>=), (||))
 import qualified Prelude as P
 
 import BasePrelude (IOException)
@@ -142,9 +142,10 @@ import Effectful.Dispatch.Dynamic
 import Effectful.Dispatch.Static (unsafeLiftMapIO)
 import Effectful.Error.Static as E
 import Effectful.TH (makeEffect)
+import Path.IO (AbsPath, AnyPath, RelPath)
 import PyrethrumExtras (MonadMask, toS, txt, uu)
 import qualified System.Directory as SD
-import Path.IO (AnyPath, AbsPath, RelPath)
+import UnliftIO (UnliftIO, askUnliftIO)
 
 -- TODO: hide relude exceptions add exceptions
 
@@ -159,7 +160,7 @@ data FileSystem :: Effect where
   ListDir :: Path b Dir -> FileSystem m ([Path Abs Dir], [Path Abs File])
   GetCurrentDir :: FileSystem m (Path Abs Dir)
   SetCurrentDir :: Path Abs Dir -> FileSystem m ()
-  -- WithCurrentDir :: Path Abs Dir -> FileSystem m a -> FileSystem m a
+  WithCurrentDir :: Path Abs Dir -> m a -> FileSystem m a
   GetHomeDir :: FileSystem m (Path Abs Dir)
   GetXdgDir :: R.XdgDirectory -> Maybe (Path Rel Dir) -> FileSystem m (Path Abs Dir)
   GetXdgDirList :: R.XdgDirectoryList -> FileSystem m [Path Abs Dir]
@@ -172,9 +173,9 @@ data FileSystem :: Effect where
   CopyFile :: Path b File -> Path b File -> FileSystem m ()
   CopyFileWithMetadata :: Path b File -> Path b File -> FileSystem m ()
   GetFileSize :: Path b File -> FileSystem m Integer
-  CanonicalizePath :: AnyPath p =>  p -> FileSystem m (AbsPath p)
-  MakeAbsolute :: AnyPath p => p -> FileSystem m (AbsPath p)
-  MakeRelativeToCurrentDir :: AnyPath p => p -> FileSystem m (RelPath p)
+  CanonicalizePath :: (AnyPath p) => p -> FileSystem m (AbsPath p)
+  MakeAbsolute :: (AnyPath p) => p -> FileSystem m (AbsPath p)
+  MakeRelativeToCurrentDir :: (AnyPath p) => p -> FileSystem m (RelPath p)
   DoesPathExist :: Path b t -> FileSystem m Bool
   DoesFileExist :: Path b File -> FileSystem m Bool
   DoesDirExist :: Path b Dir -> FileSystem m Bool
@@ -216,12 +217,9 @@ data FileSystem :: Effect where
   OpenTempFile :: Path b Dir -> Text -> FileSystem m (Path Abs File, Handle)
   CreateTempDir :: Path b Dir -> Text -> FileSystem m (Path Abs Dir)
   IsLocationOccupied :: Path b t -> FileSystem m Bool
-  -- ForgiveAbsence :: FileSystem m a -> FileSystem m (Maybe a)
-  -- IgnoreAbsence :: FileSystem m a -> FileSystem m ()
 
-
-
-
+-- ForgiveAbsence :: FileSystem m a -> FileSystem m (Maybe a)
+-- IgnoreAbsence :: FileSystem m a -> FileSystem m ()
 
 makeEffect ''FileSystem
 
@@ -234,6 +232,21 @@ instance Exception FSException
 
 adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -> Eff es b
 adaptException m = EF.liftIO m `catch` \(e :: IOException) -> throwError . FSException $ e
+
+runFileSystemHOE :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
+runFileSystemHOE =
+  interpret $ \env ->
+    \case
+      WithCurrentDir p action ->
+        rethrow $
+          localSeqUnliftIO
+            env
+            ( \unlift ->
+                R.withCurrentDir p (unlift action)
+            )
+      _ -> P.error "not implememted"
+ where
+  rethrow m = m `catch` \(e :: IOException) -> throwError . FSException $ e
 
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
@@ -309,11 +322,7 @@ runFileSystem =
       IsLocationOccupied p -> R.isLocationOccupied p
       -- ForgiveAbsence m -> R.forgivingAbsence m
       -- IgnoreAbsence m -> R.ignoreAbsence m
-
-
-
-
-
+      _ -> uu
 
 ----------------------------------------
 -- path-io only
@@ -336,9 +345,6 @@ forgivingAbsence = unsafeEff_ . R.forgivingAbsence
 -}
 ignoringAbsence :: (FileSystem :> es) => IO a -> Eff es ()
 ignoringAbsence = unsafeEff_ . R.ignoringAbsence
-
-
-
 
 ----------------------------------------
 -- Current working directory

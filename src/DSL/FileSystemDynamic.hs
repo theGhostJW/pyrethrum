@@ -5,7 +5,6 @@ module DSL.FileSystemDynamic (
   FileSystem,
   -- -- ** Handlers
   runFileSystem,
-
   -- -- * Actions on directories
   createDir,
   -- createDirIfMissing,
@@ -141,11 +140,11 @@ import Effectful as EF (
   type (:>),
  )
 import Effectful.Dispatch.Dynamic
+import Effectful.Dispatch.Static (unsafeLiftMapIO)
 import Effectful.Error.Static as E
 import Effectful.TH (makeEffect)
 import PyrethrumExtras (MonadMask, toS, txt, uu)
 import qualified System.Directory as SD
-import Effectful.Dispatch.Static (unsafeLiftMapIO)
 
 -- TODO: hide relude exceptions add exceptions
 
@@ -160,7 +159,13 @@ data FileSystem :: Effect where
   ListDir :: Path b Dir -> FileSystem m ([Path Abs Dir], [Path Abs File])
   GetCurrentDir :: FileSystem m (Path Abs Dir)
   SetCurrentDir :: Path Abs Dir -> FileSystem m ()
-  WithCurrentDir :: Path Abs Dir -> FileSystem m a -> FileSystem m a
+  -- WithCurrentDir :: Path Abs Dir -> FileSystem m a -> FileSystem m a
+  GetHomeDir :: FileSystem m (Path Abs Dir)
+  GetXdgDir :: R.XdgDirectory -> Maybe (Path Rel Dir) -> FileSystem m (Path Abs Dir)
+  GetXdgDirList :: R.XdgDirectoryList -> FileSystem m [Path Abs Dir]
+  GetAppUserDataDir :: Text -> FileSystem m (Path Abs Dir)
+  GetUserDocsDir :: FileSystem m (Path Abs Dir)
+  GetTempDir :: FileSystem m (Path Abs Dir)
 
 makeEffect ''FileSystem
 
@@ -175,28 +180,29 @@ adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -
 adaptException m = EF.liftIO m `catch` \(e :: IOException) -> throwError . FSException $ e
 
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
-runFileSystem ef =
-  let 
+runFileSystem =
+  let
     er :: IO b -> Eff es b
     er = adaptException
-  in
-  (
-  interpret $ \_ -> \case
-    EnsureDir p -> er $ R.ensureDir p
-    CreateDir d -> er $ R.createDir d
-    CreateDirIfMissing b d -> er $ R.createDirIfMissing b d
-    RemoveDir d -> er $ R.removeDir d
-    RemoveDirRecur d -> er $ R.removeDirRecur d
-    RemovePathForcibly p -> er $ R.removePathForcibly p
-    RenameDir o n -> er $ R.renameDir o n
-    ListDir d -> er $ R.listDir d
-    GetCurrentDir -> er R.getCurrentDir
-    SetCurrentDir d -> er $ R.setCurrentDir d
-    WithCurrentDir p ef' -> unsafeLiftMapIO (R.withCurrentDir p) ef'
-    ) ef
-
-
-
+   in
+    interpret . adaptException $ \_ -> \case
+      EnsureDir p -> er $ R.ensureDir p
+      CreateDir d -> er $ R.createDir d
+      CreateDirIfMissing b d -> er $ R.createDirIfMissing b d
+      RemoveDir d -> er $ R.removeDir d
+      RemoveDirRecur d -> er $ R.removeDirRecur d
+      RemovePathForcibly p -> er $ R.removePathForcibly p
+      RenameDir o n -> er $ R.renameDir o n
+      ListDir d -> er $ R.listDir d
+      GetCurrentDir -> er R.getCurrentDir
+      SetCurrentDir d -> er $ R.setCurrentDir d
+      -- WithCurrentDir p ef' -> unsafeLiftMapIO (R.withCurrentDir p) ef'
+      GetHomeDir -> er R.getHomeDir
+      GetXdgDir xd bd -> er $ R.getXdgDir xd bd
+      GetXdgDirList l -> er $ R.getXdgDirList l
+      GetAppUserDataDir d -> er $ R.getAppUserDataDir d
+      GetUserDocsDir -> er R.getUserDocsDir
+      GetTempDir -> er R.getTempDir
 
 {-
 
@@ -210,36 +216,7 @@ withCurrentDir path = unsafeLiftMapIO (R.withCurrentDir path)
 ----------------------------------------
 -- Pre-defined directories
 
--- | Lifted 'R.getHomeDir'.
-getHomeDir :: (FileSystem :> es) => Eff es (Path Abs Dir)
-getHomeDir = unsafeEff_ R.getHomeDir
 
--- | Lifted 'R.getXdgDir'.
-getXdgDir ::
-  (FileSystem :> es) =>
-  R.XdgDirectory ->
-  Maybe (Path Rel Dir) ->
-  Eff es (Path Abs Dir)
-getXdgDir xdgDir = unsafeEff_ . R.getXdgDir xdgDir
-
--- | Lifted 'R.getXdgDirList'.
-getXdgDirList ::
-  (FileSystem :> es) =>
-  R.XdgDirectoryList ->
-  Eff es [Path Abs Dir]
-getXdgDirList = unsafeEff_ . R.getXdgDirList
-
--- | Lifted 'R.getAppUserDataDir'.
-getAppUserDataDir :: (FileSystem :> es) => Text -> Eff es (Path Abs Dir)
-getAppUserDataDir = unsafeEff_ . R.getAppUserDataDir . toS
-
--- | Lifted 'R.getUserDocsDir'.
-getUserDocsDir :: (FileSystem :> es) => Eff es (Path Abs Dir)
-getUserDocsDir = unsafeEff_ R.getUserDocsDir
-
--- | Lifted 'R.getTempDir'.
-getTempDir :: (FileSystem :> es) => Eff es (Path Abs Dir)
-getTempDir = unsafeEff_ R.getTempDir
 
 ----------------------------------------
 -- Actions on files

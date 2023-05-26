@@ -175,11 +175,12 @@ adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -
 adaptException m = EF.liftIO m `catch` \(e :: IOException) -> throwError . FSException $ e
 
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
-runFileSystem =
+runFileSystem ef =
   let 
     er :: IO b -> Eff es b
     er = adaptException
   in
+  (
   interpret $ \_ -> \case
     EnsureDir p -> er $ R.ensureDir p
     CreateDir d -> er $ R.createDir d
@@ -191,7 +192,11 @@ runFileSystem =
     ListDir d -> er $ R.listDir d
     GetCurrentDir -> er R.getCurrentDir
     SetCurrentDir d -> er $ R.setCurrentDir d
-    WithCurrentDir p ef -> er $ unsafeLiftMapIO (R.withCurrentDir p) ef
+    WithCurrentDir p ef' -> unsafeLiftMapIO (R.withCurrentDir p) ef'
+    ) ef
+
+
+
 
 {-
 

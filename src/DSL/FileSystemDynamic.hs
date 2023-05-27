@@ -255,9 +255,9 @@ runFileSystem =
       ae :: IO b -> Eff es b
       ae = adaptException
 
-      rethrow = handle (\(e :: IOException) -> throwError . FSException $ e)
-      hoe :: forall b (localEs :: [Effect]). ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
-      hoe aUnlift = rethrow $ localSeqUnliftIO env aUnlift
+      -- rethrow = handle (\(e :: IOException) -> throwError . FSException $ e)
+      -- hoe :: forall b (localEs :: [Effect]). ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
+      -- hoe aUnlift = rethrow $ localSeqUnliftIO env aUnlift
      in
       \case
         EnsureDir p -> ae $ R.ensureDir p
@@ -270,7 +270,7 @@ runFileSystem =
         ListDir d -> ae $ R.listDir d
         GetCurrentDir -> ae R.getCurrentDir
         SetCurrentDir d -> ae $ R.setCurrentDir d
-        WithCurrentDir p action -> hoe $ \unlift -> R.withCurrentDir p (unlift action)
+        -- WithCurrentDir p action -> hoe $ \unlift -> R.withCurrentDir p (unlift action)
         -- WithCurrentDir p ef' -> unsafeLiftMapIO (R.withCurrentDir p) ef'
         GetHomeDir -> ae R.getHomeDir
         GetXdgDir xd bd -> ae $ R.getXdgDir xd bd

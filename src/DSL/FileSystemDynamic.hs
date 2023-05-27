@@ -128,7 +128,7 @@ import qualified Prelude as P
 
 import BasePrelude (IOException)
 import Chronos (OffsetDatetime)
-import Control.Monad.Catch (catch)
+import Control.Monad.Catch (catch, handle)
 import Effectful as EF (
   Dispatch (Dynamic),
   DispatchOf,
@@ -244,13 +244,18 @@ runFileSystemHOE =
             ( \unlift ->
                 R.withCurrentDir p (unlift action)
             )
-      _ -> P.error "not implememted"
  where
-  rethrow m = m `catch` \(e :: IOException) -> throwError . FSException $ e
+  -- catch from Control.Monad.Catch (catch) in the exceptions package
+  rethrow = handle (\(e :: IOException) -> throwError . FSException $ e)
 
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
-  interpret $ \_ ->
+  interpret $ \env ->
+    let
+      ae :: IO b -> Eff es b
+      ae = adaptException
+      -- hoe = handle (\(e :: IOException) -> throwError . FSException $ e) . localSeqUnliftIO env
+    in
     adaptException . \case
       EnsureDir p -> R.ensureDir p
       CreateDir d -> R.createDir d

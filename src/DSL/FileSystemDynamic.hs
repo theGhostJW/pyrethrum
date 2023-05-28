@@ -182,8 +182,8 @@ data FileSystem :: Effect where
   FindExecutable :: Path Rel File -> FileSystem m (Maybe (Path Abs File))
   FindFile :: [Path Abs Dir] -> Path Rel File -> FileSystem m (Maybe (Path Abs File))
   FindFiles :: [Path Abs Dir] -> Path Rel File -> FileSystem m [Path Abs File]
-  -- FindFilesWith :: (Path Abs File -> Bool) -> [Path Abs Dir] -> Path Rel File -> FileSystem m [Path Abs File]
-  -- FindFileWith :: (Path Abs File -> Bool) -> [Path Abs Dir] -> Path Rel File -> FileSystem m (Maybe (Path Abs File))
+  FindFilesWith :: (Path Abs File -> m Bool) -> [Path Abs Dir] -> Path Rel File -> FileSystem m [Path Abs File]
+  FindFileWith :: (Path Abs File -> m Bool) -> [Path Abs Dir] -> Path Rel File -> FileSystem m (Maybe (Path Abs File))
   CreateFileLink :: Path b File -> Path b File -> FileSystem m ()
   CreateDirLink :: Path b Dir -> Path b Dir -> FileSystem m ()
   RemoveDirLink :: Path b Dir -> FileSystem m ()
@@ -201,7 +201,7 @@ data FileSystem :: Effect where
   ListDirRecurRel :: Path Rel Dir -> FileSystem m ([Path Rel Dir], [Path Rel File])
   CopyDirRecur :: Path b Dir -> Path b Dir -> FileSystem m ()
   CopyDirRecur' :: Path b Dir -> Path b Dir -> FileSystem m ()
-  -- WalkDir :: (Path b Dir -> [Path Abs Dir] -> [Path Abs File] -> FileSystem m (R.WalkAction Abs)) -> Path b Dir -> FileSystem m ()
+  WalkDir :: (Path b Dir -> [Path Abs Dir] -> [Path Abs File] -> m (R.WalkAction Abs)) -> Path b Dir -> FileSystem m ()
   -- WalkDirRel :: Path Rel Dir -> (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> FileSystem m (R.WalkAction Rel)) -> FileSystem m ()
   -- WalkDirAccum :: (Path b Dir -> [Path Abs Dir] -> [Path Abs File] -> a -> FileSystem m (R.WalkAction a)) -> Path b Dir -> a -> FileSystem m ()
   -- WalkDirAccumRel :: (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> a -> FileSystem m (R.WalkAction a)) -> Path Rel Dir -> a -> FileSystem m ()
@@ -278,7 +278,6 @@ runFileSystem =
         GetCurrentDir -> ae R.getCurrentDir
         SetCurrentDir d -> ae $ R.setCurrentDir d
         WithCurrentDir p action -> hoe $ \unlift -> R.withCurrentDir p (unlift action)
-        -- WithCurrentDir p ef' -> unsafeLiftMapIO (R.withCurrentDir p) ef'
         GetHomeDir -> ae R.getHomeDir
         GetXdgDir xd bd -> ae $ R.getXdgDir xd bd
         GetXdgDirList l -> ae $ R.getXdgDirList l
@@ -300,8 +299,8 @@ runFileSystem =
         FindExecutable t -> ae $ R.findExecutable t
         FindFile ds t -> ae $ R.findFile ds t
         FindFiles ds t -> ae $ R.findFiles ds t
-        -- FindFilesWith f ds t -> R.findFilesWith f ds t
-        -- FindFileWith f ds t -> R.findFileWith f ds t
+        FindFilesWith f ds t -> hoe $ \unlift -> R.findFilesWith (unlift. f) ds t
+        FindFileWith f ds t -> hoe $ \unlift -> R.findFileWith (unlift . f) ds t
         CreateFileLink o n -> ae $ R.createFileLink o n
         CreateDirLink o n -> ae $ R.createDirLink o n
         RemoveDirLink d -> ae $ R.removeDirLink d
@@ -319,7 +318,11 @@ runFileSystem =
         ListDirRecurRel d -> ae $ R.listDirRecurRel d
         CopyDirRecur o n -> ae $ R.copyDirRecur o n
         CopyDirRecur' o n -> ae $ R.copyDirRecur' o n
-        -- WalkDir h p -> R.walkDir d h
+        WalkDir h p -> hoe $ \unlift -> 
+          R.walkDir h' p
+          where 
+            h' = uu
+
         -- WalkDirRel h p-> R.walkDirRel d h
         -- WalkDirAccum h o p -> R.walkDirAccum h o p
         -- WalkDirAccumRel h o p -> R.walkDirAccumRel h o p
@@ -338,7 +341,7 @@ runFileSystem =
         IsLocationOccupied p -> ae $ R.isLocationOccupied p
         -- ForgiveAbsence m -> R.forgivingAbsence m
         -- IgnoreAbsence m -> R.ignoreAbsence m
-        _ -> uu
+        -- _ -> uu
 
 ----------------------------------------
 -- path-io only

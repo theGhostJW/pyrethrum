@@ -250,14 +250,21 @@ runFileSystemHOE =
 
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
-  interpret $ \env ->
+  interpret handler
+ where
+  handler ::
+    forall a' localEs.
+    (HasCallStack, FileSystem :> localEs) =>
+    LocalEnv localEs es ->
+    FileSystem (Eff localEs) a' ->
+    Eff es a'
+  handler env =
     let
       ae :: IO b -> Eff es b
       ae = adaptException
 
-      -- rethrow = handle (\(e :: IOException) -> throwError . FSException $ e)
-      -- hoe :: forall b (localEs :: [Effect]). ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
-      -- hoe aUnlift = rethrow $ localSeqUnliftIO env aUnlift
+      hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
+      hoe h = handle (\(e :: IOException) -> throwError . FSException $ e) (localSeqUnliftIO env h)
      in
       \case
         EnsureDir p -> ae $ R.ensureDir p
@@ -270,7 +277,7 @@ runFileSystem =
         ListDir d -> ae $ R.listDir d
         GetCurrentDir -> ae R.getCurrentDir
         SetCurrentDir d -> ae $ R.setCurrentDir d
-        -- WithCurrentDir p action -> hoe $ \unlift -> R.withCurrentDir p (unlift action)
+        WithCurrentDir p action -> hoe $ \unlift -> R.withCurrentDir p (unlift action)
         -- WithCurrentDir p ef' -> unsafeLiftMapIO (R.withCurrentDir p) ef'
         GetHomeDir -> ae R.getHomeDir
         GetXdgDir xd bd -> ae $ R.getXdgDir xd bd

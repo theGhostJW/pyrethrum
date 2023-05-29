@@ -122,11 +122,10 @@ module DSL.FileSystemDynamic (
 
 import qualified DSL.FileSystem.Raw as R
 import Path
-import qualified Path.IO as PIO
-import Prelude (Bool (..), ByteString, Either (..), Exception, Handle, IO, IOMode, Integer, Maybe (..), Show, Text, pure, ($), (&), (.), (=<<), (==), (>>=), (||))
+import Prelude (Bool (..), ByteString, Either (..), Exception, Handle, IO, IOMode, Integer, Maybe (..), Monoid, Show, Text, pure, ($), (&), (.), (<$>), (=<<), (==), (>>=), (||))
 import qualified Prelude as P
 
-import BasePrelude (IOException)
+import BasePrelude (IOException, last)
 import Chronos (OffsetDatetime)
 import Control.Monad.Catch (catch, handle)
 import Effectful as EF (
@@ -201,14 +200,14 @@ data FileSystem :: Effect where
   ListDirRecurRel :: Path Rel Dir -> FileSystem m ([Path Rel Dir], [Path Rel File])
   CopyDirRecur :: Path b Dir -> Path b Dir -> FileSystem m ()
   CopyDirRecur' :: Path b Dir -> Path b Dir -> FileSystem m ()
-  WalkDir :: (Path b Dir -> [Path Abs Dir] -> [Path Abs File] -> m (R.WalkAction Abs)) -> Path b Dir -> FileSystem m ()
-  -- WalkDirRel :: Path Rel Dir -> (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> FileSystem m (R.WalkAction Rel)) -> FileSystem m ()
-  -- WalkDirAccum :: (Path b Dir -> [Path Abs Dir] -> [Path Abs File] -> a -> FileSystem m (R.WalkAction a)) -> Path b Dir -> a -> FileSystem m ()
-  -- WalkDirAccumRel :: (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> a -> FileSystem m (R.WalkAction a)) -> Path Rel Dir -> a -> FileSystem m ()
+  WalkDir :: (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (R.WalkAction Abs)) -> Path b Dir -> FileSystem m ()
+  WalkDirRel :: Path Rel Dir -> (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (R.WalkAction Rel)) -> FileSystem m ()
+  WalkDirAccum :: (Monoid o) => Maybe (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (R.WalkAction Abs)) -> (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m o) -> Path b Dir -> FileSystem m o
+  WalkDirAccumRel :: (Monoid o) => Maybe (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (R.WalkAction Rel)) -> (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m o) -> Path b Dir -> FileSystem m o
   ResolveFile :: Path Abs Dir -> Text -> FileSystem m (Path Abs File)
-  -- ResolveFile' :: [Path Abs Dir] -> Path Rel File -> FileSystem m (Path Abs File)
+  ResolveFile' :: Text -> FileSystem m (Path Abs File)
   ResolveDir :: Path Abs Dir -> Text -> FileSystem m (Path Abs Dir)
-  -- ResolveDir' :: [Path Abs Dir] -> Path Rel Dir -> FileSystem m (Path Abs Dir)
+  ResolveDir' :: Text -> FileSystem m (Path Abs Dir) 
   -- WithTempFile :: Path Abs Dir -> Text -> (Path Abs File -> Handle -> FileSystem m a) -> FileSystem m a
   -- WithTempDir :: Path Abs Dir -> Text -> (Path Abs Dir -> FileSystem m a) -> FileSystem m a
   -- WithSystemTempFile :: Text -> (Path Abs File -> Handle -> FileSystem m a) -> FileSystem m a
@@ -232,21 +231,6 @@ instance Exception FSException
 
 adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -> Eff es b
 adaptException m = EF.liftIO m `catch` \(e :: IOException) -> throwError . FSException $ e
-
-runFileSystemHOE :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
-runFileSystemHOE =
-  interpret $ \env ->
-    \case
-      WithCurrentDir p action ->
-        rethrow $
-          localSeqUnliftIO
-            env
-            ( \unlift ->
-                R.withCurrentDir p (unlift action)
-            )
- where
-  -- catch from Control.Monad.Catch (catch) in the exceptions package
-  rethrow = handle (\(e :: IOException) -> throwError . FSException $ e)
 
 {-
 
@@ -272,19 +256,24 @@ runFileSystem =
       hoe h = handle (\(e :: IOException) -> throwError . FSException $ e) (localSeqUnliftIO env h)
      in
       case fs of
-        WalkDir h p -> hoe $ \ul ->
-          R.walkDir h' p
-         where
-          h' = uu
         WithCurrentDir p action -> hoe $ \ul -> R.withCurrentDir p (ul action)
         FindFilesWith f ds t -> hoe $ \ul -> R.findFilesWith (ul . f) ds t
         FindFileWith f ds t -> hoe $ \ul -> R.findFileWith (ul . f) ds t
-        CopyFileWithMetadata o n -> uu -- R.copyFileWithMetadata o n
-        -- WalkDirRel h p-> R.walkDirRel d h
-        -- WalkDirAccum h o p -> R.walkDirAccum h o p
-        -- WalkDirAccumRel h o p -> R.walkDirAccumRel h o p
-        -- ResolveFile' ds f -> R.resolveFile' ds f
-        -- ResolveDir' ds d -> R.resolveDir' ds d
+        CopyFileWithMetadata o n -> hoe $ \ul -> R.copyFileWithMetadata o n
+        WalkDir h p -> hoe $ \ul -> R.walkDir (\b drs -> ul . h b drs) p
+        WalkDirRel p h -> hoe $ \ul -> R.walkDirRel (\b drs -> ul . h b drs) p
+        WalkDirAccum mdh ow b -> hoe $ \ul ->
+          let
+            mdh' = (\dh b' drs -> ul . dh b' drs) <$> mdh
+            ow' b' drs = ul . ow b' drs
+           in
+            R.walkDirAccum mdh' ow' b
+        WalkDirAccumRel mdh ow b -> hoe $ \ul ->
+          let
+            mdh' = (\dh b' drs -> ul . dh b' drs) <$> mdh
+            ow' b' drs = ul . ow b' drs
+           in
+            R.walkDirAccumRel mdh' ow' b
         -- WithTempFile d t f -> R.withTempFile d t f
         -- WithTempDir d t f -> R.withTempDir d t f
         -- WithSystemTempFile t f -> R.withSystemTempFile t f
@@ -341,7 +330,10 @@ runFileSystem =
           CopyDirRecur o n -> R.copyDirRecur o n
           CopyDirRecur' o n -> R.copyDirRecur' o n
           ResolveFile ds f -> R.resolveFile ds f
+          ResolveFile' f -> R.resolveFile' f
           ResolveDir ds d -> R.resolveDir ds d
+          ResolveDir' f -> R.resolveDir' f
+
           OpenBinaryTempFile p t -> R.openBinaryTempFile p t
           OpenTempFile p t -> R.openTempFile p t
           CreateTempDir p t -> R.createTempDir p t

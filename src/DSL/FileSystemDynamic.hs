@@ -123,7 +123,7 @@ module DSL.FileSystemDynamic (
 import qualified DSL.FileSystem.Raw as R
 import Path
 import qualified Path.IO as PIO
-import Prelude (Bool (..), ByteString, Either (..), Exception, Handle, IO, IOMode, Integer, Maybe (..), Show, Text, pure, ($), (.), (=<<), (==), (>>=), (||))
+import Prelude (Bool (..), ByteString, Either (..), Exception, Handle, IO, IOMode, Integer, Maybe (..), Show, Text, pure, ($), (&), (.), (=<<), (==), (>>=), (||))
 import qualified Prelude as P
 
 import BasePrelude (IOException)
@@ -248,6 +248,14 @@ runFileSystemHOE =
   -- catch from Control.Monad.Catch (catch) in the exceptions package
   rethrow = handle (\(e :: IOException) -> throwError . FSException $ e)
 
+{-
+
+interpret $ \_ ->
+  adaptException . \case
+    EnsureDir p -> R.ensureDir p
+
+-}
+
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
   interpret handler
@@ -258,90 +266,86 @@ runFileSystem =
     LocalEnv localEs es ->
     FileSystem (Eff localEs) a' ->
     Eff es a'
-  handler env =
+  handler env fs =
     let
-      ae :: IO b -> Eff es b
-      ae = adaptException
-
       hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
       hoe h = handle (\(e :: IOException) -> throwError . FSException $ e) (localSeqUnliftIO env h)
      in
-      \case
-        EnsureDir p -> ae $ R.ensureDir p
-        CreateDir d -> ae $ R.createDir d
-        CreateDirIfMissing b d -> ae $ R.createDirIfMissing b d
-        RemoveDir d -> ae $ R.removeDir d
-        RemoveDirRecur d -> ae $ R.removeDirRecur d
-        RemovePathForcibly p -> ae $ R.removePathForcibly p
-        RenameDir o n -> ae $ R.renameDir o n
-        ListDir d -> ae $ R.listDir d
-        GetCurrentDir -> ae R.getCurrentDir
-        SetCurrentDir d -> ae $ R.setCurrentDir d
-        WithCurrentDir p action -> hoe $ \unlift -> R.withCurrentDir p (unlift action)
-        GetHomeDir -> ae R.getHomeDir
-        GetXdgDir xd bd -> ae $ R.getXdgDir xd bd
-        GetXdgDirList l -> ae $ R.getXdgDirList l
-        GetAppUserDataDir d -> ae $ R.getAppUserDataDir d
-        GetUserDocsDir -> ae R.getUserDocsDir
-        GetTempDir -> ae R.getTempDir
-        RemoveFile f -> ae $ R.removeFile f
-        RenameFile o n -> ae $ R.renameFile o n
-        RenamePath o n -> ae $ R.renamePath o n
-        CopyFile o n -> ae $ R.copyFile o n
-        CopyFileWithMetadata o n -> ae $ R.copyFileWithMetadata o n
-        GetFileSize f -> ae $ R.getFileSize f
-        CanonicalizePath p -> ae $ R.canonicalizePath p
-        MakeAbsolute p -> ae $ R.makeAbsolute p
-        MakeRelativeToCurrentDir p -> ae $ R.makeRelativeToCurrentDir p
-        DoesPathExist p -> ae $ R.doesPathExist p
-        DoesFileExist f -> ae $ R.doesFileExist f
-        DoesDirExist d -> ae $ R.doesDirExist d
-        FindExecutable t -> ae $ R.findExecutable t
-        FindFile ds t -> ae $ R.findFile ds t
-        FindFiles ds t -> ae $ R.findFiles ds t
-        FindFilesWith f ds t -> hoe $ \unlift -> R.findFilesWith (unlift. f) ds t
-        FindFileWith f ds t -> hoe $ \unlift -> R.findFileWith (unlift . f) ds t
-        CreateFileLink o n -> ae $ R.createFileLink o n
-        CreateDirLink o n -> ae $ R.createDirLink o n
-        RemoveDirLink d -> ae $ R.removeDirLink d
-        IsSymlink p -> ae $ R.isSymlink p
-        GetSymlinkTarget p -> ae $ R.getSymlinkTarget p
-        GetPermissions p -> ae $ R.getPermissions p
-        SetPermissions p ps -> ae $ R.setPermissions p ps
-        CopyPermissions o n -> ae $ R.copyPermissions o n
-        GetAccessTime p -> ae $ R.getAccessTime p
-        GetModificationTime p -> ae $ R.getModificationTime p
-        SetAccessTime p t -> ae $ R.setAccessTime p t
-        SetModificationTime p t -> ae $ R.setModificationTime p t
-        ListDirRel d -> ae $ R.listDirRel d
-        ListDirRecur d -> ae $ R.listDirRecur d
-        ListDirRecurRel d -> ae $ R.listDirRecurRel d
-        CopyDirRecur o n -> ae $ R.copyDirRecur o n
-        CopyDirRecur' o n -> ae $ R.copyDirRecur' o n
-        WalkDir h p -> hoe $ \unlift -> 
+      case fs of
+        WalkDir h p -> hoe $ \ul ->
           R.walkDir h' p
-          where 
-            h' = uu
-
+         where
+          h' = uu
+        WithCurrentDir p action -> hoe $ \ul -> R.withCurrentDir p (ul action)
+        FindFilesWith f ds t -> hoe $ \ul -> R.findFilesWith (ul . f) ds t
+        FindFileWith f ds t -> hoe $ \ul -> R.findFileWith (ul . f) ds t
+        CopyFileWithMetadata o n -> uu -- R.copyFileWithMetadata o n
         -- WalkDirRel h p-> R.walkDirRel d h
         -- WalkDirAccum h o p -> R.walkDirAccum h o p
         -- WalkDirAccumRel h o p -> R.walkDirAccumRel h o p
-        ResolveFile ds f -> ae $ R.resolveFile ds f
         -- ResolveFile' ds f -> R.resolveFile' ds f
-        ResolveDir ds d -> ae $ R.resolveDir ds d
         -- ResolveDir' ds d -> R.resolveDir' ds d
         -- WithTempFile d t f -> R.withTempFile d t f
         -- WithTempDir d t f -> R.withTempDir d t f
         -- WithSystemTempFile t f -> R.withSystemTempFile t f
         -- WithSystemTempDir t f -> R.withSystemTempDir t f
-        OpenBinaryTempFile p t -> ae $ R.openBinaryTempFile p t
-        OpenTempFile p t -> ae $ R.openTempFile p t
         -- ReadBinaryFile p -> R.readBinaryFile p
-        CreateTempDir p t -> ae $ R.createTempDir p t
-        IsLocationOccupied p -> ae $ R.isLocationOccupied p
         -- ForgiveAbsence m -> R.forgivingAbsence m
         -- IgnoreAbsence m -> R.ignoreAbsence m
-        -- _ -> uu
+        _ -> adaptException $ case fs of
+          EnsureDir p -> R.ensureDir p
+          CreateDir d -> R.createDir d
+          CreateDirIfMissing b d -> R.createDirIfMissing b d
+          RemoveDir d -> R.removeDir d
+          RemoveDirRecur d -> R.removeDirRecur d
+          RemovePathForcibly p -> R.removePathForcibly p
+          RenameDir o n -> R.renameDir o n
+          ListDir d -> R.listDir d
+          GetCurrentDir -> R.getCurrentDir
+          SetCurrentDir d -> R.setCurrentDir d
+          GetHomeDir -> R.getHomeDir
+          GetXdgDir xd bd -> R.getXdgDir xd bd
+          GetXdgDirList l -> R.getXdgDirList l
+          GetAppUserDataDir d -> R.getAppUserDataDir d
+          GetUserDocsDir -> R.getUserDocsDir
+          GetTempDir -> R.getTempDir
+          RemoveFile f -> R.removeFile f
+          RenameFile o n -> R.renameFile o n
+          RenamePath o n -> R.renamePath o n
+          CopyFile o n -> R.copyFile o n
+          GetFileSize f -> R.getFileSize f
+          CanonicalizePath p -> R.canonicalizePath p
+          MakeAbsolute p -> R.makeAbsolute p
+          MakeRelativeToCurrentDir p -> R.makeRelativeToCurrentDir p
+          DoesPathExist p -> R.doesPathExist p
+          DoesFileExist f -> R.doesFileExist f
+          DoesDirExist d -> R.doesDirExist d
+          FindExecutable t -> R.findExecutable t
+          FindFile ds t -> R.findFile ds t
+          FindFiles ds t -> R.findFiles ds t
+          CreateFileLink o n -> R.createFileLink o n
+          CreateDirLink o n -> R.createDirLink o n
+          RemoveDirLink d -> R.removeDirLink d
+          IsSymlink p -> R.isSymlink p
+          GetSymlinkTarget p -> R.getSymlinkTarget p
+          GetPermissions p -> R.getPermissions p
+          SetPermissions p ps -> R.setPermissions p ps
+          CopyPermissions o n -> R.copyPermissions o n
+          GetAccessTime p -> R.getAccessTime p
+          GetModificationTime p -> R.getModificationTime p
+          SetAccessTime p t -> R.setAccessTime p t
+          SetModificationTime p t -> R.setModificationTime p t
+          ListDirRel d -> R.listDirRel d
+          ListDirRecur d -> R.listDirRecur d
+          ListDirRecurRel d -> R.listDirRecurRel d
+          CopyDirRecur o n -> R.copyDirRecur o n
+          CopyDirRecur' o n -> R.copyDirRecur' o n
+          ResolveFile ds f -> R.resolveFile ds f
+          ResolveDir ds d -> R.resolveDir ds d
+          OpenBinaryTempFile p t -> R.openBinaryTempFile p t
+          OpenTempFile p t -> R.openTempFile p t
+          CreateTempDir p t -> R.createTempDir p t
+          IsLocationOccupied p -> R.isLocationOccupied p
 
 ----------------------------------------
 -- path-io only

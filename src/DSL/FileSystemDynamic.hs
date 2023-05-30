@@ -207,18 +207,17 @@ data FileSystem :: Effect where
   ResolveFile :: Path Abs Dir -> Text -> FileSystem m (Path Abs File)
   ResolveFile' :: Text -> FileSystem m (Path Abs File)
   ResolveDir :: Path Abs Dir -> Text -> FileSystem m (Path Abs Dir)
-  ResolveDir' :: Text -> FileSystem m (Path Abs Dir) 
-  -- WithTempFile :: Path Abs Dir -> Text -> (Path Abs File -> Handle -> FileSystem m a) -> FileSystem m a
-  -- WithTempDir :: Path Abs Dir -> Text -> (Path Abs Dir -> FileSystem m a) -> FileSystem m a
-  -- WithSystemTempFile :: Text -> (Path Abs File -> Handle -> FileSystem m a) -> FileSystem m a
-  -- WithSystemTempDir :: Text -> (Path Abs Dir -> FileSystem m a) -> FileSystem m a
+  ResolveDir' :: Text -> FileSystem m (Path Abs Dir)
+  WithTempFile :: Path Abs Dir -> Text -> (Path Abs File -> Handle -> m a) -> FileSystem m a
+  WithTempDir :: Path Abs Dir -> Text -> (Path Abs Dir -> m a) -> FileSystem m a
+  WithSystemTempFile :: Text -> (Path Abs File -> Handle -> m a) -> FileSystem m a
+  WithSystemTempDir :: Text -> (Path Abs Dir -> m a) -> FileSystem m a
   OpenBinaryTempFile :: Path b Dir -> Text -> FileSystem m (Path Abs File, Handle)
   OpenTempFile :: Path b Dir -> Text -> FileSystem m (Path Abs File, Handle)
   CreateTempDir :: Path b Dir -> Text -> FileSystem m (Path Abs Dir)
   IsLocationOccupied :: Path b t -> FileSystem m Bool
-
--- ForgiveAbsence :: FileSystem m a -> FileSystem m (Maybe a)
--- IgnoreAbsence :: FileSystem m a -> FileSystem m ()
+  ForgiveAbsence :: m a -> FileSystem m (Maybe a)
+  IgnoreAbsence :: m a -> FileSystem m ()
 
 makeEffect ''FileSystem
 
@@ -231,14 +230,6 @@ instance Exception FSException
 
 adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -> Eff es b
 adaptException m = EF.liftIO m `catch` \(e :: IOException) -> throwError . FSException $ e
-
-{-
-
-interpret $ \_ ->
-  adaptException . \case
-    EnsureDir p -> R.ensureDir p
-
--}
 
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
@@ -274,13 +265,12 @@ runFileSystem =
             ow' b' drs = ul . ow b' drs
            in
             R.walkDirAccumRel mdh' ow' b
-        -- WithTempFile d t f -> R.withTempFile d t f
-        -- WithTempDir d t f -> R.withTempDir d t f
-        -- WithSystemTempFile t f -> R.withSystemTempFile t f
-        -- WithSystemTempDir t f -> R.withSystemTempDir t f
-        -- ReadBinaryFile p -> R.readBinaryFile p
-        -- ForgiveAbsence m -> R.forgivingAbsence m
-        -- IgnoreAbsence m -> R.ignoreAbsence m
+        WithTempFile d t f -> hoe $ \ul -> R.withTempFile d t (\p -> ul . f p)
+        WithTempDir d t f -> hoe $ \ul -> R.withTempDir d t (ul . f)
+        WithSystemTempFile t f -> hoe $ \ul -> R.withSystemTempFile t (\p -> ul . f p)
+        WithSystemTempDir t f -> hoe $ \ul -> R.withSystemTempDir t (ul . f)
+        ForgiveAbsence m -> hoe $ \ul -> R.forgivingAbsence (ul m)
+        IgnoreAbsence m -> hoe $ \ul -> R.ignoringAbsence (ul m)
         _ -> adaptException $ case fs of
           EnsureDir p -> R.ensureDir p
           CreateDir d -> R.createDir d
@@ -333,7 +323,6 @@ runFileSystem =
           ResolveFile' f -> R.resolveFile' f
           ResolveDir ds d -> R.resolveDir ds d
           ResolveDir' f -> R.resolveDir' f
-
           OpenBinaryTempFile p t -> R.openBinaryTempFile p t
           OpenTempFile p t -> R.openTempFile p t
           CreateTempDir p t -> R.createTempDir p t

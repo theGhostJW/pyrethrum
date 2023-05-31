@@ -65,6 +65,16 @@
       "problemMatcher": []
     },
     {
+      "label": "build",
+      "type": "shell",
+      "command": "hpack | cabal build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "cabal test",
       "type": "shell",
       "command": "cabal",

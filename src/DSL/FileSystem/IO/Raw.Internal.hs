@@ -1,6 +1,6 @@
 -- remapping of Path.IO with some minor type changes to be used by both static and dynamic effects
 
-module DSL.FileSystem.Raw (
+module DSL.FileSystem.IO.Raw.Internal (
   -- * Actions on directories
   D.createDir,
   D.createDirIfMissing,

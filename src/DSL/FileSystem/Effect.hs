@@ -105,6 +105,7 @@ module DSL.FileSystem.Effect (
   isLocationOccupied,
   forgivingAbsence,
   ignoringAbsence,
+  ensureFileDurable
   --
   
   --  writeBinaryFile
@@ -117,7 +118,7 @@ module DSL.FileSystem.Effect (
   -- , withBinaryFileDurable
   -- , withBinaryFileDurableAtomic
 
-  -- , ensureFileDurable
+  -- , 
 ) where
 
 import qualified DSL.FileSystem.IO.Raw.Internal as R
@@ -218,6 +219,7 @@ data FileSystem :: Effect where
   IsLocationOccupied :: Path b t -> FileSystem m Bool
   ForgivingAbsence :: m a -> FileSystem m (Maybe a)
   IgnoringAbsence :: m a -> FileSystem m ()
+  EnsureFileDurable :: Path b File -> FileSystem m ()
 
 makeEffect ''FileSystem
 

@@ -116,6 +116,10 @@ module DSL.FileSystem.IO.Raw.Internal (
   D.isLocationOccupied,
   D.forgivingAbsence,
   D.ignoringAbsence,
+
+  -- * from UnliftIO
+  ensureFileDurable,
+  
 ) where
 
 import Data.Time (UTCTime)
@@ -129,6 +133,7 @@ import Chronos (OffsetDatetime)
 import PyrethrumExtras (MonadCatch, MonadMask, toS)
 import qualified System.Directory as SD
 import TempUtils (offsetDateTimeToUtc, utcToOffsetDateTime)
+import qualified UnliftIO.IO.File as ULF
 
 findFileWith ::
   (Path Abs File -> IO Bool) ->
@@ -143,6 +148,9 @@ findFileWith p dirs n =
 
 exeExtension :: Text
 exeExtension = toS SD.exeExtension
+
+ensureFileDurable :: (MonadIO m) => Path b File -> m ()
+ensureFileDurable = ULF.ensureFileDurable . toFilePath
 
 getAppUserDataDir ::
   (MonadIO m) =>

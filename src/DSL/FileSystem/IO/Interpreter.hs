@@ -5,19 +5,11 @@ module DSL.FileSystem.IO.Interpreter (
   runFileSystem,
 ) where
 
+import BasePrelude (IOException)
 import qualified DSL.FileSystem.IO.Internal.Raw as R
-import Path
-import Prelude (Bool (..), ByteString, Either (..), Exception, Handle, IO, IOMode, Integer, Maybe (..), Monoid, Show, Text, pure, ($), (&), (.), (<$>), (=<<), (==), (>>=), (||))
-import qualified Prelude as P
-
-import BasePrelude (IOException, last)
-import Chronos (OffsetDatetime)
 import Control.Monad.Catch (catch, handle)
 import Effectful as EF (
-  Dispatch (Dynamic),
-  DispatchOf,
   Eff,
-  Effect,
   IOE,
   liftIO,
   type (:>),
@@ -30,15 +22,10 @@ import Effectful.Dispatch.Dynamic (
   interpret,
   localSeqUnliftIO,
  )
-import Effectful.Error.Static as E
-import Effectful.TH (makeEffect)
-import Path.IO (AbsPath, AnyPath, RelPath)
-import PyrethrumExtras (MonadMask, toS, txt, uu)
-import qualified System.Directory as SD
-import UnliftIO (UnliftIO, askUnliftIO)
+import qualified Effectful.Error.Static as E
 
 adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -> Eff es b
-adaptException m = EF.liftIO m `catch` \(e :: IOException) -> throwError . FSException $ e
+adaptException m = EF.liftIO m `catch` \(e :: IOException) -> E.throwError . FSException $ e
 
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
@@ -53,7 +40,7 @@ runFileSystem =
   handler env fs =
     let
       hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
-      hoe h = handle (\(e :: IOException) -> throwError . FSException $ e) (localSeqUnliftIO env h)
+      hoe h = handle (\(e :: IOException) -> E.throwError . FSException $ e) (localSeqUnliftIO env h)
      in
       case fs of
         WithCurrentDir p action -> hoe $ \ul -> R.withCurrentDir p (ul action)
@@ -80,6 +67,10 @@ runFileSystem =
         WithSystemTempDir t f -> hoe $ \ul -> R.withSystemTempDir t (ul . f)
         ForgivingAbsence m -> hoe $ \ul -> R.forgivingAbsence (ul m)
         IgnoringAbsence m -> hoe $ \ul -> R.ignoringAbsence (ul m)
+        WithBinaryFile p m f -> hoe $ \ul -> R.withBinaryFile p m (ul . f)
+        WithBinaryFileAtomic p m f -> hoe $ \ul -> R.withBinaryFileAtomic p m (ul . f)
+        WithBinaryFileDurable p m f -> hoe $ \ul -> R.withBinaryFileDurable p m (ul . f)
+        WithBinaryFileDurableAtomic p m f -> hoe $ \ul -> R.withBinaryFileDurableAtomic p m (ul . f)
         _ -> adaptException $ case fs of
           EnsureDir p -> R.ensureDir p
           CreateDir d -> R.createDir d
@@ -137,3 +128,7 @@ runFileSystem =
           CreateTempDir p t -> R.createTempDir p t
           IsLocationOccupied p -> R.isLocationOccupied p
           EnsureFileDurable p -> R.ensureFileDurable p
+          WriteBinaryFile p bs -> R.writeBinaryFile p bs
+          WriteBinaryFileAtomic p bs -> R.writeBinaryFileAtomic p bs
+          WriteBinaryFileDurable p bs -> R.writeBinaryFileDurable p bs
+          WriteBinaryFileDurableAtomic p bs -> R.writeBinaryFileDurableAtomic p bs

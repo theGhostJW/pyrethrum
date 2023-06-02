@@ -1,10 +1,7 @@
-{-# OPTIONS_GHC -Wno-redundant-constraints #-}
-
 module DSL.FileSystem.Effect (
   -- * Effect
   FileSystem (..),
   FSException (..),
-
   -- -- * Actions on directories
   createDir,
   createDirIfMissing,
@@ -105,20 +102,17 @@ module DSL.FileSystem.Effect (
   isLocationOccupied,
   forgivingAbsence,
   ignoringAbsence,
-  ensureFileDurable
-  --
-  
-  --  writeBinaryFile
-  -- , writeBinaryFileAtomic
-  -- , writeBinaryFileDurable
-  -- , writeBinaryFileDurableAtomic
-
-  -- , withBinaryFile
-  -- , withBinaryFileAtomic
-  -- , withBinaryFileDurable
-  -- , withBinaryFileDurableAtomic
-
-  -- , 
+  -- from UnliftIO.IO.File
+  writeBinaryFile,
+  writeBinaryFileAtomic,
+  writeBinaryFileDurable,
+  writeBinaryFileDurableAtomic,
+  withBinaryFile,
+  withBinaryFileAtomic,
+  withBinaryFileDurable,
+  withBinaryFileDurableAtomic,
+  ensureFileDurable,
+  -- ,
 ) where
 
 import qualified DSL.FileSystem.IO.Internal.Raw as R
@@ -147,7 +141,12 @@ import PyrethrumExtras (MonadMask, toS, txt, uu)
 import qualified System.Directory as SD
 import UnliftIO (UnliftIO, askUnliftIO)
 
--- TODO: hide relude exceptions add exceptions
+type instance DispatchOf FileSystem = Dynamic
+
+newtype FSException = FSException IOException
+  deriving (Show)
+
+instance Exception FSException
 
 data FileSystem :: Effect where
   EnsureDir :: Path b Dir -> FileSystem m ()
@@ -219,13 +218,15 @@ data FileSystem :: Effect where
   IsLocationOccupied :: Path b t -> FileSystem m Bool
   ForgivingAbsence :: m a -> FileSystem m (Maybe a)
   IgnoringAbsence :: m a -> FileSystem m ()
+  -- from UnliftIO.IO.File
+  WithBinaryFile :: Path a File -> IOMode -> (Handle -> m a) -> FileSystem m a
+  WithBinaryFileAtomic :: Path a File -> IOMode -> (Handle -> m a) -> FileSystem m a
+  WithBinaryFileDurable :: Path a File -> IOMode -> (Handle -> m a) -> FileSystem m a
+  WithBinaryFileDurableAtomic :: Path a File -> IOMode -> (Handle -> m a) -> FileSystem m a
   EnsureFileDurable :: Path b File -> FileSystem m ()
+  WriteBinaryFile :: Path b File -> ByteString -> FileSystem m ()
+  WriteBinaryFileAtomic :: Path b File -> ByteString -> FileSystem m ()
+  WriteBinaryFileDurable :: Path b File -> ByteString -> FileSystem m ()
+  WriteBinaryFileDurableAtomic :: Path b File -> ByteString -> FileSystem m ()
 
 makeEffect ''FileSystem
-
-type instance DispatchOf FileSystem = Dynamic
-
-newtype FSException = FSException IOException
-  deriving (Show)
-
-instance Exception FSException

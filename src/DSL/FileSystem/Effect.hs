@@ -121,7 +121,7 @@ module DSL.FileSystem.Effect (
   -- , 
 ) where
 
-import qualified DSL.FileSystem.IO.Raw.Internal as R
+import qualified DSL.FileSystem.IO.Internal.Raw as R
 import Path (Abs, Dir, File, Path, Rel)
 import Prelude (Bool (..), ByteString, Either (..), Exception, Handle, IO, IOMode, Integer, Maybe (..), Monoid, Show, Text, pure, ($), (&), (.), (<$>), (=<<), (==), (>>=), (||))
 import qualified Prelude as P

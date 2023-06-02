@@ -1,6 +1,6 @@
 -- remapping of Path.IO with some minor type changes to be used by both static and dynamic effects
 
-module DSL.FileSystem.IO.Raw.Internal (
+module DSL.FileSystem.IO.Internal.Raw (
   -- * Actions on directories
   D.createDir,
   D.createDirIfMissing,
@@ -119,7 +119,7 @@ module DSL.FileSystem.IO.Raw.Internal (
 
   -- * from UnliftIO
   ensureFileDurable,
-  
+
 ) where
 
 import Data.Time (UTCTime)

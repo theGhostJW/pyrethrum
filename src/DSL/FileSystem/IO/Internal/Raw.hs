@@ -1,139 +1,149 @@
 -- remapping of Path.IO with some minor type changes to be used by both static and dynamic effects
 
-module DSL.FileSystem.IO.Raw.Internal (
+module DSL.FileSystem.IO.Internal.Raw (
   -- * Actions on directories
-  D.createDir,
-  D.createDirIfMissing,
-  D.removeDir,
-  D.removeDirRecur,
-  D.removePathForcibly,
-  D.renameDir,
-  D.listDir,
+  D.createDir ,
+  D.createDirIfMissing ,
+  D.removeDir ,
+  D.removeDirRecur ,
+  D.removePathForcibly ,
+  D.renameDir ,
+  D.listDir ,
 
   -- ** Current working directory
-  D.getCurrentDir,
-  D.setCurrentDir,
-  D.withCurrentDir,
+  D.getCurrentDir ,
+  D.setCurrentDir ,
+  D.withCurrentDir ,
 
   -- * Pre-defined directories
-  D.getHomeDir,
-  D.getXdgDir,
-  D.getXdgDirList,
-  getAppUserDataDir,
-  D.getUserDocsDir,
-  D.getTempDir,
+  D.getHomeDir ,
+  D.getXdgDir ,
+  D.getXdgDirList ,
+  getAppUserDataDir ,
+  D.getUserDocsDir ,
+  D.getTempDir ,
 
   -- * Actions on files
-  D.removeFile,
-  D.renameFile,
-  D.renamePath,
-  D.copyFile,
-  copyFileWithMetadata,
-  D.getFileSize,
-  D.canonicalizePath,
-  D.makeAbsolute,
-  D.makeRelativeToCurrentDir,
+  D.removeFile ,
+  D.renameFile ,
+  D.renamePath ,
+  D.copyFile ,
+  copyFileWithMetadata ,
+  D.getFileSize ,
+  D.canonicalizePath ,
+  D.makeAbsolute ,
+  D.makeRelativeToCurrentDir ,
 
   -- * Existence tests
-  D.doesPathExist,
-  D.doesFileExist,
-  D.doesDirExist,
-  D.findExecutable,
-  D.findFile,
-  D.findFiles,
-  findFileWith,
-  D.findFilesWith,
+  D.doesPathExist ,
+  D.doesFileExist ,
+  D.doesDirExist ,
+  D.findExecutable ,
+  D.findFile ,
+  D.findFiles ,
+  findFileWith ,
+  D.findFilesWith ,
 
   -- * Symbolic links
-  D.createFileLink,
-  D.createDirLink,
-  D.removeDirLink,
-  D.isSymlink,
-  getSymlinkTarget,
+  D.createFileLink ,
+  D.createDirLink ,
+  D.removeDirLink ,
+  D.isSymlink ,
+  getSymlinkTarget ,
 
   -- * Permissions
-  D.getPermissions,
-  D.setPermissions,
-  D.copyPermissions,
+  D.getPermissions ,
+  D.setPermissions ,
+  D.copyPermissions ,
 
   -- * Timestamps
-  getAccessTime,
-  getModificationTime,
-  setAccessTime,
-  setModificationTime,
+  getAccessTime ,
+  getModificationTime ,
+  setAccessTime ,
+  setModificationTime ,
 
   -- * Re-exports
 
   -- ** Pre-defined directories
-  D.XdgDirectory (..),
-  D.XdgDirectoryList (..),
+  D.XdgDirectory (..) ,
+  D.XdgDirectoryList (..) ,
 
   -- ** Existence tests
-  exeExtension,
+  exeExtension ,
 
   -- ** Permissions
-  D.Permissions,
-  D.emptyPermissions,
-  D.readable,
-  D.writable,
-  D.executable,
-  D.searchable,
-  D.setOwnerReadable,
-  D.setOwnerWritable,
-  D.setOwnerExecutable,
-  D.setOwnerSearchable,
+  D.Permissions ,
+  D.emptyPermissions ,
+  D.readable ,
+  D.writable ,
+  D.executable ,
+  D.searchable ,
+  D.setOwnerReadable ,
+  D.setOwnerWritable ,
+  D.setOwnerExecutable ,
+  D.setOwnerSearchable ,
   -- from pathIO
-  D.ensureDir,
-  D.listDirRel,
-  D.listDirRecur,
-  D.listDirRecurRel,
-  D.copyDirRecur,
-  D.copyDirRecur',
+  D.ensureDir ,
+  D.listDirRel ,
+  D.listDirRecur ,
+  D.listDirRecurRel ,
+  D.copyDirRecur ,
+  D.copyDirRecur' ,
 
   -- ** Walking directory trees
-  D.WalkAction (..),
-  D.walkDir,
-  D.walkDirRel,
-  D.walkDirAccum,
-  D.walkDirAccumRel,
+  D.WalkAction (..) ,
+  D.walkDir ,
+  D.walkDirRel ,
+  D.walkDirAccum ,
+  D.walkDirAccumRel ,
 
   -- * Path b t transformation
-  resolveFile,
-  resolveFile',
-  resolveDir,
-  resolveDir',
+  resolveFile ,
+  resolveFile' ,
+  resolveDir ,
+  resolveDir' ,
 
   -- * Temporary files and directories
-  withTempFile,
-  withTempDir,
-  withSystemTempFile,
-  withSystemTempDir,
-  openTempFile,
-  openBinaryTempFile,
-  createTempDir,
+  withTempFile ,
+  withTempDir ,
+  withSystemTempFile ,
+  withSystemTempDir ,
+  openTempFile ,
+  openBinaryTempFile ,
+  createTempDir ,
 
   -- * Existence tests
-  D.isLocationOccupied,
-  D.forgivingAbsence,
-  D.ignoringAbsence,
+  D.isLocationOccupied ,
+  D.forgivingAbsence ,
+  D.ignoringAbsence ,
 
   -- * from UnliftIO
-  ensureFileDurable,
-  
+  writeBinaryFile  ,
+  writeBinaryFileAtomic ,
+  writeBinaryFileDurable ,
+  writeBinaryFileDurableAtomic ,
+
+  withBinaryFile ,
+  withBinaryFileAtomic ,
+  withBinaryFileDurable ,
+  withBinaryFileDurableAtomic ,
+
+  ensureFileDurable ,
 ) where
 
 import Data.Time (UTCTime)
 import Path
 import Path.IO (AnyPath (..))
 import qualified Path.IO as D
-import Prelude (Bool (..), IO, Integer, Maybe (..), MonadIO, Text, fmap, ($), (.), (<$>), (==), (>>=), (||))
+import Prelude (Bool (..),IO,Integer,Maybe (..),MonadIO,Text,fmap,($),(.),(<$>),(==),(>>=),(||), ByteString, flip, IOMode, Handle)
 import qualified Prelude as P
 
 import Chronos (OffsetDatetime)
-import PyrethrumExtras (MonadCatch, MonadMask, toS)
+import PyrethrumExtras (MonadCatch,MonadMask,toS)
 import qualified System.Directory as SD
-import TempUtils (offsetDateTimeToUtc, utcToOffsetDateTime)
+import TempUtils (offsetDateTimeToUtc,utcToOffsetDateTime)
 import qualified UnliftIO.IO.File as ULF
+import UnliftIO (MonadUnliftIO)
 
 findFileWith ::
   (Path Abs File -> IO Bool) ->
@@ -148,9 +158,6 @@ findFileWith p dirs n =
 
 exeExtension :: Text
 exeExtension = toS SD.exeExtension
-
-ensureFileDurable :: (MonadIO m) => Path b File -> m ()
-ensureFileDurable = ULF.ensureFileDurable . toFilePath
 
 getAppUserDataDir ::
   (MonadIO m) =>
@@ -205,7 +212,7 @@ resolveDir' ::
 resolveDir' = D.resolveDir' . toS
 
 withTempFile ::
-  (MonadIO m, MonadMask m) =>
+  (MonadIO m,MonadMask m) =>
   Path b Dir ->
   Text ->
   (Path Abs File -> P.Handle -> m a) ->
@@ -213,7 +220,7 @@ withTempFile ::
 withTempFile path = D.withTempFile path . toS
 
 withTempDir ::
-  (MonadIO m, MonadMask m) =>
+  (MonadIO m,MonadMask m) =>
   Path b Dir ->
   Text ->
   (Path Abs Dir -> m a) ->
@@ -221,14 +228,14 @@ withTempDir ::
 withTempDir path = D.withTempDir path . toS
 
 withSystemTempFile ::
-  (MonadIO m, MonadMask m) =>
+  (MonadIO m,MonadMask m) =>
   Text ->
   (Path Abs File -> P.Handle -> m a) ->
   m a
 withSystemTempFile = D.withSystemTempFile . toS
 
 withSystemTempDir ::
-  (MonadIO m, MonadMask m) =>
+  (MonadIO m,MonadMask m) =>
   Text ->
   (Path Abs Dir -> m a) ->
   m a
@@ -238,14 +245,14 @@ openTempFile ::
   (MonadIO m) =>
   Path b Dir ->
   Text ->
-  m (Path Abs File, P.Handle)
+  m (Path Abs File,P.Handle)
 openTempFile p = D.openTempFile p . toS
 
 openBinaryTempFile ::
   (MonadIO m) =>
   Path b Dir ->
   Text ->
-  m (Path Abs File, P.Handle)
+  m (Path Abs File,P.Handle)
 openBinaryTempFile p = D.openBinaryTempFile p . toS
 
 createTempDir ::
@@ -254,3 +261,32 @@ createTempDir ::
   Text ->
   m (Path Abs Dir)
 createTempDir p = D.createTempDir p . toS
+
+-- from UnliftIO.IO.File
+
+writeBinaryFile :: MonadIO m => Path a File -> ByteString -> m () 
+writeBinaryFile = ULF.writeBinaryFile . toFilePath
+
+writeBinaryFileAtomic :: MonadIO m => Path a File -> ByteString -> m ()
+writeBinaryFileAtomic = ULF.writeBinaryFileAtomic . toFilePath
+
+writeBinaryFileDurable :: MonadIO m => Path a File -> ByteString -> m ()
+writeBinaryFileDurable = ULF.writeBinaryFileDurable . toFilePath
+
+writeBinaryFileDurableAtomic :: MonadIO m => Path a File -> ByteString -> m ()
+writeBinaryFileDurableAtomic = ULF.writeBinaryFileDurableAtomic . toFilePath
+
+withBinaryFile :: MonadUnliftIO m  => Path a File -> IOMode -> (Handle -> m b) -> m b
+withBinaryFile = ULF.withBinaryFile . toFilePath
+
+withBinaryFileAtomic :: MonadUnliftIO m  => Path a File -> IOMode -> (Handle -> m b) -> m b
+withBinaryFileAtomic = ULF.withBinaryFileAtomic . toFilePath 
+
+withBinaryFileDurable :: MonadUnliftIO m  => Path a File -> IOMode -> (Handle -> m b) -> m b
+withBinaryFileDurable = ULF.withBinaryFileDurable . toFilePath
+
+withBinaryFileDurableAtomic :: MonadUnliftIO m  => Path a File -> IOMode -> (Handle -> m b) -> m b
+withBinaryFileDurableAtomic = ULF.withBinaryFileDurableAtomic . toFilePath 
+
+ensureFileDurable :: (MonadIO m) => Path b File -> m ()
+ensureFileDurable = ULF.ensureFileDurable . toFilePath

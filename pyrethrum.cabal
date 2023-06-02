@@ -40,7 +40,7 @@ library
       DSL.FileSystem.IO
       DSL.FileSystem.IO.File
       DSL.FileSystem.IO.Interpreter
-      DSL.FileSystem.IO.Raw.Internal
+      DSL.FileSystem.IO.Internal.Raw
       DSL.FileSystemPsy
       DSL.Interpreter
       DSL.Logger

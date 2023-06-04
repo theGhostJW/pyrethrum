@@ -5,7 +5,7 @@ import qualified Check as CK
 import Common as C
 import DSL.Interpreter
 import DSL.LogProtocol as LP
-import DSL.Logger
+import DSL.LoggerPsy
 import Data.Aeson (ToJSON (toJSON))
 import qualified Data.DList as D
 import qualified Data.Foldable as F

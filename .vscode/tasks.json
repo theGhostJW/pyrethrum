@@ -44,6 +44,9 @@
       "label": "hpack",
       "type": "process",
       "command": "hpack",
+      "args": [
+        "--force"
+      ],
       "presentation": {
         "reveal": "always",
         "panel": "new",
@@ -66,13 +69,8 @@
     },
     {
       "label": "build",
-      "type": "shell",
-      "command": "hpack | cabal build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "problemMatcher": []
+      "dependsOrder": "sequence",
+      "dependsOn": ["hpack", "cabal build"]
     },
     {
       "label": "cabal test",

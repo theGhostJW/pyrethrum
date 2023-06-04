@@ -3,7 +3,7 @@ module DSL.FileSystemPsy where
 import Common
 import Control.Exception as E
 import DSL.LogProtocol (LogProtocolBase (IOAction'))
-import DSL.Logger (Logger, logAction, logItem)
+import DSL.LoggerPsy (Logger, logAction, logItem)
 import qualified Data.Aeson as A
 import Path (File, Path, toFilePath)
 import Polysemy (

@@ -13,7 +13,7 @@ import TestFilter
 import Text.Show.Pretty
 import GHC.Records
 import DSL.Interpreter
-import DSL.Logger
+import DSL.LoggerPsy
 import MemberReflection (showEffs)
 
 import EvalHelp

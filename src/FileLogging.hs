@@ -1,7 +1,7 @@
 module FileLogging where
 
 import Common as C
-import DSL.Logger
+import DSL.LoggerPsy
 import PyrethrumExtras.IO
 import Text.Show.Pretty
 import AuxFiles

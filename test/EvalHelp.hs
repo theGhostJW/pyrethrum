@@ -5,7 +5,7 @@ module EvalHelp (
 import Text.Show.Pretty
 import DSL.FileSystemPsy
 import DSL.ArbitraryIO
-import DSL.Logger
+import DSL.LoggerPsy
 import Polysemy.Reader
 import Polysemy.State
 import DSL.LogProtocol

@@ -10,7 +10,7 @@ import Polysemy.State ( State, evalState )
 import Polysemy.Reader ( Reader )
 import DSL.FileSystemPsy
     ( fileSystemDocInterpreter, fileSystemIOInterpreter, FileSystem )
-import DSL.Logger
+import DSL.LoggerPsy
     ( Logger,
       logRunConsoleInterpreter,
       runThreadInfoReader,

@@ -4,7 +4,7 @@ import           Polysemy
 import           Polysemy.Reader
 import           Polysemy.State
 import           Common
-import           DSL.Logger
+import           DSL.LoggerPsy
 import           DSL.CurrentTime
 import DSL.LogProtocol
 import DSL.LogProtocol.PrettyPrint

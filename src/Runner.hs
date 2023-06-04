@@ -33,7 +33,7 @@ import DSL.LogProtocol as LP
     ThenClause (ThenClause),
     WhenClause (WhenClause),
   )
-import DSL.Logger (Logger (LogError), log, logError, logItem)
+import DSL.LoggerPsy (Logger (LogError), log, logError, logItem)
 import Data.Aeson as A (ToJSON (toJSON), Value (Bool))
 import Data.Either.Extra (Either, eitherToMaybe)
 import Data.List (dropWhile)

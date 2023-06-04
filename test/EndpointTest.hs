@@ -8,7 +8,7 @@ import           Runner                 as R
 import           PyrethrumExtras.IO
 import           DSL.Interpreter
 import           Common
-import           DSL.Logger
+import           DSL.LoggerPsy
 import Polysemy
 -- import           DemoProject.Test.Rough as RT
 -- import           DemoProject.Test.Rough2 as RT2

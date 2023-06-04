@@ -1,7 +1,7 @@
 module Internal.ExeNode where
 
 import Internal.SuiteRuntime
-import DSL.Logger (Logger (LogError), log, logError, logItem)
+import DSL.LoggerPsy (Logger (LogError), log, logError, logItem)
 import Internal.RunnerBaseLazy
 import qualified RunElementClasses as RC
 import Polysemy (Member, Sem)

@@ -6,7 +6,7 @@ module MemberReflection where
 import Polysemy
 import Polysemy.Internal.CustomErrors
 import           DSL.ArbitraryIO
-import           DSL.Logger
+import           DSL.LoggerPsy
 import           Runner  as R hiding (interactor, parse)
 import           Data.Aeson.TH
 import           Data.Set as S

@@ -6,7 +6,7 @@ import           Prelude as P
 import           PyrethrumExtras.IO as PIO
 import Polysemy
 import DSL.CurrentTime as CT hiding (now)
-import DSL.Logger
+import DSL.LoggerPsy
 import DSL.LogProtocol
 import PyrethrumExtras
 import Chronos

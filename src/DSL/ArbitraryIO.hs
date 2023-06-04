@@ -3,7 +3,7 @@ module DSL.ArbitraryIO where
 import qualified Data.Aeson as A
 import Common
 import DSL.LogProtocol
-import DSL.Logger
+import DSL.LoggerPsy
 import           Control.Exception as E
 import Polysemy
 import Polysemy.Error as PE

@@ -6,7 +6,7 @@ import Common (DetailedInfo (DetailedInfo), FrameworkError, HookType (..))
 import DSL.Interpreter (effExecuteLog, minInterpret, executeInIOConsolePretty)
 import DSL.LogProtocol (LogProtocolBase (..))
 import DSL.LogProtocol.PrettyPrint (LogStyle (..), prettyPrintLogProtocol)
-import DSL.Logger
+import DSL.LoggerPsy
 import Data.Foldable (Foldable (length))
 import Data.Text (Text)
 import qualified Data.Text as Text

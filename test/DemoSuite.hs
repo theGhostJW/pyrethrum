@@ -9,7 +9,7 @@ import DSL.ArbitraryIO
 import DSL.CurrentTime
 import DSL.FileSystemPsy
 import DSL.Interpreter (AllEffects, Failure, MinEffs)
-import DSL.Logger as L
+import DSL.LoggerPsy as L
 import Data.Aeson.TH
 import Data.Aeson.Types hiding (One)
 import Data.Yaml

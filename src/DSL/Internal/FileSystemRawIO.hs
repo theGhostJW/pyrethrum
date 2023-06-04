@@ -1,6 +1,6 @@
 -- remapping of Path.IO with some minor type changes to be used by both static and dynamic effects
 
-module DSL.FileSystem.IO.Internal.Raw (
+module DSL.Internal.FileSystemRawIO (
   -- * Actions on directories
   D.createDir,
   D.createDirIfMissing,
@@ -65,14 +65,8 @@ module DSL.FileSystem.IO.Internal.Raw (
   -- * Re-exports
 
   -- ** Pre-defined directories
-  D.XdgDirectory (..),
-  D.XdgDirectoryList (..),
-
-  -- ** Existence tests
-  exeExtension,
 
   -- ** Permissions
-  D.Permissions,
   D.emptyPermissions,
   D.readable,
   D.writable,
@@ -91,7 +85,6 @@ module DSL.FileSystem.IO.Internal.Raw (
   D.copyDirRecur',
 
   -- ** Walking directory trees
-  D.WalkAction (..),
   D.walkDir,
   D.walkDirRel,
   D.walkDirAccum,
@@ -127,6 +120,7 @@ module DSL.FileSystem.IO.Internal.Raw (
   withBinaryFileDurable,
   withBinaryFileDurableAtomic,
   ensureFileDurable,
+  
 ) where
 
 import Data.Time (UTCTime)
@@ -138,10 +132,11 @@ import qualified Prelude as P
 
 import Chronos (OffsetDatetime)
 import PyrethrumExtras (MonadCatch, MonadMask, toS)
-import qualified System.Directory as SD
 import TempUtils (offsetDateTimeToUtc, utcToOffsetDateTime)
 import UnliftIO (MonadUnliftIO)
 import qualified UnliftIO.IO.File as ULF
+import qualified System.Directory as SD
+
 
 findFileWith ::
   (Path Abs File -> IO Bool) ->
@@ -153,9 +148,6 @@ findFileWith p dirs n =
  where
   p' :: P.FilePath -> IO Bool
   p' f = parseAbsFile f >>= p
-
-exeExtension :: Text
-exeExtension = toS SD.exeExtension
 
 getAppUserDataDir ::
   (MonadIO m) =>

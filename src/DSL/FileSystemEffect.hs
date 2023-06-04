@@ -1,8 +1,12 @@
-module DSL.FileSystem.Effect (
+module DSL.FileSystemEffect (
   -- * Effect
   FileSystem (..),
   FSException (..),
   -- -- * Actions on directories
+  module FSP,
+  FSP.XdgDirectory (..),
+  FSP.XdgDirectoryList (..),
+
   createDir,
   createDirIfMissing,
   removeDir,
@@ -57,21 +61,6 @@ module DSL.FileSystem.Effect (
   setModificationTime,
   -- -- * Re-exports
 
-  -- -- ** Pre-defined directories
-  R.XdgDirectory (..),
-  R.XdgDirectoryList (..),
-  R.exeExtension,
-  -- -- ** Permissions
-  R.Permissions,
-  R.emptyPermissions,
-  R.readable,
-  R.writable,
-  R.executable,
-  R.searchable,
-  R.setOwnerReadable,
-  R.setOwnerWritable,
-  R.setOwnerExecutable,
-  R.setOwnerSearchable,
   -- from pathIO
   ensureDir,
   listDirRel,
@@ -80,7 +69,7 @@ module DSL.FileSystem.Effect (
   copyDirRecur,
   copyDirRecur',
   -- -- ** Walking directory trees
-  R.WalkAction (..),
+  FSP.WalkAction (..),
   walkDir,
   walkDirRel,
   walkDirAccum,
@@ -112,10 +101,9 @@ module DSL.FileSystem.Effect (
   withBinaryFileDurable,
   withBinaryFileDurableAtomic,
   ensureFileDurable,
-  -- ,
 ) where
 
-import qualified DSL.FileSystem.IO.Internal.Raw as R
+import DSL.Internal.FileSystemPure as FSP
 import Path (Abs, Dir, File, Path, Rel)
 import Prelude (Bool (..), ByteString, Either (..), Exception, Handle, IO, IOMode, Integer, Maybe (..), Monoid, Show, Text, pure, ($), (&), (.), (<$>), (=<<), (==), (>>=), (||))
 import qualified Prelude as P
@@ -161,8 +149,8 @@ data FileSystem :: Effect where
   SetCurrentDir :: Path Abs Dir -> FileSystem m ()
   WithCurrentDir :: Path Abs Dir -> m a -> FileSystem m a
   GetHomeDir :: FileSystem m (Path Abs Dir)
-  GetXdgDir :: R.XdgDirectory -> Maybe (Path Rel Dir) -> FileSystem m (Path Abs Dir)
-  GetXdgDirList :: R.XdgDirectoryList -> FileSystem m [Path Abs Dir]
+  GetXdgDir :: FSP.XdgDirectory -> Maybe (Path Rel Dir) -> FileSystem m (Path Abs Dir)
+  GetXdgDirList :: FSP.XdgDirectoryList -> FileSystem m [Path Abs Dir]
   GetAppUserDataDir :: Text -> FileSystem m (Path Abs Dir)
   GetUserDocsDir :: FileSystem m (Path Abs Dir)
   GetTempDir :: FileSystem m (Path Abs Dir)
@@ -188,8 +176,8 @@ data FileSystem :: Effect where
   RemoveDirLink :: Path b Dir -> FileSystem m ()
   IsSymlink :: Path b t -> FileSystem m Bool
   GetSymlinkTarget :: Path b t -> FileSystem m Text
-  GetPermissions :: Path b t -> FileSystem m R.Permissions
-  SetPermissions :: Path b t -> R.Permissions -> FileSystem m ()
+  GetPermissions :: Path b t -> FileSystem m FSP.Permissions
+  SetPermissions :: Path b t -> FSP.Permissions -> FileSystem m ()
   CopyPermissions :: Path b t -> Path b t -> FileSystem m ()
   GetAccessTime :: Path b t -> FileSystem m OffsetDatetime
   GetModificationTime :: Path b t -> FileSystem m OffsetDatetime
@@ -200,10 +188,10 @@ data FileSystem :: Effect where
   ListDirRecurRel :: Path Rel Dir -> FileSystem m ([Path Rel Dir], [Path Rel File])
   CopyDirRecur :: Path b Dir -> Path b Dir -> FileSystem m ()
   CopyDirRecur' :: Path b Dir -> Path b Dir -> FileSystem m ()
-  WalkDir :: (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (R.WalkAction Abs)) -> Path b Dir -> FileSystem m ()
-  WalkDirRel :: Path Rel Dir -> (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (R.WalkAction Rel)) -> FileSystem m ()
-  WalkDirAccum :: (Monoid o) => Maybe (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (R.WalkAction Abs)) -> (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m o) -> Path b Dir -> FileSystem m o
-  WalkDirAccumRel :: (Monoid o) => Maybe (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (R.WalkAction Rel)) -> (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m o) -> Path b Dir -> FileSystem m o
+  WalkDir :: (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (FSP.WalkAction Abs)) -> Path b Dir -> FileSystem m ()
+  WalkDirRel :: Path Rel Dir -> (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (FSP.WalkAction Rel)) -> FileSystem m ()
+  WalkDirAccum :: (Monoid o) => Maybe (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (FSP.WalkAction Abs)) -> (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m o) -> Path b Dir -> FileSystem m o
+  WalkDirAccumRel :: (Monoid o) => Maybe (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (FSP.WalkAction Rel)) -> (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m o) -> Path b Dir -> FileSystem m o
   ResolveFile :: Path Abs Dir -> Text -> FileSystem m (Path Abs File)
   ResolveFile' :: Text -> FileSystem m (Path Abs File)
   ResolveDir :: Path Abs Dir -> Text -> FileSystem m (Path Abs Dir)

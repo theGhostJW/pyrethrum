@@ -1,13 +1,13 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
-module DSL.FileSystem.IO.Interpreter (
+module DSL.FileSystemIOInterpreter (
   FileSystem,
   runFileSystem,
 ) where
 
 import BasePrelude (IOException)
-import qualified DSL.FileSystem.IO.Internal.Raw as R
 import Control.Monad.Catch (catch, handle)
+import qualified DSL.Internal.FileSystemRawIO as R
 import Effectful as EF (
   Eff,
   IOE,
@@ -15,7 +15,7 @@ import Effectful as EF (
   type (:>),
  )
 
-import DSL.FileSystem.Effect (FSException (..), FileSystem (..))
+import DSL.FileSystemEffect (FSException (..), FileSystem (..))
 import Effectful.Dispatch.Dynamic (
   HasCallStack,
   LocalEnv,

@@ -14,7 +14,6 @@ import qualified Internal.PreNode as PN (
   Test (..),
  )
 import Internal.RunTimeLogging (
-  EventSink,
   ExeEvent (..),
   ExeEventType (TestHook, TestHookRelease, ThreadHookRelease),
   Loc (Node, Root),
@@ -208,7 +207,7 @@ runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCou
             runChildQ childConcurrent runner canRun' q
         )
 
-mkChildQ :: Foldable m => m a -> IO (ChildQ a)
+mkChildQ :: (Foldable m) => m a -> IO (ChildQ a)
 mkChildQ children = do
   s <- newTVarIO Runnable
   q <- newTQueueIO
@@ -659,13 +658,13 @@ runNode eventLogger hkIn =
           when r $ modifyTVar' runningThreads succ
           pure r
 
-newLogger :: EventSink Loc a -> ThreadId -> IO (EventLogger a)
+newLogger :: (ExeEvent Loc a -> IO ()) -> ThreadId -> IO (EventLogger a)
 newLogger sink tid =
   do
     ir <- UnliftIO.newIORef (-1)
     pure $ mkLogger sink ir tid
 
-runTree :: EventSink Loc a -> ExeTree a () () -> Int -> IO ()
+runTree :: (ExeEvent Loc a -> IO ()) -> ExeTree a () () -> Int -> IO ()
 runTree sink xtri maxThreads =
   let hkIn = Right (ExeIn () () ())
       thrdTokens = replicate maxThreads True
@@ -694,7 +693,7 @@ execute
     }
   preRoot =
     -- TODO - Validatte prenode
-      -- fixture titles are unique ?? 
+    -- fixture titles are unique ??
     concurrently_ logWorker linkExecute
    where
     linkExecute :: IO ()

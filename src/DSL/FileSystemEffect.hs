@@ -105,29 +105,17 @@ module DSL.FileSystemEffect (
 
 import DSL.Internal.FileSystemPure as FSP
 import Path (Abs, Dir, File, Path, Rel)
-import Prelude (Bool (..), ByteString, Either (..), Exception, Handle, IO, IOMode, Integer, Maybe (..), Monoid, Show, Text, pure, ($), (&), (.), (<$>), (=<<), (==), (>>=), (||))
-import qualified Prelude as P
 
-import BasePrelude (IOException, last)
+import BasePrelude (IOException)
 import Chronos (OffsetDatetime)
-import Control.Monad.Catch (catch, handle)
 import Effectful as EF (
   Dispatch (Dynamic),
   DispatchOf,
-  Eff,
   Effect,
-  IOE,
-  liftIO,
-  type (:>),
  )
 import Effectful.Dispatch.Dynamic
-import Effectful.Dispatch.Static (unsafeLiftMapIO)
-import Effectful.Error.Static as E
 import Effectful.TH (makeEffect)
 import Path.IO (AbsPath, AnyPath, RelPath)
-import PyrethrumExtras (MonadMask, toS, txt, uu)
-import qualified System.Directory as SD
-import UnliftIO (UnliftIO, askUnliftIO)
 
 type instance DispatchOf FileSystem = Dynamic
 

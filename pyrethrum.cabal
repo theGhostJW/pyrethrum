@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: aaa92c7444d73e8aaa2826da5ee59dd132bbdb98163994276f5a334c2da47db0
+-- hash: 5a2e18efe4219d233048440135b632bff3d99dc453491769202085d90ef4ee9f
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -47,6 +47,7 @@ library
       DSL.LogProtocol.PrettyPrint
       EffPlay.SpeakEffect
       EffPlay.SpeakIOInterpreterDynamic
+      EffPlay.SpeakIOInterpreterStatic
       FileLogging
       Internal.ExeNode
       Internal.PreNode

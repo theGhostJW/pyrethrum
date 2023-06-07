@@ -1,7 +1,7 @@
 module EffPlay.SpeakEffect (
   Speak (..),
   hello,
-  goodbuy
+  goodbye
 ) where
 
 
@@ -16,6 +16,6 @@ type instance DispatchOf Speak = Dynamic
 
 data Speak :: Effect where
   Hello :: Text -> Speak m ()
-  Goodbuy :: Text -> Speak m ()
+  Goodbye :: Text -> Speak m ()
  
 makeEffect ''Speak

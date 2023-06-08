@@ -10,7 +10,7 @@ module Internal.PreNode (
   nodeEmpty,
 ) where
 
-import Internal.RunTimeLogging (Loc, MessageLogger)
+import Internal.RunTimeLogging (Loc)
 
 type PreNodeRoot a = PreNode a () ()
 
@@ -21,7 +21,7 @@ data Test a si ti ii = Test
 
 data Context a = Context
   { loc :: Loc
-  , logger :: MessageLogger a
+  , logger :: a -> IO ()
   }
 
 data Fixture a oi ti tsti where

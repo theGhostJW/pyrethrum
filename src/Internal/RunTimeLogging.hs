@@ -169,7 +169,6 @@ data ExeEvent l a
   deriving (Show)
 
 -------  IO Logging --------
-type MessageLogger a = a -> IO ()
 
 -- not used in concurrent code ie. one IORef per thread
 -- this approach means I can't write a pure logger but I can live with that for now

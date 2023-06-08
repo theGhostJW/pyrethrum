@@ -7,7 +7,9 @@ module DSL.FileSystemDocInterpreter (
 
 import BasePrelude (IOException)
 import qualified DSL.Internal.FileSystemRawIO as R
+import qualified DSL.Internal.FileSystemPure as FSP
 import Control.Monad.Catch (catch, handle)
+import DSL.Logger
 import Effectful as EF (
   Eff,
   IOE,
@@ -23,11 +25,12 @@ import Effectful.Dispatch.Dynamic (
   localSeqUnliftIO,
  )
 import qualified Effectful.Error.Static as E
+import PyrethrumExtras (uu)
 
 adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -> Eff es b
-adaptException m = EF.liftIO m `catch` \(e :: IOException) -> E.throwError . FSException $ e
+adaptException m = uu -- EF.liftIO m `catch` \(e :: IOException) -> E.throwError . FSException $ e
 
-runFileSystem :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
+runFileSystem :: forall es a. (HasCallStack, Log :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
   interpret handler
  where

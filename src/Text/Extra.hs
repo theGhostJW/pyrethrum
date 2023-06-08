@@ -14,7 +14,7 @@ import PyrethrumExtras ( (?) )
 
 safet :: (Text -> b) -> Text -> Maybe b
 safet unsafef t = 
-  T.null t ? Nothing $ Just $ unsafef t
+  T.null t ? Nothing $ Just (unsafef t)
                                                             
 last:: Text -> Maybe Char
 last = safet T.last  
@@ -33,3 +33,5 @@ replaceFirst needle replacement haystack
     | otherwise = T.concat [front, replacement, T.drop (T.length needle) back] 
       where
         (front, back) = breakOn needle haystack
+
+-- TODO: hide putLnStr and friends and expose the same in Text.IO

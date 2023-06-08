@@ -1,4 +1,5 @@
--- remapping of Path.IO with some minor type changes to be used by both static and dynamic effects
+-- remapping of types and pur functions from 
+-- Path.IO with some minor type changes to be used by both static and dynamic effects
 
 module DSL.Internal.FileSystemPure (
   D.XdgDirectory (..),

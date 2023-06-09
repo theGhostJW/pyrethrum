@@ -1,14 +1,15 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module DSL.FileSystemDocInterpreter (
-  -- FileSystem,
-  -- runFileSystem,
-) where
+  ) where
+
+-- FileSystem,
+-- runFileSystem,
 
 import BasePrelude (IOException)
-import qualified DSL.Internal.FileSystemRawIO as R
-import qualified DSL.Internal.FileSystemPure as FSP
 import Control.Monad.Catch (catch, handle)
+import qualified DSL.Internal.FileSystemPure as FSP
+import qualified DSL.Internal.FileSystemRawIO as R
 import DSL.Logger
 import Effectful as EF (
   Eff,
@@ -27,11 +28,10 @@ import Effectful.Dispatch.Dynamic (
 import qualified Effectful.Error.Static as E
 import PyrethrumExtras (uu)
 
-{-
 adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -> Eff es b
-adaptException m = uu -- EF.liftIO m `catch` \(e :: IOException) -> E.throwError . FSException $ e
+adaptException m = EF.liftIO m `catch` \(e :: IOException) -> E.throwError . FSException $ e
 
-runFileSystem :: forall es a. (HasCallStack, Log :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
+runFileSystem :: forall es a. (HasCallStack, Log a :> es, Log a :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
   interpret handler
  where
@@ -44,7 +44,7 @@ runFileSystem =
   handler env fs =
     let
       hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
-      hoe h = handle (\(e :: IOException) -> E.throwError . FSException $ e) (localSeqUnliftIO env h)
+      hoe h = uu -- handle (\(e :: IOException) -> E.throwError . FSException $ e) (localSeqUnliftIO env h)
      in
       case fs of
         WithCurrentDir p action -> hoe $ \ul -> R.withCurrentDir p (ul action)
@@ -136,4 +136,3 @@ runFileSystem =
           WriteBinaryFileAtomic p bs -> R.writeBinaryFileAtomic p bs
           WriteBinaryFileDurable p bs -> R.writeBinaryFileDurable p bs
           WriteBinaryFileDurableAtomic p bs -> R.writeBinaryFileDurableAtomic p bs
--}

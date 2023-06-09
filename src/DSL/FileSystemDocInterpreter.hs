@@ -10,7 +10,7 @@ import BasePrelude (IOException)
 import Control.Monad.Catch (catch, handle)
 import qualified DSL.Internal.FileSystemPure as FSP
 import qualified DSL.Internal.FileSystemRawIO as R
-import DSL.Logger
+import DSL.Out
 import Effectful as EF (
   Eff,
   IOE,
@@ -18,7 +18,7 @@ import Effectful as EF (
   type (:>),
  )
 
-import DSL.FileSystemEffect (FSException (..), FileSystem (..))
+import DSL.FileSystemEffect (FileSystem (..))
 import Effectful.Dispatch.Dynamic (
   HasCallStack,
   LocalEnv,
@@ -26,12 +26,21 @@ import Effectful.Dispatch.Dynamic (
   localSeqUnliftIO,
  )
 import qualified Effectful.Error.Static as E
-import PyrethrumExtras (uu)
+import PyrethrumExtras (uu, toS)
+import DSL.Internal.ApEvent (ApEvent(..))
+import GHC.TypeError (ErrorMessage(Text))
+import Path.Extended (toFilePath, Path)
 
-adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -> Eff es b
-adaptException m = EF.liftIO m `catch` \(e :: IOException) -> E.throwError . FSException $ e
+data DocException = DocException Text SomeException
+  deriving (Show)
 
-runFileSystem :: forall es a. (HasCallStack, Log a :> es, Log a :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
+instance Exception DocException
+
+
+adaptException :: (HasCallStack, IOE :> es, E.Error DocException :> es) => IO b -> Eff es b
+adaptException m = EF.liftIO m `catch` \(e :: SomeException) -> E.throwError . DocException "Exception thrown in documenter" $ e
+
+runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, Out a :> es, E.Error DocException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
   interpret handler
  where
@@ -45,6 +54,15 @@ runFileSystem =
     let
       hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
       hoe h = uu -- handle (\(e :: IOException) -> E.throwError . FSException $ e) (localSeqUnliftIO env h)
+
+      dirInfo :: forall c d. Text -> Path c d -> Text
+      dirInfo prefix p = prefix <> ": " <> toS (toFilePath p)
+
+      dirInfo' :: forall c d e f. Text -> Path c d -> Text -> Path e f -> Text 
+      dirInfo' prefix p sep p2 = prefix <> ": " <> toS (toFilePath p) <> sep <> ": " <> toS (toFilePath p2)
+
+      fudge :: Text -> Eff es a'
+      fudge txt = uu -- out . Step 
      in
       case fs of
         WithCurrentDir p action -> hoe $ \ul -> R.withCurrentDir p (ul action)
@@ -75,64 +93,65 @@ runFileSystem =
         WithBinaryFileAtomic p m f -> hoe $ \ul -> R.withBinaryFileAtomic p m (ul . f)
         WithBinaryFileDurable p m f -> hoe $ \ul -> R.withBinaryFileDurable p m (ul . f)
         WithBinaryFileDurableAtomic p m f -> hoe $ \ul -> R.withBinaryFileDurableAtomic p m (ul . f)
-        _ -> adaptException $ case fs of
-          EnsureDir p -> R.ensureDir p
-          CreateDir d -> R.createDir d
-          CreateDirIfMissing b d -> R.createDirIfMissing b d
-          RemoveDir d -> R.removeDir d
-          RemoveDirRecur d -> R.removeDirRecur d
-          RemovePathForcibly p -> R.removePathForcibly p
-          RenameDir o n -> R.renameDir o n
-          ListDir d -> R.listDir d
-          GetCurrentDir -> R.getCurrentDir
-          SetCurrentDir d -> R.setCurrentDir d
-          GetHomeDir -> R.getHomeDir
-          GetXdgDir xd bd -> R.getXdgDir xd bd
-          GetXdgDirList l -> R.getXdgDirList l
-          GetAppUserDataDir d -> R.getAppUserDataDir d
-          GetUserDocsDir -> R.getUserDocsDir
-          GetTempDir -> R.getTempDir
-          RemoveFile f -> R.removeFile f
-          RenameFile o n -> R.renameFile o n
-          RenamePath o n -> R.renamePath o n
-          CopyFile o n -> R.copyFile o n
-          GetFileSize f -> R.getFileSize f
-          CanonicalizePath p -> R.canonicalizePath p
-          MakeAbsolute p -> R.makeAbsolute p
-          MakeRelativeToCurrentDir p -> R.makeRelativeToCurrentDir p
-          DoesPathExist p -> R.doesPathExist p
-          DoesFileExist f -> R.doesFileExist f
-          DoesDirExist d -> R.doesDirExist d
-          FindExecutable t -> R.findExecutable t
-          FindFile ds t -> R.findFile ds t
-          FindFiles ds t -> R.findFiles ds t
-          CreateFileLink o n -> R.createFileLink o n
-          CreateDirLink o n -> R.createDirLink o n
-          RemoveDirLink d -> R.removeDirLink d
-          IsSymlink p -> R.isSymlink p
-          GetSymlinkTarget p -> R.getSymlinkTarget p
-          GetPermissions p -> R.getPermissions p
-          SetPermissions p ps -> R.setPermissions p ps
-          CopyPermissions o n -> R.copyPermissions o n
-          GetAccessTime p -> R.getAccessTime p
-          GetModificationTime p -> R.getModificationTime p
-          SetAccessTime p t -> R.setAccessTime p t
-          SetModificationTime p t -> R.setModificationTime p t
-          ListDirRel d -> R.listDirRel d
-          ListDirRecur d -> R.listDirRecur d
-          ListDirRecurRel d -> R.listDirRecurRel d
-          CopyDirRecur o n -> R.copyDirRecur o n
-          CopyDirRecur' o n -> R.copyDirRecur' o n
-          ResolveFile ds f -> R.resolveFile ds f
-          ResolveFile' f -> R.resolveFile' f
-          ResolveDir ds d -> R.resolveDir ds d
-          ResolveDir' f -> R.resolveDir' f
-          OpenBinaryTempFile p t -> R.openBinaryTempFile p t
-          OpenTempFile p t -> R.openTempFile p t
-          CreateTempDir p t -> R.createTempDir p t
-          IsLocationOccupied p -> R.isLocationOccupied p
-          EnsureFileDurable p -> R.ensureFileDurable p
-          WriteBinaryFile p bs -> R.writeBinaryFile p bs
-          WriteBinaryFileAtomic p bs -> R.writeBinaryFileAtomic p bs
-          WriteBinaryFileDurable p bs -> R.writeBinaryFileDurable p bs
-          WriteBinaryFileDurableAtomic p bs -> R.writeBinaryFileDurableAtomic p bs
+        -- GetCurrentDir -> R.getCurrentDir
+          -- GetHomeDir -> R.getHomeDir
+          -- GetXdgDir xd bd -> R.getXdgDir xd bd
+          -- GetXdgDirList l -> R.getXdgDirList l
+          -- GetAppUserDataDir d -> R.getAppUserDataDir d
+          -- GetUserDocsDir -> R.getUserDocsDir
+          -- GetTempDir -> R.getTempDir
+          -- GetFileSize f -> R.getFileSize f
+          -- DoesPathExist p -> R.doesPathExist p
+          -- DoesFileExist f -> R.doesFileExist f
+          -- DoesDirExist d -> R.doesDirExist d
+          -- CanonicalizePath p -> R.canonicalizePath p
+          -- MakeAbsolute p -> R.makeAbsolute p
+          -- MakeRelativeToCurrentDir p -> R.makeRelativeToCurrentDir p
+          -- FindExecutable t -> R.findExecutable t
+          -- FindFile ds t -> R.findFile ds t
+          -- FindFiles ds t -> R.findFiles ds t
+          -- IsSymlink p -> R.isSymlink p
+          -- GetSymlinkTarget p -> R.getSymlinkTarget p
+          -- GetPermissions p -> R.getPermissions p
+        _ -> fudge $ case fs of
+          EnsureDir p -> dirInfo "ensure directory exists" p
+          CreateDir d -> dirInfo "create directory" d
+          CreateDirIfMissing _ d -> dirInfo "create directory if missing" d
+          RemoveDir d -> dirInfo "remove directory" d
+          RemoveDirRecur d -> dirInfo "remove directory recursively" d
+          RemovePathForcibly p -> dirInfo "remove path forcibly" p
+          RenameDir o n -> dirInfo' "rename directory from" o "to" n
+          ListDir d -> dirInfo "list directory" d
+          SetCurrentDir d -> dirInfo "set current directory" d
+          RemoveFile f -> dirInfo "remove file" f
+          RenameFile o n -> dirInfo' "rename file from:" o "to:" n
+          RenamePath o n -> dirInfo' "rename path from:" o "to:" n
+          CopyFile o n -> dirInfo' "copy file from:" o "to:" n
+          CreateFileLink o n -> dirInfo' "create file link from:" o "to:" n
+          CreateDirLink o n -> dirInfo' "create directory link from:" o "to:" n
+          RemoveDirLink d -> dirInfo "remove directory link" d
+          -- SetPermissions p ps -> R.setPermissions p ps
+          -- CopyPermissions o n -> R.copyPermissions o n
+          -- GetAccessTime p -> R.getAccessTime p
+          -- GetModificationTime p -> R.getModificationTime p
+          -- SetAccessTime p t -> R.setAccessTime p t
+          -- SetModificationTime p t -> R.setModificationTime p t
+          -- ListDirRel d -> R.listDirRel d
+          -- ListDirRecur d -> R.listDirRecur d
+          -- ListDirRecurRel d -> R.listDirRecurRel d
+          -- CopyDirRecur o n -> R.copyDirRecur o n
+          -- CopyDirRecur' o n -> R.copyDirRecur' o n
+          -- ResolveFile ds f -> R.resolveFile ds f
+          -- ResolveFile' f -> R.resolveFile' f
+          -- ResolveDir ds d -> R.resolveDir ds d
+          -- ResolveDir' f -> R.resolveDir' f
+          -- OpenBinaryTempFile p t -> R.openBinaryTempFile p t
+          -- OpenTempFile p t -> R.openTempFile p t
+          -- CreateTempDir p t -> R.createTempDir p t
+          -- IsLocationOccupied p -> R.isLocationOccupied p
+          -- EnsureFileDurable p -> R.ensureFileDurable p
+          -- WriteBinaryFile p bs -> R.writeBinaryFile p bs
+          -- WriteBinaryFileAtomic p bs -> R.writeBinaryFileAtomic p bs
+          -- WriteBinaryFileDurable p bs -> R.writeBinaryFileDurable p bs
+          -- WriteBinaryFileDurableAtomic p bs -> R.writeBinaryFileDurableAtomic p bs
+          _ -> uu

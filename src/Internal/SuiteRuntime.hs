@@ -60,21 +60,14 @@ data HookStatus
 
 data XContext a = XContext
   { loc :: Loc
-  , evtLogger :: EventLogger a
+  , evtLogger :: L.ExeEvent Loc a  -> IO ()
   }
-
-type EventLogger a = (Int -> SThreadId -> ExeEvent Loc a) -> IO ()
 
 mkCtx :: forall a. XContext a -> Context a
 mkCtx XContext{loc, evtLogger} =
   let
     msgLogger :: a -> IO ()
-    msgLogger msg = evtLogger $ \idx trdId ->
-      ApEvent
-        { idx = idx
-        , threadId = trdId
-        , event = msg
-        }
+    msgLogger = evtLogger . ApEvent
    in
     Context loc msgLogger
 
@@ -295,7 +288,13 @@ withinThreadLimit :: ThreadLimit -> STM Bool
 withinThreadLimit ThreadLimit{maxThreads, runningThreads} =
   (\rt -> maybe True (rt <) maxThreads) <$> readTVar runningThreads
 
-runXFixture :: forall oi ti ii a. EventLogger a -> Either Abandon (ExeIn oi ti ()) -> TestHook a oi ti () ii -> XFixture a oi ti ii -> IO ()
+runXFixture ::
+  forall oi ti ii a.
+  (ExeEvent Loc a -> IO ()) ->
+  Either Abandon (ExeIn oi ti ()) ->
+  TestHook a oi ti () ii ->
+  XFixture a oi ti ii ->
+  IO ()
 runXFixture
   evtLgr
   exin
@@ -619,7 +618,12 @@ nodeStatus =
           XFixtures{fixtures} -> fixtures.status
       )
 
-runNode :: forall oi ti a. EventLogger a -> Either Abandon (ExeIn oi ti ()) -> ExeTree a oi ti -> IO ()
+runNode ::
+  forall oi ti a.
+  (L.ExeEvent Loc a -> IO ()) ->
+  Either Abandon (ExeIn oi ti ()) ->
+  ExeTree a oi ti ->
+  IO ()
 runNode eventLogger hkIn =
   \case
     XGroup
@@ -658,30 +662,24 @@ runNode eventLogger hkIn =
           when r $ modifyTVar' runningThreads succ
           pure r
 
-newLogger :: (ExeEvent Loc a -> IO ()) -> ThreadId -> IO (EventLogger a)
-newLogger sink tid =
-  do
-    ir <- UnliftIO.newIORef (-1)
-    pure $ mkLogger sink ir tid
-
-runTree :: (ExeEvent Loc a -> IO ()) -> ExeTree a () () -> Int -> IO ()
+runTree :: (L.ExeLog Loc a -> IO ()) -> ExeTree a () () -> Int -> IO ()
 runTree sink xtri maxThreads =
-  let hkIn = Right (ExeIn () () ())
-      thrdTokens = replicate maxThreads True
-   in do
-        rootThreadId <- myThreadId
-        rootLogger <- newLogger sink rootThreadId
-        finally
-          ( rootLogger StartExecution
-              >> forConcurrently_
-                thrdTokens
-                ( const do
-                    tid' <- myThreadId
-                    logger' <- newLogger sink tid'
-                    runNode logger' hkIn xtri
-                )
-          )
-          (waitDone xtri >> rootLogger EndExecution)
+  do
+    rootLogger <- newLogger
+    finally
+      ( rootLogger StartExecution
+          >> forConcurrently_
+            thrdTokens
+            ( const do
+                logger' <- newLogger
+                runNode logger' hkIn xtri
+            )
+      )
+      (waitDone xtri >> rootLogger EndExecution)
+ where
+  hkIn = Right (ExeIn () () ())
+  thrdTokens = replicate maxThreads True
+  newLogger = mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
 
 execute :: Int -> LogControls m Loc a -> PN.PreNodeRoot a -> IO ()
 execute

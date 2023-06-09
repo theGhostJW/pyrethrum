@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module DSL.FileSystemDocInterpreter (
-  FileSystem,
-  runFileSystem,
+  -- FileSystem,
+  -- runFileSystem,
 ) where
 
 import BasePrelude (IOException)
@@ -27,6 +27,7 @@ import Effectful.Dispatch.Dynamic (
 import qualified Effectful.Error.Static as E
 import PyrethrumExtras (uu)
 
+{-
 adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -> Eff es b
 adaptException m = uu -- EF.liftIO m `catch` \(e :: IOException) -> E.throwError . FSException $ e
 
@@ -135,3 +136,4 @@ runFileSystem =
           WriteBinaryFileAtomic p bs -> R.writeBinaryFileAtomic p bs
           WriteBinaryFileDurable p bs -> R.writeBinaryFileDurable p bs
           WriteBinaryFileDurableAtomic p bs -> R.writeBinaryFileDurableAtomic p bs
+-}

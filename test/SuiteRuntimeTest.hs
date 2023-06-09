@@ -39,6 +39,8 @@ import Internal.RunTimeLogging as L (
   -- isThreadedEvent,
   -- mkLogger,
   ExeEvent (..),
+  ExeLog,
+  Log (..),
   LogControls (..),
   testLogControls,
  )
@@ -264,10 +266,10 @@ prepare threadCount = prepare' 0 0
         , test = \_ctx _oi _ti _tsti -> ioAction p t
         }
 
-q2List :: forall l a. TQueue (ExeEvent l a) -> STM [ExeEvent l a]
+q2List :: TQueue a -> STM [a]
 q2List qu = reverse <$> recurse [] qu
  where
-  recurse :: [ExeEvent l a] -> TQueue (ExeEvent l a) -> STM [ExeEvent l a]
+  recurse :: [a] -> TQueue a -> STM [a]
   recurse l q =
     tryReadTQueue q
       >>= maybe (pure l) (\e -> recurse (e : l) q)
@@ -290,7 +292,7 @@ runTest maxThreads template = do
       (T.chkFail "No Events Log")
       (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
 
-chkProperties :: (Show a, Show l) => Int -> Template -> [ExeEvent l a] -> IO ()
+chkProperties :: (Show a, Show l) => Int -> Template -> [ExeLog l a] -> IO ()
 chkProperties mxThrds t evts =
   do
     traverse_
@@ -418,8 +420,8 @@ chkProperties mxThrds t evts =
 --              in (cl, accm')
 --         )
 
-fail :: String -> c
-fail = error . toS
+fail :: (Show a) => a -> c
+fail = error . txt
 
 -- lookupThrow :: (Ord k, Show k, Show v) => Text -> M.Map k v -> k -> v
 -- lookupThrow msg m k =
@@ -790,7 +792,7 @@ chkEq' msg e a =
         <> ppShow a
         <> "\n"
 
-chkThreadLogsInOrder :: (Show a, Show l) => [ExeEvent l a] -> IO ()
+chkThreadLogsInOrder :: (Show a, Show l) => [ExeLog l a] -> IO ()
 chkThreadLogsInOrder evts =
   do
     T.chk' "Nothing found in heads - groupOn error this should not happen" (all isJust heads)
@@ -812,25 +814,25 @@ chkThreadLogsInOrder evts =
                   <> toS (ppShow ev2)
       )
 
-chkStartEndExecution :: [ExeEvent l a] -> IO ()
+chkStartEndExecution :: (Show a, Show l) => [ExeLog l a] -> IO ()
 chkStartEndExecution evts =
   (,) <$> L.head evts <*> L.last evts
     & maybe
       (fail "no events")
       ( \(s, e) -> do
-          s & \case
+          s.event & \case
             StartExecution{} -> pure ()
-            _ -> fail "first event is not StartExecution"
-          e & \case
+            _ -> fail $ "first event is not StartExecution:\n " <> toS (ppShow s)
+          e.event & \case
             EndExecution{} -> pure ()
-            _ -> fail "last event is not EndExecution"
+            _ -> fail $ "last event is not EndExecution:\n " <> toS (ppShow e)
       )
 
 {-
 TODO ::
-  - remove end events 
+  - remove end events
   - fix naming of nested test hooks (duplicate names)
-  - flag to turn off in place logging 
+  - flag to turn off in place logging
   - make loc a list
   - map to different object for logging
   - add test for thread hook
@@ -865,8 +867,8 @@ baseFx =
 
 fxWithHooks :: TFixture
 fxWithHooks =
-  baseFx { 
-     onceHook = OnceAround passProps passProps
+  baseFx
+    { onceHook = OnceAround passProps passProps
     , threadHook = Around passPropsSingleton passPropsSingleton
     , testHook = Around passPropsSingleton passPropsSingleton
     }

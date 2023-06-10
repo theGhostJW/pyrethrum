@@ -43,42 +43,42 @@ runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, Out a
 runFileSystem =
   interpret handler
  where
-  -- handler ::
-  --   forall a' localEs.
-  --   (HasCallStack, FileSystem :> localEs) =>
-  --   LocalEnv localEs es ->
-  --   FileSystem (Eff localEs) a' ->
-  --   Eff es a'
+  handler ::
+    forall a' localEs.
+    (HasCallStack, FileSystem :> localEs) =>
+    LocalEnv localEs es ->
+    FileSystem (Eff localEs) a' ->
+    Eff es a'
   handler env fs =
     case fs of
-      WithCurrentDir p action -> hoe $ \ul -> R.withCurrentDir p (ul action)
-      FindFilesWith f ds t -> hoe $ \ul -> R.findFilesWith (ul . f) ds t
-      FindFileWith f ds t -> hoe $ \ul -> R.findFileWith (ul . f) ds t
-      CopyFileWithMetadata o n -> hoe $ \ul -> R.copyFileWithMetadata o n
-      WalkDir h p -> hoe $ \ul -> R.walkDir (\b drs -> ul . h b drs) p
-      WalkDirRel p h -> hoe $ \ul -> R.walkDirRel (\b drs -> ul . h b drs) p
-      WalkDirAccum mdh ow b -> hoe $ \ul ->
-        let
-          mdh' = (\dh b' drs -> ul . dh b' drs) <$> mdh
-          ow' b' drs = ul . ow b' drs
-         in
-          R.walkDirAccum mdh' ow' b
-      WalkDirAccumRel mdh ow b -> hoe $ \ul ->
-        let
-          mdh' = (\dh b' drs -> ul . dh b' drs) <$> mdh
-          ow' b' drs = ul . ow b' drs
-         in
-          R.walkDirAccumRel mdh' ow' b
-      WithTempFile d t f -> hoe $ \ul -> R.withTempFile d t (\p -> ul . f p)
-      WithTempDir d t f -> hoe $ \ul -> R.withTempDir d t (ul . f)
-      WithSystemTempFile t f -> hoe $ \ul -> R.withSystemTempFile t (\p -> ul . f p)
-      WithSystemTempDir t f -> hoe $ \ul -> R.withSystemTempDir t (ul . f)
-      ForgivingAbsence m -> hoe $ \ul -> R.forgivingAbsence (ul m)
-      IgnoringAbsence m -> hoe $ \ul -> R.ignoringAbsence (ul m)
-      WithBinaryFile p m f -> hoe $ \ul -> R.withBinaryFile p m (ul . f)
-      WithBinaryFileAtomic p m f -> hoe $ \ul -> R.withBinaryFileAtomic p m (ul . f)
-      WithBinaryFileDurable p m f -> hoe $ \ul -> R.withBinaryFileDurable p m (ul . f)
-      WithBinaryFileDurableAtomic p m f -> hoe $ \ul -> R.withBinaryFileDurableAtomic p m (ul . f)
+      -- WithCurrentDir p action -> hoe $ \ul -> R.withCurrentDir p (ul action)
+      -- FindFilesWith f ds t -> hoe $ \ul -> R.findFilesWith (ul . f) ds t
+      -- FindFileWith f ds t -> hoe $ \ul -> R.findFileWith (ul . f) ds t
+      -- CopyFileWithMetadata o n -> hoe $ \ul -> R.copyFileWithMetadata o n
+      -- WalkDir h p -> hoe $ \ul -> R.walkDir (\b drs -> ul . h b drs) p
+      -- WalkDirRel p h -> hoe $ \ul -> R.walkDirRel (\b drs -> ul . h b drs) p
+      -- WalkDirAccum mdh ow b -> hoe $ \ul ->
+      --   let
+      --     mdh' = (\dh b' drs -> ul . dh b' drs) <$> mdh
+      --     ow' b' drs = ul . ow b' drs
+      --    in
+      --     R.walkDirAccum mdh' ow' b
+      -- WalkDirAccumRel mdh ow b -> hoe $ \ul ->
+      --   let
+      --     mdh' = (\dh b' drs -> ul . dh b' drs) <$> mdh
+      --     ow' b' drs = ul . ow b' drs
+      --    in
+      --     R.walkDirAccumRel mdh' ow' b
+      -- WithTempFile d t f -> hoe $ \ul -> R.withTempFile d t (\p -> ul . f p)
+      -- WithTempDir d t f -> hoe $ \ul -> R.withTempDir d t (ul . f)
+      -- WithSystemTempFile t f -> hoe $ \ul -> R.withSystemTempFile t (\p -> ul . f p)
+      -- WithSystemTempDir t f -> hoe $ \ul -> R.withSystemTempDir t (ul . f)
+      -- ForgivingAbsence m -> hoe $ \ul -> R.forgivingAbsence (ul m)
+      -- IgnoringAbsence m -> hoe $ \ul -> R.ignoringAbsence (ul m)
+      -- WithBinaryFile p m f -> hoe $ \ul -> R.withBinaryFile p m (ul . f)
+      -- WithBinaryFileAtomic p m f -> hoe $ \ul -> R.withBinaryFileAtomic p m (ul . f)
+      -- WithBinaryFileDurable p m f -> hoe $ \ul -> R.withBinaryFileDurable p m (ul . f)
+      -- WithBinaryFileDurableAtomic p m f -> hoe $ \ul -> R.withBinaryFileDurableAtomic p m (ul . f)
       -- GetCurrentDir -> R.getCurrentDir
       -- GetHomeDir -> R.getHomeDir
       -- GetXdgDir xd bd -> R.getXdgDir xd bd
@@ -141,8 +141,8 @@ runFileSystem =
         WriteBinaryFileDurable p bs -> dirInfo "write binary file contents" p 
         WriteBinaryFileDurableAtomic p bs -> dirInfo "write binary file contents atomically" p
    where
-    hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
-    hoe h = uu -- handle (\(e :: IOException) -> E.throwError . FSException $ e) (localSeqUnliftIO env h)
+    -- hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
+    -- hoe h = uu -- handle (\(e :: IOException) -> E.throwError . FSException $ e) (localSeqUnliftIO env h)
     --
     info :: (Show o) => Text -> o -> Text
     info prefix o = prefix <> ": " <> txt o

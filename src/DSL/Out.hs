@@ -10,6 +10,7 @@ import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, (:>))
 import Effectful.Dispatch.Static (SideEffects (WithSideEffects), StaticRep, getStaticRep, unsafeEff_, unsafeLiftMapIO)
 import qualified Effectful.Error.Static as E
 import PyrethrumExtras (finally)
+import DSL.Internal.ApEvent
 
 {-
 a very simple  logging effect initially copied from
@@ -23,9 +24,9 @@ newtype instance StaticRep (Out a) = Out Sink
 type instance DispatchOf (Out a) = Static WithSideEffects
 
 out :: (HasCallStack, Out a :> es) => a -> Eff es ()
-out action = do
+out payload = do
   Out (Sink sink) <- getStaticRep
-  unsafeEff_ . sink $ action
+  unsafeEff_ . sink $ payload
 
 -- folder :: (Out a :> es) => Text -> Eff es () -> Eff es ()
 -- folder fldrName action = do

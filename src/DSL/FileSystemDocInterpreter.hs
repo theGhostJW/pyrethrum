@@ -31,13 +31,21 @@ import GHC.TypeError (ErrorMessage (Text))
 import Path.Extended (Path, toFilePath)
 import PyrethrumExtras (toS, txt, uu)
 
-data DocException = DocException Text SomeException
+data DocException
+  = DocException Text
+  | DocException' Text IOException
   deriving (Show)
 
 instance Exception DocException
 
 adaptException :: (HasCallStack, IOE :> es, E.Error DocException :> es) => IO b -> Eff es b
-adaptException m = EF.liftIO m `catch` \(e :: SomeException) -> E.throwError . DocException "Exception thrown in documenter" $ e
+adaptException m = EF.liftIO m `catch` \(e :: IOException) -> E.throwError . DocException' "Exception thrown in documenter" $ e
+
+-- TODO:
+--   - finish doc file system
+-- simple console effect
+--   - demo simple efffect app including returning a doc value exception IO and step listing
+--   - add deferred validation
 
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, Out a :> es, E.Error DocException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
@@ -51,7 +59,7 @@ runFileSystem =
     Eff es a'
   handler env fs =
     case fs of
-      -- WithCurrentDir p action -> hoe $ \ul -> R.withCurrentDir p (ul action)
+      WithCurrentDir p action -> docErr "withCurrentDir" "run action in current working directory"
       -- FindFilesWith f ds t -> hoe $ \ul -> R.findFilesWith (ul . f) ds t
       -- FindFileWith f ds t -> hoe $ \ul -> R.findFileWith (ul . f) ds t
       -- CopyFileWithMetadata o n -> hoe $ \ul -> R.copyFileWithMetadata o n
@@ -111,38 +119,55 @@ runFileSystem =
       -- OpenBinaryTempFile p t -> R.openBinaryTempFile p t
       -- OpenTempFile p t -> R.openTempFile p t
       -- CreateTempDir p t -> R.createTempDir p t
-        -- IsLocationOccupied p -> R.isLocationOccupied p
-      _ -> out $ Step $ case fs of
-        EnsureDir p -> dirInfo "ensure directory exists" p
-        CreateDir d -> dirInfo "create directory" d
-        CreateDirIfMissing _ d -> dirInfo "create directory if missing" d
-        RemoveDir d -> dirInfo "remove directory" d
-        RemoveDirRecur d -> dirInfo "remove directory recursively" d
-        RemovePathForcibly p -> dirInfo "remove path forcibly" p
-        RenameDir o n -> dirInfo' "rename directory from" o "to" n
-        ListDir d -> dirInfo "list directory" d
-        SetCurrentDir d -> dirInfo "set current directory" d
-        RemoveFile f -> dirInfo "remove file" f
-        RenameFile o n -> dirInfo' "rename file from:" o "to" n
-        RenamePath o n -> dirInfo' "rename path from:" o "to" n
-        CopyFile o n -> dirInfo' "copy file from:" o "to" n
-        CreateFileLink o n -> dirInfo' "create file link from" o "to" n
-        CreateDirLink o n -> dirInfo' "create directory link from" o "to" n
-        RemoveDirLink d -> dirInfo "remove directory link" d
-        SetPermissions p ps -> info' "set permissions of" p "to" ps
-        CopyPermissions o n -> info' "copy permissions from" o "to" n
-        SetAccessTime p t -> info' "set access time of" p "to" t
-        SetModificationTime p t -> info' "set modification time of" p "to" t
-        CopyDirRecur o n -> dirInfo' "copy directory recursively from" o "to" n
-        CopyDirRecur' o n -> dirInfo' "copy directory recursively from" o "to" n
-        EnsureFileDurable p -> dirInfo "ensure file durable (non-windows only)" p
-        WriteBinaryFile p bs -> dirInfo "write binary file contents" p 
-        WriteBinaryFileAtomic p bs -> dirInfo "write binary file contents atomically" p
-        WriteBinaryFileDurable p bs -> dirInfo "write binary file contents" p 
-        WriteBinaryFileDurableAtomic p bs -> dirInfo "write binary file contents atomically" p
+      -- IsLocationOccupied p -> R.isLocationOccupied p
+      _ -> case fs of
+        EnsureDir p -> logStep $ dirInfo "ensure directory exists" p
+        _ -> uu
    where
-    -- hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
-    -- hoe h = uu -- handle (\(e :: IOException) -> E.throwError . FSException $ e) (localSeqUnliftIO env h)
+    -- CreateDir d -> dirInfo "create directory" d
+    -- CreateDirIfMissing _ d -> dirInfo "create directory if missing" d
+    -- RemoveDir d -> dirInfo "remove directory" d
+    -- RemoveDirRecur d -> dirInfo "remove directory recursively" d
+    -- RemovePathForcibly p -> dirInfo "remove path forcibly" p
+    -- RenameDir o n -> dirInfo' "rename directory from" o "to" n
+    -- ListDir d -> dirInfo "list directory" d
+    -- SetCurrentDir d -> dirInfo "set current directory" d
+    -- RemoveFile f -> dirInfo "remove file" f
+    -- RenameFile o n -> dirInfo' "rename file from:" o "to" n
+    -- RenamePath o n -> dirInfo' "rename path from:" o "to" n
+    -- CopyFile o n -> dirInfo' "copy file from:" o "to" n
+    -- CreateFileLink o n -> dirInfo' "create file link from" o "to" n
+    -- CreateDirLink o n -> dirInfo' "create directory link from" o "to" n
+    -- RemoveDirLink d -> dirInfo "remove directory link" d
+    -- SetPermissions p ps -> info' "set permissions of" p "to" ps
+    -- CopyPermissions o n -> info' "copy permissions from" o "to" n
+    -- SetAccessTime p t -> info' "set access time of" p "to" t
+    -- SetModificationTime p t -> info' "set modification time of" p "to" t
+    -- CopyDirRecur o n -> dirInfo' "copy directory recursively from" o "to" n
+    -- CopyDirRecur' o n -> dirInfo' "copy directory recursively from" o "to" n
+    -- EnsureFileDurable p -> dirInfo "ensure file durable (non-windows only)" p
+    -- WriteBinaryFile p bs -> dirInfo "write binary file contents" p
+    -- WriteBinaryFileAtomic p bs -> dirInfo "write binary file contents atomically" p
+    -- WriteBinaryFileDurable p bs -> dirInfo "write binary file contents" p
+    -- WriteBinaryFileDurableAtomic p bs -> dirInfo "write binary file contents atomically" p
+    logStep :: Text -> Eff es ()
+    logStep = out . Step
+
+  -- TODO: implement docReplace, docHush, docReplace', or docHush'
+    docErr :: forall a''. Text -> Text -> Eff es a''
+    docErr funcName funcDesc =
+      do
+        logStep funcDesc
+        pure
+          . error
+          $ "Value forced from: "
+            <> funcName
+            <> " in documentation mode, use docReplace, docHush, docReplace', or docHush'"
+            <> " to replace or silence this value at the call site for: "
+            <> funcName
+
+    hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
+    hoe h = handle (\(e :: IOException) -> E.throwError . DocException' "Exception genrated running step documenter" $ e) (localSeqUnliftIO env h)
     --
     info :: (Show o) => Text -> o -> Text
     info prefix o = prefix <> ": " <> txt o
@@ -155,6 +180,3 @@ runFileSystem =
 
     dirInfo' :: forall c d e f. Text -> Path c d -> Text -> Path e f -> Text
     dirInfo' prefix p sep p2 = info' prefix (toFilePath p) sep (toFilePath p2)
-
-
-

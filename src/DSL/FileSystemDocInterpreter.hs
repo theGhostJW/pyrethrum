@@ -42,10 +42,14 @@ adaptException :: (HasCallStack, IOE :> es, E.Error DocException :> es) => IO b 
 adaptException m = EF.liftIO m `catch` \(e :: IOException) -> E.throwError . DocException' "Exception thrown in documenter" $ e
 
 -- TODO:
---   - finish doc file system
+-- sort out lazy IO
 -- simple console effect
---   - demo simple efffect app including returning a doc value exception IO and step listing
 --   - add deferred validation
+-- read file effect
+--  - repro issue
+--  - solve issue
+-- finish doc file system
+--   - demo simple efffect app including returning a doc value exception IO and step listing
 
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, Out a :> es, E.Error DocException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
@@ -60,9 +64,9 @@ runFileSystem =
   handler env fs =
     case fs of
       WithCurrentDir p action -> docErr "withCurrentDir" "run action in current working directory"
-      -- FindFilesWith f ds t -> hoe $ \ul -> R.findFilesWith (ul . f) ds t
-      -- FindFileWith f ds t -> hoe $ \ul -> R.findFileWith (ul . f) ds t
-      -- CopyFileWithMetadata o n -> hoe $ \ul -> R.copyFileWithMetadata o n
+      FindFilesWith f ds t -> docErr "findFilesWith" "find files matching predicate"
+      FindFileWith f ds t -> docErr "findFileWith" "find file matching predicate"
+      CopyFileWithMetadata o n -> docErr "copyFileWithMetadata" "copy file with metadata"
       -- WalkDir h p -> hoe $ \ul -> R.walkDir (\b drs -> ul . h b drs) p
       -- WalkDirRel p h -> hoe $ \ul -> R.walkDirRel (\b drs -> ul . h b drs) p
       -- WalkDirAccum mdh ow b -> hoe $ \ul ->
@@ -153,7 +157,7 @@ runFileSystem =
     logStep :: Text -> Eff es ()
     logStep = out . Step
 
-  -- TODO: implement docReplace, docHush, docReplace', or docHush'
+  -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
     docErr :: forall a''. Text -> Text -> Eff es a''
     docErr funcName funcDesc =
       do
@@ -162,7 +166,7 @@ runFileSystem =
           . error
           $ "Value forced from: "
             <> funcName
-            <> " in documentation mode, use docReplace, docHush, docReplace', or docHush'"
+            <> " in documentation mode. Use  docVal, docHush, docVoid, docVal', or docVoid "
             <> " to replace or silence this value at the call site for: "
             <> funcName
 

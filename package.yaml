@@ -19,6 +19,26 @@ extra-source-files:
 # common to point users to the README.md file.
 description: Please see the README on GitHub at <https://github.com/githubuser/simple-hpack#readme>
 
+flags:
+  godLibrary:
+    description: compile all modules (including tests) into one module
+    manual: true
+    default: true
+  optimised:
+    description: is the exe optimised
+    manual: true
+    default: false
+
+_optimisation: &optimisation
+  when:
+    condition: flag(optimised)
+    then:
+      ghc-options:
+        - -O2
+    else:
+      ghc-options:
+        - -O0
+
 dependencies:
   - aeson
   - base-prelude # needed for IOError
@@ -68,12 +88,10 @@ ghc-options:
   # - -with-rtsopts=-N
 
   # - -O2
-  # TODO: prgma to turn optimisations on for non-dev build
-  # - -O2
   # - -flate-specialise # reqiuired for polysemy
   # - -fspecialise-aggressively # reqiuired for polysemy
   # - -Werror
-  - -O0
+  # - *optimisation
   - -Wall
   - -Wcompat
   - -Wincomplete-record-updates
@@ -91,6 +109,8 @@ ghc-options:
   - -fwrite-ide-info
   # - -fdefer-type-errors
   - -Wno-overlapping-patterns
+<<: *optimisation
+  
 
 default-extensions:
   - AllowAmbiguousTypes
@@ -160,6 +180,7 @@ library:
   source-dirs:
     - src
     # this enables eval in ghcid - remove test when finally compiling
+
     - test
   dependencies:
     # test dependencies remove in split config

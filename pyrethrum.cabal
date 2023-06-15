@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 153f571d4f9177e3e93d13f3f434db8609ed598d7cd809371b32c0b88c471356
+-- hash: 3a9fa67c0e71ee6b85a17eaf55b4cfcc431bbbe4e49c9eda26c6a5cc1618f289
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -290,7 +290,6 @@ test-suite pyrethrum-test
       aeson
     , base
     , base-prelude
-    , bytestring
     , chronos
     , containers
     , directory
@@ -301,7 +300,6 @@ test-suite pyrethrum-test
     , effectful-th
     , exceptions
     , extra
-    , hedgehog
     , mtl
     , path
     , path-io
@@ -312,10 +310,6 @@ test-suite pyrethrum-test
     , pyrethrum-extras
     , raw-strings-qq
     , relude
-    , tasty
-    , tasty-discover
-    , tasty-hedgehog
-    , tasty-hunit
     , text
     , time
     , transformers-either

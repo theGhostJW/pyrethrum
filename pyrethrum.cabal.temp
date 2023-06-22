@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5c17376bd2a947537d54f52044f4be3a2394b63b0c650c33e42009565fe6c7e8
+-- hash: 771d25552370b6dd869e61ff88565179cf4355ed96109a74ff2e414f7d3681dd
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -20,11 +20,7 @@ build-type:     Simple
 extra-source-files:
     README.md
     ChangeLog.md
-common optimisation
-  if flag(optimised)
-    ghc-options: -O2
-  else
-    ghc-options: -O0
+
 common testDeps
   build-depends:
     tasty
@@ -35,13 +31,6 @@ common testDeps
     , bytestring
   hs-source-dirs:
     test
-common libImports
-  if flag(godLibrary)
-    import:
-      testDeps, optimisation
-  else
-    import:
-      optimisation
 
 source-repository head
   type: git
@@ -57,8 +46,14 @@ flag optimised
   manual: True
   default: False
 
+common optimisation
+  if flag(optimised)
+    ghc-options: -O2
+  else
+    ghc-options: -O0
+
 library
-  import: libImports
+  import: testDeps, optimisation
   exposed-modules:
       AuxFiles
       Check

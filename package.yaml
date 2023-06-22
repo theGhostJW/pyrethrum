@@ -1,7 +1,7 @@
 name: pyrethrum
 version: 0.1.0.0
 github: "githubuser/simple-hpack"
-license: BSD3
+license: MIT
 author: "Author name here"
 maintainer: "example@example.com"
 copyright: "2018 Author name here"
@@ -9,6 +9,8 @@ copyright: "2018 Author name here"
 extra-source-files:
   - README.md
   - ChangeLog.md
+
+
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -19,7 +21,15 @@ extra-source-files:
 # common to point users to the README.md file.
 description: Please see the README on GitHub at <https://github.com/githubuser/simple-hpack#readme>
 
+# command line:
+  # development
+    # cabal build --flags="-optimised +godLibrary"
+  # test
+    # cabal ci --flags="+optimised -godLibrary"
+
 flags:
+  # use God library for debugging now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
+  # can probably be depricated when HLS can live load multiple modules
   godLibrary:
     description: compile all modules (including tests) into one module
     manual: true
@@ -29,19 +39,38 @@ flags:
     manual: true
     default: false
 
-_optimisation: &optimisation
-  when:
-    condition: flag(optimised)
-    then:
-      ghc-options:
-        - -O2
-    else:
-      ghc-options:
-        - -O0
+verbatim: 
+  - cabal-version: 3.6
+  - |
+    common optimisation
+      if flag(optimised)
+        ghc-options: -O2
+      else
+        ghc-options: -O0
+  - |
+    common testDeps
+      build-depends:
+        tasty
+        , tasty-hunit
+        , tasty-hedgehog
+        , tasty-discover
+        , hedgehog
+        , bytestring
+      hs-source-dirs:
+        test
+  - |
+    common libImports
+      if flag(godLibrary)
+        import:
+          testDeps, optimisation
+      else
+        import:
+          optimisation
 
 dependencies:
   - aeson
   - base-prelude # needed for IOError
+  - bytestring
   - chronos
   - containers
   - directory
@@ -108,8 +137,7 @@ ghc-options:
   - -fno-warn-unused-binds
   - -fno-warn-unused-do-bind
   - -Wno-overlapping-patterns
-  # - -fdefer-type-errors
-<<: *optimisation
+  # - -fdefer-type-error
 
 default-extensions:
   - AllowAmbiguousTypes
@@ -162,50 +190,30 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
-_commonTestDependencies: &commonTestDependencies
-  dependencies:
-    - tasty
-    - tasty-hunit
-    - tasty-hedgehog
-    - tasty-discover
-    - hedgehog
-    - bytestring
 
 library:
+  verbatim:
+    import: libImports
   when:
     # https://github.com/sol/hpack#handling-of-paths_-modules
     - condition: false
       other-modules: Paths_pyrethrum
   source-dirs:
     - src
-    # this enables eval in ghcid - remove test when finally compiling
-
-    - test
   dependencies:
-    # test dependencies remove in split config
-    - tasty
-    - tasty-hunit
-    - tasty-hedgehog
-    - tasty-discover
-    - hedgehog
-    - bytestring
-    # end test dependencies remove in split config
     - deepseq
     - unordered-containers
     - template-haskell
-    - bytestring
     - fmt
-
-#  reinstate when LHS can live load multiple modules
-# use God library for now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
 
 tests:
   pyrethrum-test:
+    verbatim:
+      import: testDeps
     main: Main.hs
     source-dirs:
       - test
     dependencies:
       - pyrethrum
-    <<: *commonTestDependencies
 
 build-tools: tasty-discover:tasty-discover

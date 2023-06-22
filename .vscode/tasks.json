@@ -76,7 +76,22 @@
       "type": "shell",
       "command": "cabal",
       "args": [
-        "build"
+        "build",
+        "--flags='-optimised +godLibrary'"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "cabal build CI",
+      "type": "shell",
+      "command": "cabal",
+      "args": [
+        "build",
+        "--flags='+optimised -godLibrary'"
       ],
       "presentation": {
         "reveal": "always",

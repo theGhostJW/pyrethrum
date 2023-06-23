@@ -1,4 +1,3 @@
-
 {
   // See https://go.microsoft.com/fwlink/?LinkId=733558
   // for the documentation about the tasks.json format
@@ -17,7 +16,17 @@
       "dependsOrder": "sequence",
       "dependsOn": [
         "build",
+        "copy pyrethrum ghci",
         "ghcid pyrethrum"
+      ]
+    },
+    {
+      "label": "build restart ghcid examples",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "build",
+        "copy examples ghci",
+        "ghcid examples"
       ]
     },
     {
@@ -113,6 +122,39 @@
       "args": [
         "build",
         "--flags='+optimised -godLibrary'"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "copy pyrethrum ghci",
+      "type": "shell",
+      "command": "xcopy",
+      "args": [
+        ".pyrethrum.ghci",
+        ".ghci",
+        "/Y",
+        "/Q"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "copy example ghci",
+      "type": "shell",
+      "command": "xcopy",
+      "args": [
+        ".examples.ghci",
+        ".ghci",
+        "/Y",
+        "/I",
+        "/Q"
       ],
       "presentation": {
         "reveal": "always",

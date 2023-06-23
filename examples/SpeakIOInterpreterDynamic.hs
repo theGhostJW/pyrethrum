@@ -59,7 +59,7 @@ exeSpeakerApp :: IO ()
 exeSpeakerApp =
   runEff . runSpeak $ speakApp "John"
 
--- $> exeSpeakerAppCasual 
+-- $ > exeSpeakerAppCasual 
 exeSpeakerAppCasual :: IO ()
 exeSpeakerAppCasual =
   runEff . runSpeakCasual $ speakApp "John"

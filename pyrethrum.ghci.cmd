@@ -1,0 +1,1 @@
+xcopy .pyrethrum.ghci .ghci /Y /Q

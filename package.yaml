@@ -208,13 +208,13 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
-# internal-libraries:
-#   examples:
-#     ghc-options: -O0
-#     source-dirs:
-#       - examples
-#     dependencies:
-#       - pyrethrum
+internal-libraries:
+  examples:
+    ghc-options: -O0
+    source-dirs:
+      - examples
+    dependencies:
+      - pyrethrum
 
 library:
   verbatim:

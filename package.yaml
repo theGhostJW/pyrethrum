@@ -10,8 +10,6 @@ extra-source-files:
   - README.md
   - ChangeLog.md
 
-
-
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
 # category:            Web
@@ -22,10 +20,10 @@ extra-source-files:
 description: Please see the README on GitHub at <https://github.com/githubuser/simple-hpack#readme>
 
 # command line:
-  # development
-    # cabal build --flags="-optimised +godLibrary"
-  # test
-    # cabal ci --flags="+optimised -godLibrary"
+# development
+# cabal build --flags="-optimised +godLibrary"
+# test
+# cabal ci --flags="+optimised -godLibrary"
 
 flags:
   # use God library for debugging now - https://www.haskellforall.com/2021/05/module-organization-guidelines-for.html
@@ -39,7 +37,7 @@ flags:
     manual: true
     default: false
 
-verbatim: 
+verbatim:
   - cabal-version: 3.6
   - |
     common optimisation
@@ -190,6 +188,13 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
+internal-libraries:
+  examples:
+    ghc-options: -O0
+    source-dirs:
+      - examples
+    dependencies:
+      - pyrethrum
 
 library:
   verbatim:

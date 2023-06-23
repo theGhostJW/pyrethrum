@@ -17,16 +17,16 @@
       "dependsOrder": "sequence",
       "dependsOn": [
         "build",
-        "ghcid"
+        "ghcid pyrethrum"
       ]
     },
     {
-      "label": "ghcid",
+      "label": "ghcid pyrethrum",
       "type": "shell",
       "command": "ghcid",
       "args": [
         "--command",
-        "'cabal repl'",
+        "'cabal repl pyrethrum'",
         "--allow-eval",
         "--clear",
         "--no-height-limit",

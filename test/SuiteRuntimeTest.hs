@@ -845,7 +845,7 @@ TODO ::
 unit_group_fixture_with_hooks :: IO ()
 unit_group_fixture_with_hooks = runTest 1 simpleGroupWithHooks
 
--- $ > unit_single_fixture
+-- $> unit_single_fixture
 unit_single_fixture :: IO ()
 unit_single_fixture = runTest 1 singleFixture
 

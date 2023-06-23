@@ -841,6 +841,7 @@ TODO ::
   - does a log sink have toalways be io?
 -}
 
+
 -- $> unit_group_fixture_with_hooks
 unit_group_fixture_with_hooks :: IO ()
 unit_group_fixture_with_hooks = runTest 1 simpleGroupWithHooks

@@ -26,7 +26,8 @@
       "command": "ghcid",
       "args": [
         "--command",
-        "'cabal repl pyrethrum'",
+        "'cabal repl'",
+        // "pyrethrum",
         "--allow-eval",
         "--clear",
         "--no-height-limit",

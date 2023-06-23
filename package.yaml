@@ -54,6 +54,26 @@ verbatim:
         , tasty-discover
         , hedgehog
         , bytestring
+      other-modules:
+        ArbitraryIOTest
+        AuxFilesTest
+        CheckTest
+        ConcurrentSuiteSimple
+        ConcurrentSuiteTestOnly
+        DemoConfig
+        DemoSuite
+        EndpointTest
+        EvalHelp
+        ItemFiltersTest
+        LogListCheck
+        LogProtocolTest
+        LogTransformationTest
+        PrettyPrintTest
+        RunnerTest
+        SemTest
+        SuiteRunIntegrityTest
+        SuiteRuntimeTest
+        TestFilterTest
       hs-source-dirs:
         test
   - |
@@ -188,13 +208,13 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
-internal-libraries:
-  examples:
-    ghc-options: -O0
-    source-dirs:
-      - examples
-    dependencies:
-      - pyrethrum
+# internal-libraries:
+#   examples:
+#     ghc-options: -O0
+#     source-dirs:
+#       - examples
+#     dependencies:
+#       - pyrethrum
 
 library:
   verbatim:

@@ -1,1 +1,0 @@
-xcopy .examples.ghci .ghci /Y /Q

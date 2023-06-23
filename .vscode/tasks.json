@@ -27,7 +27,27 @@
       "args": [
         "--command",
         "'cabal repl'",
-        // "pyrethrum",
+        "pyrethrum",
+        "--allow-eval",
+        "--clear",
+        "--no-height-limit",
+        "-o ghcid.log"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ghcid examples",
+      "type": "shell",
+      "command": "ghcid",
+      "args": [
+        "--command",
+        "'cabal repl examples'",
+        // "examples",
+        // "--with-ghc=.examples.ghci",
         "--allow-eval",
         "--clear",
         "--no-height-limit",

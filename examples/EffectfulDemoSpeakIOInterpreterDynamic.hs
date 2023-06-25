@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
-module SpeakIOInterpreterDynamic where
+module EffectfulDemoSpeakIOInterpreterDynamic where
 
 import qualified Data.Text.IO as T
 import Effectful as EF (
@@ -43,23 +43,23 @@ runSpeakCasual =
   interpret $ \_ ->
     EF.liftIO . \case
       Hello name -> T.putStrLn $ "hi (dynamic) " <> name
-      Goodbye name -> T.putStrLn $ "buy (dynamic) " <> name
+      Goodbye name -> T.putStrLn $ "bye (dynamic) " <> name
 
 -- Effectful Ap
 
-speakApp :: (HasCallStack, IOE :> es) => Text -> Eff (Speak : es) ()
+speakApp :: (Speak :> es) => Text -> Eff es ()
 speakApp name = do
   hello name
   goodbye name
 
 -- Implementation
 
--- $> exeSpeakerApp 
+-- $> exeSpeakerApp
 exeSpeakerApp :: IO ()
 exeSpeakerApp =
   runEff . runSpeak $ speakApp "John"
 
--- $ > exeSpeakerAppCasual 
+-- $ > exeSpeakerAppCasual
 exeSpeakerAppCasual :: IO ()
 exeSpeakerAppCasual =
   runEff . runSpeakCasual $ speakApp "John"

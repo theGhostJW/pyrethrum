@@ -16,7 +16,6 @@
       "dependsOrder": "sequence",
       "dependsOn": [
         "build",
-        "copy pyrethrum ghci",
         "ghcid pyrethrum"
       ]
     },
@@ -31,42 +30,19 @@
     },
     {
       "label": "ghcid pyrethrum",
-      "type": "shell",
-      "command": "ghcid",
-      "args": [
-        "--command",
-        "'cabal repl'",
-        "pyrethrum",
-        "--allow-eval",
-        "--clear",
-        "--no-height-limit",
-        "-o ghcid.log"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "problemMatcher": []
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "copy pyrethrum ghci",
+        "ghcid-pyrethrum-no-copy"
+      ]
     },
     {
       "label": "ghcid examples",
-      "type": "shell",
-      "command": "ghcid",
-      "args": [
-        "--command",
-        "'cabal repl examples'",
-        // "examples",
-        // "--with-ghc=.examples.ghci",
-        "--allow-eval",
-        "--clear",
-        "--no-height-limit",
-        "-o ghcid.log"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "problemMatcher": []
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "copy examples ghci",
+        "ghcid-examples-no-copy"
+      ]
     },
     // {
     //   // Not working - exits after first run
@@ -136,8 +112,8 @@
       "args": [
         ".pyrethrum.ghci",
         ".ghci",
-        "/Y",
-        "/Q"
+        "/y",
+        "/f"
       ],
       "presentation": {
         "reveal": "always",
@@ -146,15 +122,14 @@
       "problemMatcher": []
     },
     {
-      "label": "copy example ghci",
+      "label": "copy examples ghci",
       "type": "shell",
       "command": "xcopy",
       "args": [
         ".examples.ghci",
         ".ghci",
-        "/Y",
-        "/I",
-        "/Q"
+        "/y",
+        "/f"
       ],
       "presentation": {
         "reveal": "always",
@@ -169,6 +144,43 @@
       "args": [
         "test",
         "--test-show-details=streaming"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ghcid-examples-no-copy",
+      "type": "shell",
+      "command": "ghcid",
+      "args": [
+        "--command",
+        "'cabal repl examples'",
+        "--allow-eval",
+        "--clear",
+        "--no-height-limit",
+        "-o ghcid.log"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ghcid-pyrethrum-no-copy",
+      "type": "shell",
+      "command": "ghcid",
+      "args": [
+        "--command",
+        "'cabal repl'",
+        "pyrethrum",
+        "--allow-eval",
+        "--clear",
+        "--no-height-limit",
+        "-o ghcid.log"
       ],
       "presentation": {
         "reveal": "always",

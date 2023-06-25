@@ -1,3 +1,3 @@
-:l SpeakEffect SpeakIOInterpreterDynamic
+:l EffectfulDemoSpeakEffect EffectfulDemoSpeakIOInterpreterDynamic
 
-:m SpeakEffect SpeakIOInterpreterDynamic
+:m EffectfulDemoSpeakEffect EffectfulDemoSpeakIOInterpreterDynamic

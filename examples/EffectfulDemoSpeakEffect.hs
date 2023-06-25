@@ -1,4 +1,4 @@
-module SpeakEffect where
+module EffectfulDemoSpeakEffect where
 
 import Effectful as EF (
   Dispatch (Dynamic),

@@ -1,4 +1,6 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
+-- TODO - Why do I to need this?
+{-# LANGUAGE NoPolyKinds #-}
 
 module DSL.Out (
   Out,
@@ -7,7 +9,7 @@ module DSL.Out (
 ) where
 
 import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, (:>))
-import Effectful.Dispatch.Static (SideEffects (WithSideEffects), StaticRep, getStaticRep, unsafeEff_, unsafeLiftMapIO)
+import Effectful.Dispatch.Static (SideEffects (WithSideEffects, NoSideEffects), StaticRep, getStaticRep, unsafeEff_, unsafeLiftMapIO)
 import qualified Effectful.Error.Static as E
 import PyrethrumExtras (finally)
 import DSL.Internal.ApEvent
@@ -18,22 +20,12 @@ https://hackage.haskell.org/package/effectful-core-2.2.2.2/docs/Effectful-Dispat
 -}
 
 data Out a :: Effect
-newtype Sink = Sink {sink :: forall a. a -> IO ()}
-newtype instance StaticRep (Out a) = Out Sink
-
 type instance DispatchOf (Out a) = Static WithSideEffects
+newtype instance StaticRep (Out a) = Out (Sink a)
+
+newtype Sink a = Sink {sink :: a -> IO ()}
 
 out :: (HasCallStack, Out a :> es) => a -> Eff es ()
 out payload = do
   Out (Sink sink) <- getStaticRep
   unsafeEff_ . sink $ payload
-
--- folder :: (Out a :> es) => Text -> Eff es () -> Eff es ()
--- folder fldrName action = do
---   Out (Sink sink) <- getStaticRep
---   finally
---     ( do
---         unsafeEff_ . sink $ StartFolder fldrName
---         action
---     )
---     (unsafeEff_ $ sink EndFolder) 

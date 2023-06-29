@@ -157,7 +157,7 @@ data FileSystem :: Effect where
   FindExecutable :: Path Rel File -> FileSystem m (Maybe (Path Abs File))
   FindFile :: [Path Abs Dir] -> Path Rel File -> FileSystem m (Maybe (Path Abs File))
   FindFiles :: [Path Abs Dir] -> Path Rel File -> FileSystem m [Path Abs File]
-  FindFilesWith :: (Path Abs File -> m Bool) -> [Path Abs Dir] -> Path Rel File -> FileSystem m [Path Abs File]
+  FindFilesWith :: (Path Abs File -> m Bool) -> [Path a Dir] -> Path Rel File -> FileSystem m [Path Abs File]
   FindFileWith :: (Path Abs File -> m Bool) -> [Path Abs Dir] -> Path Rel File -> FileSystem m (Maybe (Path Abs File))
   CreateFileLink :: Path b File -> Path b File -> FileSystem m ()
   CreateDirLink :: Path b Dir -> Path b Dir -> FileSystem m ()

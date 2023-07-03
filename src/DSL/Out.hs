@@ -1,6 +1,6 @@
-{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 -- TODO - Why do I to need this?
 {-# LANGUAGE NoPolyKinds #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module DSL.Out (
   Out,
@@ -8,11 +8,11 @@ module DSL.Out (
   out,
 ) where
 
-import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, (:>))
-import Effectful.Dispatch.Static (SideEffects (WithSideEffects, NoSideEffects), StaticRep, getStaticRep, unsafeEff_, unsafeLiftMapIO)
+import DSL.Internal.ApEvent
+import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, IOE, (:>))
+import Effectful.Dispatch.Static (SideEffects (NoSideEffects, WithSideEffects), StaticRep, evalStaticRep, getStaticRep, unsafeEff_, unsafeLiftMapIO)
 import qualified Effectful.Error.Static as E
 import PyrethrumExtras (finally)
-import DSL.Internal.ApEvent
 
 {-
 a very simple  logging effect initially copied from
@@ -25,7 +25,10 @@ newtype instance StaticRep (Out a) = Out (Sink a)
 
 newtype Sink a = Sink {sink :: a -> IO ()}
 
-out :: (HasCallStack, Out a :> es) => a -> Eff es ()
+out :: (Out a :> es) => a -> Eff es ()
 out payload = do
   Out (Sink sink) <- getStaticRep
   unsafeEff_ . sink $ payload
+
+runOut :: (IOE :> es) => (a -> IO ()) -> Eff (Out a : es) a -> Eff es a
+runOut = evalStaticRep . Out . Sink

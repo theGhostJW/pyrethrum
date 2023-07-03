@@ -8,9 +8,9 @@ import PyrethrumExtras (uu, Path, File, Abs, (?), toS, txt)
 import Path (toFilePath, reldir, relfile)
 import Data.List.Extra (isInfixOf)
 
-type FSOut es = (Out Text :> es, FileSystem :> es)
+-- type FSOut es = (Out Text :> es, FileSystem :> es)
 
-demoApp :: FSOut es => Text -> Eff es ()
+demoApp :: (Out Text :> es, FileSystem :> es) => Text -> Eff es ()
 demoApp txt' = do 
   s <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
   r <- test s
@@ -22,6 +22,6 @@ demoApp txt' = do
 test :: [Path Abs File] -> Eff es Bool
 test _ = pure True
 
--- TODO => hide teplace with text
+-- TODO => hide string based prntLn et. al.
 consoleSink :: Show a => Sink a
-consoleSink = Sink $ \o -> putStrLn . toS $ txt o
+consoleSink = Sink print

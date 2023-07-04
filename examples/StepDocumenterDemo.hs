@@ -1,27 +1,64 @@
 module StepDocumenterDemo where
 
-import DSL.FileSystemDocInterpreter
+import qualified DSL.FileSystemDocInterpreter as DII
 import DSL.FileSystemEffect
+import qualified DSL.FileSystemIOInterpreter as IOI
 import DSL.Out
-import Effectful ((:>), Eff)
-import PyrethrumExtras (uu, Path, File, Abs, (?), toS, txt)
-import Path (toFilePath, reldir, relfile)
 import Data.List.Extra (isInfixOf)
+import Effectful (Eff, IOE, runEff, (:>))
+import Effectful.Error.Static (Error, runError)
+import Path (reldir, relfile, toFilePath)
+import PyrethrumExtras (Abs, File, Path, toS, txt, uu, (?))
+import DSL.Internal.ApEvent
 
 -- type FSOut es = (Out Text :> es, FileSystem :> es)
 
-demoApp :: (Out Text :> es, FileSystem :> es) => Text -> Eff es ()
-demoApp txt' = do 
+demo2 :: forall es. (Out ApEvent :> es, FileSystem :> es) => Eff es ()
+demo2 = do
+  paths <- getPaths
+  chk paths
+ where
+  chk :: [Path Abs File] -> Eff es ()
+  chk ps =  log $ length ps > 0 ? "More than 0 paths" $ "zero paths"
+
+demo :: forall es. (Out ApEvent :> es, FileSystem :> es) => Eff es ()
+demo = do
+  paths <- getPaths
+  chk paths
+ where
+  chk :: [Path Abs File] -> Eff es ()
+  chk _ = log "This is a check"
+
+docRun :: Eff '[FileSystem, Out ApEvent, Error DII.DocException, IOE] a -> IO (Either (CallStack, DII.DocException) a)
+docRun = runEff . runError . apEventOut . DII.runFileSystem
+
+apEventOut :: forall a es. (IOE :> es) => Eff (Out ApEvent : es) a -> Eff es a
+apEventOut = runOut print
+
+-- $> runDemo
+runDemo :: IO (Either (CallStack, DII.DocException) ())
+runDemo = docRun demo
+
+-- $> runDemo2
+runDemo2 :: IO (Either (CallStack, DII.DocException) ())
+runDemo2 = docRun demo2
+
+log :: (Out ApEvent :> es) => Text -> Eff es ()
+log = out . Log
+
+getPaths :: (Out ApEvent :> es, FileSystem :> es) => Eff es [Path Abs File]
+getPaths = do
   s <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
   r <- test s
-  out $ r ? "yes" $ "no"
- where 
+  log $ r ? "yes" $ "no"
+  pure s
+ where
   isDeleteMe :: Path Abs File -> Eff es Bool
-  isDeleteMe = pure . ("deleteMe" `isInfixOf`) . toFilePath
+  isDeleteMe = pure . isInfixOf "deleteMe" . toFilePath
 
 test :: [Path Abs File] -> Eff es Bool
 test _ = pure True
 
 -- TODO => hide string based prntLn et. al.
-consoleSink :: Show a => Sink a
+consoleSink :: (Show a) => Sink a
 consoleSink = Sink print

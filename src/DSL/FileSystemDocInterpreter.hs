@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module DSL.FileSystemDocInterpreter (
+    runFileSystem,
+    DocException
   ) where
 
 -- FileSystem,
@@ -51,7 +53,7 @@ adaptException m = EF.liftIO m `catch` \(e :: IOException) -> E.throwError . Doc
 -- finish doc file system
 --   - demo simple efffect app including returning a doc value exception IO and step listing
 
-runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, Out a :> es, E.Error DocException :> es) => Eff (FileSystem : es) a -> Eff es a
+runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, E.Error DocException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
   interpret handler
  where

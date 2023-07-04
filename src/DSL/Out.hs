@@ -6,6 +6,7 @@ module DSL.Out (
   Out,
   Sink (..),
   out,
+  runOut
 ) where
 
 import DSL.Internal.ApEvent
@@ -30,5 +31,6 @@ out payload = do
   Out (Sink sink) <- getStaticRep
   unsafeEff_ . sink $ payload
 
-runOut :: (IOE :> es) => (a -> IO ()) -> Eff (Out a : es) a -> Eff es a
+
+runOut :: (IOE :> es) => (a -> IO ()) -> Eff (Out a : es) b -> Eff es b
 runOut = evalStaticRep . Out . Sink

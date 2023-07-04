@@ -54,7 +54,7 @@ speakApp name = do
 
 -- Implementation
 
--- $> exeSpeakerApp
+-- $ > exeSpeakerApp
 exeSpeakerApp :: IO ()
 exeSpeakerApp =
   runEff . runSpeak $ speakApp "John"

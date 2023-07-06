@@ -46,7 +46,7 @@ verbatim:
       else
         ghc-options: -O0
   - |
-    common testDeps
+    common testLibProps
       build-depends:
         tasty
         , tasty-hunit
@@ -54,33 +54,22 @@ verbatim:
         , tasty-discover
         , hedgehog
         , bytestring
-      other-modules:
-        ArbitraryIOTest
-        AuxFilesTest
-        CheckTest
-        ConcurrentSuiteSimple
-        ConcurrentSuiteTestOnly
-        DemoConfig
-        DemoSuite
-        EndpointTest
-        EvalHelp
-        ItemFiltersTest
-        LogListCheck
-        LogProtocolTest
-        LogTransformationTest
-        PrettyPrintTest
-        RunnerTest
-        SemTest
-        SuiteRunIntegrityTest
-        SuiteRuntimeTest
-        TestFilterTest
       hs-source-dirs:
         test
+  - |
+    common pyrethrumProps
+      hs-source-dirs:
+        src
+      build-depends:
+        deepseq
+        , unordered-containers
+        , template-haskell
+        , fmt
   - |
     common libImports
       if flag(godLibrary)
         import:
-          testDeps, optimisation
+          testLibProps, optimisation
       else
         import:
           optimisation
@@ -217,8 +206,6 @@ internal-libraries:
       - pyrethrum
 
 library:
-  verbatim:
-    import: libImports
   when:
     # https://github.com/sol/hpack#handling-of-paths_-modules
     - condition: false
@@ -230,15 +217,19 @@ library:
     - unordered-containers
     - template-haskell
     - fmt
+  # verbatum needs to go last otherwise exposed module inference does not work
+  verbatim:
+    import: libImports, pyrethrumProps
 
 tests:
   pyrethrum-test:
-    verbatim:
-      import: testDeps
     main: Main.hs
     source-dirs:
       - test
     dependencies:
       - pyrethrum
-
+    # verbatum needs to go last otherwise other module inference does not work
+    verbatim:
+      import: testLibProps
+      
 build-tools: tasty-discover:tasty-discover

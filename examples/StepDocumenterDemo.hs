@@ -13,13 +13,21 @@ import DSL.Internal.ApEvent
 
 -- type FSOut es = (Out Text :> es, FileSystem :> es)
 
+demo3 :: forall es. (Out ApEvent :> es, FileSystem :> es) => Eff es ()
+demo3 = do
+  paths <- getPaths
+  chk paths
+ where
+  chk :: [Path Abs File] -> Eff es ()
+  chk ps = log $ length ps > 0 ? "More than 0 paths" $ "zero paths"
+
 demo2 :: forall es. (Out ApEvent :> es, FileSystem :> es) => Eff es ()
 demo2 = do
   paths <- getPaths
   chk paths
  where
   chk :: [Path Abs File] -> Eff es ()
-  chk ps =  log $ length ps > 0 ? "More than 0 paths" $ "zero paths"
+  chk ps = log $ length ps > 0 ? "More than 0 paths" $ "zero paths"
 
 demo :: forall es. (Out ApEvent :> es, FileSystem :> es) => Eff es ()
 demo = do
@@ -28,6 +36,9 @@ demo = do
  where
   chk :: [Path Abs File] -> Eff es ()
   chk _ = log "This is a check"
+
+docRunHandleAll :: Eff '[FileSystem, Out ApEvent, Error DII.DocException, IOE] a -> IO (Either (CallStack, DII.DocException) a)
+docRunHandleAll = runEff . runError . apEventOut . DII.runFileSystem
 
 docRun :: Eff '[FileSystem, Out ApEvent, Error DII.DocException, IOE] a -> IO (Either (CallStack, DII.DocException) a)
 docRun = runEff . runError . apEventOut . DII.runFileSystem

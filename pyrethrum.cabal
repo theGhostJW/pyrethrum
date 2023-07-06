@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: cc7d85176fed6cea117a78c9f35c4818e03a5d7b4917c7d72d07e3a671924f04
+-- hash: 876957bce40da6a15ef6681317381c154b75f75fff6a0a23d921b9bb5eb22171
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -25,7 +25,7 @@ common optimisation
     ghc-options: -O2
   else
     ghc-options: -O0
-common testDeps
+common testLibProps
   build-depends:
     tasty
     , tasty-hunit
@@ -33,32 +33,20 @@ common testDeps
     , tasty-discover
     , hedgehog
     , bytestring
-  other-modules:
-    ArbitraryIOTest
-    AuxFilesTest
-    CheckTest
-    ConcurrentSuiteSimple
-    ConcurrentSuiteTestOnly
-    DemoConfig
-    DemoSuite
-    EndpointTest
-    EvalHelp
-    ItemFiltersTest
-    LogListCheck
-    LogProtocolTest
-    LogTransformationTest
-    PrettyPrintTest
-    RunnerTest
-    SemTest
-    SuiteRunIntegrityTest
-    SuiteRuntimeTest
-    TestFilterTest
   hs-source-dirs:
     test
+common pyrethrumProps
+  hs-source-dirs:
+    src
+  build-depends:
+    deepseq
+    , unordered-containers
+    , template-haskell
+    , fmt
 common libImports
   if flag(godLibrary)
     import:
-      testDeps, optimisation
+      testLibProps, optimisation
   else
     import:
       optimisation
@@ -78,7 +66,7 @@ flag optimised
   default: False
 
 library
-  import: libImports
+  import: libImports, pyrethrumProps
   exposed-modules:
       AuxFiles
       Check
@@ -319,7 +307,7 @@ library examples
   default-language: Haskell2010
 
 test-suite pyrethrum-test
-  import: testDeps
+  import: testLibProps
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:

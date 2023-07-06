@@ -83,6 +83,7 @@
       "command": "cabal",
       "args": [
         "build",
+        // "-v",
         "--flags='-optimised +godLibrary'"
       ],
       "presentation": {

@@ -2,7 +2,8 @@
 
 module DSL.FileSystemDocInterpreter (
     runFileSystem,
-    DocException
+    DocException,
+    adaptException
   ) where
 
 -- FileSystem,
@@ -35,13 +36,13 @@ import PyrethrumExtras (toS, txt, uu)
 
 data DocException
   = DocException Text
-  | DocException' Text IOException
+  | DocException' Text SomeException
   deriving (Show)
 
 instance Exception DocException
 
-adaptException :: (HasCallStack, IOE :> es, E.Error DocException :> es) => IO b -> Eff es b
-adaptException m = EF.liftIO m `catch` \(e :: IOException) -> E.throwError . DocException' "Exception thrown in documenter" $ e
+adaptException :: forall es a. (HasCallStack, IOE :> es, E.Error DocException :> es) => IO a -> Eff es a
+adaptException m = EF.liftIO m `catch` \(e :: SomeException) -> E.throwError . DocException' "Exception thrown in documenter" $ e
 
 -- TODO:
 -- sort out lazy IO
@@ -164,8 +165,8 @@ runFileSystem =
     docErr funcName funcDesc =
       do
         logStep funcDesc
-        pure
-          . error
+        adaptException $ pure
+           . error
           $ "Value forced from: "
             <> funcName
             <> " in documentation mode. Use  docVal, docHush, docVoid, docVal', or docVoid "
@@ -173,7 +174,7 @@ runFileSystem =
             <> funcName
 
     hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
-    hoe h = handle (\(e :: IOException) -> E.throwError . DocException' "Exception genrated running step documenter" $ e) (localSeqUnliftIO env h)
+    hoe h = handle (\(e :: SomeException) -> E.throwError . DocException' "Exception genrated running step documenter" $ e) (localSeqUnliftIO env h)
     --
     info :: (Show o) => Text -> o -> Text
     info prefix o = prefix <> ": " <> txt o

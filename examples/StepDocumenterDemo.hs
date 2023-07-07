@@ -12,7 +12,6 @@ import PyrethrumExtras (Abs, File, Path, toS, txt, uu, (?))
 import DSL.Internal.ApEvent
 
 -- type FSOut es = (Out Text :> es, FileSystem :> es)
-
 demo3 :: forall es. (Out ApEvent :> es, FileSystem :> es) => Eff es ()
 demo3 = do
   paths <- getPaths

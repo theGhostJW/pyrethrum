@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module DSL.FileSystemDocInterpreter (
-    runFileSystem,
-    DocException,
-    adaptException
-  ) where
+  runFileSystem,
+  DocException,
+  adaptException,
+) where
 
 -- FileSystem,
 -- runFileSystem,
@@ -160,18 +160,20 @@ runFileSystem =
     logStep :: Text -> Eff es ()
     logStep = out . Step
 
-  -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
+    -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
     docErr :: forall a''. Text -> Text -> Eff es a''
     docErr funcName funcDesc =
       do
         logStep funcDesc
-        adaptException $ pure
-           . error
-          $ "Value forced from: "
+        -- E.throwError . DocException $
+        error $
+          "\nException thrown in step documentation."
+            <> "\n  Value forced from function: '"
             <> funcName
-            <> " in documentation mode. Use  docVal, docHush, docVoid, docVal', or docVoid "
-            <> " to replace or silence this value at the call site for: "
-            <> funcName
+            <> "' in documentation mode."
+            <> "\n  Use  docVal, docHush, docVoid, docVal', or docVoid "
+            <> " to replace or silence this value at the call site for: '"
+            <> funcName <> "'"
 
     hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
     hoe h = handle (\(e :: SomeException) -> E.throwError . DocException' "Exception genrated running step documenter" $ e) (localSeqUnliftIO env h)

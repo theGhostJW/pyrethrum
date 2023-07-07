@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 876957bce40da6a15ef6681317381c154b75f75fff6a0a23d921b9bb5eb22171
+-- hash: 8f000fe8fd9a7ef7250c558aee383d699e7de64fe379dc49accfbcc95ed9ff9d
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -212,12 +212,58 @@ library examples
       EffectfulDemoSpeakIOInterpreterDynamic
       StepDocumenterDemo
       StepRunDemo
+      AuxFiles
+      Check
+      Common
+      DSL
+      DSL.ArbitraryIO
+      DSL.CurrentTime
+      DSL.CurrentTimeDocLogger
+      DSL.FileSystemDocInterpreter
+      DSL.FileSystemEffect
+      DSL.FileSystemIOInterpreter
+      DSL.FileSystemPsy
+      DSL.Internal.ApEvent
+      DSL.Internal.FileSystemPure
+      DSL.Internal.FileSystemRawIO
+      DSL.Interpreter
+      DSL.LoggerPsy
+      DSL.LogProtocol
+      DSL.LogProtocol.PrettyPrint
+      DSL.Out
+      FileLogging
+      Internal.ExeNode
+      Internal.PreNode
+      Internal.RunnerBaseLazy
+      Internal.RunTimeLogging
+      Internal.SuiteRuntime
+      Internal.SuiteRuntimeOld
+      ItemFilter
+      ItemRunners
+      List.Extra
+      LogTransformation
+      LogTransformation.Common
+      LogTransformation.PrintLogDisplayElement
+      LogTransformation.Stats
+      LogTransformation.Test
+      MemberReflection
+      OrphanedInstances
+      PrettyPrintCommon
+      RunElementClasses
+      Runner
+      RunnerBase
+      RunnerConsoleAndFile
+      TempUtils
+      TestFilter
+      TestFilters
+      Text.Extra
   other-modules:
       Paths_pyrethrum
   autogen-modules:
       Paths_pyrethrum
   hs-source-dirs:
       examples
+      src
   default-extensions:
       AllowAmbiguousTypes
       BangPatterns

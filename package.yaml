@@ -202,6 +202,7 @@ internal-libraries:
     ghc-options: -O0
     source-dirs:
       - examples
+      - src
     dependencies:
       - pyrethrum
 

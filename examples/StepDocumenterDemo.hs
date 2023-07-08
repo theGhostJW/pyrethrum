@@ -22,7 +22,7 @@ demo = do
   chk :: [Path Abs File] -> Eff es ()
   chk _ = log "This is a check"
 
--- $> runDemo
+-- $ > runDemo
 runDemo :: IO (Either (CallStack, DII.DocException) ())
 runDemo = docRun demo
 
@@ -34,7 +34,7 @@ demo2 = do
   chk :: [Path Abs File] -> Eff es ()
   chk ps = log $ length ps > 0 ? "More than 0 paths" $ "zero paths"
 
--- $> runDemo2
+-- $ > runDemo2
 runDemo2 :: IO (Either (CallStack, DII.DocException) ())
 runDemo2 = docRun demo2
 
@@ -47,7 +47,7 @@ demo3 = do
   chk :: a -> Eff es ()
   chk _ = log "This is a check demo 3"
 
--- $> runDemo3
+-- $ > runDemo3
 runDemo3 :: IO (Either (CallStack, DII.DocException) ())
 runDemo3 = docRun demo3
 

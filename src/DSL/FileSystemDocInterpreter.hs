@@ -165,8 +165,10 @@ runFileSystem =
     docErr funcName funcDesc =
       do
         logStep funcDesc
+        -- replace this later when have code to process call 
+        -- stack right now out of the boc call handling looks better
         -- E.throwError . DocException $
-        error $
+        pure . error $
           "\nException thrown in step documentation."
             <> "\n  Value forced from function: '"
             <> funcName

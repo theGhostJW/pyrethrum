@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8f000fe8fd9a7ef7250c558aee383d699e7de64fe379dc49accfbcc95ed9ff9d
+-- hash: 2deb2de5b1f92b2281a6c26767a5b442a978c80afdad383c0d89f7f6165ac3c4
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -207,6 +207,7 @@ library
   default-language: Haskell2010
 
 library examples
+  import: pyrethrumProps
   exposed-modules:
       EffectfulDemoSpeakEffect
       EffectfulDemoSpeakIOInterpreterDynamic

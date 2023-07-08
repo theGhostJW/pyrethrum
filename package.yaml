@@ -202,9 +202,13 @@ internal-libraries:
     ghc-options: -O0
     source-dirs:
       - examples
+      # remove later
       - src
     dependencies:
       - pyrethrum
+      # remove later
+    verbatim:
+      import: pyrethrumProps
 
 library:
   when:
@@ -232,5 +236,5 @@ tests:
     # verbatum needs to go last otherwise other module inference does not work
     verbatim:
       import: testLibProps
-      
+
 build-tools: tasty-discover:tasty-discover

@@ -23,6 +23,7 @@ import Effectful as EF (
 
 import DSL.FileSystemEffect (FileSystem (..))
 import DSL.Internal.ApEvent (ApEvent (..))
+import qualified Data.Text as T
 import Effectful.Dispatch.Dynamic (
   HasCallStack,
   LocalEnv,
@@ -66,21 +67,65 @@ runFileSystem =
     Eff es a'
   handler env fs =
     case fs of
-      WithCurrentDir p action -> docErr "withCurrentDir" "run action in current working directory"
-      FindFilesWith f ds t -> docErr "findFilesWith" "find files matching predicate"
-      FindFileWith f ds t -> docErr "findFileWith" "find file matching predicate"
-      CopyFileWithMetadata o n -> docErr "copyFileWithMetadata" "copy file with metadata"
-      WalkDir h p -> docErr "walkDir" $ "walk (absolute) directory: " <> toS (toFilePath p)
-      WalkDirRel p h -> docErr "WalkDirRel" $ "walk (relative) directory: " <> toS (toFilePath p)
-      WalkDirAccum mdh ow b -> docErr "WalkDirAccum" $ "walk (relative) accumulating a result: " <> toS (toFilePath b)
-      -- WalkDirAccumRel mdh ow b -> hoe $ \ul ->
-      --   let
-      --     mdh' = (\dh b' drs -> ul . dh b' drs) <$> mdh
-      --     ow' b' drs = ul . ow b' drs
-      --    in
-      --     R.walkDirAccumRel mdh' ow' b
-      -- WithTempFile d t f -> hoe $ \ul -> R.withTempFile d t (\p -> ul . f p)
-      -- WithTempDir d t f -> hoe $ \ul -> R.withTempDir d t (ul . f)
+      -- todo: rename all variables / separate type signatures by using the other templateHaskell method
+      WithCurrentDir path action -> docErr "withCurrentDir" "run action in current working directory"
+      FindFilesWith predicate searchDirs targetFileName ->
+        docErr4
+          "findFilesWith"
+          "find all files that match the file name:"
+          (showPath targetFileName)
+          "and satisfy the given predicate in directories:"
+          (showPaths searchDirs)
+      FindFileWith predicate searchDirs targetFileName ->
+        docErr4
+          "findFileWith"
+          "find the first file that matches the file name:"
+          (showPath targetFileName)
+          "and satisfies the given predicate in directories:"
+          (showPaths searchDirs)
+      CopyFileWithMetadata srcFile destFile ->
+        docErr4
+          "copyFileWithMetadata"
+          "copy file:"
+          (showPath srcFile)
+          "with metadata to:"
+          (showPath destFile)
+      WalkDir action dir ->
+        docErr3
+          "walkDir"
+          "recurssively walk the directory:"
+          (showPath dir)
+          "performing an action on each subdirectory"
+      WalkDirRel action path ->
+        docErr3
+          "walkDirRel"
+          "recurssively walk the directory:"
+          (showPath path)
+          "performing an action on each subdirectory"
+      WalkDirAccum descendHandler transformer startDir ->
+        docErr3
+          "WalkDirAccum"
+          "walk:"
+          (showPath startDir)
+          "accumulating a result"
+      WalkDirAccumRel descendHandler transformer startDir ->
+        docErr3
+          "WalkDirAccum"
+          "walk:"
+          (showPath startDir)
+          "accumulating a result"
+      WithTempFile parentDir fileName action ->
+        docErr3
+          "withTempFile"
+          "create a new temporary file inside:"
+          (showPath parentDir)
+          "perform an action in the new file and delete after use"
+      WithTempDir parentDir dirTemplate action ->
+        docErr3
+          "withTempDir"
+          "create a new temporary directory inside:"
+          (showPath parentDir)
+          "perform an action in the new directory and delete after use"
       -- WithSystemTempFile t f -> hoe $ \ul -> R.withSystemTempFile t (\p -> ul . f p)
       -- WithSystemTempDir t f -> hoe $ \ul -> R.withSystemTempDir t (ul . f)
       -- ForgivingAbsence m -> hoe $ \ul -> R.forgivingAbsence (ul m)
@@ -155,12 +200,19 @@ runFileSystem =
     logStep :: Text -> Eff es ()
     logStep = out . Step
 
+    showPath :: Path c d -> Text
+    showPath = toS . toFilePath
+
+    showPaths :: [Path c d] -> Text
+    showPaths = toS . show . fmap toFilePath
+
     -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
-    docErr :: forall a''. Text -> Text -> Eff es a''
-    docErr funcName funcDesc =
+    docErrn :: forall a''. Text -> [Text] -> Eff es a''
+    docErrn funcName dscFrags =
       do
+        let funcDesc = T.intercalate " " dscFrags
         logStep funcDesc
-        -- replace this later when have code to process call 
+        -- replace this later when have code to process call
         -- stack right now out of the boc call handling looks better
         -- E.throwError . DocException $
         pure . error $
@@ -170,7 +222,23 @@ runFileSystem =
             <> "' in documentation mode."
             <> "\n  Use  docVal, docHush, docVoid, docVal', or docVoid "
             <> " to replace or silence this value at the call site for: '"
-            <> funcName <> "'"
+            <> funcName
+            <> "'"
+
+    docErr :: forall a''. Text -> Text -> Eff es a''
+    docErr funcName funcDesc = docErrn funcName [funcDesc]
+
+    docErr2 :: forall a''. Text -> Text -> Text -> Eff es a''
+    docErr2 funcName funcDesc1 funcDesc2 = docErrn funcName [funcDesc1, funcDesc2]
+
+    docErr3 :: forall a''. Text -> Text -> Text -> Text -> Eff es a''
+    docErr3 funcName funcDesc1 funcDesc2 funcDesc3 = docErrn funcName [funcDesc1, funcDesc2, funcDesc3]
+
+    docErr4 :: forall a''. Text -> Text -> Text -> Text -> Text -> Eff es a''
+    docErr4 funcName funcDesc1 funcDesc2 funcDesc3 funcDesc4 = docErrn funcName [funcDesc1, funcDesc2, funcDesc3, funcDesc4]
+
+    docErr5 :: forall a''. Text -> Text -> Text -> Text -> Text -> Text -> Eff es a''
+    docErr5 funcName funcDesc1 funcDesc2 funcDesc3 funcDesc4 funcDesc5 = docErrn funcName [funcDesc1, funcDesc2, funcDesc3, funcDesc4, funcDesc5]
 
     hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
     hoe h = handle (\(e :: SomeException) -> E.throwError . DocException' "Exception genrated running step documenter" $ e) (localSeqUnliftIO env h)

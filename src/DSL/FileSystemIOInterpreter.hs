@@ -43,26 +43,26 @@ runFileSystem =
       withUnlifter h = handle (\(e :: IOException) -> E.throwError . FSException $ e) (localSeqUnliftIO env h)
      in
       case fs of
-        WithCurrentDir p action -> withUnlifter $ \ul -> R.withCurrentDir p (ul action)
-        FindFilesWith f ds t -> withUnlifter $ \ul -> R.findFilesWith (ul . f) ds t
-        FindFileWith f ds t -> withUnlifter $ \ul -> R.findFileWith (ul . f) ds t
-        CopyFileWithMetadata o n -> withUnlifter $ \ul -> R.copyFileWithMetadata o n
-        WalkDir h p -> withUnlifter $ \ul -> R.walkDir (\b drs -> ul . h b drs) p
-        WalkDirRel p h -> withUnlifter $ \ul -> R.walkDirRel (\b drs -> ul . h b drs) p
-        WalkDirAccum mdh ow b -> withUnlifter $ \ul ->
+        WithCurrentDir path action -> withUnlifter $ \ul -> R.withCurrentDir path (ul action)
+        FindFilesWith predicate searchDirs targetFileName -> withUnlifter $ \ul -> R.findFilesWith (ul . predicate) searchDirs targetFileName
+        FindFileWith predicate searchDirs targetFileName -> withUnlifter $ \ul -> R.findFileWith (ul . predicate) searchDirs targetFileName
+        CopyFileWithMetadata srcFile destFile -> withUnlifter $ \ul -> R.copyFileWithMetadata srcFile destFile
+        WalkDir action dir -> withUnlifter $ \ul -> R.walkDir (\b drs -> ul . action b drs) dir
+        WalkDirRel action dir -> withUnlifter $ \ul -> R.walkDirRel (\b drs -> ul . action b drs) dir
+        WalkDirAccum descendHandler transformer startDir -> withUnlifter $ \ul ->
           let
-            mdh' = (\dh b' drs -> ul . dh b' drs) <$> mdh
-            ow' b' drs = ul . ow b' drs
+            mdh' = (\dh b' drs -> ul . dh b' drs) <$> descendHandler
+            ow' b' drs = ul . transformer b' drs
            in
-            R.walkDirAccum mdh' ow' b
-        WalkDirAccumRel mdh ow b -> withUnlifter $ \ul ->
+            R.walkDirAccum mdh' ow' startDir
+        WalkDirAccumRel descendHandler transformer startDir -> withUnlifter $ \ul ->
           let
-            mdh' = (\dh b' drs -> ul . dh b' drs) <$> mdh
-            ow' b' drs = ul . ow b' drs
+            mdh' = (\dh b' drs -> ul . dh b' drs) <$> descendHandler
+            ow' b' drs = ul . transformer b' drs
            in
-            R.walkDirAccumRel mdh' ow' b
-        WithTempFile d t f -> withUnlifter $ \ul -> R.withTempFile d t (\p -> ul . f p)
-        WithTempDir d t f -> withUnlifter $ \ul -> R.withTempDir d t (ul . f)
+            R.walkDirAccumRel mdh' ow' startDir
+        WithTempFile parentDir dirTemplate action -> withUnlifter $ \ul -> R.withTempFile parentDir dirTemplate (\p -> ul . f p)
+        WithTempDir parentDir dirTemplate action -> withUnlifter $ \ul -> R.withTempDir parentDir dirTemplate (ul . f)
         WithSystemTempFile t f -> withUnlifter $ \ul -> R.withSystemTempFile t (\p -> ul . f p)
         WithSystemTempDir t f -> withUnlifter $ \ul -> R.withSystemTempDir t (ul . f)
         ForgivingAbsence m -> withUnlifter $ \ul -> R.forgivingAbsence (ul m)

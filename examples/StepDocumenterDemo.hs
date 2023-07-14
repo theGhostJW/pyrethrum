@@ -98,7 +98,7 @@ getPathsData = do
   isDeleteMe = pure . isInfixOf "deleteMe" . toFilePath
 
 test :: [Path Abs File] -> Eff es Bool
-test _ = pure True
+test _ignored = pure True
 
 -- TODO => hide string based prntLn et. al.
 consoleSink :: (Show a) => Sink a

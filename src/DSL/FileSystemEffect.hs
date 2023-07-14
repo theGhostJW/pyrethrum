@@ -177,7 +177,7 @@ data FileSystem :: Effect where
   CopyDirRecur :: Path b Dir -> Path b Dir -> FileSystem m ()
   CopyDirRecur' :: Path b Dir -> Path b Dir -> FileSystem m ()
   WalkDir :: (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (FSP.WalkAction Abs)) -> Path b Dir -> FileSystem m ()
-  WalkDirRel :: Path Rel Dir -> (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (FSP.WalkAction Rel)) -> FileSystem m ()
+  WalkDirRel :: (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (FSP.WalkAction Rel)) -> Path Rel Dir -> FileSystem m ()
   WalkDirAccum :: (Monoid o) => Maybe (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (FSP.WalkAction Abs)) -> (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m o) -> Path b Dir -> FileSystem m o
   WalkDirAccumRel :: (Monoid o) => Maybe (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (FSP.WalkAction Rel)) -> (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m o) -> Path b Dir -> FileSystem m o
   ResolveFile :: Path Abs Dir -> Text -> FileSystem m (Path Abs File)
@@ -205,4 +205,6 @@ data FileSystem :: Effect where
   WriteBinaryFileDurable :: Path b File -> ByteString -> FileSystem m ()
   WriteBinaryFileDurableAtomic :: Path b File -> ByteString -> FileSystem m ()
 
+-- todo: genrate splice and use makeEffect without type 
+-- signatures add docs investigate renaming params
 makeEffect ''FileSystem

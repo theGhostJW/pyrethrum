@@ -10,14 +10,15 @@ import DSL.Out
 import Chronos (Time, now)
 import Effectful (Eff, IOE, runEff, (:>))
 import Effectful.Error.Static (Error, runError)
-import Path (parseAbsFile, reldir, relfile, toFilePath, absdir)
-import PyrethrumExtras (Abs, ConvertString, File, MonadMask, Path, bracket, parseRelFileSafe, toS, txt, uu, (?))
+import Path (absdir, parseAbsFile, reldir, relfile, toFilePath)
+import PyrethrumExtras (Abs, ConvertString, File, MonadMask, Path, bracket, debug, debug_, parseRelFileSafe, toS, txt, uu, (?))
+import qualified PyrethrumExtras as PE
 import System.IO (hClose, hGetContents)
 
 -- TODO: add to pyrelude
 
 import qualified DSL.FileSystemEffect as IOI
-import Data.Text as T (concat, isInfixOf)
+import qualified Data.Text as T
 import System.Time.Extra (sleep)
 
 {-
@@ -107,11 +108,15 @@ timeTest = do
 -- time 2 Time {getTime = 1689018957979000000}
 -- time 3 Time {getTime = 1689018959089000000}
 
+--  TODO: pyrelude depricate debug in favour of trace
+
 -- use eff
-listFileImp :: (FileSystem :> es) => Eff es [Text]
+listFileImp :: (FileSystem :> es, Out ApEvent :> es) => Eff es [Text]
 listFileImp = do
+  log "listFileImp"
   files <- walkDirAccum Nothing (\root subs files -> pure files) [absdir|C:\Pyrethrum|]
-  pure . filter ("cabal" `isInfixOf`) $ toS . toFilePath <$> files
+  log "done"
+  pure . filter ("cabal" `T.isInfixOf`) $ toS . toFilePath <$> files
 
 apEventOut :: forall a es. (IOE :> es) => Eff (Out ApEvent : es) a -> Eff es a
 apEventOut = runOut print
@@ -119,14 +124,30 @@ apEventOut = runOut print
 ioRun :: Eff '[FileSystem, Out ApEvent, Error IOI.FSException, IOE] a -> IO (Either (CallStack, IOI.FSException) a)
 ioRun = runEff . runError . apEventOut . IOI.runFileSystem
 
-log :: (Out ApEvent :> es, Show a) => a -> Eff es ()
-log = out . Log . txt
+logShow :: (Out ApEvent :> es, Show a) => a -> Eff es ()
+logShow = out . Log . txt
+
+log :: (Out ApEvent :> es) => Text -> Eff es ()
+log = out . Log
 
 -- $> ioRun effDemo
 effDemo :: Eff '[FileSystem, Out ApEvent, Error IOI.FSException, IOE] ()
 effDemo = do
   res <- listFileImp
-  log $ T.concat res
+  chk res
+ where
+  chk _ = log "This is a effDemo"
+
+-- $> ioRun effDemo2
+effDemo2 :: Eff '[FileSystem, Out ApEvent, Error IOI.FSException, IOE] ()
+effDemo2 = do
+  res <- listFileImp
+  chk res
+ where
+  chk res = log $ length res > 5 ? "its BIG" $ "its small"
+
+-- traverse_ log res
+-- log $ T.unlines res
 
 {-
 TODO:

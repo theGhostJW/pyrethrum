@@ -70,14 +70,9 @@ runFileSystem =
       FindFilesWith f ds t -> docErr "findFilesWith" "find files matching predicate"
       FindFileWith f ds t -> docErr "findFileWith" "find file matching predicate"
       CopyFileWithMetadata o n -> docErr "copyFileWithMetadata" "copy file with metadata"
-      WalkDir h p -> docErr "walkDir" $ "walk directory: " <> toS (toFilePath p)
-      -- WalkDirRel p h -> hoe $ \ul -> R.walkDirRel (\b drs -> ul . h b drs) p
-      -- WalkDirAccum mdh ow b -> hoe $ \ul ->
-      --   let
-      --     mdh' = (\dh b' drs -> ul . dh b' drs) <$> mdh
-      --     ow' b' drs = ul . ow b' drs
-      --    in
-      --     R.walkDirAccum mdh' ow' b
+      WalkDir h p -> docErr "walkDir" $ "walk (absolute) directory: " <> toS (toFilePath p)
+      WalkDirRel p h -> docErr "WalkDirRel" $ "walk (relative) directory: " <> toS (toFilePath p)
+      WalkDirAccum mdh ow b -> docErr "WalkDirAccum" $ "walk (relative) accumulating a result: " <> toS (toFilePath b)
       -- WalkDirAccumRel mdh ow b -> hoe $ \ul ->
       --   let
       --     mdh' = (\dh b' drs -> ul . dh b' drs) <$> mdh

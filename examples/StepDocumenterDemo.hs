@@ -8,7 +8,7 @@ import DSL.Out
 import Data.List.Extra (isInfixOf)
 import Effectful (Eff, IOE, runEff, (:>))
 import Effectful.Error.Static (Error, runError)
-import Path (reldir, relfile, toFilePath, parseAbsFile)
+import Path (reldir, relfile, toFilePath, parseAbsFile, absdir)
 import PyrethrumExtras (Abs, File, Path, toS, txt, uu, (?), parseRelFileSafe)
 
 -- type FSOut es = (Out Text :> es, FileSystem :> es)
@@ -34,7 +34,7 @@ demo2 = do
   chk :: [Path Abs File] -> Eff es ()
   chk ps = log $ length ps > 0 ? "More than 0 paths" $ "zero paths"
 
--- $ > runDemo2
+-- $> runDemo2
 runDemo2 :: IO (Either (CallStack, DII.DocException) ())
 runDemo2 = docRun demo2
 
@@ -47,7 +47,8 @@ demo3 = do
   chk :: a -> Eff es ()
   chk _ = log "This is a check demo 3"
 
--- $ > runDemo3
+
+-- $> runDemo3
 runDemo3 :: IO (Either (CallStack, DII.DocException) ())
 runDemo3 = docRun demo3
 
@@ -75,6 +76,7 @@ getPaths = do
 
 data PathResult = PathResult
   { title :: Text
+  , moreOutput ::  [Path Abs File]
   , paths :: [Path Abs File]
   }
 
@@ -82,11 +84,13 @@ data PathResult = PathResult
 getPathsData :: (Out ApEvent :> es, FileSystem :> es) => Eff es PathResult
 getPathsData = do
   p <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
+  output <- walkDirAccum Nothing (\root subs files -> pure files) [absdir|C:\Pyrethrum|]
   r <- test p
   log $ r ? "yes" $ "no"
   pure $
     PathResult
       { title = "Hi"
+      , moreOutput = output
       , paths = p
       }
  where

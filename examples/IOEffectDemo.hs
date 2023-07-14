@@ -144,9 +144,10 @@ effDemo2 = do
   res <- listFileImp
   chk res
  where
-  chk res = log $ length res > 5 ? "its BIG" $ "its small"
+  chk res = do
+    traverse_ log res
+    log $ length res > 5 ? "its BIG" $ "its small"
 
--- traverse_ log res
 -- log $ T.unlines res
 
 {-

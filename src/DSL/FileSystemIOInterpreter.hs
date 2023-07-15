@@ -15,6 +15,7 @@ import Effectful as EF (
   type (:>),
  )
 
+import AuxFiles (HandleInfo (path))
 import DSL.FileSystemEffect (FSException (..), FileSystem (..))
 import Effectful.Dispatch.Dynamic (
   HasCallStack,
@@ -61,16 +62,16 @@ runFileSystem =
             ow' b' drs = ul . transformer b' drs
            in
             R.walkDirAccumRel mdh' ow' startDir
-        WithTempFile parentDir dirTemplate action -> withUnlifter $ \ul -> R.withTempFile parentDir dirTemplate (\p -> ul . f p)
-        WithTempDir parentDir dirTemplate action -> withUnlifter $ \ul -> R.withTempDir parentDir dirTemplate (ul . f)
-        WithSystemTempFile t f -> withUnlifter $ \ul -> R.withSystemTempFile t (\p -> ul . f p)
-        WithSystemTempDir t f -> withUnlifter $ \ul -> R.withSystemTempDir t (ul . f)
-        ForgivingAbsence m -> withUnlifter $ \ul -> R.forgivingAbsence (ul m)
-        IgnoringAbsence m -> withUnlifter $ \ul -> R.ignoringAbsence (ul m)
-        WithBinaryFile p m f -> withUnlifter $ \ul -> R.withBinaryFile p m (ul . f)
-        WithBinaryFileAtomic p m f -> withUnlifter $ \ul -> R.withBinaryFileAtomic p m (ul . f)
-        WithBinaryFileDurable p m f -> withUnlifter $ \ul -> R.withBinaryFileDurable p m (ul . f)
-        WithBinaryFileDurableAtomic p m f -> withUnlifter $ \ul -> R.withBinaryFileDurableAtomic p m (ul . f)
+        WithTempFile parentDir dirTemplate action -> withUnlifter $ \ul -> R.withTempFile parentDir dirTemplate (\p -> ul . action p)
+        WithTempDir parentDir dirTemplate action -> withUnlifter $ \ul -> R.withTempDir parentDir dirTemplate (ul . action)
+        WithSystemTempFile dirTemplate action -> withUnlifter $ \ul -> R.withSystemTempFile dirTemplate (\p -> ul . action p)
+        WithSystemTempDir dirTemplate f -> withUnlifter $ \ul -> R.withSystemTempDir dirTemplate (ul . f)
+        ForgivingAbsence action -> withUnlifter $ \ul -> R.forgivingAbsence (ul action)
+        IgnoringAbsence action -> withUnlifter $ \ul -> R.ignoringAbsence (ul action)
+        WithBinaryFile path ioMode action -> withUnlifter $ \ul -> R.withBinaryFile path ioMode (ul . action)
+        WithBinaryFileAtomic path ioMode action -> withUnlifter $ \ul -> R.withBinaryFileAtomic path ioMode (ul . action)
+        WithBinaryFileDurable path ioMode action -> withUnlifter $ \ul -> R.withBinaryFileDurable path ioMode (ul . action)
+        WithBinaryFileDurableAtomic path ioMode action -> withUnlifter $ \ul -> R.withBinaryFileDurableAtomic path ioMode (ul . action)
         _ -> adaptException $ case fs of
           EnsureDir p -> R.ensureDir p
           CreateDir d -> R.createDir d

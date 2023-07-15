@@ -33,7 +33,7 @@ import Effectful.Dispatch.Dynamic (
 import qualified Effectful.Error.Static as E
 import GHC.TypeError (ErrorMessage (Text))
 import Path.Extended (Path, toFilePath)
-import PyrethrumExtras (toS, txt, uu)
+import PyrethrumExtras (toS, txt, uu, (?))
 
 data DocException
   = DocException Text
@@ -185,13 +185,13 @@ runFileSystem =
       GetAppUserDataDir apName -> docErr2 "getAppUserDataDir" "get the application user data directory:" (txt apName)
       GetUserDocsDir -> docErr "getUserDocsDir" "get the user documents directory"
       GetTempDir -> docErr "getTempDir" "get the system temp directory"
-      GetFileSize f -> docErr2 "getFileSize" "get the size of file:" (showPath f)
-      DoesPathExist p -> docErr2 "doesPathExist" "check if path exists:" (showPath p)
-      DoesFileExist f -> docErr2 "doesFileExist" "check if file exists:" (showPath f)
-      DoesDirExist d -> docErr2 "doesDirExist" "check if directory exists:" (showPath d)
-      CanonicalizePath p -> docErr2 "canonicalizePath" "canonicalize path:" (txt p)
-      MakeAbsolute p -> docErr2 "makeAbsolute" "make path absolute:" (txt p)
-      MakeRelativeToCurrentDir p -> docErr2 "makeRelativeToCurrentDir" "make path relative to current directory:" (txt p)
+      GetFileSize file -> docErr2 "getFileSize" "get the size of file:" (showPath file)
+      DoesPathExist path -> docErr2 "doesPathExist" "check if path exists:" (showPath path)
+      DoesFileExist file -> docErr2 "doesFileExist" "check if file exists:" (showPath file)
+      DoesDirExist dir -> docErr2 "doesDirExist" "check if directory exists:" (showPath dir)
+      CanonicalizePath path -> docErr "canonicalizePath" "canonicalize path"
+      MakeAbsolute p -> docErr "makeAbsolute" "make path absolute"
+      MakeRelativeToCurrentDir p -> docErr "makeRelativeToCurrentDir" "make path relative to current directory"
       FindExecutable fileName -> docErr3 "findExecutable" "find executable:" (showPath fileName) "in the directories listed in system PATH."
       FindFile searchDirs fileName -> docErr4 "findFile" "find file:" (showPath fileName) "in the directories:" (showPaths searchDirs)
       FindFiles searchDirs fileName -> docErr4 "findFiles" "find files:" (showPath fileName) "in the directories:" (showPaths searchDirs)
@@ -209,32 +209,41 @@ runFileSystem =
       ResolveDir' dirname -> docErr3 "resolveDir'" "resolve directory:" dirname "in working directory"
       OpenBinaryTempFile dir fileTemplate -> docErr4 "openBinaryTempFile" "open binary temp file with base name:" fileTemplate "in directory:" (showPath dir)
       OpenTempFile dir fileTemplate -> docErr4 "openTempFile" "open temp file with base name:" fileTemplate "in directory:" (showPath dir)
-      CreateTempDir dir dirTemplate  -> docErr4 "createTempDir" "create temp directory with base name:" dirTemplate "in directory:" (showPath dir)
+      CreateTempDir dir dirTemplate -> docErr4 "createTempDir" "create temp directory with base name:" dirTemplate "in directory:" (showPath dir)
       IsLocationOccupied path -> docErr2 "isLocationOccupied" "check if location is occupied:" (showPath path)
       EnsureDir p -> docErr2 "ensureDir" "ensure directory exists:" (showPath p)
-
-    -- CreateDir dir -> dirInfo "create directory" d
-    -- CreateDirIfMissing _ dir -> dirInfo "create directory if missing" d
-    -- RemoveDir dir -> dirInfo "remove directory" d
-    -- RemoveDirRecur dir -> dirInfo "remove directory recursively" d
-    -- RemovePathForcibly dir -> dirInfo "remove path forcibly" p
-    -- RenameDir old new -> dirInfo' "rename directory from" o "to" n
-    -- ListDir dir -> dirInfo "list directory" d
-    -- SetCurrentDir dir -> dirInfo "set current directory" d
-    -- RemoveFile file -> dirInfo "remove file" f
-    -- RenameFile old new -> dirInfo' "rename file from:" o "to" n
-    -- RenamePath  old new -> dirInfo' "rename path from:" o "to" n
-    -- CopyFile src dst -> dirInfo' "copy file from:" o "to" n
-    -- CreateFileLink src dst -> dirInfo' "create file link from" o "to" n
-    -- CreateDirLink src dst -> dirInfo' "create directory link from" o "to" n
-    -- RemoveDirLink dir -> dirInfo "remove directory link" d
-    -- SetPermissions p ps -> info' "set permissions of" p "to" ps
-    -- CopyPermissions src dst -> info' "copy permissions from" o "to"  old new
-    -- SetAccessTime p t -> info' "set access time of" p "to" t
-    -- SetModificationTime p t -> info' "set modification time of" p "to" t
-    -- CopyDirRecur src dst -> dirInfo' "copy directory recursively from" o "to" n
-    -- CopyDirRecur' src dst -> dirInfo' "copy directory recursively from" o "to" n
-    -- EnsureFileDurable p -> dirInfo "ensure file durable (non-windows only)" p
+      CreateDir dir -> docErr2 "createDir" "create directory:" (showPath dir)
+      -- TODO: what does this do with false?
+      CreateDirIfMissing createParents dir ->
+        docErr3
+          "createDirIfMissing"
+          "create directory if missing:"
+          (showPath dir)
+          (createParents ? "creating parents" $ "not creating parents")
+      RemoveDir dir -> docErr2 "removeDir" "remove directory:" (showPath dir)
+      RemoveDirRecur dir -> docErr2 "removeDirRecur" "remove directory recursively:" (showPath dir)
+      RemovePathForcibly dir -> docErr2 "removePathForcibly" "remove path forcibly:" (showPath dir)
+      RenameDir old new -> docErr4 "renameDir" "rename directory:" (showPath old) "to:" (showPath new)
+      ListDir dir -> docErr2 "listDir" "list directory:" (showPath dir)
+      SetCurrentDir dir -> docErr2 "setCurrentDir" "set current directory to:" (showPath dir)
+      RemoveFile file -> docErr2 "removeFile" "remove file:" (showPath file)
+      RenameFile old new -> docErr4 "renameFile" "rename file:" (showPath old) "to:" (showPath new)
+      RenamePath old new -> docErr4 "renamePath" "rename path:" (showPath old) "to:" (showPath new)
+      CopyFile src dst -> docErr4 "copyFile" "copy file:" (showPath src) "to:" (showPath dst)
+      CreateFileLink src dst -> docErr4 "createFileLink" "create file link:" (showPath src) "to:" (showPath dst)
+      CreateDirLink src dst -> docErr4 "createDirLink" "create directory link:" (showPath src) "to:" (showPath dst)
+      RemoveDirLink dir -> docErr2 "removeDirLink" "remove directory link:" (showPath dir)
+      SetPermissions path permissions -> docErr4 "setPermissions" "set permissions of:" (showPath path) "to:" (txt permissions)
+      CopyPermissions src dst -> docErr4 "copyPermissions" "copy permissions of:" (showPath src) "to:" (showPath dst)
+      SetAccessTime path accessTime -> docErr4 "setAccessTime" "set access time of:" (showPath path) "to:" (txt accessTime)
+      SetModificationTime path accessTime -> docErr4 "setModificationTime" "set modification time of:" (showPath path) "to:" (txt accessTime)
+      CopyDirRecur src dst -> docErr4 "copyDirRecur" "copy directory recursively:" (showPath src) "to:" (showPath dst)
+      CopyDirRecur' src dst -> docErr4 "copyDirRecur'" "copy directory recursively:" (showPath src) "to:" (showPath dst)
+      EnsureFileDurable filePath -> docErr2 "ensureFileDurable" "ensure file is durable:" (showPath filePath)
+      WriteBinaryFile filePath bytes -> docErr2 "writeBinaryFile" "write binary file:" (showPath filePath)
+      WriteBinaryFileAtomic filePath bytes -> docErr2 "writeBinaryFileAtomic" "write binary file atomically:" (showPath filePath)
+      WriteBinaryFileDurable filePath bytes -> docErr2 "writeBinaryFileDurable" "write binary file durably:" (showPath filePath)
+      WriteBinaryFileDurableAtomic filePath bytes -> docErr2 "writeBinaryFileDurableAtomic" "write binary file durably atomically:" (showPath filePath)
    where
     showPath :: Path c d -> Text
     showPath = toS . toFilePath

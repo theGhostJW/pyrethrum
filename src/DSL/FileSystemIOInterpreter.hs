@@ -73,63 +73,63 @@ runFileSystem =
         WithBinaryFileDurable path ioMode action -> withUnlifter $ \ul -> R.withBinaryFileDurable path ioMode (ul . action)
         WithBinaryFileDurableAtomic path ioMode action -> withUnlifter $ \ul -> R.withBinaryFileDurableAtomic path ioMode (ul . action)
         _ -> adaptException $ case fs of
-          EnsureDir p -> R.ensureDir p
-          CreateDir d -> R.createDir d
-          CreateDirIfMissing b d -> R.createDirIfMissing b d
-          RemoveDir d -> R.removeDir d
-          RemoveDirRecur d -> R.removeDirRecur d
-          RemovePathForcibly p -> R.removePathForcibly p
-          RenameDir o n -> R.renameDir o n
-          ListDir d -> R.listDir d
+          EnsureDir dir -> R.ensureDir dir
+          CreateDir dir -> R.createDir dir
+          CreateDirIfMissing b dir -> R.createDirIfMissing b dir
+          RemoveDir dir -> R.removeDir dir
+          RemoveDirRecur dir -> R.removeDirRecur dir
+          RemovePathForcibly path -> R.removePathForcibly path
+          RenameDir old new -> R.renameDir old new
+          ListDir dir -> R.listDir dir
           GetCurrentDir -> R.getCurrentDir
-          SetCurrentDir d -> R.setCurrentDir d
+          SetCurrentDir dir -> R.setCurrentDir dir
           GetHomeDir -> R.getHomeDir
-          GetXdgDir xd bd -> R.getXdgDir xd bd
-          GetXdgDirList l -> R.getXdgDirList l
-          GetAppUserDataDir d -> R.getAppUserDataDir d
+          GetXdgDir directoryType subDir -> R.getXdgDir directoryType subDir
+          GetXdgDirList xdgList -> R.getXdgDirList xdgList
+          GetAppUserDataDir subDir -> R.getAppUserDataDir subDir
           GetUserDocsDir -> R.getUserDocsDir
           GetTempDir -> R.getTempDir
-          RemoveFile f -> R.removeFile f
-          RenameFile o n -> R.renameFile o n
-          RenamePath o n -> R.renamePath o n
-          CopyFile o n -> R.copyFile o n
-          GetFileSize f -> R.getFileSize f
-          CanonicalizePath p -> R.canonicalizePath p
-          MakeAbsolute p -> R.makeAbsolute p
-          MakeRelativeToCurrentDir p -> R.makeRelativeToCurrentDir p
-          DoesPathExist p -> R.doesPathExist p
-          DoesFileExist f -> R.doesFileExist f
-          DoesDirExist d -> R.doesDirExist d
-          FindExecutable t -> R.findExecutable t
-          FindFile ds t -> R.findFile ds t
-          FindFiles ds t -> R.findFiles ds t
-          CreateFileLink o n -> R.createFileLink o n
-          CreateDirLink o n -> R.createDirLink o n
-          RemoveDirLink d -> R.removeDirLink d
-          IsSymlink p -> R.isSymlink p
-          GetSymlinkTarget p -> R.getSymlinkTarget p
-          GetPermissions p -> R.getPermissions p
-          SetPermissions p ps -> R.setPermissions p ps
-          CopyPermissions o n -> R.copyPermissions o n
-          GetAccessTime p -> R.getAccessTime p
-          GetModificationTime p -> R.getModificationTime p
-          SetAccessTime p t -> R.setAccessTime p t
-          SetModificationTime p t -> R.setModificationTime p t
-          ListDirRel d -> R.listDirRel d
-          ListDirRecur d -> R.listDirRecur d
-          ListDirRecurRel d -> R.listDirRecurRel d
-          CopyDirRecur o n -> R.copyDirRecur o n
-          CopyDirRecur' o n -> R.copyDirRecur' o n
-          ResolveFile ds f -> R.resolveFile ds f
-          ResolveFile' f -> R.resolveFile' f
-          ResolveDir ds d -> R.resolveDir ds d
-          ResolveDir' f -> R.resolveDir' f
-          OpenBinaryTempFile p t -> R.openBinaryTempFile p t
-          OpenTempFile p t -> R.openTempFile p t
-          CreateTempDir p t -> R.createTempDir p t
-          IsLocationOccupied p -> R.isLocationOccupied p
-          EnsureFileDurable p -> R.ensureFileDurable p
-          WriteBinaryFile p bs -> R.writeBinaryFile p bs
-          WriteBinaryFileAtomic p bs -> R.writeBinaryFileAtomic p bs
-          WriteBinaryFileDurable p bs -> R.writeBinaryFileDurable p bs
-          WriteBinaryFileDurableAtomic p bs -> R.writeBinaryFileDurableAtomic p bs
+          RemoveFile file -> R.removeFile file
+          RenameFile old new -> R.renameFile old new
+          RenamePath old new -> R.renamePath old new
+          CopyFile old new -> R.copyFile old new
+          GetFileSize file -> R.getFileSize file
+          CanonicalizePath path -> R.canonicalizePath path
+          MakeAbsolute path -> R.makeAbsolute path
+          MakeRelativeToCurrentDir path -> R.makeRelativeToCurrentDir path
+          DoesPathExist path -> R.doesPathExist path
+          DoesFileExist file -> R.doesFileExist file
+          DoesDirExist dir -> R.doesDirExist dir
+          FindExecutable file -> R.findExecutable file
+          FindFile searchDirs files -> R.findFile searchDirs files
+          FindFiles searchDirs files -> R.findFiles searchDirs files
+          CreateFileLink old new -> R.createFileLink old new
+          CreateDirLink old new -> R.createDirLink old new
+          RemoveDirLink dir -> R.removeDirLink dir
+          IsSymlink path -> R.isSymlink path
+          GetSymlinkTarget path -> R.getSymlinkTarget path
+          GetPermissions path -> R.getPermissions path
+          SetPermissions path ps -> R.setPermissions path ps
+          CopyPermissions old new -> R.copyPermissions old new
+          GetAccessTime path -> R.getAccessTime path
+          GetModificationTime path -> R.getModificationTime path
+          SetAccessTime path time -> R.setAccessTime path time
+          SetModificationTime path time -> R.setModificationTime path time
+          ListDirRel dir -> R.listDirRel dir
+          ListDirRecur dir -> R.listDirRecur dir
+          ListDirRecurRel dir -> R.listDirRecurRel dir
+          CopyDirRecur old new -> R.copyDirRecur old new
+          CopyDirRecur' old new -> R.copyDirRecur' old new
+          ResolveFile parentDir fileName -> R.resolveFile parentDir fileName
+          ResolveFile' fileName -> R.resolveFile' fileName
+          ResolveDir parentDir dirName -> R.resolveDir parentDir dirName
+          ResolveDir' dirName -> R.resolveDir' dirName
+          OpenBinaryTempFile parentDir fileName -> R.openBinaryTempFile parentDir fileName
+          OpenTempFile parentDir fileName -> R.openTempFile parentDir fileName
+          CreateTempDir parentDir dirName -> R.createTempDir parentDir dirName
+          IsLocationOccupied path -> R.isLocationOccupied path
+          EnsureFileDurable file -> R.ensureFileDurable file
+          WriteBinaryFile file byteString -> R.writeBinaryFile file byteString
+          WriteBinaryFileAtomic file byteString -> R.writeBinaryFileAtomic file byteString
+          WriteBinaryFileDurable file byteString -> R.writeBinaryFileDurable file byteString
+          WriteBinaryFileDurableAtomic file byteString -> R.writeBinaryFileDurableAtomic file byteString

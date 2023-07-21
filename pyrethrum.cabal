@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7ff64cd7872e35027fcf1a4e056c86e7302e76e482a64ac1cc9f326452b7a486
+-- hash: 7319e31b9db9a640572b5f0ebceffb72ced1d38f2e3b76519d4ee87861026eb0
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -71,6 +71,7 @@ library
       AuxFiles
       Check
       Common
+      Core
       DSL
       DSL.ArbitraryIO
       DSL.CurrentTime
@@ -212,11 +213,13 @@ library examples
       EffectfulDemoSpeakEffect
       EffectfulDemoSpeakIOInterpreterDynamic
       IOEffectDemo
+      PyrethrumDemo
+      RunDemo
       StepDocumenterDemo
-      StepRunDemo
       AuxFiles
       Check
       Common
+      Core
       DSL
       DSL.ArbitraryIO
       DSL.CurrentTime

@@ -97,6 +97,11 @@ data CanRun
   | Done
   deriving (Show, Eq)
 
+data Concurrency
+  = Sequential
+  | Concurrent
+  deriving (Show, Eq)
+
 data XTest a si ti ii = XTest
   { loc :: Loc
   , test :: XContext a -> si -> ti -> ii -> IO ()
@@ -158,8 +163,8 @@ canRunChildQ cq =
     Saturated -> False
     Done -> False
 
-runChildQ :: forall a. Bool -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
-runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCount} =
+runChildQ :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
+runChildQ concurrency runner canRun' q@ChildQ{childNodes, status, runningCount} =
   do
     eNext <- atomically $ do
       let pop = tryReadTQueue childNodes
@@ -191,13 +196,13 @@ runChildQ childConcurrent runner canRun' q@ChildQ{childNodes, status, runningCou
                   Runnable -> do
                     -- when childConcurrent, the element is placed back on the end of the q before running so
                     -- can be picked up by other threads
-                    when childConcurrent $
+                    when (concurrency == Concurrent) $
                       atomically (writeTQueue childNodes a)
                     runner a
                   Saturated -> pure ()
                   Done -> pure ()
               (atomically $ modifyTVar runningCount pred)
-            runChildQ childConcurrent runner canRun' q
+            runChildQ concurrency runner canRun' q
         )
 
 mkChildQ :: (Foldable m) => m a -> IO (ChildQ a)
@@ -324,7 +329,7 @@ runXFixture
       finally
         (runXTest ctx tstIn' testHook tst)
         (releaseTestHook ctx ((.tstIn) <$> prntTstOut) prntTstHk)
-    runTests fxIn = runChildQ False (runTst fxIn) (const $ pure Runnable) tests
+    runTests fxIn = runChildQ Sequential (runTst fxIn) (const $ pure Runnable) tests
 
 runXTest :: forall so' to' tsti' ho' a. XContext a -> Either Abandon (ExeIn so' to' tsti') -> TestHook a so' to' tsti' ho' -> XTest a so' to' ho' -> IO ()
 runXTest ctx@XContext{loc = fxLoc} fxIpts testHk test@XTest{loc = tstLoc, test = tstAction} =
@@ -639,7 +644,7 @@ runNode eventLogger hkIn =
           when canRun' $
             withOnceHook ctx threadLimit subNodes hkIn onceHook $ \trdIn ->
               withThreadHook ctx trdIn threadHook $ \tstIn ->
-                void $ runChildQ True (runNode eventLogger tstIn) nodeStatus subNodes
+                void $ runChildQ Concurrent (runNode eventLogger tstIn) nodeStatus subNodes
     XFixtures
       { loc
       , threadLimit = tl@ThreadLimit{maxThreads, runningThreads}
@@ -650,7 +655,7 @@ runNode eventLogger hkIn =
           canRun' <- atomically xfxRunnable
           when canRun' $
             finally
-              (void $ runChildQ True runFixture canRunFixture fixtures)
+              (void $ runChildQ Concurrent runFixture canRunFixture fixtures)
               (atomically $ modifyTVar' runningThreads pred)
        where
         canRunFixture XFixture{tests} = readTVar tests.status

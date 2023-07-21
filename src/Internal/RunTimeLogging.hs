@@ -157,28 +157,26 @@ data ExeEvent l a
   | EndExecution
   deriving (Show)
 
-  
-
 -------  IO Logging --------
-type ExeLog l a = Log (ExeEvent l a)
+type ExeLog loc apEvt = Log (ExeEvent loc apEvt)
 
 -- not used in concurrent code ie. one IORef per thread
 -- this approach means I can't write a pure logger but I can live with that for now
-mkLogger :: (ExeLog l a -> IO ()) -> IORef Int -> ThreadId -> ExeEvent l a -> IO ()
+mkLogger :: (ExeLog loc apEvt -> IO ()) -> IORef Int -> ThreadId -> ExeEvent loc apEvt -> IO ()
 mkLogger sink threadCounter thrdId mkExeEvnt = do
   tc <- readIORef threadCounter
   let nxt = succ tc
   finally (sink $ Log (SThreadId $ txt thrdId) nxt mkExeEvnt) $ writeIORef threadCounter nxt
 
-data LogControls m l a = LogControls
-  { sink :: ExeLog l a -> IO ()
+data LogControls m loc apEvt = LogControls
+  { sink :: ExeLog loc apEvt -> IO ()
   , logWorker :: IO ()
   , stopWorker :: IO ()
-  , log :: m (TQueue (ExeLog l a))
+  , log :: m (TQueue (ExeLog loc apEvt))
   }
 
-testLogControls :: forall l a. (Show l, Show a) => TChan (Maybe (ExeLog l a)) -> TQueue (ExeLog l a) -> IO (LogControls Maybe l a)
-testLogControls chn log = do
+testLogControls :: forall loc apEvt. (Show loc, Show apEvt) => TChan (Maybe (ExeLog loc apEvt)) -> TQueue (ExeLog loc apEvt) -> IO (LogControls Maybe loc apEvt)
+testLogControls chn logQ = do
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   let logWorker :: IO ()
       logWorker =
@@ -190,13 +188,13 @@ testLogControls chn log = do
       stopWorker :: IO ()
       stopWorker = atomically $ writeTChan chn Nothing
 
-      sink :: ExeLog l a -> IO ()
+      sink :: ExeLog loc apEvt -> IO ()
       sink eventLog =
         atomically $ do
           writeTChan chn $ Just eventLog
-          writeTQueue log eventLog
+          writeTQueue logQ eventLog
 
-  pure . LogControls sink logWorker stopWorker $ Just log
+  pure . LogControls sink logWorker stopWorker $ Just logQ
 
 $(deriveToJSON defaultOptions ''SThreadId)
 $(deriveJSON defaultOptions ''ExeEventType)

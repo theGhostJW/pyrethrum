@@ -3,9 +3,9 @@
 module Core where
 
 import DSL.Internal.ApEvent
-import Data.Aeson (FromJSON, ToJSON, Value(..), parseJSON, toJSON)
+import Data.Aeson (FromJSON, ToJSON, Value (..), parseJSON, toJSON)
 
-
+import Data.Aeson.Types (ToJSON (..))
 import qualified Data.DList as DL
 import Effectful (Eff)
 import qualified Effectful.Error.Dynamic as E
@@ -14,7 +14,6 @@ import GHC.Records (HasField)
 import GHC.Show (Show (..))
 import qualified Internal.PreNode as PN
 import PyrethrumExtras (toS, uu)
-import Data.Aeson.Types (ToJSON(..))
 
 newtype CheckFailure = CheckFailure Text
   deriving (Show)
@@ -74,101 +73,127 @@ instance ToJSON (Check v) where
   toJSON :: Check v -> Value
   toJSON = String . toS . (.header)
 
-data GenericTest rc tc effs where
+data PyrethrumTest rc tc effs where
   Test ::
     { config :: tc
     , items :: rc -> [i]
     , interactor :: rc -> i -> Eff effs as
     , parse :: as -> Eff '[E.Error ParseException] ds
     } ->
-    GenericTest rc tc effs
+    PyrethrumTest rc tc effs
   TestNoParse ::
     { config :: tc
     , items :: rc -> [i]
     , interactor :: rc -> i -> Eff effs ds
     } ->
-    GenericTest rc tc effs
+    PyrethrumTest rc tc effs
 
-type PreNodeRoot = PreNode () ()
+-- type PreNodeRoot = PreNode () ()
 
-data Test'' si ti ii = Test''
-  { id :: Text
-  , test :: si -> ti -> ii -> IO ()
-  }
+-- data Test'' si ti ii = Test''
+--   { id :: Text
+--   , test :: si -> ti -> ii -> Eff effs ()
+--   }
 
-data Fixture oi ti tsti where
+data Fixture effs oi ti tsti where
   Fixture ::
     { title :: Text
     , maxThreads :: Maybe Int
-    , onceHook :: OnceHook oi oo
+    , onceHook :: OnceHook effs oi oo
     , threadHook :: ThreadHook oo ti to
     , testHook :: TestHook oo to tsti tsto
     -- , tests :: NonEmpty (Test oo to tsto)
     } ->
-    Fixture oi ti tsti
+    Fixture effs oi ti tsti
 
-data PreNode oi ti where
-  Group ::
-    { title :: Text
-    , threadLimit :: Maybe Int
-    , onceHook :: OnceHook oi oo
-    , threadHook :: ThreadHook oo ti to
-    , subNodes :: NonEmpty (PreNode oo to)
-    } ->
-    PreNode oi ti
-  Fixtures ::
-    { title :: Text
-    , threadLimit :: Maybe Int
-    , testHook :: TestHook oi ti () tsto
-    , fixtures :: NonEmpty (Fixture oi ti tsto)
-    } ->
-    PreNode oi ti
+-- data HookOut o where
+--   HookOut ::
+--     { title :: Text
+--     , value :: o
+--     } ->
+--     HookOut o
 
-data OnceHook oi oo where
-  OnceNone :: OnceHook oi oi
+-- data Hook effs o where
+--   Hook ::
+--     { title :: Text
+--     , action :: Eff effs o
+--     } ->
+--     Hook effs o
+--   deriving (Functor)
+
+-- runHook :: Hook effs o -> Eff effs (HookOut o)
+-- runHook Hook{title, action} = HookOut title <$> action
+
+-- mkHook :: Text -> Hook effs i -> (i -> Eff effs o) -> Hook effs o
+-- mkHook title parentHook f =
+--   withHook parentHook f $ Hook title
+   
+-- withHook :: Hook effs i -> (i -> Eff effs o) -> (Eff effs o -> a) -> a
+-- withHook Hook{action} transformer constructor =
+--   constructor $ action >>= transformer
+
+-- data PreNode oi ti where
+--   Group ::
+--     { title :: Text
+--     , threadLimit :: Maybe Int
+--     , onceHook :: OnceHook oi oo
+--     , threadHook :: ThreadHook oo ti to
+--     , subNodes :: NonEmpty (PreNode oo to)
+--     } ->
+--     PreNode oi ti
+--   Fixtures ::
+--     { title :: Text
+--     , threadLimit :: Maybe Int
+--     , testHook :: TestHook oi ti () tsto
+--     , fixtures :: NonEmpty (Fixture oi ti tsto)
+--     } ->
+--     PreNode oi ti
+
+data OnceHook effs oi oo where
+  OnceNone :: OnceHook effs oi oi
   OnceBefore ::
-    { hook :: oi -> IO oo
+    { hook :: oi -> Eff effs oo
     } ->
-    OnceHook oi oo
+    OnceHook effs oi oo
   OnceAfter ::
-    { releaseOnly :: oi -> IO ()
+    { releaseOnly :: oi -> Eff effs ()
     } ->
-    OnceHook oi oi
+    OnceHook effs oi oi
   OnceAround ::
-    { hook :: oi -> IO oo
-    , release :: oo -> IO ()
+    { hook :: oi -> Eff effs oo
+    , release :: oo -> Eff effs ()
     } ->
-    OnceHook oi oo
+    OnceHook effs oi oo
 
 data ThreadHook oi ti to where
   ThreadNone :: ThreadHook oi ti ti
   ThreadBefore ::
-    { hook :: oi -> ti -> IO to
+    { hook :: oi -> ti -> Eff effs to
     } ->
     ThreadHook oi ti to
   ThreadAfter ::
-    { releaseOnly :: ti -> IO ()
+    { releaseOnly :: ti -> Eff effs ()
     } ->
     ThreadHook oi ti ti
   ThreadAround ::
-    { hook :: oi -> ti -> IO to
-    , release :: to -> IO ()
+    { hook :: oi -> ti -> Eff effs to
+    , release :: to -> Eff effs ()
     } ->
     ThreadHook oi ti to
 
 data TestHook oi ti tsti tsto where
   TestNone :: TestHook oi ti tsti tsti
   TestBefore ::
-    { hook :: oi -> ti -> tsti -> IO tsto
+    { hook :: oi -> ti -> tsti -> Eff effs tsto
     } ->
     TestHook oi ti tsti tsto
   TestAfter ::
-    { releaseOnly :: tsti -> IO ()
+    { releaseOnly :: tsti -> Eff effs ()
     } ->
     TestHook oi ti tsti tsti
   TestAround ::
-    { hook :: oi -> ti -> tsti -> IO tsto
-    , release :: tsto -> IO ()
+    { hook :: oi -> ti -> tsti -> Eff effs tsto
+    , release :: tsto -> Eff effs ()
     } ->
     TestHook oi ti tsti tsto
 

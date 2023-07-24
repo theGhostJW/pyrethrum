@@ -47,6 +47,30 @@ $(deriveJSON defaultOptions ''TestConfig)
 
 instance Config TestConfig
 
-type ApEffects = '[FileSystem, Out AE.ApEvent, Error Text, IOE]
+type AppEffs = '[FileSystem, Out AE.ApEvent, Error Text, IOE]
 
-type Test = GenericTest RunConfig TestConfig ApEffects
+type Test = PyrethrumTest RunConfig TestConfig AppEffs
+
+log :: (Out AE.ApEvent :> es) => Text -> Eff es ()
+log = out . AE.Log
+
+parent :: Hook AppEffs Integer
+parent = Hook {
+  title = "parent",
+  action = do
+    log "parent run"
+    pure 3
+}
+
+-- child :: Hook AppEffs Text
+-- child = 
+--   withHook parent $ \i ->
+--   pure $ Hook {
+--   title = "child",
+--   action = do
+--     let msg = repeat "Hi"
+--     log "Hi"
+--     pure "child"
+-- }
+
+-- Hook interpretor that runs hook with mute out and oc effects

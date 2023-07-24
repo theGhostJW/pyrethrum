@@ -1,5 +1,6 @@
 module DSL.Internal.ApEvent where
 
+-- TODO: make log effect requiring out
 data ApEvent =
     StartFolder Text
   | EndFolder

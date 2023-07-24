@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7319e31b9db9a640572b5f0ebceffb72ced1d38f2e3b76519d4ee87861026eb0
+-- hash: 9a2e687bbc928d3cb592310a3e3dda8a25f0eb694ce5236a7cf288172f16c0db
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -80,6 +80,7 @@ library
       DSL.FileSystemEffect
       DSL.FileSystemIOInterpreter
       DSL.FileSystemPsy
+      DSL.Hook
       DSL.Internal.ApEvent
       DSL.Internal.FileSystemPure
       DSL.Internal.FileSystemRawIO
@@ -210,6 +211,7 @@ library
 library examples
   import: pyrethrumProps
   exposed-modules:
+      DemoSuite
       EffectfulDemoSpeakEffect
       EffectfulDemoSpeakIOInterpreterDynamic
       IOEffectDemo
@@ -228,6 +230,7 @@ library examples
       DSL.FileSystemEffect
       DSL.FileSystemIOInterpreter
       DSL.FileSystemPsy
+      DSL.Hook
       DSL.Internal.ApEvent
       DSL.Internal.FileSystemPure
       DSL.Internal.FileSystemRawIO

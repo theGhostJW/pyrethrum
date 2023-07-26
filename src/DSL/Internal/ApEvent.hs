@@ -25,3 +25,5 @@ data ApEvent =
     details :: Text
   }
   deriving stock (Eq, Show)
+
+  -- ToDo user facing? start log, logWarning

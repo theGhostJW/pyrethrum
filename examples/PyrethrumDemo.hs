@@ -54,13 +54,13 @@ type Test = PyrethrumTest RunConfig TestConfig AppEffs
 log :: (Out AE.ApEvent :> es) => Text -> Eff es ()
 log = out . AE.Log
 
-parent :: Hook AppEffs Integer
-parent = Hook {
-  title = "parent",
-  action = do
-    log "parent run"
-    pure 3
-}
+-- parent :: Hook AppEffs Integer
+-- parent = Hook {
+--   title = "parent",
+--   action = do
+--     log "parent run"
+--     pure 3
+-- }
 
 -- child :: Hook AppEffs Text
 -- child = 

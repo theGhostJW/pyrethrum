@@ -11,10 +11,11 @@ import Effectful.Error.Static (Error, runError)
 import Path (reldir, relfile, toFilePath, parseAbsFile, absdir)
 import PyrethrumExtras (Abs, File, Path, toS, txt, uu, (?), parseRelFileSafe)
 
--- type FSOut es = (Out Text :> es, FileSystem :> es)
+type FSOut es = (Out ApEvent :> es, FileSystem :> es)
+
 
 -- todo - use a more believable base fuunction
-demo :: forall es. (Out ApEvent :> es, FileSystem :> es) => Eff es ()
+demo :: forall es. FSOut es => Eff es ()
 demo = do
   paths <- getPaths
   chk paths

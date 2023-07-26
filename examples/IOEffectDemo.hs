@@ -21,6 +21,8 @@ import qualified DSL.FileSystemEffect as IOI
 import qualified Data.Text as T
 import System.Time.Extra (sleep)
 
+
+
 {-
 \************************************************************
 \************ standard haskell laziness examples ************
@@ -137,6 +139,7 @@ effDemo = do
   chk res
  where
   chk _ = log "This is a effDemo"
+
 
 -- $> ioRun effDemo2
 effDemo2 :: Eff '[FileSystem, Out ApEvent, Error IOI.FSException, IOE] ()

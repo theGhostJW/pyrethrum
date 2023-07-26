@@ -7,13 +7,14 @@ import Data.Aeson (FromJSON, ToJSON, Value (..), parseJSON, toJSON)
 
 import Data.Aeson.Types (ToJSON (..))
 import qualified Data.DList as DL
-import Effectful (Eff)
+import Effectful (Eff, Effect)
 import qualified Effectful.Error.Dynamic as E
 import Effectful.Internal.Effect ((:>))
 import GHC.Records (HasField)
 import GHC.Show (Show (..))
 import qualified Internal.PreNode as PN
 import PyrethrumExtras (toS, uu)
+import Effectful.TH (makeEffect)
 
 newtype CheckFailure = CheckFailure Text
   deriving (Show)
@@ -25,18 +26,18 @@ instance Exception ParseException
 
 {-
 
--- polymorphic hooks or fixtures
-withOnceHook
-withThreadHook
+-- polymorphic Suites or fixtures
+withOnceSuite
+withThreadSuite
 
-hookesAction
+SuiteesAction
 
-data Hook = Hook
+data Suite = Suite
   {
-    hookId:: Text,
-    hookDescription :: Text,
-    hookType :: HookType,
-    hook :: Eff '[E.Error ParseException] a
+    SuiteId:: Text,
+    SuiteDescription :: Text,
+    SuiteType :: SuiteType,
+    Suite :: Eff '[E.Error ParseException] a
   }
 
   -}
@@ -73,128 +74,164 @@ instance ToJSON (Check v) where
   toJSON :: Check v -> Value
   toJSON = String . toS . (.header)
 
+-- concurrency
+data Once
+data Thread
+
+-- order
+data Before
+data After
+
+class Before' a
+class Once' a
+class Thread' a
+class After' a
+
+data OnceBefore
+
+instance Before' OnceBefore
+instance Once' OnceBefore
+
+data ThreadBefore
+instance Before' ThreadBefore
+instance Thread' ThreadBefore
+
+newtype HookResult hookProps a = HookResult a
+
+-- data Suite effs :: Effect where
+--   OnceBefore :: Eff effs a -> Suite effs m (HookResult OnceBefore a)
+--   OnceBefore' :: Eff effs (HookResult OnceBefore a) -> (a -> Eff effs b) -> Suite effs m (HookResult OnceBefore b)
+
+data Suite rc tc effs :: Effect where
+  OnceBefore :: (rc -> Eff effs a) -> Suite rc tc effs m (HookResult OnceBefore a)
+  OnceBefore' :: m (HookResult OnceBefore a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (HookResult OnceBefore b)
+  ThreadBefore :: (rc -> Eff effs a) -> Suite rc tc effs m (HookResult ThreadBefore a)
+  ThreadBefore' :: Before' hc => m (HookResult hc a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (HookResult ThreadBefore b)
+  OnceAfter :: (rc -> Eff effs ()) -> Suite rc tc effs m ()
+
 data PyrethrumTest rc tc effs where
   Test ::
     { config :: tc
-    , items :: rc -> [i]
-    , interactor :: rc -> i -> Eff effs as
+    , action :: rc -> i -> Eff effs as
     , parse :: as -> Eff '[E.Error ParseException] ds
+    , items :: rc -> [i]
     } ->
     PyrethrumTest rc tc effs
   TestNoParse ::
     { config :: tc
+    , action :: rc -> i -> Eff effs ds
     , items :: rc -> [i]
-    , interactor :: rc -> i -> Eff effs ds
     } ->
     PyrethrumTest rc tc effs
 
+makeEffect ''Suite
 -- type PreNodeRoot = PreNode () ()
 
 -- data Test'' si ti ii = Test''
 --   { id :: Text
---   , test :: si -> ti -> ii -> Eff effs ()
+
 --   }
 
-data Fixture effs oi ti tsti where
-  Fixture ::
-    { title :: Text
-    , maxThreads :: Maybe Int
-    , onceHook :: OnceHook effs oi oo
-    , threadHook :: ThreadHook oo ti to
-    , testHook :: TestHook oo to tsti tsto
-    -- , tests :: NonEmpty (Test oo to tsto)
-    } ->
-    Fixture effs oi ti tsti
+-- data Fixture effs oi ti tsti where
+--   Fixture ::
+--     { title :: Text
+--     , maxThreads :: Maybe Int
+--     , onceSuite :: OnceSuite effs oi oo
+--     , threadSuite :: ThreadSuite oo ti to
+--     , testSuite :: TestSuite oo to tsti tsto
+--     -- , tests :: NonEmpty (Test oo to tsto)
+--     } ->
+--     Fixture effs oi ti tsti
 
--- data HookOut o where
---   HookOut ::
+-- data SuiteOut o where
+--   SuiteOut ::
 --     { title :: Text
 --     , value :: o
 --     } ->
---     HookOut o
+--     SuiteOut o
 
--- data Hook effs o where
---   Hook ::
+-- data Suite effs o where
+--   Suite ::
 --     { title :: Text
 --     , action :: Eff effs o
 --     } ->
---     Hook effs o
+--     Suite effs o
 --   deriving (Functor)
 
--- runHook :: Hook effs o -> Eff effs (HookOut o)
--- runHook Hook{title, action} = HookOut title <$> action
+-- runSuite :: Suite effs o -> Eff effs (SuiteOut o)
+-- runSuite Suite{title, action} = SuiteOut title <$> action
 
--- mkHook :: Text -> Hook effs i -> (i -> Eff effs o) -> Hook effs o
--- mkHook title parentHook f =
---   withHook parentHook f $ Hook title
-   
--- withHook :: Hook effs i -> (i -> Eff effs o) -> (Eff effs o -> a) -> a
--- withHook Hook{action} transformer constructor =
+-- mkSuite :: Text -> Suite effs i -> (i -> Eff effs o) -> Suite effs o
+-- mkSuite title parentSuite f =
+--   withSuite parentSuite f $ Suite title
+
+-- withSuite :: Suite effs i -> (i -> Eff effs o) -> (Eff effs o -> a) -> a
+-- withSuite Suite{action} transformer constructor =
 --   constructor $ action >>= transformer
 
 -- data PreNode oi ti where
 --   Group ::
 --     { title :: Text
 --     , threadLimit :: Maybe Int
---     , onceHook :: OnceHook oi oo
---     , threadHook :: ThreadHook oo ti to
+--     , onceSuite :: OnceSuite oi oo
+--     , threadSuite :: ThreadSuite oo ti to
 --     , subNodes :: NonEmpty (PreNode oo to)
 --     } ->
 --     PreNode oi ti
 --   Fixtures ::
 --     { title :: Text
 --     , threadLimit :: Maybe Int
---     , testHook :: TestHook oi ti () tsto
+--     , testSuite :: TestSuite oi ti () tsto
 --     , fixtures :: NonEmpty (Fixture oi ti tsto)
 --     } ->
 --     PreNode oi ti
 
-data OnceHook effs oi oo where
-  OnceNone :: OnceHook effs oi oi
-  OnceBefore ::
-    { hook :: oi -> Eff effs oo
-    } ->
-    OnceHook effs oi oo
-  OnceAfter ::
-    { releaseOnly :: oi -> Eff effs ()
-    } ->
-    OnceHook effs oi oi
-  OnceAround ::
-    { hook :: oi -> Eff effs oo
-    , release :: oo -> Eff effs ()
-    } ->
-    OnceHook effs oi oo
+-- data OnceSuite effs oi oo where
+--   OnceNone :: OnceSuite effs oi oi
+--   OnceBefore ::
+--     { Suite :: oi -> Eff effs oo
+--     } ->
+--     OnceSuite effs oi oo
+--   OnceAfter ::
+--     { releaseOnly :: oi -> Eff effs ()
+--     } ->
+--     OnceSuite effs oi oi
+--   OnceAround ::
+--     { Suite :: oi -> Eff effs oo
+--     , release :: oo -> Eff effs ()
+--     } ->
+--     OnceSuite effs oi oo
 
-data ThreadHook oi ti to where
-  ThreadNone :: ThreadHook oi ti ti
-  ThreadBefore ::
-    { hook :: oi -> ti -> Eff effs to
-    } ->
-    ThreadHook oi ti to
-  ThreadAfter ::
-    { releaseOnly :: ti -> Eff effs ()
-    } ->
-    ThreadHook oi ti ti
-  ThreadAround ::
-    { hook :: oi -> ti -> Eff effs to
-    , release :: to -> Eff effs ()
-    } ->
-    ThreadHook oi ti to
+-- data ThreadSuite oi ti to where
+--   ThreadNone :: ThreadSuite oi ti ti
+--   ThreadBefore ::
+--     { Suite :: oi -> ti -> Eff effs to
+--     } ->
+--     ThreadSuite oi ti to
+--   ThreadAfter ::
+--     { releaseOnly :: ti -> Eff effs ()
+--     } ->
+--     ThreadSuite oi ti ti
+--   ThreadAround ::
+--     { Suite :: oi -> ti -> Eff effs to
+--     , release :: to -> Eff effs ()
+--     } ->
+--     ThreadSuite oi ti to
 
-data TestHook oi ti tsti tsto where
-  TestNone :: TestHook oi ti tsti tsti
-  TestBefore ::
-    { hook :: oi -> ti -> tsti -> Eff effs tsto
-    } ->
-    TestHook oi ti tsti tsto
-  TestAfter ::
-    { releaseOnly :: tsti -> Eff effs ()
-    } ->
-    TestHook oi ti tsti tsti
-  TestAround ::
-    { hook :: oi -> ti -> tsti -> Eff effs tsto
-    , release :: tsto -> Eff effs ()
-    } ->
-    TestHook oi ti tsti tsto
+-- data TestSuite oi ti tsti tsto where
+--   TestNone :: TestSuite oi ti tsti tsti
+--   TestBefore ::
+--     { Suite :: oi -> ti -> tsti -> Eff effs tsto
+--     } ->
+--     TestSuite oi ti tsti tsto
+--   TestAfter ::
+--     { releaseOnly :: tsti -> Eff effs ()
+--     } ->
+--     TestSuite oi ti tsti tsti
+--   TestAround ::
+--     { Suite :: oi -> ti -> tsti -> Eff effs tsto
+--     , release :: tsto -> Eff effs ()
+--     } ->
+--     TestSuite oi ti tsti tsto
 
--- mkTest r context = Test r (items r) (interactor r) (parse r)
+-- -- mkTest r context = Test r (items r) (interactor r) (parse r)

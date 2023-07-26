@@ -1,6 +1,5 @@
 module DSL.Hook where
 
-import Core (ThreadHook (ThreadAfter, ThreadBefore))
 import Effectful as EF (
   Dispatch (Dynamic),
   DispatchOf,
@@ -44,6 +43,23 @@ data Hook userEffs :: Effect where
   OnceBefore' :: m (HookResult OnceBefore a) -> (a -> Eff userEffs b) -> Hook userEffs m (HookResult OnceBefore b)
   ThreadBefore :: Eff userEffs a -> Hook userEffs m (HookResult ThreadBefore a)
   ThreadBefore' :: (Before' hc) => m (HookResult hc a) -> (a -> Eff userEffs b) -> Hook userEffs m (HookResult ThreadBefore b)
+  OnceAfter :: Eff userEffs a -> Hook userEffs m (HookResult OnceBefore a)
+
+
+  -- data PyrethrumTest rc tc effs where
+  -- Test ::
+  --   { config :: tc
+  --   , items :: rc -> [i]
+  --   , interactor :: rc -> i -> Eff effs as
+  --   , parse :: as -> Eff '[E.Error ParseException] ds
+  --   } ->
+  --   PyrethrumTest rc tc effs
+  -- TestNoParse ::
+  --   { config :: tc
+  --   , items :: rc -> [i]
+  --   , interactor :: rc -> i -> Eff effs ds
+  --   } ->
+  --   PyrethrumTest rc tc effs
 
 -- todo: genrate splice and use makeEffect without type
 -- signatures add docs investigate renaming params

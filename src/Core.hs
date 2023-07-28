@@ -98,7 +98,7 @@ data ThreadBefore
 instance BeforeTest ThreadBefore
 instance ThreadParam ThreadBefore
 
-newtype HookResult hookProps a = HookResult a
+newtype Hook hookProps a = HookResult a
 
 -- data Suite effs :: Effect where
 --   OnceBefore :: Eff effs a -> Suite effs m (HookResult OnceBefore a)
@@ -109,35 +109,36 @@ newtype HookResult hookProps a = HookResult a
 -- Around
 -- Test
 -- see --  HERE!!!!!!! - implementt stub esp checks
+-- sub effs -- how does it work
 -- document lifted functions
 
 data Suite rc tc effs :: Effect where
-  BeforeOnce :: (rc -> Eff effs a) -> Suite rc tc effs m (HookResult OnceBefore a)
-  BeforeOnceChild :: m (HookResult OnceBefore a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (HookResult OnceBefore b)
-  BeforeThread :: (rc -> Eff effs a) -> Suite rc tc effs m (HookResult ThreadBefore a)
-  BeforeThreadChild :: ThreadParam hc => m (HookResult hc a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (HookResult ThreadBefore b)
+  BeforeOnce :: (rc -> Eff effs a) -> Suite rc tc effs m (Hook OnceBefore a)
+  BeforeOnceChild :: m (Hook OnceBefore a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (Hook OnceBefore b)
+  BeforeThread :: (rc -> Eff effs a) -> Suite rc tc effs m (Hook ThreadBefore a)
+  BeforeThreadChild :: ThreadParam hc => m (Hook hc a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (Hook ThreadBefore b)
   -- Test :: ItemClass i ds => (rc -> i -> Eff effs as) -> (as -> Eff '[E.Error ParseException] ds) -> (rc -> [i]) -> Suite rc tc effs m ()
-  Test ::  TestParams rc tc effs -> Suite rc tc effs m (TestParams rc tc effs)
-  WithHook :: m (HookResult hc a) -> (a -> TestParams rc tc effs) -> Suite rc tc effs m (TestParams rc tc effs)
+  Test ::  AbstractTest rc tc effs -> Suite rc tc effs m (AbstractTest rc tc effs)
+  WithHook :: m (Hook hc a) -> (a -> AbstractTest rc tc effs) -> Suite rc tc effs m (AbstractTest rc tc effs)
 
 
   OnceAfter :: Eff effs () -> Suite rc tc effs m ()
   -- TODO: error messages when hooks are wrong
 
-data TestParams rc tc effs where
+data AbstractTest rc tc effs where
   Full ::
     { config :: tc
     , action :: rc -> i -> Eff effs as
     , parse :: as -> Eff '[E.Error ParseException] ds
     , items :: rc -> [i]
     } ->
-    TestParams rc tc effs
+    AbstractTest rc tc effs
   NoParse ::
     { config :: tc
     , action :: rc -> i -> Eff effs ds
     , items :: rc -> [i]
     } ->
-    TestParams rc tc effs
+    AbstractTest rc tc effs
   -- TODO Singleton
 
 makeEffect ''Suite

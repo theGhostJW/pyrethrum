@@ -18,7 +18,7 @@ import DSL.Out
 import Effectful (Eff, IOE, (:>))
 import Effectful.Error.Static (Error, runError)
 import PyrethrumExtras (txt)
-import DSL.Hook
+-- import DSL.Hook
 
 {-
  - Suite elements
@@ -88,33 +88,32 @@ type Test = TestParams RunConfig TestConfig AppEffs
 
 -- set up elements
 
-onceBeforeHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
-onceBeforeHook = onceBefore $ \rc -> pure 1
+beforeOnceHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
+beforeOnceHook = beforeOnce $ \rc -> pure 1
 
-onceBeforeChildHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
-onceBeforeChildHook =
-  onceBeforeChild onceBeforeHook $
+beforeOnceChildHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
+beforeOnceChildHook =
+  beforeOnceChild beforeOnceHook $
     \rc i -> do
       log $ "beforeAll' " <> txt i
       pure $ i + 1
 
 threadBeforeHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult ThreadBefore Int)
-threadBeforeHook = threadBefore . const $ pure 1
+threadBeforeHook = beforeThread . const $ pure 1
 
-threadBeforeInt :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult ThreadBefore Text)
-threadBeforeInt =
-  threadBeforeChild threadBeforeHook $
+threadBeforeChildInt :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult ThreadBefore Text)
+threadBeforeChildInt =
+ beforeThreadChild threadBeforeHook $
     \rc i -> do
       log $ "beforeEach' " <> txt i
       pure . txt $ i + 1
 
 threadBeforeChild2 :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult ThreadBefore Int)
 threadBeforeChild2 =
-  threadBeforeChild onceBeforeChildHook $
+ beforeThreadChild beforeOnceChildHook $
     \rc i -> do
       log $ "beforeEach' " <> txt i
       pure $ i + 1
-
 
 
 -- parent :: Hook AppEffs Integer

@@ -63,4 +63,4 @@ data Hook userEffs :: Effect where
 
 -- todo: genrate splice and use makeEffect without type
 -- signatures add docs investigate renaming params
-makeEffect ''Hook
+-- makeEffect ''Hook

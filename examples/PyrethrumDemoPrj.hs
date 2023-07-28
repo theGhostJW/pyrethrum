@@ -19,22 +19,10 @@ import Effectful (Eff, IOE, (:>))
 import Effectful.Error.Static (Error, runError)
 import PyrethrumExtras (txt)
 
--- import DSL.Hook
-
-{-
- - Suite elements
-  - only expose data constructors to users not lifted constructors
-  - only expose user effects to user
-  - interpretors internal
-    - may or may not require sub-interpreter
-    - suite interpretor double parameterised
-  - first run interpretors as required
--}
 
 type AppEffs = '[FileSystem, Out ApEvent, Error FSException, IOE]
 type App es = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] es
 type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
-type ControlEffs es = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] es
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum, Bounded)
 $(deriveJSON defaultOptions ''Environment)
@@ -68,5 +56,6 @@ $(deriveJSON defaultOptions ''TestConfig)
 instance Config TestConfig
 
 type Test = AbstractTest RunConfig TestConfig AppEffs
+type ControlEffs = '[Suite RunConfig TestConfig AppEffs] 
 
-type Fixture a = Eff '[Suite RunConfig TestConfig AppEffs] a
+type Fixture a = Eff ControlEffs a

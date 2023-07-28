@@ -105,9 +105,9 @@ newtype Hook hookProps a = HookResult a
 --   OnceBefore' :: Eff effs (HookResult OnceBefore a) -> (a -> Eff effs b) -> Suite effs m (HookResult OnceBefore b)
 
 -- Rename constraints
+-- Test
 -- Instance
 -- Around
--- Test
 -- see --  HERE!!!!!!! - implementt stub esp checks
 -- sub effs -- how does it work
 -- document lifted functions

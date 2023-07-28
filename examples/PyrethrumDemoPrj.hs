@@ -1,4 +1,4 @@
-module PyrethrumDemoProject where
+module PyrethrumDemoPrj where
 
 import Core
 import qualified Core as C
@@ -70,5 +70,3 @@ instance Config TestConfig
 type Test = AbstractTest RunConfig TestConfig AppEffs
 
 type Fixture a = Eff '[Suite RunConfig TestConfig AppEffs] a
-
-

@@ -1,5 +1,6 @@
 module PyrethrumDemoTest where
 
+import PyrethrumDemoPrj
 import Core
 -- import qualified Core as C
 -- import Data.Aeson.TH
@@ -18,7 +19,7 @@ import DSL.Out
 import Effectful (Eff, IOE, (:>))
 -- import Effectful.Error.Static (Error, runError)
 import PyrethrumExtras (txt)
-import PyrethrumDemoProject
+
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . Log

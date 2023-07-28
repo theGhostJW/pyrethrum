@@ -28,6 +28,7 @@ import PyrethrumExtras
 mkId :: forall tc i. (HasId i, Config tc) => Address -> tc -> i -> ItemId
 mkId md tc i = ItemId (push (getField @"title" tc) R.Test md) (getField @"id" i)
 
+--  HERE!!!!!!!
 runItem ::
   forall e effs rc tc hi i as ds.
   ( MinEffs e effs,

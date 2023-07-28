@@ -26,36 +26,41 @@ type ControlEffs es = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] es
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . Log
 
-onceBeforeHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
-onceBeforeHook = onceBefore $ \rc -> pure 1
+-- direct 
 
-onceBeforeChildHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
-onceBeforeChildHook =
-  onceBefore' onceBeforeHook $
+beforeOnceHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
+beforeOnceHook = beforeOnce $ \rc -> pure 1
+
+beforeOnceChildHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
+beforeOnceChildHook =
+  beforeOnceChild beforeOnceHook $
     \rc i -> do
       log $ "beforeAll' " <> txt i
       pure $ i + 1
 
 threadBeforeHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult ThreadBefore Int)
-threadBeforeHook = threadBefore . const $ pure 1
+threadBeforeHook = beforeThread . const $ pure 1
 
-threadBeforeChild :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult ThreadBefore Text)
-threadBeforeChild =
-  threadBefore' threadBeforeHook $
+threadBeforeChildInt :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult ThreadBefore Text)
+threadBeforeChildInt =
+ beforeThreadChild threadBeforeHook $
     \rc i -> do
       log $ "beforeEach' " <> txt i
       pure . txt $ i + 1
 
 threadBeforeChild2 :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult ThreadBefore Int)
 threadBeforeChild2 =
-  threadBefore' onceBeforeChildHook $
+ beforeThreadChild beforeOnceChildHook $
     \rc i -> do
       log $ "beforeEach' " <> txt i
       pure $ i + 1
 
--- onceBeforeHookChildHookWontCompile :: forall rc tc cfs. (HasCallStack, Suite UserEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
--- onceBeforeHookChildHookWontCompile  =
---   onceBefore' threadBeforeChild $
+-- object 
+
+
+-- beforeOnceHookChildHookWontCompile :: forall rc tc cfs. (HasCallStack, Suite UserEffs :> cfs) => Eff cfs (HookResult beforeOnce Int)
+-- beforeOnceHookChildHookWontCompile  =
+--   beforeOnce' $
 --     \rc i -> do
 --       log $ "beforeAll' " <> txt i
 --       pure $ i + 1

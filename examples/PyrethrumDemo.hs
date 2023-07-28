@@ -1,6 +1,6 @@
 module PyrethrumDemo where
 
-import Core
+import Core as C
 import Data.Aeson.TH
 import Data.Aeson.Types (
   FromJSON,
@@ -9,12 +9,46 @@ import Data.Aeson.Types (
   parse,
  )
 
-import DSL.FileSystemEffect
 import qualified DSL.FileSystemEffect as IOI
 import qualified DSL.Internal.ApEvent as AE
+
+import DSL.FileSystemEffect
+import DSL.Internal.ApEvent
 import DSL.Out
 import Effectful (Eff, IOE, (:>))
-import Effectful.Error.Dynamic (Error)
+import Effectful.Error.Static (Error, runError)
+import PyrethrumExtras (txt)
+import DSL.Hook
+
+{-
+ - Suite elements
+  - only expose data constructors to users not lifted constructors
+  - only expose user effects to user
+  - interpretors internal
+    - may or may not require sub-interpreter
+    - suite interpretor double parameterised
+  - first run interpretors as required
+-}
+
+type AutoEffs = '[FileSystem, Out ApEvent, Error FSException, IOE]
+type ApEffs es = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] es
+type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
+type ControlEffs es = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] es
+
+log :: (Out ApEvent :> es) => Text -> Eff es ()
+log = out . Log
+
+
+-- object 
+
+
+-- onceBeforeHookChildHookWontCompile :: forall rc tc cfs. (HasCallStack, Suite UserEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
+-- onceBeforeHookChildHookWontCompile  =
+--   onceBefore' threadBeforeChild $
+--     \rc i -> do
+--       log $ "beforeAll' " <> txt i
+--       pure $ i + 1
+
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum, Bounded)
 $(deriveJSON defaultOptions ''Environment)
@@ -49,10 +83,39 @@ instance Config TestConfig
 
 type AppEffs = '[FileSystem, Out AE.ApEvent, Error Text, IOE]
 
-type Test = PyrethrumTest RunConfig TestConfig AppEffs
+type Test = TestParams RunConfig TestConfig AppEffs
 
-log :: (Out AE.ApEvent :> es) => Text -> Eff es ()
-log = out . AE.Log
+
+-- set up elements
+
+onceBeforeHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
+onceBeforeHook = onceBefore $ \rc -> pure 1
+
+onceBeforeChildHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult OnceBefore Int)
+onceBeforeChildHook =
+  onceBeforeChild onceBeforeHook $
+    \rc i -> do
+      log $ "beforeAll' " <> txt i
+      pure $ i + 1
+
+threadBeforeHook :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult ThreadBefore Int)
+threadBeforeHook = threadBefore . const $ pure 1
+
+threadBeforeInt :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult ThreadBefore Text)
+threadBeforeInt =
+  threadBeforeChild threadBeforeHook $
+    \rc i -> do
+      log $ "beforeEach' " <> txt i
+      pure . txt $ i + 1
+
+threadBeforeChild2 :: forall rc tc cfs. (HasCallStack, Suite rc tc AutoEffs :> cfs) => Eff cfs (HookResult ThreadBefore Int)
+threadBeforeChild2 =
+  threadBeforeChild onceBeforeChildHook $
+    \rc i -> do
+      log $ "beforeEach' " <> txt i
+      pure $ i + 1
+
+
 
 -- parent :: Hook AppEffs Integer
 -- parent = Hook {

@@ -77,24 +77,26 @@ instance ToJSON (Check v) where
 -- concurrency
 data Once
 data Thread
+data Each
 
 -- order
 data Before
 data After
 
-class Before' a
-class Once' a
-class Thread' a
-class After' a
+class BeforeTest a
+class OnceParam a
+class ThreadParam a
+class AfterTest a
 
 data OnceBefore
 
-instance Before' OnceBefore
-instance Once' OnceBefore
+instance BeforeTest OnceBefore
+instance OnceParam OnceBefore
+instance ThreadParam OnceBefore
 
 data ThreadBefore
-instance Before' ThreadBefore
-instance Thread' ThreadBefore
+instance BeforeTest ThreadBefore
+instance ThreadParam ThreadBefore
 
 newtype HookResult hookProps a = HookResult a
 
@@ -102,27 +104,41 @@ newtype HookResult hookProps a = HookResult a
 --   OnceBefore :: Eff effs a -> Suite effs m (HookResult OnceBefore a)
 --   OnceBefore' :: Eff effs (HookResult OnceBefore a) -> (a -> Eff effs b) -> Suite effs m (HookResult OnceBefore b)
 
-data Suite rc tc effs :: Effect where
-  OnceBefore :: (rc -> Eff effs a) -> Suite rc tc effs m (HookResult OnceBefore a)
-  OnceBefore' :: m (HookResult OnceBefore a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (HookResult OnceBefore b)
-  ThreadBefore :: (rc -> Eff effs a) -> Suite rc tc effs m (HookResult ThreadBefore a)
-  ThreadBefore' :: Before' hc => m (HookResult hc a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (HookResult ThreadBefore b)
-  OnceAfter :: (rc -> Eff effs ()) -> Suite rc tc effs m ()
+-- Rename constraints
+-- Instance
+-- Around
+-- Test
+-- see --  HERE!!!!!!! - implementt stub esp checks
+-- document lifted functions
 
-data PyrethrumTest rc tc effs where
-  Test ::
+data Suite rc tc effs :: Effect where
+  BeforeOnce :: (rc -> Eff effs a) -> Suite rc tc effs m (HookResult OnceBefore a)
+  BeforeOnceChild :: m (HookResult OnceBefore a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (HookResult OnceBefore b)
+  BeforeThread :: (rc -> Eff effs a) -> Suite rc tc effs m (HookResult ThreadBefore a)
+  BeforeThreadChild :: ThreadParam hc => m (HookResult hc a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (HookResult ThreadBefore b)
+  -- Test :: ItemClass i ds => (rc -> i -> Eff effs as) -> (as -> Eff '[E.Error ParseException] ds) -> (rc -> [i]) -> Suite rc tc effs m ()
+  Test ::  TestParams rc tc effs -> Suite rc tc effs m (TestParams rc tc effs)
+  WithHook :: m (HookResult hc a) -> (a -> TestParams rc tc effs) -> Suite rc tc effs m (TestParams rc tc effs)
+
+
+  OnceAfter :: Eff effs () -> Suite rc tc effs m ()
+  -- TODO: error messages when hooks are wrong
+
+data TestParams rc tc effs where
+  Full ::
     { config :: tc
     , action :: rc -> i -> Eff effs as
     , parse :: as -> Eff '[E.Error ParseException] ds
     , items :: rc -> [i]
     } ->
-    PyrethrumTest rc tc effs
-  TestNoParse ::
+    TestParams rc tc effs
+  NoParse ::
     { config :: tc
     , action :: rc -> i -> Eff effs ds
     , items :: rc -> [i]
     } ->
-    PyrethrumTest rc tc effs
+    TestParams rc tc effs
+  -- TODO Singleton
 
 makeEffect ''Suite
 -- type PreNodeRoot = PreNode () ()

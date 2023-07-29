@@ -98,38 +98,36 @@ data ThreadBefore
 instance BeforeTest ThreadBefore
 instance ThreadParam ThreadBefore
 
+
 newtype Hook hookProps a = HookResult a
 
 -- data Suite effs :: Effect where
 --   OnceBefore :: Eff effs a -> Suite effs m (HookResult OnceBefore a)
 --   OnceBefore' :: Eff effs (HookResult OnceBefore a) -> (a -> Eff effs b) -> Suite effs m (HookResult OnceBefore b)
 
--- Rename constraints
--- Test
--- Instance
--- Around
--- see --  HERE!!!!!!! - implementt stub esp checks
--- sub effs -- how does it work
--- document lifted functions
 
-data Suite rc tc effs :: Effect where
-  BeforeOnce :: (rc -> Eff effs a) -> Suite rc tc effs m (Hook OnceBefore a)
-  BeforeOnceChild :: m (Hook OnceBefore a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (Hook OnceBefore b)
-  BeforeThread :: (rc -> Eff effs a) -> Suite rc tc effs m (Hook ThreadBefore a)
-  BeforeThreadChild :: ThreadParam hc => m (Hook hc a) -> (rc -> a -> Eff effs b) -> Suite rc tc effs m (Hook ThreadBefore b)
-  -- Test :: ItemClass i ds => (rc -> i -> Eff effs as) -> (as -> Eff '[E.Error ParseException] ds) -> (rc -> [i]) -> Suite rc tc effs m ()
-  Test ::  AbstractTest rc tc effs -> Suite rc tc effs m (AbstractTest rc tc effs)
-  WithHook :: m (Hook hc a) -> (a -> AbstractTest rc tc effs) -> Suite rc tc effs m (AbstractTest rc tc effs)
+data AbstractFixture rc tc effs :: Effect where
+  BeforeOnce :: (rc -> Eff effs a) -> AbstractFixture rc tc effs m (Hook OnceBefore a)
+  BeforeOnceChild :: m (Hook OnceBefore a) -> (rc -> a -> Eff effs b) -> AbstractFixture rc tc effs m (Hook OnceBefore b)
+  -- BeforeThread :: (rc -> Eff effs a) -> AbstractFixture rc tc effs m (Hook ThreadBefore a)
+  -- BeforeThreadChild :: ThreadParam hc => m (Hook hc a) -> (rc -> a -> Eff effs b) -> AbstractFixture rc tc effs m (Hook ThreadBefore b)
+  -- -- Test :: ItemClass i ds => (rc -> i -> Eff effs as) -> (as -> Eff '[E.Error ParseException] ds) -> (rc -> [i]) -> Suite rc tc effs m ()
+  -- -- add maybe parent fixture
+  Test :: AbstractTest rc tc effs -> AbstractFixture rc tc effs m (AbstractTest rc tc effs)
+  WithHook :: m (Hook hc a) -> (a -> AbstractTest rc tc effs) -> AbstractFixture rc tc effs m (AbstractTest rc tc effs)
 
 
-  OnceAfter :: Eff effs () -> Suite rc tc effs m ()
+  OnceAfter :: Eff effs () -> AbstractFixture rc tc effs m ()
   -- TODO: error messages when hooks are wrong
+
+
+data AbstactChildTest rc tc a effs
 
 data AbstractTest rc tc effs where
   Full ::
     { config :: tc
     , action :: rc -> i -> Eff effs as
-    , parse :: as -> Eff '[E.Error ParseException] ds
+    , parse :: as -> Either ParseException ds
     , items :: rc -> [i]
     } ->
     AbstractTest rc tc effs
@@ -141,8 +139,26 @@ data AbstractTest rc tc effs where
     AbstractTest rc tc effs
   -- TODO Singleton
 
-makeEffect ''Suite
+makeEffect ''AbstractFixture
+
+-- try this 
+  -- expose parent in return type in hook
+  -- have a root element
+  -- list of tests
+  -- copy types??
+    -- reddit
+  -- work backward to root 
+  -- build from root 
+
+-- Rename constraints
+-- Test
+-- Instance
+-- Around
+-- see --  HERE!!!!!!! - implementt stub esp checks
+-- sub effs -- how does it work
+-- document lifted functions
 -- type PreNodeRoot = PreNode () ()
+
 
 -- data Test'' si ti ii = Test''
 --   { id :: Text

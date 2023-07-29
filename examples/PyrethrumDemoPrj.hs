@@ -56,6 +56,6 @@ $(deriveJSON defaultOptions ''TestConfig)
 instance Config TestConfig
 
 type Test = AbstractTest RunConfig TestConfig AppEffs
-type ControlEffs = '[Suite RunConfig TestConfig AppEffs] 
+type ControlEffs = '[AbstractFixture RunConfig TestConfig AppEffs] 
 
 type Fixture a = Eff ControlEffs a

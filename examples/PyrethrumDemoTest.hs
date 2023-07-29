@@ -27,7 +27,7 @@ beforeOnceChildHook =
     \rc i -> do
       log $ "beforeAll' " <> txt i
       pure $ i + 1
-
+{-
 threadBeforeHook :: Eff ControlEffs  (Hook ThreadBefore Int)
 threadBeforeHook = beforeThread . const $ pure 1
 
@@ -44,7 +44,7 @@ threadBeforeChild2 =
     \rc i -> do
       log $ "beforeEach' " <> txt i
       pure $ i + 1
-
+-}
 test :: Test
 test = Full config action parse items
 

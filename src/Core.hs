@@ -142,6 +142,52 @@ data AbstractTest rc tc effs where
 makeEffect ''AbstractFixture
 
 -- try this 
+  -- do notation 
+  -- - interpretor + writer
+  -- - extract loc from item + fixtureType and dependency  loc
+  -- start with:: https://github.com/theGhostJW/pyrethrum-extras/blob/master/src/Language/Haskell/TH/Syntax/Extended.hs
+    -- see also:: https://hackage.haskell.org/package/template-haskell-2.20.0.0/docs/Language-Haskell-TH-Syntax.html#t:Name
+  -- - check for recursion
+  -- - generate suite based on prenode
+  -- - need 2 files 
+  --  - fixture list - plain old do for initial extraction
+  --  - test Suite - the actual test suite with interperetor as param
+  --   - error as warning addded to the top of both generated files
+  {-
+
+  
+module Language.Haskell.TH.Syntax.Extended (
+ module S,
+ moduleOf
+)
+ where
+
+import           BasePrelude as B
+import           Data.Text hiding (reverse, dropWhile)
+import           Language.Haskell.TH.Syntax as S
+import           Stringy
+
+
+-- https://stackoverflow.com/a/5679470/5589037
+moduleOf :: S.Name -> Text
+moduleOf =
+  let
+    dropLastToken :: String -> String
+    dropLastToken = reverse . dropWhile (== '.') . dropWhile (/= '.') . reverse
+  in
+    toS . dropLastToken . show
+
+
+mkTestAddress :: Name -> TestAddress
+mkTestAddress = TestAddress . moduleOf   
+    
+      
+nameOfModule :: TestAddress
+nameOfModule = mkTestAddress ''ApState
+    
+  -}
+  -- - create concrete object Foo vs AbstractFoo
+
   -- expose parent in return type in hook
   -- have a root element
   -- list of tests

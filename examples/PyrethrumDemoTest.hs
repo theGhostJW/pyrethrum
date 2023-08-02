@@ -1,8 +1,7 @@
 module PyrethrumDemoTest where
-  
-import PyrethrumDemoPrj
-import Core
 
+import Core
+import PyrethrumDemoPrj
 
 -- import qualified DSL.FileSystemEffect as IOI
 -- import qualified DSL.Internal.ApEvent as AE
@@ -11,9 +10,9 @@ import Core
 import DSL.Internal.ApEvent
 import DSL.Out
 import Effectful (Eff, IOE, (:>))
+
 -- import Effectful.Error.Static (Error, runError)
 import PyrethrumExtras (txt)
-
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . Log
@@ -21,12 +20,34 @@ log = out . Log
 beforeOnceHook :: Eff ControlEffs (Hook OnceBefore Int)
 beforeOnceHook = beforeOnce $ \rc -> pure 1
 
-beforeOnceChildHook :: Eff ControlEffs  (Hook OnceBefore Int)
+beforeOnceChildHook :: Eff ControlEffs (Hook OnceBefore Int)
 beforeOnceChildHook =
   beforeOnceChild beforeOnceHook $
     \rc i -> do
       log $ "beforeAll' " <> txt i
       pure $ i + 1
+
+beforeOnceHook' :: AbstractFixtureS rc tc effs (Hook OnceBefore Integer)
+beforeOnceHook' =
+  BeforeOnceS
+    { action = \rc -> pure 1
+    }
+
+beforeOnceChildHook' :: (Out ApEvent :> es) => AbstractFixtureS rc tc es (Hook OnceBefore (rc -> Integer -> Eff es Integer))
+beforeOnceChildHook' =
+  BeforeOnceChildS
+    { parent = beforeOnceHook'
+    , childAction =
+        \rc i -> do
+          log $ "beforeAll' " <> txt i
+          pure $ i + 1
+    }
+
+-- beforeOnceChildHook' =
+--   BeforeOnceChild beforeOnceHook' $
+--     \rc i -> do
+--       log $ "beforeAll' " <> txt i
+--       pure $ i + 1
 {-
 threadBeforeHook :: Eff ControlEffs  (Hook ThreadBefore Int)
 threadBeforeHook = beforeThread . const $ pure 1

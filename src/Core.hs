@@ -10,11 +10,11 @@ import qualified Data.DList as DL
 import Effectful (Eff, Effect)
 import qualified Effectful.Error.Dynamic as E
 import Effectful.Internal.Effect ((:>))
+import Effectful.TH (makeEffect)
 import GHC.Records (HasField)
 import GHC.Show (Show (..))
 import qualified Internal.PreNode as PN
 import PyrethrumExtras (toS, uu)
-import Effectful.TH (makeEffect)
 
 newtype CheckFailure = CheckFailure Text
   deriving (Show)
@@ -98,13 +98,18 @@ data ThreadBefore
 instance BeforeTest ThreadBefore
 instance ThreadParam ThreadBefore
 
+-- expand to include parent or root maybe
+newtype Hook hookType a = Hook a
 
-newtype Hook hookProps a = HookResult a
+newtype StubLoc = StubLoc Text
+data Addressed a = Addressed
+  { loc :: StubLoc
+  , value :: a
+  }
 
 -- data Suite effs :: Effect where
 --   OnceBefore :: Eff effs a -> Suite effs m (HookResult OnceBefore a)
 --   OnceBefore' :: Eff effs (HookResult OnceBefore a) -> (a -> Eff effs b) -> Suite effs m (HookResult OnceBefore b)
-
 
 data AbstractFixture rc tc effs :: Effect where
   BeforeOnce :: (rc -> Eff effs a) -> AbstractFixture rc tc effs m (Hook OnceBefore a)
@@ -115,11 +120,30 @@ data AbstractFixture rc tc effs :: Effect where
   -- -- add maybe parent fixture
   Test :: AbstractTest rc tc effs -> AbstractFixture rc tc effs m (AbstractTest rc tc effs)
   WithHook :: m (Hook hc a) -> (a -> AbstractTest rc tc effs) -> AbstractFixture rc tc effs m (AbstractTest rc tc effs)
-
-
   OnceAfter :: Eff effs () -> AbstractFixture rc tc effs m ()
-  -- TODO: error messages when hooks are wrong
 
+-- TODO: error messages when hooks are wrong
+
+data AbstractFixtureS rc tc effs a where
+  BeforeOnceS ::
+    { action :: rc -> Eff effs a
+    } ->
+    AbstractFixtureS rc tc effs (Hook OnceBefore a)
+  BeforeOnceChildS ::
+    { parent :: AbstractFixtureS rc tc effs (Hook OnceBefore a)
+    , childAction :: rc -> a -> Eff effs b
+    } ->
+    AbstractFixtureS rc tc effs (Hook OnceBefore (rc -> a -> Eff effs b))
+
+-- -- BeforeThread :: (rc -> Eff effs a) -> AbstractFixture rc tc effs m (Hook ThreadBefore a)
+-- -- BeforeThreadChild :: ThreadParam hc => m (Hook hc a) -> (rc -> a -> Eff effs b) -> AbstractFixture rc tc effs m (Hook ThreadBefore b)
+-- -- -- Test :: ItemClass i ds => (rc -> i -> Eff effs as) -> (as -> Eff '[E.Error ParseException] ds) -> (rc -> [i]) -> Suite rc tc effs m ()
+-- -- -- add maybe parent fixture
+-- TestS :: AbstractTest rc tc effs -> AbstractFixtureS rc tc effs (AbstractTest rc tc effs)
+-- WithHookS :: (Hook hc a) -> (a -> AbstractTest rc tc effs) -> AbstractFixtureS rc tc effs (AbstractTest rc tc effs)
+
+-- OnceAfterS :: Eff effs () -> AbstractFixture rc tc effs ()
+-- TODO: error messages when hooks are wrong
 
 data AbstactChildTest rc tc a effs
 
@@ -137,25 +161,45 @@ data AbstractTest rc tc effs where
     , items :: rc -> [i]
     } ->
     AbstractTest rc tc effs
-  -- TODO Singleton
+
+-- TODO Singleton
 
 makeEffect ''AbstractFixture
 
--- try this 
-  -- do notation 
-  -- - interpretor + writer
-  -- - extract loc from item + fixtureType and dependency  loc
-  -- start with:: https://github.com/theGhostJW/pyrethrum-extras/blob/master/src/Language/Haskell/TH/Syntax/Extended.hs
-    -- see also:: https://hackage.haskell.org/package/template-haskell-2.20.0.0/docs/Language-Haskell-TH-Syntax.html#t:Name
-  -- - check for recursion
-  -- - generate suite based on prenode
-  -- - need 2 files 
-  --  - fixture list - plain old do for initial extraction
-  --  - test Suite - the actual test suite with interperetor as param
-  --   - error as warning addded to the top of both generated files
-  {-
+-- try this
+-- part 1
+-- do notation
+-- - interpretor + writer
+-- - extract loc from item (hard code for now) + fixtureType and dependency  loc
+-- - stub for checks (see part 4)
+-- - add missing fixtures
+-- - reinstate before
+-- - hook around
+-- - fixture hooks
+-- - instance hooks
+-- - check constraints line up
+-- change prenode and execution to match new structure
+-- - need 2 files
+--  - fixture list - plain old do for initial extraction -- hard code for now
+--  - test Suite - the actual test suite with interperetor as param
+--   - error as warning extension added to the top of both generated files
+-- stub for run test
+-- - generate suite based on prenode
+-- part 2
+-- reinstrate run test
+-- demo running single test
+-- part 3
+--  - unit tests for suite runtime
+-- part 4
+-- - implement check for recursion check
+-- - generator (hie or below)
+-- remove stubLoc from type
+-- start with:: https://github.com/theGhostJW/pyrethrum-extras/blob/master/src/Language/Haskell/TH/Syntax/Extended.hs
+-- see also:: https://hackage.haskell.org/package/template-haskell-2.20.0.0/docs/Language-Haskell-TH-Syntax.html#t:Name
+-- part 5 reinstate filtering // tree shaking
 
-  
+{-
+
 module Language.Haskell.TH.Syntax.Extended (
  module S,
  moduleOf
@@ -167,7 +211,6 @@ import           Data.Text hiding (reverse, dropWhile)
 import           Language.Haskell.TH.Syntax as S
 import           Stringy
 
-
 -- https://stackoverflow.com/a/5679470/5589037
 moduleOf :: S.Name -> Text
 moduleOf =
@@ -177,24 +220,22 @@ moduleOf =
   in
     toS . dropLastToken . show
 
-
 mkTestAddress :: Name -> TestAddress
-mkTestAddress = TestAddress . moduleOf   
-    
-      
+mkTestAddress = TestAddress . moduleOf
+
 nameOfModule :: TestAddress
 nameOfModule = mkTestAddress ''ApState
-    
-  -}
-  -- - create concrete object Foo vs AbstractFoo
 
-  -- expose parent in return type in hook
-  -- have a root element
-  -- list of tests
-  -- copy types??
-    -- reddit
-  -- work backward to root 
-  -- build from root 
+  -}
+-- - create concrete object Foo vs AbstractFoo
+
+-- expose parent in return type in hook
+-- have a root element
+-- list of tests
+-- copy types??
+-- reddit
+-- work backward to root
+-- build from root
 
 -- Rename constraints
 -- Test
@@ -204,7 +245,6 @@ nameOfModule = mkTestAddress ''ApState
 -- sub effs -- how does it work
 -- document lifted functions
 -- type PreNodeRoot = PreNode () ()
-
 
 -- data Test'' si ti ii = Test''
 --   { id :: Text

@@ -20,9 +20,11 @@ import Effectful.Error.Static (Error, runError)
 import PyrethrumExtras (txt)
 
 
-type AppEffs = '[FileSystem, Out ApEvent, Error FSException, IOE]
+type AppEs = '[FileSystem, Out ApEvent, Error FSException, IOE]
 type App es = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] es
 type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
+type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
+
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum, Bounded)
 $(deriveJSON defaultOptions ''Environment)
@@ -55,7 +57,7 @@ $(deriveJSON defaultOptions ''TestConfig)
 
 instance Config TestConfig
 
-type Test = AbstractTest RunConfig TestConfig AppEffs
-type ControlEffs = '[AbstractFixture RunConfig TestConfig AppEffs] 
+type Test = AbstractTest RunConfig TestConfig AppEs
+type ControlEffs = '[AbstractFixture RunConfig TestConfig AppEs] 
 
-type Fixture a = Eff ControlEffs a
+type Fixture a = AbstractFixture RunConfig TestConfig AppEs

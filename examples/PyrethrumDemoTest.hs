@@ -17,26 +17,17 @@ import PyrethrumExtras (txt)
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . Log
 
-beforeOnceHook :: Eff ControlEffs (Hook OnceBefore Int)
-beforeOnceHook = beforeOnce $ \rc -> pure 1
 
-beforeOnceChildHook :: Eff ControlEffs (Hook OnceBefore Int)
-beforeOnceChildHook =
-  beforeOnceChild beforeOnceHook $
-    \rc i -> do
-      log $ "beforeAll' " <> txt i
-      pure $ i + 1
-
-beforeOnceHook' :: AbstractFixtureS rc tc effs (Hook OnceBefore Integer)
-beforeOnceHook' =
-  BeforeOnceS
+int_hook :: Fixture (Hook OnceBefore Integer)
+int_hook =
+  BeforeOnce
     { action = \rc -> pure 1
     }
 
-beforeOnceChildHook' :: (Out ApEvent :> es) => AbstractFixtureS rc tc es (Hook OnceBefore (rc -> Integer -> Eff es Integer))
-beforeOnceChildHook' =
-  BeforeOnceChildS
-    { parent = beforeOnceHook'
+add_int_hook :: Fixture (Hook OnceBefore (RunConfig -> Integer -> Eff ApEffs Integer))
+add_int_hook =
+  BeforeOnceChild
+    { parent = int_hook
     , childAction =
         \rc i -> do
           log $ "beforeAll' " <> txt i

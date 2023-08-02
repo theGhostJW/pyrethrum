@@ -111,29 +111,18 @@ data Addressed a = Addressed
 --   OnceBefore :: Eff effs a -> Suite effs m (HookResult OnceBefore a)
 --   OnceBefore' :: Eff effs (HookResult OnceBefore a) -> (a -> Eff effs b) -> Suite effs m (HookResult OnceBefore b)
 
-data AbstractFixture rc tc effs :: Effect where
-  BeforeOnce :: (rc -> Eff effs a) -> AbstractFixture rc tc effs m (Hook OnceBefore a)
-  BeforeOnceChild :: m (Hook OnceBefore a) -> (rc -> a -> Eff effs b) -> AbstractFixture rc tc effs m (Hook OnceBefore b)
-  -- BeforeThread :: (rc -> Eff effs a) -> AbstractFixture rc tc effs m (Hook ThreadBefore a)
-  -- BeforeThreadChild :: ThreadParam hc => m (Hook hc a) -> (rc -> a -> Eff effs b) -> AbstractFixture rc tc effs m (Hook ThreadBefore b)
-  -- -- Test :: ItemClass i ds => (rc -> i -> Eff effs as) -> (as -> Eff '[E.Error ParseException] ds) -> (rc -> [i]) -> Suite rc tc effs m ()
-  -- -- add maybe parent fixture
-  Test :: AbstractTest rc tc effs -> AbstractFixture rc tc effs m (AbstractTest rc tc effs)
-  WithHook :: m (Hook hc a) -> (a -> AbstractTest rc tc effs) -> AbstractFixture rc tc effs m (AbstractTest rc tc effs)
-  OnceAfter :: Eff effs () -> AbstractFixture rc tc effs m ()
-
 -- TODO: error messages when hooks are wrong
 
-data AbstractFixtureS rc tc effs a where
-  BeforeOnceS ::
+data AbstractFixture rc tc effs a where
+  BeforeOnce ::
     { action :: rc -> Eff effs a
     } ->
-    AbstractFixtureS rc tc effs (Hook OnceBefore a)
-  BeforeOnceChildS ::
-    { parent :: AbstractFixtureS rc tc effs (Hook OnceBefore a)
+    AbstractFixture rc tc effs (Hook OnceBefore a)
+  BeforeOnceChild ::
+    { parent :: AbstractFixture rc tc effs (Hook OnceBefore a)
     , childAction :: rc -> a -> Eff effs b
     } ->
-    AbstractFixtureS rc tc effs (Hook OnceBefore (rc -> a -> Eff effs b))
+    AbstractFixture rc tc effs (Hook OnceBefore (rc -> a -> Eff effs b))
 
 -- -- BeforeThread :: (rc -> Eff effs a) -> AbstractFixture rc tc effs m (Hook ThreadBefore a)
 -- -- BeforeThreadChild :: ThreadParam hc => m (Hook hc a) -> (rc -> a -> Eff effs b) -> AbstractFixture rc tc effs m (Hook ThreadBefore b)
@@ -164,12 +153,10 @@ data AbstractTest rc tc effs where
 
 -- TODO Singleton
 
-makeEffect ''AbstractFixture
-
 -- try this
 -- part 1
--- do notation
--- - interpretor + writer
+--  - do notation :: NA
+-- - interpretor + writer :: NA
 -- - extract loc from item (hard code for now) + fixtureType and dependency  loc
 -- - stub for checks (see part 4)
 -- - add missing fixtures
@@ -194,6 +181,7 @@ makeEffect ''AbstractFixture
 -- - implement check for recursion check
 -- - generator (hie or below)
 -- remove stubLoc from type
+-- see weeder :: HIE
 -- start with:: https://github.com/theGhostJW/pyrethrum-extras/blob/master/src/Language/Haskell/TH/Syntax/Extended.hs
 -- see also:: https://hackage.haskell.org/package/template-haskell-2.20.0.0/docs/Language-Haskell-TH-Syntax.html#t:Name
 -- part 5 reinstate filtering // tree shaking

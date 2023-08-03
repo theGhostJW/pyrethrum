@@ -98,7 +98,6 @@ data ThreadBefore
 instance BeforeTest ThreadBefore
 instance ThreadParam ThreadBefore
 
-
 newtype StubLoc = StubLoc Text
 data Addressed a = Addressed
   { loc :: StubLoc
@@ -113,14 +112,23 @@ data Addressed a = Addressed
 
 data AbstractFixture rc tc effs loc a where
   OnceBefore ::
+    { onceAction :: rc -> Eff effs a
+    } ->
+    AbstractFixture rc tc effs OnceBefore a
+  ChildOnceBefore ::
+    { onceParent :: AbstractFixture rc tc effs OnceBefore a
+    , onceChildAction :: rc -> a -> Eff effs b
+    } ->
+    AbstractFixture rc tc effs OnceBefore b
+  ThreadBefore ::
     { action :: rc -> Eff effs a
     } ->
-    AbstractFixture rc tc effs OnceBefore (rc -> Eff effs a)
-  ChildOnceBefore ::
-    { parent :: AbstractFixture rc tc effs OnceBefore (rc -> Eff effs a)
+    AbstractFixture rc tc effs ThreadBefore a
+  ChildThreadBefore ::
+    { parent :: (ThreadParam loc) => AbstractFixture rc tc effs loc a
     , childAction :: rc -> a -> Eff effs b
     } ->
-    AbstractFixture rc tc effs OnceBefore (rc -> a -> Eff effs b)
+    AbstractFixture rc tc effs ThreadBefore b
 
 -- -- BeforeThread :: (rc -> Eff effs a) -> AbstractFixture rc tc effs m (Hook ThreadBefore a)
 -- -- BeforeThreadChild :: ThreadParam hc => m (Hook hc a) -> (rc -> a -> Eff effs b) -> AbstractFixture rc tc effs m (Hook ThreadBefore b)

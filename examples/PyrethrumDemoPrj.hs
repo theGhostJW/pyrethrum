@@ -16,7 +16,7 @@ import DSL.Internal.ApEvent
 import DSL.Out
 import Effectful (Eff, IOE, (:>))
 import Effectful.Error.Static (Error, runError)
-import PyrethrumExtras (txt)
+import PyrethrumExtras (txt, uu)
 
 
 type ApEffs = '[FileSystem, Out ApEvent, Error FSException, IOE]
@@ -63,16 +63,42 @@ type Test = C.AbstractTest RunConfig TestConfig ApEffs
 
 data Fixture loc a where
   OnceBefore ::
-    { action :: RunConfig -> Suite a
+    { onceAction :: RunConfig -> Suite a
     } ->
-    Fixture C.OnceBefore (RunConfig -> Suite a)
+    Fixture C.OnceBefore a
   ChildOnceBefore ::
-    { parent :: Fixture C.OnceBefore (RunConfig -> Suite a)
-    , childAction :: RunConfig -> a -> Suite b
+    { onceParent :: Fixture C.OnceBefore a
+    , onceChildAction :: RunConfig -> a -> Suite b
     } ->
-    Fixture C.OnceBefore (RunConfig-> a -> Suite b)
+    Fixture C.OnceBefore b
 
 makeAbstract :: Fixture loc a -> C.AbstractFixture RunConfig TestConfig ApEffs loc a
 makeAbstract = \case 
   OnceBefore action -> C.OnceBefore action
   ChildOnceBefore parent childAction -> C.ChildOnceBefore (makeAbstract parent) childAction
+  _ -> uu
+
+
+
+{-
+data AbstractFixture rc tc effs loc a where
+  OnceBefore ::
+    { onceAction :: rc -> Eff effs a
+    } ->
+    AbstractFixture rc tc effs OnceBefore as
+  ChildOnceBefore ::
+    { onceParent :: AbstractFixture rc tc effs OnceBefore a
+    , onceChildAction :: rc -> a -> Eff effs b
+    } ->
+    AbstractFixture rc tc effs OnceBefore a
+  ThreadBefore ::
+    { action :: rc -> Eff effs a
+    } ->
+    AbstractFixture rc tc effs ThreadBefore a
+  ChildThreadBefore ::
+    { parent :: (ThreadParam loc) => AbstractFixture rc tc effs loc a
+    , childAction :: rc -> a -> Eff effs b
+    } ->
+    AbstractFixture rc tc effs ThreadBefore b
+
+    -}

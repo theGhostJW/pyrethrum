@@ -18,14 +18,14 @@ log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . Log
 
 
-intHook :: Fixture OnceBefore (RunConfig -> Suite Int)
+intHook :: Fixture OnceBefore Int
 intHook =
   OnceBefore
     { onceAction = \rc -> pure 1
     }
 
 
-addIntHook :: Fixture OnceBefore (RunConfig -> Int -> Suite Int)
+addIntHook :: Fixture OnceBefore Int
 addIntHook =
   ChildOnceBefore
     { onceParent = intHook

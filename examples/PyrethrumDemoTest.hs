@@ -18,23 +18,24 @@ log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . Log
 
 
-int_hook :: Fixture OnceBefore (RunConfig -> Suite Int)
-int_hook =
+intHook :: Fixture OnceBefore (RunConfig -> Suite Int)
+intHook =
   OnceBefore
-    { action = \rc -> pure 1
+    { onceAction = \rc -> pure 1
     }
 
 
-add_int_hook :: Fixture OnceBefore (RunConfig -> Int -> Suite Int)
-add_int_hook =
+addIntHook :: Fixture OnceBefore (RunConfig -> Int -> Suite Int)
+addIntHook =
   ChildOnceBefore
-    { parent = int_hook
-    , childAction =
+    { onceParent = intHook
+    , onceChildAction =
         \rc i -> do
           log $ "beforeAll' " <> txt i
           pure $ i + 1
     }
 
+val = intHook.onceAction
 -- beforeOnceChildHook' =
 --   BeforeOnceChild beforeOnceHook' $
 --     \rc i -> do

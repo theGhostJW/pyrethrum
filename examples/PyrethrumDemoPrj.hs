@@ -1,6 +1,5 @@
 module PyrethrumDemoPrj where
 
-import Core
 import qualified Core as C
 import Data.Aeson.TH
 import Data.Aeson.Types (
@@ -21,9 +20,10 @@ import PyrethrumExtras (txt)
 
 
 type ApEffs = '[FileSystem, Out ApEvent, Error FSException, IOE]
-type App es = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] es
+type Suite es = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] es
 type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
 type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
+
 
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum, Bounded)
@@ -45,7 +45,7 @@ data RunConfig = RunConfig
 
 $(deriveJSON defaultOptions ''RunConfig)
 
-instance Config RunConfig
+instance C.Config RunConfig
 
 data TestConfig = TestConfig
   { title :: Text
@@ -55,8 +55,24 @@ data TestConfig = TestConfig
 
 $(deriveJSON defaultOptions ''TestConfig)
 
-instance Config TestConfig
+instance C.Config TestConfig
 
-type Test = AbstractTest RunConfig TestConfig ApEffs
+type Test = C.AbstractTest RunConfig TestConfig ApEffs
 
-type Fixture a = AbstractFixture RunConfig TestConfig ApEffs a
+-- type Fixture a = AbstractFixture RunConfig TestConfig ApEffs a
+
+data Fixture a where
+  OnceBefore ::
+    { action :: RunConfig -> Suite a
+    } ->
+    Fixture (C.OnceBefore a)
+  ChildOnceBefore ::
+    { parent :: Fixture (C.OnceBefore a)
+    , childAction :: RunConfig -> a -> Suite b
+    } ->
+    Fixture (C.OnceBefore (RunConfig-> a -> Suite b))
+
+makeAbstract :: Fixture a -> C.AbstractFixture RunConfig TestConfig ApEffs a
+makeAbstract = \case 
+  OnceBefore action -> C.OnceBefore action
+  ChildOnceBefore parent childAction -> C.ChildOnceBefore (makeAbstract parent) childAction

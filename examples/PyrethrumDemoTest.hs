@@ -1,6 +1,6 @@
 module PyrethrumDemoTest where
 
-import Core
+import Core (OnceBefore)
 import PyrethrumDemoPrj
 
 -- import qualified DSL.FileSystemEffect as IOI
@@ -17,16 +17,15 @@ import PyrethrumExtras (txt)
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . Log
 
-
-int_hook :: Fixture (Hook OnceBefore Integer)
+int_hook :: Fixture (OnceBefore Int)
 int_hook =
-  BeforeOnce
+  OnceBefore
     { action = \rc -> pure 1
     }
 
-add_int_hook :: Fixture (Hook OnceBefore (RunConfig -> Integer -> Eff ApEffs Integer))
+add_int_hook :: Fixture (OnceBefore (RunConfig -> Int -> Suite Int))
 add_int_hook =
-  BeforeOnceChild
+  ChildOnceBefore
     { parent = int_hook
     , childAction =
         \rc i -> do
@@ -57,15 +56,15 @@ threadBeforeChild2 =
       log $ "beforeEach' " <> txt i
       pure $ i + 1
 -}
-test :: Test
-test = Full config action parse items
+-- test :: Test
+-- test = Full config action parse items
 
-config :: TestConfig
-config = TestConfig "test" DeepRegression
+-- config :: TestConfig
+-- config = TestConfig "test" DeepRegression
 
-action :: (Out ApEvent :> es, Show b, Num b) => p -> b -> Eff es b
-action rc i = do
-  log $ txt i
-  pure $ i + 1
-parse = pure
-items = const [1, 2, 3]
+-- action :: (Out ApEvent :> es, Show b, Num b) => p -> b -> Eff es b
+-- action rc i = do
+--   log $ txt i
+--   pure $ i + 1
+-- parse = pure
+-- items = const [1, 2, 3]

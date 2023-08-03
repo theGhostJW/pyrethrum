@@ -61,18 +61,18 @@ type Test = C.AbstractTest RunConfig TestConfig ApEffs
 
 -- type Fixture a = AbstractFixture RunConfig TestConfig ApEffs a
 
-data Fixture a where
+data Fixture loc a where
   OnceBefore ::
     { action :: RunConfig -> Suite a
     } ->
-    Fixture (C.OnceBefore a)
+    Fixture C.OnceBefore (RunConfig -> Suite a)
   ChildOnceBefore ::
-    { parent :: Fixture (C.OnceBefore a)
+    { parent :: Fixture C.OnceBefore (RunConfig -> Suite a)
     , childAction :: RunConfig -> a -> Suite b
     } ->
-    Fixture (C.OnceBefore (RunConfig-> a -> Suite b))
+    Fixture C.OnceBefore (RunConfig-> a -> Suite b)
 
-makeAbstract :: Fixture a -> C.AbstractFixture RunConfig TestConfig ApEffs a
+makeAbstract :: Fixture loc a -> C.AbstractFixture RunConfig TestConfig ApEffs loc a
 makeAbstract = \case 
   OnceBefore action -> C.OnceBefore action
   ChildOnceBefore parent childAction -> C.ChildOnceBefore (makeAbstract parent) childAction

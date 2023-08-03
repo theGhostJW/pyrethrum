@@ -88,13 +88,13 @@ class OnceParam a
 class ThreadParam a
 class AfterTest a
 
-data OnceBefore a
+data OnceBefore
 
 instance BeforeTest OnceBefore
 instance OnceParam OnceBefore
 instance ThreadParam OnceBefore
 
-data ThreadBefore a
+data ThreadBefore
 instance BeforeTest ThreadBefore
 instance ThreadParam ThreadBefore
 
@@ -111,16 +111,16 @@ data Addressed a = Addressed
 
 -- TODO: error messages when hooks are wrong
 
-data AbstractFixture rc tc effs a where
+data AbstractFixture rc tc effs loc a where
   OnceBefore ::
     { action :: rc -> Eff effs a
     } ->
-    AbstractFixture rc tc effs (OnceBefore a)
+    AbstractFixture rc tc effs OnceBefore (rc -> Eff effs a)
   ChildOnceBefore ::
-    { parent :: AbstractFixture rc tc effs (OnceBefore a)
+    { parent :: AbstractFixture rc tc effs OnceBefore (rc -> Eff effs a)
     , childAction :: rc -> a -> Eff effs b
     } ->
-    AbstractFixture rc tc effs (OnceBefore (rc -> a -> Eff effs b))
+    AbstractFixture rc tc effs OnceBefore (rc -> a -> Eff effs b)
 
 -- -- BeforeThread :: (rc -> Eff effs a) -> AbstractFixture rc tc effs m (Hook ThreadBefore a)
 -- -- BeforeThreadChild :: ThreadParam hc => m (Hook hc a) -> (rc -> a -> Eff effs b) -> AbstractFixture rc tc effs m (Hook ThreadBefore b)

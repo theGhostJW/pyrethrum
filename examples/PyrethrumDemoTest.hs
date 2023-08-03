@@ -17,13 +17,15 @@ import PyrethrumExtras (txt)
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . Log
 
-int_hook :: Fixture (OnceBefore Int)
+
+int_hook :: Fixture OnceBefore (RunConfig -> Suite Int)
 int_hook =
   OnceBefore
     { action = \rc -> pure 1
     }
 
-add_int_hook :: Fixture (OnceBefore (RunConfig -> Int -> Suite Int))
+
+add_int_hook :: Fixture OnceBefore (RunConfig -> Int -> Suite Int)
 add_int_hook =
   ChildOnceBefore
     { parent = int_hook

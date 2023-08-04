@@ -1,6 +1,6 @@
 module PyrethrumDemoTest where
 
-import Core (OnceBefore)
+import Core (OnceBefore, Checks, chk, ParseException)
 import PyrethrumDemoPrj
 
 -- import qualified DSL.FileSystemEffect as IOI
@@ -17,13 +17,11 @@ import PyrethrumExtras (txt)
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . Log
 
-
 intHook :: Fixture OnceBefore Int
 intHook =
   OnceBefore
     { onceAction = \rc -> pure 1
     }
-
 
 addIntHook :: Fixture OnceBefore Int
 addIntHook =
@@ -35,7 +33,8 @@ addIntHook =
           pure $ i + 1
     }
 
-val = intHook.onceAction
+
+
 -- beforeOnceChildHook' =
 --   BeforeOnceChild beforeOnceHook' $
 --     \rc i -> do
@@ -59,15 +58,27 @@ threadBeforeChild2 =
       log $ "beforeEach' " <> txt i
       pure $ i + 1
 -}
--- test :: Test
--- test = Full config action parse items
+test :: Test
+test = Full config action parse items
 
--- config :: TestConfig
--- config = TestConfig "test" DeepRegression
+config :: TestConfig
+config = TestConfig "test" DeepRegression
 
--- action :: (Out ApEvent :> es, Show b, Num b) => p -> b -> Eff es b
--- action rc i = do
---   log $ txt i
---   pure $ i + 1
--- parse = pure
--- items = const [1, 2, 3]
+action :: RunConfig -> Item -> Suite Int
+action rc i = do
+  log $ txt i
+  pure $ i.value + 1
+
+parse :: Int -> Either ParseException Int
+parse = pure
+
+items :: RunConfig -> [Item]
+items = const [Item 1 "test" 2 (chk "test" (== 1))]
+
+data Item = Item
+  { id :: Int
+  , title :: Text
+  , value :: Int
+  , checks :: Checks Int
+  }
+  deriving (Show, Generic)

@@ -72,17 +72,17 @@ data Fixture loc a where
     , onceAfterAction :: RunConfig -> Suite ()
     } ->
     Fixture C.OnceAfter ()
+  OnceResource ::
+    { onceSetup :: RunConfig -> Suite a
+    , onceTearDown :: a -> Suite ()
+    } ->
+    Fixture C.OnceBefore ()
   ChildOnceResource ::
     { onceResourceParent :: Fixture C.OnceBefore a
     , onceChildSetup :: a -> RunConfig -> Suite b
     , onceChildTearDown :: b -> Suite ()
     } ->
     Fixture C.OnceBefore a
-  OnceResource ::
-    { onceSetup :: RunConfig -> Suite a
-    , onceTearDown :: a -> Suite ()
-    } ->
-    Fixture C.OnceBefore ()
   ThreadBefore ::
     { action :: RunConfig -> Suite a
     } ->

@@ -62,13 +62,28 @@ map :: (Check ds -> Check ds2) -> Checks ds -> Checks ds2
 map f = Checks . DL.map f . (.un)
 
 data Check ds = Check
-  { header :: Text
-  , rule :: ds -> Eff '[E.Error CheckFailure] ()
+  { header :: Text,
+    rule :: ds -> Bool
+  }  |
+ CheckMessage
+  { header :: Text,
+    message :: ds -> Text,
+    rule :: ds -> Bool
   }
+
+-- generate a check from a predicate
+chk :: Text -> (ds -> Bool) -> Checks ds
+chk hdr = Checks . pure . Check hdr
+
+-- generate a check from a predicate with detailed message
+chk' :: Text -> (ds -> Text) -> (ds -> Bool) -> Checks ds
+chk' hdr msg = Checks . pure . CheckMessage hdr msg
+
+
 
 instance Show (Check v) where
   show :: Check v -> String
-  show ck@Check{header} = toS header
+  show ck = toS ck.header
 
 instance ToJSON (Check v) where
   toJSON :: Check v -> Value

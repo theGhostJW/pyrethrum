@@ -74,14 +74,7 @@ instance ToJSON (Check v) where
   toJSON :: Check v -> Value
   toJSON = String . toS . (.header)
 
--- concurrency
-data Once
-data Thread
-data Each
-
--- order
-data Before
-data After
+--
 
 class BeforeTest a
 class OnceParam a
@@ -97,6 +90,15 @@ instance ThreadParam OnceBefore
 data ThreadBefore
 instance BeforeTest ThreadBefore
 instance ThreadParam ThreadBefore
+
+data Test
+instance AfterTest Test
+
+data OnceAfter
+instance AfterTest OnceAfter
+
+data ThreadAfter
+instance AfterTest ThreadAfter
 
 newtype StubLoc = StubLoc Text
 data Addressed a = Addressed
@@ -125,10 +127,48 @@ data AbstractFixture rc tc effs loc a where
     } ->
     AbstractFixture rc tc effs ThreadBefore a
   ChildThreadBefore ::
-    { parent :: (ThreadParam loc) => AbstractFixture rc tc effs loc a
+    { parent :: (ThreadParam loc, BeforeTest loc) => AbstractFixture rc tc effs loc a
     , childAction :: rc -> a -> Eff effs b
     } ->
     AbstractFixture rc tc effs ThreadBefore b
+  OnceAfter ::
+    { onceBefore :: (AfterTest loc) => AbstractFixture rc tc effs loc ()
+    , onceAfterAction :: rc -> Eff effs ()
+    } ->
+    AbstractFixture rc tc effs OnceAfter ()
+  ThreadAfter ::
+    { threadBefore :: (AfterTest loc) => AbstractFixture rc tc effs loc ()
+    , threadAfterAction :: rc -> Eff effs ()
+    } ->
+    AbstractFixture rc tc effs ThreadAfter ()
+  OnceResource ::
+    { onceSetup :: rc -> Eff effs a
+    , onceTearDown :: a -> Eff effs ()
+    } ->
+    AbstractFixture rc tc effs OnceBefore ()
+  ChildOnceResource ::
+    { onceChildSetup :: a -> rc -> Eff effs b
+    , onceChildTearDown :: b -> Eff effs ()
+    } ->
+    AbstractFixture rc tc effs OnceBefore a
+  ThreadResource ::
+    { threadSetup :: rc -> Eff effs a
+    , threadTearDown :: a -> Eff effs ()
+    } ->
+    AbstractFixture rc tc effs ThreadBefore ()
+  ThreadChildResource ::
+    { threadChildSetup :: a -> rc -> Eff effs b
+    , threadChildTearDown :: b -> Eff effs ()
+    } ->
+    AbstractFixture rc tc effs ThreadBefore a
+  Test :: {test :: AbstractTest rc tc effs} -> AbstractFixture rc tc effs Test ()
+  WithHook ::
+    { parentHook :: (ThreadParam loc, BeforeTest loc) => AbstractFixture rc tc effs loc a
+    , test :: AbstractTest rc tc effs
+    } ->
+    AbstractFixture rc tc effs Test ()
+
+-- WithHook :: (Hook hc a) -> (a -> AbstractTest rc tc effs) -> AbstractFixtureS rc tc effs (AbstractTest rc tc effs)
 
 -- -- BeforeThread :: (rc -> Eff effs a) -> AbstractFixture rc tc effs m (Hook ThreadBefore a)
 -- -- BeforeThreadChild :: ThreadParam hc => m (Hook hc a) -> (rc -> a -> Eff effs b) -> AbstractFixture rc tc effs m (Hook ThreadBefore b)

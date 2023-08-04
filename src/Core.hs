@@ -122,6 +122,22 @@ data AbstractFixture rc tc effs loc a where
     , onceChildAction :: rc -> a -> Eff effs b
     } ->
     AbstractFixture rc tc effs OnceBefore b
+  OnceAfter ::
+    { onceBefore :: (AfterTest loc) => AbstractFixture rc tc effs loc ()
+    , onceAfterAction :: rc -> Eff effs ()
+    } ->
+    AbstractFixture rc tc effs OnceAfter ()
+  OnceResource ::
+    { onceSetup :: rc -> Eff effs a
+    , onceTearDown :: a -> Eff effs ()
+    } ->
+    AbstractFixture rc tc effs OnceBefore ()
+  ChildOnceResource ::
+    { onceResourceParent :: AbstractFixture rc tc effs OnceBefore a
+    , onceChildSetup :: a -> rc -> Eff effs b
+    , onceChildTearDown :: b -> Eff effs ()
+    } ->
+    AbstractFixture rc tc effs OnceBefore a
   ThreadBefore ::
     { action :: rc -> Eff effs a
     } ->
@@ -131,59 +147,32 @@ data AbstractFixture rc tc effs loc a where
     , childAction :: rc -> a -> Eff effs b
     } ->
     AbstractFixture rc tc effs ThreadBefore b
-  OnceAfter ::
-    { onceBefore :: (AfterTest loc) => AbstractFixture rc tc effs loc ()
-    , onceAfterAction :: rc -> Eff effs ()
-    } ->
-    AbstractFixture rc tc effs OnceAfter ()
   ThreadAfter ::
     { threadBefore :: (AfterTest loc) => AbstractFixture rc tc effs loc ()
     , threadAfterAction :: rc -> Eff effs ()
     } ->
     AbstractFixture rc tc effs ThreadAfter ()
-  OnceResource ::
-    { onceSetup :: rc -> Eff effs a
-    , onceTearDown :: a -> Eff effs ()
-    } ->
-    AbstractFixture rc tc effs OnceBefore ()
-  ChildOnceResource ::
-    { onceChildSetup :: a -> rc -> Eff effs b
-    , onceChildTearDown :: b -> Eff effs ()
-    } ->
-    AbstractFixture rc tc effs OnceBefore a
   ThreadResource ::
     { threadSetup :: rc -> Eff effs a
     , threadTearDown :: a -> Eff effs ()
     } ->
     AbstractFixture rc tc effs ThreadBefore ()
-  ThreadChildResource ::
-    { threadChildSetup :: a -> rc -> Eff effs b
+  ChildThreadResource ::
+    { threadResourceParent :: AbstractFixture rc tc effs OnceBefore a
+    , threadChildSetup :: a -> rc -> Eff effs b
     , threadChildTearDown :: b -> Eff effs ()
     } ->
     AbstractFixture rc tc effs ThreadBefore a
   Test :: {test :: AbstractTest rc tc effs} -> AbstractFixture rc tc effs Test ()
-  WithHook ::
+  ChildTest ::
     { parentHook :: (ThreadParam loc, BeforeTest loc) => AbstractFixture rc tc effs loc a
-    , test :: AbstractTest rc tc effs
+    , childTest :: a -> AbstractTest rc tc effs
     } ->
     AbstractFixture rc tc effs Test ()
 
--- WithHook :: (Hook hc a) -> (a -> AbstractTest rc tc effs) -> AbstractFixtureS rc tc effs (AbstractTest rc tc effs)
-
--- -- BeforeThread :: (rc -> Eff effs a) -> AbstractFixture rc tc effs m (Hook ThreadBefore a)
--- -- BeforeThreadChild :: ThreadParam hc => m (Hook hc a) -> (rc -> a -> Eff effs b) -> AbstractFixture rc tc effs m (Hook ThreadBefore b)
--- -- -- Test :: ItemClass i ds => (rc -> i -> Eff effs as) -> (as -> Eff '[E.Error ParseException] ds) -> (rc -> [i]) -> Suite rc tc effs m ()
--- -- -- add maybe parent fixture
--- TestS :: AbstractTest rc tc effs -> AbstractFixtureS rc tc effs (AbstractTest rc tc effs)
--- WithHookS :: (Hook hc a) -> (a -> AbstractTest rc tc effs) -> AbstractFixtureS rc tc effs (AbstractTest rc tc effs)
-
--- OnceAfterS :: Eff effs () -> AbstractFixture rc tc effs ()
--- TODO: error messages when hooks are wrong
-
-data AbstactChildTest rc tc a effs
-
 data AbstractTest rc tc effs where
   Full ::
+    (ItemClass i ds) =>
     { config :: tc
     , action :: rc -> i -> Eff effs as
     , parse :: as -> Either ParseException ds
@@ -191,6 +180,7 @@ data AbstractTest rc tc effs where
     } ->
     AbstractTest rc tc effs
   NoParse ::
+    (ItemClass i ds) =>
     { config :: tc
     , action :: rc -> i -> Eff effs ds
     , items :: rc -> [i]

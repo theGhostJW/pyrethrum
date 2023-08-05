@@ -77,13 +77,13 @@ data Fixture loc a where
     { onceSetup :: RunConfig -> Suite a
     , onceTearDown :: a -> Suite ()
     } ->
-    Fixture C.OnceBefore ()
+    Fixture C.OnceResource  ()
   OnceResource' ::
-    { onceResourceParent :: Fixture C.OnceBefore a
+    { onceParent :: Fixture C.OnceBefore a
     , onceChildSetup :: a -> RunConfig -> Suite b
     , onceChildTearDown :: b -> Suite ()
     } ->
-    Fixture C.OnceBefore a
+    Fixture C.OnceResource a
   -- once per thread hooks
   ThreadBefore ::
     { action :: RunConfig -> Suite a
@@ -91,7 +91,7 @@ data Fixture loc a where
     Fixture C.ThreadBefore a
   ThreadBefore' ::
     (C.ThreadParam loc, C.BeforeTest loc) =>
-    { parent :: Fixture loc a
+    { threadParent :: Fixture loc a
     , childAction :: RunConfig -> a -> Suite b
     } ->
     Fixture C.ThreadBefore b
@@ -107,7 +107,8 @@ data Fixture loc a where
     } ->
     Fixture C.ThreadBefore ()
   ThreadResource' ::
-    { threadResourceParent :: Fixture C.OnceBefore a
+    (C.ThreadParam loc, C.BeforeTest loc) =>
+    { threadParent :: Fixture loc a
     , threadChildSetup :: a -> RunConfig -> Suite b
     , threadChildTearDown :: b -> Suite ()
     } ->
@@ -133,7 +134,7 @@ data Fixture loc a where
     } ->
     Fixture C.EachBefore ()
   EachResource' ::
-    { eachResourceParent :: (C.BeforeTest loc) => Fixture loc a
+    { eachParent :: (C.BeforeTest loc) => Fixture loc a
     , eachChildSetup :: a -> RunConfig -> Suite b
     , eachChildTearDown :: b -> Suite ()
     } ->
@@ -165,7 +166,7 @@ data Test where
   Full' ::
     forall i as ds loc a.
     (C.ItemClass i ds) =>
-    { parentHook :: (C.BeforeTest loc) => Fixture loc a
+    { parent :: (C.BeforeTest loc) => Fixture loc a
     , config :: TestConfig
     , childAction :: a -> RunConfig -> i -> Suite as
     , parse :: as -> Either C.ParseException ds
@@ -175,19 +176,36 @@ data Test where
   NoParse' ::
     forall i ds loc a.
     (C.ItemClass i ds) =>
-    { parentHook :: (C.BeforeTest loc) => Fixture loc a
+    { parent :: (C.BeforeTest loc) => Fixture loc a
     , config :: TestConfig
     , childAction :: a -> RunConfig -> i -> Suite ds
     , items :: RunConfig -> [i]
     } ->
     Test
+  Single ::
+    { config :: TestConfig
+    , singleAction :: RunConfig -> Suite as
+    , checks :: C.Checks as
+    } ->
+    Test
+  Single' ::
+    { parent :: (C.BeforeTest loc) => Fixture loc a
+    , config :: TestConfig
+    , childSingleAction :: a -> RunConfig -> Suite as
+    , checks :: C.Checks as
+    } ->
+    Test
+
+
 
 mkAbstractTest :: Test -> C.AbstractTest RunConfig TestConfig ApEffs
 mkAbstractTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
-  Full'{..} -> C.Full' (mkAbstractFx parentHook) config childAction parse items
-  NoParse'{..} -> C.NoParse' (mkAbstractFx parentHook) config childAction items
+  Full'{..} -> C.Full' (mkAbstractFx parent) config childAction parse items
+  NoParse'{..} -> C.NoParse' (mkAbstractFx parent) config childAction items
+  Single{..} -> C.Single{..}
+  Single'{..} -> C.Single' (mkAbstractFx parent) config childSingleAction checks
 
 mkAbstractFx :: Fixture loc a -> C.AbstractFixture RunConfig TestConfig ApEffs loc a
 mkAbstractFx = \case

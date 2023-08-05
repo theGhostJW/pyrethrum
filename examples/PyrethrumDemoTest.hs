@@ -1,6 +1,6 @@
 module PyrethrumDemoTest where
 
-import Core (Checks, OnceBefore, ParseException, ThreadBefore, chk)
+import Core (Checks, OnceBefore, ParseException, ThreadBefore, EachResource, chk)
 import PyrethrumDemoPrj
 
 -- import qualified DSL.FileSystemEffect as IOI
@@ -37,6 +37,18 @@ intHook2 :: Fixture ThreadBefore Int
 intHook2 = ThreadBefore' addIntHook $ \rc i -> do
   log $ "beforeThread' " <> txt i
   pure $ i + 1
+
+eachResource :: Fixture EachResource Int
+eachResource =
+  EachResource'
+  { eachResourceParent = intHook2,
+    eachChildSetup = \i rc -> do
+      log "eachSetup"
+      pure 1
+  , eachChildTearDown = \i -> do
+      log "eachTearDown"
+      pure ()
+  }
 
 -- ##################################
 
@@ -138,7 +150,7 @@ test3 :: TestFixture
 test3 =
   Test $
     Full'
-      { parentHook = intHook2
+      { parent = intHook2
       , config = TestConfig "test" DeepRegression
       , childAction = \i rc itm -> do
           log $ txt itm
@@ -174,6 +186,21 @@ test4 =
                 , checks = chk "test" ((== 1) . (.value))
                 }
             ]
+      }
+
+-- ##################################
+
+test5 :: TestFixture
+test5 =
+  Test $
+    Single' 
+      {
+       parent = eachResource  
+      , config = TestConfig "test" DeepRegression
+      , childSingleAction = \i rc -> do
+          log $ txt itm
+          pure $ DState2 (itm.value + 1) $ txt itm.value
+      , checks = chk "test" ((== 1) . (.value))
       }
 
 {-

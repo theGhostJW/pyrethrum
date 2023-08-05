@@ -38,25 +38,6 @@ intHook2 = ThreadBefore' addIntHook $ \rc i -> do
   log $ "beforeThread' " <> txt i
   pure $ i + 1
 
-{-
-threadBeforeHook :: Eff ControlEffs  (Hook ThreadBefore Int)
-threadBeforeHook = beforeThread . const $ pure 1
-
-threadBeforeChildInt :: Eff ControlEffs (Hook ThreadBefore Text)
-threadBeforeChildInt =
-  beforeThreadChild threadBeforeHook $
-    \rc i -> do
-      log $ "beforeEach' " <> txt i
-      pure . txt $ i + 1
-
-threadBeforeChild2 :: Eff ControlEffs (Hook ThreadBefore Int)
-threadBeforeChild2 =
-  beforeThreadChild beforeOnceChildHook $
-    \rc i -> do
-      log $ "beforeEach' " <> txt i
-      pure $ i + 1
--}
-
 -- ##################################
 
 test :: TestFixture
@@ -106,9 +87,11 @@ items =
 
 -- ##################################
 
+test2 :: TestFixture
 test2 =
   Test $ Full' intHook2 config2 action2 parse2 items2
 
+config2 :: TestConfig
 config2 = TestConfig "test" DeepRegression
 
 data ApState2 = ApState2
@@ -116,6 +99,7 @@ data ApState2 = ApState2
   , valTxt :: Text
   }
 
+action2 :: Int -> RunConfig -> Item2 -> Suite ApState2
 action2 i rc itm = do
   log $ txt itm
   pure $ ApState2 (itm.value + 1 + i) $ txt itm.value
@@ -126,6 +110,7 @@ data DState2 = DState2
   }
   deriving (Show, Generic)
 
+parse2 :: ApState2 -> Either ParseException DState2
 parse2 ApState2{..} = pure DState2{..}
 
 data Item2 = Item2
@@ -136,6 +121,7 @@ data Item2 = Item2
   }
   deriving (Show, Generic)
 
+items2 :: RunConfig -> [Item2]
 items2 =
   const
     [ Item2

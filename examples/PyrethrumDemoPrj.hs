@@ -19,7 +19,7 @@ import Effectful.Error.Static (Error, runError)
 import PyrethrumExtras (txt, uu)
 
 type ApEffs = '[FileSystem, Out ApEvent, Error FSException, IOE]
-type Suite es = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] es
+type Suite a = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] a
 type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
 type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
 
@@ -57,11 +57,12 @@ instance C.Config TestConfig
 -- type Fixture a = AbstractFixture RunConfig TestConfig ApEffs a
 
 data Fixture loc a where
+  -- once hooks
   OnceBefore ::
     { onceAction :: RunConfig -> Suite a
     } ->
     Fixture C.OnceBefore a
-  ChildOnceBefore ::
+  OnceBefore' ::
     { onceParent :: Fixture C.OnceBefore a
     , onceChildAction :: RunConfig -> a -> Suite b
     } ->
@@ -77,17 +78,18 @@ data Fixture loc a where
     , onceTearDown :: a -> Suite ()
     } ->
     Fixture C.OnceBefore ()
-  ChildOnceResource ::
+  OnceResource' ::
     { onceResourceParent :: Fixture C.OnceBefore a
     , onceChildSetup :: a -> RunConfig -> Suite b
     , onceChildTearDown :: b -> Suite ()
     } ->
     Fixture C.OnceBefore a
+  -- once per thread hooks
   ThreadBefore ::
     { action :: RunConfig -> Suite a
     } ->
     Fixture C.ThreadBefore a
-  ChildThreadBefore ::
+  ThreadBefore' ::
     (C.ThreadParam loc, C.BeforeTest loc) =>
     { parent :: Fixture loc a
     , childAction :: RunConfig -> a -> Suite b
@@ -104,25 +106,47 @@ data Fixture loc a where
     , threadTearDown :: a -> Suite ()
     } ->
     Fixture C.ThreadBefore ()
-  ChildThreadResource ::
+  ThreadResource' ::
     { threadResourceParent :: Fixture C.OnceBefore a
     , threadChildSetup :: a -> RunConfig -> Suite b
     , threadChildTearDown :: b -> Suite ()
     } ->
     Fixture C.ThreadBefore a
+  -- each hooks
+  EachBefore ::
+    { eachAction :: RunConfig -> Suite a
+    } ->
+    Fixture C.EachBefore a
+  EachBefore' ::
+    { eachParent :: (C.BeforeTest loc) => Fixture loc a
+    , eachChildAction :: RunConfig -> a -> Suite b
+    } ->
+    Fixture C.EachBefore b
+  EachAfter ::
+    { eachBefore :: (C.AfterTest loc) => Fixture loc ()
+    , eachAfterAction :: RunConfig -> Suite ()
+    } ->
+    Fixture C.EachAfter ()
+  EachResource ::
+    { eachSetup :: RunConfig -> Suite a
+    , eachTearDown :: a -> Suite ()
+    } ->
+    Fixture C.EachBefore ()
+  EachResource' ::
+    { eachResourceParent :: (C.BeforeTest loc) => Fixture loc a
+    , eachChildSetup :: a -> RunConfig -> Suite b
+    , eachChildTearDown :: b -> Suite ()
+    } ->
+    Fixture C.EachBefore a
   Test ::
     { test :: Test
     } ->
     Fixture C.Test ()
-  ChildTest ::
-    (C.ThreadParam loc, C.BeforeTest loc) =>
-    { parentHook :: Fixture loc a
-    , childTest :: a -> Test
-    } ->
-    Fixture C.Test ()
 
+type TestFixture = Fixture C.Test ()
 data Test where
   Full ::
+    forall i as ds.
     (C.ItemClass i ds) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Suite as
@@ -131,36 +155,62 @@ data Test where
     } ->
     Test
   NoParse ::
+    forall i ds.
     (C.ItemClass i ds) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Suite ds
     , items :: RunConfig -> [i]
     } ->
     Test
-
--- TODO Singleton
+  Full' ::
+    forall i as ds loc a.
+    (C.ItemClass i ds) =>
+    { parentHook :: (C.BeforeTest loc) => Fixture loc a
+    , config :: TestConfig
+    , childAction :: a -> RunConfig -> i -> Suite as
+    , parse :: as -> Either C.ParseException ds
+    , items :: RunConfig -> [i]
+    } ->
+    Test
+  NoParse' ::
+    forall i ds loc a.
+    (C.ItemClass i ds) =>
+    { parentHook :: (C.BeforeTest loc) => Fixture loc a
+    , config :: TestConfig
+    , childAction :: a -> RunConfig -> i -> Suite ds
+    , items :: RunConfig -> [i]
+    } ->
+    Test
 
 mkAbstractTest :: Test -> C.AbstractTest RunConfig TestConfig ApEffs
 mkAbstractTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
+  Full'{..} -> C.Full' (mkAbstractFx parentHook) config childAction parse items
+  NoParse'{..} -> C.NoParse' (mkAbstractFx parentHook) config childAction items
 
 mkAbstractFx :: Fixture loc a -> C.AbstractFixture RunConfig TestConfig ApEffs loc a
 mkAbstractFx = \case
   OnceBefore{..} -> C.OnceBefore{..}
-  ChildOnceBefore{..} -> C.ChildOnceBefore (mkAbstractFx onceParent) onceChildAction
+  OnceBefore'{..} -> C.OnceBefore' (mkAbstractFx onceParent) onceChildAction
   OnceAfter{..} -> C.OnceAfter (mkAbstractFx onceBefore) onceAfterAction
-  ChildOnceResource
+  OnceResource'
     { onceResourceParent
     , onceChildSetup
     , onceChildTearDown
     } ->
-      C.ChildOnceResource (mkAbstractFx onceResourceParent) onceChildSetup onceChildTearDown
+      C.OnceResource' (mkAbstractFx onceResourceParent) onceChildSetup onceChildTearDown
   OnceResource{..} -> C.OnceResource{..}
   ThreadBefore{..} -> C.ThreadBefore{..}
-  ChildThreadBefore{..} -> C.ChildThreadBefore (mkAbstractFx parent) childAction
+  ThreadBefore'{..} -> C.ThreadBefore' (mkAbstractFx parent) childAction
   ThreadAfter{..} -> C.ThreadAfter (mkAbstractFx threadBefore) threadAfterAction
   ThreadResource{..} -> C.ThreadResource{..}
-  ChildThreadResource{threadResourceParent = p, ..} -> C.ChildThreadResource (mkAbstractFx p) threadChildSetup threadChildTearDown
+  ThreadResource'{threadResourceParent = p, ..} -> C.ThreadResource' (mkAbstractFx p) threadChildSetup threadChildTearDown
+  EachBefore{..} -> C.EachBefore {..}
+  EachBefore'{eachParent, eachChildAction} -> C.EachBefore' (mkAbstractFx eachParent) eachChildAction
+  EachAfter{..} -> C.EachAfter (mkAbstractFx eachBefore) eachAfterAction
+  EachResource{..} -> C.EachResource {..}
+  EachResource'{eachResourceParent, eachChildSetup, eachChildTearDown} -> C.EachResource' (mkAbstractFx eachResourceParent) eachChildSetup eachChildTearDown
   Test{test} -> C.Test $ mkAbstractTest test
-  ChildTest{..} -> C.ChildTest (mkAbstractFx parentHook) (mkAbstractTest . childTest)
+
+  

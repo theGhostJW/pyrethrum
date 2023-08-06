@@ -92,64 +92,62 @@ instance ToJSON (Check v) where
 
 class OnceParam a
 class ThreadParam a
-class TestParam a
+class EachParam a
 
-
-class AfterOnceParam a
-class AfterThreadParam a
-class AfterTestParam a
+class OnceAfterParam a
+class ThreadAfterParam a
+class EachAfterParam a
 
 data OnceParent
 instance OnceParam OnceParent
 instance ThreadParam OnceParent
-instance TestParam OnceParent
+instance EachParam OnceParent
 
 data ThreadParent
 instance ThreadParam ThreadParent
-instance TestParam ThreadParent
+instance EachParam ThreadParent
 
 data EachParent
-instance TestParam EachParent
+instance EachParam EachParent
 
 -- After events can not depend on any other fixtures 
 -- before / after dependencies are implemented via Resource
 -- which provides a bracket like function
 
-{-
-TODO:
-once 
-  can hold test
-  can hold each
-  can hold thread
-  can hold once
-
-thread 
-  can hold test
-  can hold each
-  can hold thread
-  cannot hold once
-
-each
-  can hold test 
-  can hold each
-  cannot hold thread
-  cannot hold once
-
-
-
-
--}
-data OnceAfter
-instance AfterTestParam OnceAfter
-
-data ThreadAfter
-instance AfterTestParam ThreadAfter
+data Test
+instance EachAfterParam Test
+instance ThreadAfterParam Test
+instance OnceAfterParam Test
 
 data EachAfter
-instance AfterTestParam EachAfter
+instance EachAfterParam EachAfter
+instance ThreadAfterParam EachAfter
+instance OnceAfterParam EachAfter
 
-data Test
-instance AfterTestParam Test
+data ThreadAfter
+instance ThreadAfterParam ThreadAfter
+instance OnceAfterParam ThreadAfter
+
+data OnceAfter
+instance OnceAfterParam OnceAfter
+
+{-
+After Constraints:
+ 
+OnceAfter Once    Y
+OnceAfter Thread  Y
+OnceAfter Each    Y
+
+ThreadAfter Once    N
+ThreadAfter Thread  Y
+ThreadAfter Each    Y
+
+EachAfter Once    N
+EachAfter Thread  N
+EachAfter Each    Y
+
+Test == N/A
+-}
 
 newtype StubLoc = StubLoc Text
 data Addressed a = Addressed
@@ -175,7 +173,7 @@ data AbstractFixture rc tc effs loc a where
     } ->
     AbstractFixture rc tc effs OnceParent b
   OnceAfter ::
-    { onceBefore :: (AfterTestParam loc) => AbstractFixture rc tc effs loc ()
+    { onceBefore :: (OnceAfterParam loc) => AbstractFixture rc tc effs loc ()
     , onceAfterAction :: rc -> Eff effs ()
     } ->
     AbstractFixture rc tc effs OnceAfter ()
@@ -185,7 +183,7 @@ data AbstractFixture rc tc effs loc a where
     } ->
     AbstractFixture rc tc effs OnceParent ()
   OnceResource' ::
-    { onceParent :: (OnceParam loc) => AbstractFixture rc tc effs loc a
+    { onceResourceParent :: (OnceParam loc) => AbstractFixture rc tc effs loc a
     , onceChildSetup :: a -> rc -> Eff effs b
     , onceChildTearDown :: b -> Eff effs ()
     } ->
@@ -196,12 +194,12 @@ data AbstractFixture rc tc effs loc a where
     } ->
     AbstractFixture rc tc effs ThreadParent a
   ThreadBefore' ::
-    { parent :: (ThreadParam loc, TestParam loc) => AbstractFixture rc tc effs loc a
+    { parent :: (ThreadParam loc, EachParam loc) => AbstractFixture rc tc effs loc a
     , childAction :: rc -> a -> Eff effs b
     } ->
     AbstractFixture rc tc effs ThreadParent b
   ThreadAfter ::
-    { threadBefore :: (AfterTestParam loc) => AbstractFixture rc tc effs loc ()
+    { threadBefore :: (ThreadAfterParam loc) => AbstractFixture rc tc effs loc ()
     , threadAfterAction :: rc -> Eff effs ()
     } ->
     AbstractFixture rc tc effs ThreadAfter ()
@@ -211,7 +209,7 @@ data AbstractFixture rc tc effs loc a where
     } ->
     AbstractFixture rc tc effs ThreadParent ()
   ThreadResource' ::
-    { threadResourceParent :: AbstractFixture rc tc effs OnceBefore a
+    { threadResourceParent :: (ThreadParam loc) => AbstractFixture rc tc effs loc a
     , threadChildSetup :: a -> rc -> Eff effs b
     , threadChildTearDown :: b -> Eff effs ()
     } ->
@@ -220,14 +218,14 @@ data AbstractFixture rc tc effs loc a where
   EachBefore ::
     { eachAction :: rc -> Eff effs a
     } ->
-    AbstractFixture rc tc effs EachBefore a
+    AbstractFixture rc tc effs EachParent a
   EachBefore' ::
-    { eachParent :: (TestParam loc) => AbstractFixture rc tc effs loc a
+    { eachParent :: (EachParam loc) => AbstractFixture rc tc effs loc a
     , eachChildAction :: rc -> a -> Eff effs b
     } ->
-    AbstractFixture rc tc effs EachBefore b
+    AbstractFixture rc tc effs EachParent b
   EachAfter ::
-    { eachBefore :: (AfterTestParam loc) => AbstractFixture rc tc effs loc ()
+    { eachBefore :: (EachAfterParam loc) => AbstractFixture rc tc effs loc ()
     , eachAfterAction :: rc -> Eff effs ()
     } ->
     AbstractFixture rc tc effs EachAfter ()
@@ -235,13 +233,13 @@ data AbstractFixture rc tc effs loc a where
     { eachSetup :: rc -> Eff effs a
     , eachTearDown :: a -> Eff effs ()
     } ->
-    AbstractFixture rc tc effs EachBefore ()
+    AbstractFixture rc tc effs EachParent ()
   EachResource' ::
-    { eachResourceParent :: (TestParam loc) => AbstractFixture rc tc effs loc a
+    { eachResourceParent :: (EachParam loc) => AbstractFixture rc tc effs loc a
     , eachChildSetup :: a -> rc -> Eff effs b
     , eachChildTearDown :: b -> Eff effs ()
     } ->
-    AbstractFixture rc tc effs EachBefore a
+    AbstractFixture rc tc effs EachParent a
   -- test
   Test :: {test :: AbstractTest rc tc effs} -> AbstractFixture rc tc effs Test ()
 
@@ -256,7 +254,7 @@ data AbstractTest rc tc effs where
     AbstractTest rc tc effs
   Full' ::
     (ItemClass i ds) =>
-    { parentHook :: (TestParam loc) => AbstractFixture rc tc effs loc a
+    { parentHook :: (EachParam loc) => AbstractFixture rc tc effs loc a
     , config :: tc
     , childAction :: a -> rc -> i -> Eff effs as
     , parse :: as -> Either ParseException ds
@@ -272,7 +270,7 @@ data AbstractTest rc tc effs where
     AbstractTest rc tc effs
   NoParse' ::
     (ItemClass i ds) =>
-    { parentHook :: (TestParam loc) => AbstractFixture rc tc effs loc a
+    { parentHook :: (EachParam loc) => AbstractFixture rc tc effs loc a
     , config :: tc
     , childAction :: a -> rc -> i -> Eff effs ds
     , items :: rc -> [i]
@@ -285,7 +283,7 @@ data AbstractTest rc tc effs where
     } ->
     AbstractTest rc tc effs
   Single' ::
-    { parentHook :: (TestParam loc) => AbstractFixture rc tc effs loc a
+    { parentHook :: (EachParam loc) => AbstractFixture rc tc effs loc a
     , config :: tc
     , childSingleAction :: a -> rc -> Eff effs ds
     , checks :: Checks ds

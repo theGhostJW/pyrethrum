@@ -38,7 +38,7 @@ intHook2 = ThreadBefore' addIntHook $ \rc i -> do
   log $ "beforeThread' " <> txt i
   pure $ i + 1
 
-eachResource :: Fixture EachResource Int
+-- eachResource :: Fixture EachResource Int
 eachResource =
   EachResource'
   { eachResourceParent = intHook2,

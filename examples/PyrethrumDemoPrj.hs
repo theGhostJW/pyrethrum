@@ -68,7 +68,7 @@ data Fixture loc a where
     } ->
     Fixture C.OnceBefore b
   OnceAfter ::
-    (C.AfterTest loc) =>
+    (C.OnceParam loc) =>
     { onceBefore :: Fixture loc ()
     , onceAfterAction :: RunConfig -> Suite ()
     } ->
@@ -90,13 +90,13 @@ data Fixture loc a where
     } ->
     Fixture C.ThreadBefore a
   ThreadBefore' ::
-    (C.ThreadParam loc, C.BeforeTest loc) =>
+    (C.ThreadParam loc) =>
     { threadParent :: Fixture loc a
     , childAction :: RunConfig -> a -> Suite b
     } ->
     Fixture C.ThreadBefore b
   ThreadAfter ::
-    (C.AfterTest loc) =>
+    (C.ThreadAfterParam loc) =>
     { threadBefore :: Fixture loc ()
     , threadAfterAction :: RunConfig -> Suite ()
     } ->
@@ -107,7 +107,7 @@ data Fixture loc a where
     } ->
     Fixture C.ThreadBefore ()
   ThreadResource' ::
-    (C.ThreadParam loc, C.BeforeTest loc) =>
+    (C.ThreadParam loc) =>
     { threadParent :: Fixture loc a
     , threadChildSetup :: a -> RunConfig -> Suite b
     , threadChildTearDown :: b -> Suite ()
@@ -119,12 +119,12 @@ data Fixture loc a where
     } ->
     Fixture C.EachBefore a
   EachBefore' ::
-    { eachParent :: (C.BeforeTest loc) => Fixture loc a
+    { eachParent :: (C.EachParam loc) => Fixture loc a
     , eachChildAction :: RunConfig -> a -> Suite b
     } ->
     Fixture C.EachBefore b
   EachAfter ::
-    { eachBefore :: (C.AfterTest loc) => Fixture loc ()
+    { eachBefore :: (C.EachAfterParam loc) => Fixture loc ()
     , eachAfterAction :: RunConfig -> Suite ()
     } ->
     Fixture C.EachAfter ()
@@ -134,7 +134,7 @@ data Fixture loc a where
     } ->
     Fixture C.EachBefore ()
   EachResource' ::
-    { eachParent :: (C.BeforeTest loc) => Fixture loc a
+    { eachParent :: (C.EachParam loc) => Fixture loc a
     , eachChildSetup :: a -> RunConfig -> Suite b
     , eachChildTearDown :: b -> Suite ()
     } ->
@@ -166,7 +166,7 @@ data Test where
   Full' ::
     forall i as ds loc a.
     (C.ItemClass i ds) =>
-    { parent :: (C.BeforeTest loc) => Fixture loc a
+    { parent :: (C.EachParam loc) => Fixture loc a
     , config :: TestConfig
     , childAction :: a -> RunConfig -> i -> Suite as
     , parse :: as -> Either C.ParseException ds
@@ -176,7 +176,7 @@ data Test where
   NoParse' ::
     forall i ds loc a.
     (C.ItemClass i ds) =>
-    { parent :: (C.BeforeTest loc) => Fixture loc a
+    { parent :: (C.EachParam loc) => Fixture loc a
     , config :: TestConfig
     , childAction :: a -> RunConfig -> i -> Suite ds
     , items :: RunConfig -> [i]
@@ -189,7 +189,7 @@ data Test where
     } ->
     Test
   Single' ::
-    { parent :: (C.BeforeTest loc) => Fixture loc a
+    { parent :: (C.EachParam loc) => Fixture loc a
     , config :: TestConfig
     , childSingleAction :: a -> RunConfig -> Suite as
     , checks :: C.Checks as
@@ -207,6 +207,7 @@ mkAbstractTest = \case
   Single{..} -> C.Single{..}
   Single'{..} -> C.Single' (mkAbstractFx parent) config childSingleAction checks
 
+update constraints and filed names reexport constraints
 mkAbstractFx :: Fixture loc a -> C.AbstractFixture RunConfig TestConfig ApEffs loc a
 mkAbstractFx = \case
   OnceBefore{..} -> C.OnceBefore{..}

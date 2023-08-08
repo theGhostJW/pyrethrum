@@ -61,43 +61,40 @@ data Fixture loc a where
   OnceBefore ::
     { onceAction :: RunConfig -> Suite a
     } ->
-    Fixture C.OnceBefore a
+    Fixture C.OnceParent a
   OnceBefore' ::
-    { onceParent :: Fixture C.OnceBefore a
-    , onceChildAction :: RunConfig -> a -> Suite b
+    { onceParent :: C.OnceParam loc => Fixture loc a
+    , onceAction' :: RunConfig -> a -> Suite b
     } ->
-    Fixture C.OnceBefore b
+    Fixture C.OnceParent b
   OnceAfter ::
-    (C.OnceParam loc) =>
-    { onceBefore :: Fixture loc ()
-    , onceAfterAction :: RunConfig -> Suite ()
+    { onceBefore :: (C.OnceAfterParam loc) => Fixture loc ()
+    , onceAfter :: RunConfig -> Suite ()
     } ->
     Fixture C.OnceAfter ()
   OnceResource ::
     { onceSetup :: RunConfig -> Suite a
     , onceTearDown :: a -> Suite ()
     } ->
-    Fixture C.OnceResource  ()
+    Fixture C.OnceParent  ()
   OnceResource' ::
-    { onceParent :: Fixture C.OnceBefore a
-    , onceChildSetup :: a -> RunConfig -> Suite b
-    , onceChildTearDown :: b -> Suite ()
+    { onceResourceParent :: C.OnceParam loc => Fixture loc a
+    , onceSetup' :: a -> RunConfig -> Suite b
+    , onceTearDown' :: b -> Suite ()
     } ->
-    Fixture C.OnceResource a
+    Fixture C.OnceParent a
   -- once per thread hooks
   ThreadBefore ::
-    { action :: RunConfig -> Suite a
+    { threadAction :: RunConfig -> Suite a
     } ->
-    Fixture C.ThreadBefore a
+    Fixture C.ThreadParent a
   ThreadBefore' ::
-    (C.ThreadParam loc) =>
-    { threadParent :: Fixture loc a
-    , childAction :: RunConfig -> a -> Suite b
+    { threadParent :: (C.ThreadParam loc) => Fixture loc a
+    , threadAction' :: RunConfig -> a -> Suite b
     } ->
-    Fixture C.ThreadBefore b
+    Fixture C.ThreadParent b
   ThreadAfter ::
-    (C.ThreadAfterParam loc) =>
-    { threadBefore :: Fixture loc ()
+    { threadBefore :: (C.ThreadAfterParam loc) => Fixture loc ()
     , threadAfterAction :: RunConfig -> Suite ()
     } ->
     Fixture C.ThreadAfter ()
@@ -105,24 +102,23 @@ data Fixture loc a where
     { threadSetup :: RunConfig -> Suite a
     , threadTearDown :: a -> Suite ()
     } ->
-    Fixture C.ThreadBefore ()
+    Fixture C.ThreadParent ()
   ThreadResource' ::
-    (C.ThreadParam loc) =>
-    { threadParent :: Fixture loc a
-    , threadChildSetup :: a -> RunConfig -> Suite b
-    , threadChildTearDown :: b -> Suite ()
+    { threadResourceParent :: (C.ThreadParam loc) => Fixture loc a
+    , threadSetup' :: a -> RunConfig -> Suite b
+    , threadTearDown' :: b -> Suite ()
     } ->
-    Fixture C.ThreadBefore a
+    Fixture C.ThreadParent a
   -- each hooks
   EachBefore ::
     { eachAction :: RunConfig -> Suite a
     } ->
-    Fixture C.EachBefore a
+    Fixture C.EachParent a
   EachBefore' ::
     { eachParent :: (C.EachParam loc) => Fixture loc a
-    , eachChildAction :: RunConfig -> a -> Suite b
+    , eachAction' :: RunConfig -> a -> Suite b
     } ->
-    Fixture C.EachBefore b
+    Fixture C.EachParent b
   EachAfter ::
     { eachBefore :: (C.EachAfterParam loc) => Fixture loc ()
     , eachAfterAction :: RunConfig -> Suite ()
@@ -132,13 +128,13 @@ data Fixture loc a where
     { eachSetup :: RunConfig -> Suite a
     , eachTearDown :: a -> Suite ()
     } ->
-    Fixture C.EachBefore ()
+    Fixture C.EachParent ()
   EachResource' ::
-    { eachParent :: (C.EachParam loc) => Fixture loc a
-    , eachChildSetup :: a -> RunConfig -> Suite b
-    , eachChildTearDown :: b -> Suite ()
+    { eachResourceParent :: (C.EachParam loc) => Fixture loc a
+    , eachSetup' :: a -> RunConfig -> Suite b
+    , eachTearDown' :: b -> Suite ()
     } ->
-    Fixture C.EachBefore a
+    Fixture C.EachParent a
   Test ::
     { test :: Test
     } ->
@@ -207,29 +203,28 @@ mkAbstractTest = \case
   Single{..} -> C.Single{..}
   Single'{..} -> C.Single' (mkAbstractFx parent) config childSingleAction checks
 
-update constraints and filed names reexport constraints
 mkAbstractFx :: Fixture loc a -> C.AbstractFixture RunConfig TestConfig ApEffs loc a
 mkAbstractFx = \case
   OnceBefore{..} -> C.OnceBefore{..}
-  OnceBefore'{..} -> C.OnceBefore' (mkAbstractFx onceParent) onceChildAction
-  OnceAfter{..} -> C.OnceAfter (mkAbstractFx onceBefore) onceAfterAction
+  OnceBefore'{..} -> C.OnceBefore' (mkAbstractFx onceParent) onceAction'
+  OnceAfter{..} -> C.OnceAfter (mkAbstractFx onceBefore) onceAfter
   OnceResource'
     { onceResourceParent
-    , onceChildSetup
-    , onceChildTearDown
+    , onceSetup'
+    , onceTearDown'
     } ->
-      C.OnceResource' (mkAbstractFx onceResourceParent) onceChildSetup onceChildTearDown
+      C.OnceResource' (mkAbstractFx onceResourceParent) onceSetup' onceTearDown'
   OnceResource{..} -> C.OnceResource{..}
   ThreadBefore{..} -> C.ThreadBefore{..}
-  ThreadBefore'{..} -> C.ThreadBefore' (mkAbstractFx parent) childAction
+  ThreadBefore'{..} -> C.ThreadBefore' (mkAbstractFx threadParent) threadAction'
   ThreadAfter{..} -> C.ThreadAfter (mkAbstractFx threadBefore) threadAfterAction
   ThreadResource{..} -> C.ThreadResource{..}
-  ThreadResource'{threadResourceParent = p, ..} -> C.ThreadResource' (mkAbstractFx p) threadChildSetup threadChildTearDown
+  ThreadResource'{threadResourceParent = p, ..} -> C.ThreadResource' (mkAbstractFx p) threadSetup' threadTearDown'
   EachBefore{..} -> C.EachBefore {..}
-  EachBefore'{eachParent, eachChildAction} -> C.EachBefore' (mkAbstractFx eachParent) eachChildAction
+  EachBefore'{eachParent, eachAction'} -> C.EachBefore' (mkAbstractFx eachParent) eachAction'
   EachAfter{..} -> C.EachAfter (mkAbstractFx eachBefore) eachAfterAction
   EachResource{..} -> C.EachResource {..}
-  EachResource'{eachResourceParent, eachChildSetup, eachChildTearDown} -> C.EachResource' (mkAbstractFx eachResourceParent) eachChildSetup eachChildTearDown
+  EachResource'{eachResourceParent, eachSetup', eachTearDown'} -> C.EachResource' (mkAbstractFx eachResourceParent) eachSetup' eachTearDown'
   Test{test} -> C.Test $ mkAbstractTest test
 
   

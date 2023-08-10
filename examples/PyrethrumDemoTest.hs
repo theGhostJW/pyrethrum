@@ -104,30 +104,30 @@ test2 =
 config2 :: TestConfig
 config2 = TestConfig "test" DeepRegression
 
-data ApState2 = ApState2
+action2 :: Int -> RunConfig -> Item2 -> Suite AS
+action2 i rc itm = do
+  log $ txt itm
+  pure $ AS (itm.value + 1 + i) $ txt itm.value
+
+parse2 :: AS -> Either ParseException DS
+parse2 AS {..} = pure DS {..}
+
+data AS = AS
   { value :: Int,
     valTxt :: Text
   }
 
-action2 :: Int -> RunConfig -> Item2 -> Suite ApState2
-action2 i rc itm = do
-  log $ txt itm
-  pure $ ApState2 (itm.value + 1 + i) $ txt itm.value
-
-data DState2 = DState2
+data DS = DS
   { value :: Int,
     valTxt :: Text
   }
   deriving (Show, Generic)
 
-parse2 :: ApState2 -> Either ParseException DState2
-parse2 ApState2 {..} = pure DState2 {..}
-
 data Item2 = Item2
   { id :: Int,
     title :: Text,
     value :: Int,
-    checks :: Checks DState2
+    checks :: Checks DS
   }
   deriving (Show, Generic)
 
@@ -138,7 +138,10 @@ items2 =
         { id = 1,
           title = "test the value is one",
           value = 2,
-          checks = chk "test" ((== 1) . (.value))
+          checks =
+            chk "test" ((== 1) . (.value))
+              <> chk "test2" (\DS {..} -> value < 10)
+              <> chk "test3" (\ds -> ds.value < 10)
         }
     ]
 
@@ -152,8 +155,8 @@ test3 =
         config = TestConfig "test" DeepRegression,
         childAction = \i rc itm -> do
           log $ txt itm
-          pure $ ApState2 (itm.value + 1 + i) $ txt itm.value,
-        parse = \ApState2 {..} -> pure DState2 {..},
+          pure $ AS (itm.value + 1 + i) $ txt itm.value,
+        parse = \AS {..} -> pure DS {..},
         items =
           const
             [ Item2
@@ -174,7 +177,7 @@ test4 =
       { config = TestConfig "test" DeepRegression,
         action = \rc itm -> do
           log $ txt itm
-          pure $ DState2 (itm.value + 1) $ txt itm.value,
+          pure $ DS (itm.value + 1) $ txt itm.value,
         items =
           const
             [ Item2
@@ -196,7 +199,7 @@ test5 =
         config = TestConfig "test" DeepRegression,
         childSingleAction = \i rc -> do
           log $ txt i
-          pure $ DState2 (i + 1) $ txt i,
+          pure $ DS (i + 1) $ txt i,
         checks = chk "test" ((== 1) . (.value))
       }
 
@@ -204,9 +207,10 @@ test5 =
 
 -- TODO : stubs:
 
-    stub (only function - takes an item and adds "DEBUG ONLY" to the title)",
+    stubOnly (only function - takes an item and adds "DEBUG ONLY" to the title)",
+    get rid of ids
     stubRaw,
-    stubHash (make a hash of props other than id and title: ADFG165ER7 - 10 letter hash - module + item),
+    stubHash (make a hash of props other than id and title: aDfG165Er7 - 10 letter hash - module + item first 4 letters is module, next 6 is item),
     stubAll,
     stubFilter (takes a predicate and stubs all items that match it)
 -}

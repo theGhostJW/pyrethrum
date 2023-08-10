@@ -206,9 +206,17 @@ internal-libraries:
       - src
     dependencies:
       - pyrethrum
+      - template-haskell
+
+  discover:
+    # change optimisation and move later
+    ghc-options: -O0
+    visibility: public
+    source-dirs:
+      - discover
       # remove later
-    verbatim:
-      import: pyrethrumProps
+    dependencies:
+      - weeder
 
 library:
   when:

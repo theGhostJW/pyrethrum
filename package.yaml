@@ -73,6 +73,15 @@ verbatim:
       else
         import:
           optimisation
+  - |
+    common reludeImports
+      build-depends:
+       base
+       , relude
+      mixins:
+        base hiding (Prelude),
+        relude (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
+      
 
 dependencies:
   - aeson
@@ -100,15 +109,15 @@ dependencies:
   - time # need for timezone which is missing from chronos
   - transformers-either
   - raw-strings-qq
-  - relude
+  # - relude
   - unliftio
   - yaml
-  - name: base
-    mixin:
-      - hiding (Prelude)
-  - name: relude
-    mixin:
-      - (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
+  # - name: base
+  #   mixin:
+  #     - hiding (Prelude)
+  # - name: relude
+  #   mixin:
+  #     - (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
 
 ghc-options:
   # - -threaded
@@ -205,18 +214,37 @@ internal-libraries:
       # remove later
       - src
     dependencies:
+      - unordered-containers
       - pyrethrum
       - template-haskell
+    verbatim:
+      import: reludeImports
 
   discover:
     # change optimisation and move later
+    default-extensions:
+      - FieldSelectors
     ghc-options: -O0
     visibility: public
     source-dirs:
       - discover
       # remove later
     dependencies:
-      - weeder
+      - algebraic-graphs     ^>= 0.7
+      - base                 ^>= 4.17.0.0 || ^>= 4.18.0.0
+      - bytestring           ^>= 0.10.9.0 || ^>= 0.11.0.0
+      - containers           ^>= 0.6.2.1
+      - directory            ^>= 1.3.3.2
+      - filepath             ^>= 1.4.2.1
+      - generic-lens         ^>= 2.2.0.0
+      - ghc                  ^>= 9.4 || ^>= 9.6
+      - lens                 ^>= 5.1 || ^>= 5.2
+      - mtl                  ^>= 2.2.2 || ^>= 2.3
+      - optparse-applicative ^>= 0.14.3.0 || ^>= 0.15.1.0 || ^>= 0.16.0.0 || ^>=  0.17
+      - regex-tdfa           ^>= 1.2.0.0 || ^>= 1.3.1.0
+      - text                 ^>= 2.0.1
+      - toml-reader          ^>= 0.2.0.0
+      - transformers         ^>= 0.5.6.2 || ^>= 0.6
 
 library:
   when:
@@ -232,7 +260,7 @@ library:
     - fmt
   # verbatum needs to go last otherwise exposed module inference does not work
   verbatim:
-    import: libImports, pyrethrumProps
+    import: libImports, pyrethrumProps, reludeImports
 
 tests:
   pyrethrum-test:
@@ -243,6 +271,6 @@ tests:
       - pyrethrum
     # verbatum needs to go last otherwise other module inference does not work
     verbatim:
-      import: testLibProps
+      import: testLibProps, reludeImports
 
 build-tools: tasty-discover:tasty-discover

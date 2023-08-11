@@ -3,7 +3,6 @@
 module Internal.SuiteRuntimeOld where
 
 import Check (CheckReport (result))
-import Control.DeepSeq (NFData, deepseq, force, ($!!))
 import Data.Function (const, ($), (&))
 import Data.Sequence (Seq (Empty), empty)
 import Data.Tuple.Extra (both)

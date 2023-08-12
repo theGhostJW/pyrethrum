@@ -8,7 +8,7 @@
 
 -- | This module provides an entry point to the Weeder executable.
 
-module WeederLibCopy.Weeder.Main ( main, mainWithConfig ) where
+module WeederLibCopy.Weeder.Main ( main, mainWithConfig, discover ) where
 
 -- base
 import Control.Exception ( throwIO )
@@ -318,3 +318,64 @@ infixr 5 ==>
 (==>) :: Bool -> Bool -> Bool
 True  ==> x = x
 False ==> _ = True
+
+
+-- My Non Weeder Code
+discover :: IO (ExitCode, Analysis)
+discover = do
+  hieFilePaths <- concat <$> traverse ( getFilesIn ".hie" ) ["./."]
+  hsFilePaths <- getFilesIn ".hs" "./."
+  nameCache <- initNameCache 'z' []
+
+  hieFileResults <-
+    mapM ( readCompatibleHieFileOrExit nameCache ) hieFilePaths
+
+  let
+    hieFileResults' = flip filter hieFileResults \hieFileResult -> any ( hie_hs_file hieFileResult `isSuffixOf` ) hsFilePaths
+
+  analysis <-
+    execStateT ( analyseHieFilesDiscover hieFileResults' ) emptyAnalysis
+
+  let
+    roots = allDeclarations analysis
+
+    reachableSet =
+      reachable
+        analysis
+        ( Set.map DeclarationRoot roots <> filterImplicitRoots analysis ( implicitRoots analysis ) )
+
+    dead =
+      allDeclarations analysis Set.\\ reachableSet
+
+    warnings =
+      Map.unionsWith (++) $
+      foldMap
+        ( \d ->
+            fold $ do
+              moduleFilePath <- Map.lookup ( declModule d ) ( modulePaths analysis )
+              spans <- Map.lookup d ( declarationSites analysis )
+              guard $ not $ null spans
+              let starts = map realSrcSpanStart $ Set.toList spans
+              return [ Map.singleton moduleFilePath ( liftA2 (,) starts (pure d) ) ]
+        )
+        dead
+
+  for_ ( Map.toList warnings ) \( path, declarations ) ->
+    for_ (sortOn (srcLocLine . fst) declarations) \( start, d ) ->
+      case Map.lookup d (prettyPrintedType analysis) of
+        Nothing -> putStrLn $ showWeed path start d
+        Just t -> putStrLn $ showPath path start <> "(Instance) :: " <> t
+
+  let exitCode = if null warnings then ExitSuccess else ExitFailure 1
+
+  pure (exitCode, analysis)
+
+  where
+
+    filterImplicitRoots :: Analysis -> Set Root -> Set Root
+    filterImplicitRoots Analysis{ prettyPrintedType, modulePaths } = Set.filter $ \case
+      DeclarationRoot _ -> True -- keep implicit roots for rewrite rules etc
+
+      ModuleRoot _ -> True
+
+      InstanceRoot d c -> True

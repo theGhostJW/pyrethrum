@@ -49,6 +49,14 @@
         "ghcid-examples-no-copy"
       ]
     },
+    {
+      "label": "ghcid discover",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "copy discover ghci",
+        "ghcid-discover-no-copy"
+      ]
+    },
     // {
     //   // Not working - exits after first run
     //   "label": "ghcid test",
@@ -118,14 +126,15 @@
       "type": "shell",
       "command": "xcopy",
       "args": [
-        ".pyrethrum.ghci",
+        ".ghci.pyrethrum",
         ".ghci",
         "/y",
         "/f"
       ],
       "presentation": {
         "reveal": "always",
-        "panel": "new"
+        "panel": "shared",
+        "showReuseMessage": false
       },
       "problemMatcher": []
     },
@@ -134,14 +143,32 @@
       "type": "shell",
       "command": "xcopy",
       "args": [
-        ".examples.ghci",
+        ".ghci.examples",
         ".ghci",
         "/y",
         "/f"
       ],
       "presentation": {
         "reveal": "always",
-        "panel": "new"
+        "panel": "shared",
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "copy discover ghci",
+      "type": "shell",
+      "command": "xcopy",
+      "args": [
+        ".ghci.discover",
+        ".ghci",
+        "/y",
+        "/f"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false
       },
       "problemMatcher": []
     },
@@ -155,7 +182,8 @@
       ],
       "presentation": {
         "reveal": "always",
-        "panel": "new"
+        "panel": "shared",
+        "showReuseMessage": false
       },
       "problemMatcher": []
     },
@@ -173,7 +201,27 @@
       ],
       "presentation": {
         "reveal": "always",
-        "panel": "new"
+        "panel": "shared",
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ghcid-discover-no-copy",
+      "type": "shell",
+      "command": "ghcid",
+      "args": [
+        "--command",
+        "'cabal repl discover'",
+        "--allow-eval",
+        "--clear",
+        "--no-height-limit",
+        "-o ghcid.log"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false
       },
       "problemMatcher": []
     },
@@ -192,7 +240,8 @@
       ],
       "presentation": {
         "reveal": "always",
-        "panel": "new"
+        "panel": "shared",
+        "showReuseMessage": false
       },
       "problemMatcher": []
     }

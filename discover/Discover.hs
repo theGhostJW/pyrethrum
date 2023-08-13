@@ -5,7 +5,7 @@ import qualified BasePrelude as P
 import qualified WeederLibCopy.Weeder as W
 
 
--- $> Discover.discover
+-- $ > Discover.discover
 discover :: IO (P.ExitCode, W.Analysis)
 discover = W.discover
 

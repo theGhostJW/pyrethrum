@@ -14,8 +14,9 @@ import Control.Monad.State.Strict
 import PrettyPrintCommon as PC
 import LogTransformation.PrintLogDisplayElement
 import Path.Extended
-import PyrethrumExtras
+import PyrethrumExtras ( finally, txt, txtPretty, toS, MonadThrow )
 import Prelude hiding (putStrLn)
+import Data.Text.IO (putStrLn)
 
 -- TODO: update to use streaming library such as streamly
 

@@ -19,7 +19,9 @@ import Path.Extended
 import Chronos
 import PyrethrumExtras
 import UnliftIO ()
-import PyrethrumExtras
+-- TODO - et test / file sorted in Pyrelude - see beware readFile
+-- sort out lazyness in effects etc
+import Data.Text.IO
 
 jsonItemLogExt = ".jsoni" :: Text
 

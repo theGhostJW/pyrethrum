@@ -3,14 +3,13 @@ module DSL.CurrentTimeDocLogger where
 
 import qualified Data.Aeson as A
 import           Prelude as P
-import           PyrethrumExtras.IO as PIO
 import Polysemy
 import DSL.CurrentTime as CT hiding (now)
 import DSL.LoggerPsy
 import DSL.LogProtocol
 import PyrethrumExtras
 import Chronos
-import Data.Time (TimeZone(..))
+import Data.Time (TimeZone(..), getCurrentTimeZone)
 
 currentTimeDocInterpreter :: forall a e effs. (Show e, A.ToJSON e, Members [Logger e, Embed IO] effs) => Sem (CurrentTime ': effs) a -> Sem effs a
 currentTimeDocInterpreter = 
@@ -22,7 +21,7 @@ currentTimeDocInterpreter =
                     do
                       (lbl, v) <- embed $ case ct of
                               Now -> showTup "getCurrentTime: " now
-                              GetTimeZone -> showTup "getTimeZone: " PIO.getCurrentTimeZone
-                              UtcOffset -> showTup "utcOffset: " $ timeZoneMinutes <$> PIO.getCurrentTimeZone
+                              GetTimeZone -> showTup "getTimeZone: " getCurrentTimeZone
+                              UtcOffset -> showTup "utcOffset: " $ timeZoneMinutes <$> getCurrentTimeZone
                       logAction lbl
                       pure v

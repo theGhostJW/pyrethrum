@@ -23,6 +23,8 @@ source-repository-package
 
 optimization: 0
 
+allow-newer: chronos:base
+
 package *
  ghc-options: -haddock
 

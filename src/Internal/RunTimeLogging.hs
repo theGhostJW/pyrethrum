@@ -1,7 +1,6 @@
 module Internal.RunTimeLogging where
 
 import qualified BasePrelude as P
-import Control.Monad.State (Monad ((>>), (>>=)))
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import Data.Set
 import GHC.Show (show)

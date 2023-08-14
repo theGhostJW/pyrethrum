@@ -5,17 +5,18 @@ import  DSL.LogProtocol as LP
 import  DSL.CurrentTime as CT
 import DSL.LogProtocol.PrettyPrint
 import           Data.DList as D
-import           Prelude as P hiding (get, modify, ask, State, runReader, Reader)
+import           Prelude as P hiding (get, modify, ask, State, runReader, Reader, lines)
 import           PyrethrumExtras.IO as PIO
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
-import System.IO (stdout)
 import Polysemy
 import Polysemy.Output as O
 import Polysemy.Reader
 import Polysemy.State
 import Chronos
 import PyrethrumExtras
+import Data.Text
+import Data.Text.IO
 
 
 data Logger e m a where
@@ -59,7 +60,7 @@ logRunConsoleInterpreter =
 
 -- ToDo move to lib
 putLines :: Handle -> Text -> IO ()
-putLines hOut tx = mapM_ (PIO.hPutStrLn hOut) (lines tx)
+putLines hOut tx = mapM_ (hPutStrLn hOut) $ toS <$> lines tx
 
 utfEncode :: A.ToJSON a => a -> Text
 utfEncode a = either

@@ -19,6 +19,7 @@ import Polysemy.Error as PE (Error, throw)
 import PyrethrumExtras (txt)
 import PyrethrumExtras.IO as PO
 import Prelude as P
+import Data.Text.IO as TIO (putStrLn, writeFile, readFile)
 
 {- File System Lang -}
 
@@ -41,8 +42,8 @@ fileSystemIOInterpreter =
           Right f -> pure f
    in
     interpret $ \case
-      ReadFile path -> handleException (PO.readFile $ toFilePath path) (FileSystemError ReadFileError)
-      WriteFile path str -> handleException (PO.writeFile (toFilePath path) str) (FileSystemError WriteFileError)
+      ReadFile path -> handleException (TIO.readFile $ toFilePath path) (FileSystemError ReadFileError)
+      WriteFile path str -> handleException (TIO.writeFile (toFilePath path) str) (FileSystemError WriteFileError)
 
 fileSystemDocInterpreter :: forall a e effs. (Show e, A.ToJSON e, Member (Logger e) effs) => Sem (FileSystem ': effs) a -> Sem effs a
 fileSystemDocInterpreter =

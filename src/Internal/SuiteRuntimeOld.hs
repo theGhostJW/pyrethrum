@@ -14,7 +14,7 @@ import qualified Internal.PreNode as PN
   )
 import LogTransformation.PrintLogDisplayElement (PrintLogDisplayElement (tstTitle))
 import Polysemy.Bundle (subsumeBundle)
-import PyrethrumExtras.IO (hPutStrLn, putStrLn)
+import Data.Text.IO (hPutStrLn, putStrLn)
 import UnliftIO
   ( Exception (displayException),
     bracket,

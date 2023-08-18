@@ -35,11 +35,12 @@ import System.FilePath ( isExtensionOf )
 
 -- ghc
 import GHC.Iface.Ext.Binary ( HieFileResult( HieFileResult, hie_file_result ), readHieFileWithVersion )
-import GHC.Iface.Ext.Types ( HieFile( hie_hs_file ), hieVersion )
-import GHC.Unit.Module ( moduleName, moduleNameString )
+import GHC.Iface.Ext.Types ( HieFile(.. ), hieVersion, HieASTs (..), HieAST, TypeIndex )
+import GHC.Unit.Module ( moduleName, moduleNameString, GenModule (..) )
 import GHC.Types.Name.Cache ( initNameCache, NameCache )
 import GHC.Types.Name ( occNameString )
 import GHC.Types.SrcLoc ( RealSrcLoc, realSrcSpanStart, srcLocLine )
+import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
 
 -- regex-tdfa
 import Text.Regex.TDFA ( (=~) )
@@ -57,6 +58,11 @@ import Control.Monad.Trans.State.Strict ( execStateT )
 import WeederLibCopy.Weeder
 import WeederLibCopy.Weeder.Config
 import Paths_pyrethrum (version)
+import BasePrelude ((&))
+import Debug.Trace
+import Data.Text (Text, intercalate, isInfixOf)
+import PyrethrumExtras (uu, txt, toS)
+import GHC.Plugins (Outputable(..), renderWithContext, defaultSDocContext)
 
 
 data CLIArguments = CLIArguments
@@ -125,8 +131,8 @@ main = do
 
   exitWith exitCode
   where
-    decodeConfig noDefaultFields = 
-      if noDefaultFields 
+    decodeConfig noDefaultFields =
+      if noDefaultFields
         then fmap (TOML.decodeWith decodeNoDefaults) . T.readFile
         else TOML.decodeFile
     versionP = infoOption ( "weeder version "
@@ -220,16 +226,16 @@ mainWithConfig hieExt hieDirectories requireHsFiles weederConfig@Config{ rootPat
 
       InstanceRoot d c -> typeClassRoots || matchingType
         where
-          matchingType = 
+          matchingType =
             let mt = Map.lookup d prettyPrintedType
                 matches = maybe (const False) (=~) mt
             in any (maybe True matches) filteredInstances
 
           filteredInstances :: Set (Maybe String)
-          filteredInstances = 
-            Set.map instancePattern 
-            . Set.filter (maybe True (displayDeclaration c =~) . classPattern) 
-            . Set.filter (maybe True modulePathMatches . modulePattern) 
+          filteredInstances =
+            Set.map instancePattern
+            . Set.filter (maybe True (displayDeclaration c =~) . classPattern)
+            . Set.filter (maybe True modulePathMatches . modulePattern)
             $ rootInstances
 
           modulePathMatches :: String -> Bool
@@ -237,7 +243,7 @@ mainWithConfig hieExt hieDirectories requireHsFiles weederConfig@Config{ rootPat
 
 
 displayDeclaration :: Declaration -> String
-displayDeclaration d = 
+displayDeclaration d =
   moduleNameString ( moduleName ( declModule d ) ) <> "." <> occNameString ( declOccName d )
 
 
@@ -320,55 +326,85 @@ True  ==> x = x
 False ==> _ = True
 
 
+
+displayHieAst :: HieAST TypeIndex -> Text
+displayHieAst ast = toS . renderWithContext defaultSDocContext $ ppr ast
+
+data DecShow = DecShow {
+  path :: Text,
+  decs :: Text
+} deriving Show
+
+displayInfo :: HieFile -> Text
+displayInfo HieFile {hie_hs_file, hie_module = hie_module@Module {
+  moduleUnit, moduleName
+}, hie_types, hie_asts, hie_hs_src } =
+  -- intercalate ", " $ txt <$> paths
+  -- txt . ppShow $ astDs -- hangs
+  toS . ppShowList $ decs2 -- module path 
+ where
+  asts = getAsts hie_asts
+  paths = Map.keys asts
+  decs = findDeclarations <$> asts
+  justEg =  Map.filterWithKey (\k _ -> isInfixOf "DemoTest" $ txt k) decs
+  decs2 =  Map.mapWithKey (\k v -> DecShow (txt k) (toS $ ppShowList v)) decs
+  astDs = Map.mapWithKey (\k v ->
+     DecShow (txt k) (displayHieAst v)
+    ) asts
+
+
 -- My Non Weeder Code
-discover :: IO (ExitCode, Analysis)
+-- discover :: IO (ExitCode, Analysis)
+discover :: IO ()
 discover = do
   hieFilePaths <- concat <$> traverse ( getFilesIn ".hie" ) ["./."]
   hsFilePaths <- getFilesIn ".hs" "./."
   nameCache <- initNameCache 'z' []
 
-  hieFileResults <-
+  hieFiles <-
     mapM ( readCompatibleHieFileOrExit nameCache ) hieFilePaths
 
   let
-    hieFileResults' = flip filter hieFileResults \hieFileResult -> any ( hie_hs_file hieFileResult `isSuffixOf` ) hsFilePaths
+    filteredHieFiles = 
+      flip filter hieFiles \hieFile -> (isInfixOf "DemoTest" . toS $ hie_hs_file hieFile) && any ( hie_hs_file hieFile `isSuffixOf`) hsFilePaths
 
-  analysis <-
-    execStateT ( analyseHieFilesDiscover hieFileResults' ) emptyAnalysis
+  traverse_ (pPrint . displayInfo) filteredHieFiles
+  -- analysis <-
+  --   execStateT ( analyseHieFilesDiscover hieFileResults' ) emptyAnalysis
 
-  let
-    roots = allDeclarations analysis
+  -- let
+  --   roots = allDeclarations analysis
 
-    reachableSet =
-      reachable
-        analysis
-        ( Set.map DeclarationRoot roots <> filterImplicitRoots analysis ( implicitRoots analysis ) )
+  --   reachableSet =
+  --     reachable
+  --       analysis
+  --       ( Set.map DeclarationRoot roots <> filterImplicitRoots analysis ( implicitRoots analysis ) )
 
-    dead =
-      allDeclarations analysis Set.\\ reachableSet
+  --   dead =
+  --     allDeclarations analysis Set.\\ reachableSet
 
-    warnings =
-      Map.unionsWith (++) $
-      foldMap
-        ( \d ->
-            fold $ do
-              moduleFilePath <- Map.lookup ( declModule d ) ( modulePaths analysis )
-              spans <- Map.lookup d ( declarationSites analysis )
-              guard $ not $ null spans
-              let starts = map realSrcSpanStart $ Set.toList spans
-              return [ Map.singleton moduleFilePath ( liftA2 (,) starts (pure d) ) ]
-        )
-        dead
+  --   warnings =
+  --     Map.unionsWith (++) $
+  --     foldMap
+  --       ( \d ->
+  --           fold $ do
+  --             moduleFilePath <- Map.lookup ( declModule d ) ( modulePaths analysis )
+  --             spans <- Map.lookup d ( declarationSites analysis )
+  --             guard $ not $ null spans
+  --             let starts = map realSrcSpanStart $ Set.toList spans
+  --             return [ Map.singleton moduleFilePath ( liftA2 (,) starts (pure d) ) ]
+  --       )
+  --       dead
 
-  for_ ( Map.toList warnings ) \( path, declarations ) ->
-    for_ (sortOn (srcLocLine . fst) declarations) \( start, d ) ->
-      case Map.lookup d (prettyPrintedType analysis) of
-        Nothing -> putStrLn $ showWeed path start d
-        Just t -> putStrLn $ showPath path start <> "(Instance) :: " <> t
+  -- for_ ( Map.toList warnings ) \( path, declarations ) ->
+  --   for_ (sortOn (srcLocLine . fst) declarations) \( start, d ) ->
+  --     case Map.lookup d (prettyPrintedType analysis) of
+  --       Nothing -> putStrLn $ showWeed path start d
+  --       Just t -> putStrLn $ showPath path start <> "(Instance) :: " <> t
 
-  let exitCode = if null warnings then ExitSuccess else ExitFailure 1
+  -- let exitCode = if null warnings then ExitSuccess else ExitFailure 1
 
-  pure (exitCode, analysis)
+  -- pure (exitCode, analysis)
 
   where
 

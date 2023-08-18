@@ -29,7 +29,6 @@ import DemoSuite as M (
   txtRun)
 import Polysemy
 import Polysemy.Internal.Union (Member)
-import PyrethrumExtras.IO (putStrLn)
 import RunElementClasses as REC (Address (..), AddressElem (..), AddressTxtElm, TestLogInfo (..), toStrElm)
 import qualified RunElementClasses as C
 import Runner (SuiteSource, TestFilterResult (TestFilterResult, reasonForRejection, testInfo), config)

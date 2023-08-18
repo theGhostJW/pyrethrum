@@ -45,7 +45,7 @@ chkFilter' :: ItemClass TestItem DState => ItemFilter TestItem -> Int -> [TestIt
 chkFilter' flter expted itms = chkEq (Right $ S.singleton expted) $ filterredItemIds @TestItem @DState flter itms
 
 chkSingleton :: forall i ds. (ItemClass i ds) => ItemFilter i -> [i] -> Assertion
-chkSingleton flter itms = either (\_ -> chk False) (chkEq (1 :: Int)) $ length <$> filterredItemIds @i @ds flter itms
+chkSingleton flter itms = either (\_ -> chk False) (chkEq (1 :: Int) . length) $ filterredItemIds @i @ds flter itms
 
 --
 unit_item_filter_iid = chkFilter' (ID 120) 120 itemsNoChks

@@ -19,7 +19,7 @@ import Path.Extended
 import Chronos
 import PyrethrumExtras
 import UnliftIO ()
--- TODO - et test / file sorted in Pyrelude - see beware readFile
+-- TODO - et test / file / putStrLn sorted in Pyrelude - see beware readFile
 -- sort out lazyness in effects etc
 import Data.Text.IO
 

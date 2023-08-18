@@ -23,6 +23,7 @@ module WeederLibCopy.Weeder
     -- * Declarations
   , Declaration(..)
   , analyseHieFilesDiscover
+  , findDeclarations
   )
    where
 
@@ -89,7 +90,7 @@ import GHC.Iface.Ext.Utils
   , hieTypeToIface
   , recoverFullType
   )
-import GHC.Unit.Module ( Module, moduleStableString, ModuleName )
+import GHC.Unit.Module ( Module, moduleStableString, ModuleName, moduleNameString )
 import GHC.Utils.Outputable ( defaultSDocContext, showSDocOneLine )
 import GHC.Iface.Type
   ( ShowForAllFlag (ShowForAllWhen)
@@ -121,6 +122,8 @@ import Control.Monad.Trans.Reader ( runReaderT )
 
 -- weeder
 import WeederLibCopy.Weeder.Config ( Config( Config, typeClassRoots, unusedTypes ) )
+import qualified GHC.Unit.Types
+import Data.Functor.Classes (Show1)
 
 
 data Declaration =
@@ -131,7 +134,7 @@ data Declaration =
       -- ^ The symbol name of a declaration.
     }
   deriving
-    ( Eq, Ord )
+    ( Eq, Ord)
 
 
 instance Show Declaration where
@@ -180,8 +183,11 @@ data Analysis =
       -- appearance of declarations in the output
     }
   deriving
-    ( Generic )
+    ( Generic, Show )
 
+instance Show (GHC.Unit.Types.GenModule GHC.Unit.Types.Unit) where
+  show GHC.Unit.Types.Module { moduleUnit, moduleName } =
+    show moduleUnit <> ":" <> moduleNameString moduleName
 
 data AnalysisInfo =
   AnalysisInfo
@@ -208,7 +214,7 @@ data Root
   | -- | All exported declarations in a module are roots.
     ModuleRoot Module
   deriving
-    ( Eq, Ord )
+    ( Eq, Ord, Show )
 
 
 -- | Determine the set of all declaration reachable from a set of roots.
@@ -642,23 +648,6 @@ findEvInstBinds n = (\(d, ids, ast) -> (d, getClassNames ids, ids, ast)) <$>
       . identInfo
 
 
-findDeclarations :: HieAST a -> Seq Declaration
-findDeclarations =
-  findIdentifiers
-    (   not
-      . Set.null
-      . Set.filter \case
-          -- Things that count as declarations
-          ValBind RegularBind ModuleScope _ -> True
-          PatternBind ModuleScope _ _       -> True
-          Decl _ _                          -> True
-          TyDecl                            -> True
-          ClassTyDecl{}                     -> True
-
-          -- Anything else is not a declaration
-          _ -> False
-    )
-
 
 findIdentifiers
   :: ( Set ContextInfo -> Bool )
@@ -706,6 +695,24 @@ isUse = \case
   RecField RecFieldOcc _ -> True
   _ -> False
 
+
+
+findDeclarations :: HieAST a -> Seq Declaration
+findDeclarations =
+  findIdentifiers
+    (   not
+      . Set.null
+      . Set.filter \case
+          -- Things that count as declarations
+          ValBind RegularBind ModuleScope _ -> True
+          PatternBind ModuleScope _ _       -> True
+          Decl _ _                          -> True
+          TyDecl                            -> True
+          ClassTyDecl{}                     -> True
+
+          -- Anything else is not a declaration
+          _ -> False
+    )
 
 nameToDeclaration :: Name -> Maybe Declaration
 nameToDeclaration name = do

@@ -25,15 +25,23 @@ intOnceHook =
     { onceAction = \rc -> pure 1
     }
 
+
+--  this should not compile
 addOnceIntHook :: Fixture OnceParent Int
 addOnceIntHook =
   OnceBefore'
-    { onceParent = intOnceHook
+    { onceParent = intThreadHook
+    -- onceParent = onceThreadHook,
     , onceAction' =
         \i rc -> do
           log $ "beforeAll' " <> txt i
           pure $ i + 1
     }
+
+intThreadHook :: Fixture ThreadParent Int
+intThreadHook = ThreadBefore $ \rc -> do
+  log "deriving meaning of life' "
+  pure 42
 
 data HookInfo = HookInfo
   { message :: Text

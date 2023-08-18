@@ -64,7 +64,7 @@ data Fixture loc a where
     Fixture C.OnceParent a
   OnceBefore' ::
     { onceParent :: C.OnceParam loc => Fixture loc a
-    , onceAction' :: RunConfig -> a -> Suite b
+    , onceAction' :: a -> RunConfig -> Suite b
     } ->
     Fixture C.OnceParent b
   OnceAfter ::
@@ -90,7 +90,7 @@ data Fixture loc a where
     Fixture C.ThreadParent a
   ThreadBefore' ::
     { threadParent :: (C.ThreadParam loc) => Fixture loc a
-    , threadAction' :: RunConfig -> a -> Suite b
+    , threadAction' :: a -> RunConfig -> Suite b
     } ->
     Fixture C.ThreadParent b
   ThreadAfter ::
@@ -116,7 +116,7 @@ data Fixture loc a where
     Fixture C.EachParent a
   EachBefore' ::
     { eachParent :: (C.EachParam loc) => Fixture loc a
-    , eachAction' :: RunConfig -> a -> Suite b
+    , eachAction' :: a -> RunConfig -> Suite b
     } ->
     Fixture C.EachParent b
   EachAfter ::

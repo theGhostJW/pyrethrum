@@ -341,7 +341,8 @@ displayInfo HieFile {hie_hs_file, hie_module = hie_module@Module {
 }, hie_types, hie_asts, hie_hs_src } =
   -- intercalate ", " $ txt <$> paths
   -- txt . ppShow $ astDs -- hangs
-  toS . ppShowList $ decs2 -- module path 
+  toS . ppShowList $ decs2 -- module path
+  --  str <- lookupPprType t 
  where
   asts = getAsts hie_asts
   paths = Map.keys asts

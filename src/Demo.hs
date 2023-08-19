@@ -1,4 +1,4 @@
-module PyrethrumDemoPrj where
+module Demo where
 
 class OnceParam a
 class ThreadParam a

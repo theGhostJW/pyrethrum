@@ -1,4 +1,0 @@
-Introduction of the \cases\
-    - https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0302-cases.rst#changes
-NoFieldSelectors 
-OverloadedRecordDot

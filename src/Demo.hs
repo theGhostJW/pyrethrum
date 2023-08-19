@@ -2,23 +2,14 @@ module Demo where
 
 class OnceParam a
 class ThreadParam a
-class EachParam a
-
-class OnceAfterParam a
-class ThreadAfterParam a
-class EachAfterParam a
 
 data OnceParent
 instance OnceParam OnceParent
 instance ThreadParam OnceParent
-instance EachParam OnceParent
 
 data ThreadParent
 instance ThreadParam ThreadParent
-instance EachParam ThreadParent
 
-data EachParent
-instance EachParam EachParent
 
 data Fixture loc a where
   -- once hooks
@@ -27,7 +18,7 @@ data Fixture loc a where
     } ->
     Fixture OnceParent a
   OnceBefore' ::
-    { onceParent :: (OnceParam loc) => Fixture loc a
+    { onceParent :: (OnceParam l) => Fixture l a
     , onceAction' :: (Monad m) => a -> m b
     } ->
     Fixture OnceParent b
@@ -37,10 +28,11 @@ data Fixture loc a where
     } ->
     Fixture ThreadParent a
   ThreadBefore' ::
-    { threadParent :: (ThreadParam loc) => Fixture loc a
+    { threadParent :: (ThreadParam tl) => Fixture tl a
     , threadAction' :: (Monad m) => a -> m b
     } ->
     Fixture ThreadParent b
+
 
 intOnceHook :: Fixture OnceParent Int
 intOnceHook =
@@ -48,17 +40,17 @@ intOnceHook =
     { onceAction = pure 1
     }
 
---  this should not compile
+intThreadHook :: Fixture ThreadParent Int
+intThreadHook = ThreadBefore $ do
+  pure 42
+
 addOnceIntHook :: Fixture OnceParent Int
 addOnceIntHook =
   OnceBefore'
-    { onceParent = intThreadHook
-    -- onceParent = onceThreadHook,
+    { 
+      -- why does this compile? intThreadHook  does not have a OnceParam instance
+      onceParent = intThreadHook
     , onceAction' =
         \i -> do
           pure $ i + 1
     }
-
-intThreadHook :: Fixture ThreadParent Int
-intThreadHook = ThreadBefore $ do
-  pure 42

@@ -167,13 +167,13 @@ data AbstractFixture rc tc effs loc a where
     { onceAction :: rc -> Eff effs a
     } ->
     AbstractFixture rc tc effs OnceParent a
-  OnceBefore' ::
-    { onceParent :: (OnceParam loc) => AbstractFixture rc tc effs loc a
+  OnceBefore' :: forall rc tc effs loc a b. (OnceParam loc) =>
+    { onceParent ::  AbstractFixture rc tc effs loc a
     , onceAction' :: a -> rc -> Eff effs b
     } ->
     AbstractFixture rc tc effs OnceParent b
-  OnceAfter ::
-    { onceBefore :: (OnceAfterParam loc) => AbstractFixture rc tc effs loc ()
+  OnceAfter :: forall rc tc effs loc. (OnceAfterParam loc) =>
+    { onceBefore ::  AbstractFixture rc tc effs loc ()
     , onceAfter :: rc -> Eff effs ()
     } ->
     AbstractFixture rc tc effs OnceAfter ()
@@ -182,8 +182,8 @@ data AbstractFixture rc tc effs loc a where
     , onceTearDown :: a -> Eff effs ()
     } ->
     AbstractFixture rc tc effs OnceParent ()
-  OnceResource' ::
-    { onceResourceParent :: (OnceParam loc) => AbstractFixture rc tc effs loc a
+  OnceResource' :: forall rc tc effs loc a b. (OnceParam loc) =>
+    { onceResourceParent :: AbstractFixture rc tc effs loc a
     , onceSetup' :: a -> rc -> Eff effs b
     , onceTearDown' :: b -> Eff effs ()
     } ->
@@ -193,13 +193,13 @@ data AbstractFixture rc tc effs loc a where
     { threadAction :: rc -> Eff effs a
     } ->
     AbstractFixture rc tc effs ThreadParent a
-  ThreadBefore' ::
-    { threadParent :: (ThreadParam loc) => AbstractFixture rc tc effs loc a
+  ThreadBefore' :: forall rc tc effs loc a b. (ThreadParam loc) =>
+    { threadParent :: AbstractFixture rc tc effs loc a
     , threadAction' :: a -> rc -> Eff effs b
     } ->
     AbstractFixture rc tc effs ThreadParent b
-  ThreadAfter ::
-    { threadBefore :: (ThreadAfterParam loc) => AbstractFixture rc tc effs loc ()
+  ThreadAfter :: forall rc tc effs loc. (ThreadAfterParam loc) =>
+    { threadBefore :: AbstractFixture rc tc effs loc ()
     , threadAfter :: rc -> Eff effs ()
     } ->
     AbstractFixture rc tc effs ThreadAfter ()
@@ -208,8 +208,8 @@ data AbstractFixture rc tc effs loc a where
     , threadTearDown :: a -> Eff effs ()
     } ->
     AbstractFixture rc tc effs ThreadParent ()
-  ThreadResource' ::
-    { threadResourceParent :: (ThreadParam loc) => AbstractFixture rc tc effs loc a
+  ThreadResource' :: forall rc tc effs loc a b. (ThreadParam loc) =>
+    { threadResourceParent :: AbstractFixture rc tc effs loc a
     , threadSetup' :: a -> rc -> Eff effs b
     , threadTearDown' :: b -> Eff effs ()
     } ->
@@ -219,13 +219,13 @@ data AbstractFixture rc tc effs loc a where
     { eachAction :: rc -> Eff effs a
     } ->
     AbstractFixture rc tc effs EachParent a
-  EachBefore' ::
-    { eachParent :: (EachParam loc) => AbstractFixture rc tc effs loc a
+  EachBefore' :: forall rc tc effs loc a b. (EachParam loc) =>
+    { eachParent :: AbstractFixture rc tc effs loc a
     , eachAction' :: a -> rc -> Eff effs b
     } ->
     AbstractFixture rc tc effs EachParent b
-  EachAfter ::
-    { eachBefore :: (EachAfterParam loc) => AbstractFixture rc tc effs loc ()
+  EachAfter :: forall rc tc effs loc. (EachAfterParam loc) =>
+    { eachBefore :: AbstractFixture rc tc effs loc ()
     , eachAfter :: rc -> Eff effs ()
     } ->
     AbstractFixture rc tc effs EachAfter ()
@@ -234,8 +234,8 @@ data AbstractFixture rc tc effs loc a where
     , eachTearDown :: a -> Eff effs ()
     } ->
     AbstractFixture rc tc effs EachParent ()
-  EachResource' ::
-    { eachResourceParent :: (EachParam loc) => AbstractFixture rc tc effs loc a
+  EachResource' :: forall rc tc effs loc a b. (EachParam loc) =>
+    { eachResourceParent :: AbstractFixture rc tc effs loc a
     , eachSetup' :: a -> rc -> Eff effs b
     , eachTearDown' :: b -> Eff effs ()
     } ->

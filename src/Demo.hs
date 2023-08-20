@@ -17,9 +17,9 @@ data Fixture loc a where
     { onceAction :: (Monad m) => m a
     } ->
     Fixture OnceParent a
-  OnceBefore' :: 
-    { onceParent :: forall l. (OnceParam l) => Fixture l a
-    , onceAction' :: (Monad m) => a -> m b
+  OnceBefore' :: forall a b l. (OnceParam l) =>
+    { onceParent :: Fixture l a
+    , onceAction' :: forall m. Monad m => a -> m b
     } ->
     Fixture OnceParent b
   -- once per thread hooks
@@ -28,7 +28,7 @@ data Fixture loc a where
     } ->
     Fixture ThreadParent a
   ThreadBefore' ::
-    { threadParent ::  forall tl. (ThreadParam tl) => Fixture tl a
+    { threadParent :: (ThreadParam tl) => Fixture tl a
     , threadAction' :: (Monad m) => a -> m b
     } ->
     Fixture ThreadParent b
@@ -48,8 +48,10 @@ addOnceIntHook :: Fixture OnceParent Int
 addOnceIntHook =
   OnceBefore'
     { 
-      -- why does this compile? intThreadHook  does not have a OnceParam instance
+      -- why does this compile? intThreadHook does not have a OnceParam instance
       onceParent = intOnceHook
     , onceAction' =
-        \i -> pure $ i + 1
+        \i -> Just $ i + 1
     }
+
+data SomeData a = SomeData a | OtherData

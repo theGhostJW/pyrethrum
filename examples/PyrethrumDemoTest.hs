@@ -30,8 +30,9 @@ intOnceHook =
 addOnceIntHook :: Fixture OnceParent Int
 addOnceIntHook =
   OnceBefore'
-    { onceParent = intThreadHook
-    -- onceParent = onceThreadHook,
+    { 
+    -- onceParent = intThreadHook
+    onceParent = intOnceHook
     , onceAction' =
         \i rc -> do
           log $ "beforeAll' " <> txt i

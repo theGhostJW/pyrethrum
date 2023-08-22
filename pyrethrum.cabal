@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 073c18db09f9869f43e62703f66adf5ba6e71230cdc0a703cb12f6a50488b27b
+-- hash: 9f2c77268d4205ddb5817ae659278e37c7051ee416a75a0dcb8185336e772f33
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -25,16 +25,6 @@ common optimisation
     ghc-options: -O2
   else
     ghc-options: -O0
-common testLibProps
-  build-depends:
-    tasty
-    , tasty-hunit
-    , tasty-hedgehog
-    , tasty-discover
-    , hedgehog
-    , bytestring
-  hs-source-dirs:
-    test
 common pyrethrumProps
   hs-source-dirs:
     src
@@ -44,12 +34,8 @@ common pyrethrumProps
     , template-haskell
     , fmt
 common libImports
-  if flag(godLibrary)
-    import:
-      testLibProps, optimisation
-  else
-    import:
-      optimisation
+  import:
+    optimisation
 common reludeImports
   build-depends:
    base
@@ -57,7 +43,6 @@ common reludeImports
   mixins:
     base hiding (Prelude),
     relude (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
-  
 
 source-repository head
   type: git
@@ -78,49 +63,20 @@ library
   exposed-modules:
       AuxFiles
       Check
-      Common
       Core
-      DSL
-      DSL.ArbitraryIO
-      DSL.CurrentTime
-      DSL.CurrentTimeDocLogger
       DSL.FileSystemDocInterpreter
       DSL.FileSystemEffect
       DSL.FileSystemIOInterpreter
-      DSL.FileSystemPsy
       DSL.Internal.ApEvent
       DSL.Internal.FileSystemPure
       DSL.Internal.FileSystemRawIO
-      DSL.Interpreter
-      DSL.LoggerPsy
-      DSL.LogProtocol
-      DSL.LogProtocol.PrettyPrint
       DSL.Out
-      FileLogging
-      Internal.ExeNode
       Internal.PreNode
-      Internal.RunnerBaseLazy
       Internal.RunTimeLogging
       Internal.SuiteRuntime
-      Internal.SuiteRuntimeOld
-      ItemFilter
-      ItemRunners
       List.Extra
-      LogTransformation
-      LogTransformation.Common
-      LogTransformation.PrintLogDisplayElement
-      LogTransformation.Stats
-      LogTransformation.Test
-      MemberReflection
       OrphanedInstances
-      PrettyPrintCommon
-      RunElementClasses
-      Runner
-      RunnerBase
-      RunnerConsoleAndFile
       TempUtils
-      TestFilter
-      TestFilters
       Text.Extra
   hs-source-dirs:
       src
@@ -174,9 +130,7 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns
-  build-tool-depends:
-      tasty-discover:tasty-discover
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns
   build-depends:
       aeson
     , base-prelude
@@ -196,8 +150,6 @@ library
     , mtl
     , path
     , path-io
-    , polysemy
-    , polysemy-plugin
     , pretty-show
     , pyrethrum-extras
     , raw-strings-qq
@@ -217,6 +169,7 @@ library discover
       WeederLibCopy.Weeder
       WeederLibCopy.Weeder.Config
       WeederLibCopy.Weeder.Main
+      WeederLibCopy.WeederDiscover
   other-modules:
       Paths_pyrethrum
   autogen-modules:
@@ -274,9 +227,7 @@ library discover
       TypeFamilyDependencies
       TypeOperators
       FieldSelectors
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -O0
-  build-tool-depends:
-      tasty-discover:tasty-discover
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -O0
   build-depends:
       aeson
     , algebraic-graphs ==0.7.*
@@ -301,8 +252,6 @@ library discover
     , optparse-applicative
     , path
     , path-io
-    , polysemy
-    , polysemy-plugin
     , pretty-show
     , pyrethrum-extras
     , raw-strings-qq
@@ -328,49 +277,20 @@ library examples
       StepDocumenterDemo
       AuxFiles
       Check
-      Common
       Core
-      DSL
-      DSL.ArbitraryIO
-      DSL.CurrentTime
-      DSL.CurrentTimeDocLogger
       DSL.FileSystemDocInterpreter
       DSL.FileSystemEffect
       DSL.FileSystemIOInterpreter
-      DSL.FileSystemPsy
       DSL.Internal.ApEvent
       DSL.Internal.FileSystemPure
       DSL.Internal.FileSystemRawIO
-      DSL.Interpreter
-      DSL.LoggerPsy
-      DSL.LogProtocol
-      DSL.LogProtocol.PrettyPrint
       DSL.Out
-      FileLogging
-      Internal.ExeNode
       Internal.PreNode
-      Internal.RunnerBaseLazy
       Internal.RunTimeLogging
       Internal.SuiteRuntime
-      Internal.SuiteRuntimeOld
-      ItemFilter
-      ItemRunners
       List.Extra
-      LogTransformation
-      LogTransformation.Common
-      LogTransformation.PrintLogDisplayElement
-      LogTransformation.Stats
-      LogTransformation.Test
-      MemberReflection
       OrphanedInstances
-      PrettyPrintCommon
-      RunElementClasses
-      Runner
-      RunnerBase
-      RunnerConsoleAndFile
       TempUtils
-      TestFilter
-      TestFilters
       Text.Extra
   other-modules:
       Paths_pyrethrum
@@ -429,9 +349,7 @@ library examples
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -O0
-  build-tool-depends:
-      tasty-discover:tasty-discover
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -O0
   build-depends:
       aeson
     , base-prelude
@@ -449,8 +367,6 @@ library examples
     , mtl
     , path
     , path-io
-    , polysemy
-    , polysemy-plugin
     , pretty-show
     , pyrethrum
     , pyrethrum-extras
@@ -461,117 +377,5 @@ library examples
     , transformers-either
     , unliftio
     , unordered-containers
-    , yaml
-  default-language: Haskell2010
-
-test-suite pyrethrum-test
-  import: testLibProps, reludeImports
-  type: exitcode-stdio-1.0
-  main-is: Main.hs
-  other-modules:
-      ArbitraryIOTest
-      AuxFilesTest
-      CheckTest
-      ConcurrentSuiteSimple
-      ConcurrentSuiteTestOnly
-      DemoConfig
-      DemoSuite
-      EndpointTest
-      EvalHelp
-      ItemFiltersTest
-      LogListCheck
-      LogProtocolTest
-      LogTransformationTest
-      PrettyPrintTest
-      RunnerTest
-      SemTest
-      SuiteRunIntegrityTest
-      SuiteRuntimeTest
-      TestFilterTest
-      Paths_pyrethrum
-  autogen-modules:
-      Paths_pyrethrum
-  hs-source-dirs:
-      test
-  default-extensions:
-      AllowAmbiguousTypes
-      BangPatterns
-      BlockArguments
-      ConstrainedClassMethods
-      ConstraintKinds
-      DisambiguateRecordFields
-      DuplicateRecordFields
-      DataKinds
-      DefaultSignatures
-      DeriveFoldable
-      DeriveFunctor
-      DeriveGeneric
-      DeriveLift
-      DeriveTraversable
-      DerivingStrategies
-      EmptyCase
-      ExistentialQuantification
-      ExtendedDefaultRules
-      FlexibleContexts
-      FlexibleInstances
-      FunctionalDependencies
-      GADTs
-      GeneralizedNewtypeDeriving
-      InstanceSigs
-      KindSignatures
-      LambdaCase
-      LiberalTypeSynonyms
-      MultiParamTypeClasses
-      MultiWayIf
-      NamedFieldPuns
-      NoFieldSelectors
-      NumericUnderscores
-      OverloadedStrings
-      OverloadedRecordDot
-      PartialTypeSignatures
-      PatternSynonyms
-      PolyKinds
-      QuasiQuotes
-      RankNTypes
-      RecordWildCards
-      ScopedTypeVariables
-      StandaloneDeriving
-      StrictData
-      TemplateHaskell
-      TupleSections
-      TypeApplications
-      TypeFamilies
-      TypeFamilyDependencies
-      TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns
-  build-tool-depends:
-      tasty-discover:tasty-discover
-  build-depends:
-      aeson
-    , base-prelude
-    , bytestring
-    , chronos
-    , containers
-    , directory
-    , dlist
-    , effectful
-    , effectful-core
-    , effectful-plugin
-    , effectful-th
-    , exceptions
-    , extra
-    , mtl
-    , path
-    , path-io
-    , polysemy
-    , polysemy-plugin
-    , pretty-show
-    , pyrethrum
-    , pyrethrum-extras
-    , raw-strings-qq
-    , text
-    , time
-    , transformers-either
-    , unliftio
     , yaml
   default-language: Haskell2010

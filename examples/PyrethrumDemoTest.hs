@@ -14,7 +14,6 @@ import PyrethrumDemoPrj (
   TestFixture,
  )
 import PyrethrumExtras (txt)
-import RunElementClasses (AddressElemType (Hook))
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . Log

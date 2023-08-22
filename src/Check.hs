@@ -21,7 +21,6 @@ module Check
   )
 where
 
-import Common (DetailedInfo (DetailedInfo))
 import Data.Aeson.TH
 import Data.Aeson.Types as AT hiding (Error)
 import Data.DList as D
@@ -47,6 +46,15 @@ that deals with
     json fieldContains
 
 -}
+
+
+data DetailedInfo = DetailedInfo
+  { message :: Text,
+    info :: Text
+  }
+  deriving (Eq, Show)
+
+$(deriveJSON defaultOptions ''DetailedInfo)
 
 -- generate a check from a predicate
 chk :: Text -> (v -> Bool) -> Checks v

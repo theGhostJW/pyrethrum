@@ -91,15 +91,8 @@ dependencies:
   - time # need for timezone which is missing from chronos
   - transformers-either
   - raw-strings-qq
-  # - relude
   - unliftio
   - yaml
-  # - name: base
-  #   mixin:
-  #     - hiding (Prelude)
-  # - name: relude
-  #   mixin:
-  #     - (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
 
 ghc-options:
   # - -threaded

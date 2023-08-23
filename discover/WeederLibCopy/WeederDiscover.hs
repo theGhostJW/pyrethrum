@@ -1,13 +1,11 @@
 {-# language ApplicativeDo #-}
 {-# language BlockArguments #-}
-{-# language DeriveGeneric #-}
 {-# language FlexibleContexts #-}
 {-# language LambdaCase #-}
 {-# language NamedFieldPuns #-}
 {-# language NoImplicitPrelude #-}
 {-# language OverloadedLabels #-}
 {-# language OverloadedStrings #-}
-{-# language TupleSections #-}
 
 module WeederLibCopy.WeederDiscover where
 

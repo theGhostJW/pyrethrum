@@ -63,6 +63,7 @@ import Debug.Trace
 import Data.Text (Text, intercalate, isInfixOf)
 import PyrethrumExtras (uu, txt, toS)
 import GHC.Plugins (Outputable(..), renderWithContext, defaultSDocContext)
+import Data.Sequence (Seq)
 
 
 data CLIArguments = CLIArguments
@@ -325,36 +326,47 @@ infixr 5 ==>
 True  ==> x = x
 False ==> _ = True
 
+-- *********************************************************
+-- *************** My Non Weeder Code **********************
+-- *********************************************************
 
+data FixturePath = FixturePath {
+  modulePath :: Text,
+  fixtureName :: Text,
+  parent :: Maybe FixturePath
+} deriving Show
+
+followYourDreams :: [FixturePath]
+followYourDreams = uu
 
 displayHieAst :: HieAST TypeIndex -> Text
 displayHieAst ast = toS . renderWithContext defaultSDocContext $ ppr ast
 
 data DecShow = DecShow {
   path :: Text,
-  decs :: Text
+  decs :: Seq Declaration
 } deriving Show
 
-displayInfo :: HieFile -> Text
+displayInfo :: HieFile -> [DecShow]
 displayInfo HieFile {hie_hs_file, hie_module = hie_module@Module {
   moduleUnit, moduleName
 }, hie_types, hie_asts, hie_hs_src } =
   -- intercalate ", " $ txt <$> paths
   -- txt . ppShow $ astDs -- hangs
-  toS . ppShowList $ decs2 -- module path
+  decs2 -- module path
   --  str <- lookupPprType t 
  where
   asts = getAsts hie_asts
   paths = Map.keys asts
   decs = findDeclarations <$> asts
   justEg =  Map.filterWithKey (\k _ -> isInfixOf "DemoTest" $ txt k) decs
-  decs2 =  Map.mapWithKey (\k v -> DecShow (txt k) (toS $ ppShowList v)) decs
-  astDs = Map.mapWithKey (\k v ->
-     DecShow (txt k) (displayHieAst v)
-    ) asts
+  decs2 =  Map.elems $ Map.mapWithKey (DecShow . txt) decs
+  -- astDs = Map.mapWithKey (\k v ->
+  --    DecShow (txt k) (displayHieAst v)
+  --   ) asts
 
 
--- My Non Weeder Code
+
 -- discover :: IO (ExitCode, Analysis)
 discover :: IO ()
 discover = do
@@ -366,10 +378,10 @@ discover = do
     mapM ( readCompatibleHieFileOrExit nameCache ) hieFilePaths
 
   let
-    filteredHieFiles = 
+    filteredHieFiles =
       flip filter hieFiles \hieFile -> (isInfixOf "DemoTest" . toS $ hie_hs_file hieFile) && any ( hie_hs_file hieFile `isSuffixOf`) hsFilePaths
 
-  traverse_ (pPrint . displayInfo) filteredHieFiles
+  pPrintList $ displayInfo <$> filteredHieFiles
   -- analysis <-
   --   execStateT ( analyseHieFilesDiscover hieFileResults' ) emptyAnalysis
 

@@ -330,13 +330,18 @@ False ==> _ = True
 -- *************** My Non Weeder Code **********************
 -- *********************************************************
 
-data FixturePath = FixturePath {
+data DeclarationPath = DeclarationPath {
   modulePath :: Text,
   fixtureName :: Text,
-  parent :: Maybe FixturePath
-} deriving Show
+  typeName :: Text
+} deriving (Show, Eq, Ord)
 
-followYourDreams :: [FixturePath]
+data FixtureSpec = FixtureSpec {
+  path :: DeclarationPath,
+  parent :: Maybe DeclarationPath
+} deriving (Show, Eq, Ord)
+
+followYourDreams :: [FixtureSpec]
 followYourDreams = uu
 
 displayHieAst :: HieAST TypeIndex -> Text
@@ -344,8 +349,13 @@ displayHieAst ast = toS . renderWithContext defaultSDocContext $ ppr ast
 
 data DecShow = DecShow {
   path :: Text,
-  decs :: Seq Declaration
+  decs :: [Declaration]
 } deriving Show
+
+pPrintDisplayInfo :: DecShow -> IO ()
+pPrintDisplayInfo d = do 
+  pPrint d.path 
+  pPrintList d.decs
 
 displayInfo :: HieFile -> [DecShow]
 displayInfo HieFile {hie_hs_file, hie_module = hie_module@Module {
@@ -360,7 +370,7 @@ displayInfo HieFile {hie_hs_file, hie_module = hie_module@Module {
   paths = Map.keys asts
   decs = findDeclarations <$> asts
   justEg =  Map.filterWithKey (\k _ -> isInfixOf "DemoTest" $ txt k) decs
-  decs2 =  Map.elems $ Map.mapWithKey (DecShow . txt) decs
+  decs2 =  Map.elems $ Map.mapWithKey (\modPath decs' -> DecShow (txt modPath) (toList decs')) decs
   -- astDs = Map.mapWithKey (\k v ->
   --    DecShow (txt k) (displayHieAst v)
   --   ) asts
@@ -381,7 +391,8 @@ discover = do
     filteredHieFiles =
       flip filter hieFiles \hieFile -> (isInfixOf "DemoTest" . toS $ hie_hs_file hieFile) && any ( hie_hs_file hieFile `isSuffixOf`) hsFilePaths
 
-  pPrintList $ displayInfo <$> filteredHieFiles
+    l = displayInfo <$> filteredHieFiles
+  traverse_ (traverse_ pPrintDisplayInfo) l
   -- analysis <-
   --   execStateT ( analyseHieFilesDiscover hieFileResults' ) emptyAnalysis
 
@@ -428,3 +439,4 @@ discover = do
       ModuleRoot _ -> True
 
       InstanceRoot d c -> True
+

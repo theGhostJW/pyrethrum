@@ -10,6 +10,7 @@ instance ThreadParam OnceParent
 data ThreadParent
 instance ThreadParam ThreadParent
 
+--  correct solution
 
 data Fixture loc a where
   -- once hooks
@@ -48,7 +49,7 @@ addOnceIntHook :: Fixture OnceParent Int
 addOnceIntHook =
   OnceBefore'
     { 
-      onceParent = intThreadHook
+      onceParent = intOnceHook
     , onceAction' =
         \i -> pure $ i + 1
     }

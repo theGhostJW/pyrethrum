@@ -330,18 +330,18 @@ False ==> _ = True
 -- *************** My Non Weeder Code **********************
 -- *********************************************************
 
-data DeclarationPath = DeclarationPath {
+data DiscoverDeclarationPath = DiscoverDeclarationPath {
   modulePath :: Text,
   fixtureName :: Text,
   typeName :: Text
 } deriving (Show, Eq, Ord)
 
-data FixtureSpec = FixtureSpec {
-  path :: DeclarationPath,
-  parent :: Maybe DeclarationPath
+data DiscoverFixtureSpec = FixtureSpec {
+  path :: DiscoverDeclarationPath,
+  parent :: Maybe DiscoverDeclarationPath
 } deriving (Show, Eq, Ord)
 
-followYourDreams :: [FixtureSpec]
+followYourDreams :: [DiscoverFixtureSpec]
 followYourDreams = uu
 
 displayHieAst :: HieAST TypeIndex -> Text

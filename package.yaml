@@ -153,6 +153,9 @@ ghc-options:
   - -fno-warn-unused-binds
   - -fno-warn-unused-do-bind
   - -Wno-overlapping-patterns
+  # todo: more researchon this: https://well-typed.com/blog/2023/02/interface-files-with-core/
+  - -fprefer-byte-code 
+  - -fbyte-code-and-object-code
   # - -fdefer-type-error
 
 default-extensions:

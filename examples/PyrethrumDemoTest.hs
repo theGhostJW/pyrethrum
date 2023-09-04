@@ -8,7 +8,7 @@ import PyrethrumDemoPrj (
   Depth (DeepRegression),
   Fixture (..),
   RunConfig (..),
-  Suite,
+  Action,
   Test (..),
   TestConfig (TestConfig),
   TestFixture,
@@ -89,7 +89,7 @@ data ApState = ApState
   , valTxt :: Text
   }
 
-action :: RunConfig -> Item -> Suite ApState
+action :: RunConfig -> Item -> Action ApState
 action rc itm = do
   log $ txt itm
   pure $ ApState (itm.value + 1) $ txt itm.value
@@ -130,7 +130,7 @@ test2 =
 config2 :: TestConfig
 config2 = TestConfig "test" DeepRegression
 
-action2 :: HookInfo -> RunConfig -> Item2 -> Suite AS
+action2 :: HookInfo -> RunConfig -> Item2 -> Action AS
 action2 HookInfo{value = hookVal} rc itm = do
   log $ txt itm
   pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
@@ -234,7 +234,7 @@ test5 =
 -- TODO : stubs:
 
     stubOnly (only function - takes an item and adds "DEBUG ONLY" to the title)",
-    get rid of ids
+    get rid of ids ?? dubious
     stubRaw,
     stubHash (make a hash of props other than id and title: aDfG165Er7 - 10 letter hash - module + item first 4 letters is module, next 6 is item),
     stubAll,

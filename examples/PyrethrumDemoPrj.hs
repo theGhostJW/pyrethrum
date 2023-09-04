@@ -19,7 +19,7 @@ import Effectful.Error.Static (Error, runError)
 import PyrethrumExtras (txt, uu)
 
 type ApEffs = '[FileSystem, Out ApEvent, Error FSException, IOE]
-type Suite a = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] a
+type Action a = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] a
 type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
 type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
 
@@ -59,97 +59,97 @@ instance C.Config TestConfig
 data Fixture loc a where
   -- once hooks
   OnceBefore ::
-    { onceAction :: RunConfig -> Suite a
+    { onceAction :: RunConfig -> Action a
     } ->
     Fixture C.OnceParent a
   OnceBefore' ::
     forall loc a b.
     (C.OnceParam loc) =>
     { onceParent :: Fixture loc a
-    , onceAction' :: a -> RunConfig -> Suite b
+    , onceAction' :: a -> RunConfig -> Action b
     } ->
     Fixture C.OnceParent b
   OnceAfter ::
     forall loc.
     (C.OnceAfterParam loc) =>
     { onceBefore :: Fixture loc ()
-    , onceAfter :: RunConfig -> Suite ()
+    , onceAfter :: RunConfig -> Action ()
     } ->
     Fixture C.OnceAfter ()
   OnceResource ::
-    { onceSetup :: RunConfig -> Suite a
-    , onceTearDown :: a -> Suite ()
+    { onceSetup :: RunConfig -> Action a
+    , onceTearDown :: a -> Action ()
     } ->
     Fixture C.OnceParent ()
   OnceResource' ::
     forall loc a b.
     (C.OnceParam loc) =>
     { onceResourceParent :: Fixture loc a
-    , onceSetup' :: a -> RunConfig -> Suite b
-    , onceTearDown' :: b -> Suite ()
+    , onceSetup' :: a -> RunConfig -> Action b
+    , onceTearDown' :: b -> Action ()
     } ->
     Fixture C.OnceParent a
   -- once per thread hooks
   ThreadBefore ::
-    { threadAction :: RunConfig -> Suite a
+    { threadAction :: RunConfig -> Action a
     } ->
     Fixture C.ThreadParent a
   ThreadBefore' ::
     forall loc a b.
     (C.ThreadParam loc) =>
     { threadParent :: Fixture loc a
-    , threadAction' :: a -> RunConfig -> Suite b
+    , threadAction' :: a -> RunConfig -> Action b
     } ->
     Fixture C.ThreadParent b
   ThreadAfter ::
     forall loc.
     (C.ThreadAfterParam loc) =>
     { threadBefore :: Fixture loc ()
-    , threadAfterAction :: RunConfig -> Suite ()
+    , threadAfterAction :: RunConfig -> Action ()
     } ->
     Fixture C.ThreadAfter ()
   ThreadResource ::
-    { threadSetup :: RunConfig -> Suite a
-    , threadTearDown :: a -> Suite ()
+    { threadSetup :: RunConfig -> Action a
+    , threadTearDown :: a -> Action ()
     } ->
     Fixture C.ThreadParent ()
   ThreadResource' ::
     forall loc a b.
     (C.ThreadParam loc) =>
     { threadResourceParent :: Fixture loc a
-    , threadSetup' :: a -> RunConfig -> Suite b
-    , threadTearDown' :: b -> Suite ()
+    , threadSetup' :: a -> RunConfig -> Action b
+    , threadTearDown' :: b -> Action ()
     } ->
     Fixture C.ThreadParent a
   -- each hooks
   EachBefore ::
-    { eachAction :: RunConfig -> Suite a
+    { eachAction :: RunConfig -> Action a
     } ->
     Fixture C.EachParent a
   EachBefore' ::
     forall loc a b.
     (C.EachParam loc) =>
     { eachParent :: Fixture loc a
-    , eachAction' :: a -> RunConfig -> Suite b
+    , eachAction' :: a -> RunConfig -> Action b
     } ->
     Fixture C.EachParent b
   EachAfter ::
     forall loc.
     (C.EachAfterParam loc) =>
     { eachBefore :: Fixture loc ()
-    , eachAfterAction :: RunConfig -> Suite ()
+    , eachAfterAction :: RunConfig -> Action ()
     } ->
     Fixture C.EachAfter ()
   EachResource ::
-    { eachSetup :: RunConfig -> Suite a
-    , eachTearDown :: a -> Suite ()
+    { eachSetup :: RunConfig -> Action a
+    , eachTearDown :: a -> Action ()
     } ->
     Fixture C.EachParent ()
   EachResource' ::
     forall loc a b. (C.EachParam loc) =>
     { eachResourceParent :: Fixture loc a
-    , eachSetup' :: a -> RunConfig -> Suite b
-    , eachTearDown' :: b -> Suite ()
+    , eachSetup' :: a -> RunConfig -> Action b
+    , eachTearDown' :: b -> Action ()
     } ->
     Fixture C.EachParent a
   Test ::
@@ -163,7 +163,7 @@ data Test where
     forall i as ds.
     (C.ItemClass i ds) =>
     { config :: TestConfig
-    , action :: RunConfig -> i -> Suite as
+    , action :: RunConfig -> i -> Action as
     , parse :: as -> Either C.ParseException ds
     , items :: RunConfig -> [i]
     } ->
@@ -172,7 +172,7 @@ data Test where
     forall i ds.
     (C.ItemClass i ds) =>
     { config :: TestConfig
-    , action :: RunConfig -> i -> Suite ds
+    , action :: RunConfig -> i -> Action ds
     , items :: RunConfig -> [i]
     } ->
     Test
@@ -181,7 +181,7 @@ data Test where
     (C.ItemClass i ds) =>
     { parent :: (C.EachParam loc) => Fixture loc a
     , config :: TestConfig
-    , childAction :: a -> RunConfig -> i -> Suite as
+    , childAction :: a -> RunConfig -> i -> Action as
     , parse :: as -> Either C.ParseException ds
     , items :: RunConfig -> [i]
     } ->
@@ -191,20 +191,20 @@ data Test where
     (C.ItemClass i ds) =>
     { parent :: (C.EachParam loc) => Fixture loc a
     , config :: TestConfig
-    , childAction :: a -> RunConfig -> i -> Suite ds
+    , childAction :: a -> RunConfig -> i -> Action ds
     , items :: RunConfig -> [i]
     } ->
     Test
   Single ::
     { config :: TestConfig
-    , singleAction :: RunConfig -> Suite as
+    , singleAction :: RunConfig -> Action as
     , checks :: C.Checks as
     } ->
     Test
   Single' ::
     { parent :: (C.EachParam loc) => Fixture loc a
     , config :: TestConfig
-    , childSingleAction :: a -> RunConfig -> Suite as
+    , childSingleAction :: a -> RunConfig -> Action as
     , checks :: C.Checks as
     } ->
     Test

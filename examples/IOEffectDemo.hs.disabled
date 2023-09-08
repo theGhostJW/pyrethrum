@@ -2,7 +2,7 @@ module IOEffectDemo where
 
 import BasePrelude (openFile)
 import qualified DSL.FileSystemDocInterpreter as DII
-import DSL.FileSystemEffect
+import DSL.FileSystemEffect as F
 import qualified DSL.FileSystemIOInterpreter as IOI
 import DSL.Internal.ApEvent
 import DSL.Out
@@ -111,7 +111,7 @@ timeTest = do
 --  TODO: pyrelude depricate debug in favour of trace
 
 -- use eff
-listFileImp :: (FileSystem :> es, Out ApEvent :> es) => Eff es [Text]
+listFileImp :: (F.FileSystem :> es, Out ApEvent :> es) => Eff es [Text]
 listFileImp = do
   log "listFileImp"
   files <- walkDirAccum Nothing (\root subs files -> pure files) [absdir|C:\Pyrethrum|]

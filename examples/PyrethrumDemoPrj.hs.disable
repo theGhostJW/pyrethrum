@@ -5,18 +5,17 @@ import Data.Aeson.TH
 import Data.Aeson.Types (
   FromJSON,
   ToJSON (toJSON),
-  Value (String),
+  Value (String)
  )
 
 import qualified DSL.FileSystemEffect as IOI
 import qualified DSL.Internal.ApEvent as AE
-
-import DSL.FileSystemEffect
 import DSL.Internal.ApEvent
 import DSL.Out
 import Effectful (Eff, IOE, (:>))
 import Effectful.Error.Static (Error, runError)
 import PyrethrumExtras (txt, uu)
+import DSL.FileSystemEffect
 
 type ApEffs = '[FileSystem, Out ApEvent, Error FSException, IOE]
 type Action a = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] a
@@ -61,14 +60,14 @@ data Fixture loc a where
   OnceBefore ::
     { onceAction :: RunConfig -> Action a
     } ->
-    Fixture C.OnceParent a
+    Fixture C.Once a
   OnceBefore' ::
     forall loc a b.
     (C.OnceParam loc) =>
     { onceParent :: Fixture loc a
     , onceAction' :: a -> RunConfig -> Action b
     } ->
-    Fixture C.OnceParent b
+    Fixture C.Once b
   OnceAfter ::
     forall loc.
     (C.OnceAfterParam loc) =>
@@ -80,7 +79,7 @@ data Fixture loc a where
     { onceSetup :: RunConfig -> Action a
     , onceTearDown :: a -> Action ()
     } ->
-    Fixture C.OnceParent ()
+    Fixture C.Once ()
   OnceResource' ::
     forall loc a b.
     (C.OnceParam loc) =>
@@ -88,19 +87,19 @@ data Fixture loc a where
     , onceSetup' :: a -> RunConfig -> Action b
     , onceTearDown' :: b -> Action ()
     } ->
-    Fixture C.OnceParent a
+    Fixture C.Once a
   -- once per thread hooks
   ThreadBefore ::
     { threadAction :: RunConfig -> Action a
     } ->
-    Fixture C.ThreadParent a
+    Fixture C.Thread a
   ThreadBefore' ::
     forall loc a b.
     (C.ThreadParam loc) =>
     { threadParent :: Fixture loc a
     , threadAction' :: a -> RunConfig -> Action b
     } ->
-    Fixture C.ThreadParent b
+    Fixture C.Thread b
   ThreadAfter ::
     forall loc.
     (C.ThreadAfterParam loc) =>
@@ -112,7 +111,7 @@ data Fixture loc a where
     { threadSetup :: RunConfig -> Action a
     , threadTearDown :: a -> Action ()
     } ->
-    Fixture C.ThreadParent ()
+    Fixture C.Thread ()
   ThreadResource' ::
     forall loc a b.
     (C.ThreadParam loc) =>
@@ -120,19 +119,19 @@ data Fixture loc a where
     , threadSetup' :: a -> RunConfig -> Action b
     , threadTearDown' :: b -> Action ()
     } ->
-    Fixture C.ThreadParent a
+    Fixture C.Thread a
   -- each hooks
   EachBefore ::
     { eachAction :: RunConfig -> Action a
     } ->
-    Fixture C.EachParent a
+    Fixture C.Each a
   EachBefore' ::
     forall loc a b.
     (C.EachParam loc) =>
     { eachParent :: Fixture loc a
     , eachAction' :: a -> RunConfig -> Action b
     } ->
-    Fixture C.EachParent b
+    Fixture C.Each b
   EachAfter ::
     forall loc.
     (C.EachAfterParam loc) =>
@@ -144,7 +143,7 @@ data Fixture loc a where
     { eachSetup :: RunConfig -> Action a
     , eachTearDown :: a -> Action ()
     } ->
-    Fixture C.EachParent ()
+    Fixture C.Each ()
   EachResource' ::
     forall loc a b.
     (C.EachParam loc) =>
@@ -152,7 +151,7 @@ data Fixture loc a where
     , eachSetup' :: a -> RunConfig -> Action b
     , eachTearDown' :: b -> Action ()
     } ->
-    Fixture C.EachParent a
+    Fixture C.Each a
   Test ::
     { test :: Test
     } ->

@@ -309,24 +309,42 @@ data AbstractTest rc tc effs where
     } ->
     AbstractTest rc tc effs
 
-data PreparedTest tc effs t = PreparedTest
-  { config :: tc
-  , items :: [t]
-  }
 
-prepTest' :: (ItemClass i ds) => [i] -> (i -> Eff effs as) -> (as -> Either ParseException ds) -> [Eff effs ()]
-prepTest' items action parse = uu
+-- data PreNode i where
+--   Hook ::
+--     { title :: Text
+--     , threadLimit :: Maybe Int
+--     , onceHook :: OnceHook a oi oo
+--     , threadHook :: ThreadHook a oo ti to
+--     , subNodes :: NonEmpty (PreNode a oo to)
+--     } ->
+--     PreNode a oi ti
+--   Fixtures ::
+--     { title :: Text
+--     , threadLimit :: Maybe Int
+--     , testHook :: TestHook a oi ti () tsto
+--     , fixtures :: NonEmpty (Fixture a oi ti tsto)
+--     } ->
+--     PreNode a oi ti
 
-prepareTest :: rc -> AbstractTest rc tc effs -> PreparedTest tc effs
-prepareTest rc = \case
-  Full{config, items, action, parse} ->
-    PreparedTest config $
-      items rc <&> (action rc >=>
-     (\ as
-        -> case parse as of
-             Left e -> E.throwError e
-             Right ds -> pure ()))
-  _ -> uu
+-- data PreparedTest tc effs t = PreparedTest
+--   { config :: tc
+--   , items :: [t]
+--   }
+
+-- prepTest' :: (ItemClass i ds) => [i] -> (i -> Eff effs as) -> (as -> Either ParseException ds) -> [Eff effs ()]
+-- prepTest' items action parse = uu
+
+-- prepareTest :: rc -> AbstractTest rc tc effs -> PreparedTest tc effs (Eff effs ())
+-- prepareTest rc = \case
+--   Full{config, items, action, parse} ->
+--     PreparedTest config $
+--       items rc <&> (action rc >=>
+--      (\ as
+--         -> case parse as of
+--              Left e -> E.throwError e
+--              Right ds -> pure ()))
+--   _ -> uu
 
 
 -- run 

@@ -1,7 +1,7 @@
 module PyrethrumDemoTest where
 
 import Core (Checks, EachParent, OnceParam, OnceParent, ParseException, ThreadParent, chk)
-import DSL.Internal.ApEvent (ApEvent (Log))
+import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, IOE, (:>))
 import PyrethrumDemoPrj (
@@ -17,7 +17,7 @@ import PyrethrumExtras (txt)
 import RunElementClasses (AddressElemType (Hook))
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
-log = out . Log
+log = out . User . Log
 
 intOnceHook :: Fixture OnceParent Int
 intOnceHook =

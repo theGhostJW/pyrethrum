@@ -4,7 +4,7 @@ import Core (Checks, Each, OnceParam, Once, ParseException, Thread, chk)
 import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, IOE, (:>))
-import PyrethrumDemoPrj (
+import PyrethrumDemoProject (
   Depth (DeepRegression),
   Fixture (..),
   RunConfig (..),

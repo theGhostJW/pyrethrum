@@ -1,10 +1,14 @@
 module StepDocumenterDemo where
 
 import qualified DSL.FileSystemDocInterpreter as DII
-import DSL.FileSystemEffect
+import DSL.FileSystemEffect (
+  FileSystem,
+  findFilesWith,
+  walkDirAccum,
+ )
 import qualified DSL.FileSystemIOInterpreter as IOI
-import DSL.Internal.ApEvent
-import DSL.Out
+import DSL.Internal.ApEvent (ApEvent (User), ULog (Log))
+import DSL.Out (Out, Sink (Sink), out, runOut)
 import Data.List.Extra (isInfixOf)
 import Effectful (Eff, IOE, runEff, (:>))
 import Effectful.Error.Static (Error, runError)

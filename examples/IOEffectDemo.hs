@@ -1,25 +1,17 @@
 module IOEffectDemo where
 
-import BasePrelude (openFile)
-import qualified DSL.FileSystemDocInterpreter as DII
-import DSL.FileSystemEffect as F
-import qualified DSL.FileSystemIOInterpreter as IOI
-import DSL.Internal.ApEvent
-import DSL.Out
-
+import PyrethrumExtras as PE
 import Chronos (Time, now)
-import Effectful (Eff, IOE, runEff, (:>))
-import Effectful.Error.Static (Error, runError)
-import Path (absdir, parseAbsFile, reldir, relfile, toFilePath)
-import PyrethrumExtras (Abs, ConvertString, File, MonadMask, Path, bracket, debug, debug_, parseRelFileSafe, toS, txt, uu, (?))
-import qualified PyrethrumExtras as PE
-import System.IO (hClose, hGetContents)
-
--- TODO: add to pyrelude
-
-import qualified DSL.FileSystemEffect as IOI
+import DSL.FileSystemEffect
+import Effectful
+import DSL.Out
+import DSL.Internal.ApEvent
+import Effectful.Error.Static as E (Error, runError)
 import qualified Data.Text as T
+import BasePrelude (openFile, hClose, hGetContents)
+import DSL.FileSystemIOInterpreter
 import System.Time.Extra (sleep)
+
 
 {-
 \************************************************************
@@ -27,8 +19,10 @@ import System.Time.Extra (sleep)
 \************************************************************
 -- https://www.tweag.io/blog/2017-07-27-streaming-programs/
 -}
+
 putTxt :: (ConvertString a String) => a -> IO ()
 putTxt = putStrLn . toS
+
 
 headLine :: Text -> Text
 headLine = unlines . take 1 . lines
@@ -111,7 +105,7 @@ timeTest = do
 --  TODO: pyrelude depricate debug in favour of trace
 
 -- use eff
-listFileImp :: (F.FileSystem :> es, Out ApEvent :> es) => Eff es [Text]
+listFileImp :: (FileSystem :> es, Out ApEvent :> es) => Eff es [Text]
 listFileImp = do
   log "listFileImp"
   files <- walkDirAccum Nothing (\root subs files -> pure files) [absdir|C:\Pyrethrum|]
@@ -121,8 +115,8 @@ listFileImp = do
 apEventOut :: forall a es. (IOE :> es) => Eff (Out ApEvent : es) a -> Eff es a
 apEventOut = runOut print
 
-ioRun :: Eff '[FileSystem, Out ApEvent, Error IOI.FSException, IOE] a -> IO (Either (CallStack, IOI.FSException) a)
-ioRun = runEff . runError . apEventOut . IOI.runFileSystem
+ioRun :: Eff '[FileSystem, Out ApEvent, Error FSException, IOE] a -> IO (Either (CallStack, FSException) a)
+ioRun = runEff . runError . apEventOut . runFileSystem
 
 logShow :: (Out ApEvent :> es, Show a) => a -> Eff es ()
 logShow = out . User . Log . txt
@@ -131,7 +125,7 @@ log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
 -- $> ioRun effDemo
-effDemo :: Eff '[FileSystem, Out ApEvent, Error IOI.FSException, IOE] ()
+effDemo :: Eff '[FileSystem, Out ApEvent, Error FSException, IOE] ()
 effDemo = do
   res <- listFileImp
   chk res
@@ -139,7 +133,7 @@ effDemo = do
   chk _ = log "This is a effDemo"
 
 -- $> ioRun effDemo2
-effDemo2 :: Eff '[FileSystem, Out ApEvent, Error IOI.FSException, IOE] ()
+effDemo2 :: Eff '[FileSystem, Out ApEvent, Error FSException, IOE] ()
 effDemo2 = do
   res <- listFileImp
   chk res

@@ -1,24 +1,15 @@
-module PyrethrumDemoPrj where
+module PyrethrumDemoProject where
 
 import qualified Core as C
-import Data.Aeson.TH
-import Data.Aeson.Types (
-  FromJSON,
-  ToJSON (toJSON),
-  Value (String)
- )
+import DSL.FileSystemEffect ( FileSystem, FSException )
+import DSL.Internal.ApEvent ( ApEvent )
+import DSL.Out ( Out )
+import Data.Aeson.TH (defaultOptions, deriveJSON)
+import Effectful ( type (:>), Eff, IOE )
+import Effectful.Error.Static as E (Error)
 
-import qualified DSL.FileSystemEffect as IOI
-import qualified DSL.Internal.ApEvent as AE
-import DSL.Internal.ApEvent
-import DSL.Out
-import Effectful (Eff, IOE, (:>))
-import Effectful.Error.Static (Error, runError)
-import PyrethrumExtras (txt, uu)
-import DSL.FileSystemEffect
-
-type ApEffs = '[FileSystem, Out ApEvent, Error FSException, IOE]
-type Action a = Eff '[FileSystem, Out ApEvent, Error FSException, IOE] a
+type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
+type Action a = Eff '[FileSystem, Out ApEvent, E.Error FSException, IOE] a
 type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
 type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
 

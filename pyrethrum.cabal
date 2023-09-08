@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6706304fb1eb8484d8a60203aa6a649f28acd0e7a997ff7fa6e5d37b3ee9f450
+-- hash: 0231e5d009c33d7420e2a393a3e69eae52a5a9464dbb46ef0e0bc690437fe5e4
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -321,6 +321,7 @@ library examples
   exposed-modules:
       EffectfulDemoSpeakEffect
       EffectfulDemoSpeakIOInterpreterDynamic
+      PyrethrumDemoProject
       RunDemo
       AuxFiles
       Check

@@ -22,7 +22,7 @@ import Effectful as EF (
  )
 
 import DSL.FileSystemEffect (FileSystem (..))
-import DSL.Internal.ApEvent (ApEvent (..))
+import DSL.Internal.ApEvent (ApEvent (..), FLog (Step))
 import qualified Data.Text as T
 import Effectful.Dispatch.Dynamic (
   HasCallStack,
@@ -58,7 +58,7 @@ adaptException m = EF.liftIO m `catch` \(e :: SomeException) -> E.throwError . D
 -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
 
 logStep :: (Out ApEvent :> es) => Text -> Eff es ()
-logStep = out . Step
+logStep = out . Framework . Step
 
 docErrn :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, E.Error DocException :> es) => Text -> [Text] -> Eff es a
 docErrn funcName dscFrags =

@@ -146,7 +146,8 @@ data Fixture loc a where
     } ->
     Fixture C.EachParent ()
   EachResource' ::
-    forall loc a b. (C.EachParam loc) =>
+    forall loc a b.
+    (C.EachParam loc) =>
     { eachResourceParent :: Fixture loc a
     , eachSetup' :: a -> RunConfig -> Action b
     , eachTearDown' :: b -> Action ()
@@ -178,8 +179,8 @@ data Test where
     Test
   Full' ::
     forall i as ds loc a.
-    (C.ItemClass i ds) =>
-    { parent :: (C.EachParam loc) => Fixture loc a
+    (C.ItemClass i ds, C.EachParam loc) =>
+    { parent :: Fixture loc a
     , config :: TestConfig
     , childAction :: a -> RunConfig -> i -> Action as
     , parse :: as -> Either C.ParseException ds
@@ -188,8 +189,8 @@ data Test where
     Test
   NoParse' ::
     forall i ds loc a.
-    (C.ItemClass i ds) =>
-    { parent :: (C.EachParam loc) => Fixture loc a
+    (C.ItemClass i ds, C.EachParam loc) =>
+    { parent :: Fixture loc a
     , config :: TestConfig
     , childAction :: a -> RunConfig -> i -> Action ds
     , items :: RunConfig -> [i]
@@ -202,7 +203,8 @@ data Test where
     } ->
     Test
   Single' ::
-    { parent :: (C.EachParam loc) => Fixture loc a
+    (C.EachParam loc) =>
+    { parent :: Fixture loc a
     , config :: TestConfig
     , childSingleAction :: a -> RunConfig -> Action as
     , checks :: C.Checks as

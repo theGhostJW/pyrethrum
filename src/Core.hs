@@ -2,7 +2,7 @@
 
 module Core where
 
-import DSL.Internal.ApEvent
+import DSL.Internal.ApEvent hiding (Check)
 import Data.Aeson (FromJSON, ToJSON, Value (..), parseJSON, toJSON)
 
 import Data.Aeson.Types (ToJSON (..))
@@ -110,7 +110,7 @@ instance EachParam ThreadParent
 data EachParent
 instance EachParam EachParent
 
--- After events can not depend on any other fixtures 
+-- After events can not depend on any other fixtures
 -- before / after dependencies are implemented via Resource
 -- which provides a bracket like function
 
@@ -133,7 +133,7 @@ instance OnceAfterParam OnceAfter
 
 {-
 After Constraints:
- 
+
 OnceAfter Once    Y
 OnceAfter Thread  Y
 OnceAfter Each    Y
@@ -167,13 +167,17 @@ data AbstractFixture rc tc effs loc a where
     { onceAction :: rc -> Eff effs a
     } ->
     AbstractFixture rc tc effs OnceParent a
-  OnceBefore' :: forall rc tc effs loc a b. (OnceParam loc) =>
-    { onceParent ::  AbstractFixture rc tc effs loc a
+  OnceBefore' ::
+    forall rc tc effs loc a b.
+    (OnceParam loc) =>
+    { onceParent :: AbstractFixture rc tc effs loc a
     , onceAction' :: a -> rc -> Eff effs b
     } ->
     AbstractFixture rc tc effs OnceParent b
-  OnceAfter :: forall rc tc effs loc. (OnceAfterParam loc) =>
-    { onceBefore ::  AbstractFixture rc tc effs loc ()
+  OnceAfter ::
+    forall rc tc effs loc.
+    (OnceAfterParam loc) =>
+    { onceBefore :: AbstractFixture rc tc effs loc ()
     , onceAfter :: rc -> Eff effs ()
     } ->
     AbstractFixture rc tc effs OnceAfter ()
@@ -182,7 +186,9 @@ data AbstractFixture rc tc effs loc a where
     , onceTearDown :: a -> Eff effs ()
     } ->
     AbstractFixture rc tc effs OnceParent ()
-  OnceResource' :: forall rc tc effs loc a b. (OnceParam loc) =>
+  OnceResource' ::
+    forall rc tc effs loc a b.
+    (OnceParam loc) =>
     { onceResourceParent :: AbstractFixture rc tc effs loc a
     , onceSetup' :: a -> rc -> Eff effs b
     , onceTearDown' :: b -> Eff effs ()
@@ -193,12 +199,16 @@ data AbstractFixture rc tc effs loc a where
     { threadAction :: rc -> Eff effs a
     } ->
     AbstractFixture rc tc effs ThreadParent a
-  ThreadBefore' :: forall rc tc effs loc a b. (ThreadParam loc) =>
+  ThreadBefore' ::
+    forall rc tc effs loc a b.
+    (ThreadParam loc) =>
     { threadParent :: AbstractFixture rc tc effs loc a
     , threadAction' :: a -> rc -> Eff effs b
     } ->
     AbstractFixture rc tc effs ThreadParent b
-  ThreadAfter :: forall rc tc effs loc. (ThreadAfterParam loc) =>
+  ThreadAfter ::
+    forall rc tc effs loc.
+    (ThreadAfterParam loc) =>
     { threadBefore :: AbstractFixture rc tc effs loc ()
     , threadAfter :: rc -> Eff effs ()
     } ->
@@ -208,7 +218,9 @@ data AbstractFixture rc tc effs loc a where
     , threadTearDown :: a -> Eff effs ()
     } ->
     AbstractFixture rc tc effs ThreadParent ()
-  ThreadResource' :: forall rc tc effs loc a b. (ThreadParam loc) =>
+  ThreadResource' ::
+    forall rc tc effs loc a b.
+    (ThreadParam loc) =>
     { threadResourceParent :: AbstractFixture rc tc effs loc a
     , threadSetup' :: a -> rc -> Eff effs b
     , threadTearDown' :: b -> Eff effs ()
@@ -219,12 +231,16 @@ data AbstractFixture rc tc effs loc a where
     { eachAction :: rc -> Eff effs a
     } ->
     AbstractFixture rc tc effs EachParent a
-  EachBefore' :: forall rc tc effs loc a b. (EachParam loc) =>
+  EachBefore' ::
+    forall rc tc effs loc a b.
+    (EachParam loc) =>
     { eachParent :: AbstractFixture rc tc effs loc a
     , eachAction' :: a -> rc -> Eff effs b
     } ->
     AbstractFixture rc tc effs EachParent b
-  EachAfter :: forall rc tc effs loc. (EachAfterParam loc) =>
+  EachAfter ::
+    forall rc tc effs loc.
+    (EachAfterParam loc) =>
     { eachBefore :: AbstractFixture rc tc effs loc ()
     , eachAfter :: rc -> Eff effs ()
     } ->
@@ -234,7 +250,9 @@ data AbstractFixture rc tc effs loc a where
     , eachTearDown :: a -> Eff effs ()
     } ->
     AbstractFixture rc tc effs EachParent ()
-  EachResource' :: forall rc tc effs loc a b. (EachParam loc) =>
+  EachResource' ::
+    forall rc tc effs loc a b.
+    (EachParam loc) =>
     { eachResourceParent :: AbstractFixture rc tc effs loc a
     , eachSetup' :: a -> rc -> Eff effs b
     , eachTearDown' :: b -> Eff effs ()
@@ -253,8 +271,8 @@ data AbstractTest rc tc effs where
     } ->
     AbstractTest rc tc effs
   Full' ::
-    (ItemClass i ds) =>
-    { parentHook :: (EachParam loc) => AbstractFixture rc tc effs loc a
+    (ItemClass i ds, EachParam loc) =>
+    { parentHook :: AbstractFixture rc tc effs loc a
     , config :: tc
     , childAction :: a -> rc -> i -> Eff effs as
     , parse :: as -> Either ParseException ds
@@ -269,8 +287,8 @@ data AbstractTest rc tc effs where
     } ->
     AbstractTest rc tc effs
   NoParse' ::
-    (ItemClass i ds) =>
-    { parentHook :: (EachParam loc) => AbstractFixture rc tc effs loc a
+    (ItemClass i ds, EachParam loc) =>
+    { parentHook :: AbstractFixture rc tc effs loc a
     , config :: tc
     , childAction :: a -> rc -> i -> Eff effs ds
     , items :: rc -> [i]
@@ -283,12 +301,48 @@ data AbstractTest rc tc effs where
     } ->
     AbstractTest rc tc effs
   Single' ::
-    { parentHook :: (EachParam loc) => AbstractFixture rc tc effs loc a
+    (EachParam loc) =>
+    { parentHook :: AbstractFixture rc tc effs loc a
     , config :: tc
     , childSingleAction :: a -> rc -> Eff effs ds
     , checks :: Checks ds
     } ->
     AbstractTest rc tc effs
+
+data PreparedTest tc effs t = PreparedTest
+  { config :: tc
+  , items :: [t]
+  }
+
+prepTest' :: (ItemClass i ds) => [i] -> (i -> Eff effs as) -> (as -> Either ParseException ds) -> [Eff effs ()]
+prepTest' items action parse = uu
+
+prepareTest :: rc -> AbstractTest rc tc effs -> PreparedTest tc effs
+prepareTest rc = \case
+  Full{config, items, action, parse} ->
+    PreparedTest config $
+      items rc <&> (action rc >=>
+     (\ as
+        -> case parse as of
+             Left e -> E.throwError e
+             Right ds -> pure ()))
+  _ -> uu
+
+
+-- run 
+-- doc
+-- info
+
+-- Full'{items, childAction, config, parentHook} ->
+--   [uu| Full' |]
+-- NoParse{items, action, config} ->
+--   [uu| NoParse |]
+-- NoParse'{items, childAction, config, parentHook} ->
+--   [uu| NoParse' |]
+-- Single{singleAction, config} ->
+--   [uu| Single |]
+-- Single'{childSingleAction, config, parentHook} ->
+--   [uu| Single' |]
 
 -- try this
 -- part 1

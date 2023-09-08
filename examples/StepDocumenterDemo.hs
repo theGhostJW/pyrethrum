@@ -8,14 +8,13 @@ import DSL.Out
 import Data.List.Extra (isInfixOf)
 import Effectful (Eff, IOE, runEff, (:>))
 import Effectful.Error.Static (Error, runError)
-import Path (reldir, relfile, toFilePath, parseAbsFile, absdir)
-import PyrethrumExtras (Abs, File, Path, toS, txt, uu, (?), parseRelFileSafe)
+import Path (absdir, parseAbsFile, reldir, relfile, toFilePath)
+import PyrethrumExtras (Abs, File, Path, parseRelFileSafe, toS, txt, uu, (?))
 
 type FSOut es = (Out ApEvent :> es, FileSystem :> es)
 
-
 -- todo - use a more believable base fuunction
-demo :: forall es. FSOut es => Eff es ()
+demo :: forall es. (FSOut es) => Eff es ()
 demo = do
   paths <- getPaths
   chk paths
@@ -48,7 +47,6 @@ demo3 = do
   chk :: a -> Eff es ()
   chk _ = log "This is a check demo 3"
 
-
 -- $> runDemo3
 runDemo3 :: IO (Either (CallStack, DII.DocException) ())
 runDemo3 = docRun demo3
@@ -63,7 +61,7 @@ apEventOut :: forall a es. (IOE :> es) => Eff (Out ApEvent : es) a -> Eff es a
 apEventOut = runOut print
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
-log = out . Log
+log = out . User . Log
 
 getPaths :: (Out ApEvent :> es, FileSystem :> es) => Eff es [Path Abs File]
 getPaths = do
@@ -77,7 +75,7 @@ getPaths = do
 
 data PathResult = PathResult
   { title :: Text
-  , moreOutput ::  [Path Abs File]
+  , moreOutput :: [Path Abs File]
   , paths :: [Path Abs File]
   }
 
@@ -88,8 +86,8 @@ getPathsData = do
   output <- walkDirAccum Nothing (\root subs files -> pure files) [absdir|C:\Pyrethrum|]
   r <- test p
   log $ r ? "yes" $ "no"
-  pure $
-    PathResult
+  pure
+    $ PathResult
       { title = "Hi"
       , moreOutput = output
       , paths = p

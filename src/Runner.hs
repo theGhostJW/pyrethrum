@@ -249,7 +249,7 @@ mkSem rp@RunParams {suite, filters, rc, itemRunner} =
         offset' <- utcOffset
         logItem . StartRun (RunTitle $ getField @"title" rc) offset' $ toJSON rc
         logItem $ FilterLog lg
-        mapM_ (exeElm included rootAddress ()) (rCmp.suitItems)
+        mapM_ (exeElm included rootAddress ()) rCmp.suitItems
         logItem EndRun
 
       lgError :: Text -> Sem effs ()

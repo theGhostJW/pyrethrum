@@ -3,9 +3,8 @@
 module Core where
 
 import DSL.Internal.ApEvent hiding (Check)
-import Data.Aeson (FromJSON, ToJSON, Value (..), parseJSON, toJSON)
+import Data.Aeson (FromJSON, ToJSON (..), Value (..), parseJSON, toJSON)
 
-import Data.Aeson.Types (ToJSON (..))
 import qualified Data.DList as DL
 import Effectful (Eff, Effect)
 import qualified Effectful.Error.Dynamic as E
@@ -13,7 +12,6 @@ import Effectful.Internal.Effect ((:>))
 import Effectful.TH (makeEffect)
 import GHC.Records (HasField)
 import GHC.Show (Show (..))
-import qualified Internal.PreNode as PN
 import PyrethrumExtras (toS, uu)
 
 newtype CheckFailure = CheckFailure Text
@@ -310,6 +308,15 @@ data AbstractTest rc tc effs where
     AbstractTest rc tc effs
 
 
+  -- Test :: {
+  --    config :: tc
+  --   , childAction :: a -> rc -> i -> Eff effs as
+  --   , parse :: as -> Either ParseException ds
+  --   , items :: rc -> [i]
+  --   } ->
+  --   AbstractPreNode rc tc effs
+ 
+
 -- data PreNode i where
 --   Hook ::
 --     { title :: Text
@@ -346,8 +353,7 @@ data AbstractTest rc tc effs where
 --              Right ds -> pure ()))
 --   _ -> uu
 
-
--- run 
+-- run
 -- doc
 -- info
 

@@ -202,78 +202,85 @@ data Test where
     } ->
     Test
 
-data PreNode i where
-  Before ::
-    { title :: Text
-    , cardinality :: Cardinality
-    , action :: RunConfig -> Eff effs o
-    , subNodes :: [AbstractPreNode o]
+data Suite o where
+  Node ::
+    { path :: C.Path
+    , fixture :: Fixture loc o
+    , subNodes :: [Suite a]
     } ->
-    PreNode i
-  Before' ::
-    { title :: Text
-    , cardinality :: Cardinality
-    , childAction :: i -> RunConfig -> Eff effs o
-    , subNodes :: [PreNode o]
-    } ->
-    PreNode i
-  After ::
-    { title :: Text
-    , cardinality :: Cardinality
-    , before :: PreNode i
-    , after :: RunConfig -> Eff effs ()
-    } ->
-    PreNode i
-  Resource ::
-    { title :: Text
-    , cardinality :: Cardinality
-    , setUp :: RunConfig -> Eff effs a
-    , tearDown :: a -> Eff effs ()
-    } ->
-    PreNode i
+    Suite ()
 
+-- data PreNode i where
+--   Before ::
+--     { title :: Text
+--     , cardinality :: Cardinality
+--     , action :: RunConfig -> Eff effs o
+--     , subNodes :: [AbstractPreNode o]
+--     } ->
+--     PreNode i
+--   Before' ::
+--     { title :: Text
+--     , cardinality :: Cardinality
+--     , childAction :: i -> RunConfig -> Eff effs o
+--     , subNodes :: [PreNode o]
+--     } ->
+--     PreNode i
+--   After ::
+--     { title :: Text
+--     , cardinality :: Cardinality
+--     , before :: PreNode i
+--     , after :: RunConfig -> Eff effs ()
+--     } ->
+--     PreNode i
+--   Resource ::
+--     { title :: Text
+--     , cardinality :: Cardinality
+--     , setUp :: RunConfig -> Eff effs a
+--     , tearDown :: a -> Eff effs ()
+--     } ->
+--     PreNode i
 
-data PreNode i where
-  Before ::
-    { title :: Text
-    , cardinality :: Cardinality
-    , action :: RunConfig -> Eff effs o
-    , subNodes :: [AbstractPreNode rc tc m o]
-    } ->
-    AbstractPreNode rc tc m i
-  Before' ::
-    { title :: Text
-    , cardinality :: Cardinality
-    , childAction :: i -> rc -> m o
-    , subNodes :: [AbstractPreNode rc tc m o]
-    } ->
-    AbstractPreNode rc tc m i
-  After ::
-    { title :: Text
-    , cardinality :: Cardinality
-    , before :: AbstractPreNode rc tc m i
-    , after :: rc -> m ()
-    } ->
-    AbstractPreNode rc tc m i
-  Resource ::
-    { title :: Text
-    , cardinality :: Cardinality
-    , setUp :: rc -> m a
-    , tearDown :: a -> m ()
-    } ->
-    AbstractPreNode rc tc m i
-  Test ::
-    { config :: tc
-    , items :: [AbstractTestItem rc tc m i]
-    } ->
-    AbstractPreNode rc tc m ()
+-- data PreNode i where
+--   Before ::
+--     { title :: Text
+--     , cardinality :: Cardinality
+--     , action :: RunConfig -> Eff effs o
+--     , subNodes :: [AbstractPreNode rc tc m o]
+--     } ->
+--     AbstractPreNode rc tc m i
+--   Before' ::
+--     { title :: Text
+--     , cardinality :: Cardinality
+--     , childAction :: i -> rc -> m o
+--     , subNodes :: [AbstractPreNode rc tc m o]
+--     } ->
+--     AbstractPreNode rc tc m i
+--   After ::
+--     { title :: Text
+--     , cardinality :: Cardinality
+--     , before :: AbstractPreNode rc tc m i
+--     , after :: rc -> m ()
+--     } ->
+--     AbstractPreNode rc tc m i
+--   Resource ::
+--     { title :: Text
+--     , cardinality :: Cardinality
+--     , setUp :: rc -> m a
+--     , tearDown :: a -> m ()
+--     } ->
+--     AbstractPreNode rc tc m i
+--   Test ::
+--     { config :: tc
+--     , items :: [AbstractTestItem rc tc m i]
+--     } ->
+--     AbstractPreNode rc tc m ()
 
-data AbstractTestItem rc tc m i = TestItem
-  { id :: Int
-  , title :: Text
-  , test :: rc -> i -> m ()
-  , chkText :: Text
-  }
+-- data AbstractTestItem rc tc m i = TestItem
+--   { id :: Int
+--   , title :: Text
+--   , test :: rc -> i -> m ()
+--   , chkText :: Text
+--   }
 
 mkAbstractTest :: Test -> C.AbstractTest RunConfig TestConfig ApEffs
 mkAbstractTest = \case

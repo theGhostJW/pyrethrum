@@ -307,66 +307,18 @@ data AbstractTest rc tc effs where
     } ->
     AbstractTest rc tc effs
 
+data Path = Path
+  { module' :: Text
+  , name :: Text
+  }
 
-  -- Test :: {
-  --    config :: tc
-  --   , childAction :: a -> rc -> i -> Eff effs as
-  --   , parse :: as -> Either ParseException ds
-  --   , items :: rc -> [i]
-  --   } ->
-  --   AbstractPreNode rc tc effs
- 
-
--- data PreNode i where
---   Hook ::
---     { title :: Text
---     , threadLimit :: Maybe Int
---     , onceHook :: OnceHook a oi oo
---     , threadHook :: ThreadHook a oo ti to
---     , subNodes :: NonEmpty (PreNode a oo to)
---     } ->
---     PreNode a oi ti
---   Fixtures ::
---     { title :: Text
---     , threadLimit :: Maybe Int
---     , testHook :: TestHook a oi ti () tsto
---     , fixtures :: NonEmpty (Fixture a oi ti tsto)
---     } ->
---     PreNode a oi ti
-
--- data PreparedTest tc effs t = PreparedTest
---   { config :: tc
---   , items :: [t]
---   }
-
--- prepTest' :: (ItemClass i ds) => [i] -> (i -> Eff effs as) -> (as -> Either ParseException ds) -> [Eff effs ()]
--- prepTest' items action parse = uu
-
--- prepareTest :: rc -> AbstractTest rc tc effs -> PreparedTest tc effs (Eff effs ())
--- prepareTest rc = \case
---   Full{config, items, action, parse} ->
---     PreparedTest config $
---       items rc <&> (action rc >=>
---      (\ as
---         -> case parse as of
---              Left e -> E.throwError e
---              Right ds -> pure ()))
---   _ -> uu
-
--- run
--- doc
--- info
-
--- Full'{items, childAction, config, parentHook} ->
---   [uu| Full' |]
--- NoParse{items, action, config} ->
---   [uu| NoParse |]
--- NoParse'{items, childAction, config, parentHook} ->
---   [uu| NoParse' |]
--- Single{singleAction, config} ->
---   [uu| Single |]
--- Single'{childSingleAction, config, parentHook} ->
---   [uu| Single' |]
+data AbstractSuite rc tc effs o where
+  Root ::
+    { path :: Path
+    , fixture :: AbstractFixture rc tc effs loc o
+    , subNodes :: [AbstractSuite rc tc effs a]
+    } ->
+    AbstractSuite rc tc effs ()
 
 -- try this
 -- part 1

@@ -1,14 +1,15 @@
 module PyrethrumDemoTest where
 
-import Core (Checks, Each, OnceParam, Once, ParseException, Thread, chk)
+import Core (Checks, Each, Once, OnceParam, ParseException, Path (..), Thread, chk)
 import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, IOE, (:>))
 import PyrethrumDemoProject (
+  Action,
   Depth (DeepRegression),
   Fixture (..),
   RunConfig (..),
-  Action,
+  Suite (..),
   Test (..),
   TestConfig (TestConfig),
   TestFixture,
@@ -25,14 +26,11 @@ intOnceHook =
     { onceAction = \rc -> pure 1
     }
 
-
---  this should not compile
 addOnceIntHook :: Fixture Once Int
 addOnceIntHook =
   OnceBefore'
-    { 
-    -- onceParent = intThreadHook
-    onceParent = intOnceHook
+    { -- onceParent = intThreadHook
+      onceParent = intOnceHook
     , onceAction' =
         \i rc -> do
           log $ "beforeAll' " <> txt i
@@ -229,12 +227,46 @@ test5 =
       , checks = chk "the value must be 1" ((== 1) . (.value))
       }
 
+-- ############### Suite ###################
+suite :: Suite ()
+suite =
+  Node
+    { path = Path "module" "name"
+    , fixture = intOnceHook
+    , subNodes =
+        [ Node
+            { path = Path "module" "name"
+            , fixture = addOnceIntHook
+            , subNodes =
+                [ Node
+                    { path = Path "module" "name"
+                    , fixture = infoThreadHook
+                    , subNodes =
+                        [ Node
+                            { path = Path "module" "name"
+                            , fixture = addOnceIntHook
+                            , subNodes =
+                                [ Node
+                                    { path = Path "module" "name"
+                                    , fixture = eachInfoResource
+                                    , subNodes =
+                                        []
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+
 {-
--- TODO: review bracket 
+-- TODO: review bracket
 
 -- TODO : stubs:
   - reinstate runner => Actions
-     - indivdual tests ? 
+     - indivdual tests ?
   - PreNode2 - what format
   - execution Exetre
 

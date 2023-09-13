@@ -7,7 +7,6 @@ import DSL.Out (Out)
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Effectful (Eff, IOE, type (:>))
 import Effectful.Error.Static as E (Error)
-import PreNode
 
 type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
 type Action a = Eff '[FileSystem, Out ApEvent, E.Error FSException, IOE] a
@@ -47,119 +46,132 @@ instance C.Config TestConfig
 
 -- type Fixture a = AbstractFixture RunConfig TestConfig ApEffs a
 
-data Fixture loc a where
+data Fixture loc i o where
   -- once hooks
   OnceBefore ::
-    { onceAction :: RunConfig -> Action a
+    { onceAction :: RunConfig -> Action o
     } ->
-    Fixture C.Once a
+    Fixture C.Once () o
   OnceBefore' ::
-    forall loc a b.
+    -- forall loc a b.
     (C.OnceParam loc) =>
-    { onceParent :: Fixture loc a
-    , onceAction' :: a -> RunConfig -> Action b
+    { onceParent :: Fixture loc pi i
+    , onceAction' :: i -> RunConfig -> Action o
     } ->
-    Fixture C.Once b
+    Fixture C.Once i o
   OnceAfter ::
     forall loc.
     (C.OnceAfterParam loc) =>
-    { onceBefore :: Fixture loc ()
+    { onceBefore :: Fixture loc () ()
     , onceAfter :: RunConfig -> Action ()
     } ->
-    Fixture C.OnceAfter ()
+    Fixture C.OnceAfter () ()
   OnceResource ::
-    { onceSetup :: RunConfig -> Action a
-    , onceTearDown :: a -> Action ()
+    { onceSetup :: RunConfig -> Action o
+    , onceTearDown :: o -> Action ()
     } ->
-    Fixture C.Once ()
+    Fixture C.Once () o
   OnceResource' ::
-    forall loc a b.
+    -- forall loc a b.
     (C.OnceParam loc) =>
-    { onceResourceParent :: Fixture loc a
-    , onceSetup' :: a -> RunConfig -> Action b
-    , onceTearDown' :: b -> Action ()
+    { onceResourceParent :: Fixture loc pi i
+    , onceSetup' :: i -> RunConfig -> Action o
+    , onceTearDown' :: o -> Action ()
     } ->
-    Fixture C.Once a
+    Fixture C.Once i o
   -- once per thread hooks
   ThreadBefore ::
-    { threadAction :: RunConfig -> Action a
+    { threadAction :: RunConfig -> Action o
     } ->
-    Fixture C.Thread a
+    Fixture C.Thread () o
   ThreadBefore' ::
-    forall loc a b.
+    -- forall loc a b.
     (C.ThreadParam loc) =>
-    { threadParent :: Fixture loc a
-    , threadAction' :: a -> RunConfig -> Action b
+    { threadParent :: Fixture loc pi i
+    , threadAction' :: i -> RunConfig -> Action o
     } ->
-    Fixture C.Thread b
+    Fixture C.Thread i o
   ThreadAfter ::
-    forall loc.
+    -- forall loc.
+    -- TODO: check this should probably be test
     (C.ThreadAfterParam loc) =>
-    { threadBefore :: Fixture loc ()
+    { threadBefore :: Fixture loc pi ()
     , threadAfterAction :: RunConfig -> Action ()
     } ->
-    Fixture C.ThreadAfter ()
+    Fixture C.ThreadAfter () ()
   ThreadResource ::
-    { threadSetup :: RunConfig -> Action a
+    { threadSetup :: RunConfig -> Action o
     , threadTearDown :: a -> Action ()
     } ->
-    Fixture C.Thread ()
+    Fixture C.Thread () o
   ThreadResource' ::
-    forall loc a b.
+    -- forall loc a b.
     (C.ThreadParam loc) =>
-    { threadResourceParent :: Fixture loc a
-    , threadSetup' :: a -> RunConfig -> Action b
-    , threadTearDown' :: b -> Action ()
+    { threadResourceParent :: Fixture loc pi i
+    , threadSetup' :: i -> RunConfig -> Action o
+    , threadTearDown' :: o -> Action ()
     } ->
-    Fixture C.Thread a
+    Fixture C.Thread i o
   -- each hooks
   EachBefore ::
-    { eachAction :: RunConfig -> Action a
+    { eachAction :: RunConfig -> Action o
     } ->
-    Fixture C.Each a
+    Fixture C.Each () o
   EachBefore' ::
-    forall loc a b.
+    -- forall loc a b.
     (C.EachParam loc) =>
-    { eachParent :: Fixture loc a
-    , eachAction' :: a -> RunConfig -> Action b
+    { eachParent :: Fixture loc pi i
+    , eachAction' :: i -> RunConfig -> Action o
     } ->
-    Fixture C.Each b
+    Fixture C.Each i o
   EachAfter ::
-    forall loc.
     (C.EachAfterParam loc) =>
-    { eachBefore :: Fixture loc ()
+    { eachBefore :: Fixture loc () ()
     , eachAfterAction :: RunConfig -> Action ()
     } ->
-    Fixture C.EachAfter ()
+    Fixture C.EachAfter () ()
   EachResource ::
-    { eachSetup :: RunConfig -> Action a
-    , eachTearDown :: a -> Action ()
+    { eachSetup :: RunConfig -> Action o
+    , eachTearDown :: o -> Action ()
     } ->
-    Fixture C.Each ()
+    Fixture C.Each () o
   EachResource' ::
-    forall loc a b.
     (C.EachParam loc) =>
-    { eachResourceParent :: Fixture loc a
-    , eachSetup' :: a -> RunConfig -> Action b
-    , eachTearDown' :: b -> Action ()
+    { eachResourceParent :: Fixture loc pi i
+    , eachSetup' :: i -> RunConfig -> Action o
+    , eachTearDown' :: o -> Action ()
     } ->
-    Fixture C.Each a
+    Fixture C.Each i o
   Test ::
-    { test :: Test
+    { test :: Test ()
     } ->
-    Fixture C.Test ()
+    Fixture C.Test () ()
+  Test' ::
+    { test' :: Test i
+    } ->
+    Fixture C.Test i ()
 
 type TestFixture = Fixture C.Test ()
-data Test where
+data Test hi where
   Full ::
-    forall i as ds.
+    -- forall i as ds.
     (C.ItemClass i ds) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Action as
     , parse :: as -> Either C.ParseException ds
     , items :: RunConfig -> [i]
     } ->
-    Test
+    Test ()
+  Full' ::
+    -- forall i as ds loc a.
+    (C.ItemClass i ds, C.EachParam loc) =>
+    { parent :: Fixture loc pi a
+    , config' :: TestConfig
+    , childAction :: a -> RunConfig -> i -> Action as
+    , parse' :: as -> Either C.ParseException ds
+    , items' :: RunConfig -> [i]
+    } ->
+    Test a
   NoParse ::
     forall i ds.
     (C.ItemClass i ds) =>
@@ -167,48 +179,38 @@ data Test where
     , action :: RunConfig -> i -> Action ds
     , items :: RunConfig -> [i]
     } ->
-    Test
-  Full' ::
-    forall i as ds loc a.
-    (C.ItemClass i ds, C.EachParam loc) =>
-    { parent :: Fixture loc a
-    , config :: TestConfig
-    , childAction :: a -> RunConfig -> i -> Action as
-    , parse :: as -> Either C.ParseException ds
-    , items :: RunConfig -> [i]
-    } ->
-    Test
+    Test ()
   NoParse' ::
-    forall i ds loc a.
+    -- forall i ds loc a.
     (C.ItemClass i ds, C.EachParam loc) =>
-    { parent :: Fixture loc a
-    , config :: TestConfig
+    { parent :: Fixture loc pi a
+    , config' :: TestConfig
     , childAction :: a -> RunConfig -> i -> Action ds
-    , items :: RunConfig -> [i]
+    , items' :: RunConfig -> [i]
     } ->
-    Test
+    Test a
   Single ::
     { config :: TestConfig
     , singleAction :: RunConfig -> Action as
     , checks :: C.Checks as
     } ->
-    Test
+    Test ()
   Single' ::
     (C.EachParam loc) =>
-    { parent :: Fixture loc a
-    , config :: TestConfig
+    { parent :: Fixture loc pi a
+    , config' :: TestConfig
     , childSingleAction :: a -> RunConfig -> Action as
-    , checks :: C.Checks as
+    , checks' :: C.Checks as
     } ->
-    Test
+    Test a
 
-data Suite o where
+data Suite i where
   Node ::
     { path :: C.Path
-    , fixture :: Fixture loc o
-    , subNodes :: [Suite a]
+    , fixture :: Fixture loc pi i
+    , subNodes :: [Suite i]
     } ->
-    Suite ()
+    Suite i
 
 -- data PreNode i where
 --   Before ::
@@ -282,16 +284,16 @@ data Suite o where
 --   , chkText :: Text
 --   }
 
-mkAbstractTest :: Test -> C.AbstractTest RunConfig TestConfig ApEffs
+mkAbstractTest :: Test hi -> C.AbstractTest RunConfig TestConfig ApEffs hi
 mkAbstractTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
-  Full'{..} -> C.Full' (mkAbstractFx parent) config childAction parse items
-  NoParse'{..} -> C.NoParse' (mkAbstractFx parent) config childAction items
+  Full'{..} -> C.Full' (mkAbstractFx parent) config' childAction parse' items'
+  NoParse'{..} -> C.NoParse' (mkAbstractFx parent) config' childAction items'
   Single{..} -> C.Single{..}
-  Single'{..} -> C.Single' (mkAbstractFx parent) config childSingleAction checks
+  Single'{..} -> C.Single' (mkAbstractFx parent) config' childSingleAction checks'
 
-mkAbstractFx :: Fixture loc a -> C.AbstractFixture RunConfig TestConfig ApEffs loc a
+mkAbstractFx :: Fixture loc i o -> C.AbstractFixture RunConfig TestConfig ApEffs loc i o
 mkAbstractFx = \case
   OnceBefore{..} -> C.OnceBefore{..}
   OnceBefore'{..} -> C.OnceBefore' (mkAbstractFx onceParent) onceAction'

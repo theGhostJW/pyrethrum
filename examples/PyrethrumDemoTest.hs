@@ -175,12 +175,12 @@ test3 =
   Test
     $ Full'
       { parent = eachIntBefore
-      , config = TestConfig "test" DeepRegression
+      , config' = TestConfig "test" DeepRegression
       , childAction = \i rc itm -> do
           log $ txt itm
           pure $ AS (itm.value + 1 + i) $ txt itm.value
-      , parse = \AS{..} -> pure DS{..}
-      , items =
+      , parse' = \AS{..} -> pure DS{..}
+      , items' =
           const
             [ Item2
                 { id = 1
@@ -228,6 +228,7 @@ test5 =
       }
 
 -- ############### Suite ###################
+-- TODO: include type changing hooks
 suite :: Suite ()
 suite =
   Node

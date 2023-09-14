@@ -112,10 +112,10 @@ instance EachParam Each
 -- before / after dependencies are implemented via Resource
 -- which provides a bracket like function
 
-data Test
-instance EachAfterParam Test
-instance ThreadAfterParam Test
-instance OnceAfterParam Test
+-- data Test
+-- instance EachAfterParam Test
+-- instance ThreadAfterParam Test
+-- instance OnceAfterParam Test
 
 data EachAfter
 instance EachAfterParam EachAfter
@@ -257,7 +257,7 @@ data AbstractFixture rc tc effs loc i o where
     } ->
     AbstractFixture rc tc effs Each i o
   -- test
-  Test :: {test :: AbstractTest rc tc effs i} -> AbstractFixture rc tc effs Test i ()
+  -- Test :: {test :: AbstractTest rc tc effs i} -> AbstractFixture rc tc effs Test i ()
 
 data AbstractTest rc tc effs hi where
   Full ::

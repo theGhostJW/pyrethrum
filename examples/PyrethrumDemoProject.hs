@@ -142,16 +142,16 @@ data Fixture loc i o where
     , eachTearDown' :: o -> Action ()
     } ->
     Fixture C.Each i o
-  Test ::
-    { test :: Test i
-    } ->
-    Fixture C.Test i ()
+  -- Test ::
+  --   { test :: Test i
+  --   } ->
+  --   Fixture C.Test i ()
   -- Test' ::
   --   { test' :: Test i
   --   } ->
   --   Fixture C.Test i ()
 
-type TestFixture i = Fixture C.Test i ()
+-- type TestFixture i = Fixture C.Test i ()
 data Test hi where
   Full ::
     -- forall i as ds.
@@ -284,6 +284,7 @@ data Suite i where
     , subNodes :: [Suite i]
     } ->
     Suite i
+  -}
 
 mkAbstractTest :: Test hi -> C.AbstractTest RunConfig TestConfig ApEffs hi
 mkAbstractTest = \case
@@ -316,6 +317,5 @@ mkAbstractFx = \case
   EachAfter{..} -> C.EachAfter (mkAbstractFx eachBefore) eachAfterAction
   EachResource{..} -> C.EachResource{..}
   EachResource'{eachResourceParent, eachSetup', eachTearDown'} -> C.EachResource' (mkAbstractFx eachResourceParent) eachSetup' eachTearDown'
-  Test{test} -> C.Test $ mkAbstractTest test
 
-  -}
+

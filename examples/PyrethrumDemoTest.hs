@@ -12,7 +12,6 @@ import PyrethrumDemoProject (
   -- Suite (..),
   Test (..),
   TestConfig (TestConfig),
-  TestFixture,
  )
 import PyrethrumExtras (txt)
 import RunElementClasses (AddressElemType (Hook))
@@ -75,9 +74,9 @@ eachIntBefore =
     }
 
 -- ############### Test the Lot ###################
-test :: TestFixture ()
+test :: Test ()
 test =
-  Test $ Full config action parse items
+  Full config action parse items
 
 config :: TestConfig
 config = TestConfig "test" DeepRegression
@@ -121,9 +120,9 @@ items =
     ]
 
 -- ############### Test the Lot Child ###################
-test2 :: TestFixture HookInfo
+test2 :: Test HookInfo
 test2 =
-  Test $ Full' infoThreadHook config2 action2 parse2 items2
+  Full' infoThreadHook config2 action2 parse2 items2
 
 config2 :: TestConfig
 config2 = TestConfig "test" DeepRegression
@@ -170,62 +169,59 @@ items2 =
     ]
 
 -- ############### Test the Lot (Record) ###################
-test3 :: TestFixture Int
+test3 :: Test Int
 test3 =
-  Test
-    $ Full'
-      { parent = eachIntBefore
-      , config' = TestConfig "test" DeepRegression
-      , childAction = \i rc itm -> do
-          log $ txt itm
-          pure $ AS (itm.value + 1 + i) $ txt itm.value
-      , parse' = \AS{..} -> pure DS{..}
-      , items' =
-          const
-            [ Item2
-                { id = 1
-                , title = "test the value is one"
-                , value = 2
-                , checks = chk "test" ((== 1) . (.value))
-                }
-            ]
-      }
+  Full'
+    { parent = eachIntBefore
+    , config' = TestConfig "test" DeepRegression
+    , childAction = \i rc itm -> do
+        log $ txt itm
+        pure $ AS (itm.value + 1 + i) $ txt itm.value
+    , parse' = \AS{..} -> pure DS{..}
+    , items' =
+        const
+          [ Item2
+              { id = 1
+              , title = "test the value is one"
+              , value = 2
+              , checks = chk "test" ((== 1) . (.value))
+              }
+          ]
+    }
 
 -- ############### Test NoParse (Record) ###################
-test4 :: TestFixture ()
+test4 :: Test ()
 test4 =
-  Test
-    $ NoParse
-      { config = TestConfig "test" DeepRegression
-      , action = \rc itm -> do
-          log $ txt itm
-          pure $ DS (itm.value + 1) $ txt itm.value
-      , items =
-          const
-            [ Item2
-                { id = 1
-                , title = "test the value is one"
-                , value = 2
-                , checks = chk "test" ((== 1) . (.value))
-                }
-            ]
-      }
+  NoParse
+    { config = TestConfig "test" DeepRegression
+    , action = \rc itm -> do
+        log $ txt itm
+        pure $ DS (itm.value + 1) $ txt itm.value
+    , items =
+        const
+          [ Item2
+              { id = 1
+              , title = "test the value is one"
+              , value = 2
+              , checks = chk "test" ((== 1) . (.value))
+              }
+          ]
+    }
 
 -- ############### Test Single (Record) ###################
-test5 :: TestFixture ()
+test5 :: Test ()
 test5 =
-  Test
-    $ Single
-      { config = TestConfig "test" DeepRegression
-      , singleAction = \rc -> do
-          log $ "RunConfig is: " <> rc.title
-          pure
-            $ DS
-              { value = 1
-              , valTxt = rc.title
-              }
-      , checks = chk "the value must be 1" ((== 1) . (.value))
-      }
+  Single
+    { config = TestConfig "test" DeepRegression
+    , singleAction = \rc -> do
+        log $ "RunConfig is: " <> rc.title
+        pure
+          $ DS
+            { value = 1
+            , valTxt = rc.title
+            }
+    , checks = chk "the value must be 1" ((== 1) . (.value))
+    }
 
 -- ############### Suite ###################
 -- TODO: include type changing hooks

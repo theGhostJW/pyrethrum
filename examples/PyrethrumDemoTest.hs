@@ -9,7 +9,7 @@ import PyrethrumDemoProject (
   Depth (DeepRegression),
   Fixture (..),
   RunConfig (..),
-  Suite (..),
+  -- Suite (..),
   Test (..),
   TestConfig (TestConfig),
   TestFixture,
@@ -20,13 +20,13 @@ import RunElementClasses (AddressElemType (Hook))
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
-intOnceHook :: Fixture Once Int
+intOnceHook :: Fixture Once () Int
 intOnceHook =
   OnceBefore
     { onceAction = \rc -> pure 1
     }
 
-addOnceIntHook :: Fixture Once Int
+addOnceIntHook :: Fixture Once Int Int
 addOnceIntHook =
   OnceBefore'
     { -- onceParent = intThreadHook
@@ -37,7 +37,7 @@ addOnceIntHook =
           pure $ i + 1
     }
 
-intThreadHook :: Fixture Thread Int
+intThreadHook :: Fixture Thread () Int
 intThreadHook = ThreadBefore $ \rc -> do
   log "deriving meaning of life' "
   pure 42
@@ -48,12 +48,12 @@ data HookInfo = HookInfo
   }
   deriving (Show, Generic)
 
-infoThreadHook :: Fixture Thread HookInfo
+infoThreadHook :: Fixture Thread Int HookInfo
 infoThreadHook = ThreadBefore' addOnceIntHook $ \i rc -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
-eachInfoResource :: Fixture Each HookInfo
+eachInfoResource :: Fixture Each HookInfo Int
 eachInfoResource =
   EachResource'
     { eachResourceParent = infoThreadHook
@@ -65,17 +65,17 @@ eachInfoResource =
         pure ()
     }
 
-eachIntBefore :: Fixture Each Int
+eachIntBefore :: Fixture Each Int Int
 eachIntBefore =
   EachBefore'
     { eachParent = eachInfoResource
     , eachAction' = \hi rc -> do
         log "eachSetup"
-        pure $ hi.value + 1
+        pure $ hi + 1
     }
 
 -- ############### Test the Lot ###################
-test :: TestFixture
+test :: TestFixture ()
 test =
   Test $ Full config action parse items
 
@@ -121,7 +121,7 @@ items =
     ]
 
 -- ############### Test the Lot Child ###################
-test2 :: TestFixture
+test2 :: TestFixture HookInfo
 test2 =
   Test $ Full' infoThreadHook config2 action2 parse2 items2
 
@@ -170,7 +170,7 @@ items2 =
     ]
 
 -- ############### Test the Lot (Record) ###################
-test3 :: TestFixture
+test3 :: TestFixture Int
 test3 =
   Test
     $ Full'
@@ -192,7 +192,7 @@ test3 =
       }
 
 -- ############### Test NoParse (Record) ###################
-test4 :: TestFixture
+test4 :: TestFixture ()
 test4 =
   Test
     $ NoParse
@@ -212,7 +212,7 @@ test4 =
       }
 
 -- ############### Test Single (Record) ###################
-test5 :: TestFixture
+test5 :: TestFixture ()
 test5 =
   Test
     $ Single
@@ -229,6 +229,8 @@ test5 =
 
 -- ############### Suite ###################
 -- TODO: include type changing hooks
+
+{-
 suite :: Suite ()
 suite =
   Node
@@ -261,6 +263,7 @@ suite =
             }
         ]
     }
+-}
 
 {-
 -- TODO: review bracket

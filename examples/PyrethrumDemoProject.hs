@@ -143,15 +143,15 @@ data Fixture loc i o where
     } ->
     Fixture C.Each i o
   Test ::
-    { test :: Test ()
-    } ->
-    Fixture C.Test () ()
-  Test' ::
-    { test' :: Test i
+    { test :: Test i
     } ->
     Fixture C.Test i ()
+  -- Test' ::
+  --   { test' :: Test i
+  --   } ->
+  --   Fixture C.Test i ()
 
-type TestFixture = Fixture C.Test ()
+type TestFixture i = Fixture C.Test i ()
 data Test hi where
   Full ::
     -- forall i as ds.
@@ -203,14 +203,6 @@ data Test hi where
     , checks' :: C.Checks as
     } ->
     Test a
-
-data Suite i where
-  Node ::
-    { path :: C.Path
-    , fixture :: Fixture loc pi i
-    , subNodes :: [Suite i]
-    } ->
-    Suite i
 
 -- data PreNode i where
 --   Before ::
@@ -284,6 +276,15 @@ data Suite i where
 --   , chkText :: Text
 --   }
 
+{-
+data Suite i where
+  Node ::
+    { path :: C.Path
+    , fixture :: Fixture loc pi i
+    , subNodes :: [Suite i]
+    } ->
+    Suite i
+
 mkAbstractTest :: Test hi -> C.AbstractTest RunConfig TestConfig ApEffs hi
 mkAbstractTest = \case
   Full{..} -> C.Full{..}
@@ -316,3 +317,5 @@ mkAbstractFx = \case
   EachResource{..} -> C.EachResource{..}
   EachResource'{eachResourceParent, eachSetup', eachTearDown'} -> C.EachResource' (mkAbstractFx eachResourceParent) eachSetup' eachTearDown'
   Test{test} -> C.Test $ mkAbstractTest test
+
+  -}

@@ -159,105 +159,105 @@ data Addressed a = Addressed
 
 -- TODO: error messages when hooks are wrong
 
-data AbstractFixture rc tc effs loc i o where
+data AbstractHook rc tc effs loc i o where
   -- once hooks
   OnceBefore ::
     { onceAction :: rc -> Eff effs o
     } ->
-    AbstractFixture rc tc effs Once () o
+    AbstractHook rc tc effs Once () o
   OnceBefore' ::
     -- forall rc tc effs loc i o.
     (OnceParam loc) =>
-    { onceParent :: AbstractFixture rc tc effs loc pi i
+    { onceParent :: AbstractHook rc tc effs loc pi i
     , onceAction' :: i -> rc -> Eff effs o
     } ->
-    AbstractFixture rc tc effs Once i o
+    AbstractHook rc tc effs Once i o
   OnceAfter ::
     -- forall rc tc effs loc.
     (OnceAfterParam loc) =>
-    { onceBefore :: AbstractFixture rc tc effs loc pi ()
+    { onceBefore :: AbstractHook rc tc effs loc pi ()
     , onceAfter :: rc -> Eff effs ()
     } ->
-    AbstractFixture rc tc effs OnceAfter () ()
+    AbstractHook rc tc effs OnceAfter () ()
   OnceResource ::
     { onceSetup :: rc -> Eff effs o
     , onceTearDown :: o -> Eff effs ()
     } ->
-    AbstractFixture rc tc effs Once () o
+    AbstractHook rc tc effs Once () o
   OnceResource' ::
     -- forall rc tc effs loc a b.
     (OnceParam loc) =>
-    { onceResourceParent :: AbstractFixture rc tc effs loc pi i
+    { onceResourceParent :: AbstractHook rc tc effs loc pi i
     , onceSetup' :: i -> rc -> Eff effs o
     , onceTearDown' :: o -> Eff effs ()
     } ->
-    AbstractFixture rc tc effs Once i o
+    AbstractHook rc tc effs Once i o
   -- once per thread hooks
   ThreadBefore ::
     { threadAction :: rc -> Eff effs o
     } ->
-    AbstractFixture rc tc effs Thread () o
+    AbstractHook rc tc effs Thread () o
   ThreadBefore' ::
     -- forall rc tc effs loc a b.
     (ThreadParam loc) =>
-    { threadParent :: AbstractFixture rc tc effs loc pi i
+    { threadParent :: AbstractHook rc tc effs loc pi i
     , threadAction' :: i -> rc -> Eff effs o
     } ->
-    AbstractFixture rc tc effs Thread i o
+    AbstractHook rc tc effs Thread i o
   ThreadAfter ::
     -- forall rc tc effs loc.
     (ThreadAfterParam loc) =>
-    { threadBefore :: AbstractFixture rc tc effs loc pi ()
+    { threadBefore :: AbstractHook rc tc effs loc pi ()
     , threadAfter :: rc -> Eff effs ()
     } ->
-    AbstractFixture rc tc effs ThreadAfter () ()
+    AbstractHook rc tc effs ThreadAfter () ()
   ThreadResource ::
     { threadSetup :: rc -> Eff effs o
     , threadTearDown :: a -> Eff effs ()
     } ->
-    AbstractFixture rc tc effs Thread () o
+    AbstractHook rc tc effs Thread () o
   ThreadResource' ::
     -- forall rc tc effs loc a b.
     (ThreadParam loc) =>
-    { threadResourceParent :: AbstractFixture rc tc effs loc pi i
+    { threadResourceParent :: AbstractHook rc tc effs loc pi i
     , threadSetup' :: i -> rc -> Eff effs o
     , threadTearDown' :: o -> Eff effs ()
     } ->
-    AbstractFixture rc tc effs Thread i o
+    AbstractHook rc tc effs Thread i o
   -- each hooks
   EachBefore ::
     { eachAction :: rc -> Eff effs o
     } ->
-    AbstractFixture rc tc effs Each () o
+    AbstractHook rc tc effs Each () o
   EachBefore' ::
     -- forall rc tc effs loc a b.
     (EachParam loc) =>
-    { eachParent :: AbstractFixture rc tc effs loc pi i
+    { eachParent :: AbstractHook rc tc effs loc pi i
     , eachAction' :: i -> rc -> Eff effs o
     } ->
-    AbstractFixture rc tc effs Each i o
+    AbstractHook rc tc effs Each i o
   EachAfter ::
     -- forall rc tc effs loc.
     (EachAfterParam loc) =>
-    { eachBefore :: AbstractFixture rc tc effs loc pi ()
+    { eachBefore :: AbstractHook rc tc effs loc pi ()
     , eachAfter :: rc -> Eff effs ()
     } ->
-    AbstractFixture rc tc effs EachAfter () ()
+    AbstractHook rc tc effs EachAfter () ()
   EachResource ::
     { eachSetup :: rc -> Eff effs o
     , eachTearDown :: o -> Eff effs ()
     } ->
-    AbstractFixture rc tc effs Each () o
+    AbstractHook rc tc effs Each () o
   EachResource' ::
     -- forall rc tc effs loc a b.
     (EachParam loc) =>
-    { eachResourceParent :: AbstractFixture rc tc effs loc pi i
+    { eachResourceParent :: AbstractHook rc tc effs loc pi i
     , eachSetup' :: i -> rc -> Eff effs o
     , eachTearDown' :: o -> Eff effs ()
     } ->
-    AbstractFixture rc tc effs Each i o
+    AbstractHook rc tc effs Each i o
   -- test
-  -- Test :: {test :: AbstractTest rc tc effs i} -> AbstractFixture rc tc effs Test i ()
+  -- Test :: {test :: AbstractTest rc tc effs i} -> AbstractHook rc tc effs Test i ()
 
 data AbstractTest rc tc effs hi where
   Full ::
@@ -270,7 +270,7 @@ data AbstractTest rc tc effs hi where
     AbstractTest rc tc effs ()
   Full' ::
     (ItemClass i ds, EachParam loc) =>
-    { parentHook :: AbstractFixture rc tc effs loc pi hi
+    { parentHook :: AbstractHook rc tc effs loc pi hi
     , config' :: tc
     , childAction :: hi -> rc -> i -> Eff effs as
     , parse' :: as -> Either ParseException ds
@@ -286,7 +286,7 @@ data AbstractTest rc tc effs hi where
     AbstractTest rc tc effs ()
   NoParse' ::
     (ItemClass i ds, EachParam loc) =>
-    { parentHook :: AbstractFixture rc tc effs loc pi hi
+    { parentHook :: AbstractHook rc tc effs loc pi hi
     , config' :: tc
     , childAction :: hi -> rc -> i -> Eff effs ds
     , items' :: rc -> [i]
@@ -300,7 +300,7 @@ data AbstractTest rc tc effs hi where
     AbstractTest rc tc effs ()
   Single' ::
     (EachParam loc) =>
-    { parentHook :: AbstractFixture rc tc effs loc pi hi
+    { parentHook :: AbstractHook rc tc effs loc pi hi
     , config' :: tc
     , childSingleAction :: hi -> rc -> Eff effs ds
     , checks' :: Checks ds
@@ -312,13 +312,18 @@ data Path = Path
   , title :: Text
   }
 
-data AbstractSuite rc tc effs i o where
-  Node ::
+data AbstractSuite rc tc effs i where
+  Hook ::
     { path :: Path
-    , fixture :: AbstractFixture rc tc effs loc pi i
-    , subNodes :: [AbstractSuite rc tc effs i ()]
+    , hook :: AbstractHook rc tc effs loc i o
+    , subNodes :: [AbstractSuite rc tc effs o]
     } ->
-    AbstractSuite rc tc effs i ()
+    AbstractSuite rc tc effs i 
+  Test ::
+    { path :: Path
+    , test :: AbstractTest rc tc effs i
+    } ->
+    AbstractSuite rc tc effs i 
 
 -- try this
 -- part 1

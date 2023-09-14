@@ -7,7 +7,7 @@ import Effectful (Eff, IOE, (:>))
 import PyrethrumDemoProject (
   Action,
   Depth (DeepRegression),
-  Fixture (..),
+  Hook (..),
   RunConfig (..),
   -- Suite (..),
   Test (..),
@@ -19,13 +19,13 @@ import RunElementClasses (AddressElemType (Hook))
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
-intOnceHook :: Fixture Once () Int
+intOnceHook :: Hook Once () Int
 intOnceHook =
   OnceBefore
     { onceAction = \rc -> pure 1
     }
 
-addOnceIntHook :: Fixture Once Int Int
+addOnceIntHook :: Hook Once Int Int
 addOnceIntHook =
   OnceBefore'
     { -- onceParent = intThreadHook
@@ -36,7 +36,7 @@ addOnceIntHook =
           pure $ i + 1
     }
 
-intThreadHook :: Fixture Thread () Int
+intThreadHook :: Hook Thread () Int
 intThreadHook = ThreadBefore $ \rc -> do
   log "deriving meaning of life' "
   pure 42
@@ -47,12 +47,12 @@ data HookInfo = HookInfo
   }
   deriving (Show, Generic)
 
-infoThreadHook :: Fixture Thread Int HookInfo
+infoThreadHook :: Hook Thread Int HookInfo
 infoThreadHook = ThreadBefore' addOnceIntHook $ \i rc -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
-eachInfoResource :: Fixture Each HookInfo Int
+eachInfoResource :: Hook Each HookInfo Int
 eachInfoResource =
   EachResource'
     { eachResourceParent = infoThreadHook
@@ -64,7 +64,7 @@ eachInfoResource =
         pure ()
     }
 
-eachIntBefore :: Fixture Each Int Int
+eachIntBefore :: Hook Each Int Int
 eachIntBefore =
   EachBefore'
     { eachParent = eachInfoResource
@@ -231,23 +231,23 @@ suite :: Suite ()
 suite =
   Node
     { path = Path "module" "name"
-    , fixture = intOnceHook
+    , Hook = intOnceHook
     , subNodes =
         [ Node
             { path = Path "module" "name"
-            , fixture = addOnceIntHook
+            , Hook = addOnceIntHook
             , subNodes =
                 [ Node
                     { path = Path "module" "name"
-                    , fixture = infoThreadHook
+                    , Hook = infoThreadHook
                     , subNodes =
                         [ Node
                             { path = Path "module" "name"
-                            , fixture = addOnceIntHook
+                            , Hook = addOnceIntHook
                             , subNodes =
                                 [ Node
                                     { path = Path "module" "name"
-                                    , fixture = eachInfoResource
+                                    , Hook = eachInfoResource
                                     , subNodes =
                                         []
                                     }

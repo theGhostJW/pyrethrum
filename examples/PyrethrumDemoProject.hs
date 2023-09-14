@@ -44,7 +44,7 @@ $(deriveJSON defaultOptions ''TestConfig)
 
 instance C.Config TestConfig
 
--- type Hook a = AbstractHook RunConfig TestConfig ApEffs a
+-- type Hook a = Hook RunConfig TestConfig ApEffs a
 
 data Hook loc i o where
   -- once hooks
@@ -199,19 +199,19 @@ data Test hi where
 -- data Suite rc tc effs i where
 --   Hook ::
 --     { path :: Path
---     , hook :: AbstractHook rc tc effs loc i o
---     , subNodes :: [AbstractSuite rc tc effs o]
+--     , hook :: Hook rc tc effs loc i o
+--     , subNodes :: [Suite rc tc effs o]
 --     } ->
---     AbstractSuite rc tc effs i 
+--     Suite rc tc effs i 
 --   Test ::
 --     { path :: Path
---     , test :: AbstractTest rc tc effs i
+--     , test :: Test rc tc effs i
 --     } ->
---     AbstractSuite rc tc effs i 
+--     Suite rc tc effs i 
 
 
-mkAbstractTest :: Test hi -> C.AbstractTest RunConfig TestConfig ApEffs hi
-mkAbstractTest = \case
+mkTest :: Test hi -> C.Test RunConfig TestConfig ApEffs hi
+mkTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
   Full'{..} -> C.Full' (mkAbstractFx parent) config' childAction parse' items'
@@ -219,7 +219,7 @@ mkAbstractTest = \case
   Single{..} -> C.Single{..}
   Single'{..} -> C.Single' (mkAbstractFx parent) config' childSingleAction checks'
 
-mkAbstractFx :: Hook loc i o -> C.AbstractHook RunConfig TestConfig ApEffs loc i o
+mkAbstractFx :: Hook loc i o -> C.Hook RunConfig TestConfig ApEffs loc i o
 mkAbstractFx = \case
   OnceBefore{..} -> C.OnceBefore{..}
   OnceBefore'{..} -> C.OnceBefore' (mkAbstractFx onceParent) onceAction'

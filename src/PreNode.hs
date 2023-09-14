@@ -33,11 +33,11 @@ data AbstractPreNode rc tc m i where
     AbstractPreNode rc tc m i
   Test ::
     { config :: tc
-    , items :: [AbstractTestItem rc tc m i]
+    , items :: [TestItem rc tc m i]
     } ->
     AbstractPreNode rc tc m ()
 
-data AbstractTestItem rc tc m i = TestItem
+data TestItem rc tc m i = TestItem
   { id :: Int
   , title :: Text
   , test :: rc -> i -> m ()

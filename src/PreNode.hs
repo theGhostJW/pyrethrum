@@ -2,34 +2,34 @@ module PreNode where
 
 import qualified Core as C
 
-data Cardinality = Once | Thread | Each deriving (Show, Eq)
+data Frequency = Once | Thread | Each deriving (Show, Eq)
 
-data PreNode m i o where
+data PreNode m i where
   Before ::
     { title :: Text
-    , cardinality :: Cardinality
+    , frequency :: Frequency
     , action :: i -> m o
-    , subNodes :: [PreNode m o ()]
+    , subNodes :: [PreNode m o]
     } ->
-    PreNode m i ()
+    PreNode m i 
   After ::
     { title' :: Text
-    , cardinality' :: Cardinality
-    , before :: PreNode m () ()
+    , frequency' :: Frequency
+    , subNode :: PreNode m ()
     , after :: m ()
     } ->
-    PreNode m () ()
+    PreNode m ()
   Resource ::
     { title :: Text
-    , cardinality :: Cardinality
-    , setUp :: m i
-    , subNodes :: [PreNode m o ()]
+    , frequency :: Frequency
+    , setUp :: i -> m o
+    , subNodes' :: [PreNode m o]
     , tearDown :: o -> m ()
     } ->
-    PreNode m i ()
+    PreNode m i
   Test ::
     { tests :: [i -> m ()]
-    } -> PreNode m i ()
+    } -> PreNode m i
 
 
 

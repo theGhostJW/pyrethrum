@@ -78,6 +78,8 @@ class OnceAfterParam a
 class ThreadAfterParam a
 class EachAfterParam a
 
+---
+
 data Once
 instance OnceParam Once
 instance ThreadParam Once
@@ -90,29 +92,45 @@ instance EachParam Thread
 data Each
 instance EachParam Each
 
--- After events can not depend on any other fixtures
--- before / after dependencies are implemented via Resource
--- which provides a bracket like function
+---
 
--- data Test
--- instance EachAfterParam Test
--- instance ThreadAfterParam Test
--- instance OnceAfterParam Test
-
-data EachAfter
-instance EachAfterParam EachAfter
-instance ThreadAfterParam EachAfter
-instance OnceAfterParam EachAfter
-
-data ThreadAfter
-instance ThreadAfterParam ThreadAfter
-instance OnceAfterParam ThreadAfter
+-- After hooks simply pass data through to the suite elements that depend on them
 
 data OnceAfter
 instance OnceAfterParam OnceAfter
+instance ThreadAfterParam OnceAfter
+instance EachAfterParam OnceAfter
+
+data ThreadAfter
+instance OnceAfterParam ThreadAfter
+instance ThreadAfterParam ThreadAfter
+
+data EachAfter
+instance EachAfterParam EachAfter
+
+---
+
+data OnceResource
+instance OnceParam OnceResource
+instance ThreadParam OnceResource
+instance EachParam OnceResource
+instance OnceAfterParam OnceResource
+instance ThreadAfterParam OnceResource
+instance EachAfterParam OnceResource
+
+data ThreadResource
+instance ThreadParam ThreadResource
+instance EachParam ThreadResource
+instance OnceAfterParam ThreadResource
+instance ThreadAfterParam ThreadResource
+
+data EachResource
+instance EachParam EachResource
+instance OnceAfterParam EachResource
 
 {-
-After Constraints:
+
+A onceAfter can be a param forAfter Constraints:
 
 OnceAfter Once    Y
 OnceAfter Thread  Y
@@ -155,7 +173,7 @@ data Hook rc tc effs loc i o where
     } ->
     Hook rc tc effs Once i o
   OnceAfter ::
-    {  onceAfter :: rc -> Eff effs ()
+    { onceAfter :: rc -> Eff effs ()
     } ->
     Hook rc tc effs OnceAfter () ()
   OnceResource ::
@@ -184,8 +202,7 @@ data Hook rc tc effs loc i o where
     } ->
     Hook rc tc effs Thread i o
   ThreadAfter ::
-    {
-     threadAfter :: rc -> Eff effs ()
+    { threadAfter :: rc -> Eff effs ()
     } ->
     Hook rc tc effs ThreadAfter () ()
   ThreadResource ::
@@ -292,12 +309,12 @@ data SuiteElement rc tc effs i where
     , hook :: Hook rc tc effs loc i o
     , subNodes :: [SuiteElement rc tc effs o]
     } ->
-    SuiteElement rc tc effs i 
+    SuiteElement rc tc effs i
   Test ::
     { path :: Path
     , test :: Test rc tc effs i
     } ->
-    SuiteElement rc tc effs i 
+    SuiteElement rc tc effs i
 
 -- try this
 -- part 1

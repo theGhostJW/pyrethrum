@@ -312,20 +312,20 @@ data Path = Path
   , title :: Text
   }
 
-type TestRun rc tc effs = [Suite rc tc effs ()]
+type Suite rc tc effs = [SuiteElement rc tc effs ()]
 
-data Suite rc tc effs i where
+data SuiteElement rc tc effs i where
   Hook ::
     { path :: Path
     , hook :: Hook rc tc effs loc i o
-    , subNodes :: [Suite rc tc effs o]
+    , subNodes :: [SuiteElement rc tc effs o]
     } ->
-    Suite rc tc effs i 
+    SuiteElement rc tc effs i 
   Test ::
     { path :: Path
     , test :: Test rc tc effs i
     } ->
-    Suite rc tc effs i 
+    SuiteElement rc tc effs i 
 
 -- try this
 -- part 1

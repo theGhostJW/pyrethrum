@@ -9,10 +9,10 @@ import PyrethrumDemoProject (
   Depth (DeepRegression),
   Hook (..),
   RunConfig (..),
-  Suite (..),
+  SuiteElement (..),
   Test (..),
   TestConfig (TestConfig),
-  TestRun,
+  Suite,
  )
 import PyrethrumExtras (txt)
 
@@ -226,7 +226,7 @@ test5 =
 -- ############### Suite ###################
 -- this will be generated be generated
 
-suite :: TestRun
+suite :: Suite
 suite =
   [ Test (Path "module" "testName") test
   , Test (Path "module" "testName") test4
@@ -271,32 +271,6 @@ suite =
   ]
 
 {-
-
-Node
-  { path = Path "module" "name"
-  , Hook = addOnceIntHook
-  , subNodes =
-      [ Node
-          { path = Path "module" "name"
-          , Hook = infoThreadHook
-          , subNodes =
-              [ Node
-                  { path = Path "module" "name"
-                  , Hook = addOnceIntHook
-                  , subNodes =
-                      [ Node
-                          { path = Path "module" "name"
-                          , Hook = eachInfoResource
-                          , subNodes =
-                              []
-                          }
-                      ]
-                  }
-              ]
-          }
-      ]
-  }
-
 -- TODO: review bracket
 
 -- TODO : stubs:

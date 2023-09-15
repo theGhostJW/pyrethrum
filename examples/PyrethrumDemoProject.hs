@@ -195,19 +195,19 @@ data Test hi where
     } ->
     Test a
 
-type TestRun = [Suite ()]
-data Suite i where
+type Suite = [SuiteElement ()]
+data SuiteElement i where
   Hook ::
     { path :: C.Path
     , hook :: Hook loc i o
-    , subNodes :: [Suite o]
+    , subNodes :: [SuiteElement o]
     } ->
-    Suite i
+    SuiteElement i
   Test ::
     { path :: C.Path
     , test :: Test i
     } ->
-    Suite i
+    SuiteElement i
 
 mkTest :: Test hi -> C.Test RunConfig TestConfig ApEffs hi
 mkTest = \case
@@ -241,7 +241,7 @@ mkHook = \case
   EachResource{..} -> C.EachResource{..}
   EachResource'{eachResourceParent, eachSetup', eachTearDown'} -> C.EachResource' (mkHook eachResourceParent) eachSetup' eachTearDown'
 
-mkSuite :: Suite i -> C.Suite RunConfig TestConfig ApEffs i
+mkSuite :: SuiteElement i -> C.SuiteElement RunConfig TestConfig ApEffs i
 mkSuite = \case
   Hook{..} ->
     C.Hook
@@ -251,5 +251,5 @@ mkSuite = \case
       }
   Test{..} -> C.Test{test = mkTest test, ..}
 
-mkTestRun :: TestRun -> C.TestRun RunConfig TestConfig ApEffs
+mkTestRun :: Suite -> C.Suite RunConfig TestConfig ApEffs
 mkTestRun tr = mkSuite <$> tr

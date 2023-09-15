@@ -25,6 +25,7 @@ $(deriveJSON defaultOptions ''Depth)
 data RunConfig = RunConfig
   { title :: Text
   , environment :: Environment
+  , maxThreads :: Int
   , country :: Country
   , depth :: Depth
   }
@@ -36,6 +37,7 @@ instance C.Config RunConfig
 
 data TestConfig = TestConfig
   { title :: Text
+  , maxThreads :: Int
   , depth :: Depth
   }
   deriving (Show, Eq)
@@ -62,8 +64,7 @@ data Hook loc i o where
   OnceAfter ::
     forall loc.
     (C.OnceAfterParam loc) =>
-    { onceBefore :: Hook loc () ()
-    , onceAfter :: RunConfig -> Action ()
+    { onceAfter :: RunConfig -> Action ()
     } ->
     Hook C.OnceAfter () ()
   OnceResource ::
@@ -95,8 +96,7 @@ data Hook loc i o where
     -- forall loc.
     -- TODO: check this should probably be test
     (C.ThreadAfterParam loc) =>
-    { threadBefore :: Hook loc pi ()
-    , threadAfterAction :: RunConfig -> Action ()
+    { threadAfter :: RunConfig -> Action ()
     } ->
     Hook C.ThreadAfter () ()
   ThreadResource ::
@@ -126,8 +126,7 @@ data Hook loc i o where
     Hook C.Each i o
   EachAfter ::
     (C.EachAfterParam loc) =>
-    { eachBefore :: Hook loc () ()
-    , eachAfterAction :: RunConfig -> Action ()
+    { eachAfter :: RunConfig -> Action ()
     } ->
     Hook C.EachAfter () ()
   EachResource ::
@@ -222,7 +221,7 @@ mkHook :: Hook loc i o -> C.Hook RunConfig TestConfig ApEffs loc i o
 mkHook = \case
   OnceBefore{..} -> C.OnceBefore{..}
   OnceBefore'{..} -> C.OnceBefore' (mkHook onceParent) onceAction'
-  OnceAfter{..} -> C.OnceAfter (mkHook onceBefore) onceAfter
+  OnceAfter{..} -> C.OnceAfter {..} 
   OnceResource'
     { onceResourceParent
     , onceSetup'
@@ -232,12 +231,12 @@ mkHook = \case
   OnceResource{..} -> C.OnceResource{..}
   ThreadBefore{..} -> C.ThreadBefore{..}
   ThreadBefore'{..} -> C.ThreadBefore' (mkHook threadParent) threadAction'
-  ThreadAfter{..} -> C.ThreadAfter (mkHook threadBefore) threadAfterAction
+  ThreadAfter{..} -> C.ThreadAfter {..} 
   ThreadResource{..} -> C.ThreadResource{..}
   ThreadResource'{threadResourceParent = p, ..} -> C.ThreadResource' (mkHook p) threadSetup' threadTearDown'
   EachBefore{..} -> C.EachBefore{..}
   EachBefore'{eachParent, eachAction'} -> C.EachBefore' (mkHook eachParent) eachAction'
-  EachAfter{..} -> C.EachAfter (mkHook eachBefore) eachAfterAction
+  EachAfter{..} -> C.EachAfter {..}
   EachResource{..} -> C.EachResource{..}
   EachResource'{eachResourceParent, eachSetup', eachTearDown'} -> C.EachResource' (mkHook eachResourceParent) eachSetup' eachTearDown'
 

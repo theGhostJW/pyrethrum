@@ -9,10 +9,10 @@ import PyrethrumDemoProject (
   Depth (DeepRegression),
   Hook (..),
   RunConfig (..),
+  Suite,
   SuiteElement (..),
   Test (..),
-  TestConfig (TestConfig),
-  Suite,
+  TestConfig (..),
  )
 import PyrethrumExtras (txt)
 
@@ -73,13 +73,14 @@ eachIntBefore =
         pure $ hi + 1
     }
 
+
 -- ############### Test the Lot ###################
 test :: Test ()
 test =
   Full config action parse items
 
 config :: TestConfig
-config = TestConfig "test" DeepRegression
+config = TestConfig "test" 1 DeepRegression
 
 data ApState = ApState
   { value :: Int
@@ -125,7 +126,7 @@ test2 =
   Full' infoThreadHook config2 action2 parse2 items2
 
 config2 :: TestConfig
-config2 = TestConfig "test" DeepRegression
+config2 = TestConfig "test" 1 DeepRegression
 
 action2 :: HookInfo -> RunConfig -> Item2 -> Action AS
 action2 HookInfo{value = hookVal} rc itm = do
@@ -173,7 +174,7 @@ test3 :: Test Int
 test3 =
   Full'
     { parent = eachIntBefore
-    , config' = TestConfig "test" DeepRegression
+    , config' = TestConfig "test" 1 DeepRegression
     , childAction = \i rc itm -> do
         log $ txt itm
         pure $ AS (itm.value + 1 + i) $ txt itm.value
@@ -193,7 +194,7 @@ test3 =
 test4 :: Test ()
 test4 =
   NoParse
-    { config = TestConfig "test" DeepRegression
+    { config = TestConfig "test" 1 DeepRegression
     , action = \rc itm -> do
         log $ txt itm
         pure $ DS (itm.value + 1) $ txt itm.value
@@ -212,7 +213,7 @@ test4 =
 test5 :: Test ()
 test5 =
   Single
-    { config = TestConfig "test" DeepRegression
+    { config = TestConfig "test" 1 DeepRegression
     , singleAction = \rc -> do
         log $ "RunConfig is: " <> rc.title
         pure

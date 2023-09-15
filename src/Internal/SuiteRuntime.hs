@@ -48,6 +48,35 @@ import UnliftIO.STM (
   writeTQueue,
  )
 import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO)
+import qualified Core as C
+
+executeNew :: Int -> LogControls m Loc a -> PN.PreNodeRoot a -> IO ()
+executeNew
+  maxThreads
+  LogControls
+    { sink
+    , logWorker
+    , stopWorker
+    }
+  preRoot =
+    -- TODO - Validatte prenode
+    -- fixture titles are unique ??
+    concurrently_ logWorker linkExecute
+   where
+    linkExecute :: IO ()
+    linkExecute =
+      finally
+        ( do
+            exeTree <- prepare preRoot
+            runTree sink exeTree maxThreads
+        )
+        stopWorker
+
+{- 
+  ##########################################################################
+  ############################ OLD CODE ####################################
+  ##########################################################################
+-}
 
 data HookStatus
   = HookVoid
@@ -707,5 +736,3 @@ execute
             runTree sink exeTree maxThreads
         )
         stopWorker
-
--- TODO: USE bracket unliftIO

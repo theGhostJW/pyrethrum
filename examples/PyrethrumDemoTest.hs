@@ -1,6 +1,6 @@
 module PyrethrumDemoTest where
 
-import Core (Checks, EachBefore, EachResource, OnceBefore, OnceParam, ParseException, Path (..), ThreadBefore, chk)
+import Core (Checks, EachAfter, EachBefore, EachResource, OnceBefore, OnceParam, ParseException, Path (..), ThreadBefore, chk)
 import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, IOE, (:>))
@@ -64,6 +64,15 @@ eachInfoResource =
         pure ()
     }
 
+eachAfter :: Hook EachAfter Int Int
+eachAfter =
+  EachAfter'
+    { eachAfterParent = eachInfoResource
+    , eachAfter' = \rc -> do
+        log "eachAfter"
+        pure ()
+    }
+
 eachIntBefore :: Hook EachBefore Int Int
 eachIntBefore =
   EachBefore'
@@ -72,7 +81,6 @@ eachIntBefore =
         log "eachSetup"
         pure $ hi + 1
     }
-
 
 -- ############### Test the Lot ###################
 test :: Test ()
@@ -255,9 +263,15 @@ suite =
                                       , subNodes =
                                           [ Hook
                                               { path = Path "module" "name"
-                                              , hook = eachIntBefore
+                                              , hook = eachAfter
                                               , subNodes =
-                                                  [Test (Path "module" "testName") test3]
+                                                  [ Hook
+                                                      { path = Path "module" "name"
+                                                      , hook = eachIntBefore
+                                                      , subNodes =
+                                                          [Test (Path "module" "testName") test3]
+                                                      }
+                                                  ]
                                               }
                                           ]
                                       }

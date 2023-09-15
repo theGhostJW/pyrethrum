@@ -126,7 +126,7 @@ instance ThreadAfterParam ThreadResource
 
 data EachResource
 instance EachParam EachResource
-instance OnceAfterParam EachResource
+instance EachAfterParam EachResource
 
 newtype StubLoc = StubLoc Text
 data Addressed a = Addressed

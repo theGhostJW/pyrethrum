@@ -62,11 +62,15 @@ data Hook loc i o where
     } ->
     Hook C.OnceBefore i o
   OnceAfter ::
-    forall loc.
-    (C.OnceAfterParam loc) =>
     { onceAfter :: RunConfig -> Action ()
     } ->
     Hook C.OnceAfter () ()
+  OnceAfter' ::
+    (C.OnceAfterParam loc) =>
+    { onceAfterParent :: Hook loc pi i
+    , onceAfter' :: RunConfig -> Action ()
+    } ->
+    Hook C.OnceAfter i i
   OnceResource ::
     { onceSetup :: RunConfig -> Action o
     , onceTearDown :: o -> Action ()
@@ -93,19 +97,21 @@ data Hook loc i o where
     } ->
     Hook C.ThreadBefore i o
   ThreadAfter ::
-    -- forall loc.
-    -- TODO: check this should probably be test
-    (C.ThreadAfterParam loc) =>
     { threadAfter :: RunConfig -> Action ()
     } ->
     Hook C.ThreadAfter () ()
+  ThreadAfter' ::
+    (C.ThreadAfterParam loc) =>
+    { threadAfterParent :: Hook loc pi i
+    , threadAfter' :: RunConfig -> Action ()
+    } ->
+    Hook C.ThreadAfter i i
   ThreadResource ::
     { threadSetup :: RunConfig -> Action o
     , threadTearDown :: a -> Action ()
     } ->
     Hook C.ThreadResource () o
   ThreadResource' ::
-    -- forall loc a b.
     (C.ThreadParam loc) =>
     { threadResourceParent :: Hook loc pi i
     , threadSetup' :: i -> RunConfig -> Action o
@@ -125,10 +131,15 @@ data Hook loc i o where
     } ->
     Hook C.EachBefore i o
   EachAfter ::
-    (C.EachAfterParam loc) =>
     { eachAfter :: RunConfig -> Action ()
     } ->
     Hook C.EachAfter () ()
+  EachAfter' ::
+    (C.EachAfterParam loc) =>
+    { eachAfterParent :: Hook loc pi i
+    , eachAfter' :: RunConfig -> Action ()
+    } ->
+    Hook C.EachAfter i i
   EachResource ::
     { eachSetup :: RunConfig -> Action o
     , eachTearDown :: o -> Action ()
@@ -221,7 +232,10 @@ mkHook :: Hook loc i o -> C.Hook RunConfig TestConfig ApEffs loc i o
 mkHook = \case
   OnceBefore{..} -> C.OnceBefore{..}
   OnceBefore'{..} -> C.OnceBefore' (mkHook onceParent) onceAction'
-  OnceAfter{..} -> C.OnceAfter {..} 
+  OnceAfter{..} -> C.OnceAfter{..}
+  OnceAfter'{..} -> C.OnceAfter'{onceAfterParent = mkHook  onceAfterParent,..}
+  ThreadAfter'{..} -> C.ThreadAfter'{threadAfterParent = mkHook threadAfterParent,..}
+  EachAfter'{..} -> C.EachAfter'{eachAfterParent = mkHook eachAfterParent,..}
   OnceResource'
     { onceResourceParent
     , onceSetup'
@@ -231,12 +245,12 @@ mkHook = \case
   OnceResource{..} -> C.OnceResource{..}
   ThreadBefore{..} -> C.ThreadBefore{..}
   ThreadBefore'{..} -> C.ThreadBefore' (mkHook threadParent) threadAction'
-  ThreadAfter{..} -> C.ThreadAfter {..} 
+  ThreadAfter{..} -> C.ThreadAfter{..}
   ThreadResource{..} -> C.ThreadResource{..}
   ThreadResource'{threadResourceParent = p, ..} -> C.ThreadResource' (mkHook p) threadSetup' threadTearDown'
   EachBefore{..} -> C.EachBefore{..}
   EachBefore'{eachParent, eachAction'} -> C.EachBefore' (mkHook eachParent) eachAction'
-  EachAfter{..} -> C.EachAfter {..}
+  EachAfter{..} -> C.EachAfter{..}
   EachResource{..} -> C.EachResource{..}
   EachResource'{eachResourceParent, eachSetup', eachTearDown'} -> C.EachResource' (mkHook eachResourceParent) eachSetup' eachTearDown'
 

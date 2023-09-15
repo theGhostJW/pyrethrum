@@ -195,51 +195,61 @@ data Test hi where
     } ->
     Test a
 
-
--- data Suite rc tc effs i where
---   Hook ::
---     { path :: Path
---     , hook :: Hook rc tc effs loc i o
---     , subNodes :: [Suite rc tc effs o]
---     } ->
---     Suite rc tc effs i 
---   Test ::
---     { path :: Path
---     , test :: Test rc tc effs i
---     } ->
---     Suite rc tc effs i 
-
+type TestRun = [Suite ()]
+data Suite i where
+  Hook ::
+    { path :: C.Path
+    , hook :: Hook loc i o
+    , subNodes :: [Suite o]
+    } ->
+    Suite i
+  Test ::
+    { path :: C.Path
+    , test :: Test i
+    } ->
+    Suite i
 
 mkTest :: Test hi -> C.Test RunConfig TestConfig ApEffs hi
 mkTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
-  Full'{..} -> C.Full' (mkAbstractFx parent) config' childAction parse' items'
-  NoParse'{..} -> C.NoParse' (mkAbstractFx parent) config' childAction items'
+  Full'{..} -> C.Full' (mkHook parent) config' childAction parse' items'
+  NoParse'{..} -> C.NoParse' (mkHook parent) config' childAction items'
   Single{..} -> C.Single{..}
-  Single'{..} -> C.Single' (mkAbstractFx parent) config' childSingleAction checks'
+  Single'{..} -> C.Single' (mkHook parent) config' childSingleAction checks'
 
-mkAbstractFx :: Hook loc i o -> C.Hook RunConfig TestConfig ApEffs loc i o
-mkAbstractFx = \case
+mkHook :: Hook loc i o -> C.Hook RunConfig TestConfig ApEffs loc i o
+mkHook = \case
   OnceBefore{..} -> C.OnceBefore{..}
-  OnceBefore'{..} -> C.OnceBefore' (mkAbstractFx onceParent) onceAction'
-  OnceAfter{..} -> C.OnceAfter (mkAbstractFx onceBefore) onceAfter
+  OnceBefore'{..} -> C.OnceBefore' (mkHook onceParent) onceAction'
+  OnceAfter{..} -> C.OnceAfter (mkHook onceBefore) onceAfter
   OnceResource'
     { onceResourceParent
     , onceSetup'
     , onceTearDown'
     } ->
-      C.OnceResource' (mkAbstractFx onceResourceParent) onceSetup' onceTearDown'
+      C.OnceResource' (mkHook onceResourceParent) onceSetup' onceTearDown'
   OnceResource{..} -> C.OnceResource{..}
   ThreadBefore{..} -> C.ThreadBefore{..}
-  ThreadBefore'{..} -> C.ThreadBefore' (mkAbstractFx threadParent) threadAction'
-  ThreadAfter{..} -> C.ThreadAfter (mkAbstractFx threadBefore) threadAfterAction
+  ThreadBefore'{..} -> C.ThreadBefore' (mkHook threadParent) threadAction'
+  ThreadAfter{..} -> C.ThreadAfter (mkHook threadBefore) threadAfterAction
   ThreadResource{..} -> C.ThreadResource{..}
-  ThreadResource'{threadResourceParent = p, ..} -> C.ThreadResource' (mkAbstractFx p) threadSetup' threadTearDown'
+  ThreadResource'{threadResourceParent = p, ..} -> C.ThreadResource' (mkHook p) threadSetup' threadTearDown'
   EachBefore{..} -> C.EachBefore{..}
-  EachBefore'{eachParent, eachAction'} -> C.EachBefore' (mkAbstractFx eachParent) eachAction'
-  EachAfter{..} -> C.EachAfter (mkAbstractFx eachBefore) eachAfterAction
+  EachBefore'{eachParent, eachAction'} -> C.EachBefore' (mkHook eachParent) eachAction'
+  EachAfter{..} -> C.EachAfter (mkHook eachBefore) eachAfterAction
   EachResource{..} -> C.EachResource{..}
-  EachResource'{eachResourceParent, eachSetup', eachTearDown'} -> C.EachResource' (mkAbstractFx eachResourceParent) eachSetup' eachTearDown'
+  EachResource'{eachResourceParent, eachSetup', eachTearDown'} -> C.EachResource' (mkHook eachResourceParent) eachSetup' eachTearDown'
 
+mkSuite :: Suite i -> C.Suite RunConfig TestConfig ApEffs i
+mkSuite = \case
+  Hook{..} ->
+    C.Hook
+      { hook = mkHook hook
+      , subNodes = mkSuite <$> subNodes
+      , ..
+      }
+  Test{..} -> C.Test{test = mkTest test, ..}
 
+mkTestRun :: TestRun -> C.TestRun RunConfig TestConfig ApEffs
+mkTestRun tr = mkSuite <$> tr

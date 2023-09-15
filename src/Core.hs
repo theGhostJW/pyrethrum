@@ -312,6 +312,8 @@ data Path = Path
   , title :: Text
   }
 
+type TestRun rc tc effs = [Suite rc tc effs ()]
+
 data Suite rc tc effs i where
   Hook ::
     { path :: Path

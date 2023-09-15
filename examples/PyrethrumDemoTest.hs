@@ -9,12 +9,12 @@ import PyrethrumDemoProject (
   Depth (DeepRegression),
   Hook (..),
   RunConfig (..),
-  -- Suite (..),
+  Suite (..),
   Test (..),
   TestConfig (TestConfig),
+  TestRun,
  )
 import PyrethrumExtras (txt)
-import RunElementClasses (AddressElemType (Hook))
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
@@ -224,44 +224,79 @@ test5 =
     }
 
 -- ############### Suite ###################
--- TODO: include type changing hooks
+-- this will be generated be generated
 
-{-
-suite :: Suite ()
+suite :: TestRun
 suite =
-  Node
-    { path = Path "module" "name"
-    , Hook = intOnceHook
-    , subNodes =
-        [ Node
-            { path = Path "module" "name"
-            , Hook = addOnceIntHook
-            , subNodes =
-                [ Node
-                    { path = Path "module" "name"
-                    , Hook = infoThreadHook
-                    , subNodes =
-                        [ Node
-                            { path = Path "module" "name"
-                            , Hook = addOnceIntHook
-                            , subNodes =
-                                [ Node
-                                    { path = Path "module" "name"
-                                    , Hook = eachInfoResource
-                                    , subNodes =
-                                        []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    }
--}
+  [ Test (Path "module" "testName") test
+  , Test (Path "module" "testName") test4
+  , Test (Path "module" "testName") test5
+  , Hook
+      { path = Path "module" "name"
+      , hook = intOnceHook
+      , subNodes =
+          [ Hook
+              { path = Path "module" "name"
+              , hook = addOnceIntHook
+              , subNodes =
+                  [ Hook
+                      { path = Path "module" "name"
+                      , hook = addOnceIntHook
+                      , subNodes =
+                          [ Hook
+                              { path = Path "module" "name"
+                              , hook = infoThreadHook
+                              , subNodes =
+                                  [ Test (Path "module" "testName") test2
+                                  , Hook
+                                      { path = Path "module" "name"
+                                      , hook = eachInfoResource
+                                      , subNodes =
+                                          [ Hook
+                                              { path = Path "module" "name"
+                                              , hook = eachIntBefore
+                                              , subNodes =
+                                                  [Test (Path "module" "testName") test3]
+                                              }
+                                          ]
+                                      }
+                                  ]
+                              }
+                          ]
+                      }
+                  ]
+              }
+          ]
+      }
+  ]
 
 {-
+
+Node
+  { path = Path "module" "name"
+  , Hook = addOnceIntHook
+  , subNodes =
+      [ Node
+          { path = Path "module" "name"
+          , Hook = infoThreadHook
+          , subNodes =
+              [ Node
+                  { path = Path "module" "name"
+                  , Hook = addOnceIntHook
+                  , subNodes =
+                      [ Node
+                          { path = Path "module" "name"
+                          , Hook = eachInfoResource
+                          , subNodes =
+                              []
+                          }
+                      ]
+                  }
+              ]
+          }
+      ]
+  }
+
 -- TODO: review bracket
 
 -- TODO : stubs:
@@ -278,4 +313,7 @@ suite =
     stubHash (make a hash of props other than id and title: aDfG165Er7 - 10 letter hash - module + item first 4 letters is module, next 6 is item),
     stubAll,
     stubFilter (takes a predicate and stubs all items that match it)
+
+-- ToDO webdriveIO protocol
+--- https://github.com/webdriverio/webdriverio/blob/main/packages/wdio-protocols/src/protocols/gecko.ts
 -}

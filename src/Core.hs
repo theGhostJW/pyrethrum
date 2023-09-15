@@ -109,6 +109,7 @@ data EachAfter
 instance EachAfterParam EachAfter
 
 ---
+-- resource ooks can be params for before or after hooks
 
 data OnceResource
 instance OnceParam OnceResource
@@ -180,7 +181,7 @@ data Hook rc tc effs loc i o where
     { onceSetup :: rc -> Eff effs o
     , onceTearDown :: o -> Eff effs ()
     } ->
-    Hook rc tc effs Once () o
+    Hook rc tc effs OnceResource () o
   OnceResource' ::
     -- forall rc tc effs loc a b.
     (OnceParam loc) =>
@@ -188,7 +189,7 @@ data Hook rc tc effs loc i o where
     , onceSetup' :: i -> rc -> Eff effs o
     , onceTearDown' :: o -> Eff effs ()
     } ->
-    Hook rc tc effs Once i o
+    Hook rc tc effs OnceResource i o
   -- once per thread hooks
   ThreadBefore ::
     { threadAction :: rc -> Eff effs o
@@ -209,7 +210,7 @@ data Hook rc tc effs loc i o where
     { threadSetup :: rc -> Eff effs o
     , threadTearDown :: a -> Eff effs ()
     } ->
-    Hook rc tc effs Thread () o
+    Hook rc tc effs ThreadResource () o
   ThreadResource' ::
     -- forall rc tc effs loc a b.
     (ThreadParam loc) =>
@@ -217,7 +218,7 @@ data Hook rc tc effs loc i o where
     , threadSetup' :: i -> rc -> Eff effs o
     , threadTearDown' :: o -> Eff effs ()
     } ->
-    Hook rc tc effs Thread i o
+    Hook rc tc effs ThreadResource i o
   -- each hooks
   EachBefore ::
     { eachAction :: rc -> Eff effs o
@@ -238,7 +239,7 @@ data Hook rc tc effs loc i o where
     { eachSetup :: rc -> Eff effs o
     , eachTearDown :: o -> Eff effs ()
     } ->
-    Hook rc tc effs Each () o
+    Hook rc tc effs EachResource () o
   EachResource' ::
     -- forall rc tc effs loc a b.
     (EachParam loc) =>
@@ -246,7 +247,7 @@ data Hook rc tc effs loc i o where
     , eachSetup' :: i -> rc -> Eff effs o
     , eachTearDown' :: o -> Eff effs ()
     } ->
-    Hook rc tc effs Each i o
+    Hook rc tc effs EachResource i o
 
 data Test rc tc effs hi where
   Full ::

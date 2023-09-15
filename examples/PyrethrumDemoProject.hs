@@ -53,14 +53,14 @@ data Hook loc i o where
   OnceBefore ::
     { onceAction :: RunConfig -> Action o
     } ->
-    Hook C.Once () o
+    Hook C.OnceBefore () o
   OnceBefore' ::
     -- forall loc a b.
     (C.OnceParam loc) =>
     { onceParent :: Hook loc pi i
     , onceAction' :: i -> RunConfig -> Action o
     } ->
-    Hook C.Once i o
+    Hook C.OnceBefore i o
   OnceAfter ::
     forall loc.
     (C.OnceAfterParam loc) =>
@@ -71,7 +71,7 @@ data Hook loc i o where
     { onceSetup :: RunConfig -> Action o
     , onceTearDown :: o -> Action ()
     } ->
-    Hook C.Once () o
+    Hook C.OnceResource () o
   OnceResource' ::
     -- forall loc a b.
     (C.OnceParam loc) =>
@@ -79,7 +79,7 @@ data Hook loc i o where
     , onceSetup' :: i -> RunConfig -> Action o
     , onceTearDown' :: o -> Action ()
     } ->
-    Hook C.Once i o
+    Hook C.OnceResource i o
   -- once per thread hooks
   ThreadBefore ::
     { threadAction :: RunConfig -> Action o
@@ -103,7 +103,7 @@ data Hook loc i o where
     { threadSetup :: RunConfig -> Action o
     , threadTearDown :: a -> Action ()
     } ->
-    Hook C.Thread () o
+    Hook C.ThreadResource () o
   ThreadResource' ::
     -- forall loc a b.
     (C.ThreadParam loc) =>
@@ -111,7 +111,7 @@ data Hook loc i o where
     , threadSetup' :: i -> RunConfig -> Action o
     , threadTearDown' :: o -> Action ()
     } ->
-    Hook C.Thread i o
+    Hook C.ThreadResource i o
   -- each hooks
   EachBefore ::
     { eachAction :: RunConfig -> Action o
@@ -133,14 +133,14 @@ data Hook loc i o where
     { eachSetup :: RunConfig -> Action o
     , eachTearDown :: o -> Action ()
     } ->
-    Hook C.Each () o
+    Hook C.EachResource () o
   EachResource' ::
     (C.EachParam loc) =>
     { eachResourceParent :: Hook loc pi i
     , eachSetup' :: i -> RunConfig -> Action o
     , eachTearDown' :: o -> Action ()
     } ->
-    Hook C.Each i o
+    Hook C.EachResource i o
 
 data Test hi where
   Full ::

@@ -80,10 +80,10 @@ class EachAfterParam a
 
 ---
 
-data Once
-instance OnceParam Once
-instance ThreadParam Once
-instance EachParam Once
+data OnceBefore
+instance OnceParam OnceBefore
+instance ThreadParam OnceBefore
+instance EachParam OnceBefore
 
 data Thread
 instance ThreadParam Thread
@@ -93,8 +93,7 @@ data Each
 instance EachParam Each
 
 ---
-
--- After hooks simply pass data through to the suite elements that depend on them
+-- after hooks simply pass data through to the suite elements that depend on them
 
 data OnceAfter
 instance OnceAfterParam OnceAfter
@@ -129,25 +128,6 @@ data EachResource
 instance EachParam EachResource
 instance OnceAfterParam EachResource
 
-{-
-
-A onceAfter can be a param forAfter Constraints:
-
-OnceAfter Once    Y
-OnceAfter Thread  Y
-OnceAfter Each    Y
-
-ThreadAfter Once    N
-ThreadAfter Thread  Y
-ThreadAfter Each    Y
-
-EachAfter Once    N
-EachAfter Thread  N
-EachAfter Each    Y
-
-Test == N/A
--}
-
 newtype StubLoc = StubLoc Text
 data Addressed a = Addressed
   { loc :: StubLoc
@@ -165,14 +145,20 @@ data Hook rc tc effs loc i o where
   OnceBefore ::
     { onceAction :: rc -> Eff effs o
     } ->
-    Hook rc tc effs Once () o
+    Hook rc tc effs OnceBefore () o
   OnceBefore' ::
     -- forall rc tc effs loc i o.
     (OnceParam loc) =>
     { onceParent :: Hook rc tc effs loc pi i
     , onceAction' :: i -> rc -> Eff effs o
     } ->
-    Hook rc tc effs Once i o
+    Hook rc tc effs OnceBefore i o
+  OnceAfter' ::
+    (OnceAfterParam loc) =>
+    { onceAfterParent :: Hook rc tc effs loc pi i
+    , onceAfter' :: rc -> Eff effs ()
+    } ->
+    Hook rc tc effs OnceAfter i i
   OnceAfter ::
     { onceAfter :: rc -> Eff effs ()
     } ->
@@ -206,6 +192,13 @@ data Hook rc tc effs loc i o where
     { threadAfter :: rc -> Eff effs ()
     } ->
     Hook rc tc effs ThreadAfter () ()
+  ThreadAfter' ::
+    (ThreadAfterParam loc) =>
+    { 
+      threadAfterParent :: Hook rc tc effs loc pi i,
+      threadAfter' :: rc -> Eff effs ()
+    } ->
+    Hook rc tc effs ThreadAfter i i
   ThreadResource ::
     { threadSetup :: rc -> Eff effs o
     , threadTearDown :: a -> Eff effs ()
@@ -235,6 +228,13 @@ data Hook rc tc effs loc i o where
     { eachAfter :: rc -> Eff effs ()
     } ->
     Hook rc tc effs EachAfter () ()
+  EachAfter' ::
+    (EachAfterParam loc) =>
+    { 
+      eachAfterParent :: Hook rc tc effs loc pi i,
+      eachAfter' :: rc -> Eff effs ()
+    } ->
+    Hook rc tc effs EachAfter i i
   EachResource ::
     { eachSetup :: rc -> Eff effs o
     , eachTearDown :: o -> Eff effs ()

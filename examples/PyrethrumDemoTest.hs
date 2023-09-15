@@ -1,6 +1,6 @@
 module PyrethrumDemoTest where
 
-import Core (Checks, Each, Once, OnceParam, ParseException, Path (..), Thread, chk)
+import Core (Checks, Each, EachResource, OnceBefore, OnceParam, ParseException, Path (..), Thread, chk)
 import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, IOE, (:>))
@@ -19,13 +19,13 @@ import PyrethrumExtras (txt)
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
-intOnceHook :: Hook Once () Int
+intOnceHook :: Hook OnceBefore () Int
 intOnceHook =
   OnceBefore
     { onceAction = \rc -> pure 1
     }
 
-addOnceIntHook :: Hook Once Int Int
+addOnceIntHook :: Hook OnceBefore Int Int
 addOnceIntHook =
   OnceBefore'
     { -- onceParent = intThreadHook
@@ -52,7 +52,7 @@ infoThreadHook = ThreadBefore' addOnceIntHook $ \i rc -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
-eachInfoResource :: Hook Each HookInfo Int
+eachInfoResource :: Hook EachResource HookInfo Int
 eachInfoResource =
   EachResource'
     { eachResourceParent = infoThreadHook

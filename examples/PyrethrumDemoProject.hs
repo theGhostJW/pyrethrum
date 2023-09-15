@@ -71,19 +71,19 @@ data Hook loc i o where
     , onceAfter' :: RunConfig -> Action ()
     } ->
     Hook C.OnceAfter i i
-  OnceResource ::
+  OnceAround ::
     { onceSetup :: RunConfig -> Action o
     , onceTearDown :: o -> Action ()
     } ->
-    Hook C.OnceResource () o
-  OnceResource' ::
+    Hook C.OnceAround () o
+  OnceAround' ::
     -- forall loc a b.
     (C.OnceParam loc) =>
-    { onceResourceParent :: Hook loc pi i
+    { onceAroundParent :: Hook loc pi i
     , onceSetup' :: i -> RunConfig -> Action o
     , onceTearDown' :: o -> Action ()
     } ->
-    Hook C.OnceResource i o
+    Hook C.OnceAround i o
   -- once per thread hooks
   ThreadBefore ::
     { threadAction :: RunConfig -> Action o
@@ -106,18 +106,18 @@ data Hook loc i o where
     , threadAfter' :: RunConfig -> Action ()
     } ->
     Hook C.ThreadAfter i i
-  ThreadResource ::
+  ThreadAround ::
     { threadSetup :: RunConfig -> Action o
     , threadTearDown :: a -> Action ()
     } ->
-    Hook C.ThreadResource () o
-  ThreadResource' ::
+    Hook C.ThreadAround () o
+  ThreadAround' ::
     (C.ThreadParam loc) =>
-    { threadResourceParent :: Hook loc pi i
+    { threadAroundParent :: Hook loc pi i
     , threadSetup' :: i -> RunConfig -> Action o
     , threadTearDown' :: o -> Action ()
     } ->
-    Hook C.ThreadResource i o
+    Hook C.ThreadAround i o
   -- each hooks
   EachBefore ::
     { eachAction :: RunConfig -> Action o
@@ -140,18 +140,18 @@ data Hook loc i o where
     , eachAfter' :: RunConfig -> Action ()
     } ->
     Hook C.EachAfter i i
-  EachResource ::
+  EachAround ::
     { eachSetup :: RunConfig -> Action o
     , eachTearDown :: o -> Action ()
     } ->
-    Hook C.EachResource () o
-  EachResource' ::
+    Hook C.EachAround () o
+  EachAround' ::
     (C.EachParam loc) =>
-    { eachResourceParent :: Hook loc pi i
+    { eachAroundParent :: Hook loc pi i
     , eachSetup' :: i -> RunConfig -> Action o
     , eachTearDown' :: o -> Action ()
     } ->
-    Hook C.EachResource i o
+    Hook C.EachAround i o
 
 data Test hi where
   Full ::
@@ -236,23 +236,23 @@ mkHook = \case
   OnceAfter'{..} -> C.OnceAfter'{onceAfterParent = mkHook  onceAfterParent,..}
   ThreadAfter'{..} -> C.ThreadAfter'{threadAfterParent = mkHook threadAfterParent,..}
   EachAfter'{..} -> C.EachAfter'{eachAfterParent = mkHook eachAfterParent,..}
-  OnceResource'
-    { onceResourceParent
+  OnceAround'
+    { onceAroundParent
     , onceSetup'
     , onceTearDown'
     } ->
-      C.OnceResource' (mkHook onceResourceParent) onceSetup' onceTearDown'
-  OnceResource{..} -> C.OnceResource{..}
+      C.OnceAround' (mkHook onceAroundParent) onceSetup' onceTearDown'
+  OnceAround{..} -> C.OnceAround{..}
   ThreadBefore{..} -> C.ThreadBefore{..}
   ThreadBefore'{..} -> C.ThreadBefore' (mkHook threadParent) threadAction'
   ThreadAfter{..} -> C.ThreadAfter{..}
-  ThreadResource{..} -> C.ThreadResource{..}
-  ThreadResource'{threadResourceParent = p, ..} -> C.ThreadResource' (mkHook p) threadSetup' threadTearDown'
+  ThreadAround{..} -> C.ThreadAround{..}
+  ThreadAround'{threadAroundParent = p, ..} -> C.ThreadAround' (mkHook p) threadSetup' threadTearDown'
   EachBefore{..} -> C.EachBefore{..}
   EachBefore'{eachParent, eachAction'} -> C.EachBefore' (mkHook eachParent) eachAction'
   EachAfter{..} -> C.EachAfter{..}
-  EachResource{..} -> C.EachResource{..}
-  EachResource'{eachResourceParent, eachSetup', eachTearDown'} -> C.EachResource' (mkHook eachResourceParent) eachSetup' eachTearDown'
+  EachAround{..} -> C.EachAround{..}
+  EachAround'{eachAroundParent, eachSetup', eachTearDown'} -> C.EachAround' (mkHook eachAroundParent) eachSetup' eachTearDown'
 
 mkSuite :: SuiteElement i -> C.SuiteElement RunConfig TestConfig ApEffs i
 mkSuite = \case

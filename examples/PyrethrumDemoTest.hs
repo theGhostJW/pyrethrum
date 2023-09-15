@@ -1,6 +1,6 @@
 module PyrethrumDemoTest where
 
-import Core (Checks, EachAfter, EachBefore, EachResource, OnceBefore, OnceParam, ParseException, Path (..), ThreadBefore, chk)
+import Core (Checks, EachAfter, EachBefore, EachAround, OnceBefore, OnceParam, ParseException, Path (..), ThreadBefore, chk)
 import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, IOE, (:>))
@@ -52,10 +52,10 @@ infoThreadHook = ThreadBefore' addOnceIntHook $ \i rc -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
-eachInfoResource :: Hook EachResource HookInfo Int
-eachInfoResource =
-  EachResource'
-    { eachResourceParent = infoThreadHook
+eachInfoAround :: Hook EachAround HookInfo Int
+eachInfoAround =
+  EachAround'
+    { eachAroundParent = infoThreadHook
     , eachSetup' = \hi rc -> do
         log "eachSetup"
         pure $ hi.value + 1
@@ -67,7 +67,7 @@ eachInfoResource =
 eachAfter :: Hook EachAfter Int Int
 eachAfter =
   EachAfter'
-    { eachAfterParent = eachInfoResource
+    { eachAfterParent = eachInfoAround
     , eachAfter' = \rc -> do
         log "eachAfter"
         pure ()
@@ -76,7 +76,7 @@ eachAfter =
 eachIntBefore :: Hook EachBefore Int Int
 eachIntBefore =
   EachBefore'
-    { eachParent = eachInfoResource
+    { eachParent = eachInfoAround
     , eachAction' = \hi rc -> do
         log "eachSetup"
         pure $ hi + 1
@@ -259,7 +259,7 @@ suite =
                                   [ Test (Path "module" "testName") test2
                                   , Hook
                                       { path = Path "module" "name"
-                                      , hook = eachInfoResource
+                                      , hook = eachInfoAround
                                       , subNodes =
                                           [ Hook
                                               { path = Path "module" "name"

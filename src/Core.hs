@@ -108,25 +108,25 @@ data EachAfter
 instance EachAfterParam EachAfter
 
 ---
--- resource ooks can be params for before or after hooks
+-- Around ooks can be params for before or after hooks
 
-data OnceResource
-instance OnceParam OnceResource
-instance ThreadParam OnceResource
-instance EachParam OnceResource
-instance OnceAfterParam OnceResource
-instance ThreadAfterParam OnceResource
-instance EachAfterParam OnceResource
+data OnceAround
+instance OnceParam OnceAround
+instance ThreadParam OnceAround
+instance EachParam OnceAround
+instance OnceAfterParam OnceAround
+instance ThreadAfterParam OnceAround
+instance EachAfterParam OnceAround
 
-data ThreadResource
-instance ThreadParam ThreadResource
-instance EachParam ThreadResource
-instance OnceAfterParam ThreadResource
-instance ThreadAfterParam ThreadResource
+data ThreadAround
+instance ThreadParam ThreadAround
+instance EachParam ThreadAround
+instance OnceAfterParam ThreadAround
+instance ThreadAfterParam ThreadAround
 
-data EachResource
-instance EachParam EachResource
-instance EachAfterParam EachResource
+data EachAround
+instance EachParam EachAround
+instance EachAfterParam EachAround
 
 newtype StubLoc = StubLoc Text
 data Addressed a = Addressed
@@ -163,19 +163,19 @@ data Hook rc tc effs loc i o where
     { onceAfter :: rc -> Eff effs ()
     } ->
     Hook rc tc effs OnceAfter () ()
-  OnceResource ::
+  OnceAround ::
     { onceSetup :: rc -> Eff effs o
     , onceTearDown :: o -> Eff effs ()
     } ->
-    Hook rc tc effs OnceResource () o
-  OnceResource' ::
+    Hook rc tc effs OnceAround () o
+  OnceAround' ::
     -- forall rc tc effs loc a b.
     (OnceParam loc) =>
-    { onceResourceParent :: Hook rc tc effs loc pi i
+    { onceAroundParent :: Hook rc tc effs loc pi i
     , onceSetup' :: i -> rc -> Eff effs o
     , onceTearDown' :: o -> Eff effs ()
     } ->
-    Hook rc tc effs OnceResource i o
+    Hook rc tc effs OnceAround i o
   -- once per thread hooks
   ThreadBefore ::
     { threadAction :: rc -> Eff effs o
@@ -199,19 +199,19 @@ data Hook rc tc effs loc i o where
       threadAfter' :: rc -> Eff effs ()
     } ->
     Hook rc tc effs ThreadAfter i i
-  ThreadResource ::
+  ThreadAround ::
     { threadSetup :: rc -> Eff effs o
     , threadTearDown :: a -> Eff effs ()
     } ->
-    Hook rc tc effs ThreadResource () o
-  ThreadResource' ::
+    Hook rc tc effs ThreadAround () o
+  ThreadAround' ::
     -- forall rc tc effs loc a b.
     (ThreadParam loc) =>
-    { threadResourceParent :: Hook rc tc effs loc pi i
+    { threadAroundParent :: Hook rc tc effs loc pi i
     , threadSetup' :: i -> rc -> Eff effs o
     , threadTearDown' :: o -> Eff effs ()
     } ->
-    Hook rc tc effs ThreadResource i o
+    Hook rc tc effs ThreadAround i o
   -- each hooks
   EachBefore ::
     { eachAction :: rc -> Eff effs o
@@ -235,19 +235,19 @@ data Hook rc tc effs loc i o where
       eachAfter' :: rc -> Eff effs ()
     } ->
     Hook rc tc effs EachAfter i i
-  EachResource ::
+  EachAround ::
     { eachSetup :: rc -> Eff effs o
     , eachTearDown :: o -> Eff effs ()
     } ->
-    Hook rc tc effs EachResource () o
-  EachResource' ::
+    Hook rc tc effs EachAround () o
+  EachAround' ::
     -- forall rc tc effs loc a b.
     (EachParam loc) =>
-    { eachResourceParent :: Hook rc tc effs loc pi i
+    { eachAroundParent :: Hook rc tc effs loc pi i
     , eachSetup' :: i -> rc -> Eff effs o
     , eachTearDown' :: o -> Eff effs ()
     } ->
-    Hook rc tc effs EachResource i o
+    Hook rc tc effs EachAround i o
 
 data Test rc tc effs hi where
   Full ::

@@ -84,14 +84,14 @@ data Hook loc i o where
   ThreadBefore ::
     { threadAction :: RunConfig -> Action o
     } ->
-    Hook C.Thread () o
+    Hook C.ThreadBefore () o
   ThreadBefore' ::
     -- forall loc a b.
     (C.ThreadParam loc) =>
     { threadParent :: Hook loc pi i
     , threadAction' :: i -> RunConfig -> Action o
     } ->
-    Hook C.Thread i o
+    Hook C.ThreadBefore i o
   ThreadAfter ::
     -- forall loc.
     -- TODO: check this should probably be test
@@ -116,14 +116,14 @@ data Hook loc i o where
   EachBefore ::
     { eachAction :: RunConfig -> Action o
     } ->
-    Hook C.Each () o
+    Hook C.EachBefore () o
   EachBefore' ::
     -- forall loc a b.
     (C.EachParam loc) =>
     { eachParent :: Hook loc pi i
     , eachAction' :: i -> RunConfig -> Action o
     } ->
-    Hook C.Each i o
+    Hook C.EachBefore i o
   EachAfter ::
     (C.EachAfterParam loc) =>
     { eachAfter :: RunConfig -> Action ()

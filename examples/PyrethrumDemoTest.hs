@@ -1,6 +1,6 @@
 module PyrethrumDemoTest where
 
-import Core (Checks, Each, EachResource, OnceBefore, OnceParam, ParseException, Path (..), Thread, chk)
+import Core (Checks, EachBefore, EachResource, OnceBefore, OnceParam, ParseException, Path (..), ThreadBefore, chk)
 import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, IOE, (:>))
@@ -36,7 +36,7 @@ addOnceIntHook =
           pure $ i + 1
     }
 
-intThreadHook :: Hook Thread () Int
+intThreadHook :: Hook ThreadBefore () Int
 intThreadHook = ThreadBefore $ \rc -> do
   log "deriving meaning of life' "
   pure 42
@@ -47,7 +47,7 @@ data HookInfo = HookInfo
   }
   deriving (Show, Generic)
 
-infoThreadHook :: Hook Thread Int HookInfo
+infoThreadHook :: Hook ThreadBefore Int HookInfo
 infoThreadHook = ThreadBefore' addOnceIntHook $ \i rc -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
@@ -64,7 +64,7 @@ eachInfoResource =
         pure ()
     }
 
-eachIntBefore :: Hook Each Int Int
+eachIntBefore :: Hook EachBefore Int Int
 eachIntBefore =
   EachBefore'
     { eachParent = eachInfoResource

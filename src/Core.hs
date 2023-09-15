@@ -85,12 +85,12 @@ instance OnceParam OnceBefore
 instance ThreadParam OnceBefore
 instance EachParam OnceBefore
 
-data Thread
-instance ThreadParam Thread
-instance EachParam Thread
+data ThreadBefore
+instance ThreadParam ThreadBefore
+instance EachParam ThreadBefore
 
-data Each
-instance EachParam Each
+data EachBefore
+instance EachParam EachBefore
 
 ---
 -- after hooks simply pass data through to the suite elements that depend on them
@@ -180,14 +180,14 @@ data Hook rc tc effs loc i o where
   ThreadBefore ::
     { threadAction :: rc -> Eff effs o
     } ->
-    Hook rc tc effs Thread () o
+    Hook rc tc effs ThreadBefore () o
   ThreadBefore' ::
     -- forall rc tc effs loc a b.
     (ThreadParam loc) =>
     { threadParent :: Hook rc tc effs loc pi i
     , threadAction' :: i -> rc -> Eff effs o
     } ->
-    Hook rc tc effs Thread i o
+    Hook rc tc effs ThreadBefore i o
   ThreadAfter ::
     { threadAfter :: rc -> Eff effs ()
     } ->
@@ -216,14 +216,14 @@ data Hook rc tc effs loc i o where
   EachBefore ::
     { eachAction :: rc -> Eff effs o
     } ->
-    Hook rc tc effs Each () o
+    Hook rc tc effs EachBefore () o
   EachBefore' ::
     -- forall rc tc effs loc a b.
     (EachParam loc) =>
     { eachParent :: Hook rc tc effs loc pi i
     , eachAction' :: i -> rc -> Eff effs o
     } ->
-    Hook rc tc effs Each i o
+    Hook rc tc effs EachBefore i o
   EachAfter ::
     { eachAfter :: rc -> Eff effs ()
     } ->

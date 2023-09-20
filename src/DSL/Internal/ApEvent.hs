@@ -43,9 +43,13 @@ data FLog
       { message :: Text
       , details :: Text
       }
-  deriving stock (Eq, Show)
+  | Exception
+      { exception :: SomeException
+      , callStack :: CallStack
+      }
+  deriving stock Show
 
 data ApEvent
   = User ULog
   | Framework FLog
-  deriving stock (Eq, Show)
+  deriving stock Show

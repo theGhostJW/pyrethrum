@@ -1,6 +1,6 @@
 module PyrethrumDemoTest where
 
-import Core (Checks, EachAfter, EachBefore, EachAround, OnceBefore, OnceParam, ParseException, Path (..), ThreadBefore, chk)
+import Core (Checks, EachAfter, EachAround, EachBefore, OnceBefore, OnceParam, ParseException, Path (..), ThreadBefore, chk)
 import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, IOE, (:>))
@@ -202,11 +202,12 @@ test3 =
 test4 :: Test ()
 test4 =
   NoParse
-    { config = TestConfig "test" 1 DeepRegression
+    { config' = TestConfig "test" 1 DeepRegression
+    , parent = eachAfter
     , action = \rc itm -> do
         log $ txt itm
         pure $ DS (itm.value + 1) $ txt itm.value
-    , items =
+    , items' =
         const
           [ Item2
               { id = 1
@@ -220,8 +221,9 @@ test4 =
 -- ############### Test Single (Record) ###################
 test5 :: Test ()
 test5 =
-  Single
-    { config = TestConfig "test" 1 DeepRegression
+  Single'
+    { config' = TestConfig "test" 1 DeepRegression
+    , parent = eachAfter
     , singleAction = \rc -> do
         log $ "RunConfig is: " <> rc.title
         pure
@@ -229,7 +231,7 @@ test5 =
             { value = 1
             , valTxt = rc.title
             }
-    , checks = chk "the value must be 1" ((== 1) . (.value))
+    , checks' = chk "the value must be 1" ((== 1) . (.value))
     }
 
 -- ############### Suite ###################
@@ -261,16 +263,13 @@ suite =
                                       { path = Path "module" "name"
                                       , hook = eachInfoAround
                                       , subNodes =
-                                          [ Hook
+                                          [ [Test (Path "module" "testName") test3]
+                                          , Hook
                                               { path = Path "module" "name"
                                               , hook = eachAfter
                                               , subNodes =
-                                                  [ Hook
-                                                      { path = Path "module" "name"
-                                                      , hook = eachIntBefore
-                                                      , subNodes =
-                                                          [Test (Path "module" "testName") test3]
-                                                      }
+                                                  [ Test (Path "module" "testName") test4
+                                                  , Test (Path "module" "testName") test5
                                                   ]
                                               }
                                           ]

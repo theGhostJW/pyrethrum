@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 622837c175ec97873bfbacfed6bf7fa0f0eabf13f4a11549603b4386692feb66
+-- hash: 007073f755671cdb6d00d729e9e79f1dc404d7d95e7f5018d75d0ba68ee51253
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -113,7 +113,7 @@ library
       LogTransformation.Test
       MemberReflection
       OrphanedInstances
-      PreNode
+      Prepare
       PrettyPrintCommon
       RunElementClasses
       Runner
@@ -364,7 +364,7 @@ library examples
       LogTransformation.Test
       MemberReflection
       OrphanedInstances
-      PreNode
+      Prepare
       PrettyPrintCommon
       RunElementClasses
       Runner

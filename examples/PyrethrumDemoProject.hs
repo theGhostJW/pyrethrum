@@ -168,7 +168,7 @@ data Test hi where
     (C.ItemClass i ds, C.EachParam loc) =>
     { parent :: Hook loc pi a
     , config' :: TestConfig
-    , childAction :: a -> RunConfig -> i -> Action as
+    , action' :: a -> RunConfig -> i -> Action as
     , parse' :: as -> Either C.ParseException ds
     , items' :: RunConfig -> [i]
     } ->
@@ -186,7 +186,7 @@ data Test hi where
     (C.ItemClass i ds, C.EachParam loc) =>
     { parent :: Hook loc pi a
     , config' :: TestConfig
-    , childAction :: a -> RunConfig -> i -> Action ds
+    , action' :: a -> RunConfig -> i -> Action ds
     , items' :: RunConfig -> [i]
     } ->
     Test a
@@ -200,7 +200,7 @@ data Test hi where
     (C.EachParam loc) =>
     { parent :: Hook loc pi a
     , config' :: TestConfig
-    , childSingleAction :: a -> RunConfig -> Action as
+    , singleAction' :: a -> RunConfig -> Action as
     , checks' :: C.Checks as
     } ->
     Test a
@@ -223,10 +223,10 @@ mkTest :: Test hi -> C.Test RunConfig TestConfig ApEffs hi
 mkTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
-  Full'{..} -> C.Full' (mkHook parent) config' childAction parse' items'
-  NoParse'{..} -> C.NoParse' (mkHook parent) config' childAction items'
+  Full'{..} -> C.Full' (mkHook parent) config' action' parse' items'
+  NoParse'{..} -> C.NoParse' {parent = mkHook parent, .. }
   Single{..} -> C.Single{..}
-  Single'{..} -> C.Single' (mkHook parent) config' childSingleAction checks'
+  Single'{..} -> C.Single' (mkHook parent) config' singleAction' checks'
 
 mkHook :: Hook loc i o -> C.Hook RunConfig TestConfig ApEffs loc i o
 mkHook = \case

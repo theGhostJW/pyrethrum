@@ -74,10 +74,6 @@ class OnceParam a
 class ThreadParam a
 class EachParam a
 
-class OnceAfterParam a
-class ThreadAfterParam a
-class EachAfterParam a
-
 ---
 
 data OnceBefore
@@ -96,16 +92,16 @@ instance EachParam EachBefore
 -- after hooks simply pass data through to the suite elements that depend on them
 
 data OnceAfter
-instance OnceAfterParam OnceAfter
-instance ThreadAfterParam OnceAfter
-instance EachAfterParam OnceAfter
+instance OnceParam OnceAfter
+instance ThreadParam OnceAfter
+instance EachParam OnceAfter
 
 data ThreadAfter
-instance OnceAfterParam ThreadAfter
-instance ThreadAfterParam ThreadAfter
+instance ThreadParam ThreadAfter
+instance EachParam ThreadAfter
 
 data EachAfter
-instance EachAfterParam EachAfter
+instance EachParam EachAfter
 
 ---
 -- Around ooks can be params for before or after hooks
@@ -114,19 +110,13 @@ data OnceAround
 instance OnceParam OnceAround
 instance ThreadParam OnceAround
 instance EachParam OnceAround
-instance OnceAfterParam OnceAround
-instance ThreadAfterParam OnceAround
-instance EachAfterParam OnceAround
 
 data ThreadAround
 instance ThreadParam ThreadAround
 instance EachParam ThreadAround
-instance OnceAfterParam ThreadAround
-instance ThreadAfterParam ThreadAround
 
 data EachAround
 instance EachParam EachAround
-instance EachAfterParam EachAround
 
 newtype StubLoc = StubLoc Text
 data Addressed a = Addressed
@@ -154,7 +144,7 @@ data Hook rc tc effs loc i o where
     } ->
     Hook rc tc effs OnceBefore i o
   OnceAfter' ::
-    (OnceAfterParam loc) =>
+    (OnceParam loc) =>
     { onceAfterParent :: Hook rc tc effs loc pi i
     , onceAfter' :: rc -> Eff effs ()
     } ->
@@ -193,7 +183,7 @@ data Hook rc tc effs loc i o where
     } ->
     Hook rc tc effs ThreadAfter () ()
   ThreadAfter' ::
-    (ThreadAfterParam loc) =>
+    (ThreadParam loc) =>
     { 
       threadAfterParent :: Hook rc tc effs loc pi i,
       threadAfter' :: rc -> Eff effs ()
@@ -229,7 +219,7 @@ data Hook rc tc effs loc i o where
     } ->
     Hook rc tc effs EachAfter () ()
   EachAfter' ::
-    (EachAfterParam loc) =>
+    (EachParam loc) =>
     { 
       eachAfterParent :: Hook rc tc effs loc pi i,
       eachAfter' :: rc -> Eff effs ()
@@ -260,9 +250,9 @@ data Test rc tc effs hi where
     Test rc tc effs ()
   Full' ::
     (ItemClass i ds, EachParam loc) =>
-    { parentHook :: Hook rc tc effs loc pi hi
+    { parent :: Hook rc tc effs loc pi hi
     , config' :: tc
-    , childAction :: hi -> rc -> i -> Eff effs as
+    , action' :: hi -> rc -> i -> Eff effs as
     , parse' :: as -> Either ParseException ds
     , items' :: rc -> [i]
     } ->
@@ -276,9 +266,9 @@ data Test rc tc effs hi where
     Test rc tc effs ()
   NoParse' ::
     (ItemClass i ds, EachParam loc) =>
-    { parentHook :: Hook rc tc effs loc pi hi
+    { parent :: Hook rc tc effs loc pi hi
     , config' :: tc
-    , childAction :: hi -> rc -> i -> Eff effs ds
+    , action' :: hi -> rc -> i -> Eff effs ds
     , items' :: rc -> [i]
     } ->
     Test rc tc effs hi
@@ -290,9 +280,9 @@ data Test rc tc effs hi where
     Test rc tc effs ()
   Single' ::
     (EachParam loc) =>
-    { parentHook :: Hook rc tc effs loc pi hi
+    { parent :: Hook rc tc effs loc pi hi
     , config' :: tc
-    , childSingleAction :: hi -> rc -> Eff effs ds
+    , singleAction' :: hi -> rc -> Eff effs ds
     , checks' :: Checks ds
     } ->
     Test rc tc effs hi

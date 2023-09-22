@@ -183,7 +183,7 @@ test3 =
   Full'
     { parent = eachIntBefore
     , config' = TestConfig "test" 1 DeepRegression
-    , childAction = \i rc itm -> do
+    , action' = \i rc itm -> do
         log $ txt itm
         pure $ AS (itm.value + 1 + i) $ txt itm.value
     , parse' = \AS{..} -> pure DS{..}
@@ -199,12 +199,12 @@ test3 =
     }
 
 -- ############### Test NoParse (Record) ###################
-test4 :: Test ()
+test4 :: Test Int
 test4 =
-  NoParse
+  NoParse'
     { config' = TestConfig "test" 1 DeepRegression
     , parent = eachAfter
-    , action = \rc itm -> do
+    , action' = \hi rc itm -> do
         log $ txt itm
         pure $ DS (itm.value + 1) $ txt itm.value
     , items' =
@@ -219,12 +219,12 @@ test4 =
     }
 
 -- ############### Test Single (Record) ###################
-test5 :: Test ()
+test5 :: Test Int
 test5 =
   Single'
     { config' = TestConfig "test" 1 DeepRegression
     , parent = eachAfter
-    , singleAction = \rc -> do
+    , singleAction' = \hi rc -> do
         log $ "RunConfig is: " <> rc.title
         pure
           $ DS
@@ -240,13 +240,13 @@ test5 =
 suite :: Suite
 suite =
   [ Test (Path "module" "testName") test
-  , Test (Path "module" "testName") test4
-  , Test (Path "module" "testName") test5
   , Hook
       { path = Path "module" "name"
       , hook = intOnceHook
       , subNodes =
-          [ Hook
+          [ Test (Path "module" "testName") test4
+          , Test (Path "module" "testName") test5
+          , Hook
               { path = Path "module" "name"
               , hook = addOnceIntHook
               , subNodes =
@@ -263,7 +263,7 @@ suite =
                                       { path = Path "module" "name"
                                       , hook = eachInfoAround
                                       , subNodes =
-                                          [ [Test (Path "module" "testName") test3]
+                                          [ Test (Path "module" "testName") test3
                                           , Hook
                                               { path = Path "module" "name"
                                               , hook = eachAfter

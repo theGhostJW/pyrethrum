@@ -70,133 +70,63 @@ instance ToJSON (Check v) where
 
 --
 
-class OnceParam a
-class ThreadParam a
-class EachParam a
-
+class Param a
+class (Param a, Param b) => ValidParent a b
 
 data Once
-instance OnceParam Once
-instance ThreadParam Once
-instance EachParam Once
-
 data Thread
-instance ThreadParam Thread
-instance EachParam Thread
-
 data Each
-instance EachParam Each
+
+instance Param Once
+instance Param Thread
+instance Param Each
+
+instance ValidParent Once Once
+instance ValidParent Once Thread
+instance ValidParent Once Each
+
+instance ValidParent Thread Thread
+instance ValidParent Thread Each
+
+instance ValidParent Each Each
 
 
 data Hook rc tc effs loc i o where
-  -- once hooks
-  OnceBefore ::
-    { onceAction :: rc -> Eff effs o
+  Before ::
+    (Param loc) =>
+    { action :: rc -> Eff effs o
     } ->
-    Hook rc tc effs Once () o
-  OnceBefore' ::
-    -- forall rc tc effs loc i o.
-    (OnceParam loc) =>
-    { onceParent :: Hook rc tc effs loc pi i
-    , onceAction' :: i -> rc -> Eff effs o
+    Hook rc tc effs loc () o
+  Before' ::
+    (Param ploc, Param loc, ValidParent ploc loc) =>
+    { parent :: Hook rc tc effs ploc pi i
+    , action' :: i -> rc -> Eff effs o
     } ->
-    Hook rc tc effs Once i o
-  OnceAfter' ::
-    (OnceParam loc) =>
-    { onceAfterParent :: Hook rc tc effs loc pi i
-    , onceAfter' :: rc -> Eff effs ()
+    Hook rc tc effs loc i o
+  After ::
+    (Param loc) =>
+    { afterAction :: rc -> Eff effs ()
     } ->
-    Hook rc tc effs Once i i
-  OnceAfter ::
-    { onceAfter :: rc -> Eff effs ()
+    Hook rc tc effs loc () ()
+  After' ::
+    (Param ploc, Param loc, ValidParent ploc loc) =>
+    { afterParent :: Hook rc tc effs ploc pi i
+    , afterAction' :: rc -> Eff effs ()
     } ->
-    Hook rc tc effs Once () ()
-  OnceAround ::
-    { onceSetup :: rc -> Eff effs o
-    , onceTearDown :: o -> Eff effs ()
+    Hook rc tc effs loc i i
+  Around ::
+    (Param loc) =>
+    { setup :: rc -> Eff effs o
+    , teardown :: o -> Eff effs ()
     } ->
-    Hook rc tc effs Once () o
-  OnceAround' ::
-    -- forall rc tc effs loc a b.
-    (OnceParam loc) =>
-    { onceAroundParent :: Hook rc tc effs loc pi i
-    , onceSetup' :: i -> rc -> Eff effs o
-    , onceTearDown' :: o -> Eff effs ()
+    Hook rc tc effs loc () o
+  Around' ::
+    (Param ploc, Param loc, ValidParent ploc loc) =>
+    { parent :: Hook rc tc effs ploc pi i
+    , setup' :: i -> rc -> Eff effs o
+    , teardown' :: o -> Eff effs ()
     } ->
-    Hook rc tc effs Once i o
-  -- once per thread hooks
-  ThreadBefore ::
-    { threadAction :: rc -> Eff effs o
-    } ->
-    Hook rc tc effs Thread () o
-  ThreadBefore' ::
-    -- forall rc tc effs loc a b.
-    (ThreadParam loc) =>
-    { threadParent :: Hook rc tc effs loc pi i
-    , threadAction' :: i -> rc -> Eff effs o
-    } ->
-    Hook rc tc effs Thread i o
-  ThreadAfter ::
-    { threadAfter :: rc -> Eff effs ()
-    } ->
-    Hook rc tc effs Thread () ()
-  ThreadAfter' ::
-    (ThreadParam loc) =>
-    { 
-      threadAfterParent :: Hook rc tc effs loc pi i,
-      threadAfter' :: rc -> Eff effs ()
-    } ->
-    Hook rc tc effs Thread i i
-  ThreadAround ::
-    { threadSetup :: rc -> Eff effs o
-    , threadTearDown :: a -> Eff effs ()
-    } ->
-    Hook rc tc effs Thread () o
-  ThreadAround' ::
-    -- forall rc tc effs loc a b.
-    (ThreadParam loc) =>
-    { threadAroundParent :: Hook rc tc effs loc pi i
-    , threadSetup' :: i -> rc -> Eff effs o
-    , threadTearDown' :: o -> Eff effs ()
-    } ->
-    Hook rc tc effs Thread i o
-  -- each hooks
-  EachBefore ::
-    { eachAction :: rc -> Eff effs o
-    } ->
-    Hook rc tc effs Each () o
-  EachBefore' ::
-    -- forall rc tc effs loc a b.
-    (EachParam loc) =>
-    { eachParent :: Hook rc tc effs loc pi i
-    , eachAction' :: i -> rc -> Eff effs o
-    } ->
-    Hook rc tc effs Each i o
-  EachAfter ::
-    { eachAfter :: rc -> Eff effs ()
-    } ->
-    Hook rc tc effs Each () ()
-  EachAfter' ::
-    (EachParam loc) =>
-    { 
-      eachAfterParent :: Hook rc tc effs loc pi i,
-      eachAfter' :: rc -> Eff effs ()
-    } ->
-    Hook rc tc effs Each i i
-  EachAround ::
-    { eachSetup :: rc -> Eff effs o
-    , eachTearDown :: o -> Eff effs ()
-    } ->
-    Hook rc tc effs Each () o
-  EachAround' ::
-    -- forall rc tc effs loc a b.
-    (EachParam loc) =>
-    { eachAroundParent :: Hook rc tc effs loc pi i
-    , eachSetup' :: i -> rc -> Eff effs o
-    , eachTearDown' :: o -> Eff effs ()
-    } ->
-    Hook rc tc effs Each i o
-
+    Hook rc tc effs loc i o
 
 
 newtype StubLoc = StubLoc Text
@@ -204,7 +134,7 @@ data Addressed a = Addressed
   { loc :: StubLoc
   , value :: a
   }
-  
+
 data Test rc tc effs hi where
   Full ::
     (ItemClass i ds) =>
@@ -215,7 +145,7 @@ data Test rc tc effs hi where
     } ->
     Test rc tc effs ()
   Full' ::
-    (ItemClass i ds, EachParam loc) =>
+    (ItemClass i ds) =>
     { parent :: Hook rc tc effs loc pi hi
     , config' :: tc
     , action' :: hi -> rc -> i -> Eff effs as
@@ -231,7 +161,7 @@ data Test rc tc effs hi where
     } ->
     Test rc tc effs ()
   NoParse' ::
-    (ItemClass i ds, EachParam loc) =>
+    (ItemClass i ds) =>
     { parent :: Hook rc tc effs loc pi hi
     , config' :: tc
     , action' :: hi -> rc -> i -> Eff effs ds
@@ -245,7 +175,6 @@ data Test rc tc effs hi where
     } ->
     Test rc tc effs ()
   Single' ::
-    (EachParam loc) =>
     { parent :: Hook rc tc effs loc pi hi
     , config' :: tc
     , singleAction' :: hi -> rc -> Eff effs ds

@@ -87,11 +87,6 @@ instance EachParam Thread
 data Each
 instance EachParam Each
 
-newtype StubLoc = StubLoc Text
-data Addressed a = Addressed
-  { loc :: StubLoc
-  , value :: a
-  }
 
 data Hook rc tc effs loc i o where
   -- once hooks
@@ -202,6 +197,14 @@ data Hook rc tc effs loc i o where
     } ->
     Hook rc tc effs Each i o
 
+
+
+newtype StubLoc = StubLoc Text
+data Addressed a = Addressed
+  { loc :: StubLoc
+  , value :: a
+  }
+  
 data Test rc tc effs hi where
   Full ::
     (ItemClass i ds) =>

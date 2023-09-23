@@ -1,6 +1,6 @@
 module PyrethrumDemoTest where
 
-import Core (Checks, EachAfter, EachAround, EachBefore, OnceBefore, OnceParam, ParseException, Path (..), ThreadBefore, chk)
+import Core (Checks, Once, Thread, Each, ParseException, Path (..), chk)
 import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, IOE, (:>))
@@ -12,20 +12,37 @@ import PyrethrumDemoProject (
   Suite,
   SuiteElement (..),
   Test (..),
-  TestConfig (..),
+  TestConfig (..), Hook2 (..), Once2, Thread2, Each2,
  )
 import PyrethrumExtras (txt)
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
-intOnceHook :: Hook OnceBefore () Int
+intOnceHook2 :: Hook2 Each2 () Int
+intOnceHook2 =
+  Before2
+    { onceAction = \rc -> pure 1
+    }
+
+addOnceIntHook2 :: Hook2 Each2 Int Int
+addOnceIntHook2 =
+  Before2'
+    { -- onceParent = intThreadHook
+      onceParent = intOnceHook2
+    , onceAction' =
+        \i rc -> do
+          log $ "beforeAll' " <> txt i
+          pure $ i + 1
+    }
+
+intOnceHook :: Hook Once () Int
 intOnceHook =
   OnceBefore
     { onceAction = \rc -> pure 1
     }
 
-addOnceIntHook :: Hook OnceBefore Int Int
+addOnceIntHook :: Hook Once Int Int
 addOnceIntHook =
   OnceBefore'
     { -- onceParent = intThreadHook
@@ -36,7 +53,7 @@ addOnceIntHook =
           pure $ i + 1
     }
 
-intThreadHook :: Hook ThreadBefore () Int
+intThreadHook :: Hook Thread () Int
 intThreadHook = ThreadBefore $ \rc -> do
   log "deriving meaning of life' "
   pure 42
@@ -47,12 +64,12 @@ data HookInfo = HookInfo
   }
   deriving (Show, Generic)
 
-infoThreadHook :: Hook ThreadBefore Int HookInfo
+infoThreadHook :: Hook Thread Int HookInfo
 infoThreadHook = ThreadBefore' addOnceIntHook $ \i rc -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
-eachInfoAround :: Hook EachAround HookInfo Int
+eachInfoAround :: Hook Each HookInfo Int
 eachInfoAround =
   EachAround'
     { eachAroundParent = infoThreadHook
@@ -64,7 +81,7 @@ eachInfoAround =
         pure ()
     }
 
-eachAfter :: Hook EachAfter Int Int
+eachAfter :: Hook Each Int Int
 eachAfter =
   EachAfter'
     { eachAfterParent = eachInfoAround
@@ -73,7 +90,7 @@ eachAfter =
         pure ()
     }
 
-eachIntBefore :: Hook EachBefore Int Int
+eachIntBefore :: Hook Each Int Int
 eachIntBefore =
   EachBefore'
     { eachParent = eachInfoAround

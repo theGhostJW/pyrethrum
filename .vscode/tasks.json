@@ -9,7 +9,7 @@
       "presentation": {
         "reveal": "always",
         "panel": "shared",
-        "showReuseMessage": false
+        "showReuseMessage": true
       },
       "dependsOn": [
         "hpack",

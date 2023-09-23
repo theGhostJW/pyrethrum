@@ -49,50 +49,50 @@ instance C.Config TestConfig
 -- type Hook a = Hook RunConfig TestConfig ApEffs a
 
 
-class OnceParam2 a
-class ThreadParam2 a
-class EachParam2 a
-class Param2 a
-class (Param2 a, Param2 b) => ValidParent2 a b
+-- class OnceParam2 a
+-- class ThreadParam2 a
+-- class EachParam2 a
+-- class Param2 a
+-- class (Param2 a, Param2 b) => ValidParent2 a b
 
-data Once2
-instance OnceParam2 Once2
-instance ThreadParam2 Once2
-instance EachParam2 Once2
-instance Param2 Once2
+-- data Once2
+-- instance OnceParam2 Once2
+-- instance ThreadParam2 Once2
+-- instance EachParam2 Once2
+-- instance Param2 Once2
 
-data Thread2
-instance ThreadParam2 Thread2
-instance EachParam2 Thread2
-instance Param2 Thread2
+-- data Thread2
+-- instance ThreadParam2 Thread2
+-- instance EachParam2 Thread2
+-- instance Param2 Thread2
 
-data Each2
-instance EachParam2 Each2
-instance Param2 EachParam2
-instance Param2 Each2
+-- data Each2
+-- instance EachParam2 Each2
+-- instance Param2 EachParam2
+-- instance Param2 Each2
 
-instance ValidParent2 Once2 Once2
-instance ValidParent2 Once2 Thread2
-instance ValidParent2 Once2 Each2
+-- instance ValidParent2 Once2 Once2
+-- instance ValidParent2 Once2 Thread2
+-- instance ValidParent2 Once2 Each2
 
-instance ValidParent2 Thread2 Thread2
-instance ValidParent2 Thread2 Each2
+-- instance ValidParent2 Thread2 Thread2
+-- instance ValidParent2 Thread2 Each2
 
-instance ValidParent2 Each2 Each2
+-- instance ValidParent2 Each2 Each2
 
-data Hook2 loc i o where
-  Before2 ::
-    (Param2 loc) =>
-    { onceAction :: RunConfig -> Action o
-    } ->
-    Hook2 loc () o
-  Before2' ::
-    -- forall loc a b.
-    (ValidParent2 ploc loc) =>
-    { onceParent :: Hook2 ploc pi i
-    , onceAction' :: i -> RunConfig -> Action o
-    } ->
-    Hook2 loc i o
+-- data Hook2 loc i o where
+--   Before2 ::
+--     (Param2 loc) =>
+--     { onceAction :: RunConfig -> Action o
+--     } ->
+--     Hook2 loc () o
+--   Before2' ::
+--     -- forall loc a b.
+--     (ValidParent2 ploc loc) =>
+--     { onceParent :: Hook2 ploc pi i
+--     , onceAction' :: i -> RunConfig -> Action o
+--     } ->
+--     Hook2 loc i o
 
 
 data Hook loc i o where

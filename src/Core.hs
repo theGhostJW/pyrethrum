@@ -70,16 +70,28 @@ instance ToJSON (Check v) where
 
 --
 
-class Param a
+data Frequency = Once | Thread | Each deriving (Show, Eq)
+
+class Param a where
+  frequency :: Frequency
+
 class (Param a, Param b) => ValidParent a b
 
 data Once
 data Thread
 data Each
 
-instance Param Once
-instance Param Thread
-instance Param Each
+instance Param Once where
+  frequency :: Frequency
+  frequency = Once
+
+instance Param Thread where
+  frequency :: Frequency
+  frequency = Thread
+
+instance Param Each where
+  frequency :: Frequency
+  frequency = Each
 
 instance ValidParent Once Once
 instance ValidParent Once Thread
@@ -90,7 +102,6 @@ instance ValidParent Thread Each
 
 instance ValidParent Each Each
 
-
 data Hook rc tc effs loc i o where
   Before ::
     (Param loc) =>
@@ -100,7 +111,7 @@ data Hook rc tc effs loc i o where
   Before' ::
     (Param ploc, Param loc, ValidParent ploc loc) =>
     { parent :: Hook rc tc effs ploc pi i
-    , action' :: i -> rc -> Eff effs o
+    , action' :: rc -> i -> Eff effs o
     } ->
     Hook rc tc effs loc i o
   After ::
@@ -117,17 +128,20 @@ data Hook rc tc effs loc i o where
   Around ::
     (Param loc) =>
     { setup :: rc -> Eff effs o
-    , teardown :: o -> Eff effs ()
+    , teardown :: rc -> o -> Eff effs ()
     } ->
     Hook rc tc effs loc () o
   Around' ::
     (Param ploc, Param loc, ValidParent ploc loc) =>
     { parent :: Hook rc tc effs ploc pi i
-    , setup' :: i -> rc -> Eff effs o
-    , teardown' :: o -> Eff effs ()
+    , setup' :: rc -> i -> Eff effs o
+    , teardown' :: rc -> o -> Eff effs ()
     } ->
     Hook rc tc effs loc i o
 
+
+hookFrequency :: forall rc tc effs loc i o. Param loc => Hook rc tc effs loc i o -> Frequency
+hookFrequency _ = frequency @loc
 
 newtype StubLoc = StubLoc Text
 data Addressed a = Addressed
@@ -148,7 +162,7 @@ data Test rc tc effs hi where
     (ItemClass i ds) =>
     { parent :: Hook rc tc effs loc pi hi
     , config' :: tc
-    , action' :: hi -> rc -> i -> Eff effs as
+    , action' :: rc -> hi -> i -> Eff effs as
     , parse' :: as -> Either ParseException ds
     , items' :: rc -> [i]
     } ->
@@ -164,7 +178,7 @@ data Test rc tc effs hi where
     (ItemClass i ds) =>
     { parent :: Hook rc tc effs loc pi hi
     , config' :: tc
-    , action' :: hi -> rc -> i -> Eff effs ds
+    , action' :: rc -> hi -> i -> Eff effs ds
     , items' :: rc -> [i]
     } ->
     Test rc tc effs hi
@@ -177,7 +191,7 @@ data Test rc tc effs hi where
   Single' ::
     { parent :: Hook rc tc effs loc pi hi
     , config' :: tc
-    , singleAction' :: hi -> rc -> Eff effs ds
+    , singleAction' :: rc -> hi -> Eff effs ds
     , checks' :: Checks ds
     } ->
     Test rc tc effs hi
@@ -191,12 +205,14 @@ type Suite rc tc effs = [SuiteElement rc tc effs ()]
 
 data SuiteElement rc tc effs i where
   Hook ::
+    (Param loc) =>
     { path :: Path
     , hook :: Hook rc tc effs loc i o
     , subNodes :: [SuiteElement rc tc effs o]
     } ->
     SuiteElement rc tc effs i
   Test ::
+    (Param loc) =>
     { path :: Path
     , test :: Test rc tc effs i
     } ->

@@ -8,33 +8,31 @@ import Effectful (Eff)
 import Internal.RunTimeLogging (ExeLog)
 import PyrethrumExtras (uu)
 
-data Frequency = Once | Thread | Each deriving (Show, Eq)
-
 data PreNode m c i where
   Before ::
     { path :: C.Path
-    , frequency :: Frequency
+    , frequency :: C.Frequency
     , action :: i -> m o
     , subNodes :: c (PreNode m c o)
     } ->
     PreNode m c i
   After ::
-    { path' :: C.Path
-    , frequency' :: Frequency
-    , subNodes' :: c (PreNode m c o)
+    { path :: C.Path
+    , frequency :: C.Frequency
+    , subNodes :: c (PreNode m c o)
     , after :: m ()
     } ->
-    PreNode m c ()
+    PreNode m c i
   Around ::
     { path :: C.Path
-    , frequency :: Frequency
-    , setUp :: i -> m o
+    , frequency :: C.Frequency
+    , setup :: i -> m o
     , subNodes :: c (PreNode m c o)
-    , tearDown :: o -> m ()
+    , teardown :: o -> m ()
     } ->
     PreNode m c i
   Test ::
-    { tests :: [i -> m ()]
+    { tests :: c (i -> m ())
     } ->
     PreNode m c i
 
@@ -60,70 +58,63 @@ data PrepParams rc tc effs where
 ioRunSuiteElm :: forall rc tc effs i. PrepParams rc tc effs -> C.SuiteElement rc tc effs i -> PreNode IO [] i
 ioRunSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
   suiteElm & \case
-    C.Hook{hook, path, subNodes} ->
+    C.Hook{hook, path, subNodes = subNodes'} ->
       hook & \case
-        C.OnceBefore{onceAction} ->
+        C.Before{action} ->
           Before
             { path
-            , frequency = Once
-            , action = \_ -> intprt $ onceAction runConfig
-            , subNodes = run <$> subNodes
+            , frequency
+            , action = const . intprt $ action runConfig
+            , subNodes
             }
-        C.OnceBefore'
-          { onceAction'
+        C.Before'
+          { action'
           } ->
             Before
               { path
-              , frequency = Once
-              , action = \i -> intprt $ onceAction' i runConfig
-              , subNodes = run <$> subNodes
+              , frequency
+              , action = intprt . action' runConfig
+              , subNodes
               }
-        C.OnceAfter{onceAfter} ->
+        C.After{afterAction} ->
           After
-            { path' = path
-            , frequency' = Once
-            , subNodes' = run <$> subNodes
-            , after = intprt $ onceAfter runConfig
-            }
-        C.OnceAfter'{} -> uu
-        C.OnceAround{} -> uu
-        C.OnceAround'{} -> uu
-        C.ThreadBefore{threadAction} ->
-          Before
             { path
-            , frequency = Thread
-            , action = \_ -> intprt $ threadAction runConfig
-            , subNodes = run <$> subNodes
+            , frequency
+            , subNodes
+            , after = intprt $ afterAction runConfig
             }
-        C.ThreadBefore'{threadAction'} ->
-          Before
-            { path
-            , frequency = Thread
-            , action = \i -> intprt $ threadAction' i runConfig
-            , subNodes = run <$> subNodes
+        C.After'{afterAction'} ->
+          After
+            { path = path
+            , frequency = frequency
+            , subNodes = subNodes
+            , after = intprt $ afterAction' runConfig
             }
-        C.ThreadAfter{} -> uu
-        C.ThreadAfter'{} -> uu
-        C.ThreadAround{} -> uu
-        C.ThreadAround'{} -> uu
-        C.EachBefore{eachAction} ->
-          Before
-            { path
-            , frequency = Each
-            , action = \_ -> intprt $ eachAction runConfig
-            , subNodes = run <$> subNodes
-            }
-        C.EachBefore'{eachAction'} ->
-          Before
-            { path
-            , frequency = Each
-            , action = \i -> intprt $ eachAction' i runConfig
-            , subNodes = run <$> subNodes
-            }
-        C.EachAfter{} -> uu
-        C.EachAfter'{} -> uu
-        C.EachAround{} -> uu
-        C.EachAround'{} -> uu
+        C.Around
+          { setup
+          , teardown
+          } ->
+            Around
+              { path
+              , frequency
+              , setup = const . intprt $ setup runConfig
+              , subNodes
+              , teardown = intprt . teardown runConfig
+              }
+        C.Around'
+          { setup'
+          , teardown'
+          } ->
+            Around
+              { path
+              , frequency
+              , setup = intprt . setup' runConfig
+              , subNodes
+              , teardown = intprt . teardown' runConfig
+              }
+     where
+      frequency = C.hookFrequency hook
+      subNodes = run <$> subNodes'
     C.Test{} -> uu
  where
   run :: forall a. C.SuiteElement rc tc effs a -> PreNode IO [] a

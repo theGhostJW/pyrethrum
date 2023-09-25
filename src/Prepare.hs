@@ -115,7 +115,7 @@ ioRunSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
      where
       frequency = C.hookFrequency hook
       subNodes = run <$> subNodes'
-    C.Test{} -> uu
+    C.Test{path, test} -> runTest pp path test
  where
   run :: forall a. C.SuiteElement rc tc effs a -> PreNode IO [] a
   run = ioRunSuiteElm pp
@@ -129,6 +129,20 @@ ioRunSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
         (\(callstack, exception) -> throwIO exception)
         pure
 
+
+runTest :: PrepParams rc tc effs -> C.Path -> C.Test rc tc effs i -> PreNode IO [] i
+runTest pp@PrepParams{eventSink, interpreter, runConfig} path = 
+   \case 
+     C.Full {config, action, parse, items} -> uu
+     C.Full' {config', parent, action', parse', items'} -> uu
+     C.NoParse {config, action, items} -> uu
+     C.NoParse' {parent, action', items'} -> uu
+     C.Single {config, singleAction, checks} -> uu
+     C.Single' {parent, singleAction', checks'} -> uu
+    -- where 
+    --   uu
+    
+    
 data SuitePrepParams rc tc effs where
   SuitePrepParams ::
     { suite :: C.Suite rc tc effs

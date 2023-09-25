@@ -48,7 +48,6 @@ instance C.Config TestConfig
 
 -- type Hook a = Hook RunConfig TestConfig ApEffs a
 
-
 -- class OnceParam2 a
 -- class ThreadParam2 a
 -- class EachParam2 a
@@ -94,112 +93,44 @@ instance C.Config TestConfig
 --     } ->
 --     Hook2 loc i o
 
-
 data Hook loc i o where
-  -- once hooks
-  OnceBefore ::
-    { onceAction :: RunConfig -> Action o
+  Before ::
+    (C.Param loc) =>
+    { action :: RunConfig -> Action o
     } ->
-    Hook C.Once () o
-  ThreadBefore ::
-    { threadAction :: RunConfig -> Action o
+    Hook loc () o
+  Before' ::
+    (C.Param ploc, C.Param loc, C.ValidParent ploc loc) =>
+    { parent :: Hook ploc pi i
+    , action' :: RunConfig -> i -> Action o
     } ->
-    Hook C.Thread () o
-  EachBefore ::
-    { eachAction :: RunConfig -> Action o
+    Hook loc i o
+  After ::
+    (C.Param loc) =>
+    { afterAction :: RunConfig -> Action ()
     } ->
-    Hook C.Each () o
-  OnceBefore' ::
-    -- forall loc a b.
-    (C.OnceParam loc) =>
-    { onceParent :: Hook loc pi i
-    , onceAction' :: i -> RunConfig -> Action o
+    Hook loc () ()
+  After' ::
+    (C.Param ploc, C.Param loc, C.ValidParent ploc loc) =>
+    { afterParent :: Hook ploc pi i
+    , afterAction' :: RunConfig -> Action ()
     } ->
-    Hook C.Once i o
-  ThreadBefore' ::
-  -- once per thread hooks
-    -- forall loc a b.
-    (C.ThreadParam loc) =>
-    { threadParent :: Hook loc pi i
-    , threadAction' :: i -> RunConfig -> Action o
+    Hook loc i i
+  Around ::
+    (C.Param loc) =>
+    { setup :: RunConfig -> Action o
+    , teardown :: RunConfig -> o -> Action ()
     } ->
-    Hook C.Thread i o
-  OnceAfter ::
-    { onceAfter :: RunConfig -> Action ()
+    Hook loc () o
+  Around' ::
+    (C.Param ploc, C.Param loc, C.ValidParent ploc loc) =>
+    { parent :: Hook ploc pi i
+    , setup' :: RunConfig -> i -> Action o
+    , teardown' :: RunConfig -> o -> Action ()
     } ->
-    Hook C.Once () ()
-  OnceAfter' ::
-    (C.OnceParam loc) =>
-    { onceAfterParent :: Hook loc pi i
-    , onceAfter' :: RunConfig -> Action ()
-    } ->
-    Hook C.Once i i
-  OnceAround ::
-    { onceSetup :: RunConfig -> Action o
-    , onceTearDown :: o -> Action ()
-    } ->
-    Hook C.Once () o
-  OnceAround' ::
-    -- forall loc a b.
-    (C.OnceParam loc) =>
-    { onceAroundParent :: Hook loc pi i
-    , onceSetup' :: i -> RunConfig -> Action o
-    , onceTearDown' :: o -> Action ()
-    } ->
-    Hook C.Once i o
-  ThreadAfter ::
-    { threadAfter :: RunConfig -> Action ()
-    } ->
-    Hook C.Thread  () ()
-  ThreadAfter' ::
-    (C.ThreadParam loc) =>
-    { threadAfterParent :: Hook loc pi i
-    , threadAfter' :: RunConfig -> Action ()
-    } ->
-    Hook C.Thread  i i
-  ThreadAround ::
-    { threadSetup :: RunConfig -> Action o
-    , threadTearDown :: a -> Action ()
-    } ->
-    Hook C.Thread  () o
-  ThreadAround' ::
-    (C.ThreadParam loc) =>
-    { threadAroundParent :: Hook loc pi i
-    , threadSetup' :: i -> RunConfig -> Action o
-    , threadTearDown' :: o -> Action ()
-    } ->
-    Hook C.Thread  i o
-  -- each hooks
-  EachBefore' ::
-    -- forall loc a b.
-    (C.EachParam loc) =>
-    { eachParent :: Hook loc pi i
-    , eachAction' :: i -> RunConfig -> Action o
-    } ->
-    Hook C.Each i o
-  EachAfter ::
-    { eachAfter :: RunConfig -> Action ()
-    } ->
-    Hook C.Each () ()
-  EachAfter' ::
-    (C.EachParam loc) =>
-    { eachAfterParent :: Hook loc pi i
-    , eachAfter' :: RunConfig -> Action ()
-    } ->
-    Hook C.Each i i
-  EachAround ::
-    { eachSetup :: RunConfig -> Action o
-    , eachTearDown :: o -> Action ()
-    } ->
-    Hook C.Each () o
-  EachAround' ::
-    (C.EachParam loc) =>
-    { eachAroundParent :: Hook loc pi i
-    , eachSetup' :: i -> RunConfig -> Action o
-    , eachTearDown' :: o -> Action ()
-    } ->
-    Hook C.Each i o
+    Hook loc i o
 
+-- TODO: split datatypes with conversion typeclasses
 data Test hi where
   Full ::
     -- forall i as ds.
@@ -212,7 +143,7 @@ data Test hi where
     Test ()
   Full' ::
     -- forall i as ds loc a.
-    (C.ItemClass i ds, C.EachParam loc) =>
+    (C.ItemClass i ds, C.Param loc) =>
     { parent :: Hook loc pi a
     , config' :: TestConfig
     , action' :: a -> RunConfig -> i -> Action as
@@ -230,7 +161,7 @@ data Test hi where
     Test ()
   NoParse' ::
     -- forall i ds loc a.
-    (C.ItemClass i ds, C.EachParam loc) =>
+    (C.ItemClass i ds, C.Param loc) =>
     { parent :: Hook loc pi a
     , config' :: TestConfig
     , action' :: a -> RunConfig -> i -> Action ds
@@ -244,7 +175,7 @@ data Test hi where
     } ->
     Test ()
   Single' ::
-    (C.EachParam loc) =>
+    (C.Param loc) =>
     { parent :: Hook loc pi a
     , config' :: TestConfig
     , singleAction' :: a -> RunConfig -> Action as
@@ -271,35 +202,23 @@ mkTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
   Full'{..} -> C.Full' (mkHook parent) config' action' parse' items'
-  NoParse'{..} -> C.NoParse' {parent = mkHook parent, .. }
+  NoParse'{..} -> C.NoParse'{parent = mkHook parent, ..}
   Single{..} -> C.Single{..}
   Single'{..} -> C.Single' (mkHook parent) config' singleAction' checks'
 
-mkHook :: Hook loc i o -> C.Hook RunConfig TestConfig ApEffs loc i o
+mkHook :: Hook loc i o -> C.Hook RunConfig ApEffs loc i o
 mkHook = \case
-  OnceBefore{..} -> C.OnceBefore{..}
-  OnceBefore'{..} -> C.OnceBefore' (mkHook onceParent) onceAction'
-  OnceAfter{..} -> C.OnceAfter{..}
-  OnceAfter'{..} -> C.OnceAfter'{onceAfterParent = mkHook  onceAfterParent,..}
-  ThreadAfter'{..} -> C.ThreadAfter' {threadAfterParent = mkHook threadAfterParent,..}
-  EachAfter'{..} -> C.EachAfter'{eachAfterParent = mkHook eachAfterParent,..}
-  OnceAround'
-    { onceAroundParent
-    , onceSetup'
-    , onceTearDown'
+  Before{..} -> C.Before{..}
+  Before'{..} -> C.Before' (mkHook parent) action'
+  After{..} -> C.After{..}
+  After'{..} -> C.After'{afterParent = mkHook afterParent, ..}
+  Around{..} -> C.Around{..}
+  Around'
+    { parent
+    , setup'
+    , teardown'
     } ->
-      C.OnceAround' (mkHook onceAroundParent) onceSetup' onceTearDown'
-  OnceAround{..} -> C.OnceAround{..}
-  ThreadBefore{..} -> C.ThreadBefore{..}
-  ThreadBefore'{..} -> C.ThreadBefore' (mkHook threadParent) threadAction'
-  ThreadAfter{..} -> C.ThreadAfter {..}
-  ThreadAround{..} -> C.ThreadAround {..}
-  ThreadAround'{threadAroundParent = p, ..} -> C.ThreadAround' (mkHook p) threadSetup' threadTearDown'
-  EachBefore{..} -> C.EachBefore{..}
-  EachBefore'{eachParent, eachAction'} -> C.EachBefore' (mkHook eachParent) eachAction'
-  EachAfter{..} -> C.EachAfter{..}
-  EachAround{..} -> C.EachAround{..}
-  EachAround'{eachAroundParent, eachSetup', eachTearDown'} -> C.EachAround' (mkHook eachAroundParent) eachSetup' eachTearDown'
+      C.Around' (mkHook parent) setup' teardown'
 
 mkSuite :: SuiteElement i -> C.SuiteElement RunConfig TestConfig ApEffs i
 mkSuite = \case

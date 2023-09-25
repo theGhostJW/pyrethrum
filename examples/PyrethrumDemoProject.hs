@@ -46,53 +46,6 @@ $(deriveJSON defaultOptions ''TestConfig)
 
 instance C.Config TestConfig
 
--- type Hook a = Hook RunConfig TestConfig ApEffs a
-
--- class OnceParam2 a
--- class ThreadParam2 a
--- class EachParam2 a
--- class Param2 a
--- class (Param2 a, Param2 b) => ValidParent2 a b
-
--- data Once2
--- instance OnceParam2 Once2
--- instance ThreadParam2 Once2
--- instance EachParam2 Once2
--- instance Param2 Once2
-
--- data Thread2
--- instance ThreadParam2 Thread2
--- instance EachParam2 Thread2
--- instance Param2 Thread2
-
--- data Each2
--- instance EachParam2 Each2
--- instance Param2 EachParam2
--- instance Param2 Each2
-
--- instance ValidParent2 Once2 Once2
--- instance ValidParent2 Once2 Thread2
--- instance ValidParent2 Once2 Each2
-
--- instance ValidParent2 Thread2 Thread2
--- instance ValidParent2 Thread2 Each2
-
--- instance ValidParent2 Each2 Each2
-
--- data Hook2 loc i o where
---   Before2 ::
---     (Param2 loc) =>
---     { onceAction :: RunConfig -> Action o
---     } ->
---     Hook2 loc () o
---   Before2' ::
---     -- forall loc a b.
---     (ValidParent2 ploc loc) =>
---     { onceParent :: Hook2 ploc pi i
---     , onceAction' :: i -> RunConfig -> Action o
---     } ->
---     Hook2 loc i o
-
 data Hook loc i o where
   Before ::
     (C.Param loc) =>
@@ -133,7 +86,6 @@ data Hook loc i o where
 -- TODO: split datatypes with conversion typeclasses
 data Test hi where
   Full ::
-    -- forall i as ds.
     (C.ItemClass i ds) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Action as
@@ -142,11 +94,10 @@ data Test hi where
     } ->
     Test ()
   Full' ::
-    -- forall i as ds loc a.
     (C.ItemClass i ds, C.Param loc) =>
     { parent :: Hook loc pi a
     , config' :: TestConfig
-    , action' :: a -> RunConfig -> i -> Action as
+    , action' :: RunConfig -> a  -> i -> Action as
     , parse' :: as -> Either C.ParseException ds
     , items' :: RunConfig -> [i]
     } ->
@@ -160,11 +111,10 @@ data Test hi where
     } ->
     Test ()
   NoParse' ::
-    -- forall i ds loc a.
     (C.ItemClass i ds, C.Param loc) =>
     { parent :: Hook loc pi a
     , config' :: TestConfig
-    , action' :: a -> RunConfig -> i -> Action ds
+    , action' ::  RunConfig -> a -> i -> Action ds
     , items' :: RunConfig -> [i]
     } ->
     Test a
@@ -178,7 +128,7 @@ data Test hi where
     (C.Param loc) =>
     { parent :: Hook loc pi a
     , config' :: TestConfig
-    , singleAction' :: a -> RunConfig -> Action as
+    , singleAction' :: RunConfig -> a ->  Action as
     , checks' :: C.Checks as
     } ->
     Test a
@@ -186,6 +136,7 @@ data Test hi where
 type Suite = [SuiteElement ()]
 data SuiteElement i where
   Hook ::
+    (C.Param loc) =>
     { path :: C.Path
     , hook :: Hook loc i o
     , subNodes :: [SuiteElement o]

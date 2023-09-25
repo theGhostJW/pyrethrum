@@ -45,12 +45,17 @@ type PreSuite m c i = [PreNode m c i]
 --    - tree shaking
 --    - querying
 
-type EvntSink = ExeLog C.Path ApEvent
+data PrepLog = PrepLog {
+  path :: C.Path,
+  event :: ApEvent
+} deriving Show
+
+type EvntSink = PrepLog -> IO ()
 
 data PrepParams rc tc effs where
   PrepParams ::
     { eventSink :: EvntSink
-    , interpreter :: forall a. EvntSink -> Eff effs a -> IO (Either (CallStack, SomeException) a)
+    , interpreter :: forall a. {- EvntSink -> -} Eff effs a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
     PrepParams rc tc effs
@@ -122,7 +127,7 @@ ioRunSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
 
   intprt :: forall a. Eff effs a -> IO a
   intprt action =
-    interpreter eventSink action
+    interpreter action
       >>=
       -- todo throwing away callstack recreate nested exceptption or something to preserve callstack
       either
@@ -133,21 +138,27 @@ ioRunSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
 runTest :: PrepParams rc tc effs -> C.Path -> C.Test rc tc effs i -> PreNode IO [] i
 runTest pp@PrepParams{eventSink, interpreter, runConfig} path = 
    \case 
-     C.Full {config, action, parse, items} -> uu
-     C.Full' {config', parent, action', parse', items'} -> uu
-     C.NoParse {config, action, items} -> uu
-     C.NoParse' {parent, action', items'} -> uu
-     C.Single {config, singleAction, checks} -> uu
-     C.Single' {parent, singleAction', checks'} -> uu
-    -- where 
-    --   uu
+     C.Full {action, parse, items} -> uu
+     C.Full' {parent, action', parse', items'} -> uu
+     C.NoParse {action, items} -> uu
+     C.NoParse' {action', items'} -> uu
+     C.Single {singleAction, checks} -> uu
+     C.Single' {singleAction', checks'} -> uu
+    where 
+     log = eventSink . PrepLog path . Framework
+     {-
+     put configs back start end in bracket ??
+     Action
+  | Parse ApStateJSON
+  | Check DStateJSON
+     -}
     
     
 data SuitePrepParams rc tc effs where
   SuitePrepParams ::
     { suite :: C.Suite rc tc effs
     , eventSink :: EvntSink
-    , interpreter :: EvntSink -> Eff effs a -> IO (Either (CallStack, SomeException) a)
+    , interpreter :: {- EvntSink -> -} Eff effs a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
     SuitePrepParams rc tc effs
@@ -155,7 +166,7 @@ data SuitePrepParams rc tc effs where
 ioRun :: SuitePrepParams rc tc effs -> PreSuite IO [] (Either (CallStack, SomeException) ())
 ioRun pp@SuitePrepParams{interpreter} = uu
  where
-  intprt = interpreter pp.eventSink
+  intprt = interpreter 
 
 data TestItem rc tc m i = TestItem
   { id :: Int
@@ -163,19 +174,3 @@ data TestItem rc tc m i = TestItem
   , test :: rc -> i -> m ()
   , chkText :: Text
   }
-
--- prepare :: (Suite rc tc effs -> m b) -> Suite rc tc effs ->
-
--- type Suite rc tc effs = [SuiteElement rc tc effs ()]
-
--- data SuiteElement rc tc effs i where
---   Hook ::
---     { path :: Path
---     , hook :: Hook rc tc effs loc i o
---     , subNodes :: [SuiteElement rc tc effs o]
---     } ->
---     SuiteElement rc tc effs i--   Test ::
---     { path :: Path
---     , test :: Test rc tc effs i
---     } ->
---     SuiteElement rc tc effs i

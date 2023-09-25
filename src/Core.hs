@@ -199,7 +199,7 @@ data Test rc tc effs hi where
 data Path = Path
   { module' :: Text
   , title :: Text
-  }
+  } deriving Show
 
 type Suite rc tc effs = [SuiteElement rc tc effs ()]
 
@@ -212,7 +212,6 @@ data SuiteElement rc tc effs i where
     } ->
     SuiteElement rc tc effs i
   Test ::
-    -- (Param loc) =>
     { path :: Path
     , test :: Test rc tc effs i
     } ->

@@ -29,7 +29,7 @@ type HasId a = HasField "id" a Int
 
 class (HasTitle a, Show a, HasMaxThreads a, FromJSON a, ToJSON a, Eq a) => Config a
 
-type ItemClass i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds))
+class (HasTitle i, HasId i, HasField "checks" i (Checks ds),  FromJSON i, ToJSON i) => Item i ds
 
 newtype Checks ds = Checks
   { un :: DL.DList (Check ds)
@@ -151,7 +151,7 @@ data Addressed a = Addressed
 
 data Test rc tc effs hi where
   Full ::
-    (ItemClass i ds) =>
+    (Item i ds) =>
     { config :: tc
     , action :: rc -> i -> Eff effs as
     , parse :: as -> Either ParseException ds
@@ -159,7 +159,7 @@ data Test rc tc effs hi where
     } ->
     Test rc tc effs ()
   Full' ::
-    (ItemClass i ds) =>
+    (Item i ds) =>
     { parent :: Hook rc effs loc pi hi
     , config' :: tc
     , action' :: rc -> hi -> i -> Eff effs as
@@ -168,14 +168,14 @@ data Test rc tc effs hi where
     } ->
     Test rc tc effs hi
   NoParse ::
-    (ItemClass i ds) =>
+    (Item i ds) =>
     { config :: tc
     , action :: rc -> i -> Eff effs ds
     , items :: rc -> [i]
     } ->
     Test rc tc effs ()
   NoParse' ::
-    (ItemClass i ds) =>
+    (Item i ds) =>
     { parent :: Hook rc effs loc pi hi
     , config' :: tc
     , action' :: rc -> hi -> i -> Eff effs ds
@@ -203,19 +203,19 @@ data Path = Path
 
 type Suite rc tc effs = [SuiteElement rc tc effs ()]
 
-data SuiteElement rc tc effs i where
+data SuiteElement rc tc effs hi where
   Hook ::
     (Param loc) =>
     { path :: Path
-    , hook :: Hook rc effs loc i o
+    , hook :: Hook rc effs loc hi o
     , subNodes :: [SuiteElement rc tc effs o]
     } ->
-    SuiteElement rc tc effs i
+    SuiteElement rc tc effs hi
   Test ::
     { path :: Path
-    , test :: Test rc tc effs i
+    , test :: Test rc tc effs hi
     } ->
-    SuiteElement rc tc effs i
+    SuiteElement rc tc effs hi
 
 -- try this
 -- part 1

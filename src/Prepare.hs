@@ -7,6 +7,7 @@ import DSL.Out (Sink (..))
 import Effectful (Eff)
 import Internal.RunTimeLogging (ExeLog)
 import PyrethrumExtras (uu)
+import Data.Either.Extra (fromRight')
 
 data PreNode m c i where
   Before ::
@@ -32,7 +33,11 @@ data PreNode m c i where
     } ->
     PreNode m c i
   Test ::
-    { tests :: c (i -> m ())
+    (C.Config tc) =>
+    { 
+      config :: tc,
+      path :: C.Path,
+      tests :: c (i -> m ())
     } ->
     PreNode m c i
 
@@ -60,7 +65,7 @@ data PrepParams rc tc effs where
     } ->
     PrepParams rc tc effs
 
-ioRunSuiteElm :: forall rc tc effs i. PrepParams rc tc effs -> C.SuiteElement rc tc effs i -> PreNode IO [] i
+ioRunSuiteElm :: forall rc tc effs i. (C.Config rc, C.Config tc) => PrepParams rc tc effs -> C.SuiteElement rc tc effs i -> PreNode IO [] i
 ioRunSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
   suiteElm & \case
     C.Hook{hook, path, subNodes = subNodes'} ->
@@ -128,29 +133,28 @@ ioRunSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
   intprt :: forall a. Eff effs a -> IO a
   intprt action =
     interpreter action
-      >>=
-      -- todo throwing away callstack recreate nested exceptption or something to preserve callstack
-      either
-        (\(callstack, exception) -> throwIO exception)
-        pure
+      >>= toIO
 
+toIO :: Either (CallStack, SomeException) a -> IO a
+toIO = pure . fromRight' 
 
-runTest :: PrepParams rc tc effs -> C.Path -> C.Test rc tc effs i -> PreNode IO [] i
+runTest :: forall rc tc hi effs. (C.Config rc, C.Config tc) => PrepParams rc tc effs -> C.Path -> C.Test rc tc effs hi -> PreNode IO [] hi
 runTest pp@PrepParams{eventSink, interpreter, runConfig} path = 
    \case 
-     C.Full {action, parse, items} -> uu
-     C.Full' {parent, action', parse', items'} -> uu
-     C.NoParse {action, items} -> uu
-     C.NoParse' {action', items'} -> uu
-     C.Single {singleAction, checks} -> uu
-     C.Single' {singleAction', checks'} -> uu
+     C.Full {config, action, parse, items} -> uu
+     C.Full' {config', parent, action', parse', items'} -> uu
+     C.NoParse {config, action, items} -> uu
+     C.NoParse' {config', action', items'} -> uu
+     C.Single {config, singleAction, checks} -> uu
+     C.Single' {config', singleAction', checks'} -> uu
     where 
      log = eventSink . PrepLog path . Framework
      {-
-     put configs back start end in bracket ??
-     Action
-  | Parse ApStateJSON
-  | Check DStateJSON
+  = Action {item :: ItemJSON}
+  | Parse {id :: Int, apState :: ApStateJSON}
+  | CheckStart {id :: Int, apState :: ApStateJSON} 
+  | Check { description :: Text, result :: CheckResult }
+  | Step Text
      -}
     
     

@@ -86,7 +86,7 @@ data Hook loc i o where
 -- TODO: split datatypes with conversion typeclasses
 data Test hi where
   Full ::
-    (C.ItemClass i ds) =>
+    (C.Item i ds) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Action as
     , parse :: as -> Either C.ParseException ds
@@ -94,7 +94,7 @@ data Test hi where
     } ->
     Test ()
   Full' ::
-    (C.ItemClass i ds, C.Param loc) =>
+    (C.Item i ds, C.Param loc) =>
     { parent :: Hook loc pi a
     , config' :: TestConfig
     , action' :: RunConfig -> a  -> i -> Action as
@@ -104,14 +104,14 @@ data Test hi where
     Test a
   NoParse ::
     forall i ds.
-    (C.ItemClass i ds) =>
+    (C.Item i ds) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Action ds
     , items :: RunConfig -> [i]
     } ->
     Test ()
   NoParse' ::
-    (C.ItemClass i ds, C.Param loc) =>
+    (C.Item i ds, C.Param loc) =>
     { parent :: Hook loc pi a
     , config' :: TestConfig
     , action' ::  RunConfig -> a -> i -> Action ds

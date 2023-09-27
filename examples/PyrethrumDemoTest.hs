@@ -1,6 +1,7 @@
 module PyrethrumDemoTest where
 
 import Core (Checks, Once, Thread, Each, ParseException, Path (..), chk)
+import qualified Core as C
 import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, IOE, (:>))
@@ -12,49 +13,33 @@ import PyrethrumDemoProject (
   Suite,
   SuiteElement (..),
   Test (..),
-  TestConfig (..), Hook2 (..), Once2, Thread2, Each2,
+  TestConfig (..)
  )
 import PyrethrumExtras (txt)
+import Data.Aeson.TH
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
-intOnceHook2 :: Hook2 Each2 () Int
-intOnceHook2 =
-  Before2
-    { onceAction = \rc -> pure 1
-    }
-
-addOnceIntHook2 :: Hook2 Each2 Int Int
-addOnceIntHook2 =
-  Before2'
-    { -- onceParent = intThreadHook
-      onceParent = intOnceHook2
-    , onceAction' =
-        \i rc -> do
-          log $ "beforeAll' " <> txt i
-          pure $ i + 1
-    }
-
 intOnceHook :: Hook Once () Int
 intOnceHook =
-  OnceBefore
-    { onceAction = \rc -> pure 1
+  Before
+    { action = \rc -> pure 1
     }
 
 addOnceIntHook :: Hook Once Int Int
 addOnceIntHook =
-  OnceBefore'
-    { -- onceParent = intThreadHook
-      onceParent = intOnceHook
-    , onceAction' =
-        \i rc -> do
+  Before'
+    { 
+      parent = intOnceHook
+    , action' =
+        \rc i -> do
           log $ "beforeAll' " <> txt i
           pure $ i + 1
     }
 
 intThreadHook :: Hook Thread () Int
-intThreadHook = ThreadBefore $ \rc -> do
+intThreadHook = Before $ \rc -> do
   log "deriving meaning of life' "
   pure 42
 
@@ -65,44 +50,41 @@ data HookInfo = HookInfo
   deriving (Show, Generic)
 
 infoThreadHook :: Hook Thread Int HookInfo
-infoThreadHook = ThreadBefore' addOnceIntHook $ \i rc -> do
+infoThreadHook = Before' addOnceIntHook $ \rc i -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
 eachInfoAround :: Hook Each HookInfo Int
 eachInfoAround =
-  EachAround'
-    { eachAroundParent = infoThreadHook
-    , eachSetup' = \hi rc -> do
+  Around'
+    { parent = infoThreadHook
+    , setup' = \rc hi -> do
         log "eachSetup"
         pure $ hi.value + 1
-    , eachTearDown' = \i -> do
+    , teardown' = \rc i -> do
         log "eachTearDown"
         pure ()
     }
 
 eachAfter :: Hook Each Int Int
 eachAfter =
-  EachAfter'
-    { eachAfterParent = eachInfoAround
-    , eachAfter' = \rc -> do
+  After'
+    { afterParent = eachInfoAround
+    , afterAction' = \rc -> do
         log "eachAfter"
         pure ()
     }
 
 eachIntBefore :: Hook Each Int Int
 eachIntBefore =
-  EachBefore'
-    { eachParent = eachInfoAround
-    , eachAction' = \hi rc -> do
+  Before'
+    { parent = eachInfoAround
+    , action' = \rc hi -> do
         log "eachSetup"
         pure $ hi + 1
     }
 
 -- ############### Test the Lot ###################
-test :: Test ()
-test =
-  Full config action parse items
 
 config :: TestConfig
 config = TestConfig "test" 1 DeepRegression
@@ -146,15 +128,12 @@ items =
     ]
 
 -- ############### Test the Lot Child ###################
-test2 :: Test HookInfo
-test2 =
-  Full' infoThreadHook config2 action2 parse2 items2
 
 config2 :: TestConfig
 config2 = TestConfig "test" 1 DeepRegression
 
-action2 :: HookInfo -> RunConfig -> Item2 -> Action AS
-action2 HookInfo{value = hookVal} rc itm = do
+action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
+action2 rc HookInfo{value = hookVal} itm = do
   log $ txt itm
   pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
 
@@ -195,12 +174,19 @@ items2 =
     ]
 
 -- ############### Test the Lot (Record) ###################
+
+$(deriveToJSON defaultOptions ''Item2)
+$(deriveToJSON defaultOptions ''DS)
+$(deriveToJSON defaultOptions ''AS)
+-- TODO: precompiler
+instance C.Item Item2 DS
+
 test3 :: Test Int
 test3 =
   Full'
     { parent = eachIntBefore
     , config' = TestConfig "test" 1 DeepRegression
-    , action' = \i rc itm -> do
+    , action' = \rc i itm -> do
         log $ txt itm
         pure $ AS (itm.value + 1 + i) $ txt itm.value
     , parse' = \AS{..} -> pure DS{..}
@@ -221,7 +207,7 @@ test4 =
   NoParse'
     { config' = TestConfig "test" 1 DeepRegression
     , parent = eachAfter
-    , action' = \hi rc itm -> do
+    , action' = \rc hi itm -> do
         log $ txt itm
         pure $ DS (itm.value + 1) $ txt itm.value
     , items' =
@@ -241,7 +227,7 @@ test5 =
   Single'
     { config' = TestConfig "test" 1 DeepRegression
     , parent = eachAfter
-    , singleAction' = \hi rc -> do
+    , singleAction' = \rc hi -> do
         log $ "RunConfig is: " <> rc.title
         pure
           $ DS
@@ -250,6 +236,32 @@ test5 =
             }
     , checks' = chk "the value must be 1" ((== 1) . (.value))
     }
+
+-- ############### Construct Tests ###################
+-- this will be generated either by implmenting deriving, 
+-- check out DeriveAnyClass or template haskell
+-- could also look into creating un unconstrained data types
+-- all members of a convertable typeclass (specialize??)
+-- and converting to a true test fixture at the bottom of the file
+-- after deriveJson and Item
+-- TODO: precompiler template haskell
+-- need to check error messages carefully
+-- finalise templatehaskell vs deriving for these classes
+-- $(deriveTest defaultOptions ''Item)
+$(deriveToJSON defaultOptions ''Item)
+$(deriveToJSON defaultOptions ''DState)
+$(deriveToJSON defaultOptions ''ApState)
+
+instance C.Item Item DState
+
+test :: Test ()
+test =
+  Full config action parse items
+
+
+test2 :: Test HookInfo
+test2 = Full' infoThreadHook config2 action2 parse2 items2
+  
 
 -- ############### Suite ###################
 -- this will be generated be generated
@@ -300,6 +312,7 @@ suite =
           ]
       }
   ]
+
 
 {-
 -- TODO: review bracket

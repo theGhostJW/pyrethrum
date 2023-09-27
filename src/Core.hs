@@ -27,16 +27,20 @@ type HasMaxThreads a = HasField "maxThreads" a Int
 
 type HasId a = HasField "id" a Int
 
-class (HasTitle a, Show a, HasMaxThreads a, FromJSON a, ToJSON a, Eq a) => Config a
+class (HasTitle a, Show a, HasMaxThreads a, ToJSON a, Eq a) => Config a
 
-class (HasTitle i, HasId i, HasField "checks" i (Checks ds),  FromJSON i, ToJSON i) => Item i ds
+class (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i) => Item i ds
 
-newtype Checks ds = Checks
-  { un :: DL.DList (Check ds)
-  }
-  deriving (Show, Semigroup, Monoid, IsList)
+-- TODO: a property class with different constraints
+{-
 
--- TODO:: look into listLike
+Property [Data] Checks Shrinker
+
+where data is serialisable to and from JSON so can rerun speicific instances and add
+to list
+
+-}
+
 
 map :: (Check ds -> Check ds2) -> Checks ds -> Checks ds2
 map f = Checks . DL.map f . (.un)
@@ -67,6 +71,13 @@ instance Show (Check v) where
 instance ToJSON (Check v) where
   toJSON :: Check v -> Value
   toJSON = String . toS . (.header)
+
+newtype Checks ds = Checks
+  { un :: DL.DList (Check ds)
+  }
+  deriving (Show, Semigroup, Monoid, IsList, ToJSON)
+
+-- TODO:: look into listLike
 
 --
 
@@ -216,6 +227,7 @@ data SuiteElement rc tc effs hi where
     , test :: Test rc tc effs hi
     } ->
     SuiteElement rc tc effs hi
+
 
 -- try this
 -- part 1

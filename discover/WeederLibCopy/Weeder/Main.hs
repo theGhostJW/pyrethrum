@@ -150,7 +150,7 @@ main = do
 mainWithConfig :: String -> [FilePath] -> Bool -> Config -> IO (ExitCode, Analysis)
 mainWithConfig hieExt hieDirectories requireHsFiles weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances } = do
   hieFilePaths <-
-    concat <$>
+    demoTestFileOnly . concat <$>
       traverse ( getFilesIn hieExt )
         ( if null hieDirectories
           then ["./."]
@@ -376,20 +376,22 @@ displayInfo HieFile {hie_hs_file, hie_module = hie_module@Module {
   --   ) asts
 
 
+demoTestFileOnly :: [String] -> [String]
+demoTestFileOnly = filter (isInfixOf "DemoTest" . toS) 
 
 -- discover :: IO (ExitCode, Analysis)
 discover :: IO ()
 discover = do
-  hieFilePaths <- concat <$> traverse ( getFilesIn ".hie" ) ["./."]
-  hsFilePaths <- getFilesIn ".hs" "./."
+  hieFilePaths <- (traceId <$>) . concat <$> traverse ( getFilesIn ".hie" ) ["./."]
+  hsFilePaths <- (traceId <$>) <$> getFilesIn ".hs" "./."
   nameCache <- initNameCache 'z' []
 
   hieFiles <-
-    mapM ( readCompatibleHieFileOrExit nameCache ) hieFilePaths
+    mapM ( readCompatibleHieFileOrExit nameCache ) $ demoTestFileOnly hieFilePaths
 
   let
     filteredHieFiles =
-      flip filter hieFiles \hieFile -> (isInfixOf "DemoTest" . toS $ hie_hs_file hieFile) && any ( hie_hs_file hieFile `isSuffixOf`) hsFilePaths
+      flip filter hieFiles \hieFile -> any ( hie_hs_file hieFile `isSuffixOf`) hsFilePaths
 
     l = displayInfo <$> filteredHieFiles
   traverse_ (traverse_ pPrintDisplayInfo) l

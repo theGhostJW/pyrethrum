@@ -64,6 +64,7 @@ import Data.Text (Text, intercalate, isInfixOf)
 import PyrethrumExtras (uu, txt, toS)
 import GHC.Plugins (Outputable(..), renderWithContext, defaultSDocContext)
 import Data.Sequence (Seq)
+import WeederLibCopy.WeederDiscover
 
 
 data CLIArguments = CLIArguments
@@ -381,22 +382,24 @@ demoTestFileOnly = filter (isInfixOf "DemoTest" . toS)
 
 -- discover :: IO (ExitCode, Analysis)
 discover :: IO ()
-discover = do
-  hieFilePaths <- (traceId <$>) . concat <$> traverse ( getFilesIn ".hie" ) ["./."]
-  hsFilePaths <- (traceId <$>) <$> getFilesIn ".hs" "./."
-  nameCache <- initNameCache 'z' []
+-- discover :: IO Analysis
+discover = 
+  do
+    hieFilePaths <- (traceId <$>) . concat <$> traverse ( getFilesIn ".hie" ) ["./."]
+    hsFilePaths <- (traceId <$>) <$> getFilesIn ".hs" "./."
+    nameCache <- initNameCache 'z' []
 
-  hieFiles <-
-    mapM ( readCompatibleHieFileOrExit nameCache ) $ demoTestFileOnly hieFilePaths
+    hieFiles <-
+      mapM ( readCompatibleHieFileOrExit nameCache ) $ demoTestFileOnly hieFilePaths
 
-  let
-    filteredHieFiles =
-      flip filter hieFiles \hieFile -> any ( hie_hs_file hieFile `isSuffixOf`) hsFilePaths
+    let
+      filteredHieFiles =
+        flip filter hieFiles \hieFile -> any ( hie_hs_file hieFile `isSuffixOf`) hsFilePaths
+      l = displayInfo <$> filteredHieFiles
 
-    l = displayInfo <$> filteredHieFiles
-  traverse_ (traverse_ pPrintDisplayInfo) l
-  -- analysis <-
-  --   execStateT ( analyseHieFilesDiscover hieFileResults' ) emptyAnalysis
+    traverse_ (traverse_ pPrintDisplayInfo) l
+    -- analysis <- execStateT ( analyseHieFilesDiscover filteredHieFiles ) emptyAnalysis
+    -- uu
 
   -- let
   --   roots = allDeclarations analysis

@@ -19,12 +19,12 @@ import Control.Applicative ( Alternative )
 import Control.Monad ( guard, msum, when, unless )
 import Data.Traversable ( for )
 import Data.Maybe ( mapMaybe )
-import Data.Foldable ( for_, traverse_ )
+import Data.Foldable ( for_, traverse_, Foldable (toList) )
 import Data.Function ( (&) )
 import Data.List ( intercalate )
 import Data.Monoid ( First( First ), getFirst )
 import GHC.Generics ( Generic )
-import Prelude hiding ( span )
+import Prelude as P hiding ( span )
 
 
 -- ghc
@@ -34,6 +34,7 @@ import GHC.Types.Avail
   , GreName( NormalGreName, FieldGreName )
   )
 import GHC.Types.FieldLabel ( FieldLabel( FieldLabel, flSelector ) )
+import GHC.Unit.Module ( moduleName, moduleNameString, GenModule (..) )
 import GHC.Iface.Ext.Types
   ( BindType( RegularBind )
   , ContextInfo( Decl, ValBind, PatternBind, Use, TyDecl, ClassTyDecl, EvidenceVarBind, RecField )
@@ -41,7 +42,7 @@ import GHC.Iface.Ext.Types
   , EvVarSource ( EvInstBind, cls )
   , HieAST( Node, nodeChildren, nodeSpan, sourcedNodeInfo )
   , HieASTs( HieASTs, getAsts )
-  , HieFile( HieFile, hie_asts, hie_exports, hie_module, hie_hs_file, hie_types )
+  , HieFile(..)
   , HieType( HTyVarTy, HAppTy, HTyConApp, HForAllTy, HFunTy, HQualTy, HLitTy, HCastTy, HCoercionTy )
   , HieArgs( HieArgs )
   , HieTypeFix( Roll )
@@ -51,7 +52,7 @@ import GHC.Iface.Ext.Types
   , Scope( ModuleScope )
   , RecFieldContext ( RecFieldOcc )
   , TypeIndex
-  , getSourcedNodeInfo
+  , getSourcedNodeInfo, hieVersion
   )
 
 import GHC.Iface.Ext.Utils
@@ -86,9 +87,24 @@ import GHC.Types.Name
   , isVarOcc
   , occNameString
   )
-import qualified Data.Set as Set
+import qualified Data.Set as S
 import qualified Data.Map as Map
 import Control.Monad.Trans.Maybe (MaybeT(..))
+import qualified Data.Text as T
+import Data.Text ( Text, Text, intercalate, isInfixOf )
+import Debug.Trace
+import PyrethrumExtras (uu, txt, toS)
+import GHC.Plugins (Outputable(..), renderWithContext, defaultSDocContext)
+import Text.Show.Pretty hiding (Name)
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Sq
+import System.Directory.Extra
+import System.FilePath
+import GHC.Types.Name.Cache
+import GHC.Iface.Ext.Binary (HieFileResult(..), readHieFileWithVersion)
+import System.Exit (exitFailure)
+import BasePrelude (isSuffixOf)
+import Control.Monad.State (execStateT)
 
 
 analyseDataDeclarationDiscover :: ( Alternative m, MonadState Analysis m ) => HieFile -> RefMap TypeIndex -> HieAST TypeIndex -> m ()
@@ -151,7 +167,7 @@ analyseClassDeclarationDiscover refMap n@Node{ nodeSpan } = do
   where
 
     isClassDeclaration =
-      not . Set.null . Set.filter \case
+      not . S.null . S.filter \case
         Decl ClassDec _ ->
           True
 
@@ -160,7 +176,7 @@ analyseClassDeclarationDiscover refMap n@Node{ nodeSpan } = do
 
 analyseBindingDiscover :: ( Alternative m, MonadState Analysis m) => RefMap TypeIndex -> HieAST a -> m ()
 analyseBindingDiscover refMap n@Node{ nodeSpan } = do
-  let bindAnns = Set.fromList [("FunBind", "HsBindLR"), ("PatBind", "HsBindLR")]
+  let bindAnns = S.fromList [("FunBind", "HsBindLR"), ("PatBind", "HsBindLR")]
   guard $ any (annsContain n) bindAnns
 
   for_ ( findDeclarations n ) \d -> do
@@ -200,7 +216,7 @@ lookupPprTypeDiscover hieFile = renderType . lookupTypeDiscover hieFile
 addInstanceRootDiscover :: ( MonadState Analysis m) => HieFile -> Declaration -> TypeIndex -> Name -> m ()
 addInstanceRootDiscover hieFile x t cls = do
   for_ (nameToDeclaration cls) \cls' ->
-    #implicitRoots %= Set.insert (InstanceRoot x cls')
+    #implicitRoots %= S.insert (InstanceRoot x cls')
   #prettyPrintedType %= Map.insert x (lookupPprTypeDiscover hieFile t)
 
 -- | Follow evidence uses under the given node back to their instance bindings,
@@ -303,12 +319,192 @@ analyseHieFileDiscover refMap hieFile@HieFile{ hie_asts = HieASTs hieASTs, hie_e
 
 -- | Incrementally update 'Analysis' with information in every 'HieFile'.
 analyseHieFilesDiscover :: (Foldable f, MonadState Analysis m) => f HieFile -> m ()
-analyseHieFilesDiscover hieFiles = 
-  let 
+analyseHieFilesDiscover hieFiles =
+  let
     asts = concatMap (Map.elems . getAsts . hie_asts) hieFiles
     rf = generateReferencesMap asts
-  in 
+  in
     for_ hieFiles (analyseHieFileDiscover rf)
+
+
+
+-- | Recursively search for files with the given extension in given directory
+getFilesIn
+  :: String
+  -- ^ Only files with this extension are considered
+  -> FilePath
+  -- ^ Directory to look in
+  -> IO [FilePath]
+getFilesIn ext path = do
+  exists <-
+    doesPathExist path
+
+  if exists
+    then do
+      isFile <-
+        doesFileExist path
+
+      if isFile && ext `isExtensionOf` path
+        then do
+          path' <-
+            canonicalizePath path
+
+          return [ path' ]
+
+        else do
+          isDir <-
+            doesDirectoryExist path
+
+          if isDir
+            then do
+              cnts <-
+                listDirectory path
+
+              withCurrentDirectory path ( foldMap ( getFilesIn ext ) cnts )
+
+            else
+              return []
+
+    else
+      return []
+
+
+-- | Read a .hie file, exiting if it's an incompatible version.
+readCompatibleHieFileOrExit :: NameCache -> FilePath -> IO HieFile
+readCompatibleHieFileOrExit nameCache path = do
+  res <- readHieFileWithVersion (\(v, _) -> v == hieVersion) nameCache path
+  case res of
+    Right HieFileResult{ hie_file_result } ->
+      return hie_file_result
+    Left ( v, _ghcVersion ) -> do
+      putStrLn $ "incompatible hie file: " <> path
+      putStrLn $ "    this version of weeder was compiled with GHC version "
+               <> show hieVersion
+      putStrLn $ "    the hie files in this project were generated with GHC version "
+               <> show v
+      putStrLn $ "    weeder must be built with the same GHC version"
+               <> " as the project it is used on"
+      exitFailure
+
+
+
+-- *********************************************************
+-- *************** My Non Weeder Code **********************
+-- *********************************************************
+
+data DiscoverDeclarationPath = DiscoverDeclarationPath {
+  modulePath :: Text,
+  fixtureName :: Text,
+  typeName :: Text
+} deriving (Show, Eq, Ord)
+
+data DiscoverFixtureSpec = FixtureSpec {
+  path :: DiscoverDeclarationPath,
+  parent :: Maybe DiscoverDeclarationPath
+} deriving (Show, Eq, Ord)
+
+followYourDreams :: [DiscoverFixtureSpec]
+followYourDreams = uu
+
+displayHieAst :: HieAST TypeIndex -> Text
+displayHieAst ast = toS . renderWithContext defaultSDocContext $ ppr ast
+
+data DecShow = DecShow {
+  path :: Text,
+  decs :: [Declaration]
+} deriving Show
+
+pPrintDisplayInfo :: DecShow -> IO ()
+pPrintDisplayInfo d = do
+  pPrint d.path
+  pPrintList d.decs
+
+displayInfo :: HieFile -> [DecShow]
+displayInfo HieFile {hie_hs_file, hie_module = hie_module@Module {
+  moduleUnit, moduleName
+}, hie_types, hie_asts, hie_hs_src } =
+  -- intercalate ", " $ txt <$> paths
+  -- txt . ppShow $ astDs -- hangs
+  decs2 -- module path
+  --  str <- lookupPprType t 
+ where
+  asts = getAsts hie_asts
+  paths = Map.keys asts
+  decs = findDeclarations <$> asts
+  justEg =  Map.filterWithKey (\k _ -> isInfixOf "DemoTest" $ txt k) decs
+  decs2 =  Map.elems $ Map.mapWithKey (\modPath decs' -> DecShow (txt modPath) (toList decs')) decs
+  -- astDs = Map.mapWithKey (\k v ->
+  --    DecShow (txt k) (displayHieAst v)
+  --   ) asts
+
+
+demoTestFileOnly :: [String] -> [String]
+demoTestFileOnly = filter (isInfixOf "DemoTest" . toS)
+
+-- discover :: IO (ExitCode, Analysis)
+discover :: IO ()
+-- discover :: IO Analysis
+discover =
+  do
+    hieFilePaths <- (traceId <$>) . P.concat <$> traverse ( getFilesIn ".hie" ) ["./."]
+    hsFilePaths <- (traceId <$>) <$> getFilesIn ".hs" "./."
+    nameCache <- initNameCache 'z' []
+
+    hieFiles <-
+      mapM ( readCompatibleHieFileOrExit nameCache ) $ demoTestFileOnly hieFilePaths
+
+    let
+      filteredHieFiles =
+        flip filter hieFiles \hieFile -> any ( hie_hs_file hieFile `isSuffixOf`) hsFilePaths
+      l = displayInfo <$> filteredHieFiles
+
+    traverse_ (traverse_ pPrintDisplayInfo) l
+    analysis <- execStateT ( analyseHieFilesDiscover filteredHieFiles ) emptyAnalysis
+    uu
+
+  -- let
+  --   roots = allDeclarations analysis
+
+  --   reachableSet =
+  --     reachable
+  --       analysis
+  --       ( S.map DeclarationRoot roots <> filterImplicitRoots analysis ( implicitRoots analysis ) )
+
+  --   dead =
+  --     allDeclarations analysis S.\\ reachableSet
+
+  --   warnings =
+  --     Map.unionsWith (++) $
+  --     foldMap
+  --       ( \d ->
+  --           fold $ do
+  --             moduleFilePath <- Map.lookup ( declModule d ) ( modulePaths analysis )
+  --             spans <- Map.lookup d ( declarationSites analysis )
+  --             guard $ not $ null spans
+  --             let starts = map realSrcSpanStart $ S.toList spans
+  --             return [ Map.singleton moduleFilePath ( liftA2 (,) starts (pure d) ) ]
+  --       )
+  --       dead
+
+  -- for_ ( Map.toList warnings ) \( path, declarations ) ->
+  --   for_ (sortOn (srcLocLine . fst) declarations) \( start, d ) ->
+  --     case Map.lookup d (prettyPrintedType analysis) of
+  --       Nothing -> putStrLn $ showWeed path start d
+  --       Just t -> putStrLn $ showPath path start <> "(Instance) :: " <> t
+
+  -- let exitCode = if null warnings then ExitSuccess else ExitFailure 1
+
+  -- pure (exitCode, analysis)
+
+  where
+
+    filterImplicitRoots :: Analysis -> S.Set Root -> S.Set Root
+    filterImplicitRoots Analysis{ prettyPrintedType, modulePaths } = S.filter $ \case
+      DeclarationRoot _ -> True -- keep implicit roots for rewrite rules etc
+
+      ModuleRoot _ -> True
+
+      InstanceRoot d c -> True
 
 
 

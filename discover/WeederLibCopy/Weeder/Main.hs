@@ -8,7 +8,7 @@
 
 -- | This module provides an entry point to the Weeder executable.
 
-module WeederLibCopy.Weeder.Main ( main, mainWithConfig, discover ) where
+module WeederLibCopy.Weeder.Main ( main, mainWithConfig ) where
 
 -- base
 import Control.Exception ( throwIO )
@@ -64,7 +64,6 @@ import Data.Text (Text, intercalate, isInfixOf)
 import PyrethrumExtras (uu, txt, toS)
 import GHC.Plugins (Outputable(..), renderWithContext, defaultSDocContext)
 import Data.Sequence (Seq)
-import WeederLibCopy.WeederDiscover
 
 
 data CLIArguments = CLIArguments
@@ -151,7 +150,7 @@ main = do
 mainWithConfig :: String -> [FilePath] -> Bool -> Config -> IO (ExitCode, Analysis)
 mainWithConfig hieExt hieDirectories requireHsFiles weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances } = do
   hieFilePaths <-
-    demoTestFileOnly . concat <$>
+    concat <$>
       traverse ( getFilesIn hieExt )
         ( if null hieDirectories
           then ["./."]
@@ -327,121 +326,4 @@ infixr 5 ==>
 True  ==> x = x
 False ==> _ = True
 
--- *********************************************************
--- *************** My Non Weeder Code **********************
--- *********************************************************
-
-data DiscoverDeclarationPath = DiscoverDeclarationPath {
-  modulePath :: Text,
-  fixtureName :: Text,
-  typeName :: Text
-} deriving (Show, Eq, Ord)
-
-data DiscoverFixtureSpec = FixtureSpec {
-  path :: DiscoverDeclarationPath,
-  parent :: Maybe DiscoverDeclarationPath
-} deriving (Show, Eq, Ord)
-
-followYourDreams :: [DiscoverFixtureSpec]
-followYourDreams = uu
-
-displayHieAst :: HieAST TypeIndex -> Text
-displayHieAst ast = toS . renderWithContext defaultSDocContext $ ppr ast
-
-data DecShow = DecShow {
-  path :: Text,
-  decs :: [Declaration]
-} deriving Show
-
-pPrintDisplayInfo :: DecShow -> IO ()
-pPrintDisplayInfo d = do 
-  pPrint d.path 
-  pPrintList d.decs
-
-displayInfo :: HieFile -> [DecShow]
-displayInfo HieFile {hie_hs_file, hie_module = hie_module@Module {
-  moduleUnit, moduleName
-}, hie_types, hie_asts, hie_hs_src } =
-  -- intercalate ", " $ txt <$> paths
-  -- txt . ppShow $ astDs -- hangs
-  decs2 -- module path
-  --  str <- lookupPprType t 
- where
-  asts = getAsts hie_asts
-  paths = Map.keys asts
-  decs = findDeclarations <$> asts
-  justEg =  Map.filterWithKey (\k _ -> isInfixOf "DemoTest" $ txt k) decs
-  decs2 =  Map.elems $ Map.mapWithKey (\modPath decs' -> DecShow (txt modPath) (toList decs')) decs
-  -- astDs = Map.mapWithKey (\k v ->
-  --    DecShow (txt k) (displayHieAst v)
-  --   ) asts
-
-
-demoTestFileOnly :: [String] -> [String]
-demoTestFileOnly = filter (isInfixOf "DemoTest" . toS) 
-
--- discover :: IO (ExitCode, Analysis)
-discover :: IO ()
--- discover :: IO Analysis
-discover = 
-  do
-    hieFilePaths <- (traceId <$>) . concat <$> traverse ( getFilesIn ".hie" ) ["./."]
-    hsFilePaths <- (traceId <$>) <$> getFilesIn ".hs" "./."
-    nameCache <- initNameCache 'z' []
-
-    hieFiles <-
-      mapM ( readCompatibleHieFileOrExit nameCache ) $ demoTestFileOnly hieFilePaths
-
-    let
-      filteredHieFiles =
-        flip filter hieFiles \hieFile -> any ( hie_hs_file hieFile `isSuffixOf`) hsFilePaths
-      l = displayInfo <$> filteredHieFiles
-
-    traverse_ (traverse_ pPrintDisplayInfo) l
-    -- analysis <- execStateT ( analyseHieFilesDiscover filteredHieFiles ) emptyAnalysis
-    -- uu
-
-  -- let
-  --   roots = allDeclarations analysis
-
-  --   reachableSet =
-  --     reachable
-  --       analysis
-  --       ( Set.map DeclarationRoot roots <> filterImplicitRoots analysis ( implicitRoots analysis ) )
-
-  --   dead =
-  --     allDeclarations analysis Set.\\ reachableSet
-
-  --   warnings =
-  --     Map.unionsWith (++) $
-  --     foldMap
-  --       ( \d ->
-  --           fold $ do
-  --             moduleFilePath <- Map.lookup ( declModule d ) ( modulePaths analysis )
-  --             spans <- Map.lookup d ( declarationSites analysis )
-  --             guard $ not $ null spans
-  --             let starts = map realSrcSpanStart $ Set.toList spans
-  --             return [ Map.singleton moduleFilePath ( liftA2 (,) starts (pure d) ) ]
-  --       )
-  --       dead
-
-  -- for_ ( Map.toList warnings ) \( path, declarations ) ->
-  --   for_ (sortOn (srcLocLine . fst) declarations) \( start, d ) ->
-  --     case Map.lookup d (prettyPrintedType analysis) of
-  --       Nothing -> putStrLn $ showWeed path start d
-  --       Just t -> putStrLn $ showPath path start <> "(Instance) :: " <> t
-
-  -- let exitCode = if null warnings then ExitSuccess else ExitFailure 1
-
-  -- pure (exitCode, analysis)
-
-  where
-
-    filterImplicitRoots :: Analysis -> Set Root -> Set Root
-    filterImplicitRoots Analysis{ prettyPrintedType, modulePaths } = Set.filter $ \case
-      DeclarationRoot _ -> True -- keep implicit roots for rewrite rules etc
-
-      ModuleRoot _ -> True
-
-      InstanceRoot d c -> True
 

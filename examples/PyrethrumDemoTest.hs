@@ -162,6 +162,7 @@ items2 =
     ]
 
 -- ############### Test the Lot (Record) ###################
+
 test3 :: TestFixture
 test3 =
   Test
@@ -204,6 +205,7 @@ test4 =
       }
 
 -- ############### Test Single (Record) ###################
+
 test5 :: TestFixture
 test5 =
   Test
@@ -219,7 +221,14 @@ test5 =
       , checks = chk "the value must be 1" ((== 1) . (.value))
       }
 
+
+
 {-
+  h 
+   h 
+    t
+    t 
+  t
 
 -- TODO : stubs:
 

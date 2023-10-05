@@ -460,11 +460,23 @@ discover =
 
     traverse_ (traverse_ pPrintDisplayInfo) l
     analysis <- execStateT ( analyseHieFilesDiscover filteredHieFiles ) emptyAnalysis
-    uu
+
+    {-
+     map of 
+      module name
+      symbol name   => typeclass name
+      (var$$pyrethrum-0.1.0.0-inplace-examples$PyrethrumDemoTest$$$$fGenericDS,"Generic DS")
+
+       var$$pyrethrum-0.1.0.0-inplace-examples$PyrethrumDemoTest,
+       fGenericDS 
+       => 
+       Generic DS (DS is an instance of Generic)
+    -}
+    traverse_ pPrint $ Map.toList analysis.prettyPrintedType
+    pPrint "DONE"
 
   -- let
   --   roots = allDeclarations analysis
-
   --   reachableSet =
   --     reachable
   --       analysis

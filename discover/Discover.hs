@@ -3,13 +3,12 @@ module Discover where
 import qualified WeederLibCopy.Weeder.Main as W
 import qualified BasePrelude as P
 import qualified WeederLibCopy.Weeder as W
+import qualified  WeederLibCopy.WeederDiscover  as D
 
 -- $> Discover.discover
 discover :: IO ()
 discover = do 
-   discover
-
-
+   D.discover
 
 -- $ > runWeeder
 runWeeder :: IO ()

@@ -93,7 +93,7 @@ import Control.Monad.Trans.Maybe (MaybeT(..))
 import qualified Data.Text as T
 import Data.Text ( Text, Text, intercalate, isInfixOf )
 import Debug.Trace
-import PyrethrumExtras (uu, txt, toS)
+import PyrethrumExtras (uu, txt, toS, debugf')
 import GHC.Plugins (Outputable(..), renderWithContext, defaultSDocContext)
 import Text.Show.Pretty hiding (Name)
 import Data.Sequence (Seq)
@@ -208,9 +208,7 @@ analyseInstanceDeclarationDiscover refMap n@Node{ nodeSpan } hieFile = do
 
 lookupPprTypeDiscover :: HieFile -> TypeIndex -> String
 lookupPprTypeDiscover hieFile = renderType . lookupTypeDiscover hieFile
-
   where
-
     renderType = showSDocOneLine defaultSDocContext . pprIfaceSigmaType ShowForAllWhen . hieTypeToIface
 
 addInstanceRootDiscover :: ( MonadState Analysis m) => HieFile -> Declaration -> TypeIndex -> Name -> m ()
@@ -269,9 +267,24 @@ addAllDeclarationsDiscover ast hieFile = do
       case identType of
         Just t -> do
           let hieType = lookupTypeDiscover hieFile t
-              names = typeToNames hieType
+              names = debugf' (\s -> (d, displayName <$> S.elems s))  "NAMES!!!!" $ typeToNames hieType
           traverse_ (traverse_ (addDependency d) . nameToDeclaration) names
         Nothing -> pure ()
+
+{-
+Here 2 problems:
+  1. Code volitility - not showing latest changes (Stan, HLS plugin?): https://www.reddit.com/r/haskell/comments/170f6qa/comment/k4m0rh4/?utm_source=share&utm_medium=web2x&context=3
+  2. Not enough info here ~ need to distinguish finctions from raw data constructors
+       - hkConstructDemo
+       - intOnceHook
+       - modify typeToNames :: HieTypeFix -> Set Name
+NAMES!!!!: (var$$pyrethrum-0.1.0.0-inplace-examples$DSL.Out$$$out,["()","Out","Eff",":>","a","es"])
+NAMES!!!!: (var$$base$GHC.Base$$$.,["b","c","a"])
+NAMES!!!!: (var$$pyrethrum-0.1.0.0-inplace-examples$PyrethrumDemoTest$$$hkConstructDemo,["Int","OnceParent","Fixture"])
+
+-}
+displayName :: Name -> String
+displayName = occNameString . nameOccName
 
 topLevelAnalysisDiscover :: ( MonadState Analysis m) => RefMap TypeIndex -> HieFile -> HieAST TypeIndex ->  m ()
 topLevelAnalysisDiscover refMap hieFile ast@Node{ nodeChildren }  = do
@@ -473,6 +486,13 @@ discover =
        Generic DS (DS is an instance of Generic)
     -}
     traverse_ pPrint $ Map.toList analysis.prettyPrintedType
+    pPrint analysis.dependencyGraph
+    putStrLn ""
+    putStrLn ""
+    pPrint analysis.declarationSites
+    putStrLn ""
+    putStrLn ""
+    pPrint analysis.modulePaths
     pPrint "DONE"
 
   -- let

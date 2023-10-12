@@ -18,6 +18,12 @@ import PyrethrumExtras (txt)
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . Log
 
+log2 :: (Out ApEvent :> es) => Text -> Eff es ()
+log2 = out . Log
+
+hkConstructDemo :: Int -> Fixture OnceParent Int
+hkConstructDemo _ = intOnceHook
+
 intOnceHook :: Fixture OnceParent Int
 intOnceHook =
   OnceBefore

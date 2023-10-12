@@ -282,6 +282,9 @@ NAMES!!!!: (var$$pyrethrum-0.1.0.0-inplace-examples$DSL.Out$$$out,["()","Out","E
 NAMES!!!!: (var$$base$GHC.Base$$$.,["b","c","a"])
 NAMES!!!!: (var$$pyrethrum-0.1.0.0-inplace-examples$PyrethrumDemoTest$$$hkConstructDemo,["Int","OnceParent","Fixture"])
 
+see:
+analysis-graph.log
+
 -}
 displayName :: Name -> String
 displayName = occNameString . nameOccName

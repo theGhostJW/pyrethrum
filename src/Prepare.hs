@@ -142,7 +142,7 @@ runTest :: forall rc tc hi effs. (C.Config rc, C.Config tc) => PrepParams rc tc 
 runTest pp@PrepParams{eventSink, interpreter, runConfig} path = 
    \case 
      C.Full {config, action, parse, items} -> uu
-     C.Full' {config', parent, action', parse', items'} -> uu
+     C.Full' {config', depends, action', parse', items'} -> uu
      C.NoParse {config, action, items} -> uu
      C.NoParse' {config', action', items'} -> uu
      C.Single {config, singleAction, checks} -> uu

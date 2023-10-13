@@ -86,7 +86,7 @@ data Frequency = Once | Thread | Each deriving (Show, Eq)
 class Param a where
   frequency :: Frequency
 
-class (Param a, Param b) => ValidParent a b
+class (Param a, Param b) => ValidDepends a b
 
 data Once
 data Thread
@@ -104,14 +104,14 @@ instance Param Each where
   frequency :: Frequency
   frequency = Each
 
-instance ValidParent Once Once
-instance ValidParent Once Thread
-instance ValidParent Once Each
+instance ValidDepends Once Once
+instance ValidDepends Once Thread
+instance ValidDepends Once Each
 
-instance ValidParent Thread Thread
-instance ValidParent Thread Each
+instance ValidDepends Thread Thread
+instance ValidDepends Thread Each
 
-instance ValidParent Each Each
+instance ValidDepends Each Each
 
 data Hook rc effs loc i o where
   Before ::
@@ -120,8 +120,8 @@ data Hook rc effs loc i o where
     } ->
     Hook rc effs loc () o
   Before' ::
-    (Param ploc, Param loc, ValidParent ploc loc) =>
-    { parent :: Hook rc effs ploc pi i
+    (Param ploc, Param loc, ValidDepends ploc loc) =>
+    { depends :: Hook rc effs ploc pi i
     , action' :: rc -> i -> Eff effs o
     } ->
     Hook rc effs loc i o
@@ -131,8 +131,8 @@ data Hook rc effs loc i o where
     } ->
     Hook rc effs loc () ()
   After' ::
-    (Param ploc, Param loc, ValidParent ploc loc) =>
-    { afterParent :: Hook rc effs ploc pi i
+    (Param ploc, Param loc, ValidDepends ploc loc) =>
+    { afterDepends :: Hook rc effs ploc pi i
     , afterAction' :: rc -> Eff effs ()
     } ->
     Hook rc effs loc i i
@@ -143,8 +143,8 @@ data Hook rc effs loc i o where
     } ->
     Hook rc effs loc () o
   Around' ::
-    (Param ploc, Param loc, ValidParent ploc loc) =>
-    { parent :: Hook rc effs ploc pi i
+    (Param ploc, Param loc, ValidDepends ploc loc) =>
+    { depends :: Hook rc effs ploc pi i
     , setup' :: rc -> i -> Eff effs o
     , teardown' :: rc -> o -> Eff effs ()
     } ->
@@ -171,7 +171,7 @@ data Test rc tc effs hi where
     Test rc tc effs ()
   Full' ::
     (Item i ds) =>
-    { parent :: Hook rc effs loc pi hi
+    { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , action' :: rc -> hi -> i -> Eff effs as
     , parse' :: as -> Either ParseException ds
@@ -187,7 +187,7 @@ data Test rc tc effs hi where
     Test rc tc effs ()
   NoParse' ::
     (Item i ds) =>
-    { parent :: Hook rc effs loc pi hi
+    { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , action' :: rc -> hi -> i -> Eff effs ds
     , items' :: rc -> [i]
@@ -200,7 +200,7 @@ data Test rc tc effs hi where
     } ->
     Test rc tc effs ()
   Single' ::
-    { parent :: Hook rc effs loc pi hi
+    { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , singleAction' :: rc -> hi -> Eff effs ds
     , checks' :: Checks ds

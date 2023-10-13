@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 007073f755671cdb6d00d729e9e79f1dc404d7d95e7f5018d75d0ba68ee51253
+-- hash: a6a92970b945e2091fd15df1022706980ee7720549f5b04ad58913510890e7c6
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -297,7 +297,7 @@ library discover
     , filepath >=1.4.2.1 && <1.5
     , generic-lens >=2.2.0.0 && <2.3
     , ghc >=9.4 && <9.5 || >=9.6 && <9.7
-    , lens >=5.1 && <5.2 || >=5.2 && <5.3
+    , lens
     , mtl >=2.2.2 && <2.3 || >=2.3 && <2.4
     , optparse-applicative
     , path

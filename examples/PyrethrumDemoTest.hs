@@ -31,7 +31,7 @@ addOnceIntHook :: Hook Once Int Int
 addOnceIntHook =
   Before'
     { 
-      parent = intOnceHook
+      depends = intOnceHook
     , action' =
         \rc i -> do
           log $ "beforeAll' " <> txt i
@@ -57,7 +57,7 @@ infoThreadHook = Before' addOnceIntHook $ \rc i -> do
 eachInfoAround :: Hook Each HookInfo Int
 eachInfoAround =
   Around'
-    { parent = infoThreadHook
+    { depends = infoThreadHook
     , setup' = \rc hi -> do
         log "eachSetup"
         pure $ hi.value + 1
@@ -69,7 +69,7 @@ eachInfoAround =
 eachAfter :: Hook Each Int Int
 eachAfter =
   After'
-    { afterParent = eachInfoAround
+    { afterDepends = eachInfoAround
     , afterAction' = \rc -> do
         log "eachAfter"
         pure ()
@@ -78,7 +78,7 @@ eachAfter =
 eachIntBefore :: Hook Each Int Int
 eachIntBefore =
   Before'
-    { parent = eachInfoAround
+    { depends = eachInfoAround
     , action' = \rc hi -> do
         log "eachSetup"
         pure $ hi + 1
@@ -184,7 +184,7 @@ instance C.Item Item2 DS
 test3 :: Test Int
 test3 =
   Full'
-    { parent = eachIntBefore
+    { depends = eachIntBefore
     , config' = TestConfig "test" 1 DeepRegression
     , action' = \rc i itm -> do
         log $ txt itm
@@ -206,7 +206,7 @@ test4 :: Test Int
 test4 =
   NoParse'
     { config' = TestConfig "test" 1 DeepRegression
-    , parent = eachAfter
+    , depends = eachAfter
     , action' = \rc hi itm -> do
         log $ txt itm
         pure $ DS (itm.value + 1) $ txt itm.value
@@ -226,7 +226,7 @@ test5 :: Test Int
 test5 =
   Single'
     { config' = TestConfig "test" 1 DeepRegression
-    , parent = eachAfter
+    , depends = eachAfter
     , singleAction' = \rc hi -> do
         log $ "RunConfig is: " <> rc.title
         pure

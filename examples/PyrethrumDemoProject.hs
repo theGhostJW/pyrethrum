@@ -53,8 +53,8 @@ data Hook loc i o where
     } ->
     Hook loc () o
   Before' ::
-    (C.Param ploc, C.Param loc, C.ValidParent ploc loc) =>
-    { parent :: Hook ploc pi i
+    (C.Param ploc, C.Param loc, C.ValidDepends ploc loc) =>
+    { depends :: Hook ploc pi i
     , action' :: RunConfig -> i -> Action o
     } ->
     Hook loc i o
@@ -64,8 +64,8 @@ data Hook loc i o where
     } ->
     Hook loc () ()
   After' ::
-    (C.Param ploc, C.Param loc, C.ValidParent ploc loc) =>
-    { afterParent :: Hook ploc pi i
+    (C.Param ploc, C.Param loc, C.ValidDepends ploc loc) =>
+    { afterDepends :: Hook ploc pi i
     , afterAction' :: RunConfig -> Action ()
     } ->
     Hook loc i i
@@ -76,8 +76,8 @@ data Hook loc i o where
     } ->
     Hook loc () o
   Around' ::
-    (C.Param ploc, C.Param loc, C.ValidParent ploc loc) =>
-    { parent :: Hook ploc pi i
+    (C.Param ploc, C.Param loc, C.ValidDepends ploc loc) =>
+    { depends :: Hook ploc pi i
     , setup' :: RunConfig -> i -> Action o
     , teardown' :: RunConfig -> o -> Action ()
     } ->
@@ -95,7 +95,7 @@ data Test hi where
     Test ()
   Full' ::
     (C.Item i ds, C.Param loc) =>
-    { parent :: Hook loc pi a
+    { depends :: Hook loc pi a
     , config' :: TestConfig
     , action' :: RunConfig -> a  -> i -> Action as
     , parse' :: as -> Either C.ParseException ds
@@ -112,7 +112,7 @@ data Test hi where
     Test ()
   NoParse' ::
     (C.Item i ds, C.Param loc) =>
-    { parent :: Hook loc pi a
+    { depends :: Hook loc pi a
     , config' :: TestConfig
     , action' ::  RunConfig -> a -> i -> Action ds
     , items' :: RunConfig -> [i]
@@ -126,7 +126,7 @@ data Test hi where
     Test ()
   Single' ::
     (C.Param loc) =>
-    { parent :: Hook loc pi a
+    { depends :: Hook loc pi a
     , config' :: TestConfig
     , singleAction' :: RunConfig -> a ->  Action as
     , checks' :: C.Checks as
@@ -152,24 +152,24 @@ mkTest :: Test hi -> C.Test RunConfig TestConfig ApEffs hi
 mkTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
-  Full'{..} -> C.Full' (mkHook parent) config' action' parse' items'
-  NoParse'{..} -> C.NoParse'{parent = mkHook parent, ..}
+  Full'{..} -> C.Full' (mkHook depends) config' action' parse' items'
+  NoParse'{..} -> C.NoParse'{depends = mkHook depends, ..}
   Single{..} -> C.Single{..}
-  Single'{..} -> C.Single' (mkHook parent) config' singleAction' checks'
+  Single'{..} -> C.Single' (mkHook depends) config' singleAction' checks'
 
 mkHook :: Hook loc i o -> C.Hook RunConfig ApEffs loc i o
 mkHook = \case
   Before{..} -> C.Before{..}
-  Before'{..} -> C.Before' (mkHook parent) action'
+  Before'{..} -> C.Before' (mkHook depends) action'
   After{..} -> C.After{..}
-  After'{..} -> C.After'{afterParent = mkHook afterParent, ..}
+  After'{..} -> C.After'{afterDepends = mkHook afterDepends, ..}
   Around{..} -> C.Around{..}
   Around'
-    { parent
+    { depends
     , setup'
     , teardown'
     } ->
-      C.Around' (mkHook parent) setup' teardown'
+      C.Around' (mkHook depends) setup' teardown'
 
 mkSuite :: SuiteElement i -> C.SuiteElement RunConfig TestConfig ApEffs i
 mkSuite = \case

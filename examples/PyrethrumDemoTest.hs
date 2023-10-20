@@ -84,6 +84,8 @@ eachIntBefore =
         pure $ hi + 1
     }
 
+type Failable a = Eff '[E.Error ParseException] a 
+
 -- ############### Test the Lot ###################
 
 config :: TestConfig
@@ -105,7 +107,7 @@ data DState = DState
   }
   deriving (Show, Generic)
 
-parse :: ApState -> Either ParseException DState
+parse :: ApState -> Failable DState
 parse ApState{..} = pure DState{..}
 
 data Item = Item
@@ -137,7 +139,7 @@ action2 rc HookInfo{value = hookVal} itm = do
   log $ txt itm
   pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
 
-parse2 :: AS -> Either ParseException DS
+parse2 :: AS -> Failable DS
 parse2 AS{..} = pure DS{..}
 
 data AS = AS

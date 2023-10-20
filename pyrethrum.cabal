@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a6a92970b945e2091fd15df1022706980ee7720549f5b04ad58913510890e7c6
+-- hash: 97a3e42e4500d853180b3251ea62eda2a88b02a0ffb706ec5c309b49656e71e7
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -78,6 +78,7 @@ library
   exposed-modules:
       AuxFiles
       Check
+      CheckNew
       Common
       Core
       DSL
@@ -329,6 +330,7 @@ library examples
       StepDocumenterDemo
       AuxFiles
       Check
+      CheckNew
       Common
       Core
       DSL

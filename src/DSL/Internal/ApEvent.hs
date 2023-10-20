@@ -2,6 +2,8 @@ module DSL.Internal.ApEvent where
 
 import qualified Data.Aeson as A
 import Data.Aeson.TH (deriveJSON, defaultOptions)
+import CheckNew (CheckReport)
+import PyrethrumExtras (toS)
 
 -- TODO: make log effect requiring out
 
@@ -33,23 +35,26 @@ $(deriveJSON defaultOptions ''ApStateJSON)
 newtype DStateJSON = DStateJSON {unDStateJSON :: A.Value} deriving (Eq, Show, IsString)
 $(deriveJSON defaultOptions ''DStateJSON)
 
-newtype ItemJSON = ItemJSON {unDStateJSON :: A.Value} deriving (Eq, Show, IsString)
+newtype ItemJSON = ItemJSON {unItemJSON :: A.Value} deriving (Eq, Show, IsString)
 $(deriveJSON defaultOptions ''ItemJSON)
 
+exceptionEvent :: SomeException -> CallStack -> ApEvent
+exceptionEvent e cs =
+  Framework $ Exception (toS $ displayException e) (toS $ prettyCallStack cs)
 
 data FLog
   = Action {item :: ItemJSON}
   | Parse {apState :: ApStateJSON}
   | CheckStart {dState :: DStateJSON} 
-  | Check { description :: Text, result :: CheckResult }
+  | Check CheckReport
   | Step Text
   | Step'
       { message :: Text
       , details :: Text
       }
   | Exception
-      { exception :: SomeException
-      , callStack :: CallStack
+      { exception :: Text
+      , callStack :: Text
       }
   deriving stock Show
 
@@ -59,12 +64,13 @@ data ApEvent
   deriving stock Show
 
 
+$(deriveJSON defaultOptions ''ULog)
+$(deriveJSON defaultOptions ''FLog)
+$(deriveJSON defaultOptions ''ApEvent)
 
-data CheckResult
-  = Pass
-  | Skip
-  | Fail Text
-  deriving (Show, Eq, Ord)
+
+
+
 
 
 

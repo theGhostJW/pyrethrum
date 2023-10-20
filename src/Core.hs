@@ -13,6 +13,7 @@ import Effectful.TH (makeEffect)
 import GHC.Records (HasField)
 import GHC.Show (Show (..))
 import PyrethrumExtras (toS, uu)
+import CheckNew (Checks)
 
 newtype CheckFailure = CheckFailure Text
   deriving (Show)
@@ -42,40 +43,6 @@ to list
 -}
 
 
-map :: (Check ds -> Check ds2) -> Checks ds -> Checks ds2
-map f = Checks . DL.map f . (.un)
-
-data Check ds
-  = Check
-      { header :: Text
-      , rule :: ds -> Bool
-      }
-  | CheckMessage
-      { header :: Text
-      , message :: ds -> Text
-      , rule :: ds -> Bool
-      }
-
--- generate a check from a predicate
-chk :: Text -> (ds -> Bool) -> Checks ds
-chk hdr = Checks . pure . Check hdr
-
--- generate a check from a predicate with detailed message
-chk' :: Text -> (ds -> Text) -> (ds -> Bool) -> Checks ds
-chk' hdr msg = Checks . pure . CheckMessage hdr msg
-
-instance Show (Check v) where
-  show :: Check v -> String
-  show ck = toS ck.header
-
-instance ToJSON (Check v) where
-  toJSON :: Check v -> Value
-  toJSON = String . toS . (.header)
-
-newtype Checks ds = Checks
-  { un :: DL.DList (Check ds)
-  }
-  deriving (Show, Semigroup, Monoid, IsList, ToJSON)
 
 -- TODO:: look into listLike
 
@@ -165,7 +132,7 @@ data Test rc tc effs hi where
     (Item i ds) =>
     { config :: tc
     , action :: rc -> i -> Eff effs as
-    , parse :: as -> Either ParseException ds
+    , parse :: as -> Eff '[E.Error ParseException] ds
     , items :: rc -> [i]
     } ->
     Test rc tc effs ()
@@ -174,7 +141,7 @@ data Test rc tc effs hi where
     { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , action' :: rc -> hi -> i -> Eff effs as
-    , parse' :: as -> Either ParseException ds
+    , parse' :: as -> Eff '[E.Error ParseException] ds
     , items' :: rc -> [i]
     } ->
     Test rc tc effs hi
@@ -261,3 +228,20 @@ data SuiteElement rc tc effs hi where
 -- start with:: https://github.com/theGhostJW/pyrethrum-extras/blob/master/src/Language/Haskell/TH/Syntax/Extended.hs
 -- see also:: https://hackage.haskell.org/package/template-haskell-2.20.0.0/docs/Language-Haskell-TH-Syntax.html#t:Name
 -- part 5 reinstate filtering // tree shaking
+
+{-
+todo plugin issu 
+
+differ 
+case 1: 
+  hook.depends = hook1 
+  hook depends hook 1 
+  
+case 2: 
+  hook1 depends hook2
+  hook = hook1 
+  hook depends hook2
+  
+
+
+-}

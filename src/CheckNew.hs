@@ -2,7 +2,7 @@
 
 module CheckNew (
   Check (..),
-  Application (..),
+  TerminationStatus (..),
   Checks,
   CheckResult (..),
   CheckReport (..),
@@ -29,12 +29,12 @@ import PyrethrumExtras (toS, uu, (?))
 import UnliftIO (MonadUnliftIO, tryAny)
 import Prelude as P
 
-data Application = NonTerminal | Terminal deriving (Show, Eq)
+data TerminationStatus = NonTerminal | Terminal deriving (Show, Eq)
 
-$(deriveToJSON defaultOptions ''Application)
+$(deriveToJSON defaultOptions ''TerminationStatus)
 
 data Check ds = Check
-  { application :: Application
+  { terminationStatus :: TerminationStatus
   , message :: Maybe (ds -> Text)
   , header :: Text
   , rule :: ds -> Bool
@@ -98,20 +98,20 @@ skipChecks chks = skipCheck <$> chks.un
 
 -- need to do this in an error handling context so we can catch and report
 -- exceptions thrown applying the check
-applyCheck :: (MonadUnliftIO m) => ds -> (CheckReport, Application) -> Check ds -> m (CheckReport, Application)
-applyCheck ds (_, termStatus) r =
+applyCheck :: (MonadUnliftIO m) => ds -> TerminationStatus -> Check ds -> m (CheckReport, TerminationStatus)
+applyCheck ds termStatus r =
   do
     rslt <-
       tryAny
-        $ if termStatus == Terminal
-          then pure (report Skip, Terminal)
-          else
-            pure
-              ( first report
-                  $ r.rule ds
-                  ? (Pass, NonTerminal)
-                  $ (Fail, r.application)
-              )
+        . pure
+        $ case termStatus of
+          Terminal -> (report Skip, Terminal)
+          NonTerminal ->
+            first report
+              $ r.rule ds
+              ? (Pass, NonTerminal)
+              $ (Fail, r.terminationStatus)
+
     rslt
       & either
         ( \e ->

@@ -145,8 +145,10 @@ frameworkLog :: EvntSink -> C.Path -> FLog -> IO ()
 frameworkLog eventSink path = log eventSink path . Framework
 
 unTry :: EvntSink -> C.Path -> Either (CallStack, SomeException) a -> IO a
-unTry es p = either (\(cs, ex) -> log es p (exceptionEvent ex cs) >> throwIO ex) pure
+unTry es p = either (uncurry $ logThrow es p) pure
 
+logThrow :: EvntSink -> C.Path -> CallStack -> SomeException -> IO a
+logThrow es p cs ex = log es p (exceptionEvent ex cs) >> throwIO ex
 
 
 prepareTest :: forall rc tc hi effs. (C.Config rc, C.Config tc, HasCallStack) => PrepParams rc tc effs -> C.Path -> C.Test rc tc effs hi -> PreNode IO [] hi
@@ -192,13 +194,17 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
   | Step Text
      -}
 
+-- TODO :: 
+ -- unit tests for all failure points including exception thrown in applying check and genrating check detailed messge
+ --  look out for double logging
+ --  exit codes with and without known error parsing
+
 -- use FoldM and applyCheck to log check reuslts
 applyChecks :: forall ds. EvntSink -> C.Path -> Checks ds -> Either SomeException ds -> IO ()
 applyChecks es p chks = 
   either (
     \e -> do 
-      -- HERE LOG SKIPPED CHECKS rethrow
-      log es p (exceptionEvent e callStack)
+      HERE LOG SKIPPED CHECKS rethrow
       
    ) 
    applyChecks'

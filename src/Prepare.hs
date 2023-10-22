@@ -147,8 +147,6 @@ frameworkLog eventSink path = log eventSink path . Framework
 unTry :: forall a. EvntSink -> C.Path -> Either (CallStack, SomeException) a -> IO a
 unTry es p = either (uncurry $ logThrow es p) pure
 
-
-
 logThrow :: EvntSink -> C.Path -> CallStack -> SomeException -> IO a
 logThrow es p cs ex = log es p (exceptionEvent ex cs) >> throwIO ex
 
@@ -159,23 +157,26 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
       Test
         { config
         , path
-        , tests = runTest' <$> items runConfig
+        , tests = runTest (action runConfig) parse <$> items runConfig
         }
-     where
-      runTest' = runTest (action runConfig) parse
-      
-
     C.Full'{config', depends, action', parse', items'} ->
       Test
         { config = config'
         , path
-        , tests = runTest' <$> items' runConfig
+        , tests = (\i hi -> runTest (action' runConfig hi) parse' i hi) <$> items' runConfig
         }
-     where
-      runTest' i hi = runTest (action' runConfig hi) parse' i hi
-
-    C.NoParse{config, action, items} -> uu
-    C.NoParse'{config', action', items'} -> uu
+    C.NoParse{config, action, items} ->
+      Test
+        { config = config
+        , path
+        , tests = runNoParseTest (action runConfig) <$> items runConfig
+        }
+    C.NoParse'{config', action', items'} ->
+      Test
+        { config = config'
+        , path
+        , tests = (\i hi -> runNoParseTest (action' runConfig hi) i hi) <$> items' runConfig
+        }
     C.Single{config, singleAction, checks} -> uu
     C.Single'{config', singleAction', checks'} -> uu
  where
@@ -185,18 +186,28 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
 
   unTry' :: Either (CallStack, SomeException) a -> IO a
   unTry' = unTry eventSink path
+
+  runAction :: forall i as ds. (C.Item i ds) => (i -> Eff effs as) -> i -> hi -> IO as
+  runAction action i hi =
+    do
+      flog . Action . ItemJSON $ toJSON i
+      eas <- interpreter $ action i
+      unTry' eas
+
   runTest :: forall i as ds. (ToJSON as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> hi -> IO ()
-  runTest itoEffs parser i hi =
+  runTest action parser i hi =
+    do
+      ds <- tryAny
         do
-          ds <- tryAny
-            do
-              flog . Action . ItemJSON $ toJSON i
-              eas <- interpreter $ itoEffs i
-              as <- unTry' eas
-              flog . Parse . ApStateJSON $ toJSON as
-              let eds = applyParser parser as
-              unTry' eds
-          applyChecks eventSink path i.checks ds
+          as <- runAction action i hi
+          flog . Parse . ApStateJSON $ toJSON as
+          let eds = applyParser parser as
+          unTry' eds
+      applyChecks eventSink path i.checks ds
+
+  runNoParseTest :: forall i ds. (C.Item i ds) => (i -> Eff effs ds) -> i -> hi -> IO ()
+  runNoParseTest action i hi =
+    tryAny (runAction action i hi) >>= applyChecks eventSink path i.checks
 
 {-
 = Action {item :: ItemJSON}

@@ -16,36 +16,36 @@ import Internal.RunTimeLogging (ExeLog)
 import PyrethrumExtras (MonadCatch (catch), try, uu)
 import UnliftIO.Exception (tryAny)
 
-data PreNode m c i where
+data PreNode m c hi where
   Before ::
     { path :: C.Path
     , frequency :: C.Frequency
-    , action :: i -> m o
+    , action :: hi -> m o
     , subNodes :: c (PreNode m c o)
     } ->
-    PreNode m c i
+    PreNode m c hi
   After ::
     { path :: C.Path
     , frequency :: C.Frequency
     , subNodes :: c (PreNode m c o)
     , after :: m ()
     } ->
-    PreNode m c i
+    PreNode m c hi
   Around ::
     { path :: C.Path
     , frequency :: C.Frequency
-    , setup :: i -> m o
+    , setup :: hi -> m o
     , subNodes :: c (PreNode m c o)
     , teardown :: o -> m ()
     } ->
-    PreNode m c i
+    PreNode m c hi
   Test ::
     (C.Config tc) =>
     { config :: tc
     , path :: C.Path
-    , tests :: c (i -> m ())
+    , tests :: c (hi -> m ())
     } ->
-    PreNode m c i
+    PreNode m c hi
 
 type PreSuite m c i = [PreNode m c i]
 
@@ -167,7 +167,7 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
         }
     C.NoParse{config, action, items} ->
       Test
-        { config = config
+        { config
         , path
         , tests = runNoParseTest (action runConfig) <$> items runConfig
         }

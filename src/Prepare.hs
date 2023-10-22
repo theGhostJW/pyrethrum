@@ -199,9 +199,8 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
  where
   flog = frameworkLog eventSink path
 
-  applyParser :: as -> Either (CallStack, SomeException) ds
   applyParser parser = mapLeft (fmap toException) . runPureEff . E.runError . parser
-  
+
   unTry' :: Either (CallStack, SomeException) a -> IO a
   unTry' = unTry eventSink path
   runTest :: forall i as ds. (ToJSON as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[Error C.ParseException] ds) -> i -> hi -> IO ()

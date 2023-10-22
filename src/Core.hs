@@ -30,7 +30,7 @@ type HasId a = HasField "id" a Int
 
 class (HasTitle a, Show a, HasMaxThreads a, ToJSON a, Eq a) => Config a
 
-class (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i) => Item i ds
+class (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i, ToJSON ds) => Item i ds
 
 -- TODO: a property class with different constraints
 {-

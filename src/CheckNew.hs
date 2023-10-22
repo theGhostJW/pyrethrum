@@ -3,7 +3,7 @@
 module CheckNew (
   Check (..),
   TerminationStatus (..),
-  Checks,
+  Checks(..),
   CheckResult (..),
   CheckReport (..),
   chk,

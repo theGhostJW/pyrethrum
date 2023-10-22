@@ -1,6 +1,6 @@
 module Prepare where
 
-import CheckNew (Check, Checks, TerminationStatus (NonTerminal), applyCheck, skipChecks)
+import CheckNew (Check, Checks, TerminationStatus (NonTerminal), applyCheck, skipChecks, un)
 import Control.Exception (throwIO)
 import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
@@ -152,46 +152,28 @@ unTry es p = either (uncurry $ logThrow es p) pure
 logThrow :: EvntSink -> C.Path -> CallStack -> SomeException -> IO a
 logThrow es p cs ex = log es p (exceptionEvent ex cs) >> throwIO ex
 
-prepareTest :: forall rc tc hi effs. (C.Config rc, C.Config tc, HasCallStack) => PrepParams rc tc effs -> C.Path -> C.Test rc tc effs hi -> PreNode IO [] hi
+prepareTest :: forall rc tc hi effs. (C.Config tc) => PrepParams rc tc effs -> C.Path -> C.Test rc tc effs hi -> PreNode IO [] hi
 prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
   \case
     C.Full{config, action, parse, items} ->
       Test
         { config
         , path
-        , tests = runTest <$> items runConfig
+        , tests = runTest' <$> items runConfig
         }
      where
-      runTest i _ =
-        do
-          ds <- tryAny
-            do
-              flog . Action . ItemJSON $ toJSON i
-              eas <- interpreter (action runConfig i)
-              as <- unTry' eas
-              flog . Parse . ApStateJSON $ toJSON as
-              let eds = applyParser parse as
-              unTry' eds
-          
-          applyChecks eventSink path i.checks ds
+      runTest' = runTest (action runConfig) parse
+      
+
     C.Full'{config', depends, action', parse', items'} ->
       Test
         { config = config'
         , path
-        , tests = runTest <$> items' runConfig
+        , tests = runTest' <$> items' runConfig
         }
      where
-      runTest i hi  =
-        do
-          ds <- tryAny
-            do
-              flog . Action . ItemJSON $ toJSON i
-              eas <- interpreter (action' runConfig hi i)
-              as <- unTry' eas
-              flog . Parse . ApStateJSON $ toJSON as
-              let eds = applyParser parse' as
-              unTry' eds
-          applyChecks eventSink path i.checks ds
+      runTest' i hi = runTest (action' runConfig hi) parse' i hi
+
     C.NoParse{config, action, items} -> uu
     C.NoParse'{config', action', items'} -> uu
     C.Single{config, singleAction, checks} -> uu
@@ -203,7 +185,7 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
 
   unTry' :: Either (CallStack, SomeException) a -> IO a
   unTry' = unTry eventSink path
-  runTest :: forall i as ds. (ToJSON as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[Error C.ParseException] ds) -> i -> hi -> IO ()
+  runTest :: forall i as ds. (ToJSON as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> hi -> IO ()
   runTest itoEffs parser i hi =
         do
           ds <- tryAny
@@ -230,7 +212,7 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
 --  exit codes with and without known error parsing
 
 -- use FoldM and applyCheck to log check reuslts
-applyChecks :: forall ds. (HasCallStack) => EvntSink -> C.Path -> Checks ds -> Either SomeException ds -> IO ()
+applyChecks :: forall ds. (ToJSON ds) => EvntSink -> C.Path -> Checks ds -> Either SomeException ds -> IO ()
 applyChecks es p chks =
   either
     ( \e -> do

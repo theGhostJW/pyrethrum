@@ -46,6 +46,7 @@ data FLog
   = Action {item :: ItemJSON}
   | Parse {apState :: ApStateJSON}
   | CheckStart {dState :: DStateJSON} 
+  | SkipedCheckStart
   | Check CheckReport
   | Step Text
   | Step'

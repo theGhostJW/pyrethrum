@@ -129,7 +129,7 @@ data Addressed a = Addressed
 
 data Test rc tc effs hi where
   Full ::
-    (Item i ds) =>
+    (Item i ds, ToJSON as) =>
     { config :: tc
     , action :: rc -> i -> Eff effs as
     , parse :: as -> Eff '[E.Error ParseException] ds
@@ -137,7 +137,7 @@ data Test rc tc effs hi where
     } ->
     Test rc tc effs ()
   Full' ::
-    (Item i ds) =>
+    (Item i ds, ToJSON as) =>
     { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , action' :: rc -> hi -> i -> Eff effs as

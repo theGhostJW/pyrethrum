@@ -161,12 +161,14 @@ data Test rc tc effs hi where
     } ->
     Test rc tc effs hi
   Single ::
+    (ToJSON ds) =>
     { config :: tc
     , singleAction :: rc -> Eff effs ds
     , checks :: Checks ds
     } ->
     Test rc tc effs ()
   Single' ::
+    (ToJSON ds) =>
     { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , singleAction' :: rc -> hi -> Eff effs ds

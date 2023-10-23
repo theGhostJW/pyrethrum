@@ -177,8 +177,34 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
         , path
         , tests = (\i hi -> runNoParseTest (action' runConfig hi) i hi) <$> items' runConfig
         }
-    C.Single{config, singleAction, checks} -> uu
-    C.Single'{config', singleAction', checks'} -> uu
+    C.Single{config, singleAction, checks} ->
+      Test
+        { config
+        , path
+        , tests =
+            [ \hi ->
+                do
+                  ds <- tryAny $ do
+                    flog . Action . ItemJSON $ toJSON config.title
+                    eas <- interpreter (singleAction runConfig)
+                    unTry' eas
+                  applyChecks eventSink path checks ds
+            ]
+        }
+    C.Single'{config', singleAction', checks'} ->
+      Test
+        { config = config'
+        , path
+        , tests =
+            [ \hi ->
+                do
+                  ds <- tryAny $ do
+                    flog . Action . ItemJSON $ toJSON config'.title
+                    eas <- interpreter (singleAction' runConfig hi)
+                    unTry' eas
+                  applyChecks eventSink path checks' ds
+            ]
+        }
  where
   flog = frameworkLog eventSink path
 

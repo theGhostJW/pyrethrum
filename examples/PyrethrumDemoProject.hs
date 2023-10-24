@@ -1,10 +1,12 @@
 module PyrethrumDemoProject where
 
 import qualified Core as C
+import qualified CheckNew as CH
 import DSL.FileSystemEffect (FSException, FileSystem)
 import DSL.Internal.ApEvent (ApEvent)
 import DSL.Out (Out)
 import Data.Aeson.TH (defaultOptions, deriveJSON)
+import Data.Aeson (FromJSON, ToJSON)
 import Effectful (Eff, IOE, type (:>))
 import Effectful.Error.Static as E (Error)
 
@@ -86,19 +88,19 @@ data Hook loc i o where
 -- TODO: split datatypes with conversion typeclasses
 data Test hi where
   Full ::
-    (C.Item i ds) =>
+    (C.Item i ds, ToJSON as) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Action as
-    , parse :: as -> Either C.ParseException ds
+    , parse :: as -> Eff '[E.Error C.ParseException] ds
     , items :: RunConfig -> [i]
     } ->
     Test ()
   Full' ::
-    (C.Item i ds, C.Param loc) =>
+    (C.Item i ds, ToJSON as, C.Param loc) =>
     { depends :: Hook loc pi a
     , config' :: TestConfig
     , action' :: RunConfig -> a  -> i -> Action as
-    , parse' :: as -> Either C.ParseException ds
+    , parse' :: as -> Eff '[E.Error C.ParseException] ds
     , items' :: RunConfig -> [i]
     } ->
     Test a
@@ -119,17 +121,18 @@ data Test hi where
     } ->
     Test a
   Single ::
+    (ToJSON as) =>
     { config :: TestConfig
     , singleAction :: RunConfig -> Action as
-    , checks :: C.Checks as
+    , checks :: CH.Checks as
     } ->
     Test ()
   Single' ::
-    (C.Param loc) =>
+    (ToJSON as, C.Param loc) =>
     { depends :: Hook loc pi a
     , config' :: TestConfig
     , singleAction' :: RunConfig -> a ->  Action as
-    , checks' :: C.Checks as
+    , checks' :: CH.Checks as
     } ->
     Test a
 

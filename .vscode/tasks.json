@@ -96,7 +96,7 @@
       "command": "cabal",
       "args": [
         "build",
-        // "-v",
+       // "-v3",
         "--flags='-optimised +godLibrary'"
       ],
       "presentation": {

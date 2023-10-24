@@ -11,7 +11,7 @@ import Data.Aeson (ToJSON (toJSON))
 import Data.Either.Extra (fromRight', mapLeft)
 import Effectful (Eff, runEff, runPureEff)
 import Effectful.Dispatch.Dynamic (interpret)
-import qualified Effectful.Error.Dynamic as E
+import qualified Effectful.Error.Static as E
 import Internal.RunTimeLogging (ExeLog)
 import PyrethrumExtras (MonadCatch (catch), try, uu)
 import UnliftIO.Exception (tryAny)
@@ -235,20 +235,6 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
   runNoParseTest action i hi =
     tryAny (runAction action i hi) >>= applyChecks eventSink path i.checks
 
-{-
-= Action {item :: ItemJSON}
-\| Parse {id :: Int, apState :: ApStateJSON}
-\| CheckStart {id :: Int, apState :: ApStateJSON}
-\| Check { description :: Text, result :: CheckResult }
-\| Step Text
-   -}
-
--- TODO ::
--- unit tests for all failure points including exception thrown in applying check and genrating check detailed messge
---  look out for double logging
---  exit codes with and without known error parsing
-
--- use FoldM and applyCheck to log check reuslts
 applyChecks :: forall ds. (ToJSON ds) => EvntSink -> C.Path -> Checks ds -> Either SomeException ds -> IO ()
 applyChecks es p chks =
   either

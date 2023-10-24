@@ -1,6 +1,7 @@
 module PyrethrumDemoTest where
 
-import Core (Checks, Once, Thread, Each, ParseException, Path (..), chk)
+import Core (Once, Thread, Each, ParseException, Path (..))
+import CheckNew (chk, Checks)
 import qualified Core as C
 import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
 import DSL.Out (Out, out)
@@ -16,6 +17,7 @@ import PyrethrumDemoProject (
   TestConfig (..)
  )
 import PyrethrumExtras (txt)
+import qualified Effectful.Error.Static as E
 import Data.Aeson.TH
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
@@ -177,9 +179,9 @@ items2 =
 
 -- ############### Test the Lot (Record) ###################
 
-$(deriveToJSON defaultOptions ''Item2)
 $(deriveToJSON defaultOptions ''DS)
 $(deriveToJSON defaultOptions ''AS)
+$(deriveToJSON defaultOptions ''Item2)
 -- TODO: precompiler
 instance C.Item Item2 DS
 
@@ -250,9 +252,9 @@ test5 =
 -- need to check error messages carefully
 -- finalise templatehaskell vs deriving for these classes
 -- $(deriveTest defaultOptions ''Item)
-$(deriveToJSON defaultOptions ''Item)
 $(deriveToJSON defaultOptions ''DState)
 $(deriveToJSON defaultOptions ''ApState)
+$(deriveToJSON defaultOptions ''Item)
 
 instance C.Item Item DState
 
@@ -266,7 +268,7 @@ test2 = Full' infoThreadHook config2 action2 parse2 items2
   
 
 -- ############### Suite ###################
--- this will be generated be generated
+-- this will be generated
 
 suite :: Suite
 suite =

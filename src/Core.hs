@@ -7,7 +7,7 @@ import Data.Aeson (FromJSON, ToJSON (..), Value (..), parseJSON, toJSON)
 
 import qualified Data.DList as DL
 import Effectful (Eff, Effect)
-import qualified Effectful.Error.Dynamic as E
+import Effectful.Error.Static as E (Error)
 import Effectful.Internal.Effect ((:>))
 import Effectful.TH (makeEffect)
 import GHC.Records (HasField)

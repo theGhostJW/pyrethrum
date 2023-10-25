@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 74252595a1a572ba7a70a65cc0dbbbc18aaf1b0ead82a93f8bb2201df1f14dee
+-- hash: a0772b9b9f68cf492fe0e98e28bf3598fbb7b131b7d56cc4b18a520d989b3224
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -77,7 +77,6 @@ library
   import: libImports, pyrethrumProps, reludeImports
   exposed-modules:
       AuxFiles
-      Check
       CheckNew
       Core
       DSL.FileSystemDocInterpreter
@@ -86,27 +85,14 @@ library
       DSL.Internal.ApEvent
       DSL.Internal.FileSystemPure
       DSL.Internal.FileSystemRawIO
-      DSL.LogProtocol
-      DSL.LogProtocol.PrettyPrint
       DSL.Out
-      FileLogging
       Internal.PreNode
       Internal.RunTimeLogging
       Internal.SuiteRuntime
-      ItemFilter
       List.Extra
-      LogTransformation
-      LogTransformation.Common
-      LogTransformation.PrintLogDisplayElement
-      LogTransformation.Stats
-      LogTransformation.Test
       OrphanedInstances
       Prepare
-      PrettyPrintCommon
-      RunElementClasses
       TempUtils
-      TestFilter
-      TestFilters
       Text.Extra
   hs-source-dirs:
       src
@@ -305,7 +291,6 @@ library examples
       RunDemo
       StepDocumenterDemo
       AuxFiles
-      Check
       CheckNew
       Core
       DSL.FileSystemDocInterpreter
@@ -314,27 +299,14 @@ library examples
       DSL.Internal.ApEvent
       DSL.Internal.FileSystemPure
       DSL.Internal.FileSystemRawIO
-      DSL.LogProtocol
-      DSL.LogProtocol.PrettyPrint
       DSL.Out
-      FileLogging
       Internal.PreNode
       Internal.RunTimeLogging
       Internal.SuiteRuntime
-      ItemFilter
       List.Extra
-      LogTransformation
-      LogTransformation.Common
-      LogTransformation.PrintLogDisplayElement
-      LogTransformation.Stats
-      LogTransformation.Test
       OrphanedInstances
       Prepare
-      PrettyPrintCommon
-      RunElementClasses
       TempUtils
-      TestFilter
-      TestFilters
       Text.Extra
   other-modules:
       Paths_pyrethrum
@@ -432,14 +404,10 @@ test-suite pyrethrum-test
       ArbitraryIOTest
       AuxFilesTest
       CheckTest
-      DemoConfig
       ItemFiltersTest
       LogListCheck
-      LogProtocolTest
-      LogTransformationTest
       PrettyPrintTest
       RunnerTest
-      SuiteRuntimeTest
       Paths_pyrethrum
   autogen-modules:
       Paths_pyrethrum

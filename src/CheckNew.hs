@@ -24,7 +24,6 @@ import Data.Function (($), (&), (.))
 import qualified Data.List as L
 import Data.Text (Text, foldr')
 import GHC.Show (Show (..))
-import LogTransformation.PrintLogDisplayElement (IterationWarning (warning))
 import PyrethrumExtras (toS, uu, (?))
 import UnliftIO (MonadUnliftIO, tryAny)
 import Prelude as P

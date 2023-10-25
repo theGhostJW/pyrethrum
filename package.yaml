@@ -153,8 +153,8 @@ ghc-options:
   - -fbyte-code-and-object-code
   # - -fdefer-type-error
   # profiling
-  - -ddump-to-file 
-  - -ddump-timings
+  # - -ddump-to-file 
+  # - -ddump-timings
 
 default-extensions:
   - AllowAmbiguousTypes

@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 80b6a29a6b3dc6947fca214aab7c21379ed9edfacffc9c0cefc49310c2f2884b
+-- hash: 74252595a1a572ba7a70a65cc0dbbbc18aaf1b0ead82a93f8bb2201df1f14dee
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -79,47 +79,31 @@ library
       AuxFiles
       Check
       CheckNew
-      Common
       Core
-      DSL
-      DSL.ArbitraryIO
-      DSL.CurrentTime
-      DSL.CurrentTimeDocLogger
       DSL.FileSystemDocInterpreter
       DSL.FileSystemEffect
       DSL.FileSystemIOInterpreter
-      DSL.FileSystemPsy
       DSL.Internal.ApEvent
       DSL.Internal.FileSystemPure
       DSL.Internal.FileSystemRawIO
-      DSL.Interpreter
-      DSL.LoggerPsy
       DSL.LogProtocol
       DSL.LogProtocol.PrettyPrint
       DSL.Out
       FileLogging
-      Internal.ExeNode
       Internal.PreNode
-      Internal.RunnerBaseLazy
       Internal.RunTimeLogging
       Internal.SuiteRuntime
-      Internal.SuiteRuntimeOld
       ItemFilter
-      ItemRunners
       List.Extra
       LogTransformation
       LogTransformation.Common
       LogTransformation.PrintLogDisplayElement
       LogTransformation.Stats
       LogTransformation.Test
-      MemberReflection
       OrphanedInstances
       Prepare
       PrettyPrintCommon
       RunElementClasses
-      Runner
-      RunnerBase
-      RunnerConsoleAndFile
       TempUtils
       TestFilter
       TestFilters
@@ -176,7 +160,7 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings
   build-depends:
       aeson
     , base-prelude
@@ -196,8 +180,6 @@ library
     , mtl
     , path
     , path-io
-    , polysemy
-    , polysemy-plugin
     , pretty-show
     , pyrethrum-extras
     , raw-strings-qq
@@ -274,7 +256,7 @@ library discover
       TypeFamilyDependencies
       TypeOperators
       FieldSelectors
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings -O0
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings -O0
   build-depends:
       aeson
     , algebraic-graphs ==0.7.*
@@ -299,8 +281,6 @@ library discover
     , optparse-applicative
     , path
     , path-io
-    , polysemy
-    , polysemy-plugin
     , pretty-show
     , pyrethrum-extras
     , raw-strings-qq
@@ -327,47 +307,31 @@ library examples
       AuxFiles
       Check
       CheckNew
-      Common
       Core
-      DSL
-      DSL.ArbitraryIO
-      DSL.CurrentTime
-      DSL.CurrentTimeDocLogger
       DSL.FileSystemDocInterpreter
       DSL.FileSystemEffect
       DSL.FileSystemIOInterpreter
-      DSL.FileSystemPsy
       DSL.Internal.ApEvent
       DSL.Internal.FileSystemPure
       DSL.Internal.FileSystemRawIO
-      DSL.Interpreter
-      DSL.LoggerPsy
       DSL.LogProtocol
       DSL.LogProtocol.PrettyPrint
       DSL.Out
       FileLogging
-      Internal.ExeNode
       Internal.PreNode
-      Internal.RunnerBaseLazy
       Internal.RunTimeLogging
       Internal.SuiteRuntime
-      Internal.SuiteRuntimeOld
       ItemFilter
-      ItemRunners
       List.Extra
       LogTransformation
       LogTransformation.Common
       LogTransformation.PrintLogDisplayElement
       LogTransformation.Stats
       LogTransformation.Test
-      MemberReflection
       OrphanedInstances
       Prepare
       PrettyPrintCommon
       RunElementClasses
-      Runner
-      RunnerBase
-      RunnerConsoleAndFile
       TempUtils
       TestFilter
       TestFilters
@@ -429,7 +393,7 @@ library examples
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings -O0
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings -O0
   build-depends:
       aeson
     , base-prelude
@@ -447,8 +411,6 @@ library examples
     , mtl
     , path
     , path-io
-    , polysemy
-    , polysemy-plugin
     , pretty-show
     , pyrethrum
     , pyrethrum-extras
@@ -470,22 +432,14 @@ test-suite pyrethrum-test
       ArbitraryIOTest
       AuxFilesTest
       CheckTest
-      ConcurrentSuiteSimple
-      ConcurrentSuiteTestOnly
       DemoConfig
-      DemoSuite
-      EndpointTest
-      EvalHelp
       ItemFiltersTest
       LogListCheck
       LogProtocolTest
       LogTransformationTest
       PrettyPrintTest
       RunnerTest
-      SemTest
-      SuiteRunIntegrityTest
       SuiteRuntimeTest
-      TestFilterTest
       Paths_pyrethrum
   autogen-modules:
       Paths_pyrethrum
@@ -541,7 +495,7 @@ test-suite pyrethrum-test
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:
@@ -561,8 +515,6 @@ test-suite pyrethrum-test
     , mtl
     , path
     , path-io
-    , polysemy
-    , polysemy-plugin
     , pretty-show
     , pyrethrum
     , pyrethrum-extras

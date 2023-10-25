@@ -157,6 +157,9 @@ ghc-options:
   - -fprefer-byte-code 
   - -fbyte-code-and-object-code
   # - -fdefer-type-error
+  # profiling
+  - -ddump-to-file 
+  - -ddump-timings
 
 default-extensions:
   - AllowAmbiguousTypes
@@ -275,5 +278,4 @@ tests:
     # verbatum needs to go last otherwise other module inference does not work
     verbatim:
       import: testLibProps, reludeImports
-
-build-tools: tasty-discover:tasty-discover
+    build-tools: tasty-discover:tasty-discover

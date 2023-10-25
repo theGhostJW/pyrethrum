@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 97a3e42e4500d853180b3251ea62eda2a88b02a0ffb706ec5c309b49656e71e7
+-- hash: f76bfb3f1f68fbaf41aaa35006241736a02bf76bf7562fda6352774dfc7c3eb5
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -176,7 +176,7 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:
@@ -276,7 +276,7 @@ library discover
       TypeFamilyDependencies
       TypeOperators
       FieldSelectors
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -O0
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings -O0
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:
@@ -433,7 +433,7 @@ library examples
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -O0
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings -O0
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:
@@ -547,7 +547,7 @@ test-suite pyrethrum-test
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fplugin=Polysemy.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -ddump-to-file -ddump-timings
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:

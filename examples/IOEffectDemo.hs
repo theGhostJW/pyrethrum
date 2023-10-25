@@ -146,7 +146,7 @@ effDemo2 = do
 
 {-
 TODO:
-- file related functions: read file - see polysemy version and src\DSL\FileSystemPsy.hs note in docs on hover and beware of readfile
+- file related functions: read file - see polyssemy version and src\DSL\FileSystemPsy.hs note in docs on hover and beware of readfile
 - adapt effectful: effectful\src\Effectful\FileSystem\IO.hs
   - src\DSL\FileSystemPsy.hs
 - find lazy API and test from within effect

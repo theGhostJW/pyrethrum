@@ -100,8 +100,6 @@ dependencies:
   - mtl
   - path # - version set in extra deps - until can roll forward
   - path-io # -
-  - polysemy
-  - polysemy-plugin
   - pretty-show
   - pyrethrum-extras
   # since removing pyrelude
@@ -133,8 +131,6 @@ ghc-options:
   # - -with-rtsopts=-N
 
   # - -O2
-  # - -flate-specialise # reqiuired for polysemy
-  # - -fspecialise-aggressively # reqiuired for polysemy
   # - -Werror
   # - *optimisation
   - -Wall
@@ -143,7 +139,6 @@ ghc-options:
   - -Wincomplete-uni-patterns
   - -Wredundant-constraints
   - -fplugin=Effectful.Plugin
-  - -fplugin=Polysemy.Plugin
   - -fwarn-tabs
   - -fwrite-ide-info
   - -fno-warn-unused-imports

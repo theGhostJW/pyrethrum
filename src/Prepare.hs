@@ -47,15 +47,6 @@ data PreNode m c hi where
     } ->
     PreNode m c hi
 
-type PreSuite m c i = [PreNode m c i]
-
--- Suite rc tc effs
--- todo:
---    - prenode subnodes => nonEmpty
---    - filtering
---    - tree shaking
---    - querying
-
 data PrepLog = PrepLog
   { path :: C.Path
   , event :: ApEvent
@@ -72,8 +63,8 @@ data PrepParams rc tc effs where
     } ->
     PrepParams rc tc effs
 
-ioRunSuiteElm :: forall rc tc effs i. (C.Config rc, C.Config tc) => PrepParams rc tc effs -> C.SuiteElement rc tc effs i -> PreNode IO [] i
-ioRunSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
+prepSuiteElm :: forall rc tc effs i. (C.Config rc, C.Config tc) => PrepParams rc tc effs -> C.SuiteElement rc tc effs i -> PreNode IO [] i
+prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
   suiteElm & \case
     C.Hook{hook, path, subNodes = subNodes'} ->
       hook & \case
@@ -133,7 +124,7 @@ ioRunSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
       frequency = C.hookFrequency hook
       subNodes = run <$> subNodes'
       run :: forall a. C.SuiteElement rc tc effs a -> PreNode IO [] a
-      run = ioRunSuiteElm pp
+      run = prepSuiteElm pp
       intprt :: forall a. Eff effs a -> IO a
       intprt a = interpreter a >>= unTry eventSink path
     C.Test{path, test} -> prepareTest pp path test
@@ -262,15 +253,23 @@ data SuitePrepParams rc tc effs where
   SuitePrepParams ::
     { suite :: C.Suite rc tc effs
     , eventSink :: EvntSink
-    , interpreter {- EvntSink -> -} :: Eff effs a -> IO (Either (CallStack, SomeException) a)
+    , interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
     SuitePrepParams rc tc effs
 
-ioRun :: SuitePrepParams rc tc effs -> PreSuite IO [] (Either (CallStack, SomeException) ())
-ioRun pp@SuitePrepParams{interpreter} = uu
+-- 
+-- Suite rc tc effs
+-- TODO:
+--    - prenode subnodes => nonEmpty
+--    - filtering
+--    - tree shaking
+--    - querying
+prepare :: (C.Config rc, C.Config tc) => SuitePrepParams rc tc effs -> [PreNode IO [] ()]
+prepare SuitePrepParams{suite, eventSink, interpreter, runConfig} =
+  prepSuiteElm pp <$> suite
  where
-  intprt = interpreter
+  pp = PrepParams eventSink interpreter runConfig
 
 data TestItem rc tc m i = TestItem
   { id :: Int

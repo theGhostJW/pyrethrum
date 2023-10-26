@@ -6,13 +6,6 @@ module Internal.SuiteRuntime where
 
 import BasePrelude (retry)
 import GHC.Exts
-import Internal.PreNode (Context (..), OnceHook (..), PreNode (testHook), TestHook (..), ThreadHook (..))
-import qualified Internal.PreNode as PN (
-  Fixture (..),
-  PreNode (..),
-  PreNodeRoot,
-  Test (..),
- )
 import Internal.RunTimeLogging (
   ExeEvent (..),
   ExeEventType (TestHook, TestHookRelease, ThreadHookRelease),
@@ -49,6 +42,14 @@ import UnliftIO.STM (
  )
 import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO)
 import qualified Core as C
+-- PRENODE TO BE DEPRECATED
+import Internal.PreNode (Context (..), OnceHook (..), PreNode (testHook), TestHook (..), ThreadHook (..))
+import qualified Internal.PreNode as PN (
+  Fixture (..),
+  PreNode (..),
+  PreNodeRoot,
+  Test (..),
+ )
 
 executeNew :: Int -> LogControls m Loc a -> PN.PreNodeRoot a -> IO ()
 executeNew

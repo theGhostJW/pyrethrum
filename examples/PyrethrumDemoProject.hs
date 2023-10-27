@@ -1,12 +1,12 @@
 module PyrethrumDemoProject where
 
-import qualified Core as C
 import qualified CheckNew as CH
+import qualified Core as C
 import DSL.FileSystemEffect (FSException, FileSystem)
 import DSL.Internal.ApEvent (ApEvent)
 import DSL.Out (Out)
-import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Effectful (Eff, IOE, type (:>))
 import Effectful.Error.Static as E (Error)
 
@@ -99,7 +99,7 @@ data Test hi where
     (C.Item i ds, ToJSON as, C.Param loc) =>
     { depends :: Hook loc pi a
     , config' :: TestConfig
-    , action' :: RunConfig -> a  -> i -> Action as
+    , action' :: RunConfig -> a -> i -> Action as
     , parse' :: as -> Eff '[E.Error C.ParseException] ds
     , items' :: RunConfig -> [i]
     } ->
@@ -116,7 +116,7 @@ data Test hi where
     (C.Item i ds, C.Param loc) =>
     { depends :: Hook loc pi a
     , config' :: TestConfig
-    , action' ::  RunConfig -> a -> i -> Action ds
+    , action' :: RunConfig -> a -> i -> Action ds
     , items' :: RunConfig -> [i]
     } ->
     Test a
@@ -131,7 +131,7 @@ data Test hi where
     (ToJSON as, C.Param loc) =>
     { depends :: Hook loc pi a
     , config' :: TestConfig
-    , singleAction' :: RunConfig -> a ->  Action as
+    , singleAction' :: RunConfig -> a -> Action as
     , checks' :: CH.Checks as
     } ->
     Test a
@@ -151,7 +151,7 @@ data SuiteElement i where
     } ->
     SuiteElement i
 
-mkTest :: Test hi -> C.Test RunConfig TestConfig ApEffs hi
+mkTest :: Test hi -> C.Test [] RunConfig TestConfig ApEffs hi
 mkTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
@@ -174,7 +174,7 @@ mkHook = \case
     } ->
       C.Around' (mkHook depends) setup' teardown'
 
-mkSuite :: SuiteElement i -> C.SuiteElement RunConfig TestConfig ApEffs i
+mkSuite :: SuiteElement i -> C.SuiteElement [] RunConfig TestConfig ApEffs i
 mkSuite = \case
   Hook{..} ->
     C.Hook
@@ -184,5 +184,5 @@ mkSuite = \case
       }
   Test{..} -> C.Test{test = mkTest test, ..}
 
-mkTestRun :: Suite -> C.Suite RunConfig TestConfig ApEffs
+mkTestRun :: Suite -> [C.SuiteElement [] RunConfig TestConfig ApEffs ()]
 mkTestRun tr = mkSuite <$> tr

@@ -63,7 +63,7 @@ data PrepParams rc tc effs where
     } ->
     PrepParams rc tc effs
 
-prepSuiteElm :: forall rc tc effs i. (C.Config rc, C.Config tc) => PrepParams rc tc effs -> C.SuiteElement rc tc effs i -> PreNode IO [] i
+prepSuiteElm :: forall c rc tc effs i. (C.Config rc, C.Config tc, Applicative c) => PrepParams rc tc effs -> C.SuiteElement c rc tc effs i -> PreNode IO c i
 prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
   suiteElm & \case
     C.Hook{hook, path, subNodes = subNodes'} ->
@@ -122,9 +122,13 @@ prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
               }
      where
       frequency = C.hookFrequency hook
+
+
       subNodes = run <$> subNodes'
-      run :: forall a. C.SuiteElement rc tc effs a -> PreNode IO [] a
+
+      run :: forall a. C.SuiteElement c rc tc effs a -> PreNode IO c a
       run = prepSuiteElm pp
+
       intprt :: forall a. Eff effs a -> IO a
       intprt a = interpreter a >>= unTry eventSink path
     C.Test{path, test} -> prepareTest pp path test
@@ -141,7 +145,7 @@ unTry es p = either (uncurry $ logThrow es p) pure
 logThrow :: EvntSink -> C.Path -> CallStack -> SomeException -> IO a
 logThrow es p cs ex = log es p (exceptionEvent ex cs) >> throwIO ex
 
-prepareTest :: forall rc tc hi effs. (C.Config tc) => PrepParams rc tc effs -> C.Path -> C.Test rc tc effs hi -> PreNode IO [] hi
+prepareTest :: forall m rc tc hi effs. (C.Config tc, Applicative m) => PrepParams rc tc effs -> C.Path -> C.Test m rc tc effs hi -> PreNode IO m hi
 prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
   \case
     C.Full{config, action, parse, items} ->
@@ -173,28 +177,26 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
         { config
         , path
         , tests =
-            [ \hi ->
-                do
-                  ds <- tryAny $ do
-                    flog . Action . ItemJSON $ toJSON config.title
-                    eas <- interpreter (singleAction runConfig)
-                    unTry' eas
-                  applyChecks eventSink path checks ds
-            ]
+            pure $ \hi ->
+              do
+                ds <- tryAny $ do
+                  flog . Action . ItemJSON $ toJSON config.title
+                  eas <- interpreter (singleAction runConfig)
+                  unTry' eas
+                applyChecks eventSink path checks ds
         }
     C.Single'{config', singleAction', checks'} ->
       Test
         { config = config'
         , path
         , tests =
-            [ \hi ->
-                do
-                  ds <- tryAny $ do
-                    flog . Action . ItemJSON $ toJSON config'.title
-                    eas <- interpreter (singleAction' runConfig hi)
-                    unTry' eas
-                  applyChecks eventSink path checks' ds
-            ]
+            pure $ \hi ->
+              do
+                ds <- tryAny $ do
+                  flog . Action . ItemJSON $ toJSON config'.title
+                  eas <- interpreter (singleAction' runConfig hi)
+                  unTry' eas
+                applyChecks eventSink path checks' ds
         }
  where
   flog = frameworkLog eventSink path
@@ -249,25 +251,29 @@ applyChecks es p chks =
       logChk cr
       pure ts'
 
-data SuitePrepParams rc tc effs where
+data SuitePrepParams m rc tc effs where
   SuitePrepParams ::
-    { suite :: C.Suite rc tc effs
+    { suite :: m (C.SuiteElement m rc tc effs ())
     , eventSink :: EvntSink
     , interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
-    SuitePrepParams rc tc effs
+    SuitePrepParams m rc tc effs
 
--- 
+--
 -- Suite rc tc effs
 -- TODO:
 --    - prenode subnodes => nonEmpty
 --    - filtering
 --    - tree shaking
 --    - querying
-prepare :: (C.Config rc, C.Config tc) => SuitePrepParams rc tc effs -> [PreNode IO [] ()]
-prepare SuitePrepParams{suite, eventSink, interpreter, runConfig} =
-  prepSuiteElm pp <$> suite
+-- will return more info later such as filter log and have to return an either
+filterSuite :: [C.SuiteElement [] rc tc effs ()] -> NonEmpty (C.SuiteElement NonEmpty rc tc effs ())
+filterSuite = uu
+
+prepare :: (C.Config rc, C.Config tc) => SuitePrepParams [] rc tc effs -> NonEmpty (PreNode IO NonEmpty ())
+prepare spp@SuitePrepParams{suite, eventSink, interpreter, runConfig} =
+  prepSuiteElm pp <$> filterSuite suite
  where
   pp = PrepParams eventSink interpreter runConfig
 

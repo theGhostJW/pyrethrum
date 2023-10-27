@@ -127,46 +127,46 @@ data Addressed a = Addressed
   , value :: a
   }
 
-data Test rc tc effs hi where
+data Test c rc tc effs hi where
   Full ::
     (Item i ds, ToJSON as) =>
     { config :: tc
     , action :: rc -> i -> Eff effs as
     , parse :: as -> Eff '[E.Error ParseException] ds
-    , items :: rc -> [i]
+    , items :: rc -> c i
     } ->
-    Test rc tc effs ()
+    Test c rc tc effs ()
   Full' ::
     (Item i ds, ToJSON as) =>
     { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , action' :: rc -> hi -> i -> Eff effs as
     , parse' :: as -> Eff '[E.Error ParseException] ds
-    , items' :: rc -> [i]
+    , items' :: rc -> c i
     } ->
-    Test rc tc effs hi
+    Test c rc tc effs hi
   NoParse ::
     (Item i ds) =>
     { config :: tc
     , action :: rc -> i -> Eff effs ds
-    , items :: rc -> [i]
+    , items :: rc -> c i
     } ->
-    Test rc tc effs ()
+    Test c rc tc effs ()
   NoParse' ::
     (Item i ds) =>
     { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , action' :: rc -> hi -> i -> Eff effs ds
-    , items' :: rc -> [i]
+    , items' :: rc -> c i
     } ->
-    Test rc tc effs hi
+    Test c rc tc effs hi
   Single ::
     (ToJSON ds) =>
     { config :: tc
     , singleAction :: rc -> Eff effs ds
     , checks :: Checks ds
     } ->
-    Test rc tc effs ()
+    Test c rc tc effs ()
   Single' ::
     (ToJSON ds) =>
     { depends :: Hook rc effs loc pi hi
@@ -174,28 +174,26 @@ data Test rc tc effs hi where
     , singleAction' :: rc -> hi -> Eff effs ds
     , checks' :: Checks ds
     } ->
-    Test rc tc effs hi
+    Test c rc tc effs hi
 
 data Path = Path
   { module' :: Text
   , title :: Text
   } deriving Show
 
-type Suite rc tc effs = [SuiteElement rc tc effs ()]
-
-data SuiteElement rc tc effs hi where
+data SuiteElement c rc tc effs hi where
   Hook ::
     (Param loc) =>
     { path :: Path
     , hook :: Hook rc effs loc hi o
-    , subNodes :: [SuiteElement rc tc effs o]
+    , subNodes :: c (SuiteElement c rc tc effs o)
     } ->
-    SuiteElement rc tc effs hi
+    SuiteElement c rc tc effs hi
   Test ::
     { path :: Path
-    , test :: Test rc tc effs hi
+    , test :: Test c rc tc effs hi
     } ->
-    SuiteElement rc tc effs hi
+    SuiteElement c rc tc effs hi
 
 
 -- try this

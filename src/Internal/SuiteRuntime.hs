@@ -50,8 +50,10 @@ import qualified Internal.PreNode as PN (
   PreNodeRoot,
   Test (..),
  )
+-- NEW
+import qualified Prepare as P
 
-executeNew :: Int -> LogControls m Loc a -> PN.PreNodeRoot a -> IO ()
+executeNew :: Int -> LogControls m Loc a -> P.SuitePrepParams NonEmpty rc tc effs -> IO ()
 executeNew
   maxThreads
   LogControls

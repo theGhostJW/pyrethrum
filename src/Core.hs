@@ -195,6 +195,15 @@ data SuiteElement c rc tc effs hi where
     } ->
     SuiteElement c rc tc effs hi
 
+data ExeParams m rc tc effs where
+  ExeParams ::
+    { suite :: m (SuiteElement m rc tc effs ())
+    , interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
+    , runConfig :: rc
+    } ->
+    ExeParams m rc tc effs
+
+
 
 -- try this
 -- part 1

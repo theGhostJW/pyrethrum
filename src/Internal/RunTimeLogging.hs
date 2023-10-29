@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module Internal.RunTimeLogging where
 
 import qualified BasePrelude as P
@@ -9,6 +10,7 @@ import Text.Show.Pretty (pPrint)
 import UnliftIO (TChan, TQueue, atomically, finally, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
 import UnliftIO.Concurrent (ThreadId, myThreadId)
 import Prelude hiding (atomically, lines)
+import Data.Aeson (ToJSON)
 
 data Loc
   = Root
@@ -118,7 +120,7 @@ mkParentFailure fl fet pl pet ex =
     }
 
 newtype PException = PException {displayText :: [Text]} deriving (Show, Eq, Ord)
-newtype SThreadId = SThreadId {display :: Text} deriving (Show, Eq, Ord)
+newtype SThreadId = SThreadId {display :: Text} deriving (Show, Generic, Eq, Ord)
 
 data Log a = Log
   { threadId :: SThreadId

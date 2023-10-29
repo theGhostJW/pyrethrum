@@ -47,13 +47,13 @@ data PreNode m c hi where
     } ->
     PreNode m c hi
 
-data PrepLog = PrepLog
+data ApLog = ApLog
   { path :: C.Path
   , event :: ApEvent
   }
   deriving (Show)
 
-type EvntSink = PrepLog -> IO ()
+type EvntSink = ApLog -> IO ()
 
 data PrepParams rc tc effs where
   PrepParams ::
@@ -134,7 +134,7 @@ prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
     C.Test{path, test} -> prepareTest pp path test
 
 log :: EvntSink -> C.Path -> ApEvent -> IO ()
-log eventSink path = eventSink . PrepLog path
+log eventSink path = eventSink . ApLog path
 
 frameworkLog :: EvntSink -> C.Path -> FLog -> IO ()
 frameworkLog eventSink path = log eventSink path . Framework

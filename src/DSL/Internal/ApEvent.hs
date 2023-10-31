@@ -1,12 +1,11 @@
 module DSL.Internal.ApEvent where
 
-import qualified Data.Aeson as A
-import Data.Aeson.TH (deriveJSON, defaultOptions)
 import CheckNew (CheckReport)
+import qualified Data.Aeson as A
+import Data.Aeson.TH (defaultOptions, deriveJSON)
 import PyrethrumExtras (toS)
 
 -- TODO: make log effect requiring out
-
 
 -- TODO: make log effect requiring out
 data ULog
@@ -29,6 +28,12 @@ data ULog
       }
   deriving stock (Eq, Show)
 
+data Path = Path
+  { module' :: Text
+  , title :: Text
+  }
+  deriving (Show)
+
 newtype ApStateJSON = ApStateJSON {unApStateJSON :: A.Value} deriving (Eq, Show, IsString)
 $(deriveJSON defaultOptions ''ApStateJSON)
 
@@ -42,13 +47,31 @@ exceptionEvent :: SomeException -> CallStack -> ApEvent
 exceptionEvent e cs =
   Framework $ Exception (toS $ displayException e) (toS $ prettyCallStack cs)
 
+-- framework logs that represent test fixtures have a path to that fixture
+-- Steps and Exceptions do not as they don't represent test fixture
 data FLog
-  = Action {item :: ItemJSON}
-  | Parse {apState :: ApStateJSON}
-  | CheckStart {dState :: DStateJSON} 
+  = Action
+      { path :: Path
+      , item :: ItemJSON
+      }
+  | Parse
+      { path :: Path
+      , apState :: ApStateJSON
+      }
+  | CheckStart
+      { path :: Path
+      , dState :: DStateJSON
+      }
   | SkipedCheckStart
-  | Check CheckReport
-  | Step Text
+      { path :: Path
+      }
+  | Check
+      { path :: Path
+      , report :: CheckReport
+      }
+  | Step
+      { message :: Text
+      }
   | Step'
       { message :: Text
       , details :: Text
@@ -57,26 +80,19 @@ data FLog
       { exception :: Text
       , callStack :: Text
       }
-  deriving stock Show
+  deriving stock (Show)
 
 data ApEvent
   = User ULog
   | Framework FLog
-  deriving stock Show
-
+  deriving stock (Show)
 
 $(deriveJSON defaultOptions ''ULog)
+$(deriveJSON defaultOptions ''Path)
 $(deriveJSON defaultOptions ''FLog)
 $(deriveJSON defaultOptions ''ApEvent)
 
-
-
-
-
-
-
-
-  {-
+{-
 
   data LogProtocolBase e
   = FilterLog [TestFilterResult]
@@ -94,7 +110,7 @@ $(deriveJSON defaultOptions ''ApEvent)
   | EndTest Address
   | StartIteration ItemId Text Value
   | EndIteration ItemId
-  
+
   | IOAction Text
   | IOAction' DetailedInfo
   | StartInteraction
@@ -112,6 +128,6 @@ $(deriveJSON defaultOptions ''ApEvent)
   | Warning' DetailedInfo
   | Error (FrameworkError e)
   deriving (Eq, Show, Functor)
-$(deriveJSON defaultOptions ''LogProtocolBase)
-  
+\$(deriveJSON defaultOptions ''LogProtocolBase)
+
   -}

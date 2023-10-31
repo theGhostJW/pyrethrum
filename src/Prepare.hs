@@ -18,21 +18,21 @@ import UnliftIO.Exception (tryAny)
 
 data PreNode m c hi where
   Before ::
-    { path :: C.Path
+    { path :: Path
     , frequency :: C.Frequency
     , action :: hi -> m o
     , subNodes :: c (PreNode m c o)
     } ->
     PreNode m c hi
   After ::
-    { path :: C.Path
+    { path :: Path
     , frequency :: C.Frequency
     , subNodes :: c (PreNode m c o)
     , after :: m ()
     } ->
     PreNode m c hi
   Around ::
-    { path :: C.Path
+    { path :: Path
     , frequency :: C.Frequency
     , setup :: hi -> m o
     , subNodes :: c (PreNode m c o)
@@ -42,28 +42,22 @@ data PreNode m c hi where
   Test ::
     (C.Config tc) =>
     { config :: tc
-    , path :: C.Path
+    , path :: Path
     , tests :: c (hi -> m ())
     } ->
     PreNode m c hi
 
-data ApLog = ApLog
-  { path :: C.Path
-  , event :: ApEvent
-  }
-  deriving (Show)
-
-type EvntSink = ApLog -> IO ()
+type ApEventSink = ApEvent -> IO ()
 
 data PrepParams rc tc effs where
   PrepParams ::
-    { eventSink :: EvntSink
+    { eventSink :: ApEventSink
     , interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
     PrepParams rc tc effs
 
-prepSuiteElm :: forall c rc tc effs i. (C.Config rc, C.Config tc, Applicative c) => PrepParams rc tc effs -> C.SuiteElement c rc tc effs i -> PreNode IO c i
+prepSuiteElm :: forall m rc tc effs hi. (C.Config rc, C.Config tc, Applicative m) => PrepParams rc tc effs -> C.SuiteElement m rc tc effs hi -> PreNode IO m hi
 prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
   suiteElm & \case
     C.Hook{hook, path, subNodes = subNodes'} ->
@@ -126,26 +120,25 @@ prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
 
       subNodes = run <$> subNodes'
 
-      run :: forall a. C.SuiteElement c rc tc effs a -> PreNode IO c a
+      run :: forall a. C.SuiteElement m rc tc effs a -> PreNode IO m a
       run = prepSuiteElm pp
 
       intprt :: forall a. Eff effs a -> IO a
-      intprt a = interpreter a >>= unTry eventSink path
+      intprt a = interpreter a >>= unTry eventSink
     C.Test{path, test} -> prepareTest pp path test
 
-log :: EvntSink -> C.Path -> ApEvent -> IO ()
-log eventSink path = eventSink . ApLog path
 
-frameworkLog :: EvntSink -> C.Path -> FLog -> IO ()
-frameworkLog eventSink path = log eventSink path . Framework
 
-unTry :: forall a. EvntSink -> C.Path -> Either (CallStack, SomeException) a -> IO a
-unTry es p = either (uncurry $ logThrow es p) pure
+frameworkLog :: ApEventSink -> FLog -> IO ()
+frameworkLog sink = sink . Framework
 
-logThrow :: EvntSink -> C.Path -> CallStack -> SomeException -> IO a
-logThrow es p cs ex = log es p (exceptionEvent ex cs) >> throwIO ex
+unTry :: forall a. ApEventSink -> Either (CallStack, SomeException) a -> IO a
+unTry es = either (uncurry $ logThrow es) pure
 
-prepareTest :: forall m rc tc hi effs. (C.Config tc, Applicative m) => PrepParams rc tc effs -> C.Path -> C.Test m rc tc effs hi -> PreNode IO m hi
+logThrow :: ApEventSink -> CallStack -> SomeException -> IO a
+logThrow sink cs ex = sink (exceptionEvent ex cs) >> throwIO ex
+
+prepareTest :: forall m rc tc hi effs. (C.Config tc, Applicative m) => PrepParams rc tc effs -> Path -> C.Test m rc tc effs hi -> PreNode IO m hi
 prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
   \case
     C.Full{config, action, parse, items} ->
@@ -180,7 +173,7 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
             pure $ \hi ->
               do
                 ds <- tryAny $ do
-                  flog . Action . ItemJSON $ toJSON config.title
+                  flog . Action path . ItemJSON $ toJSON config.title
                   eas <- interpreter (singleAction runConfig)
                   unTry' eas
                 applyChecks eventSink path checks ds
@@ -193,23 +186,23 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
             pure $ \hi ->
               do
                 ds <- tryAny $ do
-                  flog . Action . ItemJSON $ toJSON config'.title
+                  flog . Action path . ItemJSON $ toJSON config'.title
                   eas <- interpreter (singleAction' runConfig hi)
                   unTry' eas
                 applyChecks eventSink path checks' ds
         }
  where
-  flog = frameworkLog eventSink path
+  flog = frameworkLog eventSink
 
   applyParser parser = mapLeft (fmap toException) . runPureEff . E.runError . parser
 
   unTry' :: Either (CallStack, SomeException) a -> IO a
-  unTry' = unTry eventSink path
+  unTry' = unTry eventSink
 
   runAction :: forall i as ds. (C.Item i ds) => (i -> Eff effs as) -> i -> hi -> IO as
   runAction action i hi =
     do
-      flog . Action . ItemJSON $ toJSON i
+      flog . Action path . ItemJSON $ toJSON i
       eas <- interpreter $ action i
       unTry' eas
 
@@ -219,7 +212,7 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
       ds <- tryAny
         do
           as <- runAction action i hi
-          flog . Parse . ApStateJSON $ toJSON as
+          flog . Parse path . ApStateJSON $ toJSON as
           let eds = applyParser parser as
           unTry' eds
       applyChecks eventSink path i.checks ds
@@ -228,21 +221,21 @@ prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
   runNoParseTest action i hi =
     tryAny (runAction action i hi) >>= applyChecks eventSink path i.checks
 
-applyChecks :: forall ds. (ToJSON ds) => EvntSink -> C.Path -> Checks ds -> Either SomeException ds -> IO ()
+applyChecks :: forall ds. (ToJSON ds) => ApEventSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
 applyChecks es p chks =
   either
     ( \e -> do
-        flog SkipedCheckStart
+        flog $ SkipedCheckStart p
         traverse_ logChk (skipChecks chks)
         throw e
     )
     applyChecks'
  where
-  flog = frameworkLog es p
-  logChk = flog . Check
+  flog = frameworkLog es
+  logChk = flog . Check p
   applyChecks' ds =
     do
-      flog . CheckStart . DStateJSON $ toJSON ds
+      flog . CheckStart p . DStateJSON $ toJSON ds
       foldM_ applyCheck' NonTerminal chks.un
    where
     applyCheck' :: TerminationStatus -> Check ds -> IO TerminationStatus
@@ -254,7 +247,7 @@ applyChecks es p chks =
 data SuitePrepParams m rc tc effs where
   SuitePrepParams ::
     { suite :: m (C.SuiteElement m rc tc effs ())
-    , eventSink :: EvntSink
+    , eventSink :: ApEventSink
     , interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
@@ -279,7 +272,7 @@ prepare spp@SuitePrepParams{suite, eventSink, interpreter, runConfig} =
 
 data TestItem rc tc m i = TestItem
   { id :: Int
-  , path :: C.Path
+  , path :: Path
   , test :: rc -> i -> m ()
   , chkText :: Text
   }

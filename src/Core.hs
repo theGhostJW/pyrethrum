@@ -48,6 +48,7 @@ to list
 
 --
 
+
 data Frequency = Once | Thread | Each deriving (Show, Eq)
 
 class Param a where
@@ -175,11 +176,6 @@ data Test c rc tc effs hi where
     , checks' :: Checks ds
     } ->
     Test c rc tc effs hi
-
-data Path = Path
-  { module' :: Text
-  , title :: Text
-  } deriving Show
 
 data SuiteElement c rc tc effs hi where
   Hook ::

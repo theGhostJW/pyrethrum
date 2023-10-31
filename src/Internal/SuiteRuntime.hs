@@ -25,7 +25,8 @@ import qualified Internal.RunTimeLoggingNew as NL
 import qualified Internal.RunTimeLogging as L
 
 import qualified Core as C
-import PyrethrumExtras (catchAll, txt, (?), uu)
+import qualified DSL.Internal.ApEvent as AE
+import PyrethrumExtras (catchAll, txt, uu, (?))
 import UnliftIO (
   concurrently_,
   finally,
@@ -57,17 +58,24 @@ import qualified Internal.PreNode as PN (
 -- NEW
 
 import GHC.RTS.Flags (DebugFlags (interpreter))
+import qualified Prepare as C
 import qualified Prepare as P
 
-executeNew :: Int -> LogControls m Loc P.ApLog -> C.ExeParams [] rc tc effs -> IO ()
+newtype ThreadCount = ThreadCount Int
+  deriving (Show)
+
+
+-- todo :: mkThreadCOunt with validation
+
+executeNew :: (C.Config rc, C.Config tc) => ThreadCount -> NL.LogControls m Loc AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
 executeNew
-  maxThreads
-  LogControls
+  (ThreadCount maxThreads)
+  NL.LogControls
     { sink
     , logWorker
     , stopWorker
     }
-   C.ExeParams
+  C.ExeParams
     { suite
     , interpreter
     , runConfig
@@ -76,25 +84,18 @@ executeNew
     -- fixture titles are unique ??
     concurrently_ logWorker linkExecute
    where
-    prpParams = mkPrepParams
-    eventSink = NL.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
     linkExecute :: IO ()
     linkExecute =
       finally
         ( do
-            -- let pSuite = P.prepare P.
-            uu
+            engSnk <- NL.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
+            let eventSink = engSnk . NL.ApEvent
+                nodeList = P.prepare $ C.SuitePrepParams suite eventSink interpreter runConfig
+            executeNodesNew engSnk nodeList maxThreads
+
             -- runTree sink exeTree maxThreads
         )
         stopWorker
-
-mkPrepParams :: LogControls m Loc P.ApLog  -> C.ExeParams [] rc tc effs -> P.PrepParams rc tc effs
-mkPrepParams lc C.ExeParams{..} = 
-   uu --P.PrepParams{eventSink = lc.sink, ..} 
- where 
-   evtSink :: P.ApLog -> IO ()
-   evtSink = lc.sink . ApEvent
-
 
 {-
   ##########################################################################
@@ -724,6 +725,9 @@ runNode eventLogger hkIn =
           let r = t && q
           when r $ modifyTVar' runningThreads succ
           pure r
+
+executeNodesNew :: (NL.EngineEvent Loc a -> IO ()) -> NonEmpty (P.PreNode IO NonEmpty ()) -> Int -> IO ()
+executeNodesNew sink nodes maxThreads = uu
 
 runTree :: (L.ExeLog Loc a -> IO ()) -> ExeTree a () () -> Int -> IO ()
 runTree sink xtri maxThreads =

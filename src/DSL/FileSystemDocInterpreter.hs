@@ -73,8 +73,8 @@ docErrn funcName dscFrags =
         <> "\n  Value forced from function: '"
         <> funcName
         <> "' in documentation mode."
-        <> "\n  Use  docVal, docHush, docVoid, docVal', or docVoid "
-        <> " to replace or silence this value at the call site for: '"
+        <> "\n  Use  docVal, docHush, docVoid, docVal'"
+        <> " to replace or silence this value from where the step is called: '"
         <> funcName
         <> "'"
 

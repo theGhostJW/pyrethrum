@@ -135,6 +135,9 @@ data EngineEvent l a
   | EndExecution
   deriving (Show)
 
+-- apEvent (a) a loggable event arising from the framework at runtime
+-- EngineEvent a - marks start, end and failures in test fixtures (hooks, tests) and errors
+-- ThreadEvent a - adds thread id and index to EngineEvent
 expandEvent :: TE.SThreadId -> Int -> EngineEvent loc apEvt -> TE.ThreadEvent loc apEvt
 expandEvent threadId idx = \case
   StartExecution -> TE.StartExecution{threadId, idx}
@@ -142,12 +145,9 @@ expandEvent threadId idx = \case
   End{..} -> TE.End{threadId, idx, ..}
   Failure{..} -> TE.Failure{threadId, idx, ..}
   ParentFailure{..} -> TE.ParentFailure{threadId, idx, ..}
-  ApEvent{..} -> TE.ApEvent{threadId, idx, ..}
+  ApEvent event -> TE.ApEvent{threadId, idx, event}
   EndExecution -> TE.EndExecution{threadId, idx}
 
--- apEvent (a) a loggable event arising from the framework at runtime
--- EngineEvent - marks start, end and failures in test fixtures (hooks, tests) and errors
--- Thread Event - adds thread id and index to EngineEvent
 mkLogger :: (TE.ThreadEvent loc apEvt -> IO ()) -> IORef Int -> ThreadId -> EngineEvent loc apEvt -> IO ()
 mkLogger sink threadCounter thrdId engEvnt = do
   tc <- readIORef threadCounter

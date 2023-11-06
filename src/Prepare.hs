@@ -20,7 +20,7 @@ data PreNode m c hi where
   Before ::
     { path :: Path
     , frequency :: C.Frequency
-    , action :: hi -> m o
+    , action :: ApEventSink -> hi -> m o
     , subNodes :: c (PreNode m c o)
     } ->
     PreNode m c hi
@@ -28,22 +28,22 @@ data PreNode m c hi where
     { path :: Path
     , frequency :: C.Frequency
     , subNodes' :: c (PreNode m c hi)
-    , after :: m ()
+    , after :: ApEventSink -> m ()
     } ->
     PreNode m c hi
   Around ::
     { path :: Path
     , frequency :: C.Frequency
-    , setup :: hi -> m o
+    , setup :: ApEventSink -> hi -> m o
     , subNodes :: c (PreNode m c o)
-    , teardown :: o -> m ()
+    , teardown :: ApEventSink -> o -> m ()
     } ->
     PreNode m c hi
   Test ::
     (C.Config tc) =>
     { config :: tc
     , path :: Path
-    , tests :: c (ApEventSink -> hi -> m ())
+    , tests :: ApEventSink -> c (hi -> m ())
     } ->
     PreNode m c hi
 
@@ -51,14 +51,13 @@ type ApEventSink = ApEvent -> IO ()
 
 data PrepParams rc tc effs where
   PrepParams ::
-    {
-      interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
+    { interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
     PrepParams rc tc effs
 
 prepSuiteElm :: forall m rc tc effs hi. (C.Config rc, C.Config tc, Applicative m) => PrepParams rc tc effs -> C.SuiteElement m rc tc effs hi -> PreNode IO m hi
-prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
+prepSuiteElm pp@PrepParams{interpreter, runConfig} suiteElm =
   suiteElm & \case
     C.Hook{hook, path, subNodes = subNodes'} ->
       hook & \case
@@ -66,7 +65,7 @@ prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
           Before
             { path
             , frequency
-            , action = const . intprt $ action runConfig
+            , action =  \snk -> const . intprt snk $ action runConfig
             , subNodes
             }
         C.Before'
@@ -75,7 +74,7 @@ prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
             Before
               { path
               , frequency
-              , action = intprt . action' runConfig
+              , action = \snk -> intprt snk . action' runConfig
               , subNodes
               }
         C.After{afterAction} ->
@@ -83,14 +82,14 @@ prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
             { path
             , frequency
             , subNodes' = subNodes
-            , after = intprt $ afterAction runConfig
+            , after = \snk -> intprt snk $ afterAction runConfig
             }
         C.After'{afterAction'} ->
           After
             { path
             , frequency
             , subNodes' = subNodes
-            , after = intprt $ afterAction' runConfig
+            , after = \snk -> intprt snk $ afterAction' runConfig
             }
         C.Around
           { setup
@@ -99,9 +98,9 @@ prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
             Around
               { path
               , frequency
-              , setup = const . intprt $ setup runConfig
+              , setup = \snk -> const . intprt snk $ setup runConfig
               , subNodes
-              , teardown = intprt . teardown runConfig
+              , teardown = \snk -> intprt snk . teardown runConfig
               }
         C.Around'
           { setup'
@@ -110,27 +109,24 @@ prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
             Around
               { path
               , frequency
-              , setup = intprt . setup' runConfig
+              , setup = \snk -> intprt snk . setup' runConfig
               , subNodes
-              , teardown = intprt . teardown' runConfig
+              , teardown = \snk -> intprt snk . teardown' runConfig
               }
      where
       frequency = C.hookFrequency hook
-
 
       subNodes = run <$> subNodes'
 
       run :: forall a. C.SuiteElement m rc tc effs a -> PreNode IO m a
       run = prepSuiteElm pp
 
-      intprt :: forall a. Eff effs a -> IO a
-      intprt a = interpreter a >>= unTry eventSink
+      intprt :: forall a. ApEventSink -> Eff effs a -> IO a
+      intprt snk a = interpreter a >>= unTry snk
     C.Test{path, test} -> prepareTest pp path test
 
-
-
-frameworkLog :: ApEventSink -> FLog -> IO ()
-frameworkLog sink = sink . Framework
+flog :: ApEventSink -> FLog -> IO ()
+flog sink = sink . Framework
 
 unTry :: forall a. ApEventSink -> Either (CallStack, SomeException) a -> IO a
 unTry es = either (uncurry $ logThrow es) pure
@@ -139,110 +135,108 @@ logThrow :: ApEventSink -> CallStack -> SomeException -> IO a
 logThrow sink cs ex = sink (exceptionEvent ex cs) >> throwIO ex
 
 prepareTest :: forall m rc tc hi effs. (C.Config tc, Applicative m) => PrepParams rc tc effs -> Path -> C.Test m rc tc effs hi -> PreNode IO m hi
-prepareTest pp@PrepParams{eventSink, interpreter, runConfig} path =
+prepareTest pp@PrepParams{interpreter, runConfig} path =
   \case
     C.Full{config, action, parse, items} ->
       Test
         { config
         , path
-        , tests = runTest (action runConfig) parse <$> items runConfig
+        , tests = \snk -> runTest snk (action runConfig) parse <$> items runConfig
         }
     C.Full'{config', depends, action', parse', items'} ->
       Test
         { config = config'
         , path
-        , tests = (\i hi -> runTest (action' runConfig hi) parse' i hi) <$> items' runConfig
+        , tests = \snk -> (\i hi -> runTest snk (action' runConfig hi) parse' i hi) <$> items' runConfig
         }
     C.NoParse{config, action, items} ->
       Test
         { config
         , path
-        , tests = runNoParseTest (action runConfig) <$> items runConfig
+        , tests = \snk -> runNoParseTest snk (action runConfig) <$> items runConfig
         }
     C.NoParse'{config', action', items'} ->
       Test
         { config = config'
         , path
-        , tests = (\i hi -> runNoParseTest (action' runConfig hi) i hi) <$> items' runConfig
+        , tests = \snk -> (\i hi -> runNoParseTest snk (action' runConfig hi) i hi) <$> items' runConfig
         }
     C.Single{config, singleAction, checks} ->
       Test
         { config
         , path
         , tests =
+          \snk ->
             pure $ \hi ->
               do
                 ds <- tryAny $ do
-                  flog . Action path . ItemJSON $ toJSON config.title
+                  flog snk . Action path . ItemJSON $ toJSON config.title
                   eas <- interpreter (singleAction runConfig)
-                  unTry' eas
-                applyChecks eventSink path checks ds
+                  unTry snk eas
+                applyChecks snk path checks ds
         }
     C.Single'{config', singleAction', checks'} ->
       Test
         { config = config'
         , path
         , tests =
+          \snk ->
             pure $ \hi ->
               do
                 ds <- tryAny $ do
-                  flog . Action path . ItemJSON $ toJSON config'.title
+                  -- no item to log so just log the test title
+                  flog snk . Action path . ItemJSON $ toJSON config'.title
                   eas <- interpreter (singleAction' runConfig hi)
-                  unTry' eas
-                applyChecks eventSink path checks' ds
+                  unTry snk eas
+                applyChecks snk path checks' ds
         }
  where
-  flog = frameworkLog eventSink
-
   applyParser parser = mapLeft (fmap toException) . runPureEff . E.runError . parser
 
-  unTry' :: Either (CallStack, SomeException) a -> IO a
-  unTry' = unTry eventSink
-
-  runAction :: forall i as ds. (C.Item i ds) => (i -> Eff effs as) -> i -> hi -> IO as
-  runAction action i hi =
+  runAction :: forall i as ds. (C.Item i ds) => ApEventSink -> (i -> Eff effs as) -> i -> hi -> IO as
+  runAction snk action i hi =
     do
-      flog . Action path . ItemJSON $ toJSON i
+      flog snk . Action path . ItemJSON $ toJSON i
       eas <- interpreter $ action i
-      unTry' eas
+      unTry snk eas
 
-  runTest :: forall i as ds. (ToJSON as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> hi -> IO ()
-  runTest action parser i hi =
+  runTest :: forall i as ds. (ToJSON as, C.Item i ds) => ApEventSink -> (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> hi -> IO ()
+  runTest snk action parser i hi =
     do
       ds <- tryAny
         do
-          as <- runAction action i hi
-          flog . Parse path . ApStateJSON $ toJSON as
+          as <- runAction snk action i hi
+          flog snk . Parse path . ApStateJSON $ toJSON as
           let eds = applyParser parser as
-          unTry' eds
-      applyChecks eventSink path i.checks ds
+          unTry snk eds
+      applyChecks snk path i.checks ds
 
-  runNoParseTest :: forall i ds. (C.Item i ds) => (i -> Eff effs ds) -> i -> hi -> IO ()
-  runNoParseTest action i hi =
-    tryAny (runAction action i hi) >>= applyChecks eventSink path i.checks
+  runNoParseTest :: forall i ds. ApEventSink -> (C.Item i ds) => (i -> Eff effs ds) -> i -> hi -> IO ()
+  runNoParseTest snk action i hi =
+    tryAny (runAction snk action i hi) >>= applyChecks snk path i.checks
 
 applyChecks :: forall ds. (ToJSON ds) => ApEventSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
-applyChecks es p chks =
+applyChecks snk p chks =
   either
     ( \e -> do
-        flog $ SkipedCheckStart p
+        log $ SkipedCheckStart p
         traverse_ logChk (skipChecks chks)
         throw e
     )
     applyChecks'
  where
-  flog = frameworkLog es
-  logChk = flog . Check p
+  log = flog snk
+  logChk = log . Check p
   applyChecks' ds =
     do
-      flog . CheckStart p . DStateJSON $ toJSON ds
-      foldM_ applyCheck' NonTerminal chks.un
-   where
-    applyCheck' :: TerminationStatus -> Check ds -> IO TerminationStatus
-    applyCheck' ts chk = do
-      (cr, ts') <- applyCheck ds ts chk
-      logChk cr
-      pure ts'
+      flog snk . CheckStart p . DStateJSON $ toJSON ds
+      foldM_ (applyCheck' ds) NonTerminal chks.un
+
+  applyCheck' :: ds -> TerminationStatus -> Check ds -> IO TerminationStatus
+  applyCheck' ds ts chk = do
+    (cr, ts') <- applyCheck ds ts chk
+    logChk cr
+    pure ts'
 
 data SuitePrepParams m rc tc effs where
   SuitePrepParams ::
@@ -263,12 +257,8 @@ data SuitePrepParams m rc tc effs where
 filterSuite :: [C.SuiteElement [] rc tc effs ()] -> NonEmpty (C.SuiteElement NonEmpty rc tc effs ())
 filterSuite = uu
 
-prepare :: (C.Config rc, C.Config tc) => SuitePrepParams [] rc tc effs -> ApEventSink -> NonEmpty (PreNode IO NonEmpty ())
-prepare spp@SuitePrepParams{suite, interpreter, runConfig} eventSink =
+prepare :: (C.Config rc, C.Config tc) => SuitePrepParams [] rc tc effs -> NonEmpty (PreNode IO NonEmpty ())
+prepare spp@SuitePrepParams{suite, interpreter, runConfig} =
   prepSuiteElm pp <$> filterSuite suite
  where
-  pp = PrepParams eventSink interpreter runConfig
-
-
-
-
+  pp = PrepParams interpreter runConfig

@@ -59,6 +59,7 @@ import qualified Internal.PreNode as PN (
 import GHC.RTS.Flags (DebugFlags (interpreter))
 import qualified Prepare as C
 import qualified Prepare as P
+import Internal.ThreadEvent (ThreadEvent)
 
 newtype ThreadCount = ThreadCount Int
   deriving (Show)
@@ -86,26 +87,27 @@ executeNew
     linkExecute =
       finally
         ( do
-            engSnk <- NL.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
-            let eventSink = engSnk . NL.ApEvent
-                nodeList = P.prepare $ C.SuitePrepParams suite eventSink interpreter runConfig
+            -- engSnk <- NL.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
+            -- let eventSink = engSnk . NL.ApEvent
+            let nodeList = P.prepare $ C.SuitePrepParams suite interpreter runConfig
             xtree <- mkXTreeNew (NL.ExePath []) nodeList
-            executeNodesNew engSnk xtree maxThreads
+            executeNodesNew sink xtree maxThreads
 
             -- runTree sink exeTree maxThreads
         )
         stopWorker
 
-executeNodesNew :: (NL.EngineEvent NL.ExePath a -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
+-- executeNodesNew :: (NL.EngineEvent NL.ExePath a -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
+executeNodesNew :: (ThreadEvent loc apEvt -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
 executeNodesNew sink nodes maxThreads =
   do
-    -- rootLogger <- newLogger
+    rootLogger <- newLogger
     finally
-      ( sink NL.StartExecution
+      ( rootLogger NL.StartExecution
           >> forConcurrently_
             thrdTokens
             ( const do
-                -- logger' <- newLogger
+                logger <- newLogger
                 -- runNodes sink nodes
                 uu -- runNode logger' hkIn xtri
             )
@@ -114,7 +116,7 @@ executeNodesNew sink nodes maxThreads =
  where
   hkIn = Right (ExeIn () () ())
   thrdTokens = replicate maxThreads True
-  -- newLogger = NL.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
+  newLogger = NL.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
 
 data NFrequency = Each | Thread
   deriving (Show, Eq)

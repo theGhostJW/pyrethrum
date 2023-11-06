@@ -99,13 +99,14 @@ executeNew
 executeNodesNew :: (NL.EngineEvent NL.ExePath a -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
 executeNodesNew sink nodes maxThreads =
   do
-    rootLogger <- newLogger
+    -- rootLogger <- newLogger
     finally
-      ( rootLogger StartExecution
+      ( sink NL.StartExecution
           >> forConcurrently_
             thrdTokens
             ( const do
-                logger' <- newLogger
+                -- logger' <- newLogger
+                -- runNodes sink nodes
                 uu -- runNode logger' hkIn xtri
             )
       )
@@ -113,7 +114,7 @@ executeNodesNew sink nodes maxThreads =
  where
   hkIn = Right (ExeIn () () ())
   thrdTokens = replicate maxThreads True
-  newLogger = uu -- mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
+  -- newLogger = NL.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
 
 data NFrequency = Each | Thread
   deriving (Show, Eq)
@@ -825,6 +826,8 @@ nodeStatus =
           XGroup{subNodes = s} -> s.status
           XFixtures{fixtures} -> fixtures.status
       )
+
+-- runNodes ::  ChildQ (ExeTreeNew ()) -> IO ()
 
 runNode ::
   forall oi ti a.

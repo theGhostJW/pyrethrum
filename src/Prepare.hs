@@ -43,7 +43,7 @@ data PreNode m c hi where
     (C.Config tc) =>
     { config :: tc
     , path :: Path
-    , tests :: c (hi -> m ())
+    , tests :: c (ApEventSink -> hi -> m ())
     } ->
     PreNode m c hi
 
@@ -51,8 +51,8 @@ type ApEventSink = ApEvent -> IO ()
 
 data PrepParams rc tc effs where
   PrepParams ::
-    { eventSink :: ApEventSink
-    , interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
+    {
+      interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
     PrepParams rc tc effs
@@ -247,7 +247,6 @@ applyChecks es p chks =
 data SuitePrepParams m rc tc effs where
   SuitePrepParams ::
     { suite :: m (C.SuiteElement m rc tc effs ())
-    , eventSink :: ApEventSink
     , interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
@@ -264,8 +263,8 @@ data SuitePrepParams m rc tc effs where
 filterSuite :: [C.SuiteElement [] rc tc effs ()] -> NonEmpty (C.SuiteElement NonEmpty rc tc effs ())
 filterSuite = uu
 
-prepare :: (C.Config rc, C.Config tc) => SuitePrepParams [] rc tc effs -> NonEmpty (PreNode IO NonEmpty ())
-prepare spp@SuitePrepParams{suite, eventSink, interpreter, runConfig} =
+prepare :: (C.Config rc, C.Config tc) => SuitePrepParams [] rc tc effs -> ApEventSink -> NonEmpty (PreNode IO NonEmpty ())
+prepare spp@SuitePrepParams{suite, interpreter, runConfig} eventSink =
   prepSuiteElm pp <$> filterSuite suite
  where
   pp = PrepParams eventSink interpreter runConfig

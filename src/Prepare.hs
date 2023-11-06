@@ -27,7 +27,7 @@ data PreNode m c hi where
   After ::
     { path :: Path
     , frequency :: C.Frequency
-    , subNodes :: c (PreNode m c o)
+    , subNodes' :: c (PreNode m c hi)
     , after :: m ()
     } ->
     PreNode m c hi
@@ -82,14 +82,14 @@ prepSuiteElm pp@PrepParams{eventSink, interpreter, runConfig} suiteElm =
           After
             { path
             , frequency
-            , subNodes
+            , subNodes' = subNodes
             , after = intprt $ afterAction runConfig
             }
         C.After'{afterAction'} ->
           After
             { path
             , frequency
-            , subNodes
+            , subNodes' = subNodes
             , after = intprt $ afterAction' runConfig
             }
         C.Around
@@ -270,9 +270,6 @@ prepare spp@SuitePrepParams{suite, eventSink, interpreter, runConfig} =
  where
   pp = PrepParams eventSink interpreter runConfig
 
-data TestItem rc tc m i = TestItem
-  { id :: Int
-  , path :: Path
-  , test :: rc -> i -> m ()
-  , chkText :: Text
-  }
+
+
+

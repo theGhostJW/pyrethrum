@@ -13,15 +13,14 @@ import Text.Show.Pretty (pPrint)
 import UnliftIO (TChan, TQueue, atomically, finally, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
 import UnliftIO.Concurrent (ThreadId, myThreadId)
 import Prelude hiding (atomically, lines)
+import qualified DSL.Internal.ApEvent as AE
+import Data.Text as T (Text, intercalate) 
 
-data Loc
-  = Root
-  | Node
-      { parent :: Loc
-      , tag :: Text
-      }
-  deriving (Show, Eq, Ord)
+newtype ExePath = ExePath {unExePath :: [AE.Path]} deriving (Show, Eq, Ord)
 
+-- TODO: hide string eg intercallate
+displayExePath :: ExePath -> Text
+displayExePath ep =  T.intercalate "." $ (.title) <$> reverse ep.unExePath
 
 isThreadedEvent :: TE.FrameworkEventType -> Bool
 isThreadedEvent = not . isOnceEvent
@@ -183,5 +182,5 @@ testLogControls chn logQ = do
   pure . LogControls sink logWorker stopWorker $ Just logQ
 
 
-$(deriveToJSON defaultOptions ''Loc)
+$(deriveToJSON defaultOptions ''ExePath)
 $(deriveToJSON defaultOptions ''EngineEvent)

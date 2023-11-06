@@ -281,10 +281,6 @@ suite =
           , Test (Path "module" "testName") test5
           , Hook
               { path = Path "module" "name"
-              , hook = addOnceIntHook
-              , subNodes =
-                  [ Hook
-                      { path = Path "module" "name"
                       , hook = addOnceIntHook
                       , subNodes =
                           [ Hook
@@ -310,8 +306,8 @@ suite =
                                   ]
                               }
                           ]
-                      }
-                  ]
+                }
+                 
               }
           ]
       }

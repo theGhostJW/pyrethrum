@@ -9,7 +9,6 @@ import GHC.Exts
 import Internal.RunTimeLogging (
   ExeEvent (..),
   ExeEventType (TestHook, TestHookRelease, ThreadHookRelease),
-  Loc (Node, Root),
   LogControls (LogControls),
   SThreadId,
   logWorker,
@@ -64,10 +63,9 @@ import qualified Prepare as P
 newtype ThreadCount = ThreadCount Int
   deriving (Show)
 
-
 -- todo :: mkThreadCOunt with validation
 
-executeNew :: (C.Config rc, C.Config tc) => ThreadCount -> NL.LogControls m Loc AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
+executeNew :: (C.Config rc, C.Config tc) => ThreadCount -> NL.LogControls m NL.ExePath AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
 executeNew
   (ThreadCount maxThreads)
   NL.LogControls
@@ -91,11 +89,155 @@ executeNew
             engSnk <- NL.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
             let eventSink = engSnk . NL.ApEvent
                 nodeList = P.prepare $ C.SuitePrepParams suite eventSink interpreter runConfig
-            executeNodesNew engSnk nodeList maxThreads
+            xtree <- mkXTreeNew (NL.ExePath []) nodeList
+            executeNodesNew engSnk xtree maxThreads
 
             -- runTree sink exeTree maxThreads
         )
         stopWorker
+
+executeNodesNew :: (NL.EngineEvent NL.ExePath a -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
+executeNodesNew sink nodes maxThreads =
+  do
+    rootLogger <- newLogger
+    finally
+      ( rootLogger StartExecution
+          >> forConcurrently_
+            thrdTokens
+            ( const do
+                logger' <- newLogger
+                uu -- runNode logger' hkIn xtri
+            )
+      )
+      uu -- (waitDone xtri >> rootLogger EndExecution)
+ where
+  hkIn = Right (ExeIn () () ())
+  thrdTokens = replicate maxThreads True
+  newLogger = uu -- mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
+
+data NFrequency = Each | Thread
+  deriving (Show, Eq)
+
+data ExeTreeNew hi where
+  AfterOnce ::
+    { path :: NL.ExePath
+    , status :: TVar HookStatus
+    , subNodes' :: ChildQ (ExeTreeNew hi)
+    , after :: IO ()
+    } ->
+    ExeTreeNew hi
+  AroundOnce ::
+    { path :: NL.ExePath
+    , setup :: hi -> IO ho
+    , status :: TVar HookStatus
+    , cache :: TMVar (Either Abandon ho)
+    , subNodes :: ChildQ (ExeTreeNew ho)
+    , teardown :: Maybe (ho -> IO ())
+    } ->
+    ExeTreeNew hi
+  After ::
+    { path :: NL.ExePath
+    , frequency :: NFrequency
+    , subNodes' :: ChildQ (ExeTreeNew hi)
+    , after :: IO ()
+    } ->
+    ExeTreeNew hi
+  Around ::
+    { path :: NL.ExePath
+    , frequency :: NFrequency
+    , setup :: hi -> IO o
+    , subNodes :: ChildQ (ExeTreeNew ho)
+    , teardown :: Maybe (ho -> IO ())
+    } ->
+    ExeTreeNew hi
+  Test ::
+    { path :: NL.ExePath
+    , title :: Text
+    , threadLimit :: Int
+    , tests :: ChildQ (hi -> IO ())
+    } ->
+    ExeTreeNew hi
+
+mkXTreeNew :: NL.ExePath -> NonEmpty (P.PreNode IO NonEmpty hi) -> IO (ChildQ (ExeTreeNew hi))
+mkXTreeNew xpth preNodes =
+  do
+    subTrees <- traverse mkNode preNodes
+    mkChildQ subTrees
+ where
+  mkNode :: forall hi. P.PreNode IO NonEmpty hi -> IO (ExeTreeNew hi)
+  mkNode pn =
+    pn & \case
+      P.Before
+        { frequency
+        , action
+        , subNodes
+        } ->
+          frequency & \case
+            C.Once -> mkOnceHook subNodes action Nothing
+            C.Thread -> mkNHook' Thread
+            C.Each -> mkNHook' Each
+         where
+          mkNHook' = mkNHook subNodes action Nothing
+      P.After{frequency, subNodes', after} ->
+        do
+          cq <- mkXTreeNew path subNodes'
+          let mkAfter fq = pure $ After{path, frequency = fq, subNodes' = cq, after}
+          frequency & \case
+            C.Once -> do
+              status <- newTVarIO HookPending
+              pure $ AfterOnce{path, status, subNodes' = cq, after}
+            C.Thread -> mkAfter Thread
+            C.Each -> mkAfter Each
+      P.Around
+        { frequency
+        , setup
+        , subNodes
+        , teardown
+        } ->
+          frequency & \case
+            C.Once -> mkOnceHook subNodes setup teardown'
+            C.Thread -> nHook' Thread
+            C.Each -> nHook' Each
+         where
+          teardown' = Just teardown
+          nHook' = mkNHook subNodes setup teardown'
+      P.Test
+        { config = c
+        , tests
+        } -> do
+          cq <- mkChildQ tests
+          pure $ Test{path, title = c.title, threadLimit = c.maxThreads, tests = cq}
+   where
+    path = NL.ExePath $ pn.path : xpth.unExePath
+
+    mkOnceHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (hi' -> IO ho') -> Maybe (ho' -> IO ()) -> IO (ExeTreeNew hi')
+    mkOnceHook subNodes setup teardown = do
+      s <- newTVarIO HookPending
+      cache <- newEmptyTMVarIO
+      cq <- mkXTreeNew path subNodes
+      pure
+        $ AroundOnce
+          { path
+          , setup
+          , status = s
+          , cache
+          , subNodes = cq
+          , teardown
+          }
+
+    mkNHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (hi' -> IO ho') -> Maybe (ho' -> IO ()) -> NFrequency -> IO (ExeTreeNew hi')
+    mkNHook subNodes setup teardown frequency = do
+      s <- newTVarIO HookPending
+      cache <- newEmptyTMVarIO
+      cq <- mkXTreeNew path subNodes
+      pure
+        $ Around
+          { path
+          , setup
+          , frequency
+          , subNodes = cq
+          , teardown
+          }
 
 {-
   ##########################################################################
@@ -113,8 +255,8 @@ data HookStatus
   deriving (Show, Eq)
 
 data XContext a = XContext
-  { loc :: Loc
-  , evtLogger :: L.ExeEvent Loc a -> IO ()
+  { loc :: L.Loc
+  , evtLogger :: L.ExeEvent L.Loc a -> IO ()
   }
 
 mkCtx :: forall a. XContext a -> Context a
@@ -157,7 +299,7 @@ data Concurrency
   deriving (Show, Eq)
 
 data XTest a si ti ii = XTest
-  { loc :: Loc
+  { loc :: L.Loc
   , test :: XContext a -> si -> ti -> ii -> IO ()
   }
 
@@ -195,8 +337,8 @@ runTestHook ctx@XContext{loc = testLoc} tstIn testHk =
       )
       (logReturnFailure tstCtx TestHook)
 
-mkTestChildLoc :: (Show a) => Loc -> a -> Loc
-mkTestChildLoc testLoc evt = Node testLoc $ txt evt
+mkTestChildLoc :: (Show a) => L.Loc -> a -> L.Loc
+mkTestChildLoc testLoc evt = L.Node testLoc $ txt evt
 
 releaseTestHook :: forall so' to' tsti' ho' a. XContext a -> Either Abandon ho' -> TestHook a so' to' tsti' ho' -> IO ()
 releaseTestHook ctx@XContext{loc = testLoc} tsti = \case
@@ -228,8 +370,11 @@ runChildQ concurrency runner canRun' q@ChildQ{childNodes, status, runningCount} 
         & maybe
           ( do
               if
-                | rc < 0 -> error "framework error - this should not happen - running count below zero"
+                -- broken
+                | rc < 0 -> bug @Void $ error "framework error - this should not happen - running count below zero"
+                -- nothing running an nothing in the q we must be done
                 | rc == 0 -> writeTVar status Done
+                -- q is empty but still threads running
                 | otherwise -> writeTVar status Saturated
               pure Nothing
           )
@@ -283,7 +428,7 @@ mkOnceVal h = OnceVal h <$> newTVarIO HookPending <*> newEmptyTMVarIO
 
 data XFixture a oi ti tsti where
   XFixture ::
-    { loc :: Loc
+    { loc :: L.Loc
     , onceHook :: OnceVal a oi oo
     , threadHook :: ThreadHook a oo ti to
     , testHook :: TestHook a oo to tsti tsto
@@ -349,7 +494,7 @@ withinThreadLimit ThreadLimit{maxThreads, runningThreads} =
 
 runXFixture ::
   forall oi ti ii a.
-  (ExeEvent Loc a -> IO ()) ->
+  (ExeEvent L.Loc a -> IO ()) ->
   Either Abandon (ExeIn oi ti ()) ->
   TestHook a oi ti () ii ->
   XFixture a oi ti ii ->
@@ -408,7 +553,7 @@ mkThreadLimit :: Maybe Int -> IO ThreadLimit
 mkThreadLimit mi = ThreadLimit mi <$> newTVarIO 0
 
 mkXFixture ::
-  Loc ->
+  L.Loc ->
   PN.Fixture a oi ti tsti ->
   IO (XFixture a oi ti tsti)
 mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads, title} = do
@@ -425,16 +570,16 @@ mkXFixture loc PN.Fixture{onceHook, threadHook, testHook, tests, maxThreads, tit
       , threadLimit
       }
  where
-  fxLoc = Node loc title
+  fxLoc = L.Node loc title
   mkXTest PN.Test{id, test} =
     XTest
-      { loc = Node fxLoc $ "Test :: " <> id
+      { loc = L.Node fxLoc $ "Test :: " <> id
       , test = test . mkCtx
       }
 
 data ExeTree a oi ti where
   XGroup ::
-    { loc :: Loc
+    { loc :: L.Loc
     , threadLimit :: ThreadLimit
     , onceHook :: OnceVal a oi oo
     , threadHook :: ThreadHook a oo ti to
@@ -442,7 +587,7 @@ data ExeTree a oi ti where
     } ->
     ExeTree a oi ti
   XFixtures ::
-    { loc :: Loc
+    { loc :: L.Loc
     , threadLimit :: ThreadLimit
     , testHook :: TestHook a oi ti () tsto
     , fixtures :: ChildQ (XFixture a oi ti tsto)
@@ -451,11 +596,11 @@ data ExeTree a oi ti where
 
 prepare :: forall o t a. PreNode a o t -> IO (ExeTree a o t)
 prepare =
-  prepare' Root 0
+  prepare' L.Root 0
  where
-  prepare' :: forall oi ti. Loc -> Int -> PN.PreNode a oi ti -> IO (ExeTree a oi ti)
+  prepare' :: forall oi ti. L.Loc -> Int -> PN.PreNode a oi ti -> IO (ExeTree a oi ti)
   prepare' parentLoc subElmIdx pn = do
-    let nodeLoc = Node parentLoc
+    let nodeLoc = L.Node parentLoc
     case pn of
       PN.Group
         { title
@@ -662,7 +807,7 @@ releaseOnceHookIfReady ctx cntr childq eho hk =
       HookReleased -> False
 
 data Abandon = Abandon
-  { sourceLoc :: Loc
+  { sourceLoc :: L.Loc
   , sourceEventType :: ExeEventType
   , exception :: SomeException
   }
@@ -683,7 +828,7 @@ nodeStatus =
 
 runNode ::
   forall oi ti a.
-  (L.ExeEvent Loc a -> IO ()) ->
+  (L.ExeEvent L.Loc a -> IO ()) ->
   Either Abandon (ExeIn oi ti ()) ->
   ExeTree a oi ti ->
   IO ()
@@ -726,10 +871,7 @@ runNode eventLogger hkIn =
           when r $ modifyTVar' runningThreads succ
           pure r
 
-executeNodesNew :: (NL.EngineEvent Loc a -> IO ()) -> NonEmpty (P.PreNode IO NonEmpty ()) -> Int -> IO ()
-executeNodesNew sink nodes maxThreads = uu
-
-runTree :: (L.ExeLog Loc a -> IO ()) -> ExeTree a () () -> Int -> IO ()
+runTree :: (L.ExeLog L.Loc a -> IO ()) -> ExeTree a () () -> Int -> IO ()
 runTree sink xtri maxThreads =
   do
     rootLogger <- newLogger
@@ -748,7 +890,7 @@ runTree sink xtri maxThreads =
   thrdTokens = replicate maxThreads True
   newLogger = mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
 
-execute :: Int -> LogControls m Loc a -> PN.PreNodeRoot a -> IO ()
+execute :: Int -> LogControls m L.Loc a -> PN.PreNodeRoot a -> IO ()
 execute
   maxThreads
   LogControls

@@ -85,7 +85,14 @@ data Hook loc i o where
     } ->
     Hook loc i o
 
--- TODO: split datatypes with conversion typeclasses
+{-
+TODO: - 
+      - UX of after hook looks sus
+       - how do I do a test with an each in and a once after
+       - once after and thread after
+      - split datatypes with conversion typeclasses at project level
+-}
+
 data Test hi where
   Full ::
     (C.Item i ds, ToJSON as) =>

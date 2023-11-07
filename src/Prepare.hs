@@ -43,7 +43,7 @@ data PreNode m c hi where
     (C.Config tc) =>
     { config :: tc
     , path :: Path
-    , tests :: ApEventSink -> c (hi -> m ())
+    , tests :: c (ApEventSink -> hi -> m ())
     } ->
     PreNode m c hi
 
@@ -141,13 +141,13 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
       Test
         { config
         , path
-        , tests = \snk -> runTest snk (action runConfig) parse <$> items runConfig
+        , tests = runTest (action runConfig) parse <$> items runConfig
         }
     C.Full'{config', depends, action', parse', items'} ->
       Test
         { config = config'
         , path
-        , tests = \snk -> (\i hi -> runTest snk (action' runConfig hi) parse' i hi) <$> items' runConfig
+        , tests = (\i snk hi -> runTest (action' runConfig hi) parse' i snk hi) <$> items' runConfig
         }
     C.NoParse{config, action, items} ->
       Test
@@ -159,7 +159,8 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
       Test
         { config = config'
         , path
-        , tests = \snk -> (\i hi -> runNoParseTest snk (action' runConfig hi) i hi) <$> items' runConfig
+        , tests =  (\i snk hi -> runNoParseTest (action' runConfig hi) i snk hi) <$> items' runConfig
+
         }
     C.Single{config, singleAction, checks} ->
       Test
@@ -200,8 +201,8 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
       eas <- interpreter $ action i
       unTry snk eas
 
-  runTest :: forall i as ds. (ToJSON as, C.Item i ds) => ApEventSink -> (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> hi -> IO ()
-  runTest snk action parser i hi =
+  runTest :: forall i as ds. (ToJSON as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> ApEventSink -> hi -> IO ()
+  runTest action parser i snk hi =
     do
       ds <- tryAny
         do

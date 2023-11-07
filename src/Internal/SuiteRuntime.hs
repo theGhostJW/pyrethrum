@@ -126,38 +126,38 @@ data ExeTreeNew hi where
     { path :: NL.ExePath
     , status :: TVar HookStatus
     , subNodes' :: ChildQ (ExeTreeNew hi)
-    , after :: IO ()
+    , after :: P.ApEventSink -> IO ()
     } ->
     ExeTreeNew hi
   AroundOnce ::
     { path :: NL.ExePath
-    , setup :: hi -> IO ho
+    , setup :: P.ApEventSink -> hi -> IO ho
     , status :: TVar HookStatus
     , cache :: TMVar (Either Abandon ho)
     , subNodes :: ChildQ (ExeTreeNew ho)
-    , teardown :: Maybe (ho -> IO ())
+    , teardown :: Maybe (P.ApEventSink -> ho -> IO ())
     } ->
     ExeTreeNew hi
   After ::
     { path :: NL.ExePath
     , frequency :: NFrequency
     , subNodes' :: ChildQ (ExeTreeNew hi)
-    , after :: IO ()
+    , after :: P.ApEventSink -> IO ()
     } ->
     ExeTreeNew hi
   Around ::
     { path :: NL.ExePath
     , frequency :: NFrequency
-    , setup :: hi -> IO o
+    , setup :: P.ApEventSink -> hi -> IO o
     , subNodes :: ChildQ (ExeTreeNew ho)
-    , teardown :: Maybe (ho -> IO ())
+    , teardown :: Maybe (P.ApEventSink -> ho -> IO ())
     } ->
     ExeTreeNew hi
   Test ::
     { path :: NL.ExePath
     , title :: Text
     , threadLimit :: Int
-    , tests :: ChildQ (hi -> IO ())
+    , tests :: ChildQ (P.ApEventSink -> hi -> IO ())
     } ->
     ExeTreeNew hi
 
@@ -213,7 +213,7 @@ mkXTreeNew xpth preNodes =
    where
     path = NL.ExePath $ pn.path : xpth.unExePath
 
-    mkOnceHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (hi' -> IO ho') -> Maybe (ho' -> IO ()) -> IO (ExeTreeNew hi')
+    mkOnceHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> IO (ExeTreeNew hi')
     mkOnceHook subNodes setup teardown = do
       s <- newTVarIO HookPending
       cache <- newEmptyTMVarIO
@@ -228,7 +228,7 @@ mkXTreeNew xpth preNodes =
           , teardown
           }
 
-    mkNHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (hi' -> IO ho') -> Maybe (ho' -> IO ()) -> NFrequency -> IO (ExeTreeNew hi')
+    mkNHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> NFrequency -> IO (ExeTreeNew hi')
     mkNHook subNodes setup teardown frequency = do
       s <- newTVarIO HookPending
       cache <- newEmptyTMVarIO

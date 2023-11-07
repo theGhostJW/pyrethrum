@@ -57,9 +57,9 @@ import qualified Internal.PreNode as PN (
 -- NEW
 
 import GHC.RTS.Flags (DebugFlags (interpreter))
+import Internal.ThreadEvent (ThreadEvent)
 import qualified Prepare as C
 import qualified Prepare as P
-import Internal.ThreadEvent (ThreadEvent)
 
 newtype ThreadCount = ThreadCount Int
   deriving (Show)
@@ -79,26 +79,20 @@ executeNew
     , interpreter
     , runConfig
     } =
-    -- TODO - Validatte prenode
-    -- fixture titles are unique ??
     concurrently_ logWorker linkExecute
    where
     linkExecute :: IO ()
     linkExecute =
       finally
         ( do
-            -- engSnk <- NL.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
-            -- let eventSink = engSnk . NL.ApEvent
             let nodeList = P.prepare $ C.SuitePrepParams suite interpreter runConfig
             xtree <- mkXTreeNew (NL.ExePath []) nodeList
             executeNodesNew sink xtree maxThreads
-
-            -- runTree sink exeTree maxThreads
         )
         stopWorker
 
 -- executeNodesNew :: (NL.EngineEvent NL.ExePath a -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
-executeNodesNew :: (ThreadEvent loc apEvt -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
+executeNodesNew :: (ThreadEvent NL.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
 executeNodesNew sink nodes maxThreads =
   do
     rootLogger <- newLogger
@@ -108,11 +102,10 @@ executeNodesNew sink nodes maxThreads =
             thrdTokens
             ( const do
                 logger <- newLogger
-                -- runNodes sink nodes
-                uu -- runNode logger' hkIn xtri
+                runNodes logger nodes
             )
       )
-      uu -- (waitDone xtri >> rootLogger EndExecution)
+      ({- waitDone nodes >>-} rootLogger NL.EndExecution)
  where
   hkIn = Right (ExeIn () () ())
   thrdTokens = replicate maxThreads True
@@ -829,7 +822,25 @@ nodeStatus =
           XFixtures{fixtures} -> fixtures.status
       )
 
--- runNodes ::  ChildQ (ExeTreeNew ()) -> IO ()
+type EngineLogger = NL.EngineEvent NL.ExePath AE.ApEvent -> IO ()
+
+runNodes :: EngineLogger -> ChildQ (ExeTreeNew ()) -> IO ()
+runNodes logger cq = 
+  void $ runChildQ Concurrent runner canRun cq
+ where 
+  qStatus q = readTVar q.status
+
+  canRun :: ExeTreeNew hi -> STM CanRun
+  canRun = \case
+    AfterOnce{subNodes'} -> qStatus subNodes'
+    AroundOnce{subNodes} -> qStatus subNodes
+    After{subNodes'} -> qStatus subNodes'
+    Around{subNodes} -> qStatus subNodes
+    Test{tests} -> qStatus tests
+
+     
+
+  runner = uu
 
 runNode ::
   forall oi ti a.

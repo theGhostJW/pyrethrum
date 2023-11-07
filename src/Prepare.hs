@@ -65,7 +65,7 @@ prepSuiteElm pp@PrepParams{interpreter, runConfig} suiteElm =
           Before
             { path
             , frequency
-            , action =  \snk -> const . intprt snk $ action runConfig
+            , action = \snk -> const . intprt snk $ action runConfig
             , subNodes
             }
         C.Before'
@@ -153,22 +153,20 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
       Test
         { config
         , path
-        , tests = \snk -> runNoParseTest snk (action runConfig) <$> items runConfig
+        , tests = runNoParseTest (action runConfig) <$> items runConfig
         }
     C.NoParse'{config', action', items'} ->
       Test
         { config = config'
         , path
-        , tests =  (\i snk hi -> runNoParseTest (action' runConfig hi) i snk hi) <$> items' runConfig
-
+        , tests = (\i snk hi -> runNoParseTest (action' runConfig hi) i snk hi) <$> items' runConfig
         }
     C.Single{config, singleAction, checks} ->
       Test
         { config
         , path
         , tests =
-          \snk ->
-            pure $ \hi ->
+            pure $ \snk hi ->
               do
                 ds <- tryAny $ do
                   flog snk . Action path . ItemJSON $ toJSON config.title
@@ -181,8 +179,7 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
         { config = config'
         , path
         , tests =
-          \snk ->
-            pure $ \hi ->
+            pure $ \snk hi ->
               do
                 ds <- tryAny $ do
                   -- no item to log so just log the test title
@@ -212,8 +209,8 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
           unTry snk eds
       applyChecks snk path i.checks ds
 
-  runNoParseTest :: forall i ds. ApEventSink -> (C.Item i ds) => (i -> Eff effs ds) -> i -> hi -> IO ()
-  runNoParseTest snk action i hi =
+  runNoParseTest :: forall i ds. (C.Item i ds) => (i -> Eff effs ds) -> i -> ApEventSink -> hi -> IO ()
+  runNoParseTest action i snk hi =
     tryAny (runAction snk action i hi) >>= applyChecks snk path i.checks
 
 applyChecks :: forall ds. (ToJSON ds) => ApEventSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
@@ -254,6 +251,7 @@ data SuitePrepParams m rc tc effs where
 --    - filtering
 --    - tree shaking
 --    - querying
+--    - validation ??
 -- will return more info later such as filter log and have to return an either
 filterSuite :: [C.SuiteElement [] rc tc effs ()] -> NonEmpty (C.SuiteElement NonEmpty rc tc effs ())
 filterSuite = uu

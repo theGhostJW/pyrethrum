@@ -9,6 +9,7 @@ import Data.Aeson (FromJSON, ToJSON)
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Effectful (Eff, IOE, type (:>))
 import Effectful.Error.Static as E (Error)
+import qualified DSL.Internal.ApEvent as AE
 
 type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
 type Action a = Eff '[FileSystem, Out ApEvent, E.Error FSException, IOE] a
@@ -147,13 +148,13 @@ type Suite = [SuiteElement ()]
 data SuiteElement i where
   Hook ::
     (C.Param loc) =>
-    { path :: C.Path
+    { path :: AE.Path
     , hook :: Hook loc i o
     , subNodes :: [SuiteElement o]
     } ->
     SuiteElement i
   Test ::
-    { path :: C.Path
+    { path :: AE.Path
     , test :: Test i
     } ->
     SuiteElement i

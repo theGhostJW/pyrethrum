@@ -1,11 +1,13 @@
 module PyrethrumDemoTest where
 
-import Core (Once, Thread, Each, ParseException, Path (..))
-import CheckNew (chk, Checks)
+import CheckNew (Checks, chk)
+import Core (Each, Once, ParseException, Thread)
 import qualified Core as C
-import DSL.Internal.ApEvent (ApEvent (..), ULog (Log))
+import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
 import DSL.Out (Out, out)
+import Data.Aeson.TH
 import Effectful (Eff, IOE, (:>))
+import qualified Effectful.Error.Static as E
 import PyrethrumDemoProject (
   Action,
   Depth (DeepRegression),
@@ -14,11 +16,9 @@ import PyrethrumDemoProject (
   Suite,
   SuiteElement (..),
   Test (..),
-  TestConfig (..)
+  TestConfig (..),
  )
 import PyrethrumExtras (txt)
-import qualified Effectful.Error.Static as E
-import Data.Aeson.TH
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
@@ -32,8 +32,7 @@ intOnceHook =
 addOnceIntHook :: Hook Once Int Int
 addOnceIntHook =
   Before'
-    { 
-      depends = intOnceHook
+    { depends = intOnceHook
     , action' =
         \rc i -> do
           log $ "beforeAll' " <> txt i
@@ -86,7 +85,7 @@ eachIntBefore =
         pure $ hi + 1
     }
 
-type Failable a = Eff '[E.Error ParseException] a 
+type Failable a = Eff '[E.Error ParseException] a
 
 -- ############### Test the Lot ###################
 
@@ -182,6 +181,7 @@ items2 =
 $(deriveToJSON defaultOptions ''DS)
 $(deriveToJSON defaultOptions ''AS)
 $(deriveToJSON defaultOptions ''Item2)
+
 -- TODO: precompiler
 instance C.Item Item2 DS
 
@@ -242,7 +242,7 @@ test5 =
     }
 
 -- ############### Construct Tests ###################
--- this will be generated either by implmenting deriving, 
+-- this will be generated either by implmenting deriving,
 -- check out DeriveAnyClass or template haskell
 -- could also look into creating un unconstrained data types
 -- all members of a convertable typeclass (specialize??)
@@ -251,6 +251,7 @@ test5 =
 -- TODO: precompiler template haskell
 -- need to check error messages carefully
 -- finalise templatehaskell vs deriving for these classes
+
 -- $(deriveTest defaultOptions ''Item)
 $(deriveToJSON defaultOptions ''DState)
 $(deriveToJSON defaultOptions ''ApState)
@@ -262,10 +263,8 @@ test :: Test ()
 test =
   Full config action parse items
 
-
 test2 :: Test HookInfo
 test2 = Full' infoThreadHook config2 action2 parse2 items2
-  
 
 -- ############### Suite ###################
 -- this will be generated
@@ -281,38 +280,35 @@ suite =
           , Test (Path "module" "testName") test5
           , Hook
               { path = Path "module" "name"
-                      , hook = addOnceIntHook
+              , hook = addOnceIntHook
+              , subNodes =
+                  [ Hook
+                      { path = Path "module" "name"
+                      , hook = infoThreadHook
                       , subNodes =
-                          [ Hook
+                          [ Test (Path "module" "testName") test2
+                          , Hook
                               { path = Path "module" "name"
-                              , hook = infoThreadHook
+                              , hook = eachInfoAround
                               , subNodes =
-                                  [ Test (Path "module" "testName") test2
+                                  [ Test (Path "module" "testName") test3
                                   , Hook
                                       { path = Path "module" "name"
-                                      , hook = eachInfoAround
+                                      , hook = eachAfter
                                       , subNodes =
-                                          [ Test (Path "module" "testName") test3
-                                          , Hook
-                                              { path = Path "module" "name"
-                                              , hook = eachAfter
-                                              , subNodes =
-                                                  [ Test (Path "module" "testName") test4
-                                                  , Test (Path "module" "testName") test5
-                                                  ]
-                                              }
+                                          [ Test (Path "module" "testName") test4
+                                          , Test (Path "module" "testName") test5
                                           ]
                                       }
                                   ]
                               }
                           ]
-                }
-                 
+                      }
+                  ]
               }
           ]
       }
   ]
-
 
 {-
 -- TODO: review bracket

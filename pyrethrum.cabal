@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: db96662ed2d43ffc14245c181051dac90be26cbfb33c21c66ee4b959ffc96859
+-- hash: ac4e197ce29f67691f960d03552b849f7e44ee8be96a414b39dbb355144a76a3
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -88,7 +88,9 @@ library
       DSL.Out
       Internal.PreNode
       Internal.RunTimeLogging
+      Internal.RunTimeLoggingNew
       Internal.SuiteRuntime
+      Internal.ThreadEvent
       List.Extra
       OrphanedInstances
       Prepare
@@ -302,7 +304,9 @@ library examples
       DSL.Out
       Internal.PreNode
       Internal.RunTimeLogging
+      Internal.RunTimeLoggingNew
       Internal.SuiteRuntime
+      Internal.ThreadEvent
       List.Extra
       OrphanedInstances
       Prepare

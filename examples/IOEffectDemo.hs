@@ -102,7 +102,7 @@ timeTest = do
 -- time 2 Time {getTime = 1689018957979000000}
 -- time 3 Time {getTime = 1689018959089000000}
 
---  TODO: pyrelude depricate debug in favour of trace
+--  TODO: pyrelude depricate debug in favour of trace or add warnings to debug
 
 -- use eff
 listFileImp :: (FileSystem :> es, Out ApEvent :> es) => Eff es [Text]

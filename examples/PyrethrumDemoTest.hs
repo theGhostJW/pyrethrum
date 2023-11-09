@@ -320,8 +320,6 @@ suite =
 -- TODO : stubs:
   - reinstate runner => Actions
      - indivdual tests ?
-  - PreNode2 - what format
-  - execution Exetre
 
 -- TODO : stubs:
 

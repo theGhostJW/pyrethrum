@@ -117,7 +117,7 @@ data NFrequency = Each | Thread
 data ExeTreeNew hi where
   AfterOnce ::
     { path :: NL.ExePath
-    , status :: TVar HookStatus
+    , status' :: TVar HookStatusNew
     , subNodes' :: ChildQ (ExeTreeNew hi)
     , after :: P.ApEventSink -> IO ()
     } ->
@@ -125,7 +125,7 @@ data ExeTreeNew hi where
   AroundOnce ::
     { path :: NL.ExePath
     , setup :: P.ApEventSink -> hi -> IO ho
-    , status :: TVar HookStatus
+    , status :: TVar AroundStatus
     , cache :: TMVar (Either Abandon ho)
     , subNodes :: ChildQ (ExeTreeNew ho)
     , teardown :: Maybe (P.ApEventSink -> ho -> IO ())
@@ -180,8 +180,8 @@ mkXTreeNew xpth preNodes =
           let mkAfter fq = pure $ After{path, frequency = fq, subNodes' = cq, after}
           frequency & \case
             C.Once -> do
-              status <- newTVarIO HookPending
-              pure $ AfterOnce{path, status, subNodes' = cq, after}
+              status' <- newTVarIO Pending
+              pure $ AfterOnce{path, status', subNodes' = cq, after}
             C.Thread -> mkAfter Thread
             C.Each -> mkAfter Each
       P.Around
@@ -208,7 +208,7 @@ mkXTreeNew xpth preNodes =
 
     mkOnceHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> IO (ExeTreeNew hi')
     mkOnceHook subNodes setup teardown = do
-      s <- newTVarIO HookPending
+      s <- newTVarIO $ Setup Pending
       cache <- newEmptyTMVarIO
       cq <- mkXTreeNew path subNodes
       pure
@@ -248,6 +248,16 @@ data HookStatus
   | HookComplete
   | HookReleaseRunning
   | HookReleased
+  deriving (Show, Eq)
+data HookStatusNew
+  = Pending
+  | Running
+  | Complete
+  deriving (Show, Eq)
+
+data AroundStatus
+  = Setup HookStatusNew
+  | Teardown HookStatusNew
   deriving (Show, Eq)
 
 data XContext a = XContext
@@ -356,12 +366,11 @@ canRunChildQ cq =
     Done -> False
 
 runChildQ :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
-runChildQ concurrency runner canRun' q@ChildQ{childNodes, status, runningCount} =
+runChildQ concurrency runner childCanRun q@ChildQ{childNodes, status, runningCount} =
   do
     eNext <- atomically $ do
-      let pop = tryReadTQueue childNodes
       rc <- readTVar runningCount
-      mNext <- pop
+      mNext <- tryReadTQueue childNodes
       mNext
         & maybe
           ( do
@@ -385,7 +394,7 @@ runChildQ concurrency runner canRun' q@ChildQ{childNodes, status, runningCount} 
         ( \a -> do
             finally
               do
-                cr <- atomically $ canRun' a
+                cr <- atomically $ childCanRun a
                 cr & \case
                   -- runner MUST ensure the integrity of sub element status and handle all exceptions
                   Runnable -> do
@@ -397,7 +406,7 @@ runChildQ concurrency runner canRun' q@ChildQ{childNodes, status, runningCount} 
                   Saturated -> pure ()
                   Done -> pure ()
               (atomically $ modifyTVar runningCount pred)
-            runChildQ concurrency runner canRun' q
+            runChildQ concurrency runner childCanRun q
         )
 
 mkChildQ :: (Foldable m) => m a -> IO (ChildQ a)
@@ -809,6 +818,13 @@ data Abandon = Abandon
   }
   deriving (Show)
 
+data AbandonNew = AbandonNew
+  { sourceLoc :: NL.ExePath
+  , sourceEventType :: NL.ExeEventType
+  -- , exception :: SomeException
+  }
+  deriving (Show)
+
 data ExeIn oi ti tsti = ExeIn
   { onceIn :: oi
   , threadIn :: ti
@@ -824,23 +840,56 @@ nodeStatus =
 
 type EngineLogger = NL.EngineEvent NL.ExePath AE.ApEvent -> IO ()
 
+abandonTree :: EngineLogger -> ExeTreeNew hi -> AbandonNew ->  IO ()
+abandonTree = uu -- log abandonned all tests
+
 runNodes :: EngineLogger -> ChildQ (ExeTreeNew ()) -> IO ()
-runNodes logger cq = 
-  void $ runChildQ Concurrent runner canRun cq
- where 
+runNodes logger cq =
+  void $ runChildQ Concurrent (runner . pure $ Right ()) canRun cq
+ where
   qStatus q = readTVar q.status
 
   canRun :: ExeTreeNew hi -> STM CanRun
   canRun = \case
-    AfterOnce{subNodes'} -> qStatus subNodes'
+    AfterOnce{subNodes', status'} -> 
+       do
+        s <- readTVar status'
+        s & \case
+          Pending -> do
+            qs <- qStatus subNodes'
+            pure $ qs & \case
+              Runnable -> Runnable
+              Saturated -> Saturated
+              Done -> Saturated
+          Running -> pure Saturated
+          Complete -> pure Done
+
     AroundOnce{subNodes} -> qStatus subNodes
     After{subNodes'} -> qStatus subNodes'
     Around{subNodes} -> qStatus subNodes
     Test{tests} -> qStatus tests
 
-     
+  runner :: forall hi. IO (Either AbandonNew hi ) -> ExeTreeNew hi -> IO ()
+  runner ehIn xtr =
+    do 
+      ehi <- ehIn
+      ehi
+       & either 
+         (abandonTree logger xtr)
+         uu
 
-  runner = uu
+-- TODO: warning on uu 
+    --  xtr & \case
+    -- AfterOnce
+    --   { path
+    --   , status'
+    --   , subNodes'
+    --   , after
+    --   } -> uu
+    -- AroundOnce{subNodes, setup, teardown} -> uu
+    -- After{subNodes', after} -> uu
+    -- Around{subNodes, setup, teardown} -> uu
+    -- Test{tests} -> uu
 
 runNode ::
   forall oi ti a.

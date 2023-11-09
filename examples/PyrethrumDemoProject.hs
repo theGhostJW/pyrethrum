@@ -86,7 +86,7 @@ data Hook loc i o where
     Hook loc i o
 
 {-
-TODO: - 
+TODO: 
       - UX of after hook looks sus
        - how do I do a test with an each in and a once after
        - once after and thread after

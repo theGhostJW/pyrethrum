@@ -2,6 +2,7 @@
 
 module Internal.RunTimeLoggingNew where
 
+-- TODO: Explicit exports remove old code
 import qualified BasePrelude as P
 import Data.Aeson (ToJSON)
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
@@ -21,6 +22,17 @@ newtype ExePath = ExePath {unExePath :: [AE.Path]} deriving (Show, Eq, Ord)
 -- TODO: hide string eg intercallate
 displayExePath :: ExePath -> Text
 displayExePath ep =  T.intercalate "." $ (.title) <$> reverse ep.unExePath
+
+
+data ExeEventType
+  = OnceHook
+  | OnceHookRelease
+  | ThreadHook
+  | ThreadHookRelease
+  | TestHook
+  | TestHookRelease
+  | Test
+  deriving (Show, Eq, Ord, Enum)
 
 isThreadedEvent :: TE.FrameworkEventType -> Bool
 isThreadedEvent = not . isOnceEvent

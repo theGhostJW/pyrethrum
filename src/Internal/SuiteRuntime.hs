@@ -61,6 +61,7 @@ import Internal.ThreadEvent (ThreadEvent, EventType)
 import qualified Internal.ThreadEvent as F (Frequency(..)) 
 import qualified Prepare as C
 import qualified Prepare as P
+import qualified Hedgehog.Internal.Report as HookStatusNew
 
 newtype ThreadCount = ThreadCount Int
   deriving (Show)
@@ -118,7 +119,7 @@ data NFrequency = Each | Thread
 data ExeTreeNew hi where
   AfterOnce ::
     { path :: NL.ExePath
-    , status' :: TVar HookStatusNew
+    , status' :: TVar AfterStatus
     , subNodes' :: ChildQ (ExeTreeNew hi)
     , after :: P.ApEventSink -> IO ()
     } ->
@@ -181,7 +182,7 @@ mkXTreeNew xpth preNodes =
           let mkAfter fq = pure $ After{path, frequency = fq, subNodes' = cq, after}
           frequency & \case
             F.Once -> do
-              status' <- newTVarIO Pending
+              status' <- newTVarIO $ ChildQStatus Pending
               pure $ AfterOnce{path, status', subNodes' = cq, after}
             F.Thread -> mkAfter Thread
             F.Each -> mkAfter Each
@@ -259,6 +260,11 @@ data HookStatusNew
 data AroundStatus
   = Setup HookStatusNew
   | Teardown HookStatusNew
+  deriving (Show, Eq)
+
+data AfterStatus
+  = ChildQStatus HookStatusNew
+  | AfterHookStatus HookStatusNew
   deriving (Show, Eq)
 
 data XContext a = XContext
@@ -819,13 +825,6 @@ data Abandon = Abandon
   }
   deriving (Show)
 
-data AbandonNew = AbandonNew
-  { sourceLoc :: NL.ExePath
-  , sourceEventType :: EventType
-  -- , exception :: SomeException
-  }
-  deriving (Show)
-
 data ExeIn oi ti tsti = ExeIn
   { onceIn :: oi
   , threadIn :: ti
@@ -839,22 +838,76 @@ nodeStatus =
           XFixtures{fixtures} -> fixtures.status
       )
 
-type EngineLogger = NL.EngineEvent NL.ExePath AE.ApEvent -> IO ()
+type Logger = NL.EngineEvent NL.ExePath AE.ApEvent -> IO ()
 
-logAbandonnedNew :: XContext a -> ExeEventType -> Abandon -> IO ()
-logAbandonnedNew XContext{loc, evtLogger} fet Abandon{sourceLoc, sourceEventType, exception} =
-  evtLogger (NL.mkParentFailure loc fet sourceLoc sourceEventType exception)
+logAbandonnedNew :: Logger -> NL.ExePath -> EventType -> NL.AbandonNew -> IO ()
+logAbandonnedNew lgr p e a = lgr $ NL.mkParentFailure p e a
 
-logReturnFailureNew :: XContext a -> ExeEventType -> SomeException -> IO (Either Abandon b)
-logReturnFailureNew XContext{loc, evtLogger} et e =
+logReturnFailureNew :: Logger -> NL.ExePath  -> EventType -> SomeException -> IO (Either NL.AbandonNew b)
+logReturnFailureNew lgr p et e =
   do
-    evtLogger (NL.mkFailure loc et (txt et <> "Failed at: " <> txt loc) e)
-    pure $ Left $ Abandon loc et e
+    lgr (NL.mkFailure p et (txt et <> "Failed at: " <> txt p) e)
+    pure . Left $ NL.AbandonNew p et
 
-abandonTree :: EngineLogger -> ExeTreeNew hi -> AbandonNew ->  IO ()
-abandonTree = uu -- log abandonned all tests
+abandonTree :: Logger -> ExeTreeNew hi -> NL.AbandonNew ->  IO ()
+abandonTree lgr xtr ab = xtr & \case 
+  AfterOnce{path, status', subNodes', after} -> 
+    do 
+      locked <- atomically $ do
+           s <- readTVar status'
+           let locked = s == ChildQStatus Pending
+           when locked $ 
+             writeTVar status' $ AfterHookStatus Running
+           pure locked
+      finally 
+       ( do 
+          abandonChildren subNodes'    
+       )
+       (when locked $ do 
+         logAbandon path $ TE.Hook TE.Once After
+         atomically $ writeTVar status' $ AfterHookStatus Complete
+         )
+       
+    -- lgr $ NL.mkParentFailure path NL.AfterOnce ab
+    -- atomically $ writeTVar status' NL.Complete
+    -- atomically $ abandonTree lgr subNodes' ab
+    -- after $ logAbandonnedNew lgr path NL.AfterOnce ab
 
-runNodes :: EngineLogger -> ChildQ (ExeTreeNew ()) -> IO ()
+  AroundOnce{path, status, cache, subNodes, teardown} -> do
+    lgr $ NL.mkParentFailure path NL.AroundOnce ab
+    atomically $ writeTVar status NL.Complete
+    atomically $ abandonTree lgr subNodes ab
+    teardown & \case
+      Nothing -> pure ()
+      Just td -> do
+        eto <- atomically $ readTMVar cache
+        eto & \case
+          Left _ -> pure ()
+          Right to -> td $ logAbandonnedNew lgr path NL.AroundOnceRelease ab
+
+  After{path, frequency, subNodes', after} -> do
+    lgr $ NL.mkParentFailure path NL.After ab
+    atomically $ abandonTree lgr subNodes' ab
+    after $ logAbandonnedNew lgr path NL.After ab
+
+  Around{path, frequency, setup, subNodes, teardown} -> do
+    lgr $ NL.mkParentFailure path NL.Around ab
+    atomically $ abandonTree lgr subNodes ab
+    teardown & \case
+      Nothing -> pure ()
+      Just td -> td $ logAbandonnedNew lgr path NL.AroundRelease ab
+
+  Test{path, title, threadLimit, tests} -> do
+    lgr $ NL.mkParentFailure path NL.Test ab
+    atomically $ abandonTree lgr tests ab
+  where 
+    subAbandon subtree = abandonTree lgr subtree ab 
+    abandonChildren = traverse_ subAbandon
+    logAbandon p et = logAbandonnedNew lgr p et ab
+
+
+
+runNodes :: Logger -> ChildQ (ExeTreeNew ()) -> IO ()
 runNodes logger cq =
   void $ runChildQ Concurrent (runner . pure $ Right ()) canRun cq
  where
@@ -880,7 +933,7 @@ runNodes logger cq =
     Around{subNodes} -> qStatus subNodes --TODO
     Test{tests} -> qStatus tests --TODO
 
-  runner :: forall hi. IO (Either AbandonNew hi ) -> ExeTreeNew hi -> IO ()
+  runner :: forall hi. IO (Either NL.AbandonNew hi ) -> ExeTreeNew hi -> IO ()
   runner ehIn xtr =
     do 
       ehi <- ehIn

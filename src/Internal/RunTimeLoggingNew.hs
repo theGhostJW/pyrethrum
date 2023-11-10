@@ -24,6 +24,13 @@ displayExePath :: ExePath -> Text
 displayExePath ep =  T.intercalate "." $ (.title) <$> reverse ep.unExePath
 
 
+data AbandonNew = AbandonNew
+  { path :: ExePath
+  , eventType :: TE.EventType
+  }
+  deriving (Show)
+
+
 -- data ExeEventType
 --   = OnceHook
 --   | OnceHookRelease
@@ -107,14 +114,14 @@ exceptionTxt e = TE.PException $ txt <$> P.lines (displayException e)
 mkFailure :: l -> TE.EventType -> Text -> SomeException -> EngineEvent l a
 mkFailure loc eventType msg exception = Failure {exception = exceptionTxt exception, ..}
 
-mkParentFailure :: l -> TE.EventType -> l -> TE.EventType -> EngineEvent l a
-mkParentFailure l evt pl pEvt  =
+mkParentFailure :: ExePath -> TE.EventType -> AbandonNew -> EngineEvent ExePath a
+mkParentFailure l evt ab  =
   ParentFailure
     { 
       loc = l
     , eventType = evt
-    , parentLoc = pl
-    , parentEventType = pEvt
+    , parentLoc = ab.path
+    , parentEventType = ab.eventType
     }
 
 data EngineEvent l a

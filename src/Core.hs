@@ -4,6 +4,7 @@ module Core where
 
 import DSL.Internal.ApEvent hiding (Check)
 import Data.Aeson (FromJSON, ToJSON (..), Value (..), parseJSON, toJSON)
+import Internal.ThreadEvent ( Frequency(..) )
 
 import qualified Data.DList as DL
 import Effectful (Eff, Effect)
@@ -47,9 +48,6 @@ to list
 -- TODO:: look into listLike
 
 --
-
-
-data Frequency = Once | Thread | Each deriving (Show, Eq)
 
 class Param a where
   frequency :: Frequency

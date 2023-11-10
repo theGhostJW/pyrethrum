@@ -24,121 +24,120 @@ displayExePath :: ExePath -> Text
 displayExePath ep =  T.intercalate "." $ (.title) <$> reverse ep.unExePath
 
 
-data ExeEventType
-  = OnceHook
-  | OnceHookRelease
-  | ThreadHook
-  | ThreadHookRelease
-  | TestHook
-  | TestHookRelease
-  | Test
-  deriving (Show, Eq, Ord, Enum)
+-- data ExeEventType
+--   = OnceHook
+--   | OnceHookRelease
+--   | ThreadHook
+--   | ThreadHookRelease
+--   | TestHook
+--   | TestHookRelease
+--   | Test
+--   deriving (Show, Eq, Ord, Enum)
 
-isThreadedEvent :: TE.FrameworkEventType -> Bool
-isThreadedEvent = not . isOnceEvent
+-- isThreadedEvent :: TE.FrameworkEventType -> Bool
+-- isThreadedEvent = not . isOnceEvent
 
-isOnceEvent :: TE.FrameworkEventType -> Bool
-isOnceEvent = \case
-  TE.OnceHook -> True
-  TE.OnceHookRelease -> True
-  TE.ThreadHook -> False
-  TE.ThreadHookRelease -> False
-  TE.FixtureOnceHook -> True
-  TE.FixtureOnceHookRelease -> True
-  TE.FixtureThreadHook -> False
-  TE.FixtureThreadHookRelease -> False
-  TE.TestHook -> False
-  TE.TestHookRelease -> False
-  TE.Group -> False
-  TE.Fixture -> False
-  TE.Test -> False
+-- isOnceEvent :: TE.FrameworkEventType -> Bool
+-- isOnceEvent = \case
+--   TE.OnceHook -> True
+--   TE.OnceHookAfter -> True
+--   TE.ThreadHook -> False
+--   TE.ThreadHookAfter -> False
+--   TE.FixtureOnceHook -> True
+--   TE.FixtureOnceHookRelease -> True
+--   TE.FixtureThreadHook -> False
+--   TE.FixtureThreadHookRelease -> False
+--   TE.TestHook -> False
+--   TE.TestHookAfter -> False
+--   TE.Group -> False
+--   TE.Fixture -> False
+--   TE.Test -> False
 
-isGrouping :: TE.FrameworkEventType -> Bool
-isGrouping = \case
-  TE.OnceHook -> False
-  TE.ThreadHook -> False
-  TE.TestHook -> False
-  TE.FixtureThreadHook -> False
-  TE.FixtureOnceHook -> False
-  TE.FixtureThreadHookRelease -> False
-  TE.FixtureOnceHookRelease -> False
-  TE.OnceHookRelease -> False
-  TE.ThreadHookRelease -> False
-  TE.TestHookRelease -> False
-  TE.Group -> True
-  TE.Fixture -> True
-  TE.Test -> False
+-- isGrouping :: TE.FrameworkEventType -> Bool
+-- isGrouping = \case
+--   TE.OnceHook -> False
+--   TE.ThreadHook -> False
+--   TE.TestHook -> False
+--   TE.FixtureThreadHook -> False
+--   TE.FixtureOnceHook -> False
+--   TE.FixtureThreadHookRelease -> False
+--   TE.FixtureOnceHookRelease -> False
+--   TE.OnceHookAfter -> False
+--   TE.ThreadHookAfter -> False
+--   TE.TestHookAfter -> False
+--   TE.Group -> True
+--   TE.Fixture -> True
+--   TE.Test -> False
 
-isFixtureChild :: TE.FrameworkEventType -> Bool
-isFixtureChild = \case
-  TE.OnceHook -> False
-  TE.ThreadHook -> False
-  TE.TestHook -> True
-  TE.FixtureThreadHook -> True
-  TE.FixtureOnceHook -> True
-  TE.FixtureThreadHookRelease -> True
-  TE.FixtureOnceHookRelease -> True
-  TE.OnceHookRelease -> False
-  TE.ThreadHookRelease -> False
-  TE.TestHookRelease -> True
-  TE.Group -> False
-  TE.Fixture -> False
-  TE.Test -> True
+-- isFixtureChild :: TE.FrameworkEventType -> Bool
+-- isFixtureChild = \case
+--   TE.OnceHook -> False
+--   TE.ThreadHook -> False
+--   TE.TestHook -> True
+--   TE.FixtureThreadHook -> True
+--   TE.FixtureOnceHook -> True
+--   TE.FixtureThreadHookRelease -> True
+--   TE.FixtureOnceHookRelease -> True
+--   TE.OnceHookAfter -> False
+--   TE.ThreadHookAfter -> False
+--   TE.TestHookAfter -> True
+--   TE.Group -> False
+--   TE.Fixture -> False
+--   TE.Test -> True
 
-endIsTerminal :: TE.FrameworkEventType -> Bool
-endIsTerminal = \case
-  TE.FixtureThreadHookRelease -> True
-  TE.FixtureOnceHookRelease -> True
-  TE.OnceHookRelease -> True
-  TE.ThreadHookRelease -> True
-  TE.TestHookRelease -> True
-  TE.Group -> True
-  TE.Fixture -> True
-  TE.Test -> True
-  TE.OnceHook -> False
-  TE.ThreadHook -> False
-  TE.TestHook -> False
-  TE.FixtureThreadHook -> False
-  TE.FixtureOnceHook -> False
+-- endIsTerminal :: TE.FrameworkEventType -> Bool
+-- endIsTerminal = \case
+--   TE.FixtureThreadHookRelease -> True
+--   TE.FixtureOnceHookRelease -> True
+--   TE.OnceHookAfter -> True
+--   TE.ThreadHookAfter -> True
+--   TE.TestHookAfter -> True
+--   TE.Group -> True
+--   TE.Fixture -> True
+--   TE.Test -> True
+--   TE.OnceHook -> False
+--   TE.ThreadHook -> False
+--   TE.TestHook -> False
+--   TE.FixtureThreadHook -> False
+--   TE.FixtureOnceHook -> False
 
 exceptionTxt :: SomeException -> TE.PException
 exceptionTxt e = TE.PException $ txt <$> P.lines (displayException e)
 
-mkFailure :: l -> TE.FrameworkEventType -> Text -> SomeException -> EngineEvent l a
-mkFailure l et t e = Failure t (exceptionTxt e) et l
+mkFailure :: l -> TE.EventType -> Text -> SomeException -> EngineEvent l a
+mkFailure loc eventType msg exception = Failure {exception = exceptionTxt exception, ..}
 
-mkParentFailure :: l -> TE.FrameworkEventType -> l -> TE.FrameworkEventType -> SomeException -> EngineEvent l a
-mkParentFailure fl fet pl pet ex =
+mkParentFailure :: l -> TE.EventType -> l -> TE.EventType -> EngineEvent l a
+mkParentFailure l evt pl pEvt  =
   ParentFailure
-    { exception = exceptionTxt ex
-    , loc = fl
-    , fEventType = fet
+    { 
+      loc = l
+    , eventType = evt
     , parentLoc = pl
-    , parentEventType = pet
+    , parentEventType = pEvt
     }
 
 data EngineEvent l a
   = StartExecution
   | Start
-      { eventType :: TE.FrameworkEventType
+      { eventType :: TE.EventType
       , loc :: l
       }
   | End
-      { eventType :: TE.FrameworkEventType
+      { eventType :: TE.EventType
       , loc :: l
       }
   | Failure
       { msg :: Text
       , exception :: TE.PException
-      , parentEventType :: TE.FrameworkEventType
       , loc :: l
+      , eventType :: TE.EventType
       }
   | ParentFailure
-      { exception :: TE.PException
-      , loc :: l
-      , fEventType :: TE.FrameworkEventType
+      { loc :: l
+      , eventType :: TE.EventType
       , parentLoc :: l
-      , parentEventType :: TE.FrameworkEventType
+      , parentEventType :: TE.EventType
       }
   | ApEvent
       { event :: a

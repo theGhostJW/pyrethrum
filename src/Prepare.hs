@@ -15,25 +15,26 @@ import qualified Effectful.Error.Static as E
 import Internal.RunTimeLogging (ExeLog)
 import PyrethrumExtras (MonadCatch (catch), try, uu)
 import UnliftIO.Exception (tryAny)
+import Internal.ThreadEvent (Frequency)
 
 data PreNode m c hi where
   Before ::
     { path :: Path
-    , frequency :: C.Frequency
+    , frequency :: Frequency
     , action :: ApEventSink -> hi -> m o
     , subNodes :: c (PreNode m c o)
     } ->
     PreNode m c hi
   After ::
     { path :: Path
-    , frequency :: C.Frequency
+    , frequency :: Frequency
     , subNodes' :: c (PreNode m c hi)
     , after :: ApEventSink -> m ()
     } ->
     PreNode m c hi
   Around ::
     { path :: Path
-    , frequency :: C.Frequency
+    , frequency :: Frequency
     , setup :: ApEventSink -> hi -> m o
     , subNodes :: c (PreNode m c o)
     , teardown :: ApEventSink -> o -> m ()

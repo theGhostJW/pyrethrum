@@ -57,7 +57,8 @@ import qualified Internal.PreNode as PN (
 -- NEW
 
 import GHC.RTS.Flags (DebugFlags (interpreter))
-import Internal.ThreadEvent (ThreadEvent)
+import Internal.ThreadEvent (ThreadEvent, EventType)
+import qualified Internal.ThreadEvent as F (Frequency(..)) 
 import qualified Prepare as C
 import qualified Prepare as P
 
@@ -169,9 +170,9 @@ mkXTreeNew xpth preNodes =
         , subNodes
         } ->
           frequency & \case
-            C.Once -> mkOnceHook subNodes action Nothing
-            C.Thread -> mkNHook' Thread
-            C.Each -> mkNHook' Each
+            F.Once -> mkOnceHook subNodes action Nothing
+            F.Thread -> mkNHook' Thread
+            F.Each -> mkNHook' Each
          where
           mkNHook' = mkNHook subNodes action Nothing
       P.After{frequency, subNodes', after} ->
@@ -179,11 +180,11 @@ mkXTreeNew xpth preNodes =
           cq <- mkXTreeNew path subNodes'
           let mkAfter fq = pure $ After{path, frequency = fq, subNodes' = cq, after}
           frequency & \case
-            C.Once -> do
+            F.Once -> do
               status' <- newTVarIO Pending
               pure $ AfterOnce{path, status', subNodes' = cq, after}
-            C.Thread -> mkAfter Thread
-            C.Each -> mkAfter Each
+            F.Thread -> mkAfter Thread
+            F.Each -> mkAfter Each
       P.Around
         { frequency
         , setup
@@ -191,9 +192,9 @@ mkXTreeNew xpth preNodes =
         , teardown
         } ->
           frequency & \case
-            C.Once -> mkOnceHook subNodes setup teardown'
-            C.Thread -> nHook' Thread
-            C.Each -> nHook' Each
+            F.Once -> mkOnceHook subNodes setup teardown'
+            F.Thread -> nHook' Thread
+            F.Each -> nHook' Each
          where
           teardown' = Just teardown
           nHook' = mkNHook subNodes setup teardown'
@@ -820,7 +821,7 @@ data Abandon = Abandon
 
 data AbandonNew = AbandonNew
   { sourceLoc :: NL.ExePath
-  , sourceEventType :: NL.ExeEventType
+  , sourceEventType :: EventType
   -- , exception :: SomeException
   }
   deriving (Show)
@@ -839,6 +840,16 @@ nodeStatus =
       )
 
 type EngineLogger = NL.EngineEvent NL.ExePath AE.ApEvent -> IO ()
+
+logAbandonnedNew :: XContext a -> ExeEventType -> Abandon -> IO ()
+logAbandonnedNew XContext{loc, evtLogger} fet Abandon{sourceLoc, sourceEventType, exception} =
+  evtLogger (NL.mkParentFailure loc fet sourceLoc sourceEventType exception)
+
+logReturnFailureNew :: XContext a -> ExeEventType -> SomeException -> IO (Either Abandon b)
+logReturnFailureNew XContext{loc, evtLogger} et e =
+  do
+    evtLogger (NL.mkFailure loc et (txt et <> "Failed at: " <> txt loc) e)
+    pure $ Left $ Abandon loc et e
 
 abandonTree :: EngineLogger -> ExeTreeNew hi -> AbandonNew ->  IO ()
 abandonTree = uu -- log abandonned all tests
@@ -864,10 +875,10 @@ runNodes logger cq =
           Running -> pure Saturated
           Complete -> pure Done
 
-    AroundOnce{subNodes} -> qStatus subNodes
-    After{subNodes'} -> qStatus subNodes'
-    Around{subNodes} -> qStatus subNodes
-    Test{tests} -> qStatus tests
+    AroundOnce{subNodes} -> qStatus subNodes --TODO
+    After{subNodes'} -> qStatus subNodes' --TODO
+    Around{subNodes} -> qStatus subNodes --TODO
+    Test{tests} -> qStatus tests --TODO
 
   runner :: forall hi. IO (Either AbandonNew hi ) -> ExeTreeNew hi -> IO ()
   runner ehIn xtr =

@@ -171,6 +171,9 @@ mkLogger sink threadCounter thrdId engEvnt = do
   let nxt = succ tc
   finally (sink $ expandEvent (TE.SThreadId $ txt thrdId) nxt engEvnt) $ writeIORef threadCounter nxt
 
+
+-- TODO:: Logger should be wrapped in an except that sets non-zero exit code on failure
+
 data LogControls m loc apEvt = LogControls
   { sink :: TE.ThreadEvent loc apEvt -> IO ()
   , logWorker :: IO ()

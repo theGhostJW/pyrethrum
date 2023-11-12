@@ -411,6 +411,7 @@ runChildQ concurrency runner childCanRun q@ChildQ{childNodes, status, runningCou
                     when (concurrency == Concurrent)
                       $ atomically (writeTQueue childNodes a)
                     runner a
+                  -- when not runnabel clean up the q by returning without adding the element back
                   Saturated -> pure ()
                   Done -> pure ()
               (atomically $ modifyTVar runningCount pred)
@@ -850,6 +851,27 @@ logReturnFailureNew lgr p et e =
     lgr (NL.mkFailure p et (txt et <> "Failed at: " <> txt p) e)
     pure . Left $ NL.AbandonNew p et
 
+canRunXTree :: ExeTreeNew hi -> STM CanRun
+canRunXTree = \case
+  AfterOnce{subNodes', status'} ->
+    do
+      s <- readTVar status'
+      s & \case
+        Pending -> do
+          qs <- qStatus subNodes'
+          pure $ qs & \case
+            Runnable -> Runnable
+            Saturated -> Saturated
+            Done -> Saturated
+        Running -> pure Saturated
+        Complete -> pure Done
+  AroundOnce{subNodes} -> qStatus subNodes -- TODO
+  After{subNodes'} -> qStatus subNodes' -- TODO
+  Around{subNodes} -> qStatus subNodes -- TODO
+  Test{tests} -> qStatus tests -- TODO
+ where
+  qStatus q = readTVar q.status
+
 abandonTree :: Logger -> ExeTreeNew hi -> NL.AbandonNew -> IO ()
 abandonTree lgr xtr ab =
   xtr & \case
@@ -859,8 +881,7 @@ abandonTree lgr xtr ab =
           s <- readTVar status'
           let locked = s == ChildQStatus Pending
           when locked
-            $ writeTVar status'
-            $ AfterHookStatus Running
+            $ writeTVar status' (AfterHookStatus Running)
           pure locked
         finally
           (abandonChildren subNodes')
@@ -872,60 +893,60 @@ abandonTree lgr xtr ab =
                 (atomically $ writeTVar status' $ AfterHookStatus Complete)
           )
 
-
     AroundOnce{path, status, cache, subNodes, teardown} -> do
       setUpLocked <- atomically $ do
         s <- readTVar status
         let locked = s == Setup Pending
         when locked
-          $ writeTVar status
-          $ Teardown Running
+          $ writeTVar status (Teardown Running)
         pure locked
-
-      when setUpLocked $
-         logAbandon path (TE.Hook TE.Once TE.SetUp)
-
+      when setUpLocked
+        $ logAbandon path (TE.Hook TE.Once TE.SetUp)
       finally
         (abandonChildren subNodes)
-        ( -- only abndon after if setup has not started
+        ( -- only abandon teardown if setup has not started
           when setUpLocked $ do
             finally
               (logAbandon path $ TE.Hook TE.Once TE.TearDown)
               (atomically $ writeTVar status $ Teardown Complete)
         )
-      -- lgr $ NL.mkParentFailure path NL.AroundOnce ab
-      -- atomically $ writeTVar status NL.Complete
+  
+
+    After{path, frequency, subNodes', after} -> uu
+      -- todo:: generate runner to abndon nodes and travese que
+      -- WRITE EXE CODE TGHEN COME BACK TO THIS
+
+      --  finally
+      --   (abandonChildren subNodes')
+      --   ( -- only abandon teardown if setup has not started
+      --     when setUpLocked $ do
+      --       finally
+      --         (logAbandon path $ TE.Hook TE.Once TE.TearDown)
+      --         (atomically $ writeTVar status $ Teardown Complete)
+      --   )
+      
+      -- do
+      -- lgr $ NL.mkParentFailure path NL.After ab
+      -- atomically $ abandonTree lgr subNodes' ab
+      -- after $ logAbandonnedNew lgr path NL.After ab
+
+
+    Around{path, frequency, setup, subNodes, teardown} -> uu
+        -- todo:: generate runner to abndon nodes and travese que
+      -- lgr $ NL.mkParentFailure path NL.Around ab
       -- atomically $ abandonTree lgr subNodes ab
       -- teardown & \case
       --   Nothing -> pure ()
-      --   Just td -> do
-      --     eto <- atomically $ readTMVar cache
-      --     eto & \case
-      --       Left _ -> pure ()
-      --       Right to -> td $ logAbandonnedNew lgr path NL.AroundOnceRelease ab
-
-
-    After{path, frequency, subNodes', after} -> do
-      lgr $ NL.mkParentFailure path NL.After ab
-      atomically $ abandonTree lgr subNodes' ab
-      after $ logAbandonnedNew lgr path NL.After ab
-
-    Around{path, frequency, setup, subNodes, teardown} -> do
-      lgr $ NL.mkParentFailure path NL.Around ab
-      atomically $ abandonTree lgr subNodes ab
-      teardown & \case
-        Nothing -> pure ()
-        Just td -> td $ logAbandonnedNew lgr path NL.AroundRelease ab
+      --   Just td -> td $ logAbandonnedNew lgr path NL.AroundRelease ab
     Test{path, title, threadLimit, tests} -> do
       lgr $ NL.mkParentFailure path NL.Test ab
       atomically $ abandonTree lgr tests ab
  where
-
   subAbandon :: forall hi'. ExeTreeNew hi' -> IO ()
   subAbandon subtree = abandonTree lgr subtree ab
 
-  abandonChildren :: forall hi'. ChildQ (ExeTreeNew hi') -> IO ()
-  abandonChildren = traverse_ subAbandon
+  abandonChildren :: ChildQ (ExeTreeNew hi') -> IO ()
+  abandonChildren = void . runChildQ Concurrent subAbandon canRunXTree
 
   logAbandon p et = logAbandonnedNew lgr p et ab
 
@@ -933,26 +954,6 @@ runNodes :: Logger -> ChildQ (ExeTreeNew ()) -> IO ()
 runNodes logger cq =
   void $ runChildQ Concurrent (runner . pure $ Right ()) canRun cq
  where
-  qStatus q = readTVar q.status
-
-  canRun :: ExeTreeNew hi -> STM CanRun
-  canRun = \case
-    AfterOnce{subNodes', status'} ->
-      do
-        s <- readTVar status'
-        s & \case
-          Pending -> do
-            qs <- qStatus subNodes'
-            pure $ qs & \case
-              Runnable -> Runnable
-              Saturated -> Saturated
-              Done -> Saturated
-          Running -> pure Saturated
-          Complete -> pure Done
-    AroundOnce{subNodes} -> qStatus subNodes -- TODO
-    After{subNodes'} -> qStatus subNodes' -- TODO
-    Around{subNodes} -> qStatus subNodes -- TODO
-    Test{tests} -> qStatus tests -- TODO
   runner :: forall hi. IO (Either NL.AbandonNew hi) -> ExeTreeNew hi -> IO ()
   runner ehIn xtr =
     do

@@ -13,9 +13,9 @@ import Effectful (Eff, runEff, runPureEff)
 import Effectful.Dispatch.Dynamic (interpret)
 import qualified Effectful.Error.Static as E
 import Internal.RunTimeLogging (ExeLog)
+import Internal.ThreadEvent (Frequency)
 import PyrethrumExtras (MonadCatch (catch), try, uu)
 import UnliftIO.Exception (tryAny)
-import Internal.ThreadEvent (Frequency)
 
 data PreNode m c hi where
   Before ::
@@ -44,11 +44,17 @@ data PreNode m c hi where
     (C.Config tc) =>
     { config :: tc
     , path :: Path
-    , tests :: c (ApEventSink -> hi -> m ())
+    , tests :: c (TestItem m hi)
     } ->
     PreNode m c hi
 
 type ApEventSink = ApEvent -> IO ()
+
+data TestItem m hi = TestItem
+  { id :: Int
+  , title :: Text
+  , action :: ApEventSink -> hi -> m ()
+  }
 
 data PrepParams rc tc effs where
   PrepParams ::
@@ -142,52 +148,90 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
       Test
         { config
         , path
-        , tests = runTest (action runConfig) parse <$> items runConfig
+        , tests =  ( \i ->
+                TestItem
+                  { id = i.id
+                  , title = i.title
+                  , action = runTest (action runConfig) parse i
+                  }
+            ) <$> items runConfig
         }
+
     C.Full'{config', depends, action', parse', items'} ->
       Test
         { config = config'
         , path
-        , tests = (\i snk hi -> runTest (action' runConfig hi) parse' i snk hi) <$> items' runConfig
+        , tests =  ( \i ->
+                TestItem
+                  { id = i.id
+                  , title = i.title
+                  , action = \snk hi -> runTest (action' runConfig hi) parse' i snk hi
+                  }
+            ) <$> items' runConfig
         }
     C.NoParse{config, action, items} ->
       Test
         { config
         , path
-        , tests = runNoParseTest (action runConfig) <$> items runConfig
+        , tests =
+            ( \i ->
+                TestItem
+                  { id = i.id
+                  , title = i.title
+                  , action = runNoParseTest (action runConfig) i
+                  }
+            )
+              <$> items runConfig
         }
     C.NoParse'{config', action', items'} ->
       Test
         { config = config'
         , path
-        , tests = (\i snk hi -> runNoParseTest (action' runConfig hi) i snk hi) <$> items' runConfig
+        , tests =
+            ( \i ->
+                TestItem
+                  { id = i.id
+                  , title = i.title
+                  , action = \snk hi -> runNoParseTest (action' runConfig hi) i snk hi
+                  }
+            )
+              <$> items' runConfig
         }
     C.Single{config, singleAction, checks} ->
       Test
         { config
         , path
         , tests =
-            pure $ \snk hi ->
-              do
-                ds <- tryAny $ do
-                  flog snk . Action path . ItemJSON $ toJSON config.title
-                  eas <- interpreter (singleAction runConfig)
-                  unTry snk eas
-                applyChecks snk path checks ds
+            pure
+              $ TestItem
+                { id = 0
+                , title = config.title
+                , action = \snk hi ->
+                    do
+                      ds <- tryAny $ do
+                        flog snk . Action path . ItemJSON $ toJSON config.title
+                        eas <- interpreter (singleAction runConfig)
+                        unTry snk eas
+                      applyChecks snk path checks ds
+                }
         }
     C.Single'{config', singleAction', checks'} ->
       Test
         { config = config'
         , path
         , tests =
-            pure $ \snk hi ->
-              do
-                ds <- tryAny $ do
-                  -- no item to log so just log the test title
-                  flog snk . Action path . ItemJSON $ toJSON config'.title
-                  eas <- interpreter (singleAction' runConfig hi)
-                  unTry snk eas
-                applyChecks snk path checks' ds
+            pure
+              $ TestItem
+                { id = 0
+                , title = config'.title
+                , action = \snk hi ->
+                    do
+                      ds <- tryAny $ do
+                        flog snk . Action path . ItemJSON $ toJSON config'.title
+                        eas <- interpreter (singleAction' runConfig hi)
+                        unTry snk eas
+                      applyChecks snk path checks' ds
+                }
         }
  where
   applyParser parser = mapLeft (fmap toException) . runPureEff . E.runError . parser

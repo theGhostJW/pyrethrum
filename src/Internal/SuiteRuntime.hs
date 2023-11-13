@@ -117,6 +117,12 @@ executeNodesNew sink nodes maxThreads =
 data NFrequency = Each | Thread
   deriving (Show, Eq)
 
+data TestItem hi = TestItem {
+  id :: Int,
+  title :: Text,
+  action :: P.ApEventSink -> hi -> IO ()
+}
+
 data ExeTreeNew hi where
   AfterOnce ::
     { path :: NL.ExePath
@@ -153,7 +159,7 @@ data ExeTreeNew hi where
     { path :: NL.ExePath
     , title :: Text
     , threadLimit :: Int
-    , tests :: ChildQ (P.ApEventSink -> hi -> IO ())
+    , tests :: ChildQ (TestItem hi)
     } ->
     ExeTreeNew hi
 
@@ -912,12 +918,12 @@ abandonTree lgr xtr ab =
         )
   
 
-    After{path, frequency, subNodes', after} -> uu
+    After{path, frequency, subNodes', after} -> uu --abandonChildren subNodes'
       -- todo:: generate runner to abndon nodes and travese que
       -- WRITE EXE CODE TGHEN COME BACK TO THIS
 
       --  finally
-      --   (abandonChildren subNodes')
+      --   ()
       --   ( -- only abandon teardown if setup has not started
       --     when setUpLocked $ do
       --       finally

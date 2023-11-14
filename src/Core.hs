@@ -175,6 +175,18 @@ data Test c rc tc effs hi where
     } ->
     Test c rc tc effs hi
 
+-- TODO :: RENAME
+-- SuiteElement => Node
+-- Test => Fixture
+{-
+Suite 
+  - Nodes 
+    - Hooks 
+    - Fixtures 
+      - Test
+      - Test
+      - Test
+-}
 data SuiteElement c rc tc effs hi where
   Hook ::
     (Param loc) =>

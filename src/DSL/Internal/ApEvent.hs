@@ -32,6 +32,11 @@ data Path = Path
   { module' :: Text
   , title :: Text
   }
+  | TestPath
+  { 
+    id :: Int
+  , title :: Text
+  }
   deriving (Show, Eq, Ord)
 
 newtype ApStateJSON = ApStateJSON {unApStateJSON :: A.Value} deriving (Eq, Show, IsString)

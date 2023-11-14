@@ -878,9 +878,16 @@ canRunXTree = \case
  where
   qStatus q = readTVar q.status
 
-abandonTree :: Logger -> ExeTreeNew hi -> NL.AbandonNew -> IO ()
-abandonTree lgr xtr ab =
-  xtr & \case
+abandonChildren :: forall hi'. Logger -> NL.AbandonNew -> ChildQ (ExeTreeNew hi') -> IO ()
+abandonChildren lgr ab = 
+  void . runChildQ Concurrent subAbandon canRunXTree
+ where
+  abandonChildren' :: forall hi''. ChildQ (ExeTreeNew hi'') -> IO ()
+  abandonChildren' = abandonChildren lgr ab
+  
+  abandonTree :: forall hi'''. ExeTreeNew hi''' -> IO ()
+  abandonTree xtr =
+   xtr & \case
     AfterOnce{path, status', subNodes'} ->
       do
         locked <- atomically $ do
@@ -890,7 +897,7 @@ abandonTree lgr xtr ab =
             $ writeTVar status' (AfterHookStatus Running)
           pure locked
         finally
-          (abandonChildren subNodes')
+          (abandonChildren' subNodes')
           ( -- only abndon after if child q has not started
             when locked $ do
               finally
@@ -909,7 +916,7 @@ abandonTree lgr xtr ab =
       when setUpLocked
         $ logAbandon path (TE.Hook TE.Once TE.SetUp)
       finally
-        (abandonChildren subNodes)
+        (abandonChildren' subNodes)
         ( -- only abandon teardown if setup has not started
           when setUpLocked $ do
             finally
@@ -944,15 +951,15 @@ abandonTree lgr xtr ab =
       -- teardown & \case
       --   Nothing -> pure ()
       --   Just td -> td $ logAbandonnedNew lgr path NL.AroundRelease ab
-    Test{path, title, threadLimit, tests} -> do
-      lgr $ NL.mkParentFailure path NL.Test ab
-      atomically $ abandonTree lgr tests ab
- where
-  subAbandon :: forall hi'. ExeTreeNew hi' -> IO ()
-  subAbandon subtree = abandonTree lgr subtree ab
+    Test{path, title, tests} ->
+      void $ runChildQ Sequential (abndonTest path) (const $ pure Runnable) tests
 
-  abandonChildren :: ChildQ (ExeTreeNew hi') -> IO ()
-  abandonChildren = void . runChildQ Concurrent subAbandon canRunXTree
+  abndonTest :: NL.ExePath -> TestItem hi -> IO ()
+  abndonTest fxPath tst = logAbandonnedNew lgr (mkTestPath fxPath tst) TE.Test ab
+
+  mkTestPath :: NL.ExePath -> TestItem hi -> NL.ExePath
+  mkTestPath p TestItem{id, title} = NL.ExePath $ AE.TestPath {id, title} : p.unExePath
+
 
   logAbandon p et = logAbandonnedNew lgr p et ab
 

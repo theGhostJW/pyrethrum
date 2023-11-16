@@ -25,11 +25,13 @@ newtype ParseException = ParseException Text
 instance Exception ParseException
 
 type HasTitle a = HasField "title" a Text
+
+-- TODO :: YAGNI delete this
 type HasMaxThreads a = HasField "maxThreads" a Int
 
 type HasId a = HasField "id" a Int
 
-class (HasTitle a, Show a, HasMaxThreads a, ToJSON a, Eq a) => Config a
+class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
 
 class (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i, ToJSON ds) => Item i ds
 

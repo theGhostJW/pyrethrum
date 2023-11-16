@@ -117,12 +117,6 @@ executeNodesNew sink nodes maxThreads =
 data NFrequency = Each | Thread
   deriving (Show, Eq)
 
-data TestItem hi = TestItem {
-  id :: Int,
-  title :: Text,
-  action :: P.ApEventSink -> hi -> IO ()
-}
-
 data ExeTreeNew hi where
   AfterOnce ::
     { path :: NL.ExePath
@@ -158,8 +152,7 @@ data ExeTreeNew hi where
   Test ::
     { path :: NL.ExePath
     , title :: Text
-    , threadLimit :: Int
-    , tests :: ChildQ (TestItem hi)
+    , tests :: ChildQ (P.TestItem IO hi)
     } ->
     ExeTreeNew hi
 
@@ -211,7 +204,7 @@ mkXTreeNew xpth preNodes =
         , tests
         } -> do
           cq <- mkChildQ tests
-          pure $ Test{path, title = c.title, threadLimit = c.maxThreads, tests = cq}
+          pure $ Test{path, title = c.title, tests = cq}
    where
     path = NL.ExePath $ pn.path : xpth.unExePath
 
@@ -862,15 +855,16 @@ canRunXTree = \case
   AfterOnce{subNodes', status'} ->
     do
       s <- readTVar status'
-      s & \case
-        Pending -> do
-          qs <- qStatus subNodes'
-          pure $ qs & \case
-            Runnable -> Runnable
-            Saturated -> Saturated
-            Done -> Saturated
-        Running -> pure Saturated
-        Complete -> pure Done
+      pure $ s & \case
+        ChildQStatus s' -> s' & \case 
+          Pending -> Runnable
+          Running -> Runnable
+          Complete -> Saturated
+        AfterHookStatus s' -> s' & \case
+          Pending -> Saturated
+          Running -> Saturated
+          Complete -> Done
+
   AroundOnce{subNodes} -> qStatus subNodes -- TODO
   After{subNodes'} -> qStatus subNodes' -- TODO
   Around{subNodes} -> qStatus subNodes -- TODO
@@ -880,7 +874,7 @@ canRunXTree = \case
 
 abandonChildren :: forall hi'. Logger -> NL.AbandonNew -> ChildQ (ExeTreeNew hi') -> IO ()
 abandonChildren lgr ab = 
-  void . runChildQ Concurrent subAbandon canRunXTree
+  void . runChildQ Concurrent abandonTree canRunXTree
  where
   abandonChildren' :: forall hi''. ChildQ (ExeTreeNew hi'') -> IO ()
   abandonChildren' = abandonChildren lgr ab
@@ -954,11 +948,11 @@ abandonChildren lgr ab =
     Test{path, title, tests} ->
       void $ runChildQ Sequential (abndonTest path) (const $ pure Runnable) tests
 
-  abndonTest :: NL.ExePath -> TestItem hi -> IO ()
+  abndonTest :: NL.ExePath -> P.TestItem IO hi -> IO ()
   abndonTest fxPath tst = logAbandonnedNew lgr (mkTestPath fxPath tst) TE.Test ab
 
-  mkTestPath :: NL.ExePath -> TestItem hi -> NL.ExePath
-  mkTestPath p TestItem{id, title} = NL.ExePath $ AE.TestPath {id, title} : p.unExePath
+  mkTestPath :: NL.ExePath -> P.TestItem IO hi -> NL.ExePath
+  mkTestPath p P.TestItem{id, title} = NL.ExePath $ AE.TestPath {id, title} : p.unExePath
 
 
   logAbandon p et = logAbandonnedNew lgr p et ab
@@ -973,7 +967,7 @@ runNodes logger cq =
       ehi <- ehIn
       ehi
         & either
-          (abandonTree logger xtr)
+          (\abd -> abandonChildren logger xtr)
           uu
 
 -- TODO: warning on uu

@@ -182,7 +182,7 @@ mkXTreeNew xpth preNodes =
           let mkAfter fq = pure $ After{path, frequency = fq, subNodes' = cq, after}
           frequency & \case
             F.Once -> do
-              status' <- newTVarIO $ ChildQStatus Pending
+              status' <- newTVarIO AfterQPending
               pure $ AfterOnce{path, status', subNodes' = cq, after}
             F.Thread -> mkAfter Thread
             F.Each -> mkAfter Each
@@ -209,31 +209,31 @@ mkXTreeNew xpth preNodes =
     path = NL.ExePath $ pn.path : xpth.unExePath
 
     mkOnceHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> IO (ExeTreeNew hi')
-    mkOnceHook subNodes setup teardown = do
-      s <- newTVarIO $ Setup Pending
+    mkOnceHook subNodes' setup teardown = do
+      status <- newTVarIO SetupPending
       cache <- newEmptyTMVarIO
-      cq <- mkXTreeNew path subNodes
+      subNodes <- mkXTreeNew path subNodes'
       pure
         $ AroundOnce
           { path
           , setup
-          , status = s
+          , status
           , cache
-          , subNodes = cq
+          , subNodes
           , teardown
           }
 
     mkNHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> NFrequency -> IO (ExeTreeNew hi')
-    mkNHook subNodes setup teardown frequency = do
+    mkNHook subNodes' setup teardown frequency = do
       s <- newTVarIO HookPending
       cache <- newEmptyTMVarIO
-      cq <- mkXTreeNew path subNodes
+      subNodes <- mkXTreeNew path subNodes'
       pure
         $ Around
           { path
           , setup
           , frequency
-          , subNodes = cq
+          , subNodes
           , teardown
           }
 
@@ -251,20 +251,27 @@ data HookStatus
   | HookReleaseRunning
   | HookReleased
   deriving (Show, Eq)
-data HookStatusNew
-  = Pending
-  | Running
-  | Complete
+
+data BeforeStatus
+  = BeforePending
+  | BeforeRunning
+  | BeforeQRunning
+  | BeforeDone
   deriving (Show, Eq)
 
 data AroundStatus
-  = Setup HookStatusNew
-  | Teardown HookStatusNew
+  = SetupPending
+  | SetupRunning
+  | AroundQRunning
+  | TeardownRunning
+  | TeardownDone
   deriving (Show, Eq)
 
 data AfterStatus
-  = ChildQStatus HookStatusNew
-  | AfterHookStatus HookStatusNew
+  = AfterQPending
+  | AfterQRunning
+  | AfterRunning
+  | AfterDone
   deriving (Show, Eq)
 
 data XContext a = XContext
@@ -855,71 +862,97 @@ canRunXTree = \case
   AfterOnce{subNodes', status'} ->
     do
       s <- readTVar status'
+      qs <- readTVar subNodes'.status
       pure $ s & \case
-        ChildQStatus s' -> s' & \case 
-          Pending -> Runnable
-          Running -> Runnable
-          Complete -> Saturated
-        AfterHookStatus s' -> s' & \case
-          Pending -> Saturated
-          Running -> Saturated
-          Complete -> Done
+        AfterQPending -> Runnable
+        AfterQRunning -> stepDownQStatus qs
+        AfterRunning -> Saturated
+        AfterDone -> Done
+  AroundOnce{subNodes, status} -> do
+    s <- readTVar status
+    qs <- readTVar subNodes.status
+    pure $ s & \case
+      SetupPending -> Runnable
+      SetupRunning -> Runnable
+      AroundQRunning -> stepDownQStatus qs
+      TeardownRunning -> Saturated
+      TeardownDone -> Done
 
-  AroundOnce{subNodes} -> qStatus subNodes -- TODO
-  After{subNodes'} -> qStatus subNodes' -- TODO
-  Around{subNodes} -> qStatus subNodes -- TODO
-  Test{tests} -> qStatus tests -- TODO
+  -- base non singleton can run status on underlying q
+  After{subNodes'} -> qStatus subNodes'
+  Around{subNodes} -> qStatus subNodes
+  Test{tests} -> qStatus tests
  where
   qStatus q = readTVar q.status
+  stepDownQStatus = \case
+    Runnable -> Runnable
+    Saturated -> Saturated
+    Done -> Saturated
 
 abandonChildren :: forall hi'. Logger -> NL.AbandonNew -> ChildQ (ExeTreeNew hi') -> IO ()
-abandonChildren lgr ab = 
+abandonChildren lgr ab =
   void . runChildQ Concurrent abandonTree canRunXTree
  where
   abandonChildren' :: forall hi''. ChildQ (ExeTreeNew hi'') -> IO ()
   abandonChildren' = abandonChildren lgr ab
-  
+
   abandonTree :: forall hi'''. ExeTreeNew hi''' -> IO ()
   abandonTree xtr =
-   xtr & \case
-    AfterOnce{path, status', subNodes'} ->
-      do
-        locked <- atomically $ do
-          s <- readTVar status'
-          let locked = s == ChildQStatus Pending
+    xtr & \case
+      ao@AfterOnce{path, status', subNodes'} ->
+        do
+          locked <- atomically $ do
+            s <- canRunXTree ao
+            let locked = s == Runnable
+            when locked
+              $ writeTVar status' AfterRunning
+            pure locked
+          finally
+            (abandonChildren' subNodes')
+            ( -- only abndon after if no nodes had already started
+              when locked $ do
+                finally
+                  -- if the logging fails we are really screwed so update to complete
+                  (logAbandon path $ TE.Hook TE.Once TE.After)
+                  (atomically $ writeTVar status' AfterDone)
+            )
+      AroundOnce{path, status, cache, subNodes, teardown} -> do
+        setUpLocked <- atomically $ do
+          s <- readTVar status
+          let locked = s == SetupPending
           when locked
-            $ writeTVar status' (AfterHookStatus Running)
+            $ writeTVar status TeardownRunning
           pure locked
+        when setUpLocked
+          $ logAbandon path (TE.Hook TE.Once TE.SetUp)
         finally
-          (abandonChildren' subNodes')
-          ( -- only abndon after if child q has not started
-            when locked $ do
+          (abandonChildren' subNodes)
+          ( -- only abandon teardown if setup has not started
+            when setUpLocked $ do
               finally
-                -- if the logging fails we are really screwed so update to complete
-                (logAbandon path $ TE.Hook TE.Once TE.After)
-                (atomically $ writeTVar status' $ AfterHookStatus Complete)
+                (logAbandon path $ TE.Hook TE.Once TE.TearDown)
+                (atomically $ writeTVar status TeardownDone)
           )
 
-    AroundOnce{path, status, cache, subNodes, teardown} -> do
-      setUpLocked <- atomically $ do
-        s <- readTVar status
-        let locked = s == Setup Pending
-        when locked
-          $ writeTVar status (Teardown Running)
-        pure locked
-      when setUpLocked
-        $ logAbandon path (TE.Hook TE.Once TE.SetUp)
-      finally
-        (abandonChildren' subNodes)
-        ( -- only abandon teardown if setup has not started
-          when setUpLocked $ do
-            finally
-              (logAbandon path $ TE.Hook TE.Once TE.TearDown)
-              (atomically $ writeTVar status $ Teardown Complete)
-        )
-  
-
-    After{path, frequency, subNodes', after} -> uu --abandonChildren subNodes'
+      -- HERE THIS FUNCTION NEEDS TO BE GENERALISED TO RUN ~ finish runNodenew and come back here
+      After{path, frequency, subNodes', after} -> do 
+        qlocked <- atomically $ do
+          qs <- readTVar subNodes'.status
+          rc <- readTVar subNodes'.runningCount
+          let locked = rc == 0 && qs == Runnable
+          when locked
+            $ writeTVar subNodes'.status Saturated
+          pure locked
+        -- finally
+        --   (abandonChildren' subNodes')
+        --   ( -- only abandon teardown if setup has not started
+        --     when qlocked $ do
+        --       finally
+        --         (logAbandon path $ TE.Hook TE.Once TE.TearDown)
+        --         (atomically $ writeTVar frequency F.Once)
+        --   )
+        
+        uu -- abandonChildren subNodes'
       -- todo:: generate runner to abndon nodes and travese que
       -- WRITE EXE CODE TGHEN COME BACK TO THIS
 
@@ -931,31 +964,51 @@ abandonChildren lgr ab =
       --         (logAbandon path $ TE.Hook TE.Once TE.TearDown)
       --         (atomically $ writeTVar status $ Teardown Complete)
       --   )
-      
+
       -- do
       -- lgr $ NL.mkParentFailure path NL.After ab
       -- atomically $ abandonTree lgr subNodes' ab
       -- after $ logAbandonnedNew lgr path NL.After ab
 
-
-    Around{path, frequency, setup, subNodes, teardown} -> uu
-        -- todo:: generate runner to abndon nodes and travese que
+      Around{path, frequency, setup, subNodes, teardown} -> uu
+      -- todo:: generate runner to abndon nodes and travese que
       -- lgr $ NL.mkParentFailure path NL.Around ab
       -- atomically $ abandonTree lgr subNodes ab
       -- teardown & \case
       --   Nothing -> pure ()
       --   Just td -> td $ logAbandonnedNew lgr path NL.AroundRelease ab
-    Test{path, title, tests} ->
-      void $ runChildQ Sequential (abndonTest path) (const $ pure Runnable) tests
+      Test{path, title, tests} ->
+        void $ runChildQ Sequential (abndonTest path) (const $ pure Runnable) tests
 
   abndonTest :: NL.ExePath -> P.TestItem IO hi -> IO ()
   abndonTest fxPath tst = logAbandonnedNew lgr (mkTestPath fxPath tst) TE.Test ab
 
   mkTestPath :: NL.ExePath -> P.TestItem IO hi -> NL.ExePath
-  mkTestPath p P.TestItem{id, title} = NL.ExePath $ AE.TestPath {id, title} : p.unExePath
-
+  mkTestPath p P.TestItem{id, title} = NL.ExePath $ AE.TestPath{id, title} : p.unExePath
 
   logAbandon p et = logAbandonnedNew lgr p et ab
+
+-- TODO: warning on uu
+--  xtr & \case
+-- AfterOnce
+--   { path
+--   , status'
+--   , subNodes'
+--   , after
+--   } -> uu
+-- AroundOnce{subNodes, setup, teardown} -> uu
+-- After{subNodes', after} -> uu
+-- Around{subNodes, setup, teardown} -> uu
+-- Test{tests} -> uu
+
+here
+runNodeNew ::
+  forall oi ti a.
+  (L.ExeEvent L.Loc a -> IO ()) ->
+  Either Abandon (ExeIn oi ti ()) ->
+  ExeTreeNew a oi ti ->
+  IO ()
+runNodeNew eventLogger hkIn = uu
 
 runNodes :: Logger -> ChildQ (ExeTreeNew ()) -> IO ()
 runNodes logger cq =
@@ -970,18 +1023,7 @@ runNodes logger cq =
           (\abd -> abandonChildren logger xtr)
           uu
 
--- TODO: warning on uu
---  xtr & \case
--- AfterOnce
---   { path
---   , status'
---   , subNodes'
---   , after
---   } -> uu
--- AroundOnce{subNodes, setup, teardown} -> uu
--- After{subNodes', after} -> uu
--- Around{subNodes, setup, teardown} -> uu
--- Test{tests} -> uu
+
 
 runNode ::
   forall oi ti a.

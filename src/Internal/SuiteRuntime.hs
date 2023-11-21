@@ -257,6 +257,7 @@ data BeforeStatus
   | BeforeRunning
   | BeforeQRunning
   | BeforeDone
+  | BeforeAbandoning
   deriving (Show, Eq)
 
 data AroundStatus
@@ -265,6 +266,7 @@ data AroundStatus
   | AroundQRunning
   | TeardownRunning
   | TeardownDone
+  | AroundAbandoning
   deriving (Show, Eq)
 
 data AfterStatus
@@ -272,6 +274,7 @@ data AfterStatus
   | AfterQRunning
   | AfterRunning
   | AfterDone
+  | AfterAbandoning
   deriving (Show, Eq)
 
 data XContext a = XContext
@@ -679,6 +682,7 @@ readOrLockHook hs hVal =
     s <- readTVar hs
     (==) s HookPending
       ? (writeTVar hs HookRunning >> pure Nothing)
+      -- blocks until the other thread has written the MVar
       $ (Just <$> readTMVar hVal)
 
 setHookComplete :: TVar HookStatus -> TMVar (Either Abandon ho) -> Either Abandon ho -> STM (Either Abandon ho)
@@ -857,6 +861,40 @@ logReturnFailureNew lgr p et e =
     lgr (NL.mkFailure p et (txt et <> "Failed at: " <> txt p) e)
     pure . Left $ NL.AbandonNew p et
 
+data CanAbandon = None | Partial | Full 
+  deriving (Show, Eq)
+
+canAbandon :: ExeTreeNew hi -> STM CanAbandon
+canAbandon = \case
+  AfterOnce{subNodes', status'} -> do
+    s <- readTVar status'
+    pure $ s & \case
+      AfterQPending -> Full
+      AfterQRunning -> Partial
+      AfterRunning -> None
+      AfterAbandoning -> None
+      AfterDone -> None
+  AroundOnce{subNodes, status} -> do
+    s <- readTVar status
+    pure $ s & \case
+      SetupPending -> Full
+      SetupRunning -> Partial
+      AroundQRunning -> Partial
+      AroundAbandoning -> None
+      TeardownRunning -> None
+      TeardownDone -> None
+
+  -- base non singleton can run status on underlying q
+  After{subNodes'} -> qStatus subNodes'
+  Around{subNodes} -> qStatus subNodes
+  Test{tests} -> qStatus tests
+ where
+  qStatus q = convert <$> readTVar q.status
+  convert = \case
+    Runnable -> Full
+    Saturated -> None
+    Done -> None
+
 canRunXTree :: ExeTreeNew hi -> STM CanRun
 canRunXTree = \case
   AfterOnce{subNodes', status'} ->
@@ -867,6 +905,7 @@ canRunXTree = \case
         AfterQPending -> Runnable
         AfterQRunning -> stepDownQStatus qs
         AfterRunning -> Saturated
+        AfterAbandoning -> Saturated
         AfterDone -> Done
   AroundOnce{subNodes, status} -> do
     s <- readTVar status
@@ -901,27 +940,36 @@ abandonChildren lgr ab =
     xtr & \case
       ao@AfterOnce{path, status', subNodes'} ->
         do
-          locked <- atomically $ do
-            s <- canRunXTree ao
-            let locked = s == Runnable
-            when locked
-              $ writeTVar status' AfterRunning
-            pure locked
-          finally
-            (abandonChildren' subNodes')
-            ( -- only abndon after if no nodes had already started
-              when locked $ do
-                finally
-                  -- if the logging fails we are really screwed so update to complete
-                  (logAbandon path $ TE.Hook TE.Once TE.After)
-                  (atomically $ writeTVar status' AfterDone)
-            )
+          aStatus <- atomically $ do
+            s <- canAbandon ao
+            when (s == Full)
+              $ writeTVar status' AfterAbandoning
+            pure s
+          aStatus & \case
+            Full ->
+              finally
+                (abandonChildren' subNodes')
+                ( do
+                    -- only abndon after if no nodes had already started
+                    logAbandon path $ TE.Hook TE.Once TE.After
+                    atomically $ writeTVar status' AfterDone
+                )
+            Partial -> abandonChildren' subNodes'
+            None -> pure ()
       AroundOnce{path, status, cache, subNodes, teardown} -> do
         setUpLocked <- atomically $ do
           s <- readTVar status
           let locked = s == SetupPending
+              canAbandon =
+                s & \case
+                  SetupPending -> True
+                  SetupRunning -> False
+                  AroundQRunning -> False
+                  TeardownRunning -> False
+                  TeardownDone -> False
+                  AroundAbandoning -> False
           when locked
-            $ writeTVar status TeardownRunning
+            $ writeTVar status AroundAbandoning
           pure locked
         when setUpLocked
           $ logAbandon path (TE.Hook TE.Once TE.SetUp)
@@ -935,7 +983,7 @@ abandonChildren lgr ab =
           )
 
       -- HERE THIS FUNCTION NEEDS TO BE GENERALISED TO RUN ~ finish runNodenew and come back here
-      After{path, frequency, subNodes', after} -> do 
+      After{path, frequency, subNodes', after} -> do
         qlocked <- atomically $ do
           qs <- readTVar subNodes'.status
           rc <- readTVar subNodes'.runningCount
@@ -951,10 +999,10 @@ abandonChildren lgr ab =
         --         (logAbandon path $ TE.Hook TE.Once TE.TearDown)
         --         (atomically $ writeTVar frequency F.Once)
         --   )
-        
+
         uu -- abandonChildren subNodes'
-      -- todo:: generate runner to abndon nodes and travese que
-      -- WRITE EXE CODE TGHEN COME BACK TO THIS
+        -- todo:: generate runner to abndon nodes and travese que
+        -- WRITE EXE CODE TGHEN COME BACK TO THIS
 
       --  finally
       --   ()
@@ -1001,17 +1049,50 @@ abandonChildren lgr ab =
 -- Around{subNodes, setup, teardown} -> uu
 -- Test{tests} -> uu
 
+-- returns
+--   Nothing -> cache empty hook needs to be run
+--   value (ho or Abandon) -> cache has value and is ready to be used
+--    - will block until cach is full if already running
+readOrLockHookNew :: forall s ho. TVar s -> (s -> Bool) -> s -> TMVar (Either Abandon ho) -> STM (Maybe (Either Abandon ho))
+readOrLockHookNew hs isPending runningStatus hVal =
+  do
+    s <- readTVar hs
+    isPending s
+      ? (writeTVar hs runningStatus >> pure Nothing)
+      -- blocks until the other thread has written the MVar
+      $ (Just <$> readTMVar hVal)
+
 --- HERE !!!!!!!!!
 runNodeNew ::
-  forall oi ti a.
-  (L.ExeEvent L.Loc a -> IO ()) ->
-  Either Abandon (ExeIn oi ti ()) ->
-  ExeTreeNew a oi ti ->
+  forall hi.
+  Logger ->
+  IO (Either Abandon hi) ->
+  ExeTreeNew hi ->
   IO ()
-runNodeNew eventLogger hkIn = uu
+runNodeNew logger ehi = \case
+  AfterOnce
+    { path
+    , status'
+    , subNodes'
+    , after
+    } -> do
+      ehi' <- ehi
+      ehi'
+        & either
+          (\abd -> abandonChildren logger abd subNodes')
+          ( \hi -> do
+              atomically $ writeTVar status' AfterQRunning
+              finally
+                (runNodeNew logger (after hi) subNodes')
+                (atomically $ writeTVar status' AfterDone)
+          )
+  AroundOnce{path, status, cache, subNodes, teardown} -> uu
+  After{path, frequency, subNodes', after} -> uu
+  Around{path, frequency, setup, subNodes, teardown} -> uu
+  Test{path, title, tests} -> uu
 
-runNodes :: Logger -> ChildQ (ExeTreeNew ()) -> IO ()
-runNodes logger cq =
+runNodesNew :: Logger -> ChildQ (ExeTreeNew ()) -> IO ()
+runNodesNew logger cq =
   void $ runChildQ Concurrent (runner . pure $ Right ()) canRun cq
  where
   runner :: forall hi. IO (Either NL.AbandonNew hi) -> ExeTreeNew hi -> IO ()
@@ -1022,8 +1103,6 @@ runNodes logger cq =
         & either
           (\abd -> abandonChildren logger xtr)
           uu
-
-
 
 runNode ::
   forall oi ti a.

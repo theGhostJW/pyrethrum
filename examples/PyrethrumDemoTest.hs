@@ -311,6 +311,11 @@ suite =
   ]
 
 {-
+-- TODO: test documenter that returns a handle from onceHook 
+      - research lazy vs strict TVar - may need to run differently doc and exe 
+      - aftr depends on before 
+      - after depends on around
+
 -- TODO: review bracket
 
 -- TODO : stubs:

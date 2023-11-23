@@ -382,50 +382,54 @@ canRunChildQ cq =
     Saturated -> False
     Done -> False
 
-runChildQ :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
-runChildQ concurrency runner childCanRun q@ChildQ{childNodes, status, runningCount} =
-  do
-    eNext <- atomically $ do
-      rc <- readTVar runningCount
-      mNext <- tryReadTQueue childNodes
-      mNext
-        & maybe
-          ( do
-              if
-                -- broken
-                | rc < 0 -> bug @Void $ error "framework error - this should not happen - child que running count below zero"
-                -- nothing running an nothing in the q we must be done
-                | rc == 0 -> writeTVar status Done
-                -- q is empty but still threads running
-                | otherwise -> writeTVar status Saturated
-              pure Nothing
-          )
-          ( \a -> do
-              modifyTVar runningCount succ
-              pure $ Just a
-          )
+runChildQ :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
+runChildQ concurrency runner childCanRun q  =
+  void $ runChildQ' concurrency runner childCanRun q
+ where
+  runChildQ' :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
+  runChildQ' concurrency runner childCanRun q@ChildQ{childNodes, status, runningCount} =
+    do
+      eNext <- atomically $ do
+        rc <- readTVar runningCount
+        mNext <- tryReadTQueue childNodes
+        mNext
+          & maybe
+            ( do
+                if
+                  -- broken
+                  | rc < 0 -> bug @Void $ error "framework error - this should not happen - child que running count below zero"
+                  -- nothing running an nothing in the q we must be done
+                  | rc == 0 -> writeTVar status Done
+                  -- q is empty but still threads running
+                  | otherwise -> writeTVar status Saturated
+                pure Nothing
+            )
+            ( \a -> do
+                modifyTVar runningCount succ
+                pure $ Just a
+            )
 
-    eNext
-      & maybe
-        (atomically $ readTVar status)
-        ( \a -> do
-            finally
-              do
-                cr <- atomically $ childCanRun a
-                cr & \case
-                  -- runner MUST ensure the integrity of sub element status and handle all exceptions
-                  Runnable -> do
-                    -- when Concurrent, the element is placed back on the end of the q before running so
-                    -- can be picked up by other threads child qs are concurrent test items are not
-                    when (concurrency == Concurrent)
-                      $ atomically (writeTQueue childNodes a)
-                    runner a
-                  -- when not runnabel clean up the q by returning without adding the element back
-                  Saturated -> pure ()
-                  Done -> pure ()
-              (atomically $ modifyTVar runningCount pred)
-            runChildQ concurrency runner childCanRun q
-        )
+      eNext
+        & maybe
+          (atomically $ readTVar status)
+          ( \a -> do
+              finally
+                do
+                  cr <- atomically $ childCanRun a
+                  cr & \case
+                    -- runner MUST ensure the integrity of sub element status and handle all exceptions
+                    Runnable -> do
+                      -- when Concurrent, the element is placed back on the end of the q before running so
+                      -- can be picked up by other threads child qs are concurrent test items are not
+                      when (concurrency == Concurrent)
+                        $ atomically (writeTQueue childNodes a)
+                      runner a
+                    -- when not runnabel clean up the q by returning without adding the element back
+                    Saturated -> pure ()
+                    Done -> pure ()
+                (atomically $ modifyTVar runningCount pred)
+              runChildQ' concurrency runner childCanRun q
+          )
 
 mkChildQ :: (Foldable m) => m a -> IO (ChildQ a)
 mkChildQ children = do
@@ -861,7 +865,7 @@ logReturnFailureNew lgr p et e =
     lgr (NL.mkFailure p et (txt et <> "Failed at: " <> txt p) e)
     pure . Left $ NL.AbandonNew p et
 
-data CanAbandon = None | Partial | Full 
+data CanAbandon = None | Partial | Full
   deriving (Show, Eq)
 
 canAbandon :: ExeTreeNew hi -> STM CanAbandon
@@ -928,105 +932,101 @@ canRunXTree = \case
     Saturated -> Saturated
     Done -> Saturated
 
-abandonChildren :: forall hi'. Logger -> NL.AbandonNew -> ChildQ (ExeTreeNew hi') -> IO ()
-abandonChildren lgr ab =
-  void . runChildQ Concurrent abandonTree canRunXTree
+abandonTree :: forall hi. Logger -> NL.AbandonNew -> ExeTreeNew hi -> IO ()
+abandonTree lgr ab = \case
+  ao@AfterOnce{path, status', subNodes'} ->
+    do
+      aStatus <- atomically $ do
+        ca <- canAbandon ao
+        when (ca == Full)
+          $ writeTVar status' AfterAbandoning
+        pure ca
+      aStatus & \case
+        Full ->
+          finally
+            (abandonChildren' subNodes')
+            ( do
+                -- only abandon after if no nodes had already started
+                logAbandon path $ TE.Hook TE.Once TE.After
+                atomically $ writeTVar status' AfterDone
+            )
+        Partial -> abandonChildren' subNodes'
+        None -> pure ()
+  AroundOnce{path, status, cache, subNodes, teardown} -> do
+    setUpLocked <- atomically $ do
+      s <- readTVar status
+      -- HERE
+      let locked = s == SetupPending
+          canAbandon =
+            s & \case
+              SetupPending -> True
+              SetupRunning -> False
+              AroundQRunning -> False
+              TeardownRunning -> False
+              TeardownDone -> False
+              AroundAbandoning -> False
+      when locked
+        $ writeTVar status AroundAbandoning
+      pure locked
+    when setUpLocked
+      $ logAbandon path (TE.Hook TE.Once TE.SetUp)
+    finally
+      (abandonChildren' subNodes)
+      ( -- only abandon teardown if setup has not started
+        when setUpLocked $ do
+          finally
+            (logAbandon path $ TE.Hook TE.Once TE.TearDown)
+            (atomically $ writeTVar status TeardownDone)
+      )
+
+  -- HERE THIS FUNCTION NEEDS TO BE GENERALISED TO RUN ~ finish runNodenew and come back here
+  After{path, frequency, subNodes', after} -> do
+    qlocked <- atomically $ do
+      qs <- readTVar subNodes'.status
+      rc <- readTVar subNodes'.runningCount
+      let locked = rc == 0 && qs == Runnable
+      when locked
+        $ writeTVar subNodes'.status Saturated
+      pure locked
+    -- finally
+    --   (abandonChildren' subNodes')
+    --   ( -- only abandon teardown if setup has not started
+    --     when qlocked $ do
+    --       finally
+    --         (logAbandon path $ TE.Hook TE.Once TE.TearDown)
+    --         (atomically $ writeTVar frequency F.Once)
+    --   )
+
+    uu -- abandonChildren subNodes'
+    -- todo:: generate runner to abndon nodes and travese que
+    -- WRITE EXE CODE TGHEN COME BACK TO THIS
+
+  --  finally
+  --   ()
+  --   ( -- only abandon teardown if setup has not started
+  --     when setUpLocked $ do
+  --       finally
+  --         (logAbandon path $ TE.Hook TE.Once TE.TearDown)
+  --         (atomically $ writeTVar status $ Teardown Complete)
+  --   )
+
+  -- do
+  -- lgr $ NL.mkParentFailure path NL.After ab
+  -- atomically $ abandonTree lgr subNodes' ab
+  -- after $ logAbandonnedNew lgr path NL.After ab
+
+  Around{path, frequency, setup, subNodes, teardown} -> uu
+  -- todo:: generate runner to abndon nodes and travese que
+  -- lgr $ NL.mkParentFailure path NL.Around ab
+  -- atomically $ abandonTree lgr subNodes ab
+  -- teardown & \case
+  --   Nothing -> pure ()
+  --   Just td -> td $ logAbandonnedNew lgr path NL.AroundRelease ab
+  Test{path, title, tests} ->
+    void $ runChildQ Sequential (abndonTest path) (const $ pure Runnable) tests
  where
   abandonChildren' :: forall hi''. ChildQ (ExeTreeNew hi'') -> IO ()
   abandonChildren' = abandonChildren lgr ab
-
-  abandonTree :: forall hi'''. ExeTreeNew hi''' -> IO ()
-  abandonTree xtr =
-    xtr & \case
-      ao@AfterOnce{path, status', subNodes'} ->
-        do
-          aStatus <- atomically $ do
-            s <- canAbandon ao
-            when (s == Full)
-              $ writeTVar status' AfterAbandoning
-            pure s
-          aStatus & \case
-            Full ->
-              finally
-                (abandonChildren' subNodes')
-                ( do
-                    -- only abndon after if no nodes had already started
-                    logAbandon path $ TE.Hook TE.Once TE.After
-                    atomically $ writeTVar status' AfterDone
-                )
-            Partial -> abandonChildren' subNodes'
-            None -> pure ()
-      AroundOnce{path, status, cache, subNodes, teardown} -> do
-        setUpLocked <- atomically $ do
-          s <- readTVar status
-          let locked = s == SetupPending
-              canAbandon =
-                s & \case
-                  SetupPending -> True
-                  SetupRunning -> False
-                  AroundQRunning -> False
-                  TeardownRunning -> False
-                  TeardownDone -> False
-                  AroundAbandoning -> False
-          when locked
-            $ writeTVar status AroundAbandoning
-          pure locked
-        when setUpLocked
-          $ logAbandon path (TE.Hook TE.Once TE.SetUp)
-        finally
-          (abandonChildren' subNodes)
-          ( -- only abandon teardown if setup has not started
-            when setUpLocked $ do
-              finally
-                (logAbandon path $ TE.Hook TE.Once TE.TearDown)
-                (atomically $ writeTVar status TeardownDone)
-          )
-
-      -- HERE THIS FUNCTION NEEDS TO BE GENERALISED TO RUN ~ finish runNodenew and come back here
-      After{path, frequency, subNodes', after} -> do
-        qlocked <- atomically $ do
-          qs <- readTVar subNodes'.status
-          rc <- readTVar subNodes'.runningCount
-          let locked = rc == 0 && qs == Runnable
-          when locked
-            $ writeTVar subNodes'.status Saturated
-          pure locked
-        -- finally
-        --   (abandonChildren' subNodes')
-        --   ( -- only abandon teardown if setup has not started
-        --     when qlocked $ do
-        --       finally
-        --         (logAbandon path $ TE.Hook TE.Once TE.TearDown)
-        --         (atomically $ writeTVar frequency F.Once)
-        --   )
-
-        uu -- abandonChildren subNodes'
-        -- todo:: generate runner to abndon nodes and travese que
-        -- WRITE EXE CODE TGHEN COME BACK TO THIS
-
-      --  finally
-      --   ()
-      --   ( -- only abandon teardown if setup has not started
-      --     when setUpLocked $ do
-      --       finally
-      --         (logAbandon path $ TE.Hook TE.Once TE.TearDown)
-      --         (atomically $ writeTVar status $ Teardown Complete)
-      --   )
-
-      -- do
-      -- lgr $ NL.mkParentFailure path NL.After ab
-      -- atomically $ abandonTree lgr subNodes' ab
-      -- after $ logAbandonnedNew lgr path NL.After ab
-
-      Around{path, frequency, setup, subNodes, teardown} -> uu
-      -- todo:: generate runner to abndon nodes and travese que
-      -- lgr $ NL.mkParentFailure path NL.Around ab
-      -- atomically $ abandonTree lgr subNodes ab
-      -- teardown & \case
-      --   Nothing -> pure ()
-      --   Just td -> td $ logAbandonnedNew lgr path NL.AroundRelease ab
-      Test{path, title, tests} ->
-        void $ runChildQ Sequential (abndonTest path) (const $ pure Runnable) tests
 
   abndonTest :: NL.ExePath -> P.TestItem IO hi -> IO ()
   abndonTest fxPath tst = logAbandonnedNew lgr (mkTestPath fxPath tst) TE.Test ab
@@ -1035,6 +1035,13 @@ abandonChildren lgr ab =
   mkTestPath p P.TestItem{id, title} = NL.ExePath $ AE.TestPath{id, title} : p.unExePath
 
   logAbandon p et = logAbandonnedNew lgr p et ab
+
+abandonChildren :: forall hi'. Logger -> NL.AbandonNew -> ChildQ (ExeTreeNew hi') -> IO ()
+abandonChildren lgr ab =
+  void . runChildQ Concurrent (abandonTree lgr ab) canRunXTree
+ where
+  abandonChildren' :: forall hi''. ChildQ (ExeTreeNew hi'') -> IO ()
+  abandonChildren' = abandonChildren lgr ab
 
 -- TODO: warning on uu
 --  xtr & \case
@@ -1053,56 +1060,121 @@ abandonChildren lgr ab =
 --   Nothing -> cache empty hook needs to be run
 --   value (ho or Abandon) -> cache has value and is ready to be used
 --    - will block until cach is full if already running
-readOrLockHookNew :: forall s ho. TVar s -> (s -> Bool) -> s -> TMVar (Either Abandon ho) -> STM (Maybe (Either Abandon ho))
-readOrLockHookNew hs isPending runningStatus hVal =
-  do
-    s <- readTVar hs
-    isPending s
-      ? (writeTVar hs runningStatus >> pure Nothing)
-      -- blocks until the other thread has written the MVar
-      $ (Just <$> readTMVar hVal)
+-- readOrLockHookNew :: forall s ho. TVar s -> (s -> Bool) -> s -> TMVar (Either Abandon ho) -> STM (Maybe (Either Abandon ho))
+-- readOrLockHookNew hs isPending runningStatus hVal =
+--   do
+--     s <- readTVar hs
+--     isPending s
+--       ? (writeTVar hs runningStatus >> pure Nothing)
+--       -- blocks until the other thread has written the MVar
+--       $ (Just <$> readTMVar hVal)
 
 --- HERE !!!!!!!!!
 runNodeNew ::
   forall hi.
   Logger ->
-  IO (Either Abandon hi) ->
+  IO (Either NL.AbandonNew hi) ->
   ExeTreeNew hi ->
   IO ()
-runNodeNew logger ehi = \case
-  AfterOnce
-    { path
-    , status'
-    , subNodes'
-    , after
-    } -> do
-      ehi' <- ehi
-      ehi'
-        & either
-          (\abd -> abandonChildren logger abd subNodes')
-          ( \hi -> do
-              atomically $ writeTVar status' AfterQRunning
-              finally
-                (runNodeNew logger (after hi) subNodes')
-                (atomically $ writeTVar status' AfterDone)
-          )
-  AroundOnce{path, status, cache, subNodes, teardown} -> uu
-  After{path, frequency, subNodes', after} -> uu
-  Around{path, frequency, setup, subNodes, teardown} -> uu
-  Test{path, title, tests} -> uu
+runNodeNew lgr ehi xt =
+  ehi
+    >>= either
+      (\ab -> abandonTree lgr ab xt)
+      ( \hi ->
+          let
+            runSubNodes :: forall hi'. hi' -> ChildQ (ExeTreeNew hi') -> IO ()
+            runSubNodes hi' = runChildQ Concurrent (runNodeNew lgr . pure $ Right hi') canRunXTree
+           in
+            case xt of
+              AfterOnce
+                { path
+                , status'
+                , subNodes'
+                , after
+                } -> do
+                  run <- atomically $ do
+                    s <- readTVar status'
+                    qs <- readTVar subNodes'.status
+                    when (s == AfterQPending)
+                      $ writeTVar status' AfterQRunning
+                    pure $ case s of
+                      AfterQPending -> True
+                      AfterQRunning -> case qs of
+                        Runnable -> True
+                        Saturated -> False
+                        Done -> False
+                      AfterRunning -> False
+                      AfterAbandoning -> False
+                      AfterDone -> False
+                  when run
+                    $ finally
+                      -- here !!!!! - run child nodes then after hook if statuses line up
+                      -- logging exception handling - look at existing functions
+                      (runSubNodes hi subNodes')
+                      (do 
+                         qs <- readTVar subNodes'.status
+                         locked <- atomically $ tryLock status' (\s -> qs == Done && s == AfterQRunning) AfterDone
+                         when locked
+                           
+                        atomically $ writeTVar status' AfterDone)
+              AroundOnce{path, status, cache, subNodes, teardown} -> uu
+              After{path, frequency, subNodes', after} -> uu
+              Around{path, frequency, setup, subNodes, teardown} -> uu
+              Test{path, title, tests} -> uu
 
-runNodesNew :: Logger -> ChildQ (ExeTreeNew ()) -> IO ()
-runNodesNew logger cq =
-  void $ runChildQ Concurrent (runner . pure $ Right ()) canRun cq
- where
-  runner :: forall hi. IO (Either NL.AbandonNew hi) -> ExeTreeNew hi -> IO ()
-  runner ehIn xtr =
-    do
-      ehi <- ehIn
-      ehi
-        & either
-          (\abd -> abandonChildren logger xtr)
-          uu
+
+      )
+
+-- runNodesNew :: Logger -> ChildQ (ExeTreeNew hi) -> IO ()
+-- runNodesNew logger cq =
+--   void $ runChildQ Concurrent (runNode eventLogger tstIn) nodeStatus subNodes
+--  where
+--   --  runChildQ Concurrent (runner . pure $ Right ()) canRun cq
+
+--   runner :: forall hi. IO (Either NL.AbandonNew hi) -> ExeTreeNew hi -> IO ()
+--   runner ehIn xtr =
+--     do
+--       ehi <- ehIn
+--       ehi
+--         & either
+--           (\abd -> abandonChildren logger xtr)
+--           uu
+
+tryLock :: TVar s -> (s -> Bool) -> s -> STM Bool
+tryLock hs canLock lockStatus  =
+  do
+    s <- readTVar hs
+    let cl = canLock s
+    when cl $
+      writeTVar hs lockStatus
+    pure cl
+
+withStartEndNew :: XContext a -> ExeEventType -> IO b -> IO b
+withStartEndNew XContext{loc, evtLogger} evt io = do
+  evtLogger $ Start evt loc
+  finally io . evtLogger $ End evt loc
+  
+setHookCompleteNew :: TVar HookStatus -> TMVar (Either Abandon ho) -> Either Abandon ho -> STM (Either Abandon ho)
+setHookCompleteNew hs hVal eso = do
+  putTMVar hVal eso
+  writeTVar hs HookComplete
+  pure eso
+
+tryLockRunNew :: TVar HookStatus -> TMVar (Either Abandon ho) -> IO (Either Abandon ho) -> IO (Either Abandon ho)
+tryLockRunNew hkStatus hkVal hkAction =
+  atomically (readOrLockHook hkStatus hkVal)
+    >>= maybe
+      hkAction
+      pure
+
+runLogHookNew :: forall hi ho a. XContext a -> ExeEventType -> (Context a -> hi -> IO ho) -> hi -> IO (Either Abandon ho)
+runLogHookNew ctx@XContext{loc} hkEvent hook hi =
+  withStartEnd ctx hkEvent
+    $ catchAll
+      (Right <$> hook (mkCtx ctx) hi)
+      (logReturnFailure ctx hkEvent)
+
+
 
 runNode ::
   forall oi ti a.

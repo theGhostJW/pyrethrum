@@ -105,7 +105,8 @@ executeNodesNew sink nodes maxThreads =
             thrdTokens
             ( const do
                 logger <- newLogger
-                runNodes logger nodes
+                uu
+                -- runNodes logger nodes
             )
       )
       ({- waitDone nodes >>-} rootLogger NL.EndExecution)
@@ -383,7 +384,7 @@ canRunChildQ cq =
     Done -> False
 
 runChildQ :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
-runChildQ concurrency runner childCanRun q  =
+runChildQ concurrency runner childCanRun q =
   void $ runChildQ' concurrency runner childCanRun q
  where
   runChildQ' :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
@@ -862,7 +863,7 @@ logAbandonnedNew lgr p e a = lgr $ NL.mkParentFailure p e a
 logReturnFailureNew :: Logger -> NL.ExePath -> EventType -> SomeException -> IO (Either NL.AbandonNew b)
 logReturnFailureNew lgr p et e =
   do
-    lgr (NL.mkFailure p et (txt et <> "Failed at: " <> txt p) e)
+    lgr (NL.mkFailure p et e)
     pure . Left $ NL.AbandonNew p et
 
 data CanAbandon = None | Partial | Full
@@ -1070,6 +1071,29 @@ abandonChildren lgr ab =
 --       $ (Just <$> readTMVar hVal)
 
 --- HERE !!!!!!!!!
+
+canRunAfterOnce :: AfterStatus -> CanRun -> Bool
+canRunAfterOnce s qs = case s of
+  AfterQPending -> True
+  AfterQRunning -> case qs of
+    Runnable -> True
+    Saturated -> False
+    Done -> False
+  AfterRunning -> False
+  AfterAbandoning -> False
+  AfterDone -> False
+
+canLockAfterOnce :: AfterStatus -> CanRun -> Bool
+canLockAfterOnce s qs = case s of
+  AfterQPending -> False
+  AfterQRunning -> case qs of
+    Runnable -> False
+    Saturated -> False
+    Done -> True
+  AfterRunning -> False
+  AfterAbandoning -> False
+  AfterDone -> False
+
 runNodeNew ::
   forall hi.
   Logger ->
@@ -1084,6 +1108,11 @@ runNodeNew lgr ehi xt =
           let
             runSubNodes :: forall hi'. hi' -> ChildQ (ExeTreeNew hi') -> IO ()
             runSubNodes hi' = runChildQ Concurrent (runNodeNew lgr . pure $ Right hi') canRunXTree
+
+            logRun' :: TE.EventType -> IO b -> IO (Either NL.AbandonNew b)
+            logRun' = logRun lgr xt.path
+
+            sink = lgr . NL.ApEvent
            in
             case xt of
               AfterOnce
@@ -1097,32 +1126,38 @@ runNodeNew lgr ehi xt =
                     qs <- readTVar subNodes'.status
                     when (s == AfterQPending)
                       $ writeTVar status' AfterQRunning
-                    pure $ case s of
-                      AfterQPending -> True
-                      AfterQRunning -> case qs of
-                        Runnable -> True
-                        Saturated -> False
-                        Done -> False
-                      AfterRunning -> False
-                      AfterAbandoning -> False
-                      AfterDone -> False
+                    pure $ canRunAfterOnce s qs
                   when run
                     $ finally
-                      -- here !!!!! - run child nodes then after hook if statuses line up
-                      -- logging exception handling - look at existing functions
                       (runSubNodes hi subNodes')
-                      (do 
-                         qs <- readTVar subNodes'.status
-                         locked <- atomically $ tryLock status' (\s -> qs == Done && s == AfterQRunning) AfterDone
-                         when locked
-                           
-                        atomically $ writeTVar status' AfterDone)
-              AroundOnce{path, status, cache, subNodes, teardown} -> uu
+                      ( do
+                          locked <- atomically $ tryLock status' subNodes' canLockAfterOnce AfterRunning
+                          when locked
+                            $ finally
+                              (void $ logRun' (TE.Hook TE.Once TE.After) (after sink))
+                              (atomically $ writeTVar status' AfterDone)
+                      )
+              AroundOnce{path, status, cache, subNodes, teardown} -> do
+                run <- atomically $ do
+                  s <- readTVar status
+                  qs <- readTVar subNodes.status
+                  case s of
+                    SetupPending ->
+                      do
+                        writeTVar status SetupRunning
+                        pure SetupRunning
+                    SetupRunning -> pure ()
+                    AroundQRunning -> pure ()
+                    TeardownRunning -> pure ()
+                    TeardownDone -> pure ()
+                    AroundAbandoning -> pure ()
+                when run
+                  $ finally
+                    (runSubNodes hi subNodes')
+                    (logRun' (TE.Hook TE.Once TE.After) (after sink))
               After{path, frequency, subNodes', after} -> uu
               Around{path, frequency, setup, subNodes, teardown} -> uu
               Test{path, title, tests} -> uu
-
-
       )
 
 -- runNodesNew :: Logger -> ChildQ (ExeTreeNew hi) -> IO ()
@@ -1140,20 +1175,28 @@ runNodeNew lgr ehi xt =
 --           (\abd -> abandonChildren logger xtr)
 --           uu
 
-tryLock :: TVar s -> (s -> Bool) -> s -> STM Bool
-tryLock hs canLock lockStatus  =
+tryLock :: TVar s -> ChildQ a -> (s -> CanRun -> Bool) -> s -> STM Bool
+tryLock hs cq canLock lockStatus =
   do
     s <- readTVar hs
-    let cl = canLock s
-    when cl $
-      writeTVar hs lockStatus
+    qs <- readTVar cq.status
+    let cl = canLock s qs
+    when cl
+      $ writeTVar hs lockStatus
     pure cl
 
-withStartEndNew :: XContext a -> ExeEventType -> IO b -> IO b
-withStartEndNew XContext{loc, evtLogger} evt io = do
-  evtLogger $ Start evt loc
-  finally io . evtLogger $ End evt loc
-  
+logRun :: Logger -> NL.ExePath -> TE.EventType -> IO b -> IO (Either NL.AbandonNew b)
+logRun lgr path evt action = do
+  lgr $ NL.Start evt path
+  finally
+    ( catchAll
+        -- TODO :: test for strictness issues esp with failing thread hook
+        -- eg returns handle and handle is closed
+        (Right <$> action)
+        (logReturnFailureNew lgr path evt)
+    )
+    (lgr $ NL.End evt path)
+
 setHookCompleteNew :: TVar HookStatus -> TMVar (Either Abandon ho) -> Either Abandon ho -> STM (Either Abandon ho)
 setHookCompleteNew hs hVal eso = do
   putTMVar hVal eso
@@ -1173,8 +1216,6 @@ runLogHookNew ctx@XContext{loc} hkEvent hook hi =
     $ catchAll
       (Right <$> hook (mkCtx ctx) hi)
       (logReturnFailure ctx hkEvent)
-
-
 
 runNode ::
   forall oi ti a.

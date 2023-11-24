@@ -36,7 +36,6 @@ data ThreadEvent l a
     | Failure
         { idx :: Int
         , threadId :: SThreadId
-        , msg :: Text
         , exception :: PException
         , loc :: l
         }

@@ -111,8 +111,8 @@ data AbandonNew = AbandonNew
 exceptionTxt :: SomeException -> TE.PException
 exceptionTxt e = TE.PException $ txt <$> P.lines (displayException e)
 
-mkFailure :: l -> TE.EventType -> Text -> SomeException -> EngineEvent l a
-mkFailure loc eventType msg exception = Failure {exception = exceptionTxt exception, ..}
+mkFailure :: l -> TE.EventType -> SomeException -> EngineEvent l a
+mkFailure loc eventType exception = Failure {exception = exceptionTxt exception, ..}
 
 mkParentFailure :: ExePath -> TE.EventType -> AbandonNew -> EngineEvent ExePath a
 mkParentFailure l evt ab  =
@@ -135,10 +135,10 @@ data EngineEvent l a
       , loc :: l
       }
   | Failure
-      { msg :: Text
-      , exception :: TE.PException
+      { 
+       eventType :: TE.EventType
       , loc :: l
-      , eventType :: TE.EventType
+      ,  exception :: TE.PException
       }
   | ParentFailure
       { loc :: l

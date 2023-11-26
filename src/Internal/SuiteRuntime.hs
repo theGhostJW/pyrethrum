@@ -31,6 +31,7 @@ import UnliftIO (
   finally,
   forConcurrently_,
   newIORef,
+  writeTMVar,
  )
 import UnliftIO.Concurrent
 import UnliftIO.STM (
@@ -43,7 +44,7 @@ import UnliftIO.STM (
   tryReadTQueue,
   writeTQueue,
  )
-import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO)
+import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
 
 -- PRENODE TO BE DEPRECATED
 import Internal.PreNode (Context (..), OnceHook (..), PreNode (testHook), TestHook (..), ThreadHook (..))
@@ -58,6 +59,7 @@ import qualified Internal.ThreadEvent as TE
 
 -- NEW
 
+import Foreign.C (eMULTIHOP)
 import GHC.RTS.Flags (DebugFlags (interpreter))
 import Internal.ThreadEvent (EventType, ThreadEvent)
 import qualified Internal.ThreadEvent as F (Frequency (..))
@@ -130,7 +132,7 @@ data ExeTreeNew hi where
     { path :: NL.ExePath
     , setup :: P.ApEventSink -> hi -> IO ho
     , status :: TVar AroundStatus
-    , cache :: TMVar (Either Abandon ho)
+    , cache :: TMVar (Either NL.AbandonNew ho)
     , subNodes :: ChildQ (ExeTreeNew ho)
     , teardown :: Maybe (P.ApEventSink -> ho -> IO ())
     } ->
@@ -266,7 +268,7 @@ data AroundStatus
   | SetupRunning
   | AroundQRunning
   | TeardownRunning
-  | TeardownDone
+  | AroundDone
   | AroundAbandoning
   deriving (Show, Eq)
 
@@ -383,12 +385,14 @@ canRunChildQ cq =
     Saturated -> False
     Done -> False
 
-runChildQ :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO ()
-runChildQ concurrency runner childCanRun q =
-  void $ runChildQ' concurrency runner childCanRun q
+newtype QElementRun = QElementRun {hasRun :: Bool}
+
+runChildQ :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO QElementRun
+runChildQ concurrency runner childCanRun q@ChildQ{childNodes, status, runningCount} =
+  runChildQ' (QElementRun False) 
  where
-  runChildQ' :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO CanRun
-  runChildQ' concurrency runner childCanRun q@ChildQ{childNodes, status, runningCount} =
+  runChildQ' :: QElementRun -> IO QElementRun
+  runChildQ' hasRun =
     do
       eNext <- atomically $ do
         rc <- readTVar runningCount
@@ -412,7 +416,7 @@ runChildQ concurrency runner childCanRun q =
 
       eNext
         & maybe
-          (atomically $ readTVar status)
+          (pure hasRun)
           ( \a -> do
               finally
                 do
@@ -429,7 +433,7 @@ runChildQ concurrency runner childCanRun q =
                     Saturated -> pure ()
                     Done -> pure ()
                 (atomically $ modifyTVar runningCount pred)
-              runChildQ' concurrency runner childCanRun q
+              runChildQ' $ QElementRun True
           )
 
 mkChildQ :: (Foldable m) => m a -> IO (ChildQ a)
@@ -887,7 +891,7 @@ canAbandon = \case
       AroundQRunning -> Partial
       AroundAbandoning -> None
       TeardownRunning -> None
-      TeardownDone -> None
+      AroundDone -> None
 
   -- base non singleton can run status on underlying q
   After{subNodes'} -> qStatus subNodes'
@@ -920,7 +924,7 @@ canRunXTree = \case
       SetupRunning -> Runnable
       AroundQRunning -> stepDownQStatus qs
       TeardownRunning -> Saturated
-      TeardownDone -> Done
+      AroundDone -> Done
 
   -- base non singleton can run status on underlying q
   After{subNodes'} -> qStatus subNodes'
@@ -964,7 +968,7 @@ abandonTree lgr ab = \case
               SetupRunning -> False
               AroundQRunning -> False
               TeardownRunning -> False
-              TeardownDone -> False
+              AroundDone -> False
               AroundAbandoning -> False
       when locked
         $ writeTVar status AroundAbandoning
@@ -977,7 +981,7 @@ abandonTree lgr ab = \case
         when setUpLocked $ do
           finally
             (logAbandon path $ TE.Hook TE.Once TE.TearDown)
-            (atomically $ writeTVar status TeardownDone)
+            (atomically $ writeTVar status AroundDone)
       )
 
   -- HERE THIS FUNCTION NEEDS TO BE GENERALISED TO RUN ~ finish runNodenew and come back here
@@ -1039,7 +1043,7 @@ abandonTree lgr ab = \case
 
 abandonChildren :: forall hi'. Logger -> NL.AbandonNew -> ChildQ (ExeTreeNew hi') -> IO ()
 abandonChildren lgr ab =
-  void . runChildQ Concurrent (abandonTree lgr ab) canRunXTree
+  void . runChildQ Sequential (abandonTree lgr ab) canRunXTree
  where
   abandonChildren' :: forall hi''. ChildQ (ExeTreeNew hi'') -> IO ()
   abandonChildren' = abandonChildren lgr ab
@@ -1094,6 +1098,27 @@ canLockAfterOnce s qs = case s of
   AfterAbandoning -> False
   AfterDone -> False
 
+canLockSetup :: AroundStatus -> CanRun -> Bool
+canLockSetup s _qs = case s of
+  SetupPending -> True
+  SetupRunning -> False
+  AroundQRunning -> False
+  TeardownRunning -> False
+  AroundDone -> False
+  AroundAbandoning -> False
+
+canLockTeardown :: AroundStatus -> CanRun -> Bool
+canLockTeardown s qs = case s of
+  SetupPending -> False
+  SetupRunning -> False
+  AroundQRunning -> case qs of
+    Runnable -> False
+    Saturated -> False
+    Done -> True
+  TeardownRunning -> False
+  AroundDone -> False
+  AroundAbandoning -> False
+
 runNodeNew ::
   forall hi.
   Logger ->
@@ -1106,15 +1131,17 @@ runNodeNew lgr ehi xt =
       (\ab -> abandonTree lgr ab xt)
       ( \hi ->
           let
-            runSubNodes :: forall hi'. hi' -> ChildQ (ExeTreeNew hi') -> IO ()
-            runSubNodes hi' = runChildQ Concurrent (runNodeNew lgr . pure $ Right hi') canRunXTree
-
             logRun' :: TE.EventType -> IO b -> IO (Either NL.AbandonNew b)
             logRun' = logRun lgr xt.path
 
+            logAbandonned' = logAbandonnedNew lgr xt.path
+
+            runSubNodes :: forall hi'. hi' -> ChildQ (ExeTreeNew hi') -> IO ()
+            runSubNodes hi' = runChildQ Concurrent (runNodeNew lgr . pure $ Right hi') canRunXTree
+
             sink = lgr . NL.ApEvent
            in
-            case xt of
+            xt & \case
               AfterOnce
                 { path
                 , status'
@@ -1137,26 +1164,54 @@ runNodeNew lgr ehi xt =
                               (void $ logRun' (TE.Hook TE.Once TE.After) (after sink))
                               (atomically $ writeTVar status' AfterDone)
                       )
-              AroundOnce{path, status, cache, subNodes, teardown} -> do
-                run <- atomically $ do
-                  s <- readTVar status
-                  qs <- readTVar subNodes.status
-                  case s of
-                    SetupPending ->
-                      do
-                        writeTVar status SetupRunning
-                        pure SetupRunning
-                    SetupRunning -> pure ()
-                    AroundQRunning -> pure ()
-                    TeardownRunning -> pure ()
-                    TeardownDone -> pure ()
-                    AroundAbandoning -> pure ()
-                when run
-                  $ finally
-                    (runSubNodes hi subNodes')
-                    (logRun' (TE.Hook TE.Once TE.After) (after sink))
-              After{path, frequency, subNodes', after} -> uu
+              AroundOnce{path, setup, status, cache, subNodes, teardown} ->
+                do
+                  setUpLocked <- atomically $ tryLock status subNodes canLockSetup SetupRunning
+                  eho <-
+                    if setUpLocked
+                      then do
+                        eho <- logRun' (TE.Hook TE.Once TE.SetUp) (setup sink hi)
+                        atomically $ writeTMVar cache eho
+                        eho
+                          & either
+                            ( \abandon -> do
+                                atomically $ writeTVar status AroundAbandoning
+                                finally
+                                  ( do
+                                      abandonChildren lgr abandon subNodes
+                                      whenJust teardown
+                                        $ const (logAbandonned' (TE.Hook TE.Once TE.TearDown) abandon)
+                                  )
+                                  (atomically $ writeTVar status AroundDone)
+                            )
+                            (const $ atomically $ writeTVar status AroundQRunning)
+                        pure eho
+                      else
+                        atomically
+                          (readTMVar cache)
+                  whenRight_
+                    eho
+                    ( \ho -> 
+                         finally
+                          (runSubNodes ho subNodes)
+                          (whenJust teardown $
+                           \td -> do
+                              locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
+                              when locked
+                                $ finally
+                                  (void $ logRun' (TE.Hook TE.Once TE.TearDown) (td sink ho))
+                                  (atomically $ writeTVar status AroundDone)
+                          )
+                    )
+              After{path, frequency, subNodes', after} -> 
+                case frequency of
+                  Each -> uu
+                  Thread -> uu
+
               Around{path, frequency, setup, subNodes, teardown} -> uu
+               case frequency of
+                  Each -> uu
+                  Thread -> uu
               Test{path, title, tests} -> uu
       )
 
@@ -1185,6 +1240,15 @@ tryLock hs cq canLock lockStatus =
       $ writeTVar hs lockStatus
     pure cl
 
+-- readOrLockHook :: TVar HookStatus -> TMVar (Either Abandon ho) -> STM (Maybe (Either Abandon ho))
+-- readOrLockHook hs hVal =
+--   do
+--     s <- readTVar hs
+--     (==) s HookPending
+--       ? (writeTVar hs HookRunning >> pure Nothing)
+--       -- blocks until the other thread has written the MVar
+--       $ (Just <$> readTMVar hVal)
+
 logRun :: Logger -> NL.ExePath -> TE.EventType -> IO b -> IO (Either NL.AbandonNew b)
 logRun lgr path evt action = do
   lgr $ NL.Start evt path
@@ -1202,13 +1266,6 @@ setHookCompleteNew hs hVal eso = do
   putTMVar hVal eso
   writeTVar hs HookComplete
   pure eso
-
-tryLockRunNew :: TVar HookStatus -> TMVar (Either Abandon ho) -> IO (Either Abandon ho) -> IO (Either Abandon ho)
-tryLockRunNew hkStatus hkVal hkAction =
-  atomically (readOrLockHook hkStatus hkVal)
-    >>= maybe
-      hkAction
-      pure
 
 runLogHookNew :: forall hi ho a. XContext a -> ExeEventType -> (Context a -> hi -> IO ho) -> hi -> IO (Either Abandon ho)
 runLogHookNew ctx@XContext{loc} hkEvent hook hi =

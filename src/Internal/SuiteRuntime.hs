@@ -389,7 +389,7 @@ newtype QElementRun = QElementRun {hasRun :: Bool}
 
 runChildQ :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO QElementRun
 runChildQ concurrency runner childCanRun q@ChildQ{childNodes, status, runningCount} =
-  runChildQ' (QElementRun False) 
+  runChildQ' (QElementRun False)
  where
   runChildQ' :: QElementRun -> IO QElementRun
   runChildQ' hasRun =
@@ -1136,7 +1136,7 @@ runNodeNew lgr ehi xt =
 
             logAbandonned' = logAbandonnedNew lgr xt.path
 
-            runSubNodes :: forall hi'. hi' -> ChildQ (ExeTreeNew hi') -> IO ()
+            runSubNodes :: forall hi'. hi' -> ChildQ (ExeTreeNew hi') -> IO QElementRun
             runSubNodes hi' = runChildQ Concurrent (runNodeNew lgr . pure $ Right hi') canRunXTree
 
             sink = lgr . NL.ApEvent
@@ -1156,7 +1156,7 @@ runNodeNew lgr ehi xt =
                     pure $ canRunAfterOnce s qs
                   when run
                     $ finally
-                      (runSubNodes hi subNodes')
+                      (void $ runSubNodes hi subNodes')
                       ( do
                           locked <- atomically $ tryLock status' subNodes' canLockAfterOnce AfterRunning
                           when locked
@@ -1186,34 +1186,53 @@ runNodeNew lgr ehi xt =
                             )
                             (const $ atomically $ writeTVar status AroundQRunning)
                         pure eho
-                      else
-                        atomically
-                          (readTMVar cache)
+                      else 
+                        -- waits till populated
+                        atomically (readTMVar cache)
                   whenRight_
                     eho
-                    ( \ho -> 
-                         finally
-                          (runSubNodes ho subNodes)
-                          (whenJust teardown $
-                           \td -> do
-                              locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
-                              when locked
-                                $ finally
-                                  (void $ logRun' (TE.Hook TE.Once TE.TearDown) (td sink ho))
-                                  (atomically $ writeTVar status AroundDone)
+                    ( \ho ->
+                        finally
+                          (void $ runSubNodes ho subNodes)
+                          ( whenJust teardown
+                              $ \td -> do
+                                locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
+                                when locked
+                                  $ finally
+                                    (void $ logRun' (TE.Hook TE.Once TE.TearDown) (td sink ho))
+                                    (atomically $ writeTVar status AroundDone)
                           )
                     )
-              After{path, frequency, subNodes', after} -> 
+              After{path, frequency, subNodes', after} ->
                 case frequency of
                   Each -> uu
                   Thread -> uu
-
               Around{path, frequency, setup, subNodes, teardown} -> uu
-               case frequency of
+                case frequency of
                   Each -> uu
                   Thread -> uu
               Test{path, title, tests} -> uu
       )
+
+
+data TestIn hi ho = TestIn {
+  -- get rid of one param , how to compose
+  setup :: hi -> IO ho,
+  teardown :: ho -> IO (),
+  after :: IO ()
+}
+
+{-
+ 1. get runtest working
+ 2. genrate testin including logging start finish for functions
+ 3.  IO (Either NL.AbandonNew hi) => NodeIn  = Abandon NL.AbandonNew | HookIn (IO hi) | TestIn hi
+
+-}
+runTest :: Logger -> TestIn hi ho  -> P.TestItem IO ho -> IO ()
+runTest lgr TestIn {setup, teardown,  after} P.TestItem {id, title, action} = 
+  uu
+  where 
+    sink = lgr . NL.ApEvent
 
 -- runNodesNew :: Logger -> ChildQ (ExeTreeNew hi) -> IO ()
 -- runNodesNew logger cq =

@@ -24,7 +24,8 @@ displayExePath :: ExePath -> Text
 displayExePath ep =  T.intercalate "." $ (.title) <$> reverse ep.unExePath
 
 
-data AbandonNew = AbandonNew
+-- TODO :: will need thread id
+data FailPoint = FailPoint
   { path :: ExePath
   , eventType :: TE.EventType
   }
@@ -113,16 +114,6 @@ exceptionTxt e = TE.PException $ txt <$> P.lines (displayException e)
 
 mkFailure :: l -> TE.EventType -> SomeException -> EngineEvent l a
 mkFailure loc eventType exception = Failure {exception = exceptionTxt exception, ..}
-
-mkParentFailure :: ExePath -> TE.EventType -> AbandonNew -> EngineEvent ExePath a
-mkParentFailure l evt ab  =
-  ParentFailure
-    { 
-      loc = l
-    , eventType = evt
-    , parentLoc = ab.path
-    , parentEventType = ab.eventType
-    }
 
 data EngineEvent l a
   = StartExecution

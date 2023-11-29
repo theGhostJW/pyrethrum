@@ -1145,10 +1145,16 @@ runNodeNew lgr hi xt =
 
         runSubNodes :: forall hi'. NodeIn hi' -> ChildQ (ExeTreeNew hi') -> IO QElementRun
         runSubNodes hi'' = runChildQ Concurrent (runNodeNew lgr hi'') canRunXTree
-
+        
+        -- tree generation is restricted by typeclasses so unless the typeclass constrint implmentation is wrong
+        -- execution trees with invalid structure (Thread or Once depending on Each) should never be generated. 
+        shouldNeverHappen cst = bug @Void . error $ "EachIn should not be passed to: " <> cst <> " " <> txt xt.path
         sink = lgr . NL.ApEvent
        in
         case xt of
+          -- as we know tree shaking has been executed prior to running we can assume we
+          -- always need to execute once hooks if the status is correct. There is no 
+          -- possibility of empty subnodes due to tree shaking.
           AfterOnce
             { path
             , status'
@@ -1171,9 +1177,12 @@ runNodeNew lgr hi xt =
                           (void $ logRun' (TE.Hook TE.Once TE.After) (after sink))
                           (atomically $ writeTVar status' AfterDone)
                   )
+          -- as we know tree shaking has been executed prior to running we can assume we
+          -- always need to execute once hooks if the status is correct. There is no 
+          -- possibility of empty subnodes due to tree shaking.
           AroundOnce{path, setup, status, cache, subNodes, teardown} ->
             case hi' of
-              EachIn{} -> bug $ "EachIn should not be passed to AroundOnce: " <> txt path
+              EachIn{} -> shouldNeverHappen "AroundOnce"
               HookIn ioHi ->
                 do
                   i <- ioHi
@@ -1185,19 +1194,19 @@ runNodeNew lgr hi xt =
                         atomically $ writeTMVar cache eho
                         eho
                           & either
-                            ( \fail -> do
+                            ( \fail' -> do
                                 atomically $ writeTVar status AroundAbandoning
                                 finally
                                   ( do
-                                      abandonChildren lgr fail subNodes
+                                      abandonChildren lgr fail' subNodes
                                       whenJust teardown
-                                        $ const (logAbandonned' (TE.Hook TE.Once TE.TearDown) fail)
+                                        $ const (logAbandonned' (TE.Hook TE.Once TE.TearDown) fail')
                                   )
                                   (atomically $ writeTVar status AroundDone)
                             )
                             (const $ atomically $ writeTVar status AroundQRunning)
                         pure eho
-                      else -- waits till populated
+                      else
                         atomically (readTMVar cache)
                   whenRight_
                     eho
@@ -1216,12 +1225,19 @@ runNodeNew lgr hi xt =
           After{path, frequency, subNodes', after} ->
             case frequency of
               Each -> uu
-              Thread -> uu
-          Around{path, frequency, setup, subNodes, teardown} -> uu
+              Thread -> case hi' of
+                    EachIn{} -> shouldNeverHappen "After Thread"
+                    HookIn ioHi -> uu
+          Around{path, frequency, setup, subNodes, teardown} -> 
             case frequency of
               Each -> uu
-              Thread -> uu
-          Test{path, title, tests} -> uu
+              Thread -> case hi' of
+                          EachIn{} -> shouldNeverHappen "Around Thread"
+                          HookIn ioHi -> uu
+          Test{path, title, tests} ->
+            case hi' of
+                  EachIn{} -> shouldNeverHappen "Around Thread"
+                  HookIn ioHi -> uu
 
 -- >>= either
 --   (\ab -> abandonTree lgr ab xt)

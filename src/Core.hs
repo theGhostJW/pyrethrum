@@ -190,19 +190,19 @@ Suite
       - Test
       - Test
 -}
-data SuiteElement c rc tc effs hi where
+data SuiteElement m rc tc effs hi where
   Hook ::
     (Param loc) =>
     { path :: Path
     , hook :: Hook rc effs loc hi o
-    , subNodes :: c (SuiteElement c rc tc effs o)
+    , subNodes :: m (SuiteElement m rc tc effs o)
     } ->
-    SuiteElement c rc tc effs hi
+    SuiteElement m rc tc effs hi
   Test ::
     { path :: Path
-    , test :: Test c rc tc effs hi
+    , test :: Test m rc tc effs hi
     } ->
-    SuiteElement c rc tc effs hi
+    SuiteElement m rc tc effs hi
 
 data ExeParams m rc tc effs where
   ExeParams ::

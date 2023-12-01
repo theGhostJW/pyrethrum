@@ -149,7 +149,7 @@ data ExeTreeNew hi where
   Around ::
     { path :: NL.ExePath
     , frequency :: NFrequency
-    , setup :: P.ApEventSink -> hi -> IO o
+    , setup :: P.ApEventSink -> hi -> IO ho
     , subNodes :: ChildQ (ExeTreeNew ho)
     , teardown :: Maybe (P.ApEventSink -> ho -> IO ())
     } ->
@@ -1151,7 +1151,7 @@ runNodeNew lgr hi xt =
         runSubNodes hi'' = runChildQ Concurrent (runNodeNew lgr hi'') canRunXTree
 
         runSubNodes_ :: forall hi'. NodeIn hi' -> ChildQ (ExeTreeNew hi') -> IO ()
-        runSubNodes_ hi'' = void . runSubNodes hi''
+        runSubNodes_ n = void . runSubNodes n
 
         -- tree generation is restricted by typeclasses so unless the typeclass constrint implmentation is wrong
         -- execution trees with invalid structure (Thread or Once depending on Each) should never be generated.
@@ -1190,7 +1190,8 @@ runNodeNew lgr hi xt =
           AroundOnce{path, setup, status, cache, subNodes, teardown} ->
             case hi' of
               EachIn{} -> shouldNeverHappen "AroundOnce"
-              HookIn ioHi ->
+              ThreadIn _ -> shouldNeverHappen "AroundOnce"
+              OnceIn ioHi ->
                 do
                   i <- ioHi
                   setUpLocked <- atomically $ tryLock status subNodes canLockSetup SetupRunning
@@ -1218,7 +1219,7 @@ runNodeNew lgr hi xt =
                     eho
                     ( \ho ->
                         finally
-                          (runSubNodes_ (HookIn $ pure ho) subNodes)
+                          (runSubNodes_ (ThreadIn . pure $ Right ho) subNodes)
                           ( whenJust teardown
                               $ \td -> do
                                 locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
@@ -1238,60 +1239,104 @@ runNodeNew lgr hi xt =
                       , ..
                       }
                     subNodes'
-                HookIn ioHi -> 
+                OnceIn ioHi ->
                   runSubNodes_
                     EachIn
-                      { 
-                        setup = ioHi,
-                        teardown = const $ pure (),
-                        after = runAfter
+                      { setup = Right <$> ioHi
+                      , teardown = const $ pure ()
+                      , after = runAfter
                       }
                     subNodes'
-                where
-                  runAfter = logRun_ (TE.Hook TE.Each TE.After) (after sink)
+                ThreadIn ioHi ->
+                  runSubNodes_
+                    EachIn
+                      { setup = ioHi
+                      , teardown = const $ pure ()
+                      , after = runAfter
+                      }
+                    subNodes'
+               where
+                runAfter = logRun_ (TE.Hook TE.Each TE.After) (after sink)
               Thread -> case hi' of
                 EachIn{} -> shouldNeverHappen "After Thread"
-                HookIn ioHi ->
+                OnceIn _ -> runSubNodesAfter
+                ThreadIn _ -> runSubNodesAfter
+               where
+                runSubNodesAfter =
                   do
-                    eHasRun <- tryAny $ runSubNodes hi' subNodes'
-                    eHasRun
-                      & either
-                        (const runAfter)
-                        (\cldRun -> when cldRun.hasRun runAfter)
-                 where
-                  runAfter = logRun_ (TE.Hook TE.Thread TE.After) (after sink)
-          Around{path, frequency, setup, subNodes, teardown} ->
-            case frequency of
-              Each -> case hi' of
-                EachIn{} -> uu
-                HookIn ioHi -> uu
-              Thread -> case hi' of
-                EachIn{} -> shouldNeverHappen "Around Thread"
-                HookIn ioHi -> do
-                  hoVar <- newEmptyTMVarIO 
-                  -- I think I need to do this because the thread can't be run until its
-                  -- actually needed by a test. There is a possibilty of the hook enclosing 
-                  -- an empty or saturated subNode list plain old laziness might be enough 
-                  -- TODO: test this
-                  uu 
-                  where 
-                    mkHo hov = do 
+                    run <- runSubNodes hi' subNodes'
+                    when run.hasRun
+                      $ logRun_ (TE.Hook TE.Thread TE.After) (after sink)
+          Around{frequency, setup, subNodes, teardown = mteardown} ->
+            let
+              runThreadAround ioHo hoVar =
+                finally
+                  (runSubNodes_ (ThreadIn ioHo) subNodes)
+                  ( do
+                      whenJust mteardown
+                        $ \td -> do
+                          mho <- atomically $ tryReadTMVar hoVar
+                          whenJust mho
+                            $ either
+                              (logAbandonned' (TE.Hook TE.Thread TE.TearDown))
+                              (logRun_ (TE.Hook TE.Thread TE.TearDown) . td sink)
+                  )
+             in
+              case frequency of
+                Each -> case hi' of
+                  EachIn{} -> uu
+                  OnceIn{} -> uu
+                  ThreadIn ioHi -> uu
+                Thread -> case hi' of
+                  EachIn{} -> shouldNeverHappen "Around Thread"
+                  OnceIn ioHi -> do
+                    hoVar <- newEmptyTMVarIO
+                    -- I think I need to do this because the thread can't be run until its
+                    -- actually needed by a test. There is a possibilty of the hook enclosing
+                    -- an empty or saturated subNode list plain old laziness might be enough
+                    let ioHo = mkHo hoVar
+                    runThreadAround ioHo hoVar
+                   where
+                    mkHo hov = do
                       mho <- atomically $ tryReadTMVar hov
-                      mho & maybe 
-                        ( do 
-                            hi'' <- ioHi 
-                            ho <- logRun' (TE.Hook TE.Thread TE.After) (setup sink hi'') 
-                            atomically $ putTMVar hov ho
-                            pure ho
-                        )
-                        pure
-                      
-
-
+                      mho
+                        & maybe
+                          ( do
+                              hi'' <- ioHi
+                              ho <- logRun' (TE.Hook TE.Thread TE.SetUp) (setup sink hi'')
+                              atomically $ putTMVar hov ho
+                              pure ho
+                          )
+                          pure
+                  ThreadIn ioeHi -> do
+                    hoVar <- newEmptyTMVarIO
+                    -- I think I need to do this because the thread can't be run until its
+                    -- actually needed by a test. There is a possibilty of the hook enclosing
+                    -- an empty or saturated subNode list plain old laziness might be enough
+                    -- TODO: test this
+                    let ioHo = mkHo hoVar
+                    runThreadAround ioHo hoVar
+                   where
+                    mkHo hov = do
+                      mho <- atomically $ tryReadTMVar hov
+                      mho
+                        & maybe
+                          ( do
+                              ethi <- ioeHi
+                              ho <-
+                                either
+                                  (pure . Left)
+                                  (logRun' (TE.Hook TE.Thread TE.SetUp) . setup sink)
+                                  ethi
+                              atomically $ putTMVar hov ho
+                              pure ho
+                          )
+                          pure
           Test{path, title, tests} ->
             case hi' of
               EachIn{} -> uu
-              HookIn ioHi -> uu
+              OnceIn{} -> uu
+              ThreadIn ioHi -> uu
 
 -- >>= either
 --   (\ab -> abandonTree lgr ab xt)
@@ -1381,7 +1426,8 @@ runNodeNew lgr hi xt =
 
 data NodeIn hi
   = Abandon FailPoint
-  | HookIn (IO (Either FailPoint hi))
+  | OnceIn (IO hi)
+  | ThreadIn (IO (Either FailPoint hi))
   | EachIn
       { -- get rid of one param , how to compose
         setup :: IO (Either FailPoint hi) -- pure ()

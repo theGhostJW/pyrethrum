@@ -1139,11 +1139,11 @@ runNodeNew lgr hi xt =
     Abandon ab -> abandonTree lgr ab xt
     hi' ->
       let
-        logRun' :: TE.EventType -> IO b -> IO (Either NL.FailPoint b)
-        logRun' = logRun lgr xt.path
+        logRun' :: TE.EventType -> (P.ApEventSink  -> IO b) -> IO (Either NL.FailPoint b)
+        logRun' et action = logRun lgr xt.path et (action sink)
 
-        logRun_ :: TE.EventType -> IO b -> IO ()
-        logRun_ et io = void $ logRun' et io
+        logRun_ :: TE.EventType -> (P.ApEventSink  -> IO b) -> IO ()
+        logRun_ et action = void $ logRun' et action
 
         logAbandonned' = logAbandonnedNew lgr xt.path
 
@@ -1181,7 +1181,7 @@ runNodeNew lgr hi xt =
                       locked <- atomically $ tryLock status' subNodes' canLockAfterOnce AfterRunning
                       when locked
                         $ finally
-                          (void $ logRun' (TE.Hook TE.Once TE.After) (after sink))
+                          (void $ logRun' (TE.Hook TE.Once TE.After) after)
                           (atomically $ writeTVar status' AfterDone)
                   )
           -- as we know tree shaking has been executed prior to running we can assume we
@@ -1198,7 +1198,7 @@ runNodeNew lgr hi xt =
                   eho <-
                     if setUpLocked
                       then do
-                        eho <- logRun' (TE.Hook TE.Once TE.SetUp) (setup sink i)
+                        eho <- logRun' (TE.Hook TE.Once TE.SetUp) (`setup` i)
                         atomically $ writeTMVar cache eho
                         eho
                           & either
@@ -1225,7 +1225,7 @@ runNodeNew lgr hi xt =
                                 locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
                                 when locked
                                   $ finally
-                                    (logRun_ (TE.Hook TE.Once TE.TearDown) (td sink ho))
+                                    (logRun_ (TE.Hook TE.Once TE.TearDown) (`td` ho))
                                     (atomically $ writeTVar status AroundDone)
                           )
                     )
@@ -1256,7 +1256,7 @@ runNodeNew lgr hi xt =
                       }
                     subNodes'
                where
-                runAfter = logRun_ (TE.Hook TE.Each TE.After) (after sink)
+                runAfter = logRun_ (TE.Hook TE.Each TE.After) after
               Thread -> case hi' of
                 EachIn{} -> shouldNeverHappen "After Thread"
                 OnceIn _ -> runSubNodesAfter
@@ -1266,7 +1266,7 @@ runNodeNew lgr hi xt =
                   do
                     run <- runSubNodes hi' subNodes'
                     when run.hasRun
-                      $ logRun_ (TE.Hook TE.Thread TE.After) (after sink)
+                      $ logRun_ (TE.Hook TE.Thread TE.After) after
           Around{frequency, setup, subNodes, teardown = mteardown} ->
             let
               runThreadAround ioHo hoVar =
@@ -1279,21 +1279,23 @@ runNodeNew lgr hi xt =
                           whenJust mho
                             $ either
                               (logAbandonned' (TE.Hook TE.Thread TE.TearDown))
-                              (logRun_ (TE.Hook TE.Thread TE.TearDown) . td sink)
+                              (\ho -> logRun_ (TE.Hook TE.Thread TE.TearDown) (`td` ho))
                   )
              in
               case frequency of
                 Each -> case hi' of
-                  EachIn{} -> uu
+                  EachIn {..} -> uu
+
                   OnceIn{} -> uu
                   ThreadIn ioHi -> uu
                 Thread -> case hi' of
                   EachIn{} -> shouldNeverHappen "Around Thread"
                   OnceIn ioHi -> do
+                    -- Action can't be run until its actually needed by a test. 
+                    -- There is a possibilty of the hook enclosing an empty or 
+                    -- saturated subNode list. plain old laziness might be enough
+                    -- TODO: test this
                     hoVar <- newEmptyTMVarIO
-                    -- I think I need to do this because the thread can't be run until its
-                    -- actually needed by a test. There is a possibilty of the hook enclosing
-                    -- an empty or saturated subNode list plain old laziness might be enough
                     let ioHo = mkHo hoVar
                     runThreadAround ioHo hoVar
                    where
@@ -1303,17 +1305,13 @@ runNodeNew lgr hi xt =
                         & maybe
                           ( do
                               hi'' <- ioHi
-                              ho <- logRun' (TE.Hook TE.Thread TE.SetUp) (setup sink hi'')
+                              ho <- logRun' (TE.Hook TE.Thread TE.SetUp) (`setup` hi'')
                               atomically $ putTMVar hov ho
                               pure ho
                           )
                           pure
                   ThreadIn ioeHi -> do
                     hoVar <- newEmptyTMVarIO
-                    -- I think I need to do this because the thread can't be run until its
-                    -- actually needed by a test. There is a possibilty of the hook enclosing
-                    -- an empty or saturated subNode list plain old laziness might be enough
-                    -- TODO: test this
                     let ioHo = mkHo hoVar
                     runThreadAround ioHo hoVar
                    where
@@ -1326,7 +1324,7 @@ runNodeNew lgr hi xt =
                               ho <-
                                 either
                                   (pure . Left)
-                                  (logRun' (TE.Hook TE.Thread TE.SetUp) . setup sink)
+                                  (\hi'' -> logRun' (TE.Hook TE.Thread TE.SetUp) (`setup` hi'') )
                                   ethi
                               atomically $ putTMVar hov ho
                               pure ho

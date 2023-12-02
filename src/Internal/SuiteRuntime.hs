@@ -989,7 +989,7 @@ abandonTree lgr ab = \case
       ( -- only AbandonOld teardown if setup has not started
         when setUpLocked $ do
           finally
-            (logAbandon path $ TE.Hook TE.Once TE.TearDown)
+            (logAbandon path $ TE.Hook TE.Once TE.Teardown)
             (atomically $ writeTVar status AroundDone)
       )
 
@@ -1007,7 +1007,7 @@ abandonTree lgr ab = \case
     --   ( -- only AbandonOld teardown if setup has not started
     --     when qlocked $ do
     --       finally
-    --         (logAbandon path $ TE.Hook TE.Once TE.TearDown)
+    --         (logAbandon path $ TE.Hook TE.Once TE.Teardown)
     --         (atomically $ writeTVar frequency F.Once)
     --   )
 
@@ -1020,7 +1020,7 @@ abandonTree lgr ab = \case
   --   ( -- only AbandonOld teardown if setup has not started
   --     when setUpLocked $ do
   --       finally
-  --         (logAbandon path $ TE.Hook TE.Once TE.TearDown)
+  --         (logAbandon path $ TE.Hook TE.Once TE.Teardown)
   --         (atomically $ writeTVar status $ Teardown Complete)
   --   )
 
@@ -1146,6 +1146,7 @@ runNodeNew lgr hi xt =
         logRun_ et action = void $ logRun' et action
 
         logAbandonned' = logAbandonnedNew lgr xt.path
+        logAbandonnedParent = logAbandonnedNew lgr 
 
         runSubNodes :: forall hi'. NodeIn hi' -> ChildQ (ExeTreeNew hi') -> IO QElementRun
         runSubNodes hi'' = runChildQ Concurrent (runNodeNew lgr hi'') canRunXTree
@@ -1208,7 +1209,7 @@ runNodeNew lgr hi xt =
                                   ( do
                                       abandonChildren lgr fail' subNodes
                                       whenJust teardown
-                                        $ const (logAbandonned' (TE.Hook TE.Once TE.TearDown) fail')
+                                        $ const (logAbandonned' (TE.Hook TE.Once TE.Teardown) fail')
                                   )
                                   (atomically $ writeTVar status AroundDone)
                             )
@@ -1225,7 +1226,7 @@ runNodeNew lgr hi xt =
                                 locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
                                 when locked
                                   $ finally
-                                    (logRun_ (TE.Hook TE.Once TE.TearDown) (`td` ho))
+                                    (logRun_ (TE.Hook TE.Once TE.Teardown) (`td` ho))
                                     (atomically $ writeTVar status AroundDone)
                           )
                     )
@@ -1276,15 +1277,43 @@ runNodeNew lgr hi xt =
                       whenJust mteardown
                         $ \td -> do
                           mho <- atomically $ tryReadTMVar hoVar
+                          -- if mho is nothing then setup was not run (empty subnodes)
                           whenJust mho
                             $ either
-                              (logAbandonned' (TE.Hook TE.Thread TE.TearDown))
-                              (\ho -> logRun_ (TE.Hook TE.Thread TE.TearDown) (`td` ho))
+                              (logAbandonned' (TE.Hook TE.Thread TE.Teardown))
+                              (\ho -> logRun_ (TE.Hook TE.Thread TE.Teardown) (`td` ho))
                   )
              in
               case frequency of
                 Each -> case hi' of
-                  EachIn {..} -> uu
+                  EachIn {setup = setupOld, teardown = teardownOld, after} -> 
+                    finally
+                     (
+                      let (nxtSetup, nxtTeardown) = do 
+                            i <- setupOld
+                            let setUp = i & either 
+                                  (logAbandonned' (TE.Hook TE.Each TE.Setup) >> pure . Left)
+                                  (\i' -> logRun' (TE.Hook TE.Each TE.Setup) (`setup` i'))
+                                teardown = mteardown & maybe 
+                                  (const $ i & either 
+                                    (logAbandonnedChild (TE.Hook TE.Each TE.Teardown))
+                                    teardownOld
+                                  )
+                                  uu
+                                  -- (\td -> logRun_ (TE.Hook TE.Each TE.Teardown) (`td` i))
+                               
+                            uu
+                      in
+                       uu     
+                      --       hi <- setupOld
+                      --       ethi <- logRun' (TE.Hook TE.Each TE.Setup)  setup
+                      --       ho <- either (pure . Left) (\hi'' -> logRun' (TE.Hook TE.Each TE.SetUp) (`setup` hi'')) ethi
+                      --       pure ho
+                      -- in
+                      --   uu
+                      )
+                      -- runSubNodes_ (ThreadIn ioHo) subNodes)
+                     (uu)
 
                   OnceIn{} -> uu
                   ThreadIn ioHi -> uu
@@ -1389,7 +1418,7 @@ runNodeNew lgr hi xt =
 --                               ( do
 --                                   abandonChildren lgr AbandonOld subNodes
 --                                   whenJust teardown
---                                     $ const (logAbandonned' (TE.Hook TE.Once TE.TearDown) AbandonOld)
+--                                     $ const (logAbandonned' (TE.Hook TE.Once TE.Teardown) AbandonOld)
 --                               )
 --                               (atomically $ writeTVar status AroundDone)
 --                         )
@@ -1407,7 +1436,7 @@ runNodeNew lgr hi xt =
 --                             locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
 --                             when locked
 --                               $ finally
---                                 (void $ logRun' (TE.Hook TE.Once TE.TearDown) (td sink ho))
+--                                 (void $ logRun' (TE.Hook TE.Once TE.Teardown) (td sink ho))
 --                                 (atomically $ writeTVar status AroundDone)
 --                       )
 --                 )
@@ -1431,6 +1460,7 @@ data NodeIn hi
         setup :: IO (Either FailPoint hi) -- pure ()
       , teardown :: hi -> IO () -- const $ pure ()
       , after :: IO () -- pure ()
+
       }
 
 {-

@@ -8,7 +8,7 @@ import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 newtype PException = PException {displayText :: [Text]} deriving (Show, Eq, Ord)
 newtype SThreadId = SThreadId {display :: Text} deriving (Show, Generic, Eq, Ord)
 
-data HookPos = Before | After | SetUp | TearDown deriving (Show, Eq, Ord)
+data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
 
 data Frequency = Once | Thread | Each deriving (Show, Eq, Ord)
 data EventType

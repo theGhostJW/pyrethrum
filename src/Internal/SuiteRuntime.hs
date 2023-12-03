@@ -1139,14 +1139,14 @@ runNodeNew lgr hi xt =
     Abandon ab -> abandonTree lgr ab xt
     hi' ->
       let
-        logRun' :: TE.EventType -> (P.ApEventSink  -> IO b) -> IO (Either NL.FailPoint b)
+        logRun' :: TE.EventType -> (P.ApEventSink -> IO b) -> IO (Either NL.FailPoint b)
         logRun' et action = logRun lgr xt.path et (action sink)
 
-        logRun_ :: TE.EventType -> (P.ApEventSink  -> IO b) -> IO ()
+        logRun_ :: TE.EventType -> (P.ApEventSink -> IO b) -> IO ()
         logRun_ et action = void $ logRun' et action
 
         logAbandonned' = logAbandonnedNew lgr xt.path
-        logAbandonnedParent = logAbandonnedNew lgr 
+        logAbandonnedParent = logAbandonnedNew lgr
 
         runSubNodes :: forall hi'. NodeIn hi' -> ChildQ (ExeTreeNew hi') -> IO QElementRun
         runSubNodes hi'' = runChildQ Concurrent (runNodeNew lgr hi'') canRunXTree
@@ -1234,28 +1234,29 @@ runNodeNew lgr hi xt =
             case frequency of
               Each -> case hi' of
                 EachIn{apply} -> uu
-                  -- runSubNodes_
-                  --   EachIn
-                  --     { apply = apply >> runAfter
-                  --     , ..
-                  --     }
-                  --   subNodes'
+                -- runSubNodes_
+                --   EachIn
+                --     { apply = apply >> runAfter
+                --     , ..
+                --     }
+                --   subNodes'
                 OnceIn ioHi -> uu
-                  -- runSubNodes_
-                  --   EachIn
-                  --     { apply = apply >> runAfter
-                  --     , ..
-                  --     }
-                  --   subNodes'
+                -- runSubNodes_
+                --   EachIn
+                --     { apply = apply >> runAfter
+                --     , ..
+                --     }
+                --   subNodes'
                 ThreadIn ioHi -> uu
-                  -- runSubNodes_
-                  --   EachIn
-                  --     { setup = ioHi
-                  --     , teardown = const $ pure ()
-                  --     , after = runAfter
-                  --     }
-                  --   subNodes'
                where
+                -- runSubNodes_
+                --   EachIn
+                --     { setup = ioHi
+                --     , teardown = const $ pure ()
+                --     , after = runAfter
+                --     }
+                --   subNodes'
+
                 runAfter = logRun_ (TE.Hook TE.Each TE.After) after
               Thread -> case hi' of
                 EachIn{} -> shouldNeverHappen "After Thread"
@@ -1284,45 +1285,45 @@ runNodeNew lgr hi xt =
                   )
              in
               case frequency of
-                Each -> 
+                Each ->
                   case hi' of
-                  --  EachIn {setup = setupOld, teardown = teardownOld, after} -> uu
-                  --   finally
-                  --    (
-                  --     let (nxtSetup, nxtTeardown) = do 
-                  --           i <- setupOld
-                  --           let setUp = i & either 
-                  --                 (logAbandonned' (TE.Hook TE.Each TE.Setup) >> pure . Left)
-                  --                 (\i' -> logRun' (TE.Hook TE.Each TE.Setup) (`setup` i'))
-                  --               teardown = mteardown & maybe 
-                  --                 (const $ i & either 
-                  --                   (logAbandonnedChild (TE.Hook TE.Each TE.Teardown))
-                  --                   teardownOld
-                  --                 )
-                  --                 uu
-                  --                 -- (\td -> logRun_ (TE.Hook TE.Each TE.Teardown) (`td` i))
-                               
-                  --           uu
-                  --     in
-                  --      uu     
-                  --     --       hi <- setupOld
-                  --     --       ethi <- logRun' (TE.Hook TE.Each TE.Setup)  setup
-                  --     --       ho <- either (pure . Left) (\hi'' -> logRun' (TE.Hook TE.Each TE.SetUp) (`setup` hi'')) ethi
-                  --     --       pure ho
-                  --     -- in
-                  --     --   uu
-                  --     )
-                      -- runSubNodes_ (ThreadIn ioHo) subNodes)
+                    --  EachIn {setup = setupOld, teardown = teardownOld, after} -> uu
+                    --   finally
+                    --    (
+                    --     let (nxtSetup, nxtTeardown) = do
+                    --           i <- setupOld
+                    --           let setUp = i & either
+                    --                 (logAbandonned' (TE.Hook TE.Each TE.Setup) >> pure . Left)
+                    --                 (\i' -> logRun' (TE.Hook TE.Each TE.Setup) (`setup` i'))
+                    --               teardown = mteardown & maybe
+                    --                 (const $ i & either
+                    --                   (logAbandonnedChild (TE.Hook TE.Each TE.Teardown))
+                    --                   teardownOld
+                    --                 )
+                    --                 uu
+                    --                 -- (\td -> logRun_ (TE.Hook TE.Each TE.Teardown) (`td` i))
+
+                    --           uu
+                    --     in
+                    --      uu
+                    --     --       hi <- setupOld
+                    --     --       ethi <- logRun' (TE.Hook TE.Each TE.Setup)  setup
+                    --     --       ho <- either (pure . Left) (\hi'' -> logRun' (TE.Hook TE.Each TE.SetUp) (`setup` hi'')) ethi
+                    --     --       pure ho
+                    --     -- in
+                    --     --   uu
+                    --     )
+                    -- runSubNodes_ (ThreadIn ioHo) subNodes)
                     --  (uu)
 
-                  EachIn {} -> uu
-                  OnceIn{} -> uu
-                  ThreadIn ioHi -> uu
+                    EachIn{} -> uu
+                    OnceIn{} -> uu
+                    ThreadIn ioHi -> uu
                 Thread -> case hi' of
                   EachIn{} -> shouldNeverHappen "Around Thread"
                   OnceIn ioHi -> do
-                    -- Action can't be run until its actually needed by a test. 
-                    -- There is a possibilty of the hook enclosing an empty or 
+                    -- Action can't be run until its actually needed by a test.
+                    -- There is a possibilty of the hook enclosing an empty or
                     -- saturated subNode list. plain old laziness might be enough
                     -- TODO: test this
                     hoVar <- newEmptyTMVarIO
@@ -1354,7 +1355,7 @@ runNodeNew lgr hi xt =
                               ho <-
                                 either
                                   (pure . Left)
-                                  (\hi'' -> logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi'') )
+                                  (\hi'' -> logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi''))
                                   ethi
                               atomically $ putTMVar hov ho
                               pure ho
@@ -1362,30 +1363,20 @@ runNodeNew lgr hi xt =
                           pure
           Test{path, title, tests} ->
             case hi' of
-              EachIn{} -> uu
+              EachIn{apply} -> 
+               void $ runChildQ Sequential (apply . runTestItem) (const $ pure Runnable) tests
               OnceIn{} -> uu
               ThreadIn ioHi -> uu
-            where 
-              runTest :: P.TestItem IO hi -> Either FailPoint hi -> IO ()
-              runTest tstItm = either 
-                (logAbandonnedNew lgr (mkTestPath tstItm) TE.Test)
-                ( \hi -> do
-                    finally
-                      (runSubNodes_ (ThreadIn . pure $ Right hi) tests)
-                      (logRun_ TE.Test (const $ pure ()))
-                )
-                let path' = mkTestPath path tst
-                eho <- logRun lgr path' TE.Test (tst.action sink)
-                logRun' TE.Test (const $ pure ())
-                eho & either
-                  (logAbandonned' TE.Test)
-                  ( \ho -> do
-                      finally
-                        (runSubNodes_ (ThreadIn . pure $ Right ho) tests)
-                        (logRun_ TE.Test (const $ pure ()))
-                  )
-              mkTestPath :: P.TestItem IO hi -> NL.ExePath
-              mkTestPath P.TestItem{id, title = ttl} = NL.ExePath $ AE.TestPath{id, title = ttl} : path.unExePath
+           where
+            runTestItem :: P.TestItem IO hi -> Either FailPoint hi -> IO ()
+            runTestItem
+              tstItm =
+                either
+                  (logAbandonnedNew lgr (mkTestPath tstItm) TE.Test)
+                  (void . logRun lgr (mkTestPath tstItm) TE.Test . tstItm.action sink)
+
+            mkTestPath :: P.TestItem IO hi -> NL.ExePath
+            mkTestPath P.TestItem{id, title = ttl} = NL.ExePath $ AE.TestPath{id, title = ttl} : path.unExePath
 
 -- >>= either
 --   (\ab -> abandonTree lgr ab xt)
@@ -1479,13 +1470,11 @@ data NodeIn hi
   | ThreadIn (IO (Either FailPoint hi))
   | EachIn
       { -- get rid of one param , how to compose
-      --   setup :: IO (Either FailPoint hi) -- pure ()
-      -- , teardown :: hi -> IO () -- const $ pure ()
-      -- , after :: IO () -- pure ()
-       apply :: (Either FailPoint hi -> IO ()) -> IO ()
+        --   setup :: IO (Either FailPoint hi) -- pure ()
+        -- , teardown :: hi -> IO () -- const $ pure ()
+        -- , after :: IO () -- pure ()
+        apply :: (Either FailPoint hi -> IO ()) -> IO ()
       }
-
-
 
 {-
  1. get runtest working

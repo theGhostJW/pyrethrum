@@ -1287,36 +1287,14 @@ runNodeNew lgr hi xt =
               case frequency of
                 Each ->
                   case hi' of
-                    --  EachIn {setup = setupOld, teardown = teardownOld, after} -> uu
-                    --   finally
-                    --    (
-                    --     let (nxtSetup, nxtTeardown) = do
-                    --           i <- setupOld
-                    --           let setUp = i & either
-                    --                 (logAbandonned' (TE.Hook TE.Each TE.Setup) >> pure . Left)
-                    --                 (\i' -> logRun' (TE.Hook TE.Each TE.Setup) (`setup` i'))
-                    --               teardown = mteardown & maybe
-                    --                 (const $ i & either
-                    --                   (logAbandonnedChild (TE.Hook TE.Each TE.Teardown))
-                    --                   teardownOld
-                    --                 )
-                    --                 uu
-                    --                 -- (\td -> logRun_ (TE.Hook TE.Each TE.Teardown) (`td` i))
-
-                    --           uu
-                    --     in
-                    --      uu
-                    --     --       hi <- setupOld
-                    --     --       ethi <- logRun' (TE.Hook TE.Each TE.Setup)  setup
-                    --     --       ho <- either (pure . Left) (\hi'' -> logRun' (TE.Hook TE.Each TE.SetUp) (`setup` hi'')) ethi
-                    --     --       pure ho
-                    --     -- in
-                    --     --   uu
-                    --     )
-                    -- runSubNodes_ (ThreadIn ioHo) subNodes)
-                    --  (uu)
-
-                    EachIn{} -> uu
+                    EachIn{apply} -> 
+                      do 
+                        let 
+                          nxtApply :: (Either FailPoint ho -> IO ()) -> IO ()
+                          nxtApply chldActn = do 
+                            
+                          
+                        uu
                     OnceIn{} -> uu
                     ThreadIn ioHi -> uu
                 Thread -> case hi' of
@@ -1363,11 +1341,13 @@ runNodeNew lgr hi xt =
                           pure
           Test{path, title, tests} ->
             case hi' of
-              EachIn{apply} -> 
-               void $ runChildQ Sequential (apply . runTestItem) (const $ pure Runnable) tests
-              OnceIn{} -> uu
-              ThreadIn ioHi -> uu
+              EachIn{apply} -> runTests (apply . runTestItem)
+              OnceIn ioHi -> ioHi >>= \hii -> runTests (`runTestItem` Right hii)
+              ThreadIn ethIoHi -> ethIoHi >>= \ehi -> runTests (`runTestItem` ehi)
            where
+            runTests :: (P.TestItem IO hi -> IO ()) -> IO ()
+            runTests actn = void $ runChildQ Sequential actn (const $ pure Runnable) tests
+
             runTestItem :: P.TestItem IO hi -> Either FailPoint hi -> IO ()
             runTestItem
               tstItm =

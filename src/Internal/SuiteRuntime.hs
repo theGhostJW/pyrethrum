@@ -27,6 +27,7 @@ import qualified Core as C
 import qualified DSL.Internal.ApEvent as AE
 import PyrethrumExtras (catchAll, txt, uu, (?))
 import UnliftIO (
+  bracket,
   concurrently_,
   finally,
   forConcurrently_,
@@ -1135,229 +1136,254 @@ runNodeNew ::
   ExeTreeNew hi ->
   IO ()
 runNodeNew lgr hi xt =
-  case hi of
-    Abandon ab -> abandonTree lgr ab xt
-    hi' ->
-      let
-        logRun' :: TE.EventType -> (P.ApEventSink -> IO b) -> IO (Either NL.FailPoint b)
-        logRun' et action = logRun lgr xt.path et (action sink)
+  let
+    abandonTree' = abandonTree lgr
+   in
+    case hi of
+      Abandon fp -> abandonTree' fp xt
+      hi' ->
+        let
+          logRun' :: TE.EventType -> (P.ApEventSink -> IO b) -> IO (Either NL.FailPoint b)
+          logRun' et action = logRun lgr xt.path et (action sink)
 
-        logRun_ :: TE.EventType -> (P.ApEventSink -> IO b) -> IO ()
-        logRun_ et action = void $ logRun' et action
+          logRun_ :: TE.EventType -> (P.ApEventSink -> IO b) -> IO ()
+          logRun_ et action = void $ logRun' et action
 
-        logAbandonned' = logAbandonnedNew lgr xt.path
-        logAbandonnedParent = logAbandonnedNew lgr
+          logAbandonned' = logAbandonnedNew lgr xt.path
+          -- logAbandonnedParent = logAbandonnedNew lgr
 
-        runSubNodes :: forall hi'. NodeIn hi' -> ChildQ (ExeTreeNew hi') -> IO QElementRun
-        runSubNodes hi'' = runChildQ Concurrent (runNodeNew lgr hi'') canRunXTree
+          runSubNodes :: forall hi'. NodeIn hi' -> ChildQ (ExeTreeNew hi') -> IO QElementRun
+          runSubNodes hi'' = runChildQ Concurrent (runNodeNew lgr hi'') canRunXTree
 
-        runSubNodes_ :: forall hi'. NodeIn hi' -> ChildQ (ExeTreeNew hi') -> IO ()
-        runSubNodes_ n = void . runSubNodes n
+          runSubNodes_ :: forall hi'. NodeIn hi' -> ChildQ (ExeTreeNew hi') -> IO ()
+          runSubNodes_ n = void . runSubNodes n
 
-        -- tree generation is restricted by typeclasses so unless the typeclass constrint implmentation is wrong
-        -- execution trees with invalid structure (Thread or Once depending on Each) should never be generated.
-        shouldNeverHappen cst = bug @Void . error $ "EachIn should not be passed to: " <> cst <> " " <> txt xt.path
-        sink = lgr . NL.ApEvent
-       in
-        case xt of
-          -- as we know tree shaking has been executed prior to running we can assume we
-          -- always need to execute once hooks if the status is correct. There is no
-          -- possibility of empty subnodes due to tree shaking.
-          AfterOnce
-            { path
-            , status'
-            , subNodes'
-            , after
-            } -> do
-              run <- atomically $ do
-                s <- readTVar status'
-                qs <- readTVar subNodes'.status
-                when (s == AfterQPending)
-                  $ writeTVar status' AfterQRunning
-                pure $ canRunAfterOnce s qs
-              when run
-                $ finally
-                  (runSubNodes_ hi subNodes')
-                  ( do
-                      locked <- atomically $ tryLock status' subNodes' canLockAfterOnce AfterRunning
-                      when locked
-                        $ finally
-                          (void $ logRun' (TE.Hook TE.Once TE.After) after)
-                          (atomically $ writeTVar status' AfterDone)
-                  )
-          -- as we know tree shaking has been executed prior to running we can assume we
-          -- always need to execute once hooks if the status is correct. There is no
-          -- possibility of empty subnodes due to tree shaking.
-          AroundOnce{path, setup, status, cache, subNodes, teardown} ->
-            case hi' of
-              EachIn{} -> shouldNeverHappen "AroundOnce"
-              ThreadIn _ -> shouldNeverHappen "AroundOnce"
-              OnceIn ioHi ->
-                do
-                  i <- ioHi
-                  setUpLocked <- atomically $ tryLock status subNodes canLockSetup SetupRunning
-                  eho <-
-                    if setUpLocked
-                      then do
-                        eho <- logRun' (TE.Hook TE.Once TE.Setup) (`setup` i)
-                        atomically $ writeTMVar cache eho
-                        eho
-                          & either
-                            ( \fail' -> do
-                                atomically $ writeTVar status AroundAbandoning
-                                finally
-                                  ( do
-                                      abandonChildren lgr fail' subNodes
-                                      whenJust teardown
-                                        $ const (logAbandonned' (TE.Hook TE.Once TE.Teardown) fail')
-                                  )
-                                  (atomically $ writeTVar status AroundDone)
-                            )
-                            (const $ atomically $ writeTVar status AroundQRunning)
-                        pure eho
-                      else atomically (readTMVar cache)
-                  whenRight_
-                    eho
-                    ( \ho ->
-                        finally
-                          (runSubNodes_ (ThreadIn . pure $ Right ho) subNodes)
-                          ( whenJust teardown
-                              $ \td -> do
-                                locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
-                                when locked
-                                  $ finally
-                                    (logRun_ (TE.Hook TE.Once TE.Teardown) (`td` ho))
-                                    (atomically $ writeTVar status AroundDone)
-                          )
+          -- tree generation is restricted by typeclasses so unless the typeclass constrint implmentation is wrong
+          -- execution trees with invalid structure (Thread or Once depending on Each) should never be generated.
+          shouldNeverHappen cst = bug @Void . error $ "EachIn should not be passed to: " <> cst <> " " <> txt xt.path
+          sink = lgr . NL.ApEvent
+         in
+          case xt of
+            -- as we know tree shaking has been executed prior to running we can assume we
+            -- always need to execute once hooks if the status is correct. There is no
+            -- possibility of empty subnodes due to tree shaking.
+            AfterOnce
+              { path
+              , status'
+              , subNodes'
+              , after
+              } -> do
+                run <- atomically $ do
+                  s <- readTVar status'
+                  qs <- readTVar subNodes'.status
+                  when (s == AfterQPending)
+                    $ writeTVar status' AfterQRunning
+                  pure $ canRunAfterOnce s qs
+                when run
+                  $ finally
+                    (runSubNodes_ hi subNodes')
+                    ( do
+                        locked <- atomically $ tryLock status' subNodes' canLockAfterOnce AfterRunning
+                        when locked
+                          $ finally
+                            (void $ logRun' (TE.Hook TE.Once TE.After) after)
+                            (atomically $ writeTVar status' AfterDone)
                     )
-          After{frequency, subNodes', after} ->
-            case frequency of
-              Each -> case hi' of
-                EachIn{apply} -> uu
-                -- runSubNodes_
-                --   EachIn
-                --     { apply = apply >> runAfter
-                --     , ..
-                --     }
-                --   subNodes'
-                OnceIn ioHi -> uu
-                -- runSubNodes_
-                --   EachIn
-                --     { apply = apply >> runAfter
-                --     , ..
-                --     }
-                --   subNodes'
-                ThreadIn ioHi -> uu
-               where
-                -- runSubNodes_
-                --   EachIn
-                --     { setup = ioHi
-                --     , teardown = const $ pure ()
-                --     , after = runAfter
-                --     }
-                --   subNodes'
-
-                runAfter = logRun_ (TE.Hook TE.Each TE.After) after
-              Thread -> case hi' of
-                EachIn{} -> shouldNeverHappen "After Thread"
-                OnceIn _ -> runSubNodesAfter
-                ThreadIn _ -> runSubNodesAfter
-               where
-                runSubNodesAfter =
+            -- as we know tree shaking has been executed prior to running we can assume we
+            -- always need to execute once hooks if the status is correct. There is no
+            -- possibility of empty subnodes due to tree shaking.
+            AroundOnce{path, setup, status, cache, subNodes, teardown} ->
+              case hi' of
+                EachIn{} -> shouldNeverHappen "AroundOnce"
+                ThreadIn _ -> shouldNeverHappen "AroundOnce"
+                OnceIn ioHi ->
                   do
-                    run <- runSubNodes hi' subNodes'
-                    when run.hasRun
-                      $ logRun_ (TE.Hook TE.Thread TE.After) after
-          Around{frequency, setup, subNodes, teardown = mteardown} ->
-            let
-              runThreadAround ioHo hoVar =
-                finally
-                  (runSubNodes_ (ThreadIn ioHo) subNodes)
-                  ( do
-                      whenJust mteardown
-                        $ \td -> do
-                          mho <- atomically $ tryReadTMVar hoVar
-                          -- if mho is nothing then setup was not run (empty subnodes)
-                          whenJust mho
-                            $ either
-                              (logAbandonned' (TE.Hook TE.Thread TE.Teardown))
-                              (\ho -> logRun_ (TE.Hook TE.Thread TE.Teardown) (`td` ho))
-                  )
-             in
+                    i <- ioHi
+                    setUpLocked <- atomically $ tryLock status subNodes canLockSetup SetupRunning
+                    eho <-
+                      if setUpLocked
+                        then do
+                          eho <- logRun' (TE.Hook TE.Once TE.Setup) (`setup` i)
+                          atomically $ writeTMVar cache eho
+                          eho
+                            & either
+                              ( \fail' -> do
+                                  atomically $ writeTVar status AroundAbandoning
+                                  finally
+                                    ( do
+                                        abandonChildren lgr fail' subNodes
+                                        whenJust teardown
+                                          $ const (logAbandonned' (TE.Hook TE.Once TE.Teardown) fail')
+                                    )
+                                    (atomically $ writeTVar status AroundDone)
+                              )
+                              (const $ atomically $ writeTVar status AroundQRunning)
+                          pure eho
+                        else atomically (readTMVar cache)
+                    whenRight_
+                      eho
+                      ( \ho ->
+                          finally
+                            (runSubNodes_ (ThreadIn . pure $ Right ho) subNodes)
+                            ( whenJust teardown
+                                $ \td -> do
+                                  locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
+                                  when locked
+                                    $ finally
+                                      (logRun_ (TE.Hook TE.Once TE.Teardown) (`td` ho))
+                                      (atomically $ writeTVar status AroundDone)
+                            )
+                      )
+            After{frequency, subNodes', after} ->
               case frequency of
-                Each ->
-                  case hi' of
-                    EachIn{apply} -> 
-                      do 
-                        let 
-                          nxtApply :: (Either FailPoint ho -> IO ()) -> IO ()
-                          nxtApply chldActn = do 
-                            
-                          
-                        uu
-                    OnceIn{} -> uu
-                    ThreadIn ioHi -> uu
+                Each -> case hi' of
+                  EachIn{apply} -> uu
+                  -- runSubNodes_
+                  --   EachIn
+                  --     { apply = apply >> runAfter
+                  --     , ..
+                  --     }
+                  --   subNodes'
+                  OnceIn ioHi -> uu
+                  -- runSubNodes_
+                  --   EachIn
+                  --     { apply = apply >> runAfter
+                  --     , ..
+                  --     }
+                  --   subNodes'
+                  ThreadIn ioHi -> uu
+                 where
+                  -- runSubNodes_
+                  --   EachIn
+                  --     { setup = ioHi
+                  --     , teardown = const $ pure ()
+                  --     , after = runAfter
+                  --     }
+                  --   subNodes'
+
+                  runAfter = logRun_ (TE.Hook TE.Each TE.After) after
                 Thread -> case hi' of
-                  EachIn{} -> shouldNeverHappen "Around Thread"
-                  OnceIn ioHi -> do
-                    -- Action can't be run until its actually needed by a test.
-                    -- There is a possibilty of the hook enclosing an empty or
-                    -- saturated subNode list. plain old laziness might be enough
-                    -- TODO: test this
-                    hoVar <- newEmptyTMVarIO
-                    let ioHo = mkHo hoVar
-                    runThreadAround ioHo hoVar
-                   where
-                    mkHo hov = do
-                      mho <- atomically $ tryReadTMVar hov
-                      mho
-                        & maybe
-                          ( do
-                              hi'' <- ioHi
-                              ho <- logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi'')
-                              atomically $ putTMVar hov ho
-                              pure ho
-                          )
-                          pure
-                  ThreadIn ioeHi -> do
-                    hoVar <- newEmptyTMVarIO
-                    let ioHo = mkHo hoVar
-                    runThreadAround ioHo hoVar
-                   where
-                    mkHo hov = do
-                      mho <- atomically $ tryReadTMVar hov
-                      mho
-                        & maybe
-                          ( do
-                              ethi <- ioeHi
-                              ho <-
-                                either
-                                  (pure . Left)
-                                  (\hi'' -> logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi''))
-                                  ethi
-                              atomically $ putTMVar hov ho
-                              pure ho
-                          )
-                          pure
-          Test{path, title, tests} ->
-            case hi' of
-              EachIn{apply} -> runTests (apply . runTestItem)
-              OnceIn ioHi -> ioHi >>= \hii -> runTests (`runTestItem` Right hii)
-              ThreadIn ethIoHi -> ethIoHi >>= \ehi -> runTests (`runTestItem` ehi)
-           where
-            runTests :: (P.TestItem IO hi -> IO ()) -> IO ()
-            runTests actn = void $ runChildQ Sequential actn (const $ pure Runnable) tests
+                  EachIn{} -> shouldNeverHappen "After Thread"
+                  OnceIn _ -> runSubNodesAfter
+                  ThreadIn _ -> runSubNodesAfter
+                 where
+                  runSubNodesAfter =
+                    do
+                      run <- runSubNodes hi' subNodes'
+                      when run.hasRun
+                        $ logRun_ (TE.Hook TE.Thread TE.After) after
+            Around{frequency, setup, subNodes, teardown = mteardown} ->
+              let
+                runThreadAround ioHo hoVar =
+                  finally
+                    (runSubNodes_ (ThreadIn ioHo) subNodes)
+                    ( do
+                        whenJust mteardown
+                          $ \td -> do
+                            mho <- atomically $ tryReadTMVar hoVar
+                            -- if mho is Nothing then setup was not run (empty subnodes)
+                            whenJust mho
+                              $ either
+                                (logAbandonned' (TE.Hook TE.Thread TE.Teardown))
+                                (\ho -> logRun_ (TE.Hook TE.Thread TE.Teardown) (`td` ho))
+                    )
+               in
+                case frequency of
+                  Each ->
+                    case hi' of
+                      EachIn{apply} ->
+                        let
+                          nxtAround nxtAction =
+                            apply
+                              ( either
+                                  ( \fp -> do
+                                      logAbandonned' (TE.Hook TE.Each TE.Setup) fp
+                                      nxtAction . Left $ fp
+                                      whenJust mteardown
+                                        $ const
+                                        $ logAbandonned' (TE.Hook TE.Each TE.Teardown) fp
+                                  )
+                                  ( \hki ->
+                                      bracket
+                                        (logRun' (TE.Hook TE.Each TE.Setup) (`setup` hki))
+                                        nxtAction
+                                        ( \eho ->
+                                            whenJust mteardown
+                                              $ \teardown' ->
+                                                eho
+                                                  & either
+                                                    (logAbandonned' (TE.Hook TE.Each TE.Teardown))
+                                                    (\ho -> logRun_ (TE.Hook TE.Each TE.Teardown) (`teardown'` ho))
+                                        )
+                                  )
+                              )
+                         in
+                          runSubNodes_ (EachIn nxtAround) subNodes
+                      OnceIn{} -> uu
+                      ThreadIn ioHi -> uu
+                  Thread -> case hi' of
+                    EachIn{} -> shouldNeverHappen "Around Thread"
+                    OnceIn ioHi -> do
+                      -- Action can't be run until its actually needed by a test.
+                      -- There is a possibilty of the hook enclosing an empty or
+                      -- saturated subNode list. plain old laziness might be enough
+                      -- TODO: test this
+                      hoVar <- newEmptyTMVarIO
+                      let ioHo = mkHo hoVar
+                      runThreadAround TE.Thread ioHo hoVar
+                     where
+                      mkHo hov = do
+                        mho <- atomically $ tryReadTMVar hov
+                        mho
+                          & maybe
+                            ( do
+                                hi'' <- ioHi
+                                ho <- logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi'')
+                                atomically $ putTMVar hov ho
+                                pure ho
+                            )
+                            pure
+                    ThreadIn ioeHi -> do
+                      hoVar <- newEmptyTMVarIO
+                      let ioHo = mkHo hoVar
+                      runThreadAround TE.Thread ioHo hoVar
+                     where
+                      mkHo hov = do
+                        mho <- atomically $ tryReadTMVar hov
+                        mho
+                          & maybe
+                            ( do
+                                ethi <- ioeHi
+                                ho <-
+                                  either
+                                    (pure . Left)
+                                    (\hi'' -> logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi''))
+                                    ethi
+                                atomically $ putTMVar hov ho
+                                pure ho
+                            )
+                            pure
+            Test{path, title, tests} ->
+              case hi' of
+                EachIn{apply} -> runTests (apply . runTestItem)
+                OnceIn ioHi -> ioHi >>= \hii -> runTests (`runTestItem` Right hii)
+                ThreadIn ethIoHi -> ethIoHi >>= \ehi -> runTests (`runTestItem` ehi)
+             where
+              runTests :: (P.TestItem IO hi -> IO ()) -> IO ()
+              runTests actn = void $ runChildQ Sequential actn (const $ pure Runnable) tests
 
-            runTestItem :: P.TestItem IO hi -> Either FailPoint hi -> IO ()
-            runTestItem
-              tstItm =
-                either
-                  (logAbandonnedNew lgr (mkTestPath tstItm) TE.Test)
-                  (void . logRun lgr (mkTestPath tstItm) TE.Test . tstItm.action sink)
+              runTestItem :: P.TestItem IO hi -> Either FailPoint hi -> IO ()
+              runTestItem
+                tstItm =
+                  either
+                    (logAbandonnedNew lgr (mkTestPath tstItm) TE.Test)
+                    (void . logRun lgr (mkTestPath tstItm) TE.Test . tstItm.action sink)
 
-            mkTestPath :: P.TestItem IO hi -> NL.ExePath
-            mkTestPath P.TestItem{id, title = ttl} = NL.ExePath $ AE.TestPath{id, title = ttl} : path.unExePath
+              mkTestPath :: P.TestItem IO hi -> NL.ExePath
+              mkTestPath P.TestItem{id, title = ttl} = NL.ExePath $ AE.TestPath{id, title = ttl} : path.unExePath
 
+-- TODO :: 1. Each
+--         2. Abandon same function
 -- >>= either
 --   (\ab -> abandonTree lgr ab xt)
 --   ( \hi ->

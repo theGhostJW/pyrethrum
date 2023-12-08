@@ -1273,96 +1273,96 @@ runNodeNew lgr hi xt =
                       when run.hasRun
                         $ logRun_ (TE.Hook TE.Thread TE.After) after
             Around{frequency, setup, subNodes, teardown = mteardown} ->
-              let
-                runThreadAround ioHo hoVar =
-                  finally
-                    (runSubNodes_ (ThreadIn ioHo) subNodes)
-                    ( do
-                        whenJust mteardown
-                          $ \td -> do
-                            mho <- atomically $ tryReadTMVar hoVar
-                            -- if mho is Nothing then setup was not run (empty subnodes)
-                            whenJust mho
-                              $ either
-                                (logAbandonned' (TE.Hook TE.Thread TE.Teardown))
-                                (\ho -> logRun_ (TE.Hook TE.Thread TE.Teardown) (`td` ho))
-                    )
-               in
-                case frequency of
-                  Each ->
+              case frequency of
+                Each ->
+                  let
+                    nxtApply nxtAction =
+                      let
+                        runAbandon fp = do
+                          logAbandonned' (TE.Hook TE.Each TE.Setup) fp
+                          nxtAction . Left $ fp
+                          whenJust mteardown
+                            $ const
+                            $ logAbandonned' (TE.Hook TE.Each TE.Teardown) fp
+                        runNxt hki =
+                          bracket
+                            (logRun' (TE.Hook TE.Each TE.Setup) (`setup` hki))
+                            nxtAction
+                            ( \eho ->
+                                whenJust mteardown
+                                  $ \teardown' ->
+                                    eho
+                                      & either
+                                        (logAbandonned' (TE.Hook TE.Each TE.Teardown))
+                                        (\ho -> logRun_ (TE.Hook TE.Each TE.Teardown) (`teardown'` ho))
+                            )
+                       in
+                        case hi' of
+                          EachIn{apply} ->
+                            apply $ either runAbandon runNxt
+                          OnceIn ioHi -> ioHi >>= runNxt
+                          ThreadIn ethIoHi -> ethIoHi >>= either runAbandon runNxt
+                   in
+                    runSubNodes_ (EachIn nxtApply) subNodes
+                Thread ->
+                  let
+                    runThreadAround ioHo hoVar =
+                      finally
+                        (runSubNodes_ (ThreadIn ioHo) subNodes)
+                        ( do
+                            whenJust mteardown
+                              $ \td -> do
+                                mho <- atomically $ tryReadTMVar hoVar
+                                -- if mho is Nothing then setup was not run (empty subnodes)
+                                whenJust mho
+                                  $ either
+                                    (logAbandonned' (TE.Hook TE.Thread TE.Teardown))
+                                    (\ho -> logRun_ (TE.Hook TE.Thread TE.Teardown) (`td` ho))
+                        )
+                   in
                     case hi' of
-                      EachIn{apply} ->
-                        let
-                          nxtAround nxtAction =
-                            apply
-                              ( either
-                                  ( \fp -> do
-                                      logAbandonned' (TE.Hook TE.Each TE.Setup) fp
-                                      nxtAction . Left $ fp
-                                      whenJust mteardown
-                                        $ const
-                                        $ logAbandonned' (TE.Hook TE.Each TE.Teardown) fp
-                                  )
-                                  ( \hki ->
-                                      bracket
-                                        (logRun' (TE.Hook TE.Each TE.Setup) (`setup` hki))
-                                        nxtAction
-                                        ( \eho ->
-                                            whenJust mteardown
-                                              $ \teardown' ->
-                                                eho
-                                                  & either
-                                                    (logAbandonned' (TE.Hook TE.Each TE.Teardown))
-                                                    (\ho -> logRun_ (TE.Hook TE.Each TE.Teardown) (`teardown'` ho))
-                                        )
-                                  )
+                      EachIn{} -> shouldNeverHappen "Around Thread"
+                      OnceIn ioHi -> do
+                        -- Action can't be run until its actually needed by a test.
+                        -- There is a possibilty of the hook enclosing an empty or
+                        -- saturated subNode list. plain old laziness might be enough
+                        -- TODO: test this
+                        hoVar <- newEmptyTMVarIO
+                        let ioHo = mkHo hoVar
+                        runThreadAround ioHo hoVar
+                       where
+                        mkHo hov = do
+                          mho <- atomically $ tryReadTMVar hov
+                          mho
+                            & maybe
+                              ( do
+                                  hi'' <- ioHi
+                                  ho <- logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi'')
+                                  atomically $ putTMVar hov ho
+                                  pure ho
                               )
-                         in
-                          runSubNodes_ (EachIn nxtAround) subNodes
-                      OnceIn{} -> uu
-                      ThreadIn ioHi -> uu
-                  Thread -> case hi' of
-                    EachIn{} -> shouldNeverHappen "Around Thread"
-                    OnceIn ioHi -> do
-                      -- Action can't be run until its actually needed by a test.
-                      -- There is a possibilty of the hook enclosing an empty or
-                      -- saturated subNode list. plain old laziness might be enough
-                      -- TODO: test this
-                      hoVar <- newEmptyTMVarIO
-                      let ioHo = mkHo hoVar
-                      runThreadAround TE.Thread ioHo hoVar
-                     where
-                      mkHo hov = do
-                        mho <- atomically $ tryReadTMVar hov
-                        mho
-                          & maybe
-                            ( do
-                                hi'' <- ioHi
-                                ho <- logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi'')
-                                atomically $ putTMVar hov ho
-                                pure ho
-                            )
-                            pure
-                    ThreadIn ioeHi -> do
-                      hoVar <- newEmptyTMVarIO
-                      let ioHo = mkHo hoVar
-                      runThreadAround TE.Thread ioHo hoVar
-                     where
-                      mkHo hov = do
-                        mho <- atomically $ tryReadTMVar hov
-                        mho
-                          & maybe
-                            ( do
-                                ethi <- ioeHi
-                                ho <-
-                                  either
-                                    (pure . Left)
-                                    (\hi'' -> logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi''))
-                                    ethi
-                                atomically $ putTMVar hov ho
-                                pure ho
-                            )
-                            pure
+                              pure
+                      ThreadIn ioeHi -> do
+                        hoVar <- newEmptyTMVarIO
+                        let ioHo = mkHo hoVar
+                        runThreadAround ioHo hoVar
+                       where
+                        mkHo hov = do
+                          mho <- atomically $ tryReadTMVar hov
+                          mho
+                            & maybe
+                              ( do
+                                  ethi <- ioeHi
+                                  ho <-
+                                    either
+                                      (pure . Left)
+                                      (\hi'' -> logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi''))
+                                      ethi
+                                  atomically $ putTMVar hov ho
+                                  pure ho
+                              )
+                              pure
+            ---
             Test{path, title, tests} ->
               case hi' of
                 EachIn{apply} -> runTests (apply . runTestItem)

@@ -46,7 +46,7 @@ import UnliftIO.STM (
   tryReadTQueue,
   writeTQueue,
  )
-import Prelude hiding (atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
+import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
 
 -- PRENODE TO BE DEPRECATED
 import Internal.PreNode (Context (..), OnceHook (..), PreNode (testHook), TestHook (..), ThreadHook (..))
@@ -880,7 +880,7 @@ logReturnFailureNew lgr p et e =
     lgr (NL.mkFailure p et e)
     pure . Left $ NL.FailPoint p et
 
-data CanAbandon = None | Partial | Full
+data CanAbandon = None | Partial | All
   deriving (Show, Eq)
 
 canAbandon :: ExeTreeNew hi -> STM CanAbandon
@@ -888,7 +888,7 @@ canAbandon = \case
   AfterOnce{subNodes', status'} -> do
     s <- readTVar status'
     pure $ s & \case
-      AfterQPending -> Full
+      AfterQPending -> All
       AfterQRunning -> Partial
       AfterRunning -> None
       AfterAbandoning -> None
@@ -896,7 +896,7 @@ canAbandon = \case
   AroundOnce{subNodes, status} -> do
     s <- readTVar status
     pure $ s & \case
-      SetupPending -> Full
+      SetupPending -> All
       SetupRunning -> Partial
       AroundQRunning -> Partial
       AroundAbandoning -> None
@@ -910,7 +910,7 @@ canAbandon = \case
  where
   qStatus q = convert <$> readTVar q.status
   convert = \case
-    Runnable -> Full
+    Runnable -> All
     Saturated -> None
     Done -> None
 
@@ -933,6 +933,7 @@ canRunXTree = \case
       SetupPending -> Runnable
       SetupRunning -> Runnable
       AroundQRunning -> stepDownQStatus qs
+      AroundAbandoning -> Saturated
       TeardownRunning -> Saturated
       AroundDone -> Done
 
@@ -953,11 +954,11 @@ abandonTree lgr ab = \case
     do
       aStatus <- atomically $ do
         ca <- canAbandon ao
-        when (ca == Full)
+        when (ca == All)
           $ writeTVar status' AfterAbandoning
         pure ca
       aStatus & \case
-        Full ->
+        All ->
           finally
             (abandonChildren' subNodes')
             ( do
@@ -967,19 +968,10 @@ abandonTree lgr ab = \case
             )
         Partial -> abandonChildren' subNodes'
         None -> pure ()
-  AroundOnce{path, status, cache, subNodes, teardown} -> do
+  ao@AroundOnce{path, status, cache, subNodes, teardown} -> do
     setUpLocked <- atomically $ do
-      s <- readTVar status
-      -- HERE
-      let locked = s == SetupPending
-          canAbandon =
-            s & \case
-              SetupPending -> True
-              SetupRunning -> False
-              AroundQRunning -> False
-              TeardownRunning -> False
-              AroundDone -> False
-              AroundAbandoning -> False
+      ca <- canAbandon ao
+      let locked = ca == All
       when locked
         $ writeTVar status AroundAbandoning
       pure locked
@@ -1234,32 +1226,18 @@ runNodeNew lgr hi xt =
           ---
           After{frequency, subNodes', after} ->
             case frequency of
-              Each -> case hi' of
-                EachIn{apply} -> uu
-                -- runSubNodes_
-                --   EachIn
-                --     { apply = apply >> runAfter
-                --     , ..
-                --     }
-                --   subNodes'
-                OnceIn ioHi -> uu
-                -- runSubNodes_
-                --   EachIn
-                --     { apply = apply >> runAfter
-                --     , ..
-                --     }
-                --   subNodes'
-                ThreadIn ioHi -> uu
+              Each -> 
+                runSubNodes_ (EachIn nxtApply) subNodes'
                where
-                -- runSubNodes_
-                --   EachIn
-                --     { setup = ioHi
-                --     , teardown = const $ pure ()
-                --     , after = runAfter
-                --     }
-                --   subNodes'
+                nxtApply nxtAction =
+                  case hi' of
+                    EachIn{apply} -> apply nxtAction >> runAfter
+                    OnceIn ioHi -> ioHi >>= \i -> nxtAction (Right i) >> runAfter
+                    ThreadIn ioHi -> ioHi >>= \i -> nxtAction i >> (i & either abandonAfter (const runAfter))
+                  where
+                    runAfter = logRun_ (TE.Hook TE.Each TE.After) after
+                    abandonAfter = logAbandonned' (TE.Hook TE.Each TE.After)
 
-                runAfter = logRun_ (TE.Hook TE.Each TE.After) after
               Thread -> case hi' of
                 EachIn{} -> shouldNeverHappen "After Thread"
                 OnceIn _ -> runSubNodesAfter
@@ -1379,20 +1357,14 @@ runNodeNew lgr hi xt =
             mkTestPath :: P.TestItem IO hi -> NL.ExePath
             mkTestPath P.TestItem{id, title = ttl} = NL.ExePath $ AE.TestPath{id, title = ttl} : path.unExePath
 
--- TODO :: 1. Each
---         2. Abandon same function
+-- TODO :: 2. Abandon same function
 
 data NodeIn hi
   = Abandon FailPoint
   | OnceIn (IO hi)
   | ThreadIn (IO (Either FailPoint hi))
   | EachIn
-      { -- get rid of one param , how to compose
-        --   setup :: IO (Either FailPoint hi) -- pure ()
-        -- , teardown :: hi -> IO () -- const $ pure ()
-        -- , after :: IO () -- pure ()
-        apply :: (Either FailPoint hi -> IO ()) -> IO ()
-      }
+      {  apply :: (Either FailPoint hi -> IO ()) -> IO () }
 
 {-
  1. get runtest working

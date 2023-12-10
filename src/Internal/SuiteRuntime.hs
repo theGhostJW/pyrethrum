@@ -1260,7 +1260,7 @@ runNodeNew lgr hi xt =
            where
             nxtApply nxtAction =
               case hi of
-                Abandon fp -> uu
+                Abandon fp -> nxtAction (Left fp) >> abandonAfter fp
                 EachIn{apply} -> apply nxtAction >> runAfter
                 OnceIn ioHi -> ioHi >>= \i -> nxtAction (Right i) >> runAfter
                 ThreadIn ioHi -> ioHi >>= \i -> nxtAction i >> (i & either abandonAfter (const runAfter))
@@ -1268,16 +1268,19 @@ runNodeNew lgr hi xt =
               runAfter = logRun_ (TE.Hook TE.Each TE.After) after
               abandonAfter = logAbandonned' (TE.Hook TE.Each TE.After)
           Thread -> case hi of
-            Abandon fp -> uu
+            Abandon fp -> runSubNodesAfter $ Just fp
             EachIn _ -> shouldNeverHappen "After Thread"
-            OnceIn _ -> runSubNodesAfter
-            ThreadIn _ -> runSubNodesAfter
+            OnceIn _ -> runSubNodesAfter Nothing
+            ThreadIn _ -> runSubNodesAfter Nothing
            where
-            runSubNodesAfter =
+            runSubNodesAfter abandonned =
               do
                 run <- runSubNodes hi subNodes'
                 when run.hasRun
-                  $ logRun_ (TE.Hook TE.Thread TE.After) after
+                  $ abandonned
+                  & maybe
+                    (logRun_ (TE.Hook TE.Thread TE.After) after)
+                    (logAbandonned' (TE.Hook TE.Thread TE.After))
       ---
       Around{frequency, setup, subNodes, teardown = mteardown} ->
         case frequency of
@@ -1286,7 +1289,7 @@ runNodeNew lgr hi xt =
            where
             nxtApply nxtAction =
               case hi of
-                Abandon fp -> uu
+                Abandon fp -> runAbandon fp
                 EachIn{apply} ->
                   apply $ either runAbandon runNxt
                 OnceIn ioHi -> ioHi >>= runNxt
@@ -1325,9 +1328,26 @@ runNodeNew lgr hi xt =
                               (logAbandonned' (TE.Hook TE.Thread TE.Teardown))
                               (\ho -> logRun_ (TE.Hook TE.Thread TE.Teardown) (`td` ho))
                   )
+
+          
              in
               case hi of
-                Abandon fp -> uu
+                Abandon fp -> do
+                  hoVar <- newEmptyTMVarIO
+                  runThreadAround (hkOutSingleton hoVar) hoVar
+                 where
+                  hkOutSingleton hov = do
+                    mho <- atomically $ tryReadTMVar hov
+                    mho
+                      & maybe
+                        ( do
+                            let ab = Left fp 
+                            atomically $ putTMVar hov ab
+                            pure ab
+                        )
+                        pure
+
+
                 EachIn{} -> shouldNeverHappen "Around Thread"
                 OnceIn ioHi -> do
                   -- Action can't be run until its actually needed by a test.
@@ -1335,10 +1355,9 @@ runNodeNew lgr hi xt =
                   -- saturated subNode list. plain old laziness might be enough
                   -- TODO: test this
                   hoVar <- newEmptyTMVarIO
-                  let ioHo = mkHo hoVar
-                  runThreadAround ioHo hoVar
+                  runThreadAround (hkOutSingleton hoVar) hoVar
                  where
-                  mkHo hov = do
+                  hkOutSingleton hov = do
                     mho <- atomically $ tryReadTMVar hov
                     mho
                       & maybe
@@ -1351,10 +1370,10 @@ runNodeNew lgr hi xt =
                         pure
                 ThreadIn ioeHi -> do
                   hoVar <- newEmptyTMVarIO
-                  let ioHo = mkHo hoVar
+                  let ioHo = hkOutSingleton hoVar
                   runThreadAround ioHo hoVar
                  where
-                  mkHo hov = do
+                  hkOutSingleton hov = do
                     mho <- atomically $ tryReadTMVar hov
                     mho
                       & maybe
@@ -1362,7 +1381,7 @@ runNodeNew lgr hi xt =
                             ethi <- ioeHi
                             ho <-
                               either
-                                (pure . Left)
+                                (\fp -> logAbandonned' (TE.Hook TE.Thread TE.Setup) fp >> pure (Left fp))
                                 (\hi'' -> logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi''))
                                 ethi
                             atomically $ putTMVar hov ho
@@ -1372,7 +1391,7 @@ runNodeNew lgr hi xt =
       ---
       Test{path, title, tests} ->
         case hi of
-          Abandon fp -> uu
+          Abandon fp -> runTests (`runTestItem` Left fp)
           EachIn{apply} -> runTests (apply . runTestItem)
           OnceIn ioHi -> ioHi >>= \hii -> runTests (`runTestItem` Right hii)
           ThreadIn ethIoHi -> ethIoHi >>= \ehi -> runTests (`runTestItem` ehi)
@@ -1389,8 +1408,6 @@ runNodeNew lgr hi xt =
 
         mkTestPath :: P.TestItem IO hi -> NL.ExePath
         mkTestPath P.TestItem{id, title = ttl} = NL.ExePath $ AE.TestPath{id, title = ttl} : path.unExePath
-
--- TODO :: 2. Abandon same function
 
 data NodeIn hi
   = Abandon FailPoint

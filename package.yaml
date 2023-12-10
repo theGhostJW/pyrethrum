@@ -143,7 +143,7 @@ ghc-options:
   - -fwrite-ide-info
   # - -fno-warn-unused-imports
   # - -fno-warn-missing-signatures
-  # - -fno-warn-type-defaults
+  - -fno-warn-type-defaults
   # - -fno-warn-unused-matches
   # - -fno-warn-unused-binds
   # - -fno-warn-unused-do-bind

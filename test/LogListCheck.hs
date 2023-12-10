@@ -2,7 +2,6 @@ module LogListCheck where
 
 import           Data.DList as DL
 import           PyrethrumExtras.Test
-import           DSL.LogProtocol
 import List.Extra as L
 import Text.Extra as T
 
@@ -13,5 +12,3 @@ chkLog intprt assrt = assrt . intprt
 
 chkMessageInstances :: Text -> Int -> DList Text -> Assertion
 chkMessageInstances msg exCount  = chkLog (L.count (T.isInfixOf msg) . DL.toList) (chkEq exCount)
-
-type Log = [LogProtocolBase Int]

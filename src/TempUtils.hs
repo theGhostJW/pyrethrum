@@ -1,9 +1,8 @@
 module TempUtils where
 
 import Chronos
-import Data.Time (Day (..), UTCTime (..))
-import Debug.Trace
-import PyrethrumExtras (uu)
+import Data.Time ( UTCTime (..))
+import Debug.Trace ( traceIO )
 
 -- TODO :: functions that will be moved to pyrelude - check if needed vs prettyprint functions
 debugLines :: (Show a) => [a] -> IO ()

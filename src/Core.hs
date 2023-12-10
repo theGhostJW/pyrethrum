@@ -14,7 +14,7 @@ import Effectful.TH (makeEffect)
 import GHC.Records (HasField)
 import GHC.Show (Show (..))
 import PyrethrumExtras (toS, uu)
-import CheckNew (Checks)
+import Check (Checks)
 
 newtype CheckFailure = CheckFailure Text
   deriving (Show)

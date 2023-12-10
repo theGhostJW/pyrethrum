@@ -37,8 +37,8 @@ import qualified Prepare as P
 newtype ThreadCount = ThreadCount Int
   deriving (Show)
 
-executeNew :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls m L.ExePath AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
-executeNew
+execute :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls m L.ExePath AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
+execute
   (ThreadCount maxThreads)
   L.LogControls
     { sink
@@ -58,12 +58,12 @@ executeNew
         ( do
             let nodeList = P.prepare $ C.SuitePrepParams suite interpreter runConfig
             xtree <- mkXTreeNew (L.ExePath []) nodeList
-            executeNodesNew sink xtree maxThreads
+            executeNodes sink xtree maxThreads
         )
         stopWorker
 
-executeNodesNew :: (TE.ThreadEvent L.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
-executeNodesNew sink nodes maxThreads =
+executeNodes :: (TE.ThreadEvent L.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTree ()) -> Int -> IO ()
+executeNodes sink nodes maxThreads =
   do
     rootLogger <- newLogger
     finally
@@ -83,52 +83,52 @@ executeNodesNew sink nodes maxThreads =
 data NFrequency = Each | Thread
   deriving (Show, Eq)
 
-data ExeTreeNew hi where
+data ExeTree hi where
   AfterOnce ::
     { path :: L.ExePath
     , status' :: TVar AfterStatus
-    , subNodes' :: ChildQ (ExeTreeNew hi)
+    , subNodes' :: ChildQ (ExeTree hi)
     , after :: P.ApEventSink -> IO ()
     } ->
-    ExeTreeNew hi
+    ExeTree hi
   AroundOnce ::
     { path :: L.ExePath
     , setup :: P.ApEventSink -> hi -> IO ho
     , status :: TVar AroundStatus
     , cache :: TMVar (Either L.FailPoint ho)
-    , subNodes :: ChildQ (ExeTreeNew ho)
+    , subNodes :: ChildQ (ExeTree ho)
     , teardown :: Maybe (P.ApEventSink -> ho -> IO ())
     } ->
-    ExeTreeNew hi
+    ExeTree hi
   After ::
     { path :: L.ExePath
     , frequency :: NFrequency
-    , subNodes' :: ChildQ (ExeTreeNew hi)
+    , subNodes' :: ChildQ (ExeTree hi)
     , after :: P.ApEventSink -> IO ()
     } ->
-    ExeTreeNew hi
+    ExeTree hi
   Around ::
     { path :: L.ExePath
     , frequency :: NFrequency
     , setup :: P.ApEventSink -> hi -> IO ho
-    , subNodes :: ChildQ (ExeTreeNew ho)
+    , subNodes :: ChildQ (ExeTree ho)
     , teardown :: Maybe (P.ApEventSink -> ho -> IO ())
     } ->
-    ExeTreeNew hi
+    ExeTree hi
   Test ::
     { path :: L.ExePath
     , title :: Text
     , tests :: ChildQ (P.TestItem IO hi)
     } ->
-    ExeTreeNew hi
+    ExeTree hi
 
-mkXTreeNew :: L.ExePath -> NonEmpty (P.PreNode IO NonEmpty hi) -> IO (ChildQ (ExeTreeNew hi))
+mkXTreeNew :: L.ExePath -> NonEmpty (P.PreNode IO NonEmpty hi) -> IO (ChildQ (ExeTree hi))
 mkXTreeNew xpth preNodes =
   do
     subTrees <- traverse mkNode preNodes
     mkChildQ subTrees
  where
-  mkNode :: forall hi. P.PreNode IO NonEmpty hi -> IO (ExeTreeNew hi)
+  mkNode :: forall hi. P.PreNode IO NonEmpty hi -> IO (ExeTree hi)
   mkNode pn =
     pn & \case
       P.Before
@@ -174,7 +174,7 @@ mkXTreeNew xpth preNodes =
    where
     path = L.ExePath $ pn.path : xpth.unExePath
 
-    mkOnceHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> IO (ExeTreeNew hi')
+    mkOnceHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> IO (ExeTree hi')
     mkOnceHook subNodes' setup teardown = do
       status <- newTVarIO SetupPending
       cache <- newEmptyTMVarIO
@@ -189,7 +189,7 @@ mkXTreeNew xpth preNodes =
           , teardown
           }
 
-    mkNHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> NFrequency -> IO (ExeTreeNew hi')
+    mkNHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> NFrequency -> IO (ExeTree hi')
     mkNHook subNodes' setup teardown frequency = do
       subNodes <- mkXTreeNew path subNodes'
       pure
@@ -363,7 +363,7 @@ logReturnFailureNew lgr p et e =
 data CanAbandon = None | Partial | All
   deriving (Show, Eq)
 
-canAbandon :: ExeTreeNew hi -> STM CanAbandon
+canAbandon :: ExeTree hi -> STM CanAbandon
 canAbandon = \case
   AfterOnce{status'} -> do
     s <- readTVar status'
@@ -394,7 +394,7 @@ canAbandon = \case
     Saturated -> None
     Done -> None
 
-canRunXTree :: ExeTreeNew hi -> STM CanRun
+canRunXTree :: ExeTree hi -> STM CanRun
 canRunXTree = \case
   AfterOnce{subNodes', status'} ->
     do
@@ -475,7 +475,7 @@ runNodeNew ::
   forall hi.
   Logger ->
   NodeIn hi ->
-  ExeTreeNew hi ->
+  ExeTree hi ->
   IO ()
 runNodeNew lgr hi xt =
   let
@@ -488,10 +488,10 @@ runNodeNew lgr hi xt =
     logAbandonned' = logAbandonnedNew lgr xt.path
     -- logAbandonnedParent = logAbandonnedNew lgr
 
-    runSubNodes :: forall hi'. NodeIn hi' -> ChildQ (ExeTreeNew hi') -> IO QElementRun
+    runSubNodes :: forall hi'. NodeIn hi' -> ChildQ (ExeTree hi') -> IO QElementRun
     runSubNodes hi'' = runChildQ Concurrent (runNodeNew lgr hi'') canRunXTree
 
-    runSubNodes_ :: forall hi'. NodeIn hi' -> ChildQ (ExeTreeNew hi') -> IO ()
+    runSubNodes_ :: forall hi'. NodeIn hi' -> ChildQ (ExeTree hi') -> IO ()
     runSubNodes_ n = void . runSubNodes n
 
     -- tree generation is restricted by typeclasses so unless the typeclass constrint implmentation is wrong

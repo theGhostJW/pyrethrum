@@ -1,6 +1,6 @@
 module PyrethrumDemoProject where
 
-import qualified CheckNew as CH
+import qualified Check as CH
 import qualified Core as C
 import DSL.FileSystemEffect (FSException, FileSystem)
 import DSL.Internal.ApEvent (ApEvent)

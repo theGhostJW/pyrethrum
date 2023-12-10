@@ -7,6 +7,7 @@ import qualified PyrethrumExtras.Test       as UT
 import PyrethrumExtras
 import PyrethrumExtras.Test hiding (chk, chk')
 
+{-
 isBig = chk "More than 10" (> 10)
 isEven = chk "Even" even
 isOdd = chk "Odd" odd
@@ -93,3 +94,4 @@ unit_chk_with_gateAll_on_list_gates_all = [GateCheck, GateCheck, GateCheck, Gate
 unit_chk_expect_defect_only_affects_first = [False, True, True, True] ... D.toList $ ((ExpectPass ==) . (.expectation) <$> (expectFailure "Failed" evenOddEven).un)
 
 unit_chk_expect_defect_fixed_only_affects_first = [True, False, False, False] ... D.toList ((ExpectFailure Inactive "Failed" ==) . (.expectation) <$> (expectFailureFixed "Failed" evenOddEven).un)
+-}

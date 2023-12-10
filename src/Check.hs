@@ -1,6 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 
-module CheckNew (
+module Check (
   Check (..),
   TerminationStatus (..),
   Checks(..),

@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 18c72cb195087afceda4d8fd52a8fdab83979ea8c984ed1d967dce821659122b
+-- hash: 225e2859bfecfa4c99c124440363bc72d249c4a94e4f0e1716d4f4a5f685c824
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -86,8 +86,7 @@ library
       DSL.Internal.FileSystemPure
       DSL.Internal.FileSystemRawIO
       DSL.Out
-      Internal.PreNode
-      Internal.RunTimeLoggingNew
+      Internal.RunTimeLogging
       Internal.SuiteRuntime
       Internal.ThreadEvent
       List.Extra
@@ -147,7 +146,7 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code
   build-depends:
       aeson
     , base-prelude
@@ -243,7 +242,7 @@ library discover
       TypeFamilyDependencies
       TypeOperators
       FieldSelectors
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -O0
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -O0
   build-depends:
       aeson
     , algebraic-graphs ==0.7.*
@@ -301,8 +300,7 @@ library examples
       DSL.Internal.FileSystemPure
       DSL.Internal.FileSystemRawIO
       DSL.Out
-      Internal.PreNode
-      Internal.RunTimeLoggingNew
+      Internal.RunTimeLogging
       Internal.SuiteRuntime
       Internal.ThreadEvent
       List.Extra
@@ -367,7 +365,7 @@ library examples
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -O0
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -O0
   build-depends:
       aeson
     , base-prelude
@@ -465,7 +463,7 @@ test-suite pyrethrum-test
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-unused-imports -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-unused-matches -fno-warn-unused-binds -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -j3 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code
   build-tool-depends:
       tasty-discover:tasty-discover
   build-depends:

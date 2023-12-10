@@ -1,21 +1,20 @@
 {-# LANGUAGE DeriveAnyClass #-}
 
-module Internal.RunTimeLoggingNew where
+module Internal.RunTimeLogging where
 
 -- TODO: Explicit exports remove old code
 import qualified BasePrelude as P
-import Data.Aeson (ToJSON)
-import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
-import Data.Set
-import GHC.Show (show)
+import Data.Aeson.TH (defaultOptions, deriveToJSON)
 import qualified Internal.ThreadEvent as TE
-import PyrethrumExtras (toS, txt)
+import PyrethrumExtras (txt)
 import Text.Show.Pretty (pPrint)
-import UnliftIO (TChan, TQueue, atomically, finally, newChan, newTChan, newTChanIO, newTQueue, newTQueueIO, readTChan, writeChan, writeTChan, writeTQueue)
-import UnliftIO.Concurrent (ThreadId, myThreadId)
+import UnliftIO.Concurrent (ThreadId)
 import Prelude hiding (atomically, lines)
 import qualified DSL.Internal.ApEvent as AE
-import Data.Text as T (Text, intercalate) 
+import Data.Text as T (intercalate)
+import Effectful.Concurrent.STM (TQueue)
+import UnliftIO.STM ( TChan, writeTChan, atomically, readTChan )
+import UnliftIO (finally, writeTQueue)
 
 newtype ExePath = ExePath {unExePath :: [AE.Path]} deriving (Show, Eq, Ord)
 
@@ -30,84 +29,6 @@ data FailPoint = FailPoint
   , eventType :: TE.EventType
   }
   deriving (Show)
-
-
--- data ExeEventType
---   = OnceHook
---   | OnceHookRelease
---   | ThreadHook
---   | ThreadHookRelease
---   | TestHook
---   | TestHookRelease
---   | Test
---   deriving (Show, Eq, Ord, Enum)
-
--- isThreadedEvent :: TE.FrameworkEventType -> Bool
--- isThreadedEvent = not . isOnceEvent
-
--- isOnceEvent :: TE.FrameworkEventType -> Bool
--- isOnceEvent = \case
---   TE.OnceHook -> True
---   TE.OnceHookAfter -> True
---   TE.ThreadHook -> False
---   TE.ThreadHookAfter -> False
---   TE.FixtureOnceHook -> True
---   TE.FixtureOnceHookRelease -> True
---   TE.FixtureThreadHook -> False
---   TE.FixtureThreadHookRelease -> False
---   TE.TestHook -> False
---   TE.TestHookAfter -> False
---   TE.Group -> False
---   TE.Fixture -> False
---   TE.Test -> False
-
--- isGrouping :: TE.FrameworkEventType -> Bool
--- isGrouping = \case
---   TE.OnceHook -> False
---   TE.ThreadHook -> False
---   TE.TestHook -> False
---   TE.FixtureThreadHook -> False
---   TE.FixtureOnceHook -> False
---   TE.FixtureThreadHookRelease -> False
---   TE.FixtureOnceHookRelease -> False
---   TE.OnceHookAfter -> False
---   TE.ThreadHookAfter -> False
---   TE.TestHookAfter -> False
---   TE.Group -> True
---   TE.Fixture -> True
---   TE.Test -> False
-
--- isFixtureChild :: TE.FrameworkEventType -> Bool
--- isFixtureChild = \case
---   TE.OnceHook -> False
---   TE.ThreadHook -> False
---   TE.TestHook -> True
---   TE.FixtureThreadHook -> True
---   TE.FixtureOnceHook -> True
---   TE.FixtureThreadHookRelease -> True
---   TE.FixtureOnceHookRelease -> True
---   TE.OnceHookAfter -> False
---   TE.ThreadHookAfter -> False
---   TE.TestHookAfter -> True
---   TE.Group -> False
---   TE.Fixture -> False
---   TE.Test -> True
-
--- endIsTerminal :: TE.FrameworkEventType -> Bool
--- endIsTerminal = \case
---   TE.FixtureThreadHookRelease -> True
---   TE.FixtureOnceHookRelease -> True
---   TE.OnceHookAfter -> True
---   TE.ThreadHookAfter -> True
---   TE.TestHookAfter -> True
---   TE.Group -> True
---   TE.Fixture -> True
---   TE.Test -> True
---   TE.OnceHook -> False
---   TE.ThreadHook -> False
---   TE.TestHook -> False
---   TE.FixtureThreadHook -> False
---   TE.FixtureOnceHook -> False
 
 exceptionTxt :: SomeException -> TE.PException
 exceptionTxt e = TE.PException $ txt <$> P.lines (displayException e)
@@ -126,7 +47,7 @@ data EngineEvent l a
       , loc :: l
       }
   | Failure
-      { 
+      {
        eventType :: TE.EventType
       , loc :: l
       ,  exception :: TE.PException

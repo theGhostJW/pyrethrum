@@ -4,21 +4,19 @@
 
 module Internal.SuiteRuntime where
 
-import BasePrelude (retry)
-import qualified Internal.RunTimeLoggingNew as NL
+import qualified Internal.RunTimeLogging as L
 import qualified Core as C
 import qualified DSL.Internal.ApEvent as AE
-import PyrethrumExtras (catchAll, txt, uu, (?))
+import PyrethrumExtras (catchAll, txt, (?))
 import UnliftIO (
   bracket,
   concurrently_,
   finally,
   forConcurrently_,
   newIORef,
-  tryAny,
   writeTMVar,
  )
-import UnliftIO.Concurrent
+import UnliftIO.Concurrent ( myThreadId )
 import UnliftIO.STM (
   TQueue,
   atomically,
@@ -30,17 +28,8 @@ import UnliftIO.STM (
   writeTQueue,
  )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
-
--- import Internal.PreNode (Context (..), OnceHook (..), PreNode (testHook), TestHook (..), ThreadHook (..))
--- import qualified Internal.PreNode as PN (
---   Fixture (..),
---   PreNode (..),
---   PreNodeRoot,
---   Test (..),
---  )
-
 import qualified Internal.ThreadEvent as TE
-import Internal.RunTimeLoggingNew (FailPoint)
+import Internal.RunTimeLogging (FailPoint)
 import qualified Internal.ThreadEvent as F (Frequency (..))
 import qualified Prepare as C
 import qualified Prepare as P
@@ -48,12 +37,10 @@ import qualified Prepare as P
 newtype ThreadCount = ThreadCount Int
   deriving (Show)
 
--- todo :: mkThreadCOunt with validation
-
-executeNew :: (C.Config rc, C.Config tc) => ThreadCount -> NL.LogControls m NL.ExePath AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
+executeNew :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls m L.ExePath AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
 executeNew
   (ThreadCount maxThreads)
-  NL.LogControls
+  L.LogControls
     { sink
     , logWorker
     , stopWorker
@@ -70,17 +57,17 @@ executeNew
       finally
         ( do
             let nodeList = P.prepare $ C.SuitePrepParams suite interpreter runConfig
-            xtree <- mkXTreeNew (NL.ExePath []) nodeList
+            xtree <- mkXTreeNew (L.ExePath []) nodeList
             executeNodesNew sink xtree maxThreads
         )
         stopWorker
 
-executeNodesNew :: (TE.ThreadEvent NL.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
+executeNodesNew :: (TE.ThreadEvent L.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
 executeNodesNew sink nodes maxThreads =
   do
     rootLogger <- newLogger
     finally
-      ( rootLogger NL.StartExecution
+      ( rootLogger L.StartExecution
           >> forConcurrently_
             thrdTokens
             ( const do
@@ -88,41 +75,40 @@ executeNodesNew sink nodes maxThreads =
                 runChildQ Concurrent (runNodeNew logger (OnceIn (pure ())) ) canRunXTree nodes
             )
       )
-      (rootLogger NL.EndExecution)
+      (rootLogger L.EndExecution)
  where
-  hkIn = Right (ExeIn () () ())
   thrdTokens = replicate maxThreads True
-  newLogger = NL.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
+  newLogger = L.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
 
 data NFrequency = Each | Thread
   deriving (Show, Eq)
 
 data ExeTreeNew hi where
   AfterOnce ::
-    { path :: NL.ExePath
+    { path :: L.ExePath
     , status' :: TVar AfterStatus
     , subNodes' :: ChildQ (ExeTreeNew hi)
     , after :: P.ApEventSink -> IO ()
     } ->
     ExeTreeNew hi
   AroundOnce ::
-    { path :: NL.ExePath
+    { path :: L.ExePath
     , setup :: P.ApEventSink -> hi -> IO ho
     , status :: TVar AroundStatus
-    , cache :: TMVar (Either NL.FailPoint ho)
+    , cache :: TMVar (Either L.FailPoint ho)
     , subNodes :: ChildQ (ExeTreeNew ho)
     , teardown :: Maybe (P.ApEventSink -> ho -> IO ())
     } ->
     ExeTreeNew hi
   After ::
-    { path :: NL.ExePath
+    { path :: L.ExePath
     , frequency :: NFrequency
     , subNodes' :: ChildQ (ExeTreeNew hi)
     , after :: P.ApEventSink -> IO ()
     } ->
     ExeTreeNew hi
   Around ::
-    { path :: NL.ExePath
+    { path :: L.ExePath
     , frequency :: NFrequency
     , setup :: P.ApEventSink -> hi -> IO ho
     , subNodes :: ChildQ (ExeTreeNew ho)
@@ -130,13 +116,13 @@ data ExeTreeNew hi where
     } ->
     ExeTreeNew hi
   Test ::
-    { path :: NL.ExePath
+    { path :: L.ExePath
     , title :: Text
     , tests :: ChildQ (P.TestItem IO hi)
     } ->
     ExeTreeNew hi
 
-mkXTreeNew :: NL.ExePath -> NonEmpty (P.PreNode IO NonEmpty hi) -> IO (ChildQ (ExeTreeNew hi))
+mkXTreeNew :: L.ExePath -> NonEmpty (P.PreNode IO NonEmpty hi) -> IO (ChildQ (ExeTreeNew hi))
 mkXTreeNew xpth preNodes =
   do
     subTrees <- traverse mkNode preNodes
@@ -186,7 +172,7 @@ mkXTreeNew xpth preNodes =
           cq <- mkChildQ tests
           pure $ Test{path, title = c.title, tests = cq}
    where
-    path = NL.ExePath $ pn.path : xpth.unExePath
+    path = L.ExePath $ pn.path : xpth.unExePath
 
     mkOnceHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> IO (ExeTreeNew hi')
     mkOnceHook subNodes' setup teardown = do
@@ -205,8 +191,6 @@ mkXTreeNew xpth preNodes =
 
     mkNHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> NFrequency -> IO (ExeTreeNew hi')
     mkNHook subNodes' setup teardown frequency = do
-      s <- newTVarIO HookPending
-      cache <- newEmptyTMVarIO
       subNodes <- mkXTreeNew path subNodes'
       pure
         $ Around
@@ -291,7 +275,7 @@ canRunChildQ cq =
 newtype QElementRun = QElementRun {hasRun :: Bool}
 
 runChildQ :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO QElementRun
-runChildQ concurrency runner childCanRun q@ChildQ{childNodes, status, runningCount} =
+runChildQ concurrency runner childCanRun ChildQ{childNodes, status, runningCount} =
   runChildQ' (QElementRun False)
  where
   runChildQ' :: QElementRun -> IO QElementRun
@@ -358,30 +342,30 @@ data ExeIn oi ti tsti = ExeIn
   , tstIn :: tsti
   }
 
-type Logger = NL.EngineEvent NL.ExePath AE.ApEvent -> IO ()
+type Logger = L.EngineEvent L.ExePath AE.ApEvent -> IO ()
 
-logAbandonnedNew :: Logger -> NL.ExePath -> TE.EventType -> NL.FailPoint -> IO ()
+logAbandonnedNew :: Logger -> L.ExePath -> TE.EventType -> L.FailPoint -> IO ()
 logAbandonnedNew lgr p e a =
   lgr
-    $ NL.ParentFailure
+    $ L.ParentFailure
       { loc = p
       , eventType = e
       , parentLoc = a.path
       , parentEventType = a.eventType
       }
 
-logReturnFailureNew :: Logger -> NL.ExePath -> TE.EventType -> SomeException -> IO (Either NL.FailPoint b)
+logReturnFailureNew :: Logger -> L.ExePath -> TE.EventType -> SomeException -> IO (Either L.FailPoint b)
 logReturnFailureNew lgr p et e =
   do
-    lgr (NL.mkFailure p et e)
-    pure . Left $ NL.FailPoint p et
+    lgr (L.mkFailure p et e)
+    pure . Left $ L.FailPoint p et
 
 data CanAbandon = None | Partial | All
   deriving (Show, Eq)
 
 canAbandon :: ExeTreeNew hi -> STM CanAbandon
 canAbandon = \case
-  AfterOnce{subNodes', status'} -> do
+  AfterOnce{status'} -> do
     s <- readTVar status'
     pure $ s & \case
       AfterQPending -> All
@@ -389,7 +373,7 @@ canAbandon = \case
       AfterRunning -> None
       AfterAbandoning -> None
       AfterDone -> None
-  AroundOnce{subNodes, status} -> do
+  AroundOnce{status} -> do
     s <- readTVar status
     pure $ s & \case
       SetupPending -> All
@@ -495,7 +479,7 @@ runNodeNew ::
   IO ()
 runNodeNew lgr hi xt =
   let
-    logRun' :: TE.EventType -> (P.ApEventSink -> IO b) -> IO (Either NL.FailPoint b)
+    logRun' :: TE.EventType -> (P.ApEventSink -> IO b) -> IO (Either L.FailPoint b)
     logRun' et action = logRun lgr xt.path et (action sink)
 
     logRun_ :: TE.EventType -> (P.ApEventSink -> IO b) -> IO ()
@@ -515,15 +499,14 @@ runNodeNew lgr hi xt =
     shouldNeverHappen :: Text -> IO ()
     shouldNeverHappen cst = bug @Void . error $ "EachIn should not be passed to: " <> cst <> " " <> txt xt.path
 
-    sink = lgr . NL.ApEvent
+    sink = lgr . L.ApEvent
    in
     case xt of
       -- as we know tree shaking has been executed prior to running we can assume we
       -- always need to execute once hooks if the status is correct. There is no
       -- possibility of empty subnodes due to tree shaking.
       AfterOnce
-        { path
-        , status'
+        { status'
         , subNodes'
         , after
         } -> do
@@ -554,12 +537,12 @@ runNodeNew lgr hi xt =
                       Abandon fp -> runAfter (Just fp)
                       EachIn _ -> shouldNeverHappen "AfterOnce"
                       ThreadIn _ -> shouldNeverHappen "AfterOnce"
-                      OnceIn ioHi -> runAfter Nothing
+                      OnceIn _ -> runAfter Nothing
               )
       -- as we know tree shaking has been executed prior to running we can assume we
       -- always need to execute once hooks if the status is correct. There is no
       -- possibility of empty subnodes due to tree shaking.
-      ao@AroundOnce{path, setup, status, cache, subNodes, teardown} ->
+      ao@AroundOnce{setup, status, cache, subNodes, teardown} ->
         case hi of
           Abandon fp -> do
             setUpLocked <- atomically $ do
@@ -713,7 +696,6 @@ runNodeNew lgr hi xt =
                         )
                         pure
 
-
                 EachIn{} -> shouldNeverHappen "Around Thread"
                 OnceIn ioHi -> do
                   -- Action can't be run until its actually needed by a test.
@@ -755,7 +737,7 @@ runNodeNew lgr hi xt =
                         )
                         pure
       ---
-      Test{path, title, tests} ->
+      Test{path, tests} ->
         case hi of
           Abandon fp -> runTests (`runTestItem` Left fp)
           EachIn{apply} -> runTests (apply . runTestItem)
@@ -772,8 +754,8 @@ runNodeNew lgr hi xt =
               (logAbandonnedNew lgr (mkTestPath tstItm) TE.Test)
               (void . logRun lgr (mkTestPath tstItm) TE.Test . tstItm.action sink)
 
-        mkTestPath :: P.TestItem IO hi -> NL.ExePath
-        mkTestPath P.TestItem{id, title = ttl} = NL.ExePath $ AE.TestPath{id, title = ttl} : path.unExePath
+        mkTestPath :: P.TestItem IO hi -> L.ExePath
+        mkTestPath P.TestItem{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : path.unExePath
 
 data NodeIn hi
   = Abandon FailPoint
@@ -794,9 +776,9 @@ tryLock hs cq canLock lockStatus =
     pure cl
 
 
-logRun :: Logger -> NL.ExePath -> TE.EventType -> IO b -> IO (Either NL.FailPoint b)
+logRun :: Logger -> L.ExePath -> TE.EventType -> IO b -> IO (Either L.FailPoint b)
 logRun lgr path evt action = do
-  lgr $ NL.Start evt path
+  lgr $ L.Start evt path
   finally
     ( catchAll
         -- TODO :: test for strictness issues esp with failing thread hook
@@ -804,4 +786,4 @@ logRun lgr path evt action = do
         (Right <$> action)
         (logReturnFailureNew lgr path evt)
     )
-    (lgr $ NL.End evt path)
+    (lgr $ L.End evt path)

@@ -5,7 +5,6 @@
 module Internal.SuiteRuntime where
 
 import BasePrelude (retry)
--- import GHC.Exts
 -- import Internal.RunTimeLogging (
 --   ExeEvent (..),
 --   ExeEventType (TestHook, TestHookRelease, ThreadHookRelease),
@@ -48,23 +47,16 @@ import UnliftIO.STM (
  )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
 
--- PRENODE TO BE DEPRECATED
-import Internal.PreNode (Context (..), OnceHook (..), PreNode (testHook), TestHook (..), ThreadHook (..))
-import qualified Internal.PreNode as PN (
-  Fixture (..),
-  PreNode (..),
-  PreNodeRoot,
-  Test (..),
- )
+-- import Internal.PreNode (Context (..), OnceHook (..), PreNode (testHook), TestHook (..), ThreadHook (..))
+-- import qualified Internal.PreNode as PN (
+--   Fixture (..),
+--   PreNode (..),
+--   PreNodeRoot,
+--   Test (..),
+--  )
 
 import qualified Internal.ThreadEvent as TE
-
--- NEW
-
-import Foreign.C (eMULTIHOP)
-import GHC.RTS.Flags (DebugFlags (interpreter))
 import Internal.RunTimeLoggingNew (FailPoint)
-import Internal.ThreadEvent (EventType, ThreadEvent)
 import qualified Internal.ThreadEvent as F (Frequency (..))
 import qualified Prepare as C
 import qualified Prepare as P
@@ -99,8 +91,7 @@ executeNew
         )
         stopWorker
 
--- executeNodesNew :: (NL.EngineEvent NL.ExePath a -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
-executeNodesNew :: (ThreadEvent NL.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
+executeNodesNew :: (TE.ThreadEvent NL.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTreeNew ()) -> Int -> IO ()
 executeNodesNew sink nodes maxThreads =
   do
     rootLogger <- newLogger
@@ -110,11 +101,10 @@ executeNodesNew sink nodes maxThreads =
             thrdTokens
             ( const do
                 logger <- newLogger
-                uu
-                -- runNodes logger nodes
+                runChildQ Concurrent (runNodeNew logger (OnceIn (pure ())) ) canRunXTree nodes
             )
       )
-      ({- waitDone nodes >>-} rootLogger NL.EndExecution)
+      (rootLogger NL.EndExecution)
  where
   hkIn = Right (ExeIn () () ())
   thrdTokens = replicate maxThreads True
@@ -381,18 +371,15 @@ mkChildQ children = do
       , runningCount = rc
       }
 
-
-
 data ExeIn oi ti tsti = ExeIn
   { onceIn :: oi
   , threadIn :: ti
   , tstIn :: tsti
   }
 
-
 type Logger = NL.EngineEvent NL.ExePath AE.ApEvent -> IO ()
 
-logAbandonnedNew :: Logger -> NL.ExePath -> EventType -> NL.FailPoint -> IO ()
+logAbandonnedNew :: Logger -> NL.ExePath -> TE.EventType -> NL.FailPoint -> IO ()
 logAbandonnedNew lgr p e a =
   lgr
     $ NL.ParentFailure
@@ -402,7 +389,7 @@ logAbandonnedNew lgr p e a =
       , parentEventType = a.eventType
       }
 
-logReturnFailureNew :: Logger -> NL.ExePath -> EventType -> SomeException -> IO (Either NL.FailPoint b)
+logReturnFailureNew :: Logger -> NL.ExePath -> TE.EventType -> SomeException -> IO (Either NL.FailPoint b)
 logReturnFailureNew lgr p et e =
   do
     lgr (NL.mkFailure p et e)

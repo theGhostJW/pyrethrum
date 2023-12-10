@@ -12,7 +12,6 @@ import Data.Either.Extra (fromRight', mapLeft)
 import Effectful (Eff, runEff, runPureEff)
 import Effectful.Dispatch.Dynamic (interpret)
 import qualified Effectful.Error.Static as E
-import Internal.RunTimeLogging (ExeLog)
 import Internal.ThreadEvent (Frequency)
 import PyrethrumExtras (MonadCatch (catch), try, uu)
 import UnliftIO.Exception (tryAny)

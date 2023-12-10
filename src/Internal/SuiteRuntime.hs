@@ -5,23 +5,7 @@
 module Internal.SuiteRuntime where
 
 import BasePrelude (retry)
--- import Internal.RunTimeLogging (
---   ExeEvent (..),
---   ExeEventType (TestHook, TestHookRelease, ThreadHookRelease),
---   LogControls (LogControls),
---   SThreadId,
---   logWorker,
---   mkFailure,
---   mkLogger,
---   mkParentFailure,
---   sink,
---   stopWorker,
---  )
-
 import qualified Internal.RunTimeLoggingNew as NL
-
-import qualified Internal.RunTimeLogging as L
-
 import qualified Core as C
 import qualified DSL.Internal.ApEvent as AE
 import PyrethrumExtras (catchAll, txt, uu, (?))
@@ -294,9 +278,6 @@ data Concurrency
   = Sequential
   | Concurrent
   deriving (Show, Eq)
-
-mkTestChildLoc :: (Show a) => L.Loc -> a -> L.Loc
-mkTestChildLoc testLoc evt = L.Node testLoc $ txt evt
 
 canRunChildQ :: ChildQ a -> STM Bool
 canRunChildQ cq =

@@ -1,12 +1,57 @@
 module AuxFiles where
 
-import BasePrelude as P (IOError, IOErrorType, getExecutablePath, userError)
+import BasePrelude as P (IOError, getExecutablePath, userError)
 import Chronos as C
+    ( (...),
+      encode_YmdHMS,
+      now,
+      timeFromYmdhms,
+      timeToDatetime,
+      width,
+      Date(dateYear),
+      Datetime(datetimeDate),
+      DatetimeFormat(DatetimeFormat),
+      SubsecondPrecision(SubsecondPrecisionAuto),
+      Time,
+      Timespan(getTimespan),
+      Year(getYear) )
 import Control.Exception (throw)
 import qualified Data.Char as C
 import Data.Text.IO (putStrLn, writeFile)
 import Path.Extended
+    ( toFilePath,
+      (</>),
+      parent,
+      parseAbsFile,
+      reldir,
+      relfile,
+      parseRelFileSafe,
+      Path,
+      Abs,
+      Rel,
+      AbsDir,
+      AbsFile,
+      RelDir,
+      RelFile )
 import PyrethrumExtras
+    ( txt,
+      (?),
+      toS,
+      catchIOError,
+      toFilePath,
+      (</>),
+      parent,
+      parseAbsFile,
+      reldir,
+      relfile,
+      parseRelFileSafe,
+      Path,
+      Abs,
+      Rel,
+      AbsDir,
+      AbsFile,
+      RelDir,
+      RelFile )
 import PyrethrumExtras.IO as PIO (subDirFromBaseDir)
 import qualified System.IO as S
 import Prelude hiding (putStrLn, writeFile)
@@ -49,6 +94,7 @@ dumpTxt projRoot txt' file = do
       throw
       (\p -> writeFile (toFilePath p) txt')
 
+_tempFile :: IO (Either IOError AbsFile)
 _tempFile = tempFileBase (parent <$> (parseAbsFile =<< getExecutablePath)) [relfile|demoTemp.txt|]
 
 newtype FileExt = FileExt {unFileExt :: Text} deriving (Show, Eq, Ord)

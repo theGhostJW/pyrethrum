@@ -87,7 +87,7 @@ data PathResult = PathResult
 getPathsData :: (Out ApEvent :> es, FileSystem :> es) => Eff es PathResult
 getPathsData = do
   p <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
-  output <- walkDirAccum Nothing (\root subs files -> pure files) [absdir|C:\Pyrethrum|]
+  output <- walkDirAccum Nothing (\_root _subs files -> pure files) [absdir|C:\Pyrethrum|]
   r <- test p
   log $ r ? "yes" $ "no"
   pure

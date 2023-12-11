@@ -13,7 +13,7 @@ import BasePrelude (IOException)
 import Control.Monad.Catch (catch, handle)
 import qualified DSL.Internal.FileSystemPure as FSP
 import qualified DSL.Internal.FileSystemRawIO as R
-import DSL.Out
+import DSL.Out ( out, Out )
 import Effectful as EF (
   Eff,
   IOE,
@@ -24,16 +24,11 @@ import Effectful as EF (
 import DSL.FileSystemEffect (FileSystem (..))
 import DSL.Internal.ApEvent (ApEvent (..), FLog (Step))
 import qualified Data.Text as T
-import Effectful.Dispatch.Dynamic (
-  HasCallStack,
-  LocalEnv,
-  interpret,
-  localSeqUnliftIO,
- )
 import qualified Effectful.Error.Static as E
 import GHC.TypeError (ErrorMessage (Text))
 import Path.Extended (Path, toFilePath)
-import PyrethrumExtras (toS, txt, uu, (?))
+import PyrethrumExtras (toS, txt, (?))
+import Effectful.Dispatch.Dynamic (LocalEnv, interpret)
 
 data DocException
   = DocException Text
@@ -90,9 +85,6 @@ docErr3 funcName funcDesc1 funcDesc2 funcDesc3 = docErrn funcName [funcDesc1, fu
 docErr4 :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, E.Error DocException :> es) => Text -> Text -> Text -> Text -> Text -> Eff es a
 docErr4 funcName funcDesc1 funcDesc2 funcDesc3 funcDesc4 = docErrn funcName [funcDesc1, funcDesc2, funcDesc3, funcDesc4]
 
-docErr5 :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, E.Error DocException :> es) => Text -> Text -> Text -> Text -> Text -> Text -> Eff es a
-docErr5 funcName funcDesc1 funcDesc2 funcDesc3 funcDesc4 funcDesc5 = docErrn funcName [funcDesc1, funcDesc2, funcDesc3, funcDesc4, funcDesc5]
-
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, E.Error DocException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
   interpret handler
@@ -103,18 +95,18 @@ runFileSystem =
     LocalEnv localEs es ->
     FileSystem (Eff localEs) a' ->
     Eff es a'
-  handler env fs =
+  handler _env fs =
     case fs of
       -- todo: rename all variables / separate type signatures by using the other templateHaskell method
-      WithCurrentDir path action -> docErr "withCurrentDir" "run action in current working directory"
-      FindFilesWith predicate searchDirs targetFileName ->
+      WithCurrentDir _path _action -> docErr "withCurrentDir" "run action in current working directory"
+      FindFilesWith _predicate searchDirs targetFileName ->
         docErr4
           "findFilesWith"
           "find all files that match the file name:"
           (showPath targetFileName)
           "and satisfy the given predicate in directories:"
           (showPaths searchDirs)
-      FindFileWith predicate searchDirs targetFileName ->
+      FindFileWith _predicate searchDirs targetFileName ->
         docErr4
           "findFileWith"
           "find the first file that matches the file name:"
@@ -128,56 +120,56 @@ runFileSystem =
           (showPath srcFile)
           "with metadata to:"
           (showPath destFile)
-      WalkDir action dir ->
+      WalkDir _action dir ->
         docErr3
           "walkDir"
           "recurssively walk the directory:"
           (showPath dir)
           "performing an action on each subdirectory"
-      WalkDirRel action path ->
+      WalkDirRel _action path ->
         docErr3
           "walkDirRel"
           "recurssively walk the directory:"
           (showPath path)
           "performing an action on each subdirectory"
-      WalkDirAccum descendHandler transformer startDir ->
+      WalkDirAccum _descendHandler _transformer startDir ->
         docErr3
           "WalkDirAccum"
           "walk:"
           (showPath startDir)
           "accumulating a result"
-      WalkDirAccumRel descendHandler transformer startDir ->
+      WalkDirAccumRel _descendHandler _transformer startDir ->
         docErr3
           "WalkDirAccum"
           "walk:"
           (showPath startDir)
           "accumulating a result"
-      WithTempFile parentDir fileName action ->
+      WithTempFile parentDir _fileName _action ->
         docErr3
           "withTempFile"
           "create a new temporary file inside:"
           (showPathComma parentDir)
           "perform an action in the new file, and delete after use"
-      WithTempDir parentDir dirTemplate action ->
+      WithTempDir parentDir _dirTemplate _action ->
         docErr3
           "withTempDir"
           "create a new temporary directory inside:"
           (showPathComma parentDir)
           "perform an action in the new directory, and delete after use"
-      WithSystemTempFile dirTemplate action ->
+      WithSystemTempFile _dirTemplate _action ->
         docErr
           "withSystemTempFile"
           "create a new temporary file inside the system temp directory, perform an action in the new file and delete after use"
-      WithSystemTempDir dirTemplate action ->
+      WithSystemTempDir _dirTemplate _action ->
         docErr
           "withSystemTempDir"
           "create a new temporary directory inside the system temp directory, perform an action in the new directory and delete after use"
-      ForgivingAbsence action -> docErr "forgivingAbsence" "run an action, returning Nothing if it throws a `Does Not Exist` exception"
-      IgnoringAbsence action -> docErr "ignoringAbsence" "run an action ignoring `Does Not Exist` exception"
-      WithBinaryFile path ioMode action -> docErr3 "withBinaryFile" "open a binary file:" (showPath path) "perform an action in the file and close it after use"
-      WithBinaryFileAtomic path ioMode action -> docErr3 "withBinaryFileAtomic" "open a binary file:" (showPath path) "perform an action in the file and close it after use"
-      WithBinaryFileDurable path ioMode action -> docErr3 "withBinaryFileDurable" "open a binary file:" (showPath path) "perform an action in the file and close it after use"
-      WithBinaryFileDurableAtomic path ioMode action -> docErr3 "withBinaryFileDurableAtomic" "open a binary file:" (showPath path) "perform an action in the file and close it after use"
+      ForgivingAbsence _action -> docErr "forgivingAbsence" "run an action, returning Nothing if it throws a `Does Not Exist` exception"
+      IgnoringAbsence _action -> docErr "ignoringAbsence" "run an action ignoring `Does Not Exist` exception"
+      WithBinaryFile path _ioMode _action -> docErr3 "withBinaryFile" "open a binary file:" (showPath path) "perform an action in the file and close it after use"
+      WithBinaryFileAtomic path _ioMode _action -> docErr3 "withBinaryFileAtomic" "open a binary file:" (showPath path) "perform an action in the file and close it after use"
+      WithBinaryFileDurable path _ioMode _action -> docErr3 "withBinaryFileDurable" "open a binary file:" (showPath path) "perform an action in the file and close it after use"
+      WithBinaryFileDurableAtomic path _ioMode _action -> docErr3 "withBinaryFileDurableAtomic" "open a binary file:" (showPath path) "perform an action in the file and close it after use"
       GetCurrentDir -> docErr "getCurrentDir" "get the current working directory"
       GetHomeDir -> docErr "getHomeDir" "get the home directory"
       GetXdgDir directoryType subDir -> docErr3 "getXdgDir" "get the XDG directory:" (txt directoryType) (maybe "" (\d -> "subDir:" <> showPath d) subDir)
@@ -189,9 +181,9 @@ runFileSystem =
       DoesPathExist path -> docErr2 "doesPathExist" "check if path exists:" (showPath path)
       DoesFileExist file -> docErr2 "doesFileExist" "check if file exists:" (showPath file)
       DoesDirExist dir -> docErr2 "doesDirExist" "check if directory exists:" (showPath dir)
-      CanonicalizePath path -> docErr "canonicalizePath" "canonicalize path"
-      MakeAbsolute p -> docErr "makeAbsolute" "make path absolute"
-      MakeRelativeToCurrentDir p -> docErr "makeRelativeToCurrentDir" "make path relative to current directory"
+      CanonicalizePath _path -> docErr "canonicalizePath" "canonicalize path"
+      MakeAbsolute _p -> docErr "makeAbsolute" "make path absolute"
+      MakeRelativeToCurrentDir _p -> docErr "makeRelativeToCurrentDir" "make path relative to current directory"
       FindExecutable fileName -> docErr3 "findExecutable" "find executable:" (showPath fileName) "in the directories listed in system PATH."
       FindFile searchDirs fileName -> docErr4 "findFile" "find file:" (showPath fileName) "in the directories:" (showPaths searchDirs)
       FindFiles searchDirs fileName -> docErr4 "findFiles" "find files:" (showPath fileName) "in the directories:" (showPaths searchDirs)
@@ -240,10 +232,10 @@ runFileSystem =
       CopyDirRecur src dst -> docErr4 "copyDirRecur" "copy directory recursively:" (showPath src) "to:" (showPath dst)
       CopyDirRecur' src dst -> docErr4 "copyDirRecur'" "copy directory recursively:" (showPath src) "to:" (showPath dst)
       EnsureFileDurable filePath -> docErr2 "ensureFileDurable" "ensure file is durable:" (showPath filePath)
-      WriteBinaryFile filePath bytes -> docErr2 "writeBinaryFile" "write binary file:" (showPath filePath)
-      WriteBinaryFileAtomic filePath bytes -> docErr2 "writeBinaryFileAtomic" "write binary file atomically:" (showPath filePath)
-      WriteBinaryFileDurable filePath bytes -> docErr2 "writeBinaryFileDurable" "write binary file durably:" (showPath filePath)
-      WriteBinaryFileDurableAtomic filePath bytes -> docErr2 "writeBinaryFileDurableAtomic" "write binary file durably atomically:" (showPath filePath)
+      WriteBinaryFile filePath _bytes -> docErr2 "writeBinaryFile" "write binary file:" (showPath filePath)
+      WriteBinaryFileAtomic filePath _bytes -> docErr2 "writeBinaryFileAtomic" "write binary file atomically:" (showPath filePath)
+      WriteBinaryFileDurable filePath _bytes -> docErr2 "writeBinaryFileDurable" "write binary file durably:" (showPath filePath)
+      WriteBinaryFileDurableAtomic filePath _bytes -> docErr2 "writeBinaryFileDurableAtomic" "write binary file durably atomically:" (showPath filePath)
    where
     showPath :: Path c d -> Text
     showPath = toS . toFilePath
@@ -253,18 +245,3 @@ runFileSystem =
 
     showPaths :: [Path c d] -> Text
     showPaths = toS . show . fmap toFilePath
-
-    hoe :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
-    hoe h = handle (\(e :: SomeException) -> E.throwError . DocException' "Exception genrated running step documenter" $ e) (localSeqUnliftIO env h)
-    --
-    info :: (Show o) => Text -> o -> Text
-    info prefix o = prefix <> ": " <> txt o
-
-    info' :: (Show o, Show o2) => Text -> o -> Text -> o2 -> Text
-    info' prefix o sep o2 = prefix <> ": " <> txt o <> sep <> ": " <> txt o2
-
-    dirInfo :: forall c d. Text -> Path c d -> Text
-    dirInfo prefix = info prefix . toFilePath
-
-    dirInfo' :: forall c d e f. Text -> Path c d -> Text -> Path e f -> Text
-    dirInfo' prefix p sep p2 = info' prefix (toFilePath p) sep (toFilePath p2)

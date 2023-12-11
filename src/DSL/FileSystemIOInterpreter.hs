@@ -15,10 +15,8 @@ import Effectful as EF (
   type (:>),
  )
 
-import AuxFiles (HandleInfo (path))
 import DSL.FileSystemEffect (FSException (..), FileSystem (..))
 import Effectful.Dispatch.Dynamic (
-  HasCallStack,
   LocalEnv,
   interpret,
   localSeqUnliftIO,
@@ -47,7 +45,7 @@ runFileSystem =
         WithCurrentDir path action -> withUnlifter $ \ul -> R.withCurrentDir path (ul action)
         FindFilesWith predicate searchDirs targetFileName -> withUnlifter $ \ul -> R.findFilesWith (ul . predicate) searchDirs targetFileName
         FindFileWith predicate searchDirs targetFileName -> withUnlifter $ \ul -> R.findFileWith (ul . predicate) searchDirs targetFileName
-        CopyFileWithMetadata srcFile destFile -> withUnlifter $ \ul -> R.copyFileWithMetadata srcFile destFile
+        CopyFileWithMetadata srcFile destFile -> withUnlifter $ const $ R.copyFileWithMetadata srcFile destFile
         WalkDir action dir -> withUnlifter $ \ul -> R.walkDir (\b drs -> ul . action b drs) dir
         WalkDirRel action dir -> withUnlifter $ \ul -> R.walkDirRel (\b drs -> ul . action b drs) dir
         WalkDirAccum descendHandler transformer startDir -> withUnlifter $ \ul ->

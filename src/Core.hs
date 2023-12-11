@@ -3,17 +3,12 @@
 module Core where
 
 import DSL.Internal.ApEvent hiding (Check)
-import Data.Aeson (FromJSON, ToJSON (..), Value (..), parseJSON, toJSON)
+import Data.Aeson (ToJSON (..))
 import Internal.ThreadEvent ( Frequency(..) )
 
-import qualified Data.DList as DL
-import Effectful (Eff, Effect)
+import Effectful (Eff)
 import Effectful.Error.Static as E (Error)
-import Effectful.Internal.Effect ((:>))
-import Effectful.TH (makeEffect)
 import GHC.Records (HasField)
-import GHC.Show (Show (..))
-import PyrethrumExtras (toS, uu)
 import Check (Checks)
 
 newtype CheckFailure = CheckFailure Text

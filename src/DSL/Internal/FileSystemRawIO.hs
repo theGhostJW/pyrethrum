@@ -124,14 +124,13 @@ module DSL.Internal.FileSystemRawIO (
 ) where
 
 import Data.Time (UTCTime)
-import Path
-import Path.IO (AnyPath (..))
+import Path ( toFilePath, parseAbsFile, Path, Abs, Dir, File, Rel )
 import qualified Path.IO as D
-import Prelude (Bool (..), ByteString, Handle, IO, IOMode, Integer, Maybe (..), MonadIO, Text, flip, fmap, ($), (.), (<$>), (==), (>>=), (||))
+import Prelude (Bool (..), ByteString, Handle, IO, IOMode, Maybe (..), MonadIO, Text, fmap, (.), (<$>), (>>=))
 import qualified Prelude as P
 
 import Chronos (OffsetDatetime)
-import PyrethrumExtras (MonadCatch, MonadMask, toS)
+import PyrethrumExtras (MonadMask, toS)
 import TempUtils (offsetDateTimeToUtc, utcToOffsetDateTime)
 import UnliftIO (MonadUnliftIO)
 import qualified UnliftIO.IO.File as ULF

@@ -6,15 +6,20 @@ import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
 import qualified Core as C
 import DSL.Internal.ApEvent
-import DSL.Out (Sink (..))
+    ( ApEvent(Framework),
+      Path,
+      exceptionEvent,
+      ApStateJSON(ApStateJSON),
+      DStateJSON(DStateJSON),
+      FLog(SkipedCheckStart, Parse, Action, Check, CheckStart),
+      ItemJSON(ItemJSON) )
 import Data.Aeson (ToJSON (toJSON))
-import Data.Either.Extra (fromRight', mapLeft)
-import Effectful (Eff, runEff, runPureEff)
-import Effectful.Dispatch.Dynamic (interpret)
+import Data.Either.Extra ( mapLeft)
+import Effectful (Eff, runPureEff)
 import qualified Effectful.Error.Static as E
 import Internal.ThreadEvent (Frequency)
-import PyrethrumExtras (MonadCatch (catch), try, uu)
 import UnliftIO.Exception (tryAny)
+import PyrethrumExtras (uu)
 
 data PreNode m c hi where
   Before ::
@@ -141,7 +146,7 @@ logThrow :: ApEventSink -> CallStack -> SomeException -> IO a
 logThrow sink cs ex = sink (exceptionEvent ex cs) >> throwIO ex
 
 prepareTest :: forall m rc tc hi effs. (C.Config tc, Applicative m) => PrepParams rc tc effs -> Path -> C.Test m rc tc effs hi -> PreNode IO m hi
-prepareTest pp@PrepParams{interpreter, runConfig} path =
+prepareTest PrepParams{interpreter, runConfig} path =
   \case
     C.Full{config, action, parse, items} ->
       Test
@@ -151,12 +156,12 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
                 TestItem
                   { id = i.id
                   , title = i.title
-                  , action = runTest (action runConfig) parse i
+                  , action = \snk _hi -> runTest (action runConfig) parse i snk
                   }
             ) <$> items runConfig
         }
 
-    C.Full'{config', depends, action', parse', items'} ->
+    C.Full'{config', action', parse', items'} ->
       Test
         { config = config'
         , path
@@ -164,7 +169,7 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
                 TestItem
                   { id = i.id
                   , title = i.title
-                  , action = \snk hi -> runTest (action' runConfig hi) parse' i snk hi
+                  , action = \snk hi -> runTest (action' runConfig hi) parse' i snk
                   }
             ) <$> items' runConfig
         }
@@ -177,7 +182,7 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
                 TestItem
                   { id = i.id
                   , title = i.title
-                  , action = runNoParseTest (action runConfig) i
+                  , action =  \snk _hi -> runNoParseTest (action runConfig) i snk
                   }
             )
               <$> items runConfig
@@ -191,7 +196,7 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
                 TestItem
                   { id = i.id
                   , title = i.title
-                  , action = \snk hi -> runNoParseTest (action' runConfig hi) i snk hi
+                  , action = \snk hi -> runNoParseTest (action' runConfig hi) i snk
                   }
             )
               <$> items' runConfig
@@ -205,7 +210,7 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
               $ TestItem
                 { id = 0
                 , title = config.title
-                , action = \snk hi ->
+                , action = \snk _hi ->
                     do
                       ds <- tryAny $ do
                         flog snk . Action path . ItemJSON $ toJSON config.title
@@ -235,27 +240,27 @@ prepareTest pp@PrepParams{interpreter, runConfig} path =
  where
   applyParser parser = mapLeft (fmap toException) . runPureEff . E.runError . parser
 
-  runAction :: forall i as ds. (C.Item i ds) => ApEventSink -> (i -> Eff effs as) -> i -> hi -> IO as
-  runAction snk action i hi =
+  runAction :: forall i as ds. (C.Item i ds) => ApEventSink -> (i -> Eff effs as) -> i -> IO as
+  runAction snk action i =
     do
       flog snk . Action path . ItemJSON $ toJSON i
       eas <- interpreter $ action i
       unTry snk eas
 
-  runTest :: forall i as ds. (ToJSON as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> ApEventSink -> hi -> IO ()
-  runTest action parser i snk hi =
+  runTest :: forall i as ds. (ToJSON as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> ApEventSink -> IO ()
+  runTest action parser i snk =
     do
       ds <- tryAny
         do
-          as <- runAction snk action i hi
+          as <- runAction snk action i
           flog snk . Parse path . ApStateJSON $ toJSON as
           let eds = applyParser parser as
           unTry snk eds
       applyChecks snk path i.checks ds
 
-  runNoParseTest :: forall i ds. (C.Item i ds) => (i -> Eff effs ds) -> i -> ApEventSink -> hi -> IO ()
-  runNoParseTest action i snk hi =
-    tryAny (runAction snk action i hi) >>= applyChecks snk path i.checks
+  runNoParseTest :: forall i ds. (C.Item i ds) => (i -> Eff effs ds) -> i -> ApEventSink -> IO ()
+  runNoParseTest action i snk =
+    tryAny (runAction snk action i) >>= applyChecks snk path i.checks
 
 applyChecks :: forall ds. (ToJSON ds) => ApEventSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
 applyChecks snk p chks =
@@ -301,7 +306,7 @@ filterSuite :: [C.SuiteElement [] rc tc effs ()] -> NonEmpty (C.SuiteElement Non
 filterSuite = uu
 
 prepare :: (C.Config rc, C.Config tc) => SuitePrepParams [] rc tc effs -> NonEmpty (PreNode IO NonEmpty ())
-prepare spp@SuitePrepParams{suite, interpreter, runConfig} =
+prepare SuitePrepParams{suite, interpreter, runConfig} =
   prepSuiteElm pp <$> filterSuite suite
  where
   pp = PrepParams interpreter runConfig

@@ -1,6 +1,6 @@
 module SuiteRuntimeTest where
 
-import Internal.SuiteRuntime
+-- import Internal.SuiteRuntime
 
 
 {-

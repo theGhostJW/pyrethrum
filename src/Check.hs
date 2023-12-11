@@ -20,11 +20,8 @@ where
 
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import Data.Aeson.Types as AT (ToJSON (toJSON), Value (String))
-import Data.Function (($), (&), (.))
-import qualified Data.List as L
-import Data.Text (Text, foldr')
 import GHC.Show (Show (..))
-import PyrethrumExtras (toS, uu, (?))
+import PyrethrumExtras (toS, (?))
 import UnliftIO (MonadUnliftIO, tryAny)
 import Prelude as P
 

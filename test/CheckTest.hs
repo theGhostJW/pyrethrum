@@ -1,5 +1,6 @@
 module CheckTest where
 
+{-
 import           Check               as Chk
 import           Data.Function
 import           Data.DList as D
@@ -7,7 +8,6 @@ import qualified PyrethrumExtras.Test       as UT
 import PyrethrumExtras
 import PyrethrumExtras.Test hiding (chk, chk')
 
-{-
 isBig = chk "More than 10" (> 10)
 isEven = chk "Even" even
 isOdd = chk "Odd" odd

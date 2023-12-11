@@ -113,7 +113,6 @@ import Effectful as EF (
   DispatchOf,
   Effect,
  )
-import Effectful.Dispatch.Dynamic
 import Effectful.TH (makeEffect)
 import Path.IO (AbsPath, AnyPath, RelPath)
 

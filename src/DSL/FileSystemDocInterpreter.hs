@@ -6,13 +6,7 @@ module DSL.FileSystemDocInterpreter (
   adaptException,
 ) where
 
--- FileSystem,
--- runFileSystem,
-
-import BasePrelude (IOException)
-import Control.Monad.Catch (catch, handle)
-import qualified DSL.Internal.FileSystemPure as FSP
-import qualified DSL.Internal.FileSystemRawIO as R
+import Control.Monad.Catch (catch)
 import DSL.Out ( out, Out )
 import Effectful as EF (
   Eff,
@@ -25,7 +19,6 @@ import DSL.FileSystemEffect (FileSystem (..))
 import DSL.Internal.ApEvent (ApEvent (..), FLog (Step))
 import qualified Data.Text as T
 import qualified Effectful.Error.Static as E
-import GHC.TypeError (ErrorMessage (Text))
 import Path.Extended (Path, toFilePath)
 import PyrethrumExtras (toS, txt, (?))
 import Effectful.Dispatch.Dynamic (LocalEnv, interpret)

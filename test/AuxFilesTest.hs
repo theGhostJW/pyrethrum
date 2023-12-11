@@ -3,6 +3,7 @@ import AuxFiles
 import Chronos as C
 import PyrethrumExtras.Test
 
+unit_a_file_prefix_generated_at_a_later_date_will_be_smaller :: Assertion
 unit_a_file_prefix_generated_at_a_later_date_will_be_smaller =
   chk $ pfxLate < pfxEarly
   where

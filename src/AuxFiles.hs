@@ -1,57 +1,46 @@
 module AuxFiles where
 
 import BasePrelude as P (IOError, getExecutablePath, userError)
-import Chronos as C
-    ( (...),
-      encode_YmdHMS,
-      now,
-      timeFromYmdhms,
-      timeToDatetime,
-      width,
-      Date(dateYear),
-      Datetime(datetimeDate),
-      DatetimeFormat(DatetimeFormat),
-      SubsecondPrecision(SubsecondPrecisionAuto),
-      Time,
-      Timespan(getTimespan),
-      Year(getYear) )
+import Chronos as C (
+  Date (dateYear),
+  Datetime (datetimeDate),
+  DatetimeFormat (DatetimeFormat),
+  SubsecondPrecision (SubsecondPrecisionAuto),
+  Time,
+  Timespan (getTimespan),
+  Year (getYear),
+  encode_YmdHMS,
+  now,
+  timeFromYmdhms,
+  timeToDatetime,
+  width,
+  (...),
+ )
 import Control.Exception (throw)
 import qualified Data.Char as C
 import Data.Text.IO (putStrLn, writeFile)
-import Path.Extended
-    ( toFilePath,
-      (</>),
-      parent,
-      parseAbsFile,
-      reldir,
-      relfile,
-      parseRelFileSafe,
-      Path,
-      Abs,
-      Rel,
-      AbsDir,
-      AbsFile,
-      RelDir,
-      RelFile )
-import PyrethrumExtras
-    ( txt,
-      (?),
-      toS,
-      catchIOError,
-      toFilePath,
-      (</>),
-      parent,
-      parseAbsFile,
-      reldir,
-      relfile,
-      parseRelFileSafe,
-      Path,
-      Abs,
-      Rel,
-      AbsDir,
-      AbsFile,
-      RelDir,
-      RelFile )
+import Path.Extended (
+  Abs,
+  AbsDir,
+  AbsFile,
+  Path,
+  Rel,
+  RelDir,
+  RelFile,
+  parent,
+  parseAbsFile,
+  parseRelFileSafe,
+  reldir,
+  relfile,
+  toFilePath,
+  (</>),
+ )
+import PyrethrumExtras (
+  catchIOError,
+  toS,
+  txt,
+  (?),
+ )
 import PyrethrumExtras.IO as PIO (subDirFromBaseDir)
 import qualified System.IO as S
 import Prelude hiding (putStrLn, writeFile)

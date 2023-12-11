@@ -9,15 +9,13 @@ module DSL.Out (
   runOut
 ) where
 
-import DSL.Internal.ApEvent
 import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, IOE, (:>))
-import Effectful.Dispatch.Static (SideEffects (NoSideEffects, WithSideEffects), StaticRep, evalStaticRep, getStaticRep, unsafeEff_, unsafeLiftMapIO)
-import qualified Effectful.Error.Static as E
-import PyrethrumExtras (finally)
+import Effectful.Dispatch.Static (StaticRep, SideEffects(..), getStaticRep, unsafeEff_, evalStaticRep)
 
 {-
 a very simple  logging effect initially copied from
 https://hackage.haskell.org/package/effectful-core-2.2.2.2/docs/Effectful-Dispatch-Static.html
+inspired by polysemy's Out effect
 -}
 
 data Out a :: Effect

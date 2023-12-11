@@ -6,7 +6,7 @@ import qualified Core as C
 import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
 import DSL.Out (Out, out)
 import Data.Aeson.TH
-import Effectful (Eff, IOE, (:>))
+import Effectful (Eff, (:>))
 import qualified Effectful.Error.Static as E
 import PyrethrumDemoProject (
   Action,
@@ -26,7 +26,7 @@ log = out . User . Log
 intOnceHook :: Hook Once () Int
 intOnceHook =
   Before
-    { action = \rc -> pure 1
+    { action = \_rc -> pure 1
     }
 
 addOnceIntHook :: Hook Once Int Int
@@ -34,13 +34,13 @@ addOnceIntHook =
   Before'
     { depends = intOnceHook
     , action' =
-        \rc i -> do
+        \_rc i -> do
           log $ "beforeAll' " <> txt i
           pure $ i + 1
     }
 
-intThreadHook :: Hook Thread () Int
-intThreadHook = Before $ \rc -> do
+_intThreadHook :: Hook Thread () Int
+_intThreadHook = Before $ \_rc -> do
   log "deriving meaning of life' "
   pure 42
 
@@ -51,7 +51,7 @@ data HookInfo = HookInfo
   deriving (Show, Generic)
 
 infoThreadHook :: Hook Thread Int HookInfo
-infoThreadHook = Before' addOnceIntHook $ \rc i -> do
+infoThreadHook = Before' addOnceIntHook $ \_rc i -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
@@ -59,10 +59,10 @@ eachInfoAround :: Hook Each HookInfo Int
 eachInfoAround =
   Around'
     { depends = infoThreadHook
-    , setup' = \rc hi -> do
+    , setup' = \_rc hi -> do
         log "eachSetup"
         pure $ hi.value + 1
-    , teardown' = \rc i -> do
+    , teardown' = \_rc _i -> do
         log "eachTearDown"
         pure ()
     }
@@ -71,7 +71,7 @@ eachAfter :: Hook Each Int Int
 eachAfter =
   After'
     { afterDepends = eachInfoAround
-    , afterAction' = \rc -> do
+    , afterAction' = \_rc -> do
         log "eachAfter"
         pure ()
     }
@@ -80,7 +80,7 @@ eachIntBefore :: Hook Each Int Int
 eachIntBefore =
   Before'
     { depends = eachInfoAround
-    , action' = \rc hi -> do
+    , action' = \_rc hi -> do
         log "eachSetup"
         pure $ hi + 1
     }
@@ -98,7 +98,7 @@ data ApState = ApState
   }
 
 action :: RunConfig -> Item -> Action ApState
-action rc itm = do
+action _expectedrc itm = do
   log $ txt itm
   pure $ ApState (itm.value + 1) $ txt itm.value
 
@@ -136,7 +136,7 @@ config2 :: TestConfig
 config2 = TestConfig "test" 1 DeepRegression
 
 action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
-action2 rc HookInfo{value = hookVal} itm = do
+action2 _rc HookInfo{value = hookVal} itm = do
   log $ txt itm
   pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
 
@@ -190,7 +190,7 @@ test3 =
   Full'
     { depends = eachIntBefore
     , config' = TestConfig "test" 1 DeepRegression
-    , action' = \rc i itm -> do
+    , action' = \_rc i itm -> do
         log $ txt itm
         pure $ AS (itm.value + 1 + i) $ txt itm.value
     , parse' = \AS{..} -> pure DS{..}
@@ -211,7 +211,7 @@ test4 =
   NoParse'
     { config' = TestConfig "test" 1 DeepRegression
     , depends = eachAfter
-    , action' = \rc hi itm -> do
+    , action' = \_rc _hi itm -> do
         log $ txt itm
         pure $ DS (itm.value + 1) $ txt itm.value
     , items' =
@@ -231,7 +231,7 @@ test5 =
   Single'
     { config' = TestConfig "test" 1 DeepRegression
     , depends = eachAfter
-    , singleAction' = \rc hi -> do
+    , singleAction' = \rc _hi -> do
         log $ "RunConfig is: " <> rc.title
         pure
           $ DS

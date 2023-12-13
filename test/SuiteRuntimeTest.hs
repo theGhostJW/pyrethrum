@@ -1,15 +1,140 @@
 module SuiteRuntimeTest where
 
--- import Internal.SuiteRuntime
+import DSL.Internal.ApEvent (Path (..))
+import Internal.RunTimeLogging (testLogControls)
+import Internal.SuiteRuntime (executeNodeList)
+import Prepare (ApEventSink, PreNode (..))
+import qualified Prepare as P
+import qualified PyrethrumExtras.Test as T
+import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
 
+runTest :: Int -> NonEmpty Template -> IO ()
+runTest maxThreads testNodes = do
+  putStrLn ""
+  pPrint testNodes
+  putStrLn "========="
+  lc <- testLogControls
+  pn <- atomically $ prepare maxThreads template
+  execute maxThreads lc pn
+  log
+    & maybe
+      (T.chkFail "No Events Log")
+      (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
+
+data Template
+  = OnceBefore
+      { path :: Path
+      , delay :: Int
+      , pass :: Bool
+      , subNodes :: [Template]
+      }
+  | OnceAfter
+      { path :: Path
+      , delay :: Int
+      , pass :: Bool
+      , subNodes :: [Template]
+      }
+  | OnceAround
+      { path :: Path
+      , delay :: Int
+      , passSetup :: Bool
+      , passTeardown :: Bool
+      , subNodes :: [Template]
+      }
+  | ThreadBefore
+      { path :: Path
+      , delay :: Int
+      , pass :: Bool
+      , subNodes :: [Template]
+      }
+  | ThreadAfter
+      { path :: Path
+      , delay :: Int
+      , pass :: Bool
+      , subNodes :: [Template]
+      }
+  | ThreadAround
+      { path :: Path
+      , delay :: Int
+      , passSetup :: Bool
+      , passTeardown :: Bool
+      , subNodes :: [Template]
+      }
+  | EachBefore
+      { path :: Path
+      , delay :: Int
+      , pass :: Bool
+      , subNodes :: [Template]
+      }
+  | EachAfter
+      { path :: Path
+      , delay :: Int
+      , pass :: Bool
+      , subNodes :: [Template]
+      }
+  | EachAround
+      { path :: Path
+      , delay :: Int
+      , passSetup :: Bool
+      , passTeardown :: Bool
+      , subNodes :: [Template]
+      }
+  | Test
+      { path :: Path
+      , testItems :: [TestItem]
+      }
+  deriving (Show, Eq)
+
+data TestItem = TestItem { path :: Path
+      , delay :: Int
+      , pass :: Bool
+      } deriving (Show, Eq)
 
 {-
+data PreNode m c hi where
+  Before ::
+    { path :: Path
+    , frequency :: Frequency
+    , action :: ApEventSink -> hi -> m o
+    , subNodes :: c (PreNode m c o)
+    } ->
+    PreNode m c hi
+  After ::
+    { path :: Path
+    , frequency :: Frequency
+    , subNodes' :: c (PreNode m c hi)
+    , after :: ApEventSink -> m ()
+    } ->
+    PreNode m c hi
+  Around ::
+    { path :: Path
+    , frequency :: Frequency
+    , setup :: ApEventSink -> hi -> m o
+    , subNodes :: c (PreNode m c o)
+    , teardown :: ApEventSink -> o -> m ()
+    } ->
+    PreNode m c hi
+  Test ::
+    (C.Config tc) =>
+    { config :: tc
+    , path :: Path
+    , tests :: c (TestItem m hi)
+    } ->
+    PreNode m c hi
+
+type ApEventSink = ApEvent -> IO ()
+
+data TestItem m hi = TestItem
+  { id :: Int
+  , title :: Text
+  , action :: ApEventSink -> hi -> m ()
+  }
+
 --  should be able to remove this in later versions of GHC
 -- https://gitlab.haskell.org/ghc/ghc/-/issues/21443
 {-# OPTIONS_GHC -Wno-ambiguous-fields #-}
 
 module SuiteRuntimeTest where
-
 
 -- -- TODO Add to Pyrelude
 -- -- TODO Add to Pyrelude
@@ -845,7 +970,6 @@ TODO ::
     - redisplay loc
   - does a log sink have toalways be io?
 -}
-
 
 -- $> unit_group_fixture_with_hooks
 unit_group_fixture_with_hooks :: IO ()

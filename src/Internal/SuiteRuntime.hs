@@ -4,9 +4,14 @@
 
 module Internal.SuiteRuntime where
 
-import qualified Internal.RunTimeLogging as L
 import qualified Core as C
 import qualified DSL.Internal.ApEvent as AE
+import Internal.RunTimeLogging (FailPoint)
+import qualified Internal.RunTimeLogging as L
+import qualified Internal.ThreadEvent as F (Frequency (..))
+import qualified Internal.ThreadEvent as TE
+import qualified Prepare as C
+import qualified Prepare as P
 import PyrethrumExtras (catchAll, txt, (?))
 import UnliftIO (
   bracket,
@@ -16,7 +21,7 @@ import UnliftIO (
   newIORef,
   writeTMVar,
  )
-import UnliftIO.Concurrent ( myThreadId )
+import UnliftIO.Concurrent (myThreadId)
 import UnliftIO.STM (
   TQueue,
   atomically,
@@ -28,42 +33,40 @@ import UnliftIO.STM (
   writeTQueue,
  )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
-import qualified Internal.ThreadEvent as TE
-import Internal.RunTimeLogging (FailPoint)
-import qualified Internal.ThreadEvent as F (Frequency (..))
-import qualified Prepare as C
-import qualified Prepare as P
 
-newtype ThreadCount = ThreadCount Int
+newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
 execute :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls m L.ExePath AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
 execute
-  (ThreadCount maxThreads)
+  tc
+  lc
+  C.ExeParams
+    { suite
+    , interpreter
+    , runConfig
+    } = executeNodeList tc lc (P.prepare $ C.SuitePrepParams suite interpreter runConfig)
+
+executeNodeList :: ThreadCount -> L.LogControls m L.ExePath AE.ApEvent -> NonEmpty (P.PreNode IO NonEmpty ()) -> IO ()
+executeNodeList
+  tc
   L.LogControls
     { sink
     , logWorker
     , stopWorker
     }
-  C.ExeParams
-    { suite
-    , interpreter
-    , runConfig
-    } =
-    concurrently_ logWorker linkExecute
-   where
-    linkExecute :: IO ()
-    linkExecute =
-      finally
-        ( do
-            let nodeList = P.prepare $ C.SuitePrepParams suite interpreter runConfig
-            xtree <- mkXTreeNew (L.ExePath []) nodeList
-            executeNodes sink xtree maxThreads
+  nodeList =
+    do
+      xtree <- mkXTreeNew (L.ExePath []) nodeList
+      concurrently_
+        logWorker
+        ( finally
+            (executeNodes sink xtree tc)
+            stopWorker
         )
-        stopWorker
 
-executeNodes :: (TE.ThreadEvent L.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTree ()) -> Int -> IO ()
-executeNodes sink nodes maxThreads =
+executeNodes :: (TE.ThreadEvent L.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
+executeNodes sink nodes tc =
   do
     rootLogger <- newLogger
     finally
@@ -72,12 +75,12 @@ executeNodes sink nodes maxThreads =
             thrdTokens
             ( const do
                 logger <- newLogger
-                runChildQ Concurrent (runNodeNew logger (OnceIn (pure ())) ) canRunXTree nodes
+                runChildQ Concurrent (runNodeNew logger (OnceIn (pure ()))) canRunXTree nodes
             )
       )
       (rootLogger L.EndExecution)
  where
-  thrdTokens = replicate maxThreads True
+  thrdTokens = replicate tc.maxThreads True
   newLogger = L.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
 
 data NFrequency = Each | Thread
@@ -234,8 +237,6 @@ data AfterStatus
   | AfterDone
   | AfterAbandoning
   deriving (Show, Eq)
-
-
 
 data IdxLst a = IdxLst
   { maxIndex :: Int
@@ -502,9 +503,8 @@ runNodeNew lgr hi xt =
     sink = lgr . L.ApEvent
    in
     case xt of
-      -- as we know tree shaking has been executed prior to running we can assume we
-      -- always need to execute once hooks if the status is correct. There is no
-      -- possibility of empty subnodes due to tree shaking.
+      -- For AfterOnce and AroundOnce we assume tree shaking has been executed prior to execution.
+      -- There is no possibility of empty subnodes due to tree shaking, so these hooks will always need to be run
       AfterOnce
         { status'
         , subNodes'
@@ -539,9 +539,6 @@ runNodeNew lgr hi xt =
                       ThreadIn _ -> shouldNeverHappen "AfterOnce"
                       OnceIn _ -> runAfter Nothing
               )
-      -- as we know tree shaking has been executed prior to running we can assume we
-      -- always need to execute once hooks if the status is correct. There is no
-      -- possibility of empty subnodes due to tree shaking.
       ao@AroundOnce{setup, status, cache, subNodes, teardown} ->
         case hi of
           Abandon fp -> do
@@ -677,8 +674,6 @@ runNodeNew lgr hi xt =
                               (logAbandonned' (TE.Hook TE.Thread TE.Teardown))
                               (\ho -> logRun_ (TE.Hook TE.Thread TE.Teardown) (`td` ho))
                   )
-
-          
              in
               case hi of
                 Abandon fp -> do
@@ -690,12 +685,11 @@ runNodeNew lgr hi xt =
                     mho
                       & maybe
                         ( do
-                            let ab = Left fp 
+                            let ab = Left fp
                             atomically $ putTMVar hov ab
                             pure ab
                         )
                         pure
-
                 EachIn{} -> shouldNeverHappen "Around Thread"
                 OnceIn ioHi -> do
                   -- Action can't be run until its actually needed by a test.
@@ -764,7 +758,6 @@ data NodeIn hi
   | EachIn
       {apply :: (Either FailPoint hi -> IO ()) -> IO ()}
 
-
 tryLock :: TVar s -> ChildQ a -> (s -> CanRun -> Bool) -> s -> STM Bool
 tryLock hs cq canLock lockStatus =
   do
@@ -774,7 +767,6 @@ tryLock hs cq canLock lockStatus =
     when cl
       $ writeTVar hs lockStatus
     pure cl
-
 
 logRun :: Logger -> L.ExePath -> TE.EventType -> IO b -> IO (Either L.FailPoint b)
 logRun lgr path evt action = do

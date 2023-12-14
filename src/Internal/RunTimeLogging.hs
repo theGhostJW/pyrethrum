@@ -13,7 +13,7 @@ import Prelude hiding (atomically, lines)
 import qualified DSL.Internal.ApEvent as AE
 import Data.Text as T (intercalate)
 import Effectful.Concurrent.STM (TQueue)
-import UnliftIO.STM ( writeTChan, atomically, readTChan, newTChanIO, newTQueueIO,  writeTQueue )
+import UnliftIO.STM ( writeTChan, atomically, readTChan, newTChanIO, newTQueueIO,  writeTQueue, TChan )
 import UnliftIO (finally)
 
 newtype ExePath = ExePath {unExePath :: [AE.Path]} deriving (Show, Eq, Ord)
@@ -93,7 +93,7 @@ data LogControls m loc apEvt = LogControls
   , log :: m (TQueue (TE.ThreadEvent loc apEvt))
   }
 
-testLogControls :: forall loc apEvt. (Show loc, Show apEvt) => IO (LogControls Maybe loc apEvt)
+testLogControls :: forall loc apEvt. (Show loc, Show apEvt) => IO (LogControls Maybe loc apEvt, TChan (Maybe (TE.ThreadEvent loc apEvt)))
 testLogControls = do
 
   chn <- newTChanIO

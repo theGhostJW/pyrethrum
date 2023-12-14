@@ -5,6 +5,7 @@ import Internal.RunTimeLogging (testLogControls)
 import Internal.SuiteRuntime (executeNodeList)
 import Prepare (ApEventSink, PreNode (..))
 import qualified Prepare as P
+import PyrethrumExtras (uu)
 import qualified PyrethrumExtras.Test as T
 import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
 
@@ -13,13 +14,80 @@ runTest maxThreads testNodes = do
   putStrLn ""
   pPrint testNodes
   putStrLn "========="
-  lc <- testLogControls
+  (lc, outChan) <- testLogControls
   pn <- atomically $ prepare maxThreads template
   execute maxThreads lc pn
   log
     & maybe
       (T.chkFail "No Events Log")
       (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
+
+mkNodes :: NonEmpty Template -> NonEmpty (PreNode IO NonEmpty ())
+mkNodes = fmap mkNode
+ where
+  mkNode :: Template -> NonEmpty (PreNode IO NonEmpty ())
+  mkNode t = case t of
+    SuiteRuntimeTest.Test
+      { path
+      , testItems
+      } -> uu
+    OnceBefore
+      { path
+      , delay
+      , pass
+      , subNodes
+      } -> uu
+    OnceAfter
+      { path
+      , delay
+      , pass
+      , subNodes
+      } -> uu
+    OnceAround
+      { path
+      , delay
+      , passSetup
+      , passTeardown
+      , subNodes
+      } -> uu
+    ThreadBefore
+      { path
+      , delay
+      , pass
+      , subNodes
+      } -> uu
+    ThreadAfter
+      { path
+      , delay
+      , pass
+      , subNodes
+      } -> uu
+    ThreadAround
+      { path
+      , delay
+      , passSetup
+      , passTeardown
+      , subNodes
+      } -> uu
+    EachBefore
+      { path
+      , delay
+      , pass
+      , subNodes
+      } -> uu
+    EachAfter
+      { path
+      , delay
+      , pass
+      , subNodes
+      } -> uu
+    EachAround
+      { path
+      , delay
+      , passSetup
+      , passTeardown
+      , subNodes
+      } -> uu
 
 data Template
   = OnceBefore
@@ -85,10 +153,12 @@ data Template
       }
   deriving (Show, Eq)
 
-data TestItem = TestItem { path :: Path
-      , delay :: Int
-      , pass :: Bool
-      } deriving (Show, Eq)
+data TestItem = TestItem
+  { path :: Path
+  , delay :: Int
+  , pass :: Bool
+  }
+  deriving (Show, Eq)
 
 {-
 data PreNode m c hi where

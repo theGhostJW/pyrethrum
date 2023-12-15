@@ -77,7 +77,8 @@ rename newName eg = case eg of
                   _ ->  eg {name = newName}
 
 
-na = ""
+na :: Text
+na = "N/A"
 
 mkNodes :: NonEmpty Template -> NonEmpty (PreNode IO NonEmpty ())
 mkNodes = fmap (mkNode 0 0)
@@ -88,11 +89,11 @@ mkNodes = fmap (mkNode 0 0)
       { path,
         testItems
       } -> uu 
-       P.Test {
+      --  P.Test {
 
-       config = na,
+      --  config = na,
 
-       }
+      --  }
     OnceBefore
       { path
       , delay

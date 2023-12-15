@@ -116,7 +116,7 @@ testLogControls = do
           writeTChan chn $ Just eventLog
           writeTQueue logQ eventLog
 
-  pure . LogControls sink logWorker stopWorker $ Just logQ
+  pure  (LogControls sink logWorker stopWorker (Just logQ), chn)
 
 
 $(deriveToJSON defaultOptions ''ExePath)

@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 module SuiteRuntimeTest where
 
 import DSL.Internal.ApEvent (Path (..))
@@ -5,32 +6,93 @@ import Internal.RunTimeLogging (testLogControls)
 import Internal.SuiteRuntime (executeNodeList)
 import Prepare (ApEventSink, PreNode (..))
 import qualified Prepare as P
-import PyrethrumExtras (uu)
+import PyrethrumExtras (uu, txt, (?))
 import qualified PyrethrumExtras.Test as T
 import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
+import qualified Data.List.NonEmpty as N
+import qualified Data.Text as T
+import Prelude hiding (pass, id)
+import BasePrelude (HasField)
 
 runTest :: Int -> NonEmpty Template -> IO ()
 runTest maxThreads testNodes = do
-  putStrLn ""
-  pPrint testNodes
-  putStrLn "========="
   (lc, outChan) <- testLogControls
-  pn <- atomically $ prepare maxThreads template
-  execute maxThreads lc pn
-  log
-    & maybe
-      (T.chkFail "No Events Log")
-      (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
+  let templates = setPaths "" $ toList testNodes
+  putStrLn ""
+  pPrint templates
+  putStrLn "========="
+  uu
+  -- pn <- atomically $ prepare maxThreads template
+  -- execute maxThreads lc pn
+  -- log
+  --   & maybe
+  --     (T.chkFail "No Events Log")
+  --     (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
+
+
+setPaths :: Text -> [Template] -> [Template]
+setPaths address ts =
+   uncurry setPath <$> zip [0..] ts 
+  where
+    nxtAdd idx = 
+      let 
+        txIdx = txt idx
+        sfx = T.null address ? txIdx  $ "." <> txIdx
+      in 
+        address <> sfx
+    
+    setPath :: Int -> Template -> Template
+    setPath idx tp =
+      case tp of
+        SuiteRuntimeTest.Test{testItems} ->
+          SuiteRuntimeTest.Test
+            { path = newPath "Test"
+            , testItems = zip [0 ..] testItems <&> \(id, TestItem{..}) -> TestItem{path = TestPath{id, title = newAdd <> "TestItem"}, ..}
+            }
+        -- _ -> case tp of
+        -- get a (invalid??) ambiguous update warining if I try to use record update for these 2 fields
+        -- in a subscase statement here - try refactor after record update changes go into GHC
+        OnceBefore{..} -> OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
+        OnceAfter{..} -> OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
+        OnceAround{..} -> OnceAround{path = newPath "OnceAround", subNodes = newNodes, ..}
+        ThreadBefore{..} -> ThreadBefore{path = newPath "ThreadBefore", subNodes = newNodes, ..}
+        ThreadAfter{..} -> ThreadAfter{path = newPath "ThreadAfter", subNodes = newNodes, ..}
+        ThreadAround{..} -> ThreadAround{path = newPath "ThreadAround", subNodes = newNodes, ..}
+        EachBefore{..} -> EachBefore{path = newPath "EachBefore", subNodes = newNodes, ..}
+        EachAfter{..} -> EachAfter{path = newPath "EachAfter", subNodes = newNodes, ..}
+        EachAround{..} -> EachAround{path = newPath "EachAround", subNodes = newNodes, ..}
+     where
+      newPath = SuiteElmPath newAdd
+      newAdd = nxtAdd idx
+      newNodes = setPaths newAdd tp.subNodes
+    
+  
+data Eg = Foo {fullName :: Text} |
+          Bar {name :: Text, id :: Int} |
+          Baz {name :: Text}
+
+rename :: Text -> Eg -> Eg 
+rename newName eg = case eg of 
+                  Foo {} -> Foo {fullName = newName}
+                  _ ->  eg {name = newName}
+
+
+na = ""
 
 mkNodes :: NonEmpty Template -> NonEmpty (PreNode IO NonEmpty ())
-mkNodes = fmap mkNode
+mkNodes = fmap (mkNode 0 0)
  where
-  mkNode :: Template -> NonEmpty (PreNode IO NonEmpty ())
-  mkNode t = case t of
+  mkNode :: forall a. Int -> Int ->  Template -> PreNode IO NonEmpty a
+  mkNode depth index t = case t of
     SuiteRuntimeTest.Test
-      { path
-      , testItems
-      } -> uu
+      { path,
+        testItems
+      } -> uu 
+       P.Test {
+
+       config = na,
+
+       }
     OnceBefore
       { path
       , delay
@@ -88,6 +150,8 @@ mkNodes = fmap mkNode
       , passTeardown
       , subNodes
       } -> uu
+    where 
+      elmPath = SuiteElmPath (txt depth)
 
 data Template
   = OnceBefore

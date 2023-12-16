@@ -57,7 +57,7 @@ executeNodeList
     }
   nodeList =
     do
-      xtree <- mkXTreeNew (L.ExePath []) nodeList
+      xtree <- mkXTree (L.ExePath []) nodeList
       concurrently_
         logWorker
         ( finally
@@ -75,7 +75,7 @@ executeNodes sink nodes tc =
             thrdTokens
             ( const do
                 logger <- newLogger
-                runChildQ Concurrent (runNodeNew logger (OnceIn (pure ()))) canRunXTree nodes
+                runChildQ Concurrent (runNode logger (OnceIn (pure ()))) canRunXTree nodes
             )
       )
       (rootLogger L.EndExecution)
@@ -125,8 +125,8 @@ data ExeTree hi where
     } ->
     ExeTree hi
 
-mkXTreeNew :: L.ExePath -> NonEmpty (P.PreNode IO NonEmpty hi) -> IO (ChildQ (ExeTree hi))
-mkXTreeNew xpth preNodes =
+mkXTree :: L.ExePath -> NonEmpty (P.PreNode IO NonEmpty hi) -> IO (ChildQ (ExeTree hi))
+mkXTree xpth preNodes =
   do
     subTrees <- traverse mkNode preNodes
     mkChildQ subTrees
@@ -147,7 +147,7 @@ mkXTreeNew xpth preNodes =
           mkNHook' = mkNHook subNodes action Nothing
       P.After{frequency, subNodes', after} ->
         do
-          cq <- mkXTreeNew path subNodes'
+          cq <- mkXTree path subNodes'
           let mkAfter fq = pure $ After{path, frequency = fq, subNodes' = cq, after}
           frequency & \case
             F.Once -> do
@@ -181,7 +181,7 @@ mkXTreeNew xpth preNodes =
     mkOnceHook subNodes' setup teardown = do
       status <- newTVarIO SetupPending
       cache <- newEmptyTMVarIO
-      subNodes <- mkXTreeNew path subNodes'
+      subNodes <- mkXTree path subNodes'
       pure
         $ AroundOnce
           { path
@@ -194,7 +194,7 @@ mkXTreeNew xpth preNodes =
 
     mkNHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> NFrequency -> IO (ExeTree hi')
     mkNHook subNodes' setup teardown frequency = do
-      subNodes <- mkXTreeNew path subNodes'
+      subNodes <- mkXTree path subNodes'
       pure
         $ Around
           { path
@@ -345,8 +345,8 @@ data ExeIn oi ti tsti = ExeIn
 
 type Logger = L.EngineEvent L.ExePath AE.ApEvent -> IO ()
 
-logAbandonnedNew :: Logger -> L.ExePath -> TE.EventType -> L.FailPoint -> IO ()
-logAbandonnedNew lgr p e a =
+logAbandonned :: Logger -> L.ExePath -> TE.EventType -> L.FailPoint -> IO ()
+logAbandonned lgr p e a =
   lgr
     $ L.ParentFailure
       { loc = p
@@ -355,8 +355,8 @@ logAbandonnedNew lgr p e a =
       , parentEventType = a.eventType
       }
 
-logReturnFailureNew :: Logger -> L.ExePath -> TE.EventType -> SomeException -> IO (Either L.FailPoint b)
-logReturnFailureNew lgr p et e =
+logReturnFailure :: Logger -> L.ExePath -> TE.EventType -> SomeException -> IO (Either L.FailPoint b)
+logReturnFailure lgr p et e =
   do
     lgr (L.mkFailure p et e)
     pure . Left $ L.FailPoint p et
@@ -472,13 +472,13 @@ canLockTeardown s qs = case s of
   AroundDone -> False
   AroundAbandoning -> False
 
-runNodeNew ::
+runNode ::
   forall hi.
   Logger ->
   NodeIn hi ->
   ExeTree hi ->
   IO ()
-runNodeNew lgr hi xt =
+runNode lgr hi xt =
   let
     logRun' :: TE.EventType -> (P.ApEventSink -> IO b) -> IO (Either L.FailPoint b)
     logRun' et action = logRun lgr xt.path et (action sink)
@@ -486,11 +486,11 @@ runNodeNew lgr hi xt =
     logRun_ :: TE.EventType -> (P.ApEventSink -> IO b) -> IO ()
     logRun_ et action = void $ logRun' et action
 
-    logAbandonned' = logAbandonnedNew lgr xt.path
+    logAbandonned' = logAbandonned lgr xt.path
     -- logAbandonnedParent = logAbandonnedNew lgr
 
     runSubNodes :: forall hi'. NodeIn hi' -> ChildQ (ExeTree hi') -> IO QElementRun
-    runSubNodes hi'' = runChildQ Concurrent (runNodeNew lgr hi'') canRunXTree
+    runSubNodes hi'' = runChildQ Concurrent (runNode lgr hi'') canRunXTree
 
     runSubNodes_ :: forall hi'. NodeIn hi' -> ChildQ (ExeTree hi') -> IO ()
     runSubNodes_ n = void . runSubNodes n
@@ -745,7 +745,7 @@ runNodeNew lgr hi xt =
         runTestItem
           tstItm =
             either
-              (logAbandonnedNew lgr (mkTestPath tstItm) TE.Test)
+              (logAbandonned lgr (mkTestPath tstItm) TE.Test)
               (void . logRun lgr (mkTestPath tstItm) TE.Test . tstItm.action sink)
 
         mkTestPath :: P.TestItem IO hi -> L.ExePath
@@ -776,6 +776,6 @@ logRun lgr path evt action = do
         -- TODO :: test for strictness issues esp with failing thread hook
         -- eg returns handle and handle is closed
         (Right <$> action)
-        (logReturnFailureNew lgr path evt)
+        (logReturnFailure lgr path evt)
     )
     (lgr $ L.End evt path)

@@ -1,158 +1,235 @@
-{-# LANGUAGE DuplicateRecordFields #-}
+
 module SuiteRuntimeTest where
 
-import DSL.Internal.ApEvent (Path (..))
+import BasePrelude (HasField)
+import DSL.Internal.ApEvent (ApEvent (User), Path (..), ULog (..))
+import Data.Aeson (ToJSON)
+import Data.Aeson.Types (toEncoding)
+import qualified Data.List.NonEmpty as N
+import qualified Data.Text as T
 import Internal.RunTimeLogging (testLogControls)
 import Internal.SuiteRuntime (executeNodeList)
 import Prepare (ApEventSink, PreNode (..))
 import qualified Prepare as P
-import PyrethrumExtras (uu, txt, (?))
+import PyrethrumExtras (toS, txt, uu, (?))
 import qualified PyrethrumExtras.Test as T
 import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
-import qualified Data.List.NonEmpty as N
-import qualified Data.Text as T
-import Prelude hiding (pass, id)
-import BasePrelude (HasField)
+import UnliftIO.Concurrent as C (
+  ThreadId,
+  forkFinally,
+  forkIO,
+  myThreadId,
+  threadDelay,
+ )
+import Prelude hiding (id, pass)
+import qualified Core
+import Internal.ThreadEvent (Frequency(..))
+import UnliftIO.STM (TQueue, tryReadTQueue)
 
-runTest :: Int -> NonEmpty Template -> IO ()
-runTest maxThreads testNodes = do
-  (lc, outChan) <- testLogControls
+-- exeTemplate :: Int -> [Template] -> IO ()
+exeTemplate maxThreads testNodes = do
+  (lc, logQ) <- testLogControls
   let templates = setPaths "" $ toList testNodes
   putStrLn ""
   pPrint templates
   putStrLn "========="
-  uu
-  -- pn <- atomically $ prepare maxThreads template
-  -- execute maxThreads lc pn
-  -- log
-  --   & maybe
-  --     (T.chkFail "No Events Log")
-  --     (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
+  executeNodeList maxThreads lc templates
+  atomically $ q2List logQ
 
+
+
+-- pn <- atomically $ prepare maxThreads template
+-- execute maxThreads lc pn
+-- log
+--   & maybe
+--     (T.chkFail "No Events Log")
+--     (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
+
+q2List :: TQueue a -> STM [a]
+q2List qu = reverse <$> recurse [] qu
+ where
+  recurse :: [a] -> TQueue a -> STM [a]
+  recurse l q =
+    tryReadTQueue q
+      >>= maybe (pure l) (\e -> recurse (e : l) q)
 
 setPaths :: Text -> [Template] -> [Template]
 setPaths address ts =
-   uncurry setPath <$> zip [0..] ts 
-  where
-    nxtAdd idx = 
-      let 
-        txIdx = txt idx
-        sfx = T.null address ? txIdx  $ "." <> txIdx
-      in 
-        address <> sfx
-    
-    setPath :: Int -> Template -> Template
-    setPath idx tp =
-      case tp of
-        SuiteRuntimeTest.Test{testItems} ->
-          SuiteRuntimeTest.Test
-            { path = newPath "Test"
-            , testItems = zip [0 ..] testItems <&> \(id, TestItem{..}) -> TestItem{path = TestPath{id, title = newAdd <> "TestItem"}, ..}
-            }
-        -- _ -> case tp of
-        -- get a (invalid??) ambiguous update warining if I try to use record update for these 2 fields
-        -- in a subscase statement here - try refactor after record update changes go into GHC
-        OnceBefore{..} -> OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
-        OnceAfter{..} -> OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
-        OnceAround{..} -> OnceAround{path = newPath "OnceAround", subNodes = newNodes, ..}
-        ThreadBefore{..} -> ThreadBefore{path = newPath "ThreadBefore", subNodes = newNodes, ..}
-        ThreadAfter{..} -> ThreadAfter{path = newPath "ThreadAfter", subNodes = newNodes, ..}
-        ThreadAround{..} -> ThreadAround{path = newPath "ThreadAround", subNodes = newNodes, ..}
-        EachBefore{..} -> EachBefore{path = newPath "EachBefore", subNodes = newNodes, ..}
-        EachAfter{..} -> EachAfter{path = newPath "EachAfter", subNodes = newNodes, ..}
-        EachAround{..} -> EachAround{path = newPath "EachAround", subNodes = newNodes, ..}
-     where
-      newPath = SuiteElmPath newAdd
-      newAdd = nxtAdd idx
-      newNodes = setPaths newAdd tp.subNodes
-    
-  
-data Eg = Foo {fullName :: Text} |
-          Bar {name :: Text, id :: Int} |
-          Baz {name :: Text}
+  uncurry setPath <$> zip [0 ..] ts
+ where
+  nxtAdd idx =
+    let
+      txIdx = txt idx
+      sfx = T.null address ? txIdx $ "." <> txIdx
+     in
+      address <> sfx
 
-rename :: Text -> Eg -> Eg 
-rename newName eg = case eg of 
-                  Foo {} -> Foo {fullName = newName}
-                  _ ->  eg {name = newName}
+  setPath :: Int -> Template -> Template
+  setPath idx tp =
+    case tp of
+      SuiteRuntimeTest.Test{testItems} ->
+        SuiteRuntimeTest.Test
+          { path = newPath "Test"
+          , testItems = zip [0 ..] testItems <&> \(idx', TestItem{..}) -> TestItem{title = newAdd <> " TestItem", id = idx', ..}
+          }
+      -- _ -> case tp of
+      -- get a (invalid??) ambiguous update warining if I try to use record update for these 2 fields
+      -- in a subscase statement here - try refactor after record update changes go into GHC
+      OnceBefore{..} -> OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
+      OnceAfter{..} -> OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
+      OnceAround{..} -> OnceAround{path = newPath "OnceAround", subNodes = newNodes, ..}
+      ThreadBefore{..} -> ThreadBefore{path = newPath "ThreadBefore", subNodes = newNodes, ..}
+      ThreadAfter{..} -> ThreadAfter{path = newPath "ThreadAfter", subNodes = newNodes, ..}
+      ThreadAround{..} -> ThreadAround{path = newPath "ThreadAround", subNodes = newNodes, ..}
+      EachBefore{..} -> EachBefore{path = newPath "EachBefore", subNodes = newNodes, ..}
+      EachAfter{..} -> EachAfter{path = newPath "EachAfter", subNodes = newNodes, ..}
+      EachAround{..} -> EachAround{path = newPath "EachAround", subNodes = newNodes, ..}
+   where
+    newPath = SuiteElmPath newAdd
+    newAdd = nxtAdd idx
+    newNodes = setPaths newAdd tp.subNodes
 
+newtype TestConfig = TestConfig
+  {title :: Text}
+  deriving (Generic, Show, Eq)
 
-na :: Text
-na = "N/A"
+instance ToJSON TestConfig
+instance Core.Config TestConfig
+
+tc :: TestConfig
+tc = TestConfig {title = "test config"}
+
+mkVoidAction :: forall desc. Show desc => desc -> Int -> Bool -> ApEventSink -> IO ()
+mkVoidAction  path delay pass sink =
+  do
+    C.threadDelay delay
+    sink . User $ Log msg
+    unless pass . error $ toS msg
+ where
+  msg = pass ? txt path <> " passed" $ txt path <> " failed"
+
+mkAction :: forall hi desc. Show desc => desc -> Int -> Bool -> ApEventSink -> hi -> IO ()
+mkAction path delay pass sink _in = mkVoidAction path delay pass sink
+
 
 mkNodes :: NonEmpty Template -> NonEmpty (PreNode IO NonEmpty ())
-mkNodes = fmap (mkNode 0 0)
+mkNodes = fmap mkNode
  where
-  mkNode :: forall a. Int -> Int ->  Template -> PreNode IO NonEmpty a
-  mkNode depth index t = case t of
+  mkNode :: Template -> PreNode IO NonEmpty ()
+  mkNode = \case
     SuiteRuntimeTest.Test
-      { path,
-        testItems
-      } -> uu 
-      --  P.Test {
-
-      --  config = na,
-
-      --  }
+      { path
+      , testItems
+      } ->  P.Test {
+       config = tc,
+       path,
+       tests = mkTestItem <$> testItems
+    }
     OnceBefore
       { path
       , delay
       , pass
       , subNodes
-      } -> uu
+      } -> P.Before {
+       path,
+       frequency = Once,
+       action = mkAction path delay pass,
+       subNodes = mkNodes subNodes
+      }
     OnceAfter
       { path
       , delay
       , pass
       , subNodes
-      } -> uu
+      } -> P.After  {
+       path,
+       frequency = Once,
+       after = mkVoidAction path delay pass,
+       subNodes' = mkNodes subNodes
+      }
     OnceAround
       { path
       , delay
       , passSetup
       , passTeardown
       , subNodes
-      } -> uu
+      } -> P.Around {
+       path,
+       frequency = Once,
+       setup = mkAction path delay passSetup,
+       teardown = mkAction path delay passTeardown,
+       subNodes = mkNodes subNodes
+      }
     ThreadBefore
       { path
       , delay
       , pass
       , subNodes
-      } -> uu
+      } -> P.Before {
+       path,
+       frequency = Thread,
+       action = mkAction path delay pass,
+       subNodes = mkNodes subNodes
+      }
     ThreadAfter
       { path
       , delay
       , pass
       , subNodes
-      } -> uu
+      } -> P.After {
+       path,
+       frequency = Thread,
+       after = mkVoidAction path delay pass,
+       subNodes' = mkNodes subNodes
+      }
     ThreadAround
       { path
       , delay
       , passSetup
       , passTeardown
       , subNodes
-      } -> uu
+      } -> P.Around {
+       path,
+       frequency = Thread,
+       setup = mkAction path delay passSetup,
+       teardown = mkAction path delay passTeardown,
+       subNodes = mkNodes subNodes
+      }
     EachBefore
       { path
       , delay
       , pass
       , subNodes
-      } -> uu
+      } -> P.Before {
+       path,
+       frequency = Each,
+       action = mkAction path delay pass,
+       subNodes = mkNodes subNodes
+      }
     EachAfter
       { path
       , delay
       , pass
       , subNodes
-      } -> uu
+      } -> P.After {
+       path,
+       frequency = Each,
+       after = mkVoidAction path delay pass,
+       subNodes' = mkNodes subNodes
+      }
     EachAround
       { path
       , delay
       , passSetup
       , passTeardown
       , subNodes
-      } -> uu
-    where 
-      elmPath = SuiteElmPath (txt depth)
+      } -> P.Around {
+       path,
+       frequency = Each,
+       setup = mkAction path delay passSetup,
+       teardown = mkAction path delay passTeardown,
+       subNodes = mkNodes subNodes
+      }
 
 data Template
   = OnceBefore
@@ -219,11 +296,15 @@ data Template
   deriving (Show, Eq)
 
 data TestItem = TestItem
-  { path :: Path
+  { id :: Int
+  , title :: Text
   , delay :: Int
   , pass :: Bool
   }
   deriving (Show, Eq)
+
+mkTestItem :: TestItem -> P.TestItem IO ()
+mkTestItem TestItem{id, title, delay, pass} = P.TestItem id title (mkAction title delay pass)
 
 {-
 data PreNode m c hi where
@@ -531,13 +612,7 @@ prepare threadCount = prepare' 0 0
         , test = \_ctx _oi _ti _tsti -> ioAction p t
         }
 
-q2List :: TQueue a -> STM [a]
-q2List qu = reverse <$> recurse [] qu
- where
-  recurse :: [a] -> TQueue a -> STM [a]
-  recurse l q =
-    tryReadTQueue q
-      >>= maybe (pure l) (\e -> recurse (e : l) q)
+
 
 runTest :: Int -> Template -> IO ()
 runTest maxThreads template = do

@@ -93,7 +93,7 @@ data LogControls m loc apEvt = LogControls
   , log :: m (TQueue (TE.ThreadEvent loc apEvt))
   }
 
-testLogControls :: forall loc apEvt. (Show loc, Show apEvt) => IO (LogControls Maybe loc apEvt, TChan (Maybe (TE.ThreadEvent loc apEvt)))
+testLogControls :: forall loc apEvt. (Show loc, Show apEvt) => IO (LogControls Maybe loc apEvt, TQueue (TE.ThreadEvent loc apEvt))
 testLogControls = do
 
   chn <- newTChanIO
@@ -116,7 +116,7 @@ testLogControls = do
           writeTChan chn $ Just eventLog
           writeTQueue logQ eventLog
 
-  pure  (LogControls sink logWorker stopWorker (Just logQ), chn)
+  pure  (LogControls sink logWorker stopWorker (Just logQ), logQ)
 
 
 $(deriveToJSON defaultOptions ''ExePath)

@@ -21,9 +21,6 @@ instance Exception ParseException
 
 type HasTitle a = HasField "title" a Text
 
--- TODO :: YAGNI delete this
-type HasMaxThreads a = HasField "maxThreads" a Int
-
 type HasId a = HasField "id" a Int
 
 class (HasTitle a, Show a, ToJSON a, Eq a) => Config a

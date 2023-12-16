@@ -37,7 +37,7 @@ import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
-execute :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls m L.ExePath AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
+execute :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls NonEmpty L.ExePath AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
 execute
   tc
   lc
@@ -47,7 +47,7 @@ execute
     , runConfig
     } = executeNodeList tc lc (P.prepare $ C.SuitePrepParams suite interpreter runConfig)
 
-executeNodeList :: ThreadCount -> L.LogControls m L.ExePath AE.ApEvent -> NonEmpty (P.PreNode IO NonEmpty ()) -> IO ()
+executeNodeList :: Traversable m => ThreadCount -> L.LogControls m L.ExePath AE.ApEvent -> m (P.PreNode IO m ()) -> IO ()
 executeNodeList
   tc
   L.LogControls
@@ -125,13 +125,13 @@ data ExeTree hi where
     } ->
     ExeTree hi
 
-mkXTree :: L.ExePath -> NonEmpty (P.PreNode IO NonEmpty hi) -> IO (ChildQ (ExeTree hi))
+mkXTree :: Traversable m => L.ExePath -> m (P.PreNode IO m hi) -> IO (ChildQ (ExeTree hi))
 mkXTree xpth preNodes =
   do
     subTrees <- traverse mkNode preNodes
     mkChildQ subTrees
  where
-  mkNode :: forall hi. P.PreNode IO NonEmpty hi -> IO (ExeTree hi)
+  mkNode :: forall m hi. Traversable m => P.PreNode IO m hi -> IO (ExeTree hi)
   mkNode pn =
     pn & \case
       P.Before
@@ -177,7 +177,7 @@ mkXTree xpth preNodes =
    where
     path = L.ExePath $ pn.path : xpth.unExePath
 
-    mkOnceHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> IO (ExeTree hi')
+    mkOnceHook :: forall hi' ho'. m (P.PreNode IO m ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> IO (ExeTree hi')
     mkOnceHook subNodes' setup teardown = do
       status <- newTVarIO SetupPending
       cache <- newEmptyTMVarIO
@@ -192,7 +192,7 @@ mkXTree xpth preNodes =
           , teardown
           }
 
-    mkNHook :: forall hi' ho'. NonEmpty (P.PreNode IO NonEmpty ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> NFrequency -> IO (ExeTree hi')
+    mkNHook :: forall hi' ho'. m (P.PreNode IO m ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> NFrequency -> IO (ExeTree hi')
     mkNHook subNodes' setup teardown frequency = do
       subNodes <- mkXTree path subNodes'
       pure

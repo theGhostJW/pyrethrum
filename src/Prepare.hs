@@ -67,7 +67,7 @@ data PrepParams rc tc effs where
     } ->
     PrepParams rc tc effs
 
-prepSuiteElm :: forall m rc tc effs hi. (C.Config rc, C.Config tc, Applicative m) => PrepParams rc tc effs -> C.SuiteElement m rc tc effs hi -> PreNode IO m hi
+prepSuiteElm :: forall m rc tc effs hi. (C.Config rc, C.Config tc, Applicative m, Traversable m) => PrepParams rc tc effs -> C.SuiteElement m rc tc effs hi -> PreNode IO m hi
 prepSuiteElm pp@PrepParams{interpreter, runConfig} suiteElm =
   suiteElm & \case
     C.Hook{hook, path, subNodes = subNodes'} ->
@@ -296,16 +296,16 @@ data SuitePrepParams m rc tc effs where
 --
 -- Suite rc tc effs
 -- TODO:
---    - prenode subnodes => nonEmpty
+--    - prenode subnodes => m
 --    - filtering
 --    - tree shaking
 --    - querying
 --    - validation ??
 -- will return more info later such as filter log and have to return an either
-filterSuite :: [C.SuiteElement [] rc tc effs ()] -> NonEmpty (C.SuiteElement NonEmpty rc tc effs ())
+filterSuite :: [C.SuiteElement [] rc tc effs ()] -> m (C.SuiteElement m rc tc effs ())
 filterSuite = uu
 
-prepare :: (C.Config rc, C.Config tc) => SuitePrepParams [] rc tc effs -> NonEmpty (PreNode IO NonEmpty ())
+prepare :: (C.Config rc, C.Config tc,  Applicative m, Traversable m) => SuitePrepParams [] rc tc effs -> m (PreNode IO m ())
 prepare SuitePrepParams{suite, interpreter, runConfig} =
   prepSuiteElm pp <$> filterSuite suite
  where

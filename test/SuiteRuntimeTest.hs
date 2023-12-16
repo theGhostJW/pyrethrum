@@ -7,7 +7,7 @@ import Data.Aeson (ToJSON)
 import Data.Aeson.Types (toEncoding)
 import qualified Data.List.NonEmpty as N
 import qualified Data.Text as T
-import Internal.RunTimeLogging (testLogControls)
+import Internal.RunTimeLogging (testLogControls, ExePath)
 import Internal.SuiteRuntime (executeNodeList)
 import Prepare (ApEventSink, PreNode (..))
 import qualified Prepare as P
@@ -23,27 +23,73 @@ import UnliftIO.Concurrent as C (
  )
 import Prelude hiding (id, pass)
 import qualified Core
-import Internal.ThreadEvent (Frequency(..))
+import Internal.ThreadEvent (Frequency(..), ThreadEvent)
 import UnliftIO.STM (TQueue, tryReadTQueue)
+import Internal.SuiteRuntime (ThreadCount(..))
+import qualified FullSuiteTestTemplate as T
 
--- exeTemplate :: Int -> [Template] -> IO ()
+
+-- $> unit_group_fixture_with_hooks
+unit_group_fixture_with_hooks :: IO ()
+unit_group_fixture_with_hooks = uu
+  
+  -- runTest 1 [OnceAround
+  --     { path = ""
+  --     , delay = 0
+  --     , passSetup = True
+  --     , passTeardown = True
+  --     , subNodes  = [
+
+  --         ThreadAround
+  --           { path = ""
+  --           , delay = 0
+  --           , passSetup = True
+  --           , passTeardown = True
+  --           , subNodes = [
+  --               EachAround
+  --                 { path = ""
+  --                 , delay = 0
+  --                 , passSetup = True
+  --                 , passTeardown = True
+  --                 , subNodes = [
+  --                     Test
+  --                       { path = ""
+  --                       , testItems = [
+  --                           TestItem
+  --                             { id = 0
+  --                             , title = "test 0"
+  --                             , delay = 0
+  --                             , pass = True
+  --                             }
+  --                         ]
+  --                       }
+  --                   ]
+  --                 }
+  --             ]
+  --           }
+  --       ]
+  --     }]
+  --     ]
+  --     }]
+
+
+runTest :: Int -> [Template] -> IO ()
+runTest maxThreads templates = do
+  exeTemplate (ThreadCount maxThreads) templates >>= chkProperties maxThreads templates
+
+chkProperties :: Int -> [Template] -> [ThreadEvent ExePath ApEvent] -> IO ()
+chkProperties mxThrds t evts = uu
+
+exeTemplate :: ThreadCount -> [Template] -> IO [ThreadEvent ExePath ApEvent]
 exeTemplate maxThreads testNodes = do
   (lc, logQ) <- testLogControls
-  let templates = setPaths "" $ toList testNodes
+  let templates = setPathss "" $ toList testNodes
   putStrLn ""
   pPrint templates
   putStrLn "========="
-  executeNodeList maxThreads lc templates
+  executeNodeList maxThreads lc $ mkNodes templates
   atomically $ q2List logQ
 
-
-
--- pn <- atomically $ prepare maxThreads template
--- execute maxThreads lc pn
--- log
---   & maybe
---     (T.chkFail "No Events Log")
---     (\evts -> atomically (q2List evts) >>= chkProperties maxThreads template)
 
 q2List :: TQueue a -> STM [a]
 q2List qu = reverse <$> recurse [] qu
@@ -53,8 +99,8 @@ q2List qu = reverse <$> recurse [] qu
     tryReadTQueue q
       >>= maybe (pure l) (\e -> recurse (e : l) q)
 
-setPaths :: Text -> [Template] -> [Template]
-setPaths address ts =
+setPathss :: Text -> [Template] -> [T.Template]
+setPathss address ts =
   uncurry setPath <$> zip [0 ..] ts
  where
   nxtAdd idx =
@@ -64,30 +110,30 @@ setPaths address ts =
      in
       address <> sfx
 
-  setPath :: Int -> Template -> Template
+  setPath :: Int -> Template -> T.Template
   setPath idx tp =
     case tp of
       SuiteRuntimeTest.Test{testItems} ->
-        SuiteRuntimeTest.Test
+        T.Test
           { path = newPath "Test"
-          , testItems = zip [0 ..] testItems <&> \(idx', TestItem{..}) -> TestItem{title = newAdd <> " TestItem", id = idx', ..}
+          , testItems = zip [0 ..] testItems <&> \(idx', TestItem{..}) -> T.TestItem{title = newAdd <> " TestItem", id = idx', ..}
           }
       -- _ -> case tp of
       -- get a (invalid??) ambiguous update warining if I try to use record update for these 2 fields
       -- in a subscase statement here - try refactor after record update changes go into GHC
-      OnceBefore{..} -> OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
-      OnceAfter{..} -> OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
-      OnceAround{..} -> OnceAround{path = newPath "OnceAround", subNodes = newNodes, ..}
-      ThreadBefore{..} -> ThreadBefore{path = newPath "ThreadBefore", subNodes = newNodes, ..}
-      ThreadAfter{..} -> ThreadAfter{path = newPath "ThreadAfter", subNodes = newNodes, ..}
-      ThreadAround{..} -> ThreadAround{path = newPath "ThreadAround", subNodes = newNodes, ..}
-      EachBefore{..} -> EachBefore{path = newPath "EachBefore", subNodes = newNodes, ..}
-      EachAfter{..} -> EachAfter{path = newPath "EachAfter", subNodes = newNodes, ..}
-      EachAround{..} -> EachAround{path = newPath "EachAround", subNodes = newNodes, ..}
+      OnceBefore{..} -> T.OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
+      OnceAfter{..} -> T.OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
+      OnceAround{..} -> T.OnceAround{path = newPath "OnceAround", subNodes = newNodes, ..}
+      ThreadBefore{..} -> T.ThreadBefore{path = newPath "ThreadBefore", subNodes = newNodes, ..}
+      ThreadAfter{..} -> T.ThreadAfter{path = newPath "ThreadAfter", subNodes = newNodes, ..}
+      ThreadAround{..} -> T.ThreadAround{path = newPath "ThreadAround", subNodes = newNodes, ..}
+      EachBefore{..} -> T.EachBefore{path = newPath "EachBefore", subNodes = newNodes, ..}
+      EachAfter{..} -> T.EachAfter{path = newPath "EachAfter", subNodes = newNodes, ..}
+      EachAround{..} -> T.EachAround{path = newPath "EachAround", subNodes = newNodes, ..}
    where
     newPath = SuiteElmPath newAdd
     newAdd = nxtAdd idx
-    newNodes = setPaths newAdd tp.subNodes
+    newNodes = setPathss newAdd tp.subNodes
 
 newtype TestConfig = TestConfig
   {title :: Text}
@@ -112,12 +158,12 @@ mkAction :: forall hi desc. Show desc => desc -> Int -> Bool -> ApEventSink -> h
 mkAction path delay pass sink _in = mkVoidAction path delay pass sink
 
 
-mkNodes :: NonEmpty Template -> NonEmpty (PreNode IO NonEmpty ())
+mkNodes :: [T.Template] -> [PreNode IO [] ()]
 mkNodes = fmap mkNode
  where
-  mkNode :: Template -> PreNode IO NonEmpty ()
+  mkNode :: T.Template -> PreNode IO [] ()
   mkNode = \case
-    SuiteRuntimeTest.Test
+    T.Test
       { path
       , testItems
       } ->  P.Test {
@@ -125,7 +171,7 @@ mkNodes = fmap mkNode
        path,
        tests = mkTestItem <$> testItems
     }
-    OnceBefore
+    T.OnceBefore
       { path
       , delay
       , pass
@@ -136,7 +182,7 @@ mkNodes = fmap mkNode
        action = mkAction path delay pass,
        subNodes = mkNodes subNodes
       }
-    OnceAfter
+    T.OnceAfter
       { path
       , delay
       , pass
@@ -147,7 +193,7 @@ mkNodes = fmap mkNode
        after = mkVoidAction path delay pass,
        subNodes' = mkNodes subNodes
       }
-    OnceAround
+    T.OnceAround
       { path
       , delay
       , passSetup
@@ -160,7 +206,7 @@ mkNodes = fmap mkNode
        teardown = mkAction path delay passTeardown,
        subNodes = mkNodes subNodes
       }
-    ThreadBefore
+    T.ThreadBefore
       { path
       , delay
       , pass
@@ -171,7 +217,7 @@ mkNodes = fmap mkNode
        action = mkAction path delay pass,
        subNodes = mkNodes subNodes
       }
-    ThreadAfter
+    T.ThreadAfter
       { path
       , delay
       , pass
@@ -182,7 +228,7 @@ mkNodes = fmap mkNode
        after = mkVoidAction path delay pass,
        subNodes' = mkNodes subNodes
       }
-    ThreadAround
+    T.ThreadAround
       { path
       , delay
       , passSetup
@@ -195,7 +241,7 @@ mkNodes = fmap mkNode
        teardown = mkAction path delay passTeardown,
        subNodes = mkNodes subNodes
       }
-    EachBefore
+    T.EachBefore
       { path
       , delay
       , pass
@@ -206,7 +252,7 @@ mkNodes = fmap mkNode
        action = mkAction path delay pass,
        subNodes = mkNodes subNodes
       }
-    EachAfter
+    T.EachAfter
       { path
       , delay
       , pass
@@ -217,7 +263,7 @@ mkNodes = fmap mkNode
        after = mkVoidAction path delay pass,
        subNodes' = mkNodes subNodes
       }
-    EachAround
+    T.EachAround
       { path
       , delay
       , passSetup
@@ -233,27 +279,23 @@ mkNodes = fmap mkNode
 
 data Template
   = OnceBefore
-      { path :: Path
-      , delay :: Int
+      { delay :: Int
       , pass :: Bool
       , subNodes :: [Template]
       }
   | OnceAfter
-      { path :: Path
-      , delay :: Int
+      { delay :: Int
       , pass :: Bool
       , subNodes :: [Template]
       }
   | OnceAround
-      { path :: Path
-      , delay :: Int
+      { delay :: Int
       , passSetup :: Bool
       , passTeardown :: Bool
       , subNodes :: [Template]
       }
   | ThreadBefore
-      { path :: Path
-      , delay :: Int
+      { delay :: Int
       , pass :: Bool
       , subNodes :: [Template]
       }
@@ -264,8 +306,7 @@ data Template
       , subNodes :: [Template]
       }
   | ThreadAround
-      { path :: Path
-      , delay :: Int
+      { delay :: Int
       , passSetup :: Bool
       , passTeardown :: Bool
       , subNodes :: [Template]
@@ -277,34 +318,30 @@ data Template
       , subNodes :: [Template]
       }
   | EachAfter
-      { path :: Path
-      , delay :: Int
+      { delay :: Int
       , pass :: Bool
       , subNodes :: [Template]
       }
   | EachAround
-      { path :: Path
-      , delay :: Int
+      {  delay :: Int
       , passSetup :: Bool
       , passTeardown :: Bool
       , subNodes :: [Template]
       }
   | Test
-      { path :: Path
-      , testItems :: [TestItem]
+      {testItems :: [TestItem]
       }
   deriving (Show, Eq)
 
 data TestItem = TestItem
-  { id :: Int
-  , title :: Text
-  , delay :: Int
+  {
+   delay :: Int
   , pass :: Bool
   }
   deriving (Show, Eq)
 
-mkTestItem :: TestItem -> P.TestItem IO ()
-mkTestItem TestItem{id, title, delay, pass} = P.TestItem id title (mkAction title delay pass)
+mkTestItem :: T.TestItem -> P.TestItem IO ()
+mkTestItem T.TestItem{id, title, delay, pass} = P.TestItem id title (mkAction title delay pass)
 
 {-
 data PreNode m c hi where

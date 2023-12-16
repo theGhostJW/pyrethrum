@@ -271,33 +271,33 @@ test2 = Full' infoThreadHook config2 action2 parse2 items2
 
 suite :: Suite
 suite =
-  [ Test (Path "module" "testName") test
+  [ Test (SuiteElmPath "module" "testName") test
   , Hook
-      { path = Path "module" "name"
+      { path = SuiteElmPath "module" "name"
       , hook = intOnceHook
       , subNodes =
-          [ Test (Path "module" "testName") test4
-          , Test (Path "module" "testName") test5
+          [ Test (SuiteElmPath "module" "testName") test4
+          , Test (SuiteElmPath "module" "testName") test5
           , Hook
-              { path = Path "module" "name"
+              { path = SuiteElmPath "module" "name"
               , hook = addOnceIntHook
               , subNodes =
                   [ Hook
-                      { path = Path "module" "name"
+                      { path = SuiteElmPath "module" "name"
                       , hook = infoThreadHook
                       , subNodes =
-                          [ Test (Path "module" "testName") test2
+                          [ Test (SuiteElmPath "module" "testName") test2
                           , Hook
-                              { path = Path "module" "name"
+                              { path = SuiteElmPath "module" "name"
                               , hook = eachInfoAround
                               , subNodes =
-                                  [ Test (Path "module" "testName") test3
+                                  [ Test (SuiteElmPath "module" "testName") test3
                                   , Hook
-                                      { path = Path "module" "name"
+                                      { path = SuiteElmPath "module" "name"
                                       , hook = eachAfter
                                       , subNodes =
-                                          [ Test (Path "module" "testName") test4
-                                          , Test (Path "module" "testName") test5
+                                          [ Test (SuiteElmPath "module" "testName") test4
+                                          , Test (SuiteElmPath "module" "testName") test5
                                           ]
                                       }
                                   ]

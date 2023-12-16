@@ -37,7 +37,7 @@ import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
-execute :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls NonEmpty L.ExePath AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
+execute :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
 execute
   tc
   lc
@@ -47,7 +47,7 @@ execute
     , runConfig
     } = executeNodeList tc lc (P.prepare $ C.SuitePrepParams suite interpreter runConfig)
 
-executeNodeList :: Traversable m => ThreadCount -> L.LogControls m L.ExePath AE.ApEvent -> m (P.PreNode IO m ()) -> IO ()
+executeNodeList :: Traversable m => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> m (P.PreNode IO m ()) -> IO ()
 executeNodeList
   tc
   L.LogControls

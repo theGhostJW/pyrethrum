@@ -13,7 +13,7 @@ import Prelude hiding (atomically, lines)
 import qualified DSL.Internal.ApEvent as AE
 import Data.Text as T (intercalate)
 import Effectful.Concurrent.STM (TQueue)
-import UnliftIO.STM ( writeTChan, atomically, readTChan, newTChanIO, newTQueueIO,  writeTQueue, TChan )
+import UnliftIO.STM ( writeTChan, atomically, readTChan, newTChanIO, newTQueueIO,  writeTQueue)
 import UnliftIO (finally)
 
 newtype ExePath = ExePath {unExePath :: [AE.Path]} deriving (Show, Eq, Ord)
@@ -86,14 +86,14 @@ mkLogger sink threadCounter thrdId engEvnt = do
 
 -- TODO:: Logger should be wrapped in an except that sets non-zero exit code on failure
 
-data LogControls m loc apEvt = LogControls
+data LogControls loc apEvt = LogControls
   { sink :: TE.ThreadEvent loc apEvt -> IO ()
   , logWorker :: IO ()
   , stopWorker :: IO ()
-  , log :: m (TQueue (TE.ThreadEvent loc apEvt))
+  , log :: TQueue (TE.ThreadEvent loc apEvt)
   }
 
-testLogControls :: forall loc apEvt. (Show loc, Show apEvt) => IO (LogControls Maybe loc apEvt, TQueue (TE.ThreadEvent loc apEvt))
+testLogControls :: forall loc apEvt. (Show loc, Show apEvt) => IO (LogControls loc apEvt, TQueue (TE.ThreadEvent loc apEvt))
 testLogControls = do
 
   chn <- newTChanIO
@@ -116,7 +116,7 @@ testLogControls = do
           writeTChan chn $ Just eventLog
           writeTQueue logQ eventLog
 
-  pure  (LogControls sink logWorker stopWorker (Just logQ), logQ)
+  pure  (LogControls sink logWorker stopWorker logQ, logQ)
 
 
 $(deriveToJSON defaultOptions ''ExePath)

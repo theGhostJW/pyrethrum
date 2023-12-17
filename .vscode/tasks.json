@@ -124,12 +124,10 @@
     {
       "label": "copy pyrethrum ghci",
       "type": "shell",
-      "command": "xcopy",
+      "command": "sh",
       "args": [
-        ".ghci.pyrethrum",
-        ".ghci",
-        "/y",
-        "/f"
+        "-c",
+        "if [ \"$(expr substr $(uname -s) 1 5)\" = \"MINGW\" ]; then xcopy .ghci.pyrethrum .ghci /y /f; else cp .ghci.pyrethrum .ghci -f; fi"
       ],
       "presentation": {
         "reveal": "always",

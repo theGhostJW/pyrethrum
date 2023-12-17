@@ -29,11 +29,12 @@ import Internal.SuiteRuntime (ThreadCount(..))
 import qualified FullSuiteTestTemplate as T
 
 
--- $> unit_group_fixture_with_hooks
-unit_group_fixture_with_hooks :: IO ()
-unit_group_fixture_with_hooks = uu
+-- $> demo
+demo :: IO ()
+demo = putStrLn "Hello"
   
   -- runTest 1 [OnceAround
+
   --     { path = ""
   --     , delay = 0
   --     , passSetup = True
@@ -83,7 +84,7 @@ chkProperties mxThrds t evts = uu
 exeTemplate :: ThreadCount -> [Template] -> IO [ThreadEvent ExePath ApEvent]
 exeTemplate maxThreads testNodes = do
   (lc, logQ) <- testLogControls
-  let templates = setPathss "" $ toList testNodes
+  let templates = setPaths "" $ toList testNodes
   putStrLn ""
   pPrint templates
   putStrLn "========="
@@ -99,8 +100,8 @@ q2List qu = reverse <$> recurse [] qu
     tryReadTQueue q
       >>= maybe (pure l) (\e -> recurse (e : l) q)
 
-setPathss :: Text -> [Template] -> [T.Template]
-setPathss address ts =
+setPaths :: Text -> [Template] -> [T.Template]
+setPaths address ts =
   uncurry setPath <$> zip [0 ..] ts
  where
   nxtAdd idx =
@@ -133,7 +134,7 @@ setPathss address ts =
    where
     newPath = SuiteElmPath newAdd
     newAdd = nxtAdd idx
-    newNodes = setPathss newAdd tp.subNodes
+    newNodes = setPaths newAdd tp.subNodes
 
 newtype TestConfig = TestConfig
   {title :: Text}
@@ -1218,11 +1219,7 @@ TODO ::
   - does a log sink have toalways be io?
 -}
 
--- $> unit_group_fixture_with_hooks
-unit_group_fixture_with_hooks :: IO ()
-unit_group_fixture_with_hooks = runTest 1 simpleGroupWithHooks
-
--- $> unit_single_fixture
+unit_single_fixture
 unit_single_fixture :: IO ()
 unit_single_fixture = runTest 1 singleFixture
 

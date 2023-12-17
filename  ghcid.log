@@ -1,8 +1,14 @@
-test/SuiteRuntimeTest.hs:4:1-29: warning: [-Wunused-imports]
+test/SuiteRuntimeTest.hs:3:1-29: warning: [-Wunused-imports]
     The import of ‘BasePrelude’ is redundant
   |
-4 | import BasePrelude (HasField)
+3 | import BasePrelude (HasField)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test/SuiteRuntimeTest.hs:5:1-66: warning: [-Wunused-imports]
+    The import of ‘ULog, User’
+    from module ‘DSL.Internal.ApEvent’ is redundant
+  |
+5 | import DSL.Internal.ApEvent (ApEvent (User), Path (..), ULog (..))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 test/SuiteRuntimeTest.hs:7:1-36: warning: [-Wunused-imports]
     The import of ‘Data.Aeson.Types’ is redundant
   |
@@ -13,53 +19,45 @@ test/SuiteRuntimeTest.hs:8:1-40: warning: [-Wunused-imports]
   |
 8 | import qualified Data.List.NonEmpty as N
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-test/SuiteRuntimeTest.hs:15:1-42: warning: [-Wunused-imports]
+test/SuiteRuntimeTest.hs:15:35-36: warning: [-Wunused-imports]
+    The import of ‘uu’ from module ‘PyrethrumExtras’ is redundant
+   |
+15 | import PyrethrumExtras (toS, txt, uu, (?))
+   |                                   ^^
+test/SuiteRuntimeTest.hs:16:1-42: warning: [-Wunused-imports]
     The qualified import of ‘PyrethrumExtras.Test’ is redundant
    |
-15 | import qualified PyrethrumExtras.Test as T
+16 | import qualified PyrethrumExtras.Test as T
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-test/SuiteRuntimeTest.hs:16:1-98: warning: [-Wunused-imports]
+test/SuiteRuntimeTest.hs:17:1-98: warning: [-Wunused-imports]
     The import of ‘PrettyVal, pPrintList, ppDocList, ppShow,
                    ppShowList, prettyVal’
     from module ‘Text.Show.Pretty’ is redundant
    |
-16 | import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
+17 | import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-test/SuiteRuntimeTest.hs:(17,1)-(23,2): warning: [-Wunused-imports]
+test/SuiteRuntimeTest.hs:(18,1)-(24,2): warning: [-Wunused-imports]
     The import of ‘ThreadId, forkFinally, forkIO, myThreadId’
     from module ‘UnliftIO.Concurrent’ is redundant
    |
-17 | import UnliftIO.Concurrent as C (
+18 | import UnliftIO.Concurrent as C (
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...
-test/SuiteRuntimeTest.hs:82:15-21: warning: [-Wunused-matches]
+test/SuiteRuntimeTest.hs:114:15-21: warning: [-Wunused-matches]
     Defined but not used: ‘mxThrds’
-   |
-82 | chkProperties mxThrds t evts = uu
-   |               ^^^^^^^
-test/SuiteRuntimeTest.hs:82:23: warning: [-Wunused-matches]
+    |
+114 | chkProperties mxThrds t evts = putStrLn " checks done"
+    |               ^^^^^^^
+test/SuiteRuntimeTest.hs:114:23: warning: [-Wunused-matches]
     Defined but not used: ‘t’
-   |
-82 | chkProperties mxThrds t evts = uu
-   |                       ^
-test/SuiteRuntimeTest.hs:82:25-28: warning: [-Wunused-matches]
+    |
+114 | chkProperties mxThrds t evts = putStrLn " checks done"
+    |                       ^
+test/SuiteRuntimeTest.hs:114:25-28: warning: [-Wunused-matches]
     Defined but not used: ‘evts’
-   |
-82 | chkProperties mxThrds t evts = uu
-   |                         ^^^^
+    |
+114 | chkProperties mxThrds t evts = putStrLn " checks done"
+    |                         ^^^^
  
-/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:32:1
-$> demo
-panic! (the 'impossible' happened)
-  GHC version 9.6.3:
-	nameModule
-  internal stepDownQStatus_iDan
-  Call stack:
-      CallStack (from HasCallStack):
-        callStackDoc, called at compiler/GHC/Utils/Panic.hs:189:37 in ghc:GHC.Utils.Panic
-        pprPanic, called at compiler/GHC/Types/Name.hs:329:3 in ghc:GHC.Types.Name
-  CallStack (from HasCallStack):
-    panic, called at compiler/GHC/Utils/Error.hs:454:29 in ghc:GHC.Utils.Error
-
-
-Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug
-
+/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:33:1
+$> unit_simple_fail
+[OnceAround {delay = 0, passSetup = False, passTeardown = True, subNodes = [Test {testItems = [TestItem {delay = 0, pass = True},TestItem {delay = 0, pass = False}]}]}]

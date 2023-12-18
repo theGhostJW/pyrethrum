@@ -1,25 +1,17 @@
 module SuiteRuntimeTest where
 
-import BasePrelude (HasField)
 import qualified Core
-import DSL.Internal.ApEvent (ApEvent (User), Path (..), ULog (..))
+import DSL.Internal.ApEvent (ApEvent, Path (..))
 import Data.Aeson (ToJSON)
-import Data.Aeson.Types (toEncoding)
-import qualified Data.List.NonEmpty as N
 import qualified Data.Text as T
 import qualified FullSuiteTestTemplate as T
 import Internal.RunTimeLogging (ExePath, testLogControls)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
 import Internal.ThreadEvent (Frequency (..), ThreadEvent)
 import qualified Prepare as P
-import PyrethrumExtras (toS, txt, uu, (?))
-import qualified PyrethrumExtras.Test as T
-import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
+import PyrethrumExtras (toS, txt, (?))
+import Text.Show.Pretty (pPrint)
 import UnliftIO.Concurrent as C (
-  ThreadId,
-  forkFinally,
-  forkIO,
-  myThreadId,
   threadDelay,
  )
 import UnliftIO.STM (TQueue, tryReadTQueue)
@@ -29,11 +21,23 @@ import Prelude hiding (id, pass)
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest 1 [onceAround True True [test [testItem True, testItem False]]]
 
+-- $ > unit_simple_fail
+unit_simple_fail :: IO ()
+unit_simple_fail = runTest 1 [onceAround False True [test [testItem True, testItem False]]]
 
--- $> unit_simple_fail
-unit_simple_fail :: [Template]
-unit_simple_fail = [onceAround False True [test [testItem True, testItem False]]]
-
+-- $> unit_nested_thread_pass_fail
+unit_nested_thread_pass_fail :: IO ()
+unit_nested_thread_pass_fail =
+  runTest
+    1
+    [ onceAround
+        True
+        True
+        [ threadAround True True [eachAfter False [test [testItem True, testItem False]]]
+        , threadAround False True [eachAfter True [test [testItem True, testItem False]]]
+        ]
+    ]
+ 
 onceBefore :: Bool -> [Template] -> Template
 onceBefore = OnceBefore 0
 
@@ -67,53 +71,13 @@ test = Test
 testItem :: Bool -> TestItem
 testItem = TestItem 0
 
--- runTest 1 [OnceAround
-
---     { path = ""
---     , delay = 0
---     , passSetup = True
---     , passTeardown = True
---     , subNodes  = [
-
---         ThreadAround
---           { path = ""
---           , delay = 0
---           , passSetup = True
---           , passTeardown = True
---           , subNodes = [
---               EachAround
---                 { path = ""
---                 , delay = 0
---                 , passSetup = True
---                 , passTeardown = True
---                 , subNodes = [
---                     Test
---                       { path = ""
---                       , testItems = [
---                           TestItem
---                             { id = 0
---                             , title = "test 0"
---                             , delay = 0
---                             , pass = True
---                             }
---                         ]
---                       }
---                   ]
---                 }
---             ]
---           }
---       ]
---     }]
---     ]
---     }]
-
 runTest :: Int -> [Template] -> IO ()
 runTest maxThreads templates = exeTemplate (ThreadCount maxThreads) templates >>= chkProperties maxThreads templates
 
-chkProperties :: Int -> [Template] -> [ThreadEvent ExePath ApEvent] -> IO ()
+chkProperties :: Int -> [Template] -> [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent] -> IO ()
 chkProperties mxThrds t evts = putStrLn " checks done"
 
-exeTemplate :: ThreadCount -> [Template] -> IO [ThreadEvent ExePath ApEvent]
+exeTemplate :: ThreadCount -> [Template] -> IO [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent]
 exeTemplate maxThreads testNodes = do
   (lc, logQ) <- testLogControls
   let templates = setPaths "" $ toList testNodes
@@ -163,7 +127,7 @@ setPaths address ts =
       EachAfter{..} -> T.EachAfter{path = newPath "EachAfter", subNodes = newNodes, ..}
       EachAround{..} -> T.EachAround{path = newPath "EachAround", subNodes = newNodes, ..}
    where
-    newPath = SuiteElmPath newAdd
+    newPath = DSL.Internal.ApEvent.SuiteElmPath newAdd
     newAdd = nxtAdd idx
     newNodes = setPaths newAdd tp.subNodes
 

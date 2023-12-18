@@ -256,6 +256,7 @@ library:
     - src
     # remove later when finish most dev and move away from god modules
     - test
+    - examples
   dependencies:
     - deepseq
     - unordered-containers

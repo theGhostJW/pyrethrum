@@ -108,7 +108,7 @@ timeTest = do
 listFileImp :: (FileSystem :> es, Out ApEvent :> es) => Eff es [Text]
 listFileImp = do
   log "listFileImp"
-  files <- walkDirAccum Nothing (\root subs files -> pure files) [absdir|C:\Pyrethrum|]
+  files <- walkDirAccum Nothing (\_root _subs files -> pure files) [absdir|/pyrethrum/pyrethrum|]
   log "done"
   pure . filter ("cabal" `T.isInfixOf`) $ toS . toFilePath <$> files
 

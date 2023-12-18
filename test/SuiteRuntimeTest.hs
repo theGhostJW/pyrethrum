@@ -75,7 +75,7 @@ runTest :: Int -> [Template] -> IO ()
 runTest maxThreads templates = exeTemplate (ThreadCount maxThreads) templates >>= chkProperties maxThreads templates
 
 chkProperties :: Int -> [Template] -> [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent] -> IO ()
-chkProperties mxThrds t evts = putStrLn " checks done"
+chkProperties _mxThrds _t _evts = putStrLn " checks done"
 
 exeTemplate :: ThreadCount -> [Template] -> IO [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent]
 exeTemplate maxThreads testNodes = do

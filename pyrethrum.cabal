@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f6dc77c7b029932740992cde85caf62cc7df77960d9713814b8436e4b48a200d
+-- hash: 7420a66c263d9f915e9f99611e9e3926ed1c03549244881b7259e6837ca36101
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -102,9 +102,17 @@ library
       Main
       RunnerTest
       SuiteRuntimeTest
+      EffectfulDemoSpeakEffect
+      EffectfulDemoSpeakIOInterpreterDynamic
+      IOEffectDemo
+      PyrethrumDemoProject
+      PyrethrumDemoTest
+      RunDemo
+      StepDocumenterDemo
   hs-source-dirs:
       src
       test
+      examples
   default-extensions:
       AllowAmbiguousTypes
       BangPatterns

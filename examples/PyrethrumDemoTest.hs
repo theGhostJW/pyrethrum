@@ -10,15 +10,20 @@ import Effectful (Eff, (:>))
 import qualified Effectful.Error.Static as E
 import PyrethrumDemoProject (
   Action,
-  Depth (DeepRegression),
+  Depth (..),
   Hook (..),
   RunConfig (..),
   Suite,
   SuiteElement (..),
   Test (..),
-  TestConfig (..),
+  TestConfig (..), testConfig,
  )
 import PyrethrumExtras (txt)
+
+{-
+Note:: tried alternative with individual hook types but the results 
+were starting to look more complex than the original so abandonned.
+-}
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
@@ -90,7 +95,7 @@ type Failable a = Eff '[E.Error ParseException] a
 -- ############### Test the Lot ###################
 
 config :: TestConfig
-config = TestConfig "test" 1 DeepRegression
+config = TestConfig "test" DeepRegression
 
 data ApState = ApState
   { value :: Int
@@ -133,7 +138,7 @@ items =
 -- ############### Test the Lot Child ###################
 
 config2 :: TestConfig
-config2 = TestConfig "test" 1 DeepRegression
+config2 = TestConfig "test" DeepRegression
 
 action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
 action2 _rc HookInfo{value = hookVal} itm = do
@@ -160,7 +165,7 @@ data Item2 = Item2
   , value :: Int
   , checks :: Checks DS
   }
-  deriving (Show, Generic)
+  deriving (Show)
 
 items2 :: RunConfig -> [Item2]
 items2 =
@@ -176,20 +181,23 @@ items2 =
         }
     ]
 
--- ############### Test the Lot (Record) ###################
 
 $(deriveToJSON defaultOptions ''DS)
 $(deriveToJSON defaultOptions ''AS)
 $(deriveToJSON defaultOptions ''Item2)
 
--- TODO: precompiler
-instance C.Item Item2 DS
+test2 :: Test HookInfo
+test2 = Full' infoThreadHook config2 action2 parse2 items2
+
+-- TODO: precompiler / teplateHaskell
+
+-- ############### Test the Lot (Record) ###################
 
 test3 :: Test Int
 test3 =
   Full'
     { depends = eachIntBefore
-    , config' = TestConfig "test" 1 DeepRegression
+    , config' = TestConfig "test" DeepRegression
     , action' = \_rc i itm -> do
         log $ txt itm
         pure $ AS (itm.value + 1 + i) $ txt itm.value
@@ -209,7 +217,7 @@ test3 =
 test4 :: Test Int
 test4 =
   NoParse'
-    { config' = TestConfig "test" 1 DeepRegression
+    { config' = TestConfig "test" DeepRegression
     , depends = eachAfter
     , action' = \_rc _hi itm -> do
         log $ txt itm
@@ -229,7 +237,7 @@ test4 =
 test5 :: Test Int
 test5 =
   Single'
-    { config' = TestConfig "test" 1 DeepRegression
+    { config' = TestConfig "test" DeepRegression
     , depends = eachAfter
     , singleAction' = \rc _hi -> do
         log $ "RunConfig is: " <> rc.title
@@ -257,14 +265,22 @@ $(deriveToJSON defaultOptions ''DState)
 $(deriveToJSON defaultOptions ''ApState)
 $(deriveToJSON defaultOptions ''Item)
 
-instance C.Item Item DState
-
 test :: Test ()
 test =
   Full config action parse items
 
-test2 :: Test HookInfo
-test2 = Full' infoThreadHook config2 action2 parse2 items2
+-- ############### Demo Default Configs ###################
+
+cfg :: TestConfig
+cfg = testConfig "test"
+
+-- ambiguous record update error - should work 
+-- after 9.8.1
+-- cfg2 :: TestConfig
+-- cfg2 = (testConfig "test") {
+--   depth = Regression
+-- }
+
 
 -- ############### Suite ###################
 -- this will be generated

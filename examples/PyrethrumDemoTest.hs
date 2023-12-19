@@ -2,7 +2,7 @@ module PyrethrumDemoTest where
 
 import Check (Checks, chk)
 import Core (Each, Once, ParseException, Thread)
-import qualified Core as C
+import qualified Core() 
 import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
 import DSL.Out (Out, out)
 import Data.Aeson.TH

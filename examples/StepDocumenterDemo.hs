@@ -6,14 +6,13 @@ import DSL.FileSystemEffect (
   findFilesWith,
   walkDirAccum,
  )
-import qualified DSL.FileSystemIOInterpreter as IOI
 import DSL.Internal.ApEvent (ApEvent (User), ULog (Log))
 import DSL.Out (Out, Sink (Sink), out, runOut)
 import Data.List.Extra (isInfixOf)
 import Effectful (Eff, IOE, runEff, (:>))
 import Effectful.Error.Static (Error, runError)
-import Path (absdir, parseAbsFile, reldir, relfile, toFilePath)
-import PyrethrumExtras (Abs, File, Path, parseRelFileSafe, toS, txt, uu, (?))
+import Path (absdir, reldir, relfile, toFilePath, Abs, File, Path)
+import PyrethrumExtras ((?))
 
 type FSOut es = (Out ApEvent :> es, FileSystem :> es)
 
@@ -87,7 +86,7 @@ data PathResult = PathResult
 getPathsData :: (Out ApEvent :> es, FileSystem :> es) => Eff es PathResult
 getPathsData = do
   p <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
-  output <- walkDirAccum Nothing (\_root _subs files -> pure files) [absdir|C:\Pyrethrum|]
+  output <- walkDirAccum Nothing (\_root _subs files -> pure files) [absdir|/pyrethrum/pyrethrum|]
   r <- test p
   log $ r ? "yes" $ "no"
   pure

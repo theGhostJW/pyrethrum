@@ -27,7 +27,7 @@ class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
 
 -- class (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i, ToJSON ds) => Item i ds
 
-type Item'' i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i, ToJSON ds)
+type Item i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i, ToJSON ds)
 -- TODO: a property class with different constraints
 {-
 
@@ -124,7 +124,7 @@ data Addressed a = Addressed
 
 data Test c rc tc effs hi where
   Full ::
-    (Item'' i ds, ToJSON as) =>
+    (Item i ds, ToJSON as) =>
     { config :: tc
     , action :: rc -> i -> Eff effs as
     , parse :: as -> Eff '[E.Error ParseException] ds
@@ -132,7 +132,7 @@ data Test c rc tc effs hi where
     } ->
     Test c rc tc effs ()
   Full' ::
-    (Item'' i ds, ToJSON as) =>
+    (Item i ds, ToJSON as) =>
     { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , action' :: rc -> hi -> i -> Eff effs as
@@ -141,14 +141,14 @@ data Test c rc tc effs hi where
     } ->
     Test c rc tc effs hi
   NoParse ::
-    (Item'' i ds) =>
+    (Item i ds) =>
     { config :: tc
     , action :: rc -> i -> Eff effs ds
     , items :: rc -> c i
     } ->
     Test c rc tc effs ()
   NoParse' ::
-    (Item'' i ds) =>
+    (Item i ds) =>
     { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , action' :: rc -> hi -> i -> Eff effs ds

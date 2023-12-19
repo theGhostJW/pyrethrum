@@ -115,7 +115,7 @@ TODO:
 
 data Test hi where
   Full ::
-    (C.Item'' i ds, ToJSON as) =>
+    (C.Item i ds, ToJSON as) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Action as
     , parse :: as -> Eff '[E.Error C.ParseException] ds
@@ -123,7 +123,7 @@ data Test hi where
     } ->
     Test ()
   Full' ::
-    (C.Item'' i ds, ToJSON as, C.Param loc) =>
+    (C.Item i ds, ToJSON as, C.Param loc) =>
     { depends :: Hook loc pi a
     , config' :: TestConfig
     , action' :: RunConfig -> a -> i -> Action as
@@ -133,14 +133,14 @@ data Test hi where
     Test a
   NoParse ::
     forall i ds.
-    (C.Item'' i ds) =>
+    (C.Item i ds) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Action ds
     , items :: RunConfig -> [i]
     } ->
     Test ()
   NoParse' ::
-    (C.Item'' i ds, C.Param loc) =>
+    (C.Item i ds, C.Param loc) =>
     { depends :: Hook loc pi a
     , config' :: TestConfig
     , action' :: RunConfig -> a -> i -> Action ds

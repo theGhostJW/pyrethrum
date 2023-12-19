@@ -240,14 +240,14 @@ prepareTest PrepParams{interpreter, runConfig} path =
  where
   applyParser parser = mapLeft (fmap toException) . runPureEff . E.runError . parser
 
-  runAction :: forall i as ds. (C.Item'' i ds) => ApEventSink -> (i -> Eff effs as) -> i -> IO as
+  runAction :: forall i as ds. (C.Item i ds) => ApEventSink -> (i -> Eff effs as) -> i -> IO as
   runAction snk action i =
     do
       flog snk . Action path . ItemJSON $ toJSON i
       eas <- interpreter $ action i
       unTry snk eas
 
-  runTest :: forall i as ds. (ToJSON as, C.Item'' i ds) => (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> ApEventSink -> IO ()
+  runTest :: forall i as ds. (ToJSON as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> ApEventSink -> IO ()
   runTest action parser i snk =
     do
       ds <- tryAny
@@ -258,7 +258,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
           unTry snk eds
       applyChecks snk path i.checks ds
 
-  runNoParseTest :: forall i ds. (C.Item'' i ds) => (i -> Eff effs ds) -> i -> ApEventSink -> IO ()
+  runNoParseTest :: forall i ds. (C.Item i ds) => (i -> Eff effs ds) -> i -> ApEventSink -> IO ()
   runNoParseTest action i snk =
     tryAny (runAction snk action i) >>= applyChecks snk path i.checks
 

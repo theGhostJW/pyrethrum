@@ -1,18 +1,1 @@
-All good (32 modules, at 10:59:52)
- 
-/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:28:1
-$> unit_nested_thread_pass_fail
-panic! (the 'impossible' happened)
-  GHC version 9.6.3:
-	nameModule
-  internal stepDownQStatus_ik9S
-  Call stack:
-      CallStack (from HasCallStack):
-        callStackDoc, called at compiler/GHC/Utils/Panic.hs:189:37 in ghc:GHC.Utils.Panic
-        pprPanic, called at compiler/GHC/Types/Name.hs:329:3 in ghc:GHC.Types.Name
-  CallStack (from HasCallStack):
-    panic, called at compiler/GHC/Utils/Error.hs:454:29 in ghc:GHC.Utils.Error
-
-
-Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug
-
+Ghcid has stopped.

@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d05014dc35f080c224a99fb2806384101fa93bcd42db3c51d9b12a982bdde57a
+-- hash: 13e24373a876674e793fb672eb4cc69c1f5d4475521893e59468fdf8ec534a7e
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -76,7 +76,6 @@ flag optimised
 library
   import: libImports, pyrethrumProps, reludeImports
   exposed-modules:
-      AuxFiles
       Check
       Core
       DSL.Internal.ApEvent
@@ -89,12 +88,7 @@ library
       Prepare
       TempUtils
       Text.Extra
-      ArbitraryIOTest
-      AuxFilesTest
-      CheckTest
       FullSuiteTestTemplate
-      LogListCheck
-      RunnerTest
       SuiteRuntimeTest
   hs-source-dirs:
       src

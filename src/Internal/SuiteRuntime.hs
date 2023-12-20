@@ -34,6 +34,8 @@ import UnliftIO.STM (
  )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
 
+-- todo: minimise AESON requirements => AS, DS, ITEM => Show Only. tc, rc => JSON
+
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 

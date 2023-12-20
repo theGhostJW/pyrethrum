@@ -19,16 +19,16 @@ import Prelude hiding (id, pass)
 
 -- $ > unit_simple_pass
 unit_simple_pass :: IO ()
-unit_simple_pass = runTest 1 [onceAround True True [test [testItem True, testItem False]]]
+unit_simple_pass = runTest False 1 [onceAround True True [test [testItem True, testItem False]]]
 
 -- $ > unit_simple_fail
 unit_simple_fail :: IO ()
-unit_simple_fail = runTest 1 [onceAround False True [test [testItem True, testItem False]]]
+unit_simple_fail = runTest False 1 [onceAround False True [test [testItem True, testItem False]]]
 
 -- $> unit_nested_thread_pass_fail
 unit_nested_thread_pass_fail :: IO ()
 unit_nested_thread_pass_fail =
-  runTest
+  runTest False
     1
     [ onceAround
         True
@@ -71,15 +71,15 @@ test = Test
 testItem :: Bool -> TestItem
 testItem = TestItem 0
 
-runTest :: Int -> [Template] -> IO ()
-runTest maxThreads templates = exeTemplate (ThreadCount maxThreads) templates >>= chkProperties maxThreads templates
+runTest :: Bool -> Int -> [Template] -> IO ()
+runTest wantConsole maxThreads templates = exeTemplate wantConsole (ThreadCount maxThreads) templates >>= chkProperties maxThreads templates
 
 chkProperties :: Int -> [Template] -> [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent] -> IO ()
 chkProperties _mxThrds _t _evts = putStrLn " checks done"
 
-exeTemplate :: ThreadCount -> [Template] -> IO [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent]
-exeTemplate maxThreads testNodes = do
-  (lc, logQ) <- testLogControls
+exeTemplate :: Bool -> ThreadCount -> [Template] -> IO [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent]
+exeTemplate wantConsole maxThreads testNodes = do
+  (lc, logQ) <- testLogControls wantConsole
   let templates = setPaths "" $ toList testNodes
   putStrLn ""
   pPrint templates

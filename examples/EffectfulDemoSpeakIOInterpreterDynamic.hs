@@ -14,7 +14,7 @@ import Effectful as EF (
   type (:>),
  )
 import Effectful.Dispatch.Dynamic (
-  HasCallStack,
+  -- HasCallStack,
   interpret,
  )
 import Effectful.TH (makeEffect)

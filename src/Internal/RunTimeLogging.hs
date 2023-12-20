@@ -4,24 +4,23 @@ module Internal.RunTimeLogging where
 
 -- TODO: Explicit exports remove old code
 import qualified BasePrelude as P
+import qualified DSL.Internal.ApEvent as AE
 import Data.Aeson.TH (defaultOptions, deriveToJSON)
+import Data.Text as T (intercalate)
+import Effectful.Concurrent.STM (TQueue)
 import qualified Internal.ThreadEvent as TE
 import PyrethrumExtras (txt)
 import Text.Show.Pretty (pPrint)
-import UnliftIO.Concurrent (ThreadId)
-import Prelude hiding (atomically, lines)
-import qualified DSL.Internal.ApEvent as AE
-import Data.Text as T (intercalate)
-import Effectful.Concurrent.STM (TQueue)
-import UnliftIO.STM ( writeTChan, atomically, readTChan, newTChanIO, newTQueueIO,  writeTQueue)
 import UnliftIO (finally)
+import UnliftIO.Concurrent (ThreadId)
+import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
+import Prelude hiding (atomically, lines)
 
 newtype ExePath = ExePath {unExePath :: [AE.Path]} deriving (Show, Eq, Ord)
 
 -- TODO: hide string eg intercallate
 displayExePath :: ExePath -> Text
-displayExePath ep =  T.intercalate "." $ (.title) <$> reverse ep.unExePath
-
+displayExePath ep = T.intercalate "." $ (.title) <$> reverse ep.unExePath
 
 -- TODO :: will need thread id
 data FailPoint = FailPoint
@@ -34,7 +33,7 @@ exceptionTxt :: SomeException -> TE.PException
 exceptionTxt e = TE.PException $ txt <$> P.lines (displayException e)
 
 mkFailure :: l -> TE.EventType -> SomeException -> EngineEvent l a
-mkFailure loc eventType exception = Failure {exception = exceptionTxt exception, ..}
+mkFailure loc eventType exception = Failure{exception = exceptionTxt exception, ..}
 
 data EngineEvent l a
   = StartExecution
@@ -47,10 +46,9 @@ data EngineEvent l a
       , loc :: l
       }
   | Failure
-      {
-       eventType :: TE.EventType
+      { eventType :: TE.EventType
       , loc :: l
-      ,  exception :: TE.PException
+      , exception :: TE.PException
       }
   | ParentFailure
       { loc :: l
@@ -83,7 +81,6 @@ mkLogger sink threadCounter thrdId engEvnt = do
   let nxt = succ tc
   finally (sink $ expandEvent (TE.SThreadId $ txt thrdId) nxt engEvnt) $ writeIORef threadCounter nxt
 
-
 -- TODO:: Logger should be wrapped in an except that sets non-zero exit code on failure
 
 data LogControls loc apEvt = LogControls
@@ -93,9 +90,8 @@ data LogControls loc apEvt = LogControls
   , log :: TQueue (TE.ThreadEvent loc apEvt)
   }
 
-testLogControls :: forall loc apEvt. (Show loc, Show apEvt) => IO (LogControls loc apEvt, TQueue (TE.ThreadEvent loc apEvt))
-testLogControls = do
-
+testLogControls :: forall loc apEvt. (Show loc, Show apEvt) => Bool -> IO (LogControls loc apEvt, TQueue (TE.ThreadEvent loc apEvt))
+testLogControls wantConsole = do
   chn <- newTChanIO
   logQ <- newTQueueIO
 
@@ -105,7 +101,7 @@ testLogControls = do
         atomically (readTChan chn)
           >>= maybe
             (pure ())
-            (\evt -> pPrint evt >> logWorker)
+            (\evt -> when wantConsole (pPrint evt) >> logWorker)
 
       stopWorker :: IO ()
       stopWorker = atomically $ writeTChan chn Nothing
@@ -116,8 +112,7 @@ testLogControls = do
           writeTChan chn $ Just eventLog
           writeTQueue logQ eventLog
 
-  pure  (LogControls sink logWorker stopWorker logQ, logQ)
-
+  pure (LogControls sink logWorker stopWorker logQ, logQ)
 
 $(deriveToJSON defaultOptions ''ExePath)
 $(deriveToJSON defaultOptions ''EngineEvent)

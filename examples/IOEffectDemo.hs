@@ -33,7 +33,7 @@ printHeadLine = putTxt . headLine . toS
 -- import Control.Exception (bracket)
 -- import System.IO (hGetContents, hClose, openFile, IOMode(ReadMode))
 
--- $> printHeadLineFail1 "pyrethrum.cabal"
+-- $ > printHeadLineFail1 "pyrethrum.cabal"
 printHeadLineFail1 :: FilePath -> IO ()
 printHeadLineFail1 path = do
   contents <- bracket (openFile path ReadMode) hClose hGetContents
@@ -41,14 +41,14 @@ printHeadLineFail1 path = do
 
 -- illegal operation (delayed read on closed handle)
 
--- $> printHeadLineWorks "pyrethrum.cabal"
+-- $ > printHeadLineWorks "pyrethrum.cabal"
 printHeadLineWorks :: FilePath -> IO ()
 printHeadLineWorks path =
   bracket (openFile path ReadMode) hClose (hGetContents >=> printHeadLine)
 
 -- cabal-version: 3.6
 
--- $> printHeadLineForce "pyrethrum.cabal"
+-- $ > printHeadLineForce "pyrethrum.cabal"
 printHeadLineForce :: FilePath -> IO ()
 printHeadLineForce path = do
   str <- bracket (openFile path ReadMode) hClose \h -> do
@@ -66,7 +66,7 @@ forceBracket ::
   m b
 forceBracket aquire cleanUp action = bracket aquire cleanUp (action >=> (pure $!!))
 
--- $> printHeadLineForceBracket "pyrethrum.cabal"
+-- $ > printHeadLineForceBracket "pyrethrum.cabal"
 printHeadLineForceBracket :: FilePath -> IO ()
 printHeadLineForceBracket path = do
   contents <- forceBracket (openFile path ReadMode) hClose hGetContents
@@ -77,7 +77,7 @@ printHeadLineForceBracket path = do
 printTime :: Text -> Time -> IO ()
 printTime msg t = putTxt $ msg <> " " <> toS (show t)
 
--- $> timeTest
+-- $ > timeTest
 timeTest :: IO ()
 timeTest = do
   t <- now
@@ -124,7 +124,7 @@ logShow = out . User . Log . txt
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
--- $> ioRun effDemo
+-- $ > ioRun effDemo
 effDemo :: Eff '[FileSystem, Out ApEvent, Error FSException, IOE] ()
 effDemo = do
   res <- listFileImp
@@ -132,7 +132,7 @@ effDemo = do
  where
   chk _ = log "This is a effDemo"
 
--- $> ioRun effDemo2
+-- $ > ioRun effDemo2
 effDemo2 :: Eff '[FileSystem, Out ApEvent, Error FSException, IOE] ()
 effDemo2 = do
   res <- listFileImp

@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5dab64d91537004a11a4c93f0cbe3f6d2d9a49d5f5a9a8b9d9e17599b444c6ce
+-- hash: d05014dc35f080c224a99fb2806384101fa93bcd42db3c51d9b12a982bdde57a
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -79,12 +79,7 @@ library
       AuxFiles
       Check
       Core
-      DSL.FileSystemDocInterpreter
-      DSL.FileSystemEffect
-      DSL.FileSystemIOInterpreter
       DSL.Internal.ApEvent
-      DSL.Internal.FileSystemPure
-      DSL.Internal.FileSystemRawIO
       DSL.Out
       Internal.RunTimeLogging
       Internal.SuiteRuntime
@@ -101,17 +96,9 @@ library
       LogListCheck
       RunnerTest
       SuiteRuntimeTest
-      EffectfulDemoSpeakEffect
-      EffectfulDemoSpeakIOInterpreterDynamic
-      IOEffectDemo
-      PyrethrumDemoProject
-      PyrethrumDemoTest
-      RunDemo
-      StepDocumenterDemo
   hs-source-dirs:
       src
       test
-      examples
   default-extensions:
       AllowAmbiguousTypes
       BangPatterns

@@ -27,7 +27,7 @@ unit_simple_fail = runTest False 1 [onceAround False True [test [testItem True, 
 
 -- $> unit_nested_thread_pass_fail
 unit_nested_thread_pass_fail :: IO ()
-unit_nested_thread_pass_fail =
+unit_nested_thread_pass_fail = 
   runTest False
     1
     [ onceAround

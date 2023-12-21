@@ -16,11 +16,11 @@ import UnliftIO.Concurrent (ThreadId)
 import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
 import Prelude hiding (atomically, lines)
 
-newtype ExePath = ExePath {unExePath :: [AE.Path]} deriving (Show, Eq, Ord)
+newtype ExePath = ExePath [AE.Path] deriving (Show, Eq, Ord)
 
 -- TODO: hide string eg intercallate
 displayExePath :: ExePath -> Text
-displayExePath ep = T.intercalate "." $ (.title) <$> reverse ep.unExePath
+displayExePath (ExePath l) = T.intercalate "." $ (.title) <$> reverse l
 
 -- TODO :: will need thread id
 data FailPoint = FailPoint
@@ -53,8 +53,8 @@ data EngineEvent l a
   | ParentFailure
       { loc :: l
       , eventType :: TE.EventType
-      , parentLoc :: l
-      , parentEventType :: TE.EventType
+      , failLoc :: l
+      , failEventType :: TE.EventType
       }
   | ApEvent
       { event :: a
@@ -65,7 +65,7 @@ data EngineEvent l a
 -- apEvent (a) a loggable event arising from the framework at runtime
 -- EngineEvent a - marks start, end and failures in test fixtures (hooks, tests) and errors
 -- ThreadEvent a - adds thread id and index to EngineEvent
-expandEvent :: TE.SThreadId -> Int -> EngineEvent loc apEvt -> TE.ThreadEvent loc apEvt
+expandEvent :: TE.ThreadId -> Int -> EngineEvent loc apEvt -> TE.ThreadEvent loc apEvt
 expandEvent threadId idx = \case
   StartExecution -> TE.StartExecution{threadId, idx}
   Start{..} -> TE.Start{threadId, idx, ..}
@@ -79,7 +79,7 @@ mkLogger :: (TE.ThreadEvent loc apEvt -> IO ()) -> IORef Int -> ThreadId -> Engi
 mkLogger sink threadCounter thrdId engEvnt = do
   tc <- readIORef threadCounter
   let nxt = succ tc
-  finally (sink $ expandEvent (TE.SThreadId $ txt thrdId) nxt engEvnt) $ writeIORef threadCounter nxt
+  finally (sink $ expandEvent (TE.mkThreadId thrdId) nxt engEvnt) $ writeIORef threadCounter nxt
 
 -- TODO:: Logger should be wrapped in an except that sets non-zero exit code on failure
 

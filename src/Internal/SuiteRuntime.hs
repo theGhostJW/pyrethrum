@@ -177,7 +177,7 @@ mkXTree xpth preNodes =
           cq <- mkChildQ tests
           pure $ Test{path, title = c.title, tests = cq}
    where
-    path = L.ExePath $ pn.path : xpth.unExePath
+    path = L.ExePath $ pn.path : coerce xpth
 
     mkOnceHook :: forall hi' ho'. m (P.PreNode IO m ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> IO (ExeTree hi')
     mkOnceHook subNodes' setup teardown = do
@@ -353,8 +353,8 @@ logAbandonned lgr p e a =
     $ L.ParentFailure
       { loc = p
       , eventType = e
-      , parentLoc = a.path
-      , parentEventType = a.eventType
+      , failLoc = a.path
+      , failEventType = a.eventType
       }
 
 logReturnFailure :: Logger -> L.ExePath -> TE.EventType -> SomeException -> IO (Either L.FailPoint b)
@@ -751,7 +751,7 @@ runNode lgr hi xt =
               (void . logRun lgr (mkTestPath tstItm) TE.Test . tstItm.action sink)
 
         mkTestPath :: P.TestItem IO hi -> L.ExePath
-        mkTestPath P.TestItem{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : path.unExePath
+        mkTestPath P.TestItem{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : coerce path
 
 data NodeIn hi
   = Abandon FailPoint

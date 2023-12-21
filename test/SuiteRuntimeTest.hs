@@ -5,6 +5,7 @@ import DSL.Internal.ApEvent (ApEvent, Path (..))
 import Data.Aeson (ToJSON)
 import qualified Data.Text as T
 import qualified FullSuiteTestTemplate as T
+import FullSuiteTestTemplate (Result(..))
 import Internal.RunTimeLogging (ExePath, testLogControls)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
 import Internal.ThreadEvent (Frequency (..), ThreadEvent (..))
@@ -16,11 +17,12 @@ import UnliftIO.Concurrent as C (
   threadDelay,
  )
 import UnliftIO.STM (TQueue, tryReadTQueue)
-import Prelude hiding (id, pass)
+import Prelude hiding (id)
 import qualified Data.Map.Strict as M
 import qualified List.Extra as L
 
 type LogItem = ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent
+
 
 chkProperties :: Int -> [Template] -> [LogItem] -> IO ()
 chkProperties _mxThrds _t evts = do
@@ -47,11 +49,10 @@ chkStartEndExecution evts =
               _ -> fail $ "last event is not EndExecution:\n " <> toS (ppShow e)
         )
 
-
 -- TODO - add tests add to pyrelude
 -- research groupon on lists is consecutive and dodgy
 -- conver to to non-empty and use groupby from relude??
-groupOn :: (Ord b) => (a -> b) -> [a] -> [[a]]
+groupOn :: Ord b => (a -> b) -> [a] -> [[a]]
 groupOn f =
   M.elems . foldl' fld M.empty . reverse
  where
@@ -102,13 +103,13 @@ chkEq' msg e a =
         <> ppShow a
         <> "\n"
 
--- $> unit_simple_pass
+-- $ > unit_simple_pass
 unit_simple_pass :: IO ()
-unit_simple_pass = runTest True 1 [onceAround True True [test [testItem True, testItem False]]]
+unit_simple_pass = runTest True 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
--- $ > unit_simple_fail
+-- $> unit_simple_fail
 unit_simple_fail :: IO ()
-unit_simple_fail = runTest False 1 [onceAround False True [test [testItem True, testItem False]]]
+unit_simple_fail = runTest True 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
 -- $ > unit_nested_thread_pass_fail
 unit_nested_thread_pass_fail :: IO ()
@@ -117,44 +118,44 @@ unit_nested_thread_pass_fail =
     False
     1
     [ onceAround
-        True
-        True
-        [ threadAround True True [eachAfter False [test [testItem True, testItem False]]]
-        , threadAround False True [eachAfter True [test [testItem True, testItem False]]]
+        Pass
+        Pass
+        [ threadAround Pass Pass [eachAfter Fail [test [testItem Pass, testItem Fail]]]
+        , threadAround Fail Pass [eachAfter Pass [test [testItem Pass, testItem Fail]]]
         ]
     ]
 
-onceBefore :: Bool -> [Template] -> Template
+onceBefore :: Result -> [Template] -> Template
 onceBefore = OnceBefore 0
 
-onceAfter :: Bool -> [Template] -> Template
+onceAfter :: Result -> [Template] -> Template
 onceAfter = OnceAfter 0
 
-onceAround :: Bool -> Bool -> [Template] -> Template
+onceAround :: Result -> Result -> [Template] -> Template
 onceAround = OnceAround 0
 
-threadBefore :: Bool -> [Template] -> Template
+threadBefore :: Result -> [Template] -> Template
 threadBefore = ThreadBefore 0
 
-threadAfter :: Bool -> [Template] -> Template
+threadAfter :: Result -> [Template] -> Template
 threadAfter = ThreadAfter 0
 
-threadAround :: Bool -> Bool -> [Template] -> Template
+threadAround :: Result -> Result -> [Template] -> Template
 threadAround = ThreadAround 0
 
-eachBefore :: Bool -> [Template] -> Template
+eachBefore :: Result -> [Template] -> Template
 eachBefore = EachBefore 0
 
-eachAfter :: Bool -> [Template] -> Template
+eachAfter :: Result -> [Template] -> Template
 eachAfter = EachAfter 0
 
-eachAround :: Bool -> Bool -> [Template] -> Template
+eachAround :: Result -> Result -> [Template] -> Template
 eachAround = EachAround 0
 
 test :: [TestItem] -> Template
 test = Test
 
-testItem :: Bool -> TestItem
+testItem :: Result -> TestItem
 testItem = TestItem 0
 
 runTest :: Bool -> Int -> [Template] -> IO ()
@@ -227,17 +228,16 @@ instance Core.Config TestConfig
 tc :: TestConfig
 tc = TestConfig{title = "test config"}
 
-mkVoidAction :: forall desc. (Show desc) => desc -> Int -> Bool -> P.ApEventSink -> IO ()
-mkVoidAction path delay pass _sink =
+mkVoidAction :: forall desc. (Show desc) => desc -> Int -> Result -> P.ApEventSink -> IO ()
+mkVoidAction path delay outcome _sink =
   do
     C.threadDelay delay
-    -- sink . User $ Log msg
-    unless pass . error $ toS msg
- where
-  msg = pass ? txt path <> " passed" $ txt path <> " failed"
+    unless (outcome == Pass) $
+      error . toS  $ txt path <> " failed"
 
-mkAction :: forall hi desc. (Show desc) => desc -> Int -> Bool -> P.ApEventSink -> hi -> IO ()
-mkAction path delay pass sink _in = mkVoidAction path delay pass sink
+
+mkAction :: forall hi desc. (Show desc) => desc -> Int -> Result -> P.ApEventSink -> hi -> IO ()
+mkAction path delay rslt sink _in = mkVoidAction path delay rslt sink
 
 mkNodes :: [T.Template] -> [P.PreNode IO [] ()]
 mkNodes = fmap mkNode
@@ -256,165 +256,164 @@ mkNodes = fmap mkNode
     T.OnceBefore
       { path
       , delay
-      , pass
+      , result
       , subNodes
       } ->
         P.Before
           { path
           , frequency = Once
-          , action = mkAction path delay pass
+          , action = mkAction path delay result
           , subNodes = mkNodes subNodes
           }
     T.OnceAfter
       { path
       , delay
-      , pass
+      , result
       , subNodes
       } ->
         P.After
           { path
           , frequency = Once
-          , after = mkVoidAction path delay pass
+          , after = mkVoidAction path delay result
           , subNodes' = mkNodes subNodes
           }
     T.OnceAround
       { path
       , delay
-      , passSetup
-      , passTeardown
+      , setupResult
+      , teardownResult
       , subNodes
       } ->
         P.Around
           { path
           , frequency = Once
-          , setup = mkAction path delay passSetup
-          , teardown = mkAction path delay passTeardown
+          , setup = mkAction path delay setupResult
+          , teardown = mkAction path delay teardownResult
           , subNodes = mkNodes subNodes
           }
     T.ThreadBefore
       { path
       , delay
-      , pass
+      , result
       , subNodes
       } ->
         P.Before
           { path
           , frequency = Thread
-          , action = mkAction path delay pass
+          , action = mkAction path delay result
           , subNodes = mkNodes subNodes
           }
     T.ThreadAfter
       { path
       , delay
-      , pass
+      , result
       , subNodes
       } ->
         P.After
           { path
           , frequency = Thread
-          , after = mkVoidAction path delay pass
+          , after = mkVoidAction path delay result
           , subNodes' = mkNodes subNodes
           }
     T.ThreadAround
       { path
       , delay
-      , passSetup
-      , passTeardown
+      , setupResult
+      , teardownResult
       , subNodes
       } ->
         P.Around
           { path
           , frequency = Thread
-          , setup = mkAction path delay passSetup
-          , teardown = mkAction path delay passTeardown
+          , setup = mkAction path delay setupResult
+          , teardown = mkAction path delay teardownResult
           , subNodes = mkNodes subNodes
           }
     T.EachBefore
       { path
       , delay
-      , pass
+      , result
       , subNodes
       } ->
         P.Before
           { path
           , frequency = Each
-          , action = mkAction path delay pass
+          , action = mkAction path delay result
           , subNodes = mkNodes subNodes
           }
     T.EachAfter
       { path
       , delay
-      , pass
+      , result
       , subNodes
       } ->
         P.After
           { path
           , frequency = Each
-          , after = mkVoidAction path delay pass
+          , after = mkVoidAction path delay result
           , subNodes' = mkNodes subNodes
           }
     T.EachAround
       { path
       , delay
-      , passSetup
-      , passTeardown
+      , setupResult
+      , teardownResult
       , subNodes
       } ->
         P.Around
           { path
           , frequency = Each
-          , setup = mkAction path delay passSetup
-          , teardown = mkAction path delay passTeardown
+          , setup = mkAction path delay setupResult
+          , teardown = mkAction path delay teardownResult
           , subNodes = mkNodes subNodes
           }
-
 data Template
   = OnceBefore
       { delay :: Int
-      , pass :: Bool
+      , result :: Result
       , subNodes :: [Template]
       }
   | OnceAfter
       { delay :: Int
-      , pass :: Bool
+      , result :: Result
       , subNodes :: [Template]
       }
   | OnceAround
       { delay :: Int
-      , passSetup :: Bool
-      , passTeardown :: Bool
+      , setupResult :: Result
+      , teardownResult :: Result
       , subNodes :: [Template]
       }
   | ThreadBefore
       { delay :: Int
-      , pass :: Bool
+      , result :: Result
       , subNodes :: [Template]
       }
   | ThreadAfter
       { delay :: Int
-      , pass :: Bool
+      , result :: Result
       , subNodes :: [Template]
       }
   | ThreadAround
       { delay :: Int
-      , passSetup :: Bool
-      , passTeardown :: Bool
+      , setupResult :: Result
+      , teardownResult :: Result
       , subNodes :: [Template]
       }
   | EachBefore
       { delay :: Int
-      , pass :: Bool
+      , result :: Result
       , subNodes :: [Template]
       }
   | EachAfter
       { delay :: Int
-      , pass :: Bool
+      , result :: Result
       , subNodes :: [Template]
       }
   | EachAround
       { delay :: Int
-      , passSetup :: Bool
-      , passTeardown :: Bool
+      , setupResult :: Result
+      , teardownResult :: Result
       , subNodes :: [Template]
       }
   | Test
@@ -424,9 +423,9 @@ data Template
 
 data TestItem = TestItem
   { delay :: Int
-  , pass :: Bool
+  , result :: Result
   }
   deriving (Show, Eq)
 
 mkTestItem :: T.TestItem -> P.TestItem IO ()
-mkTestItem T.TestItem{id, title, delay, pass} = P.TestItem id title (mkAction title delay pass)
+mkTestItem T.TestItem{id, title, delay, result} = P.TestItem id title (mkAction title delay result)

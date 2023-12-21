@@ -1,142 +1,94 @@
-All good (32 modules, at 07:37:09)
+All good (32 modules, at 13:58:05)
  
-/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:105:1
-$> unit_simple_pass
+/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:110:1
+$> unit_simple_fail
 
 [ OnceAround
     { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
     , delay = 0
-    , passSetup = True
-    , passTeardown = True
+    , setupResult = Fail
+    , teardownResult = Pass
     , subNodes =
         [ Test
             { path = SuiteElmPath { module' = "0.0" , path = "Test" }
             , testItems =
                 [ TestItem
-                    { id = 0 , title = "0.0 TestItem" , delay = 0 , pass = True }
+                    { id = 0 , title = "0.0 TestItem" , delay = 0 , result = Pass }
                 , TestItem
-                    { id = 1 , title = "0.0 TestItem" , delay = 0 , pass = False }
+                    { id = 1 , title = "0.0 TestItem" , delay = 0 , result = Fail }
                 ]
             }
         ]
     }
 ]
 =========
-StartExecution
-  { idx = 0 , threadId = SThreadId { display = "ThreadId 2625" } }
+StartExecution { idx = 0 , threadId = 8035 }
 Start
   { idx = 0
-  , threadId = SThreadId { display = "ThreadId 2626" }
+  , threadId = 8036
   , eventType = Hook Once Setup
   , loc =
-      ExePath
-        { unExePath =
-            [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-        }
-  }
-End
-  { idx = 1
-  , threadId = SThreadId { display = "ThreadId 2626" }
-  , eventType = Hook Once Setup
-  , loc =
-      ExePath
-        { unExePath =
-            [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-        }
-  }
-Start
-  { idx = 2
-  , threadId = SThreadId { display = "ThreadId 2626" }
-  , eventType = Test
-  , loc =
-      ExePath
-        { unExePath =
-            [ TestPath { id = 0 , title = "0.0 TestItem" }
-            , SuiteElmPath { module' = "0.0" , path = "Test" }
-            , SuiteElmPath { module' = "0" , path = "OnceAround" }
-            ]
-        }
-  }
-End
-  { idx = 3
-  , threadId = SThreadId { display = "ThreadId 2626" }
-  , eventType = Test
-  , loc =
-      ExePath
-        { unExePath =
-            [ TestPath { id = 0 , title = "0.0 TestItem" }
-            , SuiteElmPath { module' = "0.0" , path = "Test" }
-            , SuiteElmPath { module' = "0" , path = "OnceAround" }
-            ]
-        }
-  }
-Start
-  { idx = 4
-  , threadId = SThreadId { display = "ThreadId 2626" }
-  , eventType = Test
-  , loc =
-      ExePath
-        { unExePath =
-            [ TestPath { id = 1 , title = "0.0 TestItem" }
-            , SuiteElmPath { module' = "0.0" , path = "Test" }
-            , SuiteElmPath { module' = "0" , path = "OnceAround" }
-            ]
-        }
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
   }
 Failure
-  { idx = 5
-  , threadId = SThreadId { display = "ThreadId 2626" }
+  { idx = 1
+  , threadId = 8036
   , exception =
       PException
         { displayText =
-            [ "\"\\\"0.0 TestItem\\\" failed\""
+            [ "\"SuiteElmPath {module' = \\\"0\\\", path = \\\"OnceAround\\\"} failed\""
             , "\"CallStack (from HasCallStack):\""
             , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-e314f41607d4a917a3a6b3d2eb68ea6953a6c8fa4d8f501d8d65aebf58f573f7:Relude.Debug\""
-            , "\"  error, called at test/SuiteRuntimeTest.hs:235:19 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTest\""
+            , "\"  error, called at test/SuiteRuntimeTest.hs:236:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTest\""
             ]
         }
   , loc =
-      ExePath
-        { unExePath =
-            [ TestPath { id = 1 , title = "0.0 TestItem" }
-            , SuiteElmPath { module' = "0.0" , path = "Test" }
-            , SuiteElmPath { module' = "0" , path = "OnceAround" }
-            ]
-        }
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
   }
 End
-  { idx = 6
-  , threadId = SThreadId { display = "ThreadId 2626" }
+  { idx = 2
+  , threadId = 8036
+  , eventType = Hook Once Setup
+  , loc =
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
+  }
+ParentFailure
+  { idx = 3
+  , threadId = 8036
+  , loc =
+      ExePath
+        [ TestPath { id = 0 , title = "0.0 TestItem" }
+        , SuiteElmPath { module' = "0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
   , eventType = Test
+  , failLoc =
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
+  , failEventType = Hook Once Setup
+  }
+ParentFailure
+  { idx = 4
+  , threadId = 8036
   , loc =
       ExePath
-        { unExePath =
-            [ TestPath { id = 1 , title = "0.0 TestItem" }
-            , SuiteElmPath { module' = "0.0" , path = "Test" }
-            , SuiteElmPath { module' = "0" , path = "OnceAround" }
-            ]
-        }
+        [ TestPath { id = 1 , title = "0.0 TestItem" }
+        , SuiteElmPath { module' = "0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  , eventType = Test
+  , failLoc =
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
+  , failEventType = Hook Once Setup
   }
-Start
-  { idx = 7
-  , threadId = SThreadId { display = "ThreadId 2626" }
+ParentFailure
+  { idx = 5
+  , threadId = 8036
+  , loc =
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
   , eventType = Hook Once Teardown
-  , loc =
-      ExePath
-        { unExePath =
-            [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-        }
+  , failLoc =
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
+  , failEventType = Hook Once Setup
   }
-End
-  { idx = 8
-  , threadId = SThreadId { display = "ThreadId 2626" }
-  , eventType = Hook Once Teardown
-  , loc =
-      ExePath
-        { unExePath =
-            [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-        }
-  }
-EndExecution
-  { idx = 1 , threadId = SThreadId { display = "ThreadId 2625" } }
+EndExecution { idx = 1 , threadId = 8035 }
  checks done

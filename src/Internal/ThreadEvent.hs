@@ -22,6 +22,14 @@ data EventType
     | Test
     deriving (Show, Eq, Ord)
 
+evtTypeToFrequency :: EventType -> Frequency
+evtTypeToFrequency = \case
+    Hook f _ -> f
+    Test -> Each
+
+onceEventType :: EventType -> Bool
+onceEventType = (== Once) . evtTypeToFrequency
+
 data ThreadEvent l a
     = StartExecution
         { idx :: Int

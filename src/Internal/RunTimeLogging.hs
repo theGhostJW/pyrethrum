@@ -15,8 +15,15 @@ import UnliftIO (finally)
 import UnliftIO.Concurrent (ThreadId)
 import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
 import Prelude hiding (atomically, lines)
+import qualified List.Extra as L
+
 
 newtype ExePath = ExePath [AE.Path] deriving (Show, Eq, Ord)
+
+topPath :: ExePath -> Maybe AE.Path
+topPath = L.head . coerce
+
+
 
 -- TODO: hide string eg intercallate
 displayExePath :: ExePath -> Text

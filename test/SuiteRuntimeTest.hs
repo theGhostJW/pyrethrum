@@ -3,35 +3,65 @@ module SuiteRuntimeTest where
 import qualified Core
 import DSL.Internal.ApEvent (ApEvent, Path (..))
 import Data.Aeson (ToJSON)
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
+import FullSuiteTestTemplate (Result (..))
 import qualified FullSuiteTestTemplate as T
-import FullSuiteTestTemplate (Result(..))
-import Internal.RunTimeLogging (ExePath, testLogControls)
+import Internal.RunTimeLogging (ExePath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
-import Internal.ThreadEvent (Frequency (..), ThreadEvent (..))
+import Internal.ThreadEvent as TE (Frequency (..), ThreadEvent (..), ThreadId, onceEventType)
+import qualified List.Extra as L
 import qualified Prepare as P
-import PyrethrumExtras (toS, txt, (?))
-import PyrethrumExtras.Test hiding (chkEq', maybe, test)
+import PyrethrumExtras (toS, txt, (?), uu)
+import PyrethrumExtras.Test hiding (chkEq', filter, maybe, test)
 import Text.Show.Pretty (pPrint, ppShow)
+import List.Extra  as LE
 import UnliftIO.Concurrent as C (
   threadDelay,
  )
 import UnliftIO.STM (TQueue, tryReadTQueue)
 import Prelude hiding (id)
-import qualified Data.Map.Strict as M
-import qualified List.Extra as L
 
 type LogItem = ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent
 
-
 chkProperties :: Int -> [Template] -> [LogItem] -> IO ()
-chkProperties _mxThrds _t evts = do
+chkProperties _mxThrds ts evts = do
   traverse_
     (evts &)
     [ chkStartEndExecution
     , chkThreadLogsInOrder
+    , chkAllTemplateItemsLogged ts
     ]
   putStrLn " checks done"
+
+chkAllTemplateItemsLogged :: [Template] -> [LogItem] -> IO ()
+chkAllTemplateItemsLogged ts lgs =
+  uu
+  where
+    startsParentFailurePaths =
+      Prelude.mapMaybe (
+       \lg ->
+        do
+          xp <- case lg of
+                ParentFailure{loc} -> Just loc
+                Start{loc} -> Just loc
+                _ -> Nothing
+          topPath xp
+      ) lgs
+
+threadVisible :: ThreadId -> [LogItem] -> [LogItem]
+threadVisible tid =
+  filter (\l -> tid == l.threadId || isOnce l)
+
+isOnce :: ThreadEvent l a -> Bool
+isOnce l = case l of
+    StartExecution{} -> False
+    Failure{} -> False
+    ParentFailure{} -> False
+    ApEvent{} -> False
+    EndExecution{} -> False
+    _ -> onceEventType l.eventType
+
 
 chkStartEndExecution :: [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent] -> IO ()
 chkStartEndExecution evts =
@@ -52,8 +82,8 @@ chkStartEndExecution evts =
 -- TODO - add tests add to pyrelude
 -- research groupon on lists is consecutive and dodgy
 -- conver to to non-empty and use groupby from relude??
-groupOn :: Ord b => (a -> b) -> [a] -> [[a]]
-groupOn f =
+groupOn' :: (Ord b) => (a -> b) -> [a] -> [[a]]
+groupOn' f =
   M.elems . foldl' fld M.empty . reverse
  where
   fld m a =
@@ -69,7 +99,7 @@ chkThreadLogsInOrder evts =
     traverse_ (chkEq' "first index of thread should be 0" 0 . (.idx)) $ catMaybes heads
     traverse_ chkIds threads
  where
-  threads = groupOn (.threadId) evts
+  threads = groupOn' (.threadId) evts
   -- TODO: need to draw a line in the sand re maybe vs nonemptyList
   heads = L.head <$> threads
   chkIds evts' =
@@ -103,11 +133,12 @@ chkEq' msg e a =
         <> ppShow a
         <> "\n"
 
--- $ > unit_simple_pass
+
+-- $> unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest True 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
--- $> unit_simple_fail
+-- $ > unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest True 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
@@ -153,20 +184,19 @@ eachAround :: Result -> Result -> [Template] -> Template
 eachAround = EachAround 0
 
 test :: [TestItem] -> Template
-test = Test
+test = SuiteRuntimeTest.Test
 
 testItem :: Result -> TestItem
 testItem = TestItem 0
 
 runTest :: Bool -> Int -> [Template] -> IO ()
 runTest wantConsole maxThreads templates = do
-  lg <- exeTemplate wantConsole (ThreadCount maxThreads) templates
+  lg <- exeTemplate wantConsole (ThreadCount maxThreads) . setPaths "" $ toList templates
   chkProperties maxThreads templates lg
 
-exeTemplate :: Bool -> ThreadCount -> [Template] -> IO [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent]
-exeTemplate wantConsole maxThreads testNodes = do
+exeTemplate :: Bool -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent]
+exeTemplate wantConsole maxThreads templates = do
   (lc, logQ) <- testLogControls wantConsole
-  let templates = setPaths "" $ toList testNodes
   when wantConsole $ do
     putStrLn ""
     pPrint templates
@@ -233,8 +263,10 @@ mkVoidAction path delay outcome _sink =
   do
     C.threadDelay delay
     unless (outcome == Pass) $
-      error . toS  $ txt path <> " failed"
+      error . toS $
+        txt path <> " failed"
 
+-- TODO: make bug / error functions that uses text instead of string
 
 mkAction :: forall hi desc. (Show desc) => desc -> Int -> Result -> P.ApEventSink -> hi -> IO ()
 mkAction path delay rslt sink _in = mkVoidAction path delay rslt sink

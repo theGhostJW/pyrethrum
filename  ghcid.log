@@ -1,12 +1,21 @@
-All good (32 modules, at 13:58:05)
+test/SuiteRuntimeTest.hs:38:27-28: warning: [-Wunused-matches]
+    Defined but not used: ‘ts’
+   |
+38 | chkAllTemplateItemsLogged ts lgs =
+   |                           ^^
+test/SuiteRuntimeTest.hs:41:5-28: warning: [-Wunused-local-binds]
+    Defined but not used: ‘startsParentFailurePaths’
+   |
+41 |     startsParentFailurePaths =
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
  
-/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:110:1
-$> unit_simple_fail
+/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:137:1
+$> unit_simple_pass
 
 [ OnceAround
     { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
     , delay = 0
-    , setupResult = Fail
+    , setupResult = Pass
     , teardownResult = Pass
     , subNodes =
         [ Test
@@ -22,73 +31,99 @@ $> unit_simple_fail
     }
 ]
 =========
-StartExecution { idx = 0 , threadId = 8035 }
+StartExecution { idx = 0 , threadId = 1165 }
 Start
   { idx = 0
-  , threadId = 8036
+  , threadId = 1166
   , eventType = Hook Once Setup
-  , loc =
-      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-  }
-Failure
-  { idx = 1
-  , threadId = 8036
-  , exception =
-      PException
-        { displayText =
-            [ "\"SuiteElmPath {module' = \\\"0\\\", path = \\\"OnceAround\\\"} failed\""
-            , "\"CallStack (from HasCallStack):\""
-            , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-e314f41607d4a917a3a6b3d2eb68ea6953a6c8fa4d8f501d8d65aebf58f573f7:Relude.Debug\""
-            , "\"  error, called at test/SuiteRuntimeTest.hs:236:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTest\""
-            ]
-        }
   , loc =
       ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
   }
 End
-  { idx = 2
-  , threadId = 8036
+  { idx = 1
+  , threadId = 1166
   , eventType = Hook Once Setup
   , loc =
       ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
   }
-ParentFailure
-  { idx = 3
-  , threadId = 8036
+Start
+  { idx = 2
+  , threadId = 1166
+  , eventType = Test
   , loc =
       ExePath
         [ TestPath { id = 0 , title = "0.0 TestItem" }
         , SuiteElmPath { module' = "0.0" , path = "Test" }
         , SuiteElmPath { module' = "0" , path = "OnceAround" }
         ]
-  , eventType = Test
-  , failLoc =
-      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-  , failEventType = Hook Once Setup
   }
-ParentFailure
+End
+  { idx = 3
+  , threadId = 1166
+  , eventType = Test
+  , loc =
+      ExePath
+        [ TestPath { id = 0 , title = "0.0 TestItem" }
+        , SuiteElmPath { module' = "0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+Start
   { idx = 4
-  , threadId = 8036
+  , threadId = 1166
+  , eventType = Test
   , loc =
       ExePath
         [ TestPath { id = 1 , title = "0.0 TestItem" }
         , SuiteElmPath { module' = "0.0" , path = "Test" }
         , SuiteElmPath { module' = "0" , path = "OnceAround" }
         ]
-  , eventType = Test
-  , failLoc =
-      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-  , failEventType = Hook Once Setup
   }
-ParentFailure
+Failure
   { idx = 5
-  , threadId = 8036
+  , threadId = 1166
+  , exception =
+      PException
+        { displayText =
+            [ "\"\\\"0.0 TestItem\\\" failed\""
+            , "\"CallStack (from HasCallStack):\""
+            , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-e314f41607d4a917a3a6b3d2eb68ea6953a6c8fa4d8f501d8d65aebf58f573f7:Relude.Debug\""
+            , "\"  error, called at test/SuiteRuntimeTest.hs:266:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTest\""
+            ]
+        }
+  , loc =
+      ExePath
+        [ TestPath { id = 1 , title = "0.0 TestItem" }
+        , SuiteElmPath { module' = "0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+End
+  { idx = 6
+  , threadId = 1166
+  , eventType = Test
+  , loc =
+      ExePath
+        [ TestPath { id = 1 , title = "0.0 TestItem" }
+        , SuiteElmPath { module' = "0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+Start
+  { idx = 7
+  , threadId = 1166
+  , eventType = Hook Once Teardown
   , loc =
       ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-  , eventType = Hook Once Teardown
-  , failLoc =
-      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-  , failEventType = Hook Once Setup
   }
-EndExecution { idx = 1 , threadId = 8035 }
- checks done
+End
+  { idx = 8
+  , threadId = 1166
+  , eventType = Hook Once Teardown
+  , loc =
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
+  }
+EndExecution { idx = 1 , threadId = 1165 }
+*** Exception: Not implemented
+CallStack (from HasCallStack):
+  error, called at src/PyrethrumExtras.hs:72:6 in pyrethrum-extras-0.1.0.0-7baa15e8162576ff175cffe811455beda6428cb4bcdc657a091eebd781faae8d:PyrethrumExtras

@@ -22,6 +22,7 @@ data EventType
     | Test
     deriving (Show, Eq, Ord)
 
+ 
 evtTypeToFrequency :: EventType -> Frequency
 evtTypeToFrequency = \case
     Hook f _ -> f

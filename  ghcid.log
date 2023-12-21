@@ -1,129 +1,17 @@
-test/SuiteRuntimeTest.hs:38:27-28: warning: [-Wunused-matches]
-    Defined but not used: ‘ts’
+test/SuiteRuntimeTest.hs:15:40-41: warning: [-Wunused-imports]
+    The import of ‘uu’ from module ‘PyrethrumExtras’ is redundant
    |
-38 | chkAllTemplateItemsLogged ts lgs =
-   |                           ^^
-test/SuiteRuntimeTest.hs:41:5-28: warning: [-Wunused-local-binds]
-    Defined but not used: ‘startsParentFailurePaths’
-   |
-41 |     startsParentFailurePaths =
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+15 | import PyrethrumExtras (toS, txt, (?), uu)
+   |                                        ^^
  
-/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:137:1
+/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:148:1
 $> unit_simple_pass
-
-[ OnceAround
-    { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
-    , delay = 0
-    , setupResult = Pass
-    , teardownResult = Pass
-    , subNodes =
-        [ Test
-            { path = SuiteElmPath { module' = "0.0" , path = "Test" }
-            , testItems =
-                [ TestItem
-                    { id = 0 , title = "0.0 TestItem" , delay = 0 , result = Pass }
-                , TestItem
-                    { id = 1 , title = "0.0 TestItem" , delay = 0 , result = Fail }
-                ]
-            }
-        ]
-    }
-]
-=========
-StartExecution { idx = 0 , threadId = 1165 }
-Start
-  { idx = 0
-  , threadId = 1166
-  , eventType = Hook Once Setup
-  , loc =
-      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-  }
-End
-  { idx = 1
-  , threadId = 1166
-  , eventType = Hook Once Setup
-  , loc =
-      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-  }
-Start
-  { idx = 2
-  , threadId = 1166
-  , eventType = Test
-  , loc =
-      ExePath
-        [ TestPath { id = 0 , title = "0.0 TestItem" }
-        , SuiteElmPath { module' = "0.0" , path = "Test" }
-        , SuiteElmPath { module' = "0" , path = "OnceAround" }
-        ]
-  }
-End
-  { idx = 3
-  , threadId = 1166
-  , eventType = Test
-  , loc =
-      ExePath
-        [ TestPath { id = 0 , title = "0.0 TestItem" }
-        , SuiteElmPath { module' = "0.0" , path = "Test" }
-        , SuiteElmPath { module' = "0" , path = "OnceAround" }
-        ]
-  }
-Start
-  { idx = 4
-  , threadId = 1166
-  , eventType = Test
-  , loc =
-      ExePath
-        [ TestPath { id = 1 , title = "0.0 TestItem" }
-        , SuiteElmPath { module' = "0.0" , path = "Test" }
-        , SuiteElmPath { module' = "0" , path = "OnceAround" }
-        ]
-  }
-Failure
-  { idx = 5
-  , threadId = 1166
-  , exception =
-      PException
-        { displayText =
-            [ "\"\\\"0.0 TestItem\\\" failed\""
-            , "\"CallStack (from HasCallStack):\""
-            , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-e314f41607d4a917a3a6b3d2eb68ea6953a6c8fa4d8f501d8d65aebf58f573f7:Relude.Debug\""
-            , "\"  error, called at test/SuiteRuntimeTest.hs:266:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTest\""
-            ]
-        }
-  , loc =
-      ExePath
-        [ TestPath { id = 1 , title = "0.0 TestItem" }
-        , SuiteElmPath { module' = "0.0" , path = "Test" }
-        , SuiteElmPath { module' = "0" , path = "OnceAround" }
-        ]
-  }
-End
-  { idx = 6
-  , threadId = 1166
-  , eventType = Test
-  , loc =
-      ExePath
-        [ TestPath { id = 1 , title = "0.0 TestItem" }
-        , SuiteElmPath { module' = "0.0" , path = "Test" }
-        , SuiteElmPath { module' = "0" , path = "OnceAround" }
-        ]
-  }
-Start
-  { idx = 7
-  , threadId = 1166
-  , eventType = Hook Once Teardown
-  , loc =
-      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-  }
-End
-  { idx = 8
-  , threadId = 1166
-  , eventType = Hook Once Teardown
-  , loc =
-      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-  }
-EndExecution { idx = 1 , threadId = 1165 }
-*** Exception: Not implemented
-CallStack (from HasCallStack):
-  error, called at src/PyrethrumExtras.hs:72:6 in pyrethrum-extras-0.1.0.0-7baa15e8162576ff175cffe811455beda6428cb4bcdc657a091eebd781faae8d:PyrethrumExtras
+ checks done
+ 
+/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:152:1
+$> unit_simple_fail
+ checks done
+ 
+/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:156:1
+$> unit_nested_thread_pass_fail
+ checks done

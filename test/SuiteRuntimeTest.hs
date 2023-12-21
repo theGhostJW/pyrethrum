@@ -21,10 +21,11 @@ import UnliftIO.Concurrent as C (
  )
 import UnliftIO.STM (TQueue, tryReadTQueue)
 import Prelude hiding (id)
+import Data.Set (difference)
 
 type LogItem = ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent
 
-chkProperties :: Int -> [Template] -> [LogItem] -> IO ()
+chkProperties :: Int -> [T.Template] -> [LogItem] -> IO ()
 chkProperties _mxThrds ts evts = do
   traverse_
     (evts &)
@@ -34,11 +35,21 @@ chkProperties _mxThrds ts evts = do
     ]
   putStrLn " checks done"
 
-chkAllTemplateItemsLogged :: [Template] -> [LogItem] -> IO ()
+chkAllTemplateItemsLogged :: [T.Template] -> [LogItem] -> IO ()
 chkAllTemplateItemsLogged ts lgs =
-  uu
+  unless (null errMissng || null errExtra) $
+    fail (errMissng <> "\n" <> errExtra)
   where
-    startsParentFailurePaths =
+    errMissng = null missing ? "" $ "template items not present in log:\n" <> toS (ppShow missing)
+    errExtra = null extra ? "" $ "extra items in the log that are not in the template:\n" <> toS (ppShow extra)
+    extra = difference logStartPaths tmplatePaths
+    missing = difference tmplatePaths logStartPaths
+
+    tmplatePaths :: Set Path
+    tmplatePaths = fromList $ ((.path) <$>  (ts >>= T.eventPaths ))
+
+    logStartPaths :: Set Path
+    logStartPaths = fromList $
       Prelude.mapMaybe (
        \lg ->
         do
@@ -136,13 +147,13 @@ chkEq' msg e a =
 
 -- $> unit_simple_pass
 unit_simple_pass :: IO ()
-unit_simple_pass = runTest True 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
+unit_simple_pass = runTest False 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
--- $ > unit_simple_fail
+-- $> unit_simple_fail
 unit_simple_fail :: IO ()
-unit_simple_fail = runTest True 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
+unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
--- $ > unit_nested_thread_pass_fail
+-- $> unit_nested_thread_pass_fail
 unit_nested_thread_pass_fail :: IO ()
 unit_nested_thread_pass_fail =
   runTest
@@ -191,8 +202,9 @@ testItem = TestItem 0
 
 runTest :: Bool -> Int -> [Template] -> IO ()
 runTest wantConsole maxThreads templates = do
-  lg <- exeTemplate wantConsole (ThreadCount maxThreads) . setPaths "" $ toList templates
-  chkProperties maxThreads templates lg
+  let fullTs =  setPaths "" templates
+  lg <- exeTemplate wantConsole (ThreadCount maxThreads) fullTs
+  chkProperties maxThreads fullTs lg
 
 exeTemplate :: Bool -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent]
 exeTemplate wantConsole maxThreads templates = do

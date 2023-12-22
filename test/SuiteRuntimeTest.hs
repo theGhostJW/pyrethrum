@@ -40,7 +40,7 @@ chkProperties _mxThrds ts evts = do
 -- TODO:: reexport prettyprint withtext conversion
 chkAllOnceElementsStartedEnd :: Text ->  (LogItem -> Bool) ->  [LogItem] -> IO ()
 chkAllOnceElementsStartedEnd errSfx p l = do 
-  --  putStrLn $ ppShowList onceEvents
+  --  putStrLn $ ppShowList trgEvnts
    unless (null dupLocs) $ 
     fail $ toS errSfx <> ":\n" <> toS (ppShow dupLocs)
 
@@ -48,10 +48,10 @@ chkAllOnceElementsStartedEnd errSfx p l = do
    unless (null startNotFollwedByEnd) $ 
       fail $ toS errSfx <> " start not followed by end:\n" <> toS (ppShow startNotFollwedByEnd)
   where 
-    onceEvents = filter p l
-    onceStarts = filter isStart onceEvents
-    dupLocs = filter ((>1) . length) . fmap (L.head . fmap (.loc)) . groupOn' (.loc) $ onceStarts
-    startNotFollwedByEnd = filter (\(s, e) -> isStart s && s.loc /= e.loc) . zip onceEvents $ drop 1 onceEvents
+    trgEvnts = filter p l
+    starts = filter isStart trgEvnts
+    dupLocs = filter ((>1) . length) . fmap (L.head . fmap (.loc)) . groupOn' (.loc) $ starts
+    startNotFollwedByEnd = filter (\(s, e) -> isStart s && s.loc /= e.loc) . zip trgEvnts $ drop 1 trgEvnts
 
 
 chkAllTemplateItemsLogged :: [T.Template] -> [LogItem] -> IO ()

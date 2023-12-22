@@ -17,6 +17,8 @@ mkThreadId = read . drop 9 . show
 data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
 
 data Hz = Once | Thread | Each deriving (Show, Eq, Ord)
+
+todo = _ -- here rename EventType 
 data EventType
     = Hook Hz HookPos
     | Test

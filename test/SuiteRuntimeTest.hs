@@ -9,12 +9,12 @@ import FullSuiteTestTemplate (Result (..))
 import qualified FullSuiteTestTemplate as T
 import Internal.RunTimeLogging (ExePath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
-import Internal.ThreadEvent as TE (Frequency (..), ThreadEvent (..), ThreadId, onceEventType)
+import Internal.ThreadEvent as TE (Frequency (..), ThreadEvent (..), ThreadId, onceEventType, EventType(..), isStart)
 import qualified List.Extra as L
 import qualified Prepare as P
 import PyrethrumExtras (toS, txt, (?), uu)
 import PyrethrumExtras.Test hiding (chkEq', filter, maybe, test)
-import Text.Show.Pretty (pPrint, ppShow)
+import Text.Show.Pretty (pPrint, ppShow, ppShowList)
 import List.Extra  as LE
 import UnliftIO.Concurrent as C (
   threadDelay,
@@ -32,8 +32,27 @@ chkProperties _mxThrds ts evts = do
     [ chkStartEndExecution
     , chkThreadLogsInOrder
     , chkAllTemplateItemsLogged ts
+    , chkAllOnceElementsStartedEnd "once elements" shouldOccurOnce
     ]
   putStrLn " checks done"
+
+
+-- TODO:: reexport prettyprint withtext conversion
+chkAllOnceElementsStartedEnd :: Text ->  (LogItem -> Bool) ->  [LogItem] -> IO ()
+chkAllOnceElementsStartedEnd errSfx p l = do 
+  --  putStrLn $ ppShowList onceEvents
+   unless (null dupLocs) $ 
+    fail $ toS errSfx <> ":\n" <> toS (ppShow dupLocs)
+
+   -- each start shoud be followed by an end
+   unless (null startNotFollwedByEnd) $ 
+      fail $ toS errSfx <> " start not followed by end:\n" <> toS (ppShow startNotFollwedByEnd)
+  where 
+    onceEvents = filter p l
+    onceStarts = filter isStart onceEvents
+    dupLocs = filter ((>1) . length) . fmap (L.head . fmap (.loc)) . groupOn' (.loc) $ onceStarts
+    startNotFollwedByEnd = filter (\(s, e) -> isStart s && s.loc /= e.loc) . zip onceEvents $ drop 1 onceEvents
+
 
 chkAllTemplateItemsLogged :: [T.Template] -> [LogItem] -> IO ()
 chkAllTemplateItemsLogged ts lgs =
@@ -64,14 +83,23 @@ threadVisible :: ThreadId -> [LogItem] -> [LogItem]
 threadVisible tid =
   filter (\l -> tid == l.threadId || isOnce l)
 
-isOnce :: ThreadEvent l a -> Bool
-isOnce l = case l of
+hasEventType :: (EventType -> Bool) -> ThreadEvent l a -> Bool
+hasEventType p l = case l of
     StartExecution{} -> False
     Failure{} -> False
     ParentFailure{} -> False
     ApEvent{} -> False
     EndExecution{} -> False
-    _ -> onceEventType l.eventType
+    _ -> p l.eventType
+
+isOnce :: ThreadEvent l a -> Bool
+isOnce = hasEventType onceEventType
+
+shouldOccurOnce :: ThreadEvent l a -> Bool
+shouldOccurOnce =  hasEventType (\et -> onceEventType et || et == TE.Test)
+
+-- isTest :: ThreadEvent l a -> Bool
+-- isTest = (==) Test . (.eventType)
 
 
 chkStartEndExecution :: [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent] -> IO ()

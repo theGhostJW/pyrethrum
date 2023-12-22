@@ -3,15 +3,21 @@ test/SuiteRuntimeTest.hs:15:40-41: warning: [-Wunused-imports]
    |
 15 | import PyrethrumExtras (toS, txt, (?), uu)
    |                                        ^^
+test/SuiteRuntimeTest.hs:17:42-51: warning: [-Wunused-imports]
+    The import of ‘ppShowList’
+    from module ‘Text.Show.Pretty’ is redundant
+   |
+17 | import Text.Show.Pretty (pPrint, ppShow, ppShowList)
+   |                                          ^^^^^^^^^^
  
-/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:148:1
+/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:176:1
 $> unit_simple_pass
  checks done
  
-/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:152:1
+/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:180:1
 $> unit_simple_fail
  checks done
  
-/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:156:1
+/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:184:1
 $> unit_nested_thread_pass_fail
  checks done

@@ -31,6 +31,11 @@ evtTypeToFrequency = \case
 onceEventType :: EventType -> Bool
 onceEventType = (== Once) . evtTypeToFrequency
 
+isStart :: ThreadEvent a b -> Bool
+isStart = \case
+    Start{} -> True
+    _ -> False
+
 data ThreadEvent l a
     = StartExecution
         { idx :: Int

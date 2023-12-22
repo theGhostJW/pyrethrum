@@ -74,7 +74,7 @@ data Hook hz when input output where
     { action :: RunConfig -> Action o
     } ->
     Hook hz C.Before () o
-  Before' ::
+  BeforeHook' ::
     (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
     { depends :: Hook phz pw pi i
     , action' :: RunConfig -> i -> Action o
@@ -190,7 +190,7 @@ mkTest = \case
 mkHook :: Hook hz pw i o -> C.Hook RunConfig ApEffs hz i o
 mkHook = \case
   BeforeHook{..} -> C.Before{..}
-  Before'{..} -> C.Before' (mkHook depends) action'
+  BeforeHook'{..} -> C.Before' (mkHook depends) action'
   After{..} -> C.After{..}
   After'{..} -> C.After'{afterDepends = mkHook afterDepends, ..}
   Around{..} -> C.Around{..}

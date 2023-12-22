@@ -36,7 +36,7 @@ intOnceHook =
 
 addOnceIntHook :: Hook Once Int Int
 addOnceIntHook =
-  Before'
+  BeforeHook'
     { depends = intOnceHook
     , action' =
         \_rc i -> do
@@ -56,7 +56,7 @@ data HookInfo = HookInfo
   deriving (Show, Generic)
 
 infoThreadHook :: Hook Thread Int HookInfo
-infoThreadHook = Before' addOnceIntHook $ \_rc i -> do
+infoThreadHook = BeforeHook' addOnceIntHook $ \_rc i -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
@@ -83,7 +83,7 @@ eachAfter =
 
 eachIntBefore :: Hook Each Int Int
 eachIntBefore =
-  Before'
+  BeforeHook'
     { depends = eachInfoAround
     , action' = \_rc hi -> do
         log "eachSetup"

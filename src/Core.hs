@@ -11,6 +11,17 @@ import Effectful.Error.Static as E (Error)
 import GHC.Records (HasField)
 import Check (Checks)
 
+
+data Before
+data After
+data Around
+
+class When a
+
+instance When Before
+instance When After
+instance When Around
+
 newtype CheckFailure = CheckFailure Text
   deriving (Show)
 
@@ -44,68 +55,67 @@ to list
 
 --
 
-class Param a where
+class Frequency a where
   frequency :: Hz
 
-class (Param a, Param b) => ValidDepends a b
+class (Frequency a, Frequency b) => CanDependOn a b
 
 data Once
 data Thread
 data Each
 
-instance Param Once where
+instance Frequency Once where
   frequency :: Hz
   frequency = Once
 
-instance Param Thread where
+instance Frequency Thread where
   frequency :: Hz
   frequency = Thread
 
-instance Param Each where
+instance Frequency Each where
   frequency :: Hz
   frequency = Each
 
-instance ValidDepends Once Once
+instance CanDependOn Once Once
 
-instance ValidDepends Once Thread
-instance ValidDepends Thread Thread
+instance CanDependOn Thread Once
+instance CanDependOn Thread Thread
 
-instance ValidDepends Once Each
-instance ValidDepends Thread Each
-instance ValidDepends Each Each
-
+instance CanDependOn Each Once
+instance CanDependOn Each Thread
+instance CanDependOn Each Each
 
 data Hook rc effs loc i o where
   Before ::
-    (Param loc) =>
+    (Frequency loc) =>
     { action :: rc -> Eff effs o
     } ->
     Hook rc effs loc () o
   Before' ::
-    (Param ploc, Param loc, ValidDepends ploc loc) =>
+    (Frequency ploc, Frequency loc, CanDependOn loc ploc) =>
     { depends :: Hook rc effs ploc pi i
     , action' :: rc -> i -> Eff effs o
     } ->
     Hook rc effs loc i o
   After ::
-    (Param loc) =>
+    (Frequency loc) =>
     { afterAction :: rc -> Eff effs ()
     } ->
     Hook rc effs loc () ()
   After' ::
-    (Param ploc, Param loc, ValidDepends ploc loc) =>
+    (Frequency ploc, Frequency loc, CanDependOn loc ploc) =>
     { afterDepends :: Hook rc effs ploc pi i
     , afterAction' :: rc -> Eff effs ()
     } ->
     Hook rc effs loc i i
   Around ::
-    (Param loc) =>
+    (Frequency loc) =>
     { setup :: rc -> Eff effs o
     , teardown :: rc -> o -> Eff effs ()
     } ->
     Hook rc effs loc () o
   Around' ::
-    (Param ploc, Param loc, ValidDepends ploc loc) =>
+    (Frequency ploc, Frequency loc, CanDependOn loc ploc) =>
     { depends :: Hook rc effs ploc pi i
     , setup' :: rc -> i -> Eff effs o
     , teardown' :: rc -> o -> Eff effs ()
@@ -113,7 +123,7 @@ data Hook rc effs loc i o where
     Hook rc effs loc i o
 
 
-hookFrequency :: forall rc effs loc i o. Param loc => Hook rc effs loc i o -> Hz
+hookFrequency :: forall rc effs loc i o. Frequency loc => Hook rc effs loc i o -> Hz
 hookFrequency _ = frequency @loc
 
 newtype StubLoc = StubLoc Text
@@ -185,7 +195,7 @@ Suite
 -}
 data SuiteElement m rc tc effs hi where
   Hook ::
-    (Param loc) =>
+    (Frequency loc) =>
     { path :: Path
     , hook :: Hook rc effs loc hi o
     , subNodes :: m (SuiteElement m rc tc effs o)

@@ -60,10 +60,10 @@ infoThreadHook = Before' addOnceIntHook $ \_rc i -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
-eachInfoAround :: Hook Each HookInfo Int
+eachInfoAround :: Hook Each Around HookInfo Int
 eachInfoAround =
   Around'
-    { depends = infoThreadHook
+    { aroundDepends = infoThreadHook
     , setup' = \_rc hi -> do
         log "eachSetup"
         pure $ hi.value + 1

@@ -37,7 +37,7 @@ chkProperties _mxThrds ts evts = do
   putStrLn " checks done"
 
 
--- TODO:: reexport prettyprint withtext conversion
+-- TODO:: reexport putStrLn et. al withtext conversion
 chkAllOnceElementsStartedEnd :: Text ->  (LogItem -> Bool) ->  [LogItem] -> IO ()
 chkAllOnceElementsStartedEnd errSfx p l = do 
   --  putStrLn $ ppShowList trgEvnts

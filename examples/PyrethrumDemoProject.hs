@@ -68,42 +68,42 @@ $(deriveJSON defaultOptions ''TestConfig)
 
 instance C.Config TestConfig
 
-data Hook loc i o where
+data Hook hz when input output where
   Before ::
-    (C.Param loc) =>
+    (C.Frequency hz) =>
     { action :: RunConfig -> Action o
     } ->
-    Hook loc () o
+    Hook hz C.Before () o
   Before' ::
-    (C.Param ploc, C.Param loc, C.ValidDepends ploc loc) =>
-    { depends :: Hook ploc pi i
+    (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
+    { depends :: Hook phz pw pi i
     , action' :: RunConfig -> i -> Action o
     } ->
-    Hook loc i o
+    Hook hz C.Before i o
   After ::
-    (C.Param loc) =>
+    (C.Frequency hz) =>
     { afterAction :: RunConfig -> Action ()
     } ->
-    Hook loc () ()
+    Hook hz C.After () ()
   After' ::
-    (C.Param ploc, C.Param loc, C.ValidDepends ploc loc) =>
-    { afterDepends :: Hook ploc pi i
+    (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
+    { afterDepends :: Hook phz pw pi i
     , afterAction' :: RunConfig -> Action ()
     } ->
-    Hook loc i i
+    Hook hz C.After i i
   Around ::
-    (C.Param loc) =>
+    (C.Frequency hz) =>
     { setup :: RunConfig -> Action o
     , teardown :: RunConfig -> o -> Action ()
     } ->
-    Hook loc () o
+    Hook hz C.Around () o
   Around' ::
-    (C.Param ploc, C.Param loc, C.ValidDepends ploc loc) =>
-    { depends :: Hook ploc pi i
+    (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
+    { aroundDepends :: Hook phz pw pi i
     , setup' :: RunConfig -> i -> Action o
     , teardown' :: RunConfig -> o -> Action ()
     } ->
-    Hook loc i o
+    Hook hz C.Around i o
 
 {-
 TODO:
@@ -123,8 +123,8 @@ data Test hi where
     } ->
     Test ()
   Full' ::
-    (C.Item i ds, ToJSON as, C.Param loc) =>
-    { depends :: Hook loc pi a
+    (C.Item i ds, ToJSON as, C.Frequency hz) =>
+    { depends :: Hook hz pw pi a
     , config' :: TestConfig
     , action' :: RunConfig -> a -> i -> Action as
     , parse' :: as -> Eff '[E.Error C.ParseException] ds
@@ -140,8 +140,8 @@ data Test hi where
     } ->
     Test ()
   NoParse' ::
-    (C.Item i ds, C.Param loc) =>
-    { depends :: Hook loc pi a
+    (C.Item i ds, C.Frequency hz) =>
+    { depends :: Hook hz pw pi a
     , config' :: TestConfig
     , action' :: RunConfig -> a -> i -> Action ds
     , items' :: RunConfig -> [i]
@@ -155,8 +155,8 @@ data Test hi where
     } ->
     Test ()
   Single' ::
-    (ToJSON as, C.Param loc) =>
-    { depends :: Hook loc pi a
+    (ToJSON as, C.Frequency hz) =>
+    { depends :: Hook hz pw pi a
     , config' :: TestConfig
     , singleAction' :: RunConfig -> a -> Action as
     , checks' :: CH.Checks as
@@ -166,9 +166,9 @@ data Test hi where
 type Suite = [SuiteElement ()]
 data SuiteElement i where
   Hook ::
-    (C.Param loc) =>
+    (C.Frequency hz) =>
     { path :: AE.Path
-    , hook :: Hook loc i o
+    , hook :: Hook hz pw i o
     , subNodes :: [SuiteElement o]
     } ->
     SuiteElement i
@@ -187,7 +187,7 @@ mkTest = \case
   Single{..} -> C.Single{..}
   Single'{..} -> C.Single' (mkHook depends) config' singleAction' checks'
 
-mkHook :: Hook loc i o -> C.Hook RunConfig ApEffs loc i o
+mkHook :: Hook hz pw i o -> C.Hook RunConfig ApEffs hz i o
 mkHook = \case
   Before{..} -> C.Before{..}
   Before'{..} -> C.Before' (mkHook depends) action'
@@ -195,11 +195,11 @@ mkHook = \case
   After'{..} -> C.After'{afterDepends = mkHook afterDepends, ..}
   Around{..} -> C.Around{..}
   Around'
-    { depends
+    { aroundDepends
     , setup'
     , teardown'
     } ->
-      C.Around' (mkHook depends) setup' teardown'
+      C.Around' (mkHook aroundDepends) setup' teardown'
 
 mkSuite :: SuiteElement i -> C.SuiteElement [] RunConfig TestConfig ApEffs i
 mkSuite = \case

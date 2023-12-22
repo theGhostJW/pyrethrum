@@ -17,28 +17,28 @@ import Data.Aeson (ToJSON (toJSON))
 import Data.Either.Extra ( mapLeft)
 import Effectful (Eff, runPureEff)
 import qualified Effectful.Error.Static as E
-import Internal.ThreadEvent (Frequency)
+import Internal.ThreadEvent (Hz)
 import UnliftIO.Exception (tryAny)
 import PyrethrumExtras (uu)
 
 data PreNode m c hi where
   Before ::
     { path :: Path
-    , frequency :: Frequency
+    , frequency :: Hz
     , action :: ApEventSink -> hi -> m o
     , subNodes :: c (PreNode m c o)
     } ->
     PreNode m c hi
   After ::
     { path :: Path
-    , frequency :: Frequency
+    , frequency :: Hz
     , subNodes' :: c (PreNode m c hi)
     , after :: ApEventSink -> m ()
     } ->
     PreNode m c hi
   Around ::
     { path :: Path
-    , frequency :: Frequency
+    , frequency :: Hz
     , setup :: ApEventSink -> hi -> m o
     , subNodes :: c (PreNode m c o)
     , teardown :: ApEventSink -> o -> m ()

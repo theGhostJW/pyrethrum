@@ -16,14 +16,14 @@ mkThreadId = read . drop 9 . show
 
 data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
 
-data Frequency = Once | Thread | Each deriving (Show, Eq, Ord)
+data Hz = Once | Thread | Each deriving (Show, Eq, Ord)
 data EventType
-    = Hook Frequency HookPos
+    = Hook Hz HookPos
     | Test
     deriving (Show, Eq, Ord)
 
  
-evtTypeToFrequency :: EventType -> Frequency
+evtTypeToFrequency :: EventType -> Hz
 evtTypeToFrequency = \case
     Hook f _ -> f
     Test -> Each
@@ -78,7 +78,7 @@ data ThreadEvent l a
         }
     deriving (Show)
 
-$(deriveJSON defaultOptions ''Frequency)
+$(deriveJSON defaultOptions ''Hz)
 $(deriveJSON defaultOptions ''HookPos)
 $(deriveJSON defaultOptions ''EventType)
 $(deriveToJSON defaultOptions ''PException)

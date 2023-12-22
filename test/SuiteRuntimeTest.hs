@@ -9,7 +9,7 @@ import FullSuiteTestTemplate (Result (..))
 import qualified FullSuiteTestTemplate as T
 import Internal.RunTimeLogging (ExePath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
-import Internal.ThreadEvent as TE (Frequency (..), ThreadEvent (..), ThreadId, onceEventType, EventType(..), isStart)
+import Internal.ThreadEvent as TE (Hz (..), ThreadEvent (..), ThreadId, onceEventType, EventType(..), isStart)
 import qualified List.Extra as L
 import qualified Prepare as P
 import PyrethrumExtras (toS, txt, (?), uu)
@@ -65,7 +65,7 @@ chkAllTemplateItemsLogged ts lgs =
     missing = difference tmplatePaths logStartPaths
 
     tmplatePaths :: Set Path
-    tmplatePaths = fromList $ ((.path) <$>  (ts >>= T.eventPaths ))
+    tmplatePaths = fromList $ (.path) <$>  (ts >>= T.eventPaths )
 
     logStartPaths :: Set Path
     logStartPaths = fromList $

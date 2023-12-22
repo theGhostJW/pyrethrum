@@ -8,7 +8,7 @@ import qualified Core as C
 import qualified DSL.Internal.ApEvent as AE
 import Internal.RunTimeLogging (FailPoint)
 import qualified Internal.RunTimeLogging as L
-import qualified Internal.ThreadEvent as F (Frequency (..))
+import qualified Internal.ThreadEvent as F (Hz (..))
 import qualified Internal.ThreadEvent as TE
 import qualified Prepare as C
 import qualified Prepare as P

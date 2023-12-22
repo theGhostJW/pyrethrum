@@ -4,7 +4,7 @@ module Core where
 
 import DSL.Internal.ApEvent hiding (Check)
 import Data.Aeson (ToJSON (..))
-import Internal.ThreadEvent ( Frequency(..) )
+import Internal.ThreadEvent ( Hz(..) )
 
 import Effectful (Eff)
 import Effectful.Error.Static as E (Error)
@@ -45,7 +45,7 @@ to list
 --
 
 class Param a where
-  frequency :: Frequency
+  frequency :: Hz
 
 class (Param a, Param b) => ValidDepends a b
 
@@ -54,15 +54,15 @@ data Thread
 data Each
 
 instance Param Once where
-  frequency :: Frequency
+  frequency :: Hz
   frequency = Once
 
 instance Param Thread where
-  frequency :: Frequency
+  frequency :: Hz
   frequency = Thread
 
 instance Param Each where
-  frequency :: Frequency
+  frequency :: Hz
   frequency = Each
 
 instance ValidDepends Once Once
@@ -113,7 +113,7 @@ data Hook rc effs loc i o where
     Hook rc effs loc i o
 
 
-hookFrequency :: forall rc effs loc i o. Param loc => Hook rc effs loc i o -> Frequency
+hookFrequency :: forall rc effs loc i o. Param loc => Hook rc effs loc i o -> Hz
 hookFrequency _ = frequency @loc
 
 newtype StubLoc = StubLoc Text

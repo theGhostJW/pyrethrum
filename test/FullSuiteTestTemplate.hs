@@ -1,7 +1,7 @@
 module FullSuiteTestTemplate where
 
 import DSL.Internal.ApEvent (Path (..))
-import Internal.ThreadEvent (EventType (..), Frequency (..), HookPos (..))
+import Internal.ThreadEvent (EventType (..), Hz (..), HookPos (..))
 import qualified Internal.ThreadEvent as TE
 
 

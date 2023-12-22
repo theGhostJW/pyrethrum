@@ -30,7 +30,7 @@ log = out . User . Log
 
 intOnceHook :: Hook Once () Int
 intOnceHook =
-  Before
+  BeforeHook
     { action = \_rc -> pure 1
     }
 
@@ -45,7 +45,7 @@ addOnceIntHook =
     }
 
 _intThreadHook :: Hook Thread () Int
-_intThreadHook = Before $ \_rc -> do
+_intThreadHook = BeforeHook $ \_rc -> do
   log "deriving meaning of life' "
   pure 42
 

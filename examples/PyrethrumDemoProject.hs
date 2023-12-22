@@ -69,7 +69,7 @@ $(deriveJSON defaultOptions ''TestConfig)
 instance C.Config TestConfig
 
 data Hook hz when input output where
-  Before ::
+  BeforeHook ::
     (C.Frequency hz) =>
     { action :: RunConfig -> Action o
     } ->
@@ -189,7 +189,7 @@ mkTest = \case
 
 mkHook :: Hook hz pw i o -> C.Hook RunConfig ApEffs hz i o
 mkHook = \case
-  Before{..} -> C.Before{..}
+  BeforeHook{..} -> C.Before{..}
   Before'{..} -> C.Before' (mkHook depends) action'
   After{..} -> C.After{..}
   After'{..} -> C.After'{afterDepends = mkHook afterDepends, ..}

@@ -80,7 +80,7 @@ data Hook hz when input output where
     , action' :: RunConfig -> i -> Action o
     } ->
     Hook hz C.Before i o
-  After ::
+  AfterHook ::
     (C.Frequency hz) =>
     { afterAction :: RunConfig -> Action ()
     } ->
@@ -91,13 +91,13 @@ data Hook hz when input output where
     , afterAction' :: RunConfig -> Action ()
     } ->
     Hook hz C.After i i
-  Around ::
+  AroundHook ::
     (C.Frequency hz) =>
     { setup :: RunConfig -> Action o
     , teardown :: RunConfig -> o -> Action ()
     } ->
     Hook hz C.Around () o
-  Around' ::
+  AroundHook' ::
     (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
     { aroundDepends :: Hook phz pw pi i
     , setup' :: RunConfig -> i -> Action o
@@ -191,10 +191,10 @@ mkHook :: Hook hz pw i o -> C.Hook RunConfig ApEffs hz i o
 mkHook = \case
   BeforeHook{..} -> C.Before{..}
   BeforeHook'{..} -> C.Before' (mkHook depends) action'
-  After{..} -> C.After{..}
+  AfterHook{..} -> C.After{..}
   After'{..} -> C.After'{afterDepends = mkHook afterDepends, ..}
-  Around{..} -> C.Around{..}
-  Around'
+  AroundHook{..} -> C.Around{..}
+  AroundHook'
     { aroundDepends
     , setup'
     , teardown'

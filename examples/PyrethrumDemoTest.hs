@@ -1,7 +1,7 @@
 module PyrethrumDemoTest where
 
 import Check (Checks, chk)
-import Core (Each, Once, ParseException, Thread)
+import Core (Each, Once, ParseException, Thread, Before, Around, After)
 import qualified Core() 
 import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
 import DSL.Out (Out, out)
@@ -28,13 +28,13 @@ were starting to look more complex than the original so abandonned.
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
-intOnceHook :: Hook Once () Int
+intOnceHook :: Hook Once Before () Int
 intOnceHook =
   BeforeHook
     { action = \_rc -> pure 1
     }
 
-addOnceIntHook :: Hook Once Int Int
+addOnceIntHook :: Hook Once Before Int Int
 addOnceIntHook =
   BeforeHook'
     { depends = intOnceHook
@@ -44,7 +44,7 @@ addOnceIntHook =
           pure $ i + 1
     }
 
-_intThreadHook :: Hook Thread () Int
+_intThreadHook :: Hook Thread Before () Int
 _intThreadHook = BeforeHook $ \_rc -> do
   log "deriving meaning of life' "
   pure 42
@@ -55,14 +55,14 @@ data HookInfo = HookInfo
   }
   deriving (Show, Generic)
 
-infoThreadHook :: Hook Thread Int HookInfo
+infoThreadHook :: Hook Thread Before Int HookInfo
 infoThreadHook = BeforeHook' addOnceIntHook $ \_rc i -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
 eachInfoAround :: Hook Each Around HookInfo Int
 eachInfoAround =
-  Around'
+  AroundHook'
     { aroundDepends = infoThreadHook
     , setup' = \_rc hi -> do
         log "eachSetup"
@@ -72,7 +72,7 @@ eachInfoAround =
         pure ()
     }
 
-eachAfter :: Hook Each Int Int
+eachAfter :: Hook Each After Int Int
 eachAfter =
   After'
     { afterDepends = eachInfoAround
@@ -81,7 +81,7 @@ eachAfter =
         pure ()
     }
 
-eachIntBefore :: Hook Each Int Int
+eachIntBefore :: Hook Each Before Int Int
 eachIntBefore =
   BeforeHook'
     { depends = eachInfoAround

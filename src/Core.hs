@@ -10,6 +10,7 @@ import Effectful (Eff)
 import Effectful.Error.Static as E (Error)
 import GHC.Records (HasField)
 import Check (Checks)
+import Text.Read (Read)
 
 
 data Before
@@ -26,7 +27,7 @@ newtype CheckFailure = CheckFailure Text
   deriving (Show)
 
 newtype ParseException = ParseException Text
-  deriving (Show)
+  deriving (Show, Read)
 
 instance Exception ParseException
 
@@ -39,7 +40,7 @@ class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
 -- class (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i, ToJSON ds) => Item i ds
 
 type Item i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i, ToJSON ds)
--- TODO: a property class with different constraints
+-- TODO: a property class with different constraints - remove JSON contraints
 {-
 
 Property [Data] Checks Shrinker
@@ -47,6 +48,23 @@ Property [Data] Checks Shrinker
 where data is serialisable to and from JSON so can rerun speicific instances and add
 to list
 
+-}
+
+{-
+TODO:: idea defect reconciler 
+ - can pretty print (No JSON) to log so long as id/title/hash is logged and a hash of the show is logged so
+    we can warn if the item has changed since it was run
+
+ - for property based / generative tests we insist on deriving JSON and log as YAML and pprint
+    on failure
+
+ - consider removing ids from items 
+    ~ regular use title which must be unique or title stub (which can include test)
+    ~ property based stub
+      ~ generator
+
+ - global stub function
+ - tst stub function  Item -> [Item] -> [Item] ~ ignores list and creates singleton
 -}
 
 

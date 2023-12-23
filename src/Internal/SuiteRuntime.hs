@@ -348,17 +348,17 @@ data ExeIn oi ti tsti = ExeIn
 
 type Logger = L.EngineEvent L.ExePath AE.ApEvent -> IO ()
 
-logAbandonned :: Logger -> L.ExePath -> TE.EventType -> L.FailPoint -> IO ()
+logAbandonned :: Logger -> L.ExePath -> TE.SuiteEvent -> L.FailPoint -> IO ()
 logAbandonned lgr p e a =
   lgr
     $ L.ParentFailure
       { loc = p
-      , eventType = e
+      , suiteEvent = e
       , failLoc = a.path
-      , failEventType = a.eventType
+      , failSuiteEvent = a.suiteEvent
       }
 
-logReturnFailure :: Logger -> L.ExePath -> TE.EventType -> SomeException -> IO (Either L.FailPoint b)
+logReturnFailure :: Logger -> L.ExePath -> TE.SuiteEvent -> SomeException -> IO (Either L.FailPoint b)
 logReturnFailure lgr p et e =
   do
     lgr (L.mkFailure p et e)
@@ -483,10 +483,10 @@ runNode ::
   IO ()
 runNode lgr hi xt =
   let
-    logRun' :: TE.EventType -> (P.ApEventSink -> IO b) -> IO (Either L.FailPoint b)
+    logRun' :: TE.SuiteEvent -> (P.ApEventSink -> IO b) -> IO (Either L.FailPoint b)
     logRun' et action = logRun lgr xt.path et (action sink)
 
-    logRun_ :: TE.EventType -> (P.ApEventSink -> IO b) -> IO ()
+    logRun_ :: TE.SuiteEvent -> (P.ApEventSink -> IO b) -> IO ()
     logRun_ et action = void $ logRun' et action
 
     logAbandonned' = logAbandonned lgr xt.path
@@ -771,7 +771,7 @@ tryLock hs cq canLock lockStatus =
       $ writeTVar hs lockStatus
     pure cl
 
-logRun :: Logger -> L.ExePath -> TE.EventType -> IO b -> IO (Either L.FailPoint b)
+logRun :: Logger -> L.ExePath -> TE.SuiteEvent -> IO b -> IO (Either L.FailPoint b)
 logRun lgr path evt action = do
   lgr $ L.Start evt path
   finally

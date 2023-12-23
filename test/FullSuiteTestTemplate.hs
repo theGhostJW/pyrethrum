@@ -1,7 +1,7 @@
 module FullSuiteTestTemplate where
 
 import DSL.Internal.ApEvent (Path (..))
-import Internal.ThreadEvent (EventType (..), Hz (..), HookPos (..))
+import Internal.ThreadEvent (SuiteEvent (..), Hz (..), HookPos (..))
 import qualified Internal.ThreadEvent as TE
 
 
@@ -76,7 +76,7 @@ data Template
 
 data EventPath = EventPath
     { path :: Path
-    , eventType :: EventType
+    , suiteEvent :: SuiteEvent
     }
     deriving (Show, Eq)
 

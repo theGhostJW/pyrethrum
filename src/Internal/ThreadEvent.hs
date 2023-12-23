@@ -18,19 +18,19 @@ data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
 
 data Hz = Once | Thread | Each deriving (Show, Eq, Ord)
 
-todo = _ -- here rename EventType 
-data EventType
+-- todo = _ -- here rename SuiteEvent 
+data SuiteEvent
     = Hook Hz HookPos
     | Test
     deriving (Show, Eq, Ord)
 
  
-evtTypeToFrequency :: EventType -> Hz
+evtTypeToFrequency :: SuiteEvent -> Hz
 evtTypeToFrequency = \case
     Hook f _ -> f
     Test -> Each
 
-onceEventType :: EventType -> Bool
+onceEventType :: SuiteEvent -> Bool
 onceEventType = (== Once) . evtTypeToFrequency
 
 isStart :: ThreadEvent a b -> Bool
@@ -46,13 +46,13 @@ data ThreadEvent l a
     | Start
         { idx :: Int
         , threadId :: ThreadId
-        , eventType :: EventType
+        , suiteEvent :: SuiteEvent
         , loc :: l
         }
     | End
         { idx :: Int
         , threadId :: ThreadId
-        , eventType :: EventType
+        , suiteEvent :: SuiteEvent
         , loc :: l
         }
     | Failure
@@ -65,9 +65,9 @@ data ThreadEvent l a
         { idx :: Int
         , threadId :: ThreadId
         , loc :: l
-        , eventType :: EventType
+        , suiteEvent :: SuiteEvent
         , failLoc :: l
-        , failEventType :: EventType
+        , failSuiteEvent :: SuiteEvent
         }
     | ApEvent
         { idx :: Int
@@ -82,5 +82,5 @@ data ThreadEvent l a
 
 $(deriveJSON defaultOptions ''Hz)
 $(deriveJSON defaultOptions ''HookPos)
-$(deriveJSON defaultOptions ''EventType)
+$(deriveJSON defaultOptions ''SuiteEvent)
 $(deriveToJSON defaultOptions ''PException)

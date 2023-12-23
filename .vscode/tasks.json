@@ -78,7 +78,7 @@
     // },
     {
       "label": "hpack",
-      "type": "process",
+      "type": "shell",
       "command": "hpack",
       "args": [
         "--force"

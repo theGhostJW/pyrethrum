@@ -9,7 +9,7 @@ import FullSuiteTestTemplate (Result (..))
 import qualified FullSuiteTestTemplate as T
 import Internal.RunTimeLogging (ExePath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
-import Internal.ThreadEvent as TE (Hz (..), ThreadEvent (..), ThreadId, onceEventType, EventType(..), isStart)
+import Internal.ThreadEvent as TE (Hz (..), ThreadEvent (..), ThreadId, onceEventType, SuiteEvent(..), isStart)
 import qualified List.Extra as L
 import qualified Prepare as P
 import PyrethrumExtras (toS, txt, (?), uu)
@@ -83,14 +83,14 @@ threadVisible :: ThreadId -> [LogItem] -> [LogItem]
 threadVisible tid =
   filter (\l -> tid == l.threadId || isOnce l)
 
-hasEventType :: (EventType -> Bool) -> ThreadEvent l a -> Bool
+hasEventType :: (SuiteEvent -> Bool) -> ThreadEvent l a -> Bool
 hasEventType p l = case l of
     StartExecution{} -> False
     Failure{} -> False
     ParentFailure{} -> False
     ApEvent{} -> False
     EndExecution{} -> False
-    _ -> p l.eventType
+    _ -> p l.suiteEvent
 
 isOnce :: ThreadEvent l a -> Bool
 isOnce = hasEventType onceEventType
@@ -99,7 +99,7 @@ shouldOccurOnce :: ThreadEvent l a -> Bool
 shouldOccurOnce =  hasEventType (\et -> onceEventType et || et == TE.Test)
 
 -- isTest :: ThreadEvent l a -> Bool
--- isTest = (==) Test . (.eventType)
+-- isTest = (==) Test . (.suiteEvent)
 
 
 chkStartEndExecution :: [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent] -> IO ()

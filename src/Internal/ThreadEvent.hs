@@ -27,15 +27,41 @@ data SuiteEvent
  
 evtTypeToFrequency :: SuiteEvent -> Hz
 evtTypeToFrequency = \case
-    Hook f _ -> f
-    Test -> Each
+    Hook hz _ -> hz
+    -- an individual test is always run once
+    Test -> Once
 
-onceEventType :: SuiteEvent -> Bool
-onceEventType = (== Once) . evtTypeToFrequency
+hookWithHz :: Hz -> SuiteEvent -> Bool
+hookWithHz hz = \case
+    Hook hz' _ -> hz == hz'
+    Test -> False
+
+onceHook :: SuiteEvent -> Bool
+onceHook = hookWithHz Once
+
+threadHook :: SuiteEvent -> Bool
+threadHook = hookWithHz Thread
+
+onceSuiteEvent :: SuiteEvent -> Bool
+onceSuiteEvent = (== Once) . evtTypeToFrequency
+
+hasSuiteEvent :: (SuiteEvent -> Bool) -> ThreadEvent l a -> Bool
+hasSuiteEvent p l = case l of
+    StartExecution{} -> False
+    Failure{} -> False
+    ParentFailure{} -> False
+    ApEvent{} -> False
+    EndExecution{} -> False
+    _ -> p l.suiteEvent
 
 isStart :: ThreadEvent a b -> Bool
 isStart = \case
     Start{} -> True
+    _ -> False
+
+isEnd :: ThreadEvent a b -> Bool
+isEnd = \case
+    End{} -> True
     _ -> False
 
 data ThreadEvent l a

@@ -10,7 +10,6 @@ import Effectful (Eff)
 import Effectful.Error.Static as E (Error)
 import GHC.Records (HasField)
 import Check (Checks)
-import Text.Read (Read)
 
 
 data Before

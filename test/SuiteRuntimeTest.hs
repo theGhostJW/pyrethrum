@@ -4,24 +4,24 @@ import qualified Core
 import DSL.Internal.ApEvent (ApEvent, Path (..))
 import Data.Aeson (ToJSON)
 import qualified Data.Map.Strict as M
+import Data.Set (difference)
 import qualified Data.Text as T
 import FullSuiteTestTemplate (Result (..))
 import qualified FullSuiteTestTemplate as T
 import Internal.RunTimeLogging (ExePath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
-import Internal.ThreadEvent as TE (Hz (..), ThreadEvent (..), ThreadId, onceEventType, SuiteEvent(..), isStart)
+import Internal.ThreadEvent as TE (Hz (..), SuiteEvent (..), ThreadEvent (..), ThreadId, hasSuiteEvent, isStart, onceHook, onceSuiteEvent, isEnd, threadHook)
+import List.Extra as LE
 import qualified List.Extra as L
 import qualified Prepare as P
-import PyrethrumExtras (toS, txt, (?), uu)
+import PyrethrumExtras (toS, txt, uu, (?), debug)
 import PyrethrumExtras.Test hiding (chkEq', filter, maybe, test)
 import Text.Show.Pretty (pPrint, ppShow, ppShowList)
-import List.Extra  as LE
 import UnliftIO.Concurrent as C (
   threadDelay,
  )
 import UnliftIO.STM (TQueue, tryReadTQueue)
 import Prelude hiding (id)
-import Data.Set (difference)
 
 type LogItem = ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent
 
@@ -32,75 +32,91 @@ chkProperties _mxThrds ts evts = do
     [ chkStartEndExecution
     , chkThreadLogsInOrder
     , chkAllTemplateItemsLogged ts
-    , chkAllOnceElementsStartedEnd "once elements" shouldOccurOnce
+    , chkStartsOnce "once hooks and tests" shouldOccurOnce
+    , chkStartSuiteEventImmediatlyFollowedByEnd "once hooks" (hasSuiteEvent onceHook)
+    , chkThreadHooksStartedOnceInThread
+    , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
     ]
   putStrLn " checks done"
 
+chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
+chkAllStartSuitEventsInThreadImmedialyFollowedByEnd = 
+  traverse_ 
+    (chkStartSuiteEventImmediatlyFollowedByEnd "thread suite elements" (hasSuiteEvent (const True))) 
+    . threadVisibleSequences
+
+chkThreadHooksStartedOnceInThread :: [LogItem] -> IO ()
+chkThreadHooksStartedOnceInThread =
+  traverse_
+    (chkStartsOnce "thread elements" (hasSuiteEvent threadHook))
+    . threadVisibleSequences
 
 -- TODO:: reexport putStrLn et. al with text conversion
-chkAllOnceElementsStartedEnd :: Text ->  (LogItem -> Bool) ->  [LogItem] -> IO ()
-chkAllOnceElementsStartedEnd errSfx p l = do 
+
+chkStartSuiteEventImmediatlyFollowedByEnd :: Text -> (LogItem -> Bool) -> [LogItem] -> IO ()
+chkStartSuiteEventImmediatlyFollowedByEnd errSfx p l = do
   --  putStrLn $ ppShowList trgEvnts
-   unless (null dupLocs) $ 
-    fail $ toS errSfx <> ":\n" <> toS (ppShow dupLocs)
+  unless (null startNotFollwedByEnd) $
+    fail $
+      toS errSfx <> " start not followed by end:\n" <> toS (ppShow startNotFollwedByEnd)
+ where
+  trgEvnts = filter p l
+  startNotFollwedByEnd = filter (\(s, e) -> isStart s && (not (isEnd e) || s.loc /= e.loc)) . zip trgEvnts $ drop 1 trgEvnts
 
-   -- each start shoud be followed by an end
-   unless (null startNotFollwedByEnd) $ 
-      fail $ toS errSfx <> " start not followed by end:\n" <> toS (ppShow startNotFollwedByEnd)
-  where 
-    trgEvnts = filter p l
-    starts = filter isStart trgEvnts
-    dupLocs = filter ((>1) . length) . fmap (L.head . fmap (.loc)) . groupOn' (.loc) $ starts
-    startNotFollwedByEnd = filter (\(s, e) -> isStart s && s.loc /= e.loc) . zip trgEvnts $ drop 1 trgEvnts
-
+chkStartsOnce :: Text -> (LogItem -> Bool) -> [LogItem] -> IO ()
+chkStartsOnce errSfx p l = do
+  --  putStrLn $ ppShowList trgEvnts
+  unless (null dupLocs) $
+    fail $
+      toS errSfx <> ":\n" <> toS (ppShow dupLocs)
+ where
+  trgEvnts = filter p l
+  starts = filter isStart trgEvnts
+  dupLocs = filter ((> 1) . length) . fmap (L.head . fmap (.loc)) . groupOn' (.loc) $ starts
 
 chkAllTemplateItemsLogged :: [T.Template] -> [LogItem] -> IO ()
 chkAllTemplateItemsLogged ts lgs =
   unless (null errMissng || null errExtra) $
     fail (errMissng <> "\n" <> errExtra)
-  where
-    errMissng = null missing ? "" $ "template items not present in log:\n" <> toS (ppShow missing)
-    errExtra = null extra ? "" $ "extra items in the log that are not in the template:\n" <> toS (ppShow extra)
-    extra = difference logStartPaths tmplatePaths
-    missing = difference tmplatePaths logStartPaths
+ where
+  errMissng = null missing ? "" $ "template items not present in log:\n" <> toS (ppShow missing)
+  errExtra = null extra ? "" $ "extra items in the log that are not in the template:\n" <> toS (ppShow extra)
+  extra = difference logStartPaths tmplatePaths
+  missing = difference tmplatePaths logStartPaths
 
-    tmplatePaths :: Set Path
-    tmplatePaths = fromList $ (.path) <$>  (ts >>= T.eventPaths )
+  tmplatePaths :: Set Path
+  tmplatePaths = fromList $ (.path) <$> (ts >>= T.eventPaths)
 
-    logStartPaths :: Set Path
-    logStartPaths = fromList $
-      Prelude.mapMaybe (
-       \lg ->
-        do
-          xp <- case lg of
+  logStartPaths :: Set Path
+  logStartPaths =
+    fromList $
+      Prelude.mapMaybe
+        ( \lg ->
+            do
+              xp <- case lg of
                 ParentFailure{loc} -> Just loc
                 Start{loc} -> Just loc
                 _ -> Nothing
-          topPath xp
-      ) lgs
+              topPath xp
+        )
+        lgs
 
 threadVisible :: ThreadId -> [LogItem] -> [LogItem]
 threadVisible tid =
-  filter (\l -> tid == l.threadId || isOnce l)
+  filter (\l -> tid == l.threadId || hasSuiteEvent onceHook l)
 
-hasEventType :: (SuiteEvent -> Bool) -> ThreadEvent l a -> Bool
-hasEventType p l = case l of
-    StartExecution{} -> False
-    Failure{} -> False
-    ParentFailure{} -> False
-    ApEvent{} -> False
-    EndExecution{} -> False
-    _ -> p l.suiteEvent
+threadIds :: [LogItem] -> [ThreadId]
+threadIds = nub . fmap (.threadId)
 
-isOnce :: ThreadEvent l a -> Bool
-isOnce = hasEventType onceEventType
+threadVisibleSequences :: [LogItem] -> [[LogItem]]
+threadVisibleSequences l =
+  (`threadVisible` l) <$> threadIds l
 
-shouldOccurOnce :: ThreadEvent l a -> Bool
-shouldOccurOnce =  hasEventType (\et -> onceEventType et || et == TE.Test)
+shouldOccurOnce :: LogItem -> Bool
+shouldOccurOnce = hasSuiteEvent onceSuiteEvent
 
 -- isTest :: ThreadEvent l a -> Bool
 -- isTest = (==) Test . (.suiteEvent)
-
 
 chkStartEndExecution :: [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent] -> IO ()
 chkStartEndExecution evts =
@@ -172,7 +188,6 @@ chkEq' msg e a =
         <> ppShow a
         <> "\n"
 
-
 -- $> unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest False 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
@@ -230,7 +245,7 @@ testItem = TestItem 0
 
 runTest :: Bool -> Int -> [Template] -> IO ()
 runTest wantConsole maxThreads templates = do
-  let fullTs =  setPaths "" templates
+  let fullTs = setPaths "" templates
   lg <- exeTemplate wantConsole (ThreadCount maxThreads) fullTs
   chkProperties maxThreads fullTs lg
 

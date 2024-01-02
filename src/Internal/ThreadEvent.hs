@@ -31,6 +31,16 @@ evtTypeToFrequency = \case
     -- an individual test is always run once
     Test -> Once
 
+isHookParentFailure :: ThreadEvent l a -> Bool
+isHookParentFailure = \case
+    ParentFailure{suiteEvent} -> isHook suiteEvent
+    _ -> False
+
+isHook :: SuiteEvent -> Bool
+isHook = \case
+    Hook{} -> True
+    _ -> False
+
 hookWithHz :: Hz -> SuiteEvent -> Bool
 hookWithHz hz = \case
     Hook hz' _ -> hz == hz'

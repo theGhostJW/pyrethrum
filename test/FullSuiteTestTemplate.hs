@@ -1,14 +1,65 @@
 module FullSuiteTestTemplate where
 
 import DSL.Internal.ApEvent (Path (..))
-import Internal.ThreadEvent (SuiteEvent (..), Hz (..), HookPos (..))
+import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
 import qualified Internal.ThreadEvent as TE
-
+import PyrethrumExtras (uu)
+import Prelude hiding (id)
+import qualified Data.Map.Strict as Map
 
 data Result
-  = Pass
-  | Fail
-  deriving (Show, Eq)
+    = Pass
+    | Fail
+    deriving (Show, Eq)
+
+data SuiteEventPath = SuiteEventPath
+    { path :: Path
+    , suiteEvent :: SuiteEvent
+    }
+    deriving (Show, Eq, Ord)
+
+expectedPriorPath :: [Template] -> Map SuiteEventPath SuiteEventPath
+expectedPriorPath = uu
+  where
+    priorMap :: (Maybe SuiteEventPath, Map SuiteEventPath SuiteEventPath) -> Template -> (Maybe SuiteEventPath, Map SuiteEventPath SuiteEventPath) 
+    priorMap pm@(mParent, _) t = 
+        case t of
+        FullSuiteTestTemplate.Test{testItems} -> 
+            mParent & maybe pm (\parent -> 
+            foldl' (\(_, accMap') testItem -> 
+                    let 
+                     thisEvtPath = SuiteEventPath (testItemPath testItem) TE.Test
+                    in
+                     (mParent, Map.insert thisEvtPath parent accMap')
+             ) pm testItems
+            )
+        _ -> 
+         b4Evnt & maybe pm (\parent -> 
+            foldl' (\(_, accMap') child -> 
+                    let 
+                     thisEvtPath = SuiteEventPath child.path (suiteEvent child)
+                    in
+                     (Just thisEvtPath, Map.insert thisEvtPath parent accMap')
+             ) pm chldEvnts
+            )   
+         where 
+            b4Evnt = templateBeforeEvnt t
+            chldEvnts = t.subNodes
+
+    templateBeforeEvnt :: Template -> Maybe SuiteEvent
+    templateBeforeEvnt t =
+        case t of
+            FullSuiteTestTemplate.Test{} -> Nothing
+            OnceAfter{} -> Nothing
+            ThreadAfter{} -> Nothing
+            EachAfter{} -> Nothing
+            _ -> Just $ case t of
+                OnceBefore{} -> Hook Once Before
+                OnceAround{} -> Hook Once Setup
+                ThreadBefore{} -> Hook Thread Before
+                ThreadAround{} -> Hook Thread Setup
+                EachBefore{} -> Hook Each Before
+                EachAround{} -> Hook Each Setup
 
 data Template
     = OnceBefore
@@ -80,13 +131,13 @@ data EventPath = EventPath
     }
     deriving (Show, Eq)
 
+testItemPath :: TestItem -> Path
+testItemPath TestItem{..} = TestPath{..}
+
 eventPaths :: Template -> [EventPath]
 eventPaths t = case t of
     FullSuiteTestTemplate.Test{testItems} ->
-        let
-            mkEvnt i = EventPath (TestPath i.id i.title) TE.Test
-         in
-            map mkEvnt testItems
+        flip EventPath TE.Test . testItemPath <$> testItems
     _ ->
         let
             recurse = concatMap eventPaths t.subNodes

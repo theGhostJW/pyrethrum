@@ -10,7 +10,7 @@ import FullSuiteTestTemplate (Result (..))
 import qualified FullSuiteTestTemplate as T
 import Internal.RunTimeLogging (ExePath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
-import Internal.ThreadEvent as TE (Hz (..), SuiteEvent (..), ThreadEvent (..), ThreadId, hasSuiteEvent, isStart, onceHook, onceSuiteEvent, isEnd, threadHook)
+import Internal.ThreadEvent as TE (Hz (..), SuiteEvent (..), ThreadEvent (..), ThreadId, hasSuiteEvent, isStart, onceHook, onceSuiteEvent, isEnd, threadHook, isHook, isHookParentFailure)
 import List.Extra as LE
 import qualified List.Extra as L
 import qualified Prepare as P
@@ -101,6 +101,9 @@ chkAllTemplateItemsLogged ts lgs =
         )
         lgs
 
+nxtHookLog :: [LogItem] -> Maybe LogItem
+nxtHookLog = find (\l -> hasSuiteEvent isHook l || isHookParentFailure l) 
+
 threadVisible :: ThreadId -> [LogItem] -> [LogItem]
 threadVisible tid =
   filter (\l -> tid == l.threadId || hasSuiteEvent onceHook l)
@@ -188,11 +191,11 @@ chkEq' msg e a =
         <> ppShow a
         <> "\n"
 
--- $> unit_simple_pass
+-- $ > unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest False 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
--- $> unit_simple_fail
+-- $ > unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
@@ -200,13 +203,13 @@ unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, t
 unit_nested_thread_pass_fail :: IO ()
 unit_nested_thread_pass_fail =
   runTest
-    False
+    True
     1
     [ onceAround
         Pass
         Pass
         [ threadAround Pass Pass [eachAfter Fail [test [testItem Pass, testItem Fail]]]
-        , threadAround Fail Pass [eachAfter Pass [test [testItem Pass, testItem Fail]]]
+        , threadAround Fail Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
         ]
     ]
 
@@ -239,7 +242,7 @@ eachAround = EachAround 0
 
 test :: [TestItem] -> Template
 test = SuiteRuntimeTest.Test
-
+ 
 testItem :: Result -> TestItem
 testItem = TestItem 0
 
@@ -322,6 +325,7 @@ mkVoidAction path delay outcome _sink =
         txt path <> " failed"
 
 -- TODO: make bug / error functions that uses text instead of string
+-- TODO: check callstack 
 
 mkAction :: forall hi desc. (Show desc) => desc -> Int -> Result -> P.ApEventSink -> hi -> IO ()
 mkAction path delay rslt sink _in = mkVoidAction path delay rslt sink

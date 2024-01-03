@@ -34,6 +34,12 @@ expectedPriorPath = uu
              ) pm testItems
             )
         _ -> 
+         let 
+            b4Evnt = templateBeforeEvnt t <|> mParent
+            chldEvnts = t.subNodes 
+         in 
+            case t of 
+             OnceAfter{} -> uu
          b4Evnt & maybe pm (\parent -> 
             foldl' (\(_, accMap') child -> 
                     let 

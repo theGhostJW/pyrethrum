@@ -36,6 +36,10 @@ chkProperties _mxThrds ts evts = do
     , chkStartSuiteEventImmediatlyFollowedByEnd "once hooks" (hasSuiteEvent onceHook)
     , chkThreadHooksStartedOnceInThread
     , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
+    -- preceeding parent events in thread + once
+    -- subsequent parent events in thread + once
+    -- setup followed by teardown in thread + once
+    -- failure propagation
     ]
   putStrLn " checks done"
 

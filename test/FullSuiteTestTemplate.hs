@@ -1,11 +1,11 @@
 module FullSuiteTestTemplate where
 
 import DSL.Internal.ApEvent (Path (..))
+import qualified Data.Map.Strict as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
 import qualified Internal.ThreadEvent as TE
 import PyrethrumExtras (uu)
 import Prelude hiding (id)
-import qualified Data.Map.Strict as Map
 
 data Result
     = Pass
@@ -18,39 +18,48 @@ data SuiteEventPath = SuiteEventPath
     }
     deriving (Show, Eq, Ord)
 
-expectedPriorPath :: [Template] -> Map SuiteEventPath SuiteEventPath
-expectedPriorPath = uu
+data ParentAcc = ParentAcc
+    { mB4Parent :: Maybe SuiteEventPath
+    , accMap :: Map SuiteEventPath SuiteEventPath
+    }
+    deriving (Show, Eq)
+
+-- | Given a list of templates, return a map of each event path to its preceeding parent event path
+expectedParentBeforeEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
+expectedParentBeforeEvents ts = 
+    (foldl' priorMap (ParentAcc Nothing Map.empty) ts).accMap
   where
-    priorMap :: (Maybe SuiteEventPath, Map SuiteEventPath SuiteEventPath) -> Template -> (Maybe SuiteEventPath, Map SuiteEventPath SuiteEventPath) 
-    priorMap pm@(mParent, _) t = 
+    priorMap :: ParentAcc -> Template -> ParentAcc
+    priorMap pm@ParentAcc{mB4Parent, accMap} t =
         case t of
-        FullSuiteTestTemplate.Test{testItems} -> 
-            mParent & maybe pm (\parent -> 
-            foldl' (\(_, accMap') testItem -> 
-                    let 
-                     thisEvtPath = SuiteEventPath (testItemPath testItem) TE.Test
-                    in
-                     (mParent, Map.insert thisEvtPath parent accMap')
-             ) pm testItems
-            )
-        _ -> 
-         let 
-            b4Evnt = templateBeforeEvnt t <|> mParent
-            chldEvnts = t.subNodes 
-         in 
-            case t of 
-             OnceAfter{} -> uu
-         b4Evnt & maybe pm (\parent -> 
-            foldl' (\(_, accMap') child -> 
-                    let 
-                     thisEvtPath = SuiteEventPath child.path (suiteEvent child)
-                    in
-                     (Just thisEvtPath, Map.insert thisEvtPath parent accMap')
-             ) pm chldEvnts
-            )   
-         where 
-            b4Evnt = templateBeforeEvnt t
-            chldEvnts = t.subNodes
+            FullSuiteTestTemplate.Test{testItems} ->
+                mB4Parent
+                    & maybe
+                        pm
+                        ( \parent ->
+                            foldl'
+                                ( \(ParentAcc mParent' accMap') testItem ->
+                                    let
+                                        thisEvtPath = SuiteEventPath (testItemPath testItem) TE.Test
+                                     in
+                                        ParentAcc mParent' (Map.insert thisEvtPath parent accMap')
+                                )
+                                pm
+                                testItems
+                        )
+            _ ->
+                foldl' priorMap nxtParentAcc t.subNodes
+              where
+                thisTemplateEvntPaths = SuiteEventPath t.path <$> emittedHooks t
+                nxtB4Evnt = (SuiteEventPath t.path <$> templateBeforeEvnt t) <|> mB4Parent
+                nxtMap =
+                    mB4Parent
+                        & maybe
+                            accMap
+                            ( \p ->
+                                foldl' (\accMap' thisEvtPath -> Map.insert thisEvtPath p accMap') accMap thisTemplateEvntPaths
+                            )
+                nxtParentAcc = ParentAcc nxtB4Evnt nxtMap
 
     templateBeforeEvnt :: Template -> Maybe SuiteEvent
     templateBeforeEvnt t =
@@ -66,6 +75,23 @@ expectedPriorPath = uu
                 ThreadAround{} -> Hook Thread Setup
                 EachBefore{} -> Hook Each Before
                 EachAround{} -> Hook Each Setup
+
+emittedHooks :: Template -> [SuiteEvent]
+emittedHooks = \case
+    FullSuiteTestTemplate.Test{} -> []
+    OnceBefore{} -> [oh Before]
+    OnceAfter{} -> [oh After]
+    OnceAround{} -> [oh Setup, oh Teardown]
+    ThreadBefore{} -> [th Before]
+    ThreadAfter{} -> [th After]
+    ThreadAround{} -> [th Setup, th Teardown]
+    EachBefore{} -> [eh Before]
+    EachAfter{} -> [eh After]
+    EachAround{} -> [eh Setup, eh Teardown]
+ where 
+    oh = Hook Once
+    th = Hook Thread
+    eh = Hook Each
 
 data Template
     = OnceBefore

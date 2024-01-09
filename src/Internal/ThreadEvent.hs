@@ -1,8 +1,8 @@
 module Internal.ThreadEvent where
 
+import BasePrelude (read)
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import qualified UnliftIO.Concurrent as C
-import BasePrelude (read)
 
 -- needs a separate module to avoid field name conflicts
 -- can move when this is no longer a limitation of ghc
@@ -18,13 +18,12 @@ data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
 
 data Hz = Once | Thread | Each deriving (Show, Eq, Ord)
 
--- todo = _ -- here rename SuiteEvent 
+-- todo = _ -- here rename SuiteEvent
 data SuiteEvent
     = Hook Hz HookPos
     | Test
     deriving (Show, Eq, Ord)
 
- 
 evtTypeToFrequency :: SuiteEvent -> Hz
 evtTypeToFrequency = \case
     Hook hz _ -> hz
@@ -115,6 +114,16 @@ data ThreadEvent l a
         , threadId :: ThreadId
         }
     deriving (Show)
+
+startSuiteEventLoc :: ThreadEvent l a -> Maybe l
+startSuiteEventLoc te = case te of
+    StartExecution{} -> Nothing
+    EndExecution{} -> Nothing
+    ApEvent{} -> Nothing
+    Failure{} -> Nothing
+    ParentFailure{} -> Nothing
+    Start{loc} -> Just loc
+    End{loc} -> Just loc
 
 $(deriveJSON defaultOptions ''Hz)
 $(deriveJSON defaultOptions ''HookPos)

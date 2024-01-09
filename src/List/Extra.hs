@@ -5,13 +5,14 @@ module List.Extra (
   List.Extra.maximum,
   List.Extra.minimum,
   List.Extra.head,
+  List.Extra.tail,
   count,
   zipWithIndex,
 ) where
 
 --  shims for relude to ultimately be included in a revived pyrelude
 
-import Data.List.Extra hiding (head, init, last, maximum, minimum)
+import Data.List.Extra hiding (head, tail, init, last, maximum, minimum)
 import Data.List.Extra as L hiding (lines, unlines)
 import PyrethrumExtras ((?))
 import Prelude hiding (last)
@@ -29,6 +30,9 @@ last = safel L.last
 
 head :: [a] -> Maybe a
 head = safel L.head
+
+tail :: [a] -> Maybe [a]
+tail = safel L.tail
 
 init :: [a] -> Maybe [a]
 init = safel L.init

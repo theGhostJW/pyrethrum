@@ -8,9 +8,9 @@ import Data.Set (difference)
 import qualified Data.Text as T
 import FullSuiteTestTemplate (Result (..))
 import qualified FullSuiteTestTemplate as T
-import Internal.RunTimeLogging (ExePath, testLogControls, topPath)
+import Internal.RunTimeLogging (ExePath(..), testLogControls, topPath, parentPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
-import Internal.ThreadEvent as TE (Hz (..), SuiteEvent (..), ThreadEvent (..), ThreadId, hasSuiteEvent, isStart, onceHook, onceSuiteEvent, isEnd, threadHook, isHook, isHookParentFailure)
+import Internal.ThreadEvent as TE (Hz (..), SuiteEvent (..), ThreadEvent (..), ThreadId, hasSuiteEvent, isStart, onceHook, onceSuiteEvent, isEnd, threadHook, isHook, isHookParentFailure, startSuiteEventLoc)
 import List.Extra as LE
 import qualified List.Extra as L
 import qualified Prepare as P
@@ -22,11 +22,13 @@ import UnliftIO.Concurrent as C (
  )
 import UnliftIO.STM (TQueue, tryReadTQueue)
 import Prelude hiding (id)
+import GHC.Read (paren)
 
 type LogItem = ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent
 
 chkProperties :: Int -> [T.Template] -> [LogItem] -> IO ()
 chkProperties _mxThrds ts evts = do
+  -- these checks apply to the log as a whole
   traverse_
     (evts &)
     [ chkStartEndExecution
@@ -34,26 +36,44 @@ chkProperties _mxThrds ts evts = do
     , chkAllTemplateItemsLogged ts
     , chkStartsOnce "once hooks and tests" shouldOccurOnce
     , chkStartSuiteEventImmediatlyFollowedByEnd "once hooks" (hasSuiteEvent onceHook)
-    , chkThreadHooksStartedOnceInThread
+    ]
+  -- these checks apply to each thread log (ie. Once events + events with the same thread id)
+  threadLogChks evts [
+    chkThreadHooksStartedOnceInThread
     , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-    -- preceeding parent events in thread + once
+    , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
     -- subsequent parent events in thread + once
     -- setup followed by teardown in thread + once
+    -- failure has correct loc
     -- failure propagation
-    ]
+   ]
   putStrLn " checks done"
 
+chkPrecedingSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
+chkPrecedingSuiteEventAsExpected expectedChildParentMap thrdLog = uu
+  where
+    actualPrecedingParent = tails $ reverse thrdLog
+    extractChildParent :: [LogItem] -> (T.SuiteEventPath, T.SuiteEventPath)
+    extractChildParent = uu
+
+
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
-chkAllStartSuitEventsInThreadImmedialyFollowedByEnd = 
-  traverse_ 
-    (chkStartSuiteEventImmediatlyFollowedByEnd "thread suite elements" (hasSuiteEvent (const True))) 
-    . threadVisibleSequences
+chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =
+    chkStartSuiteEventImmediatlyFollowedByEnd "thread suite elements" (hasSuiteEvent (const True))
+
+
+threadLogChks :: [LogItem] -> [[LogItem] -> IO ()] -> IO ()
+threadLogChks fullLog = traverse_ chkTls
+  where
+    tlgs = threadLogs fullLog
+    chkTls = checkThreadLogs tlgs
+    checkThreadLogs :: [[LogItem]] -> ([LogItem] -> IO ()) -> IO ()
+    checkThreadLogs tls' lgChk = traverse_ lgChk tls'
 
 chkThreadHooksStartedOnceInThread :: [LogItem] -> IO ()
 chkThreadHooksStartedOnceInThread =
-  traverse_
-    (chkStartsOnce "thread elements" (hasSuiteEvent threadHook))
-    . threadVisibleSequences
+  chkStartsOnce "thread elements" (hasSuiteEvent threadHook)
+
 
 -- TODO:: reexport putStrLn et. al with text conversion
 
@@ -106,7 +126,7 @@ chkAllTemplateItemsLogged ts lgs =
         lgs
 
 nxtHookLog :: [LogItem] -> Maybe LogItem
-nxtHookLog = find (\l -> hasSuiteEvent isHook l || isHookParentFailure l) 
+nxtHookLog = find (\l -> hasSuiteEvent isHook l || isHookParentFailure l)
 
 threadVisible :: ThreadId -> [LogItem] -> [LogItem]
 threadVisible tid =
@@ -115,8 +135,8 @@ threadVisible tid =
 threadIds :: [LogItem] -> [ThreadId]
 threadIds = nub . fmap (.threadId)
 
-threadVisibleSequences :: [LogItem] -> [[LogItem]]
-threadVisibleSequences l =
+threadLogs :: [LogItem] -> [[LogItem]]
+threadLogs l =
   (`threadVisible` l) <$> threadIds l
 
 shouldOccurOnce :: LogItem -> Bool
@@ -246,7 +266,7 @@ eachAround = EachAround 0
 
 test :: [TestItem] -> Template
 test = SuiteRuntimeTest.Test
- 
+
 testItem :: Result -> TestItem
 testItem = TestItem 0
 
@@ -309,6 +329,18 @@ setPaths address ts =
     newPath = DSL.Internal.ApEvent.SuiteElmPath newAdd
     newAdd = nxtAdd idx
     newNodes = setPaths newAdd tp.subNodes
+
+firstParentStart :: ThreadEvent ExePath a -> [ThreadEvent ExePath a]  -> Maybe (ThreadEvent ExePath a)
+firstParentStart targEvnt =
+  find (fromMaybe False . differentParentPath)
+ where
+  thisParent = startSuiteEventLoc targEvnt >>= parentPath
+  differentParentPath :: ThreadEvent ExePath a -> Maybe Bool
+  differentParentPath evt = do
+    tp <- thisParent
+    evtLc <- startSuiteEventLoc evt
+    evtPlc <- parentPath evtLc
+    pure $ tp /= evtPlc
 
 newtype TestConfig = TestConfig
   {title :: Text}

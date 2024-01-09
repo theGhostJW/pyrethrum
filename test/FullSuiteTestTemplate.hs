@@ -24,9 +24,9 @@ data ParentAcc = ParentAcc
     }
     deriving (Show, Eq)
 
--- | Given a list of templates, return a map of each event path to its preceeding parent event path
-expectedParentBeforeEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
-expectedParentBeforeEvents ts = 
+-- | Given a list of templates, return a map of each event path to its expected preceeding parent event path
+expectedParentPrecedingEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
+expectedParentPrecedingEvents ts = 
     (foldl' priorMap (ParentAcc Nothing Map.empty) ts).accMap
   where
     priorMap :: ParentAcc -> Template -> ParentAcc

@@ -23,7 +23,8 @@ newtype ExePath = ExePath [AE.Path] deriving (Show, Eq, Ord)
 topPath :: ExePath -> Maybe AE.Path
 topPath = L.head . coerce
 
-
+parentPath :: ExePath -> Maybe ExePath
+parentPath (ExePath l) = ExePath <$> L.tail l
 
 -- TODO: hide string eg intercallate
 displayExePath :: ExePath -> Text

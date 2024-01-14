@@ -73,6 +73,12 @@ isEnd = \case
     End{} -> True
     _ -> False
 
+suiteEvent :: ThreadEvent a b -> Maybe SuiteEvent
+suiteEvent = \case
+    Start{suiteEvent = e} -> Just e
+    End{suiteEvent = e} -> Just e
+    _ -> Nothing
+
 data ThreadEvent l a
     = StartExecution
         { idx :: Int

@@ -10,12 +10,12 @@ import FullSuiteTestTemplate (Result (..))
 import qualified FullSuiteTestTemplate as T
 import Internal.RunTimeLogging (ExePath(..), testLogControls, topPath, parentPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
-import Internal.ThreadEvent as TE (Hz (..), SuiteEvent (..), ThreadEvent (..), ThreadId, hasSuiteEvent, isStart, onceHook, onceSuiteEvent, isEnd, threadHook, isHook, isHookParentFailure, startSuiteEventLoc)
+import Internal.ThreadEvent as TE (Hz (..), SuiteEvent (..), ThreadEvent (..), ThreadId, hasSuiteEvent, isStart, onceHook, onceSuiteEvent, isEnd, threadHook, isHook, isHookParentFailure, startSuiteEventLoc, suiteEvent)
 import List.Extra as LE
 import qualified List.Extra as L
 import qualified Prepare as P
 import PyrethrumExtras (toS, txt, uu, (?), debug)
-import PyrethrumExtras.Test hiding (chkEq', filter, maybe, test)
+import PyrethrumExtras.Test hiding (mapMaybe, chkEq', filter, maybe, test)
 import Text.Show.Pretty (pPrint, ppShow, ppShowList)
 import UnliftIO.Concurrent as C (
   threadDelay,
@@ -50,11 +50,35 @@ chkProperties _mxThrds ts evts = do
   putStrLn " checks done"
 
 chkPrecedingSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
-chkPrecedingSuiteEventAsExpected expectedChildParentMap thrdLog = uu
+chkPrecedingSuiteEventAsExpected expectedChildParentMap thrdLog = 
+  traverse_ chkParent actualParents
   where
-    actualPrecedingParent = tails $ reverse thrdLog
-    extractChildParent :: [LogItem] -> (T.SuiteEventPath, T.SuiteEventPath)
-    extractChildParent = uu
+    chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
+    chkParent (childPath, actualParentPath) = 
+      chkEq' ("preceding parent event for " <> txt childPath) expectedParentPath actualParentPath
+      where
+        expectedParentPath = M.lookup childPath expectedChildParentMap
+      
+     
+    actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
+    actualParents = mapMaybe extractChildParent actualPrecedingParent
+
+    actualPrecedingParent :: [[LogItem]]
+    actualPrecedingParent = tails . reverse $ filter isStart thrdLog
+
+    extractChildParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
+    extractChildParent starts =
+        (, actulaParentPath) <$> targetPath
+      where
+        logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
+        logSuiteEventPath l =  T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> suiteEvent l
+        targEvnt = L.head starts
+        targetPath = targEvnt >>= logSuiteEventPath
+        actulaParentPath = do
+          h <- targEvnt
+          t <- L.tail starts
+          fps <- firstParentStart h t
+          logSuiteEventPath fps
 
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()

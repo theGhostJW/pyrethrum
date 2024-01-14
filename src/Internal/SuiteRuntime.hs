@@ -50,6 +50,7 @@ execute
     , runConfig
     } = executeNodeList tc lc (P.prepare $ C.SuitePrepParams suite interpreter runConfig)
 
+
 executeNodeList :: Traversable m => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> m (P.PreNode IO m ()) -> IO ()
 executeNodeList
   tc
@@ -782,3 +783,7 @@ logRun lgr path evt action = do
         (logReturnFailure lgr path evt)
     )
     (lgr $ L.End evt path)
+
+    
+x :: IO ()
+x = putStrLn "hello"

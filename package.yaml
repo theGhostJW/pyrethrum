@@ -151,6 +151,7 @@ ghc-options:
   # todo: more researchon this: https://well-typed.com/blog/2023/02/interface-files-with-core/
   - -fprefer-byte-code 
   - -fbyte-code-and-object-code
+  - -fno-break-points
   # - -fdefer-type-error
   # profiling
   # - -ddump-to-file 

@@ -784,6 +784,5 @@ logRun lgr path evt action = do
     )
     (lgr $ L.End evt path)
 
-    
 x :: IO ()
-x = putStrLn "hello"
+x = putStrLn "hello!"

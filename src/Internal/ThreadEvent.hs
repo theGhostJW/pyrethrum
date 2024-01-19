@@ -32,7 +32,7 @@ evtTypeToFrequency = \case
 
 isHookParentFailure :: ThreadEvent l a -> Bool
 isHookParentFailure = \case
-    ParentFailure{suiteEvent} -> isHook suiteEvent
+    ParentFailure{suiteEvent=s} -> isHook s
     _ -> False
 
 isHook :: SuiteEvent -> Bool

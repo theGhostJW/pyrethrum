@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-x-partial#-} 
+
 module List.Extra (
   module Data.List.Extra,
   List.Extra.last,

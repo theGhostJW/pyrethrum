@@ -10,19 +10,18 @@ import FullSuiteTestTemplate (Result (..))
 import qualified FullSuiteTestTemplate as T
 import Internal.RunTimeLogging (ExePath(..), testLogControls, topPath, parentPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
-import Internal.ThreadEvent as TE (Hz (..), SuiteEvent (..), ThreadEvent (..), ThreadId, hasSuiteEvent, isStart, onceHook, onceSuiteEvent, isEnd, threadHook, isHook, isHookParentFailure, startSuiteEventLoc, suiteEvent)
+import Internal.ThreadEvent as TE (Hz (..), ThreadEvent (..), ThreadId, hasSuiteEvent, isStart, onceHook, onceSuiteEvent, isEnd, threadHook, isHook, isHookParentFailure, startSuiteEventLoc, suiteEvent)
 import List.Extra as LE
 import qualified List.Extra as L
 import qualified Prepare as P
-import PyrethrumExtras (toS, txt, uu, (?), debug)
+import PyrethrumExtras (toS, txt, (?), debug')
 import PyrethrumExtras.Test hiding (mapMaybe, chkEq', filter, maybe, test)
-import Text.Show.Pretty (pPrint, ppShow, ppShowList)
+import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
   threadDelay,
  )
 import UnliftIO.STM (TQueue, tryReadTQueue)
 import Prelude hiding (id)
-import GHC.Read (paren)
 
 type LogItem = ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent
 
@@ -41,7 +40,7 @@ chkProperties _mxThrds ts evts = do
   threadLogChks evts [
     chkThreadHooksStartedOnceInThread
     , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-    , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
+    , chkPrecedingSuiteEventAsExpected ( debug' "Expected Preceeding Map" $ T.expectedParentPrecedingEvents ts)
     -- subsequent parent events in thread + once
     -- setup followed by teardown in thread + once
     -- failure has correct loc
@@ -55,7 +54,7 @@ chkPrecedingSuiteEventAsExpected expectedChildParentMap thrdLog =
   where
     chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
     chkParent (childPath, actualParentPath) = 
-      chkEq' ("preceding parent event for " <> txt childPath) expectedParentPath actualParentPath
+      chkEq' ("preceding parent event for \n" <> (toS $ ppShow childPath)) expectedParentPath actualParentPath
       where
         expectedParentPath = M.lookup childPath expectedChildParentMap
       
@@ -187,7 +186,7 @@ chkStartEndExecution evts =
 
 -- TODO - add tests add to pyrelude
 -- research groupon on lists is consecutive and dodgy
--- conver to to non-empty and use groupby from relude??
+-- convert to to non-empty and use groupby from relude??
 groupOn' :: (Ord b) => (a -> b) -> [a] -> [[a]]
 groupOn' f =
   M.elems . foldl' fld M.empty . reverse
@@ -356,15 +355,14 @@ setPaths address ts =
 
 firstParentStart :: ThreadEvent ExePath a -> [ThreadEvent ExePath a]  -> Maybe (ThreadEvent ExePath a)
 firstParentStart targEvnt =
-  find (fromMaybe False . differentParentPath)
+  find (fromMaybe False . matchesParentPath)
  where
   thisParent = startSuiteEventLoc targEvnt >>= parentPath
-  differentParentPath :: ThreadEvent ExePath a -> Maybe Bool
-  differentParentPath evt = do
+  matchesParentPath :: ThreadEvent ExePath a -> Maybe Bool
+  matchesParentPath evt = do
     tp <- thisParent
     evtLc <- startSuiteEventLoc evt
-    evtPlc <- parentPath evtLc
-    pure $ tp /= evtPlc
+    pure $ tp == evtLc
 
 newtype TestConfig = TestConfig
   {title :: Text}

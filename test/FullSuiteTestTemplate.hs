@@ -4,8 +4,9 @@ import DSL.Internal.ApEvent (Path (..))
 import qualified Data.Map.Strict as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
 import qualified Internal.ThreadEvent as TE
-import PyrethrumExtras (uu)
 import Prelude hiding (id)
+
+-- import PyrethrumExtras (debug')
 
 data Result
     = Pass
@@ -18,48 +19,46 @@ data SuiteEventPath = SuiteEventPath
     }
     deriving (Show, Eq, Ord)
 
-data ParentAcc = ParentAcc
-    { mB4Parent :: Maybe SuiteEventPath
-    , accMap :: Map SuiteEventPath SuiteEventPath
-    }
-    deriving (Show, Eq)
-
--- | Given a list of templates, return a map of each event path to its expected preceeding parent event path
+{- | Given a list of templates, return a map of each event path to its expected preceeding
+parent event path
+-}
 expectedParentPrecedingEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
-expectedParentPrecedingEvents ts = 
-    (foldl' priorMap (ParentAcc Nothing Map.empty) ts).accMap
+expectedParentPrecedingEvents ts =
+    foldl' (priorMap Nothing) Map.empty ts
   where
-    priorMap :: ParentAcc -> Template -> ParentAcc
-    priorMap pm@ParentAcc{mB4Parent, accMap} t =
+    priorMap :: Maybe SuiteEventPath -> Map SuiteEventPath SuiteEventPath -> Template -> Map SuiteEventPath SuiteEventPath
+    priorMap mParentEvnt accMap t =
         case t of
             FullSuiteTestTemplate.Test{testItems} ->
-                mB4Parent
+                mParentEvnt
                     & maybe
-                        pm
+                        accMap
                         ( \parent ->
                             foldl'
-                                ( \(ParentAcc mParent' accMap') testItem ->
+                                ( \accMap' testItem ->
                                     let
                                         thisEvtPath = SuiteEventPath (testItemPath testItem) TE.Test
                                      in
-                                        ParentAcc mParent' (Map.insert thisEvtPath parent accMap')
+                                        Map.insert thisEvtPath parent accMap'
                                 )
-                                pm
+                                accMap
                                 testItems
                         )
             _ ->
-                foldl' priorMap nxtParentAcc t.subNodes
+                foldl' (priorMap nxtB4Evnt) nxtMap t.subNodes
               where
                 thisTemplateEvntPaths = SuiteEventPath t.path <$> emittedHooks t
-                nxtB4Evnt = (SuiteEventPath t.path <$> templateBeforeEvnt t) <|> mB4Parent
+                nxtB4Evnt = (SuiteEventPath t.path <$> templateBeforeEvnt t) <|> mParentEvnt
                 nxtMap =
-                    mB4Parent
+                    mParentEvnt
                         & maybe
                             accMap
                             ( \p ->
-                                foldl' (\accMap' thisEvtPath -> Map.insert thisEvtPath p accMap') accMap thisTemplateEvntPaths
+                                foldl'
+                                    (\accMap' thisEvtPath -> Map.insert thisEvtPath p accMap')
+                                    accMap
+                                    thisTemplateEvntPaths
                             )
-                nxtParentAcc = ParentAcc nxtB4Evnt nxtMap
 
     templateBeforeEvnt :: Template -> Maybe SuiteEvent
     templateBeforeEvnt t =
@@ -88,7 +87,7 @@ emittedHooks = \case
     EachBefore{} -> [eh Before]
     EachAfter{} -> [eh After]
     EachAround{} -> [eh Setup, eh Teardown]
- where 
+  where
     oh = Hook Once
     th = Hook Thread
     eh = Hook Each

@@ -1,142 +1,631 @@
-All good (32 modules, at 06:21:05)
+All good (2 modules, at 07:55:42)
  
-/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:23:1
-$> unit_simple_pass
+/home/theghostjw/pyrethrum/pyrethrum/test/SuiteRuntimeTest.hs:250:1
+$> unit_nested_thread_pass_fail
 
 [ OnceAround
     { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
     , delay = 0
-    , passSetup = True
-    , passTeardown = True
+    , setupResult = Pass
+    , teardownResult = Pass
     , subNodes =
-        [ Test
-            { path = SuiteElmPath { module' = "0.0" , path = "Test" }
-            , testItems =
-                [ TestItem
-                    { id = 0 , title = "0.0 TestItem" , delay = 0 , pass = True }
-                , TestItem
-                    { id = 1 , title = "0.0 TestItem" , delay = 0 , pass = False }
+        [ ThreadAround
+            { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+            , delay = 0
+            , setupResult = Pass
+            , teardownResult = Pass
+            , subNodes =
+                [ EachAfter
+                    { path = SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+                    , delay = 0
+                    , result = Fail
+                    , subNodes =
+                        [ Test
+                            { path = SuiteElmPath { module' = "0.0.0.0" , path = "Test" }
+                            , testItems =
+                                [ TestItem
+                                    { id = 0
+                                    , title = "0.0.0.0 TestItem"
+                                    , delay = 0
+                                    , result = Pass
+                                    }
+                                , TestItem
+                                    { id = 1
+                                    , title = "0.0.0.0 TestItem"
+                                    , delay = 0
+                                    , result = Fail
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        , ThreadAround
+            { path = SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+            , delay = 0
+            , setupResult = Fail
+            , teardownResult = Pass
+            , subNodes =
+                [ EachAfter
+                    { path = SuiteElmPath { module' = "0.1.0" , path = "EachAfter" }
+                    , delay = 0
+                    , result = Pass
+                    , subNodes =
+                        [ Test
+                            { path = SuiteElmPath { module' = "0.1.0.0" , path = "Test" }
+                            , testItems =
+                                [ TestItem
+                                    { id = 0
+                                    , title = "0.1.0.0 TestItem"
+                                    , delay = 0
+                                    , result = Fail
+                                    }
+                                , TestItem
+                                    { id = 1
+                                    , title = "0.1.0.0 TestItem"
+                                    , delay = 0
+                                    , result = Pass
+                                    }
+                                ]
+                            }
+                        ]
+                    }
                 ]
             }
         ]
     }
 ]
 =========
-StartExecution
-  { idx = 0 , threadId = SThreadId { display = "ThreadId 953" } }
+StartExecution { idx = 0 , threadId = 120 }
 Start
   { idx = 0
-  , threadId = SThreadId { display = "ThreadId 954" }
-  , eventType = Hook Once Setup
+  , threadId = 121
+  , suiteEvent = Hook Once Setup
   , loc =
-      ExePath
-        { unExePath =
-            [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-        }
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
   }
 End
   { idx = 1
-  , threadId = SThreadId { display = "ThreadId 954" }
-  , eventType = Hook Once Setup
+  , threadId = 121
+  , suiteEvent = Hook Once Setup
   , loc =
-      ExePath
-        { unExePath =
-            [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-        }
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
   }
 Start
   { idx = 2
-  , threadId = SThreadId { display = "ThreadId 954" }
-  , eventType = Test
+  , threadId = 121
+  , suiteEvent = Hook Thread Setup
   , loc =
       ExePath
-        { unExePath =
-            [ TestPath { id = 0 , title = "0.0 TestItem" }
-            , SuiteElmPath { module' = "0.0" , path = "Test" }
-            , SuiteElmPath { module' = "0" , path = "OnceAround" }
-            ]
-        }
+        [ SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
   }
 End
   { idx = 3
-  , threadId = SThreadId { display = "ThreadId 954" }
-  , eventType = Test
+  , threadId = 121
+  , suiteEvent = Hook Thread Setup
   , loc =
       ExePath
-        { unExePath =
-            [ TestPath { id = 0 , title = "0.0 TestItem" }
-            , SuiteElmPath { module' = "0.0" , path = "Test" }
-            , SuiteElmPath { module' = "0" , path = "OnceAround" }
-            ]
-        }
+        [ SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
   }
 Start
   { idx = 4
-  , threadId = SThreadId { display = "ThreadId 954" }
-  , eventType = Test
+  , threadId = 121
+  , suiteEvent = Test
   , loc =
       ExePath
-        { unExePath =
-            [ TestPath { id = 1 , title = "0.0 TestItem" }
-            , SuiteElmPath { module' = "0.0" , path = "Test" }
-            , SuiteElmPath { module' = "0" , path = "OnceAround" }
-            ]
-        }
+        [ TestPath { id = 0 , title = "0.0.0.0 TestItem" }
+        , SuiteElmPath { module' = "0.0.0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+End
+  { idx = 5
+  , threadId = 121
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        [ TestPath { id = 0 , title = "0.0.0.0 TestItem" }
+        , SuiteElmPath { module' = "0.0.0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+Start
+  { idx = 6
+  , threadId = 121
+  , suiteEvent = Hook Each After
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
   }
 Failure
-  { idx = 5
-  , threadId = SThreadId { display = "ThreadId 954" }
+  { idx = 7
+  , threadId = 121
   , exception =
       PException
         { displayText =
-            [ "\"\\\"0.0 TestItem\\\" failed\""
+            [ "\"SuiteElmPath {module' = \\\"0.0.0\\\", path = \\\"EachAfter\\\"} failed\""
             , "\"CallStack (from HasCallStack):\""
-            , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-e314f41607d4a917a3a6b3d2eb68ea6953a6c8fa4d8f501d8d65aebf58f573f7:Relude.Debug\""
-            , "\"  error, called at test/SuiteRuntimeTest.hs:153:19 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTest\""
+            , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-a5ed481547a2e612ba94330f420241e261fb518e17d71449cef78fe63d829fa3:Relude.Debug\""
+            , "\"  error, called at test/SuiteRuntimeTest.hs:383:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTest\""
             ]
         }
   , loc =
       ExePath
-        { unExePath =
-            [ TestPath { id = 1 , title = "0.0 TestItem" }
-            , SuiteElmPath { module' = "0.0" , path = "Test" }
-            , SuiteElmPath { module' = "0" , path = "OnceAround" }
-            ]
-        }
-  }
-End
-  { idx = 6
-  , threadId = SThreadId { display = "ThreadId 954" }
-  , eventType = Test
-  , loc =
-      ExePath
-        { unExePath =
-            [ TestPath { id = 1 , title = "0.0 TestItem" }
-            , SuiteElmPath { module' = "0.0" , path = "Test" }
-            , SuiteElmPath { module' = "0" , path = "OnceAround" }
-            ]
-        }
-  }
-Start
-  { idx = 7
-  , threadId = SThreadId { display = "ThreadId 954" }
-  , eventType = Hook Once Teardown
-  , loc =
-      ExePath
-        { unExePath =
-            [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-        }
+        [ SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
   }
 End
   { idx = 8
-  , threadId = SThreadId { display = "ThreadId 954" }
-  , eventType = Hook Once Teardown
+  , threadId = 121
+  , suiteEvent = Hook Each After
   , loc =
       ExePath
-        { unExePath =
-            [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
-        }
+        [ SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
   }
-EndExecution
-  { idx = 1 , threadId = SThreadId { display = "ThreadId 953" } }
- checks done
+Start
+  { idx = 9
+  , threadId = 121
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        [ TestPath { id = 1 , title = "0.0.0.0 TestItem" }
+        , SuiteElmPath { module' = "0.0.0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+Failure
+  { idx = 10
+  , threadId = 121
+  , exception =
+      PException
+        { displayText =
+            [ "\"\\\"0.0.0.0 TestItem\\\" failed\""
+            , "\"CallStack (from HasCallStack):\""
+            , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-a5ed481547a2e612ba94330f420241e261fb518e17d71449cef78fe63d829fa3:Relude.Debug\""
+            , "\"  error, called at test/SuiteRuntimeTest.hs:383:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTest\""
+            ]
+        }
+  , loc =
+      ExePath
+        [ TestPath { id = 1 , title = "0.0.0.0 TestItem" }
+        , SuiteElmPath { module' = "0.0.0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+End
+  { idx = 11
+  , threadId = 121
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        [ TestPath { id = 1 , title = "0.0.0.0 TestItem" }
+        , SuiteElmPath { module' = "0.0.0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+Start
+  { idx = 12
+  , threadId = 121
+  , suiteEvent = Hook Each After
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+Failure
+  { idx = 13
+  , threadId = 121
+  , exception =
+      PException
+        { displayText =
+            [ "\"SuiteElmPath {module' = \\\"0.0.0\\\", path = \\\"EachAfter\\\"} failed\""
+            , "\"CallStack (from HasCallStack):\""
+            , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-a5ed481547a2e612ba94330f420241e261fb518e17d71449cef78fe63d829fa3:Relude.Debug\""
+            , "\"  error, called at test/SuiteRuntimeTest.hs:383:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTest\""
+            ]
+        }
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+End
+  { idx = 14
+  , threadId = 121
+  , suiteEvent = Hook Each After
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+Start
+  { idx = 15
+  , threadId = 121
+  , suiteEvent = Hook Thread Teardown
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+End
+  { idx = 16
+  , threadId = 121
+  , suiteEvent = Hook Thread Teardown
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+Start
+  { idx = 17
+  , threadId = 121
+  , suiteEvent = Hook Thread Setup
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+Failure
+  { idx = 18
+  , threadId = 121
+  , exception =
+      PException
+        { displayText =
+            [ "\"SuiteElmPath {module' = \\\"0.1\\\", path = \\\"ThreadAround\\\"} failed\""
+            , "\"CallStack (from HasCallStack):\""
+            , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-a5ed481547a2e612ba94330f420241e261fb518e17d71449cef78fe63d829fa3:Relude.Debug\""
+            , "\"  error, called at test/SuiteRuntimeTest.hs:383:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTest\""
+            ]
+        }
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+End
+  { idx = 19
+  , threadId = 121
+  , suiteEvent = Hook Thread Setup
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  }
+ParentFailure
+  { idx = 20
+  , threadId = 121
+  , loc =
+      ExePath
+        [ TestPath { id = 0 , title = "0.1.0.0 TestItem" }
+        , SuiteElmPath { module' = "0.1.0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0.1.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  , suiteEvent = Test
+  , failLoc =
+      ExePath
+        [ SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  , failSuiteEvent = Hook Thread Setup
+  }
+ParentFailure
+  { idx = 21
+  , threadId = 121
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.1.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  , suiteEvent = Hook Each After
+  , failLoc =
+      ExePath
+        [ SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  , failSuiteEvent = Hook Thread Setup
+  }
+ParentFailure
+  { idx = 22
+  , threadId = 121
+  , loc =
+      ExePath
+        [ TestPath { id = 1 , title = "0.1.0.0 TestItem" }
+        , SuiteElmPath { module' = "0.1.0.0" , path = "Test" }
+        , SuiteElmPath { module' = "0.1.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  , suiteEvent = Test
+  , failLoc =
+      ExePath
+        [ SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  , failSuiteEvent = Hook Thread Setup
+  }
+ParentFailure
+  { idx = 23
+  , threadId = 121
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.1.0" , path = "EachAfter" }
+        , SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  , suiteEvent = Hook Each After
+  , failLoc =
+      ExePath
+        [ SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  , failSuiteEvent = Hook Thread Setup
+  }
+ParentFailure
+  { idx = 24
+  , threadId = 121
+  , loc =
+      ExePath
+        [ SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  , suiteEvent = Hook Thread Teardown
+  , failLoc =
+      ExePath
+        [ SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+  , failSuiteEvent = Hook Thread Setup
+  }
+Start
+  { idx = 25
+  , threadId = 121
+  , suiteEvent = Hook Once Teardown
+  , loc =
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
+  }
+End
+  { idx = 26
+  , threadId = 121
+  , suiteEvent = Hook Once Teardown
+  , loc =
+      ExePath [ SuiteElmPath { module' = "0" , path = "OnceAround" } ]
+  }
+EndExecution { idx = 1 , threadId = 120 }
+--- nxtB4Evnt (parent) ---
+Just
+  SuiteEventPath
+    { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
+    , suiteEvent = Hook Once Setup
+    }
+--- child Hooks ---
+[ SuiteEventPath
+    { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+    , suiteEvent = Hook Thread Setup
+    }
+, SuiteEventPath
+    { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+    , suiteEvent = Hook Thread Teardown
+    }
+]
+--- parent ---
+SuiteEventPath
+  { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
+  , suiteEvent = Hook Once Setup
+  }
+--- parent ---
+SuiteEventPath
+  { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
+  , suiteEvent = Hook Once Setup
+  }
+--- nxtB4Evnt (parent) ---
+Just
+  SuiteEventPath
+    { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+    , suiteEvent = Hook Thread Setup
+    }
+--- child Hooks ---
+[ SuiteEventPath
+    { path = SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+    , suiteEvent = Hook Each After
+    }
+]
+--- parent ---
+SuiteEventPath
+  { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+  , suiteEvent = Hook Thread Setup
+  }
+--- nxtB4Evnt (parent) ---
+Just
+  SuiteEventPath
+    { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+    , suiteEvent = Hook Thread Setup
+    }
+--- child Hooks ---
+[ SuiteEventPath
+    { path = SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+    , suiteEvent = Hook Thread Setup
+    }
+, SuiteEventPath
+    { path = SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+    , suiteEvent = Hook Thread Teardown
+    }
+]
+--- parent ---
+SuiteEventPath
+  { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
+  , suiteEvent = Hook Once Setup
+  }
+--- parent ---
+SuiteEventPath
+  { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
+  , suiteEvent = Hook Once Setup
+  }
+--- nxtB4Evnt (parent) ---
+Just
+  SuiteEventPath
+    { path = SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+    , suiteEvent = Hook Thread Setup
+    }
+--- child Hooks ---
+[ SuiteEventPath
+    { path = SuiteElmPath { module' = "0.1.0" , path = "EachAfter" }
+    , suiteEvent = Hook Each After
+    }
+]
+--- parent ---
+SuiteEventPath
+  { path = SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+  , suiteEvent = Hook Thread Setup
+  }
+--- nxtB4Evnt (parent) ---
+Just
+  SuiteEventPath
+    { path = SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+    , suiteEvent = Hook Thread Setup
+    }
+--- Expected Preceeding Map ---
+fromList
+  [ ( SuiteEventPath
+        { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , suiteEvent = Hook Thread Setup
+        }
+    , SuiteEventPath
+        { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
+        , suiteEvent = Hook Once Setup
+        }
+    )
+  , ( SuiteEventPath
+        { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , suiteEvent = Hook Thread Teardown
+        }
+    , SuiteEventPath
+        { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
+        , suiteEvent = Hook Once Setup
+        }
+    )
+  , ( SuiteEventPath
+        { path = SuiteElmPath { module' = "0.0.0" , path = "EachAfter" }
+        , suiteEvent = Hook Each After
+        }
+    , SuiteEventPath
+        { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , suiteEvent = Hook Thread Setup
+        }
+    )
+  , ( SuiteEventPath
+        { path = SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , suiteEvent = Hook Thread Setup
+        }
+    , SuiteEventPath
+        { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
+        , suiteEvent = Hook Once Setup
+        }
+    )
+  , ( SuiteEventPath
+        { path = SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , suiteEvent = Hook Thread Teardown
+        }
+    , SuiteEventPath
+        { path = SuiteElmPath { module' = "0" , path = "OnceAround" }
+        , suiteEvent = Hook Once Setup
+        }
+    )
+  , ( SuiteEventPath
+        { path = SuiteElmPath { module' = "0.1.0" , path = "EachAfter" }
+        , suiteEvent = Hook Each After
+        }
+    , SuiteEventPath
+        { path = SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , suiteEvent = Hook Thread Setup
+        }
+    )
+  , ( SuiteEventPath
+        { path = TestPath { id = 0 , title = "0.0.0.0 TestItem" }
+        , suiteEvent = Test
+        }
+    , SuiteEventPath
+        { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , suiteEvent = Hook Thread Setup
+        }
+    )
+  , ( SuiteEventPath
+        { path = TestPath { id = 0 , title = "0.1.0.0 TestItem" }
+        , suiteEvent = Test
+        }
+    , SuiteEventPath
+        { path = SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , suiteEvent = Hook Thread Setup
+        }
+    )
+  , ( SuiteEventPath
+        { path = TestPath { id = 1 , title = "0.0.0.0 TestItem" }
+        , suiteEvent = Test
+        }
+    , SuiteEventPath
+        { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+        , suiteEvent = Hook Thread Setup
+        }
+    )
+  , ( SuiteEventPath
+        { path = TestPath { id = 1 , title = "0.1.0.0 TestItem" }
+        , suiteEvent = Test
+        }
+    , SuiteEventPath
+        { path = SuiteElmPath { module' = "0.1" , path = "ThreadAround" }
+        , suiteEvent = Hook Thread Setup
+        }
+    )
+  ]
+*** Exception: user error (
+preceding parent event for 
+SuiteEventPath
+  { path = TestPath { id = 1 , title = "0.0.0.0 TestItem" }
+  , suiteEvent = Test
+  }
+equality check failed:
+Expected:
+  Just
+  SuiteEventPath
+    { path = SuiteElmPath { module' = "0.0" , path = "ThreadAround" }
+    , suiteEvent = Hook Thread Setup
+    }
+Does not Equal:
+  Nothing
+)

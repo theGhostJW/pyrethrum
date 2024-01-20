@@ -93,7 +93,7 @@ chkPrecedingSuiteEventAsExpected expectedChildParentMap thrdLog =
     targetPath = targEvnt >>= logSuiteEventPath
     actulaParentPath = do
       h <- targEvnt
-      t <- L.tail evntLog
+      t <- L.tail evntLog -- all preceding events
       fps <- firstParentStart h t
       logSuiteEventPath fps
 
@@ -377,19 +377,22 @@ setPaths address ts =
 todo - trace like
   db == debug'
   dbNoLabel
-
+  dbCondional
+  dbCondionalNoLabel
 -}
 firstParentStart :: ThreadEvent ExePath a -> [ThreadEvent ExePath a] -> Maybe (ThreadEvent ExePath a)
 firstParentStart targEvnt =
   find (fromMaybe False . matchesParentPath) 
  where
   targEvntSubPath = startSuiteEventLoc targEvnt >>= parentPath
-  -- HERE EachPaths need to include test IDs
   matchesParentPath :: ThreadEvent ExePath a -> Maybe Bool
-  matchesParentPath evt = do
-    tp <- targEvntSubPath
-    evtLc <- startSuiteEventLoc evt
-    pure $ isBeforeSuiteEvent evt && (coerce @ExePath @[Path] evtLc) `isSuffixOf` (coerce tp)
+  matchesParentPath thisEvt = do
+    targPath <- targEvntSubPath
+    thisParentCandidate <- startSuiteEventLoc thisEvt
+    pure $ isBeforeSuiteEvent thisEvt && thisParentCandidate `isParentPath` targPath
+
+isParentPath :: ExePath -> ExePath -> Bool
+isParentPath (ExePath parent) (ExePath child) = parent `isSuffixOf` child  
 
 isBeforeSuiteEvent :: ThreadEvent ExePath a -> Bool
 isBeforeSuiteEvent te =

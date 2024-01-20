@@ -32,7 +32,7 @@ evtTypeToFrequency = \case
 
 isHookParentFailure :: ThreadEvent l a -> Bool
 isHookParentFailure = \case
-    ParentFailure{suiteEvent=s} -> isHook s
+    ParentFailure{suiteEvent = s} -> isHook s
     _ -> False
 
 isHook :: SuiteEvent -> Bool
@@ -75,13 +75,13 @@ isEnd = \case
 
 suiteEventOrParentFailureSuiteEvent :: ThreadEvent a b -> Maybe SuiteEvent
 suiteEventOrParentFailureSuiteEvent = \case
-   StartExecution {} -> Nothing
-   Start {suiteEvent = s} -> Just s
-   End {suiteEvent = s} -> Just s
-   Failure {} -> Nothing
-   ParentFailure {suiteEvent = s} -> Just s
-   ApEvent {} -> Nothing 
-   EndExecution {} -> Nothing
+    StartExecution{} -> Nothing
+    Start{suiteEvent = s} -> Just s
+    End{suiteEvent = s} -> Just s
+    Failure{} -> Nothing
+    ParentFailure{suiteEvent = s} -> Just s
+    ApEvent{} -> Nothing
+    EndExecution{} -> Nothing
 
 suiteEvent :: ThreadEvent a b -> Maybe SuiteEvent
 suiteEvent = \case
@@ -137,9 +137,11 @@ startSuiteEventLoc te = case te of
     EndExecution{} -> Nothing
     ApEvent{} -> Nothing
     Failure{} -> Nothing
-    ParentFailure{loc {- suiteEvent -}} -> Just loc 
+    -- event will either have a start or be
+    -- represented by a parent failure if skipped
+    ParentFailure{loc} -> Just loc
     Start{loc} -> Just loc
-    End{{-loc-}} -> Nothing -- Just loc
+    End{} -> Nothing
 
 $(deriveJSON defaultOptions ''Hz)
 $(deriveJSON defaultOptions ''HookPos)

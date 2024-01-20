@@ -31,7 +31,7 @@ import Internal.ThreadEvent as TE (
 import List.Extra as LE
 import qualified List.Extra as L
 import qualified Prepare as P
-import PyrethrumExtras (debug', toS, txt, (?))
+import PyrethrumExtras (debug', toS, txt, (?), uu)
 import PyrethrumExtras.Test hiding (chkEq', filter, mapMaybe, maybe, test)
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
@@ -96,6 +96,9 @@ chkPrecedingSuiteEventAsExpected expectedChildParentMap thrdLog =
       t <- L.tail evntLog -- all preceding events
       fps <- firstParentStart h t
       logSuiteEventPath fps
+
+chkForMatchedParents :: Bool -> (ThreadEvent ExePath a -> Bool) -> Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
+chkForMatchedParents wantReverse parentEventPredicate expectedChildParentMap thrdLog = uu
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =
@@ -380,16 +383,20 @@ todo - trace like
   dbCondional
   dbCondionalNoLabel
 -}
-firstParentStart :: ThreadEvent ExePath a -> [ThreadEvent ExePath a] -> Maybe (ThreadEvent ExePath a)
-firstParentStart targEvnt =
-  find (fromMaybe False . matchesParentPath) 
+
+findMathcingParent :: forall a. (ThreadEvent ExePath a -> Bool) -> ThreadEvent ExePath a -> [ThreadEvent ExePath a] -> Maybe (ThreadEvent ExePath a)
+findMathcingParent evntPredicate targEvnt =
+    find (fromMaybe False . matchesParentPath) 
  where
   targEvntSubPath = startSuiteEventLoc targEvnt >>= parentPath
   matchesParentPath :: ThreadEvent ExePath a -> Maybe Bool
   matchesParentPath thisEvt = do
     targPath <- targEvntSubPath
     thisParentCandidate <- startSuiteEventLoc thisEvt
-    pure $ isBeforeSuiteEvent thisEvt && thisParentCandidate `isParentPath` targPath
+    pure $ evntPredicate thisEvt && thisParentCandidate `isParentPath` targPath
+
+firstParentStart :: ThreadEvent ExePath a -> [ThreadEvent ExePath a] -> Maybe (ThreadEvent ExePath a)
+firstParentStart = findMathcingParent isBeforeSuiteEvent
 
 isParentPath :: ExePath -> ExePath -> Bool
 isParentPath (ExePath parent) (ExePath child) = parent `isSuffixOf` child  

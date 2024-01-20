@@ -73,6 +73,16 @@ isEnd = \case
     End{} -> True
     _ -> False
 
+suiteEventOrParentFailureSuiteEvent :: ThreadEvent a b -> Maybe SuiteEvent
+suiteEventOrParentFailureSuiteEvent = \case
+   StartExecution {} -> Nothing
+   Start {suiteEvent = s} -> Just s
+   End {suiteEvent = s} -> Just s
+   Failure {} -> Nothing
+   ParentFailure {suiteEvent = s} -> Just s
+   ApEvent {} -> Nothing 
+   EndExecution {} -> Nothing
+
 suiteEvent :: ThreadEvent a b -> Maybe SuiteEvent
 suiteEvent = \case
     Start{suiteEvent = e} -> Just e
@@ -127,9 +137,9 @@ startSuiteEventLoc te = case te of
     EndExecution{} -> Nothing
     ApEvent{} -> Nothing
     Failure{} -> Nothing
-    ParentFailure{} -> Nothing
+    ParentFailure{loc {- suiteEvent -}} -> Just loc 
     Start{loc} -> Just loc
-    End{loc} -> Just loc
+    End{{-loc-}} -> Nothing -- Just loc
 
 $(deriveJSON defaultOptions ''Hz)
 $(deriveJSON defaultOptions ''HookPos)

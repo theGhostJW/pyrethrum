@@ -6,7 +6,6 @@ import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
 import qualified Internal.ThreadEvent as TE
 import Prelude hiding (id)
 
--- import PyrethrumExtras (debug')
 
 data Result
     = Pass

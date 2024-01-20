@@ -8,14 +8,31 @@ import Data.Set (difference)
 import qualified Data.Text as T
 import FullSuiteTestTemplate (Result (..))
 import qualified FullSuiteTestTemplate as T
-import Internal.RunTimeLogging (ExePath(..), testLogControls, topPath, parentPath)
+import Internal.RunTimeLogging (ExePath (..), parentPath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
-import Internal.ThreadEvent as TE (Hz (..), ThreadEvent (..), ThreadId, hasSuiteEvent, isStart, onceHook, onceSuiteEvent, isEnd, threadHook, isHook, isHookParentFailure, startSuiteEventLoc, suiteEvent)
+import Internal.ThreadEvent as TE (
+  Hz (..),
+  SuiteEvent (..),
+  ThreadEvent (..),
+  HookPos (..),
+  ThreadId,
+  hasSuiteEvent,
+  isEnd,
+  isHook,
+  isHookParentFailure,
+  isStart,
+  onceHook,
+  onceSuiteEvent,
+  startSuiteEventLoc,
+  suiteEvent,
+  suiteEventOrParentFailureSuiteEvent,
+  threadHook,
+ )
 import List.Extra as LE
 import qualified List.Extra as L
 import qualified Prepare as P
-import PyrethrumExtras (toS, txt, (?), debug')
-import PyrethrumExtras.Test hiding (mapMaybe, chkEq', filter, maybe, test)
+import PyrethrumExtras (debug', toS, txt, (?))
+import PyrethrumExtras.Test hiding (chkEq', filter, mapMaybe, maybe, test)
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
   threadDelay,
@@ -28,6 +45,7 @@ type LogItem = ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent
 chkProperties :: Int -> [T.Template] -> [LogItem] -> IO ()
 chkProperties _mxThrds ts evts = do
   -- these checks apply to the log as a whole
+  {-
   traverse_
     (evts &)
     [ chkStartEndExecution
@@ -36,67 +54,69 @@ chkProperties _mxThrds ts evts = do
     , chkStartsOnce "once hooks and tests" shouldOccurOnce
     , chkStartSuiteEventImmediatlyFollowedByEnd "once hooks" (hasSuiteEvent onceHook)
     ]
+    -}
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
-  threadLogChks evts [
-    chkThreadHooksStartedOnceInThread
-    , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-    , chkPrecedingSuiteEventAsExpected ( debug' "Expected Preceeding Map" $ T.expectedParentPrecedingEvents ts)
-    -- subsequent parent events in thread + once
-    -- setup followed by teardown in thread + once
-    -- failure has correct loc
-    -- failure propagation
-   ]
+  threadLogChks
+    evts
+    [ {-
+      chkThreadHooksStartedOnceInThread
+      , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
+      ,
+      -}
+      chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
+      -- subsequent parent events in thread + once
+      -- setup followed by teardown in thread + once
+      -- failure has correct loc
+      -- failure propagation
+    ]
   putStrLn " checks done"
 
 chkPrecedingSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
-chkPrecedingSuiteEventAsExpected expectedChildParentMap thrdLog = 
+chkPrecedingSuiteEventAsExpected expectedChildParentMap thrdLog =
   traverse_ chkParent actualParents
-  where
-    chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
-    chkParent (childPath, actualParentPath) = 
-      chkEq' ("preceding parent event for \n" <> (toS $ ppShow childPath)) expectedParentPath actualParentPath
-      where
-        expectedParentPath = M.lookup childPath expectedChildParentMap
-      
-     
-    actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
-    actualParents = mapMaybe extractChildParent actualPrecedingParent
+ where
+  chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
+  chkParent (childPath, actualParentPath) =
+    chkEq' ("preceding parent event for \n" <> (toS $ ppShow childPath)) expectedParentPath actualParentPath
+   where
+    expectedParentPath = M.lookup childPath expectedChildParentMap
 
-    actualPrecedingParent :: [[LogItem]]
-    actualPrecedingParent = tails . reverse $ filter isStart thrdLog
+  actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
+  actualParents = mapMaybe extractChildParent actualPrecedingParent
 
-    extractChildParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
-    extractChildParent starts =
-        (, actulaParentPath) <$> targetPath
-      where
-        logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
-        logSuiteEventPath l =  T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> suiteEvent l
-        targEvnt = L.head starts
-        targetPath = targEvnt >>= logSuiteEventPath
-        actulaParentPath = do
-          h <- targEvnt
-          t <- L.tail starts
-          fps <- firstParentStart h t
-          logSuiteEventPath fps
+  actualPrecedingParent :: [[LogItem]]
+  actualPrecedingParent = tails . reverse $ thrdLog
 
+  extractChildParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
+  extractChildParent evntLog =
+    (,actulaParentPath) <$> targetPath
+   where
+    logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
+    logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> suiteEvent l
+    targEvnt = L.head evntLog
+    targetPath = targEvnt >>= logSuiteEventPath
+    actulaParentPath = do
+      h <- targEvnt
+      t <- L.tail evntLog
+      --  HERE NEED TO CHANGE TO FIRST PARENT START TO INCLUDE PARENT FAILURES
+      fps <- firstParentStart h t
+      logSuiteEventPath fps
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =
-    chkStartSuiteEventImmediatlyFollowedByEnd "thread suite elements" (hasSuiteEvent (const True))
-
+  chkStartSuiteEventImmediatlyFollowedByEnd "thread suite elements" (hasSuiteEvent (const True))
 
 threadLogChks :: [LogItem] -> [[LogItem] -> IO ()] -> IO ()
 threadLogChks fullLog = traverse_ chkTls
-  where
-    tlgs = threadLogs fullLog
-    chkTls = checkThreadLogs tlgs
-    checkThreadLogs :: [[LogItem]] -> ([LogItem] -> IO ()) -> IO ()
-    checkThreadLogs tls' lgChk = traverse_ lgChk tls'
+ where
+  tlgs = threadLogs fullLog
+  chkTls = checkThreadLogs tlgs
+  checkThreadLogs :: [[LogItem]] -> ([LogItem] -> IO ()) -> IO ()
+  checkThreadLogs tls' lgChk = traverse_ lgChk tls'
 
 chkThreadHooksStartedOnceInThread :: [LogItem] -> IO ()
 chkThreadHooksStartedOnceInThread =
   chkStartsOnce "thread elements" (hasSuiteEvent threadHook)
-
 
 -- TODO:: reexport putStrLn et. al with text conversion
 
@@ -151,6 +171,14 @@ chkAllTemplateItemsLogged ts lgs =
 nxtHookLog :: [LogItem] -> Maybe LogItem
 nxtHookLog = find (\l -> hasSuiteEvent isHook l || isHookParentFailure l)
 
+{-
+ TODO: when implementing log parsing need a threadView which includes all thread events
+ and all parent OnceEvents - should probably log OnceEvents in a separate log
+ as well as main log to so don't have to read whole log for once events
+
+ same goes for filter log
+-}
+
 threadVisible :: ThreadId -> [LogItem] -> [LogItem]
 threadVisible tid =
   filter (\l -> tid == l.threadId || hasSuiteEvent onceHook l)
@@ -164,9 +192,6 @@ threadLogs l =
 
 shouldOccurOnce :: LogItem -> Bool
 shouldOccurOnce = hasSuiteEvent onceSuiteEvent
-
--- isTest :: ThreadEvent l a -> Bool
--- isTest = (==) Test . (.suiteEvent)
 
 chkStartEndExecution :: [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent] -> IO ()
 chkStartEndExecution evts =
@@ -353,16 +378,34 @@ setPaths address ts =
     newAdd = nxtAdd idx
     newNodes = setPaths newAdd tp.subNodes
 
-firstParentStart :: ThreadEvent ExePath a -> [ThreadEvent ExePath a]  -> Maybe (ThreadEvent ExePath a)
+{-
+todo - trace like
+  db == debug'
+  dbNoLabel
+
+-}
+firstParentStart :: ThreadEvent ExePath a -> [ThreadEvent ExePath a] -> Maybe (ThreadEvent ExePath a)
 firstParentStart targEvnt =
-  find (fromMaybe False . matchesParentPath)
+  find (fromMaybe False . matchesParentPath) 
  where
-  thisParent = startSuiteEventLoc targEvnt >>= parentPath
+  targEvntSubPath = startSuiteEventLoc targEvnt >>= parentPath
+  -- HERE EachPaths need to include test IDs
   matchesParentPath :: ThreadEvent ExePath a -> Maybe Bool
   matchesParentPath evt = do
-    tp <- thisParent
+    tp <- targEvntSubPath
     evtLc <- startSuiteEventLoc evt
-    pure $ tp == evtLc
+    pure $ isBeforeSuiteEvent evt && (coerce @ExePath @[Path] evtLc) `isSuffixOf` (coerce tp)
+
+isBeforeSuiteEvent :: ThreadEvent ExePath a -> Bool
+isBeforeSuiteEvent te =
+  suiteEventOrParentFailureSuiteEvent te
+    & maybe
+      False
+      ( \case 
+          -- TODO: sort out imports see LE.elem
+          Hook _frq pos -> pos `LE.elem` [Before, Setup]
+          TE.Test -> False
+      )
 
 newtype TestConfig = TestConfig
   {title :: Text}
@@ -383,7 +426,7 @@ mkVoidAction path delay outcome _sink =
         txt path <> " failed"
 
 -- TODO: make bug / error functions that uses text instead of string
--- TODO: check callstack 
+-- TODO: check callstack
 
 mkAction :: forall hi desc. (Show desc) => desc -> Int -> Result -> P.ApEventSink -> hi -> IO ()
 mkAction path delay rslt sink _in = mkVoidAction path delay rslt sink

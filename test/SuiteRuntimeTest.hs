@@ -45,7 +45,6 @@ type LogItem = ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent
 chkProperties :: Int -> [T.Template] -> [LogItem] -> IO ()
 chkProperties _mxThrds ts evts = do
   -- these checks apply to the log as a whole
-  {-
   traverse_
     (evts &)
     [ chkStartEndExecution
@@ -54,16 +53,13 @@ chkProperties _mxThrds ts evts = do
     , chkStartsOnce "once hooks and tests" shouldOccurOnce
     , chkStartSuiteEventImmediatlyFollowedByEnd "once hooks" (hasSuiteEvent onceHook)
     ]
-    -}
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
   threadLogChks
     evts
-    [ {-
+    [ 
       chkThreadHooksStartedOnceInThread
       , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-      ,
-      -}
-      chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
+      , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
       -- subsequent parent events in thread + once
       -- setup followed by teardown in thread + once
       -- failure has correct loc
@@ -98,7 +94,6 @@ chkPrecedingSuiteEventAsExpected expectedChildParentMap thrdLog =
     actulaParentPath = do
       h <- targEvnt
       t <- L.tail evntLog
-      --  HERE NEED TO CHANGE TO FIRST PARENT START TO INCLUDE PARENT FAILURES
       fps <- firstParentStart h t
       logSuiteEventPath fps
 

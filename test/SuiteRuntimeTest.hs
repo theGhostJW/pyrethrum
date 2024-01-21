@@ -60,12 +60,14 @@ chkProperties _mxThrds ts evts = do
       chkThreadHooksStartedOnceInThread
       , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
       , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
-      -- subsequent parent events in thread + once
-      -- setup followed by teardown in thread + once
+      , chkSubsequentSuiteEventAsExpected (T.expectedParentSucceedingEvents ts)
       -- failure has correct loc
       -- failure propagation
     ]
   putStrLn " checks done"
+
+-- TODO: do empty thread test case should not run anything (ie no thread events - cna happpen despite tree
+-- shaking due to multiple threads)
 
 chkSubsequentSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkSubsequentSuiteEventAsExpected =
@@ -270,11 +272,11 @@ chkEq' msg e a =
         <> ppShow a
         <> "\n"
 
--- $ > unit_simple_pass
+-- $> unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest False 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
--- $ > unit_simple_fail
+-- $> unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
@@ -282,7 +284,7 @@ unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, t
 unit_nested_thread_pass_fail :: IO ()
 unit_nested_thread_pass_fail =
   runTest
-    True
+    False
     1
     [ onceAround
         Pass

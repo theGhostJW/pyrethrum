@@ -18,11 +18,17 @@ data SuiteEventPath = SuiteEventPath
     }
     deriving (Show, Eq, Ord)
 
-{- | Given a list of templates, return a map of each event path to its expected preceeding
+{- Given a list of templates, return a map of each event path to its expected preceeding
 parent event path
 -}
-expectedParentPrecedingEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
-expectedParentPrecedingEvents ts =
+expectedParentPrecedingEvents ::  [Template] -> Map SuiteEventPath SuiteEventPath
+expectedParentPrecedingEvents = expectedSuiteEvntMap templateBeforeEvnt
+
+expectedParentSucceedingEvents ::  [Template] -> Map SuiteEventPath SuiteEventPath
+expectedParentSucceedingEvents = expectedSuiteEvntMap templateAfterEvnt
+
+expectedSuiteEvntMap :: (Template -> Maybe SuiteEvent) -> [Template] -> Map SuiteEventPath SuiteEventPath
+expectedSuiteEvntMap getSuiteEvnt ts =
     foldl' (priorMap Nothing) Map.empty ts
   where
     priorMap :: Maybe SuiteEventPath -> Map SuiteEventPath SuiteEventPath -> Template -> Map SuiteEventPath SuiteEventPath
@@ -47,7 +53,7 @@ expectedParentPrecedingEvents ts =
                 foldl' (priorMap nxtB4Evnt) nxtMap t.subNodes
               where
                 thisTemplateEvntPaths = SuiteEventPath t.path <$> emittedHooks t
-                nxtB4Evnt = (SuiteEventPath t.path <$> templateBeforeEvnt t) <|> mParentEvnt
+                nxtB4Evnt = (SuiteEventPath t.path <$> getSuiteEvnt t) <|> mParentEvnt
                 nxtMap =
                     mParentEvnt
                         & maybe
@@ -73,6 +79,21 @@ templateBeforeEvnt t =
             ThreadAround{} -> Hook Thread Setup
             EachBefore{} -> Hook Each Before
             EachAround{} -> Hook Each Setup
+
+templateAfterEvnt :: Template -> Maybe SuiteEvent
+templateAfterEvnt t =
+    case t of
+        FullSuiteTestTemplate.Test{} -> Nothing
+        OnceBefore{} -> Nothing
+        ThreadBefore{} -> Nothing
+        EachBefore{} -> Nothing
+        _ -> Just $ case t of
+            OnceAfter{} -> Hook Once After
+            OnceAround{} -> Hook Once Teardown
+            ThreadAfter{} -> Hook Thread After
+            ThreadAround{} -> Hook Thread Teardown
+            EachAfter{} -> Hook Each After
+            EachAround{} -> Hook Each Teardown
 
 emittedHooks :: Template -> [SuiteEvent]
 emittedHooks = \case

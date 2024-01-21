@@ -96,22 +96,24 @@ chkFailureLocEqualsLastStartLoc =
 chkSubsequentSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkSubsequentSuiteEventAsExpected =
   chkForMatchedParents
-    False -- do not reverse list so we are searching subsequent events
+    "subsequent parent event"
+    False -- do not reverse list so we are forward through subsequent events
     isAfterSuiteEvent
 
 chkPrecedingSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkPrecedingSuiteEventAsExpected =
   chkForMatchedParents
-    True -- reverse list so wwe are searching preceding events
+    "preceding parent event"
+    True -- reverse list so we are searching back through preceding events
     isBeforeSuiteEvent
 
-chkForMatchedParents :: Bool -> (LogItem -> Bool) -> Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
-chkForMatchedParents wantReverseLog parentEventPredicate expectedChildParentMap thrdLog =
+chkForMatchedParents :: Text -> Bool -> (LogItem -> Bool) -> Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
+chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildParentMap thrdLog =
   traverse_ chkParent actualParents
  where
   chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
   chkParent (childPath, actualParentPath) =
-    chkEq' ("preceding parent event for \n" <> (toS $ ppShow childPath)) expectedParentPath actualParentPath
+    chkEq' (message <> " for:\n" <> (toS $ ppShow childPath)) expectedParentPath actualParentPath
    where
     expectedParentPath = M.lookup childPath expectedChildParentMap
 

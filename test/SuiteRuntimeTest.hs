@@ -97,8 +97,35 @@ chkPrecedingSuiteEventAsExpected expectedChildParentMap thrdLog =
       fps <- firstParentStart h t
       logSuiteEventPath fps
 
-chkForMatchedParents :: Bool -> (ThreadEvent ExePath a -> Bool) -> Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
-chkForMatchedParents wantReverse parentEventPredicate expectedChildParentMap thrdLog = uu
+chkForMatchedParents :: Bool -> (LogItem -> Bool) -> Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
+chkForMatchedParents wantReverseLog parentEventPredicate expectedChildParentMap thrdLog = 
+    traverse_ chkParent actualParents
+ where
+  chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
+  chkParent (childPath, actualParentPath) =
+    chkEq' ("preceding parent event for \n" <> (toS $ ppShow childPath)) expectedParentPath actualParentPath
+   where
+    expectedParentPath = M.lookup childPath expectedChildParentMap
+
+  actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
+  actualParents = mapMaybe extractChildParent actualPrecedingParent
+
+  actualPrecedingParent :: [[LogItem]]
+  actualPrecedingParent = tails . (\l -> wantReverseLog ? reverse l $ l) $ thrdLog
+
+  extractChildParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
+  extractChildParent evntLog =
+    (,actulaParentPath) <$> targetPath
+   where
+    logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
+    logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> suiteEvent l
+    targEvnt = L.head evntLog
+    targetPath = targEvnt >>= logSuiteEventPath
+    actulaParentPath = do
+      h <- targEvnt
+      t <- L.tail evntLog -- all preceding events
+      fps <- findMathcingParent parentEventPredicate h t
+      logSuiteEventPath fps
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =
@@ -384,18 +411,18 @@ todo - trace like
   dbCondionalNoLabel
 -}
 
-findMathcingParent :: forall a. (ThreadEvent ExePath a -> Bool) -> ThreadEvent ExePath a -> [ThreadEvent ExePath a] -> Maybe (ThreadEvent ExePath a)
+findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem
 findMathcingParent evntPredicate targEvnt =
     find (fromMaybe False . matchesParentPath) 
  where
   targEvntSubPath = startSuiteEventLoc targEvnt >>= parentPath
-  matchesParentPath :: ThreadEvent ExePath a -> Maybe Bool
+  matchesParentPath :: LogItem -> Maybe Bool
   matchesParentPath thisEvt = do
     targPath <- targEvntSubPath
     thisParentCandidate <- startSuiteEventLoc thisEvt
     pure $ evntPredicate thisEvt && thisParentCandidate `isParentPath` targPath
 
-firstParentStart :: ThreadEvent ExePath a -> [ThreadEvent ExePath a] -> Maybe (ThreadEvent ExePath a)
+firstParentStart :: LogItem -> [LogItem] -> Maybe LogItem
 firstParentStart = findMathcingParent isBeforeSuiteEvent
 
 isParentPath :: ExePath -> ExePath -> Bool

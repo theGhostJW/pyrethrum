@@ -59,20 +59,20 @@ expectedParentPrecedingEvents ts =
                                     thisTemplateEvntPaths
                             )
 
-    templateBeforeEvnt :: Template -> Maybe SuiteEvent
-    templateBeforeEvnt t =
-        case t of
-            FullSuiteTestTemplate.Test{} -> Nothing
-            OnceAfter{} -> Nothing
-            ThreadAfter{} -> Nothing
-            EachAfter{} -> Nothing
-            _ -> Just $ case t of
-                OnceBefore{} -> Hook Once Before
-                OnceAround{} -> Hook Once Setup
-                ThreadBefore{} -> Hook Thread Before
-                ThreadAround{} -> Hook Thread Setup
-                EachBefore{} -> Hook Each Before
-                EachAround{} -> Hook Each Setup
+templateBeforeEvnt :: Template -> Maybe SuiteEvent
+templateBeforeEvnt t =
+    case t of
+        FullSuiteTestTemplate.Test{} -> Nothing
+        OnceAfter{} -> Nothing
+        ThreadAfter{} -> Nothing
+        EachAfter{} -> Nothing
+        _ -> Just $ case t of
+            OnceBefore{} -> Hook Once Before
+            OnceAround{} -> Hook Once Setup
+            ThreadBefore{} -> Hook Thread Before
+            ThreadAround{} -> Hook Thread Setup
+            EachBefore{} -> Hook Each Before
+            EachAround{} -> Hook Each Setup
 
 emittedHooks :: Template -> [SuiteEvent]
 emittedHooks = \case

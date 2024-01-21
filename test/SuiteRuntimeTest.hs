@@ -67,35 +67,17 @@ chkProperties _mxThrds ts evts = do
     ]
   putStrLn " checks done"
 
+chkSubsequentSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
+chkSubsequentSuiteEventAsExpected =
+  chkForMatchedParents 
+    False -- do not reverse list so we are searching subsequent events
+    isAfterSuiteEvent
+
 chkPrecedingSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
-chkPrecedingSuiteEventAsExpected expectedChildParentMap thrdLog =
-  traverse_ chkParent actualParents
- where
-  chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
-  chkParent (childPath, actualParentPath) =
-    chkEq' ("preceding parent event for \n" <> (toS $ ppShow childPath)) expectedParentPath actualParentPath
-   where
-    expectedParentPath = M.lookup childPath expectedChildParentMap
-
-  actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
-  actualParents = mapMaybe extractChildParent actualPrecedingParent
-
-  actualPrecedingParent :: [[LogItem]]
-  actualPrecedingParent = tails . reverse $ thrdLog
-
-  extractChildParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
-  extractChildParent evntLog =
-    (,actulaParentPath) <$> targetPath
-   where
-    logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
-    logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> suiteEvent l
-    targEvnt = L.head evntLog
-    targetPath = targEvnt >>= logSuiteEventPath
-    actulaParentPath = do
-      h <- targEvnt
-      t <- L.tail evntLog -- all preceding events
-      fps <- firstParentStart h t
-      logSuiteEventPath fps
+chkPrecedingSuiteEventAsExpected =
+  chkForMatchedParents 
+    True -- reverse list so wwe are searching preceding events
+    isBeforeSuiteEvent
 
 chkForMatchedParents :: Bool -> (LogItem -> Bool) -> Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkForMatchedParents wantReverseLog parentEventPredicate expectedChildParentMap thrdLog = 
@@ -422,22 +404,25 @@ findMathcingParent evntPredicate targEvnt =
     thisParentCandidate <- startSuiteEventLoc thisEvt
     pure $ evntPredicate thisEvt && thisParentCandidate `isParentPath` targPath
 
-firstParentStart :: LogItem -> [LogItem] -> Maybe LogItem
-firstParentStart = findMathcingParent isBeforeSuiteEvent
-
 isParentPath :: ExePath -> ExePath -> Bool
 isParentPath (ExePath parent) (ExePath child) = parent `isSuffixOf` child  
 
-isBeforeSuiteEvent :: ThreadEvent ExePath a -> Bool
-isBeforeSuiteEvent te =
-  suiteEventOrParentFailureSuiteEvent te
+eventMatchesHookPos :: [HookPos] -> LogItem -> Bool
+eventMatchesHookPos hookPoses lg = 
+    suiteEventOrParentFailureSuiteEvent lg
     & maybe
       False
       ( \case 
           -- TODO: sort out imports see LE.elem
-          Hook _frq pos -> pos `LE.elem` [Before, Setup]
+          Hook _frq pos -> pos `LE.elem` hookPoses
           TE.Test -> False
       )
+
+isBeforeSuiteEvent :: LogItem -> Bool
+isBeforeSuiteEvent = eventMatchesHookPos [Before, Setup]
+
+isAfterSuiteEvent :: LogItem -> Bool
+isAfterSuiteEvent = eventMatchesHookPos [After, Teardown]
 
 newtype TestConfig = TestConfig
   {title :: Text}

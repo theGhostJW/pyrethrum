@@ -11,10 +11,10 @@ import qualified FullSuiteTestTemplate as T
 import Internal.RunTimeLogging (ExePath (..), parentPath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
 import Internal.ThreadEvent as TE (
+  HookPos (..),
   Hz (..),
   SuiteEvent (..),
   ThreadEvent (..),
-  HookPos (..),
   ThreadId,
   hasSuiteEvent,
   isEnd,
@@ -31,7 +31,7 @@ import Internal.ThreadEvent as TE (
 import List.Extra as LE
 import qualified List.Extra as L
 import qualified Prepare as P
-import PyrethrumExtras (debug', toS, txt, (?), uu)
+import PyrethrumExtras (debug', toS, txt, uu, (?))
 import PyrethrumExtras.Test hiding (chkEq', filter, mapMaybe, maybe, test)
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
@@ -56,34 +56,58 @@ chkProperties _mxThrds ts evts = do
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
   threadLogChks
     evts
-    [ 
-      chkThreadHooksStartedOnceInThread
-      , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-      , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
-      , chkSubsequentSuiteEventAsExpected (T.expectedParentSucceedingEvents ts)
-      -- failure has correct loc
-      -- failure propagation
+    [ chkThreadHooksStartedOnceInThread
+    , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
+    , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
+    , chkSubsequentSuiteEventAsExpected (T.expectedParentSucceedingEvents ts)
+    , chkFailureLocEqualsLastStartLoc
+    -- failure propagation
     ]
   putStrLn " checks done"
 
 -- TODO: do empty thread test case should not run anything (ie no thread events - cna happpen despite tree
 -- shaking due to multiple threads)
+chkFailureLocEqualsLastStartLoc :: [LogItem] -> IO ()
+chkFailureLocEqualsLastStartLoc =
+  void . foldl' step (pure Nothing)
+ where
+  step :: IO (Maybe ExePath) -> LogItem -> IO (Maybe ExePath)
+  step mParentLoc li = do
+    let newStart = startLoc li
+    mpl <- mParentLoc
+    newStart
+      & maybe
+        ( do
+            chkParentFailureLoc mpl li
+            mParentLoc
+        )
+        pure
+      . Just
+
+  startLoc :: LogItem -> Maybe ExePath
+  startLoc l = isStart l ? startSuiteEventLoc l $ Nothing
+
+  chkParentFailureLoc :: Maybe ExePath -> LogItem -> IO ()
+  chkParentFailureLoc mParentLoc li =
+    case li of
+      ParentFailure{loc} -> chkEq' ("Parent failure loc for " <> toS (ppShow li)) mParentLoc (Just loc)
+      _ -> pure ()
 
 chkSubsequentSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkSubsequentSuiteEventAsExpected =
-  chkForMatchedParents 
+  chkForMatchedParents
     False -- do not reverse list so we are searching subsequent events
     isAfterSuiteEvent
 
 chkPrecedingSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkPrecedingSuiteEventAsExpected =
-  chkForMatchedParents 
+  chkForMatchedParents
     True -- reverse list so wwe are searching preceding events
     isBeforeSuiteEvent
 
 chkForMatchedParents :: Bool -> (LogItem -> Bool) -> Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
-chkForMatchedParents wantReverseLog parentEventPredicate expectedChildParentMap thrdLog = 
-    traverse_ chkParent actualParents
+chkForMatchedParents wantReverseLog parentEventPredicate expectedChildParentMap thrdLog =
+  traverse_ chkParent actualParents
  where
   chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
   chkParent (childPath, actualParentPath) =
@@ -284,7 +308,7 @@ unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, t
 unit_nested_thread_pass_fail :: IO ()
 unit_nested_thread_pass_fail =
   runTest
-    False
+    True
     1
     [ onceAround
         Pass
@@ -397,7 +421,7 @@ todo - trace like
 
 findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem
 findMathcingParent evntPredicate targEvnt =
-    find (fromMaybe False . matchesParentPath) 
+  find (fromMaybe False . matchesParentPath)
  where
   targEvntSubPath = startSuiteEventLoc targEvnt >>= parentPath
   matchesParentPath :: LogItem -> Maybe Bool
@@ -407,14 +431,14 @@ findMathcingParent evntPredicate targEvnt =
     pure $ evntPredicate thisEvt && thisParentCandidate `isParentPath` targPath
 
 isParentPath :: ExePath -> ExePath -> Bool
-isParentPath (ExePath parent) (ExePath child) = parent `isSuffixOf` child  
+isParentPath (ExePath parent) (ExePath child) = parent `isSuffixOf` child
 
 eventMatchesHookPos :: [HookPos] -> LogItem -> Bool
-eventMatchesHookPos hookPoses lg = 
-    suiteEventOrParentFailureSuiteEvent lg
+eventMatchesHookPos hookPoses lg =
+  suiteEventOrParentFailureSuiteEvent lg
     & maybe
       False
-      ( \case 
+      ( \case
           -- TODO: sort out imports see LE.elem
           Hook _frq pos -> pos `LE.elem` hookPoses
           TE.Test -> False

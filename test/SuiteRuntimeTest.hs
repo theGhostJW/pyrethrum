@@ -59,7 +59,7 @@ chkProperties _mxThrds ts evts = do
     [ chkThreadHooksStartedOnceInThread
     , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
     , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
-    , chkSubsequentSuiteEventAsExpected (T.expectedParentSucceedingEvents ts)
+    , chkSubsequentSuiteEventAsExpected (T.expectedParentSubsequentEvents ts)
     , chkFailureLocEqualsLastStartLoc
     -- failure propagation
     ]
@@ -315,6 +315,8 @@ unit_nested_thread_pass_fail =
         Pass
         [ threadAround Pass Pass [eachAfter Fail [test [testItem Pass, testItem Fail]]]
         , threadAround Fail Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
+        , threadAround Pass Pass [eachBefore Fail [test [testItem Fail, testItem Pass]]]
+        , eachAround Fail Pass [test [testItem Fail, testItem Pass]]
         ]
     ]
 

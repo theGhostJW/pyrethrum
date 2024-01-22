@@ -40,6 +40,30 @@ import UnliftIO.Concurrent as C (
 import UnliftIO.STM (TQueue, tryReadTQueue)
 import Prelude hiding (id)
 
+-- $ > unit_simple_pass
+unit_simple_pass :: IO ()
+unit_simple_pass = runTest False 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
+
+-- $ > unit_simple_fail
+unit_simple_fail :: IO ()
+unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
+
+-- $> unit_nested_thread_pass_fail
+unit_nested_thread_pass_fail :: IO ()
+unit_nested_thread_pass_fail =
+  runTest
+    True
+    1
+    [ onceAround
+        Pass
+        Pass
+        [ threadAround Pass Pass [eachAfter Fail [test [testItem Pass, testItem Fail]]]
+        , threadAround Fail Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
+        , threadAround Pass Pass [eachBefore Fail [test [testItem Fail, testItem Pass]]]
+        , eachAround Fail Pass [test [testItem Fail, testItem Pass]]
+        ]
+    ]
+
 type LogItem = ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent
 
 chkProperties :: Int -> [T.Template] -> [LogItem] -> IO ()
@@ -61,7 +85,7 @@ chkProperties _mxThrds ts evts = do
     , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
     , chkSubsequentSuiteEventAsExpected (T.expectedParentSubsequentEvents ts)
     , chkFailureLocEqualsLastStartLoc
-    -- failure propagation
+    -- failure propagation 
     ]
   putStrLn " checks done"
 
@@ -298,30 +322,6 @@ chkEq' msg e a =
         <> ppShow a
         <> "\n"
 
--- $> unit_simple_pass
-unit_simple_pass :: IO ()
-unit_simple_pass = runTest False 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
-
--- $> unit_simple_fail
-unit_simple_fail :: IO ()
-unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
-
--- $> unit_nested_thread_pass_fail
-unit_nested_thread_pass_fail :: IO ()
-unit_nested_thread_pass_fail =
-  runTest
-    True
-    1
-    [ onceAround
-        Pass
-        Pass
-        [ threadAround Pass Pass [eachAfter Fail [test [testItem Pass, testItem Fail]]]
-        , threadAround Fail Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
-        , threadAround Pass Pass [eachBefore Fail [test [testItem Fail, testItem Pass]]]
-        , eachAround Fail Pass [test [testItem Fail, testItem Pass]]
-        ]
-    ]
-
 onceBefore :: Result -> [Template] -> Template
 onceBefore = OnceBefore 0
 
@@ -474,7 +474,6 @@ mkVoidAction path delay outcome _sink =
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
-
 mkAction :: forall hi desc. (Show desc) => desc -> Int -> Result -> P.ApEventSink -> hi -> IO ()
 mkAction path delay rslt sink _in = mkVoidAction path delay rslt sink
 

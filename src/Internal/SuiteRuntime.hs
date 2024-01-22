@@ -544,6 +544,9 @@ runNode lgr hi xt =
                       OnceIn _ -> runAfter Nothing
               )
       ao@AroundOnce{setup, status, cache, subNodes, teardown} ->
+        let 
+          leadHookPos = aroundLeadingHookPos teardown  
+        in
         case hi of
           Abandon fp -> do
             setUpLocked <- atomically $ do
@@ -553,7 +556,7 @@ runNode lgr hi xt =
                 $ writeTVar status AroundAbandoning
               pure locked
             when setUpLocked
-              $ logAbandonned' (TE.Hook TE.Once TE.Setup) fp
+              $ logAbandonned' (TE.Hook TE.Once leadHookPos) fp
             finally
               (runSubNodes_ (Abandon fp) subNodes)
               ( -- only AbandonOld teardown if setup has not started
@@ -571,7 +574,7 @@ runNode lgr hi xt =
               eho <-
                 if setUpLocked
                   then do
-                    eho <- logRun' (TE.Hook TE.Once TE.Setup) (`setup` i)
+                    eho <- logRun' (TE.Hook TE.Once leadHookPos) (`setup` i)
                     atomically $ writeTMVar cache eho
                     eho
                       & either
@@ -633,6 +636,9 @@ runNode lgr hi xt =
                     (logAbandonned' (TE.Hook TE.Thread TE.After))
       ---
       Around{frequency, setup, subNodes, teardown = mteardown} ->
+        let
+          leadHookPos = aroundLeadingHookPos mteardown
+        in
         case frequency of
           Each ->
             runSubNodes_ (EachIn nxtApply) subNodes
@@ -646,14 +652,14 @@ runNode lgr hi xt =
                 ThreadIn ethIoHi -> ethIoHi >>= either runAbandon runNxt
              where
               runAbandon fp = do
-                logAbandonned' (TE.Hook TE.Each TE.Setup) fp
+                logAbandonned' (TE.Hook TE.Each leadHookPos) fp
                 nxtAction . Left $ fp
                 whenJust mteardown
                   $ const
                   $ logAbandonned' (TE.Hook TE.Each TE.Teardown) fp
               runNxt hki =
                 bracket
-                  (logRun' (TE.Hook TE.Each TE.Setup) (`setup` hki))
+                  (logRun' (TE.Hook TE.Each leadHookPos) (`setup` hki))
                   nxtAction
                   ( \eho ->
                       whenJust mteardown
@@ -709,7 +715,7 @@ runNode lgr hi xt =
                       & maybe
                         ( do
                             hi'' <- ioHi
-                            ho <- logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi'')
+                            ho <- logRun' (TE.Hook TE.Thread leadHookPos) (`setup` hi'')
                             atomically $ putTMVar hov ho
                             pure ho
                         )
@@ -727,13 +733,14 @@ runNode lgr hi xt =
                             ethi <- ioeHi
                             ho <-
                               either
-                                (\fp -> logAbandonned' (TE.Hook TE.Thread TE.Setup) fp >> pure (Left fp))
-                                (\hi'' -> logRun' (TE.Hook TE.Thread TE.Setup) (`setup` hi''))
+                                (\fp -> logAbandonned' (TE.Hook TE.Thread leadHookPos) fp >> pure (Left fp))
+                                (\hi'' -> logRun' (TE.Hook TE.Thread leadHookPos) (`setup` hi''))
                                 ethi
                             atomically $ putTMVar hov ho
                             pure ho
                         )
                         pure
+ 
       ---
       Test{path, tests} ->
         case hi of
@@ -754,6 +761,11 @@ runNode lgr hi xt =
 
         mkTestPath :: P.TestItem IO hi -> L.ExePath
         mkTestPath P.TestItem{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : coerce path
+
+-- user facing (logged) hook position varies depending on if there is a teardown
+-- or not. teardown exists => Setup, teardown does not exist => Before
+aroundLeadingHookPos :: Maybe a -> TE.HookPos
+aroundLeadingHookPos {- Maybe teardown -} = maybe TE.Before (const TE.Setup) 
 
 data NodeIn hi
   = Abandon FailPoint
@@ -783,6 +795,3 @@ logRun lgr path evt action = do
         (logReturnFailure lgr path evt)
     )
     (lgr $ L.End evt path)
-
-x :: IO ()
-x = putStrLn "hello!"

@@ -5,6 +5,7 @@ import qualified Data.Map.Strict as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
 import qualified Internal.ThreadEvent as TE
 import Prelude hiding (id)
+import PyrethrumExtras (debug')
 
 data Result
   = Pass
@@ -21,7 +22,7 @@ data SuiteEventPath = SuiteEventPath
 parent event path
 -}
 expectedParentPrecedingEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
-expectedParentPrecedingEvents = expectedSuiteEvntMap templateBeforeEvnt
+expectedParentPrecedingEvents = debug' "expectedParentPrecedingEvents" . expectedSuiteEvntMap templateBeforeEvnt
 
 expectedParentSubsequentEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
 expectedParentSubsequentEvents = expectedSuiteEvntMap templateAfterEvnt

@@ -85,10 +85,41 @@ chkProperties _mxThrds ts evts = do
     , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
     , chkSubsequentSuiteEventAsExpected (T.expectedParentSubsequentEvents ts)
     , chkFailureLocEqualsLastStartLoc
+    , chkEachBeforeErrorPropagation
     -- failure propagation 
     ]
   putStrLn " checks done"
 
+
+data FailInfo = FailInfo {
+  idx :: Int,
+  threadId :: ThreadId,
+  suiteEvent :: SuiteEvent,
+  failLoc :: ExePath,
+  -- 
+  relevantSuffix :: [LogItem]
+  } deriving (Show)
+
+chkEachBeforeErrorPropagation :: [LogItem] -> [FailInfo] 
+chkEachBeforeErrorPropagation = uu
+
+failInfo :: [LogItem] -> (Maybe SuiteEvent, [FailInfo]) 
+failInfo li = 
+    foldl' step  (Nothing, [])  $ tails relevantLogs
+  where 
+    step :: (Maybe SuiteEvent, [FailInfo]) -> [LogItem] -> (Maybe SuiteEvent, [FailInfo]) 
+    step (lastStart, result) logItm = _ need case for last start and failure
+
+    -- filter for Failures parentFailures or starts 
+    relevantLogs = filter (\case 
+      Failure{} -> True
+      ParentFailure{} -> True
+      Start{} -> True
+      _ -> False
+     ) li
+  
+
+  
 -- TODO: do empty thread test case should not run anything (ie no thread events - cna happpen despite tree
 -- shaking due to multiple threads)
 chkFailureLocEqualsLastStartLoc :: [LogItem] -> IO ()
@@ -142,10 +173,10 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
     expectedParentPath = M.lookup childPath expectedChildParentMap
 
   actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
-  actualParents = mapMaybe extractChildParent actualPrecedingParent
+  actualParents = mapMaybe extractChildParent actualParent
 
-  actualPrecedingParent :: [[LogItem]]
-  actualPrecedingParent = tails . (\l -> wantReverseLog ? reverse l $ l) $ thrdLog
+  actualParent :: [[LogItem]]
+  actualParent = tails . (\l -> wantReverseLog ? reverse l $ l) $ thrdLog
 
   extractChildParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
   extractChildParent evntLog =

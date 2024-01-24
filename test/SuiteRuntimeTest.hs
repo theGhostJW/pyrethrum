@@ -97,21 +97,50 @@ data FailInfo = FailInfo {
   suiteEvent :: SuiteEvent,
   failLoc :: ExePath,
   -- 
-  relevantSuffix :: [LogItem]
+  failStartTail :: [LogItem]
   } deriving (Show)
 
-chkEachBeforeErrorPropagation :: [LogItem] -> [FailInfo] 
+chkEachBeforeErrorPropagation :: [LogItem] -> IO ()
 chkEachBeforeErrorPropagation = uu
+  -- add eacharound to test
+  -- parent failures all the way to last sibling including last sibling when setup / teardown
+
+
+-- TODO :: REMOVE USER ERROR force to throw
 
 failInfo :: [LogItem] -> (Maybe SuiteEvent, [FailInfo]) 
 failInfo li = 
-    foldl' step  (Nothing, [])  $ tails relevantLogs
+    foldl' step  (Nothing, [])  $ tails failStarts
   where 
     step :: (Maybe SuiteEvent, [FailInfo]) -> [LogItem] -> (Maybe SuiteEvent, [FailInfo]) 
-    step (lastStart, result) logItm = _ need case for last start and failure
-
-    -- filter for Failures parentFailures or starts 
-    relevantLogs = filter (\case 
+    step (lastStartEvnt, result)  = 
+      \case
+        [] -> (lastStartEvnt, result)
+        (l:ls) -> 
+          l & \case
+            Start{suiteEvent = se} -> 
+              (Just se, result)
+            f@Failure{idx, loc, threadId} -> 
+              lastStartEvnt & maybe 
+                (error $ "Failure encountered before start:\n" <> toS (ppShow f))
+                (\s -> 
+                  (Nothing, FailInfo {
+                    idx,
+                    threadId,
+                    suiteEvent = s,
+                    -- fail loc is loc of active event denoted by previous start
+                    -- checked in chkFailureLocEqualsLastStartLoc
+                    failLoc = loc,
+                    failStartTail = ls
+                  } : result))
+            ParentFailure{} -> passThrough
+            StartExecution{} -> passThrough
+            EndExecution{} -> passThrough
+            ApEvent{} -> passThrough
+            End{} -> passThrough
+      where 
+        passThrough = (lastStartEvnt, result)
+    failStarts = filter (\case
       Failure{} -> True
       ParentFailure{} -> True
       Start{} -> True

@@ -57,10 +57,21 @@ unit_nested_thread_pass_fail =
     [ onceAround
         Pass
         Pass
-        [ threadAround Pass Pass [eachAfter Fail [test [testItem Pass, testItem Fail]]]
+        [ 
+          threadAround Pass Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
+        , threadAround Pass Pass [eachAfter Fail [test [testItem Pass, testItem Fail]]]
         , threadAround Fail Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
         , threadAround Pass Pass [eachBefore Fail [test [testItem Fail, testItem Pass]]]
         , eachAround Fail Pass [test [testItem Fail, testItem Pass]]
+        , eachBefore Fail [
+           test [testItem Pass, testItem Pass],
+           eachAround Pass Pass [
+            test [
+              testItem Pass, 
+              testItem Pass
+              ]
+           ]
+          ]
         ]
     ]
 
@@ -100,13 +111,20 @@ data FailInfo = FailInfo {
   failStartTail :: [LogItem]
   } deriving (Show)
 
+-- TODO logging options ~ only log failures - need a Pass summary log Object
+
 chkEachBeforeErrorPropagation :: [LogItem] -> IO ()
-chkEachBeforeErrorPropagation = uu
-  -- add eacharound to test
-  -- parent failures all the way to last sibling including last sibling when setup / teardown
+chkEachBeforeErrorPropagation = const $ pure ()
+  -- discrete events no child 
+  -- parent events expect all chidren to fail
+    -- pall the way to last sibling including last sibling when setup / teardown
 
 
--- TODO :: REMOVE USER ERROR force to throw
+-- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
+-- captures 
+ -- declares element details and has default plus bepoke validation
+ -- chkCapture - will log a soft exception and allow trace in place
+ -- property that includes assertions
 
 failInfo :: [LogItem] -> (Maybe SuiteEvent, [FailInfo]) 
 failInfo li = 
@@ -481,6 +499,7 @@ todo - trace like
   dbNoLabel
   dbCondional
   dbCondionalNoLabel
+
 -}
 
 findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem

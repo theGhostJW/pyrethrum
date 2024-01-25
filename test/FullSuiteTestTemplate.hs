@@ -22,7 +22,7 @@ data SuiteEventPath = SuiteEventPath
 parent event path
 -}
 expectedParentPrecedingEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
-expectedParentPrecedingEvents = debug' "expectedParentPrecedingEvents" . expectedSuiteEvntMap templateBeforeEvnt
+expectedParentPrecedingEvents = expectedSuiteEvntMap templateBeforeEvnt
 
 expectedParentSubsequentEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
 expectedParentSubsequentEvents = expectedSuiteEvntMap templateAfterEvnt

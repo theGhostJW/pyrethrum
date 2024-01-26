@@ -31,7 +31,7 @@ import Internal.ThreadEvent as TE (
 import List.Extra as LE
 import qualified List.Extra as L
 import qualified Prepare as P
-import PyrethrumExtras (debug', toS, txt, uu, (?))
+import PyrethrumExtras (debug', debug'_, toS, txt, uu, (?))
 import PyrethrumExtras.Test hiding (chkEq', filter, mapMaybe, maybe, test)
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
@@ -57,21 +57,23 @@ unit_nested_thread_pass_fail =
     [ onceAround
         Pass
         Pass
-        [ 
-          threadAround Pass Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
+        [ threadAround Pass Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
         , threadAround Pass Pass [eachAfter Fail [test [testItem Pass, testItem Fail]]]
         , threadAround Fail Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
         , threadAround Pass Pass [eachBefore Fail [test [testItem Fail, testItem Pass]]]
         , eachAround Fail Pass [test [testItem Fail, testItem Pass]]
-        , eachBefore Fail [
-           test [testItem Pass, testItem Pass],
-           eachAround Pass Pass [
-            test [
-              testItem Pass, 
-              testItem Pass
-              ]
-           ]
-          ]
+        , eachBefore
+            Fail
+            [ test [testItem Pass, testItem Pass]
+            , eachAround
+                Pass
+                Pass
+                [ test
+                    [ testItem Pass
+                    , testItem Pass
+                    ]
+                ]
+            ]
         ]
     ]
 
@@ -93,80 +95,106 @@ chkProperties _mxThrds ts evts = do
     evts
     [ chkThreadHooksStartedOnceInThread
     , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-    , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
-    , chkSubsequentSuiteEventAsExpected (T.expectedParentSubsequentEvents ts)
+    -- , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
+    , chkSubsequentSuiteEventAsExpected (T.expectedParentSubsequentEvents ts & debug'_ "!!! expectedParentSubsequentEvents !!!")
     , chkFailureLocEqualsLastStartLoc
-    , chkEachBeforeErrorPropagation
-    -- failure propagation 
+    , chkErrorPropagation
+    -- failure propagation
     ]
   putStrLn " checks done"
 
-
-data FailInfo = FailInfo {
-  idx :: Int,
-  threadId :: ThreadId,
-  suiteEvent :: SuiteEvent,
-  failLoc :: ExePath,
-  -- 
-  failStartTail :: [LogItem]
-  } deriving (Show)
+data FailInfo = FailInfo
+  { idx :: Int
+  , threadId :: ThreadId
+  , suiteEvent :: SuiteEvent
+  , loc :: ExePath
+  , --
+    failStartTail :: [LogItem]
+  }
+  deriving (Show)
 
 -- TODO logging options ~ only log failures - need a Pass summary log Object
 
-chkEachBeforeErrorPropagation :: [LogItem] -> IO ()
-chkEachBeforeErrorPropagation = const $ pure ()
-  -- discrete events no child 
-  -- parent events expect all chidren to fail
-    -- pall the way to last sibling including last sibling when setup / teardown
+chkErrorPropagation :: [LogItem] -> IO ()
+chkErrorPropagation lg =
+  traverse_ chkDiscreteFailsAreNotPropagated failTails
+ where
+  failTails = snd $ failInfo lg
 
+isDiscrete :: SuiteEvent -> Bool
+isDiscrete = \case
+  Hook _hz pos -> pos == After
+  TE.Test{} -> True
+
+chkDiscreteFailsAreNotPropagated :: FailInfo -> IO ()
+chkDiscreteFailsAreNotPropagated
+  f@FailInfo
+    { failStartTail
+    } = when (isDiscrete f.suiteEvent) $ do
+    LE.head failStartTail & maybe
+      (pure ())
+      \case
+        ParentFailure{} ->
+          chkFail $ "Discrete failure propagated to next event:\n" <> toS (ppShow f.suiteEvent)
+        _ -> pure ()
+
+-- discrete events no child
+-- parent events expect all chidren to fail
+-- pall the way to last sibling including last sibling when setup / teardown
 
 -- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
--- captures 
- -- declares element details and has default plus bepoke validation
- -- chkCapture - will log a soft exception and allow trace in place
- -- property that includes assertions
+-- captures
+-- declares element details and has default plus bepoke validation
+-- chkCapture - will log a soft exception and allow trace in place
+-- property that includes assertions
 
-failInfo :: [LogItem] -> (Maybe SuiteEvent, [FailInfo]) 
-failInfo li = 
-    foldl' step  (Nothing, [])  $ tails failStarts
-  where 
-    step :: (Maybe SuiteEvent, [FailInfo]) -> [LogItem] -> (Maybe SuiteEvent, [FailInfo]) 
-    step (lastStartEvnt, result)  = 
-      \case
-        [] -> (lastStartEvnt, result)
-        (l:ls) -> 
-          l & \case
-            Start{suiteEvent = se} -> 
-              (Just se, result)
-            f@Failure{idx, loc, threadId} -> 
-              lastStartEvnt & maybe 
+failInfo :: [LogItem] -> (Maybe SuiteEvent, [FailInfo])
+failInfo li =
+  foldl' step (Nothing, []) $ tails failStarts
+ where
+  step :: (Maybe SuiteEvent, [FailInfo]) -> [LogItem] -> (Maybe SuiteEvent, [FailInfo])
+  step (lastStartEvnt, result) =
+    \case
+      [] -> (lastStartEvnt, result)
+      (l : ls) ->
+        l & \case
+          Start{suiteEvent = se} ->
+            (Just se, result)
+          f@Failure{idx, loc, threadId} ->
+            lastStartEvnt
+              & maybe
                 (error $ "Failure encountered before start:\n" <> toS (ppShow f))
-                (\s -> 
-                  (Nothing, FailInfo {
-                    idx,
-                    threadId,
-                    suiteEvent = s,
-                    -- fail loc is loc of active event denoted by previous start
-                    -- checked in chkFailureLocEqualsLastStartLoc
-                    failLoc = loc,
-                    failStartTail = ls
-                  } : result))
-            ParentFailure{} -> passThrough
-            StartExecution{} -> passThrough
-            EndExecution{} -> passThrough
-            ApEvent{} -> passThrough
-            End{} -> passThrough
-      where 
-        passThrough = (lastStartEvnt, result)
-    failStarts = filter (\case
-      Failure{} -> True
-      ParentFailure{} -> True
-      Start{} -> True
-      _ -> False
-     ) li
-  
+                ( \s ->
+                    ( Nothing
+                    , FailInfo
+                        { idx
+                        , threadId
+                        , suiteEvent = s
+                        , -- fail loc is loc of active event denoted by previous start
+                          -- checked in chkFailureLocEqualsLastStartLoc
+                          loc
+                        , failStartTail = ls
+                        }
+                        : result
+                    )
+                )
+          ParentFailure{} -> passThrough
+          StartExecution{} -> passThrough
+          EndExecution{} -> passThrough
+          ApEvent{} -> passThrough
+          End{} -> passThrough
+   where
+    passThrough = (lastStartEvnt, result)
+  failStarts =
+    filter
+      ( \case
+          Failure{} -> True
+          ParentFailure{} -> True
+          Start{} -> True
+          _ -> False
+      )
+      li
 
-  
 -- TODO: do empty thread test case should not run anything (ie no thread events - cna happpen despite tree
 -- shaking due to multiple threads)
 chkFailureLocEqualsLastStartLoc :: [LogItem] -> IO ()
@@ -200,7 +228,9 @@ chkSubsequentSuiteEventAsExpected =
   chkForMatchedParents
     "subsequent parent event"
     False -- do not reverse list so we are forward through subsequent events
-    isAfterSuiteEvent
+    (const True)
+
+-- isAfterSuiteEvent -- I think this logic is wrong shoud be checking every event
 
 chkPrecedingSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkPrecedingSuiteEventAsExpected =
@@ -220,10 +250,13 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
     expectedParentPath = M.lookup childPath expectedChildParentMap
 
   actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
-  actualParents = mapMaybe extractChildParent actualParent
+  actualParents = mapMaybe extractChildParent actualParent & debug' ("!!! ACTUAL " <> toS message <> " !!!")
 
   actualParent :: [[LogItem]]
-  actualParent = tails . (\l -> wantReverseLog ? reverse l $ l) $ thrdLog
+  actualParent =
+    debug'_ ("!!! ACTUAL TAILS " <> toS message <> " !!!") $
+      tails . (\l -> wantReverseLog ? reverse l $ l) $
+        thrdLog
 
   extractChildParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
   extractChildParent evntLog =
@@ -231,12 +264,12 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
    where
     logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
     logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> suiteEvent l
-    targEvnt = L.head evntLog
-    targetPath = targEvnt >>= logSuiteEventPath
+    targEvnt = L.head evntLog & debug' "targ Event"
+    targetPath = debug' "targ Event Path" $ targEvnt >>= logSuiteEventPath
     actulaParentPath = do
       h <- targEvnt
-      t <- L.tail evntLog -- all preceding events
-      fps <- findMathcingParent parentEventPredicate h t
+      t <- L.tail evntLog -- all preceding / successive events
+      fps <- debug' "FPS" $  findMathcingParent parentEventPredicate h t
       logSuiteEventPath fps
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()

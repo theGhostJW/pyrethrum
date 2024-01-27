@@ -195,6 +195,7 @@ failInfo li =
       )
       li
 
+
 -- TODO: do empty thread test case should not run anything (ie no thread events - cna happpen despite tree
 -- shaking due to multiple threads)
 chkFailureLocEqualsLastStartLoc :: [LogItem] -> IO ()
@@ -228,7 +229,7 @@ chkSubsequentSuiteEventAsExpected =
   chkForMatchedParents
     "subsequent parent event"
     False -- do not reverse list so we are forward through subsequent events
-    (const True)
+    isAfterSuiteEvent
 
 -- isAfterSuiteEvent -- I think this logic is wrong shoud be checking every event
 
@@ -238,6 +239,7 @@ chkPrecedingSuiteEventAsExpected =
     "preceding parent event"
     True -- reverse list so we are searching back through preceding events
     isBeforeSuiteEvent
+
 
 chkForMatchedParents :: Text -> Bool -> (LogItem -> Bool) -> Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildParentMap thrdLog =
@@ -264,12 +266,12 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
    where
     logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
     logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> suiteEvent l
-    targEvnt = L.head evntLog & debug' "targ Event"
-    targetPath = debug' "targ Event Path" $ targEvnt >>= logSuiteEventPath
+    targEvnt = L.head evntLog & debug'_ "targ Event"
+    targetPath = debug'_ "targ Event Path" $ targEvnt >>= logSuiteEventPath
     actulaParentPath = do
       h <- targEvnt
       t <- L.tail evntLog -- all preceding / successive events
-      fps <- debug' "FPS" $  findMathcingParent parentEventPredicate h t
+      fps <- debug'_ "FPS" $  findMathcingParent parentEventPredicate h t
       logSuiteEventPath fps
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()

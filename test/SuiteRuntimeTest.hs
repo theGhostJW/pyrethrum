@@ -54,7 +54,7 @@ unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, t
 unit_nested_thread_pass_fail :: IO ()
 unit_nested_thread_pass_fail =
   runTest
-    False
+    True
     1
     [ onceAround
         Pass
@@ -100,8 +100,9 @@ chkProperties _mxThrds ts evts = do
     , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
     , chkSubsequentSuiteEventAsExpected (T.expectedParentSubsequentEvents ts)
     , chkFailureLocEqualsLastStartLoc
-    , chkErrorPropagation
+    , chkFailurePropagation
     -- failure propagation
+    -- check definite template failures and passes are logged as such
     ]
   putStrLn " checks done"
 
@@ -110,18 +111,20 @@ data FailInfo = FailInfo
   , threadId :: ThreadId
   , suiteEvent :: SuiteEvent
   , loc :: ExePath
-  , --
-    failStartTail :: [LogItem]
+  , failStartTail :: [LogItem]
   }
   deriving (Show)
 
 -- TODO logging options ~ only log failures - need a Pass summary log Object
 
-chkErrorPropagation :: [LogItem] -> IO ()
-chkErrorPropagation lg =
+chkFailurePropagation :: [LogItem] -> IO ()
+chkFailurePropagation lg =
   traverse_ chkDiscreteFailsAreNotPropagated failTails
  where
   failTails = snd $ failInfo lg
+-- discrete events no child
+-- parent events expect all chidren to fail
+-- pall the way to last sibling including last sibling when setup / teardown
 
 isDiscrete :: SuiteEvent -> Bool
 isDiscrete = \case
@@ -133,16 +136,15 @@ chkDiscreteFailsAreNotPropagated
   f@FailInfo
     { failStartTail
     } = when (isDiscrete f.suiteEvent) $ do
-    LE.head failStartTail & maybe
-      (pure ())
+    whenJust
+      (LE.head failStartTail)
       \case
         ParentFailure{} ->
+          -- if a discrete item such as an after hook or test as failed the next item should not be
+          -- a parent failure because discrete items can't be parents
           chkFail $ "Discrete failure propagated to next event:\n" <> toS (ppShow f.suiteEvent)
         _ -> pure ()
 
--- discrete events no child
--- parent events expect all chidren to fail
--- pall the way to last sibling including last sibling when setup / teardown
 
 -- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
 -- captures

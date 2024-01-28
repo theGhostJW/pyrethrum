@@ -21,8 +21,9 @@ import Internal.ThreadEvent as TE (
   isHook,
   isHookParentFailure,
   isStart,
-  isTest,
+  isTestLogItem,
   isTestParentFailure,
+  isTestEventOrTestParentFailure,
   onceHook,
   onceSuiteEvent,
   startSuiteEventLoc,
@@ -119,9 +120,12 @@ data FailInfo = FailInfo
 
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =
-  traverse_ chkDiscreteFailsAreNotPropagated failTails
+  do
+    traverse_ chkDiscreteFailsAreNotPropagated failTails
+    traverse_ chkNonDiscreteFailsPropagated failTails
  where
   failTails = snd $ failInfo lg
+
 -- discrete events no child
 -- parent events expect all chidren to fail
 -- pall the way to last sibling including last sibling when setup / teardown
@@ -130,6 +134,39 @@ isDiscrete :: SuiteEvent -> Bool
 isDiscrete = \case
   Hook _hz pos -> pos == After
   TE.Test{} -> True
+
+data Acc = ExpectParentFails | ExpectNotParentFails | DoneChecking
+  deriving (Show, Eq)
+
+chkNonDiscreteFailsPropagated :: FailInfo -> IO ()
+chkNonDiscreteFailsPropagated
+  f@FailInfo
+    { failStartTail
+    , loc = failLoc
+    , suiteEvent = failSuiteEvent
+    } =
+    unless (isDiscrete f.suiteEvent) $ do
+      void $ foldlM validateEvent ExpectParentFails failStartTail
+   where
+    validateEvent :: Acc -> LogItem -> IO Acc
+    validateEvent done lgItm =
+      if done
+        then pure done
+        else case lgItm of
+          ParentFailure{} -> pure done
+          Failure{} -> do
+            chkEq' ("Non discrete failure not propagated to next event:\n" <> toS (ppShow f.suiteEvent)) loc lgItm.loc
+            pure True
+          Start{loc} -> 
+            let
+              thisParentPath = parentPath (isTestEventOrTestParentFailure lgItm) loc
+              isFailChild = failLoc `isSuffixOf` thisParentPath
+            in unstableNub
+          _ ->
+            error $
+              "Unexpected event in failStartTail - these events should have been filtered out:\n" <> toS (ppShow lgItm)
+
+        
 
 chkDiscreteFailsAreNotPropagated :: FailInfo -> IO ()
 chkDiscreteFailsAreNotPropagated
@@ -144,7 +181,6 @@ chkDiscreteFailsAreNotPropagated
           -- a parent failure because discrete items can't be parents
           chkFail $ "Discrete failure propagated to next event:\n" <> toS (ppShow f.suiteEvent)
         _ -> pure ()
-
 
 -- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
 -- captures
@@ -544,7 +580,7 @@ findMathcingParent evntPredicate targEvnt =
   find (fromMaybe False . matchesParentPath)
  where
   targEvntSubPath = startSuiteEventLoc targEvnt >>= parentPath isTestEvent
-  isTestEvent = isTestParentFailure targEvnt || ((isTest <$> suiteEvent targEvnt) == Just True)
+  isTestEvent = isTestParentFailure targEvnt || isTestLogItem targEvnt
   matchesParentPath :: LogItem -> Maybe Bool
   matchesParentPath thisEvt = do
     targPath <- targEvntSubPath

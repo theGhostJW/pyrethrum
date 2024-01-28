@@ -24,6 +24,16 @@ data SuiteEvent
     | Test
     deriving (Show, Eq, Ord)
 
+isSetup :: SuiteEvent -> Bool
+isSetup = \case
+    Hook _ Setup -> True
+    _ -> False
+
+isTeardown :: SuiteEvent -> Bool
+isTeardown = \case
+    Hook _ Teardown -> True
+    _ -> False
+
 evtTypeToFrequency :: SuiteEvent -> Hz
 evtTypeToFrequency = \case
     Hook hz _ -> hz
@@ -44,6 +54,12 @@ isTestParentFailure :: ThreadEvent l a -> Bool
 isTestParentFailure = \case
     ParentFailure{suiteEvent = s} -> isTest s
     _ -> False
+
+isTestLogItem :: ThreadEvent l a -> Bool
+isTestLogItem li = (isTest <$> suiteEvent li) == Just True
+
+isTestEventOrTestParentFailure :: ThreadEvent l a -> Bool
+isTestEventOrTestParentFailure te = isTestParentFailure te || isTestLogItem te
 
 isHook :: SuiteEvent -> Bool
 isHook = \case

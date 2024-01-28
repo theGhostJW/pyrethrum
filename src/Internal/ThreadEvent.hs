@@ -35,6 +35,16 @@ isHookParentFailure = \case
     ParentFailure{suiteEvent = s} -> isHook s
     _ -> False
 
+isTest :: SuiteEvent -> Bool
+isTest = \case
+    Test{} -> True
+    _ -> False
+
+isTestParentFailure :: ThreadEvent l a -> Bool
+isTestParentFailure = \case
+    ParentFailure{suiteEvent = s} -> isTest s
+    _ -> False
+
 isHook :: SuiteEvent -> Bool
 isHook = \case
     Hook{} -> True

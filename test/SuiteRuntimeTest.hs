@@ -21,6 +21,8 @@ import Internal.ThreadEvent as TE (
   isHook,
   isHookParentFailure,
   isStart,
+  isTest,
+  isTestParentFailure,
   onceHook,
   onceSuiteEvent,
   startSuiteEventLoc,
@@ -40,11 +42,11 @@ import UnliftIO.Concurrent as C (
 import UnliftIO.STM (TQueue, tryReadTQueue)
 import Prelude hiding (id)
 
--- $ > unit_simple_pass
+-- $> unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest False 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
--- $ > unit_simple_fail
+-- $> unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
@@ -52,7 +54,7 @@ unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, t
 unit_nested_thread_pass_fail :: IO ()
 unit_nested_thread_pass_fail =
   runTest
-    True
+    False
     1
     [ onceAround
         Pass
@@ -95,8 +97,8 @@ chkProperties _mxThrds ts evts = do
     evts
     [ chkThreadHooksStartedOnceInThread
     , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-    -- , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
-    , chkSubsequentSuiteEventAsExpected (T.expectedParentSubsequentEvents ts & debug'_ "!!! expectedParentSubsequentEvents !!!")
+    , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
+    , chkSubsequentSuiteEventAsExpected (T.expectedParentSubsequentEvents ts)
     , chkFailureLocEqualsLastStartLoc
     , chkErrorPropagation
     -- failure propagation
@@ -195,7 +197,6 @@ failInfo li =
       )
       li
 
-
 -- TODO: do empty thread test case should not run anything (ie no thread events - cna happpen despite tree
 -- shaking due to multiple threads)
 chkFailureLocEqualsLastStartLoc :: [LogItem] -> IO ()
@@ -231,6 +232,8 @@ chkSubsequentSuiteEventAsExpected =
     False -- do not reverse list so we are forward through subsequent events
     isAfterSuiteEvent
 
+-- isAnyHookSuiteEvent
+
 -- isAfterSuiteEvent -- I think this logic is wrong shoud be checking every event
 
 chkPrecedingSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
@@ -239,7 +242,6 @@ chkPrecedingSuiteEventAsExpected =
     "preceding parent event"
     True -- reverse list so we are searching back through preceding events
     isBeforeSuiteEvent
-
 
 chkForMatchedParents :: Text -> Bool -> (LogItem -> Bool) -> Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildParentMap thrdLog =
@@ -252,13 +254,12 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
     expectedParentPath = M.lookup childPath expectedChildParentMap
 
   actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
-  actualParents = mapMaybe extractChildParent actualParent & debug' ("!!! ACTUAL " <> toS message <> " !!!")
+  actualParents = mapMaybe extractChildParent actualParent
 
   actualParent :: [[LogItem]]
   actualParent =
-    debug'_ ("!!! ACTUAL TAILS " <> toS message <> " !!!") $
-      tails . (\l -> wantReverseLog ? reverse l $ l) $
-        thrdLog
+    tails . (\l -> wantReverseLog ? reverse l $ l) $
+      thrdLog
 
   extractChildParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
   extractChildParent evntLog =
@@ -266,12 +267,12 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
    where
     logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
     logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> suiteEvent l
-    targEvnt = L.head evntLog & debug'_ "targ Event"
-    targetPath = debug'_ "targ Event Path" $ targEvnt >>= logSuiteEventPath
+    targEvnt = L.head evntLog
+    targetPath = targEvnt >>= logSuiteEventPath
     actulaParentPath = do
       h <- targEvnt
       t <- L.tail evntLog -- all preceding / successive events
-      fps <- debug'_ "FPS" $  findMathcingParent parentEventPredicate h t
+      fps <- findMathcingParent parentEventPredicate h t
       logSuiteEventPath fps
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
@@ -534,14 +535,14 @@ todo - trace like
   dbNoLabel
   dbCondional
   dbCondionalNoLabel
-
 -}
 
 findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem
 findMathcingParent evntPredicate targEvnt =
   find (fromMaybe False . matchesParentPath)
  where
-  targEvntSubPath = startSuiteEventLoc targEvnt >>= parentPath
+  targEvntSubPath = startSuiteEventLoc targEvnt >>= parentPath isTestEvent
+  isTestEvent = isTestParentFailure targEvnt || ((isTest <$> suiteEvent targEvnt) == Just True)
   matchesParentPath :: LogItem -> Maybe Bool
   matchesParentPath thisEvt = do
     targPath <- targEvntSubPath
@@ -564,6 +565,9 @@ eventMatchesHookPos hookPoses lg =
 
 isBeforeSuiteEvent :: LogItem -> Bool
 isBeforeSuiteEvent = eventMatchesHookPos [Before, Setup]
+
+isAnyHookSuiteEvent :: LogItem -> Bool
+isAnyHookSuiteEvent = eventMatchesHookPos [After, Teardown, Before, Setup]
 
 isAfterSuiteEvent :: LogItem -> Bool
 isAfterSuiteEvent = eventMatchesHookPos [After, Teardown]

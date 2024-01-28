@@ -12,7 +12,7 @@ import qualified Internal.ThreadEvent as F (Hz (..))
 import qualified Internal.ThreadEvent as TE
 import qualified Prepare as C
 import qualified Prepare as P
-import PyrethrumExtras (catchAll, txt, (?))
+import PyrethrumExtras (catchAll, txt, (?), debug')
 import UnliftIO (
   bracket,
   concurrently_,
@@ -657,18 +657,19 @@ runNode lgr hi xt =
                 whenJust mteardown
                   $ const
                   $ logAbandonned' (TE.Hook TE.Each TE.Teardown) fp
+    
+              runNxt :: hi -> IO ()
               runNxt hki =
-                bracket
-                  (logRun' (TE.Hook TE.Each leadHookPos) (`setup` hki))
-                  nxtAction
-                  ( \eho ->
-                      whenJust mteardown
-                        $ \teardown' ->
-                          eho
-                            & either
-                              (logAbandonned' (TE.Hook TE.Each TE.Teardown))
-                              (\ho -> logRun_ (TE.Hook TE.Each TE.Teardown) (`teardown'` ho))
-                  )
+                do
+                  eho <- logRun' (TE.Hook TE.Each leadHookPos) (`setup` hki)
+                  nxtAction eho
+                  whenJust mteardown
+                    $ \teardown' ->
+                      eho
+                        & either
+                          (logAbandonned' $ TE.Hook TE.Each TE.Teardown)
+                          (\ho -> logRun_ (TE.Hook TE.Each TE.Teardown) (`teardown'` ho))
+             -- TODO CHECK :: [ TestPath { id = 0 , title = "0.4.0 TestItem" } IS BEING CHECKED
           Thread ->
             let
               runThreadAround ioHo hoVar =

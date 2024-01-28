@@ -9,7 +9,7 @@ import Data.Aeson.TH (defaultOptions, deriveToJSON)
 import Data.Text as T (intercalate)
 import Effectful.Concurrent.STM (TQueue)
 import qualified Internal.ThreadEvent as TE
-import PyrethrumExtras (txt)
+import PyrethrumExtras (txt, (?))
 import Text.Show.Pretty (pPrint)
 import UnliftIO (finally)
 import UnliftIO.Concurrent (ThreadId)
@@ -23,9 +23,42 @@ newtype ExePath = ExePath [AE.Path] deriving (Show, Eq, Ord)
 topPath :: ExePath -> Maybe AE.Path
 topPath = L.head . coerce
 
-parentPath :: ExePath -> Maybe ExePath
-parentPath (ExePath l) = ExePath <$> L.tail l
+{-
+ drop 2 paths for tests because tests are logged as .. parent / test path / test item path
+      ExePath
+        [ TestPath { id = 1 , title = "0.5.1.0 TestItem" }
+        , SuiteElmPath { module' = "0.5.1.0" , path = "Test" }
+        , SuiteElmPath { module' = "0.5.1" , path = "EachAround" }
+        , SuiteElmPath { module' = "0.5" , path = "EachBefore" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+      => parent
+       ExePath
+        [ SuiteElmPath { module' = "0.5.1" , path = "EachAround" }
+        , SuiteElmPath { module' = "0.5" , path = "EachBefore" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+       
+  
+  for Hooks the parent is simply the tail of the target path
+      ExePath
+        [ SuiteElmPath { module' = "0.5.1" , path = "EachAround" }
+        , SuiteElmPath { module' = "0.5" , path = "EachBefore" }
+        , SuiteElmPath { module' = "0" , path = "OnceAround" }
+        ]
+       => parent 
+        ExePath
+          [ SuiteElmPath { module' = "0.5" , path = "EachBefore" }
+          , SuiteElmPath { module' = "0" , path = "OnceAround" }
+          ]
 
+-}
+parentPath :: Bool -> ExePath -> Maybe ExePath
+parentPath isTestPath (ExePath l) = 
+  ExePath <$> parentPathList
+  where
+    parentPathList = isTestPath ? (L.tail l >>= L.tail) $ L.tail l
+ 
 -- TODO: hide string eg intercallate
 displayExePath :: ExePath -> Text
 displayExePath (ExePath l) = T.intercalate "." $ (.title) <$> reverse l

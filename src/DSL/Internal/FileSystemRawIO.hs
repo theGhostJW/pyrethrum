@@ -125,16 +125,16 @@ module DSL.Internal.FileSystemRawIO (
 
 import Data.Time (UTCTime)
 import Path ( toFilePath, parseAbsFile, Path, Abs, Dir, File, Rel )
-import qualified Path.IO as D
+import Path.IO qualified as D
 import Prelude (Bool (..), ByteString, Handle, IO, IOMode, Maybe (..), MonadIO, Text, fmap, (.), (<$>), (>>=))
-import qualified Prelude as P
+import Prelude qualified as P
 
 import Chronos (OffsetDatetime)
 import PyrethrumExtras (MonadMask, toS)
 import TempUtils (offsetDateTimeToUtc, utcToOffsetDateTime)
 import UnliftIO (MonadUnliftIO)
-import qualified UnliftIO.IO.File as ULF
-import qualified System.Directory as SD
+import UnliftIO.IO.File qualified as ULF
+import System.Directory qualified as SD
 
 
 findFileWith ::

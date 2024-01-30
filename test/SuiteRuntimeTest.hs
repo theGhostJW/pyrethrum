@@ -1,13 +1,13 @@
 module SuiteRuntimeTest where
 
-import qualified Core
+import Core qualified
 import DSL.Internal.ApEvent (ApEvent, Path (..))
 import Data.Aeson (ToJSON)
-import qualified Data.Map.Strict as M
+import Data.Map.Strict qualified as M
 import Data.Set (difference)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import FullSuiteTestTemplate (Result (..))
-import qualified FullSuiteTestTemplate as T
+import FullSuiteTestTemplate qualified as T
 import Internal.RunTimeLogging (ExePath (..), parentPath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
 import Internal.ThreadEvent as TE (
@@ -32,8 +32,8 @@ import Internal.ThreadEvent as TE (
   threadHook,
  )
 import List.Extra as LE
-import qualified List.Extra as L
-import qualified Prepare as P
+import List.Extra qualified as L
+import Prepare qualified as P
 import PyrethrumExtras (debug', debug'_, toS, txt, uu, (?))
 import PyrethrumExtras.Test hiding (chkEq', filter, mapMaybe, maybe, test)
 import Text.Show.Pretty (pPrint, ppShow)
@@ -150,7 +150,7 @@ chkNonDiscreteFailsPropagated
    where
     isFailChildLoc :: (ExePath, Maybe SuiteEvent) -> Bool 
     isFailChildLoc (path, mse) = 
-      let isTearDown = mse & maybe False 
+      let thisEventisTeardown = mse & maybe False 
            \case 
             Hook _ Teardown -> True
             _ -> False
@@ -159,17 +159,17 @@ chkNonDiscreteFailsPropagated
                                  _ -> False
            {-
              if the fail event is a setup then it is morally a fail parent of a sibling teardown 
-             -- sibling teardown will not run
+             -- ie. if setup fails sibling teardown will not run
              baseHook . subHook . subsubHook setup
              ....
              .... 
              baseHook . subHook . subsubHook teardown
 
-             otherwise sibline will 
+             otherwise fails will propaget to  will 
            
            -}
-          targetParent = isTearDown && failEventIsSetup 
-            ? (fromMaybe (ExePath []) (parentPath (isTest failSuiteEvent) failLoc)) -- can be sibling
+          targetParent = failEventIsSetup &&  thisEventisTeardown 
+            ? (fromMaybe (ExePath []) (parentPath False failLoc)) -- can be sibling
             $ failLoc -- must be parent
       in 
         isParentPath targetParent path

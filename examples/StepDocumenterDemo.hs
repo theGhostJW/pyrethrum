@@ -1,6 +1,6 @@
 module StepDocumenterDemo where
 
-import qualified DSL.FileSystemDocInterpreter as DII
+import DSL.FileSystemDocInterpreter qualified as DII
 import DSL.FileSystemEffect (
   FileSystem,
   findFilesWith,

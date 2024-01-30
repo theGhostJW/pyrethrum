@@ -19,8 +19,8 @@ module DSL.Internal.FileSystemPure (
   D.WalkAction (..),
 ) where
 
-import qualified Path.IO as D
-import qualified System.Directory as SD
+import Path.IO qualified as D
+import System.Directory qualified as SD
 import PyrethrumExtras (toS)
 
 exeExtension :: Text

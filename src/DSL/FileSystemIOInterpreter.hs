@@ -7,7 +7,7 @@ module DSL.FileSystemIOInterpreter (
 
 import BasePrelude (IOException)
 import Control.Monad.Catch (catch, handle)
-import qualified DSL.Internal.FileSystemRawIO as R
+import DSL.Internal.FileSystemRawIO qualified as R
 import Effectful as EF (
   Eff,
   IOE,
@@ -21,7 +21,7 @@ import Effectful.Dispatch.Dynamic (
   interpret,
   localSeqUnliftIO,
  )
-import qualified Effectful.Error.Static as E
+import Effectful.Error.Static qualified as E
 
 adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -> Eff es b
 adaptException m = EF.liftIO m `catch` \(e :: IOException) -> E.throwError . FSException $ e

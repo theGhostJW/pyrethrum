@@ -1,8 +1,8 @@
 module Discover where
 
-import qualified WeederLibCopy.Weeder.Main as W
-import qualified BasePrelude as P
-import qualified WeederLibCopy.Weeder as W
+import WeederLibCopy.Weeder.Main qualified as W
+import BasePrelude qualified as P
+import WeederLibCopy.Weeder qualified as W
 
 -- $> Discover.discover
 discover :: IO ()

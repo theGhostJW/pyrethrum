@@ -17,7 +17,7 @@ import Chronos as C (
   (...),
  )
 import Control.Exception (throw)
-import qualified Data.Char as C
+import Data.Char qualified as C
 import Data.Text.IO (putStrLn, writeFile)
 import Path.Extended (
   Abs,
@@ -42,7 +42,7 @@ import PyrethrumExtras (
   (?),
  )
 import PyrethrumExtras.IO as PIO (subDirFromBaseDir)
-import qualified System.IO as S
+import System.IO qualified as S
 import Prelude hiding (putStrLn, writeFile)
 
 data WantConsole = Console | NoConsole deriving (Eq)

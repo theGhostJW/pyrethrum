@@ -1,7 +1,7 @@
 module DSL.Internal.ApEvent where
 
 import Check (CheckReport)
-import qualified Data.Aeson as A
+import Data.Aeson qualified as A
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import PyrethrumExtras (toS)
 

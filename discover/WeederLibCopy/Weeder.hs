@@ -45,12 +45,12 @@ import Prelude hiding ( span )
 
 -- containers
 import Data.Map.Strict ( Map )
-import qualified Data.Map.Strict as Map
+import Data.Map.Strict qualified as Map
 import Data.Sequence ( Seq )
 import Data.Set ( Set )
-import qualified Data.Set as Set
+import Data.Set qualified as Set
 import Data.Tree (Tree)
-import qualified Data.Tree as Tree
+import Data.Tree qualified as Tree
 
 -- generic-lens
 import Data.Generics.Labels ()
@@ -122,7 +122,7 @@ import Control.Monad.Trans.Reader ( runReaderT )
 
 -- weeder
 import WeederLibCopy.Weeder.Config ( Config( Config, typeClassRoots, unusedTypes ) )
-import qualified GHC.Unit.Types
+import GHC.Unit.Types qualified
 import Data.Functor.Classes (Show1)
 
 

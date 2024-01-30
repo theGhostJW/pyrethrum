@@ -1,9 +1,9 @@
 module FullSuiteTestTemplate where
 
 import DSL.Internal.ApEvent (Path (..))
-import qualified Data.Map.Strict as Map
+import Data.Map.Strict qualified as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
-import qualified Internal.ThreadEvent as TE
+import Internal.ThreadEvent qualified as TE
 import Prelude hiding (id)
 import PyrethrumExtras (debug')
 

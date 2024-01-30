@@ -29,10 +29,10 @@ import Data.List (intersperse, intercalate)
 
 -- containers
 import Data.Set ( Set )
-import qualified Data.Set as Set
+import Data.Set qualified as Set
 
 -- toml-reader
-import qualified TOML
+import TOML qualified
 
 
 -- | Configuration for Weeder analysis.

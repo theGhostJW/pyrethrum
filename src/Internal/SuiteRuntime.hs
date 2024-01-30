@@ -4,14 +4,13 @@
 
 module Internal.SuiteRuntime where
 
-import qualified Core as C
-import qualified DSL.Internal.ApEvent as AE
+import Core qualified as C
+import DSL.Internal.ApEvent qualified as AE
 import Internal.RunTimeLogging (FailPoint)
-import qualified Internal.RunTimeLogging as L
-import qualified Internal.ThreadEvent as F (Hz (..))
-import qualified Internal.ThreadEvent as TE
-import qualified Prepare as C
-import qualified Prepare as P
+import Internal.RunTimeLogging qualified as L
+import Internal.ThreadEvent qualified as F (Hz (..))
+import Internal.ThreadEvent qualified as TE
+import Prepare qualified as P
 import PyrethrumExtras (catchAll, debug', txt, (?))
 import UnliftIO (
   bracket,
@@ -47,7 +46,7 @@ execute
     { suite
     , interpreter
     , runConfig
-    } = executeNodeList tc lc (P.prepare $ C.SuitePrepParams suite interpreter runConfig)
+    } = executeNodeList tc lc (P.prepare $ P.SuitePrepParams suite interpreter runConfig)
 
 executeNodeList :: (Traversable m) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> m (P.PreNode IO m ()) -> IO ()
 executeNodeList

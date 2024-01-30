@@ -7,7 +7,7 @@ module Text.Extra (
 
 --  shims for relude to ultimately be included in a revived pyrelude
 
-import qualified Data.Text as T 
+import Data.Text qualified as T 
 import Data.Text hiding (last, init)
 import Prelude hiding (last, init)
 import PyrethrumExtras ( (?) )

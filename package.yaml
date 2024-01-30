@@ -151,7 +151,9 @@ ghc-options:
   # todo: more researchon this: https://well-typed.com/blog/2023/02/interface-files-with-core/
   - -fprefer-byte-code 
   - -fbyte-code-and-object-code
+  # https://gitlab.haskell.org/ghc/ghc/-/issues/24278
   - -fno-break-points
+  - -Werror=prepositive-qualified-module
   # - -fdefer-type-error
   # profiling
   # - -ddump-to-file 
@@ -181,6 +183,7 @@ default-extensions:
   - FunctionalDependencies
   - GADTs
   - GeneralizedNewtypeDeriving
+  - ImportQualifiedPost
   - InstanceSigs
   - KindSignatures
   - LambdaCase

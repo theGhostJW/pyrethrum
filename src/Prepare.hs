@@ -4,7 +4,7 @@ import Check (Check, Checks(..), TerminationStatus (NonTerminal), applyCheck, sk
 import Control.Exception (throwIO)
 import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
-import qualified Core as C
+import Core qualified as C
 import DSL.Internal.ApEvent
     ( ApEvent(Framework),
       Path,
@@ -16,7 +16,7 @@ import DSL.Internal.ApEvent
 import Data.Aeson (ToJSON (toJSON))
 import Data.Either.Extra ( mapLeft)
 import Effectful (Eff, runPureEff)
-import qualified Effectful.Error.Static as E
+import Effectful.Error.Static qualified as E
 import Internal.ThreadEvent (Hz)
 import UnliftIO.Exception (tryAny)
 import PyrethrumExtras (uu)

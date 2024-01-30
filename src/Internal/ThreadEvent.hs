@@ -2,7 +2,7 @@ module Internal.ThreadEvent where
 
 import BasePrelude (read)
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
-import qualified UnliftIO.Concurrent as C
+import UnliftIO.Concurrent qualified as C
 
 -- needs a separate module to avoid field name conflicts
 -- can move when this is no longer a limitation of ghc

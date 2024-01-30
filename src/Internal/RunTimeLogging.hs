@@ -3,19 +3,19 @@
 module Internal.RunTimeLogging where
 
 -- TODO: Explicit exports remove old code
-import qualified BasePrelude as P
-import qualified DSL.Internal.ApEvent as AE
+import BasePrelude qualified as P
+import DSL.Internal.ApEvent qualified as AE
 import Data.Aeson.TH (defaultOptions, deriveToJSON)
 import Data.Text as T (intercalate)
 import Effectful.Concurrent.STM (TQueue)
-import qualified Internal.ThreadEvent as TE
+import Internal.ThreadEvent qualified as TE
 import PyrethrumExtras (txt, (?))
 import Text.Show.Pretty (pPrint)
 import UnliftIO (finally)
 import UnliftIO.Concurrent (ThreadId)
 import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
 import Prelude hiding (atomically, lines)
-import qualified List.Extra as L
+import List.Extra qualified as L
 
 
 newtype ExePath = ExePath [AE.Path] deriving (Show, Eq, Ord)

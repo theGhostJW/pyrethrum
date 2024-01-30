@@ -1,10 +1,10 @@
 module PyrethrumDemoProject where
 
-import qualified Check as CH
-import qualified Core as C
+import Check qualified as CH
+import Core qualified as C
 import DSL.FileSystemEffect (FSException, FileSystem)
 import DSL.Internal.ApEvent (ApEvent)
-import qualified DSL.Internal.ApEvent as AE
+import DSL.Internal.ApEvent qualified as AE
 import DSL.Out (Out)
 import Data.Aeson (ToJSON)
 import Data.Aeson.TH (defaultOptions, deriveJSON)

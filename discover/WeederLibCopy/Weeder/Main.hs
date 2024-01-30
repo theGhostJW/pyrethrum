@@ -20,12 +20,12 @@ import System.Exit ( exitFailure, ExitCode(..), exitWith )
 import System.IO ( stderr, hPutStrLn )
 
 -- containers
-import qualified Data.Map.Strict as Map
+import Data.Map.Strict qualified as Map
 import Data.Set ( Set )
-import qualified Data.Set as Set
+import Data.Set qualified as Set
 
 -- toml-reader
-import qualified TOML
+import TOML qualified
 
 -- directory
 import System.Directory ( canonicalizePath, doesDirectoryExist, doesFileExist, doesPathExist, listDirectory, withCurrentDirectory )
@@ -49,7 +49,7 @@ import Text.Regex.TDFA ( (=~) )
 import Options.Applicative
 
 -- text
-import qualified Data.Text.IO as T
+import Data.Text.IO qualified as T
 
 -- transformers
 import Control.Monad.Trans.State.Strict ( execStateT )

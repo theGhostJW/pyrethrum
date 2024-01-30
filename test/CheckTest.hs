@@ -4,7 +4,7 @@ module CheckTest where
 import           Check               as Chk
 import           Data.Function
 import           Data.DList as D
-import qualified PyrethrumExtras.Test       as UT
+import PyrethrumExtras.Test qualified       as UT
 import PyrethrumExtras
 import PyrethrumExtras.Test hiding (chk, chk')
 

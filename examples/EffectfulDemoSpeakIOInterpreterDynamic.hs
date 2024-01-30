@@ -2,7 +2,7 @@
 
 module EffectfulDemoSpeakIOInterpreterDynamic where
 
-import qualified Data.Text.IO as T
+import Data.Text.IO qualified as T
 import Effectful as EF (
   Dispatch (Dynamic),
   DispatchOf,

@@ -17,8 +17,8 @@ import Effectful as EF (
 
 import DSL.FileSystemEffect (FileSystem (..))
 import DSL.Internal.ApEvent (ApEvent (..), FLog (Step))
-import qualified Data.Text as T
-import qualified Effectful.Error.Static as E
+import Data.Text qualified as T
+import Effectful.Error.Static qualified as E
 import Path.Extended (Path, toFilePath)
 import PyrethrumExtras (toS, txt, (?))
 import Effectful.Dispatch.Dynamic (LocalEnv, interpret)

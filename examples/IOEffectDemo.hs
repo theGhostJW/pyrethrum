@@ -7,7 +7,7 @@ import Effectful
 import DSL.Out
 import DSL.Internal.ApEvent
 import Effectful.Error.Static as E (Error, runError)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import BasePrelude (openFile, hClose, hGetContents)
 import DSL.FileSystemIOInterpreter
 import System.Time.Extra (sleep)

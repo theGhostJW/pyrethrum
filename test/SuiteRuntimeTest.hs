@@ -21,9 +21,7 @@ import Internal.ThreadEvent as TE (
   isHook,
   isHookParentFailure,
   isStart,
-  isTestLogItem,
-  isTestParentFailure,
-  isTest,
+  isTestEventOrTestParentFailure,
   onceHook,
   onceSuiteEvent,
   startSuiteEventLoc,
@@ -31,6 +29,7 @@ import Internal.ThreadEvent as TE (
   suiteEventOrParentFailureSuiteEvent,
   threadHook,
  )
+
 import List.Extra as LE
 import List.Extra qualified as L
 import Prepare qualified as P
@@ -135,7 +134,7 @@ isDiscrete = \case
   Hook _hz pos -> pos == After
   TE.Test{} -> True
 
-data Acc = ExpectParentFail | ExpectNotParentFail | DoneChecking
+data Acc = ExpectParentFail | DoneChecking
   deriving (Show, Eq)
 
 chkNonDiscreteFailsPropagated :: FailInfo -> IO ()
@@ -148,15 +147,17 @@ chkNonDiscreteFailsPropagated
     unless (isDiscrete f.suiteEvent) $ do
       void $ foldlM validateEvent ExpectParentFail failStartTail
    where
-    isFailChildLoc :: (ExePath, Maybe SuiteEvent) -> Bool 
-    isFailChildLoc (path, mse) = 
-      let thisEventisTeardown = mse & maybe False 
+    isFailChildLog :: LogItem -> Bool 
+    isFailChildLog li = 
+      let
+        mSuitEvnt = suiteEvent li 
+        thisEventisTeardown = mSuitEvnt & maybe False 
            \case 
             Hook _ Teardown -> True
             _ -> False
-          failEventIsSetup = failSuiteEvent & \case 
-                                 Hook _ Setup -> True
-                                 _ -> False
+        failEventIsSetup = failSuiteEvent & \case 
+                                Hook _ Setup -> True
+                                _ -> False
            {-
              if the fail event is a setup then it is morally a fail parent of a sibling teardown 
              -- ie. if setup fails sibling teardown will not run
@@ -166,36 +167,47 @@ chkNonDiscreteFailsPropagated
              baseHook . subHook . subsubHook teardown
 
              otherwise fails will propaget to  will 
-           
            -}
-          targetParent = failEventIsSetup &&  thisEventisTeardown 
+        targetParent = failEventIsSetup && thisEventisTeardown 
             ? (fromMaybe (ExePath []) (parentPath False failLoc)) -- can be sibling
             $ failLoc -- must be parent
       in 
-        isParentPath targetParent path
+        isParentPath targetParent li.loc
 
     validateEvent :: Acc -> LogItem -> IO Acc
     validateEvent acc lgItm =
-      case acc of 
-        DoneChecking -> pure acc
-        ExpectNotParentFail -> uu
-        ExpectParentFail -> uu
-
-      -- if acc == DoneChecking
-      --   then pure acc
-      --   else case lgItm of
-      --     ParentFailure{} -> pure done
-      --     Failure{} -> do
-      --       chkEq' ("Non discrete failure not propagated to next event:\n" <> toS (ppShow f.suiteEvent)) loc lgItm.loc
-      --       pure True
-      --     Start{loc} -> 
-      --       let
-      --         thisParentPath = parentPath (isTestEventOrTestParentFailure lgItm) loc
-      --         isFailChild = failLoc `isSuffixOf` thisParentPath
-      --       in unstableNub
-      --     _ ->
-      --       error $
-      --         "Unexpected event in failStartTail - these events should have been filtered out:\n" <> toS (ppShow lgItm)
+      let 
+        isFailChild = isFailChildLog lgItm
+      in
+      acc == DoneChecking 
+        ? pure DoneChecking
+        $ lgItm &
+          \case 
+            p@ParentFailure{} -> 
+              do
+               chk' (T.unlines [
+                  "Parent failure path is no a child path of failure path:",
+                  "  Parent Failure is:",
+                  "    " <> txt failLoc,
+                  "  Child Failure is:",
+                  "    " <> toS (ppShow p)]) isFailChild
+               pure ExpectParentFail
+            f'@Failure{} -> 
+              -- TODO :: hide reinstate with test conversion
+              fail $ "Failure when expect parent failure:\n" <> toS (ppShow f')
+            s@Start{} -> 
+              do
+               -- TODO :: implement chkFalse' 
+               chk' (T.unlines [
+                  "This event should be a child failure:",
+                  "  This Event is:",
+                  "    " <> toS (ppShow s), 
+                  "  Parent Failure is:",
+                  "    " <> txt failLoc]) (not isFailChild)
+               pure DoneChecking
+            _ ->
+              fail $
+                "Unexpected event in failStartTail - these events should have been filtered out:\n" <> toS (ppShow lgItm)
 
         
 
@@ -610,8 +622,8 @@ findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem
 findMathcingParent evntPredicate targEvnt =
   find (fromMaybe False . matchesParentPath)
  where
-  targEvntSubPath = startSuiteEventLoc targEvnt >>= parentPath isTestEvent
-  isTestEvent = isTestParentFailure targEvnt || isTestLogItem targEvnt
+  targEvntSubPath = 
+      startSuiteEventLoc targEvnt >>= parentPath (isTestEventOrTestParentFailure targEvnt )
   matchesParentPath :: LogItem -> Maybe Bool
   matchesParentPath thisEvt = do
     targPath <- targEvntSubPath

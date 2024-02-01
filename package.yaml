@@ -153,7 +153,8 @@ ghc-options:
   - -fbyte-code-and-object-code
   # https://gitlab.haskell.org/ghc/ghc/-/issues/24278
   - -fno-break-points
-  - -Werror=prepositive-qualified-module
+  # this would be nice but seems to break ghcid
+  # - -Werror=prepositive-qualified-module
   # - -fdefer-type-error
   # profiling
   # - -ddump-to-file 

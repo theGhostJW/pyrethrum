@@ -1,7 +1,7 @@
 module SuiteRuntimeTest where
 
 import Core qualified
-import DSL.Internal.ApEvent (ApEvent, Path (..))
+import DSL.Internal.ApEvent qualified as AE  
 import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
 import Data.Set (difference)
@@ -79,7 +79,7 @@ unit_nested_thread_pass_fail =
         ]
     ]
 
-type LogItem = ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent
+type LogItem = ThreadEvent ExePath AE.ApEvent
 
 chkProperties :: Int -> [T.Template] -> [LogItem] -> IO ()
 chkProperties _mxThrds ts evts = do
@@ -166,7 +166,7 @@ chkNonDiscreteFailsPropagated
              .... 
              baseHook . subHook . subsubHook teardown
 
-             otherwise fails will propaget to  will 
+             otherwise fails will propagate 
            -}
         targetParent = failEventIsSetup && thisEventisTeardown 
             ? (fromMaybe (ExePath []) (parentPath False failLoc)) -- can be sibling
@@ -185,12 +185,12 @@ chkNonDiscreteFailsPropagated
           \case 
             p@ParentFailure{} -> 
               do
-               chk' (T.unlines [
-                  "Parent failure path is no a child path of failure path:",
-                  "  Parent Failure is:",
-                  "    " <> txt failLoc,
-                  "  Child Failure is:",
-                  "    " <> toS (ppShow p)]) isFailChild
+               chkEq' (
+                  "Parent failure path is no a child path of failure path:\n" <>
+                  "  Parent Failure is:\n" <>
+                  "    " <> toS (ppShow failLoc) <>
+                  "  Child Failure is:\n" <>
+                  "    " <> toS (ppShow p)) True isFailChild
                pure ExpectParentFail
             f'@Failure{} -> 
               -- TODO :: hide reinstate with test conversion
@@ -198,12 +198,14 @@ chkNonDiscreteFailsPropagated
             s@Start{} -> 
               do
                -- TODO :: implement chkFalse' 
-               chk' (T.unlines [
-                  "This event should be a child failure:",
-                  "  This Event is:",
-                  "    " <> toS (ppShow s), 
-                  "  Parent Failure is:",
-                  "    " <> txt failLoc]) (not isFailChild)
+               -- TODO :: implement ppTxt 
+               -- TODO :: chk' error mkessage prints to single line - chkEq' works properly
+               chkEq' (
+                  "This event should be a child failure:\n" <>
+                  "  This Event is:\n" <>
+                  "    " <> (toS $ ppShow s) <>
+                  "  Parent Failure is:\n" <>
+                  "    " <> (toS $ ppShow failLoc)) False isFailChild
                pure DoneChecking
             _ ->
               fail $
@@ -405,10 +407,10 @@ chkAllTemplateItemsLogged ts lgs =
   extra = difference logStartPaths tmplatePaths
   missing = difference tmplatePaths logStartPaths
 
-  tmplatePaths :: Set Path
+  tmplatePaths :: Set AE.Path
   tmplatePaths = fromList $ (.path) <$> (ts >>= T.eventPaths)
 
-  logStartPaths :: Set Path
+  logStartPaths :: Set AE.Path
   logStartPaths =
     fromList $
       Prelude.mapMaybe
@@ -447,7 +449,7 @@ threadLogs l =
 shouldOccurOnce :: LogItem -> Bool
 shouldOccurOnce = hasSuiteEvent onceSuiteEvent
 
-chkStartEndExecution :: [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent] -> IO ()
+chkStartEndExecution :: [ThreadEvent ExePath AE.ApEvent] -> IO ()
 chkStartEndExecution evts =
   (,)
     <$> L.head evts
@@ -556,7 +558,7 @@ runTest wantConsole maxThreads templates = do
   lg <- exeTemplate wantConsole (ThreadCount maxThreads) fullTs
   chkProperties maxThreads fullTs lg
 
-exeTemplate :: Bool -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath DSL.Internal.ApEvent.ApEvent]
+exeTemplate :: Bool -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath AE.ApEvent]
 exeTemplate wantConsole maxThreads templates = do
   (lc, logQ) <- testLogControls wantConsole
   when wantConsole $ do
@@ -606,7 +608,7 @@ setPaths address ts =
       EachAfter{..} -> T.EachAfter{path = newPath "EachAfter", subNodes = newNodes, ..}
       EachAround{..} -> T.EachAround{path = newPath "EachAround", subNodes = newNodes, ..}
    where
-    newPath = DSL.Internal.ApEvent.SuiteElmPath newAdd
+    newPath = AE.SuiteElmPath newAdd
     newAdd = nxtAdd idx
     newNodes = setPaths newAdd tp.subNodes
 
@@ -628,10 +630,12 @@ findMathcingParent evntPredicate targEvnt =
   matchesParentPath thisEvt = do
     targPath <- targEvntSubPath
     thisParentCandidate <- startSuiteEventLoc thisEvt
-    pure $ evntPredicate thisEvt && thisParentCandidate `isParentPath` targPath
+    pure $ evntPredicate thisEvt && (thisParentCandidate.un) `isSuffixOf` (targPath.un)
 
 isParentPath :: ExePath -> ExePath -> Bool
-isParentPath (ExePath parent) (ExePath child) = parent `isSuffixOf` child
+isParentPath (ExePath parent) (ExePath child) = 
+  LE.tail child & maybe False (parent `isSuffixOf`)
+
 
 eventMatchesHookPos :: [HookPos] -> LogItem -> Bool
 eventMatchesHookPos hookPoses lg =

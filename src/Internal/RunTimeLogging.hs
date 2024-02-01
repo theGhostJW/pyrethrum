@@ -18,7 +18,7 @@ import Prelude hiding (atomically, lines)
 import List.Extra qualified as L
 
 
-newtype ExePath = ExePath [AE.Path] deriving (Show, Eq, Ord)
+newtype ExePath = ExePath {un :: [AE.Path] }deriving (Show, Eq, Ord)
 
 topPath :: ExePath -> Maybe AE.Path
 topPath = L.head . coerce

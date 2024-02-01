@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: eefda9fcdfe3a271289aebb724fd328f452b0e71aa28080c26a52cec2feb9e7d
+-- hash: c05185b690535f075771b3d447d15c5743fe7bc556f8ed1c7c8eded23a766c8d
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -164,7 +164,7 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points -Werror=prepositive-qualified-module
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points
   build-depends:
       aeson
     , base-prelude

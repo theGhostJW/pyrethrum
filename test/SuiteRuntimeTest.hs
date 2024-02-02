@@ -42,19 +42,19 @@ import UnliftIO.Concurrent as C (
 import UnliftIO.STM (TQueue, tryReadTQueue)
 import Prelude hiding (id)
 
+
 -- $> unit_simple_pass
 unit_simple_pass :: IO ()
-unit_simple_pass = runTest False 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
+unit_simple_pass = runTest 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
 -- $> unit_simple_fail
 unit_simple_fail :: IO ()
-unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
+unit_simple_fail = runTest 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
 -- $> unit_nested_thread_pass_fail
 unit_nested_thread_pass_fail :: IO ()
 unit_nested_thread_pass_fail =
   runTest
-    False
     1
     [ onceAround
         Pass
@@ -119,30 +119,43 @@ data FailInfo = FailInfo
 data Acc = MkAcc
   { fails :: Set (AE.Path, SuiteEvent)
   , parentFails :: Set (AE.Path, SuiteEvent)
-  , allPaths :: Set (AE.Path, SuiteEvent)
+  , allEvents :: Set (AE.Path, SuiteEvent)
   , lastStarted :: Maybe SuiteEvent
   }
   deriving (Show)
 
-bugs here
+emptyAcc :: Acc
+emptyAcc = MkAcc S.empty S.empty S.empty Nothing
+
 -- needs some work 
--- last lastStarted will be wrong if multi threaded
 -- partial passes will be recorded as fail
 chkTemplateAbsoluteFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
 chkTemplateAbsoluteFailsAndPassesLogged ts lgs =
-  -- existence checks are in another test. just checking results correspond to expected
-  -- this test will need to be updated when non-deterministic thread templates results are added
-  chkEq' "All expected failures should actually fail" S.empty (expectedFail S.\\ failsParentFails)
+  do
+    -- existence checks are in another test. just checking results correspond to expected
+    -- this test will need to be updated when non-deterministic thread templates results are added
+    chkEq' "All expected failures should actually fail" S.empty (expectedFail S.\\ (summary.fails <> summary.parentFails))
     -- for threaded events that can occur more than once
-    >> chkEq' "Nothing expected to fail should pass" S.empty ((S.intersection expectedFail actualNotFailed) S.\\ actuals.parentFails)
+    chkEq' "Nothing expected to fail should pass" S.empty (S.intersection expectedFail passes)
  where
-  actuals = foldl' logResults (MkAcc S.empty S.empty S.empty Nothing) lgs
+  actuals = foldl' logResults emptyAcc
+  threadedActuals = actuals <$> threadedLogs False lgs
+  passes = foldMap' (\acc -> acc.allEvents S.\\ acc.fails S.\\ acc.parentFails) threadedActuals
 
-  failsParentFails = actuals.fails <> actuals.parentFails
-  actualNotFailed = (actuals.allPaths S.\\ actuals.fails) 
+  summary :: Acc
+  summary = foldl' aggregate emptyAcc $ actuals <$> threadedLogs False lgs
+
+  aggregate :: Acc -> Acc -> Acc
+  aggregate a1 a2 = MkAcc
+    { fails = a1.fails <> a2.fails
+    , parentFails = a1.parentFails <> a2.parentFails
+    , allEvents = a1.allEvents <> a2.allEvents
+    , lastStarted = Nothing 
+    }
+  
 
   logResults :: Acc -> LogItem -> Acc
-  logResults acc@MkAcc{fails, parentFails, allPaths, lastStarted} li =
+  logResults acc@MkAcc{fails, parentFails, allEvents, lastStarted} li =
     case li of
       End{} -> acc
       Failure{loc} ->
@@ -153,11 +166,11 @@ chkTemplateAbsoluteFailsAndPassesLogged ts lgs =
       ParentFailure{loc, suiteEvent = se} ->
         acc
           { parentFails = S.insert (mkTpl loc se) parentFails
-          , allPaths = S.insert (mkTpl loc se) allPaths
+          , allEvents = S.insert (mkTpl loc se) allEvents
           }
       Start{loc, suiteEvent = se} ->
         acc
-          { allPaths = S.insert (mkTpl loc se) allPaths
+          { allEvents = S.insert (mkTpl loc se) allEvents
           , -- there is another check that failures match with last started
             lastStarted = Just se
           }
@@ -171,21 +184,11 @@ chkTemplateAbsoluteFailsAndPassesLogged ts lgs =
           (error $ "Empty path in: " <> (toS $ ppShow li))
           (\p -> (p, se))
 
-  -- chkLoc :: LogItem -> Text -> Set AE.Path -> ExePath -> IO ()
-  -- chkLoc li msg expectedPaths loc =
-  --   chkEq' (msg <> ":\n" <> txt loc) True isMember
-  --  where
-  --   thisPath = topPath loc
-  --   isMember = thisPath & maybe (error $ "Empty path in: " <> (toS $ ppShow li)) (`S.member` expectedPaths)
-
   expectedResults :: [T.EventPath]
   expectedResults = ts >>= T.eventPaths
 
   resultPaths :: Result -> Set (AE.Path, SuiteEvent)
   resultPaths r = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filter ((== r) . (.result)) expectedResults
-
-  expectedPass :: Set (AE.Path, SuiteEvent)
-  expectedPass = resultPaths Pass
 
   expectedFail :: Set (AE.Path, SuiteEvent)
   expectedFail = resultPaths Fail
@@ -452,7 +455,7 @@ chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =
 threadLogChks :: [LogItem] -> [[LogItem] -> IO ()] -> IO ()
 threadLogChks fullLog = traverse_ chkTls
  where
-  tlgs = threadLogs fullLog
+  tlgs = threadedLogs True fullLog
   chkTls = checkThreadLogs tlgs
   checkThreadLogs :: [[LogItem]] -> ([LogItem] -> IO ()) -> IO ()
   checkThreadLogs tls' lgChk = traverse_ lgChk tls'
@@ -523,16 +526,16 @@ nxtHookLog = find (\l -> hasSuiteEvent isHook l || isHookParentFailure l)
  same goes for filter log
 -}
 
-threadVisible :: ThreadId -> [LogItem] -> [LogItem]
-threadVisible tid =
-  filter (\l -> tid == l.threadId || hasSuiteEvent onceHook l)
+threadVisible :: Bool -> ThreadId -> [LogItem] -> [LogItem]
+threadVisible onceHookInclude tid =
+  filter (\l -> tid == l.threadId || onceHookInclude && hasSuiteEvent onceHook l)
 
 threadIds :: [LogItem] -> [ThreadId]
 threadIds = nub . fmap (.threadId)
 
-threadLogs :: [LogItem] -> [[LogItem]]
-threadLogs l =
-  (`threadVisible` l) <$> threadIds l
+threadedLogs :: Bool -> [LogItem] -> [[LogItem]]
+threadedLogs onceHookInclude l =
+  (\tid -> threadVisible onceHookInclude tid l) <$> threadIds l
 
 shouldOccurOnce :: LogItem -> Bool
 shouldOccurOnce = hasSuiteEvent onceSuiteEvent
@@ -640,9 +643,15 @@ test = SuiteRuntimeTest.Test
 testItem :: Result -> TestItem
 testItem = TestItem 0
 
-runTest :: Bool -> Int -> [Template] -> IO ()
-runTest wantConsole maxThreads templates = do
-  let fullTs = setPaths "" templates
+logging :: Bool
+logging  = False
+
+runTest :: Int -> [Template] -> IO ()
+runTest maxThreads templates = do
+  let 
+    fullTs = setPaths "" templates
+    wantConsole = logging
+
   lg <- exeTemplate wantConsole (ThreadCount maxThreads) fullTs
   chkProperties maxThreads fullTs lg
 

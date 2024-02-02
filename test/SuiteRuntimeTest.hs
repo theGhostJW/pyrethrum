@@ -1,10 +1,10 @@
 module SuiteRuntimeTest where
 
 import Core qualified
-import DSL.Internal.ApEvent qualified as AE  
+import DSL.Internal.ApEvent qualified as AE
 import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
-import Data.Set (difference)
+import Data.Set qualified as S
 import Data.Text qualified as T
 import FullSuiteTestTemplate (Result (..))
 import FullSuiteTestTemplate qualified as T
@@ -33,7 +33,7 @@ import Internal.ThreadEvent as TE (
 import List.Extra as LE
 import List.Extra qualified as L
 import Prepare qualified as P
-import PyrethrumExtras (debug', debug'_, toS, txt, uu, (?))
+import PyrethrumExtras (debug, debug', debug'_, toS, txt, uu, (?))
 import PyrethrumExtras.Test hiding (chkEq', filter, mapMaybe, maybe, test)
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
@@ -54,7 +54,7 @@ unit_simple_fail = runTest False 1 [onceAround Fail Pass [test [testItem Pass, t
 unit_nested_thread_pass_fail :: IO ()
 unit_nested_thread_pass_fail =
   runTest
-    True
+    False
     1
     [ onceAround
         Pass
@@ -91,6 +91,7 @@ chkProperties _mxThrds ts evts = do
     , chkAllTemplateItemsLogged ts
     , chkStartsOnce "once hooks and tests" shouldOccurOnce
     , chkStartSuiteEventImmediatlyFollowedByEnd "once hooks" (hasSuiteEvent onceHook)
+    , chkTemplateAbsoluteFailsAndPassesLogged ts
     ]
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
   threadLogChks
@@ -101,8 +102,6 @@ chkProperties _mxThrds ts evts = do
     , chkSubsequentSuiteEventAsExpected (T.expectedParentSubsequentEvents ts)
     , chkFailureLocEqualsLastStartLoc
     , chkFailurePropagation
-    -- failure propagation
-    -- check definite template failures and passes are logged as such
     ]
   putStrLn " checks done"
 
@@ -115,7 +114,77 @@ data FailInfo = FailInfo
   }
   deriving (Show)
 
--- TODO logging options ~ only log failures - need a Pass summary log Object
+-- TODO: logging options ~ only log failures - need a Pass summary log Object
+
+data Acc = MkAcc
+  { fails :: Set (AE.Path, SuiteEvent)
+  , parentFails :: Set (AE.Path, SuiteEvent)
+  , allPaths :: Set (AE.Path, SuiteEvent)
+  , lastStarted :: Maybe SuiteEvent
+  }
+  deriving (Show)
+
+chkTemplateAbsoluteFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
+chkTemplateAbsoluteFailsAndPassesLogged ts lgs =
+  -- existence checks are in another test. just checking results correspond to expected
+  -- this test will need to be updated when non-deterministic thread templates results are added
+  chkEq' "All expected failures should actually fail" S.empty (expectedFail S.\\ failsParentFails)
+    -- for threaded events that can occur more than once
+    >> chkEq' "Nothing expected to fail should pass" S.empty ((S.intersection expectedFail actualNotFailed) S.\\ actuals.parentFails)
+ where
+  actuals = foldl' logResults (MkAcc S.empty S.empty S.empty Nothing) lgs
+
+  failsParentFails = actuals.fails <> actuals.parentFails
+  actualNotFailed = (actuals.allPaths S.\\ actuals.fails) 
+
+  logResults :: Acc -> LogItem -> Acc
+  logResults acc@MkAcc{fails, parentFails, allPaths, lastStarted} li =
+    case li of
+      End{} -> acc
+      Failure{loc} ->
+        let failEvnt = fromMaybe (error $ "Fail with no preceeding start: " <> (toS $ ppShow li)) lastStarted
+         in acc
+              { fails = S.insert (mkTpl loc failEvnt) fails
+              }
+      ParentFailure{loc, suiteEvent = se} ->
+        acc
+          { parentFails = S.insert (mkTpl loc se) parentFails
+          , allPaths = S.insert (mkTpl loc se) allPaths
+          }
+      Start{loc, suiteEvent = se} ->
+        acc
+          { allPaths = S.insert (mkTpl loc se) allPaths
+          , -- there is another check that failures match with last started
+            lastStarted = Just se
+          }
+      StartExecution{} -> acc
+      ApEvent{} -> acc
+      EndExecution{} -> acc
+   where
+    mkTpl loc se =
+      topPath loc
+        & maybe
+          (error $ "Empty path in: " <> (toS $ ppShow li))
+          (\p -> (p, se))
+
+  -- chkLoc :: LogItem -> Text -> Set AE.Path -> ExePath -> IO ()
+  -- chkLoc li msg expectedPaths loc =
+  --   chkEq' (msg <> ":\n" <> txt loc) True isMember
+  --  where
+  --   thisPath = topPath loc
+  --   isMember = thisPath & maybe (error $ "Empty path in: " <> (toS $ ppShow li)) (`S.member` expectedPaths)
+
+  expectedResults :: [T.EventPath]
+  expectedResults = ts >>= T.eventPaths
+
+  resultPaths :: Result -> Set (AE.Path, SuiteEvent)
+  resultPaths r = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filter ((== r) . (.result)) expectedResults
+
+  expectedPass :: Set (AE.Path, SuiteEvent)
+  expectedPass = resultPaths Pass
+
+  expectedFail :: Set (AE.Path, SuiteEvent)
+  expectedFail = resultPaths Fail
 
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =
@@ -134,7 +203,7 @@ isDiscrete = \case
   Hook _hz pos -> pos == After
   TE.Test{} -> True
 
-data Acc = ExpectParentFail | DoneChecking
+data ChkState = ExpectParentFail | DoneChecking
   deriving (Show, Eq)
 
 chkNonDiscreteFailsPropagated :: FailInfo -> IO ()
@@ -147,71 +216,85 @@ chkNonDiscreteFailsPropagated
     unless (isDiscrete f.suiteEvent) $ do
       void $ foldlM validateEvent ExpectParentFail failStartTail
    where
-    isFailChildLog :: LogItem -> Bool 
-    isFailChildLog li = 
+    isFailChildLog :: LogItem -> Bool
+    isFailChildLog li =
       let
-        mSuitEvnt = suiteEvent li 
-        thisEventisTeardown = mSuitEvnt & maybe False 
-           \case 
-            Hook _ Teardown -> True
+        mSuitEvnt = suiteEvent li
+        thisEventisTeardown =
+          mSuitEvnt & maybe
+            False
+            \case
+              Hook _ Teardown -> True
+              _ -> False
+        failEventIsSetup =
+          failSuiteEvent & \case
+            Hook _ Setup -> True
             _ -> False
-        failEventIsSetup = failSuiteEvent & \case 
-                                Hook _ Setup -> True
-                                _ -> False
-           {-
-             if the fail event is a setup then it is morally a fail parent of a sibling teardown 
-             -- ie. if setup fails sibling teardown will not run
-             baseHook . subHook . subsubHook setup
-             ....
-             .... 
-             baseHook . subHook . subsubHook teardown
+        {-
+          if the fail event is a setup then it is morally a fail parent of a sibling teardown
+          -- ie. if setup fails sibling teardown will not run
+          baseHook . subHook . subsubHook setup
+          ....
+          ....
+          baseHook . subHook . subsubHook teardown
 
-             otherwise fails will propagate 
-           -}
-        targetParent = failEventIsSetup && thisEventisTeardown 
-            ? (fromMaybe (ExePath []) (parentPath False failLoc)) -- can be sibling
+          otherwise fails will propagate
+        -}
+        targetParent =
+          failEventIsSetup
+            && thisEventisTeardown
+              ? (fromMaybe (ExePath []) (parentPath False failLoc)) -- can be sibling
             $ failLoc -- must be parent
-      in 
+       in
         isParentPath targetParent li.loc
 
-    validateEvent :: Acc -> LogItem -> IO Acc
+    validateEvent :: ChkState -> LogItem -> IO ChkState
     validateEvent acc lgItm =
-      let 
+      let
         isFailChild = isFailChildLog lgItm
-      in
-      acc == DoneChecking 
-        ? pure DoneChecking
-        $ lgItm &
-          \case 
-            p@ParentFailure{} -> 
-              do
-               chkEq' (
-                  "Parent failure path is no a child path of failure path:\n" <>
-                  "  Parent Failure is:\n" <>
-                  "    " <> toS (ppShow failLoc) <>
-                  "  Child Failure is:\n" <>
-                  "    " <> toS (ppShow p)) True isFailChild
-               pure ExpectParentFail
-            f'@Failure{} -> 
-              -- TODO :: hide reinstate with test conversion
-              fail $ "Failure when expect parent failure:\n" <> toS (ppShow f')
-            s@Start{} -> 
-              do
-               -- TODO :: implement chkFalse' 
-               -- TODO :: implement ppTxt 
-               -- TODO :: chk' error mkessage prints to single line - chkEq' works properly
-               chkEq' (
-                  "This event should be a child failure:\n" <>
-                  "  This Event is:\n" <>
-                  "    " <> (toS $ ppShow s) <>
-                  "  Parent Failure is:\n" <>
-                  "    " <> (toS $ ppShow failLoc)) False isFailChild
-               pure DoneChecking
-            _ ->
-              fail $
-                "Unexpected event in failStartTail - these events should have been filtered out:\n" <> toS (ppShow lgItm)
-
-        
+       in
+        acc
+          == DoneChecking
+            ? pure DoneChecking
+          $ lgItm
+            & \case
+              p@ParentFailure{} ->
+                do
+                  chkEq'
+                    ( "Parent failure path is no a child path of failure path:\n"
+                        <> "  Parent Failure is:\n"
+                        <> "    "
+                        <> toS (ppShow failLoc)
+                        <> "  Child Failure is:\n"
+                        <> "    "
+                        <> toS (ppShow p)
+                    )
+                    True
+                    isFailChild
+                  pure ExpectParentFail
+              f'@Failure{} ->
+                -- TODO :: hide reinstate with test conversion
+                fail $ "Failure when expect parent failure:\n" <> toS (ppShow f')
+              s@Start{} ->
+                do
+                  -- TODO :: implement chkFalse'
+                  -- TODO :: implement ppTxt
+                  -- TODO :: chk' error mkessage prints to single line - chkEq' works properly
+                  chkEq'
+                    ( "This event should be a child failure:\n"
+                        <> "  This Event is:\n"
+                        <> "    "
+                        <> (toS $ ppShow s)
+                        <> "  Parent Failure is:\n"
+                        <> "    "
+                        <> (toS $ ppShow failLoc)
+                    )
+                    False
+                    isFailChild
+                  pure DoneChecking
+              _ ->
+                fail $
+                  "Unexpected event in failStartTail - these events should have been filtered out:\n" <> toS (ppShow lgItm)
 
 chkDiscreteFailsAreNotPropagated :: FailInfo -> IO ()
 chkDiscreteFailsAreNotPropagated
@@ -404,9 +487,10 @@ chkAllTemplateItemsLogged ts lgs =
  where
   errMissng = null missing ? "" $ "template items not present in log:\n" <> toS (ppShow missing)
   errExtra = null extra ? "" $ "extra items in the log that are not in the template:\n" <> toS (ppShow extra)
-  extra = difference logStartPaths tmplatePaths
-  missing = difference tmplatePaths logStartPaths
+  extra = S.difference logStartPaths tmplatePaths
+  missing = S.difference tmplatePaths logStartPaths
 
+  -- init to empty set
   tmplatePaths :: Set AE.Path
   tmplatePaths = fromList $ (.path) <$> (ts >>= T.eventPaths)
 
@@ -624,8 +708,8 @@ findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem
 findMathcingParent evntPredicate targEvnt =
   find (fromMaybe False . matchesParentPath)
  where
-  targEvntSubPath = 
-      startSuiteEventLoc targEvnt >>= parentPath (isTestEventOrTestParentFailure targEvnt )
+  targEvntSubPath =
+    startSuiteEventLoc targEvnt >>= parentPath (isTestEventOrTestParentFailure targEvnt)
   matchesParentPath :: LogItem -> Maybe Bool
   matchesParentPath thisEvt = do
     targPath <- targEvntSubPath
@@ -633,9 +717,8 @@ findMathcingParent evntPredicate targEvnt =
     pure $ evntPredicate thisEvt && (thisParentCandidate.un) `isSuffixOf` (targPath.un)
 
 isParentPath :: ExePath -> ExePath -> Bool
-isParentPath (ExePath parent) (ExePath child) = 
+isParentPath (ExePath parent) (ExePath child) =
   LE.tail child & maybe False (parent `isSuffixOf`)
-
 
 eventMatchesHookPos :: [HookPos] -> LogItem -> Bool
 eventMatchesHookPos hookPoses lg =

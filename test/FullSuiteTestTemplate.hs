@@ -179,6 +179,7 @@ data Template
 data EventPath = EventPath
   { path :: Path
   , suiteEvent :: SuiteEvent
+  , result :: Result
   }
   deriving (Show, Eq)
 
@@ -188,36 +189,39 @@ testItemPath TestItem{..} = TestPath{..}
 eventPaths :: Template -> [EventPath]
 eventPaths t = case t of
   FullSuiteTestTemplate.Test{testItems} ->
-    flip EventPath TE.Test . testItemPath <$> testItems
+     (\ti -> EventPath (testItemPath ti) TE.Test ti.result) <$> testItems
   _ ->
     let
       recurse = concatMap eventPaths t.subNodes
-      mkEvnt f p = EventPath t.path $ Hook f p
+      mkEvnt f p r = EventPath t.path (Hook f p) r
      in
       case t of
-        OnceBefore{} ->
-          mkEvnt Once Before : recurse
-        OnceAfter{} ->
-          mkEvnt Once After : recurse
-        OnceAround{} ->
-          mkEvnt Once Setup
-            : mkEvnt Once Teardown
+        OnceBefore{result} ->
+          mkEvnt Once Before result : recurse
+        OnceAfter{result} ->
+          mkEvnt Once After result : recurse
+        OnceAround{setupResult
+                  , teardownResult} ->
+          mkEvnt Once Setup setupResult
+            : mkEvnt Once Teardown teardownResult
             : recurse
-        ThreadBefore{} ->
-          mkEvnt Thread Before : recurse
-        ThreadAfter{} ->
-          mkEvnt Thread After : recurse
-        ThreadAround{} ->
-          mkEvnt Thread Setup
-            : mkEvnt Thread Teardown
+        ThreadBefore{result} ->
+          mkEvnt Thread Before result: recurse
+        ThreadAfter{result} ->
+          mkEvnt Thread After result: recurse
+        ThreadAround{setupResult
+                  , teardownResult} ->
+          mkEvnt Thread Setup setupResult
+            : mkEvnt Thread Teardown teardownResult
             : recurse
-        EachBefore{} ->
-          mkEvnt Each Before : recurse
-        EachAfter{} ->
-          mkEvnt Each After : recurse
-        EachAround{} ->
-          mkEvnt Each Setup
-            : mkEvnt Each Teardown
+        EachBefore{result} ->
+          mkEvnt Each Before result: recurse
+        EachAfter{result} ->
+          mkEvnt Each After result: recurse
+        EachAround{setupResult
+                  , teardownResult} ->
+          mkEvnt Each Setup setupResult
+            : mkEvnt Each Teardown teardownResult
             : recurse
 
 -- map

@@ -124,6 +124,10 @@ data Acc = MkAcc
   }
   deriving (Show)
 
+bugs here
+-- needs some work 
+-- last lastStarted will be wrong if multi threaded
+-- partial passes will be recorded as fail
 chkTemplateAbsoluteFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
 chkTemplateAbsoluteFailsAndPassesLogged ts lgs =
   -- existence checks are in another test. just checking results correspond to expected

@@ -51,9 +51,9 @@ unit_simple_pass = runTest 1 [onceAround Pass Pass [test [testItem Pass, testIte
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
--- $> unit_nested_thread_pass_fail
-unit_nested_thread_pass_fail :: IO ()
-unit_nested_thread_pass_fail =
+-- $> unit_nested_pass_fail
+unit_nested_pass_fail :: IO ()
+unit_nested_pass_fail =
   runTest
     1
     [ onceAround
@@ -73,6 +73,37 @@ unit_nested_thread_pass_fail =
                 [ test
                     [ testItem Pass
                     , testItem Pass
+                    ]
+                ]
+            ]
+        ]
+    ]
+
+
+-- $> unit_nested_threaded_pass_fail
+unit_nested_threaded_pass_fail :: IO ()
+unit_nested_threaded_pass_fail =
+  runTest' True
+    10
+    [ OnceAround
+        300
+        Pass
+        Pass
+        [ threadAround Pass Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
+        , ThreadAround 50 Pass Pass [eachAfter Fail [test [testItem Pass, testItem Fail]]]
+        , threadAround Fail Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
+        , threadAround Pass Pass [EachBefore 300 Fail [test [testItem Fail, testItem Pass]]]
+        , eachAround Fail Pass [test [TestItem 40 Fail, TestItem 10 Pass]]
+        , eachBefore
+            Fail
+            [ test [TestItem 100 Pass, TestItem 10 Pass]
+            , EachAround
+                50
+                Pass
+                Pass
+                [ test
+                    [ TestItem 5 Pass
+                    , TestItem 200 Pass
                     ]
                 ]
             ]
@@ -647,10 +678,12 @@ logging :: Bool
 logging  = False
 
 runTest :: Int -> [Template] -> IO ()
-runTest maxThreads templates = do
+runTest = runTest' logging
+
+runTest' :: Bool -> Int -> [Template] -> IO ()
+runTest' wantConsole maxThreads templates = do
   let 
     fullTs = setPaths "" templates
-    wantConsole = logging
 
   lg <- exeTemplate wantConsole (ThreadCount maxThreads) fullTs
   chkProperties maxThreads fullTs lg

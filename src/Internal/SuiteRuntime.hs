@@ -502,8 +502,8 @@ runNode lgr hi xt =
 
     -- tree generation is restricted by typeclasses so unless the typeclass constrint implmentation is wrong
     -- execution trees with invalid structure (Thread or Once depending on Each) should never be generated.
-    shouldNeverHappen :: Text -> IO ()
-    shouldNeverHappen cst = bug @Void . error $ "EachIn should not be passed to: " <> cst <> " " <> txt xt.path
+    invalidTree :: Text -> Text -> IO ()
+    invalidTree input cst = bug @Void . error $ input <> " >>> should not be passed to >>> " <> cst <> "\n" <> txt xt.path
 
     sink = lgr . L.ApEvent
    in
@@ -540,8 +540,8 @@ runNode lgr hi xt =
                   do
                     case hi of
                       Abandon fp -> runAfter (Just fp)
-                      EachIn _ -> shouldNeverHappen "AfterOnce"
-                      ThreadIn _ -> shouldNeverHappen "AfterOnce"
+                      EachIn _ -> invalidTree "EachIn" "AfterOnce"
+                      ThreadIn _ -> invalidTree "ThreadIn" "AfterOnce"
                       OnceIn _ -> runAfter Nothing
               )
       ao@AroundOnce{setup, status, cache, subNodes, teardown} ->
@@ -566,8 +566,8 @@ runNode lgr hi xt =
                       (logAbandonned' (TE.Hook TE.Once TE.Teardown) fp)
                       (atomically $ writeTVar status AroundDone)
                 )
-            EachIn _ -> shouldNeverHappen "AroundOnce"
-            ThreadIn _ -> shouldNeverHappen "AroundOnce"
+            EachIn _ -> invalidTree "EachIn" "AroundOnce"
+            ThreadIn _ -> invalidTree "ThreadIn" "AroundOnce"
             OnceIn ioHi ->
               do
                 i <- ioHi
@@ -623,7 +623,7 @@ runNode lgr hi xt =
               abandonAfter = logAbandonned' (TE.Hook TE.Each TE.After)
           Thread -> case hi of
             Abandon fp -> runSubNodesAfter $ Just fp
-            EachIn _ -> shouldNeverHappen "After Thread"
+            EachIn _ -> invalidTree "EachIn" "After Thread"
             OnceIn _ -> runSubNodesAfter Nothing
             ThreadIn _ -> runSubNodesAfter Nothing
            where
@@ -701,7 +701,7 @@ runNode lgr hi xt =
                               pure ab
                           )
                           pure
-                  EachIn{} -> shouldNeverHappen "Around Thread"
+                  EachIn{} -> invalidTree "EachIn" "Around Thread"
                   OnceIn ioHi -> do
                     -- Action can't be run until its actually needed by a test.
                     -- There is a possibilty of the hook enclosing an empty or

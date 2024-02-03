@@ -42,16 +42,15 @@ import UnliftIO.Concurrent as C (
 import UnliftIO.STM (TQueue, tryReadTQueue)
 import Prelude hiding (id)
 
-
--- $> unit_simple_pass
+-- $ > unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
--- $> unit_simple_fail
+-- $ > unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
--- $> unit_nested_pass_fail
+-- $ > unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
   runTest
@@ -79,41 +78,70 @@ unit_nested_pass_fail =
         ]
     ]
 
-
 -- $> unit_nested_threaded_pass_fail
 unit_nested_threaded_pass_fail :: IO ()
 unit_nested_threaded_pass_fail =
-  runTest' True
-    10
-    [ OnceAround
-        300
-        Pass
-        Pass
-        [ threadAround Pass Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
-        , ThreadAround 50 Pass Pass [eachAfter Fail [test [testItem Pass, testItem Fail]]]
-        , threadAround Fail Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
-        , threadAround Pass Pass [EachBefore 300 Fail [test [testItem Fail, testItem Pass]]]
-        , eachAround Fail Pass [test [TestItem 40 Fail, TestItem 10 Pass]]
-        , eachBefore
-            Fail
-            [ test [TestItem 100 Pass, TestItem 10 Pass]
-            , EachAround
-                50
+  do
+    let mxThrds = 10
+        logging' = True
+    r <-
+      execute
+        logging'
+        mxThrds
+        [ OnceAround
+            1000
+            Pass
+            Pass
+            [ ThreadAround
+                10
                 Pass
                 Pass
-                [ test
-                    [ TestItem 5 Pass
-                    , TestItem 200 Pass
+                [ EachAfter
+                    50
+                    Pass
+                    [ test
+                        [ TestItem 0 Pass
+                        , TestItem 1 Fail
+                        ]
+                    ]
+                ]
+            , ThreadAround
+                100
+                Pass
+                Fail
+                [ ThreadAround
+                    300
+                    Pass
+                    Pass
+                    [ threadAround Pass Pass [eachAfter Pass [test [TestItem 3000 Fail, TestItem 1000 Pass]]]
+                    , ThreadAround 50 Pass Pass [eachAfter Fail [test [TestItem 1000 Pass, TestItem 1000 Fail]]]
+                    , threadAround Fail Pass [eachAfter Pass [test [TestItem 1000 Fail, TestItem 1000 Pass]]]
+                    , threadAround Pass Pass [EachBefore 300 Fail [test [TestItem 1000 Fail, TestItem 3000 Pass]]]
+                    , eachAround Fail Pass [test [TestItem 40 Fail, TestItem 10 Pass]]
+                    , eachBefore
+                        Fail
+                        [ test [TestItem 300 Pass, TestItem 10 Pass]
+                        , EachAround
+                            50
+                            Pass
+                            Pass
+                            [ test
+                                [ TestItem 1000 Pass
+                                , TestItem 200 Pass
+                                ]
+                            ]
+                        ]
                     ]
                 ]
             ]
         ]
-    ]
+    chkProperties r.expandedTemplate r.log
+    chkThreadCount mxThrds r.log
 
 type LogItem = ThreadEvent ExePath AE.ApEvent
 
-chkProperties :: Int -> [T.Template] -> [LogItem] -> IO ()
-chkProperties _mxThrds ts evts = do
+chkProperties :: [T.Template] -> [LogItem] -> IO ()
+chkProperties ts evts = do
   -- these checks apply to the log as a whole
   traverse_
     (evts &)
@@ -158,7 +186,16 @@ data Acc = MkAcc
 emptyAcc :: Acc
 emptyAcc = MkAcc S.empty S.empty S.empty Nothing
 
--- needs some work 
+--  note this test will only work if there are enough delays in the template
+--  and the template is big enough to ensure that the threads are used
+chkThreadCount :: Int -> [LogItem] -> IO ()
+chkThreadCount mxThrds evts =
+  chkEq' 
+    "Thread count" 
+     (mxThrds + 1) -- main thread + number of threads specified
+     (length $ threadIds evts)
+
+-- needs some work
 -- partial passes will be recorded as fail
 chkTemplateAbsoluteFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
 chkTemplateAbsoluteFailsAndPassesLogged ts lgs =
@@ -168,6 +205,9 @@ chkTemplateAbsoluteFailsAndPassesLogged ts lgs =
     chkEq' "All expected failures should actually fail" S.empty (expectedFail S.\\ (summary.fails <> summary.parentFails))
     -- for threaded events that can occur more than once
     chkEq' "Nothing expected to fail should pass" S.empty (S.intersection expectedFail passes)
+    chkEq' "All expected passes should actually pass" S.empty (expectedPass S.\\ (passes <> summary.parentFails))
+    -- for threaded events that can occur more than once
+    chkEq' "Nothing expected to pass should fail" S.empty (S.intersection expectedPass summary.fails)
  where
   actuals = foldl' logResults emptyAcc
   threadedActuals = actuals <$> threadedLogs False lgs
@@ -177,13 +217,13 @@ chkTemplateAbsoluteFailsAndPassesLogged ts lgs =
   summary = foldl' aggregate emptyAcc $ actuals <$> threadedLogs False lgs
 
   aggregate :: Acc -> Acc -> Acc
-  aggregate a1 a2 = MkAcc
-    { fails = a1.fails <> a2.fails
-    , parentFails = a1.parentFails <> a2.parentFails
-    , allEvents = a1.allEvents <> a2.allEvents
-    , lastStarted = Nothing 
-    }
-  
+  aggregate a1 a2 =
+    MkAcc
+      { fails = a1.fails <> a2.fails
+      , parentFails = a1.parentFails <> a2.parentFails
+      , allEvents = a1.allEvents <> a2.allEvents
+      , lastStarted = Nothing
+      }
 
   logResults :: Acc -> LogItem -> Acc
   logResults acc@MkAcc{fails, parentFails, allEvents, lastStarted} li =
@@ -215,14 +255,14 @@ chkTemplateAbsoluteFailsAndPassesLogged ts lgs =
           (error $ "Empty path in: " <> (toS $ ppShow li))
           (\p -> (p, se))
 
-  expectedResults :: [T.EventPath]
-  expectedResults = ts >>= T.eventPaths
+  expectedResults :: Result -> Set (AE.Path, SuiteEvent)
+  expectedResults r = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filter ((== r) . (.result)) (ts >>= T.eventPaths)
 
-  resultPaths :: Result -> Set (AE.Path, SuiteEvent)
-  resultPaths r = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filter ((== r) . (.result)) expectedResults
+  expectedPass :: Set (AE.Path, SuiteEvent)
+  expectedPass = expectedResults Pass
 
   expectedFail :: Set (AE.Path, SuiteEvent)
-  expectedFail = resultPaths Fail
+  expectedFail = expectedResults Fail
 
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =
@@ -675,18 +715,26 @@ testItem :: Result -> TestItem
 testItem = TestItem 0
 
 logging :: Bool
-logging  = False
+logging = False
+
+data ExeResult = ExeResult
+  { expandedTemplate :: [T.Template]
+  , log :: [ThreadEvent ExePath AE.ApEvent]
+  }
 
 runTest :: Int -> [Template] -> IO ()
 runTest = runTest' logging
 
 runTest' :: Bool -> Int -> [Template] -> IO ()
 runTest' wantConsole maxThreads templates = do
-  let 
-    fullTs = setPaths "" templates
+  r <- execute wantConsole maxThreads templates
+  chkProperties r.expandedTemplate r.log
 
+execute :: Bool -> Int -> [Template] -> IO ExeResult
+execute wantConsole maxThreads templates = do
+  let fullTs = setPaths "" templates
   lg <- exeTemplate wantConsole (ThreadCount maxThreads) fullTs
-  chkProperties maxThreads fullTs lg
+  pure $ ExeResult fullTs lg
 
 exeTemplate :: Bool -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath AE.ApEvent]
 exeTemplate wantConsole maxThreads templates = do

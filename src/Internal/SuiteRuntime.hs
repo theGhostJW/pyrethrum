@@ -59,6 +59,8 @@ executeNodeList
   nodeList =
     do
       xtree <- mkXTree (L.ExePath []) nodeList
+      -- logWorker and execution run concurrently
+      -- logworker serialises the log events emitted by the execution
       concurrently_
         logWorker
         ( finally

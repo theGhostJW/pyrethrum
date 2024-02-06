@@ -54,6 +54,7 @@ verbatim:
         , tasty-discover
         , hedgehog
         , bytestring
+        , falsify
       hs-source-dirs:
         test
   - |
@@ -146,7 +147,7 @@ ghc-options:
   - -fno-warn-type-defaults
   # - -fno-warn-unused-matches
   # - -fno-warn-unused-binds
-  # - -fno-warn-unused-do-bind
+  - -fno-warn-unused-do-bind
   - -Wno-overlapping-patterns
   # todo: more researchon this: https://well-typed.com/blog/2023/02/interface-files-with-core/
   - -fprefer-byte-code 

@@ -28,6 +28,9 @@ allow-newer: base,
              encode-string-0.1.0.0:bytestring,
              encode-string-0.1.0.0:text,
              discrimination:deepseq,
+             falsify:base,
+             falsify:bytestring,
+             falsify:tasty
 
 package *
  ghc-options: -haddock

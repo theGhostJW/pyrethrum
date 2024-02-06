@@ -42,6 +42,16 @@ import UnliftIO.Concurrent as C (
 import UnliftIO.STM (TQueue, tryReadTQueue)
 import Prelude hiding (id)
 
+import Test.Falsify.Generator qualified as FG
+import Test.Falsify.Predicate qualified as FP
+import Test.Falsify.Range qualified as FR
+import Test.Tasty.Falsify qualified as F
+
+{-
+ - each fail
+ - thread fail
+-}
+
 -- $ > unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
@@ -78,9 +88,9 @@ unit_nested_pass_fail =
         ]
     ]
 
--- $> unit_nested_threaded_pass_fail
-unit_nested_threaded_pass_fail :: IO ()
-unit_nested_threaded_pass_fail =
+-- $ > unit_nested_threaded_chk_thread_count
+unit_nested_threaded_chk_thread_count :: IO ()
+unit_nested_threaded_chk_thread_count =
   do
     let mxThrds = 10
         logging' = True
@@ -138,6 +148,25 @@ unit_nested_threaded_pass_fail =
     chkProperties r.expandedTemplate r.log
     chkThreadCount mxThrds r.log
 
+{- each and once hooks will always run but thread hooks may be empty
+   due to subitems being stolen by another thread. We need to ensure
+   that empty thread TestTrees are not executed
+-}
+-- $> unit_empty_thread_around
+unit_empty_thread_around :: IO ()
+unit_empty_thread_around =
+  do
+    exe [ThreadAround 0 Pass Pass []] >>= chkEmptyLog
+    exe [ThreadBefore 0 Pass []] >>= chkEmptyLog
+    exe [ThreadAfter 0 Pass []] >>= chkEmptyLog
+    exe [ThreadAround 0 Pass Pass [ThreadBefore 0 Pass [ThreadAfter 0 Pass []]]] >>= chkEmptyLog
+    exe [ThreadAround 0 Pass Pass [ThreadBefore 0 Pass [ThreadAfter 0 Pass [test[testItem Pass]]]]] >>= chkLogLength
+ where
+  exe = execute False 1
+  chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (toS $ ppShow r.log)) 2 (length r.log)
+  chkLogLength r = chkEq' ("Log length not as expected:\n" <> (toS $ ppShow r.log)) 12 (length r.log)
+
+  
 type LogItem = ThreadEvent ExePath AE.ApEvent
 
 chkProperties :: [T.Template] -> [LogItem] -> IO ()
@@ -190,10 +219,10 @@ emptyAcc = MkAcc S.empty S.empty S.empty Nothing
 --  and the template is big enough to ensure that the threads are used
 chkThreadCount :: Int -> [LogItem] -> IO ()
 chkThreadCount mxThrds evts =
-  chkEq' 
-    "Thread count" 
-     (mxThrds + 1) -- main thread + number of threads specified
-     (length $ threadIds evts)
+  chkEq'
+    "Thread count"
+    (mxThrds + 1) -- main thread + number of threads specified
+    (length $ threadIds evts)
 
 -- needs some work
 -- partial passes will be recorded as fail

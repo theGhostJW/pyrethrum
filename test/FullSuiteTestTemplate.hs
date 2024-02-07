@@ -12,6 +12,11 @@ data Result
   | Fail
   deriving (Show, Eq)
 
+data ThreadResult
+  = All Result
+  | Some [Result]
+  deriving (Show, Eq)
+
 data SuiteEventPath = SuiteEventPath
   { path :: Path
   , suiteEvent :: SuiteEvent

@@ -13,7 +13,6 @@ import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
 import PyrethrumExtras (catchAll, debug', txt, (?))
 import UnliftIO (
-  bracket,
   concurrently_,
   finally,
   forConcurrently_,

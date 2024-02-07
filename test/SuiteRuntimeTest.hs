@@ -39,7 +39,7 @@ import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
   threadDelay,
  )
-import UnliftIO.STM (TQueue, tryReadTQueue)
+import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (id)
 
 import Test.Falsify.Generator qualified as FG
@@ -93,7 +93,7 @@ unit_nested_threaded_chk_thread_count :: IO ()
 unit_nested_threaded_chk_thread_count =
   do
     let mxThrds = 10
-        logging' = True
+        logging' = NoLog
     r <-
       execute
         logging'
@@ -152,6 +152,7 @@ unit_nested_threaded_chk_thread_count =
    due to subitems being stolen by another thread. We need to ensure
    that empty thread TestTrees are not executed
 -}
+
 -- $> unit_empty_thread_around
 unit_empty_thread_around :: IO ()
 unit_empty_thread_around =
@@ -160,13 +161,12 @@ unit_empty_thread_around =
     exe [ThreadBefore 0 Pass []] >>= chkEmptyLog
     exe [ThreadAfter 0 Pass []] >>= chkEmptyLog
     exe [ThreadAround 0 Pass Pass [ThreadBefore 0 Pass [ThreadAfter 0 Pass []]]] >>= chkEmptyLog
-    exe [ThreadAround 0 Pass Pass [ThreadBefore 0 Pass [ThreadAfter 0 Pass [test[testItem Pass]]]]] >>= chkLogLength
+    exe [ThreadAround 0 Pass Pass [ThreadBefore 0 Pass [ThreadAfter 0 Pass [test [testItem Pass]]]]] >>= chkLogLength
  where
-  exe = execute False 1
+  exe = execute NoLog 1
   chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (toS $ ppShow r.log)) 2 (length r.log)
   chkLogLength r = chkEq' ("Log length not as expected:\n" <> (toS $ ppShow r.log)) 12 (length r.log)
 
-  
 type LogItem = ThreadEvent ExePath AE.ApEvent
 
 chkProperties :: [T.Template] -> [LogItem] -> IO ()
@@ -743,9 +743,6 @@ test = SuiteRuntimeTest.Test
 testItem :: Result -> TestItem
 testItem = TestItem 0
 
-logging :: Bool
-logging = False
-
 data ExeResult = ExeResult
   { expandedTemplate :: [T.Template]
   , log :: [ThreadEvent ExePath AE.ApEvent]
@@ -754,25 +751,32 @@ data ExeResult = ExeResult
 runTest :: Int -> [Template] -> IO ()
 runTest = runTest' logging
 
-runTest' :: Bool -> Int -> [Template] -> IO ()
-runTest' wantConsole maxThreads templates = do
-  r <- execute wantConsole maxThreads templates
+data Logging = Logging | NoLog deriving (Show, Eq)
+
+logging :: Logging
+logging = NoLog
+
+runTest' :: Logging -> Int -> [Template] -> IO ()
+runTest' wantLog maxThreads templates = do
+  r <- execute wantLog maxThreads templates
   chkProperties r.expandedTemplate r.log
 
-execute :: Bool -> Int -> [Template] -> IO ExeResult
-execute wantConsole maxThreads templates = do
+execute :: Logging -> Int -> [Template] -> IO ExeResult
+execute wantLog maxThreads templates = do
   let fullTs = setPaths "" templates
-  lg <- exeTemplate wantConsole (ThreadCount maxThreads) fullTs
+  lg <- exeTemplate wantLog (ThreadCount maxThreads) fullTs
   pure $ ExeResult fullTs lg
 
-exeTemplate :: Bool -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath AE.ApEvent]
-exeTemplate wantConsole maxThreads templates = do
-  (lc, logQ) <- testLogControls wantConsole
-  when wantConsole $ do
+exeTemplate :: Logging -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath AE.ApEvent]
+exeTemplate wantLog maxThreads templates = do
+  let wantLog' = wantLog == Logging
+  (lc, logQ) <- testLogControls wantLog'
+  when wantLog' $ do
     putStrLn ""
     pPrint templates
     putStrLn "========="
-  executeNodeList maxThreads lc $ mkNodes templates
+  nodes <- mkNodes maxThreads templates
+  executeNodeList maxThreads lc nodes
   atomically $ q2List logQ
 
 q2List :: TQueue a -> STM [a]
@@ -782,6 +786,9 @@ q2List qu = reverse <$> recurse [] qu
   recurse l q =
     tryReadTQueue q
       >>= maybe (pure l) (\e -> recurse (e : l) q)
+
+loadTQueue :: TQueue a -> [a] -> STM ()
+loadTQueue q = traverse_ (writeTQueue q)
 
 setPaths :: Text -> [Template] -> [T.Template]
 setPaths address ts =
@@ -873,8 +880,17 @@ instance Core.Config TestConfig
 tc :: TestConfig
 tc = TestConfig{title = "test config"}
 
-mkVoidAction :: forall desc. (Show desc) => desc -> Int -> Result -> P.ApEventSink -> IO ()
-mkVoidAction path delay outcome _sink =
+mkThreadAction :: forall desc. (Show desc) => TQueue Result -> desc -> Int -> IO ()
+mkThreadAction q path delay =
+  do 
+    r <- atomically $ tryReadTQueue q
+    r & maybe 
+      (error "thread result queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen)") 
+      (mkVoidAction path delay)
+
+
+mkVoidAction :: forall desc. (Show desc) => desc -> Int -> Result -> IO ()
+mkVoidAction path delay outcome =
   do
     C.threadDelay delay
     unless (outcome == Pass) $
@@ -884,136 +900,138 @@ mkVoidAction path delay outcome _sink =
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
 mkAction :: forall hi desc. (Show desc) => desc -> Int -> Result -> P.ApEventSink -> hi -> IO ()
-mkAction path delay rslt sink _in = mkVoidAction path delay rslt sink
+mkAction path delay rslt _sink _in = mkVoidAction path delay rslt
 
-mkNodes :: [T.Template] -> [P.PreNode IO [] ()]
-mkNodes = fmap mkNode
+mkNodes :: ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
+mkNodes mxThreads = sequence . fmap mkNode
  where
-  mkNode :: T.Template -> P.PreNode IO [] ()
-  mkNode = \case
+
+  afterAction = const $ mkVoidAction
+  mkNodes' = mkNodes mxThreads
+  mkNode :: T.Template -> IO (P.PreNode IO [] ())
+  mkNode t = case t of
     T.Test
       { path
       , testItems
       } ->
-        P.Test
-          { config = tc
-          , path
-          , tests = mkTestItem <$> testItems
-          }
-    T.OnceBefore
-      { path
-      , delay
-      , result
-      , subNodes
-      } ->
-        P.Before
-          { path
-          , frequency = Once
-          , action = mkAction path delay result
-          , subNodes = mkNodes subNodes
-          }
-    T.OnceAfter
-      { path
-      , delay
-      , result
-      , subNodes
-      } ->
-        P.After
-          { path
-          , frequency = Once
-          , after = mkVoidAction path delay result
-          , subNodes' = mkNodes subNodes
-          }
-    T.OnceAround
-      { path
-      , delay
-      , setupResult
-      , teardownResult
-      , subNodes
-      } ->
-        P.Around
-          { path
-          , frequency = Once
-          , setup = mkAction path delay setupResult
-          , teardown = mkAction path delay teardownResult
-          , subNodes = mkNodes subNodes
-          }
-    T.ThreadBefore
-      { path
-      , delay
-      , result
-      , subNodes
-      } ->
-        P.Before
-          { path
-          , frequency = Thread
-          , action = mkAction path delay result
-          , subNodes = mkNodes subNodes
-          }
-    T.ThreadAfter
-      { path
-      , delay
-      , result
-      , subNodes
-      } ->
-        P.After
-          { path
-          , frequency = Thread
-          , after = mkVoidAction path delay result
-          , subNodes' = mkNodes subNodes
-          }
-    T.ThreadAround
-      { path
-      , delay
-      , setupResult
-      , teardownResult
-      , subNodes
-      } ->
-        P.Around
-          { path
-          , frequency = Thread
-          , setup = mkAction path delay setupResult
-          , teardown = mkAction path delay teardownResult
-          , subNodes = mkNodes subNodes
-          }
-    T.EachBefore
-      { path
-      , delay
-      , result
-      , subNodes
-      } ->
-        P.Before
-          { path
-          , frequency = Each
-          , action = mkAction path delay result
-          , subNodes = mkNodes subNodes
-          }
-    T.EachAfter
-      { path
-      , delay
-      , result
-      , subNodes
-      } ->
-        P.After
-          { path
-          , frequency = Each
-          , after = mkVoidAction path delay result
-          , subNodes' = mkNodes subNodes
-          }
-    T.EachAround
-      { path
-      , delay
-      , setupResult
-      , teardownResult
-      , subNodes
-      } ->
-        P.Around
-          { path
-          , frequency = Each
-          , setup = mkAction path delay setupResult
-          , teardown = mkAction path delay teardownResult
-          , subNodes = mkNodes subNodes
-          }
+        pure $
+          P.Test
+            { config = tc
+            , path
+            , tests = mkTestItem <$> testItems
+            }
+    _ ->
+      do
+        nds <- mkNodes' $ t.subNodes
+        threadResults <- newTQueueIO
+        pure $ case t of
+          T.OnceBefore
+            { path
+            , delay
+            , result
+            } ->
+              do
+                P.Before
+                  { path
+                  , frequency = Once
+                  , action = mkAction path delay result
+                  , subNodes = nds
+                  }
+          T.OnceAfter
+            { path
+            , delay
+            , result
+            } ->
+              P.After
+                { path
+                , frequency = Once
+                , after = const $ mkVoidAction path delay result
+                , subNodes' = nds
+                }
+          T.OnceAround
+            { path
+            , delay
+            , setupResult
+            , teardownResult
+            } ->
+              P.Around
+                { path
+                , frequency = Once
+                , setup = mkAction path delay setupResult
+                , teardown = mkAction path delay teardownResult
+                , subNodes = nds
+                }
+          T.EachBefore
+            { path
+            , delay
+            , result
+            } ->
+              P.Before
+                { path
+                , frequency = Each
+                , action = mkAction path delay result
+                , subNodes = nds
+                }
+          T.EachAfter
+            { path
+            , delay
+            , result
+            } ->
+              P.After
+                { path
+                , frequency = Each
+                , after = const $ mkVoidAction path delay result
+                , subNodes' = nds
+                }
+          T.EachAround
+            { path
+            , delay
+            , setupResult
+            , teardownResult
+            } ->
+              P.Around
+                { path
+                , frequency = Each
+                , setup = mkAction path delay setupResult
+                , teardown = mkAction path delay teardownResult
+                , subNodes = nds
+                }
+          _ -> case t of
+            T.ThreadBefore
+              { path
+              , delay
+              , result
+              } ->
+                P.Before
+                  { path
+                  , frequency = Thread
+                  , action = mkAction path delay result
+                  , subNodes = nds
+                  }
+            T.ThreadAfter
+              { path
+              , delay
+              , result
+              } ->
+                P.After
+                  { path
+                  , frequency = Thread
+                  , after = const $ mkVoidAction path delay result
+                  , subNodes' = nds
+                  }
+            T.ThreadAround
+              { path
+              , delay
+              , setupResult
+              , teardownResult
+              } ->
+                P.Around
+                  { path
+                  , frequency = Thread
+                  , setup = mkAction path delay setupResult
+                  , teardown = mkAction path delay teardownResult
+                  , subNodes = nds
+                  }
 data Template
   = OnceBefore
       { delay :: Int

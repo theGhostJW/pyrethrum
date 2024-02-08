@@ -707,7 +707,6 @@ runNode lgr hi xt =
                     -- Action can't be run until its actually needed by a test.
                     -- There is a possibilty of the hook enclosing an empty or
                     -- saturated subNode list. plain old laziness might be enough
-                    -- TODO: test this
                     hoVar <- newEmptyTMVarIO
                     runThreadAround (hkOutSingleton hoVar) hoVar
                    where

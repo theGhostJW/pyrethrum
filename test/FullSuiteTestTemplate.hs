@@ -4,17 +4,20 @@ import DSL.Internal.ApEvent (Path (..))
 import Data.Map.Strict qualified as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
 import Internal.ThreadEvent qualified as TE
-import Prelude hiding (id)
+import Prelude hiding (id, All)
 import PyrethrumExtras (debug')
 
+
+data Spec = Spec {delay :: Int, result :: Result}
+  deriving (Show, Eq)
 data Result
   = Pass
   | Fail
   deriving (Show, Eq)
 
-data ThreadResult
-  = All Result
-  | Some [Result]
+data ThreadSpec
+  = All Spec
+  | Some [Spec]
   deriving (Show, Eq)
 
 data SuiteEventPath = SuiteEventPath
@@ -120,59 +123,53 @@ emittedHooks = \case
 data Template
   = OnceBefore
       { path :: Path
-      , delay :: Int
-      , result :: Result
+      , spec :: Spec
       , subNodes :: [Template]
       }
   | OnceAfter
       { path :: Path
-      , delay :: Int
-      , result :: Result
+      , spec :: Spec
       , subNodes :: [Template]
       }
   | OnceAround
       { path :: Path
-      , delay :: Int
-      , setupResult :: Result
-      , teardownResult :: Result
+      , setupSpec :: Spec
+      , teardownSpec:: Spec
       , subNodes :: [Template]
       }
   | ThreadBefore
       { path :: Path
       , delay :: Int
-      , result :: Result
+      , threadSpec :: ThreadSpec
       , subNodes :: [Template]
       }
   | ThreadAfter
       { path :: Path
       , delay :: Int
-      , result :: Result
+      , threadSpec :: ThreadSpec
       , subNodes :: [Template]
       }
   | ThreadAround
       { path :: Path
       , delay :: Int
-      , setupResult :: Result
-      , teardownResult :: Result
+      , setupThreadSpec :: ThreadSpec
+      , teardownThreadSpec :: ThreadSpec
       , subNodes :: [Template]
       }
   | EachBefore
       { path :: Path
-      , delay :: Int
-      , result :: Result
+      , spec :: Spec
       , subNodes :: [Template]
       }
   | EachAfter
       { path :: Path
-      , delay :: Int
-      , result :: Result
+      , spec :: Spec
       , subNodes :: [Template]
       }
   | EachAround
       { path :: Path
-      , delay :: Int
-      , setupResult :: Result
-      , teardownResult :: Result
+      , setupSpec :: Spec
+      , teardownSpec:: Spec
       , subNodes :: [Template]
       }
   | Test
@@ -184,7 +181,7 @@ data Template
 data EventPath = EventPath
   { path :: Path
   , suiteEvent :: SuiteEvent
-  , result :: Result
+  , evntSpec :: ThreadSpec
   }
   deriving (Show, Eq)
 
@@ -194,39 +191,39 @@ testItemPath TestItem{..} = TestPath{..}
 eventPaths :: Template -> [EventPath]
 eventPaths t = case t of
   FullSuiteTestTemplate.Test{testItems} ->
-     (\ti -> EventPath (testItemPath ti) TE.Test ti.result) <$> testItems
+     (\ti -> EventPath (testItemPath ti) TE.Test $ All (ti.spec)) <$> testItems
   _ ->
     let
       recurse = concatMap eventPaths t.subNodes
       mkEvnt f p r = EventPath t.path (Hook f p) r
      in
       case t of
-        OnceBefore{result} ->
-          mkEvnt Once Before result : recurse
-        OnceAfter{result} ->
-          mkEvnt Once After result : recurse
-        OnceAround{setupResult
-                  , teardownResult} ->
-          mkEvnt Once Setup setupResult
-            : mkEvnt Once Teardown teardownResult
+        OnceBefore{spec} ->
+          mkEvnt Once Before (All spec) : recurse
+        OnceAfter{spec} ->
+          mkEvnt Once After (All spec) : recurse
+        OnceAround{setupSpec
+                  , teardownSpec} ->
+          mkEvnt Once Setup (All setupSpec)
+            : mkEvnt Once Teardown (All teardownSpec)
             : recurse
-        ThreadBefore{result} ->
-          mkEvnt Thread Before result: recurse
-        ThreadAfter{result} ->
-          mkEvnt Thread After result: recurse
-        ThreadAround{setupResult
-                  , teardownResult} ->
-          mkEvnt Thread Setup setupResult
-            : mkEvnt Thread Teardown teardownResult
+        ThreadBefore{threadSpec} ->
+          mkEvnt Thread Before threadSpec : recurse
+        ThreadAfter{threadSpec} ->
+          mkEvnt Thread After threadSpec: recurse
+        ThreadAround{setupThreadSpec
+                  , teardownThreadSpec} ->
+          mkEvnt Thread Setup setupThreadSpec
+            : mkEvnt Thread Teardown teardownThreadSpec
             : recurse
-        EachBefore{result} ->
-          mkEvnt Each Before result: recurse
-        EachAfter{result} ->
-          mkEvnt Each After result: recurse
-        EachAround{setupResult
-                  , teardownResult} ->
-          mkEvnt Each Setup setupResult
-            : mkEvnt Each Teardown teardownResult
+        EachBefore{spec} ->
+          mkEvnt Each Before (All spec): recurse
+        EachAfter{spec} ->
+          mkEvnt Each After (All spec): recurse
+        EachAround{setupSpec
+                  , teardownSpec} ->
+          mkEvnt Each Setup (All setupSpec)
+            : mkEvnt Each Teardown (All teardownSpec)
             : recurse
 
 -- map
@@ -237,7 +234,6 @@ eventPaths t = case t of
 data TestItem = TestItem
   { id :: Int
   , title :: Text
-  , delay :: Int
-  , result :: Result
+  , spec :: Spec
   }
   deriving (Show, Eq)

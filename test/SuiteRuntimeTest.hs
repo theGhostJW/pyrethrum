@@ -6,7 +6,7 @@ import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (Result (..))
+import FullSuiteTestTemplate (Result (..), Spec(..))
 import FullSuiteTestTemplate qualified as T
 import Internal.RunTimeLogging (ExePath (..), parentPath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
@@ -788,7 +788,7 @@ q2List qu = reverse <$> recurse [] qu
       >>= maybe (pure l) (\e -> recurse (e : l) q)
 
 loadTQueue :: TQueue a -> [a] -> STM ()
-loadTQueue q = traverse_ (writeTQueue q)
+loadTQueue q = traverse_ (writeTQueue q) . reverse
 
 setPaths :: Text -> [Template] -> [T.Template]
 setPaths address ts =
@@ -809,9 +809,6 @@ setPaths address ts =
           { path = newPath "Test"
           , testItems = zip [0 ..] testItems <&> \(idx', TestItem{..}) -> T.TestItem{title = newAdd <> " TestItem", id = idx', ..}
           }
-      -- _ -> case tp of
-      -- get a (invalid??) ambiguous update warining if I try to use record update for these 2 fields
-      -- in a subscase statement here - try refactor after record update changes go into GHC
       OnceBefore{..} -> T.OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
       OnceAfter{..} -> T.OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
       OnceAround{..} -> T.OnceAround{path = newPath "OnceAround", subNodes = newNodes, ..}
@@ -827,7 +824,7 @@ setPaths address ts =
     newNodes = setPaths newAdd tp.subNodes
 
 {-
-todo - trace like
+todo - trace like with pretty printing
   db == debug'
   dbNoLabel
   dbCondional
@@ -880,33 +877,35 @@ instance Core.Config TestConfig
 tc :: TestConfig
 tc = TestConfig{title = "test config"}
 
-mkThreadAction :: forall desc. (Show desc) => TQueue Result -> desc -> Int -> IO ()
-mkThreadAction q path delay =
+mkThreadAction :: forall desc. (Show desc) => TQueue Spec -> desc -> Int -> IO ()
+mkThreadAction q path =
   do 
-    r <- atomically $ tryReadTQueue q
-    r & maybe 
-      (error "thread result queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen)") 
-      (mkVoidAction path delay)
+    s <- atomically $ tryReadTQueue q
+    s & maybe 
+      (error "thread spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen)") 
+      (mkVoidAction path s)
 
 
-mkVoidAction :: forall desc. (Show desc) => desc -> Int -> Result -> IO ()
-mkVoidAction path delay outcome =
+mkVoidAction :: forall desc. (Show desc) => desc -> Spec -> IO ()
+mkVoidAction path spec =
   do
-    C.threadDelay delay
-    unless (outcome == Pass) $
+    C.threadDelay spec.delay
+    unless (spec.result == Pass) $
       error . toS $
         txt path <> " failed"
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
-mkAction :: forall hi desc. (Show desc) => desc -> Int -> Result -> P.ApEventSink -> hi -> IO ()
-mkAction path delay rslt _sink _in = mkVoidAction path delay rslt
+mkAction :: forall hi desc. (Show desc) => desc -> Spec -> P.ApEventSink -> hi -> IO ()
+mkAction path s _sink _in = mkVoidAction path s
 
 mkNodes :: ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
 mkNodes mxThreads = sequence . fmap mkNode
  where
 
-  afterAction = const $ mkVoidAction
+  afterAction :: Show desc => desc -> Int -> Result -> b -> IO ()
+  afterAction path delay result = const $ mkVoidAction path delay result
+
   mkNodes' = mkNodes mxThreads
   mkNode :: T.Template -> IO (P.PreNode IO [] ())
   mkNode t = case t of
@@ -923,7 +922,8 @@ mkNodes mxThreads = sequence . fmap mkNode
     _ ->
       do
         nds <- mkNodes' $ t.subNodes
-        threadResults <- newTQueueIO
+        q <- newTQueueIO
+        let threadAction = mkThreadAction q
         pure $ case t of
           T.OnceBefore
             { path
@@ -945,7 +945,7 @@ mkNodes mxThreads = sequence . fmap mkNode
               P.After
                 { path
                 , frequency = Once
-                , after = const $ mkVoidAction path delay result
+                , after = afterAction path delay result
                 , subNodes' = nds
                 }
           T.OnceAround
@@ -980,7 +980,7 @@ mkNodes mxThreads = sequence . fmap mkNode
               P.After
                 { path
                 , frequency = Each
-                , after = const $ mkVoidAction path delay result
+                , after = afterAction path delay result
                 , subNodes' = nds
                 }
           T.EachAround
@@ -1000,12 +1000,12 @@ mkNodes mxThreads = sequence . fmap mkNode
             T.ThreadBefore
               { path
               , delay
-              , result
+              , threadResult
               } ->
                 P.Before
                   { path
                   , frequency = Thread
-                  , action = mkAction path delay result
+                  , action = mkThreadAction path delay result
                   , subNodes = nds
                   }
             T.ThreadAfter
@@ -1016,7 +1016,7 @@ mkNodes mxThreads = sequence . fmap mkNode
                 P.After
                   { path
                   , frequency = Thread
-                  , after = const $ mkVoidAction path delay result
+                  , after = afterAction path delay result
                   , subNodes' = nds
                   }
             T.ThreadAround
@@ -1051,7 +1051,7 @@ data Template
       }
   | ThreadBefore
       { delay :: Int
-      , result :: Result
+      , result :: T.ThreadSpec
       , subNodes :: [Template]
       }
   | ThreadAfter

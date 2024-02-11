@@ -6,7 +6,7 @@ import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (Result (..), Spec(..))
+import FullSuiteTestTemplate (Result (..), Spec (..), ThreadSpec (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.RunTimeLogging (ExePath (..), parentPath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
@@ -40,7 +40,7 @@ import UnliftIO.Concurrent as C (
   threadDelay,
  )
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
-import Prelude hiding (id)
+import Prelude hiding (All, id)
 
 import Test.Falsify.Generator qualified as FG
 import Test.Falsify.Predicate qualified as FP
@@ -94,50 +94,45 @@ unit_nested_threaded_chk_thread_count =
   do
     let mxThrds = 10
         logging' = NoLog
+        all' d r = All $ Spec d r
     r <-
       execute
         logging'
         mxThrds
         [ OnceAround
-            1000
-            Pass
-            Pass
+            (Spec 1000 Pass)
+            (Spec 0 Pass)
             [ ThreadAround
-                10
-                Pass
-                Pass
+                (all' 0 Pass)
+                (all' 0 Pass)
                 [ EachAfter
-                    50
-                    Pass
+                    (Spec 50 Pass)
                     [ test
-                        [ TestItem 0 Pass
-                        , TestItem 1 Fail
+                        [ Spec 0 Pass
+                        , Spec 1 Fail
                         ]
                     ]
                 ]
             , ThreadAround
-                100
-                Pass
-                Fail
+                (all' 100 Pass)
+                (all' 0 Fail)
                 [ ThreadAround
-                    300
-                    Pass
-                    Pass
-                    [ threadAround Pass Pass [eachAfter Pass [test [TestItem 3000 Fail, TestItem 1000 Pass]]]
-                    , ThreadAround 50 Pass Pass [eachAfter Fail [test [TestItem 1000 Pass, TestItem 1000 Fail]]]
-                    , threadAround Fail Pass [eachAfter Pass [test [TestItem 1000 Fail, TestItem 1000 Pass]]]
-                    , threadAround Pass Pass [EachBefore 300 Fail [test [TestItem 1000 Fail, TestItem 3000 Pass]]]
-                    , eachAround Fail Pass [test [TestItem 40 Fail, TestItem 10 Pass]]
+                    (all' 300 Pass)
+                    (all' 300 Pass)
+                    [ threadAround Pass Pass [eachAfter Pass [test [Spec 3000 Fail, Spec 1000 Pass]]]
+                    , ThreadAround (All $ Spec 50 Pass) (All $ Spec 0 Pass) [eachAfter Fail [test [Spec 1000 Pass, Spec 1000 Fail]]]
+                    , threadAround Fail Pass [eachAfter Pass [test [Spec 1000 Fail, Spec 1000 Pass]]]
+                    , threadAround Pass Pass [EachBefore (Spec 300 Fail) [test [Spec 1000 Fail, Spec 3000 Pass]]]
+                    , eachAround Fail Pass [test [Spec 40 Fail, Spec 10 Pass]]
                     , eachBefore
                         Fail
-                        [ test [TestItem 300 Pass, TestItem 10 Pass]
+                        [ test [Spec 300 Pass, Spec 10 Pass]
                         , EachAround
-                            50
-                            Pass
-                            Pass
+                            (Spec 50 Pass)
+                            (Spec 0 Pass)
                             [ test
-                                [ TestItem 1000 Pass
-                                , TestItem 200 Pass
+                                [ Spec 1000 Pass
+                                , Spec 200 Pass
                                 ]
                             ]
                         ]
@@ -711,37 +706,37 @@ chkEq' msg e a =
         <> "\n"
 
 onceBefore :: Result -> [Template] -> Template
-onceBefore = OnceBefore 0
+onceBefore = OnceBefore . Spec 0
 
 onceAfter :: Result -> [Template] -> Template
-onceAfter = OnceAfter 0
+onceAfter = OnceAfter . Spec 0
 
 onceAround :: Result -> Result -> [Template] -> Template
-onceAround = OnceAround 0
+onceAround suRslt tdRslt = OnceAround (Spec 0 suRslt) (Spec 0 tdRslt)
 
 threadBefore :: Result -> [Template] -> Template
-threadBefore = ThreadBefore 0
+threadBefore r = ThreadBefore (All $ Spec 0 r)
 
 threadAfter :: Result -> [Template] -> Template
-threadAfter = ThreadAfter 0
+threadAfter r = ThreadAfter (All $ Spec 0 r)
 
 threadAround :: Result -> Result -> [Template] -> Template
-threadAround = ThreadAround 0
+threadAround suRslt tdRslt = ThreadAround (All $ Spec 0 suRslt) (All $ Spec 0 tdRslt)
 
 eachBefore :: Result -> [Template] -> Template
-eachBefore = EachBefore 0
+eachBefore = EachBefore . Spec 0
 
 eachAfter :: Result -> [Template] -> Template
-eachAfter = EachAfter 0
+eachAfter = EachAfter . Spec 0
 
 eachAround :: Result -> Result -> [Template] -> Template
-eachAround = EachAround 0
+eachAround suRslt tdRslt = EachAround (Spec 0 suRslt) (Spec 0 tdRslt)
 
-test :: [TestItem] -> Template
+test :: [Spec] -> Template
 test = SuiteRuntimeTest.Test
 
-testItem :: Result -> TestItem
-testItem = TestItem 0
+testItem :: Result -> Spec
+testItem = Spec 0
 
 data ExeResult = ExeResult
   { expandedTemplate :: [T.Template]
@@ -807,7 +802,7 @@ setPaths address ts =
       SuiteRuntimeTest.Test{testItems} ->
         T.Test
           { path = newPath "Test"
-          , testItems = zip [0 ..] testItems <&> \(idx', TestItem{..}) -> T.TestItem{title = newAdd <> " TestItem", id = idx', ..}
+          , testItems = zip [0 ..] testItems <&> \(idx', spec) -> T.TestItem{title = newAdd <> " TestItem", id = idx', ..}
           }
       OnceBefore{..} -> T.OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
       OnceAfter{..} -> T.OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
@@ -879,12 +874,12 @@ tc = TestConfig{title = "test config"}
 
 mkThreadAction :: forall desc. (Show desc) => TQueue Spec -> desc -> Int -> IO ()
 mkThreadAction q path =
-  do 
+  do
     s <- atomically $ tryReadTQueue q
-    s & maybe 
-      (error "thread spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen)") 
-      (mkVoidAction path s)
-
+    s
+      & maybe
+        (error "thread spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen)")
+        (mkVoidAction path s)
 
 mkVoidAction :: forall desc. (Show desc) => desc -> Spec -> IO ()
 mkVoidAction path spec =
@@ -902,8 +897,7 @@ mkAction path s _sink _in = mkVoidAction path s
 mkNodes :: ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
 mkNodes mxThreads = sequence . fmap mkNode
  where
-
-  afterAction :: Show desc => desc -> Int -> Result -> b -> IO ()
+  afterAction :: (Show desc) => desc -> Int -> Result -> b -> IO ()
   afterAction path delay result = const $ mkVoidAction path delay result
 
   mkNodes' = mkNodes mxThreads
@@ -927,8 +921,7 @@ mkNodes mxThreads = sequence . fmap mkNode
         pure $ case t of
           T.OnceBefore
             { path
-            , delay
-            , result
+            , spec
             } ->
               do
                 P.Before
@@ -939,8 +932,7 @@ mkNodes mxThreads = sequence . fmap mkNode
                   }
           T.OnceAfter
             { path
-            , delay
-            , result
+            , spec
             } ->
               P.After
                 { path
@@ -950,9 +942,8 @@ mkNodes mxThreads = sequence . fmap mkNode
                 }
           T.OnceAround
             { path
-            , delay
-            , setupResult
-            , teardownResult
+            , setupSpec
+            , teardownSpec
             } ->
               P.Around
                 { path
@@ -963,8 +954,7 @@ mkNodes mxThreads = sequence . fmap mkNode
                 }
           T.EachBefore
             { path
-            , delay
-            , result
+            , spec
             } ->
               P.Before
                 { path
@@ -974,8 +964,7 @@ mkNodes mxThreads = sequence . fmap mkNode
                 }
           T.EachAfter
             { path
-            , delay
-            , result
+            , spec
             } ->
               P.After
                 { path
@@ -985,9 +974,8 @@ mkNodes mxThreads = sequence . fmap mkNode
                 }
           T.EachAround
             { path
-            , delay
-            , setupResult
-            , teardownResult
+            , setupSpec
+            , teardownSpec
             } ->
               P.Around
                 { path
@@ -999,8 +987,7 @@ mkNodes mxThreads = sequence . fmap mkNode
           _ -> case t of
             T.ThreadBefore
               { path
-              , delay
-              , threadResult
+              , threadSpec
               } ->
                 P.Before
                   { path
@@ -1010,8 +997,7 @@ mkNodes mxThreads = sequence . fmap mkNode
                   }
             T.ThreadAfter
               { path
-              , delay
-              , result
+              , threadSpec
               } ->
                 P.After
                   { path
@@ -1021,9 +1007,8 @@ mkNodes mxThreads = sequence . fmap mkNode
                   }
             T.ThreadAround
               { path
-              , delay
-              , setupResult
-              , teardownResult
+              , setupThreadSpec
+              , teardownThreadSpec
               } ->
                 P.Around
                   { path
@@ -1034,63 +1019,48 @@ mkNodes mxThreads = sequence . fmap mkNode
                   }
 data Template
   = OnceBefore
-      { delay :: Int
-      , result :: Result
+      { spec :: Spec
       , subNodes :: [Template]
       }
   | OnceAfter
-      { delay :: Int
-      , result :: Result
+      { spec :: Spec
       , subNodes :: [Template]
       }
   | OnceAround
-      { delay :: Int
-      , setupResult :: Result
-      , teardownResult :: Result
+      { setupSpec :: Spec
+      , teardownSpec :: Spec
       , subNodes :: [Template]
       }
   | ThreadBefore
-      { delay :: Int
-      , result :: T.ThreadSpec
+      { threadSpec :: ThreadSpec
       , subNodes :: [Template]
       }
   | ThreadAfter
-      { delay :: Int
-      , result :: Result
+      { threadSpec :: ThreadSpec
       , subNodes :: [Template]
       }
   | ThreadAround
-      { delay :: Int
-      , setupResult :: Result
-      , teardownResult :: Result
+      { setupThreadSpec :: ThreadSpec
+      , teardownThreadSpec :: ThreadSpec
       , subNodes :: [Template]
       }
   | EachBefore
-      { delay :: Int
-      , result :: Result
+      { spec :: Spec
       , subNodes :: [Template]
       }
   | EachAfter
-      { delay :: Int
-      , result :: Result
+      { spec :: Spec
       , subNodes :: [Template]
       }
   | EachAround
-      { delay :: Int
-      , setupResult :: Result
-      , teardownResult :: Result
+      { setupSpec :: Spec
+      , teardownSpec :: Spec
       , subNodes :: [Template]
       }
   | Test
-      { testItems :: [TestItem]
+      { testItems :: [Spec]
       }
   deriving (Show, Eq)
 
-data TestItem = TestItem
-  { delay :: Int
-  , result :: Result
-  }
-  deriving (Show, Eq)
-
 mkTestItem :: T.TestItem -> P.TestItem IO ()
-mkTestItem T.TestItem{id, title, delay, result} = P.TestItem id title (mkAction title delay result)
+mkTestItem T.TestItem{id, title, spec} = P.TestItem id title (mkAction title delay result)

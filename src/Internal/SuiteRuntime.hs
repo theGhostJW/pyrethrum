@@ -478,6 +478,14 @@ canLockTeardown s qs = case s of
   AroundDone -> False
   AroundAbandoning -> False
 
+-- TODO play with case statements
+-- runNode2 :: ExeTree hi -> a
+-- runNode2 AfterOnce{ } = undefined
+
+-- runNode2 n = case n of
+--    AfterOnce {} -> undefined
+--    _ -> undefined
+
 runNode ::
   forall hi.
   Logger ->

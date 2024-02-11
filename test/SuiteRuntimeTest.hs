@@ -6,7 +6,7 @@ import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (Result (..), Spec (..), ThreadSpec (..))
+import FullSuiteTestTemplate (Result (..), Spec (..), ThreadSpec (..), specs)
 import FullSuiteTestTemplate qualified as T
 import Internal.RunTimeLogging (ExePath (..), parentPath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
@@ -52,15 +52,15 @@ import Test.Tasty.Falsify qualified as F
  - thread fail
 -}
 
--- $ > unit_simple_pass
+-- $> unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
--- $ > unit_simple_fail
+-- $> unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
--- $ > unit_nested_pass_fail
+-- $> unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
   runTest
@@ -88,7 +88,7 @@ unit_nested_pass_fail =
         ]
     ]
 
--- $ > unit_nested_threaded_chk_thread_count
+-- $> unit_nested_threaded_chk_thread_count
 unit_nested_threaded_chk_thread_count :: IO ()
 unit_nested_threaded_chk_thread_count =
   do
@@ -152,11 +152,11 @@ unit_nested_threaded_chk_thread_count =
 unit_empty_thread_around :: IO ()
 unit_empty_thread_around =
   do
-    exe [ThreadAround 0 Pass Pass []] >>= chkEmptyLog
-    exe [ThreadBefore 0 Pass []] >>= chkEmptyLog
-    exe [ThreadAfter 0 Pass []] >>= chkEmptyLog
-    exe [ThreadAround 0 Pass Pass [ThreadBefore 0 Pass [ThreadAfter 0 Pass []]]] >>= chkEmptyLog
-    exe [ThreadAround 0 Pass Pass [ThreadBefore 0 Pass [ThreadAfter 0 Pass [test [testItem Pass]]]]] >>= chkLogLength
+    exe [threadAround Pass Pass []] >>= chkEmptyLog
+    exe [threadBefore Pass []] >>= chkEmptyLog
+    exe [threadAfter Pass []] >>= chkEmptyLog
+    exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass []]]] >>= chkEmptyLog
+    exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [test [testItem Pass]]]]] >>= chkLogLength
  where
   exe = execute NoLog 1
   chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (toS $ ppShow r.log)) 2 (length r.log)
@@ -174,7 +174,8 @@ chkProperties ts evts = do
     , chkAllTemplateItemsLogged ts
     , chkStartsOnce "once hooks and tests" shouldOccurOnce
     , chkStartSuiteEventImmediatlyFollowedByEnd "once hooks" (hasSuiteEvent onceHook)
-    , chkTemplateAbsoluteFailsAndPassesLogged ts
+    , chkTemplateAllFailsAndPassesLogged ts
+    , chkTemplateSomeFailsAndPassesLogged ts
     ]
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
   threadLogChks
@@ -219,10 +220,13 @@ chkThreadCount mxThrds evts =
     (mxThrds + 1) -- main thread + number of threads specified
     (length $ threadIds evts)
 
--- needs some work
--- partial passes will be recorded as fail
-chkTemplateAbsoluteFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
-chkTemplateAbsoluteFailsAndPassesLogged ts lgs =
+-- TODO :: add test for threaded (Some failures) - ie. some failures in a thread
+-- count should match number of result instance in log (allow for parent failures)
+chkTemplateSomeFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
+chkTemplateSomeFailsAndPassesLogged = uu
+
+chkTemplateAllFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
+chkTemplateAllFailsAndPassesLogged ts lgs =
   do
     -- existence checks are in another test. just checking results correspond to expected
     -- this test will need to be updated when non-deterministic thread templates results are added
@@ -279,20 +283,38 @@ chkTemplateAbsoluteFailsAndPassesLogged ts lgs =
           (error $ "Empty path in: " <> (toS $ ppShow li))
           (\p -> (p, se))
 
-  expectedResults :: Result -> Set (AE.Path, SuiteEvent)
-  expectedResults r = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filter ((== r) . (.result)) (ts >>= T.eventPaths)
+  expectedResults :: (ThreadSpec -> Bool) -> Set (AE.Path, SuiteEvent)
+  expectedResults pred' = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filter (pred' . (.evntSpec)) (ts >>= T.eventPaths)
 
   expectedPass :: Set (AE.Path, SuiteEvent)
-  expectedPass = expectedResults Pass
+  expectedPass = expectedResults (
+     \case
+       All (Spec _ Pass) -> True
+       All (Spec _ Fail) -> False
+       Some _ -> False
+    )
 
   expectedFail :: Set (AE.Path, SuiteEvent)
-  expectedFail = expectedResults Fail
+  expectedFail = expectedResults (
+     \case
+       All (Spec _ Pass) -> False
+       All (Spec _ Fail) -> True
+       Some _ -> False
+    )
+
+  -- expectedSome :: Set (AE.Path, SuiteEvent)
+  -- expectedSome = expectedResults (
+  --    \case
+  --      All (Spec _ Pass) -> False
+  --      All (Spec _ Fail) -> False
+  --      Some _ -> True
+  --   )
 
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =
   do
     traverse_ chkDiscreteFailsAreNotPropagated failTails
-    traverse_ chkNonDiscreteFailsPropagated failTails
+    traverse_ chkParentFailsPropagated failTails
  where
   failTails = snd $ failInfo lg
 
@@ -300,22 +322,22 @@ chkFailurePropagation lg =
 -- parent events expect all chidren to fail
 -- pall the way to last sibling including last sibling when setup / teardown
 
-isDiscrete :: SuiteEvent -> Bool
-isDiscrete = \case
+isChildless :: SuiteEvent -> Bool
+isChildless = \case
   Hook _hz pos -> pos == After
   TE.Test{} -> True
 
 data ChkState = ExpectParentFail | DoneChecking
   deriving (Show, Eq)
 
-chkNonDiscreteFailsPropagated :: FailInfo -> IO ()
-chkNonDiscreteFailsPropagated
+chkParentFailsPropagated :: FailInfo -> IO ()
+chkParentFailsPropagated
   f@FailInfo
     { failStartTail
     , loc = failLoc
     , suiteEvent = failSuiteEvent
     } =
-    unless (isDiscrete f.suiteEvent) $ do
+    unless (isChildless f.suiteEvent) $ do
       void $ foldlM validateEvent ExpectParentFail failStartTail
    where
     isFailChildLog :: LogItem -> Bool
@@ -402,7 +424,7 @@ chkDiscreteFailsAreNotPropagated :: FailInfo -> IO ()
 chkDiscreteFailsAreNotPropagated
   f@FailInfo
     { failStartTail
-    } = when (isDiscrete f.suiteEvent) $ do
+    } = when (isChildless f.suiteEvent) $ do
     whenJust
       (LE.head failStartTail)
       \case
@@ -872,14 +894,14 @@ instance Core.Config TestConfig
 tc :: TestConfig
 tc = TestConfig{title = "test config"}
 
-mkThreadAction :: forall desc. (Show desc) => TQueue Spec -> desc -> Int -> IO ()
+mkThreadAction :: forall desc. (Show desc) => TQueue Spec -> desc -> IO ()
 mkThreadAction q path =
   do
     s <- atomically $ tryReadTQueue q
     s
       & maybe
         (error "thread spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen)")
-        (mkVoidAction path s)
+        (mkVoidAction path)
 
 mkVoidAction :: forall desc. (Show desc) => desc -> Spec -> IO ()
 mkVoidAction path spec =
@@ -897,8 +919,8 @@ mkAction path s _sink _in = mkVoidAction path s
 mkNodes :: ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
 mkNodes mxThreads = sequence . fmap mkNode
  where
-  afterAction :: (Show desc) => desc -> Int -> Result -> b -> IO ()
-  afterAction path delay result = const $ mkVoidAction path delay result
+  afterAction :: (Show desc) => desc -> Spec-> b -> IO ()
+  afterAction path spec = const $ mkVoidAction path spec
 
   mkNodes' = mkNodes mxThreads
   mkNode :: T.Template -> IO (P.PreNode IO [] ())
@@ -914,10 +936,20 @@ mkNodes mxThreads = sequence . fmap mkNode
             , tests = mkTestItem <$> testItems
             }
     _ ->
+      let
+        mkThreadAction' :: forall desc. Show desc => TQueue Spec -> ThreadSpec -> desc -> IO () 
+        mkThreadAction' q ts desc = 
+          do 
+           atomically $ loadTQueue q (specs mxThreads.maxThreads ts)
+           mkThreadAction q desc
+      in
       do
         nds <- mkNodes' $ t.subNodes
-        q <- newTQueueIO
-        let threadAction = mkThreadAction q
+        b4Q <- newTQueueIO
+        afterQ <- newTQueueIO
+        let mkB4ThrdAction ts desc _ _ = mkThreadAction' b4Q ts desc
+            mkTeardownThrdAction ts desc _ _ = mkThreadAction' afterQ ts desc
+            mkAfterThrdAction ts desc _ = mkThreadAction' afterQ ts desc
         pure $ case t of
           T.OnceBefore
             { path
@@ -927,7 +959,7 @@ mkNodes mxThreads = sequence . fmap mkNode
                 P.Before
                   { path
                   , frequency = Once
-                  , action = mkAction path delay result
+                  , action = mkAction path spec
                   , subNodes = nds
                   }
           T.OnceAfter
@@ -937,7 +969,7 @@ mkNodes mxThreads = sequence . fmap mkNode
               P.After
                 { path
                 , frequency = Once
-                , after = afterAction path delay result
+                , after = afterAction path spec
                 , subNodes' = nds
                 }
           T.OnceAround
@@ -948,8 +980,8 @@ mkNodes mxThreads = sequence . fmap mkNode
               P.Around
                 { path
                 , frequency = Once
-                , setup = mkAction path delay setupResult
-                , teardown = mkAction path delay teardownResult
+                , setup = mkAction path setupSpec
+                , teardown = mkAction path teardownSpec
                 , subNodes = nds
                 }
           T.EachBefore
@@ -959,7 +991,7 @@ mkNodes mxThreads = sequence . fmap mkNode
               P.Before
                 { path
                 , frequency = Each
-                , action = mkAction path delay result
+                , action = mkAction path spec
                 , subNodes = nds
                 }
           T.EachAfter
@@ -969,7 +1001,7 @@ mkNodes mxThreads = sequence . fmap mkNode
               P.After
                 { path
                 , frequency = Each
-                , after = afterAction path delay result
+                , after = afterAction path spec
                 , subNodes' = nds
                 }
           T.EachAround
@@ -980,8 +1012,8 @@ mkNodes mxThreads = sequence . fmap mkNode
               P.Around
                 { path
                 , frequency = Each
-                , setup = mkAction path delay setupResult
-                , teardown = mkAction path delay teardownResult
+                , setup = mkAction path setupSpec
+                , teardown = mkAction path teardownSpec
                 , subNodes = nds
                 }
           _ -> case t of
@@ -992,7 +1024,7 @@ mkNodes mxThreads = sequence . fmap mkNode
                 P.Before
                   { path
                   , frequency = Thread
-                  , action = mkThreadAction path delay result
+                  , action = mkB4ThrdAction threadSpec path
                   , subNodes = nds
                   }
             T.ThreadAfter
@@ -1002,7 +1034,7 @@ mkNodes mxThreads = sequence . fmap mkNode
                 P.After
                   { path
                   , frequency = Thread
-                  , after = afterAction path delay result
+                  , after = mkAfterThrdAction threadSpec path 
                   , subNodes' = nds
                   }
             T.ThreadAround
@@ -1013,8 +1045,8 @@ mkNodes mxThreads = sequence . fmap mkNode
                 P.Around
                   { path
                   , frequency = Thread
-                  , setup = mkAction path delay setupResult
-                  , teardown = mkAction path delay teardownResult
+                  , setup = mkB4ThrdAction setupThreadSpec path
+                  , teardown = mkTeardownThrdAction teardownThreadSpec path
                   , subNodes = nds
                   }
 data Template
@@ -1063,4 +1095,4 @@ data Template
   deriving (Show, Eq)
 
 mkTestItem :: T.TestItem -> P.TestItem IO ()
-mkTestItem T.TestItem{id, title, spec} = P.TestItem id title (mkAction title delay result)
+mkTestItem T.TestItem{id, title, spec} = P.TestItem id title (mkAction title spec)

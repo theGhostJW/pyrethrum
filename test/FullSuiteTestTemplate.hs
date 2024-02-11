@@ -4,7 +4,7 @@ import DSL.Internal.ApEvent (Path (..))
 import Data.Map.Strict qualified as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
 import Internal.ThreadEvent qualified as TE
-import PyrethrumExtras (debug')
+import PyrethrumExtras (debug', (?))
 import Prelude hiding (All, id)
 
 data Spec = Spec {delay :: Int, result :: Result}
@@ -18,6 +18,16 @@ data ThreadSpec
   = All Spec
   | Some [Spec]
   deriving (Show, Eq)
+
+specs :: Int -> ThreadSpec ->  [Spec]
+specs maxThreads ts  = case ts of
+  All s -> replicate maxThreads s
+  Some ss -> 
+    length ss == maxThreads 
+        ? ss 
+        $ error "ThreadSpec: mismatched number of specs"
+
+
 
 data SuiteEventPath = SuiteEventPath
   { path :: Path

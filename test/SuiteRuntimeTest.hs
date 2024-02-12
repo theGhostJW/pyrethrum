@@ -223,7 +223,26 @@ chkThreadCount mxThrds evts =
 -- TODO :: add test for threaded (Some failures) - ie. some failures in a thread
 -- count should match number of result instance in log (allow for parent failures)
 chkTemplateSomeFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
-chkTemplateSomeFailsAndPassesLogged = uu
+chkTemplateSomeFailsAndPassesLogged ts lgs = uu
+  where 
+  actuals = foldl' logResults emptyAcc
+  threadedActuals = actuals <$> threadedLogs False lgs
+  
+  expectedSomeResults = M.fromList $ (\ep -> (ep.path, someResults ep)) <$> filteredEvntPaths isSome ts
+
+  someResults :: T.EventPath -> [Result]
+  someResults ep = ep.evntSpec &
+     \case
+       All (Spec _ _) -> error "this should not happen"
+       Some s -> (.result) <$> s
+
+  isSome :: ThreadSpec -> Bool
+  isSome = 
+     \case
+       All (Spec _ _) -> False
+       Some _ -> True
+
+
 
 chkTemplateAllFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
 chkTemplateAllFailsAndPassesLogged ts lgs =
@@ -284,7 +303,7 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
           (\p -> (p, se))
 
   expectedResults :: (ThreadSpec -> Bool) -> Set (AE.Path, SuiteEvent)
-  expectedResults pred' = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filter (pred' . (.evntSpec)) (ts >>= T.eventPaths)
+  expectedResults pred' = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filteredEvntPaths pred' ts
 
   expectedPass :: Set (AE.Path, SuiteEvent)
   expectedPass = expectedResults (
@@ -309,6 +328,9 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
   --      All (Spec _ Fail) -> False
   --      Some _ -> True
   --   )
+
+filteredEvntPaths :: (ThreadSpec -> Bool) -> [T.Template] -> [T.EventPath]
+filteredEvntPaths pred' templates = filter (pred' . (.evntSpec)) (templates >>= T.eventPaths)
 
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =

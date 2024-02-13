@@ -25,7 +25,7 @@ import Internal.ThreadEvent as TE (
   onceHook,
   onceSuiteEvent,
   startSuiteEventLoc,
-  suiteEvent,
+  getSuiteEvent,
   suiteEventOrParentFailureSuiteEvent,
   threadHook,
  )
@@ -148,6 +148,9 @@ unit_nested_threaded_chk_thread_count =
    that empty thread TestTrees are not executed
 -}
 
+ppTxt :: Show a => a -> Text
+ppTxt = toS . ppShow
+
 -- $> unit_empty_thread_around
 unit_empty_thread_around :: IO ()
 unit_empty_thread_around =
@@ -159,8 +162,8 @@ unit_empty_thread_around =
     exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [test [testItem Pass]]]]] >>= chkLogLength
  where
   exe = execute NoLog 1
-  chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (toS $ ppShow r.log)) 2 (length r.log)
-  chkLogLength r = chkEq' ("Log length not as expected:\n" <> (toS $ ppShow r.log)) 12 (length r.log)
+  chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (ppTxt r.log)) 2 (length r.log)
+  chkLogLength r = chkEq' ("Log length not as expected:\n" <> (ppTxt r.log)) 12 (length r.log)
 
 type LogItem = ThreadEvent ExePath AE.ApEvent
 
@@ -208,6 +211,46 @@ data Acc = MkAcc
   }
   deriving (Show)
 
+data LogResult
+  = Actual Result
+  | ParentFailed
+  deriving (Eq, Show)
+
+data ResultInfo = ResultInfo
+  { suiteEvent :: SuiteEvent
+  , result :: LogResult
+  }
+
+
+-- a result accumulator function to be used across a single thread log - will fail due to duplicate
+-- if run across multiple thread logs
+logResults :: M.Map AE.Path ResultInfo -> LogItem -> M.Map AE.Path ResultInfo
+logResults acc =
+  \case
+    End{} -> acc
+    Failure{loc,  suiteEvent} ->
+       M.insert (ensureMember loc) (ResultInfo suiteEvent (Actual Fail)) acc
+    ParentFailure{loc, suiteEvent} ->
+      acc
+        { parentFails = S.insert (mkTpl loc se) parentFails
+        , allEvents = S.insert (mkTpl loc se) allEvents
+        }
+    Start{loc, suiteEvent} ->
+      acc
+        { allEvents = S.insert (mkTpl loc se) allEvents
+        , -- there is another check that failures match with last started
+          lastStarted = Just se
+        }
+    StartExecution{} -> acc
+    ApEvent{} -> acc
+    EndExecution{} -> acc
+ where
+  ensureMember loc = 
+    let p = topPath loc
+    in
+    M.member p acc p ? loc p $ error $ "Event of path not started " <> p
+
+
 emptyAcc :: Acc
 emptyAcc = MkAcc S.empty S.empty S.empty Nothing
 
@@ -224,25 +267,26 @@ chkThreadCount mxThrds evts =
 -- count should match number of result instance in log (allow for parent failures)
 chkTemplateSomeFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
 chkTemplateSomeFailsAndPassesLogged ts lgs = uu
-  where 
-  actuals = foldl' logResults emptyAcc
-  threadedActuals = actuals <$> threadedLogs False lgs
-  
+ where
+  accSums :: [(AE.Path, [Result])] -> LogItem -> [(AE.Path, [Result])]
+  accSums acc = \case {}
+
+  threadedActuals = foldl' accSums [] <$> threadedLogs False lgs
+
   expectedSomeResults = M.fromList $ (\ep -> (ep.path, someResults ep)) <$> filteredEvntPaths isSome ts
 
   someResults :: T.EventPath -> [Result]
-  someResults ep = ep.evntSpec &
-     \case
-       All (Spec _ _) -> error "this should not happen"
-       Some s -> (.result) <$> s
+  someResults ep =
+    ep.evntSpec
+      & \case
+        All (Spec _ _) -> error "this should not happen"
+        Some s -> (.result) <$> s
 
   isSome :: ThreadSpec -> Bool
-  isSome = 
-     \case
-       All (Spec _ _) -> False
-       Some _ -> True
-
-
+  isSome =
+    \case
+      All (Spec _ _) -> False
+      Some _ -> True
 
 chkTemplateAllFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
 chkTemplateAllFailsAndPassesLogged ts lgs =
@@ -277,7 +321,7 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
     case li of
       End{} -> acc
       Failure{loc} ->
-        let failEvnt = fromMaybe (error $ "Fail with no preceeding start: " <> (toS $ ppShow li)) lastStarted
+        let failEvnt = fromMaybe (error $ "Fail with no preceeding start: " <> (ppTxt li)) lastStarted
          in acc
               { fails = S.insert (mkTpl loc failEvnt) fails
               }
@@ -289,8 +333,6 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
       Start{loc, suiteEvent = se} ->
         acc
           { allEvents = S.insert (mkTpl loc se) allEvents
-          , -- there is another check that failures match with last started
-            lastStarted = Just se
           }
       StartExecution{} -> acc
       ApEvent{} -> acc
@@ -299,35 +341,37 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
     mkTpl loc se =
       topPath loc
         & maybe
-          (error $ "Empty path in: " <> (toS $ ppShow li))
+          (error $ "Empty path in: " <> (ppTxt li))
           (\p -> (p, se))
 
   expectedResults :: (ThreadSpec -> Bool) -> Set (AE.Path, SuiteEvent)
   expectedResults pred' = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filteredEvntPaths pred' ts
 
   expectedPass :: Set (AE.Path, SuiteEvent)
-  expectedPass = expectedResults (
-     \case
-       All (Spec _ Pass) -> True
-       All (Spec _ Fail) -> False
-       Some _ -> False
-    )
+  expectedPass =
+    expectedResults
+      ( \case
+          All (Spec _ Pass) -> True
+          All (Spec _ Fail) -> False
+          Some _ -> False
+      )
 
   expectedFail :: Set (AE.Path, SuiteEvent)
-  expectedFail = expectedResults (
-     \case
-       All (Spec _ Pass) -> False
-       All (Spec _ Fail) -> True
-       Some _ -> False
-    )
+  expectedFail =
+    expectedResults
+      ( \case
+          All (Spec _ Pass) -> False
+          All (Spec _ Fail) -> True
+          Some _ -> False
+      )
 
-  -- expectedSome :: Set (AE.Path, SuiteEvent)
-  -- expectedSome = expectedResults (
-  --    \case
-  --      All (Spec _ Pass) -> False
-  --      All (Spec _ Fail) -> False
-  --      Some _ -> True
-  --   )
+-- expectedSome :: Set (AE.Path, SuiteEvent)
+-- expectedSome = expectedResults (
+--    \case
+--      All (Spec _ Pass) -> False
+--      All (Spec _ Fail) -> False
+--      Some _ -> True
+--   )
 
 filteredEvntPaths :: (ThreadSpec -> Bool) -> [T.Template] -> [T.EventPath]
 filteredEvntPaths pred' templates = filter (pred' . (.evntSpec)) (templates >>= T.eventPaths)
@@ -365,7 +409,7 @@ chkParentFailsPropagated
     isFailChildLog :: LogItem -> Bool
     isFailChildLog li =
       let
-        mSuitEvnt = suiteEvent li
+        mSuitEvnt = getSuiteEvent li
         thisEventisTeardown =
           mSuitEvnt & maybe
             False
@@ -430,10 +474,10 @@ chkParentFailsPropagated
                     ( "This event should be a child failure:\n"
                         <> "  This Event is:\n"
                         <> "    "
-                        <> (toS $ ppShow s)
+                        <> (ppTxt s)
                         <> "  Parent Failure is:\n"
                         <> "    "
-                        <> (toS $ ppShow failLoc)
+                        <> (ppTxt failLoc)
                     )
                     False
                     isFailChild
@@ -561,7 +605,7 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
  where
   chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
   chkParent (childPath, actualParentPath) =
-    chkEq' (message <> " for:\n" <> (toS $ ppShow childPath)) expectedParentPath actualParentPath
+    chkEq' (message <> " for:\n" <> (ppTxt childPath)) expectedParentPath actualParentPath
    where
     expectedParentPath = M.lookup childPath expectedChildParentMap
 
@@ -578,7 +622,7 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
     (,actulaParentPath) <$> targetPath
    where
     logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
-    logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> suiteEvent l
+    logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> getSuiteEvent l
     targEvnt = L.head evntLog
     targetPath = targEvnt >>= logSuiteEventPath
     actulaParentPath = do
@@ -941,7 +985,7 @@ mkAction path s _sink _in = mkVoidAction path s
 mkNodes :: ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
 mkNodes mxThreads = sequence . fmap mkNode
  where
-  afterAction :: (Show desc) => desc -> Spec-> b -> IO ()
+  afterAction :: (Show desc) => desc -> Spec -> b -> IO ()
   afterAction path spec = const $ mkVoidAction path spec
 
   mkNodes' = mkNodes mxThreads
@@ -959,118 +1003,118 @@ mkNodes mxThreads = sequence . fmap mkNode
             }
     _ ->
       let
-        mkThreadAction' :: forall desc. Show desc => TQueue Spec -> ThreadSpec -> desc -> IO () 
-        mkThreadAction' q ts desc = 
-          do 
-           atomically $ loadTQueue q (specs mxThreads.maxThreads ts)
-           mkThreadAction q desc
-      in
-      do
-        nds <- mkNodes' $ t.subNodes
-        b4Q <- newTQueueIO
-        afterQ <- newTQueueIO
-        let mkB4ThrdAction ts desc _ _ = mkThreadAction' b4Q ts desc
-            mkTeardownThrdAction ts desc _ _ = mkThreadAction' afterQ ts desc
-            mkAfterThrdAction ts desc _ = mkThreadAction' afterQ ts desc
-        pure $ case t of
-          T.OnceBefore
-            { path
-            , spec
-            } ->
-              do
-                P.Before
-                  { path
-                  , frequency = Once
-                  , action = mkAction path spec
-                  , subNodes = nds
-                  }
-          T.OnceAfter
-            { path
-            , spec
-            } ->
-              P.After
-                { path
-                , frequency = Once
-                , after = afterAction path spec
-                , subNodes' = nds
-                }
-          T.OnceAround
-            { path
-            , setupSpec
-            , teardownSpec
-            } ->
-              P.Around
-                { path
-                , frequency = Once
-                , setup = mkAction path setupSpec
-                , teardown = mkAction path teardownSpec
-                , subNodes = nds
-                }
-          T.EachBefore
-            { path
-            , spec
-            } ->
-              P.Before
-                { path
-                , frequency = Each
-                , action = mkAction path spec
-                , subNodes = nds
-                }
-          T.EachAfter
-            { path
-            , spec
-            } ->
-              P.After
-                { path
-                , frequency = Each
-                , after = afterAction path spec
-                , subNodes' = nds
-                }
-          T.EachAround
-            { path
-            , setupSpec
-            , teardownSpec
-            } ->
-              P.Around
-                { path
-                , frequency = Each
-                , setup = mkAction path setupSpec
-                , teardown = mkAction path teardownSpec
-                , subNodes = nds
-                }
-          _ -> case t of
-            T.ThreadBefore
+        mkThreadAction' :: forall desc. (Show desc) => TQueue Spec -> ThreadSpec -> desc -> IO ()
+        mkThreadAction' q ts desc =
+          do
+            atomically $ loadTQueue q (specs mxThreads.maxThreads ts)
+            mkThreadAction q desc
+       in
+        do
+          nds <- mkNodes' $ t.subNodes
+          b4Q <- newTQueueIO
+          afterQ <- newTQueueIO
+          let mkB4ThrdAction ts desc _ _ = mkThreadAction' b4Q ts desc
+              mkTeardownThrdAction ts desc _ _ = mkThreadAction' afterQ ts desc
+              mkAfterThrdAction ts desc _ = mkThreadAction' afterQ ts desc
+          pure $ case t of
+            T.OnceBefore
               { path
-              , threadSpec
+              , spec
               } ->
-                P.Before
-                  { path
-                  , frequency = Thread
-                  , action = mkB4ThrdAction threadSpec path
-                  , subNodes = nds
-                  }
-            T.ThreadAfter
+                do
+                  P.Before
+                    { path
+                    , frequency = Once
+                    , action = mkAction path spec
+                    , subNodes = nds
+                    }
+            T.OnceAfter
               { path
-              , threadSpec
+              , spec
               } ->
                 P.After
                   { path
-                  , frequency = Thread
-                  , after = mkAfterThrdAction threadSpec path 
+                  , frequency = Once
+                  , after = afterAction path spec
                   , subNodes' = nds
                   }
-            T.ThreadAround
+            T.OnceAround
               { path
-              , setupThreadSpec
-              , teardownThreadSpec
+              , setupSpec
+              , teardownSpec
               } ->
                 P.Around
                   { path
-                  , frequency = Thread
-                  , setup = mkB4ThrdAction setupThreadSpec path
-                  , teardown = mkTeardownThrdAction teardownThreadSpec path
+                  , frequency = Once
+                  , setup = mkAction path setupSpec
+                  , teardown = mkAction path teardownSpec
                   , subNodes = nds
                   }
+            T.EachBefore
+              { path
+              , spec
+              } ->
+                P.Before
+                  { path
+                  , frequency = Each
+                  , action = mkAction path spec
+                  , subNodes = nds
+                  }
+            T.EachAfter
+              { path
+              , spec
+              } ->
+                P.After
+                  { path
+                  , frequency = Each
+                  , after = afterAction path spec
+                  , subNodes' = nds
+                  }
+            T.EachAround
+              { path
+              , setupSpec
+              , teardownSpec
+              } ->
+                P.Around
+                  { path
+                  , frequency = Each
+                  , setup = mkAction path setupSpec
+                  , teardown = mkAction path teardownSpec
+                  , subNodes = nds
+                  }
+            _ -> case t of
+              T.ThreadBefore
+                { path
+                , threadSpec
+                } ->
+                  P.Before
+                    { path
+                    , frequency = Thread
+                    , action = mkB4ThrdAction threadSpec path
+                    , subNodes = nds
+                    }
+              T.ThreadAfter
+                { path
+                , threadSpec
+                } ->
+                  P.After
+                    { path
+                    , frequency = Thread
+                    , after = mkAfterThrdAction threadSpec path
+                    , subNodes' = nds
+                    }
+              T.ThreadAround
+                { path
+                , setupThreadSpec
+                , teardownThreadSpec
+                } ->
+                  P.Around
+                    { path
+                    , frequency = Thread
+                    , setup = mkB4ThrdAction setupThreadSpec path
+                    , teardown = mkTeardownThrdAction teardownThreadSpec path
+                    , subNodes = nds
+                    }
 data Template
   = OnceBefore
       { spec :: Spec

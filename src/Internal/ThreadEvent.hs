@@ -56,7 +56,7 @@ isTestParentFailure = \case
     _ -> False
 
 isTestLogItem :: ThreadEvent l a -> Bool
-isTestLogItem li = (isTest <$> suiteEvent li) == Just True
+isTestLogItem li = (isTest <$> getSuiteEvent li) == Just True
 
 isTestEventOrTestParentFailure :: ThreadEvent l a -> Bool
 isTestEventOrTestParentFailure te = isTestParentFailure te || isTestLogItem te
@@ -109,11 +109,11 @@ suiteEventOrParentFailureSuiteEvent = \case
     ApEvent{} -> Nothing
     EndExecution{} -> Nothing
 
-suiteEvent :: ThreadEvent a b -> Maybe SuiteEvent
-suiteEvent = \case
-    Start{suiteEvent = e} -> Just e
-    End{suiteEvent = e} -> Just e
-    ParentFailure{suiteEvent = e} -> Just e
+getSuiteEvent :: ThreadEvent a b -> Maybe SuiteEvent
+getSuiteEvent = \case
+    Start{suiteEvent} -> Just suiteEvent
+    End{suiteEvent} -> Just suiteEvent
+    ParentFailure{suiteEvent} -> Just suiteEvent
     _ -> Nothing
 
 data ThreadEvent l a
@@ -136,8 +136,9 @@ data ThreadEvent l a
     | Failure
         { idx :: Int
         , threadId :: ThreadId
-        , exception :: PException
+        , suiteEvent :: SuiteEvent
         , loc :: l
+        , exception :: PException
         }
     | ParentFailure
         { idx :: Int

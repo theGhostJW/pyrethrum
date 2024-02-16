@@ -12,20 +12,25 @@ data Spec = Spec {delay :: Int, result :: Result}
 data Result
   = Pass
   | Fail
-  deriving (Show, Eq)
+  deriving (Ord, Eq, Show)
 
-data ThreadSpec
+data ManySpec
   = All Spec
+  -- with Some we can determine expected pass fail from template
+  -- but implementation requires STM which could mask synchronisation bugs
   | Some [Spec]
+  -- with PassProb we can't determine expected pass fail from template
+  -- but we can run tests without any locking so we wont mask synchronisation bugs
+  | PassProb Double -- 0.0 - 1.0
   deriving (Show, Eq)
 
-specs :: Int -> ThreadSpec ->  [Spec]
+specs :: Int -> ManySpec ->  [Spec]
 specs maxThreads ts  = case ts of
   All s -> replicate maxThreads s
   Some ss -> 
     length ss == maxThreads 
         ? ss 
-        $ error "ThreadSpec: mismatched number of specs"
+        $ error "ManySpec: mismatched number of specs"
 
 
 
@@ -148,18 +153,18 @@ data Template
       }
   | ThreadBefore
       { path :: Path
-      , threadSpec :: ThreadSpec
+      , threadSpec :: ManySpec
       , subNodes :: [Template]
       }
   | ThreadAfter
       { path :: Path
-      , threadSpec :: ThreadSpec
+      , threadSpec :: ManySpec
       , subNodes :: [Template]
       }
   | ThreadAround
       { path :: Path
-      , setupThreadSpec :: ThreadSpec
-      , teardownThreadSpec :: ThreadSpec
+      , setupThreadSpec :: ManySpec
+      , teardownThreadSpec :: ManySpec
       , subNodes :: [Template]
       }
   | EachBefore
@@ -187,7 +192,7 @@ data Template
 data EventPath = EventPath
   { path :: Path
   , suiteEvent :: SuiteEvent
-  , evntSpec :: ThreadSpec
+  , evntSpec :: ManySpec
   }
   deriving (Show, Eq)
 

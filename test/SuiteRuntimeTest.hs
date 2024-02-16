@@ -16,6 +16,7 @@ import Internal.ThreadEvent as TE (
   SuiteEvent (..),
   ThreadEvent (..),
   ThreadId,
+  getSuiteEvent,
   hasSuiteEvent,
   isEnd,
   isHook,
@@ -25,7 +26,6 @@ import Internal.ThreadEvent as TE (
   onceHook,
   onceSuiteEvent,
   startSuiteEventLoc,
-  getSuiteEvent,
   suiteEventOrParentFailureSuiteEvent,
   threadHook,
  )
@@ -148,7 +148,7 @@ unit_nested_threaded_chk_thread_count =
    that empty thread TestTrees are not executed
 -}
 
-ppTxt :: Show a => a -> Text
+ppTxt :: (Show a) => a -> Text
 ppTxt = toS . ppShow
 
 -- $> unit_empty_thread_around
@@ -203,56 +203,54 @@ data FailInfo = FailInfo
 
 -- TODO: logging options ~ only log failures - need a Pass summary log Object
 
-data Acc = MkAcc
+data Summary = Summary
   { fails :: Set (AE.Path, SuiteEvent)
   , parentFails :: Set (AE.Path, SuiteEvent)
-  , allEvents :: Set (AE.Path, SuiteEvent)
-  , lastStarted :: Maybe SuiteEvent
+  , passes :: Set (AE.Path, SuiteEvent)
   }
   deriving (Show)
 
 data LogResult
   = Actual Result
   | ParentFailed
-  deriving (Eq, Show)
+  deriving (Ord, Eq, Show)
 
 data ResultInfo = ResultInfo
-  { suiteEvent :: SuiteEvent
+  { path :: AE.Path
+  , suiteEvent :: SuiteEvent
   , result :: LogResult
   }
+  deriving (Ord, Eq, Show)
 
-
--- a result accumulator function to be used across a single thread log - will fail due to duplicate
--- if run across multiple thread logs
-logResults :: M.Map AE.Path ResultInfo -> LogItem -> M.Map AE.Path ResultInfo
-logResults acc =
+-- a result accumulator function to be used across a logs grouped by thread
+-- this will fail if run across logs due to duplicate thread hooks
+logAccum :: Set ResultInfo -> LogItem -> Set ResultInfo
+logAccum acc =
   \case
     End{} -> acc
-    Failure{loc,  suiteEvent} ->
-       M.insert (ensureMember loc) (ResultInfo suiteEvent (Actual Fail)) acc
-    ParentFailure{loc, suiteEvent} ->
-      acc
-        { parentFails = S.insert (mkTpl loc se) parentFails
-        , allEvents = S.insert (mkTpl loc se) allEvents
-        }
-    Start{loc, suiteEvent} ->
-      acc
-        { allEvents = S.insert (mkTpl loc se) allEvents
-        , -- there is another check that failures match with last started
-          lastStarted = Just se
-        }
+    f@Failure{loc, suiteEvent} ->
+      S.member (passResult loc suiteEvent) acc
+        ? (S.insert (ResultInfo (topPath' loc) suiteEvent $ Actual Fail) $ S.delete (passResult loc suiteEvent) acc)
+        $ error
+        $ "Failure event not started or failed twice\n" <> ppTxt f
+    pf@ParentFailure{loc, suiteEvent} ->
+      eventExists loc suiteEvent acc
+        ? (error $ "parent failure encountered for already started event\n" <> ppTxt pf)
+        $ S.insert (ResultInfo (topPath' loc) suiteEvent ParentFailed) acc
+    s@Start{loc, suiteEvent} ->
+      eventExists loc suiteEvent acc
+        ? (error $ "start found for already started event\n" <> ppTxt s)
+        $ S.insert (passResult loc suiteEvent) acc
     StartExecution{} -> acc
     ApEvent{} -> acc
     EndExecution{} -> acc
  where
-  ensureMember loc = 
-    let p = topPath loc
-    in
-    M.member p acc p ? loc p $ error $ "Event of path not started " <> p
-
-
-emptyAcc :: Acc
-emptyAcc = MkAcc S.empty S.empty S.empty Nothing
+  eventExists :: ExePath -> SuiteEvent -> Set ResultInfo -> Bool
+  eventExists loc suiteEvent set' = S.filter (\ri -> ri.suiteEvent == suiteEvent && ri.path == topPath' loc) set' /= S.empty
+  passResult loc suiteEvent = ResultInfo (topPath' loc) suiteEvent $ Actual Pass
+  topPath' p =
+    topPath p
+      & fromMaybe (error $ "Empty event path ~ bad template setup " <> txt p)
 
 --  note this test will only work if there are enough delays in the template
 --  and the template is big enough to ensure that the threads are used
@@ -266,84 +264,41 @@ chkThreadCount mxThrds evts =
 -- TODO :: add test for threaded (Some failures) - ie. some failures in a thread
 -- count should match number of result instance in log (allow for parent failures)
 chkTemplateSomeFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
-chkTemplateSomeFailsAndPassesLogged ts lgs = uu
- where
-  accSums :: [(AE.Path, [Result])] -> LogItem -> [(AE.Path, [Result])]
-  accSums acc = \case {}
+chkTemplateSomeFailsAndPassesLogged ts lgs = pure ()
 
-  threadedActuals = foldl' accSums [] <$> threadedLogs False lgs
+--  where
+--   accSums :: [(AE.Path, [Result])] -> LogItem -> [(AE.Path, [Result])]
+--   accSums acc = \case {}
 
-  expectedSomeResults = M.fromList $ (\ep -> (ep.path, someResults ep)) <$> filteredEvntPaths isSome ts
+--   threadedActuals = foldl' accSums [] <$> threadedLogs False lgs
 
-  someResults :: T.EventPath -> [Result]
-  someResults ep =
-    ep.evntSpec
-      & \case
-        All (Spec _ _) -> error "this should not happen"
-        Some s -> (.result) <$> s
+--   expectedSomeResults = M.fromList $ (\ep -> (ep.path, someResults ep)) <$> filteredEvntPaths isSome ts
 
-  isSome :: ThreadSpec -> Bool
-  isSome =
-    \case
-      All (Spec _ _) -> False
-      Some _ -> True
+--   someResults :: T.EventPath -> [Result]
+--   someResults ep =
+--     ep.evntSpec
+--       & \case
+--         All (Spec _ _) -> error "this should not happen"
+--         Some s -> (.result) <$> s
+
+--   isSome :: ThreadSpec -> Bool
+--   isSome =
+--     \case
+--       All (Spec _ _) -> False
+--       Some _ -> True
 
 chkTemplateAllFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
 chkTemplateAllFailsAndPassesLogged ts lgs =
   do
     -- existence checks are in another test. just checking results correspond to expected
     -- this test will need to be updated when non-deterministic thread templates results are added
-    chkEq' "All expected failures should actually fail" S.empty (expectedFail S.\\ (summary.fails <> summary.parentFails))
+    chkEq' "All expected failures should actually fail" S.empty (expectedFail S.\\ (actual.fails <> actual.parentFails))
     -- for threaded events that can occur more than once
-    chkEq' "Nothing expected to fail should pass" S.empty (S.intersection expectedFail passes)
-    chkEq' "All expected passes should actually pass" S.empty (expectedPass S.\\ (passes <> summary.parentFails))
+    chkEq' "Nothing expected to fail should pass" S.empty (S.intersection expectedFail actual.passes)
+    chkEq' "All expected passes should actually pass" S.empty (expectedPass S.\\ (actual.passes <> actual.parentFails))
     -- for threaded events that can occur more than once
-    chkEq' "Nothing expected to pass should fail" S.empty (S.intersection expectedPass summary.fails)
+    chkEq' "Nothing expected to pass should fail" S.empty (S.intersection expectedPass actual.fails)
  where
-  actuals = foldl' logResults emptyAcc
-  threadedActuals = actuals <$> threadedLogs False lgs
-  passes = foldMap' (\acc -> acc.allEvents S.\\ acc.fails S.\\ acc.parentFails) threadedActuals
-
-  summary :: Acc
-  summary = foldl' aggregate emptyAcc $ actuals <$> threadedLogs False lgs
-
-  aggregate :: Acc -> Acc -> Acc
-  aggregate a1 a2 =
-    MkAcc
-      { fails = a1.fails <> a2.fails
-      , parentFails = a1.parentFails <> a2.parentFails
-      , allEvents = a1.allEvents <> a2.allEvents
-      , lastStarted = Nothing
-      }
-
-  logResults :: Acc -> LogItem -> Acc
-  logResults acc@MkAcc{fails, parentFails, allEvents, lastStarted} li =
-    case li of
-      End{} -> acc
-      Failure{loc} ->
-        let failEvnt = fromMaybe (error $ "Fail with no preceeding start: " <> (ppTxt li)) lastStarted
-         in acc
-              { fails = S.insert (mkTpl loc failEvnt) fails
-              }
-      ParentFailure{loc, suiteEvent = se} ->
-        acc
-          { parentFails = S.insert (mkTpl loc se) parentFails
-          , allEvents = S.insert (mkTpl loc se) allEvents
-          }
-      Start{loc, suiteEvent = se} ->
-        acc
-          { allEvents = S.insert (mkTpl loc se) allEvents
-          }
-      StartExecution{} -> acc
-      ApEvent{} -> acc
-      EndExecution{} -> acc
-   where
-    mkTpl loc se =
-      topPath loc
-        & maybe
-          (error $ "Empty path in: " <> (ppTxt li))
-          (\p -> (p, se))
-
   expectedResults :: (ThreadSpec -> Bool) -> Set (AE.Path, SuiteEvent)
   expectedResults pred' = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filteredEvntPaths pred' ts
 
@@ -365,13 +320,53 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
           Some _ -> False
       )
 
--- expectedSome :: Set (AE.Path, SuiteEvent)
--- expectedSome = expectedResults (
---    \case
---      All (Spec _ Pass) -> False
---      All (Spec _ Fail) -> False
---      Some _ -> True
---   )
+  actual :: Summary
+  actual =
+    foldl' aggregate (Summary S.empty S.empty S.empty) $ summarise <$> allResultInfo
+   where
+    allResultInfo = actuals <$> threadedLogs False lgs
+
+    -- results :: (LogResult -> Bool) ->  Set (AE.Path, SuiteEvent)
+    summarise :: Set ResultInfo -> Summary
+    summarise ri =
+      Summary
+        { passes =
+            results
+              ( \case
+                  Actual Pass -> True
+                  _ -> False
+              )
+              ri
+        , fails =
+            results
+              ( \case
+                  Actual Fail -> True
+                  _ -> False
+              )
+              ri
+        , parentFails =
+            results
+              ( \case
+                  ParentFailed -> True
+                  _ -> False
+              )
+              ri
+        }
+
+    actuals :: [LogItem] -> Set ResultInfo
+    actuals = foldl' logAccum S.empty
+
+    results :: (LogResult -> Bool) -> Set ResultInfo -> Set (AE.Path, SuiteEvent)
+    results prd rslts =
+      S.map (\ri -> (ri.path, ri.suiteEvent)) $ S.filter (\ri -> prd ri.result) rslts
+
+    aggregate :: Summary -> Summary -> Summary
+    aggregate a1 a2 =
+      Summary
+        { passes = a1.passes <> a2.passes
+        , fails = a1.fails <> a2.fails
+        , parentFails = a1.parentFails <> a2.parentFails
+        }
 
 filteredEvntPaths :: (ThreadSpec -> Bool) -> [T.Template] -> [T.EventPath]
 filteredEvntPaths pred' templates = filter (pred' . (.evntSpec)) (templates >>= T.eventPaths)

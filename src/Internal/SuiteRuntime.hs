@@ -34,6 +34,12 @@ import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar
 
 -- todo: minimise AESON requirements => AS, DS, ITEM => Show Only. tc, rc => JSON
 
+{-
+todo :: define defect properties with sum type type and typeclass which returns defect info 
+
+
+-}
+
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 

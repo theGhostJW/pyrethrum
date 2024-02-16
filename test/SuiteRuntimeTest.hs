@@ -42,6 +42,8 @@ import UnliftIO.Concurrent as C (
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, id)
 
+import Data.Hashable qualified as H
+import System.Random qualified as R
 import Test.Falsify.Generator qualified as FG
 import Test.Falsify.Predicate qualified as FP
 import Test.Falsify.Range qualified as FR
@@ -52,18 +54,22 @@ import Test.Tasty.Falsify qualified as F
  - thread fail
 -}
 
+defaultSeed :: Int
+defaultSeed = 13579
+
 -- $> unit_simple_pass
 unit_simple_pass :: IO ()
-unit_simple_pass = runTest 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
+unit_simple_pass = runTest defaultSeed 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
 -- $> unit_simple_fail
 unit_simple_fail :: IO ()
-unit_simple_fail = runTest 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
+unit_simple_fail = runTest defaultSeed 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
 -- $> unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
   runTest
+    defaultSeed
     1
     [ onceAround
         Pass
@@ -98,6 +104,7 @@ unit_nested_threaded_chk_thread_count =
     r <-
       execute
         logging'
+        defaultSeed
         mxThrds
         [ OnceAround
             (Spec 1000 Pass)
@@ -161,7 +168,7 @@ unit_empty_thread_around =
     exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass []]]] >>= chkEmptyLog
     exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [test [testItem Pass]]]]] >>= chkLogLength
  where
-  exe = execute NoLog 1
+  exe = execute NoLog defaultSeed 1
   chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (ppTxt r.log)) 2 (length r.log)
   chkLogLength r = chkEq' ("Log length not as expected:\n" <> (ppTxt r.log)) 12 (length r.log)
 
@@ -826,7 +833,7 @@ data ExeResult = ExeResult
   , log :: [ThreadEvent ExePath AE.ApEvent]
   }
 
-runTest :: Int -> [Template] -> IO ()
+runTest :: Int -> Int -> [Template] -> IO ()
 runTest = runTest' logging
 
 data Logging = Logging | NoLog deriving (Show, Eq)
@@ -834,26 +841,26 @@ data Logging = Logging | NoLog deriving (Show, Eq)
 logging :: Logging
 logging = NoLog
 
-runTest' :: Logging -> Int -> [Template] -> IO ()
-runTest' wantLog maxThreads templates = do
-  r <- execute wantLog maxThreads templates
+runTest' :: Logging -> Int -> Int -> [Template] -> IO ()
+runTest' wantLog baseRandomSeed maxThreads templates = do
+  r <- execute wantLog baseRandomSeed maxThreads templates
   chkProperties r.expandedTemplate r.log
 
-execute :: Logging -> Int -> [Template] -> IO ExeResult
-execute wantLog maxThreads templates = do
+execute :: Logging -> Int -> Int -> [Template] -> IO ExeResult
+execute wantLog baseRandomSeed maxThreads templates = do
   let fullTs = setPaths "" templates
-  lg <- exeTemplate wantLog (ThreadCount maxThreads) fullTs
+  lg <- exeTemplate wantLog baseRandomSeed (ThreadCount maxThreads) fullTs
   pure $ ExeResult fullTs lg
 
-exeTemplate :: Logging -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath AE.ApEvent]
-exeTemplate wantLog maxThreads templates = do
+exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath AE.ApEvent]
+exeTemplate wantLog baseRandomSeed maxThreads templates = do
   let wantLog' = wantLog == Logging
   (lc, logQ) <- testLogControls wantLog'
   when wantLog' $ do
     putStrLn ""
     pPrint templates
     putStrLn "========="
-  nodes <- mkNodes maxThreads templates
+  nodes <- mkNodes baseRandomSeed maxThreads  templates
   executeNodeList maxThreads lc nodes
   atomically $ q2List logQ
 
@@ -964,7 +971,32 @@ mkQueAction q path =
         (error "spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen)")
         (mkVoidAction path)
 
-mkVoidAction :: forall desc. (Show desc) => desc -> Spec -> IO ()
+data ManyParams = ManyParams {
+  baseSeed :: Int,
+  subSeed :: Int,
+  path :: Text,
+  pecntPass :: Int8,
+  minDelay :: Int,
+  maxDelay :: Int
+}
+
+mkManyAction :: ManyParams -> Spec 
+mkManyAction ManyParams {
+  baseSeed,
+  subSeed,
+  path,
+  pecntPass,
+  minDelay,
+  maxDelay
+} = 
+   Spec delay result
+  where
+    -- TODO add bounds checks
+    seed = baseSeed + subSeed + H.hash path
+    delay = minDelay + (seed `mod` (maxDelay - minDelay))
+    result = seed `mod` 100 < fromIntegral pecntPass ? Pass $ Fail
+
+mkVoidAction :: forall pth. (Show pth) => pth -> Spec -> IO ()
 mkVoidAction path spec =
   do
     C.threadDelay spec.delay
@@ -974,16 +1006,16 @@ mkVoidAction path spec =
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
-mkAction :: forall hi desc. (Show desc) => desc -> Spec -> P.ApEventSink -> hi -> IO ()
+mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.ApEventSink -> hi -> IO ()
 mkAction path s _sink _in = mkVoidAction path s
 
-mkNodes :: ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
-mkNodes mxThreads = sequence . fmap mkNode
+mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
+mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
  where
-  afterAction :: (Show desc) => desc -> Spec -> b -> IO ()
+  afterAction :: (Show pth) => pth -> Spec -> b -> IO ()
   afterAction path spec = const $ mkVoidAction path spec
 
-  mkNodes' = mkNodes mxThreads
+  mkNodes' = mkNodes baseRandomSeed mxThreads
   mkNode :: T.Template -> IO (P.PreNode IO [] ())
   mkNode t = case t of
     T.Test
@@ -998,10 +1030,10 @@ mkNodes mxThreads = sequence . fmap mkNode
             }
     _ ->
       let
-        mkManyAction' :: forall desc. (Show desc) => Int -> TQueue Spec -> ManySpec -> desc -> IO ()
-        mkManyAction' q ms desc =
+        mkManyAction' :: forall pth. (Show pth) => Int -> TQueue Spec -> ManySpec -> pth -> IO ()
+        mkManyAction' listCount q ms pth =
           case ms of
-            All s -> mkVoidAction desc s
+            All s -> mkVoidAction pth s
             PassProb {
               preGenerate,
               prob,
@@ -1009,16 +1041,17 @@ mkNodes mxThreads = sequence . fmap mkNode
               maxDelay 
             } -> uu
           -- do
-              atomically $ loadTQueue q (specs mxThreads.maxThreads ts)
-          --   mkQueAction q desc
+              -- atomically $ loadTQueue q (specs mxThreads.maxThreads ts)
+          --   mkQueAction q pth
        in
         do
           nds <- mkNodes' $ t.subNodes
           b4Q <- newTQueueIO
           afterQ <- newTQueueIO
-          let mkB4ThrdAction ts desc _ _ = mkManyAction' b4Q ts desc
-              mkTeardownThrdAction ts desc _ _ = mkManyAction' afterQ ts desc
-              mkAfterThrdAction ts desc _ = mkManyAction' afterQ ts desc
+          let nThrds = mxThreads.maxThreads
+              mkB4ThrdAction ts pth _ _ = mkManyAction' nThrds b4Q ts pth
+              mkTeardownThrdAction ts pth _ _ = mkManyAction' nThrds afterQ ts pth
+              mkAfterThrdAction ts pth _ = mkManyAction' nThrds afterQ ts pth
           pure $ case t of
             T.OnceBefore
               { path

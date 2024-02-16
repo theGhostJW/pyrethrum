@@ -6,7 +6,7 @@ import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (Result (..), Spec (..), ThreadSpec (..), specs)
+import FullSuiteTestTemplate (Result (..), Spec (..), ManySpec (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.RunTimeLogging (ExePath (..), parentPath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
@@ -281,7 +281,7 @@ chkTemplateSomeFailsAndPassesLogged ts lgs = pure ()
 --         All (Spec _ _) -> error "this should not happen"
 --         Some s -> (.result) <$> s
 
---   isSome :: ThreadSpec -> Bool
+--   isSome :: ManySpec -> Bool
 --   isSome =
 --     \case
 --       All (Spec _ _) -> False
@@ -299,7 +299,7 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
     -- for threaded events that can occur more than once
     chkEq' "Nothing expected to pass should fail" S.empty (S.intersection expectedPass actual.fails)
  where
-  expectedResults :: (ThreadSpec -> Bool) -> Set (AE.Path, SuiteEvent)
+  expectedResults :: (ManySpec -> Bool) -> Set (AE.Path, SuiteEvent)
   expectedResults pred' = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filteredEvntPaths pred' ts
 
   expectedPass :: Set (AE.Path, SuiteEvent)
@@ -308,7 +308,7 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
       ( \case
           All (Spec _ Pass) -> True
           All (Spec _ Fail) -> False
-          Some _ -> False
+          PassProb {} -> False
       )
 
   expectedFail :: Set (AE.Path, SuiteEvent)
@@ -317,7 +317,7 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
       ( \case
           All (Spec _ Pass) -> False
           All (Spec _ Fail) -> True
-          Some _ -> False
+          PassProb {} -> False
       )
 
   actual :: Summary
@@ -368,7 +368,7 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
         , parentFails = a1.parentFails <> a2.parentFails
         }
 
-filteredEvntPaths :: (ThreadSpec -> Bool) -> [T.Template] -> [T.EventPath]
+filteredEvntPaths :: (ManySpec -> Bool) -> [T.Template] -> [T.EventPath]
 filteredEvntPaths pred' templates = filter (pred' . (.evntSpec)) (templates >>= T.eventPaths)
 
 chkFailurePropagation :: [LogItem] -> IO ()
@@ -955,13 +955,13 @@ instance Core.Config TestConfig
 tc :: TestConfig
 tc = TestConfig{title = "test config"}
 
-mkThreadAction :: forall desc. (Show desc) => TQueue Spec -> desc -> IO ()
-mkThreadAction q path =
+mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> IO ()
+mkQueAction q path =
   do
     s <- atomically $ tryReadTQueue q
     s
       & maybe
-        (error "thread spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen)")
+        (error "spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen)")
         (mkVoidAction path)
 
 mkVoidAction :: forall desc. (Show desc) => desc -> Spec -> IO ()
@@ -998,19 +998,27 @@ mkNodes mxThreads = sequence . fmap mkNode
             }
     _ ->
       let
-        mkThreadAction' :: forall desc. (Show desc) => TQueue Spec -> ThreadSpec -> desc -> IO ()
-        mkThreadAction' q ts desc =
-          do
-            atomically $ loadTQueue q (specs mxThreads.maxThreads ts)
-            mkThreadAction q desc
+        mkManyAction' :: forall desc. (Show desc) => Int -> TQueue Spec -> ManySpec -> desc -> IO ()
+        mkManyAction' q ms desc =
+          case ms of
+            All s -> mkVoidAction desc s
+            PassProb {
+              preGenerate,
+              prob,
+              minDelay,
+              maxDelay 
+            } -> uu
+          -- do
+              atomically $ loadTQueue q (specs mxThreads.maxThreads ts)
+          --   mkQueAction q desc
        in
         do
           nds <- mkNodes' $ t.subNodes
           b4Q <- newTQueueIO
           afterQ <- newTQueueIO
-          let mkB4ThrdAction ts desc _ _ = mkThreadAction' b4Q ts desc
-              mkTeardownThrdAction ts desc _ _ = mkThreadAction' afterQ ts desc
-              mkAfterThrdAction ts desc _ = mkThreadAction' afterQ ts desc
+          let mkB4ThrdAction ts desc _ _ = mkManyAction' b4Q ts desc
+              mkTeardownThrdAction ts desc _ _ = mkManyAction' afterQ ts desc
+              mkAfterThrdAction ts desc _ = mkManyAction' afterQ ts desc
           pure $ case t of
             T.OnceBefore
               { path
@@ -1125,16 +1133,16 @@ data Template
       , subNodes :: [Template]
       }
   | ThreadBefore
-      { threadSpec :: ThreadSpec
+      { threadSpec :: ManySpec
       , subNodes :: [Template]
       }
   | ThreadAfter
-      { threadSpec :: ThreadSpec
+      { threadSpec :: ManySpec
       , subNodes :: [Template]
       }
   | ThreadAround
-      { setupThreadSpec :: ThreadSpec
-      , teardownThreadSpec :: ThreadSpec
+      { setupThreadSpec :: ManySpec
+      , teardownThreadSpec :: ManySpec
       , subNodes :: [Template]
       }
   | EachBefore
@@ -1154,6 +1162,11 @@ data Template
       { testItems :: [Spec]
       }
   deriving (Show, Eq)
+
+countTestItems :: Template -> Int
+countTestItems t = case t of
+  SuiteRuntimeTest.Test{testItems} -> length testItems
+  _ -> LE.sum $ countTestItems <$> t.subNodes
 
 mkTestItem :: T.TestItem -> P.TestItem IO ()
 mkTestItem T.TestItem{id, title, spec} = P.TestItem id title (mkAction title spec)

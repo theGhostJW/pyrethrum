@@ -16,23 +16,19 @@ data Result
 
 data ManySpec
   = All Spec
-  -- with Some we can determine expected pass fail from template
-  -- but implementation requires STM which could mask synchronisation bugs
-  | Some [Spec]
-  -- with PassProb we can't determine expected pass fail from template
-  -- but we can run tests without any locking so we wont mask synchronisation bugs
-  | PassProb Double -- 0.0 - 1.0
+  -- if pregenerate is True, a spec is genrated when loading the template and we can
+  -- check expected failures by comparing template results to actual results but
+  -- the implementation test tree requires STM which could mask synchronisation bugs
+  -- if pregenerate is false, the spec is generated when the test is run and we cannot
+  -- predict the result of the test from the tempalate but there is no STM involved so
+  -- so we avoid masking synchronisation bugs
+  | PassProb {
+      preGenerate :: Bool,
+      prob :: Double,
+      minDelay :: Int,
+      maxDelay :: Int
+  }
   deriving (Show, Eq)
-
-specs :: Int -> ManySpec ->  [Spec]
-specs maxThreads ts  = case ts of
-  All s -> replicate maxThreads s
-  Some ss -> 
-    length ss == maxThreads 
-        ? ss 
-        $ error "ManySpec: mismatched number of specs"
-
-
 
 data SuiteEventPath = SuiteEventPath
   { path :: Path

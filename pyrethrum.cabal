@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 45994ce7e9792345e4160bf3dfb0960a9b4383f73000c1d3a96b280a06df208a
+-- hash: 7c40d616ab8f39de3457a2c2be9402000c6b3ef4f16fe24186758f3b72511b02
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -187,6 +187,7 @@ library
     , path-io
     , pretty-show
     , pyrethrum-extras
+    , random
     , raw-strings-qq
     , template-haskell
     , text

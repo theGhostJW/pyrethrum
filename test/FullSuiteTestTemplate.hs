@@ -24,7 +24,7 @@ data ManySpec
   -- so we avoid masking synchronisation bugs
   | PassProb {
       preGenerate :: Bool,
-      passPcnt :: Double,
+      passPcnt :: Int8,
       minDelay :: Int,
       maxDelay :: Int
   }

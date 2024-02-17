@@ -4,7 +4,7 @@ import DSL.Internal.ApEvent (Path (..))
 import Data.Map.Strict qualified as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
 import Internal.ThreadEvent qualified as TE
-import PyrethrumExtras (debug', (?))
+import PyrethrumExtras (debug', (?), uu)
 import Prelude hiding (All, id)
 
 data Spec = Spec {delay :: Int, result :: Result}
@@ -165,18 +165,18 @@ data Template
       }
   | EachBefore
       { path :: Path
-      , spec :: Spec
+      , eachSpec :: ManySpec
       , subNodes :: [Template]
       }
   | EachAfter
       { path :: Path
-      , spec :: Spec
+      , eachSpec :: ManySpec
       , subNodes :: [Template]
       }
   | EachAround
       { path :: Path
-      , setupSpec :: Spec
-      , teardownSpec :: Spec
+      , eachSetupSpec :: ManySpec
+      , eachTeardownSpec :: ManySpec
       , subNodes :: [Template]
       }
   | Test
@@ -227,17 +227,18 @@ eventPaths t = case t of
             mkEvnt Thread Setup setupThreadSpec
               : mkEvnt Thread Teardown teardownThreadSpec
               : recurse
-        EachBefore{spec} ->
-          mkEvnt Each Before (All spec) : recurse
-        EachAfter{spec} ->
-          mkEvnt Each After (All spec) : recurse
+        EachBefore{eachSpec} -> uu
+          -- mkEvnt Each Before (All spec) : recurse
+        EachAfter{eachSpec} -> uu
+          -- mkEvnt Each After (All spec) : recurse
         EachAround
-          { setupSpec
-          , teardownSpec
-          } ->
-            mkEvnt Each Setup (All setupSpec)
-              : mkEvnt Each Teardown (All teardownSpec)
-              : recurse
+          { 
+           eachSetupSpec
+           , eachTeardownSpec
+          } -> uu
+            -- mkEvnt Each Setup (All setupSpec)
+            --   : mkEvnt Each Teardown (All teardownSpec)
+            --   : recurse
 
 -- map
 --   (\testItem ->

@@ -94,13 +94,15 @@ unit_nested_pass_fail =
         ]
     ]
 
+allSpec :: Int -> Result -> ManySpec
+allSpec delay rslt = All $ Spec delay rslt
+
 -- $> unit_nested_threaded_chk_thread_count
 unit_nested_threaded_chk_thread_count :: IO ()
 unit_nested_threaded_chk_thread_count =
   do
     let mxThrds = 10
         logging' = NoLog
-        all' d r = All $ Spec d r
     r <-
       execute
         logging'
@@ -110,10 +112,10 @@ unit_nested_threaded_chk_thread_count =
             (Spec 1000 Pass)
             (Spec 0 Pass)
             [ ThreadAround
-                (all' 0 Pass)
-                (all' 0 Pass)
+                (allSpec 0 Pass)
+                (allSpec 0 Pass)
                 [ EachAfter
-                    (Spec 50 Pass)
+                    (allSpec 50 Pass)
                     [ test
                         [ Spec 0 Pass
                         , Spec 1 Fail
@@ -121,22 +123,22 @@ unit_nested_threaded_chk_thread_count =
                     ]
                 ]
             , ThreadAround
-                (all' 100 Pass)
-                (all' 0 Fail)
+                (allSpec 100 Pass)
+                (allSpec 0 Fail)
                 [ ThreadAround
-                    (all' 300 Pass)
-                    (all' 300 Pass)
+                    (allSpec 300 Pass)
+                    (allSpec 300 Pass)
                     [ threadAround Pass Pass [eachAfter Pass [test [Spec 3000 Fail, Spec 1000 Pass]]]
-                    , ThreadAround (All $ Spec 50 Pass) (All $ Spec 0 Pass) [eachAfter Fail [test [Spec 1000 Pass, Spec 1000 Fail]]]
+                    , ThreadAround (All $ Spec 50 Pass) (allSpec 0 Pass) [eachAfter Fail [test [Spec 1000 Pass, Spec 1000 Fail]]]
                     , threadAround Fail Pass [eachAfter Pass [test [Spec 1000 Fail, Spec 1000 Pass]]]
-                    , threadAround Pass Pass [EachBefore (Spec 300 Fail) [test [Spec 1000 Fail, Spec 3000 Pass]]]
+                    , threadAround Pass Pass [EachBefore (allSpec 300 Fail) [test [Spec 1000 Fail, Spec 3000 Pass]]]
                     , eachAround Fail Pass [test [Spec 40 Fail, Spec 10 Pass]]
                     , eachBefore
                         Fail
                         [ test [Spec 300 Pass, Spec 10 Pass]
                         , EachAround
-                            (Spec 50 Pass)
-                            (Spec 0 Pass)
+                            (allSpec 50 Pass)
+                            (allSpec 0 Pass)
                             [ test
                                 [ Spec 1000 Pass
                                 , Spec 200 Pass
@@ -814,13 +816,13 @@ threadAround :: Result -> Result -> [Template] -> Template
 threadAround suRslt tdRslt = ThreadAround (All $ Spec 0 suRslt) (All $ Spec 0 tdRslt)
 
 eachBefore :: Result -> [Template] -> Template
-eachBefore = EachBefore . Spec 0
+eachBefore = EachBefore . allSpec 0
 
 eachAfter :: Result -> [Template] -> Template
-eachAfter = EachAfter . Spec 0
+eachAfter = EachAfter . allSpec 0
 
 eachAround :: Result -> Result -> [Template] -> Template
-eachAround suRslt tdRslt = EachAround (Spec 0 suRslt) (Spec 0 tdRslt)
+eachAround suRslt tdRslt = EachAround (allSpec 0 suRslt) (allSpec 0 tdRslt)
 
 test :: [Spec] -> Template
 test = SuiteRuntimeTest.Test
@@ -968,14 +970,14 @@ mkQueAction q path =
     s <- atomically $ tryReadTQueue q
     s
       & maybe
-        (error "spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen)")
+        (error $ "spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> ppTxt path)
         (mkVoidAction path)
 
 data ManyParams = ManyParams {
   baseSeed :: Int,
   subSeed :: Int,
   path :: Text,
-  pecntPass :: Int8,
+  passPcnt :: Int8,
   minDelay :: Int,
   maxDelay :: Int
 }
@@ -985,16 +987,57 @@ mkManySpec ManyParams {
   baseSeed,
   subSeed,
   path,
-  pecntPass,
+  passPcnt,
   minDelay,
   maxDelay
 } = 
    Spec delay result
   where
-    -- TODO add bounds checks
     seed = H.hash $ txt baseSeed <> path <> txt subSeed
     delay = minDelay + (seed `mod` (maxDelay - minDelay))
-    result = seed `mod` 100 < fromIntegral pecntPass ? Pass $ Fail
+    result = seed `mod` 100 < fromIntegral passPcnt ? Pass $ Fail
+
+
+loadTQueueFromSpec :: TQueue Spec -> ManySpec -> IO ()
+loadTQueueFromSpec q ms = uu
+  -- do
+  --   s <- mkManySpec <$> manySpec
+  --   atomically $ writeTQueue q s
+  -- where
+  --   manySpec subSeed = mkManySpec ManyParams {
+  --         baseSeed,
+  --         subSeed,
+  --         path = toS pth,
+  --         passPcnt,
+  --         minDelay,
+  --         maxDelay
+  --       }
+
+
+mkManyAction :: forall pth. (Show pth) => Int ->  ManySpec ->  TQueue Spec -> pth -> IO ()
+mkManyAction baseSeed ms q pth = uu
+          -- case ms of
+          --   All s -> mkVoidAction pth s
+          --   PassProb {
+          --     preGenerate
+          --   } -> if preGenerate then
+          --         do
+          --           -- could be wrong
+          --          mkQueAction q pth
+          --        else
+          --         uu
+          --        end
+          --   where 
+          --     manySpec subSeed = mkManySpec ManyParams {
+          --           baseSeed,
+          --           subSeed,
+          --           path = toS pth,
+          --           passPcnt,
+          --           minDelay,
+          --           maxDelay
+          --         }
+
+
 
 mkVoidAction :: forall pth. (Show pth) => pth -> Spec -> IO ()
 mkVoidAction path spec =
@@ -1029,37 +1072,15 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
             , tests = mkTestItem <$> testItems
             }
     _ ->
-      let
-        mkManyAction' :: forall pth. (Show pth) => Int -> TQueue Spec -> ManySpec -> pth -> IO ()
-        mkManyAction' listCount q ms pth =
-          case ms of
-            All s -> mkVoidAction pth s
-            PassProb {
-              preGenerate,
-              passPcnt,
-              minDelay,
-              maxDelay 
-            } -> uu
-          if preGenerate then
-            let mkManySpec' subSeed = mkManySpec ManyParams {
-              baseSeed = baseRandomSeed,
-              subSeed,
-              path = toS pth,
-              pecntPass = passPcnt,
-              minDelay,
-              maxDelay
-            }
-          else
-          end
-       in
+   
         do
           nds <- mkNodes' $ t.subNodes
           b4Q <- newTQueueIO
           afterQ <- newTQueueIO
           let nThrds = mxThreads.maxThreads
-              mkB4ThrdAction ts pth _ _ = mkManyAction' nThrds b4Q ts pth
-              mkTeardownThrdAction ts pth _ _ = mkManyAction' nThrds afterQ ts pth
-              mkAfterThrdAction ts pth _ = mkManyAction' nThrds afterQ ts pth
+              mkB4ThrdAction ts pth _ _ = uu --mkManyAction nThrds b4Q ts pth
+              mkTeardownThrdAction ts pth _ _ = uu -- mkManyAction nThrds afterQ ts pth
+              mkAfterThrdAction ts pth _ = uu -- mkManyAction nThrds afterQ ts pth
           pure $ case t of
             T.OnceBefore
               { path
@@ -1096,34 +1117,36 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
                   }
             T.EachBefore
               { path
-              , spec
-              } ->
-                P.Before
-                  { path
-                  , frequency = Each
-                  , action = mkAction path spec
-                  , subNodes = nds
-                  }
+              , eachSpec
+              } -> uu
+                -- do 
+                --   loadTQueueFromSpec b4Q eachSpec
+                -- P.Before
+                --   { path
+                --   , frequency = Each
+                --   , action = mkAction path spec
+                --   , subNodes = nds
+                --   }
             T.EachAfter
               { path
-              , spec
+              , eachSpec
               } ->
                 P.After
                   { path
                   , frequency = Each
-                  , after = afterAction path spec
+                  , after = uu -- afterAction path spec
                   , subNodes' = nds
                   }
             T.EachAround
               { path
-              , setupSpec
-              , teardownSpec
+              , eachSetupSpec
+              , eachTeardownSpec
               } ->
                 P.Around
                   { path
                   , frequency = Each
-                  , setup = mkAction path setupSpec
-                  , teardown = mkAction path teardownSpec
+                  , setup = uu -- mkAction path setupSpec
+                  , teardown = uu -- mkAction path teardownSpec
                   , subNodes = nds
                   }
             _ -> case t of
@@ -1187,16 +1210,16 @@ data Template
       , subNodes :: [Template]
       }
   | EachBefore
-      { spec :: Spec
+      { eachSpec :: ManySpec
       , subNodes :: [Template]
       }
   | EachAfter
-      { spec :: Spec
+      { eachSpec :: ManySpec
       , subNodes :: [Template]
       }
   | EachAround
-      { setupSpec :: Spec
-      , teardownSpec :: Spec
+      { eachSetupSpec :: ManySpec
+      , eachTeardownSpec :: ManySpec
       , subNodes :: [Template]
       }
   | Test

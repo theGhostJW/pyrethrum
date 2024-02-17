@@ -980,8 +980,8 @@ data ManyParams = ManyParams {
   maxDelay :: Int
 }
 
-mkManyAction :: ManyParams -> Spec 
-mkManyAction ManyParams {
+mkManySpec :: ManyParams -> Spec 
+mkManySpec ManyParams {
   baseSeed,
   subSeed,
   path,
@@ -992,7 +992,7 @@ mkManyAction ManyParams {
    Spec delay result
   where
     -- TODO add bounds checks
-    seed = baseSeed + subSeed + H.hash path
+    seed = H.hash $ txt baseSeed <> path <> txt subSeed
     delay = minDelay + (seed `mod` (maxDelay - minDelay))
     result = seed `mod` 100 < fromIntegral pecntPass ? Pass $ Fail
 
@@ -1036,13 +1036,21 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
             All s -> mkVoidAction pth s
             PassProb {
               preGenerate,
-              prob,
+              passPcnt,
               minDelay,
               maxDelay 
             } -> uu
-          -- do
-              -- atomically $ loadTQueue q (specs mxThreads.maxThreads ts)
-          --   mkQueAction q pth
+          if preGenerate then
+            let mkManySpec' subSeed = mkManySpec ManyParams {
+              baseSeed = baseRandomSeed,
+              subSeed,
+              path = toS pth,
+              pecntPass = passPcnt,
+              minDelay,
+              maxDelay
+            }
+          else
+          end
        in
         do
           nds <- mkNodes' $ t.subNodes

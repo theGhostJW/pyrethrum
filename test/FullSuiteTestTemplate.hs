@@ -6,6 +6,7 @@ import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
 import Internal.ThreadEvent qualified as TE
 import PyrethrumExtras (debug', (?), uu)
 import Prelude hiding (All, id)
+import List.Extra as LE
 
 data Spec = Spec {delay :: Int, result :: Result}
   deriving (Show, Eq)
@@ -184,6 +185,12 @@ data Template
       , testItems :: [TestItem]
       }
   deriving (Show, Eq)
+
+
+countTestItems :: Template -> Int
+countTestItems t = case t of
+  FullSuiteTestTemplate.Test{testItems} -> length testItems
+  _ -> LE.sum $ countTestItems <$> t.subNodes
 
 data EventPath = EventPath
   { path :: Path

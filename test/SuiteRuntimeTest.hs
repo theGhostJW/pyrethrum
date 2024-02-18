@@ -55,6 +55,7 @@ import Test.Tasty.Falsify qualified as F
  - thread fail
 -}
 
+--  todo :: siple random api / effect
 
 -- $> genPlay
 genPlay :: IO ()
@@ -341,9 +342,9 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
 
   actual :: Summary
   actual =
-    foldl' aggregate (Summary S.empty S.empty S.empty) $ summarise <$>  allResultInfo
+    foldl' aggregate (Summary S.empty S.empty S.empty) $ summarise <$> allResultInfo
    where
-    allResultInfo = actuals <$>  threadedLogs False lgs
+    allResultInfo = actuals <$> threadedLogs False lgs
 
     -- results :: (LogResult -> Bool) ->  Set (AE.Path, SuiteEvent)
     summarise :: Set ResultInfo -> Summary
@@ -633,10 +634,10 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
 
   extractChildParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
   extractChildParent evntLog =
-    (,actulaParentPath) <$>  targetPath
+    (,actulaParentPath) <$> targetPath
    where
     logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
-    logSuiteEventPath l = T.SuiteEventPath <$>  (startSuiteEventLoc l >>= topPath) <*> getSuiteEvent l
+    logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> getSuiteEvent l
     targEvnt = L.head evntLog
     targetPath = targEvnt >>= logSuiteEventPath
     actulaParentPath = do
@@ -696,7 +697,7 @@ chkAllTemplateItemsLogged ts lgs =
 
   -- init to empty set
   tmplatePaths :: Set AE.Path
-  tmplatePaths = fromList $ (.path) <$>  (ts >>= T.eventPaths)
+  tmplatePaths = fromList $ (.path) <$> (ts >>= T.eventPaths)
 
   logStartPaths :: Set AE.Path
   logStartPaths =
@@ -732,7 +733,7 @@ threadIds = nub . fmap (.threadId)
 
 threadedLogs :: Bool -> [LogItem] -> [[LogItem]]
 threadedLogs onceHookInclude l =
-  (\tid -> threadVisible onceHookInclude tid l) <$>  threadIds l
+  (\tid -> threadVisible onceHookInclude tid l) <$> threadIds l
 
 shouldOccurOnce :: LogItem -> Bool
 shouldOccurOnce = hasSuiteEvent onceSuiteEvent
@@ -1008,6 +1009,21 @@ mkManySpec
     delay = minDelay + (seed `mod` (maxDelay - minDelay))
     result = seed `mod` 100 < fromIntegral passPcnt ? Pass $ Fail
 
+generateSpecs :: (Show pth) => Int -> Int -> pth -> Int8 -> Int -> Int -> [Spec]
+generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay =
+  manySpec <$> [1 .. qLength]
+ where
+  manySpec :: Int -> Spec
+  manySpec subSeed =
+    mkManySpec
+      ManyParams
+        { baseSeed
+        , subSeed
+        , path = txt pth
+        , passPcnt
+        , minDelay
+        , maxDelay
+        }
 
 loadQIfPregen :: (Show pth) => Int -> Int -> pth -> TQueue Spec -> ManySpec -> IO ()
 loadQIfPregen baseSeed qLength pth q = \case
@@ -1019,20 +1035,8 @@ loadQIfPregen baseSeed qLength pth q = \case
     , maxDelay
     } ->
       preGenerate
-        ? (atomically . loadTQueue q $ manySpec <$> [1 .. qLength])
+        ? (atomically . loadTQueue q $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay)
         $ pure ()
-     where
-      manySpec :: Int -> Spec
-      manySpec subSeed =
-        mkManySpec
-          ManyParams
-            { baseSeed
-            , subSeed
-            , path = txt pth
-            , passPcnt
-            , minDelay
-            , maxDelay
-            }
 
 -- do
 --   s <- mkManySpec <$> manySpec
@@ -1053,33 +1057,24 @@ mkManyAction baseSeed q pth = \case
   All s -> mkVoidAction pth s
   PassProb
     { preGenerate
+    , passPcnt
+    , minDelay
+    , maxDelay
     } ->
       preGenerate
         ? mkQueAction q pth
-        $ do 
-           uu
-
-
--- case ms of
---   All s -> mkVoidAction pth s
---   PassProb {
---     preGenerate
---   } -> if preGenerate then
---         do
---           -- could be wrong
---          mkQueAction q pth
---        else
---         uu
---        end
---   where
---     manySpec subSeed = mkManySpec ManyParams {
---           baseSeed,
---           subSeed,
---           path = toS pth,
---           passPcnt,
---           minDelay,
---           maxDelay
---         }
+        $ do
+          subSeed <- RS.uniformM RS.globalStdGen :: IO Int
+          mkVoidAction pth $
+            mkManySpec
+              ManyParams
+                { baseSeed
+                , subSeed
+                , path = txt pth
+                , passPcnt
+                , minDelay
+                , maxDelay
+                }
 
 mkVoidAction :: forall pth. (Show pth) => pth -> Spec -> IO ()
 mkVoidAction path spec =
@@ -1118,16 +1113,14 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
         nds <- mkNodes' $ t.subNodes
         b4Q <- newTQueueIO
         afterQ <- newTQueueIO
-        let nThrds = mxThreads.maxThreads
-            mkB4ThrdAction ts pth _ _ = uu -- mkManyAction nThrds b4Q ts pth
-            mkTeardownThrdAction ts pth _ _ = uu -- mkManyAction nThrds afterQ ts pth
-            mkAfterThrdAction ts pth _ = uu -- mkManyAction nThrds afterQ ts pth
-        pure $ case t of
+        let mxThrds = mxThreads.maxThreads
+            tstItemCount = T.countTestItems t
+        case t of
           T.OnceBefore
             { path
             , spec
             } ->
-              do
+              pure $ do
                 P.Before
                   { path
                   , frequency = Once
@@ -1138,91 +1131,118 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
             { path
             , spec
             } ->
-              P.After
-                { path
-                , frequency = Once
-                , after = afterAction path spec
-                , subNodes' = nds
-                }
+              pure $
+                P.After
+                  { path
+                  , frequency = Once
+                  , after = afterAction path spec
+                  , subNodes' = nds
+                  }
           T.OnceAround
             { path
             , setupSpec
             , teardownSpec
             } ->
-              P.Around
-                { path
-                , frequency = Once
-                , setup = mkAction path setupSpec
-                , teardown = mkAction path teardownSpec
-                , subNodes = nds
-                }
+              pure $
+                P.Around
+                  { path
+                  , frequency = Once
+                  , setup = mkAction path setupSpec
+                  , teardown = mkAction path teardownSpec
+                  , subNodes = nds
+                  }
           T.EachBefore
             { path
             , eachSpec
-            } -> uu
-          -- do
-          --   loadQIfPregen b4Q eachSpec
-          -- P.Before
-          --   { path
-          --   , frequency = Each
-          --   , action = mkAction path spec
-          --   , subNodes = nds
-          --   }
+            } ->
+              do
+                loadQIfPregen baseRandomSeed tstItemCount path b4Q eachSpec
+                pure $
+                  P.Before
+                    { path
+                    , frequency = Each
+                    , action = const . const $ mkManyAction baseRandomSeed b4Q path eachSpec
+                    , subNodes = nds
+                    }
           T.EachAfter
             { path
             , eachSpec
             } ->
-              P.After
-                { path
-                , frequency = Each
-                , after = uu -- afterAction path spec
-                , subNodes' = nds
-                }
+              do
+                loadQIfPregen baseRandomSeed tstItemCount path afterQ eachSpec
+                pure $
+                  P.After
+                    { path
+                    , frequency = Each
+                    , after = const $ mkManyAction baseRandomSeed b4Q path eachSpec
+                    , subNodes' = nds
+                    }
           T.EachAround
             { path
             , eachSetupSpec
             , eachTeardownSpec
             } ->
-              P.Around
-                { path
-                , frequency = Each
-                , setup = uu -- mkAction path setupSpec
-                , teardown = uu -- mkAction path teardownSpec
-                , subNodes = nds
-                }
+              do
+                loadQIfPregen baseRandomSeed tstItemCount path b4Q eachSetupSpec
+                loadQIfPregen baseRandomSeed tstItemCount path afterQ eachTeardownSpec
+                pure $
+                  P.Around
+                    { path
+                    , frequency = Each
+                    , setup = const . const $ mkManyAction baseRandomSeed b4Q path eachSetupSpec
+                    , teardown = const . const $ mkManyAction baseRandomSeed afterQ path eachTeardownSpec
+                    , subNodes = nds
+                    }
           _ -> case t of
             T.ThreadBefore
               { path
               , threadSpec
               } ->
-                P.Before
-                  { path
-                  , frequency = Thread
-                  , action = mkB4ThrdAction threadSpec path
-                  , subNodes = nds
-                  }
+                do
+                  loadQIfPregen baseRandomSeed mxThrds path b4Q threadSpec
+                  pure $
+                    P.Before
+                      { path
+                      , frequency = Thread
+                      , action = const . const $ mkManyAction baseRandomSeed b4Q path threadSpec
+                      , subNodes = nds
+                      }
             T.ThreadAfter
               { path
               , threadSpec
               } ->
-                P.After
-                  { path
-                  , frequency = Thread
-                  , after = mkAfterThrdAction threadSpec path
-                  , subNodes' = nds
-                  }
+                do
+                  loadQIfPregen baseRandomSeed mxThrds path afterQ threadSpec
+                  pure $
+                    P.After
+                      { path
+                      , frequency = Each
+                      , after = const $ mkManyAction baseRandomSeed b4Q path threadSpec
+                      , subNodes' = nds
+                      }
             T.ThreadAround
               { path
               , setupThreadSpec
               , teardownThreadSpec
-              } ->
-                P.Around
-                  { path
-                  , frequency = Thread
-                  , setup = mkB4ThrdAction setupThreadSpec path
-                  , teardown = mkTeardownThrdAction teardownThreadSpec path
-                  , subNodes = nds
-                  }
+              } -> do
+                loadQIfPregen baseRandomSeed mxThrds path b4Q setupThreadSpec
+                loadQIfPregen baseRandomSeed mxThrds path afterQ teardownThreadSpec
+                pure $
+                  P.Around
+                    { path
+                    , frequency = Each
+                    , setup = const . const $ mkManyAction baseRandomSeed b4Q path setupThreadSpec
+                    , teardown = const . const $ mkManyAction baseRandomSeed afterQ path teardownThreadSpec
+                    , subNodes = nds
+                    }
+
+-- P.Around
+--   { path
+--   , frequency = Thread
+--   , setup = mkB4ThrdAction setupThreadSpec path
+--   , teardown = mkTeardownThrdAction teardownThreadSpec path
+--   , subNodes = nds
+--   }
 data Template
   = OnceBefore
       { spec :: Spec
@@ -1267,11 +1287,6 @@ data Template
       { testItems :: [Spec]
       }
   deriving (Show, Eq)
-
-countTestItems :: Template -> Int
-countTestItems t = case t of
-  SuiteRuntimeTest.Test{testItems} -> length testItems
-  _ -> LE.sum $ countTestItems <$> t.subNodes
 
 mkTestItem :: T.TestItem -> P.TestItem IO ()
 mkTestItem T.TestItem{id, title, spec} = P.TestItem id title (mkAction title spec)

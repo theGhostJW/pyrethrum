@@ -68,11 +68,15 @@ genPlay = do
 defaultSeed :: Int
 defaultSeed = 13579
 
--- $> unit_simple_pass
+
+logging :: Logging
+logging = Logging
+
+-- $ > unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest defaultSeed 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
--- $> unit_simple_fail
+-- $ > unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest defaultSeed 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
@@ -105,20 +109,21 @@ unit_nested_pass_fail =
         ]
     ]
 
+
 allSpec :: Int -> Result -> ManySpec
-allSpec delay rslt = All $ Spec delay rslt
+allSpec delay rslt = T.All $ Spec delay rslt
 
 -- $ > unit_nested_threaded_chk_thread_count
 unit_nested_threaded_chk_thread_count :: IO ()
 unit_nested_threaded_chk_thread_count =
   do
-    let mxThrds = 10
+    let threadLimit = ThreadCount 10
         logging' = NoLog
     r <-
       execute
         logging'
         defaultSeed
-        mxThrds
+        threadLimit
         [ OnceAround
             (Spec 1000 Pass)
             (Spec 0 Pass)
@@ -140,7 +145,7 @@ unit_nested_threaded_chk_thread_count =
                     (allSpec 300 Pass)
                     (allSpec 300 Pass)
                     [ threadAround Pass Pass [eachAfter Pass [test [Spec 3000 Fail, Spec 1000 Pass]]]
-                    , ThreadAround (All $ Spec 50 Pass) (allSpec 0 Pass) [eachAfter Fail [test [Spec 1000 Pass, Spec 1000 Fail]]]
+                    , ThreadAround (allSpec 50 Pass) (allSpec 0 Pass) [eachAfter Fail [test [Spec 1000 Pass, Spec 1000 Fail]]]
                     , threadAround Fail Pass [eachAfter Pass [test [Spec 1000 Fail, Spec 1000 Pass]]]
                     , threadAround Pass Pass [EachBefore (allSpec 300 Fail) [test [Spec 1000 Fail, Spec 3000 Pass]]]
                     , eachAround Fail Pass [test [Spec 40 Fail, Spec 10 Pass]]
@@ -160,8 +165,8 @@ unit_nested_threaded_chk_thread_count =
                 ]
             ]
         ]
-    chkProperties r.expandedTemplate r.log
-    chkThreadCount mxThrds r.log
+    chkProperties defaultSeed threadLimit r.expandedTemplate r.log
+    chkThreadCount threadLimit r.log
 
 {- each and once hooks will always run but thread hooks may be empty
    due to subitems being stolen by another thread. We need to ensure
@@ -187,8 +192,8 @@ unit_empty_thread_around =
 
 type LogItem = ThreadEvent ExePath AE.ApEvent
 
-chkProperties :: [T.Template] -> [LogItem] -> IO ()
-chkProperties ts evts = do
+chkProperties :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
+chkProperties baseSeed threadLimit ts evts = do
   -- these checks apply to the log as a whole
   traverse_
     (evts &)
@@ -197,7 +202,7 @@ chkProperties ts evts = do
     , chkAllTemplateItemsLogged ts
     , chkStartsOnce "once hooks and tests" shouldOccurOnce
     , chkStartSuiteEventImmediatlyFollowedByEnd "once hooks" (hasSuiteEvent onceHook)
-    , chkTemplateAllFailsAndPassesLogged ts
+    , chkTemplateAllFailsAndPassesLogged baseSeed threadLimit ts
     , chkTemplateSomeFailsAndPassesLogged ts
     ]
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
@@ -242,43 +247,52 @@ data ResultInfo = ResultInfo
   }
   deriving (Ord, Eq, Show)
 
+data LocKey = LocKey
+  { path :: AE.Path
+  , suiteEvent :: SuiteEvent
+  }
+  deriving (Ord, Eq, Show)
+
+
 -- a result accumulator function to be used across a logs grouped by thread
--- this will fail if run across logs due to duplicate thread hooks
-logAccum :: Set ResultInfo -> LogItem -> Set ResultInfo
-logAccum acc =
+actuals :: [LogItem] -> Map LocKey [LogResult]
+actuals = snd . foldl' logAccum (Nothing, M.empty)
+
+-- a result accumulator function to be used across a logs grouped by thread
+logAccum :: (Maybe (ExePath, SuiteEvent), Map LocKey [LogResult]) -> LogItem -> (Maybe (ExePath, SuiteEvent), Map LocKey [LogResult])
+logAccum acc@(passStart, rMap) =
   \case
-    End{} -> acc
+    End{loc, suiteEvent} -> passStart & 
+                            maybe acc
+                            (\(_l, _s) -> (Nothing, insert' loc suiteEvent $ Actual Pass))
     f@Failure{loc, suiteEvent} ->
-      S.member (passResult loc suiteEvent) acc
-        ? (S.insert (ResultInfo (topPath' loc) suiteEvent $ Actual Fail) $ S.delete (passResult loc suiteEvent) acc)
-        $ error
-        $ "Failure event not started or failed twice\n" <> ppTxt f
+       isJust passStart
+        ? (Nothing, insert' loc suiteEvent $ Actual Fail)
+        $ error ("Failure event not started\n" <> ppTxt f)
     pf@ParentFailure{loc, suiteEvent} ->
-      eventExists loc suiteEvent acc
-        ? (error $ "parent failure encountered for already started event\n" <> ppTxt pf)
-        $ S.insert (ResultInfo (topPath' loc) suiteEvent ParentFailed) acc
+      isJust passStart
+        ? (error $ "parent failure encountered when parent event not ended\n" <> ppTxt pf)
+        $ (Nothing, insert' loc suiteEvent $ ParentFailed)
     s@Start{loc, suiteEvent} ->
-      eventExists loc suiteEvent acc
+      isJust passStart
         ? (error $ "start found for already started event\n" <> ppTxt s)
-        $ S.insert (passResult loc suiteEvent) acc
+        $ (Just (loc, suiteEvent), rMap)
     StartExecution{} -> acc
     ApEvent{} -> acc
     EndExecution{} -> acc
  where
-  eventExists :: ExePath -> SuiteEvent -> Set ResultInfo -> Bool
-  eventExists loc suiteEvent set' = S.filter (\ri -> ri.suiteEvent == suiteEvent && ri.path == topPath' loc) set' /= S.empty
-  passResult loc suiteEvent = ResultInfo (topPath' loc) suiteEvent $ Actual Pass
+  insert' :: ExePath -> SuiteEvent -> LogResult -> Map LocKey [LogResult]
+  insert' l se r = M.insertWith (<>) (LocKey (topPath' l) se) [r] rMap
   topPath' p =
-    topPath p
-      & fromMaybe (error $ "Empty event path ~ bad template setup " <> txt p)
+      fromMaybe (error $ "Empty event path ~ bad template setup " <> txt p) $ topPath p
 
 --  note this test will only work if there are enough delays in the template
 --  and the template is big enough to ensure that the threads are used
-chkThreadCount :: Int -> [LogItem] -> IO ()
-chkThreadCount mxThrds evts =
+chkThreadCount :: ThreadCount -> [LogItem] -> IO ()
+chkThreadCount threadLimit evts =
   chkEq'
     "Thread count"
-    (mxThrds + 1) -- main thread + number of threads specified
+    (threadLimit.maxThreads + 1) -- main thread + number of threads specified
     (length $ threadIds evts)
 
 -- TODO :: add test for threaded (Some failures) - ie. some failures in a thread
@@ -307,8 +321,14 @@ chkTemplateSomeFailsAndPassesLogged ts lgs = pure ()
 --       All (Spec _ _) -> False
 --       Some _ -> True
 
-chkTemplateAllFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
-chkTemplateAllFailsAndPassesLogged ts lgs =
+
+data ExpectedResult = 
+  All Result
+  | NonDeterministic
+  | Multi [Result] deriving (Show, Eq)
+
+chkTemplateAllFailsAndPassesLogged :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
+chkTemplateAllFailsAndPassesLogged baseSeed threadLimit ts lgs =
   do
     -- existence checks are in another test. just checking results correspond to expected
     -- this test will need to be updated when non-deterministic thread templates results are added
@@ -319,74 +339,54 @@ chkTemplateAllFailsAndPassesLogged ts lgs =
     -- for threaded events that can occur more than once
     chkEq' "Nothing expected to pass should fail" S.empty (S.intersection expectedPass actual.fails)
  where
-  expectedResults :: (ManySpec -> Bool) -> Set (AE.Path, SuiteEvent)
-  expectedResults pred' = fromList $ (\ep -> (ep.path, ep.suiteEvent)) <$> filteredEvntPaths pred' ts
+  -- need to switch to producing an expected map Map LocKey [LogResult]
+  -- thred events will need special treatment
 
-  expectedPass :: Set (AE.Path, SuiteEvent)
-  expectedPass =
-    expectedResults
-      ( \case
-          All (Spec _ Pass) -> True
-          All (Spec _ Fail) -> False
-          PassProb{} -> False
-      )
+  -- expectedResults ::  Map LocKey [ManySpec]
+  expectedResults =  ts >>= T.eventPaths
 
-  expectedFail :: Set (AE.Path, SuiteEvent)
-  expectedFail =
-    expectedResults
-      ( \case
-          All (Spec _ Pass) -> False
-          All (Spec _ Fail) -> True
-          PassProb{} -> False
-      )
+  accum :: Map LocKey [LogResult] -> T.EventPath -> Map LocKey ExpectedResult
+  accum acc T.EventPath { path, suiteEvent, evntSpec} = 
+    M.insertWith (<>) (LocKey (path) (suiteEvent)) result acc 
+    where 
+      result :: LogResult
+      result =
+       case evntSpec of 
+        T.All Spec {result} -> SuitRuntimeTest.All result
+        PassProb {preGenerate, passPcnt} -> 
+          if preGenerate
+            then 
+              error "preGenerate not yet implemented"
+            else 
+              NonDeterministic
+ 
+        
 
-  actual :: Summary
+
+ 
+  -- expectedPass :: Set (AE.Path, SuiteEvent)
+  -- expectedPass =
+  --   expectedResults
+  --     ( \case
+  --         All (Spec _ Pass) -> True
+  --         All (Spec _ Fail) -> False
+  --         PassProb{} -> False
+  --     )
+
+  -- expectedFail :: Set (AE.Path, SuiteEvent)
+  -- expectedFail =
+  --   expectedResults
+  --     ( \case
+  --         All (Spec _ Pass) -> False
+  --         All (Spec _ Fail) -> True
+  --         PassProb{} -> False
+  --     )
+
+  actual :: Map LocKey [LogResult]
   actual =
-    foldl' aggregate (Summary S.empty S.empty S.empty) $ summarise <$> allResultInfo
+    foldl' (M.unionWith (<>)) M.empty allResults
    where
-    allResultInfo = actuals <$> threadedLogs False lgs
-
-    -- results :: (LogResult -> Bool) ->  Set (AE.Path, SuiteEvent)
-    summarise :: Set ResultInfo -> Summary
-    summarise ri =
-      Summary
-        { passes =
-            results
-              ( \case
-                  Actual Pass -> True
-                  _ -> False
-              )
-              ri
-        , fails =
-            results
-              ( \case
-                  Actual Fail -> True
-                  _ -> False
-              )
-              ri
-        , parentFails =
-            results
-              ( \case
-                  ParentFailed -> True
-                  _ -> False
-              )
-              ri
-        }
-
-    actuals :: [LogItem] -> Set ResultInfo
-    actuals = foldl' logAccum S.empty
-
-    results :: (LogResult -> Bool) -> Set ResultInfo -> Set (AE.Path, SuiteEvent)
-    results prd rslts =
-      S.map (\ri -> (ri.path, ri.suiteEvent)) $ S.filter (\ri -> prd ri.result) rslts
-
-    aggregate :: Summary -> Summary -> Summary
-    aggregate a1 a2 =
-      Summary
-        { passes = a1.passes <> a2.passes
-        , fails = a1.fails <> a2.fails
-        , parentFails = a1.parentFails <> a2.parentFails
-        }
+    allResults = actuals <$> threadedLogs False lgs
 
 filteredEvntPaths :: (ManySpec -> Bool) -> [T.Template] -> [T.EventPath]
 filteredEvntPaths pred' templates = filter (pred' . (.evntSpec)) (templates >>= T.eventPaths)
@@ -818,13 +818,13 @@ onceAround :: Result -> Result -> [Template] -> Template
 onceAround suRslt tdRslt = OnceAround (Spec 0 suRslt) (Spec 0 tdRslt)
 
 threadBefore :: Result -> [Template] -> Template
-threadBefore r = ThreadBefore (All $ Spec 0 r)
+threadBefore r = ThreadBefore (allSpec 0 r)
 
 threadAfter :: Result -> [Template] -> Template
-threadAfter r = ThreadAfter (All $ Spec 0 r)
+threadAfter r = ThreadAfter (allSpec 0 r)
 
 threadAround :: Result -> Result -> [Template] -> Template
-threadAround suRslt tdRslt = ThreadAround (All $ Spec 0 suRslt) (All $ Spec 0 tdRslt)
+threadAround suRslt tdRslt = ThreadAround (allSpec 0 suRslt) (allSpec 0 tdRslt)
 
 eachBefore :: Result -> [Template] -> Template
 eachBefore = EachBefore . allSpec 0
@@ -846,23 +846,20 @@ data ExeResult = ExeResult
   , log :: [ThreadEvent ExePath AE.ApEvent]
   }
 
-runTest :: Int -> Int -> [Template] -> IO ()
+runTest :: Int -> ThreadCount -> [Template] -> IO ()
 runTest = runTest' logging
 
 data Logging = Logging | NoLog deriving (Show, Eq)
 
-logging :: Logging
-logging = NoLog
+runTest' :: Logging -> Int -> ThreadCount -> [Template] -> IO ()
+runTest' wantLog baseRandomSeed threadLimit templates = do
+  r <- execute wantLog baseRandomSeed threadLimit templates
+  chkProperties baseRandomSeed r.expandedTemplate r.log
 
-runTest' :: Logging -> Int -> Int -> [Template] -> IO ()
-runTest' wantLog baseRandomSeed maxThreads templates = do
-  r <- execute wantLog baseRandomSeed maxThreads templates
-  chkProperties r.expandedTemplate r.log
-
-execute :: Logging -> Int -> Int -> [Template] -> IO ExeResult
-execute wantLog baseRandomSeed maxThreads templates = do
+execute :: Logging -> Int -> ThreadCount -> [Template] -> IO ExeResult
+execute wantLog baseRandomSeed threadLimit templates = do
   let fullTs = setPaths "" templates
-  lg <- exeTemplate wantLog baseRandomSeed (ThreadCount maxThreads) fullTs
+  lg <- exeTemplate wantLog baseRandomSeed threadLimit fullTs
   pure $ ExeResult fullTs lg
 
 exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath AE.ApEvent]
@@ -1027,7 +1024,7 @@ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay =
 
 loadQIfPregen :: (Show pth) => Int -> Int -> pth -> TQueue Spec -> ManySpec -> IO ()
 loadQIfPregen baseSeed qLength pth q = \case
-  All _ -> pure ()
+  T.All _ -> pure ()
   PassProb
     { preGenerate
     , passPcnt
@@ -1054,7 +1051,7 @@ loadQIfPregen baseSeed qLength pth q = \case
 -- assumes th queue is preloaded if pregen is true see loadQIfPregen
 mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
 mkManyAction baseSeed q pth = \case
-  All s -> mkVoidAction pth s
+  T.All s -> mkVoidAction pth s
   PassProb
     { preGenerate
     , passPcnt

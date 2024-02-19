@@ -4,9 +4,9 @@ import DSL.Internal.ApEvent (Path (..))
 import Data.Map.Strict qualified as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
 import Internal.ThreadEvent qualified as TE
-import PyrethrumExtras (debug', (?), uu)
-import Prelude hiding (All, id)
 import List.Extra as LE
+import PyrethrumExtras (debug', uu, (?))
+import Prelude hiding (All, id)
 
 data Spec = Spec {delay :: Int, result :: Result}
   deriving (Show, Eq)
@@ -17,18 +17,18 @@ data Result
 
 data ManySpec
   = All Spec
-  -- if pregenerate is True, a spec is genrated when loading the template and we can
-  -- check expected failures by comparing template results to actual results but
-  -- the implementation test tree requires STM which could mask synchronisation bugs
-  -- if pregenerate is false, the spec is generated when the test is run and we cannot
-  -- predict the result of the test from the tempalate but there is no STM involved so
-  -- so we avoid masking synchronisation bugs
-  | PassProb {
-      preGenerate :: Bool,
-      passPcnt :: Int8,
-      minDelay :: Int,
-      maxDelay :: Int
-  }
+  | -- if pregenerate is True, a spec is genrated when loading the template and we can
+    -- check expected failures by comparing template results to actual results but
+    -- the implementation test tree requires STM which could mask synchronisation bugs
+    -- if pregenerate is false, the spec is generated when the test is run and we cannot
+    -- predict the result of the test from the tempalate but there is no STM involved so
+    -- so we avoid masking synchronisation bugs
+    PassProb
+      { preGenerate :: Bool
+      , passPcnt :: Int8
+      , minDelay :: Int
+      , maxDelay :: Int
+      }
   deriving (Show, Eq)
 
 data SuiteEventPath = SuiteEventPath
@@ -186,7 +186,6 @@ data Template
       }
   deriving (Show, Eq)
 
-
 countTestItems :: Template -> Int
 countTestItems t = case t of
   FullSuiteTestTemplate.Test{testItems} -> length testItems
@@ -234,18 +233,17 @@ eventPaths t = case t of
             mkEvnt Thread Setup setupThreadSpec
               : mkEvnt Thread Teardown teardownThreadSpec
               : recurse
-        EachBefore{eachSpec} -> uu
-          -- mkEvnt Each Before (All spec) : recurse
-        EachAfter{eachSpec} -> uu
-          -- mkEvnt Each After (All spec) : recurse
+        EachBefore{eachSpec} ->
+          mkEvnt Each Before eachSpec : recurse
+        EachAfter{eachSpec} ->
+          mkEvnt Each After eachSpec : recurse
         EachAround
-          { 
-           eachSetupSpec
-           , eachTeardownSpec
-          } -> uu
-            -- mkEvnt Each Setup (All setupSpec)
-            --   : mkEvnt Each Teardown (All teardownSpec)
-            --   : recurse
+          { eachSetupSpec
+          , eachTeardownSpec
+          } ->
+            mkEvnt Each Setup eachSetupSpec
+              : mkEvnt Each Teardown eachTeardownSpec
+              : recurse
 
 -- map
 --   (\testItem ->

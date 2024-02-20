@@ -2,7 +2,7 @@ module FullSuiteTestTemplate where
 
 import DSL.Internal.ApEvent (Path (..))
 import Data.Map.Strict qualified as Map
-import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (..))
+import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent(Hook))
 import Internal.ThreadEvent qualified as TE
 import List.Extra as LE
 import PyrethrumExtras (debug', uu, (?))
@@ -192,7 +192,9 @@ countTestItems t = case t of
   _ -> LE.sum $ countTestItems <$> t.subNodes
 
 data EventPath = EventPath
-  { path :: Path
+  { 
+   template :: Template
+  , path :: Path
   , suiteEvent :: SuiteEvent
   , evntSpec :: ManySpec
   }
@@ -203,12 +205,12 @@ testItemPath TestItem{..} = TestPath{..}
 
 eventPaths :: Template -> [EventPath]
 eventPaths t = case t of
-  FullSuiteTestTemplate.Test{testItems} ->
-    (\ti -> EventPath (testItemPath ti) TE.Test $ All (ti.spec)) <$> testItems
+  Test{testItems} ->
+    (\ti -> EventPath t (testItemPath ti) TE.Test $ All (ti.spec)) <$> testItems
   _ ->
     let
       recurse = concatMap eventPaths t.subNodes
-      mkEvnt f p r = EventPath t.path (Hook f p) r
+      mkEvnt f p r = EventPath t t.path (Hook f p) r
      in
       case t of
         OnceBefore{spec} ->

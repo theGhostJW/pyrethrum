@@ -40,7 +40,8 @@ import UnliftIO.Concurrent as C (
   threadDelay,
  )
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
-import Prelude hiding (All, id)
+import Prelude hiding (All, id, bug)
+import Prelude qualified as PR
 
 import Data.Hashable qualified as H
 import System.Random qualified as R
@@ -68,6 +69,10 @@ genPlay = do
 defaultSeed :: Int
 defaultSeed = 13579
 
+
+-- todo :: remap in Pyrelude bug' ~ use exception // bug ~ use text
+bug :: Text -> c
+bug = PR.bug . error
 
 logging :: Logging
 logging = Logging
@@ -202,8 +207,7 @@ chkProperties baseSeed threadLimit ts evts = do
     , chkAllTemplateItemsLogged ts
     , chkStartsOnce "once hooks and tests" shouldOccurOnce
     , chkStartSuiteEventImmediatlyFollowedByEnd "once hooks" (hasSuiteEvent onceHook)
-    , chkTemplateAllFailsAndPassesLogged baseSeed threadLimit ts
-    , chkTemplateSomeFailsAndPassesLogged ts
+    , chkExpectedResults baseSeed threadLimit ts
     ]
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
   threadLogChks
@@ -284,7 +288,7 @@ logAccum acc@(passStart, rMap) =
   insert' :: ExePath -> SuiteEvent -> LogResult -> Map LocKey [LogResult]
   insert' l se r = M.insertWith (<>) (LocKey (topPath' l) se) [r] rMap
   topPath' p =
-      fromMaybe (error $ "Empty event path ~ bad template setup " <> txt p) $ topPath p
+      fromMaybe (bug $ "Empty event path ~ bad template setup " <> txt p) $ topPath p
 
 --  note this test will only work if there are enough delays in the template
 --  and the template is big enough to ensure that the threads are used
@@ -295,101 +299,60 @@ chkThreadCount threadLimit evts =
     (threadLimit.maxThreads + 1) -- main thread + number of threads specified
     (length $ threadIds evts)
 
--- TODO :: add test for threaded (Some failures) - ie. some failures in a thread
--- count should match number of result instance in log (allow for parent failures)
-chkTemplateSomeFailsAndPassesLogged :: [T.Template] -> [LogItem] -> IO ()
-chkTemplateSomeFailsAndPassesLogged ts lgs = pure ()
-
---  where
---   accSums :: [(AE.Path, [Result])] -> LogItem -> [(AE.Path, [Result])]
---   accSums acc = \case {}
-
---   threadedActuals = foldl' accSums [] <$> threadedLogs False lgs
-
---   expectedSomeResults = M.fromList $ (\ep -> (ep.path, someResults ep)) <$> filteredEvntPaths isSome ts
-
---   someResults :: T.EventPath -> [Result]
---   someResults ep =
---     ep.evntSpec
---       & \case
---         All (Spec _ _) -> error "this should not happen"
---         Some s -> (.result) <$> s
-
---   isSome :: ManySpec -> Bool
---   isSome =
---     \case
---       All (Spec _ _) -> False
---       Some _ -> True
-
-
 data ExpectedResult = 
   All Result
   | NonDeterministic
   | Multi [Result] deriving (Show, Eq)
 
-chkTemplateAllFailsAndPassesLogged :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
-chkTemplateAllFailsAndPassesLogged baseSeed threadLimit ts lgs =
+chkExpectedResults :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
+chkExpectedResults baseSeed threadLimit ts lgs =
   do
-    -- existence checks are in another test. just checking results correspond to expected
-    -- this test will need to be updated when non-deterministic thread templates results are added
-    chkEq' "All expected failures should actually fail" S.empty (expectedFail S.\\ (actual.fails <> actual.parentFails))
-    -- for threaded events that can occur more than once
-    chkEq' "Nothing expected to fail should pass" S.empty (S.intersection expectedFail actual.passes)
-    chkEq' "All expected passes should actually pass" S.empty (expectedPass S.\\ (actual.passes <> actual.parentFails))
-    -- for threaded events that can occur more than once
-    chkEq' "Nothing expected to pass should fail" S.empty (S.intersection expectedPass actual.fails)
+    -- fail missing expected results or different to expected
+    firstUnexpectedResult & maybe (pure ()) (error . ppTxt)
+    -- fail extra results
+    let extrActual = M.keysSet actual S.\\ M.keysSet expectedResults
+    chkEq' "Extra results found in actual that are not expected" S.empty extrActual
+    
  where
   -- need to switch to producing an expected map Map LocKey [LogResult]
   -- thred events will need special treatment
+  
+  firstUnexpectedResult :: Maybe Text 
+  firstUnexpectedResult = HERE
+  -- foldrWithKey :: (k -> a -> b -> b) -> b -> Map k a -> b 
 
-  -- expectedResults ::  Map LocKey [ManySpec]
-  expectedResults =  ts >>= T.eventPaths
+  expectedResults :: Map LocKey ExpectedResult
+  expectedResults = foldl' accum M.empty $  ts >>= T.eventPaths
 
-  accum :: Map LocKey [LogResult] -> T.EventPath -> Map LocKey ExpectedResult
-  accum acc T.EventPath { path, suiteEvent, evntSpec} = 
-    M.insertWith (<>) (LocKey (path) (suiteEvent)) result acc 
-    where 
-      result :: LogResult
-      result =
+  accum :: Map LocKey ExpectedResult -> T.EventPath -> Map LocKey ExpectedResult
+  accum acc T.EventPath { path, suiteEvent, evntSpec,  template } = 
+    M.insert (ensureUnique key) expected acc 
+    where
+      key = LocKey (path) (suiteEvent)
+      ensureUnique k = M.member k acc 
+        ? (bug $ "duplicate key should not happen. Template paths should be unique: " <> txt k) 
+        $ k
+
+      expected :: ExpectedResult
+      expected =
        case evntSpec of 
-        T.All Spec {result} -> SuitRuntimeTest.All result
-        PassProb {preGenerate, passPcnt} -> 
-          if preGenerate
-            then 
-              error "preGenerate not yet implemented"
-            else 
-              NonDeterministic
+        T.All Spec {result} -> SuiteRuntimeTest.All result
+        PassProb {preGenerate, passPcnt,  minDelay, maxDelay } -> 
+          preGenerate ?
+              (Multi $ (.result) <$> generateSpecs baseSeed rLength path passPcnt minDelay maxDelay)
+              $ NonDeterministic
+          where 
+            rLength = case suiteEvent of 
+              TE.Test{} -> bug $ "Test not expected to have PassProb spec"
+              TE.Hook TE.Once _ -> bug $ "Once  not expected to have PassProb spec"
+              TE.Hook TE.Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
+              TE.Hook TE.Each _ -> T.countTestItems template -- expect a result for each test item
  
-        
-
-
- 
-  -- expectedPass :: Set (AE.Path, SuiteEvent)
-  -- expectedPass =
-  --   expectedResults
-  --     ( \case
-  --         All (Spec _ Pass) -> True
-  --         All (Spec _ Fail) -> False
-  --         PassProb{} -> False
-  --     )
-
-  -- expectedFail :: Set (AE.Path, SuiteEvent)
-  -- expectedFail =
-  --   expectedResults
-  --     ( \case
-  --         All (Spec _ Pass) -> False
-  --         All (Spec _ Fail) -> True
-  --         PassProb{} -> False
-  --     )
-
   actual :: Map LocKey [LogResult]
   actual =
     foldl' (M.unionWith (<>)) M.empty allResults
    where
     allResults = actuals <$> threadedLogs False lgs
-
-filteredEvntPaths :: (ManySpec -> Bool) -> [T.Template] -> [T.EventPath]
-filteredEvntPaths pred' templates = filter (pred' . (.evntSpec)) (templates >>= T.eventPaths)
 
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =

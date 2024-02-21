@@ -6,7 +6,7 @@ import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (ManySpec (..), Result (..), Spec (..))
+import FullSuiteTestTemplate (ManySpec (PassProb), Result (..), Spec (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.RunTimeLogging (ExePath (..), parentPath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
@@ -71,26 +71,26 @@ defaultSeed = 13579
 
 
 -- todo :: remap in Pyrelude bug' ~ use exception // bug ~ use text
-bug :: Text -> c
-bug = PR.bug . error
+-- bug :: Text -> c
+bug t = PR.bug $ (error t :: SomeException)
 
 logging :: Logging
 logging = Logging
 
 -- $ > unit_simple_pass
 unit_simple_pass :: IO ()
-unit_simple_pass = runTest defaultSeed 1 [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
+unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
 
 -- $ > unit_simple_fail
 unit_simple_fail :: IO ()
-unit_simple_fail = runTest defaultSeed 1 [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
+unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
 
 -- $> unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
   runTest
     defaultSeed
-    1
+    (ThreadCount 1)
     [ onceAround
         Pass
         Pass
@@ -178,8 +178,8 @@ unit_nested_threaded_chk_thread_count =
    that empty thread TestTrees are not executed
 -}
 
-ppTxt :: (Show a) => a -> Text
-ppTxt = toS . ppShow
+ptxt :: (Show a) => a -> Text
+ptxt = toS . ppShow
 
 -- $ > unit_empty_thread_around
 unit_empty_thread_around :: IO ()
@@ -191,9 +191,9 @@ unit_empty_thread_around =
     exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass []]]] >>= chkEmptyLog
     exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [test [testItem Pass]]]]] >>= chkLogLength
  where
-  exe = execute NoLog defaultSeed 1
-  chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (ppTxt r.log)) 2 (length r.log)
-  chkLogLength r = chkEq' ("Log length not as expected:\n" <> (ppTxt r.log)) 12 (length r.log)
+  exe = execute NoLog defaultSeed (ThreadCount 1)
+  chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (ptxt r.log)) 2 (length r.log)
+  chkLogLength r = chkEq' ("Log length not as expected:\n" <> (ptxt r.log)) 12 (length r.log)
 
 type LogItem = ThreadEvent ExePath AE.ApEvent
 
@@ -259,8 +259,8 @@ data LocKey = LocKey
 
 
 -- a result accumulator function to be used across a logs grouped by thread
-actuals :: [LogItem] -> Map LocKey [LogResult]
-actuals = snd . foldl' logAccum (Nothing, M.empty)
+actualResults :: [LogItem] -> Map LocKey [LogResult]
+actualResults = snd . foldl' logAccum (Nothing, M.empty)
 
 -- a result accumulator function to be used across a logs grouped by thread
 logAccum :: (Maybe (ExePath, SuiteEvent), Map LocKey [LogResult]) -> LogItem -> (Maybe (ExePath, SuiteEvent), Map LocKey [LogResult])
@@ -272,14 +272,14 @@ logAccum acc@(passStart, rMap) =
     f@Failure{loc, suiteEvent} ->
        isJust passStart
         ? (Nothing, insert' loc suiteEvent $ Actual Fail)
-        $ error ("Failure event not started\n" <> ppTxt f)
+        $ error ("Failure event not started\n" <> ptxt f)
     pf@ParentFailure{loc, suiteEvent} ->
       isJust passStart
-        ? (error $ "parent failure encountered when parent event not ended\n" <> ppTxt pf)
+        ? (error $ "parent failure encountered when parent event not ended\n" <> ptxt pf)
         $ (Nothing, insert' loc suiteEvent $ ParentFailed)
     s@Start{loc, suiteEvent} ->
       isJust passStart
-        ? (error $ "start found for already started event\n" <> ppTxt s)
+        ? (error $ "start found for already started event\n" <> ptxt s)
         $ (Just (loc, suiteEvent), rMap)
     StartExecution{} -> acc
     ApEvent{} -> acc
@@ -304,22 +304,63 @@ data ExpectedResult =
   | NonDeterministic
   | Multi [Result] deriving (Show, Eq)
 
+-- todo add to pyrelude
+groupCount :: Eq a => [a] -> M.Map a Int
+groupCount = M.fromListWith (+) . fmap (,1)
+
 chkExpectedResults :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
 chkExpectedResults baseSeed threadLimit ts lgs =
   do
     -- fail missing expected results or different to expected
-    firstUnexpectedResult & maybe (pure ()) (error . ppTxt)
+    chkExpectedResults
     -- fail extra results
-    let extrActual = M.keysSet actual S.\\ M.keysSet expectedResults
+    let extrActual = M.keysSet actuals S.\\ M.keysSet expectedResults
     chkEq' "Extra results found in actual that are not expected" S.empty extrActual
     
  where
   -- need to switch to producing an expected map Map LocKey [LogResult]
   -- thred events will need special treatment
   
-  firstUnexpectedResult :: Maybe Text 
-  firstUnexpectedResult = HERE
-  -- foldrWithKey :: (k -> a -> b -> b) -> b -> Map k a -> b 
+  chkExpectedResults :: IO ()
+  chkExpectedResults = traverse_ chkResult $ M.toList expectedResults
+   where
+    chkResult :: (LocKey, ExpectedResult) -> IO ()
+    chkResult (k, expected) = 
+      M.lookup k actuals & maybe
+        (chkFail $ "Expected result for " <> ptxt k <> " not found in actual")
+        (\actual -> 
+           case expected of 
+            All e -> 
+              chk' ("Unexpected result for:\n " <> ptxt k <> "\n   expected: " <> ptxt expected) 
+                $ all (\r -> r == Actual e || r == ParentFailed) actual
+            NonDeterministic -> pure ()
+            Multi expLst -> case k.suiteEvent of 
+              TE.Test{} -> bug $ "Test not expected to have Multi result"
+              TE.Hook TE.Once _ -> bug $ "Once  not expected to have Multi result"
+              TE.Hook TE.Thread _ -> 
+                -- dont forget parent failures
+                -- take sam number of instances in actual cause the nuber of time run is non deterministic
+                -- chk count less than or equal to max threads
+                -- comment on lcoking STM
+                threadLimit.maxThreads -- the most results we will get is the number of threads
+              TE.Hook TE.Each _ -> T.countTestItems (ts !! 0) -- expect a result for each test item
+             where
+              chkMulti ex ac = 
+              summarise = groupCount
+        
+        
+        )
+
+  --         case e of 
+  --           T.All{} -> bug $ "All result expected but not found in actual"
+  --           NonDeterministic -> bug $ "NonDeterministic result expected but not found in actual"
+  --           Multi{} -> bug $ "Multi result expected but not found in actual"
+  --       Just r -> 
+  --         case e of 
+  --           T.All e' -> chkEq' ("Expected result for " <> toS (ppShow k)) e' r
+  --           NonDeterministic -> pure ()
+  --           Multi es -> chkEq' ("Expected result for " <> toS (ppShow k)) True (r `elem` es)
+  -- -- foldrWithKey :: (k -> a -> b -> b) -> b -> Map k a -> b 
 
   expectedResults :: Map LocKey ExpectedResult
   expectedResults = foldl' accum M.empty $  ts >>= T.eventPaths
@@ -348,11 +389,11 @@ chkExpectedResults baseSeed threadLimit ts lgs =
               TE.Hook TE.Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
               TE.Hook TE.Each _ -> T.countTestItems template -- expect a result for each test item
  
-  actual :: Map LocKey [LogResult]
-  actual =
+  actuals :: Map LocKey [LogResult]
+  actuals =
     foldl' (M.unionWith (<>)) M.empty allResults
    where
-    allResults = actuals <$> threadedLogs False lgs
+    allResults = actualResults <$> threadedLogs False lgs
 
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =
@@ -446,16 +487,16 @@ chkParentFailsPropagated
               s@Start{} ->
                 do
                   -- TODO :: implement chkFalse'
-                  -- TODO :: implement ppTxt
+                  -- TODO :: implement ptxt
                   -- TODO :: chk' error mkessage prints to single line - chkEq' works properly
                   chkEq'
                     ( "This event should be a child failure:\n"
                         <> "  This Event is:\n"
                         <> "    "
-                        <> (ppTxt s)
+                        <> (ptxt s)
                         <> "  Parent Failure is:\n"
                         <> "    "
-                        <> (ppTxt failLoc)
+                        <> (ptxt failLoc)
                     )
                     False
                     isFailChild
@@ -583,7 +624,7 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
  where
   chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
   chkParent (childPath, actualParentPath) =
-    chkEq' (message <> " for:\n" <> (ppTxt childPath)) expectedParentPath actualParentPath
+    chkEq' (message <> " for:\n" <> (ptxt childPath)) expectedParentPath actualParentPath
    where
     expectedParentPath = M.lookup childPath expectedChildParentMap
 
@@ -817,7 +858,7 @@ data Logging = Logging | NoLog deriving (Show, Eq)
 runTest' :: Logging -> Int -> ThreadCount -> [Template] -> IO ()
 runTest' wantLog baseRandomSeed threadLimit templates = do
   r <- execute wantLog baseRandomSeed threadLimit templates
-  chkProperties baseRandomSeed r.expandedTemplate r.log
+  chkProperties baseRandomSeed threadLimit r.expandedTemplate r.log
 
 execute :: Logging -> Int -> ThreadCount -> [Template] -> IO ExeResult
 execute wantLog baseRandomSeed threadLimit templates = do
@@ -941,7 +982,7 @@ mkQueAction q path =
     s <- atomically $ tryReadTQueue q
     s
       & maybe
-        (error $ "spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> ppTxt path)
+        (error $ "spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> ptxt path)
         (mkVoidAction path)
 
 data ManyParams = ManyParams

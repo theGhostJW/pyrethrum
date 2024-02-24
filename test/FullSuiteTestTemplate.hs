@@ -37,6 +37,7 @@ data SuiteEventPath = SuiteEventPath
   }
   deriving (Show, Eq, Ord)
 
+
 {- Given a list of templates, return a map of each event path to its expected preceeding
 parent event path
 -}
@@ -246,11 +247,6 @@ eventPaths t = case t of
             mkEvnt Each Setup eachSetupSpec
               : mkEvnt Each Teardown eachTeardownSpec
               : recurse
-
--- map
---   (\testItem ->
---      mkEvnt (Test {id = id testItem, title = title testItem}))
---   testItems
 
 data TestItem = TestItem
   { id :: Int

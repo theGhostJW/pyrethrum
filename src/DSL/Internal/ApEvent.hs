@@ -39,6 +39,7 @@ data Path
       }
   deriving (Show, Eq, Ord)
 
+
 newtype ApStateJSON = ApStateJSON {unApStateJSON :: A.Value} deriving (Eq, Show, IsString)
 $(deriveJSON defaultOptions ''ApStateJSON)
 
@@ -96,43 +97,3 @@ $(deriveJSON defaultOptions ''ULog)
 $(deriveJSON defaultOptions ''Path)
 $(deriveJSON defaultOptions ''FLog)
 $(deriveJSON defaultOptions ''ApEvent)
-
-{-
-
-  data LogProtocolBase e
-  = FilterLog [TestFilterResult]
-  | StartRun
-      { runTitle :: RunTitle,
-        runUtcOffsetMins :: Int,
-        runConfig :: Value
-      }
-  | EndRun
-  | StaXTGroup GroupTitle
-  | EndGroup GroupTitle
-  | StartHook HookType Text
-  | EndHook HookType Text
-  | StartTest TestLogInfo
-  | EndTest Address
-  | StartIteration ItemId Text Value
-  | EndIteration ItemId
-
-  | IOAction Text
-  | IOAction' DetailedInfo
-  | StartInteraction
-  | InteractorSuccess ItemId ApStateJSON
-  | InteractorFailure ItemId (FrameworkError e)
-  | StartParser
-  | ParserSuccess ItemId DStateJSON
-  | ParserSkipped ItemId
-  | ParserFailure ItemId (FrameworkError e)
-  | StartChecks
-  | CheckOutcome ItemId CheckReport
-  | Message Text
-  | Message' DetailedInfo
-  | Warning Text
-  | Warning' DetailedInfo
-  | Error (FrameworkError e)
-  deriving (Eq, Show, Functor)
-\$(deriveJSON defaultOptions ''LogProtocolBase)
-
-  -}

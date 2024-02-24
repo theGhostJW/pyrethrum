@@ -23,7 +23,7 @@ data SuiteEvent
     = Hook Hz HookPos
     | Test
     deriving (Show, Eq, Ord)
-
+    
 isSetup :: SuiteEvent -> Bool
 isSetup = \case
     Hook _ Setup -> True

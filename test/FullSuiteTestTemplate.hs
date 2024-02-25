@@ -2,7 +2,7 @@ module FullSuiteTestTemplate where
 
 import DSL.Internal.ApEvent (Path (..))
 import Data.Map.Strict qualified as Map
-import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent(Hook))
+import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (Hook))
 import Internal.ThreadEvent qualified as TE
 import List.Extra as LE
 import PyrethrumExtras (debug', uu, (?))
@@ -17,12 +17,14 @@ data Result
 
 data ManySpec
   = All Spec
-  | -- if pregenerate is True, a spec is genrated when loading the template and we can
-    -- check expected failures by comparing template results to actual results but
-    -- the implementation test tree requires STM which could mask synchronisation bugs
-    -- if pregenerate is false, the spec is generated when the test is run and we cannot
-    -- predict the result of the test from the tempalate but there is no STM involved so
-    -- so we avoid masking synchronisation bugs
+  | {-
+     if pregenerate is True, a spec is genrated when loading the template and we can
+      check expected failures by comparing template results to actual results but
+      the implementation test tree requires STM which could mask synchronisation bugs
+      if pregenerate is false, the spec is generated when the test is run and we cannot
+      predict the result of the test from the tempalate but there is no STM involved so
+      so we avoid masking synchronisation bugs in testing other properties
+      -}
     PassProb
       { preGenerate :: Bool
       , passPcnt :: Int8
@@ -36,7 +38,6 @@ data SuiteEventPath = SuiteEventPath
   , suiteEvent :: SuiteEvent
   }
   deriving (Show, Eq, Ord)
-
 
 {- Given a list of templates, return a map of each event path to its expected preceeding
 parent event path
@@ -193,8 +194,7 @@ countTestItems t = case t of
   _ -> LE.sum $ countTestItems <$> t.subNodes
 
 data EventPath = EventPath
-  { 
-   template :: Template
+  { template :: Template
   , path :: Path
   , suiteEvent :: SuiteEvent
   , evntSpec :: ManySpec

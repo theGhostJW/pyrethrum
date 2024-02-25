@@ -6,7 +6,7 @@ import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (ManySpec (PassProb), Result (..), Spec (..), SuiteEventPath(..))
+import FullSuiteTestTemplate (ManySpec (PassProb), Result (..), Spec (..), SuiteEventPath (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.RunTimeLogging (ExePath (..), parentPath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
@@ -34,7 +34,7 @@ import List.Extra as LE
 import List.Extra qualified as L
 import Prepare qualified as P
 import PyrethrumExtras (debug, debug', debug'_, toS, txt, uu, (?))
-import PyrethrumExtras.Test hiding (chkEq', filter, mapMaybe, maybe, test)
+import PyrethrumExtras.Test hiding (chkEq', filter, fixture, mapMaybe, maybe, test)
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
   threadDelay,
@@ -71,18 +71,19 @@ defaultSeed = 13579
 
 -- todo :: remap in Pyrelude bug' ~ use exception // bug ~ use text
 -- bug :: Text -> c
+bug :: Text -> a
 bug t = PR.bug $ (error t :: SomeException)
 
 logging :: Logging
-logging = Log
+logging = NoLog
 
--- $ > unit_simple_pass
+-- $> unit_simple_pass
 unit_simple_pass :: IO ()
-unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [test [testItem Pass, testItem Fail]]]
+unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
--- $ > unit_simple_fail
+-- $> unit_simple_fail
 unit_simple_fail :: IO ()
-unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [test [testItem Pass, testItem Fail]]]
+unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fixture [test Pass, test Fail]]]
 
 -- $> unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
@@ -93,30 +94,65 @@ unit_nested_pass_fail =
     [ onceAround
         Pass
         Pass
-        [ threadAround Pass Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
-        , threadAround Pass Pass [eachAfter Fail [test [testItem Pass, testItem Fail]]]
-        , threadAround Fail Pass [eachAfter Pass [test [testItem Fail, testItem Pass]]]
-        , threadAround Pass Pass [eachBefore Fail [test [testItem Fail, testItem Pass]]]
-        , eachAround Fail Pass [test [testItem Fail, testItem Pass]]
+        [ threadAround Pass Pass [eachAfter Pass [fixture [test Fail, test Pass]]]
+        , threadAround Pass Pass [eachAfter Fail [fixture [test Pass, test Fail]]]
+        , threadAround Fail Pass [eachAfter Pass [fixture [test Fail, test Pass]]]
+        , threadAround Pass Pass [eachBefore Fail [fixture [test Fail, test Pass]]]
+        , eachAround Fail Pass [fixture [test Fail, test Pass]]
         , eachBefore
             Fail
-            [ test [testItem Pass, testItem Pass]
+            [ fixture [test Pass, test Pass]
             , eachAround
                 Pass
                 Pass
-                [ test
-                    [ testItem Pass
-                    , testItem Pass
+                [ fixture
+                    [ test Pass
+                    , test Pass
                     ]
                 ]
             ]
         ]
     ]
 
+passProbSuite :: Bool -> IO ()
+passProbSuite preGen =
+  runTest
+    defaultSeed
+    (ThreadCount 1)
+    [ onceAround
+        Pass
+        Pass
+        [ ThreadAround passProb50 passProb100 [eachAfter Pass [fixture [test Fail, test Pass]]]
+        , ThreadAround passProb100 passProb100 [eachAfter Fail [fixture [test Pass, test Fail]]]
+        , ThreadAround passProb75 passProb20 [eachAfter Pass [fixture [test Fail, test Pass]]]
+        , ThreadAround passProb0 passProb100 [eachBefore Fail [fixture [test Fail, test Pass]]]
+        , EachAround passProb75 passProb75 [fixture [test Fail, test Pass]]
+        , EachBefore
+            passProb100
+            [ fixture [test Pass, test Pass]
+            , EachAround
+                passProb100
+                passProb75
+                [ fixture
+                    [ test Pass
+                    , test Pass
+                    ]
+                ]
+            ]
+        ]
+    ]
+ where
+  passProb pcnt = T.PassProb preGen pcnt 100 1000
+  passProb0 = passProb 0
+  passProb20 = passProb 20
+  passProb50 = passProb 50
+  passProb75 = passProb 75
+  passProb100 = passProb 100
+
 allSpec :: Int -> Result -> ManySpec
 allSpec delay rslt = T.All $ Spec delay rslt
 
--- $ > unit_nested_threaded_chk_thread_count
+-- $> unit_nested_threaded_chk_thread_count
 unit_nested_threaded_chk_thread_count :: IO ()
 unit_nested_threaded_chk_thread_count =
   do
@@ -135,9 +171,14 @@ unit_nested_threaded_chk_thread_count =
                 (allSpec 0 Pass)
                 [ EachAfter
                     (allSpec 50 Pass)
-                    [ test
+                    [ fixture
                         [ Spec 0 Pass
-                        , Spec 1 Fail
+                        , Spec 1000 Fail
+                        , Spec 100 Fail
+                        , Spec 100 Fail
+                        , Spec 100 Fail
+                        , Spec 100 Fail
+                        , Spec 100 Fail
                         ]
                     ]
                 ]
@@ -147,18 +188,18 @@ unit_nested_threaded_chk_thread_count =
                 [ ThreadAround
                     (allSpec 300 Pass)
                     (allSpec 300 Pass)
-                    [ threadAround Pass Pass [eachAfter Pass [test [Spec 3000 Fail, Spec 1000 Pass]]]
-                    , ThreadAround (allSpec 50 Pass) (allSpec 0 Pass) [eachAfter Fail [test [Spec 1000 Pass, Spec 1000 Fail]]]
-                    , threadAround Fail Pass [eachAfter Pass [test [Spec 1000 Fail, Spec 1000 Pass]]]
-                    , threadAround Pass Pass [EachBefore (allSpec 300 Fail) [test [Spec 1000 Fail, Spec 3000 Pass]]]
-                    , eachAround Fail Pass [test [Spec 40 Fail, Spec 10 Pass]]
+                    [ threadAround Pass Pass [eachAfter Pass [fixture [Spec 3000 Fail, Spec 1000 Pass]]]
+                    , ThreadAround (allSpec 50 Pass) (allSpec 0 Pass) [eachAfter Fail [fixture [Spec 1000 Pass, Spec 1000 Fail]]]
+                    , threadAround Fail Pass [eachAfter Pass [fixture [Spec 1000 Fail, Spec 1000 Pass]]]
+                    , threadAround Pass Pass [EachBefore (allSpec 300 Fail) [fixture [Spec 1000 Fail, Spec 3000 Pass]]]
+                    , eachAround Fail Pass [fixture [Spec 40 Fail, Spec 10 Pass]]
                     , eachBefore
                         Fail
-                        [ test [Spec 300 Pass, Spec 10 Pass]
+                        [ fixture [Spec 300 Pass, Spec 10 Pass]
                         , EachAround
                             (allSpec 50 Pass)
                             (allSpec 0 Pass)
-                            [ test
+                            [ fixture
                                 [ Spec 1000 Pass
                                 , Spec 200 Pass
                                 ]
@@ -179,7 +220,7 @@ unit_nested_threaded_chk_thread_count =
 ptxt :: (Show a) => a -> Text
 ptxt = toS . ppShow
 
--- $ > unit_empty_thread_around
+-- $> unit_empty_thread_around
 unit_empty_thread_around :: IO ()
 unit_empty_thread_around =
   do
@@ -187,11 +228,32 @@ unit_empty_thread_around =
     exe [threadBefore Pass []] >>= chkEmptyLog
     exe [threadAfter Pass []] >>= chkEmptyLog
     exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass []]]] >>= chkEmptyLog
-    exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [test [testItem Pass]]]]] >>= chkLogLength
+    exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [fixture [test Pass]]]]] >>= chkLogLength
  where
   exe = execute NoLog defaultSeed (ThreadCount 1)
   chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (ptxt r.log)) 2 (length r.log)
   chkLogLength r = chkEq' ("Log length not as expected:\n" <> (ptxt r.log)) 12 (length r.log)
+
+
+{-
+  the following tests are to make sure all the property checks are working for
+  probability based tests, both with and without pregeneration
+
+    if pregenerate is True, a spec is genrated when loading the template and we can
+     check expected failures by comparing template results to actual results but
+     the implementation test tree requires STM which could mask synchronisation bugs
+     if pregenerate is false, the spec is generated when the test is run and we cannot
+     predict the result of the test from the tempalate but there is no STM involved so
+     so we avoid masking synchronisation bugs in testing other properties
+  -}
+
+-- $> unit_pass_prob_pregen
+unit_pass_prob_pregen :: IO ()
+unit_pass_prob_pregen = passProbSuite True
+
+-- $> unit_pass_prob_no_pregen
+unit_pass_prob_no_pregen :: IO ()
+unit_pass_prob_no_pregen = passProbSuite False
 
 type LogItem = ThreadEvent ExePath AE.ApEvent
 
@@ -217,7 +279,6 @@ chkProperties baseSeed threadLimit ts evts = do
     , chkFailureLocEqualsLastStartLoc
     , chkFailurePropagation
     ]
-  putStrLn " checks done"
 
 data FailInfo = FailInfo
   { idx :: Int
@@ -283,7 +344,7 @@ logAccum acc@(passStart, rMap) =
   topPath' p =
     fromMaybe (bug $ "Empty event path ~ bad template setup " <> txt p) $ topPath p
 
---  note this test will only work if there are enough delays in the template
+--  note this fixture will only work if there are enough delays in the template
 --  and the template is big enough to ensure that the threads are used
 chkThreadCount :: ThreadCount -> [LogItem] -> IO ()
 chkThreadCount threadLimit evts =
@@ -303,14 +364,14 @@ groupCount :: (Ord a) => [a] -> M.Map a Int
 groupCount = M.fromListWith (+) . fmap (,1)
 
 {-
-bugs found in testing:: 
+defects found in testing::
   - incorrect label on thread hook - labeld as each
   - hook events out of order - due to bracket and laziness
   - missing thread around events
-    - chkExpectedResults failing but not
+    - chkExpectedResults failing but not chkAllTemplateItemsLogged
+    - chkAllTemplateItemsLogged was incomplete + prenode generator (fixture) bug
 
 -}
-
 
 chkExpectedResults :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
 chkExpectedResults baseSeed threadLimit ts lgs =
@@ -328,7 +389,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
     chkResult (k, expected) =
       M.lookup k actuals
         & maybe
-          --  todo: this doesn't format as expected 
+          --  todo: this doesn't format as expected
           (chkFail $ "Expected result for " <> ptxt (k & debug) <> " not found in actual")
           ( \actual ->
               case expected of
@@ -367,12 +428,11 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                       (expectedPassCount >= actualPasses)
                     chk'
                       (failMsg "Fail Count: expectedFailCount [" <> ptxt expectedPassCount <> "] <= actualPasses [" <> ptxt actualPasses <> "] + actualParentFails [" <> ptxt actualParentFails <> "]")
-                      (expectedFailCount <= actualFails+ actualParentFails)
+                      (expectedFailCount <= actualFails + actualParentFails)
                     chk'
                       (failMsg "Fail Count: expectedFailCount [" <> ptxt expectedFailCount <> "] >= actualFails [" <> ptxt actualFails <> "]")
                       (expectedFailCount >= actualFails)
           )
-
 
   expectedResults :: Map SuiteEventPath ExpectedResult
   expectedResults = foldl' accum M.empty $ ts >>= T.eventPaths
@@ -401,8 +461,6 @@ chkExpectedResults baseSeed threadLimit ts lgs =
             TE.Hook TE.Once _ -> bug $ "Once  not expected to have PassProb spec"
             TE.Hook TE.Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
             TE.Hook TE.Each _ -> T.countTestItems template -- expect a result for each test item
-  
-  
   actuals :: Map SuiteEventPath [LogResult]
   actuals =
     foldl' (M.unionWith (<>)) M.empty allResults
@@ -715,7 +773,7 @@ chkAllTemplateItemsLogged ts lgs =
 
   -- init to empty set
   tmplatePaths :: Set SuiteEventPath
-  tmplatePaths = debug' "EXPECTED PATHS" . fromList $ (\ep -> SuiteEventPath ep.path ep.suiteEvent) <$> (ts >>= T.eventPaths)
+  tmplatePaths = fromList $ (\ep -> SuiteEventPath ep.path ep.suiteEvent) <$> (ts >>= T.eventPaths)
 
   logStartPaths :: Set SuiteEventPath
   logStartPaths =
@@ -725,7 +783,7 @@ chkAllTemplateItemsLogged ts lgs =
             do
               case lg of
                 ParentFailure{loc, suiteEvent} -> flip SuiteEventPath suiteEvent <$> topPath loc
-                Start{loc, suiteEvent} ->  flip SuiteEventPath suiteEvent <$> topPath loc
+                Start{loc, suiteEvent} -> flip SuiteEventPath suiteEvent <$> topPath loc
                 _ -> Nothing
         )
         lgs
@@ -852,11 +910,11 @@ eachAfter = EachAfter . allSpec 0
 eachAround :: Result -> Result -> [Template] -> Template
 eachAround suRslt tdRslt = EachAround (allSpec 0 suRslt) (allSpec 0 tdRslt)
 
-test :: [Spec] -> Template
-test = SuiteRuntimeTest.Test
+fixture :: [Spec] -> Template
+fixture = SuiteRuntimeTest.Test
 
-testItem :: Result -> Spec
-testItem = Spec 0
+test :: Result -> Spec
+test = Spec 0
 
 data ExeResult = ExeResult
   { expandedTemplate :: [T.Template]
@@ -987,7 +1045,7 @@ instance ToJSON TestConfig
 instance Core.Config TestConfig
 
 tc :: TestConfig
-tc = TestConfig{title = "test config"}
+tc = TestConfig{title = "fixture config"}
 
 mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> IO ()
 mkQueAction q path =
@@ -995,7 +1053,7 @@ mkQueAction q path =
     s <- atomically $ tryReadTQueue q
     s
       & maybe
-        (error $ "spec queue is empty - either the test template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> ptxt path)
+        (error $ "spec queue is empty - either the fixture template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> ptxt path)
         (mkVoidAction path)
 
 data ManyParams = ManyParams
@@ -1230,7 +1288,7 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
                   pure $
                     P.After
                       { path
-                      , frequency = Each
+                      , frequency = Thread
                       , after = const $ mkManyAction baseRandomSeed b4Q path threadSpec
                       , subNodes' = nds
                       }
@@ -1244,7 +1302,7 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
                 pure $
                   P.Around
                     { path
-                    , frequency = Each
+                    , frequency = Thread
                     , setup = const . const $ mkManyAction baseRandomSeed b4Q path setupThreadSpec
                     , teardown = const . const $ mkManyAction baseRandomSeed afterQ path teardownThreadSpec
                     , subNodes = nds

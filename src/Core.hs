@@ -199,9 +199,11 @@ data Test c rc tc effs hi where
     Test c rc tc effs hi
 
 -- TODO :: RENAME
+-- Suite
 -- SuiteElement => Node
 -- Test => Fixture
-{-
+-- Test
+{- Final Naming
 Suite 
   - Nodes 
     - Hooks 

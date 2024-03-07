@@ -34,7 +34,7 @@ import List.Extra as LE
 import List.Extra qualified as L
 import Prepare qualified as P
 import PyrethrumExtras (debug, debug', debug'_, toS, txt, uu, (?))
-import PyrethrumExtras.Test hiding (chkEq', filter, fixture, mapMaybe, maybe, test)
+import PyrethrumExtras.Test hiding (chkEq', filter, mapMaybe, maybe, test)
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
   threadDelay,
@@ -57,6 +57,11 @@ import Test.Tasty.Falsify qualified as F
 -}
 
 --  todo :: simple random api / effect
+-- generate [Template]
+-- generate Template
+-- generate Test
+
+
 
 -- $ > genPlay
 genPlay :: IO ()
@@ -233,6 +238,27 @@ unit_empty_thread_around =
   exe = execute NoLog defaultSeed (ThreadCount 1)
   chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (ptxt r.log)) 2 (length r.log)
   chkLogLength r = chkEq' ("Log length not as expected:\n" <> (ptxt r.log)) 12 (length r.log)
+
+  {-
+  todo: 
+  
+  find out about: +optimise-heavily -f +enable-cluster-counting
+  and other compile options 
+
+  1. Getting the release candidate
+
+       $ cabal get 
+https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
+       $ cd Agda-2.6.4.3
+
+2. a. Using cabal-install
+
+       $ cabal install -f +optimise-heavily -f +enable-cluster-counting
+  
+  
+  
+  
+  -}
 
 
 {-

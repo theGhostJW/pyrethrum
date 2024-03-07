@@ -15,6 +15,7 @@ data Result
   | Fail
   deriving (Ord, Eq, Show)
 
+
 data ManySpec
   = All Spec
   | {-

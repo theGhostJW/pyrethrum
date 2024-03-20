@@ -16,7 +16,7 @@ import PyrethrumExtras ((?))
 
 type FSOut es = (Out ApEvent :> es, FileSystem :> es)
 
--- todo - use a more believable base fuunction
+-- todo - use a more believable base function
 demo :: forall es. (FSOut es) => Eff es ()
 demo = do
   paths <- getPaths

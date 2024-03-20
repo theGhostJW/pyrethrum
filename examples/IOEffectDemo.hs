@@ -150,5 +150,6 @@ TODO:
 - adapt effectful: effectful\src\Effectful\FileSystem\IO.hs
   - src\DSL\FileSystemPsy.hs
 - find lazy API and test from within effect
+- make file functions relative to working dir
 
 -}

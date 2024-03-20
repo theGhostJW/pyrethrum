@@ -39,7 +39,8 @@ class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
 -- class (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i, ToJSON ds) => Item i ds
 
 type Item i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i, ToJSON ds)
--- TODO: a property class with different constraints - remove JSON contraints
+-- TODO: a property class with different constraints - remove JSON contraints - should be able to get away with show and PPrint
+-- https://softwareengineering.stackexchange.com/a/250135https://softwareengineering.stackexchange.com/a/250135
 {-
 
 Property [Data] Checks Shrinker

@@ -145,7 +145,7 @@ unTry es = either (uncurry $ logThrow es) pure
 logThrow :: ApEventSink -> CallStack -> SomeException -> IO a
 logThrow sink cs ex = sink (exceptionEvent ex cs) >> throwIO ex
 
-prepareTest :: forall m rc tc hi effs. (C.Config tc, Applicative m) => PrepParams rc tc effs -> Path -> C.Test m rc tc effs hi -> PreNode IO m hi
+prepareTest :: forall m rc tc hi effs. (C.Config tc, Applicative m) => PrepParams rc tc effs -> Path -> C.Fixture m rc tc effs hi -> PreNode IO m hi
 prepareTest PrepParams{interpreter, runConfig} path =
   \case
     C.Full{config, action, parse, items} ->

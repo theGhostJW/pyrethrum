@@ -178,7 +178,7 @@ data Node i where
     } ->
     Node i
 
-mkTest :: Fixture hi -> C.Test [] RunConfig TestConfig ApEffs hi
+mkTest :: Fixture hi -> C.Fixture [] RunConfig TestConfig ApEffs hi
 mkTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}

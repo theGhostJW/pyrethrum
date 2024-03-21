@@ -10,6 +10,10 @@ import Effectful (Eff)
 {- TODO: 
   - consider removing Eff from Core (Eff effs => m) 
   - Effectful runner would just be parameterised (Eff effs) 
+  - change parse to Either
+  - have to see how this would affect dependencies between Hooks and tests
+    - should not nhave to use whole effect stack across all Hooks and Fixtures
+    - expect to just work => implement after examples are done
   -}
 import Effectful.Error.Static as E (Error)
 import GHC.Records (HasField)
@@ -154,7 +158,7 @@ data Addressed a = Addressed
   , value :: a
   }
 
-data Test c rc tc effs hi where
+data Fixture c rc tc effs hi where
   Full ::
     (Item i ds, ToJSON as) =>
     { config :: tc
@@ -162,7 +166,7 @@ data Test c rc tc effs hi where
     , parse :: as -> Eff '[E.Error ParseException] ds
     , items :: rc -> c i
     } ->
-    Test c rc tc effs ()
+    Fixture c rc tc effs ()
   Full' ::
     (Item i ds, ToJSON as) =>
     { depends :: Hook rc effs loc pi hi
@@ -171,14 +175,14 @@ data Test c rc tc effs hi where
     , parse' :: as -> Eff '[E.Error ParseException] ds
     , items' :: rc -> c i
     } ->
-    Test c rc tc effs hi
+    Fixture c rc tc effs hi
   NoParse ::
     (Item i ds) =>
     { config :: tc
     , action :: rc -> i -> Eff effs ds
     , items :: rc -> c i
     } ->
-    Test c rc tc effs ()
+    Fixture c rc tc effs ()
   NoParse' ::
     (Item i ds) =>
     { depends :: Hook rc effs loc pi hi
@@ -186,14 +190,14 @@ data Test c rc tc effs hi where
     , action' :: rc -> hi -> i -> Eff effs ds
     , items' :: rc -> c i
     } ->
-    Test c rc tc effs hi
+    Fixture c rc tc effs hi
   Single ::
     (ToJSON ds) =>
     { config :: tc
     , singleAction :: rc -> Eff effs ds
     , checks :: Checks ds
     } ->
-    Test c rc tc effs ()
+    Fixture c rc tc effs ()
   Single' ::
     (ToJSON ds) =>
     { depends :: Hook rc effs loc pi hi
@@ -201,22 +205,8 @@ data Test c rc tc effs hi where
     , singleAction' :: rc -> hi -> Eff effs ds
     , checks' :: Checks ds
     } ->
-    Test c rc tc effs hi
+    Fixture c rc tc effs hi
 
--- TODO :: RENAME
--- Suite
--- SuiteElement => Node
--- Test => Fixture
--- Test
-{- Final Naming
-Suite 
-  - Nodes 
-    - Hooks 
-    - Fixtures 
-      - Test
-      - Test
-      - Test
--}
 data Node m rc tc effs hi where
   Hook ::
     (Frequency loc) =>
@@ -227,7 +217,7 @@ data Node m rc tc effs hi where
     Node m rc tc effs hi
   Fixture ::
     { path :: Path
-    , fixture :: Test m rc tc effs hi
+    , fixture :: Fixture m rc tc effs hi
     } ->
     Node m rc tc effs hi
 
@@ -238,7 +228,6 @@ data ExeParams m rc tc effs where
     , runConfig :: rc
     } ->
     ExeParams m rc tc effs
-
 
 
 -- try this

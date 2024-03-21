@@ -201,7 +201,7 @@ mkHook = \case
     } ->
       C.Around' (mkHook aroundDepends) setup' teardown'
 
-mkSuite :: SuiteElement i -> C.SuiteElement [] RunConfig TestConfig ApEffs i
+mkSuite :: SuiteElement i -> C.Node [] RunConfig TestConfig ApEffs i
 mkSuite = \case
   Hook{..} ->
     C.Hook
@@ -209,7 +209,7 @@ mkSuite = \case
       , subNodes = mkSuite <$> subNodes
       , ..
       }
-  Test{..} -> C.Test{test = mkTest test, ..}
+  Test{..} -> C.Fixture{fixture = mkTest test, ..}
 
-mkTestRun :: Suite -> [C.SuiteElement [] RunConfig TestConfig ApEffs ()]
+mkTestRun :: Suite -> [C.Node [] RunConfig TestConfig ApEffs ()]
 mkTestRun tr = mkSuite <$> tr

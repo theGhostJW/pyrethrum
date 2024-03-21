@@ -67,7 +67,7 @@ data PrepParams rc tc effs where
     } ->
     PrepParams rc tc effs
 
-prepSuiteElm :: forall m rc tc effs hi. (C.Config rc, C.Config tc, Applicative m, Traversable m) => PrepParams rc tc effs -> C.SuiteElement m rc tc effs hi -> PreNode IO m hi
+prepSuiteElm :: forall m rc tc effs hi. (C.Config rc, C.Config tc, Applicative m, Traversable m) => PrepParams rc tc effs -> C.Node m rc tc effs hi -> PreNode IO m hi
 prepSuiteElm pp@PrepParams{interpreter, runConfig} suiteElm =
   suiteElm & \case
     C.Hook{hook, path, subNodes = subNodes'} ->
@@ -129,12 +129,12 @@ prepSuiteElm pp@PrepParams{interpreter, runConfig} suiteElm =
 
       subNodes = run <$> subNodes'
 
-      run :: forall a. C.SuiteElement m rc tc effs a -> PreNode IO m a
+      run :: forall a. C.Node m rc tc effs a -> PreNode IO m a
       run = prepSuiteElm pp
 
       intprt :: forall a. ApEventSink -> Eff effs a -> IO a
       intprt snk a = interpreter a >>= unTry snk
-    C.Test{path, test} -> prepareTest pp path test
+    C.Fixture{path, fixture} -> prepareTest pp path fixture
 
 flog :: ApEventSink -> FLog -> IO ()
 flog sink = sink . Framework
@@ -287,7 +287,7 @@ applyChecks snk p chks =
 
 data SuitePrepParams m rc tc effs where
   SuitePrepParams ::
-    { suite :: m (C.SuiteElement m rc tc effs ())
+    { suite :: m (C.Node m rc tc effs ())
     , interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
@@ -302,7 +302,7 @@ data SuitePrepParams m rc tc effs where
 --    - querying
 --    - validation ??
 -- will return more info later such as filter log and have to return an either
-filterSuite :: [C.SuiteElement [] rc tc effs ()] -> m (C.SuiteElement m rc tc effs ())
+filterSuite :: [C.Node [] rc tc effs ()] -> m (C.Node m rc tc effs ())
 filterSuite = uu
 
 prepare :: (C.Config rc, C.Config tc,  Applicative m, Traversable m) => SuitePrepParams [] rc tc effs -> m (PreNode IO m ())

@@ -213,23 +213,23 @@ Suite
       - Test
       - Test
 -}
-data SuiteElement m rc tc effs hi where
+data Node m rc tc effs hi where
   Hook ::
     (Frequency loc) =>
     { path :: Path
     , hook :: Hook rc effs loc hi o
-    , subNodes :: m (SuiteElement m rc tc effs o)
+    , subNodes :: m (Node m rc tc effs o)
     } ->
-    SuiteElement m rc tc effs hi
-  Test ::
+    Node m rc tc effs hi
+  Fixture ::
     { path :: Path
-    , test :: Test m rc tc effs hi
+    , fixture :: Test m rc tc effs hi
     } ->
-    SuiteElement m rc tc effs hi
+    Node m rc tc effs hi
 
 data ExeParams m rc tc effs where
   ExeParams ::
-    { suite :: m (SuiteElement m rc tc effs ())
+    { suite :: m (Node m rc tc effs ())
     , interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->

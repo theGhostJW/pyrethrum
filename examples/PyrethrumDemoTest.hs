@@ -13,8 +13,8 @@ import PyrethrumDemoProject (
   Hook (..),
   RunConfig (..),
   Suite,
-  SuiteElement (..),
-  Test (..),
+  Node (..),
+  Fixture (..),
   TestConfig (..), testConfig,
  )
 import PyrethrumExtras (txt)
@@ -185,14 +185,14 @@ $(deriveToJSON defaultOptions ''DS)
 $(deriveToJSON defaultOptions ''AS)
 $(deriveToJSON defaultOptions ''Item2)
 
-test2 :: Test HookInfo
+test2 :: Fixture HookInfo
 test2 = Full' infoThreadHook config2 action2 parse2 items2
 
 -- TODO: precompiler / teplateHaskell
 
 -- ############### Test the Lot (Record) ###################
 
-test3 :: Test Int
+test3 :: Fixture Int
 test3 =
   Full'
     { depends = eachIntBefore
@@ -213,7 +213,7 @@ test3 =
     }
 
 -- ############### Test NoParse (Record) ###################
-test4 :: Test Int
+test4 :: Fixture Int
 test4 =
   NoParse'
     { config' = TestConfig "test" DeepRegression
@@ -233,7 +233,7 @@ test4 =
     }
 
 -- ############### Test Single (Record) ###################
-test5 :: Test Int
+test5 :: Fixture Int
 test5 =
   Single'
     { config' = TestConfig "test" DeepRegression
@@ -264,7 +264,7 @@ $(deriveToJSON defaultOptions ''DState)
 $(deriveToJSON defaultOptions ''ApState)
 $(deriveToJSON defaultOptions ''Item)
 
-test :: Test ()
+test :: Fixture ()
 test =
   Full config action parse items
 

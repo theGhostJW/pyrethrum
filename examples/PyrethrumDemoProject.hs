@@ -113,7 +113,7 @@ TODO:
       - split datatypes with conversion typeclasses at project level
 -}
 
-data Test hi where
+data Fixture hi where
   Full ::
     (C.Item i ds, ToJSON as) =>
     { config :: TestConfig
@@ -121,7 +121,7 @@ data Test hi where
     , parse :: as -> Eff '[E.Error C.ParseException] ds
     , items :: RunConfig -> [i]
     } ->
-    Test ()
+    Fixture ()
   Full' ::
     (C.Item i ds, ToJSON as, C.Frequency hz) =>
     { depends :: Hook hz pw pi a
@@ -130,7 +130,7 @@ data Test hi where
     , parse' :: as -> Eff '[E.Error C.ParseException] ds
     , items' :: RunConfig -> [i]
     } ->
-    Test a
+    Fixture a
   NoParse ::
     forall i ds.
     (C.Item i ds) =>
@@ -138,7 +138,7 @@ data Test hi where
     , action :: RunConfig -> i -> Action ds
     , items :: RunConfig -> [i]
     } ->
-    Test ()
+    Fixture ()
   NoParse' ::
     (C.Item i ds, C.Frequency hz) =>
     { depends :: Hook hz pw pi a
@@ -146,14 +146,14 @@ data Test hi where
     , action' :: RunConfig -> a -> i -> Action ds
     , items' :: RunConfig -> [i]
     } ->
-    Test a
+    Fixture a
   Single ::
     (ToJSON as) =>
     { config :: TestConfig
     , singleAction :: RunConfig -> Action as
     , checks :: CH.Checks as
     } ->
-    Test ()
+    Fixture ()
   Single' ::
     (ToJSON as, C.Frequency hz) =>
     { depends :: Hook hz pw pi a
@@ -161,24 +161,24 @@ data Test hi where
     , singleAction' :: RunConfig -> a -> Action as
     , checks' :: CH.Checks as
     } ->
-    Test a
+    Fixture a
 
-type Suite = [SuiteElement ()]
-data SuiteElement i where
+type Suite = [Node ()]
+data Node i where
   Hook ::
     (C.Frequency hz) =>
     { path :: AE.Path
     , hook :: Hook hz pw i o
-    , subNodes :: [SuiteElement o]
+    , subNodes :: [Node o]
     } ->
-    SuiteElement i
+    Node i
   Test ::
     { path :: AE.Path
-    , test :: Test i
+    , test :: Fixture i
     } ->
-    SuiteElement i
+    Node i
 
-mkTest :: Test hi -> C.Test [] RunConfig TestConfig ApEffs hi
+mkTest :: Fixture hi -> C.Test [] RunConfig TestConfig ApEffs hi
 mkTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
@@ -201,7 +201,7 @@ mkHook = \case
     } ->
       C.Around' (mkHook aroundDepends) setup' teardown'
 
-mkSuite :: SuiteElement i -> C.Node [] RunConfig TestConfig ApEffs i
+mkSuite :: Node i -> C.Node [] RunConfig TestConfig ApEffs i
 mkSuite = \case
   Hook{..} ->
     C.Hook

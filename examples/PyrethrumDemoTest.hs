@@ -197,9 +197,9 @@ test3 =
   Full'
     { depends = eachIntBefore
     , config' = TestConfig "test" DeepRegression
-    , action' = \_rc i itm -> do
+    , action' = \_rc hkInt itm -> do
         log $ txt itm
-        pure $ AS (itm.value + 1 + i) $ txt itm.value
+        pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
     , parse' = \AS{..} -> pure DS{..}
     , items' =
         const

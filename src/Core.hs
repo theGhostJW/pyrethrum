@@ -7,6 +7,10 @@ import Data.Aeson (ToJSON (..))
 import Internal.ThreadEvent ( Hz(..) )
 
 import Effectful (Eff)
+{- TODO: 
+  - consider removing Eff from Core (Eff effs => m) 
+  - Effectful runner would just be parameterised (Eff effs) 
+  -}
 import Effectful.Error.Static as E (Error)
 import GHC.Records (HasField)
 import Check (Checks)

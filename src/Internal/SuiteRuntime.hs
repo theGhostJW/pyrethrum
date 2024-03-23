@@ -1,7 +1,3 @@
---  should be able to remove this in later versions of GHC
--- https://gitlab.haskell.org/ghc/ghc/-/issues/21443
-{-# OPTIONS_GHC -Wno-ambiguous-fields #-}
-
 module Internal.SuiteRuntime where
 
 import Core qualified as C
@@ -32,7 +28,6 @@ import UnliftIO.STM (
  )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
 
--- todo: minimise AESON requirements => AS, DS, ITEM => Show Only. tc, rc => JSON
 
 {-
 todo :: define defect properties with sum type type and typeclass which returns defect info 
@@ -43,7 +38,7 @@ todo :: define defect properties with sum type type and typeclass which returns 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
-execute :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> C.ExeParams [] rc tc effs -> IO ()
+execute :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> C.ExeParams m [] rc tc -> IO ()
 execute
   tc
   lc
@@ -53,7 +48,7 @@ execute
     , runConfig
     } = executeNodeList tc lc (P.prepare $ P.SuitePrepParams suite interpreter runConfig)
 
-executeNodeList :: (Traversable m) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> m (P.PreNode IO m ()) -> IO ()
+executeNodeList :: (Traversable c) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> c (P.PreNode IO c ()) -> IO ()
 executeNodeList
   tc
   L.LogControls

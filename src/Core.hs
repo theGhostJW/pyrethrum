@@ -5,17 +5,6 @@ module Core where
 import DSL.Internal.ApEvent hiding (Check)
 import Data.Aeson (ToJSON (..))
 import Internal.ThreadEvent ( Hz(..) )
-
-import Effectful (Eff)
-{- TODO: 
-  - consider removing Eff from Core (Eff effs => m) 
-  - Effectful runner would just be parameterised (Eff effs) 
-  - change parse to Either
-  - have to see how this would affect dependencies between Hooks and tests
-    - should not nhave to use whole effect stack across all Hooks and Fixtures
-    - expect to just work => implement after examples are done
-  -}
-import Effectful.Error.Static as E (Error)
 import GHC.Records (HasField)
 import Check (Checks)
 
@@ -33,7 +22,8 @@ instance When Around
 newtype CheckFailure = CheckFailure Text
   deriving (Show)
 
-newtype ParseException = ParseException Text
+newtype ParseException = 
+  ParseFailure Text
   deriving (Show, Read)
 
 instance Exception ParseException
@@ -44,7 +34,12 @@ type HasId a = HasField "id" a Int
 
 class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
 
-type Item i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), Show i, Show ds)
+type Item i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), Show i, Read i, Show ds, Show i)
+
+failParser :: Text -> Either ParseException a
+failParser = Left . ParseFailure
+
+
 -- add a function to serialise known properties to JSON on id, title, -> optional tricky may need to parse from string  notes, calcs
 -- https://softwareengineering.stackexchange.com/a/250135https://softwareengineering.stackexchange.com/a/250135
 {-
@@ -109,45 +104,45 @@ instance CanDependOn Each Once
 instance CanDependOn Each Thread
 instance CanDependOn Each Each
 
-data Hook rc effs loc i o where
+data Hook m rc loc i o where
   Before ::
     (Frequency loc) =>
-    { action :: rc -> Eff effs o
+    { action :: rc -> m o
     } ->
-    Hook rc effs loc () o
+    Hook m rc loc () o
   Before' ::
     (Frequency ploc, Frequency loc, CanDependOn loc ploc) =>
-    { depends :: Hook rc effs ploc pi i
-    , action' :: rc -> i -> Eff effs o
+    { depends :: Hook m rc ploc pi i
+    , action' :: rc -> i -> m o
     } ->
-    Hook rc effs loc i o
+    Hook m rc loc i o
   After ::
     (Frequency loc) =>
-    { afterAction :: rc -> Eff effs ()
+    { afterAction :: rc -> m ()
     } ->
-    Hook rc effs loc () ()
+    Hook m rc loc () ()
   After' ::
     (Frequency ploc, Frequency loc, CanDependOn loc ploc) =>
-    { afterDepends :: Hook rc effs ploc pi i
-    , afterAction' :: rc -> Eff effs ()
+    { afterDepends :: Hook m rc ploc pi i
+    , afterAction' :: rc -> m ()
     } ->
-    Hook rc effs loc i i
+    Hook m rc loc i i
   Around ::
     (Frequency loc) =>
-    { setup :: rc -> Eff effs o
-    , teardown :: rc -> o -> Eff effs ()
+    { setup :: rc -> m o
+    , teardown :: rc -> o -> m ()
     } ->
-    Hook rc effs loc () o
+    Hook m rc loc () o
   Around' ::
     (Frequency ploc, Frequency loc, CanDependOn loc ploc) =>
-    { depends :: Hook rc effs ploc pi i
-    , setup' :: rc -> i -> Eff effs o
-    , teardown' :: rc -> o -> Eff effs ()
+    { depends :: Hook m rc ploc pi i
+    , setup' :: rc -> i -> m o
+    , teardown' :: rc -> o -> m ()
     } ->
-    Hook rc effs loc i o
+    Hook m rc loc i o
 
 
-hookFrequency :: forall rc effs loc i o. Frequency loc => Hook rc effs loc i o -> Hz
+hookFrequency :: forall m rc loc i o. Frequency loc => Hook m rc loc i o -> Hz
 hookFrequency _ = frequency @loc
 
 newtype StubLoc = StubLoc Text
@@ -156,76 +151,76 @@ data Addressed a = Addressed
   , value :: a
   }
 
-data Fixture c rc tc effs hi where
+data Fixture m c rc tc hi where
   Full ::
     (Item i ds, Show as) =>
     { config :: tc
-    , action :: rc -> i -> Eff effs as
-    , parse :: as -> Eff '[E.Error ParseException] ds
+    , action :: rc -> i -> m as
+    , parse :: as -> Either ParseException ds
     , items :: rc -> c i
     } ->
-    Fixture c rc tc effs ()
+    Fixture m c rc tc ()
   Full' ::
     (Item i ds, Show as) =>
-    { depends :: Hook rc effs loc pi hi
+    { depends :: Hook m rc loc pi hi
     , config' :: tc
-    , action' :: rc -> hi -> i -> Eff effs as
-    , parse' :: as -> Eff '[E.Error ParseException] ds
+    , action' :: rc -> hi -> i -> m as
+    , parse' :: as -> Either ParseException ds
     , items' :: rc -> c i
     } ->
-    Fixture c rc tc effs hi
+    Fixture m c rc tc hi
   NoParse ::
     (Item i ds) =>
     { config :: tc
-    , action :: rc -> i -> Eff effs ds
+    , action :: rc -> i -> m ds
     , items :: rc -> c i
     } ->
-    Fixture c rc tc effs ()
+    Fixture m c rc tc ()
   NoParse' ::
     (Item i ds) =>
-    { depends :: Hook rc effs loc pi hi
+    { depends :: Hook m rc loc pi hi
     , config' :: tc
-    , action' :: rc -> hi -> i -> Eff effs ds
+    , action' :: rc -> hi -> i -> m ds
     , items' :: rc -> c i
     } ->
-    Fixture c rc tc effs hi
+    Fixture m c rc tc hi
   Single ::
     (Show ds) =>
     { config :: tc
-    , singleAction :: rc -> Eff effs ds
+    , singleAction :: rc -> m ds
     , checks :: Checks ds
     } ->
-    Fixture c rc tc effs ()
+    Fixture m c rc tc ()
   Single' ::
     (Show ds) =>
-    { depends :: Hook rc effs loc pi hi
+    { depends :: Hook m rc loc pi hi
     , config' :: tc
-    , singleAction' :: rc -> hi -> Eff effs ds
+    , singleAction' :: rc -> hi -> m ds
     , checks' :: Checks ds
     } ->
-    Fixture c rc tc effs hi
+    Fixture m c rc tc hi
 
-data Node m rc tc effs hi where
+data Node m c rc tc hi where
   Hook ::
     (Frequency loc) =>
     { path :: Path
-    , hook :: Hook rc effs loc hi o
-    , subNodes :: m (Node m rc tc effs o)
+    , hook :: Hook m rc loc hi o
+    , subNodes :: c (Node m c rc tc o)
     } ->
-    Node m rc tc effs hi
+    Node m c rc tc hi
   Fixture ::
     { path :: Path
-    , fixture :: Fixture m rc tc effs hi
+    , fixture :: Fixture m c rc tc hi
     } ->
-    Node m rc tc effs hi
+    Node m c rc tc hi
 
-data ExeParams m rc tc effs where
+data ExeParams m c rc tc where
   ExeParams ::
-    { suite :: m (Node m rc tc effs ())
-    , interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
+    { suite :: c (Node m c rc tc ())
+    , interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
-    ExeParams m rc tc effs
+    ExeParams m c rc tc
 
 
 -- try this

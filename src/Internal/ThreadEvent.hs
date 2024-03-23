@@ -18,7 +18,6 @@ data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
 
 data Hz = Once | Thread | Each deriving (Show, Eq, Ord)
 
--- todo = _ -- here rename SuiteEvent
 data SuiteEvent
     = Hook Hz HookPos
     | Test

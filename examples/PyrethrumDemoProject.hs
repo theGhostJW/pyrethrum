@@ -10,10 +10,13 @@ import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Effectful (Eff, IOE, type (:>))
 import Effectful.Error.Static as E (Error)
 
-type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
-type Action a = Eff '[FileSystem, Out ApEvent, E.Error FSException, IOE] a
+type Action a = Eff ApEffs a
+type HasLog es = Out ApEvent :> es
+type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a
 type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
+type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
 type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
+type App = Eff ApEffs
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum, Bounded)
 $(deriveJSON defaultOptions ''Environment)
@@ -117,7 +120,7 @@ data Fixture hi where
     (C.Item i ds, Show as) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Action as
-    , parse :: as -> Eff '[E.Error C.ParseException] ds
+    , parse :: as -> Either C.ParseException ds
     , items :: RunConfig -> [i]
     } ->
     Fixture ()
@@ -126,7 +129,7 @@ data Fixture hi where
     { depends :: Hook hz pw pi a
     , config' :: TestConfig
     , action' :: RunConfig -> a -> i -> Action as
-    , parse' :: as -> Eff '[E.Error C.ParseException] ds
+    , parse' :: as -> Either C.ParseException ds
     , items' :: RunConfig -> [i]
     } ->
     Fixture a
@@ -177,7 +180,7 @@ data Node i where
     } ->
     Node i
 
-mkTest :: Fixture hi -> C.Fixture [] RunConfig TestConfig ApEffs hi
+mkTest :: Fixture hi -> C.Fixture App [] RunConfig TestConfig hi
 mkTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
@@ -186,7 +189,7 @@ mkTest = \case
   Single{..} -> C.Single{..}
   Single'{..} -> C.Single' (mkHook depends) config' singleAction' checks'
 
-mkHook :: Hook hz pw i o -> C.Hook RunConfig ApEffs hz i o
+mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) RunConfig hz i o
 mkHook = \case
   BeforeHook{..} -> C.Before{..}
   BeforeHook'{..} -> C.Before' (mkHook depends) action'
@@ -200,7 +203,7 @@ mkHook = \case
     } ->
       C.Around' (mkHook aroundDepends) setup' teardown'
 
-mkSuite :: Node i -> C.Node [] RunConfig TestConfig ApEffs i
+mkSuite :: Node i -> C.Node App [] RunConfig TestConfig i
 mkSuite = \case
   Hook{..} ->
     C.Hook
@@ -210,5 +213,5 @@ mkSuite = \case
       }
   Test{..} -> C.Fixture{fixture = mkTest test, ..}
 
-mkTestRun :: Suite -> [C.Node [] RunConfig TestConfig ApEffs ()]
+mkTestRun :: Suite -> [C.Node App [] RunConfig TestConfig ()]
 mkTestRun tr = mkSuite <$> tr

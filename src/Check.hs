@@ -3,7 +3,7 @@
 module Check (
   Check (..),
   TerminationStatus (..),
-  Checks(..),
+  Checks (..),
   CheckResult (..),
   CheckReport (..),
   chk,
@@ -20,12 +20,18 @@ where
 
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import Data.Aeson.Types as AT (ToJSON (toJSON), Value (String))
-import GHC.Show (Show (..))
 import PyrethrumExtras (toS, (?))
 import UnliftIO (MonadUnliftIO, tryAny)
 import Prelude as P
 
-data TerminationStatus = NonTerminal | Terminal deriving (Show, Eq)
+-- import Prelude (Show (..), Read(..))
+import GHC.Show (Show (..))
+import GHC.Read (Read(..))
+import BasePrelude (read)
+
+-- import Hedgehog.Internal.Prelude (Show (..), Read(..))
+
+data TerminationStatus = NonTerminal | Terminal deriving (Show, Read, Eq)
 
 $(deriveToJSON defaultOptions ''TerminationStatus)
 
@@ -35,6 +41,12 @@ data Check ds = Check
   , header :: Text
   , rule :: ds -> Bool
   }
+
+data CheckReadable = CheckLog
+  { header :: Text
+  , terminationStatus :: TerminationStatus
+  }
+  deriving (Show, Read)
 
 chk :: Text -> (ds -> Bool) -> Checks ds
 chk header rule = Checks [Check NonTerminal Nothing header rule]
@@ -50,7 +62,20 @@ assert' header message rule = Checks [Check Terminal (Just message) header rule]
 
 instance Show (Check v) where
   show :: Check v -> String
-  show ck = toS ck.header
+  show Check{header, terminationStatus} = P.show $ CheckLog header terminationStatus
+
+instance Read (Check v) where
+  readsPrec :: Int -> String -> [(Check v, String)]
+  readsPrec _ s = [(check, s)]
+   where
+    check =
+      Check
+        { terminationStatus = showable.terminationStatus
+        , message = Nothing
+        , header = showable.header
+        , rule = const . error $ "Tried to call rule on a deserialised version of Check for: " <> toS showable.header
+        }
+    showable = read @CheckReadable s 
 
 instance ToJSON (Check v) where
   toJSON :: Check v -> Value
@@ -59,7 +84,7 @@ instance ToJSON (Check v) where
 newtype Checks ds = Checks
   { un :: [Check ds]
   }
-  deriving (Show, Semigroup, Monoid, IsList)
+  deriving (Show, Read, Semigroup, Monoid, IsList)
 
 mapRules :: (Check ds -> Check ds') -> Checks ds -> Checks ds'
 mapRules f = Checks . fmap f . coerce
@@ -105,7 +130,7 @@ applyCheck ds termStatus r =
           NonTerminal ->
             first report
               $ r.rule ds
-              ? (Pass, NonTerminal)
+                ? (Pass, NonTerminal)
               $ (Fail, r.terminationStatus)
 
     rslt

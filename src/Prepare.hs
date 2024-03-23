@@ -13,13 +13,10 @@ import DSL.Internal.ApEvent
       DStateText(DStateText),
       FLog(SkipedCheckStart, Parse, Action, Check, CheckStart),
       ItemText(ItemText) )
-import Data.Aeson (ToJSON (toJSON))
 import Data.Either.Extra ( mapLeft)
-import Effectful (Eff, runPureEff)
-import Effectful.Error.Static qualified as E
 import Internal.ThreadEvent (Hz)
 import UnliftIO.Exception (tryAny)
-import PyrethrumExtras (uu, txt)
+import PyrethrumExtras (uu, txt, toS)
 
 data PreNode m c hi where
   Before ::
@@ -60,14 +57,14 @@ data TestItem m hi = TestItem
   , action :: ApEventSink -> hi -> m ()
   }
 
-data PrepParams rc tc effs where
+data PrepParams m rc tc where
   PrepParams ::
-    { interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
+    { interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
-    PrepParams rc tc effs
+    PrepParams m rc tc
 
-prepSuiteElm :: forall m rc tc effs hi. (C.Config rc, C.Config tc, Applicative m, Traversable m) => PrepParams rc tc effs -> C.Node m rc tc effs hi -> PreNode IO m hi
+prepSuiteElm :: forall m c rc tc hi. (C.Config rc, C.Config tc, Applicative c, Traversable c) => PrepParams m rc tc -> C.Node m c rc tc hi -> PreNode IO c hi
 prepSuiteElm pp@PrepParams{interpreter, runConfig} suiteElm =
   suiteElm & \case
     C.Hook{hook, path, subNodes = subNodes'} ->
@@ -129,23 +126,23 @@ prepSuiteElm pp@PrepParams{interpreter, runConfig} suiteElm =
 
       subNodes = run <$> subNodes'
 
-      run :: forall a. C.Node m rc tc effs a -> PreNode IO m a
+      run :: forall a. C.Node m c rc tc a -> PreNode IO c a
       run = prepSuiteElm pp
 
-      intprt :: forall a. ApEventSink -> Eff effs a -> IO a
+      intprt :: forall a. ApEventSink -> m a -> IO a
       intprt snk a = interpreter a >>= unTry snk
     C.Fixture{path, fixture} -> prepareTest pp path fixture
 
 flog :: ApEventSink -> FLog -> IO ()
 flog sink = sink . Framework
 
-unTry :: forall a. ApEventSink -> Either (CallStack, SomeException) a -> IO a
+unTry :: forall a e. Exception e => ApEventSink -> Either (CallStack, e) a -> IO a
 unTry es = either (uncurry $ logThrow es) pure
 
-logThrow :: ApEventSink -> CallStack -> SomeException -> IO a
+logThrow :: Exception e => ApEventSink -> CallStack -> e -> IO a
 logThrow sink cs ex = sink (exceptionEvent ex cs) >> throwIO ex
 
-prepareTest :: forall m rc tc hi effs. (C.Config tc, Applicative m) => PrepParams rc tc effs -> Path -> C.Fixture m rc tc effs hi -> PreNode IO m hi
+prepareTest :: forall m c rc tc hi. (C.Config tc, Applicative c) => PrepParams m rc tc -> Path -> C.Fixture m c rc tc hi -> PreNode IO c hi
 prepareTest PrepParams{interpreter, runConfig} path =
   \case
     C.Full{config, action, parse, items} ->
@@ -238,27 +235,40 @@ prepareTest PrepParams{interpreter, runConfig} path =
                 }
         }
  where
-  applyParser parser = mapLeft (fmap toException) . runPureEff . E.runError . parser
+  applyParser :: forall as ds. (HasCallStack => as -> Either C.ParseException ds) -> as -> IO (Either (CallStack, C.ParseException) ds)
+  applyParser parser as = 
+     tryAny (pure $ parser as) <&> either
+            (\e -> Left (callStack, C.ParseFailure . toS $ displayException e))
+            (mapLeft (callStack,))
 
-  runAction :: forall i as ds. (C.Item i ds) => ApEventSink -> (i -> Eff effs as) -> i -> IO as
+{-
+TODO :: Try Different Stategies 
+  - eg. Eff vs dependency injection - vs Eff embedded in core (see before remove effectful from core)
+  - tests 
+    - hooks with lower / different capabilities than tests (rest hook vs ui test) see "Demonstraits using partial effect" for effectful version 
+    - effects that use effects / logger
+    - arbitary STM as an example of adding an effect that requires its own context
+
+-}
+  runAction :: forall i as ds. (C.Item i ds) => ApEventSink -> (i -> m as) -> i -> IO as
   runAction snk action i =
     do
       flog snk . Action path . ItemText $ txt i
       eas <- interpreter $ action i
       unTry snk eas
 
-  runTest :: forall i as ds. (Show as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> ApEventSink -> IO ()
+  runTest :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> ( HasCallStack => as -> Either C.ParseException ds) -> i -> ApEventSink -> IO ()
   runTest action parser i snk =
     do
       ds <- tryAny
         do
           as <- runAction snk action i
           flog snk . Parse path . ApStateText $ txt as
-          let eds = applyParser parser as
+          eds <- applyParser parser as
           unTry snk eds
       applyChecks snk path i.checks ds
 
-  runNoParseTest :: forall i ds. (C.Item i ds) => (i -> Eff effs ds) -> i -> ApEventSink -> IO ()
+  runNoParseTest :: forall i ds. (C.Item i ds) => (i -> m ds) -> i -> ApEventSink -> IO ()
   runNoParseTest action i snk =
     tryAny (runAction snk action i) >>= applyChecks snk path i.checks
 
@@ -285,13 +295,13 @@ applyChecks snk p chks =
     logChk cr
     pure ts'
 
-data SuitePrepParams m rc tc effs where
+data SuitePrepParams m c rc tc where
   SuitePrepParams ::
-    { suite :: m (C.Node m rc tc effs ())
-    , interpreter :: forall a. Eff effs a -> IO (Either (CallStack, SomeException) a)
+    { suite :: c (C.Node m c rc tc ())
+    , interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
-    SuitePrepParams m rc tc effs
+    SuitePrepParams m c rc tc
 
 --
 -- Suite rc tc effs
@@ -302,10 +312,10 @@ data SuitePrepParams m rc tc effs where
 --    - querying
 --    - validation ??
 -- will return more info later such as filter log and have to return an either
-filterSuite :: [C.Node [] rc tc effs ()] -> m (C.Node m rc tc effs ())
+filterSuite :: forall m c rc tc. c (C.Node m c rc tc ()) ->  c (C.Node m c rc tc ())
 filterSuite = uu
 
-prepare :: (C.Config rc, C.Config tc,  Applicative m, Traversable m) => SuitePrepParams [] rc tc effs -> m (PreNode IO m ())
+prepare :: (C.Config rc, C.Config tc,  Applicative c, Traversable c) => SuitePrepParams m c rc tc -> c (PreNode IO c ())
 prepare SuitePrepParams{suite, interpreter, runConfig} =
   prepSuiteElm pp <$> filterSuite suite
  where

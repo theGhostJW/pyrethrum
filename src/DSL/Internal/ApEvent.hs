@@ -48,7 +48,7 @@ $(deriveJSON defaultOptions ''DStateText)
 newtype ItemText = ItemText {text :: Text} deriving (Eq, Show, IsString)
 $(deriveJSON defaultOptions ''ItemText)
 
-exceptionEvent :: SomeException -> CallStack -> ApEvent
+exceptionEvent :: Exception e => e -> CallStack -> ApEvent
 exceptionEvent e cs =
   Framework $ Exception (toS $ displayException e) (toS $ prettyCallStack cs)
 

@@ -5,7 +5,6 @@ import Core (Each, Once, ParseException, Thread, Before, Around, After)
 import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, (:>))
-import Effectful.Error.Static qualified as E
 import PyrethrumDemoProject (
   Action,
   Depth (..),
@@ -14,7 +13,7 @@ import PyrethrumDemoProject (
   Suite,
   Node (..),
   Fixture (..),
-  TestConfig (..), testConfig,
+  TestConfig (..), testConfig, LogEffs,
  )
 import PyrethrumExtras (txt)
 
@@ -26,10 +25,22 @@ were starting to look more complex than the original so abandonned.
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
+
+{- Demonstraits using partial effect 
+  type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a
+
+  Hook has all the effects of the application but will compile with
+  an action that only requires a sublist of these effects
+-}
+simpleLog :: RunConfig -> LogEffs Int
+simpleLog _ = pure 1
+
+
 intOnceHook :: Hook Once Before () Int
 intOnceHook =
   BeforeHook
-    { action = \_rc -> pure 1
+    { 
+      action = simpleLog
     }
 
 addOnceIntHook :: Hook Once Before Int Int
@@ -88,7 +99,6 @@ eachIntBefore =
         pure $ hi + 1
     }
 
-type Failable a = Eff '[E.Error ParseException] a
 
 -- ############### Test the Lot ###################
 
@@ -114,7 +124,8 @@ data DState = DState
   }
   deriving (Show, Generic)
 
-parse :: ApState -> Failable DState
+--TODO: Document pragmatism - create funtion that throws parser exception
+parse :: ApState -> Either ParseException DState
 parse ApState{..} = pure DState{..}
 
 data Item = Item
@@ -123,7 +134,7 @@ data Item = Item
   , value :: Int
   , checks :: Checks DState
   }
-  deriving (Show, Generic)
+  deriving (Show, Read)
 
 items :: RunConfig -> [Item]
 items =
@@ -135,7 +146,7 @@ items =
         , checks = chk "test" ((== 1) . (.value))
         }
     ]
-    
+
 -- ############### Test the Lot Child ###################
 config2 :: TestConfig
 config2 = TestConfig "test" DeepRegression
@@ -148,19 +159,19 @@ action2 _rc HookInfo{value = hookVal} itm = do
   log $ txt itm
   pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
 
-parse2 :: AS -> Failable DS
+parse2 :: AS -> Either ParseException DS
 parse2 AS{..} = pure DS{..}
 
 data AS = AS
   { value :: Int
   , valTxt :: Text
-  } deriving Show
+  } deriving (Show, Read)
 
 data DS = DS
   { value :: Int
   , valTxt :: Text
   }
-  deriving Show
+  deriving (Show, Read)
 
 data Item2 = Item2
   { id :: Int
@@ -168,7 +179,7 @@ data Item2 = Item2
   , value :: Int
   , checks :: Checks DS
   }
-  deriving (Show)
+  deriving (Show, Read)
 
 items2 :: RunConfig -> [Item2]
 items2 =

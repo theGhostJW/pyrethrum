@@ -6,7 +6,6 @@ import DSL.FileSystemEffect (FSException, FileSystem)
 import DSL.Internal.ApEvent (ApEvent)
 import DSL.Internal.ApEvent qualified as AE
 import DSL.Out (Out)
-import Data.Aeson (ToJSON)
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Effectful (Eff, IOE, type (:>))
 import Effectful.Error.Static as E (Error)
@@ -115,7 +114,7 @@ TODO:
 
 data Fixture hi where
   Full ::
-    (C.Item i ds, ToJSON as) =>
+    (C.Item i ds, Show as) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Action as
     , parse :: as -> Eff '[E.Error C.ParseException] ds
@@ -123,7 +122,7 @@ data Fixture hi where
     } ->
     Fixture ()
   Full' ::
-    (C.Item i ds, ToJSON as, C.Frequency hz) =>
+    (C.Item i ds, Show as, C.Frequency hz) =>
     { depends :: Hook hz pw pi a
     , config' :: TestConfig
     , action' :: RunConfig -> a -> i -> Action as
@@ -148,14 +147,14 @@ data Fixture hi where
     } ->
     Fixture a
   Single ::
-    (ToJSON as) =>
+    (Show as) =>
     { config :: TestConfig
     , singleAction :: RunConfig -> Action as
     , checks :: CH.Checks as
     } ->
     Fixture ()
   Single' ::
-    (ToJSON as, C.Frequency hz) =>
+    (Show as, C.Frequency hz) =>
     { depends :: Hook hz pw pi a
     , config' :: TestConfig
     , singleAction' :: RunConfig -> a -> Action as

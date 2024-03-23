@@ -1,7 +1,6 @@
 module DSL.Internal.ApEvent where
 
 import Check (CheckReport)
-import Data.Aeson qualified as A
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import PyrethrumExtras (toS)
 
@@ -40,14 +39,14 @@ data Path
   deriving (Show, Eq, Ord)
 
 
-newtype ApStateJSON = ApStateJSON {unApStateJSON :: A.Value} deriving (Eq, Show, IsString)
-$(deriveJSON defaultOptions ''ApStateJSON)
+newtype ApStateText = ApStateText {text :: Text} deriving (Eq, Show, IsString)
+$(deriveJSON defaultOptions ''ApStateText)
 
-newtype DStateJSON = DStateJSON {unDStateJSON :: A.Value} deriving (Eq, Show, IsString)
-$(deriveJSON defaultOptions ''DStateJSON)
+newtype DStateText = DStateText {text :: Text} deriving (Eq, Show, IsString)
+$(deriveJSON defaultOptions ''DStateText)
 
-newtype ItemJSON = ItemJSON {unItemJSON :: A.Value} deriving (Eq, Show, IsString)
-$(deriveJSON defaultOptions ''ItemJSON)
+newtype ItemText = ItemText {text :: Text} deriving (Eq, Show, IsString)
+$(deriveJSON defaultOptions ''ItemText)
 
 exceptionEvent :: SomeException -> CallStack -> ApEvent
 exceptionEvent e cs =
@@ -58,15 +57,15 @@ exceptionEvent e cs =
 data FLog
   = Action
       { path :: Path
-      , item :: ItemJSON
+      , item :: ItemText
       }
   | Parse
       { path :: Path
-      , apState :: ApStateJSON
+      , apState :: ApStateText
       }
   | CheckStart
       { path :: Path
-      , dState :: DStateJSON
+      , dState :: DStateText
       }
   | SkipedCheckStart
       { path :: Path

@@ -44,11 +44,8 @@ type HasId a = HasField "id" a Int
 
 class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
 
--- class (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i, ToJSON ds) => Item i ds
-
-type Item i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), ToJSON i, ToJSON ds)
--- TODO: a property class with different constraints - remove JSON contraints - should be able to get away with show and PPrint
--- ad a function to serialise known properties to JSON on id, title, -> optional tricky may need to parse from string  notes, calcs
+type Item i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), Show i, Show ds)
+-- add a function to serialise known properties to JSON on id, title, -> optional tricky may need to parse from string  notes, calcs
 -- https://softwareengineering.stackexchange.com/a/250135https://softwareengineering.stackexchange.com/a/250135
 {-
 
@@ -161,7 +158,7 @@ data Addressed a = Addressed
 
 data Fixture c rc tc effs hi where
   Full ::
-    (Item i ds, ToJSON as) =>
+    (Item i ds, Show as) =>
     { config :: tc
     , action :: rc -> i -> Eff effs as
     , parse :: as -> Eff '[E.Error ParseException] ds
@@ -169,7 +166,7 @@ data Fixture c rc tc effs hi where
     } ->
     Fixture c rc tc effs ()
   Full' ::
-    (Item i ds, ToJSON as) =>
+    (Item i ds, Show as) =>
     { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , action' :: rc -> hi -> i -> Eff effs as
@@ -193,14 +190,14 @@ data Fixture c rc tc effs hi where
     } ->
     Fixture c rc tc effs hi
   Single ::
-    (ToJSON ds) =>
+    (Show ds) =>
     { config :: tc
     , singleAction :: rc -> Eff effs ds
     , checks :: Checks ds
     } ->
     Fixture c rc tc effs ()
   Single' ::
-    (ToJSON ds) =>
+    (Show ds) =>
     { depends :: Hook rc effs loc pi hi
     , config' :: tc
     , singleAction' :: rc -> hi -> Eff effs ds

@@ -9,17 +9,17 @@ import DSL.Internal.ApEvent
     ( ApEvent(Framework),
       Path,
       exceptionEvent,
-      ApStateJSON(ApStateJSON),
-      DStateJSON(DStateJSON),
+      ApStateText(ApStateText),
+      DStateText(DStateText),
       FLog(SkipedCheckStart, Parse, Action, Check, CheckStart),
-      ItemJSON(ItemJSON) )
+      ItemText(ItemText) )
 import Data.Aeson (ToJSON (toJSON))
 import Data.Either.Extra ( mapLeft)
 import Effectful (Eff, runPureEff)
 import Effectful.Error.Static qualified as E
 import Internal.ThreadEvent (Hz)
 import UnliftIO.Exception (tryAny)
-import PyrethrumExtras (uu)
+import PyrethrumExtras (uu, txt)
 
 data PreNode m c hi where
   Before ::
@@ -213,7 +213,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
                 , action = \snk _hi ->
                     do
                       ds <- tryAny $ do
-                        flog snk . Action path . ItemJSON $ toJSON config.title
+                        flog snk . Action path . ItemText $ config.title
                         eas <- interpreter (singleAction runConfig)
                         unTry snk eas
                       applyChecks snk path checks ds
@@ -231,7 +231,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
                 , action = \snk hi ->
                     do
                       ds <- tryAny $ do
-                        flog snk . Action path . ItemJSON $ toJSON config'.title
+                        flog snk . Action path . ItemText $ config'.title
                         eas <- interpreter (singleAction' runConfig hi)
                         unTry snk eas
                       applyChecks snk path checks' ds
@@ -243,17 +243,17 @@ prepareTest PrepParams{interpreter, runConfig} path =
   runAction :: forall i as ds. (C.Item i ds) => ApEventSink -> (i -> Eff effs as) -> i -> IO as
   runAction snk action i =
     do
-      flog snk . Action path . ItemJSON $ toJSON i
+      flog snk . Action path . ItemText $ txt i
       eas <- interpreter $ action i
       unTry snk eas
 
-  runTest :: forall i as ds. (ToJSON as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> ApEventSink -> IO ()
+  runTest :: forall i as ds. (Show as, C.Item i ds) => (i -> Eff effs as) -> (as -> Eff '[E.Error C.ParseException] ds) -> i -> ApEventSink -> IO ()
   runTest action parser i snk =
     do
       ds <- tryAny
         do
           as <- runAction snk action i
-          flog snk . Parse path . ApStateJSON $ toJSON as
+          flog snk . Parse path . ApStateText $ txt as
           let eds = applyParser parser as
           unTry snk eds
       applyChecks snk path i.checks ds
@@ -262,7 +262,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
   runNoParseTest action i snk =
     tryAny (runAction snk action i) >>= applyChecks snk path i.checks
 
-applyChecks :: forall ds. (ToJSON ds) => ApEventSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
+applyChecks :: forall ds. Show ds => ApEventSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
 applyChecks snk p chks =
   either
     ( \e -> do
@@ -276,7 +276,7 @@ applyChecks snk p chks =
   logChk = log . Check p
   applyChecks' ds =
     do
-      flog snk . CheckStart p . DStateJSON $ toJSON ds
+      flog snk . CheckStart p . DStateText $ txt ds
       foldM_ (applyCheck' ds) NonTerminal chks.un
 
   applyCheck' :: ds -> TerminationStatus -> Check ds -> IO TerminationStatus

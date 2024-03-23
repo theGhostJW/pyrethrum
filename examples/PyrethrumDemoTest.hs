@@ -4,7 +4,6 @@ import Check (Checks, chk)
 import Core (Each, Once, ParseException, Thread, Before, Around, After)
 import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
 import DSL.Out (Out, out)
-import Data.Aeson.TH
 import Effectful (Eff, (:>))
 import Effectful.Error.Static qualified as E
 import PyrethrumDemoProject (
@@ -96,15 +95,18 @@ type Failable a = Eff '[E.Error ParseException] a
 config :: TestConfig
 config = TestConfig "test" DeepRegression
 
-data ApState = ApState
-  { value :: Int
-  , valTxt :: Text
-  }
+test :: Fixture ()
+test = Full config action parse items
 
 action :: RunConfig -> Item -> Action ApState
 action _expectedrc itm = do
   log $ txt itm
   pure $ ApState (itm.value + 1) $ txt itm.value
+
+data ApState = ApState
+  { value :: Int
+  , valTxt :: Text
+  } deriving Show
 
 data DState = DState
   { value :: Int
@@ -133,11 +135,13 @@ items =
         , checks = chk "test" ((== 1) . (.value))
         }
     ]
-
+    
 -- ############### Test the Lot Child ###################
-
 config2 :: TestConfig
 config2 = TestConfig "test" DeepRegression
+
+test2 :: Fixture HookInfo
+test2 = Full' infoThreadHook config2 action2 parse2 items2
 
 action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
 action2 _rc HookInfo{value = hookVal} itm = do
@@ -150,13 +154,13 @@ parse2 AS{..} = pure DS{..}
 data AS = AS
   { value :: Int
   , valTxt :: Text
-  }
+  } deriving Show
 
 data DS = DS
   { value :: Int
   , valTxt :: Text
   }
-  deriving (Show, Generic)
+  deriving Show
 
 data Item2 = Item2
   { id :: Int
@@ -179,14 +183,6 @@ items2 =
               <> chk "test3" (\ds -> ds.value < 10)
         }
     ]
-
-
-$(deriveToJSON defaultOptions ''DS)
-$(deriveToJSON defaultOptions ''AS)
-$(deriveToJSON defaultOptions ''Item2)
-
-test2 :: Fixture HookInfo
-test2 = Full' infoThreadHook config2 action2 parse2 items2
 
 -- TODO: precompiler / teplateHaskell
 
@@ -258,15 +254,6 @@ test5 =
 -- TODO: precompiler template haskell
 -- need to check error messages carefully
 -- finalise templatehaskell vs deriving for these classes
-
--- $(deriveTest defaultOptions ''Item)
-$(deriveToJSON defaultOptions ''DState)
-$(deriveToJSON defaultOptions ''ApState)
-$(deriveToJSON defaultOptions ''Item)
-
-test :: Fixture ()
-test =
-  Full config action parse items
 
 -- ############### Demo Default Configs ###################
 

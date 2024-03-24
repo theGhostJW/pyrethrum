@@ -254,10 +254,6 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
 2. a. Using cabal-install
 
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
-  
-  
-  
-  
   -}
 
 
@@ -265,12 +261,13 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
   the following tests are to make sure all the property checks are working for
   probability based tests, both with and without pregeneration
 
-    if pregenerate is True, a spec is genrated when loading the template and we can
-     check expected failures by comparing template results to actual results but
-     the implementation test tree requires STM which could mask synchronisation bugs
-     if pregenerate is false, the spec is generated when the test is run and we cannot
-     predict the result of the test from the tempalate but there is no STM involved so
-     so we avoid masking synchronisation bugs in testing other properties
+    If pregenerate is True, a spec is genrated when loading the template prior to the test. The expected test results
+     can be read from the template and can be reconciled by comparing template results to actual 
+     results. The the implementation test tree in this mode requires STM which could mask synchronisation bugs.
+
+    If pregenerate is False, the spec is generated when the test is run and we cannot
+     predict, or test for, the test result. There is, however, no STM involved so
+     so we avoid masking synchronisation bugs in testing other properties.
   -}
 
 -- $> unit_pass_prob_pregen

@@ -60,7 +60,9 @@ import Test.Tasty.Falsify qualified as F
 -- generate [Template]
 -- generate Template
 -- generate Test
+-- generate Spec
 
+-- HERE !!!!!
 
 
 -- $ > genPlay

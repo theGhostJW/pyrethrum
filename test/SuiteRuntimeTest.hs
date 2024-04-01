@@ -74,6 +74,23 @@ genPlay = do
 defaultSeed :: Int
 defaultSeed = 13579
 
+
+-- todo :: add repeatedly to Pyrelude
+{-
+-- https://github.com/well-typed/unfolder/blob/main/episode019-repeatedly/app/Main.hs
+
+-- | Generalization to 'Foldable'
+repeatedly :: Foldable t => (a -> b -> b) -> (t a -> b -> b)
+repeatedly = flip . foldl' . flip
+
+-- make foldable not array
+repeatedlyM1 :: Monad m => (a -> b -> m b) -> ([a] -> b -> m b)
+repeatedlyM1 _ []     !b = return b
+repeatedlyM1 f (a:as) !b = do b' <- f a b
+                              repeatedlyM1 f as b'
+
+
+-}
 -- todo :: remap in Pyrelude bug' ~ use exception // bug ~ use text
 -- bug :: Text -> c
 bug :: Text -> a

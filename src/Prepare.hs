@@ -170,7 +170,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
                   }
             ) <$> items' runConfig
         }
-    C.NoParse{config, action, items} ->
+    C.Direct{config, action, items} ->
       Test
         { config
         , path
@@ -179,12 +179,12 @@ prepareTest PrepParams{interpreter, runConfig} path =
                 TestItem
                   { id = i.id
                   , title = i.title
-                  , action =  \snk _hi -> runNoParseTest (action runConfig) i snk
+                  , action =  \snk _hi -> runDirectTest (action runConfig) i snk
                   }
             )
               <$> items runConfig
         }
-    C.NoParse'{config', action', items'} ->
+    C.Direct'{config', action', items'} ->
       Test
         { config = config'
         , path
@@ -193,7 +193,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
                 TestItem
                   { id = i.id
                   , title = i.title
-                  , action = \snk hi -> runNoParseTest (action' runConfig hi) i snk
+                  , action = \snk hi -> runDirectTest (action' runConfig hi) i snk
                   }
             )
               <$> items' runConfig
@@ -268,8 +268,8 @@ TODO :: Try Different Stategies
           unTry snk eds
       applyChecks snk path i.checks ds
 
-  runNoParseTest :: forall i ds. (C.Item i ds) => (i -> m ds) -> i -> ApEventSink -> IO ()
-  runNoParseTest action i snk =
+  runDirectTest :: forall i ds. (C.Item i ds) => (i -> m ds) -> i -> ApEventSink -> IO ()
+  runDirectTest action i snk =
     tryAny (runAction snk action i) >>= applyChecks snk path i.checks
 
 applyChecks :: forall ds. Show ds => ApEventSink -> Path -> Checks ds -> Either SomeException ds -> IO ()

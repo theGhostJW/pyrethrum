@@ -164,14 +164,14 @@ data Fixture m c rc tc hi where
     , items' :: rc -> c i
     } ->
     Fixture m c rc tc hi
-  NoParse ::
+  Direct ::
     (Item i ds) =>
     { config :: tc
     , action :: rc -> i -> m ds
     , items :: rc -> c i
     } ->
     Fixture m c rc tc ()
-  NoParse' ::
+  Direct' ::
     (Item i ds) =>
     { config' :: tc
     , depends :: Hook m rc loc pi hi

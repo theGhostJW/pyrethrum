@@ -133,7 +133,7 @@ data Fixture hi where
     , items' :: RunConfig -> [i]
     } ->
     Fixture a
-  NoParse ::
+  Direct ::
     forall i ds.
     (C.Item i ds) =>
     { config :: TestConfig
@@ -141,7 +141,7 @@ data Fixture hi where
     , items :: RunConfig -> [i]
     } ->
     Fixture ()
-  NoParse' ::
+  Direct' ::
     (C.Item i ds, C.Frequency hz) =>
     { config' :: TestConfig
     , depends :: Hook hz pw pi a
@@ -183,9 +183,9 @@ data Node i where
 mkTest :: Fixture hi -> C.Fixture App [] RunConfig TestConfig hi
 mkTest = \case
   Full{..} -> C.Full{..}
-  NoParse{..} -> C.NoParse{..}
+  Direct{..} -> C.Direct{..}
   Full'{..} -> C.Full' config' (mkHook depends) action' parse' items'
-  NoParse'{..} -> C.NoParse'{depends = mkHook depends, ..}
+  Direct'{..} -> C.Direct'{depends = mkHook depends, ..}
   Single{..} -> C.Single{..}
   Single'{..} -> C.Single' config' (mkHook depends) singleAction' checks'
 

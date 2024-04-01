@@ -218,10 +218,10 @@ test3 =
           ]
     }
 
--- ############### Test NoParse (Record) ###################
+-- ############### Test Direct (Record) ###################
 test4 :: Fixture Int
 test4 =
-  NoParse'
+  Direct'
     { config' = TestConfig "test" DeepRegression
     , depends = eachAfter
     , action' = \_rc _hi itm -> do

@@ -28,7 +28,7 @@ data ULog
   deriving stock (Eq, Show)
 
 data Path
-  = SuiteElmPath
+  = NodePath
       { module' :: Text
       , path :: Text
       }

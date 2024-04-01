@@ -282,33 +282,33 @@ cfg = testConfig "test"
 
 suite :: Suite
 suite =
-  [ Test (SuiteElmPath "module" "testName") test
+  [ Test (NodePath "module" "testName") test
   , Hook
-      { path = SuiteElmPath "module" "name"
+      { path = NodePath "module" "name"
       , hook = intOnceHook
       , subNodes =
-          [ Test (SuiteElmPath "module" "testName") test4
-          , Test (SuiteElmPath "module" "testName") test5
+          [ Test (NodePath "module" "testName") test4
+          , Test (NodePath "module" "testName") test5
           , Hook
-              { path = SuiteElmPath "module" "name"
+              { path = NodePath "module" "name"
               , hook = addOnceIntHook
               , subNodes =
                   [ Hook
-                      { path = SuiteElmPath "module" "name"
+                      { path = NodePath "module" "name"
                       , hook = infoThreadHook
                       , subNodes =
-                          [ Test (SuiteElmPath "module" "testName") test2
+                          [ Test (NodePath "module" "testName") test2
                           , Hook
-                              { path = SuiteElmPath "module" "name"
+                              { path = NodePath "module" "name"
                               , hook = eachInfoAround
                               , subNodes =
-                                  [ Test (SuiteElmPath "module" "testName") test3
+                                  [ Test (NodePath "module" "testName") test3
                                   , Hook
-                                      { path = SuiteElmPath "module" "name"
+                                      { path = NodePath "module" "name"
                                       , hook = eachAfter
                                       , subNodes =
-                                          [ Test (SuiteElmPath "module" "testName") test4
-                                          , Test (SuiteElmPath "module" "testName") test5
+                                          [ Test (NodePath "module" "testName") test4
+                                          , Test (NodePath "module" "testName") test5
                                           ]
                                       }
                                   ]

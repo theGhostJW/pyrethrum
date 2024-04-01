@@ -1012,7 +1012,7 @@ setPaths address ts =
       EachAfter{..} -> T.EachAfter{path = newPath "EachAfter", subNodes = newNodes, ..}
       EachAround{..} -> T.EachAround{path = newPath "EachAround", subNodes = newNodes, ..}
    where
-    newPath = AE.SuiteElmPath newAdd
+    newPath = AE.NodePath newAdd
     newAdd = nxtAdd idx
     newNodes = setPaths newAdd tp.subNodes
 

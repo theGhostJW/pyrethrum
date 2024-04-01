@@ -179,21 +179,6 @@ data Fixture m c rc tc hi where
     , items' :: rc -> c i
     } ->
     Fixture m c rc tc hi
-  Single ::
-    (Show ds) =>
-    { config :: tc
-    , singleAction :: rc -> m ds
-    , checks :: Checks ds
-    } ->
-    Fixture m c rc tc ()
-  Single' ::
-    (Show ds) =>
-    { config' :: tc
-    , depends :: Hook m rc loc pi hi
-    , singleAction' :: rc -> hi -> m ds
-    , checks' :: Checks ds
-    } ->
-    Fixture m c rc tc hi
 
 data Node m c rc tc hi where
   Hook ::

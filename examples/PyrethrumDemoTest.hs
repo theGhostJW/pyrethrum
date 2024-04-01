@@ -238,21 +238,6 @@ test4 =
           ]
     }
 
--- ############### Test Single (Record) ###################
-test5 :: Fixture Int
-test5 =
-  Single'
-    { config' = TestConfig "test" DeepRegression
-    , depends = eachAfter
-    , singleAction' = \rc _hi -> do
-        log $ "RunConfig is: " <> rc.title
-        pure $
-          DS
-            { value = 1
-            , valTxt = rc.title
-            }
-    , checks' = chk "the value must be 1" ((== 1) . (.value))
-    }
 
 -- ############### Construct Tests ###################
 -- this will be generated either by implmenting deriving,
@@ -288,7 +273,6 @@ suite =
       , hook = intOnceHook
       , subNodes =
           [ Test (NodePath "module" "testName") test4
-          , Test (NodePath "module" "testName") test5
           , Hook
               { path = NodePath "module" "name"
               , hook = addOnceIntHook
@@ -307,8 +291,8 @@ suite =
                                       { path = NodePath "module" "name"
                                       , hook = eachAfter
                                       , subNodes =
-                                          [ Test (NodePath "module" "testName") test4
-                                          , Test (NodePath "module" "testName") test5
+                                          [ Test (NodePath "module" "testName") test4,
+                                            Test (NodePath "module" "testName") test3
                                           ]
                                       }
                                   ]

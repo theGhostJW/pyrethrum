@@ -149,21 +149,6 @@ data Fixture hi where
     , items' :: RunConfig -> [i]
     } ->
     Fixture a
-  Single ::
-    (Show as) =>
-    { config :: TestConfig
-    , singleAction :: RunConfig -> Action as
-    , checks :: CH.Checks as
-    } ->
-    Fixture ()
-  Single' ::
-    (Show as, C.Frequency hz) =>
-    { config' :: TestConfig
-    , depends :: Hook hz pw pi a
-    , singleAction' :: RunConfig -> a -> Action as
-    , checks' :: CH.Checks as
-    } ->
-    Fixture a
 
 type Suite = [Node ()]
 data Node i where
@@ -186,8 +171,6 @@ mkTest = \case
   Direct{..} -> C.Direct{..}
   Full'{..} -> C.Full' config' (mkHook depends) action' parse' items'
   Direct'{..} -> C.Direct'{depends = mkHook depends, ..}
-  Single{..} -> C.Single{..}
-  Single'{..} -> C.Single' config' (mkHook depends) singleAction' checks'
 
 mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) RunConfig hz i o
 mkHook = \case

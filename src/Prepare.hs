@@ -198,42 +198,6 @@ prepareTest PrepParams{interpreter, runConfig} path =
             )
               <$> items' runConfig
         }
-    C.Single{config, singleAction, checks} ->
-      Test
-        { config
-        , path
-        , tests =
-            pure
-              $ TestItem
-                { id = 0
-                , title = config.title
-                , action = \snk _hi ->
-                    do
-                      ds <- tryAny $ do
-                        flog snk . Action path . ItemText $ config.title
-                        eas <- interpreter (singleAction runConfig)
-                        unTry snk eas
-                      applyChecks snk path checks ds
-                }
-        }
-    C.Single'{config', singleAction', checks'} ->
-      Test
-        { config = config'
-        , path
-        , tests =
-            pure
-              $ TestItem
-                { id = 0
-                , title = config'.title
-                , action = \snk hi ->
-                    do
-                      ds <- tryAny $ do
-                        flog snk . Action path . ItemText $ config'.title
-                        eas <- interpreter (singleAction' runConfig hi)
-                        unTry snk eas
-                      applyChecks snk path checks' ds
-                }
-        }
  where
   applyParser :: forall as ds. (HasCallStack => as -> Either C.ParseException ds) -> as -> IO (Either (CallStack, C.ParseException) ds)
   applyParser parser as = 

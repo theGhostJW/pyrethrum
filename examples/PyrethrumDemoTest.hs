@@ -1,32 +1,33 @@
 module PyrethrumDemoTest where
 
 import Check (Checks, chk)
-import Core (Each, Once, ParseException, Thread, Before, Around, After)
+import Core (After, Around, Before, Each, Once, ParseException, Thread)
 import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, (:>))
 import PyrethrumDemoProject (
   Action,
   Depth (..),
+  Fixture (..),
   Hook (..),
+  LogEffs,
+  Node (..),
   RunConfig (..),
   Suite,
-  Node (..),
-  Fixture (..),
-  TestConfig (..), testConfig, LogEffs,
+  TestConfig (..),
+  testConfig,
  )
 import PyrethrumExtras (txt)
 
 {-
-Note:: tried alternative with individual hook types but the results 
+Note:: tried alternative with individual hook types but the results
 were starting to look more complex than the original so abandonned.
 -}
 
 log :: (Out ApEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
-
-{- Demonstraits using partial effect 
+{- Demonstraits using partial effect
   type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a
 
   Hook has all the effects of the application but will compile with
@@ -35,12 +36,10 @@ log = out . User . Log
 simpleLog :: RunConfig -> LogEffs Int
 simpleLog _ = pure 1
 
-
 intOnceHook :: Hook Once Before () Int
 intOnceHook =
   BeforeHook
-    { 
-      action = simpleLog
+    { action = simpleLog
     }
 
 addOnceIntHook :: Hook Once Before Int Int
@@ -99,7 +98,6 @@ eachIntBefore =
         pure $ hi + 1
     }
 
-
 -- ############### Test the Lot ###################
 
 config :: TestConfig
@@ -116,15 +114,15 @@ action _expectedrc itm = do
 data ApState = ApState
   { value :: Int
   , valTxt :: Text
-  } deriving Show
+  }
+  deriving (Show, Read)
 
 data DState = DState
   { value :: Int
   , valTxt :: Text
   }
-  deriving (Show, Generic)
+  deriving (Show, Read)
 
---TODO: Document pragmatism - create funtion that throws parser exception
 parse :: ApState -> Either ParseException DState
 parse ApState{..} = pure DState{..}
 
@@ -152,7 +150,7 @@ config2 :: TestConfig
 config2 = TestConfig "test" DeepRegression
 
 test2 :: Fixture HookInfo
-test2 = Full' infoThreadHook config2 action2 parse2 items2
+test2 = Full' config2 infoThreadHook action2 parse2 items2
 
 action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
 action2 _rc HookInfo{value = hookVal} itm = do
@@ -165,7 +163,8 @@ parse2 AS{..} = pure DS{..}
 data AS = AS
   { value :: Int
   , valTxt :: Text
-  } deriving (Show, Read)
+  }
+  deriving (Show, Read)
 
 data DS = DS
   { value :: Int
@@ -247,8 +246,8 @@ test5 =
     , depends = eachAfter
     , singleAction' = \rc _hi -> do
         log $ "RunConfig is: " <> rc.title
-        pure
-          $ DS
+        pure $
+          DS
             { value = 1
             , valTxt = rc.title
             }
@@ -271,13 +270,12 @@ test5 =
 cfg :: TestConfig
 cfg = testConfig "test"
 
--- ambiguous record update error - should work 
+-- ambiguous record update error - should work
 -- after 9.8.1
 -- cfg2 :: TestConfig
 -- cfg2 = (testConfig "test") {
 --   depth = Regression
 -- }
-
 
 -- ############### Suite ###################
 -- this will be generated
@@ -324,9 +322,9 @@ suite =
   ]
 
 {-
--- TODO: test documenter that returns a handle from onceHook 
-      - research lazy vs strict TVar - may need to run differently doc and exe 
-      - aftr depends on before 
+-- TODO: test documenter that returns a handle from onceHook
+      - research lazy vs strict TVar - may need to run differently doc and exe
+      - aftr depends on before
       - after depends on around
 
 -- TODO: review bracket

@@ -2,12 +2,11 @@
 
 module Core where
 
+import Check (Checks)
 import DSL.Internal.ApEvent hiding (Check)
 import Data.Aeson (ToJSON (..))
-import Internal.ThreadEvent ( Hz(..) )
 import GHC.Records (HasField)
-import Check (Checks)
-
+import Internal.ThreadEvent (Hz (..))
 
 data Before
 data After
@@ -22,8 +21,8 @@ instance When Around
 newtype CheckFailure = CheckFailure Text
   deriving (Show)
 
-newtype ParseException = 
-  ParseFailure Text
+newtype ParseException
+  = ParseFailure Text
   deriving (Show, Read)
 
 instance Exception ParseException
@@ -39,7 +38,6 @@ type Item i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), Show i, 
 failParser :: Text -> Either ParseException a
 failParser = Left . ParseFailure
 
-
 -- add a function to serialise known properties to JSON on id, title, -> optional tricky may need to parse from string  notes, calcs
 -- https://softwareengineering.stackexchange.com/a/250135https://softwareengineering.stackexchange.com/a/250135
 {-
@@ -52,14 +50,14 @@ to list
 -}
 
 {-
-TODO:: idea defect reconciler 
+TODO:: idea defect reconciler
  - can pretty print (No JSON) to log so long as id/title/hash is logged and a hash of the show is logged so
     we can warn if the item has changed since it was run
 
  - for property based / generative tests we insist on deriving JSON and log as YAML and pprint
     on failure
 
- - consider removing ids from items 
+ - consider removing ids from items
     ~ regular use title which must be unique or title stub (which can include test)
     ~ property based stub
       ~ generator
@@ -67,8 +65,6 @@ TODO:: idea defect reconciler
  - global stub function
  - tst stub function  Item -> [Item] -> [Item] ~ ignores list and creates singleton
 -}
-
-
 
 -- TODO:: look into listLike
 
@@ -141,8 +137,7 @@ data Hook m rc loc i o where
     } ->
     Hook m rc loc i o
 
-
-hookFrequency :: forall m rc loc i o. Frequency loc => Hook m rc loc i o -> Hz
+hookFrequency :: forall m rc loc i o. (Frequency loc) => Hook m rc loc i o -> Hz
 hookFrequency _ = frequency @loc
 
 newtype StubLoc = StubLoc Text
@@ -162,8 +157,8 @@ data Fixture m c rc tc hi where
     Fixture m c rc tc ()
   Full' ::
     (Item i ds, Show as) =>
-    { depends :: Hook m rc loc pi hi
-    , config' :: tc
+    { config' :: tc
+    , depends :: Hook m rc loc pi hi
     , action' :: rc -> hi -> i -> m as
     , parse' :: as -> Either ParseException ds
     , items' :: rc -> c i
@@ -178,8 +173,8 @@ data Fixture m c rc tc hi where
     Fixture m c rc tc ()
   NoParse' ::
     (Item i ds) =>
-    { depends :: Hook m rc loc pi hi
-    , config' :: tc
+    { config' :: tc
+    , depends :: Hook m rc loc pi hi
     , action' :: rc -> hi -> i -> m ds
     , items' :: rc -> c i
     } ->
@@ -193,8 +188,8 @@ data Fixture m c rc tc hi where
     Fixture m c rc tc ()
   Single' ::
     (Show ds) =>
-    { depends :: Hook m rc loc pi hi
-    , config' :: tc
+    { config' :: tc
+    , depends :: Hook m rc loc pi hi
     , singleAction' :: rc -> hi -> m ds
     , checks' :: Checks ds
     } ->
@@ -221,7 +216,6 @@ data ExeParams m c rc tc where
     , runConfig :: rc
     } ->
     ExeParams m c rc tc
-
 
 -- try this
 -- part 1
@@ -257,18 +251,16 @@ data ExeParams m c rc tc where
 -- part 5 reinstate filtering // tree shaking
 
 {-
-todo plugin issu 
+todo plugin issu
 
-differ 
-case 1: 
-  hook.depends = hook1 
-  hook depends hook 1 
-  
-case 2: 
+differ
+case 1:
+  hook.depends = hook1
+  hook depends hook 1
+
+case 2:
   hook1 depends hook2
-  hook = hook1 
+  hook = hook1
   hook depends hook2
-  
-
 
 -}

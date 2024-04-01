@@ -126,8 +126,8 @@ data Fixture hi where
     Fixture ()
   Full' ::
     (C.Item i ds, Show as, C.Frequency hz) =>
-    { depends :: Hook hz pw pi a
-    , config' :: TestConfig
+    { config' :: TestConfig
+    , depends :: Hook hz pw pi a
     , action' :: RunConfig -> a -> i -> Action as
     , parse' :: as -> Either C.ParseException ds
     , items' :: RunConfig -> [i]
@@ -143,8 +143,8 @@ data Fixture hi where
     Fixture ()
   NoParse' ::
     (C.Item i ds, C.Frequency hz) =>
-    { depends :: Hook hz pw pi a
-    , config' :: TestConfig
+    { config' :: TestConfig
+    , depends :: Hook hz pw pi a
     , action' :: RunConfig -> a -> i -> Action ds
     , items' :: RunConfig -> [i]
     } ->
@@ -158,8 +158,8 @@ data Fixture hi where
     Fixture ()
   Single' ::
     (Show as, C.Frequency hz) =>
-    { depends :: Hook hz pw pi a
-    , config' :: TestConfig
+    { config' :: TestConfig
+    , depends :: Hook hz pw pi a
     , singleAction' :: RunConfig -> a -> Action as
     , checks' :: CH.Checks as
     } ->
@@ -184,10 +184,10 @@ mkTest :: Fixture hi -> C.Fixture App [] RunConfig TestConfig hi
 mkTest = \case
   Full{..} -> C.Full{..}
   NoParse{..} -> C.NoParse{..}
-  Full'{..} -> C.Full' (mkHook depends) config' action' parse' items'
+  Full'{..} -> C.Full' config' (mkHook depends) action' parse' items'
   NoParse'{..} -> C.NoParse'{depends = mkHook depends, ..}
   Single{..} -> C.Single{..}
-  Single'{..} -> C.Single' (mkHook depends) config' singleAction' checks'
+  Single'{..} -> C.Single' config' (mkHook depends) singleAction' checks'
 
 mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) RunConfig hz i o
 mkHook = \case

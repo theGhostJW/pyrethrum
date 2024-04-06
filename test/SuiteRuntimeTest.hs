@@ -76,6 +76,7 @@ genPlay = do
 defaultSeed :: Int
 defaultSeed = 13579
 
+-- TODO: other collection types generator / shrinker
 
 -- todo :: add repeatedly to Pyrelude
 {-

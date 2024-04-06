@@ -1,6 +1,6 @@
 module Prepare where
 
-import Check (Check, Checks(..), TerminationStatus (NonTerminal), applyCheck, skipChecks)
+import Check (Check, Checks(..), FailStatus (NonTerminal), applyCheck, skipChecks)
 import Control.Exception (throwIO)
 import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
@@ -253,7 +253,7 @@ applyChecks snk p chks =
       flog snk . CheckStart p . DStateText $ txt ds
       foldM_ (applyCheck' ds) NonTerminal chks.un
 
-  applyCheck' :: ds -> TerminationStatus -> Check ds -> IO TerminationStatus
+  applyCheck' :: ds -> FailStatus -> Check ds -> IO FailStatus
   applyCheck' ds ts chk = do
     (cr, ts') <- applyCheck ds ts chk
     logChk cr

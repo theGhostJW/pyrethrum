@@ -48,6 +48,7 @@ import Prelude hiding (putStrLn, writeFile)
 data WantConsole = Console | NoConsole deriving (Eq)
 
 -- TODO: Revisit add to efffect must work on all OSes?
+-- TODO: base on working dir including validation that working dir is correct instead of current dir
 
 auxBase :: IO AbsDir -> IO (Either IOError AbsDir)
 auxBase projRoot = subDirFromBaseDir projRoot [reldir|auxFiles|]

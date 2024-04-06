@@ -2,7 +2,7 @@
 
 module Check (
   Check (..),
-  TerminationStatus (..),
+  FailStatus (..),
   Checks (..),
   CheckResult (..),
   CheckReport (..),
@@ -31,12 +31,15 @@ import BasePrelude (read)
 
 -- import Hedgehog.Internal.Prelude (Show (..), Read(..))
 
-data TerminationStatus = NonTerminal | Terminal deriving (Show, Read, Eq)
+data FailStatus = NonTerminal | Terminal deriving (Show, Read, Eq)
 
-$(deriveToJSON defaultOptions ''TerminationStatus)
+$(deriveToJSON defaultOptions ''FailStatus)
 
 data Check ds = Check
-  { terminationStatus :: TerminationStatus
+  { -- terminationStatus: 
+    -- NonTerminal for regular checks (suceeding checks will be run)
+    -- Terminal for asserts (suceeding checks will not be run)
+    failStatus :: FailStatus
   , message :: Maybe (ds -> Text)
   , header :: Text
   , rule :: ds -> Bool
@@ -44,7 +47,7 @@ data Check ds = Check
 
 data CheckReadable = CheckLog
   { header :: Text
-  , terminationStatus :: TerminationStatus
+  , failStatus :: FailStatus
   }
   deriving (Show, Read)
 
@@ -60,9 +63,11 @@ assert header rule = Checks [Check Terminal Nothing header rule]
 assert' :: Text -> (ds -> Text) -> (ds -> Bool) -> Checks ds
 assert' header message rule = Checks [Check Terminal (Just message) header rule]
 
+-- todo: play with labelling values to see if useful similar to falsify: https://well-typed.com/blog/2023/04/falsify/?utm_source=pocket_reader#ranges-labelling
+
 instance Show (Check v) where
   show :: Check v -> String
-  show Check{header, terminationStatus} = P.show $ CheckLog header terminationStatus
+  show Check{header, failStatus} = P.show $ CheckLog header failStatus
 
 instance Read (Check v) where
   readsPrec :: Int -> String -> [(Check v, String)]
@@ -70,7 +75,7 @@ instance Read (Check v) where
    where
     check =
       Check
-        { terminationStatus = showable.terminationStatus
+        { failStatus = showable.failStatus
         , message = Nothing
         , header = showable.header
         , rule = const . error $ "Tried to call rule on a deserialised version of Check for: " <> toS showable.header
@@ -119,26 +124,26 @@ skipChecks chks = skipCheck <$> chks.un
 
 -- need to do this in an error handling context so we can catch and report
 -- exceptions thrown applying the check
-applyCheck :: (MonadUnliftIO m) => ds -> TerminationStatus -> Check ds -> m (CheckReport, TerminationStatus)
-applyCheck ds termStatus r =
+applyCheck :: (MonadUnliftIO m) => ds -> FailStatus -> Check ds -> m (CheckReport, FailStatus)
+applyCheck ds failStatus ck =
   do
     rslt <-
       tryAny
         . pure
-        $ case termStatus of
+        $ case failStatus of
           Terminal -> (report Skip, Terminal)
           NonTerminal ->
             first report
-              $ r.rule ds
+              $ ck.rule ds
                 ? (Pass, NonTerminal)
-              $ (Fail, r.terminationStatus)
+              $ (Fail, ck.failStatus)
 
     rslt
       & either
         ( \e ->
             pure
               ( CheckApplicationFailed
-                  { header = r.header
+                  { header = ck.header
                   , exception = toS $ displayException e
                   , callStack = toS $ prettyCallStack callStack
                   }
@@ -147,7 +152,7 @@ applyCheck ds termStatus r =
         )
         pure
  where
-  report rslt = CheckReport rslt r.header (r.message & maybe "" (ds &))
+  report rslt = CheckReport rslt ck.header (ck.message & maybe "" (ds &))
 
 $(deriveJSON defaultOptions ''CheckResult)
 $(deriveJSON defaultOptions ''CheckReport)

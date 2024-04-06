@@ -63,7 +63,7 @@ assert header rule = Checks [Check Terminal Nothing header rule]
 assert' :: Text -> (ds -> Text) -> (ds -> Bool) -> Checks ds
 assert' header message rule = Checks [Check Terminal (Just message) header rule]
 
--- todo: play with labelling values to see if useful similar to falsify: https://well-typed.com/blog/2023/04/falsify/?utm_source=pocket_reader#ranges-labelling
+-- todo: play with labelling values to see if useful similar to falsify: https://well-typed.com/blog/2023/04/falsify/?utm_source=pocket_reader#predicates
 
 instance Show (Check v) where
   show :: Check v -> String

@@ -155,7 +155,7 @@ data Node i where
   Hook ::
     (C.Frequency hz) =>
     { path :: AE.Path
-    , hook :: Hook hz pw i o
+    , hook :: Hook hz when i o
     , subNodes :: [Node o]
     } ->
     Node i

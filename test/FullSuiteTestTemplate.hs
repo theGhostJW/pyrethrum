@@ -5,7 +5,6 @@ import Data.Map.Strict qualified as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (Hook))
 import Internal.ThreadEvent qualified as TE
 import List.Extra as LE
-import PyrethrumExtras (debug', uu, (?))
 import Prelude hiding (All, id)
 
 data Spec = Spec {delay :: Int, result :: Result}

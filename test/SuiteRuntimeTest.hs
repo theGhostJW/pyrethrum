@@ -34,7 +34,8 @@ import List.Extra as LE
 import List.Extra qualified as L
 import Prepare qualified as P
 import PyrethrumExtras (debug, debug', debug'_, toS, txt, uu, (?))
-import PyrethrumExtras.Test hiding (chkEq', filter, mapMaybe, maybe, test)
+-- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
+import PyrethrumExtras.Test ( chk', chkFail )
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
   threadDelay,
@@ -46,24 +47,17 @@ import Prelude qualified as PR
 import Data.Hashable qualified as H
 import System.Random qualified as R
 import System.Random.Stateful qualified as RS
-import Test.Falsify.Generator qualified as FG
+import Test.Falsify.Generator as G (frequency) 
+import Test.Falsify.Property as P (gen, collect, Property) 
 import Test.Falsify.Predicate qualified as FP
 import Test.Falsify.Range qualified as FR
-import Test.Tasty.Falsify qualified as F
+import Test.Tasty.Falsify (testPropertyWith, TestOptions (overrideNumTests), TestOptions(..), ExpectFailure (DontExpectFailure))
+import Test.Tasty (TestTree, defaultMain, testGroup)
 
 {-
  - each fail
  - thread fail
 -}
-
---  todo :: simple random api / effect
--- generate [Template]
--- generate Template
--- generate Test
--- generate Spec
-
--- HERE !!!!!
-
 
 -- $ > genPlay
 genPlay :: IO ()
@@ -76,6 +70,42 @@ genPlay = do
 defaultSeed :: Int
 defaultSeed = 13579
 
+--  todo :: simple random api / effect
+-- generate [Template]
+-- generate Template
+-- generate Test
+-- generate Spec
+
+-- HERE !!!!!
+-- gen delay
+-- gen result
+
+genResult :: Word -> Property Result
+genResult passPcnt = gen $ frequency [
+        (passPcnt, pure Pass)
+      , (100 - passPcnt, pure Fail)
+      ]
+
+def :: TestOptions
+def = TestOptions {
+        expectFailure      = DontExpectFailure
+      , overrideVerbose    = Nothing
+      , overrideMaxShrinks = Nothing
+      , overrideNumTests   = Just 1000
+      , overrideMaxRatio   = Nothing
+      }
+
+stubProp :: String -> Property () -> TestTree
+stubProp = testPropertyWith def 
+
+propStubs :: TestTree
+propStubs = stubProp "Result" $ genResult 80 >>= collect "Result" . pure
+
+-- $> stub_generators
+stub_generators :: IO ()
+stub_generators = defaultMain $ testGroup "generator stubs" [ propStubs ]
+  
+-- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
 -- TODO: other collection types generator / shrinker
 
 -- todo :: add repeatedly to Pyrelude
@@ -102,15 +132,15 @@ bug t = PR.bug $ (error t :: SomeException)
 logging :: Logging
 logging = NoLog
 
--- $> unit_simple_pass
+-- $ > unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
--- $> unit_simple_fail
+-- $ > unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fixture [test Pass, test Fail]]]
 
--- $> unit_nested_pass_fail
+-- $ > unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
   runTest
@@ -177,7 +207,7 @@ passProbSuite preGen =
 allSpec :: Int -> Result -> ManySpec
 allSpec delay rslt = T.All $ Spec delay rslt
 
--- $> unit_nested_threaded_chk_thread_count
+-- $ > unit_nested_threaded_chk_thread_count
 unit_nested_threaded_chk_thread_count :: IO ()
 unit_nested_threaded_chk_thread_count =
   do
@@ -245,7 +275,7 @@ unit_nested_threaded_chk_thread_count =
 ptxt :: (Show a) => a -> Text
 ptxt = toS . ppShow
 
--- $> unit_empty_thread_around
+-- $ > unit_empty_thread_around
 unit_empty_thread_around :: IO ()
 unit_empty_thread_around =
   do
@@ -290,11 +320,11 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
      so we avoid masking synchronisation bugs in testing other properties.
   -}
 
--- $> unit_pass_prob_pregen
+-- $ > unit_pass_prob_pregen
 unit_pass_prob_pregen :: IO ()
 unit_pass_prob_pregen = passProbSuite True
 
--- $> unit_pass_prob_no_pregen
+-- $ > unit_pass_prob_no_pregen
 unit_pass_prob_no_pregen :: IO ()
 unit_pass_prob_no_pregen = passProbSuite False
 

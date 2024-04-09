@@ -1,19 +1,21 @@
 module PyrethrumDemoTest where
 
 import Check (Checks, chk)
-import Core (After, Around, Before, Each, Once, ParseException, Thread)
+-- import Core (After, Around, Before, Each, Once, ParseException, Thread) 
+-- import Core hiding (Fixture(..), Hook(..)) 
+import Core
 import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, (:>))
 import PyrethrumDemoProject (
   Action,
   Depth (..),
-  Fixture (..),
-  Hook (..),
+  TFixture (..),
+  THook (..),
   LogEffs,
-  Node (..),
+  -- Node (..),
   RunConfig (..),
-  Suite,
+  -- Suite,
   TestConfig (..),
   testConfig,
  )
@@ -36,15 +38,15 @@ log = out . User . Log
 simpleLog :: RunConfig -> LogEffs Int
 simpleLog _ = pure 1
 
-intOnceHook :: Hook Once Before () Int
+intOnceHook :: THook Once () Int
 intOnceHook =
-  BeforeHook
+  Before
     { action = simpleLog
     }
 
-addOnceIntHook :: Hook Once Before Int Int
+addOnceIntHook :: THook Once Int Int
 addOnceIntHook =
-  BeforeHook'
+  Before'
     { depends = intOnceHook
     , action' =
         \_rc i -> do
@@ -52,8 +54,8 @@ addOnceIntHook =
           pure $ i + 1
     }
 
-_intThreadHook :: Hook Thread Before () Int
-_intThreadHook = BeforeHook $ \_rc -> do
+_intThreadHook :: THook Thread () Int
+_intThreadHook = Before $ \_rc -> do
   log "deriving meaning of life' "
   pure 42
 
@@ -63,15 +65,15 @@ data HookInfo = HookInfo
   }
   deriving (Show, Generic)
 
-infoThreadHook :: Hook Thread Before Int HookInfo
-infoThreadHook = BeforeHook' addOnceIntHook $ \_rc i -> do
+infoThreadHook :: THook Thread Int HookInfo
+infoThreadHook = Before' addOnceIntHook $ \_rc i -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
-eachInfoAround :: Hook Each Around HookInfo Int
+eachInfoAround :: THook Each HookInfo Int
 eachInfoAround =
-  AroundHook'
-    { aroundDepends = infoThreadHook
+  Around'
+    { depends = infoThreadHook
     , setup' = \_rc hi -> do
         log "eachSetup"
         pure $ hi.value + 1
@@ -80,7 +82,7 @@ eachInfoAround =
         pure ()
     }
 
-eachAfter :: Hook Each After Int Int
+eachAfter :: THook Each Int Int
 eachAfter =
   After'
     { afterDepends = eachInfoAround
@@ -89,9 +91,9 @@ eachAfter =
         pure ()
     }
 
-eachIntBefore :: Hook Each Before Int Int
+eachIntBefore :: THook Each Int Int
 eachIntBefore =
-  BeforeHook'
+  Before'
     { depends = eachInfoAround
     , action' = \_rc hi -> do
         log "eachSetup"
@@ -103,10 +105,10 @@ eachIntBefore =
 config :: TestConfig
 config = TestConfig "test" DeepRegression
 
-test :: Fixture ()
+test :: TFixture ()
 test = Full config action parse items
 
-action :: RunConfig -> Item -> Action ApState
+action :: RunConfig -> ItemData -> Action ApState
 action _expectedrc itm = do
   log $ txt itm
   pure $ ApState (itm.value + 1) $ txt itm.value
@@ -126,7 +128,7 @@ data DState = DState
 parse :: ApState -> Either ParseException DState
 parse ApState{..} = pure DState{..}
 
-data Item = Item
+data ItemData = ItemData
   { id :: Int
   , title :: Text
   , value :: Int
@@ -134,10 +136,10 @@ data Item = Item
   }
   deriving (Show, Read)
 
-items :: RunConfig -> [Item]
+items :: RunConfig -> [ItemData]
 items =
   const
-    [ Item
+    [ ItemData
         { id = 1
         , title = "test the value is one"
         , value = 2
@@ -149,7 +151,7 @@ items =
 config2 :: TestConfig
 config2 = TestConfig "test" DeepRegression
 
-test2 :: Fixture HookInfo
+test2 :: TFixture HookInfo
 test2 = Full' config2 infoThreadHook action2 parse2 items2
 
 action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
@@ -198,7 +200,7 @@ items2 =
 
 -- ############### Test the Lot (Record) ###################
 
-test3 :: Fixture Int
+test3 :: TFixture Int
 test3 =
   Full'
     { depends = eachIntBefore
@@ -219,7 +221,7 @@ test3 =
     }
 
 -- ############### Test Direct (Record) ###################
-test4 :: Fixture Int
+test4 :: TFixture Int
 test4 =
   Direct'
     { config' = TestConfig "test" DeepRegression
@@ -245,7 +247,7 @@ test4 =
 -- could also look into creating un unconstrained data types
 -- all members of a convertable typeclass (specialize??)
 -- and converting to a true test fixture at the bottom of the file
--- after deriveJson and Item
+-- after deriveJson and ItemData
 -- TODO: precompiler template haskell
 -- need to check error messages carefully
 -- finalise templatehaskell vs deriving for these classes
@@ -264,7 +266,7 @@ cfg = testConfig "test"
 
 -- ############### Suite ###################
 -- this will be generated
-
+{-
 suite :: Suite
 suite =
   [ Test (NodePath "module" "testName") test
@@ -304,6 +306,7 @@ suite =
           ]
       }
   ]
+-}
 
 {-
 -- TODO: test documenter that returns a handle from onceHook

@@ -100,6 +100,8 @@ instance CanDependOn Each Once
 instance CanDependOn Each Thread
 instance CanDependOn Each Each
 
+
+--  TODO - fix misnamed
 data Hook m rc loc i o where
   Before ::
     (Frequency loc) =>

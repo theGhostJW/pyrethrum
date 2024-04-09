@@ -70,42 +70,51 @@ $(deriveJSON defaultOptions ''TestConfig)
 
 instance C.Config TestConfig
 
-data Hook hz when input output where
-  BeforeHook ::
-    (C.Frequency hz) =>
-    { action :: RunConfig -> Action o
-    } ->
-    Hook hz C.Before () o
-  BeforeHook' ::
-    (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
-    { depends :: Hook phz pw pi i
-    , action' :: RunConfig -> i -> Action o
-    } ->
-    Hook hz C.Before i o
-  AfterHook ::
-    (C.Frequency hz) =>
-    { afterAction :: RunConfig -> Action ()
-    } ->
-    Hook hz C.After () ()
-  After' ::
-    (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
-    { afterDepends :: Hook phz pw pi i
-    , afterAction' :: RunConfig -> Action ()
-    } ->
-    Hook hz C.After i i
-  AroundHook ::
-    (C.Frequency hz) =>
-    { setup :: RunConfig -> Action o
-    , teardown :: RunConfig -> o -> Action ()
-    } ->
-    Hook hz C.Around () o
-  AroundHook' ::
-    (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
-    { aroundDepends :: Hook phz pw pi i
-    , setup' :: RunConfig -> i -> Action o
-    , teardown' :: RunConfig -> o -> Action ()
-    } ->
-    Hook hz C.Around i o
+-- data Hook m rc loc i o where
+-- type AdHook = C.Hook
+
+
+-- data Hook m rc loc i o where
+
+type THook loc i o = C.Hook App RunConfig loc i o
+
+
+-- data Hook hz when input output where
+--   BeforeHook ::
+--     (C.Frequency hz) =>
+--     { action :: RunConfig -> Action o
+--     } ->
+--     Hook hz C.Before () o
+--   BeforeHook' ::
+--     (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
+--     { depends :: Hook phz pw pi i
+--     , action' :: RunConfig -> i -> Action o
+--     } ->
+--     Hook hz C.Before i o
+--   AfterHook ::
+--     (C.Frequency hz) =>
+--     { afterAction :: RunConfig -> Action ()
+--     } ->
+--     Hook hz C.After () ()
+--   After' ::
+--     (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
+--     { afterDepends :: Hook phz pw pi i
+--     , afterAction' :: RunConfig -> Action ()
+--     } ->
+--     Hook hz C.After i i
+--   AroundHook ::
+--     (C.Frequency hz) =>
+--     { setup :: RunConfig -> Action o
+--     , teardown :: RunConfig -> o -> Action ()
+--     } ->
+--     Hook hz C.Around () o
+--   AroundHook' ::
+--     (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
+--     { aroundDepends :: Hook phz pw pi i
+--     , setup' :: RunConfig -> i -> Action o
+--     , teardown' :: RunConfig -> o -> Action ()
+--     } ->
+--     Hook hz C.Around i o
 
 {-
 TODO:
@@ -115,86 +124,92 @@ TODO:
       - split datatypes with conversion typeclasses at project level
 -}
 
-data Fixture hi where
-  Full ::
-    (C.Item i ds, Show as) =>
-    { config :: TestConfig
-    , action :: RunConfig -> i -> Action as
-    , parse :: as -> Either C.ParseException ds
-    , items :: RunConfig -> [i]
-    } ->
-    Fixture ()
-  Full' ::
-    (C.Item i ds, Show as, C.Frequency hz) =>
-    { config' :: TestConfig
-    , depends :: Hook hz pw pi a
-    , action' :: RunConfig -> a -> i -> Action as
-    , parse' :: as -> Either C.ParseException ds
-    , items' :: RunConfig -> [i]
-    } ->
-    Fixture a
-  Direct ::
-    forall i ds.
-    (C.Item i ds) =>
-    { config :: TestConfig
-    , action :: RunConfig -> i -> Action ds
-    , items :: RunConfig -> [i]
-    } ->
-    Fixture ()
-  Direct' ::
-    (C.Item i ds, C.Frequency hz) =>
-    { config' :: TestConfig
-    , depends :: Hook hz pw pi a
-    , action' :: RunConfig -> a -> i -> Action ds
-    , items' :: RunConfig -> [i]
-    } ->
-    Fixture a
+-- data Fixture m c rc tc hi where
+type TFixture hi = C.Fixture App [] RunConfig TestConfig hi
 
-type Suite = [Node ()]
-data Node i where
-  Hook ::
-    (C.Frequency hz) =>
-    { path :: AE.Path
-    , hook :: Hook hz when i o
-    , subNodes :: [Node o]
-    } ->
-    Node i
-  Test ::
-    { path :: AE.Path
-    , test :: Fixture i
-    } ->
-    Node i
 
-mkTest :: Fixture hi -> C.Fixture App [] RunConfig TestConfig hi
-mkTest = \case
-  Full{..} -> C.Full{..}
-  Direct{..} -> C.Direct{..}
-  Full'{..} -> C.Full' config' (mkHook depends) action' parse' items'
-  Direct'{..} -> C.Direct'{depends = mkHook depends, ..}
+-- data Fixture hi where
+--   Full ::
+--     (C.Item i ds, Show as) =>
+--     { config :: TestConfig
+--     , action :: RunConfig -> i -> App as
+--     , parse :: as -> Either C.ParseException ds
+--     , items :: RunConfig -> [i]
+--     } ->
+--     Fixture ()
+--   Full' ::
+--     (C.Item i ds, Show as, C.Frequency hz) =>
+--     { config' :: TestConfig
+--     , depends :: Hook hz pw pi a
+--     , action' :: RunConfig -> a -> i -> Action as
+--     , parse' :: as -> Either C.ParseException ds
+--     , items' :: RunConfig -> [i]
+--     } ->
+--     Fixture a
+--   Direct ::
+--     forall i ds.
+--     (C.Item i ds) =>
+--     { config :: TestConfig
+--     , action :: RunConfig -> i -> Action ds
+--     , items :: RunConfig -> [i]
+--     } ->
+--     Fixture ()
+--   Direct' ::
+--     (C.Item i ds, C.Frequency hz) =>
+--     { config' :: TestConfig
+--     , depends :: Hook hz pw pi a
+--     , action' :: RunConfig -> a -> i -> Action ds
+--     , items' :: RunConfig -> [i]
+--     } ->
+--     Fixture a
 
-mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) RunConfig hz i o
-mkHook = \case
-  BeforeHook{..} -> C.Before{..}
-  BeforeHook'{..} -> C.Before' (mkHook depends) action'
-  AfterHook{..} -> C.After{..}
-  After'{..} -> C.After'{afterDepends = mkHook afterDepends, ..}
-  AroundHook{..} -> C.Around{..}
-  AroundHook'
-    { aroundDepends
-    , setup'
-    , teardown'
-    } ->
-      C.Around' (mkHook aroundDepends) setup' teardown'
+-- type Suite = [C.Node ()]
 
-mkSuite :: Node i -> C.Node App [] RunConfig TestConfig i
-mkSuite = \case
-  Hook{..} ->
-    C.Hook
-      { hook = mkHook hook
-      , subNodes = mkSuite <$> subNodes
-      , ..
-      }
-  Test{..} -> C.Fixture{fixture = mkTest test, ..}
+-- data Node i where
+--   Hook ::
+--     (C.Frequency hz) =>
+--     { path :: AE.Path
+--     , hook :: Hook hz when i o
+--     , subNodes :: [Node o]
+--     } ->
+--     Node i
+--   Test ::
+--     { path :: AE.Path
+--     , test :: Fixture i
+--     } ->
+--     Node i
 
-mkTestRun :: Suite -> [C.Node App [] RunConfig TestConfig ()]
-mkTestRun tr = mkSuite <$> tr
+-- mkTest :: Fixture hi -> C.Fixture App [] RunConfig TestConfig hi
+-- mkTest = \case
+--   Full{..} -> C.Full{..}
+--   Direct{..} -> C.Direct{..}
+--   Full'{..} -> C.Full' config' (mkHook depends) action' parse' items'
+--   Direct'{..} -> C.Direct'{depends = mkHook depends, ..}
+
+-- mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) RunConfig hz i o
+-- mkHook = \case
+--   BeforeHook{..} -> C.Before{..}
+--   BeforeHook'{..} -> C.Before' (mkHook depends) action'
+--   AfterHook{..} -> C.After{..}
+--   After'{..} -> C.After'{afterDepends = mkHook afterDepends, ..}
+--   AroundHook{..} -> C.Around{..}
+--   AroundHook'
+--     { aroundDepends
+--     , setup'
+--     , teardown'
+--     } ->
+--       C.Around' (mkHook aroundDepends) setup' teardown'
+
+-- mkSuite :: C.Node i -> C.Node App [] RunConfig TestConfig i
+-- mkSuite = \case
+--   C.Hook{..} ->
+--     C.Hook
+--       { hook = mkHook hook
+--       , subNodes = mkSuite <$> subNodes
+--       , ..
+--       }
+--   -- Test{..} -> C.Fixture{fixture = mkTest test, ..}
+--   C.Fixture{..} -> C.Fixture{fixture = test, ..}
+
+-- mkTestRun :: Suite -> [C.Node App [] RunConfig TestConfig ()]
+-- mkTestRun tr = mkSuite <$> tr

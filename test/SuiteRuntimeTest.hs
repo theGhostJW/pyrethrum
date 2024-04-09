@@ -98,12 +98,11 @@ def = TestOptions {
 stubProp :: String -> Property () -> TestTree
 stubProp = testPropertyWith def 
 
-propStubs :: TestTree
-propStubs = stubProp "Result" $ genResult 80 >>= collect "Result" . pure
-
 -- $> stub_generators
 stub_generators :: IO ()
-stub_generators = defaultMain $ testGroup "generator stubs" [ propStubs ]
+stub_generators = defaultMain $ testGroup "generator stubs" [ 
+  stubProp "Result" $ genResult 80 >>= collect "Result" . pure
+ ]
   
 -- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
 -- TODO: other collection types generator / shrinker

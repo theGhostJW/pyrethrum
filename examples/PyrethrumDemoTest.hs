@@ -10,8 +10,8 @@ import Effectful (Eff, (:>))
 import PyrethrumDemoProject (
   Action,
   Depth (..),
-  TFixture (..),
-  THook (..),
+  TFixture ,
+  THook,
   LogEffs,
   -- Node (..),
   RunConfig (..),
@@ -38,6 +38,10 @@ log = out . User . Log
 simpleLog :: RunConfig -> LogEffs Int
 simpleLog _ = pure 1
 
+-- HERE 1 !!! master has an extra redundant type param for hook position
+-- so the Type fully descrribes the hook => doesmean that depns needs to be renames for AroundHook
+-- intOnceHook :: Hook Once Before () Int
+-- intOnceHook :: THook Once () Int
 intOnceHook :: THook Once () Int
 intOnceHook =
   Before
@@ -73,7 +77,14 @@ infoThreadHook = Before' addOnceIntHook $ \_rc i -> do
 eachInfoAround :: THook Each HookInfo Int
 eachInfoAround =
   Around'
-    { depends = infoThreadHook
+    { 
+      -- HERE 2 !!! this is why I didn't use a type alias in master
+      -- same for Fixture
+      --       depends :: Hook App RunConfig Thread Int HookInfo
+      -- aroundDepends :: Hook Thread Before Int HookInfo
+      -- note the slightly more awkward prop name in master (aroundDepends vs depends) due to the extra param 
+      -- probably will usually be called positionally anyway
+      depends = infoThreadHook
     , setup' = \_rc hi -> do
         log "eachSetup"
         pure $ hi.value + 1

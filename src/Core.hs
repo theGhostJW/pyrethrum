@@ -100,51 +100,45 @@ instance CanDependOn Each Once
 instance CanDependOn Each Thread
 instance CanDependOn Each Each
 
-data Hook m rc loc i o where
+data Hook m rc hz i o where
   Before ::
-    (Frequency loc) =>
+    (Frequency hz) =>
     { action :: rc -> m o
     } ->
-    Hook m rc loc () o
+    Hook m rc hz () o
   Before' ::
-    (Frequency ploc, Frequency loc, CanDependOn loc ploc) =>
-    { depends :: Hook m rc ploc pi i
+    (Frequency phz, Frequency hz, CanDependOn hz phz) =>
+    { depends :: Hook m rc phz pi i
     , action' :: rc -> i -> m o
     } ->
-    Hook m rc loc i o
+    Hook m rc hz i o
   After ::
-    (Frequency loc) =>
+    (Frequency hz) =>
     { afterAction :: rc -> m ()
     } ->
-    Hook m rc loc () ()
+    Hook m rc hz () ()
   After' ::
-    (Frequency ploc, Frequency loc, CanDependOn loc ploc) =>
-    { afterDepends :: Hook m rc ploc pi i
+    (Frequency phz, Frequency hz, CanDependOn hz phz) =>
+    { afterDepends :: Hook m rc phz pi i
     , afterAction' :: rc -> m ()
     } ->
-    Hook m rc loc i i
+    Hook m rc hz i i
   Around ::
-    (Frequency loc) =>
+    (Frequency hz) =>
     { setup :: rc -> m o
     , teardown :: rc -> o -> m ()
     } ->
-    Hook m rc loc () o
+    Hook m rc hz () o
   Around' ::
-    (Frequency ploc, Frequency loc, CanDependOn loc ploc) =>
-    { depends :: Hook m rc ploc pi i
+    (Frequency phz, Frequency hz, CanDependOn hz phz) =>
+    { depends :: Hook m rc phz pi i
     , setup' :: rc -> i -> m o
     , teardown' :: rc -> o -> m ()
     } ->
-    Hook m rc loc i o
+    Hook m rc hz i o
 
-hookFrequency :: forall m rc loc i o. (Frequency loc) => Hook m rc loc i o -> Hz
-hookFrequency _ = frequency @loc
-
-newtype StubLoc = StubLoc Text
-data Addressed a = Addressed
-  { loc :: StubLoc
-  , value :: a
-  }
+hookFrequency :: forall m rc hz i o. (Frequency hz) => Hook m rc hz i o -> Hz
+hookFrequency _ = frequency @hz
 
 data Fixture m c rc tc hi where
   Full ::
@@ -158,7 +152,7 @@ data Fixture m c rc tc hi where
   Full' ::
     (Item i ds, Show as) =>
     { config' :: tc
-    , depends :: Hook m rc loc pi hi
+    , depends :: Hook m rc hz pi hi
     , action' :: rc -> hi -> i -> m as
     , parse' :: as -> Either ParseException ds
     , items' :: rc -> c i
@@ -174,7 +168,7 @@ data Fixture m c rc tc hi where
   Direct' ::
     (Item i ds) =>
     { config' :: tc
-    , depends :: Hook m rc loc pi hi
+    , depends :: Hook m rc hz pi hi
     , action' :: rc -> hi -> i -> m ds
     , items' :: rc -> c i
     } ->
@@ -182,9 +176,9 @@ data Fixture m c rc tc hi where
 
 data Node m c rc tc hi where
   Hook ::
-    (Frequency loc) =>
+    (Frequency hz) =>
     { path :: Path
-    , hook :: Hook m rc loc hi o
+    , hook :: Hook m rc hz hi o
     , subNodes :: c (Node m c rc tc o)
     } ->
     Node m c rc tc hi
@@ -206,7 +200,7 @@ data ExeParams m c rc tc where
 -- part 1
 --  - do notation :: NA
 -- - interpretor + writer :: NA
--- - extract loc from item (hard code for now) + fixtureType and dependency  loc
+-- - extract hz from item (hard code for now) + fixtureType and dependency  hz
 -- - stub for checks (see part 4)
 -- - add missing fixtures
 -- - reinstate before

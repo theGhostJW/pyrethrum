@@ -267,12 +267,12 @@ cfg = testConfig "test"
 
 suite :: Suite
 suite =
-  [ Test (NodePath "module" "testName") test
+  [ Fixture (NodePath "module" "testName") test
   , Hook
       { path = NodePath "module" "name"
       , hook = intOnceHook
       , subNodes =
-          [ Test (NodePath "module" "testName") test4
+          [ Fixture (NodePath "module" "testName") test4
           , Hook
               { path = NodePath "module" "name"
               , hook = addOnceIntHook
@@ -281,18 +281,18 @@ suite =
                       { path = NodePath "module" "name"
                       , hook = infoThreadHook
                       , subNodes =
-                          [ Test (NodePath "module" "testName") test2
+                          [ Fixture (NodePath "module" "testName") test2
                           , Hook
                               { path = NodePath "module" "name"
                               , hook = eachInfoAround
                               , subNodes =
-                                  [ Test (NodePath "module" "testName") test3
+                                  [ Fixture (NodePath "module" "testName") test3
                                   , Hook
                                       { path = NodePath "module" "name"
                                       , hook = eachAfter
                                       , subNodes =
-                                          [ Test (NodePath "module" "testName") test4,
-                                            Test (NodePath "module" "testName") test3
+                                          [ Fixture (NodePath "module" "testName") test4,
+                                            Fixture (NodePath "module" "testName") test3
                                           ]
                                       }
                                   ]

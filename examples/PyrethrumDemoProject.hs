@@ -9,13 +9,12 @@ import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Effectful (Eff, IOE, type (:>))
 import Effectful.Error.Static as E (Error)
 
-type Action a = Eff ApEffs a
+type Action = Eff ApEffs
 type HasLog es = Out ApEvent :> es
 type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a
 type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
 type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
 type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
-type App = Eff ApEffs
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum, Bounded)
 $(deriveJSON defaultOptions ''Environment)
@@ -158,14 +157,14 @@ data Node i where
     , subNodes :: [Node o]
     } ->
     Node i
-  Test ::
+  Fixture ::
     { path :: AE.Path
-    , test :: Fixture i
+    , fixture :: Fixture i
     } ->
     Node i
 
-mkTest :: Fixture hi -> C.Fixture App [] RunConfig TestConfig hi
-mkTest = \case
+mkFixture :: Fixture hi -> C.Fixture Action [] RunConfig TestConfig hi
+mkFixture = \case
   Full{..} -> C.Full{..}
   Direct{..} -> C.Direct{..}
   Full'{..} -> C.Full' config' (mkHook depends) action' parse' items'
@@ -185,7 +184,7 @@ mkHook = \case
     } ->
       C.Around' (mkHook aroundDepends) setup' teardown'
 
-mkSuite :: Node i -> C.Node App [] RunConfig TestConfig i
+mkSuite :: Node i -> C.Node Action [] RunConfig TestConfig i
 mkSuite = \case
   Hook{..} ->
     C.Hook
@@ -193,7 +192,7 @@ mkSuite = \case
       , subNodes = mkSuite <$> subNodes
       , ..
       }
-  Test{..} -> C.Fixture{fixture = mkTest test, ..}
+  Fixture{..} -> C.Fixture{fixture = mkFixture fixture, ..}
 
-mkTestRun :: Suite -> [C.Node App [] RunConfig TestConfig ()]
+mkTestRun :: Suite -> [C.Node Action [] RunConfig TestConfig ()]
 mkTestRun tr = mkSuite <$> tr

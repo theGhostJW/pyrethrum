@@ -34,8 +34,9 @@ import List.Extra as LE
 import List.Extra qualified as L
 import Prepare qualified as P
 import PyrethrumExtras (debug, debug', debug'_, toS, txt, uu, (?))
+
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
-import PyrethrumExtras.Test ( chk', chkFail )
+import PyrethrumExtras.Test (chk', chkFail)
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
   threadDelay,
@@ -47,12 +48,12 @@ import Prelude qualified as PR
 import Data.Hashable qualified as H
 import System.Random qualified as R
 import System.Random.Stateful qualified as RS
-import Test.Falsify.Generator as G (frequency) 
-import Test.Falsify.Property as P (gen, collect, Property) 
+import Test.Falsify.Generator as G (frequency, inRange)
 import Test.Falsify.Predicate qualified as FP
-import Test.Falsify.Range qualified as FR
-import Test.Tasty.Falsify (testPropertyWith, TestOptions (overrideNumTests), TestOptions(..), ExpectFailure (DontExpectFailure))
+import Test.Falsify.Property as P (Property, collect, gen)
+import Test.Falsify.Range (skewedBy)
 import Test.Tasty (TestTree, defaultMain, testGroup)
+import Test.Tasty.Falsify (ExpectFailure (DontExpectFailure), TestOptions (..), testPropertyWith)
 
 {-
  - each fail
@@ -80,31 +81,53 @@ defaultSeed = 13579
 -- gen delay
 -- gen result
 
+def :: TestOptions
+def =
+  TestOptions
+    { expectFailure = DontExpectFailure
+    , overrideVerbose = Nothing
+    , overrideMaxShrinks = Nothing
+    , overrideNumTests = Just 1000
+    , overrideMaxRatio = Nothing
+    }
+
+demoProp :: (Show a) => String -> Property a -> TestTree
+demoProp label prop = testPropertyWith def label $ prop >>= collect label . pure
+
 genResult :: Word -> Property Result
-genResult passPcnt = gen $ frequency [
-        (passPcnt, pure Pass)
+genResult passPcnt =
+  gen $
+    frequency
+      [ (passPcnt, pure Pass)
       , (100 - passPcnt, pure Fail)
       ]
 
-def :: TestOptions
-def = TestOptions {
-        expectFailure      = DontExpectFailure
-      , overrideVerbose    = Nothing
-      , overrideMaxShrinks = Nothing
-      , overrideNumTests   = Just 1000
-      , overrideMaxRatio   = Nothing
-      }
+demoResult :: TestTree
+demoResult = demoProp "result" $ genResult 80
 
-stubProp :: String -> Property () -> TestTree
-stubProp = testPropertyWith def 
+genDelay :: Int -> Property Int
+genDelay max' = gen $ inRange $ skewedBy 2 (0, max')
 
-propStubs :: TestTree
-propStubs = stubProp "Result" $ genResult 80 >>= collect "Result" . pure
+demoDelay :: TestTree
+demoDelay = demoProp "delay" $ genDelay 3000
+
+genSpec :: Int -> Word -> Property Spec
+genSpec maxDelay passPcnt = Spec <$> genDelay maxDelay <*> genResult passPcnt
+
+demoSpec :: TestTree
+demoSpec = demoProp "spec" $ genSpec 3000 80
 
 -- $> stub_generators
 stub_generators :: IO ()
-stub_generators = defaultMain $ testGroup "generator stubs" [ propStubs ]
-  
+stub_generators =
+  defaultMain $
+    testGroup
+      "generator stubs"
+      [ demoResult
+      , demoDelay
+      , demoSpec
+      ]
+
 -- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
 -- TODO: other collection types generator / shrinker
 
@@ -121,7 +144,6 @@ repeatedlyM1 :: Monad m => (a -> b -> m b) -> ([a] -> b -> m b)
 repeatedlyM1 _ []     !b = return b
 repeatedlyM1 f (a:as) !b = do b' <- f a b
                               repeatedlyM1 f as b'
-
 
 -}
 -- todo :: remap in Pyrelude bug' ~ use exception // bug ~ use text
@@ -289,15 +311,15 @@ unit_empty_thread_around =
   chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (ptxt r.log)) 2 (length r.log)
   chkLogLength r = chkEq' ("Log length not as expected:\n" <> (ptxt r.log)) 12 (length r.log)
 
-  {-
-  todo: 
-  
+{-
+  todo:
+
   find out about: +optimise-heavily -f +enable-cluster-counting
-  and other compile options 
+  and other compile options
 
   1. Getting the release candidate
 
-       $ cabal get 
+       $ cabal get
 https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cd Agda-2.6.4.3
 
@@ -306,13 +328,12 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
   -}
 
-
 {-
   the following tests are to make sure all the property checks are working for
   probability based tests, both with and without pregeneration
 
     If pregenerate is True, a spec is genrated when loading the template prior to the test. The expected test results
-     can be read from the template and can be reconciled by comparing template results to actual 
+     can be read from the template and can be reconciled by comparing template results to actual
      results. The the implementation test tree in this mode requires STM which could mask synchronisation bugs.
 
     If pregenerate is False, the spec is generated when the test is run and we cannot

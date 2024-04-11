@@ -8,11 +8,11 @@ import List.Extra as LE
 import Prelude hiding (All, id)
 
 data Spec = Spec {delay :: Int, result :: Result}
-  deriving (Show, Eq)
+  deriving (Read, Show, Eq)
 data Result
   = Pass
   | Fail
-  deriving (Ord, Eq, Show)
+  deriving (Ord, Eq, Read, Show)
 
 
 data ManySpec

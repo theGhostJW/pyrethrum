@@ -14,6 +14,22 @@ data Result
   | Fail
   deriving (Ord, Eq, Read, Show)
 
+{-
+    PreLoad:
+     A spec is genrated when loading the template and expected failures can be verified
+     by comparing the pre-generated template results to actual results. The execution of
+     these specs (specifically thread hooks), however, requires STM which could mask
+     synchronisation bugs in testing.
+
+    RunTime:
+     A spec is generated when the test is run but the result will be non-deterministic and
+     hence cannot be verified. On the other hand, the execution of these specs does not require
+     any syncronisation and will not mask synchronisation bugs.
+   -}
+data SpecGen
+  = PreLoad
+  | RunTime
+  deriving (Ord, Eq, Read, Show)
 
 data ManySpec
   = All Spec

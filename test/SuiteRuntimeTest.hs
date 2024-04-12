@@ -330,7 +330,7 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
 
 {-
   the following tests are to make sure all the property checks are working for
-  probability based tests, both with and without pregeneration
+  probability based tests, both with and without pre-generation (preGen)
 
     If pregenerate is True, a spec is genrated when loading the template prior to the test. The expected test results
      can be read from the template and can be reconciled by comparing template results to actual
@@ -529,10 +529,10 @@ chkExpectedResults baseSeed threadLimit ts lgs =
           )
 
   expectedResults :: Map SuiteEventPath ExpectedResult
-  expectedResults = foldl' accum M.empty $ ts >>= T.eventPaths
+  expectedResults = foldl' calcExpected M.empty $ ts >>= T.eventPaths
 
-  accum :: Map SuiteEventPath ExpectedResult -> T.EventPath -> Map SuiteEventPath ExpectedResult
-  accum acc T.EventPath{path, suiteEvent, evntSpec, template} =
+  calcExpected :: Map SuiteEventPath ExpectedResult -> T.EventPath -> Map SuiteEventPath ExpectedResult
+  calcExpected acc T.EventPath{path, suiteEvent, evntSpec, template} =
     M.insert (ensureUnique key) expected acc
    where
     key = SuiteEventPath (path) (suiteEvent)
@@ -1200,22 +1200,10 @@ loadQIfPregen baseSeed qLength pth q = \case
     , minDelay
     , maxDelay
     } ->
-      preGenerate
-        ? (atomically . loadTQueue q $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay)
-        $ pure ()
-
--- do
---   s <- mkManySpec <$> manySpec
---   atomically $ writeTQueue q s
--- where
---   manySpec subSeed = mkManySpec ManyParams {
---         baseSeed,
---         subSeed,
---         path = toS pth,
---         passPcnt,
---         minDelay,
---         maxDelay
---       }
+      do 
+        when preGenerate .
+          atomically . loadTQueue q $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay
+        pure ()
 
 -- assumes th queue is preloaded if pregen is true see loadQIfPregen
 mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
@@ -1256,12 +1244,12 @@ mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.ApEventSink -> hi -> I
 mkAction path s _sink _in = mkVoidAction path s
 
 mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
-mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
+mkNodes baseSeed mxThreads = sequence . fmap mkNode
  where
   afterAction :: (Show pth) => pth -> Spec -> b -> IO ()
   afterAction path spec = const $ mkVoidAction path spec
 
-  mkNodes' = mkNodes baseRandomSeed mxThreads
+  mkNodes' = mkNodes baseSeed mxThreads
   mkNode :: T.Template -> IO (P.PreNode IO [] ())
   mkNode t = case t of
     T.Test
@@ -1322,12 +1310,12 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
             , eachSpec
             } ->
               do
-                loadQIfPregen baseRandomSeed tstItemCount path b4Q eachSpec
+                loadQIfPregen baseSeed tstItemCount path b4Q eachSpec
                 pure $
                   P.Before
                     { path
                     , frequency = Each
-                    , action = const . const $ mkManyAction baseRandomSeed b4Q path eachSpec
+                    , action = const . const $ mkManyAction baseSeed b4Q path eachSpec
                     , subNodes = nds
                     }
           T.EachAfter
@@ -1335,12 +1323,12 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
             , eachSpec
             } ->
               do
-                loadQIfPregen baseRandomSeed tstItemCount path afterQ eachSpec
+                loadQIfPregen baseSeed tstItemCount path afterQ eachSpec
                 pure $
                   P.After
                     { path
                     , frequency = Each
-                    , after = const $ mkManyAction baseRandomSeed b4Q path eachSpec
+                    , after = const $ mkManyAction baseSeed b4Q path eachSpec
                     , subNodes' = nds
                     }
           T.EachAround
@@ -1349,14 +1337,14 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
             , eachTeardownSpec
             } ->
               do
-                loadQIfPregen baseRandomSeed tstItemCount path b4Q eachSetupSpec
-                loadQIfPregen baseRandomSeed tstItemCount path afterQ eachTeardownSpec
+                loadQIfPregen baseSeed tstItemCount path b4Q eachSetupSpec
+                loadQIfPregen baseSeed tstItemCount path afterQ eachTeardownSpec
                 pure $
                   P.Around
                     { path
                     , frequency = Each
-                    , setup = const . const $ mkManyAction baseRandomSeed b4Q path eachSetupSpec
-                    , teardown = const . const $ mkManyAction baseRandomSeed afterQ path eachTeardownSpec
+                    , setup = const . const $ mkManyAction baseSeed b4Q path eachSetupSpec
+                    , teardown = const . const $ mkManyAction baseSeed afterQ path eachTeardownSpec
                     , subNodes = nds
                     }
           _ -> case t of
@@ -1365,12 +1353,12 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
               , threadSpec
               } ->
                 do
-                  loadQIfPregen baseRandomSeed mxThrds path b4Q threadSpec
+                  loadQIfPregen baseSeed mxThrds path b4Q threadSpec
                   pure $
                     P.Before
                       { path
                       , frequency = Thread
-                      , action = const . const $ mkManyAction baseRandomSeed b4Q path threadSpec
+                      , action = const . const $ mkManyAction baseSeed b4Q path threadSpec
                       , subNodes = nds
                       }
             T.ThreadAfter
@@ -1378,12 +1366,12 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
               , threadSpec
               } ->
                 do
-                  loadQIfPregen baseRandomSeed mxThrds path afterQ threadSpec
+                  loadQIfPregen baseSeed mxThrds path afterQ threadSpec
                   pure $
                     P.After
                       { path
                       , frequency = Thread
-                      , after = const $ mkManyAction baseRandomSeed b4Q path threadSpec
+                      , after = const $ mkManyAction baseSeed b4Q path threadSpec
                       , subNodes' = nds
                       }
             T.ThreadAround
@@ -1391,24 +1379,17 @@ mkNodes baseRandomSeed mxThreads = sequence . fmap mkNode
               , setupThreadSpec
               , teardownThreadSpec
               } -> do
-                loadQIfPregen baseRandomSeed mxThrds path b4Q setupThreadSpec
-                loadQIfPregen baseRandomSeed mxThrds path afterQ teardownThreadSpec
+                loadQIfPregen baseSeed mxThrds path b4Q setupThreadSpec
+                loadQIfPregen baseSeed mxThrds path afterQ teardownThreadSpec
                 pure $
                   P.Around
                     { path
                     , frequency = Thread
-                    , setup = const . const $ mkManyAction baseRandomSeed b4Q path setupThreadSpec
-                    , teardown = const . const $ mkManyAction baseRandomSeed afterQ path teardownThreadSpec
+                    , setup = const . const $ mkManyAction baseSeed b4Q path setupThreadSpec
+                    , teardown = const . const $ mkManyAction baseSeed afterQ path teardownThreadSpec
                     , subNodes = nds
                     }
 
--- P.Around
---   { path
---   , frequency = Thread
---   , setup = mkB4ThrdAction setupThreadSpec path
---   , teardown = mkTeardownThrdAction teardownThreadSpec path
---   , subNodes = nds
---   }
 data Template
   = OnceBefore
       { spec :: Spec

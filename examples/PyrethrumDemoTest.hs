@@ -146,6 +146,7 @@ items =
     ]
 
 -- ############### Test the Lot Child ###################
+
 config2 :: TestConfig
 config2 = TestConfig "test" DeepRegression
 

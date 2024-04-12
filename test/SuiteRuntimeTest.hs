@@ -81,6 +81,14 @@ defaultSeed = 13579
 -- gen delay
 -- gen result
 
+
+{- As property based tests have been implemented after "unit tests" and there has already been 
+   arbitary behavior implemented with respect to test results and test durations, these properties 
+   will not be subject to to generation or shrinking by the property based testing library. 
+   It would be too much work replace the existing behavior with the property based testing properties
+   for these attributes.
+-}
+
 def :: TestOptions
 def =
   TestOptions
@@ -94,6 +102,7 @@ def =
 demoProp :: (Show a) => String -> Property a -> TestTree
 demoProp label prop = testPropertyWith def label $ prop >>= collect label . pure
 
+-- wont be used delete later
 genResult :: Word -> Property Result
 genResult passPcnt =
   gen $
@@ -105,17 +114,23 @@ genResult passPcnt =
 demoResult :: TestTree
 demoResult = demoProp "result" $ genResult 80
 
+-- wont be used delete later
 genDelay :: Int -> Property Int
 genDelay max' = gen $ inRange $ skewedBy 2 (0, max')
 
 demoDelay :: TestTree
 demoDelay = demoProp "delay" $ genDelay 3000
 
+-- wont be used delete later
 genSpec :: Int -> Word -> Property Spec
 genSpec maxDelay passPcnt = Spec <$> genDelay maxDelay <*> genResult passPcnt
 
 demoSpec :: TestTree
 demoSpec = demoProp "spec" $ genSpec 3000 80
+
+genTemplate :: Word -> Word -> Property Template
+genTemplate maxTests maxbranches = do 
+  uu
 
 -- $> stub_generators
 stub_generators :: IO ()
@@ -127,6 +142,7 @@ stub_generators =
       , demoDelay
       , demoSpec
       ]
+
 
 -- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
 -- TODO: other collection types generator / shrinker

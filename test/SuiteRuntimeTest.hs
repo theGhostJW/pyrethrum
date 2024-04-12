@@ -6,7 +6,7 @@ import Data.Aeson (ToJSON)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (ManySpec (PassProb), Result (..), Spec (..), SuiteEventPath (..))
+import FullSuiteTestTemplate (ManySpec (PassProb), Result (..), Spec (..), SpecGen (..), SuiteEventPath (..), isPreload)
 import FullSuiteTestTemplate qualified as T
 import Internal.RunTimeLogging (ExePath (..), parentPath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
@@ -191,8 +191,8 @@ unit_nested_pass_fail =
         ]
     ]
 
-passProbSuite :: Bool -> IO ()
-passProbSuite preGen =
+passProbSuite :: SpecGen -> IO ()
+passProbSuite specGen =
   runTest
     defaultSeed
     (ThreadCount 1)
@@ -219,7 +219,7 @@ passProbSuite preGen =
         ]
     ]
  where
-  passProb pcnt = T.PassProb preGen pcnt 100 1000
+  passProb pcnt = T.PassProb specGen pcnt 100 1000
   passProb0 = passProb 0
   passProb20 = passProb 20
   passProb50 = passProb 50
@@ -328,26 +328,13 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
   -}
 
-{-
-  the following tests are to make sure all the property checks are working for
-  probability based tests, both with and without pre-generation (preGen)
-
-    If pregenerate is True, a spec is genrated when loading the template prior to the test. The expected test results
-     can be read from the template and can be reconciled by comparing template results to actual
-     results. The the implementation test tree in this mode requires STM which could mask synchronisation bugs.
-
-    If pregenerate is False, the spec is generated when the test is run and we cannot
-     predict, or test for, the test result. There is, however, no STM involved so
-     so we avoid masking synchronisation bugs in testing other properties.
-  -}
-
 -- $ > unit_pass_prob_pregen
 unit_pass_prob_pregen :: IO ()
-unit_pass_prob_pregen = passProbSuite True
+unit_pass_prob_pregen = passProbSuite Preload
 
 -- $ > unit_pass_prob_no_pregen
 unit_pass_prob_no_pregen :: IO ()
-unit_pass_prob_no_pregen = passProbSuite False
+unit_pass_prob_no_pregen = passProbSuite Runtime
 
 type LogItem = ThreadEvent ExePath AE.ApEvent
 
@@ -545,10 +532,10 @@ chkExpectedResults baseSeed threadLimit ts lgs =
     expected =
       case evntSpec of
         T.All Spec{result} -> SuiteRuntimeTest.All result
-        PassProb{preGenerate, passPcnt, minDelay, maxDelay} ->
-          preGenerate
-            ? (Multi $ (.result) <$> generateSpecs baseSeed rLength path passPcnt minDelay maxDelay)
-            $ NonDeterministic
+        PassProb{genStrategy, passPcnt, minDelay, maxDelay} ->
+          case genStrategy of
+            T.Preload -> Multi $ (.result) <$> generateSpecs baseSeed rLength path passPcnt minDelay maxDelay
+            T.Runtime -> NonDeterministic
          where
           rLength = case suiteEvent of
             TE.Test{} -> bug $ "Test not expected to have PassProb spec"
@@ -1191,33 +1178,35 @@ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay =
         , maxDelay
         }
 
-loadQIfPregen :: (Show pth) => Int -> Int -> pth -> TQueue Spec -> ManySpec -> IO ()
-loadQIfPregen baseSeed qLength pth q = \case
+loadQIfPreload :: (Show pth) => Int -> Int -> pth -> TQueue Spec -> ManySpec -> IO ()
+loadQIfPreload baseSeed qLength pth q = \case
   T.All _ -> pure ()
   PassProb
-    { preGenerate
+    { genStrategy
     , passPcnt
     , minDelay
     , maxDelay
     } ->
-      do 
-        when preGenerate .
-          atomically . loadTQueue q $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay
+      do
+        when (isPreload genStrategy)
+          . atomically
+          . loadTQueue q
+          $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay
         pure ()
 
--- assumes th queue is preloaded if pregen is true see loadQIfPregen
+-- assumes th queue is preloaded (ie loadQIfPrload has already been run) if genStrategy == Preload
 mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
 mkManyAction baseSeed q pth = \case
   T.All s -> mkVoidAction pth s
   PassProb
-    { preGenerate
+    { genStrategy
     , passPcnt
     , minDelay
     , maxDelay
     } ->
-      preGenerate
-        ? mkQueAction q pth
-        $ do
+      case genStrategy of
+        Runtime -> mkQueAction q pth
+        Preload -> do
           subSeed <- RS.uniformM RS.globalStdGen :: IO Int
           mkVoidAction pth $
             mkManySpec
@@ -1269,6 +1258,7 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
         afterQ <- newTQueueIO
         let mxThrds = mxThreads.maxThreads
             tstItemCount = T.countTestItems t
+            loadQIfPreload' = loadQIfPreload baseSeed
         case t of
           T.OnceBefore
             { path
@@ -1310,7 +1300,7 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
             , eachSpec
             } ->
               do
-                loadQIfPregen baseSeed tstItemCount path b4Q eachSpec
+                loadQIfPreload' tstItemCount path b4Q eachSpec
                 pure $
                   P.Before
                     { path
@@ -1323,7 +1313,7 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
             , eachSpec
             } ->
               do
-                loadQIfPregen baseSeed tstItemCount path afterQ eachSpec
+                loadQIfPreload' tstItemCount path afterQ eachSpec
                 pure $
                   P.After
                     { path
@@ -1337,8 +1327,8 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
             , eachTeardownSpec
             } ->
               do
-                loadQIfPregen baseSeed tstItemCount path b4Q eachSetupSpec
-                loadQIfPregen baseSeed tstItemCount path afterQ eachTeardownSpec
+                loadQIfPreload' tstItemCount path b4Q eachSetupSpec
+                loadQIfPreload' tstItemCount path afterQ eachTeardownSpec
                 pure $
                   P.Around
                     { path
@@ -1353,7 +1343,7 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
               , threadSpec
               } ->
                 do
-                  loadQIfPregen baseSeed mxThrds path b4Q threadSpec
+                  loadQIfPreload' mxThrds path b4Q threadSpec
                   pure $
                     P.Before
                       { path
@@ -1366,7 +1356,7 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
               , threadSpec
               } ->
                 do
-                  loadQIfPregen baseSeed mxThrds path afterQ threadSpec
+                  loadQIfPreload' mxThrds path afterQ threadSpec
                   pure $
                     P.After
                       { path
@@ -1379,8 +1369,8 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
               , setupThreadSpec
               , teardownThreadSpec
               } -> do
-                loadQIfPregen baseSeed mxThrds path b4Q setupThreadSpec
-                loadQIfPregen baseSeed mxThrds path afterQ teardownThreadSpec
+                loadQIfPreload' mxThrds path b4Q setupThreadSpec
+                loadQIfPreload' mxThrds path afterQ teardownThreadSpec
                 pure $
                   P.Around
                     { path

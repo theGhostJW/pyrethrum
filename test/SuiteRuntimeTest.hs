@@ -177,7 +177,7 @@ genTemplate maxTests maxbranches = do
       , subNodes :: [Template]
       }
   | Test
-      { testItems :: [Spec]
+      { tests :: [Spec]
       }
   
   
@@ -611,7 +611,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
             TE.Test{} -> bug $ "Test not expected to have PassProb spec"
             TE.Hook TE.Once _ -> bug $ "Once  not expected to have PassProb spec"
             TE.Hook TE.Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
-            TE.Hook TE.Each _ -> T.countTestItems template -- expect a result for each test item
+            TE.Hook TE.Each _ -> T.counttests template -- expect a result for each test item
   actuals :: Map SuiteEventPath [LogResult]
   actuals =
     foldl' (M.unionWith (<>)) M.empty allResults
@@ -1126,9 +1126,9 @@ setPaths address ts =
   setPath idx tp =
     case tp of
       SuiteRuntimeTest.Fixture{tests} ->
-        T.Test
+        T.Fixture
           { path = newPath "Test"
-          , testItems = zip [0 ..] tests <&> \(idx', spec) -> T.TestItem{title = newAdd <> " Test", id = idx', ..}
+          , tests = zip [0 ..] tests <&> \(idx', spec) -> T.TestItem{title = newAdd <> " Test", id = idx', ..}
           }
       OnceBefore{..} -> T.OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
       OnceAfter{..} -> T.OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
@@ -1311,15 +1311,15 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
   mkNodes' = mkNodes baseSeed mxThreads
   mkNode :: T.Template -> IO (P.PreNode IO [] ())
   mkNode t = case t of
-    T.Test
+    T.Fixture
       { path
-      , testItems
+      , tests
       } ->
         pure $
           P.Test
             { config = tc
             , path
-            , tests = mkTestItem <$> testItems
+            , tests = mkTestItem <$> tests
             }
     _ ->
       do
@@ -1327,7 +1327,7 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
         b4Q <- newTQueueIO
         afterQ <- newTQueueIO
         let mxThrds = mxThreads.maxThreads
-            tstItemCount = T.countTestItems t
+            tstItemCount = T.counttests t
             loadQIfPreload' = loadQIfPreload baseSeed
         case t of
           T.OnceBefore

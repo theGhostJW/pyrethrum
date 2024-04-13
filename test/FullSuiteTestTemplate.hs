@@ -66,7 +66,7 @@ expectedSuiteEvntMap getSuiteEvnt ts =
   priorMap :: Maybe SuiteEventPath -> Map SuiteEventPath SuiteEventPath -> Template -> Map SuiteEventPath SuiteEventPath
   priorMap mParentEvnt accMap t =
     case t of
-      FullSuiteTestTemplate.Test{testItems} ->
+      FullSuiteTestTemplate.Fixture{tests} ->
         mParentEvnt
           & maybe
             accMap
@@ -79,7 +79,7 @@ expectedSuiteEvntMap getSuiteEvnt ts =
                         Map.insert thisEvtPath parent accMap'
                   )
                   accMap
-                  testItems
+                  tests
             )
       _ ->
         foldl' (priorMap nxtB4Evnt) nxtMap t.subNodes
@@ -100,7 +100,7 @@ expectedSuiteEvntMap getSuiteEvnt ts =
 templateBeforeEvnt :: Template -> Maybe SuiteEvent
 templateBeforeEvnt t =
   case t of
-    FullSuiteTestTemplate.Test{} -> Nothing
+    FullSuiteTestTemplate.Fixture{} -> Nothing
     OnceAfter{} -> Nothing
     ThreadAfter{} -> Nothing
     EachAfter{} -> Nothing
@@ -115,7 +115,7 @@ templateBeforeEvnt t =
 templateAfterEvnt :: Template -> Maybe SuiteEvent
 templateAfterEvnt t =
   case t of
-    FullSuiteTestTemplate.Test{} -> Nothing
+    FullSuiteTestTemplate.Fixture{} -> Nothing
     OnceBefore{} -> Nothing
     ThreadBefore{} -> Nothing
     EachBefore{} -> Nothing
@@ -129,7 +129,7 @@ templateAfterEvnt t =
 
 emittedHooks :: Template -> [SuiteEvent]
 emittedHooks = \case
-  FullSuiteTestTemplate.Test{} -> []
+  FullSuiteTestTemplate.Fixture{} -> []
   OnceBefore{} -> [oh Before]
   OnceAfter{} -> [oh After]
   OnceAround{} -> [oh Setup, oh Teardown]
@@ -193,16 +193,16 @@ data Template
       , eachTeardownSpec :: ManySpec
       , subNodes :: [Template]
       }
-  | Test
+  | Fixture
       { path :: Path
-      , testItems :: [TestItem]
+      , tests :: [TestItem]
       }
   deriving (Show, Eq)
 
-countTestItems :: Template -> Int
-countTestItems t = case t of
-  FullSuiteTestTemplate.Test{testItems} -> length testItems
-  _ -> LE.sum $ countTestItems <$> t.subNodes
+counttests :: Template -> Int
+counttests t = case t of
+  FullSuiteTestTemplate.Fixture{tests} -> length tests
+  _ -> LE.sum $ counttests <$> t.subNodes
 
 data EventPath = EventPath
   { template :: Template
@@ -217,8 +217,8 @@ testItemPath TestItem{..} = TestPath{..}
 
 eventPaths :: Template -> [EventPath]
 eventPaths t = case t of
-  Test{testItems} ->
-    (\ti -> EventPath t (testItemPath ti) TE.Test $ All (ti.spec)) <$> testItems
+  Fixture{tests} ->
+    (\ti -> EventPath t (testItemPath ti) TE.Test $ All (ti.spec)) <$> tests
   _ ->
     let
       recurse = concatMap eventPaths t.subNodes

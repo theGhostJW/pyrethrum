@@ -81,10 +81,9 @@ defaultSeed = 13579
 -- gen delay
 -- gen result
 
-
-{- As property based tests have been implemented after "unit tests" and there has already been 
-   arbitary behavior implemented with respect to test results and test durations, these properties 
-   will not be subject to to generation or shrinking by the property based testing library. 
+{- As property based tests have been implemented after "unit tests" and there has already been
+   arbitary behavior implemented with respect to test results and test durations, these properties
+   will not be subject to to generation or shrinking by the property based testing library.
    It would be too much work replace the existing behavior with the property based testing properties
    for these attributes.
 -}
@@ -128,63 +127,93 @@ genSpec maxDelay passPcnt = Spec <$> genDelay maxDelay <*> genResult passPcnt
 demoSpec :: TestTree
 demoSpec = demoProp "spec" $ genSpec 3000 80
 
-genOnceBefore :: Int -> Word -> Property Template
-genOnceBefore md pp = OnceBefore <$> genSpec md pp <*> pure [] -- ??
+data GenLimits = Contraints
+  { maxTests :: Word
+  , maxBranches :: Word
+  , maxDepth :: Word
+  , minHz :: Hz
+  }
+
+constrain :: GenLimits -> Template -> Bool
+constrain
+  Contraints
+    { maxTests
+    , maxBranches
+    , maxDepth
+    , minHz
+    }
+  t = case t of
+    Fixture{} -> uu
+    _ -> maxDepth < 2 ? False $
+      case t of
+        OnceBefore{} -> uu
+        OnceAfter{} -> uu
+        OnceAround{} -> uu
+        ThreadBefore{} -> uu
+        ThreadAfter{} -> uu
+        ThreadAround{} -> uu
+        EachBefore{} -> uu
+        EachAfter{} -> uu
+        EachAround{} -> uu
+
+genOnceBefore :: Int -> Word -> Int -> Int -> Property Template
+genOnceBefore md pp maxBranches maxDepth = OnceBefore <$> genSpec md pp <*> (pure []) -- ??
+
+{-
+genBST :: forall k v. Ord k => Gen k -> Gen v -> Gen (BST k v)
+genBST k v = fromList <$> Gen.list (Range.between (0, 100)) ((,) <$> k <*> v)
+
+-}
 
 genTemplate :: Word -> Word -> Property Template
-genTemplate maxTests maxbranches = do 
+genTemplate maxTests maxbranches = do
   uu
 
+{-
+OnceBefore
+    { spec :: Spec
+    , subNodes :: [Template]
+    }
+\| OnceAfter
+    { spec :: Spec
+    , subNodes :: [Template]
+    }
+\| OnceAround
+    { setupSpec :: Spec
+    , teardownSpec :: Spec
+    , subNodes :: [Template]
+    }
+\| ThreadBefore
+    { threadSpec :: ManySpec
+    , subNodes :: [Template]
+    }
+\| ThreadAfter
+    { threadSpec :: ManySpec
+    , subNodes :: [Template]
+    }
+\| ThreadAround
+    { setupThreadSpec :: ManySpec
+    , teardownThreadSpec :: ManySpec
+    , subNodes :: [Template]
+    }
+\| EachBefore
+    { eachSpec :: ManySpec
+    , subNodes :: [Template]
+    }
+\| EachAfter
+    { eachSpec :: ManySpec
+    , subNodes :: [Template]
+    }
+\| EachAround
+    { eachSetupSpec :: ManySpec
+    , eachTeardownSpec :: ManySpec
+    , subNodes :: [Template]
+    }
+\| Test
+    { tests :: [Spec]
+    }
 
-  {-
-  OnceBefore
-      { spec :: Spec
-      , subNodes :: [Template]
-      }
-  | OnceAfter
-      { spec :: Spec
-      , subNodes :: [Template]
-      }
-  | OnceAround
-      { setupSpec :: Spec
-      , teardownSpec :: Spec
-      , subNodes :: [Template]
-      }
-  | ThreadBefore
-      { threadSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | ThreadAfter
-      { threadSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | ThreadAround
-      { setupThreadSpec :: ManySpec
-      , teardownThreadSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | EachBefore
-      { eachSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | EachAfter
-      { eachSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | EachAround
-      { eachSetupSpec :: ManySpec
-      , eachTeardownSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | Test
-      { tests :: [Spec]
-      }
-  
-  
-  
-  
-  
-  -}
+-}
 
 -- $> stub_generators
 stub_generators :: IO ()
@@ -196,7 +225,6 @@ stub_generators =
       , demoDelay
       , demoSpec
       ]
-
 
 -- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
 -- TODO: other collection types generator / shrinker

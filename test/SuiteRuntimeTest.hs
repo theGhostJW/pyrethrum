@@ -116,7 +116,7 @@ demoResult = demoProp "result" $ genResult 80
 
 -- wont be used delete later
 genDelay :: Int -> Property Int
-genDelay max' = gen $ inRange $ skewedBy 2 (0, max')
+genDelay maxms = gen $ inRange $ skewedBy 2 (0, maxms)
 
 demoDelay :: TestTree
 demoDelay = demoProp "delay" $ genDelay 3000
@@ -128,9 +128,63 @@ genSpec maxDelay passPcnt = Spec <$> genDelay maxDelay <*> genResult passPcnt
 demoSpec :: TestTree
 demoSpec = demoProp "spec" $ genSpec 3000 80
 
+genOnceBefore :: Int -> Word -> Property Template
+genOnceBefore md pp = OnceBefore <$> genSpec md pp <*> pure [] -- ??
+
 genTemplate :: Word -> Word -> Property Template
 genTemplate maxTests maxbranches = do 
   uu
+
+
+  {-
+  OnceBefore
+      { spec :: Spec
+      , subNodes :: [Template]
+      }
+  | OnceAfter
+      { spec :: Spec
+      , subNodes :: [Template]
+      }
+  | OnceAround
+      { setupSpec :: Spec
+      , teardownSpec :: Spec
+      , subNodes :: [Template]
+      }
+  | ThreadBefore
+      { threadSpec :: ManySpec
+      , subNodes :: [Template]
+      }
+  | ThreadAfter
+      { threadSpec :: ManySpec
+      , subNodes :: [Template]
+      }
+  | ThreadAround
+      { setupThreadSpec :: ManySpec
+      , teardownThreadSpec :: ManySpec
+      , subNodes :: [Template]
+      }
+  | EachBefore
+      { eachSpec :: ManySpec
+      , subNodes :: [Template]
+      }
+  | EachAfter
+      { eachSpec :: ManySpec
+      , subNodes :: [Template]
+      }
+  | EachAround
+      { eachSetupSpec :: ManySpec
+      , eachTeardownSpec :: ManySpec
+      , subNodes :: [Template]
+      }
+  | Test
+      { testItems :: [Spec]
+      }
+  
+  
+  
+  
+  
+  -}
 
 -- $> stub_generators
 stub_generators :: IO ()
@@ -1008,7 +1062,7 @@ eachAround :: Result -> Result -> [Template] -> Template
 eachAround suRslt tdRslt = EachAround (allSpec 0 suRslt) (allSpec 0 tdRslt)
 
 fixture :: [Spec] -> Template
-fixture = SuiteRuntimeTest.Test
+fixture = SuiteRuntimeTest.Fixture
 
 test :: Result -> Spec
 test = Spec 0
@@ -1071,10 +1125,10 @@ setPaths address ts =
   setPath :: Int -> Template -> T.Template
   setPath idx tp =
     case tp of
-      SuiteRuntimeTest.Test{testItems} ->
+      SuiteRuntimeTest.Fixture{tests} ->
         T.Test
           { path = newPath "Test"
-          , testItems = zip [0 ..] testItems <&> \(idx', spec) -> T.TestItem{title = newAdd <> " TestItem", id = idx', ..}
+          , testItems = zip [0 ..] tests <&> \(idx', spec) -> T.TestItem{title = newAdd <> " Test", id = idx', ..}
           }
       OnceBefore{..} -> T.OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
       OnceAfter{..} -> T.OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
@@ -1436,8 +1490,8 @@ data Template
       , eachTeardownSpec :: ManySpec
       , subNodes :: [Template]
       }
-  | Test
-      { testItems :: [Spec]
+  | Fixture
+      { tests :: [Spec]
       }
   deriving (Show, Eq)
 

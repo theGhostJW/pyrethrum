@@ -68,6 +68,14 @@ $(deriveJSON defaultOptions ''TestConfig)
 
 instance C.Config TestConfig
 
+newtype NTHook hz i o = NTHook {unHook :: C.Hook Action RunConfig hz i o}
+
+mkBefore :: (C.Frequency hz) => (RunConfig -> Action o) -> NTHook hz () o
+mkBefore = NTHook . C.Before
+
+mkBefore' :: forall {k1} {k2} {m :: * -> *} {rc} {phz :: k1} {pi} {i1}        {hz :: k2} {i2} {o}. C.Hook m rc phz pi i1 -> NTHook hz i2 o
+mkBefore' = NTHook . C.Before'
+
 data Hook hz when input output where
   BeforeHook ::
     (C.Frequency hz) =>

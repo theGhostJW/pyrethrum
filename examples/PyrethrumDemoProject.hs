@@ -76,6 +76,8 @@ mkBefore = NTHook . C.Before
 mkBefore' :: forall {k1} {k2} {m :: * -> *} {rc} {phz :: k1} {pi} {i1}        {hz :: k2} {i2} {o}. C.Hook m rc phz pi i1 -> NTHook hz i2 o
 mkBefore' = NTHook . C.Before'
 
+-- --------- BaseNodes ---------------
+-- get mapped to core
 data Hook hz when input output where
   BeforeHook ::
     (C.Frequency hz) =>
@@ -171,6 +173,9 @@ data Node i where
     } ->
     Node i
 
+------ Mappings ------
+--- base node -> core ---
+
 mkFixture :: Fixture hi -> C.Fixture Action [] RunConfig TestConfig hi
 mkFixture = \case
   Full{..} -> C.Full{..}
@@ -192,15 +197,15 @@ mkHook = \case
     } ->
       C.Around' (mkHook aroundDepends) setup' teardown'
 
-mkSuite :: Node i -> C.Node Action [] RunConfig TestConfig i
-mkSuite = \case
+mkNode :: Node i -> C.Node Action [] RunConfig TestConfig i
+mkNode = \case
   Hook{..} ->
     C.Hook
       { hook = mkHook hook
-      , subNodes = mkSuite <$> subNodes
+      , subNodes = mkNode <$> subNodes
       , ..
       }
   Fixture{..} -> C.Fixture{fixture = mkFixture fixture, ..}
 
 mkTestRun :: Suite -> [C.Node Action [] RunConfig TestConfig ()]
-mkTestRun tr = mkSuite <$> tr
+mkTestRun tr = mkNode <$> tr

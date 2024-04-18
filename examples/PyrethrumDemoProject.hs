@@ -115,6 +115,61 @@ TODO:
       - split datatypes with conversion typeclasses at project level
 -}
 
+class FixConvert fx hi where 
+  mkFixture' :: fx -> C.Fixture Action [] RunConfig TestConfig hi
+
+data FullFixture where
+  FullFixture ::
+    (C.Item i ds, Show as) =>
+    { config :: TestConfig
+    , action :: RunConfig -> i -> Action as
+    , parse :: as -> Either C.ParseException ds
+    , items :: RunConfig -> [i]
+    } ->
+    FullFixture
+
+
+instance FixConvert FullFixture () where
+  mkFixture' :: FullFixture -> C.Fixture Action [] RunConfig TestConfig ()
+  mkFixture' FullFixture{..} = C.Full{..}
+
+data FullFixture' a where
+  FullFixture' ::
+    (C.Item i ds, Show as, C.Frequency hz) =>
+    { config :: TestConfig
+    , depends :: Hook hz pw pi a
+    , action :: RunConfig -> a -> i -> Action as
+    , parse :: as -> Either C.ParseException ds
+    , items :: RunConfig -> [i]
+    } ->
+    FullFixture' a
+
+instance FixConvert (FullFixture' a) a where
+
+  mkFixture' FullFixture'{
+    config = config', 
+    items = items',
+    action = action',
+    parse = parse',
+    depends} = C.Full' config' (mkHook depends) action' parse' items'
+
+{- !!!!!!!!!!! Abandoning here !!!!!!!!!!!!
+- the next move would require me to  create a typeclass of HookConvert and depends would need to be changed
+   depends :: Hook hz pw pi a changed to something like:
+     (HookConvert (hk hz pw pi) a) =>
+     depends :: hk hz pw pi a
+
+     then the subnodes of the hook would have to be instances of mkFixture because all these nodes are now different types
+     and the type signature of subNodes would still have the same type as subnodes in core. I sure there would be some neater 
+     solution given enough time spent but its looking pretty horrible as a way of just simplifying record field names.
+      subNodes = [
+        mkFixture node1,
+        mkFixture node2,
+        mkFixture node3,
+       ]
+
+-}
+
 data Fixture hi where
   Full ::
     (C.Item i ds, Show as) =>

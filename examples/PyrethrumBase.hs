@@ -1,13 +1,33 @@
-module PyrethrumDemoProject where
+module PyrethrumBase (
+  Action,
+  Depth (..),
+  Fixture (..),
+  Hook (..),
+  LogEffs,
+  Node (..),
+  RunConfig (..),
+  Suite,
+  TestConfig (..),
+  testConfig,
+) where
 
 import Core qualified as C
 import DSL.FileSystemEffect (FSException, FileSystem)
 import DSL.Internal.ApEvent (ApEvent)
 import DSL.Internal.ApEvent qualified as AE
 import DSL.Out (Out)
-import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Effectful (Eff, IOE, type (:>))
 import Effectful.Error.Static as E (Error)
+import PyrethrumConfigTypes as CG
+    ( Depth(..), RunConfig(..), TestConfig(..), testConfig ) 
+
+{-
+TODO:
+      - UX of after hook looks sus
+       - how do I do a test with an each in and a once after
+       - once after and thread after
+      - split datatypes with conversion typeclasses at project level
+-}
 
 type Action = Eff ApEffs
 type HasLog es = Out ApEvent :> es
@@ -16,60 +36,8 @@ type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException 
 type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
 type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
 
-data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum, Bounded)
-$(deriveJSON defaultOptions ''Environment)
 
-data Country = AU | NZ deriving (Show, Eq, Ord, Enum)
-$(deriveJSON defaultOptions ''Country)
 
-data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show, Eq, Ord, Enum)
-$(deriveJSON defaultOptions ''Depth)
-
-data RunConfig = RunConfig
-  { title :: Text
-  , environment :: Environment
-  , maxThreads :: Int
-  , country :: Country
-  , depth :: Depth
-  }
-  deriving (Eq, Show)
-
-$(deriveJSON defaultOptions ''RunConfig)
-
-instance C.Config RunConfig
-
-data TestConfig = TestConfig
-  { title :: Text
-  , depth :: Depth
-  }
-  deriving (Show, Eq)
-
-newtype DefaultCfg = DefaultCfg
-  { depth :: Depth
-  }
-  deriving (Show, Eq)
-
-defaults :: DefaultCfg
-defaults =
-  DefaultCfg
-    { depth = DeepRegression
-    }
-
-testConfig :: Text -> TestConfig
-testConfig title =
-  mkFull defaults
- where
-  mkFull DefaultCfg{..} =
-    TestConfig
-      { ..
-      }
-
-$(deriveJSON defaultOptions ''TestConfig)
-
-instance C.Config TestConfig
-
--- --------- BaseNodes ---------------
--- get mapped to core
 data Hook hz when input output where
   BeforeHook ::
     (C.Frequency hz) =>
@@ -106,14 +74,6 @@ data Hook hz when input output where
     , teardown' :: RunConfig -> o -> Action ()
     } ->
     Hook hz C.Around i o
-
-{-
-TODO:
-      - UX of after hook looks sus
-       - how do I do a test with an each in and a once after
-       - once after and thread after
-      - split datatypes with conversion typeclasses at project level
--}
 
 data Fixture hi where
   Full ::

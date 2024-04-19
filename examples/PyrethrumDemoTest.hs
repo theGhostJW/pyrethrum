@@ -5,7 +5,7 @@ import Core (After, Around, Before, Each, Once, ParseException, Thread)
 import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
 import DSL.Out (Out, out)
 import Effectful (Eff, (:>))
-import PyrethrumDemoProject (
+import PyrethrumBase (
   Action,
   Depth (..),
   Fixture (..),

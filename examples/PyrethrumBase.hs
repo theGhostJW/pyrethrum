@@ -9,6 +9,7 @@ module PyrethrumBase (
   Suite,
   TestConfig (..),
   testConfig,
+  HasLog
 ) where
 
 import Core qualified as C
@@ -29,6 +30,7 @@ TODO:
       - split datatypes with conversion typeclasses at project level
 -}
 
+--  these wi;ll probably be split off and go into core later
 type Action = Eff ApEffs
 type HasLog es = Out ApEvent :> es
 type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a
@@ -125,7 +127,7 @@ data Node i where
     } ->
     Node i
 
------- Mappings ------
+------ Mappings will be exported used later ------
 --- base node -> core ---
 
 mkFixture :: Fixture hi -> C.Fixture Action [] RunConfig TestConfig hi

@@ -9,6 +9,7 @@ import PyrethrumBase (
   Action,
   Depth (..),
   Fixture (..),
+  HasLog,
   Hook (..),
   LogEffs,
   Node (..),
@@ -24,7 +25,7 @@ Note:: tried alternative with individual hook types but the results
 were starting to look more complex than the original so abandonned.
 -}
 
-log :: (Out ApEvent :> es) => Text -> Eff es ()
+log :: (HasLog es) => Text -> Eff es ()
 log = out . User . Log
 
 {- Demonstraits using partial effect
@@ -239,7 +240,6 @@ test4 =
           ]
     }
 
-
 -- ############### Construct Tests ###################
 -- this will be generated either by implmenting deriving,
 -- check out DeriveAnyClass or template haskell
@@ -292,8 +292,8 @@ suite =
                                       { path = NodePath "module" "name"
                                       , hook = eachAfter
                                       , subNodes =
-                                          [ Fixture (NodePath "module" "testName") test4,
-                                            Fixture (NodePath "module" "testName") test3
+                                          [ Fixture (NodePath "module" "testName") test4
+                                          , Fixture (NodePath "module" "testName") test3
                                           ]
                                       }
                                   ]

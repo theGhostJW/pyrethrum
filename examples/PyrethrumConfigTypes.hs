@@ -1,14 +1,7 @@
 module PyrethrumConfigTypes where
 
 import Core qualified as C
-import DSL.FileSystemEffect (FSException, FileSystem)
-import DSL.Internal.ApEvent (ApEvent)
-import DSL.Internal.ApEvent qualified as AE
-import DSL.Out (Out)
 import Data.Aeson.TH (defaultOptions, deriveJSON)
-import Effectful (Eff, IOE, type (:>))
-import Effectful.Error.Static as E (Error)
-
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum, Bounded)
 $(deriveJSON defaultOptions ''Environment)

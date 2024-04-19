@@ -48,10 +48,10 @@ import Prelude qualified as PR
 import Data.Hashable qualified as H
 import System.Random qualified as R
 import System.Random.Stateful qualified as RS
-import Test.Falsify.Generator as G (frequency, inRange, Gen, list)
+import Test.Falsify.Generator as G (Gen, frequency, inRange, list)
 import Test.Falsify.Predicate qualified as FP
 import Test.Falsify.Property as P (Property, collect, gen)
-import Test.Falsify.Range (skewedBy, between)
+import Test.Falsify.Range (between, skewedBy)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Falsify (ExpectFailure (DontExpectFailure), TestOptions (..), testPropertyWith)
 
@@ -94,7 +94,7 @@ def =
     { expectFailure = DontExpectFailure
     , overrideVerbose = Nothing
     , overrideMaxShrinks = Nothing
-    , overrideNumTests = Just 1000
+    , overrideNumTests = Just 1
     , overrideMaxRatio = Nothing
     }
 
@@ -103,10 +103,10 @@ demoProp label gen' = testPropertyWith def label $ (gen gen') >>= collect label 
 
 genResult :: Word -> Gen Result
 genResult passPcnt =
-    frequency
-      [ (passPcnt, pure Pass)
-      , (100 - passPcnt, pure Fail)
-      ]
+  frequency
+    [ (passPcnt, pure Pass)
+    , (100 - passPcnt, pure Fail)
+    ]
 
 demoResult :: TestTree
 demoResult = demoProp "result" $ genResult 80
@@ -123,8 +123,9 @@ genSpec maxDelay passPcnt = Spec <$> genDelay maxDelay <*> genResult passPcnt
 demoSpec :: TestTree
 demoSpec = demoProp "spec" $ genSpec 3000 80
 
-data GenLimits = Contraints
-  { maxTests :: Word
+data GenParams = GenParams
+  { genStrategy :: SpecGen
+  , maxTests :: Word
   , maxBranches :: Word
   , maxDelay :: Int
   , passPcnt :: Word
@@ -132,70 +133,56 @@ data GenLimits = Contraints
   , minHz :: Hz
   }
 
-
--- constrain :: GenLimits -> Template -> Bool
--- constrain
---   Contraints
---     { 
---      maxDepth
---     , minHz
---     }
---   t = case t of
---     Fixture{} -> True
---     _ -> maxDepth < 2 ? False $
---       case t of
---         OnceBefore{} -> minHz == Once
---         OnceAfter{} -> minHz == Once
---         OnceAround{} -> minHz == Once
---         ThreadBefore{} -> minHz < Each
---         ThreadAfter{} -> minHz < Each
---         ThreadAround{} -> minHz < Each
---         EachBefore{} -> True
---         EachAfter{} -> True
---         EachAround{} -> True
-
-genNode :: GenLimits -> Gen Template
-genNode gl@Contraints {maxDepth, minHz, maxDelay, passPcnt} =  
+genNode :: GenParams -> Gen Template
+genNode gl@GenParams{genStrategy, maxDepth, minHz, maxDelay, maxBranches, maxTests, passPcnt} =
+  frequency
+    [ (fixtureWeight, genFixture)
+    , (eachWeight, genEachBefore)
+    , (eachWeight, genEachAfter)
+    , (eachWeight, genEachAround)
+    , (onceWeight, genOnceBefore)
+    , (onceWeight, genOnceAfter)
+    , (onceWeight, genOnceAround)
+    , (threadWeight, genThreadBefore)
+    , (threadWeight, genThreadAfter)
+    , (threadWeight, genThreadAround)
+    ]
+ where
+  hkWeight = 10
+  isLeaf = maxDepth < 2
+  onceWeight = minHz > Once || isLeaf ? 0 $ hkWeight
+  threadWeight = minHz > Thread || isLeaf ? 0 $ hkWeight
+  eachWeight = maxDepth < 2 ? 0 $ hkWeight
+  fixtureWeight = 100 - (onceWeight + threadWeight + eachWeight)
+  nxtLimits = gl{maxDepth = maxDepth - 1}
+  genSubnodes = list (between (1, maxBranches))
+  genOnceSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Once})
+  genSpec' = genSpec maxDelay passPcnt
+  genSpec'' = genSpec maxDelay passPcnt
+  genOnceBefore = OnceBefore <$> genSpec' <*> genOnceSubnodes
+  genOnceAfter = OnceAfter <$> genSpec' <*> genOnceSubnodes
+  genOnceAround = OnceAround <$> genSpec' <*> genSpec'' <*> genOnceSubnodes
+  genThreadSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Thread})
+  genManySpec =
     frequency
       [ 
-       (fixtureWeight, genFixture)
-      , (eachWeight, genEachBefore)
-      , (eachWeight, genEachAfter)
-      , (eachWeight, genEachAround)
-      , (onceWeight, genOnceBefore)
-      , (onceWeight, genOnceAfter)
-      , (onceWeight, genOnceAround)
-      , (threadWeight, genThreadBefore)
-      , (threadWeight, genThreadAfter)
-      , (threadWeight, genThreadAround)
+        (10, T.All <$> genSpec'),
+        (90, T.PassProb genStrategy <$> (inRange $ between (fromIntegral passPcnt, 0)) <*> genDelay 0 <*> genDelay maxDelay)
       ]
-    where 
-      hkWeight = 10
-      isLeaf = maxDepth < 2
-      onceWeight = minHz > Once || isLeaf ? 0 $ hkWeight
-      threadWeight = minHz > Thread || isLeaf ? 0 $ hkWeight
-      eachWeight = maxDepth < 2 ? 0 $ hkWeight
-      fixtureWeight = 100 - (onceWeight + threadWeight + eachWeight)
-      nxtLimits = gl {maxDepth = maxDepth - 1}
-      genSubnodes = list (between (1,4)) 
-      genOnceSubnodes = genSubnodes $ genNode (nxtLimits {minHz = Once})
-      genSpec' = genSpec maxDelay passPcnt
-      genSpec'' = genSpec maxDelay passPcnt
-      genOnceBefore = OnceBefore <$> genSpec' <*> genOnceSubnodes
-      genOnceAfter = OnceAfter <$> genSpec' <*> genOnceSubnodes
-      genOnceAround = OnceAround <$> genSpec' <*> genSpec'' <*> genOnceSubnodes
-      genThreadSubnodes = genSubnodes $ genNode (nxtLimits {minHz = Thread})
-      genThreadBefore = uu
-      genThreadAfter = uu
-      genThreadAround = uu
-      genEachSubnodes = genSubnodes $ genNode (nxtLimits {minHz = Each})
-      genEachBefore = uu
-      genEachAfter = uu
-      genEachAround = uu
-      genFixture = uu
-
-
-
+  genManySpec' =
+    frequency
+      [ 
+        (10, T.All <$> genSpec'),
+        (90, T.PassProb genStrategy <$> (inRange $ between (fromIntegral passPcnt, 0)) <*> genDelay 0 <*> genDelay maxDelay)
+      ]
+  genThreadBefore = ThreadBefore <$> genManySpec <*> genThreadSubnodes
+  genThreadAfter = ThreadAfter <$> genManySpec <*> genThreadSubnodes
+  genThreadAround = ThreadAround <$> genManySpec <*> genManySpec' <*> genThreadSubnodes
+  genEachSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Each})
+  genEachBefore = EachBefore <$> genManySpec <*> genEachSubnodes
+  genEachAfter = EachAfter <$> genManySpec <*> genEachSubnodes
+  genEachAround =  EachAround <$> genManySpec <*> genManySpec' <*> genEachSubnodes
+  genFixture = Fixture <$> (list (between (1, maxTests)) $ genSpec')
 
 {-
 genBST :: forall k v. Ord k => Gen k -> Gen v -> Gen (BST k v)
@@ -203,55 +190,22 @@ genBST k v = fromList <$> Gen.list (Range.between (0, 100)) ((,) <$> k <*> v)
 
 -}
 
-genTemplate :: Word -> Word -> Property Template
-genTemplate maxTests maxbranches = do
-  uu
+genParams :: GenParams
+genParams = GenParams
+  { genStrategy = Preload
+  , maxTests = 20
+  , maxBranches = 4
+  , maxDelay = 1000
+  , passPcnt = 90
+  , maxDepth = 5
+  , minHz = Once
+  }
 
-{-
-OnceBefore
-    { spec :: Spec
-    , subNodes :: [Template]
-    }
-\| OnceAfter
-    { spec :: Spec
-    , subNodes :: [Template]
-    }
-\| OnceAround
-    { setupSpec :: Spec
-    , teardownSpec :: Spec
-    , subNodes :: [Template]
-    }
-\| ThreadBefore
-    { threadSpec :: ManySpec
-    , subNodes :: [Template]
-    }
-\| ThreadAfter
-    { threadSpec :: ManySpec
-    , subNodes :: [Template]
-    }
-\| ThreadAround
-    { setupThreadSpec :: ManySpec
-    , teardownThreadSpec :: ManySpec
-    , subNodes :: [Template]
-    }
-\| EachBefore
-    { eachSpec :: ManySpec
-    , subNodes :: [Template]
-    }
-\| EachAfter
-    { eachSpec :: ManySpec
-    , subNodes :: [Template]
-    }
-\| EachAround
-    { eachSetupSpec :: ManySpec
-    , eachTeardownSpec :: ManySpec
-    , subNodes :: [Template]
-    }
-\| Test
-    { tests :: [Spec]
-    }
+genTemplate :: GenParams -> Gen [Template]
+genTemplate p = list (between (1, p.maxBranches)) $ genNode p
 
--}
+demoTemplate :: TestTree
+demoTemplate = demoProp "template" $ genTemplate genParams
 
 -- $> stub_generators
 stub_generators :: IO ()
@@ -259,9 +213,11 @@ stub_generators =
   defaultMain $
     testGroup
       "generator stubs"
-      [ demoResult
-      , demoDelay
-      , demoSpec
+      [ 
+      --   demoResult
+      -- , demoDelay
+      -- , demoSpec
+       demoTemplate
       ]
 
 -- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)

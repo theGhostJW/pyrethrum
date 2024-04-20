@@ -46,14 +46,22 @@ import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
 
 import Data.Hashable qualified as H
-import System.Random qualified as R
 import System.Random.Stateful qualified as RS
 import Test.Falsify.Generator as G (Gen, frequency, inRange, list)
 import Test.Falsify.Predicate qualified as FP
-import Test.Falsify.Property as P (Property, collect, gen)
-import Test.Falsify.Range (between, skewedBy)
+
+import Test.Falsify.Range (between, skewedBy, withOrigin)
 import Test.Tasty (TestTree, defaultMain, testGroup)
-import Test.Tasty.Falsify (ExpectFailure (DontExpectFailure), TestOptions (..), testPropertyWith)
+import Test.Tasty.Falsify (
+  ExpectFailure (DontExpectFailure),
+  TestOptions (..),
+  Verbose (Verbose),
+  assert,
+  collect,
+  gen,
+  genWith,
+  testPropertyWith,
+ )
 
 {-
  - each fail
@@ -92,7 +100,7 @@ def :: TestOptions
 def =
   TestOptions
     { expectFailure = DontExpectFailure
-    , overrideVerbose = Nothing
+    , overrideVerbose = Just Verbose
     , overrideMaxShrinks = Nothing
     , overrideNumTests = Just 1
     , overrideMaxRatio = Nothing
@@ -129,12 +137,21 @@ data GenParams = GenParams
   , maxBranches :: Word
   , maxDelay :: Int
   , passPcnt :: Word
+  , hookPassPcnt :: Word
   , maxDepth :: Word
   , minHz :: Hz
   }
 
+{- All constructors
 genNode :: GenParams -> Gen Template
-genNode gl@GenParams{genStrategy, maxDepth, minHz, maxDelay, maxBranches, maxTests, passPcnt} =
+genNode gl@GenParams{genStrategy, 
+  maxDepth, 
+  minHz, 
+  maxDelay, 
+  maxBranches, 
+  maxTests, 
+  hookPassPcnt,
+  passPcnt} =
   frequency
     [ (fixtureWeight, genFixture)
     , (eachWeight, genEachBefore)
@@ -148,12 +165,11 @@ genNode gl@GenParams{genStrategy, maxDepth, minHz, maxDelay, maxBranches, maxTes
     , (threadWeight, genThreadAround)
     ]
  where
-  hkWeight = 10
-  isLeaf = maxDepth < 2
-  onceWeight = minHz > Once || isLeaf ? 0 $ hkWeight
-  threadWeight = minHz > Thread || isLeaf ? 0 $ hkWeight
-  eachWeight = maxDepth < 2 ? 0 $ hkWeight
-  fixtureWeight = 100 - (onceWeight + threadWeight + eachWeight)
+  hkWeight = maxDepth < 2 ? 0 $ 10
+  onceWeight = minHz > Once ? 0 $ hkWeight
+  threadWeight = minHz > Thread ? 0 $ hkWeight
+  eachWeight = hkWeight
+  fixtureWeight = 100 - (onceWeight + threadWeight + eachWeight) * 2
   nxtLimits = gl{maxDepth = maxDepth - 1}
   genSubnodes = list (between (1, maxBranches))
   genOnceSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Once})
@@ -165,15 +181,13 @@ genNode gl@GenParams{genStrategy, maxDepth, minHz, maxDelay, maxBranches, maxTes
   genThreadSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Thread})
   genManySpec =
     frequency
-      [ 
-        (10, T.All <$> genSpec'),
-        (90, T.PassProb genStrategy <$> (inRange $ between (fromIntegral passPcnt, 0)) <*> genDelay 0 <*> genDelay maxDelay)
+      [ (10, T.All <$> genSpec')
+      , (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$>  genDelay maxDelay)
       ]
   genManySpec' =
     frequency
-      [ 
-        (10, T.All <$> genSpec'),
-        (90, T.PassProb genStrategy <$> (inRange $ between (fromIntegral passPcnt, 0)) <*> genDelay 0 <*> genDelay maxDelay)
+      [ (10, T.All <$> genSpec')
+      , (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$> genDelay maxDelay)
       ]
   genThreadBefore = ThreadBefore <$> genManySpec <*> genThreadSubnodes
   genThreadAfter = ThreadAfter <$> genManySpec <*> genThreadSubnodes
@@ -181,31 +195,76 @@ genNode gl@GenParams{genStrategy, maxDepth, minHz, maxDelay, maxBranches, maxTes
   genEachSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Each})
   genEachBefore = EachBefore <$> genManySpec <*> genEachSubnodes
   genEachAfter = EachAfter <$> genManySpec <*> genEachSubnodes
-  genEachAround =  EachAround <$> genManySpec <*> genManySpec' <*> genEachSubnodes
+  genEachAround = EachAround <$> genManySpec <*> genManySpec' <*> genEachSubnodes
+  genFixture = Fixture <$> (list (between (1, maxTests)) $ genSpec')
+-}
+
+{- simplified -}
+{- Reddit post: 
+   https://www.reddit.com/r/haskell/comments/1bsnpk2/comment/l0iw3bf/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button 
+-}
+genNode :: GenParams -> Gen Template
+genNode gl@GenParams{genStrategy, 
+  maxDepth, 
+  minHz, 
+  maxDelay, 
+  maxBranches, 
+  maxTests, 
+  hookPassPcnt,
+  passPcnt} =
+  frequency
+    [ (fixtureWeight, genFixture)
+    , (onceWeight, genOnceBefore)
+    , (threadWeight, genThreadBefore)
+    ]
+ where
+  hkWeight = maxDepth < 2 ? 0 $ 10
+  onceWeight = minHz > Once ? 0 $ hkWeight
+  threadWeight = minHz > Thread ? 0 $ hkWeight
+  fixtureWeight = 100 - (onceWeight + threadWeight) * 2
+  nxtLimits = gl{maxDepth = maxDepth - 1}
+  genSubnodes = list (between (1, maxBranches))
+  genOnceSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Once})
+  genSpec' = genSpec maxDelay passPcnt
+  genOnceBefore = OnceBefore <$> genSpec' <*> genOnceSubnodes
+  genThreadSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Thread})
+  genManySpec =
+    frequency
+      [ (10, T.All <$> genSpec')
+      , (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$>  genDelay maxDelay)
+      ]
+  genThreadBefore = ThreadBefore <$> genManySpec <*> genThreadSubnodes
   genFixture = Fixture <$> (list (between (1, maxTests)) $ genSpec')
 
 {-
 genBST :: forall k v. Ord k => Gen k -> Gen v -> Gen (BST k v)
 genBST k v = fromList <$> Gen.list (Range.between (0, 100)) ((,) <$> k <*> v)
-
 -}
 
 genParams :: GenParams
-genParams = GenParams
-  { genStrategy = Preload
-  , maxTests = 20
-  , maxBranches = 4
-  , maxDelay = 1000
-  , passPcnt = 90
-  , maxDepth = 5
-  , minHz = Once
-  }
+genParams =
+  GenParams
+    { genStrategy = Preload
+    , maxTests = 20
+    , maxBranches = 4
+    , maxDelay = 1000
+    , passPcnt = 90
+    , hookPassPcnt = 95
+    , maxDepth = 5
+    , minHz = Once
+    }
 
 genTemplate :: GenParams -> Gen [Template]
 genTemplate p = list (between (1, p.maxBranches)) $ genNode p
 
-demoTemplate :: TestTree
-demoTemplate = demoProp "template" $ genTemplate genParams
+-- demoTemplate :: TestTree
+-- demoTemplate :: Gen ()
+
+-- $ > demoTemplateShrinking
+demoTemplateShrinking :: TestTree
+demoTemplateShrinking = testPropertyWith def "Template" $ do
+  genWith (Just . ppShow) $ genTemplate genParams
+  assert $ FP.alwaysFail
 
 -- $> stub_generators
 stub_generators :: IO ()
@@ -213,11 +272,10 @@ stub_generators =
   defaultMain $
     testGroup
       "generator stubs"
-      [ 
-      --   demoResult
-      -- , demoDelay
-      -- , demoSpec
-       demoTemplate
+      [ --   demoResult
+        -- , demoDelay
+        -- , demoSpec
+        demoTemplateShrinking
       ]
 
 -- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)

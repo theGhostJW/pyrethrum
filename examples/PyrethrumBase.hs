@@ -30,7 +30,7 @@ TODO:
       - split datatypes with conversion typeclasses at project level
 -}
 
---  these wi;ll probably be split off and go into core later
+--  these will probably be split off and go into core later
 type Action = Eff ApEffs
 type HasLog es = Out ApEvent :> es
 type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a

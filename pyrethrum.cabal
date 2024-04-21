@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: abd575e13ef1ae619f5a67a4486b0d929e1d0c26a539b4f9888e2729abb8ab17
+-- hash: df92495f5d239bac38c580c378b3bb26ef32da7f9ef4b3cd5fef05ecbceb3cdc
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -102,7 +102,9 @@ library
       FullSuiteTestTemplate
       LogListCheck
       RunnerTest
+      SuiteRuntimePropTest
       SuiteRuntimeTest
+      SuiteRuntimeTestBase
       EffectfulDemoSpeakEffect
       EffectfulDemoSpeakIOInterpreterDynamic
       IOEffectDemo

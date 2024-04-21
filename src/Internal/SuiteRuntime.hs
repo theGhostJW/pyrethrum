@@ -7,7 +7,7 @@ import Internal.RunTimeLogging qualified as L
 import Internal.ThreadEvent qualified as F (Hz (..))
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
-import PyrethrumExtras (catchAll, debug', txt, (?))
+import PyrethrumExtras (catchAll, txt, (?))
 import UnliftIO (
   concurrently_,
   finally,

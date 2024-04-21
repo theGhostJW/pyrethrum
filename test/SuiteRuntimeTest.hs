@@ -204,42 +204,25 @@ genNode gl@GenParams{genStrategy,
    https://www.reddit.com/r/haskell/comments/1bsnpk2/comment/l0iw3bf/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button 
 -}
 genNode :: GenParams -> Gen Template
-genNode gl@GenParams{genStrategy, 
+genNode gl@GenParams{
   maxDepth, 
-  minHz, 
   maxDelay, 
   maxBranches, 
   maxTests, 
-  hookPassPcnt,
   passPcnt} =
   frequency
     [ (fixtureWeight, genFixture)
-    , (onceWeight, genOnceBefore)
-    , (threadWeight, genThreadBefore)
+    , (hkWeight, genOnceBefore)
     ]
  where
-  hkWeight = maxDepth < 2 ? 0 $ 10
-  onceWeight = minHz > Once ? 0 $ hkWeight
-  threadWeight = minHz > Thread ? 0 $ hkWeight
-  fixtureWeight = 100 - (onceWeight + threadWeight) * 2
+  hkWeight = 20
+  fixtureWeight = 100 - hkWeight * 2
   nxtLimits = gl{maxDepth = maxDepth - 1}
   genSubnodes = list (between (1, maxBranches))
   genOnceSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Once})
   genSpec' = genSpec maxDelay passPcnt
   genOnceBefore = OnceBefore <$> genSpec' <*> genOnceSubnodes
-  genThreadSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Thread})
-  genManySpec =
-    frequency
-      [ (10, T.All <$> genSpec')
-      , (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$>  genDelay maxDelay)
-      ]
-  genThreadBefore = ThreadBefore <$> genManySpec <*> genThreadSubnodes
   genFixture = Fixture <$> (list (between (1, maxTests)) $ genSpec')
-
-{-
-genBST :: forall k v. Ord k => Gen k -> Gen v -> Gen (BST k v)
-genBST k v = fromList <$> Gen.list (Range.between (0, 100)) ((,) <$> k <*> v)
--}
 
 genParams :: GenParams
 genParams =
@@ -256,9 +239,6 @@ genParams =
 
 genTemplate :: GenParams -> Gen [Template]
 genTemplate p = list (between (1, p.maxBranches)) $ genNode p
-
--- demoTemplate :: TestTree
--- demoTemplate :: Gen ()
 
 -- $ > demoTemplateShrinking
 demoTemplateShrinking :: TestTree

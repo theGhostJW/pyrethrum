@@ -1,6 +1,6 @@
+{-# OPTIONS_GHC -fno-cse #-}
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
 {-# OPTIONS_GHC -fno-full-laziness #-}
-{-# OPTIONS_GHC -fno-cse #-}
 
 module SuiteRuntimePropTest where
 
@@ -11,12 +11,17 @@ import PyrethrumExtras
 import SuiteRuntimeTestBase
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
-import Text.Show.Pretty (pPrint, ppShow)
-import Prelude hiding (All, bug, id)
+
 import System.Random.Stateful qualified as RS
 import Test.Falsify.Generator as G (Gen, frequency, inRange, list)
 import Test.Falsify.Predicate qualified as FP
+import Text.Show.Pretty (pPrint, ppShow)
+import Prelude hiding (All, bug, id)
 
+import BasePrelude (unsafePerformIO)
+import Data.Either.Extra
+import Internal.SuiteRuntime (ThreadCount (..))
+import Internal.ThreadEvent (Hz (..))
 import Test.Falsify.Range (between, skewedBy)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Falsify (
@@ -29,11 +34,7 @@ import Test.Tasty.Falsify (
   genWith,
   testPropertyWith,
  )
-import Internal.ThreadEvent (Hz (..))
-import Internal.SuiteRuntime (ThreadCount (..))
-import Extra (mapLeft)
 import UnliftIO (tryAny)
-import BasePrelude (unsafePerformIO)
 
 {-
  - each fail
@@ -66,14 +67,14 @@ genPlay = do
 -}
 
 {- simplified
-   Reddit post: 
-   https://www.reddit.com/r/haskell/comments/1bsnpk2/comment/l0iw3bf/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button 
+   Reddit post:
+   https://www.reddit.com/r/haskell/comments/1bsnpk2/comment/l0iw3bf/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 genNode :: GenParams -> Gen Template
 genNode gl@GenParams{
-  maxDepth, 
-  maxDelay, 
-  maxBranches, 
-  maxTests, 
+  maxDepth,
+  maxDelay,
+  maxBranches,
+  maxTests,
   passPcnt} =
   frequency
     [ (fixtureWeight, genFixture)
@@ -96,7 +97,7 @@ def =
     { expectFailure = DontExpectFailure
     , overrideVerbose = Just Verbose
     , overrideMaxShrinks = Nothing
-    , overrideNumTests = Just 1
+    , overrideNumTests = Just 10
     , overrideMaxRatio = Nothing
     }
 
@@ -136,62 +137,63 @@ data GenParams = GenParams
   , minHz :: Hz
   }
 
-
 genNode :: GenParams -> Gen Template
-genNode gl@GenParams{genStrategy, 
-  maxDepth, 
-  minHz, 
-  maxDelay, 
-  maxBranches, 
-  maxTests, 
-  hookPassPcnt,
-  passPcnt} =
-  frequency
-    [ (fixtureWeight, genFixture)
-    , (eachWeight, genEachBefore)
-    , (eachWeight, genEachAfter)
-    , (eachWeight, genEachAround)
-    , (onceWeight, genOnceBefore)
-    , (onceWeight, genOnceAfter)
-    , (onceWeight, genOnceAround)
-    , (threadWeight, genThreadBefore)
-    , (threadWeight, genThreadAfter)
-    , (threadWeight, genThreadAround)
-    ]
- where
-  hkWeight = maxDepth < 2 ? 0 $ 10
-  onceWeight = minHz > Once ? 0 $ hkWeight
-  threadWeight = minHz > Thread ? 0 $ hkWeight
-  eachWeight = hkWeight
-  fixtureWeight = 100 - (onceWeight + threadWeight + eachWeight) * 2
-  nxtLimits = gl{maxDepth = maxDepth - 1}
-  genSubnodes = list (between (1, maxBranches))
-  genOnceSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Once})
-  genSpec' = genSpec maxDelay passPcnt
-  genSpec'' = genSpec maxDelay passPcnt
-  genOnceBefore = OnceBefore <$> genSpec' <*> genOnceSubnodes
-  genOnceAfter = OnceAfter <$> genSpec' <*> genOnceSubnodes
-  genOnceAround = OnceAround <$> genSpec' <*> genSpec'' <*> genOnceSubnodes
-  genThreadSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Thread})
-  genManySpec =
+genNode
+  gl@GenParams
+    { genStrategy
+    , maxDepth
+    , minHz
+    , maxDelay
+    , maxBranches
+    , maxTests
+    , hookPassPcnt
+    , passPcnt
+    } =
     frequency
-      [ (10, T.All <$> genSpec')
-      , (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$>  genDelay maxDelay)
+      [ (fixtureWeight, genFixture)
+      , (eachWeight, genEachBefore)
+      , (eachWeight, genEachAfter)
+      , (eachWeight, genEachAround)
+      , (onceWeight, genOnceBefore)
+      , (onceWeight, genOnceAfter)
+      , (onceWeight, genOnceAround)
+      , (threadWeight, genThreadBefore)
+      , (threadWeight, genThreadAfter)
+      , (threadWeight, genThreadAround)
       ]
-  genManySpec' =
-    frequency
-      [ (10, T.All <$> genSpec')
-      , (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$> genDelay maxDelay)
-      ]
-  genThreadBefore = ThreadBefore <$> genManySpec <*> genThreadSubnodes
-  genThreadAfter = ThreadAfter <$> genManySpec <*> genThreadSubnodes
-  genThreadAround = ThreadAround <$> genManySpec <*> genManySpec' <*> genThreadSubnodes
-  genEachSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Each})
-  genEachBefore = EachBefore <$> genManySpec <*> genEachSubnodes
-  genEachAfter = EachAfter <$> genManySpec <*> genEachSubnodes
-  genEachAround = EachAround <$> genManySpec <*> genManySpec' <*> genEachSubnodes
-  genFixture = Fixture <$> (list (between (1, maxTests)) $ genSpec')
-
+   where
+    hkWeight = maxDepth < 2 ? 0 $ 10
+    onceWeight = minHz > Once ? 0 $ hkWeight
+    threadWeight = minHz > Thread ? 0 $ hkWeight
+    eachWeight = hkWeight
+    fixtureWeight = 100 - (onceWeight + threadWeight + eachWeight) * 2
+    nxtLimits = gl{maxDepth = maxDepth - 1}
+    genSubnodes = list (between (1, maxBranches))
+    genOnceSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Once})
+    genSpec' = genSpec maxDelay passPcnt
+    genSpec'' = genSpec maxDelay passPcnt
+    genOnceBefore = OnceBefore <$> genSpec' <*> genOnceSubnodes
+    genOnceAfter = OnceAfter <$> genSpec' <*> genOnceSubnodes
+    genOnceAround = OnceAround <$> genSpec' <*> genSpec'' <*> genOnceSubnodes
+    genThreadSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Thread})
+    genManySpec =
+      frequency
+        [ (10, T.All <$> genSpec')
+        , (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$> genDelay maxDelay)
+        ]
+    genManySpec' =
+      frequency
+        [ (10, T.All <$> genSpec')
+        , (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$> genDelay maxDelay)
+        ]
+    genThreadBefore = ThreadBefore <$> genManySpec <*> genThreadSubnodes
+    genThreadAfter = ThreadAfter <$> genManySpec <*> genThreadSubnodes
+    genThreadAround = ThreadAround <$> genManySpec <*> genManySpec' <*> genThreadSubnodes
+    genEachSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Each})
+    genEachBefore = EachBefore <$> genManySpec <*> genEachSubnodes
+    genEachAfter = EachAfter <$> genManySpec <*> genEachSubnodes
+    genEachAround = EachAround <$> genManySpec <*> genManySpec' <*> genEachSubnodes
+    genFixture = Fixture <$> (list (between (1, maxTests)) $ genSpec')
 
 genParams :: GenParams
 genParams =
@@ -210,23 +212,21 @@ genTemplate :: GenParams -> Gen [Template]
 genTemplate p = list (between (1, p.maxBranches)) $ genNode p
 
 tryRunTest :: ThreadCount -> [Template] -> IO (Either Text ())
-tryRunTest c suite = 
-  mapLeft (toS . displayException) <$> tryAny (runTest defaultSeed c suite) 
-
+tryRunTest c suite =
+  mapLeft (toS . displayException) <$> tryAny (runTest defaultSeed c suite)
 
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
-{-# NOINLINE prop_test_suite #-} 
+{-# NOINLINE prop_test_suite #-}
 -- $ > demoTemplateShrinking
 prop_test_suite :: TestTree
 prop_test_suite = testPropertyWith def "Template" $ do
   t <- genWith (Just . ppShow) $ genTemplate genParams
   let result = unsafePerformIO $ tryRunTest (ThreadCount 5) t
-  assert $ FP.unary isRight  ("t", result)
-  assert $ FP.alwaysFail
+  assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
--- $> stub_generators
-stub_generators :: IO ()
-stub_generators =
+-- $> test_suite
+test_suite :: IO ()
+test_suite =
   defaultMain $
     testGroup
       "generator stubs"
@@ -235,3 +235,29 @@ stub_generators =
         -- , demoSpec
         prop_test_suite
       ]
+
+
+{-
+
+   generated [ EachBefore
+        { eachSpec = All Spec { delay = 0 , result = Pass }
+        , subNodes =
+            [ EachBefore
+                { eachSpec =
+                    PassProb
+                      { genStrategy = Preload
+                      , passPcnt = 95
+                      , minDelay = 0
+                      , maxDelay = 0
+                      }
+                , subNodes =
+                    [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+                }
+            ]
+        }
+    ] 
+
+
+
+
+-}

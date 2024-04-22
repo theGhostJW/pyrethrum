@@ -1,3 +1,7 @@
+-- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
+{-# OPTIONS_GHC -fno-full-laziness #-}
+{-# OPTIONS_GHC -fno-cse #-}
+
 module SuiteRuntimePropTest where
 
 import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
@@ -26,6 +30,10 @@ import Test.Tasty.Falsify (
   testPropertyWith,
  )
 import Internal.ThreadEvent (Hz (..))
+import Internal.SuiteRuntime (ThreadCount (..))
+import Extra (mapLeft)
+import UnliftIO (tryAny)
+import BasePrelude (unsafePerformIO)
 
 {-
  - each fail
@@ -201,10 +209,19 @@ genParams =
 genTemplate :: GenParams -> Gen [Template]
 genTemplate p = list (between (1, p.maxBranches)) $ genNode p
 
+tryRunTest :: ThreadCount -> [Template] -> IO (Either Text ())
+tryRunTest c suite = 
+  mapLeft (toS . displayException) <$> tryAny (runTest defaultSeed c suite) 
+
+
+-- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
+{-# NOINLINE prop_test_suite #-} 
 -- $ > demoTemplateShrinking
-demoTemplateShrinking :: TestTree
-demoTemplateShrinking = testPropertyWith def "Template" $ do
-  genWith (Just . ppShow) $ genTemplate genParams
+prop_test_suite :: TestTree
+prop_test_suite = testPropertyWith def "Template" $ do
+  t <- genWith (Just . ppShow) $ genTemplate genParams
+  let result = unsafePerformIO $ tryRunTest (ThreadCount 5) t
+  assert $ FP.unary isRight  ("t", result)
   assert $ FP.alwaysFail
 
 -- $> stub_generators
@@ -216,5 +233,5 @@ stub_generators =
       [ --   demoResult
         -- , demoDelay
         -- , demoSpec
-        demoTemplateShrinking
+        prop_test_suite
       ]

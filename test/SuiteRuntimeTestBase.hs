@@ -930,7 +930,8 @@ mkManySpec
     Spec delay result
    where
     seed = H.hash $ txt baseSeed <> path <> txt subSeed
-    delay = minDelay + (seed `mod` (maxDelay - minDelay))
+    delayRange = maxDelay - minDelay
+    delay = delayRange > 0 ? minDelay + seed `mod` (maxDelay - minDelay) $ minDelay
     result = seed `mod` 100 < fromIntegral passPcnt ? Pass $ Fail
 
 generateSpecs :: (Show pth) => Int -> Int -> pth -> Int8 -> Int -> Int -> [Spec]

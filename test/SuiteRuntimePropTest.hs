@@ -19,7 +19,6 @@ import Text.Show.Pretty (pPrint, ppShow)
 import Prelude hiding (All, bug, id)
 
 import BasePrelude (unsafePerformIO)
-import Data.Either.Extra
 import Internal.SuiteRuntime (ThreadCount (..))
 import Internal.ThreadEvent (Hz (..))
 import Test.Falsify.Range (between, skewedBy)
@@ -35,6 +34,7 @@ import Test.Tasty.Falsify (
   testPropertyWith,
  )
 import UnliftIO (tryAny)
+
 
 {-
  - each fail
@@ -211,9 +211,9 @@ genParams =
 genTemplate :: GenParams -> Gen [Template]
 genTemplate p = list (between (1, p.maxBranches)) $ genNode p
 
-tryRunTest :: ThreadCount -> [Template] -> IO (Either Text ())
+tryRunTest :: ThreadCount -> [Template] -> IO (Either SomeException ())
 tryRunTest c suite =
-  mapLeft (toS . displayException) <$> tryAny (runTest defaultSeed c suite)
+  tryAny (runTest defaultSeed c suite)
 
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
 {-# NOINLINE prop_test_suite #-}
@@ -223,6 +223,7 @@ prop_test_suite = testPropertyWith def "Template" $ do
   t <- genWith (Just . ppShow) $ genTemplate genParams
   let result = unsafePerformIO $ tryRunTest (ThreadCount 5) t
   assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
+
 
 -- $> test_suite
 test_suite :: IO ()
@@ -238,26 +239,33 @@ test_suite =
 
 
 {-
-
-   generated [ EachBefore
+ Step 38
+    generated [ EachBefore
         { eachSpec = All Spec { delay = 0 , result = Pass }
         , subNodes =
             [ EachBefore
-                { eachSpec =
-                    PassProb
-                      { genStrategy = Preload
-                      , passPcnt = 95
-                      , minDelay = 0
-                      , maxDelay = 0
-                      }
+                { eachSpec = All Spec { delay = 0 , result = Pass }
                 , subNodes =
-                    [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+                    [ EachBefore
+                        { eachSpec = All Spec { delay = 0 , result = Pass }
+                        , subNodes =
+                            [ EachAfter
+                                { eachSpec =
+                                    PassProb
+                                      { genStrategy = Preload
+                                      , passPcnt = 95
+                                      , minDelay = 0
+                                      , maxDelay = 0
+                                      }
+                                , subNodes =
+                                    [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+                                }
+                            ]
+                        }
+                    ]
                 }
             ]
         }
-    ] 
-
-
-
+    ]
 
 -}

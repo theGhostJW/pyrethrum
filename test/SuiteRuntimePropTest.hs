@@ -215,6 +215,7 @@ tryRunTest :: ThreadCount -> [Template] -> IO (Either SomeException ())
 tryRunTest c suite =
   tryAny (runTest defaultSeed c suite)
 
+-- delete me
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
 {-# NOINLINE prop_test_suite #-}
 -- $ > demoTemplateShrinking
@@ -224,8 +225,7 @@ prop_test_suite = testPropertyWith def "Template" $ do
   let result = unsafePerformIO $ tryRunTest (ThreadCount 5) t
   assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
-
--- $> test_suite
+-- $ > test_suite
 test_suite :: IO ()
 test_suite =
   defaultMain $
@@ -236,36 +236,3 @@ test_suite =
         -- , demoSpec
         prop_test_suite
       ]
-
-
-{-
- Step 38
-    generated [ EachBefore
-        { eachSpec = All Spec { delay = 0 , result = Pass }
-        , subNodes =
-            [ EachBefore
-                { eachSpec = All Spec { delay = 0 , result = Pass }
-                , subNodes =
-                    [ EachBefore
-                        { eachSpec = All Spec { delay = 0 , result = Pass }
-                        , subNodes =
-                            [ EachAfter
-                                { eachSpec =
-                                    PassProb
-                                      { genStrategy = Preload
-                                      , passPcnt = 95
-                                      , minDelay = 0
-                                      , maxDelay = 0
-                                      }
-                                , subNodes =
-                                    [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
-        }
-    ]
-
--}

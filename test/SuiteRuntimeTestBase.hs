@@ -33,7 +33,7 @@ import Internal.ThreadEvent as TE (
 import List.Extra as LE hiding (list)
 import List.Extra qualified as L
 import Prepare qualified as P
-import PyrethrumExtras (debug, toS, (?), txt)
+import PyrethrumExtras (debug, toS, (?), txt, debug')
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 import PyrethrumExtras.Test (chk', chkFail)
@@ -76,7 +76,7 @@ bug :: Text -> a
 bug t = PR.bug $ (error t :: SomeException)
 
 logging :: Logging
-logging = NoLog
+logging = Log
 
 
 {- each and once hooks will always run but thread hooks may be empty
@@ -242,7 +242,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
       M.lookup k actuals
         & maybe
           --  todo: this doesn't format as expected
-          (chkFail $ "Expected result for " <> ptxt (k & debug) <> " not found in actual")
+          (chkFail $ "Expected result for " <> ptxt k <> " not found in actual")
           ( \actual ->
               case expected of
                 All e ->
@@ -256,38 +256,39 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                     chk'
                       ("actual thread events: " <> ptxt actualCount <> " more than max threads: " <> ptxt threadLimit.maxThreads)
                       $ actualCount <= threadLimit.maxThreads
-                    countChks $ take actualCount expLst
-                  TE.Hook TE.Each _ -> countChks expLst
+                    countChks $ take actualCount expLst 
+                  TE.Hook TE.Each _ -> countChks (expLst & debug' "expLst")
                  where
-                  failMsg law = "property failed for:\n  " <> ptxt k <> "\n  " <> law
-                  countExpected r rList = M.findWithDefault 0 r $ groupCount rList
+                  failMsg law = "Property failed for:\n  " <> ptxt k <> "\n  " <> law
+                  -- COUNT EXPECTED IS WRONG
+                  countExpected r rList = M.findWithDefault 0 r $ groupCount rList & debug' "rList"
                   expectedPasses = countExpected Pass
                   expectedFails = countExpected Fail
-
+                  -- TODO: an infix high precedence operator for debugging
                   actualCount = length actual
-                  actuals' = groupCount actual
+                  actuals' = groupCount . debug' "actual - full map" $ actual 
                   actualPasses = M.findWithDefault 0 (Actual Pass) actuals'
                   actualFails = M.findWithDefault 0 (Actual Fail) actuals'
-                  actualParentFails = M.findWithDefault 0 ParentFailed actuals'
+                  actualParentFails = M.findWithDefault 0 ParentFailed (actuals' & debug' "actuals' - group count")
                   countChks lstExpected = do
-                    let expectedPassCount = expectedPasses lstExpected
+                    let expectedPassCount = expectedPasses (lstExpected & debug' "EXPECTED LIST")
                         expectedFailCount = expectedFails lstExpected
                     chk'
-                      (failMsg "Pass Count: expectedPassCount [" <> ptxt expectedPassCount <> "] <= actualPasses [" <> ptxt actualPasses <> "] + actualParentFails [" <> ptxt actualParentFails <> "]")
+                      (failMsg "Pass Count: expectedPassCount: " <> ptxt expectedPassCount <> " <= actualPasses: " <> ptxt actualPasses <> " + actualParentFails: " <> ptxt actualParentFails)
                       (expectedPassCount <= actualPasses + actualParentFails)
                     chk'
-                      (failMsg "Pass Count: expectedPassCount [" <> ptxt expectedPassCount <> "] >= actualPasses [" <> ptxt actualPasses <> "]")
+                      (failMsg "Pass Count: expectedPassCount: " <> ptxt expectedPassCount <> " >= actualPasses: " <> ptxt actualPasses)
                       (expectedPassCount >= actualPasses)
                     chk'
-                      (failMsg "Fail Count: expectedFailCount [" <> ptxt expectedPassCount <> "] <= actualPasses [" <> ptxt actualPasses <> "] + actualParentFails [" <> ptxt actualParentFails <> "]")
+                      (failMsg "Fail Count: expectedFailCount: " <> ptxt expectedPassCount <> " <= actualPasses: " <> ptxt actualPasses <> " + actualParentFails: " <> ptxt actualParentFails)
                       (expectedFailCount <= actualFails + actualParentFails)
                     chk'
-                      (failMsg "Fail Count: expectedFailCount [" <> ptxt expectedFailCount <> "] >= actualFails [" <> ptxt actualFails <> "]")
+                      (failMsg "Fail Count: expectedFailCount: " <> ptxt expectedFailCount <> " >= actualFails: " <> ptxt actualFails)
                       (expectedFailCount >= actualFails)
           )
 
   expectedResults :: Map SuiteEventPath ExpectedResult
-  expectedResults = foldl' calcExpected M.empty $ ts >>= T.eventPaths
+  expectedResults = debug' "WRONG !!!!!!! expectedResults !!!!!!!" $ foldl' calcExpected M.empty $ ts >>= T.eventPaths
 
   calcExpected :: Map SuiteEventPath ExpectedResult -> T.EventPath -> Map SuiteEventPath ExpectedResult
   calcExpected acc T.EventPath{path, suiteEvent, evntSpec, template} =
@@ -315,9 +316,9 @@ chkExpectedResults baseSeed threadLimit ts lgs =
             TE.Hook TE.Each _ -> T.counttests template -- expect a result for each test item
   actuals :: Map SuiteEventPath [LogResult]
   actuals =
-    foldl' (M.unionWith (<>)) M.empty allResults
+    debug' "ACTUALS" $ foldl' (M.unionWith (<>)) M.empty (allResults & debug' "All Results")
    where
-    allResults = actualResults <$> threadedLogs False lgs
+    allResults = actualResults <$> threadedLogs False (lgs & debug' "The Log")
 
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =

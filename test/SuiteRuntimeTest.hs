@@ -189,3 +189,32 @@ unit_pass_prob_pregen = passProbSuite Preload
 -- $ > unit_pass_prob_no_pregen
 unit_pass_prob_no_pregen :: IO ()
 unit_pass_prob_no_pregen = passProbSuite Runtime
+
+--
+-- $> unit_prop_test_fail_many
+unit_prop_test_fail_many :: IO ()
+unit_prop_test_fail_many = sequence_ $ replicate 100 unit_prop_test_fail
+
+-- $ > unit_prop_test_fail
+unit_prop_test_fail :: IO ()
+unit_prop_test_fail =   
+   runTest
+    defaultSeed
+    (ThreadCount 1)
+    [ EachBefore
+        { eachSpec =
+            T.PassProb
+              { genStrategy = Preload
+              , passPcnt = 95
+              -- 50 gets a different value -- Fail Count: expectedFailCount: 0 >= actualFails: 1
+              , minDelay = 0
+              , maxDelay = 0
+              }
+        , subNodes =
+            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+        }
+    ]
+
+--  expectedPassCount: 1 <= actualPasses: 0 + actualParentFails: 0
+
+

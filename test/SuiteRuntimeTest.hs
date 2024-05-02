@@ -187,9 +187,9 @@ unit_pass_prob_pregen = passProbSuite Preload
 unit_pass_prob_no_pregen :: IO ()
 unit_pass_prob_no_pregen = passProbSuite Runtime
 
--- $> unit_prop_fail
-unit_prop_fail :: IO ()
-unit_prop_fail =
+-- $> unit_prop_fail_each_after_out_of_order
+unit_prop_fail_each_after_out_of_order :: IO ()
+unit_prop_fail_each_after_out_of_order =
     runTest'
         Log
         defaultSeed

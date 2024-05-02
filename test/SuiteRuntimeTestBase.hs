@@ -33,7 +33,7 @@ import Internal.ThreadEvent as TE (
 import List.Extra as LE hiding (list)
 import List.Extra qualified as L
 import Prepare qualified as P
-import PyrethrumExtras (debug, toS, (?), txt, debug')
+import PyrethrumExtras (debug, debug', toS, txt, (?))
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 import PyrethrumExtras.Test (chk', chkFail)
@@ -46,11 +46,11 @@ import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
 
 import Data.Hashable qualified as H
+import Debug.Trace.Extended (debug'_)
 import System.Random.Stateful qualified as RS
 
 defaultSeed :: Int
 defaultSeed = 13579
-
 
 -- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
 -- TODO: other collection types generator / shrinker
@@ -77,7 +77,6 @@ bug t = PR.bug $ (error t :: SomeException)
 
 logging :: Logging
 logging = Log
-
 
 {- each and once hooks will always run but thread hooks may be empty
    due to subitems being stolen by another thread. We need to ensure
@@ -256,17 +255,17 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                     chk'
                       ("actual thread events: " <> ptxt actualCount <> " more than max threads: " <> ptxt threadLimit.maxThreads)
                       $ actualCount <= threadLimit.maxThreads
-                    countChks $ take actualCount expLst 
-                  TE.Hook TE.Each _ -> countChks (expLst & debug' "expLst")
+                    countChks $ take actualCount expLst
+                  TE.Hook TE.Each _ -> countChks (expLst & debug'_ "expLst")
                  where
                   failMsg law = "Property failed for:\n  " <> ptxt k <> "\n  " <> law
                   -- COUNT EXPECTED IS WRONG
-                  countExpected r rList = M.findWithDefault 0 r $ groupCount rList & debug' "rList"
+                  countExpected r rList = M.findWithDefault 0 r $ groupCount rList & debug'_ "rList"
                   expectedPasses = countExpected Pass
                   expectedFails = countExpected Fail
                   -- TODO: an infix high precedence operator for debugging
                   actualCount = length actual
-                  actuals' = groupCount . debug' "actual - full map" $ actual 
+                  actuals' = groupCount . debug' "actual - full map" $ actual
                   actualPasses = M.findWithDefault 0 (Actual Pass) actuals'
                   actualFails = M.findWithDefault 0 (Actual Fail) actuals'
                   actualParentFails = M.findWithDefault 0 ParentFailed (actuals' & debug' "actuals' - group count")
@@ -288,7 +287,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
           )
 
   expectedResults :: Map SuiteEventPath ExpectedResult
-  expectedResults = debug' "WRONG !!!!!!! expectedResults !!!!!!!" $ foldl' calcExpected M.empty $ ts >>= T.eventPaths
+  expectedResults = debug' "WRONG !!!!!!! expectedResults !!!!!!!" $ foldl' calcExpected M.empty $ ts & debug' "Template" >>= T.eventPaths
 
   calcExpected :: Map SuiteEventPath ExpectedResult -> T.EventPath -> Map SuiteEventPath ExpectedResult
   calcExpected acc T.EventPath{path, suiteEvent, evntSpec, template} =
@@ -964,7 +963,7 @@ loadQIfPreload baseSeed qLength pth q = \case
         when (isPreload genStrategy)
           . atomically
           . loadTQueue q
-          $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay
+          $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay & debug' "THE SPECS"
         pure ()
 
 -- assumes th queue is preloaded (ie loadQIfPrload has already been run) if genStrategy == Preload
@@ -978,8 +977,8 @@ mkManyAction baseSeed q pth = \case
     , maxDelay
     } ->
       case genStrategy of
-        Runtime -> mkQueAction q pth
-        Preload -> do
+        Preload -> mkQueAction q pth
+        Runtime -> do
           subSeed <- RS.uniformM RS.globalStdGen :: IO Int
           mkVoidAction pth $
             mkManySpec

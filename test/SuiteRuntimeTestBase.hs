@@ -76,7 +76,7 @@ bug :: Text -> a
 bug t = PR.bug $ (error t :: SomeException)
 
 logging :: Logging
-logging = Log
+logging = NoLog
 
 {- each and once hooks will always run but thread hooks may be empty
    due to subitems being stolen by another thread. We need to ensure
@@ -216,12 +216,18 @@ groupCount = M.fromListWith (+) . fmap (,1)
 
 {-
 defects found in testing::
+ - unit testing
   - incorrect label on thread hook - labeld as each
   - hook events out of order - due to bracket and laziness
   - missing thread around events
     - chkExpectedResults failing but not chkAllTemplateItemsLogged
     - chkAllTemplateItemsLogged was incomplete + prenode generator (fixture) bug
 
+ - property testing
+  - test function error causing tests to fail event though suite results were correct 
+    specifically - mkManyAction implementations flipped for construcots  
+    - T.All s -> had implementation meant for PassProb
+    - PassProb -> had implementation meant for All
 -}
 
 chkExpectedResults :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
@@ -256,21 +262,21 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                       ("actual thread events: " <> ptxt actualCount <> " more than max threads: " <> ptxt threadLimit.maxThreads)
                       $ actualCount <= threadLimit.maxThreads
                     countChks $ take actualCount expLst
-                  TE.Hook TE.Each _ -> countChks (expLst & debug'_ "expLst")
+                  TE.Hook TE.Each _ -> countChks expLst
                  where
                   failMsg law = "Property failed for:\n  " <> ptxt k <> "\n  " <> law
                   -- COUNT EXPECTED IS WRONG
-                  countExpected r rList = M.findWithDefault 0 r $ groupCount rList & debug'_ "rList"
+                  countExpected r rList = M.findWithDefault 0 r $ groupCount rList
                   expectedPasses = countExpected Pass
                   expectedFails = countExpected Fail
                   -- TODO: an infix high precedence operator for debugging
                   actualCount = length actual
-                  actuals' = groupCount . debug' "actual - full map" $ actual
+                  actuals' = groupCount actual
                   actualPasses = M.findWithDefault 0 (Actual Pass) actuals'
                   actualFails = M.findWithDefault 0 (Actual Fail) actuals'
-                  actualParentFails = M.findWithDefault 0 ParentFailed (actuals' & debug' "actuals' - group count")
+                  actualParentFails = M.findWithDefault 0 ParentFailed actuals'
                   countChks lstExpected = do
-                    let expectedPassCount = expectedPasses (lstExpected & debug' "EXPECTED LIST")
+                    let expectedPassCount = expectedPasses lstExpected
                         expectedFailCount = expectedFails lstExpected
                     chk'
                       (failMsg "Pass Count: expectedPassCount: " <> ptxt expectedPassCount <> " <= actualPasses: " <> ptxt actualPasses <> " + actualParentFails: " <> ptxt actualParentFails)
@@ -287,7 +293,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
           )
 
   expectedResults :: Map SuiteEventPath ExpectedResult
-  expectedResults = debug' "WRONG !!!!!!! expectedResults !!!!!!!" $ foldl' calcExpected M.empty $ ts & debug' "Template" >>= T.eventPaths
+  expectedResults = foldl' calcExpected M.empty $ ts >>= T.eventPaths
 
   calcExpected :: Map SuiteEventPath ExpectedResult -> T.EventPath -> Map SuiteEventPath ExpectedResult
   calcExpected acc T.EventPath{path, suiteEvent, evntSpec, template} =
@@ -315,9 +321,9 @@ chkExpectedResults baseSeed threadLimit ts lgs =
             TE.Hook TE.Each _ -> T.counttests template -- expect a result for each test item
   actuals :: Map SuiteEventPath [LogResult]
   actuals =
-    debug' "ACTUALS" $ foldl' (M.unionWith (<>)) M.empty (allResults & debug' "All Results")
+    foldl' (M.unionWith (<>)) M.empty allResults
    where
-    allResults = actualResults <$> threadedLogs False (lgs & debug' "The Log")
+    allResults = actualResults <$> threadedLogs False lgs
 
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =
@@ -963,7 +969,7 @@ loadQIfPreload baseSeed qLength pth q = \case
         when (isPreload genStrategy)
           . atomically
           . loadTQueue q
-          $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay & debug' "THE SPECS"
+          $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay
         pure ()
 
 -- assumes th queue is preloaded (ie loadQIfPrload has already been run) if genStrategy == Preload

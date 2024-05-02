@@ -4,13 +4,12 @@ import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.SuiteRuntime (ThreadCount (..))
 
-
 import List.Extra as LE hiding (list)
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 
-import Prelude hiding (All, bug, id)
 import SuiteRuntimeTestBase
+import Prelude hiding (All, bug, id)
 
 -- $ > unit_simple_pass
 unit_simple_pass :: IO ()
@@ -23,128 +22,126 @@ unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fi
 -- $ > unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
-  runTest
-    defaultSeed
-    (ThreadCount 1)
-    [ onceAround
-        Pass
-        Pass
-        [ threadAround Pass Pass [eachAfter Pass [fixture [test Fail, test Pass]]]
-        , threadAround Pass Pass [eachAfter Fail [fixture [test Pass, test Fail]]]
-        , threadAround Fail Pass [eachAfter Pass [fixture [test Fail, test Pass]]]
-        , threadAround Pass Pass [eachBefore Fail [fixture [test Fail, test Pass]]]
-        , eachAround Fail Pass [fixture [test Fail, test Pass]]
-        , eachBefore
-            Fail
-            [ fixture [test Pass, test Pass]
-            , eachAround
-                Pass
-                Pass
-                [ fixture
-                    [ test Pass
-                    , test Pass
+    runTest
+        defaultSeed
+        (ThreadCount 1)
+        [ onceAround
+            Pass
+            Pass
+            [ threadAround Pass Pass [eachAfter Pass [fixture [test Fail, test Pass]]]
+            , threadAround Pass Pass [eachAfter Fail [fixture [test Pass, test Fail]]]
+            , threadAround Fail Pass [eachAfter Pass [fixture [test Fail, test Pass]]]
+            , threadAround Pass Pass [eachBefore Fail [fixture [test Fail, test Pass]]]
+            , eachAround Fail Pass [fixture [test Fail, test Pass]]
+            , eachBefore
+                Fail
+                [ fixture [test Pass, test Pass]
+                , eachAround
+                    Pass
+                    Pass
+                    [ fixture
+                        [ test Pass
+                        , test Pass
+                        ]
                     ]
                 ]
             ]
         ]
-    ]
 
 passProbSuite :: SpecGen -> IO ()
 passProbSuite specGen =
-  runTest
-    defaultSeed
-    (ThreadCount 1)
-    [ onceAround
-        Pass
-        Pass
-        [ ThreadAround passProb50 passProb100 [eachAfter Pass [fixture [test Fail, test Pass]]]
-        , ThreadAround passProb100 passProb100 [eachAfter Fail [fixture [test Pass, test Fail]]]
-        , ThreadAround passProb75 passProb20 [eachAfter Pass [fixture [test Fail, test Pass]]]
-        , ThreadAround passProb0 passProb100 [eachBefore Fail [fixture [test Fail, test Pass]]]
-        , EachAround passProb75 passProb75 [fixture [test Fail, test Pass]]
-        , EachBefore
-            passProb100
-            [ fixture [test Pass, test Pass]
-            , EachAround
+    runTest
+        defaultSeed
+        (ThreadCount 1)
+        [ onceAround
+            Pass
+            Pass
+            [ ThreadAround passProb50 passProb100 [eachAfter Pass [fixture [test Fail, test Pass]]]
+            , ThreadAround passProb100 passProb100 [eachAfter Fail [fixture [test Pass, test Fail]]]
+            , ThreadAround passProb75 passProb20 [eachAfter Pass [fixture [test Fail, test Pass]]]
+            , ThreadAround passProb0 passProb100 [eachBefore Fail [fixture [test Fail, test Pass]]]
+            , EachAround passProb75 passProb75 [fixture [test Fail, test Pass]]
+            , EachBefore
                 passProb100
-                passProb75
-                [ fixture
-                    [ test Pass
-                    , test Pass
+                [ fixture [test Pass, test Pass]
+                , EachAround
+                    passProb100
+                    passProb75
+                    [ fixture
+                        [ test Pass
+                        , test Pass
+                        ]
                     ]
                 ]
             ]
         ]
-    ]
- where
-  passProb pcnt = T.PassProb specGen pcnt 100 1000
-  passProb0 = passProb 0
-  passProb20 = passProb 20
-  passProb50 = passProb 50
-  passProb75 = passProb 75
-  passProb100 = passProb 100
-
-
+  where
+    passProb pcnt = T.PassProb specGen pcnt 100 1000
+    passProb0 = passProb 0
+    passProb20 = passProb 20
+    passProb50 = passProb 50
+    passProb75 = passProb 75
+    passProb100 = passProb 100
 
 -- $ > unit_nested_threaded_chk_thread_count
 unit_nested_threaded_chk_thread_count :: IO ()
 unit_nested_threaded_chk_thread_count =
-  do
-    let threadLimit = ThreadCount 10
-        logging' = NoLog
-    r <-
-      execute
-        logging'
-        defaultSeed
-        threadLimit
-        [ OnceAround
-            (Spec 1000 Pass)
-            (Spec 0 Pass)
-            [ ThreadAround
-                (allSpec 0 Pass)
-                (allSpec 0 Pass)
-                [ EachAfter
-                    (allSpec 50 Pass)
-                    [ fixture
-                        [ Spec 0 Pass
-                        , Spec 1000 Fail
-                        , Spec 100 Fail
-                        , Spec 100 Fail
-                        , Spec 100 Fail
-                        , Spec 100 Fail
-                        , Spec 100 Fail
-                        ]
-                    ]
-                ]
-            , ThreadAround
-                (allSpec 100 Pass)
-                (allSpec 0 Fail)
-                [ ThreadAround
-                    (allSpec 300 Pass)
-                    (allSpec 300 Pass)
-                    [ threadAround Pass Pass [eachAfter Pass [fixture [Spec 3000 Fail, Spec 1000 Pass]]]
-                    , ThreadAround (allSpec 50 Pass) (allSpec 0 Pass) [eachAfter Fail [fixture [Spec 1000 Pass, Spec 1000 Fail]]]
-                    , threadAround Fail Pass [eachAfter Pass [fixture [Spec 1000 Fail, Spec 1000 Pass]]]
-                    , threadAround Pass Pass [EachBefore (allSpec 300 Fail) [fixture [Spec 1000 Fail, Spec 3000 Pass]]]
-                    , eachAround Fail Pass [fixture [Spec 40 Fail, Spec 10 Pass]]
-                    , eachBefore
-                        Fail
-                        [ fixture [Spec 300 Pass, Spec 10 Pass]
-                        , EachAround
+    do
+        let threadLimit = ThreadCount 10
+            logging' = NoLog
+        r <-
+            execute
+                logging'
+                defaultSeed
+                threadLimit
+                [ OnceAround
+                    (Spec 1000 Pass)
+                    (Spec 0 Pass)
+                    [ ThreadAround
+                        (allSpec 0 Pass)
+                        (allSpec 0 Pass)
+                        [ EachAfter
                             (allSpec 50 Pass)
-                            (allSpec 0 Pass)
                             [ fixture
-                                [ Spec 1000 Pass
-                                , Spec 200 Pass
+                                [ Spec 0 Pass
+                                , Spec 1000 Fail
+                                , Spec 100 Fail
+                                , Spec 100 Fail
+                                , Spec 100 Fail
+                                , Spec 100 Fail
+                                , Spec 100 Fail
+                                ]
+                            ]
+                        ]
+                    , ThreadAround
+                        (allSpec 100 Pass)
+                        (allSpec 0 Fail)
+                        [ ThreadAround
+                            (allSpec 300 Pass)
+                            (allSpec 300 Pass)
+                            [ threadAround Pass Pass [eachAfter Pass [fixture [Spec 3000 Fail, Spec 1000 Pass]]]
+                            , ThreadAround (allSpec 50 Pass) (allSpec 0 Pass) [eachAfter Fail [fixture [Spec 1000 Pass, Spec 1000 Fail]]]
+                            , threadAround Fail Pass [eachAfter Pass [fixture [Spec 1000 Fail, Spec 1000 Pass]]]
+                            , threadAround Pass Pass [EachBefore (allSpec 300 Fail) [fixture [Spec 1000 Fail, Spec 3000 Pass]]]
+                            , eachAround Fail Pass [fixture [Spec 40 Fail, Spec 10 Pass]]
+                            , eachBefore
+                                Fail
+                                [ fixture [Spec 300 Pass, Spec 10 Pass]
+                                , EachAround
+                                    (allSpec 50 Pass)
+                                    (allSpec 0 Pass)
+                                    [ fixture
+                                        [ Spec 1000 Pass
+                                        , Spec 200 Pass
+                                        ]
+                                    ]
                                 ]
                             ]
                         ]
                     ]
                 ]
-            ]
-        ]
-    chkProperties defaultSeed threadLimit r.expandedTemplate r.log
-    chkThreadCount threadLimit r.log
+        chkProperties defaultSeed threadLimit r.expandedTemplate r.log
+        chkThreadCount threadLimit r.log
 
 {- each and once hooks will always run but thread hooks may be empty
    due to subitems being stolen by another thread. We need to ensure
@@ -154,16 +151,16 @@ unit_nested_threaded_chk_thread_count =
 -- $ > unit_empty_thread_around
 unit_empty_thread_around :: IO ()
 unit_empty_thread_around =
-  do
-    exe [threadAround Pass Pass []] >>= chkEmptyLog
-    exe [threadBefore Pass []] >>= chkEmptyLog
-    exe [threadAfter Pass []] >>= chkEmptyLog
-    exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass []]]] >>= chkEmptyLog
-    exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [fixture [test Pass]]]]] >>= chkLogLength
- where
-  exe = execute NoLog defaultSeed (ThreadCount 1)
-  chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (ptxt r.log)) 2 (length r.log)
-  chkLogLength r = chkEq' ("Log length not as expected:\n" <> (ptxt r.log)) 12 (length r.log)
+    do
+        exe [threadAround Pass Pass []] >>= chkEmptyLog
+        exe [threadBefore Pass []] >>= chkEmptyLog
+        exe [threadAfter Pass []] >>= chkEmptyLog
+        exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass []]]] >>= chkEmptyLog
+        exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [fixture [test Pass]]]]] >>= chkLogLength
+  where
+    exe = execute NoLog defaultSeed (ThreadCount 1)
+    chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (ptxt r.log)) 2 (length r.log)
+    chkLogLength r = chkEq' ("Log length not as expected:\n" <> (ptxt r.log)) 12 (length r.log)
 
 {-
   todo:
@@ -190,31 +187,56 @@ unit_pass_prob_pregen = passProbSuite Preload
 unit_pass_prob_no_pregen :: IO ()
 unit_pass_prob_no_pregen = passProbSuite Runtime
 
---
--- $> unit_prop_test_fail_many
-unit_prop_test_fail_many :: IO ()
-unit_prop_test_fail_many = sequence_ $ replicate 100 unit_prop_test_fail
+-- $> unit_prop_fail
+unit_prop_fail :: IO ()
+unit_prop_fail =
+    runTest'
+        Log
+        defaultSeed
+        (ThreadCount 1)
+        [ EachBefore
+            { eachSpec = T.All Spec{delay = 0, result = Pass}
+            , subNodes =
+                [ EachAfter
+                    { eachSpec = T.All Spec{delay = 0, result = Pass}
+                    , subNodes =
+                        [ EachAfter
+                            { eachSpec = T.All Spec{delay = 0, result = Pass}
+                            , subNodes =
+                                [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
 
--- $ > unit_prop_test_fail
-unit_prop_test_fail :: IO ()
-unit_prop_test_fail =   
-   runTest
-    defaultSeed
-    (ThreadCount 1)
-    [ EachBefore
-        { eachSpec =
-            T.PassProb
-              { genStrategy = Preload
-              , passPcnt = 95
-              -- 50 gets a different value -- Fail Count: expectedFailCount: 0 >= actualFails: 1
-              , minDelay = 0
-              , maxDelay = 0
-              }
-        , subNodes =
-            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+{-
+generator stubs
+  Template: FAIL (17.41s)
+    failed after 21 shrinks
+    expected /= (is right t)
+    t         : Left user error (
+    subsequent parent event for:
+    SuiteEventPath
+      { path = TestPath { id = 0 , title = "0.0.0.0 Test" }
+      , suiteEvent = Test
+      }
+    equality check failed:
+    Expected:
+      Just
+      SuiteEventPath
+        { path = NodePath { module' = "0.0.0" , path = "EachAfter" }
+        , suiteEvent = Hook Each After
         }
-    ]
+    Does not Equal:
+      Just
+      SuiteEventPath
+        { path = NodePath { module' = "0.0" , path = "EachAfter" }
+        , suiteEvent = Hook Each After
+        }
+    )
+    expected  : True
+    is right t: False
 
---  expectedPassCount: 1 <= actualPasses: 0 + actualParentFails: 0
-
-
+-}

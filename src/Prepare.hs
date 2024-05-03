@@ -1,22 +1,23 @@
 module Prepare where
 
-import Check (Check, Checks(..), FailStatus (NonTerminal), applyCheck, skipChecks)
+import Check (Check, Checks (..), FailStatus (NonTerminal), applyCheck, skipChecks)
 import Control.Exception (throwIO)
 import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
 import Core qualified as C
-import DSL.Internal.ApEvent
-    ( ApEvent(Framework),
-      Path,
-      exceptionEvent,
-      ApStateText(ApStateText),
-      DStateText(DStateText),
-      FLog(SkipedCheckStart, Parse, Action, Check, CheckStart),
-      ItemText(ItemText) )
-import Data.Either.Extra ( mapLeft)
+import DSL.Internal.ApEvent (
+  ApEvent (Framework),
+  ApStateText (ApStateText),
+  DStateText (DStateText),
+  FLog (Action, Check, CheckStart, Parse, SkipedCheckStart),
+  ItemText (ItemText),
+  Path,
+  exceptionEvent,
+ )
+import Data.Either.Extra (mapLeft)
 import Internal.ThreadEvent (Hz)
+import PyrethrumExtras (toS, txt, uu)
 import UnliftIO.Exception (tryAny)
-import PyrethrumExtras (uu, txt, toS)
 
 data PreNode m c hi where
   Before ::
@@ -50,6 +51,24 @@ data PreNode m c hi where
     PreNode m c hi
 
 type ApEventSink = ApEvent -> IO ()
+
+-- used in debugging
+listPaths :: forall m c hi. Foldable c =>  PreNode m c hi -> [(Int, Path)]
+listPaths = 
+  reverse . step 0 []
+ where
+  step :: forall hi'. Int -> [(Int, Path)] -> PreNode m c hi' -> [(Int, Path)]
+  step i accum n =
+    n & \case
+      Test{} -> accum'
+      Before{subNodes} -> accumPaths subNodes
+      After{subNodes'} -> accumPaths subNodes'
+      Around{subNodes} -> accumPaths subNodes
+   where
+    accum' = (i, n.path) : accum
+    i' = succ i
+    accumPaths :: forall hii. c (PreNode m c hii) -> [(Int, Path)]
+    accumPaths = foldl' (step i') accum'
 
 data TestItem m hi = TestItem
   { id :: Int
@@ -136,10 +155,10 @@ prepSuiteElm pp@PrepParams{interpreter, runConfig} suiteElm =
 flog :: ApEventSink -> FLog -> IO ()
 flog sink = sink . Framework
 
-unTry :: forall a e. Exception e => ApEventSink -> Either (CallStack, e) a -> IO a
+unTry :: forall a e. (Exception e) => ApEventSink -> Either (CallStack, e) a -> IO a
 unTry es = either (uncurry $ logThrow es) pure
 
-logThrow :: Exception e => ApEventSink -> CallStack -> e -> IO a
+logThrow :: (Exception e) => ApEventSink -> CallStack -> e -> IO a
 logThrow sink cs ex = sink (exceptionEvent ex cs) >> throwIO ex
 
 prepareTest :: forall m c rc tc hi. (C.Config tc, Applicative c) => PrepParams m rc tc -> Path -> C.Fixture m c rc tc hi -> PreNode IO c hi
@@ -149,26 +168,29 @@ prepareTest PrepParams{interpreter, runConfig} path =
       Test
         { config
         , path
-        , tests =  ( \i ->
+        , tests =
+            ( \i ->
                 TestItem
                   { id = i.id
                   , title = i.title
                   , action = \snk _hi -> runTest (action runConfig) parse i snk
                   }
-            ) <$> items runConfig
+            )
+              <$> items runConfig
         }
-
     C.Full'{config', action', parse', items'} ->
       Test
         { config = config'
         , path
-        , tests =  ( \i ->
+        , tests =
+            ( \i ->
                 TestItem
                   { id = i.id
                   , title = i.title
                   , action = \snk hi -> runTest (action' runConfig hi) parse' i snk
                   }
-            ) <$> items' runConfig
+            )
+              <$> items' runConfig
         }
     C.Direct{config, action, items} ->
       Test
@@ -179,7 +201,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
                 TestItem
                   { id = i.id
                   , title = i.title
-                  , action =  \snk _hi -> runDirectTest (action runConfig) i snk
+                  , action = \snk _hi -> runDirectTest (action runConfig) i snk
                   }
             )
               <$> items runConfig
@@ -199,21 +221,22 @@ prepareTest PrepParams{interpreter, runConfig} path =
               <$> items' runConfig
         }
  where
-  applyParser :: forall as ds. (HasCallStack => as -> Either C.ParseException ds) -> as -> IO (Either (CallStack, C.ParseException) ds)
-  applyParser parser as = 
-     tryAny (pure $ parser as) <&> either
-            (\e -> Left (callStack, C.ParseFailure . toS $ displayException e))
-            (mapLeft (callStack,))
+  applyParser :: forall as ds. ((HasCallStack) => as -> Either C.ParseException ds) -> as -> IO (Either (CallStack, C.ParseException) ds)
+  applyParser parser as =
+    tryAny (pure $ parser as)
+      <&> either
+        (\e -> Left (callStack, C.ParseFailure . toS $ displayException e))
+        (mapLeft (callStack,))
 
-{-
-TODO :: Try Different Stategies 
-  - eg. Eff vs dependency injection - vs Eff embedded in core (see before remove effectful from core)
-  - tests 
-    - hooks with lower / different capabilities than tests (rest hook vs ui test) see "Demonstraits using partial effect" for effectful version 
-    - effects that use effects / logger
-    - arbitary STM as an example of adding an effect that requires its own context
+  {-
+  TODO :: Try Different Stategies
+    - eg. Eff vs dependency injection - vs Eff embedded in core (see before remove effectful from core)
+    - tests
+      - hooks with lower / different capabilities than tests (rest hook vs ui test) see "Demonstraits using partial effect" for effectful version
+      - effects that use effects / logger
+      - arbitary STM as an example of adding an effect that requires its own context
 
--}
+  -}
   runAction :: forall i as ds. (C.Item i ds) => ApEventSink -> (i -> m as) -> i -> IO as
   runAction snk action i =
     do
@@ -221,7 +244,7 @@ TODO :: Try Different Stategies
       eas <- interpreter $ action i
       unTry snk eas
 
-  runTest :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> ( HasCallStack => as -> Either C.ParseException ds) -> i -> ApEventSink -> IO ()
+  runTest :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> ((HasCallStack) => as -> Either C.ParseException ds) -> i -> ApEventSink -> IO ()
   runTest action parser i snk =
     do
       ds <- tryAny
@@ -236,7 +259,7 @@ TODO :: Try Different Stategies
   runDirectTest action i snk =
     tryAny (runAction snk action i) >>= applyChecks snk path i.checks
 
-applyChecks :: forall ds. Show ds => ApEventSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
+applyChecks :: forall ds. (Show ds) => ApEventSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
 applyChecks snk p chks =
   either
     ( \e -> do
@@ -276,10 +299,10 @@ data SuitePrepParams m c rc tc where
 --    - querying
 --    - validation ??
 -- will return more info later such as filter log and have to return an either
-filterSuite :: forall m c rc tc. c (C.Node m c rc tc ()) ->  c (C.Node m c rc tc ())
+filterSuite :: forall m c rc tc. c (C.Node m c rc tc ()) -> c (C.Node m c rc tc ())
 filterSuite = uu
 
-prepare :: (C.Config rc, C.Config tc,  Applicative c, Traversable c) => SuitePrepParams m c rc tc -> c (PreNode IO c ())
+prepare :: (C.Config rc, C.Config tc, Applicative c, Traversable c) => SuitePrepParams m c rc tc -> c (PreNode IO c ())
 prepare SuitePrepParams{suite, interpreter, runConfig} =
   prepSuiteElm pp <$> filterSuite suite
  where

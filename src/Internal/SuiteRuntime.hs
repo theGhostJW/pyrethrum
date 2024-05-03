@@ -7,7 +7,8 @@ import Internal.RunTimeLogging qualified as L
 import Internal.ThreadEvent qualified as F (Hz (..))
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
-import PyrethrumExtras (catchAll, txt, (?))
+import PyrethrumExtras (catchAll, txt, (?), debugf', toS)
+import Text.Show.Pretty (ppShow)
 import UnliftIO (
   concurrently_,
   finally,
@@ -34,6 +35,9 @@ todo :: define defect properties with sum type type and typeclass which returns 
 
 
 -}
+-- TODO; move to pyrelude
+ptxt :: (Show a) => a -> Text
+ptxt = toS . ppShow
 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
@@ -510,8 +514,10 @@ runNode lgr hi xt =
     runSubNodes_ :: forall hi'. NodeIn hi' -> ChildQ (ExeTree hi') -> IO ()
     runSubNodes_ n = void . runSubNodes n
 
-    -- tree generation is restricted by typeclasses so unless the typeclass constrint implmentation is wrong
+    -- tree generation is restricted by typeclasses so unless the typeclass constraint implmentation is wrong
     -- execution trees with invalid structure (Thread or Once depending on Each) should never be generated.
+    -- The only way these errors could be thrown is from unit testing code that generates a testsuite via
+    -- lower level, where there are no typeclass contraints
     invalidTree :: Text -> Text -> IO ()
     invalidTree input cst = bug @Void . error $ input <> " >>> should not be passed to >>> " <> cst <> "\n" <> txt xt.path
 
@@ -519,7 +525,8 @@ runNode lgr hi xt =
    in
     case xt of
       -- For AfterOnce and AroundOnce we assume tree shaking has been executed prior to execution.
-      -- There is no possibility of empty subnodes due to tree shaking, so these hooks will always need to be run
+      -- There is no possibility of empty subnodes due to tree shaking, so these hooks will always 
+      -- need to be run
       AfterOnce
         { status'
         , subNodes'
@@ -617,7 +624,7 @@ runNode lgr hi xt =
                         )
                   )
       ---
-      After{frequency, subNodes', after} ->
+      After{frequency, subNodes', after, path} ->
         case frequency of
           Each ->
             runSubNodes_ (EachIn nxtApply) subNodes'
@@ -625,7 +632,37 @@ runNode lgr hi xt =
             nxtApply nxtAction =
               case hi of
                 Abandon fp -> nxtAction (Left fp) >> abandonAfter fp
-                EachIn{apply} -> apply nxtAction >> runAfter
+                EachIn{apply} -> debugf' (const $ "appending after action >> " <> ptxt path) "APPEND" $ apply nxtAction >> runAfter
+                  
+                {- Defect Here
+                 Template:
+                  EachAfter 0
+                    [
+                      EachAfter 0.0
+                       [
+                         Fixture 0.0.0
+                       ]
+
+                    ]
+                
+                 Action Construction:
+                  - EachAfter 0
+                     -- apply => ((()-> ta)) >> EA.0
+                  - EachAfter 0.0
+                    -- apply => ((() -> ta)) >> EA.0) >> EA.0.0
+                  - Test 0.0.0.0
+                    -- apply => ((() -> Test 0.0.0.0)) >> EA.0) >> EA.0.0
+                  - execution will be
+                    1. Test 0.0.0.0
+                    2. EA.0
+                    3. EA.0.0
+                  !! => Should be:
+                    1. Test 0.0.0.0
+                    2. EA.0.0
+                    3. EA.0
+
+                 Action Construction is Wrong
+                -}
                 OnceIn ioHi -> ioHi >>= \i -> nxtAction (Right i) >> runAfter
                 ThreadIn ioHi -> ioHi >>= \i -> nxtAction i >> (i & either abandonAfter (const runAfter))
              where
@@ -772,10 +809,16 @@ runNode lgr hi xt =
         mkTestPath :: P.TestItem IO hi -> L.ExePath
         mkTestPath P.TestItem{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : coerce path
 
--- user facing (logged) hook position varies depending on if there is a teardown
--- or not. teardown exists => Setup, teardown does not exist => Before
+
 aroundLeadingHookPos :: Maybe a -> TE.HookPos
-aroundLeadingHookPos {- Maybe teardown -} = maybe TE.Before (const TE.Setup)
+aroundLeadingHookPos teardown =
+  case teardown of 
+    -- if there is no tearown the hook is deemed a Before hook
+    -- the hook action that runs before is of type Before
+    Nothing -> TE.Before 
+    -- if there is a tearown the hook is deemed a Around hook
+    -- so the the hook action that runs before is of type Setup
+    Just _ -> TE.Setup
 
 data NodeIn hi
   = Abandon FailPoint

@@ -223,7 +223,7 @@ prop_test_suite = testPropertyWith def "Template" $ do
   let result = unsafePerformIO $ tryRunTest (ThreadCount 5) t
   assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
--- $> test_suite
+-- $ > test_suite
 test_suite :: IO ()
 test_suite =
   defaultMain $

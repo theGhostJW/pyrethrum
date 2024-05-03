@@ -46,7 +46,6 @@ import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
 
 import Data.Hashable qualified as H
-import Debug.Trace.Extended (debug'_)
 import System.Random.Stateful qualified as RS
 
 defaultSeed :: Int
@@ -86,6 +85,7 @@ logging = NoLog
 allSpec :: Int -> Result -> ManySpec
 allSpec delay rslt = T.All $ Spec delay rslt
 
+-- TODO; move to pyrelude
 ptxt :: (Show a) => a -> Text
 ptxt = toS . ppShow
 
@@ -224,10 +224,13 @@ defects found in testing::
     - chkAllTemplateItemsLogged was incomplete + prenode generator (fixture) bug
 
  - property testing
-  - test function error causing tests to fail event though suite results were correct 
+  - test function error causing tests to fail even though suite results were correct 
     specifically - mkManyAction implementations flipped for construcots  
     - T.All s -> had implementation meant for PassProb
     - PassProb -> had implementation meant for All
+    - https://github.com/theGhostJW/pyrethrum/commit/ef50961
+
+  - framework error - nested each after hooks executed out of order
 -}
 
 chkExpectedResults :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
@@ -800,10 +803,15 @@ exeTemplate wantLog baseRandomSeed maxThreads templates = do
   let wantLog' = wantLog == Log
   (lc, logQ) <- testLogControls wantLog'
   when wantLog' $ do
-    putStrLn ""
+    putStrLn "#### Template ####"
     pPrint templates
     putStrLn "========="
   nodes <- mkNodes baseRandomSeed maxThreads templates
+  when wantLog' $ do
+    putStrLn "#### (Indent, Node Path) After Prepare ####"
+    pPrint $ P.listPaths <$> nodes
+    putStrLn "========="
+    putStrLn "#### Log ####"
   executeNodeList maxThreads lc nodes
   atomically $ q2List logQ
 

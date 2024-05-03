@@ -187,6 +187,45 @@ unit_pass_prob_pregen = passProbSuite Preload
 unit_pass_prob_no_pregen :: IO ()
 unit_pass_prob_no_pregen = passProbSuite Runtime
 
+{-
+  property test revealed incorrect template transformation due to
+  selectors being flipped when genrating action (mkManyAction)
+  intermittent - hence replicate n
+
+  Commit:        ef509617ef3bf4762e2a3215d192cf3ebab873ca
+  Author:        theGhostJW <theghostjw@gmail.com>
+  AuthorDate:    Thu May 2 19:23:45 2024
+  Commit:        theGhostJW <theghostjw@gmail.com>
+  CommitDate:    Thu May 2 19:23:45 2024
+  Url:           https://github.com/theGhostJW/pyrethrum/commit/ef50961
+-}
+
+-- $ > unit_prop_test_fail_template_wrong_result
+unit_prop_test_fail_template_wrong_result :: IO ()
+unit_prop_test_fail_template_wrong_result = sequence_ $ replicate 10 propFailTemplateGenWrongEachHookResult
+
+propFailTemplateGenWrongEachHookResult :: IO ()
+propFailTemplateGenWrongEachHookResult =
+    runTest
+        defaultSeed
+        (ThreadCount 1)
+        [ EachBefore
+            { eachSpec =
+                T.PassProb
+                    { genStrategy = Preload
+                    , passPcnt = 95
+                    , minDelay = 0
+                    , maxDelay = 0
+                    }
+            , subNodes =
+                [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+            }
+        ]
+
+{-- 
+  property test revealed nested AfterEach hooks firing out of order
+-}
+
 -- $> unit_prop_fail_each_after_out_of_order
 unit_prop_fail_each_after_out_of_order :: IO ()
 unit_prop_fail_each_after_out_of_order =
@@ -194,49 +233,38 @@ unit_prop_fail_each_after_out_of_order =
         Log
         defaultSeed
         (ThreadCount 1)
-        [ EachBefore
+        [ EachAfter
             { eachSpec = T.All Spec{delay = 0, result = Pass}
             , subNodes =
                 [ EachAfter
                     { eachSpec = T.All Spec{delay = 0, result = Pass}
                     , subNodes =
-                        [ EachAfter
-                            { eachSpec = T.All Spec{delay = 0, result = Pass}
-                            , subNodes =
-                                [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
-                            }
-                        ]
+                        [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
                     }
                 ]
             }
         ]
 
-{-
-generator stubs
-  Template: FAIL (17.41s)
-    failed after 21 shrinks
-    expected /= (is right t)
-    t         : Left user error (
-    subsequent parent event for:
-    SuiteEventPath
-      { path = TestPath { id = 0 , title = "0.0.0.0 Test" }
-      , suiteEvent = Test
-      }
-    equality check failed:
-    Expected:
-      Just
-      SuiteEventPath
-        { path = NodePath { module' = "0.0.0" , path = "EachAfter" }
-        , suiteEvent = Hook Each After
-        }
-    Does not Equal:
-      Just
-      SuiteEventPath
-        { path = NodePath { module' = "0.0" , path = "EachAfter" }
-        , suiteEvent = Hook Each After
-        }
-    )
-    expected  : True
-    is right t: False
 
+{-
+*** Exception: user error (
+subsequent parent event for:
+SuiteEventPath
+  { path = TestPath { id = 0 , title = "0.0.0 Test" }
+  , suiteEvent = Test
+  }
+equality check failed:
+Expected:
+  Just
+  SuiteEventPath
+    { path = NodePath { module' = "0.0" , path = "EachAfter" }
+    , suiteEvent = Hook Each After
+    }
+Does not Equal:
+  Just
+  SuiteEventPath
+    { path = NodePath { module' = "0" , path = "EachAfter" }
+    , suiteEvent = Hook Each After
+    }
+)
 -}

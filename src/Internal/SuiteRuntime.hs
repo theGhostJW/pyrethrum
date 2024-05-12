@@ -88,39 +88,67 @@ executeNodes sink nodes tc =
   thrdTokens = replicate tc.maxThreads True
   newLogger = L.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
 
-data NFrequency = Each | Thread
-  deriving (Show, Eq)
-
 data ExeTree hi where
-  AfterOnce ::
+  OnceBefore ::
+    { path :: L.ExePath
+    , before :: P.ApEventSink -> hi -> IO ho
+    , beforeStatus :: TVar BeforeStatus
+    , cache :: TMVar (Either L.FailPoint ho)
+    , subNodes :: ChildQ (ExeTree ho)
+    } ->
+    ExeTree hi
+  OnceAfter ::
     { path :: L.ExePath
     , status' :: TVar AfterStatus
     , subNodes' :: ChildQ (ExeTree hi)
     , after :: P.ApEventSink -> IO ()
     } ->
     ExeTree hi
-  AroundOnce ::
+  OnceAround ::
     { path :: L.ExePath
     , setup :: P.ApEventSink -> hi -> IO ho
     , status :: TVar AroundStatus
     , cache :: TMVar (Either L.FailPoint ho)
     , subNodes :: ChildQ (ExeTree ho)
-    , teardown :: Maybe (P.ApEventSink -> ho -> IO ())
+    , teardown :: P.ApEventSink -> ho -> IO ()
     } ->
     ExeTree hi
-  After ::
+  ThreadBefore ::
     { path :: L.ExePath
-    , frequency :: NFrequency
+    , before :: P.ApEventSink -> hi -> IO ho
+    , subNodes :: ChildQ (ExeTree ho)
+    } ->
+    ExeTree hi
+  ThreadAround ::
+    { path :: L.ExePath
+    , setup :: P.ApEventSink -> hi -> IO ho
+    , subNodes :: ChildQ (ExeTree ho)
+    , teardown :: P.ApEventSink -> ho -> IO ()
+    } ->
+    ExeTree hi
+  ThreadAfter ::
+    { path :: L.ExePath
     , subNodes' :: ChildQ (ExeTree hi)
     , after :: P.ApEventSink -> IO ()
     } ->
     ExeTree hi
-  Around ::
+  EachBefore ::
     { path :: L.ExePath
-    , frequency :: NFrequency
+    , before :: P.ApEventSink -> hi -> IO ho
+    , subNodes :: ChildQ (ExeTree ho)
+    } ->
+    ExeTree hi
+  EachAround ::
+    { path :: L.ExePath
     , setup :: P.ApEventSink -> hi -> IO ho
     , subNodes :: ChildQ (ExeTree ho)
-    , teardown :: Maybe (P.ApEventSink -> ho -> IO ())
+    , teardown :: P.ApEventSink -> ho -> IO ()
+    } ->
+    ExeTree hi
+  EachAfter ::
+    { path :: L.ExePath
+    , subNodes' :: ChildQ (ExeTree hi)
+    , after :: P.ApEventSink -> IO ()
     } ->
     ExeTree hi
   Test ::
@@ -144,22 +172,27 @@ mkXTree xpth preNodes =
         , action
         , subNodes
         } ->
-          frequency & \case
-            F.Once -> mkOnceHook subNodes action Nothing
-            F.Thread -> mkNHook' Thread
-            F.Each -> mkNHook' Each
-         where
-          mkNHook' = mkNHook subNodes action Nothing
+          do
+            childTree <- mkXTree path subNodes
+            frequency & \case
+              F.Once -> do
+                cache <- newEmptyTMVarIO
+                status <- newTVarIO BeforePending
+                pure $ OnceBefore path action status cache childTree
+              F.Thread -> pure $ ThreadBefore path action childTree
+              F.Each -> pure $ EachBefore path action childTree
+      --
       P.After{frequency, subNodes', after} ->
         do
-          cq <- mkXTree path subNodes'
-          let mkAfter fq = pure $ After{path, frequency = fq, subNodes' = cq, after}
+          childTree <- mkXTree path subNodes'
+          -- let mkAfter fq = pure $ After{path, frequency = fq, subNodes' = cq, after}
           frequency & \case
             F.Once -> do
-              status' <- newTVarIO AfterQPending
-              pure $ AfterOnce{path, status', subNodes' = cq, after}
-            F.Thread -> mkAfter Thread
-            F.Each -> mkAfter Each
+              status <- newTVarIO AfterQPending
+              pure $ OnceAfter path status childTree after
+            F.Thread -> pure $ ThreadAfter path childTree after
+            F.Each -> pure $ EachAfter path childTree after
+      --
       P.Around
         { frequency
         , setup
@@ -167,12 +200,22 @@ mkXTree xpth preNodes =
         , teardown
         } ->
           frequency & \case
-            F.Once -> mkOnceHook subNodes setup teardown'
-            F.Thread -> nHook' Thread
-            F.Each -> nHook' Each
-         where
-          teardown' = Just teardown
-          nHook' = mkNHook subNodes setup teardown'
+            F.Once -> do
+              status <- newTVarIO SetupPending
+              cache <- newEmptyTMVarIO
+              subNodes <- mkXTree path subNodes'
+              pure $
+                OnceAround
+                  { path
+                  , setup
+                  , status
+                  , cache
+                  , subNodes
+                  , teardown
+                  }
+            F.Thread -> pure $ ThreadAround path setup subNodes teardown
+            F.Each -> pure $ EachAround path setup subNodes teardown
+      --
       P.Test
         { config = c
         , tests
@@ -182,41 +225,14 @@ mkXTree xpth preNodes =
    where
     path = L.ExePath $ pn.path : coerce xpth
 
-    mkOnceHook :: forall hi' ho'. m (P.PreNode IO m ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> IO (ExeTree hi')
-    mkOnceHook subNodes' setup teardown = do
-      status <- newTVarIO SetupPending
-      cache <- newEmptyTMVarIO
-      subNodes <- mkXTree path subNodes'
-      pure $
-        AroundOnce
-          { path
-          , setup
-          , status
-          , cache
-          , subNodes
-          , teardown
-          }
-
-    mkNHook :: forall hi' ho'. m (P.PreNode IO m ho') -> (P.ApEventSink -> hi' -> IO ho') -> Maybe (P.ApEventSink -> ho' -> IO ()) -> NFrequency -> IO (ExeTree hi')
-    mkNHook subNodes' setup teardown frequency = do
-      subNodes <- mkXTree path subNodes'
-      pure $
-        Around
-          { path
-          , setup
-          , frequency
-          , subNodes
-          , teardown
-          }
-
-data HookStatus
-  = HookVoid
-  | HookPending
-  | HookRunning
-  | HookComplete
-  | HookReleaseRunning
-  | HookReleased
-  deriving (Show, Eq)
+-- data HookStatus
+--   = HookVoid
+--   | HookPending
+--   | HookRunning
+--   | HookComplete
+--   | HookReleaseRunning
+--   | HookReleased
+--   deriving (Show, Eq)
 
 data BeforeStatus
   = BeforePending
@@ -369,18 +385,23 @@ logReturnFailure lgr p et e =
 data CanAbandon = None | Partial | All
   deriving (Show, Eq)
 
+-- TODO: double check logic with all calls to this after refactor is done
+-- esp use of Partial vs All
 canAbandon :: ExeTree hi -> STM CanAbandon
 canAbandon = \case
-  AfterOnce{status'} -> do
-    s <- readTVar status'
+  -- Once* will be redundant until killing a test run is implemented
+  -- because the runner will only be abandoning nodes before they are started
+  -- Once* hooks are effectively single threaded
+  OnceBefore{beforeStatus} -> do
+    s <- readTVar beforeStatus
     pure $
       s & \case
-        AfterQPending -> All
-        AfterQRunning -> Partial
-        AfterRunning -> None
-        AfterAbandoning -> None
-        AfterDone -> None
-  AroundOnce{status} -> do
+        BeforePending -> All
+        BeforeRunning -> Partial
+        BeforeQRunning -> Partial
+        BeforeDone -> None
+        BeforeAbandoning -> None
+  OnceAround{status} -> do
     s <- readTVar status
     pure $
       s & \case
@@ -390,10 +411,26 @@ canAbandon = \case
         AroundAbandoning -> None
         TeardownRunning -> None
         AroundDone -> None
+  OnceAfter{status'} -> do
+    s <- readTVar status'
+    pure $
+      s & \case
+        AfterQPending -> All
+        AfterQRunning -> Partial
+        AfterRunning -> None
+        AfterAbandoning -> None
+        AfterDone -> None
 
   -- base non singleton can run status on underlying q
-  After{subNodes'} -> qStatus subNodes'
-  Around{subNodes} -> qStatus subNodes
+  -- the q is the only state for these constructors
+  ThreadAfter{subNodes'} -> qStatus subNodes'
+  ThreadAround{subNodes} -> qStatus subNodes
+  ThreadBefore{subNodes} -> qStatus subNodes
+  --
+  EachBefore{subNodes} -> qStatus subNodes
+  EachAround{subNodes} -> qStatus subNodes
+  EachAfter{subNodes'} -> qStatus subNodes'
+  --
   Test{tests} -> qStatus tests
  where
   qStatus q = convert <$> readTVar q.status
@@ -404,7 +441,7 @@ canAbandon = \case
 
 canRunXTree :: ExeTree hi -> STM CanRun
 canRunXTree = \case
-  AfterOnce{subNodes', status'} ->
+  OnceAfter{subNodes', status'} ->
     do
       s <- readTVar status'
       qs <- readTVar subNodes'.status
@@ -415,7 +452,7 @@ canRunXTree = \case
           AfterRunning -> Saturated
           AfterAbandoning -> Saturated
           AfterDone -> Done
-  AroundOnce{subNodes, status} -> do
+  OnceAround{subNodes, status} -> do
     s <- readTVar status
     qs <- readTVar subNodes.status
     pure $
@@ -513,9 +550,10 @@ runNode lgr hi xt =
     runSubNodes_ n = void . runSubNodes n
 
     -- tree generation is restricted by typeclasses so unless the typeclass constraint implmentation is wrong
-    -- execution trees with invalid structure (Thread or Once depending on Each) should never be generated.
-    -- The only way these errors could be thrown is from unit testing code that generates a testsuite via
-    -- lower level, where there are no typeclass contraints
+    -- execution trees with invalid structure (Thread or Once depending on Each, or Once depending on Thread) 
+    -- should never be generated.
+    -- The only way these errors could be thrown is from unit testing code that generates an invalid testsuite 
+    -- via lower level constructors where there are no typeclass contraints apply
     invalidTree :: Text -> Text -> IO ()
     invalidTree input cst = bug @Void . error $ input <> " >>> should not be passed to >>> " <> cst <> "\n" <> txt xt.path
 
@@ -629,17 +667,16 @@ runNode lgr hi xt =
            where
             runAfter = logRun_ (TE.Hook TE.Each TE.After) after
             abandonAfter = logAbandonned' (TE.Hook TE.Each TE.After)
-            nxtAfter = 
-               case hi of
+            nxtAfter =
+              case hi of
                 Abandon fp -> abandonAfter fp
                 EachIn{after = hiAfter} -> runAfter >> hiAfter
-               
-                OnceIn {} -> runAfter
+                OnceIn{} -> runAfter
                 ThreadIn ioHi -> ioHi >>= either abandonAfter (const runAfter)
             nxtApply nxtAction =
               case hi of
-                Abandon fp -> nxtAction (Left fp) 
-                EachIn{apply} -> apply nxtAction 
+                Abandon fp -> nxtAction (Left fp)
+                EachIn{apply} -> apply nxtAction
                 {- Defect Here
                  Template:
                   EachAfter 0
@@ -669,8 +706,8 @@ runNode lgr hi xt =
 
                  Action Construction is Wrong
                 -}
-                OnceIn ioHi -> ioHi >>= \i -> nxtAction (Right i) 
-                ThreadIn ioHi -> ioHi >>= \i -> nxtAction i 
+                OnceIn ioHi -> ioHi >>= \i -> nxtAction (Right i)
+                ThreadIn ioHi -> ioHi >>= \i -> nxtAction i
           Thread -> case hi of
             Abandon fp -> runSubNodesAfter $ Just fp
             EachIn _ _ -> invalidTree "EachIn" "After Thread"

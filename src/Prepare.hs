@@ -66,9 +66,8 @@ listPaths =
       Around{subNodes} -> accumPaths subNodes
    where
     accum' = (i, n.path) : accum
-    i' = succ i
     accumPaths :: forall hii. c (PreNode m c hii) -> [(Int, Path)]
-    accumPaths = foldl' (step i') accum'
+    accumPaths = foldl' (step $ succ i) accum'
 
 data TestItem m hi = TestItem
   { id :: Int
@@ -297,7 +296,7 @@ data SuitePrepParams m c rc tc where
 --    - filtering
 --    - tree shaking
 --    - querying
---    - validation ??
+--    - validation - eg. no repeat item titles
 -- will return more info later such as filter log and have to return an either
 filterSuite :: forall m c rc tc. c (C.Node m c rc tc ()) -> c (C.Node m c rc tc ())
 filterSuite = uu

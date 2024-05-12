@@ -222,15 +222,15 @@ propFailTemplateGenWrongEachHookResult =
             }
         ]
 
-{-- 
+{--
   property test revealed nested AfterEach hooks firing out of order
 -}
+--
 
--- $> unit_prop_fail_each_after_out_of_order
+-- $ > unit_prop_fail_each_after_out_of_order
 unit_prop_fail_each_after_out_of_order :: IO ()
 unit_prop_fail_each_after_out_of_order =
-    runTest'
-        Log
+    runTest
         defaultSeed
         (ThreadCount 1)
         [ EachAfter
@@ -245,9 +245,8 @@ unit_prop_fail_each_after_out_of_order =
             }
         ]
 
-
 {-
-*** Exception: user error (
+\*** Exception: user error (
 subsequent parent event for:
 SuiteEventPath
   { path = TestPath { id = 0 , title = "0.0.0 Test" }
@@ -268,3 +267,22 @@ Does not Equal:
     }
 )
 -}
+
+-- $> unit_prop_fail_each_after_out_of_order1
+unit_prop_fail_each_after_out_of_order1 :: IO ()
+unit_prop_fail_each_after_out_of_order1 =
+    runTest'
+        Log
+        defaultSeed
+        (ThreadCount 1)
+        [ EachAfter
+            { eachSpec = T.All Spec{delay = 0, result = Pass}
+            , subNodes =
+                [ EachBefore
+                    { eachSpec = T.All Spec{delay = 0, result = Pass}
+                    , subNodes =
+                        [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+                    }
+                ]
+            }
+        ]

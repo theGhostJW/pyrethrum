@@ -7,7 +7,7 @@ import Internal.RunTimeLogging qualified as L
 import Internal.ThreadEvent qualified as F (Hz (..))
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
-import PyrethrumExtras (catchAll, txt, (?), debugf', toS)
+import PyrethrumExtras (catchAll, debugf', toS, txt, (?))
 import Text.Show.Pretty (ppShow)
 import UnliftIO (
   concurrently_,
@@ -29,10 +29,8 @@ import UnliftIO.STM (
  )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
 
-
 {-
-todo :: define defect properties with sum type type and typeclass which returns defect info 
-
+todo :: define defect properties with sum type type and typeclass which returns defect info
 
 -}
 -- TODO; move to pyrelude
@@ -525,7 +523,7 @@ runNode lgr hi xt =
    in
     case xt of
       -- For AfterOnce and AroundOnce we assume tree shaking has been executed prior to execution.
-      -- There is no possibility of empty subnodes due to tree shaking, so these hooks will always 
+      -- There is no possibility of empty subnodes due to tree shaking, so these hooks will always
       -- need to be run
       AfterOnce
         { status'
@@ -557,7 +555,7 @@ runNode lgr hi xt =
                   do
                     case hi of
                       Abandon fp -> runAfter (Just fp)
-                      EachIn _ -> invalidTree "EachIn" "AfterOnce"
+                      EachIn _ _ -> invalidTree "EachIn" "AfterOnce"
                       ThreadIn _ -> invalidTree "ThreadIn" "AfterOnce"
                       OnceIn _ -> runAfter Nothing
               )
@@ -583,7 +581,7 @@ runNode lgr hi xt =
                       (logAbandonned' (TE.Hook TE.Once TE.Teardown) fp)
                       (atomically $ writeTVar status AroundDone)
                 )
-            EachIn _ -> invalidTree "EachIn" "AroundOnce"
+            EachIn _ _ -> invalidTree "EachIn" "AroundOnce"
             ThreadIn _ -> invalidTree "ThreadIn" "AroundOnce"
             OnceIn ioHi ->
               do
@@ -624,16 +622,24 @@ runNode lgr hi xt =
                         )
                   )
       ---
-      After{frequency, subNodes', after, path} ->
+      After{frequency, subNodes', after} ->
         case frequency of
           Each ->
-            runSubNodes_ (EachIn nxtApply) subNodes'
+            runSubNodes_ (EachIn nxtApply nxtAfter) subNodes'
            where
+            runAfter = logRun_ (TE.Hook TE.Each TE.After) after
+            abandonAfter = logAbandonned' (TE.Hook TE.Each TE.After)
+            nxtAfter = 
+               case hi of
+                Abandon fp -> abandonAfter fp
+                EachIn{after = hiAfter} -> runAfter >> hiAfter
+               
+                OnceIn {} -> runAfter
+                ThreadIn ioHi -> ioHi >>= either abandonAfter (const runAfter)
             nxtApply nxtAction =
               case hi of
-                Abandon fp -> nxtAction (Left fp) >> abandonAfter fp
-                EachIn{apply} -> debugf' (const $ "appending after action >> " <> ptxt path) "APPEND" $ apply nxtAction >> runAfter
-                  
+                Abandon fp -> nxtAction (Left fp) 
+                EachIn{apply} -> apply nxtAction 
                 {- Defect Here
                  Template:
                   EachAfter 0
@@ -644,7 +650,7 @@ runNode lgr hi xt =
                        ]
 
                     ]
-                
+
                  Action Construction:
                   - EachAfter 0
                      -- apply => ((()-> ta)) >> EA.0
@@ -663,14 +669,11 @@ runNode lgr hi xt =
 
                  Action Construction is Wrong
                 -}
-                OnceIn ioHi -> ioHi >>= \i -> nxtAction (Right i) >> runAfter
-                ThreadIn ioHi -> ioHi >>= \i -> nxtAction i >> (i & either abandonAfter (const runAfter))
-             where
-              runAfter = logRun_ (TE.Hook TE.Each TE.After) after
-              abandonAfter = logAbandonned' (TE.Hook TE.Each TE.After)
+                OnceIn ioHi -> ioHi >>= \i -> nxtAction (Right i) 
+                ThreadIn ioHi -> ioHi >>= \i -> nxtAction i 
           Thread -> case hi of
             Abandon fp -> runSubNodesAfter $ Just fp
-            EachIn _ -> invalidTree "EachIn" "After Thread"
+            EachIn _ _ -> invalidTree "EachIn" "After Thread"
             OnceIn _ -> runSubNodesAfter Nothing
             ThreadIn _ -> runSubNodesAfter Nothing
            where
@@ -689,8 +692,9 @@ runNode lgr hi xt =
          in
           case frequency of
             Each ->
-              runSubNodes_ (EachIn nxtApply) subNodes
+              runSubNodes_ (EachIn nxtApply emptyAfter) subNodes
              where
+              emptyAfter = pure ()
               nxtApply nxtAction =
                 case hi of
                   Abandon fp -> runAbandon fp
@@ -792,7 +796,7 @@ runNode lgr hi xt =
       Test{path, tests} ->
         case hi of
           Abandon fp -> runTests (`runTestItem` Left fp)
-          EachIn{apply} -> runTests (apply . runTestItem)
+          EachIn{apply, after} -> runTests (\i -> (apply $ runTestItem i) >> after)
           OnceIn ioHi -> ioHi >>= \hii -> runTests (`runTestItem` Right hii)
           ThreadIn ethIoHi -> ethIoHi >>= \ehi -> runTests (`runTestItem` ehi)
        where
@@ -809,13 +813,12 @@ runNode lgr hi xt =
         mkTestPath :: P.TestItem IO hi -> L.ExePath
         mkTestPath P.TestItem{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : coerce path
 
-
 aroundLeadingHookPos :: Maybe a -> TE.HookPos
 aroundLeadingHookPos teardown =
-  case teardown of 
+  case teardown of
     -- if there is no tearown the hook is deemed a Before hook
     -- the hook action that runs before is of type Before
-    Nothing -> TE.Before 
+    Nothing -> TE.Before
     -- if there is a tearown the hook is deemed a Around hook
     -- so the the hook action that runs before is of type Setup
     Just _ -> TE.Setup
@@ -825,7 +828,9 @@ data NodeIn hi
   | OnceIn (IO hi)
   | ThreadIn (IO (Either FailPoint hi))
   | EachIn
-      {apply :: (Either FailPoint hi -> IO ()) -> IO ()}
+      { apply :: (Either FailPoint hi -> IO ()) -> IO ()
+      , after :: IO ()
+      }
 
 tryLock :: TVar s -> ChildQ a -> (s -> CanRun -> Bool) -> s -> STM Bool
 tryLock hs cq canLock lockStatus =

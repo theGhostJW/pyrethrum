@@ -91,8 +91,8 @@ genNode gl@GenParams{
   genFixture = Fixture <$> (list (between (1, maxTests)) $ genSpec')
 -}
 
-def :: TestOptions
-def =
+defaultTestOptions :: TestOptions
+defaultTestOptions =
   TestOptions
     { expectFailure = DontExpectFailure
     , overrideVerbose = Just Verbose
@@ -102,7 +102,7 @@ def =
     }
 
 demoProp :: (Show a) => String -> Gen a -> TestTree
-demoProp label gen' = testPropertyWith def label $ (gen gen') >>= collect label . pure
+demoProp label gen' = testPropertyWith defaultTestOptions label $ (gen gen') >>= collect label . pure
 
 genResult :: Word -> Gen Result
 genResult passPcnt =
@@ -218,12 +218,12 @@ tryRunTest c suite =
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
 {-# NOINLINE prop_test_suite #-}
 prop_test_suite :: TestTree
-prop_test_suite = testPropertyWith def "Template" $ do
+prop_test_suite = testPropertyWith defaultTestOptions "Template" $ do
   t <- genWith (Just . ppShow) $ genTemplate genParams
   let result = unsafePerformIO $ tryRunTest (ThreadCount 5) t
   assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
--- $ > test_suite
+-- $> test_suite
 test_suite :: IO ()
 test_suite =
   defaultMain $

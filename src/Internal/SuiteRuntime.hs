@@ -441,17 +441,16 @@ canAbandon = \case
 
 canRunXTree :: ExeTree hi -> STM CanRun
 canRunXTree = \case
-  OnceAfter{subNodes', status'} ->
-    do
-      s <- readTVar status'
-      qs <- readTVar subNodes'.status
-      pure $
-        s & \case
-          AfterQPending -> Runnable
-          AfterQRunning -> stepDownQStatus qs
-          AfterRunning -> Saturated
-          AfterAbandoning -> Saturated
-          AfterDone -> Done
+  OnceBefore{subNodes, beforeStatus} -> do
+    s <- readTVar status
+    qs <- readTVar subNodes.status
+    pure $
+      s & \case
+        BeforePending -> Runnable
+        BeforeRunning -> Runnable
+        BeforeQRunning -> stepDownQStatus qs
+        BeforeAbandoning -> Saturated
+        BeforeDone -> Done
   OnceAround{subNodes, status} -> do
     s <- readTVar status
     qs <- readTVar subNodes.status
@@ -463,10 +462,25 @@ canRunXTree = \case
         AroundAbandoning -> Saturated
         TeardownRunning -> Saturated
         AroundDone -> Done
+  OnceAfter{subNodes', status'} ->
+    do
+      s <- readTVar status'
+      qs <- readTVar subNodes'.status
+      pure $
+        s & \case
+          AfterQPending -> Runnable
+          AfterQRunning -> stepDownQStatus qs
+          AfterRunning -> Saturated
+          AfterAbandoning -> Saturated
+          AfterDone -> Done
 
   -- base non singleton can run status on underlying q
-  After{subNodes'} -> qStatus subNodes'
-  Around{subNodes} -> qStatus subNodes
+  ThreadBefore{subNodes} -> qStatus subNodes
+  ThreadAround{subNodes} -> qStatus subNodes
+  ThreadAfter{subNodes'} -> qStatus subNodes'
+  EachBefore{subNodes} -> qStatus subNodes
+  EachAround{subNodes} -> qStatus subNodes
+  EachAfter{subNodes'} -> qStatus subNodes'
   Test{tests} -> qStatus tests
  where
   qStatus q = readTVar q.status
@@ -474,6 +488,18 @@ canRunXTree = \case
     Runnable -> Runnable
     Saturated -> Saturated
     Done -> Saturated
+
+canRunBeforeOnce :: BeforeStatus -> CanRun -> Bool
+canRunBeforeOnce s qs = case s of
+  BeforePending -> True
+  BeforeRunning -> True
+  BeforeQRunning ->
+    qs & \case
+      Runnable -> True
+      Saturated -> False
+      Done -> False
+  BeforeDone -> False
+  BeforeAbandoning -> False
 
 canRunAfterOnce :: AfterStatus -> CanRun -> Bool
 canRunAfterOnce s qs = case s of
@@ -505,6 +531,14 @@ canLockSetup s _qs = case s of
   TeardownRunning -> False
   AroundDone -> False
   AroundAbandoning -> False
+
+canLockBefore :: BeforeStatus -> CanRun -> Bool
+canLockBefore s _qs = case s of
+  BeforePending -> True
+  BeforeRunning -> False
+  BeforeQRunning -> False
+  BeforeDone -> False
+  BeforeAbandoning -> False
 
 canLockTeardown :: AroundStatus -> CanRun -> Bool
 canLockTeardown s qs = case s of
@@ -550,9 +584,9 @@ runNode lgr hi xt =
     runSubNodes_ n = void . runSubNodes n
 
     -- tree generation is restricted by typeclasses so unless the typeclass constraint implmentation is wrong
-    -- execution trees with invalid structure (Thread or Once depending on Each, or Once depending on Thread) 
+    -- execution trees with invalid structure (Thread or Once depending on Each, or Once depending on Thread)
     -- should never be generated.
-    -- The only way these errors could be thrown is from unit testing code that generates an invalid testsuite 
+    -- The only way these errors could be thrown is from unit testing code that generates an invalid testsuite
     -- via lower level constructors where there are no typeclass contraints apply
     invalidTree :: Text -> Text -> IO ()
     invalidTree input cst = bug @Void . error $ input <> " >>> should not be passed to >>> " <> cst <> "\n" <> txt xt.path
@@ -560,47 +594,57 @@ runNode lgr hi xt =
     sink = lgr . L.ApEvent
    in
     case xt of
-      -- For AfterOnce and AroundOnce we assume tree shaking has been executed prior to execution.
+      -- For Once* we assume tree shaking has been executed prior to execution.
       -- There is no possibility of empty subnodes due to tree shaking, so these hooks will always
       -- need to be run
-      AfterOnce
-        { status'
-        , subNodes'
-        , after
-        } -> do
-          run <- atomically $ do
-            s <- readTVar status'
-            qs <- readTVar subNodes'.status
-            when (s == AfterQPending) $
-              writeTVar status' AfterQRunning
-            pure $ canRunAfterOnce s qs
-          when run $
-            finally
-              (runSubNodes_ hi subNodes')
-              ( let
-                  runAfter mAbandon = do
-                    let lockStatus = isJust mAbandon ? AfterAbandoning $ AfterRunning
-                    locked <- atomically $ tryLock status' subNodes' canLockAfterOnce lockStatus
-                    when locked $
-                      finally
-                        ( mAbandon
-                            & maybe
-                              (void $ logRun' (TE.Hook TE.Once TE.After) after)
-                              (logAbandonned' (TE.Hook TE.Once TE.After))
-                        )
-                        (atomically $ writeTVar status' AfterDone)
-                 in
-                  do
-                    case hi of
-                      Abandon fp -> runAfter (Just fp)
-                      EachIn _ _ -> invalidTree "EachIn" "AfterOnce"
-                      ThreadIn _ -> invalidTree "ThreadIn" "AfterOnce"
-                      OnceIn _ -> runAfter Nothing
-              )
-      ao@AroundOnce{setup, status, cache, subNodes, teardown} ->
-        let
-          leadHookPos = aroundLeadingHookPos teardown
-         in
+      ob@OnceBefore
+        { before
+        , beforeStatus
+        , cache
+        , subNodes
+        } ->
+          case hi of
+            Abandon fp -> do
+              (beforeLocked, canAbandonQ) <- atomically $ do
+                ca <- canAbandon ob
+                let locked = ca == All
+                when locked $
+                  writeTVar beforeStatus BeforeAbandoning
+                pure (locked, ca /= None)
+              when beforeLocked $
+                logAbandonned' (TE.Hook TE.Once TE.Before) fp
+              when canAbandonQ $
+                runSubNodes_ (Abandon fp) subNodes
+            EachIn _ _ -> invalidTree "EachIn" "AroundOnce"
+            ThreadIn _ -> invalidTree "ThreadIn" "AroundOnce"
+            OnceIn ioHi ->
+              do
+                i <- ioHi
+                setUpLocked <- atomically $ tryLock status subNodes canLockBefore SetupRunning
+                eho <-
+                  if setUpLocked
+                    then do
+                      eho <- logRun' (TE.Hook TE.Once TE.Before) (`setup` i)
+                      atomically $ writeTMVar cache eho
+                      eho
+                        & either
+                          ( \fp -> do
+                              atomically $ writeTVar status AroundAbandoning
+                              finally
+                                ( do
+                                    runSubNodes_ (Abandon fp) subNodes
+                                    when (isJust teardown) $
+                                      logAbandonned' (TE.Hook TE.Once TE.Teardown) fp
+                                )
+                                (atomically $ writeTVar status AroundDone)
+                          )
+                          (const $ atomically $ writeTVar status AroundQRunning)
+                      pure eho
+                    else atomically (readTMVar cache)
+                whenRight_
+                  eho
+                  (\ho -> runSubNodes_ (ThreadIn . pure $ Right ho) subNodes)
+      ao@OnceAround{setup, status, cache, subNodes, teardown} -> up to here - wip
           case hi of
             Abandon fp -> do
               setUpLocked <- atomically $ do
@@ -659,6 +703,36 @@ runNode lgr hi xt =
                                   (atomically $ writeTVar status AroundDone)
                         )
                   )
+      OnceAfter{status', subNodes', after} -> do
+        run <- atomically $ do
+          s <- readTVar status'
+          qs <- readTVar subNodes'.status
+          when (s == AfterQPending) $
+            writeTVar status' AfterQRunning
+          pure $ canRunAfterOnce s qs
+        when run $
+          finally
+            (runSubNodes_ hi subNodes')
+            ( let
+                runAfter mAbandon = do
+                  let lockStatus = isJust mAbandon ? AfterAbandoning $ AfterRunning
+                  locked <- atomically $ tryLock status' subNodes' canLockAfterOnce lockStatus
+                  when locked $
+                    finally
+                      ( mAbandon
+                          & maybe
+                            (void $ logRun' (TE.Hook TE.Once TE.After) after)
+                            (logAbandonned' (TE.Hook TE.Once TE.After))
+                      )
+                      (atomically $ writeTVar status' AfterDone)
+               in
+                do
+                  case hi of
+                    Abandon fp -> runAfter (Just fp)
+                    EachIn _ _ -> invalidTree "EachIn" "AfterOnce"
+                    ThreadIn _ -> invalidTree "ThreadIn" "AfterOnce"
+                    OnceIn _ -> runAfter Nothing
+            )
       ---
       After{frequency, subNodes', after} ->
         case frequency of
@@ -850,15 +924,15 @@ runNode lgr hi xt =
         mkTestPath :: P.TestItem IO hi -> L.ExePath
         mkTestPath P.TestItem{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : coerce path
 
-aroundLeadingHookPos :: Maybe a -> TE.HookPos
-aroundLeadingHookPos teardown =
-  case teardown of
-    -- if there is no tearown the hook is deemed a Before hook
-    -- the hook action that runs before is of type Before
-    Nothing -> TE.Before
-    -- if there is a tearown the hook is deemed a Around hook
-    -- so the the hook action that runs before is of type Setup
-    Just _ -> TE.Setup
+-- aroundLeadingHookPos :: Maybe a -> TE.HookPos
+-- aroundLeadingHookPos teardown =
+--   case teardown of
+--     -- if there is no tearown the hook is deemed a Before hook
+--     -- the hook action that runs before is of type Before
+--     Nothing -> TE.Before
+--     -- if there is a tearown the hook is deemed a Around hook
+--     -- so the the hook action that runs before is of type Setup
+--     Just _ -> TE.Setup
 
 data NodeIn hi
   = Abandon FailPoint
@@ -870,13 +944,13 @@ data NodeIn hi
       }
 
 tryLock :: TVar s -> ChildQ a -> (s -> CanRun -> Bool) -> s -> STM Bool
-tryLock hs cq canLock lockStatus =
+tryLock hs cq canLock lockedStatus =
   do
     s <- readTVar hs
     qs <- readTVar cq.status
     let cl = canLock s qs
     when cl $
-      writeTVar hs lockStatus
+      writeTVar hs lockedStatus
     pure cl
 
 logRun :: Logger -> L.ExePath -> TE.SuiteEvent -> IO b -> IO (Either L.FailPoint b)

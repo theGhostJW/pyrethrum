@@ -4,8 +4,8 @@ import Core qualified as C
 import DSL.Internal.ApEvent qualified as AE
 import Internal.RunTimeLogging (FailPoint)
 import Internal.RunTimeLogging qualified as L
+import Internal.ThreadEvent as TE hiding (Test)
 import Internal.ThreadEvent qualified as F (Hz (..))
-import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
 import PyrethrumExtras (catchAll, debugf', toS, txt, (?))
 import Text.Show.Pretty (ppShow)
@@ -70,7 +70,7 @@ executeNodeList
             stopWorker
         )
 
-executeNodes :: (TE.ThreadEvent L.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
+executeNodes :: (ThreadEvent L.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
 executeNodes sink nodes tc =
   do
     rootLogger <- newLogger
@@ -97,13 +97,6 @@ data ExeTree hi where
     , subNodes :: ChildQ (ExeTree ho)
     } ->
     ExeTree hi
-  OnceAfter ::
-    { path :: L.ExePath
-    , status' :: TVar AfterStatus
-    , subNodes' :: ChildQ (ExeTree hi)
-    , after :: P.ApEventSink -> IO ()
-    } ->
-    ExeTree hi
   OnceAround ::
     { path :: L.ExePath
     , setup :: P.ApEventSink -> hi -> IO ho
@@ -111,6 +104,13 @@ data ExeTree hi where
     , cache :: TMVar (Either L.FailPoint ho)
     , subNodes :: ChildQ (ExeTree ho)
     , teardown :: P.ApEventSink -> ho -> IO ()
+    } ->
+    ExeTree hi
+  OnceAfter ::
+    { path :: L.ExePath
+    , status' :: TVar AfterStatus
+    , subNodes' :: ChildQ (ExeTree hi)
+    , after :: P.ApEventSink -> IO ()
     } ->
     ExeTree hi
   ThreadBefore ::
@@ -238,8 +238,8 @@ data BeforeStatus
   = BeforePending
   | BeforeRunning
   | BeforeQRunning
-  | BeforeDone
   | BeforeAbandoning
+  | BeforeDone
   deriving (Show, Eq)
 
 data AroundStatus
@@ -366,7 +366,7 @@ data ExeIn oi ti tsti = ExeIn
 
 type Logger = L.EngineEvent L.ExePath AE.ApEvent -> IO ()
 
-logAbandonned :: Logger -> L.ExePath -> TE.SuiteEvent -> L.FailPoint -> IO ()
+logAbandonned :: Logger -> L.ExePath -> SuiteEvent -> L.FailPoint -> IO ()
 logAbandonned lgr p e a =
   lgr $
     L.ParentFailure
@@ -376,7 +376,7 @@ logAbandonned lgr p e a =
       , failSuiteEvent = a.suiteEvent
       }
 
-logReturnFailure :: Logger -> L.ExePath -> TE.SuiteEvent -> SomeException -> IO (Either L.FailPoint b)
+logReturnFailure :: Logger -> L.ExePath -> SuiteEvent -> SomeException -> IO (Either L.FailPoint b)
 logReturnFailure lgr p et e =
   do
     lgr (L.mkFailure p et e)
@@ -541,16 +541,19 @@ canLockBefore s _qs = case s of
   BeforeAbandoning -> False
 
 canLockTeardown :: AroundStatus -> CanRun -> Bool
-canLockTeardown s qs = case s of
-  SetupPending -> False
-  SetupRunning -> False
-  AroundQRunning -> case qs of
+canLockTeardown s qs =
+  case s of
+    SetupPending -> False
+    SetupRunning -> False
+    AroundQRunning -> qDone
+    TeardownRunning -> False
+    AroundDone -> False
+    AroundAbandoning -> qDone
+ where
+  qDone = case qs of
     Runnable -> False
     Saturated -> False
     Done -> True
-  TeardownRunning -> False
-  AroundDone -> False
-  AroundAbandoning -> False
 
 -- TODO play with case statements
 -- runNode2 :: ExeTree hi -> a
@@ -568,10 +571,10 @@ runNode ::
   IO ()
 runNode lgr hi xt =
   let
-    logRun' :: TE.SuiteEvent -> (P.ApEventSink -> IO b) -> IO (Either L.FailPoint b)
+    logRun' :: SuiteEvent -> (P.ApEventSink -> IO b) -> IO (Either L.FailPoint b)
     logRun' et action = logRun lgr xt.path et (action sink)
 
-    logRun_ :: TE.SuiteEvent -> (P.ApEventSink -> IO b) -> IO ()
+    logRun_ :: SuiteEvent -> (P.ApEventSink -> IO b) -> IO ()
     logRun_ et action = void $ logRun' et action
 
     logAbandonned' = logAbandonned lgr xt.path
@@ -612,7 +615,7 @@ runNode lgr hi xt =
                   writeTVar beforeStatus BeforeAbandoning
                 pure (locked, ca /= None)
               when beforeLocked $
-                logAbandonned' (TE.Hook TE.Once TE.Before) fp
+                logAbandonned' (Hook Once Before) fp
               when canAbandonQ $
                 runSubNodes_ (Abandon fp) subNodes
             EachIn _ _ -> invalidTree "EachIn" "AroundOnce"
@@ -624,85 +627,85 @@ runNode lgr hi xt =
                 eho <-
                   if setUpLocked
                     then do
-                      eho <- logRun' (TE.Hook TE.Once TE.Before) (`setup` i)
+                      eho <- logRun' (Hook Once Before) (`setup` i)
                       atomically $ writeTMVar cache eho
                       eho
                         & either
                           ( \fp -> do
-                              atomically $ writeTVar status AroundAbandoning
+                              atomically $ writeTVar status BeforeAbandoning
                               finally
-                                ( do
-                                    runSubNodes_ (Abandon fp) subNodes
-                                    when (isJust teardown) $
-                                      logAbandonned' (TE.Hook TE.Once TE.Teardown) fp
-                                )
-                                (atomically $ writeTVar status AroundDone)
+                                (runSubNodes_ (Abandon fp) subNodes)
+                                (atomically $ writeTVar status BeforeDone)
                           )
-                          (const $ atomically $ writeTVar status AroundQRunning)
+                          (const $ atomically $ writeTVar status BeforeQRunning)
                       pure eho
                     else atomically (readTMVar cache)
                 whenRight_
                   eho
-                  (\ho -> runSubNodes_ (ThreadIn . pure $ Right ho) subNodes)
-      ao@OnceAround{setup, status, cache, subNodes, teardown} -> up to here - wip
-          case hi of
-            Abandon fp -> do
-              setUpLocked <- atomically $ do
-                ca <- canAbandon ao
-                let locked = ca == All
-                when locked $
-                  writeTVar status AroundAbandoning
-                pure locked
-              when setUpLocked $
-                logAbandonned' (TE.Hook TE.Once leadHookPos) fp
-              finally
-                (runSubNodes_ (Abandon fp) subNodes)
-                ( -- only AbandonOld teardown if setup has not started
-                  when setUpLocked $ do
-                    finally
-                      (logAbandonned' (TE.Hook TE.Once TE.Teardown) fp)
-                      (atomically $ writeTVar status AroundDone)
-                )
-            EachIn _ _ -> invalidTree "EachIn" "AroundOnce"
-            ThreadIn _ -> invalidTree "ThreadIn" "AroundOnce"
-            OnceIn ioHi ->
-              do
-                i <- ioHi
-                setUpLocked <- atomically $ tryLock status subNodes canLockSetup SetupRunning
-                eho <-
-                  if setUpLocked
-                    then do
-                      eho <- logRun' (TE.Hook TE.Once leadHookPos) (`setup` i)
-                      atomically $ writeTMVar cache eho
-                      eho
-                        & either
-                          ( \fp -> do
-                              atomically $ writeTVar status AroundAbandoning
-                              finally
-                                ( do
-                                    runSubNodes_ (Abandon fp) subNodes
-                                    when (isJust teardown) $
-                                      logAbandonned' (TE.Hook TE.Once TE.Teardown) fp
-                                )
-                                (atomically $ writeTVar status AroundDone)
-                          )
-                          (const $ atomically $ writeTVar status AroundQRunning)
-                      pure eho
-                    else atomically (readTMVar cache)
-                whenRight_
-                  eho
-                  ( \ho ->
-                      finally
-                        (runSubNodes_ (ThreadIn . pure $ Right ho) subNodes)
-                        ( whenJust teardown $
-                            \td -> do
-                              locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
-                              when locked $
-                                finally
-                                  (logRun_ (TE.Hook TE.Once TE.Teardown) (`td` ho))
-                                  (atomically $ writeTVar status AroundDone)
-                        )
+                  ( finally
+                      (\ho -> runSubNodes_ (OnceIn $ pure ho) subNodes)
+                      (atomically $ writeTVar status BeforeDone)
                   )
+      ao@OnceAround{setup, status, cache, subNodes, teardown} ->
+        case hi of
+          Abandon fp -> do
+            setUpLocked <- atomically $ do
+              ca <- canAbandon ao
+              let locked = ca == All
+              when locked $
+                writeTVar status AroundAbandoning
+              pure locked
+            when setUpLocked $
+              logAbandonned' (Hook Once Setup) fp
+            finally
+              (runSubNodes_ (Abandon fp) subNodes)
+              ( -- only Abandon teardown if locked
+                do
+                  locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
+                  when locked $
+                    finally
+                      (logAbandonned' (Hook Once Teardown) fp)
+                      (atomically $ writeTVar status AroundDone)
+              )
+          EachIn _ _ -> invalidTree "EachIn" "AroundOnce"
+          ThreadIn _ -> invalidTree "ThreadIn" "AroundOnce"
+          OnceIn ioHi ->
+            do
+              i <- ioHi
+              setUpLocked <- atomically $ tryLock status subNodes canLockSetup SetupRunning
+              eho <-
+                if setUpLocked
+                  then do
+                    eho <- logRun' (Hook Once leadHookPos) (`setup` i)
+                    atomically $ writeTMVar cache eho
+                    eho
+                      & either
+                        ( \fp -> do
+                            atomically $ writeTVar status AroundAbandoning
+                            finally
+                              ( do
+                                  runSubNodes_ (Abandon fp) subNodes
+                                  when (isJust teardown) $
+                                    logAbandonned' (Hook Once Teardown) fp
+                              )
+                              (atomically $ writeTVar status AroundDone)
+                        )
+                        (const $ atomically $ writeTVar status AroundQRunning)
+                    pure eho
+                  else atomically (readTMVar cache)
+              whenRight_
+                eho
+                ( \ho ->
+                    finally
+                      (runSubNodes_ (OnceIn $ pure ho) subNodes)
+                      ( \td -> do
+                          locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
+                          when locked $
+                            finally
+                              (logRun_ (Hook Once Teardown) (`td` ho))
+                              (atomically $ writeTVar status AroundDone)
+                      )
+                )
       OnceAfter{status', subNodes', after} -> do
         run <- atomically $ do
           s <- readTVar status'
@@ -721,8 +724,8 @@ runNode lgr hi xt =
                     finally
                       ( mAbandon
                           & maybe
-                            (void $ logRun' (TE.Hook TE.Once TE.After) after)
-                            (logAbandonned' (TE.Hook TE.Once TE.After))
+                            (void $ logRun' (Hook Once After) after)
+                            (logAbandonned' (Hook Once After))
                       )
                       (atomically $ writeTVar status' AfterDone)
                in
@@ -734,13 +737,27 @@ runNode lgr hi xt =
                     OnceIn _ -> runAfter Nothing
             )
       ---
+      ThreadBefore{before, subNodes} ->
+        case hi of
+          Abandon fp -> do
+            runSubNodes_ (Abandon fp) subnodes
+          EachIn _ _ -> invalidTree "EachIn" "ThreadBefore"
+          OnceIn ioHi -> do
+            hi' <- ioHi
+            eho <- logRun' (Hook Thread Before) (`before` hi')
+            eho & either
+              (\fp -> logAbandonned' (Hook Thread Before))
+              (\ho -> runSubNodes_ (ThreadIn $ pure ho) subnodes)
+          ThreadIn ioHi -> do
+            ethi <- ioHi
+            runSubNodes_ (ThreadIn $ either (pure . Left) (fmap Right) ethi) subnodes
       After{frequency, subNodes', after} ->
         case frequency of
           Each ->
             runSubNodes_ (EachIn nxtApply nxtAfter) subNodes'
            where
-            runAfter = logRun_ (TE.Hook TE.Each TE.After) after
-            abandonAfter = logAbandonned' (TE.Hook TE.Each TE.After)
+            runAfter = logRun_ (Hook Each After) after
+            abandonAfter = logAbandonned' (Hook Each After)
             nxtAfter =
               case hi of
                 Abandon fp -> abandonAfter fp
@@ -794,9 +811,8 @@ runNode lgr hi xt =
                 when run.hasRun $
                   abandonned
                     & maybe
-                      (logRun_ (TE.Hook TE.Thread TE.After) after)
-                      (logAbandonned' (TE.Hook TE.Thread TE.After))
-      ---
+                      (logRun_ (Hook Thread After) after)
+                      (logAbandonned' (Hook Thread After))
       Around{frequency, setup, subNodes, teardown = mteardown} ->
         let
           leadHookPos = aroundLeadingHookPos mteardown
@@ -815,23 +831,23 @@ runNode lgr hi xt =
                   ThreadIn ethIoHi -> ethIoHi >>= either runAbandon runNxt
                where
                 runAbandon fp = do
-                  logAbandonned' (TE.Hook TE.Each leadHookPos) fp
+                  logAbandonned' (Hook Each leadHookPos) fp
                   nxtAction . Left $ fp
                   whenJust mteardown $
                     const $
-                      logAbandonned' (TE.Hook TE.Each TE.Teardown) fp
+                      logAbandonned' (Hook Each Teardown) fp
 
                 runNxt :: hi -> IO ()
                 runNxt hki =
                   do
-                    eho <- logRun' (TE.Hook TE.Each leadHookPos) (`setup` hki)
+                    eho <- logRun' (Hook Each leadHookPos) (`setup` hki)
                     nxtAction eho
                     whenJust mteardown $
                       \teardown' ->
                         eho
                           & either
-                            (logAbandonned' $ TE.Hook TE.Each TE.Teardown)
-                            (\ho -> logRun_ (TE.Hook TE.Each TE.Teardown) (`teardown'` ho))
+                            (logAbandonned' $ Hook Each Teardown)
+                            (\ho -> logRun_ (Hook Each Teardown) (`teardown'` ho))
             Thread ->
               let
                 runThreadAround ioHo hoVar =
@@ -844,8 +860,8 @@ runNode lgr hi xt =
                             -- if mho is Nothing then setup was not run (empty subnodes)
                             whenJust mho $
                               either
-                                (logAbandonned' (TE.Hook TE.Thread TE.Teardown))
-                                (\ho -> logRun_ (TE.Hook TE.Thread TE.Teardown) (`td` ho))
+                                (logAbandonned' (Hook Thread Teardown))
+                                (\ho -> logRun_ (Hook Thread Teardown) (`td` ho))
                     )
                in
                 case hi of
@@ -877,7 +893,7 @@ runNode lgr hi xt =
                         & maybe
                           ( do
                               hi'' <- ioHi
-                              ho <- logRun' (TE.Hook TE.Thread leadHookPos) (`setup` hi'')
+                              ho <- logRun' (Hook Thread leadHookPos) (`setup` hi'')
                               atomically $ putTMVar hov ho
                               pure ho
                           )
@@ -895,8 +911,8 @@ runNode lgr hi xt =
                               ethi <- ioeHi
                               ho <-
                                 either
-                                  (\fp -> logAbandonned' (TE.Hook TE.Thread leadHookPos) fp >> pure (Left fp))
-                                  (\hi'' -> logRun' (TE.Hook TE.Thread leadHookPos) (`setup` hi''))
+                                  (\fp -> logAbandonned' (Hook Thread leadHookPos) fp >> pure (Left fp))
+                                  (\hi'' -> logRun' (Hook Thread leadHookPos) (`setup` hi''))
                                   ethi
                               atomically $ putTMVar hov ho
                               pure ho
@@ -918,21 +934,21 @@ runNode lgr hi xt =
         runTestItem
           tstItm =
             either
-              (logAbandonned lgr (mkTestPath tstItm) TE.Test)
-              (void . logRun lgr (mkTestPath tstItm) TE.Test . tstItm.action sink)
+              (logAbandonned lgr (mkTestPath tstItm) Test)
+              (void . logRun lgr (mkTestPath tstItm) Test . tstItm.action sink)
 
         mkTestPath :: P.TestItem IO hi -> L.ExePath
         mkTestPath P.TestItem{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : coerce path
 
--- aroundLeadingHookPos :: Maybe a -> TE.HookPos
+-- aroundLeadingHookPos :: Maybe a -> HookPos
 -- aroundLeadingHookPos teardown =
 --   case teardown of
 --     -- if there is no tearown the hook is deemed a Before hook
 --     -- the hook action that runs before is of type Before
---     Nothing -> TE.Before
+--     Nothing -> Before
 --     -- if there is a tearown the hook is deemed a Around hook
 --     -- so the the hook action that runs before is of type Setup
---     Just _ -> TE.Setup
+--     Just _ -> Setup
 
 data NodeIn hi
   = Abandon FailPoint
@@ -953,7 +969,7 @@ tryLock hs cq canLock lockedStatus =
       writeTVar hs lockedStatus
     pure cl
 
-logRun :: Logger -> L.ExePath -> TE.SuiteEvent -> IO b -> IO (Either L.FailPoint b)
+logRun :: Logger -> L.ExePath -> SuiteEvent -> IO b -> IO (Either L.FailPoint b)
 logRun lgr path evt action = do
   lgr $ L.Start evt path
   finally

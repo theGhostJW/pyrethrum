@@ -225,14 +225,6 @@ mkXTree xpth preNodes =
    where
     path = L.ExePath $ pn.path : coerce xpth
 
--- data HookStatus
---   = HookVoid
---   | HookPending
---   | HookRunning
---   | HookComplete
---   | HookReleaseRunning
---   | HookReleased
---   deriving (Show, Eq)
 
 data BeforeStatus
   = BeforePending
@@ -474,7 +466,7 @@ canRunXTree = \case
           AfterAbandoning -> Saturated
           AfterDone -> Done
 
-  -- base non singleton can run status on underlying q
+  -- base non singleton canRun status on underlying q
   ThreadBefore{subNodes} -> qStatus subNodes
   ThreadAround{subNodes} -> qStatus subNodes
   ThreadAfter{subNodes'} -> qStatus subNodes'
@@ -600,6 +592,7 @@ runNode lgr hi xt =
       -- For Once* we assume tree shaking has been executed prior to execution.
       -- There is no possibility of empty subnodes due to tree shaking, so these hooks will always
       -- need to be run
+      -- ##### Once* #####
       ob@OnceBefore
         { before
         , beforeStatus
@@ -736,7 +729,8 @@ runNode lgr hi xt =
                     ThreadIn _ -> invalidTree "ThreadIn" "AfterOnce"
                     OnceIn _ -> runAfter Nothing
             )
-      ---
+      -- ##### Thread* #####
+      -- NOTE: If we hit
       ThreadBefore{before, subNodes} ->
         case hi of
           Abandon fp -> do
@@ -751,6 +745,13 @@ runNode lgr hi xt =
           ThreadIn ioHi -> do
             ethi <- ioHi
             runSubNodes_ (ThreadIn $ either (pure . Left) (fmap Right) ethi) subnodes
+          where
+            runAbandon fp = do
+              logAbandonned' (Hook Each leadHookPos) fp
+              nxtAction . Left $ fp
+              whenJust mteardown $
+                const $
+                  logAbandonned' (Hook Each Teardown) fp
       After{frequency, subNodes', after} ->
         case frequency of
           Each ->

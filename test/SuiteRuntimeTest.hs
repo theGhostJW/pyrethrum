@@ -148,9 +148,15 @@ unit_nested_threaded_chk_thread_count =
    that empty thread TestTrees are not executed
 -}
 
--- $ > unit_empty_thread_around
-unit_empty_thread_around :: IO ()
-unit_empty_thread_around =
+{-
+TODO revist this test after any concrete interpretor is implemented
+    that affects laziness ie. ensure empty subnodes are not run if we 
+    force strictness in hooks
+-}
+
+-- $ > unit_empty_thread_hooks
+unit_empty_thread_hooks :: IO ()
+unit_empty_thread_hooks =
     do
         exe [threadAround Pass Pass []] >>= chkEmptyLog
         exe [threadBefore Pass []] >>= chkEmptyLog

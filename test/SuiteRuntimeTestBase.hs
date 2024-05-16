@@ -106,11 +106,15 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
   -}
 
+
+
 type LogItem = ThreadEvent ExePath AE.ApEvent
 
 chkProperties :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
 chkProperties baseSeed threadLimit ts evts = do
   -- these checks apply to the log as a whole
+  -- TODO: Add to test - errors always logged when no parent error should be derivable from
+  -- template
   traverse_
     (evts &)
     [ chkStartEndExecution

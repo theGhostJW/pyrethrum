@@ -154,7 +154,7 @@ data ExeTree hi where
   Test ::
     { path :: L.ExePath
     , title :: Text
-    , tests :: ChildQ (P.TestItem IO hi)
+    , tests :: ChildQ (P.Test IO hi)
     } ->
     ExeTree hi
 
@@ -219,7 +219,7 @@ mkXTree xpth preNodes =
               TE.Each ->
                 pure $ EachAround path setup childTree teardown
       --
-      P.Test
+      P.Fixture
         { config = c
         , tests
         } -> do
@@ -600,10 +600,10 @@ runNode lgr hi xt =
     abandonSubs :: forall a. ChildQ (ExeTree a) -> IO ()
     abandonSubs = runSubNodes_ i
 
-    runTests :: (P.TestItem IO hi -> IO ()) -> ChildQ (P.TestItem IO hi) -> IO ()
+    runTests :: (P.Test IO hi -> IO ()) -> ChildQ (P.Test IO hi) -> IO ()
     runTests actn tests = void $ runChildQ Sequential actn (const $ pure Runnable) tests
 
-    mkTestPath :: P.TestItem IO hi -> L.ExePath -> L.ExePath
+    mkTestPath :: P.Test IO hi -> L.ExePath -> L.ExePath
     mkTestPath P.TestItem{id, title = ttl} fxPath = L.ExePath $ AE.TestPath{id, title = ttl} : coerce fxPath
 
     

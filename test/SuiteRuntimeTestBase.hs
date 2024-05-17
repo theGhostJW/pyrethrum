@@ -72,7 +72,7 @@ repeatedlyM1 f (a:as) !b = do b' <- f a b
 -- todo :: remap in Pyrelude bug' ~ use exception // bug ~ use text
 -- bug :: Text -> c
 bug :: Text -> a
-bug t = PR.bug $ (error t :: SomeException)
+bug t = PR.bug (error t :: SomeException)
 
 logging :: Logging
 logging = NoLog
@@ -1036,7 +1036,7 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
       , tests
       } ->
         pure $
-          P.Test
+          P.Fixture
             { config = tc
             , path
             , tests = mkTestItem <$> tests
@@ -1215,5 +1215,5 @@ data Template
       }
   deriving (Show, Eq)
 
-mkTestItem :: T.TestItem -> P.TestItem IO ()
+mkTestItem :: T.TestItem -> P.Test IO ()
 mkTestItem T.TestItem{id, title, spec} = P.TestItem id title (mkAction title spec)

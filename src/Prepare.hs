@@ -42,11 +42,11 @@ data PreNode m c hi where
     , teardown :: ApEventSink -> o -> m ()
     } ->
     PreNode m c hi
-  Test ::
+  Fixture ::
     (C.Config tc) =>
     { config :: tc
     , path :: Path
-    , tests :: c (TestItem m hi)
+    , tests :: c (Test m hi)
     } ->
     PreNode m c hi
 
@@ -60,7 +60,7 @@ listPaths =
   step :: forall hi'. Int -> [(Int, Path)] -> PreNode m c hi' -> [(Int, Path)]
   step i accum n =
     n & \case
-      Test{} -> accum'
+      Fixture{} -> accum'
       Before{subNodes} -> accumPaths subNodes
       After{subNodes'} -> accumPaths subNodes'
       Around{subNodes} -> accumPaths subNodes
@@ -69,7 +69,7 @@ listPaths =
     accumPaths :: forall hii. c (PreNode m c hii) -> [(Int, Path)]
     accumPaths = foldl' (step $ succ i) accum'
 
-data TestItem m hi = TestItem
+data Test m hi = TestItem
   { id :: Int
   , title :: Text
   , action :: ApEventSink -> hi -> m ()
@@ -164,7 +164,7 @@ prepareTest :: forall m c rc tc hi. (C.Config tc, Applicative c) => PrepParams m
 prepareTest PrepParams{interpreter, runConfig} path =
   \case
     C.Full{config, action, parse, items} ->
-      Test
+      Fixture
         { config
         , path
         , tests =
@@ -178,7 +178,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
               <$> items runConfig
         }
     C.Full'{config', action', parse', items'} ->
-      Test
+      Fixture
         { config = config'
         , path
         , tests =
@@ -192,7 +192,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
               <$> items' runConfig
         }
     C.Direct{config, action, items} ->
-      Test
+      Fixture
         { config
         , path
         , tests =
@@ -206,7 +206,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
               <$> items runConfig
         }
     C.Direct'{config', action', items'} ->
-      Test
+      Fixture
         { config = config'
         , path
         , tests =

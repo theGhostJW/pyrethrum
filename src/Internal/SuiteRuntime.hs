@@ -4,9 +4,8 @@ import Core qualified as C
 import DSL.Internal.ApEvent qualified as AE
 import Internal.RunTimeLogging (FailPoint)
 import Internal.RunTimeLogging qualified as L
-import Internal.ThreadEvent as TE hiding (Test)
-import Internal.ThreadEvent qualified as F (Hz (..))
-import Prepare qualified as P
+import Internal.ThreadEvent hiding (Test)
+import Internal.ThreadEvent qualified as TE 
 import PyrethrumExtras (catchAll, debugf', toS, txt, (?))
 import Text.Show.Pretty (ppShow)
 import UnliftIO (
@@ -28,6 +27,7 @@ import UnliftIO.STM (
   writeTQueue,
  )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
+import qualified Prepare as P
 
 {-
 todo :: define defect properties with sum type type and typeclass which returns defect info
@@ -175,23 +175,23 @@ mkXTree xpth preNodes =
           do
             childTree <- mkXTree path subNodes
             frequency & \case
-              F.Once -> do
+              Once -> do
                 cache <- newEmptyTMVarIO
                 status <- newTVarIO BeforePending
                 pure $ OnceBefore path action status cache childTree
-              F.Thread -> pure $ ThreadBefore path action childTree
-              F.Each -> pure $ EachBefore path action childTree
+              Thread -> pure $ ThreadBefore path action childTree
+              Each -> pure $ EachBefore path action childTree
       --
       P.After{frequency, subNodes', after} ->
         do
           childTree <- mkXTree path subNodes'
           -- let mkAfter fq = pure $ After{path, frequency = fq, subNodes' = cq, after}
           frequency & \case
-            F.Once -> do
+            Once -> do
               status <- newTVarIO AfterQPending
               pure $ OnceAfter path status childTree after
-            F.Thread -> pure $ ThreadAfter path childTree after
-            F.Each -> pure $ EachAfter path childTree after
+            Thread -> pure $ ThreadAfter path childTree after
+            TE.Each -> pure $ EachAfter path childTree after
       --
       P.Around
         { frequency
@@ -202,7 +202,7 @@ mkXTree xpth preNodes =
           do
             childTree <- mkXTree path subNodes
             frequency & \case
-              F.Once -> do
+              TE.Once -> do
                 status <- newTVarIO SetupPending
                 cache <- newEmptyTMVarIO
                 pure $
@@ -214,9 +214,9 @@ mkXTree xpth preNodes =
                     , subNodes = childTree
                     , teardown
                     }
-              F.Thread ->
+              TE.Thread ->
                 pure $ ThreadAround path setup childTree teardown
-              F.Each ->
+              TE.Each ->
                 pure $ EachAround path setup childTree teardown
       --
       P.Test
@@ -581,6 +581,7 @@ runNode lgr hi xt =
   runSubNodes_ :: forall hi' ho'. NodeIn hi' -> ChildQ (ExeTree ho') -> IO ()
   runSubNodes_ n = void . runSubNodes n
 
+
   -- tree generation is restricted by typeclasses so unless the typeclass constraint implmentation is wrong
   -- execution trees with invalid structure (Thread or Once depending on Each, or Once depending on Thread)
   -- should never be generated.
@@ -593,14 +594,28 @@ runNode lgr hi xt =
   sink = lgr . L.ApEvent
 
   runNode' :: forall hi' ho'. NodeIn hi' -> ExeTree ho' -> IO ()
-  runNode' =
-    \cases
+  runNode' i t =
+     run  i t
+    where
+    abandonSubs :: forall a. ChildQ (ExeTree a) -> IO ()
+    abandonSubs = runSubNodes_ i
+
+    runTests :: (P.TestItem IO hi -> IO ()) -> ChildQ (P.TestItem IO hi) -> IO ()
+    runTests actn tests = void $ runChildQ Sequential actn (const $ pure Runnable) tests
+
+    mkTestPath :: P.TestItem IO hi -> L.ExePath -> L.ExePath
+    mkTestPath P.TestItem{id, title = ttl} fxPath = L.ExePath $ AE.TestPath{id, title = ttl} : coerce fxPath
+
+    
+    run :: NodeIn hi' -> ExeTree ho' -> IO ()
+    run =
+     \cases
       -- For Once* we assume tree shaking has been executed prior to execution.
       -- There is no possibility of empty subnodes due to tree shaking, so these hooks will always
       -- need to be run
 
       -- abandon -> onceBefore
-      ab@(Abandon fp) ob@OnceBefore{subNodes} -> do
+      (Abandon fp) ob@OnceBefore{subNodes} -> do
         (beforeLocked, canAbandonQ) <- atomically $ do
           ca <- canAbandon ob
           let locked = ca == All
@@ -610,10 +625,10 @@ runNode lgr hi xt =
         when beforeLocked $
           logAbandonned' (Hook Once Before) fp
         when canAbandonQ $
-          runSubNodes_ ab subNodes
+          abandonSubs subNodes
 
       -- abandon -> onceAround
-      ab@(Abandon fp) oa@OnceAround{subNodes, status} -> do
+      (Abandon fp) oa@OnceAround{subNodes, status} -> do
         setUpLocked <- atomically $ do
           ca <- canAbandon oa
           let locked = ca == All
@@ -623,8 +638,8 @@ runNode lgr hi xt =
         when setUpLocked $
           logAbandonned' (Hook Once Setup) fp
         finally
-          (runSubNodes_ ab subNodes)
-          ( -- only Abandon teardown if locked
+          (abandonSubs subNodes)
+          ( 
             do
               locked <- atomically $ tryLock status subNodes canLockTeardown TeardownRunning
               when locked $
@@ -634,7 +649,7 @@ runNode lgr hi xt =
           )
 
       -- abandon -> onceAfter
-      ab@(Abandon fp) OnceAfter{subNodes', status'} -> do
+      (Abandon fp) OnceAfter{subNodes', status'} -> do
         run <- atomically $ do
           s <- readTVar status'
           qs <- readTVar subNodes'.status
@@ -643,7 +658,7 @@ runNode lgr hi xt =
           pure $ canRunAfterOnce s qs
         when run $
           finally
-            (runSubNodes_ ab subNodes')
+            (abandonSubs subNodes')
             ( do
                 locked <- atomically $ tryLock status' subNodes' canLockAfterOnce AfterAbandoning
                 when locked $
@@ -653,15 +668,44 @@ runNode lgr hi xt =
             )
 
       -- abandon -> threadBefore
-      ab@(Abandon fp) ThreadBefore{subNodes} -> 
-        logAbandonned' (Hook Thread Before) fp >> runSubNodes_ ab subNodes
-      -- ThreadBefore{before, subNodes} ->
---   case hi of
---     abandon@(Abandon fp )-> do
---       logAbandonned' (Hook Thread Before) fp
---       runSubNodes_ abandon subnodes
+      (Abandon fp) ThreadBefore{subNodes} -> 
+        logAbandonned' (Hook Thread Before) fp >> abandonSubs subNodes
 
-      ab@(Abandon fp) ThreadAround{setup, subNodes, teardown} ->
+      -- abandon -> threadAround
+      (Abandon fp) ThreadAround{subNodes} ->
+        do
+          logAbandonned' (Hook Thread Setup) fp
+          abandonSubs subNodes
+          logAbandonned' (Hook Thread Teardown) fp 
+
+      -- abandon -> threadAfter
+      (Abandon fp) ThreadAfter{subNodes'} ->
+        abandonSubs subNodes' >> logAbandonned' (Hook Thread After) fp 
+
+      -- abandon -> eachBefore
+      (Abandon fp) EachBefore{subNodes} -> 
+        logAbandonned' (Hook Each Before) fp >> abandonSubs subNodes
+
+      -- abandon -> eachAround
+      (Abandon fp) EachAround{subNodes} ->
+        do
+          logAbandonned' (Hook Each Setup) fp
+          abandonSubs subNodes
+          logAbandonned' (Hook Each Teardown) fp
+
+      -- abandon -> eachAfter
+      (Abandon fp) EachAfter{subNodes'} ->
+          abandonSubs subNodes' >> logAbandonned' (Hook Each After) fp
+
+      -- abandon -> test
+      -- (Abandon fp) Test{path, tests} -> 
+      --   let 
+      --     abandonTest test = logAbandonned lgr (mkTestPath test path) TE.Test fp
+      --   in
+      --     runTests abnadonTest tests
+
+       
+       
 --       do
 --         hoVar <- newEmptyTMVarIO
 --         runThreadAround (hkOutSingleton hoVar) hoVar
@@ -689,6 +733,7 @@ runNode lgr hi xt =
       ThreadIn{} OnceBefore{} -> invalidTree "ThreadIn" "OnceBefore"
       ThreadIn{} OnceAround{} -> invalidTree "ThreadIn" "OnceAround"
       ThreadIn{} OnceAfter{} -> invalidTree "ThreadIn" "OnceAfter"
+  
 
 --       EachIn _ _ -> invalidTree "EachIn" "AroundOnce"
 --       ThreadIn _ -> invalidTree "ThreadIn" "AroundOnce"
@@ -1068,6 +1113,9 @@ data NodeIn hi
       { apply :: (Either FailPoint hi -> IO ()) -> IO ()
       , after :: IO ()
       }
+
+applyEach :: ((Either FailPoint hi -> IO ()) -> IO ()) -> IO () -> (Either FailPoint hi -> IO ()) -> IO ()
+applyEach apply after test = apply test >> after
 
 tryLock :: TVar s -> ChildQ a -> (s -> CanRun -> Bool) -> s -> STM Bool
 tryLock hs cq canLock lockedStatus =

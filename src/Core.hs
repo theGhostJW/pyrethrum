@@ -71,7 +71,7 @@ TODO:: idea defect reconciler
 class Frequency a where
   frequency :: Hz
 
-class (Frequency a, Frequency b) => CanDependOn a b
+class CanDependOn a b
 
 data Once
 data Thread

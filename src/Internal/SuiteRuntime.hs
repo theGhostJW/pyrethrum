@@ -838,15 +838,15 @@ runNode lgr hi xt =
               logRun_ (Hook Thread After) after
 
         oi@(OnceIn ioHi) (EachBefore {before, subNodes}) -> uu
-          do 
-           hki <- ioHi
+        --   do 
+        --    hki <- ioHi
 
-          where 
-            nxtIn i = EachIn { 
-              apply = uu 
-              -- :: (Either FailPoint hi -> IO ()) -> IO ()
-             , after = pure ()
-         }
+        --   where 
+        --     nxtIn i = EachIn { 
+        --       apply = uu 
+        --       -- :: (Either FailPoint hi -> IO ()) -> IO ()
+        --      , after = pure ()
+        --  }
         -- (OnceIn _) (EachAround _ _ _ _)
         -- (OnceIn _) (EachAfter _ _ _)
         -- (OnceIn _) (Test _ _ _)

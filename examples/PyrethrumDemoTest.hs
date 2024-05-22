@@ -19,7 +19,7 @@ import PyrethrumBase (
   testConfig,
  )
 import PyrethrumExtras (txt)
-import PyrethrumConfigTypes (Country(..))
+import PyrethrumConfigTypes (Country(..), Environment (Prod))
 
 {-
 Note:: tried alternative with individual hook types but the results
@@ -162,13 +162,15 @@ test2 :: Fixture HookInfo
 test2 = Full' config2 infoThreadHook action2 parse2 items2
 
 action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
-action2 RunConfig{country, depth} HookInfo{value = hookVal} itm = do
+action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = do
   logShow itm
   when (country == AU) $
     log "Aus test"
   when (country == NZ) $
     log "NZ test"
   runSomethingToDoWithTestDepth depth
+  unless (environment == Prod) $
+    log "Completing payment with test credit card"
   pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
 
 parse2 :: AS -> Either ParseException DS

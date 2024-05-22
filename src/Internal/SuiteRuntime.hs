@@ -838,57 +838,7 @@ runNode lgr hi xt =
               logRun_ (Hook Thread After) after
 
         oi@(OnceIn ioHi) (EachBefore {before, subNodes}) -> uu
-        --   do 
-        --    hki <- ioHi
-
-        --   where 
-        --     nxtIn i = EachIn { 
-        --       apply = uu 
-        --       -- :: (Either FailPoint hi -> IO ()) -> IO ()
-        --      , after = pure ()
-        --  }
-        -- (OnceIn _) (EachAround _ _ _ _)
-        -- (OnceIn _) (EachAfter _ _ _)
-        -- (OnceIn _) (Test _ _ _)
-        {-
-          --     Thread -> case hi of
---       Abandon fp -> runSubNodesAfter $ Just fp
---       EachIn _ _ -> invalidTree "EachIn" "After Thread"
---       OnceIn _ -> runSubNodesAfter Nothing
---       ThreadIn _ -> runSubNodesAfter Nothing
---      where
---       runSubNodesAfter abandonned =
---         do
---           run <- runSubNodes hi subNodes'
---           when run.hasRun $
---             abandonned
---               & maybe
---                 (logRun_ (Hook Thread After) after)
---                 (logAbandonned' (Hook Thread After))
-        
-        -}
-             
-        {-
-        do
---         -- Action can't be run until its actually needed by a test.
---         -- There is a possibilty of the hook enclosing an empty or
---         -- saturated subNode list. plain old laziness might be enough
---         hoVar <- newEmptyTMVarIO
---         runThreadAround (hkOutSingleton hoVar) hoVar
---        where
---         hkOutSingleton hov = do
---           mho <- atomically $ tryReadTMVar hov
---           mho
---             & maybe
---               ( do
---                   hi'' <- ioHi
---                   ho <- logRun' (Hook Thread leadHookPos) (`setup` hi'')
---                   atomically $ putTMVar hov ho
---                   pure ho
---               )
---               pure
-        
-        -}
+     
 
 
         -- ### all invalid combos ### --

@@ -593,7 +593,6 @@ runNode lgr hi xt =
   sink :: P.ApEventSink
   sink = lgr . L.ApEvent
 
-
   runNode' :: forall hi'. NodeIn hi' -> ExeTree hi' -> IO ()
   runNode' i t =
     run i t
@@ -608,53 +607,51 @@ runNode lgr hi xt =
     abandonSubs fp = runSubNodes_ (Abandon fp)
 
     runOnceAfter :: forall a. ChildQ (ExeTree a) -> TVar AfterStatus -> NodeIn a -> AfterStatus -> IO () -> IO ()
-    runOnceAfter subNodes status nxtIn lockedStatus runHook =  
-        do
-          run' <- atomically $ do
-            s <- readTVar status
-            qs <- readTVar subNodes.status
-            when (s == AfterQPending) $
-              writeTVar status AfterQRunning
-            pure $ canRunAfterOnce s qs
-          when run' $
-            finally
-              (runSubNodes_ nxtIn subNodes)
-              ( do
-                  locked <- tryLockIO canLockAfterOnce status subNodes lockedStatus
-                  when locked $
-                    finally
-                      runHook
-                      (atomically $ writeTVar status AfterDone)
-              )
+    runOnceAfter subNodes status nxtIn lockedStatus runHook =
+      do
+        run' <- atomically $ do
+          s <- readTVar status
+          qs <- readTVar subNodes.status
+          when (s == AfterQPending) $
+            writeTVar status AfterQRunning
+          pure $ canRunAfterOnce s qs
+        when run' $
+          finally
+            (runSubNodes_ nxtIn subNodes)
+            ( do
+                locked <- tryLockIO canLockAfterOnce status subNodes lockedStatus
+                when locked $
+                  finally
+                    runHook
+                    (atomically $ writeTVar status AfterDone)
+            )
 
+    {-
+     do
+            run <- atomically $ do
+              s <- readTVar status'
+              qs <- readTVar subNodes'.status
+              when (s == AfterQPending) $
+                writeTVar status' AfterQRunning
+              pure $ canRunAfterOnce s qs
+            when run $
+              finally
+                (runSubNodes_ hi subNodes')
+                ( let
+                    runAfter mAbandon = do
+                      let lockStatus = isJust mAbandon ? AfterAbandoning $ AfterRunning
+                      locked <- atomically $ tryLock status' subNodes' canLockAfterOnce lockStatus
+                      when locked $
+                        finally
+                          ( mAbandon
+                              & maybe
+                                (void $ logRun' (Hook Once After) after)
+                                (logAbandonned' (Hook Once After))
+                          )
+                          (atomically $ writeTVar status' AfterDone)
+                )
 
-  {-
-   do
-          run <- atomically $ do
-            s <- readTVar status'
-            qs <- readTVar subNodes'.status
-            when (s == AfterQPending) $
-              writeTVar status' AfterQRunning
-            pure $ canRunAfterOnce s qs
-          when run $
-            finally
-              (runSubNodes_ hi subNodes')
-              ( let
-                  runAfter mAbandon = do
-                    let lockStatus = isJust mAbandon ? AfterAbandoning $ AfterRunning
-                    locked <- atomically $ tryLock status' subNodes' canLockAfterOnce lockStatus
-                    when locked $
-                      finally
-                        ( mAbandon
-                            & maybe
-                              (void $ logRun' (Hook Once After) after)
-                              (logAbandonned' (Hook Once After))
-                        )
-                        (atomically $ writeTVar status' AfterDone)
-              )
-  
-  
-  -}
+    -}
 
     run :: NodeIn hi' -> ExeTree hi' -> IO ()
     run =
@@ -697,9 +694,8 @@ runNode lgr hi xt =
             )
         --
         -- abandon -> onceAfter
-        abn@(Abandon fp) OnceAfter{subNodes', status'} -> 
+        abn@(Abandon fp) OnceAfter{subNodes', status'} ->
           runOnceAfter subNodes' status' abn AfterAbandoning (logAbandonned' (Hook Once After) fp)
-         
         --
         -- abandon -> threadBefore
         (Abandon fp) ThreadBefore{subNodes} ->
@@ -803,8 +799,7 @@ runNode lgr hi xt =
         -- onceIn -> onceAfter
         oi@(OnceIn ioHi) OnceAfter{status', subNodes', after} ->
           runOnceAfter subNodes' status' oi AfterRunning (logRun_ (Hook Once After) after)
-          
---
+        --
         -- onceIn -> threadBefore
         (OnceIn ioHi) ThreadBefore{before, subNodes} -> do
           oi <- ioHi
@@ -815,31 +810,185 @@ runNode lgr hi xt =
               )
               ( \ho -> runSubNodes_ (ThreadIn $ pure ho) subNodes
               )
-        
-        -- onceIn -> threadAround
-        (OnceIn ioHi) ThreadAround{setup, teardown, subNodes} -> 
-          do 
-             hki <- ioHi
-             eho <- logRun' (Hook Each Setup) (`setup` hki)
-             eho
-                & either
-                  ( flip runSubNodes_ subNodes . Abandon
-                  )
-                  ( \ho -> do
-                      runSubNodes_ (ThreadIn $ pure ho) subNodes
-                      logRun_ (Hook Each Teardown) (`teardown` ho)
-                  )
 
+        -- onceIn -> threadAround
+        (OnceIn ioHi) ThreadAround{setup, teardown, subNodes} ->
+          do
+            hki <- ioHi
+            eho <- logRun' (Hook Each Setup) (`setup` hki)
+            eho
+              & either
+                ( flip runSubNodes_ subNodes . Abandon
+                )
+                ( \ho -> do
+                    runSubNodes_ (ThreadIn $ pure ho) subNodes
+                    logRun_ (Hook Each Teardown) (`teardown` ho)
+                )
+        --
         -- onceIn -> threadAfter
-        oi@(OnceIn {}) ThreadAfter{after, subNodes'} -> 
-          do 
+        oi@(OnceIn{}) ThreadAfter{after, subNodes'} ->
+          do
             run' <- runSubNodes oi subNodes'
             when run'.hasRun $
               logRun_ (Hook Thread After) after
+        --
+        -- onceIn -> eachBefore
+        (OnceIn ioHi) (EachBefore{before, subNodes}) ->
+          runSubNodes_ (EachIn nxtApply $ pure ()) subNodes
+         where
+          -- nxtApply :: (Either FailPoint ho -> IO ()) -> IO ()
+          nxtApply test = do
+            hi' <- ioHi
+            eho' <- logRun' (Hook Each Before) (`before` hi')
+            test eho'
+        --
+        -- onceIn -> eachAround
+        (OnceIn ioHi) (EachAround{setup, teardown, subNodes}) ->
+          runSubNodes_ (EachIn nxtApply $ pure ()) subNodes
+         where
+          nxtApply test = do
+            hi' <- ioHi
+            eho <- logRun' (Hook Each Setup) (`setup` hi')
+            finally
+              (test eho)
+              (whenRight_ eho $ logRun_ (Hook Each Teardown) . flip teardown)
+        --
+        -- onceIn -> eachAfter
+        (OnceIn ioHi) (EachAfter{after, subNodes'}) ->
+          runSubNodes_ (EachIn nxtApply $ logRun_ (Hook Each After) after) subNodes'
+         where
+          nxtApply test =
+            ioHi >>= test . Right
 
-        oi@(OnceIn ioHi) (EachBefore {before, subNodes}) -> uu
-     
+        (OnceIn _) (Test _ _ _) -> uu
+        (EachIn _ _) (EachBefore _ _ _) -> uu
+        (EachIn _ _) (EachAround _ _ _ _) -> uu
+        (EachIn _ _) (EachAfter _ _ _) -> uu
+        (EachIn _ _) (Test _ _ _) -> uu
+        (ThreadIn _) (ThreadBefore _ _ _) -> uu
+        (ThreadIn _) (ThreadAround _ _ _ _) -> uu
+        (ThreadIn _) (ThreadAfter _ _ _) -> uu
+        (ThreadIn _) (EachBefore _ _ _) -> uu
+        (ThreadIn _) (EachAround _ _ _ _) -> uu
+        (ThreadIn _) (EachAfter _ _ _) -> uu
+        (ThreadIn _) (Test _ _ _) -> uu
 
+        -- eho <- logRun' (Hook Each Before) (`before` hi)
+        -- eho
+        --   & either
+        --     ( flip runSubNodes_ subNodes . Abandon
+        --     )
+        --     ( \ho -> runSubNodes_ (EachIn $ pure ho) subNodes
+        --     )
+
+        {-
+        Around{frequency, setup, subNodes, teardown = mteardown} ->
+        --   let
+        --     leadHookPos = aroundLeadingHookPos mteardown
+        --    in
+        --     case frequency of
+        --       Each ->
+        --         runSubNodes_ (EachIn nxtApply emptyAfter) subNodes
+        --        where
+        --         emptyAfter = pure ()
+        --         nxtApply nxtAction =
+        --           case hi of
+        --             Abandon fp -> runAbandon fp
+        --             EachIn{apply} ->
+        --               apply $ either runAbandon runNxt
+        --             OnceIn ioHi -> ioHi >>= runNxt
+        --             ThreadIn ethIoHi -> ethIoHi >>= either runAbandon runNxt
+        --          where
+        --           runAbandon fp = do
+        --             logAbandonned' (Hook Each leadHookPos) fp
+        --             nxtAction . Left $ fp
+        --             whenJust mteardown $
+        --               const $
+        --                 logAbandonned' (Hook Each Teardown) fp
+
+        --           runNxt :: hi -> IO ()
+        --           runNxt hki =
+        --             do
+        --               eho <- logRun' (Hook Each leadHookPos) (`setup` hki)
+        --               nxtAction eho
+        --               whenJust mteardown $
+        --                 \teardown' ->
+        --                   eho
+        --                     & either
+        --                       (logAbandonned' $ Hook Each Teardown)
+        --                       (\ho -> logRun_ (Hook Each Teardown) (`teardown'` ho))
+        --       Thread ->
+        --         let
+        --           runThreadAround ioHo hoVar =
+        --             finally
+        --               (runSubNodes_ (ThreadIn ioHo) subNodes)
+        --               ( do
+        --                   whenJust mteardown $
+        --                     \td -> do
+        --                       mho <- atomically $ tryReadTMVar hoVar
+        --                       -- if mho is Nothing then setup was not run (empty subnodes)
+        --                       whenJust mho $
+        --                         either
+        --                           (logAbandonned' (Hook Thread Teardown))
+        --                           (\ho -> logRun_ (Hook Thread Teardown) (`td` ho))
+        --               )
+        --          in
+        --           case hi of
+        --             Abandon fp -> do
+        --               hoVar <- newEmptyTMVarIO
+        --               runThreadAround (hkOutSingleton hoVar) hoVar
+        --              where
+        --               hkOutSingleton hov = do
+        --                 mho <- atomically $ tryReadTMVar hov
+        --                 mho
+        --                   & maybe
+        --                     ( do
+        --                         let ab = Left fp
+        --                         atomically $ putTMVar hov ab
+        --                         pure ab
+        --                     )
+        --                     pure
+        --             EachIn{} -> invalidTree "EachIn" "Around Thread"
+        --             OnceIn ioHi -> do
+        --               -- Action can't be run until its actually needed by a test.
+        --               -- There is a possibilty of the hook enclosing an empty or
+        --               -- saturated subNode list. plain old laziness might be enough
+        --               hoVar <- newEmptyTMVarIO
+        --               runThreadAround (hkOutSingleton hoVar) hoVar
+        --              where
+        --               hkOutSingleton hov = do
+        --                 mho <- atomically $ tryReadTMVar hov
+        --                 mho
+        --                   & maybe
+        --                     ( do
+        --                         hi'' <- ioHi
+        --                         ho <- logRun' (Hook Thread leadHookPos) (`setup` hi'')
+        --                         atomically $ putTMVar hov ho
+        --                         pure ho
+        --                     )
+        --                     pure
+        --             ThreadIn ioeHi -> do
+        --               hoVar <- newEmptyTMVarIO
+        --               let ioHo = hkOutSingleton hoVar
+        --               runThreadAround ioHo hoVar
+        --              where
+        --               hkOutSingleton hov = do
+        --                 mho <- atomically $ tryReadTMVar hov
+        --                 mho
+        --                   & maybe
+        --                     ( do
+        --                         ethi <- ioeHi
+        --                         ho <-
+        --                           either
+        --                             (\fp -> logAbandonned' (Hook Thread leadHookPos) fp >> pure (Left fp))
+        --                             (\hi'' -> logRun' (Hook Thread leadHookPos) (`setup` hi''))
+        --                             ethi
+        --                         atomically $ putTMVar hov ho
+        --                         pure ho
+        --                     )
+        --                     pure
+
+        -}
 
         -- ### all invalid combos ### --
         EachIn{} OnceBefore{} -> invalidTree "EachIn" "OnceBefore"
@@ -1222,16 +1371,15 @@ runNode lgr hi xt =
 --   mkTestPath :: P.TestItem IO hi -> L.ExePath
 --   mkTestPath P.TestItem{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : coerce path
 
-data NodeIn hi
-  = Abandon FailPoint
-  | OnceIn (IO hi)
-  | -- | ThreadIn (IO (Either FailPoint hi)) -- Will probably need to be reinstated
-    -- reuse / reename EachIn as deferred and use for each and threadIn
-    ThreadIn (IO hi)
-  | EachIn
-      { apply :: (Either FailPoint hi -> IO ()) -> IO ()
-      , after :: IO ()
-      }
+data NodeIn hi where
+  Abandon :: FailPoint -> NodeIn hi
+  OnceIn :: IO hi -> NodeIn hi
+  ThreadIn :: IO hi -> NodeIn hi
+  EachIn ::
+    { apply :: (Either FailPoint hi -> IO ()) -> IO ()
+    , after :: IO ()
+    } ->
+    NodeIn hi
 
 applyEach :: ((Either FailPoint hi -> IO ()) -> IO ()) -> IO () -> (Either FailPoint hi -> IO ()) -> IO ()
 applyEach apply after test = apply test >> after

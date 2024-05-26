@@ -1216,4 +1216,4 @@ data Template
   deriving (Show, Eq)
 
 mkTestItem :: T.TestItem -> P.Test IO ()
-mkTestItem T.TestItem{id, title, spec} = P.TestItem id title (mkAction title spec)
+mkTestItem T.TestItem{id, title, spec} = P.MkTest id title (mkAction title spec)

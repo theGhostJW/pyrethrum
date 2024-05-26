@@ -69,7 +69,7 @@ listPaths =
     accumPaths :: forall hii. c (PreNode m c hii) -> [(Int, Path)]
     accumPaths = foldl' (step $ succ i) accum'
 
-data Test m hi = TestItem
+data Test m hi = MkTest
   { id :: Int
   , title :: Text
   , action :: ApEventSink -> hi -> m ()
@@ -169,7 +169,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
         , path
         , tests =
             ( \i ->
-                TestItem
+                MkTest
                   { id = i.id
                   , title = i.title
                   , action = \snk _hi -> runTest (action runConfig) parse i snk
@@ -183,7 +183,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
         , path
         , tests =
             ( \i ->
-                TestItem
+                MkTest
                   { id = i.id
                   , title = i.title
                   , action = \snk hi -> runTest (action' runConfig hi) parse' i snk
@@ -197,7 +197,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
         , path
         , tests =
             ( \i ->
-                TestItem
+                MkTest
                   { id = i.id
                   , title = i.title
                   , action = \snk _hi -> runDirectTest (action runConfig) i snk
@@ -211,7 +211,7 @@ prepareTest PrepParams{interpreter, runConfig} path =
         , path
         , tests =
             ( \i ->
-                TestItem
+                MkTest
                   { id = i.id
                   , title = i.title
                   , action = \snk hi -> runDirectTest (action' runConfig hi) i snk

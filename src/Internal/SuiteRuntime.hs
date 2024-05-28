@@ -608,13 +608,16 @@ runNode lgr hi xt =
   sink :: P.ApEventSink
   sink = lgr . L.ApEvent
 
-  runTests :: forall ti. TestContext ti -> ChildQ (P.Test IO ti) -> IO ()
+  runTests :: forall ti. IO (TestContext ti) -> ChildQ (P.Test IO ti) -> IO ()
   runTests eti tests = void $ runChildQ Sequential (runTest eti) (const $ pure Runnable) tests
 
-  runTest :: forall ti. TestContext ti -> P.Test IO ti -> IO ()
-  runTest
-    MkTestContext{setup, teardown}
-    t =
+  nxtRunner :: forall i. IO (Either FailPoint i) -> (Either FailPoint i -> IO ()) -> NodeIn i
+  nxtRunner su td = TestRunner . pure $ MkTestContext su td
+
+  runTest :: forall ti. IO (TestContext ti) -> P.Test IO ti -> IO ()
+  runTest ioCtx t =
+    do
+      MkTestContext{setup, teardown} <- ioCtx
       let path = mkTestPath t
        in do
             ti <- setup
@@ -716,7 +719,10 @@ runNode lgr hi xt =
         abandonSubs fp subNodes' >> logAbandonned' (Hook Thread After) fp
       -- TODO: WRONG REVISIT abandon -> eachBefore
       Abandon{fp} EachBefore{subNodes} ->
-        logAbandonned' (Hook Each Before) fp >> abandonSubs fp subNodes
+        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
+       where
+        nxtSetup = logAbandonned' (Hook Each Before) fp >> pure (Left fp)
+        nxtTeardown = const $ pure ()
       --
       -- TODO: WRONG REVISIT abandon -> eachAround
       Abandon{fp} EachAround{subNodes} ->
@@ -731,7 +737,7 @@ runNode lgr hi xt =
       --
       -- abandon -> test
       Abandon{fp} Fixture{tests} ->
-        runTests (Left fp) tests
+        runTests (pure $ MkTestContext (pure $ Left fp) (const $ pure ())) tests
       --
       -- onceIn -> onceBefore
       OnceIn{ioHi} OnceBefore{before, beforeStatus, cache, subNodes} -> do
@@ -792,7 +798,7 @@ runNode lgr hi xt =
                     ( eho
                         & either
                           (logAbandonned' (Hook Once Teardown))
-                          (\hki -> logRun_ (Hook Once Teardown) (`teardown` hki))
+                          (\hi' -> logRun_ (Hook Once Teardown) (`teardown` hi'))
                     )
                     (atomically $ writeTVar status AroundDone)
             )
@@ -804,27 +810,49 @@ runNode lgr hi xt =
       -- onceIn -> threadBefore
       OnceIn{ioHi} ThreadBefore{before, subNodes} -> do
         oi <- ioHi
-        suo <- logRun' (Hook Thread Before) (`before` oi)
-        suo
-          & either
-            ( flip runSubNodes_ subNodes . Abandon
-            )
-            ( \ho -> runSubNodes_ (ThreadIn $ pure ho) subNodes
-            )
+        tCache <- newEmptyTMVarIO
+        let nxtSetup = do
+              -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
+              -- no need for thread synchronisation as this happpens within a thread
+              mho <- atomically $ tryReadTMVar tCache
+              mho
+                & maybe
+                  ( do
+                      to <- logRun' (Hook Thread Before) (`before` oi)
+                      atomically $ writeTMVar tCache to
+                      pure to
+                  )
+                  pure
+            nxtTeardown = const $ pure ()
+        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
 
       -- onceIn -> threadAround
-      OnceIn{ioHi} ThreadAround{setup, teardown, subNodes} ->
-        do
-          hki <- ioHi
-          eho <- logRun' (Hook Each Setup) (`setup` hki)
-          eho
-            & either
-              ( flip runSubNodes_ subNodes . Abandon
-              )
-              ( \ho -> do
-                  runSubNodes_ (ThreadIn $ pure ho) subNodes
-                  logRun_ (Hook Each Teardown) (`teardown` ho)
-              )
+      OnceIn{ioHi} ThreadAround{setup, teardown, subNodes} -> do
+        oi <- ioHi
+        tCache <- newEmptyTMVarIO
+        let nxtSetup = do
+              -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
+              -- no need for thread synchronisation as this happpens within a thread
+              mho <- atomically $ tryReadTMVar tCache
+              mho
+                & maybe
+                  ( do
+                      to <- logRun' (Hook Thread Setup) (`setup` oi)
+                      atomically $ writeTMVar tCache to
+                      pure to
+                  )
+                  pure
+            nxtTeardown = const $ pure ()
+        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
+        mho <- atomically $ tryReadTMVar tCache
+        mho -- if mho is Nothing it means hook was not run (empty subnodes)
+          & maybe
+            (pure ())
+            ( either
+                (logAbandonned' (Hook Thread Teardown))
+                (\ho -> logRun_ (Hook Thread Teardown) (`teardown` ho))
+            )
+
       --
       -- onceIn -> threadAfter
       oi@(OnceIn{}) ThreadAfter{after, subNodes'} ->
@@ -835,172 +863,159 @@ runNode lgr hi xt =
       --
       -- onceIn -> eachBefore
       (OnceIn ioHi) EachBefore{before, subNodes} ->
-        runSubNodes_ (EachIn nxtApply $ pure ()) subNodes
+        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
        where
-        -- nxtApply :: (Either FailPoint ho -> IO ()) -> IO ()
-        nxtApply test = do
-          hi' <- ioHi
-          eho' <- logRun' (Hook Each Before) (`before` hi')
-          test eho'
+        nxtSetup = ioHi >>= \ho -> logRun' (Hook Each Before) (`before` ho)
+        nxtTeardown = const $ pure ()
       --
       -- onceIn -> eachAround
       OnceIn{ioHi} EachAround{setup, teardown, subNodes} ->
-        runSubNodes_ (EachIn nxtApply $ pure ()) subNodes
+        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
        where
-        nxtApply test = do
-          hi' <- ioHi
-          eho <- logRun' (Hook Each Setup) (`setup` hi')
-          finally
-            (test eho)
-            (whenRight_ eho $ logRun_ (Hook Each Teardown) . flip teardown)
+        nxtSetup = ioHi >>= \ho -> logRun' (Hook Each Before) (`setup` ho)
+        nxtTeardown = either 
+          (logAbandonned' (Hook Each Teardown)) 
+          (\ho -> logRun_ (Hook Each Teardown) (`teardown` ho))
       --
       -- onceIn -> eachAfter
       OnceIn{ioHi} EachAfter{after, subNodes'} ->
-        runSubNodes_ (EachIn nxtApply $ logRun_ (Hook Each After) after) subNodes'
+        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes'
        where
-        nxtApply test =
-          ioHi >>= test . Right
+        nxtSetup = Right <$> ioHi
+        nxtTeardown = either 
+          (logAbandonned' (Hook Each After)) 
+          (\_ -> logRun_ (Hook Each After) after)
       --
       -- onceIn -> eachAfter
       OnceIn{ioHi} Fixture{title, tests} -> uu
-      (ThreadIn _) (ThreadBefore _ _ _) -> uu
-      (ThreadIn _) (ThreadAround _ _ _ _) -> uu
-      (ThreadIn _) (ThreadAfter _ _ _) -> uu
-      (ThreadIn _) (EachBefore _ _ _) -> uu
-      (ThreadIn _) (EachAround _ _ _ _) -> uu
-      (ThreadIn _) (EachAfter _ _ _) -> uu
-      (ThreadIn _) (Fixture _ _ _) -> uu
-      (EachIn _ _) (EachBefore _ _ _) -> uu
-      (EachIn _ _) (EachAround _ _ _ _) -> uu
-      (EachIn _ _) (EachAfter _ _ _) -> uu
-      (EachIn _ _) (Fixture _ _ _) -> uu
-      -- eho <- logRun' (Hook Each Before) (`before` hi)
-      -- eho
-      --   & either
-      --     ( flip runSubNodes_ subNodes . Abandon
-      --     )
-      --     ( \ho -> runSubNodes_ (EachIn $ pure ho) subNodes
-      --     )
-
-      {-
-      Around{frequency, setup, subNodes, teardown = mteardown} ->
-      --   let
-      --     leadHookPos = aroundLeadingHookPos mteardown
-      --    in
-      --     case frequency of
-      --       Each ->
-      --         runSubNodes_ (EachIn nxtApply emptyAfter) subNodes
-      --        where
-      --         emptyAfter = pure ()
-      --         nxtApply nxtAction =
-      --           case hi of
-      --             Abandon fp -> runAbandon fp
-      --             EachIn{apply} ->
-      --               apply $ either runAbandon runNxt
-      --             OnceIn ioHi -> ioHi >>= runNxt
-      --             ThreadIn ethIoHi -> ethIoHi >>= either runAbandon runNxt
-      --          where
-      --           runAbandon fp = do
-      --             logAbandonned' (Hook Each leadHookPos) fp
-      --             nxtAction . Left $ fp
-      --             whenJust mteardown $
-      --               const $
-      --                 logAbandonned' (Hook Each Teardown) fp
-
-      --           runNxt :: hi -> IO ()
-      --           runNxt hki =
-      --             do
-      --               eho <- logRun' (Hook Each leadHookPos) (`setup` hki)
-      --               nxtAction eho
-      --               whenJust mteardown $
-      --                 \teardown' ->
-      --                   eho
-      --                     & either
-      --                       (logAbandonned' $ Hook Each Teardown)
-      --                       (\ho -> logRun_ (Hook Each Teardown) (`teardown'` ho))
-      --       Thread ->
-      --         let
-      --           runThreadAround ioHo hoVar =
-      --             finally
-      --               (runSubNodes_ (ThreadIn ioHo) subNodes)
-      --               ( do
-      --                   whenJust mteardown $
-      --                     \td -> do
-      --                       mho <- atomically $ tryReadTMVar hoVar
-      --                       -- if mho is Nothing then setup was not run (empty subnodes)
-      --                       whenJust mho $
-      --                         either
-      --                           (logAbandonned' (Hook Thread Teardown))
-      --                           (\ho -> logRun_ (Hook Thread Teardown) (`td` ho))
-      --               )
-      --          in
-      --           case hi of
-      --             Abandon fp -> do
-      --               hoVar <- newEmptyTMVarIO
-      --               runThreadAround (hkOutSingleton hoVar) hoVar
-      --              where
-      --               hkOutSingleton hov = do
-      --                 mho <- atomically $ tryReadTMVar hov
-      --                 mho
-      --                   & maybe
-      --                     ( do
-      --                         let ab = Left fp
-      --                         atomically $ putTMVar hov ab
-      --                         pure ab
-      --                     )
-      --                     pure
-      --             EachIn{} -> invalidTree "EachIn" "Around Thread"
-      --             OnceIn ioHi -> do
-      --               -- Action can't be run until its actually needed by a test.
-      --               -- There is a possibilty of the hook enclosing an empty or
-      --               -- saturated subNode list. plain old laziness might be enough
-      --               hoVar <- newEmptyTMVarIO
-      --               runThreadAround (hkOutSingleton hoVar) hoVar
-      --              where
-      --               hkOutSingleton hov = do
-      --                 mho <- atomically $ tryReadTMVar hov
-      --                 mho
-      --                   & maybe
-      --                     ( do
-      --                         hi'' <- ioHi
-      --                         ho <- logRun' (Hook Thread leadHookPos) (`setup` hi'')
-      --                         atomically $ putTMVar hov ho
-      --                         pure ho
-      --                     )
-      --                     pure
-      --             ThreadIn ioeHi -> do
-      --               hoVar <- newEmptyTMVarIO
-      --               let ioHo = hkOutSingleton hoVar
-      --               runThreadAround ioHo hoVar
-      --              where
-      --               hkOutSingleton hov = do
-      --                 mho <- atomically $ tryReadTMVar hov
-      --                 mho
-      --                   & maybe
-      --                     ( do
-      --                         ethi <- ioeHi
-      --                         ho <-
-      --                           either
-      --                             (\fp -> logAbandonned' (Hook Thread leadHookPos) fp >> pure (Left fp))
-      --                             (\hi'' -> logRun' (Hook Thread leadHookPos) (`setup` hi''))
-      --                             ethi
-      --                         atomically $ putTMVar hov ho
-      --                         pure ho
-      --                     )
-      --                     pure
-
-      -}
-
+      TestRunner{} (ThreadBefore _ _ _) -> uu
+      TestRunner{} (ThreadAround _ _ _ _) -> uu
+      TestRunner{} (ThreadAfter _ _ _) -> uu
+      TestRunner{} (EachBefore _ _ _) -> uu
+      TestRunner{} (EachAround _ _ _ _) -> uu
+      TestRunner{} (EachAfter _ _ _) -> uu
+      TestRunner{} (Fixture _ _ _) -> uu
       -- ### all invalid combos ### --
-      EachIn{} OnceBefore{} -> invalidTree "EachIn" "OnceBefore"
-      EachIn{} OnceAround{} -> invalidTree "EachIn" "OnceAround"
-      EachIn{} OnceAfter{} -> invalidTree "EachIn" "OnceAfter"
-      EachIn{} ThreadBefore{} -> invalidTree "EachIn" "ThreadBefore"
-      EachIn{} ThreadAround{} -> invalidTree "EachIn" "ThreadAround"
-      EachIn{} ThreadAfter{} -> invalidTree "EachIn" "ThreadAfter"
-      ThreadIn{} OnceBefore{} -> invalidTree "ThreadIn" "OnceBefore"
-      ThreadIn{} OnceAround{} -> invalidTree "ThreadIn" "OnceAround"
-      ThreadIn{} OnceAfter{} -> invalidTree "ThreadIn" "OnceAfter"
+      TestRunner{} OnceBefore{} -> invalidTree "TestRunner" "OnceBefore"
+      TestRunner{} OnceAround{} -> invalidTree "TestRunner" "OnceAround"
+      TestRunner{} OnceAfter{} -> invalidTree "TestRunner" "OnceAfter"
+
+-- eho <- logRun' (Hook Each Before) (`before` hi)
+-- eho
+--   & either
+--     ( flip runSubNodes_ subNodes . Abandon
+--     )
+--     ( \ho -> runSubNodes_ (EachIn $ pure ho) subNodes
+--     )
+
+{-
+Around{frequency, setup, subNodes, teardown = mteardown} ->
+--   let
+--     leadHookPos = aroundLeadingHookPos mteardown
+--    in
+--     case frequency of
+--       Each ->
+--         runSubNodes_ (EachIn nxtApply emptyAfter) subNodes
+--        where
+--         emptyAfter = pure ()
+--         nxtApply nxtAction =
+--           case hi of
+--             Abandon fp -> runAbandon fp
+--             EachIn{apply} ->
+--               apply $ either runAbandon runNxt
+--             OnceIn ioHi -> ioHi >>= runNxt
+--             ThreadIn ethIoHi -> ethIoHi >>= either runAbandon runNxt
+--          where
+--           runAbandon fp = do
+--             logAbandonned' (Hook Each leadHookPos) fp
+--             nxtAction . Left $ fp
+--             whenJust mteardown $
+--               const $
+--                 logAbandonned' (Hook Each Teardown) fp
+
+--           runNxt :: hi -> IO ()
+--           runNxt hki =
+--             do
+--               eho <- logRun' (Hook Each leadHookPos) (`setup` hki)
+--               nxtAction eho
+--               whenJust mteardown $
+--                 \teardown' ->
+--                   eho
+--                     & either
+--                       (logAbandonned' $ Hook Each Teardown)
+--                       (\ho -> logRun_ (Hook Each Teardown) (`teardown'` ho))
+--       Thread ->
+--         let
+--           runThreadAround ioHo hoVar =
+--             finally
+--               (runSubNodes_ (ThreadIn ioHo) subNodes)
+--               ( do
+--                   whenJust mteardown $
+--                     \td -> do
+--                       mho <- atomically $ tryReadTMVar hoVar
+--                       -- if mho is Nothing then setup was not run (empty subnodes)
+--                       whenJust mho $
+--                         either
+--                           (logAbandonned' (Hook Thread Teardown))
+--                           (\ho -> logRun_ (Hook Thread Teardown) (`td` ho))
+--               )
+--          in
+--           case hi of
+--             Abandon fp -> do
+--               hoVar <- newEmptyTMVarIO
+--               runThreadAround (hkOutSingleton hoVar) hoVar
+--              where
+--               hkOutSingleton hov = do
+--                 mho <- atomically $ tryReadTMVar hov
+--                 mho
+--                   & maybe
+--                     ( do
+--                         let ab = Left fp
+--                         atomically $ putTMVar hov ab
+--                         pure ab
+--                     )
+--                     pure
+--             EachIn{} -> invalidTree "EachIn" "Around Thread"
+--             OnceIn ioHi -> do
+--               -- Action can't be run until its actually needed by a test.
+--               -- There is a possibilty of the hook enclosing an empty or
+--               -- saturated subNode list. plain old laziness might be enough
+--               hoVar <- newEmptyTMVarIO
+--               runThreadAround (hkOutSingleton hoVar) hoVar
+--              where
+--               hkOutSingleton hov = do
+--                 mho <- atomically $ tryReadTMVar hov
+--                 mho
+--                   & maybe
+--                     ( do
+--                         hi'' <- ioHi
+--                         ho <- logRun' (Hook Thread leadHookPos) (`setup` hi'')
+--                         atomically $ putTMVar hov ho
+--                         pure ho
+--                     )
+--                     pure
+--             ThreadIn ioeHi -> do
+--               hoVar <- newEmptyTMVarIO
+--               let ioHo = hkOutSingleton hoVar
+--               runThreadAround ioHo hoVar
+--              where
+--               hkOutSingleton hov = do
+--                 mho <- atomically $ tryReadTMVar hov
+--                 mho
+--                   & maybe
+--                     ( do
+--                         ethi <- ioeHi
+--                         ho <-
+--                           either
+--                             (\fp -> logAbandonned' (Hook Thread leadHookPos) fp >> pure (Left fp))
+--                             (\hi'' -> logRun' (Hook Thread leadHookPos) (`setup` hi''))
+--                             ethi
+--                         atomically $ putTMVar hov ho
+--                         pure ho
+--                     )
+--                     pure
+
+-}
 
 --       EachIn _ _ -> invalidTree "EachIn" "AroundOnce"
 --       ThreadIn _ -> invalidTree "ThreadIn" "AroundOnce"
@@ -1375,12 +1390,17 @@ runNode lgr hi xt =
 data NodeIn hi where
   Abandon :: {fp :: FailPoint} -> NodeIn hi
   OnceIn :: {ioHi :: IO hi} -> NodeIn hi
-  ThreadIn :: {ioHi :: IO hi} -> NodeIn hi
-  EachIn ::
-    { apply :: (Either FailPoint hi -> IO ()) -> IO ()
-    , after :: IO ()
+  -- ThreadIn :: {ioHi :: IO hi} -> NodeIn hi
+  TestRunner ::
+    { context :: IO (TestContext hi)
     } ->
     NodeIn hi
+
+-- EachIn ::
+--   { apply :: (Either FailPoint hi -> IO ()) -> IO ()
+--   , after :: IO ()
+--   } ->
+--   NodeIn hi
 
 applyEach :: ((Either FailPoint hi -> IO ()) -> IO ()) -> IO () -> (Either FailPoint hi -> IO ()) -> IO ()
 applyEach apply after test = apply test >> after

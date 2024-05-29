@@ -651,14 +651,10 @@ runNode lgr hi xt =
                   runHook
                   (atomically $ writeTVar status AfterDone)
           )
-
-  {-
-
-    --   runTests :: (P.TestItem IO hi -> IO ()) -> IO ()
-  --   runTests actn = void $ runChildQ Sequential actn (const $ pure Runnable) tests
-
-    -}
-
+  
+  noOp :: forall a. a -> IO ()
+  noOp = const $ pure ()
+  
   run :: NodeIn hi' -> ExeTree hi' -> IO ()
   run =
     \cases
@@ -719,10 +715,9 @@ runNode lgr hi xt =
         abandonSubs fp subNodes' >> logAbandonned' (Hook Thread After) fp
       -- TODO: WRONG REVISIT abandon -> eachBefore
       Abandon{fp} EachBefore{subNodes} ->
-        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
+        runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
        where
         nxtSetup = logAbandonned' (Hook Each Before) fp >> pure (Left fp)
-        nxtTeardown = const $ pure ()
       --
       -- TODO: WRONG REVISIT abandon -> eachAround
       Abandon{fp} EachAround{subNodes} ->
@@ -737,7 +732,7 @@ runNode lgr hi xt =
       --
       -- abandon -> test
       Abandon{fp} Fixture{tests} ->
-        runTests (pure $ MkTestContext (pure $ Left fp) (const $ pure ())) tests
+        runTests (pure $ MkTestContext (pure $ Left fp) noOp) tests
       --
       -- onceIn -> onceBefore
       OnceIn{ioHi} OnceBefore{before, beforeStatus, cache, subNodes} -> do
@@ -823,8 +818,7 @@ runNode lgr hi xt =
                       pure to
                   )
                   pure
-            nxtTeardown = const $ pure ()
-        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
+        runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
 
       -- onceIn -> threadAround
       OnceIn{ioHi} ThreadAround{setup, teardown, subNodes} -> do
@@ -842,8 +836,7 @@ runNode lgr hi xt =
                       pure to
                   )
                   pure
-            nxtTeardown = const $ pure ()
-        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
+        runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
         mho <- atomically $ tryReadTMVar tCache
         mho -- if mho is Nothing it means hook was not run (empty subnodes)
           & maybe
@@ -863,38 +856,81 @@ runNode lgr hi xt =
       --
       -- onceIn -> eachBefore
       (OnceIn ioHi) EachBefore{before, subNodes} ->
-        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
+        runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
        where
         nxtSetup = ioHi >>= \ho -> logRun' (Hook Each Before) (`before` ho)
-        nxtTeardown = const $ pure ()
       --
       -- onceIn -> eachAround
       OnceIn{ioHi} EachAround{setup, teardown, subNodes} ->
         runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
        where
         nxtSetup = ioHi >>= \ho -> logRun' (Hook Each Before) (`setup` ho)
-        nxtTeardown = either 
-          (logAbandonned' (Hook Each Teardown)) 
-          (\ho -> logRun_ (Hook Each Teardown) (`teardown` ho))
+        nxtTeardown =
+          either
+            (logAbandonned' (Hook Each Teardown))
+            (\ho -> logRun_ (Hook Each Teardown) (`teardown` ho))
       --
       -- onceIn -> eachAfter
       OnceIn{ioHi} EachAfter{after, subNodes'} ->
         runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes'
        where
         nxtSetup = Right <$> ioHi
-        nxtTeardown = either 
-          (logAbandonned' (Hook Each After)) 
-          (\_ -> logRun_ (Hook Each After) after)
+        nxtTeardown =
+          either
+            (logAbandonned' (Hook Each After))
+            (\_ -> logRun_ (Hook Each After) after)
       --
-      -- onceIn -> eachAfter
-      OnceIn{ioHi} Fixture{title, tests} -> uu
-      TestRunner{} (ThreadBefore _ _ _) -> uu
-      TestRunner{} (ThreadAround _ _ _ _) -> uu
-      TestRunner{} (ThreadAfter _ _ _) -> uu
-      TestRunner{} (EachBefore _ _ _) -> uu
-      TestRunner{} (EachAround _ _ _ _) -> uu
-      TestRunner{} (EachAfter _ _ _) -> uu
-      TestRunner{} (Fixture _ _ _) -> uu
+      -- onceIn -> fixture
+      OnceIn{ioHi} Fixture{tests} ->
+        runTests (pure $ MkTestContext (Right <$> ioHi) noOp) tests
+      TestRunner{context} ThreadBefore{before, subNodes} ->
+        -- newContext :: TestContext hi -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> IO (TestContext ho)
+        do 
+          tCache <- newEmptyTMVarIO
+          let nxtSetup ehi = 
+            ehi & either 
+              (logAbandonned' (Hook Thread Before))
+              (\hi -> logRun' (Hook Thread Before) (`before` hi))
+              >>= \ho -> atomically $ writeTMVar tCache ho
+            
+            do
+                -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
+                -- no need for thread synchronisation as this happpens within a thread
+                mho <- atomically $ tryReadTMVar tCache
+                mho
+                  & maybe
+                    ( do
+                        
+                        to <- logRun' (Hook Thread Before) (`before` context)
+                        atomically $ writeTMVar tCache to
+                        pure to
+                    )
+                    pure
+        context >>= \ctx -> newContext ctx before noOp >>= runSubNodes_ (TestRunner . pure) subNodes
+           
+        do
+        oi <- ioHi
+        tCache <- newEmptyTMVarIO
+        let nxtSetup = do
+              -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
+              -- no need for thread synchronisation as this happpens within a thread
+              mho <- atomically $ tryReadTMVar tCache
+              mho
+                & maybe
+                  ( do
+                      to <- logRun' (Hook Thread Before) (`before` oi)
+                      atomically $ writeTMVar tCache to
+                      pure to
+                  )
+                  pure
+        runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
+
+      TestRunner{context} ThreadAround{} -> uu
+      TestRunner{context} ThreadAfter{} -> uu
+      TestRunner{context} EachBefore{} -> uu
+      TestRunner{context} EachAround{} -> uu
+      TestRunner{context} EachAfter{} -> uu
+      TestRunner{context} Fixture{tests} -> runTests context tests
       -- ### all invalid combos ### --
       TestRunner{} OnceBefore{} -> invalidTree "TestRunner" "OnceBefore"
       TestRunner{} OnceAround{} -> invalidTree "TestRunner" "OnceAround"

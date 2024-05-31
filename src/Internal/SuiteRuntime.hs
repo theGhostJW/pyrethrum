@@ -563,15 +563,15 @@ data TestContext hi = MkTestContext
   , teardown :: Either FailPoint hi -> IO ()
   }
 
-newContext :: TestContext hi -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> IO (TestContext ho)
-newContext MkTestContext{setup, teardown} setupNxt teardownNxt =
-  setup
-    >>= \hi ->
-      pure $
-        MkTestContext
-          { setup = setupNxt hi
-          , teardown = \ho -> teardownNxt ho >> teardown hi
-          }
+newContext :: IO (TestContext hi) -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> IO (TestContext ho)
+newContext ioCtx setupNxt teardownNxt = do
+  MkTestContext{setup, teardown} <- ioCtx
+  ( \hi ->
+      MkTestContext
+        { setup = setupNxt hi
+        , teardown = \ho -> teardownNxt ho >> teardown hi
+        }
+   ) <$> setup
 
 runNode ::
   forall hi.
@@ -655,28 +655,28 @@ runNode lgr hi xt =
   noOp :: forall a. a -> IO ()
   noOp = const $ pure ()
 
+  runThreadSetup :: forall i o. TMVar (Either FailPoint o) -> SuiteEvent -> (P.ApEventSink -> i -> IO o) -> Either FailPoint i -> IO (Either FailPoint o)
   runThreadSetup tCache evnt setup eti = do
-              -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
-              -- no need for thread synchronisation as this happpens within a thread
-              mho <- atomically $ tryReadTMVar tCache
-              mho
-                & maybe
-                  ( 
-                    eti & either 
-                      (\fp -> do 
-                        let r = Left fp 
-                        logAbandonned' evnt
-                        atomically $ writeTMVar tCache r
-                        pure r
-                      )
-                      (\ti -> do
-                        to <- logRun' evnt (`setup` ti)
-                        atomically $ writeTMVar tCache to
-                        pure to
-
-                      )
-                  )
-                  pure
+    -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
+    -- no need for thread synchronisation as this happpens within a thread
+    mho <- atomically $ tryReadTMVar tCache
+    mho
+      & maybe
+        ( eti
+            & either
+              ( \fp -> do
+                  let r = Left fp
+                  logAbandonned' evnt fp
+                  atomically $ writeTMVar tCache r
+                  pure r
+              )
+              ( \ti -> do
+                  to <- logRun' evnt (`setup` ti)
+                  atomically $ writeTMVar tCache to
+                  pure to
+              )
+        )
+        pure
 
   run :: NodeIn hi' -> ExeTree hi' -> IO ()
   run =
@@ -785,7 +785,6 @@ runNode lgr hi xt =
             )
             (atomically $ writeTVar beforeStatus BeforeDone)
       --
-      --
       -- onceIn -> onceAround
       OnceIn{ioHi} OnceAround{setup, teardown, status, cache, subNodes} -> do
         hki <- ioHi
@@ -829,15 +828,15 @@ runNode lgr hi xt =
       OnceIn{ioHi} ThreadBefore{before, subNodes} -> do
         oi <- ioHi
         tCache <- newEmptyTMVarIO
-        let nxtSetup = runThreadSetup tCache (Hook Thread Before) before oi
+        let nxtSetup = runThreadSetup tCache (Hook Thread Before) before $ Right oi
         runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
       --
       -- onceIn -> threadAround
       OnceIn{ioHi} ThreadAround{setup, teardown, subNodes} -> do
         oi <- ioHi
         tCache <- newEmptyTMVarIO
-        let nxtSetup = runThreadSetup tCache (Hook Thread Setup) setup oi
-          
+        let nxtSetup = runThreadSetup tCache (Hook Thread Setup) setup $ Right oi
+
         runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
         mho <- atomically $ tryReadTMVar tCache
         mho -- if mho is Nothing it means hook was not run (empty subnodes)
@@ -888,63 +887,11 @@ runNode lgr hi xt =
         runTests (pure $ MkTestContext (Right <$> ioHi) noOp) tests
       --
       -- onceIn -> threadbefore
-      TestRunner{context} ThreadBefore{before, subNodes} -> uu
-        -- newContext :: TestContext hi -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> IO (TestContext ho)
+      TestRunner{context} ThreadBefore{before, subNodes} ->
         do
           tCache <- newEmptyTMVarIO
-          let nxtSetup ehi = do
-             mho
-                & maybe
-                  ( ehi & either 
-                            (\fp -> logAbandonned' (Hook Thread Before) >> pure (Left fp))
-                            (runThreadSetup (Hook Thread Before) tCache before)
-                            )
-                  pure
-              mho
-                ehi
-                  & either
-                    (\fp -> do
-                        logAbandonned' (Hook Thread Before) fp
-                        pure (Left fp)
-                    )
-                    (\hi -> do 
-                       ho <- logRun' (Hook Thread Before) (`before` hi))
-                       atomically $ writeTMVar tCache ho
-                       pure (Right ho)
-                uu
-      {-
-            do
-                -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
-                -- no need for thread synchronisation as this happpens within a thread
-                mho <- atomically $ tryReadTMVar tCache
-                mho
-                  & maybe
-                    ( do
-
-                        to <- logRun' (Hook Thread Before) (`before` context)
-                        atomically $ writeTMVar tCache to
-                        pure to
-                    )
-                    pure
-        context >>= \ctx -> newContext ctx before noOp >>= runSubNodes_ (TestRunner . pure) subNodes
-
-        do
-        oi <- ioHi
-        tCache <- newEmptyTMVarIO
-        let nxtSetup = do
-              -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
-              -- no need for thread synchronisation as this happpens within a thread
-              mho <- atomically $ tryReadTMVar tCache
-              mho
-                & maybe
-                  ( do
-                      to <- logRun' (Hook Thread Before) (`before` oi)
-                      atomically $ writeTMVar tCache to
-                      pure to
-                  )
-                  pure
-        runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
-      -}
+          let mkBefore = runThreadSetup tCache (Hook Thread Before) before
+          runSubNodes_ (TestRunner $ newContext context mkBefore noOp) subNodes
 
       TestRunner{context} ThreadAround{} -> uu
       TestRunner{context} ThreadAfter{} -> uu

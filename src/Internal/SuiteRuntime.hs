@@ -571,7 +571,8 @@ newContext ioCtx setupNxt teardownNxt = do
         { setup = setupNxt hi
         , teardown = \ho -> teardownNxt ho >> teardown hi
         }
-   ) <$> setup
+    )
+    <$> setup
 
 runNode ::
   forall hi.
@@ -662,21 +663,35 @@ runNode lgr hi xt =
     mho <- atomically $ tryReadTMVar tCache
     mho
       & maybe
-        ( eti
-            & either
-              ( \fp -> do
-                  let r = Left fp
-                  logAbandonned' evnt fp
-                  atomically $ writeTMVar tCache r
-                  pure r
-              )
-              ( \ti -> do
-                  to <- logRun' evnt (`setup` ti)
-                  atomically $ writeTMVar tCache to
-                  pure to
-              )
+        ( do
+            eo <- runSetup evnt setup eti
+            atomically $ writeTMVar tCache eo
+            pure eo
         )
         pure
+
+  runSetup :: forall i o. SuiteEvent -> (P.ApEventSink -> i -> IO o) -> Either FailPoint i -> IO (Either FailPoint o)
+  runSetup evnt setup eti =
+    eti
+      & either
+        ( \fp -> do
+            let r = Left fp
+            logAbandonned' evnt fp
+            pure r
+        )
+        ( \ti -> logRun' evnt (`setup` ti)
+        )
+
+  runThreadTeardown :: forall i. TMVar (Either FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
+  runThreadTeardown tCache teardown = do
+    mho <- atomically $ tryReadTMVar tCache
+    mho -- if mho is Nothing it means hook was not run (empty subnodes)
+      & maybe
+        (pure ())
+        ( either
+            (logAbandonned' (Hook Thread Teardown))
+            (\ho -> logRun_ (Hook Thread Teardown) (`teardown` ho))
+        )
 
   run :: NodeIn hi' -> ExeTree hi' -> IO ()
   run =
@@ -836,16 +851,8 @@ runNode lgr hi xt =
         oi <- ioHi
         tCache <- newEmptyTMVarIO
         let nxtSetup = runThreadSetup tCache (Hook Thread Setup) setup $ Right oi
-
         runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
-        mho <- atomically $ tryReadTMVar tCache
-        mho -- if mho is Nothing it means hook was not run (empty subnodes)
-          & maybe
-            (pure ())
-            ( either
-                (logAbandonned' (Hook Thread Teardown))
-                (\ho -> logRun_ (Hook Thread Teardown) (`teardown` ho))
-            )
+        runThreadTeardown tCache teardown
 
       --
       -- onceIn -> threadAfter
@@ -892,10 +899,23 @@ runNode lgr hi xt =
           tCache <- newEmptyTMVarIO
           let mkBefore = runThreadSetup tCache (Hook Thread Before) before
           runSubNodes_ (TestRunner $ newContext context mkBefore noOp) subNodes
-
-      TestRunner{context} ThreadAround{} -> uu
-      TestRunner{context} ThreadAfter{} -> uu
-      TestRunner{context} EachBefore{} -> uu
+      TestRunner{context} ThreadAround{setup, teardown, subNodes} ->
+        do
+          tCache <- newEmptyTMVarIO
+          let mkBefore = runThreadSetup tCache (Hook Thread Setup) setup
+          runSubNodes_ (TestRunner $ newContext context mkBefore noOp) subNodes
+          runThreadTeardown tCache teardown
+      tr@TestRunner{} ThreadAfter{subNodes', after} ->
+        do
+          -- may not run if subnodes are empty
+          run' <- runSubNodes tr subNodes'
+          when run'.hasRun $
+            logRun_ (Hook Thread After) after
+      TestRunner{context} EachBefore{before, subNodes} ->
+        runSubNodes_ (TestRunner $ newContext context nxtSetup noOp) subNodes
+       where
+        nxtSetup :: Either FailPoint hi' -> IO (Either FailPoint ho)
+        nxtSetup = logRun' (Hook Each Before) (runSetup (Hook Each Before) before)
       TestRunner{context} EachAround{} -> uu
       TestRunner{context} EachAfter{} -> uu
       TestRunner{context} Fixture{tests} -> runTests context tests

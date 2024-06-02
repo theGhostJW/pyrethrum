@@ -915,7 +915,7 @@ runNode lgr hi xt =
         runSubNodes_ (TestRunner $ newContext context nxtSetup noOp) subNodes
        where
         nxtSetup :: Either FailPoint hi' -> IO (Either FailPoint ho)
-        nxtSetup = logRun' (Hook Each Before) (runSetup (Hook Each Before) before)
+        nxtSetup ehi = logRun' (Hook Each Before) (runSetup (Hook Each Before) before ehi)
       TestRunner{context} EachAround{} -> uu
       TestRunner{context} EachAfter{} -> uu
       TestRunner{context} Fixture{tests} -> runTests context tests

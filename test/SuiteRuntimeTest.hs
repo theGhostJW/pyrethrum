@@ -10,10 +10,11 @@ import List.Extra as LE hiding (list)
 
 import SuiteRuntimeTestBase
 import Prelude hiding (All, bug, id)
+import PyrethrumExtras (uu)
 
--- $ > unit_simple_pass
+-- $> unit_simple_pass
 unit_simple_pass :: IO ()
-unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
+unit_simple_pass = print "start" >> runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
 -- $ > unit_simple_fail
 unit_simple_fail :: IO ()
@@ -271,10 +272,10 @@ Does not Equal:
     { path = NodePath { module' = "0" , path = "EachAfter" }
     , suiteEvent = Hook Each After
     }
-)
+
 -}
 
--- $> unit_prop_fail_each_after_out_of_order1
+-- $ > unit_prop_fail_each_after_out_of_order1
 unit_prop_fail_each_after_out_of_order1 :: IO ()
 unit_prop_fail_each_after_out_of_order1 =
     runTest'

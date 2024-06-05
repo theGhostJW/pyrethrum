@@ -610,7 +610,7 @@ runNode lgr hi xt =
   sink = lgr . L.ApEvent
 
   runTests :: forall ti. IO (TestContext ti) -> ChildQ (P.Test IO ti) -> IO ()
-  runTests eti tests = void $ runChildQ Sequential (runTest eti) (const $ pure Runnable) tests
+  runTests eti tests = error "Bang" -- void $ runChildQ Sequential (runTest eti) (const $ pure Runnable) tests
 
   nxtRunner :: forall i. IO (Either FailPoint i) -> (Either FailPoint i -> IO ()) -> NodeIn i
   nxtRunner su td = TestRunner . pure $ MkTestContext su td
@@ -751,20 +751,21 @@ runNode lgr hi xt =
       -- abandon -> threadAfter
       Abandon{fp} ThreadAfter{subNodes'} ->
         abandonSubs fp subNodes' >> logAbandonned' (Hook Thread After) fp
-      -- TODO: WRONG REVISIT abandon -> eachBefore
+      --
+      -- abandon -> eachBefore
       Abandon{fp} EachBefore{subNodes} ->
         runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
        where
         nxtSetup = logAbandonned' (Hook Each Before) fp >> pure (Left fp)
       --
-      -- TODO: WRONG REVISIT abandon -> eachAround
+      -- abandon -> eachAround
       Abandon{fp} EachAround{subNodes} ->
         do
           logAbandonned' (Hook Each Setup) fp
           abandonSubs fp subNodes
           logAbandonned' (Hook Each Teardown) fp
       --
-      -- TODO: WRONG REVISIT abandon -> eachAfter
+      -- abandon -> eachAfter
       Abandon{fp} EachAfter{subNodes'} ->
         abandonSubs fp subNodes' >> logAbandonned' (Hook Each After) fp
       --
@@ -802,8 +803,14 @@ runNode lgr hi xt =
       --
       -- onceIn -> onceAround
       OnceIn{ioHi} OnceAround{setup, teardown, status, cache, subNodes} -> do
+        print "OnceAround"
+        -- error "OnceAround"
         hki <- ioHi
+        print "locking setup"
+        -- error "locking setup"
         setUpLocked <- tryLockIO canLockSetup status subNodes SetupRunning
+        print "setup locked"
+        -- error "setup locked"
         eho <-
           if setUpLocked
             then do
@@ -812,8 +819,9 @@ runNode lgr hi xt =
                 writeTMVar cache eho
                 writeTVar status AroundQRunning
               pure eho
-            else atomically (readTMVar cache)
-
+            else print "reading mVar" >> atomically (readTMVar cache)
+        print "got eho" 
+        error "got eho"
         runQ <- statusCheckIO canLockTeardown status subNodes
         when runQ $
           finally
@@ -899,25 +907,48 @@ runNode lgr hi xt =
           tCache <- newEmptyTMVarIO
           let mkBefore = runThreadSetup tCache (Hook Thread Before) before
           runSubNodes_ (TestRunner $ newContext context mkBefore noOp) subNodes
+      --
+      -- context -> threadAround
       TestRunner{context} ThreadAround{setup, teardown, subNodes} ->
         do
           tCache <- newEmptyTMVarIO
           let mkBefore = runThreadSetup tCache (Hook Thread Setup) setup
           runSubNodes_ (TestRunner $ newContext context mkBefore noOp) subNodes
           runThreadTeardown tCache teardown
+      --
+      -- context -> threadAfter
       tr@TestRunner{} ThreadAfter{subNodes', after} ->
         do
           -- may not run if subnodes are empty
           run' <- runSubNodes tr subNodes'
           when run'.hasRun $
             logRun_ (Hook Thread After) after
+      --
+      -- context -> eachBefore
       TestRunner{context} EachBefore{before, subNodes} ->
         runSubNodes_ (TestRunner $ newContext context nxtSetup noOp) subNodes
        where
-        nxtSetup :: Either FailPoint hi' -> IO (Either FailPoint ho)
-        nxtSetup ehi = logRun' (Hook Each Before) (runSetup (Hook Each Before) before ehi)
-      TestRunner{context} EachAround{} -> uu
-      TestRunner{context} EachAfter{} -> uu
+        nxtSetup = runSetup (Hook Each Before) before 
+      --
+      -- context -> eachAround
+      TestRunner{context} EachAround{setup, teardown, subNodes} -> 
+        runSubNodes_ (TestRunner $ newContext context nxtSetup nxtTeardown) subNodes
+        where 
+          nxtSetup = runSetup (Hook Each Before) setup 
+          nxtTeardown = either 
+                         (logAbandonned' (Hook Each Teardown) ) 
+                         (\i -> logRun_ (Hook Each Teardown) (`teardown` i))
+      --
+      --
+      -- context -> eachAfter
+      TestRunner{context} EachAfter{subNodes', after} ->  
+        runSubNodes_ (TestRunner $ newContext context pure nxtAfter) subNodes'
+        where 
+         nxtAfter = either 
+                     (logAbandonned' (Hook Each After) ) 
+                     (\_i -> logRun_ (Hook Each After) after)
+      --
+      -- context -> fixtures
       TestRunner{context} Fixture{tests} -> runTests context tests
       -- ### all invalid combos ### --
       TestRunner{} OnceBefore{} -> invalidTree "TestRunner" "OnceBefore"

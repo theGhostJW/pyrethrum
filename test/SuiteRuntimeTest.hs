@@ -12,7 +12,8 @@ import SuiteRuntimeTestBase
 import Prelude hiding (All, bug, id)
 import PyrethrumExtras (uu)
 
--- $> unit_simple_pass
+
+-- $ > unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = print "start" >> runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
@@ -209,7 +210,7 @@ unit_pass_prob_no_pregen = passProbSuite Runtime
 
 -- $ > unit_prop_test_fail_template_wrong_result
 unit_prop_test_fail_template_wrong_result :: IO ()
-unit_prop_test_fail_template_wrong_result = sequence_ $ replicate 10 propFailTemplateGenWrongEachHookResult
+unit_prop_test_fail_template_wrong_result = replicateM_ 10 propFailTemplateGenWrongEachHookResult
 
 propFailTemplateGenWrongEachHookResult :: IO ()
 propFailTemplateGenWrongEachHookResult =
@@ -293,3 +294,29 @@ unit_prop_fail_each_after_out_of_order1 =
                 ]
             }
         ]
+
+-- $> unit_prop_fail_each_after
+unit_prop_fail_each_after :: IO ()
+unit_prop_fail_each_after =
+    runTest'
+        Log
+        defaultSeed
+        (ThreadCount 1)
+        [ EachAfter
+         { eachSpec =
+            T.PassProb { 
+                genStrategy = Preload
+              , passPcnt = 95
+              , minDelay = 0
+              , maxDelay = 0
+              }
+        , subNodes =
+            [ Fixture
+                { tests =
+                    [ Spec { delay = 0 , result = Pass }
+                    , Spec { delay = 0 , result = Pass }
+                    ]
+                }
+            ]
+        }
+    ] 

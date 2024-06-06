@@ -295,6 +295,7 @@ unit_prop_fail_each_after_out_of_order1 =
             }
         ]
 
+
 -- $> unit_prop_fail_each_after
 unit_prop_fail_each_after :: IO ()
 unit_prop_fail_each_after =

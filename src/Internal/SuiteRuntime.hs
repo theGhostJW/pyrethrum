@@ -574,10 +574,6 @@ newContext ioCtx setupNxt teardownNxt = do
     )
     <$> setup
 
-pp = print
-
-pp' m = print m >> error m
-
 runNode ::
   forall hi.
   Logger ->
@@ -615,7 +611,7 @@ runNode lgr hi xt =
 
   runTests :: forall ti. IO (TestContext ti) -> ChildQ (P.Test IO ti) -> IO ()
   runTests eti tests = void $ runChildQ Sequential (runTest eti) (const $ pure Runnable) tests
-  
+
   nxtRunner :: forall i. IO (Either FailPoint i) -> (Either FailPoint i -> IO ()) -> NodeIn i
   nxtRunner su td = TestRunner . pure $ MkTestContext su td
 
@@ -807,12 +803,8 @@ runNode lgr hi xt =
       --
       -- onceIn -> onceAround
       OnceIn{ioHi} OnceAround{setup, teardown, status, cache, subNodes} -> do
-        pp "OnceAround"
         hki <- ioHi
-        pp "locking setup"
-
         setUpLocked <- tryLockIO canLockSetup status subNodes SetupRunning
-        pp "setup locked"
         eho <-
           if setUpLocked
             then do
@@ -820,26 +812,20 @@ runNode lgr hi xt =
               atomically $ do
                 writeTMVar cache eho
                 writeTVar status AroundQRunning
-              pp "returned eho"
               pure eho
-            else pp "reading mVar" >> atomically (readTMVar cache)
-        pp "got eho"
+            else atomically (readTMVar cache)
         finally
           ( eho
               & either
                 ( \fp -> do
-                    pp "abandon subnodes"
                     (flip runSubNodes_ subNodes . Abandon) fp
                 )
                 ( \ho -> do
-                    pp "run subnodes"
                     runSubNodes_ (OnceIn $ pure ho) subNodes
                 )
           )
           ( do
-              pp "before lock"
               locked <- tryLockIO canLockTeardown status subNodes TeardownRunning
-              pp "after lock"
               when locked $
                 finally
                   ( eho

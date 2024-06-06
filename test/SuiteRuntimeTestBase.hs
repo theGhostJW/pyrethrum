@@ -1108,7 +1108,7 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
                   P.After
                     { path
                     , frequency = Each
-                    , after = const $ mkManyAction baseSeed b4Q path eachSpec
+                    , after = const $ mkManyAction baseSeed afterQ path eachSpec
                     , subNodes' = nds
                     }
           T.EachAround

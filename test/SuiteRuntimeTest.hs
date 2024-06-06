@@ -296,7 +296,7 @@ unit_prop_fail_each_after_out_of_order1 =
         ]
 
 
--- $> unit_prop_fail_each_after
+-- $ > unit_prop_fail_each_after
 unit_prop_fail_each_after :: IO ()
 unit_prop_fail_each_after =
     runTest'
@@ -319,5 +319,16 @@ unit_prop_fail_each_after =
                     ]
                 }
             ]
+        }
+    ] 
+
+-- $> unit_missing_setup
+unit_missing_setup:: IO ()
+unit_missing_setup = runTest' Log defaultSeed (ThreadCount 1) 
+    [ EachAround
+        { eachSetupSpec = T.All $ Spec { delay = 0 , result = Pass }
+        , eachTeardownSpec = T.All $ Spec { delay = 0 , result = Pass }
+        , subNodes =
+            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
         }
     ] 

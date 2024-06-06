@@ -874,7 +874,7 @@ runNode lgr hi xt =
       OnceIn{ioHi} EachAround{setup, teardown, subNodes} ->
         runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
        where
-        nxtSetup = ioHi >>= \ho -> logRun' (Hook Each Before) (`setup` ho)
+        nxtSetup = ioHi >>= \ho -> logRun' (Hook Each Setup) (`setup` ho)
         nxtTeardown =
           either
             (logAbandonned' (Hook Each Teardown))
@@ -927,7 +927,7 @@ runNode lgr hi xt =
       TestRunner{context} EachAround{setup, teardown, subNodes} ->
         runSubNodes_ (TestRunner $ newContext context nxtSetup nxtTeardown) subNodes
        where
-        nxtSetup = runSetup (Hook Each Before) setup
+        nxtSetup = runSetup (Hook Each Setup) setup
         nxtTeardown =
           either
             (logAbandonned' (Hook Each Teardown))

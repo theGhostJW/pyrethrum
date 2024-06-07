@@ -60,8 +60,8 @@ expectedParentSubsequentEvents :: [Template] -> Map SuiteEventPath SuiteEventPat
 expectedParentSubsequentEvents = expectedSuiteEvntMap templateAfterEvnt
 
 expectedSuiteEvntMap :: (Template -> Maybe SuiteEvent) -> [Template] -> Map SuiteEventPath SuiteEventPath
-expectedSuiteEvntMap getSuiteEvnt ts =
-  foldl' (priorMap Nothing) Map.empty ts
+expectedSuiteEvntMap getSuiteEvnt =
+  foldl' (priorMap Nothing) Map.empty
  where
   priorMap :: Maybe SuiteEventPath -> Map SuiteEventPath SuiteEventPath -> Template -> Map SuiteEventPath SuiteEventPath
   priorMap mParentEvnt accMap t =

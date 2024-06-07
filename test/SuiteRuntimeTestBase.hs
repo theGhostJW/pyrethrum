@@ -75,7 +75,7 @@ bug :: Text -> a
 bug t = PR.bug (error t :: SomeException)
 
 logging :: Logging
-logging = Log
+logging = NoLog
 
 {- each and once hooks will always run but thread hooks may be empty
    due to subitems being stolen by another thread. We need to ensure
@@ -106,8 +106,6 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
   -}
 
-
-
 type LogItem = ThreadEvent ExePath AE.ApEvent
 
 chkProperties :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
@@ -121,15 +119,20 @@ chkProperties baseSeed threadLimit ts evts = do
     , chkThreadLogsInOrder
     , chkAllTemplateItemsLogged ts
     , chkStartsOnce "once hooks and tests" shouldOccurOnce
-    , chkStartSuiteEventImmediatlyFollowedByEnd "once hooks" (hasSuiteEvent onceHook)
     , chkExpectedResults baseSeed threadLimit ts
     ]
-  -- these checks apply to each thread log (ie. Once events + events with the same thread id)
+  -- these checks apply to each thread log (events with the same thread id)
   threadLogChks
+    False
     evts
     [ chkThreadHooksStartedOnceInThread
     , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-    , chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
+    ]
+  -- these checks apply to each thread log (ie. Once events + events with the same thread id)
+  threadLogChks
+    True
+    evts
+    [ chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
     , chkSubsequentSuiteEventAsExpected (T.expectedParentSubsequentEvents ts)
     , chkFailureLocEqualsLastStartLoc
     , chkFailurePropagation
@@ -184,11 +187,11 @@ logAccum acc@(passStart, rMap) =
         $ error ("Failure event not started\n" <> ptxt f)
     pf@ParentFailure{loc, suiteEvent} ->
       isJust passStart
-        ? (error $ "parent failure encountered when parent event not ended\n" <> ptxt pf)
-        $ (Nothing, insert' loc suiteEvent $ ParentFailed)
+        ? error ("parent failure encountered when parent event not ended\n" <> ptxt pf)
+        $ (Nothing, insert' loc suiteEvent ParentFailed)
     s@Start{loc, suiteEvent} ->
       isJust passStart
-        ? (error $ "start found for already started event\n" <> ptxt s)
+        ? error ("start found for already started event\n" <> ptxt s)
         $ (Just (loc, suiteEvent), rMap)
     StartExecution{} -> acc
     ApEvent{} -> acc
@@ -228,8 +231,8 @@ defects found in testing::
     - chkAllTemplateItemsLogged was incomplete + prenode generator (fixture) bug
 
  - property testing
-  - test function error causing tests to fail even though suite results were correct 
-    specifically - mkManyAction implementations flipped for construcots  
+  - test function error causing tests to fail even though suite results were correct
+    specifically - mkManyAction implementations flipped for construcots
     - T.All s -> had implementation meant for PassProb
     - PassProb -> had implementation meant for All
     - https://github.com/theGhostJW/pyrethrum/commit/ef50961
@@ -262,8 +265,8 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                     all (\r -> r == Actual e || r == ParentFailed) actual
                 NonDeterministic -> pure ()
                 Multi expLst -> case k.suiteEvent of
-                  TE.Test{} -> bug $ "Test not expected to have Multi result"
-                  TE.Hook TE.Once _ -> bug $ "Once  not expected to have Multi result"
+                  TE.Test{} -> bug "Test not expected to have Multi result"
+                  TE.Hook TE.Once _ -> bug "Once not expected to have Multi result"
                   TE.Hook TE.Thread _ -> do
                     chk'
                       ("actual thread events: " <> ptxt actualCount <> " more than max threads: " <> ptxt threadLimit.maxThreads)
@@ -309,7 +312,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
     key = SuiteEventPath (path) (suiteEvent)
     ensureUnique k =
       M.member k acc
-        ? (bug $ "duplicate key should not happen. Template paths should be unique: " <> txt k)
+        ? bug ("duplicate key should not happen. Template paths should be unique: " <> txt k)
         $ k
 
     expected :: ExpectedResult
@@ -589,12 +592,21 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =
-  chkStartSuiteEventImmediatlyFollowedByEnd "thread suite elements" (hasSuiteEvent (const True))
+  chkStartSuiteEventImmediatlyFollowedByEnd (hasSuiteEvent (const True))
 
-threadLogChks :: [LogItem] -> [[LogItem] -> IO ()] -> IO ()
-threadLogChks fullLog = traverse_ chkTls
+chkStartSuiteEventImmediatlyFollowedByEnd :: (LogItem -> Bool) -> [LogItem] -> IO ()
+chkStartSuiteEventImmediatlyFollowedByEnd p l = do
+  unless (null startNotFollwedByEnd) $
+    fail $
+      "Thread suite elements - start not followed by end:\n" <> toS (ppShow startNotFollwedByEnd)
  where
-  tlgs = threadedLogs True fullLog
+  trgEvnts = filter p l
+  startNotFollwedByEnd = filter (\(s, e) -> isStart s && (not (isEnd e) || s.loc /= e.loc)) . zip trgEvnts $ drop 1 trgEvnts
+
+threadLogChks :: Bool -> [LogItem] -> [[LogItem] -> IO ()] -> IO ()
+threadLogChks includeOnce fullLog = traverse_ chkTls
+ where
+  tlgs = threadedLogs includeOnce fullLog
   chkTls = checkThreadLogs tlgs
   checkThreadLogs :: [[LogItem]] -> ([LogItem] -> IO ()) -> IO ()
   checkThreadLogs tls' lgChk = traverse_ lgChk tls'
@@ -604,16 +616,6 @@ chkThreadHooksStartedOnceInThread =
   chkStartsOnce "thread elements" (hasSuiteEvent threadHook)
 
 -- TODO:: reexport putStrLn et. al with text conversion
-
-chkStartSuiteEventImmediatlyFollowedByEnd :: Text -> (LogItem -> Bool) -> [LogItem] -> IO ()
-chkStartSuiteEventImmediatlyFollowedByEnd errSfx p l = do
-  --  putStrLn $ ppShowList trgEvnts
-  unless (null startNotFollwedByEnd) $
-    fail $
-      toS errSfx <> " start not followed by end:\n" <> toS (ppShow startNotFollwedByEnd)
- where
-  trgEvnts = filter p l
-  startNotFollwedByEnd = filter (\(s, e) -> isStart s && (not (isEnd e) || s.loc /= e.loc)) . zip trgEvnts $ drop 1 trgEvnts
 
 chkStartsOnce :: Text -> (LogItem -> Bool) -> [LogItem] -> IO ()
 chkStartsOnce errSfx p l = do
@@ -1151,7 +1153,7 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
                     P.After
                       { path
                       , frequency = Thread
-                      , after = const $ mkManyAction baseSeed b4Q path threadSpec
+                      , after = const $ mkManyAction baseSeed afterQ path threadSpec
                       , subNodes' = nds
                       }
             T.ThreadAround
@@ -1217,323 +1219,3 @@ data Template
 
 mkTestItem :: T.TestItem -> P.Test IO ()
 mkTestItem T.TestItem{id, title, spec} = P.MkTest id title (mkAction title spec)
-
-{- ANOTHER TEST FAILURE - check is wrong
-#### Template ####
-[ OnceBefore
-    { path = NodePath { module' = "0" , path = "OnceBefore" }
-    , spec = Spec { delay = 0 , result = Pass }
-    , subNodes =
-        [ OnceAfter
-            { path = NodePath { module' = "0.0" , path = "OnceAfter" }
-            , spec = Spec { delay = 0 , result = Pass }
-            , subNodes =
-                [ OnceBefore
-                    { path = NodePath { module' = "0.0.0" , path = "OnceBefore" }
-                    , spec = Spec { delay = 0 , result = Pass }
-                    , subNodes =
-                        [ Fixture
-                            { path = NodePath { module' = "0.0.0.0" , path = "Test" }
-                            , tests =
-                                [ TestItem
-                                    { id = 0
-                                    , title = "0.0.0.0 Test"
-                                    , spec = Spec { delay = 0 , result = Pass }
-                                    }
-                                ]
-                            }
-                        , OnceBefore
-                            { path = NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
-                            , spec = Spec { delay = 30 , result = Pass }
-                            , subNodes =
-                                [ Fixture
-                                    { path = NodePath { module' = "0.0.0.1.0" , path = "Test" }
-                                    , tests =
-                                        [ TestItem
-                                            { id = 0
-                                            , title = "0.0.0.1.0 Test"
-                                            , spec = Spec { delay = 90 , result = Pass }
-                                            }
-                                        , TestItem
-                                            { id = 1
-                                            , title = "0.0.0.1.0 Test"
-                                            , spec = Spec { delay = 0 , result = Pass }
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    }
-]
-=========
-#### (Indent, Node Path) After Prepare ####
-[ [ ( 0 , NodePath { module' = "0" , path = "OnceBefore" } )
-  , ( 1 , NodePath { module' = "0.0" , path = "OnceAfter" } )
-  , ( 2 , NodePath { module' = "0.0.0" , path = "OnceBefore" } )
-  , ( 3 , NodePath { module' = "0.0.0.0" , path = "Test" } )
-  , ( 3 , NodePath { module' = "0.0.0.1" , path = "OnceBefore" } )
-  , ( 4 , NodePath { module' = "0.0.0.1.0" , path = "Test" } )
-  ]
-]
-=========
-#### Log ####
-StartExecution { idx = 0 , threadId = 19491 }
-Start
-  { idx = 0
-  , threadId = 19492
-  , suiteEvent = Hook Once Before
-  , loc =
-      ExePath
-        { un = [ NodePath { module' = "0" , path = "OnceBefore" } ] }
-  }
-End
-  { idx = 1
-  , threadId = 19492
-  , suiteEvent = Hook Once Before
-  , loc =
-      ExePath
-        { un = [ NodePath { module' = "0" , path = "OnceBefore" } ] }
-  }
-Start
-  { idx = 2
-  , threadId = 19492
-  , suiteEvent = Hook Once Before
-  , loc =
-      ExePath
-        { un =
-            [ NodePath { module' = "0.0.0" , path = "OnceBefore" }
-            , NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-End
-  { idx = 3
-  , threadId = 19492
-  , suiteEvent = Hook Once Before
-  , loc =
-      ExePath
-        { un =
-            [ NodePath { module' = "0.0.0" , path = "OnceBefore" }
-            , NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-Start
-  { idx = 0
-  , threadId = 19493
-  , suiteEvent = Hook Once Before
-  , loc =
-      ExePath
-        { un =
-            [ NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
-            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-            , NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-Start
-  { idx = 4
-  , threadId = 19492
-  , suiteEvent = Test
-  , loc =
-      ExePath
-        { un =
-            [ TestPath { id = 0 , title = "0.0.0.0 Test" }
-            , NodePath { module' = "0.0.0.0" , path = "Test" }
-            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-            , NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-End
-  { idx = 1
-  , threadId = 19493
-  , suiteEvent = Hook Once Before
-  , loc =
-      ExePath
-        { un =
-            [ NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
-            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-            , NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-Start
-  { idx = 2
-  , threadId = 19493
-  , suiteEvent = Test
-  , loc =
-      ExePath
-        { un =
-            [ TestPath { id = 0 , title = "0.0.0.1.0 Test" }
-            , NodePath { module' = "0.0.0.1.0" , path = "Test" }
-            , NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
-            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-            , NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-End
-  { idx = 5
-  , threadId = 19492
-  , suiteEvent = Test
-  , loc =
-      ExePath
-        { un =
-            [ TestPath { id = 0 , title = "0.0.0.0 Test" }
-            , NodePath { module' = "0.0.0.0" , path = "Test" }
-            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-            , NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-Start
-  { idx = 6
-  , threadId = 19492
-  , suiteEvent = Test
-  , loc =
-      ExePath
-        { un =
-            [ TestPath { id = 1 , title = "0.0.0.1.0 Test" }
-            , NodePath { module' = "0.0.0.1.0" , path = "Test" }
-            , NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
-            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-            , NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-End
-  { idx = 7
-  , threadId = 19492
-  , suiteEvent = Test
-  , loc =
-      ExePath
-        { un =
-            [ TestPath { id = 1 , title = "0.0.0.1.0 Test" }
-            , NodePath { module' = "0.0.0.1.0" , path = "Test" }
-            , NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
-            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-            , NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-End
-  { idx = 3
-  , threadId = 19493
-  , suiteEvent = Test
-  , loc =
-      ExePath
-        { un =
-            [ TestPath { id = 0 , title = "0.0.0.1.0 Test" }
-            , NodePath { module' = "0.0.0.1.0" , path = "Test" }
-            , NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
-            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-            , NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-Start
-  { idx = 4
-  , threadId = 19493
-  , suiteEvent = Hook Once After
-  , loc =
-      ExePath
-        { un =
-            [ NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-End
-  { idx = 5
-  , threadId = 19493
-  , suiteEvent = Hook Once After
-  , loc =
-      ExePath
-        { un =
-            [ NodePath { module' = "0.0" , path = "OnceAfter" }
-            , NodePath { module' = "0" , path = "OnceBefore" }
-            ]
-        }
-  }
-EndExecution { idx = 1 , threadId = 19491 }
-*** Exception: user error (thread suite elements start not followed by end:
-!!!! LOOKS LIKE THE CHECK IS WRONG !!!!!
-[ ( Start
-      { idx = 0
-      , threadId = 19493
-      , suiteEvent = Hook Once Before
-      , loc =
-          ExePath
-            { un =
-                [ NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
-                , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-                , NodePath { module' = "0.0" , path = "OnceAfter" }
-                , NodePath { module' = "0" , path = "OnceBefore" }
-                ]
-            }
-      }
-  , Start
-      { idx = 4
-      , threadId = 19492
-      , suiteEvent = Test
-      , loc =
-          ExePath
-            { un =
-                [ TestPath { id = 0 , title = "0.0.0.0 Test" }
-                , NodePath { module' = "0.0.0.0" , path = "Test" }
-                , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-                , NodePath { module' = "0.0" , path = "OnceAfter" }
-                , NodePath { module' = "0" , path = "OnceBefore" }
-                ]
-            }
-      }
-  )
-, ( Start
-      { idx = 4
-      , threadId = 19492
-      , suiteEvent = Test
-      , loc =
-          ExePath
-            { un =
-                [ TestPath { id = 0 , title = "0.0.0.0 Test" }
-                , NodePath { module' = "0.0.0.0" , path = "Test" }
-                , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-                , NodePath { module' = "0.0" , path = "OnceAfter" }
-                , NodePath { module' = "0" , path = "OnceBefore" }
-                ]
-            }
-      }
-  , End
-      { idx = 1
-      , threadId = 19493
-      , suiteEvent = Hook Once Before
-      , loc =
-          ExePath
-            { un =
-                [ NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
-                , NodePath { module' = "0.0.0" , path = "OnceBefore" }
-                , NodePath { module' = "0.0" , path = "OnceAfter" }
-                , NodePath { module' = "0" , path = "OnceBefore" }
-                ]
-            }
-      }
-  )
-])
-
--}

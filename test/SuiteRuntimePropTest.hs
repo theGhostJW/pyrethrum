@@ -224,9 +224,6 @@ prop_test_suite =
     let result = unsafePerformIO $ tryRunTest (ThreadCount 5) t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
-
-
---- comment
 -- $ > test_suite
 test_suite :: IO ()
 test_suite = do

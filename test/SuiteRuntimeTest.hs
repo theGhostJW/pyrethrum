@@ -331,40 +331,30 @@ unit_missing_setup = runTest' Log defaultSeed (ThreadCount 1)
         , subNodes =
             [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
         }
-    ] 
+    ]
 
-
--- $> unit_another_fail
-unit_another_fail:: IO ()
-unit_another_fail = replicateM_ 200 failsSometimes
-    
-    
-failsSometimes = runTest' Log defaultSeed (ThreadCount 5) 
-    [ OnceBefore
-        { spec = Spec { delay = 0 , result = Pass }
+-- $> unit_wrong_result
+unit_wrong_result :: IO ()
+unit_wrong_result = runTest' Log defaultSeed (ThreadCount 1) 
+   [ ThreadAfter
+        { threadSpec = T.All $ Spec { delay = 0 , result = Pass }
         , subNodes =
-            [ OnceAfter
-                { spec = Spec { delay = 0 , result = Pass }
+            [ ThreadBefore
+                { threadSpec = T.All $ Spec { delay = 0 , result = Pass }
                 , subNodes =
-                    [ OnceBefore
-                        { spec = Spec { delay = 0 , result = Pass }
+                    [ ThreadAfter
+                        { threadSpec =
+                            T.PassProb
+                              { genStrategy = Preload
+                              , passPcnt = 100
+                              , minDelay = 0
+                              , maxDelay = 0
+                              }
                         , subNodes =
-                            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] }
-                            , OnceBefore
-                                { spec = Spec { delay = 30 , result = Pass }
-                                , subNodes =
-                                    [ Fixture
-                                        { tests =
-                                            [ Spec { delay = 90 , result = Pass }
-                                            , Spec { delay = 0 , result = Pass }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            ]
+                            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
                         }
                     ]
                 }
             ]
         }
-    ] 
+    ]

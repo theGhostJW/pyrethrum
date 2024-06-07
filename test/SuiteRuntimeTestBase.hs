@@ -1217,3 +1217,323 @@ data Template
 
 mkTestItem :: T.TestItem -> P.Test IO ()
 mkTestItem T.TestItem{id, title, spec} = P.MkTest id title (mkAction title spec)
+
+{- ANOTHER TEST FAILURE - check is wrong
+#### Template ####
+[ OnceBefore
+    { path = NodePath { module' = "0" , path = "OnceBefore" }
+    , spec = Spec { delay = 0 , result = Pass }
+    , subNodes =
+        [ OnceAfter
+            { path = NodePath { module' = "0.0" , path = "OnceAfter" }
+            , spec = Spec { delay = 0 , result = Pass }
+            , subNodes =
+                [ OnceBefore
+                    { path = NodePath { module' = "0.0.0" , path = "OnceBefore" }
+                    , spec = Spec { delay = 0 , result = Pass }
+                    , subNodes =
+                        [ Fixture
+                            { path = NodePath { module' = "0.0.0.0" , path = "Test" }
+                            , tests =
+                                [ TestItem
+                                    { id = 0
+                                    , title = "0.0.0.0 Test"
+                                    , spec = Spec { delay = 0 , result = Pass }
+                                    }
+                                ]
+                            }
+                        , OnceBefore
+                            { path = NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
+                            , spec = Spec { delay = 30 , result = Pass }
+                            , subNodes =
+                                [ Fixture
+                                    { path = NodePath { module' = "0.0.0.1.0" , path = "Test" }
+                                    , tests =
+                                        [ TestItem
+                                            { id = 0
+                                            , title = "0.0.0.1.0 Test"
+                                            , spec = Spec { delay = 90 , result = Pass }
+                                            }
+                                        , TestItem
+                                            { id = 1
+                                            , title = "0.0.0.1.0 Test"
+                                            , spec = Spec { delay = 0 , result = Pass }
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+]
+=========
+#### (Indent, Node Path) After Prepare ####
+[ [ ( 0 , NodePath { module' = "0" , path = "OnceBefore" } )
+  , ( 1 , NodePath { module' = "0.0" , path = "OnceAfter" } )
+  , ( 2 , NodePath { module' = "0.0.0" , path = "OnceBefore" } )
+  , ( 3 , NodePath { module' = "0.0.0.0" , path = "Test" } )
+  , ( 3 , NodePath { module' = "0.0.0.1" , path = "OnceBefore" } )
+  , ( 4 , NodePath { module' = "0.0.0.1.0" , path = "Test" } )
+  ]
+]
+=========
+#### Log ####
+StartExecution { idx = 0 , threadId = 19491 }
+Start
+  { idx = 0
+  , threadId = 19492
+  , suiteEvent = Hook Once Before
+  , loc =
+      ExePath
+        { un = [ NodePath { module' = "0" , path = "OnceBefore" } ] }
+  }
+End
+  { idx = 1
+  , threadId = 19492
+  , suiteEvent = Hook Once Before
+  , loc =
+      ExePath
+        { un = [ NodePath { module' = "0" , path = "OnceBefore" } ] }
+  }
+Start
+  { idx = 2
+  , threadId = 19492
+  , suiteEvent = Hook Once Before
+  , loc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+End
+  { idx = 3
+  , threadId = 19492
+  , suiteEvent = Hook Once Before
+  , loc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+Start
+  { idx = 0
+  , threadId = 19493
+  , suiteEvent = Hook Once Before
+  , loc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
+            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+Start
+  { idx = 4
+  , threadId = 19492
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 0 , title = "0.0.0.0 Test" }
+            , NodePath { module' = "0.0.0.0" , path = "Test" }
+            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+End
+  { idx = 1
+  , threadId = 19493
+  , suiteEvent = Hook Once Before
+  , loc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
+            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+Start
+  { idx = 2
+  , threadId = 19493
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 0 , title = "0.0.0.1.0 Test" }
+            , NodePath { module' = "0.0.0.1.0" , path = "Test" }
+            , NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
+            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+End
+  { idx = 5
+  , threadId = 19492
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 0 , title = "0.0.0.0 Test" }
+            , NodePath { module' = "0.0.0.0" , path = "Test" }
+            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+Start
+  { idx = 6
+  , threadId = 19492
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 1 , title = "0.0.0.1.0 Test" }
+            , NodePath { module' = "0.0.0.1.0" , path = "Test" }
+            , NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
+            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+End
+  { idx = 7
+  , threadId = 19492
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 1 , title = "0.0.0.1.0 Test" }
+            , NodePath { module' = "0.0.0.1.0" , path = "Test" }
+            , NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
+            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+End
+  { idx = 3
+  , threadId = 19493
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 0 , title = "0.0.0.1.0 Test" }
+            , NodePath { module' = "0.0.0.1.0" , path = "Test" }
+            , NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
+            , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+Start
+  { idx = 4
+  , threadId = 19493
+  , suiteEvent = Hook Once After
+  , loc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+End
+  { idx = 5
+  , threadId = 19493
+  , suiteEvent = Hook Once After
+  , loc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceAfter" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+EndExecution { idx = 1 , threadId = 19491 }
+*** Exception: user error (thread suite elements start not followed by end:
+!!!! LOOKS LIKE THE CHECK IS WRONG !!!!!
+[ ( Start
+      { idx = 0
+      , threadId = 19493
+      , suiteEvent = Hook Once Before
+      , loc =
+          ExePath
+            { un =
+                [ NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
+                , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+                , NodePath { module' = "0.0" , path = "OnceAfter" }
+                , NodePath { module' = "0" , path = "OnceBefore" }
+                ]
+            }
+      }
+  , Start
+      { idx = 4
+      , threadId = 19492
+      , suiteEvent = Test
+      , loc =
+          ExePath
+            { un =
+                [ TestPath { id = 0 , title = "0.0.0.0 Test" }
+                , NodePath { module' = "0.0.0.0" , path = "Test" }
+                , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+                , NodePath { module' = "0.0" , path = "OnceAfter" }
+                , NodePath { module' = "0" , path = "OnceBefore" }
+                ]
+            }
+      }
+  )
+, ( Start
+      { idx = 4
+      , threadId = 19492
+      , suiteEvent = Test
+      , loc =
+          ExePath
+            { un =
+                [ TestPath { id = 0 , title = "0.0.0.0 Test" }
+                , NodePath { module' = "0.0.0.0" , path = "Test" }
+                , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+                , NodePath { module' = "0.0" , path = "OnceAfter" }
+                , NodePath { module' = "0" , path = "OnceBefore" }
+                ]
+            }
+      }
+  , End
+      { idx = 1
+      , threadId = 19493
+      , suiteEvent = Hook Once Before
+      , loc =
+          ExePath
+            { un =
+                [ NodePath { module' = "0.0.0.1" , path = "OnceBefore" }
+                , NodePath { module' = "0.0.0" , path = "OnceBefore" }
+                , NodePath { module' = "0.0" , path = "OnceAfter" }
+                , NodePath { module' = "0" , path = "OnceBefore" }
+                ]
+            }
+      }
+  )
+])
+
+-}

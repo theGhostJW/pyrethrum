@@ -218,15 +218,19 @@ tryRunTest c suite =
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
 {-# NOINLINE prop_test_suite #-}
 prop_test_suite :: TestTree
-prop_test_suite = testPropertyWith defaultTestOptions "Template" $ do
-  t <- genWith (Just . ppShow) $ genTemplate genParams
-  let result = unsafePerformIO $ tryRunTest (ThreadCount 5) t
-  assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
+prop_test_suite = 
+  testPropertyWith defaultTestOptions "Template" $ do
+    t <- genWith (Just . ppShow) $ genTemplate genParams
+    let result = unsafePerformIO $ tryRunTest (ThreadCount 5) t
+    assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
 
--- $> test_suite
+
+--- comment
+-- $ > test_suite
 test_suite :: IO ()
-test_suite =
+test_suite = do
+  print "RUNNING TEST"
   defaultMain $
     testGroup
       "generator stubs"

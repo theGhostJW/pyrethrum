@@ -322,7 +322,7 @@ unit_prop_fail_each_after =
         }
     ] 
 
--- $> unit_missing_setup
+-- $ > unit_missing_setup
 unit_missing_setup:: IO ()
 unit_missing_setup = runTest' Log defaultSeed (ThreadCount 1) 
     [ EachAround
@@ -330,5 +330,41 @@ unit_missing_setup = runTest' Log defaultSeed (ThreadCount 1)
         , eachTeardownSpec = T.All $ Spec { delay = 0 , result = Pass }
         , subNodes =
             [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+        }
+    ] 
+
+
+-- $> unit_another_fail
+unit_another_fail:: IO ()
+unit_another_fail = replicateM_ 200 failsSometimes
+    
+    
+failsSometimes = runTest' Log defaultSeed (ThreadCount 5) 
+    [ OnceBefore
+        { spec = Spec { delay = 0 , result = Pass }
+        , subNodes =
+            [ OnceAfter
+                { spec = Spec { delay = 0 , result = Pass }
+                , subNodes =
+                    [ OnceBefore
+                        { spec = Spec { delay = 0 , result = Pass }
+                        , subNodes =
+                            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] }
+                            , OnceBefore
+                                { spec = Spec { delay = 30 , result = Pass }
+                                , subNodes =
+                                    [ Fixture
+                                        { tests =
+                                            [ Spec { delay = 90 , result = Pass }
+                                            , Spec { delay = 0 , result = Pass }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
         }
     ] 

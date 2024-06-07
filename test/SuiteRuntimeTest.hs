@@ -8,10 +8,9 @@ import List.Extra as LE hiding (list)
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 
+import PyrethrumExtras (uu)
 import SuiteRuntimeTestBase
 import Prelude hiding (All, bug, id)
-import PyrethrumExtras (uu)
-
 
 -- $ > unit_simple_pass
 unit_simple_pass :: IO ()
@@ -152,7 +151,7 @@ unit_nested_threaded_chk_thread_count =
 
 {-
 TODO revist this test after any concrete interpretor is implemented
-    that affects laziness ie. ensure empty subnodes are not run if we 
+    that affects laziness ie. ensure empty subnodes are not run if we
     force strictness in hooks
 -}
 
@@ -253,34 +252,10 @@ unit_prop_fail_each_after_out_of_order =
             }
         ]
 
-{-
-\*** Exception: user error (
-subsequent parent event for:
-SuiteEventPath
-  { path = TestPath { id = 0 , title = "0.0.0 Test" }
-  , suiteEvent = Test
-  }
-equality check failed:
-Expected:
-  Just
-  SuiteEventPath
-    { path = NodePath { module' = "0.0" , path = "EachAfter" }
-    , suiteEvent = Hook Each After
-    }
-Does not Equal:
-  Just
-  SuiteEventPath
-    { path = NodePath { module' = "0" , path = "EachAfter" }
-    , suiteEvent = Hook Each After
-    }
-
--}
-
 -- $ > unit_prop_fail_each_after_out_of_order1
 unit_prop_fail_each_after_out_of_order1 :: IO ()
 unit_prop_fail_each_after_out_of_order1 =
-    runTest'
-        Log
+    runTest
         defaultSeed
         (ThreadCount 1)
         [ EachAfter
@@ -295,66 +270,202 @@ unit_prop_fail_each_after_out_of_order1 =
             }
         ]
 
-
 -- $ > unit_prop_fail_each_after
 unit_prop_fail_each_after :: IO ()
 unit_prop_fail_each_after =
-    runTest'
-        Log
+    runTest
         defaultSeed
         (ThreadCount 1)
         [ EachAfter
-         { eachSpec =
-            T.PassProb { 
-                genStrategy = Preload
-              , passPcnt = 95
-              , minDelay = 0
-              , maxDelay = 0
-              }
-        , subNodes =
-            [ Fixture
-                { tests =
-                    [ Spec { delay = 0 , result = Pass }
-                    , Spec { delay = 0 , result = Pass }
-                    ]
-                }
-            ]
-        }
-    ] 
+            { eachSpec =
+                T.PassProb
+                    { genStrategy = Preload
+                    , passPcnt = 95
+                    , minDelay = 0
+                    , maxDelay = 0
+                    }
+            , subNodes =
+                [ Fixture
+                    { tests =
+                        [ Spec{delay = 0, result = Pass}
+                        , Spec{delay = 0, result = Pass}
+                        ]
+                    }
+                ]
+            }
+        ]
 
 -- $ > unit_missing_setup
-unit_missing_setup:: IO ()
-unit_missing_setup = runTest' Log defaultSeed (ThreadCount 1) 
-    [ EachAround
-        { eachSetupSpec = T.All $ Spec { delay = 0 , result = Pass }
-        , eachTeardownSpec = T.All $ Spec { delay = 0 , result = Pass }
-        , subNodes =
-            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+unit_missing_setup :: IO ()
+unit_missing_setup =
+    runTest
+        defaultSeed
+        (ThreadCount 1)
+        [ EachAround
+            { eachSetupSpec = T.All $ Spec{delay = 0, result = Pass}
+            , eachTeardownSpec = T.All $ Spec{delay = 0, result = Pass}
+            , subNodes =
+                [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+            }
+        ]
+
+-- $ > unit_wrong_result
+unit_wrong_result :: IO ()
+unit_wrong_result =
+    runTest
+        defaultSeed
+        (ThreadCount 1)
+        [ ThreadAfter
+            { threadSpec = T.All $ Spec{delay = 0, result = Pass}
+            , subNodes =
+                [ ThreadBefore
+                    { threadSpec = T.All $ Spec{delay = 0, result = Pass}
+                    , subNodes =
+                        [ ThreadAfter
+                            { threadSpec =
+                                T.PassProb
+                                    { genStrategy = Preload
+                                    , passPcnt = 100
+                                    , minDelay = 0
+                                    , maxDelay = 0
+                                    }
+                            , subNodes =
+                                [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+
+
+
+-- $> unit_failed
+unit_failed :: IO ()
+unit_failed = replicateM_ 10 mightFail
+
+mightFail =
+    runTest'
+        Log
+        defaultSeed
+        (ThreadCount 5)
+        [ OnceAround { setupSpec = Spec { delay = 0 , result = Fail }
+                       , teardownSpec = Spec { delay = 0 , result = Pass }
+                       , subNodes = [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
         }
     ]
 
--- $> unit_wrong_result
-unit_wrong_result :: IO ()
-unit_wrong_result = runTest' Log defaultSeed (ThreadCount 1) 
-   [ ThreadAfter
-        { threadSpec = T.All $ Spec { delay = 0 , result = Pass }
-        , subNodes =
-            [ ThreadBefore
-                { threadSpec = T.All $ Spec { delay = 0 , result = Pass }
-                , subNodes =
-                    [ ThreadAfter
-                        { threadSpec =
-                            T.PassProb
-                              { genStrategy = Preload
-                              , passPcnt = 100
-                              , minDelay = 0
-                              , maxDelay = 0
-                              }
-                        , subNodes =
-                            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
-                        }
-                    ]
-                }
+{-
+ $> unit_failed
+#### Template ####
+[ OnceAround
+    { path = NodePath { module' = "0" , path = "OnceAround" }
+    , setupSpec = Spec { delay = 0 , result = Fail }
+    , teardownSpec = Spec { delay = 0 , result = Pass }
+    , subNodes =
+        [ Fixture
+            { path = NodePath { module' = "0.0" , path = "Test" }
+            , tests =
+                [ TestItem
+                    { id = 0
+                    , title = "0.0 Test"
+                    , spec = Spec { delay = 0 , result = Pass }
+                    }
+                ]
+            }
+        ]
+    }
+]
+=========
+#### (Indent, Node Path) After Prepare ####
+[ [ ( 0 , NodePath { module' = "0" , path = "OnceAround" } )
+  , ( 1 , NodePath { module' = "0.0" , path = "Test" } )
+  ]
+]
+=========
+#### Log ####
+StartExecution { idx = 0 , threadId = 3663 }
+Start
+  { idx = 0
+  , threadId = 3664
+  , suiteEvent = Hook Once Setup
+  , loc =
+      ExePath
+        { un = [ NodePath { module' = "0" , path = "OnceAround" } ] }
+  }
+Failure
+  { idx = 1
+  , threadId = 3664
+  , suiteEvent = Hook Once Setup
+  , loc =
+      ExePath
+        { un = [ NodePath { module' = "0" , path = "OnceAround" } ] }
+  , exception =
+      PException
+        { displayText =
+            [ "\"NodePath {module' = \\\"0\\\", path = \\\"OnceAround\\\"} failed\""
+            , "\"CallStack (from HasCallStack):\""
+            , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-d785bc774ce2cb944aefabcc579bcc6aa958f3b3aa563694f6184f924047743c:Relude.Debug\""
+            , "\"  error, called at test/SuiteRuntimeTestBase.hs:1019:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTestBase\""
             ]
         }
-    ]
+  }
+End
+  { idx = 2
+  , threadId = 3664
+  , suiteEvent = Hook Once Setup
+  , loc =
+      ExePath
+        { un = [ NodePath { module' = "0" , path = "OnceAround" } ] }
+  }
+ParentFailure
+  { idx = 3
+  , threadId = 3664
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 0 , title = "0.0 Test" }
+            , NodePath { module' = "0.0" , path = "Test" }
+            , NodePath { module' = "0" , path = "OnceAround" }
+            ]
+        }
+  , suiteEvent = Test
+  , failLoc =
+      ExePath
+        { un = [ NodePath { module' = "0" , path = "OnceAround" } ] }
+  , failSuiteEvent = Hook Once Setup
+  }
+ParentFailure
+  { idx = 0
+  , threadId = 3665
+  , loc =
+      ExePath
+        { un = [ NodePath { module' = "0" , path = "OnceAround" } ] }
+  , suiteEvent = Hook Once Teardown
+  , failLoc =
+      ExePath
+        { un = [ NodePath { module' = "0" , path = "OnceAround" } ] }
+  , failSuiteEvent = Hook Once Setup
+  }
+EndExecution { idx = 1 , threadId = 3663 }
+*** Exception: user error (
+subsequent parent event for:
+SuiteEventPath
+  { path = TestPath { id = 0 , title = "0.0 Test" }
+  , suiteEvent = Test
+  }
+equality check failed:
+Expected:
+  Just
+  SuiteEventPath
+    { path = NodePath { module' = "0" , path = "OnceAround" }
+    , suiteEvent = Hook Once Teardown
+    }
+Does not Equal:
+  Nothing
+)   
+    
+    
+    
+    
+-}

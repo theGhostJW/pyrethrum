@@ -128,6 +128,7 @@ chkProperties baseSeed threadLimit ts evts = do
     evts
     [ chkThreadHooksStartedOnceInThread
     , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
+    , chkNoEmptyHooks
     ]
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
   threadLogChks
@@ -220,7 +221,7 @@ data ExpectedResult
 
 -- todo add to pyrelude
 groupCount :: (Ord a) => [a] -> M.Map a Int
-groupCount = M.fromListWith (+) . fmap (,1)
+groupCount = M.fromListWith (+) . fmap (,1) 
 
 {-
 defects found in testing::
@@ -310,7 +311,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
   calcExpected acc T.EventPath{path, suiteEvent, evntSpec, template} =
     M.insert (ensureUnique key) expected acc
    where
-    key = SuiteEventPath (path) (suiteEvent)
+    key = SuiteEventPath path suiteEvent
     ensureUnique k =
       M.member k acc
         ? bug ("duplicate key should not happen. Template paths should be unique: " <> txt k)
@@ -326,10 +327,10 @@ chkExpectedResults baseSeed threadLimit ts lgs =
             T.Runtime -> NonDeterministic
          where
           rLength = case suiteEvent of
-            TE.Test{} -> bug $ "Test not expected to have PassProb spec"
-            TE.Hook TE.Once _ -> bug $ "Once  not expected to have PassProb spec"
+            TE.Test{} -> bug "Test not expected to have PassProb spec"
+            TE.Hook TE.Once _ -> bug "Once  not expected to have PassProb spec"
             TE.Hook TE.Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
-            TE.Hook TE.Each _ -> T.counttests template -- expect a result for each test item
+            TE.Hook TE.Each _ -> T.countTests template -- expect a result for each test item
   actuals :: Map SuiteEventPath [LogResult]
   actuals =
     foldl' (M.unionWith (<>)) M.empty allResults
@@ -434,7 +435,7 @@ chkParentFailsPropagated
                     ( "This event should be a child failure:\n"
                         <> "  This Event is:\n"
                         <> "    "
-                        <> (ptxt s)
+                        <> ptxt s
                         <> "  Parent Failure is:\n"
                         <> "    "
                         <> (ptxt failLoc)
@@ -589,6 +590,23 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
       t <- L.tail evntLog -- all preceding / successive events
       fps <- findMathcingParent parentEventPredicate h t
       logSuiteEventPath fps
+
+
+chkNoEmptyHooks :: [LogItem] -> IO ()
+chkNoEmptyHooks = const $ pure ()
+-- copiolet
+--   traverse_ chkNoEmptyHook . threadedLogs False
+--  where
+--   chkNoEmptyHook :: [LogItem] -> IO ()
+--   chkNoEmptyHook lgs =
+--     traverse_ chkNoEmptyHook' $ filter isHook lgs
+--    where
+--     chkNoEmptyHook' :: LogItem -> IO ()
+--     chkNoEmptyHook' l =
+--       let
+--         isHookEmpty = isHook l && null (filter isTestEventOrTestParentFailure lgs)
+--        in
+--         chk' ("Empty hook found:\n" <> toS (ppShow l)) $ not isHookEmpty
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =
@@ -830,7 +848,7 @@ q2List qu = reverse <$> recurse [] qu
       >>= maybe (pure l) (\e -> recurse (e : l) q)
 
 loadTQueue :: TQueue a -> [a] -> STM ()
-loadTQueue q = traverse_ (writeTQueue q) . reverse
+loadTQueue q = traverse_ (writeTQueue q)
 
 setPaths :: Text -> [Template] -> [T.Template]
 setPaths address ts =
@@ -1016,8 +1034,7 @@ mkVoidAction path spec =
   do
     C.threadDelay spec.delay
     unless (spec.result == Pass) $
-      error . toS $
-        txt path <> " failed"
+      error . toS $ "FAIL RESULT @ " <> txt path
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
@@ -1025,7 +1042,7 @@ mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.ApEventSink -> hi -> I
 mkAction path s _sink _in = mkVoidAction path s
 
 mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
-mkNodes baseSeed mxThreads = sequence . fmap mkNode
+mkNodes baseSeed mxThreads = mapM mkNode
  where
   afterAction :: (Show pth) => pth -> Spec -> b -> IO ()
   afterAction path spec = const $ mkVoidAction path spec
@@ -1045,11 +1062,11 @@ mkNodes baseSeed mxThreads = sequence . fmap mkNode
             }
     _ ->
       do
-        nds <- mkNodes' $ t.subNodes
+        nds <- mkNodes' t.subNodes
         b4Q <- newTQueueIO
         afterQ <- newTQueueIO
         let mxThrds = mxThreads.maxThreads
-            tstItemCount = T.counttests t
+            tstItemCount = T.countTests t
             loadQIfPreload' = loadQIfPreload baseSeed
         case t of
           T.OnceBefore

@@ -166,8 +166,8 @@ unit_empty_thread_hooks =
         exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [fixture [test Pass]]]]] >>= chkLogLength
   where
     exe = execute NoLog defaultSeed (ThreadCount 1)
-    chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (ptxt r.log)) 2 (length r.log)
-    chkLogLength r = chkEq' ("Log length not as expected:\n" <> (ptxt r.log)) 12 (length r.log)
+    chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> ptxt r.log) 2 (length r.log)
+    chkLogLength r = chkEq' ("Log length not as expected:\n" <> ptxt r.log) 12 (length r.log)
 
 {-
   todo:
@@ -341,3 +341,35 @@ unit_wrong_result =
 
 -- TODO: resolve WSL UNC issues
 -- document forgotten password :: sudo chown -R usertename:username ~/pyrethrum/pyrethrum
+
+
+
+-- TODO :: implement chkNoEmptyHooks -- this test will fail that check - can see empty afterhook in  log
+-- $> unit_fail_wrong_counts
+unit_fail_wrong_counts :: IO ()
+unit_fail_wrong_counts = replicateM_ 1000 mayFail
+    
+mayFail :: IO ()
+mayFail = 
+       runTest'
+        Log
+        defaultSeed
+        (ThreadCount 5)
+        [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] }
+       , OnceBefore
+        { spec = Spec { delay = 0 , result = Pass }
+        , subNodes =
+            [ ThreadAfter
+                { threadSpec =
+                    T.PassProb
+                      { genStrategy = Preload
+                      , passPcnt = 95
+                      , minDelay = 0
+                      , maxDelay = 0
+                      }
+                , subNodes =
+                    [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+                }
+            ]
+        }
+    ]

@@ -972,6 +972,8 @@ mkManySpec
     delay = delayRange > 0 ? minDelay + seed `mod` (maxDelay - minDelay) $ minDelay
     result = seed `mod` 100 < fromIntegral passPcnt ? Pass $ Fail
 
+-- used in both generating test run and validation 
+-- is pure ie. will always generate the same specs for same inputs
 generateSpecs :: (Show pth) => Int -> Int -> pth -> Int8 -> Int -> Int -> [Spec]
 generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay =
   manySpec <$> [1 .. qLength]

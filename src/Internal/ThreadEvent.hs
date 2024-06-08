@@ -39,10 +39,16 @@ evtTypeToFrequency = \case
     -- an individual test is always run once
     Test -> Once
 
-isHookParentFailure :: ThreadEvent l a -> Bool
-isHookParentFailure = \case
-    ParentFailure{suiteEvent = s} -> isHook s
+isSuiteEventFailureWith :: (SuiteEvent -> Bool) -> ThreadEvent l a -> Bool
+isSuiteEventFailureWith  evntPredicate = \case
+    ParentFailure{suiteEvent = s} -> evntPredicate s
     _ -> False
+
+isOnceHookParentFailure :: ThreadEvent l a -> Bool
+isOnceHookParentFailure = isSuiteEventFailureWith onceHook
+
+isHookParentFailure :: ThreadEvent l a -> Bool
+isHookParentFailure =  isSuiteEventFailureWith isHook
 
 isTest :: SuiteEvent -> Bool
 isTest = \case

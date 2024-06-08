@@ -21,6 +21,7 @@ import Internal.ThreadEvent as TE (
   isEnd,
   isHook,
   isHookParentFailure,
+  isOnceHookParentFailure,
   isStart,
   isTestEventOrTestParentFailure,
   onceHook,
@@ -133,7 +134,7 @@ chkProperties baseSeed threadLimit ts evts = do
     True
     evts
     [ chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
-    , chkSubsequentSuiteEventAsExpected (T.expectedParentSubsequentEvents ts)
+    , chkAfterTeardownParents (T.expectedParentSubsequentEvents ts)
     , chkFailureLocEqualsLastStartLoc
     , chkFailurePropagation
     ]
@@ -392,7 +393,7 @@ chkParentFailsPropagated
         targetParent =
           failEventIsSetup
             && thisEventisTeardown
-              ? (fromMaybe (ExePath []) (parentPath False failLoc)) -- can be sibling
+              ? fromMaybe (ExePath []) (parentPath False failLoc) -- can be sibling
             $ failLoc -- must be parent
        in
         isParentPath targetParent li.loc
@@ -540,11 +541,11 @@ chkFailureLocEqualsLastStartLoc =
       ParentFailure{loc} -> chkEq' ("Parent failure loc for " <> toS (ppShow li)) mParentLoc (Just loc)
       _ -> pure ()
 
-chkSubsequentSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
-chkSubsequentSuiteEventAsExpected =
+chkAfterTeardownParents :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
+chkAfterTeardownParents =
   chkForMatchedParents
-    "subsequent parent event"
-    False -- do not reverse list so we are forward through subsequent events
+    "After / Teardown parent event"
+    False -- leave the list in reverse order so we are forward through subsequent events
     isAfterSuiteEvent
 
 -- isAnyHookSuiteEvent
@@ -564,20 +565,19 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
  where
   chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
   chkParent (childPath, actualParentPath) =
-    chkEq' (message <> " for:\n" <> (ptxt childPath)) expectedParentPath actualParentPath
+    chkEq' (message <> " for:\n" <> ptxt childPath) expectedParentPath actualParentPath
    where
     expectedParentPath = M.lookup childPath expectedChildParentMap
 
   actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
-  actualParents = mapMaybe extractChildParent actualParent
+  actualParents = mapMaybe extractHeadParent thrdLogTails
 
-  actualParent :: [[LogItem]]
-  actualParent =
-    tails . (\l -> wantReverseLog ? reverse l $ l) $
-      thrdLog
+  thrdLogTails :: [[LogItem]]
+  thrdLogTails =
+    tails $ bool PR.id reverse wantReverseLog thrdLog
 
-  extractChildParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
-  extractChildParent evntLog =
+  extractHeadParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
+  extractHeadParent evntLog =
     (,actulaParentPath) <$> targetPath
    where
     logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
@@ -668,7 +668,7 @@ nxtHookLog = find (\l -> hasSuiteEvent isHook l || isHookParentFailure l)
 
 threadVisible :: Bool -> ThreadId -> [LogItem] -> [LogItem]
 threadVisible onceHookInclude tid =
-  filter (\l -> tid == l.threadId || onceHookInclude && hasSuiteEvent onceHook l)
+  filter (\l -> tid == l.threadId || onceHookInclude && (hasSuiteEvent onceHook l || isOnceHookParentFailure l))
 
 threadIds :: [LogItem] -> [ThreadId]
 threadIds = nub . fmap (.threadId)
@@ -883,7 +883,7 @@ findMathcingParent evntPredicate targEvnt =
   matchesParentPath thisEvt = do
     targPath <- targEvntSubPath
     thisParentCandidate <- startSuiteEventLoc thisEvt
-    pure $ evntPredicate thisEvt && (thisParentCandidate.un) `isSuffixOf` (targPath.un)
+    pure $ evntPredicate thisEvt && thisParentCandidate.un `isSuffixOf` targPath.un
 
 isParentPath :: ExePath -> ExePath -> Bool
 isParentPath (ExePath parent) (ExePath child) =

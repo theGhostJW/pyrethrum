@@ -341,7 +341,6 @@ unit_wrong_result =
 -- TODO: resolve WSL UNC issues
 -- document forgotten password :: sudo chown -R usertename:username ~/pyrethrum/pyrethrum
 
-
 -- $> unit_fail_wrong_counts
 unit_fail_wrong_counts :: IO ()
 unit_fail_wrong_counts =

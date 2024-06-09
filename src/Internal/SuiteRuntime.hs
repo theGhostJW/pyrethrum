@@ -7,7 +7,7 @@ import Internal.RunTimeLogging qualified as L
 import Internal.ThreadEvent hiding (Test)
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
-import PyrethrumExtras (catchAll, debugf', toS, txt, uu, (?))
+import PyrethrumExtras (catchAll, debugf', debug', toS, txt, uu, (?))
 import Text.Show.Pretty (ppShow)
 import UnliftIO (
   concurrently_,
@@ -291,7 +291,7 @@ canRunChildQ cq =
 
 newtype QElementRun = QElementRun {hasRun :: Bool}
 
-runChildQ :: forall a. Concurrency -> (a -> IO ()) -> (a -> STM CanRun) -> ChildQ a -> IO QElementRun
+runChildQ :: forall a. Concurrency -> (a -> IO QElementRun) -> (a -> STM CanRun) -> ChildQ a -> IO QElementRun
 runChildQ concurrency runner childCanRun ChildQ{childNodes, status, runningCount} =
   runChildQ' (QElementRun False)
  where
@@ -322,22 +322,26 @@ runChildQ concurrency runner childCanRun ChildQ{childNodes, status, runningCount
         & maybe
           (pure hasRun)
           ( \a -> do
-              finally
-                do
-                  cr <- atomically $ childCanRun a
-                  cr & \case
-                    -- runner MUST ensure the integrity of sub element status and handle all exceptions
-                    Runnable -> do
-                      -- when Concurrent, the element is placed back on the end of the q before running so
-                      -- can be picked up by other threads child qs are concurrent test items are not
-                      when (concurrency == Concurrent) $
-                        atomically (writeTQueue childNodes a)
-                      runner a
-                    -- when not runnabel clean up the q by returning without adding the element back
-                    Saturated -> pure ()
-                    Done -> pure ()
-                (atomically $ modifyTVar runningCount pred)
-              runChildQ' $ QElementRun True
+              hasRun' <-
+                finally
+                  do
+                    cr <- atomically $ childCanRun a
+                    debug' "CHILD CAN RUN" cr & \case
+                      -- runner MUST ensure the integrity of sub element status and handle all exceptions
+                      Runnable -> do
+                        -- when Concurrent, the element is placed back on the end of the q before running so
+                        -- can be picked up by other threads child qs are concurrent test items are not
+                        when (concurrency == Concurrent) $
+                          atomically (writeTQueue childNodes a)
+                        runner a
+                        -- TODO:: BUG HERE RUNNER NEEDS TO RETURN IF RUN ELSE 
+                        -- NestED RUNNERS WILL RESULT IN FALSE HOOKS
+                        pure True
+                      -- when not runnabel clean up the q by returning without adding the element back
+                      Saturated -> pure False
+                      Done -> pure False
+                  (atomically $ modifyTVar runningCount pred)
+              runChildQ' $ QElementRun (hasRun' || hasRun.hasRun)
           )
 
 mkChildQ :: (Foldable m) => m a -> IO (ChildQ a)
@@ -579,7 +583,7 @@ runNode ::
   Logger ->
   NodeIn hi ->
   ExeTree hi ->
-  IO ()
+  IO QElementRun
 runNode lgr hi xt =
   run hi xt
  where
@@ -598,6 +602,9 @@ runNode lgr hi xt =
   runSubNodes_ :: forall hi'. NodeIn hi' -> ChildQ (ExeTree hi') -> IO ()
   runSubNodes_ n = void . runSubNodes n
 
+  hasRun :: Bool -> IO QElementRun
+  hasRun = pure . QElementRun
+
   -- tree generation is restricted by typeclasses so unless the typeclass constraint implmentation is wrong
   -- execution trees with invalid structure (Thread or Once depending on Each, or Once depending on Thread)
   -- should never be generated.
@@ -610,7 +617,7 @@ runNode lgr hi xt =
   sink = lgr . L.ApEvent
 
   runTests :: forall ti. IO (TestContext ti) -> ChildQ (P.Test IO ti) -> IO ()
-  runTests eti tests = void $ runChildQ Sequential (runTest eti) (const $ pure Runnable) tests
+  runTests eti tests = void $ debugf' (const "") "RUN TESTS" $ runChildQ Sequential (runTest eti) (const $ pure Runnable) tests
 
   nxtRunner :: forall i. IO (Either FailPoint i) -> (Either FailPoint i -> IO ()) -> NodeIn i
   nxtRunner su td = TestRunner . pure $ MkTestContext su td
@@ -630,8 +637,8 @@ runNode lgr hi xt =
 
   mkTestPath :: forall a. P.Test IO a -> L.ExePath
   mkTestPath P.MkTest{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : coerce xt.path {- fixture path -}
-  abandonSubs :: forall a. FailPoint -> ChildQ (ExeTree a) -> IO ()
-  abandonSubs fp = runSubNodes_ (Abandon fp)
+  abandonSubs :: forall a. FailPoint -> ChildQ (ExeTree a) -> IO QElementRun
+  abandonSubs fp = runSubNodes (Abandon fp)
 
   runOnceAfter :: forall a. ChildQ (ExeTree a) -> TVar AfterStatus -> NodeIn a -> AfterStatus -> IO () -> IO ()
   runOnceAfter subNodes status nxtIn lockedStatus runHook =
@@ -693,7 +700,10 @@ runNode lgr hi xt =
             (\ho -> logRun_ (Hook Thread Teardown) (`teardown` ho))
         )
 
-  run :: NodeIn hi' -> ExeTree hi' -> IO ()
+  onceRun :: Bool -> IO QElementRun -> IO QElementRun
+  onceRun hookRun childQRun = childQRun >>= \qr -> pure $ QElementRun $ hookRun || qr.hasRun
+
+  run :: NodeIn hi' -> ExeTree hi' -> IO QElementRun
   run =
     \cases
       -- For Once* we assume tree shaking has been executed prior to execution.
@@ -710,8 +720,11 @@ runNode lgr hi xt =
           pure (locked, ca /= None)
         when beforeLocked $
           logAbandonned' (Hook Once Before) fp
-        when canAbandonQ $
-          abandonSubs fp subNodes
+        if canAbandonQ then
+          onceRun beforeLocked (abandonSubs fp subNodes)
+        else
+          hasRun beforeLocked
+
       --
       -- abandon -> onceAround
       Abandon{fp} oa@OnceAround{subNodes, status} -> do
@@ -724,7 +737,7 @@ runNode lgr hi xt =
         when setUpLocked $
           logAbandonned' (Hook Once Setup) fp
         finally
-          (abandonSubs fp subNodes)
+          (onceRun setUpLocked (abandonSubs fp subNodes))
           ( do
               locked <- tryLockIO canLockTeardown status subNodes TeardownRunning
               when locked $
@@ -790,14 +803,14 @@ runNode lgr hi xt =
                   )
               pure eho
             else atomically (readTMVar cache)
-
+       -- TODO: add dbRem to prelude like: debugf' (const "OnceInd") "SUBNODES OF ONCE")
         runQ <- statusCheckIO canRunBeforeOnce beforeStatus subNodes
         when runQ $
           finally
             ( eho
                 & either
                   (`abandonSubs` subNodes)
-                  (\ho -> runSubNodes_ (OnceIn $ pure ho) subNodes)
+                  (\ho -> runSubNodes_ (OnceIn $ pure ho) subNodes & debugf' (const "") "RUN SUBNODES OF ONCE")
             )
             (atomically $ writeTVar beforeStatus BeforeDone)
       --
@@ -860,8 +873,8 @@ runNode lgr hi xt =
       oi@(OnceIn{}) ThreadAfter{after, subNodes'} ->
         do
           -- may not run if subnodes are empty
-          run' <- runSubNodes oi subNodes'
-          when run'.hasRun $
+          run' <- debugf' (const "") "RUN ThreadAfter SUBNODES" $ runSubNodes oi subNodes'
+          when (run'.hasRun & debug' "HAS RUN - threadAfter") $
             logRun_ (Hook Thread After) after
       --
       -- onceIn -> eachBefore

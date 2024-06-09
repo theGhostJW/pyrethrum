@@ -121,6 +121,12 @@ getSuiteEvent = \case
     ParentFailure{suiteEvent} -> Just suiteEvent
     _ -> Nothing
 
+getHookInfo :: ThreadEvent a b -> Maybe (Hz, HookPos)
+getHookInfo t = getSuiteEvent t >>= \case 
+                                  Hook hz pos -> Just (hz, pos)
+                                  Test {} -> Nothing
+
+
 data ThreadEvent l a
     = StartExecution
         { idx :: Int
@@ -163,6 +169,18 @@ data ThreadEvent l a
         , threadId :: ThreadId
         }
     deriving (Show)
+
+startOrParentFailure :: ThreadEvent l a -> Bool
+startOrParentFailure te = case te of
+    StartExecution{} -> False
+    EndExecution{} -> False
+    ApEvent{} -> False
+    Failure{} -> False
+    -- event will either have a start or be
+    -- represented by a parent failure if skipped
+    ParentFailure{} -> True
+    Start{} -> True
+    End{} -> False
 
 startSuiteEventLoc :: ThreadEvent l a -> Maybe l
 startSuiteEventLoc te = case te of

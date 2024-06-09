@@ -343,8 +343,6 @@ unit_wrong_result =
 -- document forgotten password :: sudo chown -R usertename:username ~/pyrethrum/pyrethrum
 
 
-
--- TODO :: implement chkNoEmptyHooks -- this test will fail that check - can see empty afterhook in  log
 -- $> unit_fail_wrong_counts
 unit_fail_wrong_counts :: IO ()
 unit_fail_wrong_counts = replicateM_ 1000 mayFail

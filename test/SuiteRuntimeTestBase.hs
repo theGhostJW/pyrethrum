@@ -17,6 +17,7 @@ import Internal.ThreadEvent as TE (
   ThreadEvent (..),
   ThreadId,
   getSuiteEvent,
+  getHookInfo,
   hasSuiteEvent,
   isEnd,
   isHook,
@@ -24,6 +25,7 @@ import Internal.ThreadEvent as TE (
   isOnceHookParentFailure,
   isStart,
   isTestEventOrTestParentFailure,
+  startOrParentFailure,
   onceHook,
   onceSuiteEvent,
   startSuiteEventLoc,
@@ -34,7 +36,7 @@ import Internal.ThreadEvent as TE (
 import List.Extra as LE hiding (list)
 import List.Extra qualified as L
 import Prepare qualified as P
-import PyrethrumExtras (debug, debug', toS, txt, (?))
+import PyrethrumExtras (debug, debug', toS, txt, uu, (?))
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 import PyrethrumExtras.Test (chk', chkFail)
@@ -78,6 +80,10 @@ bug t = PR.bug (error t :: SomeException)
 logging :: Logging
 logging = NoLog
 
+-- TODO; move to pyrelude
+ptxt :: (Show a) => a -> Text
+ptxt = toS . ppShow
+
 {- each and once hooks will always run but thread hooks may be empty
    due to subitems being stolen by another thread. We need to ensure
    that empty thread TestTrees are not executed
@@ -85,10 +91,6 @@ logging = NoLog
 
 allSpec :: Int -> Result -> ManySpec
 allSpec delay rslt = T.All $ Spec delay rslt
-
--- TODO; move to pyrelude
-ptxt :: (Show a) => a -> Text
-ptxt = toS . ppShow
 
 {-
   todo:
@@ -128,7 +130,8 @@ chkProperties baseSeed threadLimit ts evts = do
     evts
     [ chkThreadHooksStartedOnceInThread
     , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-    , chkNoEmptyHooks
+    , chkNoEmptyPostHooks 
+    , chkNoEmptyPreHooks 
     ]
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
   threadLogChks
@@ -590,12 +593,59 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
       fps <- findMathcingParent parentEventPredicate h t
       logSuiteEventPath fps
 
-  logTails :: Bool -> [LogItem] -> [[LogItem]]
-  logTails wantReverse = tails . bool PR.id reverse wantReverse
+logTails :: Bool -> [LogItem] -> [[LogItem]]
+logTails wantReverse = tails . bool PR.id reverse wantReverse
 
-chkNoEmptyHooks :: [LogItem] -> IO ()
-chkNoEmptyHooks = const $ pure ()
 
+startHook :: [HookPos] -> LogItem -> Bool
+startHook poss l = startOrParentFailure l && (getHookInfo l & maybe False (\(hz, hkPos) ->  hz /= Once && (hkPos `LE.elem` poss)))
+
+chkNoEmptyPostHooks :: [LogItem] -> IO ()
+chkNoEmptyPostHooks =
+  chkNoEmptyHooks
+   "Post Hook Empty"
+   (startHook [Teardown, After])
+   True
+
+chkNoEmptyPreHooks :: [LogItem] -> IO ()
+chkNoEmptyPreHooks =
+  chkNoEmptyHooks
+   "Post Hook Empty"
+   (startHook [Setup, Before])
+   False
+
+chkNoEmptyHooks :: Text -> (LogItem -> Bool) -> Bool -> [LogItem] -> IO ()
+chkNoEmptyHooks message hookPredicate wantReverse =
+  traverse_ chkHasTest . logTails wantReverse
+ where
+  chkHasTest :: [LogItem] -> IO ()
+  chkHasTest = \case
+    [] -> pure () -- wont happen
+    x : xs ->
+      when
+        (hookPredicate x)
+        $ chk'
+          (message <> " \nEmpty Hook: \n" <> ptxt x)
+          (findChildTest x xs)
+
+  findChildTest :: LogItem -> [LogItem] -> Bool
+  findChildTest hk =
+    any (fromMaybe False . testMatchesParent)
+   where
+    testMatchesParent :: LogItem -> Maybe Bool
+    testMatchesParent =
+      parentMatchesTest (const True) hk
+
+{-
+
+findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem
+findMathcingParent parentPredicate testStartEvnt =
+  find (fromMaybe False . parentEvntMatches)
+ where
+  parentEvntMatches :: LogItem -> Maybe Bool
+  parentEvntMatches parentCandidteEvt =
+    parentMatchesTest parentPredicate parentCandidteEvt testStartEvnt
+-}
 -- copiolet
 --   traverse_ chkNoEmptyHook . threadedLogs False
 --  where
@@ -893,20 +943,32 @@ todo - trace like with pretty printing
   dbCondionalNoLabel
 -}
 
+{-
+ Look for a matching nested test
+ Just True if:
+  IF  parent item matches predicate
+  AND parent is a start event
+  AND testItem is a start test or test abandonned event
+  AND testItem is a child of hook
+-}
+parentMatchesTest :: (LogItem -> Bool) -> LogItem -> LogItem -> Maybe Bool
+parentMatchesTest parentPredicate parentHookItm testItm = do
+  if parentPredicate parentHookItm
+    then do
+      startEvntPath <- startSuiteEventLoc testItm
+      tstStartSubPath <- parentPath (isTestEventOrTestParentFailure testItm) startEvntPath
+      parentPath' <- startSuiteEventLoc parentHookItm
+      pure $ parentPath'.un `isSuffixOf` tstStartSubPath.un
+    else
+      pure False
+
 findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem
 findMathcingParent parentPredicate testStartEvnt =
-  find (fromMaybe False . matchesParentPath)
+  find (fromMaybe False . parentEvntMatches)
  where
-  matchesParentPath :: LogItem -> Maybe Bool
-  matchesParentPath parentCandidteEvt =
-    if parentPredicate parentCandidteEvt
-      then do
-        startEvntPath <- startSuiteEventLoc testStartEvnt
-        tstStartSubPath <- parentPath (isTestEventOrTestParentFailure testStartEvnt) startEvntPath
-        thisParentCandidate <- startSuiteEventLoc parentCandidteEvt
-        pure $ thisParentCandidate.un `isSuffixOf` tstStartSubPath.un
-      else
-        pure False
+  parentEvntMatches :: LogItem -> Maybe Bool
+  parentEvntMatches parentCandidteEvt =
+    parentMatchesTest parentPredicate parentCandidteEvt testStartEvnt
 
 isParentPath :: ExePath -> ExePath -> Bool
 isParentPath (ExePath parent) (ExePath child) =

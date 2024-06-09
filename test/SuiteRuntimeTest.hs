@@ -338,36 +338,38 @@ unit_wrong_result =
             }
         ]
 
-
 -- TODO: resolve WSL UNC issues
 -- document forgotten password :: sudo chown -R usertename:username ~/pyrethrum/pyrethrum
 
 
 -- $> unit_fail_wrong_counts
 unit_fail_wrong_counts :: IO ()
-unit_fail_wrong_counts = replicateM_ 1000 mayFail
-    
+unit_fail_wrong_counts =
+    do
+        putStrLn "unit_fail_wrong_counts"
+        replicateM_ 1000 mayFail
+
 mayFail :: IO ()
-mayFail = 
-       runTest'
+mayFail =
+    runTest'
         Log
         defaultSeed
         (ThreadCount 5)
-        [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] }
-       , OnceBefore
-        { spec = Spec { delay = 0 , result = Pass }
-        , subNodes =
-            [ ThreadAfter
-                { threadSpec =
-                    T.PassProb
-                      { genStrategy = Preload
-                      , passPcnt = 95
-                      , minDelay = 0
-                      , maxDelay = 0
-                      }
-                , subNodes =
-                    [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
-                }
-            ]
-        }
-    ]
+        [ Fixture{tests = [Spec{delay = 0, result = Pass}]}
+        , OnceBefore
+            { spec = Spec{delay = 0, result = Pass}
+            , subNodes =
+                [ ThreadAfter
+                    { threadSpec =
+                        T.PassProb
+                            { genStrategy = Preload
+                            , passPcnt = 95
+                            , minDelay = 0
+                            , maxDelay = 0
+                            }
+                    , subNodes =
+                        [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+                    }
+                ]
+            }
+        ]

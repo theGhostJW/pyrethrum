@@ -594,7 +594,7 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
       logSuiteEventPath fps
 
 logTails :: Bool -> [LogItem] -> [[LogItem]]
-logTails wantReverse = tails . bool PR.id reverse wantReverse
+logTails wantReverse = debug' "TAILS" . tails . bool PR.id reverse wantReverse
 
 
 startHook :: [HookPos] -> LogItem -> Bool
@@ -625,40 +625,17 @@ chkNoEmptyHooks message hookPredicate wantReverse =
       when
         (hookPredicate x)
         $ chk'
-          (message <> " \nEmpty Hook: \n" <> ptxt x)
-          (findChildTest x xs)
+          (message <> " \nEmpty Hook:\n" <> ptxt x)
+          (findChildTest (debug' "PARENT" $ x) (debug' "CHILD ITEMS" $ xs))
 
   findChildTest :: LogItem -> [LogItem] -> Bool
   findChildTest hk =
-    any (fromMaybe False . testMatchesParent)
+    any (fromMaybe False . testMatchesParent) 
    where
     testMatchesParent :: LogItem -> Maybe Bool
     testMatchesParent =
       parentMatchesTest (const True) hk
 
-{-
-
-findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem
-findMathcingParent parentPredicate testStartEvnt =
-  find (fromMaybe False . parentEvntMatches)
- where
-  parentEvntMatches :: LogItem -> Maybe Bool
-  parentEvntMatches parentCandidteEvt =
-    parentMatchesTest parentPredicate parentCandidteEvt testStartEvnt
--}
--- copiolet
---   traverse_ chkNoEmptyHook . threadedLogs False
---  where
---   chkNoEmptyHook :: [LogItem] -> IO ()
---   chkNoEmptyHook lgs =
---     traverse_ chkNoEmptyHook' $ filter isHook lgs
---    where
---     chkNoEmptyHook' :: LogItem -> IO ()
---     chkNoEmptyHook' l =
---       let
---         isHookEmpty = isHook l && null (filter isTestEventOrTestParentFailure lgs)
---        in
---         chk' ("Empty hook found:\n" <> toS (ppShow l)) $ not isHookEmpty
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =

@@ -221,7 +221,7 @@ data ExpectedResult
 
 -- todo add to pyrelude
 groupCount :: (Ord a) => [a] -> M.Map a Int
-groupCount = M.fromListWith (+) . fmap (,1) 
+groupCount = M.fromListWith (+) . fmap (,1)
 
 {-
 defects found in testing::
@@ -574,8 +574,7 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
   actualParents = mapMaybe extractHeadParent thrdLogTails
 
   thrdLogTails :: [[LogItem]]
-  thrdLogTails =
-    tails $ bool PR.id reverse wantReverseLog thrdLog
+  thrdLogTails = logTails wantReverseLog thrdLog
 
   extractHeadParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
   extractHeadParent evntLog =
@@ -591,9 +590,12 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
       fps <- findMathcingParent parentEventPredicate h t
       logSuiteEventPath fps
 
+  logTails :: Bool -> [LogItem] -> [[LogItem]]
+  logTails wantReverse = tails . bool PR.id reverse wantReverse
 
 chkNoEmptyHooks :: [LogItem] -> IO ()
 chkNoEmptyHooks = const $ pure ()
+
 -- copiolet
 --   traverse_ chkNoEmptyHook . threadedLogs False
 --  where
@@ -892,16 +894,19 @@ todo - trace like with pretty printing
 -}
 
 findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem
-findMathcingParent evntPredicate targEvnt =
+findMathcingParent parentPredicate testStartEvnt =
   find (fromMaybe False . matchesParentPath)
  where
-  targEvntSubPath =
-    startSuiteEventLoc targEvnt >>= parentPath (isTestEventOrTestParentFailure targEvnt)
   matchesParentPath :: LogItem -> Maybe Bool
-  matchesParentPath thisEvt = do
-    targPath <- targEvntSubPath
-    thisParentCandidate <- startSuiteEventLoc thisEvt
-    pure $ evntPredicate thisEvt && thisParentCandidate.un `isSuffixOf` targPath.un
+  matchesParentPath parentCandidteEvt =
+    if parentPredicate parentCandidteEvt
+      then do
+        startEvntPath <- startSuiteEventLoc testStartEvnt
+        tstStartSubPath <- parentPath (isTestEventOrTestParentFailure testStartEvnt) startEvntPath
+        thisParentCandidate <- startSuiteEventLoc parentCandidteEvt
+        pure $ thisParentCandidate.un `isSuffixOf` tstStartSubPath.un
+      else
+        pure False
 
 isParentPath :: ExePath -> ExePath -> Bool
 isParentPath (ExePath parent) (ExePath child) =
@@ -972,7 +977,7 @@ mkManySpec
     delay = delayRange > 0 ? minDelay + seed `mod` (maxDelay - minDelay) $ minDelay
     result = seed `mod` 100 < fromIntegral passPcnt ? Pass $ Fail
 
--- used in both generating test run and validation 
+-- used in both generating test run and validation
 -- is pure ie. will always generate the same specs for same inputs
 generateSpecs :: (Show pth) => Int -> Int -> pth -> Int8 -> Int -> Int -> [Spec]
 generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay =
@@ -1036,7 +1041,8 @@ mkVoidAction path spec =
   do
     C.threadDelay spec.delay
     unless (spec.result == Pass) $
-      error . toS $ "FAIL RESULT @ " <> txt path
+      error . toS $
+        "FAIL RESULT @ " <> txt path
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack

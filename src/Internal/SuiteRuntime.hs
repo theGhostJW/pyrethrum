@@ -372,11 +372,12 @@ logAbandonned lgr p e a =
       , failSuiteEvent = a.suiteEvent
       }
 
+pureFailure :: L.ExePath -> SuiteEvent -> IO (Either L.FailPoint b)
+pureFailure p = pure . Left . L.FailPoint p
+
 logReturnFailure :: Logger -> L.ExePath -> SuiteEvent -> SomeException -> IO (Either L.FailPoint b)
 logReturnFailure lgr p et e =
-  do
-    lgr (L.mkFailure p et e)
-    pure . Left $ L.FailPoint p et
+  lgr (L.mkFailure p et e) >> pureFailure p et
 
 data CanAbandon = None | Partial | All
   deriving (Show, Eq)
@@ -590,8 +591,11 @@ runNode lgr hi xt =
   logRun_ :: SuiteEvent -> (P.ApEventSink -> IO b) -> IO ()
   logRun_ et action = void $ logRun' et action
 
-  logAbandonned' = logAbandonned lgr xt.path
-  -- logAbandonnedParent = logAbandonnedNew lgr
+  logAbandonned_ :: SuiteEvent -> FailPoint -> IO ()
+  logAbandonned_ = logAbandonned lgr xt.path
+
+  logAbandonned' :: forall a. SuiteEvent -> FailPoint -> IO (Either FailPoint a)
+  logAbandonned' se fp = logAbandonned_ se fp >> pure (Left fp)
 
   runSubNodes :: forall hi'. NodeIn hi' -> ChildQ (ExeTree hi') -> IO QElementRun
   runSubNodes hi'' = runChildQ Concurrent (runNode lgr hi'') canRunXTree
@@ -617,7 +621,7 @@ runNode lgr hi xt =
   runTests eti tests = debugf' (const "") "RUN TESTS" $ runChildQ Sequential (runTest eti) (const $ pure Runnable) tests
 
   nxtRunner :: forall i. IO (Either FailPoint i) -> (Either FailPoint i -> IO ()) -> NodeIn i
-  nxtRunner su td = TestRunner . pure $ MkTestContext su td
+  nxtRunner su = TestRunner . pure . MkTestContext su
 
   runTest :: forall ti. IO (TestContext ti) -> P.Test IO ti -> IO QElementRun
   runTest ioCtx t =
@@ -634,11 +638,10 @@ runNode lgr hi xt =
 
   mkTestPath :: forall a. P.Test IO a -> L.ExePath
   mkTestPath P.MkTest{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : coerce xt.path {- fixture path -}
-
   abandonSubs :: forall a. FailPoint -> ChildQ (ExeTree a) -> IO QElementRun
   abandonSubs fp = runSubNodes (Abandon fp)
-  
-  notRun :: IO  QElementRun
+
+  notRun :: IO QElementRun
   notRun = pure $ QElementRun False
 
   runOnceAfter :: forall a. ChildQ (ExeTree a) -> TVar AfterStatus -> NodeIn a -> AfterStatus -> IO () -> IO QElementRun
@@ -650,8 +653,8 @@ runNode lgr hi xt =
         when (s == AfterQPending) $
           writeTVar status AfterQRunning
         pure $ canRunAfterOnce s qs
-      run' ?
-        finally
+      run'
+        ? finally
           (runSubNodes nxtIn subNodes)
           ( do
               locked <- tryLockIO canLockAfterOnce status subNodes lockedStatus
@@ -660,36 +663,36 @@ runNode lgr hi xt =
                   runHook
                   (atomically $ writeTVar status AfterDone)
           )
-          $ notRun
+        $ notRun
 
   noOp :: forall a. a -> IO ()
   noOp = const $ pure ()
+
+  -- GOF strikes back
+  singleton :: forall a. TMVar a -> IO a -> IO a
+  singleton tCache ioa = do
+    ma <- atomically $ tryReadTMVar tCache
+    ma
+      & maybe
+        ( do
+            a <- ioa
+            atomically $ writeTMVar tCache a
+            pure a
+        )
+        pure
 
   runThreadSetup :: forall i o. TMVar (Either FailPoint o) -> SuiteEvent -> (P.ApEventSink -> i -> IO o) -> Either FailPoint i -> IO (Either FailPoint o)
   runThreadSetup tCache evnt setup eti = do
     -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
     -- no need for thread synchronisation as this happpens within a thread
-    mho <- atomically $ tryReadTMVar tCache
-    mho
-      & maybe
-        ( do
-            eo <- runSetup evnt setup eti
-            atomically $ writeTMVar tCache eo
-            pure eo
-        )
-        pure
+    singleton tCache $ runSetup evnt setup eti
 
   runSetup :: forall i o. SuiteEvent -> (P.ApEventSink -> i -> IO o) -> Either FailPoint i -> IO (Either FailPoint o)
   runSetup evnt setup eti =
     eti
       & either
-        ( \fp -> do
-            let r = Left fp
-            logAbandonned' evnt fp
-            pure r
-        )
-        ( \ti -> logRun' evnt (`setup` ti)
-        )
+        (logAbandonned' evnt)
+        (logRun' evnt . flip setup)
 
   runThreadTeardown :: forall i. TMVar (Either FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
   runThreadTeardown tCache teardown = do
@@ -698,8 +701,8 @@ runNode lgr hi xt =
       & maybe
         (pure ())
         ( either
-            (logAbandonned' (Hook Thread Teardown))
-            (\ho -> logRun_ (Hook Thread Teardown) (`teardown` ho))
+            (logAbandonned_ (Hook Thread Teardown))
+            (logRun_ (Hook Thread Teardown) . flip teardown)
         )
 
   onceRun :: Bool -> IO QElementRun -> IO QElementRun
@@ -721,7 +724,7 @@ runNode lgr hi xt =
             writeTVar ob.beforeStatus BeforeAbandoning
           pure (locked, ca /= None)
         when beforeLocked $
-          logAbandonned' (Hook Once Before) fp
+          logAbandonned_ (Hook Once Before) fp
         canAbandonQ
           ? onceRun beforeLocked (abandonSubs fp subNodes)
           $ hasRun beforeLocked
@@ -736,55 +739,64 @@ runNode lgr hi xt =
             writeTVar status AroundAbandoning
           pure locked
         when setUpLocked $
-          logAbandonned' (Hook Once Setup) fp
+          logAbandonned_ (Hook Once Setup) fp
         finally
           (onceRun setUpLocked (abandonSubs fp subNodes))
           ( do
               locked <- tryLockIO canLockTeardown status subNodes TeardownRunning
               when locked $
                 finally
-                  (logAbandonned' (Hook Once Teardown) fp)
+                  (logAbandonned_ (Hook Once Teardown) fp)
                   (atomically $ writeTVar status AroundDone)
           )
       --
       -- abandon -> onceAfter
-      abn@Abandon{fp} OnceAfter{subNodes', status'} -> 
-        runOnceAfter subNodes' status' abn AfterAbandoning (logAbandonned' (Hook Once After) fp)
-
-      ---
-      --- !!!!!!!! ALL THESE NEED REWOKING AND HAVE TO BE EXPRESSED IN TERMS OF TESTRUNNER !!!!!!!!
+      abn@Abandon{fp} OnceAfter{subNodes', status'} ->
+        runOnceAfter subNodes' status' abn AfterAbandoning (logAbandonned_ (Hook Once After) fp)
       --
       -- abandon -> threadBefore
-      Abandon{fp} ThreadBefore{subNodes} ->
-        logAbandonned' (Hook Thread Before) fp >> abandonSubs fp subNodes
+      Abandon{fp} ThreadBefore{subNodes} -> do
+        tCache <- newEmptyTMVarIO
+        runSubNodes (nxtRunner (singleton tCache abandon) noOp) subNodes
+       where
+        abandon = logAbandonned' (Hook Thread Before) fp
       --
       -- abandon -> threadAround
-      Abandon{fp} ThreadAround{subNodes} ->
-        do
-          logAbandonned' (Hook Thread Setup) fp
-          abandonSubs fp subNodes
-          logAbandonned' (Hook Thread Teardown) fp
+      Abandon{fp} ThreadAround{subNodes, teardown} -> do
+        tCache <- newEmptyTMVarIO
+        let nxtTeardown _ignored = runThreadTeardown tCache teardown
+        runSubNodes (nxtRunner (singleton tCache abandon) nxtTeardown) subNodes
+       where
+        abandon = logAbandonned' (Hook Thread Setup) fp
       --
       -- abandon -> threadAfter
-      Abandon{fp} ThreadAfter{subNodes'} ->
-        abandonSubs fp subNodes' >> logAbandonned' (Hook Thread After) fp
+      Abandon{fp} ThreadAfter{subNodes'} -> do
+        r <- abandonSubs fp subNodes'
+        when r.hasRun $
+          logAbandonned_ (Hook Thread After) fp
+        pure r
+
       --
       -- abandon -> eachBefore
       Abandon{fp} EachBefore{subNodes} ->
-        runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
+        runSubNodes (nxtRunner nxtSetup noOp) subNodes
        where
-        nxtSetup = logAbandonned' (Hook Each Before) fp >> pure (Left fp)
+        nxtSetup = logAbandonned' (Hook Each Before) fp
       --
       -- abandon -> eachAround
       Abandon{fp} EachAround{subNodes} ->
-        do
-          logAbandonned' (Hook Each Setup) fp
-          abandonSubs fp subNodes
-          logAbandonned' (Hook Each Teardown) fp
+        runSubNodes (nxtRunner nxtSetup nxtTeardown) subNodes
+       where
+        nxtSetup = logAbandonned' (Hook Each Setup) fp
+        nxtTeardown _ignore = logAbandonned_ (Hook Each Teardown) fp
       --
       -- abandon -> eachAfter
       Abandon{fp} EachAfter{subNodes'} ->
-        abandonSubs fp subNodes' >> logAbandonned' (Hook Each After) fp
+        runSubNodes (nxtRunner nxtSetup nxtTeardown) subNodes'
+       where
+        nxtSetup = pure $ Left fp
+        nxtTeardown _ignore = logAbandonned_ (Hook Each After) fp
+
       --
       -- abandon -> test
       Abandon{fp} Fixture{tests} ->
@@ -847,7 +859,7 @@ runNode lgr hi xt =
                 finally
                   ( eho
                       & either
-                        (logAbandonned' (Hook Once Teardown))
+                        (logAbandonned_ (Hook Once Teardown))
                         (\hi' -> logRun_ (Hook Once Teardown) (`teardown` hi'))
                   )
                   (atomically $ writeTVar status AroundDone)
@@ -894,7 +906,7 @@ runNode lgr hi xt =
         nxtSetup = ioHi >>= \ho -> logRun' (Hook Each Setup) (`setup` ho)
         nxtTeardown =
           either
-            (logAbandonned' (Hook Each Teardown))
+            (logAbandonned_ (Hook Each Teardown))
             (\ho -> logRun_ (Hook Each Teardown) (`teardown` ho))
       --
       -- onceIn -> eachAfter
@@ -904,7 +916,7 @@ runNode lgr hi xt =
         nxtSetup = Right <$> ioHi
         nxtTeardown =
           either
-            (logAbandonned' (Hook Each After))
+            (logAbandonned_ (Hook Each After))
             (\_ -> logRun_ (Hook Each After) after)
       --
       -- onceIn -> fixture
@@ -947,7 +959,7 @@ runNode lgr hi xt =
         nxtSetup = runSetup (Hook Each Setup) setup
         nxtTeardown =
           either
-            (logAbandonned' (Hook Each Teardown))
+            (logAbandonned_ (Hook Each Teardown))
             (\i -> logRun_ (Hook Each Teardown) (`teardown` i))
       --
       --
@@ -957,7 +969,7 @@ runNode lgr hi xt =
        where
         nxtAfter =
           either
-            (logAbandonned' (Hook Each After))
+            (logAbandonned_ (Hook Each After))
             (\_i -> logRun_ (Hook Each After) after)
       --
       -- context -> fixtures

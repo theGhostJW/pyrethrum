@@ -607,14 +607,14 @@ runNode lgr hi xt =
   -- should never be generated.
   -- The only way these errors could be thrown is from unit testing code that generates an invalid testsuite
   -- via lower level constructors where there are no typeclass contraints apply
-  invalidTree :: Text -> Text -> IO ()
+  invalidTree :: Text -> Text -> IO QElementRun
   invalidTree input cst = bug @Void . error $ input <> " >>> should not be passed to >>> " <> cst <> "\n" <> txt xt.path
 
   sink :: P.ApEventSink
   sink = lgr . L.ApEvent
 
-  runTests :: forall ti. IO (TestContext ti) -> ChildQ (P.Test IO ti) -> IO ()
-  runTests eti tests = void $ debugf' (const "") "RUN TESTS" $ runChildQ Sequential (runTest eti) (const $ pure Runnable) tests
+  runTests :: forall ti. IO (TestContext ti) -> ChildQ (P.Test IO ti) -> IO QElementRun
+  runTests eti tests = debugf' (const "") "RUN TESTS" $ runChildQ Sequential (runTest eti) (const $ pure Runnable) tests
 
   nxtRunner :: forall i. IO (Either FailPoint i) -> (Either FailPoint i -> IO ()) -> NodeIn i
   nxtRunner su td = TestRunner . pure $ MkTestContext su td
@@ -634,10 +634,14 @@ runNode lgr hi xt =
 
   mkTestPath :: forall a. P.Test IO a -> L.ExePath
   mkTestPath P.MkTest{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : coerce xt.path {- fixture path -}
+
   abandonSubs :: forall a. FailPoint -> ChildQ (ExeTree a) -> IO QElementRun
   abandonSubs fp = runSubNodes (Abandon fp)
+  
+  notRun :: IO  QElementRun
+  notRun = pure $ QElementRun False
 
-  runOnceAfter :: forall a. ChildQ (ExeTree a) -> TVar AfterStatus -> NodeIn a -> AfterStatus -> IO () -> IO ()
+  runOnceAfter :: forall a. ChildQ (ExeTree a) -> TVar AfterStatus -> NodeIn a -> AfterStatus -> IO () -> IO QElementRun
   runOnceAfter subNodes status nxtIn lockedStatus runHook =
     do
       run' <- atomically $ do
@@ -646,9 +650,9 @@ runNode lgr hi xt =
         when (s == AfterQPending) $
           writeTVar status AfterQRunning
         pure $ canRunAfterOnce s qs
-      when run' $
+      run' ?
         finally
-          (runSubNodes_ nxtIn subNodes)
+          (runSubNodes nxtIn subNodes)
           ( do
               locked <- tryLockIO canLockAfterOnce status subNodes lockedStatus
               when locked $
@@ -656,6 +660,7 @@ runNode lgr hi xt =
                   runHook
                   (atomically $ writeTVar status AfterDone)
           )
+          $ notRun
 
   noOp :: forall a. a -> IO ()
   noOp = const $ pure ()
@@ -743,8 +748,11 @@ runNode lgr hi xt =
           )
       --
       -- abandon -> onceAfter
-      abn@Abandon{fp} OnceAfter{subNodes', status'} ->
+      abn@Abandon{fp} OnceAfter{subNodes', status'} -> 
         runOnceAfter subNodes' status' abn AfterAbandoning (logAbandonned' (Hook Once After) fp)
+
+      ---
+      --- !!!!!!!! ALL THESE NEED REWOKING AND HAVE TO BE EXPRESSED IN TERMS OF TESTRUNNER !!!!!!!!
       --
       -- abandon -> threadBefore
       Abandon{fp} ThreadBefore{subNodes} ->
@@ -827,10 +835,10 @@ runNode lgr hi xt =
           ( eho
               & either
                 ( \fp -> do
-                    (flip runSubNodes_ subNodes . Abandon) fp
+                    (flip runSubNodes subNodes . Abandon) fp
                 )
                 ( \ho -> do
-                    runSubNodes_ (OnceIn $ pure ho) subNodes
+                    runSubNodes (OnceIn $ pure ho) subNodes
                 )
           )
           ( do

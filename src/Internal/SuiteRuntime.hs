@@ -7,7 +7,7 @@ import Internal.RunTimeLogging qualified as L
 import Internal.ThreadEvent hiding (Test)
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
-import PyrethrumExtras (catchAll, debugf', debug', toS, txt, uu, (?))
+import PyrethrumExtras (catchAll, debug', debugf', toS, txt, uu, (?))
 import Text.Show.Pretty (ppShow)
 import UnliftIO (
   concurrently_,
@@ -334,14 +334,11 @@ runChildQ concurrency runner childCanRun ChildQ{childNodes, status, runningCount
                         when (concurrency == Concurrent) $
                           atomically (writeTQueue childNodes a)
                         runner a
-                        -- TODO:: BUG HERE RUNNER NEEDS TO RETURN IF RUN ELSE 
-                        -- NestED RUNNERS WILL RESULT IN FALSE HOOKS
-                        pure True
                       -- when not runnabel clean up the q by returning without adding the element back
-                      Saturated -> pure False
-                      Done -> pure False
+                      Saturated -> pure $ QElementRun False
+                      Done -> pure $ QElementRun False
                   (atomically $ modifyTVar runningCount pred)
-              runChildQ' $ QElementRun (hasRun' || hasRun.hasRun)
+              runChildQ' $ QElementRun (hasRun'.hasRun || hasRun.hasRun)
           )
 
 mkChildQ :: (Foldable m) => m a -> IO (ChildQ a)
@@ -622,18 +619,18 @@ runNode lgr hi xt =
   nxtRunner :: forall i. IO (Either FailPoint i) -> (Either FailPoint i -> IO ()) -> NodeIn i
   nxtRunner su td = TestRunner . pure $ MkTestContext su td
 
-  runTest :: forall ti. IO (TestContext ti) -> P.Test IO ti -> IO ()
+  runTest :: forall ti. IO (TestContext ti) -> P.Test IO ti -> IO QElementRun
   runTest ioCtx t =
     do
-      MkTestContext{setup, teardown} <- ioCtx
       let path = mkTestPath t
-       in do
-            ti <- setup
-            ti
-              & either
-                (logAbandonned lgr path TE.Test)
-                (void . logRun lgr path TE.Test . t.action sink)
-            teardown ti
+      MkTestContext{setup, teardown} <- ioCtx
+      ti <- setup
+      ti
+        & either
+          (logAbandonned lgr path TE.Test)
+          (void . logRun lgr path TE.Test . t.action sink)
+      teardown ti
+      pure $ QElementRun True
 
   mkTestPath :: forall a. P.Test IO a -> L.ExePath
   mkTestPath P.MkTest{id, title = ttl} = L.ExePath $ AE.TestPath{id, title = ttl} : coerce xt.path {- fixture path -}
@@ -720,10 +717,9 @@ runNode lgr hi xt =
           pure (locked, ca /= None)
         when beforeLocked $
           logAbandonned' (Hook Once Before) fp
-        if canAbandonQ then
-          onceRun beforeLocked (abandonSubs fp subNodes)
-        else
-          hasRun beforeLocked
+        canAbandonQ
+          ? onceRun beforeLocked (abandonSubs fp subNodes)
+          $ hasRun beforeLocked
 
       --
       -- abandon -> onceAround
@@ -803,7 +799,7 @@ runNode lgr hi xt =
                   )
               pure eho
             else atomically (readTMVar cache)
-       -- TODO: add dbRem to prelude like: debugf' (const "OnceInd") "SUBNODES OF ONCE")
+        -- TODO: add dbRem to prelude like: debugf' (const "OnceInd") "SUBNODES OF ONCE")
         runQ <- statusCheckIO canRunBeforeOnce beforeStatus subNodes
         when runQ $
           finally

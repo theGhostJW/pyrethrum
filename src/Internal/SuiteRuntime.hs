@@ -819,7 +819,7 @@ runNode lgr hi xt =
                   )
               pure eho
             else atomically (readTMVar cache)
-        -- TODO: add dbRem to prelude like: debugf' (const "OnceInd") "SUBNODES OF ONCE")
+        -- TODO: add dbLog to prelude like: debugf' (const "OnceInd") "SUBNODES OF ONCE")
         runQ <- statusCheckIO canRunBeforeOnce beforeStatus subNodes
         when runQ $
           finally

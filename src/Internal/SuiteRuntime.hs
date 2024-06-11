@@ -821,14 +821,16 @@ runNode lgr hi xt =
             else atomically (readTMVar cache)
         -- TODO: add dbLog to prelude like: debugf' (const "OnceInd") "SUBNODES OF ONCE")
         runQ <- statusCheckIO canRunBeforeOnce beforeStatus subNodes
-        when runQ $
+        if runQ then
           finally
             ( eho
                 & either
                   (`abandonSubs` subNodes)
-                  (\ho -> runSubNodes_ (OnceIn $ pure ho) subNodes & debugf' (const "") "RUN SUBNODES OF ONCE")
+                  (\ho -> runSubNodes (OnceIn $ pure ho) subNodes & debugf' (const "") "RUN SUBNODES OF ONCE")
             )
             (atomically $ writeTVar beforeStatus BeforeDone)
+        else 
+          hasRun False
       --
       -- onceIn -> onceAround
       OnceIn{ioHi} OnceAround{setup, teardown, status, cache, subNodes} -> do
@@ -874,16 +876,16 @@ runNode lgr hi xt =
         oi <- ioHi
         tCache <- newEmptyTMVarIO
         let nxtSetup = runThreadSetup tCache (Hook Thread Before) before $ Right oi
-        runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
+        runSubNodes (nxtRunner nxtSetup noOp) subNodes
       --
       -- onceIn -> threadAround
       OnceIn{ioHi} ThreadAround{setup, teardown, subNodes} -> do
         oi <- ioHi
         tCache <- newEmptyTMVarIO
-        let nxtSetup = runThreadSetup tCache (Hook Thread Setup) setup $ Right oi
-        runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
-        runThreadTeardown tCache teardown
-
+        let 
+          nxtSetup = runThreadSetup tCache (Hook Thread Setup) setup $ Right oi
+          nxtTeardown _ignored = runThreadTeardown tCache teardown
+        runSubNodes (nxtRunner nxtSetup nxtTeardown) subNodes
       --
       -- onceIn -> threadAfter
       oi@(OnceIn{}) ThreadAfter{after, subNodes'} ->
@@ -892,16 +894,17 @@ runNode lgr hi xt =
           run' <- debugf' (const "") "RUN ThreadAfter SUBNODES" $ runSubNodes oi subNodes'
           when (run'.hasRun & debug' "HAS RUN - threadAfter") $
             logRun_ (Hook Thread After) after
+          pure run'
       --
       -- onceIn -> eachBefore
       (OnceIn ioHi) EachBefore{before, subNodes} ->
-        runSubNodes_ (nxtRunner nxtSetup noOp) subNodes
+        runSubNodes (nxtRunner nxtSetup noOp) subNodes
        where
         nxtSetup = ioHi >>= \ho -> logRun' (Hook Each Before) (`before` ho)
       --
       -- onceIn -> eachAround
       OnceIn{ioHi} EachAround{setup, teardown, subNodes} ->
-        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes
+        runSubNodes (nxtRunner nxtSetup nxtTeardown) subNodes
        where
         nxtSetup = ioHi >>= \ho -> logRun' (Hook Each Setup) (`setup` ho)
         nxtTeardown =
@@ -911,7 +914,7 @@ runNode lgr hi xt =
       --
       -- onceIn -> eachAfter
       OnceIn{ioHi} EachAfter{after, subNodes'} ->
-        runSubNodes_ (nxtRunner nxtSetup nxtTeardown) subNodes'
+        runSubNodes (nxtRunner nxtSetup nxtTeardown) subNodes'
        where
         nxtSetup = Right <$> ioHi
         nxtTeardown =
@@ -928,15 +931,17 @@ runNode lgr hi xt =
         do
           tCache <- newEmptyTMVarIO
           let mkBefore = runThreadSetup tCache (Hook Thread Before) before
-          runSubNodes_ (TestRunner $ newContext context mkBefore noOp) subNodes
+          runSubNodes (TestRunner $ newContext context mkBefore noOp) subNodes
       --
       -- context -> threadAround
       TestRunner{context} ThreadAround{setup, teardown, subNodes} ->
         do
           tCache <- newEmptyTMVarIO
-          let mkBefore = runThreadSetup tCache (Hook Thread Setup) setup
-          runSubNodes_ (TestRunner $ newContext context mkBefore noOp) subNodes
-          runThreadTeardown tCache teardown
+          let 
+            mkBefore = runThreadSetup tCache (Hook Thread Setup) setup
+            nxtTeardown _ignore = runThreadTeardown tCache teardown
+          runSubNodes (TestRunner $ newContext context mkBefore nxtTeardown) subNodes
+          
       --
       -- context -> threadAfter
       tr@TestRunner{} ThreadAfter{subNodes', after} ->
@@ -945,16 +950,17 @@ runNode lgr hi xt =
           run' <- runSubNodes tr subNodes'
           when run'.hasRun $
             logRun_ (Hook Thread After) after
+          pure run'
       --
       -- context -> eachBefore
       TestRunner{context} EachBefore{before, subNodes} ->
-        runSubNodes_ (TestRunner $ newContext context nxtSetup noOp) subNodes
+        runSubNodes (TestRunner $ newContext context nxtSetup noOp) subNodes
        where
         nxtSetup = runSetup (Hook Each Before) before
       --
       -- context -> eachAround
       TestRunner{context} EachAround{setup, teardown, subNodes} ->
-        runSubNodes_ (TestRunner $ newContext context nxtSetup nxtTeardown) subNodes
+        runSubNodes (TestRunner $ newContext context nxtSetup nxtTeardown) subNodes
        where
         nxtSetup = runSetup (Hook Each Setup) setup
         nxtTeardown =
@@ -965,7 +971,7 @@ runNode lgr hi xt =
       --
       -- context -> eachAfter
       TestRunner{context} EachAfter{subNodes', after} ->
-        runSubNodes_ (TestRunner $ newContext context pure nxtAfter) subNodes'
+        runSubNodes (TestRunner $ newContext context pure nxtAfter) subNodes'
        where
         nxtAfter =
           either

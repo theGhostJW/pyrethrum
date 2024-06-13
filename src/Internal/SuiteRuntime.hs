@@ -997,9 +997,26 @@ runNode lgr hi xt =
 data NodeIn hi where
   Abandon :: {fp :: FailPoint} -> NodeIn hi
   OnceIn :: {ioHi :: IO hi} -> NodeIn hi
-  -- ThreadIn :: {ioHi :: IO hi} -> NodeIn hi
+  {-
+    ThreadContext 
+      - registerChildRun i -> IO i 
+        - mkTreadContextBefore - needs Cach - dummy register
+        - mkTreadContextAround - needs Cach - dummy register
+        - mkTreadContextAfter TVar Bool -> IO ThreadContext
+        --
+        - nxtTreadContextBefore - needs Cach - dummy register
+        - nxtTreadContextAround - needs Cach - dummy register
+        - nxtTreadContextAfter TVar Bool -> ThreadContext -> IO ThreadContext (compose registerChildRun)
+
+      setup :: IO (Either FailPoint hi)
+    , teardown :: Either FailPoint hi -> IO () -- use MVar for teardown / registerChildRun for setup
+    } -> NodeIn hi
+    -- add registerChildRun to setup when ThreadIn -> Eachin
+  -}
+  
   EachContext ::
-    { context :: IO (TestContext hi)
+    { 
+      context :: IO (TestContext hi)
     } ->
     NodeIn hi
 

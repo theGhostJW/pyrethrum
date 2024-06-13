@@ -36,7 +36,7 @@ import Internal.ThreadEvent as TE (
 import List.Extra as LE hiding (list)
 import List.Extra qualified as L
 import Prepare qualified as P
-import PyrethrumExtras (debug, debug', toS, txt, uu, (?))
+import PyrethrumExtras (debug, debug', debug'_,toS, txt, uu, (?))
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 import PyrethrumExtras.Test (chk', chkFail)
@@ -594,7 +594,7 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
       logSuiteEventPath fps
 
 logTails :: Bool -> [LogItem] -> [[LogItem]]
-logTails wantReverse = debug' "TAILS" . tails . bool PR.id reverse wantReverse
+logTails wantReverse = debug'_ "TAILS" . tails . bool PR.id reverse wantReverse
 
 
 startHook :: [HookPos] -> LogItem -> Bool
@@ -626,7 +626,7 @@ chkNoEmptyHooks message hookPredicate wantReverse =
         (hookPredicate x)
         $ chk'
           (message <> " \nEmpty Hook:\n" <> ptxt x)
-          (findChildTest (debug' "PARENT" $ x) (debug' "CHILD ITEMS" $ xs))
+          (findChildTest (debug'_ "PARENT" $ x) (debug'_ "CHILD ITEMS" $ xs))
 
   findChildTest :: LogItem -> [LogItem] -> Bool
   findChildTest hk =
@@ -838,7 +838,7 @@ data ExeResult = ExeResult
 runTest :: Int -> ThreadCount -> [Template] -> IO ()
 runTest = runTest' logging
 
-data Logging = Log | NoLog deriving (Show, Eq)
+data Logging = Log | NoLog | LogTemplate deriving (Show, Eq)
 
 runTest' :: Logging -> Int -> ThreadCount -> [Template] -> IO ()
 runTest' wantLog baseRandomSeed threadLimit templates = do
@@ -855,7 +855,7 @@ exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [ThreadEvent 
 exeTemplate wantLog baseRandomSeed maxThreads templates = do
   let wantLog' = wantLog == Log
   (lc, logQ) <- testLogControls wantLog'
-  when wantLog' $ do
+  when (wantLog' || wantLog == LogTemplate) $ do
     putStrLn "#### Template ####"
     pPrint templates
     putStrLn "========="
@@ -918,6 +918,8 @@ todo - trace like with pretty printing
   dbNoLabel
   dbCondional
   dbCondionalNoLabel
+  dbRem
+  dbf
 -}
 
 {-

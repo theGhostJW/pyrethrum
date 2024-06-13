@@ -341,7 +341,8 @@ unit_wrong_result =
 -- TODO: resolve WSL UNC issues
 -- document forgotten password :: sudo chown -R usertename:username ~/pyrethrum/pyrethrum
 
--- $> unit_fail_wrong_counts
+
+-- $ > unit_fail_wrong_counts
 unit_fail_wrong_counts :: IO ()
 unit_fail_wrong_counts =
     do
@@ -372,3 +373,33 @@ mayFail =
                 ]
             }
         ]
+
+
+-- $> unit_fail
+unit_fail :: IO ()
+unit_fail =
+    do
+        putStrLn "unit_fail"
+        replicateM_ 1 mayFail'
+
+mayFail' :: IO ()
+mayFail' =
+        runTest'
+        Log
+        defaultSeed
+        (ThreadCount 5)
+        [ ThreadAround
+        { setupThreadSpec = T.All $ Spec { delay = 0 , result = Pass }
+        , teardownThreadSpec = T.All $ Spec { delay = 0 , result = Pass }
+        , subNodes =
+            [ ThreadAfter
+                { threadSpec = T.All $ Spec { delay = 0 , result = Pass }
+                , subNodes =
+                    [ Fixture { tests = [ 
+                        Spec { delay = 0 , result = Pass } ,
+                        Spec { delay = 0 , result = Pass } 
+                    ] } ]
+                }
+            ]
+        }
+    ] 

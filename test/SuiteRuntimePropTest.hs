@@ -23,6 +23,7 @@ import Internal.SuiteRuntime (ThreadCount (..))
 import Internal.ThreadEvent (Hz (..))
 import Test.Falsify.Range (between, skewedBy)
 import Test.Tasty (TestTree, defaultMain, testGroup)
+import Chronos (Time, now)
 import Test.Tasty.Falsify (
   ExpectFailure (DontExpectFailure),
   TestOptions (..),
@@ -211,23 +212,35 @@ genParams =
 genTemplate :: GenParams -> Gen [Template]
 genTemplate p = list (between (1, p.maxBranches)) $ genNode p
 
-tryRunTest :: ThreadCount -> [Template] -> IO (Either SomeException ())
-tryRunTest c suite =
-  tryAny (runTest defaultSeed c suite)
+tryRunTest :: Logging -> ThreadCount -> [Template] -> IO (Either SomeException ())
+tryRunTest wantLog c suite =
+  tryAny (printNow "TEST START" >> runTest' wantLog defaultSeed c suite >> printNow "TEST END")
 
+-- todo: add timestamp to debug
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
 {-# NOINLINE prop_test_suite #-}
 prop_test_suite :: TestTree
 prop_test_suite = 
   testPropertyWith defaultTestOptions "Template" $ do
     t <- genWith (Just . ppShow) $ genTemplate genParams
-    let result = unsafePerformIO $ tryRunTest (ThreadCount 5) t
+    let result = unsafePerformIO $ tryRunTest LogTemplate (ThreadCount 5)  t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
--- $ > test_suite
+putTxt :: (ConvertString a String) => a -> IO ()
+putTxt = putStrLn . toS
+
+printTime :: Text -> Time -> IO ()
+printTime msg t = putTxt $ msg <> ":: " <> toS (show t)
+
+printNow :: Text -> IO ()
+printNow lbl = do 
+  t <- now
+  printTime lbl  t
+
+-- $> test_suite
 test_suite :: IO ()
 test_suite = do
-  print "RUNNING TEST"
+  print "RUNNING TEST SUITE"
   defaultMain $
     testGroup
       "generator stubs"
@@ -236,3 +249,4 @@ test_suite = do
         -- , demoSpec
         prop_test_suite
       ]
+  print "TEST SUITE DONE"

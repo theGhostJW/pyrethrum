@@ -20,6 +20,7 @@ import System.Time.Extra (sleep)
 -- https://www.tweag.io/blog/2017-07-27-streaming-programs/
 -}
 
+-- TODO :: Add to pyrelude
 putTxt :: (ConvertString a String) => a -> IO ()
 putTxt = putStrLn . toS
 

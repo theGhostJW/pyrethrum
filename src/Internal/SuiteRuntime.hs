@@ -7,7 +7,7 @@ import Internal.RunTimeLogging qualified as L
 import Internal.ThreadEvent hiding (Test)
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
-import PyrethrumExtras (catchAll, debug', debugf', toS, txt, uu, (?))
+import PyrethrumExtras (catchAll, debug', debug'_, debugf', toS, txt, uu, (?), debugf'_)
 import Text.Show.Pretty (ppShow)
 import UnliftIO (
   concurrently_,
@@ -326,7 +326,7 @@ runChildQ concurrency runner childCanRun ChildQ{childNodes, status, runningCount
                 finally
                   do
                     cr <- atomically $ childCanRun a
-                    debug' "CHILD CAN RUN" cr & \case
+                    debug'_ "CHILD CAN RUN" cr & \case
                       -- runner MUST ensure the integrity of sub element status and handle all exceptions
                       Runnable -> do
                         -- when Concurrent, the element is placed back on the end of the q before running so
@@ -618,7 +618,7 @@ runNode lgr hi xt =
   sink = lgr . L.ApEvent
 
   runTests :: forall ti. IO (TestContext ti) -> ChildQ (P.Test IO ti) -> IO QElementRun
-  runTests eti tests = debugf' (const "") "RUN TESTS" $ runChildQ Sequential (runTest eti) (const $ pure Runnable) tests
+  runTests eti = runChildQ Sequential (runTest eti) (const $ pure Runnable)
 
   nxtRunner :: forall i. IO (Either FailPoint i) -> (Either FailPoint i -> IO ()) -> NodeIn i
   nxtRunner su = TestRunner . pure . MkTestContext su
@@ -812,7 +812,7 @@ runNode lgr hi xt =
               eho <- logRun' (Hook Once Before) (`before` i)
               atomically $ do
                 writeTMVar cache eho
-                writeTVar beforeStatus $
+                writeTVar beforeStatus
                   ( eho & \case
                       Left _ -> BeforeAbandoning
                       Right _ -> BeforeQRunning
@@ -826,7 +826,7 @@ runNode lgr hi xt =
             ( eho
                 & either
                   (`abandonSubs` subNodes)
-                  (\ho -> runSubNodes (OnceIn $ pure ho) subNodes & debugf' (const "") "RUN SUBNODES OF ONCE")
+                  (\ho -> runSubNodes (OnceIn $ pure ho) subNodes)
             )
             (atomically $ writeTVar beforeStatus BeforeDone)
         else 
@@ -891,8 +891,8 @@ runNode lgr hi xt =
       oi@(OnceIn{}) ThreadAfter{after, subNodes'} ->
         do
           -- may not run if subnodes are empty
-          run' <- debugf' (const "") "RUN ThreadAfter SUBNODES" $ runSubNodes oi subNodes'
-          when (run'.hasRun & debug' "HAS RUN - threadAfter") $
+          run' <- debugf'_ (const "") "RUN ThreadAfter SUBNODES" $ runSubNodes oi subNodes'
+          when (run'.hasRun & debug'_ "HAS RUN - threadAfter") $
             logRun_ (Hook Thread After) after
           pure run'
       --
@@ -944,14 +944,27 @@ runNode lgr hi xt =
           
       --
       -- context -> threadAfter
-      tr@TestRunner{} ThreadAfter{subNodes', after} ->
+      TestRunner{context} ThreadAfter{subNodes', after} ->
         do
-          -- may not run if subnodes are empty
-          run' <- runSubNodes tr subNodes'
-          when run'.hasRun $
-            logRun_ (Hook Thread After) after
-          pure run'
-      --
+          runSubNodes (TestRunner $ newContext context pure nxtAfter) subNodes'
+          where
+            nxtAfter i = do
+              qRunnable <- atomically $ canRunChildQ subNodes'
+              unless qRunnable $
+               i & either
+                (logAbandonned_ (Hook Thread After))
+                (\_i -> logRun_ (Hook Thread After) after)
+          -- let 
+          --   mkBefore = runThreadSetup tCache (Hook Thread Setup) setup
+          --   nxtTeardown _ignore = runThreadTeardown tCache teardown
+          -- runSubNodes (TestRunner $ newContext context mkBefore nxtTeardown) subNodes
+      --   do
+      --     -- may not run if subnodes are empty
+      --     run' <- runSubNodes tr subNodes'
+      --     when run'.hasRun $
+      --       logRun_ (Hook Thread After) after
+      --     pure run'
+      -- --
       -- context -> eachBefore
       TestRunner{context} EachBefore{before, subNodes} ->
         runSubNodes (TestRunner $ newContext context nxtSetup noOp) subNodes

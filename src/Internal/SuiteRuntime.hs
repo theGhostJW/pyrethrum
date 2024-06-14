@@ -642,8 +642,8 @@ runNode lgr hi xt =
           )
         $ notRun
 
-  noOp :: IO ()
-  noOp = pure ()
+  noOp :: a -> IO ()
+  noOp = const $ pure ()
 
   -- GOF strikes back
   singleton :: forall a. TMVar a -> IO a -> IO a
@@ -939,13 +939,13 @@ runNode lgr hi xt =
       -- --
       -- context -> eachBefore
       EachContext {testContext} EachBefore{before, subNodes} ->
-        runSubNodes (mkEachContext hookIn after nxtSetup noOp) subNodes
+        runSubNodes (composeEachContext testContext nxtSetup noOp) subNodes
        where
         nxtSetup = runSetup (Hook Each Before) before
       --
       -- context -> eachAround
-      (EachContext (MkTestContext hookIn after))EachAround{setup, teardown, subNodes} ->
-        runSubNodes (mkEachContext hookIn after nxtSetup nxtTeardown) subNodes
+      EachContext  {testContext} EachAround{setup, teardown, subNodes} ->
+        runSubNodes (composeEachContext testContext nxtSetup nxtTeardown) subNodes
        where
         nxtSetup = runSetup (Hook Each Setup) setup
         nxtTeardown =
@@ -1014,13 +1014,29 @@ data TestContext hi = MkTestContext
     after :: IO ()
   }
 
+mkTestContext :: forall hi ho. Either FailPoint hi -> IO () -> (Either FailPoint hi ->  IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) ->  IO (TestContext ho)
+mkTestContext parentIn afterParent setupNxt teardownNxt = 
+  -- must be in IO so teardown has access to ho
+  do 
+   eho <- setupNxt parentIn
+   pure $ MkTestContext eho $ teardownNxt eho >> afterParent
+
+composeEachContext :: forall hi ho. IO (TestContext hi) -> (Either FailPoint hi ->  IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> NodeIn ho
+composeEachContext parentContext setupNxt teardownNxt  = 
+   EachContext ioTc 
+   where 
+    ioTc :: IO (TestContext ho) 
+    ioTc = do
+      MkTestContext parentIn afterParent <- parentContext
+      mkTestContext parentIn afterParent setupNxt teardownNxt
+
+
 mkEachContext :: forall hi ho. IO (Either FailPoint hi) -> IO () -> (Either FailPoint hi ->  IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> NodeIn ho
 mkEachContext parentIn afterParent setupNxt teardownNxt = 
-  -- must be in IO so teardown has access to ho
   EachContext $ do 
    hi <- parentIn
-   eho <- setupNxt hi
-   pure $ MkTestContext eho $ teardownNxt eho >> afterParent
+   mkTestContext hi afterParent setupNxt teardownNxt
+
 {- 
 newContext :: IO (TestContext hi) -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> IO (TestContext ho)
 newContext ioCtx setupNxt teardownNxt = do

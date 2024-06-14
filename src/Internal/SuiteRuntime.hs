@@ -591,7 +591,7 @@ runNode lgr hi xt =
   -- execution trees with invalid structure (Thread or Once depending on Each, or Once depending on Thread)
   -- should never be generated.
   -- The only way these errors could be thrown is from unit testing code that generates an invalid testsuite
-  -- via lower level constructors where there are no typeclass contraints apply
+  -- via lower level constructors where no typeclass contraints apply
   invalidTree :: Text -> Text -> IO QElementRun
   invalidTree input cst = bug @Void . error $ input <> " >>> should not be passed to >>> " <> cst <> "\n" <> txt xt.path
 
@@ -601,12 +601,14 @@ runNode lgr hi xt =
   runTests :: forall ti. IO (Either FailPoint ti) -> IO () -> ChildQ (P.Test IO ti) -> IO QElementRun
   runTests su td = runChildQ Sequential (runTest su td) (const $ pure Runnable)
 
-  runTest :: forall ti. IO (Either FailPoint ti)  -> IO () -> P.Test IO ti -> IO QElementRun
-  runTest hi' after t =
+  runTest :: forall ti. IO (Either FailPoint ti) -> IO () -> P.Test IO ti -> IO QElementRun
+  runTest hi' after t = hi' >>= \i -> runTest' i after t 
+
+  runTest' :: forall ti. Either FailPoint ti -> IO () -> P.Test IO ti -> IO QElementRun
+  runTest' hi' after t =
     do
       let path = mkTestPath t
-      ti <- hi'
-      ti
+      hi'
         & either
           (logAbandonned lgr path TE.Test)
           (void . logRun lgr path TE.Test . t.action sink)
@@ -642,8 +644,11 @@ runNode lgr hi xt =
           )
         $ notRun
 
-  noOp :: a -> IO ()
-  noOp = const $ pure ()
+  noOp :: IO ()
+  noOp = pure ()
+
+  noOp' :: a -> IO ()
+  noOp' = const $ pure ()
 
   -- GOF strikes back
   singleton :: forall a. TMVar a -> IO a -> IO a
@@ -939,7 +944,7 @@ runNode lgr hi xt =
       -- --
       -- context -> eachBefore
       EachContext {testContext} EachBefore{before, subNodes} ->
-        runSubNodes (composeEachContext testContext nxtSetup noOp) subNodes
+        runSubNodes (composeEachContext testContext nxtSetup noOp') subNodes
        where
         nxtSetup = runSetup (Hook Each Before) before
       --
@@ -955,8 +960,8 @@ runNode lgr hi xt =
       --
       --
       -- context -> eachAfter
-      (EachContext(MkTestContext {hookIn, after = parentAfter})) EachAfter{subNodes', after} ->
-        runSubNodes (mkEachContext hookIn parentAfter pure nxtAfter) subNodes'
+      EachContext  {testContext} EachAfter{subNodes', after} ->
+        runSubNodes (composeEachContext testContext pure nxtAfter) subNodes'
        where
         nxtAfter =
           either
@@ -964,7 +969,7 @@ runNode lgr hi xt =
             (\_i -> logRun_ (Hook Each After) after)
       --
       -- context -> fixtures
-      (EachContext(MkTestContext hookIn after)) Fixture{tests} -> runTests hookIn after tests
+      EachContext {testContext} Fixture{tests} -> runTests testContext tests
       -- ### all invalid combos ### --
       ThreadContext{} OnceBefore{} -> invalidTree "ThreadContext" "OnceBefore"
       ThreadContext{} OnceAround{} -> invalidTree "ThreadContext" "OnceAround"

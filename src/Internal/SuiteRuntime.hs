@@ -81,7 +81,7 @@ executeNodes sink nodes tc =
             thrdTokens
             ( const do
                 logger <- newLogger
-                runChildQ Concurrent (runNode logger (OnceIn (pure ()))) canRunXTree nodes
+                runChildQ Concurrent (runNode logger $ OnceIn ()) canRunXTree nodes
             )
       )
       (rootLogger L.EndExecution)
@@ -793,13 +793,12 @@ runNode lgr hi xt =
         runTests (pure $ Left fp) noOp tests
       --
       -- onceIn -> onceBefore
-      OnceIn{ioHi} OnceBefore{before, beforeStatus, cache, subNodes} -> do
-        i <- ioHi
+      OnceIn{hki} OnceBefore{before, beforeStatus, cache, subNodes} -> do
         setUpLocked <- tryLockIO canLockBefore beforeStatus subNodes BeforeRunning
         eho <-
           if setUpLocked
             then do
-              eho <- logRun' (Hook Once Before) (`before` i)
+              eho <- logRun' (Hook Once Before) (`before` hki)
               atomically $ do
                 writeTMVar cache eho
                 writeTVar
@@ -818,15 +817,14 @@ runNode lgr hi xt =
               ( eho
                   & either
                     (`abandonSubs` subNodes)
-                    (\ho -> runSubNodes (OnceIn $ pure ho) subNodes)
+                    (\ho -> runSubNodes (OnceIn ho) subNodes)
               )
               (atomically $ writeTVar beforeStatus BeforeDone)
           else
             hasRun False
       --
       -- onceIn -> onceAround
-      OnceIn{ioHi} OnceAround{setup, teardown, status, cache, subNodes} -> do
-        hki <- ioHi
+      OnceIn{hki} OnceAround{setup, teardown, status, cache, subNodes} -> do
         setUpLocked <- tryLockIO canLockSetup status subNodes SetupRunning
         eho <-
           if setUpLocked
@@ -844,7 +842,7 @@ runNode lgr hi xt =
                     (flip runSubNodes subNodes . Abandon) fp
                 )
                 ( \ho -> do
-                    runSubNodes (OnceIn $ pure ho) subNodes
+                    runSubNodes (OnceIn ho) subNodes
                 )
           )
           ( do
@@ -864,20 +862,19 @@ runNode lgr hi xt =
         runOnceAfter subNodes' status' oi AfterRunning (logRun_ (Hook Once After) after)
       --
       -- onceIn -> threadBefore
-      OnceIn{ioHi} ThreadBefore{before, subNodes} -> do
-        oi <- ioHi
+      OnceIn{hki} ThreadBefore{before, subNodes} -> do
         tCache <- newEmptyTMVarIO
-        let nxtSetup = runThreadSetup tCache (Hook Thread Before) before $ Right oi
+        let nxtSetup = runThreadSetup tCache (Hook Thread Before) before $ Right hki
         runSubNodes (nxtRunnerDEPRICATE nxtSetup noOp) subNodes
       --
       -- onceIn -> threadAround
-      OnceIn{ioHi} ThreadAround{setup, teardown, subNodes} -> do
-        oi <- ioHi
-        tCache <- newEmptyTMVarIO
-        let
-          nxtSetup = runThreadSetup tCache (Hook Thread Setup) setup $ Right oi
-          nxtTeardown _ignored = runThreadTeardown tCache teardown
-        runSubNodes (mkThreadContext nxtSetup nxtTeardown) subNodes
+      OnceIn{hki} ThreadAround{setup, teardown, subNodes} -> uu -- UP TO HERE
+        -- do
+        -- tCache <- newEmptyTMVarIO
+        -- let
+        --   nxtSetup = runThreadSetup tCache (Hook Thread Setup) setup $ Right hki
+        --   nxtTeardown _ignored = runThreadTeardown tCache teardown
+        -- runSubNodes (mkThreadContext nxtSetup nxtTeardown) subNodes
       --
       -- onceIn -> threadAfter
       oi@(OnceIn{}) ThreadAfter{after, subNodes'} ->
@@ -889,34 +886,34 @@ runNode lgr hi xt =
           pure run'
       --
       -- onceIn -> eachBefore
-      (OnceIn ioHi) EachBefore{before, subNodes} ->
+      (OnceIn hki) EachBefore{before, subNodes} ->
         runSubNodes (nxtRunnerDEPRICATE nxtSetup noOp) subNodes
        where
-        nxtSetup = ioHi >>= \ho -> logRun' (Hook Each Before) (`before` ho)
+        nxtSetup = logRun' (Hook Each Before) (`before` hki)
       --
       -- onceIn -> eachAround
-      OnceIn{ioHi} EachAround{setup, teardown, subNodes} ->
+      OnceIn{hki} EachAround{setup, teardown, subNodes} ->
         runSubNodes (nxtRunnerDEPRICATE nxtSetup nxtTeardown) subNodes
        where
-        nxtSetup = ioHi >>= \ho -> logRun' (Hook Each Setup) (`setup` ho)
+        nxtSetup = logRun' (Hook Each Setup) (`setup` hki)
         nxtTeardown =
           either
             (logAbandonned_ (Hook Each Teardown))
             (\ho -> logRun_ (Hook Each Teardown) (`teardown` ho))
       --
       -- onceIn -> eachAfter
-      OnceIn{ioHi} EachAfter{after, subNodes'} ->
+      OnceIn{hki} EachAfter{after, subNodes'} ->
         runSubNodes (nxtRunnerDEPRICATE nxtSetup nxtTeardown) subNodes'
        where
-        nxtSetup = Right <$> ioHi
+        nxtSetup = pure @IO $ Right hki
         nxtTeardown =
           either
             (logAbandonned_ (Hook Each After))
             (\_ -> logRun_ (Hook Each After) after)
       --
       -- onceIn -> fixture
-      OnceIn{ioHi} Fixture{tests} ->
-        runTests (Right <$> ioHi) noOp tests
+      OnceIn{hki} Fixture{tests} ->
+        runTests (pure $ Right hki) noOp tests
       --
       -- onceIn -> threadbefore
       ThreadContext{} ThreadBefore{before, subNodes} -> uu
@@ -992,7 +989,7 @@ runNode lgr hi xt =
 
 data NodeIn hi where
   Abandon :: {fp :: FailPoint} -> NodeIn hi
-  OnceIn :: {ioHi :: IO hi} -> NodeIn hi
+  OnceIn :: {hki :: hi} -> NodeIn hi
   {-
     ThreadIn -> Each*
 

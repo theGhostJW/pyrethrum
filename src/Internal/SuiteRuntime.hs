@@ -375,6 +375,9 @@ logAbandonned lgr p e a =
 ioLeft :: forall a. L.FailPoint -> IO (Either L.FailPoint a)
 ioLeft = pure . Left
 
+ioRight :: forall a. a -> IO (Either L.FailPoint a)
+ioRight = pure . Right
+
 logReturnFailure :: Logger -> L.ExePath -> SuiteEvent -> SomeException -> IO (Either L.FailPoint b)
 logReturnFailure lgr p et e =
   lgr (L.mkFailure p et e) >> ioLeft (L.FailPoint p et)
@@ -671,6 +674,10 @@ runNode lgr hi xt =
         )
         pure
 
+  -- GOF strikes back
+  singleton' :: forall a. TMVar a -> IO a -> a -> IO a
+  singleton' tCache ioa = const $ singleton tCache ioa
+
   runThreadSetup :: forall i o. TMVar (Either FailPoint o) -> SuiteEvent -> (P.ApEventSink -> i -> IO o) -> Either FailPoint i -> IO (Either FailPoint o)
   runThreadSetup tCache evnt setup eti = do
     -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
@@ -696,8 +703,6 @@ runNode lgr hi xt =
 
   onceRun :: Bool -> IO QElementRun -> IO QElementRun
   onceRun hookRun childQRun = childQRun >>= \qr -> pure $ QElementRun $ hookRun || qr.hasRun
-
-  nxtRunnerDEPRICATE = uu
 
   run :: NodeIn hi' -> ExeTree hi' -> IO QElementRun
   run =
@@ -748,7 +753,7 @@ runNode lgr hi xt =
       -- abandon -> threadBefore
       Abandon{fp} ThreadBefore{subNodes} -> do
         tCache <- newEmptyTMVarIO
-        runSubNodes (nxtRunnerDEPRICATE (singleton tCache abandon) noOp) subNodes
+        runSubNodes (mkThreadContext (ioLeft fp) noOp (singleton' tCache abandon) noOp') subNodes
        where
         abandon = logAbandonned' (Hook Thread Before) fp
       --
@@ -756,7 +761,7 @@ runNode lgr hi xt =
       Abandon{fp} ThreadAround{subNodes, teardown} -> do
         tCache <- newEmptyTMVarIO
         let nxtTeardown _ignored = runThreadTeardown tCache teardown
-        runSubNodes (nxtRunnerDEPRICATE (singleton tCache abandon) nxtTeardown) subNodes
+        runSubNodes (mkThreadContext (ioLeft fp) noOp (singleton' tCache abandon) nxtTeardown) subNodes
        where
         abandon = logAbandonned' (Hook Thread Setup) fp
       --
@@ -766,7 +771,6 @@ runNode lgr hi xt =
         when r.hasRun $
           logAbandonned_ (Hook Thread After) fp
         pure r
-
       --
       -- abandon -> eachBefore
       Abandon{fp} EachBefore{subNodes} ->
@@ -864,17 +868,17 @@ runNode lgr hi xt =
       -- onceIn -> threadBefore
       OnceIn{hki} ThreadBefore{before, subNodes} -> do
         tCache <- newEmptyTMVarIO
-        let nxtSetup = runThreadSetup tCache (Hook Thread Before) before $ Right hki
-        runSubNodes (nxtRunnerDEPRICATE nxtSetup noOp) subNodes
+        let nxtSetup = runThreadSetup tCache (Hook Thread Before) before
+        runSubNodes (mkThreadContext (ioRight hki) noOp nxtSetup noOp') subNodes
       --
       -- onceIn -> threadAround
-      OnceIn{hki} ThreadAround{setup, teardown, subNodes} -> uu -- UP TO HERE
-        -- do
-        -- tCache <- newEmptyTMVarIO
-        -- let
-        --   nxtSetup = runThreadSetup tCache (Hook Thread Setup) setup $ Right hki
-        --   nxtTeardown _ignored = runThreadTeardown tCache teardown
-        -- runSubNodes (mkThreadContext nxtSetup nxtTeardown) subNodes
+      OnceIn{hki} ThreadAround{setup, teardown, subNodes} ->
+        do
+          tCache <- newEmptyTMVarIO
+          let
+            nxtSetup = runThreadSetup tCache (Hook Thread Setup) setup
+            nxtTeardown _ignored = runThreadTeardown tCache teardown
+          runSubNodes (mkThreadContext (ioRight hki) noOp nxtSetup nxtTeardown) subNodes
       --
       -- onceIn -> threadAfter
       oi@(OnceIn{}) ThreadAfter{after, subNodes'} ->
@@ -887,15 +891,15 @@ runNode lgr hi xt =
       --
       -- onceIn -> eachBefore
       (OnceIn hki) EachBefore{before, subNodes} ->
-        runSubNodes (nxtRunnerDEPRICATE nxtSetup noOp) subNodes
+        runSubNodes (mkEachContext (ioRight hki) noOp nxtSetup noOp') subNodes
        where
-        nxtSetup = logRun' (Hook Each Before) (`before` hki)
+        nxtSetup = const $ logRun' (Hook Each Before) (`before` hki)
       --
       -- onceIn -> eachAround
       OnceIn{hki} EachAround{setup, teardown, subNodes} ->
-        runSubNodes (nxtRunnerDEPRICATE nxtSetup nxtTeardown) subNodes
+        runSubNodes (mkEachContext (ioRight hki) noOp nxtSetup nxtTeardown) subNodes
        where
-        nxtSetup = logRun' (Hook Each Setup) (`setup` hki)
+        nxtSetup = const $ logRun' (Hook Each Setup) (`setup` hki)
         nxtTeardown =
           either
             (logAbandonned_ (Hook Each Teardown))
@@ -903,9 +907,8 @@ runNode lgr hi xt =
       --
       -- onceIn -> eachAfter
       OnceIn{hki} EachAfter{after, subNodes'} ->
-        runSubNodes (nxtRunnerDEPRICATE nxtSetup nxtTeardown) subNodes'
+        runSubNodes (mkEachContext (ioRight hki) noOp pure nxtTeardown) subNodes'
        where
-        nxtSetup = pure @IO $ Right hki
         nxtTeardown =
           either
             (logAbandonned_ (Hook Each After))
@@ -915,38 +918,68 @@ runNode lgr hi xt =
       OnceIn{hki} Fixture{tests} ->
         runTests (pure $ Right hki) noOp tests
       --
-      -- onceIn -> threadbefore
-      ThreadContext{} ThreadBefore{before, subNodes} -> uu
-      -- do
-      --   tCache <- newEmptyTMVarIO
-      --   let mkBefore = runThreadSetup tCache (Hook Thread Before) before
-      --   runSubNodes (EachContext $ newContext context mkBefore noOp) subNodes
+      -- threadContext -> threadbefore
+      ThreadContext{testContext} ThreadBefore{before, subNodes} ->
+        do
+          tCache <- newEmptyTMVarIO
+          let mkBefore = runThreadSetup tCache (Hook Thread Before) before
+          runSubNodes (composeThreadContext testContext mkBefore noOp') subNodes
       --
-      -- context -> threadAround
-      ThreadContext{} ThreadAround{setup, teardown, subNodes} -> uu
-      -- do
-      --   tCache <- newEmptyTMVarIO
-      --   let
-      --     mkBefore = runThreadSetup tCache (Hook Thread Setup) setup
-      --     nxtTeardown _ignore = runThreadTeardown tCache teardown
-      --   runSubNodes (EachContext $ newContext context mkBefore nxtTeardown) subNodes
+      -- threadContext -> threadAround
+      ThreadContext{testContext} ThreadAround{setup, teardown, subNodes} ->
+        do
+          tCache <- newEmptyTMVarIO
+          let
+            nxtBefore = runThreadSetup tCache (Hook Thread Setup) setup
+            nxtTeardown = const $ runThreadTeardown tCache teardown
+          runSubNodes (composeThreadContext testContext nxtBefore nxtTeardown) subNodes
 
       --
-      -- context -> threadAfter
-      ThreadContext{} ThreadAfter{subNodes', after} -> uu
-      -- do
-      --   runSubNodes (EachContext $ newContext context pure nxtAfter) subNodes'
-      --   where
-      --     nxtAfter i = do
-      --       qRunnable <- atomically $ canRunChildQ subNodes'
-      --       unless qRunnable $
-      --        i & either
-      --         (logAbandonned_ (Hook Thread After))
-      --         (\_i -> logRun_ (Hook Thread After) after)
-      ThreadContext{} (EachBefore _ _ _) -> uu
-      ThreadContext{} (EachAround _ _ _ _) -> uu
-      ThreadContext{} (EachAfter _ _ _) -> uu
-      ThreadContext{} (Fixture _ _ _) -> uu
+      -- threadContext -> threadAfter
+      ThreadContext{testContext} ThreadAfter{subNodes', after} ->
+        do
+          hasRunCache <- newTVarIO False
+          let
+            nxtBefore i = atomically (writeTVar hasRunCache True) >> pure i
+            nxtAfter i = do
+              qRunnable <- atomically $ canRunChildQ subNodes'
+              hasRun' <- atomically $ readTVar hasRunCache
+              unless (qRunnable && hasRun') $
+                i
+                  & either
+                    (logAbandonned_ (Hook Thread After))
+                    (\_i -> logRun_ (Hook Thread After) after)
+          runSubNodes (composeThreadContext testContext nxtBefore nxtAfter) subNodes'
+
+      --
+      -- threadContext -> eachBefore
+      -- TODO same as eachContext -> eachBefore refactor
+      ThreadContext{testContext} EachBefore{before, subNodes} ->
+        runSubNodes (composeEachContext testContext nxtSetup noOp') subNodes
+       where
+        nxtSetup = runSetup (Hook Each Before) before
+      -- TODO same as eachContext -> eachAround refactor
+      ThreadContext{testContext} EachAround{setup, teardown, subNodes} ->
+        runSubNodes (composeEachContext testContext nxtSetup nxtTeardown) subNodes
+       where
+        nxtSetup = runSetup (Hook Each Setup) setup
+        nxtTeardown =
+          either
+            (logAbandonned_ (Hook Each Teardown))
+            (\i -> logRun_ (Hook Each Teardown) (`teardown` i))
+      --
+      -- threadContext -> eachAfter
+      -- TODO same as eachContext -> eachAfter refactor
+      ThreadContext{testContext} EachAfter{subNodes', after} ->
+        runSubNodes (composeEachContext testContext pure nxtAfter) subNodes'
+       where
+        nxtAfter =
+          either
+            (logAbandonned_ (Hook Each After))
+            (\_i -> logRun_ (Hook Each After) after)
+      -- threadContext -> fixture
+      -- TODO same as eachContext -> fixture refactor
+      ThreadContext{testContext} Fixture{tests} -> runTestsWithEachContext testContext tests
       -- --
       -- context -> eachBefore
       EachContext{testContext} EachBefore{before, subNodes} ->
@@ -1042,7 +1075,7 @@ mkTestContextM parentIn afterParent setupNxt teardownNxt =
 composeTestContext :: forall hi ho. IO (TestContext hi) -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> IO (TestContext ho)
 composeTestContext parentContext setupNxt teardownNxt =
   do
-    MkTestContext {hookIn, after} <- parentContext
+    MkTestContext{hookIn, after} <- parentContext
     mkTestContext hookIn after setupNxt teardownNxt
 
 mkEachContext :: forall hi ho. IO (Either FailPoint hi) -> IO () -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> NodeIn ho

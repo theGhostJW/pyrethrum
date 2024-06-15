@@ -692,6 +692,7 @@ runNode lgr hi xt =
 
   runThreadTeardown :: forall i. TMVar (Either FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
   runThreadTeardown tCache teardown = do
+    -- unless ()
     mho <- atomically $ tryReadTMVar tCache
     mho -- if mho is Nothing it means hook was not run (empty subnodes)
       & maybe
@@ -877,8 +878,11 @@ runNode lgr hi xt =
           tCache <- newEmptyTMVarIO
           let
             nxtSetup = runThreadSetup tCache (Hook Thread Setup) setup
-            nxtTeardown _ignored = runThreadTeardown tCache teardown
-          runSubNodes (mkThreadContext (ioRight hki) noOp nxtSetup nxtTeardown) subNodes
+            -- nxtTeardown = const $ runThreadTeardown tCache teardown -- BUG was running after each test
+            -- runSubNodes (mkThreadContext (ioRight hki) noOp nxtSetup nxtTeardown) 
+          r <- runSubNodes (mkThreadContext (ioRight hki) noOp nxtSetup noOp') subNodes 
+          runThreadTeardown tCache teardown
+          pure r
       --
       -- onceIn -> threadAfter
       oi@(OnceIn{}) ThreadAfter{after, subNodes'} ->
@@ -931,12 +935,13 @@ runNode lgr hi xt =
           tCache <- newEmptyTMVarIO
           let
             nxtBefore = runThreadSetup tCache (Hook Thread Setup) setup
-            nxtTeardown = const $ runThreadTeardown tCache teardown
+            nxtTeardown = const $ runThreadTeardown tCache teardown -- THHIS WILL BE A BUG WILLL RUN ON EVERY TEST
           runSubNodes (composeThreadContext testContext nxtBefore nxtTeardown) subNodes
 
       --
       -- threadContext -> threadAfter
       ThreadContext{testContext} ThreadAfter{subNodes', after} ->
+        {-
         do
           hasRunCache <- newTVarIO False
           let
@@ -944,7 +949,16 @@ runNode lgr hi xt =
             nxtAfter i = do
               qRunnable <- atomically $ canRunChildQ subNodes'
               hasRun' <- atomically $ readTVar hasRunCache
-              unless (qRunnable && hasRun') $
+              unless (qRunnable && hasRun' -- this condition was wrong) $
+                i
+                  & either
+                    (logAbandonned_ (Hook Thread After))
+                    (\_i -> logRun_ (Hook Thread After) after)
+          runSubNodes (composeThreadContext testContext nxtBefore nxtAfter) subNodes'
+        -}
+        do
+          let
+            nxtAfter i = do
                 i
                   & either
                     (logAbandonned_ (Hook Thread After))

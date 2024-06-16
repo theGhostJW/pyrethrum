@@ -983,7 +983,7 @@ runNode lgr hi xt =
             (\_i -> logRun_ (Hook Each After) after)
       -- threadContext -> fixture
       -- TODO same as eachContext -> fixture refactor
-      ThreadContext{threadContext} Fixture{tests} -> runTestsWithEachContext (mkTestContext threadContext noOp pure noOp') tests
+      ThreadContext{threadContext} Fixture{tests} -> runChildQ Sequential (runTest threadContext noOp) (const $ pure Runnable) tests
       -- --
       -- context -> eachBefore
       EachContext{testContext} EachBefore{before, subNodes} ->

@@ -441,7 +441,7 @@ chkParentFailsPropagated
                         <> ptxt s
                         <> "  Parent Failure is:\n"
                         <> "    "
-                        <> (ptxt failLoc)
+                        <> ptxt failLoc
                     )
                     False
                     isFailChild

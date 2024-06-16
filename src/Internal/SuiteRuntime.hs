@@ -691,15 +691,21 @@ runNode lgr hi xt =
       (logRun' evnt . flip setup)
 
   runThreadTeardown :: forall i. TMVar (Either FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
-  runThreadTeardown tCache teardown = do
+  runThreadTeardown = runPostThread TE.Teardown
+
+  runThreadAfter :: TMVar (Either FailPoint ()) -> (P.ApEventSink -> IO ()) -> IO ()
+  runThreadAfter tCache after = runPostThread TE.After tCache (\s _i -> after s)
+
+  runPostThread :: forall i. HookPos -> TMVar (Either FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
+  runPostThread hp tCache teardown = do
     -- unless ()
     mho <- atomically $ tryReadTMVar tCache
     mho -- if mho is Nothing it means hook was not run (empty subnodes)
       & maybe
         (pure ())
         ( either
-            (logAbandonned_ (Hook Thread Teardown))
-            (logRun_ (Hook Thread Teardown) . flip teardown)
+            (logAbandonned_ (Hook Thread hp))
+            (logRun_ (Hook Thread hp) . flip teardown)
         )
 
   onceRun :: Bool -> IO QElementRun -> IO QElementRun
@@ -754,15 +760,16 @@ runNode lgr hi xt =
       -- abandon -> threadBefore
       Abandon{fp} ThreadBefore{subNodes} -> do
         tCache <- newEmptyTMVarIO
-        runSubNodes (mkThreadContext (ioLeft fp) noOp (singleton' tCache abandon) noOp') subNodes
+        runSubNodes (mkThreadContext (ioLeft fp) (singleton' tCache abandon)) subNodes
        where
         abandon = logAbandonned' (Hook Thread Before) fp
       --
       -- abandon -> threadAround
       Abandon{fp} ThreadAround{subNodes, teardown} -> do
         tCache <- newEmptyTMVarIO
-        let nxtTeardown _ignored = runThreadTeardown tCache teardown
-        runSubNodes (mkThreadContext (ioLeft fp) noOp (singleton' tCache abandon) nxtTeardown) subNodes
+        hasRun' <- runSubNodes (mkThreadContext (ioLeft fp) (singleton' tCache abandon)) subNodes
+        runThreadTeardown tCache teardown
+        pure hasRun'
        where
         abandon = logAbandonned' (Hook Thread Setup) fp
       --
@@ -870,7 +877,7 @@ runNode lgr hi xt =
       OnceIn{hki} ThreadBefore{before, subNodes} -> do
         tCache <- newEmptyTMVarIO
         let nxtSetup = runThreadSetup tCache (Hook Thread Before) before
-        runSubNodes (mkThreadContext (ioRight hki) noOp nxtSetup noOp') subNodes
+        runSubNodes (mkThreadContext (ioRight hki) nxtSetup) subNodes
       --
       -- onceIn -> threadAround
       OnceIn{hki} ThreadAround{setup, teardown, subNodes} ->
@@ -880,7 +887,7 @@ runNode lgr hi xt =
             nxtSetup = runThreadSetup tCache (Hook Thread Setup) setup
             -- nxtTeardown = const $ runThreadTeardown tCache teardown -- BUG was running after each test
             -- runSubNodes (mkThreadContext (ioRight hki) noOp nxtSetup nxtTeardown) 
-          r <- runSubNodes (mkThreadContext (ioRight hki) noOp nxtSetup noOp') subNodes 
+          r <- runSubNodes (mkThreadContext (ioRight hki) nxtSetup) subNodes 
           runThreadTeardown tCache teardown
           pure r
       --
@@ -923,58 +930,41 @@ runNode lgr hi xt =
         runTests (pure $ Right hki) noOp tests
       --
       -- threadContext -> threadbefore
-      ThreadContext{testContext} ThreadBefore{before, subNodes} ->
+      ThreadContext{threadContext} ThreadBefore{before, subNodes} ->
         do
           tCache <- newEmptyTMVarIO
-          let mkBefore = runThreadSetup tCache (Hook Thread Before) before
-          runSubNodes (composeThreadContext testContext mkBefore noOp') subNodes
+          let nxtBefore = runThreadSetup tCache (Hook Thread Before) before
+          runSubNodes (mkThreadContext threadContext nxtBefore) subNodes
       --
       -- threadContext -> threadAround
-      ThreadContext{testContext} ThreadAround{setup, teardown, subNodes} ->
+      ThreadContext{threadContext} ThreadAround{setup, teardown, subNodes} ->
         do
           tCache <- newEmptyTMVarIO
-          let
-            nxtBefore = runThreadSetup tCache (Hook Thread Setup) setup
-            nxtTeardown = const $ runThreadTeardown tCache teardown -- THHIS WILL BE A BUG WILLL RUN ON EVERY TEST
-          runSubNodes (composeThreadContext testContext nxtBefore nxtTeardown) subNodes
+          let nxtBefore = runThreadSetup tCache (Hook Thread Setup) setup
+          hasRun' <- runSubNodes (mkThreadContext threadContext nxtBefore) subNodes
+          runThreadTeardown tCache teardown
+          pure hasRun'
 
       --
       -- threadContext -> threadAfter
-      ThreadContext{testContext} ThreadAfter{subNodes', after} ->
-        {-
+      ThreadContext{threadContext} ThreadAfter{subNodes', after} ->
         do
-          hasRunCache <- newTVarIO False
-          let
-            nxtBefore i = atomically (writeTVar hasRunCache True) >> pure i
-            nxtAfter i = do
-              qRunnable <- atomically $ canRunChildQ subNodes'
-              hasRun' <- atomically $ readTVar hasRunCache
-              unless (qRunnable && hasRun' -- this condition was wrong) $
-                i
-                  & either
-                    (logAbandonned_ (Hook Thread After))
-                    (\_i -> logRun_ (Hook Thread After) after)
-          runSubNodes (composeThreadContext testContext nxtBefore nxtAfter) subNodes'
-        -}
-        do
-          let
-            nxtAfter i = do
-                i
-                  & either
-                    (logAbandonned_ (Hook Thread After))
-                    (\_i -> logRun_ (Hook Thread After) after)
-          runSubNodes (composeThreadContext testContext nxtBefore nxtAfter) subNodes'
+          tCache <- newEmptyTMVarIO
+          let nxtBefore hi' = atomically (tryPutTMVar tCache $ Right ()) >> pure hi'
+          hasRun' <- runSubNodes (mkThreadContext threadContext nxtBefore) subNodes'
+          runThreadAfter tCache after
+          pure hasRun'
 
       --
       -- threadContext -> eachBefore
       -- TODO same as eachContext -> eachBefore refactor
-      ThreadContext{testContext} EachBefore{before, subNodes} ->
-        runSubNodes (composeEachContext testContext nxtSetup noOp') subNodes
+      ThreadContext{threadContext} EachBefore{before, subNodes} ->
+        runSubNodes (mkEachContext threadContext noOp nxtSetup noOp') subNodes
        where
         nxtSetup = runSetup (Hook Each Before) before
       -- TODO same as eachContext -> eachAround refactor
-      ThreadContext{testContext} EachAround{setup, teardown, subNodes} ->
-        runSubNodes (composeEachContext testContext nxtSetup nxtTeardown) subNodes
+      ThreadContext{threadContext} EachAround{setup, teardown, subNodes} ->
+        runSubNodes (mkEachContext threadContext noOp nxtSetup nxtTeardown) subNodes
        where
         nxtSetup = runSetup (Hook Each Setup) setup
         nxtTeardown =
@@ -984,8 +974,8 @@ runNode lgr hi xt =
       --
       -- threadContext -> eachAfter
       -- TODO same as eachContext -> eachAfter refactor
-      ThreadContext{testContext} EachAfter{subNodes', after} ->
-        runSubNodes (composeEachContext testContext pure nxtAfter) subNodes'
+      ThreadContext{threadContext} EachAfter{subNodes', after} ->
+        runSubNodes (mkEachContext threadContext noOp pure nxtAfter) subNodes'
        where
         nxtAfter =
           either
@@ -993,7 +983,7 @@ runNode lgr hi xt =
             (\_i -> logRun_ (Hook Each After) after)
       -- threadContext -> fixture
       -- TODO same as eachContext -> fixture refactor
-      ThreadContext{testContext} Fixture{tests} -> runTestsWithEachContext testContext tests
+      ThreadContext{threadContext} Fixture{tests} -> runTestsWithEachContext (mkTestContext threadContext noOp pure noOp') tests
       -- --
       -- context -> eachBefore
       EachContext{testContext} EachBefore{before, subNodes} ->
@@ -1061,7 +1051,7 @@ data NodeIn hi where
     } -> NodeIn hi
     -- add registerChildRun to setup when ThreadIn -> Eachin
   -}
-  ThreadContext :: {testContext :: IO (TestContext hi)} -> NodeIn hi
+  ThreadContext :: {threadContext :: IO (Either FailPoint hi)} -> NodeIn hi
   EachContext ::
     { testContext :: IO (TestContext hi)
     } ->
@@ -1100,13 +1090,9 @@ composeEachContext :: forall hi ho. IO (TestContext hi) -> (Either FailPoint hi 
 composeEachContext parentContext setupNxt teardownNxt =
   EachContext $ composeTestContext parentContext setupNxt teardownNxt
 
-mkThreadContext :: forall hi ho. IO (Either FailPoint hi) -> IO () -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> NodeIn ho
-mkThreadContext parentIn afterParent setupNxt teardownNxt =
-  ThreadContext $ mkTestContextM parentIn afterParent setupNxt teardownNxt
-
-composeThreadContext :: forall hi ho. IO (TestContext hi) -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> NodeIn ho
-composeThreadContext parentContext setupNxt teardownNxt =
-  ThreadContext $ composeTestContext parentContext setupNxt teardownNxt
+mkThreadContext :: forall hi ho. IO (Either FailPoint hi) -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> NodeIn ho
+mkThreadContext parentIn setupNxt =
+  ThreadContext $ parentIn >>= setupNxt
 
 {-
 newContext :: IO (TestContext hi) -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> IO (TestContext ho)

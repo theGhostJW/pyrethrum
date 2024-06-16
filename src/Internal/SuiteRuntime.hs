@@ -34,9 +34,6 @@ import Prelude qualified as P
 todo :: define defect properties with sum type type and typeclass which returns defect info
 
 -}
--- TODO; move to pyrelude
-ptxt :: (Show a) => a -> Text
-ptxt = toS . ppShow
 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)

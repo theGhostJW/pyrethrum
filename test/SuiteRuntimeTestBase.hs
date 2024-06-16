@@ -148,6 +148,7 @@ data FailInfo = FailInfo
   , threadId :: ThreadId
   , suiteEvent :: SuiteEvent
   , loc :: ExePath
+  , failLog :: LogItem
   , failStartTail :: [LogItem]
   }
   deriving (Show)
@@ -360,11 +361,20 @@ isChildless = \case
 data ChkState = ExpectParentFail | DoneChecking
   deriving (Show, Eq)
 
+HERE
+isFailChildEventOf :: LogItem -> LogItem -> Bool
+isFailChildEventOf c p = uu 
+  where 
+    sameThread = p.threadId == c.threadId
+
+  -- isParentPath (topPath p) c.loc
+
 chkParentFailsPropagated :: FailInfo -> IO ()
 chkParentFailsPropagated
   f@FailInfo
     { failStartTail
     , loc = failLoc
+    , failLog
     , suiteEvent = failSuiteEvent
     } =
     unless (isChildless f.suiteEvent) $ do
@@ -414,14 +424,17 @@ chkParentFailsPropagated
             & \case
               p@ParentFailure{} ->
                 do
+                  -- TODO fix chk' so it prettyprints properly
+                  -- that is why chkEq' was used here
                   chkEq'
-                    ( "Parent failure path is no a child path of failure path:\n"
-                        <> "  Parent Failure is:\n"
-                        <> "    "
-                        <> toS (ppShow failLoc)
-                        <> "  Child Failure is:\n"
-                        <> "    "
-                        <> toS (ppShow p)
+                    ( "Event logged ParentFailure does not have failure path that is a sub-path of the actual failed event:\n"
+                        <> "Parent Failure is:\n"
+                        <> "FaileEvent: \n"
+                        <> ptxt failLog
+                        <> "\n"
+                        <> "\n"
+                        <> "Child Failure is:\n"
+                        <> ptxt p
                     )
                     True
                     isFailChild
@@ -492,6 +505,7 @@ failInfo li =
                         { idx
                         , threadId
                         , suiteEvent = s
+                        , failLog = f
                         , -- fail loc is loc of active event denoted by previous start
                           -- checked in chkFailureLocEqualsLastStartLoc
                           loc

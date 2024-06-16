@@ -376,14 +376,11 @@ mayFail =
 
 
 -- $ > unit_fail
-unit_fail :: IO ()
-unit_fail =
-    do
-        putStrLn "unit_fail"
-        replicateM_ 1 mayFail'
+unit_missing_hooks :: IO ()
+unit_missing_hooks = replicateM_ 1 missingHookFail
 
-mayFail' :: IO ()
-mayFail' =
+missingHookFail :: IO ()
+missingHookFail =
         runTest
         defaultSeed
         (ThreadCount 5)
@@ -402,3 +399,38 @@ mayFail' =
             ]
         }
     ] 
+
+-- $> unit_wrong_failure_path
+unit_wrong_failure_path :: IO ()
+unit_wrong_failure_path = replicateM_ 1 wrongFailurePath
+
+wrongFailurePath :: IO ()
+wrongFailurePath =
+        runTest'
+        Log
+        defaultSeed
+        (ThreadCount 5)
+        [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] }
+        , ThreadAfter
+        { threadSpec = T.All Spec { delay = 0 , result = Pass }
+        , subNodes =
+            [ ThreadAround
+                { setupThreadSpec =
+                    T.PassProb
+                      { genStrategy = Preload
+                      , passPcnt = 95
+                      , minDelay = 0
+                      , maxDelay = 2
+                      }
+                , teardownThreadSpec = T.All Spec { delay = 0 , result = Pass }
+                , subNodes =
+                    [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+                }
+            ]
+        }
+    , OnceBefore
+        { spec = Spec { delay = 0 , result = Pass }
+        , subNodes =
+            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+        }
+    ]

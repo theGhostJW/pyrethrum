@@ -14,7 +14,7 @@ import Prelude hiding (All, bug, id)
 
 -- $ > unit_simple_pass
 unit_simple_pass :: IO ()
-unit_simple_pass = print "start" >> runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
+unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
 -- $ > unit_simple_fail
 unit_simple_fail :: IO ()
@@ -83,6 +83,7 @@ passProbSuite specGen =
     passProb50 = passProb 50
     passProb75 = passProb 75
     passProb100 = passProb 100
+
 
 -- $ > unit_nested_threaded_chk_thread_count
 unit_nested_threaded_chk_thread_count :: IO ()
@@ -351,8 +352,7 @@ unit_fail_wrong_counts =
 
 mayFail :: IO ()
 mayFail =
-    runTest'
-        Log
+    runTest
         defaultSeed
         (ThreadCount 5)
         [ Fixture{tests = [Spec{delay = 0, result = Pass}]}
@@ -375,7 +375,7 @@ mayFail =
         ]
 
 
--- $> unit_fail
+-- $ > unit_fail
 unit_fail :: IO ()
 unit_fail =
     do
@@ -384,8 +384,7 @@ unit_fail =
 
 mayFail' :: IO ()
 mayFail' =
-        runTest'
-        Log
+        runTest
         defaultSeed
         (ThreadCount 5)
         [ ThreadAround

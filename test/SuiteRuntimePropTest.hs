@@ -97,7 +97,7 @@ defaultTestOptions =
   TestOptions
     { expectFailure = DontExpectFailure
     , overrideVerbose = Just Verbose
-    , overrideMaxShrinks = Nothing
+    , overrideMaxShrinks = Just 50
     , overrideNumTests = Just 10
     , overrideMaxRatio = Nothing
     }
@@ -219,11 +219,11 @@ tryRunTest wantLog c suite =
 -- todo: add timestamp to debug
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
 {-# NOINLINE prop_test_suite #-}
-prop_test_suite :: TestTree
-prop_test_suite = 
+prop_test_suite :: SpecGen -> TestTree
+prop_test_suite genStrategy = 
   testPropertyWith defaultTestOptions "Template" $ do
-    t <- genWith (Just . ppShow) $ genTemplate genParams
-    let result = unsafePerformIO $ tryRunTest LogTemplate (ThreadCount 5)  t
+    t <- genWith (Just . ppShow) $ genTemplate genParams {genStrategy = genStrategy}
+    let result = unsafePerformIO $ tryRunTest NoLog (ThreadCount 5)  t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
 putTxt :: (ConvertString a String) => a -> IO ()
@@ -237,16 +237,21 @@ printNow lbl = do
   t <- now
   printTime lbl  t
 
--- $> test_suite
-test_suite :: IO ()
-test_suite = do
-  print "RUNNING TEST SUITE"
+-- $> test_suite_preload
+test_suite_preload :: IO ()
+test_suite_preload = do
+  defaultMain $
+   testGroup "PreLoad" [prop_test_suite Preload]
+  print "TEST SUITE DONE"
+
+-- $ > test_suite_runtime
+test_suite_runtime :: IO ()
+test_suite_runtime = do
   defaultMain $
     testGroup
       "generator stubs"
-      [ --   demoResult
-        -- , demoDelay
-        -- , demoSpec
-        prop_test_suite
+      [
+        prop_test_suite Preload,
+        prop_test_suite Runtime
       ]
   print "TEST SUITE DONE"

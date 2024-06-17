@@ -144,11 +144,13 @@ chkProperties baseSeed threadLimit ts evts = do
     ]
 
 data FailInfo = FailInfo
-  { idx :: Int
-  , threadId :: ThreadId
-  , suiteEvent :: SuiteEvent
-  , loc :: ExePath
-  , failLog :: LogItem
+  { 
+  --   idx :: Int
+  -- , threadId :: ThreadId
+  -- , suiteEvent :: SuiteEvent
+  -- , loc :: ExePath
+  -- , 
+  failLog :: LogItem
   , failStartTail :: [LogItem]
   }
   deriving (Show)
@@ -353,26 +355,29 @@ chkFailurePropagation lg =
 -- parent events expect all chidren to fail
 -- pall the way to last sibling including last sibling when setup / teardown
 
-isChildless :: SuiteEvent -> Bool
-isChildless = \case
+isChildless :: LogItem -> Bool
+isChildless = suitEvntToBool (\case
   Hook _hz pos -> pos == After
-  TE.Test{} -> True
+  TE.Test{} -> True)
 
 data ChkState = ExpectParentFail | DoneChecking
   deriving (Show, Eq)
 
+suitEvntToBool :: (SuiteEvent -> Bool) -> LogItem -> Bool
+suitEvntToBool prd = maybe False prd . getSuiteEvent
+
 isFailChildEventOf :: LogItem -> LogItem -> Bool
 isFailChildEventOf c p = 
-  (cIsSubpathOfp || samePath && pIsSetup && cIsTeardown) && (sameThread || pIsOnceHook)
+  (cIsSubpathOfp || samePath && pIsSetupFailure && cIsTeardown) && (sameThread || pIsOnceHook) 
  where
   sameThread = p.threadId == c.threadId
-  hookToBool prd = maybe False prd . getSuiteEvent
-  hasHookPos l hp = hookToBool (\case Hook _ hp' -> hp == hp'; _ -> False) l
-  cIsTeardown = hasHookPos c Teardown
-  pIsSetup = hasHookPos p Setup
-  samePath = p.loc == c.loc
+  hasHookPos l hp = suitEvntToBool (\case Hook _ hp' -> hp == hp'; _ -> False) l
+  cIsTeardown = debug' "C IS TEARDOWN" $ hasHookPos c Teardown
+  pIsSetupFailure = uu -- HERE
+    -- WRONG :: debug' "P IS SETUP" $ hasHookPos p Setup
+  samePath = debug' "SAME PATH" $ p.loc == c.loc
   cIsSubpathOfp = isParentPath p.loc c.loc
-  pIsOnceHook = hookToBool (\case Hook hz _ -> hz == Once; _ -> False) p
+  pIsOnceHook = suitEvntToBool (\case Hook hz _ -> hz == Once; _ -> False) p
 
 chkParentFailsPropagated :: FailInfo -> IO ()
 chkParentFailsPropagated
@@ -380,11 +385,11 @@ chkParentFailsPropagated
     { failStartTail
     , failLog
     } =
-    unless (isChildless f.suiteEvent) $ do
+    unless (isChildless f.failLog) $ do
       void $ foldlM chkEvent ExpectParentFail failStartTail
    where
     isFailChildLog :: LogItem -> Bool
-    isFailChildLog = flip isFailChildEventOf failLog
+    isFailChildLog = debug' "CHILD RESULT" . flip isFailChildEventOf (debug' "FAIL LOG" failLog) . debug' "CHILD LOG"
       
     chkEvent :: ChkState -> LogItem -> IO ChkState
     chkEvent acc lgItm =
@@ -441,14 +446,14 @@ chkDiscreteFailsAreNotPropagated :: FailInfo -> IO ()
 chkDiscreteFailsAreNotPropagated
   f@FailInfo
     { failStartTail
-    } = when (isChildless f.suiteEvent) $ do
+    } = when (isChildless f.failLog) $ do
     whenJust
       (LE.head failStartTail)
       \case
         ParentFailure{} ->
           -- if a discrete item such as an after hook or test as failed the next item should not be
           -- a parent failure because discrete items can't be parents
-          chkFail $ "Discrete failure propagated to next event:\n" <> toS (ppShow f.suiteEvent)
+          chkFail $ "Discrete failure propagated to next event:\n" <> toS (ppShow f.failLog)
         _ -> pure ()
 
 -- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
@@ -469,25 +474,11 @@ failInfo li =
         l & \case
           Start{suiteEvent = se} ->
             (Just se, result)
-          f@Failure{idx, loc, threadId} ->
+          f@Failure{} ->
             lastStartEvnt
               & maybe
                 (error $ "Failure encountered before start:\n" <> toS (ppShow f))
-                ( \s ->
-                    ( Nothing
-                    , FailInfo
-                        { idx
-                        , threadId
-                        , suiteEvent = s
-                        , failLog = f
-                        , -- fail loc is loc of active event denoted by previous start
-                          -- checked in chkFailureLocEqualsLastStartLoc
-                          loc
-                        , failStartTail = ls
-                        }
-                        : result
-                    )
-                )
+                (const $ (Nothing, FailInfo f ls : result))
           ParentFailure{} -> passThrough
           StartExecution{} -> passThrough
           EndExecution{} -> passThrough

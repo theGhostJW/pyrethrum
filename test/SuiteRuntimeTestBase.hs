@@ -16,8 +16,8 @@ import Internal.ThreadEvent as TE (
   SuiteEvent (..),
   ThreadEvent (..),
   ThreadId,
-  getSuiteEvent,
   getHookInfo,
+  getSuiteEvent,
   hasSuiteEvent,
   isEnd,
   isHook,
@@ -25,9 +25,9 @@ import Internal.ThreadEvent as TE (
   isOnceHookParentFailure,
   isStart,
   isTestEventOrTestParentFailure,
-  startOrParentFailure,
   onceHook,
   onceSuiteEvent,
+  startOrParentFailure,
   startSuiteEventLoc,
   suiteEventOrParentFailureSuiteEvent,
   threadHook,
@@ -36,7 +36,7 @@ import Internal.ThreadEvent as TE (
 import List.Extra as LE hiding (list)
 import List.Extra qualified as L
 import Prepare qualified as P
-import PyrethrumExtras (debug, debug', debug'_,toS, txt, uu, (?))
+import PyrethrumExtras (debug, debug', debug'_, toS, txt, uu, (?))
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 import PyrethrumExtras.Test (chk', chkFail)
@@ -130,8 +130,8 @@ chkProperties baseSeed threadLimit ts evts = do
     evts
     [ chkThreadHooksStartedOnceInThread
     , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-    , chkNoEmptyPostHooks 
-    , chkNoEmptyPreHooks 
+    , chkNoEmptyPostHooks
+    , chkNoEmptyPreHooks
     ]
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
   threadLogChks
@@ -361,57 +361,31 @@ isChildless = \case
 data ChkState = ExpectParentFail | DoneChecking
   deriving (Show, Eq)
 
-HERE
 isFailChildEventOf :: LogItem -> LogItem -> Bool
-isFailChildEventOf c p = uu 
-  where 
-    sameThread = p.threadId == c.threadId
-
-  -- isParentPath (topPath p) c.loc
+isFailChildEventOf c p = 
+  (cIsSubpathOfp || samePath && pIsSetup && cIsTeardown) && (sameThread || pIsOnceHook)
+ where
+  sameThread = p.threadId == c.threadId
+  hookToBool prd = maybe False prd . getSuiteEvent
+  hasHookPos l hp = hookToBool (\case Hook _ hp' -> hp == hp'; _ -> False) l
+  cIsTeardown = hasHookPos c Teardown
+  pIsSetup = hasHookPos p Setup
+  samePath = p.loc == c.loc
+  cIsSubpathOfp = isParentPath p.loc c.loc
+  pIsOnceHook = hookToBool (\case Hook hz _ -> hz == Once; _ -> False) p
 
 chkParentFailsPropagated :: FailInfo -> IO ()
 chkParentFailsPropagated
   f@FailInfo
     { failStartTail
-    , loc = failLoc
     , failLog
-    , suiteEvent = failSuiteEvent
     } =
     unless (isChildless f.suiteEvent) $ do
       void $ foldlM chkEvent ExpectParentFail failStartTail
    where
     isFailChildLog :: LogItem -> Bool
-    isFailChildLog li =
-      let
-        mSuitEvnt = getSuiteEvent li
-        thisEventisTeardown =
-          mSuitEvnt & maybe
-            False
-            \case
-              Hook _ Teardown -> True
-              _ -> False
-        failEventIsSetup =
-          failSuiteEvent & \case
-            Hook _ Setup -> True
-            _ -> False
-        {-
-          if the fail event is a setup then it is morally a fail parent of a sibling teardown
-          -- ie. if setup fails sibling teardown will not run
-          baseHook . subHook . subsubHook setup
-          ....
-          ....
-          baseHook . subHook . subsubHook teardown
-
-          otherwise fails will propagate
-        -}
-        targetParent =
-          failEventIsSetup
-            && thisEventisTeardown
-              ? fromMaybe (ExePath []) (parentPath False failLoc) -- can be sibling
-            $ failLoc -- must be parent
-       in
-        isParentPath targetParent li.loc
-
+    isFailChildLog = flip isFailChildEventOf failLog
+      
     chkEvent :: ChkState -> LogItem -> IO ChkState
     chkEvent acc lgItm =
       let
@@ -427,7 +401,7 @@ chkParentFailsPropagated
                   -- TODO fix chk' so it prettyprints properly
                   -- that is why chkEq' was used here
                   chkEq'
-                    ( "Event logged ParentFailure does not have failure path that is a sub-path of the actual failed event:\n"
+                    ( "ParentFailure event does not have failure path that is a sub-path of the actual failed event:\n"
                         <> "Parent Failure is:\n"
                         <> "FaileEvent: \n"
                         <> ptxt failLog
@@ -454,7 +428,7 @@ chkParentFailsPropagated
                         <> ptxt s
                         <> "  Parent Failure is:\n"
                         <> "    "
-                        <> ptxt failLoc
+                        <> ptxt failLog
                     )
                     False
                     isFailChild
@@ -610,23 +584,22 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
 logTails :: Bool -> [LogItem] -> [[LogItem]]
 logTails wantReverse = debug'_ "TAILS" . tails . bool PR.id reverse wantReverse
 
-
 startHook :: [HookPos] -> LogItem -> Bool
-startHook poss l = startOrParentFailure l && (getHookInfo l & maybe False (\(hz, hkPos) ->  hz /= Once && (hkPos `LE.elem` poss)))
+startHook poss l = startOrParentFailure l && (getHookInfo l & maybe False (\(hz, hkPos) -> hz /= Once && (hkPos `LE.elem` poss)))
 
 chkNoEmptyPostHooks :: [LogItem] -> IO ()
 chkNoEmptyPostHooks =
   chkNoEmptyHooks
-   "Post Hook Empty"
-   (startHook [Teardown, After])
-   True
+    "Post Hook Empty"
+    (startHook [Teardown, After])
+    True
 
 chkNoEmptyPreHooks :: [LogItem] -> IO ()
 chkNoEmptyPreHooks =
   chkNoEmptyHooks
-   "Post Hook Empty"
-   (startHook [Setup, Before])
-   False
+    "Post Hook Empty"
+    (startHook [Setup, Before])
+    False
 
 chkNoEmptyHooks :: Text -> (LogItem -> Bool) -> Bool -> [LogItem] -> IO ()
 chkNoEmptyHooks message hookPredicate wantReverse =
@@ -644,12 +617,11 @@ chkNoEmptyHooks message hookPredicate wantReverse =
 
   findChildTest :: LogItem -> [LogItem] -> Bool
   findChildTest hk =
-    any (fromMaybe False . testMatchesParent) 
+    any (fromMaybe False . testMatchesParent)
    where
     testMatchesParent :: LogItem -> Maybe Bool
     testMatchesParent =
       parentMatchesTest (const True) hk
-
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =

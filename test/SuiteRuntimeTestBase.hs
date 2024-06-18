@@ -356,28 +356,36 @@ chkFailurePropagation lg =
 -- pall the way to last sibling including last sibling when setup / teardown
 
 isChildless :: LogItem -> Bool
-isChildless = suitEvntToBool (\case
+isChildless = logItemToBool (\case
   Hook _hz pos -> pos == After
   TE.Test{} -> True)
 
 data ChkState = ExpectParentFail | DoneChecking
   deriving (Show, Eq)
 
-suitEvntToBool :: (SuiteEvent -> Bool) -> LogItem -> Bool
-suitEvntToBool prd = maybe False prd . getSuiteEvent
+suitEvntToBool :: (SuiteEvent -> Bool) -> Maybe SuiteEvent -> Bool
+suitEvntToBool = maybe False 
+
+logItemToBool :: (SuiteEvent -> Bool) -> LogItem -> Bool
+logItemToBool prd = suitEvntToBool prd . getSuiteEvent
 
 isFailChildEventOf :: LogItem -> LogItem -> Bool
 isFailChildEventOf c p = 
   (cIsSubpathOfp || samePath && pIsSetupFailure && cIsTeardown) && (sameThread || pIsOnceHook) 
  where
   sameThread = p.threadId == c.threadId
-  hasHookPos l hp = suitEvntToBool (\case Hook _ hp' -> hp == hp'; _ -> False) l
-  cIsTeardown = debug' "C IS TEARDOWN" $ hasHookPos c Teardown
-  pIsSetupFailure = uu -- HERE
-    -- WRONG :: debug' "P IS SETUP" $ hasHookPos p Setup
+  hasHookPos hp = \case 
+     Hook _ hp' -> hp == hp'
+     _ -> False
+  cIsTeardown = logItemToBool (hasHookPos Teardown) c
+  pFailEvent = case p of 
+    Failure{suiteEvent} -> Just suiteEvent
+    _ -> Nothing
+  pIsSetupFailure = suitEvntToBool (hasHookPos Setup) pFailEvent
+
   samePath = debug' "SAME PATH" $ p.loc == c.loc
   cIsSubpathOfp = isParentPath p.loc c.loc
-  pIsOnceHook = suitEvntToBool (\case Hook hz _ -> hz == Once; _ -> False) p
+  pIsOnceHook = suitEvntToBool (\case Hook hz _ -> hz == Once; _ -> False)  pFailEvent
 
 chkParentFailsPropagated :: FailInfo -> IO ()
 chkParentFailsPropagated

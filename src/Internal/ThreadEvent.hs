@@ -119,8 +119,11 @@ getSuiteEvent = \case
     Start{suiteEvent} -> Just suiteEvent
     End{suiteEvent} -> Just suiteEvent
     ParentFailure{suiteEvent} -> Just suiteEvent
-    _ -> Nothing
-
+    Failure{suiteEvent} -> Just suiteEvent
+    StartExecution{} -> Nothing
+    ApEvent{} -> Nothing
+    EndExecution{} -> Nothing
+    
 getHookInfo :: ThreadEvent a b -> Maybe (Hz, HookPos)
 getHookInfo t = getSuiteEvent t >>= \case 
                                   Hook hz pos -> Just (hz, pos)

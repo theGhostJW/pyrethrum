@@ -383,7 +383,7 @@ isFailChildEventOf c p =
     _ -> Nothing
   pIsSetupFailure = suitEvntToBool (hasHookPos Setup) pFailEvent
 
-  samePath = debug' "SAME PATH" $ p.loc == c.loc
+  samePath = p.loc == c.loc
   cIsSubpathOfp = isParentPath p.loc c.loc
   pIsOnceHook = suitEvntToBool (\case Hook hz _ -> hz == Once; _ -> False)  pFailEvent
 
@@ -397,7 +397,7 @@ chkParentFailsPropagated
       void $ foldlM chkEvent ExpectParentFail failStartTail
    where
     isFailChildLog :: LogItem -> Bool
-    isFailChildLog = debug' "CHILD RESULT" . flip isFailChildEventOf (debug' "FAIL LOG" failLog) . debug' "CHILD LOG"
+    isFailChildLog = flip isFailChildEventOf failLog
       
     chkEvent :: ChkState -> LogItem -> IO ChkState
     chkEvent acc lgItm =

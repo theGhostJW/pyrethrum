@@ -12,15 +12,15 @@ import PyrethrumExtras (uu)
 import SuiteRuntimeTestBase
 import Prelude hiding (All, bug, id)
 
--- $> unit_simple_pass
+-- $ > unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
--- $> unit_simple_fail
+-- $ > unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fixture [test Pass, test Fail]]]
 
--- $> unit_nested_pass_fail
+-- $ > unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
     runTest
@@ -84,8 +84,7 @@ passProbSuite specGen =
     passProb75 = passProb 75
     passProb100 = passProb 100
 
-
--- $> unit_nested_threaded_chk_thread_count
+-- $ > unit_nested_threaded_chk_thread_count
 unit_nested_threaded_chk_thread_count :: IO ()
 unit_nested_threaded_chk_thread_count =
     do
@@ -156,7 +155,7 @@ TODO revist this test after any concrete interpretor is implemented
     force strictness in hooks
 -}
 
--- $> unit_empty_thread_hooks
+-- $ > unit_empty_thread_hooks
 unit_empty_thread_hooks :: IO ()
 unit_empty_thread_hooks =
     do
@@ -187,11 +186,11 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
   -}
 
--- $> unit_pass_prob_pregen
+-- $ > unit_pass_prob_pregen
 unit_pass_prob_pregen :: IO ()
 unit_pass_prob_pregen = passProbSuite Preload
 
--- $> unit_pass_prob_no_pregen
+-- $ > unit_pass_prob_no_pregen
 unit_pass_prob_no_pregen :: IO ()
 unit_pass_prob_no_pregen = passProbSuite Runtime
 
@@ -208,7 +207,7 @@ unit_pass_prob_no_pregen = passProbSuite Runtime
   Url:           https://github.com/theGhostJW/pyrethrum/commit/ef50961
 -}
 
--- $> unit_prop_test_fail_template_wrong_result
+-- $ > unit_prop_test_fail_template_wrong_result
 unit_prop_test_fail_template_wrong_result :: IO ()
 unit_prop_test_fail_template_wrong_result = replicateM_ 10 propFailTemplateGenWrongEachHookResult
 
@@ -235,7 +234,7 @@ propFailTemplateGenWrongEachHookResult =
 -}
 --
 
--- $> unit_prop_fail_each_after_out_of_order
+-- $ > unit_prop_fail_each_after_out_of_order
 unit_prop_fail_each_after_out_of_order :: IO ()
 unit_prop_fail_each_after_out_of_order =
     runTest
@@ -253,7 +252,7 @@ unit_prop_fail_each_after_out_of_order =
             }
         ]
 
--- $> unit_prop_fail_each_after_out_of_order1
+-- $ > unit_prop_fail_each_after_out_of_order1
 unit_prop_fail_each_after_out_of_order1 :: IO ()
 unit_prop_fail_each_after_out_of_order1 =
     runTest
@@ -271,7 +270,7 @@ unit_prop_fail_each_after_out_of_order1 =
             }
         ]
 
--- $> unit_prop_fail_each_after
+-- $ > unit_prop_fail_each_after
 unit_prop_fail_each_after :: IO ()
 unit_prop_fail_each_after =
     runTest
@@ -296,7 +295,7 @@ unit_prop_fail_each_after =
             }
         ]
 
--- $> unit_missing_setup
+-- $ > unit_missing_setup
 unit_missing_setup :: IO ()
 unit_missing_setup =
     runTest
@@ -310,7 +309,7 @@ unit_missing_setup =
             }
         ]
 
--- $> unit_wrong_result
+-- $ > unit_wrong_result
 unit_wrong_result :: IO ()
 unit_wrong_result =
     runTest
@@ -342,8 +341,7 @@ unit_wrong_result =
 -- TODO: resolve WSL UNC issues
 -- document forgotten password :: sudo chown -R usertename:username ~/pyrethrum/pyrethrum
 
-
--- $> unit_fail_wrong_counts
+-- $ > unit_fail_wrong_counts
 unit_fail_wrong_counts :: IO ()
 unit_fail_wrong_counts =
     do
@@ -374,62 +372,94 @@ mayFail =
             }
         ]
 
-
--- $> unit_missing_hooks
+-- $ > unit_missing_hooks
 unit_missing_hooks :: IO ()
 unit_missing_hooks = replicateM_ 1 missingHookFail
 
 missingHookFail :: IO ()
 missingHookFail =
-        runTest
+    runTest
         defaultSeed
         (ThreadCount 5)
         [ ThreadAround
-        { setupThreadSpec = T.All $ Spec { delay = 0 , result = Pass }
-        , teardownThreadSpec = T.All $ Spec { delay = 0 , result = Pass }
-        , subNodes =
-            [ ThreadAfter
-                { threadSpec = T.All $ Spec { delay = 0 , result = Pass }
-                , subNodes =
-                    [ Fixture { tests = [ 
-                        Spec { delay = 0 , result = Pass } ,
-                        Spec { delay = 0 , result = Pass } 
-                    ] } ]
-                }
-            ]
-        }
-    ] 
+            { setupThreadSpec = T.All $ Spec{delay = 0, result = Pass}
+            , teardownThreadSpec = T.All $ Spec{delay = 0, result = Pass}
+            , subNodes =
+                [ ThreadAfter
+                    { threadSpec = T.All $ Spec{delay = 0, result = Pass}
+                    , subNodes =
+                        [ Fixture
+                            { tests =
+                                [ Spec{delay = 0, result = Pass}
+                                , Spec{delay = 0, result = Pass}
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
 
--- $> unit_wrong_failure_path
+-- $ > unit_wrong_failure_path
 unit_wrong_failure_path :: IO ()
 unit_wrong_failure_path = replicateM_ 1 wrongFailurePath
 
 wrongFailurePath :: IO ()
 wrongFailurePath =
-        runTest
+    runTest
         defaultSeed
         (ThreadCount 5)
-        [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] }
+        [ Fixture{tests = [Spec{delay = 0, result = Pass}]}
         , ThreadAfter
-        { threadSpec = T.All Spec { delay = 0 , result = Pass }
-        , subNodes =
-            [ ThreadAround
-                { setupThreadSpec =
-                    T.PassProb
-                      { genStrategy = Preload
-                      , passPcnt = 95
-                      , minDelay = 0
-                      , maxDelay = 2
-                      }
-                , teardownThreadSpec = T.All Spec { delay = 0 , result = Pass }
-                , subNodes =
-                    [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
-                }
-            ]
-        }
-    , OnceBefore
-        { spec = Spec { delay = 0 , result = Pass }
-        , subNodes =
-            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
-        }
-    ]
+            { threadSpec = T.All Spec{delay = 0, result = Pass}
+            , subNodes =
+                [ ThreadAround
+                    { setupThreadSpec =
+                        T.PassProb
+                            { genStrategy = Preload
+                            , passPcnt = 95
+                            , minDelay = 0
+                            , maxDelay = 2
+                            }
+                    , teardownThreadSpec = T.All Spec{delay = 0, result = Pass}
+                    , subNodes =
+                        [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+                    }
+                ]
+            }
+        , OnceBefore
+            { spec = Spec{delay = 0, result = Pass}
+            , subNodes =
+                [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+            }
+        ]
+
+-- $> unit_once_failure_missing
+unit_once_failure_missing :: IO ()
+unit_once_failure_missing =
+    runTest'
+        Log
+        defaultSeed
+        (ThreadCount 1)
+        [ OnceBefore
+            { spec = Spec{delay = 0, result = Fail}
+            , subNodes =
+                [ ThreadAround
+                    { setupThreadSpec = T.All Spec{delay = 0, result = Pass}
+                    , teardownThreadSpec = T.All Spec{delay = 0, result = Pass}
+                    , subNodes =
+                        [ ThreadBefore
+                            { threadSpec = T.All Spec{delay = 0, result = Pass}
+                            , subNodes =
+                                [ ThreadAfter
+                                    { threadSpec = T.All Spec{delay = 0, result = Pass}
+                                    , subNodes =
+                                        [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]

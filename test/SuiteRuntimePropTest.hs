@@ -166,9 +166,9 @@ falsifyOptions :: TestOptions
 falsifyOptions =
   TestOptions
     { expectFailure = DontExpectFailure
-    , overrideVerbose = Just Verbose
+    , overrideVerbose = Nothing -- Just Verbose
     , overrideMaxShrinks = Nothing
-    , overrideNumTests = Just 1
+    , overrideNumTests = Just 100
     , overrideMaxRatio = Nothing
     }
 

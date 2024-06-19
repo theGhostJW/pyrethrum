@@ -36,7 +36,7 @@ import Internal.ThreadEvent as TE (
 import List.Extra as LE hiding (list)
 import List.Extra qualified as L
 import Prepare qualified as P
-import PyrethrumExtras (debug, debug', debug'_, toS, txt, uu, (?))
+import PyrethrumExtras (debug, debug', debug'_, toS, txt, uu, (?), onError, ConvertString)
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 import PyrethrumExtras.Test (chk', chkFail)
@@ -50,9 +50,21 @@ import Prelude qualified as PR
 
 import Data.Hashable qualified as H
 import System.Random.Stateful qualified as RS
+import Chronos (Time, now)
 
 defaultSeed :: Int
 defaultSeed = 13579
+
+putTxt :: (ConvertString a String) => a -> IO ()
+putTxt = putStrLn . toS
+
+printTime :: Text -> Time -> IO ()
+printTime msg t = putTxt $ msg <> ":: " <> toS (show t)
+
+printNow :: Text -> IO ()
+printNow lbl = do 
+  t <- now
+  printTime lbl t
 
 -- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
 -- TODO: other collection types generator / shrinker
@@ -823,12 +835,23 @@ data ExeResult = ExeResult
 runTest :: Int -> ThreadCount -> [Template] -> IO ()
 runTest = runTest' logging
 
-data Logging = Log | NoLog | LogTemplate deriving (Show, Eq)
+data Logging = Log | NoLog | LogTemplate | LogFails | LogFailsAndStartTest deriving (Show, Eq)
 
 runTest' :: Logging -> Int -> ThreadCount -> [Template] -> IO ()
 runTest' wantLog baseRandomSeed threadLimit templates = do
-  r <- execute wantLog baseRandomSeed threadLimit templates
-  chkProperties baseRandomSeed threadLimit r.expandedTemplate r.log
+   when (wantLog == LogFailsAndStartTest) $
+    printNow "start test"
+   ExeResult expandedTemplate log <- execute wantLog baseRandomSeed threadLimit templates
+   onError 
+    (chkProperties baseRandomSeed threadLimit expandedTemplate log)
+    (do 
+      when (wantLog `LE.elem` [LogFails, LogFailsAndStartTest] ) $ do
+        putStrLn "#### Template ####"
+        pPrint expandedTemplate
+        putStrLn "#### Log ####"
+        pPrint log
+        putStrLn "========="
+      )
 
 execute :: Logging -> Int -> ThreadCount -> [Template] -> IO ExeResult
 execute wantLog baseRandomSeed threadLimit templates = do

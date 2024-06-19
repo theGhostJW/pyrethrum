@@ -139,7 +139,7 @@ genNode
     genEachBefore = EachBefore <$> genManySpec <*> genEachSubnodes
     genEachAfter = EachAfter <$> genManySpec <*> genEachSubnodes
     genEachAround = EachAround <$> genManySpec <*> genManySpec' <*> genEachSubnodes
-    genFixture = Fixture <$> (list (between (1, maxTests)) $ genSpec')
+    genFixture = Fixture <$> list (between (1, maxTests)) genSpec'
 
 genParams :: GenParams
 genParams =
@@ -158,17 +158,26 @@ genTemplate :: GenParams -> Gen [Template]
 genTemplate p = list (between (1, p.maxBranches)) $ genNode p
 
 tryRunTest :: Logging -> ThreadCount -> [Template] -> IO (Either SomeException ())
-tryRunTest wantLog c suite =
-  tryAny (printNow "TEST START" >> runTest' wantLog defaultSeed c suite >> printNow "TEST END")
+tryRunTest wantLog c suite = do
+  r <- tryAny $ runTest' wantLog defaultSeed c suite
+  if isRight r
+    then 
+      printNow "PASS"
+    else do
+      printNow "FAIL"
+      putStrLn "#### Template ####"
+      pPrint suite
+      putStrLn "========="
+  pure r
 
 
 falsifyOptions :: TestOptions
 falsifyOptions =
   TestOptions
     { expectFailure = DontExpectFailure
-    , overrideVerbose = Nothing -- Just Verbose
+    , overrideVerbose = Just Verbose
     , overrideMaxShrinks = Nothing
-    , overrideNumTests = Just 100
+    , overrideNumTests = Just 10
     , overrideMaxRatio = Nothing
     }
 
@@ -182,18 +191,8 @@ runProp testName genStrategy =
     let result = unsafePerformIO $ tryRunTest NoLog (ThreadCount 5)  t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
-putTxt :: (ConvertString a String) => a -> IO ()
-putTxt = putStrLn . toS
 
-printTime :: Text -> Time -> IO ()
-printTime msg t = putTxt $ msg <> ":: " <> toS (show t)
-
-printNow :: Text -> IO ()
-printNow lbl = do 
-  t <- now
-  printTime lbl  t
-
--- $ > test_suite_preload
+-- $> test_suite_preload
 test_suite_preload :: IO ()
 test_suite_preload = do
   defaultMain $

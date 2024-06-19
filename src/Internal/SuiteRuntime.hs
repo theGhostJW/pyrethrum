@@ -946,11 +946,17 @@ runNode lgr hi xt =
       -- threadContext -> threadAfter
       ThreadContext{threadContext} ThreadAfter{subNodes', after} ->
         do
-          tCache <- newEmptyTMVarIO
-          let nxtBefore hi' = atomically (tryPutTMVar tCache $ Right ()) >> pure hi'
-          hasRun' <- runSubNodes (mkThreadContext threadContext nxtBefore) subNodes'
-          runThreadAfter tCache after
-          pure hasRun'
+        tCache <- newEmptyTMVarIO
+        let
+          nxtBefore :: Either FailPoint hi' -> IO (Either FailPoint hi')
+          nxtBefore hi' = do
+            mt <- atomically $ isEmptyTMVar tCache 
+            when mt do
+             atomically $ writeTMVar tCache $ hi' $> ()
+            pure hi'
+        hasRun' <- runSubNodes (mkThreadContext threadContext nxtBefore) subNodes'
+        runThreadAfter tCache after
+        pure hasRun'
 
       --
       -- threadContext -> eachBefore
@@ -1024,30 +1030,6 @@ runNode lgr hi xt =
 data NodeIn hi where
   Abandon :: {fp :: FailPoint} -> NodeIn hi
   OnceIn :: {hki :: hi} -> NodeIn hi
-  {-
-    ThreadIn -> Each*
-
-    ThreadIn    <- this is why u need thread context to only run if required
-      ThreadIn
-
-    ThreadAfter - should be straight forward - no need to use context
-    Teardown (how to pass in setup ~ reuse each context)
-
-    ThreadContext
-      - registerChildRun i -> IO i
-        - mkTreadContextBefore - needs Cach - dummy register
-        - mkTreadContextAround - needs Cach - dummy register
-        - mkTreadContextAfter TVar Bool -> IO ThreadContext
-        --
-        - nxtTreadContextBefore - needs Cach - dummy register
-        - nxtTreadContextAround - needs Cach - dummy register
-        - nxtTreadContextAfter TVar Bool -> ThreadContext -> IO ThreadContext (compose registerChildRun)
-
-      setup :: IO (Either FailPoint hi)
-    , teardown :: Either FailPoint hi -> IO () -- use MVar for teardown / registerChildRun for setup
-    } -> NodeIn hi
-    -- add registerChildRun to setup when ThreadIn -> Eachin
-  -}
   ThreadContext :: {threadContext :: IO (Either FailPoint hi)} -> NodeIn hi
   EachContext ::
     { testContext :: IO (TestContext hi)

@@ -281,6 +281,8 @@ cfg = testConfig "test"
 -- ############### Suite ###################
 -- this will be generated
 
+-- TODO Add plain old aFTER
+
 suite :: Suite
 suite =
   [ Fixture (NodePath "module" "testName") test

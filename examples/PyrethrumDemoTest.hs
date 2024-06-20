@@ -3,8 +3,8 @@ module PyrethrumDemoTest where
 import Check (Checks, chk)
 import Core (After, Around, Before, Each, Once, ParseException, Thread)
 import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
-import DSL.Out (Out, out)
-import Effectful (Eff, (:>))
+import DSL.Out (out)
+import Effectful (Eff)
 import PyrethrumBase (
   Action,
   Depth (..),
@@ -18,16 +18,16 @@ import PyrethrumBase (
   TestConfig (..),
   testConfig,
  )
+import PyrethrumConfigTypes (Country (..), Environment (Prod))
 import PyrethrumExtras (txt)
-import PyrethrumConfigTypes (Country(..), Environment (Prod))
 
 {-
 Note:: tried alternative with individual hook types but the results
 were starting to look more complex than the original so abandonned.
 -}
 
-log :: HasLog es => Text -> Eff es ()
-log = out . User . Log 
+log :: (HasLog es) => Text -> Eff es ()
+log = out . User . Log
 
 logShow :: (HasLog es, Show a) => a -> Eff es ()
 logShow = out . User . Log . txt
@@ -38,16 +38,23 @@ logShow = out . User . Log . txt
   Hook has all the effects of the application but will compile with
   an action that only requires a sublist of these effects
 -}
-simpleLog :: RunConfig -> LogEffs Int
-simpleLog _ = pure 1
+logReturnInt :: RunConfig -> LogEffs Int
+logReturnInt _ = log "Returning One" >> pure 1
 
 runSomethingToDoWithTestDepth :: Depth -> Action ()
 runSomethingToDoWithTestDepth = logShow
 
+demoOnceAfterHook :: Hook Once After () ()
+demoOnceAfterHook =
+  AfterHook
+    { afterAction = const $ log "After all tests"
+    }
+
 intOnceHook :: Hook Once Before () Int
 intOnceHook =
-  BeforeHook
-    { action = simpleLog
+  BeforeHook'
+    { depends = demoOnceAfterHook
+    , action' = \rc _void -> logReturnInt rc
     }
 
 addOnceIntHook :: Hook Once Before Int Int
@@ -90,7 +97,7 @@ eachInfoAround =
 
 eachAfter :: Hook Each After Int Int
 eachAfter =
-  After'
+  AfterHook'
     { afterDepends = eachInfoAround
     , afterAction' = \_rc -> do
         log "eachAfter"
@@ -281,36 +288,40 @@ cfg = testConfig "test"
 -- ############### Suite ###################
 -- this will be generated
 
--- TODO Add plain old aFTER
-
 suite :: Suite
 suite =
   [ Fixture (NodePath "module" "testName") test
   , Hook
       { path = NodePath "module" "name"
-      , hook = intOnceHook
+      , hook = demoOnceAfterHook
       , subNodes =
-          [ Fixture (NodePath "module" "testName") test4
-          , Hook
+          [ Hook
               { path = NodePath "module" "name"
-              , hook = addOnceIntHook
+              , hook = intOnceHook
               , subNodes =
-                  [ Hook
+                  [ Fixture (NodePath "module" "testName") test4
+                  , Hook
                       { path = NodePath "module" "name"
-                      , hook = infoThreadHook
+                      , hook = addOnceIntHook
                       , subNodes =
-                          [ Fixture (NodePath "module" "testName") test2
-                          , Hook
+                          [ Hook
                               { path = NodePath "module" "name"
-                              , hook = eachInfoAround
+                              , hook = infoThreadHook
                               , subNodes =
-                                  [ Fixture (NodePath "module" "testName") test3
+                                  [ Fixture (NodePath "module" "testName") test2
                                   , Hook
                                       { path = NodePath "module" "name"
-                                      , hook = eachAfter
+                                      , hook = eachInfoAround
                                       , subNodes =
-                                          [ Fixture (NodePath "module" "testName") test4
-                                          , Fixture (NodePath "module" "testName") test3
+                                          [ Fixture (NodePath "module" "testName") test3
+                                          , Hook
+                                              { path = NodePath "module" "name"
+                                              , hook = eachAfter
+                                              , subNodes =
+                                                  [ Fixture (NodePath "module" "testName") test4
+                                                  , Fixture (NodePath "module" "testName") test3
+                                                  ]
+                                              }
                                           ]
                                       }
                                   ]

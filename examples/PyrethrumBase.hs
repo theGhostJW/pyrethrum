@@ -9,7 +9,8 @@ module PyrethrumBase (
   Suite,
   TestConfig (..),
   testConfig,
-  HasLog
+  HasLog,
+  mkTestRun
 ) where
 
 import Core qualified as C
@@ -34,9 +35,10 @@ TODO:
 type Action = Eff ApEffs
 type HasLog es = Out ApEvent :> es
 type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a
-type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
 type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
-type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
+
+-- type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
+-- type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
 
 
 
@@ -57,7 +59,7 @@ data Hook hz when input output where
     { afterAction :: RunConfig -> Action ()
     } ->
     Hook hz C.After () ()
-  After' ::
+  AfterHook' ::
     (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
     { afterDepends :: Hook phz pw pi i
     , afterAction' :: RunConfig -> Action ()
@@ -127,9 +129,6 @@ data Node i where
     } ->
     Node i
 
------- Mappings will be exported used later ------
---- base node -> core ---
-
 mkFixture :: Fixture hi -> C.Fixture Action [] RunConfig TestConfig hi
 mkFixture = \case
   Full{..} -> C.Full{..}
@@ -137,12 +136,15 @@ mkFixture = \case
   Full'{..} -> C.Full' config' (mkHook depends) action' parse' items'
   Direct'{..} -> C.Direct'{depends = mkHook depends, ..}
 
+mkTestRun :: Suite -> [C.Node Action [] RunConfig TestConfig ()]
+mkTestRun tr = mkNode <$> tr
+
 mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) RunConfig hz i o
 mkHook = \case
   BeforeHook{..} -> C.Before{..}
   BeforeHook'{..} -> C.Before' (mkHook depends) action'
   AfterHook{..} -> C.After{..}
-  After'{..} -> C.After'{afterDepends = mkHook afterDepends, ..}
+  AfterHook'{..} -> C.After'{afterDepends = mkHook afterDepends, ..}
   AroundHook{..} -> C.Around{..}
   AroundHook'
     { aroundDepends
@@ -160,6 +162,3 @@ mkNode = \case
       , ..
       }
   Fixture{..} -> C.Fixture{fixture = mkFixture fixture, ..}
-
-mkTestRun :: Suite -> [C.Node Action [] RunConfig TestConfig ()]
-mkTestRun tr = mkNode <$> tr

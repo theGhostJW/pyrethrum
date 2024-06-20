@@ -40,7 +40,7 @@ type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
 -- type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
 -- type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
 
-
+-- TODO: research StrictSTM
 
 data Hook hz when input output where
   BeforeHook ::

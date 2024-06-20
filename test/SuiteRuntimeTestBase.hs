@@ -454,7 +454,7 @@ chkParentFailsPropagated
 
 chkLeafFailsAreNotPropagated :: FailInfo -> IO ()
 chkLeafFailsAreNotPropagated
-  f@FailInfo
+  FailInfo
     { failStartTail
     , failLog
     } = when (isChildless failLog) $ do
@@ -464,12 +464,17 @@ chkLeafFailsAreNotPropagated
       \case
         c@ParentFailure{failSuiteEvent} ->
           -- this is wrong can pick up failed elements from another branch
-          -- unless(onceSuiteEvent failSuiteEvent) $ do
-          -- if a discrete item such as an after hook or test as failed the next item should not be
-          -- a parent failure because discrete items can't be parents
+         unless(onceSuiteEvent failSuiteEvent) $ do 
+            {-
+            if a leaf item such as an after hook or test fails then the next item 
+            should not be a parent failure because leaf items can't be parents.
+            This does not apply if the parent failure was caused by a once event 
+            because such failures can be generated when the thread picks up nodes from
+            a different branch 
+            -}
           fail $
             "Leaf failure propagated to next event.\nLeaf event was:\n"
-              <> ppShow f.failLog
+              <> ppShow failLog
               <> "\nNext event was:\n"
               <> ppShow c
         _ -> pure ()

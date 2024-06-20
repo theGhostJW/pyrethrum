@@ -174,9 +174,9 @@ falsifyOptions :: TestOptions
 falsifyOptions =
   TestOptions
     { expectFailure = DontExpectFailure
-    , overrideVerbose = Just Verbose
+    , overrideVerbose = Nothing -- Just Verbose
     , overrideMaxShrinks = Nothing
-    , overrideNumTests = Just 10
+    , overrideNumTests = Nothing -- Just 10
     , overrideMaxRatio = Nothing
     }
 
@@ -187,11 +187,11 @@ runProp :: TestName -> SpecGen -> TestTree
 runProp testName genStrategy = 
   testPropertyWith falsifyOptions testName $ do
     t <- genWith (Just . ppShow) $ genTemplate genParams {genStrategy = genStrategy}
-    let result = unsafePerformIO $ tryRunTest NoLog (ThreadCount 5)  t
+    let result = unsafePerformIO $ tryRunTest NoLog (ThreadCount 1)  t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
 
--- $> test_suite_preload
+-- $ > test_suite_preload
 test_suite_preload :: IO ()
 test_suite_preload = do
   defaultMain $
@@ -208,3 +208,14 @@ test_suite_runtime = do
         runProp "Runtime" Runtime
       ]
   print "TEST SUITE DONE"
+
+  {- TODO: Check out performance. 
+    Many threads is slower than a handfull 
+    Threads   Time for 100 tests (Seconds)
+    --------------------------------------
+    1         254
+    5         109
+    500       146
+  
+    could be contention on hook TMVars or child ques - or logging or memory
+  -}

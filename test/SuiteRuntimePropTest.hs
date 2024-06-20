@@ -22,7 +22,7 @@ import BasePrelude (unsafePerformIO)
 import Internal.SuiteRuntime (ThreadCount (..))
 import Internal.ThreadEvent (Hz (..))
 import Test.Falsify.Range (between, skewedBy)
-import Test.Tasty (TestTree, defaultMain, testGroup)
+import Test.Tasty (TestTree, defaultMain, testGroup, TestName)
 import Test.Tasty.Falsify (
   ExpectFailure (DontExpectFailure),
   TestOptions (..),
@@ -36,11 +36,6 @@ import Test.Tasty.Falsify (
 import UnliftIO (tryAny)
 
 
-{-
- - each fail
- - thread fail
--}
-
 -- $ > genPlay
 genPlay :: IO ()
 genPlay = do
@@ -50,59 +45,9 @@ genPlay = do
   pPrint rg
 
 --  todo :: simple random api / effect
--- generate [Template]
--- generate Template
--- generate Test
--- generate Spec
-
--- HERE !!!!!
--- gen delay
--- gen result
-
-{- As property based tests have been implemented after "unit tests" and there has already been
-   arbitary behavior implemented with respect to test results and test durations, these properties
-   will not be subject to to generation or shrinking by the property based testing library.
-   It would be too much work replace the existing behavior with the property based testing properties
-   for these attributes.
--}
-
-{- simplified
-   Reddit post:
-   https://www.reddit.com/r/haskell/comments/1bsnpk2/comment/l0iw3bf/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
-genNode :: GenParams -> Gen Template
-genNode gl@GenParams{
-  maxDepth,
-  maxDelay,
-  maxBranches,
-  maxTests,
-  passPcnt} =
-  frequency
-    [ (fixtureWeight, genFixture)
-    , (hkWeight, genOnceBefore)
-    ]
- where
-  hkWeight = 20
-  fixtureWeight = 100 - hkWeight * 2
-  nxtLimits = gl{maxDepth = maxDepth - 1}
-  genSubnodes = list (between (1, maxBranches))
-  genOnceSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Once})
-  genSpec' = genSpec maxDelay passPcnt
-  genOnceBefore = OnceBefore <$> genSpec' <*> genOnceSubnodes
-  genFixture = Fixture <$> (list (between (1, maxTests)) $ genSpec')
--}
-
-defaultTestOptions :: TestOptions
-defaultTestOptions =
-  TestOptions
-    { expectFailure = DontExpectFailure
-    , overrideVerbose = Just Verbose
-    , overrideMaxShrinks = Nothing
-    , overrideNumTests = Just 10
-    , overrideMaxRatio = Nothing
-    }
 
 demoProp :: (Show a) => String -> Gen a -> TestTree
-demoProp label gen' = testPropertyWith defaultTestOptions label $ (gen gen') >>= collect label . pure
+demoProp label gen' = testPropertyWith falsifyOptions label $ gen gen' >>= collect label . pure
 
 genResult :: Word -> Gen Result
 genResult passPcnt =
@@ -193,7 +138,7 @@ genNode
     genEachBefore = EachBefore <$> genManySpec <*> genEachSubnodes
     genEachAfter = EachAfter <$> genManySpec <*> genEachSubnodes
     genEachAround = EachAround <$> genManySpec <*> genManySpec' <*> genEachSubnodes
-    genFixture = Fixture <$> (list (between (1, maxTests)) $ genSpec')
+    genFixture = Fixture <$> list (between (1, maxTests)) genSpec'
 
 genParams :: GenParams
 genParams =
@@ -211,26 +156,66 @@ genParams =
 genTemplate :: GenParams -> Gen [Template]
 genTemplate p = list (between (1, p.maxBranches)) $ genNode p
 
-tryRunTest :: ThreadCount -> [Template] -> IO (Either SomeException ())
-tryRunTest c suite =
-  tryAny (runTest defaultSeed c suite)
+tryRunTest :: Logging -> ThreadCount -> [Template] -> IO (Either SomeException ())
+tryRunTest wantLog c suite = do
+  r <- tryAny $ runTest' wantLog defaultSeed c suite
+  if isRight r
+    then 
+      printNow "PASS"
+    else do
+      printNow "FAIL"
+      putStrLn "#### Template ####"
+      pPrint suite
+      putStrLn "========="
+  pure r
 
+
+falsifyOptions :: TestOptions
+falsifyOptions =
+  TestOptions
+    { expectFailure = DontExpectFailure
+    , overrideVerbose = Nothing -- Just Verbose
+    , overrideMaxShrinks = Nothing
+    , overrideNumTests = Nothing -- Just 10
+    , overrideMaxRatio = Nothing
+    }
+
+-- todo: add timestamp to debug
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
-{-# NOINLINE prop_test_suite #-}
-prop_test_suite :: TestTree
-prop_test_suite = testPropertyWith defaultTestOptions "Template" $ do
-  t <- genWith (Just . ppShow) $ genTemplate genParams
-  let result = unsafePerformIO $ tryRunTest (ThreadCount 5) t
-  assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
+{-# NOINLINE runProp #-}
+runProp :: TestName -> SpecGen -> TestTree
+runProp testName genStrategy = 
+  testPropertyWith falsifyOptions testName $ do
+    t <- genWith (Just . ppShow) $ genTemplate genParams {genStrategy = genStrategy}
+    let result = unsafePerformIO $ tryRunTest NoLog (ThreadCount 1)  t
+    assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
--- $> test_suite
-test_suite :: IO ()
-test_suite =
+
+-- $ > test_suite_preload
+test_suite_preload :: IO ()
+test_suite_preload = do
+  defaultMain $
+   testGroup "PreLoad" [runProp "Preload" Preload]
+  print "TEST SUITE DONE"
+
+-- $ > test_suite_runtime
+test_suite_runtime :: IO ()
+test_suite_runtime = do
   defaultMain $
     testGroup
       "generator stubs"
-      [ --   demoResult
-        -- , demoDelay
-        -- , demoSpec
-        prop_test_suite
+      [
+        runProp "Runtime" Runtime
       ]
+  print "TEST SUITE DONE"
+
+  {- TODO: Check out performance. 
+    Many threads is slower than a handfull 
+    Threads   Time for 100 tests (Seconds)
+    --------------------------------------
+    1         254
+    5         109
+    500       146
+  
+    could be contention on hook TMVars or child ques - or logging or memory
+  -}

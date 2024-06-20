@@ -2,7 +2,8 @@ module Text.Extra (
   last,
   init,
   replaceFirst,
-  module Data.Text
+  module Data.Text,
+  ptxt
 ) where 
 
 --  shims for relude to ultimately be included in a revived pyrelude
@@ -10,7 +11,12 @@ module Text.Extra (
 import Data.Text qualified as T 
 import Data.Text hiding (last, init)
 import Prelude hiding (last, init)
-import PyrethrumExtras ( (?) )
+import PyrethrumExtras ( (?), toS )
+import Text.Show.Pretty (ppShow)
+
+-- TODO; move to pyrelude
+ptxt :: (Show a) => a -> Text
+ptxt = toS . ppShow
 
 safet :: (Text -> b) -> Text -> Maybe b
 safet unsafef t = 

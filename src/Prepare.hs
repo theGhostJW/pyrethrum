@@ -42,11 +42,11 @@ data PreNode m c hi where
     , teardown :: ApEventSink -> o -> m ()
     } ->
     PreNode m c hi
-  Test ::
+  Fixture ::
     (C.Config tc) =>
     { config :: tc
     , path :: Path
-    , tests :: c (TestItem m hi)
+    , tests :: c (Test m hi)
     } ->
     PreNode m c hi
 
@@ -60,17 +60,16 @@ listPaths =
   step :: forall hi'. Int -> [(Int, Path)] -> PreNode m c hi' -> [(Int, Path)]
   step i accum n =
     n & \case
-      Test{} -> accum'
+      Fixture{} -> accum'
       Before{subNodes} -> accumPaths subNodes
       After{subNodes'} -> accumPaths subNodes'
       Around{subNodes} -> accumPaths subNodes
    where
     accum' = (i, n.path) : accum
-    i' = succ i
     accumPaths :: forall hii. c (PreNode m c hii) -> [(Int, Path)]
-    accumPaths = foldl' (step i') accum'
+    accumPaths = foldl' (step $ succ i) accum'
 
-data TestItem m hi = TestItem
+data Test m hi = MkTest
   { id :: Int
   , title :: Text
   , action :: ApEventSink -> hi -> m ()
@@ -165,12 +164,12 @@ prepareTest :: forall m c rc tc hi. (C.Config tc, Applicative c) => PrepParams m
 prepareTest PrepParams{interpreter, runConfig} path =
   \case
     C.Full{config, action, parse, items} ->
-      Test
+      Fixture
         { config
         , path
         , tests =
             ( \i ->
-                TestItem
+                MkTest
                   { id = i.id
                   , title = i.title
                   , action = \snk _hi -> runTest (action runConfig) parse i snk
@@ -179,12 +178,12 @@ prepareTest PrepParams{interpreter, runConfig} path =
               <$> items runConfig
         }
     C.Full'{config', action', parse', items'} ->
-      Test
+      Fixture
         { config = config'
         , path
         , tests =
             ( \i ->
-                TestItem
+                MkTest
                   { id = i.id
                   , title = i.title
                   , action = \snk hi -> runTest (action' runConfig hi) parse' i snk
@@ -193,12 +192,12 @@ prepareTest PrepParams{interpreter, runConfig} path =
               <$> items' runConfig
         }
     C.Direct{config, action, items} ->
-      Test
+      Fixture
         { config
         , path
         , tests =
             ( \i ->
-                TestItem
+                MkTest
                   { id = i.id
                   , title = i.title
                   , action = \snk _hi -> runDirectTest (action runConfig) i snk
@@ -207,12 +206,12 @@ prepareTest PrepParams{interpreter, runConfig} path =
               <$> items runConfig
         }
     C.Direct'{config', action', items'} ->
-      Test
+      Fixture
         { config = config'
         , path
         , tests =
             ( \i ->
-                TestItem
+                MkTest
                   { id = i.id
                   , title = i.title
                   , action = \snk hi -> runDirectTest (action' runConfig hi) i snk
@@ -297,7 +296,7 @@ data SuitePrepParams m c rc tc where
 --    - filtering
 --    - tree shaking
 --    - querying
---    - validation ??
+--    - validation - eg. no repeat item titles
 -- will return more info later such as filter log and have to return an either
 filterSuite :: forall m c rc tc. c (C.Node m c rc tc ()) -> c (C.Node m c rc tc ())
 filterSuite = uu

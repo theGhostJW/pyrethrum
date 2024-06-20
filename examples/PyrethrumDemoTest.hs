@@ -19,14 +19,18 @@ import PyrethrumBase (
   testConfig,
  )
 import PyrethrumExtras (txt)
+import PyrethrumConfigTypes (Country(..), Environment (Prod))
 
 {-
 Note:: tried alternative with individual hook types but the results
 were starting to look more complex than the original so abandonned.
 -}
 
-log :: (HasLog es) => Text -> Eff es ()
-log = out . User . Log
+log :: HasLog es => Text -> Eff es ()
+log = out . User . Log 
+
+logShow :: (HasLog es, Show a) => a -> Eff es ()
+logShow = out . User . Log . txt
 
 {- Demonstraits using partial effect
   type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a
@@ -36,6 +40,9 @@ log = out . User . Log
 -}
 simpleLog :: RunConfig -> LogEffs Int
 simpleLog _ = pure 1
+
+runSomethingToDoWithTestDepth :: Depth -> Action ()
+runSomethingToDoWithTestDepth = logShow
 
 intOnceHook :: Hook Once Before () Int
 intOnceHook =
@@ -155,8 +162,15 @@ test2 :: Fixture HookInfo
 test2 = Full' config2 infoThreadHook action2 parse2 items2
 
 action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
-action2 _rc HookInfo{value = hookVal} itm = do
-  log $ txt itm
+action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = do
+  logShow itm
+  when (country == AU) $
+    log "Aus test"
+  when (country == NZ) $
+    log "NZ test"
+  runSomethingToDoWithTestDepth depth
+  unless (environment == Prod) $
+    log "Completing payment with test credit card"
   pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
 
 parse2 :: AS -> Either ParseException DS
@@ -183,8 +197,9 @@ data Item2 = Item2
   deriving (Show, Read)
 
 items2 :: RunConfig -> [Item2]
-items2 =
-  const
+items2 rc =
+  filter
+    (\i -> rc.depth == Regression || i.id < 10)
     [ Item2
         { id = 1
         , title = "test the value is one"
@@ -265,6 +280,8 @@ cfg = testConfig "test"
 
 -- ############### Suite ###################
 -- this will be generated
+
+-- TODO Add plain old aFTER
 
 suite :: Suite
 suite =

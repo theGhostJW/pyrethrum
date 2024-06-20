@@ -4,7 +4,7 @@ import WeederLibCopy.Weeder.Main qualified as W
 import BasePrelude qualified as P
 import WeederLibCopy.Weeder qualified as W
 
--- $> Discover.discover
+-- $ > Discover.discover
 discover :: IO ()
 discover = do 
   --- W.main

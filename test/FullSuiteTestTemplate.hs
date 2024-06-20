@@ -60,8 +60,8 @@ expectedParentSubsequentEvents :: [Template] -> Map SuiteEventPath SuiteEventPat
 expectedParentSubsequentEvents = expectedSuiteEvntMap templateAfterEvnt
 
 expectedSuiteEvntMap :: (Template -> Maybe SuiteEvent) -> [Template] -> Map SuiteEventPath SuiteEventPath
-expectedSuiteEvntMap getSuiteEvnt ts =
-  foldl' (priorMap Nothing) Map.empty ts
+expectedSuiteEvntMap getSuiteEvnt =
+  foldl' (priorMap Nothing) Map.empty
  where
   priorMap :: Maybe SuiteEventPath -> Map SuiteEventPath SuiteEventPath -> Template -> Map SuiteEventPath SuiteEventPath
   priorMap mParentEvnt accMap t =
@@ -199,10 +199,10 @@ data Template
       }
   deriving (Show, Eq)
 
-counttests :: Template -> Int
-counttests t = case t of
+countTests :: Template -> Int
+countTests t = case t of
   FullSuiteTestTemplate.Fixture{tests} -> length tests
-  _ -> LE.sum $ counttests <$> t.subNodes
+  _ -> LE.sum $ countTests <$> t.subNodes
 
 data EventPath = EventPath
   { template :: Template
@@ -222,7 +222,7 @@ eventPaths t = case t of
   _ ->
     let
       recurse = concatMap eventPaths t.subNodes
-      mkEvnt f p r = EventPath t t.path (Hook f p) r
+      mkEvnt f p = EventPath t t.path (Hook f p)
      in
       case t of
         OnceBefore{spec} ->

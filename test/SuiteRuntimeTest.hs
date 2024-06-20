@@ -11,15 +11,15 @@ import List.Extra as LE hiding (list)
 import SuiteRuntimeTestBase
 import Prelude hiding (All, bug, id)
 
--- $ > unit_simple_pass
+-- $> unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
--- $ > unit_simple_fail
+-- $> unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fixture [test Pass, test Fail]]]
 
--- $ > unit_nested_pass_fail
+-- $> unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
     runTest
@@ -83,7 +83,7 @@ passProbSuite specGen =
     passProb75 = passProb 75
     passProb100 = passProb 100
 
--- $ > unit_nested_threaded_chk_thread_count
+-- $> unit_nested_threaded_chk_thread_count
 unit_nested_threaded_chk_thread_count :: IO ()
 unit_nested_threaded_chk_thread_count =
     do
@@ -148,9 +148,15 @@ unit_nested_threaded_chk_thread_count =
    that empty thread TestTrees are not executed
 -}
 
--- $ > unit_empty_thread_around
-unit_empty_thread_around :: IO ()
-unit_empty_thread_around =
+{-
+TODO revist this test after any concrete interpretor is implemented
+    that affects laziness ie. ensure empty subnodes are not run if we
+    force strictness in hooks
+-}
+
+-- $> unit_empty_thread_hooks
+unit_empty_thread_hooks :: IO ()
+unit_empty_thread_hooks =
     do
         exe [threadAround Pass Pass []] >>= chkEmptyLog
         exe [threadBefore Pass []] >>= chkEmptyLog
@@ -159,8 +165,8 @@ unit_empty_thread_around =
         exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [fixture [test Pass]]]]] >>= chkLogLength
   where
     exe = execute NoLog defaultSeed (ThreadCount 1)
-    chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> (ptxt r.log)) 2 (length r.log)
-    chkLogLength r = chkEq' ("Log length not as expected:\n" <> (ptxt r.log)) 12 (length r.log)
+    chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> ptxt r.log) 2 (length r.log)
+    chkLogLength r = chkEq' ("Log length not as expected:\n" <> ptxt r.log) 12 (length r.log)
 
 {-
   todo:
@@ -179,11 +185,11 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
   -}
 
--- $ > unit_pass_prob_pregen
+-- $> unit_pass_prob_pregen
 unit_pass_prob_pregen :: IO ()
 unit_pass_prob_pregen = passProbSuite Preload
 
--- $ > unit_pass_prob_no_pregen
+-- $> unit_pass_prob_no_pregen
 unit_pass_prob_no_pregen :: IO ()
 unit_pass_prob_no_pregen = passProbSuite Runtime
 
@@ -200,9 +206,9 @@ unit_pass_prob_no_pregen = passProbSuite Runtime
   Url:           https://github.com/theGhostJW/pyrethrum/commit/ef50961
 -}
 
--- $ > unit_prop_test_fail_template_wrong_result
+-- $> unit_prop_test_fail_template_wrong_result
 unit_prop_test_fail_template_wrong_result :: IO ()
-unit_prop_test_fail_template_wrong_result = sequence_ $ replicate 10 propFailTemplateGenWrongEachHookResult
+unit_prop_test_fail_template_wrong_result = replicateM_ 10 propFailTemplateGenWrongEachHookResult
 
 propFailTemplateGenWrongEachHookResult :: IO ()
 propFailTemplateGenWrongEachHookResult =
@@ -227,7 +233,7 @@ propFailTemplateGenWrongEachHookResult =
 -}
 --
 
--- $ > unit_prop_fail_each_after_out_of_order
+-- $> unit_prop_fail_each_after_out_of_order
 unit_prop_fail_each_after_out_of_order :: IO ()
 unit_prop_fail_each_after_out_of_order =
     runTest
@@ -245,34 +251,10 @@ unit_prop_fail_each_after_out_of_order =
             }
         ]
 
-{-
-\*** Exception: user error (
-subsequent parent event for:
-SuiteEventPath
-  { path = TestPath { id = 0 , title = "0.0.0 Test" }
-  , suiteEvent = Test
-  }
-equality check failed:
-Expected:
-  Just
-  SuiteEventPath
-    { path = NodePath { module' = "0.0" , path = "EachAfter" }
-    , suiteEvent = Hook Each After
-    }
-Does not Equal:
-  Just
-  SuiteEventPath
-    { path = NodePath { module' = "0" , path = "EachAfter" }
-    , suiteEvent = Hook Each After
-    }
-)
--}
-
 -- $> unit_prop_fail_each_after_out_of_order1
 unit_prop_fail_each_after_out_of_order1 :: IO ()
 unit_prop_fail_each_after_out_of_order1 =
-    runTest'
-        Log
+    runTest
         defaultSeed
         (ThreadCount 1)
         [ EachAfter
@@ -282,6 +264,199 @@ unit_prop_fail_each_after_out_of_order1 =
                     { eachSpec = T.All Spec{delay = 0, result = Pass}
                     , subNodes =
                         [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+                    }
+                ]
+            }
+        ]
+
+-- $> unit_prop_fail_each_after
+unit_prop_fail_each_after :: IO ()
+unit_prop_fail_each_after =
+    runTest
+        defaultSeed
+        (ThreadCount 1)
+        [ EachAfter
+            { eachSpec =
+                T.PassProb
+                    { genStrategy = Preload
+                    , passPcnt = 95
+                    , minDelay = 0
+                    , maxDelay = 0
+                    }
+            , subNodes =
+                [ Fixture
+                    { tests =
+                        [ Spec{delay = 0, result = Pass}
+                        , Spec{delay = 0, result = Pass}
+                        ]
+                    }
+                ]
+            }
+        ]
+
+-- $> unit_missing_setup
+unit_missing_setup :: IO ()
+unit_missing_setup =
+    runTest
+        defaultSeed
+        (ThreadCount 1)
+        [ EachAround
+            { eachSetupSpec = T.All $ Spec{delay = 0, result = Pass}
+            , eachTeardownSpec = T.All $ Spec{delay = 0, result = Pass}
+            , subNodes =
+                [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+            }
+        ]
+
+-- $> unit_wrong_result
+unit_wrong_result :: IO ()
+unit_wrong_result =
+    runTest
+        defaultSeed
+        (ThreadCount 1)
+        [ ThreadAfter
+            { threadSpec = T.All $ Spec{delay = 0, result = Pass}
+            , subNodes =
+                [ ThreadBefore
+                    { threadSpec = T.All $ Spec{delay = 0, result = Pass}
+                    , subNodes =
+                        [ ThreadAfter
+                            { threadSpec =
+                                T.PassProb
+                                    { genStrategy = Preload
+                                    , passPcnt = 100
+                                    , minDelay = 0
+                                    , maxDelay = 0
+                                    }
+                            , subNodes =
+                                [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+
+-- TODO: resolve WSL UNC issues
+-- document forgotten password :: sudo chown -R usertename:username ~/pyrethrum/pyrethrum
+
+-- $> unit_fail_wrong_counts
+unit_fail_wrong_counts :: IO ()
+unit_fail_wrong_counts =
+    do
+        putStrLn "unit_fail_wrong_counts"
+        replicateM_ 1000 mayFail
+
+mayFail :: IO ()
+mayFail =
+    runTest
+        defaultSeed
+        (ThreadCount 5)
+        [ Fixture{tests = [Spec{delay = 0, result = Pass}]}
+        , OnceBefore
+            { spec = Spec{delay = 0, result = Pass}
+            , subNodes =
+                [ ThreadAfter
+                    { threadSpec =
+                        T.PassProb
+                            { genStrategy = Preload
+                            , passPcnt = 95
+                            , minDelay = 0
+                            , maxDelay = 0
+                            }
+                    , subNodes =
+                        [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+                    }
+                ]
+            }
+        ]
+
+-- $> unit_missing_hooks
+unit_missing_hooks :: IO ()
+unit_missing_hooks = replicateM_ 1 missingHookFail
+
+missingHookFail :: IO ()
+missingHookFail =
+    runTest
+        defaultSeed
+        (ThreadCount 5)
+        [ ThreadAround
+            { setupThreadSpec = T.All $ Spec{delay = 0, result = Pass}
+            , teardownThreadSpec = T.All $ Spec{delay = 0, result = Pass}
+            , subNodes =
+                [ ThreadAfter
+                    { threadSpec = T.All $ Spec{delay = 0, result = Pass}
+                    , subNodes =
+                        [ Fixture
+                            { tests =
+                                [ Spec{delay = 0, result = Pass}
+                                , Spec{delay = 0, result = Pass}
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+
+-- $> unit_wrong_failure_path
+unit_wrong_failure_path :: IO ()
+unit_wrong_failure_path = replicateM_ 1 wrongFailurePath
+
+wrongFailurePath :: IO ()
+wrongFailurePath =
+    runTest
+        defaultSeed
+        (ThreadCount 5)
+        [ Fixture{tests = [Spec{delay = 0, result = Pass}]}
+        , ThreadAfter
+            { threadSpec = T.All Spec{delay = 0, result = Pass}
+            , subNodes =
+                [ ThreadAround
+                    { setupThreadSpec =
+                        T.PassProb
+                            { genStrategy = Preload
+                            , passPcnt = 95
+                            , minDelay = 0
+                            , maxDelay = 2
+                            }
+                    , teardownThreadSpec = T.All Spec{delay = 0, result = Pass}
+                    , subNodes =
+                        [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+                    }
+                ]
+            }
+        , OnceBefore
+            { spec = Spec{delay = 0, result = Pass}
+            , subNodes =
+                [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+            }
+        ]
+
+-- $> unit_once_failure_missing
+unit_once_failure_missing :: IO ()
+unit_once_failure_missing =
+    runTest
+        defaultSeed
+        (ThreadCount 1)
+        [ OnceBefore
+            { spec = Spec{delay = 0, result = Fail}
+            , subNodes =
+                [ ThreadAround
+                    { setupThreadSpec = T.All Spec{delay = 0, result = Pass}
+                    , teardownThreadSpec = T.All Spec{delay = 0, result = Pass}
+                    , subNodes =
+                        [ ThreadBefore
+                            { threadSpec = T.All Spec{delay = 0, result = Pass}
+                            , subNodes =
+                                [ ThreadAfter
+                                    { threadSpec = T.All Spec{delay = 0, result = Pass}
+                                    , subNodes =
+                                        [Fixture{tests = [Spec{delay = 0, result = Pass}]}]
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             }

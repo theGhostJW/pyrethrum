@@ -39,10 +39,16 @@ evtTypeToFrequency = \case
     -- an individual test is always run once
     Test -> Once
 
-isHookParentFailure :: ThreadEvent l a -> Bool
-isHookParentFailure = \case
-    ParentFailure{suiteEvent = s} -> isHook s
+isSuiteEventFailureWith :: (SuiteEvent -> Bool) -> ThreadEvent l a -> Bool
+isSuiteEventFailureWith  evntPredicate = \case
+    ParentFailure{suiteEvent = s} -> evntPredicate s
     _ -> False
+
+isOnceHookParentFailure :: ThreadEvent l a -> Bool
+isOnceHookParentFailure = isSuiteEventFailureWith onceHook
+
+isHookParentFailure :: ThreadEvent l a -> Bool
+isHookParentFailure =  isSuiteEventFailureWith isHook
 
 isTest :: SuiteEvent -> Bool
 isTest = \case
@@ -79,6 +85,17 @@ threadHook = hookWithHz Thread
 onceSuiteEvent :: SuiteEvent -> Bool
 onceSuiteEvent = (== Once) . evtTypeToFrequency
 
+isChildless :: ThreadEvent l a  -> Bool
+isChildless = threadEventToBool (\case
+  Hook _hz pos -> pos == After
+  Test{} -> True)
+
+suitEvntToBool :: (SuiteEvent -> Bool) -> Maybe SuiteEvent -> Bool
+suitEvntToBool = maybe False 
+
+threadEventToBool :: (SuiteEvent -> Bool) -> ThreadEvent l a  -> Bool
+threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
+
 hasSuiteEvent :: (SuiteEvent -> Bool) -> ThreadEvent l a -> Bool
 hasSuiteEvent p l = case l of
     StartExecution{} -> False
@@ -113,7 +130,16 @@ getSuiteEvent = \case
     Start{suiteEvent} -> Just suiteEvent
     End{suiteEvent} -> Just suiteEvent
     ParentFailure{suiteEvent} -> Just suiteEvent
-    _ -> Nothing
+    Failure{suiteEvent} -> Just suiteEvent
+    StartExecution{} -> Nothing
+    ApEvent{} -> Nothing
+    EndExecution{} -> Nothing
+    
+getHookInfo :: ThreadEvent a b -> Maybe (Hz, HookPos)
+getHookInfo t = getSuiteEvent t >>= \case 
+                                  Hook hz pos -> Just (hz, pos)
+                                  Test {} -> Nothing
+
 
 data ThreadEvent l a
     = StartExecution
@@ -157,6 +183,18 @@ data ThreadEvent l a
         , threadId :: ThreadId
         }
     deriving (Show)
+
+startOrParentFailure :: ThreadEvent l a -> Bool
+startOrParentFailure te = case te of
+    StartExecution{} -> False
+    EndExecution{} -> False
+    ApEvent{} -> False
+    Failure{} -> False
+    -- event will either have a start or be
+    -- represented by a parent failure if skipped
+    ParentFailure{} -> True
+    Start{} -> True
+    End{} -> False
 
 startSuiteEventLoc :: ThreadEvent l a -> Maybe l
 startSuiteEventLoc te = case te of

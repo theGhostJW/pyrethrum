@@ -19,6 +19,7 @@ import Internal.ThreadEvent as TE (
   getHookInfo,
   getSuiteEvent,
   hasSuiteEvent,
+  isChildless,
   isEnd,
   isHook,
   isHookParentFailure,
@@ -29,20 +30,19 @@ import Internal.ThreadEvent as TE (
   onceSuiteEvent,
   startOrParentFailure,
   startSuiteEventLoc,
-  suiteEventOrParentFailureSuiteEvent,
-  threadHook,
-  threadEventToBool,
   suitEvntToBool,
-  isChildless
+  suiteEventOrParentFailureSuiteEvent,
+  threadEventToBool,
+  threadHook,
  )
 
 import List.Extra as LE hiding (list)
 import List.Extra qualified as L
 import Prepare qualified as P
-import PyrethrumExtras (toS, txt, (?), onError, ConvertString)
+import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
-import PyrethrumExtras.Test (chk', chkFail)
+import PyrethrumExtras.Test (chk') -- don't use chkFail it does not format properly
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
   threadDelay,
@@ -51,9 +51,9 @@ import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
 
+import Chronos (Time, now)
 import Data.Hashable qualified as H
 import System.Random.Stateful qualified as RS
-import Chronos (Time, now)
 
 defaultSeed :: Int
 defaultSeed = 13579
@@ -65,7 +65,7 @@ printTime :: Text -> Time -> IO ()
 printTime msg t = putTxt $ msg <> ":: " <> toS (show t)
 
 printNow :: Text -> IO ()
-printNow lbl = do 
+printNow lbl = do
   t <- now
   printTime lbl t
 
@@ -162,13 +162,12 @@ chkProperties baseSeed threadLimit ts evts = do
     ]
 
 data FailInfo = FailInfo
-  { 
-  --   idx :: Int
-  -- , threadId :: ThreadId
-  -- , suiteEvent :: SuiteEvent
-  -- , loc :: ExePath
-  -- , 
-  failLog :: LogItem
+  { --   idx :: Int
+    -- , threadId :: ThreadId
+    -- , suiteEvent :: SuiteEvent
+    -- , loc :: ExePath
+    -- ,
+    failLog :: LogItem
   , failStartTail :: [LogItem]
   }
   deriving (Show)
@@ -283,7 +282,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
       M.lookup k actuals
         & maybe
           --  todo: this doesn't format as expected
-          (chkFail $ "Expected result for " <> ptxt k <> " not found in actual")
+          (fail $ "Expected result for " <> ppShow k <> " not found in actual")
           ( \actual ->
               case expected of
                 All e ->
@@ -364,35 +363,31 @@ chkExpectedResults baseSeed threadLimit ts lgs =
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =
   do
-    traverse_ chkDiscreteFailsAreNotPropagated failTails
+    traverse_ chkLeafFailsAreNotPropagated failTails
     traverse_ chkParentFailsPropagated failTails
  where
   failTails = snd $ failInfo lg
-
--- discrete events no child
--- parent events expect all chidren to fail
--- pall the way to last sibling including last sibling when setup / teardown
 
 data ChkState = ExpectParentFail | DoneChecking
   deriving (Show, Eq)
 
 isFailChildEventOf :: LogItem -> LogItem -> Bool
-isFailChildEventOf c p = 
-  (cIsSubpathOfp || samePath && pIsSetupFailure && cIsTeardown) && (sameThread || pIsOnceHook) 
+isFailChildEventOf c p =
+  (cIsSubpathOfp || samePath && pIsSetupFailure && cIsTeardown) && (sameThread || pIsOnceHook)
  where
   sameThread = p.threadId == c.threadId
-  hasHookPos hp = \case 
-     Hook _ hp' -> hp == hp'
-     _ -> False
+  hasHookPos hp = \case
+    Hook _ hp' -> hp == hp'
+    _ -> False
   cIsTeardown = logItemtoBool (hasHookPos Teardown) c
-  pFailEvent = case p of 
+  pFailEvent = case p of
     Failure{suiteEvent} -> Just suiteEvent
     _ -> Nothing
   pIsSetupFailure = suitEvntToBool (hasHookPos Setup) pFailEvent
 
   samePath = p.loc == c.loc
   cIsSubpathOfp = isParentPath p.loc c.loc
-  pIsOnceHook = suitEvntToBool (\case Hook hz _ -> hz == Once; _ -> False)  pFailEvent
+  pIsOnceHook = suitEvntToBool (\case Hook hz _ -> hz == Once; _ -> False) pFailEvent
 
 chkParentFailsPropagated :: FailInfo -> IO ()
 chkParentFailsPropagated
@@ -405,7 +400,7 @@ chkParentFailsPropagated
    where
     isFailChildLog :: LogItem -> Bool
     isFailChildLog = flip isFailChildEventOf failLog
-      
+
     chkEvent :: ChkState -> LogItem -> IO ChkState
     chkEvent acc lgItm =
       let
@@ -457,22 +452,26 @@ chkParentFailsPropagated
                 fail $
                   "Unexpected event in failStartTail - these events should have been filtered out:\n" <> ppShow lgItm
 
-chkDiscreteFailsAreNotPropagated :: FailInfo -> IO ()
-chkDiscreteFailsAreNotPropagated
+chkLeafFailsAreNotPropagated :: FailInfo -> IO ()
+chkLeafFailsAreNotPropagated
   f@FailInfo
-    { 
-      failStartTail,
-      failLog
+    { failStartTail
+    , failLog
     } = when (isChildless failLog) $ do
     whenJust
       (LE.head failStartTail)
+      -- TODO: chkFail does not work here it escapes new lines - fix and check all chk functions format properly
       \case
-        ParentFailure{suiteEvent = childSuiteEvent} ->
+        c@ParentFailure{failSuiteEvent} ->
           -- this is wrong can pick up failed elements from another branch
-          -- unless(onceSuiteEvent childSuiteEvent) $ do
-            -- if a discrete item such as an after hook or test as failed the next item should not be
-             -- a parent failure because discrete items can't be parents
-            chkFail $ "Discrete failure propagated to next event:\n" <> ptxt f.failLog
+          -- unless(onceSuiteEvent failSuiteEvent) $ do
+          -- if a discrete item such as an after hook or test as failed the next item should not be
+          -- a parent failure because discrete items can't be parents
+          fail $
+            "Leaf failure propagated to next event.\nLeaf event was:\n"
+              <> ppShow f.failLog
+              <> "\nNext event was:\n"
+              <> ppShow c
         _ -> pure ()
 
 -- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
@@ -838,19 +837,19 @@ data Logging = Log | NoLog | LogTemplate | LogFails | LogFailsAndStartTest deriv
 
 runTest' :: Logging -> Int -> ThreadCount -> [Template] -> IO ()
 runTest' wantLog baseRandomSeed threadLimit templates = do
-   when (wantLog == LogFailsAndStartTest) $
+  when (wantLog == LogFailsAndStartTest) $
     printNow "start test"
-   ExeResult expandedTemplate log <- execute wantLog baseRandomSeed threadLimit templates
-   onError 
+  ExeResult expandedTemplate log <- execute wantLog baseRandomSeed threadLimit templates
+  onError
     (chkProperties baseRandomSeed threadLimit expandedTemplate log)
-    (do 
-      when (wantLog `LE.elem` [LogFails, LogFailsAndStartTest] ) $ do
-        putStrLn "#### Template ####"
-        pPrint expandedTemplate
-        putStrLn "#### Log ####"
-        pPrint log
-        putStrLn "========="
-      )
+    ( do
+        when (wantLog `LE.elem` [LogFails, LogFailsAndStartTest]) $ do
+          putStrLn "#### Template ####"
+          pPrint expandedTemplate
+          putStrLn "#### Log ####"
+          pPrint log
+          putStrLn "========="
+    )
 
 execute :: Logging -> Int -> ThreadCount -> [Template] -> IO ExeResult
 execute wantLog baseRandomSeed threadLimit templates = do
@@ -903,7 +902,7 @@ setPaths address ts =
       SuiteRuntimeTestBase.Fixture{tests} ->
         T.Fixture
           { path = newPath "Test"
-          , tests = zip [0 ..] tests <&> \(idx', spec) -> T.TestItem{title = newAdd <> " Test", id = idx', ..}
+          , tests = zip [0 ..] tests <&> \(idx', spec) -> T.TestItem{title = newAdd <> ".Test #" <> txt idx', id = idx', ..}
           }
       OnceBefore{..} -> T.OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
       OnceAfter{..} -> T.OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}

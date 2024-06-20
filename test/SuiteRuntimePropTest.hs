@@ -23,7 +23,6 @@ import Internal.SuiteRuntime (ThreadCount (..))
 import Internal.ThreadEvent (Hz (..))
 import Test.Falsify.Range (between, skewedBy)
 import Test.Tasty (TestTree, defaultMain, testGroup, TestName)
-import Chronos (Time, now)
 import Test.Tasty.Falsify (
   ExpectFailure (DontExpectFailure),
   TestOptions (..),
@@ -48,7 +47,7 @@ genPlay = do
 --  todo :: simple random api / effect
 
 demoProp :: (Show a) => String -> Gen a -> TestTree
-demoProp label gen' = testPropertyWith falsifyOptions label $ (gen gen') >>= collect label . pure
+demoProp label gen' = testPropertyWith falsifyOptions label $ gen gen' >>= collect label . pure
 
 genResult :: Word -> Gen Result
 genResult passPcnt =

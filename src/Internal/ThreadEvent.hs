@@ -85,6 +85,17 @@ threadHook = hookWithHz Thread
 onceSuiteEvent :: SuiteEvent -> Bool
 onceSuiteEvent = (== Once) . evtTypeToFrequency
 
+isChildless :: ThreadEvent l a  -> Bool
+isChildless = threadEventToBool (\case
+  Hook _hz pos -> pos == After
+  Test{} -> True)
+
+suitEvntToBool :: (SuiteEvent -> Bool) -> Maybe SuiteEvent -> Bool
+suitEvntToBool = maybe False 
+
+threadEventToBool :: (SuiteEvent -> Bool) -> ThreadEvent l a  -> Bool
+threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
+
 hasSuiteEvent :: (SuiteEvent -> Bool) -> ThreadEvent l a -> Bool
 hasSuiteEvent p l = case l of
     StartExecution{} -> False

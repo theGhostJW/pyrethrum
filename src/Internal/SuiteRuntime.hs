@@ -7,8 +7,7 @@ import Internal.RunTimeLogging qualified as L
 import Internal.ThreadEvent hiding (Test)
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
-import PyrethrumExtras (catchAll, debug', debug'_, debugf', debugf'_, toS, txt, uu, (?))
-import Text.Show.Pretty (ppShow)
+import PyrethrumExtras (catchAll, txt, (?))
 import UnliftIO (
   concurrently_,
   finally,
@@ -28,7 +27,6 @@ import UnliftIO.STM (
   writeTQueue,
  )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
-import Prelude qualified as P
 
 {-
 todo :: define defect properties with sum type type and typeclass which returns defect info
@@ -323,7 +321,7 @@ runChildQ concurrency runner childCanRun ChildQ{childNodes, status, runningCount
                 finally
                   do
                     cr <- atomically $ childCanRun a
-                    debug'_ "CHILD CAN RUN" cr & \case
+                    cr & \case
                       -- runner MUST ensure the integrity of sub element status and handle all exceptions
                       Runnable -> do
                         -- when Concurrent, the element is placed back on the end of the q before running so
@@ -892,8 +890,8 @@ runNode lgr hi xt =
       oi@(OnceIn{}) ThreadAfter{after, subNodes'} ->
         do
           -- may not run if subnodes are empty
-          run' <- debugf'_ (const "") "RUN ThreadAfter SUBNODES" $ runSubNodes oi subNodes'
-          when (run'.hasRun & debug'_ "HAS RUN - threadAfter") $
+          run' <- runSubNodes oi subNodes'
+          when run'.hasRun $
             logRun_ (Hook Thread After) after
           pure run'
       --

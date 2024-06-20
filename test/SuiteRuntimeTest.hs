@@ -8,7 +8,6 @@ import List.Extra as LE hiding (list)
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 
-import PyrethrumExtras (uu)
 import SuiteRuntimeTestBase
 import Prelude hiding (All, bug, id)
 

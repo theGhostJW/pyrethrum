@@ -31,12 +31,15 @@ import Internal.ThreadEvent as TE (
   startSuiteEventLoc,
   suiteEventOrParentFailureSuiteEvent,
   threadHook,
+  threadEventToBool,
+  suitEvntToBool,
+  isChildless
  )
 
 import List.Extra as LE hiding (list)
 import List.Extra qualified as L
 import Prepare qualified as P
-import PyrethrumExtras (debug, debug', debug'_, toS, txt, uu, (?), onError, ConvertString)
+import PyrethrumExtras (toS, txt, (?), onError, ConvertString)
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 import PyrethrumExtras.Test (chk', chkFail)
@@ -122,6 +125,9 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
   -}
 
 type LogItem = ThreadEvent ExePath AE.ApEvent
+
+logItemtoBool :: (SuiteEvent -> Bool) -> LogItem -> Bool
+logItemtoBool = threadEventToBool
 
 chkProperties :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
 chkProperties baseSeed threadLimit ts evts = do
@@ -367,19 +373,8 @@ chkFailurePropagation lg =
 -- parent events expect all chidren to fail
 -- pall the way to last sibling including last sibling when setup / teardown
 
-isChildless :: LogItem -> Bool
-isChildless = logItemToBool (\case
-  Hook _hz pos -> pos == After
-  TE.Test{} -> True)
-
 data ChkState = ExpectParentFail | DoneChecking
   deriving (Show, Eq)
-
-suitEvntToBool :: (SuiteEvent -> Bool) -> Maybe SuiteEvent -> Bool
-suitEvntToBool = maybe False 
-
-logItemToBool :: (SuiteEvent -> Bool) -> LogItem -> Bool
-logItemToBool prd = suitEvntToBool prd . getSuiteEvent
 
 isFailChildEventOf :: LogItem -> LogItem -> Bool
 isFailChildEventOf c p = 
@@ -389,7 +384,7 @@ isFailChildEventOf c p =
   hasHookPos hp = \case 
      Hook _ hp' -> hp == hp'
      _ -> False
-  cIsTeardown = logItemToBool (hasHookPos Teardown) c
+  cIsTeardown = logItemtoBool (hasHookPos Teardown) c
   pFailEvent = case p of 
     Failure{suiteEvent} -> Just suiteEvent
     _ -> Nothing
@@ -440,7 +435,7 @@ chkParentFailsPropagated
                   pure ExpectParentFail
               f'@Failure{} ->
                 -- TODO :: hide reinstate with test conversion
-                fail $ "Failure when expect parent failure:\n" <> toS (ppShow f')
+                fail $ "Failure when expect parent failure:\n" <> ppShow f'
               s@Start{} ->
                 do
                   -- TODO :: implement chkFalse'
@@ -460,20 +455,24 @@ chkParentFailsPropagated
                   pure DoneChecking
               _ ->
                 fail $
-                  "Unexpected event in failStartTail - these events should have been filtered out:\n" <> toS (ppShow lgItm)
+                  "Unexpected event in failStartTail - these events should have been filtered out:\n" <> ppShow lgItm
 
 chkDiscreteFailsAreNotPropagated :: FailInfo -> IO ()
 chkDiscreteFailsAreNotPropagated
   f@FailInfo
-    { failStartTail
-    } = when (isChildless f.failLog) $ do
+    { 
+      failStartTail,
+      failLog
+    } = when (isChildless failLog) $ do
     whenJust
       (LE.head failStartTail)
       \case
-        ParentFailure{} ->
-          -- if a discrete item such as an after hook or test as failed the next item should not be
-          -- a parent failure because discrete items can't be parents
-          chkFail $ "Discrete failure propagated to next event:\n" <> toS (ppShow f.failLog)
+        ParentFailure{suiteEvent = childSuiteEvent} ->
+          -- this is wrong can pick up failed elements from another branch
+          -- unless(onceSuiteEvent childSuiteEvent) $ do
+            -- if a discrete item such as an after hook or test as failed the next item should not be
+             -- a parent failure because discrete items can't be parents
+            chkFail $ "Discrete failure propagated to next event:\n" <> ptxt f.failLog
         _ -> pure ()
 
 -- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
@@ -498,7 +497,7 @@ failInfo li =
             lastStartEvnt
               & maybe
                 (error $ "Failure encountered before start:\n" <> toS (ppShow f))
-                (const $ (Nothing, FailInfo f ls : result))
+                (const (Nothing, FailInfo f ls : result))
           ParentFailure{} -> passThrough
           StartExecution{} -> passThrough
           EndExecution{} -> passThrough
@@ -593,7 +592,7 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
       logSuiteEventPath fps
 
 logTails :: Bool -> [LogItem] -> [[LogItem]]
-logTails wantReverse = debug'_ "TAILS" . tails . bool PR.id reverse wantReverse
+logTails wantReverse = tails . bool PR.id reverse wantReverse
 
 startHook :: [HookPos] -> LogItem -> Bool
 startHook poss l = startOrParentFailure l && (getHookInfo l & maybe False (\(hz, hkPos) -> hz /= Once && (hkPos `LE.elem` poss)))
@@ -624,7 +623,7 @@ chkNoEmptyHooks message hookPredicate wantReverse =
         (hookPredicate x)
         $ chk'
           (message <> " \nEmpty Hook:\n" <> ptxt x)
-          (findChildTest (debug'_ "PARENT" $ x) (debug'_ "CHILD ITEMS" $ xs))
+          (findChildTest x xs)
 
   findChildTest :: LogItem -> [LogItem] -> Bool
   findChildTest hk =

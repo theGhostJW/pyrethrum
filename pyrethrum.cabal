@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: df92495f5d239bac38c580c378b3bb26ef32da7f9ef4b3cd5fef05ecbceb3cdc
+-- hash: b160e87349990f5f4af597c56899442c877e5cea54f2864ed404784df184b7f1
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -55,10 +55,10 @@ common reludeImports
   build-depends:
    base
    , relude
+   , pyrethrum-extras
   mixins:
     base hiding (Prelude),
     relude (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
-  
 
 source-repository head
   type: git
@@ -91,11 +91,8 @@ library
       Internal.RunTimeLogging
       Internal.SuiteRuntime
       Internal.ThreadEvent
-      List.Extra
       OrphanedInstances
       Prepare
-      TempUtils
-      Text.Extra
       ArbitraryIOTest
       AuxFilesTest
       CheckTest

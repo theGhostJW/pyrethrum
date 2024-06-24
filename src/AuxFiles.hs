@@ -41,7 +41,7 @@ import PyrethrumExtras (
   txt,
   (?),
  )
-import PyrethrumExtras.IO as PIO (subDirFromBaseDir)
+import PyrethrumExtras.IO as PIO (subDirFromBaseDir, openFile)
 import System.IO qualified as S
 import Prelude hiding (putStrLn, writeFile)
 
@@ -141,11 +141,6 @@ logFilePath projRoot mNamePrefix suffix fileExt =
         (pure . Left . userError . toS . show)
         (fmap ((pfx,) <$>) . logFile projRoot)
 
--- toDo  - move to extended
-safeOpenFile :: AbsFile -> S.IOMode -> IO (Either IOError S.Handle)
-safeOpenFile pth mode =
-  catchIOError (Right <$> S.openFile (toFilePath pth) mode) (pure . Left)
-
 data HandleInfo = HandleInfo
   { prefix :: Text
   , path :: AbsFile
@@ -157,7 +152,7 @@ logFileHandle projRoot fileNameSuffix fileExt =
   logFilePath projRoot Nothing fileNameSuffix fileExt
     >>= either
       (pure . Left)
-      (\(pfx, pth) -> (HandleInfo pfx pth <$>) <$> safeOpenFile pth S.WriteMode)
+      (\(pfx, pth) -> (HandleInfo pfx pth <$>) <$> openFile pth S.WriteMode)
 
 -- Writing temp files used mostly used for de bugging
 defaultTempFileName :: RelFile

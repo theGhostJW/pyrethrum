@@ -23,14 +23,6 @@ import Effectful.Error.Static as E (Error)
 import PyrethrumConfigTypes as CG
     ( Depth(..), RunConfig(..), TestConfig(..), testConfig ) 
 
-{-
-TODO:
-      - UX of after hook looks sus
-       - how do I do a test with an each in and a once after
-       - once after and thread after
-      - split datatypes with conversion typeclasses at project level
--}
-
 --  these will probably be split off and go into core later
 type Action = Eff ApEffs
 type HasLog es = Out ApEvent :> es

@@ -47,22 +47,6 @@ to list
 
 -}
 
-{-
-TODO:: idea defect reconciler
- - can pretty print (No JSON) to log so long as id/title/hash is logged and a hash of the show is logged so
-    we can warn if the item has changed since it was run
-
- - for property based / generative tests we insist on deriving JSON and log as YAML and pprint
-    on failure
-
- - consider removing ids from items
-    ~ regular use title which must be unique or title stub (which can include test)
-    ~ property based stub
-      ~ generator
-
- - global stub function
- - tst stub function  Item -> [Item] -> [Item] ~ ignores list and creates singleton
--}
 
 -- TODO:: look into listLike
 
@@ -194,50 +178,8 @@ data ExeParams m c rc tc where
     } ->
     ExeParams m c rc tc
 
--- try this
--- part 1
---  - do notation :: NA
--- - interpretor + writer :: NA
--- - extract hz from item (hard code for now) + fixtureType and dependency  hz
--- - stub for checks (see part 4)
--- - add missing fixtures
--- - reinstate before
--- - hook around
--- - fixture hooks
--- - instance hooks
--- - check constraints line up
--- change prenode and execution to match new structure
--- - need 2 files
---  - fixture list - plain old do for initial extraction -- hard code for now
---  - test Suite - the actual test suite with interperetor as param
---   - error as warning extension added to the top of both generated files
--- stub for run test
--- - generate suite based on prenode
--- part 2
--- reinstrate run test
--- demo running single test
--- part 3
---  - unit tests for suite runtime
--- part 4
--- - implement check for recursion check
--- - generator (hie or below)
--- remove stubLoc from type
+-- Todo
 -- see weeder :: HIE
 -- start with:: https://github.com/theGhostJW/pyrethrum-extras/blob/master/src/Language/Haskell/TH/Syntax/Extended.hs
 -- see also:: https://hackage.haskell.org/package/template-haskell-2.20.0.0/docs/Language-Haskell-TH-Syntax.html#t:Name
 -- part 5 reinstate filtering // tree shaking
-
-{-
-todo plugin issu
-
-differ
-case 1:
-  hook.depends = hook1
-  hook depends hook 1
-
-case 2:
-  hook1 depends hook2
-  hook = hook1
-  hook depends hook2
-
--}

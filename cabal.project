@@ -11,12 +11,12 @@ source-repository-package
 -- source-repository-package
 --   type: git
 --   location: https://github.com/theGhostJW/encode-string
---   tag: 6c2ad7c2ef99d2e7d21d68fa8b0f2058aa8f16fe
+--   tag: 9e9b91cdec5a4ce92d2024d1d9edea0e98eccf66
 
 source-repository-package
   type: git
   location: https://github.com/theGhostJW/pyrethrum-extras
-  tag: a52273f3336c96c93d18cb7f9e90c90da58503a3
+  tag: a02d299bca4407a26c48ae2c78c83b0886964a81
 
 
 optimization: 0

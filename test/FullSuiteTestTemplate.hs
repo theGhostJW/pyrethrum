@@ -4,7 +4,6 @@ import DSL.Internal.ApEvent (Path (..))
 import Data.Map.Strict qualified as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (Hook))
 import Internal.ThreadEvent qualified as TE
-import List.Extra as LE
 import Prelude hiding (All, id)
 
 data Spec = Spec {delay :: Int, result :: Result}
@@ -202,7 +201,7 @@ data Template
 countTests :: Template -> Int
 countTests t = case t of
   FullSuiteTestTemplate.Fixture{tests} -> length tests
-  _ -> LE.sum $ countTests <$> t.subNodes
+  _ -> sum $ countTests <$> t.subNodes
 
 data EventPath = EventPath
   { template :: Template

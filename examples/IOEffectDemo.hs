@@ -11,6 +11,7 @@ import Data.Text qualified as T
 import BasePrelude (openFile, hClose, hGetContents)
 import DSL.FileSystemIOInterpreter
 import System.Time.Extra (sleep)
+import PyrethrumExtras.IO (putTxt)
 
 
 {-
@@ -20,16 +21,11 @@ import System.Time.Extra (sleep)
 -- https://www.tweag.io/blog/2017-07-27-streaming-programs/
 -}
 
--- TODO :: Add to pyrelude
-putTxt :: (ConvertString a String) => a -> IO ()
-putTxt = putStrLn . toS
-
-
 headLine :: Text -> Text
-headLine = unlines . take 1 . lines
+headLine = T.unlines . take 1 . T.lines
 
 printHeadLine :: String -> IO ()
-printHeadLine = putTxt . headLine . toS
+printHeadLine = putText . headLine . toS
 
 -- import Control.Exception (bracket)
 -- import System.IO (hGetContents, hClose, openFile, IOMode(ReadMode))
@@ -102,8 +98,6 @@ timeTest = do
 -- time 1 Time {getTime = 1689018956967000000}
 -- time 2 Time {getTime = 1689018957979000000}
 -- time 3 Time {getTime = 1689018959089000000}
-
---  TODO: pyrelude depricate debug in favour of trace or add warnings to debug
 
 -- use eff
 listFileImp :: (FileSystem :> es, Out ApEvent :> es) => Eff es [Text]

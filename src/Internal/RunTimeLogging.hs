@@ -9,19 +9,19 @@ import Data.Aeson.TH (defaultOptions, deriveToJSON)
 import Data.Text as T (intercalate)
 import Effectful.Concurrent.STM (TQueue)
 import Internal.ThreadEvent qualified as TE
-import PyrethrumExtras (txt, (?))
+import PyrethrumExtras as PE (txt, (?), head, tail) 
 import Text.Show.Pretty (pPrint)
 import UnliftIO (finally)
 import UnliftIO.Concurrent (ThreadId)
 import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
 import Prelude hiding (atomically, lines)
-import List.Extra qualified as L
+
 
 
 newtype ExePath = ExePath {un :: [AE.Path] }deriving (Show, Eq, Ord)
 
 topPath :: ExePath -> Maybe AE.Path
-topPath = L.head . coerce
+topPath = PE.head . coerce
 
 {-
  drop 2 paths for tests because tests are logged as .. parent / test path / test item path
@@ -57,7 +57,7 @@ parentPath :: Bool -> ExePath -> Maybe ExePath
 parentPath isTestPath (ExePath l) = 
   ExePath <$> parentPathList
   where
-    parentPathList = isTestPath ? (L.tail l >>= L.tail) $ L.tail l
+    parentPathList = isTestPath ? (PE.tail l >>= PE.tail) $ PE.tail l
  
 -- TODO: hide string eg intercallate
 displayExePath :: ExePath -> Text

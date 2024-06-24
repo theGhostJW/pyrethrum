@@ -227,15 +227,6 @@ prepareTest PrepParams{interpreter, runConfig} path =
         (\e -> Left (callStack, C.ParseFailure . toS $ displayException e))
         (mapLeft (callStack,))
 
-  {-
-  TODO :: Try Different Stategies
-    - eg. Eff vs dependency injection - vs Eff embedded in core (see before remove effectful from core)
-    - tests
-      - hooks with lower / different capabilities than tests (rest hook vs ui test) see "Demonstraits using partial effect" for effectful version
-      - effects that use effects / logger
-      - arbitary STM as an example of adding an effect that requires its own context
-
-  -}
   runAction :: forall i as ds. (C.Item i ds) => ApEventSink -> (i -> m as) -> i -> IO as
   runAction snk action i =
     do

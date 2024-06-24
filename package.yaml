@@ -79,10 +79,10 @@ verbatim:
       build-depends:
        base
        , relude
+       , pyrethrum-extras
       mixins:
         base hiding (Prelude),
         relude (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
-      
 
 dependencies:
   - aeson

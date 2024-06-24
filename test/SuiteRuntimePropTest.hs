@@ -7,7 +7,7 @@ module SuiteRuntimePropTest where
 import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
 import FullSuiteTestTemplate qualified as T
 
-import PyrethrumExtras
+import PyrethrumExtras as PE
 import SuiteRuntimeTestBase
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
@@ -113,7 +113,7 @@ genNode
     eachWeight = hkWeight
     fixtureWeight = 100 - (onceWeight + threadWeight + eachWeight) * 2
     nxtLimits = gl{maxDepth = maxDepth - 1}
-    genSubnodes = list (between (1, maxBranches))
+    genSubnodes = G.list (between (1, maxBranches))
     genOnceSubnodes = genSubnodes $ genNode (nxtLimits{minHz = Once})
     genSpec' = genSpec maxDelay passPcnt
     genSpec'' = genSpec maxDelay passPcnt
@@ -138,7 +138,7 @@ genNode
     genEachBefore = EachBefore <$> genManySpec <*> genEachSubnodes
     genEachAfter = EachAfter <$> genManySpec <*> genEachSubnodes
     genEachAround = EachAround <$> genManySpec <*> genManySpec' <*> genEachSubnodes
-    genFixture = Fixture <$> list (between (1, maxTests)) genSpec'
+    genFixture = Fixture <$> G.list (between (1, maxTests)) genSpec'
 
 genParams :: GenParams
 genParams =
@@ -154,7 +154,7 @@ genParams =
     }
 
 genTemplate :: GenParams -> Gen [Template]
-genTemplate p = list (between (1, p.maxBranches)) $ genNode p
+genTemplate p = G.list (between (1, p.maxBranches)) $ genNode p
 
 tryRunTest :: Logging -> ThreadCount -> [Template] -> IO (Either SomeException ())
 tryRunTest wantLog c suite = do

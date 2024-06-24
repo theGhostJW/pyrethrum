@@ -36,10 +36,9 @@ import Internal.ThreadEvent as TE (
   threadHook,
  )
 
-import List.Extra as LE hiding (list)
-import List.Extra qualified as L
 import Prepare qualified as P
 import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
+import PyrethrumExtras qualified as PE 
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 import PyrethrumExtras.Test (chk') -- don't use chkFail it does not format properly
@@ -95,9 +94,6 @@ bug t = PR.bug (error t :: SomeException)
 logging :: Logging
 logging = NoLog
 
--- TODO; move to pyrelude
-ptxt :: (Show a) => a -> Text
-ptxt = toS . ppShow
 
 {- each and once hooks will always run but thread hooks may be empty
    due to subitems being stolen by another thread. We need to ensure
@@ -209,14 +205,14 @@ logAccum acc@(passStart, rMap) =
     f@Failure{loc, suiteEvent} ->
       isJust passStart
         ? (Nothing, insert' loc suiteEvent $ Actual Fail)
-        $ error ("Failure event not started\n" <> ptxt f)
+        $ error ("Failure event not started\n" <> txt f)
     pf@ParentFailure{loc, suiteEvent} ->
       isJust passStart
-        ? error ("parent failure encountered when parent event not ended\n" <> ptxt pf)
+        ? error ("parent failure encountered when parent event not ended\n" <> txt pf)
         $ (Nothing, insert' loc suiteEvent ParentFailed)
     s@Start{loc, suiteEvent} ->
       isJust passStart
-        ? error ("start found for already started event\n" <> ptxt s)
+        ? error ("start found for already started event\n" <> txt s)
         $ (Just (loc, suiteEvent), rMap)
     StartExecution{} -> acc
     ApEvent{} -> acc
@@ -286,7 +282,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
           ( \actual ->
               case expected of
                 All e ->
-                  chk' ("Unexpected result for:\n " <> ptxt k <> "\n   expected: " <> ptxt expected) $
+                  chk' ("Unexpected result for:\n " <> txt k <> "\n   expected: " <> txt expected) $
                     all (\r -> r == Actual e || r == ParentFailed) actual
                 NonDeterministic -> pure ()
                 Multi expLst -> case k.suiteEvent of
@@ -294,12 +290,12 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                   TE.Hook TE.Once _ -> bug "Once not expected to have Multi result"
                   TE.Hook TE.Thread _ -> do
                     chk'
-                      ("actual thread events: " <> ptxt actualCount <> " more than max threads: " <> ptxt threadLimit.maxThreads)
+                      ("actual thread events: " <> txt actualCount <> " more than max threads: " <> txt threadLimit.maxThreads)
                       $ actualCount <= threadLimit.maxThreads
                     countChks $ take actualCount expLst
                   TE.Hook TE.Each _ -> countChks expLst
                  where
-                  failMsg law = "Property failed for:\n  " <> ptxt k <> "\n  " <> law
+                  failMsg law = "Property failed for:\n  " <> txt k <> "\n  " <> law
                   -- COUNT EXPECTED IS WRONG
                   countExpected r rList = M.findWithDefault 0 r $ groupCount rList
                   expectedPasses = countExpected Pass
@@ -314,16 +310,16 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                     let expectedPassCount = expectedPasses lstExpected
                         expectedFailCount = expectedFails lstExpected
                     chk'
-                      (failMsg "Pass Count: expectedPassCount: " <> ptxt expectedPassCount <> " <= actualPasses: " <> ptxt actualPasses <> " + actualParentFails: " <> ptxt actualParentFails)
+                      (failMsg "Pass Count: expectedPassCount: " <> txt expectedPassCount <> " <= actualPasses: " <> txt actualPasses <> " + actualParentFails: " <> txt actualParentFails)
                       (expectedPassCount <= actualPasses + actualParentFails)
                     chk'
-                      (failMsg "Pass Count: expectedPassCount: " <> ptxt expectedPassCount <> " >= actualPasses: " <> ptxt actualPasses)
+                      (failMsg "Pass Count: expectedPassCount: " <> txt expectedPassCount <> " >= actualPasses: " <> txt actualPasses)
                       (expectedPassCount >= actualPasses)
                     chk'
-                      (failMsg "Fail Count: expectedFailCount: " <> ptxt expectedPassCount <> " <= actualPasses: " <> ptxt actualPasses <> " + actualParentFails: " <> ptxt actualParentFails)
+                      (failMsg "Fail Count: expectedFailCount: " <> txt expectedPassCount <> " <= actualPasses: " <> txt actualPasses <> " + actualParentFails: " <> txt actualParentFails)
                       (expectedFailCount <= actualFails + actualParentFails)
                     chk'
-                      (failMsg "Fail Count: expectedFailCount: " <> ptxt expectedFailCount <> " >= actualFails: " <> ptxt actualFails)
+                      (failMsg "Fail Count: expectedFailCount: " <> txt expectedFailCount <> " >= actualFails: " <> txt actualFails)
                       (expectedFailCount >= actualFails)
           )
 
@@ -419,11 +415,11 @@ chkParentFailsPropagated
                     ( "ParentFailure event does not have failure path that is a sub-path of the actual failed event:\n"
                         <> "Parent Failure is:\n"
                         <> "FaileEvent: \n"
-                        <> ptxt failLog
+                        <> txt failLog
                         <> "\n"
                         <> "\n"
                         <> "Child Failure is:\n"
-                        <> ptxt p
+                        <> txt p
                     )
                     True
                     isFailChild
@@ -434,16 +430,16 @@ chkParentFailsPropagated
               s@Start{} ->
                 do
                   -- TODO :: implement chkFalse'
-                  -- TODO :: implement ptxt
+                  -- TODO :: implement txt
                   -- TODO :: chk' error mkessage prints to single line - chkEq' works properly
                   chkEq'
                     ( "This event should be a child failure:\n"
                         <> "  This Event is:\n"
                         <> "    "
-                        <> ptxt s
+                        <> txt s
                         <> "  Parent Failure is:\n"
                         <> "    "
-                        <> ptxt failLog
+                        <> txt failLog
                     )
                     False
                     isFailChild
@@ -459,7 +455,7 @@ chkLeafFailsAreNotPropagated
     , failLog
     } = when (isChildless failLog) $ do
     whenJust
-      (LE.head failStartTail)
+      (PE.head failStartTail)
       -- TODO: chkFail does not work here it escapes new lines - fix and check all chk functions format properly
       \case
         c@ParentFailure{failSuiteEvent} ->
@@ -571,7 +567,7 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
  where
   chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
   chkParent (childPath, actualParentPath) =
-    chkEq' (message <> " for:\n" <> ptxt childPath) expectedParentPath actualParentPath
+    chkEq' (message <> " for:\n" <> txt childPath) expectedParentPath actualParentPath
    where
     expectedParentPath = M.lookup childPath expectedChildParentMap
 
@@ -587,11 +583,11 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
    where
     logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
     logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> getSuiteEvent l
-    targEvnt = L.head evntLog
+    targEvnt = PE.head evntLog
     targetPath = targEvnt >>= logSuiteEventPath
     actulaParentPath = do
       h <- targEvnt
-      t <- L.tail evntLog -- all preceding / successive events
+      t <- PE.tail evntLog -- all preceding / successive events
       fps <- findMathcingParent parentEventPredicate h t
       logSuiteEventPath fps
 
@@ -599,7 +595,7 @@ logTails :: Bool -> [LogItem] -> [[LogItem]]
 logTails wantReverse = tails . bool PR.id reverse wantReverse
 
 startHook :: [HookPos] -> LogItem -> Bool
-startHook poss l = startOrParentFailure l && (getHookInfo l & maybe False (\(hz, hkPos) -> hz /= Once && (hkPos `LE.elem` poss)))
+startHook poss l = startOrParentFailure l && (getHookInfo l & maybe False (\(hz, hkPos) -> hz /= Once && (hkPos `PE.elem` poss)))
 
 chkNoEmptyPostHooks :: [LogItem] -> IO ()
 chkNoEmptyPostHooks =
@@ -626,7 +622,7 @@ chkNoEmptyHooks message hookPredicate wantReverse =
       when
         (hookPredicate x)
         $ chk'
-          (message <> " \nEmpty Hook:\n" <> ptxt x)
+          (message <> " \nEmpty Hook:\n" <> txt x)
           (findChildTest x xs)
 
   findChildTest :: LogItem -> [LogItem] -> Bool
@@ -673,7 +669,7 @@ chkStartsOnce errSfx p l = do
  where
   trgEvnts = filter p l
   starts = filter isStart trgEvnts
-  dupLocs = filter ((> 1) . length) . fmap (L.head . fmap (.loc)) . groupOn' (.loc) $ starts
+  dupLocs = filter ((> 1) . length) . fmap (PE.head . fmap (.loc)) . groupOn' (.loc) $ starts
 
 chkAllTemplateItemsLogged :: [T.Template] -> [LogItem] -> IO ()
 chkAllTemplateItemsLogged ts lgs =
@@ -718,7 +714,7 @@ threadVisible onceHookInclude tid =
   filter (\l -> tid == l.threadId || onceHookInclude && (hasSuiteEvent onceHook l || isOnceHookParentFailure l))
 
 threadIds :: [LogItem] -> [ThreadId]
-threadIds = nub . fmap (.threadId)
+threadIds = PE.nub . fmap (.threadId)
 
 threadedLogs :: Bool -> [LogItem] -> [[LogItem]]
 threadedLogs onceHookInclude l =
@@ -730,8 +726,8 @@ shouldOccurOnce = hasSuiteEvent onceSuiteEvent
 chkStartEndExecution :: [ThreadEvent ExePath AE.ApEvent] -> IO ()
 chkStartEndExecution evts =
   (,)
-    <$> L.head evts
-    <*> L.last evts
+    <$> PE.head evts
+    <*> PE.last evts
       & maybe
         (fail "no events")
         ( \(s, e) -> do
@@ -765,7 +761,7 @@ chkThreadLogsInOrder evts =
  where
   threads = groupOn' (.threadId) evts
   -- TODO: need to draw a line in the sand re maybe vs nonemptyList
-  heads = L.head <$> threads
+  heads = PE.head <$> threads
   chkIds evts' =
     for_
       (zip evts' $ drop 1 evts')
@@ -848,7 +844,7 @@ runTest' wantLog baseRandomSeed threadLimit templates = do
   onError
     (chkProperties baseRandomSeed threadLimit expandedTemplate log)
     ( do
-        when (wantLog `LE.elem` [LogFails, LogFailsAndStartTest]) $ do
+        when (wantLog `PE.elem` [LogFails, LogFailsAndStartTest]) $ do
           putStrLn "#### Template ####"
           pPrint expandedTemplate
           putStrLn "#### Log ####"
@@ -948,7 +944,7 @@ parentMatchesTest parentPredicate parentHookItm testItm = do
       startEvntPath <- startSuiteEventLoc testItm
       tstStartSubPath <- parentPath (isTestEventOrTestParentFailure testItm) startEvntPath
       parentPath' <- startSuiteEventLoc parentHookItm
-      pure $ parentPath'.un `isSuffixOf` tstStartSubPath.un
+      pure $ parentPath'.un `PE.isSuffixOf` tstStartSubPath.un
     else
       pure False
 
@@ -962,7 +958,7 @@ findMathcingParent parentPredicate testStartEvnt =
 
 isParentPath :: ExePath -> ExePath -> Bool
 isParentPath (ExePath parent) (ExePath child) =
-  LE.tail child & maybe False (parent `isSuffixOf`)
+  PE.tail child & maybe False (parent `PE.isSuffixOf`)
 
 eventMatchesHookPos :: [HookPos] -> LogItem -> Bool
 eventMatchesHookPos hookPoses lg =
@@ -970,8 +966,8 @@ eventMatchesHookPos hookPoses lg =
     & maybe
       False
       ( \case
-          -- TODO: sort out imports see LE.elem
-          Hook _frq pos -> pos `LE.elem` hookPoses
+          -- TODO: sort out imports see PE.elem
+          Hook _frq pos -> pos `PR.elem` hookPoses
           TE.Test -> False
       )
 
@@ -1000,7 +996,7 @@ mkQueAction q path =
     s <- atomically $ tryReadTQueue q
     s
       & maybe
-        (error $ "spec queue is empty - either the fixture template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> ptxt path)
+        (error $ "spec queue is empty - either the fixture template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> txt path)
         (mkVoidAction path)
 
 data ManyParams = ManyParams

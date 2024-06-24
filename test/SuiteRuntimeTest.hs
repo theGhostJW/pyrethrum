@@ -4,10 +4,9 @@ import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.SuiteRuntime (ThreadCount (..))
 
-import List.Extra as LE hiding (list)
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
-
+import PyrethrumExtras (txt)
 import SuiteRuntimeTestBase
 import Prelude hiding (All, bug, id)
 
@@ -165,8 +164,8 @@ unit_empty_thread_hooks =
         exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [fixture [test Pass]]]]] >>= chkLogLength
   where
     exe = execute NoLog defaultSeed (ThreadCount 1)
-    chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> ptxt r.log) 2 (length r.log)
-    chkLogLength r = chkEq' ("Log length not as expected:\n" <> ptxt r.log) 12 (length r.log)
+    chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> txt r.log) 2 (length r.log)
+    chkLogLength r = chkEq' ("Log length not as expected:\n" <> txt r.log) 12 (length r.log)
 
 {-
   todo:

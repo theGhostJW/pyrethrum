@@ -11,40 +11,40 @@ import FullSuiteTestTemplate qualified as T
 import Internal.RunTimeLogging (ExePath (..), parentPath, testLogControls, topPath)
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
 import Internal.ThreadEvent as TE (
-  HookPos (..),
-  Hz (..),
-  SuiteEvent (..),
-  ThreadEvent (..),
-  ThreadId,
-  getHookInfo,
-  getSuiteEvent,
-  hasSuiteEvent,
-  isChildless,
-  isEnd,
-  isHook,
-  isHookParentFailure,
-  isOnceHookParentFailure,
-  isStart,
-  isTestEventOrTestParentFailure,
-  onceHook,
-  onceSuiteEvent,
-  startOrParentFailure,
-  startSuiteEventLoc,
-  suitEvntToBool,
-  suiteEventOrParentFailureSuiteEvent,
-  threadEventToBool,
-  threadHook,
+    HookPos (..),
+    Hz (..),
+    SuiteEvent (..),
+    ThreadEvent (..),
+    ThreadId,
+    getHookInfo,
+    getSuiteEvent,
+    hasSuiteEvent,
+    isChildless,
+    isEnd,
+    isHook,
+    isHookParentFailure,
+    isOnceHookParentFailure,
+    isStart,
+    isTestEventOrTestParentFailure,
+    onceHook,
+    onceSuiteEvent,
+    startOrParentFailure,
+    startSuiteEventLoc,
+    suitEvntToBool,
+    suiteEventOrParentFailureSuiteEvent,
+    threadEventToBool,
+    threadHook,
  )
 
 import Prepare qualified as P
 import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
-import PyrethrumExtras qualified as PE 
+import PyrethrumExtras qualified as PE
 
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 import PyrethrumExtras.Test (chk') -- don't use chkFail it does not format properly
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C (
-  threadDelay,
+    threadDelay,
  )
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
@@ -65,8 +65,8 @@ printTime msg t = putTxt $ msg <> ":: " <> toS (show t)
 
 printNow :: Text -> IO ()
 printNow lbl = do
-  t <- now
-  printTime lbl t
+    t <- now
+    printTime lbl t
 
 -- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
 -- TODO: other collection types generator / shrinker
@@ -93,7 +93,6 @@ bug t = PR.bug (error t :: SomeException)
 
 logging :: Logging
 logging = NoLog
-
 
 {- each and once hooks will always run but thread hooks may be empty
    due to subitems being stolen by another thread. We need to ensure
@@ -127,67 +126,67 @@ logItemtoBool = threadEventToBool
 
 chkProperties :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
 chkProperties baseSeed threadLimit ts evts = do
-  -- these checks apply to the log as a whole
-  -- TODO: Add to test - errors always logged when no parent error should be derivable from
-  -- template
-  traverse_
-    (evts &)
-    [ chkStartEndExecution
-    , chkThreadLogsInOrder
-    , chkAllTemplateItemsLogged ts
-    , chkStartsOnce "once hooks and tests" shouldOccurOnce
-    , chkExpectedResults baseSeed threadLimit ts
-    ]
-  -- these checks apply to each thread log (events with the same thread id)
-  threadLogChks
-    False
-    evts
-    [ chkThreadHooksStartedOnceInThread
-    , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-    , chkNoEmptyPostHooks
-    , chkNoEmptyPreHooks
-    ]
-  -- these checks apply to each thread log (ie. Once events + events with the same thread id)
-  threadLogChks
-    True
-    evts
-    [ chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
-    , chkAfterTeardownParents (T.expectedParentSubsequentEvents ts)
-    , chkFailureLocEqualsLastStartLoc
-    , chkFailurePropagation
-    ]
+    -- these checks apply to the log as a whole
+    -- TODO: Add to test - errors always logged when no parent error should be derivable from
+    -- template
+    traverse_
+        (evts &)
+        [ chkStartEndExecution
+        , chkThreadLogsInOrder
+        , chkAllTemplateItemsLogged ts
+        , chkStartsOnce "once hooks and tests" shouldOccurOnce
+        , chkExpectedResults baseSeed threadLimit ts
+        ]
+    -- these checks apply to each thread log (events with the same thread id)
+    threadLogChks
+        False
+        evts
+        [ chkThreadHooksStartedOnceInThread
+        , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
+        , chkNoEmptyPostHooks
+        , chkNoEmptyPreHooks
+        ]
+    -- these checks apply to each thread log (ie. Once events + events with the same thread id)
+    threadLogChks
+        True
+        evts
+        [ chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts)
+        , chkAfterTeardownParents (T.expectedParentSubsequentEvents ts)
+        , chkFailureLocEqualsLastStartLoc
+        , chkFailurePropagation
+        ]
 
 data FailInfo = FailInfo
-  { --   idx :: Int
-    -- , threadId :: ThreadId
-    -- , suiteEvent :: SuiteEvent
-    -- , loc :: ExePath
-    -- ,
-    failLog :: LogItem
-  , failStartTail :: [LogItem]
-  }
-  deriving (Show)
+    { --   idx :: Int
+      -- , threadId :: ThreadId
+      -- , suiteEvent :: SuiteEvent
+      -- , loc :: ExePath
+      -- ,
+      failLog :: LogItem
+    , failStartTail :: [LogItem]
+    }
+    deriving (Show)
 
 -- TODO: logging options ~ only log failures - need a Pass summary log Object
 
 data Summary = Summary
-  { fails :: Set (AE.Path, SuiteEvent)
-  , parentFails :: Set (AE.Path, SuiteEvent)
-  , passes :: Set (AE.Path, SuiteEvent)
-  }
-  deriving (Show)
+    { fails :: Set (AE.Path, SuiteEvent)
+    , parentFails :: Set (AE.Path, SuiteEvent)
+    , passes :: Set (AE.Path, SuiteEvent)
+    }
+    deriving (Show)
 
 data LogResult
-  = Actual Result
-  | ParentFailed
-  deriving (Ord, Eq, Show)
+    = Actual Result
+    | ParentFailed
+    deriving (Ord, Eq, Show)
 
 data ResultInfo = ResultInfo
-  { path :: AE.Path
-  , suiteEvent :: SuiteEvent
-  , result :: LogResult
-  }
-  deriving (Ord, Eq, Show)
+    { path :: AE.Path
+    , suiteEvent :: SuiteEvent
+    , result :: LogResult
+    }
+    deriving (Ord, Eq, Show)
 
 -- a result accumulator function to be used across a logs grouped by thread
 actualResults :: [LogItem] -> Map SuiteEventPath [LogResult]
@@ -196,47 +195,47 @@ actualResults = snd . foldl' logAccum (Nothing, M.empty)
 -- a result accumulator function to be used across a logs grouped by thread
 logAccum :: (Maybe (ExePath, SuiteEvent), Map SuiteEventPath [LogResult]) -> LogItem -> (Maybe (ExePath, SuiteEvent), Map SuiteEventPath [LogResult])
 logAccum acc@(passStart, rMap) =
-  \case
-    End{loc, suiteEvent} ->
-      passStart
-        & maybe
-          acc
-          (\(_l, _s) -> (Nothing, insert' loc suiteEvent $ Actual Pass))
-    f@Failure{loc, suiteEvent} ->
-      isJust passStart
-        ? (Nothing, insert' loc suiteEvent $ Actual Fail)
-        $ error ("Failure event not started\n" <> txt f)
-    pf@ParentFailure{loc, suiteEvent} ->
-      isJust passStart
-        ? error ("parent failure encountered when parent event not ended\n" <> txt pf)
-        $ (Nothing, insert' loc suiteEvent ParentFailed)
-    s@Start{loc, suiteEvent} ->
-      isJust passStart
-        ? error ("start found for already started event\n" <> txt s)
-        $ (Just (loc, suiteEvent), rMap)
-    StartExecution{} -> acc
-    ApEvent{} -> acc
-    EndExecution{} -> acc
- where
-  insert' :: ExePath -> SuiteEvent -> LogResult -> Map SuiteEventPath [LogResult]
-  insert' l se r = M.insertWith (<>) (SuiteEventPath (topPath' l) se) [r] rMap
-  topPath' p =
-    fromMaybe (bug $ "Empty event path ~ bad template setup " <> txt p) $ topPath p
+    \case
+        End{loc, suiteEvent} ->
+            passStart
+                & maybe
+                    acc
+                    (\(_l, _s) -> (Nothing, insert' loc suiteEvent $ Actual Pass))
+        f@Failure{loc, suiteEvent} ->
+            isJust passStart
+                ? (Nothing, insert' loc suiteEvent $ Actual Fail)
+                $ error ("Failure event not started\n" <> txt f)
+        pf@ParentFailure{loc, suiteEvent} ->
+            isJust passStart
+                ? error ("parent failure encountered when parent event not ended\n" <> txt pf)
+                $ (Nothing, insert' loc suiteEvent ParentFailed)
+        s@Start{loc, suiteEvent} ->
+            isJust passStart
+                ? error ("start found for already started event\n" <> txt s)
+                $ (Just (loc, suiteEvent), rMap)
+        StartExecution{} -> acc
+        ApEvent{} -> acc
+        EndExecution{} -> acc
+  where
+    insert' :: ExePath -> SuiteEvent -> LogResult -> Map SuiteEventPath [LogResult]
+    insert' l se r = M.insertWith (<>) (SuiteEventPath (topPath' l) se) [r] rMap
+    topPath' p =
+        fromMaybe (bug $ "Empty event path ~ bad template setup " <> txt p) $ topPath p
 
 --  note this fixture will only work if there are enough delays in the template
 --  and the template is big enough to ensure that the threads are used
 chkThreadCount :: ThreadCount -> [LogItem] -> IO ()
 chkThreadCount threadLimit evts =
-  chkEq'
-    "Thread count"
-    (threadLimit.maxThreads + 1) -- main thread + number of threads specified
-    (length $ threadIds evts)
+    chkEq'
+        "Thread count"
+        (threadLimit.maxThreads + 1) -- main thread + number of threads specified
+        (length $ threadIds evts)
 
 data ExpectedResult
-  = All Result
-  | NonDeterministic
-  | Multi [Result]
-  deriving (Show, Eq)
+    = All Result
+    | NonDeterministic
+    | Multi [Result]
+    deriving (Show, Eq)
 
 -- todo add to pyrelude
 groupCount :: (Ord a) => [a] -> M.Map a Int
@@ -263,217 +262,217 @@ defects found in testing::
 
 chkExpectedResults :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
 chkExpectedResults baseSeed threadLimit ts lgs =
-  do
-    -- fail missing expected results or different to expected
-    chkResults
-    -- fail extra results
-    let extrActual = M.keysSet actuals S.\\ M.keysSet expectedResults
-    chkEq' "Extra results found in actual that are not expected" S.empty extrActual
- where
-  chkResults :: IO ()
-  chkResults = traverse_ chkResult $ M.toList expectedResults
-   where
-    chkResult :: (SuiteEventPath, ExpectedResult) -> IO ()
-    chkResult (k, expected) =
-      M.lookup k actuals
-        & maybe
-          --  todo: this doesn't format as expected
-          (fail $ "Expected result for " <> ppShow k <> " not found in actual")
-          ( \actual ->
-              case expected of
-                All e ->
-                  chk' ("Unexpected result for:\n " <> txt k <> "\n   expected: " <> txt expected) $
-                    all (\r -> r == Actual e || r == ParentFailed) actual
-                NonDeterministic -> pure ()
-                Multi expLst -> case k.suiteEvent of
-                  TE.Test{} -> bug "Test not expected to have Multi result"
-                  TE.Hook TE.Once _ -> bug "Once not expected to have Multi result"
-                  TE.Hook TE.Thread _ -> do
-                    chk'
-                      ("actual thread events: " <> txt actualCount <> " more than max threads: " <> txt threadLimit.maxThreads)
-                      $ actualCount <= threadLimit.maxThreads
-                    countChks $ take actualCount expLst
-                  TE.Hook TE.Each _ -> countChks expLst
-                 where
-                  failMsg law = "Property failed for:\n  " <> txt k <> "\n  " <> law
-                  -- COUNT EXPECTED IS WRONG
-                  countExpected r rList = M.findWithDefault 0 r $ groupCount rList
-                  expectedPasses = countExpected Pass
-                  expectedFails = countExpected Fail
-                  -- TODO: an infix high precedence operator for debugging
-                  actualCount = length actual
-                  actuals' = groupCount actual
-                  actualPasses = M.findWithDefault 0 (Actual Pass) actuals'
-                  actualFails = M.findWithDefault 0 (Actual Fail) actuals'
-                  actualParentFails = M.findWithDefault 0 ParentFailed actuals'
-                  countChks lstExpected = do
-                    let expectedPassCount = expectedPasses lstExpected
-                        expectedFailCount = expectedFails lstExpected
-                    chk'
-                      (failMsg "Pass Count: expectedPassCount: " <> txt expectedPassCount <> " <= actualPasses: " <> txt actualPasses <> " + actualParentFails: " <> txt actualParentFails)
-                      (expectedPassCount <= actualPasses + actualParentFails)
-                    chk'
-                      (failMsg "Pass Count: expectedPassCount: " <> txt expectedPassCount <> " >= actualPasses: " <> txt actualPasses)
-                      (expectedPassCount >= actualPasses)
-                    chk'
-                      (failMsg "Fail Count: expectedFailCount: " <> txt expectedPassCount <> " <= actualPasses: " <> txt actualPasses <> " + actualParentFails: " <> txt actualParentFails)
-                      (expectedFailCount <= actualFails + actualParentFails)
-                    chk'
-                      (failMsg "Fail Count: expectedFailCount: " <> txt expectedFailCount <> " >= actualFails: " <> txt actualFails)
-                      (expectedFailCount >= actualFails)
-          )
+    do
+        -- fail missing expected results or different to expected
+        chkResults
+        -- fail extra results
+        let extrActual = M.keysSet actuals S.\\ M.keysSet expectedResults
+        chkEq' "Extra results found in actual that are not expected" S.empty extrActual
+  where
+    chkResults :: IO ()
+    chkResults = traverse_ chkResult $ M.toList expectedResults
+      where
+        chkResult :: (SuiteEventPath, ExpectedResult) -> IO ()
+        chkResult (k, expected) =
+            M.lookup k actuals
+                & maybe
+                    --  todo: this doesn't format as expected
+                    (fail $ "Expected result for " <> ppShow k <> " not found in actual")
+                    ( \actual ->
+                        case expected of
+                            All e ->
+                                chk' ("Unexpected result for:\n " <> txt k <> "\n   expected: " <> txt expected) $
+                                    all (\r -> r == Actual e || r == ParentFailed) actual
+                            NonDeterministic -> pure ()
+                            Multi expLst -> case k.suiteEvent of
+                                TE.Test{} -> bug "Test not expected to have Multi result"
+                                TE.Hook TE.Once _ -> bug "Once not expected to have Multi result"
+                                TE.Hook TE.Thread _ -> do
+                                    chk'
+                                        ("actual thread events: " <> txt actualCount <> " more than max threads: " <> txt threadLimit.maxThreads)
+                                        $ actualCount <= threadLimit.maxThreads
+                                    countChks $ take actualCount expLst
+                                TE.Hook TE.Each _ -> countChks expLst
+                              where
+                                failMsg law = "Property failed for:\n  " <> txt k <> "\n  " <> law
+                                -- COUNT EXPECTED IS WRONG
+                                countExpected r rList = M.findWithDefault 0 r $ groupCount rList
+                                expectedPasses = countExpected Pass
+                                expectedFails = countExpected Fail
+                                -- TODO: an infix high precedence operator for debugging
+                                actualCount = length actual
+                                actuals' = groupCount actual
+                                actualPasses = M.findWithDefault 0 (Actual Pass) actuals'
+                                actualFails = M.findWithDefault 0 (Actual Fail) actuals'
+                                actualParentFails = M.findWithDefault 0 ParentFailed actuals'
+                                countChks lstExpected = do
+                                    let expectedPassCount = expectedPasses lstExpected
+                                        expectedFailCount = expectedFails lstExpected
+                                    chk'
+                                        (failMsg "Pass Count: expectedPassCount: " <> txt expectedPassCount <> " <= actualPasses: " <> txt actualPasses <> " + actualParentFails: " <> txt actualParentFails)
+                                        (expectedPassCount <= actualPasses + actualParentFails)
+                                    chk'
+                                        (failMsg "Pass Count: expectedPassCount: " <> txt expectedPassCount <> " >= actualPasses: " <> txt actualPasses)
+                                        (expectedPassCount >= actualPasses)
+                                    chk'
+                                        (failMsg "Fail Count: expectedFailCount: " <> txt expectedPassCount <> " <= actualPasses: " <> txt actualPasses <> " + actualParentFails: " <> txt actualParentFails)
+                                        (expectedFailCount <= actualFails + actualParentFails)
+                                    chk'
+                                        (failMsg "Fail Count: expectedFailCount: " <> txt expectedFailCount <> " >= actualFails: " <> txt actualFails)
+                                        (expectedFailCount >= actualFails)
+                    )
 
-  expectedResults :: Map SuiteEventPath ExpectedResult
-  expectedResults = foldl' calcExpected M.empty $ ts >>= T.eventPaths
+    expectedResults :: Map SuiteEventPath ExpectedResult
+    expectedResults = foldl' calcExpected M.empty $ ts >>= T.eventPaths
 
-  calcExpected :: Map SuiteEventPath ExpectedResult -> T.EventPath -> Map SuiteEventPath ExpectedResult
-  calcExpected acc T.EventPath{path, suiteEvent, evntSpec, template} =
-    M.insert (ensureUnique key) expected acc
-   where
-    key = SuiteEventPath path suiteEvent
-    ensureUnique k =
-      M.member k acc
-        ? bug ("duplicate key should not happen. Template paths should be unique: " <> txt k)
-        $ k
+    calcExpected :: Map SuiteEventPath ExpectedResult -> T.EventPath -> Map SuiteEventPath ExpectedResult
+    calcExpected acc T.EventPath{path, suiteEvent, evntSpec, template} =
+        M.insert (ensureUnique key) expected acc
+      where
+        key = SuiteEventPath path suiteEvent
+        ensureUnique k =
+            M.member k acc
+                ? bug ("duplicate key should not happen. Template paths should be unique: " <> txt k)
+                $ k
 
-    expected :: ExpectedResult
-    expected =
-      case evntSpec of
-        T.All Spec{result} -> SuiteRuntimeTestBase.All result
-        PassProb{genStrategy, passPcnt, minDelay, maxDelay} ->
-          case genStrategy of
-            T.Preload -> Multi $ (.result) <$> generateSpecs baseSeed rLength path passPcnt minDelay maxDelay
-            T.Runtime -> NonDeterministic
-         where
-          rLength = case suiteEvent of
-            TE.Test{} -> bug "Test not expected to have PassProb spec"
-            TE.Hook TE.Once _ -> bug "Once  not expected to have PassProb spec"
-            TE.Hook TE.Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
-            TE.Hook TE.Each _ -> T.countTests template -- expect a result for each test item
-  actuals :: Map SuiteEventPath [LogResult]
-  actuals =
-    foldl' (M.unionWith (<>)) M.empty allResults
-   where
-    allResults = actualResults <$> threadedLogs False lgs
+        expected :: ExpectedResult
+        expected =
+            case evntSpec of
+                T.All Spec{result} -> SuiteRuntimeTestBase.All result
+                PassProb{genStrategy, passPcnt, minDelay, maxDelay} ->
+                    case genStrategy of
+                        T.Preload -> Multi $ (.result) <$> generateSpecs baseSeed rLength path passPcnt minDelay maxDelay
+                        T.Runtime -> NonDeterministic
+                  where
+                    rLength = case suiteEvent of
+                        TE.Test{} -> bug "Test not expected to have PassProb spec"
+                        TE.Hook TE.Once _ -> bug "Once  not expected to have PassProb spec"
+                        TE.Hook TE.Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
+                        TE.Hook TE.Each _ -> T.countTests template -- expect a result for each test item
+    actuals :: Map SuiteEventPath [LogResult]
+    actuals =
+        foldl' (M.unionWith (<>)) M.empty allResults
+      where
+        allResults = actualResults <$> threadedLogs False lgs
 
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =
-  do
-    traverse_ chkLeafFailsAreNotPropagated failTails
-    traverse_ chkParentFailsPropagated failTails
- where
-  failTails = snd $ failInfo lg
+    do
+        traverse_ chkLeafFailsAreNotPropagated failTails
+        traverse_ chkParentFailsPropagated failTails
+  where
+    failTails = snd $ failInfo lg
 
 data ChkState = ExpectParentFail | DoneChecking
-  deriving (Show, Eq)
+    deriving (Show, Eq)
 
 isFailChildEventOf :: LogItem -> LogItem -> Bool
 isFailChildEventOf c p =
-  (cIsSubpathOfp || samePath && pIsSetupFailure && cIsTeardown) && (sameThread || pIsOnceHook)
- where
-  sameThread = p.threadId == c.threadId
-  hasHookPos hp = \case
-    Hook _ hp' -> hp == hp'
-    _ -> False
-  cIsTeardown = logItemtoBool (hasHookPos Teardown) c
-  pFailEvent = case p of
-    Failure{suiteEvent} -> Just suiteEvent
-    _ -> Nothing
-  pIsSetupFailure = suitEvntToBool (hasHookPos Setup) pFailEvent
+    (cIsSubpathOfp || samePath && pIsSetupFailure && cIsTeardown) && (sameThread || pIsOnceHook)
+  where
+    sameThread = p.threadId == c.threadId
+    hasHookPos hp = \case
+        Hook _ hp' -> hp == hp'
+        _ -> False
+    cIsTeardown = logItemtoBool (hasHookPos Teardown) c
+    pFailEvent = case p of
+        Failure{suiteEvent} -> Just suiteEvent
+        _ -> Nothing
+    pIsSetupFailure = suitEvntToBool (hasHookPos Setup) pFailEvent
 
-  samePath = p.loc == c.loc
-  cIsSubpathOfp = isParentPath p.loc c.loc
-  pIsOnceHook = suitEvntToBool (\case Hook hz _ -> hz == Once; _ -> False) pFailEvent
+    samePath = p.loc == c.loc
+    cIsSubpathOfp = isParentPath p.loc c.loc
+    pIsOnceHook = suitEvntToBool (\case Hook hz _ -> hz == Once; _ -> False) pFailEvent
 
 chkParentFailsPropagated :: FailInfo -> IO ()
 chkParentFailsPropagated
-  f@FailInfo
-    { failStartTail
-    , failLog
-    } =
-    unless (isChildless f.failLog) $ do
-      void $ foldlM chkEvent ExpectParentFail failStartTail
-   where
-    isFailChildLog :: LogItem -> Bool
-    isFailChildLog = flip isFailChildEventOf failLog
+    f@FailInfo
+        { failStartTail
+        , failLog
+        } =
+        unless (isChildless f.failLog) $ do
+            void $ foldlM chkEvent ExpectParentFail failStartTail
+      where
+        isFailChildLog :: LogItem -> Bool
+        isFailChildLog = flip isFailChildEventOf failLog
 
-    chkEvent :: ChkState -> LogItem -> IO ChkState
-    chkEvent acc lgItm =
-      let
-        isFailChild = isFailChildLog lgItm
-       in
-        acc
-          == DoneChecking
-            ? pure DoneChecking
-          $ lgItm
-            & \case
-              p@ParentFailure{} ->
-                do
-                  -- TODO fix chk' so it prettyprints properly
-                  -- that is why chkEq' was used here
-                  chkEq'
-                    ( "ParentFailure event does not have failure path that is a sub-path of the actual failed event:\n"
-                        <> "Parent Failure is:\n"
-                        <> "FaileEvent: \n"
-                        <> txt failLog
-                        <> "\n"
-                        <> "\n"
-                        <> "Child Failure is:\n"
-                        <> txt p
-                    )
-                    True
-                    isFailChild
-                  pure ExpectParentFail
-              f'@Failure{} ->
-                -- TODO :: hide reinstate with test conversion
-                fail $ "Failure when expect parent failure:\n" <> ppShow f'
-              s@Start{} ->
-                do
-                  -- TODO :: implement chkFalse'
-                  -- TODO :: implement txt
-                  -- TODO :: chk' error mkessage prints to single line - chkEq' works properly
-                  chkEq'
-                    ( "This event should be a child failure:\n"
-                        <> "  This Event is:\n"
-                        <> "    "
-                        <> txt s
-                        <> "  Parent Failure is:\n"
-                        <> "    "
-                        <> txt failLog
-                    )
-                    False
-                    isFailChild
-                  pure DoneChecking
-              _ ->
-                fail $
-                  "Unexpected event in failStartTail - these events should have been filtered out:\n" <> ppShow lgItm
+        chkEvent :: ChkState -> LogItem -> IO ChkState
+        chkEvent acc lgItm =
+            let
+                isFailChild = isFailChildLog lgItm
+             in
+                acc
+                    == DoneChecking
+                        ? pure DoneChecking
+                    $ lgItm
+                        & \case
+                            p@ParentFailure{} ->
+                                do
+                                    -- TODO fix chk' so it prettyprints properly
+                                    -- that is why chkEq' was used here
+                                    chkEq'
+                                        ( "ParentFailure event does not have failure path that is a sub-path of the actual failed event:\n"
+                                            <> "Parent Failure is:\n"
+                                            <> "FaileEvent: \n"
+                                            <> txt failLog
+                                            <> "\n"
+                                            <> "\n"
+                                            <> "Child Failure is:\n"
+                                            <> txt p
+                                        )
+                                        True
+                                        isFailChild
+                                    pure ExpectParentFail
+                            f'@Failure{} ->
+                                -- TODO :: hide reinstate with test conversion
+                                fail $ "Failure when expect parent failure:\n" <> ppShow f'
+                            s@Start{} ->
+                                do
+                                    -- TODO :: implement chkFalse'
+                                    -- TODO :: implement txt
+                                    -- TODO :: chk' error mkessage prints to single line - chkEq' works properly
+                                    chkEq'
+                                        ( "This event should be a child failure:\n"
+                                            <> "  This Event is:\n"
+                                            <> "    "
+                                            <> txt s
+                                            <> "  Parent Failure is:\n"
+                                            <> "    "
+                                            <> txt failLog
+                                        )
+                                        False
+                                        isFailChild
+                                    pure DoneChecking
+                            _ ->
+                                fail $
+                                    "Unexpected event in failStartTail - these events should have been filtered out:\n" <> ppShow lgItm
 
 chkLeafFailsAreNotPropagated :: FailInfo -> IO ()
 chkLeafFailsAreNotPropagated
-  FailInfo
-    { failStartTail
-    , failLog
-    } = when (isChildless failLog) $ do
-    whenJust
-      (PE.head failStartTail)
-      -- TODO: chkFail does not work here it escapes new lines - fix and check all chk functions format properly
-      \case
-        c@ParentFailure{failSuiteEvent} ->
-          -- this is wrong can pick up failed elements from another branch
-         unless(onceSuiteEvent failSuiteEvent) $ do 
-            {-
-            if a leaf item such as an after hook or test fails then the next item 
-            should not be a parent failure because leaf items can't be parents.
-            This does not apply if the parent failure was caused by a once event 
-            because such failures can be generated when the thread picks up nodes from
-            a different branch 
-            -}
-          fail $
-            "Leaf failure propagated to next event.\nLeaf event was:\n"
-              <> ppShow failLog
-              <> "\nNext event was:\n"
-              <> ppShow c
-        _ -> pure ()
+    FailInfo
+        { failStartTail
+        , failLog
+        } = when (isChildless failLog) $ do
+        whenJust
+            (PE.head failStartTail)
+            -- TODO: chkFail does not work here it escapes new lines - fix and check all chk functions format properly
+            \case
+                c@ParentFailure{failSuiteEvent} ->
+                    -- this is wrong can pick up failed elements from another branch
+                    unless (onceSuiteEvent failSuiteEvent) $ do
+                        {-
+                        if a leaf item such as an after hook or test fails then the next item
+                        should not be a parent failure because leaf items can't be parents.
+                        This does not apply if the parent failure was caused by a once event
+                        because such failures can be generated when the thread picks up nodes from
+                        a different branch
+                        -}
+                        fail $
+                            "Leaf failure propagated to next event.\nLeaf event was:\n"
+                                <> ppShow failLog
+                                <> "\nNext event was:\n"
+                                <> ppShow c
+                _ -> pure ()
 
 -- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
 -- captures
@@ -483,72 +482,72 @@ chkLeafFailsAreNotPropagated
 
 failInfo :: [LogItem] -> (Maybe SuiteEvent, [FailInfo])
 failInfo li =
-  foldl' step (Nothing, []) $ tails failStarts
- where
-  step :: (Maybe SuiteEvent, [FailInfo]) -> [LogItem] -> (Maybe SuiteEvent, [FailInfo])
-  step (lastStartEvnt, result) =
-    \case
-      [] -> (lastStartEvnt, result)
-      (l : ls) ->
-        l & \case
-          Start{suiteEvent = se} ->
-            (Just se, result)
-          f@Failure{} ->
-            lastStartEvnt
-              & maybe
-                (error $ "Failure encountered before start:\n" <> toS (ppShow f))
-                (const (Nothing, FailInfo f ls : result))
-          ParentFailure{} -> passThrough
-          StartExecution{} -> passThrough
-          EndExecution{} -> passThrough
-          ApEvent{} -> passThrough
-          End{} -> passThrough
-   where
-    passThrough = (lastStartEvnt, result)
-  failStarts =
-    filter
-      ( \case
-          Failure{} -> True
-          ParentFailure{} -> True
-          Start{} -> True
-          _ -> False
-      )
-      li
+    foldl' step (Nothing, []) $ tails failStarts
+  where
+    step :: (Maybe SuiteEvent, [FailInfo]) -> [LogItem] -> (Maybe SuiteEvent, [FailInfo])
+    step (lastStartEvnt, result) =
+        \case
+            [] -> (lastStartEvnt, result)
+            (l : ls) ->
+                l & \case
+                    Start{suiteEvent = se} ->
+                        (Just se, result)
+                    f@Failure{} ->
+                        lastStartEvnt
+                            & maybe
+                                (error $ "Failure encountered before start:\n" <> toS (ppShow f))
+                                (const (Nothing, FailInfo f ls : result))
+                    ParentFailure{} -> passThrough
+                    StartExecution{} -> passThrough
+                    EndExecution{} -> passThrough
+                    ApEvent{} -> passThrough
+                    End{} -> passThrough
+      where
+        passThrough = (lastStartEvnt, result)
+    failStarts =
+        filter
+            ( \case
+                Failure{} -> True
+                ParentFailure{} -> True
+                Start{} -> True
+                _ -> False
+            )
+            li
 
 -- TODO: do empty thread test case should not run anything (ie no thread events - cna happpen despite tree
 -- shaking due to multiple threads)
 chkFailureLocEqualsLastStartLoc :: [LogItem] -> IO ()
 chkFailureLocEqualsLastStartLoc =
-  void . foldl' step (pure Nothing)
- where
-  step :: IO (Maybe ExePath) -> LogItem -> IO (Maybe ExePath)
-  step mParentLoc li = do
-    let newStart = startLoc li
-    mpl <- mParentLoc
-    newStart
-      & maybe
-        ( do
-            chkParentFailureLoc mpl li
-            mParentLoc
-        )
-        pure
-      . Just
+    void . foldl' step (pure Nothing)
+  where
+    step :: IO (Maybe ExePath) -> LogItem -> IO (Maybe ExePath)
+    step mParentLoc li = do
+        let newStart = startLoc li
+        mpl <- mParentLoc
+        newStart
+            & maybe
+                ( do
+                    chkParentFailureLoc mpl li
+                    mParentLoc
+                )
+                pure
+            . Just
 
-  startLoc :: LogItem -> Maybe ExePath
-  startLoc l = isStart l ? startSuiteEventLoc l $ Nothing
+    startLoc :: LogItem -> Maybe ExePath
+    startLoc l = isStart l ? startSuiteEventLoc l $ Nothing
 
-  chkParentFailureLoc :: Maybe ExePath -> LogItem -> IO ()
-  chkParentFailureLoc mParentLoc li =
-    case li of
-      ParentFailure{loc} -> chkEq' ("Parent failure loc for " <> toS (ppShow li)) mParentLoc (Just loc)
-      _ -> pure ()
+    chkParentFailureLoc :: Maybe ExePath -> LogItem -> IO ()
+    chkParentFailureLoc mParentLoc li =
+        case li of
+            ParentFailure{loc} -> chkEq' ("Parent failure loc for " <> toS (ppShow li)) mParentLoc (Just loc)
+            _ -> pure ()
 
 chkAfterTeardownParents :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkAfterTeardownParents =
-  chkForMatchedParents
-    "After / Teardown parent event"
-    False -- leave the list in reverse order so we are forward through subsequent events
-    isAfterSuiteEvent
+    chkForMatchedParents
+        "After / Teardown parent event"
+        False -- leave the list in reverse order so we are forward through subsequent events
+        isAfterSuiteEvent
 
 -- isAnyHookSuiteEvent
 
@@ -556,40 +555,40 @@ chkAfterTeardownParents =
 
 chkPrecedingSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkPrecedingSuiteEventAsExpected =
-  chkForMatchedParents
-    "preceding parent event"
-    True -- reverse list so we are searching back through preceding events
-    isBeforeSuiteEvent
+    chkForMatchedParents
+        "preceding parent event"
+        True -- reverse list so we are searching back through preceding events
+        isBeforeSuiteEvent
 
 chkForMatchedParents :: Text -> Bool -> (LogItem -> Bool) -> Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
 chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildParentMap thrdLog =
-  traverse_ chkParent actualParents
- where
-  chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
-  chkParent (childPath, actualParentPath) =
-    chkEq' (message <> " for:\n" <> txt childPath) expectedParentPath actualParentPath
-   where
-    expectedParentPath = M.lookup childPath expectedChildParentMap
+    traverse_ chkParent actualParents
+  where
+    chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
+    chkParent (childPath, actualParentPath) =
+        chkEq' (message <> " for:\n" <> txt childPath) expectedParentPath actualParentPath
+      where
+        expectedParentPath = M.lookup childPath expectedChildParentMap
 
-  actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
-  actualParents = mapMaybe extractHeadParent thrdLogTails
+    actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
+    actualParents = mapMaybe extractHeadParent thrdLogTails
 
-  thrdLogTails :: [[LogItem]]
-  thrdLogTails = logTails wantReverseLog thrdLog
+    thrdLogTails :: [[LogItem]]
+    thrdLogTails = logTails wantReverseLog thrdLog
 
-  extractHeadParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
-  extractHeadParent evntLog =
-    (,actulaParentPath) <$> targetPath
-   where
-    logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
-    logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> getSuiteEvent l
-    targEvnt = PE.head evntLog
-    targetPath = targEvnt >>= logSuiteEventPath
-    actulaParentPath = do
-      h <- targEvnt
-      t <- PE.tail evntLog -- all preceding / successive events
-      fps <- findMathcingParent parentEventPredicate h t
-      logSuiteEventPath fps
+    extractHeadParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
+    extractHeadParent evntLog =
+        (,actulaParentPath) <$> targetPath
+      where
+        logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
+        logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> getSuiteEvent l
+        targEvnt = PE.head evntLog
+        targetPath = targEvnt >>= logSuiteEventPath
+        actulaParentPath = do
+            h <- targEvnt
+            t <- PE.tail evntLog -- all preceding / successive events
+            fps <- findMathcingParent parentEventPredicate h t
+            logSuiteEventPath fps
 
 logTails :: Bool -> [LogItem] -> [[LogItem]]
 logTails wantReverse = tails . bool PR.id reverse wantReverse
@@ -599,104 +598,104 @@ startHook poss l = startOrParentFailure l && (getHookInfo l & maybe False (\(hz,
 
 chkNoEmptyPostHooks :: [LogItem] -> IO ()
 chkNoEmptyPostHooks =
-  chkNoEmptyHooks
-    "Post Hook Empty"
-    (startHook [Teardown, After])
-    True
+    chkNoEmptyHooks
+        "Post Hook Empty"
+        (startHook [Teardown, After])
+        True
 
 chkNoEmptyPreHooks :: [LogItem] -> IO ()
 chkNoEmptyPreHooks =
-  chkNoEmptyHooks
-    "Post Hook Empty"
-    (startHook [Setup, Before])
-    False
+    chkNoEmptyHooks
+        "Post Hook Empty"
+        (startHook [Setup, Before])
+        False
 
 chkNoEmptyHooks :: Text -> (LogItem -> Bool) -> Bool -> [LogItem] -> IO ()
 chkNoEmptyHooks message hookPredicate wantReverse =
-  traverse_ chkHasTest . logTails wantReverse
- where
-  chkHasTest :: [LogItem] -> IO ()
-  chkHasTest = \case
-    [] -> pure () -- wont happen
-    x : xs ->
-      when
-        (hookPredicate x)
-        $ chk'
-          (message <> " \nEmpty Hook:\n" <> txt x)
-          (findChildTest x xs)
+    traverse_ chkHasTest . logTails wantReverse
+  where
+    chkHasTest :: [LogItem] -> IO ()
+    chkHasTest = \case
+        [] -> pure () -- wont happen
+        x : xs ->
+            when
+                (hookPredicate x)
+                $ chk'
+                    (message <> " \nEmpty Hook:\n" <> txt x)
+                    (findChildTest x xs)
 
-  findChildTest :: LogItem -> [LogItem] -> Bool
-  findChildTest hk =
-    any (fromMaybe False . testMatchesParent)
-   where
-    testMatchesParent :: LogItem -> Maybe Bool
-    testMatchesParent =
-      parentMatchesTest (const True) hk
+    findChildTest :: LogItem -> [LogItem] -> Bool
+    findChildTest hk =
+        any (fromMaybe False . testMatchesParent)
+      where
+        testMatchesParent :: LogItem -> Maybe Bool
+        testMatchesParent =
+            parentMatchesTest (const True) hk
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =
-  chkStartSuiteEventImmediatlyFollowedByEnd (hasSuiteEvent (const True))
+    chkStartSuiteEventImmediatlyFollowedByEnd (hasSuiteEvent (const True))
 
 chkStartSuiteEventImmediatlyFollowedByEnd :: (LogItem -> Bool) -> [LogItem] -> IO ()
 chkStartSuiteEventImmediatlyFollowedByEnd p l = do
-  unless (null startNotFollwedByEnd) $
-    fail $
-      "Thread suite elements - start not followed by end:\n" <> toS (ppShow startNotFollwedByEnd)
- where
-  trgEvnts = filter p l
-  startNotFollwedByEnd = filter (\(s, e) -> isStart s && (not (isEnd e) || s.loc /= e.loc)) . zip trgEvnts $ drop 1 trgEvnts
+    unless (null startNotFollwedByEnd) $
+        fail $
+            "Thread suite elements - start not followed by end:\n" <> toS (ppShow startNotFollwedByEnd)
+  where
+    trgEvnts = filter p l
+    startNotFollwedByEnd = filter (\(s, e) -> isStart s && (not (isEnd e) || s.loc /= e.loc)) . zip trgEvnts $ drop 1 trgEvnts
 
 threadLogChks :: Bool -> [LogItem] -> [[LogItem] -> IO ()] -> IO ()
 threadLogChks includeOnce fullLog = traverse_ chkTls
- where
-  tlgs = threadedLogs includeOnce fullLog
-  chkTls = checkThreadLogs tlgs
-  checkThreadLogs :: [[LogItem]] -> ([LogItem] -> IO ()) -> IO ()
-  checkThreadLogs tls' lgChk = traverse_ lgChk tls'
+  where
+    tlgs = threadedLogs includeOnce fullLog
+    chkTls = checkThreadLogs tlgs
+    checkThreadLogs :: [[LogItem]] -> ([LogItem] -> IO ()) -> IO ()
+    checkThreadLogs tls' lgChk = traverse_ lgChk tls'
 
 chkThreadHooksStartedOnceInThread :: [LogItem] -> IO ()
 chkThreadHooksStartedOnceInThread =
-  chkStartsOnce "thread elements" (hasSuiteEvent threadHook)
+    chkStartsOnce "thread elements" (hasSuiteEvent threadHook)
 
 -- TODO:: reexport putStrLn et. al with text conversion
 
 chkStartsOnce :: Text -> (LogItem -> Bool) -> [LogItem] -> IO ()
 chkStartsOnce errSfx p l = do
-  --  putStrLn $ ppShowList trgEvnts
-  unless (null dupLocs) $
-    fail $
-      toS errSfx <> ":\n" <> toS (ppShow dupLocs)
- where
-  trgEvnts = filter p l
-  starts = filter isStart trgEvnts
-  dupLocs = filter ((> 1) . length) . fmap (PE.head . fmap (.loc)) . groupOn' (.loc) $ starts
+    --  putStrLn $ ppShowList trgEvnts
+    unless (null dupLocs) $
+        fail $
+            toS errSfx <> ":\n" <> toS (ppShow dupLocs)
+  where
+    trgEvnts = filter p l
+    starts = filter isStart trgEvnts
+    dupLocs = filter ((> 1) . length) . fmap (PE.head . fmap (.loc)) . groupOn' (.loc) $ starts
 
 chkAllTemplateItemsLogged :: [T.Template] -> [LogItem] -> IO ()
 chkAllTemplateItemsLogged ts lgs =
-  unless (null errMissng || null errExtra) $
-    fail (errMissng <> "\n" <> errExtra)
- where
-  errMissng = null missing ? "" $ "template items not present in log:\n" <> ppShow missing
-  errExtra = null extra ? "" $ "extra items in the log that are not in the template:\n" <> ppShow extra
-  extra = S.difference logStartPaths tmplatePaths
-  missing = S.difference tmplatePaths logStartPaths
+    unless (null errMissng || null errExtra) $
+        fail (errMissng <> "\n" <> errExtra)
+  where
+    errMissng = null missing ? "" $ "template items not present in log:\n" <> ppShow missing
+    errExtra = null extra ? "" $ "extra items in the log that are not in the template:\n" <> ppShow extra
+    extra = S.difference logStartPaths tmplatePaths
+    missing = S.difference tmplatePaths logStartPaths
 
-  -- init to empty set
-  tmplatePaths :: Set SuiteEventPath
-  tmplatePaths = fromList $ (\ep -> SuiteEventPath ep.path ep.suiteEvent) <$> (ts >>= T.eventPaths)
+    -- init to empty set
+    tmplatePaths :: Set SuiteEventPath
+    tmplatePaths = fromList $ (\ep -> SuiteEventPath ep.path ep.suiteEvent) <$> (ts >>= T.eventPaths)
 
-  logStartPaths :: Set SuiteEventPath
-  logStartPaths =
-    fromList $
-      Prelude.mapMaybe
-        ( \lg ->
-            do
-              case lg of
-                ParentFailure{loc, suiteEvent} -> flip SuiteEventPath suiteEvent <$> topPath loc
-                Start{loc, suiteEvent} -> flip SuiteEventPath suiteEvent <$> topPath loc
-                _ -> Nothing
-        )
-        lgs
+    logStartPaths :: Set SuiteEventPath
+    logStartPaths =
+        fromList $
+            Prelude.mapMaybe
+                ( \lg ->
+                    do
+                        case lg of
+                            ParentFailure{loc, suiteEvent} -> flip SuiteEventPath suiteEvent <$> topPath loc
+                            Start{loc, suiteEvent} -> flip SuiteEventPath suiteEvent <$> topPath loc
+                            _ -> Nothing
+                )
+                lgs
 
 nxtHookLog :: [LogItem] -> Maybe LogItem
 nxtHookLog = find (\l -> hasSuiteEvent isHook l || isHookParentFailure l)
@@ -711,69 +710,69 @@ nxtHookLog = find (\l -> hasSuiteEvent isHook l || isHookParentFailure l)
 
 threadVisible :: Bool -> ThreadId -> [LogItem] -> [LogItem]
 threadVisible onceHookInclude tid =
-  filter (\l -> tid == l.threadId || onceHookInclude && (hasSuiteEvent onceHook l || isOnceHookParentFailure l))
+    filter (\l -> tid == l.threadId || onceHookInclude && (hasSuiteEvent onceHook l || isOnceHookParentFailure l))
 
 threadIds :: [LogItem] -> [ThreadId]
 threadIds = PE.nub . fmap (.threadId)
 
 threadedLogs :: Bool -> [LogItem] -> [[LogItem]]
 threadedLogs onceHookInclude l =
-  (\tid -> threadVisible onceHookInclude tid l) <$> threadIds l
+    (\tid -> threadVisible onceHookInclude tid l) <$> threadIds l
 
 shouldOccurOnce :: LogItem -> Bool
 shouldOccurOnce = hasSuiteEvent onceSuiteEvent
 
 chkStartEndExecution :: [ThreadEvent ExePath AE.ApEvent] -> IO ()
 chkStartEndExecution evts =
-  (,)
-    <$> PE.head evts
-    <*> PE.last evts
-      & maybe
-        (fail "no events")
-        ( \(s, e) -> do
-            s & \case
-              StartExecution{} -> pure ()
-              _ -> fail $ "first event is not StartExecution:\n " <> toS (ppShow s)
-            e & \case
-              EndExecution{} -> pure ()
-              _ -> fail $ "last event is not EndExecution:\n " <> toS (ppShow e)
-        )
+    (,)
+        <$> PE.head evts
+        <*> PE.last evts
+            & maybe
+                (fail "no events")
+                ( \(s, e) -> do
+                    s & \case
+                        StartExecution{} -> pure ()
+                        _ -> fail $ "first event is not StartExecution:\n " <> toS (ppShow s)
+                    e & \case
+                        EndExecution{} -> pure ()
+                        _ -> fail $ "last event is not EndExecution:\n " <> toS (ppShow e)
+                )
 
 -- TODO - add tests add to pyrelude
 -- research groupon on lists is consecutive and dodgy
 -- convert to to non-empty and use groupby from relude??
 groupOn' :: (Ord b) => (a -> b) -> [a] -> [[a]]
 groupOn' f =
-  M.elems . foldl' fld M.empty . reverse
- where
-  fld m a =
-    M.lookup (f a) m
-      & maybe
-        (M.insert (f a) [a] m)
-        (\as -> M.insert (f a) (a : as) m)
+    M.elems . foldl' fld M.empty . reverse
+  where
+    fld m a =
+        M.lookup (f a) m
+            & maybe
+                (M.insert (f a) [a] m)
+                (\as -> M.insert (f a) (a : as) m)
 
 chkThreadLogsInOrder :: [LogItem] -> IO ()
 chkThreadLogsInOrder evts =
-  do
-    chk' "Nothing found in heads - groupOn error this should not happen" (all isJust heads)
-    traverse_ (chkEq' "first index of thread should be 0" 0 . (.idx)) $ catMaybes heads
-    traverse_ chkIds threads
- where
-  threads = groupOn' (.threadId) evts
-  -- TODO: need to draw a line in the sand re maybe vs nonemptyList
-  heads = PE.head <$> threads
-  chkIds evts' =
-    for_
-      (zip evts' $ drop 1 evts')
-      ( \(ev1, ev2) ->
-          let idx1 = ev1.idx
-              idx2 = ev2.idx
-           in chkEqfmt' (succ idx1) idx2 $
-                "event idx not consecutive\n"
-                  <> toS (ppShow ev1)
-                  <> "\n"
-                  <> toS (ppShow ev2)
-      )
+    do
+        chk' "Nothing found in heads - groupOn error this should not happen" (all isJust heads)
+        traverse_ (chkEq' "first index of thread should be 0" 0 . (.idx)) $ catMaybes heads
+        traverse_ chkIds threads
+  where
+    threads = groupOn' (.threadId) evts
+    -- TODO: need to draw a line in the sand re maybe vs nonemptyList
+    heads = PE.head <$> threads
+    chkIds evts' =
+        for_
+            (zip evts' $ drop 1 evts')
+            ( \(ev1, ev2) ->
+                let idx1 = ev1.idx
+                    idx2 = ev2.idx
+                 in chkEqfmt' (succ idx1) idx2 $
+                        "event idx not consecutive\n"
+                            <> toS (ppShow ev1)
+                            <> "\n"
+                            <> toS (ppShow ev2)
+            )
 
 -- -- TODO - better formatting chkEq pyrelude
 chkEqfmt' :: (Eq a, Show a) => a -> a -> Text -> IO ()
@@ -781,17 +780,17 @@ chkEqfmt' e a msg = chkEq' msg e a
 
 chkEq' :: (Eq a, Show a) => Text -> a -> a -> IO ()
 chkEq' msg e a =
-  when (e /= a) $
-    fail $
-      "\n"
-        <> toS msg
-        <> "\n"
-        <> "equality check failed:\n"
-        <> "Expected:\n  "
-        <> ppShow e
-        <> "\nDoes not Equal:\n  "
-        <> ppShow a
-        <> "\n"
+    when (e /= a) $
+        fail $
+            "\n"
+                <> toS msg
+                <> "\n"
+                <> "equality check failed:\n"
+                <> "Expected:\n  "
+                <> ppShow e
+                <> "\nDoes not Equal:\n  "
+                <> ppShow a
+                <> "\n"
 
 onceBefore :: Result -> [Template] -> Template
 onceBefore = OnceBefore . Spec 0
@@ -827,9 +826,9 @@ test :: Result -> Spec
 test = Spec 0
 
 data ExeResult = ExeResult
-  { expandedTemplate :: [T.Template]
-  , log :: [ThreadEvent ExePath AE.ApEvent]
-  }
+    { expandedTemplate :: [T.Template]
+    , log :: [ThreadEvent ExePath AE.ApEvent]
+    }
 
 runTest :: Int -> ThreadCount -> [Template] -> IO ()
 runTest = runTest' logging
@@ -838,86 +837,86 @@ data Logging = Log | NoLog | LogTemplate | LogFails | LogFailsAndStartTest deriv
 
 runTest' :: Logging -> Int -> ThreadCount -> [Template] -> IO ()
 runTest' wantLog baseRandomSeed threadLimit templates = do
-  when (wantLog == LogFailsAndStartTest) $
-    printNow "start test"
-  ExeResult expandedTemplate log <- execute wantLog baseRandomSeed threadLimit templates
-  onError
-    (chkProperties baseRandomSeed threadLimit expandedTemplate log)
-    ( do
-        when (wantLog `PE.elem` [LogFails, LogFailsAndStartTest]) $ do
-          putStrLn "#### Template ####"
-          pPrint expandedTemplate
-          putStrLn "#### Log ####"
-          pPrint log
-          putStrLn "========="
-    )
+    when (wantLog == LogFailsAndStartTest) $
+        printNow "start test"
+    ExeResult expandedTemplate log <- execute wantLog baseRandomSeed threadLimit templates
+    onError
+        (chkProperties baseRandomSeed threadLimit expandedTemplate log)
+        ( do
+            when (wantLog `PE.elem` [LogFails, LogFailsAndStartTest]) $ do
+                putStrLn "#### Template ####"
+                pPrint expandedTemplate
+                putStrLn "#### Log ####"
+                pPrint log
+                putStrLn "========="
+        )
 
 execute :: Logging -> Int -> ThreadCount -> [Template] -> IO ExeResult
 execute wantLog baseRandomSeed threadLimit templates = do
-  let fullTs = setPaths "" templates
-  lg <- exeTemplate wantLog baseRandomSeed threadLimit fullTs
-  pure $ ExeResult fullTs lg
+    let fullTs = setPaths "" templates
+    lg <- exeTemplate wantLog baseRandomSeed threadLimit fullTs
+    pure $ ExeResult fullTs lg
 
 exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath AE.ApEvent]
 exeTemplate wantLog baseRandomSeed maxThreads templates = do
-  let wantLog' = wantLog == Log
-  (lc, logQ) <- testLogControls wantLog'
-  when (wantLog' || wantLog == LogTemplate) $ do
-    putStrLn "#### Template ####"
-    pPrint templates
-    putStrLn "========="
-  nodes <- mkNodes baseRandomSeed maxThreads templates
-  when wantLog' $ do
-    putStrLn "#### (Indent, Node Path) After Prepare ####"
-    pPrint $ P.listPaths <$> nodes
-    putStrLn "========="
-    putStrLn "#### Log ####"
-  executeNodeList maxThreads lc nodes
-  atomically $ q2List logQ
+    let wantLog' = wantLog == Log
+    (lc, logQ) <- testLogControls wantLog'
+    when (wantLog' || wantLog == LogTemplate) $ do
+        putStrLn "#### Template ####"
+        pPrint templates
+        putStrLn "========="
+    nodes <- mkNodes baseRandomSeed maxThreads templates
+    when wantLog' $ do
+        putStrLn "#### (Indent, Node Path) After Prepare ####"
+        pPrint $ P.listPaths <$> nodes
+        putStrLn "========="
+        putStrLn "#### Log ####"
+    executeNodeList maxThreads lc nodes
+    atomically $ q2List logQ
 
 q2List :: TQueue a -> STM [a]
 q2List qu = reverse <$> recurse [] qu
- where
-  recurse :: [a] -> TQueue a -> STM [a]
-  recurse l q =
-    tryReadTQueue q
-      >>= maybe (pure l) (\e -> recurse (e : l) q)
+  where
+    recurse :: [a] -> TQueue a -> STM [a]
+    recurse l q =
+        tryReadTQueue q
+            >>= maybe (pure l) (\e -> recurse (e : l) q)
 
 loadTQueue :: TQueue a -> [a] -> STM ()
 loadTQueue q = traverse_ (writeTQueue q)
 
 setPaths :: Text -> [Template] -> [T.Template]
 setPaths address ts =
-  uncurry setPath <$> zip [0 ..] ts
- where
-  nxtAdd idx =
-    let
-      txIdx = txt idx
-      sfx = T.null address ? txIdx $ "." <> txIdx
-     in
-      address <> sfx
+    uncurry setPath <$> zip [0 ..] ts
+  where
+    nxtAdd idx =
+        let
+            txIdx = txt idx
+            sfx = T.null address ? txIdx $ "." <> txIdx
+         in
+            address <> sfx
 
-  setPath :: Int -> Template -> T.Template
-  setPath idx tp =
-    case tp of
-      SuiteRuntimeTestBase.Fixture{tests} ->
-        T.Fixture
-          { path = newPath "Test"
-          , tests = zip [0 ..] tests <&> \(idx', spec) -> T.TestItem{title = newAdd <> ".Test #" <> txt idx', id = idx', ..}
-          }
-      OnceBefore{..} -> T.OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
-      OnceAfter{..} -> T.OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
-      OnceAround{..} -> T.OnceAround{path = newPath "OnceAround", subNodes = newNodes, ..}
-      ThreadBefore{..} -> T.ThreadBefore{path = newPath "ThreadBefore", subNodes = newNodes, ..}
-      ThreadAfter{..} -> T.ThreadAfter{path = newPath "ThreadAfter", subNodes = newNodes, ..}
-      ThreadAround{..} -> T.ThreadAround{path = newPath "ThreadAround", subNodes = newNodes, ..}
-      EachBefore{..} -> T.EachBefore{path = newPath "EachBefore", subNodes = newNodes, ..}
-      EachAfter{..} -> T.EachAfter{path = newPath "EachAfter", subNodes = newNodes, ..}
-      EachAround{..} -> T.EachAround{path = newPath "EachAround", subNodes = newNodes, ..}
-   where
-    newPath = AE.NodePath newAdd
-    newAdd = nxtAdd idx
-    newNodes = setPaths newAdd tp.subNodes
+    setPath :: Int -> Template -> T.Template
+    setPath idx tp =
+        case tp of
+            SuiteRuntimeTestBase.Fixture{tests} ->
+                T.Fixture
+                    { path = newPath "Test"
+                    , tests = zip [0 ..] tests <&> \(idx', spec) -> T.TestItem{title = newAdd <> ".Test #" <> txt idx', id = idx', ..}
+                    }
+            OnceBefore{..} -> T.OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
+            OnceAfter{..} -> T.OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
+            OnceAround{..} -> T.OnceAround{path = newPath "OnceAround", subNodes = newNodes, ..}
+            ThreadBefore{..} -> T.ThreadBefore{path = newPath "ThreadBefore", subNodes = newNodes, ..}
+            ThreadAfter{..} -> T.ThreadAfter{path = newPath "ThreadAfter", subNodes = newNodes, ..}
+            ThreadAround{..} -> T.ThreadAround{path = newPath "ThreadAround", subNodes = newNodes, ..}
+            EachBefore{..} -> T.EachBefore{path = newPath "EachBefore", subNodes = newNodes, ..}
+            EachAfter{..} -> T.EachAfter{path = newPath "EachAfter", subNodes = newNodes, ..}
+            EachAround{..} -> T.EachAround{path = newPath "EachAround", subNodes = newNodes, ..}
+      where
+        newPath = AE.NodePath newAdd
+        newAdd = nxtAdd idx
+        newNodes = setPaths newAdd tp.subNodes
 
 {-
 todo - trace like with pretty printing
@@ -939,37 +938,37 @@ todo - trace like with pretty printing
 -}
 parentMatchesTest :: (LogItem -> Bool) -> LogItem -> LogItem -> Maybe Bool
 parentMatchesTest parentPredicate parentHookItm testItm = do
-  if parentPredicate parentHookItm
-    then do
-      startEvntPath <- startSuiteEventLoc testItm
-      tstStartSubPath <- parentPath (isTestEventOrTestParentFailure testItm) startEvntPath
-      parentPath' <- startSuiteEventLoc parentHookItm
-      pure $ parentPath'.un `PE.isSuffixOf` tstStartSubPath.un
-    else
-      pure False
+    if parentPredicate parentHookItm
+        then do
+            startEvntPath <- startSuiteEventLoc testItm
+            tstStartSubPath <- parentPath (isTestEventOrTestParentFailure testItm) startEvntPath
+            parentPath' <- startSuiteEventLoc parentHookItm
+            pure $ parentPath'.un `PE.isSuffixOf` tstStartSubPath.un
+        else
+            pure False
 
 findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem
 findMathcingParent parentPredicate testStartEvnt =
-  find (fromMaybe False . parentEvntMatches)
- where
-  parentEvntMatches :: LogItem -> Maybe Bool
-  parentEvntMatches parentCandidteEvt =
-    parentMatchesTest parentPredicate parentCandidteEvt testStartEvnt
+    find (fromMaybe False . parentEvntMatches)
+  where
+    parentEvntMatches :: LogItem -> Maybe Bool
+    parentEvntMatches parentCandidteEvt =
+        parentMatchesTest parentPredicate parentCandidteEvt testStartEvnt
 
 isParentPath :: ExePath -> ExePath -> Bool
 isParentPath (ExePath parent) (ExePath child) =
-  PE.tail child & maybe False (parent `PE.isSuffixOf`)
+    PE.tail child & maybe False (parent `PE.isSuffixOf`)
 
 eventMatchesHookPos :: [HookPos] -> LogItem -> Bool
 eventMatchesHookPos hookPoses lg =
-  suiteEventOrParentFailureSuiteEvent lg
-    & maybe
-      False
-      ( \case
-          -- TODO: sort out imports see PE.elem
-          Hook _frq pos -> pos `PR.elem` hookPoses
-          TE.Test -> False
-      )
+    suiteEventOrParentFailureSuiteEvent lg
+        & maybe
+            False
+            ( \case
+                -- TODO: sort out imports see PE.elem
+                Hook _frq pos -> pos `PR.elem` hookPoses
+                TE.Test -> False
+            )
 
 isBeforeSuiteEvent :: LogItem -> Bool
 isBeforeSuiteEvent = eventMatchesHookPos [Before, Setup]
@@ -981,8 +980,8 @@ isAfterSuiteEvent :: LogItem -> Bool
 isAfterSuiteEvent = eventMatchesHookPos [After, Teardown]
 
 newtype TestConfig = TestConfig
-  {title :: Text}
-  deriving (Generic, Show, Eq)
+    {title :: Text}
+    deriving (Generic, Show, Eq)
 
 instance ToJSON TestConfig
 instance Core.Config TestConfig
@@ -992,90 +991,49 @@ tc = TestConfig{title = "fixture config"}
 
 mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> IO ()
 mkQueAction q path =
-  do
-    s <- atomically $ tryReadTQueue q
-    s
-      & maybe
-        (error $ "spec queue is empty - either the fixture template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> txt path)
-        (mkVoidAction path)
+    do
+        s <- atomically $ tryReadTQueue q
+        s
+            & maybe
+                (error $ "spec queue is empty - either the fixture template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> txt path)
+                (mkVoidAction path)
 
 data ManyParams = ManyParams
-  { baseSeed :: Int
-  , subSeed :: Int
-  , path :: Text
-  , passPcnt :: Int8
-  , minDelay :: Int
-  , maxDelay :: Int
-  }
+    { baseSeed :: Int
+    , subSeed :: Int
+    , path :: Text
+    , passPcnt :: Int8
+    , minDelay :: Int
+    , maxDelay :: Int
+    }
 
 mkManySpec :: ManyParams -> Spec
 mkManySpec
-  ManyParams
-    { baseSeed
-    , subSeed
-    , path
-    , passPcnt
-    , minDelay
-    , maxDelay
-    } =
-    Spec delay result
-   where
-    seed = H.hash $ txt baseSeed <> path <> txt subSeed
-    delayRange = maxDelay - minDelay
-    delay = delayRange > 0 ? minDelay + seed `mod` (maxDelay - minDelay) $ minDelay
-    result = seed `mod` 100 < fromIntegral passPcnt ? Pass $ Fail
+    ManyParams
+        { baseSeed
+        , subSeed
+        , path
+        , passPcnt
+        , minDelay
+        , maxDelay
+        } =
+        Spec delay result
+      where
+        seed = H.hash $ txt baseSeed <> path <> txt subSeed
+        delayRange = maxDelay - minDelay
+        delay = delayRange > 0 ? minDelay + seed `mod` (maxDelay - minDelay) $ minDelay
+        result = seed `mod` 100 < fromIntegral passPcnt ? Pass $ Fail
 
 -- used in both generating test run and validation
 -- is pure ie. will always generate the same specs for same inputs
 generateSpecs :: (Show pth) => Int -> Int -> pth -> Int8 -> Int -> Int -> [Spec]
 generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay =
-  manySpec <$> [1 .. qLength]
- where
-  manySpec :: Int -> Spec
-  manySpec subSeed =
-    mkManySpec
-      ManyParams
-        { baseSeed
-        , subSeed
-        , path = txt pth
-        , passPcnt
-        , minDelay
-        , maxDelay
-        }
-
-loadQIfPreload :: (Show pth) => Int -> Int -> pth -> TQueue Spec -> ManySpec -> IO ()
-loadQIfPreload baseSeed qLength pth q = \case
-  T.All _ -> pure ()
-  PassProb
-    { genStrategy
-    , passPcnt
-    , minDelay
-    , maxDelay
-    } ->
-      do
-        when (isPreload genStrategy)
-          . atomically
-          . loadTQueue q
-          $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay
-        pure ()
-
--- assumes th queue is preloaded (ie loadQIfPrload has already been run) if genStrategy == Preload
-mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
-mkManyAction baseSeed q pth = \case
-  T.All s -> mkVoidAction pth s
-  PassProb
-    { genStrategy
-    , passPcnt
-    , minDelay
-    , maxDelay
-    } ->
-      case genStrategy of
-        Preload -> mkQueAction q pth
-        Runtime -> do
-          subSeed <- RS.uniformM RS.globalStdGen :: IO Int
-          mkVoidAction pth $
-            mkManySpec
-              ManyParams
+    manySpec <$> [1 .. qLength]
+  where
+    manySpec :: Int -> Spec
+    manySpec subSeed =
+        mkManySpec
+            ManyParams
                 { baseSeed
                 , subSeed
                 , path = txt pth
@@ -1084,211 +1042,340 @@ mkManyAction baseSeed q pth = \case
                 , maxDelay
                 }
 
+loadQIfPreload :: (Show pth) => Int -> Int -> pth -> TQueue Spec -> ManySpec -> IO ()
+loadQIfPreload baseSeed qLength pth q = \case
+    T.All _ -> pure ()
+    PassProb
+        { genStrategy
+        , passPcnt
+        , minDelay
+        , maxDelay
+        } ->
+            do
+                when (isPreload genStrategy)
+                    . atomically
+                    . loadTQueue q
+                    $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay
+                pure ()
+
+-- assumes th queue is preloaded (ie loadQIfPrload has already been run) if genStrategy == Preload
+mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
+mkManyAction baseSeed q pth = \case
+    T.All s -> mkVoidAction pth s
+    PassProb
+        { genStrategy
+        , passPcnt
+        , minDelay
+        , maxDelay
+        } ->
+            case genStrategy of
+                Preload -> mkQueAction q pth
+                Runtime -> do
+                    subSeed <- RS.uniformM RS.globalStdGen :: IO Int
+                    mkVoidAction pth $
+                        mkManySpec
+                            ManyParams
+                                { baseSeed
+                                , subSeed
+                                , path = txt pth
+                                , passPcnt
+                                , minDelay
+                                , maxDelay
+                                }
+
 mkVoidAction :: forall pth. (Show pth) => pth -> Spec -> IO ()
 mkVoidAction path spec =
-  do
-    C.threadDelay spec.delay
-    unless (spec.result == Pass) $
-      error . toS $
-        "FAIL RESULT @ " <> txt path
+    do
+        C.threadDelay spec.delay
+        unless (spec.result == Pass) $
+            error . toS $
+                "FAIL RESULT @ " <> txt path
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
 mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.ApEventSink -> hi -> IO ()
 mkAction path s _sink _in = mkVoidAction path s
 
+mkCoreNode :: T.Template -> Core.Node IO [] TestConfig ()
+mkCoreNode t = case t of
+    T.Fixture{path, tests} ->
+        Core.Fixture
+            { path
+            , fixture =
+                Core.Direct
+                    { config = tc
+                    , items = mkItem <$> tests
+                    , action = \i -> pure i.value
+                    }
+            }
+    T.OnceBefore{path, subNodes} ->
+        Core.Hook
+            { path
+            , hook =
+                Core.Before{action = pure ()} :: Core.Hook IO Core.Once () ()
+            , subNodes = mkCoreNode <$> subNodes
+            }
+    T.OnceAfter{path, subNodes} ->
+        Core.Hook
+            { path
+            , hook =
+                Core.After{afterAction = pure ()} :: Core.Hook IO Core.Once () ()
+            , subNodes = mkCoreNode <$> subNodes
+            }
+    T.OnceAround{path, subNodes} ->
+        Core.Hook
+            { path
+            , hook =
+                Core.Around{setup = pure (), teardown = \_ -> pure ()} :: Core.Hook IO Core.Once () ()
+            , subNodes = mkCoreNode <$> subNodes
+            }
+    T.EachBefore{path, subNodes} ->
+        Core.Hook
+            { path
+            , hook =
+                Core.Before{action = pure ()} :: Core.Hook IO Core.Each () ()
+            , subNodes = mkCoreNode <$> subNodes
+            }
+    T.EachAfter{path, subNodes} ->
+        Core.Hook
+            { path
+            , hook =
+                Core.After{afterAction = pure ()} :: Core.Hook IO Core.Each () ()
+            , subNodes = mkCoreNode <$> subNodes
+            }
+    T.EachAround{path, subNodes} ->
+        Core.Hook
+            { path
+            , hook =
+                Core.Around{setup = pure (), teardown = \_ -> pure ()} :: Core.Hook IO Core.Each () ()
+            , subNodes = mkCoreNode <$> subNodes
+            }
+    T.ThreadBefore{path, subNodes} ->
+        Core.Hook
+            { path
+            , hook =
+                Core.Before{action = pure ()} :: Core.Hook IO Core.Thread () ()
+            , subNodes = mkCoreNode <$> subNodes
+            }
+    T.ThreadAfter{path, subNodes} ->
+        Core.Hook
+            { path
+            , hook =
+                Core.After{afterAction = pure ()} :: Core.Hook IO Core.Thread () ()
+            , subNodes = mkCoreNode <$> subNodes
+            }
+    T.ThreadAround{path, subNodes} ->
+        Core.Hook
+            { path
+            , hook =
+                Core.Around{setup = pure (), teardown = \_ -> pure ()} :: Core.Hook IO Core.Thread () ()
+            , subNodes = mkCoreNode <$> subNodes
+            }
+
+data Item = Item
+    { id :: Int
+    , title :: Text
+    , value :: Spec
+    , checks :: Checks Spec
+    }
+    deriving (Show, Read)
+
+mkItem :: T.TestItem -> Item
+mkItem T.TestItem{id, title, spec} =
+    Item id title spec $ chk "test" (\s -> s.result == Pass)
+
 mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
 mkNodes baseSeed mxThreads = mapM mkNode
- where
-  afterAction :: (Show pth) => pth -> Spec -> b -> IO ()
-  afterAction path spec = const $ mkVoidAction path spec
+  where
+    afterAction :: (Show pth) => pth -> Spec -> b -> IO ()
+    afterAction path spec = const $ mkVoidAction path spec
 
-  mkNodes' = mkNodes baseSeed mxThreads
-  mkNode :: T.Template -> IO (P.PreNode IO [] ())
-  mkNode t = case t of
-    T.Fixture
-      { path
-      , tests
-      } ->
-        pure $
-          P.Fixture
-            { config = tc
-            , path
-            , tests = mkTestItem <$> tests
-            }
-    _ ->
-      do
-        nds <- mkNodes' t.subNodes
-        b4Q <- newTQueueIO
-        afterQ <- newTQueueIO
-        let mxThrds = mxThreads.maxThreads
-            tstItemCount = T.countTests t
-            loadQIfPreload' = loadQIfPreload baseSeed
-        case t of
-          T.OnceBefore
+    mkNodes' = mkNodes baseSeed mxThreads
+    mkNode :: T.Template -> IO (P.PreNode IO [] ())
+    mkNode t = case t of
+        T.Fixture
             { path
-            , spec
+            , tests
             } ->
-              pure $ do
-                P.Before
-                  { path
-                  , frequency = Once
-                  , action = mkAction path spec
-                  , subNodes = nds
-                  }
-          T.OnceAfter
-            { path
-            , spec
-            } ->
-              pure $
-                P.After
-                  { path
-                  , frequency = Once
-                  , after = afterAction path spec
-                  , subNodes' = nds
-                  }
-          T.OnceAround
-            { path
-            , setupSpec
-            , teardownSpec
-            } ->
-              pure $
-                P.Around
-                  { path
-                  , frequency = Once
-                  , setup = mkAction path setupSpec
-                  , teardown = mkAction path teardownSpec
-                  , subNodes = nds
-                  }
-          T.EachBefore
-            { path
-            , eachSpec
-            } ->
-              do
-                loadQIfPreload' tstItemCount path b4Q eachSpec
                 pure $
-                  P.Before
-                    { path
-                    , frequency = Each
-                    , action = const . const $ mkManyAction baseSeed b4Q path eachSpec
-                    , subNodes = nds
-                    }
-          T.EachAfter
-            { path
-            , eachSpec
-            } ->
-              do
-                loadQIfPreload' tstItemCount path afterQ eachSpec
-                pure $
-                  P.After
-                    { path
-                    , frequency = Each
-                    , after = const $ mkManyAction baseSeed afterQ path eachSpec
-                    , subNodes' = nds
-                    }
-          T.EachAround
-            { path
-            , eachSetupSpec
-            , eachTeardownSpec
-            } ->
-              do
-                loadQIfPreload' tstItemCount path b4Q eachSetupSpec
-                loadQIfPreload' tstItemCount path afterQ eachTeardownSpec
-                pure $
-                  P.Around
-                    { path
-                    , frequency = Each
-                    , setup = const . const $ mkManyAction baseSeed b4Q path eachSetupSpec
-                    , teardown = const . const $ mkManyAction baseSeed afterQ path eachTeardownSpec
-                    , subNodes = nds
-                    }
-          _ -> case t of
-            T.ThreadBefore
-              { path
-              , threadSpec
-              } ->
-                do
-                  loadQIfPreload' mxThrds path b4Q threadSpec
-                  pure $
-                    P.Before
-                      { path
-                      , frequency = Thread
-                      , action = const . const $ mkManyAction baseSeed b4Q path threadSpec
-                      , subNodes = nds
-                      }
-            T.ThreadAfter
-              { path
-              , threadSpec
-              } ->
-                do
-                  loadQIfPreload' mxThrds path afterQ threadSpec
-                  pure $
-                    P.After
-                      { path
-                      , frequency = Thread
-                      , after = const $ mkManyAction baseSeed afterQ path threadSpec
-                      , subNodes' = nds
-                      }
-            T.ThreadAround
-              { path
-              , setupThreadSpec
-              , teardownThreadSpec
-              } -> do
-                loadQIfPreload' mxThrds path b4Q setupThreadSpec
-                loadQIfPreload' mxThrds path afterQ teardownThreadSpec
-                pure $
-                  P.Around
-                    { path
-                    , frequency = Thread
-                    , setup = const . const $ mkManyAction baseSeed b4Q path setupThreadSpec
-                    , teardown = const . const $ mkManyAction baseSeed afterQ path teardownThreadSpec
-                    , subNodes = nds
-                    }
+                    P.Fixture
+                        { config = tc
+                        , path
+                        , tests = mkTestItem <$> tests
+                        }
+        _ ->
+            do
+                nds <- mkNodes' t.subNodes
+                b4Q <- newTQueueIO
+                afterQ <- newTQueueIO
+                let mxThrds = mxThreads.maxThreads
+                    tstItemCount = T.countTests t
+                    loadQIfPreload' = loadQIfPreload baseSeed
+                case t of
+                    T.OnceBefore
+                        { path
+                        , spec
+                        } ->
+                            pure $ do
+                                P.Before
+                                    { path
+                                    , frequency = Once
+                                    , action = mkAction path spec
+                                    , subNodes = nds
+                                    }
+                    T.OnceAfter
+                        { path
+                        , spec
+                        } ->
+                            pure $
+                                P.After
+                                    { path
+                                    , frequency = Once
+                                    , after = afterAction path spec
+                                    , subNodes' = nds
+                                    }
+                    T.OnceAround
+                        { path
+                        , setupSpec
+                        , teardownSpec
+                        } ->
+                            pure $
+                                P.Around
+                                    { path
+                                    , frequency = Once
+                                    , setup = mkAction path setupSpec
+                                    , teardown = mkAction path teardownSpec
+                                    , subNodes = nds
+                                    }
+                    T.EachBefore
+                        { path
+                        , eachSpec
+                        } ->
+                            do
+                                loadQIfPreload' tstItemCount path b4Q eachSpec
+                                pure $
+                                    P.Before
+                                        { path
+                                        , frequency = Each
+                                        , action = const . const $ mkManyAction baseSeed b4Q path eachSpec
+                                        , subNodes = nds
+                                        }
+                    T.EachAfter
+                        { path
+                        , eachSpec
+                        } ->
+                            do
+                                loadQIfPreload' tstItemCount path afterQ eachSpec
+                                pure $
+                                    P.After
+                                        { path
+                                        , frequency = Each
+                                        , after = const $ mkManyAction baseSeed afterQ path eachSpec
+                                        , subNodes' = nds
+                                        }
+                    T.EachAround
+                        { path
+                        , eachSetupSpec
+                        , eachTeardownSpec
+                        } ->
+                            do
+                                loadQIfPreload' tstItemCount path b4Q eachSetupSpec
+                                loadQIfPreload' tstItemCount path afterQ eachTeardownSpec
+                                pure $
+                                    P.Around
+                                        { path
+                                        , frequency = Each
+                                        , setup = const . const $ mkManyAction baseSeed b4Q path eachSetupSpec
+                                        , teardown = const . const $ mkManyAction baseSeed afterQ path eachTeardownSpec
+                                        , subNodes = nds
+                                        }
+                    _ -> case t of
+                        T.ThreadBefore
+                            { path
+                            , threadSpec
+                            } ->
+                                do
+                                    loadQIfPreload' mxThrds path b4Q threadSpec
+                                    pure $
+                                        P.Before
+                                            { path
+                                            , frequency = Thread
+                                            , action = const . const $ mkManyAction baseSeed b4Q path threadSpec
+                                            , subNodes = nds
+                                            }
+                        T.ThreadAfter
+                            { path
+                            , threadSpec
+                            } ->
+                                do
+                                    loadQIfPreload' mxThrds path afterQ threadSpec
+                                    pure $
+                                        P.After
+                                            { path
+                                            , frequency = Thread
+                                            , after = const $ mkManyAction baseSeed afterQ path threadSpec
+                                            , subNodes' = nds
+                                            }
+                        T.ThreadAround
+                            { path
+                            , setupThreadSpec
+                            , teardownThreadSpec
+                            } -> do
+                                loadQIfPreload' mxThrds path b4Q setupThreadSpec
+                                loadQIfPreload' mxThrds path afterQ teardownThreadSpec
+                                pure $
+                                    P.Around
+                                        { path
+                                        , frequency = Thread
+                                        , setup = const . const $ mkManyAction baseSeed b4Q path setupThreadSpec
+                                        , teardown = const . const $ mkManyAction baseSeed afterQ path teardownThreadSpec
+                                        , subNodes = nds
+                                        }
 
 data Template
-  = OnceBefore
-      { spec :: Spec
-      , subNodes :: [Template]
-      }
-  | OnceAfter
-      { spec :: Spec
-      , subNodes :: [Template]
-      }
-  | OnceAround
-      { setupSpec :: Spec
-      , teardownSpec :: Spec
-      , subNodes :: [Template]
-      }
-  | ThreadBefore
-      { threadSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | ThreadAfter
-      { threadSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | ThreadAround
-      { setupThreadSpec :: ManySpec
-      , teardownThreadSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | EachBefore
-      { eachSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | EachAfter
-      { eachSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | EachAround
-      { eachSetupSpec :: ManySpec
-      , eachTeardownSpec :: ManySpec
-      , subNodes :: [Template]
-      }
-  | Fixture
-      { tests :: [Spec]
-      }
-  deriving (Show, Eq)
+    = OnceBefore
+        { spec :: Spec
+        , subNodes :: [Template]
+        }
+    | OnceAfter
+        { spec :: Spec
+        , subNodes :: [Template]
+        }
+    | OnceAround
+        { setupSpec :: Spec
+        , teardownSpec :: Spec
+        , subNodes :: [Template]
+        }
+    | ThreadBefore
+        { threadSpec :: ManySpec
+        , subNodes :: [Template]
+        }
+    | ThreadAfter
+        { threadSpec :: ManySpec
+        , subNodes :: [Template]
+        }
+    | ThreadAround
+        { setupThreadSpec :: ManySpec
+        , teardownThreadSpec :: ManySpec
+        , subNodes :: [Template]
+        }
+    | EachBefore
+        { eachSpec :: ManySpec
+        , subNodes :: [Template]
+        }
+    | EachAfter
+        { eachSpec :: ManySpec
+        , subNodes :: [Template]
+        }
+    | EachAround
+        { eachSetupSpec :: ManySpec
+        , eachTeardownSpec :: ManySpec
+        , subNodes :: [Template]
+        }
+    | Fixture
+        { tests :: [Spec]
+        }
+    deriving (Show, Eq)
 
 mkTestItem :: T.TestItem -> P.Test IO ()
 mkTestItem T.TestItem{id, title, spec} = P.MkTest id title (mkAction title spec)

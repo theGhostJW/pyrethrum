@@ -11,6 +11,7 @@ module PyrethrumBase (
     testConfig,
     HasLog,
     mkTestRun,
+    mkNode,
 ) where
 
 import Core qualified as C
@@ -37,6 +38,12 @@ type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
 -- type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
 
 -- TODO: research StrictSTM
+--
+instance C.Logger Action where
+    fLog = print
+
+instance C.Concurrently Action where
+    runConcurrently = sequence
 
 data Hook hz when input output where
     BeforeHook ::

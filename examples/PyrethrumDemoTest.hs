@@ -1,10 +1,11 @@
 module PyrethrumDemoTest where
 
 import Check (Checks, chk)
-import Core (After, Around, Before, Each, Once, ParseException, Thread)
+import Core (After, Around, Before, Each, Once, ParseException, Thread, runNode)
 import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
 import DSL.Out (out)
 import Effectful (Eff)
+import IOEffectDemo (ioRun)
 import PyrethrumBase (
     Action,
     Depth (..),
@@ -16,6 +17,7 @@ import PyrethrumBase (
     RunConfig (..),
     Suite,
     TestConfig (..),
+    mkNode,
     testConfig,
  )
 import PyrethrumConfigTypes (Country (..), Environment (Prod))
@@ -55,6 +57,14 @@ intOnceHook =
     BeforeHook'
         { depends = demoOnceAfterHook
         , action' = \_void -> logReturnInt
+        }
+
+intOnceHook2 :: Hook Once Before () Int
+intOnceHook2 =
+    BeforeHook
+        { action = do
+            log "2222222 should only be onceeee"
+            logReturnInt
         }
 
 addOnceIntHook :: Hook Once Before Int Int
@@ -328,6 +338,21 @@ suite =
             ]
         }
     ]
+
+-- nodes =
+--     Fixture (NodePath "module" "testName") test4
+
+--
+nodes =
+    Hook
+        { path = NodePath "module" "name"
+        , hook = intOnceHook
+        , subNodes = [Fixture (NodePath "module" "testName") test4]
+        }
+
+coreNode = mkNode nodes
+
+result = ioRun $ runNode coreNode
 
 {-
 -- TODO: test documenter that returns a handle from onceHook

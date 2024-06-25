@@ -50,8 +50,10 @@ import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
 
+import Check (Checks, chk)
 import Chronos (Time, now)
 import Data.Hashable qualified as H
+import Data.List ((!!))
 import System.Random.Stateful qualified as RS
 
 defaultSeed :: Int
@@ -865,13 +867,15 @@ exeTemplate wantLog baseRandomSeed maxThreads templates = do
         putStrLn "#### Template ####"
         pPrint templates
         putStrLn "========="
-    nodes <- mkNodes baseRandomSeed maxThreads templates
+    -- nodes <- mkNodes baseRandomSeed maxThreads templates
+    let nodes = mkCoreNode <$> templates
     when wantLog' $ do
         putStrLn "#### (Indent, Node Path) After Prepare ####"
-        pPrint $ P.listPaths <$> nodes
+        -- pPrint $ P.listPaths <$> nodes
         putStrLn "========="
         putStrLn "#### Log ####"
-    executeNodeList maxThreads lc nodes
+    -- executeNodeList maxThreads lc nodes
+    forM_ nodes Core.runNode
     atomically $ q2List logQ
 
 q2List :: TQueue a -> STM [a]

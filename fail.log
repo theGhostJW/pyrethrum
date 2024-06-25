@@ -1,0 +1,513 @@
+
+#### Template ####
+[ OnceBefore
+    { path = NodePath { module' = "0" , path = "OnceBefore" }
+    , spec = Spec { delay = 0 , result = Pass }
+    , subNodes =
+        [ OnceBefore
+            { path = NodePath { module' = "0.0" , path = "OnceBefore" }
+            , spec = Spec { delay = 0 , result = Fail }
+            , subNodes =
+                [ Fixture
+                    { path = NodePath { module' = "0.0.0" , path = "Test" }
+                    , tests =
+                        [ TestItem
+                            { id = 0
+                            , title = "0.0.0 Test"
+                            , spec = Spec { delay = 24 , result = Pass }
+                            }
+                        , TestItem
+                            { id = 1
+                            , title = "0.0.0 Test"
+                            , spec = Spec { delay = 0 , result = Pass }
+                            }
+                        , TestItem
+                            { id = 2
+                            , title = "0.0.0 Test"
+                            , spec = Spec { delay = 18 , result = Pass }
+                            }
+                        , TestItem
+                            { id = 3
+                            , title = "0.0.0 Test"
+                            , spec = Spec { delay = 20 , result = Fail }
+                            }
+                        , TestItem
+                            { id = 4
+                            , title = "0.0.0 Test"
+                            , spec = Spec { delay = 3 , result = Pass }
+                            }
+                        ]
+                    }
+                , OnceBefore
+                    { path = NodePath { module' = "0.0.1" , path = "OnceBefore" }
+                    , spec = Spec { delay = 0 , result = Pass }
+                    , subNodes =
+                        [ Fixture
+                            { path = NodePath { module' = "0.0.1.0" , path = "Test" }
+                            , tests =
+                                [ TestItem
+                                    { id = 0
+                                    , title = "0.0.1.0 Test"
+                                    , spec = Spec { delay = 0 , result = Pass }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+, Fixture
+    { path = NodePath { module' = "1" , path = "Test" }
+    , tests =
+        [ TestItem
+            { id = 0
+            , title = "1 Test"
+            , spec = Spec { delay = 16 , result = Pass }
+            }
+        , TestItem
+            { id = 1
+            , title = "1 Test"
+            , spec = Spec { delay = 134 , result = Fail }
+            }
+        , TestItem
+            { id = 2
+            , title = "1 Test"
+            , spec = Spec { delay = 0 , result = Pass }
+            }
+        , TestItem
+            { id = 3
+            , title = "1 Test"
+            , spec = Spec { delay = 320 , result = Pass }
+            }
+        , TestItem
+            { id = 4
+            , title = "1 Test"
+            , spec = Spec { delay = 12 , result = Pass }
+            }
+        , TestItem
+            { id = 5
+            , title = "1 Test"
+            , spec = Spec { delay = 4 , result = Pass }
+            }
+        ]
+    }
+]
+=========
+#### (Indent, Node Path) After Prepare ####
+[ [ ( 0 , NodePath { module' = "0" , path = "OnceBefore" } )
+  , ( 1 , NodePath { module' = "0.0" , path = "OnceBefore" } )
+  , ( 2 , NodePath { module' = "0.0.0" , path = "Test" } )
+  , ( 2 , NodePath { module' = "0.0.1" , path = "OnceBefore" } )
+  , ( 3 , NodePath { module' = "0.0.1.0" , path = "Test" } )
+  ]
+, [ ( 0 , NodePath { module' = "1" , path = "Test" } ) ]
+]
+=========
+#### Log ####
+StartExecution { idx = 0 , threadId = 45452 }
+Start
+  { idx = 0
+  , threadId = 45453
+  , suiteEvent = Hook Once Before
+  , loc =
+      ExePath
+        { un = [ NodePath { module' = "0" , path = "OnceBefore" } ] }
+  }
+End
+  { idx = 1
+  , threadId = 45453
+  , suiteEvent = Hook Once Before
+  , loc =
+      ExePath
+        { un = [ NodePath { module' = "0" , path = "OnceBefore" } ] }
+  }
+Start
+  { idx = 2
+  , threadId = 45453
+  , suiteEvent = Hook Once Before
+  , loc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+Failure
+  { idx = 3
+  , threadId = 45453
+  , suiteEvent = Hook Once Before
+  , loc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , exception =
+      PException
+        { displayText =
+            [ "\"FAIL RESULT @ NodePath {module' = \\\"0.0\\\", path = \\\"OnceBefore\\\"}\""
+            , "\"CallStack (from HasCallStack):\""
+            , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-d785bc774ce2cb944aefabcc579bcc6aa958f3b3aa563694f6184f924047743c:Relude.Debug\""
+            , "\"  error, called at test/SuiteRuntimeTestBase.hs:1070:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTestBase\""
+            ]
+        }
+  }
+End
+  { idx = 4
+  , threadId = 45453
+  , suiteEvent = Hook Once Before
+  , loc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  }
+ParentFailure
+  { idx = 5
+  , threadId = 45453
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 0 , title = "0.0.0 Test" }
+            , NodePath { module' = "0.0.0" , path = "Test" }
+            , NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , suiteEvent = Test
+  , failLoc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , failSuiteEvent = Hook Once Before
+  }
+ParentFailure
+  { idx = 6
+  , threadId = 45453
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 1 , title = "0.0.0 Test" }
+            , NodePath { module' = "0.0.0" , path = "Test" }
+            , NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , suiteEvent = Test
+  , failLoc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , failSuiteEvent = Hook Once Before
+  }
+ParentFailure
+  { idx = 7
+  , threadId = 45453
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 2 , title = "0.0.0 Test" }
+            , NodePath { module' = "0.0.0" , path = "Test" }
+            , NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , suiteEvent = Test
+  , failLoc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , failSuiteEvent = Hook Once Before
+  }
+ParentFailure
+  { idx = 8
+  , threadId = 45453
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 3 , title = "0.0.0 Test" }
+            , NodePath { module' = "0.0.0" , path = "Test" }
+            , NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , suiteEvent = Test
+  , failLoc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , failSuiteEvent = Hook Once Before
+  }
+ParentFailure
+  { idx = 9
+  , threadId = 45453
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 4 , title = "0.0.0 Test" }
+            , NodePath { module' = "0.0.0" , path = "Test" }
+            , NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , suiteEvent = Test
+  , failLoc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , failSuiteEvent = Hook Once Before
+  }
+Start
+  { idx = 0
+  , threadId = 45454
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 0 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+Start
+  { idx = 0
+  , threadId = 45455
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 1 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+End
+  { idx = 1
+  , threadId = 45454
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 0 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+Start
+  { idx = 2
+  , threadId = 45454
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 2 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+End
+  { idx = 3
+  , threadId = 45454
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 2 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+Start
+  { idx = 4
+  , threadId = 45454
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 3 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+Start
+  { idx = 0
+  , threadId = 45456
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 4 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+Start
+  { idx = 0
+  , threadId = 45457
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 5 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+Failure
+  { idx = 1
+  , threadId = 45455
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 1 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  , exception =
+      PException
+        { displayText =
+            [ "\"FAIL RESULT @ \\\"1 Test\\\"\""
+            , "\"CallStack (from HasCallStack):\""
+            , "\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-d785bc774ce2cb944aefabcc579bcc6aa958f3b3aa563694f6184f924047743c:Relude.Debug\""
+            , "\"  error, called at test/SuiteRuntimeTestBase.hs:1070:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTestBase\""
+            ]
+        }
+  }
+End
+  { idx = 2
+  , threadId = 45455
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 1 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+ParentFailure
+  { idx = 10
+  , threadId = 45453
+  , loc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0.1" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , suiteEvent = Hook Once Before
+  , failLoc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , failSuiteEvent = Hook Once Before
+  }
+ParentFailure
+  { idx = 11
+  , threadId = 45453
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 0 , title = "0.0.1.0 Test" }
+            , NodePath { module' = "0.0.1.0" , path = "Test" }
+            , NodePath { module' = "0.0.1" , path = "OnceBefore" }
+            , NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , suiteEvent = Test
+  , failLoc =
+      ExePath
+        { un =
+            [ NodePath { module' = "0.0" , path = "OnceBefore" }
+            , NodePath { module' = "0" , path = "OnceBefore" }
+            ]
+        }
+  , failSuiteEvent = Hook Once Before
+  }
+End
+  { idx = 5
+  , threadId = 45454
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 3 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+End
+  { idx = 1
+  , threadId = 45456
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 4 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+End
+  { idx = 1
+  , threadId = 45457
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 5 , title = "1 Test" }
+            , NodePath { module' = "1" , path = "Test" }
+            ]
+        }
+  }
+EndExecution { idx = 1 , threadId = 45452 }
+*** Exception: HUnitFailure (Just (SrcLoc {srcLocPackage = "pyrethrum-extras-0.1.0.0-48baf2b3ade8fa061660aab69ae7d9e56d899e04819fdd53aa0e3df546e9aff2", srcLocModule = "PyrethrumExtras.Test.Tasty.HUnit.Extended", srcLocFile = "src/PyrethrumExtras/Test/Tasty/HUnit/Extended.hs", srcLocStartLine = 35, srcLocStartCol = 11, srcLocEndLine = 35, srcLocEndCol = 24})) 
+"Discrete failure propagated to next event:
+Failure
+  { idx = 1
+  , threadId = 45455
+  , suiteEvent = Test
+  , loc =
+      ExePath
+        { un =
+            [ TestPath { id = 1 , title = \"1 Test\" }
+            , NodePath { module' = \"1\" , path = \"Test\" }
+            ]
+        }
+  , exception =
+      PException
+        { displayText =
+            [ \"\\\"FAIL RESULT @ \\\\\\\"1 Test\\\\\\\"\\\"\"
+            , \"\\\"CallStack (from HasCallStack):\\\"\"
+            , \"\\\"  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-d785bc774ce2cb944aefabcc579bcc6aa958f3b3aa563694f6184f924047743c:Relude.Debug\\\"\"
+            , \"\\\"  error, called at test/SuiteRuntimeTestBase.hs:1070:7 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTestBase\\\"\"
+            ]
+        }
+  }"

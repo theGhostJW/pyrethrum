@@ -381,6 +381,7 @@ ioLeft = pure . Left
 ioRight :: forall a. a -> IO (Either L.FailPoint a)
 ioRight = pure . Right
 
+noImpPropertyError :: any
 noImpPropertyError = error "property tests not implemented"
 
 logReturnFailure :: Logger -> L.ExePath -> SuiteEvent -> SomeException -> IO (Either L.FailPoint b)

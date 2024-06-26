@@ -904,7 +904,7 @@ setPaths address ts =
       SuiteRuntimeTestBase.Fixture{tests} ->
         T.Fixture
           { path = newPath "Test"
-          , tests = ItemList $ zip [0 ..] tests <&> \(idx', spec) -> T.TestItem{title = newAdd <> ".Test #" <> txt idx', id = idx', ..}
+          , tests = zip [0 ..] tests <&> \(idx', spec) -> T.TestItem{title = newAdd <> ".Test #" <> txt idx', id = idx', ..}
           }
       OnceBefore{..} -> T.OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
       OnceAfter{..} -> T.OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
@@ -1115,7 +1115,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
           P.Fixture
             { config = tc
             , path
-            , tests = mkTestItem <$> tests
+            , tests = ItemList $ mkTestItem <$> tests
             }
     _ ->
       do

@@ -19,45 +19,46 @@ import Internal.ThreadEvent (Hz)
 import PyrethrumExtras (toS, txt, uu)
 import UnliftIO.Exception (tryAny)
 
-data PreNode m c hi where
+data PreNode m hi where
   Before ::
     { path :: Path
     , frequency :: Hz
     , action :: ApEventSink -> hi -> m o
-    , subNodes :: c (PreNode m c o)
+    , subNodes :: [PreNode m o]
     } ->
-    PreNode m c hi
+    PreNode m hi
   After ::
     { path :: Path
     , frequency :: Hz
-    , subNodes' :: c (PreNode m c hi)
+    , subNodes' :: [PreNode m hi]
     , after :: ApEventSink -> m ()
     } ->
-    PreNode m c hi
+    PreNode m hi
   Around ::
     { path :: Path
     , frequency :: Hz
     , setup :: ApEventSink -> hi -> m o
-    , subNodes :: c (PreNode m c o)
+    , subNodes :: [PreNode m o]
     , teardown :: ApEventSink -> o -> m ()
     } ->
-    PreNode m c hi
+    PreNode m hi
   Fixture ::
     (C.Config tc) =>
     { config :: tc
     , path :: Path
-    , tests :: c (Test m hi)
+    , tests :: C.DataSource (Test m hi)
     } ->
-    PreNode m c hi
+    PreNode m hi
+
 
 type ApEventSink = ApEvent -> IO ()
 
 -- used in debugging
-listPaths :: forall m c hi. Foldable c =>  PreNode m c hi -> [(Int, Path)]
+listPaths :: forall m hi. PreNode m hi -> [(Int, Path)]
 listPaths = 
   reverse . step 0 []
  where
-  step :: forall hi'. Int -> [(Int, Path)] -> PreNode m c hi' -> [(Int, Path)]
+  step :: forall hi'. Int -> [(Int, Path)] -> PreNode m hi' -> [(Int, Path)]
   step i accum n =
     n & \case
       Fixture{} -> accum'
@@ -66,7 +67,7 @@ listPaths =
       Around{subNodes} -> accumPaths subNodes
    where
     accum' = (i, n.path) : accum
-    accumPaths :: forall hii. c (PreNode m c hii) -> [(Int, Path)]
+    accumPaths :: forall hii. [PreNode m hii] -> [(Int, Path)]
     accumPaths = foldl' (step $ succ i) accum'
 
 data Test m hi = MkTest
@@ -82,7 +83,7 @@ data PrepParams m rc tc where
     } ->
     PrepParams m rc tc
 
-prepSuiteElm :: forall m c rc tc hi. (C.Config rc, C.Config tc, Applicative c, Traversable c) => PrepParams m rc tc -> C.Node m c rc tc hi -> PreNode IO c hi
+prepSuiteElm :: forall m rc tc hi. (C.Config rc, C.Config tc) => PrepParams m rc tc -> C.Node m rc tc hi -> PreNode IO hi
 prepSuiteElm pp@PrepParams{interpreter, runConfig} suiteElm =
   suiteElm & \case
     C.Hook{hook, path, subNodes = subNodes'} ->
@@ -141,10 +142,9 @@ prepSuiteElm pp@PrepParams{interpreter, runConfig} suiteElm =
               }
      where
       frequency = C.hookFrequency hook
-
       subNodes = run <$> subNodes'
 
-      run :: forall a. C.Node m c rc tc a -> PreNode IO c a
+      run :: forall a. C.Node m rc tc a -> PreNode IO a
       run = prepSuiteElm pp
 
       intprt :: forall a. ApEventSink -> m a -> IO a
@@ -160,7 +160,7 @@ unTry es = either (uncurry $ logThrow es) pure
 logThrow :: (Exception e) => ApEventSink -> CallStack -> e -> IO a
 logThrow sink cs ex = sink (exceptionEvent ex cs) >> throwIO ex
 
-prepareTest :: forall m c rc tc hi. (C.Config tc, Applicative c) => PrepParams m rc tc -> Path -> C.Fixture m c rc tc hi -> PreNode IO c hi
+prepareTest :: forall m rc tc hi. (C.Config tc) => PrepParams m rc tc -> Path -> C.Fixture m rc tc hi -> PreNode IO hi
 prepareTest PrepParams{interpreter, runConfig} path =
   \case
     C.Full{config, action, parse, items} ->
@@ -272,13 +272,13 @@ applyChecks snk p chks =
     logChk cr
     pure ts'
 
-data SuitePrepParams m c rc tc where
+data SuitePrepParams m rc tc where
   SuitePrepParams ::
-    { suite :: c (C.Node m c rc tc ())
+    { suite :: [C.Node m rc tc ()]
     , interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
-    SuitePrepParams m c rc tc
+    SuitePrepParams m rc tc
 
 --
 -- Suite rc tc effs
@@ -289,10 +289,10 @@ data SuitePrepParams m c rc tc where
 --    - querying
 --    - validation - eg. no repeat item titles
 -- will return more info later such as filter log and have to return an either
-filterSuite :: forall m c rc tc. c (C.Node m c rc tc ()) -> c (C.Node m c rc tc ())
+filterSuite :: forall m rc tc. [C.Node m rc tc ()] -> [C.Node m rc tc ()]
 filterSuite = uu
 
-prepare :: (C.Config rc, C.Config tc, Applicative c, Traversable c) => SuitePrepParams m c rc tc -> c (PreNode IO c ())
+prepare :: (C.Config rc, C.Config tc) => SuitePrepParams m rc tc -> [PreNode IO ()]
 prepare SuitePrepParams{suite, interpreter, runConfig} =
   prepSuiteElm pp <$> filterSuite suite
  where

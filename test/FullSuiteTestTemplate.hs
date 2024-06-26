@@ -5,6 +5,7 @@ import Data.Map.Strict qualified as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (Hook))
 import Internal.ThreadEvent qualified as TE
 import Prelude hiding (All, id)
+import Core (DataSource(..))
 
 data Spec = Spec {delay :: Int, result :: Result}
   deriving (Read, Show, Eq)
@@ -194,7 +195,7 @@ data Template
       }
   | Fixture
       { path :: Path
-      , tests :: [TestItem]
+      , tests :: DataSource TestItem
       }
   deriving (Show, Eq)
 

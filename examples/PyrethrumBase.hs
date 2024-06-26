@@ -6,6 +6,7 @@ module PyrethrumBase (
   LogEffs,
   Node (..),
   RunConfig (..),
+  C.DataSource(..),
   Suite,
   TestConfig (..),
   testConfig,
@@ -77,7 +78,7 @@ data Fixture hi where
     { config :: TestConfig
     , action :: RunConfig -> i -> Action as
     , parse :: as -> Either C.ParseException ds
-    , items :: RunConfig -> [i]
+    , items :: RunConfig -> C.DataSource i
     } ->
     Fixture ()
   Full' ::
@@ -86,7 +87,7 @@ data Fixture hi where
     , depends :: Hook hz pw pi a
     , action' :: RunConfig -> a -> i -> Action as
     , parse' :: as -> Either C.ParseException ds
-    , items' :: RunConfig -> [i]
+    , items' :: RunConfig -> C.DataSource i
     } ->
     Fixture a
   Direct ::
@@ -94,7 +95,7 @@ data Fixture hi where
     (C.Item i ds) =>
     { config :: TestConfig
     , action :: RunConfig -> i -> Action ds
-    , items :: RunConfig -> [i]
+    , items :: RunConfig -> C.DataSource i
     } ->
     Fixture ()
   Direct' ::
@@ -102,7 +103,7 @@ data Fixture hi where
     { config' :: TestConfig
     , depends :: Hook hz pw pi a
     , action' :: RunConfig -> a -> i -> Action ds
-    , items' :: RunConfig -> [i]
+    , items' :: RunConfig -> C.DataSource i
     } ->
     Fixture a
 
@@ -121,14 +122,14 @@ data Node i where
     } ->
     Node i
 
-mkFixture :: Fixture hi -> C.Fixture Action [] RunConfig TestConfig hi
+mkFixture :: Fixture hi -> C.Fixture Action RunConfig TestConfig hi
 mkFixture = \case
   Full{..} -> C.Full{..}
   Direct{..} -> C.Direct{..}
   Full'{..} -> C.Full' config' (mkHook depends) action' parse' items'
   Direct'{..} -> C.Direct'{depends = mkHook depends, ..}
 
-mkTestRun :: Suite -> [C.Node Action [] RunConfig TestConfig ()]
+mkTestRun :: Suite -> [C.Node Action RunConfig TestConfig ()]
 mkTestRun tr = mkNode <$> tr
 
 mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) RunConfig hz i o
@@ -145,7 +146,7 @@ mkHook = \case
     } ->
       C.Around' (mkHook aroundDepends) setup' teardown'
 
-mkNode :: Node i -> C.Node Action [] RunConfig TestConfig i
+mkNode :: Node i -> C.Node Action RunConfig TestConfig i
 mkNode = \case
   Hook{..} ->
     C.Hook

@@ -53,6 +53,7 @@ import Prelude qualified as PR
 import Chronos (Time, now)
 import Data.Hashable qualified as H
 import System.Random.Stateful qualified as RS
+import Core (DataSource(ItemList))
 
 defaultSeed :: Int
 defaultSeed = 13579
@@ -903,7 +904,7 @@ setPaths address ts =
       SuiteRuntimeTestBase.Fixture{tests} ->
         T.Fixture
           { path = newPath "Test"
-          , tests = zip [0 ..] tests <&> \(idx', spec) -> T.TestItem{title = newAdd <> ".Test #" <> txt idx', id = idx', ..}
+          , tests = ItemList $ zip [0 ..] tests <&> \(idx', spec) -> T.TestItem{title = newAdd <> ".Test #" <> txt idx', id = idx', ..}
           }
       OnceBefore{..} -> T.OnceBefore{path = newPath "OnceBefore", subNodes = newNodes, ..}
       OnceAfter{..} -> T.OnceAfter{path = newPath "OnceAfter", subNodes = newNodes, ..}
@@ -1097,14 +1098,14 @@ mkVoidAction path spec =
 mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.ApEventSink -> hi -> IO ()
 mkAction path s _sink _in = mkVoidAction path s
 
-mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
+mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO ()]
 mkNodes baseSeed mxThreads = mapM mkNode
  where
   afterAction :: (Show pth) => pth -> Spec -> b -> IO ()
   afterAction path spec = const $ mkVoidAction path spec
 
   mkNodes' = mkNodes baseSeed mxThreads
-  mkNode :: T.Template -> IO (P.PreNode IO [] ())
+  mkNode :: T.Template -> IO (P.PreNode IO ())
   mkNode t = case t of
     T.Fixture
       { path

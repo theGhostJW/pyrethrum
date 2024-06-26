@@ -122,61 +122,63 @@ data Hook m rc hz i o where
 hookFrequency :: forall m rc hz i o. (Frequency hz) => Hook m rc hz i o -> Hz
 hookFrequency _ = frequency @hz
 
-data Fixture m c rc tc hi where
+data DataSource i = ItemList [i] | Property i deriving (Show, Functor)
+
+data Fixture m rc tc hi where
   Full ::
     (Item i ds, Show as) =>
     { config :: tc
     , action :: rc -> i -> m as
     , parse :: as -> Either ParseException ds
-    , items :: rc -> c i
+    , items :: rc -> DataSource i
     } ->
-    Fixture m c rc tc ()
+    Fixture m rc tc ()
   Full' ::
     (Item i ds, Show as) =>
     { config' :: tc
     , depends :: Hook m rc hz pi hi
     , action' :: rc -> hi -> i -> m as
     , parse' :: as -> Either ParseException ds
-    , items' :: rc -> c i
+    , items' :: rc -> DataSource i
     } ->
-    Fixture m c rc tc hi
+    Fixture m rc tc hi
   Direct ::
     (Item i ds) =>
     { config :: tc
     , action :: rc -> i -> m ds
-    , items :: rc -> c i
+    , items :: rc -> DataSource i
     } ->
-    Fixture m c rc tc ()
+    Fixture m rc tc ()
   Direct' ::
     (Item i ds) =>
     { config' :: tc
     , depends :: Hook m rc hz pi hi
     , action' :: rc -> hi -> i -> m ds
-    , items' :: rc -> c i
+    , items' :: rc -> DataSource i
     } ->
-    Fixture m c rc tc hi
+    Fixture m rc tc hi
 
-data Node m c rc tc hi where
+data Node m rc tc hi where
   Hook ::
     (Frequency hz) =>
     { path :: Path
     , hook :: Hook m rc hz hi o
-    , subNodes :: c (Node m c rc tc o)
+    , subNodes :: [Node m rc tc o]
     } ->
-    Node m c rc tc hi
+    Node m rc tc hi
   Fixture ::
     { path :: Path
-    , fixture :: Fixture m c rc tc hi
+    , fixture :: Fixture m rc tc hi
     } ->
-    Node m c rc tc hi
+    Node m rc tc hi
 
-data ExeParams m c rc tc where
+data ExeParams m rc tc where
   ExeParams ::
-    { suite :: c (Node m c rc tc ())
+    { suite :: [Node m rc tc ()]
     , interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a)
     , runConfig :: rc
     } ->
-    ExeParams m c rc tc
+    ExeParams m rc tc
 
 -- Todo
 -- see weeder :: HIE

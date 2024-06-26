@@ -53,6 +53,7 @@ import Prelude qualified as PR
 import Chronos (Time, now)
 import Data.Hashable qualified as H
 import System.Random.Stateful qualified as RS
+import Core (DataSource(ItemList))
 
 defaultSeed :: Int
 defaultSeed = 13579
@@ -1097,14 +1098,14 @@ mkVoidAction path spec =
 mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.ApEventSink -> hi -> IO ()
 mkAction path s _sink _in = mkVoidAction path s
 
-mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO [] ()]
+mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO ()]
 mkNodes baseSeed mxThreads = mapM mkNode
  where
   afterAction :: (Show pth) => pth -> Spec -> b -> IO ()
   afterAction path spec = const $ mkVoidAction path spec
 
   mkNodes' = mkNodes baseSeed mxThreads
-  mkNode :: T.Template -> IO (P.PreNode IO [] ())
+  mkNode :: T.Template -> IO (P.PreNode IO ())
   mkNode t = case t of
     T.Fixture
       { path
@@ -1114,7 +1115,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
           P.Fixture
             { config = tc
             , path
-            , tests = mkTestItem <$> tests
+            , tests = ItemList $ mkTestItem <$> tests
             }
     _ ->
       do

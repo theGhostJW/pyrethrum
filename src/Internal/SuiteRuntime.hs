@@ -36,7 +36,7 @@ todo :: define defect properties with sum type type and typeclass which returns 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
-execute :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> C.ExeParams m [] rc tc -> IO ()
+execute :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> C.ExeParams m rc tc -> IO ()
 execute
   tc
   lc
@@ -46,7 +46,7 @@ execute
     , runConfig
     } = executeNodeList tc lc (P.prepare $ P.SuitePrepParams suite interpreter runConfig)
 
-executeNodeList :: (Traversable c) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> c (P.PreNode IO c ()) -> IO ()
+executeNodeList :: ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> [P.PreNode IO ()] -> IO ()
 executeNodeList
   tc
   L.LogControls
@@ -150,17 +150,25 @@ data ExeTree hi where
   Fixture ::
     { path :: L.ExePath
     , title :: Text
-    , tests :: ChildQ (P.Test IO hi)
+    , tests :: TestSource hi
     } ->
     ExeTree hi
 
-mkXTree :: (Traversable m) => L.ExePath -> m (P.PreNode IO m hi) -> IO (ChildQ (ExeTree hi))
+data TestSource hi = Queue (ChildQ (P.Test IO hi) )| PropertyTest hi
+
+loadTests ::  C.DataSource (P.Test IO hi) -> IO (TestSource hi)
+loadTests = \case 
+  C.ItemList tests -> Queue <$> mkChildQ tests
+  C.Property _i -> noImpPropertyError
+
+
+mkXTree :: L.ExePath -> [P.PreNode IO hi ]-> IO (ChildQ (ExeTree hi))
 mkXTree xpth preNodes =
   do
     subTrees <- traverse mkNode preNodes
     mkChildQ subTrees
  where
-  mkNode :: forall m hi. (Traversable m) => P.PreNode IO m hi -> IO (ExeTree hi)
+  mkNode :: forall hi. P.PreNode IO hi -> IO (ExeTree hi)
   mkNode pn =
     pn & \case
       P.Before
@@ -219,7 +227,7 @@ mkXTree xpth preNodes =
         { config = c
         , tests
         } -> do
-          cq <- mkChildQ tests
+          cq <- loadTests tests
           pure $ Fixture{path, title = c.title, tests = cq}
    where
     path = L.ExePath $ pn.path : coerce xpth
@@ -373,6 +381,9 @@ ioLeft = pure . Left
 ioRight :: forall a. a -> IO (Either L.FailPoint a)
 ioRight = pure . Right
 
+noImpPropertyError :: any
+noImpPropertyError = error "property tests not implemented"
+
 logReturnFailure :: Logger -> L.ExePath -> SuiteEvent -> SomeException -> IO (Either L.FailPoint b)
 logReturnFailure lgr p et e =
   lgr (L.mkFailure p et e) >> ioLeft (L.FailPoint p et)
@@ -418,21 +429,28 @@ canAbandon = \case
 
   -- base non singleton can run status on underlying q
   -- the q is the only state for these constructors
-  ThreadAfter{subNodes'} -> qStatus subNodes'
-  ThreadAround{subNodes} -> qStatus subNodes
-  ThreadBefore{subNodes} -> qStatus subNodes
+  ThreadAfter{subNodes'} -> canAbandonQ subNodes'
+  ThreadAround{subNodes} -> canAbandonQ subNodes
+  ThreadBefore{subNodes} -> canAbandonQ subNodes
   --
-  EachBefore{subNodes} -> qStatus subNodes
-  EachAround{subNodes} -> qStatus subNodes
-  EachAfter{subNodes'} -> qStatus subNodes'
+  EachBefore{subNodes} -> canAbandonQ subNodes
+  EachAround{subNodes} -> canAbandonQ subNodes
+  EachAfter{subNodes'} -> canAbandonQ subNodes'
   --
-  Fixture{tests} -> qStatus tests
+  Fixture{tests} -> tests & \case 
+      Queue q -> canAbandonQ q
+      PropertyTest _ -> noImpPropertyError
  where
-  qStatus q = convert <$> readTVar q.status
-  convert = \case
-    Runnable -> All
-    Saturated -> None
-    Done -> None
+  canAbandonQ :: ChildQ a -> STM CanAbandon
+  canAbandonQ q = 
+    convert <$> readTVar q.status
+    where 
+      convert = \case
+        Runnable -> All
+        Saturated -> None
+        Done -> None
+
+
 
 canRunXTree :: ExeTree hi -> STM CanRun
 canRunXTree = \case
@@ -470,15 +488,17 @@ canRunXTree = \case
           AfterDone -> Done
 
   -- base non singleton canRun status on underlying q
-  ThreadBefore{subNodes} -> qStatus subNodes
-  ThreadAround{subNodes} -> qStatus subNodes
-  ThreadAfter{subNodes'} -> qStatus subNodes'
-  EachBefore{subNodes} -> qStatus subNodes
-  EachAround{subNodes} -> qStatus subNodes
-  EachAfter{subNodes'} -> qStatus subNodes'
-  Fixture{tests} -> qStatus tests
+  ThreadBefore{subNodes} -> canRunQ subNodes
+  ThreadAround{subNodes} -> canRunQ subNodes
+  ThreadAfter{subNodes'} -> canRunQ subNodes'
+  EachBefore{subNodes} -> canRunQ subNodes
+  EachAround{subNodes} -> canRunQ subNodes
+  EachAfter{subNodes'} -> canRunQ subNodes'
+  Fixture{tests} -> tests & \case 
+      Queue q -> canRunQ q
+      PropertyTest _ -> noImpPropertyError
  where
-  qStatus q = readTVar q.status
+  canRunQ q = readTVar q.status
   stepDownQStatus = \case
     Runnable -> Runnable
     Saturated -> Saturated
@@ -596,16 +616,22 @@ runNode lgr hi xt =
   sink :: P.ApEventSink
   sink = lgr . L.ApEvent
 
-  runTestsWithEachContext :: forall ti. IO (TestContext ti) -> ChildQ (P.Test IO ti) -> IO QElementRun
+  runTestsWithEachContext :: forall ti. IO (TestContext ti) -> TestSource ti -> IO QElementRun
   runTestsWithEachContext ctx =
-    runChildQ Sequential runInCtx (const $ pure Runnable)
-   where
-    runInCtx t = do
-      MkTestContext hkin aftr <- ctx
-      runTest (pure hkin) aftr t
+    \case
+      Queue childQ ->  
+        runChildQ Sequential runInCtx (const $ pure Runnable) childQ
+        where
+          runInCtx t = do
+            MkTestContext hkin aftr <- ctx
+            runTest (pure hkin) aftr t
+      PropertyTest _hi -> noImpPropertyError
+   
 
-  runTests :: forall ti. IO (Either FailPoint ti) -> IO () -> ChildQ (P.Test IO ti) -> IO QElementRun
-  runTests su td = runChildQ Sequential (runTest su td) (const $ pure Runnable)
+  runTests :: forall ti. IO (Either FailPoint ti) -> IO () -> TestSource ti -> IO QElementRun
+  runTests su td = \case
+     Queue childQ -> runChildQ Sequential (runTest su td) (const $ pure Runnable) childQ
+     PropertyTest _hi -> noImpPropertyError
 
   runTest :: forall ti. IO (Either FailPoint ti) -> IO () -> P.Test IO ti -> IO QElementRun
   runTest hi' after t = hi' >>= \i -> runTest' i after t
@@ -984,7 +1010,7 @@ runNode lgr hi xt =
             (\_i -> logRun_ (Hook Each After) after)
       -- threadContext -> fixture
       -- TODO same as eachContext -> fixture refactor
-      ThreadContext{threadContext} Fixture{tests} -> runChildQ Sequential (runTest threadContext noOp) (const $ pure Runnable) tests
+      ThreadContext{threadContext} Fixture{tests} -> runTests threadContext noOp tests
       -- --
       -- context -> eachBefore
       EachContext{testContext} EachBefore{before, subNodes} ->

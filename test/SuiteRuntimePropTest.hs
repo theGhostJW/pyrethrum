@@ -26,7 +26,7 @@ import Test.Tasty (TestTree, defaultMain, testGroup, TestName)
 import Test.Tasty.Falsify (
   ExpectFailure (DontExpectFailure),
   TestOptions (..),
-  Verbose (Verbose),
+  -- Verbose (Verbose),
   assert,
   collect,
   gen,

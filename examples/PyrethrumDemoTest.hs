@@ -16,10 +16,12 @@ import PyrethrumBase (
   RunConfig (..),
   Suite,
   TestConfig (..),
+  DataSource(..),
   testConfig,
  )
 import PyrethrumConfigTypes (Country (..), Environment (Prod))
 import PyrethrumExtras (txt)
+import qualified Core as C
 
 {-
 Note:: tried alternative with individual hook types but the results
@@ -149,10 +151,10 @@ data Item = Item
   }
   deriving (Show, Read)
 
-items :: RunConfig -> [Item]
+items :: RunConfig -> DataSource Item
 items =
-  const
-    [ Item
+  const $
+    C.ItemList [ Item
         { id = 1
         , title = "test the value is one"
         , value = 2
@@ -203,9 +205,9 @@ data Item2 = Item2
   }
   deriving (Show, Read)
 
-items2 :: RunConfig -> [Item2]
+items2 :: RunConfig -> DataSource Item2
 items2 rc =
-  filter
+  ItemList $ filter
     (\i -> rc.depth == Regression || i.id < 10)
     [ Item2
         { id = 1
@@ -232,8 +234,8 @@ test3 =
         pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
     , parse' = \AS{..} -> pure DS{..}
     , items' =
-        const
-          [ Item2
+        const .
+         ItemList $ [ Item2
               { id = 1
               , title = "test the value is one"
               , value = 2
@@ -252,8 +254,8 @@ test4 =
         log $ txt itm
         pure $ DS (itm.value + 1) $ txt itm.value
     , items' =
-        const
-          [ Item2
+        const .
+          ItemList $ [ Item2
               { id = 1
               , title = "test the value is one"
               , value = 2

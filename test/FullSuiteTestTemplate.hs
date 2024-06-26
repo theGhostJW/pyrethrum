@@ -5,7 +5,6 @@ import Data.Map.Strict qualified as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (Hook))
 import Internal.ThreadEvent qualified as TE
 import Prelude hiding (All, id)
-
 data Spec = Spec {delay :: Int, result :: Result}
   deriving (Read, Show, Eq)
 data Result
@@ -217,7 +216,7 @@ testItemPath TestItem{..} = TestPath{..}
 eventPaths :: Template -> [EventPath]
 eventPaths t = case t of
   Fixture{tests} ->
-    (\ti -> EventPath t (testItemPath ti) TE.Test $ All (ti.spec)) <$> tests
+    (\ti -> EventPath t (testItemPath ti) TE.Test $ All ti.spec) <$> tests
   _ ->
     let
       recurse = concatMap eventPaths t.subNodes

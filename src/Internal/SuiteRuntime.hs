@@ -346,7 +346,7 @@ runChildQ concurrency runner childCanRun ChildQ{childNodes, status, runningCount
 
 mkChildQ :: (Foldable m) => m a -> IO (ChildQ a)
 mkChildQ children = do
-  s <- newTVarIO Runnable
+  s <- newTVarIO $ null children ? Done $ Runnable
   q <- newTQueueIO
   rc <- newTVarIO 0
   atomically $ traverse_ (writeTQueue q) children

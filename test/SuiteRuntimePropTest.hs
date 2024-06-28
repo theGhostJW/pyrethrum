@@ -47,7 +47,7 @@ genPlay = do
 --  todo :: simple random api / effect
 
 demoProp :: (Show a) => String -> Gen a -> TestTree
-demoProp label gen' = testPropertyWith falsifyOptions label $ gen gen' >>= collect label . pure
+demoProp label gen' = testPropertyWith testOpts label $ gen gen' >>= collect label . pure
 
 genResult :: Word -> Gen Result
 genResult passPcnt =
@@ -73,13 +73,16 @@ demoSpec = demoProp "spec" $ genSpec 3000 80
 
 data GenParams = GenParams
   { genStrategy :: SpecGen
-  , maxTests :: Word
+  , minTestsPerFixture :: Word
+  , maxTestsPerFixture :: Word
   , maxBranches :: Word
   , maxDelay :: Int
   , passPcnt :: Word
   , hookPassPcnt :: Word
   , maxDepth :: Word
   , minHz :: Hz
+  , threadCount :: ThreadCount
+  , test :: ThreadCount -> [Template] -> IO (Either SomeException ())
   }
 
 genNode :: GenParams -> Gen Template
@@ -90,7 +93,8 @@ genNode
     , minHz
     , maxDelay
     , maxBranches
-    , maxTests
+    , minTestsPerFixture
+    , maxTestsPerFixture
     , hookPassPcnt
     , passPcnt
     } =
@@ -138,19 +142,22 @@ genNode
     genEachBefore = EachBefore <$> genManySpec <*> genEachSubnodes
     genEachAfter = EachAfter <$> genManySpec <*> genEachSubnodes
     genEachAround = EachAround <$> genManySpec <*> genManySpec' <*> genEachSubnodes
-    genFixture = Fixture <$> G.list (between (1, maxTests)) genSpec'
+    genFixture = Fixture <$> G.list (between (minTestsPerFixture, maxTestsPerFixture)) genSpec'
 
-genParams :: GenParams
-genParams =
+defParams :: GenParams
+defParams =
   GenParams
     { genStrategy = Preload
-    , maxTests = 20
+    , minTestsPerFixture = 1
+    , maxTestsPerFixture = 20
     , maxBranches = 4
     , maxDelay = 1000
     , passPcnt = 90
     , hookPassPcnt = 95
     , maxDepth = 5
     , minHz = Once
+    , threadCount = ThreadCount 5
+    , test = tryRunTest LogFails
     }
 
 genTemplate :: GenParams -> Gen [Template]
@@ -170,8 +177,8 @@ tryRunTest wantLog c suite = do
   pure r
 
 
-falsifyOptions :: TestOptions
-falsifyOptions =
+testOpts :: TestOptions
+testOpts =
   TestOptions
     { expectFailure = DontExpectFailure
     , overrideVerbose = Nothing -- Just Verbose
@@ -183,11 +190,11 @@ falsifyOptions =
 -- todo: add timestamp to debug
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
 {-# NOINLINE runProp #-}
-runProp :: TestName -> SpecGen -> TestTree
-runProp testName genStrategy = 
-  testPropertyWith falsifyOptions testName $ do
-    t <- genWith (Just . ppShow) $ genTemplate genParams {genStrategy = genStrategy}
-    let result = unsafePerformIO $ tryRunTest NoLog (ThreadCount 1)  t
+runProp :: TestName -> TestOptions -> GenParams -> TestTree
+runProp testName o p  = 
+  testPropertyWith o testName $ do
+    t <- genWith (Just . ppShow) $ genTemplate p
+    let result = unsafePerformIO $ p.test p.threadCount t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
 
@@ -195,7 +202,7 @@ runProp testName genStrategy =
 test_suite_preload :: IO ()
 test_suite_preload = do
   defaultMain $
-   testGroup "PreLoad" [runProp "Preload" Preload]
+   testGroup "PreLoad" [runProp "Preload" testOpts defParams {genStrategy = Preload} ]
   print "TEST SUITE DONE"
 
 -- $ > test_suite_runtime
@@ -205,7 +212,7 @@ test_suite_runtime = do
     testGroup
       "generator stubs"
       [
-        runProp "Runtime" Runtime
+        runProp "Runtime" testOpts {overrideNumTests = Just 10} defParams {genStrategy = Runtime, minTestsPerFixture = 0} 
       ]
   print "TEST SUITE DONE"
 

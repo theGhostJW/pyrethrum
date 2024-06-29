@@ -205,7 +205,6 @@ test_suite_preload = do
   shrinkState <- newTVarIO False
   defaultMain $
     testGroup "PreLoad" [runProp shrinkState "Preload" testOpts defParams {genStrategy = Preload}]
-  print "TEST SUITE DONE"
 
 -- $ > test_suite_runtime
 
@@ -216,9 +215,8 @@ test_suite_runtime = do
   defaultMain $
     testGroup
       "generator stubs"
-      [ runProp shrinkState "Runtime" testOpts {overrideNumTests = Just 100} defParams {genStrategy = Runtime, minTestsPerFixture = 0}
+      [ runProp shrinkState "Runtime" testOpts {overrideNumTests = Just 100} defParams {genStrategy = Runtime, minTestsPerFixture = 1}
       ]
-  print "TEST SUITE DONE"
 
 {- TODO: Check out performance.
   Many threads is slower than a handfull

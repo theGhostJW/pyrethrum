@@ -19,6 +19,16 @@ import Internal.ThreadEvent (Hz)
 import PyrethrumExtras (toS, txt, uu)
 import UnliftIO.Exception (tryAny)
 
+-- TODO Full E2E property tests from Core fixtures and Hooks --> logs
+-- can reuse some suiteruntime chks 
+-- should be able to write a converter from template to core hooks and fixtures
+
+prepare :: (C.Config rc, C.Config tc) => SuitePrepParams m rc tc -> [PreNode IO ()]
+prepare SuitePrepParams{suite, interpreter, runConfig} =
+  prepSuiteElm pp <$> treeShake (filterSuite suite)
+ where
+  pp = PrepParams interpreter runConfig
+
 data PreNode m hi where
   Before ::
     { path :: Path
@@ -292,8 +302,17 @@ data SuitePrepParams m rc tc where
 filterSuite :: forall m rc tc. [C.Node m rc tc ()] -> [C.Node m rc tc ()]
 filterSuite = uu
 
-prepare :: (C.Config rc, C.Config tc) => SuitePrepParams m rc tc -> [PreNode IO ()]
-prepare SuitePrepParams{suite, interpreter, runConfig} =
-  prepSuiteElm pp <$> filterSuite suite
+-- will return more info later such as filter log and have to return an either
+treeShake :: forall m rc tc. [C.Node m rc tc ()] -> [C.Node m rc tc ()]
+treeShake suite = filter populated . shakeNodes
  where
-  pp = PrepParams interpreter runConfig
+  shakeNodes s = shakeNode <$> s
+
+  shakeNode :: C.Node m rc tc () -> C.Node m rc tc ()
+  shakeNode = foldMap shakeNode' 
+
+
+  populated :: C.Node m rc tc () -> Bool
+  populated = \case
+    C.Hook{subNodes} -> not . null $ subNodes
+    C.Fixture{} -> True

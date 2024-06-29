@@ -68,7 +68,7 @@ genSpec maxDelay passPcnt = Spec <$> genDelay maxDelay <*> genResult passPcnt
 demoSpec :: TestTree
 demoSpec = demoProp "spec" $ genSpec 3000 80
 
-data GenParams = GenParams
+data TGenParams = GenParams
   { genStrategy :: SpecGen,
     minTestsPerFixture :: Word,
     maxTestsPerFixture :: Word,
@@ -83,8 +83,8 @@ data GenParams = GenParams
     test :: Logging -> Int -> ThreadCount -> [Template] -> IO ()
   }
 
-genNode :: GenParams -> Gen Template
-genNode
+templateGenParams :: TGenParams -> Gen Template
+templateGenParams
   gl@GenParams
     { genStrategy,
       maxDepth,
@@ -116,13 +116,13 @@ genNode
       fixtureWeight = 100 - (onceWeight + threadWeight + eachWeight) * 2
       nxtLimits = gl {maxDepth = maxDepth - 1}
       genSubnodes = G.list (between (1, maxBranches))
-      genOnceSubnodes = genSubnodes $ genNode (nxtLimits {minHz = Once})
+      genOnceSubnodes = genSubnodes $ templateGenParams (nxtLimits {minHz = Once})
       genSpec' = genSpec maxDelay passPcnt
       genSpec'' = genSpec maxDelay passPcnt
       genOnceBefore = OnceBefore <$> genSpec' <*> genOnceSubnodes
       genOnceAfter = OnceAfter <$> genSpec' <*> genOnceSubnodes
       genOnceAround = OnceAround <$> genSpec' <*> genSpec'' <*> genOnceSubnodes
-      genThreadSubnodes = genSubnodes $ genNode (nxtLimits {minHz = Thread})
+      genThreadSubnodes = genSubnodes $ templateGenParams (nxtLimits {minHz = Thread})
       genManySpec =
         frequency
           [ (10, T.All <$> genSpec'),
@@ -136,13 +136,13 @@ genNode
       genThreadBefore = ThreadBefore <$> genManySpec <*> genThreadSubnodes
       genThreadAfter = ThreadAfter <$> genManySpec <*> genThreadSubnodes
       genThreadAround = ThreadAround <$> genManySpec <*> genManySpec' <*> genThreadSubnodes
-      genEachSubnodes = genSubnodes $ genNode (nxtLimits {minHz = Each})
+      genEachSubnodes = genSubnodes $ templateGenParams (nxtLimits {minHz = Each})
       genEachBefore = EachBefore <$> genManySpec <*> genEachSubnodes
       genEachAfter = EachAfter <$> genManySpec <*> genEachSubnodes
       genEachAround = EachAround <$> genManySpec <*> genManySpec' <*> genEachSubnodes
       genFixture = Fixture <$> G.list (between (minTestsPerFixture, maxTestsPerFixture)) genSpec'
 
-defParams :: GenParams
+defParams :: TGenParams
 defParams =
   GenParams
     { genStrategy = Preload,
@@ -159,11 +159,11 @@ defParams =
       test = runTest'
     }
 
-genTemplate :: GenParams -> Gen [Template]
-genTemplate p = G.list (between (1, p.maxBranches)) $ genNode p
+genTemplate :: TGenParams -> Gen [Template]
+genTemplate p = G.list (between (1, p.maxBranches)) $ templateGenParams p
 
 -- tryRunTest :: Logging -> ThreadCount -> [Template] -> IO (Either SomeException ())
-tryRunTest :: TVar Bool -> GenParams -> [Template] -> IO (Either SomeException ())
+tryRunTest :: TVar Bool -> TGenParams -> [Template] -> IO (Either SomeException ())
 tryRunTest isShinking p suite = do
   r <- tryAny $ p.test p.logging defaultSeed p.threadCount suite
   srk <- readTVarIO isShinking
@@ -190,7 +190,7 @@ testOpts =
 -- todo: add timestamp to debug
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
 {-# NOINLINE runProp #-}
-runProp ::  TVar Bool -> TestName -> TestOptions -> GenParams -> TestTree
+runProp ::  TVar Bool -> TestName -> TestOptions -> TGenParams -> TestTree
 runProp isShrinking testName o p =
   testPropertyWith o testName $ do
     t <- genWith (Just . ppShow) $ genTemplate p

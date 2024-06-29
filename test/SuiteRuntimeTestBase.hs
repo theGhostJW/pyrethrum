@@ -129,8 +129,6 @@ logItemtoBool = threadEventToBool
 chkProperties :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
 chkProperties baseSeed threadLimit ts evts = do
   -- these checks apply to the log as a whole
-  -- TODO: Add to test - errors always logged when no parent error should be derivable from
-  -- template
   traverse_
     (evts &)
     [ chkStartEndExecution
@@ -138,6 +136,8 @@ chkProperties baseSeed threadLimit ts evts = do
     , chkAllTemplateItemsLogged ts
     , chkStartsOnce "once hooks and tests" shouldOccurOnce
     , chkExpectedResults baseSeed threadLimit ts
+    , chkNoEmptyPreHooks [Once]
+    , chkNoEmptyPostHooks [Once]
     ]
   -- these checks apply to each thread log (events with the same thread id)
   threadLogChks
@@ -145,8 +145,8 @@ chkProperties baseSeed threadLimit ts evts = do
     evts
     [ chkThreadHooksStartedOnceInThread
     , chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
-    , chkNoEmptyPostHooks
-    , chkNoEmptyPreHooks
+    , chkNoEmptyPreHooks [Thread, Each]
+    , chkNoEmptyPostHooks [Thread, Each]
     ]
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
   threadLogChks
@@ -595,21 +595,21 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
 logTails :: Bool -> [LogItem] -> [[LogItem]]
 logTails wantReverse = tails . bool PR.id reverse wantReverse
 
-startHook :: [HookPos] -> LogItem -> Bool
-startHook poss l = startOrParentFailure l && (getHookInfo l & maybe False (\(hz, hkPos) -> hz /= Once && (hkPos `PE.elem` poss)))
+startHook :: [Hz] -> [HookPos] -> LogItem -> Bool
+startHook hzs poss l = startOrParentFailure l && (getHookInfo l & maybe False (\(hz', hkPos) -> hz' `PE.elem` hzs && hkPos `PE.elem` poss))
 
-chkNoEmptyPostHooks :: [LogItem] -> IO ()
-chkNoEmptyPostHooks =
+chkNoEmptyPostHooks :: [Hz] -> [LogItem] -> IO ()
+chkNoEmptyPostHooks hzs =
   chkNoEmptyHooks
     "Post Hook Empty"
-    (startHook [Teardown, After])
+    (startHook hzs [Teardown, After])
     True
 
-chkNoEmptyPreHooks :: [LogItem] -> IO ()
-chkNoEmptyPreHooks =
+chkNoEmptyPreHooks :: [Hz] -> [LogItem] -> IO ()
+chkNoEmptyPreHooks hzs =
   chkNoEmptyHooks
     "Post Hook Empty"
-    (startHook [Setup, Before])
+    (startHook hzs [Setup, Before])
     False
 
 chkNoEmptyHooks :: Text -> (LogItem -> Bool) -> Bool -> [LogItem] -> IO ()

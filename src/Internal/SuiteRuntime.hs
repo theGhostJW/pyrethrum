@@ -8,7 +8,7 @@ import Internal.ThreadEvent hiding (Test)
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
 import PyrethrumExtras (catchAll, txt, (?))
-import qualified Data.Set qualified as S
+import Data.Set qualified as S
 import UnliftIO (
   concurrently_,
   finally,

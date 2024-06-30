@@ -298,34 +298,36 @@ data SuitePrepParams m rc fc where
 --    - validation - eg. no repeat item titles
 -- will return more info later such as filter log and have to return an either
 filterSuite :: forall m rc fc i. [Filter rc fc] -> rc -> [C.Node m rc fc i] -> ([C.Node m rc fc i], [FilterResult fc])
-filterSuite fltrs rc suite = uu
+filterSuite fltrs rc = 
+    foldl' filterNode ([], [])
   where
     filterSuite' :: [C.Node m rc fc ()] -> ([C.Node m rc fc ()], [FilterResult fc])
     filterSuite' = filterSuite fltrs rc
 
-    filterNode ::  forall hi. C.Node m rc fc hi -> (C.Node m rc fc hi, [FilterResult fc])
-    filterNode = \case
-      C.Hook {hook, path, subNodes} ->
-        ( hook
-            { subNodes = fst <$> filterSuite' subNodes
-            },
-          classifyHook hook
-        )
-      n@C.Fixture {fixture, path} ->
-        ( n,
-          [filterFixture fixture]
-        )
-
+    filterNode ::  forall hi. ([C.Node m rc fc hi], [FilterResult fc]) -> C.Node m rc fc hi -> ([C.Node m rc fc hi], [FilterResult fc])
+    filterNode (nodes, fltrInfo) = \case
+      h@C.Hook {hook, path, subNodes} -> uu
+        where 
+          sn = 
+    --     ( hook
+    --         { subNodes = fst <$> filterSuite' subNodes
+    --         },
+    --       classifyHook hook
+    --     )
+      fx@C.Fixture {fixture} -> 
+         (isAccepted fr ? fx : nodes $ nodes, fr : fltrInfo)
+        where
+          fr = filterFixture fixture
 
     filterFixture :: forall hi. C.Fixture m rc fc hi -> FilterResult fc
     filterFixture fx =
-      fltrRslt
+      fr
         { rejection =
-            fltrRslt.rejection
+            fr.rejection
               <|> ( C.fixtureEmpty rc fx
                       ? Just "Empty Fixture - the fixture either has no test data or all test data has been filtered out"
                       $ Nothing
                   )
         }
       where
-        fltrRslt = applyFilters fltrs rc (C.getConfig fx)
+        fr = applyFilters fltrs rc (C.getConfig fx)

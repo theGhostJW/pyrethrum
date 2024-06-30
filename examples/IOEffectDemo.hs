@@ -5,7 +5,7 @@ import Chronos (Time, now)
 import DSL.FileSystemEffect
 import Effectful
 import DSL.Out
-import DSL.Internal.ApEvent
+import DSL.Internal.NodeEvent
 import Effectful.Error.Static as E (Error, runError)
 import Data.Text qualified as T
 import BasePrelude (openFile, hClose, hGetContents)
@@ -100,27 +100,27 @@ timeTest = do
 -- time 3 Time {getTime = 1689018959089000000}
 
 -- use eff
-listFileImp :: (FileSystem :> es, Out ApEvent :> es) => Eff es [Text]
+listFileImp :: (FileSystem :> es, Out NodeEvent :> es) => Eff es [Text]
 listFileImp = do
   log "listFileImp"
   files <- walkDirAccum Nothing (\_root _subs files -> pure files) [absdir|/pyrethrum/pyrethrum|]
   log "done"
   pure . filter ("cabal" `T.isInfixOf`) $ toS . toFilePath <$> files
 
-apEventOut :: forall a es. (IOE :> es) => Eff (Out ApEvent : es) a -> Eff es a
+apEventOut :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
 apEventOut = runOut print
 
-ioRun :: Eff '[FileSystem, Out ApEvent, Error FSException, IOE] a -> IO (Either (CallStack, FSException) a)
+ioRun :: Eff '[FileSystem, Out NodeEvent, Error FSException, IOE] a -> IO (Either (CallStack, FSException) a)
 ioRun = runEff . runError . apEventOut . runFileSystem
 
-logShow :: (Out ApEvent :> es, Show a) => a -> Eff es ()
+logShow :: (Out NodeEvent :> es, Show a) => a -> Eff es ()
 logShow = out . User . Log . txt
 
-log :: (Out ApEvent :> es) => Text -> Eff es ()
+log :: (Out NodeEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
 -- $ > ioRun effDemo
-effDemo :: Eff '[FileSystem, Out ApEvent, Error FSException, IOE] ()
+effDemo :: Eff '[FileSystem, Out NodeEvent, Error FSException, IOE] ()
 effDemo = do
   res <- listFileImp
   chk res
@@ -128,7 +128,7 @@ effDemo = do
   chk _ = log "This is a effDemo"
 
 -- $ > ioRun effDemo2
-effDemo2 :: Eff '[FileSystem, Out ApEvent, Error FSException, IOE] ()
+effDemo2 :: Eff '[FileSystem, Out NodeEvent, Error FSException, IOE] ()
 effDemo2 = do
   res <- listFileImp
   chk res

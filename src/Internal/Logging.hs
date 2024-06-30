@@ -1,10 +1,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
 
-module Internal.RunTimeLogging where
+module Internal.Logging where
 
 -- TODO: Explicit exports remove old code
 import BasePrelude qualified as P
-import DSL.Internal.ApEvent qualified as AE
+import DSL.Internal.NodeEvent qualified as AE
 import Data.Aeson.TH (defaultOptions, deriveToJSON)
 import Data.Text as T (intercalate)
 import Effectful.Concurrent.STM (TQueue)
@@ -95,7 +95,7 @@ data EngineEvent l a
       , failLoc :: l
       , failSuiteEvent :: TE.SuiteEvent
       }
-  | ApEvent
+  | NodeEvent
       { event :: a
       }
   | EndExecution
@@ -111,7 +111,7 @@ expandEvent threadId idx = \case
   End{..} -> TE.End{threadId, idx, ..}
   Failure{..} -> TE.Failure{threadId, idx, ..}
   ParentFailure{..} -> TE.ParentFailure{threadId, idx, ..}
-  ApEvent event -> TE.ApEvent{threadId, idx, event}
+  NodeEvent event -> TE.NodeEvent{threadId, idx, event}
   EndExecution -> TE.EndExecution{threadId, idx}
 
 mkLogger :: (TE.ThreadEvent loc apEvt -> IO ()) -> IORef Int -> ThreadId -> EngineEvent loc apEvt -> IO ()

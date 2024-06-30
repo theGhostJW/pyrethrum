@@ -1,6 +1,6 @@
 module FullSuiteTestTemplate where
 
-import DSL.Internal.ApEvent (Path (..))
+import DSL.Internal.NodeEvent (Path (..))
 import Data.Map.Strict qualified as Map
 import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (Hook))
 import Internal.ThreadEvent qualified as TE

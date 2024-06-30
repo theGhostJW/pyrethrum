@@ -16,8 +16,8 @@ module PyrethrumBase (
 
 import Core qualified as C
 import DSL.FileSystemEffect (FSException, FileSystem)
-import DSL.Internal.ApEvent (ApEvent)
-import DSL.Internal.ApEvent qualified as AE
+import DSL.Internal.NodeEvent (NodeEvent)
+import DSL.Internal.NodeEvent qualified as AE
 import DSL.Out (Out)
 import Effectful (Eff, IOE, type (:>))
 import Effectful.Error.Static as E (Error)
@@ -26,12 +26,12 @@ import PyrethrumConfigTypes as CG
 
 --  these will probably be split off and go into core later
 type Action = Eff ApEffs
-type HasLog es = Out ApEvent :> es
-type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a
-type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
+type HasLog es = Out NodeEvent :> es
+type LogEffs a = forall es. (Out NodeEvent :> es) => Eff es a
+type ApEffs = '[FileSystem, Out NodeEvent, E.Error FSException, IOE]
 
--- type ApConstraints es = (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es)
--- type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
+-- type ApConstraints es = (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es)
+-- type AppEffs a = forall es. (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
 
 -- TODO: research StrictSTM
 

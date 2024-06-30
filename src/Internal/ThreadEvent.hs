@@ -101,7 +101,7 @@ hasSuiteEvent p l = case l of
     StartExecution{} -> False
     Failure{} -> False
     ParentFailure{} -> False
-    ApEvent{} -> False
+    NodeEvent{} -> False
     EndExecution{} -> False
     _ -> p l.suiteEvent
 
@@ -122,7 +122,7 @@ suiteEventOrParentFailureSuiteEvent = \case
     End{suiteEvent = s} -> Just s
     Failure{} -> Nothing
     ParentFailure{suiteEvent = s} -> Just s
-    ApEvent{} -> Nothing
+    NodeEvent{} -> Nothing
     EndExecution{} -> Nothing
 
 getSuiteEvent :: ThreadEvent a b -> Maybe SuiteEvent
@@ -132,7 +132,7 @@ getSuiteEvent = \case
     ParentFailure{suiteEvent} -> Just suiteEvent
     Failure{suiteEvent} -> Just suiteEvent
     StartExecution{} -> Nothing
-    ApEvent{} -> Nothing
+    NodeEvent{} -> Nothing
     EndExecution{} -> Nothing
     
 getHookInfo :: ThreadEvent a b -> Maybe (Hz, HookPos)
@@ -173,7 +173,7 @@ data ThreadEvent l a
         , failLoc :: l
         , failSuiteEvent :: SuiteEvent
         }
-    | ApEvent
+    | NodeEvent
         { idx :: Int
         , threadId :: ThreadId
         , event :: a
@@ -188,7 +188,7 @@ startOrParentFailure :: ThreadEvent l a -> Bool
 startOrParentFailure te = case te of
     StartExecution{} -> False
     EndExecution{} -> False
-    ApEvent{} -> False
+    NodeEvent{} -> False
     Failure{} -> False
     -- event will either have a start or be
     -- represented by a parent failure if skipped
@@ -200,7 +200,7 @@ startSuiteEventLoc :: ThreadEvent l a -> Maybe l
 startSuiteEventLoc te = case te of
     StartExecution{} -> Nothing
     EndExecution{} -> Nothing
-    ApEvent{} -> Nothing
+    NodeEvent{} -> Nothing
     Failure{} -> Nothing
     -- event will either have a start or be
     -- represented by a parent failure if skipped

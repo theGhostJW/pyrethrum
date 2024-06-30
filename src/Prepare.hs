@@ -5,8 +5,8 @@ import Control.Exception (throwIO)
 import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
 import Core qualified as C
-import DSL.Internal.ApEvent
-  ( ApEvent (Framework),
+import DSL.Internal.NodeEvent
+  ( NodeEvent (Framework),
     ApStateText (ApStateText),
     DStateText (DStateText),
     FLog (Action, Check, CheckStart, Parse, SkipedCheckStart),
@@ -59,7 +59,7 @@ data PreNode m hi where
     } ->
     PreNode m hi
 
-type ApEventSink = ApEvent -> IO ()
+type ApEventSink = NodeEvent -> IO ()
 
 -- used in debugging
 listPaths :: forall m hi. PreNode m hi -> [(Int, Path)]

@@ -16,7 +16,7 @@ import DSL.Internal.ApEvent
   )
 import Data.Either.Extra (mapLeft)
 import Internal.ThreadEvent (Hz)
-import PyrethrumExtras (toS, txt, uu, (?))
+import PyrethrumExtras (toS, txt)
 import UnliftIO.Exception (tryAny)
 
 

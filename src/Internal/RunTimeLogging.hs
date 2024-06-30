@@ -39,7 +39,6 @@ topPath = PE.head . coerce
         , SuiteElmPath { module' = "0" , path = "OnceAround" }
         ]
        
-  
   for Hooks the parent is simply the tail of the target path
       ExePath
         [ SuiteElmPath { module' = "0.5.1" , path = "EachAround" }
@@ -51,7 +50,6 @@ topPath = PE.head . coerce
           [ SuiteElmPath { module' = "0.5" , path = "EachBefore" }
           , SuiteElmPath { module' = "0" , path = "OnceAround" }
           ]
-
 -}
 parentPath :: Bool -> ExePath -> Maybe ExePath
 parentPath isTestPath (ExePath l) = 

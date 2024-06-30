@@ -15,7 +15,7 @@ data Filter rc t = MkFilter
 data FilterResult t = MkFilterResult
   { target :: t,
     rejection :: Maybe Text
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Functor)
 
 isAccepted :: FilterResult t -> Bool
 isAccepted = isNothing . (.rejection)

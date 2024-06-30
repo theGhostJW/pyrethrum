@@ -8,6 +8,7 @@ import Internal.ThreadEvent hiding (Test)
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
 import PyrethrumExtras (catchAll, txt, (?))
+import qualified Data.Set qualified as S
 import UnliftIO (
   concurrently_,
   finally,
@@ -27,6 +28,7 @@ import UnliftIO.STM (
   writeTQueue,
  )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
+import Filter
 
 {-
 todo :: define defect properties with sum type type and typeclass which returns defect info
@@ -36,19 +38,64 @@ todo :: define defect properties with sum type type and typeclass which returns 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
-execute :: (C.Config rc, C.Config tc) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> C.ExeParams m rc tc -> IO ()
+execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> C.ExeParams m rc fc -> IO ()
 execute
-  tc
+  fc
   lc
   C.ExeParams
     { suite
     , interpreter
     , runConfig
-    } = executeNodeList tc lc (P.prepare $ P.SuitePrepParams suite interpreter runConfig)
+    } = executeNodeList fc lc (P.prepare $ P.SuitePrepParams suite interpreter runConfig)
+
+firstDuplicateFixtureTitle :: [FilterResult Text] -> Maybe Text 
+firstDuplicateFixtureTitle = firstDuplicate . fmap (.target)
+  where
+    -- todo make polymorphic and add to pyrelude (replace existing)
+    firstDuplicate :: [Text] -> Maybe Text
+    firstDuplicate = go S.empty
+      where
+        go _ [] = Nothing 
+        go seen (x:xs)
+          | x `S.member` seen = Just x 
+          | otherwise = go (S.insert x seen) xs
+
+filterSuite :: forall m rc fc i. C.Config fc => [Filter rc fc] -> rc -> [C.Node m rc fc i] -> ([C.Node m rc fc i], [FilterResult Text])
+filterSuite fltrs rc suite = 
+     (reverse fNodes, fRslts)
+  where
+    (fNodes, fRslts) = foldl' filterNode ([], []) suite
+    
+    filterSuite' :: forall i'. [C.Node m rc fc i'] -> ([C.Node m rc fc i'], [FilterResult Text])
+    filterSuite' = filterSuite fltrs rc
+
+    filterNode ::  forall hi. ([C.Node m rc fc hi], [FilterResult Text]) -> C.Node m rc fc hi -> ([C.Node m rc fc hi], [FilterResult Text])
+    filterNode (accNodes, fltrInfo) = \case
+      C.Hook {..} -> 
+        (null sn ? accNodes $ C.Hook {subNodes = sn, ..} : accNodes, fr)
+        where 
+         ( sn, fr ) = filterSuite' subNodes
+      fx@C.Fixture {fixture} -> 
+         (isAccepted fr ? fx : accNodes $ accNodes, fr : fltrInfo)
+        where
+          fr = filterFixture fixture
+
+    filterFixture :: forall hi. C.Fixture m rc fc hi -> FilterResult Text
+    filterFixture fx =
+      fr
+        { rejection =
+            fr.rejection
+              <|> ( C.fixtureEmpty rc fx
+                      ? Just "Empty Fixture - the fixture either has no test data or all test data has been filtered out"
+                      $ Nothing
+                  )
+        }
+      where
+        fr = (.title) <$> applyFilters fltrs rc (C.getConfig fx)
 
 executeNodeList :: ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> [P.PreNode IO ()] -> IO ()
 executeNodeList
-  tc
+  fc
   L.LogControls
     { sink
     , logWorker
@@ -62,12 +109,12 @@ executeNodeList
       concurrently_
         logWorker
         ( finally
-            (executeNodes sink xtree tc)
+            (executeNodes sink xtree fc)
             stopWorker
         )
 
 executeNodes :: (ThreadEvent L.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
-executeNodes sink nodes tc =
+executeNodes sink nodes fc =
   do
     rootLogger <- newLogger
     finally
@@ -81,7 +128,7 @@ executeNodes sink nodes tc =
       )
       (rootLogger L.EndExecution)
  where
-  thrdTokens = replicate tc.maxThreads True
+  thrdTokens = replicate fc.maxThreads True
   newLogger = L.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
 
 data ExeTree hi where

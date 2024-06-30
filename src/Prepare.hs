@@ -15,10 +15,10 @@ import DSL.Internal.ApEvent
     exceptionEvent,
   )
 import Data.Either.Extra (mapLeft)
-import Filter
 import Internal.ThreadEvent (Hz)
 import PyrethrumExtras (toS, txt, uu, (?))
 import UnliftIO.Exception (tryAny)
+
 
 -- TODO Full E2E property tests from Core fixtures and Hooks --> logs
 -- can reuse some suiteruntime chks
@@ -287,47 +287,3 @@ data SuitePrepParams m rc fc where
       runConfig :: rc
     } ->
     SuitePrepParams m rc fc
-
---
--- Suite rc fc effs
--- TODO:
---    - prenode subnodes => m
---    - filtering
---    - tree shaking
---    - querying
---    - validation - eg. no repeat item titles
--- will return more info later such as filter log and have to return an either
-filterSuite :: forall m rc fc i. [Filter rc fc] -> rc -> [C.Node m rc fc i] -> ([C.Node m rc fc i], [FilterResult fc])
-filterSuite fltrs rc = 
-    foldl' filterNode ([], [])
-  where
-    filterSuite' :: [C.Node m rc fc ()] -> ([C.Node m rc fc ()], [FilterResult fc])
-    filterSuite' = filterSuite fltrs rc
-
-    filterNode ::  forall hi. ([C.Node m rc fc hi], [FilterResult fc]) -> C.Node m rc fc hi -> ([C.Node m rc fc hi], [FilterResult fc])
-    filterNode (nodes, fltrInfo) = \case
-      h@C.Hook {hook, path, subNodes} -> uu
-        where 
-          sn = 
-    --     ( hook
-    --         { subNodes = fst <$> filterSuite' subNodes
-    --         },
-    --       classifyHook hook
-    --     )
-      fx@C.Fixture {fixture} -> 
-         (isAccepted fr ? fx : nodes $ nodes, fr : fltrInfo)
-        where
-          fr = filterFixture fixture
-
-    filterFixture :: forall hi. C.Fixture m rc fc hi -> FilterResult fc
-    filterFixture fx =
-      fr
-        { rejection =
-            fr.rejection
-              <|> ( C.fixtureEmpty rc fx
-                      ? Just "Empty Fixture - the fixture either has no test data or all test data has been filtered out"
-                      $ Nothing
-                  )
-        }
-      where
-        fr = applyFilters fltrs rc (C.getConfig fx)

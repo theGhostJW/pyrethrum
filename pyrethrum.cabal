@@ -197,4 +197,6 @@ library
     , unliftio
     , unordered-containers
     , yaml
+    , async
+    , tslogger
   default-language: Haskell2010

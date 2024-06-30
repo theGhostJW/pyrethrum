@@ -867,15 +867,13 @@ exeTemplate wantLog baseRandomSeed maxThreads templates = do
         putStrLn "#### Template ####"
         pPrint templates
         putStrLn "========="
-    -- nodes <- mkNodes baseRandomSeed maxThreads templates
-    let nodes = mkCoreNode <$> templates
+    nodes <- mkNodes baseRandomSeed maxThreads templates
     when wantLog' $ do
         putStrLn "#### (Indent, Node Path) After Prepare ####"
-        -- pPrint $ P.listPaths <$> nodes
+        pPrint $ P.listPaths <$> nodes
         putStrLn "========="
         putStrLn "#### Log ####"
-    -- executeNodeList maxThreads lc nodes
-    forM_ nodes Core.runNode
+    executeNodeList maxThreads lc nodes
     atomically $ q2List logQ
 
 q2List :: TQueue a -> STM [a]
@@ -1100,81 +1098,81 @@ mkVoidAction path spec =
 mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.ApEventSink -> hi -> IO ()
 mkAction path s _sink _in = mkVoidAction path s
 
-mkCoreNode :: T.Template -> Core.Node IO [] TestConfig ()
-mkCoreNode t = case t of
-    T.Fixture{path, tests} ->
-        Core.Fixture
-            { path
-            , fixture =
-                Core.Direct
-                    { config = tc
-                    , items = mkItem <$> tests
-                    , action = \i -> pure i.value
-                    }
-            }
-    T.OnceBefore{path, subNodes} ->
-        Core.Hook
-            { path
-            , hook =
-                Core.Before{action = pure ()} :: Core.Hook IO Core.Once () ()
-            , subNodes = mkCoreNode <$> subNodes
-            }
-    T.OnceAfter{path, subNodes} ->
-        Core.Hook
-            { path
-            , hook =
-                Core.After{afterAction = pure ()} :: Core.Hook IO Core.Once () ()
-            , subNodes = mkCoreNode <$> subNodes
-            }
-    T.OnceAround{path, subNodes} ->
-        Core.Hook
-            { path
-            , hook =
-                Core.Around{setup = pure (), teardown = \_ -> pure ()} :: Core.Hook IO Core.Once () ()
-            , subNodes = mkCoreNode <$> subNodes
-            }
-    T.EachBefore{path, subNodes} ->
-        Core.Hook
-            { path
-            , hook =
-                Core.Before{action = pure ()} :: Core.Hook IO Core.Each () ()
-            , subNodes = mkCoreNode <$> subNodes
-            }
-    T.EachAfter{path, subNodes} ->
-        Core.Hook
-            { path
-            , hook =
-                Core.After{afterAction = pure ()} :: Core.Hook IO Core.Each () ()
-            , subNodes = mkCoreNode <$> subNodes
-            }
-    T.EachAround{path, subNodes} ->
-        Core.Hook
-            { path
-            , hook =
-                Core.Around{setup = pure (), teardown = \_ -> pure ()} :: Core.Hook IO Core.Each () ()
-            , subNodes = mkCoreNode <$> subNodes
-            }
-    T.ThreadBefore{path, subNodes} ->
-        Core.Hook
-            { path
-            , hook =
-                Core.Before{action = pure ()} :: Core.Hook IO Core.Thread () ()
-            , subNodes = mkCoreNode <$> subNodes
-            }
-    T.ThreadAfter{path, subNodes} ->
-        Core.Hook
-            { path
-            , hook =
-                Core.After{afterAction = pure ()} :: Core.Hook IO Core.Thread () ()
-            , subNodes = mkCoreNode <$> subNodes
-            }
-    T.ThreadAround{path, subNodes} ->
-        Core.Hook
-            { path
-            , hook =
-                Core.Around{setup = pure (), teardown = \_ -> pure ()} :: Core.Hook IO Core.Thread () ()
-            , subNodes = mkCoreNode <$> subNodes
-            }
+-- mkCoreNode :: T.Template -> Core.Node IO [] TestConfig ()
+-- mkCoreNode t = case t of
+--     T.Fixture{path, tests} ->
+--         Core.Fixture
+--             { path
+--             , fixture =
+--                 Core.Direct
+--                     { config = tc
+--                     , items = mkItem <$> tests
+--                     , action = \i -> pure i.value
+--                     }
+--             }
+--     T.OnceBefore{path, subNodes} ->
+--         Core.Hook
+--             { path
+--             , hook =
+--                 Core.Before{action = pure ()} :: Core.Hook IO Core.Once () ()
+--             , subNodes = mkCoreNode <$> subNodes
+--             }
+--     T.OnceAfter{path, subNodes} ->
+--         Core.Hook
+--             { path
+--             , hook =
+--                 Core.After{afterAction = pure ()} :: Core.Hook IO Core.Once () ()
+--             , subNodes = mkCoreNode <$> subNodes
+--             }
+--     T.OnceAround{path, subNodes} ->
+--         Core.Hook
+--             { path
+--             , hook =
+--                 Core.Around{setup = pure (), teardown = \_ -> pure ()} :: Core.Hook IO Core.Once () ()
+--             , subNodes = mkCoreNode <$> subNodes
+--             }
+--     T.EachBefore{path, subNodes} ->
+--         Core.Hook
+--             { path
+--             , hook =
+--                 Core.Before{action = pure ()} :: Core.Hook IO Core.Each () ()
+--             , subNodes = mkCoreNode <$> subNodes
+--             }
+--     T.EachAfter{path, subNodes} ->
+--         Core.Hook
+--             { path
+--             , hook =
+--                 Core.After{afterAction = pure ()} :: Core.Hook IO Core.Each () ()
+--             , subNodes = mkCoreNode <$> subNodes
+--             }
+--     T.EachAround{path, subNodes} ->
+--         Core.Hook
+--             { path
+--             , hook =
+--                 Core.Around{setup = pure (), teardown = \_ -> pure ()} :: Core.Hook IO Core.Each () ()
+--             , subNodes = mkCoreNode <$> subNodes
+--             }
+--     T.ThreadBefore{path, subNodes} ->
+--         Core.Hook
+--             { path
+--             , hook =
+--                 Core.Before{action = pure ()} :: Core.Hook IO Core.Thread () ()
+--             , subNodes = mkCoreNode <$> subNodes
+--             }
+--     T.ThreadAfter{path, subNodes} ->
+--         Core.Hook
+--             { path
+--             , hook =
+--                 Core.After{afterAction = pure ()} :: Core.Hook IO Core.Thread () ()
+--             , subNodes = mkCoreNode <$> subNodes
+--             }
+--     T.ThreadAround{path, subNodes} ->
+--         Core.Hook
+--             { path
+--             , hook =
+--                 Core.Around{setup = pure (), teardown = \_ -> pure ()} :: Core.Hook IO Core.Thread () ()
+--             , subNodes = mkCoreNode <$> subNodes
+--             }
 
 data Item = Item
     { id :: Int

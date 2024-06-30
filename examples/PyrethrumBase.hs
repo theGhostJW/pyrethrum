@@ -1,5 +1,4 @@
 module PyrethrumBase (
-    Action,
     Depth (..),
     Fixture (..),
     Hook (..),
@@ -19,17 +18,20 @@ import DSL.FileSystemEffect (FSException, FileSystem)
 import DSL.Internal.ApEvent (ApEvent)
 import DSL.Internal.ApEvent qualified as AE
 import DSL.Out (Out)
+import Data.Map qualified as Map
 import Effectful (Eff, IOE, type (:>))
 import Effectful.Error.Static as E (Error)
+import GHC.IO.Unsafe (unsafePerformIO)
 import PyrethrumConfigTypes as CG (
     Depth (..),
     RunConfig (..),
     TestConfig (..),
     testConfig,
  )
+import PyrethrumExtras (uu)
 
 --  these will probably be split off and go into core later
-type Action = Eff ApEffs
+-- type Action = Eff ApEffs
 type HasLog es = Out ApEvent :> es
 type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a
 type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
@@ -38,47 +40,46 @@ type ApEffs = '[FileSystem, Out ApEvent, E.Error FSException, IOE]
 -- type AppEffs a = forall es. (FileSystem :> es, Out ApEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
 
 -- TODO: research StrictSTM
---
-instance C.Logger Action where
-    fLog = print
-
-instance C.Concurrently Action where
-    runConcurrently = sequence
-
 data Hook hz when input output where
     BeforeHook ::
         (C.Frequency hz) =>
-        { action :: Action o
+        { action :: IO o
+        , beforeId :: Text
         } ->
         Hook hz C.Before () o
     BeforeHook' ::
         (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
         { depends :: Hook phz pw pi i
-        , action' :: i -> Action o
+        , action' :: i -> IO o
+        , beforeId' :: Text
         } ->
         Hook hz C.Before i o
     AfterHook ::
         (C.Frequency hz) =>
-        { afterAction :: Action ()
+        { afterAction :: IO ()
+        , afterId :: Text
         } ->
         Hook hz C.After () ()
     AfterHook' ::
         (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
         { afterDepends :: Hook phz pw pi i
-        , afterAction' :: Action ()
+        , afterAction' :: IO ()
+        , afterId' :: Text
         } ->
         Hook hz C.After i i
     AroundHook ::
         (C.Frequency hz) =>
-        { setup :: Action o
-        , teardown :: o -> Action ()
+        { setup :: IO o
+        , teardown :: o -> IO ()
+        , aroundId :: Text
         } ->
         Hook hz C.Around () o
     AroundHook' ::
         (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
         { aroundDepends :: Hook phz pw pi i
-        , setup' :: i -> Action o
-        , teardown' :: o -> Action ()
+        , setup' :: i -> IO o
+        , teardown' :: o -> IO ()
+        , aroundId' :: Text
         } ->
         Hook hz C.Around i o
 
@@ -86,7 +87,7 @@ data Fixture hi where
     Full ::
         (C.Item i ds, Show as) =>
         { config :: TestConfig
-        , action :: i -> Action as
+        , action :: i -> IO as
         , parse :: as -> Either C.ParseException ds
         , items :: [i]
         } ->
@@ -95,7 +96,7 @@ data Fixture hi where
         (C.Item i ds, Show as, C.Frequency hz) =>
         { config' :: TestConfig
         , depends :: Hook hz pw pi a
-        , action' :: a -> i -> Action as
+        , action' :: a -> i -> IO as
         , parse' :: as -> Either C.ParseException ds
         , items' :: [i]
         } ->
@@ -104,7 +105,7 @@ data Fixture hi where
         forall i ds.
         (C.Item i ds) =>
         { config :: TestConfig
-        , action :: i -> Action ds
+        , action :: i -> IO ds
         , items :: [i]
         } ->
         Fixture ()
@@ -112,7 +113,7 @@ data Fixture hi where
         (C.Item i ds, C.Frequency hz) =>
         { config' :: TestConfig
         , depends :: Hook hz pw pi a
-        , action' :: a -> i -> Action ds
+        , action' :: a -> i -> IO ds
         , items' :: [i]
         } ->
         Fixture a
@@ -132,20 +133,20 @@ data Node i where
         } ->
         Node i
 
-mkFixture :: Fixture hi -> C.Fixture Action [] TestConfig hi
+mkFixture :: Fixture hi -> C.Fixture IO [] TestConfig hi
 mkFixture = \case
     Full{..} -> C.Full{..}
     Direct{..} -> C.Direct{..}
     Full'{..} -> C.Full' config' (mkHook depends) action' parse' items'
     Direct'{..} -> C.Direct'{depends = mkHook depends, ..}
 
-mkTestRun :: Suite -> [C.Node Action [] TestConfig ()]
+mkTestRun :: Suite -> [C.Node IO [] TestConfig ()]
 mkTestRun tr = mkNode <$> tr
 
-mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) hz i o
+mkHook :: Hook hz pw i o -> C.Hook IO hz i o
 mkHook = \case
     BeforeHook{..} -> C.Before{..}
-    BeforeHook'{..} -> C.Before' (mkHook depends) action'
+    BeforeHook'{..} -> C.Before' (mkHook depends) action' beforeId'
     AfterHook{..} -> C.After{..}
     AfterHook'{..} -> C.After'{afterDepends = mkHook afterDepends, ..}
     AroundHook{..} -> C.Around{..}
@@ -153,10 +154,11 @@ mkHook = \case
         { aroundDepends
         , setup'
         , teardown'
+        , aroundId'
         } ->
-            C.Around' (mkHook aroundDepends) setup' teardown'
+            C.Around' (mkHook aroundDepends) setup' teardown' aroundId'
 
-mkNode :: Node i -> C.Node Action [] TestConfig i
+mkNode :: Node i -> C.Node IO [] TestConfig i
 mkNode = \case
     Hook{..} ->
         C.Hook

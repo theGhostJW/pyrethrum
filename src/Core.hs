@@ -3,6 +3,7 @@
 module Core where
 
 import Check
+import Control.Concurrent.Async qualified as Async
 import Control.Monad.Extra (foldM_)
 import DSL.Internal.ApEvent hiding (Check)
 import DSL.Internal.ApEvent qualified as AE
@@ -105,29 +106,34 @@ data Hook m hz i o where
     Before ::
         (Frequency hz) =>
         { action :: m o
+        , beforeId :: Text
         } ->
         Hook m hz () o
     Before' ::
         (Frequency phz, Frequency hz, CanDependOn hz phz) =>
         { depends :: Hook m phz pi i
         , action' :: i -> m o
+        , beforeId' :: Text
         } ->
         Hook m hz i o
     After ::
         (Frequency hz) =>
         { afterAction :: m ()
+        , afterId :: Text
         } ->
         Hook m hz () ()
     After' ::
         (Frequency phz, Frequency hz, CanDependOn hz phz) =>
         { afterDepends :: Hook m phz pi i
         , afterAction' :: m ()
+        , afterId' :: Text
         } ->
         Hook m hz i i
     Around ::
         (Frequency hz) =>
         { setup :: m o
         , teardown :: o -> m ()
+        , aroundId :: Text
         } ->
         Hook m hz () o
     Around' ::
@@ -135,20 +141,21 @@ data Hook m hz i o where
         { depends :: Hook m phz pi i
         , setup' :: i -> m o
         , teardown' :: o -> m ()
+        , aroundId' :: Text
         } ->
         Hook m hz i o
 
 hookFrequency :: forall m hz i o. (Frequency hz) => Hook m hz i o -> Hz
 hookFrequency _ = frequency @hz
 
-instance Logger IO where
-    fLog = print
-
 instance Concurrently IO where
-    runConcurrently = sequence
+    runConcurrently as = Async.forConcurrently as id
 
 class (Monad m) => Logger m where
     fLog :: FLog -> m ()
+
+instance Logger IO where
+    fLog = print
 
 class Concurrently m where
     runConcurrently :: (Traversable c) => c (m a) -> m (c a)
@@ -161,77 +168,198 @@ forConcurrently_ ::
 forConcurrently_ t f = runConcurrently (f <$> t) $> ()
 
 runNode ::
-    (Logger m, Concurrently m, Traversable c) =>
+    (Logger m, Concurrently m, Traversable c, Cache m) =>
     Node m c tc hi ->
     m ()
 runNode Fixture{path, fixture} = runFixture path fixture
-runNode Hook{hook, subNodes} = case hookFrequency hook of
-    Once -> runHook hook $ const . forConcurrently_ subNodes $ runNode
-    Thread -> runHook hook $ const . forConcurrently_ subNodes $ runNode
-    Each -> forConcurrently_ subNodes $ \n -> do
-        runHook hook $ \_ -> runNode n
+runNode Hook{subNodes} = forConcurrently_ subNodes runNode
+
+class Cache m where
+    runBeforeAll :: Text -> m a -> m a
+    runAfterAll :: Text -> m a -> m a
+
+instance Cache IO where
+    runBeforeAll = uu
+    runAfterAll = uu
 
 runHook ::
-    (Monad m) =>
+    (Monad m, Concurrently m, Traversable c, Cache m) =>
     Hook m hz pi o ->
-    (o -> m ()) ->
+    c (o -> m ()) ->
     m ()
-runHook h a = case h of
-    Before{action} -> action >>= a
-    Before'{depends, action'} -> runHook depends $ \i -> do
-        o <- action' i
-        a o
-    Around{setup, teardown} -> do
-        o <- setup
-        a o
-        teardown o
-    Around'{depends, setup', teardown'} -> runHook depends $ \i -> do
-        o <- setup' i
-        a o
-        teardown' o
-    After{afterAction} -> a () >> afterAction
-    After'{afterDepends, afterAction'} -> do
-        runHook afterDepends $ \ho -> do
-            a ho
-            afterAction'
+runHook hook as = case hook of
+    Before{action, beforeId} -> case hookFrequency hook of
+        Once -> runBeforeAll beforeId action >>= \o -> forConcurrently_ as $ \a -> a o
+        Thread -> forConcurrently_ as $ \a -> do
+            o <- action
+            a o
+        Each -> forConcurrently_ as $ \a -> do
+            o <- action
+            a o
+    Before'{depends, action', beforeId'} -> case hookFrequency hook of
+        Once -> runHook depends newAs
+          where
+            newAs =
+                as <&> \a i -> do
+                    o <- runBeforeAll beforeId' $ action' i
+                    a o
+        Thread -> runHook depends newAs
+          where
+            newAs =
+                as <&> \a i -> do
+                    o <- action' i
+                    a o
+        Each -> runHook depends newAs
+          where
+            newAs =
+                as <&> \a i -> do
+                    o <- action' i
+                    a o
+    Around{setup, teardown, aroundId} -> case hookFrequency hook of
+        Once -> do
+            o <- runBeforeAll (aroundId <> "before") setup
+            forConcurrently_ as $ \a -> a o
+            runAfterAll (aroundId <> "after") $ teardown o
+        Thread -> forConcurrently_ as $ \a -> do
+            o <- setup
+            a o
+            teardown o
+        Each -> forConcurrently_ as $ \a -> do
+            o <- setup
+            a o
+            teardown o
+    Around'{depends, setup', teardown', aroundId'} -> case hookFrequency hook of
+        Once -> runHook depends newAs
+          where
+            newAs =
+                as <&> \a i -> do
+                    o <- runBeforeAll (aroundId' <> "before") $ setup' i
+                    a o
+                    runAfterAll (aroundId' <> "after") $ teardown' o
+        Thread -> runHook depends newAs
+          where
+            newAs =
+                as <&> \a i -> do
+                    o <- setup' i
+                    a o
+                    teardown' o
+        Each -> runHook depends newAs
+          where
+            newAs =
+                as <&> \a i -> do
+                    o <- setup' i
+                    a o
+                    teardown' o
+    After{afterAction, afterId} -> case hookFrequency hook of
+        Once -> do
+            forConcurrently_ as $ \a -> a ()
+            runAfterAll afterId afterAction
+        Thread -> forConcurrently_ as $ \a -> do
+            a ()
+            afterAction
+        Each -> forConcurrently_ as $ \a -> do
+            a ()
+            afterAction
+    After'{afterDepends, afterAction', afterId'} -> case hookFrequency hook of
+        Once -> runHook afterDepends newAs
+          where
+            newAs =
+                as <&> \a i -> do
+                    a i
+                    runAfterAll afterId' afterAction'
+        Thread -> runHook afterDepends newAs
+          where
+            newAs =
+                as <&> \a i -> do
+                    a i
+                    afterAction'
+        Each -> runHook afterDepends newAs
+          where
+            newAs =
+                as <&> \a i -> do
+                    a i
+                    afterAction'
 
 runFixture ::
-    (Logger m, Concurrently m, Traversable c) =>
+    (HasCallStack, Logger m, Concurrently m, Traversable c, Cache m) =>
     Path ->
     Fixture m c tc hi ->
     m ()
-runFixture p Direct'{config', depends, action', items'} = runHook depends $ \ho -> do
-    runChecks p
-        =<< ( runConcurrently $
-                items' <&> \i -> do
-                    ds <- action' ho i
-                    pure (ds, i.checks.un)
-            )
+runFixture p Direct'{config', depends, action', items'} =
+    runHook depends $
+        items' <&> \i ho -> do
+            ds <- action' ho i
+            runCheck p ds i.checks.un
 runFixture p Direct{config, action, items} =
-    runChecks p
-        =<< ( runConcurrently $
-                items <&> \i -> do
-                    ds <- action i
-                    pure (ds, i.checks.un)
-            )
-runFixture p Full{config, action, parse, items} = runFull p action parse items
-runFixture p Full'{config', depends, action', parse', items'} = runHook depends $ \ho -> runFull p (action' ho) parse' items'
+    forConcurrently_ items $ \i -> do
+        ds <- action i
+        runCheck p ds i.checks.un
+runFixture p Full{config, action, parse, items} = forConcurrently_ items $ \i -> do
+    d <- action i
+    case parse d of
+        Left e -> (fLog $ Exception (show e) (show callStack))
+        Right ds -> runCheck p ds i.checks.un
+runFixture p Full'{config', depends, action', parse', items'} =
+    runHook depends $
+        items' <&> \i ho -> do
+            o <- action' ho i
+            case parse' o of
+                Left e -> (fLog $ Exception (show e) (show callStack))
+                Right ds -> runCheck p ds i.checks.un
 
-runFull ::
-    (HasCallStack, Logger m, Item i ds, Traversable c, Concurrently m) =>
-    Path ->
-    (i -> m as) ->
-    (as -> Either ParseException ds) ->
-    c i ->
-    m ()
-runFull p action parse items = forConcurrently_ items applyAction
-  where
-    applyAction i = do
-        d <- action i
-        case parse d of
-            Left e -> (fLog $ Exception (show e) (show callStack))
-            Right ds -> runCheck p ds i.checks.un
+-- runFull ::
+--     (HasCallStack, Logger m, Item i ds, Traversable c, Concurrently m) =>
+--     Path ->
+--     (i -> m as) ->
+--     (as -> Either ParseException ds) ->
+--     c i ->
+--     m ()
+-- runFull p action parse items = forConcurrently_ items applyAction
+--   where
+--     applyAction i = do
+--         d <- action i
+--         case parse d of
+--             Left e -> (fLog $ Exception (show e) (show callStack))
+--             Right ds -> runCheck p ds i.checks.un
 
+-- runFixture ::
+--     (HasCallStack, Logger m, Concurrently m, Traversable c) =>
+--     Path ->
+--     Fixture m c tc hi ->
+--     m ()
+-- runFixture p Direct'{config', depends, action', items'} = case hookFrequency depends of
+--     Once -> runHook depends $ \ho ->
+--         forConcurrently_ items' $ \i -> do
+--             ds <- action' ho i
+--             runCheck p ds i.checks.un
+--     Each ->
+--         forConcurrently_ items' $ \i ->
+--             runHook depends $ \ho -> do
+--                 ds <- action' ho i
+--                 runCheck p ds i.checks.un
+-- runFixture p Direct{config, action, items} =
+--     forConcurrently_ items $ \i -> do
+--         ds <- action i
+--         runCheck p ds i.checks.un
+-- runFixture p Full{config, action, parse, items} = forConcurrently_ items $ \i -> do
+--     d <- action i
+--     case parse d of
+--         Left e -> (fLog $ Exception (show e) (show callStack))
+--         Right ds -> runCheck p ds i.checks.un
+-- runFixture p Full'{config', depends, action', parse', items'} = case hookFrequency depends of
+--     Once -> runHook depends $ \ho ->
+--         forConcurrently_ items' $ \i -> do
+--             d <- action' ho i
+--             case parse' d of
+--                 Left e -> (fLog $ Exception (show e) (show callStack))
+--                 Right ds -> runCheck p ds i.checks.un
+--     Each -> forConcurrently_ items' $ \i ->
+--         runHook depends $ \ho -> do
+--             d <- action' ho i
+--             case parse' d of
+--                 Left e -> (fLog $ Exception (show e) (show callStack))
+--                 Right ds -> runCheck p ds i.checks.un
+--
 runChecks :: (Traversable c, Logger m, Show ds, Concurrently m) => Path -> c (ds, [Check ds]) -> m ()
 runChecks p cds =
     forConcurrently_ cds $ \(ds, checks) -> runCheck p ds checks
@@ -261,7 +389,7 @@ data Fixture m c tc hi where
         } ->
         Fixture m c tc ()
     Full' ::
-        (Item i ds, Show as) =>
+        (Item i ds, Show as, Frequency hz) =>
         { config' :: tc
         , depends :: Hook m hz pi hi
         , action' :: hi -> i -> m as
@@ -277,7 +405,7 @@ data Fixture m c tc hi where
         } ->
         Fixture m c tc ()
     Direct' ::
-        (Item i ds) =>
+        (Item i ds, Frequency hz) =>
         { config' :: tc
         , depends :: Hook m hz pi hi
         , action' :: hi -> i -> m ds

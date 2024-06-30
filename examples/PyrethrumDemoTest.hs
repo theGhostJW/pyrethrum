@@ -1,13 +1,14 @@
 module PyrethrumDemoTest where
 
 import Check (Checks, chk)
-import Core (After, Around, Before, Each, Once, ParseException, Thread, runNode)
-import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
+import Core (After, Around, Before, Each, ExeParams (..), Logger (..), Once, ParseException, Thread, runNode)
+import DSL.Internal.ApEvent (ApEvent (..), FLog (Step), Path (..), ULog (Log))
 import DSL.Out (out)
 import Effectful (Eff)
 import IOEffectDemo (ioRun)
+import Internal.RunTimeLogging (testLogControls)
+import Internal.SuiteRuntime (ThreadCount (ThreadCount), execute)
 import PyrethrumBase (
-    Action,
     Depth (..),
     Fixture (..),
     HasLog,
@@ -21,18 +22,19 @@ import PyrethrumBase (
     testConfig,
  )
 import PyrethrumConfigTypes (Country (..), Environment (Prod))
-import PyrethrumExtras (txt)
+import PyrethrumExtras (txt, uu)
+import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 
 {-
 Note:: tried alternative with individual hook types but the results
 were starting to look more complex than the original so abandonned.
 -}
 
-log :: (HasLog es) => Text -> Eff es ()
-log = out . User . Log
+log :: (Logger m) => Text -> m ()
+log = fLog . Step
 
-logShow :: (HasLog es, Show a) => a -> Eff es ()
-logShow = out . User . Log . txt
+logShow :: (Show a) => a -> IO ()
+logShow = log . txt
 
 {- Demonstraits using partial effect
   type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a
@@ -40,16 +42,17 @@ logShow = out . User . Log . txt
   Hook has all the effects of the application but will compile with
   an action that only requires a sublist of these effects
 -}
-logReturnInt :: LogEffs Int
+logReturnInt :: IO Int
 logReturnInt = log "Returning One" >> pure 1
 
-runSomethingToDoWithTestDepth :: Depth -> Action ()
+runSomethingToDoWithTestDepth :: Depth -> IO ()
 runSomethingToDoWithTestDepth = logShow
 
 demoOnceAfterHook :: Hook Once After () ()
 demoOnceAfterHook =
     AfterHook
         { afterAction = log "After all tests"
+        , afterId = "demoOnceAfterHook"
         }
 
 intOnceHook :: Hook Once Before () Int
@@ -57,6 +60,7 @@ intOnceHook =
     BeforeHook'
         { depends = demoOnceAfterHook
         , action' = \_void -> logReturnInt
+        , beforeId' = "intOnceHook"
         }
 
 intOnceHook2 :: Hook Once Before () Int
@@ -65,6 +69,7 @@ intOnceHook2 =
         { action = do
             log "2222222 should only be onceeee"
             logReturnInt
+        , beforeId = "intOnceHook2"
         }
 
 addOnceIntHook :: Hook Once Before Int Int
@@ -75,12 +80,17 @@ addOnceIntHook =
             \i -> do
                 log $ "beforeAll' " <> txt i
                 pure $ i + 1
+        , beforeId' = "addOnceIntHook"
         }
 
 _intThreadHook :: Hook Thread Before () Int
-_intThreadHook = BeforeHook $ do
-    log "deriving meaning of life' "
-    pure 42
+_intThreadHook =
+    BeforeHook
+        { action = do
+            log "deriving meaning of life' "
+            pure 42
+        , beforeId = "_intThreadHook"
+        }
 
 data HookInfo = HookInfo
     { message :: Text
@@ -89,9 +99,14 @@ data HookInfo = HookInfo
     deriving (Show, Generic)
 
 infoThreadHook :: Hook Thread Before Int HookInfo
-infoThreadHook = BeforeHook' addOnceIntHook $ \i -> do
-    log $ "beforeThread' " <> txt i
-    pure $ HookInfo "Hello there" i
+infoThreadHook =
+    BeforeHook'
+        { depends = addOnceIntHook
+        , action' = \i -> do
+            log $ "beforeThread' " <> txt i
+            pure $ HookInfo "Hello there" i
+        , beforeId' = "infoThreadHook"
+        }
 
 eachInfoAround :: Hook Each Around HookInfo Int
 eachInfoAround =
@@ -103,6 +118,7 @@ eachInfoAround =
         , teardown' = \_i -> do
             log "eachTearDown"
             pure ()
+        , aroundId' = "eachInfoAround"
         }
 
 eachAfter :: Hook Each After Int Int
@@ -112,6 +128,7 @@ eachAfter =
         , afterAction' = do
             log "eachAfter"
             pure ()
+        , afterId' = "eachAfter"
         }
 
 eachIntBefore :: Hook Each Before Int Int
@@ -121,6 +138,7 @@ eachIntBefore =
         , action' = \hi -> do
             log "eachSetup"
             pure $ hi + 1
+        , beforeId' = "eachIntBefore"
         }
 
 -- ############### Test the Lot ###################
@@ -131,7 +149,7 @@ config = TestConfig "test" DeepRegression
 test :: Fixture ()
 test = Full config action parse items
 
-action :: Item -> Action ApState
+action :: Item -> IO ApState
 action itm = do
     log $ txt itm
     pure $ ApState (itm.value + 1) $ txt itm.value
@@ -177,7 +195,7 @@ config2 = TestConfig "test" DeepRegression
 test2 :: Fixture HookInfo
 test2 = Full' config2 infoThreadHook action2 parse2 items2
 
-action2 :: HookInfo -> Item2 -> Action AS
+action2 :: HookInfo -> Item2 -> IO AS
 action2 HookInfo{value = hookVal} itm = do
     logShow itm
     -- when (country == AU) $
@@ -264,6 +282,12 @@ test4 =
                 , value = 2
                 , checks = chk "test" ((== 1) . (.value))
                 }
+            , Item2
+                { id = 1
+                , title = "test the value is one 2 "
+                , value = 2
+                , checks = chk "test" ((== 1) . (.value))
+                }
             ]
         }
 
@@ -339,20 +363,32 @@ suite =
         }
     ]
 
--- nodes =
---     Fixture (NodePath "module" "testName") test4
-
---
 nodes =
+    Fixture (NodePath "module" "testName") test4
+
+nodes2 =
     Hook
         { path = NodePath "module" "name"
         , hook = intOnceHook
-        , subNodes = [Fixture (NodePath "module" "testName") test4]
+        , subNodes =
+            [ nodes
+            , nodes
+            ]
         }
 
-coreNode = mkNode nodes
+--
+-- nodes =
+--     Hook
+--         { path = NodePath "module" "name"
+--         , hook = intOnceHook
+--         , subNodes = [Fixture (NodePath "module" "testName") test4]
+--         }
 
-result = ioRun $ runNode coreNode
+coreNode = mkNode nodes
+coreNode2 = mkNode nodes2
+
+result = runNode coreNode
+result2 = runNode coreNode2
 
 {-
 -- TODO: test documenter that returns a handle from onceHook

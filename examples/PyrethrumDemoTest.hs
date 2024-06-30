@@ -2,7 +2,7 @@ module PyrethrumDemoTest where
 
 import Check (Checks, chk)
 import Core (After, Around, Before, Each, Once, ParseException, Thread)
-import DSL.Internal.ApEvent (ApEvent (..), Path (..), ULog (Log))
+import DSL.Internal.NodeEvent (NodeEvent (..), Path (..), ULog (Log))
 import DSL.Out (out)
 import Effectful (Eff)
 import PyrethrumBase (
@@ -35,7 +35,7 @@ logShow :: (HasLog es, Show a) => a -> Eff es ()
 logShow = out . User . Log . txt
 
 {- Demonstraits using partial effect
-  type LogEffs a = forall es. (Out ApEvent :> es) => Eff es a
+  type LogEffs a = forall es. (Out NodeEvent :> es) => Eff es a
 
   Hook has all the effects of the application but will compile with
   an action that only requires a sublist of these effects

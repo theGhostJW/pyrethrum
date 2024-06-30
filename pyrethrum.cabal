@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: db631299f849bb5bfa6ed5f785cb2dfec7803d190596be2bd5080cf3e7892791
+-- hash: f5a92178a2f0dc0d34b4f349218ede5dd6f400bffafb6fc7defcf73717ea8290
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -84,9 +84,9 @@ library
       DSL.FileSystemDocInterpreter
       DSL.FileSystemEffect
       DSL.FileSystemIOInterpreter
-      DSL.Internal.ApEvent
       DSL.Internal.FileSystemPure
       DSL.Internal.FileSystemRawIO
+      DSL.Internal.NodeEvent
       DSL.Out
       Filter
       Internal.RunTimeLogging

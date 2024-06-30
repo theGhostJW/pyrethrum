@@ -6,7 +6,7 @@ module SuiteRuntimeTestBase where
 import Chronos (Time, now)
 import Core (DataSource (ItemList))
 import Core qualified
-import DSL.Internal.ApEvent qualified as AE
+import DSL.Internal.NodeEvent qualified as AE
 import Data.Aeson (ToJSON)
 import Data.Hashable qualified as H
 import Data.Map.Strict qualified as M
@@ -119,7 +119,7 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
   -}
 
-type LogItem = ThreadEvent ExePath AE.ApEvent
+type LogItem = ThreadEvent ExePath AE.NodeEvent
 
 logItemtoBool :: (SuiteEvent -> Bool) -> LogItem -> Bool
 logItemtoBool = threadEventToBool
@@ -227,7 +227,7 @@ logAccum acc@(passStart, rMap) =
         ? error ("start found for already started event\n" <> txt s)
         $ (Just (loc, suiteEvent), rMap)
     StartExecution {} -> acc
-    ApEvent {} -> acc
+    NodeEvent {} -> acc
     EndExecution {} -> acc
   where
     insert' :: ExePath -> SuiteEvent -> LogResult -> Map SuiteEventPath [LogResult]
@@ -511,7 +511,7 @@ failInfo li =
             ParentFailure {} -> passThrough
             StartExecution {} -> passThrough
             EndExecution {} -> passThrough
-            ApEvent {} -> passThrough
+            NodeEvent {} -> passThrough
             End {} -> passThrough
       where
         passThrough = (lastStartEvnt, result)
@@ -733,7 +733,7 @@ threadedLogs onceHookInclude l =
 shouldOccurOnce :: LogItem -> Bool
 shouldOccurOnce = hasSuiteEvent onceSuiteEvent
 
-chkStartEndExecution :: [ThreadEvent ExePath AE.ApEvent] -> IO ()
+chkStartEndExecution :: [ThreadEvent ExePath AE.NodeEvent] -> IO ()
 chkStartEndExecution evts =
   (,)
     <$> PE.head evts
@@ -838,7 +838,7 @@ test = Spec 0
 
 data ExeResult = ExeResult
   { expandedTemplate :: [T.Template],
-    log :: [ThreadEvent ExePath AE.ApEvent]
+    log :: [ThreadEvent ExePath AE.NodeEvent]
   }
 
 runTest :: Int -> ThreadCount -> [Template] -> IO ()
@@ -868,7 +868,7 @@ execute wantLog baseRandomSeed threadLimit templates = do
   lg <- exeTemplate wantLog baseRandomSeed threadLimit fullTs
   pure $ ExeResult fullTs lg
 
-exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath AE.ApEvent]
+exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath AE.NodeEvent]
 exeTemplate wantLog baseRandomSeed maxThreads templates = do
   let wantLog' = wantLog == Log
   (lc, logQ) <- testLogControls wantLog'

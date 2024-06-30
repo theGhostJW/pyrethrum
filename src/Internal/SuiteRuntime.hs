@@ -1,7 +1,7 @@
 module Internal.SuiteRuntime where
 
 import Core qualified as C
-import DSL.Internal.ApEvent qualified as AE
+import DSL.Internal.NodeEvent qualified as AE
 import Internal.RunTimeLogging (FailPoint)
 import Internal.RunTimeLogging qualified as L
 import Internal.ThreadEvent hiding (Test)
@@ -38,7 +38,7 @@ todo :: define defect properties with sum type type and typeclass which returns 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> C.ExeParams m rc fc -> IO ()
+execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls L.ExePath AE.NodeEvent -> C.ExeParams m rc fc -> IO ()
 execute
   fc
   lc
@@ -93,7 +93,7 @@ filterSuite fltrs rc suite =
       where
         fr = (.title) <$> applyFilters fltrs rc (C.getConfig fx)
 
-executeNodeList :: ThreadCount -> L.LogControls L.ExePath AE.ApEvent -> [P.PreNode IO ()] -> IO ()
+executeNodeList :: ThreadCount -> L.LogControls L.ExePath AE.NodeEvent -> [P.PreNode IO ()] -> IO ()
 executeNodeList
   fc
   L.LogControls
@@ -113,7 +113,7 @@ executeNodeList
             stopWorker
         )
 
-executeNodes :: (ThreadEvent L.ExePath AE.ApEvent -> IO ()) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
+executeNodes :: (ThreadEvent L.ExePath AE.NodeEvent -> IO ()) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
 executeNodes sink nodes fc =
   do
     rootLogger <- newLogger
@@ -410,7 +410,7 @@ data ExeIn oi ti tsti = ExeIn
   , tstIn :: tsti
   }
 
-type Logger = L.EngineEvent L.ExePath AE.ApEvent -> IO ()
+type Logger = L.EngineEvent L.ExePath AE.NodeEvent -> IO ()
 
 logAbandonned :: Logger -> L.ExePath -> SuiteEvent -> L.FailPoint -> IO ()
 logAbandonned lgr p e a =
@@ -661,7 +661,7 @@ runNode lgr hi xt =
   invalidTree input cst = bug @Void . error $ input <> " >>> should not be passed to >>> " <> cst <> "\n" <> txt xt.path
 
   sink :: P.ApEventSink
-  sink = lgr . L.ApEvent
+  sink = lgr . L.NodeEvent
 
   runTestsWithEachContext :: forall ti. IO (TestContext ti) -> TestSource ti -> IO QElementRun
   runTestsWithEachContext ctx =

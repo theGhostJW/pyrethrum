@@ -76,7 +76,7 @@ filterSuite fltrs rc suite =
         where 
          ( sn, fr ) = filterSuite' subNodes
       fx@C.Fixture {fixture} -> 
-         (isAccepted fr ? fx : accNodes $ accNodes, fr : fltrInfo)
+         (accepted fr ? fx : accNodes $ accNodes, fr : fltrInfo)
         where
           fr = filterFixture fixture
 

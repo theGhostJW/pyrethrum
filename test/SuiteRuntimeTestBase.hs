@@ -226,6 +226,8 @@ logAccum acc@(passStart, rMap) =
       isJust passStart
         ? error ("start found for already started event\n" <> txt s)
         $ (Just (loc, suiteEvent), rMap)
+    FilterLog {} -> acc
+    SuiteInitFailure {} -> acc
     StartExecution {} -> acc
     NodeEvent {} -> acc
     EndExecution {} -> acc
@@ -501,6 +503,8 @@ failInfo li =
         [] -> (lastStartEvnt, result)
         (l : ls) ->
           l & \case
+            FilterLog {} -> passThrough
+            SuiteInitFailure {} -> passThrough
             Start {suiteEvent = se} ->
               (Just se, result)
             f@Failure {} ->

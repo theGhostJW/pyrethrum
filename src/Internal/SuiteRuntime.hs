@@ -2,7 +2,7 @@ module Internal.SuiteRuntime where
 
 import Core qualified as C
 import DSL.Internal.NodeEvent qualified as AE
-import Internal.Logging (FailPoint)
+import Internal.Logging (FailPoint, LogControls (LogControls))
 import Internal.Logging qualified as L
 import Internal.ThreadEvent hiding (Test)
 import Internal.ThreadEvent qualified as TE
@@ -41,12 +41,16 @@ newtype ThreadCount = ThreadCount {maxThreads :: Int}
 execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls L.ExePath AE.NodeEvent -> C.ExeParams m rc fc -> IO ()
 execute
   fc
-  lc
+  lc@LogControls{sink}
   C.ExeParams
     { suite
     , interpreter
     , runConfig
-    } = executeNodeList fc lc (P.prepare $ P.SuitePrepParams suite interpreter runConfig)
+    } = 
+      do 
+        --  filter log
+        -- validation , duplicates and empty
+      executeNodeList fc lc (P.prepare $ P.SuitePrepParams suite interpreter runConfig)
 
 firstDuplicateFixtureTitle :: [FilterResult Text] -> Maybe Text 
 firstDuplicateFixtureTitle = firstDuplicate . fmap (.target)

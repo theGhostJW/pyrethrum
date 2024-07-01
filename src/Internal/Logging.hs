@@ -64,36 +64,36 @@ displayExePath (ExePath l) = T.intercalate "." $ (.title) <$> reverse l
 -- TODO :: will need thread id
 data FailPoint = FailPoint
   { path :: ExePath
-  , suiteEvent :: TE.SuiteEvent
+  , nodeType :: TE.NodeType
   }
   deriving (Show)
 
 exceptionTxt :: SomeException -> TE.PException
 exceptionTxt e = TE.PException $ txt <$> P.lines (displayException e)
 
-mkFailure :: l -> TE.SuiteEvent -> SomeException -> EngineEvent l a
-mkFailure loc suiteEvent exception = Failure{exception = exceptionTxt exception, ..}
+mkFailure :: l -> TE.NodeType -> SomeException -> EngineEvent l a
+mkFailure loc nodeType exception = Failure{exception = exceptionTxt exception, ..}
 
 data EngineEvent l a
   = StartExecution
   | Start
-      { suiteEvent :: TE.SuiteEvent
+      { nodeType :: TE.NodeType
       , loc :: l
       }
   | End
-      { suiteEvent :: TE.SuiteEvent
+      { nodeType :: TE.NodeType
       , loc :: l
       }
   | Failure
-      { suiteEvent :: TE.SuiteEvent
+      { nodeType :: TE.NodeType
       , loc :: l
       , exception :: TE.PException
       }
   | ParentFailure
       { loc :: l
-      , suiteEvent :: TE.SuiteEvent
+      , nodeType :: TE.NodeType
       , failLoc :: l
-      , failSuiteEvent :: TE.SuiteEvent
+      , failSuiteEvent :: TE.NodeType
       }
   | NodeEvent
       { event :: a

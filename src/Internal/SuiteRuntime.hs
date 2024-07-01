@@ -412,14 +412,14 @@ data ExeIn oi ti tsti = ExeIn
 
 type Logger = L.EngineEvent L.ExePath AE.NodeEvent -> IO ()
 
-logAbandonned :: Logger -> L.ExePath -> SuiteEvent -> L.FailPoint -> IO ()
+logAbandonned :: Logger -> L.ExePath -> NodeType -> L.FailPoint -> IO ()
 logAbandonned lgr p e a =
   lgr $
     L.ParentFailure
       { loc = p
-      , suiteEvent = e
+      , nodeType = e
       , failLoc = a.path
-      , failSuiteEvent = a.suiteEvent
+      , failSuiteEvent = a.nodeType
       }
 
 ioLeft :: forall a. L.FailPoint -> IO (Either L.FailPoint a)
@@ -431,7 +431,7 @@ ioRight = pure . Right
 noImpPropertyError :: any
 noImpPropertyError = error "property tests not implemented"
 
-logReturnFailure :: Logger -> L.ExePath -> SuiteEvent -> SomeException -> IO (Either L.FailPoint b)
+logReturnFailure :: Logger -> L.ExePath -> NodeType -> SomeException -> IO (Either L.FailPoint b)
 logReturnFailure lgr p et e =
   lgr (L.mkFailure p et e) >> ioLeft (L.FailPoint p et)
 
@@ -634,16 +634,16 @@ runNode ::
 runNode lgr hi xt =
   run hi xt
  where
-  logRun' :: SuiteEvent -> (P.ApEventSink -> IO b) -> IO (Either L.FailPoint b)
+  logRun' :: NodeType -> (P.ApEventSink -> IO b) -> IO (Either L.FailPoint b)
   logRun' et action = logRun lgr xt.path et (action sink)
 
-  logRun_ :: SuiteEvent -> (P.ApEventSink -> IO b) -> IO ()
+  logRun_ :: NodeType -> (P.ApEventSink -> IO b) -> IO ()
   logRun_ et action = void $ logRun' et action
 
-  logAbandonned_ :: SuiteEvent -> FailPoint -> IO ()
+  logAbandonned_ :: NodeType -> FailPoint -> IO ()
   logAbandonned_ = logAbandonned lgr xt.path
 
-  logAbandonned' :: forall a. SuiteEvent -> FailPoint -> IO (Either FailPoint a)
+  logAbandonned' :: forall a. NodeType -> FailPoint -> IO (Either FailPoint a)
   logAbandonned' se fp = logAbandonned_ se fp >> pure (Left fp)
 
   runSubNodes :: forall hi'. NodeIn hi' -> ChildQ (ExeTree hi') -> IO QElementRun
@@ -746,13 +746,13 @@ runNode lgr hi xt =
   singleton' :: forall a. TMVar a -> IO a -> a -> IO a
   singleton' tCache ioa = const $ singleton tCache ioa
 
-  runThreadSetup :: forall i o. TMVar (Either FailPoint o) -> SuiteEvent -> (P.ApEventSink -> i -> IO o) -> Either FailPoint i -> IO (Either FailPoint o)
+  runThreadSetup :: forall i o. TMVar (Either FailPoint o) -> NodeType -> (P.ApEventSink -> i -> IO o) -> Either FailPoint i -> IO (Either FailPoint o)
   runThreadSetup tCache evnt setup eti = do
     -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
     -- no need for thread synchronisation as this happpens within a thread
     singleton tCache $ runSetup evnt setup eti
 
-  runSetup :: forall i o. SuiteEvent -> (P.ApEventSink -> i -> IO o) -> Either FailPoint i -> IO (Either FailPoint o)
+  runSetup :: forall i o. NodeType -> (P.ApEventSink -> i -> IO o) -> Either FailPoint i -> IO (Either FailPoint o)
   runSetup evnt setup =
     either
       (logAbandonned' evnt)
@@ -1177,7 +1177,7 @@ tryLock canLock hs cq lockedStatus =
 tryLockIO :: (s -> CanRun -> Bool) -> TVar s -> ChildQ a -> s -> IO Bool
 tryLockIO canLock hs cq lockedStatus = atomically $ tryLock canLock hs cq lockedStatus
 
-logRun :: Logger -> L.ExePath -> SuiteEvent -> IO b -> IO (Either L.FailPoint b)
+logRun :: Logger -> L.ExePath -> NodeType -> IO b -> IO (Either L.FailPoint b)
 logRun lgr path evt action = do
   lgr $ L.Start evt path
   finally

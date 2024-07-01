@@ -2,7 +2,7 @@ module FullSuiteTestTemplate where
 
 import DSL.Internal.NodeEvent (Path (..))
 import Data.Map.Strict qualified as Map
-import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (Hook))
+import Internal.ThreadEvent (HookPos (..), Hz (..), NodeType (Hook))
 import Internal.ThreadEvent qualified as TE
 import Prelude hiding (All, id)
 data Spec = Spec {delay :: Int, result :: Result}
@@ -44,7 +44,7 @@ data ManySpec
 
 data SuiteEventPath = SuiteEventPath
   { path :: Path
-  , suiteEvent :: SuiteEvent
+  , nodeType :: NodeType
   }
   deriving (Show, Eq, Ord)
 
@@ -57,7 +57,7 @@ expectedParentPrecedingEvents = expectedSuiteEvntMap templateBeforeEvnt
 expectedParentSubsequentEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
 expectedParentSubsequentEvents = expectedSuiteEvntMap templateAfterEvnt
 
-expectedSuiteEvntMap :: (Template -> Maybe SuiteEvent) -> [Template] -> Map SuiteEventPath SuiteEventPath
+expectedSuiteEvntMap :: (Template -> Maybe NodeType) -> [Template] -> Map SuiteEventPath SuiteEventPath
 expectedSuiteEvntMap getSuiteEvnt =
   foldl' (priorMap Nothing) Map.empty
  where
@@ -95,7 +95,7 @@ expectedSuiteEvntMap getSuiteEvnt =
                     thisTemplateEvntPaths
               )
 
-templateBeforeEvnt :: Template -> Maybe SuiteEvent
+templateBeforeEvnt :: Template -> Maybe NodeType
 templateBeforeEvnt t =
   case t of
     FullSuiteTestTemplate.Fixture{} -> Nothing
@@ -110,7 +110,7 @@ templateBeforeEvnt t =
       EachBefore{} -> Hook Each Before
       EachAround{} -> Hook Each Setup
 
-templateAfterEvnt :: Template -> Maybe SuiteEvent
+templateAfterEvnt :: Template -> Maybe NodeType
 templateAfterEvnt t =
   case t of
     FullSuiteTestTemplate.Fixture{} -> Nothing
@@ -125,7 +125,7 @@ templateAfterEvnt t =
       EachAfter{} -> Hook Each After
       EachAround{} -> Hook Each Teardown
 
-emittedHooks :: Template -> [SuiteEvent]
+emittedHooks :: Template -> [NodeType]
 emittedHooks = \case
   FullSuiteTestTemplate.Fixture{} -> []
   OnceBefore{} -> [oh Before]
@@ -205,7 +205,7 @@ countTests t = case t of
 data EventPath = EventPath
   { template :: Template
   , path :: Path
-  , suiteEvent :: SuiteEvent
+  , nodeType :: NodeType
   , evntSpec :: ManySpec
   }
   deriving (Show, Eq)

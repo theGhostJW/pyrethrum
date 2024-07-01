@@ -20,30 +20,30 @@ data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
 
 data Hz = Once | Thread | Each deriving (Show, Eq, Ord)
 
-data SuiteEvent
+data NodeType
   = Hook Hz HookPos
   | Test
   deriving (Show, Eq, Ord)
 
-isSetup :: SuiteEvent -> Bool
+isSetup :: NodeType -> Bool
 isSetup = \case
   Hook _ Setup -> True
   _ -> False
 
-isTeardown :: SuiteEvent -> Bool
+isTeardown :: NodeType -> Bool
 isTeardown = \case
   Hook _ Teardown -> True
   _ -> False
 
-evtTypeToFrequency :: SuiteEvent -> Hz
+evtTypeToFrequency :: NodeType -> Hz
 evtTypeToFrequency = \case
   Hook hz _ -> hz
   -- an individual test is always run once
   Test -> Once
 
-isSuiteEventFailureWith :: (SuiteEvent -> Bool) -> ThreadEvent l a -> Bool
+isSuiteEventFailureWith :: (NodeType -> Bool) -> ThreadEvent l a -> Bool
 isSuiteEventFailureWith evntPredicate = \case
-  ParentFailure {suiteEvent = s} -> evntPredicate s
+  ParentFailure {nodeType = s} -> evntPredicate s
   _ -> False
 
 isOnceHookParentFailure :: ThreadEvent l a -> Bool
@@ -52,14 +52,14 @@ isOnceHookParentFailure = isSuiteEventFailureWith onceHook
 isHookParentFailure :: ThreadEvent l a -> Bool
 isHookParentFailure = isSuiteEventFailureWith isHook
 
-isTest :: SuiteEvent -> Bool
+isTest :: NodeType -> Bool
 isTest = \case
   Test {} -> True
   _ -> False
 
 isTestParentFailure :: ThreadEvent l a -> Bool
 isTestParentFailure = \case
-  ParentFailure {suiteEvent = s} -> isTest s
+  ParentFailure {nodeType = s} -> isTest s
   _ -> False
 
 isTestLogItem :: ThreadEvent l a -> Bool
@@ -68,23 +68,23 @@ isTestLogItem li = (isTest <$> getSuiteEvent li) == Just True
 isTestEventOrTestParentFailure :: ThreadEvent l a -> Bool
 isTestEventOrTestParentFailure te = isTestParentFailure te || isTestLogItem te
 
-isHook :: SuiteEvent -> Bool
+isHook :: NodeType -> Bool
 isHook = \case
   Hook {} -> True
   _ -> False
 
-hookWithHz :: Hz -> SuiteEvent -> Bool
+hookWithHz :: Hz -> NodeType -> Bool
 hookWithHz hz = \case
   Hook hz' _ -> hz == hz'
   Test -> False
 
-onceHook :: SuiteEvent -> Bool
+onceHook :: NodeType -> Bool
 onceHook = hookWithHz Once
 
-threadHook :: SuiteEvent -> Bool
+threadHook :: NodeType -> Bool
 threadHook = hookWithHz Thread
 
-onceSuiteEvent :: SuiteEvent -> Bool
+onceSuiteEvent :: NodeType -> Bool
 onceSuiteEvent = (== Once) . evtTypeToFrequency
 
 isChildless :: ThreadEvent l a -> Bool
@@ -95,20 +95,20 @@ isChildless =
         Test {} -> True
     )
 
-suitEvntToBool :: (SuiteEvent -> Bool) -> Maybe SuiteEvent -> Bool
+suitEvntToBool :: (NodeType -> Bool) -> Maybe NodeType -> Bool
 suitEvntToBool = maybe False
 
-threadEventToBool :: (SuiteEvent -> Bool) -> ThreadEvent l a -> Bool
+threadEventToBool :: (NodeType -> Bool) -> ThreadEvent l a -> Bool
 threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
 
-hasSuiteEvent :: (SuiteEvent -> Bool) -> ThreadEvent l a -> Bool
+hasSuiteEvent :: (NodeType -> Bool) -> ThreadEvent l a -> Bool
 hasSuiteEvent p l = case l of
   StartExecution {} -> False
   Failure {} -> False
   ParentFailure {} -> False
   NodeEvent {} -> False
   EndExecution {} -> False
-  _ -> p l.suiteEvent
+  _ -> p l.nodeType
 
 isStart :: ThreadEvent a b -> Bool
 isStart = \case
@@ -120,26 +120,26 @@ isEnd = \case
   End {} -> True
   _ -> False
 
-suiteEventOrParentFailureSuiteEvent :: ThreadEvent a b -> Maybe SuiteEvent
+suiteEventOrParentFailureSuiteEvent :: ThreadEvent a b -> Maybe NodeType
 suiteEventOrParentFailureSuiteEvent = \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   StartExecution {} -> Nothing
-  Start {suiteEvent = s} -> Just s
-  End {suiteEvent = s} -> Just s
+  Start {nodeType = s} -> Just s
+  End {nodeType = s} -> Just s
   Failure {} -> Nothing
-  ParentFailure {suiteEvent = s} -> Just s
+  ParentFailure {nodeType = s} -> Just s
   NodeEvent {} -> Nothing
   EndExecution {} -> Nothing
 
-getSuiteEvent :: ThreadEvent a b -> Maybe SuiteEvent
+getSuiteEvent :: ThreadEvent a b -> Maybe NodeType
 getSuiteEvent = \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
-  Start {suiteEvent} -> Just suiteEvent
-  End {suiteEvent} -> Just suiteEvent
-  ParentFailure {suiteEvent} -> Just suiteEvent
-  Failure {suiteEvent} -> Just suiteEvent
+  Start {nodeType} -> Just nodeType
+  End {nodeType} -> Just nodeType
+  ParentFailure {nodeType} -> Just nodeType
+  Failure {nodeType} -> Just nodeType
   StartExecution {} -> Nothing
   NodeEvent {} -> Nothing
   EndExecution {} -> Nothing
@@ -167,19 +167,19 @@ data ThreadEvent l a
   | Start
       { idx :: Int,
         threadId :: ThreadId,
-        suiteEvent :: SuiteEvent,
+        nodeType :: NodeType,
         loc :: l
       }
   | End
       { idx :: Int,
         threadId :: ThreadId,
-        suiteEvent :: SuiteEvent,
+        nodeType :: NodeType,
         loc :: l
       }
   | Failure
       { idx :: Int,
         threadId :: ThreadId,
-        suiteEvent :: SuiteEvent,
+        nodeType :: NodeType,
         loc :: l,
         exception :: PException
       }
@@ -187,9 +187,9 @@ data ThreadEvent l a
       { idx :: Int,
         threadId :: ThreadId,
         loc :: l,
-        suiteEvent :: SuiteEvent,
+        nodeType :: NodeType,
         failLoc :: l,
-        failSuiteEvent :: SuiteEvent
+        failSuiteEvent :: NodeType
       }
   | NodeEvent
       { idx :: Int,
@@ -232,5 +232,5 @@ startSuiteEventLoc te = case te of
 
 $(deriveJSON defaultOptions ''Hz)
 $(deriveJSON defaultOptions ''HookPos)
-$(deriveJSON defaultOptions ''SuiteEvent)
+$(deriveJSON defaultOptions ''NodeType)
 $(deriveToJSON defaultOptions ''PException)

@@ -19,7 +19,7 @@ import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
 import Internal.ThreadEvent as TE
   ( HookPos (..),
     Hz (..),
-    SuiteEvent (..),
+    NodeType (..),
     ThreadEvent (..),
     ThreadId,
     getHookInfo,
@@ -121,7 +121,7 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
 
 type LogItem = ThreadEvent ExePath AE.NodeEvent
 
-logItemtoBool :: (SuiteEvent -> Bool) -> LogItem -> Bool
+logItemtoBool :: (NodeType -> Bool) -> LogItem -> Bool
 logItemtoBool = threadEventToBool
 
 chkProperties :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
@@ -172,7 +172,7 @@ chkNoEmptyHooks evts = do
 data FailInfo = FailInfo
   { --   idx :: Int
     -- , threadId :: ThreadId
-    -- , suiteEvent :: SuiteEvent
+    -- , nodeType :: NodeType
     -- , loc :: ExePath
     -- ,
     failLog :: LogItem,
@@ -183,9 +183,9 @@ data FailInfo = FailInfo
 -- TODO: logging options ~ only log failures - need a Pass summary log Object
 
 data Summary = Summary
-  { fails :: Set (AE.Path, SuiteEvent),
-    parentFails :: Set (AE.Path, SuiteEvent),
-    passes :: Set (AE.Path, SuiteEvent)
+  { fails :: Set (AE.Path, NodeType),
+    parentFails :: Set (AE.Path, NodeType),
+    passes :: Set (AE.Path, NodeType)
   }
   deriving (Show)
 
@@ -196,7 +196,7 @@ data LogResult
 
 data ResultInfo = ResultInfo
   { path :: AE.Path,
-    suiteEvent :: SuiteEvent,
+    nodeType :: NodeType,
     result :: LogResult
   }
   deriving (Ord, Eq, Show)
@@ -206,33 +206,33 @@ actualResults :: [LogItem] -> Map SuiteEventPath [LogResult]
 actualResults = snd . foldl' logAccum (Nothing, M.empty)
 
 -- a result accumulator function to be used across a logs grouped by thread
-logAccum :: (Maybe (ExePath, SuiteEvent), Map SuiteEventPath [LogResult]) -> LogItem -> (Maybe (ExePath, SuiteEvent), Map SuiteEventPath [LogResult])
+logAccum :: (Maybe (ExePath, NodeType), Map SuiteEventPath [LogResult]) -> LogItem -> (Maybe (ExePath, NodeType), Map SuiteEventPath [LogResult])
 logAccum acc@(passStart, rMap) =
   \case
-    End {loc, suiteEvent} ->
+    End {loc, nodeType} ->
       passStart
         & maybe
           acc
-          (\(_l, _s) -> (Nothing, insert' loc suiteEvent $ Actual Pass))
-    f@Failure {loc, suiteEvent} ->
+          (\(_l, _s) -> (Nothing, insert' loc nodeType $ Actual Pass))
+    f@Failure {loc, nodeType} ->
       isJust passStart
-        ? (Nothing, insert' loc suiteEvent $ Actual Fail)
+        ? (Nothing, insert' loc nodeType $ Actual Fail)
         $ error ("Failure event not started\n" <> txt f)
-    pf@ParentFailure {loc, suiteEvent} ->
+    pf@ParentFailure {loc, nodeType} ->
       isJust passStart
         ? error ("parent failure encountered when parent event not ended\n" <> txt pf)
-        $ (Nothing, insert' loc suiteEvent ParentFailed)
-    s@Start {loc, suiteEvent} ->
+        $ (Nothing, insert' loc nodeType ParentFailed)
+    s@Start {loc, nodeType} ->
       isJust passStart
         ? error ("start found for already started event\n" <> txt s)
-        $ (Just (loc, suiteEvent), rMap)
+        $ (Just (loc, nodeType), rMap)
     FilterLog {} -> acc
     SuiteInitFailure {} -> acc
     StartExecution {} -> acc
     NodeEvent {} -> acc
     EndExecution {} -> acc
   where
-    insert' :: ExePath -> SuiteEvent -> LogResult -> Map SuiteEventPath [LogResult]
+    insert' :: ExePath -> NodeType -> LogResult -> Map SuiteEventPath [LogResult]
     insert' l se r = M.insertWith (<>) (SuiteEventPath (topPath' l) se) [r] rMap
     topPath' p =
       fromMaybe (bug $ "Empty event path ~ bad template setup " <> txt p) $ topPath p
@@ -299,7 +299,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                       chk' ("Unexpected result for:\n " <> txt k <> "\n   expected: " <> txt expected) $
                         all (\r -> r == Actual e || r == ParentFailed) actual
                     NonDeterministic -> pure ()
-                    Multi expLst -> case k.suiteEvent of
+                    Multi expLst -> case k.nodeType of
                       TE.Test {} -> bug "Test not expected to have Multi result"
                       TE.Hook TE.Once _ -> bug "Once not expected to have Multi result"
                       TE.Hook TE.Thread _ -> do
@@ -341,10 +341,10 @@ chkExpectedResults baseSeed threadLimit ts lgs =
     expectedResults = foldl' calcExpected M.empty $ ts >>= T.eventPaths
 
     calcExpected :: Map SuiteEventPath ExpectedResult -> T.EventPath -> Map SuiteEventPath ExpectedResult
-    calcExpected acc T.EventPath {path, suiteEvent, evntSpec, template} =
+    calcExpected acc T.EventPath {path, nodeType, evntSpec, template} =
       M.insert (ensureUnique key) expected acc
       where
-        key = SuiteEventPath path suiteEvent
+        key = SuiteEventPath path nodeType
         ensureUnique k =
           M.member k acc
             ? bug ("duplicate key should not happen. Template paths should be unique: " <> txt k)
@@ -359,7 +359,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                 T.Preload -> Multi $ (.result) <$> generateSpecs baseSeed rLength path passPcnt minDelay maxDelay
                 T.Runtime -> NonDeterministic
               where
-                rLength = case suiteEvent of
+                rLength = case nodeType of
                   TE.Test {} -> bug "Test not expected to have PassProb spec"
                   TE.Hook TE.Once _ -> bug "Once  not expected to have PassProb spec"
                   TE.Hook TE.Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
@@ -391,7 +391,7 @@ isFailChildEventOf c p =
       _ -> False
     cIsTeardown = logItemtoBool (hasHookPos Teardown) c
     pFailEvent = case p of
-      Failure {suiteEvent} -> Just suiteEvent
+      Failure {nodeType} -> Just nodeType
       _ -> Nothing
     pIsSetupFailure = suitEvntToBool (hasHookPos Setup) pFailEvent
 
@@ -493,11 +493,11 @@ chkLeafFailsAreNotPropagated
 -- chkCapture - will log a soft exception and allow trace in place
 -- property that includes assertions
 
-failInfo :: [LogItem] -> (Maybe SuiteEvent, [FailInfo])
+failInfo :: [LogItem] -> (Maybe NodeType, [FailInfo])
 failInfo li =
   foldl' step (Nothing, []) $ tails failStarts
   where
-    step :: (Maybe SuiteEvent, [FailInfo]) -> [LogItem] -> (Maybe SuiteEvent, [FailInfo])
+    step :: (Maybe NodeType, [FailInfo]) -> [LogItem] -> (Maybe NodeType, [FailInfo])
     step (lastStartEvnt, result) =
       \case
         [] -> (lastStartEvnt, result)
@@ -505,7 +505,7 @@ failInfo li =
           l & \case
             FilterLog {} -> passThrough
             SuiteInitFailure {} -> passThrough
-            Start {suiteEvent = se} ->
+            Start {nodeType = se} ->
               (Just se, result)
             f@Failure {} ->
               lastStartEvnt
@@ -697,7 +697,7 @@ chkAllTemplateItemsLogged ts lgs =
 
     -- init to empty set
     tmplatePaths :: Set SuiteEventPath
-    tmplatePaths = fromList $ (\ep -> SuiteEventPath ep.path ep.suiteEvent) <$> (ts >>= T.eventPaths)
+    tmplatePaths = fromList $ (\ep -> SuiteEventPath ep.path ep.nodeType) <$> (ts >>= T.eventPaths)
 
     logStartPaths :: Set SuiteEventPath
     logStartPaths =
@@ -706,8 +706,8 @@ chkAllTemplateItemsLogged ts lgs =
           ( \lg ->
               do
                 case lg of
-                  ParentFailure {loc, suiteEvent} -> flip SuiteEventPath suiteEvent <$> topPath loc
-                  Start {loc, suiteEvent} -> flip SuiteEventPath suiteEvent <$> topPath loc
+                  ParentFailure {loc, nodeType} -> flip SuiteEventPath nodeType <$> topPath loc
+                  Start {loc, nodeType} -> flip SuiteEventPath nodeType <$> topPath loc
                   _ -> Nothing
           )
           lgs

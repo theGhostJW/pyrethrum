@@ -11,7 +11,7 @@ where
 data Filters rc fc = Filtered [Filter rc fc] | Unfiltered
 
 data Filter rc t = MkFilter
-  { rejectionDescription :: Text,
+  { description :: Text,
     predicate :: rc -> t -> Bool
   }
 
@@ -31,4 +31,4 @@ applyFilters :: forall rc t. Filters rc t -> rc -> t -> FilterResult t
 applyFilters fltrs rc t =
   case fltrs of
     Unfiltered -> MkFilterResult t Nothing
-    Filtered fltrs' -> MkFilterResult t $ (.rejectionDescription) <$> find (\f -> not $ f.predicate rc t) fltrs'
+    Filtered fltrs' -> MkFilterResult t $ (.description) <$> find (\f -> not $ f.predicate rc t) fltrs'

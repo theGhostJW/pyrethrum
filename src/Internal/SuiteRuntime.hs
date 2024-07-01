@@ -60,7 +60,7 @@ firstDuplicateFixtureTitle = firstDuplicate . fmap (.target)
           | x `S.member` seen = Just x 
           | otherwise = go (S.insert x seen) xs
 
-filterSuite :: forall m rc fc i. C.Config fc => [Filter rc fc] -> rc -> [C.Node m rc fc i] -> ([C.Node m rc fc i], [FilterResult Text])
+filterSuite :: forall m rc fc i. C.Config fc => Filters rc fc -> rc -> [C.Node m rc fc i] -> ([C.Node m rc fc i], [FilterResult Text])
 filterSuite fltrs rc suite = 
      (reverse fNodes, fRslts)
   where

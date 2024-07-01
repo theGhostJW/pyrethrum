@@ -197,7 +197,6 @@ data Node m rc fc hi where
       fixture :: Fixture m rc fc hi
     } ->
     Node m rc fc hi
-
 data ExeParams m rc fc where
   ExeParams ::
     { suite :: [Node m rc fc ()],

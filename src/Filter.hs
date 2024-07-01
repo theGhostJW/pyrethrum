@@ -1,11 +1,14 @@
 module Filter
   ( Filter (..),
     FilterResult (..),
+    Filters (..),
     isAccepted,
     isRejected,
     applyFilters,
   )
 where
+
+data Filters rc fc = Filtered [Filter rc fc] | Unfiltered
 
 data Filter rc t = MkFilter
   { rejectionDescription :: Text,
@@ -15,7 +18,8 @@ data Filter rc t = MkFilter
 data FilterResult t = MkFilterResult
   { target :: t,
     rejection :: Maybe Text
-  } deriving (Show, Eq, Functor)
+  }
+  deriving (Show, Eq, Functor)
 
 isAccepted :: FilterResult t -> Bool
 isAccepted = isNothing . (.rejection)
@@ -23,5 +27,8 @@ isAccepted = isNothing . (.rejection)
 isRejected :: FilterResult t -> Bool
 isRejected = isJust . (.rejection)
 
-applyFilters :: forall rc t. [Filter rc t] -> rc -> t -> FilterResult t
-applyFilters fltrs rc t = MkFilterResult t $ (.rejectionDescription) <$> find (\f -> not $ f.predicate rc t) fltrs
+applyFilters :: forall rc t. Filters rc t -> rc -> t -> FilterResult t
+applyFilters fltrs rc t =
+  case fltrs of
+    Unfiltered -> MkFilterResult t Nothing
+    Filtered fltrs' -> MkFilterResult t $ (.rejectionDescription) <$> find (\f -> not $ f.predicate rc t) fltrs'

@@ -146,7 +146,7 @@ mkTestRun tr = mkNode <$> tr
 mkHook :: Hook hz pw i o -> C.Hook IO hz i o
 mkHook = \case
     BeforeHook{..} -> C.Before{..}
-    BeforeHook'{..} -> C.Before' (mkHook depends) action' beforeId'
+    BeforeHook'{..} -> C.Before' (mkHook depends) action'
     AfterHook{..} -> C.After{..}
     AfterHook'{..} -> C.After'{afterDepends = mkHook afterDepends, ..}
     AroundHook{..} -> C.Around{..}
@@ -154,9 +154,8 @@ mkHook = \case
         { aroundDepends
         , setup'
         , teardown'
-        , aroundId'
         } ->
-            C.Around' (mkHook aroundDepends) setup' teardown' aroundId'
+            C.Around' (mkHook aroundDepends) setup' teardown'
 
 mkNode :: Node i -> C.Node IO [] TestConfig i
 mkNode = \case

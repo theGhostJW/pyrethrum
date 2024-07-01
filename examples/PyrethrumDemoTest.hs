@@ -43,7 +43,7 @@ logShow = log . txt
   an action that only requires a sublist of these effects
 -}
 logReturnInt :: IO Int
-logReturnInt = log "Returning One" >> pure 1
+logReturnInt = log "Returning One alllll" >> pure 1
 
 runSomethingToDoWithTestDepth :: Depth -> IO ()
 runSomethingToDoWithTestDepth = logShow
@@ -317,10 +317,8 @@ cfg = testConfig "test"
 -- ############### Suite ###################
 -- this will be generated
 
-suite :: Suite
 suite =
-    [ Fixture (NodePath "module" "testName") test
-    , Hook
+    Hook
         { path = NodePath "module" "name"
         , hook = demoOnceAfterHook
         , subNodes =
@@ -361,20 +359,6 @@ suite =
                 }
             ]
         }
-    ]
-
-nodes =
-    Fixture (NodePath "module" "testName") test4
-
-nodes2 =
-    Hook
-        { path = NodePath "module" "name"
-        , hook = intOnceHook
-        , subNodes =
-            [ nodes
-            , nodes
-            ]
-        }
 
 --
 -- nodes =
@@ -384,11 +368,8 @@ nodes2 =
 --         , subNodes = [Fixture (NodePath "module" "testName") test4]
 --         }
 
-coreNode = mkNode nodes
-coreNode2 = mkNode nodes2
-
-result = runNode coreNode
-result2 = runNode coreNode2
+coreNode2 = mkNode suite
+result2 = runNode () coreNode2
 
 {-
 -- TODO: test documenter that returns a handle from onceHook

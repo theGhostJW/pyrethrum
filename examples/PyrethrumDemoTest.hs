@@ -360,6 +360,20 @@ suite =
             ]
         }
 
+suite2 =
+    Hook
+        { path = NodePath "module" "name"
+        , hook = intOnceHook
+        , subNodes =
+            [ Hook
+                { path = NodePath "module" "name"
+                , hook = eachAfter
+                , subNodes =
+                    [Fixture (NodePath "module" "testName") test4]
+                }
+            ]
+        }
+
 --
 -- nodes =
 --     Hook
@@ -368,7 +382,7 @@ suite =
 --         , subNodes = [Fixture (NodePath "module" "testName") test4]
 --         }
 
-coreNode2 = mkNode suite
+coreNode2 = mkNode suite2
 result2 = runNode () coreNode2
 
 {-

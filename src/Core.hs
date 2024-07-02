@@ -259,26 +259,32 @@ runFixture p hi f = case f of
             Left e -> (fLog $ Exception (show e) (show callStack))
             Right ds -> runCheck p ds i.checks.un
 
+-- runNode ::
+--     (Monad m, Concurrently m, Traversable c) =>
+--     Node m c tc hi ->
+--     m ()
+-- runNode = uu
+--
 -- runHook ::
---     (Monad m, Concurrently m, Traversable c, Cache m) =>
+--     (Monad m, Concurrently m, Traversable c) =>
 --     Hook m hz pi o ->
 --     c (o -> m ()) ->
 --     m ()
 -- runHook hook as = case hook of
---     Before{action, beforeId} -> case hookFrequency hook of
---         Once -> runBeforeAll beforeId action >>= \o -> forConcurrently_ as $ \a -> a o
+--     Before{action} -> case hookFrequency hook of
+--         Once -> action >>= \o -> forConcurrently_ as $ \a -> a o
 --         Thread -> forConcurrently_ as $ \a -> do
 --             o <- action
 --             a o
 --         Each -> forConcurrently_ as $ \a -> do
 --             o <- action
 --             a o
---     Before'{depends, action', beforeId'} -> case hookFrequency hook of
+--     Before'{depends, action'} -> case hookFrequency hook of
 --         Once -> runHook depends newAs
 --           where
 --             newAs =
 --                 as <&> \a i -> do
---                     o <- runBeforeAll beforeId' $ action' i
+--                     o <- action' i
 --                     a o
 --         Thread -> runHook depends newAs
 --           where
@@ -292,11 +298,11 @@ runFixture p hi f = case f of
 --                 as <&> \a i -> do
 --                     o <- action' i
 --                     a o
---     Around{setup, teardown, aroundId} -> case hookFrequency hook of
+--     Around{setup, teardown} -> case hookFrequency hook of
 --         Once -> do
---             o <- runBeforeAll (aroundId <> "before") setup
+--             o <- setup
 --             forConcurrently_ as $ \a -> a o
---             runAfterAll (aroundId <> "after") $ teardown o
+--             teardown o
 --         Thread -> forConcurrently_ as $ \a -> do
 --             o <- setup
 --             a o
@@ -305,14 +311,14 @@ runFixture p hi f = case f of
 --             o <- setup
 --             a o
 --             teardown o
---     Around'{depends, setup', teardown', aroundId'} -> case hookFrequency hook of
+--     Around'{depends, setup', teardown'} -> case hookFrequency hook of
 --         Once -> runHook depends newAs
 --           where
 --             newAs =
 --                 as <&> \a i -> do
---                     o <- runBeforeAll (aroundId' <> "before") $ setup' i
+--                     o <- setup' i
 --                     a o
---                     runAfterAll (aroundId' <> "after") $ teardown' o
+--                     teardown' o
 --         Thread -> runHook depends newAs
 --           where
 --             newAs =
@@ -327,23 +333,23 @@ runFixture p hi f = case f of
 --                     o <- setup' i
 --                     a o
 --                     teardown' o
---     After{afterAction, afterId} -> case hookFrequency hook of
+--     After{afterAction} -> case hookFrequency hook of
 --         Once -> do
 --             forConcurrently_ as $ \a -> a ()
---             runAfterAll afterId afterAction
+--             afterAction
 --         Thread -> forConcurrently_ as $ \a -> do
 --             a ()
 --             afterAction
 --         Each -> forConcurrently_ as $ \a -> do
 --             a ()
 --             afterAction
---     After'{afterDepends, afterAction', afterId'} -> case hookFrequency hook of
+--     After'{afterDepends, afterAction'} -> case hookFrequency hook of
 --         Once -> runHook afterDepends newAs
 --           where
 --             newAs =
 --                 as <&> \a i -> do
 --                     a i
---                     runAfterAll afterId' afterAction'
+--                     afterAction'
 --         Thread -> runHook afterDepends newAs
 --           where
 --             newAs =
@@ -358,7 +364,7 @@ runFixture p hi f = case f of
 --                     afterAction'
 --
 -- runFixture ::
---     (HasCallStack, Logger m, Concurrently m, Traversable c, Cache m) =>
+--     (HasCallStack, Logger m, Concurrently m, Traversable c) =>
 --     Path ->
 --     Fixture m c tc hi ->
 --     m ()

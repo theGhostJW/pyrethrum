@@ -5,6 +5,7 @@ import DSL.Internal.NodeEvent hiding (Check)
 import Data.Aeson (ToJSON (..))
 import GHC.Records (HasField)
 import Internal.ThreadEvent (Hz (..))
+import Filter (Filters)
 
 data Before
 
@@ -200,6 +201,7 @@ data Node m rc fc hi where
 data ExeParams m rc fc where
   ExeParams ::
     { suite :: [Node m rc fc ()],
+      filters :: Filters rc fc,
       interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a),
       runConfig :: rc
     } ->

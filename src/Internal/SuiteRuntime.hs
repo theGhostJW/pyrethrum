@@ -45,12 +45,37 @@ execute
   C.ExeParams
     { suite
     , interpreter
+    , filters
     , runConfig
     } = 
       do 
-        --  filter log
-        -- validation , duplicates and empty
-      executeNodeList fc lc (P.prepare $ P.SuitePrepParams suite interpreter runConfig)
+        configError fRslts & maybe
+          (
+            
+             FilterLog
+      { idx :: Int,
+        threadId :: ThreadId,
+        filterResuts :: FilterResult Text
+      }
+  | SuiteInitFailure
+      { idx :: Int,
+        reason :: Text
+      }
+            executeNodeList fc lc (P.prepare $ P.SuitePrepParams fSuite interpreter runConfig))
+          (sink . L.ConfigError)
+      
+      where 
+        (fSuite, fRslts) = filterSuite filters runConfig suite
+        
+   
+configError :: [FilterResult Text] -> Maybe Text
+configError r = 
+   chk emptySuite "Suite is empty - no test data or all test data has been filtered out"
+   <|> duplicate
+  where 
+    duplicate = firstDuplicateFixtureTitle r
+    emptySuite = not $ any accepted r
+    chk b t = b ? Just t $ Nothing
 
 firstDuplicateFixtureTitle :: [FilterResult Text] -> Maybe Text 
 firstDuplicateFixtureTitle = firstDuplicate . fmap (.target)

@@ -9,7 +9,7 @@ import Internal.Logging qualified as L
 import Internal.ThreadEvent hiding (Test)
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
-import PyrethrumExtras (catchAll, txt, (?), uu)
+import PyrethrumExtras (catchAll, txt, uu, (?))
 import UnliftIO
   ( concurrently_,
     finally,
@@ -38,20 +38,19 @@ todo :: define defect properties with sum type type and typeclass which returns 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
-
 execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls L.ExePath AE.NodeEvent -> C.ExeParams m rc fc -> IO ()
-execute tc lc p = 
-      runWithLogger lc execute'
-    where 
-      execute' :: LoggerSource L.ExePath AE.NodeEvent -> IO ()
-      execute' lgr =
-        do 
-        
-        configError fRslts & maybe
-          (executeNodeList tc lgr (P.prepare $ P.SuitePrepParams fSuite interpreter runConfig))
-          (uu)
-        where
-          (fSuite, fRslts) = filterSuite filters runConfig suite
+execute tc lc p@C.ExeParams{interpreter} =
+  runWithLogger lc execute'
+  where
+    execute' :: LoggerSource L.ExePath AE.NodeEvent -> IO ()
+    execute' lgr =
+      do
+        configError fRslts
+          & maybe
+            (executeNodeList tc lgr (P.prepare $ P.SuitePrepParams fSuite interpreter p.runConfig))
+            (uu)
+      where
+        (fSuite, fRslts) = filterSuite p.filters p.runConfig p.suite
 
 -- executeNodeList fc lc (P.prepare $ P.SuitePrepParams fSuite interpreter runConfig)
 -- do
@@ -132,13 +131,12 @@ filterSuite fltrs rc suite =
       where
         fr = (.title) <$> applyFilters fltrs rc (C.getConfig fx)
 
-data LoggerSource loc evt = MkLoggerSource {
-  rootLogger :: L.EngineEvent loc evt -> IO (),
-  newLogger :: IO (L.EngineEvent loc evt -> IO ())
-}
+data LoggerSource loc evt = MkLoggerSource
+  { rootLogger :: L.EngineEvent loc evt -> IO (),
+    newLogger :: IO (L.EngineEvent loc evt -> IO ())
+  }
 
-
-runWithLogger :: forall loc evnt. L.LogControls loc evnt -> (LoggerSource loc evnt -> IO () ) -> IO ()
+runWithLogger :: forall loc evnt. L.LogControls loc evnt -> (LoggerSource loc evnt -> IO ()) -> IO ()
 runWithLogger
   L.LogControls
     { sink,
@@ -146,12 +144,12 @@ runWithLogger
       stopWorker
     }
   action =
-    do 
-     rootLogger <- mkNewLogger
-     let loggerSource = MkLoggerSource rootLogger mkNewLogger
-     -- logWorker and execution run concurrently
-     -- logworker serialises the log events emitted by the execution
-     concurrently_
+    do
+      rootLogger <- mkNewLogger
+      let loggerSource = MkLoggerSource rootLogger mkNewLogger
+      -- logWorker and execution run concurrently
+      -- logworker serialises the log events emitted by the execution
+      concurrently_
         logWorker
         ( finally
             (action loggerSource)
@@ -159,20 +157,16 @@ runWithLogger
         )
     where
       mkNewLogger :: IO (L.EngineEvent loc evnt -> IO ())
-      mkNewLogger = L.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId 
+      mkNewLogger = L.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
 
-
-executeNodeList :: ThreadCount -> L.LogControls L.ExePath AE.NodeEvent -> [P.PreNode IO ()] -> IO ()
-executeNodeList
-  tc
-  lc
-  nodeList =
-    do
-      xtree <- mkXTree (L.ExePath []) nodeList
-      runWithLogger lc (\l -> executeNodes l xtree tc)
+executeNodeList :: ThreadCount -> LoggerSource L.ExePath AE.NodeEvent -> [P.PreNode IO ()] -> IO ()
+executeNodeList tc lgr nodeList =
+  do
+    xtree <- mkXTree (L.ExePath []) nodeList
+    executeNodes lgr xtree tc
 
 executeNodes :: LoggerSource L.ExePath AE.NodeEvent -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
-executeNodes MkLoggerSource {rootLogger, newLogger}  nodes tc =
+executeNodes MkLoggerSource {rootLogger, newLogger} nodes tc =
   do
     finally
       ( rootLogger L.StartExecution

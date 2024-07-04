@@ -4,17 +4,9 @@ import BasePrelude (read)
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import Filter (FilterResult)
 import UnliftIO.Concurrent qualified as C
+import CoreUtils
 
--- needs a separate module to avoid field name conflicts
--- can move when this is no longer a limitation of ghc
 
-newtype PException = PException {displayText :: [Text]} deriving (Show, Eq, Ord)
-
-type ThreadId = Int
-
--- ThreadId 5 -> 5
-mkThreadId :: C.ThreadId -> ThreadId
-mkThreadId = read . drop 9 . show
 
 data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
 
@@ -233,4 +225,3 @@ startSuiteEventLoc te = case te of
 $(deriveJSON defaultOptions ''Hz)
 $(deriveJSON defaultOptions ''HookPos)
 $(deriveJSON defaultOptions ''NodeType)
-$(deriveToJSON defaultOptions ''PException)

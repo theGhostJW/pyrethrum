@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ff706032ac52ec2d388d2028a63a0681d4e74c4a875067e2781087bc9b432f82
+-- hash: 5c167d0a779c4a26173e81bbddd44094b65f7222cc683bd24cf1e97a220ee901
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -81,6 +81,7 @@ library
       Check
       Core
       CoreTypes
+      CoreUtils
       DSL.FileSystemDocInterpreter
       DSL.FileSystemEffect
       DSL.FileSystemIOInterpreter
@@ -90,6 +91,7 @@ library
       DSL.Out
       Filter
       Internal.Logging
+      Internal.LoggingCore
       Internal.SuiteRuntime
       Internal.ThreadEvent
       OrphanedInstances

@@ -131,33 +131,6 @@ filterSuite fltrs rc suite =
       where
         fr = (.title) <$> applyFilters fltrs rc (C.getConfig fx)
 
-data LoggerSource loc evt = MkLoggerSource
-  { rootLogger :: L.EngineEvent loc evt -> IO (),
-    newLogger :: IO (L.EngineEvent loc evt -> IO ())
-  }
-
-runWithLogger :: forall loc evnt. L.LogControls loc evnt -> (LoggerSource loc evnt -> IO ()) -> IO ()
-runWithLogger
-  L.LogControls
-    { sink,
-      logWorker,
-      stopWorker
-    }
-  action =
-    do
-      rootLogger <- mkNewLogger
-      let loggerSource = MkLoggerSource rootLogger mkNewLogger
-      -- logWorker and execution run concurrently
-      -- logworker serialises the log events emitted by the execution
-      concurrently_
-        logWorker
-        ( finally
-            (action loggerSource)
-            stopWorker
-        )
-    where
-      mkNewLogger :: IO (L.EngineEvent loc evnt -> IO ())
-      mkNewLogger = L.mkLogger sink <$> UnliftIO.newIORef (-1) <*> myThreadId
 
 executeNodeList :: ThreadCount -> LoggerSource L.ExePath AE.NodeEvent -> [P.PreNode IO ()] -> IO ()
 executeNodeList tc lgr nodeList =

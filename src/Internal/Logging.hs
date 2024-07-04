@@ -8,10 +8,11 @@ import DSL.Internal.NodeEvent qualified as AE
 import Data.Aeson.TH (defaultOptions, deriveToJSON)
 import Data.Text as T (intercalate)
 import Effectful.Concurrent.STM (TQueue)
+import CoreUtils qualified as C
 import Internal.ThreadEvent qualified as TE
 import PyrethrumExtras as PE (txt, (?), head, tail) 
 import Text.Show.Pretty (pPrint)
-import UnliftIO (finally)
+import UnliftIO (finally, concurrently_, newIORef)
 import UnliftIO.Concurrent (ThreadId)
 import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
 import Prelude hiding (atomically, lines)
@@ -68,8 +69,6 @@ data FailPoint = FailPoint
   }
   deriving (Show)
 
-exceptionTxt :: SomeException -> TE.PException
-exceptionTxt e = TE.PException $ txt <$> P.lines (displayException e)
 
 mkFailure :: l -> TE.NodeType -> SomeException -> EngineEvent l a
 mkFailure loc nodeType exception = Failure{exception = exceptionTxt exception, ..}
@@ -87,7 +86,7 @@ data EngineEvent l a
   | Failure
       { nodeType :: TE.NodeType
       , loc :: l
-      , exception :: TE.PException
+      , exception :: C.PException
       }
   | ParentFailure
       { loc :: l
@@ -101,10 +100,10 @@ data EngineEvent l a
   | EndExecution
   deriving (Show)
 
--- apEvent (a) a loggable event arising from the framework at runtime
--- EngineEvent a - marks start, end and failures in test fixtures (hooks, tests) and errors
--- ThreadEvent a - adds thread id and index to EngineEvent
-expandEvent :: TE.ThreadId -> Int -> EngineEvent loc apEvt -> TE.ThreadEvent loc apEvt
+-- -- NodeEvent (a) a loggable event generated from within a node
+-- -- EngineEvent a - marks start, end and failures in test fixtures (hooks, tests) and errors
+-- -- ThreadEvent a - adds thread id and index to EngineEvent
+expandEvent :: C.ThreadId -> Int -> EngineEvent l a -> ThreadEvent l a
 expandEvent threadId idx = \case
   StartExecution -> TE.StartExecution{threadId, idx}
   Start{..} -> TE.Start{threadId, idx, ..}
@@ -113,45 +112,6 @@ expandEvent threadId idx = \case
   ParentFailure{..} -> TE.ParentFailure{threadId, idx, ..}
   NodeEvent event -> TE.NodeEvent{threadId, idx, event}
   EndExecution -> TE.EndExecution{threadId, idx}
-
-mkLogger :: (TE.ThreadEvent loc apEvt -> IO ()) -> IORef Int -> ThreadId -> EngineEvent loc apEvt -> IO ()
-mkLogger sink threadCounter thrdId engEvnt = do
-  tc <- readIORef threadCounter
-  let nxt = succ tc
-  finally (sink $ expandEvent (TE.mkThreadId thrdId) nxt engEvnt) $ writeIORef threadCounter nxt
-
--- TODO:: Logger should be wrapped in an except that sets non-zero exit code on failure
-
-data LogControls loc apEvt = LogControls
-  { sink :: TE.ThreadEvent loc apEvt -> IO ()
-  , logWorker :: IO ()
-  , stopWorker :: IO ()
-  , log :: TQueue (TE.ThreadEvent loc apEvt)
-  }
-
-testLogControls :: forall loc apEvt. (Show loc, Show apEvt) => Bool -> IO (LogControls loc apEvt, TQueue (TE.ThreadEvent loc apEvt))
-testLogControls wantConsole = do
-  chn <- newTChanIO
-  logQ <- newTQueueIO
-
-  -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
-  let logWorker :: IO ()
-      logWorker =
-        atomically (readTChan chn)
-          >>= maybe
-            (pure ())
-            (\evt -> when wantConsole (pPrint evt) >> logWorker)
-
-      stopWorker :: IO ()
-      stopWorker = atomically $ writeTChan chn Nothing
-
-      sink :: TE.ThreadEvent loc apEvt -> IO ()
-      sink eventLog =
-        atomically $ do
-          writeTChan chn $ Just eventLog
-          writeTQueue logQ eventLog
-
-  pure (LogControls sink logWorker stopWorker logQ, logQ)
 
 $(deriveToJSON defaultOptions ''ExePath)
 $(deriveToJSON defaultOptions ''EngineEvent)

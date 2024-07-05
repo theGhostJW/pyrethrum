@@ -8,6 +8,9 @@ module Filter
   )
 where
 
+import Data.Aeson (defaultOptions)
+import Data.Aeson.TH (deriveToJSON, deriveToJSON)
+
 data Filters rc fc = Filtered [Filter rc fc] | Unfiltered
 
 data Filter rc t = MkFilter
@@ -32,3 +35,5 @@ applyFilters fltrs rc t =
   case fltrs of
     Unfiltered -> MkFilterResult t Nothing
     Filtered fltrs' -> MkFilterResult t $ (.description) <$> find (\f -> not $ f.predicate rc t) fltrs'
+
+$(deriveToJSON defaultOptions ''FilterResult)

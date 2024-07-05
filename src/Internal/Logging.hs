@@ -12,6 +12,7 @@ import Internal.LoggingCore
 import Internal.ThreadEvent qualified as TE
 import PyrethrumExtras as PE (head, tail, (?))
 import Prelude hiding (atomically, lines)
+import Filter ( FilterResult )
 
 newtype ExePath = ExePath {un :: [AE.Path]} deriving (Show, Eq, Ord)
 
@@ -67,7 +68,15 @@ mkFailure :: l -> TE.NodeType -> SomeException -> EngineEvent l a
 mkFailure loc nodeType exception = Failure {exception = C.exceptionTxt exception, ..}
 
 data EngineEvent l a
-  = StartExecution
+  = 
+    FilterLog
+      { filterResuts :: [FilterResult Text]
+      }
+  | SuiteInitFailure
+      { 
+        reason :: Text
+      }
+  |  StartExecution
   | Start
       { nodeType :: TE.NodeType,
         loc :: l
@@ -102,6 +111,8 @@ testLogControls = testLogControls' expandEvent
 expandEvent :: C.ThreadId -> Int -> EngineEvent l a -> TE.ThreadEvent l a
 expandEvent threadId idx = \case
   StartExecution -> TE.StartExecution {threadId, idx}
+  FilterLog {..} -> TE.FilterLog {threadId, idx, ..}
+  SuiteInitFailure {..} -> TE.SuiteInitFailure {threadId, idx, ..}
   Start {..} -> TE.Start {threadId, idx, ..}
   End {..} -> TE.End {threadId, idx, ..}
   Failure {..} -> TE.Failure {threadId, idx, ..}

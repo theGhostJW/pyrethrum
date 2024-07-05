@@ -144,7 +144,7 @@ data ThreadEvent l a
   = FilterLog
       { idx :: Int,
         threadId :: ThreadId,
-        filterResuts :: FilterResult Text
+        filterResuts :: [FilterResult Text]
       }
   | SuiteInitFailure
       { idx :: Int,

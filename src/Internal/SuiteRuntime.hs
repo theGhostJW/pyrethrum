@@ -9,7 +9,7 @@ import Internal.LoggingCore qualified as L
 import Internal.ThreadEvent hiding (Test)
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
-import PyrethrumExtras (catchAll, txt, uu, (?))
+import PyrethrumExtras (catchAll, txt, (?))
 import UnliftIO
   ( finally,
     forConcurrently_,
@@ -46,14 +46,15 @@ execute tc lc p@C.ExeParams {interpreter} =
   L.runWithLogger lc execute'
   where
     execute' :: L.LoggerSource (L.EngineEvent L.ExePath AE.NodeEvent) -> IO ()
-    execute' lgr =
+    execute' l =
       do
-        sink $ FilterLog fRslts
+        log $ L.FilterLog fRslts
         configError fRslts
           & maybe
-            (executeNodeList tc lgr preparedNodes)
-            sink . ConfigError
+            (executeNodeList tc l preparedNodes)
+            (log . L.SuiteInitFailure)
       where
+        log = l.rootLogger
         (fSuite, fRslts) = filterSuite p.filters p.runConfig p.suite
         preparedNodes = P.prepare $ P.SuitePrepParams fSuite interpreter p.runConfig
 

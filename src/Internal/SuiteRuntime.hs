@@ -52,20 +52,30 @@ execute tc lc p@C.ExeParams {interpreter} =
         configError fRslts
           & maybe
             (executeNodeList tc l preparedNodes)
-            (log . L.SuiteInitFailure)
+            log
       where
         log = l.rootLogger
         (fSuite, fRslts) = filterSuite p.filters p.runConfig p.suite
         preparedNodes = P.prepare $ P.SuitePrepParams fSuite interpreter p.runConfig
 
-configError :: [FilterResult Text] -> Maybe Text
-configError r =
-  chk emptySuite "Suite is empty - no test data or all test data has been filtered out"
-    <|> duplicate
+configError :: [FilterResult Text] -> Maybe (L.EngineEvent L.ExePath AE.NodeEvent)
+configError r = emptySuite <|> duplicate
   where
-    duplicate = firstDuplicateFixtureTitle r
-    emptySuite = not $ any accepted r
-    chk b t = b ? Just t $ Nothing
+    duplicate = firstDuplicateFixtureTitle r <&> 
+      \dupe -> L.SuiteInitFailure {
+         failure = "Duplicate Fixture Title",
+         notes = "The following fixture title is duplicated in the test suite:\n" 
+          <> dupe 
+          <> "\n"
+          <> "Fixture titles must be unique, please change the title of one of these fixtures."
+      }
+    emptySuite = any accepted r  ? Nothing $
+        Just $  
+         L.SuiteInitFailure {
+         failure = "Filtered Test Suite is Empty",
+         notes = "The test suite is empty after filtering:\n" 
+          <> "Check the filter log and change the relevant test or run config to ensure some fixtures are run."
+      }
 
 firstDuplicateFixtureTitle :: [FilterResult Text] -> Maybe Text
 firstDuplicateFixtureTitle = firstDuplicate . fmap (.target)

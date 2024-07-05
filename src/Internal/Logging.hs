@@ -74,7 +74,8 @@ data EngineEvent l a
       }
   | SuiteInitFailure
       { 
-        reason :: Text
+        failure :: Text,
+        notes :: Text
       }
   |  StartExecution
   | Start

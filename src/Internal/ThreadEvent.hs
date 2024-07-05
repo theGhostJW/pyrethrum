@@ -149,7 +149,8 @@ data ThreadEvent l a
   | SuiteInitFailure
       { idx :: Int,
         threadId :: ThreadId,
-        reason :: Text
+        failure :: Text,
+        notes :: Text
       }
   | StartExecution
       { idx :: Int,

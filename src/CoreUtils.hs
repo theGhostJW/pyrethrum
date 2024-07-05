@@ -2,7 +2,9 @@ module CoreUtils where
 
 import UnliftIO.Concurrent qualified as C
 import BasePrelude (read)
-import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
+import Data.Aeson.TH (defaultOptions, deriveToJSON)
+import PyrethrumExtras (catchAll, txt, uu, (?))
+import Data.Text as T (lines)
 
 type ThreadId = Int
 
@@ -13,6 +15,6 @@ mkThreadId = read . drop 9 . show
 newtype PException = MkException {displayText :: [Text]} deriving (Show, Eq, Ord)
 
 exceptionTxt :: SomeException -> PException
-exceptionTxt e = TE.PException $ txt <$> lines (displayException e)
+exceptionTxt = MkException . T.lines . txt . displayException
 
 $(deriveToJSON defaultOptions ''PException)

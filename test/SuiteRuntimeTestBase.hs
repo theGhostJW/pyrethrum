@@ -14,14 +14,13 @@ import Data.Set qualified as S
 import Data.Text qualified as T
 import FullSuiteTestTemplate (ManySpec (PassProb), Result (..), Spec (..), SpecGen (..), SuiteEventPath (..), isPreload)
 import FullSuiteTestTemplate qualified as T
-import Internal.Logging (ExePath (..), parentPath, testLogControls, topPath)
+import Internal.Logging (ExePath (..), parentPath,  topPath, testLogControls )
 import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
 import Internal.ThreadEvent as TE
   ( HookPos (..),
     Hz (..),
     NodeType (..),
     ThreadEvent (..),
-    ThreadId,
     getHookInfo,
     getSuiteEvent,
     hasSuiteEvent,
@@ -53,6 +52,7 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
+import CoreUtils (ThreadId)
 
 defaultSeed :: Int
 defaultSeed = 13579

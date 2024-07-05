@@ -4,8 +4,8 @@ import Core qualified as C
 import DSL.Internal.NodeEvent qualified as AE
 import Data.Set qualified as S
 import Filter
-import Internal.Logging (FailPoint, LogControls (LogControls))
 import Internal.Logging qualified as L
+import Internal.LoggingCore qualified as L
 import Internal.ThreadEvent hiding (Test)
 import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
@@ -38,44 +38,20 @@ todo :: define defect properties with sum type type and typeclass which returns 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls L.ExePath AE.NodeEvent -> C.ExeParams m rc fc -> IO ()
-execute tc lc p@C.ExeParams{interpreter} =
-  runWithLogger lc execute'
+execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.EngineEvent L.ExePath AE.NodeEvent) (TE.ThreadEvent L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
+execute tc lc p@C.ExeParams {interpreter} =
+  L.runWithLogger lc execute'
   where
-    execute' :: LoggerSource L.ExePath AE.NodeEvent -> IO ()
+    execute' :: L.LoggerSource (L.EngineEvent L.ExePath AE.NodeEvent) -> IO ()
     execute' lgr =
       do
         configError fRslts
           & maybe
-            (executeNodeList tc lgr (P.prepare $ P.SuitePrepParams fSuite interpreter p.runConfig))
-            (uu)
+            (executeNodeList tc lgr preparedNodes)
+            uu
       where
         (fSuite, fRslts) = filterSuite p.filters p.runConfig p.suite
-
--- executeNodeList fc lc (P.prepare $ P.SuitePrepParams fSuite interpreter runConfig)
--- do
-
---   configError fRslts & maybe
---     executeNodeList fc lc (P.prepare $ P.SuitePrepParams fSuite interpreter runConfig)
---     (
---      (sink . L.ConfigError)
-
---     )
-
---         (
-
---            FilterLog
---     { idx :: Int,
---       threadId :: ThreadId,
---       filterResuts :: FilterResult Text
---     }
--- \| SuiteInitFailure
---     { idx :: Int,
---       reason :: Text
---     }
-
--- where
---   (fSuite, fRslts) = filterSuite filters runConfig suite
+        preparedNodes = P.prepare $ P.SuitePrepParams fSuite interpreter p.runConfig
 
 configError :: [FilterResult Text] -> Maybe Text
 configError r =
@@ -131,15 +107,14 @@ filterSuite fltrs rc suite =
       where
         fr = (.title) <$> applyFilters fltrs rc (C.getConfig fx)
 
-
-executeNodeList :: ThreadCount -> LoggerSource L.ExePath AE.NodeEvent -> [P.PreNode IO ()] -> IO ()
+executeNodeList :: ThreadCount -> L.LoggerSource (L.EngineEvent L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
 executeNodeList tc lgr nodeList =
   do
     xtree <- mkXTree (L.ExePath []) nodeList
     executeNodes lgr xtree tc
 
-executeNodes :: LoggerSource L.ExePath AE.NodeEvent -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
-executeNodes MkLoggerSource {rootLogger, newLogger} nodes tc =
+executeNodes :: L.LoggerSource (L.EngineEvent L.ExePath AE.NodeEvent) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
+executeNodes L.MkLoggerSource {rootLogger, newLogger} nodes tc =
   do
     finally
       ( rootLogger L.StartExecution
@@ -662,10 +637,10 @@ runNode lgr hi xt =
     logRun_ :: NodeType -> (P.ApEventSink -> IO b) -> IO ()
     logRun_ et action = void $ logRun' et action
 
-    logAbandonned_ :: NodeType -> FailPoint -> IO ()
+    logAbandonned_ :: NodeType -> L.FailPoint -> IO ()
     logAbandonned_ = logAbandonned lgr xt.path
 
-    logAbandonned' :: forall a. NodeType -> FailPoint -> IO (Either FailPoint a)
+    logAbandonned' :: forall a. NodeType -> L.FailPoint -> IO (Either L.FailPoint a)
     logAbandonned' se fp = logAbandonned_ se fp >> pure (Left fp)
 
     runSubNodes :: forall hi'. NodeIn hi' -> ChildQ (ExeTree hi') -> IO QElementRun
@@ -696,15 +671,15 @@ runNode lgr hi xt =
               runTest (pure hkin) aftr t
         PropertyTest _hi -> noImpPropertyError
 
-    runTests :: forall ti. IO (Either FailPoint ti) -> IO () -> TestSource ti -> IO QElementRun
+    runTests :: forall ti. IO (Either L.FailPoint ti) -> IO () -> TestSource ti -> IO QElementRun
     runTests su td = \case
       Queue childQ -> runChildQ Sequential (runTest su td) (const $ pure Runnable) childQ
       PropertyTest _hi -> noImpPropertyError
 
-    runTest :: forall ti. IO (Either FailPoint ti) -> IO () -> P.Test IO ti -> IO QElementRun
+    runTest :: forall ti. IO (Either L.FailPoint ti) -> IO () -> P.Test IO ti -> IO QElementRun
     runTest hi' after t = hi' >>= \i -> runTest' i after t
 
-    runTest' :: forall ti. Either FailPoint ti -> IO () -> P.Test IO ti -> IO QElementRun
+    runTest' :: forall ti. Either L.FailPoint ti -> IO () -> P.Test IO ti -> IO QElementRun
     runTest' hi' after t =
       do
         let path = mkTestPath t
@@ -717,7 +692,7 @@ runNode lgr hi xt =
 
     mkTestPath :: forall a. P.Test IO a -> L.ExePath
     mkTestPath P.MkTest {id, title = ttl} = L.ExePath $ AE.TestPath {id, title = ttl} : coerce xt.path {- fixture path -}
-    abandonSubs :: forall a. FailPoint -> ChildQ (ExeTree a) -> IO QElementRun
+    abandonSubs :: forall a. L.FailPoint -> ChildQ (ExeTree a) -> IO QElementRun
     abandonSubs fp = runSubNodes (Abandon fp)
 
     notRun :: IO QElementRun
@@ -767,25 +742,25 @@ runNode lgr hi xt =
     singleton' :: forall a. TMVar a -> IO a -> a -> IO a
     singleton' tCache ioa = const $ singleton tCache ioa
 
-    runThreadSetup :: forall i o. TMVar (Either FailPoint o) -> NodeType -> (P.ApEventSink -> i -> IO o) -> Either FailPoint i -> IO (Either FailPoint o)
+    runThreadSetup :: forall i o. TMVar (Either L.FailPoint o) -> NodeType -> (P.ApEventSink -> i -> IO o) -> Either L.FailPoint i -> IO (Either L.FailPoint o)
     runThreadSetup tCache evnt setup eti = do
       -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
       -- no need for thread synchronisation as this happpens within a thread
       singleton tCache $ runSetup evnt setup eti
 
-    runSetup :: forall i o. NodeType -> (P.ApEventSink -> i -> IO o) -> Either FailPoint i -> IO (Either FailPoint o)
+    runSetup :: forall i o. NodeType -> (P.ApEventSink -> i -> IO o) -> Either L.FailPoint i -> IO (Either L.FailPoint o)
     runSetup evnt setup =
       either
         (logAbandonned' evnt)
         (logRun' evnt . flip setup)
 
-    runThreadTeardown :: forall i. TMVar (Either FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
+    runThreadTeardown :: forall i. TMVar (Either L.FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
     runThreadTeardown = runPostThread TE.Teardown
 
-    runThreadAfter :: TMVar (Either FailPoint ()) -> (P.ApEventSink -> IO ()) -> IO ()
+    runThreadAfter :: TMVar (Either L.FailPoint ()) -> (P.ApEventSink -> IO ()) -> IO ()
     runThreadAfter tCache after = runPostThread TE.After tCache (\s _i -> after s)
 
-    runPostThread :: forall i. HookPos -> TMVar (Either FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
+    runPostThread :: forall i. HookPos -> TMVar (Either L.FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
     runPostThread hp tCache teardown = do
       -- unless ()
       mho <- atomically $ tryReadTMVar tCache
@@ -1038,7 +1013,7 @@ runNode lgr hi xt =
         ThreadContext {threadContext} ThreadAfter {subNodes', after} ->
           do
             tCache <- newEmptyTMVarIO
-            let nxtBefore :: Either FailPoint hi' -> IO (Either FailPoint hi')
+            let nxtBefore :: Either L.FailPoint hi' -> IO (Either L.FailPoint hi')
                 nxtBefore hi' = do
                   mt <- atomically $ isEmptyTMVar tCache
                   when mt do
@@ -1118,65 +1093,52 @@ runNode lgr hi xt =
         EachContext {} ThreadAfter {} -> invalidTree "EachContext" "ThreadAfter"
 
 data NodeIn hi where
-  Abandon :: {fp :: FailPoint} -> NodeIn hi
+  Abandon :: {fp :: L.FailPoint} -> NodeIn hi
   OnceIn :: {hki :: hi} -> NodeIn hi
-  ThreadContext :: {threadContext :: IO (Either FailPoint hi)} -> NodeIn hi
+  ThreadContext :: {threadContext :: IO (Either L.FailPoint hi)} -> NodeIn hi
   EachContext ::
     { testContext :: IO (TestContext hi)
     } ->
     NodeIn hi
 
 data TestContext hi = MkTestContext
-  { -- hookIn :: IO (Either FailPoint hi),
-    hookIn :: Either FailPoint hi,
+  { -- hookIn :: IO (Either L.FailPoint hi),
+    hookIn :: Either L.FailPoint hi,
     after :: IO ()
   }
 
-mkTestContext :: forall hi ho. Either FailPoint hi -> IO () -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> IO (TestContext ho)
+mkTestContext :: forall hi ho. Either L.FailPoint hi -> IO () -> (Either L.FailPoint hi -> IO (Either L.FailPoint ho)) -> (Either L.FailPoint ho -> IO ()) -> IO (TestContext ho)
 mkTestContext parentIn afterParent setupNxt teardownNxt =
   -- must be in IO so teardown has access to ho
   do
     eho <- setupNxt parentIn
     pure $ MkTestContext eho $ teardownNxt eho >> afterParent
 
-mkTestContextM :: forall hi ho. IO (Either FailPoint hi) -> IO () -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> IO (TestContext ho)
+mkTestContextM :: forall hi ho. IO (Either L.FailPoint hi) -> IO () -> (Either L.FailPoint hi -> IO (Either L.FailPoint ho)) -> (Either L.FailPoint ho -> IO ()) -> IO (TestContext ho)
 mkTestContextM parentIn afterParent setupNxt teardownNxt =
   do
     hi <- parentIn
     mkTestContext hi afterParent setupNxt teardownNxt
 
-composeTestContext :: forall hi ho. IO (TestContext hi) -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> IO (TestContext ho)
+composeTestContext :: forall hi ho. IO (TestContext hi) -> (Either L.FailPoint hi -> IO (Either L.FailPoint ho)) -> (Either L.FailPoint ho -> IO ()) -> IO (TestContext ho)
 composeTestContext parentContext setupNxt teardownNxt =
   do
     MkTestContext {hookIn, after} <- parentContext
     mkTestContext hookIn after setupNxt teardownNxt
 
-mkEachContext :: forall hi ho. IO (Either FailPoint hi) -> IO () -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> NodeIn ho
+mkEachContext :: forall hi ho. IO (Either L.FailPoint hi) -> IO () -> (Either L.FailPoint hi -> IO (Either L.FailPoint ho)) -> (Either L.FailPoint ho -> IO ()) -> NodeIn ho
 mkEachContext parentIn afterParent setupNxt teardownNxt =
   EachContext $ mkTestContextM parentIn afterParent setupNxt teardownNxt
 
-composeEachContext :: forall hi ho. IO (TestContext hi) -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> NodeIn ho
+composeEachContext :: forall hi ho. IO (TestContext hi) -> (Either L.FailPoint hi -> IO (Either L.FailPoint ho)) -> (Either L.FailPoint ho -> IO ()) -> NodeIn ho
 composeEachContext parentContext setupNxt teardownNxt =
   EachContext $ composeTestContext parentContext setupNxt teardownNxt
 
-mkThreadContext :: forall hi ho. IO (Either FailPoint hi) -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> NodeIn ho
+mkThreadContext :: forall hi ho. IO (Either L.FailPoint hi) -> (Either L.FailPoint hi -> IO (Either L.FailPoint ho)) -> NodeIn ho
 mkThreadContext parentIn setupNxt =
   ThreadContext $ parentIn >>= setupNxt
 
-{-
-newContext :: IO (TestContext hi) -> (Either FailPoint hi -> IO (Either FailPoint ho)) -> (Either FailPoint ho -> IO ()) -> IO (TestContext ho)
-newContext ioCtx setupNxt teardownNxt = do
-  MkTestContext{setup, teardown} <- ioCtx
-  ( \hi ->
-      MkTestContext
-        { setup = setupNxt hi
-        , teardown = \ho -> teardownNxt ho >> teardown hi
-        }
-    )
-    <$> setup
--}
-
-applyEach :: ((Either FailPoint hi -> IO ()) -> IO ()) -> IO () -> (Either FailPoint hi -> IO ()) -> IO ()
+applyEach :: ((Either L.FailPoint hi -> IO ()) -> IO ()) -> IO () -> (Either L.FailPoint hi -> IO ()) -> IO ()
 applyEach apply after test = apply test >> after
 
 statusCheck :: (s -> CanRun -> Bool) -> TVar s -> ChildQ a -> STM Bool

@@ -11,13 +11,10 @@ import Internal.ThreadEvent qualified as TE
 import Prepare qualified as P
 import PyrethrumExtras (catchAll, txt, uu, (?))
 import UnliftIO
-  ( concurrently_,
-    finally,
+  ( finally,
     forConcurrently_,
-    newIORef,
     writeTMVar,
   )
-import UnliftIO.Concurrent (myThreadId)
 import UnliftIO.STM
   ( TQueue,
     atomically,
@@ -38,6 +35,12 @@ todo :: define defect properties with sum type type and typeclass which returns 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
+-- executes prenodes directly without any tree shaking,
+--  filtering or validation used in testing
+executeWithoutValidation :: ThreadCount -> L.LogControls (L.EngineEvent L.ExePath AE.NodeEvent) (TE.ThreadEvent L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
+executeWithoutValidation tc lc pn =
+  L.runWithLogger lc (\l -> executeNodeList tc l pn)
+
 execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.EngineEvent L.ExePath AE.NodeEvent) (TE.ThreadEvent L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
 execute tc lc p@C.ExeParams {interpreter} =
   L.runWithLogger lc execute'
@@ -45,10 +48,11 @@ execute tc lc p@C.ExeParams {interpreter} =
     execute' :: L.LoggerSource (L.EngineEvent L.ExePath AE.NodeEvent) -> IO ()
     execute' lgr =
       do
+        sink $ FilterLog fRslts
         configError fRslts
           & maybe
             (executeNodeList tc lgr preparedNodes)
-            uu
+            sink . ConfigError
       where
         (fSuite, fRslts) = filterSuite p.filters p.runConfig p.suite
         preparedNodes = P.prepare $ P.SuitePrepParams fSuite interpreter p.runConfig

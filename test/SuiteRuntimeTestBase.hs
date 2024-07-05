@@ -15,7 +15,7 @@ import Data.Text qualified as T
 import FullSuiteTestTemplate (ManySpec (PassProb), Result (..), Spec (..), SpecGen (..), SuiteEventPath (..), isPreload)
 import FullSuiteTestTemplate qualified as T
 import Internal.Logging (ExePath (..), parentPath,  topPath, testLogControls )
-import Internal.SuiteRuntime (ThreadCount (..), executeNodeList)
+import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Internal.ThreadEvent as TE
   ( HookPos (..),
     Hz (..),
@@ -886,7 +886,7 @@ exeTemplate wantLog baseRandomSeed maxThreads templates = do
     pPrint $ P.listPaths <$> nodes
     putStrLn "========="
     putStrLn "#### Log ####"
-  executeNodeList maxThreads lc nodes
+  executeWithoutValidation maxThreads lc nodes
   atomically $ q2List logQ
 
 q2List :: TQueue a -> STM [a]

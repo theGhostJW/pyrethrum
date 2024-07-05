@@ -3,7 +3,7 @@ module CoreUtils where
 import UnliftIO.Concurrent qualified as C
 import BasePrelude (read)
 import Data.Aeson.TH (defaultOptions, deriveToJSON)
-import PyrethrumExtras (catchAll, txt, uu, (?))
+import PyrethrumExtras (txt)
 import Data.Text as T (lines)
 
 type ThreadId = Int

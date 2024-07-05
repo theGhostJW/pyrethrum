@@ -3,7 +3,6 @@
 module Internal.Logging where
 
 -- TODO: Explicit exports remove old code
-import BasePrelude qualified as P
 import CoreUtils qualified as C
 import DSL.Internal.NodeEvent qualified as AE
 import Data.Aeson.TH (defaultOptions, deriveToJSON)
@@ -11,11 +10,7 @@ import Data.Text as T (intercalate)
 import Effectful.Concurrent.STM (TQueue)
 import Internal.LoggingCore
 import Internal.ThreadEvent qualified as TE
-import PyrethrumExtras as PE (head, tail, txt, (?))
-import Text.Show.Pretty (pPrint)
-import UnliftIO (concurrently_, finally, newIORef)
-import UnliftIO.Concurrent (ThreadId)
-import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
+import PyrethrumExtras as PE (head, tail, (?))
 import Prelude hiding (atomically, lines)
 
 newtype ExePath = ExePath {un :: [AE.Path]} deriving (Show, Eq, Ord)

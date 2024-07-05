@@ -1,9 +1,7 @@
 module Internal.ThreadEvent where
 
-import BasePrelude (read)
-import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
+import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Filter (FilterResult)
-import UnliftIO.Concurrent qualified as C
 import CoreUtils
 
 
@@ -150,6 +148,7 @@ data ThreadEvent l a
       }
   | SuiteInitFailure
       { idx :: Int,
+        threadId :: ThreadId,
         reason :: Text
       }
   | StartExecution

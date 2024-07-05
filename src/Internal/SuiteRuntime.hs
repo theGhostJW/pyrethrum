@@ -37,15 +37,15 @@ newtype ThreadCount = ThreadCount {maxThreads :: Int}
 
 -- executes prenodes directly without any tree shaking,
 --  filtering or validation used in testing
-executeWithoutValidation :: ThreadCount -> L.LogControls (L.EngineEvent L.ExePath AE.NodeEvent) (TE.ThreadEvent L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
+executeWithoutValidation :: ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (TE.ThreadEvent L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
 executeWithoutValidation tc lc pn =
   L.runWithLogger lc (\l -> executeNodeList tc l pn)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.EngineEvent L.ExePath AE.NodeEvent) (TE.ThreadEvent L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
+execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (TE.ThreadEvent L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
 execute tc lc p@C.ExeParams {interpreter} =
   L.runWithLogger lc execute'
   where
-    execute' :: L.LoggerSource (L.EngineEvent L.ExePath AE.NodeEvent) -> IO ()
+    execute' :: L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> IO ()
     execute' l =
       do
         log $ L.FilterLog fRslts
@@ -58,7 +58,7 @@ execute tc lc p@C.ExeParams {interpreter} =
         (fSuite, fRslts) = filterSuite p.filters p.runConfig p.suite
         preparedNodes = P.prepare $ P.SuitePrepParams fSuite interpreter p.runConfig
 
-configError :: [FilterResult Text] -> Maybe (L.EngineEvent L.ExePath AE.NodeEvent)
+configError :: [FilterResult Text] -> Maybe (L.Event L.ExePath AE.NodeEvent)
 configError r = emptySuite <|> duplicate
   where
     duplicate = firstDuplicateFixtureTitle r <&> 
@@ -122,13 +122,13 @@ filterSuite fltrs rc suite =
       where
         fr = (.title) <$> applyFilters fltrs rc (C.getConfig fx)
 
-executeNodeList :: ThreadCount -> L.LoggerSource (L.EngineEvent L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
+executeNodeList :: ThreadCount -> L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
 executeNodeList tc lgr nodeList =
   do
     xtree <- mkXTree (L.ExePath []) nodeList
     executeNodes lgr xtree tc
 
-executeNodes :: L.LoggerSource (L.EngineEvent L.ExePath AE.NodeEvent) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
+executeNodes :: L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
 executeNodes L.MkLoggerSource {rootLogger, newLogger} nodes tc =
   do
     finally
@@ -422,7 +422,7 @@ data ExeIn oi ti tsti = ExeIn
     tstIn :: tsti
   }
 
-type Logger = L.EngineEvent L.ExePath AE.NodeEvent -> IO ()
+type Logger = L.Event L.ExePath AE.NodeEvent -> IO ()
 
 logAbandonned :: Logger -> L.ExePath -> NodeType -> L.FailPoint -> IO ()
 logAbandonned lgr p e a =

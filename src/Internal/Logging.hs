@@ -4,7 +4,7 @@ module Internal.Logging where
 
 -- TODO: Explicit exports remove old code
 import CoreUtils qualified as C
-import DSL.Internal.NodeEvent qualified as AE
+import DSL.Internal.NodeEvent qualified as NE
 import Data.Aeson.TH (defaultOptions, deriveToJSON)
 import Data.Text as T (intercalate)
 import Effectful.Concurrent.STM (TQueue)
@@ -14,9 +14,9 @@ import PyrethrumExtras as PE (head, tail, (?))
 import Prelude hiding (atomically, lines)
 import Filter ( FilterResult )
 
-newtype ExePath = ExePath {un :: [AE.Path]} deriving (Show, Eq, Ord)
+newtype ExePath = ExePath {un :: [NE.Path]} deriving (Show, Eq, Ord)
 
-topPath :: ExePath -> Maybe AE.Path
+topPath :: ExePath -> Maybe NE.Path
 topPath = PE.head . coerce
 
 {-
@@ -64,10 +64,10 @@ data FailPoint = FailPoint
   }
   deriving (Show)
 
-mkFailure :: l -> TE.NodeType -> SomeException -> EngineEvent l a
+mkFailure :: l -> TE.NodeType -> SomeException -> Event l a
 mkFailure loc nodeType exception = Failure {exception = C.exceptionTxt exception, ..}
 
-data EngineEvent l a
+data Event l a
   = 
     FilterLog
       { filterResuts :: [FilterResult Text]
@@ -103,13 +103,13 @@ data EngineEvent l a
   | EndExecution
   deriving (Show)
 
-testLogControls :: forall l a. (Show a, Show l)=> Bool -> IO (LogControls (EngineEvent l a) (TE.ThreadEvent l a), TQueue (TE.ThreadEvent l a))
+testLogControls :: forall l a. (Show a, Show l)=> Bool -> IO (LogControls (Event l a) (TE.ThreadEvent l a), TQueue (TE.ThreadEvent l a))
 testLogControls = testLogControls' expandEvent
 
 -- -- NodeEvent (a) a loggable event generated from within a node
 -- -- EngineEvent a - marks start, end and failures in test fixtures (hooks, tests) and errors
 -- -- ThreadEvent a - adds thread id and index to EngineEvent
-expandEvent :: C.ThreadId -> Int -> EngineEvent l a -> TE.ThreadEvent l a
+expandEvent :: C.ThreadId -> Int -> Event l a -> TE.ThreadEvent l a
 expandEvent threadId idx = \case
   StartExecution -> TE.StartExecution {threadId, idx}
   FilterLog {..} -> TE.FilterLog {threadId, idx, ..}
@@ -122,4 +122,4 @@ expandEvent threadId idx = \case
   EndExecution -> TE.EndExecution {threadId, idx}
 
 $(deriveToJSON defaultOptions ''ExePath)
-$(deriveToJSON defaultOptions ''EngineEvent)
+$(deriveToJSON defaultOptions ''Event)

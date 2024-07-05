@@ -140,6 +140,12 @@ getHookInfo t =
     Hook hz pos -> Just (hz, pos)
     Test {} -> Nothing
 
+data LogContext = MkLogContext
+  { threadId :: ThreadId,
+    idx :: Int
+  }
+  deriving (Show)
+
 data ThreadEvent l a
   = FilterLog
       { idx :: Int,

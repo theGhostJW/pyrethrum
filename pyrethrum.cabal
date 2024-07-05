@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5c167d0a779c4a26173e81bbddd44094b65f7222cc683bd24cf1e97a220ee901
+-- hash: af4d1130f5796c267b1390e1379eebbec20153ebf5a6785e123efbb7b78befa3
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -90,10 +90,10 @@ library
       DSL.Internal.NodeEvent
       DSL.Out
       Filter
+      Internal.Log
       Internal.Logging
       Internal.LoggingCore
       Internal.SuiteRuntime
-      Internal.ThreadEvent
       OrphanedInstances
       Prepare
       ArbitraryIOTest

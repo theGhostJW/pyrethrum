@@ -6,8 +6,8 @@ import Data.Set qualified as S
 import Filter
 import Internal.Logging qualified as L
 import Internal.LoggingCore qualified as L
-import Internal.ThreadEvent hiding (Test)
-import Internal.ThreadEvent qualified as TE
+import Internal.Log hiding (Test)
+import Internal.Log qualified as TE
 import Prepare qualified as P
 import PyrethrumExtras (catchAll, txt, (?))
 import UnliftIO
@@ -37,11 +37,11 @@ newtype ThreadCount = ThreadCount {maxThreads :: Int}
 
 -- executes prenodes directly without any tree shaking,
 --  filtering or validation used in testing
-executeWithoutValidation :: ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (TE.ThreadEvent L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
+executeWithoutValidation :: ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (TE.Log L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
 executeWithoutValidation tc lc pn =
   L.runWithLogger lc (\l -> executeNodeList tc l pn)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (TE.ThreadEvent L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
+execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (TE.Log L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
 execute tc lc p@C.ExeParams {interpreter} =
   L.runWithLogger lc execute'
   where

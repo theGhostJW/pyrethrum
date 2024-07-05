@@ -10,7 +10,7 @@ import BasePrelude (unsafePerformIO)
 import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.SuiteRuntime (ThreadCount (..))
-import Internal.ThreadEvent (Hz (..))
+import Internal.Log (Hz (..))
 import PyrethrumExtras as PE
 import SuiteRuntimeTestBase
 import System.Random.Stateful qualified as RS

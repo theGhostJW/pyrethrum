@@ -16,11 +16,11 @@ import FullSuiteTestTemplate (ManySpec (PassProb), Result (..), Spec (..), SpecG
 import FullSuiteTestTemplate qualified as T
 import Internal.Logging (ExePath (..), parentPath,  topPath, testLogControls )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
-import Internal.ThreadEvent as TE
+import Internal.Log as TE
   ( HookPos (..),
     Hz (..),
     NodeType (..),
-    ThreadEvent (..),
+    Log (..),
     getHookInfo,
     getSuiteEvent,
     hasSuiteEvent,
@@ -119,7 +119,7 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
   -}
 
-type LogItem = ThreadEvent ExePath AE.NodeEvent
+type LogItem = Log ExePath AE.NodeEvent
 
 logItemtoBool :: (NodeType -> Bool) -> LogItem -> Bool
 logItemtoBool = threadEventToBool
@@ -737,7 +737,7 @@ threadedLogs onceHookInclude l =
 shouldOccurOnce :: LogItem -> Bool
 shouldOccurOnce = hasSuiteEvent onceSuiteEvent
 
-chkStartEndExecution :: [ThreadEvent ExePath AE.NodeEvent] -> IO ()
+chkStartEndExecution :: [Log ExePath AE.NodeEvent] -> IO ()
 chkStartEndExecution evts =
   (,)
     <$> PE.head evts
@@ -842,7 +842,7 @@ test = Spec 0
 
 data ExeResult = ExeResult
   { expandedTemplate :: [T.Template],
-    log :: [ThreadEvent ExePath AE.NodeEvent]
+    log :: [Log ExePath AE.NodeEvent]
   }
 
 runTest :: Int -> ThreadCount -> [Template] -> IO ()
@@ -872,7 +872,7 @@ execute wantLog baseRandomSeed threadLimit templates = do
   lg <- exeTemplate wantLog baseRandomSeed threadLimit fullTs
   pure $ ExeResult fullTs lg
 
-exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [ThreadEvent ExePath AE.NodeEvent]
+exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [Log ExePath AE.NodeEvent]
 exeTemplate wantLog baseRandomSeed maxThreads templates = do
   let wantLog' = wantLog == Log
   (lc, logQ) <- testLogControls wantLog'

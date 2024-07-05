@@ -2,8 +2,8 @@ module FullSuiteTestTemplate where
 
 import DSL.Internal.NodeEvent (Path (..))
 import Data.Map.Strict qualified as Map
-import Internal.ThreadEvent (HookPos (..), Hz (..), NodeType (Hook))
-import Internal.ThreadEvent qualified as TE
+import Internal.Log (HookPos (..), Hz (..), NodeType (Hook))
+import Internal.Log qualified as TE
 import Prelude hiding (All, id)
 data Spec = Spec {delay :: Int, result :: Result}
   deriving (Read, Show, Eq)

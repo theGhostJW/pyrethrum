@@ -1,10 +1,8 @@
-module Internal.ThreadEvent where
+module Internal.Log where
 
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Filter (FilterResult)
 import CoreUtils
-
-
 
 data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
 
@@ -31,15 +29,15 @@ evtTypeToFrequency = \case
   -- an individual test is always run once
   Test -> Once
 
-isSuiteEventFailureWith :: (NodeType -> Bool) -> ThreadEvent l a -> Bool
+isSuiteEventFailureWith :: (NodeType -> Bool) -> Log l a -> Bool
 isSuiteEventFailureWith evntPredicate = \case
   ParentFailure {nodeType = s} -> evntPredicate s
   _ -> False
 
-isOnceHookParentFailure :: ThreadEvent l a -> Bool
+isOnceHookParentFailure :: Log l a -> Bool
 isOnceHookParentFailure = isSuiteEventFailureWith onceHook
 
-isHookParentFailure :: ThreadEvent l a -> Bool
+isHookParentFailure :: Log l a -> Bool
 isHookParentFailure = isSuiteEventFailureWith isHook
 
 isTest :: NodeType -> Bool
@@ -47,15 +45,15 @@ isTest = \case
   Test {} -> True
   _ -> False
 
-isTestParentFailure :: ThreadEvent l a -> Bool
+isTestParentFailure :: Log l a -> Bool
 isTestParentFailure = \case
   ParentFailure {nodeType = s} -> isTest s
   _ -> False
 
-isTestLogItem :: ThreadEvent l a -> Bool
+isTestLogItem :: Log l a -> Bool
 isTestLogItem li = (isTest <$> getSuiteEvent li) == Just True
 
-isTestEventOrTestParentFailure :: ThreadEvent l a -> Bool
+isTestEventOrTestParentFailure :: Log l a -> Bool
 isTestEventOrTestParentFailure te = isTestParentFailure te || isTestLogItem te
 
 isHook :: NodeType -> Bool
@@ -77,7 +75,7 @@ threadHook = hookWithHz Thread
 onceSuiteEvent :: NodeType -> Bool
 onceSuiteEvent = (== Once) . evtTypeToFrequency
 
-isChildless :: ThreadEvent l a -> Bool
+isChildless :: Log l a -> Bool
 isChildless =
   threadEventToBool
     ( \case
@@ -88,10 +86,10 @@ isChildless =
 suitEvntToBool :: (NodeType -> Bool) -> Maybe NodeType -> Bool
 suitEvntToBool = maybe False
 
-threadEventToBool :: (NodeType -> Bool) -> ThreadEvent l a -> Bool
+threadEventToBool :: (NodeType -> Bool) -> Log l a -> Bool
 threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
 
-hasSuiteEvent :: (NodeType -> Bool) -> ThreadEvent l a -> Bool
+hasSuiteEvent :: (NodeType -> Bool) -> Log l a -> Bool
 hasSuiteEvent p l = case l of
   StartExecution {} -> False
   Failure {} -> False
@@ -100,17 +98,17 @@ hasSuiteEvent p l = case l of
   EndExecution {} -> False
   _ -> p l.nodeType
 
-isStart :: ThreadEvent a b -> Bool
+isStart :: Log a b -> Bool
 isStart = \case
   Start {} -> True
   _ -> False
 
-isEnd :: ThreadEvent a b -> Bool
+isEnd :: Log a b -> Bool
 isEnd = \case
   End {} -> True
   _ -> False
 
-suiteEventOrParentFailureSuiteEvent :: ThreadEvent a b -> Maybe NodeType
+suiteEventOrParentFailureSuiteEvent :: Log a b -> Maybe NodeType
 suiteEventOrParentFailureSuiteEvent = \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
@@ -122,7 +120,7 @@ suiteEventOrParentFailureSuiteEvent = \case
   NodeEvent {} -> Nothing
   EndExecution {} -> Nothing
 
-getSuiteEvent :: ThreadEvent a b -> Maybe NodeType
+getSuiteEvent :: Log a b -> Maybe NodeType
 getSuiteEvent = \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
@@ -134,7 +132,7 @@ getSuiteEvent = \case
   NodeEvent {} -> Nothing
   EndExecution {} -> Nothing
 
-getHookInfo :: ThreadEvent a b -> Maybe (Hz, HookPos)
+getHookInfo :: Log a b -> Maybe (Hz, HookPos)
 getHookInfo t =
   getSuiteEvent t >>= \case
     Hook hz pos -> Just (hz, pos)
@@ -146,7 +144,7 @@ data LogContext = MkLogContext
   }
   deriving (Show)
 
-data ThreadEvent l a
+data Log l a
   = FilterLog
       { idx :: Int,
         threadId :: ThreadId,
@@ -200,7 +198,7 @@ data ThreadEvent l a
       }
   deriving (Show)
 
-startOrParentFailure :: ThreadEvent l a -> Bool
+startOrParentFailure :: Log l a -> Bool
 startOrParentFailure te = case te of
   FilterLog {} -> False
   SuiteInitFailure {} -> False
@@ -214,7 +212,7 @@ startOrParentFailure te = case te of
   Start {} -> True
   End {} -> False
 
-startSuiteEventLoc :: ThreadEvent l a -> Maybe l
+startSuiteEventLoc :: Log l a -> Maybe l
 startSuiteEventLoc te = case te of
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing

@@ -5,6 +5,7 @@ import DSL.Internal.NodeEvent qualified as AE
 import Data.Set qualified as S
 import Filter
 import CoreUtils (Hz(..))
+import Internal.Logging (HookPos(..), NodeType(..))
 import Internal.Logging qualified as L
 import Internal.LoggingCore qualified as L
 import Prepare qualified as P
@@ -36,11 +37,11 @@ newtype ThreadCount = ThreadCount {maxThreads :: Int}
 
 -- executes prenodes directly without any tree shaking,
 --  filtering or validation used in testing
-executeWithoutValidation :: ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (TE.Log L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
+executeWithoutValidation :: ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
 executeWithoutValidation tc lc pn =
   L.runWithLogger lc (\l -> executeNodeList tc l pn)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (TE.Log L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
+execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
 execute tc lc p@C.ExeParams {interpreter} =
   L.runWithLogger lc execute'
   where
@@ -264,7 +265,7 @@ mkXTree xpth preNodes =
             do
               childTree <- mkXTree path subNodes
               frequency & \case
-                TE.Once -> do
+                Once -> do
                   status <- newTVarIO SetupPending
                   cache <- newEmptyTMVarIO
                   pure $
@@ -276,9 +277,9 @@ mkXTree xpth preNodes =
                         subNodes = childTree,
                         teardown
                       }
-                TE.Thread ->
+                Thread ->
                   pure $ ThreadAround path setup childTree teardown
-                TE.Each ->
+                Each ->
                   pure $ EachAround path setup childTree teardown
         --
         P.Fixture
@@ -699,8 +700,8 @@ runNode lgr hi xt =
         let path = mkTestPath t
         hi'
           & either
-            (logAbandonned lgr path TE.Test)
-            (void . logRun lgr path TE.Test . t.action sink)
+            (logAbandonned lgr path L.Test)
+            (void . logRun lgr path L.Test . t.action sink)
         after
         pure $ QElementRun True
 
@@ -769,10 +770,10 @@ runNode lgr hi xt =
         (logRun' evnt . flip setup)
 
     runThreadTeardown :: forall i. TMVar (Either L.FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
-    runThreadTeardown = runPostThread TE.Teardown
+    runThreadTeardown = runPostThread L.Teardown
 
     runThreadAfter :: TMVar (Either L.FailPoint ()) -> (P.ApEventSink -> IO ()) -> IO ()
-    runThreadAfter tCache after = runPostThread TE.After tCache (\s _i -> after s)
+    runThreadAfter tCache after = runPostThread L.After tCache (\s _i -> after s)
 
     runPostThread :: forall i. HookPos -> TMVar (Either L.FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
     runPostThread hp tCache teardown = do

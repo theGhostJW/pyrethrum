@@ -6,24 +6,18 @@ module SuiteRuntimeTestBase where
 import Chronos (Time, now)
 import Core (DataSource (ItemList))
 import Core qualified
+import CoreUtils (Hz (..), ThreadId)
 import DSL.Internal.NodeEvent qualified as AE
 import Data.Aeson (ToJSON)
 import Data.Hashable qualified as H
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (ManySpec (PassProb), Result (..), Spec (..), SpecGen (..), SuiteEventPath (..), isPreload)
+import FullSuiteTestTemplate (EventPath (..), ManySpec (PassProb), Result (..), Spec (..), SpecGen (..), isPreload)
 import FullSuiteTestTemplate qualified as T
-import Internal.Logging (ExePath (..), parentPath,  topPath, testLogControls )
-import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
-import Internal.Log as TE
-  ( HookPos (..),
-    Hz (..),
-    NodeType (..),
-    Log (..),
-    getHookInfo,
+import Internal.LogQueries
+  ( getHookInfo,
     getSuiteEvent,
-    startEndNodeMatch,
     isChildless,
     isEnd,
     isHook,
@@ -33,6 +27,7 @@ import Internal.Log as TE
     isTestEventOrTestParentFailure,
     onceHook,
     onceSuiteEvent,
+    startEndNodeMatch,
     startOrParentFailure,
     startSuiteEventLoc,
     suitEvntToBool,
@@ -40,6 +35,19 @@ import Internal.Log as TE
     threadEventToBool,
     threadHook,
   )
+import Internal.Logging as L
+  ( Event (..),
+    ExePath (..),
+    HookPos (..),
+    Log (..),
+    NodeType (..),
+    parentPath,
+    testLogControls,
+    topPath,
+    evnt, LogContext (..)
+  )
+import Internal.LoggingCore (BaseLog (..))
+import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
 import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
 import PyrethrumExtras qualified as PE
@@ -52,7 +60,6 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
-import CoreUtils (ThreadId)
 
 defaultSeed :: Int
 defaultSeed = 13579
@@ -120,6 +127,9 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
   -}
 
 type LogItem = Log ExePath AE.NodeEvent
+
+getThreadId :: LogItem -> ThreadId
+getThreadId (MkLog (MkLogContext {threadId}) _) = threadId
 
 logItemtoBool :: (NodeType -> Bool) -> LogItem -> Bool
 logItemtoBool = threadEventToBool
@@ -202,13 +212,13 @@ data ResultInfo = ResultInfo
   deriving (Ord, Eq, Show)
 
 -- a result accumulator function to be used across a logs grouped by thread
-actualResults :: [LogItem] -> Map SuiteEventPath [LogResult]
+actualResults :: [LogItem] -> Map EventPath [LogResult]
 actualResults = snd . foldl' logAccum (Nothing, M.empty)
 
 -- a result accumulator function to be used across a logs grouped by thread
-logAccum :: (Maybe (ExePath, NodeType), Map SuiteEventPath [LogResult]) -> LogItem -> (Maybe (ExePath, NodeType), Map SuiteEventPath [LogResult])
-logAccum acc@(passStart, rMap) =
-  \case
+logAccum :: (Maybe (ExePath, NodeType), Map EventPath [LogResult]) -> LogItem -> (Maybe (ExePath, NodeType), Map EventPath [LogResult])
+logAccum acc@(passStart, rMap) (MkLog {event}) =
+  event & \case
     End {loc, nodeType} ->
       passStart
         & maybe
@@ -232,8 +242,8 @@ logAccum acc@(passStart, rMap) =
     NodeEvent {} -> acc
     EndExecution {} -> acc
   where
-    insert' :: ExePath -> NodeType -> LogResult -> Map SuiteEventPath [LogResult]
-    insert' l se r = M.insertWith (<>) (SuiteEventPath (topPath' l) se) [r] rMap
+    insert' :: ExePath -> NodeType -> LogResult -> Map EventPath [LogResult]
+    insert' l se r = M.insertWith (<>) (MkEventPath (topPath' l) se) [r] rMap
     topPath' p =
       fromMaybe (bug $ "Empty event path ~ bad template setup " <> txt p) $ topPath p
 
@@ -287,7 +297,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
     chkResults :: IO ()
     chkResults = traverse_ chkResult $ M.toList expectedResults
       where
-        chkResult :: (SuiteEventPath, ExpectedResult) -> IO ()
+        chkResult :: (EventPath, ExpectedResult) -> IO ()
         chkResult (k, expected) =
           M.lookup k actuals
             & maybe
@@ -300,14 +310,14 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                         all (\r -> r == Actual e || r == ParentFailed) actual
                     NonDeterministic -> pure ()
                     Multi expLst -> case k.nodeType of
-                      TE.Test {} -> bug "Test not expected to have Multi result"
-                      TE.Hook TE.Once _ -> bug "Once not expected to have Multi result"
-                      TE.Hook TE.Thread _ -> do
+                      Test {} -> bug "Test not expected to have Multi result"
+                      Hook Once _ -> bug "Once not expected to have Multi result"
+                      Hook Thread _ -> do
                         chk'
                           ("actual thread events: " <> txt actualCount <> " more than max threads: " <> txt threadLimit.maxThreads)
                           $ actualCount <= threadLimit.maxThreads
                         countChks $ take actualCount expLst
-                      TE.Hook TE.Each _ -> countChks expLst
+                      Hook Each _ -> countChks expLst
                       where
                         failMsg law = "Property failed for:\n  " <> txt k <> "\n  " <> law
                         -- COUNT EXPECTED IS WRONG
@@ -337,14 +347,14 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                             (expectedFailCount >= actualFails)
               )
 
-    expectedResults :: Map SuiteEventPath ExpectedResult
+    expectedResults :: Map EventPath ExpectedResult
     expectedResults = foldl' calcExpected M.empty $ ts >>= T.eventPaths
 
-    calcExpected :: Map SuiteEventPath ExpectedResult -> T.EventPath -> Map SuiteEventPath ExpectedResult
-    calcExpected acc T.EventPath {path, nodeType, evntSpec, template} =
+    calcExpected :: Map EventPath ExpectedResult -> T.TemplatePath -> Map EventPath ExpectedResult
+    calcExpected acc T.MkTemplatePath {path, nodeType, evntSpec, template} =
       M.insert (ensureUnique key) expected acc
       where
-        key = SuiteEventPath path nodeType
+        key = MkEventPath path nodeType
         ensureUnique k =
           M.member k acc
             ? bug ("duplicate key should not happen. Template paths should be unique: " <> txt k)
@@ -360,11 +370,11 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                 T.Runtime -> NonDeterministic
               where
                 rLength = case nodeType of
-                  TE.Test {} -> bug "Test not expected to have PassProb spec"
-                  TE.Hook TE.Once _ -> bug "Once  not expected to have PassProb spec"
-                  TE.Hook TE.Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
-                  TE.Hook TE.Each _ -> T.countTests template -- expect a result for each test item
-    actuals :: Map SuiteEventPath [LogResult]
+                  Test {} -> bug "Test not expected to have PassProb spec"
+                  Hook Once _ -> bug "Once  not expected to have PassProb spec"
+                  Hook Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
+                  Hook Each _ -> T.countTests template -- expect a result for each test item
+    actuals :: Map EventPath [LogResult]
     actuals =
       foldl' (M.unionWith (<>)) M.empty allResults
       where
@@ -385,18 +395,20 @@ isFailChildEventOf :: LogItem -> LogItem -> Bool
 isFailChildEventOf c p =
   (cIsSubpathOfp || samePath && pIsSetupFailure && cIsTeardown) && (sameThread || pIsOnceHook)
   where
-    sameThread = p.threadId == c.threadId
+    sameThread = p.logContext.threadId == c.logContext.threadId
     hasHookPos hp = \case
       Hook _ hp' -> hp == hp'
       _ -> False
     cIsTeardown = logItemtoBool (hasHookPos Teardown) c
-    pFailEvent = case p of
+    pFailEvent = case p.event of
       Failure {nodeType} -> Just nodeType
       _ -> Nothing
     pIsSetupFailure = suitEvntToBool (hasHookPos Setup) pFailEvent
 
-    samePath = p.loc == c.loc
-    cIsSubpathOfp = isParentPath p.loc c.loc
+    ploc = p.event.loc 
+    cloc = c.event.loc
+    samePath = ploc == cloc
+    cIsSubpathOfp = isParentPath ploc cloc
     pIsOnceHook = suitEvntToBool (\case Hook hz _ -> hz == Once; _ -> False) pFailEvent
 
 chkParentFailsPropagated :: FailInfo -> IO ()
@@ -417,7 +429,7 @@ chkParentFailsPropagated
          in acc
               == DoneChecking
                 ? pure DoneChecking
-              $ lgItm
+              $ lgItm.event
                 & \case
                   p@ParentFailure {} ->
                     do
@@ -468,24 +480,26 @@ chkLeafFailsAreNotPropagated
     } = when (isChildless failLog) $ do
     whenJust
       (PE.head failStartTail)
-      -- TODO: chkFail does not work here it escapes new lines - fix and check all chk functions format properly
-      \case
-        c@ParentFailure {failSuiteEvent} ->
-          -- this is wrong can pick up failed elements from another branch
-          unless (onceSuiteEvent failSuiteEvent) $ do
-            {-
-            if a leaf item such as an after hook or test fails then the next item
-            should not be a parent failure because leaf items can't be parents.
-            This does not apply if the parent failure was caused by a once event
-            because such failures can be generated when the thread picks up nodes from
-            a different branch
-            -}
-            fail $
-              "Leaf failure propagated to next event.\nLeaf event was:\n"
-                <> ppShow failLog
-                <> "\nNext event was:\n"
-                <> ppShow c
-        _ -> pure ()
+      -- TODO: ()may be fixed) chkFail does not work here it escapes new lines - fix and check all chk functions format properly
+      ( \l ->
+          l.event & \case
+            c@ParentFailure {failSuiteEvent} ->
+              -- this is wrong can pick up failed elements from another branch
+              unless (onceSuiteEvent failSuiteEvent) $ do
+                {-
+                if a leaf item such as an after hook or test fails then the next item
+                should not be a parent failure because leaf items can't be parents.
+                This does not apply if the parent failure was caused by a once event
+                because such failures can be generated when the thread picks up nodes from
+                a different branch
+                -}
+                fail $
+                  "Leaf failure propagated to next event.\nLeaf event was:\n"
+                    <> ppShow failLog
+                    <> "\nNext event was:\n"
+                    <> ppShow c
+            _ -> pure ()
+      )
 
 -- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
 -- captures
@@ -494,7 +508,7 @@ chkLeafFailsAreNotPropagated
 -- property that includes assertions
 
 failInfo :: [LogItem] -> (Maybe NodeType, [FailInfo])
-failInfo li =
+failInfo ls =
   foldl' step (Nothing, []) $ tails failStarts
   where
     step :: (Maybe NodeType, [FailInfo]) -> [LogItem] -> (Maybe NodeType, [FailInfo])
@@ -502,16 +516,16 @@ failInfo li =
       \case
         [] -> (lastStartEvnt, result)
         (l : ls) ->
-          l & \case
+          l.event & \case
             FilterLog {} -> passThrough
             SuiteInitFailure {} -> passThrough
             Start {nodeType = se} ->
               (Just se, result)
-            f@Failure {} ->
+            Failure {} ->
               lastStartEvnt
                 & maybe
-                  (error $ "Failure encountered before start:\n" <> toS (ppShow f))
-                  (const (Nothing, FailInfo f ls : result))
+                  (error $ "Failure encountered before start:\n" <> toS (ppShow l))
+                  (const (Nothing, FailInfo l ls : result))
             ParentFailure {} -> passThrough
             StartExecution {} -> passThrough
             EndExecution {} -> passThrough
@@ -521,13 +535,13 @@ failInfo li =
         passThrough = (lastStartEvnt, result)
     failStarts =
       filter
-        ( \case
+        (\li -> li.event & \case
             Failure {} -> True
             ParentFailure {} -> True
             Start {} -> True
             _ -> False
         )
-        li
+        ls
 
 -- TODO: do empty thread test case should not run anything (ie no thread events - cna happpen despite tree
 -- shaking due to multiple threads)
@@ -553,11 +567,11 @@ chkFailureLocEqualsLastStartLoc =
 
     chkParentFailureLoc :: Maybe ExePath -> LogItem -> IO ()
     chkParentFailureLoc mParentLoc li =
-      case li of
+      case li.event of
         ParentFailure {loc} -> chkEq' ("Parent failure loc for " <> toS (ppShow li)) mParentLoc (Just loc)
         _ -> pure ()
 
-chkAfterTeardownParents :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
+chkAfterTeardownParents :: Map T.EventPath T.EventPath -> [LogItem] -> IO ()
 chkAfterTeardownParents =
   chkForMatchedParents
     "After / Teardown parent event"
@@ -568,35 +582,35 @@ chkAfterTeardownParents =
 
 -- isAfterSuiteEvent -- I think this logic is wrong shoud be checking every event
 
-chkPrecedingSuiteEventAsExpected :: Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
+chkPrecedingSuiteEventAsExpected :: Map T.EventPath T.EventPath -> [LogItem] -> IO ()
 chkPrecedingSuiteEventAsExpected =
   chkForMatchedParents
     "preceding parent event"
     True -- reverse list so we are searching back through preceding events
     isBeforeSuiteEvent
 
-chkForMatchedParents :: Text -> Bool -> (LogItem -> Bool) -> Map T.SuiteEventPath T.SuiteEventPath -> [LogItem] -> IO ()
+chkForMatchedParents :: Text -> Bool -> (LogItem -> Bool) -> Map T.EventPath T.EventPath -> [LogItem] -> IO ()
 chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildParentMap thrdLog =
   traverse_ chkParent actualParents
   where
-    chkParent :: (T.SuiteEventPath, Maybe T.SuiteEventPath) -> IO ()
+    chkParent :: (T.EventPath, Maybe T.EventPath) -> IO ()
     chkParent (childPath, actualParentPath) =
       chkEq' (message <> " for:\n" <> txt childPath) expectedParentPath actualParentPath
       where
         expectedParentPath = M.lookup childPath expectedChildParentMap
 
-    actualParents :: [(T.SuiteEventPath, Maybe T.SuiteEventPath)]
+    actualParents :: [(T.EventPath, Maybe T.EventPath)]
     actualParents = mapMaybe extractHeadParent thrdLogTails
 
     thrdLogTails :: [[LogItem]]
     thrdLogTails = logTails wantReverseLog thrdLog
 
-    extractHeadParent :: [LogItem] -> Maybe (T.SuiteEventPath, Maybe T.SuiteEventPath)
+    extractHeadParent :: [LogItem] -> Maybe (T.EventPath, Maybe T.EventPath)
     extractHeadParent evntLog =
       (,actulaParentPath) <$> targetPath
       where
-        logSuiteEventPath :: LogItem -> Maybe T.SuiteEventPath
-        logSuiteEventPath l = T.SuiteEventPath <$> (startSuiteEventLoc l >>= topPath) <*> getSuiteEvent l
+        logSuiteEventPath :: LogItem -> Maybe T.EventPath
+        logSuiteEventPath l = MkEventPath <$> (startSuiteEventLoc l >>= topPath) <*> getSuiteEvent l
         targEvnt = PE.head evntLog
         targetPath = targEvnt >>= logSuiteEventPath
         actulaParentPath = do
@@ -658,7 +672,7 @@ chkStartSuiteEventImmediatlyFollowedByEnd p l = do
       "Thread suite elements - start not followed by end:\n" <> toS (ppShow startNotFollwedByEnd)
   where
     trgEvnts = filter p l
-    startNotFollwedByEnd = filter (\(s, e) -> isStart s && (not (isEnd e) || s.loc /= e.loc)) . zip trgEvnts $ drop 1 trgEvnts
+    startNotFollwedByEnd = filter (\(s, e) -> isStart s && (not (isEnd e) || s.event.loc /= e.event.loc)) . zip trgEvnts $ drop 1 trgEvnts
 
 threadLogChks :: Bool -> [LogItem] -> [[LogItem] -> IO ()] -> IO ()
 threadLogChks includeOnce fullLog = traverse_ chkTls
@@ -683,7 +697,7 @@ chkStartsOnce errSfx p l = do
   where
     trgEvnts = filter p l
     starts = filter isStart trgEvnts
-    dupLocs = filter ((> 1) . length) . fmap (PE.head . fmap (.loc)) . groupOn' (.loc) $ starts
+    dupLocs = filter ((> 1) . length) . fmap (PE.head . fmap (.event.loc)) . groupOn' (.event.loc) $ starts
 
 chkAllTemplateItemsLogged :: [T.Template] -> [LogItem] -> IO ()
 chkAllTemplateItemsLogged ts lgs =
@@ -696,18 +710,18 @@ chkAllTemplateItemsLogged ts lgs =
     missing = S.difference tmplatePaths logStartPaths
 
     -- init to empty set
-    tmplatePaths :: Set SuiteEventPath
-    tmplatePaths = fromList $ (\ep -> SuiteEventPath ep.path ep.nodeType) <$> (ts >>= T.eventPaths)
+    tmplatePaths :: Set EventPath
+    tmplatePaths = fromList $ (\ep -> MkEventPath ep.path ep.nodeType) <$> (ts >>= T.eventPaths)
 
-    logStartPaths :: Set SuiteEventPath
+    logStartPaths :: Set EventPath
     logStartPaths =
       fromList $
         Prelude.mapMaybe
           ( \lg ->
               do
-                case lg of
-                  ParentFailure {loc, nodeType} -> flip SuiteEventPath nodeType <$> topPath loc
-                  Start {loc, nodeType} -> flip SuiteEventPath nodeType <$> topPath loc
+                case lg.event of
+                  ParentFailure {loc, nodeType} -> flip MkEventPath nodeType <$> topPath loc
+                  Start {loc, nodeType} -> flip MkEventPath nodeType <$> topPath loc
                   _ -> Nothing
           )
           lgs
@@ -725,10 +739,10 @@ nxtHookLog = find (\l -> startEndNodeMatch isHook l || isHookParentFailure l)
 
 threadVisible :: Bool -> ThreadId -> [LogItem] -> [LogItem]
 threadVisible onceHookInclude tid =
-  filter (\l -> tid == l.threadId || onceHookInclude && (startEndNodeMatch onceHook l || isOnceHookParentFailure l))
+  filter (\l -> tid == l.logContext.threadId || onceHookInclude && (startEndNodeMatch onceHook l || isOnceHookParentFailure l))
 
 threadIds :: [LogItem] -> [ThreadId]
-threadIds = PE.nub . fmap (.threadId)
+threadIds = PE.nub . fmap (.logContext.threadId)
 
 threadedLogs :: Bool -> [LogItem] -> [[LogItem]]
 threadedLogs onceHookInclude l =
@@ -745,10 +759,10 @@ chkStartEndExecution evts =
       & maybe
         (fail "no events")
         ( \(s, e) -> do
-            s & \case
+            s.event & \case
               StartExecution {} -> pure ()
               _ -> fail $ "first event is not StartExecution:\n " <> toS (ppShow s)
-            e & \case
+            e.event & \case
               EndExecution {} -> pure ()
               _ -> fail $ "last event is not EndExecution:\n " <> toS (ppShow e)
         )
@@ -767,26 +781,26 @@ groupOn' f =
           (\as -> M.insert (f a) (a : as) m)
 
 chkThreadLogsInOrder :: [LogItem] -> IO ()
-chkThreadLogsInOrder evts =
+chkThreadLogsInOrder ls =
   do
     chk' "Nothing found in heads - groupOn error this should not happen" (all isJust heads)
-    traverse_ (chkEq' "first index of thread should be 0" 0 . (.idx)) $ catMaybes heads
+    traverse_ (chkEq' "first index of thread should be 0" 0 . (.logContext.idx)) $ catMaybes heads
     traverse_ chkIds threads
   where
-    threads = groupOn' (.threadId) evts
+    threads = groupOn' getThreadId ls
     -- TODO: need to draw a line in the sand re maybe vs nonemptyList
     heads = PE.head <$> threads
-    chkIds evts' =
+    chkIds ls' =
       for_
-        (zip evts' $ drop 1 evts')
-        ( \(ev1, ev2) ->
-            let idx1 = ev1.idx
-                idx2 = ev2.idx
+        (zip ls' $ drop 1 ls')
+        ( \(l1, l2) ->
+            let idx1 = l1.logContext.idx
+                idx2 = l2.logContext.idx
              in chkEqfmt' (succ idx1) idx2 $
                   "event idx not consecutive\n"
-                    <> toS (ppShow ev1)
+                    <> toS (ppShow l1)
                     <> "\n"
-                    <> toS (ppShow ev2)
+                    <> toS (ppShow l2)
         )
 
 -- -- TODO - better formatting chkEq pyrelude
@@ -980,7 +994,7 @@ eventMatchesHookPos hookPoses lg =
       ( \case
           -- TODO: sort out imports see PE.elem
           Hook _frq pos -> pos `PR.elem` hookPoses
-          TE.Test -> False
+          Test -> False
       )
 
 isBeforeSuiteEvent :: LogItem -> Bool

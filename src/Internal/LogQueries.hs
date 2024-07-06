@@ -1,8 +1,6 @@
 module Internal.LogQueries where
 
 import CoreUtils
-import Data.Aeson.TH (defaultOptions, deriveJSON)
-import Filter (FilterResult)
 import Internal.Logging
 
 isSetup :: NodeType -> Bool

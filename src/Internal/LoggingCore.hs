@@ -10,6 +10,13 @@ import UnliftIO.Concurrent (ThreadId)
 import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
 import Prelude hiding (atomically, lines)
 
+
+data BaseLog lc evt = MkLog
+  { logContext :: lc,
+    event :: evt
+  }
+  deriving (Show)
+
 data LoggerSource l = MkLoggerSource
   { rootLogger :: l -> IO (),
     newLogger :: IO (l -> IO ())

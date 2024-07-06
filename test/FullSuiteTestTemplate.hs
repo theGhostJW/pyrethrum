@@ -2,8 +2,9 @@ module FullSuiteTestTemplate where
 
 import DSL.Internal.NodeEvent (Path (..))
 import Data.Map.Strict qualified as Map
-import Internal.Log (HookPos (..), Hz (..), NodeType (Hook))
-import Internal.Log qualified as TE
+import CoreUtils (Hz (..))
+import Internal.Logging (HookPos (..), NodeType (Hook))
+import Internal.Logging qualified as L
 import Prelude hiding (All, id)
 data Spec = Spec {delay :: Int, result :: Result}
   deriving (Read, Show, Eq)
@@ -72,7 +73,7 @@ expectedSuiteEvntMap getSuiteEvnt =
                 foldl'
                   ( \accMap' testItem ->
                       let
-                        thisEvtPath = SuiteEventPath (testItemPath testItem) TE.Test
+                        thisEvtPath = SuiteEventPath (testItemPath testItem) L.Test
                        in
                         Map.insert thisEvtPath parent accMap'
                   )
@@ -216,7 +217,7 @@ testItemPath TestItem{..} = TestPath{..}
 eventPaths :: Template -> [EventPath]
 eventPaths t = case t of
   Fixture{tests} ->
-    (\ti -> EventPath t (testItemPath ti) TE.Test $ All ti.spec) <$> tests
+    (\ti -> EventPath t (testItemPath ti) L.Test $ All ti.spec) <$> tests
   _ ->
     let
       recurse = concatMap eventPaths t.subNodes

@@ -5,14 +5,34 @@ module Internal.Logging where
 -- TODO: Explicit exports remove old code
 import CoreUtils qualified as C
 import DSL.Internal.NodeEvent qualified as NE
-import Data.Aeson.TH (defaultOptions, deriveToJSON)
+import Data.Aeson.TH (defaultOptions, deriveToJSON, deriveJSON)
 import Data.Text as T (intercalate)
 import Effectful.Concurrent.STM (TQueue)
 import Internal.LoggingCore
-import Internal.Log qualified as TE
 import PyrethrumExtras as PE (head, tail, (?))
 import Prelude hiding (atomically, lines)
 import Filter ( FilterResult )
+import CoreUtils (Hz (..))
+
+type Log l a = BaseLog LogContext (Event l a)
+
+ctx :: Log l a -> LogContext
+ctx = (.logContext)
+
+evnt :: Log l a -> Event l a
+evnt = (.event)
+data LogContext = MkLogContext
+  { threadId :: C.ThreadId,
+    idx :: Int
+  }
+  deriving (Show)
+
+data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
+
+data NodeType
+  = Hook Hz HookPos
+  | Test
+  deriving (Show, Eq, Ord)
 
 newtype ExePath = ExePath {un :: [NE.Path]} deriving (Show, Eq, Ord)
 
@@ -60,11 +80,11 @@ displayExePath (ExePath l) = T.intercalate "." $ (.title) <$> reverse l
 -- TODO :: will need thread id
 data FailPoint = FailPoint
   { path :: ExePath,
-    nodeType :: TE.NodeType
+    nodeType :: NodeType
   }
   deriving (Show)
 
-mkFailure :: l -> TE.NodeType -> SomeException -> Event l a
+mkFailure :: l -> NodeType -> SomeException -> Event l a
 mkFailure loc nodeType exception = Failure {exception = C.exceptionTxt exception, ..}
 
 data Event l a
@@ -79,23 +99,23 @@ data Event l a
       }
   |  StartExecution
   | Start
-      { nodeType :: TE.NodeType,
+      { nodeType :: NodeType,
         loc :: l
       }
   | End
-      { nodeType :: TE.NodeType,
+      { nodeType :: NodeType,
         loc :: l
       }
   | Failure
-      { nodeType :: TE.NodeType,
+      { nodeType :: NodeType,
         loc :: l,
         exception :: C.PException
       }
   | ParentFailure
       { loc :: l,
-        nodeType :: TE.NodeType,
+        nodeType :: NodeType,
         failLoc :: l,
-        failSuiteEvent :: TE.NodeType
+        failSuiteEvent :: NodeType
       }
   | NodeEvent
       { event :: a
@@ -103,23 +123,16 @@ data Event l a
   | EndExecution
   deriving (Show)
 
-testLogControls :: forall l a. (Show a, Show l)=> Bool -> IO (LogControls (Event l a) (TE.Log l a), TQueue (TE.Log l a))
+testLogControls :: forall l a. (Show a, Show l)=> Bool -> IO (LogControls (Event l a) (Log l a), TQueue (Log l a))
 testLogControls = testLogControls' expandEvent
 
 -- -- NodeEvent (a) a loggable event generated from within a node
 -- -- EngineEvent a - marks start, end and failures in test fixtures (hooks, tests) and errors
 -- -- Log a - adds thread id and index to EngineEvent
-expandEvent :: C.ThreadId -> Int -> Event l a -> TE.Log l a
-expandEvent threadId idx = \case
-  StartExecution -> TE.StartExecution {threadId, idx}
-  FilterLog {..} -> TE.FilterLog {threadId, idx, ..}
-  SuiteInitFailure {..} -> TE.SuiteInitFailure {threadId, idx, ..}
-  Start {..} -> TE.Start {threadId, idx, ..}
-  End {..} -> TE.End {threadId, idx, ..}
-  Failure {..} -> TE.Failure {threadId, idx, ..}
-  ParentFailure {..} -> TE.ParentFailure {threadId, idx, ..}
-  NodeEvent event -> TE.NodeEvent {threadId, idx, event}
-  EndExecution -> TE.EndExecution {threadId, idx}
+expandEvent :: C.ThreadId -> Int -> Event l a -> Log l a
+expandEvent threadId idx = MkLog (MkLogContext threadId idx)
 
 $(deriveToJSON defaultOptions ''ExePath)
+$(deriveJSON defaultOptions ''HookPos)
+$(deriveJSON defaultOptions ''NodeType)
 $(deriveToJSON defaultOptions ''Event)

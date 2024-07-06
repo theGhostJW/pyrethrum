@@ -1,17 +1,9 @@
-module Internal.Log where
+module Internal.LogQueries where
 
+import CoreUtils
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Filter (FilterResult)
-import CoreUtils
-
-data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
-
-data Hz = Once | Thread | Each deriving (Show, Eq, Ord)
-
-data NodeType
-  = Hook Hz HookPos
-  | Test
-  deriving (Show, Eq, Ord)
+import Internal.Logging
 
 isSetup :: NodeType -> Bool
 isSetup = \case
@@ -30,9 +22,10 @@ evtTypeToFrequency = \case
   Test -> Once
 
 isSuiteEventFailureWith :: (NodeType -> Bool) -> Log l a -> Bool
-isSuiteEventFailureWith evntPredicate = \case
-  ParentFailure {nodeType = s} -> evntPredicate s
-  _ -> False
+isSuiteEventFailureWith evntPredicate l =
+  evnt l & \case
+    ParentFailure {nodeType = s} -> evntPredicate s
+    _ -> False
 
 isOnceHookParentFailure :: Log l a -> Bool
 isOnceHookParentFailure = isSuiteEventFailureWith onceHook
@@ -46,7 +39,7 @@ isTest = \case
   _ -> False
 
 isTestParentFailure :: Log l a -> Bool
-isTestParentFailure = \case
+isTestParentFailure l = evnt l & \case
   ParentFailure {nodeType = s} -> isTest s
   _ -> False
 
@@ -90,26 +83,33 @@ threadEventToBool :: (NodeType -> Bool) -> Log l a -> Bool
 threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
 
 hasSuiteEvent :: (NodeType -> Bool) -> Log l a -> Bool
-hasSuiteEvent p l = case l of
+hasSuiteEvent p l = evnt l & \case
   StartExecution {} -> False
   Failure {} -> False
   ParentFailure {} -> False
   NodeEvent {} -> False
   EndExecution {} -> False
-  _ -> p l.nodeType
+  FilterLog {} -> False
+  SuiteInitFailure {} -> False
+  Start {nodeType} -> p nodeType
+  End {nodeType} -> p nodeType
+
+
+
 
 isStart :: Log a b -> Bool
-isStart = \case
+isStart l = l.event & \case
   Start {} -> True
   _ -> False
 
 isEnd :: Log a b -> Bool
-isEnd = \case
+isEnd l = l.event & \case
   End {} -> True
   _ -> False
 
 suiteEventOrParentFailureSuiteEvent :: Log a b -> Maybe NodeType
-suiteEventOrParentFailureSuiteEvent = \case
+suiteEventOrParentFailureSuiteEvent l = 
+  l.event & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   StartExecution {} -> Nothing
@@ -121,7 +121,7 @@ suiteEventOrParentFailureSuiteEvent = \case
   EndExecution {} -> Nothing
 
 getSuiteEvent :: Log a b -> Maybe NodeType
-getSuiteEvent = \case
+getSuiteEvent l = l.event & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   Start {nodeType} -> Just nodeType
@@ -138,68 +138,8 @@ getHookInfo t =
     Hook hz pos -> Just (hz, pos)
     Test {} -> Nothing
 
-data LogContext = MkLogContext
-  { threadId :: ThreadId,
-    idx :: Int
-  }
-  deriving (Show)
-
-data Log l a
-  = FilterLog
-      { idx :: Int,
-        threadId :: ThreadId,
-        filterResuts :: [FilterResult Text]
-      }
-  | SuiteInitFailure
-      { idx :: Int,
-        threadId :: ThreadId,
-        failure :: Text,
-        notes :: Text
-      }
-  | StartExecution
-      { idx :: Int,
-        threadId :: ThreadId
-      }
-  | Start
-      { idx :: Int,
-        threadId :: ThreadId,
-        nodeType :: NodeType,
-        loc :: l
-      }
-  | End
-      { idx :: Int,
-        threadId :: ThreadId,
-        nodeType :: NodeType,
-        loc :: l
-      }
-  | Failure
-      { idx :: Int,
-        threadId :: ThreadId,
-        nodeType :: NodeType,
-        loc :: l,
-        exception :: PException
-      }
-  | ParentFailure
-      { idx :: Int,
-        threadId :: ThreadId,
-        loc :: l,
-        nodeType :: NodeType,
-        failLoc :: l,
-        failSuiteEvent :: NodeType
-      }
-  | NodeEvent
-      { idx :: Int,
-        threadId :: ThreadId,
-        event :: a
-      }
-  | EndExecution
-      { idx :: Int,
-        threadId :: ThreadId
-      }
-  deriving (Show)
-
 startOrParentFailure :: Log l a -> Bool
-startOrParentFailure te = case te of
+startOrParentFailure l = l.event & \case
   FilterLog {} -> False
   SuiteInitFailure {} -> False
   StartExecution {} -> False
@@ -213,7 +153,7 @@ startOrParentFailure te = case te of
   End {} -> False
 
 startSuiteEventLoc :: Log l a -> Maybe l
-startSuiteEventLoc te = case te of
+startSuiteEventLoc l = l.event & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   StartExecution {} -> Nothing
@@ -225,7 +165,3 @@ startSuiteEventLoc te = case te of
   ParentFailure {loc} -> Just loc
   Start {loc} -> Just loc
   End {} -> Nothing
-
-$(deriveJSON defaultOptions ''Hz)
-$(deriveJSON defaultOptions ''HookPos)
-$(deriveJSON defaultOptions ''NodeType)

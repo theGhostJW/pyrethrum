@@ -4,7 +4,7 @@ import Check (Checks)
 import DSL.Internal.NodeEvent hiding (Check)
 import Data.Aeson (ToJSON (..))
 import GHC.Records (HasField)
-import Internal.Log (Hz (..))
+import CoreUtils (Hz (..))
 import Filter (Filters)
 
 data Before

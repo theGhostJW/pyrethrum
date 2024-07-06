@@ -15,7 +15,7 @@ import DSL.Internal.NodeEvent
     exceptionEvent,
   )
 import Data.Either.Extra (mapLeft)
-import Internal.Log (Hz)
+import CoreUtils (Hz)
 import PyrethrumExtras (toS, txt)
 import UnliftIO.Exception (tryAny)
 

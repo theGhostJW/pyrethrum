@@ -4,10 +4,9 @@ import Core qualified as C
 import DSL.Internal.NodeEvent qualified as AE
 import Data.Set qualified as S
 import Filter
+import CoreUtils (Hz(..))
 import Internal.Logging qualified as L
 import Internal.LoggingCore qualified as L
-import Internal.Log hiding (Test)
-import Internal.Log qualified as TE
 import Prepare qualified as P
 import PyrethrumExtras (catchAll, txt, (?))
 import UnliftIO
@@ -254,7 +253,7 @@ mkXTree xpth preNodes =
                 status <- newTVarIO AfterQPending
                 pure $ OnceAfter path status childTree after
               Thread -> pure $ ThreadAfter path childTree after
-              TE.Each -> pure $ EachAfter path childTree after
+              Each -> pure $ EachAfter path childTree after
         --
         P.Around
           { frequency,

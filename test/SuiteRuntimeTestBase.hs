@@ -39,12 +39,12 @@ import Internal.Logging as L
   ( Event (..),
     ExePath (..),
     HookPos (..),
-    Log (..),
+    Log (),
     NodeType (..),
     parentPath,
     testLogControls,
     topPath,
-    evnt, LogContext (..)
+    LogContext (..)
   )
 import Internal.LoggingCore (BaseLog (..))
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
@@ -515,7 +515,7 @@ failInfo ls =
     step (lastStartEvnt, result) =
       \case
         [] -> (lastStartEvnt, result)
-        (l : ls) ->
+        (l : ls') ->
           l.event & \case
             FilterLog {} -> passThrough
             SuiteInitFailure {} -> passThrough
@@ -525,7 +525,7 @@ failInfo ls =
               lastStartEvnt
                 & maybe
                   (error $ "Failure encountered before start:\n" <> toS (ppShow l))
-                  (const (Nothing, FailInfo l ls : result))
+                  (const (Nothing, FailInfo l ls' : result))
             ParentFailure {} -> passThrough
             StartExecution {} -> passThrough
             EndExecution {} -> passThrough

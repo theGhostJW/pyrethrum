@@ -82,8 +82,8 @@ suitEvntToBool = maybe False
 threadEventToBool :: (NodeType -> Bool) -> Log l a -> Bool
 threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
 
-hasSuiteEvent :: (NodeType -> Bool) -> Log l a -> Bool
-hasSuiteEvent p l = evnt l & \case
+startEndNodeMatch :: (NodeType -> Bool) -> Log l a -> Bool
+startEndNodeMatch p l = evnt l & \case
   StartExecution {} -> False
   Failure {} -> False
   ParentFailure {} -> False
@@ -98,18 +98,18 @@ hasSuiteEvent p l = evnt l & \case
 
 
 isStart :: Log a b -> Bool
-isStart l = l.event & \case
+isStart l = evnt l  & \case
   Start {} -> True
   _ -> False
 
 isEnd :: Log a b -> Bool
-isEnd l = l.event & \case
+isEnd l = evnt l  & \case
   End {} -> True
   _ -> False
 
 suiteEventOrParentFailureSuiteEvent :: Log a b -> Maybe NodeType
 suiteEventOrParentFailureSuiteEvent l = 
-  l.event & \case
+  evnt l  & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   StartExecution {} -> Nothing
@@ -121,7 +121,7 @@ suiteEventOrParentFailureSuiteEvent l =
   EndExecution {} -> Nothing
 
 getSuiteEvent :: Log a b -> Maybe NodeType
-getSuiteEvent l = l.event & \case
+getSuiteEvent l = evnt l  & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   Start {nodeType} -> Just nodeType
@@ -139,7 +139,7 @@ getHookInfo t =
     Test {} -> Nothing
 
 startOrParentFailure :: Log l a -> Bool
-startOrParentFailure l = l.event & \case
+startOrParentFailure l = evnt l  & \case
   FilterLog {} -> False
   SuiteInitFailure {} -> False
   StartExecution {} -> False
@@ -153,7 +153,7 @@ startOrParentFailure l = l.event & \case
   End {} -> False
 
 startSuiteEventLoc :: Log l a -> Maybe l
-startSuiteEventLoc l = l.event & \case
+startSuiteEventLoc l = evnt l & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   StartExecution {} -> Nothing

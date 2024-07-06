@@ -23,7 +23,7 @@ import Internal.Log as TE
     Log (..),
     getHookInfo,
     getSuiteEvent,
-    hasSuiteEvent,
+    startEndNodeMatch,
     isChildless,
     isEnd,
     isHook,
@@ -649,7 +649,7 @@ chkNoEmptyHooks' message hookPredicate wantReverse =
 
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =
-  chkStartSuiteEventImmediatlyFollowedByEnd (hasSuiteEvent (const True))
+  chkStartSuiteEventImmediatlyFollowedByEnd (startEndNodeMatch (const True))
 
 chkStartSuiteEventImmediatlyFollowedByEnd :: (LogItem -> Bool) -> [LogItem] -> IO ()
 chkStartSuiteEventImmediatlyFollowedByEnd p l = do
@@ -670,7 +670,7 @@ threadLogChks includeOnce fullLog = traverse_ chkTls
 
 chkThreadHooksStartedOnceInThread :: [LogItem] -> IO ()
 chkThreadHooksStartedOnceInThread =
-  chkStartsOnce "thread elements" (hasSuiteEvent threadHook)
+  chkStartsOnce "thread elements" (startEndNodeMatch threadHook)
 
 -- TODO:: reexport putStrLn et. al with text conversion
 
@@ -713,7 +713,7 @@ chkAllTemplateItemsLogged ts lgs =
           lgs
 
 nxtHookLog :: [LogItem] -> Maybe LogItem
-nxtHookLog = find (\l -> hasSuiteEvent isHook l || isHookParentFailure l)
+nxtHookLog = find (\l -> startEndNodeMatch isHook l || isHookParentFailure l)
 
 {-
  TODO: when implementing log parsing need a threadView which includes all thread events
@@ -725,7 +725,7 @@ nxtHookLog = find (\l -> hasSuiteEvent isHook l || isHookParentFailure l)
 
 threadVisible :: Bool -> ThreadId -> [LogItem] -> [LogItem]
 threadVisible onceHookInclude tid =
-  filter (\l -> tid == l.threadId || onceHookInclude && (hasSuiteEvent onceHook l || isOnceHookParentFailure l))
+  filter (\l -> tid == l.threadId || onceHookInclude && (startEndNodeMatch onceHook l || isOnceHookParentFailure l))
 
 threadIds :: [LogItem] -> [ThreadId]
 threadIds = PE.nub . fmap (.threadId)
@@ -735,7 +735,7 @@ threadedLogs onceHookInclude l =
   (\tid -> threadVisible onceHookInclude tid l) <$> threadIds l
 
 shouldOccurOnce :: LogItem -> Bool
-shouldOccurOnce = hasSuiteEvent onceSuiteEvent
+shouldOccurOnce = startEndNodeMatch onceSuiteEvent
 
 chkStartEndExecution :: [Log ExePath AE.NodeEvent] -> IO ()
 chkStartEndExecution evts =

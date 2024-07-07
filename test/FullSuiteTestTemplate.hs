@@ -1,9 +1,10 @@
 module FullSuiteTestTemplate where
 
-import DSL.Internal.ApEvent (Path (..))
+import DSL.Internal.NodeEvent (Path (..))
 import Data.Map.Strict qualified as Map
-import Internal.ThreadEvent (HookPos (..), Hz (..), SuiteEvent (Hook))
-import Internal.ThreadEvent qualified as TE
+import CoreUtils (Hz (..))
+import Internal.Logging (HookPos (..), NodeType (Hook))
+import Internal.Logging qualified as L
 import Prelude hiding (All, id)
 data Spec = Spec {delay :: Int, result :: Result}
   deriving (Read, Show, Eq)
@@ -42,26 +43,26 @@ data ManySpec
       }
   deriving (Show, Eq)
 
-data SuiteEventPath = SuiteEventPath
+data EventPath = MkEventPath
   { path :: Path
-  , suiteEvent :: SuiteEvent
+  , nodeType :: NodeType
   }
   deriving (Show, Eq, Ord)
 
 {- Given a list of templates, return a map of each event path to its expected preceeding
 parent event path
 -}
-expectedParentPrecedingEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
+expectedParentPrecedingEvents :: [Template] -> Map EventPath EventPath
 expectedParentPrecedingEvents = expectedSuiteEvntMap templateBeforeEvnt
 
-expectedParentSubsequentEvents :: [Template] -> Map SuiteEventPath SuiteEventPath
+expectedParentSubsequentEvents :: [Template] -> Map EventPath EventPath
 expectedParentSubsequentEvents = expectedSuiteEvntMap templateAfterEvnt
 
-expectedSuiteEvntMap :: (Template -> Maybe SuiteEvent) -> [Template] -> Map SuiteEventPath SuiteEventPath
+expectedSuiteEvntMap :: (Template -> Maybe NodeType) -> [Template] -> Map EventPath EventPath
 expectedSuiteEvntMap getSuiteEvnt =
   foldl' (priorMap Nothing) Map.empty
  where
-  priorMap :: Maybe SuiteEventPath -> Map SuiteEventPath SuiteEventPath -> Template -> Map SuiteEventPath SuiteEventPath
+  priorMap :: Maybe EventPath -> Map EventPath EventPath -> Template -> Map EventPath EventPath
   priorMap mParentEvnt accMap t =
     case t of
       FullSuiteTestTemplate.Fixture{tests} ->
@@ -72,7 +73,7 @@ expectedSuiteEvntMap getSuiteEvnt =
                 foldl'
                   ( \accMap' testItem ->
                       let
-                        thisEvtPath = SuiteEventPath (testItemPath testItem) TE.Test
+                        thisEvtPath = MkEventPath (testItemPath testItem) L.Test
                        in
                         Map.insert thisEvtPath parent accMap'
                   )
@@ -82,8 +83,8 @@ expectedSuiteEvntMap getSuiteEvnt =
       _ ->
         foldl' (priorMap nxtB4Evnt) nxtMap t.subNodes
        where
-        thisTemplateEvntPaths = SuiteEventPath t.path <$> emittedHooks t
-        nxtB4Evnt = (SuiteEventPath t.path <$> getSuiteEvnt t) <|> mParentEvnt
+        thisTemplateEvntPaths = MkEventPath t.path <$> emittedHooks t
+        nxtB4Evnt = (MkEventPath t.path <$> getSuiteEvnt t) <|> mParentEvnt
         nxtMap =
           mParentEvnt
             & maybe
@@ -95,7 +96,7 @@ expectedSuiteEvntMap getSuiteEvnt =
                     thisTemplateEvntPaths
               )
 
-templateBeforeEvnt :: Template -> Maybe SuiteEvent
+templateBeforeEvnt :: Template -> Maybe NodeType
 templateBeforeEvnt t =
   case t of
     FullSuiteTestTemplate.Fixture{} -> Nothing
@@ -110,7 +111,7 @@ templateBeforeEvnt t =
       EachBefore{} -> Hook Each Before
       EachAround{} -> Hook Each Setup
 
-templateAfterEvnt :: Template -> Maybe SuiteEvent
+templateAfterEvnt :: Template -> Maybe NodeType
 templateAfterEvnt t =
   case t of
     FullSuiteTestTemplate.Fixture{} -> Nothing
@@ -125,7 +126,7 @@ templateAfterEvnt t =
       EachAfter{} -> Hook Each After
       EachAround{} -> Hook Each Teardown
 
-emittedHooks :: Template -> [SuiteEvent]
+emittedHooks :: Template -> [NodeType]
 emittedHooks = \case
   FullSuiteTestTemplate.Fixture{} -> []
   OnceBefore{} -> [oh Before]
@@ -202,10 +203,10 @@ countTests t = case t of
   FullSuiteTestTemplate.Fixture{tests} -> length tests
   _ -> sum $ countTests <$> t.subNodes
 
-data EventPath = EventPath
+data TemplatePath = MkTemplatePath
   { template :: Template
   , path :: Path
-  , suiteEvent :: SuiteEvent
+  , nodeType :: NodeType
   , evntSpec :: ManySpec
   }
   deriving (Show, Eq)
@@ -213,14 +214,14 @@ data EventPath = EventPath
 testItemPath :: TestItem -> Path
 testItemPath TestItem{..} = TestPath{..}
 
-eventPaths :: Template -> [EventPath]
+eventPaths :: Template -> [TemplatePath]
 eventPaths t = case t of
   Fixture{tests} ->
-    (\ti -> EventPath t (testItemPath ti) TE.Test $ All ti.spec) <$> tests
+    (\ti -> MkTemplatePath t (testItemPath ti) L.Test $ All ti.spec) <$> tests
   _ ->
     let
       recurse = concatMap eventPaths t.subNodes
-      mkEvnt f p = EventPath t t.path (Hook f p)
+      mkEvnt f p = MkTemplatePath t t.path (Hook f p)
      in
       case t of
         OnceBefore{spec} ->

@@ -16,7 +16,7 @@ import Effectful as EF (
  )
 
 import DSL.FileSystemEffect (FileSystem (..))
-import DSL.Internal.ApEvent (ApEvent (..), FLog (Step))
+import DSL.Internal.NodeEvent (NodeEvent (..), FLog (Step))
 import Data.Text qualified as T
 import Effectful.Error.Static qualified as E
 import Path.Extended (Path, toFilePath)
@@ -45,10 +45,10 @@ adaptException m = EF.liftIO m `catch` \(e :: SomeException) -> E.throwError . D
 
 -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
 
-logStep :: (Out ApEvent :> es) => Text -> Eff es ()
+logStep :: (Out NodeEvent :> es) => Text -> Eff es ()
 logStep = out . Framework . Step
 
-docErrn :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, E.Error DocException :> es) => Text -> [Text] -> Eff es a
+docErrn :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es, E.Error DocException :> es) => Text -> [Text] -> Eff es a
 docErrn funcName dscFrags =
   do
     let funcDesc = T.intercalate " " dscFrags
@@ -66,19 +66,19 @@ docErrn funcName dscFrags =
         <> funcName
         <> "'"
 
-docErr :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, E.Error DocException :> es) => Text -> Text -> Eff es a
+docErr :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es, E.Error DocException :> es) => Text -> Text -> Eff es a
 docErr funcName funcDesc = docErrn funcName [funcDesc]
 
-docErr2 :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, E.Error DocException :> es) => Text -> Text -> Text -> Eff es a
+docErr2 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es, E.Error DocException :> es) => Text -> Text -> Text -> Eff es a
 docErr2 funcName funcDesc1 funcDesc2 = docErrn funcName [funcDesc1, funcDesc2]
 
-docErr3 :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, E.Error DocException :> es) => Text -> Text -> Text -> Text -> Eff es a
+docErr3 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es, E.Error DocException :> es) => Text -> Text -> Text -> Text -> Eff es a
 docErr3 funcName funcDesc1 funcDesc2 funcDesc3 = docErrn funcName [funcDesc1, funcDesc2, funcDesc3]
 
-docErr4 :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, E.Error DocException :> es) => Text -> Text -> Text -> Text -> Text -> Eff es a
+docErr4 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es, E.Error DocException :> es) => Text -> Text -> Text -> Text -> Text -> Eff es a
 docErr4 funcName funcDesc1 funcDesc2 funcDesc3 funcDesc4 = docErrn funcName [funcDesc1, funcDesc2, funcDesc3, funcDesc4]
 
-runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out ApEvent :> es, E.Error DocException :> es) => Eff (FileSystem : es) a -> Eff es a
+runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es, E.Error DocException :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
   interpret handler
  where

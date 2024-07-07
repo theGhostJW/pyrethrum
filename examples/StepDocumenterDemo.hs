@@ -6,7 +6,7 @@ import DSL.FileSystemEffect (
   findFilesWith,
   walkDirAccum,
  )
-import DSL.Internal.ApEvent (ApEvent (User), ULog (Log))
+import DSL.Internal.NodeEvent (NodeEvent (User), ULog (Log))
 import DSL.Out (Out, Sink (Sink), out, runOut)
 import Data.List.Extra (isInfixOf)
 import Effectful (Eff, IOE, runEff, (:>))
@@ -14,7 +14,7 @@ import Effectful.Error.Static (Error, runError)
 import Path (absdir, reldir, relfile, toFilePath, Abs, File, Path)
 import PyrethrumExtras ((?))
 
-type FSOut es = (Out ApEvent :> es, FileSystem :> es)
+type FSOut es = (Out NodeEvent :> es, FileSystem :> es)
 
 -- todo - use a more believable base function
 demo :: forall es. (FSOut es) => Eff es ()
@@ -29,7 +29,7 @@ demo = do
 runDemo :: IO (Either (CallStack, DII.DocException) ())
 runDemo = docRun demo
 
-demo2 :: forall es. (Out ApEvent :> es, FileSystem :> es) => Eff es ()
+demo2 :: forall es. (Out NodeEvent :> es, FileSystem :> es) => Eff es ()
 demo2 = do
   paths <- getPaths
   chk paths
@@ -42,7 +42,7 @@ runDemo2 :: IO (Either (CallStack, DII.DocException) ())
 runDemo2 = docRun demo2
 
 -- uses
-demo3 :: forall es. (Out ApEvent :> es, FileSystem :> es) => Eff es ()
+demo3 :: forall es. (Out NodeEvent :> es, FileSystem :> es) => Eff es ()
 demo3 = do
   paths <- getPathsData
   chk paths
@@ -54,19 +54,19 @@ demo3 = do
 runDemo3 :: IO (Either (CallStack, DII.DocException) ())
 runDemo3 = docRun demo3
 
-docRunHandleAll :: Eff '[FileSystem, Out ApEvent, Error DII.DocException, IOE] a -> IO (Either (CallStack, DII.DocException) a)
+docRunHandleAll :: Eff '[FileSystem, Out NodeEvent, Error DII.DocException, IOE] a -> IO (Either (CallStack, DII.DocException) a)
 docRunHandleAll = runEff . runError . apEventOut . DII.runFileSystem
 
-docRun :: Eff '[FileSystem, Out ApEvent, Error DII.DocException, IOE] a -> IO (Either (CallStack, DII.DocException) a)
+docRun :: Eff '[FileSystem, Out NodeEvent, Error DII.DocException, IOE] a -> IO (Either (CallStack, DII.DocException) a)
 docRun = runEff . runError . apEventOut . DII.runFileSystem
 
-apEventOut :: forall a es. (IOE :> es) => Eff (Out ApEvent : es) a -> Eff es a
+apEventOut :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
 apEventOut = runOut print
 
-log :: (Out ApEvent :> es) => Text -> Eff es ()
+log :: (Out NodeEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
-getPaths :: (Out ApEvent :> es, FileSystem :> es) => Eff es [Path Abs File]
+getPaths :: (Out NodeEvent :> es, FileSystem :> es) => Eff es [Path Abs File]
 getPaths = do
   s <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
   r <- test s
@@ -83,7 +83,7 @@ data PathResult = PathResult
   }
 
 --  proves we are OK with strict data
-getPathsData :: (Out ApEvent :> es, FileSystem :> es) => Eff es PathResult
+getPathsData :: (Out NodeEvent :> es, FileSystem :> es) => Eff es PathResult
 getPathsData = do
   p <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
   output <- walkDirAccum Nothing (\_root _subs files -> pure files) [absdir|/pyrethrum/pyrethrum|]

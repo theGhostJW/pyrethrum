@@ -1,19 +1,24 @@
 module Core where
 
 import Check (Checks)
-import DSL.Internal.ApEvent hiding (Check)
+import DSL.Internal.NodeEvent hiding (Check)
 import Data.Aeson (ToJSON (..))
 import GHC.Records (HasField)
-import Internal.ThreadEvent (Hz (..))
+import CoreUtils (Hz (..))
+import Filter (Filters)
 
 data Before
+
 data After
+
 data Around
 
 class When a
 
 instance When Before
+
 instance When After
+
 instance When Around
 
 newtype CheckFailure = CheckFailure Text
@@ -47,7 +52,6 @@ to list
 
 -}
 
-
 -- TODO:: look into listLike
 
 --
@@ -58,7 +62,9 @@ class Frequency a where
 class CanDependOn a b
 
 data Once
+
 data Thread
+
 data Each
 
 instance Frequency Once where
@@ -76,10 +82,13 @@ instance Frequency Each where
 instance CanDependOn Once Once
 
 instance CanDependOn Thread Once
+
 instance CanDependOn Thread Thread
 
 instance CanDependOn Each Once
+
 instance CanDependOn Each Thread
+
 instance CanDependOn Each Each
 
 data Hook m rc hz i o where
@@ -90,8 +99,8 @@ data Hook m rc hz i o where
     Hook m rc hz () o
   Before' ::
     (Frequency phz, Frequency hz, CanDependOn hz phz) =>
-    { depends :: Hook m rc phz pi i
-    , action' :: rc -> i -> m o
+    { depends :: Hook m rc phz pi i,
+      action' :: rc -> i -> m o
     } ->
     Hook m rc hz i o
   After ::
@@ -101,21 +110,21 @@ data Hook m rc hz i o where
     Hook m rc hz () ()
   After' ::
     (Frequency phz, Frequency hz, CanDependOn hz phz) =>
-    { afterDepends :: Hook m rc phz pi i
-    , afterAction' :: rc -> m ()
+    { afterDepends :: Hook m rc phz pi i,
+      afterAction' :: rc -> m ()
     } ->
     Hook m rc hz i i
   Around ::
     (Frequency hz) =>
-    { setup :: rc -> m o
-    , teardown :: rc -> o -> m ()
+    { setup :: rc -> m o,
+      teardown :: rc -> o -> m ()
     } ->
     Hook m rc hz () o
   Around' ::
     (Frequency phz, Frequency hz, CanDependOn hz phz) =>
-    { depends :: Hook m rc phz pi i
-    , setup' :: rc -> i -> m o
-    , teardown' :: rc -> o -> m ()
+    { depends :: Hook m rc phz pi i,
+      setup' :: rc -> i -> m o,
+      teardown' :: rc -> o -> m ()
     } ->
     Hook m rc hz i o
 
@@ -124,61 +133,79 @@ hookFrequency _ = frequency @hz
 
 data DataSource i = ItemList [i] | Property i deriving (Show, Functor)
 
-data Fixture m rc tc hi where
+getConfig :: Fixture m rc fc hi -> fc
+getConfig = \case
+  Full {config} -> config
+  Full' {config'} -> config'
+  Direct {config} -> config
+  Direct' {config'} -> config'
+
+fixtureEmpty :: forall m rc fc hi. rc -> Fixture m rc fc hi -> Bool
+fixtureEmpty rc = \case
+  Full {items} -> dsEmpty $ items rc
+  Full' {items'} -> dsEmpty $ items' rc
+  Direct {items} -> dsEmpty $ items rc
+  Direct' {items'} -> dsEmpty $ items' rc
+  where
+    dsEmpty = \case
+      ItemList itms -> null itms
+      Property {} -> False
+
+data Fixture m rc fc hi where
   Full ::
     (Item i ds, Show as) =>
-    { config :: tc
-    , action :: rc -> i -> m as
-    , parse :: as -> Either ParseException ds
-    , items :: rc -> DataSource i
+    { config :: fc,
+      action :: rc -> i -> m as,
+      parse :: as -> Either ParseException ds,
+      items :: rc -> DataSource i
     } ->
-    Fixture m rc tc ()
+    Fixture m rc fc ()
   Full' ::
     (Item i ds, Show as) =>
-    { config' :: tc
-    , depends :: Hook m rc hz pi hi
-    , action' :: rc -> hi -> i -> m as
-    , parse' :: as -> Either ParseException ds
-    , items' :: rc -> DataSource i
+    { config' :: fc,
+      depends :: Hook m rc hz pi hi,
+      action' :: rc -> hi -> i -> m as,
+      parse' :: as -> Either ParseException ds,
+      items' :: rc -> DataSource i
     } ->
-    Fixture m rc tc hi
+    Fixture m rc fc hi
   Direct ::
     (Item i ds) =>
-    { config :: tc
-    , action :: rc -> i -> m ds
-    , items :: rc -> DataSource i
+    { config :: fc,
+      action :: rc -> i -> m ds,
+      items :: rc -> DataSource i
     } ->
-    Fixture m rc tc ()
+    Fixture m rc fc ()
   Direct' ::
     (Item i ds) =>
-    { config' :: tc
-    , depends :: Hook m rc hz pi hi
-    , action' :: rc -> hi -> i -> m ds
-    , items' :: rc -> DataSource i
+    { config' :: fc,
+      depends :: Hook m rc hz pi hi,
+      action' :: rc -> hi -> i -> m ds,
+      items' :: rc -> DataSource i
     } ->
-    Fixture m rc tc hi
+    Fixture m rc fc hi
 
-data Node m rc tc hi where
+data Node m rc fc hi where
   Hook ::
     (Frequency hz) =>
-    { path :: Path
-    , hook :: Hook m rc hz hi o
-    , subNodes :: [Node m rc tc o]
+    { path :: Path,
+      hook :: Hook m rc hz hi o,
+      subNodes :: [Node m rc fc o]
     } ->
-    Node m rc tc hi
+    Node m rc fc hi
   Fixture ::
-    { path :: Path
-    , fixture :: Fixture m rc tc hi
+    { path :: Path,
+      fixture :: Fixture m rc fc hi
     } ->
-    Node m rc tc hi
-
-data ExeParams m rc tc where
+    Node m rc fc hi
+data ExeParams m rc fc where
   ExeParams ::
-    { suite :: [Node m rc tc ()]
-    , interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a)
-    , runConfig :: rc
+    { suite :: [Node m rc fc ()],
+      filters :: Filters rc fc,
+      interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a),
+      runConfig :: rc
     } ->
-    ExeParams m rc tc
+    ExeParams m rc fc
 
 -- Todo
 -- see weeder :: HIE

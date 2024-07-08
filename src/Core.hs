@@ -11,6 +11,8 @@ import Data.Aeson (ToJSON (..))
 import GHC.Records (HasField)
 import Internal.ThreadEvent (Hz (..))
 import PyrethrumExtras (txt, uu, (?))
+import System.IO.Unsafe (unsafePerformIO)
+import System.Log.TSLogger qualified as TS
 
 data Before
 data After
@@ -143,13 +145,16 @@ hookFrequency :: forall m hz i o. (Frequency hz) => Hook m hz i o -> Hz
 hookFrequency _ = frequency @hz
 
 instance Concurrently IO where
-    runConcurrently as = sequence as -- Async.forConcurrently as id
+    runConcurrently as = Async.forConcurrently as id
 
 class (Monad m) => Logger m where
     fLog :: FLog -> m ()
 
+logger :: TS.Logger
+logger = unsafePerformIO $ TS.newLogger (0, TS.dbgLvl) [TS.OutputTo stdout] TS.DontWait
+
 instance Logger IO where
-    fLog = print
+    fLog = TS.logStrLn logger 0 . show
 
 class Concurrently m where
     runConcurrently :: (Traversable c) => c (m a) -> m (c a)
@@ -161,92 +166,21 @@ forConcurrently_ ::
     m ()
 forConcurrently_ t f = runConcurrently (f <$> t) $> ()
 
-runNode ::
-    (Logger m, Concurrently m, Traversable c) =>
-    hi ->
-    Node m c tc hi ->
-    m ()
-runNode hi Fixture{path, fixture} = runFixture path hi fixture
-runNode hi Hook{hook, subNodes} = case hook of
-    Before{action} -> case hookFrequency hook of
-        Once ->
-            action >>= \i -> forConcurrently_ subNodes $ \n -> do
-                runNode i n
-        Each -> forConcurrently_ subNodes $ \n -> do
-            i <- action
-            runNode i n
-        Thread -> forConcurrently_ subNodes $ \n -> do
-            i <- action
-            runNode i n
-    Before'{action'} -> case hookFrequency hook of
-        Once ->
-            action' hi >>= \i -> forConcurrently_ subNodes $ \n -> do
-                runNode i n
-        Each -> forConcurrently_ subNodes $ \n -> do
-            i <- action' hi
-            runNode i n
-        Thread -> forConcurrently_ subNodes $ \n -> do
-            i <- action' hi
-            runNode i n
-    After{afterAction} -> case hookFrequency hook of
-        Once -> do
-            forConcurrently_ subNodes $ runNode hi
-            afterAction
-        Each -> forConcurrently_ subNodes $ \n -> do
-            runNode hi n
-            afterAction
-        Thread -> forConcurrently_ subNodes $ \n -> do
-            runNode hi n
-            afterAction
-    After'{afterAction'} -> case hookFrequency hook of
-        Once -> do
-            forConcurrently_ subNodes $ runNode hi
-            afterAction'
-        Each -> forConcurrently_ subNodes $ \n -> do
-            runNode hi n
-            afterAction'
-        Thread -> forConcurrently_ subNodes $ \n -> do
-            runNode hi n
-            afterAction'
-    Around{setup, teardown} -> case hookFrequency hook of
-        Once -> do
-            o <- setup
-            forConcurrently_ subNodes $ runNode o
-            teardown o
-        Each -> forConcurrently_ subNodes $ \n -> do
-            o <- setup
-            runNode o n
-            teardown o
-        Thread -> forConcurrently_ subNodes $ \n -> do
-            o <- setup
-            runNode o n
-            teardown o
-    Around'{setup', teardown'} -> case hookFrequency hook of
-        Once -> do
-            o <- setup' hi
-            forConcurrently_ subNodes $ runNode o
-            teardown' o
-        Each -> forConcurrently_ subNodes $ \n -> do
-            o <- setup' hi
-            runNode o n
-            teardown' o
-        Thread -> forConcurrently_ subNodes $ \n -> do
-            o <- setup' hi
-            runNode o n
-            teardown' o
-
 runFixture ::
     (Logger m, Concurrently m, Traversable c) =>
     Path ->
-    hi ->
-    Fixture m c tc hi ->
+    m o ->
+    (o -> m ()) ->
+    Fixture m c tc o ->
     m ()
-runFixture p hi f = case f of
+runFixture p beforeEachHook afterEachHook f = case f of
     Direct{config, action, items} -> forConcurrently_ items $ \i -> do
         ds <- action i
         runCheck p ds i.checks.un
     Direct'{config', action', items'} -> forConcurrently_ items' $ \i -> do
-        ds <- action' hi i
+        o <- beforeEachHook
+        ds <- action' o i
+        afterEachHook o
         runCheck p ds i.checks.un
     Full{config, parse, action, items} -> forConcurrently_ items $ \i -> do
         d <- action i
@@ -254,10 +188,72 @@ runFixture p hi f = case f of
             Left e -> (fLog $ Exception (show e) (show callStack))
             Right ds -> runCheck p ds i.checks.un
     Full'{config', parse', action', items'} -> forConcurrently_ items' $ \i -> do
+        hi <- beforeEachHook
         o <- action' hi i
+        afterEachHook hi
         case parse' o of
             Left e -> (fLog $ Exception (show e) (show callStack))
             Right ds -> runCheck p ds i.checks.un
+
+runNode ::
+    (Logger m, Concurrently m, Traversable c) =>
+    m hi ->
+    (hi -> m ()) ->
+    Node m c tc hi ->
+    m ()
+runNode bh ah Fixture{path, fixture} = runFixture path bh ah fixture
+runNode bh ah Hook{hook, subNodes = nodes} =
+    let f = hookFrequency hook
+     in case hook of
+            Before{action}
+                | f == Each -> forConcurrently_ nodes $ \n ->
+                    runNode action (const . pure $ ()) n
+                | otherwise -> do
+                    i <- action
+                    forConcurrently_ nodes $ \n -> do
+                        runNode (pure i) (const . pure $ ()) n
+            Before'{action'}
+                | f == Each -> forConcurrently_ nodes $ \n ->
+                    runNode (bh >>= action') (const . pure $ ()) n
+                | otherwise -> do
+                    o <- bh
+                    i <- action' o
+                    forConcurrently_ nodes $ \n -> do
+                        runNode (pure i) (const . pure $ ()) n
+            After{afterAction}
+                | f == Each -> forConcurrently_ nodes $ \n ->
+                    runNode bh (\i -> afterAction >> ah i) n
+                | otherwise -> do
+                    forConcurrently_ nodes $ \n -> runNode bh (const . pure $ ()) n
+                    afterAction
+            After'{afterAction'}
+                | f == Each -> forConcurrently_ nodes $ \n ->
+                    runNode bh (\i -> afterAction' >> ah i) n
+                | otherwise -> do
+                    forConcurrently_ nodes $ \n -> runNode bh (const . pure $ ()) n
+                    afterAction'
+            Around{setup, teardown}
+                | f == Each -> forConcurrently_ nodes $ \n -> do
+                    hi <- bh
+                    runNode setup teardown n
+                    ah hi
+                | otherwise -> do
+                    hi <- bh
+                    o <- setup
+                    forConcurrently_ nodes $ \n -> runNode (pure o) (const . pure $ ()) n
+                    teardown o
+                    ah hi
+            Around'{setup', teardown'}
+                | f == Each -> forConcurrently_ nodes $ \n -> do
+                    hi <- bh
+                    runNode (setup' hi) teardown' n
+                    ah hi
+                | otherwise -> do
+                    hi <- bh
+                    o <- setup' hi
+                    forConcurrently_ nodes $ \n -> runNode (pure o) (const . pure $ ()) n
+                    teardown' o
+                    ah hi
 
 -- runNode ::
 --     (Monad m, Concurrently m, Traversable c) =>

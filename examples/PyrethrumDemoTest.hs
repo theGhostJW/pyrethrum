@@ -326,8 +326,7 @@ suite =
                 { path = NodePath "module" "name"
                 , hook = intOnceHook
                 , subNodes =
-                    [ Fixture (NodePath "module" "testName") test4
-                    , Hook
+                    [ Hook
                         { path = NodePath "module" "name"
                         , hook = addOnceIntHook
                         , subNodes =
@@ -360,30 +359,8 @@ suite =
             ]
         }
 
-suite2 =
-    Hook
-        { path = NodePath "module" "name"
-        , hook = intOnceHook
-        , subNodes =
-            [ Hook
-                { path = NodePath "module" "name"
-                , hook = eachAfter
-                , subNodes =
-                    [Fixture (NodePath "module" "testName") test4]
-                }
-            ]
-        }
-
---
--- nodes =
---     Hook
---         { path = NodePath "module" "name"
---         , hook = intOnceHook
---         , subNodes = [Fixture (NodePath "module" "testName") test4]
---         }
-
-coreNode2 = mkNode suite2
-result2 = runNode () coreNode2
+coreNode2 = mkNode suite
+result2 = runNode (pure ()) (const . pure $ ()) coreNode2
 
 {-
 -- TODO: test documenter that returns a handle from onceHook

@@ -43,7 +43,7 @@ logShow = log . txt
   an action that only requires a sublist of these effects
 -}
 logReturnInt :: IO Int
-logReturnInt = log "Returning One alllll" >> pure 1
+logReturnInt = log "Returning One" >> pure 1
 
 runSomethingToDoWithTestDepth :: Depth -> IO ()
 runSomethingToDoWithTestDepth = logShow
@@ -283,7 +283,7 @@ test4 =
                 , checks = chk "test" ((== 1) . (.value))
                 }
             , Item2
-                { id = 1
+                { id = 2
                 , title = "test the value is one 2 "
                 , value = 2
                 , checks = chk "test" ((== 1) . (.value))

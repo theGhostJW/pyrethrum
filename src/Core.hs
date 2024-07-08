@@ -6,11 +6,10 @@ import Check
 import Control.Concurrent.Async qualified as Async
 import Control.Monad.Extra (foldM_)
 import DSL.Internal.ApEvent hiding (Check)
-import DSL.Internal.ApEvent qualified as AE
 import Data.Aeson (ToJSON (..))
 import GHC.Records (HasField)
 import Internal.ThreadEvent (Hz (..))
-import PyrethrumExtras (txt, uu, (?))
+import PyrethrumExtras ((?))
 import System.IO.Unsafe (unsafePerformIO)
 import System.Log.TSLogger qualified as TS
 
@@ -151,10 +150,10 @@ class (Monad m) => Logger m where
     fLog :: FLog -> m ()
 
 logger :: TS.Logger
-logger = unsafePerformIO $ TS.newLogger (0, TS.dbgLvl) [TS.OutputTo stdout] TS.DontWait
+logger = unsafePerformIO $ TS.newLogger (0, 1) [TS.OutputTo stdout] TS.DontWait
 
 instance Logger IO where
-    fLog = TS.logStrLn logger 0 . show
+    fLog = TS.logStrLn logger 1 . show
 
 class Concurrently m where
     runConcurrently :: (Traversable c) => c (m a) -> m (c a)
@@ -204,33 +203,34 @@ runNode ::
 runNode bh ah Fixture{path, fixture} = runFixture path bh ah fixture
 runNode bh ah Hook{hook, subNodes = nodes} =
     let f = hookFrequency hook
+        noop = const . pure $ ()
      in case hook of
             Before{action}
                 | f == Each -> forConcurrently_ nodes $ \n ->
-                    runNode action (const . pure $ ()) n
+                    runNode action noop n
                 | otherwise -> do
                     i <- action
                     forConcurrently_ nodes $ \n -> do
-                        runNode (pure i) (const . pure $ ()) n
+                        runNode (pure i) noop n
             Before'{action'}
                 | f == Each -> forConcurrently_ nodes $ \n ->
-                    runNode (bh >>= action') (const . pure $ ()) n
+                    runNode (bh >>= action') noop n
                 | otherwise -> do
                     o <- bh
                     i <- action' o
                     forConcurrently_ nodes $ \n -> do
-                        runNode (pure i) (const . pure $ ()) n
+                        runNode (pure i) noop n
             After{afterAction}
                 | f == Each -> forConcurrently_ nodes $ \n ->
                     runNode bh (\i -> afterAction >> ah i) n
                 | otherwise -> do
-                    forConcurrently_ nodes $ \n -> runNode bh (const . pure $ ()) n
+                    forConcurrently_ nodes $ \n -> runNode bh noop n
                     afterAction
             After'{afterAction'}
                 | f == Each -> forConcurrently_ nodes $ \n ->
                     runNode bh (\i -> afterAction' >> ah i) n
                 | otherwise -> do
-                    forConcurrently_ nodes $ \n -> runNode bh (const . pure $ ()) n
+                    forConcurrently_ nodes $ \n -> runNode bh noop n
                     afterAction'
             Around{setup, teardown}
                 | f == Each -> forConcurrently_ nodes $ \n -> do
@@ -240,7 +240,7 @@ runNode bh ah Hook{hook, subNodes = nodes} =
                 | otherwise -> do
                     hi <- bh
                     o <- setup
-                    forConcurrently_ nodes $ \n -> runNode (pure o) (const . pure $ ()) n
+                    forConcurrently_ nodes $ \n -> runNode (pure o) noop n
                     teardown o
                     ah hi
             Around'{setup', teardown'}
@@ -251,16 +251,10 @@ runNode bh ah Hook{hook, subNodes = nodes} =
                 | otherwise -> do
                     hi <- bh
                     o <- setup' hi
-                    forConcurrently_ nodes $ \n -> runNode (pure o) (const . pure $ ()) n
+                    forConcurrently_ nodes $ \n -> runNode (pure o) noop n
                     teardown' o
                     ah hi
 
--- runNode ::
---     (Monad m, Concurrently m, Traversable c) =>
---     Node m c tc hi ->
---     m ()
--- runNode = uu
---
 -- runHook ::
 --     (Monad m, Concurrently m, Traversable c) =>
 --     Hook m hz pi o ->
@@ -471,7 +465,7 @@ runChecks p cds =
 
 runCheck :: (Logger m, Show ds) => Path -> ds -> [Check ds] -> m ()
 runCheck p ds checks = do
-    fLog . CheckStart p . DStateText $ txt ds
+    -- fLog . CheckStart p . DStateText $ txt ds
     foldM_ (applyCheckk p ds) NonTerminal checks
 
 applyCheckk :: (Logger m) => Path -> ds -> FailStatus -> Check ds -> m FailStatus
@@ -479,7 +473,7 @@ applyCheckk p ds previousStatus ck = do
     let (result, status) = case previousStatus of
             Terminal -> (Skip, Terminal)
             NonTerminal -> ck.rule ds ? (Pass, NonTerminal) $ (Fail, ck.failStatus)
-    fLog . AE.Check p $ report result
+    -- fLog . AE.Check p $ report result
     pure status
   where
     report r = CheckReport r ck.header (ck.message & maybe "" (ds &))

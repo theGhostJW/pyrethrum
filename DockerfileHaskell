@@ -1,0 +1,74 @@
+# Use the latest official Ubuntu image as a base
+FROM ubuntu:latest
+
+# Set environment variables to avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update the package list and install some basic utilities
+RUN apt-get update && \
+    apt-get install -y \
+    wget \
+    git \
+    sudo \
+    # GHCUp Requirements https://www.haskell.org/ghcup/install/#version-23
+    build-essential \
+    curl \
+    build-essential \ 
+    libffi-dev \
+    libffi8ubuntu1 \
+    libgmp-dev \
+    libgmp10 \
+    libncurses-dev \
+    pkg-config \
+    && apt-get clean \
+    # get ghcup install script
+    && curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
+                                                                            BOOTSTRAP_HASKELL_GHC_VERSION=9.8.2 \
+                                                                            BOOTSTRAP_HASKELL_CABAL_VERSION=3.12.1.0 \
+                                                                            BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1 \
+                                                                            BOOTSTRAP_HASKELL_INSTALL_HLS=1 \
+                                                                            sh
+
+    # Explicitly export PATH changes
+    ENV PATH="/root/.ghcup/bin:${PATH}"
+
+    # install other tools
+    RUN cabal update \
+    && cabal install hpack \
+    && cabal install ghcid \
+    && cabal install turtle
+
+# Main settings:
+#   * BOOTSTRAP_HASKELL_NONINTERACTIVE - any nonzero value for noninteractive installation
+#   * BOOTSTRAP_HASKELL_NO_UPGRADE - any nonzero value to not trigger the upgrade
+#   * BOOTSTRAP_HASKELL_MINIMAL - any nonzero value to only install ghcup
+#   * GHCUP_USE_XDG_DIRS - any nonzero value to respect The XDG Base Directory Specification
+#   * BOOTSTRAP_HASKELL_VERBOSE - any nonzero value for more verbose installation
+#   * BOOTSTRAP_HASKELL_GHC_VERSION - the ghc version to install
+#   * BOOTSTRAP_HASKELL_CABAL_VERSION - the cabal version to install
+#   * BOOTSTRAP_HASKELL_CABAL_XDG - don't disable the XDG logic (this doesn't force XDG though, because cabal is confusing)
+#   * BOOTSTRAP_HASKELL_INSTALL_NO_STACK - disable installation of stack
+#   * BOOTSTRAP_HASKELL_INSTALL_NO_STACK_HOOK - disable installation stack ghcup hook
+#   * BOOTSTRAP_HASKELL_INSTALL_HLS - whether to install latest hls
+#   * BOOTSTRAP_HASKELL_ADJUST_BASHRC - whether to adjust PATH in bashrc (prepend)
+#   * BOOTSTRAP_HASKELL_ADJUST_CABAL_CONFIG - whether to adjust mingw paths in cabal.config on windows
+#   * BOOTSTRAP_HASKELL_DOWNLOADER - which downloader to use (default: curl)
+#   * GHCUP_BASE_URL - the base url for ghcup binary download (use this to overwrite https://downloads.haskell.org/~ghcup with a mirror)
+#   * GHCUP_MSYS2_ENV - the msys2 environment to use on windows, see https://www.msys2.org/docs/environments/ (defauts to MINGW64, MINGW32 or CLANGARM64, depending on the architecture)
+
+
+# Create a non-root user and switch to it
+RUN useradd -ms /bin/bash vscode
+USER vscode
+
+# Set the working directory
+WORKDIR /home/vscode
+
+# Copy any local files to the container (if needed)
+# COPY . /home/dockeruser/
+
+# Expose a port if the application needs it
+# EXPOSE 8080
+
+# Specify the default command to run when the container starts
+CMD ["bash"]

@@ -1,6 +1,10 @@
 # Use the latest official Ubuntu image as a base
 FROM ubuntu:latest
 
+# use
+# docker build -t "haskell" -f DockerfileHaskell .
+# 
+
 # Set environment variables to avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -20,6 +24,8 @@ RUN apt-get update && \
     libgmp10 \
     libncurses-dev \
     pkg-config \
+    # used by zlib used by turtle
+    # zlib \
     && apt-get clean \
     # get ghcup install script
     && curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
@@ -33,10 +39,15 @@ RUN apt-get update && \
     ENV PATH="/root/.ghcup/bin:${PATH}"
 
     # install other tools
-    RUN cabal update \
-    && cabal install hpack \
-    && cabal install ghcid \
-    && cabal install turtle
+    RUN cabal update 
+
+    RUN cabal install ghcid
+
+    RUN apt-get install -y zlib1g-dev
+
+    RUN cabal install hpack
+
+    RUN cabal install turtle
 
 # Main settings:
 #   * BOOTSTRAP_HASKELL_NONINTERACTIVE - any nonzero value for noninteractive installation

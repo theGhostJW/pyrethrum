@@ -172,12 +172,12 @@ runFixture ::
     (o -> m ()) ->
     Fixture m c tc o ->
     m ()
-runFixture p beforeEachHook afterEachHook f = case f of
+runFixture p beforeAction afterEachHook f = case f of
     Direct{config, action, items} -> forConcurrently_ items $ \i -> do
         ds <- action i
         runCheck p ds i.checks.un
     Direct'{config', action', items'} -> forConcurrently_ items' $ \i -> do
-        o <- beforeEachHook
+        o <- beforeAction
         ds <- action' o i
         afterEachHook o
         runCheck p ds i.checks.un
@@ -187,7 +187,7 @@ runFixture p beforeEachHook afterEachHook f = case f of
             Left e -> (fLog $ Exception (show e) (show callStack))
             Right ds -> runCheck p ds i.checks.un
     Full'{config', parse', action', items'} -> forConcurrently_ items' $ \i -> do
-        hi <- beforeEachHook
+        hi <- beforeAction
         o <- action' hi i
         afterEachHook hi
         case parse' o of

@@ -49,6 +49,8 @@ RUN apt-get update && \
 
     RUN cabal install turtle
 
+    RUN apt-get install -y bash
+
 # Main settings:
 #   * BOOTSTRAP_HASKELL_NONINTERACTIVE - any nonzero value for noninteractive installation
 #   * BOOTSTRAP_HASKELL_NO_UPGRADE - any nonzero value to not trigger the upgrade
@@ -67,13 +69,6 @@ RUN apt-get update && \
 #   * GHCUP_BASE_URL - the base url for ghcup binary download (use this to overwrite https://downloads.haskell.org/~ghcup with a mirror)
 #   * GHCUP_MSYS2_ENV - the msys2 environment to use on windows, see https://www.msys2.org/docs/environments/ (defauts to MINGW64, MINGW32 or CLANGARM64, depending on the architecture)
 
-
-# Create a non-root user and switch to it
-RUN useradd -ms /bin/bash vscode
-USER vscode
-
-# Set the working directory
-WORKDIR /home/vscode
 
 # Copy any local files to the container (if needed)
 # COPY . /home/dockeruser/

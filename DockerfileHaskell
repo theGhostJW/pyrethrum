@@ -1,12 +1,23 @@
 # Use the latest official Ubuntu image as a base
 FROM ubuntu:latest
 
+# large chunks of this file "inspired by" aka. plagerised from https://github.com/vzarytovskii/haskell-dev-env/blob/master/.devcontainer/Dockerfile
 # use
 # docker build -t "haskell" -f DockerfileHaskell .
 # 
 
 # Set environment variables to avoid interactive prompts during package installation
-ENV DEBIAN_FRONTEND=noninteractive
+ARG GHC_VERSION=9.8.2
+ARG CABAL_VERSION=3.12.1.0
+
+ENV USERNAME=vscode \
+    # modified from https://github.com/vzarytovskii/haskell-dev-env/blob/master/.devcontainer/Dockerfile 
+    # this 1000 is aready taken by ubuntu
+    USER_UID=1001 \
+    USER_GID=1001 \
+    DEBIAN_FRONTEND=noninteractive \
+    GHC_VERSION=${GHC_VERSION} \
+    CABAL_VERSION=${CABAL_VERSION} 
 
 # Update the package list and install some basic utilities
 RUN apt-get update && \
@@ -24,32 +35,49 @@ RUN apt-get update && \
     libgmp10 \
     libncurses-dev \
     pkg-config \
-    # used by zlib used by turtle
-    # zlib \
-    && apt-get clean \
-    # get ghcup install script
-    && curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
-                                                                            BOOTSTRAP_HASKELL_GHC_VERSION=9.8.2 \
-                                                                            BOOTSTRAP_HASKELL_CABAL_VERSION=3.12.1.0 \
-                                                                            BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1 \
-                                                                            BOOTSTRAP_HASKELL_INSTALL_HLS=1 \
-                                                                            sh
+    # used by zlib used by
+    zlib1g-dev \
+    && apt-get clean 
 
-    # Explicitly export PATH changes
-    ENV PATH="/root/.ghcup/bin:${PATH}"
+# Explicitly export PATH changes
+RUN groupadd --gid ${USER_GID} ${USERNAME} && \
+    useradd -ms /bin/bash -K MAIL_DIR=/dev/null --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME} && \
+    echo ${USERNAME} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USERNAME} && \
+    chmod 0440 /etc/sudoers.d/${USERNAME}
 
-    # install other tools
-    RUN cabal update 
+USER ${USER_UID}:${USER_GID}
+WORKDIR /home/${USERNAME}
+ENV PATH="/home/${USERNAME}/.local/bin:/home/${USERNAME}/.cabal/bin:/home/${USERNAME}/.ghcup/bin:$PATH"
 
-    RUN cabal install ghcid
+# RUN chmod -R 700 /home/${USERNAME}/.local/bin /home/${USERNAME}/.cabal/bin /home/${USERNAME}/.ghcup/bin
+RUN echo "export PATH=${PATH}" >> /home/${USERNAME}/.profile
 
-    RUN apt-get install -y zlib1g-dev
 
-    RUN cabal install hpack
+# get ghcup install script
+RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
+    BOOTSTRAP_HASKELL_GHC_VERSION=${GHC_VERSION} \
+    BOOTSTRAP_HASKELL_CABAL_VERSION=${CABAL_VERSION} \
+    BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1 \
+    BOOTSTRAP_HASKELL_INSTALL_HLS=1 \
+    sh
 
-    RUN cabal install turtle
+# install other tools
+RUN cabal update 
 
-    RUN apt-get install -y bash
+RUN cabal install ghcid
+
+RUN cabal install hpack
+
+RUN cabal install turtle
+
+# Switch back to root user to install packages
+USER root
+
+# Install bash or any other packages that require root privileges
+RUN apt-get install -y bash
+
+# Switch back to the non-root user if necessary
+USER ${USER_UID}:${USER_GID}
 
 # Main settings:
 #   * BOOTSTRAP_HASKELL_NONINTERACTIVE - any nonzero value for noninteractive installation

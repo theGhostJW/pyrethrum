@@ -11,9 +11,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Set the working directory
 WORKDIR /home/vscode
 
-#  cabal build was failing
-#  error: chmod on /workspaces/8217ff4d204bea625e2888e280e4f0a2eb33b8f77c89a67967029ca09aaa44db/dist-newstyle/src/chronos-e3374e440d991c5a/.git/config.lock failed: Operation not permitted
-# RUN chmod -R 777 /workspaces/
+#!/bin/bash
+
+# Clone the specific branch 'dev-container' from the repository
+RUN git clone --branch dev-container https://github.com/theGhostJW/pyrethrum.git \
+    && cd pyrethrum \
+    && cabal build --only-dependencies \
+    && cd .. \
+    && rm -rf pyrethrum
 
 # Copy any local files to the container (if needed)
 # COPY . /home/dockeruser/

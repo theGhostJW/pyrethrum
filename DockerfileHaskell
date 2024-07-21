@@ -4,7 +4,8 @@ FROM ubuntu:latest
 # large chunks of this file "inspired by" aka. plagerised from https://github.com/vzarytovskii/haskell-dev-env/blob/master/.devcontainer/Dockerfile
 # use
 # docker build -t "haskell" -f DockerfileHaskell .
-# 
+# docker tag haskell theghostjw/haskell:latest
+# docker push theghostjw/haskell:latest
 
 # Set environment variables to avoid interactive prompts during package installation
 ARG GHC_VERSION=9.8.2

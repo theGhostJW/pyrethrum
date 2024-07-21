@@ -12,7 +12,7 @@
 
 	// copy the compiled library files from dist-newstyle into the current working directory
 	// if the dist-newstyle directory does not already exist 
-	"postCreateCommand": "[ ! -d ./dist-newstyle ] && cp -r ../dist-newstyle ./",
+	"postCreateCommand": "[ ! -d ./dist-newstyle ] && cp -r ~/dist-newstyle ./",
 
 	// Configure tool-specific properties.devco
 	// "customizations": {},

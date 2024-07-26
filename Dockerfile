@@ -30,7 +30,8 @@ RUN REPO_DIR=$(basename -s .git "${REPO}") \
     # local modules => dist-newstyle
     && cabal build \
     # local copy module build artifacts to home dir
-    && cp -r ./dist-newstyle /home/vscode/dist-newstyle \
+    # note this does not work cabal is too clever with its cach invalidation
+    # && cp -r ./dist-newstyle /home/vscode/dist-newstyle \
     # CD out
     && cd .. \
     # delete the repo

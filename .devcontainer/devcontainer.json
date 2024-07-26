@@ -18,5 +18,41 @@
 	// "customizations": {},
 
 	"remoteUser": "vscode",
-	"containerUser": "vscode"
+	"containerUser": "vscode",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"alefragnani.Bookmarks",
+				"ms-vscode.vscode-speech-language-pack-en-au",
+				"ms-vscode.vscode-speech",
+				"tomoki1207.pdf",
+				"techer.open-in-browser",
+				"johnpapa.vscode-peacock",
+				"acarreiro.calculate",
+				"streetsidesoftware.code-spell-checker",
+				"nemesv.copy-file-name",
+				"mrmlnc.vscode-duplicate",
+				"sleistner.vscode-fileutils",
+				"huizhou.githd",
+				"donjayamanne.githistory",
+				"eamodio.gitlens",
+				"haskell.haskell",
+				"justusadam.language-haskell",
+				"ms-vsliveshare.vsliveshare-pack",
+				"yzhang.markdown-all-in-one",
+				"yzane.markdown-pdf",
+				"jack89ita.open-file-from-path",
+				"christian-kohler.path-intellisense",
+				"mechatroner.rainbow-csv",
+				"daiyy.quick-html-previewer",
+				"humao.rest-client",
+				"kylepaulsen.stack-tabs",
+				"spmeesseman.vscode-taskexplorer",
+				"Gruntfuggly.todo-tree",
+				"andyyaldoo.vscode-json",
+				"redhat.vscode-yaml",
+				"bee.git-temporal-vscode"
+			]
+		}
+	}
 }

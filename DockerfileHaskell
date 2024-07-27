@@ -67,12 +67,12 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTR
     BOOTSTRAP_HASKELL_CABAL_VERSION=${CABAL_VERSION} \
     BOOTSTRAP_HASKELL_INSTALL_HLS=1 \
     sh
+    
+RUN ghcup install hls ${HLS_VERSION} \
+    ghcup set hls ${HLS_VERSION}
 
 RUN ghcup install stack ${STACK_VERSION} \
     ghcup set stack ${STACK_VERSION}
-
-RUN ghcup install hls ${HLS_VERSION} \
-    ghcup set hls ${HLS_VERSION}
 
 # install other tools
 RUN cabal update 

@@ -68,6 +68,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTR
     BOOTSTRAP_HASKELL_INSTALL_HLS=1 \
     sh
     
+# RUN ghcup --url-source=https://raw.githubusercontent.com/haskell/ghcup-metadata/master/ghcup-vanilla-0.0.8.yaml install hls 2.9.0.1
 RUN ghcup install hls ${HLS_VERSION} \
     ghcup set hls ${HLS_VERSION}
 

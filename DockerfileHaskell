@@ -10,6 +10,9 @@ FROM ubuntu:latest
 # Set environment variables to avoid interactive prompts during package installation
 ARG GHC_VERSION=9.8.2
 ARG CABAL_VERSION=3.12.1.0
+ARG HLS_VERSION=2.9.0.1
+# for some reason hls trys to download stack if it is not there
+ARG STACK_VERSION=2.15.7
 
 ENV USERNAME=vscode \
     # modified from https://github.com/vzarytovskii/haskell-dev-env/blob/master/.devcontainer/Dockerfile 
@@ -29,6 +32,7 @@ RUN apt-get update && \
     # GHCUp Requirements https://www.haskell.org/ghcup/install/#version-23
     build-essential \
     curl \
+    bash \
     build-essential \ 
     libffi-dev \
     libffi8ubuntu1 \
@@ -53,32 +57,29 @@ ENV PATH="/home/${USERNAME}/.local/bin:/home/${USERNAME}/.cabal/bin:/home/${USER
 # RUN chmod -R 700 /home/${USERNAME}/.local/bin /home/${USERNAME}/.cabal/bin /home/${USERNAME}/.ghcup/bin
 RUN echo "export PATH=${PATH}" >> /home/${USERNAME}/.profile
 
-
+# Download ghciwatch binary
+RUN curl -L -o /usr/local/bin/ghciwatch https://github.com/MercuryTechnologies/ghciwatch/releases/download/v1.0.1/ghciwatch-x86_64-linux && \
+    chmod +x /usr/local/bin/
+    
 # get ghcup install script
 RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
     BOOTSTRAP_HASKELL_GHC_VERSION=${GHC_VERSION} \
     BOOTSTRAP_HASKELL_CABAL_VERSION=${CABAL_VERSION} \
-    BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1 \
     BOOTSTRAP_HASKELL_INSTALL_HLS=1 \
     sh
+
+RUN ghcup install stack ${STACK_VERSION} \
+    ghcup set stack ${STACK_VERSION}
+
+RUN ghcup install hls ${HLS_VERSION} \
+    ghcup set hls ${HLS_VERSION}
 
 # install other tools
 RUN cabal update 
 
-RUN cabal install ghcid
-
 RUN cabal install hpack
 
 RUN cabal install turtle
-
-# Switch back to root user to install packages
-USER root
-
-# Install bash or any other packages that require root privileges
-RUN apt-get install -y bash
-
-# Switch back to the non-root user if necessary
-USER ${USER_UID}:${USER_GID}
 
 # Main settings:
 #   * BOOTSTRAP_HASKELL_NONINTERACTIVE - any nonzero value for noninteractive installation

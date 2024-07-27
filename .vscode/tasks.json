@@ -4,6 +4,26 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "ghciWatch",
+      "type": "shell",
+      "command": "ghcid",
+      "args": [
+        "--before-startup-shell hpack --force",
+        "--restart-glob '**/package.yaml'",
+        "--allow-eval",
+        "--clear",
+        "--no-height-limit",
+        "--backtrace full",
+        "--logjson ghcWatch.log"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "build",
       "dependsOrder": "sequence",
       "presentation": {
@@ -96,7 +116,7 @@
       "command": "cabal",
       "args": [
         "build",
-       // "-v3",
+        // "-v3",
         "--flags='-optimised +godLibrary'"
       ],
       "presentation": {

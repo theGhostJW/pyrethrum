@@ -1,5 +1,10 @@
 # Use the latest official Ubuntu image as a base
-FROM theghostjw/haskell:haskell
+FROM theghostjw/haskell:latest
+
+# use
+# docker build -t "pyrethrum" .
+# docker tag pyrethrum theghostjw/pyrethrum:latest
+# docker push theghostjw/pyrethrum:latest
 
 # Set environment variables to avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -14,8 +19,8 @@ WORKDIR /home/vscode
 ARG REPO=https://github.com/theGhostJW/pyrethrum.git
 ARG BRANCH=dev-container
 
-# sadly this hast to all be in a single block so REPO_DIR can be used
-# Keep in mind that Docker does not directly support storing command output in variables within a Dockerfile as you might in a shell script. 
+# Sadly this has to all be in a single RUN command so REPO_DIR can be used
+# Docker does not directly support storing command output in variables within a Dockerfile as you might in a shell script. 
 # The example combines commands using && to ensure they are executed in the same shell, 
 # allowing the use of the variable ${REPO_DIR} within the scope of that RUN command.
 
@@ -23,7 +28,7 @@ ARG BRANCH=dev-container
 RUN REPO_DIR=$(basename -s .git "${REPO}") \
     # clone into home (note single branch)
     && git clone --single-branch --branch ${BRANCH} ${REPO} \
-    # cd to
+    # cd into source repo
     && cd "${REPO_DIR}" \
     # build it all (go have coffee for an hour or more)
     # libraries will be cached by cabal

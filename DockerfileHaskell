@@ -50,8 +50,6 @@ RUN curl -L -o /usr/local/bin/ghciwatch https://github.com/MercuryTechnologies/g
 
 # Explicitly export PATH changes
 RUN groupadd --gid ${USER_GID} ${USERNAME} && \
-# Explicitly export PATH changes
-RUN groupadd --gid ${USER_GID} ${USERNAME} && \
     useradd -ms /bin/bash -K MAIL_DIR=/dev/null --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME} && \
     echo ${USERNAME} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USERNAME} && \
     chmod 0440 /etc/sudoers.d/${USERNAME}
@@ -85,7 +83,6 @@ RUN echo "export PATH=${PATH}" >> /home/${USERNAME}/.profile
 #   * GHCUP_BASE_URL - the base url for ghcup binary download (use this to overwrite https://downloads.haskell.org/~ghcup with a mirror)
 #   * GHCUP_MSYS2_ENV - the msys2 environment to use on windows, see https://www.msys2.org/docs/environments/ (defauts to MINGW64, MINGW32 or CLANGARM64, depending on the architecture)
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
     BOOTSTRAP_HASKELL_GHC_VERSION=${GHC_VERSION} \
     BOOTSTRAP_HASKELL_CABAL_VERSION=${CABAL_VERSION} \

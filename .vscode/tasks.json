@@ -6,9 +6,9 @@
     {
       "label": "ghciWatch",
       "type": "shell",
-      "command": "ghcid",
+      "command": "ghciwatch",
       "args": [
-        "--before-startup-shell hpack --force",
+        "--before-startup-shell hpack",
         "--restart-glob '**/package.yaml'",
         "--allow-eval",
         "--clear",

@@ -43,26 +43,26 @@ RUN apt-get update && \
     # used by zlib used by
     zlib1g-dev \
     && apt-get clean
-
-# Download ghciwatch binary
-RUN curl -L -o /usr/local/bin/ghciwatch https://github.com/MercuryTechnologies/ghciwatch/releases/download/v1.0.1/ghciwatch-x86_64-linux && \
-    chmod +x /usr/local/bin/
-
-# Explicitly export PATH changes
-RUN groupadd --gid ${USER_GID} ${USERNAME} && \
+    
+    # Explicitly export PATH changes
+    RUN groupadd --gid ${USER_GID} ${USERNAME} && \
     useradd -ms /bin/bash -K MAIL_DIR=/dev/null --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME} && \
     echo ${USERNAME} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USERNAME} && \
     chmod 0440 /etc/sudoers.d/${USERNAME}
-
-# Ensure the vscode user has ownership of its home directory
-RUN chown -R ${USER_UID}:${USER_GID} /home/${USERNAME}
-
-USER ${USER_UID}:${USER_GID}
-WORKDIR /home/${USERNAME}
-ENV PATH="/home/${USERNAME}/.local/bin:/home/${USERNAME}/.cabal/bin:/home/${USERNAME}/.ghcup/bin:$PATH"
-
-# Set path to user
-RUN echo "export PATH=${PATH}" >> /home/${USERNAME}/.profile
+    
+    USER ${USER_UID}:${USER_GID}
+    WORKDIR /home/${USERNAME}
+    ENV PATH="/home/${USERNAME}/.local/bin:/home/${USERNAME}/.cabal/bin:/home/${USERNAME}/.ghcup/bin:$PATH"
+    
+    # Set path to user
+    RUN echo "export PATH=${PATH}" >> /home/${USERNAME}/.profile
+    
+    # Download ghciwatch binary
+    RUN curl -L -o /usr/local/bin/ghciwatch https://github.com/MercuryTechnologies/ghciwatch/releases/download/v1.0.1/ghciwatch-x86_64-linux && \
+        chmod +x /usr/local/bin/ghciwatch
+    
+    # Ensure the vscode user has ownership of its home directory
+    RUN chown -R ${USER_UID}:${USER_GID} /home/${USERNAME}
 
 # get ghcup install script
 # Main settings:

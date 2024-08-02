@@ -49,6 +49,13 @@ RUN apt-get update && \
     useradd -ms /bin/bash -K MAIL_DIR=/dev/null --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME} && \
     echo ${USERNAME} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USERNAME} && \
     chmod 0440 /etc/sudoers.d/${USERNAME}
+
+    # Download ghciwatch binary as root
+    RUN curl -L -o /usr/local/bin/ghciwatch https://github.com/MercuryTechnologies/ghciwatch/releases/download/v1.0.1/ghciwatch-x86_64-linux && \
+        chmod +x /usr/local/bin/ghciwatch
+        
+    # Ensure the vscode user has ownership of the ghciwatch binary
+    RUN chown ${USER_UID}:${USER_GID} /usr/local/bin/ghciwatch
     
     USER ${USER_UID}:${USER_GID}
     WORKDIR /home/${USERNAME}
@@ -56,10 +63,6 @@ RUN apt-get update && \
     
     # Set path to user
     RUN echo "export PATH=${PATH}" >> /home/${USERNAME}/.profile
-    
-    # Download ghciwatch binary
-    RUN curl -L -o /usr/local/bin/ghciwatch https://github.com/MercuryTechnologies/ghciwatch/releases/download/v1.0.1/ghciwatch-x86_64-linux && \
-        chmod +x /usr/local/bin/ghciwatch
     
     # Ensure the vscode user has ownership of its home directory
     RUN chown -R ${USER_UID}:${USER_GID} /home/${USERNAME}

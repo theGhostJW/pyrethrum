@@ -4,18 +4,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "ghciWatch",
+      "label": "ghciwatch",
       "type": "shell",
-      "command": "ghciwatch",
-      "args": [
-        "--before-startup-shell hpack",
-        "--restart-glob '**/package.yaml'",
-        "--allow-eval",
-        "--clear",
-        "--no-height-limit",
-        "--backtrace full",
-        "--logjson ghcWatch.log"
-      ],
+      "command": "ghciwatch --before-startup-shell 'hpack --force' --restart-glob package.yaml --command 'cabal repl --repl-no-load' --watch src --watch test --watch examples --watch testIntegration --allow-eval --clear --backtrace full",
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -36,66 +27,6 @@
         "cabal build"
       ]
     },
-    {
-      "label": "build restart ghcid",
-      "dependsOrder": "sequence",
-      "dependsOn": [
-        "build",
-        "ghcid pyrethrum"
-      ]
-    },
-    {
-      "label": "build restart ghcid examples",
-      "dependsOrder": "sequence",
-      "dependsOn": [
-        "build",
-        "copy examples ghci",
-        "ghcid examples"
-      ]
-    },
-    {
-      "label": "ghcid pyrethrum",
-      "dependsOrder": "sequence",
-      "dependsOn": [
-        "copy pyrethrum ghci",
-        "ghcid-pyrethrum-no-copy"
-      ]
-    },
-    {
-      "label": "ghcid examples",
-      "dependsOrder": "sequence",
-      "dependsOn": [
-        "copy examples ghci",
-        "ghcid-examples-no-copy"
-      ]
-    },
-    {
-      "label": "ghcid discover",
-      "dependsOrder": "sequence",
-      "dependsOn": [
-        "copy discover ghci",
-        "ghcid-discover-no-copy"
-      ]
-    },
-    // {
-    //   // Not working - exits after first run
-    //   "label": "ghcid test",
-    //   "type": "shell",
-    //   "command": "ghcid",
-    //   "args": [
-    //     "--command",
-    //     "'cabal test --test-show-details=streaming'",
-    //     "--allow-eval",
-    //     "--clear",
-    //     "--no-height-limit",
-    //     "-o ghcid.log"
-    //   ],
-    //   "presentation": {
-    //     "reveal": "always",
-    //     "panel": "new"
-    //   },
-    //   "problemMatcher": []
-    // },
     {
       "label": "hpack",
       "type": "shell",
@@ -142,119 +73,12 @@
       "problemMatcher": []
     },
     {
-      "label": "copy pyrethrum ghci",
-      "type": "shell",
-      "command": "sh",
-      "args": [
-        "-c",
-        "if [ \"$(expr substr $(uname -s) 1 5)\" = \"MINGW\" ]; then xcopy .ghci.pyrethrum .ghci /y /f; else cp .ghci.pyrethrum .ghci -f; fi"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "copy examples ghci",
-      "type": "shell",
-      "command": "xcopy",
-      "args": [
-        ".ghci.examples",
-        ".ghci",
-        "/y",
-        "/f"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "copy discover ghci",
-      "type": "shell",
-      "command": "xcopy",
-      "args": [
-        ".ghci.discover",
-        ".ghci",
-        "/y",
-        "/f"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false
-      },
-      "problemMatcher": []
-    },
-    {
       "label": "cabal test",
       "type": "shell",
       "command": "cabal",
       "args": [
         "test",
         "--test-show-details=streaming"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "ghcid-examples-no-copy",
-      "type": "shell",
-      "command": "ghcid",
-      "args": [
-        "--command",
-        "'cabal repl examples'",
-        "--allow-eval",
-        "--clear",
-        "--no-height-limit",
-        "-o ghcid.log"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "ghcid-discover-no-copy",
-      "type": "shell",
-      "command": "ghcid",
-      "args": [
-        "--command",
-        "'cabal repl discover'",
-        "--allow-eval",
-        "--clear",
-        "--no-height-limit",
-        "-o ghcid.log"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "ghcid-pyrethrum-no-copy",
-      "type": "shell",
-      "command": "ghcid",
-      "args": [
-        "--command",
-        "'cabal repl'",
-        "pyrethrum",
-        "--allow-eval",
-        "--clear",
-        "--no-height-limit",
-        "-o ghcid.log"
       ],
       "presentation": {
         "reveal": "always",

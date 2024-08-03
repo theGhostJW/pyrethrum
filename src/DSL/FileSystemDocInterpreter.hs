@@ -53,8 +53,8 @@ docErrn funcName dscFrags =
   do
     let funcDesc = T.intercalate " " dscFrags
     logStep funcDesc
-    -- replace this later when have code to process call
-    -- stack right now out of the boc call handling looks better
+    -- TODO :: replace this later when have code to process call
+    -- stack right now out of the box call handling looks better
     -- E.throwError . DocException $
     pure . error $
       "\nException thrown in step documentation."

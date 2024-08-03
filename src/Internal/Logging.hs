@@ -3,16 +3,17 @@
 module Internal.Logging where
 
 -- TODO: Explicit exports remove old code
+
+import CoreUtils (Hz (..))
 import CoreUtils qualified as C
 import DSL.Internal.NodeEvent qualified as NE
-import Data.Aeson.TH (defaultOptions, deriveToJSON, deriveJSON)
+import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import Data.Text as T (intercalate)
 import Effectful.Concurrent.STM (TQueue)
+import Filter (FilterResult)
 import Internal.LoggingCore
 import PyrethrumExtras as PE (head, tail, (?))
 import Prelude hiding (atomically, lines)
-import Filter ( FilterResult )
-import CoreUtils (Hz (..))
 
 type Log l a = BaseLog LogContext (Event l a)
 
@@ -21,6 +22,7 @@ ctx = (.logContext)
 
 evnt :: Log l a -> Event l a
 evnt = (.event)
+
 data LogContext = MkLogContext
   { threadId :: C.ThreadId,
     idx :: Int
@@ -88,16 +90,14 @@ mkFailure :: l -> NodeType -> SomeException -> Event l a
 mkFailure loc nodeType exception = Failure {exception = C.exceptionTxt exception, ..}
 
 data Event l a
-  = 
-    FilterLog
+  = FilterLog
       { filterResuts :: [FilterResult Text]
       }
   | SuiteInitFailure
-      { 
-        failure :: Text,
+      { failure :: Text,
         notes :: Text
       }
-  |  StartExecution
+  | StartExecution
   | Start
       { nodeType :: NodeType,
         loc :: l
@@ -123,7 +123,7 @@ data Event l a
   | EndExecution
   deriving (Show)
 
-testLogControls :: forall l a. (Show a, Show l)=> Bool -> IO (LogControls (Event l a) (Log l a), TQueue (Log l a))
+testLogControls :: forall l a. (Show a, Show l) => Bool -> IO (LogControls (Event l a) (Log l a), TQueue (Log l a))
 testLogControls = testLogControls' expandEvent
 
 -- -- NodeEvent (a) a loggable event generated from within a node

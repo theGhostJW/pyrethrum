@@ -26,13 +26,13 @@ chkInitFailure expected filterResults =
       L.SuiteInitFailure {failure} -> failure
       _ -> bug "Expected SuiteInitFailure"
 
--- $> unit_configError_valid_pass
+-- $ > unit_configError_valid_pass
 
 unit_configError_valid_pass :: IO ()
 unit_configError_valid_pass =
   chkInitFailure Nothing [MkFilterResult "" Nothing]
 
--- $> unit_configError_valid_fail
+-- $ > unit_configError_valid_fail
 
 unit_configError_valid_fail :: IO ()
 unit_configError_valid_fail =
@@ -42,12 +42,12 @@ unit_configError_valid_fail =
       MkFilterResult "1" Nothing
     ]
 
--- $> unit_configError_empty
+-- $ > unit_configError_empty
 
 unit_configError_empty :: IO ()
 unit_configError_empty = chkInitFailure (Just "Filtered Test Suite is Empty") []
 
--- $> unit_configError_duplicate
+-- $ > unit_configError_duplicate
 
 unit_configError_duplicate :: IO ()
 unit_configError_duplicate =
@@ -60,7 +60,6 @@ unit_configError_duplicate =
     ]
 
 -- $ > unit_simple_pass
-
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
@@ -218,7 +217,7 @@ unit_empty_thread_hooks =
     exe [threadAround Pass Pass [threadBefore Pass [threadAfter Pass [fixture [test Pass]]]]] >>= chkLogLength
   where
     exe = execute NoLog defaultSeed (ThreadCount 1)
-    chkEmptyLog r = chkEq' ("Log should only have start and end log:\n" <> txt r.log) 2 (length r.log)
+    chkEmptyLog r = chkEq' ("Log should only have start and a end log:\n" <> txt r.log) 2 (length r.log)
     chkLogLength r = chkEq' ("Log length not as expected:\n" <> txt r.log) 12 (length r.log)
 
 {-

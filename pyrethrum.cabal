@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bfc7c35256a6d098b345dfba5e8df801f0164624a3d460c5b11a367e496b7c81
+-- hash: 4c4d6df4c16625fa44512ba82ed9bd8a552da913c3cd7f8e90430d0f741d20b8
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -114,6 +114,7 @@ library
       PyrethrumDemoTest
       RunDemo
       StepDocumenterDemo
+      TestDemoSelenium
   hs-source-dirs:
       src
       test
@@ -200,5 +201,6 @@ library
     , transformers-either
     , unliftio
     , unordered-containers
+    , webdriver-w3c
     , yaml
   default-language: Haskell2010

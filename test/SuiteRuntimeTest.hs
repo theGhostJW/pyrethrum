@@ -59,17 +59,16 @@ unit_configError_duplicate =
       MkFilterResult "1" Nothing
     ]
 
--- $ > unit_simple_pass
+-- $> unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
--- $ > unit_simple_fail
-
+-- $> unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fixture [test Pass, test Fail]]]
 
--- $ > unit_nested_pass_fail
 
+-- $> unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
   runTest

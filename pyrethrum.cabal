@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 49f7df0cc9e355949ced9b07a36db8e99c36d27ded2d4673837cacb7265201d7
+-- hash: 4c4d6df4c16625fa44512ba82ed9bd8a552da913c3cd7f8e90430d0f741d20b8
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -201,5 +201,6 @@ library
     , transformers-either
     , unliftio
     , unordered-containers
+    , webdriver-w3c
     , yaml
   default-language: Haskell2010

@@ -21,8 +21,8 @@ source-repository-package
 
 source-repository-package
   type: git
-  location: https://github.com/theGhostJW/pyrethrum-extras
-  tag: a02d299bca4407a26c48ae2c78c83b0886964a81
+  location: https://github.com/theGhostJW/webdriver-w3c
+  tag: 55a8b6e7d8568fc664355c3902ff9a3fcc964e2d
 
 
 optimization: 0

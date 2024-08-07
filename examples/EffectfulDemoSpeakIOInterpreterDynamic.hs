@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-
 module EffectfulDemoSpeakIOInterpreterDynamic where
 
 import Data.Text.IO qualified as T
@@ -14,8 +12,7 @@ import Effectful as EF (
   type (:>),
  )
 import Effectful.Dispatch.Dynamic (
-  -- HasCallStack,
-  interpret,
+  interpret
  )
 import Effectful.TH (makeEffect)
 
@@ -31,19 +28,19 @@ makeEffect ''Speak
 
 -- Interpreters
 
-runSpeak :: forall es a. (HasCallStack, IOE :> es) => Eff (Speak : es) a -> Eff es a
+runSpeak :: forall es a. ( IOE :> es) =>Eff (Speak : es) a -> Eff es a
 runSpeak =
   interpret $ \_ ->
     EF.liftIO . \case
-      Hello name -> T.putStrLn $ "Hello (dynamic) " <> name
-      Goodbye name -> T.putStrLn $ "Goodbye (dynamic) " <> name
+      Hello name -> T.putStrLn $ "Hello " <> name
+      Goodbye name -> T.putStrLn $ "Goodbye " <> name
 
-runSpeakCasual :: forall es a. (HasCallStack, IOE :> es) => Eff (Speak : es) a -> Eff es a
+runSpeakCasual :: forall es a. ( IOE :> es) =>Eff (Speak : es) a -> Eff es a
 runSpeakCasual =
   interpret $ \_ ->
     EF.liftIO . \case
-      Hello name -> T.putStrLn $ "hi (dynamic) " <> name
-      Goodbye name -> T.putStrLn $ "bye (dynamic) " <> name
+      Hello name -> T.putStrLn $ "hi " <> name
+      Goodbye name -> T.putStrLn $ "bye " <> name
 
 -- Effectful Ap
 

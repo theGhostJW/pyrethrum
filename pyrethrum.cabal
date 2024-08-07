@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bfc7c35256a6d098b345dfba5e8df801f0164624a3d460c5b11a367e496b7c81
+-- hash: 49f7df0cc9e355949ced9b07a36db8e99c36d27ded2d4673837cacb7265201d7
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -114,6 +114,7 @@ library
       PyrethrumDemoTest
       RunDemo
       StepDocumenterDemo
+      TestDemoSelenium
   hs-source-dirs:
       src
       test

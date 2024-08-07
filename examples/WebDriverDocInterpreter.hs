@@ -1,7 +1,6 @@
-module TestDemoSelenium where
+module WebDriverDocInterpreter where
 
   
-
 import Data.Text.IO qualified as T
 import Effectful as EF (
   Dispatch (Dynamic),

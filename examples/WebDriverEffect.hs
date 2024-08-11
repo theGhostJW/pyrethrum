@@ -18,7 +18,24 @@ import Effectful.Dispatch.Dynamic (
   interpret
  )
 import Effectful.TH (makeEffect)
+import Effectful.Reader.Static as ERS
 
+
+
+{-
+1. revisit monad transformers step by step DONE
+2. relook at HttpTT
+3. relook at Eff
+  - THIS !!! :: https://hackage.haskell.org/package/effectful-core-2.3.0.1/docs/Effectful-Dispatch-Dynamic.html#g:4
+  - esp lifting
+4. try find examples
+
+Control.Monad.Script.Http
+
+A basic type and monad transformer transformer for describing HTTP interactions.
+
+data HttpTT e r w s p t eff a 
+-}
 
 {-
  demo the following:
@@ -43,6 +60,8 @@ import Effectful.TH (makeEffect)
 -- https://github.com/nbloomf/webdriver-w3c/blob/master/doc/Tutorial.md
 
 -- Effect
+
+type WebDriver = ERS.Reader
 
 type instance DispatchOf WebUI = Dynamic
 

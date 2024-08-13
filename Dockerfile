@@ -7,6 +7,7 @@ FROM theghostjw/haskell:latest
 # docker push theghostjw/pyrethrum:latest
 
 # vscode user created in haskell
+# TODo: parameterise this
 ENV DEBIAN_FRONTEND=noninteractive \
     USERNAME=vscode \
     # modified from https://github.com/vzarytovskii/haskell-dev-env/blob/master/.devcontainer/Dockerfile 

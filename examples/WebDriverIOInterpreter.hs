@@ -25,7 +25,7 @@ runWebDriverIO =
     EF.liftIO . \case
       Click name -> T.putStrLn $ "Click " <> name
       Go name -> T.putStrLn $ "Go " <> name
-      Read name -> T.putStrLn $ "Read " <> name
+      Read name -> undefined -- T.putStrLn $ "Read " <> name
 
 {-
  demo the following:

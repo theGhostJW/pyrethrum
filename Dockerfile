@@ -6,12 +6,17 @@ FROM theghostjw/haskell:latest
 # docker tag pyrethrum theghostjw/pyrethrum:latest
 # docker push theghostjw/pyrethrum:latest
 
-# Set environment variables to avoid interactive prompts during package installation
-ENV DEBIAN_FRONTEND=noninteractive
+# vscode user created in haskell
+ENV DEBIAN_FRONTEND=noninteractive \
+    USERNAME=vscode \
+    # modified from https://github.com/vzarytovskii/haskell-dev-env/blob/master/.devcontainer/Dockerfile 
+    # this 1000 is aready taken by ubuntu
+    USER_UID=1001 \
+    USER_GID=1001 \
 
 # Create a non-root user and switch to it
 # RUN useradd -ms /bin/bash vscode
-# USER vscode
+USER ${USER_UID}:${USER_GID}
 
 # Set the working directory
 WORKDIR /home/vscode

@@ -10,7 +10,12 @@ sed -i '/deb.debian.org\/debian unstable/d' /etc/apt/sources.list
 apt-get update
 
 # Install necessary dependencies
-apt-get install -y wget tar libdbus-glib-1-2 libgtk-3-0t64 libx11-xcb1 libxt6t64 libxrender1 libxrandr2 libdbus-1-3 libxtst6 libxss1 libasound2t64
+apt-get install -y wget tar libdbus-glib-1-2 libgtk-3-0t64 libx11-xcb1 libxt6t64 libxrender1 libxrandr2 libdbus-1-3 libxtst6 libxss1 libasound2t64 libpci3 libegl1 libgl1 libglx-mesa0 locales \
+                   gstreamer1.0-libav gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly
+
+# Set up locale for Australia
+locale-gen en_AU.UTF-8
+update-locale LANG=en_AU.UTF-8
 
 # Download the latest Firefox tarball
 wget -O /tmp/firefox.tar.bz2 "https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US"

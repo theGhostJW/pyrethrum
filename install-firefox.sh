@@ -44,3 +44,5 @@ wget -O /tmp/test-audio.wav "https://www2.cs.uic.edu/~i101/SoundFiles/StarWars3.
 aplay /tmp/test-audio.wav
 
 echo "Firefox installation and audio test completed."
+
+# TODO Audio not working - check if works with playwright emulators and get working if it does

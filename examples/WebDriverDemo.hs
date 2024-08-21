@@ -22,7 +22,23 @@ import Effectful.Dispatch.Dynamic (
 import Effectful.TH (makeEffect)
 
 
+
+
+
 {-
+1. revisit monad transformers step by step DONE
+2. relook at HttpTT
+3. relook at Eff
+  - THIS !!! :: https://hackage.haskell.org/package/effectful-core-2.3.0.1/docs/Effectful-Dispatch-Dynamic.html#g:4
+  - esp lifting
+4. try find examples
+
+Control.Monad.Script.Http
+
+A basic type and monad transformer transformer for describing HTTP interactions.
+
+data HttpTT e r w s p t eff a 
+
  demo the following:
   - single test suite with minimal selenium interpreter 
     - when web ui interaction is implemented it will probably use a custom / different library due to licence
@@ -48,8 +64,6 @@ theInternet = "https://the-internet.herokuapp.com/"
 -- https://github.com/nbloomf/webdriver-w3c/blob/master/doc/Tutorial.md
 -- https://hackage.haskell.org/package/webdriver-w3c
 
--- Effect
-
 type instance DispatchOf WebUI = Dynamic
 
 data WebUI :: Effect where
@@ -59,27 +73,7 @@ data WebUI :: Effect where
 
 makeEffect ''WebUI
 
--- Interpreters
-
--- runWebUI :: forall es a. ( IOE :> es) => Eff (WebUI : es) a -> Eff es a
--- runWebUI =
---   interpret $ \_ ->
---     EF.liftIO . \case
---       Hello name -> T.putStrLn $ "Hello " <> name
---       Goodbye name -> T.putStrLn $ "Goodbye " <> name
-
--- runWebUICasual :: forall es a. ( IOE :> es) =>Eff (WebUI : es) a -> Eff es a
--- runWebUICasual =
---   interpret $ \_ ->
---     EF.liftIO . \case
---       Hello name -> T.putStrLn $ "hi " <> name
---       Goodbye name -> T.putStrLn $ "bye " <> name
-
-
--- Basic
--- From webdriver tutorial
--- needs geckodriver running
--- TODO :: when fully implemented need to auto start driver
+-- start geckodriver first
 -- geckodriver &
 
 release_the_bats :: WebDriverT IO ()
@@ -91,8 +85,8 @@ release_the_bats = do
   wait 5000000
   pure ()
 
-
--- $> example1
+  
+-- $ > example1
 example1 :: IO ()
 example1 = do
   execWebDriverT defaultWebDriverConfig

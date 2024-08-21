@@ -27,32 +27,6 @@ runWebDriverIO =
       Go name -> T.putStrLn $ "Go " <> name
       Read name -> undefined -- T.putStrLn $ "Read " <> name
 
-{-
- demo the following:
-  - single test suite with minimal selenium interpreter 
-    - when web ui interaction is implemented it will probably use a custom / different library due to licence
-  - read a value from "the internet"
-  - navigate between pages
-  - read a second value
-  - validator on value
-  - expect issue with laziness (if not why not)
-      - solve
-  - user steps
-  - run with documenter
-  - introduce action that uses value read from the internet
-    - should blow up documenter
-    - fix with doc* functions
-  - TODO: Haddock docs for steps 
-    - effectful supports generating template haskell without type signature
-    - manually add type signature and haddock
--}
-
-
-theInternet = "https://the-internet.herokuapp.com/"
-
--- https://github.com/nbloomf/webdriver-w3c/blob/master/doc/Tutorial.md
-
--- Effect
 
 
 -- Interpreters
@@ -70,3 +44,71 @@ theInternet = "https://the-internet.herokuapp.com/"
 --     EF.liftIO . \case
 --       Hello name -> T.putStrLn $ "hi " <> name
 --       Goodbye name -> T.putStrLn $ "bye " <> name
+
+
+-- https://hackage.haskell.org/package/effectful-core-2.2.2.2/docs/Effectful-Dispatch-Dynamic.html#g:9
+-- $integration
+--
+-- #integration#
+--
+-- There exists a lot of libraries that provide their functionality as an @mtl@
+-- style effect, which generally speaking is a type class that contains core
+-- operations of the library in question.
+--
+-- Such effects are quite easy to use with the 'Eff' monad. As an example,
+-- consider the @mtl@ style effect for generation of random numbers:
+--
+-- >>> :{
+--   class Monad m => MonadRNG m where
+--     randomInt :: m Int
+-- :}
+--
+-- Let's say the library also defines a helper function for generation of random
+-- strings:
+--
+-- >>> import Control.Monad
+-- >>> import Data.Char
+--
+-- >>> :{
+--  randomString :: MonadRNG m => Int -> m String
+--  randomString n = map chr <$> replicateM n randomInt
+-- :}
+--
+-- To make it possible to use it with the 'Eff' monad, the first step is to
+-- create an effect with operations that mirror the ones of a type class:
+--
+-- >>> :{
+--   data RNG :: Effect where
+--     RandomInt :: RNG m Int
+-- :}
+--
+-- >>> type instance DispatchOf RNG = Dynamic
+--
+-- If we continued as in the example above, we'd now create top level helper
+-- functions that execute effect operations using 'send', in this case
+-- @randomInt@ tied to @RandomInt@. But this function is already declared by the
+-- @MonadRNG@ type class! Therefore, what we do instead is provide an
+-- __orphan__, __canonical__ instance of @MonadRNG@ for 'Eff' that delegates to
+-- the @RNG@ effect:
+--
+-- >>> :set -XUndecidableInstances
+--
+-- >>> :{
+--   instance RNG :> es => MonadRNG (Eff es) where
+--     randomInt = send RandomInt
+-- :}
+--
+-- Now we only need an interpreter:
+--
+-- >>> :{
+--   runDummyRNG :: Eff (RNG : es) a -> Eff es a
+--   runDummyRNG = interpret $ \_ -> \case
+--     RandomInt -> pure 55
+-- :}
+--
+-- and we can use any function that requires a @MonadRNG@ constraint with the
+-- 'Eff' monad as long as the @RNG@ effect is in place:
+--
+-- >>> runEff . runDummyRNG $ randomString 3
+-- "777"
+--

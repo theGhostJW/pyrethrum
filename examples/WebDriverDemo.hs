@@ -87,8 +87,11 @@ release_the_bats = do
 
   
 -- $ > example1
+
+-- >>> example1
 example1 :: IO ()
 example1 = do
   execWebDriverT defaultWebDriverConfig
     (runIsolated_ defaultFirefoxCapabilities release_the_bats)
   pure ()
+

@@ -31,6 +31,7 @@ data WebUI :: Effect where
   Click :: Text -> WebUI m ()
   Go :: Text -> WebUI m ()
   Read :: Text -> WebUI m Text
+  Sleep :: Int -> WebUI m ()
 
 makeEffect ''WebUI
 

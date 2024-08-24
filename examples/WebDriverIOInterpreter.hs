@@ -161,6 +161,30 @@ action = profile "greet" . liftIO $ putStrLn "Hello!"
 profileAction :: IO ()
 profileAction = runEff . runProfiling $ action
 
+
+data Driver :: Effect where
+  Driver :: m a -> Driver m a
+
+type instance DispatchOf Driver = Dynamic
+
+driver :: (HasCallStack, Driver :> es) => Eff es a -> Eff es a
+driver action = send (Driver action)
+
+runDriver :: (IOE :> es, WebUI :> es) => Eff (Profiling : es) a -> Eff es a
+runDriver = interpret $ \env -> \case
+   Driver action -> localSeqUnliftIO env $ \unlift -> do
+     execWebDriverT defaultWebDriverConfig
+        (runIsolated_ defaultFirefoxCapabilities action)
+
+
+-- >>> example1
+-- example1 :: IO ()
+-- example1 = do
+--   execWebDriverT defaultWebDriverConfig
+--     (runIsolated_ defaultFirefoxCapabilities release_the_bats)
+--   pure ()
+
+
 {-
 
 

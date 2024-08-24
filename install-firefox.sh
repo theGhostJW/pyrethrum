@@ -16,10 +16,10 @@ apt-get install -y wget tar libdbus-glib-1-2 \
   libxt6 \
   libxrender1 \
   libxrandr2 \
+  libasound2t64 \
   libdbus-1-3 \
   libxtst6 \
   libxss1 \
-  # liboss4-salsa-asound2 \
   libpci3 \
   libegl1 \
   libgl1 \
@@ -27,6 +27,7 @@ apt-get install -y wget tar libdbus-glib-1-2 \
   locales
   
 # audio related not working  gstreamer1.0-libav gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly pulseaudio pulseaudio-utils alsa-utils
+ 
 
 # Set up locale for Australia
 locale-gen en_AU.UTF-8

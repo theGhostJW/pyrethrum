@@ -170,11 +170,15 @@ type instance DispatchOf Driver = Dynamic
 driver :: (HasCallStack, Driver :> es) => Eff es a -> Eff es a
 driver action = send (Driver action)
 
-runDriver :: (IOE :> es, WebUI :> es) => Eff (Profiling : es) a -> Eff es a
+runDriver :: (IOE :> es, WebUI :> es) => Eff (Driver : es) a -> Eff es a
 runDriver = interpret $ \env -> \case
    Driver action -> localSeqUnliftIO env $ \unlift -> do
-     execWebDriverT defaultWebDriverConfig
+     liftIO $ execWebDriverT defaultWebDriverConfig
         (runIsolated_ defaultFirefoxCapabilities action)
+
+-- use liftIO somewhere - supported by webdriver
+
+
 
 
 -- >>> example1

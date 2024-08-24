@@ -11,20 +11,21 @@ apt-get update
 
 # Install necessary dependencies
 apt-get install -y wget tar libdbus-glib-1-2 \
-  libgtk-3-0t64 \
+  libgtk-3-0 \
   libx11-xcb1 \
-  libxt6t64 \
-  libxrender1 \      
+  libxt6 \
+  libxrender1 \
   libxrandr2 \
   libdbus-1-3 \
   libxtst6 \
   libxss1 \
-  libasound2t64 \
+  # liboss4-salsa-asound2 \
   libpci3 \
   libegl1 \
   libgl1 \
   libglx-mesa0 \
-  locales 
+  locales
+  
 # audio related not working  gstreamer1.0-libav gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly pulseaudio pulseaudio-utils alsa-utils
 
 # Set up locale for Australia

@@ -73,8 +73,6 @@ data WebUI :: Effect where
 
 makeEffect ''WebUI
 
--- start geckodriver first
--- geckodriver &
 
 release_the_bats :: WebDriverT IO ()
 release_the_bats = do
@@ -91,7 +89,14 @@ release_the_bats = do
 -- >>> example1
 example1 :: IO ()
 example1 = do
+-- start geckodriver first
+-- geckodriver &
   execWebDriverT defaultWebDriverConfig
     (runIsolated_ defaultFirefoxCapabilities release_the_bats)
   pure ()
+
+-- >>> helloWorld
+-- "DONE"
+helloWorld :: IO Text
+helloWorld = putStrLn "Hello, World!" >> pure "DONE"
 

@@ -113,6 +113,8 @@ dependencies:
   # - relude
   - unliftio
   - yaml
+  # used to talk to ghecko driver
+  - req
   # webdriver used in TestdemoSelenium
   - webdriver-w3c
   # - name: base

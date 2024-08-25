@@ -20,6 +20,8 @@ import Effectful.Dispatch.Dynamic (
   interpret
  )
 import Effectful.TH (makeEffect)
+import Debug.Trace.Extended (uu)
+import PyrethrumExtras (toS)
 
 
 
@@ -59,7 +61,11 @@ data HttpTT e r w s p t eff a
 -}
 
 
+theInternet :: Text
 theInternet = "https://the-internet.herokuapp.com/"
+
+gheckoUrl :: Text
+gheckoUrl = "http://127.0.0.1:4444"
 
 -- https://github.com/nbloomf/webdriver-w3c/blob/master/doc/Tutorial.md
 -- https://hackage.haskell.org/package/webdriver-w3c
@@ -98,5 +104,13 @@ example1 = do
 -- >>> helloWorld
 -- "DONE"
 helloWorld :: IO Text
-helloWorld = putStrLn "Hello, World!" >> pure "DONE"
+helloWorld = do
+  putStrLn "What is your name?"
+  name <- T.getLine
+  putStrLn $ "Hello, " <> toS name <> "!"
+  pure "DONE"
 
+-- >>> helloWorldNonInteractive
+-- "DONE"
+helloWorldNonInteractive :: IO Text
+helloWorldNonInteractive = putStrLn "Hello, World!" >> pure "DONE"

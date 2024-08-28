@@ -94,22 +94,6 @@ example1 = do
   pure ()
 
 {-
--- >>> helloWorld
--- "DONE"
-helloWorld :: IO Text
-helloWorld = do
-  putStrLn "What is your name?"
-  name <- T.getLine
-  putStrLn $ "Hello, " <> toS name <> "!"
-  pure "DONE"
-
--- >>> helloWorldNonInteractive
--- "DONE"
-helloWorldNonInteractive :: IO Text
-helloWorldNonInteractive = putStrLn "Hello, World!" >> pure "DONE"
--}
-
-{-
 Options:
       --allow-hosts <ALLOW_HOSTS>...
           List of hostnames to allow. By default the value of --host is allowed,
@@ -160,7 +144,13 @@ Options:
 -}
 
 gheckoUrl :: R.Url 'Http
-gheckoUrl = http "127.0.0.1" /: "status" 
+gheckoUrl = http "127.0.0.1" /: "status"
+
+logging :: Bool
+logging = True
+
+driver :: [Text] -> IO WebDriverDemo.HttpResponse
+driver = driver' logging
 
 driver1 :: Text -> IO WebDriverDemo.HttpResponse
 driver1 = driver . pure
@@ -168,51 +158,32 @@ driver1 = driver . pure
 driver2 :: Text -> Text -> IO WebDriverDemo.HttpResponse
 driver2 s1 s2 = driver [s1, s2]
 
-driver :: [Text] -> IO WebDriverDemo.HttpResponse
-driver subDirs = runReq defaultHttpConfig $ do
+driver' :: Bool -> [Text] -> IO WebDriverDemo.HttpResponse
+driver' log subDirs = runReq defaultHttpConfig $ do
   r <- req GET url NoReqBody jsonResponse $ port 4444
-  liftIO . pure $
-    MkHttpResponse
-      { statusCode = responseStatusCode r,
-        statusMessage = getLenient . toS $ responseStatusMessage r,
-        headers = L.responseHeaders . toVanillaResponse $ r,
-        body = responseBody r :: Value,
-        cookies = responseCookieJar r
-      }
+  let rslt =
+        MkHttpResponse
+          { statusCode = responseStatusCode r,
+            statusMessage = getLenient . toS $ responseStatusMessage r,
+            headers = L.responseHeaders . toVanillaResponse $ r,
+            body = responseBody r :: Value,
+            cookies = responseCookieJar r
+          }
+  liftIO $ do
+    when log $ 
+      T.putStrLn . txt $ rslt
+    pure $
+      MkHttpResponse
+        { statusCode = responseStatusCode r,
+          statusMessage = getLenient . toS $ responseStatusMessage r,
+          headers = L.responseHeaders . toVanillaResponse $ r,
+          body = responseBody r :: Value,
+          cookies = responseCookieJar r
+        }
   where
     url :: R.Url 'Http
-    url =  foldl' (/:) (http "127.0.0.1") subDirs
+    url = foldl' (/:) (http "127.0.0.1") subDirs
 
-{-
-responseBody :: HttpResponse response => response -> HttpResponseBody response
-
-Get the response body.
-
-responseStatusCode :: HttpResponse response => response -> Int
-
-Get the response status code.
-
-responseStatusMessage :: HttpResponse response => response -> ByteString
-
-Get the response status message.
-
-responseHeader
-:: HttpResponse response
-=> response
-
-Response interpretation
--> ByteString
-
-Header to lookup
--> Maybe ByteString
-
-Header value if found
-
-Lookup a particular header from a response.
-
-responseCookieJar :: HttpResponse response => response -> CookieJar
-
--}
 
 data HttpResponse = MkHttpResponse
   { statusCode :: Int,
@@ -223,14 +194,13 @@ data HttpResponse = MkHttpResponse
   }
   deriving (Show)
 
--- use req to get status of geckodriver
 
--- $ > example2
+-- $> driverRunning
+driverRunning :: IO Bool
+driverRunning = (==) 200 . (.statusCode) <$> driver1 "status"
 
--- >>> example2
-example2 :: IO () 
-example2 = driver1 "status" >>= putStrLn . toS . txt 
 
--- pure $ (responseBody r :: Value)
 
 -- curl -I http://127.0.0.1:4444/status
+
+-- /session/{session id}/window/fullscreen

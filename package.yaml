@@ -113,6 +113,8 @@ dependencies:
   # - relude
   - unliftio
   - yaml
+  - tslogger
+  - async
   # - name: base
   #   mixin:
   #     - hiding (Prelude)

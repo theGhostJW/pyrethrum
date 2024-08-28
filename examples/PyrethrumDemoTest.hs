@@ -2,37 +2,38 @@ module PyrethrumDemoTest where
 
 import Check (Checks, chk)
 import Core (After, Around, Before, Each, Once, ParseException, Thread)
+import Core qualified as C
 import DSL.Internal.NodeEvent (NodeEvent (..), Path (..), ULog (Log))
 import DSL.Out (out)
 import Effectful (Eff)
 import PyrethrumBase (
-  Action,
-  Depth (..),
-  Fixture (..),
-  HasLog,
-  Hook (..),
-  LogEffs,
-  Node (..),
-  RunConfig (..),
-  Suite,
-  TestConfig (..),
-  DataSource(..),
-  testConfig,
+    Action,
+    DataSource (..),
+    Depth (..),
+    Fixture (..),
+    HasLog,
+    Hook (..),
+    LogEffs,
+    Node (..),
+    RunConfig (..),
+    Suite,
+    TestConfig (..),
+    mkNode,
+    testConfig,
  )
-import PyrethrumConfigTypes (Country (..), Environment (Prod))
+import PyrethrumConfigTypes (Country (..), Environment (Prod, TST))
 import PyrethrumExtras (txt)
-import qualified Core as C
 
 {-
 Note:: tried alternative with individual hook types but the results
 were starting to look more complex than the original so abandonned.
 -}
 
-log :: (HasLog es) => Text -> Eff es ()
-log = out . User . Log
+log :: (C.Logger m) => Text -> m ()
+log = C.tLog . show . User . Log
 
-logShow :: (HasLog es, Show a) => a -> Eff es ()
-logShow = out . User . Log . txt
+logShow :: (C.Logger m, Show a) => a -> m ()
+logShow = C.tLog . show . User . Log . txt
 
 {- Demonstraits using partial effect
   type LogEffs a = forall es. (Out NodeEvent :> es) => Eff es a
@@ -40,7 +41,7 @@ logShow = out . User . Log . txt
   Hook has all the effects of the application but will compile with
   an action that only requires a sublist of these effects
 -}
-logReturnInt :: RunConfig -> LogEffs Int
+logReturnInt :: RunConfig -> IO Int
 logReturnInt _ = log "Returning One" >> pure 1
 
 runSomethingToDoWithTestDepth :: Depth -> Action ()
@@ -48,72 +49,72 @@ runSomethingToDoWithTestDepth = logShow
 
 demoOnceAfterHook :: Hook Once After () ()
 demoOnceAfterHook =
-  AfterHook
-    { afterAction = const $ log "After all tests"
-    }
+    AfterHook
+        { afterAction = const $ log "After all tests"
+        }
 
 intOnceHook :: Hook Once Before () Int
 intOnceHook =
-  BeforeHook'
-    { depends = demoOnceAfterHook
-    , action' = \rc _void -> logReturnInt rc
-    }
+    BeforeHook'
+        { depends = demoOnceAfterHook
+        , action' = \rc _void -> logReturnInt rc
+        }
 
 addOnceIntHook :: Hook Once Before Int Int
 addOnceIntHook =
-  BeforeHook'
-    { depends = intOnceHook
-    , action' =
-        \_rc i -> do
-          log $ "beforeAll' " <> txt i
-          pure $ i + 1
-    }
+    BeforeHook'
+        { depends = intOnceHook
+        , action' =
+            \_rc i -> do
+                log $ "beforeAll' " <> txt i
+                pure $ i + 1
+        }
 
 _intThreadHook :: Hook Thread Before () Int
 _intThreadHook = BeforeHook $ \_rc -> do
-  log "deriving meaning of life' "
-  pure 42
+    log "deriving meaning of life' "
+    pure 42
 
 data HookInfo = HookInfo
-  { message :: Text
-  , value :: Int
-  }
-  deriving (Show, Generic)
+    { message :: Text
+    , value :: Int
+    }
+    deriving (Show, Generic)
 
 infoThreadHook :: Hook Thread Before Int HookInfo
 infoThreadHook = BeforeHook' addOnceIntHook $ \_rc i -> do
-  log $ "beforeThread' " <> txt i
-  pure $ HookInfo "Hello there" i
+    log $ "beforeThread' " <> txt i
+    pure $ HookInfo "Hello there" i
 
 eachInfoAround :: Hook Each Around HookInfo Int
 eachInfoAround =
-  AroundHook'
-    { aroundDepends = infoThreadHook
-    , setup' = \_rc hi -> do
-        log "eachSetup"
-        pure $ hi.value + 1
-    , teardown' = \_rc _i -> do
-        log "eachTearDown"
-        pure ()
-    }
+    AroundHook'
+        { aroundDepends = infoThreadHook
+        , setup' = \_rc hi -> do
+            log "eachSetup"
+            pure $ hi.value + 1
+        , teardown' = \_rc _i -> do
+            log "eachTearDown"
+            pure ()
+        }
 
 eachAfter :: Hook Each After Int Int
 eachAfter =
-  AfterHook'
-    { afterDepends = eachInfoAround
-    , afterAction' = \_rc -> do
-        log "eachAfter"
-        pure ()
-    }
+    AfterHook'
+        { afterDepends = eachInfoAround
+        , afterAction' = \_rc -> do
+            log "eachAfter"
+            pure ()
+        }
 
 eachIntBefore :: Hook Each Before Int Int
 eachIntBefore =
-  BeforeHook'
-    { depends = eachInfoAround
-    , action' = \_rc hi -> do
-        log "eachSetup"
-        pure $ hi + 1
-    }
+    BeforeHook'
+        { depends = eachInfoAround
+        , action' = \_rc hi -> do
+            log "eachSetup"
+            pure $ hi + 1
+        }
 
 -- ############### Test the Lot ###################
 
@@ -125,42 +126,43 @@ test = Full config action parse items
 
 action :: RunConfig -> Item -> Action ApState
 action _expectedrc itm = do
-  log $ txt itm
-  pure $ ApState (itm.value + 1) $ txt itm.value
+    log $ txt itm
+    pure $ ApState (itm.value + 1) $ txt itm.value
 
 data ApState = ApState
-  { value :: Int
-  , valTxt :: Text
-  }
-  deriving (Show, Read)
+    { value :: Int
+    , valTxt :: Text
+    }
+    deriving (Show, Read)
 
 data DState = DState
-  { value :: Int
-  , valTxt :: Text
-  }
-  deriving (Show, Read)
+    { value :: Int
+    , valTxt :: Text
+    }
+    deriving (Show, Read)
 
 parse :: ApState -> Either ParseException DState
 parse ApState{..} = pure DState{..}
 
 data Item = Item
-  { id :: Int
-  , title :: Text
-  , value :: Int
-  , checks :: Checks DState
-  }
-  deriving (Show, Read)
+    { id :: Int
+    , title :: Text
+    , value :: Int
+    , checks :: Checks DState
+    }
+    deriving (Show, Read)
 
 items :: RunConfig -> DataSource Item
 items =
-  const $
-    C.ItemList [ Item
-        { id = 1
-        , title = "test the value is one"
-        , value = 2
-        , checks = chk "test" ((== 1) . (.value))
-        }
-    ]
+    const $
+        C.ItemList
+            [ Item
+                { id = 1
+                , title = "test the value is one"
+                , value = 2
+                , checks = chk "test" ((== 1) . (.value))
+                }
+            ]
 
 -- ############### Test the Lot Child ###################
 
@@ -172,53 +174,54 @@ test2 = Full' config2 infoThreadHook action2 parse2 items2
 
 action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
 action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = do
-  logShow itm
-  when (country == AU) $
-    log "Aus test"
-  when (country == NZ) $
-    log "NZ test"
-  runSomethingToDoWithTestDepth depth
-  unless (environment == Prod) $
-    log "Completing payment with test credit card"
-  pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
+    logShow itm
+    -- when (country == AU) $
+    --     log "Aus test"
+    -- when (country == NZ) $
+    --     log "NZ test"
+    -- runSomethingToDoWithTestDepth depth
+    -- unless (environment == Prod) $
+    --     log "Completing payment with test credit card"
+    pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
 
 parse2 :: AS -> Either ParseException DS
 parse2 AS{..} = pure DS{..}
 
 data AS = AS
-  { value :: Int
-  , valTxt :: Text
-  }
-  deriving (Show, Read)
+    { value :: Int
+    , valTxt :: Text
+    }
+    deriving (Show, Read)
 
 data DS = DS
-  { value :: Int
-  , valTxt :: Text
-  }
-  deriving (Show, Read)
+    { value :: Int
+    , valTxt :: Text
+    }
+    deriving (Show, Read)
 
 data Item2 = Item2
-  { id :: Int
-  , title :: Text
-  , value :: Int
-  , checks :: Checks DS
-  }
-  deriving (Show, Read)
+    { id :: Int
+    , title :: Text
+    , value :: Int
+    , checks :: Checks DS
+    }
+    deriving (Show, Read)
 
 items2 :: RunConfig -> DataSource Item2
 items2 rc =
-  ItemList $ filter
-    (\i -> rc.depth == Regression || i.id < 10)
-    [ Item2
-        { id = 1
-        , title = "test the value is one"
-        , value = 2
-        , checks =
-            chk "test" ((== 1) . (.value))
-              <> chk "test2" (\DS{..} -> value < 10)
-              <> chk "test3" (\ds -> ds.value < 10)
-        }
-    ]
+    ItemList $
+        filter
+            (\i -> rc.depth == Regression || i.id < 10)
+            [ Item2
+                { id = 1
+                , title = "test2: test the value is one"
+                , value = 2
+                , checks =
+                    chk "test" ((== 1) . (.value))
+                        <> chk "test2" (\DS{..} -> value < 10)
+                        <> chk "test3" (\ds -> ds.value < 10)
+                }
+            ]
 
 -- TODO: precompiler / teplateHaskell
 
@@ -226,43 +229,45 @@ items2 rc =
 
 test3 :: Fixture Int
 test3 =
-  Full'
-    { depends = eachIntBefore
-    , config' = TestConfig "test" DeepRegression
-    , action' = \_rc hkInt itm -> do
-        log $ txt itm
-        pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
-    , parse' = \AS{..} -> pure DS{..}
-    , items' =
-        const .
-         ItemList $ [ Item2
-              { id = 1
-              , title = "test the value is one"
-              , value = 2
-              , checks = chk "test" ((== 1) . (.value))
-              }
-          ]
-    }
+    Full'
+        { depends = eachIntBefore
+        , config' = TestConfig "test" DeepRegression
+        , action' = \_rc hkInt itm -> do
+            log $ txt itm
+            pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
+        , parse' = \AS{..} -> pure DS{..}
+        , items' =
+            const
+                . ItemList
+                $ [ Item2
+                        { id = 1
+                        , title = "test the value is one"
+                        , value = 2
+                        , checks = chk "test" ((== 1) . (.value))
+                        }
+                  ]
+        }
 
 -- ############### Test Direct (Record) ###################
 test4 :: Fixture Int
 test4 =
-  Direct'
-    { config' = TestConfig "test" DeepRegression
-    , depends = eachAfter
-    , action' = \_rc _hi itm -> do
-        log $ txt itm
-        pure $ DS (itm.value + 1) $ txt itm.value
-    , items' =
-        const .
-          ItemList $ [ Item2
-              { id = 1
-              , title = "test the value is one"
-              , value = 2
-              , checks = chk "test" ((== 1) . (.value))
-              }
-          ]
-    }
+    Direct'
+        { config' = TestConfig "test" DeepRegression
+        , depends = eachAfter
+        , action' = \_rc _hi itm -> do
+            log $ txt itm
+            pure $ DS (itm.value + 1) $ txt itm.value
+        , items' =
+            const
+                . ItemList
+                $ [ Item2
+                        { id = 1
+                        , title = "test4: test the value is one"
+                        , value = 2
+                        , checks = chk "test" ((== 1) . (.value))
+                        }
+                  ]
+        }
 
 -- ############### Construct Tests ###################
 -- this will be generated either by implmenting deriving,
@@ -290,51 +295,60 @@ cfg = testConfig "test"
 -- ############### Suite ###################
 -- this will be generated
 
-suite :: Suite
-suite =
-  [ Fixture (NodePath "module" "testName") test
-  , Hook
-      { path = NodePath "module" "name"
-      , hook = demoOnceAfterHook
-      , subNodes =
-          [ Hook
-              { path = NodePath "module" "name"
-              , hook = intOnceHook
-              , subNodes =
-                  [ Fixture (NodePath "module" "testName") test4
-                  , Hook
-                      { path = NodePath "module" "name"
-                      , hook = addOnceIntHook
-                      , subNodes =
-                          [ Hook
-                              { path = NodePath "module" "name"
-                              , hook = infoThreadHook
-                              , subNodes =
-                                  [ Fixture (NodePath "module" "testName") test2
-                                  , Hook
-                                      { path = NodePath "module" "name"
-                                      , hook = eachInfoAround
-                                      , subNodes =
-                                          [ Fixture (NodePath "module" "testName") test3
-                                          , Hook
-                                              { path = NodePath "module" "name"
-                                              , hook = eachAfter
-                                              , subNodes =
-                                                  [ Fixture (NodePath "module" "testName") test4
-                                                  , Fixture (NodePath "module" "testName") test3
-                                                  ]
-                                              }
-                                          ]
-                                      }
-                                  ]
-                              }
-                          ]
-                      }
-                  ]
-              }
-          ]
-      }
-  ]
+node =
+    Hook
+        { path = NodePath "module" "name"
+        , hook = demoOnceAfterHook
+        , subNodes =
+            [ Hook
+                { path = NodePath "module" "name"
+                , hook = intOnceHook
+                , subNodes =
+                    [ Fixture (NodePath "module" "testName") test4
+                    , Hook
+                        { path = NodePath "module" "name"
+                        , hook = addOnceIntHook
+                        , subNodes =
+                            [ Hook
+                                { path = NodePath "module" "name"
+                                , hook = infoThreadHook
+                                , subNodes =
+                                    [ Fixture (NodePath "module" "testName") test2
+                                    , Hook
+                                        { path = NodePath "module" "name"
+                                        , hook = eachInfoAround
+                                        , subNodes =
+                                            [ Fixture (NodePath "module" "testName") test3
+                                            , Hook
+                                                { path = NodePath "module" "name"
+                                                , hook = eachAfter
+                                                , subNodes =
+                                                    [ Fixture (NodePath "module" "testName") test4
+                                                    , Fixture (NodePath "module" "testName") test3
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+
+runConfig :: RunConfig
+runConfig =
+    RunConfig
+        { title = "rc"
+        , environment = TST
+        , maxThreads = 10
+        , country = AU
+        , depth = DeepRegression
+        }
+coreNode = mkNode node
+result = C.runNode runConfig (pure ()) (const $ pure ()) coreNode
 
 {-
 -- TODO: test documenter that returns a handle from onceHook

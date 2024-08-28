@@ -13,43 +13,43 @@ data Depth = DeepRegression | Regression | Connectivity | Special deriving (Show
 $(deriveJSON defaultOptions ''Depth)
 
 data RunConfig = RunConfig
-  { title :: Text
-  , environment :: Environment
-  , maxThreads :: Int
-  , country :: Country
-  , depth :: Depth
-  }
-  deriving (Eq, Show)
+    { title :: Text
+    , environment :: Environment
+    , maxThreads :: Int
+    , country :: Country
+    , depth :: Depth
+    }
+    deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''RunConfig)
 
 instance C.Config RunConfig
 
 data TestConfig = TestConfig
-  { title :: Text
-  , depth :: Depth
-  }
-  deriving (Show, Eq)
+    { title :: Text
+    , depth :: Depth
+    }
+    deriving (Show, Eq)
 
 newtype DefaultCfg = DefaultCfg
-  { depth :: Depth
-  }
-  deriving (Show, Eq)
+    { depth :: Depth
+    }
+    deriving (Show, Eq)
 
 defaults :: DefaultCfg
 defaults =
-  DefaultCfg
-    { depth = DeepRegression
-    }
+    DefaultCfg
+        { depth = DeepRegression
+        }
 
 testConfig :: Text -> TestConfig
 testConfig title =
-  mkFull defaults
- where
-  mkFull DefaultCfg{..} =
-    TestConfig
-      { ..
-      }
+    mkFull defaults
+  where
+    mkFull DefaultCfg{..} =
+        TestConfig
+            { ..
+            }
 
 $(deriveJSON defaultOptions ''TestConfig)
 

@@ -149,18 +149,18 @@ gheckoUrl = http "127.0.0.1" /: "status"
 logging :: Bool
 logging = True
 
-driver :: [Text] -> IO WebDriverDemo.HttpResponse
+driver :: HttpMethod m => m -> [Text] -> IO WebDriverDemo.HttpResponse
 driver = driver' logging
 
-driver1 :: Text -> IO WebDriverDemo.HttpResponse
-driver1 = driver . pure
+get1 :: Text -> IO WebDriverDemo.HttpResponse
+get1 = driver GET . pure
 
-driver2 :: Text -> Text -> IO WebDriverDemo.HttpResponse
-driver2 s1 s2 = driver [s1, s2]
+get2 :: Text -> Text -> IO WebDriverDemo.HttpResponse
+get2 s1 s2 = driver GET [s1, s2]
 
-driver' :: Bool -> [Text] -> IO WebDriverDemo.HttpResponse
-driver' log subDirs = runReq defaultHttpConfig $ do
-  r <- req GET url NoReqBody jsonResponse $ port 4444
+driver' :: HttpMethod m => Bool -> m -> [Text] -> IO WebDriverDemo.HttpResponse
+driver' log method subDirs = runReq defaultHttpConfig $ do
+  r <- req method url NoReqBody jsonResponse $ port 4444
   let rslt =
         MkHttpResponse
           { statusCode = responseStatusCode r,
@@ -197,7 +197,7 @@ data HttpResponse = MkHttpResponse
 
 -- $> driverRunning
 driverRunning :: IO Bool
-driverRunning = (==) 200 . (.statusCode) <$> driver1 "status"
+driverRunning = (==) 200 . (.statusCode) <$> get1 "status"
 
 
 

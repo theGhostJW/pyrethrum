@@ -19,7 +19,7 @@ import Effectful.Dispatch.Dynamic
 import Effectful.Reader.Dynamic
 import Effectful.TH (makeEffect)
 import Network.HTTP.Client qualified as L
-import Network.HTTP.Req as R
+
 import Network.HTTP.Types qualified as L
 import PyrethrumExtras (getLenient, toS, txt)
 import Web.Api.WebDriver
@@ -71,6 +71,8 @@ data WebUI :: Effect where
   Read :: Text -> WebUI m Text
 
 makeEffect ''WebUI
+
+
 
 release_the_bats :: WebDriverT IO ()
 release_the_bats = do
@@ -143,61 +145,8 @@ Options:
 
 -}
 
-gheckoUrl :: R.Url 'Http
-gheckoUrl = http "127.0.0.1" /: "status"
-
-logging :: Bool
-logging = True
-
-driver :: HttpMethod m => m -> [Text] -> IO WebDriverDemo.HttpResponse
-driver = driver' logging
-
-get1 :: Text -> IO WebDriverDemo.HttpResponse
-get1 = driver GET . pure
-
-get2 :: Text -> Text -> IO WebDriverDemo.HttpResponse
-get2 s1 s2 = driver GET [s1, s2]
-
-driver' :: HttpMethod m => Bool -> m -> [Text] -> IO WebDriverDemo.HttpResponse
-driver' log method subDirs = runReq defaultHttpConfig $ do
-  r <- req method url NoReqBody jsonResponse $ port 4444
-  let rslt =
-        MkHttpResponse
-          { statusCode = responseStatusCode r,
-            statusMessage = getLenient . toS $ responseStatusMessage r,
-            headers = L.responseHeaders . toVanillaResponse $ r,
-            body = responseBody r :: Value,
-            cookies = responseCookieJar r
-          }
-  liftIO $ do
-    when log $ 
-      T.putStrLn . txt $ rslt
-    pure $
-      MkHttpResponse
-        { statusCode = responseStatusCode r,
-          statusMessage = getLenient . toS $ responseStatusMessage r,
-          headers = L.responseHeaders . toVanillaResponse $ r,
-          body = responseBody r :: Value,
-          cookies = responseCookieJar r
-        }
-  where
-    url :: R.Url 'Http
-    url = foldl' (/:) (http "127.0.0.1") subDirs
 
 
-data HttpResponse = MkHttpResponse
-  { statusCode :: Int,
-    statusMessage :: Text,
-    headers :: L.ResponseHeaders,
-    body :: Value,
-    cookies :: L.CookieJar
-  }
-  deriving (Show)
-
-
--- $> driverRunning
-driverRunning :: IO Bool
-driverRunning = (==) 200 . (.statusCode) <$> get1 "status"
 
 
 

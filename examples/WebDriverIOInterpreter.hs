@@ -1,5 +1,3 @@
-{-# LANGUAGE UndecidableInstances #-}
-
 module WebDriverIOInterpreter where
 
 import Data.Aeson
@@ -72,19 +70,13 @@ runWebDriverIO' =
 driverRunning :: IO Bool
 driverRunning = responseCode200 <$> handleEx status
 
-capsToJson :: Capabilities -> Value
-capsToJson caps =
-  object
-    [ "capabilities"
-        .= object
-          ["alwaysMatch" .= toJSON caps],
-      "desiredCapabilities" .= toJSON caps
-    ]
+-- mkRequestParams :: HttpPathSpec -> RequestArgs
+-- mkRequestParams ps = RequestParams subDirs method body port
 
 -- >>> status
 -- Response {statusCode = 200, statusMessage = "OK", headers = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","37"),("date","Sat, 31 Aug 2024 08:16:30 GMT")], body = Object (fromList [("value",Object (fromList [("message",String ""),("ready",Bool True)]))]), cookies = CJ {expose = []}}
 status :: IO HttpResponse
-status = get1 "status"
+status = get pathStatus
 
 -- >>> newFirefoxSession
 -- "Just MkSessionId { id = \"238b3b38-96de-41e1-8f90-04bd2136e579\" }"
@@ -94,35 +86,6 @@ newFirefoxSession = do
   T.putStrLn $ txt r
   pure r
 
-parseSessionId :: HttpResponse -> Maybe SessionId
-parseSessionId r =
-    MkSessionId <$> (rslt >>= asText )
-    where
-      tryLookUp :: Key -> Value -> Maybe Value
-      tryLookUp k = \case
-        Object o -> lookup k o
-        _ -> Nothing
-
-      asText :: Value -> Maybe Text
-      asText = \case
-        String t -> Just t
-        _ -> Nothing
-
-      rslt :: Maybe Value
-      rslt = tryLookUp "value"  r.body >>= tryLookUp "sessionId"
-
-  -- MkSessionId . fromMaybe "" . lookup "sessionId" . fromMaybe "" . lookup "value" . (.body)
-
--- Aeson stuff to help debugging
--- https://blog.ssanj.net/posts/2019-09-24-pretty-printing-json-in-haskell.html
-lsbToText :: LBS.ByteString -> Text
-lsbToText = E.decodeUtf8 . LBS.toStrict
-
-jsonToText :: Value -> Text
-jsonToText = lsbToText . encodePretty
-
-prettyPrint :: Value -> IO ()
-prettyPrint = T.putStrLn . jsonToText
 
 newSession :: Capabilities -> IO (Maybe SessionId)
 newSession caps = parseSessionId <$> post1 "session" (capsToJson caps)
@@ -151,34 +114,8 @@ killSession :: IO ()
 killSession = stub_ (Desc "Get Status") $ deleteSession lastSession
 
 
--- parseSessionId :: HttpResponse -> Text
--- parseSessionId = fromMaybe "" . lookup "sessionId" . fromMaybe [] . lookup "value" . fromMaybe [] . lookup "capabilities" . body
-
-logging :: Bool
-logging = True
-
-data RequestArgs where
-  RequestParams ::
-    (HttpBodyAllowed (AllowsBody method) (ProvidesBody body), HttpMethod method, HttpBody body) =>
-    { subDirs :: [Text],
-      method :: method,
-      body :: body,
-      port :: Int
-    } ->
-    RequestArgs
-
-
-defaultRequest :: RequestArgs
-defaultRequest = RequestParams [] GET NoReqBody 4444
-
-get :: [Text] -> IO HttpResponse
-get subDirs = request $ defaultRequest {subDirs}
-
-get1 :: Text -> IO HttpResponse
-get1 = get . pure
-
-get2 :: Text -> Text -> IO HttpResponse
-get2 s1 s2 = get [s1, s2]
+get :: HttpPathSpec GET -> IO HttpResponse
+get s = request $ defaultRequest {subDirs = s.subDirs}
 
 request :: RequestArgs -> IO HttpResponse
 request RequestParams {subDirs, method, body, port = prt} =
@@ -196,10 +133,6 @@ request RequestParams {subDirs, method, body, port = prt} =
     url :: R.Url 'Http
     url = foldl' (/:) (http "127.0.0.1") subDirs
 
-data Log
-  = Desc Text
-  | None
-  deriving (Show)
 
 handleEx :: IO a -> IO (Either HttpException a)
 handleEx = try @_ @HttpException
@@ -228,14 +161,6 @@ stub desc action = do
           )
     None -> either (fail . show) pure ethr
 
-data HttpResponse = Response
-  { statusCode :: Int,
-    statusMessage :: Text,
-    headers :: L.ResponseHeaders,
-    body :: Value,
-    cookies :: L.CookieJar
-  }
-  deriving (Show)
 
 post :: [Text] -> Value -> IO HttpResponse
 post subDirs jsonBody =
@@ -246,38 +171,4 @@ post subDirs jsonBody =
         body = ReqBodyJson jsonBody
       }
 
-post1 :: Text -> Value -> IO HttpResponse
-post1 subDir = post [subDir]
 
-post2 :: Text -> Text -> Value -> IO HttpResponse
-post2 s1 s2 = post [s1, s2]
-
-{-
--- | See <https://w3c.github.io/webdriver/webdriver-spec.html#new-session>. This generalizes `newSession'` by taking an additional function @Value -> Value@ that is applied to the `Capabilities` parameter after it is converted to JSON, but before it is passed to the HTTP call.
-newSession'
-  :: (Monad eff, Monad (t eff), MonadTrans t)
-  => (Value -> Value)
-  -> Capabilities
-  -> WebDriverTT t eff SessionId
-newSession' f caps = do
-  baseUrl <- theRemoteUrl
-  format <- fromEnv (_responseFormat . _env)
-  let
-    !payload = encode $ f $ object
-      [ "capabilities" .= object
-        [ "alwaysMatch" .= toJSON caps ]
-      , "desiredCapabilities" .= toJSON caps
-      ]
-  httpPost (baseUrl <> "/session") payload
-    >>= (return . _responseBody)
-    >>= parseJson
-    >>= case format of
-          SpecFormat -> lookupKeyJson "value"
-          ChromeFormat -> return
-    >>= lookupKeyJson "sessionId"
-    >>= constructFromJson
--}
-
--- curl -I http://127.0.0.1:4444/status
-
--- /session/{session id}/window/fullscreen

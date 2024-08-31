@@ -83,7 +83,6 @@ data RequestArgs where
 -- todo stand alone instance of Show
 data HttpPathSpec method =
  PathSpec {
-      method :: method,
       path :: [Text]
     }
 
@@ -110,17 +109,17 @@ capsToJson caps =
     ]
 
 get :: [Text] -> HttpPathSpec GET
-get = PathSpec GET
+get = PathSpec
 get1 p1 = get [p1]
 get2 p1 p2 = get [p1, p2]
 
 delete :: [Text] -> HttpPathSpec DELETE
-delete = PathSpec DELETE
+delete = PathSpec
 delete1 p1 = delete [p1]
 delete2 p1 p2 = delete [p1, p2]
 
 post :: [Text] -> HttpPathSpec POST
-post = PathSpec POST
+post = PathSpec
 
 post1 p1 = post [p1]
 post2 p1 p2 = post [p1, p2]

@@ -1,6 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 
-module WebDriverIOInterpreter where
+module WebDriverRawIO where
 
 import Data.Aeson
 import Data.Text.IO qualified as T
@@ -53,24 +53,13 @@ import qualified Data.Text.Encoding as E
 import qualified Data.ByteString.Lazy as LBS
 import Data.Aeson.KeyMap (lookup, singleton)
 import Data.Aeson.Types (parseMaybe)
-import WebDriverPure
 
 type MyWebDriver eff a = WebDriverT (Eff eff) a
 
-runWebDriverIO' :: forall es a. ( IOE :> es) => Eff (WebUI : es) a  -> Eff es a
-runWebDriverIO' =
-  interpret $ \_ ->
-    EF.liftIO . \case
-      NewSession -> uu
-      KillSession sessionId -> uu
-      Click sessionId css -> uu
-      Go sessionId url -> uu -- navigateTo url
-      Sleep ms -> uu -- wait i
-      Read sessionId css -> uu -- findElement CssSelector css >>= getElementText)
-
 -- $ > driverRunning
+
 driverRunning :: IO Bool
-driverRunning = responseCode200 <$> handleEx status
+driverRunning = either (const False) ((==) 200 . (.statusCode)) <$> handleEx status
 
 capsToJson :: Capabilities -> Value
 capsToJson caps =

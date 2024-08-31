@@ -86,6 +86,7 @@ verbatim:
 
 dependencies:
   - aeson
+  - aeson-pretty
   - base-prelude # needed for IOError
   - bytestring
   - chronos

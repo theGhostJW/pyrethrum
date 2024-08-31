@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e59a5f00639c94cc29b300e775812b6bed6d3061a71b3d321c6fa5cc73f1d09e
+-- hash: cb0e882423eb3c0767dd7746d86dcf756d0ffb303808fe326bac9de61e2c2838
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -118,6 +118,8 @@ library
       WebDriverDocInterpreter
       WebDriverEffect
       WebDriverIOInterpreter
+      WebDriverPure
+      WebDriverRawIO
   hs-source-dirs:
       src
       test
@@ -176,6 +178,7 @@ library
   ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points
   build-depends:
       aeson
+    , aeson-pretty
     , base-prelude
     , bytestring
     , chronos

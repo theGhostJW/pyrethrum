@@ -1,28 +1,33 @@
 module WebDriverDemo where
 
-import Data.Aeson
 import Data.Text.IO qualified as T
-import Debug.Trace.Extended (uu)
 import Effectful as EF
   ( Dispatch (Dynamic),
     DispatchOf,
     Eff,
     Effect,
     IOE,
-    liftIO,
     runEff,
     type (:>),
   )
 import Effectful.Dispatch.Dynamic
-  ( interpret,
+  ( interpret, send, localSeqUnliftIO, localSeqUnlift,
   )
-import Effectful.Reader.Dynamic
 import Effectful.TH (makeEffect)
-import Network.HTTP.Client qualified as L
-
-import Network.HTTP.Types qualified as L
-import PyrethrumExtras (getLenient, toS, txt)
 import Web.Api.WebDriver
+    ( WebDriverT,
+      Key(EnterKey),
+      fullscreenWindow,
+      navigateTo,
+      performActions,
+      typeString,
+      press,
+      wait,
+      execWebDriverT,
+      defaultWebDriverConfig,
+      runIsolated_,
+      defaultFirefoxCapabilities )
+import GHC.Clock (getMonotonicTime)
 
 {-
 1. revisit monad transformers step by step DONE
@@ -73,7 +78,9 @@ data WebUI :: Effect where
 makeEffect ''WebUI
 
 
-
+-- ##############  Orthogonal Examples ##################
+-- | A simple example of using the WebDriver API from the 
+-- | from the webdriver-w3c library
 release_the_bats :: WebDriverT IO ()
 release_the_bats = do
   fullscreenWindow
@@ -83,7 +90,7 @@ release_the_bats = do
   wait 5000000
   pure ()
 
--- $ > example1
+-- $> example1
 
 -- >>> example1
 example1 :: IO ()
@@ -95,7 +102,7 @@ example1 = do
     (runIsolated_ defaultFirefoxCapabilities release_the_bats)
   pure ()
 
-{-
+{- from webdriver-w3c 
 Options:
       --allow-hosts <ALLOW_HOSTS>...
           List of hostnames to allow. By default the value of --host is allowed,
@@ -146,10 +153,31 @@ Options:
 -}
 
 
+-- 
+data Profiling :: Effect where
+  Profile :: String -> m a -> Profiling m a
 
+type instance DispatchOf Profiling = Dynamic
 
+profile :: (HasCallStack, Profiling :> es) => String -> Eff es a -> Eff es a
+profile label action = send (Profile label action)
 
+runProfiling :: IOE :> es => Eff (Profiling : es) a -> Eff es a
+runProfiling = interpret $ \env -> \case
+   Profile label action -> localSeqUnliftIO env $ \unlift -> do
+     t1 <- getMonotonicTime
+     r <- unlift action
+     t2 <- getMonotonicTime
+     putStrLn $ "Action '" ++ label ++ "' took " ++ show (t2 - t1) ++ " seconds."
+     pure r
 
--- curl -I http://127.0.0.1:4444/status
+runNoProfiling :: Eff (Profiling : es) a -> Eff es a
+runNoProfiling = interpret $ \env -> \case
+   Profile _label action -> localSeqUnlift env $ \unlift -> unlift action
+   
+action' :: forall es. (Profiling :> es, IOE :> es) => Eff es ()
+action' = profile "greet" . liftIO $ putStrLn "Hello!"
 
--- /session/{session id}/window/fullscreen
+-- $ > profileAction
+profileAction :: IO ()
+profileAction = runEff . runProfiling $ action'

@@ -70,7 +70,7 @@ makeEffect ''WebUI
 -- sleep wait typesafe
 
 second :: Int
-second = 1000
+second = 1_000
 
 seconds :: Int
 seconds = second

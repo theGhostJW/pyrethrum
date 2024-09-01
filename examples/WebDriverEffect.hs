@@ -37,6 +37,7 @@ import Effectful.Reader.Dynamic
 import Effectful.Reader.Static as ERS
 import Effectful.TH (makeEffect)
 import Prelude hiding (second)
+import FullSuiteTestTemplate (TestItem(id))
 
 -- Effect
 
@@ -44,7 +45,7 @@ type WebDriver = ERS.Reader
 
 type instance DispatchOf WebUI = Dynamic
 
-newtype SessionId = MkSessionId {id :: Text}
+newtype SessionId = Session {id :: Text}
   deriving (Show)
 
 {-

@@ -53,12 +53,12 @@ import Data.Aeson.KeyMap (lookup, singleton)
 import Data.Aeson.Types (parseMaybe)
 import WebDriverPure
 import UnliftIO.Concurrent (threadDelay)
-import WebDriverRawIO
+import WebDriverIO
 
 type MyWebDriver eff a = WebDriverT (Eff eff) a
 
-runWebDriverIO' :: forall es a. ( IOE :> es) => Eff (WebUI : es) a  -> Eff es a
-runWebDriverIO' =
+runWebDriverIO :: forall es a. ( IOE :> es) => Eff (WebUI : es) a  -> Eff es a
+runWebDriverIO =
   interpret $ \_ ->
     EF.liftIO . \case
       NewSession -> newFirefoxSession

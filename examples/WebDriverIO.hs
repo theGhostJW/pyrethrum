@@ -1,6 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 
-module WebDriverRawIO where
+module WebDriverIO where
 
 import Data.Aeson
 import Data.Text.IO qualified as T
@@ -46,6 +46,7 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Aeson.KeyMap (lookup, singleton)
 import Data.Aeson.Types (parseMaybe)
 import WebDriverPure
+import WebDriverSpec
 import Core (Node(path))
 
 theInternet :: Text
@@ -56,6 +57,47 @@ latestSession = Session "c2c16576-baa1-464e-aebb-694ed384017e"
 
 checkBoxesLinkCss :: Text
 checkBoxesLinkCss = "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
+
+data Result a = MkResult
+  { response :: HttpResponse,
+    value :: a
+  }
+  deriving (Show)
+
+-- will neeed to be parameterised later
+mkRequest :: W3Spec -> RequestArgs
+mkRequest =  \case 
+  Get {path} -> RequestParams path GET NoReqBody 4444
+  Post {path, body} -> RequestParams path POST (ReqBodyJson body) 4444
+  PostEmpty {path} -> RequestParams path POST NoReqBody 4444
+  Delete {path} -> RequestParams path DELETE NoReqBody 4444
+
+
+
+execute :: forall a. W3Spec -> IO (Result a)
+execute spec = 
+  r <- callWebDriver $ mkRequest spec 
+  pure $ MkResult r (spec.parseResponse r)
+where 
+  req = mkRequest spec
+
+
+callWebDriver :: RequestArgs -> IO HttpResponse
+callWebDriver RequestParams {subDirs, method, body, port = prt} =
+   runReq defaultHttpConfig $ do
+    r <- req method url body jsonResponse $ port prt
+    liftIO $ T.putStrLn $ txt r
+    pure $
+      Response
+        { statusCode = responseStatusCode r,
+          statusMessage = getLenient . toS $ responseStatusMessage r,
+          headers = L.responseHeaders . toVanillaResponse $ r,
+          body = responseBody r :: Value,
+          cookies = responseCookieJar r
+        }
+  where
+    url :: R.Url 'Http
+    url = foldl' (/:) (http "127.0.0.1") subDirs
 
 
 -- $ > driverRunning

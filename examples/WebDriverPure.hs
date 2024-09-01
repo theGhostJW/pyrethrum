@@ -88,6 +88,8 @@ data RequestArgs where
     } ->
     RequestArgs
 
+
+-- add Get | Post {path , body , later errorParser} | Delete {path }
 -- todo stand alone instance of Show
 newtype HttpPathSpec method
   = PathSpec {subDirs :: [Text]}

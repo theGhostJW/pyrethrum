@@ -81,10 +81,8 @@ data RequestArgs where
     RequestArgs 
 
 -- todo stand alone instance of Show
-data HttpPathSpec method =
- PathSpec {
-      path :: [Text]
-    }
+newtype HttpPathSpec method =
+ PathSpec {subDirs :: [Text]}
 
 data HttpResponse = Response
   { statusCode :: Int,
@@ -110,18 +108,30 @@ capsToJson caps =
 
 get :: [Text] -> HttpPathSpec GET
 get = PathSpec
+
+get1 :: Text -> HttpPathSpec GET
 get1 p1 = get [p1]
+
+
+get2 :: Text -> Text -> HttpPathSpec GET
 get2 p1 p2 = get [p1, p2]
 
 delete :: [Text] -> HttpPathSpec DELETE
 delete = PathSpec
+
+delete1 :: Text -> HttpPathSpec DELETE
 delete1 p1 = delete [p1]
+
+delete2 :: Text -> Text -> HttpPathSpec DELETE
 delete2 p1 p2 = delete [p1, p2]
 
 post :: [Text] -> HttpPathSpec POST
 post = PathSpec
 
+post1 :: Text -> HttpPathSpec POST
 post1 p1 = post [p1]
+
+post2 :: Text -> Text -> HttpPathSpec POST
 post2 p1 p2 = post [p1, p2]
 
 pathStatus :: HttpPathSpec GET

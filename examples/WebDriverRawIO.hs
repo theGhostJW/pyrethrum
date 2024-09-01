@@ -46,7 +46,7 @@ import PyrethrumExtras (delete, getLenient, toS, txt, uu)
 import UnliftIO (try)
 import Web.Api.WebDriver (Capabilities, WebDriverT, defaultFirefoxCapabilities)
 import WebDriverEffect (WebUI (..), SessionId(..))
-import Prelude hiding (get)
+import Prelude hiding (get, second)
 import Data.Aeson.Encode.Pretty (encodePretty)
 
 import qualified Data.Text.Encoding as E
@@ -56,7 +56,9 @@ import Data.Aeson.Types (parseMaybe)
 
 type MyWebDriver eff a = WebDriverT (Eff eff) a
 
--- $ > driverRunning
+
+sleep :: Int -> IO ()
+sleep milliSec = threadDelay $ 1000 milliSec
 
 driverRunning :: IO Bool
 driverRunning = either (const False) ((==) 200 . (.statusCode)) <$> handleEx status

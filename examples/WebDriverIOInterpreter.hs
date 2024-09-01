@@ -52,6 +52,7 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Aeson.KeyMap (lookup, singleton)
 import Data.Aeson.Types (parseMaybe)
 import WebDriverPure
+import UnliftIO.Concurrent (threadDelay)
 
 type MyWebDriver eff a = WebDriverT (Eff eff) a
 
@@ -59,11 +60,11 @@ runWebDriverIO' :: forall es a. ( IOE :> es) => Eff (WebUI : es) a  -> Eff es a
 runWebDriverIO' =
   interpret $ \_ ->
     EF.liftIO . \case
-      NewSession -> uu
-      KillSession sessionId -> uu
+      NewSession -> newFirefoxSession
+      KillSession sessionId -> void $ deleteSession sessionId
       Click sessionId css -> uu
       Go sessionId url -> uu -- navigateTo url
-      Sleep ms -> uu -- wait i
+      Sleep milliSec -> threadDelay $ 1_000 * milliSec
       Read sessionId css -> uu -- findElement CssSelector css >>= getElementText)
 
 -- $ > driverRunning
@@ -88,7 +89,7 @@ newFirefoxSession = do
 
 
 newSession :: Capabilities -> IO (Maybe SessionId)
-newSession caps = parseSessionId <$> post1 "session" (capsToJson caps)
+newSession caps = parseSessionId <$> post pathNewSession (capsToJson caps)
 
 -- >>> deleteSession $ MkSessionId "efc5b851-636e-4122-b2f9-018071f96200"
 -- Response {statusCode = 200, statusMessage = "OK", headers = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","14"),("date","Sat, 31 Aug 2024 09:19:50 GMT")], body = Object (fromList [("value",Null)]), cookies = CJ {expose = []}}
@@ -162,8 +163,8 @@ stub desc action = do
     None -> either (fail . show) pure ethr
 
 
-post :: [Text] -> Value -> IO HttpResponse
-post subDirs jsonBody =
+post :: HttpPathSpec POST -> Value -> IO HttpResponse
+post (PathSpec subDirs) jsonBody =
   request
     defaultRequest
       { subDirs,

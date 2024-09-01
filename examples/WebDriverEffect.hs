@@ -1,4 +1,23 @@
-module WebDriverEffect where
+module WebDriverEffect
+  ( SessionId (..),
+    WebUI (..),
+    WebDriver,
+    click,
+    go,
+    killSession,
+    newSession,
+    read,
+    sleep,
+    -- Int constants used in wait finctions
+    -- milliseconds per (eg second = 1000, seconds = 1000)
+    second,
+    seconds,
+    minute,
+    minutes,
+    hour,
+    hours
+  )
+where
 
 import Data.Text.IO qualified as T
 import Effectful as EF
@@ -17,6 +36,7 @@ import Effectful.Dispatch.Dynamic
 import Effectful.Reader.Dynamic
 import Effectful.Reader.Static as ERS
 import Effectful.TH (makeEffect)
+import Prelude hiding (second)
 
 -- Effect
 
@@ -45,3 +65,24 @@ data WebUI :: Effect where
   Sleep :: Int -> WebUI m ()
 
 makeEffect ''WebUI
+
+-- todo add newtype later and don't export type constructor to make
+-- sleep wait typesafe
+
+second :: Int
+second = 1000
+
+seconds :: Int
+seconds = second
+
+minute :: Int
+minute = 60 * seconds
+
+minutes :: Int
+minutes = minute
+
+hour :: Int
+hour = 60 * minutes
+
+hours :: Int
+hours = hour

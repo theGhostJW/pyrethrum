@@ -2,7 +2,7 @@
 
 module WebDriverIO where
 
-import Data.Aeson
+import Data.Aeson (Value)
 import Data.Text.IO qualified as T
 -- import Effectful.Reader.Dynamic
 
@@ -49,14 +49,6 @@ import WebDriverPure
 import WebDriverSpec
 import Core (Node(path))
 
-theInternet :: Text
-theInternet = "https://the-internet.herokuapp.com/"
-
-latestSession :: SessionId
-latestSession = Session "c2c16576-baa1-464e-aebb-694ed384017e"
-
-checkBoxesLinkCss :: Text
-checkBoxesLinkCss = "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
 data Result a = MkResult
   { response :: HttpResponse,
@@ -65,26 +57,21 @@ data Result a = MkResult
   deriving (Show)
 
 -- will neeed to be parameterised later
-mkRequest :: W3Spec -> RequestArgs
+mkRequest :: forall a. W3Spec a -> RequestArgs
 mkRequest =  \case 
   Get {path} -> RequestParams path GET NoReqBody 4444
   Post {path, body} -> RequestParams path POST (ReqBodyJson body) 4444
   PostEmpty {path} -> RequestParams path POST NoReqBody 4444
   Delete {path} -> RequestParams path DELETE NoReqBody 4444
 
-
-
-execute :: forall a. W3Spec -> IO (Result a)
-execute spec = 
+execute :: forall a. W3Spec a -> IO (Maybe (Result a))
+execute spec = do
   r <- callWebDriver $ mkRequest spec 
-  pure $ MkResult r (spec.parseResponse r)
-where 
-  req = mkRequest spec
-
+  pure $ MkResult r <$> spec.parser r
 
 callWebDriver :: RequestArgs -> IO HttpResponse
 callWebDriver RequestParams {subDirs, method, body, port = prt} =
-   runReq defaultHttpConfig $ do
+  runReq defaultHttpConfig $ do
     r <- req method url body jsonResponse $ port prt
     liftIO $ T.putStrLn $ txt r
     pure $
@@ -99,7 +86,32 @@ callWebDriver RequestParams {subDirs, method, body, port = prt} =
     url :: R.Url 'Http
     url = foldl' (/:) (http "127.0.0.1") subDirs
 
+describe_ :: Show a => Text -> IO a -> IO ()
+describe_ = (void .) . describe
 
+describe :: Show a => Text -> IO a -> IO a
+describe msg action = do
+  T.putStrLn msg
+  ethr <- handleEx action
+  logResponse ethr
+  either (fail . toS . txt) pure ethr
+
+handleEx :: IO a -> IO (Either HttpException a)
+handleEx = try
+
+logResponse :: Show a => Either HttpException a -> IO ()
+logResponse = either
+          ( \e -> do
+              T.putStrLn "!!!!!!!!!! REQUEST FAILED !!!!!!!!!!!"
+              T.putStrLn $ txt e
+          )
+          ( \r -> do
+              T.putStrLn "!!!!!!!!!! REQUEST SUCCEEDED !!!!!!!!!!!"
+              T.putStrLn $ txt r
+          )
+
+
+{-
 -- $ > driverRunning
 driverRunning :: IO Bool
 driverRunning = responseCode200 <$> handleEx status
@@ -245,62 +257,17 @@ lastSession = Session "238b3b38-96de-41e1-8f90-04bd2136e579"
 killSession :: IO ()
 killSession = stub_ (Desc "Get Status") $ deleteSession lastSession
 
-get :: HttpPathSpec GET -> IO HttpResponse
-get s = request $ RequestParams s.subDirs GET NoReqBody 4444
-
-request :: RequestArgs -> IO HttpResponse
-request RequestParams {subDirs, method, body, port = prt} =
-   runReq defaultHttpConfig $ do
-    r <- req method url body jsonResponse $ port prt
-    liftIO $ T.putStrLn $ txt r
-    pure $
-      Response
-        { statusCode = responseStatusCode r,
-          statusMessage = getLenient . toS $ responseStatusMessage r,
-          headers = L.responseHeaders . toVanillaResponse $ r,
-          body = responseBody r :: Value,
-          cookies = responseCookieJar r
-        }
-  where
-    url :: R.Url 'Http
-    url = foldl' (/:) (http "127.0.0.1") subDirs
 
 
-handleEx :: IO a -> IO (Either HttpException a)
-handleEx = try @_ @HttpException
+_theInternet :: Text
+_theInternet = "https://the-internet.herokuapp.com/"
 
-stub_ :: Show a => Log -> IO a -> IO ()
-stub_ = (void .) . stub
+_latestSession :: SessionId
+_latestSession = Session "c2c16576-baa1-464e-aebb-694ed384017e"
 
-stub :: Show a => Log -> IO a -> IO a
-stub desc action = do
-  ethr <- handleEx action
-  desc & \case
-    Desc d -> do
-      T.putStrLn ""
-      T.putStrLn d
-      ethr
-        & either
-          ( \e -> do
-              T.putStrLn "!!!!!!!!!! REQUEST FAILED !!!!!!!!!!!"
-              T.putStrLn (txt e)
-              fail $ show e
-          )
-          ( \r -> do
-              T.putStrLn "!!!!!!!!!! REQUEST SUCCEEDED !!!!!!!!!!!"
-              T.putStrLn $ txt r
-              pure r
-          )
-    None -> either (fail . show) pure ethr
+_checkBoxesLinkCss :: Text
+_checkBoxesLinkCss = "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
 
-post :: HttpPathSpec POST -> Value -> IO HttpResponse
-post (PathSpec subDirs) jsonBody =
-  request
-    defaultRequest
-      { subDirs,
-        method = POST,
-        body = ReqBodyJson jsonBody
-      }
 
-
+-}

@@ -5,7 +5,7 @@ module WebDriverSpec
     HttpResponse (..),
     ElementRef (..),
     DriverStatus (..),
-    statusSpec
+    statusSpec,
     -- responseCode200,
     -- capsToJson,
     -- pathStatus,
@@ -69,8 +69,9 @@ import Effectful.Dispatch.Dynamic
 --     toVanillaResponse,
 --     (/:),
 --   )
-import Network.HTTP.Types qualified as NT
+
 import Network.HTTP.Client qualified as NC
+import Network.HTTP.Types qualified as NT
 import PyrethrumExtras (getLenient, toS, txt, uu)
 import UnliftIO (try)
 import Web.Api.WebDriver (Capabilities, WebDriverT, defaultFirefoxCapabilities)
@@ -78,26 +79,25 @@ import Prelude hiding (get)
 
 {- Pure types and functions used in Webdriver -}
 
-
 --  todo: add error handler
-data W3Spec a = Get { 
-    path :: [Text],
-    parser :: HttpResponse -> Maybe a
-  }
-  Post { 
-    path :: [Text],
-    body :: Value,
-    parser :: HttpResponse -> Maybe a
-  }
-  PostEmpty { 
-    path :: [Text],
-    parser :: HttpResponse -> Maybe a
-  }
-  Delete { 
-    path :: [Text],
-    parser :: HttpResponse -> Maybe a
-  }
-  deriving (Show)
+data W3Spec a
+  = Get
+      { path :: [Text],
+        parser :: HttpResponse -> Maybe a
+      }
+  | Post
+      { path :: [Text],
+        body :: Value,
+        parser :: HttpResponse -> Maybe a
+      }
+  | PostEmpty
+      { path :: [Text],
+        parser :: HttpResponse -> Maybe a
+      }
+  | Delete
+      { path :: [Text],
+        parser :: HttpResponse -> Maybe a
+      }
 
 data HttpResponse = Response
   { statusCode :: Int,
@@ -114,20 +114,21 @@ newtype ElementRef = Element {id :: Text}
 newtype SessionRef = Session {id :: Text}
   deriving (Show)
 
-
-data DriverStatus = Ready 
-   | Running 
-   | ServiceError {statusCode :: Int, statusMessage :: Text} 
-   | Unknown {statusCode :: Int, statusMessage :: Text} 
+data DriverStatus
+  = Ready
+  | Running
+  | ServiceError {statusCode :: Int, statusMessage :: Text}
+  | Unknown {statusCode :: Int, statusMessage :: Text}
   deriving (Show)
 
-parseDriverStatus :: HttpResponse -> DriverStatus
-parseDriverStatus HttpResponse {statusCode, statusMessage} =
-   statusCode & \case
+parseDriverStatus :: HttpResponse -> Maybe DriverStatus
+parseDriverStatus Response {statusCode, statusMessage} =
+  Just $ statusCode & \case
     200 -> Ready
     500 -> ServiceError {statusCode, statusMessage}
     501 -> Running
     _ -> Unknown {statusCode, statusMessage}
+
 {-
 Method 	URI Template 	Command
 GET 	/status 	Status
@@ -258,10 +259,9 @@ parseElmText r =
   lookup "value" r.body
     >>= asText
 
-
 parseElementRef :: HttpResponse -> Maybe ElementRef
 parseElementRef r =
-  MkElementRef
+  Element
     <$> ( lookup "value" r.body
             -- very strange choice for prop name - in response and sane as webdriver-w3c
             >>= lookup "element-6066-11e4-a52e-4f735466cecf"

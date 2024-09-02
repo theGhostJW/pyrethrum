@@ -57,6 +57,7 @@ import WebDriverIO
 
 type MyWebDriver eff a = WebDriverT (Eff eff) a
 
+{-
 runWebDriverIO :: forall es a. ( IOE :> es) => Eff (WebUI : es) a  -> Eff es a
 runWebDriverIO =
   interpret $ \_ ->
@@ -67,6 +68,7 @@ runWebDriverIO =
       Go sessionId url -> navigateTo_ sessionId url 
       Sleep milliSec -> threadDelay $ 1_000 * milliSec
       Read sessionId css -> uu -- findElement CssSelector css >>= getElementText)
+-}
 
 
 

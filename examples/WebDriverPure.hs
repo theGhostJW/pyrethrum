@@ -3,7 +3,13 @@
 module WebDriverPure
   ( RequestArgs (..),
     capsToJson,
-    defaultRequest
+    defaultRequest,
+    second,
+    seconds,  
+    minute, 
+    minutes,
+    hour,
+    hours
   )
 where
 
@@ -57,10 +63,28 @@ import Network.HTTP.Types qualified as L
 import PyrethrumExtras (getLenient, toS, txt, uu)
 import UnliftIO (try)
 import Web.Api.WebDriver (Capabilities, WebDriverT, defaultFirefoxCapabilities)
-import WebDriverEffect (SessionId (..), WebUI (..))
-import Prelude hiding (get)
+import Prelude hiding (get, second)
 
 {- Pure types and functions used in Webdriver -}
+
+
+second :: Int
+second = 1_000
+
+seconds :: Int
+seconds = second
+
+minute :: Int
+minute = 60 * seconds
+
+minutes :: Int
+minutes = minute
+
+hour :: Int
+hour = 60 * minutes
+
+hours :: Int
+hours = hour
 
 -- todo stand alone instance of Show
 data RequestArgs where

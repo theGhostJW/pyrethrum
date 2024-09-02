@@ -1,5 +1,5 @@
 module WebDriverEffect
-  ( SessionId (..),
+  ( SessionRef (..),
     WebUI (..),
     WebDriver,
     click,
@@ -7,15 +7,7 @@ module WebDriverEffect
     killSession,
     newSession,
     read,
-    sleep,
-    -- Int constants used in wait finctions
-    -- milliseconds per (eg second = 1000, seconds = 1000)
-    second,
-    seconds,
-    minute,
-    minutes,
-    hour,
-    hours
+    sleep
   )
 where
 
@@ -38,6 +30,7 @@ import Effectful.Reader.Static as ERS
 import Effectful.TH (makeEffect)
 import Prelude hiding (second)
 import FullSuiteTestTemplate (TestItem(id))
+import WebDriverSpec (SessionRef(..))
 
 -- Effect
 
@@ -45,9 +38,7 @@ type WebDriver = ERS.Reader
 
 type instance DispatchOf WebUI = Dynamic
 
-newtype SessionId = Session {id :: Text}
-  deriving (Show)
-
+-- todo: reexport types utils from WebDriverSpec / webdriver Pure
 {-
 TODO: this is just a minimal POC
 will need to make this MUCH more sophisticated later
@@ -57,12 +48,12 @@ every element interaction
 -}
 data WebUI :: Effect where
   -- session
-  NewSession :: WebUI m (Maybe SessionId)
-  KillSession :: SessionId -> WebUI m ()
+  NewSession :: WebUI m (Maybe SessionRef)
+  KillSession :: SessionRef -> WebUI m ()
   -- page
-  Click :: SessionId -> Text -> WebUI m ()
-  Go :: SessionId -> Text -> WebUI m ()
-  Read :: SessionId -> Text -> WebUI m Text
+  Click :: SessionRef -> Text -> WebUI m ()
+  Go :: SessionRef -> Text -> WebUI m ()
+  Read :: SessionRef -> Text -> WebUI m Text
   Sleep :: Int -> WebUI m ()
 
 makeEffect ''WebUI
@@ -70,20 +61,3 @@ makeEffect ''WebUI
 -- todo add newtype later and don't export type constructor to make
 -- sleep wait typesafe
 
-second :: Int
-second = 1_000
-
-seconds :: Int
-seconds = second
-
-minute :: Int
-minute = 60 * seconds
-
-minutes :: Int
-minutes = minute
-
-hour :: Int
-hour = 60 * minutes
-
-hours :: Int
-hours = hour

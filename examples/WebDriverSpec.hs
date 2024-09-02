@@ -4,8 +4,10 @@ module WebDriverSpec
   ( W3Spec (..),
     HttpResponse (..),
     ElementRef (..),
+    SessionRef (..),
     DriverStatus (..),
     statusSpec,
+    sessionSpec
     -- responseCode200,
     -- capsToJson,
     -- pathStatus,
@@ -82,20 +84,24 @@ import Prelude hiding (get)
 --  todo: add error handler
 data W3Spec a
   = Get
-      { path :: [Text],
+      { description :: ~Text,
+        path :: [Text],
         parser :: HttpResponse -> Maybe a
       }
   | Post
-      { path :: [Text],
+      { description :: ~Text,
+        path :: [Text],
         body :: Value,
         parser :: HttpResponse -> Maybe a
       }
   | PostEmpty
-      { path :: [Text],
+      { description :: ~Text,
+        path :: [Text],
         parser :: HttpResponse -> Maybe a
       }
   | Delete
-      { path :: [Text],
+      { description :: ~Text,
+        path :: [Text],
         parser :: HttpResponse -> Maybe a
       }
 
@@ -129,12 +135,14 @@ parseDriverStatus Response {statusCode, statusMessage} =
     501 -> Running
     _ -> Unknown {statusCode, statusMessage}
 
+session :: Text
+session = "session"
 {-
 Method 	URI Template 	Command
 GET 	/status 	Status
 -}
 statusSpec :: W3Spec DriverStatus
-statusSpec = Get ["status"] parseDriverStatus
+statusSpec = Get "Get Driver Status" ["status"] parseDriverStatus
 
 {-
 GET 	/session/{session id}/timeouts 	Get Timeouts
@@ -169,9 +177,9 @@ GET 	/session/{session id}/screenshot 	Take Screenshot
 GET 	/session/{session id}/element/{element id}/screenshot 	Take Element Screenshot
 -}
 
-{- POST 	/session 	New Session -}
--- pathNewSession :: HttpPathSpec POST
--- pathNewSession = post [session']
+-- POST 	/session 	New Session
+sessionSpec :: W3Spec SessionRef
+sessionSpec = PostEmpty "Create New Session" [session] parseSessionRef
 
 {-
 POST 	/session/{session id}/timeouts 	Set Timeouts
@@ -246,6 +254,7 @@ asText = \case
   String t -> Just t
   _ -> Nothing
 
+-- change to Either handle expected errors
 parseSessionRef :: HttpResponse -> Maybe SessionRef
 parseSessionRef r =
   Session

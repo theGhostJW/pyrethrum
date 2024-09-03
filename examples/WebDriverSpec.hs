@@ -6,8 +6,17 @@ module WebDriverSpec
     ElementRef (..),
     SessionRef (..),
     DriverStatus (..),
+    Selector(..),
+    mkShowable,
+
+    --- Specs
     statusSpec,
-    sessionSpec
+    newSessionSpec,
+    newSessionSpec',
+    deleteSessionSpec,
+    navigateToSpec,
+    findElementSpec,
+    findElementSpec'
     -- responseCode200,
     -- capsToJson,
     -- pathStatus,
@@ -76,7 +85,6 @@ import Network.HTTP.Client qualified as NC
 import Network.HTTP.Types qualified as NT
 import PyrethrumExtras (getLenient, toS, txt, uu)
 import UnliftIO (try)
-import Web.Api.WebDriver (Capabilities, WebDriverT, defaultFirefoxCapabilities)
 import Prelude hiding (get)
 
 {- Pure types and functions used in Webdriver -}
@@ -104,6 +112,21 @@ data W3Spec a
         path :: [Text],
         parser :: HttpResponse -> Maybe a
       }
+
+data W3SpecShowable = Request {
+  description :: Text,
+  method :: Text,
+  path :: [Text],
+  body :: Maybe Value
+} deriving (Show)
+
+mkShowable :: W3Spec a -> W3SpecShowable
+mkShowable = \case
+  Get d p _ -> Request d "GET" p Nothing
+  Post d p b _ -> Request d "POST" p (Just b)
+  PostEmpty d p _ -> Request d "POST" p Nothing
+  Delete d p _ -> Request d "DELETE" p Nothing
+  
 
 data HttpResponse = Response
   { statusCode :: Int,
@@ -135,8 +158,69 @@ parseDriverStatus Response {statusCode, statusMessage} =
     501 -> Running
     _ -> Unknown {statusCode, statusMessage}
 
+
+-- TODO: add more selector types
+newtype Selector = CSS Text 
+  deriving (Show) 
+
+-- TODO capabilities for all browsers - to and from JSON
+data Capabilities = MkCapabilities
+  { 
+    -- NOT IMPLEMENTED
+    -- browserName :: Text,
+    -- browserVersion :: Text,
+    -- platformName :: Text
+  }
+  deriving (Show)
+
+capsToJson :: Capabilities -> Value
+capsToJson caps = uu
+  -- object
+  --   [ "capabilities"
+  --       .= object
+  --         ["alwaysMatch" .= toJSON caps],
+  --     "desiredCapabilities" .= toJSON caps
+  --   ]
+
+{-
+
+
+to / from JSON 
+instance ToJSON Capabilities where
+  toJSON Capabilities {browserName, browserVersion, platformName} =
+    object
+      [ "browserName" .= browserName,
+        "browserVersion" .= browserVersion,
+        "platformName" .= platformName
+      ]
+
+instance FromJSON Capabilities where
+  parseJSON = withObject "Capabilities" $ \o ->
+    Capabilities
+      <$> o .: "browserName"
+      <*> o .: "browserVersion"
+      <*> o .: "platformName"
+
+-- from w3c library  
+capsToJson :: Capabilities -> Value
+capsToJson caps =
+  object
+    [ "capabilities"
+        .= object
+          ["alwaysMatch" .= toJSON caps],
+      "desiredCapabilities" .= toJSON caps
+    ]
+-}
+
 session :: Text
 session = "session"
+
+session1 :: Text -> [Text]
+session1 sp = [session, sp]
+
+sessionId1 :: SessionRef -> Text -> [Text]
+sessionId1 sr sp = [session, sr.id, sp]
+
 {-
 Method 	URI Template 	Command
 GET 	/status 	Status
@@ -177,16 +261,26 @@ GET 	/session/{session id}/screenshot 	Take Screenshot
 GET 	/session/{session id}/element/{element id}/screenshot 	Take Element Screenshot
 -}
 
+-- TODO: capabilities type
+-- Change response to 
 -- POST 	/session 	New Session
-sessionSpec :: W3Spec SessionRef
-sessionSpec = PostEmpty "Create New Session" [session] parseSessionRef
+newSessionSpec :: Capabilities -> W3Spec SessionRef
+newSessionSpec capabilities = newSessionSpec' $ capsToJson capabilities
+
+newSessionSpec' :: Value -> W3Spec SessionRef
+newSessionSpec' capabilities = Post "Create New Session" [session] capabilities parseSessionRef
+
 
 {-
 POST 	/session/{session id}/timeouts 	Set Timeouts
 POST 	/session/{session id}/url 	Navigate To
 -}
+
 -- pathNavigateTo :: SessionRef -> HttpPathSpec POST
 -- pathNavigateTo s = postSession1 s "url"
+
+navigateToSpec :: SessionRef -> Text -> W3Spec ()
+navigateToSpec sessionRef url = Post "Navigate To" (sessionId1 sessionRef "url") (object ["url" .= url]) voidParser
 
 {-
 POST 	/session/{session id}/back 	Back
@@ -203,8 +297,11 @@ POST 	/session/{session id}/window/fullscreen 	Fullscreen Window
 -}
 
 -- POST 	/session/{session id}/element 	Find Element
--- pathFindElement :: SessionRef -> HttpPathSpec POST
--- pathFindElement = post . element
+findElementSpec :: SessionRef -> Selector -> W3Spec ElementRef
+findElementSpec sessionRef = findElementSpec' sessionRef . selectorVal 
+
+findElementSpec' :: SessionRef -> Value -> W3Spec ElementRef
+findElementSpec' sessionRef selector = Post "Find Element" (sessionId1 sessionRef "element") selector parseElementRef
 
 {-
 POST 	/session/{session id}/elements 	Find Elements
@@ -233,8 +330,10 @@ POST 	/session/{session id}/print 	Print Page
 {-
 DELETE /session/{session id} 	Delete Session
 -}
--- pathDeleteSession :: SessionRef -> HttpPathSpec DELETE
--- pathDeleteSession s = delete $ session s
+
+
+deleteSessionSpec :: SessionRef -> W3Spec ()
+deleteSessionSpec sessionRef = Delete "Delete Session" (session1 sessionRef.id) voidParser
 
 {-
 DELETE /session/{session id}/window 	Close Window
@@ -242,6 +341,14 @@ DELETE /session/{session id}/cookie/{name} 	Delete Cookie
 DELETE /session/{session id}/cookie 	Delete All Cookies
 DELETE /session/{session id}/actions 	Release Actions
 -}
+
+selectorVal :: Selector -> Value
+selectorVal = \case
+  CSS css -> object ["using" .= ("css selector" :: Text), "value" .= css]
+
+
+voidParser :: HttpResponse -> Maybe ()
+voidParser _ = Just ()
 
 -- TODO Ason helpers separate module
 lookup :: Key -> Value -> Maybe Value
@@ -254,12 +361,12 @@ asText = \case
   String t -> Just t
   _ -> Nothing
 
--- change to Either handle expected errors
+
 parseSessionRef :: HttpResponse -> Maybe SessionRef
 parseSessionRef r =
   Session
     <$> ( lookup "value" r.body
-            >>= lookup "SessionRef"
+            >>= lookup "sessionId"
             >>= asText
         )
 

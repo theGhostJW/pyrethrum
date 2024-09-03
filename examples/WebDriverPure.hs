@@ -110,35 +110,16 @@ capsToJson caps =
     ]
 
 
-
-
-{-
-GET 	/session/{session id}/timeouts 	Get Timeouts
-GET 	/session/{session id}/url 	Get Current URL
-GET 	/session/{session id}/title 	Get Title
-GET 	/session/{session id}/window 	Get Window Handle
-GET 	/session/{session id}/window/handles 	Get Window Handles
-GET 	/session/{session id}/window/rect 	Get Window Rect
-GET 	/session/{session id}/element/active 	Get Active Element
-GET 	/session/{session id}/element/{element id}/shadow 	Get Element Shadow Root
-GET 	/session/{session id}/element/{element id}/selected 	Is Element Selected
-GET 	/session/{session id}/element/{element id}/attribute/{name} 	Get Element Attribute
-GET 	/session/{session id}/element/{element id}/text 	Get Element Text
--}
-
-
-
-
 -- Aeson stuff to help debugging
 -- https://blog.ssanj.net/posts/2019-09-24-pretty-printing-json-in-haskell.html
--- lsbToText :: LBS.ByteString -> Text
--- lsbToText = E.decodeUtf8 . LBS.toStrict
+lsbToText :: LBS.ByteString -> Text
+lsbToText = E.decodeUtf8 . LBS.toStrict
 
--- jsonToText :: Value -> Text
--- jsonToText = lsbToText . encodePretty
+jsonToText :: Value -> Text
+jsonToText = lsbToText . encodePretty
 
--- prettyPrint :: Value -> IO ()
--- prettyPrint = T.putStrLn . jsonToText
+prettyPrintJson :: Value -> IO ()
+prettyPrintJson = T.putStrLn . jsonToText
 
 
 

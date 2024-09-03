@@ -43,7 +43,7 @@ import Network.HTTP.Types qualified as L
 import PyrethrumExtras (delete, getLenient, toS, txt, uu)
 import UnliftIO (try)
 import Web.Api.WebDriver (Capabilities, WebDriverT, defaultFirefoxCapabilities)
-import WebDriverEffect (WebUI (..), SessionId(..))
+import WebDriverEffect (WebUI (..), SessionRef(..))
 import Prelude hiding (get)
 import Data.Aeson.Encode.Pretty (encodePretty)
 

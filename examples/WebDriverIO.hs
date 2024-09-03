@@ -47,7 +47,6 @@ import WebDriverEffect (WebUI (..))
 import WebDriverPure
 import WebDriverSpec
 import Prelude hiding (get, second)
-import WebDriverSpec (sessionSpec)
 
 -- ############# IO Implementation #############
 
@@ -56,13 +55,33 @@ import WebDriverSpec (sessionSpec)
 status :: IO DriverStatus
 status = execute statusSpec
 
--- >>> newSession
--- Just (Session {id = "c2c16576-baa1-464e-aebb-694ed384017e"})
+-- >>> newDefaultFirefoxSession
+-- Session {id = "af2dbfc1-3aea-4fc7-ae19-4843367e097b"}
+newDefaultFirefoxSession :: IO SessionRef
+newDefaultFirefoxSession = newSession defaultFirefoxCapabilities
+
 newSession :: Capabilities -> IO SessionRef
-newSession = execute . sessionSpec
+newSession = execute . newSessionSpec' . capsToJson
+
+deleteSession :: SessionRef -> IO ()
+deleteSession = execute . deleteSessionSpec
 
 _latestSession :: SessionRef
-_latestSession = Session "c2c16576-baa1-464e-aebb-694ed384017e"
+_latestSession = Session "af2dbfc1-3aea-4fc7-ae19-4843367e097b"
+
+-- >>> deleteLastSession_
+deleteLastSession_ :: IO ()
+deleteLastSession_ = deleteSession _latestSession
+
+navigateTo :: SessionRef -> Text -> IO ()
+navigateTo s = execute' . navigateToSpec s
+
+_theInternet :: Text
+_theInternet = "https://the-internet.herokuapp.com/"
+
+-- >>> _navigateToTheInternet
+_navigateToTheInternet :: IO ()
+_navigateToTheInternet = navigateTo _latestSession _theInternet
 
 -- ############# Utils #############
 
@@ -83,27 +102,37 @@ parseIO spec r =
 
 execute :: forall a. W3Spec a -> IO a
 execute spec = do
-  r <- callWebDriver $ mkRequest spec
+  r <- callWebDriver False $ mkRequest spec
   parseIO spec r
 
--- | Execute a W3Spec  with descriptiobn
+-- | Execute with logging
 execute' :: forall a. (Show a) => W3Spec a -> IO a
 execute' spec =
-  describe spec.description $ execute spec
+  describe spec.description $ do
+    devLog . txt $ mkShowable spec
+    r <- callWebDriver True $ mkRequest spec
+    parseIO spec r
 
-callWebDriver :: RequestArgs -> IO HttpResponse
-callWebDriver RequestParams {subDirs, method, body, port = prt} =
+devLog :: (MonadIO m) => Text -> m ()
+devLog = liftIO . T.putStrLn
+
+callWebDriver :: Bool -> RequestArgs -> IO HttpResponse
+callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
   runReq defaultHttpConfig $ do
     r <- req method url body jsonResponse $ port prt
-    pure $
-      Response
-        { statusCode = responseStatusCode r,
-          statusMessage = getLenient . toS $ responseStatusMessage r,
-          headers = L.responseHeaders . toVanillaResponse $ r,
-          body = responseBody r :: Value,
-          cookies = responseCookieJar r
-        }
+    log $ "JSON Response:\n" <> txt r
+    let fr =
+          Response
+            { statusCode = responseStatusCode r,
+              statusMessage = getLenient . toS $ responseStatusMessage r,
+              headers = L.responseHeaders . toVanillaResponse $ r,
+              body = responseBody r :: Value,
+              cookies = responseCookieJar r
+            }
+    log $ "Framework Response:\n" <> txt fr
+    pure fr
   where
+    log = when wantLog . devLog
     url :: R.Url 'Http
     url = foldl' (/:) (http "127.0.0.1") subDirs
 
@@ -136,13 +165,6 @@ driverRunning = responseCode200 <$> handleEx status
 
 -- mkRequestParams :: HttpPathSpec -> RequestArgs
 -- mkRequestParams ps = RequestParams subDirs method body port
-
-navigateTo :: SessionRef -> Text -> IO HttpResponse
-navigateTo s url = post (pathNavigateTo s) $ object ["url" .= url]
-
--- >>> navigateTo_ latestSession theInternet
-navigateTo_ :: SessionRef -> Text -> IO ()
-navigateTo_ s = void . navigateTo s
 
 -- >>> stub (Desc "Find By Css") $ findByCss latestSession checkBoxesLinkCss
 -- Just (MkElementRef {id = "e9ec0c9a-2a3d-46f7-a112-b1f4361a419a"})
@@ -225,8 +247,6 @@ VanillaHttpException (HttpExceptionRequest Request {
 }
 , responseEarlyHints = []}) "{\"value\":{\"error\":\"stale element reference\",\"message\":\"The element with the reference e9ec0c9a-2a3d-46f7-a112-b1f4361a419a is stale; either its node document is not the active document, or it is no longer connected to the DOM\",\"stacktrace\":\"RemoteError@chrome://remote/content/shared/RemoteError.sys.mjs:8:8\\nWebDriverError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:193:5\\nStaleElementReferenceError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:725:5\\ngetKnownElement@chrome://remote/content/marionette/json.sys.mjs:401:11\\ndeserializeJSON@chrome://remote/content/marionette/json.sys.mjs:259:20\\ncloneObject@chrome://remote/content/marionette/json.sys.mjs:59:24\\ndeserializeJSON@chrome://remote/content/marionette/json.sys.mjs:289:16\\njson.deserialize@chrome://remote/content/marionette/json.sys.mjs:293:10\\nreceiveMessage@chrome://remote/content/marionette/actors/MarionetteCommandsChild.sys.mjs:73:30\\n\"}}"))
 -}
-
-
 
 -- >>> deleteSession $ MkSessionRef "efc5b851-636e-4122-b2f9-018071f96200"
 -- Response {statusCode = 200, statusMessage = "OK", headers = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","14"),("date","Sat, 31 Aug 2024 09:19:50 GMT")], body = Object (fromList [("value",Null)]), cookies = CJ {expose = []}}

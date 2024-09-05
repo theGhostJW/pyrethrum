@@ -5,7 +5,7 @@ module WebDriverIO where
 -- import Effectful.Reader.Dynamic
 
 import Core (Node (path))
-import Data.Aeson (Value)
+import Data.Aeson (Value, object)
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap (lookup, singleton)
 import Data.Aeson.Types (parseMaybe)
@@ -42,7 +42,7 @@ import Network.HTTP.Req as R
 import Network.HTTP.Types qualified as L
 import PyrethrumExtras (delete, getLenient, toS, txt, uu)
 import UnliftIO (try)
-import Web.Api.WebDriver (Capabilities, WebDriverT, defaultFirefoxCapabilities)
+import Web.Api.WebDriver (Capabilities, WebDriverT, defaultFirefoxCapabilities, maximizeWindow)
 import WebDriverEffect (WebUI (..))
 import WebDriverPure
 import WebDriverSpec
@@ -50,47 +50,55 @@ import Prelude hiding (get, second)
 
 -- ############# IO Implementation #############
 
--- >>> status
--- Ready
 status :: IO DriverStatus
-status = execute statusSpec
+status = run statusSpec
 
--- >>> newDefaultFirefoxSession
--- Session {id = "af2dbfc1-3aea-4fc7-ae19-4843367e097b"}
+maximizeWindow :: SessionRef -> IO ()
+maximizeWindow = run . maximizeWindowSpec
+
+minimizeWindow :: SessionRef -> IO ()
+minimizeWindow = run . minimizeWindowSpec
+
+fullscreenWindow :: SessionRef -> IO ()
+fullscreenWindow = run . fullscreenWindowSpec
+
+newSession :: Capabilities -> IO SessionRef
+newSession = run . newSessionSpec' . capsToJson
+
 newDefaultFirefoxSession :: IO SessionRef
 newDefaultFirefoxSession = newSession defaultFirefoxCapabilities
 
-newSession :: Capabilities -> IO SessionRef
-newSession = execute . newSessionSpec' . capsToJson
-
 deleteSession :: SessionRef -> IO ()
-deleteSession = execute . deleteSessionSpec
-
-_latestSession :: SessionRef
-_latestSession = Session "af2dbfc1-3aea-4fc7-ae19-4843367e097b"
-
--- >>> deleteLastSession_
-deleteLastSession_ :: IO ()
-deleteLastSession_ = deleteSession _latestSession
+deleteSession = run . deleteSessionSpec
 
 navigateTo :: SessionRef -> Text -> IO ()
-navigateTo s = execute' . navigateToSpec s
+navigateTo s = run . navigateToSpec s
 
-_theInternet :: Text
-_theInternet = "https://the-internet.herokuapp.com/"
+findElement :: SessionRef -> Selector -> IO ElementRef
+findElement s = run . findElementSpec s
 
--- >>> _navigateToTheInternet
-_navigateToTheInternet :: IO ()
-_navigateToTheInternet = navigateTo _latestSession _theInternet
+click :: SessionRef -> ElementRef -> IO ()
+click s = run . clickSpec s
+
+elementText :: SessionRef -> ElementRef -> IO Text
+elementText s = run . elementTextSpec s
 
 -- ############# Utils #############
 
--- will neeed to be parameterised later
+ -- console out (to haskell output window) for debugging
+run :: forall a. (Show a) => W3Spec a -> IO a
+run = execute'
+
+ -- no console out for "production"
+-- run :: W3Spec a -> IO a
+-- run = execute
+
+-- TODO: will neeed to be parameterised later
 mkRequest :: forall a. W3Spec a -> RequestArgs
 mkRequest = \case
   Get {path} -> RequestParams path GET NoReqBody 4444
   Post {path, body} -> RequestParams path POST (ReqBodyJson body) 4444
-  PostEmpty {path} -> RequestParams path POST NoReqBody 4444
+  PostEmpty {path} -> RequestParams path POST (ReqBodyJson $ object []) 4444
   Delete {path} -> RequestParams path DELETE NoReqBody 4444
 
 parseIO :: W3Spec a -> HttpResponse -> IO a
@@ -157,137 +165,3 @@ logResponse =
         T.putStrLn "!!!!!!!!!! REQUEST SUCCEEDED !!!!!!!!!!!"
         T.putStrLn $ txt r
     )
-
-{-
--- $ > driverRunning
-driverRunning :: IO Bool
-driverRunning = responseCode200 <$> handleEx status
-
--- mkRequestParams :: HttpPathSpec -> RequestArgs
--- mkRequestParams ps = RequestParams subDirs method body port
-
--- >>> stub (Desc "Find By Css") $ findByCss latestSession checkBoxesLinkCss
--- Just (MkElementRef {id = "e9ec0c9a-2a3d-46f7-a112-b1f4361a419a"})
-findByCss :: SessionRef -> Text -> IO (Maybe ElementRef)
-findByCss SessionRef cssSelector = do
-  r <- post (pathFindElement SessionRef) $
-    object ["using" .= ("css selector" :: Text), "value" .= cssSelector]
-  pure $ parseElementRef  r
-
--- >>> stub (Desc "Find By Css") $ click latestSession $ MkElementRef {id = "e9ec0c9a-2a3d-46f7-a112-b1f4361a419a"}
--- *** Exception: user error (VanillaHttpException (HttpExceptionRequest Request {
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session/c2c16576-baa1-464e-aebb-694ed384017e/element/e9ec0c9a-2a3d-46f7-a112-b1f4361a419a/click"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
---  (StatusCodeException (Response {responseStatus = Status {statusCode = 404, statusMessage = "Not Found"}, responseVersion = HTTP/1.1, responseHeaders = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","932"),("date","Sun, 01 Sep 2024 11:05:41 GMT")], responseBody = (), responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session/c2c16576-baa1-464e-aebb-694ed384017e/element/e9ec0c9a-2a3d-46f7-a112-b1f4361a419a/click"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
--- , responseEarlyHints = []}) "{\"value\":{\"error\":\"stale element reference\",\"message\":\"The element with the reference e9ec0c9a-2a3d-46f7-a112-b1f4361a419a is stale; either its node document is not the active document, or it is no longer connected to the DOM\",\"stacktrace\":\"RemoteError@chrome://remote/content/shared/RemoteError.sys.mjs:8:8\\nWebDriverError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:193:5\\nStaleElementReferenceError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:725:5\\ngetKnownElement@chrome://remote/content/marionette/json.sys.mjs:401:11\\ndeserializeJSON@chrome://remote/content/marionette/json.sys.mjs:259:20\\ncloneObject@chrome://remote/content/marionette/json.sys.mjs:59:24\\ndeserializeJSON@chrome://remote/content/marionette/json.sys.mjs:289:16\\njson.deserialize@chrome://remote/content/marionette/json.sys.mjs:293:10\\nreceiveMessage@chrome://remote/content/marionette/actors/MarionetteCommandsChild.sys.mjs:73:30\\n\"}}")))
-click :: SessionRef -> ElementRef -> IO HttpResponse
-click s er = post (pathClick s er) $ object []
-
--- TODO error handling all actions
--- success
--- Response {statusCode = 200, statusMessage = "OK", headers = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","14"),("date","Sun, 01 Sep 2024 11:03:41 GMT")], body = Object (fromList [("value",Null)]), cookies = CJ {expose = []}}
-
--- failure
-{-
-VanillaHttpException (HttpExceptionRequest Request {
-  host                 = "127.0.0.1"
-  port                 = 4444
-  secure               = False
-  requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
-  path                 = "/session/c2c16576-baa1-464e-aebb-694ed384017e/element/e9ec0c9a-2a3d-46f7-a112-b1f4361a419a/click"
-  queryString          = ""
-  method               = "POST"
-  proxy                = Nothing
-  rawBody              = False
-  redirectCount        = 10
-  responseTimeout      = ResponseTimeoutDefault
-  requestVersion       = HTTP/1.1
-  proxySecureMode      = ProxySecureWithConnect
-}
- (StatusCodeException (Response {responseStatus = Status {statusCode = 404, statusMessage = "Not Found"}, responseVersion = HTTP/1.1, responseHeaders = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","932"),("date","Sun, 01 Sep 2024 11:05:41 GMT")], responseBody = (), responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
-  host                 = "127.0.0.1"
-  port                 = 4444
-  secure               = False
-  requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
-  path                 = "/session/c2c16576-baa1-464e-aebb-694ed384017e/element/e9ec0c9a-2a3d-46f7-a112-b1f4361a419a/click"
-  queryString          = ""
-  method               = "POST"
-  proxy                = Nothing
-  rawBody              = False
-  redirectCount        = 10
-  responseTimeout      = ResponseTimeoutDefault
-  requestVersion       = HTTP/1.1
-  proxySecureMode      = ProxySecureWithConnect
-}
-, responseEarlyHints = []}) "{\"value\":{\"error\":\"stale element reference\",\"message\":\"The element with the reference e9ec0c9a-2a3d-46f7-a112-b1f4361a419a is stale; either its node document is not the active document, or it is no longer connected to the DOM\",\"stacktrace\":\"RemoteError@chrome://remote/content/shared/RemoteError.sys.mjs:8:8\\nWebDriverError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:193:5\\nStaleElementReferenceError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:725:5\\ngetKnownElement@chrome://remote/content/marionette/json.sys.mjs:401:11\\ndeserializeJSON@chrome://remote/content/marionette/json.sys.mjs:259:20\\ncloneObject@chrome://remote/content/marionette/json.sys.mjs:59:24\\ndeserializeJSON@chrome://remote/content/marionette/json.sys.mjs:289:16\\njson.deserialize@chrome://remote/content/marionette/json.sys.mjs:293:10\\nreceiveMessage@chrome://remote/content/marionette/actors/MarionetteCommandsChild.sys.mjs:73:30\\n\"}}"))
--}
-
--- >>> deleteSession $ MkSessionRef "efc5b851-636e-4122-b2f9-018071f96200"
--- Response {statusCode = 200, statusMessage = "OK", headers = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","14"),("date","Sat, 31 Aug 2024 09:19:50 GMT")], body = Object (fromList [("value",Null)]), cookies = CJ {expose = []}}
-deleteSession :: SessionRef -> IO HttpResponse
-deleteSession session = request $ defaultRequest {subDirs = ["session", session.id], method = DELETE}
-
-deleteSession_ :: SessionRef -> IO ()
-deleteSession_ = void . deleteSession
-
--- >>> elementText latestSession (MkElementRef "e9ec0c9a-2a3d-46f7-a112-b1f4361a419a")
--- Just "Checkboxes"
-elementText :: SessionRef -> ElementRef -> IO (Maybe Text)
-elementText s er = do
-  r <- get (pathElementText s er)
-  pure $ parseElmText r
-
--- $ > cycleSession
-
--- >>> cycleSession
-cycleSession :: IO ()
-cycleSession = do
-  mSid <- stub (Desc "New Firefox Session") newFirefoxSession
-  stub_ (Desc "Get Status") status
-  mSid & maybe (fail "Failed to get session ID")
-       (stub_ (Desc "Delete Session") . deleteSession)
-  stub_ (Desc "Get Status") status
-
-lastSession :: SessionRef
-lastSession = Session "238b3b38-96de-41e1-8f90-04bd2136e579"
-
--- >>> killSession
-killSession :: IO ()
-killSession = stub_ (Desc "Get Status") $ deleteSession lastSession
-
-_theInternet :: Text
-_theInternet = "https://the-internet.herokuapp.com/"
-
-_latestSession :: SessionRef
-_latestSession = Session "c2c16576-baa1-464e-aebb-694ed384017e"
-
-_checkBoxesLinkCss :: Text
-_checkBoxesLinkCss = "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
-
--}

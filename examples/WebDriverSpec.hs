@@ -11,12 +11,17 @@ module WebDriverSpec
 
     --- Specs
     statusSpec,
+    maximizeWindowSpec,
+    minimizeWindowSpec,
+    fullscreenWindowSpec,
     newSessionSpec,
     newSessionSpec',
     deleteSessionSpec,
     navigateToSpec,
     findElementSpec,
-    findElementSpec'
+    findElementSpec',
+    clickSpec,
+    elementTextSpec
     -- responseCode200,
     -- capsToJson,
     -- pathStatus,
@@ -83,7 +88,6 @@ import Effectful.Dispatch.Dynamic
 
 import Network.HTTP.Client qualified as NC
 import Network.HTTP.Types qualified as NT
-import PyrethrumExtras (getLenient, toS, txt, uu)
 import UnliftIO (try)
 import Prelude hiding (get)
 
@@ -173,17 +177,16 @@ data Capabilities = MkCapabilities
   }
   deriving (Show)
 
+-- TODO: capabilities type
 capsToJson :: Capabilities -> Value
 capsToJson caps = uu
-  -- object
-  --   [ "capabilities"
-  --       .= object
-  --         ["alwaysMatch" .= toJSON caps],
-  --     "desiredCapabilities" .= toJSON caps
-  --   ]
-
 {-
-
+object
+  [ "capabilities"
+      .= object
+        ["alwaysMatch" .= toJSON caps],
+    "desiredCapabilities" .= toJSON caps
+  ]
 
 to / from JSON 
 instance ToJSON Capabilities where
@@ -221,6 +224,16 @@ session1 sp = [session, sp]
 sessionId1 :: SessionRef -> Text -> [Text]
 sessionId1 sr sp = [session, sr.id, sp]
 
+window :: Text
+window = "window"
+
+window1 :: SessionRef -> Text -> [Text]
+window1 sr sp = [session, sr.id, window, sp]
+
+element1 :: SessionRef -> ElementRef -> Text -> [Text]
+element1 sr er sp = [session, sr.id, "element", er.id, sp]
+
+-- https://www.w3.org/TR/2024/WD-webdriver2-20240723/
 {-
 Method 	URI Template 	Command
 GET 	/status 	Status
@@ -239,11 +252,11 @@ GET 	/session/{session id}/element/active 	Get Active Element
 GET 	/session/{session id}/element/{element id}/shadow 	Get Element Shadow Root
 GET 	/session/{session id}/element/{element id}/selected 	Is Element Selected
 GET 	/session/{session id}/element/{element id}/attribute/{name} 	Get Element Attribute
-GET 	/session/{session id}/element/{element id}/text 	Get Element Text
 -}
 
--- pathElementText :: SessionRef -> ElementRef -> HttpPathSpec GET
--- pathElementText s r = getElement1 s r "text"
+-- GET 	/session/{session id}/element/{element id}/text 	Get Element Text
+elementTextSpec :: SessionRef -> ElementRef -> W3Spec Text
+elementTextSpec sessionRef elementRef = Get "Get Element Text" (element1 sessionRef elementRef "text") parseElmText
 
 {-
 GET 	/session/{session id}/element/{element id}/property/{name} 	Get Element Property
@@ -261,8 +274,7 @@ GET 	/session/{session id}/screenshot 	Take Screenshot
 GET 	/session/{session id}/element/{element id}/screenshot 	Take Element Screenshot
 -}
 
--- TODO: capabilities type
--- Change response to 
+
 -- POST 	/session 	New Session
 newSessionSpec :: Capabilities -> W3Spec SessionRef
 newSessionSpec capabilities = newSessionSpec' $ capsToJson capabilities
@@ -270,15 +282,11 @@ newSessionSpec capabilities = newSessionSpec' $ capsToJson capabilities
 newSessionSpec' :: Value -> W3Spec SessionRef
 newSessionSpec' capabilities = Post "Create New Session" [session] capabilities parseSessionRef
 
-
 {-
 POST 	/session/{session id}/timeouts 	Set Timeouts
-POST 	/session/{session id}/url 	Navigate To
 -}
 
--- pathNavigateTo :: SessionRef -> HttpPathSpec POST
--- pathNavigateTo s = postSession1 s "url"
-
+-- POST 	/session/{session id}/url 	Navigate To
 navigateToSpec :: SessionRef -> Text -> W3Spec ()
 navigateToSpec sessionRef url = Post "Navigate To" (sessionId1 sessionRef "url") (object ["url" .= url]) voidParser
 
@@ -291,14 +299,23 @@ POST 	/session/{session id}/window/new 	New Window
 POST 	/session/{session id}/frame 	Switch To Frame
 POST 	/session/{session id}/frame/parent 	Switch To Parent Frame
 POST 	/session/{session id}/window/rect 	Set Window Rect
-POST 	/session/{session id}/window/maximize 	Maximize Window
-POST 	/session/{session id}/window/minimize 	Minimize Window
-POST 	/session/{session id}/window/fullscreen 	Fullscreen Window
 -}
+
+-- POST 	/session/{session id}/window/maximize 	Maximize Window
+maximizeWindowSpec :: SessionRef -> W3Spec ()
+maximizeWindowSpec sessionRef = PostEmpty "Maximize Window" (window1 sessionRef "maximize") voidParser
+
+-- POST 	/session/{session id}/window/minimize 	Minimize Window
+minimizeWindowSpec :: SessionRef -> W3Spec ()
+minimizeWindowSpec sessionRef = PostEmpty "Minimize Window" (window1 sessionRef "minimize") voidParser
+
+-- POST 	/session/{session id}/window/fullscreen 	Fullscreen Window
+fullscreenWindowSpec :: SessionRef -> W3Spec ()
+fullscreenWindowSpec sessionRef = PostEmpty "Fullscreen Window" (window1 sessionRef "fullscreen") voidParser
 
 -- POST 	/session/{session id}/element 	Find Element
 findElementSpec :: SessionRef -> Selector -> W3Spec ElementRef
-findElementSpec sessionRef = findElementSpec' sessionRef . selectorVal 
+findElementSpec sessionRef = findElementSpec' sessionRef . selectorJson 
 
 findElementSpec' :: SessionRef -> Value -> W3Spec ElementRef
 findElementSpec' sessionRef selector = Post "Find Element" (sessionId1 sessionRef "element") selector parseElementRef
@@ -312,8 +329,8 @@ POST 	/session/{session id}/shadow/{shadow id}/elements 	Find Elements From Shad
 -}
 
 -- POST 	/session/{session id}/element/{element id}/click 	Element Click
--- pathClick :: SessionRef -> ElementRef -> HttpPathSpec POST
--- pathClick s r = postElement1 s r "click"
+clickSpec :: SessionRef -> ElementRef -> W3Spec ()
+clickSpec sessionRef elementRef = PostEmpty "Click Element" (element1 sessionRef elementRef "click") voidParser
 
 {-
 POST 	/session/{session id}/element/{element id}/clear 	Element Clear
@@ -327,11 +344,8 @@ POST 	/session/{session id}/alert/accept 	Accept Alert
 POST 	/session/{session id}/alert/text 	Send Alert Text
 POST 	/session/{session id}/print 	Print Page
 -}
-{-
-DELETE /session/{session id} 	Delete Session
--}
 
-
+-- DELETE /session/{session id} 	Delete Session
 deleteSessionSpec :: SessionRef -> W3Spec ()
 deleteSessionSpec sessionRef = Delete "Delete Session" (session1 sessionRef.id) voidParser
 
@@ -342,8 +356,10 @@ DELETE /session/{session id}/cookie 	Delete All Cookies
 DELETE /session/{session id}/actions 	Release Actions
 -}
 
-selectorVal :: Selector -> Value
-selectorVal = \case
+-- #### Utils ####
+
+selectorJson :: Selector -> Value
+selectorJson = \case
   CSS css -> object ["using" .= ("css selector" :: Text), "value" .= css]
 
 

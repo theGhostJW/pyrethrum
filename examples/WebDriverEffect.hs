@@ -39,7 +39,7 @@ data WebUI :: Effect where
   -- navigate
   Go :: SessionRef -> Text -> WebUI m ()
   -- page
-  -- toDO Click, Read (take selector)
+  -- toDO Click, Read... (take selector param)
   ClickElem :: SessionRef -> ElementRef -> WebUI m ()
   ReadElem :: SessionRef -> ElementRef -> WebUI m Text
   -- TODO move this its more generic (eg. used in REST wait loops)

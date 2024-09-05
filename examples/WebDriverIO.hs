@@ -4,25 +4,15 @@ module WebDriverIO where
 
 -- import Effectful.Reader.Dynamic
 
-import Core (Node (path))
 import Data.Aeson (Value, object)
-import Data.Aeson.Encode.Pretty (encodePretty)
-import Data.Aeson.KeyMap (lookup, singleton)
-import Data.Aeson.Types (parseMaybe)
-import Data.ByteString.Lazy qualified as LBS
-import Data.Text.Encoding qualified as E
 import Data.Text.IO qualified as T
 import Network.HTTP.Client qualified as L
 import Network.HTTP.Req as R
   ( DELETE (DELETE),
     GET (GET),
-    HttpBody,
-    HttpBodyAllowed,
     HttpException,
-    HttpMethod (AllowsBody),
     NoReqBody (NoReqBody),
     POST (POST),
-    ProvidesBody,
     ReqBodyJson (ReqBodyJson),
     Scheme (Http),
     Url,
@@ -39,13 +29,27 @@ import Network.HTTP.Req as R
     toVanillaResponse,
     (/:),
   )
-import Network.HTTP.Types qualified as L
-import PyrethrumExtras (delete, getLenient, toS, txt, uu)
+import PyrethrumExtras (getLenient, toS, txt)
 import UnliftIO (try)
-import Web.Api.WebDriver (Capabilities, WebDriverT, defaultFirefoxCapabilities, maximizeWindow)
-import WebDriverEffect (WebUI (..))
-import WebDriverPure
-import WebDriverSpec
+import Web.Api.WebDriver (Capabilities, defaultFirefoxCapabilities)
+import WebDriverPure ( RequestArgs(..), capsToJson )
+import WebDriverSpec as WD ( DriverStatus,
+      W3Spec(..),
+      SessionRef,
+      Selector,
+      ElementRef,
+      HttpResponse(..),
+      statusSpec,
+      newSessionSpec',
+      deleteSessionSpec,
+      navigateToSpec,
+      findElementSpec,
+      clickSpec,
+      mkShowable,
+      maximizeWindowSpec,
+      minimizeWindowSpec,
+      fullscreenWindowSpec,
+      elementTextSpec )
 import Prelude hiding (get, second)
 
 -- ############# IO Implementation #############
@@ -101,7 +105,7 @@ mkRequest = \case
   PostEmpty {path} -> RequestParams path POST (ReqBodyJson $ object []) 4444
   Delete {path} -> RequestParams path DELETE NoReqBody 4444
 
-parseIO :: W3Spec a -> HttpResponse -> IO a
+parseIO :: W3Spec a -> WD.HttpResponse -> IO a
 parseIO spec r =
   maybe
     (fail . toS $ spec.description <> "\n" <> "Failed to parse response:\n " <> txt r)
@@ -141,7 +145,7 @@ callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
     pure fr
   where
     log = when wantLog . devLog
-    url :: R.Url 'Http
+    url :: Url 'Http
     url = foldl' (/:) (http "127.0.0.1") subDirs
 
 describe :: (Show a) => Text -> IO a -> IO a

@@ -44,6 +44,7 @@ import Network.HTTP.Req as R
   )
 import PyrethrumExtras (getLenient, toS, txt)
 import UnliftIO (try)
+-- TODO deprecate
 import Web.Api.WebDriver (Capabilities, defaultFirefoxCapabilities)
 import WebDriverPure (RequestArgs (..), capsToJson)
 import WebDriverSpec as WD
@@ -104,6 +105,7 @@ elementText s = run . elementTextSpec s
 
 -- ############# Utils #############
 
+-- TODO: logging behaviour injectable special value W3CLogging
 --------------------------------------------------------------------------------
 -- console out (to haskell output window) for debugging
 run :: forall a. (Show a) => W3Spec a -> IO a

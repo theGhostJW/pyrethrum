@@ -171,6 +171,7 @@ callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
 
 describe :: (Show a) => Text -> IO a -> IO a
 describe msg action = do
+  T.putStrLn ""
   T.putStrLn $ "########### " <> msg <> " ###########"
   ethr <- handleEx action
   logResponse ethr

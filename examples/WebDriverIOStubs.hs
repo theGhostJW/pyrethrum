@@ -4,62 +4,39 @@ module WebDriverIOStubs where
 
 -- import Effectful.Reader.Dynamic
 
-import Core (Node (path))
-import Data.Aeson (Value)
-import Data.Aeson.Encode.Pretty (encodePretty)
-import Data.Aeson.KeyMap (lookup, singleton)
-import Data.Aeson.Types (parseMaybe)
-import Data.ByteString.Lazy qualified as LBS
-import Data.Text.Encoding qualified as E
-import Data.Text.IO qualified as T
-import Network.HTTP.Client qualified as L
-import Network.HTTP.Req as R
-  ( DELETE (DELETE),
-    GET (GET),
-    HttpBody,
-    HttpBodyAllowed,
-    HttpException,
-    HttpMethod (AllowsBody),
-    NoReqBody (NoReqBody),
-    POST (POST),
-    ProvidesBody,
-    ReqBodyJson (ReqBodyJson),
-    Scheme (Http),
-    Url,
-    defaultHttpConfig,
-    http,
-    jsonResponse,
-    port,
-    req,
-    responseBody,
-    responseCookieJar,
-    responseStatusCode,
-    responseStatusMessage,
-    runReq,
-    toVanillaResponse,
-    (/:),
-  )
-import Network.HTTP.Types qualified as L
-import PyrethrumExtras (delete, getLenient, toS, txt, uu)
-import UnliftIO (try)
-import Web.Api.WebDriver (Capabilities, WebDriverT, defaultFirefoxCapabilities)
-import WebDriverEffect (WebUI (..))
-import WebDriverPure
-import WebDriverSpec
 import WebDriverIO
+    ( status,
+      newDefaultFirefoxSession,
+      deleteSession,
+      navigateTo,
+      findElement,
+      click,
+      maximizeWindow,
+      minimizeWindow,
+      fullscreenWindow,
+      elementText )
+import WebDriverSpec
+    ( DriverStatus,
+      SessionRef(Session),
+      Selector(..),
+      ElementRef(Element) )
 import Prelude hiding (get, second)
 
 -- ############# IO Implementation #############
 
 _status :: IO DriverStatus
 _status = status
+
 -- >>> _status
 -- Ready
 
 _newDefaultFirefoxSession :: IO SessionRef
 _newDefaultFirefoxSession = newDefaultFirefoxSession
+
 -- >>> newDefaultFirefoxSession
+
 -- *** Exception: VanillaHttpException (HttpExceptionRequest Request {
+
 --   host                 = "127.0.0.1"
 --   port                 = 4444
 --   secure               = False
@@ -94,21 +71,24 @@ _newDefaultFirefoxSession = newDefaultFirefoxSession
 _latestSession :: SessionRef
 _latestSession = Session "1beac3df-15c8-490d-8eb5-65691b6e16d0"
 
-
 _maximizeWindow :: IO ()
 _maximizeWindow = maximizeWindow _latestSession
+
 -- >>> _maximizeWindow
 
 _minimizeWindow :: IO ()
 _minimizeWindow = minimizeWindow _latestSession
--- >>> _minimizeWindow 
+
+-- >>> _minimizeWindow
 
 _fullscreenWindow :: IO ()
 _fullscreenWindow = fullscreenWindow _latestSession
+
 -- >>> _fullscreenWindow
 
 _deleteLastSession_ :: IO ()
 _deleteLastSession_ = deleteSession _latestSession
+
 -- >>> _deleteLastSession_
 
 _theInternet :: Text
@@ -116,13 +96,15 @@ _theInternet = "https://the-internet.herokuapp.com/"
 
 _navigateToTheInternet :: IO ()
 _navigateToTheInternet = navigateTo _latestSession _theInternet
+
 -- >>> _navigateToTheInternet
 
 _checkBoxesLinkCss :: Selector
 _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
 _findCheckBoxesLink :: IO ElementRef
-_findCheckBoxesLink = findElement _latestSession _checkBoxesLinkCss 
+_findCheckBoxesLink = findElement _latestSession _checkBoxesLinkCss
+
 -- >>> _findCheckBoxesLink
 -- Element {id = "ffef18ab-c34c-48b5-8031-4b762c453b64"}
 
@@ -130,9 +112,12 @@ _checkboxesLinkElement :: ElementRef
 _checkboxesLinkElement = Element "ffef18ab-c34c-48b5-8031-4b762c453b64"
 
 _findMissing :: IO ElementRef
-_findMissing = findElement _latestSession $  CSS "#notHere"
+_findMissing = findElement _latestSession $ CSS "#notHere"
+
 -- >>> _findMissing
+
 -- *** Exception: user error (VanillaHttpException (HttpExceptionRequest Request {
+
 --   host                 = "127.0.0.1"
 --   port                 = 4444
 --   secure               = False
@@ -166,14 +151,14 @@ _findMissing = findElement _latestSession $  CSS "#notHere"
 
 _checkBoxesLinkText :: IO Text
 _checkBoxesLinkText = elementText _latestSession _checkboxesLinkElement
+
 -- >>> _checkBoxesLinkText
 -- "Checkboxes"
 
 _clickCheckBoxesLink :: IO ()
 _clickCheckBoxesLink = click _latestSession _checkboxesLinkElement
+
 -- >>> _clickCheckBoxesLink
-
-
 
 {-
 -- $ > driverRunning
@@ -308,4 +293,3 @@ _checkBoxesLinkCss :: Text
 _checkBoxesLinkCss = "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
 -}
-

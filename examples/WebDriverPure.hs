@@ -15,54 +15,16 @@ where
 
 -- import Effectful.Reader.Dynamic
 
-import Core (Node (path))
 import Data.Aeson
-import Data.Aeson.Encode.Pretty (encodePretty)
-import Data.Aeson.KeyMap qualified as AKM
-import Data.Aeson.Types (parseMaybe)
-import Data.ByteString.Lazy qualified as LBS
-import Data.Text.Encoding qualified as E
-import Data.Text.IO qualified as T
-import Effectful as EF
-  ( Eff,
-    IOE,
-    liftIO,
-    type (:>),
-  )
-import Effectful.Dispatch.Dynamic
-  ( interpret,
-  )
-import Network.HTTP.Client qualified as L
 import Network.HTTP.Req as R
-  ( DELETE (DELETE),
-    GET (GET),
+  ( GET (GET),
     HttpBody,
     HttpBodyAllowed,
-    HttpException,
     HttpMethod (AllowsBody),
     NoReqBody (NoReqBody),
-    POST (POST),
     ProvidesBody,
-    ReqBodyJson (ReqBodyJson),
-    Scheme (Http),
-    Url,
-    defaultHttpConfig,
-    http,
-    jsonResponse,
-    port,
-    req,
-    responseBody,
-    responseCookieJar,
-    responseStatusCode,
-    responseStatusMessage,
-    runReq,
-    toVanillaResponse,
-    (/:),
   )
-import Network.HTTP.Types qualified as L
-import PyrethrumExtras (getLenient, toS, txt, uu)
-import UnliftIO (try)
-import Web.Api.WebDriver (Capabilities, WebDriverT, defaultFirefoxCapabilities)
+import Web.Api.WebDriver (Capabilities)
 import Prelude hiding (get, second)
 
 {- Pure types and functions used in Webdriver -}
@@ -109,6 +71,11 @@ capsToJson caps =
       "desiredCapabilities" .= toJSON caps
     ]
 
+{-
+import Data.Aeson.Encode.Pretty (encodePretty)
+import Data.ByteString.Lazy qualified as LBS
+import Data.Text.Encoding qualified as E
+import Data.Text.IO qualified as T
 
 -- Aeson stuff to help debugging
 -- https://blog.ssanj.net/posts/2019-09-24-pretty-printing-json-in-haskell.html
@@ -120,6 +87,6 @@ jsonToText = lsbToText . encodePretty
 
 prettyPrintJson :: Value -> IO ()
 prettyPrintJson = T.putStrLn . jsonToText
-
+-}
 
 

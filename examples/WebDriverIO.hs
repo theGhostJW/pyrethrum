@@ -1,6 +1,19 @@
 {-# LANGUAGE UndecidableInstances #-}
 
-module WebDriverIO where
+module WebDriverIO
+  ( status,
+    maximizeWindow,
+    minimizeWindow,
+    fullscreenWindow,
+    newSession,
+    newDefaultFirefoxSession,
+    deleteSession,
+    navigateTo,
+    findElement,
+    click,
+    elementText,
+  )
+where
 
 -- import Effectful.Reader.Dynamic
 
@@ -32,24 +45,26 @@ import Network.HTTP.Req as R
 import PyrethrumExtras (getLenient, toS, txt)
 import UnliftIO (try)
 import Web.Api.WebDriver (Capabilities, defaultFirefoxCapabilities)
-import WebDriverPure ( RequestArgs(..), capsToJson )
-import WebDriverSpec as WD ( DriverStatus,
-      W3Spec(..),
-      SessionRef,
-      Selector,
-      ElementRef,
-      HttpResponse(..),
-      statusSpec,
-      newSessionSpec',
-      deleteSessionSpec,
-      navigateToSpec,
-      findElementSpec,
-      clickSpec,
-      mkShowable,
-      maximizeWindowSpec,
-      minimizeWindowSpec,
-      fullscreenWindowSpec,
-      elementTextSpec )
+import WebDriverPure (RequestArgs (..), capsToJson)
+import WebDriverSpec as WD
+  ( DriverStatus,
+    ElementRef,
+    HttpResponse (..),
+    Selector,
+    SessionRef,
+    W3Spec (..),
+    clickSpec,
+    deleteSessionSpec,
+    elementTextSpec,
+    findElementSpec,
+    fullscreenWindowSpec,
+    maximizeWindowSpec,
+    minimizeWindowSpec,
+    mkShowable,
+    navigateToSpec,
+    newSessionSpec',
+    statusSpec,
+  )
 import Prelude hiding (get, second)
 
 -- ############# IO Implementation #############
@@ -89,13 +104,32 @@ elementText s = run . elementTextSpec s
 
 -- ############# Utils #############
 
- -- console out (to haskell output window) for debugging
+--------------------------------------------------------------------------------
+-- console out (to haskell output window) for debugging
 run :: forall a. (Show a) => W3Spec a -> IO a
 run = execute'
 
- -- no console out for "production"
--- run :: W3Spec a -> IO a
--- run = execute
+-- | Execute with logging
+execute' :: forall a. (Show a) => W3Spec a -> IO a
+execute' spec =
+  describe spec.description $ do
+    devLog . txt $ mkShowable spec
+    r <- callWebDriver True $ mkRequest spec
+    parseIO spec r
+--------------------------------------------------------------------------------
+
+{-
+--------------------------------------------------------------------------------
+-- no console out for "production"
+run :: W3Spec a -> IO a
+run = execute
+
+execute :: forall a. W3Spec a -> IO a
+execute spec = do
+  r <- callWebDriver False $ mkRequest spec
+  parseIO spec r
+--------------------------------------------------------------------------------
+-}
 
 -- TODO: will neeed to be parameterised later
 mkRequest :: forall a. W3Spec a -> RequestArgs
@@ -112,18 +146,7 @@ parseIO spec r =
     pure
     $ spec.parser r
 
-execute :: forall a. W3Spec a -> IO a
-execute spec = do
-  r <- callWebDriver False $ mkRequest spec
-  parseIO spec r
 
--- | Execute with logging
-execute' :: forall a. (Show a) => W3Spec a -> IO a
-execute' spec =
-  describe spec.description $ do
-    devLog . txt $ mkShowable spec
-    r <- callWebDriver True $ mkRequest spec
-    parseIO spec r
 
 devLog :: (MonadIO m) => Text -> m ()
 devLog = liftIO . T.putStrLn

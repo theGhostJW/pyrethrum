@@ -2,11 +2,11 @@ module WebDriverEffect
   ( SessionRef (..),
     WebUI (..),
     WebDriver,
-    click,
+    clickElem,
     go,
     killSession,
     newSession,
-    read,
+    readElem,
     sleep
   )
 where
@@ -16,7 +16,7 @@ import Effectful as EF ( Effect, DispatchOf, Dispatch(Dynamic) )
 import Effectful.Reader.Static as ERS
 import Effectful.TH (makeEffect)
 import Prelude hiding (second)
-import WebDriverSpec (SessionRef(..))
+import WebDriverSpec (SessionRef(..), ElementRef)
 
 -- Effect
 
@@ -34,12 +34,15 @@ every element interaction
 -}
 data WebUI :: Effect where
   -- session
-  NewSession :: WebUI m (Maybe SessionRef)
+  NewSession :: WebUI m SessionRef
   KillSession :: SessionRef -> WebUI m ()
-  -- page
-  Click :: SessionRef -> Text -> WebUI m ()
+  -- navigate
   Go :: SessionRef -> Text -> WebUI m ()
-  Read :: SessionRef -> Text -> WebUI m Text
+  -- page
+  -- toDO Click, Read (take selector)
+  ClickElem :: SessionRef -> ElementRef -> WebUI m ()
+  ReadElem :: SessionRef -> ElementRef -> WebUI m Text
+  -- TODO move this its more generic (eg. used in REST wait loops)
   Sleep :: Int -> WebUI m ()
 
 makeEffect ''WebUI

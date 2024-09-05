@@ -146,8 +146,6 @@ parseIO spec r =
     pure
     $ spec.parser r
 
-
-
 devLog :: (MonadIO m) => Text -> m ()
 devLog = liftIO . T.putStrLn
 
@@ -173,7 +171,7 @@ callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
 
 describe :: (Show a) => Text -> IO a -> IO a
 describe msg action = do
-  T.putStrLn msg
+  T.putStrLn $ "########### " <> msg <> " ###########"
   ethr <- handleEx action
   logResponse ethr
   either (fail . toS . txt) pure ethr

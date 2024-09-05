@@ -21,6 +21,8 @@ import WebDriverSpec
       Selector(..),
       ElementRef(Element) )
 import Prelude hiding (get, second)
+import Data.Text.IO qualified as T
+import PyrethrumExtras (txt)
 
 -- ############# IO Implementation #############
 
@@ -84,10 +86,41 @@ _fullscreenWindow = fullscreenWindow _latestSession
 
 -- >>> _fullscreenWindow
 
-_deleteLastSession_ :: IO ()
-_deleteLastSession_ = deleteSession _latestSession
+_deleteLastSession :: IO ()
+_deleteLastSession = deleteSession _latestSession
 
--- >>> _deleteLastSession_
+-- >>> _deleteLastSession
+-- *** Exception: user error (VanillaHttpException (HttpExceptionRequest Request {
+--   host                 = "127.0.0.1"
+--   port                 = 4444
+--   secure               = False
+--   requestHeaders       = [("Accept","application/json")]
+--   path                 = "/session/1beac3df-15c8-490d-8eb5-65691b6e16d0"
+--   queryString          = ""
+--   method               = "DELETE"
+--   proxy                = Nothing
+--   rawBody              = False
+--   redirectCount        = 10
+--   responseTimeout      = ResponseTimeoutDefault
+--   requestVersion       = HTTP/1.1
+--   proxySecureMode      = ProxySecureWithConnect
+-- }
+--  (StatusCodeException (Response {responseStatus = Status {statusCode = 404, statusMessage = "Not Found"}, responseVersion = HTTP/1.1, responseHeaders = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","131"),("date","Thu, 05 Sep 2024 23:20:05 GMT")], responseBody = (), responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
+--   host                 = "127.0.0.1"
+--   port                 = 4444
+--   secure               = False
+--   requestHeaders       = [("Accept","application/json")]
+--   path                 = "/session/1beac3df-15c8-490d-8eb5-65691b6e16d0"
+--   queryString          = ""
+--   method               = "DELETE"
+--   proxy                = Nothing
+--   rawBody              = False
+--   redirectCount        = 10
+--   responseTimeout      = ResponseTimeoutDefault
+--   requestVersion       = HTTP/1.1
+--   proxySecureMode      = ProxySecureWithConnect
+-- }
+-- , responseEarlyHints = []}) "{\"value\":{\"error\":\"invalid session id\",\"message\":\"Got unexpected session id 1beac3df-15c8-490d-8eb5-65691b6e16d0\",\"stacktrace\":\"\"}}")))
 
 _theInternet :: Text
 _theInternet = "https://the-internet.herokuapp.com/"
@@ -157,3 +190,18 @@ _clickCheckBoxesLink :: IO ()
 _clickCheckBoxesLink = click _latestSession _checkboxesLinkElement
 
 -- >>> _clickCheckBoxesLink
+
+_endToEnd :: IO ()
+_endToEnd = do
+    status' <- status
+    ses <- newDefaultFirefoxSession
+    maximizeWindow ses
+    navigateTo ses _theInternet
+    link <- findElement ses _checkBoxesLinkCss
+    cbTxt <- elementText ses link
+    click ses link
+    deleteSession ses
+    T.putStrLn $ txt status'
+    T.putStrLn cbTxt
+
+-- >>> _endToEnd

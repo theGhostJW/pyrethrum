@@ -6,94 +6,38 @@ module WebDriverSpec
     ElementRef (..),
     SessionRef (..),
     DriverStatus (..),
-    Selector(..),
+    Selector (..),
+    -- Capabilities(..),
     mkShowable,
-
     --- Specs
     statusSpec,
     maximizeWindowSpec,
     minimizeWindowSpec,
     fullscreenWindowSpec,
-    newSessionSpec,
+    -- newSessionSpec,
     newSessionSpec',
     deleteSessionSpec,
     navigateToSpec,
     findElementSpec,
     findElementSpec',
     clickSpec,
-    elementTextSpec
-    -- responseCode200,
-    -- capsToJson,
-    -- pathStatus,
-    -- pathDeleteSession,
-    -- pathNewSession,
-    -- parseSessionRef,
-    -- defaultRequest,
-    -- Log (..),
-    -- pathNavigateTo,
-    -- pathClick,
-    -- pathElementText,
-    -- pathFindElement,
-    -- parseElementRef,
-    -- parseElmText,
+    elementTextSpec,
   )
 where
-
--- import Effectful.Reader.Dynamic
-
-import Core (Node (path))
 import Data.Aeson
-import Data.Aeson.Encode.Pretty (encodePretty)
+  ( Key,
+    KeyValue ((.=)),
+    Value (Object, String),
+    object,
+  )
 import Data.Aeson.KeyMap qualified as AKM
-import Data.Aeson.Types (parseMaybe)
-import Data.ByteString.Lazy qualified as LBS
-import Data.Text.Encoding qualified as E
-import Data.Text.IO qualified as T
-import Effectful as EF
-  ( Eff,
-    IOE,
-    liftIO,
-    type (:>),
-  )
-import Effectful.Dispatch.Dynamic
-  ( interpret,
-  )
--- import Network.HTTP.Client qualified as L
--- import Network.HTTP.Req as R
---   ( DELETE (DELETE),
---     GET (GET),
---     HttpBody,
---     HttpBodyAllowed,
---     HttpException,
---     HttpMethod (AllowsBody),
---     NoReqBody (NoReqBody),
---     POST (POST),
---     ProvidesBody,
---     ReqBodyJson (ReqBodyJson),
---     Scheme (Http),
---     Url,
---     defaultHttpConfig,
---     http,
---     jsonResponse,
---     port,
---     req,
---     responseBody,
---     responseCookieJar,
---     responseStatusCode,
---     responseStatusMessage,
---     runReq,
---     toVanillaResponse,
---     (/:),
---   )
-
 import Network.HTTP.Client qualified as NC
 import Network.HTTP.Types qualified as NT
-import UnliftIO (try)
 import Prelude hiding (get)
 
 {- Pure types and functions used in Webdriver -}
 
---  todo: add error handler
+--  TODO: add error handler
 data W3Spec a
   = Get
       { description :: ~Text,
@@ -117,12 +61,13 @@ data W3Spec a
         parser :: HttpResponse -> Maybe a
       }
 
-data W3SpecShowable = Request {
-  description :: Text,
-  method :: Text,
-  path :: [Text],
-  body :: Maybe Value
-} deriving (Show)
+data W3SpecShowable = Request
+  { description :: Text,
+    method :: Text,
+    path :: [Text],
+    body :: Maybe Value
+  }
+  deriving (Show)
 
 mkShowable :: W3Spec a -> W3SpecShowable
 mkShowable = \case
@@ -130,7 +75,6 @@ mkShowable = \case
   Post d p b _ -> Request d "POST" p (Just b)
   PostEmpty d p _ -> Request d "POST" p Nothing
   Delete d p _ -> Request d "DELETE" p Nothing
-  
 
 data HttpResponse = Response
   { statusCode :: Int,
@@ -156,31 +100,34 @@ data DriverStatus
 
 parseDriverStatus :: HttpResponse -> Maybe DriverStatus
 parseDriverStatus Response {statusCode, statusMessage} =
-  Just $ statusCode & \case
-    200 -> Ready
-    500 -> ServiceError {statusCode, statusMessage}
-    501 -> Running
-    _ -> Unknown {statusCode, statusMessage}
-
+  Just $
+    statusCode & \case
+      200 -> Ready
+      500 -> ServiceError {statusCode, statusMessage}
+      501 -> Running
+      _ -> Unknown {statusCode, statusMessage}
 
 -- TODO: add more selector types
-newtype Selector = CSS Text 
-  deriving (Show) 
-
--- TODO capabilities for all browsers - to and from JSON
-data Capabilities = MkCapabilities
-  { 
-    -- NOT IMPLEMENTED
-    -- browserName :: Text,
-    -- browserVersion :: Text,
-    -- platformName :: Text
-  }
+newtype Selector = CSS Text
   deriving (Show)
 
--- TODO: capabilities type
-capsToJson :: Capabilities -> Value
-capsToJson caps = uu
+-- TODO capabilities for all browsers - to and from JSON
+-- move to separate module
+data Capabilities = MkCapabilities
+  {
+  }
+  -- NOT IMPLEMENTED
+  -- browserName :: Text,
+  -- browserVersion :: Text,
+  -- platformName :: Text
+
+  deriving (Show)
+
 {-
+-- TODO: capabilities type
+-- capsToJson :: Capabilities -> Value
+-- capsToJson caps = uu
+
 object
   [ "capabilities"
       .= object
@@ -188,7 +135,7 @@ object
     "desiredCapabilities" .= toJSON caps
   ]
 
-to / from JSON 
+to / from JSON
 instance ToJSON Capabilities where
   toJSON Capabilities {browserName, browserVersion, platformName} =
     object
@@ -204,7 +151,7 @@ instance FromJSON Capabilities where
       <*> o .: "browserVersion"
       <*> o .: "platformName"
 
--- from w3c library  
+-- from w3c library
 capsToJson :: Capabilities -> Value
 capsToJson caps =
   object
@@ -274,10 +221,10 @@ GET 	/session/{session id}/screenshot 	Take Screenshot
 GET 	/session/{session id}/element/{element id}/screenshot 	Take Element Screenshot
 -}
 
-
 -- POST 	/session 	New Session
-newSessionSpec :: Capabilities -> W3Spec SessionRef
-newSessionSpec capabilities = newSessionSpec' $ capsToJson capabilities
+-- TODO: native capabilities type
+-- newSessionSpec :: Capabilities -> W3Spec SessionRef
+-- newSessionSpec capabilities = newSessionSpec' $ capsToJson capabilities
 
 newSessionSpec' :: Value -> W3Spec SessionRef
 newSessionSpec' capabilities = Post "Create New Session" [session] capabilities parseSessionRef
@@ -315,7 +262,7 @@ fullscreenWindowSpec sessionRef = PostEmpty "Fullscreen Window" (window1 session
 
 -- POST 	/session/{session id}/element 	Find Element
 findElementSpec :: SessionRef -> Selector -> W3Spec ElementRef
-findElementSpec sessionRef = findElementSpec' sessionRef . selectorJson 
+findElementSpec sessionRef = findElementSpec' sessionRef . selectorJson
 
 findElementSpec' :: SessionRef -> Value -> W3Spec ElementRef
 findElementSpec' sessionRef selector = Post "Find Element" (sessionId1 sessionRef "element") selector parseElementRef
@@ -362,7 +309,6 @@ selectorJson :: Selector -> Value
 selectorJson = \case
   CSS css -> object ["using" .= ("css selector" :: Text), "value" .= css]
 
-
 voidParser :: HttpResponse -> Maybe ()
 voidParser _ = Just ()
 
@@ -376,7 +322,6 @@ asText :: Value -> Maybe Text
 asText = \case
   String t -> Just t
   _ -> Nothing
-
 
 parseSessionRef :: HttpResponse -> Maybe SessionRef
 parseSessionRef r =
@@ -399,14 +344,3 @@ parseElementRef r =
             >>= lookup "element-6066-11e4-a52e-4f735466cecf"
             >>= asText
         )
-
--- Aeson stuff to help debugging
--- https://blog.ssanj.net/posts/2019-09-24-pretty-printing-json-in-haskell.html
--- lsbToText :: LBS.ByteString -> Text
--- lsbToText = E.decodeUtf8 . LBS.toStrict
-
--- jsonToText :: Value -> Text
--- jsonToText = lsbToText . encodePretty
-
--- prettyPrint :: Value -> IO ()
--- prettyPrint = T.putStrLn . jsonToText

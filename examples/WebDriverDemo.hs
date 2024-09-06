@@ -24,7 +24,6 @@ import Effectful.Dispatch.Dynamic
 import Effectful.Error.Dynamic qualified as E
 import Effectful.TH (makeEffect)
 import GHC.Clock (getMonotonicTime)
-import Prepare (SuitePrepParams (..))
 import PyrethrumBase
 import PyrethrumConfigTypes (Depth (..), RunConfig (..), TestConfig (..), defaultRunConfig)
 import PyrethrumExtras (txt)
@@ -84,13 +83,13 @@ suite :: Suite
 suite =
   [Fixture (NodePath "WebDriverDemo" "test") test]
 
-runParams :: SuitePrepParams Action RunConfig TestConfig
-runParams =
-  SuitePrepParams
-    { suite = mkTestRun suite,
-      interpreter = actionInterpreter,
-      runConfig = defaultRunConfig
-    }
+-- runParams :: SuitePrepParams Action RunConfig TestConfig
+-- runParams =
+--   SuitePrepParams
+--     { suite = mkTestRun suite,
+--       interpreter = actionInterpreter,
+--       runConfig = defaultRunConfig
+--     }
 
 -- TODO: repeated code - refactor
 logShow :: (HasLog es, Show a) => a -> Eff es ()

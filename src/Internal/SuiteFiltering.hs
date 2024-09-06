@@ -1,4 +1,4 @@
-module Internal.SuiteRuntime where
+module Internal.SuiteFiltering where
 
 import Core qualified as C
 import DSL.Internal.NodeEvent qualified as AE
@@ -57,9 +57,7 @@ execute tc lc p@C.MkSuiteExeParams {interpreter} =
         log = l.rootLogger
         -- TODO: move filtering to prepare module
         (fSuite, fRslts) = filterSuite p.filters p.runConfig p.suite
-        preparedNodes = P.prepare $ p {
-          C.suite = fSuite
-        } 
+        preparedNodes = P.prepare $ C.MkSuiteExeParams fSuite interpreter p.runConfig
 
 configError :: [FilterResult Text] -> Maybe (L.Event L.ExePath AE.NodeEvent)
 configError r = emptySuite <|> duplicate

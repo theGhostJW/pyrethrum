@@ -18,30 +18,16 @@ import Data.Either.Extra (mapLeft)
 import CoreUtils (Hz)
 import PyrethrumExtras (toS, txt)
 import UnliftIO.Exception (tryAny)
+import Core (SuiteExeParams)
 
 
 -- TODO Full E2E property tests from Core fixtures and Hooks --> logs
 -- can reuse some suiteruntime chks
 -- should be able to write a converter from template to core hooks and fixtures
 
-data SuitePrepParams m rc fc where
-  SuitePrepParams ::
-    { suite :: [C.Node m rc fc ()],
-      -- TODO: simplify this to just IO ()
-      -- the prepare function just takes the Lefts and throws IO anyway
-      -- catches and logs all exceptions - look more into error handling with FileSystem and 
-      -- Webdriver Exceptions as example cases
-      interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a),
-      runConfig :: rc
-    } ->
-    SuitePrepParams m rc fc
 
-prepare' :: (C.Config rc, C.Config fc) => SuitePrepParams m rc fc -> [PreNode IO ()]
-prepare' SuitePrepParams {suite, interpreter, runConfig} =
-  prepSuiteElm (PrepParams interpreter runConfig) <$> suite
-
-prepare :: (C.Config rc, C.Config fc) => SuitePrepParams m rc fc -> [PreNode IO ()]
-prepare SuitePrepParams {suite, interpreter, runConfig} =
+prepare :: (C.Config rc, C.Config fc) => SuiteExeParams m rc fc -> [PreNode IO ()]
+prepare C.MkSuiteExeParams {suite, interpreter, runConfig} =
   prepSuiteElm (PrepParams interpreter runConfig) <$> suite
 
 data PreNode m hi where

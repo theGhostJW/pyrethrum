@@ -24,6 +24,22 @@ import UnliftIO.Exception (tryAny)
 -- can reuse some suiteruntime chks
 -- should be able to write a converter from template to core hooks and fixtures
 
+data SuitePrepParams m rc fc where
+  SuitePrepParams ::
+    { suite :: [C.Node m rc fc ()],
+      -- TODO: simplify this to just IO ()
+      -- the prepare function just takes the Lefts and throws IO anyway
+      -- catches and logs all exceptions - look more into error handling with FileSystem and 
+      -- Webdriver Exceptions as example cases
+      interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a),
+      runConfig :: rc
+    } ->
+    SuitePrepParams m rc fc
+
+prepare' :: (C.Config rc, C.Config fc) => SuitePrepParams m rc fc -> [PreNode IO ()]
+prepare' SuitePrepParams {suite, interpreter, runConfig} =
+  prepSuiteElm (PrepParams interpreter runConfig) <$> suite
+
 prepare :: (C.Config rc, C.Config fc) => SuitePrepParams m rc fc -> [PreNode IO ()]
 prepare SuitePrepParams {suite, interpreter, runConfig} =
   prepSuiteElm (PrepParams interpreter runConfig) <$> suite
@@ -279,15 +295,3 @@ applyChecks snk p chks =
       (cr, ts') <- applyCheck ds ts chk
       logChk cr
       pure ts'
-
-data SuitePrepParams m rc fc where
-  SuitePrepParams ::
-    { suite :: [C.Node m rc fc ()],
-      -- TODO: simplify this to just IO ()
-      -- the prepare function just takes the Lefts and throws IO anyway
-      -- catches and logs all exceptions - look more into error handling with FileSystem and 
-      -- Webdriver Exceptions as example cases
-      interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a),
-      runConfig :: rc
-    } ->
-    SuitePrepParams m rc fc

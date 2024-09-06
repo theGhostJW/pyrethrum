@@ -73,8 +73,9 @@ _theInternet = "https://the-internet.herokuapp.com/"
 _checkBoxesLinkCss :: Selector
 _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
-execute tc lc p@C.ExeParams {interpreter} = -- do
+-- execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
+-- execute tc lc p@C.ExeParams {interpreter} = uu 
+-- do
   -- let suite = mkTestRun [Fixture (NodePath "WebDriverDemo" "test") test]
   -- let runParams = SuitePrepParams {suite, interpreter, runConfig = defaultRunConfig}
   -- C.execute tc lc p runParams
@@ -98,7 +99,7 @@ logShow = out . User . Log . txt
 log :: (HasLog es) => Text -> Eff es ()
 log = out . User . Log
 
--- ############### Test the Lot (Record) ###################
+-- ############### Test Case ###################
 
 test :: Fixture ()
 test = Full {config, action, parse, items}
@@ -106,7 +107,7 @@ test = Full {config, action, parse, items}
 config :: TestConfig
 config = TestConfig "test" DeepRegression
 
-action :: (WebUI :> es) => RunConfig -> Data -> Eff es AS
+action :: (WebUI :> es, Out NodeEvent :> es) => RunConfig -> Data -> Eff es AS
 action _rc i = do
   log i.title
   status <- driverStatus

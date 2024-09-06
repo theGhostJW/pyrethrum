@@ -41,8 +41,8 @@ executeWithoutValidation :: ThreadCount -> L.LogControls (L.Event L.ExePath AE.N
 executeWithoutValidation tc lc pn =
   L.runWithLogger lc (\l -> executeNodeList tc l pn)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
-execute tc lc p@C.ExeParams {interpreter} =
+execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> C.SuiteExeParams m rc fc -> IO ()
+execute tc lc p@C.MkSuiteExeParams {interpreter} =
   L.runWithLogger lc execute'
   where
     execute' :: L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> IO ()
@@ -55,6 +55,7 @@ execute tc lc p@C.ExeParams {interpreter} =
             log
       where
         log = l.rootLogger
+        -- TODO: move filtering to prepare module
         (fSuite, fRslts) = filterSuite p.filters p.runConfig p.suite
         preparedNodes = P.prepare $ P.SuitePrepParams fSuite interpreter p.runConfig
 

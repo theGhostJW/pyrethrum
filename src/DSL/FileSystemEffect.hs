@@ -119,9 +119,9 @@ import Path.IO (AbsPath, AnyPath, RelPath)
 type instance DispatchOf FileSystem = Dynamic
 
 newtype FSException = FSException IOException
-  deriving (Show)
+  deriving (Show, Eq, Exception)
 
-instance Exception FSException
+-- instance Exception FSException
 
 data FileSystem :: Effect where
   EnsureDir :: Path b Dir -> FileSystem m ()

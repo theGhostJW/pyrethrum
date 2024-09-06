@@ -25,6 +25,9 @@ $(deriveJSON defaultOptions ''RunConfig)
 
 instance C.Config RunConfig
 
+defaultRunConfig :: RunConfig
+defaultRunConfig = RunConfig "test" TST 1 AU DeepRegression
+
 data TestConfig = TestConfig
   { title :: Text
   , depth :: Depth

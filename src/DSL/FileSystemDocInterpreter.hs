@@ -16,7 +16,7 @@ import Effectful as EF (
  )
 
 import DSL.FileSystemEffect (FileSystem (..))
-import DSL.Internal.NodeEvent (NodeEvent (..), FLog (Step))
+import DSL.Internal.NodeEvent (NodeEvent (..), FrameworkLog (Step))
 import Data.Text qualified as T
 import Effectful.Error.Static qualified as E
 import Path.Extended (Path, toFilePath)

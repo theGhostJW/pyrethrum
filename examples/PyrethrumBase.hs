@@ -9,29 +9,65 @@ module PyrethrumBase (
   C.DataSource(..),
   Suite,
   TestConfig (..),
+  actionInterpreter,
   testConfig,
   HasLog,
   mkTestRun
 ) where
 
 import Core qualified as C
-import DSL.FileSystemEffect (FSException, FileSystem)
+import DSL.FileSystemEffect (FSException (FSException), FileSystem)
 import DSL.Internal.NodeEvent (NodeEvent)
 import DSL.Internal.NodeEvent qualified as AE
-import DSL.Out (Out)
-import Effectful (Eff, IOE, type (:>))
-import Effectful.Error.Static as E (Error)
+import DSL.Out (Out, runOut)
+import Effectful (Eff, IOE, type (:>), runEff)
+import Effectful.Error.Static as E (Error, runError)
+import WebDriverEffect (WebUI (..))
 import PyrethrumConfigTypes as CG
     ( Depth(..), RunConfig(..), TestConfig(..), testConfig ) 
+import WebDriverIOInterpreter
+import DSL.FileSystemIOInterpreter qualified as I (runFileSystem) 
+import BasePrelude (throw)
+import UnliftIO.Exception (throwIO)
+import Debug.Trace.Extended (uu)
+import Data.Either.Extra (mapLeft)
 
---  these will probably be split off and go into core later
+
+--  these will probably be split off and go into core or another library 
+-- module later
 type Action = Eff ApEffs
 type HasLog es = Out NodeEvent :> es
 type LogEffs a = forall es. (Out NodeEvent :> es) => Eff es a
-type ApEffs = '[FileSystem, Out NodeEvent, E.Error FSException, IOE]
+type ApEffs = '[FileSystem, Out NodeEvent, E.Error FSException, WebUI, IOE]
 
 -- type ApConstraints es = (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es)
 -- type AppEffs a = forall es. (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
+
+
+-- TODO - interpreters into own module
+runOutIO :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
+runOutIO = runOut print
+
+actionInterpreter :: Eff '[FileSystem, Out NodeEvent, E.Error FSException, WebUI, IOE] a -> IO (Either (CallStack, SomeException) a)
+actionInterpreter  = runEff . runWebDriver . runErrorIO . runOutIO . I.runFileSystem 
+
+runErrorIO :: forall a es. Eff (Error FSException : es) a -> Eff es (Either (CallStack, SomeException) a)
+runErrorIO effs = mapLeft upCastException <$> runError effs
+ where 
+  upCastException :: (CallStack, FSException) -> (CallStack, SomeException)
+  upCastException (cs, fsEx) = (cs, toException fsEx)
+
+ 
+--(\_cs (FSException e) -> throwIO e)
+
+
+--- could be useful when we simplify the interpreter
+-- runErrorIO ::  forall a es. (IOE :> es) => Eff (Error FSException : es) a -> Eff es a
+-- runErrorIO = runErrorWith (\_cs (FSException e) -> throwIO e)
+
+
+
+-- runOutIO & runWebDriverIO & runOutIO & runEff
 
 -- TODO: research StrictSTM
 

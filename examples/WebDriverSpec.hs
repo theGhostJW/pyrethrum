@@ -96,7 +96,7 @@ data DriverStatus
   | Running
   | ServiceError {statusCode :: Int, statusMessage :: Text}
   | Unknown {statusCode :: Int, statusMessage :: Text}
-  deriving (Show)
+  deriving (Show, Eq)
 
 parseDriverStatus :: HttpResponse -> Maybe DriverStatus
 parseDriverStatus Response {statusCode, statusMessage} =

@@ -9,7 +9,7 @@ import DSL.Internal.NodeEvent
   ( NodeEvent (Framework),
     ApStateText (ApStateText),
     DStateText (DStateText),
-    FLog (Action, Check, CheckStart, Parse, SkipedCheckStart),
+    FrameworkLog (Action, Check, CheckStart, Parse, SkipedCheckStart),
     ItemText (ItemText),
     Path,
     exceptionEvent,
@@ -159,7 +159,7 @@ prepSuiteElm pp@PrepParams {interpreter, runConfig} suiteElm =
         intprt snk a = interpreter a >>= unTry snk
     C.Fixture {path, fixture} -> prepareTest pp path fixture
 
-flog :: ApEventSink -> FLog -> IO ()
+flog :: ApEventSink -> FrameworkLog -> IO ()
 flog sink = sink . Framework
 
 unTry :: forall a e. (Exception e) => ApEventSink -> Either (CallStack, e) a -> IO a
@@ -283,6 +283,10 @@ applyChecks snk p chks =
 data SuitePrepParams m rc fc where
   SuitePrepParams ::
     { suite :: [C.Node m rc fc ()],
+      -- TODO: simplify this to just IO ()
+      -- the prepare function just takes the Lefts and throws IO anyway
+      -- catches and logs all exceptions - look more into error handling with FileSystem and 
+      -- Webdriver Exceptions as example cases
       interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a),
       runConfig :: rc
     } ->

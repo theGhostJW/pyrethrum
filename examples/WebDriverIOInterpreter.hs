@@ -10,29 +10,35 @@ import Effectful as EF
 import Effectful.Dispatch.Dynamic
   ( interpret,
   )
-import Web.Api.WebDriver (WebDriverT)
-import WebDriverEffect (WebUI (..))
-import Prelude hiding (get)
-
 import UnliftIO.Concurrent (threadDelay)
+import WebDriverEffect (WebUI (..))
 import WebDriverIO
+  ( click,
+    deleteSession,
+    elementText,
+    navigateTo,
+    newDefaultFirefoxSession,
+    status, findElement, fullscreenWindow, maximizeWindow, minimizeWindow,
+  )
 
-type MyWebDriver eff a = WebDriverT (Eff eff) a
-
-runWebDriverIO :: forall es a. ( IOE :> es) => Eff (WebUI : es) a  -> Eff es a
-runWebDriverIO =
+runWebDriver :: forall es a. (IOE :> es) => Eff (WebUI : es) a -> Eff es a
+runWebDriver =
   interpret $ \_ ->
     EF.liftIO . \case
+      -- driver
+      DriverStatus -> status
       -- session
       NewSession -> newDefaultFirefoxSession
       KillSession sessionRef -> deleteSession sessionRef
+      -- window
+      FullscreenWindow sessionRef -> fullscreenWindow sessionRef
+      MaximiseWindow sessionRef -> maximizeWindow sessionRef
+      MinimiseWindow sessionRef -> minimizeWindow sessionRef
       -- navigate
       Go sessionRef url -> navigateTo sessionRef url
       -- page
-      ClickElem sessionRef elemRef  -> click sessionRef elemRef
+      FindElem sessionRef selector -> findElement sessionRef selector
+      ClickElem sessionRef elemRef -> click sessionRef elemRef
       ReadElem sessionRef elemRef -> elementText sessionRef elemRef
       -- TODO move this its more generic (eg. used in REST wait loops)
       Sleep milliSec -> threadDelay $ 1_000 * milliSec
-
-
-

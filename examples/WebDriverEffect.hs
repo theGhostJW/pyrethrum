@@ -2,10 +2,20 @@ module WebDriverEffect
   ( SessionRef (..),
     WebUI (..),
     WebDriver,
-    clickElem,
-    go,
-    killSession,
+    -- driver
+    driverStatus,
+    -- session
     newSession,
+    killSession,
+    -- window
+    fullscreenWindow,
+    maximiseWindow,
+    minimiseWindow,
+    -- navigate
+    go,
+    -- element interactions
+    findElem,
+    clickElem,
     readElem,
     sleep
   )
@@ -16,7 +26,7 @@ import Effectful as EF ( Effect, DispatchOf, Dispatch(Dynamic) )
 import Effectful.Reader.Static as ERS
 import Effectful.TH (makeEffect)
 import Prelude hiding (second)
-import WebDriverSpec (SessionRef(..), ElementRef)
+import WebDriverSpec (SessionRef(..), ElementRef, DriverStatus, Selector)
 
 -- Effect
 
@@ -33,13 +43,20 @@ rather than having the session id leak through to
 every element interaction
 -}
 data WebUI :: Effect where
+  -- driver 
+  DriverStatus :: WebUI m  DriverStatus
   -- session
   NewSession :: WebUI m SessionRef
   KillSession :: SessionRef -> WebUI m ()
+  -- window
+  FullscreenWindow :: SessionRef -> WebUI m ()
+  MaximiseWindow :: SessionRef -> WebUI m ()
+  MinimiseWindow :: SessionRef -> WebUI m ()
   -- navigate
   Go :: SessionRef -> Text -> WebUI m ()
-  -- page
+  -- element interactions
   -- toDO Click, Read... (take selector param)
+  FindElem :: SessionRef -> Selector -> WebUI m ElementRef
   ClickElem :: SessionRef -> ElementRef -> WebUI m ()
   ReadElem :: SessionRef -> ElementRef -> WebUI m Text
   -- TODO move this its more generic (eg. used in REST wait loops)

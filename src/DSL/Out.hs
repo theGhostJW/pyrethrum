@@ -26,9 +26,8 @@ newtype Sink a = Sink {sink :: a -> IO ()}
 
 out :: (Out a :> es) => a -> Eff es ()
 out payload = do
-  Out (Sink sink) <- getStaticRep
-  unsafeEff_ . sink $ payload
-
+  Out s <- getStaticRep
+  unsafeEff_ . s.sink $ payload
 
 runOut :: (IOE :> es) => (a -> IO ()) -> Eff (Out a : es) b -> Eff es b
 runOut = evalStaticRep . Out . Sink

@@ -6,7 +6,7 @@ import DSL.FileSystemEffect (
   findFilesWith,
   walkDirAccum,
  )
-import DSL.Internal.NodeEvent (NodeEvent (User), ULog (Log))
+import DSL.Internal.NodeEvent (NodeEvent (User), UserLog (Log))
 import DSL.Out (Out, Sink (Sink), out, runOut)
 import Data.List.Extra (isInfixOf)
 import Effectful (Eff, IOE, runEff, (:>))
@@ -60,6 +60,7 @@ docRunHandleAll = runEff . runError . apEventOut . DII.runFileSystem
 docRun :: Eff '[FileSystem, Out NodeEvent, Error DII.DocException, IOE] a -> IO (Either (CallStack, DII.DocException) a)
 docRun = runEff . runError . apEventOut . DII.runFileSystem
 
+-- TODO - interpreters into own module
 apEventOut :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
 apEventOut = runOut print
 

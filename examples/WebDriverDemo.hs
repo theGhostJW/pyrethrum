@@ -38,6 +38,7 @@ import Web.Api.WebDriver as WAPI
   )
 import WebDriverEffect as WE
 import WebDriverSpec (DriverStatus (Ready), Selector (CSS))
+import qualified Core as C
 
 {-
 demo the following:
@@ -77,6 +78,10 @@ suite :: Suite
 suite =
   [Fixture (NodePath "WebDriverDemo" "test") test]
 
+-- exeParams = C.MkSuiteExeParams {interpreter = defaultInterpreter}
+
+-- ############### Test Case ###################
+
 -- TODO: repeated code - refactor
 logShow :: (HasLog es, Show a) => a -> Eff es ()
 logShow = out . User . Log . txt
@@ -84,13 +89,11 @@ logShow = out . User . Log . txt
 log :: (HasLog es) => Text -> Eff es ()
 log = out . User . Log
 
--- ############### Test Case ###################
-
 test :: Fixture ()
 test = Full config action parse items
 
-config :: TestConfig
-config = TestConfig "test" DeepRegression
+config :: FixtureConfig
+config = MkFixtureConfig "test" DeepRegression
 
 action :: (WebUI :> es, Out NodeEvent :> es) => RunConfig -> Data -> Eff es AS
 action _rc i = do

@@ -6,9 +6,11 @@ module PyrethrumBase (
   LogEffs,
   Node (..),
   RunConfig (..),
+  Country (..), 
+  Environment (..),
   C.DataSource(..),
   Suite,
-  TestConfig (..),
+  FixtureConfig (..),
   actionInterpreter,
   testConfig,
   HasLog,
@@ -24,7 +26,7 @@ import Effectful (Eff, IOE, type (:>), runEff)
 import Effectful.Error.Static as E (Error, runError)
 import WebDriverEffect (WebUI (..))
 import PyrethrumConfigTypes as CG
-    ( Depth(..), RunConfig(..), TestConfig(..), testConfig ) 
+    ( Depth(..), RunConfig(..), FixtureConfig(..), testConfig, Environment(..), Country(..) ) 
 import WebDriverIOInterpreter
 import DSL.FileSystemIOInterpreter qualified as I (runFileSystem) 
 import Data.Either.Extra (mapLeft)
@@ -108,7 +110,7 @@ data Hook hz when input output where
 data Fixture hi where
   Full ::
     (C.Item i ds, Show as) =>
-    { config :: TestConfig
+    { config :: FixtureConfig
     , action :: RunConfig -> i -> Action as
     , parse :: as -> Either C.ParseException ds
     , items :: RunConfig -> C.DataSource i
@@ -116,7 +118,7 @@ data Fixture hi where
     Fixture ()
   Full' ::
     (C.Item i ds, Show as, C.Frequency hz) =>
-    { config' :: TestConfig
+    { config' :: FixtureConfig
     , depends :: Hook hz pw pi a
     , action' :: RunConfig -> a -> i -> Action as
     , parse' :: as -> Either C.ParseException ds
@@ -126,14 +128,14 @@ data Fixture hi where
   Direct ::
     forall i ds.
     (C.Item i ds) =>
-    { config :: TestConfig
+    { config :: FixtureConfig
     , action :: RunConfig -> i -> Action ds
     , items :: RunConfig -> C.DataSource i
     } ->
     Fixture ()
   Direct' ::
     (C.Item i ds, C.Frequency hz) =>
-    { config' :: TestConfig
+    { config' :: FixtureConfig
     , depends :: Hook hz pw pi a
     , action' :: RunConfig -> a -> i -> Action ds
     , items' :: RunConfig -> C.DataSource i
@@ -155,14 +157,14 @@ data Node i where
     } ->
     Node i
 
-mkFixture :: Fixture hi -> C.Fixture Action RunConfig TestConfig hi
+mkFixture :: Fixture hi -> C.Fixture Action RunConfig FixtureConfig hi
 mkFixture = \case
   Full{..} -> C.Full{..}
   Direct{..} -> C.Direct{..}
   Full'{..} -> C.Full' config' (mkHook depends) action' parse' items'
   Direct'{..} -> C.Direct'{depends = mkHook depends, ..}
 
-mkTestRun :: Suite -> [C.Node Action RunConfig TestConfig ()]
+mkTestRun :: Suite -> [C.Node Action RunConfig FixtureConfig ()]
 mkTestRun tr = mkNode <$> tr
 
 mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) RunConfig hz i o
@@ -179,7 +181,7 @@ mkHook = \case
     } ->
       C.Around' (mkHook aroundDepends) setup' teardown'
 
-mkNode :: Node i -> C.Node Action RunConfig TestConfig i
+mkNode :: Node i -> C.Node Action RunConfig FixtureConfig i
 mkNode = \case
   Hook{..} ->
     C.Hook
@@ -188,3 +190,5 @@ mkNode = \case
       , ..
       }
   Fixture{..} -> C.Fixture{fixture = mkFixture fixture, ..}
+
+type ExePrms = C.SuiteExeParams Action RunConfig FixtureConfig

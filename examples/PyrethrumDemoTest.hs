@@ -15,11 +15,10 @@ import PyrethrumBase (
   Node (..),
   RunConfig (..),
   Suite,
-  TestConfig (..),
+  FixtureConfig (..),
   DataSource(..),
-  testConfig,
+  FixtureConfig, Country (..), Environment (..), testConfig,
  )
-import PyrethrumConfigTypes (Country (..), Environment (Prod))
 import PyrethrumExtras (txt)
 import qualified Core as C
 
@@ -117,8 +116,8 @@ eachIntBefore =
 
 -- ############### Test the Lot ###################
 
-config :: TestConfig
-config = TestConfig "test" DeepRegression
+config :: FixtureConfig
+config = MkFixtureConfig "test" DeepRegression
 
 test :: Fixture ()
 test = Full config action parse items
@@ -164,8 +163,8 @@ items =
 
 -- ############### Test the Lot Child ###################
 
-config2 :: TestConfig
-config2 = TestConfig "test" DeepRegression
+config2 :: FixtureConfig
+config2 = MkFixtureConfig "test" DeepRegression
 
 test2 :: Fixture HookInfo
 test2 = Full' config2 infoThreadHook action2 parse2 items2
@@ -228,7 +227,7 @@ test3 :: Fixture Int
 test3 =
   Full'
     { depends = eachIntBefore
-    , config' = TestConfig "test" DeepRegression
+    , config' = MkFixtureConfig "test" DeepRegression
     , action' = \_rc hkInt itm -> do
         log $ txt itm
         pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
@@ -248,7 +247,7 @@ test3 =
 test4 :: Fixture Int
 test4 =
   Direct'
-    { config' = TestConfig "test" DeepRegression
+    { config' = MkFixtureConfig "test" DeepRegression
     , depends = eachAfter
     , action' = \_rc _hi itm -> do
         log $ txt itm
@@ -277,13 +276,13 @@ test4 =
 
 -- ############### Demo Default Configs ###################
 
-cfg :: TestConfig
+cfg :: FixtureConfig
 cfg = testConfig "test"
 
 -- ambiguous record update error - should work
 -- after 9.8.1
--- cfg2 :: TestConfig
--- cfg2 = (testConfig "test") {
+-- cfg2 :: FixtureConfig
+-- cfg2 = (FixtureConfig "test") {
 --   depth = Regression
 -- }
 

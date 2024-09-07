@@ -87,7 +87,7 @@ log = out . User . Log
 -- ############### Test Case ###################
 
 test :: Fixture ()
-test = Full {config, action, parse, items}
+test = Full config action parse items
 
 config :: TestConfig
 config = TestConfig "test" DeepRegression

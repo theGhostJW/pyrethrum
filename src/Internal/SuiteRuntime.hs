@@ -48,16 +48,15 @@ execute tc lc prms =
     execute' :: L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> IO ()
     execute' l =
       do
+        let log = l.rootLogger
         P.prepare prms
           & either
-            (\Failure {failure, notes} -> log $ L.SuiteInitFailure failure notes) 
+            (\Failure {failure, notes} -> log $ L.SuiteInitFailure failure notes)
             ( \validated ->
                 do
                   log $ L.FilterLog validated.filterResults
                   executeNodeList tc l validated.suite
             )
-      where
-        log = l.rootLogger
 
 executeNodeList :: ThreadCount -> L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
 executeNodeList tc lgr nodeList =

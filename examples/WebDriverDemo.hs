@@ -77,14 +77,6 @@ suite :: Suite
 suite =
   [Fixture (NodePath "WebDriverDemo" "test") test]
 
--- runParams :: SuitePrepParams Action RunConfig TestConfig
--- runParams =
---   SuitePrepParams
---     { suite = mkTestRun suite,
---       interpreter = actionInterpreter,
---       runConfig = defaultRunConfig
---     }
-
 -- TODO: repeated code - refactor
 logShow :: (HasLog es, Show a) => a -> Eff es ()
 logShow = out . User . Log . txt

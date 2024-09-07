@@ -4,8 +4,6 @@ import Check
 import Core (ParseException)
 import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log))
 import DSL.Out (Out, out)
-import Data.Text.IO qualified as T
-import Debug.Trace.Extended (uu)
 import Effectful as EF
   ( Dispatch (Dynamic),
     DispatchOf,
@@ -21,11 +19,8 @@ import Effectful.Dispatch.Dynamic
     localSeqUnliftIO,
     send,
   )
-import Effectful.Error.Dynamic qualified as E
-import Effectful.TH (makeEffect)
 import GHC.Clock (getMonotonicTime)
 import PyrethrumBase
-import PyrethrumConfigTypes (Depth (..), RunConfig (..), TestConfig (..), defaultRunConfig)
 import PyrethrumExtras (txt)
 import Web.Api.WebDriver as WAPI
   ( Key (EnterKey),
@@ -42,8 +37,7 @@ import Web.Api.WebDriver as WAPI
     wait,
   )
 import WebDriverEffect as WE
-import WebDriverIOInterpreter (runWebDriver)
-import WebDriverSpec (DriverStatus (Ready), ElementRef, Selector (CSS))
+import WebDriverSpec (DriverStatus (Ready), Selector (CSS))
 
 {-
 demo the following:

@@ -1,34 +1,53 @@
-module Prepare where
+module Prepare
+  ( PreNode (..),
+    ApEventSink,
+    Test (..),
+    prepare,
+    listPaths,
+  )
+where
 
 import Check (Check, Checks (..), FailStatus (NonTerminal), applyCheck, skipChecks)
 import Control.Exception (throwIO)
 import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
+import Core (SuiteExeParams)
 import Core qualified as C
+import CoreUtils (Hz)
 import DSL.Internal.NodeEvent
-  ( NodeEvent (Framework),
-    ApStateText (ApStateText),
+  ( ApStateText (ApStateText),
     DStateText (DStateText),
     FrameworkLog (Action, Check, CheckStart, Parse, SkipedCheckStart),
     ItemText (ItemText),
+    NodeEvent (Framework),
     Path,
     exceptionEvent,
   )
 import Data.Either.Extra (mapLeft)
-import CoreUtils (Hz)
+import Internal.SuiteFiltering (FilteredSuite (..), filterSuite)
+import Internal.SuiteValidation (SuiteValidationError (..), chkSuite)
 import PyrethrumExtras (toS, txt)
 import UnliftIO.Exception (tryAny)
-import Core (SuiteExeParams)
-
 
 -- TODO Full E2E property tests from Core fixtures and Hooks --> logs
 -- can reuse some suiteruntime chks
 -- should be able to write a converter from template to core hooks and fixtures
 
-
-prepare :: (C.Config rc, C.Config fc) => SuiteExeParams m rc fc -> [PreNode IO ()]
-prepare C.MkSuiteExeParams {suite, interpreter, runConfig} =
-  prepSuiteElm (PrepParams interpreter runConfig) <$> suite
+prepare :: (C.Config rc, C.Config fc) => SuiteExeParams m rc fc -> Either SuiteValidationError (FilteredSuite (PreNode IO ()))
+prepare C.MkSuiteExeParams {suite, filters, interpreter, runConfig = rc} =
+  mSuiteError
+    & maybe
+      ( Right $
+          MkFilteredSuite
+            { suite = prepSuiteElm pp <$> filtered.suite,
+              filterResults = filtered.filterResults
+            }
+      )
+      Left
+  where
+    pp = PrepParams interpreter rc
+    filtered = filterSuite filters rc suite
+    mSuiteError = chkSuite filtered.filterResults
 
 data PreNode m hi where
   Before ::

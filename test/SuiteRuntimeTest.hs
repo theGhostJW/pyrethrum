@@ -5,12 +5,12 @@ module SuiteRuntimeTest where
 import Filter (FilterResult (..))
 import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
 import FullSuiteTestTemplate qualified as T
-import Internal.Logging qualified as L
-import Internal.SuiteRuntime (ThreadCount (..), configError)
+import Internal.SuiteRuntime (ThreadCount (..))
 import PyrethrumExtras (txt)
 import PyrethrumExtras.Test (chk, chkEq)
 import SuiteRuntimeTestBase
 import Prelude hiding (All, bug, id)
+import Internal.SuiteValidation
 
 -- TODO :: chkJust, chkNothing
 
@@ -21,10 +21,7 @@ chkInitFailure expected filterResults =
       (chk $ isNothing actualFail)
       (\expFail -> chkEq (Just expFail) actualFail)
   where
-    actualFail = failMsg <$> configError filterResults
-    failMsg = \case
-      L.SuiteInitFailure {failure} -> failure
-      _ -> bug "Expected SuiteInitFailure"
+    actualFail = (.failure) <$> chkSuite filterResults
 
 -- $ > unit_configError_valid_pass
 

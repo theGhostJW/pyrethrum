@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4dd7c36f275a15cbc81acc1128643ed80facda249dc743aeaa2c6ecf3b8fa3cf
+-- hash: 3817657f482eb95e11be41f2647213ae5b73ef2db58cbf3a80e6028a775157eb
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -93,7 +93,9 @@ library
       Internal.Logging
       Internal.LoggingCore
       Internal.LogQueries
+      Internal.SuiteFiltering
       Internal.SuiteRuntime
+      Internal.SuiteValidation
       OrphanedInstances
       Prepare
       ArbitraryIOTest

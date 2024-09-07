@@ -16,7 +16,7 @@ module PyrethrumBase (
 ) where
 
 import Core qualified as C
-import DSL.FileSystemEffect (FSException (FSException), FileSystem)
+import DSL.FileSystemEffect (FSException, FileSystem)
 import DSL.Internal.NodeEvent (NodeEvent)
 import DSL.Internal.NodeEvent qualified as AE
 import DSL.Out (Out, runOut)
@@ -27,9 +27,6 @@ import PyrethrumConfigTypes as CG
     ( Depth(..), RunConfig(..), TestConfig(..), testConfig ) 
 import WebDriverIOInterpreter
 import DSL.FileSystemIOInterpreter qualified as I (runFileSystem) 
-import BasePrelude (throw)
-import UnliftIO.Exception (throwIO)
-import Debug.Trace.Extended (uu)
 import Data.Either.Extra (mapLeft)
 
 

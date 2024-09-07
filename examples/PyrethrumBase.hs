@@ -12,7 +12,7 @@ module PyrethrumBase (
   Suite,
   FixtureConfig (..),
   actionInterpreter,
-  testConfig,
+  fxCfg,
   HasLog,
   mkTestRun
 ) where
@@ -26,7 +26,7 @@ import Effectful (Eff, IOE, type (:>), runEff)
 import Effectful.Error.Static as E (Error, runError)
 import WebDriverEffect (WebUI (..))
 import PyrethrumConfigTypes as CG
-    ( Depth(..), RunConfig(..), FixtureConfig(..), testConfig, Environment(..), Country(..) ) 
+    ( Depth(..), RunConfig(..), FixtureConfig(..), fxCfg, Environment(..), Country(..) ) 
 import WebDriverIOInterpreter
 import DSL.FileSystemIOInterpreter qualified as I (runFileSystem) 
 import Data.Either.Extra (mapLeft)
@@ -58,7 +58,6 @@ runErrorIO effs = mapLeft upCastException <$> runError effs
 
  
 --(\_cs (FSException e) -> throwIO e)
-
 
 --- could be useful when we simplify the interpreter
 -- runErrorIO ::  forall a es. (IOE :> es) => Eff (Error FSException : es) a -> Eff es a

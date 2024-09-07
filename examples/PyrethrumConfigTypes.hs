@@ -28,7 +28,7 @@ instance C.Config RunConfig
 defaultRunConfig :: RunConfig
 defaultRunConfig = RunConfig "test" TST 1 AU DeepRegression
 
-data FixtureConfig = MkFixtureConfig
+data FixtureConfig = FxCfg
   { title :: Text
   , depth :: Depth
   }
@@ -45,12 +45,12 @@ defaults =
     { depth = DeepRegression
     }
 
-testConfig :: Text -> FixtureConfig
-testConfig title =
+fxCfg :: Text -> FixtureConfig
+fxCfg title =
   mkFull defaults
  where
   mkFull DefaultCfg{..} =
-    MkFixtureConfig
+    FxCfg
       { ..
       }
 

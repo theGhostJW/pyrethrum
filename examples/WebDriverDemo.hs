@@ -93,7 +93,7 @@ test :: Fixture ()
 test = Full config action parse items
 
 config :: FixtureConfig
-config = MkFixtureConfig "test" DeepRegression
+config = FxCfg "test" DeepRegression
 
 action :: (WebUI :> es, Out NodeEvent :> es) => RunConfig -> Data -> Eff es AS
 action _rc i = do

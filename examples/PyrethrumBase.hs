@@ -48,6 +48,7 @@ import PyrethrumConfigTypes as CG
 import WebDriverEffect (WebUI (..))
 import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import WebDriverDocInterpreter qualified as WDDoc (runWebDriver)
+import DSL.DocInterpreterUtils (DocException)
 
 --  these will probably be split off and go into core or another library
 -- module later
@@ -71,6 +72,7 @@ ioRunParams suite filters runConfig =
       runConfig
     }
 
+{-
 docRunParams :: [C.Node Action RunConfig FixtureConfig ()] -> Filters RunConfig FixtureConfig -> RunConfig -> C.SuiteExeParams Action RunConfig FixtureConfig
 docRunParams suite filters runConfig =
   C.MkSuiteExeParams
@@ -80,11 +82,17 @@ docRunParams suite filters runConfig =
       runConfig
     }
 
-ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
-ioRunner suite filters runConfig threadCount logControls = execute threadCount logControls (ioRunParams (mkTestRun suite) filters runConfig)
-
 docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
 docRunner suite filters runConfig threadCount logControls = execute threadCount logControls (docRunParams (mkTestRun suite) filters runConfig)
+
+
+actionDocInterpreter :: Eff '[FileSystem,  WebUI, Out NodeEvent, E.Error FSException, E.Error DocException, IOE] a -> IO (Either (CallStack, SomeException) a)
+actionDocInterpreter = runEff . runErrorIO . runErrorIO .  runIOOut .  WDDoc.runWebDriver . I.runFileSystem
+
+-}
+
+ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
+ioRunner suite filters runConfig threadCount logControls = execute threadCount logControls (ioRunParams (mkTestRun suite) filters runConfig)
 
 -- TODO - interpreters into own module
 -- Need to fix up to work in with logcontrols
@@ -100,16 +108,13 @@ runDocOut =
     AE.User l -> pure ()
 
 
-actionDocInterpreter :: Eff '[FileSystem, Out NodeEvent, E.Error FSException, WebUI, IOE] a -> IO (Either (CallStack, SomeException) a)
-actionDocInterpreter = runEff . WDDoc.runWebDriver . runErrorIO . runIOOut . I.runFileSystem
-
 actionIOInterpreter :: Eff '[FileSystem, Out NodeEvent, E.Error FSException, WebUI, IOE] a -> IO (Either (CallStack, SomeException) a)
 actionIOInterpreter = runEff . WDIO.runWebDriver . runErrorIO . runIOOut . I.runFileSystem
 
-runErrorIO :: forall a es. Eff (Error FSException : es) a -> Eff es (Either (CallStack, SomeException) a)
+runErrorIO :: forall a e es. Exception e => Eff (Error e : es) a -> Eff es (Either (CallStack, SomeException) a)
 runErrorIO effs = mapLeft upCastException <$> runError effs
   where
-    upCastException :: (CallStack, FSException) -> (CallStack, SomeException)
+    upCastException :: (CallStack, e) -> (CallStack, SomeException)
     upCastException (cs, fsEx) = (cs, toException fsEx)
 
 -- (\_cs (FSException e) -> throwIO e)

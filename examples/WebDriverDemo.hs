@@ -38,9 +38,11 @@ import Web.Api.WebDriver as WAPI
   )
 import WebDriverEffect as WE
 import WebDriverSpec (DriverStatus (Ready), Selector (CSS))
+import qualified Core as C
 import Filter (Filters(..))
 import Internal.SuiteRuntime (ThreadCount(..))
 import Internal.Logging qualified as L
+import WebDriverPure (seconds)
 
 {-
 demo the following:
@@ -112,6 +114,8 @@ action _rc i = do
   link <- findElem ses _checkBoxesLinkCss
   checkButtonText <- readElem ses link
   clickElem ses link
+  -- so we can see the navigation worked
+  sleep $ 5 * seconds
   killSession ses
   pure $ AS {status, checkButtonText}
 
@@ -145,7 +149,7 @@ items _rc =
           title = "test the internet",
           checks =
             chk "Driver is ready" ((== Ready) . (.status))
-              <> chk "Checkboxes text" ((== "Checkboxes") . (.checkButtonText))
+              <> chk "Checkboxes text as expected" ((== "Checkboxes") . (.checkButtonText))
         }
     ]
 

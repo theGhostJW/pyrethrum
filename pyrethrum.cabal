@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3817657f482eb95e11be41f2647213ae5b73ef2db58cbf3a80e6028a775157eb
+-- hash: fb97559d301080331518a9829f97c7046b75728633a5de1d5b7984f49af75a52
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -82,6 +82,7 @@ library
       Core
       CoreTypes
       CoreUtils
+      DSL.DocInterpreterUtils
       DSL.FileSystemDocInterpreter
       DSL.FileSystemEffect
       DSL.FileSystemIOInterpreter

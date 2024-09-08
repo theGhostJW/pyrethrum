@@ -106,6 +106,7 @@ elementText s = run . elementTextSpec s
 -- ############# Utils #############
 
 -- TODO: logging behaviour injectable special value W3CLogging
+-- eg. thsi can scramble logs when run in Eff and multithreaded
 --------------------------------------------------------------------------------
 -- console out (to haskell output window) for debugging
 run :: forall a. (Show a) => W3Spec a -> IO a

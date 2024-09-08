@@ -1,72 +1,44 @@
 module WebDriverDocInterpreter where
 
-  
-import Data.Text.IO qualified as T
-import Effectful as EF (
-  Dispatch (Dynamic),
-  DispatchOf,
-  Eff,
-  Effect,
-  IOE,
-  liftIO,
-  runEff,
-  type (:>),
- )
-import Effectful.Reader.Dynamic
-import Effectful.Dispatch.Dynamic (
-  interpret
- )
-import Effectful.TH (makeEffect)
+import Effectful as EF
+  ( Eff,
+    IOE,
+    liftIO,
+    type (:>),
+  )
+-- import Effectful.Reader.Dynamic
+import Effectful.Dispatch.Dynamic
+  ( interpret,
+  )
+import UnliftIO.Concurrent (threadDelay)
+import WebDriverEffect (WebUI (..))
+import WebDriverIO
+  ( click,
+    deleteSession,
+    elementText,
+    navigateTo,
+    newDefaultFirefoxSession,
+    status, findElement, fullscreenWindow, maximizeWindow, minimizeWindow,
+  )
 
-
-{-
- demo the following:
-  - single test suite with minimal selenium interpreter 
-    - when web ui interaction is implemented it will probably use a custom / different library due to licence
-  - read a value from "the internet"
-  - navigate between pages
-  - read a second value
-  - validator on value
-  - expect issue with laziness (if not why not)
-      - solve
-  - user steps
-  - run with documenter
-  - introduce action that uses value read from the internet
-    - should blow up documenter
-    - fix with doc* functions
-  - TODO: Haddock docs for steps 
-    - effectful supports generating template haskell without type signature
-    - manually add type signature and haddock
--}
-
-
-theInternet = "https://the-internet.herokuapp.com/"
-
--- https://github.com/nbloomf/webdriver-w3c/blob/master/doc/Tutorial.md
-
--- Effect
-
-type instance DispatchOf WebUI = Dynamic
-
-data WebUI :: Effect where
-  Click :: Text -> WebUI m ()
-  Go :: Text -> WebUI m ()
-  Read :: Text -> WebUI m Text
-
-makeEffect ''WebUI
-
--- Interpreters
-
--- runWebUI :: forall es a. ( IOE :> es) => Eff (WebUI : es) a -> Eff es a
--- runWebUI =
---   interpret $ \_ ->
---     EF.liftIO . \case
---       Hello name -> T.putStrLn $ "Hello " <> name
---       Goodbye name -> T.putStrLn $ "Goodbye " <> name
-
--- runWebUICasual :: forall es a. ( IOE :> es) =>Eff (WebUI : es) a -> Eff es a
--- runWebUICasual =
---   interpret $ \_ ->
---     EF.liftIO . \case
---       Hello name -> T.putStrLn $ "hi " <> name
---       Goodbye name -> T.putStrLn $ "bye " <> name
+runWebDriver :: forall es a. (IOE :> es) => Eff (WebUI : es) a -> Eff es a
+runWebDriver =
+  interpret $ \_ ->
+    EF.liftIO . \case
+      -- driver
+      DriverStatus -> status
+      -- session
+      NewSession -> newDefaultFirefoxSession
+      KillSession sessionRef -> deleteSession sessionRef
+      -- window
+      FullscreenWindow sessionRef -> fullscreenWindow sessionRef
+      MaximiseWindow sessionRef -> maximizeWindow sessionRef
+      MinimiseWindow sessionRef -> minimizeWindow sessionRef
+      -- navigate
+      Go sessionRef url -> navigateTo sessionRef url
+      -- page
+      FindElem sessionRef selector -> findElement sessionRef selector
+      ClickElem sessionRef elemRef -> click sessionRef elemRef
+      ReadElem sessionRef elemRef -> elementText sessionRef elemRef
+      -- TODO move this its more generic (eg. used in REST wait loops)
+      Sleep milliSec -> threadDelay $ 1_000 * milliSec

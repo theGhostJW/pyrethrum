@@ -3,7 +3,9 @@ module StepDocumenterDemo where
 import DSL.FileSystemDocInterpreter qualified as DII
 import DSL.FileSystemEffect (
   FileSystem,
+  {- Put back before merge
   findFilesWith,
+  -}
   walkDirAccum,
  )
 import DSL.Internal.NodeEvent (NodeEvent (User), UserLog (Log))
@@ -12,7 +14,7 @@ import Data.List.Extra (isInfixOf)
 import Effectful (Eff, IOE, runEff, (:>))
 import Effectful.Error.Static (Error, runError)
 import Path (absdir, reldir, relfile, toFilePath, Abs, File, Path)
-import PyrethrumExtras ((?))
+import PyrethrumExtras ((?), uu)
 
 type FSOut es = (Out NodeEvent :> es, FileSystem :> es)
 
@@ -68,7 +70,9 @@ log :: (Out NodeEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
 getPaths :: (Out NodeEvent :> es, FileSystem :> es) => Eff es [Path Abs File]
-getPaths = do
+getPaths = uu
+  {- TODO: PUt back before merge
+  do
   s <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
   r <- test s
   log $ r ? "yes" $ "no"
@@ -76,16 +80,19 @@ getPaths = do
  where
   isDeleteMe :: Path Abs File -> Eff es Bool
   isDeleteMe = pure . isInfixOf "deleteMe" . toFilePath
-
+ -}
 data PathResult = PathResult
   { title :: Text
   , moreOutput :: [Path Abs File]
   , paths :: [Path Abs File]
   }
 
+
 --  proves we are OK with strict data
 getPathsData :: (Out NodeEvent :> es, FileSystem :> es) => Eff es PathResult
-getPathsData = do
+getPathsData = uu
+  {- TODO: PUt back before merge
+  do
   p <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
   output <- walkDirAccum Nothing (\_root _subs files -> pure files) [absdir|/pyrethrum/pyrethrum|]
   r <- test p
@@ -99,6 +106,7 @@ getPathsData = do
  where
   isDeleteMe :: Path Abs File -> Eff es Bool
   isDeleteMe = pure . isInfixOf "deleteMe" . toFilePath
+-}
 
 test :: [Path Abs File] -> Eff es Bool
 test _ignored = pure True

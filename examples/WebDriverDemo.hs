@@ -153,31 +153,6 @@ items _rc =
         }
     ]
 
--- TODO nchecks
-{-
-
-mc :: DS -> [(Text, Bool)] -> Checks DS
-
--}
-
-{-
-_endToEnd :: IO ()
-_endToEnd = do
-    status' <- status
-    ses <- newDefaultFirefoxSession
-    maximizeWindow ses
-    navigateTo ses _theInternet
-    link <- findElement ses _checkBoxesLinkCss
-    cbTxt <- elementText ses link
-    click ses link
-    deleteSession ses
-    T.putStrLn ""
-    T.putStrLn $ "----- " <> "Results" <> " -----"
-    T.putStrLn $ txt status'
-    T.putStrLn cbTxt
-    T.putStrLn ""
--}
-
 -- ################### WebDriver Example Using webdriver-w3c Library ##################
 
 -- https://github.com/nbloomf/webdriver-w3c/blob/master/doc/Tutorial.md

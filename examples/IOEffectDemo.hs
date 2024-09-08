@@ -3,13 +3,14 @@ module IOEffectDemo where
 import PyrethrumExtras as PE
 import Chronos (Time, now)
 import DSL.FileSystemEffect
-import Effectful
+    ( FSException, walkDirAccum )
+import Effectful ( IOE, type (:>), Eff, runEff )
 import DSL.Out
 import DSL.Internal.NodeEvent
 import Effectful.Error.Static as E (Error, runError)
 import Data.Text qualified as T
 import BasePrelude (openFile, hClose, hGetContents)
-import DSL.FileSystemIOInterpreter
+import DSL.FileSystemIOInterpreter ( FileSystem, runFileSystem )
 import System.Time.Extra (sleep)
 import PyrethrumExtras.IO (putTxt)
 

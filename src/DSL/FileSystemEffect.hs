@@ -6,7 +6,7 @@ module DSL.FileSystemEffect (
   module FSP,
   FSP.XdgDirectory (..),
   FSP.XdgDirectoryList (..),
-
+  {-
   createDir,
   createDirIfMissing,
   removeDir,
@@ -72,7 +72,9 @@ module DSL.FileSystemEffect (
   FSP.WalkAction (..),
   walkDir,
   walkDirRel,
+  -}
   walkDirAccum,
+  {-
   walkDirAccumRel,
   -- -- * Path b t transformation
   resolveFile,
@@ -101,6 +103,7 @@ module DSL.FileSystemEffect (
   withBinaryFileDurable,
   withBinaryFileDurableAtomic,
   ensureFileDurable,
+  -}
 ) where
 
 import DSL.Internal.FileSystemPure as FSP
@@ -124,6 +127,7 @@ newtype FSException = FSException IOException
 -- instance Exception FSException
 
 data FileSystem :: Effect where
+  {-
   EnsureDir :: Path b Dir -> FileSystem m ()
   CreateDir :: Path b Dir -> FileSystem m ()
   CreateDirIfMissing :: Bool -> Path b Dir -> FileSystem m ()
@@ -177,7 +181,11 @@ data FileSystem :: Effect where
   CopyDirRecur' :: Path b Dir -> Path b Dir -> FileSystem m ()
   WalkDir :: (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (FSP.WalkAction Abs)) -> Path b Dir -> FileSystem m ()
   WalkDirRel :: (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (FSP.WalkAction Rel)) -> Path Rel Dir -> FileSystem m ()
+  -}
+  
   WalkDirAccum :: (Monoid o) => Maybe (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (FSP.WalkAction Abs)) -> (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m o) -> Path b Dir -> FileSystem m o
+  
+  {-
   WalkDirAccumRel :: (Monoid o) => Maybe (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (FSP.WalkAction Rel)) -> (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m o) -> Path b Dir -> FileSystem m o
   ResolveFile :: Path Abs Dir -> Text -> FileSystem m (Path Abs File)
   ResolveFile' :: Text -> FileSystem m (Path Abs File)
@@ -203,6 +211,7 @@ data FileSystem :: Effect where
   WriteBinaryFileAtomic :: Path b File -> ByteString -> FileSystem m ()
   WriteBinaryFileDurable :: Path b File -> ByteString -> FileSystem m ()
   WriteBinaryFileDurableAtomic :: Path b File -> ByteString -> FileSystem m ()
+  -}
 
 -- todo: genrate splice and use makeEffect without type 
 -- signatures add docs investigate renaming params

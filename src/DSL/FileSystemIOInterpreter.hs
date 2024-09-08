@@ -42,18 +42,21 @@ runFileSystem =
       withUnlifter h = handle (\(e :: IOException) -> E.throwError . FSException $ e) (localSeqUnliftIO env h)
      in
       case fs of
+        {-
         WithCurrentDir path action -> withUnlifter $ \ul -> R.withCurrentDir path (ul action)
         FindFilesWith predicate searchDirs targetFileName -> withUnlifter $ \ul -> R.findFilesWith (ul . predicate) searchDirs targetFileName
         FindFileWith predicate searchDirs targetFileName -> withUnlifter $ \ul -> R.findFileWith (ul . predicate) searchDirs targetFileName
         CopyFileWithMetadata srcFile destFile -> withUnlifter $ const $ R.copyFileWithMetadata srcFile destFile
         WalkDir action dir -> withUnlifter $ \ul -> R.walkDir (\b drs -> ul . action b drs) dir
         WalkDirRel action dir -> withUnlifter $ \ul -> R.walkDirRel (\b drs -> ul . action b drs) dir
+        -}
         WalkDirAccum descendHandler transformer startDir -> withUnlifter $ \ul ->
           let
             mdh' = (\dh b' drs -> ul . dh b' drs) <$> descendHandler
             ow' b' drs = ul . transformer b' drs
            in
             R.walkDirAccum mdh' ow' startDir
+        {-
         WalkDirAccumRel descendHandler transformer startDir -> withUnlifter $ \ul ->
           let
             mdh' = (\dh b' drs -> ul . dh b' drs) <$> descendHandler
@@ -131,3 +134,4 @@ runFileSystem =
           WriteBinaryFileAtomic file byteString -> R.writeBinaryFileAtomic file byteString
           WriteBinaryFileDurable file byteString -> R.writeBinaryFileDurable file byteString
           WriteBinaryFileDurableAtomic file byteString -> R.writeBinaryFileDurableAtomic file byteString
+          -}

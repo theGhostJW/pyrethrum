@@ -50,13 +50,19 @@ runFileSystem =
         WalkDir action dir -> withUnlifter $ \ul -> R.walkDir (\b drs -> ul . action b drs) dir
         WalkDirRel action dir -> withUnlifter $ \ul -> R.walkDirRel (\b drs -> ul . action b drs) dir
         -}
+
+       {-
+
         WalkDirAccum descendHandler transformer startDir -> withUnlifter $ \ul ->
           let
             mdh' = (\dh b' drs -> ul . dh b' drs) <$> descendHandler
             ow' b' drs = ul . transformer b' drs
            in
             R.walkDirAccum mdh' ow' startDir
-        {-
+       
+       
+       
+        
         WalkDirAccumRel descendHandler transformer startDir -> withUnlifter $ \ul ->
           let
             mdh' = (\dh b' drs -> ul . dh b' drs) <$> descendHandler

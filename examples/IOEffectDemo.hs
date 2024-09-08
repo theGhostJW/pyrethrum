@@ -100,6 +100,7 @@ timeTest = do
 -- time 2 Time {getTime = 1689018957979000000}
 -- time 3 Time {getTime = 1689018959089000000}
 
+{-
 -- use eff
 listFileImp :: (FileSystem :> es, Out NodeEvent :> es) => Eff es [Text]
 listFileImp = do
@@ -107,6 +108,7 @@ listFileImp = do
   files <- walkDirAccum Nothing (\_root _subs files -> pure files) [absdir|/pyrethrum/pyrethrum|]
   log "done"
   pure . filter ("cabal" `T.isInfixOf`) $ toS . toFilePath <$> files
+-}
 
 apEventOut :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
 apEventOut = runOut print
@@ -120,6 +122,7 @@ logShow = out . User . Log . txt
 log :: (Out NodeEvent :> es) => Text -> Eff es ()
 log = out . User . Log
 
+{-
 -- $ > ioRun effDemo
 effDemo :: Eff '[FileSystem, Out NodeEvent, Error FSException, IOE] ()
 effDemo = do
@@ -137,6 +140,7 @@ effDemo2 = do
   chk res = do
     traverse_ log res
     log $ length res > 5 ? "its BIG" $ "its small"
+-}
 
 -- log $ T.unlines res
 

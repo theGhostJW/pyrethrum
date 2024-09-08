@@ -19,14 +19,19 @@ import DSL.FileSystemEffect (FSException (..), FileSystem (..))
 import Effectful.Dispatch.Dynamic (
   LocalEnv,
   interpret,
-  localSeqUnliftIO,
+  localSeqUnliftIO, localSeqUnlift, SharedSuffix,
  )
 import Effectful.Error.Static qualified as E
 
 adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -> Eff es b
 adaptException m = EF.liftIO m `catch` \(e :: IOException) -> E.throwError . FSException $ e
 
-runFileSystem :: forall es a. (HasCallStack, IOE :> es, E.Error FSException :> es) => Eff (FileSystem : es) a -> Eff es a
+-- adapt :: (SharedSuffix es handlerEs,  E.Error e :> localEs, IOE :> es) => LocalEnv localEs handlerEs -> (IOException -> e) -> IO a2 -> Eff es a2
+-- adapt env errCon m = liftIO m `catch` \(e::IOException) -> do
+--       -- The error effect is in scope only in the local environment.
+--       localSeqUnlift env $ \unlift -> unlift . E.throwError $ errCon e
+
+runFileSystem :: forall es a. (HasCallStack, IOE :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
   interpret handler
  where
@@ -37,10 +42,15 @@ runFileSystem =
     FileSystem (Eff localEs) a' ->
     Eff es a'
   handler env fs =
-    let
-      withUnlifter :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
-      withUnlifter h = handle (\(e :: IOException) -> E.throwError . FSException $ e) (localSeqUnliftIO env h)
-     in
+    let 
+      adapt env errCon m = liftIO m `catch` \(e::IOException) -> do
+       -- The error effect is in scope only in the local environment.
+        localSeqUnlift env $ \unlift -> unlift . E.throwError $ errCon e
+    in
+    -- let
+    --   withUnlifter :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
+    --   withUnlifter h = handle (\(e :: IOException) -> E.throwError . FSException $ e) (localSeqUnliftIO env h)
+    --  in
       case fs of
         {-
         WithCurrentDir path action -> withUnlifter $ \ul -> R.withCurrentDir path (ul action)
@@ -51,9 +61,8 @@ runFileSystem =
         WalkDirRel action dir -> withUnlifter $ \ul -> R.walkDirRel (\b drs -> ul . action b drs) dir
         -}
 
-       {-
 
-        WalkDirAccum descendHandler transformer startDir -> withUnlifter $ \ul ->
+        WalkDirAccum descendHandler transformer startDir -> adapt env FSException $ \ul ->
           let
             mdh' = (\dh b' drs -> ul . dh b' drs) <$> descendHandler
             ow' b' drs = ul . transformer b' drs
@@ -61,6 +70,7 @@ runFileSystem =
             R.walkDirAccum mdh' ow' startDir
        
        
+       {-
        
         
         WalkDirAccumRel descendHandler transformer startDir -> withUnlifter $ \ul ->

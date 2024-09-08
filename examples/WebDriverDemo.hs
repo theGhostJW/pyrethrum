@@ -38,7 +38,9 @@ import Web.Api.WebDriver as WAPI
   )
 import WebDriverEffect as WE
 import WebDriverSpec (DriverStatus (Ready), Selector (CSS))
-import qualified Core as C
+import Filter (Filters(..))
+import Internal.SuiteRuntime (ThreadCount(..))
+import Internal.Logging qualified as L
 
 {-
 demo the following:
@@ -78,7 +80,11 @@ suite :: Suite
 suite =
   [Fixture (NodePath "WebDriverDemo" "test") test]
 
--- exeParams = C.MkSuiteExeParams {interpreter = defaultInterpreter}
+runDemo :: IO ()
+runDemo = do 
+  (lc, _logQ) <- L.testLogControls True
+  ioRunner suite Unfiltered defaultRunConfig (ThreadCount 1) lc
+-- >>> runDemo
 
 -- ############### Test Case ###################
 

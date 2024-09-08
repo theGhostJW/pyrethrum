@@ -14,7 +14,10 @@ module PyrethrumBase (
   actionInterpreter,
   fxCfg,
   HasLog,
-  mkTestRun
+  mkTestRun,
+  ioRunner,
+  ioRunParams,
+  defaultRunConfig
 ) where
 
 import Core qualified as C
@@ -26,10 +29,14 @@ import Effectful (Eff, IOE, type (:>), runEff)
 import Effectful.Error.Static as E (Error, runError)
 import WebDriverEffect (WebUI (..))
 import PyrethrumConfigTypes as CG
-    ( Depth(..), RunConfig(..), FixtureConfig(..), fxCfg, Environment(..), Country(..) ) 
+    ( Depth(..), RunConfig(..), FixtureConfig(..), fxCfg, Environment(..), Country(..), defaultRunConfig ) 
 import WebDriverIOInterpreter
 import DSL.FileSystemIOInterpreter qualified as I (runFileSystem) 
 import Data.Either.Extra (mapLeft)
+import Filter (Filters)
+import Internal.SuiteRuntime (execute, ThreadCount)
+import qualified Internal.LoggingCore as L
+import qualified Internal.Logging as L
 
 
 --  these will probably be split off and go into core or another library 
@@ -41,6 +48,20 @@ type ApEffs = '[FileSystem, Out NodeEvent, E.Error FSException, WebUI, IOE]
 
 -- type ApConstraints es = (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es)
 -- type AppEffs a = forall es. (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
+
+ioRunParams :: [C.Node Action RunConfig FixtureConfig ()] -> Filters RunConfig FixtureConfig -> RunConfig -> C.SuiteExeParams Action RunConfig FixtureConfig
+ioRunParams suite filters runConfig = C.MkSuiteExeParams {
+  interpreter = actionInterpreter,
+  suite,
+  filters,
+  runConfig
+  }
+
+ 
+
+ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
+ioRunner suite filters runConfig threadCount logControls = execute threadCount logControls (ioRunParams (mkTestRun suite) filters runConfig)
+
 
 
 -- TODO - interpreters into own module
@@ -189,5 +210,3 @@ mkNode = \case
       , ..
       }
   Fixture{..} -> C.Fixture{fixture = mkFixture fixture, ..}
-
-type ExePrms = C.SuiteExeParams Action RunConfig FixtureConfig

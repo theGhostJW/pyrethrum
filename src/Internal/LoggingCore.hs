@@ -26,7 +26,7 @@ runWithLogger :: forall l lx. LogControls l lx -> (LoggerSource l -> IO ()) -> I
 runWithLogger
   LogControls
     { sink,
-      expander,
+      aggregator,
       logWorker,
       stopWorker
     }
@@ -44,26 +44,26 @@ runWithLogger
         )
     where
       mkNewLogger :: IO (l -> IO ())
-      mkNewLogger = mkLogger expander sink <$> UnliftIO.newIORef (-1) <*> P.myThreadId
+      mkNewLogger = mkLogger aggregator sink <$> UnliftIO.newIORef (-1) <*> P.myThreadId
 
 -- adds log index and thread id to loggable event and sends it to the sink
 mkLogger :: forall l lxp. (C.ThreadId -> Int -> l -> lxp) -> (lxp -> IO ()) -> IORef Int -> ThreadId -> l -> IO ()
-mkLogger expander sink idxRef thrdId logEvnt = do
+mkLogger aggregator sink idxRef thrdId logEvnt = do
   tc <- readIORef idxRef
   let nxt = succ tc
-  finally (sink $ expander (C.mkThreadId thrdId) nxt logEvnt) $ writeIORef idxRef nxt
+  finally (sink $ aggregator (C.mkThreadId thrdId) nxt logEvnt) $ writeIORef idxRef nxt
 
 -- TODO:: Logger should be wrapped in an except that sets non-zero exit code on failure
 
 data LogControls l lx = LogControls
-  { expander :: C.ThreadId -> Int -> l -> lx,
+  { aggregator :: C.ThreadId -> Int -> l -> lx,
     sink :: lx -> IO (),
     logWorker :: IO (),
     stopWorker :: IO ()
   }
 
 testLogControls' :: forall l lx. (Show lx) => (C.ThreadId -> Int -> l -> lx) -> Bool -> IO (LogControls l lx, TQueue lx)
-testLogControls' expander wantConsole = do
+testLogControls' aggregator wantConsole = do
   chn <- newTChanIO
   log <- newTQueueIO
 

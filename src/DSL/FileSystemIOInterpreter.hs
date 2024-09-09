@@ -43,9 +43,9 @@ runFileSystem =
     Eff es a'
   handler env fs =
     let 
-      adapt env errCon m = liftIO m `catch` \(e::IOException) -> do
+      adapt env' errCon m = liftIO m `catch` \(e::IOException) -> do
        -- The error effect is in scope only in the local environment.
-        localSeqUnlift env $ \unlift -> unlift . E.throwError $ errCon e
+        localSeqUnlift env' $ \unlift -> unlift . E.throwError $ errCon e
     in
     -- let
     --   withUnlifter :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b

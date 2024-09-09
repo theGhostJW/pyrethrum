@@ -184,6 +184,12 @@ data FileSystem :: Effect where
   WalkDirRel :: (Path Rel Dir -> [Path Rel Dir] -> [Path Rel File] -> m (FSP.WalkAction Rel)) -> Path Rel Dir -> FileSystem m ()
   -}
   
+  {-
+  WalkDirAccum :: (Monoid o) =>                          Maybe (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (FSP.WalkAction Abs)) -> (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m o) -> Path b Dir -> FileSystem m o
+  
+  WalkDirAccum :: (Monoid o) =>                          
+    Maybe (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m (FSP.WalkAction Abs)) -> (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> m o) -> Path b Dir -> FileSystem m o
+  -}
   WalkDirAccum :: (Monoid o, Error FSException :> es) => Maybe (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> Eff es (FSP.WalkAction Abs)) -> (Path Abs Dir -> [Path Abs Dir] -> [Path Abs File] -> Eff es o) -> Path b Dir -> FileSystem (Eff es) o
   
   {-

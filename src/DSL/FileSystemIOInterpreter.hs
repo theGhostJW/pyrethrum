@@ -7,7 +7,7 @@ module DSL.FileSystemIOInterpreter (
 
 import BasePrelude (IOException)
 import Control.Monad.Catch (catch, handle)
-import DSL.Internal.FileSystemRawIO qualified as R
+import DSL.Internal.FileSystemIO qualified as R
 import Effectful as EF (
   Eff,
   IOE,
@@ -22,14 +22,15 @@ import Effectful.Dispatch.Dynamic (
   localSeqUnliftIO, localSeqUnlift, SharedSuffix,
  )
 import Effectful.Error.Static qualified as E
+import Debug.Trace.Extended (uu)
 
 adaptException :: (HasCallStack, IOE :> es, E.Error FSException :> es) => IO b -> Eff es b
 adaptException m = EF.liftIO m `catch` \(e :: IOException) -> E.throwError . FSException $ e
 
--- adapt :: (SharedSuffix es handlerEs,  E.Error e :> localEs, IOE :> es) => LocalEnv localEs handlerEs -> (IOException -> e) -> IO a2 -> Eff es a2
--- adapt env errCon m = liftIO m `catch` \(e::IOException) -> do
---       -- The error effect is in scope only in the local environment.
---       localSeqUnlift env $ \unlift -> unlift . E.throwError $ errCon e
+adapt :: (SharedSuffix es handlerEs,  E.Error e :> localEs, IOE :> es) => LocalEnv localEs handlerEs -> (IOException -> e) -> IO a2 -> Eff es a2
+adapt env errCon m = liftIO m `catch` \(e::IOException) -> do
+      -- The error effect is in scope only in the local environment.
+      localSeqUnlift env $ \unlift -> unlift . E.throwError $ errCon e
 
 runFileSystem :: forall es a. (HasCallStack, IOE :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
@@ -43,9 +44,13 @@ runFileSystem =
     Eff es a'
   handler env fs =
     let 
-      adapt env' errCon m = liftIO m `catch` \(e::IOException) -> do
-       -- The error effect is in scope only in the local environment.
-        localSeqUnlift env' $ \unlift -> unlift . E.throwError $ errCon e
+      -- withAdaptedUnlifter :: forall es' handlerEs b. (SharedSuffix es' handlerEs, E.Error FSException :> localEs, IOE :> es') => LocalEnv localEs handlerEs -> IO b -> Eff es' b
+      -- withAdaptedUnlifter env = adapt env FSException
+      --   -- old
+      -- withAdaptedUnlifter' = withAdaptedUnlifter env
+      
+      withUnlifter :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
+      withUnlifter h = localSeqUnliftIO env h
     in
     -- let
     --   withUnlifter :: forall b. ((forall r. Eff localEs r -> IO r) -> IO b) -> Eff es b
@@ -61,17 +66,30 @@ runFileSystem =
         WalkDirRel action dir -> withUnlifter $ \ul -> R.walkDirRel (\b drs -> ul . action b drs) dir
         -}
 
+      
+        -- WalkDirAccum descendHandler transformer startDir -> adapt env FSException $ 
+        --  \ul ->
+        --     let
+        --       a = uu
+        --     in
+        --       uu
+        --     -- adaptedTransformer base dirs excludes = adapt env FSException $ transformer base dirs excludes
+        --     -- mdh' = (\dh b' drs -> ul . dh b' drs) <$> (descendHandler)
+        --     -- ow' b' drs = ul . adaptedTransformer b' drs 
+        --     -- R.walkDirAccum mdh' ow' startDir 
 
-        WalkDirAccum descendHandler transformer startDir -> adapt env FSException $ \ul ->
+
+        WalkDirAccum descendHandler transformer startDir -> withUnlifter $ \ul ->
           let
             mdh' = (\dh b' drs -> ul . dh b' drs) <$> descendHandler
             ow' b' drs = ul . transformer b' drs
            in
             R.walkDirAccum mdh' ow' startDir
+   
        
        
        {-
-       
+   
         
         WalkDirAccumRel descendHandler transformer startDir -> withUnlifter $ \ul ->
           let

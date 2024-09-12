@@ -202,7 +202,7 @@ data SuiteExeParams m rc fc where
   MkSuiteExeParams ::
     { suite :: [Node m rc fc ()],
       filters :: Filters rc fc,
-      interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a),
+      interpreter :: forall a. m a -> IO a,
       runConfig :: rc
     } ->
     SuiteExeParams m rc fc

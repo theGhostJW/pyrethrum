@@ -11,7 +11,7 @@ module PyrethrumBase
     C.DataSource (..),
     Suite,
     FixtureConfig (..),
-    actionIOInterpreter,
+    apIOInterpreter,
     fxCfg,
     HasLog,
     mkTestRun,
@@ -22,7 +22,8 @@ module PyrethrumBase
 where
 
 import Core qualified as C
-import DSL.FileSystemEffect (FSException, FileSystem)
+import DSL.DocInterpreterUtils (DocException)
+import DSL.FileSystemEffect (FileSystem)
 import DSL.FileSystemIOInterpreter qualified as I (runFileSystem)
 import DSL.Internal.NodeEvent (NodeEvent)
 import DSL.Internal.NodeEvent qualified as AE
@@ -45,10 +46,9 @@ import PyrethrumConfigTypes as CG
     defaultRunConfig,
     fxCfg,
   )
+import WebDriverDocInterpreter qualified as WDDoc (runWebDriver)
 import WebDriverEffect (WebUI (..))
 import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
-import WebDriverDocInterpreter qualified as WDDoc (runWebDriver)
-import DSL.DocInterpreterUtils (DocException)
 
 --  these will probably be split off and go into core or another library
 -- module later
@@ -58,7 +58,7 @@ type HasLog es = Out NodeEvent :> es
 
 type LogEffs a = forall es. (Out NodeEvent :> es) => Eff es a
 
-type ApEffs = '[FileSystem, Out NodeEvent, E.Error FSException, WebUI, IOE]
+type ApEffs = '[FileSystem, Out NodeEvent, WebUI, IOE]
 
 -- type ApConstraints es = (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es)
 -- type AppEffs a = forall es. (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
@@ -66,7 +66,7 @@ type ApEffs = '[FileSystem, Out NodeEvent, E.Error FSException, WebUI, IOE]
 ioRunParams :: [C.Node Action RunConfig FixtureConfig ()] -> Filters RunConfig FixtureConfig -> RunConfig -> C.SuiteExeParams Action RunConfig FixtureConfig
 ioRunParams suite filters runConfig =
   C.MkSuiteExeParams
-    { interpreter = actionIOInterpreter,
+    { interpreter = apIOInterpreter,
       suite,
       filters,
       runConfig
@@ -84,7 +84,6 @@ docRunParams suite filters runConfig =
 
 docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
 docRunner suite filters runConfig threadCount logControls = execute threadCount logControls (docRunParams (mkTestRun suite) filters runConfig)
-
 
 actionDocInterpreter :: Eff '[FileSystem,  WebUI, Out NodeEvent, E.Error FSException, E.Error DocException, IOE] a -> IO (Either (CallStack, SomeException) a)
 actionDocInterpreter = runEff . runErrorIO . runErrorIO .  runIOOut .  WDDoc.runWebDriver . I.runFileSystem
@@ -105,12 +104,17 @@ runDocOut :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
 runDocOut =
   runOut $ \case
     AE.Framework l -> print l
-    AE.User l -> pure ()
+    AE.User _l -> pure ()
 
+apIOInterpreter :: Eff '[FileSystem, Out NodeEvent, WebUI, IOE] a -> IO a
+apIOInterpreter ap =
+  ap
+    & I.runFileSystem
+    & runIOOut
+    & WDIO.runWebDriver
+    & runEff
 
-actionIOInterpreter :: Eff '[FileSystem, Out NodeEvent, E.Error FSException, WebUI, IOE] a -> IO (Either (CallStack, SomeException) a)
-actionIOInterpreter = runEff . WDIO.runWebDriver . runErrorIO . runIOOut . I.runFileSystem
-
+{-
 runErrorIO :: forall a e es. Exception e => Eff (Error e : es) a -> Eff es (Either (CallStack, SomeException) a)
 runErrorIO effs = mapLeft upCastException <$> runError effs
   where
@@ -124,7 +128,7 @@ runErrorIO effs = mapLeft upCastException <$> runError effs
 -- runErrorIO = runErrorWith (\_cs (FSException e) -> throwIO e)
 
 -- runOutIO & runWebDriverIO & runOutIO & runEff
-
+-}
 -- TODO: research StrictSTM
 
 data Hook hz when input output where

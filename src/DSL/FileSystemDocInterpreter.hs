@@ -21,16 +21,6 @@ import Effectful.Dispatch.Dynamic (LocalEnv, interpret)
 import DSL.DocInterpreterUtils (docErr, docErr2, docErr3, docErr4, adaptException, DocException(..))
 import DSL.Internal.NodeEvent (NodeEvent)
 
--- TODO:
--- sort out lazy IO
--- simple console effect
---   - add deferred validation
--- read file effect
---  - repro issue
---  - solve issue
--- finish doc file system
---   - demo simple efffect app including returning a doc value exception IO and step listing
-
 -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
 
 runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es, E.Error DocException :> es) => Eff (FileSystem : es) a -> Eff es a
@@ -45,7 +35,7 @@ runFileSystem =
     Eff es a'
   handler _env fs =
     case fs of
-      {-
+
       -- todo: rename all variables / separate type signatures by using the other templateHaskell method
       WithCurrentDir _path _action -> docErr "withCurrentDir" "run action in current working directory"
       FindFilesWith _predicate searchDirs targetFileName ->
@@ -81,14 +71,14 @@ runFileSystem =
           "recurssively walk the directory:"
           (showPath path)
           "performing an action on each subdirectory"
-                    -}
+
       WalkDirAccum _descendHandler _transformer startDir ->
         docErr3
           "WalkDirAccum"
           "walk:"
           (showPath startDir)
           "accumulating a result"
-          {-
+         
       WalkDirAccumRel _descendHandler _transformer startDir ->
         docErr3
           "WalkDirAccum"
@@ -187,7 +177,6 @@ runFileSystem =
       WriteBinaryFileAtomic filePath _bytes -> docErr2 "writeBinaryFileAtomic" "write binary file atomically:" (showPath filePath)
       WriteBinaryFileDurable filePath _bytes -> docErr2 "writeBinaryFileDurable" "write binary file durably:" (showPath filePath)
       WriteBinaryFileDurableAtomic filePath _bytes -> docErr2 "writeBinaryFileDurableAtomic" "write binary file durably atomically:" (showPath filePath)
-      -}
    where
     showPath :: Path c d -> Text
     showPath = toS . toFilePath

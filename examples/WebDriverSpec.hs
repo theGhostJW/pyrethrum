@@ -40,23 +40,23 @@ import Prelude hiding (get)
 --  TODO: add error handler
 data W3Spec a
   = Get
-      { description :: ~Text,
+      { description :: Text,
         path :: [Text],
         parser :: HttpResponse -> Maybe a
       }
   | Post
-      { description :: ~Text,
+      { description :: Text,
         path :: [Text],
         body :: Value,
         parser :: HttpResponse -> Maybe a
       }
   | PostEmpty
-      { description :: ~Text,
+      { description :: Text,
         path :: [Text],
         parser :: HttpResponse -> Maybe a
       }
   | Delete
-      { description :: ~Text,
+      { description :: Text,
         path :: [Text],
         parser :: HttpResponse -> Maybe a
       }
@@ -112,7 +112,8 @@ newtype Selector = CSS Text
   deriving (Show)
 
 -- TODO capabilities for all browsers - to and from JSON
--- move to separate module
+-- move to separate module added typed definition to all APIs that require
+-- JSON
 data Capabilities = MkCapabilities
   {
   }
@@ -124,7 +125,7 @@ data Capabilities = MkCapabilities
   deriving (Show)
 
 {-
--- TODO: capabilities type
+-- TODO: own capabilities type to from Json 
 -- capsToJson :: Capabilities -> Value
 -- capsToJson caps = uu
 

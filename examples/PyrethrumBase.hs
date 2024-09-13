@@ -17,7 +17,9 @@ module PyrethrumBase
     mkCoreSuite,
     ioRunner,
     docRunner,
+    runDocOut,
     defaultRunConfig,
+    docInterpreter
   )
 where
 
@@ -28,11 +30,7 @@ import DSL.FileSystemIOInterpreter qualified as FIO (runFileSystem)
 import DSL.Internal.NodeEvent (NodeEvent)
 import DSL.Internal.NodeEvent qualified as AE
 import DSL.Out (Out, runOut)
-import Data.Either.Extra (mapLeft)
 import Effectful (Eff, IOE, runEff, type (:>))
-import Effectful qualified as EF
-import Effectful.Dispatch.Dynamic (interpret)
-import Effectful.Error.Static as E (Error, runError)
 import Filter (Filters)
 import Internal.Logging qualified as L
 import Internal.LoggingCore qualified as L

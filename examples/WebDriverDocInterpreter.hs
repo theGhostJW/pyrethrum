@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
-{-# OPTIONS_GHC -Wno-strict-data #-}
 
 -- TODO - work out how to get rid of this 
 -- Eff has been updated and no longer needs this
@@ -9,21 +8,17 @@ module WebDriverDocInterpreter where
 import Effectful as EF
   ( Eff,
     IOE,
-    liftIO,
     type (:>),
   )
 -- import Effectful.Reader.Dynamic
 import Effectful.Dispatch.Dynamic
   ( interpret, LocalEnv,
   )
-import UnliftIO.Concurrent (threadDelay)
 import WebDriverEffect (WebUI (..))
-import DSL.DocInterpreterUtils (docErr, docErr2, docErr3, docErr4)
-import Effectful.Error.Static qualified as E
+import DSL.DocInterpreterUtils (docErr, docErr2)
 import DSL.Internal.NodeEvent (NodeEvent)
 import DSL.Out ( Out )
-import Debug.Trace.Extended (uu)
-import PyrethrumExtras (toS, txt)
+import PyrethrumExtras (txt)
 
 runWebDriver :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es{- , E.Error DocException :> es -}) => Eff (WebUI : es) a -> Eff es a
 runWebDriver =

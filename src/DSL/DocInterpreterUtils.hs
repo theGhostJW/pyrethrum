@@ -8,18 +8,15 @@ module DSL.DocInterpreterUtils (
   docErrn
 ) where
 
-import Control.Monad.Catch (catch)
 import DSL.Out ( out, Out )
 import Effectful as EF (
   Eff,
   IOE,
-  liftIO,
   type (:>),
  )
 
 import DSL.Internal.NodeEvent (NodeEvent (..), FrameworkLog (Step))
 import Data.Text qualified as T
-import Effectful.Error.Static qualified as E
 
 {-
 data DocException

@@ -2,68 +2,21 @@ module WebDriverDemo where
 
 import Check
 import Core (ParseException)
-import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log), FrameworkLog (dState))
+import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log))
 import DSL.Out (Out, out)
 import Effectful as EF
-  ( Dispatch (Dynamic),
-    DispatchOf,
-    Eff,
-    Effect,
-    IOE,
-    runEff,
+  ( Eff,
     type (:>),
   )
-import Effectful.Dispatch.Dynamic
-  ( interpret,
-    localSeqUnlift,
-    localSeqUnliftIO,
-    send,
-  )
-import GHC.Clock (getMonotonicTime)
 import PyrethrumBase
-import PyrethrumExtras (txt, uu, Abs, File, relfile)
-import Web.Api.WebDriver as WAPI
-  ( Key (EnterKey),
-    WebDriverT,
-    defaultFirefoxCapabilities,
-    defaultWebDriverConfig,
-    execWebDriverT,
-    fullscreenWindow,
-    navigateTo,
-    performActions,
-    press,
-    runIsolated_,
-    typeString,
-    wait,
-  )
+import PyrethrumExtras (txt)
 import WebDriverEffect as WE
 import WebDriverSpec (DriverStatus (Ready), Selector (CSS))
-import qualified Core as C
 import Filter (Filters(..))
 import Internal.SuiteRuntime (ThreadCount(..))
 import Internal.Logging qualified as L
 import WebDriverPure (seconds)
-import DSL.FileSystemEffect
-import Path.Extended (reldir)
 
-{-
-demo the following:
-  - single test suite with minimal selenium interpreter
-  - read a value from "the internet"
-  - navigate between pages
-  - read a second value
-  - validator on value
-  - expect issue with laziness (if not why not)
-      - solve
-  - user steps
-  - run with documenter
-  - introduce action that uses value read from the internet
-    - should blow up documenter
-    - fix with doc* functions
-  - TODO: Haddock docs for steps
-    - effectful supports generating template haskell without type signature
-    - manually add type signature and haddock
--}
 
 -- ################### Effectful Demo ##################
 
@@ -72,13 +25,6 @@ _theInternet = "https://the-internet.herokuapp.com/"
 
 _checkBoxesLinkCss :: Selector
 _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
-
--- execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
--- execute tc lc p@C.ExeParams {interpreter} = uu 
--- do
-  -- let suite = mkTestRun [Fixture (NodePath "WebDriverDemo" "test") test]
-  -- let runParams = SuitePrepParams {suite, interpreter, runConfig = defaultRunConfig}
-  -- C.execute tc lc p runParams
 
 suite :: Suite
 suite =
@@ -89,19 +35,21 @@ runDemo runner = do
   (logControls, _logQ) <- L.testLogControls True
   runner suite Unfiltered defaultRunConfig (ThreadCount 1) logControls
 
+-- start geckodriver first: geckodriver &
 runIODemo :: IO ()
 runIODemo = runDemo ioRunner
 -- >>> runIODemo
 
+-- TODO: not working looks like needs separate runner
 runDocDemo :: IO ()
 runDocDemo = runDemo docRunner
 -- >>> runDocDemo
 
 -- ############### Test Case ###################
 
--- TODO: repeated code - refactor
+-- TODO: log interpreter
 logShow :: (HasLog es, Show a) => a -> Eff es ()
-logShow = out . User . Log . txt
+logShow = log . txt
 
 log :: (HasLog es) => Text -> Eff es ()
 log = out . User . Log
@@ -111,18 +59,6 @@ test = Full config action parse items
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
-
-
-getPaths :: (Out NodeEvent :> es, FileSystem :> es) => Eff es [Path Abs File]
-getPaths =
-  do
-    s <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
-    r <- test s
-    log $ r ? "yes" $ "no"
-    pure s
-  where
-    isDeleteMe :: Path Abs File -> Eff es Bool
-    isDeleteMe = pure . isInfixOf "deleteMe" . toFilePath
 
 driver_status :: (WebUI :> es, Out NodeEvent :> es) => Eff es DriverStatus
 driver_status = do 
@@ -134,7 +70,7 @@ action :: (WebUI :> es, Out NodeEvent :> es) => RunConfig -> Data -> Eff es AS
 action _rc i = do
   log i.title
   status <- driver_status
-  log $ "the driver status is: " <> txt status
+  log $ "the driver status is (from test): " <> txt status
   ses <- newSession
   maximiseWindow ses
   go ses _theInternet
@@ -145,7 +81,7 @@ action _rc i = do
   sleep $ 5 * seconds
   killSession ses
   pure $ AS {status, checkButtonText}
-
+ 
 data AS = AS
   { status :: DriverStatus,
     checkButtonText :: Text
@@ -180,60 +116,3 @@ items _rc =
         }
     ]
 
--- ################### WebDriver Example Using webdriver-w3c Library ##################
-
--- https://github.com/nbloomf/webdriver-w3c/blob/master/doc/Tutorial.md
--- https://hackage.haskell.org/package/webdriver-w3c
-
-release_the_bats :: WebDriverT IO ()
-release_the_bats = do
-  WAPI.fullscreenWindow
-  navigateTo "https://www.google.com"
-  performActions [typeString "bats"]
-  performActions [press EnterKey]
-  wait 5000000
-  pure ()
-
--- >>> example1
-example1 :: IO ()
-example1 = do
-  -- start geckodriver first
-  -- geckodriver &
-  execWebDriverT
-    defaultWebDriverConfig
-    (runIsolated_ defaultFirefoxCapabilities release_the_bats)
-  pure ()
-
---  ################### Profiling Example ##################
-
--- profiling demo (from eff docs)
--- timing steps
--- inline drivers
-data Profiling :: Effect where
-  Profile :: String -> m a -> Profiling m a
-
-type instance DispatchOf Profiling = Dynamic
-
-profile :: (HasCallStack, Profiling :> es) => String -> Eff es a -> Eff es a
-profile label action' = send (Profile label action')
-
-runProfiling :: (IOE :> es) => Eff (Profiling : es) a -> Eff es a
-runProfiling = interpret $ \env -> \case
-  Profile label action' -> localSeqUnliftIO env $ \unlift -> do
-    t1 <- getMonotonicTime
-    r <- unlift action'
-    t2 <- getMonotonicTime
-    putStrLn $ "Action '" ++ label ++ "' took " ++ show (t2 - t1) ++ " seconds."
-    pure r
-
-runNoProfiling :: Eff (Profiling : es) a -> Eff es a
-runNoProfiling = interpret $ \env -> \case
-  Profile _label action' -> localSeqUnlift env $ \unlift -> unlift action'
-
-actionP :: forall es. (Profiling :> es, IOE :> es) => Eff es ()
-actionP = profile "greet" . liftIO $ putStrLn "Hello!"
-
-profileAction :: IO ()
-profileAction = runEff . runProfiling $ actionP
-
--- >>> profileAction

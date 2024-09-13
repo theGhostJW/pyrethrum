@@ -104,17 +104,13 @@ module DSL.FileSystemEffect
   )
 where
 
-import BasePrelude (IOException)
 import Chronos (OffsetDatetime)
 import DSL.Internal.FileSystemPure as FSP
 import Effectful as EF
   ( Dispatch (Dynamic),
     DispatchOf,
-    Eff,
     Effect,
-    (:>),
   )
-import Effectful.Error.Dynamic (Error)
 import Effectful.TH (makeEffect)
 import Path (Abs, Dir, File, Path, Rel)
 import Path.IO (AbsPath, AnyPath, RelPath)

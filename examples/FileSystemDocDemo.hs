@@ -1,4 +1,4 @@
-module StepDocumenterDemo where
+module FileSystemDocDemo where
 
 import DSL.FileSystemDocInterpreter qualified as DII
 import DSL.FileSystemEffect

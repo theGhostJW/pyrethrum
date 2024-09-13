@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
+
 module Prepare
   ( PreNode (..),
     ApEventSink,
@@ -26,7 +28,7 @@ import DSL.Internal.NodeEvent
 import Data.Either.Extra (mapLeft)
 import Internal.SuiteFiltering (FilteredSuite (..), filterSuite)
 import Internal.SuiteValidation (SuiteValidationError (..), chkSuite)
-import PyrethrumExtras (toS, txt)
+import PyrethrumExtras (txt)
 import UnliftIO.Exception (tryAny)
 
 -- TODO Full E2E property tests from Core fixtures and Hooks --> logs

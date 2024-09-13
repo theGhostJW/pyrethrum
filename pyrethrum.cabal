@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bfc7c35256a6d098b345dfba5e8df801f0164624a3d460c5b11a367e496b7c81
+-- hash: 16468d979d1b36dd622ebb58bab1be3020b60592a9169ee95ebc50de02547cc5
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -82,18 +82,21 @@ library
       Core
       CoreTypes
       CoreUtils
+      DSL.DocInterpreterUtils
       DSL.FileSystemDocInterpreter
       DSL.FileSystemEffect
       DSL.FileSystemIOInterpreter
+      DSL.Internal.FileSystemIO
       DSL.Internal.FileSystemPure
-      DSL.Internal.FileSystemRawIO
       DSL.Internal.NodeEvent
       DSL.Out
       Filter
       Internal.Logging
       Internal.LoggingCore
       Internal.LogQueries
+      Internal.SuiteFiltering
       Internal.SuiteRuntime
+      Internal.SuiteValidation
       OrphanedInstances
       Prepare
       ArbitraryIOTest
@@ -106,14 +109,24 @@ library
       SuiteRuntimePropTest
       SuiteRuntimeTest
       SuiteRuntimeTestBase
+      DocumenterDemo
       EffectfulDemoSpeakEffect
       EffectfulDemoSpeakIOInterpreterDynamic
+      FileSystemDocDemo
+      HigherOrderEffectDemo
       IOEffectDemo
       PyrethrumBase
       PyrethrumConfigTypes
       PyrethrumDemoTest
       RunDemo
-      StepDocumenterDemo
+      WebDriverDemo
+      WebDriverDocInterpreter
+      WebDriverEffect
+      WebDriverIO
+      WebDriverIOInterpreter
+      WebDriverIOStubs
+      WebDriverPure
+      WebDriverSpec
   hs-source-dirs:
       src
       test
@@ -172,6 +185,7 @@ library
   ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points
   build-depends:
       aeson
+    , aeson-pretty
     , base-prelude
     , bytestring
     , chronos
@@ -187,6 +201,8 @@ library
     , extra
     , fmt
     , hashable
+    , http-client
+    , http-types
     , mtl
     , path
     , path-io
@@ -194,11 +210,13 @@ library
     , pyrethrum-extras
     , random
     , raw-strings-qq
+    , req
     , template-haskell
     , text
     , time
     , transformers-either
     , unliftio
     , unordered-containers
+    , webdriver-w3c
     , yaml
   default-language: Haskell2010

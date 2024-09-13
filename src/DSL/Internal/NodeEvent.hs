@@ -10,13 +10,13 @@ NodeEvent is a data type that represents events emitted by or from WITHIN a node
 This is distinct from the EngineEvent data type which marks the BOUNDARIES of and events related to the nodes
 themselves (such as the start and end of a Hook or skipping a Fixture)
 
-User ULog -> ad hoc logging implemented by users of the framework
-Framework FLog -> internal events from within a test or hook such as the start of a test phase such as action, parse and checks
+User UserLog -> ad hoc logging implemented by users of the framework
+Framework FrameworkLog -> internal events from within a test or hook such as the start of a test phase such as action, parse and checks
 -}
 
 data NodeEvent
-  = User ULog
-  | Framework FLog
+  = User UserLog
+  | Framework FrameworkLog
   deriving stock (Show)
 
 newtype ItemText = ItemText {text :: Text} deriving (Eq, Show, IsString)
@@ -24,7 +24,7 @@ newtype DStateText = DStateText {text :: Text} deriving (Eq, Show, IsString)
 
 -- framework logs that represent test fixtures have a path to that fixture
 -- Steps and Exceptions do not as they don't represent test fixture
-data FLog
+data FrameworkLog
   = Action
       { path :: Path
       , item :: ItemText
@@ -57,7 +57,7 @@ data FLog
       }
   deriving stock (Show)
 
-data ULog
+data UserLog
   = StartFolder Text
   | EndFolder Text
   | Log Text
@@ -100,7 +100,7 @@ exceptionEvent :: Exception e => e -> CallStack -> NodeEvent
 exceptionEvent e cs =
   Framework $ Exception (toS $ displayException e) (toS $ prettyCallStack cs)
 
-$(deriveJSON defaultOptions ''ULog)
+$(deriveJSON defaultOptions ''UserLog)
 $(deriveJSON defaultOptions ''Path)
-$(deriveJSON defaultOptions ''FLog)
+$(deriveJSON defaultOptions ''FrameworkLog)
 $(deriveJSON defaultOptions ''NodeEvent)

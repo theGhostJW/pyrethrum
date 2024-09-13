@@ -5,12 +5,12 @@ module SuiteRuntimeTest where
 import Filter (FilterResult (..))
 import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
 import FullSuiteTestTemplate qualified as T
-import Internal.Logging qualified as L
-import Internal.SuiteRuntime (ThreadCount (..), configError)
+import Internal.SuiteRuntime (ThreadCount (..))
 import PyrethrumExtras (txt)
 import PyrethrumExtras.Test (chk, chkEq)
 import SuiteRuntimeTestBase
 import Prelude hiding (All, bug, id)
+import Internal.SuiteValidation
 
 -- TODO :: chkJust, chkNothing
 
@@ -21,10 +21,7 @@ chkInitFailure expected filterResults =
       (chk $ isNothing actualFail)
       (\expFail -> chkEq (Just expFail) actualFail)
   where
-    actualFail = failMsg <$> configError filterResults
-    failMsg = \case
-      L.SuiteInitFailure {failure} -> failure
-      _ -> bug "Expected SuiteInitFailure"
+    actualFail = (.failure) <$> chkSuite filterResults
 
 -- $ > unit_configError_valid_pass
 
@@ -59,17 +56,16 @@ unit_configError_duplicate =
       MkFilterResult "1" Nothing
     ]
 
--- $ > unit_simple_pass
+-- $> unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
--- $ > unit_simple_fail
-
+-- $> unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fixture [test Pass, test Fail]]]
 
--- $ > unit_nested_pass_fail
 
+-- $> unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
   runTest

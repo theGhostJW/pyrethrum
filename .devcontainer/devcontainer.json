@@ -52,7 +52,8 @@
 				"Gruntfuggly.todo-tree",
 				"andyyaldoo.vscode-json",
 				"redhat.vscode-yaml",
-				"bee.git-temporal-vscode"
+				"bee.git-temporal-vscode",
+				"foxundermoon.shell-format"
 			]
 		}
 	}

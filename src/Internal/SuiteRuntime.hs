@@ -1,13 +1,13 @@
 module Internal.SuiteRuntime where
 
 import Core qualified as C
+import CoreUtils (Hz (..))
 import DSL.Internal.NodeEvent qualified as AE
-import Data.Set qualified as S
-import Filter
-import CoreUtils (Hz(..))
-import Internal.Logging (HookPos(..), NodeType(..))
+import Internal.Logging (HookPos (..), NodeType (..))
 import Internal.Logging qualified as L
 import Internal.LoggingCore qualified as L
+import Internal.SuiteFiltering (FilteredSuite (..))
+import Internal.SuiteValidation (SuiteValidationError (..))
 import Prepare qualified as P
 import PyrethrumExtras (catchAll, txt, (?))
 import UnliftIO
@@ -41,86 +41,22 @@ executeWithoutValidation :: ThreadCount -> L.LogControls (L.Event L.ExePath AE.N
 executeWithoutValidation tc lc pn =
   L.runWithLogger lc (\l -> executeNodeList tc l pn)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> C.ExeParams m rc fc -> IO ()
-execute tc lc p@C.ExeParams {interpreter} =
+execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> C.SuiteExeParams m rc fc -> IO ()
+execute tc lc prms =
   L.runWithLogger lc execute'
   where
     execute' :: L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> IO ()
     execute' l =
       do
-        log $ L.FilterLog fRslts
-        configError fRslts
-          & maybe
-            (executeNodeList tc l preparedNodes)
-            log
-      where
-        log = l.rootLogger
-        (fSuite, fRslts) = filterSuite p.filters p.runConfig p.suite
-        preparedNodes = P.prepare $ P.SuitePrepParams fSuite interpreter p.runConfig
-
-configError :: [FilterResult Text] -> Maybe (L.Event L.ExePath AE.NodeEvent)
-configError r = emptySuite <|> duplicate
-  where
-    duplicate = firstDuplicateFixtureTitle r <&> 
-      \dupe -> L.SuiteInitFailure {
-         failure = "Duplicate Fixture Title",
-         notes = "The following fixture title is duplicated in the test suite:\n" 
-          <> dupe 
-          <> "\n"
-          <> "Fixture titles must be unique, please change the title of one of these fixtures."
-      }
-    emptySuite = any accepted r  ? Nothing $
-        Just $  
-         L.SuiteInitFailure {
-         failure = "Filtered Test Suite is Empty",
-         notes = "The test suite is empty after filtering:\n" 
-          <> "Check the filter log and change the relevant test or run config to ensure some fixtures are run."
-      }
-
-firstDuplicateFixtureTitle :: [FilterResult Text] -> Maybe Text
-firstDuplicateFixtureTitle = firstDuplicate . fmap (.target)
-  where
-    -- todo make polymorphic and add to pyrelude (replace existing)
-    firstDuplicate :: [Text] -> Maybe Text
-    firstDuplicate = go S.empty
-      where
-        go _ [] = Nothing
-        go seen (x : xs)
-          | x `S.member` seen = Just x
-          | otherwise = go (S.insert x seen) xs
-
-filterSuite :: forall m rc fc i. (C.Config fc) => Filters rc fc -> rc -> [C.Node m rc fc i] -> ([C.Node m rc fc i], [FilterResult Text])
-filterSuite fltrs rc suite =
-  (reverse fNodes, fRslts)
-  where
-    (fNodes, fRslts) = foldl' filterNode ([], []) suite
-
-    filterSuite' :: forall i'. [C.Node m rc fc i'] -> ([C.Node m rc fc i'], [FilterResult Text])
-    filterSuite' = filterSuite fltrs rc
-
-    filterNode :: forall hi. ([C.Node m rc fc hi], [FilterResult Text]) -> C.Node m rc fc hi -> ([C.Node m rc fc hi], [FilterResult Text])
-    filterNode (accNodes, fltrInfo) = \case
-      C.Hook {..} ->
-        (null sn ? accNodes $ C.Hook {subNodes = sn, ..} : accNodes, fr)
-        where
-          (sn, fr) = filterSuite' subNodes
-      fx@C.Fixture {fixture} ->
-        (accepted fr ? fx : accNodes $ accNodes, fr : fltrInfo)
-        where
-          fr = filterFixture fixture
-
-    filterFixture :: forall hi. C.Fixture m rc fc hi -> FilterResult Text
-    filterFixture fx =
-      fr
-        { rejection =
-            fr.rejection
-              <|> ( C.fixtureEmpty rc fx
-                      ? Just "Empty Fixture - the fixture either has no test data or all test data has been filtered out"
-                      $ Nothing
-                  )
-        }
-      where
-        fr = (.title) <$> applyFilters fltrs rc (C.getConfig fx)
+        let log = l.rootLogger
+        P.prepare prms
+          & either
+            (\Failure {failure, notes} -> log $ L.SuiteInitFailure failure notes)
+            ( \validated ->
+                do
+                  log $ L.FilterLog validated.filterResults
+                  executeNodeList tc l validated.suite
+            )
 
 executeNodeList :: ThreadCount -> L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
 executeNodeList tc lgr nodeList =

@@ -1,5 +1,5 @@
 # Use the latest official Ubuntu image as a base
-FROM ubuntu:latest
+FROM ubuntu:22.04
 
 # large chunks of this file "inspired by" aka. plagerised from https://github.com/vzarytovskii/haskell-dev-env/blob/master/.devcontainer/Dockerfile
 # use

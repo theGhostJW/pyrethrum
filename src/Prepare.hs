@@ -1,32 +1,55 @@
-module Prepare where
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
+
+module Prepare
+  ( PreNode (..),
+    ApEventSink,
+    Test (..),
+    prepare,
+    listPaths,
+  )
+where
 
 import Check (Check, Checks (..), FailStatus (NonTerminal), applyCheck, skipChecks)
 import Control.Exception (throwIO)
 import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
+import Core (SuiteExeParams)
 import Core qualified as C
+import CoreUtils (Hz)
 import DSL.Internal.NodeEvent
-  ( NodeEvent (Framework),
-    ApStateText (ApStateText),
+  ( ApStateText (ApStateText),
     DStateText (DStateText),
-    FLog (Action, Check, CheckStart, Parse, SkipedCheckStart),
+    FrameworkLog (Action, Check, CheckStart, Parse, SkipedCheckStart),
     ItemText (ItemText),
+    NodeEvent (Framework),
     Path,
     exceptionEvent,
   )
 import Data.Either.Extra (mapLeft)
-import CoreUtils (Hz)
-import PyrethrumExtras (toS, txt)
+import Internal.SuiteFiltering (FilteredSuite (..), filterSuite)
+import Internal.SuiteValidation (SuiteValidationError (..), chkSuite)
+import PyrethrumExtras (txt)
 import UnliftIO.Exception (tryAny)
-
 
 -- TODO Full E2E property tests from Core fixtures and Hooks --> logs
 -- can reuse some suiteruntime chks
 -- should be able to write a converter from template to core hooks and fixtures
 
-prepare :: (C.Config rc, C.Config fc) => SuitePrepParams m rc fc -> [PreNode IO ()]
-prepare SuitePrepParams {suite, interpreter, runConfig} =
-  prepSuiteElm (PrepParams interpreter runConfig) <$> suite
+prepare :: (C.Config rc, C.Config fc, HasCallStack) => SuiteExeParams m rc fc -> Either SuiteValidationError (FilteredSuite (PreNode IO ()))
+prepare C.MkSuiteExeParams {suite, filters, interpreter, runConfig = rc} =
+  mSuiteError
+    & maybe
+      ( Right $
+          MkFilteredSuite
+            { suite = prepSuiteElm pp <$> filtered.suite,
+              filterResults = filtered.filterResults
+            }
+      )
+      Left
+  where
+    pp = PrepParams interpreter rc
+    filtered = filterSuite filters rc suite
+    mSuiteError = chkSuite filtered.filterResults
 
 data PreNode m hi where
   Before ::
@@ -86,12 +109,12 @@ data Test m hi = MkTest
 
 data PrepParams m rc fc where
   PrepParams ::
-    { interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a),
+    { interpreter :: forall a. m a -> IO a,
       runConfig :: rc
     } ->
     PrepParams m rc fc
 
-prepSuiteElm :: forall m rc fc hi. (C.Config rc, C.Config fc) => PrepParams m rc fc -> C.Node m rc fc hi -> PreNode IO hi
+prepSuiteElm :: forall m rc fc hi. (HasCallStack, C.Config rc, C.Config fc) => PrepParams m rc fc -> C.Node m rc fc hi -> PreNode IO hi
 prepSuiteElm pp@PrepParams {interpreter, runConfig} suiteElm =
   suiteElm & \case
     C.Hook {hook, path, subNodes = subNodes'} ->
@@ -156,17 +179,21 @@ prepSuiteElm pp@PrepParams {interpreter, runConfig} suiteElm =
         run = prepSuiteElm pp
 
         intprt :: forall a. ApEventSink -> m a -> IO a
-        intprt snk a = interpreter a >>= unTry snk
+        intprt snk a = catchLog snk $ interpreter a
     C.Fixture {path, fixture} -> prepareTest pp path fixture
 
-flog :: ApEventSink -> FLog -> IO ()
+flog :: (HasCallStack) => ApEventSink -> FrameworkLog -> IO ()
 flog sink = sink . Framework
 
-unTry :: forall a e. (Exception e) => ApEventSink -> Either (CallStack, e) a -> IO a
-unTry es = either (uncurry $ logThrow es) pure
+catchLog :: forall a. (HasCallStack) => ApEventSink -> IO a -> IO a
+catchLog as io = tryAny io >>= either (logThrow as) pure
 
-logThrow :: (Exception e) => ApEventSink -> CallStack -> e -> IO a
-logThrow sink cs ex = sink (exceptionEvent ex cs) >> throwIO ex
+logThrow :: (HasCallStack) => ApEventSink -> SomeException -> IO a
+logThrow sink ex = sink (exceptionEvent ex callStack) >> throwIO ex
+
+unTry :: forall a. ApEventSink -> Either SomeException a -> IO a
+unTry es = either (logThrow es) pure
+
 
 prepareTest :: forall m rc fc hi. (C.Config fc) => PrepParams m rc fc -> Path -> C.Fixture m rc fc hi -> PreNode IO hi
 prepareTest PrepParams {interpreter, runConfig} path =
@@ -228,19 +255,14 @@ prepareTest PrepParams {interpreter, runConfig} path =
               <$> items' runConfig
         }
   where
-    applyParser :: forall as ds. ((HasCallStack) => as -> Either C.ParseException ds) -> as -> IO (Either (CallStack, C.ParseException) ds)
-    applyParser parser as =
-      tryAny (pure $ parser as)
-        <&> either
-          (\e -> Left (callStack, C.ParseFailure . toS $ displayException e))
-          (mapLeft (callStack,))
+    applyParser :: forall as ds. ((HasCallStack) => as -> Either C.ParseException ds) -> as -> Either SomeException ds
+    applyParser parser as = mapLeft toException $ parser as
 
     runAction :: forall i as ds. (C.Item i ds) => ApEventSink -> (i -> m as) -> i -> IO as
     runAction snk action i =
       do
         flog snk . Action path . ItemText $ txt i
-        eas <- interpreter $ action i
-        unTry snk eas
+        catchLog snk . interpreter $ action i
 
     runTest :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> ((HasCallStack) => as -> Either C.ParseException ds) -> i -> ApEventSink -> IO ()
     runTest action parser i snk =
@@ -249,8 +271,7 @@ prepareTest PrepParams {interpreter, runConfig} path =
           do
             as <- runAction snk action i
             flog snk . Parse path . ApStateText $ txt as
-            eds <- applyParser parser as
-            unTry snk eds
+            unTry snk $ applyParser parser as
         applyChecks snk path i.checks ds
 
     runDirectTest :: forall i ds. (C.Item i ds) => (i -> m ds) -> i -> ApEventSink -> IO ()
@@ -279,11 +300,3 @@ applyChecks snk p chks =
       (cr, ts') <- applyCheck ds ts chk
       logChk cr
       pure ts'
-
-data SuitePrepParams m rc fc where
-  SuitePrepParams ::
-    { suite :: [C.Node m rc fc ()],
-      interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a),
-      runConfig :: rc
-    } ->
-    SuitePrepParams m rc fc

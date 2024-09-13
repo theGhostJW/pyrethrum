@@ -25,7 +25,10 @@ $(deriveJSON defaultOptions ''RunConfig)
 
 instance C.Config RunConfig
 
-data TestConfig = TestConfig
+defaultRunConfig :: RunConfig
+defaultRunConfig = RunConfig "test" TST 1 AU DeepRegression
+
+data FixtureConfig = FxCfg
   { title :: Text
   , depth :: Depth
   }
@@ -42,15 +45,15 @@ defaults =
     { depth = DeepRegression
     }
 
-testConfig :: Text -> TestConfig
-testConfig title =
+fxCfg :: Text -> FixtureConfig
+fxCfg title =
   mkFull defaults
  where
   mkFull DefaultCfg{..} =
-    TestConfig
+    FxCfg
       { ..
       }
 
-$(deriveJSON defaultOptions ''TestConfig)
+$(deriveJSON defaultOptions ''FixtureConfig)
 
-instance C.Config TestConfig
+instance C.Config FixtureConfig

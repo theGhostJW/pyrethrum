@@ -86,6 +86,7 @@ verbatim:
 
 dependencies:
   - aeson
+  - aeson-pretty
   - base-prelude # needed for IOError
   - bytestring
   - chronos
@@ -113,6 +114,12 @@ dependencies:
   # - relude
   - unliftio
   - yaml
+  # used to talk to ghecko driver
+  - http-client
+  - http-types
+  - req
+  # webdriver used in TestdemoSelenium
+  - webdriver-w3c
   # - name: base
   #   mixin:
   #     - hiding (Prelude)
@@ -263,6 +270,7 @@ library:
   source-dirs:
     - src
     # remove later when finish most dev and move away from god modules
+    # TODO: God modules probably not required with latest cabal spilt fix once and for all
     - test
     - examples
   dependencies:

@@ -1006,16 +1006,16 @@ isAnyHookSuiteEvent = eventMatchesHookPos [After, Teardown, Before, Setup]
 isAfterSuiteEvent :: LogItem -> Bool
 isAfterSuiteEvent = eventMatchesHookPos [After, Teardown]
 
-newtype TestConfig = TestConfig
+newtype FixtureConfig = FxCfg
   {title :: Text}
   deriving (Generic, Show, Eq)
 
-instance ToJSON TestConfig
+instance ToJSON FixtureConfig
 
-instance Core.Config TestConfig
+instance Core.Config FixtureConfig
 
-tc :: TestConfig
-tc = TestConfig {title = "fixture config"}
+fc :: FixtureConfig
+fc = FxCfg {title = "fixture config"}
 
 mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> IO ()
 mkQueAction q path =
@@ -1139,7 +1139,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
         } ->
           pure $
             P.Fixture
-              { config = tc,
+              { config = fc,
                 path,
                 tests = ItemList $ mkTestItem <$> tests
               }

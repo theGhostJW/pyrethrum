@@ -198,14 +198,14 @@ data Node m rc fc hi where
       fixture :: Fixture m rc fc hi
     } ->
     Node m rc fc hi
-data ExeParams m rc fc where
-  ExeParams ::
+data SuiteExeParams m rc fc where
+  MkSuiteExeParams ::
     { suite :: [Node m rc fc ()],
       filters :: Filters rc fc,
-      interpreter :: forall a. m a -> IO (Either (CallStack, SomeException) a),
+      interpreter :: forall a. m a -> IO a,
       runConfig :: rc
     } ->
-    ExeParams m rc fc
+    SuiteExeParams m rc fc
 
 -- Todo
 -- see weeder :: HIE

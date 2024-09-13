@@ -1,127 +1,128 @@
-module DSL.FileSystemEffect (
-  -- * Effect
-  FileSystem (..),
-  FSException (..),
-  -- -- * Actions on directories
-  module FSP,
-  FSP.XdgDirectory (..),
-  FSP.XdgDirectoryList (..),
+module DSL.FileSystemEffect
+  ( -- * Effect
+    FileSystem (..),
+    -- come back to this later
+    -- FSException (..),
+    -- -- * Actions on directories
+    module FSP,
+    FSP.XdgDirectory (..),
+    FSP.XdgDirectoryList (..),
+    createDir,
+    createDirIfMissing,
+    removeDir,
+    removeDirRecur,
+    removePathForcibly,
+    renameDir,
+    listDir,
+    -- -- ** Current working directory
+    getCurrentDir,
+    setCurrentDir,
+    withCurrentDir,
+    -- -- * Pre-defined directories
+    getHomeDir,
+    getXdgDir,
+    getXdgDirList,
+    getAppUserDataDir,
+    getUserDocsDir,
+    getTempDir,
+    -- -- * Actions on files
+    removeFile,
+    renameFile,
+    renamePath,
+    copyFile,
+    copyFileWithMetadata,
+    getFileSize,
+    canonicalizePath,
+    makeAbsolute,
+    makeRelativeToCurrentDir,
+    -- -- * Existence tests
+    doesPathExist,
+    doesFileExist,
+    doesDirExist,
+    findExecutable,
+    findFile,
+    findFiles,
+    findFileWith,
+    findFilesWith,
+    -- -- * Symbolic links
+    createFileLink,
+    createDirLink,
+    removeDirLink,
+    isSymlink,
+    getSymlinkTarget,
+    -- -- * Permissions
+    getPermissions,
+    setPermissions,
+    copyPermissions,
+    -- -- * Timestamps
+    getAccessTime,
+    getModificationTime,
+    setAccessTime,
+    setModificationTime,
+    -- -- * Re-exports
 
-  createDir,
-  createDirIfMissing,
-  removeDir,
-  removeDirRecur,
-  removePathForcibly,
-  renameDir,
-  listDir,
-  -- -- ** Current working directory
-  getCurrentDir,
-  setCurrentDir,
-  withCurrentDir,
-  -- -- * Pre-defined directories
-  getHomeDir,
-  getXdgDir,
-  getXdgDirList,
-  getAppUserDataDir,
-  getUserDocsDir,
-  getTempDir,
-  -- -- * Actions on files
-  removeFile,
-  renameFile,
-  renamePath,
-  copyFile,
-  copyFileWithMetadata,
-  getFileSize,
-  canonicalizePath,
-  makeAbsolute,
-  makeRelativeToCurrentDir,
-  -- -- * Existence tests
-  doesPathExist,
-  doesFileExist,
-  doesDirExist,
-  findExecutable,
-  findFile,
-  findFiles,
-  findFileWith,
-  findFilesWith,
-  -- -- * Symbolic links
-  createFileLink,
-  createDirLink,
-  removeDirLink,
-  isSymlink,
-  getSymlinkTarget,
-  -- -- * Permissions
-  getPermissions,
-  setPermissions,
-  copyPermissions,
-  -- -- * Timestamps
-  getAccessTime,
-  getModificationTime,
-  setAccessTime,
-  setModificationTime,
-  -- -- * Re-exports
+    -- from pathIO
+    ensureDir,
+    listDirRel,
+    listDirRecur,
+    listDirRecurRel,
+    copyDirRecur,
+    copyDirRecur',
+    -- -- ** Walking directory trees
+    FSP.WalkAction (..),
+    walkDir,
+    walkDirRel,
+    walkDirAccum,
+    walkDirAccumRel,
+    -- -- * Path b t transformation
+    resolveFile,
+    resolveFile',
+    resolveDir,
+    resolveDir',
+    -- -- * Temporary files and directories
+    withTempFile,
+    withTempDir,
+    withSystemTempFile,
+    withSystemTempDir,
+    openTempFile,
+    openBinaryTempFile,
+    createTempDir,
+    -- -- * Existence tests
+    isLocationOccupied,
+    forgivingAbsence,
+    ignoringAbsence,
+    -- from UnliftIO.IO.File
+    writeBinaryFile,
+    writeBinaryFileAtomic,
+    writeBinaryFileDurable,
+    writeBinaryFileDurableAtomic,
+    withBinaryFile,
+    withBinaryFileAtomic,
+    withBinaryFileDurable,
+    withBinaryFileDurableAtomic,
+    ensureFileDurable,
+  )
+where
 
-  -- from pathIO
-  ensureDir,
-  listDirRel,
-  listDirRecur,
-  listDirRecurRel,
-  copyDirRecur,
-  copyDirRecur',
-  -- -- ** Walking directory trees
-  FSP.WalkAction (..),
-  walkDir,
-  walkDirRel,
-  walkDirAccum,
-  walkDirAccumRel,
-  -- -- * Path b t transformation
-  resolveFile,
-  resolveFile',
-  resolveDir,
-  resolveDir',
-  -- -- * Temporary files and directories
-  withTempFile,
-  withTempDir,
-  withSystemTempFile,
-  withSystemTempDir,
-  openTempFile,
-  openBinaryTempFile,
-  createTempDir,
-  -- -- * Existence tests
-  isLocationOccupied,
-  forgivingAbsence,
-  ignoringAbsence,
-  -- from UnliftIO.IO.File
-  writeBinaryFile,
-  writeBinaryFileAtomic,
-  writeBinaryFileDurable,
-  writeBinaryFileDurableAtomic,
-  withBinaryFile,
-  withBinaryFileAtomic,
-  withBinaryFileDurable,
-  withBinaryFileDurableAtomic,
-  ensureFileDurable,
-) where
-
-import DSL.Internal.FileSystemPure as FSP
-import Path (Abs, Dir, File, Path, Rel)
-
-import BasePrelude (IOException)
 import Chronos (OffsetDatetime)
-import Effectful as EF (
-  Dispatch (Dynamic),
-  DispatchOf,
-  Effect,
- )
+import DSL.Internal.FileSystemPure as FSP
+import Effectful as EF
+  ( Dispatch (Dynamic),
+    DispatchOf,
+    Effect,
+  )
 import Effectful.TH (makeEffect)
+import Path (Abs, Dir, File, Path, Rel)
 import Path.IO (AbsPath, AnyPath, RelPath)
 
 type instance DispatchOf FileSystem = Dynamic
 
+{-
 newtype FSException = FSException IOException
-  deriving (Show)
+  deriving (Show, Eq, Exception)
 
-instance Exception FSException
+-- instance Exception FSException
+-}
 
 data FileSystem :: Effect where
   EnsureDir :: Path b Dir -> FileSystem m ()
@@ -204,6 +205,6 @@ data FileSystem :: Effect where
   WriteBinaryFileDurable :: Path b File -> ByteString -> FileSystem m ()
   WriteBinaryFileDurableAtomic :: Path b File -> ByteString -> FileSystem m ()
 
--- todo: genrate splice and use makeEffect without type 
+-- todo: genrate splice and use makeEffect without type
 -- signatures add docs investigate renaming params
 makeEffect ''FileSystem

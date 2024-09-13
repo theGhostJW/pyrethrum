@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-strict-data #-}
 
 -- TODO - work out how to get rid of this 
 -- Eff has been updated and no longer needs this
@@ -17,14 +18,14 @@ import Effectful.Dispatch.Dynamic
   )
 import UnliftIO.Concurrent (threadDelay)
 import WebDriverEffect (WebUI (..))
-import DSL.DocInterpreterUtils (docErr, docErr2, docErr3, docErr4, adaptException, DocException(..))
+import DSL.DocInterpreterUtils (docErr, docErr2, docErr3, docErr4)
 import Effectful.Error.Static qualified as E
 import DSL.Internal.NodeEvent (NodeEvent)
 import DSL.Out ( Out )
 import Debug.Trace.Extended (uu)
 import PyrethrumExtras (toS, txt)
 
-runWebDriver :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es, E.Error DocException :> es) => Eff (WebUI : es) a -> Eff es a
+runWebDriver :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es{- , E.Error DocException :> es -}) => Eff (WebUI : es) a -> Eff es a
 runWebDriver =
    interpret handler
  where
@@ -37,7 +38,7 @@ runWebDriver =
   handler _env  =
       \case
         -- driver
-        DriverStatus -> docErr "driverStatus" "get driver status"
+        DriverStatus i -> docErr2 "driverStatus" "get driver status" $ txt i
         -- session
         NewSession ->  docErr "newSession" "create new driver session"
         KillSession _sessionRef -> docErr "killSession" "kill driver session"

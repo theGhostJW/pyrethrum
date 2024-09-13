@@ -2,7 +2,7 @@ module WebDriverDemo where
 
 import Check
 import Core (ParseException)
-import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log))
+import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log), FrameworkLog (dState))
 import DSL.Out (Out, out)
 import Effectful as EF
   ( Dispatch (Dynamic),
@@ -21,7 +21,7 @@ import Effectful.Dispatch.Dynamic
   )
 import GHC.Clock (getMonotonicTime)
 import PyrethrumBase
-import PyrethrumExtras (txt)
+import PyrethrumExtras (txt, uu, Abs, File, relfile)
 import Web.Api.WebDriver as WAPI
   ( Key (EnterKey),
     WebDriverT,
@@ -43,6 +43,8 @@ import Filter (Filters(..))
 import Internal.SuiteRuntime (ThreadCount(..))
 import Internal.Logging qualified as L
 import WebDriverPure (seconds)
+import DSL.FileSystemEffect
+import Path.Extended (reldir)
 
 {-
 demo the following:
@@ -82,11 +84,18 @@ suite :: Suite
 suite =
   [Fixture (NodePath "WebDriverDemo" "test") test]
 
-runDemo :: IO ()
-runDemo = do 
-  (lc, _logQ) <- L.testLogControls True
-  ioRunner suite Unfiltered defaultRunConfig (ThreadCount 1) lc
--- >>> runDemo
+runDemo :: SuiteRunner -> IO ()
+runDemo runner = do 
+  (logControls, _logQ) <- L.testLogControls True
+  runner suite Unfiltered defaultRunConfig (ThreadCount 1) logControls
+
+runIODemo :: IO ()
+runIODemo = runDemo ioRunner
+-- >>> runIODemo
+
+runDocDemo :: IO ()
+runDocDemo = runDemo docRunner
+-- >>> runDocDemo
 
 -- ############### Test Case ###################
 
@@ -103,10 +112,28 @@ test = Full config action parse items
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
+
+getPaths :: (Out NodeEvent :> es, FileSystem :> es) => Eff es [Path Abs File]
+getPaths =
+  do
+    s <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
+    r <- test s
+    log $ r ? "yes" $ "no"
+    pure s
+  where
+    isDeleteMe :: Path Abs File -> Eff es Bool
+    isDeleteMe = pure . isInfixOf "deleteMe" . toFilePath
+
+driver_status :: (WebUI :> es, Out NodeEvent :> es) => Eff es DriverStatus
+driver_status = do 
+  status <- driverStatus "NA"
+  log $ "the driver status is: " <> txt status
+  pure status
+
 action :: (WebUI :> es, Out NodeEvent :> es) => RunConfig -> Data -> Eff es AS
 action _rc i = do
   log i.title
-  status <- driverStatus
+  status <- driver_status
   log $ "the driver status is: " <> txt status
   ses <- newSession
   maximiseWindow ses

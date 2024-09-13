@@ -10,21 +10,21 @@ module PyrethrumBase
     Environment (..),
     C.DataSource (..),
     Suite,
+    SuiteRunner,
     FixtureConfig (..),
-    apIOInterpreter,
     fxCfg,
     HasLog,
-    mkTestRun,
+    mkCoreSuite,
     ioRunner,
-    ioRunParams,
+    docRunner,
     defaultRunConfig,
   )
 where
 
 import Core qualified as C
-import DSL.DocInterpreterUtils (DocException)
+import DSL.FileSystemDocInterpreter qualified as FDoc (runFileSystem)
 import DSL.FileSystemEffect (FileSystem)
-import DSL.FileSystemIOInterpreter qualified as I (runFileSystem)
+import DSL.FileSystemIOInterpreter qualified as FIO (runFileSystem)
 import DSL.Internal.NodeEvent (NodeEvent)
 import DSL.Internal.NodeEvent qualified as AE
 import DSL.Out (Out, runOut)
@@ -58,40 +58,51 @@ type HasLog es = Out NodeEvent :> es
 
 type LogEffs a = forall es. (Out NodeEvent :> es) => Eff es a
 
-type ApEffs = '[FileSystem, Out NodeEvent, WebUI, IOE]
+type ApEffs = '[FileSystem, WebUI, Out NodeEvent, IOE]
 
 -- type ApConstraints es = (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es)
 -- type AppEffs a = forall es. (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
 
-ioRunParams :: [C.Node Action RunConfig FixtureConfig ()] -> Filters RunConfig FixtureConfig -> RunConfig -> C.SuiteExeParams Action RunConfig FixtureConfig
-ioRunParams suite filters runConfig =
-  C.MkSuiteExeParams
-    { interpreter = apIOInterpreter,
-      suite,
-      filters,
-      runConfig
-    }
+type SuiteRunner = Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
 
-{-
-docRunParams :: [C.Node Action RunConfig FixtureConfig ()] -> Filters RunConfig FixtureConfig -> RunConfig -> C.SuiteExeParams Action RunConfig FixtureConfig
-docRunParams suite filters runConfig =
-  C.MkSuiteExeParams
-    { interpreter = actionDocInterpreter,
-      suite,
-      filters,
-      runConfig
-    }
+ioInterpreter :: Action a -> IO a
+ioInterpreter ap =
+  ap
+    & FIO.runFileSystem
+    & WDIO.runWebDriver
+    & runIOOut
+    & runEff
+
 
 docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
-docRunner suite filters runConfig threadCount logControls = execute threadCount logControls (docRunParams (mkTestRun suite) filters runConfig)
-
-actionDocInterpreter :: Eff '[FileSystem,  WebUI, Out NodeEvent, E.Error FSException, E.Error DocException, IOE] a -> IO (Either (CallStack, SomeException) a)
-actionDocInterpreter = runEff . runErrorIO . runErrorIO .  runIOOut .  WDDoc.runWebDriver . I.runFileSystem
-
--}
+docRunner suite filters runConfig threadCount logControls =
+  execute threadCount logControls $
+    C.MkSuiteExeParams
+      { interpreter = docInterpreter,
+        suite = mkCoreSuite suite,
+        filters,
+        runConfig
+      }
 
 ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
-ioRunner suite filters runConfig threadCount logControls = execute threadCount logControls (ioRunParams (mkTestRun suite) filters runConfig)
+ioRunner suite filters runConfig threadCount logControls =
+  execute threadCount logControls $
+    C.MkSuiteExeParams
+      { interpreter = ioInterpreter,
+        suite = mkCoreSuite suite,
+        filters,
+        runConfig
+      }
+
+docInterpreter :: Action a  -> IO a
+docInterpreter ap =
+  ap
+    & FDoc.runFileSystem
+    & WDDoc.runWebDriver
+    & runDocOut
+    & runEff
+
+
 
 -- TODO - interpreters into own module
 -- Need to fix up to work in with logcontrols
@@ -105,14 +116,6 @@ runDocOut =
   runOut $ \case
     AE.Framework l -> print l
     AE.User _l -> pure ()
-
-apIOInterpreter :: Eff '[FileSystem, Out NodeEvent, WebUI, IOE] a -> IO a
-apIOInterpreter ap =
-  ap
-    & I.runFileSystem
-    & runIOOut
-    & WDIO.runWebDriver
-    & runEff
 
 {-
 runErrorIO :: forall a e es. Exception e => Eff (Error e : es) a -> Eff es (Either (CallStack, SomeException) a)
@@ -226,8 +229,8 @@ mkFixture = \case
   Full' {..} -> C.Full' config' (mkHook depends) action' parse' items'
   Direct' {..} -> C.Direct' {depends = mkHook depends, ..}
 
-mkTestRun :: Suite -> [C.Node Action RunConfig FixtureConfig ()]
-mkTestRun tr = mkNode <$> tr
+mkCoreSuite :: Suite -> [C.Node Action RunConfig FixtureConfig ()]
+mkCoreSuite tr = mkNode <$> tr
 
 mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) RunConfig hz i o
 mkHook = \case

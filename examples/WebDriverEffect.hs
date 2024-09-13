@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-strict-data #-}
+
 module WebDriverEffect
   ( SessionRef (..),
     WebUI (..),
@@ -44,7 +46,8 @@ every element interaction
 -}
 data WebUI :: Effect where
   -- driver 
-  DriverStatus :: WebUI m  DriverStatus
+  DriverStatus :: ~Text -> WebUI m  DriverStatus
+  -- DriverStatus :: WebUI m  DriverStatus
   -- session
   NewSession :: WebUI m SessionRef
   KillSession :: SessionRef -> WebUI m ()

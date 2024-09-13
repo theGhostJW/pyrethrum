@@ -2,8 +2,6 @@
 
 module DSL.FileSystemDocInterpreter (
   runFileSystem,
-  DocException,
-  adaptException,
 ) where
 
 import DSL.Out ( Out )
@@ -14,16 +12,15 @@ import Effectful as EF (
  )
 
 import DSL.FileSystemEffect (FileSystem (..))
-import Effectful.Error.Static qualified as E
 import Path.Extended (Path, toFilePath)
 import PyrethrumExtras (toS, txt, (?))
 import Effectful.Dispatch.Dynamic (LocalEnv, interpret)
-import DSL.DocInterpreterUtils (docErr, docErr2, docErr3, docErr4, adaptException, DocException(..))
+import DSL.DocInterpreterUtils (docErr, docErr2, docErr3, docErr4)
 import DSL.Internal.NodeEvent (NodeEvent)
 
 -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
 
-runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es, E.Error DocException :> es) => Eff (FileSystem : es) a -> Eff es a
+runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es{- , E.Error DocException :> es -}) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
   interpret handler
  where

@@ -119,14 +119,14 @@ eachIntBefore =
 -- ############### Test the Lot ###################
 
 config :: TestConfig
-config = TestConfig "test" DeepRegression
+config = TestConfig "test the lot" DeepRegression
 
-test :: Fixture ()
-test = Full config action parse items
+test1 :: Fixture ()
+test1 = Full config action parse items
 
 action :: RunConfig -> Item -> Action ApState
 action _expectedrc itm = do
-    log $ txt itm
+    log $ txt "test the lot: " <> txt itm
     pure $ ApState (itm.value + 1) $ txt itm.value
 
 data ApState = ApState
@@ -167,7 +167,7 @@ items =
 -- ############### Test the Lot Child ###################
 
 config2 :: TestConfig
-config2 = TestConfig "test" DeepRegression
+config2 = TestConfig "test Test the Lot Child" DeepRegression
 
 test2 :: Fixture HookInfo
 test2 = Full' config2 infoThreadHook action2 parse2 items2
@@ -214,7 +214,7 @@ items2 rc =
             (\i -> rc.depth == Regression || i.id < 10)
             [ Item2
                 { id = 1
-                , title = "test2: test the value is one"
+                , title = "test the lot child"
                 , value = 2
                 , checks =
                     chk "test" ((== 1) . (.value))
@@ -231,7 +231,7 @@ test3 :: Fixture Int
 test3 =
     Full'
         { depends = eachIntBefore
-        , config' = TestConfig "test" DeepRegression
+        , config' = TestConfig "Test the Lot (Record)" DeepRegression
         , action' = \_rc hkInt itm -> do
             log $ txt itm
             pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
@@ -241,7 +241,53 @@ test3 =
                 . ItemList
                 $ [ Item2
                         { id = 1
-                        , title = "test the value is one"
+                        , title = "test the value is one - Test the Lot (Record)"
+                        , value = 2
+                        , checks = chk "test" ((== 1) . (.value))
+                        }
+                  ]
+        }
+
+-- ############### Test the Lot (Record) ###################
+
+test6 :: Fixture Int
+test6 =
+    Full'
+        { depends = eachIntBefore
+        , config' = TestConfig "6 Test the Lot (Record)" DeepRegression
+        , action' = \_rc hkInt itm -> do
+            log $ txt itm
+            pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
+        , parse' = \AS{..} -> pure DS{..}
+        , items' =
+            const
+                . ItemList
+                $ [ Item2
+                        { id = 1000
+                        , title = "test 6 the value is one - Test the Lot (Record)"
+                        , value = 2
+                        , checks = chk "test" ((== 1) . (.value))
+                        }
+                  ]
+        }
+
+-- ############### Test the Lot (Record) ###################
+
+test5 :: Fixture Int
+test5 =
+    Full'
+        { depends = eachIntBefore
+        , config' = TestConfig "Test the Lot (Record) 5" DeepRegression
+        , action' = \_rc hkInt itm -> do
+            log $ txt itm
+            pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
+        , parse' = \AS{..} -> pure DS{..}
+        , items' =
+            const
+                . ItemList
+                $ [ Item2
+                        { id = 2
+                        , title = "Test the Lot (Record) 5"
                         , value = 2
                         , checks = chk "test" ((== 1) . (.value))
                         }
@@ -252,7 +298,7 @@ test3 =
 test4 :: Fixture Int
 test4 =
     Direct'
-        { config' = TestConfig "test" DeepRegression
+        { config' = TestConfig "test4 Test Direct (Record)" DeepRegression
         , depends = eachAfter
         , action' = \_rc _hi itm -> do
             log $ txt itm
@@ -262,7 +308,13 @@ test4 =
                 . ItemList
                 $ [ Item2
                         { id = 1
-                        , title = "test4: test the value is one"
+                        , title = "I Test Direct (Record) :: test4: test the value is one"
+                        , value = 2
+                        , checks = chk "test" ((== 1) . (.value))
+                        },
+                    Item2
+                        { id = 2
+                        , title = "II Test Direct (Record) :: test4: test the value is one"
                         , value = 2
                         , checks = chk "test" ((== 1) . (.value))
                         }
@@ -295,6 +347,7 @@ cfg = testConfig "test"
 -- ############### Suite ###################
 -- this will be generated
 
+node :: Node ()
 node =
     Hook
         { path = NodePath "module" "name"
@@ -304,7 +357,7 @@ node =
                 { path = NodePath "module" "name"
                 , hook = intOnceHook
                 , subNodes =
-                    [ Fixture (NodePath "module" "testName") test4
+                    [ Fixture (NodePath "module" "testName") test3
                     , Hook
                         { path = NodePath "module" "name"
                         , hook = addOnceIntHook
@@ -318,13 +371,13 @@ node =
                                         { path = NodePath "module" "name"
                                         , hook = eachInfoAround
                                         , subNodes =
-                                            [ Fixture (NodePath "module" "testName") test3
+                                            [ Fixture (NodePath "module" "testName") test4
                                             , Hook
                                                 { path = NodePath "module" "name"
                                                 , hook = eachAfter
                                                 , subNodes =
-                                                    [ Fixture (NodePath "module" "testName") test4
-                                                    , Fixture (NodePath "module" "testName") test3
+                                                    [ Fixture (NodePath "module" "testName") test5
+                                                    , Fixture (NodePath "module" "testName") test6
                                                     ]
                                                 }
                                             ]
@@ -347,8 +400,25 @@ runConfig =
         , country = AU
         , depth = DeepRegression
         }
+
+coreNode :: C.Node Action RunConfig TestConfig ()
 coreNode = mkNode node
+
+
+{-
+??
+- how to control no of threads 
+- Once hooks
+- test for empty thread hooks
+- logging abandonned tests
+- how are tests distributed between threads (depth or breath first)
+- how switch interpreters 
+- existing tests
+-}
+
+result :: Action ()
 result = C.runNode runConfig (pure ()) (const $ pure ()) coreNode
+-- >>> result
 
 {-
 -- TODO: test documenter that returns a handle from onceHook

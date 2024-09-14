@@ -406,14 +406,42 @@ coreNode = mkNode node
 
 
 {-
-??
-- how to control no of threads 
+?? Questions ??
+- plug in existing tests
 - Once hooks
 - test for empty thread hooks
-- logging abandonned tests
-- how are tests distributed between threads (depth or breath first)
+- would noop hooks result in logging empty hooks?
+- logging abandonned (skipped) tests and hooks
 - how switch interpreters 
-- existing tests
+
+- how to control no of threads it looks like this could potentially run as many threads as there are items ?
+    - https://hackage.haskell.org/package/unliftio-0.2.25.0/docs/UnliftIO-Internals-Async.html#v:pooledMapConcurrentlyN ?
+    - note difference with my code below
+    - how are tests distributed between threads (depth or breath first)
+      - when a thread run to the end of one branch does it expire or recycle?
+      - the behaviour of main should be (limited or no unit test)
+        - t1 traverses to end of base branch 1
+        - t2 traverses to end of base branch 2
+        - when a tread 1 finishes it drops back a node and executes the next highest branch
+        - when thread 1 finishes branch 1 it cycles back and starts down branch 2 prioritising unstarted sub-branches
+        - finally, when all other branches are complete, thread 1 will eventually start running the same fixture as thread 2 if thread 2 is still on that fixture 
+        - this behaviour is achieved via nested childQueues (not sure if the same can be achieved with PO forConcurrently_)
+-- note difference master branch code
+executeNodes :: L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
+executeNodes L.MkLoggerSource {rootLogger, newLogger} nodes tc =
+  do
+    finally
+      ( rootLogger L.StartExecution
+          >> forConcurrently_
+            thrdTokens   <<<<----- THIS
+            ( const do
+                logger <- newLogger
+                runChildQ Concurrent (runNode logger $ OnceIn ()) canRunXTree nodes  <<<<----- THIS
+            )
+      )
+      (rootLogger L.EndExecution)
+  where
+    thrdTokens = replicate tc.maxThreads True
 -}
 
 result :: Action ()

@@ -15,6 +15,8 @@ module Check (
   skipCheck,
   mapRules,
   filterRules,
+  -- TODO - more checks chkFalse', ChkEmpty, chkNotEmpty, chkEqual, chkNotEqual, chkContains, 
+  -- chkNotContains, chkMatches, chkNotMatches, chkLessThan, chkLessThanOrEqual, chkGreaterThan, chkGreaterThanOrEqual
 )
 where
 

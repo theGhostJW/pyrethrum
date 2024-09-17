@@ -51,10 +51,10 @@ import DSL.OutInterpreter (runOut)
 
 runDemo :: SuiteRunner -> Suite -> IO ()
 runDemo runner suite = do
-  (logControls, logList) <- L.testLogControls True
+  (logControls, _logList) <- L.testLogControls True
   runner suite Unfiltered defaultRunConfig (ThreadCount 1) logControls
-  putStrLn "########## Log ##########"
-  atomically logList >>= mapM_ pPrint
+  -- putStrLn "########## Log ##########"
+  -- atomically logList >>= mapM_ pPrint
 
 -- ############### Test Case ###################
 
@@ -100,17 +100,23 @@ fsDocDemoSimple sink =
     docRun :: Eff '[FileSystem, Out NodeEvent, IOE] a -> IO a
     docRun = runEff . runOut sink . FDoc.runFileSystem
 
+-- TODO:: FIX
 -- >>> fsDocDemoSimple
+-- No instance for `Show (LogSink -> IO ())'
+--   arising from a use of `evalPrint'
+--   (maybe you haven't applied a function to enough arguments?)
+-- In a stmt of an interactive GHCi command: evalPrint it_a1YYG
 
 -- ################### 2. FS App with full runtime ##################
 
 {-
 OH THE HUMANITY !!!
-1. log scrambling
+1. log scrambling z:: FIXED
  1.1 - take unhandled excption out of the picture in demo - FAILED STILL SCRABLED
  1.2 - switch off filter log (execute -> executeWithoutValidation) - FAILED STILL SCRABLED
- 1.3 - log outfull channel 
+ 1.3 - log outfull channel  :: FIXED with use of proper interpreter
 2. exception not handled
+  - reinstate exception for doc
 3. laziness not working
 -}
 
@@ -132,7 +138,7 @@ getFail = pure $ error "This is an error !!! "
 
 fsAction :: (FileSystem :> es, Out NodeEvent :> es) => RunConfig -> FSData -> Eff es FSAS
 fsAction _rc i = do
-  -- getFail
+  getFail
   paths <- getPaths
   log i.title
   chkPathsThatDoesNothing paths

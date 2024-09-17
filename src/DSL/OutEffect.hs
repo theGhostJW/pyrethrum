@@ -2,12 +2,7 @@
 {-# LANGUAGE NoPolyKinds #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
-module DSL.Out (
-  Out,
-  Sink (..),
-  out,
-  runOut
-) where
+module DSL.OutEffect where
 
 import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, IOE, (:>))
 import Effectful.Dispatch.Static (StaticRep, SideEffects(..), getStaticRep, unsafeEff_, evalStaticRep)
@@ -28,6 +23,3 @@ out :: (Out a :> es) => a -> Eff es ()
 out payload = do
   Out s <- getStaticRep
   unsafeEff_ . s.sink $ payload
-
-runOut :: (IOE :> es) => (a -> IO ()) -> Eff (Out a : es) b -> Eff es b
-runOut = evalStaticRep . Out . Sink

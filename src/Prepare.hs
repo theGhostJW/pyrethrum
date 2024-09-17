@@ -23,7 +23,7 @@ import DSL.Internal.NodeEvent
     ItemText (ItemText),
     NodeEvent (Framework),
     Path,
-    exceptionEvent,
+    exceptionEvent, LogSink,
   )
 import Data.Either.Extra (mapLeft)
 import Internal.SuiteFiltering (FilteredSuite (..), filterSuite)
@@ -81,8 +81,6 @@ data PreNode m hi where
     } ->
     PreNode m hi
 
-type LogSink = NodeEvent -> IO ()
-
 -- used in debugging
 listPaths :: forall m hi. PreNode m hi -> [(Int, Path)]
 listPaths =
@@ -107,7 +105,7 @@ data Test m hi = MkTest
   }
 
 prepSuiteElm :: forall m rc fc hi. (HasCallStack, C.Config rc, C.Config fc) => 
- (forall a. m a -> IO a ) -- interpreter
+ (forall a. LogSink -> m a -> IO a ) -- interpreter
  -> rc -- runConfig
  -> C.Node m rc fc hi -- node
  -> PreNode IO hi
@@ -176,7 +174,7 @@ prepSuiteElm interpreter rc suiteElm =
         run = prepSuiteElm interpreter rc 
 
         intprt :: forall a. LogSink -> m a -> IO a
-        intprt snk a = catchLog snk $ interpreter a
+        intprt snk a = catchLog snk $ interpreter snk a
     C.Fixture {path, fixture} -> prepareTest interpreter rc  path fixture
 
 flog :: (HasCallStack) => LogSink -> FrameworkLog -> IO ()
@@ -193,7 +191,7 @@ unTry es = either (logThrow es) pure
 
 
 prepareTest :: forall m rc fc hi. (C.Config fc) =>  
- (forall a. m a -> IO a ) -- interpreter
+ (forall a.  LogSink -> m a -> IO a ) -- interpreter
  -> rc -- runConfig 
  -> Path -> C.Fixture m rc fc hi -> PreNode IO hi
 prepareTest interpreter rc path =
@@ -262,7 +260,7 @@ prepareTest interpreter rc path =
     runAction snk action i =
       do
         flog snk . Action path . ItemText $ txt i
-        catchLog snk . interpreter $ action i
+        catchLog snk . interpreter snk $ action i
 
     runTest :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> ((HasCallStack) => as -> Either C.ParseException ds) -> i -> LogSink -> IO ()
     runTest action parser i snk =

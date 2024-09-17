@@ -9,7 +9,7 @@ module DSL.DocInterpreterUtils (
   docErrn'
 ) where
 
-import DSL.Out ( out, Out )
+import DSL.OutEffect ( out, Out )
 import Effectful as EF (
   Eff,
   IOE,

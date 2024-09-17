@@ -6,8 +6,8 @@ import Check
 import Core (ParseException)
 import DSL.FileSystemDocInterpreter qualified as FDoc
 import DSL.FileSystemEffect
-import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log))
-import DSL.Out (Out, out)
+import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log), LogSink)
+import DSL.OutEffect (Out, out)
 import Data.Text (isInfixOf)
 import Effectful as EF
   ( Eff,
@@ -31,7 +31,6 @@ import PyrethrumBase
       DataSource(ItemList),
       Depth(DeepRegression),
       defaultRunConfig,
-      runDocOut,
       docRunner )
 import PyrethrumExtras (Abs, File, relfile, toS, txt, (?))
 import WebDriverEffect
@@ -47,6 +46,7 @@ import WebDriverEffect
       killSession )
 import WebDriverPure (seconds)
 import WebDriverSpec (DriverStatus (..), Selector (CSS))
+import DSL.OutInterpreter (runOut)
 
 
 runDemo :: SuiteRunner -> Suite -> IO ()
@@ -92,13 +92,13 @@ fsDemoAp = do
   paths <- getPaths
   chkPathsThatDoesNothing paths
 
-fsDocDemoSimple :: IO ()
-fsDocDemoSimple =
+fsDocDemoSimple :: LogSink -> IO ()
+fsDocDemoSimple sink =
   --  docInterpreter fsDemoAp
   docRun fsDemoAp
   where
     docRun :: Eff '[FileSystem, Out NodeEvent, IOE] a -> IO a
-    docRun = runEff . runDocOut . FDoc.runFileSystem
+    docRun = runEff . runOut sink . FDoc.runFileSystem
 
 -- >>> fsDocDemoSimple
 

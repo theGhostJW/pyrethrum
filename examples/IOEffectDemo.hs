@@ -5,14 +5,14 @@ import Chronos (Time, now)
 import DSL.FileSystemEffect
     ( walkDirAccum )
 import Effectful ( IOE, type (:>), Eff, runEff )
-import DSL.Out
+import DSL.OutEffect
+import DSL.OutInterpreter ( runOut )
 import DSL.Internal.NodeEvent
 import Data.Text qualified as T
 import BasePrelude (openFile, hClose, hGetContents)
 import DSL.FileSystemIOInterpreter ( FileSystem, runFileSystem )
 import System.Time.Extra (sleep)
 import PyrethrumExtras.IO (putTxt)
-
 
 {-
 \************************************************************

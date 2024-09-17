@@ -7,13 +7,15 @@ import DSL.FileSystemEffect
     walkDirAccum,
   )
 import DSL.Internal.NodeEvent (NodeEvent (User), UserLog (Log))
-import DSL.Out (Out, Sink (Sink), out, runOut)
+import DSL.OutEffect (Out, Sink (Sink), out)
+import DSL.OutInterpreter ( runOut )
 import Data.List.Extra (isInfixOf)
 import Effectful (Eff, IOE, runEff, (:>))
 import Path (Abs, File, Path, absdir, reldir, relfile, toFilePath)
 import PyrethrumExtras ((?))
 
 type FSOut es = (Out NodeEvent :> es, FileSystem :> es)
+
 
 -- todo - use a more believable base function
 demo :: forall es. (FSOut es) => Eff es ()

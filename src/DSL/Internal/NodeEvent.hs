@@ -4,6 +4,7 @@ import Check (CheckReport)
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import PyrethrumExtras (toS)
 
+type LogSink = NodeEvent -> IO ()
 -- TODO: Note plugin
 {-
 NodeEvent is a data type that represents events emitted by or from WITHIN a node (ie. a Hook or a Fixture) 

@@ -3,7 +3,7 @@ module PyrethrumDemoTest where
 import Check (Checks, chk)
 import Core (After, Around, Before, Each, Once, ParseException, Thread)
 import DSL.Internal.NodeEvent (NodeEvent (..), Path (..), UserLog (Log))
-import DSL.Out (out)
+import DSL.OutEffect (out)
 import Effectful (Eff)
 import PyrethrumBase (
   Action,

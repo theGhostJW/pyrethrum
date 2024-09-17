@@ -17,7 +17,6 @@ module PyrethrumBase
     mkCoreSuite,
     ioRunner,
     docRunner,
-    runDocOut,
     defaultRunConfig,
     docInterpreter
   )
@@ -29,7 +28,8 @@ import DSL.FileSystemEffect (FileSystem)
 import DSL.FileSystemIOInterpreter qualified as FIO (runFileSystem)
 import DSL.Internal.NodeEvent (NodeEvent)
 import DSL.Internal.NodeEvent qualified as AE
-import DSL.Out (Out, runOut)
+import DSL.OutEffect (Out)
+import DSL.OutInterpreter ( runOut )
 import Effectful (Eff, IOE, runEff, type (:>))
 import Filter (Filters)
 import Internal.Logging qualified as L
@@ -67,12 +67,12 @@ type ApEffs = '[FileSystem, WebUI, Out NodeEvent, IOE]
 
 type SuiteRunner = Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
 
-ioInterpreter :: Action a -> IO a
-ioInterpreter ap =
+ioInterpreter :: AE.LogSink -> Action a -> IO a
+ioInterpreter sink ap =
   ap
     & FIO.runFileSystem
     & WDIO.runWebDriver
-    & runIOOut
+    & runOut sink
     & runEff
 
 
@@ -112,12 +112,12 @@ ioRunner suite filters runConfig threadCount logControls =
         runConfig
       }
 
-docInterpreter :: Action a  -> IO a
-docInterpreter ap =
+docInterpreter :: AE.LogSink -> Action a  -> IO a
+docInterpreter sink ap =
   ap
     & FDoc.runFileSystem
     & WDDoc.runWebDriver
-    & runDocOut
+    & runOut sink
     & runEff
 
 

@@ -4,7 +4,7 @@ module DSL.FileSystemDocInterpreter (
   runFileSystem,
 ) where
 
-import DSL.Out ( Out )
+import DSL.OutEffect ( Out )
 import Effectful as EF (
   Eff,
   IOE,

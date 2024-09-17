@@ -3,7 +3,7 @@ module WebDriverDemo where
 import Check
 import Core (ParseException)
 import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log))
-import DSL.Out (Out, out)
+import DSL.OutEffect (Out, out)
 import Effectful as EF
   ( Eff,
     type (:>),

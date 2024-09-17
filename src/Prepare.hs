@@ -41,13 +41,12 @@ prepare C.MkSuiteExeParams {suite, filters, interpreter, runConfig = rc} =
     & maybe
       ( Right $
           MkFilteredSuite
-            { suite = prepSuiteElm pp <$> filtered.suite,
+            { suite = prepSuiteElm interpreter rc <$> filtered.suite,
               filterResults = filtered.filterResults
             }
       )
       Left
   where
-    pp = PrepParams interpreter rc
     filtered = filterSuite filters rc suite
     mSuiteError = chkSuite filtered.filterResults
 
@@ -107,15 +106,12 @@ data Test m hi = MkTest
     action :: ApEventSink -> hi -> m ()
   }
 
-data PrepParams m rc fc where
-  PrepParams ::
-    { interpreter :: forall a. m a -> IO a,
-      runConfig :: rc
-    } ->
-    PrepParams m rc fc
-
-prepSuiteElm :: forall m rc fc hi. (HasCallStack, C.Config rc, C.Config fc) => PrepParams m rc fc -> C.Node m rc fc hi -> PreNode IO hi
-prepSuiteElm pp@PrepParams {interpreter, runConfig} suiteElm =
+prepSuiteElm :: forall m rc fc hi. (HasCallStack, C.Config rc, C.Config fc) => 
+ (forall a. m a -> IO a ) -- interpreter
+ -> rc -- runConfig
+ -> C.Node m rc fc hi -- node
+ -> PreNode IO hi
+prepSuiteElm interpreter rc suiteElm =
   suiteElm & \case
     C.Hook {hook, path, subNodes = subNodes'} ->
       hook & \case
@@ -123,7 +119,8 @@ prepSuiteElm pp@PrepParams {interpreter, runConfig} suiteElm =
           Before
             { path,
               frequency,
-              action = \snk -> const . intprt snk $ action runConfig,
+              -- !!! HERE NEED TO WORK OUT HOW SINK IS TREADED TROUGH AND MAKE SURE INTEPRETOR USES IT
+              action = \snk -> const . intprt snk $ action rc,
               subNodes
             }
         C.Before'
@@ -132,7 +129,7 @@ prepSuiteElm pp@PrepParams {interpreter, runConfig} suiteElm =
             Before
               { path,
                 frequency,
-                action = \snk -> intprt snk . action' runConfig,
+                action = \snk -> intprt snk . action' rc,
                 subNodes
               }
         C.After {afterAction} ->
@@ -140,14 +137,14 @@ prepSuiteElm pp@PrepParams {interpreter, runConfig} suiteElm =
             { path,
               frequency,
               subNodes' = subNodes,
-              after = \snk -> intprt snk $ afterAction runConfig
+              after = \snk -> intprt snk $ afterAction rc
             }
         C.After' {afterAction'} ->
           After
             { path,
               frequency,
               subNodes' = subNodes,
-              after = \snk -> intprt snk $ afterAction' runConfig
+              after = \snk -> intprt snk $ afterAction' rc
             }
         C.Around
           { setup,
@@ -156,9 +153,9 @@ prepSuiteElm pp@PrepParams {interpreter, runConfig} suiteElm =
             Around
               { path,
                 frequency,
-                setup = \snk -> const . intprt snk $ setup runConfig,
+                setup = \snk -> const . intprt snk $ setup rc,
                 subNodes,
-                teardown = \snk -> intprt snk . teardown runConfig
+                teardown = \snk -> intprt snk . teardown rc
               }
         C.Around'
           { setup',
@@ -167,20 +164,20 @@ prepSuiteElm pp@PrepParams {interpreter, runConfig} suiteElm =
             Around
               { path,
                 frequency,
-                setup = \snk -> intprt snk . setup' runConfig,
+                setup = \snk -> intprt snk . setup' rc,
                 subNodes,
-                teardown = \snk -> intprt snk . teardown' runConfig
+                teardown = \snk -> intprt snk . teardown' rc
               }
       where
         frequency = C.hookFrequency hook
         subNodes = run <$> subNodes'
 
         run :: forall a. C.Node m rc fc a -> PreNode IO a
-        run = prepSuiteElm pp
+        run = prepSuiteElm interpreter rc 
 
         intprt :: forall a. ApEventSink -> m a -> IO a
         intprt snk a = catchLog snk $ interpreter a
-    C.Fixture {path, fixture} -> prepareTest pp path fixture
+    C.Fixture {path, fixture} -> prepareTest interpreter rc  path fixture
 
 flog :: (HasCallStack) => ApEventSink -> FrameworkLog -> IO ()
 flog sink = sink . Framework
@@ -195,8 +192,11 @@ unTry :: forall a. ApEventSink -> Either SomeException a -> IO a
 unTry es = either (logThrow es) pure
 
 
-prepareTest :: forall m rc fc hi. (C.Config fc) => PrepParams m rc fc -> Path -> C.Fixture m rc fc hi -> PreNode IO hi
-prepareTest PrepParams {interpreter, runConfig} path =
+prepareTest :: forall m rc fc hi. (C.Config fc) =>  
+ (forall a. m a -> IO a ) -- interpreter
+ -> rc -- runConfig 
+ -> Path -> C.Fixture m rc fc hi -> PreNode IO hi
+prepareTest interpreter rc path =
   \case
     C.Full {config, action, parse, items} ->
       Fixture
@@ -207,10 +207,10 @@ prepareTest PrepParams {interpreter, runConfig} path =
                 MkTest
                   { id = i.id,
                     title = i.title,
-                    action = \snk _hi -> runTest (action runConfig) parse i snk
+                    action = \snk _hi -> runTest (action rc) parse i snk
                   }
             )
-              <$> items runConfig
+              <$> items rc
         }
     C.Full' {config', action', parse', items'} ->
       Fixture
@@ -221,10 +221,10 @@ prepareTest PrepParams {interpreter, runConfig} path =
                 MkTest
                   { id = i.id,
                     title = i.title,
-                    action = \snk hi -> runTest (action' runConfig hi) parse' i snk
+                    action = \snk hi -> runTest (action' rc hi) parse' i snk
                   }
             )
-              <$> items' runConfig
+              <$> items' rc
         }
     C.Direct {config, action, items} ->
       Fixture
@@ -235,10 +235,10 @@ prepareTest PrepParams {interpreter, runConfig} path =
                 MkTest
                   { id = i.id,
                     title = i.title,
-                    action = \snk _hi -> runDirectTest (action runConfig) i snk
+                    action = \snk _hi -> runDirectTest (action rc) i snk
                   }
             )
-              <$> items runConfig
+              <$> items rc
         }
     C.Direct' {config', action', items'} ->
       Fixture
@@ -249,10 +249,10 @@ prepareTest PrepParams {interpreter, runConfig} path =
                 MkTest
                   { id = i.id,
                     title = i.title,
-                    action = \snk hi -> runDirectTest (action' runConfig hi) i snk
+                    action = \snk hi -> runDirectTest (action' rc hi) i snk
                   }
             )
-              <$> items' runConfig
+              <$> items' rc
         }
   where
     applyParser :: forall as ds. ((HasCallStack) => as -> Either C.ParseException ds) -> as -> Either SomeException ds

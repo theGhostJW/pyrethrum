@@ -18,18 +18,43 @@ import Effectful as EF
 import Filter (Filters (..))
 import Internal.Logging qualified as L
 import Internal.SuiteRuntime (ThreadCount (..))
+import Text.Show.Pretty (pPrint)
 import Path as P (Path, reldir, toFilePath)
 import PyrethrumBase
+    ( SuiteRunner,
+      Suite,
+      RunConfig,
+      FixtureConfig(FxCfg),
+      HasLog,
+      Fixture(Full),
+      Node(Fixture),
+      DataSource(ItemList),
+      Depth(DeepRegression),
+      defaultRunConfig,
+      runDocOut,
+      docRunner )
 import PyrethrumExtras (Abs, File, relfile, toS, txt, (?))
 import WebDriverEffect
+    ( WebUI,
+      driverStatus,
+      newSession,
+      maximiseWindow,
+      go,
+      findElem,
+      readElem,
+      clickElem,
+      sleep,
+      killSession )
 import WebDriverPure (seconds)
 import WebDriverSpec (DriverStatus (..), Selector (CSS))
 
 
 runDemo :: SuiteRunner -> Suite -> IO ()
 runDemo runner suite = do
-  (logControls, _logQ) <- L.testLogControls True
+  (logControls, logList) <- L.testLogControls True
   runner suite Unfiltered defaultRunConfig (ThreadCount 1) logControls
+  putStrLn "########## Log ##########"
+  atomically logList >>= mapM_ pPrint
 
 -- ############### Test Case ###################
 
@@ -79,19 +104,20 @@ fsDocDemoSimple =
 
 -- ################### 2. FS App with full runtime ##################
 
+{-
+OH THE HUMANITY !!!
+1. log scrambling
+ 1.1 - take unhandled excption out of the picture in demo - FAILED STILL SCRABLED
+ 1.2 - switch off filter log (execute -> executeWithoutValidation) - FAILED STILL SCRABLED
+ 1.3 - log outfull channel 
+2. exception not handled
+3. laziness not working
+-}
+
 fsSuiteDemo :: IO ()
 fsSuiteDemo = runDemo docRunner fsSuite
 
--- 1. log scrambling
--- 2. exception not handled
--- 3. laziness not working
-
--- TODO: EXception not handled !!!!!!!
 -- >>> fsSuiteDemo
--- *** Exception: 
--- Exception thrown in step documentation.
---   Value forced from function: 'findFilesWith' in documentation mode.
---   Use  docVal, docHush, docVoid, docVal' to replace or silence this value from where the step is called: 'findFilesWith'
 
 -- TODO: fix filter log
 fsSuite :: Suite
@@ -106,7 +132,7 @@ getFail = pure $ error "This is an error !!! "
 
 fsAction :: (FileSystem :> es, Out NodeEvent :> es) => RunConfig -> FSData -> Eff es FSAS
 fsAction _rc i = do
-  getFail
+  -- getFail
   paths <- getPaths
   log i.title
   chkPathsThatDoesNothing paths
@@ -120,7 +146,7 @@ data FSData = FSItem
   deriving (Show, Read)
 
 {- 
-TODO: compile error example
+TODO: make better compile error example
 data FSData = FSItem
   { id :: Int,
     title :: Text,

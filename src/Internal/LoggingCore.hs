@@ -5,7 +5,7 @@ import BasePrelude qualified as P
 import CoreUtils qualified as C
 import Effectful.Concurrent.STM (TQueue)
 import Text.Show.Pretty (pPrint)
-import UnliftIO (concurrently_, finally, newIORef)
+import UnliftIO ( concurrently_, finally, newIORef, tryReadTQueue )
 import UnliftIO.Concurrent (ThreadId)
 import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
 import Prelude hiding (atomically, lines)
@@ -62,7 +62,16 @@ data LogControls l lx = LogControls
     stopWorker :: IO ()
   }
 
-testLogControls' :: forall l lx. (Show lx) => (C.ThreadId -> Int -> l -> lx) -> Bool -> IO (LogControls l lx, TQueue lx)
+
+q2List :: TQueue a -> STM [a]
+q2List qu = reverse <$> recurse [] qu
+  where
+    recurse :: [a] -> TQueue a -> STM [a]
+    recurse l q =
+      tryReadTQueue q
+        >>= maybe (pure l) (\e -> recurse (e : l) q)
+
+testLogControls' :: forall l lx. (Show lx) => (C.ThreadId -> Int -> l -> lx) -> Bool -> IO (LogControls l lx, STM [lx])
 testLogControls' aggregator wantConsole = do
   chn <- newTChanIO
   log <- newTQueueIO
@@ -84,4 +93,4 @@ testLogControls' aggregator wantConsole = do
           writeTChan chn $ Just eventLog
           writeTQueue log eventLog
 
-  pure (LogControls {..}, log)
+  pure (LogControls {..}, q2List log)

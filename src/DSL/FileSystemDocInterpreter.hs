@@ -15,7 +15,7 @@ import DSL.FileSystemEffect (FileSystem (..))
 import Path.Extended (Path, toFilePath)
 import PyrethrumExtras (toS, txt, (?))
 import Effectful.Dispatch.Dynamic (LocalEnv, interpret)
-import DSL.DocInterpreterUtils (docErr, docErr2, docErr3, docErr4)
+import DSL.DocInterpreterUtils (docErr, docErr2, docErr3, docErr4, docErrn')
 import DSL.Internal.NodeEvent (NodeEvent)
 
 -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
@@ -36,12 +36,16 @@ runFileSystem =
       -- todo: rename all variables / separate type signatures by using the other templateHaskell method
       WithCurrentDir _path _action -> docErr "withCurrentDir" "run action in current working directory"
       FindFilesWith _predicate searchDirs targetFileName ->
-        docErr4
+        -- docErr4
+        --   "findFilesWith"
+        --   "find all files that match the file name:"
+        --   (showPath targetFileName)
+        --   "and satisfy the given predicate in directories:"
+        --   (showPaths searchDirs)
+        docErrn'
           "findFilesWith"
-          "find all files that match the file name:"
-          (showPath targetFileName)
-          "and satisfy the given predicate in directories:"
-          (showPaths searchDirs)
+          ["find all files that match the file name:", showPath targetFileName, "and satisfy the given predicate in directories:", showPaths searchDirs]
+          []
       FindFileWith _predicate searchDirs targetFileName ->
         docErr4
           "findFileWith"

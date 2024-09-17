@@ -99,7 +99,7 @@ bug :: Text -> a
 bug t = PR.bug (error t :: SomeException)
 
 logging :: Logging
-logging = LogFails
+logging = Log
 
 {- each and once hooks will always run but thread hooks may be empty
    due to subitems being stolen by another thread. We need to ensure
@@ -889,7 +889,7 @@ execute wantLog baseRandomSeed threadLimit templates = do
 exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [Log ExePath AE.NodeEvent]
 exeTemplate wantLog baseRandomSeed maxThreads templates = do
   let wantLog' = wantLog == Log
-  (lc, logQ) <- testLogControls wantLog'
+  (lc, logLst) <- testLogControls wantLog'
   when (wantLog' || wantLog == LogTemplate) $ do
     putStrLn "#### Template ####"
     pPrint templates
@@ -901,15 +901,7 @@ exeTemplate wantLog baseRandomSeed maxThreads templates = do
     putStrLn "========="
     putStrLn "#### Log ####"
   executeWithoutValidation maxThreads lc nodes
-  atomically $ q2List logQ
-
-q2List :: TQueue a -> STM [a]
-q2List qu = reverse <$> recurse [] qu
-  where
-    recurse :: [a] -> TQueue a -> STM [a]
-    recurse l q =
-      tryReadTQueue q
-        >>= maybe (pure l) (\e -> recurse (e : l) q)
+  atomically logLst
 
 loadTQueue :: TQueue a -> [a] -> STM ()
 loadTQueue q = traverse_ (writeTQueue q)

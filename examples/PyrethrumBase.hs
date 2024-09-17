@@ -34,7 +34,7 @@ import Effectful (Eff, IOE, runEff, type (:>))
 import Filter (Filters)
 import Internal.Logging qualified as L
 import Internal.LoggingCore qualified as L
-import Internal.SuiteRuntime (ThreadCount, execute)
+import Internal.SuiteRuntime (ThreadCount, execute, executeWithoutValidation)
 import PyrethrumConfigTypes as CG
   ( Country (..),
     Depth (..),
@@ -47,6 +47,10 @@ import PyrethrumConfigTypes as CG
 import WebDriverDocInterpreter qualified as WDDoc (runWebDriver)
 import WebDriverEffect (WebUI (..))
 import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
+import Prepare (prepare, PreNode)
+import PyrethrumExtras (txt)
+import Internal.SuiteValidation (SuiteValidationError)
+import Internal.SuiteFiltering (FilteredSuite(..))
 
 --  these will probably be split off and go into core or another library
 -- module later
@@ -72,15 +76,31 @@ ioInterpreter ap =
     & runEff
 
 
+-- docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
+-- docRunner suite filters runConfig threadCount logControls =
+--   execute threadCount logControls $
+--     C.MkSuiteExeParams
+--       { interpreter = docInterpreter,
+--         suite = mkCoreSuite suite,
+--         filters,
+--         runConfig
+--       }
+
 docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
 docRunner suite filters runConfig threadCount logControls =
-  execute threadCount logControls $
-    C.MkSuiteExeParams
+  prepared & either 
+    print
+    (\s -> executeWithoutValidation threadCount logControls s.suite)
+  where 
+    prepared :: Either SuiteValidationError (FilteredSuite (PreNode IO ()))
+    prepared = prepare $ C.MkSuiteExeParams
       { interpreter = docInterpreter,
         suite = mkCoreSuite suite,
         filters,
         runConfig
       }
+ 
+
 
 ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
 ioRunner suite filters runConfig threadCount logControls =
@@ -102,18 +122,6 @@ docInterpreter ap =
 
 
 
--- TODO - interpreters into own module
--- Need to fix up to work in with logcontrols
--- there are currently 2 paths to STD out I think ??
-runIOOut :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
-runIOOut = runOut print
-
--- in doc mode we supress log
-runDocOut :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
-runDocOut =
-  runOut $ \case
-    AE.Framework l -> print l
-    AE.User _l -> pure ()
 
 {-
 runErrorIO :: forall a e es. Exception e => Eff (Error e : es) a -> Eff es (Either (CallStack, SomeException) a)

@@ -14,6 +14,7 @@ import Filter (FilterResult)
 import Internal.LoggingCore
 import PyrethrumExtras as PE (head, tail, (?))
 import Prelude hiding (atomically, lines)
+import UnliftIO (tryReadTQueue)
 
 type Log l a = BaseLog LogContext (Event l a)
 
@@ -89,7 +90,7 @@ data FailPoint = FailPoint
 mkFailure :: l -> NodeType -> SomeException -> Event l a
 mkFailure loc nodeType exception = Failure {exception = C.exceptionTxt exception, ..}
 
-data Event l a
+data Event loc evnt
   = FilterLog
       { filterResuts :: [FilterResult Text]
       }
@@ -100,30 +101,30 @@ data Event l a
   | StartExecution
   | Start
       { nodeType :: NodeType,
-        loc :: l
+        loc :: loc
       }
   | End
       { nodeType :: NodeType,
-        loc :: l
+        loc :: loc
       }
   | Failure
       { nodeType :: NodeType,
-        loc :: l,
+        loc :: loc,
         exception :: C.PException
       }
   | ParentFailure
-      { loc :: l,
+      { loc :: loc,
         nodeType :: NodeType,
-        failLoc :: l,
+        failLoc :: loc,
         failSuiteEvent :: NodeType
       }
   | NodeEvent
-      { event :: a
+      { event :: evnt
       }
   | EndExecution
   deriving (Show)
 
-testLogControls :: forall l a. (Show a, Show l) => Bool -> IO (LogControls (Event l a) (Log l a), TQueue (Log l a))
+testLogControls :: forall l a. (Show a, Show l) => Bool -> IO (LogControls (Event l a) (Log l a), STM [Log l a])
 testLogControls = testLogControls' expandEvent
 
 -- -- NodeEvent (a) a loggable event generated from within a node

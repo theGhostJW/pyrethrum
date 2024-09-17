@@ -5,7 +5,8 @@ module DSL.DocInterpreterUtils (
   docErr2,
   docErr3,
   docErr4,
-  docErrn
+  docErrn,
+  docErrn'
 ) where
 
 import DSL.Out ( out, Out )
@@ -53,6 +54,8 @@ docErrn funcName dscFrags =
     -- TODO :: replace this later when have code to process call
     -- stack right now out of the box call handling looks better
     -- E.throwError . DocException $
+    pure $ error ""
+    {-
     pure . error $
       "\nException thrown in step documentation."
         <> "\n  Value forced from function: '"
@@ -62,6 +65,15 @@ docErrn funcName dscFrags =
         <> " to replace or silence this value from where the step is called: '"
         <> funcName
         <> "'"
+        -}
+
+docErrn' :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es{- , E.Error DocException :> es -}) => Text -> [Text] -> a -> Eff es a
+docErrn' funcName dscFrags mockValue =
+  do
+    let funcDesc = T.intercalate " " dscFrags
+    logStep funcDesc
+    pure mockValue
+   
 
 docErr :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es{- , E.Error DocException :> es -}) => Text -> Text -> Eff es a
 docErr funcName funcDesc = docErrn funcName [funcDesc]

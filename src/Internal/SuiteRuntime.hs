@@ -46,15 +46,14 @@ execute tc lc prms =
   L.runWithLogger lc execute'
   where
     execute' :: L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> IO ()
-    execute' l =
+    execute' l@L.MkLoggerSource{rootLogger} =
       do
-        let log = l.rootLogger
         P.prepare prms
           & either
-            (\Failure {failure, notes} -> log $ L.SuiteInitFailure failure notes)
+            (\Failure {failure, notes} -> rootLogger $ L.SuiteInitFailure failure notes)
             ( \validated ->
                 do
-                  log $ L.FilterLog validated.filterResults
+                  rootLogger $ L.FilterLog validated.filterResults
                   executeNodeList tc l validated.suite
             )
 

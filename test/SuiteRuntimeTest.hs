@@ -65,7 +65,7 @@ unit_simple_fail :: IO ()
 unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fixture [test Pass, test Fail]]]
 
 
--- $> unit_nested_pass_fail
+-- >>> unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
   runTest

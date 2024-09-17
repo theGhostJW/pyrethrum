@@ -82,7 +82,7 @@ executeNodes L.MkLoggerSource {rootLogger, newLogger} nodes tc =
 data ExeTree hi where
   OnceBefore ::
     { path :: L.ExePath,
-      before :: P.ApEventSink -> hi -> IO ho,
+      before :: P.LogSink -> hi -> IO ho,
       beforeStatus :: TVar BeforeStatus,
       cache :: TMVar (Either L.FailPoint ho),
       subNodes :: ChildQ (ExeTree ho)
@@ -90,56 +90,56 @@ data ExeTree hi where
     ExeTree hi
   OnceAround ::
     { path :: L.ExePath,
-      setup :: P.ApEventSink -> hi -> IO ho,
+      setup :: P.LogSink -> hi -> IO ho,
       status :: TVar AroundStatus,
       cache :: TMVar (Either L.FailPoint ho),
       subNodes :: ChildQ (ExeTree ho),
-      teardown :: P.ApEventSink -> ho -> IO ()
+      teardown :: P.LogSink -> ho -> IO ()
     } ->
     ExeTree hi
   OnceAfter ::
     { path :: L.ExePath,
       status' :: TVar AfterStatus,
       subNodes' :: ChildQ (ExeTree hi),
-      after :: P.ApEventSink -> IO ()
+      after :: P.LogSink -> IO ()
     } ->
     ExeTree hi
   ThreadBefore ::
     { path :: L.ExePath,
-      before :: P.ApEventSink -> hi -> IO ho,
+      before :: P.LogSink -> hi -> IO ho,
       subNodes :: ChildQ (ExeTree ho)
     } ->
     ExeTree hi
   ThreadAround ::
     { path :: L.ExePath,
-      setup :: P.ApEventSink -> hi -> IO ho,
+      setup :: P.LogSink -> hi -> IO ho,
       subNodes :: ChildQ (ExeTree ho),
-      teardown :: P.ApEventSink -> ho -> IO ()
+      teardown :: P.LogSink -> ho -> IO ()
     } ->
     ExeTree hi
   ThreadAfter ::
     { path :: L.ExePath,
       subNodes' :: ChildQ (ExeTree hi),
-      after :: P.ApEventSink -> IO ()
+      after :: P.LogSink -> IO ()
     } ->
     ExeTree hi
   EachBefore ::
     { path :: L.ExePath,
-      before :: P.ApEventSink -> hi -> IO ho,
+      before :: P.LogSink -> hi -> IO ho,
       subNodes :: ChildQ (ExeTree ho)
     } ->
     ExeTree hi
   EachAround ::
     { path :: L.ExePath,
-      setup :: P.ApEventSink -> hi -> IO ho,
+      setup :: P.LogSink -> hi -> IO ho,
       subNodes :: ChildQ (ExeTree ho),
-      teardown :: P.ApEventSink -> ho -> IO ()
+      teardown :: P.LogSink -> ho -> IO ()
     } ->
     ExeTree hi
   EachAfter ::
     { path :: L.ExePath,
       subNodes' :: ChildQ (ExeTree hi),
-      after :: P.ApEventSink -> IO ()
+      after :: P.LogSink -> IO ()
     } ->
     ExeTree hi
   Fixture ::
@@ -581,10 +581,10 @@ runNode ::
 runNode lgr hi xt =
   run hi xt
   where
-    logRun' :: NodeType -> (P.ApEventSink -> IO b) -> IO (Either L.FailPoint b)
+    logRun' :: NodeType -> (P.LogSink -> IO b) -> IO (Either L.FailPoint b)
     logRun' et action = logRun lgr xt.path et (action sink)
 
-    logRun_ :: NodeType -> (P.ApEventSink -> IO b) -> IO ()
+    logRun_ :: NodeType -> (P.LogSink -> IO b) -> IO ()
     logRun_ et action = void $ logRun' et action
 
     logAbandonned_ :: NodeType -> L.FailPoint -> IO ()
@@ -607,7 +607,7 @@ runNode lgr hi xt =
     invalidTree :: Text -> Text -> IO QElementRun
     invalidTree input cst = bug @Void . error $ input <> " >>> should not be passed to >>> " <> cst <> "\n" <> txt xt.path
 
-    sink :: P.ApEventSink
+    sink :: P.LogSink
     sink = lgr . L.NodeEvent
 
     runTestsWithEachContext :: forall ti. IO (TestContext ti) -> TestSource ti -> IO QElementRun
@@ -692,25 +692,25 @@ runNode lgr hi xt =
     singleton' :: forall a. TMVar a -> IO a -> a -> IO a
     singleton' tCache ioa = const $ singleton tCache ioa
 
-    runThreadSetup :: forall i o. TMVar (Either L.FailPoint o) -> NodeType -> (P.ApEventSink -> i -> IO o) -> Either L.FailPoint i -> IO (Either L.FailPoint o)
+    runThreadSetup :: forall i o. TMVar (Either L.FailPoint o) -> NodeType -> (P.LogSink -> i -> IO o) -> Either L.FailPoint i -> IO (Either L.FailPoint o)
     runThreadSetup tCache evnt setup eti = do
       -- a singleton to avoid running empty subnodes (could happen if another thread finishes child list)
       -- no need for thread synchronisation as this happpens within a thread
       singleton tCache $ runSetup evnt setup eti
 
-    runSetup :: forall i o. NodeType -> (P.ApEventSink -> i -> IO o) -> Either L.FailPoint i -> IO (Either L.FailPoint o)
+    runSetup :: forall i o. NodeType -> (P.LogSink -> i -> IO o) -> Either L.FailPoint i -> IO (Either L.FailPoint o)
     runSetup evnt setup =
       either
         (logAbandonned' evnt)
         (logRun' evnt . flip setup)
 
-    runThreadTeardown :: forall i. TMVar (Either L.FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
+    runThreadTeardown :: forall i. TMVar (Either L.FailPoint i) -> (P.LogSink -> i -> IO ()) -> IO ()
     runThreadTeardown = runPostThread L.Teardown
 
-    runThreadAfter :: TMVar (Either L.FailPoint ()) -> (P.ApEventSink -> IO ()) -> IO ()
+    runThreadAfter :: TMVar (Either L.FailPoint ()) -> (P.LogSink -> IO ()) -> IO ()
     runThreadAfter tCache after = runPostThread L.After tCache (\s _i -> after s)
 
-    runPostThread :: forall i. HookPos -> TMVar (Either L.FailPoint i) -> (P.ApEventSink -> i -> IO ()) -> IO ()
+    runPostThread :: forall i. HookPos -> TMVar (Either L.FailPoint i) -> (P.LogSink -> i -> IO ()) -> IO ()
     runPostThread hp tCache teardown = do
       -- unless ()
       mho <- atomically $ tryReadTMVar tCache

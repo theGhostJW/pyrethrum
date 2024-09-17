@@ -1113,7 +1113,7 @@ mkVoidAction path spec =
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
-mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.ApEventSink -> hi -> IO ()
+mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.LogSink -> hi -> IO ()
 mkAction path s _sink _in = mkVoidAction path s
 
 mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO ()]

@@ -2,7 +2,7 @@
 
 module Prepare
   ( PreNode (..),
-    ApEventSink,
+    LogSink,
     Test (..),
     prepare,
     listPaths,
@@ -54,7 +54,7 @@ data PreNode m hi where
   Before ::
     { path :: Path,
       frequency :: Hz,
-      action :: ApEventSink -> hi -> m o,
+      action :: LogSink -> hi -> m o,
       subNodes :: [PreNode m o]
     } ->
     PreNode m hi
@@ -62,15 +62,15 @@ data PreNode m hi where
     { path :: Path,
       frequency :: Hz,
       subNodes' :: [PreNode m hi],
-      after :: ApEventSink -> m ()
+      after :: LogSink -> m ()
     } ->
     PreNode m hi
   Around ::
     { path :: Path,
       frequency :: Hz,
-      setup :: ApEventSink -> hi -> m o,
+      setup :: LogSink -> hi -> m o,
       subNodes :: [PreNode m o],
-      teardown :: ApEventSink -> o -> m ()
+      teardown :: LogSink -> o -> m ()
     } ->
     PreNode m hi
   Fixture ::
@@ -81,7 +81,7 @@ data PreNode m hi where
     } ->
     PreNode m hi
 
-type ApEventSink = NodeEvent -> IO ()
+type LogSink = NodeEvent -> IO ()
 
 -- used in debugging
 listPaths :: forall m hi. PreNode m hi -> [(Int, Path)]
@@ -103,7 +103,7 @@ listPaths =
 data Test m hi = MkTest
   { id :: Int,
     title :: Text,
-    action :: ApEventSink -> hi -> m ()
+    action :: LogSink -> hi -> m ()
   }
 
 prepSuiteElm :: forall m rc fc hi. (HasCallStack, C.Config rc, C.Config fc) => 
@@ -175,20 +175,20 @@ prepSuiteElm interpreter rc suiteElm =
         run :: forall a. C.Node m rc fc a -> PreNode IO a
         run = prepSuiteElm interpreter rc 
 
-        intprt :: forall a. ApEventSink -> m a -> IO a
+        intprt :: forall a. LogSink -> m a -> IO a
         intprt snk a = catchLog snk $ interpreter a
     C.Fixture {path, fixture} -> prepareTest interpreter rc  path fixture
 
-flog :: (HasCallStack) => ApEventSink -> FrameworkLog -> IO ()
+flog :: (HasCallStack) => LogSink -> FrameworkLog -> IO ()
 flog sink = sink . Framework
 
-catchLog :: forall a. (HasCallStack) => ApEventSink -> IO a -> IO a
+catchLog :: forall a. (HasCallStack) => LogSink -> IO a -> IO a
 catchLog as io = tryAny io >>= either (logThrow as) pure
 
-logThrow :: (HasCallStack) => ApEventSink -> SomeException -> IO a
+logThrow :: (HasCallStack) => LogSink -> SomeException -> IO a
 logThrow sink ex = sink (exceptionEvent ex callStack) >> throwIO ex
 
-unTry :: forall a. ApEventSink -> Either SomeException a -> IO a
+unTry :: forall a. LogSink -> Either SomeException a -> IO a
 unTry es = either (logThrow es) pure
 
 
@@ -258,13 +258,13 @@ prepareTest interpreter rc path =
     applyParser :: forall as ds. ((HasCallStack) => as -> Either C.ParseException ds) -> as -> Either SomeException ds
     applyParser parser as = mapLeft toException $ parser as
 
-    runAction :: forall i as ds. (C.Item i ds) => ApEventSink -> (i -> m as) -> i -> IO as
+    runAction :: forall i as ds. (C.Item i ds) => LogSink -> (i -> m as) -> i -> IO as
     runAction snk action i =
       do
         flog snk . Action path . ItemText $ txt i
         catchLog snk . interpreter $ action i
 
-    runTest :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> ((HasCallStack) => as -> Either C.ParseException ds) -> i -> ApEventSink -> IO ()
+    runTest :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> ((HasCallStack) => as -> Either C.ParseException ds) -> i -> LogSink -> IO ()
     runTest action parser i snk =
       do
         ds <- tryAny
@@ -274,11 +274,11 @@ prepareTest interpreter rc path =
             unTry snk $ applyParser parser as
         applyChecks snk path i.checks ds
 
-    runDirectTest :: forall i ds. (C.Item i ds) => (i -> m ds) -> i -> ApEventSink -> IO ()
+    runDirectTest :: forall i ds. (C.Item i ds) => (i -> m ds) -> i -> LogSink -> IO ()
     runDirectTest action i snk =
       tryAny (runAction snk action i) >>= applyChecks snk path i.checks
 
-applyChecks :: forall ds. (Show ds) => ApEventSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
+applyChecks :: forall ds. (Show ds) => LogSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
 applyChecks snk p chks =
   either
     ( \e -> do

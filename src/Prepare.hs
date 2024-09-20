@@ -178,7 +178,7 @@ prepSuiteElm interpreter rc suiteElm =
     C.Fixture {path, fixture} -> prepareTest interpreter rc  path fixture
 
 flog :: (HasCallStack) => LogSink -> FrameworkLog -> IO ()
-flog sink = sink . force . Framework
+flog sink = sink . Framework
 
 catchLog :: forall a. (HasCallStack) => LogSink -> IO a -> IO a
 catchLog as io = tryAny io >>= either (logThrow as) pure

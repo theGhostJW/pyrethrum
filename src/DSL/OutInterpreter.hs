@@ -14,4 +14,6 @@ runOut :: (IOE :> es, NFData a) => (a -> IO ()) -> Eff (Out a : es) b -> Eff es 
 runOut sink = 
   evalStaticRep . Out $ Sink forcedSink
   where 
-    forcedSink = sink . force
+    forcedSink !a = sink a
+
+

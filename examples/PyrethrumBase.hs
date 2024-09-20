@@ -33,7 +33,6 @@ import DSL.OutInterpreter ( runOut )
 import Effectful (Eff, IOE, runEff, type (:>))
 import Filter (Filters)
 import Internal.Logging qualified as L
-import Internal.LoggingCore qualified as L
 import Internal.SuiteRuntime (ThreadCount, execute, executeWithoutValidation)
 import PyrethrumConfigTypes as CG
   ( Country (..),

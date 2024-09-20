@@ -16,6 +16,7 @@ import Filter (Filters (..))
 import Internal.Logging qualified as L
 import Internal.SuiteRuntime (ThreadCount (..))
 import Path as P (Path, reldir, toFilePath)
+import DSL.Logging
 import PyrethrumBase
     ( SuiteRunner,
       Suite,
@@ -56,12 +57,7 @@ docDemo = runDemo docRunner
 
 -- ############### Test Case ###################
 
--- TODO: repeated code - refactor
-logShow :: (HasLog es, Show a) => a -> Eff es ()
-logShow = out . User . Log . txt
 
-log :: (HasLog es) => Text -> Eff es ()
-log = out . User . Log
 
 -- copied from FileSystemDocDemo.hs
 
@@ -151,7 +147,6 @@ data FSData = FSItem
   deriving (Show, Read)
 -}
 
-
 newtype FSAS = FSAS
   { paths :: [P.Path Abs File]
   }
@@ -182,15 +177,12 @@ fsItems _rc =
 docWebDriverDemo :: IO ()
 docWebDriverDemo = runDemo docRunner webDriverSuite
 
--- $> docWebDriverDemo
--- *** Exception: 
--- Exception thrown in step documentation.
---   Value forced from function: 'driverStatus' in documentation mode.
---   Use  docVal, docHush, docVoid, docVal' to replace or silence this value from where the step is called: 'driverStatus'
 
 webDriverSuite :: Suite
 webDriverSuite =
   [Fixture (NodePath "WebDriverDemo" "test") test]
+
+-- >>> docWebDriverDemo
 
 test :: Fixture ()
 test = Full config action parse items
@@ -215,7 +207,6 @@ _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-c
 action :: (WebUI :> es, Out NodeEvent :> es) => RunConfig -> Data -> Eff es AS
 action _rc i = do
   log $ "test title is: " <> i.title
-  error "BANG"
   status <- driver_status
   log $ "the driver status is (from root): " <> txt status
   ses <- newSession

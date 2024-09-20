@@ -44,9 +44,9 @@ import Internal.Logging as L
     parentPath,
     testLogControls,
     topPath,
+    BaseLog (..),
     LogContext (..)
   )
-import Internal.LoggingCore (BaseLog (..))
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
 import PyrethrumExtras (ConvertString, onError, toS, txt, (?))

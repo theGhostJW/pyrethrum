@@ -5,7 +5,6 @@ import CoreUtils (Hz (..))
 import DSL.Internal.NodeEvent qualified as AE
 import Internal.Logging (HookPos (..), NodeType (..))
 import Internal.Logging qualified as L
-import Internal.LoggingCore qualified as L
 import Internal.SuiteFiltering (FilteredSuite (..))
 import Internal.SuiteValidation (SuiteValidationError (..))
 import Prepare qualified as P

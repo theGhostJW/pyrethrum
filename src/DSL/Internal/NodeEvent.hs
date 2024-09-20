@@ -8,10 +8,19 @@ import PyrethrumExtras (toS)
 type LogSink = NodeEvent -> IO ()
 -- TODO: Note plugin
 {-
-NodeEvent is a data type that represents events emitted by or from WITHIN a node (ie. a Hook or a Fixture) 
-This is distinct from the EngineEvent data type which marks the BOUNDARIES of and events related to the nodes
-themselves (such as the start and end of a Hook or skipping a Fixture)
+NodeEvent is a data type that represents specfic types of events loggged from WITHIN a node (ie. a Hook or a Fixture) 
+eg. 
+  - starting a test action
+  - executing checks
+  - user logs
 
+This is distinct from the Events emited by the Suite Runtime that mark the boundaries of these actions
+eg. 
+  - start of test
+  - end of hook
+  - filter log
+  - end suite execution
+  
 User UserLog -> ad hoc logging implemented by users of the framework
 Framework FrameworkLog -> internal events from within a test or hook such as the start of a test phase such as action, parse and checks
 -}

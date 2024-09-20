@@ -1,7 +1,7 @@
 module Core where
 
 import Check (Checks)
-import DSL.Internal.NodeEvent hiding (Check)
+import DSL.Internal.NodeEvent ( LogSink, Path )
 import Data.Aeson (ToJSON (..))
 import GHC.Records (HasField)
 import CoreUtils (Hz (..))

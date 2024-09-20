@@ -124,7 +124,7 @@ data Event loc evnt
   | EndExecution
   deriving (Show, Generic, NFData)
 
-testLogControls :: forall l a. (Show a, Show l, NFData l, NFData a, NFData (Log l a)) => Bool -> IO (LogControls (Event l a) (Log l a), STM [Log l a])
+testLogControls :: forall l a. (Show a, Show l, NFData l, NFData a) => Bool -> IO (LogControls (Event l a) (Log l a), STM [Log l a])
 testLogControls = testLogControls' expandEvent
 
 -- -- NodeEvent (a) a loggable event generated from within a node

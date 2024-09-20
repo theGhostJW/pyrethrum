@@ -21,16 +21,15 @@ import DSL.Internal.NodeEvent
     DStateText (DStateText),
     FrameworkLog (Action, Check, CheckStart, Parse, SkipedCheckStart),
     ItemText (ItemText),
-    NodeEvent (Framework, User),
+    NodeEvent (Framework),
     Path,
-    exceptionEvent, LogSink, UserLog (Log),
+    exceptionEvent, LogSink,
   )
 import Data.Either.Extra (mapLeft)   -- ToDO: move to Pyrelude
 import Internal.SuiteFiltering (FilteredSuite (..), filterSuite)
 import Internal.SuiteValidation (SuiteValidationError (..), chkSuite)
 import PyrethrumExtras (txt)
 import UnliftIO.Exception (tryAny)
-import Data.Text.IO as IOT (putStrLn)
 
 -- TODO Full E2E property tests from Core fixtures and Hooks --> logs
 -- can reuse some suiteruntime chks

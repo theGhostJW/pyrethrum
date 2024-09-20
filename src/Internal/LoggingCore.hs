@@ -13,7 +13,7 @@ import BasePrelude qualified as P
 import CoreUtils qualified as C
 import Effectful.Concurrent.STM (TQueue)
 import Text.Show.Pretty (pPrint)
-import UnliftIO ( concurrently_, finally, newIORef, tryReadTQueue, tryAny )
+import UnliftIO ( concurrently_, finally, newIORef, tryReadTQueue )
 import UnliftIO.Concurrent (ThreadId)
 import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
 import Prelude hiding (atomically, lines)

@@ -182,6 +182,10 @@ webDriverSuite :: Suite
 webDriverSuite =
   [Fixture (NodePath "WebDriverDemo" "test") test]
 
+-- todo experiment with hooks (laziness)
+-- altrenative prenode for documantation
+-- Doc log and doc mock to make work
+
 -- >>> docWebDriverDemo
 
 test :: Fixture ()

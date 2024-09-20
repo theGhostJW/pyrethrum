@@ -9,9 +9,10 @@ import Internal.LoggingCore qualified as L
 import Internal.SuiteFiltering (FilteredSuite (..))
 import Internal.SuiteValidation (SuiteValidationError (..))
 import Prepare qualified as P
-import PyrethrumExtras (catchAll, txt, (?))
+import PyrethrumExtras (txt, (?))
 import UnliftIO
-  ( finally,
+  ( tryAny, 
+    finally,
     forConcurrently_,
     writeTMVar,
   )
@@ -29,7 +30,6 @@ import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar
 
 {-
 todo :: define defect properties with sum type type and typeclass which returns defect info
-
 -}
 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
@@ -1108,14 +1108,16 @@ tryLock canLock hs cq lockedStatus =
 tryLockIO :: (s -> CanRun -> Bool) -> TVar s -> ChildQ a -> s -> IO Bool
 tryLockIO canLock hs cq lockedStatus = atomically $ tryLock canLock hs cq lockedStatus
 
+--  debugging only
+log :: (L.Event loc AE.NodeEvent -> c) -> Text -> c
+log lgr = lgr . L.NodeEvent . AE.User . AE.Log
+
 logRun :: Logger -> L.ExePath -> NodeType -> IO b -> IO (Either L.FailPoint b)
 logRun lgr path evt action = do
   lgr $ L.Start evt path
   finally
-    ( catchAll
-        -- TODO :: test for strictness issues esp with failing thread hook
-        -- eg returns handle and handle is closed
-        (Right <$> action)
-        (logReturnFailure lgr path evt)
-    )
+    do 
+      log lgr $ "!!!!!!!!!!!!!!!!!! RUNNING " <> txt evt <> " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+      r <- tryAny action 
+      r & either (logReturnFailure lgr path evt) (pure . Right)
     (lgr $ L.End evt path)

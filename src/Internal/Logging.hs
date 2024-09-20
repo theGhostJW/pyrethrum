@@ -9,12 +9,10 @@ import CoreUtils qualified as C
 import DSL.Internal.NodeEvent qualified as NE
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import Data.Text as T (intercalate)
-import Effectful.Concurrent.STM (TQueue)
 import Filter (FilterResult)
 import Internal.LoggingCore
 import PyrethrumExtras as PE (head, tail, (?))
 import Prelude hiding (atomically, lines)
-import UnliftIO (tryReadTQueue)
 
 type Log l a = BaseLog LogContext (Event l a)
 

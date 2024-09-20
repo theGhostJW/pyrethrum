@@ -21,15 +21,16 @@ import DSL.Internal.NodeEvent
     DStateText (DStateText),
     FrameworkLog (Action, Check, CheckStart, Parse, SkipedCheckStart),
     ItemText (ItemText),
-    NodeEvent (Framework),
+    NodeEvent (Framework, User),
     Path,
-    exceptionEvent, LogSink,
+    exceptionEvent, LogSink, UserLog (Log),
   )
-import Data.Either.Extra (mapLeft)
+import Data.Either.Extra (mapLeft)   -- ToDO: move to Pyrelude
 import Internal.SuiteFiltering (FilteredSuite (..), filterSuite)
 import Internal.SuiteValidation (SuiteValidationError (..), chkSuite)
 import PyrethrumExtras (txt)
 import UnliftIO.Exception (tryAny)
+import Data.Text.IO as IOT (putStrLn)
 
 -- TODO Full E2E property tests from Core fixtures and Hooks --> logs
 -- can reuse some suiteruntime chks
@@ -180,6 +181,10 @@ prepSuiteElm interpreter rc suiteElm =
 flog :: (HasCallStack) => LogSink -> FrameworkLog -> IO ()
 flog sink = sink . Framework
 
+-- Debugging only
+log :: (HasCallStack) => LogSink -> Text -> IO ()
+log sink = sink . User . Log
+
 catchLog :: forall a. (HasCallStack) => LogSink -> IO a -> IO a
 catchLog as io = tryAny io >>= either (logThrow as) pure
 
@@ -267,8 +272,14 @@ prepareTest interpreter rc path =
       do
         ds <- tryAny
           do
+            log snk "******************** Running action *****************"
             as <- runAction snk action i
+            log snk "******************** Action Run *****************"
+            log snk "******************** Logging AP State *****************"
+            -- TODO: special Mode for doc Don't log Ap State
+            IOT.putStrLn $ "Logging AP State " <> txt as
             flog snk . Parse path . ApStateText $ txt as
+            log snk "******************** AP State Logged *****************"
             unTry snk $ applyParser parser as
         applyChecks snk path i.checks ds
 

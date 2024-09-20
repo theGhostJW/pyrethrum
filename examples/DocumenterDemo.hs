@@ -4,21 +4,17 @@ module DocumenterDemo where
 
 import Check
 import Core (ParseException)
-import DSL.FileSystemDocInterpreter qualified as FDoc
 import DSL.FileSystemEffect
-import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log), LogSink)
+import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log))
 import DSL.OutEffect (Out, out)
 import Data.Text (isInfixOf)
 import Effectful as EF
   ( Eff,
-    IOE,
-    runEff,
     type (:>),
   )
 import Filter (Filters (..))
 import Internal.Logging qualified as L
 import Internal.SuiteRuntime (ThreadCount (..))
-import Text.Show.Pretty (pPrint)
 import Path as P (Path, reldir, toFilePath)
 import PyrethrumBase
     ( SuiteRunner,
@@ -46,7 +42,6 @@ import WebDriverEffect
       killSession )
 import WebDriverPure (seconds)
 import WebDriverSpec (DriverStatus (..), Selector (CSS))
-import DSL.OutInterpreter (runOut)
 
 
 runDemo :: SuiteRunner -> Suite -> IO ()
@@ -55,6 +50,9 @@ runDemo runner suite = do
   runner suite Unfiltered defaultRunConfig (ThreadCount 1) logControls
   -- putStrLn "########## Log ##########"
   -- atomically logList >>= mapM_ pPrint
+
+docDemo :: Suite -> IO ()
+docDemo = runDemo docRunner
 
 -- ############### Test Case ###################
 
@@ -81,7 +79,6 @@ getPaths =
     isDeleteMe :: P.Path Abs File -> Eff es Bool
     isDeleteMe = pure . isInfixOf "deleteMe" . toS . P.toFilePath
 
--- ######## 1. This has the behaviour we are after with a simple local interpreter ########
 
 chkPathsThatDoesNothing :: [P.Path Abs File] -> Eff es ()
 chkPathsThatDoesNothing _ = pure ()
@@ -92,22 +89,8 @@ fsDemoAp = do
   paths <- getPaths
   chkPathsThatDoesNothing paths
 
-fsDocDemoSimple :: LogSink -> IO ()
-fsDocDemoSimple sink =
-  --  docInterpreter fsDemoAp
-  docRun fsDemoAp
-  where
-    docRun :: Eff '[FileSystem, Out NodeEvent, IOE] a -> IO a
-    docRun = runEff . runOut sink . FDoc.runFileSystem
 
--- TODO:: FIX
--- >>> fsDocDemoSimple
--- No instance for `Show (LogSink -> IO ())'
---   arising from a use of `evalPrint'
---   (maybe you haven't applied a function to enough arguments?)
--- In a stmt of an interactive GHCi command: evalPrint it_a1YYG
-
--- ################### 2. FS App with full runtime ##################
+-- ################### 1. FS App with full runtime ##################
 
 {-
 OH THE HUMANITY !!!
@@ -116,12 +99,14 @@ OH THE HUMANITY !!!
  1.2 - switch off filter log (execute -> executeWithoutValidation) - FAILED STILL SCRABLED
  1.3 - log outfull channel  :: FIXED with use of proper interpreter
 2. exception not handled
-  - reinstate exception for doc
+  - reinstate exception for doc :: DONE
+  - its the lazy logging !!!
 3. laziness not working
+  - need special handling for docmode
 -}
 
 fsSuiteDemo :: IO ()
-fsSuiteDemo = runDemo docRunner fsSuite
+fsSuiteDemo = docDemo fsSuite
 
 -- >>> fsSuiteDemo
 
@@ -133,15 +118,20 @@ fsSuite =
 fstest :: Fixture ()
 fstest = Full config fsAction parsefs fsItems
 
+getFailNested :: Eff es FSAS
+getFailNested = pure $ error "This is a nested error !!! "
+
 getFail :: Eff es FSAS
-getFail = pure $ error "This is an error !!! "
+getFail = error "This is an error !!! "
 
 fsAction :: (FileSystem :> es, Out NodeEvent :> es) => RunConfig -> FSData -> Eff es FSAS
 fsAction _rc i = do
-  getFail
+  getFailNested
+  -- getFail
   paths <- getPaths
   log i.title
   chkPathsThatDoesNothing paths
+  log "Paths checked ~ not really"
   pure $ FSAS {paths}
 
 data FSData = FSItem
@@ -162,7 +152,7 @@ data FSData = FSItem
 -}
 
 
-newtype FSAS = FSAS
+data FSAS = FSAS
   { paths :: [P.Path Abs File]
   }
   deriving (Show)
@@ -192,7 +182,11 @@ fsItems _rc =
 docWebDriverDemo :: IO ()
 docWebDriverDemo = runDemo docRunner webDriverSuite
 
--- >>> docWebDriverDemo
+-- $> docWebDriverDemo
+-- *** Exception: 
+-- Exception thrown in step documentation.
+--   Value forced from function: 'driverStatus' in documentation mode.
+--   Use  docVal, docHush, docVoid, docVal' to replace or silence this value from where the step is called: 'driverStatus'
 
 webDriverSuite :: Suite
 webDriverSuite =
@@ -207,7 +201,8 @@ config = FxCfg "test" DeepRegression
 driver_status :: (WebUI :> es, Out NodeEvent :> es) => Eff es DriverStatus
 driver_status = do
   status <- driverStatus "NA"
-  log $ "the driver status is: " <> txt status
+  log "Forcing driver status"
+  log $ "the driver status is (from driver status): " <> txt status
   pure status
 
 _theInternet :: Text
@@ -216,11 +211,13 @@ _theInternet = "https://the-internet.herokuapp.com/"
 _checkBoxesLinkCss :: Selector
 _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
+
 action :: (WebUI :> es, Out NodeEvent :> es) => RunConfig -> Data -> Eff es AS
 action _rc i = do
-  log i.title
+  log $ "test title is: " <> i.title
+  error "BANG"
   status <- driver_status
-  log $ "the driver status is: " <> txt status
+  log $ "the driver status is (from root): " <> txt status
   ses <- newSession
   maximiseWindow ses
   go ses _theInternet

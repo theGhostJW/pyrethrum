@@ -4,8 +4,8 @@
 
 module DSL.OutEffect where
 
-import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, IOE, (:>))
-import Effectful.Dispatch.Static (StaticRep, SideEffects(..), getStaticRep, unsafeEff_, evalStaticRep)
+import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, (:>))
+import Effectful.Dispatch.Static (StaticRep, SideEffects(..), getStaticRep, unsafeEff_)
 
 {-
 a very simple  logging effect initially copied from

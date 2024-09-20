@@ -7,8 +7,8 @@ module DSL.OutInterpreter (
 ) where
 
 import DSL.OutEffect as OE
-import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, IOE, (:>))
-import Effectful.Dispatch.Static (StaticRep, SideEffects(..), getStaticRep, unsafeEff_, evalStaticRep)
+import Effectful (Eff, IOE, (:>))
+import Effectful.Dispatch.Static (evalStaticRep)
 
 runOut :: (IOE :> es) => (a -> IO ()) -> Eff (Out a : es) b -> Eff es b
 runOut = evalStaticRep . Out . Sink

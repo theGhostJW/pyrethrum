@@ -48,7 +48,6 @@ import WebDriverDocInterpreter qualified as WDDoc (runWebDriver)
 import WebDriverEffect (WebUI (..))
 import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import Prepare (prepare, PreNode)
-import PyrethrumExtras (txt)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
 

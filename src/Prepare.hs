@@ -179,11 +179,11 @@ prepSuiteElm interpreter rc suiteElm =
     C.Fixture {path, fixture} -> prepareTest interpreter rc  path fixture
 
 flog :: (HasCallStack) => LogSink -> FrameworkLog -> IO ()
-flog sink = sink . Framework
+flog sink = sink . force . Framework
 
 -- Debugging only
-log :: (HasCallStack) => LogSink -> Text -> IO ()
-log sink = sink . User . Log
+dblog :: (HasCallStack) => LogSink -> Text -> IO ()
+dblog sink = sink . User . Log
 
 catchLog :: forall a. (HasCallStack) => LogSink -> IO a -> IO a
 catchLog as io = tryAny io >>= either (logThrow as) pure
@@ -272,14 +272,16 @@ prepareTest interpreter rc path =
       do
         ds <- tryAny
           do
-            log snk "******************** Running action *****************"
+            dblog snk "******************** Running Action *****************"
             as <- runAction snk action i
-            log snk "******************** Action Run *****************"
-            log snk "******************** Logging AP State *****************"
+            dblog snk "******************** Action Run *****************"
+            dblog snk "******************** Logging AP State *****************"
             -- TODO: special Mode for doc Don't log Ap State
-            IOT.putStrLn $ "Logging AP State " <> txt as
-            flog snk . Parse path . ApStateText $ txt as
-            log snk "******************** AP State Logged *****************"
+            let !evt = force . Parse path . force ApStateText . force $ txt as
+            -- IOT.putStrLn $ "Logging AP State " <> txt as
+            flog snk $ force evt
+
+            dblog snk "******************** AP State Logged *****************"
             unTry snk $ applyParser parser as
         applyChecks snk path i.checks ds
 

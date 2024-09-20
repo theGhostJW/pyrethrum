@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module DSL.Internal.NodeEvent where
 
 import Check (CheckReport)
@@ -18,10 +19,16 @@ Framework FrameworkLog -> internal events from within a test or hook such as the
 data NodeEvent
   = User UserLog
   | Framework FrameworkLog
-  deriving stock (Show)
+  deriving (Show, Generic, NFData)
 
-newtype ItemText = ItemText {text :: Text} deriving (Eq, Show, IsString)
-newtype DStateText = DStateText {text :: Text} deriving (Eq, Show, IsString)
+
+newtype ItemText = ItemText {text :: Text} 
+  deriving (Eq, Show)
+  deriving newtype (IsString, NFData)
+
+newtype DStateText = DStateText {text :: Text} 
+  deriving (Eq, Show)
+  deriving  newtype (IsString, NFData)
 
 -- framework logs that represent test fixtures have a path to that fixture
 -- Steps and Exceptions do not as they don't represent test fixture
@@ -56,7 +63,7 @@ data FrameworkLog
       { exception :: Text
       , callStack :: Text
       }
-  deriving stock (Show)
+  deriving (Show, Generic, NFData)
 
 data UserLog
   = StartFolder Text
@@ -76,7 +83,7 @@ data UserLog
       { message :: Text
       , details :: Text
       }
-  deriving stock (Eq, Show)
+  deriving (Eq, Show, Generic, NFData)
 
 data Path
   = NodePath
@@ -87,10 +94,13 @@ data Path
       { id :: Int
       , title :: Text
       }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 
-newtype ApStateText = ApStateText {text :: Text} deriving (Eq, Show, IsString)
+newtype ApStateText = ApStateText {text :: Text} 
+    deriving (Eq, Show)
+    deriving newtype (IsString, NFData)
+
 $(deriveJSON defaultOptions ''ApStateText)
 
 

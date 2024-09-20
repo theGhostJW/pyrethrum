@@ -1,11 +1,19 @@
-module Internal.LoggingCore where
+{-# LANGUAGE DeriveAnyClass #-}
+module Internal.LoggingCore (
+  mkLog,
+  testLogControls',
+  BaseLog(..),
+  runWithLogger,
+  LogControls(..),
+  LoggerSource(..)
+) where
 
 -- TODO: Explicit exports remove old code
 import BasePrelude qualified as P
 import CoreUtils qualified as C
 import Effectful.Concurrent.STM (TQueue)
 import Text.Show.Pretty (pPrint)
-import UnliftIO ( concurrently_, finally, newIORef, tryReadTQueue )
+import UnliftIO ( concurrently_, finally, newIORef, tryReadTQueue, tryAny )
 import UnliftIO.Concurrent (ThreadId)
 import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
 import Prelude hiding (atomically, lines)
@@ -16,6 +24,10 @@ data BaseLog lc evt = MkLog
     event :: evt
   }
   deriving (Show)
+  deriving (Generic, NFData)
+
+mkLog :: NFData evt => lc -> evt -> BaseLog lc evt
+mkLog lc evt = MkLog lc $ force evt
 
 data LoggerSource l = MkLoggerSource
   { rootLogger :: l -> IO (),
@@ -71,7 +83,7 @@ q2List qu = reverse <$> recurse [] qu
       tryReadTQueue q
         >>= maybe (pure l) (\e -> recurse (e : l) q)
 
-testLogControls' :: forall l lx. (Show lx) => (C.ThreadId -> Int -> l -> lx) -> Bool -> IO (LogControls l lx, STM [lx])
+testLogControls' :: forall l lx. (Show lx, NFData lx) => (C.ThreadId -> Int -> l -> lx) -> Bool -> IO (LogControls l lx, STM [lx])
 testLogControls' aggregator wantConsole = do
   chn <- newTChanIO
   log <- newTQueueIO
@@ -83,14 +95,27 @@ testLogControls' aggregator wantConsole = do
           >>= maybe
             (pure ())
             (\evt -> when wantConsole (pPrint evt) >> logWorker)
+            -- (\evt -> when wantConsole (printToConsole evt) >> logWorker)
+
+      printToConsole :: Show evt => evt -> IO ()
+      printToConsole evt = do 
+        ep <- tryAny (pPrint evt)
+        ep & either 
+          (\e -> do
+             putStrLn "Error printing event:\n" 
+             pPrint e
+          )
+          pure 
 
       stopWorker :: IO ()
       stopWorker = atomically $ writeTChan chn Nothing
 
       sink :: lx -> IO ()
       sink eventLog =
+        let ev = force eventLog
+        in
         atomically $ do
-          writeTChan chn $ Just eventLog
-          writeTQueue log eventLog
+          writeTChan chn $ Just ev
+          writeTQueue log ev
 
   pure (LogControls {..}, q2List log)

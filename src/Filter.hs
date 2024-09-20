@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module Filter
   ( Filter (..),
     FilterResult (..),
@@ -22,7 +23,7 @@ data FilterResult t = MkFilterResult
   { target :: t,
     rejection :: Maybe Text
   }
-  deriving (Show, Eq, Functor)
+  deriving (Show, Eq, Functor, Generic, NFData)
 
 accepted :: FilterResult t -> Bool
 accepted = isNothing . (.rejection)

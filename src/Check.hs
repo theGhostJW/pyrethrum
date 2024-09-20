@@ -1,4 +1,5 @@
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Check (
   Check (..),
@@ -91,7 +92,8 @@ instance ToJSON (Check v) where
 newtype Checks ds = Checks
   { un :: [Check ds]
   }
-  deriving (Show, Read, Semigroup, Monoid, IsList)
+  deriving (Show, Read)
+  deriving newtype (Semigroup, Monoid, IsList)
 
 mapRules :: (Check ds -> Check ds') -> Checks ds -> Checks ds'
 mapRules f = Checks . fmap f . coerce
@@ -103,7 +105,7 @@ data CheckResult
   = Pass
   | Skip
   | Fail
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data CheckReport
   = CheckReport
@@ -116,7 +118,7 @@ data CheckReport
       , exception :: Text
       , callStack :: Text
       }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 skipCheck :: Check ds -> CheckReport
 skipCheck (Check{header}) = CheckReport Skip header "Validation skipped"

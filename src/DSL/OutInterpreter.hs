@@ -10,5 +10,8 @@ import DSL.OutEffect as OE
 import Effectful (Eff, IOE, (:>))
 import Effectful.Dispatch.Static (evalStaticRep)
 
-runOut :: (IOE :> es) => (a -> IO ()) -> Eff (Out a : es) b -> Eff es b
-runOut = evalStaticRep . Out . Sink
+runOut :: (IOE :> es, NFData a) => (a -> IO ()) -> Eff (Out a : es) b -> Eff es b
+runOut sink = 
+  evalStaticRep . Out $ Sink forcedSink
+  where 
+    forcedSink = sink . force

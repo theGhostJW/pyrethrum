@@ -1119,5 +1119,6 @@ logRun lgr path evt action = do
     do 
       log lgr $ "!!!!!!!!!!!!!!!!!! RUNNING " <> txt evt <> " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
       r <- tryAny action 
+      log lgr $ "!!!!!!!!!!!!!!!!!! FINISHED RUNNING ACTION " <> txt evt <> " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
       r & either (logReturnFailure lgr path evt) (pure . Right)
     (lgr $ L.End evt path)

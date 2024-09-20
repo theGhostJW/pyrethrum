@@ -152,7 +152,7 @@ data FSData = FSItem
 -}
 
 
-data FSAS = FSAS
+newtype FSAS = FSAS
   { paths :: [P.Path Abs File]
   }
   deriving (Show)

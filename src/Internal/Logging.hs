@@ -26,16 +26,18 @@ data LogContext = MkLogContext
   { threadId :: C.ThreadId,
     idx :: Int
   }
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
-data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord)
+data HookPos = Before | After | Setup | Teardown deriving (Show, Eq, Ord, Generic, NFData)
 
 data NodeType
   = Hook Hz HookPos
   | Test
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
-newtype ExePath = ExePath {un :: [NE.Path]} deriving (Show, Eq, Ord)
+newtype ExePath = ExePath {un :: [NE.Path]} 
+ deriving (Show, Eq, Ord)
+ deriving newtype NFData
 
 topPath :: ExePath -> Maybe NE.Path
 topPath = PE.head . coerce
@@ -120,16 +122,16 @@ data Event loc evnt
       { event :: evnt
       }
   | EndExecution
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
-testLogControls :: forall l a. (Show a, Show l) => Bool -> IO (LogControls (Event l a) (Log l a), STM [Log l a])
+testLogControls :: forall l a. (Show a, Show l, NFData l, NFData a, NFData (Log l a)) => Bool -> IO (LogControls (Event l a) (Log l a), STM [Log l a])
 testLogControls = testLogControls' expandEvent
 
 -- -- NodeEvent (a) a loggable event generated from within a node
 -- -- EngineEvent a - marks start, end and failures in test fixtures (hooks, tests) and errors
 -- -- Log a - adds thread id and index to EngineEvent
-expandEvent :: C.ThreadId -> Int -> Event l a -> Log l a
-expandEvent threadId idx = MkLog (MkLogContext threadId idx)
+expandEvent :: (NFData l, NFData a) => C.ThreadId -> Int -> Event l a -> Log l a
+expandEvent threadId idx = force . mkLog (MkLogContext threadId idx)
 
 $(deriveToJSON defaultOptions ''ExePath)
 $(deriveJSON defaultOptions ''HookPos)

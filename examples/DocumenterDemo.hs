@@ -100,7 +100,7 @@ OH THE HUMANITY !!!
  1.3 - log outfull channel  :: FIXED with use of proper interpreter
 2. exception not handled
   - reinstate exception for doc :: DONE
-  - its the lazy logging !!!
+  - its the lazy logging !!
 3. laziness not working
   - need special handling for docmode
 -}

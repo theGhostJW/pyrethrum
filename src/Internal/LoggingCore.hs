@@ -83,7 +83,7 @@ q2List qu = reverse <$> recurse [] qu
       tryReadTQueue q
         >>= maybe (pure l) (\e -> recurse (e : l) q)
 
-testLogControls' :: forall l lx. (Show lx, NFData lx) => (C.ThreadId -> Int -> l -> lx) -> Bool -> IO (LogControls l lx, STM [lx])
+testLogControls' :: forall l lx. Show lx => (C.ThreadId -> Int -> l -> lx) -> Bool -> IO (LogControls l lx, STM [lx])
 testLogControls' aggregator wantConsole = do
   chn <- newTChanIO
   log <- newTQueueIO
@@ -95,27 +95,14 @@ testLogControls' aggregator wantConsole = do
           >>= maybe
             (pure ())
             (\evt -> when wantConsole (pPrint evt) >> logWorker)
-            -- (\evt -> when wantConsole (printToConsole evt) >> logWorker)
-
-      printToConsole :: Show evt => evt -> IO ()
-      printToConsole evt = do 
-        ep <- tryAny (pPrint evt)
-        ep & either 
-          (\e -> do
-             putStrLn "Error printing event:\n" 
-             pPrint e
-          )
-          pure 
 
       stopWorker :: IO ()
       stopWorker = atomically $ writeTChan chn Nothing
 
       sink :: lx -> IO ()
       sink eventLog =
-        let ev = force eventLog
-        in
         atomically $ do
-          writeTChan chn $ Just ev
-          writeTQueue log ev
+          writeTChan chn $ Just eventLog
+          writeTQueue log eventLog
 
   pure (LogControls {..}, q2List log)

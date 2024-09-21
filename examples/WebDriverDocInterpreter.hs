@@ -33,7 +33,7 @@ runWebDriver =
   handler _env  =
       \case
         -- driver
-        DriverStatus i -> docErr2 "driverStatus" "get driver status" $ txt i
+        DriverStatus -> docErr "driverStatus" "get driver status"
         -- session
         NewSession ->  docErr "newSession" "create new driver session"
         KillSession _sessionRef -> docErr "killSession" "kill driver session"

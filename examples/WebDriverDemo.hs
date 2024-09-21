@@ -62,7 +62,7 @@ config = FxCfg "test" DeepRegression
 
 driver_status :: (WebUI :> es, Out NodeEvent :> es) => Eff es DriverStatus
 driver_status = do 
-  status <- driverStatus "NA"
+  status <- driverStatus
   log $ "the driver status is: " <> txt status
   pure status
 

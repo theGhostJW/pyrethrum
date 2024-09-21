@@ -40,7 +40,7 @@ import WebDriverEffect
       readElem,
       clickElem,
       sleep,
-      killSession )
+      killSession, dsNothing, maximiseWindow2 )
 import WebDriverPure (seconds)
 import WebDriverSpec (DriverStatus (..), Selector (CSS))
 
@@ -195,11 +195,7 @@ config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
 driver_status :: (WebUI :> es, Out NodeEvent :> es) => Eff es DriverStatus
-driver_status = do
-  status <- driverStatus
-  log "Forcing driver status"
-  log $ "the driver status is (from driver status): " <> txt status
-  pure status
+driver_status = driverStatus
 
 _theInternet :: Text
 _theInternet = "https://the-internet.herokuapp.com/"
@@ -212,9 +208,13 @@ action :: (WebUI :> es, Out NodeEvent :> es) => RunConfig -> Data -> Eff es AS
 action _rc i = do
   log $ "test title is: " <> i.title
   status <- driver_status
-  log $ "the driver status is (from root): " <> txt status
+  log "GOT DRIVER STATUS"
+  dsNothing status
+  -- log $ "the driver status is (from root): " <> txt status
   ses <- newSession
+  log "GOT SESSION"
   maximiseWindow ses
+  log "WINDOE MAXIMISED"
   go ses _theInternet
   link <- findElem ses _checkBoxesLinkCss
   checkButtonText <- readElem ses link

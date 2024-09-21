@@ -1,16 +1,18 @@
 
 module WebDriverEffect
-  ( SessionRef (..),
+  ( 
     WebUI (..),
     WebDriver,
     -- driver
     driverStatus,
+    dsNothing,
     -- session
     newSession,
     killSession,
     -- window
     fullscreenWindow,
     maximiseWindow,
+    maximiseWindow2,
     minimiseWindow,
     -- navigate
     go,
@@ -22,12 +24,12 @@ module WebDriverEffect
   )
 where
 
-import Effectful as EF ( Effect, DispatchOf, Dispatch(Dynamic) )
+import Effectful as EF ( Effect, DispatchOf, Dispatch(Dynamic), Eff )
 
 import Effectful.Reader.Static as ERS
 import Effectful.TH (makeEffect)
 import Prelude hiding (second)
-import WebDriverSpec (SessionRef(..), ElementRef, DriverStatus, Selector)
+import WebDriverSpec (ElementRef, DriverStatus, Selector, SessionRef)
 
 -- Effect
 
@@ -63,8 +65,14 @@ data WebUI :: Effect where
   -- TODO move this its more generic (eg. used in REST wait loops)
   Sleep :: Int -> WebUI m ()
 
+dsNothing :: DriverStatus ->  Eff es ()
+dsNothing _ds = pure ()
+
 makeEffect ''WebUI
 
+
+maximiseWindow2 :: SessionRef -> Eff es ()
+maximiseWindow2 _ses = pure ()
 -- todo add newtype later and don't export type constructor to make
 -- sleep wait typesafe
 

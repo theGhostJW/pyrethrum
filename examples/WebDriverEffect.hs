@@ -5,14 +5,12 @@ module WebDriverEffect
     WebDriver,
     -- driver
     driverStatus,
-    dsNothing,
     -- session
     newSession,
     killSession,
     -- window
     fullscreenWindow,
     maximiseWindow,
-    maximiseWindow2,
     minimiseWindow,
     -- navigate
     go,
@@ -65,14 +63,4 @@ data WebUI :: Effect where
   -- TODO move this its more generic (eg. used in REST wait loops)
   Sleep :: Int -> WebUI m ()
 
-dsNothing :: DriverStatus ->  Eff es ()
-dsNothing _ds = pure ()
-
 makeEffect ''WebUI
-
-
-maximiseWindow2 :: SessionRef -> Eff es ()
-maximiseWindow2 _ses = pure ()
--- todo add newtype later and don't export type constructor to make
--- sleep wait typesafe
-

@@ -268,9 +268,7 @@ prepareTest interpreter rc path =
         ds <- tryAny
           do
             as <- runAction snk action i
-            -- TODO: special Mode for doc Don't log Ap State
             let !evt = Parse path . ApStateText $ txt as
-            -- IOT.putStrLn $ "Logging AP State " <> txt as
             flog snk evt
             unTry snk $ applyParser parser as
         applyChecks snk path i.checks ds

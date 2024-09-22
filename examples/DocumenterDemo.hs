@@ -40,7 +40,7 @@ import WebDriverEffect
       readElem,
       clickElem,
       sleep,
-      killSession, dsNothing, maximiseWindow2 )
+      killSession )
 import WebDriverPure (seconds)
 import WebDriverSpec (DriverStatus (..), Selector (CSS))
 
@@ -87,19 +87,6 @@ fsDemoAp = do
 
 
 -- ################### 1. FS App with full runtime ##################
-
-{-
-OH THE HUMANITY !!!
-1. log scrambling z:: FIXED
- 1.1 - take unhandled excption out of the picture in demo - FAILED STILL SCRABLED
- 1.2 - switch off filter log (execute -> executeWithoutValidation) - FAILED STILL SCRABLED
- 1.3 - log outfull channel  :: FIXED with use of proper interpreter
-2. exception not handled
-  - reinstate exception for doc :: DONE
-  - its the lazy logging !!
-3. laziness not working
-  - need special handling for docmode
--}
 
 fsSuiteDemo :: IO ()
 fsSuiteDemo = docDemo fsSuite
@@ -209,7 +196,6 @@ action _rc i = do
   log $ "test title is: " <> i.title
   status <- driver_status
   log "GOT DRIVER STATUS"
-  dsNothing status
   -- log $ "the driver status is (from root): " <> txt status
   ses <- newSession
   log "GOT SESSION"

@@ -6,6 +6,17 @@ module DSL.DocInterpreterUtils
     docErr3,
     docErr4,
     docErrn,
+    docFake,
+    docFake2,
+    docFake3,
+    docFake4,
+    docFaken,
+    docAction,
+    docAction2,
+    docAction3,
+    docAction4,
+    docActionn,
+    DocException(..)
   )
 where
 
@@ -17,15 +28,16 @@ import Effectful as EF
     IOE,
     type (:>),
   )
+-- import BasePrelude (throw)
 
-{-
+
 data DocException
   = DocException Text
   | DocException' Text SomeException
   deriving (Show)
 
 instance Exception DocException
-
+{-
 adaptException :: forall es a. (HasCallStack, IOE :> es{- , E.Error DocException :> es -}) => IO a -> Eff es a
 adaptException m = EF.liftIO m `catch` \(e :: SomeException) -> E.throwError . DocException' "Exception thrown in documenter" $ e
 -}
@@ -50,10 +62,9 @@ docErrn funcName dscFrags =
   do
     let funcDesc = T.intercalate " " dscFrags
     logStep funcDesc
-    -- TODO :: replace this later when have code to process call
-    -- stack right now out of the box call handling looks better
-    -- E.throwError . DocException $
-    -- pure $ error ""
+    -- TODO :: Swith to custom DocException exception but must return full callstack
+     -- doesn't do it now but might fix itself with GHC 9.10.00 ~ otherwise need to investigate
+    -- pure . throw . DocException $
     pure . error $
       "\nException thrown in step documentation."
         <> "\n  Value forced from function: '"
@@ -75,3 +86,39 @@ docErr3 funcName funcDesc1 funcDesc2 funcDesc3 = docErrn funcName [funcDesc1, fu
 
 docErr4 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es {- , E.Error DocException :> es -}) => Text -> Text -> Text -> Text -> Text -> Eff es a
 docErr4 funcName funcDesc1 funcDesc2 funcDesc3 funcDesc4 = docErrn funcName [funcDesc1, funcDesc2, funcDesc3, funcDesc4]
+
+
+docActionn :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es {- , E.Fakeor DocException :> es -}) => [Text] -> Eff es ()
+docActionn dscFrags = logStep $  T.intercalate " " dscFrags
+
+docAction :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es {- , E.Fakeor DocException :> es -}) => Text -> Eff es ()
+docAction funcDesc = docActionn [funcDesc]
+
+docAction2 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es {- , E.Fakeor DocException :> es -}) => Text -> Text -> Eff es ()
+docAction2 funcDesc1 funcDesc2 = docActionn [funcDesc1, funcDesc2]
+
+docAction3 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es {- , E.Fakeor DocException :> es -}) => Text -> Text -> Text -> Eff es ()
+docAction3 funcDesc1 funcDesc2 funcDesc3 = docActionn [funcDesc1, funcDesc2, funcDesc3]
+
+docAction4 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es {- , E.Fakeor DocException :> es -}) => Text -> Text -> Text -> Text -> Eff es ()
+docAction4 funcDesc1 funcDesc2 funcDesc3 funcDesc4 = docActionn [funcDesc1, funcDesc2, funcDesc3, funcDesc4]
+
+docFaken :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es {- , E.Fakeor DocException :> es -}) => a -> [Text] -> Eff es a
+docFaken a dscFrags = 
+  do
+    logStep $  T.intercalate " " dscFrags
+    pure a
+    
+
+docFake :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es {- , E.Fakeor DocException :> es -}) => a -> Text -> Eff es a
+docFake a funcDesc = docFaken a [funcDesc]
+
+docFake2 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es {- , E.Fakeor DocException :> es -}) => a -> Text -> Text -> Eff es a
+docFake2 a funcDesc1 funcDesc2 = docFaken a [funcDesc1, funcDesc2]
+
+docFake3 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es {- , E.Fakeor DocException :> es -}) =>  a -> Text -> Text -> Text -> Eff es a
+docFake3 a funcDesc1 funcDesc2 funcDesc3 = docFaken a [funcDesc1, funcDesc2, funcDesc3]
+
+docFake4 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es {- , E.Fakeor DocException :> es -}) =>  a -> Text ->Text -> Text -> Text -> Eff es a
+docFake4 a funcDesc1 funcDesc2 funcDesc3 funcDesc4 = docFaken a [funcDesc1, funcDesc2, funcDesc3, funcDesc4]
+

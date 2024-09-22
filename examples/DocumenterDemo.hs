@@ -5,8 +5,8 @@ module DocumenterDemo where
 import Check
 import Core (ParseException)
 import DSL.FileSystemEffect
-import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log))
-import DSL.OutEffect (Out, out)
+import DSL.Internal.NodeEvent (NodeEvent , Path (NodePath))
+import DSL.OutEffect (Out)
 import Data.Text (isInfixOf)
 import Effectful as EF
   ( Eff,
@@ -22,14 +22,13 @@ import PyrethrumBase
       Suite,
       RunConfig,
       FixtureConfig(FxCfg),
-      HasLog,
       Fixture(Full),
       Node(Fixture),
       DataSource(ItemList),
       Depth(DeepRegression),
       defaultRunConfig,
       docRunner )
-import PyrethrumExtras (Abs, File, relfile, toS, txt, (?))
+import PyrethrumExtras (Abs, File, relfile, toS, (?))
 import WebDriverEffect
     ( WebUI,
       driverStatus,
@@ -181,7 +180,7 @@ test = Full config action parse items
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
-driver_status :: (WebUI :> es, Out NodeEvent :> es) => Eff es DriverStatus
+driver_status :: (WebUI :> es) => Eff es DriverStatus
 driver_status = driverStatus
 
 _theInternet :: Text

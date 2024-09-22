@@ -15,7 +15,6 @@ import Prelude hiding (atomically, lines)
 
 -- TODO: Explicit exports remove old code
 import BasePrelude qualified as P
-import CoreUtils qualified as C
 import Effectful.Concurrent.STM (TQueue)
 import Text.Show.Pretty (pPrint)
 import UnliftIO (concurrently_, finally, newIORef, tryReadTQueue)

@@ -22,7 +22,7 @@ module WebDriverEffect
   )
 where
 
-import Effectful as EF ( Effect, DispatchOf, Dispatch(Dynamic), Eff )
+import Effectful as EF ( Effect, DispatchOf, Dispatch(Dynamic))
 
 import Effectful.Reader.Static as ERS
 import Effectful.TH (makeEffect)

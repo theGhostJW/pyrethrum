@@ -93,6 +93,7 @@ docRunner suite filters runConfig threadCount logControls =
     prepared :: Either SuiteValidationError (FilteredSuite (PreNode IO ()))
     prepared = prepare $ C.MkSuiteExeParams
       { interpreter = docInterpreter,
+        mode = C.Listing {includeSteps = True, includeChecks = True},
         suite = mkCoreSuite suite,
         filters,
         runConfig
@@ -105,6 +106,7 @@ ioRunner suite filters runConfig threadCount logControls =
   execute threadCount logControls $
     C.MkSuiteExeParams
       { interpreter = ioInterpreter,
+        mode = C.Run,
         suite = mkCoreSuite suite,
         filters,
         runConfig

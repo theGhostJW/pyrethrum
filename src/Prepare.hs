@@ -272,7 +272,6 @@ prepareTest mode interpreter rc path =
     runAction :: forall i as ds. (C.Item i ds) => LogSink -> (i -> m as) -> i -> IO as
     runAction snk action = catchLog snk . interpreter snk . action
 
-    
     runListing :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> i -> LogSink -> Bool -> Bool -> IO ()
     runListing action i snk includeSteps includeChecks = do
             logItem snk i
@@ -303,7 +302,9 @@ prepareTest mode interpreter rc path =
     runDirectTest :: forall i ds. (C.Item i ds) => (i -> m ds) -> i -> LogSink -> IO ()
     runDirectTest action i snk =
       case mode of
-        Run -> tryAny (runAction snk action i) >>= applyChecks snk path i.checks
+        Run -> header here >> tryAny (runAction snk action i) >>= applyChecks snk path i.checks
+        Do something about Action INfo and Action COnstructors
+        Write Hook interpreters
         Listing {includeSteps, includeChecks} -> 
           runListing action i snk includeSteps includeChecks
       

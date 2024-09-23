@@ -9,7 +9,7 @@ module Prepare
   )
 where
 
-import Check (Check, Checks (..), FailStatus (NonTerminal), applyCheck, skipChecks, listChecks, CheckReport)
+import Check (Check, Checks (..), FailStatus (NonTerminal), applyCheck, skipChecks, listChecks)
 import Control.Exception (throwIO)
 import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
@@ -29,7 +29,7 @@ import DSL.Internal.NodeEvent
 import Data.Either.Extra (mapLeft) -- ToDO: move to Pyrelude
 import Internal.SuiteFiltering (FilteredSuite (..), filterSuite)
 import Internal.SuiteValidation (SuiteValidationError (..), chkSuite)
-import PyrethrumExtras (txt, uu)
+import PyrethrumExtras (txt)
 import UnliftIO.Exception (tryAny)
 
 -- TODO Full E2E property tests from Core fixtures and Hooks --> logs
@@ -272,6 +272,17 @@ prepareTest mode interpreter rc path =
     runAction :: forall i as ds. (C.Item i ds) => LogSink -> (i -> m as) -> i -> IO as
     runAction snk action = catchLog snk . interpreter snk . action
 
+    
+    runListing :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> i -> LogSink -> Bool -> Bool -> IO ()
+    runListing action i snk includeSteps includeChecks = do
+            logItem snk i
+            when includeSteps $
+              void $ runAction snk action i
+            when includeChecks $
+              traverse_ logChk (listChecks i.checks)
+            where 
+              logChk = flog snk . Check path
+    
     runTest :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> ((HasCallStack) => as -> Either C.ParseException ds) -> i -> LogSink -> IO ()
     runTest action parser i snk =
       case mode of
@@ -286,24 +297,16 @@ prepareTest mode interpreter rc path =
                 unTry snk $ applyParser parser as
             applyChecks snk path i.checks ds
         Listing {includeSteps, includeChecks} -> 
-          do
-            logItem snk i
-            when includeSteps $
-              void $ runAction snk action i
-            when includeChecks $
-              traverse_ logChk (listChecks i.checks)
-            where 
-              logChk = flog snk . Check path
- 
-            -- runTest' action parser i snk
-            -- if includeChecks then runChecks action parser i snk else pure ()
+          runListing action i snk includeSteps includeChecks
+
 
     runDirectTest :: forall i ds. (C.Item i ds) => (i -> m ds) -> i -> LogSink -> IO ()
     runDirectTest action i snk =
-      here refactor and reuse Listing case above
-      tryAny (runAction snk action i) >>= applyChecks mode snk path i.checks
-
-
+      case mode of
+        Run -> tryAny (runAction snk action i) >>= applyChecks snk path i.checks
+        Listing {includeSteps, includeChecks} -> 
+          runListing action i snk includeSteps includeChecks
+      
 applyChecks :: forall ds. (Show ds) => LogSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
 applyChecks snk p chks = 
   either

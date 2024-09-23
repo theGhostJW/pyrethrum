@@ -84,8 +84,8 @@ ioInterpreter sink ap =
 --         runConfig
 --       }
 
-docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
-docRunner suite filters runConfig threadCount logControls =
+docRunner :: Bool -> Bool -> Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
+docRunner includeSteps includeChecks suite filters runConfig threadCount logControls =
   prepared & either 
     print
     (\s -> executeWithoutValidation threadCount logControls s.suite)
@@ -93,7 +93,7 @@ docRunner suite filters runConfig threadCount logControls =
     prepared :: Either SuiteValidationError (FilteredSuite (PreNode IO ()))
     prepared = prepare $ C.MkSuiteExeParams
       { interpreter = docInterpreter,
-        mode = C.Listing {includeSteps = True, includeChecks = True},
+        mode = C.Listing {includeSteps, includeChecks},
         suite = mkCoreSuite suite,
         filters,
         runConfig

@@ -42,7 +42,7 @@ runIODemo = runDemo ioRunner
 
 -- TODO: not working looks like needs separate runner
 runDocDemo :: IO ()
-runDocDemo = runDemo docRunner
+runDocDemo = runDemo $ docRunner True True
 -- >>> runDocDemo
 
 -- ############### Test Case ###################

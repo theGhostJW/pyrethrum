@@ -51,8 +51,8 @@ runDemo runner suite = do
   -- putStrLn "########## Log ##########"
   -- atomically logList >>= mapM_ pPrint
 
-docDemo :: Suite -> IO ()
-docDemo = runDemo docRunner
+docDemo :: Bool -> Bool -> Suite -> IO ()
+docDemo stp chks = runDemo $ docRunner stp chks
 
 -- ############### Test Case ###################
 
@@ -88,7 +88,7 @@ fsDemoAp = do
 -- ################### 1. FS App with full runtime ##################
 
 fsSuiteDemo :: IO ()
-fsSuiteDemo = docDemo fsSuite
+fsSuiteDemo = docDemo True True fsSuite
 
 -- >>> fsSuiteDemo
 
@@ -160,8 +160,20 @@ fsItems _rc =
 
 -- ################### WebDriver Test ##################
 
-docWebDriverDemo :: IO ()
-docWebDriverDemo = runDemo docRunner webDriverSuite
+baseWdDemo :: Bool -> Bool -> IO ()
+baseWdDemo stp chks = docDemo stp chks webDriverSuite
+
+fullDocWebdriverDemo :: IO ()
+fullDocWebdriverDemo = baseWdDemo True True
+-- >>> fullDocWebdriverDemo
+
+chksDocWebdriverDemo :: IO ()
+chksDocWebdriverDemo = baseWdDemo False True 
+-- >>> chksDocWebdriverDemo
+
+stepsDocWebdriverDemo :: IO ()
+stepsDocWebdriverDemo = baseWdDemo True False
+-- >>> stepsDocWebdriverDemo
 
 
 webDriverSuite :: Suite
@@ -172,7 +184,6 @@ webDriverSuite =
 -- altrenative prenode for documantation
 -- Doc log and doc mock to make work
 
--- >>> docWebDriverDemo
 
 test :: Fixture ()
 test = Full config action parse items

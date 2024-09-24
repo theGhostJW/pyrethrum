@@ -195,6 +195,11 @@ titlesWebdriverDemo = baseWdDemo False False
 
 -- >>> titlesWebdriverDemo
 
+TODO:
+ - get demo working with hooks
+ - add tests
+ - play with hook data objects and laziness
+
 webDriverSuite :: Suite
 webDriverSuite =
   [Fixture (NodePath "WebDriverDemo" "test") test]

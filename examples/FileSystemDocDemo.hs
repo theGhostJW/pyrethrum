@@ -6,7 +6,7 @@ import DSL.FileSystemEffect
     findFilesWith,
     walkDirAccum,
   )
-import DSL.Internal.NodeEvent (NodeEvent (User), UserLog (Log))
+import DSL.Internal.NodeLog (NodeLog (User), UserLog (Log))
 import DSL.OutEffect (Out, Sink (Sink), out)
 import DSL.OutInterpreter ( runOut )
 import Data.List.Extra (isInfixOf)
@@ -14,7 +14,7 @@ import Effectful (Eff, IOE, runEff, (:>))
 import Path (Abs, File, Path, absdir, reldir, relfile, toFilePath)
 import PyrethrumExtras ((?))
 
-type FSOut es = (Out NodeEvent :> es, FileSystem :> es)
+type FSOut es = (Out NodeLog :> es, FileSystem :> es)
 
 
 -- todo - use a more believable base function
@@ -32,7 +32,7 @@ runDemo :: IO ()
 runDemo = docRun demo
 -- >>> runDemo
 
-demo2 :: forall es. (Out NodeEvent :> es, FileSystem :> es) => Eff es ()
+demo2 :: forall es. (Out NodeLog :> es, FileSystem :> es) => Eff es ()
 demo2 = do
   paths <- getPaths
   chk paths
@@ -46,7 +46,7 @@ runDemo2 :: IO ()
 runDemo2 = docRun demo2
 
 -- uses
-demo3 :: forall es. (Out NodeEvent :> es, FileSystem :> es) => Eff es ()
+demo3 :: forall es. (Out NodeLog :> es, FileSystem :> es) => Eff es ()
 demo3 = do
   paths <- getPathsData
   chk paths
@@ -59,17 +59,17 @@ demo3 = do
 runDemo3 :: IO ()
 runDemo3 = docRun demo3
 
-docRun :: Eff '[FileSystem, Out NodeEvent, IOE] a -> IO a
+docRun :: Eff '[FileSystem, Out NodeLog, IOE] a -> IO a
 docRun = runEff . apEventOut . DII.runFileSystem
 
 -- TODO - interpreters into own module
-apEventOut :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
+apEventOut :: forall a es. (IOE :> es) => Eff (Out NodeLog : es) a -> Eff es a
 apEventOut = runOut print
 
-log :: (Out NodeEvent :> es) => Text -> Eff es ()
+log :: (Out NodeLog :> es) => Text -> Eff es ()
 log = out . User . Log
 
-getPaths :: (Out NodeEvent :> es, FileSystem :> es) => Eff es [Path Abs File]
+getPaths :: (Out NodeLog :> es, FileSystem :> es) => Eff es [Path Abs File]
 getPaths =
   do
     s <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
@@ -87,7 +87,7 @@ data PathResult = PathResult
   }
 
 --  proves we are OK with strict data
-getPathsData :: (Out NodeEvent :> es, FileSystem :> es) => Eff es PathResult
+getPathsData :: (Out NodeLog :> es, FileSystem :> es) => Eff es PathResult
 getPathsData = do
   p <- findFilesWith isDeleteMe [[reldir|chris|]] [relfile|foo.txt|]
   output <- walkDirAccum Nothing (\_root _subs files -> pure files) [absdir|/pyrethrum/pyrethrum|]

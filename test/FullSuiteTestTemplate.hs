@@ -1,6 +1,6 @@
 module FullSuiteTestTemplate where
 
-import DSL.Internal.NodeEvent (Path (..))
+import DSL.Internal.NodeLog (Path (..))
 import Data.Map.Strict qualified as Map
 import CoreUtils (Hz (..))
 import Internal.Logging (HookPos (..), NodeType (Hook))

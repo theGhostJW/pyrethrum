@@ -16,13 +16,13 @@ import Control.Monad.Extra (foldM_)
 import Core (Mode (..), SuiteExeParams)
 import Core qualified as C
 import CoreUtils (Hz)
-import DSL.Internal.NodeEvent
+import DSL.Internal.NodeLog
   ( ApStateText (ApStateText),
     DStateText (DStateText),
-    FrameworkLog (Action, Check, CheckStart, Parse, SkipedCheckStart),
+    FrameworkLog (..),
     ItemText (ItemText),
     LogSink,
-    NodeEvent (Framework),
+    NodeLog (Framework),
     Path,
     exceptionEvent,
   )
@@ -266,15 +266,20 @@ prepareTest mode interpreter rc path =
     applyParser :: forall as ds. ((HasCallStack) => as -> Either C.ParseException ds) -> as -> Either SomeException ds
     applyParser parser as = mapLeft toException $ parser as
 
-    logItem :: forall i. (Show i) => LogSink -> i -> IO ()
-    logItem snk = flog snk . Action path . ItemText . txt 
+    logTest :: forall i. (Show i) => LogSink -> i -> IO ()
+    logTest snk = flog snk . Test path . ItemText . txt
+
+    logTestAndAction :: forall i. (Show i) => LogSink -> i -> IO ()
+    logTestAndAction snk i = do 
+      logTest snk i
+      flog snk $ ActionStart path 
 
     runAction :: forall i as ds. (C.Item i ds) => LogSink -> (i -> m as) -> i -> IO as
     runAction snk action = catchLog snk . interpreter snk . action
 
     runListing :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> i -> LogSink -> Bool -> Bool -> IO ()
     runListing action i snk includeSteps includeChecks = do
-            logItem snk i
+            logTest snk i
             when includeSteps $
               void $ runAction snk action i
             when includeChecks $
@@ -289,7 +294,7 @@ prepareTest mode interpreter rc path =
           do
             ds <- tryAny
               do
-                logItem snk i
+                logTestAndAction snk i
                 as <- runAction snk action i
                 let !evt = Parse path . ApStateText $ txt as
                 flog snk evt
@@ -302,9 +307,7 @@ prepareTest mode interpreter rc path =
     runDirectTest :: forall i ds. (C.Item i ds) => (i -> m ds) -> i -> LogSink -> IO ()
     runDirectTest action i snk =
       case mode of
-        Run -> header here >> tryAny (runAction snk action i) >>= applyChecks snk path i.checks
-        Do something about Action INfo and Action COnstructors
-        Write Hook interpreters
+        Run -> logTestAndAction snk i >> tryAny (runAction snk action i) >>= applyChecks snk path i.checks
         Listing {includeSteps, includeChecks} -> 
           runListing action i snk includeSteps includeChecks
       

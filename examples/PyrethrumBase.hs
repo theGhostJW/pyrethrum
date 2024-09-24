@@ -26,8 +26,8 @@ import Core qualified as C
 import DSL.FileSystemDocInterpreter qualified as FDoc (runFileSystem)
 import DSL.FileSystemEffect (FileSystem)
 import DSL.FileSystemIOInterpreter qualified as FIO (runFileSystem)
-import DSL.Internal.NodeEvent (NodeEvent)
-import DSL.Internal.NodeEvent qualified as AE
+import DSL.Internal.NodeLog (NodeLog)
+import DSL.Internal.NodeLog qualified as AE
 import DSL.OutEffect (Out)
 import DSL.OutInterpreter ( runOut )
 import Effectful (Eff, IOE, runEff, type (:>))
@@ -54,16 +54,16 @@ import Internal.SuiteFiltering (FilteredSuite(..))
 -- module later
 type Action = Eff ApEffs
 
-type HasLog es = Out NodeEvent :> es
+type HasLog es = Out NodeLog :> es
 
-type LogEffs a = forall es. (Out NodeEvent :> es) => Eff es a
+type LogEffs a = forall es. (Out NodeLog :> es) => Eff es a
 
-type ApEffs = '[FileSystem, WebUI, Out NodeEvent, IOE]
+type ApEffs = '[FileSystem, WebUI, Out NodeLog, IOE]
 
--- type ApConstraints es = (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es)
--- type AppEffs a = forall es. (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
+-- type ApConstraints es = (FileSystem :> es, Out NodeLog :> es, Error FSException :> es, IOE :> es)
+-- type AppEffs a = forall es. (FileSystem :> es, Out NodeLog :> es, Error FSException :> es, IOE :> es) => Eff es a
 
-type SuiteRunner = Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
+type SuiteRunner = Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeLog) (L.Log L.ExePath AE.NodeLog) -> IO ()
 
 ioInterpreter :: AE.LogSink -> Action a -> IO a
 ioInterpreter sink ap =
@@ -74,7 +74,7 @@ ioInterpreter sink ap =
     & runEff
 
 
--- docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
+-- docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeLog) (L.Log L.ExePath AE.NodeLog) -> IO ()
 -- docRunner suite filters runConfig threadCount logControls =
 --   execute threadCount logControls $
 --     C.MkSuiteExeParams
@@ -84,7 +84,7 @@ ioInterpreter sink ap =
 --         runConfig
 --       }
 
-docRunner :: Bool -> Bool -> Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
+docRunner :: Bool -> Bool -> Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeLog) (L.Log L.ExePath AE.NodeLog) -> IO ()
 docRunner includeSteps includeChecks suite filters runConfig threadCount logControls =
   prepared & either 
     print
@@ -101,7 +101,7 @@ docRunner includeSteps includeChecks suite filters runConfig threadCount logCont
  
 
 
-ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
+ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeLog) (L.Log L.ExePath AE.NodeLog) -> IO ()
 ioRunner suite filters runConfig threadCount logControls =
   execute threadCount logControls $
     C.MkSuiteExeParams

@@ -16,12 +16,12 @@ import Effectful.Dispatch.Dynamic
   )
 import WebDriverEffect (WebUI (..))
 import DSL.DocInterpreterUtils (docAction, docFake, docAction2, docFake2)
-import DSL.Internal.NodeEvent (NodeEvent)
+import DSL.Internal.NodeLog (NodeLog)
 import DSL.OutEffect ( Out )
 import PyrethrumExtras (txt)
 import WebDriverSpec (ElementRef(..), DriverStatus (Ready), SessionRef (Session))
 
-runWebDriver :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es{- , E.Error DocException :> es -}) => Eff (WebUI : es) a -> Eff es a
+runWebDriver :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es{- , E.Error DocException :> es -}) => Eff (WebUI : es) a -> Eff es a
 runWebDriver =
    interpret handler
  where

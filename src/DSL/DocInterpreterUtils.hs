@@ -20,7 +20,7 @@ module DSL.DocInterpreterUtils
   )
 where
 
-import DSL.Internal.NodeEvent (FrameworkLog (Step), NodeEvent (..))
+import DSL.Internal.NodeLog (FrameworkLog (Step), NodeLog (..))
 import DSL.OutEffect (Out, out)
 import Data.Text qualified as T
 import Effectful as EF
@@ -55,13 +55,13 @@ adaptException m = EF.liftIO m `catch` \(e :: SomeException) -> E.throwError . D
 
 -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
 
-logStep :: (Out NodeEvent :> es) => Text -> Eff es ()
+logStep :: (Out NodeLog :> es) => Text -> Eff es ()
 logStep = out . Framework . Step
 
-logDesc :: (HasCallStack, Out NodeEvent :> es) => [Text] -> Eff es ()
+logDesc :: (HasCallStack, Out NodeLog :> es) => [Text] -> Eff es ()
 logDesc = logStep . T.intercalate " "
 
-docErrn :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es) => Text -> [Text] -> Eff es a
+docErrn :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es) => Text -> [Text] -> Eff es a
 docErrn funcName dscFrags =
   logDesc dscFrags
     >> ( pure . error $
@@ -79,44 +79,44 @@ docErrn funcName dscFrags =
 -- doesn't do it now but might fix itself with GHC 9.10.00 ~ otherwise need to investigate
 -- pure . throw . DocException $
 
-docErr :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es) => Text -> Text -> Eff es a
+docErr :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es) => Text -> Text -> Eff es a
 docErr funcName funcDesc = docErrn funcName [funcDesc]
 
-docErr2 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es) => Text -> Text -> Text -> Eff es a
+docErr2 :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es) => Text -> Text -> Text -> Eff es a
 docErr2 funcName funcDesc1 funcDesc2 = docErrn funcName [funcDesc1, funcDesc2]
 
-docErr3 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es) => Text -> Text -> Text -> Text -> Eff es a
+docErr3 :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es) => Text -> Text -> Text -> Text -> Eff es a
 docErr3 funcName funcDesc1 funcDesc2 funcDesc3 = docErrn funcName [funcDesc1, funcDesc2, funcDesc3]
 
-docErr4 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es) => Text -> Text -> Text -> Text -> Text -> Eff es a
+docErr4 :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es) => Text -> Text -> Text -> Text -> Text -> Eff es a
 docErr4 funcName funcDesc1 funcDesc2 funcDesc3 funcDesc4 = docErrn funcName [funcDesc1, funcDesc2, funcDesc3, funcDesc4]
 
-docActionn :: forall es. (HasCallStack, IOE :> es, Out NodeEvent :> es) => [Text] -> Eff es ()
+docActionn :: forall es. (HasCallStack, IOE :> es, Out NodeLog :> es) => [Text] -> Eff es ()
 docActionn dscFrags = logStep $ T.intercalate " " dscFrags
 
-docAction :: forall es. (HasCallStack, IOE :> es, Out NodeEvent :> es) => Text -> Eff es ()
+docAction :: forall es. (HasCallStack, IOE :> es, Out NodeLog :> es) => Text -> Eff es ()
 docAction funcDesc = docActionn [funcDesc]
 
-docAction2 :: forall es. (HasCallStack, IOE :> es, Out NodeEvent :> es) => Text -> Text -> Eff es ()
+docAction2 :: forall es. (HasCallStack, IOE :> es, Out NodeLog :> es) => Text -> Text -> Eff es ()
 docAction2 funcDesc1 funcDesc2 = docActionn [funcDesc1, funcDesc2]
 
-docAction3 :: forall es. (HasCallStack, IOE :> es, Out NodeEvent :> es) => Text -> Text -> Text -> Eff es ()
+docAction3 :: forall es. (HasCallStack, IOE :> es, Out NodeLog :> es) => Text -> Text -> Text -> Eff es ()
 docAction3 funcDesc1 funcDesc2 funcDesc3 = docActionn [funcDesc1, funcDesc2, funcDesc3]
 
-docAction4 :: forall es. (HasCallStack, IOE :> es, Out NodeEvent :> es) => Text -> Text -> Text -> Text -> Eff es ()
+docAction4 :: forall es. (HasCallStack, IOE :> es, Out NodeLog :> es) => Text -> Text -> Text -> Text -> Eff es ()
 docAction4 funcDesc1 funcDesc2 funcDesc3 funcDesc4 = docActionn [funcDesc1, funcDesc2, funcDesc3, funcDesc4]
 
-docFaken :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es) => a -> [Text] -> Eff es a
+docFaken :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es) => a -> [Text] -> Eff es a
 docFaken a dscFrags = logDesc dscFrags >> pure a
 
-docFake :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es) => a -> Text -> Eff es a
+docFake :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es) => a -> Text -> Eff es a
 docFake a funcDesc = docFaken a [funcDesc]
 
-docFake2 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es) => a -> Text -> Text -> Eff es a
+docFake2 :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es) => a -> Text -> Text -> Eff es a
 docFake2 a funcDesc1 funcDesc2 = docFaken a [funcDesc1, funcDesc2]
 
-docFake3 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es) => a -> Text -> Text -> Text -> Eff es a
+docFake3 :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es) => a -> Text -> Text -> Text -> Eff es a
 docFake3 a funcDesc1 funcDesc2 funcDesc3 = docFaken a [funcDesc1, funcDesc2, funcDesc3]
 
-docFake4 :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es) => a -> Text -> Text -> Text -> Text -> Eff es a
+docFake4 :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es) => a -> Text -> Text -> Text -> Text -> Eff es a
 docFake4 a funcDesc1 funcDesc2 funcDesc3 funcDesc4 = docFaken a [funcDesc1, funcDesc2, funcDesc3, funcDesc4]

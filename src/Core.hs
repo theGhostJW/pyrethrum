@@ -2,7 +2,7 @@ module Core where
 
 import Check (Checks)
 import CoreUtils (Hz (..))
-import DSL.Internal.NodeEvent (LogSink, Path)
+import DSL.Internal.NodeLog (LogSink, Path)
 import Data.Aeson (ToJSON (..))
 import Filter (Filters)
 import GHC.Records (HasField)

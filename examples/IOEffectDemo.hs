@@ -7,7 +7,7 @@ import DSL.FileSystemEffect
 import Effectful ( IOE, type (:>), Eff, runEff )
 import DSL.OutEffect
 import DSL.OutInterpreter ( runOut )
-import DSL.Internal.NodeEvent
+import DSL.Internal.NodeLog
 import Data.Text qualified as T
 import BasePrelude (openFile, hClose, hGetContents)
 import DSL.FileSystemIOInterpreter ( FileSystem, runFileSystem )
@@ -101,7 +101,7 @@ timeTest = do
 
 
 -- use eff
-listFileImp :: (FileSystem :> es, Out NodeEvent :> es) => Eff es [Text]
+listFileImp :: (FileSystem :> es, Out NodeLog :> es) => Eff es [Text]
 listFileImp = do
   log "listFileImp"
   files <- walkDirAccum Nothing (\_root _subs files -> pure files) [absdir|/pyrethrum/pyrethrum|]
@@ -109,23 +109,23 @@ listFileImp = do
   pure . filter ("cabal" `T.isInfixOf`) $ toS . toFilePath <$> files
 
 
-apEventOut :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
+apEventOut :: forall a es. (IOE :> es) => Eff (Out NodeLog : es) a -> Eff es a
 apEventOut = runOut print
 
-ioRun :: Eff '[FileSystem, Out NodeEvent,  IOE] a -> IO  a
+ioRun :: Eff '[FileSystem, Out NodeLog,  IOE] a -> IO  a
 ioRun ap = ap & 
   runFileSystem & 
   apEventOut & 
   runEff  
 
-logShow :: (Out NodeEvent :> es, Show a) => a -> Eff es ()
+logShow :: (Out NodeLog :> es, Show a) => a -> Eff es ()
 logShow = out . User . Log . txt
 
-log :: (Out NodeEvent :> es) => Text -> Eff es ()
+log :: (Out NodeLog :> es) => Text -> Eff es ()
 log = out . User . Log
 
 -- $ > ioRun effDemo
-effDemo :: Eff '[FileSystem, Out NodeEvent, IOE] ()
+effDemo :: Eff '[FileSystem, Out NodeLog, IOE] ()
 effDemo = do
   res <- listFileImp
   chk res
@@ -133,7 +133,7 @@ effDemo = do
   chk _ = log "This is a effDemo"
 
 -- $ > ioRun effDemo2
-effDemo2 :: Eff '[FileSystem, Out NodeEvent, IOE] ()
+effDemo2 :: Eff '[FileSystem, Out NodeLog, IOE] ()
 effDemo2 = do
   res <- listFileImp
   chk res

@@ -85,7 +85,7 @@ startEndNodeMatch p l = evnt l & \case
   StartExecution {} -> False
   Failure {} -> False
   ParentFailure {} -> False
-  NodeEvent {} -> False
+  NodeLog {} -> False
   EndExecution {} -> False
   FilterLog {} -> False
   SuiteInitFailure {} -> False
@@ -115,7 +115,7 @@ suiteEventOrParentFailureSuiteEvent l =
   End {nodeType = s} -> Just s
   Failure {} -> Nothing
   ParentFailure {nodeType = s} -> Just s
-  NodeEvent {} -> Nothing
+  NodeLog {} -> Nothing
   EndExecution {} -> Nothing
 
 getSuiteEvent :: Log a b -> Maybe NodeType
@@ -127,7 +127,7 @@ getSuiteEvent l = evnt l  & \case
   ParentFailure {nodeType} -> Just nodeType
   Failure {nodeType} -> Just nodeType
   StartExecution {} -> Nothing
-  NodeEvent {} -> Nothing
+  NodeLog {} -> Nothing
   EndExecution {} -> Nothing
 
 getHookInfo :: Log a b -> Maybe (Hz, HookPos)
@@ -142,7 +142,7 @@ startOrParentFailure l = evnt l  & \case
   SuiteInitFailure {} -> False
   StartExecution {} -> False
   EndExecution {} -> False
-  NodeEvent {} -> False
+  NodeLog {} -> False
   Failure {} -> False
   -- event will either have a start or be
   -- represented by a parent failure if skipped
@@ -156,7 +156,7 @@ startSuiteEventLoc l = evnt l & \case
   SuiteInitFailure {} -> Nothing
   StartExecution {} -> Nothing
   EndExecution {} -> Nothing
-  NodeEvent {} -> Nothing
+  NodeLog {} -> Nothing
   Failure {} -> Nothing
   -- event will either have a start or be
   -- represented by a parent failure if skipped

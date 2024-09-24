@@ -2,7 +2,7 @@ module WebDriverDemo where
 
 import Check
 import Core (ParseException)
-import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log))
+import DSL.Internal.NodeLog (NodeLog (User), Path (NodePath), UserLog (Log))
 import DSL.OutEffect (Out, out)
 import Effectful as EF
   ( Eff,
@@ -60,13 +60,13 @@ test = Full config action parse items
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
-driver_status :: (WebUI :> es, Out NodeEvent :> es) => Eff es DriverStatus
+driver_status :: (WebUI :> es, Out NodeLog :> es) => Eff es DriverStatus
 driver_status = do 
   status <- driverStatus
   log $ "the driver status is: " <> txt status
   pure status
 
-action :: (WebUI :> es, Out NodeEvent :> es) => RunConfig -> Data -> Eff es AS
+action :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> Data -> Eff es AS
 action _rc i = do
   log i.title
   status <- driver_status

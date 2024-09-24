@@ -6,7 +6,7 @@ module Internal.Logging where
 
 import CoreUtils (Hz (..))
 import CoreUtils qualified as C
-import DSL.Internal.NodeEvent qualified as NE
+import DSL.Internal.NodeLog qualified as NE
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import Data.Text as T (intercalate)
 import Filter (FilterResult)
@@ -215,7 +215,7 @@ data Event loc evnt
         failLoc :: loc,
         failSuiteEvent :: NodeType
       }
-  | NodeEvent
+  | NodeLog
       { event :: evnt
       }
   | EndExecution
@@ -224,7 +224,7 @@ data Event loc evnt
 testLogControls :: forall l a. (Show a, Show l) => Bool -> IO (LogControls (Event l a) (Log l a), STM [Log l a])
 testLogControls = testLogControls' expandEvent
 
--- -- NodeEvent (a) a loggable event generated from within a node
+-- -- NodeLog (a) a loggable event generated from within a node
 -- -- EngineEvent a - marks start, end and failures in test fixtures (hooks, tests) and errors
 -- -- Log a - adds thread id and index to EngineEvent
 expandEvent :: C.ThreadId -> Int -> Event l a -> Log l a

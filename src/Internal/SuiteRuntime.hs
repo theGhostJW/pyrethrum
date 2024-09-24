@@ -2,7 +2,7 @@ module Internal.SuiteRuntime where
 
 import Core qualified as C
 import CoreUtils (Hz (..))
-import DSL.Internal.NodeEvent qualified as AE
+import DSL.Internal.NodeLog qualified as AE
 import Internal.Logging (HookPos (..), NodeType (..))
 import Internal.Logging qualified as L
 import Internal.SuiteFiltering (FilteredSuite (..))
@@ -36,15 +36,15 @@ newtype ThreadCount = ThreadCount {maxThreads :: Int}
 
 -- executes prenodes directly without any tree shaking,
 --  filtering or validation used in testing
-executeWithoutValidation :: ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
+executeWithoutValidation :: ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeLog) (L.Log L.ExePath AE.NodeLog) -> [P.PreNode IO ()] -> IO ()
 executeWithoutValidation tc lc pn =
   L.runWithLogger lc (\l -> executeNodeList tc l pn)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> C.SuiteExeParams m rc fc -> IO ()
+execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeLog) (L.Log L.ExePath AE.NodeLog) -> C.SuiteExeParams m rc fc -> IO ()
 execute tc lc prms =
   L.runWithLogger lc execute'
   where
-    execute' :: L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> IO ()
+    execute' :: L.LoggerSource (L.Event L.ExePath AE.NodeLog) -> IO ()
     execute' l@L.MkLoggerSource{rootLogger} =
       do
         P.prepare prms
@@ -56,13 +56,13 @@ execute tc lc prms =
                   executeNodeList tc l validated.suite
             )
 
-executeNodeList :: ThreadCount -> L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> [P.PreNode IO ()] -> IO ()
+executeNodeList :: ThreadCount -> L.LoggerSource (L.Event L.ExePath AE.NodeLog) -> [P.PreNode IO ()] -> IO ()
 executeNodeList tc lgr nodeList =
   do
     xtree <- mkXTree (L.ExePath []) nodeList
     executeNodes lgr xtree tc
 
-executeNodes :: L.LoggerSource (L.Event L.ExePath AE.NodeEvent) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
+executeNodes :: L.LoggerSource (L.Event L.ExePath AE.NodeLog) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
 executeNodes L.MkLoggerSource {rootLogger, newLogger} nodes tc =
   do
     finally
@@ -356,7 +356,7 @@ data ExeIn oi ti tsti = ExeIn
     tstIn :: tsti
   }
 
-type Logger = L.Event L.ExePath AE.NodeEvent -> IO ()
+type Logger = L.Event L.ExePath AE.NodeLog -> IO ()
 
 logAbandonned :: Logger -> L.ExePath -> NodeType -> L.FailPoint -> IO ()
 logAbandonned lgr p e a =
@@ -607,7 +607,7 @@ runNode lgr hi xt =
     invalidTree input cst = bug @Void . error $ input <> " >>> should not be passed to >>> " <> cst <> "\n" <> txt xt.path
 
     sink :: P.LogSink
-    sink = lgr . L.NodeEvent
+    sink = lgr . L.NodeLog
 
     runTestsWithEachContext :: forall ti. IO (TestContext ti) -> TestSource ti -> IO QElementRun
     runTestsWithEachContext ctx =

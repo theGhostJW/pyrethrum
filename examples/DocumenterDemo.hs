@@ -4,8 +4,23 @@ module DocumenterDemo where
 
 import Check
 import Core (ParseException)
+import PyrethrumBase (
+  Action,
+  Depth (..),
+  Fixture (..),
+  HasLog,
+  Hook (..),
+  LogEffs,
+  Node (..),
+  RunConfig (..),
+  Suite,
+  FixtureConfig (..),
+  DataSource(..),
+  FixtureConfig, Country (..), Environment (..), fxCfg,
+ )
+import Core (After, Around, Before, Each, Once, ParseException, Thread)
 import DSL.FileSystemEffect
-import DSL.Internal.NodeEvent (NodeEvent , Path (NodePath))
+import DSL.Internal.NodeLog (NodeLog , Path (NodePath))
 import DSL.OutEffect (Out)
 import Data.Text (isInfixOf)
 import Effectful as EF
@@ -27,8 +42,8 @@ import PyrethrumBase
       DataSource(ItemList),
       Depth(DeepRegression),
       defaultRunConfig,
-      docRunner )
-import PyrethrumExtras (Abs, File, relfile, toS, (?))
+      docRunner, Hook (BeforeHook') )
+import PyrethrumExtras (Abs, File, relfile, toS, (?), txt)
 import WebDriverEffect
     ( WebUI,
       driverStatus,
@@ -60,7 +75,7 @@ docDemo stp chks = runDemo $ docRunner stp chks
 
 -- copied from FileSystemDocDemo.hs
 
-getPaths :: (Out NodeEvent :> es, FileSystem :> es) => Eff es [P.Path Abs File]
+getPaths :: (Out NodeLog :> es, FileSystem :> es) => Eff es [P.Path Abs File]
 getPaths =
   do
     log "Getting paths"
@@ -79,7 +94,7 @@ chkPathsThatDoesNothing :: [P.Path Abs File] -> Eff es ()
 chkPathsThatDoesNothing _ = pure ()
 
 
-fsDemoAp :: forall es. (Out NodeEvent :> es, FileSystem :> es) => Eff es ()
+fsDemoAp :: forall es. (Out NodeLog :> es, FileSystem :> es) => Eff es ()
 fsDemoAp = do
   paths <- getPaths
   chkPathsThatDoesNothing paths
@@ -106,7 +121,7 @@ getFailNested = pure $ error "This is a nested error !!! "
 getFail :: Eff es FSAS
 getFail = error "This is an error !!! "
 
-fsAction :: (FileSystem :> es, Out NodeEvent :> es) => RunConfig -> FSData -> Eff es FSAS
+fsAction :: (FileSystem :> es, Out NodeLog :> es) => RunConfig -> FSData -> Eff es FSAS
 fsAction _rc i = do
   getFailNested
   -- getFail
@@ -175,6 +190,10 @@ stepsDocWebdriverDemo :: IO ()
 stepsDocWebdriverDemo = baseWdDemo True False
 -- >>> stepsDocWebdriverDemo
 
+titlesWebdriverDemo :: IO ()
+titlesWebdriverDemo = baseWdDemo False False
+
+-- >>> titlesWebdriverDemo
 
 webDriverSuite :: Suite
 webDriverSuite =
@@ -184,9 +203,29 @@ webDriverSuite =
 -- altrenative prenode for documantation
 -- Doc log and doc mock to make work
 
+--- Hook ---
 
-test :: Fixture ()
-test = Full config action parse items
+nothingBefore :: Hook Once Before () ()
+nothingBefore = BeforeHook {
+  action = \_rc -> do 
+    log "This is the outer hook"
+    log "Run once before the test"
+}
+
+intOnceHook :: Hook Once Before () Int
+intOnceHook =
+  BeforeHook'
+    { depends = nothingBefore
+    , action' = \_rc _void -> do 
+       log "This is the inner hook"
+       log "Run once before the test"
+       pure 8
+    }
+
+--- Fixture ---
+
+test :: Fixture Int
+test = Full' config intOnceHook action parse items
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
@@ -201,9 +240,10 @@ _checkBoxesLinkCss :: Selector
 _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
 
-action :: (WebUI :> es, Out NodeEvent :> es) => RunConfig -> Data -> Eff es AS
-action _rc i = do
+action :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> Int -> Data -> Eff es AS
+action _rc hkInt i = do
   log $ "test title is: " <> i.title
+  log $ "received hook int: " <> txt hkInt <> " from the hook"
   status <- driver_status
   log "GOT DRIVER STATUS"
   -- log $ "the driver status is (from root): " <> txt status

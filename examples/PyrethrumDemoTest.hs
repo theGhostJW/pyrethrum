@@ -3,7 +3,7 @@ module PyrethrumDemoTest where
 import Check (Checks, chk)
 -- TODO Base should reexport all required types from core
 import Core (After, Around, Before, Each, Once, ParseException, Thread)
-import DSL.Internal.NodeLog (NodeLog (..), Path (..), UserLog (Log))
+import DSL.Internal.NodeLog (NodeLog (..), Path (..), UserLog (Info))
 import DSL.OutEffect (out)
 import Effectful (Eff)
 import PyrethrumBase (
@@ -29,10 +29,10 @@ were starting to look more complex than the original so abandonned.
 -}
 
 log :: (HasLog es) => Text -> Eff es ()
-log = out . User . Log
+log = out . User . Info
 
 logShow :: (HasLog es, Show a) => a -> Eff es ()
-logShow = out . User . Log . txt
+logShow = out . User . Info . txt
 
 {- Demonstraits using partial effect
   type LogEffs a = forall es. (Out NodeLog :> es) => Eff es a

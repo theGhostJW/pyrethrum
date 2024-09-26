@@ -17,4 +17,4 @@ logTxt :: (Out E.NodeLog :> es, Show a) => a -> Eff es ()
 logTxt = log . txt
 
 log :: (Out E.NodeLog :> es) => Text -> Eff es ()
-log = out . E.User . E.Log
+log = out . E.User . E.Info

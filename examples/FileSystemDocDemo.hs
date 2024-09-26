@@ -6,7 +6,7 @@ import DSL.FileSystemEffect
     findFilesWith,
     walkDirAccum,
   )
-import DSL.Internal.NodeLog (NodeLog (User), UserLog (Log))
+import DSL.Internal.NodeLog (NodeLog (User), UserLog (Info))
 import DSL.OutEffect (Out, Sink (Sink), out)
 import DSL.OutInterpreter ( runOut )
 import Data.List.Extra (isInfixOf)
@@ -67,7 +67,7 @@ apEventOut :: forall a es. (IOE :> es) => Eff (Out NodeLog : es) a -> Eff es a
 apEventOut = runOut print
 
 log :: (Out NodeLog :> es) => Text -> Eff es ()
-log = out . User . Log
+log = out . User . Info
 
 getPaths :: (Out NodeLog :> es, FileSystem :> es) => Eff es [Path Abs File]
 getPaths =

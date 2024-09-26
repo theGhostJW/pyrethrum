@@ -81,8 +81,8 @@ data FrameworkLog
 data UserLog
   = StartFolder Text
   | EndFolder Text
-  | Log Text
-  | Log'
+  | Info Text
+  | Info'
       { message :: Text,
         details :: Text
       }

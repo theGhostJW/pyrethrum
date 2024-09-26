@@ -119,10 +119,10 @@ ioRun ap = ap &
   runEff  
 
 logShow :: (Out NodeLog :> es, Show a) => a -> Eff es ()
-logShow = out . User . Log . txt
+logShow = out . User . Info . txt
 
 log :: (Out NodeLog :> es) => Text -> Eff es ()
-log = out . User . Log
+log = out . User . Info
 
 -- $ > ioRun effDemo
 effDemo :: Eff '[FileSystem, Out NodeLog, IOE] ()

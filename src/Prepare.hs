@@ -296,7 +296,11 @@ prepareTest mode interpreter rc path =
               do
                 logTestAndAction snk i
                 as <- runAction snk action i
-                let !evt = Parse path . ApStateText $ txt as
+
+                -- TODO: RESTORE IF NEEDED
+                -- let !evt = Parse path . ApStateText $ txt as
+                let evt = Parse path . ApStateText $ txt as
+
                 flog snk evt
                 unTry snk $ applyParser parser as
             applyChecks snk path i.checks ds

@@ -41,7 +41,7 @@ runWebDriver =
         -- window
         FullscreenWindow _sessionRef -> docAction "make browser fullscreen"
         MaximiseWindow _sessionRef -> docAction "maximise browser window"
-        MinimiseWindow _sessionRef -> docAction"minimise browser window"
+        MinimiseWindow _sessionRef -> docAction "minimise browser window"
         -- navigate
         Go _sessionRef url -> docAction2 "navigate to:" url
         -- page

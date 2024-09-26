@@ -1,26 +1,10 @@
-{-# LANGUAGE NoStrictData #-}
-
 module DocumenterDemo where
 
 import Check
-import Core (ParseException)
-import PyrethrumBase (
-  Action,
-  Depth (..),
-  Fixture (..),
-  HasLog,
-  Hook (..),
-  LogEffs,
-  Node (..),
-  RunConfig (..),
-  Suite,
-  FixtureConfig (..),
-  DataSource(..),
-  FixtureConfig, Country (..), Environment (..), fxCfg,
- )
-import Core (After, Around, Before, Each, Once, ParseException, Thread)
+import Core (Before, Once, ParseException)
 import DSL.FileSystemEffect
-import DSL.Internal.NodeLog (NodeLog , Path (NodePath))
+import DSL.Internal.NodeLog (NodeLog, Path (NodePath))
+import DSL.Logging ( log )
 import DSL.OutEffect (Out)
 import Data.Text (isInfixOf)
 import Effectful as EF
@@ -31,47 +15,47 @@ import Filter (Filters (..))
 import Internal.Logging qualified as L
 import Internal.SuiteRuntime (ThreadCount (..))
 import Path as P (Path, reldir, toFilePath)
-import DSL.Logging
 import PyrethrumBase
-    ( SuiteRunner,
-      Suite,
-      RunConfig,
-      FixtureConfig(FxCfg),
-      Fixture(Full),
-      Node(Fixture),
-      DataSource(ItemList),
-      Depth(DeepRegression),
-      defaultRunConfig,
-      docRunner, Hook (BeforeHook') )
-import PyrethrumExtras (Abs, File, relfile, toS, (?), txt)
+  ( DataSource (..),
+    Depth (..),
+    Fixture (..),
+    FixtureConfig (..),
+    Hook (..),
+    Node (..),
+    RunConfig (..),
+    Suite,
+    SuiteRunner,
+    defaultRunConfig,
+    docRunner,
+  )
+import PyrethrumExtras (Abs, File, relfile, toS, txt, (?))
 import WebDriverEffect
-    ( WebUI,
-      driverStatus,
-      newSession,
-      maximiseWindow,
-      go,
-      findElem,
-      readElem,
-      clickElem,
-      sleep,
-      killSession )
+  ( WebUI,
+    clickElem,
+    driverStatus,
+    findElem,
+    go,
+    killSession,
+    maximiseWindow,
+    newSession,
+    readElem,
+    sleep,
+  )
 import WebDriverPure (seconds)
 import WebDriverSpec (DriverStatus (..), Selector (CSS))
-
 
 runDemo :: SuiteRunner -> Suite -> IO ()
 runDemo runner suite = do
   (logControls, _logList) <- L.testLogControls True
   runner suite Unfiltered defaultRunConfig (ThreadCount 1) logControls
-  -- putStrLn "########## Log ##########"
-  -- atomically logList >>= mapM_ pPrint
+
+-- putStrLn "########## Log ##########"
+-- atomically logList >>= mapM_ pPrint
 
 docDemo :: Bool -> Bool -> Suite -> IO ()
 docDemo stp chks = runDemo $ docRunner stp chks
 
 -- ############### Test Case ###################
-
-
 
 -- copied from FileSystemDocDemo.hs
 
@@ -89,16 +73,13 @@ getPaths =
     isDeleteMe :: P.Path Abs File -> Eff es Bool
     isDeleteMe = pure . isInfixOf "deleteMe" . toS . P.toFilePath
 
-
 chkPathsThatDoesNothing :: [P.Path Abs File] -> Eff es ()
 chkPathsThatDoesNothing _ = pure ()
-
 
 fsDemoAp :: forall es. (Out NodeLog :> es, FileSystem :> es) => Eff es ()
 fsDemoAp = do
   paths <- getPaths
   chkPathsThatDoesNothing paths
-
 
 -- ################### 1. FS App with full runtime ##################
 
@@ -138,7 +119,7 @@ data FSData = FSItem
   }
   deriving (Show, Read)
 
-{- 
+{-
 TODO: make better compile error example
 data FSData = FSItem
   { id :: Int,
@@ -172,7 +153,6 @@ fsItems _rc =
         }
     ]
 
-
 -- ################### WebDriver Test ##################
 
 baseWdDemo :: Bool -> Bool -> IO ()
@@ -180,14 +160,17 @@ baseWdDemo stp chks = docDemo stp chks webDriverSuite
 
 fullDocWebdriverDemo :: IO ()
 fullDocWebdriverDemo = baseWdDemo True True
+
 -- >>> fullDocWebdriverDemo
 
 chksDocWebdriverDemo :: IO ()
-chksDocWebdriverDemo = baseWdDemo False True 
+chksDocWebdriverDemo = baseWdDemo False True
+
 -- >>> chksDocWebdriverDemo
 
 stepsDocWebdriverDemo :: IO ()
 stepsDocWebdriverDemo = baseWdDemo True False
+
 -- >>> stepsDocWebdriverDemo
 
 titlesWebdriverDemo :: IO ()
@@ -195,36 +178,43 @@ titlesWebdriverDemo = baseWdDemo False False
 
 -- >>> titlesWebdriverDemo
 
-TODO:
- - get demo working with hooks
- - add tests
- - play with hook data objects and laziness
+-- TODO:
+--  - add tests
+--  - play with hook data objects and laziness
 
 webDriverSuite :: Suite
 webDriverSuite =
-  [Fixture (NodePath "WebDriverDemo" "test") test]
+  [ Hook
+      (NodePath "WebDriverDemo" "before")
+      nothingBefore
+      [ Hook
+          (NodePath "WebDriverDemo" "beforeInner")
+          intOnceHook
+          [ Fixture (NodePath "WebDriverDemo" "test") test
+          ]
+      ]
+  ]
 
--- todo experiment with hooks (laziness)
--- altrenative prenode for documantation
--- Doc log and doc mock to make work
 
 --- Hook ---
 
 nothingBefore :: Hook Once Before () ()
-nothingBefore = BeforeHook {
-  action = \_rc -> do 
-    log "This is the outer hook"
-    log "Run once before the test"
-}
+nothingBefore =
+  BeforeHook
+    { action = \_rc -> do
+        log "This is the outer hook"
+        log "Run once before the test"
+    }
 
 intOnceHook :: Hook Once Before () Int
 intOnceHook =
   BeforeHook'
-    { depends = nothingBefore
-    , action' = \_rc _void -> do 
-       log "This is the inner hook"
-       log "Run once before the test"
-       pure 8
+    { depends = nothingBefore,
+      action' = \_rc _void -> do
+        log "This is the inner hook"
+        log "Run once before the test"
+        pure 8
+        -- pure $ error "HOOK BANG !!!"
     }
 
 --- Fixture ---
@@ -236,14 +226,14 @@ config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
 driver_status :: (WebUI :> es) => Eff es DriverStatus
-driver_status = driverStatus
+driver_status = pure $ error "This is a lazy error !!!"
+-- driver_status = driverStatus
 
 _theInternet :: Text
 _theInternet = "https://the-internet.herokuapp.com/"
 
 _checkBoxesLinkCss :: Selector
 _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
-
 
 action :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> Int -> Data -> Eff es AS
 action _rc hkInt i = do

@@ -19,11 +19,9 @@ where
 
 import Data.Aeson (Value, object)
 import Data.Text.IO qualified as T
-import Network.HTTP.Client qualified as L
 import Network.HTTP.Req as R
   ( DELETE (DELETE),
     GET (GET),
-    HttpException,
     NoReqBody (NoReqBody),
     POST (POST),
     ReqBodyJson (ReqBodyJson),
@@ -35,15 +33,13 @@ import Network.HTTP.Req as R
     port,
     req,
     responseBody,
-    responseCookieJar,
     responseStatusCode,
     responseStatusMessage,
     runReq,
-    toVanillaResponse,
     (/:),
   )
 import PyrethrumExtras (getLenient, toS, txt)
-import UnliftIO (try)
+-- import UnliftIO (try)
 -- TODO deprecate
 import Web.Api.WebDriver (Capabilities, defaultFirefoxCapabilities)
 import WebDriverPure (RequestArgs (..), capsToJson)
@@ -61,7 +57,6 @@ import WebDriverSpec as WD
     fullscreenWindowSpec,
     maximizeWindowSpec,
     minimizeWindowSpec,
-    mkShowable,
     navigateToSpec,
     newSessionSpec',
     statusSpec,
@@ -105,34 +100,9 @@ elementText s = run . elementTextSpec s
 
 -- ############# Utils #############
 
--- TODO: logging behaviour injectable special value W3CLogging
--- eg. thsi can scramble logs when run in Eff and multithreaded
---------------------------------------------------------------------------------
--- console out (to haskell output window) for debugging
-run :: forall a. (Show a) => W3Spec a -> IO a
-run = execute'
-
--- | Execute with logging
-execute' :: forall a. (Show a) => W3Spec a -> IO a
-execute' spec =
-  describe spec.description $ do
-    devLog . txt $ mkShowable spec
-    r <- callWebDriver True $ mkRequest spec
-    parseIO spec r
---------------------------------------------------------------------------------
-
-{-
---------------------------------------------------------------------------------
 -- no console out for "production"
 run :: W3Spec a -> IO a
-run = execute
-
-execute :: forall a. W3Spec a -> IO a
-execute spec = do
-  r <- callWebDriver False $ mkRequest spec
-  parseIO spec r
---------------------------------------------------------------------------------
--}
+run spec = callWebDriver False (mkRequest spec) >>= parseIO spec
 
 -- TODO: will neeed to be parameterised later
 mkRequest :: forall a. W3Spec a -> RequestArgs
@@ -144,10 +114,10 @@ mkRequest = \case
 
 parseIO :: W3Spec a -> WD.HttpResponse -> IO a
 parseIO spec r =
-  maybe
-    (fail . toS $ spec.description <> "\n" <> "Failed to parse response:\n " <> txt r)
-    pure
-    $ spec.parser r
+  spec.parser r
+    & maybe
+      (fail . toS $ spec.description <> "\n" <> "Failed to parse response:\n " <> txt r)
+      pure
 
 devLog :: (MonadIO m) => Text -> m ()
 devLog = liftIO . T.putStrLn
@@ -161,9 +131,10 @@ callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
           Response
             { statusCode = responseStatusCode r,
               statusMessage = getLenient . toS $ responseStatusMessage r,
-              headers = L.responseHeaders . toVanillaResponse $ r,
-              body = responseBody r :: Value,
-              cookies = responseCookieJar r
+              body = responseBody r :: Value
+              -- not used yet may be able to remove and reduce dependncies
+              -- headers = L.responseHeaders . toVanillaResponse $ r,
+              -- cookies = responseCookieJar r
             }
     log $ "Framework Response:\n" <> txt fr
     pure fr
@@ -172,25 +143,38 @@ callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
     url :: Url 'Http
     url = foldl' (/:) (http "127.0.0.1") subDirs
 
-describe :: (Show a) => Text -> IO a -> IO a
-describe msg action = do
-  T.putStrLn ""
-  T.putStrLn $ "########### " <> msg <> " ###########"
-  ethr <- handleEx action
-  logResponse ethr
-  either (fail . toS . txt) pure ethr
 
-handleEx :: IO a -> IO (Either HttpException a)
-handleEx = try
+--------------------------------------------------------------------------------
+-- console out (to haskell output window) for debugging
+-- run :: forall a. (Show a) =>  W3Spec a -> IO a
+-- run spec =
+--   describe spec.description $ do
+--     devLog . txt $ mkShowable spec
+--     r <- callWebDriver True $ mkRequest spec
+--     parseIO spec r
 
-logResponse :: (Show a) => Either HttpException a -> IO ()
-logResponse =
-  either
-    ( \e -> do
-        T.putStrLn "!!!!!!!!!! REQUEST FAILED !!!!!!!!!!!"
-        T.putStrLn $ txt e
-    )
-    ( \r -> do
-        T.putStrLn "!!!!!!!!!! REQUEST SUCCEEDED !!!!!!!!!!!"
-        T.putStrLn $ txt r
-    )
+
+-- describe :: (Show a) => Text -> IO a -> IO a
+-- describe msg action = do
+--   T.putStrLn ""
+--   T.putStrLn $ "########### " <> msg <> " ###########"
+--   ethr <- handleEx action
+--   logResponse ethr
+--   either (fail . toS . txt) pure ethr
+
+-- handleEx :: IO a -> IO (Either HttpException a)
+-- handleEx = try
+
+-- logResponse :: (Show a) => Either HttpException a -> IO ()
+-- logResponse =
+--   either
+--     ( \e -> do
+--         T.putStrLn "!!!!!!!!!! REQUEST FAILED !!!!!!!!!!!"
+--         T.putStrLn $ txt e
+--     )
+--     ( \r -> do
+--         T.putStrLn "!!!!!!!!!! REQUEST SUCCEEDED !!!!!!!!!!!"
+--         T.putStrLn $ txt r
+--     )
+
+--------------------------------------------------------------------------------

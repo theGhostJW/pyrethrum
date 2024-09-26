@@ -115,8 +115,8 @@ dependencies:
   - unliftio
   - yaml
   # used to talk to ghecko driver
-  - http-client
-  - http-types
+  # - http-client
+  # - http-types
   - req
   # webdriver used in TestdemoSelenium
   - webdriver-w3c

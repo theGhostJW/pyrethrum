@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: be68a122f25a6347efe5553ecd39f294f56632f30e3c7608fbdf389abda8053d
+-- hash: 6fd4ef585454e85aa2ab5d4c7fe48c315eb256929b9fb58776234d11098d5866
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -202,8 +202,6 @@ library
     , extra
     , fmt
     , hashable
-    , http-client
-    , http-types
     , mtl
     , path
     , path-io

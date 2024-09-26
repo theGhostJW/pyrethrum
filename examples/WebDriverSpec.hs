@@ -31,13 +31,16 @@ import Data.Aeson
     object,
   )
 import Data.Aeson.KeyMap qualified as AKM
-import Network.HTTP.Client qualified as NC
-import Network.HTTP.Types qualified as NT
 import Prelude hiding (get)
+
+-- import Network.HTTP.Client qualified as NC (CookieJar)
+-- import Network.HTTP.Types qualified as NT (ResponseHeaders)
 
 {- Pure types and functions used in Webdriver -}
 
---  TODO: add error handler
+--  TODO: add error handler / classifier
+-- (Webdriver errors - library agnostic) vs HTTP errors (eg. driver not runnning - library dependent?)
+
 data W3Spec a
   = Get
       { description :: Text,
@@ -69,19 +72,14 @@ data W3SpecShowable = Request
   }
   deriving (Show)
 
-mkShowable :: W3Spec a -> W3SpecShowable
-mkShowable = \case
-  Get d p _ -> Request d "GET" p Nothing
-  Post d p b _ -> Request d "POST" p (Just b)
-  PostEmpty d p _ -> Request d "POST" p Nothing
-  Delete d p _ -> Request d "DELETE" p Nothing
 
 data HttpResponse = Response
   { statusCode :: Int,
     statusMessage :: Text,
-    headers :: NT.ResponseHeaders,
-    body :: Value,
-    cookies :: NC.CookieJar
+    body :: Value
+    -- not used yet may be able to remove and reduce dependencies
+    -- headers :: NT.ResponseHeaders,
+    -- cookies :: NC.CookieJar
   }
   deriving (Show)
 
@@ -97,15 +95,6 @@ data DriverStatus
   | ServiceError {statusCode :: Int, statusMessage :: Text}
   | Unknown {statusCode :: Int, statusMessage :: Text}
   deriving (Show, Eq)
-
-parseDriverStatus :: HttpResponse -> Maybe DriverStatus
-parseDriverStatus Response {statusCode, statusMessage} =
-  Just $
-    statusCode & \case
-      200 -> Ready
-      500 -> ServiceError {statusCode, statusMessage}
-      501 -> Running
-      _ -> Unknown {statusCode, statusMessage}
 
 -- TODO: add more selector types
 newtype Selector = CSS Text
@@ -163,23 +152,10 @@ capsToJson caps =
     ]
 -}
 
-session :: Text
-session = "session"
 
-session1 :: Text -> [Text]
-session1 sp = [session, sp]
-
-sessionId1 :: SessionRef -> Text -> [Text]
-sessionId1 sr sp = [session, sr.id, sp]
-
-window :: Text
-window = "window"
-
-window1 :: SessionRef -> Text -> [Text]
-window1 sr sp = [session, sr.id, window, sp]
-
-element1 :: SessionRef -> ElementRef -> Text -> [Text]
-element1 sr er sp = [session, sr.id, "element", er.id, sp]
+-- ######################################################################
+-- ########################### WebDriver API ############################
+-- ######################################################################
 
 -- https://www.w3.org/TR/2024/WD-webdriver2-20240723/
 {-
@@ -345,3 +321,37 @@ parseElementRef r =
             >>= lookup "element-6066-11e4-a52e-4f735466cecf"
             >>= asText
         )
+
+session :: Text
+session = "session"
+
+session1 :: Text -> [Text]
+session1 sp = [session, sp]
+
+sessionId1 :: SessionRef -> Text -> [Text]
+sessionId1 sr sp = [session, sr.id, sp]
+
+window :: Text
+window = "window"
+
+window1 :: SessionRef -> Text -> [Text]
+window1 sr sp = [session, sr.id, window, sp]
+
+element1 :: SessionRef -> ElementRef -> Text -> [Text]
+element1 sr er sp = [session, sr.id, "element", er.id, sp]
+
+mkShowable :: W3Spec a -> W3SpecShowable
+mkShowable = \case
+  Get d p _ -> Request d "GET" p Nothing
+  Post d p b _ -> Request d "POST" p (Just b)
+  PostEmpty d p _ -> Request d "POST" p Nothing
+  Delete d p _ -> Request d "DELETE" p Nothing
+
+parseDriverStatus :: HttpResponse -> Maybe DriverStatus
+parseDriverStatus Response {statusCode, statusMessage} =
+  Just $
+    statusCode & \case
+      200 -> Ready
+      500 -> ServiceError {statusCode, statusMessage}
+      501 -> Running
+      _ -> Unknown {statusCode, statusMessage}

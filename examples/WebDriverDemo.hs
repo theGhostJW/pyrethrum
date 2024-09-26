@@ -16,6 +16,7 @@ import Filter (Filters(..))
 import Internal.SuiteRuntime (ThreadCount(..))
 import Internal.Logging qualified as L
 import WebDriverPure (seconds)
+import DSL.Logging (log)
 
 
 -- ################### Effectful Demo ##################
@@ -30,29 +31,18 @@ suite :: Suite
 suite =
   [Fixture (NodePath "WebDriverDemo" "test") test]
 
-runDemo :: SuiteRunner -> IO ()
-runDemo runner = do 
+runDemo :: SuiteRunner -> Suite -> IO ()
+runDemo runner suite' = do 
   (logControls, _logLst) <- L.testLogControls True
-  runner suite Unfiltered defaultRunConfig (ThreadCount 1) logControls
+  runner suite' Unfiltered defaultRunConfig (ThreadCount 1) logControls
 
 -- start geckodriver first: geckodriver &
-runIODemo :: IO ()
+runIODemo :: Suite -> IO ()
 runIODemo = runDemo ioRunner
--- >>> runIODemo
-
--- TODO: not working looks like needs separate runner
-runDocDemo :: IO ()
-runDocDemo = runDemo $ docRunner True True
--- >>> runDocDemo
 
 -- ############### Test Case ###################
 
--- TODO: log interpreter
-logShow :: (HasLog es, Show a) => a -> Eff es ()
-logShow = log . txt
-
-log :: (HasLog es) => Text -> Eff es ()
-log = out . User . Log
+-- >>> runIODemo suite
 
 test :: Fixture ()
 test = Full config action parse items
@@ -116,3 +106,62 @@ items _rc =
         }
     ]
 
+-- ############### Test Case With Lazy Errors ###################
+
+{-
+todo: 
+ - exceptions in selenium
+ - check why no callstack
+ - laziness - esp hooks
+ - finish doc interpreter poc
+ - merge
+-}
+
+--- >>> lazyDemo
+lazyDemo :: IO ()
+lazyDemo = runIODemo suiteLzFail
+
+suiteLzFail :: Suite
+suiteLzFail =
+  [Fixture (NodePath "WebDriverDemo" "test") testLazy]
+
+
+testLazy :: Fixture ()
+testLazy = Full config action_fail parseLzFail itemsLzFail
+
+driver_status_fail :: (WebUI :> es, Out NodeLog :> es) => Eff es DriverStatus
+driver_status_fail = do 
+  status <- driverStatus
+  log $ "the driver status is: " <> txt status
+  pure $ error "BANG !!!! driver status failed !!!"
+
+action_fail :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> Data -> Eff es AS
+action_fail _rc i = do
+  log i.title
+  status <- driver_status_fail
+  -- log $ "the driver status is (from test): " <> txt status
+  ses <- newSession
+  maximiseWindow ses
+  go ses _theInternet
+  link <- findElem ses _checkBoxesLinkCss
+  checkButtonText <- readElem ses link
+  clickElem ses link
+  -- so we can see the navigation worked
+  sleep $ 5 * seconds
+  killSession ses
+  pure $ AS {status, checkButtonText}
+ 
+parseLzFail :: AS -> Either ParseException DS
+parseLzFail AS {..} = pure $ DS {..}
+
+itemsLzFail :: RunConfig -> DataSource Data
+itemsLzFail _rc =
+  ItemList
+    [ Item
+        { id = 1,
+          title = "test the internet",
+          checks =
+            chk "Driver is ready" ((== Ready) . (.status))
+              <> chk "Checkboxes text as expected" ((== "Checkboxes") . (.checkButtonText))
+        }
+    ]

@@ -2,7 +2,7 @@ module Internal.SuiteRuntime where
 
 import Core qualified as C
 import CoreUtils (Hz (..))
-import DSL.Internal.NodeLog qualified as AE
+import DSL.Internal.NodeLog qualified as N
 import Internal.Logging (HookPos (..), NodeType (..))
 import Internal.Logging qualified as L
 import Internal.SuiteFiltering (FilteredSuite (..))
@@ -34,18 +34,20 @@ todo :: define defect properties with sum type type and typeclass which returns 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
+type Log = L.FullLog L.LineInfo (L.Event L.ExePath N.NodeLog)
+
 -- executes prenodes directly without any tree shaking,
 --  filtering or validation used in testing
-executeWithoutValidation :: ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeLog) (L.Log L.ExePath AE.NodeLog) -> [P.PreNode IO ()] -> IO ()
+executeWithoutValidation :: ThreadCount -> L.LogActions (L.Event L.ExePath N.NodeLog) Log -> [P.PreNode IO ()] -> IO ()
 executeWithoutValidation tc lc pn =
   L.runWithLogger lc (\l -> executeNodeList tc l pn)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeLog) (L.Log L.ExePath AE.NodeLog) -> C.SuiteExeParams m rc fc -> IO ()
+execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogActions (L.Event L.ExePath N.NodeLog) Log -> C.SuiteExeParams m rc fc -> IO ()
 execute tc lc prms =
   L.runWithLogger lc execute'
   where
-    execute' :: L.LoggerSource (L.Event L.ExePath AE.NodeLog) -> IO ()
-    execute' l@L.MkLoggerSource{rootLogger} =
+    execute' :: L.Loggers (L.Event L.ExePath N.NodeLog) -> IO ()
+    execute' l@L.MkLoggers{rootLogger} =
       do
         P.prepare prms
           & either
@@ -56,14 +58,14 @@ execute tc lc prms =
                   executeNodeList tc l validated.suite
             )
 
-executeNodeList :: ThreadCount -> L.LoggerSource (L.Event L.ExePath AE.NodeLog) -> [P.PreNode IO ()] -> IO ()
+executeNodeList :: ThreadCount -> L.Loggers (L.Event L.ExePath N.NodeLog) -> [P.PreNode IO ()] -> IO ()
 executeNodeList tc lgr nodeList =
   do
     xtree <- mkXTree (L.ExePath []) nodeList
     executeNodes lgr xtree tc
 
-executeNodes :: L.LoggerSource (L.Event L.ExePath AE.NodeLog) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
-executeNodes L.MkLoggerSource {rootLogger, newLogger} nodes tc =
+executeNodes :: L.Loggers (L.Event L.ExePath N.NodeLog) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
+executeNodes L.MkLoggers {rootLogger, newLogger} nodes tc =
   do
     finally
       ( rootLogger L.StartExecution
@@ -356,9 +358,9 @@ data ExeIn oi ti tsti = ExeIn
     tstIn :: tsti
   }
 
-type Logger = L.Event L.ExePath AE.NodeLog -> IO ()
+type SuiteLogger = L.Event L.ExePath N.NodeLog -> IO ()
 
-logAbandonned :: Logger -> L.ExePath -> NodeType -> L.FailPoint -> IO ()
+logAbandonned :: SuiteLogger -> L.ExePath -> NodeType -> L.FailPoint -> IO ()
 logAbandonned lgr p e a =
   lgr $
     L.ParentFailure
@@ -377,7 +379,7 @@ ioRight = pure . Right
 noImpPropertyError :: any
 noImpPropertyError = error "property tests not implemented"
 
-logReturnFailure :: Logger -> L.ExePath -> NodeType -> SomeException -> IO (Either L.FailPoint b)
+logReturnFailure :: SuiteLogger -> L.ExePath -> NodeType -> SomeException -> IO (Either L.FailPoint b)
 logReturnFailure lgr p et e =
   lgr (L.mkFailure p et e) >> ioLeft (L.FailPoint p et)
 
@@ -573,7 +575,7 @@ canLockTeardown s qs =
 
 runNode ::
   forall hi.
-  Logger ->
+  SuiteLogger ->
   NodeIn hi ->
   ExeTree hi ->
   IO QElementRun
@@ -640,7 +642,7 @@ runNode lgr hi xt =
         pure $ QElementRun True
 
     mkTestPath :: forall a. P.Test IO a -> L.ExePath
-    mkTestPath P.MkTest {id, title = ttl} = L.ExePath $ AE.TestPath {id, title = ttl} : coerce xt.path {- fixture path -}
+    mkTestPath P.MkTest {id, title = ttl} = L.ExePath $ N.TestPath {id, title = ttl} : coerce xt.path {- fixture path -}
     abandonSubs :: forall a. L.FailPoint -> ChildQ (ExeTree a) -> IO QElementRun
     abandonSubs fp = runSubNodes (Abandon fp)
 
@@ -1107,7 +1109,7 @@ tryLock canLock hs cq lockedStatus =
 tryLockIO :: (s -> CanRun -> Bool) -> TVar s -> ChildQ a -> s -> IO Bool
 tryLockIO canLock hs cq lockedStatus = atomically $ tryLock canLock hs cq lockedStatus
 
-logRun :: Logger -> L.ExePath -> NodeType -> IO b -> IO (Either L.FailPoint b)
+logRun :: SuiteLogger -> L.ExePath -> NodeType -> IO b -> IO (Either L.FailPoint b)
 logRun lgr path evt action = do
   lgr $ L.Start evt path
   finally

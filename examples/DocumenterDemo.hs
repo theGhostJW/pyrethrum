@@ -46,7 +46,7 @@ import WebDriverSpec (DriverStatus (..), Selector (CSS))
 
 runDemo :: SuiteRunner -> Suite -> IO ()
 runDemo runner suite = do
-  (logControls, _logList) <- L.testLogControls True
+  (logControls, _logList) <- L.testLogActions True
   runner suite Unfiltered defaultRunConfig (ThreadCount 1) logControls
 
 -- putStrLn "########## Log ##########"

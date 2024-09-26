@@ -33,7 +33,7 @@ suite =
 
 runDemo :: SuiteRunner -> Suite -> IO ()
 runDemo runner suite' = do 
-  (logControls, _logLst) <- L.testLogControls True
+  (logControls, _logLst) <- L.testLogActions True
   runner suite' Unfiltered defaultRunConfig (ThreadCount 1) logControls
 
 -- start geckodriver first: geckodriver &

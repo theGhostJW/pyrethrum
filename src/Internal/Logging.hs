@@ -24,31 +24,35 @@ import Prelude hiding (atomically, lines)
 
 
 {- Fully polymorphic base logging functions -}
+type LogOLD l a = FullLog LineInfo (Event l a)
 
-data BaseLog lc evt = MkLog
-  { logContext :: lc,
+evnt :: FullLog LineInfo (Event l a) -> Event l a
+evnt = (.event)
+
+data FullLog li evt = MkLog
+  { lineInfo :: li,
     event :: evt
   }
   deriving (Show)
   deriving (Generic, NFData)
 
-data LoggerSource l = MkLoggerSource
+data Loggers l = MkLoggers
   { rootLogger :: l -> IO (),
     newLogger :: IO (l -> IO ())
   }
 
-runWithLogger :: forall l lx. LogControls l lx -> (LoggerSource l -> IO ()) -> IO ()
+runWithLogger :: forall l lx. LogActions l lx -> (Loggers l -> IO ()) -> IO ()
 runWithLogger
-  LogControls
+  MkLogActions
     { sink,
-      expander,
+      expandLog,
       logWorker,
       stopWorker
     }
   action =
     do
       rootLogger <- mkNewLogger
-      let loggerSource = MkLoggerSource rootLogger mkNewLogger
+      let loggerSource = MkLoggers rootLogger mkNewLogger
       -- logWorker and execution run concurrently
       -- logworker serialises the log events emitted by the execution
       concurrently_
@@ -59,7 +63,7 @@ runWithLogger
         )
     where
       mkNewLogger :: IO (l -> IO ())
-      mkNewLogger = mkLogger expander sink <$> UnliftIO.newIORef (-1) <*> P.myThreadId
+      mkNewLogger = mkLogger expandLog sink <$> UnliftIO.newIORef (-1) <*> P.myThreadId
 
 -- adds log index and thread id to loggable event and sends it to the sink
 mkLogger :: forall l lxp. (C.ThreadId -> Int -> l -> lxp) -> (lxp -> IO ()) -> IORef Int -> ThreadId -> l -> IO ()
@@ -71,9 +75,14 @@ mkLogger expander sink idxRef thrdId logEvnt = do
 
 -- TODO:: Logger should be wrapped in an except that sets non-zero exit code on failure
 
-data LogControls log expandedLog = LogControls
-  { expander :: C.ThreadId -> Int -> log -> expandedLog,
+
+
+
+data LogActions log expandedLog = MkLogActions
+  { -- adds line info to the log TODO: Add timestamp (and agent?)
+    expandLog :: C.ThreadId -> Int -> log -> expandedLog,
     sink :: expandedLog -> IO (),
+    -- worker that serializes log events
     logWorker :: IO (),
     stopWorker :: IO ()
   }
@@ -86,8 +95,8 @@ q2List qu = reverse <$> recurse [] qu
       tryReadTQueue q
         >>= maybe (pure l) (\e -> recurse (e : l) q)
 
-testLogControls' :: forall l lx. (Show lx) => (C.ThreadId -> Int -> l -> lx) -> Bool -> IO (LogControls l lx, STM [lx])
-testLogControls' expander wantConsole = do
+testLogActions' :: forall l lx. (Show lx) => (C.ThreadId -> Int -> l -> lx) -> Bool -> IO (LogActions l lx, STM [lx])
+testLogActions' expandLog wantConsole = do
   chn <- newTChanIO
   log <- newTQueueIO
 
@@ -108,19 +117,12 @@ testLogControls' expander wantConsole = do
           writeTChan chn $ Just eventLog
           writeTQueue log eventLog
 
-  pure (LogControls {logWorker, stopWorker, sink, expander}, q2List log)
+  pure (MkLogActions {logWorker, stopWorker, sink, expandLog}, q2List log)
 
 {- Logging functions specialised to Event type -}
 
-type Log l a = BaseLog LogContext (Event l a)
 
-ctx :: Log l a -> LogContext
-ctx = (.logContext)
-
-evnt :: Log l a -> Event l a
-evnt = (.event)
-
-data LogContext = MkLogContext
+data LineInfo = MkLineInfo
   { threadId :: C.ThreadId,
     idx :: Int
   }
@@ -188,7 +190,7 @@ data FailPoint = FailPoint
 mkFailure :: l -> NodeType -> SomeException -> Event l a
 mkFailure loc nodeType exception = Failure {exception = C.exceptionTxt exception, ..}
 
-data Event loc evnt
+data Event loc nodeLog
   = FilterLog
       { filterResuts :: [FilterResult Text]
       }
@@ -217,19 +219,19 @@ data Event loc evnt
         failSuiteEvent :: NodeType
       }
   | NodeLog
-      { event :: evnt
+      { nodeLog :: nodeLog
       }
   | EndExecution
   deriving (Show, Generic, NFData)
 
-testLogControls :: forall l a. (Show a, Show l) => Bool -> IO (LogControls (Event l a) (Log l a), STM [Log l a])
-testLogControls = testLogControls' expandEvent
+testLogActions :: forall l a. (Show a, Show l) => Bool -> IO (LogActions (Event l a) (FullLog LineInfo (Event l a)), STM [FullLog LineInfo (Event l a)])
+testLogActions = testLogActions' expandEvent
 
 -- -- NodeLog (a) a loggable event generated from within a node
 -- -- EngineEvent a - marks start, end and failures in test fixtures (hooks, tests) and errors
 -- -- Log a - adds thread id and index to EngineEvent
-expandEvent :: C.ThreadId -> Int -> Event l a -> Log l a
-expandEvent threadId idx = MkLog (MkLogContext threadId idx)
+expandEvent :: C.ThreadId -> Int -> Event l a -> FullLog LineInfo (Event l a)
+expandEvent threadId idx = MkLog (MkLineInfo threadId idx)
 
 $(deriveToJSON defaultOptions ''ExePath)
 $(deriveJSON defaultOptions ''HookPos)

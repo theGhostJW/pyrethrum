@@ -39,13 +39,13 @@ import Internal.Logging as L
   ( Event (..),
     ExePath (..),
     HookPos (..),
-    Log (),
+    LogOLD (),
     NodeType (..),
     parentPath,
-    testLogControls,
+    testLogActions,
     topPath,
-    BaseLog (..),
-    LogContext (..)
+    FullLog (..),
+    LineInfo(..)
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
@@ -126,10 +126,10 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
   -}
 
-type LogItem = Log ExePath AE.NodeLog
+type LogItem = LogOLD ExePath AE.NodeLog
 
 getThreadId :: LogItem -> ThreadId
-getThreadId (MkLog (MkLogContext {threadId}) _) = threadId
+getThreadId (MkLog (MkLineInfo{threadId}) _) = threadId
 
 logItemtoBool :: (NodeType -> Bool) -> LogItem -> Bool
 logItemtoBool = threadEventToBool
@@ -395,7 +395,7 @@ isFailChildEventOf :: LogItem -> LogItem -> Bool
 isFailChildEventOf c p =
   (cIsSubpathOfp || samePath && pIsSetupFailure && cIsTeardown) && (sameThread || pIsOnceHook)
   where
-    sameThread = p.logContext.threadId == c.logContext.threadId
+    sameThread = p.lineInfo.threadId == c.lineInfo.threadId
     hasHookPos hp = \case
       Hook _ hp' -> hp == hp'
       _ -> False
@@ -739,10 +739,10 @@ nxtHookLog = find (\l -> startEndNodeMatch isHook l || isHookParentFailure l)
 
 threadVisible :: Bool -> ThreadId -> [LogItem] -> [LogItem]
 threadVisible onceHookInclude tid =
-  filter (\l -> tid == l.logContext.threadId || onceHookInclude && (startEndNodeMatch onceHook l || isOnceHookParentFailure l))
+  filter (\l -> tid == l.lineInfo.threadId || onceHookInclude && (startEndNodeMatch onceHook l || isOnceHookParentFailure l))
 
 threadIds :: [LogItem] -> [ThreadId]
-threadIds = PE.nub . fmap (.logContext.threadId)
+threadIds = PE.nub . fmap (.lineInfo.threadId)
 
 threadedLogs :: Bool -> [LogItem] -> [[LogItem]]
 threadedLogs onceHookInclude l =
@@ -751,7 +751,7 @@ threadedLogs onceHookInclude l =
 shouldOccurOnce :: LogItem -> Bool
 shouldOccurOnce = startEndNodeMatch onceSuiteEvent
 
-chkStartEndExecution :: [Log ExePath AE.NodeLog] -> IO ()
+chkStartEndExecution :: [LogOLD ExePath AE.NodeLog] -> IO ()
 chkStartEndExecution evts =
   (,)
     <$> PE.head evts
@@ -784,7 +784,7 @@ chkThreadLogsInOrder :: [LogItem] -> IO ()
 chkThreadLogsInOrder ls =
   do
     chk' "Nothing found in heads - groupOn error this should not happen" (all isJust heads)
-    traverse_ (chkEq' "first index of thread should be 0" 0 . (.logContext.idx)) $ catMaybes heads
+    traverse_ (chkEq' "first index of thread should be 0" 0 . (.lineInfo.idx)) $ catMaybes heads
     traverse_ chkIds threads
   where
     threads = groupOn' getThreadId ls
@@ -794,8 +794,8 @@ chkThreadLogsInOrder ls =
       for_
         (zip ls' $ drop 1 ls')
         ( \(l1, l2) ->
-            let idx1 = l1.logContext.idx
-                idx2 = l2.logContext.idx
+            let idx1 = l1.lineInfo.idx
+                idx2 = l2.lineInfo.idx
              in chkEqfmt' (succ idx1) idx2 $
                   "event idx not consecutive\n"
                     <> toS (ppShow l1)
@@ -856,7 +856,7 @@ test = Spec 0
 
 data ExeResult = ExeResult
   { expandedTemplate :: [T.Template],
-    log :: [Log ExePath AE.NodeLog]
+    log :: [LogOLD ExePath AE.NodeLog]
   }
 
 runTest :: Int -> ThreadCount -> [Template] -> IO ()
@@ -886,10 +886,10 @@ execute wantLog baseRandomSeed threadLimit templates = do
   lg <- exeTemplate wantLog baseRandomSeed threadLimit fullTs
   pure $ ExeResult fullTs lg
 
-exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [Log ExePath AE.NodeLog]
+exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [LogOLD ExePath AE.NodeLog]
 exeTemplate wantLog baseRandomSeed maxThreads templates = do
   let wantLog' = wantLog == Log
-  (lc, logLst) <- testLogControls wantLog'
+  (lc, logLst) <- testLogActions wantLog'
   when (wantLog' || wantLog == LogTemplate) $ do
     putStrLn "#### Template ####"
     pPrint templates

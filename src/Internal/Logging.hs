@@ -41,18 +41,17 @@ data Loggers l = MkLoggers
     newLogger :: IO (l -> IO ())
   }
 
-runWithLogger :: forall l lx. LogActions l lx -> (Loggers l -> IO ()) -> IO ()
+runWithLogger :: forall l. LogActions l -> (Loggers l -> IO ()) -> IO ()
 runWithLogger
   MkLogActions
-    { sink,
-      expandLog,
+    { newSink,
       logWorker,
       stopWorker
     }
   action =
     do
-      rootLogger <- mkNewLogger
-      let loggerSource = MkLoggers rootLogger mkNewLogger
+      rootLogger <- newSink
+      let loggerSource = MkLoggers rootLogger newSink
       -- logWorker and execution run concurrently
       -- logworker serialises the log events emitted by the execution
       concurrently_
@@ -61,34 +60,16 @@ runWithLogger
             (action loggerSource)
             stopWorker
         )
-    where
-      mkNewLogger :: IO (l -> IO ())
-      mkNewLogger = mkLogger expandLog sink <$> UnliftIO.newIORef (-1) <*> P.myThreadId
-
--- adds log index and thread id to loggable event and sends it to the sink
-mkLogger :: forall l lxp. (C.ThreadId -> Int -> l -> lxp) -> (lxp -> IO ()) -> IORef Int -> ThreadId -> l -> IO ()
-mkLogger expander sink idxRef thrdId logEvnt = do
-  -- TODO: Add timestamp - need to change type of expander
-  tc <- readIORef idxRef
-  let nxt = succ tc
-  finally (sink $ expander (C.mkThreadId thrdId) nxt logEvnt) $ writeIORef idxRef nxt
 
 -- TODO:: Logger should be wrapped in an except that sets non-zero exit code on failure
 
-data LogActions log expandedLog = MkLogActions
+data LogActions log = MkLogActions
   { -- adds line info to the log TODO: Add timestamp (and agent?)
-    expandLog :: C.ThreadId -> Int -> log -> expandedLog,
-    sink :: expandedLog -> IO (),
+    newSink :: IO (log -> IO ()),
     -- worker that serializes log events
     logWorker :: IO (),
     stopWorker :: IO ()
   }
-
-mkLogSink :: forall lg expLg. (lg -> IO expLg) -> (expLg -> IO ()) -> lg -> IO ()
-mkLogSink 
-  expander -- transform an input log into an output log in IO (so can read time etc)
-  expandedSink -- somwhere in io to push the expanded log (eg.stdout or a file)
-  lg = expander lg >>= expandedSink
 
 q2List :: TQueue a -> STM [a]
 q2List qu = reverse <$> recurse [] qu
@@ -98,8 +79,9 @@ q2List qu = reverse <$> recurse [] qu
       tryReadTQueue q
         >>= maybe (pure l) (\e -> recurse (e : l) q)
 
-testLogActions' :: forall l lx. (Show lx) => (C.ThreadId -> Int -> l -> lx) -> Bool -> IO (LogActions l lx, STM [lx])
-testLogActions' expandLog wantConsole = do
+
+testLogActions' :: forall l lx. (Show lx) => ((lx -> IO ()) -> IO (l -> IO ())) -> Bool -> IO (LogActions l, STM [lx])
+testLogActions' mkNewSink wantConsole = do
   chn <- newTChanIO
   log <- newTQueueIO
 
@@ -120,7 +102,10 @@ testLogActions' expandLog wantConsole = do
           writeTChan chn $ Just eventLog
           writeTQueue log eventLog
 
-  pure (MkLogActions {logWorker, stopWorker, sink, expandLog}, q2List log)
+      newSink :: IO (l -> IO ())
+      newSink = mkNewSink sink
+
+  pure (MkLogActions {logWorker, stopWorker, newSink}, q2List log)
 
 {- Logging functions specialised to Event type -}
 
@@ -227,14 +212,23 @@ data Log loc nodeLog
   | EndExecution
   deriving (Show, Generic, NFData)
 
-testLogActions :: forall l a. (Show a, Show l) => Bool -> IO (LogActions (Log l a) (FullLog LineInfo (Log l a)), STM [FullLog LineInfo (Log l a)])
-testLogActions = testLogActions' expandEvent
+testLogActions :: forall l a. (Show a, Show l) => Bool -> IO (LogActions (Log l a), STM [FullLog LineInfo (Log l a)])
+testLogActions = testLogActions' mkLogSinkGenerator
 
--- -- NodeLog (a) a loggable event generated from within a node
--- -- EngineEvent a - marks start, end and failures in test fixtures (hooks, tests) and errors
--- -- Log a - adds thread id and index to EngineEvent
-expandEvent :: C.ThreadId -> Int -> Log l a -> FullLog LineInfo (Log l a)
-expandEvent threadId idx = MkLog (MkLineInfo threadId idx)
+mkLogSinkGenerator :: forall l a. (FullLog LineInfo (Log l a) -> IO ()) -> IO (Log l a -> IO ())
+mkLogSinkGenerator fullSink = 
+  logNext <$> UnliftIO.newIORef (-1) <*> P.myThreadId
+  where
+    addLineInfo :: C.ThreadId -> Int -> Log l a -> FullLog LineInfo (Log l a)
+    addLineInfo threadId idx = MkLog (MkLineInfo threadId idx)
+
+    logNext :: IORef Int -> ThreadId -> Log l a -> IO ()
+    logNext idxRef thrdId logEvnt = do
+      -- TODO: Add timestamp - need to change type of expander
+      tc <- readIORef idxRef
+      let nxt = succ tc
+      finally (fullSink $ addLineInfo (C.mkThreadId thrdId) nxt logEvnt) $ writeIORef idxRef nxt
+
 
 $(deriveToJSON defaultOptions ''ExePath)
 $(deriveJSON defaultOptions ''HookPos)

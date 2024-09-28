@@ -87,6 +87,9 @@ data LogActions log expandedLog = MkLogActions
     stopWorker :: IO ()
   }
 
+mkLogSink :: forall lg expLg. (lg -> IO expLg) -> (expLg -> IO ()) -> lg -> IO ()
+mkLogSink expansion expandedSink lg = expansion lg >>= expandedSink
+
 q2List :: TQueue a -> STM [a]
 q2List qu = reverse <$> recurse [] qu
   where

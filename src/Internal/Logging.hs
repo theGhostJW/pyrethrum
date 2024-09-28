@@ -215,6 +215,11 @@ data Log loc nodeLog
 testLogActions :: forall l a. (Show a, Show l) => Bool -> IO (LogActions (Log l a), STM [FullLog LineInfo (Log l a)])
 testLogActions = testLogActions' mkLogSinkGenerator
 
+-- Given a base sink that will send a FullLog (including line info) into IO (), this function 
+-- creates a Logger generator by intialising a new logger for the thread it is called in
+-- (so the thread id, index IORef and potentially other IO properties such as agent, shard and timezone can be used) 
+-- and then returns a function that will send an unexpanded Log through to IO () by adding the line info
+-- and sending it to the base (FullLog) sink
 mkLogSinkGenerator :: forall l a. (FullLog LineInfo (Log l a) -> IO ()) -> IO (Log l a -> IO ())
 mkLogSinkGenerator fullSink = 
   logNext <$> UnliftIO.newIORef (-1) <*> P.myThreadId

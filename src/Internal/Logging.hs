@@ -88,7 +88,10 @@ data LogActions log expandedLog = MkLogActions
   }
 
 mkLogSink :: forall lg expLg. (lg -> IO expLg) -> (expLg -> IO ()) -> lg -> IO ()
-mkLogSink expansion expandedSink lg = expansion lg >>= expandedSink
+mkLogSink 
+  expander -- transform an input log into an output log in IO (so can read time etc)
+  expandedSink -- somwhere in io to push the expanded log (eg.stdout or a file)
+  lg = expander lg >>= expandedSink
 
 q2List :: TQueue a -> STM [a]
 q2List qu = reverse <$> recurse [] qu

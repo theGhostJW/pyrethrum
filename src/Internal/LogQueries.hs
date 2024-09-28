@@ -1,7 +1,11 @@
 module Internal.LogQueries where
 
 import CoreUtils
-import Internal.Logging
+import Internal.Logging( NodeType(..),
+      HookPos(..),
+      Log(..),
+      FLog,
+      evnt )
 
 isSetup :: NodeType -> Bool
 isSetup = \case
@@ -19,16 +23,16 @@ evtTypeToFrequency = \case
   -- an individual test is always run once
   Test -> Once
 
-isSuiteEventFailureWith :: (NodeType -> Bool) -> LogOLD l a -> Bool
+isSuiteEventFailureWith :: (NodeType -> Bool) -> FLog l a -> Bool
 isSuiteEventFailureWith evntPredicate l =
   evnt l & \case
     ParentFailure {nodeType = s} -> evntPredicate s
     _ -> False
 
-isOnceHookParentFailure :: LogOLD l a -> Bool
+isOnceHookParentFailure :: FLog l a -> Bool
 isOnceHookParentFailure = isSuiteEventFailureWith onceHook
 
-isHookParentFailure :: LogOLD l a -> Bool
+isHookParentFailure :: FLog l a -> Bool
 isHookParentFailure = isSuiteEventFailureWith isHook
 
 isTest :: NodeType -> Bool
@@ -36,15 +40,15 @@ isTest = \case
   Test {} -> True
   _ -> False
 
-isTestParentFailure :: LogOLD l a -> Bool
+isTestParentFailure :: FLog l a -> Bool
 isTestParentFailure l = evnt l & \case
   ParentFailure {nodeType = s} -> isTest s
   _ -> False
 
-isTestLogItem :: LogOLD l a -> Bool
+isTestLogItem :: FLog l a -> Bool
 isTestLogItem li = (isTest <$> getSuiteEvent li) == Just True
 
-isTestEventOrTestParentFailure :: LogOLD l a -> Bool
+isTestEventOrTestParentFailure :: FLog l a -> Bool
 isTestEventOrTestParentFailure te = isTestParentFailure te || isTestLogItem te
 
 isHook :: NodeType -> Bool
@@ -66,7 +70,7 @@ threadHook = hookWithHz Thread
 onceSuiteEvent :: NodeType -> Bool
 onceSuiteEvent = (== Once) . evtTypeToFrequency
 
-isChildless :: LogOLD l a -> Bool
+isChildless :: FLog l a -> Bool
 isChildless =
   threadEventToBool
     ( \case
@@ -77,10 +81,10 @@ isChildless =
 suitEvntToBool :: (NodeType -> Bool) -> Maybe NodeType -> Bool
 suitEvntToBool = maybe False
 
-threadEventToBool :: (NodeType -> Bool) -> LogOLD l a -> Bool
+threadEventToBool :: (NodeType -> Bool) -> FLog l a -> Bool
 threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
 
-startEndNodeMatch :: (NodeType -> Bool) -> LogOLD l a -> Bool
+startEndNodeMatch :: (NodeType -> Bool) -> FLog l a -> Bool
 startEndNodeMatch p l = evnt l & \case
   StartExecution {} -> False
   Failure {} -> False
@@ -93,17 +97,17 @@ startEndNodeMatch p l = evnt l & \case
   End {nodeType} -> p nodeType
 
 
-isStart :: LogOLD a b -> Bool
+isStart :: FLog a b -> Bool
 isStart l = evnt l  & \case
   Start {} -> True
   _ -> False
 
-isEnd :: LogOLD a b -> Bool
+isEnd :: FLog a b -> Bool
 isEnd l = evnt l  & \case
   End {} -> True
   _ -> False
 
-suiteEventOrParentFailureSuiteEvent :: LogOLD a b -> Maybe NodeType
+suiteEventOrParentFailureSuiteEvent :: FLog a b -> Maybe NodeType
 suiteEventOrParentFailureSuiteEvent l = 
   evnt l  & \case
   FilterLog {} -> Nothing
@@ -116,7 +120,7 @@ suiteEventOrParentFailureSuiteEvent l =
   NodeLog {} -> Nothing
   EndExecution {} -> Nothing
 
-getSuiteEvent :: LogOLD a b -> Maybe NodeType
+getSuiteEvent :: FLog a b -> Maybe NodeType
 getSuiteEvent l = evnt l  & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
@@ -128,13 +132,13 @@ getSuiteEvent l = evnt l  & \case
   NodeLog {} -> Nothing
   EndExecution {} -> Nothing
 
-getHookInfo :: LogOLD a b -> Maybe (Hz, HookPos)
+getHookInfo :: FLog a b -> Maybe (Hz, HookPos)
 getHookInfo t =
   getSuiteEvent t >>= \case
     Hook hz pos -> Just (hz, pos)
     Test {} -> Nothing
 
-startOrParentFailure :: LogOLD l a -> Bool
+startOrParentFailure :: FLog l a -> Bool
 startOrParentFailure l = evnt l  & \case
   FilterLog {} -> False
   SuiteInitFailure {} -> False
@@ -148,7 +152,7 @@ startOrParentFailure l = evnt l  & \case
   Start {} -> True
   End {} -> False
 
-startSuiteEventLoc :: LogOLD l a -> Maybe l
+startSuiteEventLoc :: FLog l a -> Maybe l
 startSuiteEventLoc l = evnt l & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing

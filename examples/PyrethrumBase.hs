@@ -67,7 +67,7 @@ type SuiteRunner = Suite
   -> Filters RunConfig FixtureConfig 
   -> RunConfig 
   -> ThreadCount 
-  -> L.LogActions (L.Event L.ExePath AE.NodeLog) (L.LogOLD L.ExePath AE.NodeLog) 
+  -> L.LogActions (L.Log L.ExePath AE.NodeLog) (L.FLog L.ExePath AE.NodeLog) 
   -> IO ()
 
 ioInterpreter :: AE.LogSink -> Action a -> IO a
@@ -79,7 +79,7 @@ ioInterpreter sink ap =
     & runEff
 
 
--- docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.MkLogActions (L.Event L.ExePath AE.NodeLog) (L.LogOLD L.ExePath AE.NodeLog) -> IO ()
+-- docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.MkLogActions (L.Event L.ExePath AE.NodeLog) (L.FLog L.ExePath AE.NodeLog) -> IO ()
 -- docRunner suite filters runConfig threadCount logControls =
 --   execute threadCount logControls $
 --     C.MkSuiteExeParams
@@ -89,7 +89,7 @@ ioInterpreter sink ap =
 --         runConfig
 --       }
 
-docRunner :: Bool -> Bool -> Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogActions (L.Event L.ExePath AE.NodeLog) (L.LogOLD L.ExePath AE.NodeLog) -> IO ()
+docRunner :: Bool -> Bool -> Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogActions (L.Log L.ExePath AE.NodeLog) (L.FLog L.ExePath AE.NodeLog) -> IO ()
 docRunner includeSteps includeChecks suite filters runConfig threadCount logControls =
   prepared & either 
     print
@@ -106,7 +106,7 @@ docRunner includeSteps includeChecks suite filters runConfig threadCount logCont
  
 
 
-ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogActions (L.Event L.ExePath AE.NodeLog) (L.LogOLD L.ExePath AE.NodeLog) -> IO ()
+ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogActions (L.Log L.ExePath AE.NodeLog) (L.FLog L.ExePath AE.NodeLog) -> IO ()
 ioRunner suite filters runConfig threadCount logControls =
   execute threadCount logControls $
     C.MkSuiteExeParams

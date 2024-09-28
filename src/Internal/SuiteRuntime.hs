@@ -34,19 +34,19 @@ todo :: define defect properties with sum type type and typeclass which returns 
 newtype ThreadCount = ThreadCount {maxThreads :: Int}
   deriving (Show)
 
-type Log = L.FullLog L.LineInfo (L.Event L.ExePath N.NodeLog)
+type Log = L.FullLog L.LineInfo (L.Log L.ExePath N.NodeLog)
 
 -- executes prenodes directly without any tree shaking,
 --  filtering or validation used in testing
-executeWithoutValidation :: ThreadCount -> L.LogActions (L.Event L.ExePath N.NodeLog) Log -> [P.PreNode IO ()] -> IO ()
+executeWithoutValidation :: ThreadCount -> L.LogActions (L.Log L.ExePath N.NodeLog) Log -> [P.PreNode IO ()] -> IO ()
 executeWithoutValidation tc lc pn =
   L.runWithLogger lc (\l -> executeNodeList tc l pn)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogActions (L.Event L.ExePath N.NodeLog) Log -> C.SuiteExeParams m rc fc -> IO ()
+execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogActions (L.Log L.ExePath N.NodeLog) Log -> C.SuiteExeParams m rc fc -> IO ()
 execute tc lc prms =
   L.runWithLogger lc execute'
   where
-    execute' :: L.Loggers (L.Event L.ExePath N.NodeLog) -> IO ()
+    execute' :: L.Loggers (L.Log L.ExePath N.NodeLog) -> IO ()
     execute' l@L.MkLoggers{rootLogger} =
       do
         P.prepare prms
@@ -58,13 +58,13 @@ execute tc lc prms =
                   executeNodeList tc l validated.suite
             )
 
-executeNodeList :: ThreadCount -> L.Loggers (L.Event L.ExePath N.NodeLog) -> [P.PreNode IO ()] -> IO ()
+executeNodeList :: ThreadCount -> L.Loggers (L.Log L.ExePath N.NodeLog) -> [P.PreNode IO ()] -> IO ()
 executeNodeList tc lgr nodeList =
   do
     xtree <- mkXTree (L.ExePath []) nodeList
     executeNodes lgr xtree tc
 
-executeNodes :: L.Loggers (L.Event L.ExePath N.NodeLog) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
+executeNodes :: L.Loggers (L.Log L.ExePath N.NodeLog) -> ChildQ (ExeTree ()) -> ThreadCount -> IO ()
 executeNodes L.MkLoggers {rootLogger, newLogger} nodes tc =
   do
     finally
@@ -358,7 +358,7 @@ data ExeIn oi ti tsti = ExeIn
     tstIn :: tsti
   }
 
-type SuiteLogger = L.Event L.ExePath N.NodeLog -> IO ()
+type SuiteLogger = L.Log L.ExePath N.NodeLog -> IO ()
 
 logAbandonned :: SuiteLogger -> L.ExePath -> NodeType -> L.FailPoint -> IO ()
 logAbandonned lgr p e a =

@@ -22,11 +22,11 @@ import UnliftIO.Concurrent (ThreadId)
 import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
 import Prelude hiding (atomically, lines)
 
+type FLog l a = FullLog LineInfo (Log l a)
 
 {- Fully polymorphic base logging functions -}
-type LogOLD l a = FullLog LineInfo (Event l a)
 
-evnt :: FullLog LineInfo (Event l a) -> Event l a
+evnt :: FullLog LineInfo (Log l a) -> Log l a
 evnt = (.event)
 
 data FullLog li evt = MkLog
@@ -74,9 +74,6 @@ mkLogger expander sink idxRef thrdId logEvnt = do
   finally (sink $ expander (C.mkThreadId thrdId) nxt logEvnt) $ writeIORef idxRef nxt
 
 -- TODO:: Logger should be wrapped in an except that sets non-zero exit code on failure
-
-
-
 
 data LogActions log expandedLog = MkLogActions
   { -- adds line info to the log TODO: Add timestamp (and agent?)
@@ -193,10 +190,10 @@ data FailPoint = FailPoint
   }
   deriving (Show)
 
-mkFailure :: l -> NodeType -> SomeException -> Event l a
+mkFailure :: l -> NodeType -> SomeException -> Log l a
 mkFailure loc nodeType exception = Failure {exception = C.exceptionTxt exception, ..}
 
-data Event loc nodeLog
+data Log loc nodeLog
   = FilterLog
       { filterResuts :: [FilterResult Text]
       }
@@ -230,18 +227,18 @@ data Event loc nodeLog
   | EndExecution
   deriving (Show, Generic, NFData)
 
-testLogActions :: forall l a. (Show a, Show l) => Bool -> IO (LogActions (Event l a) (FullLog LineInfo (Event l a)), STM [FullLog LineInfo (Event l a)])
+testLogActions :: forall l a. (Show a, Show l) => Bool -> IO (LogActions (Log l a) (FullLog LineInfo (Log l a)), STM [FullLog LineInfo (Log l a)])
 testLogActions = testLogActions' expandEvent
 
 -- -- NodeLog (a) a loggable event generated from within a node
 -- -- EngineEvent a - marks start, end and failures in test fixtures (hooks, tests) and errors
 -- -- Log a - adds thread id and index to EngineEvent
-expandEvent :: C.ThreadId -> Int -> Event l a -> FullLog LineInfo (Event l a)
+expandEvent :: C.ThreadId -> Int -> Log l a -> FullLog LineInfo (Log l a)
 expandEvent threadId idx = MkLog (MkLineInfo threadId idx)
 
 $(deriveToJSON defaultOptions ''ExePath)
 $(deriveJSON defaultOptions ''HookPos)
 $(deriveJSON defaultOptions ''NodeType)
-$(deriveToJSON defaultOptions ''Event)
+$(deriveToJSON defaultOptions ''Log)
 
 

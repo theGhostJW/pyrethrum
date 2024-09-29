@@ -1,7 +1,7 @@
 module LazyinessSuiteDemo where
 
 import Check
-import Core (ParseException)
+import Core (ParseException, Once, Before)
 import DSL.Internal.NodeLog (NodeLog (User), Path (NodePath), UserLog (Info))
 import DSL.OutEffect (Out, out)
 import Effectful as EF
@@ -9,7 +9,7 @@ import Effectful as EF
     type (:>),
   )
 import PyrethrumBase
-import PyrethrumExtras (txt)
+import PyrethrumExtras (txt, (?))
 import WebDriverEffect as WE
 import WebDriverSpec (DriverStatus (Ready), Selector (CSS))
 import Filter (Filters(..))
@@ -47,42 +47,74 @@ todo:
  - merge
 -}
 
+blowUpInGetStatus :: Bool
+blowUpInGetStatus = True
+
 lazyDemo :: IO ()
 lazyDemo = runIODemo suiteLzFail
 --- >>> lazyDemo
 
+
+-- $> lazyDemo
+
 suiteLzFail :: Suite
 suiteLzFail =
-  [Fixture (NodePath "WebDriverDemo" "test") testLazy]
+  [ Hook
+      (NodePath "WebDriverDemo" "before")
+      nothingBefore
+      [ Hook
+          (NodePath "WebDriverDemo" "beforeInner")
+          driverStatusOnceHook
+          [ Fixture (NodePath "WebDriverDemo" "test") testLazy
+          ]
+      ]
+  ]
+
+  -- [Fixture (NodePath "WebDriverDemo" "test") testLazy]
 
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
-testLazy :: Fixture ()
-testLazy = Full config action_fail parseLzFail itemsLzFail
+testLazy :: Fixture DriverStatus
+testLazy = Full' config driverStatusOnceHook action_fail parseLzFail itemsLzFail
+
+--- Hook ---
+
+nothingBefore :: Hook Once Before () ()
+nothingBefore =
+  BeforeHook
+    { action = \_rc -> do
+        log "This is the outer hook"
+        log "Run once before the test"
+    }
+
+driverStatusOnceHook :: Hook Once Before () DriverStatus
+driverStatusOnceHook =
+  BeforeHook'
+    { depends = nothingBefore,
+      action' = \_rc _void -> do
+        log "This is the inner hook"
+        log "Run once before the test"
+        -- driver_status_fail
+        pure $ error "BANG !!!! Hook  failed !!!"
+    }
 
 driver_status_fail :: (WebUI :> es, Out NodeLog :> es) => Eff es DriverStatus
 driver_status_fail = do 
+  
   status <- driverStatus
-  log $ "the driver status is: " <> txt status
+  -- fails here when driver not running status forced
+  -- log $ "the driver status is: " <> txt status
+  -- pure $ blowUpInGetStatus ? status $ Ready
   pure $ error "BANG !!!! driver status failed !!!"
 
-action_fail :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> Data -> Eff es AS
-action_fail _rc i = do
-  log i.title
+action_fail :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> DriverStatus -> Data -> Eff es AS
+action_fail _rc i itm = do
+  log itm.title
+  log $ txt i
   status <- driver_status_fail
-  -- log $ "the driver status is (from test): " <> txt status
-  ses <- newSession
-  maximiseWindow ses
-  go ses _theInternet
-  link <- findElem ses _checkBoxesLinkCss
-  checkButtonText <- readElem ses link
-  clickElem ses link
-  -- so we can see the navigation worked
-  sleep $ 5 * seconds
-  killSession ses
-  pure $ AS {status, checkButtonText}
+  pure $ AS {status, checkButtonText = "Checkboxes"}
 
 data AS = AS
   { status :: DriverStatus,

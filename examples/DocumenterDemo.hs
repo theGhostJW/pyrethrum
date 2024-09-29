@@ -214,7 +214,6 @@ intOnceHook =
         log "This is the inner hook"
         log "Run once before the test"
         pure 8
-        -- pure $ error "HOOK BANG !!!"
     }
 
 --- Fixture ---

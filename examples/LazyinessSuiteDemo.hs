@@ -1,4 +1,4 @@
-module WebDriverDemo where
+module LazyinessSuiteDemo where
 
 import Check
 import Core (ParseException)
@@ -27,10 +27,6 @@ _theInternet = "https://the-internet.herokuapp.com/"
 _checkBoxesLinkCss :: Selector
 _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
-suite :: Suite
-suite =
-  [Fixture (NodePath "WebDriverDemo" "test") test]
-
 runDemo :: SuiteRunner -> Suite -> IO ()
 runDemo runner suite' = do 
   (logControls, _logLst) <- L.testLogActions True
@@ -40,27 +36,43 @@ runDemo runner suite' = do
 runIODemo :: Suite -> IO ()
 runIODemo = runDemo ioRunner
 
--- ############### Test Case ###################
+-- ############### Test Case With Lazy Errors ###################
 
--- >>> runIODemo suite
+{-
+todo: 
+ - check why no callstack :: skip wait till ghc upgrade
+ - laziness - esp hooks
+   - exceptions  from hooks and actions
+ - finish doc interpreter poc
+ - merge
+-}
 
-test :: Fixture ()
-test = Full config action parse items
+lazyDemo :: IO ()
+lazyDemo = runIODemo suiteLzFail
+--- >>> lazyDemo
+
+suiteLzFail :: Suite
+suiteLzFail =
+  [Fixture (NodePath "WebDriverDemo" "test") testLazy]
+
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
-driver_status :: (WebUI :> es, Out NodeLog :> es) => Eff es DriverStatus
-driver_status = do 
+testLazy :: Fixture ()
+testLazy = Full config action_fail parseLzFail itemsLzFail
+
+driver_status_fail :: (WebUI :> es, Out NodeLog :> es) => Eff es DriverStatus
+driver_status_fail = do 
   status <- driverStatus
   log $ "the driver status is: " <> txt status
-  pure status
+  pure $ error "BANG !!!! driver status failed !!!"
 
-action :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> Data -> Eff es AS
-action _rc i = do
+action_fail :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> Data -> Eff es AS
+action_fail _rc i = do
   log i.title
-  status <- driver_status
-  log $ "the driver status is (from test): " <> txt status
+  status <- driver_status_fail
+  -- log $ "the driver status is (from test): " <> txt status
   ses <- newSession
   maximiseWindow ses
   go ses _theInternet
@@ -71,7 +83,7 @@ action _rc i = do
   sleep $ 5 * seconds
   killSession ses
   pure $ AS {status, checkButtonText}
- 
+
 data AS = AS
   { status :: DriverStatus,
     checkButtonText :: Text
@@ -90,12 +102,12 @@ data Data = Item
     checks :: Checks DS
   }
   deriving (Show, Read)
+ 
+parseLzFail :: AS -> Either ParseException DS
+parseLzFail AS {..} = pure $ DS {..}
 
-parse :: AS -> Either ParseException DS
-parse AS {..} = pure $ DS {..}
-
-items :: RunConfig -> DataSource Data
-items _rc =
+itemsLzFail :: RunConfig -> DataSource Data
+itemsLzFail _rc =
   ItemList
     [ Item
         { id = 1,

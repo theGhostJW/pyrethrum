@@ -32,7 +32,6 @@ import PyrethrumExtras (Abs, File, relfile, toS, txt, (?))
 import WebDriverEffect
   ( WebUI,
     clickElem,
-    driverStatus,
     findElem,
     go,
     killSession,
@@ -224,7 +223,8 @@ test = Full' config intOnceHook action parse items
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
-driver_status :: (WebUI :> es) => Eff es DriverStatus
+-- driver_status :: (WebUI :> es) => Eff es DriverStatus
+driver_status :: Eff es DriverStatus
 driver_status = pure $ error "This is a lazy error !!!"
 -- driver_status = driverStatus
 

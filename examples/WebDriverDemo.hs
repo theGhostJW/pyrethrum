@@ -2,8 +2,8 @@ module WebDriverDemo where
 
 import Check
 import Core (ParseException)
-import DSL.Internal.NodeLog (NodeLog (User), Path (NodePath), UserLog (Info))
-import DSL.OutEffect (Out, out)
+import DSL.Internal.NodeLog (NodeLog, Path (NodePath))
+import DSL.OutEffect (Out)
 import Effectful as EF
   ( Eff,
     type (:>),

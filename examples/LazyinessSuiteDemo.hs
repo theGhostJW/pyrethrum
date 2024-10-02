@@ -2,20 +2,18 @@ module LazyinessSuiteDemo where
 
 import Check
 import Core (ParseException, Once, Before)
-import DSL.Internal.NodeLog (NodeLog (User), Path (NodePath), UserLog (Info))
-import DSL.OutEffect (Out, out)
+import DSL.Internal.NodeLog (NodeLog, Path (NodePath))
+import DSL.OutEffect (Out)
 import Effectful as EF
   ( Eff,
     type (:>),
   )
 import PyrethrumBase
-import PyrethrumExtras (txt, (?))
 import WebDriverEffect as WE
 import WebDriverSpec (DriverStatus (Ready), Selector (CSS))
 import Filter (Filters(..))
 import Internal.SuiteRuntime (ThreadCount(..))
 import Internal.Logging qualified as L
-import WebDriverPure (seconds)
 import DSL.Logging (log)
 
 
@@ -47,12 +45,11 @@ todo:
  - merge
 -}
 
-blowUpInGetStatus :: Bool
-blowUpInGetStatus = True
 
 lazyDemo :: IO ()
 lazyDemo = runIODemo suiteLzFail
 --- >>> lazyDemo
+-- *** Exception: BANG !!!! driverStatusOnceHook Hook  failed !!!
 
 
 -- $> lazyDemo
@@ -64,7 +61,7 @@ suiteLzFail =
       nothingBefore
       [ Hook
           (NodePath "WebDriverDemo" "beforeInner")
-          driverStatusOnceHook
+          pureErrorHook
           [ Fixture (NodePath "WebDriverDemo" "test") testLazy
           ]
       ]
@@ -77,7 +74,7 @@ config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
 testLazy :: Fixture DriverStatus
-testLazy = Full' config driverStatusOnceHook action_fail parseLzFail itemsLzFail
+testLazy = Full' config pureErrorHook action_fail parseLzFail itemsLzFail
 
 --- Hook ---
 
@@ -86,35 +83,37 @@ nothingBefore =
   BeforeHook
     { action = \_rc -> do
         log "This is the outer hook"
-        log "Run once before the test"
     }
 
-driverStatusOnceHook :: Hook Once Before () DriverStatus
-driverStatusOnceHook =
+pureErrorHook :: Hook Once Before () DriverStatus
+pureErrorHook =
   BeforeHook'
     { depends = nothingBefore,
       action' = \_rc _void -> do
         log "This is the inner hook"
-        log "Run once before the test"
         -- driver_status_fail
-        pure $ error "BANG !!!! Hook  failed !!!"
+        -- pure Ready
+        pure $ error "BANG !!!! driverStatusOnceHook Hook failed !!!"
+        -- error "BANG !!!! driverStatusOnceHook Hook  failed !!!"
     }
 
-driver_status_fail :: (WebUI :> es, Out NodeLog :> es) => Eff es DriverStatus
+-- driver_status_fail :: (WebUI :> es, Out NodeLog :> es) => Eff es DriverStatus
+driver_status_fail :: (WebUI :> es) => Eff es DriverStatus
 driver_status_fail = do 
-  
-  status <- driverStatus
+  _status <- driverStatus
   -- fails here when driver not running status forced
   -- log $ "the driver status is: " <> txt status
   -- pure $ blowUpInGetStatus ? status $ Ready
-  pure $ error "BANG !!!! driver status failed !!!"
+  pure $ error "BOOM %%%% driver status failed %%%%"
 
-action_fail :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> DriverStatus -> Data -> Eff es AS
-action_fail _rc i itm = do
+-- action_fail :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> DriverStatus -> Data -> Eff es AS
+action_fail :: (Out NodeLog :> es) => RunConfig -> DriverStatus -> Data -> Eff es AS
+action_fail _rc _hookDriverStatus itm = do
   log itm.title
-  log $ txt i
-  status <- driver_status_fail
-  pure $ AS {status, checkButtonText = "Checkboxes"}
+  -- log $ txt hookDriverStatus
+  -- status <- driver_status_fail
+  -- pure $ AS {status, checkButtonText = "Checkboxes"}
+  pure $ AS {status = Ready, checkButtonText = "Checkboxes"}
 
 data AS = AS
   { status :: DriverStatus,

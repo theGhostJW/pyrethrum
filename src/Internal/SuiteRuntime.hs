@@ -10,9 +10,9 @@ import Internal.SuiteValidation (SuiteValidationError (..))
 import Prepare qualified as P
 import PyrethrumExtras (txt, (?))
 import UnliftIO
-  ( tryAny,
-    finally,
-    forConcurrently_,
+  ( finally,
+    replicateConcurrently_,
+    tryAny,
     writeTMVar,
   )
 import UnliftIO.STM
@@ -47,7 +47,7 @@ execute tc lc prms =
   L.runWithLogger lc execute'
   where
     execute' :: L.Loggers Log -> IO ()
-    execute' l@L.MkLoggers{rootLogger} =
+    execute' l@L.MkLoggers {rootLogger} =
       do
         P.prepare prms
           & either
@@ -69,16 +69,14 @@ executeNodes L.MkLoggers {rootLogger, newLogger} nodes tc =
   do
     finally
       ( rootLogger L.StartExecution
-          >> forConcurrently_
-            thrdTokens
-            ( const do
+          >> replicateConcurrently_
+            tc.maxThreads
+            ( do
                 logger <- newLogger
                 runChildQ Concurrent (runNode logger $ OnceIn ()) canRunXTree nodes
             )
       )
       (rootLogger L.EndExecution)
-  where
-    thrdTokens = replicate tc.maxThreads True
 
 data ExeTree hi where
   OnceBefore ::

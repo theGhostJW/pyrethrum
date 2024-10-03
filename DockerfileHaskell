@@ -57,6 +57,7 @@ RUN apt-get update && \
     # Ensure the vscode user has ownership of the ghciwatch binary
     RUN chown ${USER_UID}:${USER_GID} /usr/local/bin/ghciwatch
     
+    # Set working directory and path for vscode user
     USER ${USER_UID}:${USER_GID}
     WORKDIR /home/${USERNAME}
     ENV PATH="/home/${USERNAME}/.local/bin:/home/${USERNAME}/.cabal/bin:/home/${USERNAME}/.ghcup/bin:$PATH"

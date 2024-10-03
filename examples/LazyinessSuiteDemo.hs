@@ -8,13 +8,19 @@ import Effectful as EF
   ( Eff,
     type (:>),
   )
-import PyrethrumBase
+import PyrethrumBase hiding (Hook)
+import PyrethrumBase qualified as PB
 import WebDriverEffect as WE
 import WebDriverSpec (DriverStatus (Ready), Selector (CSS))
 import Filter (Filters(..))
 import Internal.SuiteRuntime (ThreadCount(..))
 import Internal.Logging qualified as L
 import DSL.Logging (log)
+import UnliftIO (catchAny)
+import Data.Text.IO qualified as TIO
+import Data.Text (pack)
+import BasePrelude (throw)
+import GHC.Records (HasField)
 
 
 -- ################### Effectful Demo ##################
@@ -38,28 +44,25 @@ runIODemo = runDemo ioRunner
 
 {-
 todo: 
- - check why no callstack :: skip wait till ghc upgrade
- - laziness - esp hooks
-   - exceptions  from hooks and actions
- - finish doc interpreter poc
- - merge
+ - fix log flushing
+ - fix error handling
 -}
 
 
 lazyDemo :: IO ()
 lazyDemo = runIODemo suiteLzFail
 --- >>> lazyDemo
--- *** Exception: BANG !!!! driverStatusOnceHook Hook  failed !!!
+-- *** Exception: BANG !!!! pureErrorHook Hook failed !!!
 
 
 -- $> lazyDemo
 
 suiteLzFail :: Suite
 suiteLzFail =
-  [ Hook
+  [ PB.Hook
       (NodePath "WebDriverDemo" "before")
       nothingBefore
-      [ Hook
+      [ PB.Hook
           (NodePath "WebDriverDemo" "beforeInner")
           pureErrorHook
           [ Fixture (NodePath "WebDriverDemo" "test") testLazy
@@ -67,25 +70,23 @@ suiteLzFail =
       ]
   ]
 
-  -- [Fixture (NodePath "WebDriverDemo" "test") testLazy]
-
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
 testLazy :: Fixture DriverStatus
-testLazy = Full' config pureErrorHook action_fail parseLzFail itemsLzFail
+testLazy = Full' config pureErrorHook action' parse items
 
 --- Hook ---
 
-nothingBefore :: Hook Once Before () ()
+nothingBefore :: PB.Hook Once Before () ()
 nothingBefore =
   BeforeHook
     { action = \_rc -> do
         log "This is the outer hook"
     }
 
-pureErrorHook :: Hook Once Before () DriverStatus
+pureErrorHook :: PB.Hook Once Before () DriverStatus
 pureErrorHook =
   BeforeHook'
     { depends = nothingBefore,
@@ -93,26 +94,15 @@ pureErrorHook =
         log "This is the inner hook"
         -- driver_status_fail
         -- pure Ready
-        pure $ error "BANG !!!! driverStatusOnceHook Hook failed !!!"
-        -- error "BANG !!!! driverStatusOnceHook Hook  failed !!!"
+        pure $ error "BANG !!!! pureErrorHook Hook failed !!!"
+        -- error "BANG !!!! pureErrorHook Hook failed !!!"
     }
 
--- driver_status_fail :: (WebUI :> es, Out NodeLog :> es) => Eff es DriverStatus
-driver_status_fail :: (WebUI :> es) => Eff es DriverStatus
-driver_status_fail = do 
-  _status <- driverStatus
-  -- fails here when driver not running status forced
-  -- log $ "the driver status is: " <> txt status
-  -- pure $ blowUpInGetStatus ? status $ Ready
-  pure $ error "BOOM %%%% driver status failed %%%%"
 
 -- action_fail :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> DriverStatus -> Data -> Eff es AS
-action_fail :: (Out NodeLog :> es) => RunConfig -> DriverStatus -> Data -> Eff es AS
-action_fail _rc _hookDriverStatus itm = do
+action' :: (Out NodeLog :> es) => RunConfig -> DriverStatus -> Data -> Eff es AS
+action' _rc _hookDriverStatus itm = do
   log itm.title
-  -- log $ txt hookDriverStatus
-  -- status <- driver_status_fail
-  -- pure $ AS {status, checkButtonText = "Checkboxes"}
   pure $ AS {status = Ready, checkButtonText = "Checkboxes"}
 
 data AS = AS
@@ -134,11 +124,11 @@ data Data = Item
   }
   deriving (Show, Read)
  
-parseLzFail :: AS -> Either ParseException DS
-parseLzFail AS {..} = pure $ DS {..}
+parse :: AS -> Either ParseException DS
+parse AS {..} = pure $ DS {..}
 
-itemsLzFail :: RunConfig -> DataSource Data
-itemsLzFail _rc =
+items :: RunConfig -> DataSource Data
+items _rc =
   ItemList
     [ Item
         { id = 1,
@@ -148,3 +138,67 @@ itemsLzFail _rc =
               <> chk "Checkboxes text as expected" ((== "Checkboxes") . (.checkButtonText))
         }
     ]
+
+
+-- ################### Simplified ##################
+
+log_ :: Text -> IO ()
+log_ = TIO.putStrLn
+data Hook a = Hook {
+  description :: Text,
+  action :: () -> IO a
+  }
+
+data Test a = Test {
+  description :: Text,
+  action :: a -> IO ()
+}
+
+runner :: (HasField "action" n (t -> IO b), HasField "description" n Text) => n -> t -> IO b
+runner node input = do
+  log_ $ "Running " <> node.description
+  catchAny (node.action input) $ \e -> do
+    log_ $ "Caught exception trying to run " <> node.description <>  "\nYou better fix this:\n"  <> pack (displayException e)
+    >> throw e
+
+runTheTest :: Hook a -> Test a -> IO ()
+runTheTest hook test = 
+  log_ "" >>
+  log_ "##########################################" >>
+  runner hook () >>= runner test 
+
+-- ################### Test ##################
+
+workingExample :: IO ()
+workingExample = runTheTest workingHook workingTest
+-- $ > workingExample
+
+workingHook :: Hook Text
+workingHook = Hook "working hook" $ \_ -> do
+  log_ "working hook action"
+  pure "working hook Output"
+
+workingTest :: Test Text
+workingTest = Test "working test" $ \hIn -> do
+  log_ $ "working test action with hook input: " <> hIn
+  log_ "working test action"
+  pure ()
+
+-- ################### Failing Test ##################
+
+failExample :: IO ()
+failExample = runTheTest failingHook workingTest
+-- $ > failExample
+
+failingHook :: Hook Text
+failingHook = Hook "failing hook" $ \_ -> error "BANG !!!! failingHook Hook failed !!!"
+
+-- ################### Bombing Test ##################
+
+bombExample :: IO ()
+bombExample = runTheTest bombingHook workingTest
+-- >>> bombExample
+-- *** Exception: BANG !!!! bombingHook Hook failed !!!
+
+bombingHook :: Hook Text
+bombingHook = Hook "bombing hook" $ \_ -> pure $ error "BANG !!!! bombingHook Hook failed !!!"

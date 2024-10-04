@@ -4,20 +4,23 @@ module Internal.Logging where
 
 -- TODO: Explicit exports remove old code
 
+-- TODO: Explicit exports remove old code
+import BasePrelude qualified as P
 import CoreUtils (Hz (..))
 import CoreUtils qualified as C
 import DSL.Internal.NodeLog qualified as NE
 import Data.Aeson.TH (defaultOptions, deriveJSON, deriveToJSON)
 import Data.Text as T (intercalate)
+import Effectful.Concurrent.STM (TQueue, retry)
 import Filter (FilterResult)
 import PyrethrumExtras as PE (head, tail, (?))
-import Prelude hiding (atomically, lines)
-
--- TODO: Explicit exports remove old code
-import BasePrelude qualified as P
-import Effectful.Concurrent.STM (TQueue)
 import Text.Show.Pretty (pPrint)
-import UnliftIO (concurrently_, finally, newIORef, tryReadTQueue)
+import UnliftIO
+  ( concurrently_,
+    finally,
+    newIORef,
+    tryReadTQueue,
+  )
 import UnliftIO.Concurrent (ThreadId)
 import UnliftIO.STM (atomically, newTChanIO, newTQueueIO, readTChan, writeTChan, writeTQueue)
 import Prelude hiding (atomically, lines)
@@ -58,7 +61,7 @@ runWithLogger
         logWorker
         ( finally
             (action loggerSource)
-            stopWorker
+            stopWorker -- >> threadDelay 10_000_000
         )
 
 -- TODO:: Logger should be wrapped in an except that sets non-zero exit code on failure
@@ -79,22 +82,30 @@ q2List qu = reverse <$> recurse [] qu
       tryReadTQueue q
         >>= maybe (pure l) (\e -> recurse (e : l) q)
 
-
 testLogActions' :: forall l lx. (Show lx) => ((lx -> IO ()) -> IO (l -> IO ())) -> Bool -> IO (LogActions l, STM [lx])
 testLogActions' mkNewSink wantConsole = do
   chn <- newTChanIO
   log <- newTQueueIO
+  done <- newTVarIO False
 
   -- https://stackoverflow.com/questions/32040536/haskell-forkio-threads-writing-on-top-of-each-other-with-putstrln
   let logWorker :: IO ()
       logWorker =
         atomically (readTChan chn)
           >>= maybe
-            (pure ())
+            (atomically $ writeTVar done True)
             (\evt -> when wantConsole (pPrint evt) >> logWorker)
 
       stopWorker :: IO ()
-      stopWorker = atomically $ writeTChan chn Nothing
+      stopWorker =
+        atomically (writeTChan chn Nothing) 
+        -- must be 2 separate atomic actions
+        >> atomically waitDone
+
+      waitDone :: STM ()
+      waitDone = do
+        emt <- readTVar done
+        emt ? pure () $ retry
 
       sink :: lx -> IO ()
       sink eventLog =
@@ -109,7 +120,6 @@ testLogActions' mkNewSink wantConsole = do
 
 {- Logging functions specialised to Event type -}
 
-
 data LineInfo = MkLineInfo
   { threadId :: C.ThreadId,
     idx :: Int
@@ -123,9 +133,9 @@ data NodeType
   | Test
   deriving (Show, Eq, Ord, Generic, NFData)
 
-newtype ExePath = ExePath {un :: [NE.Path]} 
- deriving (Show, Eq, Ord)
- deriving newtype NFData
+newtype ExePath = ExePath {un :: [NE.Path]}
+  deriving (Show, Eq, Ord)
+  deriving newtype (NFData)
 
 topPath :: ExePath -> Maybe NE.Path
 topPath = PE.head . coerce
@@ -215,13 +225,13 @@ data Log loc nodeLog
 testLogActions :: forall l a. (Show a, Show l) => Bool -> IO (LogActions (Log l a), STM [FullLog LineInfo (Log l a)])
 testLogActions = testLogActions' mkLogSinkGenerator
 
--- Given a base sink that will send a FullLog (including line info) into IO (), this function 
+-- Given a base sink that will send a FullLog (including line info) into IO (), this function
 -- creates a Logger generator by intialising a new logger for the thread it is called in
--- (so the thread id, index IORef and potentially other IO properties such as agent, shard and timezone can be used) 
+-- (so the thread id, index IORef and potentially other IO properties such as agent, shard and timezone can be used)
 -- and then returns a function that will send an unexpanded Log through to IO () by adding the line info
 -- and sending it to the base (FullLog) sink
 mkLogSinkGenerator :: forall l a. (FullLog LineInfo (Log l a) -> IO ()) -> IO (Log l a -> IO ())
-mkLogSinkGenerator fullSink = 
+mkLogSinkGenerator fullSink =
   logNext <$> UnliftIO.newIORef (-1) <*> P.myThreadId
   where
     addLineInfo :: C.ThreadId -> Int -> Log l a -> FullLog LineInfo (Log l a)
@@ -234,10 +244,7 @@ mkLogSinkGenerator fullSink =
       let nxt = succ tc
       finally (fullSink $ addLineInfo (C.mkThreadId thrdId) nxt logEvnt) $ writeIORef idxRef nxt
 
-
 $(deriveToJSON defaultOptions ''ExePath)
 $(deriveJSON defaultOptions ''HookPos)
 $(deriveJSON defaultOptions ''NodeType)
 $(deriveToJSON defaultOptions ''Log)
-
-

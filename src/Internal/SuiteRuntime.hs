@@ -26,7 +26,6 @@ import UnliftIO.STM
     writeTQueue,
   )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
-import UnliftIO.Concurrent (threadDelay)
 
 {-
 todo :: define defect properties with sum type type and typeclass which returns defect info
@@ -77,8 +76,7 @@ executeNodes L.MkLoggers {rootLogger, newLogger} nodes tc =
                 runChildQ Concurrent (runNode logger $ OnceIn ()) canRunXTree nodes
             )
       )
-      flush log here
-      (rootLogger L.EndExecution >> threadDelay 10_000_000)
+      (rootLogger L.EndExecution)
 
 data ExeTree hi where
   OnceBefore ::

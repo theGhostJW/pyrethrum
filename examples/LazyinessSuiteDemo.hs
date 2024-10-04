@@ -10,7 +10,6 @@ import Effectful as EF
   )
 import PyrethrumBase hiding (Hook)
 import PyrethrumBase qualified as PB
-import WebDriverEffect as WE
 import WebDriverSpec (DriverStatus (Ready), Selector (CSS))
 import Filter (Filters(..))
 import Internal.SuiteRuntime (ThreadCount(..))
@@ -32,9 +31,9 @@ _checkBoxesLinkCss :: Selector
 _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
 runDemo :: SuiteRunner -> Suite -> IO ()
-runDemo runner suite' = do 
+runDemo runner' suite' = do 
   (logControls, _logLst) <- L.testLogActions True
-  runner suite' Unfiltered defaultRunConfig (ThreadCount 1) logControls
+  runner' suite' Unfiltered defaultRunConfig (ThreadCount 1) logControls
 
 -- start geckodriver first: geckodriver &
 runIODemo :: Suite -> IO ()

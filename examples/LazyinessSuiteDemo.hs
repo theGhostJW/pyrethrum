@@ -40,13 +40,11 @@ runIODemo :: Suite -> IO ()
 runIODemo = runDemo ioRunner
 
 -- ############### Test Case With Lazy Errors ###################
-
 {-
 todo: 
  - fix log flushing
  - fix error handling
 -}
-
 
 lazyDemo :: IO ()
 lazyDemo = runIODemo suiteLzFail

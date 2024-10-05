@@ -13,7 +13,7 @@ import UnliftIO
   ( finally,
     replicateConcurrently_,
     tryAny,
-    writeTMVar
+    writeTMVar, catchAny
   )
 import UnliftIO.STM
   ( TQueue,
@@ -377,9 +377,13 @@ ioRight = pure . Right
 noImpPropertyError :: any
 noImpPropertyError = error "property tests not implemented"
 
+logReturnFailPoint :: SuiteLogger -> L.ExePath -> NodeType -> SomeException -> IO L.FailPoint
+logReturnFailPoint lgr p et e =
+  lgr (L.mkFailure p et e) >> pure (L.FailPoint p et)
+
 logReturnFailure :: SuiteLogger -> L.ExePath -> NodeType -> SomeException -> IO (Either L.FailPoint b)
 logReturnFailure lgr p et e =
-  lgr (L.mkFailure p et e) >> ioLeft (L.FailPoint p et)
+  logReturnFailPoint lgr p et e >>= ioLeft 
 
 data CanAbandon = None | Partial | All
   deriving (Show, Eq)
@@ -640,7 +644,8 @@ runNode lgr hi xt =
         pure $ QElementRun True
 
     mkTestPath :: forall a. P.Test IO a -> L.ExePath
-    mkTestPath P.MkTest {id, title = ttl} = L.ExePath $ N.TestPath {id, title = ttl} : coerce xt.path {- fixture path -}
+    mkTestPath P.MkTest {id, title = ttl} = L.ExePath $ N.TestPath {id, title = ttl} : coerce xt.path 
+
     abandonSubs :: forall a. L.FailPoint -> ChildQ (ExeTree a) -> IO QElementRun
     abandonSubs fp = runSubNodes (Abandon fp)
 
@@ -725,7 +730,18 @@ runNode lgr hi xt =
     onceRun hookRun childQRun = childQRun >>= \qr -> pure $ QElementRun $ hookRun || qr.hasRun
 
     run :: NodeIn hi' -> ExeTree hi' -> IO QElementRun
-    run =
+    run nodeIn xtree = 
+      catchAny 
+       (runNoCatch nodeIn xtree) 
+       (\e -> do 
+          -- todo calculate node type
+          fp <- logReturnFailPoint lgr xtree.path (Hook Once Before) e
+          -- TODO call run with new Abandon ??? failPoint
+          -- abandonSubs fp xtree.subNodes 
+       )
+
+    runNoCatch :: NodeIn hi' -> ExeTree hi' -> IO QElementRun
+    runNoCatch =
       \cases
         -- For Once* we assume tree shaking has been executed prior to execution.
         -- There is no possibility of empty subnodes due to tree shaking, so these hooks will always

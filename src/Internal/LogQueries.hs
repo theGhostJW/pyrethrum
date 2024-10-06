@@ -87,6 +87,7 @@ threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
 startEndNodeMatch :: (NodeType -> Bool) -> FLog l a -> Bool
 startEndNodeMatch p l = evnt l & \case
   StartExecution {} -> False
+  InitialisationFailure {} -> False
   Failure {} -> False
   ParentFailure {} -> False
   NodeLog {} -> False
@@ -115,6 +116,7 @@ suiteEventOrParentFailureSuiteEvent l =
   StartExecution {} -> Nothing
   Start {nodeType = s} -> Just s
   End {nodeType = s} -> Just s
+  InitialisationFailure {} -> Nothing
   Failure {} -> Nothing
   ParentFailure {nodeType = s} -> Just s
   NodeLog {} -> Nothing
@@ -127,6 +129,7 @@ getSuiteEvent l = evnt l  & \case
   Start {nodeType} -> Just nodeType
   End {nodeType} -> Just nodeType
   ParentFailure {nodeType} -> Just nodeType
+  InitialisationFailure {nodeType} -> Just nodeType
   Failure {nodeType} -> Just nodeType
   StartExecution {} -> Nothing
   NodeLog {} -> Nothing
@@ -146,6 +149,7 @@ startOrParentFailure l = evnt l  & \case
   EndExecution {} -> False
   NodeLog {} -> False
   Failure {} -> False
+  InitialisationFailure {} -> False
   -- event will either have a start or be
   -- represented by a parent failure if skipped
   ParentFailure {} -> True
@@ -160,6 +164,7 @@ startSuiteEventLoc l = evnt l & \case
   EndExecution {} -> Nothing
   NodeLog {} -> Nothing
   Failure {} -> Nothing
+  InitialisationFailure {} -> Nothing
   -- event will either have a start or be
   -- represented by a parent failure if skipped
   ParentFailure {loc} -> Just loc

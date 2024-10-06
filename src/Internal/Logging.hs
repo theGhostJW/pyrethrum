@@ -188,6 +188,9 @@ data FailPoint = FailPoint
 mkFailure :: l -> NodeType -> SomeException -> Log l a
 mkFailure loc nodeType exception = Failure {exception = C.exceptionTxt exception, ..}
 
+mkInitFailure :: l -> NodeType -> SomeException -> Log l a
+mkInitFailure loc nodeType exception = InitialisationFailure {exception = C.exceptionTxt exception, ..}
+
 data Log loc nodeLog
   = FilterLog
       { filterResuts :: [FilterResult Text]
@@ -204,6 +207,11 @@ data Log loc nodeLog
   | End
       { nodeType :: NodeType,
         loc :: loc
+      }
+  | InitialisationFailure
+      { nodeType :: NodeType,
+        loc :: loc,
+        exception :: C.PException
       }
   | Failure
       { nodeType :: NodeType,

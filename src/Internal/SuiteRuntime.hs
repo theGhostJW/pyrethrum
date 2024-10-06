@@ -377,13 +377,13 @@ ioRight = pure . Right
 noImpPropertyError :: any
 noImpPropertyError = error "property tests not implemented"
 
-logReturnFailPoint :: SuiteLogger -> L.ExePath -> NodeType -> SomeException -> IO L.FailPoint
-logReturnFailPoint lgr p et e =
-  lgr (L.mkFailure p et e) >> pure (L.FailPoint p et)
+logReturnFailPoint :: Bool -> SuiteLogger -> L.ExePath -> NodeType -> SomeException -> IO L.FailPoint
+logReturnFailPoint inInitialisation lgr p et e =
+  lgr ((inInitialisation ? L.mkInitFailure $ L.mkFailure) p et e) >> pure (L.FailPoint p et)
 
 logReturnFailure :: SuiteLogger -> L.ExePath -> NodeType -> SomeException -> IO (Either L.FailPoint b)
 logReturnFailure lgr p et e =
-  logReturnFailPoint lgr p et e >>= ioLeft 
+  logReturnFailPoint False lgr p et e >>= ioLeft 
 
 data CanAbandon = None | Partial | All
   deriving (Show, Eq)
@@ -735,9 +735,8 @@ runNode lgr hi xt =
        (runNoCatch nodeIn xtree) 
        (\e -> do 
           -- todo calculate node type
-          fp <- logReturnFailPoint lgr xtree.path (Hook Once Before) e
-          -- TODO call run with new Abandon ??? failPoint
-          -- abandonSubs fp xtree.subNodes 
+          fp <- logReturnFailPoint True lgr xtree.path (initFailureNodeType xtree) e
+          run (Abandon fp) xtree
        )
 
     runNoCatch :: NodeIn hi' -> ExeTree hi' -> IO QElementRun
@@ -1067,10 +1066,23 @@ data NodeIn hi where
     NodeIn hi
 
 data TestContext hi = MkTestContext
-  { -- hookIn :: IO (Either L.FailPoint hi),
+  {
     hookIn :: Either L.FailPoint hi,
     after :: IO ()
   }
+
+initFailureNodeType ::  ExeTree hi -> NodeType
+initFailureNodeType = \case
+  OnceBefore {} -> Hook Once Before
+  OnceAround {} -> Hook Once Setup
+  OnceAfter {} -> Hook Once After
+  ThreadBefore {} -> Hook Thread Before
+  ThreadAround {} -> Hook Thread Setup
+  ThreadAfter {} -> Hook Thread After
+  EachBefore {} -> Hook Each Before
+  EachAround {} -> Hook Each Setup
+  EachAfter {} -> Hook Each After
+  Fixture {} -> L.Test
 
 mkTestContext :: forall hi ho. Either L.FailPoint hi -> IO () -> (Either L.FailPoint hi -> IO (Either L.FailPoint ho)) -> (Either L.FailPoint ho -> IO ()) -> IO (TestContext ho)
 mkTestContext parentIn afterParent setupNxt teardownNxt =

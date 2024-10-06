@@ -228,6 +228,11 @@ logAccum acc@(passStart, rMap) (MkLog {event}) =
       isJust passStart
         ? (Nothing, insert' loc nodeType $ Actual Fail)
         $ error ("Failure event not started\n" <> txt f)
+
+    -- TODO this is probably wrong fix this will cause failures when tests generate these
+    -- need to think about cortrect expected results in this case
+    InitialisationFailure {} -> acc
+
     pf@ParentFailure {loc, nodeType} ->
       isJust passStart
         ? error ("parent failure encountered when parent event not ended\n" <> txt pf)
@@ -526,6 +531,10 @@ failInfo ls =
                 & maybe
                   (error $ "Failure encountered before start:\n" <> toS (ppShow l))
                   (const (Nothing, FailInfo l ls' : result))
+
+            -- todo think about logic here 
+            InitialisationFailure {} -> passThrough
+
             ParentFailure {} -> passThrough
             StartExecution {} -> passThrough
             EndExecution {} -> passThrough

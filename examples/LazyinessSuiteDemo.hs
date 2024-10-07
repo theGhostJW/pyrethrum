@@ -19,15 +19,10 @@ import Internal.SuiteRuntime (ThreadCount (..))
 import PyrethrumBase hiding (Hook)
 import PyrethrumBase qualified as PB
 import UnliftIO (catchAny)
-import WebDriverSpec (DriverStatus (Ready), Selector (CSS))
+import WebDriverSpec (DriverStatus (Ready))
+import PyrethrumExtras (txt)
 
 -- ################### Effectful Demo ##################
-
-_theInternet :: Text
-_theInternet = "https://the-internet.herokuapp.com/"
-
-_checkBoxesLinkCss :: Selector
-_checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
 runDemo :: SuiteRunner -> Suite -> IO ()
 runDemo runner' suite' = do
@@ -38,91 +33,140 @@ runDemo runner' suite' = do
 runIODemo :: Suite -> IO ()
 runIODemo = runDemo ioRunner
 
--- ############### Test Case With Lazy Errors ###################
+-- ############### Test Cases With Lazy Errors ###################
 
 onceHkDeferredDemo :: IO ()
 onceHkDeferredDemo = runIODemo onceHkDeferredSuite
 
--- $ > onceHkDeferredDemo
+--- $> onceHkDeferredDemo
+-- creates a test initialisation failure in test when once hook output is cached
 
 onceHkDeferredSuite :: Suite
 onceHkDeferredSuite =
   [ PB.Hook
       (NodePath "WebDriverDemo" "before")
-      nothingBefore
+      nothingOnceBefore
       [ PB.Hook
           (NodePath "WebDriverDemo" "beforeInner")
-          pureErrorHook
-          [ Fixture (NodePath "WebDriverDemo" "test") fxLogMessage
+          pureOnceErrorHook
+          [ Fixture (NodePath "WebDriverDemo" "fixture") $ fxLogMessage False
           ]
       ]
   ]
+------------------------------------------------------
 
-eachHkDeferredSuiteDemo :: IO ()
-eachHkDeferredSuiteDemo = runIODemo eachHkDeferredSuite
+-- $> threadHkInitFailSuiteDemo
+-- creates an initialisation failure in each hook when thread hook output is cached
 
--- $ > eachHkDeferredSuiteDemo
+threadHkInitFailSuiteDemo :: IO ()
+threadHkInitFailSuiteDemo = runIODemo threadHkInitFailSuite
 
-eachHkDeferredSuite :: Suite
-eachHkDeferredSuite =
+threadHkInitFailSuite :: Suite
+threadHkInitFailSuite =
   [ PB.Hook
       (NodePath "WebDriverDemo" "before once")
-      nothingBefore
+      nothingOnceBefore
       [ PB.Hook
-          (NodePath "WebDriverDemo" "before inner once")
-          pureErrorHook
+          (NodePath "WebDriverDemo" "before inner thread")
+          pureThreadErrorHook
           [ PB.Hook
               (NodePath "WebDriverDemo" "each hook")
               eachHook
-              [Fixture (NodePath "WebDriverDemo" "test") fxLogMessage]
+              [Fixture (NodePath "WebDriverDemo" "fixture") $ fxLogMessage False]
           ]
       ]
   ]
 
-eachHkFailDemo :: IO ()
-eachHkFailDemo = runIODemo eachHkFail
+------------------------------------------------------
 
--- $> eachHkFailDemo
--- runs effect but does not throw error because test does not use hook input
--- TODO  - parameterise action with bool to use not use hook input
-eachHkFail :: Suite
-eachHkFail =
+--- $> eachHkInitFailSuiteDemo
+-- creates an initialisation failure in each hook when once hook output is cached
+
+eachHkInitFailSuiteDemo :: IO ()
+eachHkInitFailSuiteDemo = runIODemo eachHkInitFailSuite
+
+eachHkInitFailSuite :: Suite
+eachHkInitFailSuite =
   [ PB.Hook
       (NodePath "WebDriverDemo" "before once")
-      nothingBefore
+      nothingOnceBefore
+      [ PB.Hook
+          (NodePath "WebDriverDemo" "before inner once")
+          pureOnceErrorHook
+          [ PB.Hook
+              (NodePath "WebDriverDemo" "each hook")
+              eachHook
+              [Fixture (NodePath "WebDriverDemo" "fixture") $ fxLogMessage False]
+          ]
+      ]
+  ]
+
+------------------------------------------------------
+
+eachHkFailDemoNoRead :: IO ()
+eachHkFailDemoNoRead = runIODemo $ eachHkFail False
+
+--- $> eachHkFailDemoNoRead
+-- runs effect but does not throw error because test does not use hook input
+
+------------------------------------------------------
+
+eachHkFailDemoRead :: IO ()
+eachHkFailDemoRead = runIODemo $ eachHkFail True
+
+--- $> eachHkFailDemoRead
+-- runs effect and throws error because test uses hook output
+-- fails in the hook, not initialisation, because there is no caching of 
+-- the hook output in each hooks
+
+eachHkFail :: Bool -> Suite
+eachHkFail readStatus =
+  [ PB.Hook
+      (NodePath "WebDriverDemo" "before once")
+      nothingOnceBefore
       [ PB.Hook
           (NodePath "WebDriverDemo" "each hook Gunna Blow")
           eachFailureHook
-          [Fixture (NodePath "WebDriverDemo" "test") fxLogMessage]
+          [Fixture (NodePath "WebDriverDemo" "fixture") $ fxLogMessage readStatus]
       ]
   ]
+
+------------------------------------------------------
+------------------------------------------------------
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
-fxLogMessage :: Fixture DriverStatus
-fxLogMessage = Full' config pureErrorHook action' parse items
+fxLogMessage :: Bool -> Fixture DriverStatus
+fxLogMessage readStatus = Full' config pureOnceErrorHook (action' readStatus) parse items
 
 --- Hook ---
 
-nothingBefore :: PB.Hook Once Before () ()
-nothingBefore =
+nothingOnceBefore :: PB.Hook Once Before () ()
+nothingOnceBefore =
   BeforeHook
     { action = \_rc -> do
         log "This is the outer hook"
     }
 
-pureErrorHook :: PB.Hook Once Before () DriverStatus
-pureErrorHook =
+pureOnceErrorHook :: PB.Hook Once Before () DriverStatus
+pureOnceErrorHook =
   BeforeHook'
-    { depends = nothingBefore,
+    { depends = nothingOnceBefore,
       action' = pureError "This is the inner hook" "BANG !!!! pureErrorHook Hook failed !!!"
+    }
+
+pureThreadErrorHook :: PB.Hook Once Before () DriverStatus
+pureThreadErrorHook =
+  BeforeHook'
+    { depends = nothingOnceBefore,
+      action' = pureError "This is the Thread hook" "BANG !!!! pureThreadErrorHook Hook failed !!!"
     }
 
 eachHook :: PB.Hook Each Before DriverStatus DriverStatus
 eachHook =
   BeforeHook'
-    { depends = pureErrorHook,
+    { depends = pureOnceErrorHook,
       action' = \_rc ds -> do
         log "This is each hook"
         pure ds
@@ -132,7 +176,7 @@ eachHook =
 eachFailureHook :: PB.Hook Each Before () DriverStatus
 eachFailureHook =
   BeforeHook'
-    { depends = nothingBefore,
+    { depends = nothingOnceBefore,
       action' =  \_rc _ds -> do 
         log "This is each hook" 
         pure $ error "BANG !!!! eachFailureHook Hook failed !!!"
@@ -143,8 +187,11 @@ pureError logMsg errMsg _rc _i = do
   log logMsg
   pure $ error errMsg
 
-action' :: (Out NodeLog :> es) => RunConfig -> DriverStatus -> Data -> Eff es AS
-action' _rc _hookDriverStatus itm = do
+action' :: (Out NodeLog :> es) => Bool -> RunConfig -> DriverStatus -> Data -> Eff es AS
+action' readStatus _rc hookDriverStatus itm = do
+  when readStatus $
+    log $ "Reading status: " <> txt hookDriverStatus
+
   log itm.title
   pure $ AS {status = Ready, checkButtonText = "Checkboxes"}
 
@@ -182,7 +229,7 @@ items _rc =
         }
     ]
 
--- ################### Simplified ##################
+-- ################### Simplified Laziness (IO no test framework or effect system) ##################
 
 log_ :: Text -> IO ()
 log_ = TIO.putStrLn

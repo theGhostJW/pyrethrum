@@ -55,7 +55,7 @@ onceHkDeferredSuite =
   ]
 ------------------------------------------------------
 
--- $> threadHkInitFailSuiteDemo
+--- $> threadHkInitFailSuiteDemo
 -- creates an initialisation failure in each hook when thread hook output is cached
 
 threadHkInitFailSuiteDemo :: IO ()

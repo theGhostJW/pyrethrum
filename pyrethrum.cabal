@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 16468d979d1b36dd622ebb58bab1be3020b60592a9169ee95ebc50de02547cc5
+-- hash: 54d8765ec1817c0fffa481b4b3a8171458f8de785bfc7618961d0f210fa2271e
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -88,11 +88,12 @@ library
       DSL.FileSystemIOInterpreter
       DSL.Internal.FileSystemIO
       DSL.Internal.FileSystemPure
-      DSL.Internal.NodeEvent
-      DSL.Out
+      DSL.Internal.NodeLog
+      DSL.Logging
+      DSL.OutEffect
+      DSL.OutInterpreter
       Filter
       Internal.Logging
-      Internal.LoggingCore
       Internal.LogQueries
       Internal.SuiteFiltering
       Internal.SuiteRuntime
@@ -115,6 +116,7 @@ library
       FileSystemDocDemo
       HigherOrderEffectDemo
       IOEffectDemo
+      LazyinessSuiteDemo
       PyrethrumBase
       PyrethrumConfigTypes
       PyrethrumDemoTest
@@ -201,8 +203,6 @@ library
     , extra
     , fmt
     , hashable
-    , http-client
-    , http-types
     , mtl
     , path
     , path-io

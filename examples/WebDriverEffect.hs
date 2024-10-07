@@ -1,6 +1,6 @@
 
 module WebDriverEffect
-  ( SessionRef (..),
+  ( 
     WebUI (..),
     WebDriver,
     -- driver
@@ -22,12 +22,12 @@ module WebDriverEffect
   )
 where
 
-import Effectful as EF ( Effect, DispatchOf, Dispatch(Dynamic) )
+import Effectful as EF ( Effect, DispatchOf, Dispatch(Dynamic))
 
 import Effectful.Reader.Static as ERS
 import Effectful.TH (makeEffect)
 import Prelude hiding (second)
-import WebDriverSpec (SessionRef(..), ElementRef, DriverStatus, Selector)
+import WebDriverSpec (ElementRef, DriverStatus, Selector, SessionRef)
 
 -- Effect
 
@@ -45,8 +45,7 @@ every element interaction
 -}
 data WebUI :: Effect where
   -- driver 
-  DriverStatus :: Text -> WebUI m  DriverStatus
-  -- DriverStatus :: WebUI m  DriverStatus
+  DriverStatus :: WebUI m  DriverStatus
   -- session
   NewSession :: WebUI m SessionRef
   KillSession :: SessionRef -> WebUI m ()
@@ -65,7 +64,3 @@ data WebUI :: Effect where
   Sleep :: Int -> WebUI m ()
 
 makeEffect ''WebUI
-
--- todo add newtype later and don't export type constructor to make
--- sleep wait typesafe
-

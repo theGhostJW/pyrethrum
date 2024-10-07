@@ -7,7 +7,7 @@ import Chronos (Time, now)
 import Core (DataSource (ItemList))
 import Core qualified
 import CoreUtils (Hz (..), ThreadId)
-import DSL.Internal.NodeEvent qualified as AE
+import DSL.Internal.NodeLog qualified as AE
 import Data.Aeson (ToJSON)
 import Data.Hashable qualified as H
 import Data.Map.Strict qualified as M
@@ -36,17 +36,17 @@ import Internal.LogQueries
     threadHook,
   )
 import Internal.Logging as L
-  ( Event (..),
+  ( Log (..),
     ExePath (..),
     HookPos (..),
-    Log (),
+    FLog,
     NodeType (..),
     parentPath,
-    testLogControls,
+    testLogActions,
     topPath,
-    LogContext (..)
+    FullLog (..),
+    LineInfo(..)
   )
-import Internal.LoggingCore (BaseLog (..))
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
 import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
@@ -99,7 +99,7 @@ bug :: Text -> a
 bug t = PR.bug (error t :: SomeException)
 
 logging :: Logging
-logging = LogFails
+logging = Log
 
 {- each and once hooks will always run but thread hooks may be empty
    due to subitems being stolen by another thread. We need to ensure
@@ -126,10 +126,10 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
   -}
 
-type LogItem = Log ExePath AE.NodeEvent
+type LogItem = FLog ExePath AE.NodeLog
 
 getThreadId :: LogItem -> ThreadId
-getThreadId (MkLog (MkLogContext {threadId}) _) = threadId
+getThreadId (MkLog (MkLineInfo{threadId}) _) = threadId
 
 logItemtoBool :: (NodeType -> Bool) -> LogItem -> Bool
 logItemtoBool = threadEventToBool
@@ -228,6 +228,11 @@ logAccum acc@(passStart, rMap) (MkLog {event}) =
       isJust passStart
         ? (Nothing, insert' loc nodeType $ Actual Fail)
         $ error ("Failure event not started\n" <> txt f)
+
+    -- TODO this is probably wrong fix this will cause failures when tests generate these
+    -- need to think about cortrect expected results in this case
+    InitialisationFailure {} -> acc
+
     pf@ParentFailure {loc, nodeType} ->
       isJust passStart
         ? error ("parent failure encountered when parent event not ended\n" <> txt pf)
@@ -239,7 +244,7 @@ logAccum acc@(passStart, rMap) (MkLog {event}) =
     FilterLog {} -> acc
     SuiteInitFailure {} -> acc
     StartExecution {} -> acc
-    NodeEvent {} -> acc
+    NodeLog {} -> acc
     EndExecution {} -> acc
   where
     insert' :: ExePath -> NodeType -> LogResult -> Map EventPath [LogResult]
@@ -395,7 +400,7 @@ isFailChildEventOf :: LogItem -> LogItem -> Bool
 isFailChildEventOf c p =
   (cIsSubpathOfp || samePath && pIsSetupFailure && cIsTeardown) && (sameThread || pIsOnceHook)
   where
-    sameThread = p.logContext.threadId == c.logContext.threadId
+    sameThread = p.lineInfo.threadId == c.lineInfo.threadId
     hasHookPos hp = \case
       Hook _ hp' -> hp == hp'
       _ -> False
@@ -526,10 +531,14 @@ failInfo ls =
                 & maybe
                   (error $ "Failure encountered before start:\n" <> toS (ppShow l))
                   (const (Nothing, FailInfo l ls' : result))
+
+            -- todo think about logic here 
+            InitialisationFailure {} -> passThrough
+
             ParentFailure {} -> passThrough
             StartExecution {} -> passThrough
             EndExecution {} -> passThrough
-            NodeEvent {} -> passThrough
+            NodeLog {} -> passThrough
             End {} -> passThrough
       where
         passThrough = (lastStartEvnt, result)
@@ -739,10 +748,10 @@ nxtHookLog = find (\l -> startEndNodeMatch isHook l || isHookParentFailure l)
 
 threadVisible :: Bool -> ThreadId -> [LogItem] -> [LogItem]
 threadVisible onceHookInclude tid =
-  filter (\l -> tid == l.logContext.threadId || onceHookInclude && (startEndNodeMatch onceHook l || isOnceHookParentFailure l))
+  filter (\l -> tid == l.lineInfo.threadId || onceHookInclude && (startEndNodeMatch onceHook l || isOnceHookParentFailure l))
 
 threadIds :: [LogItem] -> [ThreadId]
-threadIds = PE.nub . fmap (.logContext.threadId)
+threadIds = PE.nub . fmap (.lineInfo.threadId)
 
 threadedLogs :: Bool -> [LogItem] -> [[LogItem]]
 threadedLogs onceHookInclude l =
@@ -751,7 +760,7 @@ threadedLogs onceHookInclude l =
 shouldOccurOnce :: LogItem -> Bool
 shouldOccurOnce = startEndNodeMatch onceSuiteEvent
 
-chkStartEndExecution :: [Log ExePath AE.NodeEvent] -> IO ()
+chkStartEndExecution :: [FLog ExePath AE.NodeLog] -> IO ()
 chkStartEndExecution evts =
   (,)
     <$> PE.head evts
@@ -784,7 +793,7 @@ chkThreadLogsInOrder :: [LogItem] -> IO ()
 chkThreadLogsInOrder ls =
   do
     chk' "Nothing found in heads - groupOn error this should not happen" (all isJust heads)
-    traverse_ (chkEq' "first index of thread should be 0" 0 . (.logContext.idx)) $ catMaybes heads
+    traverse_ (chkEq' "first index of thread should be 0" 0 . (.lineInfo.idx)) $ catMaybes heads
     traverse_ chkIds threads
   where
     threads = groupOn' getThreadId ls
@@ -794,8 +803,8 @@ chkThreadLogsInOrder ls =
       for_
         (zip ls' $ drop 1 ls')
         ( \(l1, l2) ->
-            let idx1 = l1.logContext.idx
-                idx2 = l2.logContext.idx
+            let idx1 = l1.lineInfo.idx
+                idx2 = l2.lineInfo.idx
              in chkEqfmt' (succ idx1) idx2 $
                   "event idx not consecutive\n"
                     <> toS (ppShow l1)
@@ -856,7 +865,7 @@ test = Spec 0
 
 data ExeResult = ExeResult
   { expandedTemplate :: [T.Template],
-    log :: [Log ExePath AE.NodeEvent]
+    log :: [FLog ExePath AE.NodeLog]
   }
 
 runTest :: Int -> ThreadCount -> [Template] -> IO ()
@@ -886,10 +895,10 @@ execute wantLog baseRandomSeed threadLimit templates = do
   lg <- exeTemplate wantLog baseRandomSeed threadLimit fullTs
   pure $ ExeResult fullTs lg
 
-exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [Log ExePath AE.NodeEvent]
+exeTemplate :: Logging -> Int -> ThreadCount -> [T.Template] -> IO [FLog ExePath AE.NodeLog]
 exeTemplate wantLog baseRandomSeed maxThreads templates = do
   let wantLog' = wantLog == Log
-  (lc, logQ) <- testLogControls wantLog'
+  (lc, logLst) <- testLogActions wantLog'
   when (wantLog' || wantLog == LogTemplate) $ do
     putStrLn "#### Template ####"
     pPrint templates
@@ -901,15 +910,7 @@ exeTemplate wantLog baseRandomSeed maxThreads templates = do
     putStrLn "========="
     putStrLn "#### Log ####"
   executeWithoutValidation maxThreads lc nodes
-  atomically $ q2List logQ
-
-q2List :: TQueue a -> STM [a]
-q2List qu = reverse <$> recurse [] qu
-  where
-    recurse :: [a] -> TQueue a -> STM [a]
-    recurse l q =
-      tryReadTQueue q
-        >>= maybe (pure l) (\e -> recurse (e : l) q)
+  atomically logLst
 
 loadTQueue :: TQueue a -> [a] -> STM ()
 loadTQueue q = traverse_ (writeTQueue q)
@@ -1121,7 +1122,7 @@ mkVoidAction path spec =
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
-mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.ApEventSink -> hi -> IO ()
+mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.LogSink -> hi -> IO ()
 mkAction path s _sink _in = mkVoidAction path s
 
 mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO ()]

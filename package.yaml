@@ -115,8 +115,8 @@ dependencies:
   - unliftio
   - yaml
   # used to talk to ghecko driver
-  - http-client
-  - http-types
+  # - http-client
+  # - http-types
   - req
   # webdriver used in TestdemoSelenium
   - webdriver-w3c
@@ -132,7 +132,11 @@ ghc-options:
   - -fmax-pmcheck-models=10000000
   - -ferror-spans
   - -fprint-potential-instances
-  # - -dth-dec-file -- generate template haskell
+  # generate template haskell splices files
+  # - -ddump-splices
+  # - -dth-dec-file
+  # - -ddump-to-file
+
   # - -j3 #number of cores used by ghc in compiling
 
   # threading related options only has an effect for exes

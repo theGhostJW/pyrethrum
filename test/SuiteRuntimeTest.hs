@@ -23,13 +23,13 @@ chkInitFailure expected filterResults =
   where
     actualFail = (.failure) <$> chkSuite filterResults
 
--- $ > unit_configError_valid_pass
+-- $> unit_configError_valid_pass
 
 unit_configError_valid_pass :: IO ()
 unit_configError_valid_pass =
   chkInitFailure Nothing [MkFilterResult "" Nothing]
 
--- $ > unit_configError_valid_fail
+-- $> unit_configError_valid_fail
 
 unit_configError_valid_fail :: IO ()
 unit_configError_valid_fail =
@@ -39,12 +39,12 @@ unit_configError_valid_fail =
       MkFilterResult "1" Nothing
     ]
 
--- $ > unit_configError_empty
+-- $> unit_configError_empty
 
 unit_configError_empty :: IO ()
 unit_configError_empty = chkInitFailure (Just "Filtered Test Suite is Empty") []
 
--- $ > unit_configError_duplicate
+-- $> unit_configError_duplicate
 
 unit_configError_duplicate :: IO ()
 unit_configError_duplicate =
@@ -65,7 +65,7 @@ unit_simple_fail :: IO ()
 unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fixture [test Pass, test Fail]]]
 
 
--- $> unit_nested_pass_fail
+-- >>> unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
 unit_nested_pass_fail =
   runTest

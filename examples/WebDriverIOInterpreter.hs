@@ -26,7 +26,7 @@ runWebDriver =
   interpret $ \_ ->
     EF.liftIO . \case
       -- driver
-      DriverStatus _i -> status
+      DriverStatus -> status
       -- session
       NewSession -> newDefaultFirefoxSession
       KillSession sessionRef -> deleteSession sessionRef

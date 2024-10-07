@@ -4,7 +4,7 @@ module DSL.FileSystemDocInterpreter (
   runFileSystem,
 ) where
 
-import DSL.Out ( Out )
+import DSL.OutEffect ( Out )
 import Effectful as EF (
   Eff,
   IOE,
@@ -16,11 +16,11 @@ import Path.Extended (Path, toFilePath)
 import PyrethrumExtras (toS, txt, (?))
 import Effectful.Dispatch.Dynamic (LocalEnv, interpret)
 import DSL.DocInterpreterUtils (docErr, docErr2, docErr3, docErr4)
-import DSL.Internal.NodeEvent (NodeEvent)
+import DSL.Internal.NodeLog (NodeLog)
 
 -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
 
-runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out NodeEvent :> es{- , E.Error DocException :> es -}) => Eff (FileSystem : es) a -> Eff es a
+runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es{- , E.Error DocException :> es -}) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
   interpret handler
  where

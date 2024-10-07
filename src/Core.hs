@@ -1,11 +1,11 @@
 module Core where
 
 import Check (Checks)
-import DSL.Internal.NodeEvent hiding (Check)
-import Data.Aeson (ToJSON (..))
-import GHC.Records (HasField)
 import CoreUtils (Hz (..))
+import DSL.Internal.NodeLog (LogSink, Path)
+import Data.Aeson (ToJSON (..))
 import Filter (Filters)
+import GHC.Records (HasField)
 
 data Before
 
@@ -198,11 +198,20 @@ data Node m rc fc hi where
       fixture :: Fixture m rc fc hi
     } ->
     Node m rc fc hi
+
+data Mode
+  = Run
+  | Listing
+      { includeSteps :: Bool,
+        includeChecks :: Bool
+      }
+
 data SuiteExeParams m rc fc where
   MkSuiteExeParams ::
     { suite :: [Node m rc fc ()],
+      mode :: Mode,
       filters :: Filters rc fc,
-      interpreter :: forall a. m a -> IO a,
+      interpreter :: forall a. LogSink -> m a -> IO a,
       runConfig :: rc
     } ->
     SuiteExeParams m rc fc

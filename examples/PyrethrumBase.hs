@@ -17,7 +17,6 @@ module PyrethrumBase
     mkCoreSuite,
     ioRunner,
     docRunner,
-    runDocOut,
     defaultRunConfig,
     docInterpreter
   )
@@ -27,14 +26,14 @@ import Core qualified as C
 import DSL.FileSystemDocInterpreter qualified as FDoc (runFileSystem)
 import DSL.FileSystemEffect (FileSystem)
 import DSL.FileSystemIOInterpreter qualified as FIO (runFileSystem)
-import DSL.Internal.NodeEvent (NodeEvent)
-import DSL.Internal.NodeEvent qualified as AE
-import DSL.Out (Out, runOut)
+import DSL.Internal.NodeLog (NodeLog)
+import DSL.Internal.NodeLog qualified as AE
+import DSL.OutEffect (Out)
+import DSL.OutInterpreter ( runOut )
 import Effectful (Eff, IOE, runEff, type (:>))
 import Filter (Filters)
 import Internal.Logging qualified as L
-import Internal.LoggingCore qualified as L
-import Internal.SuiteRuntime (ThreadCount, execute)
+import Internal.SuiteRuntime (ThreadCount, execute, executeWithoutValidation)
 import PyrethrumConfigTypes as CG
   ( Country (..),
     Depth (..),
@@ -47,73 +46,87 @@ import PyrethrumConfigTypes as CG
 import WebDriverDocInterpreter qualified as WDDoc (runWebDriver)
 import WebDriverEffect (WebUI (..))
 import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
+import Prepare (prepare, PreNode)
+import Internal.SuiteValidation (SuiteValidationError)
+import Internal.SuiteFiltering (FilteredSuite(..))
 
 --  these will probably be split off and go into core or another library
 -- module later
 type Action = Eff ApEffs
 
-type HasLog es = Out NodeEvent :> es
+type HasLog es = Out NodeLog :> es
 
-type LogEffs a = forall es. (Out NodeEvent :> es) => Eff es a
+type LogEffs a = forall es. (Out NodeLog :> es) => Eff es a
 
-type ApEffs = '[FileSystem, WebUI, Out NodeEvent, IOE]
+type ApEffs = '[FileSystem, WebUI, Out NodeLog, IOE]
 
--- type ApConstraints es = (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es)
--- type AppEffs a = forall es. (FileSystem :> es, Out NodeEvent :> es, Error FSException :> es, IOE :> es) => Eff es a
+-- type ApConstraints es = (FileSystem :> es, Out NodeLog :> es, Error FSException :> es, IOE :> es)
+-- type AppEffs a = forall es. (FileSystem :> es, Out NodeLog :> es, Error FSException :> es, IOE :> es) => Eff es a
 
-type SuiteRunner = Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
+type SuiteRunner = Suite 
+  -> Filters RunConfig FixtureConfig 
+  -> RunConfig 
+  -> ThreadCount 
+  -> L.LogActions (L.Log L.ExePath AE.NodeLog)
+  -> IO ()
 
-ioInterpreter :: Action a -> IO a
-ioInterpreter ap =
+ioInterpreter :: AE.LogSink -> Action a -> IO a
+ioInterpreter sink ap =
   ap
     & FIO.runFileSystem
     & WDIO.runWebDriver
-    & runIOOut
+    & runOut sink
     & runEff
 
 
-docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
-docRunner suite filters runConfig threadCount logControls =
-  execute threadCount logControls $
-    C.MkSuiteExeParams
+-- docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.MkLogActions (L.Event L.ExePath AE.NodeLog) (L.FLog L.ExePath AE.NodeLog) -> IO ()
+-- docRunner suite filters runConfig threadCount logControls =
+--   execute threadCount logControls $
+--     C.MkSuiteExeParams
+--       { interpreter = docInterpreter,
+--         suite = mkCoreSuite suite,
+--         filters,
+--         runConfig
+--       }
+
+docRunner :: Bool -> Bool -> Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogActions (L.Log L.ExePath AE.NodeLog) -> IO ()
+docRunner includeSteps includeChecks suite filters runConfig threadCount logControls =
+  prepared & either 
+    print
+    (\s -> executeWithoutValidation threadCount logControls s.suite)
+  where 
+    prepared :: Either SuiteValidationError (FilteredSuite (PreNode IO ()))
+    prepared = prepare $ C.MkSuiteExeParams
       { interpreter = docInterpreter,
+        mode = C.Listing {includeSteps, includeChecks},
         suite = mkCoreSuite suite,
         filters,
         runConfig
       }
+ 
 
-ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogControls (L.Event L.ExePath AE.NodeEvent) (L.Log L.ExePath AE.NodeEvent) -> IO ()
+
+ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogActions (L.Log L.ExePath AE.NodeLog) -> IO ()
 ioRunner suite filters runConfig threadCount logControls =
   execute threadCount logControls $
     C.MkSuiteExeParams
       { interpreter = ioInterpreter,
+        mode = C.Run,
         suite = mkCoreSuite suite,
         filters,
         runConfig
       }
 
-docInterpreter :: Action a  -> IO a
-docInterpreter ap =
+docInterpreter :: AE.LogSink -> Action a  -> IO a
+docInterpreter sink ap =
   ap
     & FDoc.runFileSystem
     & WDDoc.runWebDriver
-    & runDocOut
+    & runOut sink
     & runEff
 
 
 
--- TODO - interpreters into own module
--- Need to fix up to work in with logcontrols
--- there are currently 2 paths to STD out I think ??
-runIOOut :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
-runIOOut = runOut print
-
--- in doc mode we supress log
-runDocOut :: forall a es. (IOE :> es) => Eff (Out NodeEvent : es) a -> Eff es a
-runDocOut =
-  runOut $ \case
-    AE.Framework l -> print l
-    AE.User _l -> pure ()
 
 {-
 runErrorIO :: forall a e es. Exception e => Eff (Error e : es) a -> Eff es (Either (CallStack, SomeException) a)

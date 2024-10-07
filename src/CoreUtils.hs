@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass, DerivingStrategies #-}
 module CoreUtils where
 
 import UnliftIO.Concurrent qualified as C
@@ -6,7 +7,7 @@ import Data.Aeson.TH (defaultOptions, deriveToJSON, deriveJSON)
 import PyrethrumExtras (txt)
 import Data.Text as T (lines)
 
-data Hz = Once | Thread | Each deriving (Show, Eq, Ord)
+data Hz = Once | Thread | Each deriving (Show, Eq, Ord, Generic, NFData)
 
 type ThreadId = Int
 
@@ -14,7 +15,9 @@ type ThreadId = Int
 mkThreadId :: C.ThreadId -> ThreadId
 mkThreadId = read . drop 9 . show
 
-newtype PException = MkException {displayText :: [Text]} deriving (Show, Eq, Ord)
+newtype PException = MkException {displayText :: [Text]} 
+  deriving (Show, Eq, Ord, Generic)
+  deriving newtype NFData 
 
 exceptionTxt :: SomeException -> PException
 exceptionTxt = MkException . T.lines . txt . displayException

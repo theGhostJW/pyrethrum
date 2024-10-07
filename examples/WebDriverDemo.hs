@@ -2,8 +2,8 @@ module WebDriverDemo where
 
 import Check
 import Core (ParseException)
-import DSL.Internal.NodeEvent (NodeEvent (User), Path (NodePath), UserLog (Log))
-import DSL.Out (Out, out)
+import DSL.Internal.NodeLog (NodeLog, Path (NodePath))
+import DSL.OutEffect (Out)
 import Effectful as EF
   ( Eff,
     type (:>),
@@ -16,6 +16,7 @@ import Filter (Filters(..))
 import Internal.SuiteRuntime (ThreadCount(..))
 import Internal.Logging qualified as L
 import WebDriverPure (seconds)
+import DSL.Logging (log)
 
 
 -- ################### Effectful Demo ##################
@@ -30,29 +31,18 @@ suite :: Suite
 suite =
   [Fixture (NodePath "WebDriverDemo" "test") test]
 
-runDemo :: SuiteRunner -> IO ()
-runDemo runner = do 
-  (logControls, _logQ) <- L.testLogControls True
-  runner suite Unfiltered defaultRunConfig (ThreadCount 1) logControls
+runDemo :: SuiteRunner -> Suite -> IO ()
+runDemo runner suite' = do 
+  (logControls, _logLst) <- L.testLogActions True
+  runner suite' Unfiltered defaultRunConfig (ThreadCount 1) logControls
 
 -- start geckodriver first: geckodriver &
-runIODemo :: IO ()
+runIODemo :: Suite -> IO ()
 runIODemo = runDemo ioRunner
--- >>> runIODemo
-
--- TODO: not working looks like needs separate runner
-runDocDemo :: IO ()
-runDocDemo = runDemo docRunner
--- >>> runDocDemo
 
 -- ############### Test Case ###################
 
--- TODO: log interpreter
-logShow :: (HasLog es, Show a) => a -> Eff es ()
-logShow = log . txt
-
-log :: (HasLog es) => Text -> Eff es ()
-log = out . User . Log
+-- >>> runIODemo suite
 
 test :: Fixture ()
 test = Full config action parse items
@@ -60,13 +50,13 @@ test = Full config action parse items
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
-driver_status :: (WebUI :> es, Out NodeEvent :> es) => Eff es DriverStatus
+driver_status :: (WebUI :> es, Out NodeLog :> es) => Eff es DriverStatus
 driver_status = do 
-  status <- driverStatus "NA"
+  status <- driverStatus
   log $ "the driver status is: " <> txt status
   pure status
 
-action :: (WebUI :> es, Out NodeEvent :> es) => RunConfig -> Data -> Eff es AS
+action :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> Data -> Eff es AS
 action _rc i = do
   log i.title
   status <- driver_status
@@ -115,4 +105,3 @@ items _rc =
               <> chk "Checkboxes text as expected" ((== "Checkboxes") . (.checkButtonText))
         }
     ]
-

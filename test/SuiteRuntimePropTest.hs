@@ -76,6 +76,7 @@ data TGenParams = GenParams
     maxDelay :: Int,
     passPcnt :: Word,
     hookPassPcnt :: Word,
+    hookPassThroughErrPcnt :: Word,
     maxDepth :: Word,
     minHz :: Hz,
     threadCount :: ThreadCount,
@@ -94,6 +95,7 @@ templateGenParams
       minTestsPerFixture,
       maxTestsPerFixture,
       hookPassPcnt,
+      hookPassThroughErrPcnt,
       passPcnt
     } =
     frequency
@@ -126,12 +128,12 @@ templateGenParams
       genManySpec =
         frequency
           [ (10, T.All <$> genSpec'),
-            (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$> genDelay maxDelay)
+            (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) (fromIntegral hookPassThroughErrPcnt) 0 <$> genDelay maxDelay)
           ]
       genManySpec' =
         frequency
           [ (10, T.All <$> genSpec'),
-            (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$> genDelay maxDelay)
+            (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) (fromIntegral hookPassThroughErrPcnt) 0 <$> genDelay maxDelay)
           ]
       genThreadBefore = ThreadBefore <$> genManySpec <*> genThreadSubnodes
       genThreadAfter = ThreadAfter <$> genManySpec <*> genThreadSubnodes
@@ -152,6 +154,7 @@ defParams =
       maxDelay = 1000,
       passPcnt = 90,
       hookPassPcnt = 95,
+      hookPassThroughErrPcnt = 10,
       maxDepth = 5,
       minHz = Once,
       threadCount = ThreadCount 5,
@@ -197,7 +200,7 @@ runProp isShrinking testName o p =
     let result = unsafePerformIO $ tryRunTest isShrinking p t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
--- $ > test_suite_preload
+-- $> test_suite_preload
 test_suite_preload :: IO ()
 test_suite_preload = do
   -- need a separate shrinkState for every test group

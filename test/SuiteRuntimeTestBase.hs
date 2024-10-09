@@ -1112,6 +1112,11 @@ mkManyAction baseSeed q pth = \case
                   maxDelay
                 }
 
+newtype DummyHkResult = DummyHkResult
+  {dummyHkResult :: Int}
+  deriving (Show, Eq, Ord)
+
+
 mkVoidAction :: forall pth. (Show pth) => pth -> Spec -> IO ()
 mkVoidAction path spec =
   do
@@ -1122,8 +1127,20 @@ mkVoidAction path spec =
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
-mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.LogSink -> hi -> IO ()
-mkAction path s _sink _in = mkVoidAction path s
+mkAction :: forall pth. (Show pth) => pth -> Spec -> P.LogSink -> DummyHkResult -> IO DummyHkResult
+mkAction path spec _sink hi =   do
+    C.threadDelay spec.delay
+    
+    --  make sure the result is used to force any pas through errors
+    let hi' = hi {dummyHkResult = hi.dummyHkResult + 1}
+    when (hi' > 100000) $
+      when (hi' < 0) $
+      error "this will never happen just making sure the result is used"
+       
+    case spec.result of
+      Pass -> pure hi'
+      Fail -> error . toS $ "FAIL RESULT @ " <> txt path
+      PassThroughFail -> pure . error $ "Deferred error from " <> txt path
 
 mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO ()]
 mkNodes baseSeed mxThreads = mapM mkNode

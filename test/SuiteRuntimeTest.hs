@@ -23,13 +23,13 @@ chkInitFailure expected filterResults =
   where
     actualFail = (.failure) <$> chkSuite filterResults
 
--- $> unit_configError_valid_pass
+-- $ > unit_configError_valid_pass
 
 unit_configError_valid_pass :: IO ()
 unit_configError_valid_pass =
   chkInitFailure Nothing [MkFilterResult "" Nothing]
 
--- $> unit_configError_valid_fail
+-- $ > unit_configError_valid_fail
 
 unit_configError_valid_fail :: IO ()
 unit_configError_valid_fail =
@@ -39,12 +39,12 @@ unit_configError_valid_fail =
       MkFilterResult "1" Nothing
     ]
 
--- $> unit_configError_empty
+-- $ > unit_configError_empty
 
 unit_configError_empty :: IO ()
 unit_configError_empty = chkInitFailure (Just "Filtered Test Suite is Empty") []
 
--- $> unit_configError_duplicate
+-- $ > unit_configError_duplicate
 
 unit_configError_duplicate :: IO ()
 unit_configError_duplicate =
@@ -56,11 +56,11 @@ unit_configError_duplicate =
       MkFilterResult "1" Nothing
     ]
 
--- $> unit_simple_pass
+-- $ > unit_simple_pass
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
--- $> unit_simple_fail
+-- $ > unit_simple_fail
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fixture [test Pass, test Fail]]]
 
@@ -122,7 +122,7 @@ passProbSuite specGen =
         ]
     ]
   where
-    passProb pcnt = T.PassProb specGen pcnt 100 1000
+    passProb pcnt = T.PassProb specGen pcnt 0 100 1000
     passProb0 = passProb 0
     passProb20 = passProb 20
     passProb50 = passProb 50
@@ -271,6 +271,7 @@ propFailTemplateGenWrongEachHookResult =
             T.PassProb
               { genStrategy = Preload,
                 passPcnt = 95,
+                passThroughPcnt = 0,
                 minDelay = 0,
                 maxDelay = 0
               },
@@ -334,6 +335,7 @@ unit_prop_fail_each_after =
             T.PassProb
               { genStrategy = Preload,
                 passPcnt = 95,
+                passThroughPcnt = 0,
                 minDelay = 0,
                 maxDelay = 0
               },
@@ -381,6 +383,7 @@ unit_wrong_result =
                             T.PassProb
                               { genStrategy = Preload,
                                 passPcnt = 100,
+                                passThroughPcnt = 0,
                                 minDelay = 0,
                                 maxDelay = 0
                               },
@@ -418,6 +421,7 @@ mayFail =
                     T.PassProb
                       { genStrategy = Preload,
                         passPcnt = 95,
+                        passThroughPcnt = 0,
                         minDelay = 0,
                         maxDelay = 0
                       },
@@ -476,6 +480,7 @@ wrongFailurePath =
                     T.PassProb
                       { genStrategy = Preload,
                         passPcnt = 95,
+                        passThroughPcnt = 0,
                         minDelay = 0,
                         maxDelay = 2
                       },

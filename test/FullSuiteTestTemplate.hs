@@ -11,6 +11,7 @@ data Spec = Spec {delay :: Int, result :: Result}
 data Result
   = Pass
   | Fail
+  | PassThroughFail
   deriving (Ord, Eq, Read, Show)
 
 -- |Defines when a spec is generated, on building the template (Preload) or when the test is run (Runtime)
@@ -38,6 +39,8 @@ data ManySpec
   | PassProb
       { genStrategy :: SpecGen
       , passPcnt :: Int8
+      -- % of failures that are pass through
+      , passThroughPcnt :: Int8
       , minDelay :: Int
       , maxDelay :: Int
       }

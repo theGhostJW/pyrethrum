@@ -1117,13 +1117,15 @@ newtype DummyHkResult = DummyHkResult
   deriving (Show, Eq, Ord)
 
 
-mkVoidAction :: forall pth. (Show pth) => pth -> Spec -> IO ()
-mkVoidAction path spec =
-  do
-    C.threadDelay spec.delay
-    unless (spec.result == Pass) $
-      error . toS $
-        "FAIL RESULT @ " <> txt path
+-- mkVoidAction :: forall pth. (Show pth) => pth -> Spec -> IO ()
+-- mkVoidAction path spec =
+--   do
+--     C.threadDelay spec.delay
+--     unless (spec.result == Pass) $
+--       error . toS $
+--         "FAIL RESULT @ " <> txt path
+
+mkAction_
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack

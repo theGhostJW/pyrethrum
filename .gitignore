@@ -1,8 +1,10 @@
 .stack-work/
 .stack-hls-work/
 dist-newstyle/
+static-ls
 staticls/
 simple-hpack.cabal
 *~
 *.hie
 *.log
+.hiedb

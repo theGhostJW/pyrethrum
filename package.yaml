@@ -98,6 +98,9 @@ dependencies:
   - effectful
   - effectful-plugin
   - effectful-th
+  # static ls
+  - hiedb-plugin
+
   - extra
   - hashable
   - mtl
@@ -154,7 +157,16 @@ ghc-options:
   - -Wredundant-constraints
   - -fplugin=Effectful.Plugin
   - -fwarn-tabs
+  # static ls requirements
   - -fwrite-ide-info
+  - -hiedir .hiefiles
+  - -fdefer-type-errors
+  - -Werror=deferred-type-errors
+  - -Werror=deferred-out-of-scope-variables
+  - -fno-defer-typed-holes
+  #  hiedb-plugin 
+  - -plugin-package hiedb-plugin 
+  - -fplugin Plugin.HieDb
   # - -fno-warn-unused-imports
   # - -fno-warn-missing-signatures
   - -fno-warn-type-defaults

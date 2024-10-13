@@ -117,18 +117,9 @@ dependencies:
   # - relude
   - unliftio
   - yaml
-  # used to talk to ghecko driver
-  # - http-client
-  # - http-types
   - req
   # webdriver used in TestdemoSelenium
   - webdriver-w3c
-  # - name: base
-  #   mixin:
-  #     - hiding (Prelude)
-  # - name: relude
-  #   mixin:
-  #     - (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
 
 ghc-options:
   # - -threaded
@@ -146,10 +137,6 @@ ghc-options:
   # - -threaded
   # - -rtsopts
   # - -with-rtsopts=-N
-
-  # - -O2
-  # - -Werror
-  # - *optimisation
   - -Wall
   - -Wcompat
   - -Wincomplete-record-updates
@@ -167,24 +154,14 @@ ghc-options:
   #  hiedb-plugin 
   - -plugin-package hiedb-plugin 
   - -fplugin Plugin.HieDb
-  # - -fno-warn-unused-imports
-  # - -fno-warn-missing-signatures
   - -fno-warn-type-defaults
-  # - -fno-warn-unused-matches
-  # - -fno-warn-unused-binds
-  - -fno-warn-unused-do-bind
   - -Wno-overlapping-patterns
-  # todo: more researchon this: https://well-typed.com/blog/2023/02/interface-files-with-core/
+  # https://well-typed.com/blog/2023/02/interface-files-with-core/
   - -fprefer-byte-code 
   - -fbyte-code-and-object-code
   # https://gitlab.haskell.org/ghc/ghc/-/issues/24278
   - -fno-break-points
-  # this would be nice but seems to break ghcid
-  # - -Werror=prepositive-qualified-module
-  # - -fdefer-type-error
-  # profiling
-  # - -ddump-to-file 
-  # - -ddump-timings
+
 
 default-extensions:
   - AllowAmbiguousTypes
@@ -238,46 +215,6 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
-# internal-libraries:
-#   examples:
-#     ghc-options: -O0
-#     source-dirs:
-#       - examples
-#       # remove later
-#       - src
-#     dependencies:
-#       - unordered-containers
-#       - pyrethrum
-#       - template-haskell
-#     verbatim:
-#       import: reludeImports
-
-#   discover:
-#     # change optimisation and move later
-#     default-extensions:
-#       - FieldSelectors
-#     ghc-options: -O0
-#     visibility: public
-#     source-dirs:
-#       - discover
-#       # remove later
-#     dependencies:
-#       - algebraic-graphs     ^>= 0.7
-#       - base                 ^>= 4.17.0.0 || ^>= 4.18.0.0
-#       - bytestring           ^>= 0.10.9.0 || ^>= 0.11.0.0
-#       - containers           ^>= 0.6.2.1
-#       - directory            ^>= 1.3.3.2
-#       - filepath             ^>= 1.4.2.1
-#       - generic-lens         ^>= 2.2.0.0
-#       - ghc                  ^>= 9.4 || ^>= 9.6
-#       - lens               
-#       - mtl                  ^>= 2.2.2 || ^>= 2.3
-#       - optparse-applicative
-#       - regex-tdfa           ^>= 1.2.0.0 || ^>= 1.3.1.0
-#       - text                 ^>= 2.0.1
-#       - toml-reader          ^>= 0.2.0.0
-#       - transformers         ^>= 0.5.6.2 || ^>= 0.6
-
 library:
   when:
     # https://github.com/sol/hpack#handling-of-paths_-modules
@@ -285,8 +222,6 @@ library:
       other-modules: Paths_pyrethrum
   source-dirs:
     - src
-    # remove later when finish most dev and move away from god modules
-    # TODO: God modules probably not required with latest cabal spilt fix once and for all
     - test
     - examples
   dependencies:

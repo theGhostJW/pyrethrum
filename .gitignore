@@ -5,3 +5,5 @@ simple-hpack.cabal
 *~
 *.hie
 *.log
+.hiedb
+static-ls

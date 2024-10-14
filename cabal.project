@@ -48,10 +48,4 @@ package *
  ghc-options: -haddock
 -- NOTE: Due to revisions, this file may not work. See:
 -- https://github.com/fpco/stackage-server/issues/232
-
--- Stackage snapshot from: http://www.stackage.org/snapshot/nightly-2024-01-14
--- Please place this file next to your .cabal file as cabal.config
--- To only use tested packages, uncomment the following line:
--- remote-repo: stackage-nightly-2024-01-14:http://www.stackage.org/nightly-2024-01-14
--- constraints from http://www.stackage.org/nightly-2024-01-14/cabal.config
 with-compiler: ghc-9.8.2

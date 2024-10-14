@@ -38,7 +38,7 @@ runIODemo = runDemo ioRunner
 onceHkDeferredDemo :: IO ()
 onceHkDeferredDemo = runIODemo onceHkDeferredSuite
 
---- $> onceHkDeferredDemo
+-- $ > onceHkDeferredDemo
 -- creates a test initialisation failure in test when once hook output is cached
 
 onceHkDeferredSuite :: Suite
@@ -55,7 +55,7 @@ onceHkDeferredSuite =
   ]
 ------------------------------------------------------
 
---- $> threadHkInitFailSuiteDemo
+-- $> threadHkInitFailSuiteDemo
 -- creates an initialisation failure in each hook when thread hook output is cached
 
 threadHkInitFailSuiteDemo :: IO ()
@@ -79,7 +79,7 @@ threadHkInitFailSuite =
 
 ------------------------------------------------------
 
---- $> eachHkInitFailSuiteDemo
+-- $ > eachHkInitFailSuiteDemo
 -- creates an initialisation failure in each hook when once hook output is cached
 
 eachHkInitFailSuiteDemo :: IO ()
@@ -106,7 +106,9 @@ eachHkInitFailSuite =
 eachHkFailDemoNoRead :: IO ()
 eachHkFailDemoNoRead = runIODemo $ eachHkFail False
 
---- $> eachHkFailDemoNoRead
+--- >>> eachHkFailDemoNoRead
+
+
 -- runs effect but does not throw error because test does not use hook input
 
 ------------------------------------------------------
@@ -114,7 +116,7 @@ eachHkFailDemoNoRead = runIODemo $ eachHkFail False
 eachHkFailDemoRead :: IO ()
 eachHkFailDemoRead = runIODemo $ eachHkFail True
 
---- $> eachHkFailDemoRead
+-- $ > eachHkFailDemoRead
 -- runs effect and throws error because test uses hook output
 -- fails in the hook, not initialisation, because there is no caching of 
 -- the hook output in each hooks

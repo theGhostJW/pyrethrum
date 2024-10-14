@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 580405973134f262ca6f14f9e835f3820ad14402367f6d7a61d3e733d80f393a
+-- hash: be679b42f3d48f7d6713be08424048f58ebe4f8ee3e057d2346d9bf6ffe2db2b
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -184,7 +184,7 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -hiedir .hiefiles -fdefer-type-errors -Werror=deferred-type-errors -Werror=deferred-out-of-scope-variables -fno-defer-typed-holes -plugin-package hiedb-plugin -fplugin Plugin.HieDb -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -hiedir .hiefiles -fdefer-type-errors -Werror=deferred-type-errors -Werror=deferred-out-of-scope-variables -fno-defer-typed-holes -plugin-package hiedb-plugin -fplugin Plugin.HieDb -fno-warn-type-defaults -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points
   build-depends:
       aeson
     , aeson-pretty

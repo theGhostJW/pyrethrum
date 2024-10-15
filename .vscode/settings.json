@@ -1,9 +1,6 @@
 {
   "languageServerHaskell.useCustomHieWrapper": true,
   "languageServerHaskell.useCustomHieWrapperPath": "hie-wrapper",
-  // "haskell.serverExecutablePath": "/workspaces/pyrethrum/staticls/static-ls",
-  // "haskell.serverExecutablePath": "static-ls",
-  "haskell.serverExecutablePath": "/workspaces/pyrethrum/static-ls",
   "workbench.colorCustomizations": {},
   "cSpell.words": [
     "Aeson",
@@ -20,12 +17,7 @@
   "alloglot.languages":  [
     {
       "languageId": "haskell",
-      "serverCommand": "static-ls",
-      // "haskell.serverExecutablePath": "/workspaces/pyrethrum/staticls/static-ls",
-      // copied to project root - try relative
-      // "haskell.serverExecutablePath": "static-ls",
-      // try full path
-      "haskell.serverExecutablePath": "/workspaces/pyrethrum/static-ls",
+      "serverCommand": "/workspaces/pyrethrum/static-ls",
     }
   ],
   "workbench.colorTheme": "Default Light Modern"

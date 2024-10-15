@@ -17,7 +17,7 @@
   "alloglot.languages":  [
     {
       "languageId": "haskell",
-      "serverCommand": "/workspaces/pyrethrum/static-ls",
+      "serverCommand": "/workspaces/pyrethrum/staticls",
     }
   ],
   "workbench.colorTheme": "Default Light Modern"

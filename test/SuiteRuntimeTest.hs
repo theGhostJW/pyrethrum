@@ -13,7 +13,7 @@ import Prelude hiding (All, bug, id)
 import Internal.SuiteValidation
 
 -- TODO :: chkJust, chkNothing
-
+ 
 chkInitFailure :: Maybe Text -> [FilterResult Text] -> IO ()
 chkInitFailure expected filterResults =
   expected

@@ -27,5 +27,6 @@
       // try full path
       "haskell.serverExecutablePath": "/workspaces/pyrethrum/static-ls",
     }
-  ]
+  ],
+  "workbench.colorTheme": "Default Light Modern"
 }

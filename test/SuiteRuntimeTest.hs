@@ -271,7 +271,7 @@ propFailTemplateGenWrongEachHookResult =
             T.PassProb
               { genStrategy = Preload,
                 passPcnt = 95,
-                passThroughPcnt = 0,
+                hookPassThroughErrPcnt = 0,
                 minDelay = 0,
                 maxDelay = 0
               },
@@ -335,7 +335,7 @@ unit_prop_fail_each_after =
             T.PassProb
               { genStrategy = Preload,
                 passPcnt = 95,
-                passThroughPcnt = 0,
+                hookPassThroughErrPcnt = 0,
                 minDelay = 0,
                 maxDelay = 0
               },
@@ -383,7 +383,7 @@ unit_wrong_result =
                             T.PassProb
                               { genStrategy = Preload,
                                 passPcnt = 100,
-                                passThroughPcnt = 0,
+                                hookPassThroughErrPcnt = 0,
                                 minDelay = 0,
                                 maxDelay = 0
                               },
@@ -421,7 +421,7 @@ mayFail =
                     T.PassProb
                       { genStrategy = Preload,
                         passPcnt = 95,
-                        passThroughPcnt = 0,
+                        hookPassThroughErrPcnt = 0,
                         minDelay = 0,
                         maxDelay = 0
                       },
@@ -480,7 +480,7 @@ wrongFailurePath =
                     T.PassProb
                       { genStrategy = Preload,
                         passPcnt = 95,
-                        passThroughPcnt = 0,
+                        hookPassThroughErrPcnt = 0,
                         minDelay = 0,
                         maxDelay = 2
                       },
@@ -525,4 +525,15 @@ unit_once_failure_missing =
                 }
             ]
         }
+    ]
+
+
+-- $> unit_fixture_passthrough
+unit_fixture_passthrough :: IO ()
+unit_fixture_passthrough =
+  runTest
+    defaultSeed
+    (ThreadCount 1)
+     [ Fixture
+        { tests = [ Spec { delay = 0 , result = PassThroughFail } ] }
     ]

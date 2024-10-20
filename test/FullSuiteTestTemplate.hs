@@ -40,7 +40,7 @@ data ManySpec
       { genStrategy :: SpecGen
       , passPcnt :: Int8
       -- % of failures that are pass through
-      , passThroughPcnt :: Int8
+      , hookPassThroughErrPcnt :: Int8
       , minDelay :: Int
       , maxDelay :: Int
       }

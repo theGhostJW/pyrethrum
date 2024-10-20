@@ -46,15 +46,16 @@ genPlay = do
 demoProp :: (Show a) => String -> Gen a -> TestTree
 demoProp label gen' = testPropertyWith testOpts label $ gen gen' >>= collect label . pure
 
-genResult :: Word -> Gen Result
-genResult passPcnt =
+genResult :: Word -> Word -> Gen Result
+genResult passPcnt hookPassThroughErrPcnt =
   frequency
     [ (passPcnt, pure Pass),
-      (100 - passPcnt, pure Fail)
+      (100 - passPcnt - hookPassThroughErrPcnt, pure Fail),
+      (hookPassThroughErrPcnt, pure PassThroughFail)
     ]
 
 demoResult :: TestTree
-demoResult = demoProp "result" $ genResult 80
+demoResult = demoProp "result" $ genResult 80 5
 
 genDelay :: Int -> Gen Int
 genDelay maxms = inRange $ skewedBy 2 (0, maxms)
@@ -62,11 +63,11 @@ genDelay maxms = inRange $ skewedBy 2 (0, maxms)
 demoDelay :: TestTree
 demoDelay = demoProp "delay" $ genDelay 3000
 
-genSpec :: Int -> Word -> Gen Spec
-genSpec maxDelay passPcnt = Spec <$> genDelay maxDelay <*> genResult passPcnt
+genHookSpec :: Int -> Word -> Word -> Gen Spec
+genHookSpec maxDelay passPcnt hookPassThroughErrPcnt = Spec <$> genDelay maxDelay <*> genResult passPcnt hookPassThroughErrPcnt
 
 demoSpec :: TestTree
-demoSpec = demoProp "spec" $ genSpec 3000 80
+demoSpec = demoProp "spec" $ genHookSpec 3000 80 4
 
 data TGenParams = GenParams
   { genStrategy :: SpecGen,
@@ -119,8 +120,8 @@ templateGenParams
       nxtLimits = gl {maxDepth = maxDepth - 1}
       genSubnodes = G.list (between (1, maxBranches))
       genOnceSubnodes = genSubnodes $ templateGenParams (nxtLimits {minHz = Once})
-      genSpec' = genSpec maxDelay passPcnt
-      genSpec'' = genSpec maxDelay passPcnt
+      genSpec' = genHookSpec maxDelay passPcnt hookPassThroughErrPcnt
+      genSpec'' = genHookSpec maxDelay passPcnt hookPassThroughErrPcnt
       genOnceBefore = OnceBefore <$> genSpec' <*> genOnceSubnodes
       genOnceAfter = OnceAfter <$> genSpec' <*> genOnceSubnodes
       genOnceAround = OnceAround <$> genSpec' <*> genSpec'' <*> genOnceSubnodes
@@ -200,7 +201,7 @@ runProp isShrinking testName o p =
     let result = unsafePerformIO $ tryRunTest isShrinking p t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
--- $> test_suite_preload
+-- $ > test_suite_preload
 test_suite_preload :: IO ()
 test_suite_preload = do
   -- need a separate shrinkState for every test group

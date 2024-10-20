@@ -36,16 +36,16 @@ import Internal.LogQueries
     threadHook,
   )
 import Internal.Logging as L
-  ( Log (..),
-    ExePath (..),
-    HookPos (..),
+  ( ExePath (..),
     FLog,
+    FullLog (..),
+    HookPos (..),
+    LineInfo (..),
+    Log (..),
     NodeType (..),
     parentPath,
     testLogActions,
     topPath,
-    FullLog (..),
-    LineInfo(..)
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
@@ -129,7 +129,7 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
 type LogItem = FLog ExePath AE.NodeLog
 
 getThreadId :: LogItem -> ThreadId
-getThreadId (MkLog (MkLineInfo{threadId}) _) = threadId
+getThreadId (MkLog (MkLineInfo {threadId}) _) = threadId
 
 logItemtoBool :: (NodeType -> Bool) -> LogItem -> Bool
 logItemtoBool = threadEventToBool
@@ -228,11 +228,9 @@ logAccum acc@(passStart, rMap) (MkLog {event}) =
       isJust passStart
         ? (Nothing, insert' loc nodeType $ Actual Fail)
         $ error ("Failure event not started\n" <> txt f)
-
     -- TODO this is probably wrong fix this will cause failures when tests generate these
     -- need to think about cortrect expected results in this case
     InitialisationFailure {} -> acc
-
     pf@ParentFailure {loc, nodeType} ->
       isJust passStart
         ? error ("parent failure encountered when parent event not ended\n" <> txt pf)
@@ -410,7 +408,7 @@ isFailChildEventOf c p =
       _ -> Nothing
     pIsSetupFailure = suitEvntToBool (hasHookPos Setup) pFailEvent
 
-    ploc = p.event.loc 
+    ploc = p.event.loc
     cloc = c.event.loc
     samePath = ploc == cloc
     cIsSubpathOfp = isParentPath ploc cloc
@@ -531,10 +529,8 @@ failInfo ls =
                 & maybe
                   (error $ "Failure encountered before start:\n" <> toS (ppShow l))
                   (const (Nothing, FailInfo l ls' : result))
-
-            -- todo think about logic here 
+            -- todo think about logic here
             InitialisationFailure {} -> passThrough
-
             ParentFailure {} -> passThrough
             StartExecution {} -> passThrough
             EndExecution {} -> passThrough
@@ -544,11 +540,12 @@ failInfo ls =
         passThrough = (lastStartEvnt, result)
     failStarts =
       filter
-        (\li -> li.event & \case
-            Failure {} -> True
-            ParentFailure {} -> True
-            Start {} -> True
-            _ -> False
+        ( \li ->
+            li.event & \case
+              Failure {} -> True
+              ParentFailure {} -> True
+              Start {} -> True
+              _ -> False
         )
         ls
 
@@ -830,6 +827,51 @@ chkEq' msg e a =
         <> ppShow a
         <> "\n"
 
+data Template
+  = OnceBefore
+      { spec :: Spec,
+        subNodes :: [Template]
+      }
+  | OnceAfter
+      { spec :: Spec,
+        subNodes :: [Template]
+      }
+  | OnceAround
+      { setupSpec :: Spec,
+        teardownSpec :: Spec,
+        subNodes :: [Template]
+      }
+  | ThreadBefore
+      { threadSpec :: ManySpec,
+        subNodes :: [Template]
+      }
+  | ThreadAfter
+      { threadSpec :: ManySpec,
+        subNodes :: [Template]
+      }
+  | ThreadAround
+      { setupThreadSpec :: ManySpec,
+        teardownThreadSpec :: ManySpec,
+        subNodes :: [Template]
+      }
+  | EachBefore
+      { eachSpec :: ManySpec,
+        subNodes :: [Template]
+      }
+  | EachAfter
+      { eachSpec :: ManySpec,
+        subNodes :: [Template]
+      }
+  | EachAround
+      { eachSetupSpec :: ManySpec,
+        eachTeardownSpec :: ManySpec,
+        subNodes :: [Template]
+      }
+  | Fixture
+      { tests :: [Spec]
+      }
+  deriving (Show, Eq)
+
 onceBefore :: Result -> [Template] -> Template
 onceBefore = OnceBefore . Spec 0
 
@@ -909,7 +951,7 @@ exeTemplate wantLog baseRandomSeed maxThreads templates = do
     pPrint $ P.listPaths <$> nodes
     putStrLn "========="
     putStrLn "#### Log ####"
-  executeWithoutValidation maxThreads lc nodes
+  executeWithoutValidation maxThreads lc $ mkRootNode <$> nodes
   atomically logLst
 
 loadTQueue :: TQueue a -> [a] -> STM ()
@@ -1018,14 +1060,14 @@ instance Core.Config FixtureConfig
 fc :: FixtureConfig
 fc = FxCfg {title = "fixture config"}
 
-mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> IO ()
+mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> IO DummyHkResult
 mkQueAction q path =
   do
     s <- atomically $ tryReadTQueue q
     s
       & maybe
         (error $ "spec queue is empty - either the fixture template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> txt path)
-        (mkVoidAction path)
+        (mkAction' path)
 
 data ManyParams = ManyParams
   { baseSeed :: Int,
@@ -1088,9 +1130,9 @@ loadQIfPreload baseSeed qLength pth q = \case
         pure ()
 
 -- assumes th queue is preloaded (ie loadQIfPrload has already been run) if genStrategy == Preload
-mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
+mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO DummyHkResult
 mkManyAction baseSeed q pth = \case
-  T.All s -> mkVoidAction pth s
+  T.All s -> mkAction' pth s
   PassProb
     { genStrategy,
       passPcnt,
@@ -1101,7 +1143,7 @@ mkManyAction baseSeed q pth = \case
         Preload -> mkQueAction q pth
         Runtime -> do
           subSeed <- RS.uniformM RS.globalStdGen :: IO Int
-          mkVoidAction pth $
+          mkAction' pth $
             mkManySpec
               ManyParams
                 { baseSeed,
@@ -1112,46 +1154,87 @@ mkManyAction baseSeed q pth = \case
                   maxDelay
                 }
 
+mkManyAfterAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
+mkManyAfterAction baseSeed q pth ms = void $ mkManyAction baseSeed q pth ms
+
 newtype DummyHkResult = DummyHkResult
   {dummyHkResult :: Int}
   deriving (Show, Eq, Ord)
 
+mkRootAction :: (P.LogSink -> DummyHkResult -> IO o) -> P.LogSink -> () -> IO o
+mkRootAction action ls _hr = action ls (DummyHkResult 0)
 
--- mkVoidAction :: forall pth. (Show pth) => pth -> Spec -> IO ()
--- mkVoidAction path spec =
---   do
---     C.threadDelay spec.delay
---     unless (spec.result == Pass) $
---       error . toS $
---         "FAIL RESULT @ " <> txt path
+mkRootTest :: P.Test IO DummyHkResult -> P.Test IO ()
+mkRootTest P.MkTest {id, title, action} = P.MkTest { id,
+    title,
+    action = mkRootAction action
+  }
 
-mkAction_
+
+
+mkRootNode :: P.PreNode IO DummyHkResult -> P.PreNode IO ()
+mkRootNode = \case
+  P.Before {path, frequency, action, subNodes} ->
+    P.Before
+      { path,
+        frequency,
+        action = mkRootAction action,
+        subNodes
+      }
+  P.After {path, frequency, after, subNodes'} ->
+    P.After
+      { path,
+        frequency,
+        after = after,
+        subNodes' = mkRootNode <$> subNodes'
+      }
+  P.Around {path, frequency, setup, teardown, subNodes} ->
+    P.Around
+      { path,
+        frequency,
+        setup = mkRootAction setup,
+        teardown = teardown,
+        subNodes = subNodes
+      }
+  P.Fixture {config, path, tests} ->
+    P.Fixture
+      { config,
+        path,
+        tests = mkRootTest <$> tests
+      }
+
+mkAction' :: forall pth. (Show pth) => pth -> Spec -> IO DummyHkResult
+mkAction' path spec = mkActionBase path spec $ DummyHkResult 0
+
+mkAction_ :: forall pth. (Show pth) => pth -> Spec -> P.LogSink -> DummyHkResult -> IO ()
+mkAction_ path spec sink hkIn = void (mkAction path spec sink hkIn)
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
-mkAction :: forall pth. (Show pth) => pth -> Spec -> P.LogSink -> DummyHkResult -> IO DummyHkResult
-mkAction path spec _sink hi =   do
-    C.threadDelay spec.delay
-    
-    --  make sure the result is used to force any pas through errors
-    let hi' = hi {dummyHkResult = hi.dummyHkResult + 1}
-    when (hi' > 100000) $
-      when (hi' < 0) $
-      error "this will never happen just making sure the result is used"
-       
-    case spec.result of
-      Pass -> pure hi'
-      Fail -> error . toS $ "FAIL RESULT @ " <> txt path
-      PassThroughFail -> pure . error $ "Deferred error from " <> txt path
 
-mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO ()]
+
+-- includes unused param for convenience below
+mkAction :: forall pth. (Show pth) => pth -> Spec -> P.LogSink -> DummyHkResult -> IO DummyHkResult
+mkAction path spec _sink = mkActionBase path spec
+
+mkActionBase :: forall pth. (Show pth) => pth -> Spec -> DummyHkResult -> IO DummyHkResult
+mkActionBase path spec hi = do
+  C.threadDelay spec.delay
+  --  make sure the result is used to force any pas through errors
+  let !hi' = hi {dummyHkResult = hi.dummyHkResult + 1}
+  case spec.result of
+    Pass -> pure hi'
+    Fail -> error . toS $ "FAIL RESULT @ " <> txt path
+    PassThroughFail -> pure . error $ "Deferred error from " <> txt path
+
+mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO DummyHkResult]
 mkNodes baseSeed mxThreads = mapM mkNode
   where
     afterAction :: (Show pth) => pth -> Spec -> b -> IO ()
-    afterAction path spec = const $ mkVoidAction path spec
+    afterAction path spec = void <$> const (mkAction' path spec)
 
     mkNodes' = mkNodes baseSeed mxThreads
-    mkNode :: T.Template -> IO (P.PreNode IO ())
+    mkNode :: T.Template -> IO (P.PreNode IO DummyHkResult)
     mkNode t = case t of
       T.Fixture
         { path,
@@ -1204,7 +1287,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                     { path,
                       frequency = Once,
                       setup = mkAction path setupSpec,
-                      teardown = mkAction path teardownSpec,
+                      teardown = mkAction_ path teardownSpec,
                       subNodes = nds
                     }
             T.EachBefore
@@ -1230,7 +1313,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                     P.After
                       { path,
                         frequency = Each,
-                        after = const $ mkManyAction baseSeed afterQ path eachSpec,
+                        after = const $ mkManyAfterAction baseSeed afterQ path eachSpec,
                         subNodes' = nds
                       }
             T.EachAround
@@ -1246,7 +1329,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                       { path,
                         frequency = Each,
                         setup = const . const $ mkManyAction baseSeed b4Q path eachSetupSpec,
-                        teardown = const . const $ mkManyAction baseSeed afterQ path eachTeardownSpec,
+                        teardown = const . const $ mkManyAfterAction baseSeed afterQ path eachTeardownSpec,
                         subNodes = nds
                       }
             _ -> case t of
@@ -1273,7 +1356,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                       P.After
                         { path,
                           frequency = Thread,
-                          after = const $ mkManyAction baseSeed afterQ path threadSpec,
+                          after = const $ mkManyAfterAction baseSeed afterQ path threadSpec,
                           subNodes' = nds
                         }
               T.ThreadAround
@@ -1288,54 +1371,12 @@ mkNodes baseSeed mxThreads = mapM mkNode
                       { path,
                         frequency = Thread,
                         setup = const . const $ mkManyAction baseSeed b4Q path setupThreadSpec,
-                        teardown = const . const $ mkManyAction baseSeed afterQ path teardownThreadSpec,
+                        teardown = const . const $ mkManyAfterAction baseSeed afterQ path teardownThreadSpec,
                         subNodes = nds
                       }
 
-data Template
-  = OnceBefore
-      { spec :: Spec,
-        subNodes :: [Template]
-      }
-  | OnceAfter
-      { spec :: Spec,
-        subNodes :: [Template]
-      }
-  | OnceAround
-      { setupSpec :: Spec,
-        teardownSpec :: Spec,
-        subNodes :: [Template]
-      }
-  | ThreadBefore
-      { threadSpec :: ManySpec,
-        subNodes :: [Template]
-      }
-  | ThreadAfter
-      { threadSpec :: ManySpec,
-        subNodes :: [Template]
-      }
-  | ThreadAround
-      { setupThreadSpec :: ManySpec,
-        teardownThreadSpec :: ManySpec,
-        subNodes :: [Template]
-      }
-  | EachBefore
-      { eachSpec :: ManySpec,
-        subNodes :: [Template]
-      }
-  | EachAfter
-      { eachSpec :: ManySpec,
-        subNodes :: [Template]
-      }
-  | EachAround
-      { eachSetupSpec :: ManySpec,
-        eachTeardownSpec :: ManySpec,
-        subNodes :: [Template]
-      }
-  | Fixture
-      { tests :: [Spec]
-      }
-  deriving (Show, Eq)
+mkTestItem :: T.TestItem -> P.Test IO DummyHkResult
+mkTestItem T.TestItem {id, title, spec} = P.MkTest id title (mkAction_ title spec)
 
-mkTestItem :: T.TestItem -> P.Test IO ()
-mkTestItem T.TestItem {id, title, spec} = P.MkTest id title (mkAction title spec)
+mkRootTestItem :: T.TestItem -> P.Test IO ()
+mkRootTestItem T.TestItem {id, title, spec} = P.MkTest id title (mkRootAction $ mkAction_ title spec)

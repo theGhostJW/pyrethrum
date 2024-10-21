@@ -6,9 +6,9 @@ import CoreUtils (Hz (..))
 import Internal.Logging (HookPos (..), NodeType (Hook))
 import Internal.Logging qualified as L
 import Prelude hiding (All, id)
-data Spec = Spec {delay :: Int, result :: Result}
+data Spec = Spec {delay :: Int, result :: Directive}
   deriving (Read, Show, Eq)
-data Result
+data Directive
   = Pass
   | Fail
   | PassThroughFail

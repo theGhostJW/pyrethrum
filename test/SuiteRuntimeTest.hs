@@ -3,7 +3,7 @@ module SuiteRuntimeTest where
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 
 import Filter (FilterResult (..))
-import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
+import FullSuiteTestTemplate (Directive (..), Spec (..), SpecGen (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.SuiteRuntime (ThreadCount (..))
 import Internal.SuiteValidation

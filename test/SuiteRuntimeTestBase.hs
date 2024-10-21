@@ -13,7 +13,7 @@ import Data.Hashable qualified as H
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (EventPath (..), ManySpec (PassProb), Result, Spec (..), SpecGen (..), isPreload)
+import FullSuiteTestTemplate (EventPath (..), ManySpec (PassProb), Directive, Spec (..), SpecGen (..), isPreload)
 import FullSuiteTestTemplate qualified as T
 import Internal.LogQueries
   ( getHookInfo,
@@ -106,7 +106,7 @@ logging = LogFails
    that empty thread TestTrees are not executed
 -}
 
-allSpec :: Int -> Result -> ManySpec
+allSpec :: Int -> Directive -> ManySpec
 allSpec delay rslt = T.All $ Spec delay rslt
 
 {-
@@ -261,9 +261,9 @@ chkThreadCount threadLimit evts =
     (length $ threadIds evts)
 
 data ExpectedResult
-  = All Result
+  = All LogResult
   | NonDeterministic
-  | Multi [Result]
+  | Multi [LogResult]
   deriving (Show, Eq)
 
 -- todo add to pyrelude
@@ -289,7 +289,7 @@ defects found in testing::
   - framework error - nested each after hooks executed out of order
 -}
 
-resultsEqual :: Result -> LogResult -> Bool
+resultsEqual :: Directive -> LogResult -> Bool
 resultsEqual expt act =
   expt == T.Pass && act == Pass || expt == T.Fail && act == Fail
 
@@ -883,37 +883,37 @@ data Template
       }
   deriving (Show, Eq)
 
-onceBefore :: Result -> [Template] -> Template
+onceBefore :: Directive -> [Template] -> Template
 onceBefore = OnceBefore . Spec 0
 
-onceAfter :: Result -> [Template] -> Template
+onceAfter :: Directive -> [Template] -> Template
 onceAfter = OnceAfter . Spec 0
 
-onceAround :: Result -> Result -> [Template] -> Template
+onceAround :: Directive -> Directive -> [Template] -> Template
 onceAround suRslt tdRslt = OnceAround (Spec 0 suRslt) (Spec 0 tdRslt)
 
-threadBefore :: Result -> [Template] -> Template
+threadBefore :: Directive -> [Template] -> Template
 threadBefore r = ThreadBefore (allSpec 0 r)
 
-threadAfter :: Result -> [Template] -> Template
+threadAfter :: Directive -> [Template] -> Template
 threadAfter r = ThreadAfter (allSpec 0 r)
 
-threadAround :: Result -> Result -> [Template] -> Template
+threadAround :: Directive -> Directive -> [Template] -> Template
 threadAround suRslt tdRslt = ThreadAround (allSpec 0 suRslt) (allSpec 0 tdRslt)
 
-eachBefore :: Result -> [Template] -> Template
+eachBefore :: Directive -> [Template] -> Template
 eachBefore = EachBefore . allSpec 0
 
-eachAfter :: Result -> [Template] -> Template
+eachAfter :: Directive -> [Template] -> Template
 eachAfter = EachAfter . allSpec 0
 
-eachAround :: Result -> Result -> [Template] -> Template
+eachAround :: Directive -> Directive -> [Template] -> Template
 eachAround suRslt tdRslt = EachAround (allSpec 0 suRslt) (allSpec 0 tdRslt)
 
 fixture :: [Spec] -> Template
 fixture = SuiteRuntimeTestBase.Fixture
 
-test :: Result -> Spec
+test :: Directive -> Spec
 test = Spec 0
 
 data ExeResult = ExeResult

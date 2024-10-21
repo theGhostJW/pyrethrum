@@ -7,7 +7,7 @@ module SuiteRuntimePropTest where
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 
 import BasePrelude (unsafePerformIO)
-import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
+import FullSuiteTestTemplate (Directive (..), Spec (..), SpecGen (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.SuiteRuntime (ThreadCount (..))
 import CoreUtils (Hz (..))
@@ -46,7 +46,7 @@ genPlay = do
 demoProp :: (Show a) => String -> Gen a -> TestTree
 demoProp label gen' = testPropertyWith testOpts label $ gen gen' >>= collect label . pure
 
-genResult :: Word -> Word -> Gen Result
+genResult :: Word -> Word -> Gen Directive
 genResult passPcnt hookPassThroughErrPcnt =
   frequency
     [ (passPcnt, pure T.Pass),

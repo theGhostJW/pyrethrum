@@ -541,7 +541,6 @@ unit_fixture_passthrough =
     ]
 
 -- >>> unit_once_hook_passthrough
--- *** Exception: HUnitFailure (Just (SrcLoc {srcLocPackage = "pyrethrum-extras-0.1.0.0-45a391d86e6b7dfbde63f5b7b8cbfda38e90a6a643d2e35c818247d1adcb93d9", srcLocModule = "PyrethrumExtras.Test.Tasty.HUnit.Extended", srcLocFile = "src/PyrethrumExtras/Test/Tasty/HUnit/Extended.hs", srcLocStartLine = 72, srcLocStartCol = 15, srcLocEndLine = 72, srcLocEndCol = 25})) "Unexpected result for:\n MkEventPath\n  { path = NodePath { module' = \"0\" , path = \"OnceBefore\" }\n  , nodeType = Hook Once Before\n  }\n   expected: All PassThroughFail\n  actual: [ Actual Pass ]"
 unit_once_hook_passthrough :: IO ()
 unit_once_hook_passthrough =
   runTest

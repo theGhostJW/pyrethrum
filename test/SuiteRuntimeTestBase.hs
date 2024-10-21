@@ -290,10 +290,8 @@ defects found in testing::
 -}
 
 resultsEqual :: Result -> LogResult -> Bool
-resultsEqual expt act = 
+resultsEqual expt act =
   expt == T.Pass && act == Pass || expt == T.Fail && act == Fail
-
-                  
 
 chkExpectedResults :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
 chkExpectedResults baseSeed threadLimit ts lgs =
@@ -377,10 +375,8 @@ chkExpectedResults baseSeed threadLimit ts lgs =
               -- tests have no output so a test that generates a PassThroughFail
               -- ie. pure $ error "failure" will acually pass as nothing genrates the error
               -- being wrapped
-              nodeType == Test
-                && result
-                  == T.PassThroughFail --
-                    ? SuiteRuntimeTestBase.All T.Pass
+              (result == T.PassThroughFail)
+                ? SuiteRuntimeTestBase.All T.Pass
                 $ SuiteRuntimeTestBase.All result
             PassProb {genStrategy, passPcnt, hookPassThroughErrPcnt, minDelay, maxDelay} ->
               case genStrategy of

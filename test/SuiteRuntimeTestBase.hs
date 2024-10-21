@@ -13,7 +13,7 @@ import Data.Hashable qualified as H
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (EventPath (..), ManySpec (PassProb), Result (..), Spec (..), SpecGen (..), isPreload)
+import FullSuiteTestTemplate (EventPath (..), ManySpec (PassProb), Result, Spec (..), SpecGen (..), isPreload)
 import FullSuiteTestTemplate qualified as T
 import Internal.LogQueries
   ( getHookInfo,
@@ -99,7 +99,7 @@ bug :: Text -> a
 bug t = PR.bug (error t :: SomeException)
 
 logging :: Logging
-logging = Log
+logging = LogFails
 
 {- each and once hooks will always run but thread hooks may be empty
    due to subitems being stolen by another thread. We need to ensure
@@ -200,7 +200,8 @@ data Summary = Summary
   deriving (Show)
 
 data LogResult
-  = Actual Result
+  = Pass
+  | Fail
   | ParentFailed
   deriving (Ord, Eq, Show)
 
@@ -223,10 +224,10 @@ logAccum acc@(passStart, rMap) (MkLog {event}) =
       passStart
         & maybe
           acc
-          (\(_l, _s) -> (Nothing, insert' loc nodeType $ Actual Pass))
+          (\(_l, _s) -> (Nothing, insert' loc nodeType Pass))
     f@Failure {loc, nodeType} ->
       isJust passStart
-        ? (Nothing, insert' loc nodeType $ Actual Fail)
+        ? (Nothing, insert' loc nodeType Fail)
         $ error ("Failure event not started\n" <> txt f)
     -- TODO this is probably wrong fix this will cause failures when tests generate these
     -- need to think about cortrect expected results in this case
@@ -288,6 +289,12 @@ defects found in testing::
   - framework error - nested each after hooks executed out of order
 -}
 
+resultsEqual :: Result -> LogResult -> Bool
+resultsEqual expt act = 
+  expt == T.Pass && act == Pass || expt == T.Fail && act == Fail
+
+                  
+
 chkExpectedResults :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
 chkExpectedResults baseSeed threadLimit ts lgs =
   do
@@ -310,7 +317,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                   case expected of
                     All e ->
                       chk' ("Unexpected result for:\n " <> txt k <> "\n   expected: " <> txt expected <> "\n  actual: " <> txt actual) $
-                        all (\r -> r == Actual e || r == ParentFailed) actual
+                        all (\r -> resultsEqual e r || r == ParentFailed) actual
                     NonDeterministic -> pure ()
                     Multi expLst -> case k.nodeType of
                       Test {} -> bug "Test not expected to have Multi result"
@@ -325,13 +332,13 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                         failMsg law = "Property failed for:\n  " <> txt k <> "\n  " <> law
                         -- COUNT EXPECTED IS WRONG
                         countExpected r rList = M.findWithDefault 0 r $ groupCount rList
-                        expectedPasses = countExpected Pass
-                        expectedFails = countExpected Fail
+                        expectedPasses = countExpected T.Pass
+                        expectedFails = countExpected T.Fail
                         -- TODO: an infix high precedence operator for debugging
                         actualCount = length actual
                         actuals' = groupCount actual
-                        actualPasses = M.findWithDefault 0 (Actual Pass) actuals'
-                        actualFails = M.findWithDefault 0 (Actual Fail) actuals'
+                        actualPasses = M.findWithDefault 0 Pass actuals'
+                        actualFails = M.findWithDefault 0 Fail actuals'
                         actualParentFails = M.findWithDefault 0 ParentFailed actuals'
                         countChks lstExpected = do
                           let expectedPassCount = expectedPasses lstExpected
@@ -366,15 +373,23 @@ chkExpectedResults baseSeed threadLimit ts lgs =
         expected :: ExpectedResult
         expected =
           case evntSpec of
-            T.All Spec {result} -> SuiteRuntimeTestBase.All result
+            T.All Spec {result} ->
+              -- tests have no output so a test that generates a PassThroughFail
+              -- ie. pure $ error "failure" will acually pass as nothing genrates the error
+              -- being wrapped
+              nodeType == Test
+                && result
+                  == T.PassThroughFail --
+                    ? SuiteRuntimeTestBase.All T.Pass
+                $ SuiteRuntimeTestBase.All result
             PassProb {genStrategy, passPcnt, hookPassThroughErrPcnt, minDelay, maxDelay} ->
               case genStrategy of
                 T.Preload -> Multi $ (.result) <$> generateHookSpecs baseSeed rLength path passPcnt hookPassThroughErrPcnt minDelay maxDelay
                 T.Runtime -> NonDeterministic
               where
                 rLength = case nodeType of
-                  Test {} -> bug "Test not expected to have PassProb spec"
-                  Hook Once _ -> bug "Once  not expected to have PassProb spec"
+                  Test -> bug "Test not expected to have PassProb spec"
+                  Hook Once _ -> bug "Once not expected to have PassProb spec"
                   Hook Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
                   Hook Each _ -> T.countTests template -- expect a result for each test item
     actuals :: Map EventPath [LogResult]
@@ -1069,7 +1084,6 @@ mkQueAction q path =
         (error $ "spec queue is empty - either the fixture template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> txt path)
         (mkAction' path)
 
-
 data ManyParams = ManyParams
   { baseSeed :: Int,
     subSeed :: Int,
@@ -1095,7 +1109,7 @@ mkManySpec
       seed = H.hash $ txt baseSeed <> path <> txt subSeed
       delayRange = maxDelay - minDelay
       delay = delayRange > 0 ? minDelay + seed `mod` (maxDelay - minDelay) $ minDelay
-      result = seed `mod` 100 < fromIntegral passPcnt ? Pass $ Fail
+      result = seed `mod` 100 < fromIntegral passPcnt ? T.Pass $ T.Fail
 
 -- used in both generating test run and validation
 -- is pure ie. will always generate the same specs for same inputs
@@ -1171,12 +1185,12 @@ mkRootAction :: (P.LogSink -> DummyHkResult -> IO o) -> P.LogSink -> () -> IO o
 mkRootAction action ls _hr = action ls (DummyHkResult 0)
 
 mkRootTest :: P.Test IO DummyHkResult -> P.Test IO ()
-mkRootTest P.MkTest {id, title, action} = P.MkTest { id,
-    title,
-    action = mkRootAction action
-  }
-
-
+mkRootTest P.MkTest {id, title, action} =
+  P.MkTest
+    { id,
+      title,
+      action = mkRootAction action
+    }
 
 mkRootNode :: P.PreNode IO DummyHkResult -> P.PreNode IO ()
 mkRootNode = \case
@@ -1218,7 +1232,6 @@ mkAction_ path spec sink hkIn = void (mkAction path spec sink hkIn)
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
 
-
 -- includes unused param for convenience below
 mkAction :: forall pth. (Show pth) => pth -> Spec -> P.LogSink -> DummyHkResult -> IO DummyHkResult
 mkAction path spec _sink = mkActionBase path spec
@@ -1229,9 +1242,9 @@ mkActionBase path spec hi = do
   --  make sure the result is used to force any pas through errors
   let !hi' = hi {dummyHkResult = hi.dummyHkResult + 1}
   case spec.result of
-    Pass -> pure hi'
-    Fail -> error . toS $ "FAIL RESULT @ " <> txt path
-    PassThroughFail -> pure . error $ "Deferred error from " <> txt path
+    T.Pass -> pure hi'
+    T.Fail -> error . toS $ "FAIL RESULT @ " <> txt path
+    T.PassThroughFail -> pure . error $ "Deferred error from " <> txt path
 
 mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO DummyHkResult]
 mkNodes baseSeed mxThreads = mapM mkNode

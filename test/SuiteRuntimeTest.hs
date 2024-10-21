@@ -6,11 +6,11 @@ import Filter (FilterResult (..))
 import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.SuiteRuntime (ThreadCount (..))
+import Internal.SuiteValidation
 import PyrethrumExtras (txt)
 import PyrethrumExtras.Test (chk, chkEq)
-import SuiteRuntimeTestBase
+import SuiteRuntimeTestBase hiding (LogResult (..))
 import Prelude hiding (All, bug, id)
-import Internal.SuiteValidation
 
 -- TODO :: chkJust, chkNothing
 
@@ -57,13 +57,14 @@ unit_configError_duplicate =
     ]
 
 -- $ > unit_simple_pass
+
 unit_simple_pass :: IO ()
 unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
 
 -- $ > unit_simple_fail
+
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fixture [test Pass, test Fail]]]
-
 
 -- >>> unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
@@ -527,13 +528,28 @@ unit_once_failure_missing =
         }
     ]
 
+-- $ > unit_fixture_passthrough
 
--- $> unit_fixture_passthrough
 unit_fixture_passthrough :: IO ()
 unit_fixture_passthrough =
   runTest
     defaultSeed
     (ThreadCount 1)
-     [ Fixture
-        { tests = [ Spec { delay = 0 , result = PassThroughFail } ] }
+    [ Fixture
+        { tests = [Spec {delay = 0, result = PassThroughFail}]
+        }
+    ]
+
+-- >>> unit_once_hook_passthrough
+-- *** Exception: HUnitFailure (Just (SrcLoc {srcLocPackage = "pyrethrum-extras-0.1.0.0-45a391d86e6b7dfbde63f5b7b8cbfda38e90a6a643d2e35c818247d1adcb93d9", srcLocModule = "PyrethrumExtras.Test.Tasty.HUnit.Extended", srcLocFile = "src/PyrethrumExtras/Test/Tasty/HUnit/Extended.hs", srcLocStartLine = 72, srcLocStartCol = 15, srcLocEndLine = 72, srcLocEndCol = 25})) "Unexpected result for:\n MkEventPath\n  { path = NodePath { module' = \"0\" , path = \"OnceBefore\" }\n  , nodeType = Hook Once Before\n  }\n   expected: All PassThroughFail\n  actual: [ Actual Pass ]"
+unit_once_hook_passthrough :: IO ()
+unit_once_hook_passthrough =
+  runTest
+    defaultSeed
+    (ThreadCount 1)
+    [ OnceBefore
+        { spec = Spec {delay = 0, result = PassThroughFail},
+          subNodes =
+            [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+        }
     ]

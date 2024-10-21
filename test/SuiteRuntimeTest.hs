@@ -552,3 +552,17 @@ unit_once_hook_passthrough =
             [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
         }
     ]
+
+-- >>> unit_thread_hook_passthrough
+-- *** Exception: HUnitFailure (Just (SrcLoc {srcLocPackage = "pyrethrum-extras-0.1.0.0-45a391d86e6b7dfbde63f5b7b8cbfda38e90a6a643d2e35c818247d1adcb93d9", srcLocModule = "PyrethrumExtras.Test.Tasty.HUnit.Extended", srcLocFile = "src/PyrethrumExtras/Test/Tasty/HUnit/Extended.hs", srcLocStartLine = 72, srcLocStartCol = 15, srcLocEndLine = 72, srcLocEndCol = 25})) "Unexpected result for:\n MkEventPath\n  { path = TestPath { id = 0 , title = \"0.0.Test #0\" }\n  , nodeType = Test\n  }\n   expected: All Pass\n  actual: [ Fail ]"
+unit_thread_hook_passthrough :: IO ()
+unit_thread_hook_passthrough =
+  runTest
+    defaultSeed
+    (ThreadCount 1)
+    [ ThreadBefore
+        { threadSpec = T.All $ Spec { delay = 0 , result = PassThroughFail }
+        , subNodes =
+            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+        }
+    ]

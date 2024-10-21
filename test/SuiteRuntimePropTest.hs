@@ -201,6 +201,7 @@ runProp isShrinking testName o p =
     let result = unsafePerformIO $ tryRunTest isShrinking p t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
+
 -- $> test_suite_preload
 test_suite_preload :: IO ()
 test_suite_preload = do

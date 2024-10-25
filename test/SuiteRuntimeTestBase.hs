@@ -13,7 +13,7 @@ import Data.Hashable qualified as H
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (Directive, EventPath (..), ManySpec (PassProb), Spec (..), SpecGen (..), isPreload)
+import FullSuiteTestTemplate (Directive, EventPath (..), ManySpec (PassProb), Spec (..), SpecGen (..), isPreload, testItemPath)
 import FullSuiteTestTemplate qualified as T
 import Internal.LogQueries
   ( getHookInfo,
@@ -49,7 +49,7 @@ import Internal.Logging as L
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
-import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
+import PyrethrumExtras (ConvertString, onError, toS, txt, (?), uu)
 import PyrethrumExtras qualified as PE
 import PyrethrumExtras.Test (chk')
 import System.Random.Stateful qualified as RS
@@ -1433,10 +1433,17 @@ expectedResults gen mxThrds =
    | directive == T.Fail = Fail
    | otherwise = bug "Incomplete pattern match - this should not happen"
 
-  expectedResults' :: Map Path ExpectedResult -> NodeType -> Directive -> Template -> Map Path ExpectedResult
-  expectedResults' accum parentNodeType parentDirective = \case
-    Fixture {tests} -> PE.uu
-    _ -> PE.uu
+  expectedResults' :: Map Path ExpectedResult -> NodeType -> Maybe Directive -> T.Template -> Map Path ExpectedResult
+  expectedResults' accum parentNodeType mParentDirective = \case
+    T.Fixture {tests} -> foldl' (\a t -> M.insert (testItemPath t) (fromMaybe NonDeterministic (\pd -> All $ result parentNodeType pd t.directive)) a) accum tests
+    T.OnceBefore {spec, subNodes} -> uu
+    _ -> uu
+    --   let acc' = M.insert (path spec) (All $ nxtResult spec) accum
+    --   let nxtResult = result parentNodeType parentDirective spec
+    --   in expectedResults' accum (Hook Once Before) (All spec) subNodes
+    -- where
+    --   nxtResult = result parentNodeType parentDirective 
+    --   recurse = concatMap eventPaths t.subNodes
     -- _ -> uu
     --   (\ti -> MkNodeResult (testItemPath ti) L.Test (All ti.spec) 1)  <$> tests
     
@@ -1494,7 +1501,7 @@ expectedResults gen mxThrds =
 --     PassProb {genStrategy, passPcnt, hookPassThroughErrPcnt, minDelay, maxDelay} ->
 --       case genStrategy of
 --         T.Preload -> Multi $ (.result) <$> generateHookSpecs baseSeed rLength path passPcnt hookPassThroughErrPcnt minDelay maxDelay
---         T.Runtime -> NonDeterministic
+--         T.Runtime -> c
 --       where
 --         rLength = case nodeType of
 --           Test -> bug "Test not expected to have PassProb spec"

@@ -13,7 +13,7 @@ import Data.Hashable qualified as H
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (EventPath (..), ManySpec (PassProb), Directive, Spec (..), SpecGen (..), isPreload)
+import FullSuiteTestTemplate (Directive, EventPath (..), ManySpec (PassProb), Spec (..), SpecGen (..), isPreload)
 import FullSuiteTestTemplate qualified as T
 import Internal.LogQueries
   ( getHookInfo,
@@ -60,6 +60,7 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
+import DSL.Internal.NodeLog (Path (TestPath))
 
 defaultSeed :: Int
 defaultSeed = 13579
@@ -303,91 +304,92 @@ chkExpectedResults baseSeed threadLimit ts lgs =
     chkEq' "Extra results found in actual that are not expected" S.empty extrActual
   where
     chkResults :: IO ()
-    chkResults = traverse_ chkResult $ M.toList expectedResults
-      where
-        chkResult :: (EventPath, ExpectedResult) -> IO ()
-        chkResult (k, expected) =
-          M.lookup k actuals
-            & maybe
-              --  todo: this doesn't format as expected
-              (fail $ "Expected result for " <> ppShow k <> " not found in actual")
-              ( \actual ->
-                  case expected of
-                    All e ->
-                      chk' ("Unexpected result for:\n " <> txt k <> "\n   expected: " <> txt expected <> "\n  actual: " <> txt actual) $
-                        all (\r -> resultsEqual e r || r == ParentFailed) actual
-                    NonDeterministic -> pure ()
-                    Multi expLst -> case k.nodeType of
-                      Test {} -> bug "Test not expected to have Multi result"
-                      Hook Once _ -> bug "Once not expected to have Multi result"
-                      Hook Thread _ -> do
-                        chk'
-                          ("actual thread events: " <> txt actualCount <> " more than max threads: " <> txt threadLimit.maxThreads)
-                          $ actualCount <= threadLimit.maxThreads
-                        countChks $ take actualCount expLst
-                      Hook Each _ -> countChks expLst
-                      where
-                        failMsg law = "Property failed for:\n  " <> txt k <> "\n  " <> law
-                        -- COUNT EXPECTED IS WRONG
-                        countExpected r rList = M.findWithDefault 0 r $ groupCount rList
-                        expectedPasses = countExpected T.Pass
-                        expectedFails = countExpected T.Fail
-                        -- TODO: an infix high precedence operator for debugging
-                        actualCount = length actual
-                        actuals' = groupCount actual
-                        actualPasses = M.findWithDefault 0 Pass actuals'
-                        actualFails = M.findWithDefault 0 Fail actuals'
-                        actualParentFails = M.findWithDefault 0 ParentFailed actuals'
-                        countChks lstExpected = do
-                          let expectedPassCount = expectedPasses lstExpected
-                              expectedFailCount = expectedFails lstExpected
-                          chk'
-                            (failMsg "Pass Count: expectedPassCount: " <> txt expectedPassCount <> " <= actualPasses: " <> txt actualPasses <> " + actualParentFails: " <> txt actualParentFails)
-                            (expectedPassCount <= actualPasses + actualParentFails)
-                          chk'
-                            (failMsg "Pass Count: expectedPassCount: " <> txt expectedPassCount <> " >= actualPasses: " <> txt actualPasses)
-                            (expectedPassCount >= actualPasses)
-                          chk'
-                            (failMsg "Fail Count: expectedFailCount: " <> txt expectedPassCount <> " <= actualPasses: " <> txt actualPasses <> " + actualParentFails: " <> txt actualParentFails)
-                            (expectedFailCount <= actualFails + actualParentFails)
-                          chk'
-                            (failMsg "Fail Count: expectedFailCount: " <> txt expectedFailCount <> " >= actualFails: " <> txt actualFails)
-                            (expectedFailCount >= actualFails)
-              )
+    chkResults = PE.uu
+      -- traverse_ chkResult $ M.toList expectedResults
+      -- where
+      --   chkResult :: (EventPath, ExpectedResult) -> IO ()
+      --   chkResult (k, expected) =
+      --     M.lookup k actuals
+      --       & maybe
+      --         --  todo: this doesn't format as expected
+      --         (fail $ "Expected result for " <> ppShow k <> " not found in actual")
+      --         ( \actual ->
+      --             case expected of
+      --               All e ->
+      --                 chk' ("Unexpected result for:\n " <> txt k <> "\n   expected: " <> txt expected <> "\n  actual: " <> txt actual) $
+      --                   all (\r -> resultsEqual e r || r == ParentFailed) actual
+      --               NonDeterministic -> pure ()
+      --               Multi expLst -> case k.nodeType of
+      --                 Test {} -> bug "Test not expected to have Multi result"
+      --                 Hook Once _ -> bug "Once not expected to have Multi result"
+      --                 Hook Thread _ -> do
+      --                   chk'
+      --                     ("actual thread events: " <> txt actualCount <> " more than max threads: " <> txt threadLimit.maxThreads)
+      --                     $ actualCount <= threadLimit.maxThreads
+      --                   countChks $ take actualCount expLst
+      --                 Hook Each _ -> countChks expLst
+      --                 where
+      --                   failMsg law = "Property failed for:\n  " <> txt k <> "\n  " <> law
+      --                   -- COUNT EXPECTED IS WRONG
+      --                   countExpected r rList = M.findWithDefault 0 r $ groupCount rList
+      --                   expectedPasses = countExpected T.Pass
+      --                   expectedFails = countExpected T.Fail
+      --                   -- TODO: an infix high precedence operator for debugging
+      --                   actualCount = length actual
+      --                   actuals' = groupCount actual
+      --                   actualPasses = M.findWithDefault 0 Pass actuals'
+      --                   actualFails = M.findWithDefault 0 Fail actuals'
+      --                   actualParentFails = M.findWithDefault 0 ParentFailed actuals'
+      --                   countChks lstExpected = do
+      --                     let expectedPassCount = expectedPasses lstExpected
+      --                         expectedFailCount = expectedFails lstExpected
+      --                     chk'
+      --                       (failMsg "Pass Count: expectedPassCount: " <> txt expectedPassCount <> " <= actualPasses: " <> txt actualPasses <> " + actualParentFails: " <> txt actualParentFails)
+      --                       (expectedPassCount <= actualPasses + actualParentFails)
+      --                     chk'
+      --                       (failMsg "Pass Count: expectedPassCount: " <> txt expectedPassCount <> " >= actualPasses: " <> txt actualPasses)
+      --                       (expectedPassCount >= actualPasses)
+      --                     chk'
+      --                       (failMsg "Fail Count: expectedFailCount: " <> txt expectedPassCount <> " <= actualPasses: " <> txt actualPasses <> " + actualParentFails: " <> txt actualParentFails)
+      --                       (expectedFailCount <= actualFails + actualParentFails)
+      --                     chk'
+      --                       (failMsg "Fail Count: expectedFailCount: " <> txt expectedFailCount <> " >= actualFails: " <> txt actualFails)
+      --                       (expectedFailCount >= actualFails)
+      --         )
 
     expectedResults :: Map EventPath ExpectedResult
-    expectedResults = foldl' calcExpected M.empty $ ts >>= T.eventPaths
+    expectedResults = PE.uu --foldl' calcExpected M.empty $ ts >>= T.eventPaths
 
-    calcExpected :: Map EventPath ExpectedResult -> T.TemplatePath -> Map EventPath ExpectedResult
-    calcExpected acc T.MkTemplatePath {path, nodeType, evntSpec, template} =
-      M.insert (ensureUnique key) expected acc
-      where
-        key = MkEventPath path nodeType
-        ensureUnique k =
-          M.member k acc
-            ? bug ("duplicate key should not happen. Template paths should be unique: " <> txt k)
-            $ k
+    calcExpected :: Map EventPath ExpectedResult -> NodeResult -> Map EventPath ExpectedResult
+    calcExpected acc MkNodeResult {} = PE.uu
+      -- M.insert (ensureUnique key) expected acc
+      -- where
+      --   key = MkEventPath path nodeType
+      --   ensureUnique k =
+      --     M.member k acc
+      --       ? bug ("duplicate key should not happen. Template paths should be unique: " <> txt k)
+      --       $ k
 
-        expected :: ExpectedResult
-        expected =
-          case evntSpec of
-            T.All Spec {result} ->
-              -- tests have no output so a test that generates a PassThroughFail
-              -- ie. pure $ error "failure" will acually pass as nothing genrates the error
-              -- being wrapped
-              (result == T.PassThroughFail)
-                ? SuiteRuntimeTestBase.All T.Pass
-                $ SuiteRuntimeTestBase.All result
-            PassProb {genStrategy, passPcnt, hookPassThroughErrPcnt, minDelay, maxDelay} ->
-              case genStrategy of
-                T.Preload -> Multi $ (.result) <$> generateHookSpecs baseSeed rLength path passPcnt hookPassThroughErrPcnt minDelay maxDelay
-                T.Runtime -> NonDeterministic
-              where
-                rLength = case nodeType of
-                  Test -> bug "Test not expected to have PassProb spec"
-                  Hook Once _ -> bug "Once not expected to have PassProb spec"
-                  Hook Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
-                  Hook Each _ -> T.countTests template -- expect a result for each test item
+        -- expected :: ExpectedResult
+        -- expected =
+        --   case evntSpec of
+        --     T.All Spec {result} ->
+        --       -- tests have no output so a test that generates a PassThroughFail
+        --       -- ie. pure $ error "failure" will acually pass as nothing genrates the error
+        --       -- being wrapped
+        --       (result == T.PassThroughFail)
+        --         ? SuiteRuntimeTestBase.All Pass
+        --         $ SuiteRuntimeTestBase.All result
+        --     PassProb {genStrategy, passPcnt, hookPassThroughErrPcnt, minDelay, maxDelay} ->
+        --       case genStrategy of
+        --         T.Preload -> Multi $ (.result) <$> generateHookSpecs baseSeed rLength path passPcnt hookPassThroughErrPcnt minDelay maxDelay
+        --         T.Runtime -> NonDeterministic
+        --       where
+        --         rLength = case nodeType of
+        --           Test -> bug "Test not expected to have PassProb spec"
+        --           Hook Once _ -> bug "Once not expected to have PassProb spec"
+        --           Hook Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
+        --           Hook Each _ -> testCount -- expect a result for each test item
     actuals :: Map EventPath [LogResult]
     actuals =
       foldl' (M.unionWith (<>)) M.empty allResults
@@ -728,7 +730,7 @@ chkAllTemplateItemsLogged ts lgs =
 
     -- init to empty set
     tmplatePaths :: Set EventPath
-    tmplatePaths = fromList $ (\ep -> MkEventPath ep.path ep.nodeType) <$> (ts >>= T.eventPaths)
+    tmplatePaths = PE.uu -- fromList $ (\ep -> MkEventPath ep.path ep.nodeType) <$> PE.uu --(ts >>= T.eventPaths)
 
     logStartPaths :: Set EventPath
     logStartPaths =
@@ -1097,6 +1099,7 @@ mkManySpec
       subSeed,
       path,
       passPcnt,
+      hookPassThroughErrPcnt,
       minDelay,
       maxDelay
     } =
@@ -1105,7 +1108,13 @@ mkManySpec
       seed = H.hash $ txt baseSeed <> path <> txt subSeed
       delayRange = maxDelay - minDelay
       delay = delayRange > 0 ? minDelay + seed `mod` (maxDelay - minDelay) $ minDelay
-      result = seed `mod` 100 < fromIntegral passPcnt ? T.Pass $ T.Fail
+      pcntMod = seed `mod` 100
+      passPcnt' = fromIntegral passPcnt
+      passThuFailPcnt = fromIntegral hookPassThroughErrPcnt
+      result =
+        pcntMod < passPcnt' ? T.Pass $
+          pcntMod < passPcnt' + passThuFailPcnt ? T.PassThroughFail $
+            T.Fail
 
 -- used in both generating test run and validation
 -- is pure ie. will always generate the same specs for same inputs
@@ -1395,3 +1404,100 @@ mkTestItem T.TestItem {id, title, spec} = P.MkTest id title (mkAction_ title spe
 
 mkRootTestItem :: T.TestItem -> P.Test IO ()
 mkRootTestItem T.TestItem {id, title, spec} = P.MkTest id title (mkRootAction $ mkAction_ title spec)
+
+
+
+data NodeResult = MkNodeResult
+  { 
+    path :: Path,
+    -- nodeType :: NodeType,
+    -- evntSpec :: ManySpec,
+    -- testCount :: Int,
+    expected :: ExpectedResult
+  }
+  deriving (Show, Eq)
+
+
+expectedResults :: SpecGen -> Int -> Template -> Map Path ExpectedResult
+expectedResults gen mxThrds = 
+ expectedResults' M.empty (Hook Once Before) T.Pass
+ where
+  isPreload = gen == Preload
+
+  result :: NodeType -> Directive -> Directive -> LogResult
+  result parentNodeType parentDirective directive 
+   | parentNodeType `elem` [Hook Once Before, Hook Once Setup] && parentDirective == T.PassThroughFail = ParentFailed
+   | parentDirective == T.Fail = ParentFailed
+   | parentDirective == T.PassThroughFail = Fail
+   | directive `elem` [T.PassThroughFail, T.Pass] = Pass
+   | directive == T.Fail = Fail
+   | otherwise = bug "Incomplete pattern match - this should not happen"
+
+  expectedResults' :: Map Path ExpectedResult -> NodeType -> Directive -> Template -> Map Path ExpectedResult
+  expectedResults' accum parentNodeType parentDirective = \case
+    Fixture {tests} -> PE.uu
+    _ -> PE.uu
+    -- _ -> uu
+    --   (\ti -> MkNodeResult (testItemPath ti) L.Test (All ti.spec) 1)  <$> tests
+    
+    -- _ ->
+    --   case t of
+    --     OnceBefore {spec} ->
+    --       mkEvnt Once Before (All spec) : recurse
+    --     OnceAfter {spec} ->
+    --       mkEvnt Once After (All spec) : recurse
+    --     OnceAround
+    --       { setupSpec,
+    --         teardownSpec
+    --       } ->
+    --         mkEvnt Once Setup (All setupSpec)
+    --           : mkEvnt Once Teardown (All teardownSpec)
+    --           : recurse
+    --     ThreadBefore {threadSpec} ->
+    --       mkEvnt Thread Before threadSpec : recurse
+    --     ThreadAfter {threadSpec} ->
+    --       mkEvnt Thread After threadSpec : recurse
+    --     ThreadAround
+    --       { setupThreadSpec,
+    --         teardownThreadSpec
+    --       } ->
+    --         mkEvnt Thread Setup setupThreadSpec
+    --           : mkEvnt Thread Teardown teardownThreadSpec
+    --           : recurse
+    --     EachBefore {eachSpec} ->
+    --       mkEvnt Each Before eachSpec : recurse
+    --     EachAfter {eachSpec} ->
+    --       mkEvnt Each After eachSpec : recurse
+    --     EachAround
+    --       { eachSetupSpec,
+    --         eachTeardownSpec
+    --       } ->
+    --         mkEvnt Each Setup eachSetupSpec
+    --           : mkEvnt Each Teardown eachTeardownSpec
+    --           : recurse
+
+        -- 
+        -- recurse = concatMap eventPaths t.subNodes
+        -- mkEvnt f p ms = MkNodeResult t.path (Hook f p) ms (countTests t)
+
+
+-- expected :: ExpectedResult
+-- expected =
+--   case evntSpec of
+--     T.All Spec {result} ->
+--       -- tests have no output so a test that generates a PassThroughFail
+--       -- ie. pure $ error "failure" will acually pass as nothing genrates the error
+--       -- being wrapped
+--       (result == T.PassThroughFail)
+--         ? SuiteRuntimeTestBase.All Pass
+--         $ SuiteRuntimeTestBase.All result
+--     PassProb {genStrategy, passPcnt, hookPassThroughErrPcnt, minDelay, maxDelay} ->
+--       case genStrategy of
+--         T.Preload -> Multi $ (.result) <$> generateHookSpecs baseSeed rLength path passPcnt hookPassThroughErrPcnt minDelay maxDelay
+--         T.Runtime -> NonDeterministic
+--       where
+--         rLength = case nodeType of
+--           Test -> bug "Test not expected to have PassProb spec"
+--           Hook Once _ -> bug "Once not expected to have PassProb spec"
+--           Hook Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
+--           Hook Each _ -> testCount -- expect a result for each test item

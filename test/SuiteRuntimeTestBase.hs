@@ -1406,7 +1406,6 @@ mkRootTestItem :: T.TestItem -> P.Test IO ()
 mkRootTestItem T.TestItem {id, title, spec} = P.MkTest id title (mkRootAction $ mkAction_ title spec)
 
 
-
 data NodeResult = MkNodeResult
   { 
     path :: Path,
@@ -1417,10 +1416,9 @@ data NodeResult = MkNodeResult
   }
   deriving (Show, Eq)
 
-
-expectedResults :: SpecGen -> Int -> Template -> Map Path ExpectedResult
+expectedResults :: SpecGen -> Int -> T.Template -> Map Path ExpectedResult
 expectedResults gen mxThrds = 
- expectedResults' M.empty (Hook Once Before) T.Pass
+ expectedResults' M.empty (Hook Once Before) (Just T.Pass)
  where
   isPreload = gen == Preload
 
@@ -1435,7 +1433,7 @@ expectedResults gen mxThrds =
 
   expectedResults' :: Map Path ExpectedResult -> NodeType -> Maybe Directive -> T.Template -> Map Path ExpectedResult
   expectedResults' accum parentNodeType mParentDirective = \case
-    T.Fixture {tests} -> foldl' (\a t -> M.insert (testItemPath t) (fromMaybe NonDeterministic (\pd -> All $ result parentNodeType pd t.directive)) a) accum tests
+    T.Fixture {tests} -> foldl' (\a t -> M.insert (testItemPath t) (maybe NonDeterministic (\pd -> All $ result parentNodeType pd t.spec.result) mParentDirective) a) accum tests
     T.OnceBefore {spec, subNodes} -> uu
     _ -> uu
     --   let acc' = M.insert (path spec) (All $ nxtResult spec) accum

@@ -29,8 +29,8 @@ source-repository-package
 optimization: 0
 
 -- https://well-typed.com/blog/2023/08/reducing-haskell-parallel-build-times
-semaphore: true
-jobs: $ncpus
+-- semaphore: true
+-- jobs: $ncpus
 
 allow-newer: base, 
              hedgehog:barbies, 

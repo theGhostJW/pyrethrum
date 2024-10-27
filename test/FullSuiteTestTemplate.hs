@@ -7,7 +7,7 @@ import Internal.Logging (HookPos (..), NodeType (Hook))
 import Internal.Logging qualified as L
 import Prelude hiding (All, id)
 
-data Spec = Spec {delay :: Int, result :: Directive}
+data Spec = Spec {delay :: Int, directive :: Directive}
   deriving (Read, Show, Eq)
 
 data Directive
@@ -202,6 +202,11 @@ data Template
         tests :: [TestItem]
       }
   deriving (Show, Eq)
+
+allPaths :: Template -> [Path]
+allPaths t = case t of
+  Fixture {tests} -> testItemPath <$> tests
+  _ -> t.path : concatMap allPaths t.subNodes
 
 countTests :: Template -> Int
 countTests t = case t of

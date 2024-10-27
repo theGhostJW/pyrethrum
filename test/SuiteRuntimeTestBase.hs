@@ -1246,7 +1246,7 @@ mkActionBase path spec hi = do
   C.threadDelay spec.delay
   --  make sure the result is used to force any pas through errors
   let !hi' = hi {dummyHkResult = hi.dummyHkResult + 1}
-  case spec.result of
+  case spec.directive of
     T.Pass -> pure hi'
     T.Fail -> error . toS $ "FAIL RESULT @ " <> txt path
     T.PassThroughFail -> pure . error $ "Deferred error from " <> txt path
@@ -1422,21 +1422,44 @@ expectedResults gen mxThrds =
  where
   isPreload = gen == Preload
 
-  result :: NodeType -> Directive -> Directive -> LogResult
-  result parentNodeType parentDirective directive 
+  logResult :: NodeType -> Directive -> Directive -> LogResult
+  logResult parentNodeType parentDirective directive 
    | parentNodeType `elem` [Hook Once Before, Hook Once Setup] && parentDirective == T.PassThroughFail = ParentFailed
    | parentDirective == T.Fail = ParentFailed
-   | parentDirective == T.PassThroughFail = Fail
+   | parentDirective `elem` [T.PassThroughFail, T.Fail] = Fail
    | directive `elem` [T.PassThroughFail, T.Pass] = Pass
-   | directive == T.Fail = Fail
    | otherwise = bug "Incomplete pattern match - this should not happen"
 
   expectedResults' :: Map Path ExpectedResult -> NodeType -> Maybe Directive -> T.Template -> Map Path ExpectedResult
-  expectedResults' accum parentNodeType mParentDirective = \case
-    T.Fixture {tests} -> foldl' (\a t -> M.insert (testItemPath t) (maybe NonDeterministic (\pd -> All $ result parentNodeType pd t.spec.result) mParentDirective) a) accum tests
-    T.OnceBefore {spec, subNodes} -> uu
+  -- parent directive of Nothing indicates parent result is NonDeterministic
+  expectedResults' accum _parentNodeType Nothing template = 
+        foldl' (\a p -> M.insert p NonDeterministic a) accum $ T.allPaths template
+
+  expectedResults' accum parentNodeType (Just pDirective) template = 
+   let 
+    mkAllResult thisDirective = All $ logResult parentNodeType pDirective thisDirective
+   in
+   case template of
+    T.Fixture {tests} -> 
+      foldl' (\a t -> M.insert (testItemPath t) (mkAllResult t.spec.directive) a) accum tests
+    T.OnceBefore {spec, subNodes, path} -> 
+       let 
+        thisDir = spec.directive
+        acc' = M.insert path (mkAllResult thisDir) accum
+       in
+        foldl' (\a t -> expectedResults' a (Hook Once Before) (Just thisDir) t) acc' subNodes
+    T.OnceAround
+          { setupSpec,
+            teardownSpec
+          } ->
+        let 
+          thisDir = setupSpec.directive
+          acc' = M.insert path (mkAllResult thisDir) accum
+        in
+            mkEvnt Once Setup (All setupSpec)
+              : mkEvnt Once Teardown (All teardownSpec)
+              : recurse
     _ -> uu
-    --   let acc' = M.insert (path spec) (All $ nxtResult spec) accum
     --   let nxtResult = result parentNodeType parentDirective spec
     --   in expectedResults' accum (Hook Once Before) (All spec) subNodes
     -- where

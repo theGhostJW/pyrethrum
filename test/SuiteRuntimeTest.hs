@@ -277,7 +277,7 @@ propFailTemplateGenWrongEachHookResult =
                 maxDelay = 0
               },
           subNodes =
-            [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
         }
     ]
 
@@ -294,12 +294,12 @@ unit_prop_fail_each_after_out_of_order =
     defaultSeed
     (ThreadCount 1)
     [ EachAfter
-        { eachSpec = T.All Spec {delay = 0, result = Pass},
+        { eachSpec = T.All Spec {delay = 0, directive = Pass},
           subNodes =
             [ EachAfter
-                { eachSpec = T.All Spec {delay = 0, result = Pass},
+                { eachSpec = T.All Spec {delay = 0, directive = Pass},
                   subNodes =
-                    [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                 }
             ]
         }
@@ -313,12 +313,12 @@ unit_prop_fail_each_after_out_of_order1 =
     defaultSeed
     (ThreadCount 1)
     [ EachAfter
-        { eachSpec = T.All Spec {delay = 0, result = Pass},
+        { eachSpec = T.All Spec {delay = 0, directive = Pass},
           subNodes =
             [ EachBefore
-                { eachSpec = T.All Spec {delay = 0, result = Pass},
+                { eachSpec = T.All Spec {delay = 0, directive = Pass},
                   subNodes =
-                    [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                 }
             ]
         }
@@ -343,8 +343,8 @@ unit_prop_fail_each_after =
           subNodes =
             [ Fixture
                 { tests =
-                    [ Spec {delay = 0, result = Pass},
-                      Spec {delay = 0, result = Pass}
+                    [ Spec {delay = 0, directive = Pass},
+                      Spec {delay = 0, directive = Pass}
                     ]
                 }
             ]
@@ -359,10 +359,10 @@ unit_missing_setup =
     defaultSeed
     (ThreadCount 1)
     [ EachAround
-        { eachSetupSpec = T.All $ Spec {delay = 0, result = Pass},
-          eachTeardownSpec = T.All $ Spec {delay = 0, result = Pass},
+        { eachSetupSpec = T.All $ Spec {delay = 0, directive = Pass},
+          eachTeardownSpec = T.All $ Spec {delay = 0, directive = Pass},
           subNodes =
-            [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
         }
     ]
 
@@ -374,10 +374,10 @@ unit_wrong_result =
     defaultSeed
     (ThreadCount 1)
     [ ThreadAfter
-        { threadSpec = T.All $ Spec {delay = 0, result = Pass},
+        { threadSpec = T.All $ Spec {delay = 0, directive = Pass},
           subNodes =
             [ ThreadBefore
-                { threadSpec = T.All $ Spec {delay = 0, result = Pass},
+                { threadSpec = T.All $ Spec {delay = 0, directive = Pass},
                   subNodes =
                     [ ThreadAfter
                         { threadSpec =
@@ -389,7 +389,7 @@ unit_wrong_result =
                                 maxDelay = 0
                               },
                           subNodes =
-                            [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                         }
                     ]
                 }
@@ -413,9 +413,9 @@ mayFail =
   runTest
     defaultSeed
     (ThreadCount 5)
-    [ Fixture {tests = [Spec {delay = 0, result = Pass}]},
+    [ Fixture {tests = [Spec {delay = 0, directive = Pass}]},
       OnceBefore
-        { spec = Spec {delay = 0, result = Pass},
+        { spec = Spec {delay = 0, directive = Pass},
           subNodes =
             [ ThreadAfter
                 { threadSpec =
@@ -427,7 +427,7 @@ mayFail =
                         maxDelay = 0
                       },
                   subNodes =
-                    [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                 }
             ]
         }
@@ -444,16 +444,16 @@ missingHookFail =
     defaultSeed
     (ThreadCount 5)
     [ ThreadAround
-        { setupThreadSpec = T.All $ Spec {delay = 0, result = Pass},
-          teardownThreadSpec = T.All $ Spec {delay = 0, result = Pass},
+        { setupThreadSpec = T.All $ Spec {delay = 0, directive = Pass},
+          teardownThreadSpec = T.All $ Spec {delay = 0, directive = Pass},
           subNodes =
             [ ThreadAfter
-                { threadSpec = T.All $ Spec {delay = 0, result = Pass},
+                { threadSpec = T.All $ Spec {delay = 0, directive = Pass},
                   subNodes =
                     [ Fixture
                         { tests =
-                            [ Spec {delay = 0, result = Pass},
-                              Spec {delay = 0, result = Pass}
+                            [ Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass}
                             ]
                         }
                     ]
@@ -472,9 +472,9 @@ wrongFailurePath =
   runTest
     defaultSeed
     (ThreadCount 5)
-    [ Fixture {tests = [Spec {delay = 0, result = Pass}]},
+    [ Fixture {tests = [Spec {delay = 0, directive = Pass}]},
       ThreadAfter
-        { threadSpec = T.All Spec {delay = 0, result = Pass},
+        { threadSpec = T.All Spec {delay = 0, directive = Pass},
           subNodes =
             [ ThreadAround
                 { setupThreadSpec =
@@ -485,16 +485,16 @@ wrongFailurePath =
                         minDelay = 0,
                         maxDelay = 2
                       },
-                  teardownThreadSpec = T.All Spec {delay = 0, result = Pass},
+                  teardownThreadSpec = T.All Spec {delay = 0, directive = Pass},
                   subNodes =
-                    [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                 }
             ]
         },
       OnceBefore
-        { spec = Spec {delay = 0, result = Pass},
+        { spec = Spec {delay = 0, directive = Pass},
           subNodes =
-            [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
         }
     ]
 
@@ -506,19 +506,19 @@ unit_once_failure_missing =
     defaultSeed
     (ThreadCount 1)
     [ OnceBefore
-        { spec = Spec {delay = 0, result = Fail},
+        { spec = Spec {delay = 0, directive = Fail},
           subNodes =
             [ ThreadAround
-                { setupThreadSpec = T.All Spec {delay = 0, result = Pass},
-                  teardownThreadSpec = T.All Spec {delay = 0, result = Pass},
+                { setupThreadSpec = T.All Spec {delay = 0, directive = Pass},
+                  teardownThreadSpec = T.All Spec {delay = 0, directive = Pass},
                   subNodes =
                     [ ThreadBefore
-                        { threadSpec = T.All Spec {delay = 0, result = Pass},
+                        { threadSpec = T.All Spec {delay = 0, directive = Pass},
                           subNodes =
                             [ ThreadAfter
-                                { threadSpec = T.All Spec {delay = 0, result = Pass},
+                                { threadSpec = T.All Spec {delay = 0, directive = Pass},
                                   subNodes =
-                                    [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                                 }
                             ]
                         }
@@ -536,7 +536,7 @@ unit_fixture_passthrough =
     defaultSeed
     (ThreadCount 1)
     [ Fixture
-        { tests = [Spec {delay = 0, result = PassThroughFail}]
+        { tests = [Spec {delay = 0, directive = PassThroughFail}]
         }
     ]
 
@@ -547,9 +547,9 @@ unit_once_hook_passthrough =
     defaultSeed
     (ThreadCount 1)
     [ OnceBefore
-        { spec = Spec {delay = 0, result = PassThroughFail},
+        { spec = Spec {delay = 0, directive = PassThroughFail},
           subNodes =
-            [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
         }
     ]
 
@@ -561,8 +561,8 @@ unit_thread_hook_passthrough =
     defaultSeed
     (ThreadCount 1)
     [ ThreadBefore
-        { threadSpec = T.All $ Spec { delay = 0 , result = PassThroughFail }
+        { threadSpec = T.All $ Spec { delay = 0 , directive = PassThroughFail }
         , subNodes =
-            [ Fixture { tests = [ Spec { delay = 0 , result = Pass } ] } ]
+            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
         }
     ]

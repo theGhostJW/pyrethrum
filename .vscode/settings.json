@@ -13,5 +13,7 @@
     "log"
   ],
   "git.closeDiffOnOperation": true,
-  "git.postCommitCommand": "push"
+  "git.postCommitCommand": "push",
+  "workbench.preferredDarkColorTheme": "Default Light Modern",
+  "workbench.preferredHighContrastColorTheme": "Default High Contrast Light"
 }

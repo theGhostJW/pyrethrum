@@ -1063,9 +1063,9 @@ mkManySpec
             T.Fail
 
 -- assumes th queue is preloaded (ie loadQIfPrload has already been run) if genStrategy == Preload
-mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
+mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO DummyHkResult
 mkManyAction baseSeed q pth = \case
-  T.All s -> mkVoidAction pth s
+  T.All s -> mkAction' pth s
   PassProb
     { genStrategy,
       passPcnt,
@@ -1077,43 +1077,36 @@ mkManyAction baseSeed q pth = \case
         Preload -> mkQueAction q pth
         Runtime -> do
           subSeed <- RS.uniformM RS.globalStdGen :: IO Int
-          mkVoidAction pth $
+          mkAction' pth $
             mkManySpec
               ManyParams
                 { baseSeed,
                   subSeed,
                   path = txt pth,
-                  hookPassThroughErrPcnt,
                   passPcnt,
+                  hookPassThroughErrPcnt,
                   minDelay,
                   maxDelay
                 }
 
-mkVoidAction :: forall pth. (Show pth) => pth -> Spec -> IO ()
-mkVoidAction path spec =
-  do
-    C.threadDelay spec.delay
-    unless (spec.result == Pass) $
-      error . toS $
-        "FAIL RESULT @ " <> txt path
-
-
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack
-mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.LogSink -> hi -> IO ()
-mkAction path s _sink _in = mkVoidAction path s
+-- includes unused param for convenience below
+mkAction :: forall pth. (Show pth) => pth -> Spec -> P.LogSink -> DummyHkResult -> IO DummyHkResult
+mkAction path spec _sink = mkActionBase path spec
 
 mkManyAfterAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
 mkManyAfterAction baseSeed q pth ms = void $ mkManyAction baseSeed q pth ms
 
-mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> IO ()
+
+mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> IO DummyHkResult
 mkQueAction q path =
   do
     s <- atomically $ tryReadTQueue q
     s
       & maybe
         (error $ "spec queue is empty - either the fixture template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> txt path)
-        (mkVoidAction path)
+        (mkAction' path)
 
 -- used in both generating test run and validation
 -- is pure ie. will always generate the same specs for same inputs
@@ -1344,8 +1337,8 @@ data Template
       }
   deriving (Show, Eq)
 
-mkTestItem :: T.TestItem -> P.Test IO ()
-mkTestItem T.TestItem {id, title, spec} = P.MkTest id title (mkAction title spec)
+mkTestItem :: T.TestItem -> P.Test IO DummyHkResult
+mkTestItem T.TestItem {id, title, spec} = P.MkTest id title (mkAction_ title spec)
 
 
 newtype DummyHkResult = DummyHkResult

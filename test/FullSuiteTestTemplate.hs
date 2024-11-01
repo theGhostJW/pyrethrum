@@ -205,16 +205,16 @@ data Template
 testEventPath :: TestItem -> EventPath
 testEventPath = flip MkEventPath L.Test . testItemPath
 
-allPaths :: Template -> [EventPath]
-allPaths t = case t of
+allEventPaths :: Template -> [EventPath]
+allEventPaths t = case t of
   Fixture {tests} -> testEventPath <$> tests
   _ ->
     catMaybes (MkEventPath t.path <<$>> [templateBeforeNodeType t, templateAfterNodeType t])
-      <> concatMap allPaths t.subNodes
+      <> concatMap allEventPaths t.subNodes
 
 -- templateAfterNodeType
 
---     MkEventPath t.path : concatMap allPaths t.subNodes
+--     MkEventPath t.path : concatMap allEventPaths t.subNodes
 
 countTests :: Template -> Int
 countTests t = case t of

@@ -45,11 +45,12 @@ import Internal.Logging as L
     testLogActions,
     topPath,
     FullLog (..),
-    LineInfo(..)
+    LineInfo(..),
+    Log(..)
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
-import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
+import PyrethrumExtras (ConvertString, onError, toS, txt, (?), uu)
 import PyrethrumExtras qualified as PE
 import PyrethrumExtras.Test (chk')
 import System.Random.Stateful qualified as RS
@@ -316,7 +317,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                   case expected of
                     All e ->
                       chk' ("Unexpected result for:\n " <> txt k <> "\n   expected: " <> txt expected) $
-                        all (\r -> r == Actual e || r == ParentFailed) actual
+                        all (\r -> r == e || r == ParentFailed) actual
                     NonDeterministic -> pure ()
                     Multi expLst -> case k.nodeType of
                       Test {} -> bug "Test not expected to have Multi result"
@@ -329,15 +330,14 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                       Hook Each _ -> countChks expLst
                       where
                         failMsg law = "Property failed for:\n  " <> txt k <> "\n  " <> law
-                        -- COUNT EXPECTED IS WRONG
                         countExpected r rList = M.findWithDefault 0 r $ groupCount rList
                         expectedPasses = countExpected Pass
                         expectedFails = countExpected Fail
                         -- TODO: an infix high precedence operator for debugging
                         actualCount = length actual
                         actuals' = groupCount actual
-                        actualPasses = M.findWithDefault 0 (Actual Pass) actuals'
-                        actualFails = M.findWithDefault 0 (Actual Fail) actuals'
+                        actualPasses = M.findWithDefault 0 Pass actuals'
+                        actualFails = M.findWithDefault 0 Fail actuals'
                         actualParentFails = M.findWithDefault 0 ParentFailed actuals'
                         countChks lstExpected = do
                           let expectedPassCount = expectedPasses lstExpected
@@ -356,8 +356,18 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                             (expectedFailCount >= actualFails)
               )
 
+    actuals :: Map EventPath [LogResult]
+    actuals =
+      foldl' (M.unionWith (<>)) M.empty allResults
+      where
+        allResults = actualResults <$> threadedLogs False lgs
+
     expectedResults :: Map EventPath ExpectedResult
-    expectedResults = foldl' calcExpected M.empty $ ts >>= T.eventPaths
+    expectedResults = uu
+
+    {-
+    expectedResults :: Map EventPath ExpectedResult
+    expectedResults = foldl' calcExpected M.empty $ ts >>= T.allEventPaths
 
     calcExpected :: Map EventPath ExpectedResult -> T.TemplatePath -> Map EventPath ExpectedResult
     calcExpected acc T.MkTemplatePath {path, nodeType, evntSpec, template} =
@@ -383,11 +393,7 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                   Hook Once _ -> bug "Once  not expected to have PassProb spec"
                   Hook Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
                   Hook Each _ -> T.countTests template -- expect a result for each test item
-    actuals :: Map EventPath [LogResult]
-    actuals =
-      foldl' (M.unionWith (<>)) M.empty allResults
-      where
-        allResults = actualResults <$> threadedLogs False lgs
+                  -}
 
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =
@@ -724,7 +730,7 @@ chkAllTemplateItemsLogged ts lgs =
 
     -- init to empty set
     tmplatePaths :: Set EventPath
-    tmplatePaths = fromList $ (\ep -> MkEventPath ep.path ep.nodeType) <$> (ts >>= T.eventPaths)
+    tmplatePaths = fromList $ ts >>= T.allEventPaths
 
     logStartPaths :: Set EventPath
     logStartPaths =
@@ -1022,20 +1028,12 @@ instance Core.Config FixtureConfig
 fc :: FixtureConfig
 fc = FxCfg {title = "fixture config"}
 
-mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> IO DummyHkResult
-mkQueAction q path =
-  do
-    s <- atomically $ tryReadTQueue q
-    s
-      & maybe
-        (error $ "spec queue is empty - either the fixture template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> txt path)
-        (mkAction' path)
-
 data ManyParams = ManyParams
   { baseSeed :: Int,
     subSeed :: Int,
     path :: Text,
     passPcnt :: Int8,
+    hookPassThroughErrPcnt :: Int8,
     minDelay :: Int,
     maxDelay :: Int
   }
@@ -1047,6 +1045,7 @@ mkManySpec
       subSeed,
       path,
       passPcnt,
+      hookPassThroughErrPcnt,
       minDelay,
       maxDelay
     } =
@@ -1055,41 +1054,13 @@ mkManySpec
       seed = H.hash $ txt baseSeed <> path <> txt subSeed
       delayRange = maxDelay - minDelay
       delay = delayRange > 0 ? minDelay + seed `mod` (maxDelay - minDelay) $ minDelay
-      result = seed `mod` 100 < fromIntegral passPcnt ? Pass $ Fail
-
--- used in both generating test run and validation
--- is pure ie. will always generate the same specs for same inputs
-generateSpecs :: (Show pth) => Int -> Int -> pth -> Int8 -> Int -> Int -> [Spec]
-generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay =
-  manySpec <$> [1 .. qLength]
-  where
-    manySpec :: Int -> Spec
-    manySpec subSeed =
-      mkManySpec
-        ManyParams
-          { baseSeed,
-            subSeed,
-            path = txt pth,
-            passPcnt,
-            minDelay,
-            maxDelay
-          }
-
-loadQIfPreload :: (Show pth) => Int -> Int -> pth -> TQueue Spec -> ManySpec -> IO ()
-loadQIfPreload baseSeed qLength pth q = \case
-  T.All _ -> pure ()
-  PassProb
-    { genStrategy,
-      passPcnt,
-      minDelay,
-      maxDelay
-    } ->
-      do
-        when (isPreload genStrategy)
-          . atomically
-          . loadTQueue q
-          $ generateSpecs baseSeed qLength pth passPcnt minDelay maxDelay
-        pure ()
+      pcntMod = seed `mod` 100
+      passPcnt' = fromIntegral passPcnt
+      passThuFailPcnt = fromIntegral hookPassThroughErrPcnt
+      result =
+        pcntMod < passPcnt' ? T.Pass $
+          pcntMod < passPcnt' + passThuFailPcnt ? T.PassThroughFail $
+            T.Fail
 
 -- assumes th queue is preloaded (ie loadQIfPrload has already been run) if genStrategy == Preload
 mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
@@ -1098,6 +1069,7 @@ mkManyAction baseSeed q pth = \case
   PassProb
     { genStrategy,
       passPcnt,
+      hookPassThroughErrPcnt,
       minDelay,
       maxDelay
     } ->
@@ -1111,6 +1083,7 @@ mkManyAction baseSeed q pth = \case
                 { baseSeed,
                   subSeed,
                   path = txt pth,
+                  hookPassThroughErrPcnt,
                   passPcnt,
                   minDelay,
                   maxDelay
@@ -1130,14 +1103,62 @@ mkVoidAction path spec =
 mkAction :: forall hi pth. (Show pth) => pth -> Spec -> P.LogSink -> hi -> IO ()
 mkAction path s _sink _in = mkVoidAction path s
 
-mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO ()]
+mkManyAfterAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
+mkManyAfterAction baseSeed q pth ms = void $ mkManyAction baseSeed q pth ms
+
+mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> IO ()
+mkQueAction q path =
+  do
+    s <- atomically $ tryReadTQueue q
+    s
+      & maybe
+        (error $ "spec queue is empty - either the fixture template has been misconfigured or a thread hook is being called more than once in a thread (which should not happen) at path: " <> txt path)
+        (mkVoidAction path)
+
+-- used in both generating test run and validation
+-- is pure ie. will always generate the same specs for same inputs
+generateSpecs :: (Show pth) => Int -> Int -> pth -> Int8 -> Int8 -> Int -> Int -> [Spec]
+generateSpecs baseSeed qLength pth passPcnt hookPassThroughErrPcnt minDelay maxDelay =
+  manySpec <$> [1 .. qLength]
+  where
+    manySpec :: Int -> Spec
+    manySpec subSeed =
+      mkManySpec
+        ManyParams
+          { baseSeed,
+            subSeed,
+            path = txt pth,
+            passPcnt,
+            hookPassThroughErrPcnt,
+            minDelay,
+            maxDelay
+          }
+
+loadHookQIfPreload :: (Show pth) => Int -> Int -> pth -> TQueue Spec -> ManySpec -> IO ()
+loadHookQIfPreload baseSeed qLength pth q = \case
+  T.All _ -> pure ()
+  PassProb
+    { genStrategy,
+      passPcnt,
+      hookPassThroughErrPcnt,
+      minDelay,
+      maxDelay
+    } ->
+      do
+        when (isPreload genStrategy)
+          . atomically
+          . loadTQueue q
+          $ generateSpecs baseSeed qLength pth passPcnt hookPassThroughErrPcnt minDelay maxDelay
+        pure ()
+
+mkNodes :: Int -> ThreadCount -> [T.Template] -> IO [P.PreNode IO DummyHkResult]
 mkNodes baseSeed mxThreads = mapM mkNode
   where
     afterAction :: (Show pth) => pth -> Spec -> b -> IO ()
-    afterAction path spec = const $ mkVoidAction path spec
+    afterAction path spec = void <$> const (mkAction' path spec)
 
     mkNodes' = mkNodes baseSeed mxThreads
-    mkNode :: T.Template -> IO (P.PreNode IO ())
+    mkNode :: T.Template -> IO (P.PreNode IO DummyHkResult)
     mkNode t = case t of
       T.Fixture
         { path,
@@ -1156,7 +1177,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
           afterQ <- newTQueueIO
           let mxThrds = mxThreads.maxThreads
               tstItemCount = T.countTests t
-              loadQIfPreload' = loadQIfPreload baseSeed
+              loadHookQIfPreload' = loadHookQIfPreload baseSeed
           case t of
             T.OnceBefore
               { path,
@@ -1190,7 +1211,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                     { path,
                       frequency = Once,
                       setup = mkAction path setupSpec,
-                      teardown = mkAction path teardownSpec,
+                      teardown = mkAction_ path teardownSpec,
                       subNodes = nds
                     }
             T.EachBefore
@@ -1198,7 +1219,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                 eachSpec
               } ->
                 do
-                  loadQIfPreload' tstItemCount path b4Q eachSpec
+                  loadHookQIfPreload' tstItemCount path b4Q eachSpec
                   pure $
                     P.Before
                       { path,
@@ -1211,12 +1232,12 @@ mkNodes baseSeed mxThreads = mapM mkNode
                 eachSpec
               } ->
                 do
-                  loadQIfPreload' tstItemCount path afterQ eachSpec
+                  loadHookQIfPreload' tstItemCount path afterQ eachSpec
                   pure $
                     P.After
                       { path,
                         frequency = Each,
-                        after = const $ mkManyAction baseSeed afterQ path eachSpec,
+                        after = const $ mkManyAfterAction baseSeed afterQ path eachSpec,
                         subNodes' = nds
                       }
             T.EachAround
@@ -1225,14 +1246,14 @@ mkNodes baseSeed mxThreads = mapM mkNode
                 eachTeardownSpec
               } ->
                 do
-                  loadQIfPreload' tstItemCount path b4Q eachSetupSpec
-                  loadQIfPreload' tstItemCount path afterQ eachTeardownSpec
+                  loadHookQIfPreload' tstItemCount path b4Q eachSetupSpec
+                  loadHookQIfPreload' tstItemCount path afterQ eachTeardownSpec
                   pure $
                     P.Around
                       { path,
                         frequency = Each,
                         setup = const . const $ mkManyAction baseSeed b4Q path eachSetupSpec,
-                        teardown = const . const $ mkManyAction baseSeed afterQ path eachTeardownSpec,
+                        teardown = const . const $ mkManyAfterAction baseSeed afterQ path eachTeardownSpec,
                         subNodes = nds
                       }
             _ -> case t of
@@ -1241,7 +1262,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                   threadSpec
                 } ->
                   do
-                    loadQIfPreload' mxThrds path b4Q threadSpec
+                    loadHookQIfPreload' mxThrds path b4Q threadSpec
                     pure $
                       P.Before
                         { path,
@@ -1254,12 +1275,12 @@ mkNodes baseSeed mxThreads = mapM mkNode
                   threadSpec
                 } ->
                   do
-                    loadQIfPreload' mxThrds path afterQ threadSpec
+                    loadHookQIfPreload' mxThrds path afterQ threadSpec
                     pure $
                       P.After
                         { path,
                           frequency = Thread,
-                          after = const $ mkManyAction baseSeed afterQ path threadSpec,
+                          after = const $ mkManyAfterAction baseSeed afterQ path threadSpec,
                           subNodes' = nds
                         }
               T.ThreadAround
@@ -1267,14 +1288,14 @@ mkNodes baseSeed mxThreads = mapM mkNode
                   setupThreadSpec,
                   teardownThreadSpec
                 } -> do
-                  loadQIfPreload' mxThrds path b4Q setupThreadSpec
-                  loadQIfPreload' mxThrds path afterQ teardownThreadSpec
+                  loadHookQIfPreload' mxThrds path b4Q setupThreadSpec
+                  loadHookQIfPreload' mxThrds path afterQ teardownThreadSpec
                   pure $
                     P.Around
                       { path,
                         frequency = Thread,
                         setup = const . const $ mkManyAction baseSeed b4Q path setupThreadSpec,
-                        teardown = const . const $ mkManyAction baseSeed afterQ path teardownThreadSpec,
+                        teardown = const . const $ mkManyAfterAction baseSeed afterQ path teardownThreadSpec,
                         subNodes = nds
                       }
 
@@ -1325,3 +1346,67 @@ data Template
 
 mkTestItem :: T.TestItem -> P.Test IO ()
 mkTestItem T.TestItem {id, title, spec} = P.MkTest id title (mkAction title spec)
+
+
+newtype DummyHkResult = DummyHkResult
+  {dummyHkResult :: Int}
+  deriving (Show, Eq, Ord)
+
+mkRootAction :: (P.LogSink -> DummyHkResult -> IO o) -> P.LogSink -> () -> IO o
+mkRootAction action ls _hr = action ls (DummyHkResult 0)
+
+mkRootNode :: P.PreNode IO DummyHkResult -> P.PreNode IO ()
+mkRootNode = \case
+  P.Before {path, frequency, action, subNodes} ->
+    P.Before
+      { path,
+        frequency,
+        action = mkRootAction action,
+        subNodes
+      }
+  P.After {path, frequency, after, subNodes'} ->
+    P.After
+      { path,
+        frequency,
+        after = after,
+        subNodes' = mkRootNode <$> subNodes'
+      }
+  P.Around {path, frequency, setup, teardown, subNodes} ->
+    P.Around
+      { path,
+        frequency,
+        setup = mkRootAction setup,
+        teardown = teardown,
+        subNodes = subNodes
+      }
+  P.Fixture {config, path, tests} ->
+    P.Fixture
+      { config,
+        path,
+        tests = mkRootTest <$> tests
+      }
+
+mkRootTest :: P.Test IO DummyHkResult -> P.Test IO ()
+mkRootTest P.MkTest {id, title, action} =
+  P.MkTest
+    { id,
+      title,
+      action = mkRootAction action
+    }
+
+mkAction' :: forall pth. (Show pth) => pth -> Spec -> IO DummyHkResult
+mkAction' path spec = mkActionBase path spec $ DummyHkResult 0
+
+mkAction_ :: forall pth. (Show pth) => pth -> Spec -> P.LogSink -> DummyHkResult -> IO ()
+mkAction_ path spec sink hkIn = void (mkAction path spec sink hkIn)
+
+
+mkActionBase :: forall pth. (Show pth) => pth -> Spec -> DummyHkResult -> IO DummyHkResult
+mkActionBase path spec hi = do
+  C.threadDelay spec.delay
+  --  make sure the result is used to force any pas through errors
+  let !hi' = hi {dummyHkResult = hi.dummyHkResult + 1}
+  case spec.directive of
+    T.Pass -> pure hi'
+    T.Fail -> error . toS $ "FAIL RESULT @ " <> txt path
+    T.PassThroughFail -> pure . error $ "Deferred error from " <> txt path

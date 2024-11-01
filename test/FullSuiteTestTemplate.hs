@@ -56,11 +56,10 @@ data EventPath = MkEventPath
 parent event path
 -}
 expectedParentPrecedingEvents :: [Template] -> Map EventPath EventPath
-expectedParentPrecedingEvents = expectedSuiteEvntMap templateBeforeEvnt
+expectedParentPrecedingEvents = expectedSuiteEvntMap templateBeforeNodeType
 
 expectedParentSubsequentEvents :: [Template] -> Map EventPath EventPath
-expectedParentSubsequentEvents = expectedSuiteEvntMap templateAfterEvnt
-
+expectedParentSubsequentEvents = expectedSuiteEvntMap templateAfterNodeType
 
 testItemPath :: TestItem -> Path
 testItemPath TestItem {..} = TestPath {..}
@@ -101,8 +100,8 @@ expectedSuiteEvntMap getSuiteEvnt =
                         thisTemplateEvntPaths
                   )
 
-templateBeforeEvnt :: Template -> Maybe NodeType
-templateBeforeEvnt t =
+templateBeforeNodeType :: Template -> Maybe NodeType
+templateBeforeNodeType t =
   case t of
     FullSuiteTestTemplate.Fixture {} -> Nothing
     OnceAfter {} -> Nothing
@@ -116,8 +115,8 @@ templateBeforeEvnt t =
       EachBefore {} -> Hook Each Before
       EachAround {} -> Hook Each Setup
 
-templateAfterEvnt :: Template -> Maybe NodeType
-templateAfterEvnt t =
+templateAfterNodeType :: Template -> Maybe NodeType
+templateAfterNodeType t =
   case t of
     FullSuiteTestTemplate.Fixture {} -> Nothing
     OnceBefore {} -> Nothing
@@ -203,10 +202,19 @@ data Template
       }
   deriving (Show, Eq)
 
-allPaths :: Template -> [Path]
+testEventPath :: TestItem -> EventPath
+testEventPath = flip MkEventPath L.Test . testItemPath
+
+allPaths :: Template -> [EventPath]
 allPaths t = case t of
-  Fixture {tests} -> testItemPath <$> tests
-  _ -> t.path : concatMap allPaths t.subNodes
+  Fixture {tests} -> testEventPath <$> tests
+  _ ->
+    catMaybes (MkEventPath t.path <<$>> [templateBeforeNodeType t, templateAfterNodeType t])
+      <> concatMap allPaths t.subNodes
+
+-- templateAfterNodeType
+
+--     MkEventPath t.path : concatMap allPaths t.subNodes
 
 countTests :: Template -> Int
 countTests t = case t of

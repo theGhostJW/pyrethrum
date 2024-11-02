@@ -34,8 +34,8 @@ data SpecGen
 isPreload :: SpecGen -> Bool
 isPreload = (==) Preload
 
-data ManySpec
-  = All Spec
+data NSpec
+  = All {spec :: Spec}
   | PassProb
       { genStrategy :: SpecGen,
         passPcnt :: Int8,
@@ -166,34 +166,34 @@ data Template
       }
   | ThreadBefore
       { path :: Path,
-        threadSpec :: ManySpec,
+        threadSpec :: NSpec,
         subNodes :: [Template]
       }
   | ThreadAfter
       { path :: Path,
-        threadSpec :: ManySpec,
+        threadSpec :: NSpec,
         subNodes :: [Template]
       }
   | ThreadAround
       { path :: Path,
-        setupThreadSpec :: ManySpec,
-        teardownThreadSpec :: ManySpec,
+        setupThreadSpec :: NSpec,
+        teardownThreadSpec :: NSpec,
         subNodes :: [Template]
       }
   | EachBefore
       { path :: Path,
-        eachSpec :: ManySpec,
+        eachSpec :: NSpec,
         subNodes :: [Template]
       }
   | EachAfter
       { path :: Path,
-        eachSpec :: ManySpec,
+        eachSpec :: NSpec,
         subNodes :: [Template]
       }
   | EachAround
       { path :: Path,
-        eachSetupSpec :: ManySpec,
-        eachTeardownSpec :: ManySpec,
+        eachSetupSpec :: NSpec,
+        eachTeardownSpec :: NSpec,
         subNodes :: [Template]
       }
   | Fixture

@@ -223,7 +223,7 @@ test_suite_runtime = do
       ]
 
 {- TODO: Check out performance.
-  Many threads is slower than a handfull
+  NResult threads is slower than a handfull
   Threads   Time for 100 tests (Seconds)
   --------------------------------------
   1         254

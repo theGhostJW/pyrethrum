@@ -14,7 +14,7 @@ import Data.Hashable qualified as H
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (Directive, EventPath (..), ManySpec (PassProb), Spec (..), SpecGen (..), isPreload, testEventPath)
+import FullSuiteTestTemplate (Directive, EventPath (..), NSpec (PassProb), Spec (..), SpecGen (..), isPreload, testEventPath)
 import FullSuiteTestTemplate qualified as T
 import Internal.LogQueries
   ( getHookInfo,
@@ -38,19 +38,19 @@ import Internal.LogQueries
   )
 import Internal.Logging as L
   ( ExePath (..),
-    HookPos (..),
     FLog,
+    FullLog (..),
+    HookPos (..),
+    LineInfo (..),
+    Log (..),
     NodeType (..),
     parentPath,
     testLogActions,
     topPath,
-    FullLog (..),
-    LineInfo(..),
-    Log(..)
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
-import PyrethrumExtras (ConvertString, onError, toS, txt, (?), uu)
+import PyrethrumExtras (ConvertString, onError, toS, txt, uu, (?))
 import PyrethrumExtras qualified as PE
 import PyrethrumExtras.Test (chk')
 import System.Random.Stateful qualified as RS
@@ -107,7 +107,7 @@ logging = LogFails
    that empty thread TestTrees are not executed
 -}
 
-allSpec :: Int -> Directive -> ManySpec
+allSpec :: Int -> Directive -> NSpec
 allSpec delay rslt = T.All $ Spec delay rslt
 
 {-
@@ -130,7 +130,7 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
 type LogItem = FLog ExePath AE.NodeLog
 
 getThreadId :: LogItem -> ThreadId
-getThreadId (MkLog (MkLineInfo{threadId}) _) = threadId
+getThreadId (MkLog (MkLineInfo {threadId}) _) = threadId
 
 logItemtoBool :: (NodeType -> Bool) -> LogItem -> Bool
 logItemtoBool = threadEventToBool
@@ -145,7 +145,7 @@ chkProperties baseSeed threadLimit ts evts = do
       chkThreadLogsInOrder,
       chkAllTemplateItemsLogged ts,
       chkStartsOnce "once hooks and tests" shouldOccurOnce,
-      chkExpectedResults baseSeed threadLimit ts
+      chkResults baseSeed threadLimit ts
     ]
   -- these checks apply to each thread log (events with the same thread id)
   threadLogChks
@@ -230,11 +230,9 @@ logAccum acc@(passStart, rMap) (MkLog {event}) =
       isJust passStart
         ? (Nothing, insert' loc nodeType Fail)
         $ error ("Failure event not started\n" <> txt f)
-
     -- TODO this is probably wrong fix this will cause failures when tests generate these
     -- need to think about cortrect expected results in this case
     InitialisationFailure {} -> acc
-
     pf@ParentFailure {loc, nodeType} ->
       isJust passStart
         ? error ("parent failure encountered when parent event not ended\n" <> txt pf)
@@ -266,7 +264,7 @@ chkThreadCount threadLimit evts =
 data ExpectedResult
   = All LogResult
   | NonDeterministic
-  | Multi [LogResult]
+  | NResult [LogResult]
   deriving (Show, Eq)
 
 -- todo add to pyrelude
@@ -279,7 +277,7 @@ defects found in testing::
   - incorrect label on thread hook - labeld as each
   - hook events out of order - due to bracket and laziness
   - missing thread around events
-    - chkExpectedResults failing but not chkAllTemplateItemsLogged
+    - chkResults failing but not chkAllTemplateItemsLogged
     - chkAllTemplateItemsLogged was incomplete + prenode generator (fixture) bug
 
  - property testing
@@ -295,17 +293,17 @@ resultsEqual :: Directive -> LogResult -> Bool
 resultsEqual expt act =
   expt == T.Pass && act == Pass || expt == T.Fail && act == Fail
 
-chkExpectedResults :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
-chkExpectedResults baseSeed threadLimit ts lgs =
+chkResults :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
+chkResults baseSeed threadLimit ts lgs =
   do
     -- fail missing expected results or different to expected
-    chkResults
+    chkResults'
     -- fail extra results
     let extrActual = M.keysSet actuals S.\\ M.keysSet expectedResults
     chkEq' "Extra results found in actual that are not expected" S.empty extrActual
   where
-    chkResults :: IO ()
-    chkResults = traverse_ chkResult $ M.toList expectedResults
+    chkResults' :: IO ()
+    chkResults' = traverse_ chkResult $ M.toList expectedResults
       where
         chkResult :: (EventPath, ExpectedResult) -> IO ()
         chkResult (k, expected) =
@@ -319,9 +317,9 @@ chkExpectedResults baseSeed threadLimit ts lgs =
                       chk' ("Unexpected result for:\n " <> txt k <> "\n   expected: " <> txt expected) $
                         all (\r -> r == e || r == ParentFailed) actual
                     NonDeterministic -> pure ()
-                    Multi expLst -> case k.nodeType of
-                      Test {} -> bug "Test not expected to have Multi result"
-                      Hook Once _ -> bug "Once not expected to have Multi result"
+                    NResult expLst -> case k.nodeType of
+                      Test {} -> bug "Test not expected to have NResult result"
+                      Hook Once _ -> bug "Once not expected to have NResult result"
                       Hook Thread _ -> do
                         chk'
                           ("actual thread events: " <> txt actualCount <> " more than max threads: " <> txt threadLimit.maxThreads)
@@ -365,36 +363,147 @@ chkExpectedResults baseSeed threadLimit ts lgs =
     expectedResults :: Map EventPath ExpectedResult
     expectedResults = uu
 
-    {-
-    expectedResults :: Map EventPath ExpectedResult
-    expectedResults = foldl' calcExpected M.empty $ ts >>= T.allEventPaths
+    expectedResults' :: (Bool, ExpectedResult) -> Map EventPath ExpectedResult -> T.Template -> Map EventPath ExpectedResult
+    expectedResults' poisoned accum = \case
+      T.OnceBefore {} -> uu
+      T.OnceAfter {} -> uu
+      T.OnceAround {} -> uu
+      T.ThreadBefore {} -> uu
+      T.ThreadAfter {} -> uu
+      T.ThreadAround {} -> uu
+      T.EachBefore {} -> uu
+      T.EachAfter {} -> uu
+      T.EachAround {} -> uu
+      T.Fixture {} -> uu
 
-    calcExpected :: Map EventPath ExpectedResult -> T.TemplatePath -> Map EventPath ExpectedResult
-    calcExpected acc T.MkTemplatePath {path, nodeType, evntSpec, template} =
-      M.insert (ensureUnique key) expected acc
-      where
-        key = MkEventPath path nodeType
-        ensureUnique k =
-          M.member k acc
-            ? bug ("duplicate key should not happen. Template paths should be unique: " <> txt k)
-            $ k
-
-        expected :: ExpectedResult
-        expected =
-          case evntSpec of
-            T.All Spec {result} -> SuiteRuntimeTestBase.All result
-            PassProb {genStrategy, passPcnt, minDelay, maxDelay} ->
+specToExpected :: Int -> Int -> (Bool, ExpectedResult) -> NSpec -> (Bool, ExpectedResult)
+specToExpected
+  baseSeed
+  resultInstanceCount -- thread nodes and fixtures have more than one expected result per fixture
+  (poisoned, parentResult)
+  nspc =
+    case parentResult of
+      All lr -> case lr of
+        Pass -> case nspc of
+          T.All {spec} -> directiveToExpected poisoned spec.directive
+          T.PassProb
+            { genStrategy,
+              passPcnt,
+              hookPassThroughErrPcnt,
+              minDelay,
+              maxDelay
+            } ->
               case genStrategy of
-                T.Preload -> Multi $ (.result) <$> generateSpecs baseSeed rLength path passPcnt minDelay maxDelay
-                T.Runtime -> NonDeterministic
-              where
-                rLength = case nodeType of
-                  Test {} -> bug "Test not expected to have PassProb spec"
-                  Hook Once _ -> bug "Once  not expected to have PassProb spec"
-                  Hook Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
-                  Hook Each _ -> T.countTests template -- expect a result for each test item
-                  -}
+                T.Preload ->
+                  ( False,
+                    NResult $
+                      directiveToLogResult poisoned . (.directive)
+                        <$> generateSpecs baseSeed resultInstanceCount "path not used" passPcnt hookPassThroughErrPcnt minDelay maxDelay
+                  )
+                T.Runtime -> (False, NonDeterministic)
+        Fail -> (False, All ParentFailed)
+        ParentFailed -> (False, All ParentFailed)
+      NonDeterministic -> (False, NonDeterministic)
+      -- if the parent is an NResult the result of the child spec will be NonDeterministic because
+      -- there is no way of determining which instance will provide the input which may in turn cause the 
+      -- spec to fail if the parent is PassThroughFail
+      NResult {} -> (False, NonDeterministic) 
 
+directiveToLogResult :: Bool -> Directive -> LogResult
+directiveToLogResult poisoned directive =
+  poisoned ? Fail $
+    directive & \case
+      T.Pass -> Pass
+      T.Fail -> Fail
+      T.PassThroughFail -> Pass
+
+directiveToExpected :: Bool -> Directive -> (Bool, ExpectedResult)
+directiveToExpected poisoned d =
+  (d == T.PassThroughFail, All $ directiveToLogResult poisoned d)
+
+{- TODO:
+1. reinstate chkResult
+3. check generating Alls
+2. fix check propagation => expect to fail on OnceHook
+
+-}
+
+{-
+expectedResults :: Map EventPath ExpectedResult
+expectedResults = foldl' calcExpected M.empty $ ts >>= T.allEventPaths
+
+calcExpected :: Map EventPath ExpectedResult -> T.TemplatePath -> Map EventPath ExpectedResult
+calcExpected acc T.MkTemplatePath {path, nodeType, evntSpec, template} =
+  M.insert (ensureUnique key) expected acc
+  where
+    key = MkEventPath path nodeType
+    ensureUnique k =
+      M.member k acc
+        ? bug ("duplicate key should not happen. Template paths should be unique: " <> txt k)
+        $ k
+
+    expected :: ExpectedResult
+    expected =
+      case evntSpec of
+        T.All Spec {result} -> SuiteRuntimeTestBase.All result
+        PassProb {genStrategy, passPcnt, minDelay, maxDelay} ->
+          case genStrategy of
+            T.Preload -> NResult $ (.result) <$> y generateSpecs baseSeed rLength path passPcnt minDelamaxDelay
+            T.Runtime -> NonDeterministic
+          where
+            rLength = case nodeType of
+              Test {} -> bug "Test not expected to have PassProb spec"
+              Hook Once _ -> bug "Once  not expected to have PassProb spec"
+              Hook Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
+              Hook Each _ -> T.countTests template -- expect a result for each test item
+              -}
+
+{- NEW
+expectedResults :: SpecGen -> Int -> T.Template -> Map EventPath ExpectedResult
+expectedResults gen mxThrds =
+  expectedResults' M.empty (Hook Once Before) (Just T.Pass)
+  where
+    isPreload = gen == Preload
+
+    logResult :: NodeType -> Directive -> Directive -> LogResult
+    logResult parentNodeType parentDirective directive
+      | parentNodeType `elem` [Hook Once Before, Hook Once Setup] && parentDirective == T.PassThroughFail = ParentFailed
+      | parentDirective == T.Fail = ParentFailed
+      | parentDirective `elem` [T.PassThroughFail, T.Fail] = Fail
+      | directive `elem` [T.PassThroughFail, T.Pass] = Pass
+      | otherwise = bug "Incomplete pattern match - this should not happen"
+
+    expectedResults' :: Map EventPath ExpectedResult -> NodeType -> Maybe Directive -> T.Template -> Map EventPath ExpectedResult
+    -- parent directive of Nothing indicates parent result is NonDeterministic
+    expectedResults' accum _parentNodeType Nothing template =
+      foldl' (\a p -> M.insert p NonDeterministic a) accum $ T.allPaths template
+    expectedResults' accum parentNodeType (Just pDirective) template =
+      let mkAllResult thisDirective = All $ logResult parentNodeType pDirective thisDirective
+       in case template of
+            T.Fixture {tests} ->
+              foldl' (\a t -> M.insert (testEventPath t) (mkAllResult t.spec.directive) a) accum tests
+            T.OnceBefore {spec, subNodes, path} ->
+              let thisDir = spec.directive
+                  acc' = M.insert (MkEventPath path (Hook Once Before)) (mkAllResult thisDir) accum
+               in foldl' (\a t -> expectedResults' a (Hook Once Before) (Just thisDir) t) acc' subNodes
+            T.OnceAround
+              { setupSpec,
+                teardownSpec,
+                subNodes,
+                path
+              } ->
+                let acc' =
+                      M.insert (MkEventPath path (Hook Once Teardown)) (mkAllResult setupSpec.directive) $
+                        M.insert (MkEventPath path (Hook Once Setup)) (mkAllResult teardownSpec.directive) accum
+                 in foldl' (\a t -> expectedResults' a (Hook Once Setup) (Just setupSpec.directive) t) acc' subNodes
+            T.ThreadBefore {threadSpec, path} ->
+              let thisDir = threadSpec
+                  acc' = M.insert (MkEventPath path (Hook Thread Before)) (mkAllResult thisDir) accum
+               in foldl' (\a t -> expectedResults' a (Hook Thread Before) (Just thisDir) t) acc' subNodes
+--       mkEvnt Thread Before threadSpec : recurse
+            _ -> uu
+
+-}
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =
   do
@@ -420,7 +529,7 @@ isFailChildEventOf c p =
       _ -> Nothing
     pIsSetupFailure = suitEvntToBool (hasHookPos Setup) pFailEvent
 
-    ploc = p.event.loc 
+    ploc = p.event.loc
     cloc = c.event.loc
     samePath = ploc == cloc
     cIsSubpathOfp = isParentPath ploc cloc
@@ -541,10 +650,8 @@ failInfo ls =
                 & maybe
                   (error $ "Failure encountered before start:\n" <> toS (ppShow l))
                   (const (Nothing, FailInfo l ls' : result))
-
-            -- todo think about logic here 
+            -- todo think about logic here
             InitialisationFailure {} -> passThrough
-
             ParentFailure {} -> passThrough
             StartExecution {} -> passThrough
             EndExecution {} -> passThrough
@@ -554,11 +661,12 @@ failInfo ls =
         passThrough = (lastStartEvnt, result)
     failStarts =
       filter
-        (\li -> li.event & \case
-            Failure {} -> True
-            ParentFailure {} -> True
-            Start {} -> True
-            _ -> False
+        ( \li ->
+            li.event & \case
+              Failure {} -> True
+              ParentFailure {} -> True
+              Start {} -> True
+              _ -> False
         )
         ls
 
@@ -1063,7 +1171,7 @@ mkManySpec
             T.Fail
 
 -- assumes th queue is preloaded (ie loadQIfPrload has already been run) if genStrategy == Preload
-mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO DummyHkResult
+mkManyAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> NSpec -> IO DummyHkResult
 mkManyAction baseSeed q pth = \case
   T.All s -> mkAction' pth s
   PassProb
@@ -1095,9 +1203,8 @@ mkManyAction baseSeed q pth = \case
 mkAction :: forall pth. (Show pth) => pth -> Spec -> P.LogSink -> DummyHkResult -> IO DummyHkResult
 mkAction path spec _sink = mkActionBase path spec
 
-mkManyAfterAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> ManySpec -> IO ()
+mkManyAfterAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> NSpec -> IO ()
 mkManyAfterAction baseSeed q pth ms = void $ mkManyAction baseSeed q pth ms
-
 
 mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> IO DummyHkResult
 mkQueAction q path =
@@ -1127,7 +1234,7 @@ generateSpecs baseSeed qLength pth passPcnt hookPassThroughErrPcnt minDelay maxD
             maxDelay
           }
 
-loadHookQIfPreload :: (Show pth) => Int -> Int -> pth -> TQueue Spec -> ManySpec -> IO ()
+loadHookQIfPreload :: (Show pth) => Int -> Int -> pth -> TQueue Spec -> NSpec -> IO ()
 loadHookQIfPreload baseSeed qLength pth q = \case
   T.All _ -> pure ()
   PassProb
@@ -1307,29 +1414,29 @@ data Template
         subNodes :: [Template]
       }
   | ThreadBefore
-      { threadSpec :: ManySpec,
+      { threadSpec :: NSpec,
         subNodes :: [Template]
       }
   | ThreadAfter
-      { threadSpec :: ManySpec,
+      { threadSpec :: NSpec,
         subNodes :: [Template]
       }
   | ThreadAround
-      { setupThreadSpec :: ManySpec,
-        teardownThreadSpec :: ManySpec,
+      { setupThreadSpec :: NSpec,
+        teardownThreadSpec :: NSpec,
         subNodes :: [Template]
       }
   | EachBefore
-      { eachSpec :: ManySpec,
+      { eachSpec :: NSpec,
         subNodes :: [Template]
       }
   | EachAfter
-      { eachSpec :: ManySpec,
+      { eachSpec :: NSpec,
         subNodes :: [Template]
       }
   | EachAround
-      { eachSetupSpec :: ManySpec,
-        eachTeardownSpec :: ManySpec,
+      { eachSetupSpec :: NSpec,
+        eachTeardownSpec :: NSpec,
         subNodes :: [Template]
       }
   | Fixture
@@ -1339,7 +1446,6 @@ data Template
 
 mkTestItem :: T.TestItem -> P.Test IO DummyHkResult
 mkTestItem T.TestItem {id, title, spec} = P.MkTest id title (mkAction_ title spec)
-
 
 newtype DummyHkResult = DummyHkResult
   {dummyHkResult :: Int}
@@ -1392,7 +1498,6 @@ mkAction' path spec = mkActionBase path spec $ DummyHkResult 0
 
 mkAction_ :: forall pth. (Show pth) => pth -> Spec -> P.LogSink -> DummyHkResult -> IO ()
 mkAction_ path spec sink hkIn = void (mkAction path spec sink hkIn)
-
 
 mkActionBase :: forall pth. (Show pth) => pth -> Spec -> DummyHkResult -> IO DummyHkResult
 mkActionBase path spec hi = do

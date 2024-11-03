@@ -49,7 +49,7 @@ import Internal.Logging as L
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
-import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
+import PyrethrumExtras (ConvertString, onError, toS, txt, (?), db)
 import PyrethrumExtras qualified as PE
 import PyrethrumExtras.Test (chk')
 import System.Random.Stateful qualified as RS
@@ -298,7 +298,7 @@ chkResults baseSeed threadLimit ts lgs =
     -- fail missing expected results or different to expected
     chkResults'
     -- fail extra results
-    let extrActual = M.keysSet actuals S.\\ M.keysSet expectedResults
+    let extrActual = M.keysSet actuals S.\\ M.keysSet (db "Expected" $ expectedResults)
     chkEq' "Extra results found in actual that are not expected" S.empty extrActual
   where
     chkResults' :: IO ()
@@ -361,9 +361,20 @@ chkResults baseSeed threadLimit ts lgs =
 
     expectedResults :: Map EventPath ExpectedResult
     expectedResults =
-      foldl' M.union M.empty $ (.resultMap) . expectedResults' initAccum <$> ts
+      foldl' M.union M.empty $ (.resultMap) . expectedResultsRecursive' initAccum <$> ts
       where
         initAccum = Accum False (All Pass) M.empty
+
+    expectedResultsRecursive' :: ResultAccum -> T.Template -> ResultAccum
+    expectedResultsRecursive' accum = 
+      let 
+        thisResult = expectedResults' accum
+      in 
+        \case 
+         T.OnceBefore _ _ _
+         T.OnceAfter _ _ _
+         T.OnceAround _ _ _ _
+         T.ThreadBefore _ _ _
 
     expectedResults' :: ResultAccum -> T.Template -> ResultAccum
     expectedResults' Accum {poisoned, parentResult, resultMap} template =

@@ -128,13 +128,13 @@ templateGenParams
       genThreadSubnodes = genSubnodes $ templateGenParams (nxtLimits {minHz = Thread})
       genManySpec =
         frequency
-          [ (10, T.All <$> genSpec'),
-            (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) (fromIntegral hookPassThroughErrPcnt) 0 <$> genDelay maxDelay)
+          [ (50, T.All <$> genSpec'),
+            (50, T.PassProb genStrategy (fromIntegral hookPassPcnt) (fromIntegral hookPassThroughErrPcnt) 0 <$> genDelay maxDelay)
           ]
       genManySpec' =
         frequency
-          [ (10, T.All <$> genSpec'),
-            (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) (fromIntegral hookPassThroughErrPcnt) 0 <$> genDelay maxDelay)
+          [ (50, T.All <$> genSpec'),
+            (50, T.PassProb genStrategy (fromIntegral hookPassPcnt) (fromIntegral hookPassThroughErrPcnt) 0 <$> genDelay maxDelay)
           ]
       genThreadBefore = ThreadBefore <$> genManySpec <*> genThreadSubnodes
       genThreadAfter = ThreadAfter <$> genManySpec <*> genThreadSubnodes

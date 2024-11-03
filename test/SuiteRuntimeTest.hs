@@ -566,3 +566,29 @@ unit_thread_hook_passthrough =
             [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
         }
     ]
+
+-- >>> unit_basic_each_before
+-- *** Exception: user error (
+-- Extra results found in actual that are not expected
+-- equality check failed:
+-- Expected:
+--   fromList []
+-- Does not Equal:
+--   fromList
+--   [ MkEventPath
+--       { path = TestPath { id = 0 , title = "0.0.Test #0" }
+--       , nodeType = Test
+--       }
+--   ]
+-- )
+unit_basic_each_before :: IO ()
+unit_basic_each_before =
+    runTest
+    defaultSeed
+    (ThreadCount 1)
+    [ EachBefore
+        { eachSpec = T.All { spec = Spec { delay = 0 , directive = Pass } }
+        , subNodes =
+            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
+        }
+    ] 

@@ -7,14 +7,13 @@ import Chronos (Time, now)
 import Core (DataSource (ItemList))
 import Core qualified
 import CoreUtils (Hz (..), ThreadId)
-import DSL.Internal.NodeLog (Path (TestPath))
 import DSL.Internal.NodeLog qualified as AE
 import Data.Aeson (ToJSON)
 import Data.Hashable qualified as H
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import FullSuiteTestTemplate (Directive, EventPath (..), NSpec (PassProb), Spec (..), SpecGen (..), isPreload, testEventPath)
+import FullSuiteTestTemplate (Directive, EventPath (..), NSpec (PassProb), Spec (..), SpecGen (..), isPreload)
 import FullSuiteTestTemplate qualified as T
 import Internal.LogQueries
   ( getHookInfo,
@@ -50,7 +49,7 @@ import Internal.Logging as L
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
-import PyrethrumExtras (ConvertString, onError, toS, txt, uu, (?))
+import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
 import PyrethrumExtras qualified as PE
 import PyrethrumExtras.Test (chk')
 import System.Random.Stateful qualified as RS
@@ -61,7 +60,6 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
-import BasePrelude (foldl1')
 
 defaultSeed :: Int
 defaultSeed = 13579
@@ -362,15 +360,78 @@ chkResults baseSeed threadLimit ts lgs =
         allResults = actualResults <$> threadedLogs False lgs
 
     expectedResults :: Map EventPath ExpectedResult
-    expectedResults = uu
+    expectedResults =
+      foldl' M.union M.empty $ (.resultMap) . expectedResults' initAccum <$> ts
+      where
+        initAccum = Accum False (All Pass) M.empty
 
     expectedResults' :: ResultAccum -> T.Template -> ResultAccum
-    expectedResults' Accum {poisoned, parentResult, resultMap} template = 
-      nxtResult
+    expectedResults' Accum {poisoned, parentResult, resultMap} template =
+      case template of
+        T.OnceBefore {spec} ->
+          let (nxtPoisoned, nxtParentResult) = singleSpecToExpected spec
+              nxtMap = M.insert (MkEventPath template.path (Hook Once Before)) nxtParentResult resultMap
+           in Accum nxtPoisoned nxtParentResult nxtMap
+        T.OnceAfter {spec} ->
+          let (_nxtPoisoned, nxtParentResult) = singleSpecToExpected spec
+              nxtMap = M.insert (MkEventPath template.path (Hook Once After)) nxtParentResult resultMap
+           in -- because happens after we just pass through poisoned parentResult
+              Accum poisoned parentResult nxtMap
+        T.OnceAround {setupSpec, teardownSpec} ->
+          let -- create nxt result from setup
+              (nxtPoisoned, nxtParentResult) = singleSpecToExpected setupSpec
+              nxtMap' = M.insert (MkEventPath template.path $ Hook Once Setup) nxtParentResult resultMap
+              -- teardown depends on result of setup
+              (_tdPoisoned, tdResult) = specToExpected baseSeed 1 (nxtPoisoned, nxtParentResult) $ T.All teardownSpec
+              nxtMap = M.insert (MkEventPath template.path $ Hook Once Teardown) tdResult nxtMap'
+           in Accum nxtPoisoned nxtParentResult nxtMap
+        T.ThreadBefore {threadSpec} ->
+          let (nxtPoisoned, nxtParentResult) = specToExpected' threadSpec
+              nxtMap = M.insert (MkEventPath template.path (Hook Thread Before)) nxtParentResult resultMap
+           in Accum nxtPoisoned nxtParentResult nxtMap
+        T.ThreadAfter {threadSpec} ->
+          let (_nxtPoisoned, nxtParentResult) = specToExpected' threadSpec
+              nxtMap = M.insert (MkEventPath template.path (Hook Thread After)) nxtParentResult resultMap
+           in -- because happens after we just pass through poisoned parentResult
+              Accum poisoned parentResult nxtMap
+        T.ThreadAround {setupThreadSpec, teardownThreadSpec} ->
+          let -- create nxt result from setup
+              (nxtPoisoned, nxtParentResult) = specToExpected' setupThreadSpec
+              nxtMap' = M.insert (MkEventPath template.path $ Hook Once Setup) nxtParentResult resultMap
+              -- teardown depends on result of setup
+              (_tdPoisoned, tdResult) = specToExpected baseSeed instanceCount (nxtPoisoned, nxtParentResult) teardownThreadSpec
+              nxtMap = M.insert (MkEventPath template.path $ Hook Once Teardown) tdResult nxtMap'
+           in Accum nxtPoisoned nxtParentResult nxtMap
+        T.EachBefore {eachSpec} ->
+          let (nxtPoisoned, nxtParentResult) = specToExpected' eachSpec
+              nxtMap = M.insert (MkEventPath template.path (Hook Each Before)) nxtParentResult resultMap
+           in Accum nxtPoisoned nxtParentResult nxtMap
+        T.EachAfter {eachSpec} ->
+          let (_nxtPoisoned, nxtParentResult) = specToExpected' eachSpec
+              nxtMap = M.insert (MkEventPath template.path (Hook Each After)) nxtParentResult resultMap
+           in -- because happens after we just pass through poisoned parentResult
+              Accum poisoned parentResult nxtMap
+        T.EachAround {eachSetupSpec, eachTeardownSpec} ->
+          let -- create nxt result from setup
+              (nxtPoisoned, nxtParentResult) = specToExpected' eachSetupSpec
+              nxtMap' = M.insert (MkEventPath template.path $ Hook Each Setup) nxtParentResult resultMap
+              -- teardown depends on result of setup
+              (_tdPoisoned, tdResult) = specToExpected baseSeed instanceCount (nxtPoisoned, nxtParentResult) eachTeardownSpec
+              nxtMap = M.insert (MkEventPath template.path $ Hook Each Teardown) tdResult nxtMap'
+           in Accum nxtPoisoned nxtParentResult nxtMap
+        T.Fixture {tests} ->
+          let addTest m ti@T.TestItem {spec} =
+                let (_poisend, rslt) = singleSpecToExpected spec
+                 in M.insert (MkEventPath (T.testItemPath ti) Test) rslt m
+              -- assuming fixture templates are non-empty
+              nxtMap = foldl' addTest resultMap tests
+           in -- at te end of the branch here so just pass on poisoned and parentResult
+              -- they wont be used anyway
+              Accum poisoned parentResult nxtMap
       where
-        thrdCount = threadLimit.maxThreads 
+        thrdCount = threadLimit.maxThreads
         tstCount = T.countTests template
-        instanceCount = 
+        instanceCount =
           case template of
             -- once hooks produce one result
             T.OnceBefore {} -> 1
@@ -388,93 +449,6 @@ chkResults baseSeed threadLimit ts lgs =
             T.Fixture {} -> 1
         specToExpected' = specToExpected baseSeed instanceCount (poisoned, parentResult)
         singleSpecToExpected = specToExpected' . T.All
-        
-        -- catMaybes (MkEventPath t.path <<$>> [templateBeforeNodeType t, templateAfterNodeType t])
-        
-        nxtResult :: ResultAccum
-        nxtResult = 
-          case template of
-            T.OnceBefore {spec} -> 
-              let 
-                (nxtPoisoned, nxtParentResult) = singleSpecToExpected spec
-                nxtMap = M.insert (MkEventPath template.path (Hook Once Before)) nxtParentResult resultMap 
-              in 
-                Accum nxtPoisoned nxtParentResult nxtMap
-            T.OnceAfter {spec} -> 
-               let 
-                (_nxtPoisoned, nxtParentResult) = singleSpecToExpected spec
-                nxtMap = M.insert (MkEventPath template.path (Hook Once After)) nxtParentResult resultMap 
-              in 
-                -- because happens after we just pass through poisoned parentResult 
-                Accum poisoned parentResult nxtMap
-            T.OnceAround {setupSpec, teardownSpec} -> 
-              let
-                -- create nxt result from setup 
-                (nxtPoisoned, nxtParentResult) = singleSpecToExpected setupSpec
-                nxtMap' = M.insert (MkEventPath template.path $ Hook Once Setup) nxtParentResult resultMap 
-                -- teardown depends on result of setup
-                (_tdPoisoned, tdResult) = specToExpected baseSeed 1 (nxtPoisoned, nxtParentResult) $ T.All teardownSpec
-                nxtMap = M.insert (MkEventPath template.path $ Hook Once Teardown) tdResult nxtMap' 
-              in
-                Accum nxtPoisoned nxtParentResult nxtMap
-            T.ThreadBefore {threadSpec} -> 
-              let 
-                (nxtPoisoned, nxtParentResult) = specToExpected' threadSpec
-                nxtMap = M.insert (MkEventPath template.path (Hook Thread Before)) nxtParentResult resultMap 
-              in 
-                Accum nxtPoisoned nxtParentResult nxtMap
-            T.ThreadAfter {threadSpec} ->
-              let 
-                (_nxtPoisoned, nxtParentResult) = specToExpected' threadSpec
-                nxtMap = M.insert (MkEventPath template.path (Hook Thread After)) nxtParentResult resultMap 
-              in 
-                -- because happens after we just pass through poisoned parentResult 
-                Accum poisoned parentResult nxtMap
-            T.ThreadAround {setupThreadSpec, teardownThreadSpec} -> 
-               let
-                -- create nxt result from setup 
-                (nxtPoisoned, nxtParentResult) = specToExpected' setupThreadSpec
-                nxtMap' = M.insert (MkEventPath template.path $ Hook Once Setup) nxtParentResult resultMap 
-                -- teardown depends on result of setup
-                (_tdPoisoned, tdResult) = specToExpected baseSeed instanceCount (nxtPoisoned, nxtParentResult) teardownThreadSpec
-                nxtMap = M.insert (MkEventPath template.path $ Hook Once Teardown) tdResult nxtMap' 
-              in
-                Accum nxtPoisoned nxtParentResult nxtMap
-            T.EachBefore {eachSpec} ->
-              let 
-                (nxtPoisoned, nxtParentResult) = specToExpected' eachSpec
-                nxtMap = M.insert (MkEventPath template.path (Hook Each Before)) nxtParentResult resultMap 
-              in 
-                Accum nxtPoisoned nxtParentResult nxtMap
-            T.EachAfter {eachSpec} -> 
-              let 
-                (_nxtPoisoned, nxtParentResult) = specToExpected' eachSpec
-                nxtMap = M.insert (MkEventPath template.path (Hook Each After)) nxtParentResult resultMap 
-              in 
-                -- because happens after we just pass through poisoned parentResult 
-                Accum poisoned parentResult nxtMap
-            T.EachAround {eachSetupSpec, eachTeardownSpec} -> 
-               let
-                -- create nxt result from setup 
-                (nxtPoisoned, nxtParentResult) = specToExpected' eachSetupSpec
-                nxtMap' = M.insert (MkEventPath template.path $ Hook Each Setup) nxtParentResult resultMap 
-                -- teardown depends on result of setup
-                (_tdPoisoned, tdResult) = specToExpected baseSeed instanceCount (nxtPoisoned, nxtParentResult) eachTeardownSpec
-                nxtMap = M.insert (MkEventPath template.path $ Hook Each Teardown) tdResult nxtMap' 
-               in
-                Accum nxtPoisoned nxtParentResult nxtMap
-            T.Fixture {tests} -> let 
-              addTest m ti@T.TestItem {spec} = 
-                let 
-                  (_poisend, rslt) = singleSpecToExpected spec
-                in
-                  M.insert (MkEventPath (T.testItemPath ti) Test) rslt m
-              -- assuming fixture templates are non-empty
-              nxtMap = foldl' addTest resultMap tests
-              in
-                -- at te end of the branch here so just pass on poisoned and parentResult
-                -- they wont be used anyway
-                Accum poisoned parentResult nxtMap
 
 specToExpected :: Int -> Int -> (Bool, ExpectedResult) -> NSpec -> (Bool, ExpectedResult)
 specToExpected
@@ -509,11 +483,11 @@ specToExpected
       -- spec to fail if the parent is PassThroughFail
       NResult {} -> (False, NonDeterministic)
 
-data ResultAccum = Accum {
-  poisoned :: Bool,
-  parentResult :: ExpectedResult,
-  resultMap :: Map EventPath ExpectedResult
-}
+data ResultAccum = Accum
+  { poisoned :: Bool,
+    parentResult :: ExpectedResult,
+    resultMap :: Map EventPath ExpectedResult
+  }
 
 directiveToLogResult :: Bool -> Directive -> LogResult
 directiveToLogResult poisoned directive =

@@ -61,8 +61,7 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
-import GHC.Base (BCO)
-import GHC.Conc (setUncaughtExceptionHandler)
+import BasePrelude (foldl1')
 
 defaultSeed :: Int
 defaultSeed = 13579
@@ -367,12 +366,12 @@ chkResults baseSeed threadLimit ts lgs =
 
     expectedResults' :: ResultAccum -> T.Template -> ResultAccum
     expectedResults' Accum {poisoned, parentResult, resultMap} template = 
-      uu
+      nxtResult
       where
         thrdCount = threadLimit.maxThreads 
         tstCount = T.countTests template
         instanceCount = 
-          case template 
+          case template of
             -- once hooks produce one result
             T.OnceBefore {} -> 1
             T.OnceAfter {} -> 1
@@ -447,9 +446,9 @@ chkResults baseSeed threadLimit ts lgs =
                 nxtMap = M.insert (MkEventPath template.path (Hook Each Before)) nxtParentResult resultMap 
               in 
                 Accum nxtPoisoned nxtParentResult nxtMap
-            T.EachAfter {} -> 
+            T.EachAfter {eachSpec} -> 
               let 
-                (_nxtPoisoned, nxtParentResult) = specToExpected' threadSpec
+                (_nxtPoisoned, nxtParentResult) = specToExpected' eachSpec
                 nxtMap = M.insert (MkEventPath template.path (Hook Each After)) nxtParentResult resultMap 
               in 
                 -- because happens after we just pass through poisoned parentResult 
@@ -464,8 +463,18 @@ chkResults baseSeed threadLimit ts lgs =
                 nxtMap = M.insert (MkEventPath template.path $ Hook Each Teardown) tdResult nxtMap' 
                in
                 Accum nxtPoisoned nxtParentResult nxtMap
-            T.Fixture {tests, path} -> let 
-              addTest m ti@TesItem {spec} -> singleSpecToExpected 
+            T.Fixture {tests} -> let 
+              addTest m ti@T.TestItem {spec} = 
+                let 
+                  (_poisend, rslt) = singleSpecToExpected spec
+                in
+                  M.insert (MkEventPath (T.testItemPath ti) Test) rslt m
+              -- assuming fixture templates are non-empty
+              nxtMap = foldl' addTest resultMap tests
+              in
+                -- at te end of the branch here so just pass on poisoned and parentResult
+                -- they wont be used anyway
+                Accum poisoned parentResult nxtMap
 
 specToExpected :: Int -> Int -> (Bool, ExpectedResult) -> NSpec -> (Bool, ExpectedResult)
 specToExpected

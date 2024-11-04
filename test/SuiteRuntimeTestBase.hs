@@ -366,7 +366,7 @@ chkResults baseSeed threadLimit ts lgs =
 
     expectedResults :: Map EventPath ExpectedResult
     expectedResults =
-      foldl' M.union M.empty $ expectedResultsRecursive' initAccum <$> ts
+      db "expectedResults" $ foldl' M.union M.empty $ expectedResultsRecursive' initAccum <$> ts
       where
         initAccum = Accum False (All Pass) M.empty
 
@@ -390,7 +390,8 @@ chkResults baseSeed threadLimit ts lgs =
               nxtMap = M.insert (MkEventPath template.path (Hook Once Before)) nxtParentResult resultMap
            in Accum nxtPoisoned nxtParentResult nxtMap
         T.OnceAfter {spec} ->
-          let (_nxtPoisoned, nxtParentResult) = singleSpecToExpected spec
+          -- after hooks run independently of parent so use our specToExpected but fake a successful parent
+          let (_nxtPoisoned, nxtParentResult) = specToExpected template.path baseSeed instanceCount (False, All Pass) (T.All spec)
               nxtMap = M.insert (MkEventPath template.path (Hook Once After)) nxtParentResult resultMap
            in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
@@ -407,7 +408,8 @@ chkResults baseSeed threadLimit ts lgs =
               nxtMap = M.insert (MkEventPath template.path (Hook Thread Before)) nxtParentResult resultMap
            in Accum nxtPoisoned nxtParentResult nxtMap
         T.ThreadAfter {threadSpec} ->
-          let (_nxtPoisoned, nxtParentResult) = specToExpected' threadSpec
+          -- after hooks run independently of parent so use our specToExpected but fake a successful parent
+          let (_nxtPoisoned, nxtParentResult) = specToExpected template.path baseSeed instanceCount (False, All Pass) threadSpec
               nxtMap = M.insert (MkEventPath template.path (Hook Thread After)) nxtParentResult resultMap
            in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
@@ -424,7 +426,8 @@ chkResults baseSeed threadLimit ts lgs =
               nxtMap = M.insert (MkEventPath template.path (Hook Each Before)) nxtParentResult resultMap
            in Accum nxtPoisoned nxtParentResult nxtMap
         T.EachAfter {eachSpec} ->
-          let (_nxtPoisoned, nxtParentResult) = specToExpected' eachSpec
+          -- after hooks run independently of parent so use our specToExpected but fake a successful parent
+          let (_nxtPoisoned, nxtParentResult) = specToExpected template.path baseSeed instanceCount (False, All Pass) eachSpec
               nxtMap = M.insert (MkEventPath template.path (Hook Each After)) nxtParentResult resultMap
            in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
@@ -1365,7 +1368,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                     P.After
                       { path,
                         frequency = Each,
-                        after = const . mknTeardownAction baseSeed afterQ path eachSpec $ DummyHkResult 0,
+                        after = const . mknAfterAction baseSeed afterQ path eachSpec $ DummyHkResult 0,
                         subNodes' = nds
                       }
             T.EachAround
@@ -1408,7 +1411,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                       P.After
                         { path,
                           frequency = Thread,
-                          after = const . mknTeardownAction baseSeed afterQ path threadSpec $ DummyHkResult 0,
+                          after = const . mknAfterAction baseSeed afterQ path threadSpec $ DummyHkResult 0,
                           subNodes' = nds
                         }
               T.ThreadAround

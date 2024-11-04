@@ -409,10 +409,10 @@ chkResults baseSeed threadLimit ts lgs =
         T.ThreadAround {setupThreadSpec, teardownThreadSpec, path} ->
           let -- create nxt result from setup
               (nxtPoisoned, nxtParentResult) = specToExpected' setupThreadSpec
-              nxtMap' = M.insert (MkEventPath template.path $ Hook Once Setup) nxtParentResult resultMap
+              nxtMap' = M.insert (MkEventPath template.path $ Hook Thread Setup) nxtParentResult resultMap
               -- teardown depends on result of setup
               (_tdPoisoned, tdResult) = specToExpected path baseSeed instanceCount (nxtPoisoned, nxtParentResult) teardownThreadSpec
-              nxtMap = M.insert (MkEventPath template.path $ Hook Once Teardown) tdResult nxtMap'
+              nxtMap = M.insert (MkEventPath template.path $ Hook Thread Teardown) tdResult nxtMap'
            in Accum nxtPoisoned nxtParentResult nxtMap
         T.EachBefore {eachSpec} ->
           let (nxtPoisoned, nxtParentResult) = specToExpected' eachSpec

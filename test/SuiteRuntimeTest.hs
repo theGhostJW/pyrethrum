@@ -583,7 +583,6 @@ unit_basic_each_before =
 -- >>> unit_another_broken_test
 unit_another_broken_test :: IO ()
 unit_another_broken_test =
-  replicateM_ 10 $
     runTest'
     NoLog
     defaultSeed
@@ -619,6 +618,39 @@ unit_another_broken_test =
                             ]
                         }
                     , Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] }
+                    ]
+                }
+            ]
+        }
+    ] 
+
+
+-- $ > unit_and_another_broken_test
+unit_and_another_broken_test :: IO ()
+unit_and_another_broken_test =
+    runTest'
+    NoLog
+    defaultSeed
+    (ThreadCount 1)
+    [ OnceBefore
+        { spec = Spec { delay = 0 , directive = Pass }
+        , subNodes =
+            [ OnceAfter
+                { spec = Spec { delay = 0 , directive = Pass }
+                , subNodes =
+                    [ ThreadBefore
+                        { threadSpec = T.All { spec = Spec { delay = 0 , directive = Pass } }
+                        , subNodes =
+                            [ ThreadAround
+                                { setupThreadSpec =
+                                    T.All { spec = Spec { delay = 0 , directive = Pass } }
+                                , teardownThreadSpec =
+                                    T.All { spec = Spec { delay = 0 , directive = Pass } }
+                                , subNodes =
+                                    [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
+                                }
+                            ]
+                        }
                     ]
                 }
             ]

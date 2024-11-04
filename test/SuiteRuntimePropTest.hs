@@ -202,7 +202,7 @@ runProp isShrinking testName o p =
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
 
--- $> test_suite_preload
+-- $ > test_suite_preload
 test_suite_preload :: IO ()
 test_suite_preload = do
   -- need a separate shrinkState for every test group
@@ -211,7 +211,6 @@ test_suite_preload = do
     testGroup "PreLoad" [runProp shrinkState "Preload" testOpts defParams {genStrategy = Preload}]
 
 -- $ > test_suite_runtime
-
 test_suite_runtime :: IO ()
 test_suite_runtime = do
   -- need a separate shrinkState for every test group

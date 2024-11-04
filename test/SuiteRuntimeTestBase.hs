@@ -49,7 +49,7 @@ import Internal.Logging as L
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
-import PyrethrumExtras (ConvertString, onError, toS, txt, (?), db)
+import PyrethrumExtras (ConvertString, onError, toS, txt, (?), db, uu)
 import PyrethrumExtras qualified as PE
 import PyrethrumExtras.Test (chk')
 import System.Random.Stateful qualified as RS
@@ -298,7 +298,7 @@ chkResults baseSeed threadLimit ts lgs =
     -- fail missing expected results or different to expected
     chkResults'
     -- fail extra results
-    let extrActual = M.keysSet actuals S.\\ M.keysSet (db "Expected" $ expectedResults)
+    let extrActual = M.keysSet actuals S.\\ M.keysSet expectedResults
     chkEq' "Extra results found in actual that are not expected" S.empty extrActual
   where
     chkResults' :: IO ()
@@ -361,20 +361,21 @@ chkResults baseSeed threadLimit ts lgs =
 
     expectedResults :: Map EventPath ExpectedResult
     expectedResults =
-      foldl' M.union M.empty $ (.resultMap) . expectedResultsRecursive' initAccum <$> ts
+      foldl' M.union M.empty $ expectedResultsRecursive' initAccum <$> ts
       where
         initAccum = Accum False (All Pass) M.empty
 
-    expectedResultsRecursive' :: ResultAccum -> T.Template -> ResultAccum
-    expectedResultsRecursive' accum = 
+    expectedResultsRecursive' :: ResultAccum -> T.Template -> Map EventPath ExpectedResult
+    expectedResultsRecursive' accum template = 
       let 
-        thisResult = expectedResults' accum
+        thisResult = expectedResults' accum template
       in 
-        \case 
-         T.OnceBefore _ _ _
-         T.OnceAfter _ _ _
-         T.OnceAround _ _ _ _
-         T.ThreadBefore _ _ _
+        case template  of
+         T.Fixture {} -> thisResult.resultMap
+         node -> 
+          foldl' M.union M.empty $ expectedResultsRecursive' thisResult <$> node.subNodes
+        
+
 
     expectedResults' :: ResultAccum -> T.Template -> ResultAccum
     expectedResults' Accum {poisoned, parentResult, resultMap} template =
@@ -388,12 +389,12 @@ chkResults baseSeed threadLimit ts lgs =
               nxtMap = M.insert (MkEventPath template.path (Hook Once After)) nxtParentResult resultMap
            in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
-        T.OnceAround {setupSpec, teardownSpec} ->
+        T.OnceAround {setupSpec, teardownSpec, path} ->
           let -- create nxt result from setup
               (nxtPoisoned, nxtParentResult) = singleSpecToExpected setupSpec
               nxtMap' = M.insert (MkEventPath template.path $ Hook Once Setup) nxtParentResult resultMap
               -- teardown depends on result of setup
-              (_tdPoisoned, tdResult) = specToExpected baseSeed 1 (nxtPoisoned, nxtParentResult) $ T.All teardownSpec
+              (_tdPoisoned, tdResult) = specToExpected path baseSeed 1 (nxtPoisoned, nxtParentResult) $ T.All teardownSpec
               nxtMap = M.insert (MkEventPath template.path $ Hook Once Teardown) tdResult nxtMap'
            in Accum nxtPoisoned nxtParentResult nxtMap
         T.ThreadBefore {threadSpec} ->
@@ -405,12 +406,12 @@ chkResults baseSeed threadLimit ts lgs =
               nxtMap = M.insert (MkEventPath template.path (Hook Thread After)) nxtParentResult resultMap
            in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
-        T.ThreadAround {setupThreadSpec, teardownThreadSpec} ->
+        T.ThreadAround {setupThreadSpec, teardownThreadSpec, path} ->
           let -- create nxt result from setup
               (nxtPoisoned, nxtParentResult) = specToExpected' setupThreadSpec
               nxtMap' = M.insert (MkEventPath template.path $ Hook Once Setup) nxtParentResult resultMap
               -- teardown depends on result of setup
-              (_tdPoisoned, tdResult) = specToExpected baseSeed instanceCount (nxtPoisoned, nxtParentResult) teardownThreadSpec
+              (_tdPoisoned, tdResult) = specToExpected path baseSeed instanceCount (nxtPoisoned, nxtParentResult) teardownThreadSpec
               nxtMap = M.insert (MkEventPath template.path $ Hook Once Teardown) tdResult nxtMap'
            in Accum nxtPoisoned nxtParentResult nxtMap
         T.EachBefore {eachSpec} ->
@@ -422,12 +423,12 @@ chkResults baseSeed threadLimit ts lgs =
               nxtMap = M.insert (MkEventPath template.path (Hook Each After)) nxtParentResult resultMap
            in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
-        T.EachAround {eachSetupSpec, eachTeardownSpec} ->
+        T.EachAround {eachSetupSpec, eachTeardownSpec, path} ->
           let -- create nxt result from setup
               (nxtPoisoned, nxtParentResult) = specToExpected' eachSetupSpec
               nxtMap' = M.insert (MkEventPath template.path $ Hook Each Setup) nxtParentResult resultMap
               -- teardown depends on result of setup
-              (_tdPoisoned, tdResult) = specToExpected baseSeed instanceCount (nxtPoisoned, nxtParentResult) eachTeardownSpec
+              (_tdPoisoned, tdResult) = specToExpected path baseSeed instanceCount (nxtPoisoned, nxtParentResult) eachTeardownSpec
               nxtMap = M.insert (MkEventPath template.path $ Hook Each Teardown) tdResult nxtMap'
            in Accum nxtPoisoned nxtParentResult nxtMap
         T.Fixture {tests} ->
@@ -436,7 +437,7 @@ chkResults baseSeed threadLimit ts lgs =
                  in M.insert (MkEventPath (T.testItemPath ti) Test) rslt m
               -- assuming fixture templates are non-empty
               nxtMap = foldl' addTest resultMap tests
-           in -- at te end of the branch here so just pass on poisoned and parentResult
+           in -- at the end of the branch here so just pass on poisoned and parentResult
               -- they wont be used anyway
               Accum poisoned parentResult nxtMap
       where
@@ -458,11 +459,12 @@ chkResults baseSeed threadLimit ts lgs =
             T.EachAround {} -> tstCount
             -- with fixtures each test spec is mapped individually
             T.Fixture {} -> 1
-        specToExpected' = specToExpected baseSeed instanceCount (poisoned, parentResult)
+        specToExpected' = specToExpected template.path baseSeed instanceCount (poisoned, parentResult)
         singleSpecToExpected = specToExpected' . T.All
 
-specToExpected :: Int -> Int -> (Bool, ExpectedResult) -> NSpec -> (Bool, ExpectedResult)
+specToExpected :: AE.Path -> Int -> Int -> (Bool, ExpectedResult) -> NSpec -> (Bool, ExpectedResult)
 specToExpected
+  path
   baseSeed
   resultInstanceCount -- thread nodes and fixtures have more than one expected result per fixture
   (poisoned, parentResult)
@@ -483,7 +485,7 @@ specToExpected
                   ( False,
                     NResult $
                       directiveToLogResult poisoned . (.directive)
-                        <$> generateSpecs baseSeed resultInstanceCount "path not used" passPcnt hookPassThroughErrPcnt minDelay maxDelay
+                        <$> generateSpecs baseSeed resultInstanceCount path passPcnt hookPassThroughErrPcnt minDelay maxDelay
                   )
                 T.Runtime -> (False, NonDeterministic)
         Fail -> (False, All ParentFailed)
@@ -516,85 +518,8 @@ directiveToExpected poisoned d =
 1. reinstate chkResult
 3. check generating Alls
 2. fix check propagation => expect to fail on OnceHook
-
 -}
 
-{-
-expectedResults :: Map EventPath ExpectedResult
-expectedResults = foldl' calcExpected M.empty $ ts >>= T.allEventPaths
-
-calcExpected :: Map EventPath ExpectedResult -> T.TemplatePath -> Map EventPath ExpectedResult
-calcExpected acc T.MkTemplatePath {path, nodeType, evntSpec, template} =
-  M.insert (ensureUnique key) expected acc
-  where
-    key = MkEventPath path nodeType
-    ensureUnique k =
-      M.member k acc
-        ? bug ("duplicate key should not happen. Template paths should be unique: " <> txt k)
-        $ k
-
-    expected :: ExpectedResult
-    expected =
-      case evntSpec of
-        T.All Spec {result} -> SuiteRuntimeTestBase.All result
-        PassProb {genStrategy, passPcnt, minDelay, maxDelay} ->
-          case genStrategy of
-            T.Preload -> NResult $ (.result) <$> y generateSpecs baseSeed rLength path passPcnt minDelamaxDelay
-            T.Runtime -> NonDeterministic
-          where
-            rLength = case nodeType of
-              Test {} -> bug "Test not expected to have PassProb spec"
-              Hook Once _ -> bug "Once  not expected to have PassProb spec"
-              Hook Thread _ -> threadLimit.maxThreads -- the most results we will get is the number of threads
-              Hook Each _ -> T.countTests template -- expect a result for each test item
-              -}
-
-{- NEW
-expectedResults :: SpecGen -> Int -> T.Template -> Map EventPath ExpectedResult
-expectedResults gen mxThrds =
-  expectedResults' M.empty (Hook Once Before) (Just T.Pass)
-  where
-    isPreload = gen == Preload
-
-    logResult :: NodeType -> Directive -> Directive -> LogResult
-    logResult parentNodeType parentDirective directive
-      | parentNodeType `elem` [Hook Once Before, Hook Once Setup] && parentDirective == T.PassThroughFail = ParentFailed
-      | parentDirective == T.Fail = ParentFailed
-      | parentDirective `elem` [T.PassThroughFail, T.Fail] = Fail
-      | directive `elem` [T.PassThroughFail, T.Pass] = Pass
-      | otherwise = bug "Incomplete pattern match - this should not happen"
-
-    expectedResults' :: Map EventPath ExpectedResult -> NodeType -> Maybe Directive -> T.Template -> Map EventPath ExpectedResult
-    -- parent directive of Nothing indicates parent result is NonDeterministic
-    expectedResults' accum _parentNodeType Nothing template =
-      foldl' (\a p -> M.insert p NonDeterministic a) accum $ T.allPaths template
-    expectedResults' accum parentNodeType (Just pDirective) template =
-      let mkAllResult thisDirective = All $ logResult parentNodeType pDirective thisDirective
-       in case template of
-            T.Fixture {tests} ->
-              foldl' (\a t -> M.insert (testEventPath t) (mkAllResult t.spec.directive) a) accum tests
-            T.OnceBefore {spec, subNodes, path} ->
-              let thisDir = spec.directive
-                  acc' = M.insert (MkEventPath path (Hook Once Before)) (mkAllResult thisDir) accum
-               in foldl' (\a t -> expectedResults' a (Hook Once Before) (Just thisDir) t) acc' subNodes
-            T.OnceAround
-              { setupSpec,
-                teardownSpec,
-                subNodes,
-                path
-              } ->
-                let acc' =
-                      M.insert (MkEventPath path (Hook Once Teardown)) (mkAllResult setupSpec.directive) $
-                        M.insert (MkEventPath path (Hook Once Setup)) (mkAllResult teardownSpec.directive) accum
-                 in foldl' (\a t -> expectedResults' a (Hook Once Setup) (Just setupSpec.directive) t) acc' subNodes
-            T.ThreadBefore {threadSpec, path} ->
-              let thisDir = threadSpec
-                  acc' = M.insert (MkEventPath path (Hook Thread Before)) (mkAllResult thisDir) accum
-               in foldl' (\a t -> expectedResults' a (Hook Thread Before) (Just thisDir) t) acc' subNodes
---       mkEvnt Thread Before threadSpec : recurse
-            _ -> uu
-
--}
 chkFailurePropagation :: [LogItem] -> IO ()
 chkFailurePropagation lg =
   do

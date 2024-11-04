@@ -568,19 +568,6 @@ unit_thread_hook_passthrough =
     ]
 
 -- >>> unit_basic_each_before
--- *** Exception: user error (
--- Extra results found in actual that are not expected
--- equality check failed:
--- Expected:
---   fromList []
--- Does not Equal:
---   fromList
---   [ MkEventPath
---       { path = TestPath { id = 0 , title = "0.0.Test #0" }
---       , nodeType = Test
---       }
---   ]
--- )
 unit_basic_each_before :: IO ()
 unit_basic_each_before =
     runTest
@@ -590,5 +577,50 @@ unit_basic_each_before =
         { eachSpec = T.All { spec = Spec { delay = 0 , directive = Pass } }
         , subNodes =
             [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
+        }
+    ] 
+
+-- >>> unit_another_broken_test
+unit_another_broken_test :: IO ()
+unit_another_broken_test =
+  replicateM_ 10 $
+    runTest'
+    NoLog
+    defaultSeed
+    (ThreadCount 1)
+    [ EachAfter
+        { eachSpec = T.All { spec = Spec { delay = 0 , directive = Pass } }
+        , subNodes =
+            [ EachAfter
+                { eachSpec =
+                    T.PassProb
+                      { genStrategy = Preload
+                      , passPcnt = 90
+                      , hookPassThroughErrPcnt = 2
+                      , minDelay = 0
+                      , maxDelay = 0
+                      }
+                , subNodes =
+                    [ Fixture
+                        { tests =
+                            [ Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            ]
+                        }
+                    , Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] }
+                    ]
+                }
+            ]
         }
     ] 

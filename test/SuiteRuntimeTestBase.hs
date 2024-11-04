@@ -281,7 +281,7 @@ defects found in testing::
 
  - property testing
   - test function error causing tests to fail even though suite results were correct
-    specifically - mkNAction implementations flipped for construcots
+    specifically - mknAction implementations flipped for construcots
     - T.All s -> had implementation meant for PassProb
     - PassProb -> had implementation meant for All
     - https://github.com/theGhostJW/pyrethrum/commit/ef50961
@@ -1191,9 +1191,13 @@ mkManySpec
           pcntMod < passPcnt' + passThuFailPcnt ? T.PassThroughFail $
             T.Fail
 
+-- used for after actions which donety use the input hook value
+mknAction' :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> NSpec -> DummyHkResult -> IO DummyHkResult
+mknAction' baseSeed q pth ns _ds = mknAction baseSeed q pth ns $ DummyHkResult 0
+
 -- assumes th queue is preloaded (ie loadQIfPrload has already been run) if genStrategy == Preload
-mkNAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> NSpec -> DummyHkResult -> IO DummyHkResult
-mkNAction baseSeed q pth ns ds = ns & \case
+mknAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> NSpec -> DummyHkResult -> IO DummyHkResult
+mknAction baseSeed q pth ns ds = ns & \case
   T.All s -> mkActionBase pth s ds
   PassProb
     { genStrategy,
@@ -1224,8 +1228,11 @@ mkNAction baseSeed q pth ns ds = ns & \case
 mkAction :: forall pth. (Show pth) => pth -> Spec -> P.LogSink -> DummyHkResult -> IO DummyHkResult
 mkAction path spec _sink = mkActionBase path spec
 
-mkNAfterAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> NSpec -> DummyHkResult -> IO ()
-mkNAfterAction baseSeed q pth ms = void . mkNAction baseSeed q pth ms
+mknTeardownAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> NSpec -> DummyHkResult -> IO ()
+mknTeardownAction baseSeed q pth ms = void . mknAction baseSeed q pth ms
+
+mknAfterAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> NSpec -> DummyHkResult -> IO ()
+mknAfterAction baseSeed q pth ms = void . mknAction' baseSeed q pth ms
 
 mkQueAction :: forall path. (Show path) => TQueue Spec -> path -> DummyHkResult -> IO DummyHkResult
 mkQueAction q path dr =
@@ -1345,7 +1352,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                     P.Before
                       { path,
                         frequency = Each,
-                        action = const $ mkNAction baseSeed b4Q path eachSpec,
+                        action = const $ mknAction baseSeed b4Q path eachSpec,
                         subNodes = nds
                       }
             T.EachAfter
@@ -1358,7 +1365,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                     P.After
                       { path,
                         frequency = Each,
-                        after = const . mkNAfterAction baseSeed afterQ path eachSpec $ DummyHkResult 0,
+                        after = const . mknTeardownAction baseSeed afterQ path eachSpec $ DummyHkResult 0,
                         subNodes' = nds
                       }
             T.EachAround
@@ -1373,8 +1380,8 @@ mkNodes baseSeed mxThreads = mapM mkNode
                     P.Around
                       { path,
                         frequency = Each,
-                        setup = const $ mkNAction baseSeed b4Q path eachSetupSpec,
-                        teardown = const $ mkNAfterAction baseSeed afterQ path eachTeardownSpec,
+                        setup = const $ mknAction baseSeed b4Q path eachSetupSpec,
+                        teardown = const $ mknTeardownAction baseSeed afterQ path eachTeardownSpec,
                         subNodes = nds
                       }
             _ -> case t of
@@ -1388,7 +1395,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                       P.Before
                         { path,
                           frequency = Thread,
-                          action = const $ mkNAction baseSeed b4Q path threadSpec,
+                          action = const $ mknAction baseSeed b4Q path threadSpec,
                           subNodes = nds
                         }
               T.ThreadAfter
@@ -1401,7 +1408,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
                       P.After
                         { path,
                           frequency = Thread,
-                          after = const . mkNAfterAction baseSeed afterQ path threadSpec $ DummyHkResult 0,
+                          after = const . mknTeardownAction baseSeed afterQ path threadSpec $ DummyHkResult 0,
                           subNodes' = nds
                         }
               T.ThreadAround
@@ -1415,8 +1422,8 @@ mkNodes baseSeed mxThreads = mapM mkNode
                     P.Around
                       { path,
                         frequency = Thread,
-                        setup = const $ mkNAction baseSeed b4Q path setupThreadSpec,
-                        teardown = const $ mkNAfterAction baseSeed afterQ path teardownThreadSpec,
+                        setup = const $ mknAction baseSeed b4Q path setupThreadSpec,
+                        teardown = const $ mknTeardownAction baseSeed afterQ path teardownThreadSpec,
                         subNodes = nds
                       }
 

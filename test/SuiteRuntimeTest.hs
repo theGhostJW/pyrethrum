@@ -246,7 +246,7 @@ unit_pass_prob_no_pregen = passProbSuite Runtime
 
 {-
   property test revealed incorrect template transformation due to
-  selectors being flipped when genrating action (mkNAction)
+  selectors being flipped when genrating action (mknAction)
   intermittent - hence replicate n
 
   Commit:        ef509617ef3bf4762e2a3215d192cf3ebab873ca
@@ -679,6 +679,41 @@ unit_and_one_more_broken_test =
                             T.All { spec = Spec { delay = 0 , directive = Pass } }
                         , subNodes =
                             [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ] 
+
+-- >>> unit_and_here_is_another_broken_test
+unit_and_here_is_another_broken_test :: IO ()
+unit_and_here_is_another_broken_test =
+    runTest'
+    Log
+    defaultSeed
+    (ThreadCount 1)
+    [ ThreadAround
+        { setupThreadSpec =
+            T.All { spec = Spec { delay = 0 , directive = Pass } }
+        , teardownThreadSpec =
+            T.All { spec = Spec { delay = 0 , directive = Pass } }
+        , subNodes =
+            [ ThreadAfter
+                { threadSpec = T.All { spec = Spec { delay = 0 , directive = Pass } }
+                , subNodes =
+                    [ EachAround
+                        { eachSetupSpec =
+                            T.All { spec = Spec { delay = 0 , directive = PassThroughFail } }
+                        , eachTeardownSpec =
+                            T.All { spec = Spec { delay = 0 , directive = Pass } }
+                        , subNodes =
+                            [ EachAfter
+                                { eachSpec = T.All { spec = Spec { delay = 0 , directive = Pass } }
+                                , subNodes =
+                                    [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
+                                }
+                            ]
                         }
                     ]
                 }

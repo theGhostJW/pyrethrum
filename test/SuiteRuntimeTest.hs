@@ -246,7 +246,7 @@ unit_pass_prob_no_pregen = passProbSuite Runtime
 
 {-
   property test revealed incorrect template transformation due to
-  selectors being flipped when genrating action (mkManyAction)
+  selectors being flipped when genrating action (mkNAction)
   intermittent - hence replicate n
 
   Commit:        ef509617ef3bf4762e2a3215d192cf3ebab873ca
@@ -650,6 +650,35 @@ unit_and_another_broken_test =
                                     [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
                                 }
                             ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ] 
+
+
+-- >>> unit_and_one_more_broken_test
+unit_and_one_more_broken_test :: IO ()
+unit_and_one_more_broken_test =
+    runTest'
+    Log
+    defaultSeed
+    (ThreadCount 1)
+    [ OnceAround
+        { setupSpec = Spec { delay = 0 , directive = Pass }
+        , teardownSpec = Spec { delay = 0 , directive = Pass }
+        , subNodes =
+            [ EachAfter
+                { eachSpec = T.All { spec = Spec { delay = 0 , directive = Pass } }
+                , subNodes =
+                    [ EachAround
+                        { eachSetupSpec =
+                            T.All { spec = Spec { delay = 0 , directive = PassThroughFail } }
+                        , eachTeardownSpec =
+                            T.All { spec = Spec { delay = 0 , directive = Pass } }
+                        , subNodes =
+                            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
                         }
                     ]
                 }

@@ -366,7 +366,7 @@ chkResults baseSeed threadLimit ts lgs =
 
     expectedResults :: Map EventPath ExpectedResult
     expectedResults =
-      db "expectedResults" $ foldl' M.union M.empty $ expectedResultsRecursive' initAccum <$> ts
+      foldl' M.union M.empty $ expectedResultsRecursive' initAccum <$> ts
       where
         initAccum = Accum False (All Pass) M.empty
 

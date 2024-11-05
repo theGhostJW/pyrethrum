@@ -720,3 +720,133 @@ unit_and_here_is_another_broken_test =
             ]
         }
     ] 
+
+
+-- $> unit_and_here_is_yet_another_broken_test
+unit_and_here_is_yet_another_broken_test :: IO ()
+unit_and_here_is_yet_another_broken_test =
+  replicateM_ 100 $
+    runTest'
+    LogFails
+    defaultSeed
+    (ThreadCount 10)
+    [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] }
+    , Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] }
+    , OnceAfter
+        { spec = Spec { delay = 0 , directive = Pass }
+        , subNodes =
+            [ OnceBefore
+                { spec = Spec { delay = 0 , directive = Fail }
+                , subNodes =
+                    [ OnceBefore
+                        { spec = Spec { delay = 0 , directive = Pass }
+                        , subNodes =
+                            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
+                        }
+                    ]
+                }
+            ]
+        }
+    , ThreadBefore
+        { threadSpec =
+            T.PassProb
+              { genStrategy = Preload
+              , passPcnt = 25
+              -- , passPcnt = 90
+              , hookPassThroughErrPcnt = 50
+              -- , hookPassThroughErrPcnt = 2
+              , minDelay = 0
+              , maxDelay = 0
+              }
+        , subNodes =
+            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
+        }
+    ]
+
+{-
+FAIL (16619.62s) == 4.61656111111 hrs
+    failed after 455 successful tests and 61 shrinks
+    expected /= (is right t)
+    t         : Left user error (
+    ParentFailure event does not have failure path that is a sub-path of the actual failed event:
+    Parent Failure is:
+    FaileEvent: 
+    MkLog
+      { lineInfo = MkLineInfo { threadId = 39655 , idx = 1 }
+      , event =
+          Failure
+            { nodeType = Hook Thread Before
+            , loc =
+                ExePath
+                  { un = [ NodePath { module' = "3" , path = "ThreadBefore" } ] }
+            , exception =
+                MkException
+                  { displayText =
+                      [ "\"FAIL RESULT @ NodePath { module' = \\\"3\\\" , path = \\\"ThreadBefore\\\" }\\nCallStack (from HasCallStack):\\n  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-18850aa0cfc10d47cafa50ad7aed69c175153e61bf033791a3ee88b37f89561d:Relude.Debug\\n  error, called at test/SuiteRuntimeTestBase.hs:1540:15 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTestBase\""
+                      ]
+                  }
+            }
+      }
+    
+    Child Failure is:
+    ParentFailure
+      { loc =
+          ExePath
+            { un =
+                [ NodePath { module' = "2.0.0" , path = "OnceBefore" }
+                , NodePath { module' = "2.0" , path = "OnceBefore" }
+                , NodePath { module' = "2" , path = "OnceAfter" }
+                ]
+            }
+      , nodeType = Hook Once Before
+      , failLoc =
+          ExePath
+            { un =
+                [ NodePath { module' = "2.0" , path = "OnceBefore" }
+                , NodePath { module' = "2" , path = "OnceAfter" }
+                ]
+            }
+      , failSuiteEvent = Hook Once Before
+      }
+    equality check failed:
+    Expected:
+      True
+    Does not Equal:
+      False
+    )
+    expected  : True
+    is right t: False
+    
+    Logs for failed test run:
+    generated [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] }
+    , Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] }
+    , OnceAfter
+        { spec = Spec { delay = 0 , directive = Pass }
+        , subNodes =
+            [ OnceBefore
+                { spec = Spec { delay = 0 , directive = Fail }
+                , subNodes =
+                    [ OnceBefore
+                        { spec = Spec { delay = 0 , directive = Pass }
+                        , subNodes =
+                            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
+                        }
+                    ]
+                }
+            ]
+        }
+    , ThreadBefore
+        { threadSpec =
+            PassProb
+              { genStrategy = Preload
+              , passPcnt = 90
+              , hookPassThroughErrPcnt = 2
+              , minDelay = 0
+              , maxDelay = 0
+              }
+        , subNodes =
+            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
+        }
+    ] at CallStack (from HasCallStack):
+      genWith, called at test/SuiteRuntimePropTest.hs:200:10 in pyrethrum-0.1.0.0-inplace:SuiteRuntimePropTest
+-}

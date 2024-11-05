@@ -46,6 +46,7 @@ import Internal.Logging as L
     parentPath,
     testLogActions,
     topPath,
+    evnt
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
@@ -568,33 +569,38 @@ chkParentFailsPropagated
     unless (isChildless f.failLog) $ do
       void $ foldlM chkEvent ExpectParentFail failStartTail
     where
-      isFailChildLog :: LogItem -> Bool
-      isFailChildLog = flip isFailChildEventOf failLog
-
       chkEvent :: ChkState -> LogItem -> IO ChkState
       chkEvent acc lgItm =
-        let isFailChild = isFailChildLog lgItm
+        let isFailChild = lgItm `isFailChildEventOf` failLog
+            -- if the child node is a once hook on different thread
+            -- eg failing ThreadHook => parent failed OnceHook a parent failure will have been
+            -- caused by a OnceHook failure on a different thread
+            onceChildException = lgItm.lineInfo.threadId /= failLog.lineInfo.threadId &&
+              onceHook (evnt lgItm).nodeType
          in acc
               == DoneChecking
                 ? pure DoneChecking
               $ lgItm.event
                 & \case
-                  p@ParentFailure {} ->
+                  ParentFailure {} ->
                     do
                       -- TODO fix chk' so it prettyprints properly
                       -- that is why chkEq' was used here
                       chkEq'
-                        ( "ParentFailure event does not have failure path that is a sub-path of the actual failed event:\n"
-                            <> "Parent Failure is:\n"
-                            <> "FaileEvent: \n"
+                        ( "ParentFailure (source error) path is not a sub-path of the skipped child node:\n"
+                            <> "\nParent Failure (Source Error) is:\n"
                             <> txt failLog
                             <> "\n"
                             <> "\n"
-                            <> "Child Failure is:\n"
-                            <> txt p
+                            <> "Child Failure (Skipped Node) is:\n"
+                            <> txt lgItm
+                            <> "\n"
+                            <> "\n"
+                            <> "DEBUG failStartTail:\n"
+                            <> txt failStartTail
                         )
                         True
-                        isFailChild
+                        (isFailChild || onceChildException)
                       pure ExpectParentFail
                   f'@Failure {} ->
                     -- TODO :: hide reinstate with test conversion

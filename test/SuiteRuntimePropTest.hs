@@ -166,7 +166,6 @@ defParams =
 genTemplate :: TGenParams -> Gen [Template]
 genTemplate p = G.list (between (1, p.maxBranches)) $ templateGenParams p
 
--- tryRunTest :: Logging -> ThreadCount -> [Template] -> IO (Either SomeException ())
 tryRunTest :: TVar Bool -> TGenParams -> [Template] -> IO (Either SomeException ())
 tryRunTest isShinking p suite = do
   r <- tryAny $ p.test p.logging defaultSeed p.threadCount suite

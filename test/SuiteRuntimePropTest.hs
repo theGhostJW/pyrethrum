@@ -31,6 +31,7 @@ import Test.Tasty.Falsify
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO (tryAny)
 import Prelude hiding (All, bug, id)
+import Data.Text.IO qualified as TIO
 
 -- $ > genPlay
 
@@ -159,24 +160,28 @@ defParams =
       maxDepth = 5,
       minHz = Once,
       threadCount = ThreadCount 5,
-      logging = LogFails,
+      logging = NoLog,
       test = runTest'
     }
 
 genTemplate :: TGenParams -> Gen [Template]
 genTemplate p = G.list (between (1, p.maxBranches)) $ templateGenParams p
 
-tryRunTest :: TVar Bool -> TGenParams -> [Template] -> IO (Either SomeException ())
-tryRunTest isShinking p suite = do
+
+tryRunTest :: Word -> TVar Int -> TVar Bool -> TGenParams -> [Template] -> IO (Either SomeException ())
+tryRunTest maxTests testNo isShinking p suite = do
   r <- tryAny $ p.test p.logging defaultSeed p.threadCount suite
   srk <- readTVarIO isShinking
-  let sfx = srk ? " (shrinking)" $ ""
+  i <- atomically $ modifyTVar' testNo succ >> readTVar testNo
+  let
+    prgrs = txt i <> " / " <> txt maxTests 
+    sfx = (srk ? " (shrinking) " $ " ") <> prgrs
   if isRight r
     then
-      printNow $ "PASS" <> sfx
+      TIO.putStrLn $ "PASS" <> sfx
     else do
       atomically $ writeTVar isShinking True
-      printNow $ "FAIL" <> sfx
+      TIO.putStrLn $ "FAIL" <> sfx
       putStrLn "========="
   pure r
 
@@ -190,33 +195,40 @@ testOpts =
       overrideMaxRatio = Nothing
     }
 
+
 -- todo: add timestamp to debug
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
 {-# NOINLINE runProp #-}
-runProp ::  TVar Bool -> TestName -> TestOptions -> TGenParams -> TestTree
-runProp isShrinking testName o p =
+runProp :: TVar Int -> TVar Bool -> TestName -> TestOptions -> TGenParams -> TestTree
+runProp testNo isShrinking testName o p =
   testPropertyWith o testName $ do
     t <- genWith (Just . ppShow) $ genTemplate p
-    let result = unsafePerformIO $ tryRunTest isShrinking p t
+    let 
+      numTests = fromMaybe 100 o.overrideNumTests
+      result = unsafePerformIO $ tryRunTest numTests testNo isShrinking p t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
--- $> test_suite_preload
+
+-- $ > test_suite_preload
 test_suite_preload :: IO ()
 test_suite_preload = do
   -- need a separate shrinkState for every test group
   shrinkState <- newTVarIO False
+  testNo <- newTVarIO 0
   defaultMain $
-    testGroup "PreLoad" [runProp shrinkState "Preload" testOpts {overrideNumTests = Just 1000} defParams {genStrategy = Preload}]
+    testGroup "PreLoad" [runProp testNo shrinkState "Preload" testOpts {overrideNumTests = Just 100} defParams {genStrategy = Preload}]
 
--- $ > test_suite_runtime
+
+-- $> test_suite_runtime
 test_suite_runtime :: IO ()
 test_suite_runtime = do
   -- need a separate shrinkState for every test group
   shrinkState <- newTVarIO False
+  testNo <- newTVarIO 0
   defaultMain $
     testGroup
       "generator stubs"
-      [ runProp shrinkState "Runtime" testOpts {overrideNumTests = Just 100} defParams {genStrategy = Runtime, minTestsPerFixture = 1}
+      [ runProp testNo shrinkState "Runtime" testOpts {overrideNumTests = Just 10000} defParams {genStrategy = Runtime, minTestsPerFixture = 1}
       ]
 
 {- TODO: Check out performance.

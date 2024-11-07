@@ -136,11 +136,11 @@ logItemtoBool :: (NodeType -> Bool) -> LogItem -> Bool
 logItemtoBool = threadEventToBool
 
 chkProperties :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
-chkProperties baseSeed threadLimit ts evts = do
-  chkNoEmptyHooks evts
+chkProperties baseSeed threadLimit ts wholeLog = do
+  chkNoEmptyHooks wholeLog
   -- these checks apply to the log as a whole
   traverse_
-    (evts &)
+    (wholeLog &)
     [ chkStartEndExecution,
       chkThreadLogsInOrder,
       chkAllTemplateItemsLogged ts,
@@ -150,14 +150,14 @@ chkProperties baseSeed threadLimit ts evts = do
   -- these checks apply to each thread log (events with the same thread id)
   threadLogChks
     False
-    evts
+    wholeLog
     [ chkThreadHooksStartedOnceInThread,
       chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
     ]
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
   threadLogChks
     True
-    evts
+    wholeLog
     [ chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts),
       chkAfterTeardownParents (T.expectedParentSubsequentEvents ts),
       chkFailureLocEqualsLastStartLoc,
@@ -181,11 +181,7 @@ chkNoEmptyHooks evts = do
     ]
 
 data FailInfo = FailInfo
-  { --   idx :: Int
-    -- , threadId :: ThreadId
-    -- , nodeType :: NodeType
-    -- , loc :: ExePath
-    -- ,
+  { 
     failLog :: LogItem,
     failStartTail :: [LogItem]
   }
@@ -637,7 +633,7 @@ chkLeafFailsAreNotPropagated
       -- TODO: ()may be fixed) chkFail does not work here it escapes new lines - fix and check all chk functions format properly
       ( \l ->
           l.event & \case
-            c@ParentFailure {failSuiteEvent} ->
+            ParentFailure {failSuiteEvent} ->
               -- this is wrong can pick up failed elements from another branch
               unless (onceSuiteEvent failSuiteEvent) $ do
                 {-
@@ -651,7 +647,7 @@ chkLeafFailsAreNotPropagated
                   "Leaf failure propagated to next event.\nLeaf event was:\n"
                     <> ppShow failLog
                     <> "\nNext event was:\n"
-                    <> ppShow c
+                    <> ppShow l
             _ -> pure ()
       )
 

@@ -764,7 +764,7 @@ unit_and_here_is_yet_another_broken_test =
     ]
 
 
--- $> unit_leaf_hook_failure
+-- $ > unit_leaf_hook_failure
 unit_leaf_hook_failure :: IO ()
 unit_leaf_hook_failure =
   replicateM_ 1000 $
@@ -795,6 +795,43 @@ unit_leaf_hook_failure =
                     ]
                 }
             ]
+        }
+    ] 
+
+{-
+TODO:
+- rethink failure propagation checks
+- get unit working
+- rerun prop based tests - runtime - 1000 x
+- rerun prop based tests - runtime - 1000 x - high pass through error rate
+- fix once hook pass through error
+- rerun prop based test - preload - 1000 x
+- rerun prop based tests - runtime - 10000 x
+- rerun prop based tests - runtime - 10000 x - high pass through error rate
+- rerun prop based test - preload - 10000 x
+- rerun prop based test - preload - 10000 x - high pass through error rate
+- delete legacy propagation check
+- merge
+-}
+-- $> unit_failed_again
+unit_failed_again :: IO ()
+unit_failed_again =
+  replicateM_ 1000 $
+    runTest'
+    LogFailsAndStartTest
+    defaultSeed
+    (ThreadCount 5)
+    [ OnceAround
+        { setupSpec = Spec { delay = 0 , directive = Fail }
+        , teardownSpec = Spec { delay = 0 , directive = Pass }
+        , subNodes =
+            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
+        }
+    , OnceAround
+        { setupSpec = Spec { delay = 0 , directive = Fail }
+        , teardownSpec = Spec { delay = 0 , directive = Pass }
+        , subNodes =
+            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
         }
     ] 
 

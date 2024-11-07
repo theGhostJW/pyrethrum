@@ -127,15 +127,15 @@ https://hackage.haskell.org/package/Agda-2.6.4.3/Agda-2.6.4.3.tar.gz
        $ cabal install -f +optimise-heavily -f +enable-cluster-counting
   -}
 
-type LogItem = FLog ExePath AE.NodeLog
+type LogEntry = FLog ExePath AE.NodeLog
 
-getThreadId :: LogItem -> ThreadId
+getThreadId :: LogEntry -> ThreadId
 getThreadId (MkLog (MkLineInfo {threadId}) _) = threadId
 
-logItemtoBool :: (NodeType -> Bool) -> LogItem -> Bool
+logItemtoBool :: (NodeType -> Bool) -> LogEntry -> Bool
 logItemtoBool = threadEventToBool
 
-chkProperties :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
+chkProperties :: Int -> ThreadCount -> [T.Template] -> [LogEntry] -> IO ()
 chkProperties baseSeed threadLimit ts wholeLog = do
   chkNoEmptyHooks wholeLog
   -- these checks apply to the log as a whole
@@ -161,10 +161,10 @@ chkProperties baseSeed threadLimit ts wholeLog = do
     [ chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts),
       chkAfterTeardownParents (T.expectedParentSubsequentEvents ts),
       chkFailureLocEqualsLastStartLoc,
-      chkFailurePropagation
+      chkFailurePropagationLegacy
     ]
 
-chkNoEmptyHooks :: [LogItem] -> IO ()
+chkNoEmptyHooks :: [LogEntry] -> IO ()
 chkNoEmptyHooks evts = do
   -- these checks apply to the log as a whole
   traverse_
@@ -182,8 +182,8 @@ chkNoEmptyHooks evts = do
 
 data FailInfo = FailInfo
   { 
-    failLog :: LogItem,
-    failStartTail :: [LogItem]
+    failLog :: LogEntry,
+    failStartTail :: [LogEntry]
   }
   deriving (Show)
 
@@ -210,11 +210,11 @@ data ResultInfo = ResultInfo
   deriving (Ord, Eq, Show)
 
 -- a result accumulator function to be used across a logs grouped by thread
-actualResults :: [LogItem] -> Map EventPath [LogResult]
+actualResults :: [LogEntry] -> Map EventPath [LogResult]
 actualResults = snd . foldl' logAccum (Nothing, M.empty)
 
 -- a result accumulator function to be used across a logs grouped by thread
-logAccum :: (Maybe (ExePath, NodeType), Map EventPath [LogResult]) -> LogItem -> (Maybe (ExePath, NodeType), Map EventPath [LogResult])
+logAccum :: (Maybe (ExePath, NodeType), Map EventPath [LogResult]) -> LogEntry -> (Maybe (ExePath, NodeType), Map EventPath [LogResult])
 logAccum acc@(passStart, rMap) (MkLog {event}) =
   event & \case
     End {loc, nodeType} ->
@@ -250,7 +250,7 @@ logAccum acc@(passStart, rMap) (MkLog {event}) =
 
 --  note this fixture will only work if there are enough delays in the template
 --  and the template is big enough to ensure that the threads are used
-chkThreadCount :: ThreadCount -> [LogItem] -> IO ()
+chkThreadCount :: ThreadCount -> [LogEntry] -> IO ()
 chkThreadCount threadLimit evts =
   chkEq'
     "Thread count"
@@ -289,7 +289,7 @@ resultsEqual :: Directive -> LogResult -> Bool
 resultsEqual expt act =
   expt == T.Pass && act == Pass || expt == T.Fail && act == Fail
 
-chkResults :: Int -> ThreadCount -> [T.Template] -> [LogItem] -> IO ()
+chkResults :: Int -> ThreadCount -> [T.Template] -> [LogEntry] -> IO ()
 chkResults baseSeed threadLimit ts lgs =
   do
     -- fail missing expected results or different to expected
@@ -519,14 +519,11 @@ directiveToExpected :: Bool -> Directive -> (Bool, ExpectedResult)
 directiveToExpected poisoned d =
   (d == T.PassThroughFail, All $ directiveToLogResult poisoned d)
 
-{- TODO:
-1. reinstate chkResult
-3. check generating Alls
-2. fix check propagation => expect to fail on OnceHook
--}
+chkFailurePropagation :: [LogEntry] -> IO ()
+chkFailurePropagation = uu
 
-chkFailurePropagation :: [LogItem] -> IO ()
-chkFailurePropagation lg =
+chkFailurePropagationLegacy :: [LogEntry] -> IO ()
+chkFailurePropagationLegacy lg =
   do
     traverse_ chkLeafFailsAreNotPropagated failTails
     traverse_ chkParentFailsPropagated failTails
@@ -536,7 +533,7 @@ chkFailurePropagation lg =
 data ChkState = ExpectParentFail | DoneChecking
   deriving (Show, Eq)
 
-isFailChildEventOf :: LogItem -> LogItem -> Bool
+isFailChildEventOf :: LogEntry -> LogEntry -> Bool
 isFailChildEventOf c p =
   (cIsSubpathOfp || samePath && pIsSetupFailure && cIsTeardown) && (sameThread || pIsOnceHook)
   where
@@ -565,7 +562,7 @@ chkParentFailsPropagated
     unless (isChildless f.failLog) $ do
       void $ foldlM chkEvent ExpectParentFail failStartTail
     where
-      chkEvent :: ChkState -> LogItem -> IO ChkState
+      chkEvent :: ChkState -> LogEntry -> IO ChkState
       chkEvent acc lgItm =
         let isFailChild = lgItm `isFailChildEventOf` failLog
             -- if the child node is a once hook on different thread
@@ -657,11 +654,11 @@ chkLeafFailsAreNotPropagated
 -- chkCapture - will log a soft exception and allow trace in place
 -- property that includes assertions
 
-failInfo :: [LogItem] -> (Maybe NodeType, [FailInfo])
+failInfo :: [LogEntry] -> (Maybe NodeType, [FailInfo])
 failInfo ls =
   foldl' step (Nothing, []) $ tails failStarts
   where
-    step :: (Maybe NodeType, [FailInfo]) -> [LogItem] -> (Maybe NodeType, [FailInfo])
+    step :: (Maybe NodeType, [FailInfo]) -> [LogEntry] -> (Maybe NodeType, [FailInfo])
     step (lastStartEvnt, result) =
       \case
         [] -> (lastStartEvnt, result)
@@ -698,11 +695,11 @@ failInfo ls =
 
 -- TODO: do empty thread test case should not run anything (ie no thread events - cna happpen despite tree
 -- shaking due to multiple threads)
-chkFailureLocEqualsLastStartLoc :: [LogItem] -> IO ()
+chkFailureLocEqualsLastStartLoc :: [LogEntry] -> IO ()
 chkFailureLocEqualsLastStartLoc =
   void . foldl' step (pure Nothing)
   where
-    step :: IO (Maybe ExePath) -> LogItem -> IO (Maybe ExePath)
+    step :: IO (Maybe ExePath) -> LogEntry -> IO (Maybe ExePath)
     step mParentLoc li = do
       let newStart = startLoc li
       mpl <- mParentLoc
@@ -715,16 +712,16 @@ chkFailureLocEqualsLastStartLoc =
           pure
         . Just
 
-    startLoc :: LogItem -> Maybe ExePath
+    startLoc :: LogEntry -> Maybe ExePath
     startLoc l = isStart l ? startSuiteEventLoc l $ Nothing
 
-    chkParentFailureLoc :: Maybe ExePath -> LogItem -> IO ()
+    chkParentFailureLoc :: Maybe ExePath -> LogEntry -> IO ()
     chkParentFailureLoc mParentLoc li =
       case li.event of
         ParentFailure {loc} -> chkEq' ("Parent failure loc for " <> toS (ppShow li)) mParentLoc (Just loc)
         _ -> pure ()
 
-chkAfterTeardownParents :: Map T.EventPath T.EventPath -> [LogItem] -> IO ()
+chkAfterTeardownParents :: Map T.EventPath T.EventPath -> [LogEntry] -> IO ()
 chkAfterTeardownParents =
   chkForMatchedParents
     "After / Teardown parent event"
@@ -735,14 +732,14 @@ chkAfterTeardownParents =
 
 -- isAfterSuiteEvent -- I think this logic is wrong shoud be checking every event
 
-chkPrecedingSuiteEventAsExpected :: Map T.EventPath T.EventPath -> [LogItem] -> IO ()
+chkPrecedingSuiteEventAsExpected :: Map T.EventPath T.EventPath -> [LogEntry] -> IO ()
 chkPrecedingSuiteEventAsExpected =
   chkForMatchedParents
     "preceding parent event"
     True -- reverse list so we are searching back through preceding events
     isBeforeSuiteEvent
 
-chkForMatchedParents :: Text -> Bool -> (LogItem -> Bool) -> Map T.EventPath T.EventPath -> [LogItem] -> IO ()
+chkForMatchedParents :: Text -> Bool -> (LogEntry -> Bool) -> Map T.EventPath T.EventPath -> [LogEntry] -> IO ()
 chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildParentMap thrdLog =
   traverse_ chkParent actualParents
   where
@@ -755,14 +752,14 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
     actualParents :: [(T.EventPath, Maybe T.EventPath)]
     actualParents = mapMaybe extractHeadParent thrdLogTails
 
-    thrdLogTails :: [[LogItem]]
+    thrdLogTails :: [[LogEntry]]
     thrdLogTails = logTails wantReverseLog thrdLog
 
-    extractHeadParent :: [LogItem] -> Maybe (T.EventPath, Maybe T.EventPath)
+    extractHeadParent :: [LogEntry] -> Maybe (T.EventPath, Maybe T.EventPath)
     extractHeadParent evntLog =
       (,actulaParentPath) <$> targetPath
       where
-        logSuiteEventPath :: LogItem -> Maybe T.EventPath
+        logSuiteEventPath :: LogEntry -> Maybe T.EventPath
         logSuiteEventPath l = MkEventPath <$> (startSuiteEventLoc l >>= topPath) <*> getSuiteEvent l
         targEvnt = PE.head evntLog
         targetPath = targEvnt >>= logSuiteEventPath
@@ -772,31 +769,31 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
           fps <- findMathcingParent parentEventPredicate h t
           logSuiteEventPath fps
 
-logTails :: Bool -> [LogItem] -> [[LogItem]]
+logTails :: Bool -> [LogEntry] -> [[LogEntry]]
 logTails wantReverse = tails . bool PR.id reverse wantReverse
 
-startHook :: [Hz] -> [HookPos] -> LogItem -> Bool
+startHook :: [Hz] -> [HookPos] -> LogEntry -> Bool
 startHook hzs poss l = startOrParentFailure l && (getHookInfo l & maybe False (\(hz', hkPos) -> hz' `PE.elem` hzs && hkPos `PE.elem` poss))
 
-chkNoEmptyPostHooks :: [Hz] -> [LogItem] -> IO ()
+chkNoEmptyPostHooks :: [Hz] -> [LogEntry] -> IO ()
 chkNoEmptyPostHooks hzs =
   chkNoEmptyHooks'
     "Post Hook Empty"
     (startHook hzs [Teardown, After])
     True
 
-chkNoEmptyPreHooks :: [Hz] -> [LogItem] -> IO ()
+chkNoEmptyPreHooks :: [Hz] -> [LogEntry] -> IO ()
 chkNoEmptyPreHooks hzs =
   chkNoEmptyHooks'
     "Post Hook Empty"
     (startHook hzs [Setup, Before])
     False
 
-chkNoEmptyHooks' :: Text -> (LogItem -> Bool) -> Bool -> [LogItem] -> IO ()
+chkNoEmptyHooks' :: Text -> (LogEntry -> Bool) -> Bool -> [LogEntry] -> IO ()
 chkNoEmptyHooks' message hookPredicate wantReverse =
   traverse_ chkHasTest . logTails wantReverse
   where
-    chkHasTest :: [LogItem] -> IO ()
+    chkHasTest :: [LogEntry] -> IO ()
     chkHasTest = \case
       [] -> pure () -- wont happen
       x : xs ->
@@ -806,19 +803,19 @@ chkNoEmptyHooks' message hookPredicate wantReverse =
             (message <> " \nEmpty Hook:\n" <> txt x)
             (findChildTest x xs)
 
-    findChildTest :: LogItem -> [LogItem] -> Bool
+    findChildTest :: LogEntry -> [LogEntry] -> Bool
     findChildTest hk =
       any (fromMaybe False . testMatchesParent)
       where
-        testMatchesParent :: LogItem -> Maybe Bool
+        testMatchesParent :: LogEntry -> Maybe Bool
         testMatchesParent =
           parentMatchesTest (const True) hk
 
-chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogItem] -> IO ()
+chkAllStartSuitEventsInThreadImmedialyFollowedByEnd :: [LogEntry] -> IO ()
 chkAllStartSuitEventsInThreadImmedialyFollowedByEnd =
   chkStartSuiteEventImmediatlyFollowedByEnd (startEndNodeMatch (const True))
 
-chkStartSuiteEventImmediatlyFollowedByEnd :: (LogItem -> Bool) -> [LogItem] -> IO ()
+chkStartSuiteEventImmediatlyFollowedByEnd :: (LogEntry -> Bool) -> [LogEntry] -> IO ()
 chkStartSuiteEventImmediatlyFollowedByEnd p l = do
   unless (null startNotFollwedByEnd) $
     fail $
@@ -827,21 +824,21 @@ chkStartSuiteEventImmediatlyFollowedByEnd p l = do
     trgEvnts = filter p l
     startNotFollwedByEnd = filter (\(s, e) -> isStart s && (not (isEnd e) || s.event.loc /= e.event.loc)) . zip trgEvnts $ drop 1 trgEvnts
 
-threadLogChks :: Bool -> [LogItem] -> [[LogItem] -> IO ()] -> IO ()
+threadLogChks :: Bool -> [LogEntry] -> [[LogEntry] -> IO ()] -> IO ()
 threadLogChks includeOnce fullLog = traverse_ chkTls
   where
     tlgs = threadedLogs includeOnce fullLog
     chkTls = checkThreadLogs tlgs
-    checkThreadLogs :: [[LogItem]] -> ([LogItem] -> IO ()) -> IO ()
+    checkThreadLogs :: [[LogEntry]] -> ([LogEntry] -> IO ()) -> IO ()
     checkThreadLogs tls' lgChk = traverse_ lgChk tls'
 
-chkThreadHooksStartedOnceInThread :: [LogItem] -> IO ()
+chkThreadHooksStartedOnceInThread :: [LogEntry] -> IO ()
 chkThreadHooksStartedOnceInThread =
   chkStartsOnce "thread elements" (startEndNodeMatch threadHook)
 
 -- TODO:: reexport putStrLn et. al with text conversion
 
-chkStartsOnce :: Text -> (LogItem -> Bool) -> [LogItem] -> IO ()
+chkStartsOnce :: Text -> (LogEntry -> Bool) -> [LogEntry] -> IO ()
 chkStartsOnce errSfx p l = do
   --  putStrLn $ ppShowList trgEvnts
   unless (null dupLocs) $
@@ -852,7 +849,7 @@ chkStartsOnce errSfx p l = do
     starts = filter isStart trgEvnts
     dupLocs = filter ((> 1) . length) . fmap (PE.head . fmap (.event.loc)) . groupOn' (.event.loc) $ starts
 
-chkAllTemplateItemsLogged :: [T.Template] -> [LogItem] -> IO ()
+chkAllTemplateItemsLogged :: [T.Template] -> [LogEntry] -> IO ()
 chkAllTemplateItemsLogged ts lgs =
   unless (null errMissng || null errExtra) $
     fail (errMissng <> "\n" <> errExtra)
@@ -879,7 +876,7 @@ chkAllTemplateItemsLogged ts lgs =
           )
           lgs
 
-nxtHookLog :: [LogItem] -> Maybe LogItem
+nxtHookLog :: [LogEntry] -> Maybe LogEntry
 nxtHookLog = find (\l -> startEndNodeMatch isHook l || isHookParentFailure l)
 
 {-
@@ -890,18 +887,18 @@ nxtHookLog = find (\l -> startEndNodeMatch isHook l || isHookParentFailure l)
  same goes for filter log
 -}
 
-threadVisible :: Bool -> ThreadId -> [LogItem] -> [LogItem]
+threadVisible :: Bool -> ThreadId -> [LogEntry] -> [LogEntry]
 threadVisible onceHookInclude tid =
   filter (\l -> tid == l.lineInfo.threadId || onceHookInclude && (startEndNodeMatch onceHook l || isOnceHookParentFailure l))
 
-threadIds :: [LogItem] -> [ThreadId]
+threadIds :: [LogEntry] -> [ThreadId]
 threadIds = PE.nub . fmap (.lineInfo.threadId)
 
-threadedLogs :: Bool -> [LogItem] -> [[LogItem]]
+threadedLogs :: Bool -> [LogEntry] -> [[LogEntry]]
 threadedLogs onceHookInclude l =
   (\tid -> threadVisible onceHookInclude tid l) <$> threadIds l
 
-shouldOccurOnce :: LogItem -> Bool
+shouldOccurOnce :: LogEntry -> Bool
 shouldOccurOnce = startEndNodeMatch onceSuiteEvent
 
 chkStartEndExecution :: [FLog ExePath AE.NodeLog] -> IO ()
@@ -933,7 +930,7 @@ groupOn' f =
           (M.insert (f a) [a] m)
           (\as -> M.insert (f a) (a : as) m)
 
-chkThreadLogsInOrder :: [LogItem] -> IO ()
+chkThreadLogsInOrder :: [LogEntry] -> IO ()
 chkThreadLogsInOrder ls =
   do
     chk' "Nothing found in heads - groupOn error this should not happen" (all isJust heads)
@@ -1108,7 +1105,7 @@ todo - trace like with pretty printing
   AND testItem is a start test or test abandonned event
   AND testItem is a child of hook
 -}
-parentMatchesTest :: (LogItem -> Bool) -> LogItem -> LogItem -> Maybe Bool
+parentMatchesTest :: (LogEntry -> Bool) -> LogEntry -> LogEntry -> Maybe Bool
 parentMatchesTest parentPredicate parentHookItm testItm = do
   if parentPredicate parentHookItm
     then do
@@ -1119,11 +1116,11 @@ parentMatchesTest parentPredicate parentHookItm testItm = do
     else
       pure False
 
-findMathcingParent :: (LogItem -> Bool) -> LogItem -> [LogItem] -> Maybe LogItem
+findMathcingParent :: (LogEntry -> Bool) -> LogEntry -> [LogEntry] -> Maybe LogEntry
 findMathcingParent parentPredicate testStartEvnt =
   find (fromMaybe False . parentEvntMatches)
   where
-    parentEvntMatches :: LogItem -> Maybe Bool
+    parentEvntMatches :: LogEntry -> Maybe Bool
     parentEvntMatches parentCandidteEvt =
       parentMatchesTest parentPredicate parentCandidteEvt testStartEvnt
 
@@ -1131,7 +1128,7 @@ isParentPath :: ExePath -> ExePath -> Bool
 isParentPath (ExePath parent) (ExePath child) =
   PE.tail child & maybe False (parent `PE.isSuffixOf`)
 
-eventMatchesHookPos :: [HookPos] -> LogItem -> Bool
+eventMatchesHookPos :: [HookPos] -> LogEntry -> Bool
 eventMatchesHookPos hookPoses lg =
   suiteEventOrParentFailureSuiteEvent lg
     & maybe
@@ -1142,13 +1139,13 @@ eventMatchesHookPos hookPoses lg =
           Test -> False
       )
 
-isBeforeSuiteEvent :: LogItem -> Bool
+isBeforeSuiteEvent :: LogEntry -> Bool
 isBeforeSuiteEvent = eventMatchesHookPos [Before, Setup]
 
-isAnyHookSuiteEvent :: LogItem -> Bool
+isAnyHookSuiteEvent :: LogEntry -> Bool
 isAnyHookSuiteEvent = eventMatchesHookPos [After, Teardown, Before, Setup]
 
-isAfterSuiteEvent :: LogItem -> Bool
+isAfterSuiteEvent :: LogEntry -> Bool
 isAfterSuiteEvent = eventMatchesHookPos [After, Teardown]
 
 newtype FixtureConfig = FxCfg

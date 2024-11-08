@@ -5,7 +5,7 @@ import Internal.Logging( NodeType(..),
       HookPos(..),
       Log(..),
       FLog,
-      evnt )
+      getLog )
 
 isSetup :: NodeType -> Bool
 isSetup = \case
@@ -25,7 +25,7 @@ evtTypeToFrequency = \case
 
 isSuiteEventFailureWith :: (NodeType -> Bool) -> FLog l a -> Bool
 isSuiteEventFailureWith evntPredicate l =
-  evnt l & \case
+  getLog l & \case
     ParentFailure {nodeType = s} -> evntPredicate s
     _ -> False
 
@@ -41,7 +41,7 @@ isTest = \case
   _ -> False
 
 isTestParentFailure :: FLog l a -> Bool
-isTestParentFailure l = evnt l & \case
+isTestParentFailure l = getLog l & \case
   ParentFailure {nodeType = s} -> isTest s
   _ -> False
 
@@ -85,7 +85,7 @@ threadEventToBool :: (NodeType -> Bool) -> FLog l a -> Bool
 threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
 
 startEndNodeMatch :: (NodeType -> Bool) -> FLog l a -> Bool
-startEndNodeMatch p l = evnt l & \case
+startEndNodeMatch p l = getLog l & \case
   StartExecution {} -> False
   InitialisationFailure {} -> False
   Failure {} -> False
@@ -99,18 +99,18 @@ startEndNodeMatch p l = evnt l & \case
 
 
 isStart :: FLog a b -> Bool
-isStart l = evnt l  & \case
+isStart l = getLog l  & \case
   Start {} -> True
   _ -> False
 
 isEnd :: FLog a b -> Bool
-isEnd l = evnt l  & \case
+isEnd l = getLog l  & \case
   End {} -> True
   _ -> False
 
 suiteEventOrParentFailureSuiteEvent :: FLog a b -> Maybe NodeType
 suiteEventOrParentFailureSuiteEvent l = 
-  evnt l  & \case
+  getLog l  & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   StartExecution {} -> Nothing
@@ -123,7 +123,7 @@ suiteEventOrParentFailureSuiteEvent l =
   EndExecution {} -> Nothing
 
 getSuiteEvent :: FLog a b -> Maybe NodeType
-getSuiteEvent l = evnt l  & \case
+getSuiteEvent l = getLog l  & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   Start {nodeType} -> Just nodeType
@@ -142,7 +142,7 @@ getHookInfo t =
     Test {} -> Nothing
 
 startOrParentFailure :: FLog l a -> Bool
-startOrParentFailure l = evnt l  & \case
+startOrParentFailure l = getLog l  & \case
   FilterLog {} -> False
   SuiteInitFailure {} -> False
   StartExecution {} -> False
@@ -157,7 +157,7 @@ startOrParentFailure l = evnt l  & \case
   End {} -> False
 
 startSuiteEventLoc :: FLog l a -> Maybe l
-startSuiteEventLoc l = evnt l & \case
+startSuiteEventLoc l = getLog l & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   StartExecution {} -> Nothing

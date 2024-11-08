@@ -29,12 +29,12 @@ type FLog l a = FullLog LineInfo (Log l a)
 
 {- Fully polymorphic base logging functions -}
 
-evnt :: FullLog LineInfo (Log l a) -> Log l a
-evnt = (.event)
+getLog :: FullLog LineInfo (Log l a) -> Log l a
+getLog = (.log)
 
 data FullLog li evt = MkLog
   { lineInfo :: li,
-    event :: evt
+    log :: evt
   }
   deriving (Show)
   deriving (Generic, NFData)

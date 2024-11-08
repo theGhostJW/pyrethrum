@@ -46,7 +46,7 @@ import Internal.Logging as L
     parentPath,
     testLogActions,
     topPath,
-    evnt
+    getLog
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
@@ -215,8 +215,8 @@ actualResults = snd . foldl' logAccum (Nothing, M.empty)
 
 -- a result accumulator function to be used across a logs grouped by thread
 logAccum :: (Maybe (ExePath, NodeType), Map EventPath [LogResult]) -> LogEntry -> (Maybe (ExePath, NodeType), Map EventPath [LogResult])
-logAccum acc@(passStart, rMap) (MkLog {event}) =
-  event & \case
+logAccum acc@(passStart, rMap) (MkLog {log}) =
+  log & \case
     End {loc, nodeType} ->
       passStart
         & maybe
@@ -575,13 +575,13 @@ isFailChildEventOf c p =
       Hook _ hp' -> hp == hp'
       _ -> False
     cIsTeardown = logItemtoBool (hasHookPos Teardown) c
-    pFailEvent = case p.event of
+    pFailEvent = case p.log of
       Failure {nodeType} -> Just nodeType
       _ -> Nothing
     pIsSetupFailure = suitEvntToBool (hasHookPos Setup) pFailEvent
 
-    ploc = p.event.loc
-    cloc = c.event.loc
+    ploc = p.log.loc
+    cloc = c.log.loc
     samePath = ploc == cloc
     cIsSubpathOfp = isParentPath ploc cloc
     pIsOnceHook = suitEvntToBool (\case Hook hz _ -> hz == Once; _ -> False) pFailEvent
@@ -602,11 +602,11 @@ chkParentFailsPropagated
             -- eg failing ThreadHook => parent failed OnceHook a parent failure will have been
             -- caused by a OnceHook failure on a different thread
             onceChildException = lgItm.lineInfo.threadId /= failLog.lineInfo.threadId &&
-              onceHook (evnt lgItm).nodeType
+              onceHook (getLog lgItm).nodeType
          in acc
               == DoneChecking
                 ? pure DoneChecking
-              $ lgItm.event
+              $ lgItm.log
                 & \case
                   ParentFailure {} ->
                     do
@@ -662,7 +662,7 @@ chkLeafFailsAreNotPropagated
       (PE.head failStartTail)
       -- TODO: ()may be fixed) chkFail does not work here it escapes new lines - fix and check all chk functions format properly
       ( \l ->
-          l.event & \case
+          l.log & \case
             ParentFailure {sourceFailureNodeType} ->
               -- this is wrong can pick up failed elements from another branch
               unless (onceSuiteEvent sourceFailureNodeType) $ do
@@ -696,7 +696,7 @@ failInfo ls =
       \case
         [] -> (lastStartEvnt, result)
         (l : ls') ->
-          l.event & \case
+          l.log & \case
             FilterLog {} -> passThrough
             SuiteInitFailure {} -> passThrough
             Start {nodeType = se} ->
@@ -718,7 +718,7 @@ failInfo ls =
     failStarts =
       filter
         ( \li ->
-            li.event & \case
+            li.log & \case
               Failure {} -> True
               ParentFailure {} -> True
               Start {} -> True
@@ -750,7 +750,7 @@ chkFailureLocEqualsLastStartLoc =
 
     chkParentFailureLoc :: Maybe ExePath -> LogEntry -> IO ()
     chkParentFailureLoc mParentLoc li =
-      case li.event of
+      case li.log of
         ParentFailure {loc} -> chkEq' ("Parent failure loc for " <> toS (ppShow li)) mParentLoc (Just loc)
         _ -> pure ()
 
@@ -855,7 +855,7 @@ chkStartSuiteEventImmediatlyFollowedByEnd p l = do
       "Thread suite elements - start not followed by end:\n" <> toS (ppShow startNotFollwedByEnd)
   where
     trgEvnts = filter p l
-    startNotFollwedByEnd = filter (\(s, e) -> isStart s && (not (isEnd e) || s.event.loc /= e.event.loc)) . zip trgEvnts $ drop 1 trgEvnts
+    startNotFollwedByEnd = filter (\(s, e) -> isStart s && (not (isEnd e) || s.log.loc /= e.log.loc)) . zip trgEvnts $ drop 1 trgEvnts
 
 threadLogChks :: Bool -> [LogEntry] -> [[LogEntry] -> IO ()] -> IO ()
 threadLogChks includeOnce fullLog = traverse_ chkTls
@@ -880,7 +880,7 @@ chkStartsOnce errSfx p l = do
   where
     trgEvnts = filter p l
     starts = filter isStart trgEvnts
-    dupLocs = filter ((> 1) . length) . fmap (PE.head . fmap (.event.loc)) . groupOn' (.event.loc) $ starts
+    dupLocs = filter ((> 1) . length) . fmap (PE.head . fmap (.log.loc)) . groupOn' (.log.loc) $ starts
 
 chkAllTemplateItemsLogged :: [T.Template] -> [LogEntry] -> IO ()
 chkAllTemplateItemsLogged ts lgs =
@@ -902,7 +902,7 @@ chkAllTemplateItemsLogged ts lgs =
         Prelude.mapMaybe
           ( \lg ->
               do
-                case lg.event of
+                case lg.log of
                   ParentFailure {loc, nodeType} -> flip MkEventPath nodeType <$> topPath loc
                   Start {loc, nodeType} -> flip MkEventPath nodeType <$> topPath loc
                   _ -> Nothing
@@ -942,10 +942,10 @@ chkStartEndExecution evts =
       & maybe
         (fail "no events")
         ( \(s, e) -> do
-            s.event & \case
+            s.log & \case
               StartExecution {} -> pure ()
               _ -> fail $ "first event is not StartExecution:\n " <> toS (ppShow s)
-            e.event & \case
+            e.log & \case
               EndExecution {} -> pure ()
               _ -> fail $ "last event is not EndExecution:\n " <> toS (ppShow e)
         )

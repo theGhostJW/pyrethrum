@@ -650,9 +650,9 @@ chkLeafFailsAreNotPropagated
       -- TODO: ()may be fixed) chkFail does not work here it escapes new lines - fix and check all chk functions format properly
       ( \l ->
           l.event & \case
-            ParentFailure {failSuiteEvent} ->
+            ParentFailure {sourceFailureNodeType} ->
               -- this is wrong can pick up failed elements from another branch
-              unless (onceSuiteEvent failSuiteEvent) $ do
+              unless (onceSuiteEvent sourceFailureNodeType) $ do
                 {-
                 if a leaf item such as an after hook or test fails then the next item
                 should not be a parent failure because leaf items can't be parents.

@@ -364,8 +364,8 @@ logAbandonned lgr p e a =
     L.ParentFailure
       { loc = p,
         nodeType = e,
-        failLoc = a.path,
-        failSuiteEvent = a.nodeType
+        sourceFailureLoc = a.path,
+        sourceFailureNodeType = a.nodeType
       }
 
 ioLeft :: forall a. L.FailPoint -> IO (Either L.FailPoint a)

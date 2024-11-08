@@ -221,8 +221,8 @@ data Log loc nodeLog
   | ParentFailure
       { loc :: loc,
         nodeType :: NodeType,
-        failLoc :: loc,
-        failSuiteEvent :: NodeType
+        sourceFailureLoc :: loc,
+        sourceFailureNodeType :: NodeType
       }
   | NodeLog
       { nodeLog :: nodeLog

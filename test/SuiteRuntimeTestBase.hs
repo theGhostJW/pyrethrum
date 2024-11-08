@@ -521,7 +521,26 @@ directiveToExpected poisoned d =
   (d == T.PassThroughFail, All $ directiveToLogResult poisoned d)
 
 chkFailurePropagation :: [LogEntry] -> IO ()
-chkFailurePropagation = uu
+chkFailurePropagation logs = 
+  -- all parent failures should reference a genuine parent
+
+  -- all once parents refenced by parent failures should have failed * may need 
+  -- modification for once pass through failures 
+
+  -- when a Once before or setup hook fails all subevents should be parent failures
+  -- as should all teardown events 
+  chkThreadHookFailurePropagation logs
+
+  -- when a Once before or setup hook fails all subevents should be parent failures
+  -- as should all teardown events 
+  chkOnceHookFailurePropagation logs
+ where
+  hookFailures = uu
+  parentFailures = uu
+  chkOnceHookFailurePropagation = uu
+  chkThreadHookFailurePropagation = uu
+  
+
 
 chkFailurePropagationLegacy :: [LogEntry] -> IO ()
 chkFailurePropagationLegacy lg =

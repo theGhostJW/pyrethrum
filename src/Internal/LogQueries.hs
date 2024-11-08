@@ -12,28 +12,43 @@ isSetup = \case
   Hook _ Setup -> True
   _ -> False
 
+isBefore :: NodeType -> Bool
+isBefore = \case
+  Hook _ Before -> True
+  _ -> False
+
 isTeardown :: NodeType -> Bool
 isTeardown = \case
   Hook _ Teardown -> True
   _ -> False
 
-evtTypeToFrequency :: NodeType -> Hz
-evtTypeToFrequency = \case
+
+nodeFrequency :: NodeType -> Hz
+nodeFrequency = \case
   Hook hz _ -> hz
   -- an individual test is always run once
   Test -> Once
 
-isSuiteEventFailureWith :: (NodeType -> Bool) -> FLog l a -> Bool
-isSuiteEventFailureWith evntPredicate l =
+isParentFailure = isParentFailureWith (const True)
+isParentFailure :: FLog l a -> Bool
+
+isParentFailureWith :: (NodeType -> Bool) -> FLog l a -> Bool
+isParentFailureWith nodeTypePredicate l =
   l.log & \case
-    ParentFailure {nodeType = s} -> evntPredicate s
+    ParentFailure {nodeType = s} -> nodeTypePredicate s
     _ -> False
 
+isPreHookFailure :: FLog l a -> Bool
+isPreHookFailure l = 
+   l.log & \case
+      Failure {nodeType} -> isSetup nodeType || isBefore nodeType
+      _ -> False
+
 isOnceHookParentFailure :: FLog l a -> Bool
-isOnceHookParentFailure = isSuiteEventFailureWith onceHook
+isOnceHookParentFailure = isParentFailureWith onceHook
 
 isHookParentFailure :: FLog l a -> Bool
-isHookParentFailure = isSuiteEventFailureWith isHook
+isHookParentFailure = isParentFailureWith isHook
 
 isTest :: NodeType -> Bool
 isTest = \case
@@ -68,7 +83,7 @@ threadHook :: NodeType -> Bool
 threadHook = hookWithHz Thread
 
 onceSuiteEvent :: NodeType -> Bool
-onceSuiteEvent = (== Once) . evtTypeToFrequency
+onceSuiteEvent = (== Once) . nodeFrequency
 
 isChildless :: FLog l a -> Bool
 isChildless =
@@ -83,6 +98,14 @@ suitEvntToBool = maybe False
 
 threadEventToBool :: (NodeType -> Bool) -> FLog l a -> Bool
 threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
+
+nodeTypeMatch :: (NodeType -> Bool) -> FLog l a -> Bool
+nodeTypeMatch p l = l.log & \case
+  StartExecution {} -> False
+  InitialisationFailure {} -> False
+  NodeLog {} -> False
+  node -> p node.nodeType
+
 
 startEndNodeMatch :: (NodeType -> Bool) -> FLog l a -> Bool
 startEndNodeMatch p l = l.log & \case

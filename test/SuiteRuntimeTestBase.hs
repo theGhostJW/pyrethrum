@@ -34,6 +34,9 @@ import Internal.LogQueries
     suiteEventOrParentFailureSuiteEvent,
     threadEventToBool,
     threadHook,
+    isPreHookFailure,
+    isParentFailure,
+    nodeTypeMatch
   )
 import Internal.Logging as L
   ( ExePath (..),
@@ -51,7 +54,7 @@ import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
 import PyrethrumExtras (ConvertString, onError, toS, txt, (?), db, uu)
 import PyrethrumExtras qualified as PE
-import PyrethrumExtras.Test (chk')
+import PyrethrumExtras.Test (chk', chk)
 import System.Random.Stateful qualified as RS
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C
@@ -520,38 +523,54 @@ directiveToExpected poisoned d =
   (d == T.PassThroughFail, All $ directiveToLogResult poisoned d)
 
 chkFailurePropagation :: [LogEntry] -> IO ()
-chkFailurePropagation logs = 
+chkFailurePropagation logs = do
   -- ##### All Parent Failures #####
   -- all parent failure references should reference a genuine parent
-
+  chkSourceFailureLocs
   -- ##### Once Parent Failures ##### 
   -- all once parents refenced by parent failures should have failed * may need 
   -- modification for once pass through failures 
 
   -- when a Once before or setup hook fails all subevents should be parent failures
   -- as should all teardown events 
-  chkOnceHookFailurePropagation logs
+  chkOnceHookFailurePropagation
 
   -- ##### Thread Parent Failures ##### 
   -- all thread parents refenced by thread parent failures should have failed
 
   -- when a thread before or setup hook fails all subevents in the same thread 
   -- should be parent failures as should all teardown events 
-  chkThreadHookFailurePropagation logs
+  chkThreadHookFailurePropagation
 
   -- ##### Each Parent Failures ##### 
   -- all each parents refenced by each parent failures should have failed in the preceeding step
 
   -- when a each  before or setup hook fails, the next each subevents and tests 
   -- should be parent failures as should the next teardown event in the case of each around
-  chkThreadHookFailurePropagation logs
-
+  chkEachHookFailurePropagation
  where
-  hookFailures = uu
-  parentFailures = uu
-  chkOnceHookFailurePropagation = uu
+  sourceFailures = filter isPreHookFailure logs
+  parentFailures = filter isParentFailure logs
+  chkAllSubnodesAreParentFailures failLog = 
+      HERE
+  chkOnceHookFailurePropagation = 
+    traverse_ chkAllSubnodesAreParentFailures onceFails
+    where 
+      onceFails = filter (nodeTypeMatch onceHook) sourceFailures
+
+  chkEachHookFailurePropagation = uu
   chkThreadHookFailurePropagation = uu
-  
+  chkSourceFailureLocs = traverse_ chkSourceLocMathces parentFailures
+  chkSourceLocMathces l = l.log & \case
+      ParentFailure {
+       loc,
+       sourceFailureLoc
+      } -> do 
+        chk' 
+         ("sourceFailureLoc is not a parent path to loc in:\n" <> txt l)
+         (sourceFailureLoc `isParentPath` loc) 
+      _ -> pure ()
+   
 
 
 chkFailurePropagationLegacy :: [LogEntry] -> IO ()

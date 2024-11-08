@@ -290,29 +290,32 @@ resultsEqual expt act =
   expt == T.Pass && act == Pass || expt == T.Fail && act == Fail
 
 chkResults :: Int -> ThreadCount -> [T.Template] -> [LogEntry] -> IO ()
-chkResults baseSeed threadLimit ts lgs =
+chkResults baseSeed threadLimit templates lgs =
   do
     -- fail missing expected results or different to expected
     chkResults'
     -- fail extra results
-    let extrActual = M.keysSet actuals S.\\ M.keysSet expectedResults
+    let extrActual = M.keysSet actuals S.\\ M.keysSet expected
     chkEq' "Extra results found in actual that are not expected" S.empty extrActual
   where
+    expected :: Map EventPath ExpectedResult
+    expected = expectedResults baseSeed threadLimit templates
+
     chkResults' :: IO ()
-    chkResults' = traverse_ chkResult $ M.toList expectedResults
+    chkResults' = traverse_ chkResult $ M.toList expected
       where
         chkResult :: (EventPath, ExpectedResult) -> IO ()
-        chkResult (k, expected) =
+        chkResult (k, expected') =
           M.lookup k actuals
             & maybe
               --  todo: this doesn't format as expected
               (fail $ "Expected result for " <> ppShow k <> " not found in actual")
               ( \actual ->
-                  case expected of
+                  case expected' of
                     All e ->
                       chk' ("Unexpected result for:\n " 
                             <> txt k <> "\n   expected: " 
-                            <> txt expected
+                            <> txt expected'
                             <> "\n"
                             <> "  actual: "
                             <> txt actual) $
@@ -361,36 +364,34 @@ chkResults baseSeed threadLimit ts lgs =
       where
         allResults = actualResults <$> threadedLogs False lgs
 
-    expectedResults :: Map EventPath ExpectedResult
-    expectedResults =
-      foldl' M.union M.empty $ expectedResultsRecursive' initAccum <$> ts
-      where
-        initAccum = Accum False (All Pass) M.empty
+expectedResults :: Int -> ThreadCount -> [T.Template] -> Map EventPath ExpectedResult
+expectedResults baseSeed threadLimit templates =
+  foldl' M.union M.empty $ expectedResultsRecursive' initAccum <$> templates
+  where
+    initAccum = Accum False (All Pass) M.empty
 
     expectedResultsRecursive' :: ResultAccum -> T.Template -> Map EventPath ExpectedResult
     expectedResultsRecursive' accum template = 
       let 
-        thisResult = expectedResults' accum template
+        thisResult = addTemplateResult accum template
       in 
         case template  of
-         T.Fixture {} -> thisResult.resultMap
-         node -> 
-          foldl' M.union M.empty $ expectedResultsRecursive' thisResult <$> node.subNodes
+          T.Fixture {} -> thisResult.resultMap
+          node -> 
+            foldl' M.union M.empty $ expectedResultsRecursive' thisResult <$> node.subNodes
         
-
-
-    expectedResults' :: ResultAccum -> T.Template -> ResultAccum
-    expectedResults' Accum {poisoned, parentResult, resultMap} template =
+    addTemplateResult :: ResultAccum -> T.Template -> ResultAccum
+    addTemplateResult Accum {poisoned, parentResult, resultMap} template =
       case template of
         T.OnceBefore {spec} ->
           let (nxtPoisoned, nxtParentResult) = singleSpecToExpected spec
               nxtMap = M.insert (MkEventPath template.path (Hook Once Before)) nxtParentResult resultMap
-           in Accum nxtPoisoned nxtParentResult nxtMap
+            in Accum nxtPoisoned nxtParentResult nxtMap
         T.OnceAfter {spec} ->
           -- after hooks run independently of parent so use our specToExpected but fake a successful parent
           let (_nxtPoisoned, nxtParentResult) = specToExpected template.path baseSeed instanceCount (False, All Pass) (T.All spec)
               nxtMap = M.insert (MkEventPath template.path (Hook Once After)) nxtParentResult resultMap
-           in -- because happens after we just pass through poisoned parentResult
+            in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
         T.OnceAround {setupSpec, teardownSpec, path} ->
           let -- create nxt result from setup
@@ -399,16 +400,16 @@ chkResults baseSeed threadLimit ts lgs =
               -- teardown depends on result of setup
               (_tdPoisoned, tdResult) = specToExpected path baseSeed 1 (nxtPoisoned, nxtParentResult) $ T.All teardownSpec
               nxtMap = M.insert (MkEventPath template.path $ Hook Once Teardown) tdResult nxtMap'
-           in Accum nxtPoisoned nxtParentResult nxtMap
+            in Accum nxtPoisoned nxtParentResult nxtMap
         T.ThreadBefore {threadSpec} ->
           let (nxtPoisoned, nxtParentResult) = specToExpected' threadSpec
               nxtMap = M.insert (MkEventPath template.path (Hook Thread Before)) nxtParentResult resultMap
-           in Accum nxtPoisoned nxtParentResult nxtMap
+            in Accum nxtPoisoned nxtParentResult nxtMap
         T.ThreadAfter {threadSpec} ->
           -- after hooks run independently of parent so use our specToExpected but fake a successful parent
           let (_nxtPoisoned, nxtParentResult) = specToExpected template.path baseSeed instanceCount (False, All Pass) threadSpec
               nxtMap = M.insert (MkEventPath template.path (Hook Thread After)) nxtParentResult resultMap
-           in -- because happens after we just pass through poisoned parentResult
+            in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
         T.ThreadAround {setupThreadSpec, teardownThreadSpec, path} ->
           let -- create nxt result from setup
@@ -417,16 +418,16 @@ chkResults baseSeed threadLimit ts lgs =
               -- teardown depends on result of setup
               (_tdPoisoned, tdResult) = specToExpected path baseSeed instanceCount (nxtPoisoned, nxtParentResult) teardownThreadSpec
               nxtMap = M.insert (MkEventPath template.path $ Hook Thread Teardown) tdResult nxtMap'
-           in Accum nxtPoisoned nxtParentResult nxtMap
+            in Accum nxtPoisoned nxtParentResult nxtMap
         T.EachBefore {eachSpec} ->
           let (nxtPoisoned, nxtParentResult) = specToExpected' eachSpec
               nxtMap = M.insert (MkEventPath template.path (Hook Each Before)) nxtParentResult resultMap
-           in Accum nxtPoisoned nxtParentResult nxtMap
+            in Accum nxtPoisoned nxtParentResult nxtMap
         T.EachAfter {eachSpec} ->
           -- after hooks run independently of parent so use our specToExpected but fake a successful parent
           let (_nxtPoisoned, nxtParentResult) = specToExpected template.path baseSeed instanceCount (False, All Pass) eachSpec
               nxtMap = M.insert (MkEventPath template.path (Hook Each After)) nxtParentResult resultMap
-           in -- because happens after we just pass through poisoned parentResult
+            in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
         T.EachAround {eachSetupSpec, eachTeardownSpec, path} ->
           let -- create nxt result from setup
@@ -435,14 +436,14 @@ chkResults baseSeed threadLimit ts lgs =
               -- teardown depends on result of setup
               (_tdPoisoned, tdResult) = specToExpected path baseSeed instanceCount (nxtPoisoned, nxtParentResult) eachTeardownSpec
               nxtMap = M.insert (MkEventPath template.path $ Hook Each Teardown) tdResult nxtMap'
-           in Accum nxtPoisoned nxtParentResult nxtMap
+            in Accum nxtPoisoned nxtParentResult nxtMap
         T.Fixture {tests} ->
           let addTest m ti@T.TestItem {spec} =
                 let (_poisend, rslt) = singleSpecToExpected spec
-                 in M.insert (MkEventPath (T.testItemPath ti) Test) rslt m
+                  in M.insert (MkEventPath (T.testItemPath ti) Test) rslt m
               -- assuming fixture templates are non-empty
               nxtMap = foldl' addTest resultMap tests
-           in -- at the end of the branch here so just pass on poisoned and parentResult
+            in -- at the end of the branch here so just pass on poisoned and parentResult
               -- they wont be used anyway
               Accum poisoned parentResult nxtMap
       where

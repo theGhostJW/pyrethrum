@@ -522,18 +522,31 @@ directiveToExpected poisoned d =
 
 chkFailurePropagation :: [LogEntry] -> IO ()
 chkFailurePropagation logs = 
-  -- all parent failures should reference a genuine parent
+  -- ##### All Parent Failures #####
+  -- all parent failure references should reference a genuine parent
 
+  -- ##### Once Parent Failures ##### 
   -- all once parents refenced by parent failures should have failed * may need 
   -- modification for once pass through failures 
 
   -- when a Once before or setup hook fails all subevents should be parent failures
   -- as should all teardown events 
+  chkOnceHookFailurePropagation logs
+
+  -- ##### Thread Parent Failures ##### 
+  -- all thread parents refenced by thread parent failures should have failed
+
+  -- when a thread before or setup hook fails all subevents in the same thread 
+  -- should be parent failures as should all teardown events 
   chkThreadHookFailurePropagation logs
 
-  -- when a Once before or setup hook fails all subevents should be parent failures
-  -- as should all teardown events 
-  chkOnceHookFailurePropagation logs
+  -- ##### Each Parent Failures ##### 
+  -- all each parents refenced by each parent failures should have failed in the preceeding step
+
+  -- when a each  before or setup hook fails, the next each subevents and tests 
+  -- should be parent failures as should the next teardown event in the case of each around
+  chkThreadHookFailurePropagation logs
+
  where
   hookFailures = uu
   parentFailures = uu

@@ -45,8 +45,7 @@ import Internal.Logging as L
     NodeType (..),
     parentPath,
     testLogActions,
-    topPath,
-    getLog
+    topPath
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
@@ -602,7 +601,7 @@ chkParentFailsPropagated
             -- eg failing ThreadHook => parent failed OnceHook a parent failure will have been
             -- caused by a OnceHook failure on a different thread
             onceChildException = lgItm.lineInfo.threadId /= failLog.lineInfo.threadId &&
-              onceHook (getLog lgItm).nodeType
+              onceHook lgItm.log.nodeType
          in acc
               == DoneChecking
                 ? pure DoneChecking

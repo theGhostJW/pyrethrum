@@ -29,9 +29,6 @@ type FLog l a = FullLog LineInfo (Log l a)
 
 {- Fully polymorphic base logging functions -}
 
-getLog :: FullLog LineInfo (Log l a) -> Log l a
-getLog = (.log)
-
 data FullLog li evt = MkLog
   { lineInfo :: li,
     log :: evt

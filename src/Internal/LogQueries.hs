@@ -5,7 +5,7 @@ import Internal.Logging( NodeType(..),
       HookPos(..),
       Log(..),
       FullLog(..),
-      FLog)
+      FLog, FailPoint (nodeType))
 
 isSetup :: NodeType -> Bool
 isSetup = \case
@@ -29,13 +29,13 @@ nodeFrequency = \case
   -- an individual test is always run once
   Test -> Once
 
-isParentFailure = isParentFailureWith (const True)
-isParentFailure :: FLog l a -> Bool
+isBypassed :: FLog l a -> Bool
+isBypassed = isBypassedWith (const True)
 
-isParentFailureWith :: (NodeType -> Bool) -> FLog l a -> Bool
-isParentFailureWith nodeTypePredicate l =
+isBypassedWith :: (NodeType -> Bool) -> FLog l a -> Bool
+isBypassedWith nodeTypePredicate l =
   l.log & \case
-    ParentFailure {nodeType = s} -> nodeTypePredicate s
+    Bypassed {nodeType = s} -> nodeTypePredicate s
     _ -> False
 
 isPreHookFailure :: FLog l a -> Bool
@@ -44,27 +44,30 @@ isPreHookFailure l =
       Failure {nodeType} -> isSetup nodeType || isBefore nodeType
       _ -> False
 
-isOnceHookParentFailure :: FLog l a -> Bool
-isOnceHookParentFailure = isParentFailureWith onceHook
+isOnceHookBypassed :: FLog l a -> Bool
+isOnceHookBypassed = isBypassedWith onceHook
 
-isHookParentFailure :: FLog l a -> Bool
-isHookParentFailure = isParentFailureWith isHook
+isOnceHook :: FLog l a -> Bool
+isOnceHook = nodeTypeMatch onceHook 
+
+isHookBypassed :: FLog l a -> Bool
+isHookBypassed = isBypassedWith isHook
 
 isTest :: NodeType -> Bool
 isTest = \case
   Test {} -> True
   _ -> False
 
-isTestParentFailure :: FLog l a -> Bool
-isTestParentFailure l = l.log & \case
-  ParentFailure {nodeType = s} -> isTest s
+isTestBypassed :: FLog l a -> Bool
+isTestBypassed l = l.log & \case
+  Bypassed {nodeType = s} -> isTest s
   _ -> False
 
 isTestLogItem :: FLog l a -> Bool
 isTestLogItem li = (isTest <$> getSuiteEvent li) == Just True
 
-isTestEventOrTestParentFailure :: FLog l a -> Bool
-isTestEventOrTestParentFailure te = isTestParentFailure te || isTestLogItem te
+isTestEventOrTestBypassed :: FLog l a -> Bool
+isTestEventOrTestBypassed te = isTestBypassed te || isTestLogItem te
 
 isHook :: NodeType -> Bool
 isHook = \case
@@ -112,7 +115,7 @@ startEndNodeMatch p l = l.log & \case
   StartExecution {} -> False
   InitialisationFailure {} -> False
   Failure {} -> False
-  ParentFailure {} -> False
+  Bypassed {} -> False
   NodeLog {} -> False
   EndExecution {} -> False
   FilterLog {} -> False
@@ -131,8 +134,8 @@ isEnd l = l.log  & \case
   End {} -> True
   _ -> False
 
-suiteEventOrParentFailureSuiteEvent :: FLog a b -> Maybe NodeType
-suiteEventOrParentFailureSuiteEvent l = 
+suiteEventOrBypassedSuiteEvent :: FLog a b -> Maybe NodeType
+suiteEventOrBypassedSuiteEvent l = 
   l.log  & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
@@ -141,7 +144,7 @@ suiteEventOrParentFailureSuiteEvent l =
   End {nodeType = s} -> Just s
   InitialisationFailure {} -> Nothing
   Failure {} -> Nothing
-  ParentFailure {nodeType = s} -> Just s
+  Bypassed {nodeType = s} -> Just s
   NodeLog {} -> Nothing
   EndExecution {} -> Nothing
 
@@ -151,7 +154,7 @@ getSuiteEvent l = l.log  & \case
   SuiteInitFailure {} -> Nothing
   Start {nodeType} -> Just nodeType
   End {nodeType} -> Just nodeType
-  ParentFailure {nodeType} -> Just nodeType
+  Bypassed {nodeType} -> Just nodeType
   InitialisationFailure {nodeType} -> Just nodeType
   Failure {nodeType} -> Just nodeType
   StartExecution {} -> Nothing
@@ -164,8 +167,8 @@ getHookInfo t =
     Hook hz pos -> Just (hz, pos)
     Test {} -> Nothing
 
-startOrParentFailure :: FLog l a -> Bool
-startOrParentFailure l = l.log  & \case
+startOrBypassed :: FLog l a -> Bool
+startOrBypassed l = l.log  & \case
   FilterLog {} -> False
   SuiteInitFailure {} -> False
   StartExecution {} -> False
@@ -175,7 +178,7 @@ startOrParentFailure l = l.log  & \case
   InitialisationFailure {} -> False
   -- event will either have a start or be
   -- represented by a parent failure if skipped
-  ParentFailure {} -> True
+  Bypassed {} -> True
   Start {} -> True
   End {} -> False
 
@@ -190,6 +193,6 @@ startSuiteEventLoc l = l.log & \case
   InitialisationFailure {} -> Nothing
   -- event will either have a start or be
   -- represented by a parent failure if skipped
-  ParentFailure {loc} -> Just loc
+  Bypassed {loc} -> Just loc
   Start {loc} -> Just loc
   End {} -> Nothing

@@ -863,7 +863,7 @@ FAIL (12027.96s)
             }
       }
     Next event was:
-    ParentFailure
+    Bypassed
       { loc =
           ExePath
             { un =
@@ -921,7 +921,7 @@ FAIL (6791.94s)
     failed after 1884 successful tests and 92 shrinks
     expected /= (is right t)
     t         : Left user error (
-    ParentFailure (source error) path is not a sub-path of the skipped child node:
+    Bypassed (source error) path is not a sub-path of the skipped child node:
     
     Parent Failure (Source Error) is:
     MkLog
@@ -946,7 +946,7 @@ FAIL (6791.94s)
     MkLog
       { lineInfo = MkLineInfo { threadId = 51676 , idx = 5 }
       , event =
-          ParentFailure
+          Bypassed
             { loc =
                 ExePath
                   { un =
@@ -967,7 +967,7 @@ FAIL (6791.94s)
     [ MkLog
         { lineInfo = MkLineInfo { threadId = 51676 , idx = 3 }
         , event =
-            ParentFailure
+            Bypassed
               { loc =
                   ExePath
                     { un =
@@ -986,7 +986,7 @@ FAIL (6791.94s)
     , MkLog
         { lineInfo = MkLineInfo { threadId = 51676 , idx = 4 }
         , event =
-            ParentFailure
+            Bypassed
               { loc =
                   ExePath
                     { un = [ NodePath { module' = "1" , path = "OnceAround" } ] }
@@ -1000,7 +1000,7 @@ FAIL (6791.94s)
     , MkLog
         { lineInfo = MkLineInfo { threadId = 51676 , idx = 5 }
         , event =
-            ParentFailure
+            Bypassed
               { loc =
                   ExePath
                     { un =
@@ -1019,7 +1019,7 @@ FAIL (6791.94s)
     , MkLog
         { lineInfo = MkLineInfo { threadId = 51675 , idx = 3 }
         , event =
-            ParentFailure
+            Bypassed
               { loc =
                   ExePath
                     { un = [ NodePath { module' = "0" , path = "OnceAround" } ] }

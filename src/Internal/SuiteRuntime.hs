@@ -361,7 +361,7 @@ type SuiteLogger = Log -> IO ()
 logAbandonned :: SuiteLogger -> L.ExePath -> NodeType -> L.FailPoint -> IO ()
 logAbandonned lgr p e a =
   lgr $
-    L.ParentFailure
+    L.Bypassed
       { loc = p,
         nodeType = e,
         sourceFailureLoc = a.path,

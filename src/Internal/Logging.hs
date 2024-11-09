@@ -215,7 +215,7 @@ data Log loc nodeLog
         loc :: loc,
         exception :: C.PException
       }
-  | ParentFailure
+  | Bypassed
       { loc :: loc,
         nodeType :: NodeType,
         sourceFailureLoc :: loc,

@@ -18,25 +18,27 @@ import FullSuiteTestTemplate qualified as T
 import Internal.LogQueries
   ( getHookInfo,
     getSuiteEvent,
+    isBypassed,
     isChildless,
     isEnd,
     isHook,
-    isHookParentFailure,
-    isOnceHookParentFailure,
+    isHookBypassed,
+    isOnceHook,
+    isOnceHookBypassed,
+    isPreHookFailure,
     isStart,
-    isTestEventOrTestParentFailure,
+    isTeardown,
+    isTestEventOrTestBypassed,
+    nodeTypeMatch,
     onceHook,
     onceSuiteEvent,
     startEndNodeMatch,
-    startOrParentFailure,
+    startOrBypassed,
     startSuiteEventLoc,
     suitEvntToBool,
-    suiteEventOrParentFailureSuiteEvent,
+    suiteEventOrBypassedSuiteEvent,
     threadEventToBool,
     threadHook,
-    isPreHookFailure,
-    isParentFailure,
-    nodeTypeMatch
   )
 import Internal.Logging as L
   ( ExePath (..),
@@ -48,13 +50,13 @@ import Internal.Logging as L
     NodeType (..),
     parentPath,
     testLogActions,
-    topPath
+    topPath,
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
-import PyrethrumExtras (ConvertString, onError, toS, txt, (?), db, uu)
+import PyrethrumExtras (ConvertString, db, onError, toS, txt, uu, (?))
 import PyrethrumExtras qualified as PE
-import PyrethrumExtras.Test (chk', chk)
+import PyrethrumExtras.Test (chk, chk', chkFail)
 import System.Random.Stateful qualified as RS
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C
@@ -183,8 +185,7 @@ chkNoEmptyHooks evts = do
     ]
 
 data FailInfo = FailInfo
-  { 
-    failLog :: LogEntry,
+  { failLog :: LogEntry,
     failStartTail :: [LogEntry]
   }
   deriving (Show)
@@ -231,7 +232,7 @@ logAccum acc@(passStart, rMap) (MkLog {log}) =
     -- TODO this is probably wrong fix this will cause failures when tests generate these
     -- need to think about cortrect expected results in this case
     InitialisationFailure {} -> acc
-    pf@ParentFailure {loc, nodeType} ->
+    pf@Bypassed {loc, nodeType} ->
       isJust passStart
         ? error ("parent failure encountered when parent event not ended\n" <> txt pf)
         $ (Nothing, insert' loc nodeType ParentFailed)
@@ -315,13 +316,16 @@ chkResults baseSeed threadLimit templates lgs =
               ( \actual ->
                   case expected' of
                     All e ->
-                      chk' ("Unexpected result for:\n " 
-                            <> txt k <> "\n   expected: " 
+                      chk'
+                        ( "Unexpected result for:\n "
+                            <> txt k
+                            <> "\n   expected: "
                             <> txt expected'
                             <> "\n"
                             <> "  actual: "
-                            <> txt actual) $
-                        all (\r -> r == e || r == ParentFailed) actual
+                            <> txt actual
+                        )
+                        $ all (\r -> r == e || r == ParentFailed) actual
                     NonDeterministic -> pure ()
                     NResult expLst -> case k.nodeType of
                       Test {} -> bug "Test not expected to have NResult result"
@@ -373,27 +377,25 @@ expectedResults baseSeed threadLimit templates =
     initAccum = Accum False (All Pass) M.empty
 
     expectedResultsRecursive' :: ResultAccum -> T.Template -> Map EventPath ExpectedResult
-    expectedResultsRecursive' accum template = 
-      let 
-        thisResult = addTemplateResult accum template
-      in 
-        case template  of
-          T.Fixture {} -> thisResult.resultMap
-          node -> 
-            foldl' M.union M.empty $ expectedResultsRecursive' thisResult <$> node.subNodes
-        
+    expectedResultsRecursive' accum template =
+      let thisResult = addTemplateResult accum template
+       in case template of
+            T.Fixture {} -> thisResult.resultMap
+            node ->
+              foldl' M.union M.empty $ expectedResultsRecursive' thisResult <$> node.subNodes
+
     addTemplateResult :: ResultAccum -> T.Template -> ResultAccum
     addTemplateResult Accum {poisoned, parentResult, resultMap} template =
       case template of
         T.OnceBefore {spec} ->
           let (nxtPoisoned, nxtParentResult) = singleSpecToExpected spec
               nxtMap = M.insert (MkEventPath template.path (Hook Once Before)) nxtParentResult resultMap
-            in Accum nxtPoisoned nxtParentResult nxtMap
+           in Accum nxtPoisoned nxtParentResult nxtMap
         T.OnceAfter {spec} ->
           -- after hooks run independently of parent so use our specToExpected but fake a successful parent
           let (_nxtPoisoned, nxtParentResult) = specToExpected template.path baseSeed instanceCount (False, All Pass) (T.All spec)
               nxtMap = M.insert (MkEventPath template.path (Hook Once After)) nxtParentResult resultMap
-            in -- because happens after we just pass through poisoned parentResult
+           in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
         T.OnceAround {setupSpec, teardownSpec, path} ->
           let -- create nxt result from setup
@@ -402,16 +404,16 @@ expectedResults baseSeed threadLimit templates =
               -- teardown depends on result of setup
               (_tdPoisoned, tdResult) = specToExpected path baseSeed 1 (nxtPoisoned, nxtParentResult) $ T.All teardownSpec
               nxtMap = M.insert (MkEventPath template.path $ Hook Once Teardown) tdResult nxtMap'
-            in Accum nxtPoisoned nxtParentResult nxtMap
+           in Accum nxtPoisoned nxtParentResult nxtMap
         T.ThreadBefore {threadSpec} ->
           let (nxtPoisoned, nxtParentResult) = specToExpected' threadSpec
               nxtMap = M.insert (MkEventPath template.path (Hook Thread Before)) nxtParentResult resultMap
-            in Accum nxtPoisoned nxtParentResult nxtMap
+           in Accum nxtPoisoned nxtParentResult nxtMap
         T.ThreadAfter {threadSpec} ->
           -- after hooks run independently of parent so use our specToExpected but fake a successful parent
           let (_nxtPoisoned, nxtParentResult) = specToExpected template.path baseSeed instanceCount (False, All Pass) threadSpec
               nxtMap = M.insert (MkEventPath template.path (Hook Thread After)) nxtParentResult resultMap
-            in -- because happens after we just pass through poisoned parentResult
+           in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
         T.ThreadAround {setupThreadSpec, teardownThreadSpec, path} ->
           let -- create nxt result from setup
@@ -420,16 +422,16 @@ expectedResults baseSeed threadLimit templates =
               -- teardown depends on result of setup
               (_tdPoisoned, tdResult) = specToExpected path baseSeed instanceCount (nxtPoisoned, nxtParentResult) teardownThreadSpec
               nxtMap = M.insert (MkEventPath template.path $ Hook Thread Teardown) tdResult nxtMap'
-            in Accum nxtPoisoned nxtParentResult nxtMap
+           in Accum nxtPoisoned nxtParentResult nxtMap
         T.EachBefore {eachSpec} ->
           let (nxtPoisoned, nxtParentResult) = specToExpected' eachSpec
               nxtMap = M.insert (MkEventPath template.path (Hook Each Before)) nxtParentResult resultMap
-            in Accum nxtPoisoned nxtParentResult nxtMap
+           in Accum nxtPoisoned nxtParentResult nxtMap
         T.EachAfter {eachSpec} ->
           -- after hooks run independently of parent so use our specToExpected but fake a successful parent
           let (_nxtPoisoned, nxtParentResult) = specToExpected template.path baseSeed instanceCount (False, All Pass) eachSpec
               nxtMap = M.insert (MkEventPath template.path (Hook Each After)) nxtParentResult resultMap
-            in -- because happens after we just pass through poisoned parentResult
+           in -- because happens after we just pass through poisoned parentResult
               Accum poisoned parentResult nxtMap
         T.EachAround {eachSetupSpec, eachTeardownSpec, path} ->
           let -- create nxt result from setup
@@ -438,14 +440,14 @@ expectedResults baseSeed threadLimit templates =
               -- teardown depends on result of setup
               (_tdPoisoned, tdResult) = specToExpected path baseSeed instanceCount (nxtPoisoned, nxtParentResult) eachTeardownSpec
               nxtMap = M.insert (MkEventPath template.path $ Hook Each Teardown) tdResult nxtMap'
-            in Accum nxtPoisoned nxtParentResult nxtMap
+           in Accum nxtPoisoned nxtParentResult nxtMap
         T.Fixture {tests} ->
           let addTest m ti@T.TestItem {spec} =
                 let (_poisend, rslt) = singleSpecToExpected spec
-                  in M.insert (MkEventPath (T.testItemPath ti) Test) rslt m
+                 in M.insert (MkEventPath (T.testItemPath ti) Test) rslt m
               -- assuming fixture templates are non-empty
               nxtMap = foldl' addTest resultMap tests
-            in -- at the end of the branch here so just pass on poisoned and parentResult
+           in -- at the end of the branch here so just pass on poisoned and parentResult
               -- they wont be used anyway
               Accum poisoned parentResult nxtMap
       where
@@ -527,51 +529,133 @@ chkFailurePropagation logs = do
   -- ##### All Parent Failures #####
   -- all parent failure references should reference a genuine parent
   chkSourceFailureLocs
-  -- ##### Once Parent Failures ##### 
-  -- all once parents refenced by parent failures should have failed * may need 
-  -- modification for once pass through failures 
+  -- ##### Once Parent Failures #####
+  -- all once parents refenced by parent failures should have failed * may need
+  -- modification for once pass through failures
 
   -- when a Once before or setup hook fails all subevents should be parent failures
-  -- as should all teardown events 
+  -- as should all teardown events
   chkOnceHookFailurePropagation
 
-  -- ##### Thread Parent Failures ##### 
-  -- all thread parents refenced by thread parent failures should have failed
+  -- all once parents refenced by bypass failures should have failed
+  chkOnceHookBypassReferences
 
-  -- when a thread before or setup hook fails all subevents in the same thread 
-  -- should be parent failures as should all teardown events 
+  -- ##### Thread Parent Failures #####
+  -- all thread parents refenced by thread parent failures should have failed
+  chkThreadHookBypassReferences
+
+  -- when a thread before or setup hook fails all subevents in the same thread
+  -- should be parent failures as should all teardown events
   chkThreadHookFailurePropagation
 
-  -- ##### Each Parent Failures ##### 
+  -- ##### Each Parent Failures #####
   -- all each parents refenced by each parent failures should have failed in the preceeding step
 
-  -- when a each  before or setup hook fails, the next each subevents and tests 
+  -- when a each  before or setup hook fails, the next each subevents and tests
   -- should be parent failures as should the next teardown event in the case of each around
   chkEachHookFailurePropagation
- where
-  sourceFailures = filter isPreHookFailure logs
-  parentFailures = filter isParentFailure logs
-  chkAllSubnodesAreParentFailures failLog = 
-      HERE
-  chkOnceHookFailurePropagation = 
-    traverse_ chkAllSubnodesAreParentFailures onceFails
-    where 
-      onceFails = filter (nodeTypeMatch onceHook) sourceFailures
+  where
+    sourceFailures :: [LogEntry]
+    sourceFailures = filter isPreHookFailure logs
 
-  chkEachHookFailurePropagation = uu
-  chkThreadHookFailurePropagation = uu
-  chkSourceFailureLocs = traverse_ chkSourceLocMathces parentFailures
-  chkSourceLocMathces l = l.log & \case
-      ParentFailure {
-       loc,
-       sourceFailureLoc
-      } -> do 
-        chk' 
-         ("sourceFailureLoc is not a parent path to loc in:\n" <> txt l)
-         (sourceFailureLoc `isParentPath` loc) 
-      _ -> pure ()
-   
+    bypasses :: [LogEntry]
+    bypasses = filter isBypassed logs
 
+    threadedLogFailuresBypasses :: [([LogEntry], [LogEntry], [LogEntry])]
+    threadedLogFailuresBypasses =
+      (\lg -> (lg, filter isPreHookFailure lg, filter isBypassed lg)) <$>
+        threadedLogs False logs
+        
+    chkSourceFailureLocs = traverse_ chkSourceLocMathces bypasses
+    chkSourceLocMathces l =
+      l.log & \case
+        Bypassed
+          { loc,
+            sourceFailureLoc
+          } -> do
+            chk'
+              ("sourceFailureLoc is not a parent path to loc in:\n" <> txt l)
+              (sourceFailureLoc `isParentPath` loc)
+        _ -> pure ()
+
+    chkAllSubnodesAreBypasses :: Text -> [LogEntry] -> LogEntry -> IO ()
+    chkAllSubnodesAreBypasses message targetLog sourceFailure =
+      failed
+        & maybe
+          (pure ())
+          ( \l ->
+              chkFail $
+                message
+                  <> "\n Subnode is not bypassed when parent hook failed."
+                  <> "\n subnode:\n "
+                  <> txt l
+                  <> "\n parent hook:\n "
+                  <> txt sourceFailure
+          )
+      where
+        srcErrPath :: ExePath
+        srcErrPath = sourceFailure.log.loc
+
+        isSubnode :: LogEntry -> Bool
+        isSubnode l = srcErrPath `isParentPath` l.log.loc || srcErrPath == l.log.loc && nodeTypeMatch isTeardown l
+        
+        failed :: Maybe LogEntry
+        failed = find (\l -> isSubnode l && not (isBypassed l)) targetLog
+
+    chkOnceHookFailurePropagation :: IO ()
+    chkOnceHookFailurePropagation =
+      traverse_ (chkAllSubnodesAreBypasses "Once hook failure not propagated" logs) onceFails
+      where
+        onceFails = filter (nodeTypeMatch onceHook) sourceFailures
+
+    chkOnceHookBypassReferences :: IO ()
+    chkOnceHookBypassReferences =
+      chkFailureBypasses
+        "Once hook referenced in Bypass which did not fail"
+        bypasses
+        $ filter isOnceHook sourceFailures
+
+    chkFailureBypasses :: Text -> [LogEntry] -> [LogEntry] -> IO ()
+    chkFailureBypasses message bypasses' targertFailures =
+      traverse_ chkBypassSource bypasses'
+      where
+        chkBypassSource :: LogEntry -> IO ()
+        chkBypassSource byPass =
+          byPass.log & \case
+            Bypassed
+              { sourceFailureLoc
+              } ->
+                find (\l -> l.log.loc == sourceFailureLoc) targertFailures
+                  & maybe
+                    ( chkFail $
+                        message
+                          <> "\n"
+                          <> "node Bypass logged but source node did not fail"
+                          <> "\n"
+                          <> txt byPass
+                    )
+                    (const $ pure ())
+            _ -> bug "non Bypassed log in byPasses"
+
+    chkThreadHookFailurePropagation :: IO ()
+    chkThreadHookFailurePropagation =
+      traverse_ chkThisThread threadedLogFailuresBypasses
+      where
+        chkThisThread :: ([LogEntry], [LogEntry], [LogEntry]) -> IO ()
+        chkThisThread (logs', fails, _bypasses) =
+          traverse_ (chkAllSubnodesAreBypasses "Thread hook failure not propagated" logs') threadFails
+          where
+            threadFails = filter (nodeTypeMatch threadHook) fails
+
+    chkThreadHookBypassReferences :: IO ()
+    chkThreadHookBypassReferences = 
+      traverse_ chkThisThread threadedLogFailuresBypasses
+      where
+        chkThisThread :: ([LogEntry], [LogEntry], [LogEntry]) -> IO ()
+        chkThisThread (_logs, fails, bypasses') =
+          chkFailureBypasses "Thread hook referenced in Bypass which did not fail in same thread" bypasses' fails
+
+    chkEachHookFailurePropagation = uu
 
 chkFailurePropagationLegacy :: [LogEntry] -> IO ()
 chkFailurePropagationLegacy lg =
@@ -619,19 +703,20 @@ chkParentFailsPropagated
             -- if the child node is a once hook on different thread
             -- eg failing ThreadHook => parent failed OnceHook a parent failure will have been
             -- caused by a OnceHook failure on a different thread
-            onceChildException = lgItm.lineInfo.threadId /= failLog.lineInfo.threadId &&
-              onceHook lgItm.log.nodeType
+            onceChildException =
+              lgItm.lineInfo.threadId /= failLog.lineInfo.threadId
+                && onceHook lgItm.log.nodeType
          in acc
               == DoneChecking
                 ? pure DoneChecking
               $ lgItm.log
                 & \case
-                  ParentFailure {} ->
+                  Bypassed {} ->
                     do
                       -- TODO fix chk' so it prettyprints properly
                       -- that is why chkEq' was used here
                       chkEq'
-                        ( "ParentFailure (source error) path is not a sub-path of the skipped child node:\n"
+                        ( "Bypassed (source error) path is not a sub-path of the skipped child node:\n"
                             <> "\nParent Failure (Source Error) is:\n"
                             <> txt failLog
                             <> "\n"
@@ -681,7 +766,7 @@ chkLeafFailsAreNotPropagated
       -- TODO: ()may be fixed) chkFail does not work here it escapes new lines - fix and check all chk functions format properly
       ( \l ->
           l.log & \case
-            ParentFailure {sourceFailureNodeType} ->
+            Bypassed {sourceFailureNodeType} ->
               -- this is wrong can pick up failed elements from another branch
               unless (onceSuiteEvent sourceFailureNodeType) $ do
                 {-
@@ -726,7 +811,7 @@ failInfo ls =
                   (const (Nothing, FailInfo l ls' : result))
             -- todo think about logic here
             InitialisationFailure {} -> passThrough
-            ParentFailure {} -> passThrough
+            Bypassed {} -> passThrough
             StartExecution {} -> passThrough
             EndExecution {} -> passThrough
             NodeLog {} -> passThrough
@@ -738,7 +823,7 @@ failInfo ls =
         ( \li ->
             li.log & \case
               Failure {} -> True
-              ParentFailure {} -> True
+              Bypassed {} -> True
               Start {} -> True
               _ -> False
         )
@@ -757,7 +842,7 @@ chkFailureLocEqualsLastStartLoc =
       newStart
         & maybe
           ( do
-              chkParentFailureLoc mpl li
+              chkBypassedLoc mpl li
               mParentLoc
           )
           pure
@@ -766,10 +851,10 @@ chkFailureLocEqualsLastStartLoc =
     startLoc :: LogEntry -> Maybe ExePath
     startLoc l = isStart l ? startSuiteEventLoc l $ Nothing
 
-    chkParentFailureLoc :: Maybe ExePath -> LogEntry -> IO ()
-    chkParentFailureLoc mParentLoc li =
+    chkBypassedLoc :: Maybe ExePath -> LogEntry -> IO ()
+    chkBypassedLoc mParentLoc li =
       case li.log of
-        ParentFailure {loc} -> chkEq' ("Parent failure loc for " <> toS (ppShow li)) mParentLoc (Just loc)
+        Bypassed {loc} -> chkEq' ("Parent failure loc for " <> toS (ppShow li)) mParentLoc (Just loc)
         _ -> pure ()
 
 chkAfterTeardownParents :: Map T.EventPath T.EventPath -> [LogEntry] -> IO ()
@@ -824,7 +909,7 @@ logTails :: Bool -> [LogEntry] -> [[LogEntry]]
 logTails wantReverse = tails . bool PR.id reverse wantReverse
 
 startHook :: [Hz] -> [HookPos] -> LogEntry -> Bool
-startHook hzs poss l = startOrParentFailure l && (getHookInfo l & maybe False (\(hz', hkPos) -> hz' `PE.elem` hzs && hkPos `PE.elem` poss))
+startHook hzs poss l = startOrBypassed l && (getHookInfo l & maybe False (\(hz', hkPos) -> hz' `PE.elem` hzs && hkPos `PE.elem` poss))
 
 chkNoEmptyPostHooks :: [Hz] -> [LogEntry] -> IO ()
 chkNoEmptyPostHooks hzs =
@@ -921,14 +1006,14 @@ chkAllTemplateItemsLogged ts lgs =
           ( \lg ->
               do
                 case lg.log of
-                  ParentFailure {loc, nodeType} -> flip MkEventPath nodeType <$> topPath loc
+                  Bypassed {loc, nodeType} -> flip MkEventPath nodeType <$> topPath loc
                   Start {loc, nodeType} -> flip MkEventPath nodeType <$> topPath loc
                   _ -> Nothing
           )
           lgs
 
 nxtHookLog :: [LogEntry] -> Maybe LogEntry
-nxtHookLog = find (\l -> startEndNodeMatch isHook l || isHookParentFailure l)
+nxtHookLog = find (\l -> startEndNodeMatch isHook l || isHookBypassed l)
 
 {-
  TODO: when implementing log parsing need a threadView which includes all thread events
@@ -940,7 +1025,7 @@ nxtHookLog = find (\l -> startEndNodeMatch isHook l || isHookParentFailure l)
 
 threadVisible :: Bool -> ThreadId -> [LogEntry] -> [LogEntry]
 threadVisible onceHookInclude tid =
-  filter (\l -> tid == l.lineInfo.threadId || onceHookInclude && (startEndNodeMatch onceHook l || isOnceHookParentFailure l))
+  filter (\l -> tid == l.lineInfo.threadId || onceHookInclude && (startEndNodeMatch onceHook l || isOnceHookBypassed l))
 
 threadIds :: [LogEntry] -> [ThreadId]
 threadIds = PE.nub . fmap (.lineInfo.threadId)
@@ -1161,7 +1246,7 @@ parentMatchesTest parentPredicate parentHookItm testItm = do
   if parentPredicate parentHookItm
     then do
       startEvntPath <- startSuiteEventLoc testItm
-      tstStartSubPath <- parentPath (isTestEventOrTestParentFailure testItm) startEvntPath
+      tstStartSubPath <- parentPath (isTestEventOrTestBypassed testItm) startEvntPath
       parentPath' <- startSuiteEventLoc parentHookItm
       pure $ parentPath'.un `PE.isSuffixOf` tstStartSubPath.un
     else
@@ -1181,7 +1266,7 @@ isParentPath (ExePath parent) (ExePath child) =
 
 eventMatchesHookPos :: [HookPos] -> LogEntry -> Bool
 eventMatchesHookPos hookPoses lg =
-  suiteEventOrParentFailureSuiteEvent lg
+  suiteEventOrBypassedSuiteEvent lg
     & maybe
       False
       ( \case
@@ -1250,30 +1335,34 @@ mknAction' baseSeed q pth ns _ds = mknAction baseSeed q pth ns $ DummyHkResult 0
 
 -- assumes th queue is preloaded (ie loadQIfPrload has already been run) if genStrategy == Preload
 mknAction :: forall pth. (Show pth) => Int -> TQueue Spec -> pth -> NSpec -> DummyHkResult -> IO DummyHkResult
-mknAction baseSeed q pth ns ds = ns & \case
-  T.All s -> mkActionBase pth s ds
-  PassProb
-    { genStrategy,
-      passPcnt,
-      hookPassThroughErrPcnt,
-      minDelay,
-      maxDelay
-    } ->
-      case genStrategy of
-        Preload -> mkQueAction q pth ds
-        Runtime -> do
-          subSeed <- RS.uniformM RS.globalStdGen :: IO Int
-          mkActionBase pth 
-            (mkManySpec
-              ManyParams
-                { baseSeed,
-                  subSeed,
-                  path = txt pth,
-                  passPcnt,
-                  hookPassThroughErrPcnt,
-                  minDelay,
-                  maxDelay
-                }) ds
+mknAction baseSeed q pth ns ds =
+  ns & \case
+    T.All s -> mkActionBase pth s ds
+    PassProb
+      { genStrategy,
+        passPcnt,
+        hookPassThroughErrPcnt,
+        minDelay,
+        maxDelay
+      } ->
+        case genStrategy of
+          Preload -> mkQueAction q pth ds
+          Runtime -> do
+            subSeed <- RS.uniformM RS.globalStdGen :: IO Int
+            mkActionBase
+              pth
+              ( mkManySpec
+                  ManyParams
+                    { baseSeed,
+                      subSeed,
+                      path = txt pth,
+                      passPcnt,
+                      hookPassThroughErrPcnt,
+                      minDelay,
+                      maxDelay
+                    }
+              )
+              ds
 
 -- TODO: make bug / error functions that uses text instead of string
 -- TODO: check callstack

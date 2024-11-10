@@ -216,10 +216,10 @@ test_suite_preload = do
   shrinkState <- newTVarIO False
   testNo <- newTVarIO 0
   defaultMain $
-    testGroup "PreLoad" [runProp testNo shrinkState "Preload" testOpts {overrideNumTests = Just 100} defParams {genStrategy = Preload}]
+    testGroup "PreLoad" [runProp testNo shrinkState "Preload" testOpts {overrideNumTests = Just 1000} defParams {genStrategy = Preload}]
 
 
--- $> test_suite_runtime
+-- $ > test_suite_runtime
 test_suite_runtime :: IO ()
 test_suite_runtime = do
   -- need a separate shrinkState for every test group
@@ -228,7 +228,7 @@ test_suite_runtime = do
   defaultMain $
     testGroup
       "generator stubs"
-      [ runProp testNo shrinkState "Runtime" testOpts {overrideNumTests = Just 10000} defParams {genStrategy = Runtime, minTestsPerFixture = 1}
+      [ runProp testNo shrinkState "Runtime" testOpts {overrideNumTests = Just 1000} defParams {genStrategy = Runtime, minTestsPerFixture = 1}
       ]
 
 {- TODO: Check out performance.

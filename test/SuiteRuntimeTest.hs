@@ -801,7 +801,7 @@ unit_leaf_hook_failure =
 {-
 TODO:
 - rethink failure propagation checks :: DONE
-- get unit working
+- get unit working :: done
 - rerun prop based tests - runtime - 1000 x
 - rerun prop based tests - runtime - 1000 x - high pass through error rate
 - fix once hook pass through error
@@ -810,10 +810,10 @@ TODO:
 - rerun prop based tests - runtime - 10000 x - high pass through error rate
 - rerun prop based test - preload - 10000 x
 - rerun prop based test - preload - 10000 x - high pass through error rate
-- delete legacy propagation check
+- delete legacy propagation check - clean up unit tests
 - merge
 -}
--- $> unit_failed_again
+-- $ > unit_failed_again
 unit_failed_again :: IO ()
 unit_failed_again =
   replicateM_ 1000 $
@@ -836,242 +836,44 @@ unit_failed_again =
     ] 
 
 
-{-
-
-
-"sourceFailureLoc is not a parent path to loc in:
-\nMkLog\n  { lineInfo = MkLineInfo { threadId = 106 , idx = 4 }\n  , 
-log =\n      
-Bypassed\n        
-{ loc =\n            
-ExePath\n              { un = [ NodePath { module' = \"0\" , path = \"OnceAround\" } ] }\n        , 
-nodeType = Hook Once Teardown\n        , 
-sourceFailureLoc =\n            ExePath\n              { un = [ NodePath { module' = \"0\" , 
-path = \"OnceAround\" } ] }\n        , 
-sourceFailureNodeType = Hook Once Setup\n        }\n  
-}"
-FAIL (12027.96s)
-    failed after 948 successful tests and 110 shrinks
-    expected /= (is right t)
-    t         : Left user error (Leaf failure propagated to next event.
-    Leaf event was:
-    MkLog
-      { lineInfo = MkLineInfo { threadId = 62105 , idx = 1 }
-      , event =
-          Failure
-            { nodeType = Test
-            , loc =
-                ExePath
-                  { un =
-                      [ TestPath { id = 0 , title = "0.Test #0" }
-                      , NodePath { module' = "0" , path = "Test" }
-                      ]
-                  }
-            , exception =
-                MkException
-                  { displayText =
-                      [ "\"FAIL RESULT @ \\\"0.Test #0\\\"\\nCallStack (from HasCallStack):\\n  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-18850aa0cfc10d47cafa50ad7aed69c175153e61bf033791a3ee88b37f89561d:Relude.Debug\\n  error, called at test/SuiteRuntimeTestBase.hs:1546:15 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTestBase\""
-                      ]
-                  }
-            }
-      }
-    Next event was:
-    Bypassed
-      { loc =
-          ExePath
-            { un =
-                [ TestPath { id = 0 , title = "1.0.0.0.Test #0" }
-                , NodePath { module' = "1.0.0.0" , path = "Test" }
-                , NodePath { module' = "1.0.0" , path = "EachAfter" }
-                , NodePath { module' = "1.0" , path = "OnceAround" }
-                , NodePath { module' = "1" , path = "OnceBefore" }
-                ]
-            }
-      , nodeType = Test
-      , failLoc =
-          ExePath
-            { un =
-                [ NodePath { module' = "1.0.0" , path = "EachAfter" }
-                , NodePath { module' = "1.0" , path = "OnceAround" }
-                , NodePath { module' = "1" , path = "OnceBefore" }
-                ]
-            }
-      , failSuiteEvent = Hook Each After
-      })
-    expected  : True
-    is right t: False
-    
-    Logs for failed test run:
-    generated [ Fixture { tests = [ Spec { delay = 0 , directive = Fail } ] }
-    , OnceBefore
-        { spec = Spec { delay = 0 , directive = Pass }
+-- $ > unit_bypass_failed
+unit_bypass_failed :: IO ()
+unit_bypass_failed =
+  replicateM_ 1000 $
+  runTest'
+  LogFailsAndStartTest
+  defaultSeed
+  (ThreadCount 5)
+  [ EachBefore
+        { eachSpec = T.All { spec = Spec { delay = 0 , directive = Pass } }
         , subNodes =
-            [ OnceAround
-                { setupSpec = Spec { delay = 0 , directive = PassThroughFail }
-                , teardownSpec = Spec { delay = 0 , directive = Pass }
+            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] }
+            , EachBefore
+                { eachSpec =
+                    T.PassProb
+                      { genStrategy = Preload
+                      , passPcnt = 90
+                      , hookPassThroughErrPcnt = 2
+                      , minDelay = 0
+                      , maxDelay = 0
+                      }
                 , subNodes =
-                    [ EachAfter
-                        { eachSpec = All { spec = Spec { delay = 237 , directive = Pass } }
-                        , subNodes =
-                            [ Fixture
-                                { tests =
-                                    [ Spec { delay = 344 , directive = Pass }
-                                    , Spec { delay = 36 , directive = Pass }
-                                    , Spec { delay = 2 , directive = Pass }
-                                    ]
-                                }
+                    [ Fixture
+                        { tests =
+                            [ Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
+                            , Spec { delay = 0 , directive = Pass }
                             ]
                         }
                     ]
                 }
             ]
         }
-    ] 
-
-------- Another failure ----
-
-FAIL (6791.94s)
-    failed after 1884 successful tests and 92 shrinks
-    expected /= (is right t)
-    t         : Left user error (
-    Bypassed (source error) path is not a sub-path of the skipped child node:
-    
-    Parent Failure (Source Error) is:
-    MkLog
-      { lineInfo = MkLineInfo { threadId = 51676 , idx = 1 }
-      , event =
-          Failure
-            { nodeType = Hook Once Setup
-            , loc =
-                ExePath
-                  { un = [ NodePath { module' = "1" , path = "OnceAround" } ] }
-            , exception =
-*** Exception: ExitFailure 1
-                MkException
-                  { displayText =
-                      [ "\"FAIL RESULT @ NodePath { module' = \\\"1\\\" , path = \\\"OnceAround\\\" }\\nCallStack (from HasCallStack):\\n  error, called at src/Relude/Debug.hs:296:11 in relude-1.2.1.0-18850aa0cfc10d47cafa50ad7aed69c175153e61bf033791a3ee88b37f89561d:Relude.Debug\\n  error, called at test/SuiteRuntimeTestBase.hs:1546:15 in pyrethrum-0.1.0.0-inplace:SuiteRuntimeTestBase\""
-                      ]
-                  }
-            }
-      }
-    
-    Child Failure (Skipped Node) is:
-    MkLog
-      { lineInfo = MkLineInfo { threadId = 51676 , idx = 5 }
-      , event =
-          Bypassed
-            { loc =
-                ExePath
-                  { un =
-                      [ TestPath { id = 0 , title = "0.0.Test #0" }
-                      , NodePath { module' = "0.0" , path = "Test" }
-                      , NodePath { module' = "0" , path = "OnceAround" }
-                      ]
-                  }
-            , nodeType = Test
-            , failLoc =
-                ExePath
-                  { un = [ NodePath { module' = "0" , path = "OnceAround" } ] }
-            , failSuiteEvent = Hook Once Setup
-            }
-      }
-    
-    DEBUG failStartTail:
-    [ MkLog
-        { lineInfo = MkLineInfo { threadId = 51676 , idx = 3 }
-        , event =
-            Bypassed
-              { loc =
-                  ExePath
-                    { un =
-                        [ TestPath { id = 0 , title = "1.0.Test #0" }
-                        , NodePath { module' = "1.0" , path = "Test" }
-                        , NodePath { module' = "1" , path = "OnceAround" }
-                        ]
-                    }
-              , nodeType = Test
-              , failLoc =
-                  ExePath
-                    { un = [ NodePath { module' = "1" , path = "OnceAround" } ] }
-              , failSuiteEvent = Hook Once Setup
-              }
-        }
-    , MkLog
-        { lineInfo = MkLineInfo { threadId = 51676 , idx = 4 }
-        , event =
-            Bypassed
-              { loc =
-                  ExePath
-                    { un = [ NodePath { module' = "1" , path = "OnceAround" } ] }
-              , nodeType = Hook Once Teardown
-              , failLoc =
-                  ExePath
-                    { un = [ NodePath { module' = "1" , path = "OnceAround" } ] }
-              , failSuiteEvent = Hook Once Setup
-              }
-        }
-    , MkLog
-        { lineInfo = MkLineInfo { threadId = 51676 , idx = 5 }
-        , event =
-            Bypassed
-              { loc =
-                  ExePath
-                    { un =
-                        [ TestPath { id = 0 , title = "0.0.Test #0" }
-                        , NodePath { module' = "0.0" , path = "Test" }
-                        , NodePath { module' = "0" , path = "OnceAround" }
-                        ]
-                    }
-              , nodeType = Test
-              , failLoc =
-                  ExePath
-                    { un = [ NodePath { module' = "0" , path = "OnceAround" } ] }
-              , failSuiteEvent = Hook Once Setup
-              }
-        }
-    , MkLog
-        { lineInfo = MkLineInfo { threadId = 51675 , idx = 3 }
-        , event =
-            Bypassed
-              { loc =
-                  ExePath
-                    { un = [ NodePath { module' = "0" , path = "OnceAround" } ] }
-              , nodeType = Hook Once Teardown
-              , failLoc =
-                  ExePath
-                    { un = [ NodePath { module' = "0" , path = "OnceAround" } ] }
-              , failSuiteEvent = Hook Once Setup
-              }
-        }
     ]
-    equality check failed:
-    Expected:
-      True
-    Does not Equal:
-      False
-    )
-    expected  : True
-    is right t: False
-    
-    Logs for failed test run:
-    generated [ OnceAround
-        { setupSpec = Spec { delay = 0 , directive = Fail }
-        , teardownSpec = Spec { delay = 0 , directive = Pass }
-        , subNodes =
-            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
-        }
-    , OnceAround
-        { setupSpec = Spec { delay = 0 , directive = Fail }
-        , teardownSpec = Spec { delay = 0 , directive = Pass }
-        , subNodes =
-            [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
-        }
-    ] at CallStack (from HasCallStack):
-      genWith, called at test/SuiteRuntimePropTest.hs:205:10 in pyrethrum-0.1.0.0-inplace:SuiteRuntimePropTest
-    
-    Use --falsify-replay=010fc56013c33c163350a4d4e6c972fbff to replay.
-
-1 out of 1 tests failed (6791.96s)
-
-
--}

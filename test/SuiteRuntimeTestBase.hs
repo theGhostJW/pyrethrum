@@ -568,12 +568,15 @@ chkFailurePropagation logs = do
         <$> threadedLogs False logs
       where
         soureFailureIsNotOnce :: LogEntry -> Bool
-        soureFailureIsNotOnce l  = 
+        soureFailureIsNotOnce = bypassSourceFailureIs (not . onceHook)
+
+    bypassSourceFailureIs :: (NodeType -> Bool) -> LogEntry -> Bool 
+    bypassSourceFailureIs predicate l = 
           case l.log of
           Bypassed
             {sourceFailureNodeType
-            } -> not $ onceHook sourceFailureNodeType
-          _ -> bug $ "this function should only be fed Bypassed logs"
+            } -> predicate sourceFailureNodeType
+          _ -> bug "this function should only be fed Bypassed logs"
 
     chkSourceFailureLocs = traverse_ chkSourceLocMathces bypasses
     chkSourceLocMathces l =
@@ -627,8 +630,8 @@ chkFailurePropagation logs = do
     chkOnceHookBypassReferences =
       chkFailureBypasses
         "Once hook referenced in Bypass which did not fail"
-        bypasses
-        $ filter isOnceHook sourceFailures
+        (filter (bypassSourceFailureIs onceHook) bypasses)
+        (filter isOnceHook sourceFailures)
 
     chkFailureBypasses :: Text -> [LogEntry] -> [LogEntry] -> IO ()
     chkFailureBypasses message bypasses' targertFailures =
@@ -726,6 +729,7 @@ chkFailurePropagation logs = do
             [] -> throwFailure
             x : xs -> case x.log of 
               Failure {loc} -> when (loc /= sourceFailureLoc) throwFailure
+              End {loc} -> when (loc /= sourceFailureLoc) throwFailure
               Bypassed {sourceFailureLoc = thisSourceFailure} -> 
                 sourceFailureLoc == thisSourceFailure ? 
                   chkPrecedingFailure targetEntry sourceFailureLoc xs $

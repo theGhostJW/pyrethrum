@@ -55,7 +55,7 @@ import Internal.Logging as L
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
-import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
+import PyrethrumExtras (ConvertString, onError, toS, txt, (?), db)
 import PyrethrumExtras qualified as PE
 import PyrethrumExtras.Test (chk', chkFail)
 import System.Random.Stateful qualified as RS
@@ -575,7 +575,7 @@ chkFailurePropagation logs = do
           case l.log of
           Bypassed
             {sourceFailureNodeType
-            } -> predicate sourceFailureNodeType
+            } -> db "PREDICATE" $ predicate sourceFailureNodeType
           _ -> bug "this function should only be fed Bypassed logs"
 
     chkSourceFailureLocs = traverse_ chkSourceLocMathces bypasses
@@ -671,7 +671,7 @@ chkFailurePropagation logs = do
       where
         chkThisThread :: ([LogEntry], [LogEntry], [LogEntry]) -> IO ()
         chkThisThread (_logs, fails, bypasses') =
-          chkFailureBypasses "Thread hook referenced in Bypass which did not fail in same thread" bypasses' fails
+          chkFailureBypasses "Thread hook referenced in Bypass which did not fail in same thread" (db "THREADHOOK BYPASSES" bypasses') fails
 
     eachFailedSegments :: [LogEntry] -> [[LogEntry]]
     eachFailedSegments thrdLog =

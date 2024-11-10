@@ -877,3 +877,23 @@ unit_bypass_failed =
             ]
         }
     ]
+
+-- $> unit_passthrough_fail
+unit_passthrough_fail :: IO ()
+unit_passthrough_fail =
+  runTest'
+  LogFailsAndStartTest
+  defaultSeed
+  (ThreadCount 1)
+  [ OnceBefore
+        { spec = Spec { delay = 0 , directive = Pass }
+        , subNodes =
+            [ OnceAround
+                { setupSpec = Spec { delay = 0 , directive = PassThroughFail }
+                , teardownSpec = Spec { delay = 0 , directive = Pass }
+                , subNodes =
+                    [ Fixture { tests = [ Spec { delay = 0 , directive = Pass } ] } ]
+                }
+            ]
+        }
+    ] 

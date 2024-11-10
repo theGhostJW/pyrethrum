@@ -209,7 +209,7 @@ runProp testNo isShrinking testName o p =
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
 
--- $ > test_suite_preload
+-- $> test_suite_preload
 test_suite_preload :: IO ()
 test_suite_preload = do
   -- need a separate shrinkState for every test group

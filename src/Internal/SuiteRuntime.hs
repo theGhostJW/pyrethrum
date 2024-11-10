@@ -8,7 +8,7 @@ import Internal.Logging qualified as L
 import Internal.SuiteFiltering (FilteredSuite (..))
 import Internal.SuiteValidation (SuiteValidationError (..))
 import Prepare qualified as P
-import PyrethrumExtras (txt, (?))
+import PyrethrumExtras (txt, (?), db)
 import UnliftIO
   ( finally,
     replicateConcurrently_,
@@ -735,8 +735,10 @@ runNode lgr hi xt =
        (runNoCatch nodeIn xtree) 
        (\e -> do 
           -- todo calculate node type
+          -- if we are catching an exception here it must be an initialisation error
+          -- because we are handling exceptions thrown in the node itself
           fp <- logReturnFailPoint True lgr xtree.path (initFailureNodeType xtree) e
-          run (Abandon fp) xtree
+          run (Abandon (db "S E T U P FAIL POINT" fp)) xtree
        )
 
     runNoCatch :: NodeIn hi' -> ExeTree hi' -> IO QElementRun

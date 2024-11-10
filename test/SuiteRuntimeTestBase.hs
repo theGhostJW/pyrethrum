@@ -575,7 +575,7 @@ chkFailurePropagation logs = do
           case l.log of
           Bypassed
             {sourceFailureNodeType
-            } -> db "PREDICATE" $ predicate sourceFailureNodeType
+            } -> predicate sourceFailureNodeType
           _ -> bug "this function should only be fed Bypassed logs"
 
     chkSourceFailureLocs = traverse_ chkSourceLocMathces bypasses
@@ -641,9 +641,13 @@ chkFailurePropagation logs = do
         chkBypassSource byPass =
           byPass.log & \case
             Bypassed
-              { sourceFailureLoc
+              { sourceFailureLoc,
+                initialisationFailure
               } ->
-                find (\l -> l.log.loc == sourceFailureLoc) targertFailures
+                -- if failed in initialistion the source node would have passed and passed
+                -- through a lazy failure so skip checking for source error
+                unless initialisationFailure $
+                 find (\l -> l.log.loc == sourceFailureLoc) targertFailures
                   & maybe
                     ( chkFail $
                         message
@@ -651,6 +655,8 @@ chkFailurePropagation logs = do
                           <> "node Bypass logged but source node did not fail"
                           <> "\n"
                           <> txt byPass
+                          <> "\n "
+                          <> txt initialisationFailure
                     )
                     (const $ pure ())
             _ -> bug "non Bypassed log in byPasses"
@@ -671,7 +677,7 @@ chkFailurePropagation logs = do
       where
         chkThisThread :: ([LogEntry], [LogEntry], [LogEntry]) -> IO ()
         chkThisThread (_logs, fails, bypasses') =
-          chkFailureBypasses "Thread hook referenced in Bypass which did not fail in same thread" (db "THREADHOOK BYPASSES" bypasses') fails
+          chkFailureBypasses "Thread hook referenced in Bypass which did not fail in same thread" bypasses' fails
 
     eachFailedSegments :: [LogEntry] -> [[LogEntry]]
     eachFailedSegments thrdLog =

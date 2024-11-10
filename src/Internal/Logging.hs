@@ -178,6 +178,7 @@ displayExePath (ExePath l) = T.intercalate "." $ (.title) <$> reverse l
 -- TODO :: will need thread id
 data FailPoint = FailPoint
   { path :: ExePath,
+    initialisationFailure :: Bool,
     nodeType :: NodeType
   }
   deriving (Show)
@@ -218,6 +219,7 @@ data Log loc nodeLog
   | Bypassed
       { loc :: loc,
         nodeType :: NodeType,
+        initialisationFailure :: Bool,
         sourceFailureLoc :: loc,
         sourceFailureNodeType :: NodeType
       }

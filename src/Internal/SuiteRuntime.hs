@@ -3,7 +3,7 @@ module Internal.SuiteRuntime where
 import Core qualified as C
 import CoreUtils (Hz (..))
 import DSL.Internal.NodeLog qualified as N
-import Internal.Logging (HookPos (..), NodeType (..))
+import Internal.Logging (HookPos (..), NodeType (..), FailPoint (..))
 import Internal.Logging qualified as L
 import Internal.SuiteFiltering (FilteredSuite (..))
 import Internal.SuiteValidation (SuiteValidationError (..))
@@ -359,13 +359,14 @@ data ExeIn oi ti tsti = ExeIn
 type SuiteLogger = Log -> IO ()
 
 logAbandonned :: SuiteLogger -> L.ExePath -> NodeType -> L.FailPoint -> IO ()
-logAbandonned lgr p e a =
+logAbandonned lgr p n FailPoint {initialisationFailure, path, nodeType} =
   lgr $
     L.Bypassed
       { loc = p,
-        nodeType = e,
-        sourceFailureLoc = a.path,
-        sourceFailureNodeType = a.nodeType
+        nodeType = n,
+        initialisationFailure = initialisationFailure,
+        sourceFailureLoc = path,
+        sourceFailureNodeType = nodeType
       }
 
 ioLeft :: forall a. L.FailPoint -> IO (Either L.FailPoint a)
@@ -379,7 +380,7 @@ noImpPropertyError = error "property tests not implemented"
 
 logReturnFailPoint :: Bool -> SuiteLogger -> L.ExePath -> NodeType -> SomeException -> IO L.FailPoint
 logReturnFailPoint inInitialisation lgr p et e =
-  lgr ((inInitialisation ? L.mkInitFailure $ L.mkFailure) p et e) >> pure (L.FailPoint p et)
+  lgr ((inInitialisation ? L.mkInitFailure $ L.mkFailure) p et e) >> pure (L.FailPoint p inInitialisation et)
 
 logReturnFailure :: SuiteLogger -> L.ExePath -> NodeType -> SomeException -> IO (Either L.FailPoint b)
 logReturnFailure lgr p et e =
@@ -737,9 +738,8 @@ runNode lgr hi xt =
           -- todo calculate node type
           -- if we are catching an exception here it must be an initialisation error
           -- because we are handling exceptions thrown in the node itself
-          here add initialistion field to Bypassed log and update validation
           fp <- logReturnFailPoint True lgr xtree.path (initFailureNodeType xtree) e
-          run (Abandon (db "S E T U P FAIL POINT" fp)) xtree
+          run (Abandon fp) xtree
        )
 
     runNoCatch :: NodeIn hi' -> ExeTree hi' -> IO QElementRun

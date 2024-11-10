@@ -5,7 +5,7 @@ import Internal.Logging( NodeType(..),
       HookPos(..),
       Log(..),
       FullLog(..),
-      FLog, FailPoint (nodeType))
+      FLog)
 
 isSetup :: NodeType -> Bool
 isSetup = \case
@@ -17,11 +17,13 @@ isBefore = \case
   Hook _ Before -> True
   _ -> False
 
-isTeardown :: NodeType -> Bool
-isTeardown = \case
+isTeardownNode :: NodeType -> Bool
+isTeardownNode = \case
   Hook _ Teardown -> True
   _ -> False
 
+isTeardown :: FLog l a -> Bool
+isTeardown = nodeTypeMatch isTeardownNode
 
 nodeFrequency :: NodeType -> Hz
 nodeFrequency = \case
@@ -50,6 +52,9 @@ isOnceHookBypassed = isBypassedWith onceHook
 isOnceHook :: FLog l a -> Bool
 isOnceHook = nodeTypeMatch onceHook 
 
+isEachHook :: FLog l a -> Bool
+isEachHook = nodeTypeMatch eachHook 
+
 isHookBypassed :: FLog l a -> Bool
 isHookBypassed = isBypassedWith isHook
 
@@ -64,7 +69,7 @@ isTestBypassed l = l.log & \case
   _ -> False
 
 isTestLogItem :: FLog l a -> Bool
-isTestLogItem li = (isTest <$> getSuiteEvent li) == Just True
+isTestLogItem li = (isTest <$> getNodeType li) == Just True
 
 isTestEventOrTestBypassed :: FLog l a -> Bool
 isTestEventOrTestBypassed te = isTestBypassed te || isTestLogItem te
@@ -85,6 +90,9 @@ onceHook = hookWithHz Once
 threadHook :: NodeType -> Bool
 threadHook = hookWithHz Thread
 
+eachHook :: NodeType -> Bool
+eachHook = hookWithHz Each
+
 onceSuiteEvent :: NodeType -> Bool
 onceSuiteEvent = (== Once) . nodeFrequency
 
@@ -100,7 +108,7 @@ suitEvntToBool :: (NodeType -> Bool) -> Maybe NodeType -> Bool
 suitEvntToBool = maybe False
 
 threadEventToBool :: (NodeType -> Bool) -> FLog l a -> Bool
-threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
+threadEventToBool prd = suitEvntToBool prd . getNodeType
 
 nodeTypeMatch :: (NodeType -> Bool) -> FLog l a -> Bool
 nodeTypeMatch p l = l.log & \case
@@ -148,8 +156,8 @@ suiteEventOrBypassedSuiteEvent l =
   NodeLog {} -> Nothing
   EndExecution {} -> Nothing
 
-getSuiteEvent :: FLog a b -> Maybe NodeType
-getSuiteEvent l = l.log  & \case
+getNodeType :: FLog a b -> Maybe NodeType
+getNodeType l = l.log  & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   Start {nodeType} -> Just nodeType
@@ -163,7 +171,7 @@ getSuiteEvent l = l.log  & \case
 
 getHookInfo :: FLog a b -> Maybe (Hz, HookPos)
 getHookInfo t =
-  getSuiteEvent t >>= \case
+  getNodeType t >>= \case
     Hook hz pos -> Just (hz, pos)
     Test {} -> Nothing
 

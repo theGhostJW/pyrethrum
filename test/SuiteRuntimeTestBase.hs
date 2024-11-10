@@ -17,9 +17,10 @@ import FullSuiteTestTemplate (Directive, EventPath (..), NSpec (PassProb), Spec 
 import FullSuiteTestTemplate qualified as T
 import Internal.LogQueries
   ( getHookInfo,
-    getSuiteEvent,
+    getNodeType,
     isBypassed,
     isChildless,
+    isEachHook,
     isEnd,
     isHook,
     isHookBypassed,
@@ -39,6 +40,7 @@ import Internal.LogQueries
     suiteEventOrBypassedSuiteEvent,
     threadEventToBool,
     threadHook,
+    eachHook
   )
 import Internal.Logging as L
   ( ExePath (..),
@@ -56,7 +58,7 @@ import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
 import PyrethrumExtras (ConvertString, db, onError, toS, txt, uu, (?))
 import PyrethrumExtras qualified as PE
-import PyrethrumExtras.Test (chk, chk', chkFail)
+import PyrethrumExtras.Test (chk', chkFail)
 import System.Random.Stateful qualified as RS
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO.Concurrent as C
@@ -149,7 +151,8 @@ chkProperties baseSeed threadLimit ts wholeLog = do
       chkThreadLogsInOrder,
       chkAllTemplateItemsLogged ts,
       chkStartsOnce "once hooks and tests" shouldOccurOnce,
-      chkResults baseSeed threadLimit ts
+      chkResults baseSeed threadLimit ts,
+      chkFailurePropagation
     ]
   -- these checks apply to each thread log (events with the same thread id)
   threadLogChks
@@ -164,8 +167,8 @@ chkProperties baseSeed threadLimit ts wholeLog = do
     wholeLog
     [ chkPrecedingSuiteEventAsExpected (T.expectedParentPrecedingEvents ts),
       chkAfterTeardownParents (T.expectedParentSubsequentEvents ts),
-      chkFailureLocEqualsLastStartLoc,
-      chkFailurePropagationLegacy
+      chkFailureLocEqualsLastStartLoc
+      -- , chkFailurePropagationLegacy
     ]
 
 chkNoEmptyHooks :: [LogEntry] -> IO ()
@@ -529,31 +532,30 @@ chkFailurePropagation logs = do
   -- ##### All Parent Failures #####
   -- all parent failure references should reference a genuine parent
   chkSourceFailureLocs
-  -- ##### Once Parent Failures #####
-  -- all once parents refenced by parent failures should have failed * may need
-  -- modification for once pass through failures
 
+  -- ##### Once Parent Failures #####
   -- when a Once before or setup hook fails all subevents should be parent failures
-  -- as should all teardown events
+  -- as should all teardown events - will need modification for once pass through failures
   chkOnceHookFailurePropagation
 
   -- all once parents refenced by bypass failures should have failed
   chkOnceHookBypassReferences
 
   -- ##### Thread Parent Failures #####
-  -- all thread parents refenced by thread parent failures should have failed
-  chkThreadHookBypassReferences
-
   -- when a thread before or setup hook fails all subevents in the same thread
   -- should be parent failures as should all teardown events
   chkThreadHookFailurePropagation
 
+  -- all thread parents refenced by thread parent failures should have failed
+  chkThreadHookBypassReferences
+
   -- ##### Each Parent Failures #####
   -- all each parents refenced by each parent failures should have failed in the preceeding step
-
-  -- when a each  before or setup hook fails, the next each subevents and tests
-  -- should be parent failures as should the next teardown event in the case of each around
   chkEachHookFailurePropagation
+
+  -- when a each before or setup hook fails, the next each subevents and tests
+  -- should be parent failures as should the next teardown event in the case of each around
+  chkEachHookBypassReferences
   where
     sourceFailures :: [LogEntry]
     sourceFailures = filter isPreHookFailure logs
@@ -563,9 +565,9 @@ chkFailurePropagation logs = do
 
     threadedLogFailuresBypasses :: [([LogEntry], [LogEntry], [LogEntry])]
     threadedLogFailuresBypasses =
-      (\lg -> (lg, filter isPreHookFailure lg, filter isBypassed lg)) <$>
-        threadedLogs False logs
-        
+      (\lg -> (lg, filter isPreHookFailure lg, filter isBypassed lg))
+        <$> threadedLogs False logs
+
     chkSourceFailureLocs = traverse_ chkSourceLocMathces bypasses
     chkSourceLocMathces l =
       l.log & \case
@@ -597,16 +599,22 @@ chkFailurePropagation logs = do
         srcErrPath = sourceFailure.log.loc
 
         isSubnode :: LogEntry -> Bool
-        isSubnode l = srcErrPath `isParentPath` l.log.loc || srcErrPath == l.log.loc && nodeTypeMatch isTeardown l
-        
+        isSubnode = pathOwnsLog srcErrPath
+
         failed :: Maybe LogEntry
         failed = find (\l -> isSubnode l && not (isBypassed l)) targetLog
+
+    pathOwnsLog :: ExePath -> LogEntry -> Bool
+    pathOwnsLog prntPath chldLog =
+      prntPath `isParentPath` chldPath || prntPath == chldPath && isTeardown chldLog
+      where
+        chldPath = chldLog.log.loc
 
     chkOnceHookFailurePropagation :: IO ()
     chkOnceHookFailurePropagation =
       traverse_ (chkAllSubnodesAreBypasses "Once hook failure not propagated" logs) onceFails
       where
-        onceFails = filter (nodeTypeMatch onceHook) sourceFailures
+        onceFails = filter isOnceHook sourceFailures
 
     chkOnceHookBypassReferences :: IO ()
     chkOnceHookBypassReferences =
@@ -648,14 +656,76 @@ chkFailurePropagation logs = do
             threadFails = filter (nodeTypeMatch threadHook) fails
 
     chkThreadHookBypassReferences :: IO ()
-    chkThreadHookBypassReferences = 
+    chkThreadHookBypassReferences =
       traverse_ chkThisThread threadedLogFailuresBypasses
       where
         chkThisThread :: ([LogEntry], [LogEntry], [LogEntry]) -> IO ()
         chkThisThread (_logs, fails, bypasses') =
           chkFailureBypasses "Thread hook referenced in Bypass which did not fail in same thread" bypasses' fails
 
-    chkEachHookFailurePropagation = uu
+    eachFailedSegments :: [LogEntry] -> [[LogEntry]]
+    eachFailedSegments thrdLog =
+      takeEachFailRelated <$> filter eachHkFailureHead (inits thrdLog)
+      where
+        eachHkFailureHead sgmnt =
+          PE.head sgmnt
+            & maybe False (\l -> isPreHookFailure l && isEachHook l)
+        takeEachFailRelated =
+          \case
+            [] -> []
+            x : xs ->
+              x : takeWhile (pathOwnsLog x.log.loc) xs
+
+    chkEachHookFailurePropagation :: IO ()
+    chkEachHookFailurePropagation =
+      traverse_ chkThisThread threadedLogFailuresBypasses
+      where
+        chkThisThread :: ([LogEntry], [LogEntry], [LogEntry]) -> IO ()
+        chkThisThread (thrdlogs, _fails, _bypasses') =
+          traverse_ chkBypasses eachFails
+          where
+            eachFails = eachFailedSegments thrdlogs
+            chkBypasses =
+              \case
+                [] -> pure ()
+                x : xs -> chkAllSubnodesAreBypasses "Each hook failure not propagated" xs x
+
+    chkEachHookBypassReferences :: IO ()
+    chkEachHookBypassReferences =
+      traverse_ chkThisThread threadedLogFailuresBypasses
+      where
+        chkThisThread :: ([LogEntry], [LogEntry], [LogEntry]) -> IO ()
+        chkThisThread (thrdlogs, _fails, _bypasses') =
+          chkBypassedPrecededByFail $ reverse thrdlogs
+          where
+            chkBypassedPrecededByFail :: [LogEntry] -> IO ()
+            chkBypassedPrecededByFail revLog =
+              case revLog of
+                [] -> pure ()
+                x : xs -> do
+                  case x.log of
+                    Bypassed
+                      { 
+                        sourceFailureLoc,
+                        sourceFailureNodeType
+                      } -> when (eachHook sourceFailureNodeType) $
+                        chkPrecedingFailure x sourceFailureLoc xs
+                    _ -> pure ()
+                  chkBypassedPrecededByFail xs
+
+        chkPrecedingFailure :: LogEntry -> ExePath -> [LogEntry] -> IO ()    
+        chkPrecedingFailure targetEntry sourceFailureLoc = 
+          \case 
+            [] -> throwFailure
+            x : xs -> case x.log of 
+              Failure {loc} -> when (loc /= sourceFailureLoc) throwFailure
+              Bypassed {sourceFailureLoc = thisSourceFailure} -> 
+                sourceFailureLoc == thisSourceFailure ? 
+                  chkPrecedingFailure targetEntry sourceFailureLoc xs $
+                  throwFailure
+              _ -> throwFailure
+          where 
+            throwFailure = chkFail $ "Each source failure does not directly precede Bypassed failure:\n " <> txt targetEntry   
 
 chkFailurePropagationLegacy :: [LogEntry] -> IO ()
 chkFailurePropagationLegacy lg =
@@ -896,7 +966,7 @@ chkForMatchedParents message wantReverseLog parentEventPredicate expectedChildPa
       (,actulaParentPath) <$> targetPath
       where
         logSuiteEventPath :: LogEntry -> Maybe T.EventPath
-        logSuiteEventPath l = MkEventPath <$> (startSuiteEventLoc l >>= topPath) <*> getSuiteEvent l
+        logSuiteEventPath l = MkEventPath <$> (startSuiteEventLoc l >>= topPath) <*> getNodeType l
         targEvnt = PE.head evntLog
         targetPath = targEvnt >>= logSuiteEventPath
         actulaParentPath = do

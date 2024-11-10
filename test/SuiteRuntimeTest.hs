@@ -800,7 +800,7 @@ unit_leaf_hook_failure =
 
 {-
 TODO:
-- rethink failure propagation checks
+- rethink failure propagation checks :: DONE
 - get unit working
 - rerun prop based tests - runtime - 1000 x
 - rerun prop based tests - runtime - 1000 x - high pass through error rate

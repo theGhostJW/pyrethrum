@@ -837,6 +837,19 @@ unit_failed_again =
 
 
 {-
+
+
+"sourceFailureLoc is not a parent path to loc in:
+\nMkLog\n  { lineInfo = MkLineInfo { threadId = 106 , idx = 4 }\n  , 
+log =\n      
+Bypassed\n        
+{ loc =\n            
+ExePath\n              { un = [ NodePath { module' = \"0\" , path = \"OnceAround\" } ] }\n        , 
+nodeType = Hook Once Teardown\n        , 
+sourceFailureLoc =\n            ExePath\n              { un = [ NodePath { module' = \"0\" , 
+path = \"OnceAround\" } ] }\n        , 
+sourceFailureNodeType = Hook Once Setup\n        }\n  
+}"
 FAIL (12027.96s)
     failed after 948 successful tests and 110 shrinks
     expected /= (is right t)

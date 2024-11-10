@@ -204,3 +204,13 @@ startSuiteEventLoc l = l.log & \case
   Bypassed {loc} -> Just loc
   Start {loc} -> Just loc
   End {} -> Nothing
+
+getLoc :: FLog l a -> Maybe l
+getLoc l = l.log & \case
+  FilterLog {} -> Nothing
+  SuiteInitFailure {} -> Nothing
+  StartExecution {} -> Nothing
+  EndExecution {} -> Nothing
+  NodeLog {} -> Nothing 
+  l' -> Just l'.loc
+

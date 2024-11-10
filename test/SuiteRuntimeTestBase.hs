@@ -18,8 +18,8 @@ import FullSuiteTestTemplate qualified as T
 import Internal.LogQueries
   ( getHookInfo,
     getNodeType,
+    getLoc,
     isBypassed,
-    isChildless,
     isEachHook,
     isEnd,
     isHook,
@@ -36,7 +36,6 @@ import Internal.LogQueries
     startEndNodeMatch,
     startOrBypassed,
     startSuiteEventLoc,
-    suitEvntToBool,
     suiteEventOrBypassedSuiteEvent,
     threadEventToBool,
     threadHook,
@@ -56,7 +55,7 @@ import Internal.Logging as L
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
-import PyrethrumExtras (ConvertString, db, onError, toS, txt, uu, (?))
+import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
 import PyrethrumExtras qualified as PE
 import PyrethrumExtras.Test (chk', chkFail)
 import System.Random.Stateful qualified as RS
@@ -537,7 +536,7 @@ chkFailurePropagation logs = do
   -- when a Once before or setup hook fails all subevents should be parent failures
   -- as should all teardown events - will need modification for once pass through failures
   chkOnceHookFailurePropagation
-
+ 
   -- all once parents refenced by bypass failures should have failed
   chkOnceHookBypassReferences
 
@@ -565,19 +564,26 @@ chkFailurePropagation logs = do
 
     threadedLogFailuresBypasses :: [([LogEntry], [LogEntry], [LogEntry])]
     threadedLogFailuresBypasses =
-      (\lg -> (lg, filter isPreHookFailure lg, filter isBypassed lg))
+      (\lg -> (lg, filter isPreHookFailure lg, filter soureFailureIsNotOnce $ filter isBypassed lg))
         <$> threadedLogs False logs
+      where
+        soureFailureIsNotOnce :: LogEntry -> Bool
+        soureFailureIsNotOnce l  = 
+          case l.log of
+          Bypassed
+            {sourceFailureNodeType
+            } -> not $ onceHook sourceFailureNodeType
+          _ -> bug $ "this function should only be fed Bypassed logs"
 
     chkSourceFailureLocs = traverse_ chkSourceLocMathces bypasses
     chkSourceLocMathces l =
       l.log & \case
         Bypassed
-          { loc,
-            sourceFailureLoc
+          {sourceFailureLoc
           } -> do
             chk'
               ("sourceFailureLoc is not a parent path to loc in:\n" <> txt l)
-              (sourceFailureLoc `isParentPath` loc)
+              (pathOwnsLog sourceFailureLoc l)
         _ -> pure ()
 
     chkAllSubnodesAreBypasses :: Text -> [LogEntry] -> LogEntry -> IO ()
@@ -606,9 +612,10 @@ chkFailurePropagation logs = do
 
     pathOwnsLog :: ExePath -> LogEntry -> Bool
     pathOwnsLog prntPath chldLog =
-      prntPath `isParentPath` chldPath || prntPath == chldPath && isTeardown chldLog
+      chldPath & maybe False
+        \cp -> prntPath `isParentPath` cp || prntPath == cp && isTeardown chldLog
       where
-        chldPath = chldLog.log.loc
+        chldPath = getLoc chldLog
 
     chkOnceHookFailurePropagation :: IO ()
     chkOnceHookFailurePropagation =
@@ -727,180 +734,12 @@ chkFailurePropagation logs = do
           where 
             throwFailure = chkFail $ "Each source failure does not directly precede Bypassed failure:\n " <> txt targetEntry   
 
-chkFailurePropagationLegacy :: [LogEntry] -> IO ()
-chkFailurePropagationLegacy lg =
-  do
-    traverse_ chkLeafFailsAreNotPropagated failTails
-    traverse_ chkParentFailsPropagated failTails
-  where
-    failTails = snd $ failInfo lg
-
-data ChkState = ExpectParentFail | DoneChecking
-  deriving (Show, Eq)
-
-isFailChildEventOf :: LogEntry -> LogEntry -> Bool
-isFailChildEventOf c p =
-  (cIsSubpathOfp || samePath && pIsSetupFailure && cIsTeardown) && (sameThread || pIsOnceHook)
-  where
-    sameThread = p.lineInfo.threadId == c.lineInfo.threadId
-    hasHookPos hp = \case
-      Hook _ hp' -> hp == hp'
-      _ -> False
-    cIsTeardown = logItemtoBool (hasHookPos Teardown) c
-    pFailEvent = case p.log of
-      Failure {nodeType} -> Just nodeType
-      _ -> Nothing
-    pIsSetupFailure = suitEvntToBool (hasHookPos Setup) pFailEvent
-
-    ploc = p.log.loc
-    cloc = c.log.loc
-    samePath = ploc == cloc
-    cIsSubpathOfp = isParentPath ploc cloc
-    pIsOnceHook = suitEvntToBool (\case Hook hz _ -> hz == Once; _ -> False) pFailEvent
-
-chkParentFailsPropagated :: FailInfo -> IO ()
-chkParentFailsPropagated
-  f@FailInfo
-    { failStartTail,
-      failLog
-    } =
-    unless (isChildless f.failLog) $ do
-      void $ foldlM chkEvent ExpectParentFail failStartTail
-    where
-      chkEvent :: ChkState -> LogEntry -> IO ChkState
-      chkEvent acc lgItm =
-        let isFailChild = lgItm `isFailChildEventOf` failLog
-            -- if the child node is a once hook on different thread
-            -- eg failing ThreadHook => parent failed OnceHook a parent failure will have been
-            -- caused by a OnceHook failure on a different thread
-            onceChildException =
-              lgItm.lineInfo.threadId /= failLog.lineInfo.threadId
-                && onceHook lgItm.log.nodeType
-         in acc
-              == DoneChecking
-                ? pure DoneChecking
-              $ lgItm.log
-                & \case
-                  Bypassed {} ->
-                    do
-                      -- TODO fix chk' so it prettyprints properly
-                      -- that is why chkEq' was used here
-                      chkEq'
-                        ( "Bypassed (source error) path is not a sub-path of the skipped child node:\n"
-                            <> "\nParent Failure (Source Error) is:\n"
-                            <> txt failLog
-                            <> "\n"
-                            <> "\n"
-                            <> "Child Failure (Skipped Node) is:\n"
-                            <> txt lgItm
-                            <> "\n"
-                            <> "\n"
-                            <> "DEBUG failStartTail:\n"
-                            <> txt failStartTail
-                        )
-                        True
-                        (isFailChild || onceChildException)
-                      pure ExpectParentFail
-                  f'@Failure {} ->
-                    -- TODO :: hide reinstate with test conversion
-                    fail $ "Failure when expect parent failure:\n" <> ppShow f'
-                  s@Start {} ->
-                    do
-                      -- TODO :: implement chkFalse'
-                      -- TODO :: implement txt
-                      -- TODO :: chk' error mkessage prints to single line - chkEq' works properly
-                      chkEq'
-                        ( "This event should be a child failure:\n"
-                            <> "  This Event is:\n"
-                            <> "    "
-                            <> txt s
-                            <> "  Parent Failure is:\n"
-                            <> "    "
-                            <> txt failLog
-                        )
-                        False
-                        isFailChild
-                      pure DoneChecking
-                  _ ->
-                    fail $
-                      "Unexpected event in failStartTail - these events should have been filtered out:\n" <> ppShow lgItm
-
-chkLeafFailsAreNotPropagated :: FailInfo -> IO ()
-chkLeafFailsAreNotPropagated
-  FailInfo
-    { failStartTail,
-      failLog
-    } = when (isChildless failLog) $ do
-    whenJust
-      (PE.head failStartTail)
-      -- TODO: ()may be fixed) chkFail does not work here it escapes new lines - fix and check all chk functions format properly
-      ( \l ->
-          l.log & \case
-            Bypassed {sourceFailureNodeType} ->
-              -- this is wrong can pick up failed elements from another branch
-              unless (onceSuiteEvent sourceFailureNodeType) $ do
-                {-
-                if a leaf item such as an after hook or test fails then the next item
-                should not be a parent failure because leaf items can't be parents.
-                This does not apply if the parent failure was caused by a once event
-                because such failures can be generated when the thread picks up nodes from
-                a different branch
-                -}
-                fail $
-                  "Leaf failure propagated to next event.\nLeaf event was:\n"
-                    <> ppShow failLog
-                    <> "\nNext event was:\n"
-                    <> ppShow l
-            _ -> pure ()
-      )
-
 -- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
 -- captures
 -- declares element details and has default plus bepoke validation
 -- chkCapture - will log a soft exception and allow trace in place
 -- property that includes assertions
 
-failInfo :: [LogEntry] -> (Maybe NodeType, [FailInfo])
-failInfo ls =
-  foldl' step (Nothing, []) $ tails failStarts
-  where
-    step :: (Maybe NodeType, [FailInfo]) -> [LogEntry] -> (Maybe NodeType, [FailInfo])
-    step (lastStartEvnt, result) =
-      \case
-        [] -> (lastStartEvnt, result)
-        (l : ls') ->
-          l.log & \case
-            FilterLog {} -> passThrough
-            SuiteInitFailure {} -> passThrough
-            Start {nodeType = se} ->
-              (Just se, result)
-            Failure {} ->
-              lastStartEvnt
-                & maybe
-                  (error $ "Failure encountered before start:\n" <> toS (ppShow l))
-                  (const (Nothing, FailInfo l ls' : result))
-            -- todo think about logic here
-            InitialisationFailure {} -> passThrough
-            Bypassed {} -> passThrough
-            StartExecution {} -> passThrough
-            EndExecution {} -> passThrough
-            NodeLog {} -> passThrough
-            End {} -> passThrough
-      where
-        passThrough = (lastStartEvnt, result)
-    failStarts =
-      filter
-        ( \li ->
-            li.log & \case
-              Failure {} -> True
-              Bypassed {} -> True
-              Start {} -> True
-              _ -> False
-        )
-        ls
-
--- TODO: do empty thread test case should not run anything (ie no thread events - cna happpen despite tree
--- shaking due to multiple threads)
 chkFailureLocEqualsLastStartLoc :: [LogEntry] -> IO ()
 chkFailureLocEqualsLastStartLoc =
   void . foldl' step (pure Nothing)

@@ -219,7 +219,7 @@ test_suite_preload = do
     testGroup "PreLoad" [runProp testNo shrinkState "Preload" testOpts {overrideNumTests = Just 1000} defParams {genStrategy = Preload}]
 
 
--- $ > test_suite_runtime
+-- $> test_suite_runtime
 test_suite_runtime :: IO ()
 test_suite_runtime = do
   -- need a separate shrinkState for every test group

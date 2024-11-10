@@ -737,6 +737,7 @@ runNode lgr hi xt =
           -- todo calculate node type
           -- if we are catching an exception here it must be an initialisation error
           -- because we are handling exceptions thrown in the node itself
+          here add initialistion field to Bypassed log and update validation
           fp <- logReturnFailPoint True lgr xtree.path (initFailureNodeType xtree) e
           run (Abandon (db "S E T U P FAIL POINT" fp)) xtree
        )

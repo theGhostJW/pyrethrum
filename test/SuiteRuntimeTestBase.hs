@@ -726,33 +726,49 @@ chkFailurePropagation logs = do
                   case x.log of
                     Bypassed
                       { sourceFailureLoc,
-                        sourceFailureNodeType
+                        sourceFailureNodeType,
+                        initialisationFailure
                       } ->
                         when (eachHook sourceFailureNodeType) $
-                          chkPrecedingFailure x sourceFailureLoc xs
+                          chkPrecedingFailure x sourceFailureLoc initialisationFailure xs
                     _ -> pure ()
                   chkBypassedPrecededByFail xs
 
-        chkPrecedingFailure :: LogEntry -> ExePath -> [LogEntry] -> IO ()
-        chkPrecedingFailure targetEntry sourceFailureLoc =
+        chkPrecedingFailure :: LogEntry -> ExePath -> Bool -> [LogEntry] -> IO ()
+        chkPrecedingFailure targetEntry sourceFailureLoc targIsInitFailure =
           \case
-            [] -> throwFailure
+            mt@[] -> throwFailure mt
             x : xs -> case x.log of
-              Failure {loc} -> when (loc /= sourceFailureLoc) throwFailure
-              End {loc} -> when (loc /= sourceFailureLoc) throwFailure
+              Failure {loc} -> when (loc /= sourceFailureLoc) $ throwFailure x
+              End {loc} -> when (loc /= sourceFailureLoc) $ throwFailure x
               Bypassed
                 { sourceFailureLoc = thisSourceFailure,
                   loc,
                   initialisationFailure
                 } ->
-                  unless (initialisationFailure && thisSourceFailure == loc)
-                    $ sourceFailureLoc
-                      == thisSourceFailure
-                        ? chkPrecedingFailure targetEntry sourceFailureLoc xs
-                    $ throwFailure
-              _ -> throwFailure
+                  unless
+                    (initialisationFailure && thisSourceFailure == loc)
+                    ( sourceFailureLoc
+                        == thisSourceFailure
+                          ? chkPrecedingFailure targetEntry sourceFailureLoc targIsInitFailure xs
+                        $ throwFailure x
+                    )
+              InitialisationFailure {loc} ->
+                unless (targIsInitFailure && loc == sourceFailureLoc) $
+                  throwFailure x
+              _ -> throwFailure x
           where
-            throwFailure = chkFail $ "Each source failure does not directly precede Bypassed failure:\n " <> txt targetEntry
+            throwFailure :: (Show a) => a -> IO ()
+            throwFailure head' =
+              chkFail $
+                "Each source failure does not directly precede Bypassed failure:\n "
+                  <> "Target bypass was: "
+                  <> "\n"
+                  <> txt targetEntry
+                  <> "\n"
+                  <> "Preceding event was: "
+                  <> "\n"
+                  <> txt head'
 
 -- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
 -- captures

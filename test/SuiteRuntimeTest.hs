@@ -902,7 +902,7 @@ unit_passthrough_fail =
     ]
 
 
--- $> unit_passthrough_fail2
+-- $ > unit_passthrough_fail2
 unit_passthrough_fail2 :: IO ()
 unit_passthrough_fail2 =
   runTest'

@@ -798,22 +798,6 @@ unit_leaf_hook_failure =
           }
       ]
 
-{-
-TODO:
-- rethink failure propagation checks :: DONE
-- get unit working :: done
-- rerun prop based tests - runtime - 1000 x
-- rerun prop based tests - runtime - 1000 x - high pass through error rate
-- fix once hook pass through error
-- rerun prop based test - preload - 1000 x
-- rerun prop based tests - runtime - 10000 x
-- rerun prop based tests - runtime - 10000 x - high pass through error rate
-- rerun prop based test - preload - 10000 x
-- rerun prop based test - preload - 10000 x - high pass through error rate
-- delete legacy propagation check - clean up unit tests
-- merge
--}
-
 -- $ > unit_failed_again
 
 unit_failed_again :: IO ()
@@ -921,3 +905,20 @@ unit_passthrough_fail2 =
             ]
         }
     ]
+
+
+{-
+TODO:
+- rethink failure propagation checks :: DONE
+- get unit working :: DONE
+- rerun prop based tests - runtime - 1000 x 
+- rerun prop based tests - runtime - 1000 x - high pass through error rate
+- fix once hook pass through error
+- rerun prop based test - preload - 1000 x DONE
+- rerun prop based tests - runtime - 10000 x DONE
+- rerun prop based tests - runtime - 10000 x - DONE - high pass through error rate
+- rerun prop based test - preload - 10000 x
+- rerun prop based test - preload - 10000 x - high pass through error rate
+- delete legacy propagation check - clean up unit tests
+- merge
+-}

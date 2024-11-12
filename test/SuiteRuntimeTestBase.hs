@@ -159,7 +159,8 @@ chkProperties baseSeed threadLimit ts wholeLog = do
     False
     wholeLog
     [ chkThreadHooksStartedOnceInThread,
-      chkAllStartSuitEventsInThreadImmedialyFollowedByEnd
+      chkAllStartSuitEventsInThreadImmedialyFollowedByEnd,
+      chkFailurePropagationThreaded
     ]
   -- these checks apply to each thread log (ie. Once events + events with the same thread id)
   threadLogChks
@@ -541,21 +542,6 @@ chkFailurePropagation logs = do
   -- all once parents refenced by bypass failures should have failed
   chkOnceHookBypassReferences
 
-  -- ##### Thread Parent Failures #####
-  -- when a thread before or setup hook fails all subevents in the same thread
-  -- should be parent failures as should all teardown events
-  chkThreadHookFailurePropagation
-
-  -- all thread parents refenced by thread parent failures should have failed
-  chkThreadHookBypassReferences
-
-  -- ##### Each Parent Failures #####
-  -- all each parents refenced by each parent failures should have failed in the preceeding step
-  chkEachHookFailurePropagation
-
-  -- when a each before or setup hook fails, the next each subevents and tests
-  -- should be parent failures as should the next teardown event in the case of each around
-  chkEachHookBypassReferences
   where
     sourceFailures :: [LogEntry]
     sourceFailures = filter isPreHookFailure logs
@@ -563,21 +549,6 @@ chkFailurePropagation logs = do
     bypasses :: [LogEntry]
     bypasses = filter isBypassed logs
 
-    threadedLogFailuresBypasses :: [([LogEntry], [LogEntry], [LogEntry])]
-    threadedLogFailuresBypasses =
-      (\lg -> (lg, filter isPreHookFailure lg, filter soureFailureIsNotOnce $ filter isBypassed lg))
-        <$> threadedLogs False logs
-      where
-        soureFailureIsNotOnce :: LogEntry -> Bool
-        soureFailureIsNotOnce = bypassSourceFailureIs (not . onceHook)
-
-    bypassSourceFailureIs :: (NodeType -> Bool) -> LogEntry -> Bool
-    bypassSourceFailureIs predicate l =
-      case l.log of
-        Bypassed
-          { sourceFailureNodeType
-          } -> predicate sourceFailureNodeType
-        _ -> bug "this function should only be fed Bypassed logs"
 
     chkSourceFailureLocs = traverse_ chkSourceLocMathces bypasses
     chkSourceLocMathces l =
@@ -591,38 +562,6 @@ chkFailurePropagation logs = do
               ("sourceFailureLoc is not a parent path to loc in:\n" <> txt l)
               (pathOwnsLog sourceFailureLoc l || initialisationFailure && sourceFailureLoc == loc)
         _ -> pure ()
-
-    chkAllSubnodesAreBypasses :: Text -> [LogEntry] -> LogEntry -> IO ()
-    chkAllSubnodesAreBypasses message targetLog sourceFailure =
-      failed
-        & maybe
-          (pure ())
-          ( \l ->
-              chkFail $
-                message
-                  <> "\n Subnode is not bypassed when parent hook failed."
-                  <> "\n subnode:\n "
-                  <> txt l
-                  <> "\n parent hook:\n "
-                  <> txt sourceFailure
-          )
-      where
-        srcErrPath :: ExePath
-        srcErrPath = sourceFailure.log.loc
-
-        isSubnode :: LogEntry -> Bool
-        isSubnode = pathOwnsLog srcErrPath
-
-        failed :: Maybe LogEntry
-        failed = find (\l -> isSubnode l && not (isBypassed l)) targetLog
-
-    pathOwnsLog :: ExePath -> LogEntry -> Bool
-    pathOwnsLog prntPath chldLog =
-      chldPath & maybe
-        False
-        \cp -> prntPath `isParentPath` cp || prntPath == cp && isTeardown chldLog
-      where
-        chldPath = getLoc chldLog
 
     chkOnceHookFailurePropagation :: IO ()
     chkOnceHookFailurePropagation =
@@ -665,9 +604,78 @@ chkFailurePropagation logs = do
                       (const $ pure ())
             _ -> bug "non Bypassed log in byPasses"
 
+
+bypassSourceFailureIs :: (NodeType -> Bool) -> LogEntry -> Bool
+bypassSourceFailureIs predicate l =
+  case l.log of
+    Bypassed
+      { sourceFailureNodeType
+      } -> predicate sourceFailureNodeType
+    _ -> bug "this function should only be fed Bypassed logs"
+
+chkFailurePropagationThreaded :: [LogEntry] -> IO ()
+chkFailurePropagationThreaded threadedLogs' = do
+ 
+  -- ##### Thread Parent Failures #####
+  -- when a thread before or setup hook fails all subevents in the same thread
+  -- should be parent failures as should all teardown events
+  chkThreadHookFailurePropagation
+
+  -- all thread parents refenced by thread parent failures should have failed
+  chkThreadHookBypassReferences
+
+  -- ##### Each Parent Failures #####
+  -- all each parents refenced by each parent failures should have failed in the preceeding step
+  chkEachHookFailurePropagation
+
+  -- when a each before or setup hook fails, the next each subevents and tests
+  -- should be parent failures as should the next teardown event in the case of each around
+  chkEachHookBypassReferences
+  where
+    -- sourceFailures :: [LogEntry]
+    -- sourceFailures = filter isPreHookFailure logs
+
+    -- bypasses :: [LogEntry]
+    -- bypasses = filter isBypassed logs
+
+    threadedLogFailuresBypasses :: ([LogEntry], [LogEntry], [LogEntry])
+    threadedLogFailuresBypasses =
+      (threadedLogs', filter isPreHookFailure threadedLogs', filter soureFailureIsNotOnce $ filter isBypassed threadedLogs')
+      where
+        soureFailureIsNotOnce :: LogEntry -> Bool
+        soureFailureIsNotOnce = bypassSourceFailureIs (not . onceHook)
+
+    chkFailureBypasses :: Text -> [LogEntry] -> [LogEntry] -> IO ()
+    chkFailureBypasses message bypasses' targertFailures =
+      traverse_ chkBypassSource bypasses'
+      where
+        chkBypassSource :: LogEntry -> IO ()
+        chkBypassSource byPass =
+          byPass.log & \case
+            Bypassed
+              { sourceFailureLoc,
+                initialisationFailure
+              } ->
+                -- if failed in initialistion the source node would have passed and passed
+                -- through a lazy failure so skip checking for source error
+                unless initialisationFailure $
+                  find (\l -> l.log.loc == sourceFailureLoc) targertFailures
+                    & maybe
+                      ( chkFail $
+                          message
+                            <> "\n"
+                            <> "node Bypass logged but source node did not fail"
+                            <> "\n"
+                            <> txt byPass
+                            <> "\n "
+                            <> txt initialisationFailure
+                      )
+                      (const $ pure ())
+            _ -> bug "non Bypassed log in byPasses"
+
     chkThreadHookFailurePropagation :: IO ()
     chkThreadHookFailurePropagation =
-      traverse_ chkThisThread threadedLogFailuresBypasses
+      chkThisThread threadedLogFailuresBypasses
       where
         chkThisThread :: ([LogEntry], [LogEntry], [LogEntry]) -> IO ()
         chkThisThread (logs', fails, _bypasses) =
@@ -677,7 +685,7 @@ chkFailurePropagation logs = do
 
     chkThreadHookBypassReferences :: IO ()
     chkThreadHookBypassReferences =
-      traverse_ chkThisThread threadedLogFailuresBypasses
+      chkThisThread threadedLogFailuresBypasses
       where
         chkThisThread :: ([LogEntry], [LogEntry], [LogEntry]) -> IO ()
         chkThisThread (_logs, fails, bypasses') =
@@ -698,7 +706,7 @@ chkFailurePropagation logs = do
 
     chkEachHookFailurePropagation :: IO ()
     chkEachHookFailurePropagation =
-      traverse_ chkThisThread threadedLogFailuresBypasses
+      chkThisThread threadedLogFailuresBypasses
       where
         chkThisThread :: ([LogEntry], [LogEntry], [LogEntry]) -> IO ()
         chkThisThread (thrdlogs, _fails, _bypasses') =
@@ -712,7 +720,7 @@ chkFailurePropagation logs = do
 
     chkEachHookBypassReferences :: IO ()
     chkEachHookBypassReferences =
-      traverse_ chkThisThread threadedLogFailuresBypasses
+      chkThisThread threadedLogFailuresBypasses
       where
         chkThisThread :: ([LogEntry], [LogEntry], [LogEntry]) -> IO ()
         chkThisThread (thrdlogs, _fails, _bypasses') =
@@ -770,6 +778,37 @@ chkFailurePropagation logs = do
                   <> "\n"
                   <> txt head'
 
+pathOwnsLog :: ExePath -> LogEntry -> Bool
+pathOwnsLog prntPath chldLog =
+  chldPath & maybe
+    False
+    \cp -> prntPath `isParentPath` cp || prntPath == cp && isTeardown chldLog
+  where
+    chldPath = getLoc chldLog
+
+chkAllSubnodesAreBypasses :: Text -> [LogEntry] -> LogEntry -> IO ()
+chkAllSubnodesAreBypasses message targetLog sourceFailure =
+  failed
+    & maybe
+      (pure ())
+      ( \l ->
+          chkFail $
+            message
+              <> "\n Subnode is not bypassed when parent hook failed."
+              <> "\n subnode:\n "
+              <> txt l
+              <> "\n parent hook:\n "
+              <> txt sourceFailure
+      )
+  where
+    srcErrPath :: ExePath
+    srcErrPath = sourceFailure.log.loc
+
+    isSubnode :: LogEntry -> Bool
+    isSubnode = pathOwnsLog srcErrPath
+
+    failed :: Maybe LogEntry
+    failed = find (\l -> isSubnode l && not (isBypassed l)) targetLog
 -- TODO :: REMOVE USER ERROR force to throw or reinterpret user error as failure or ...
 -- captures
 -- declares element details and has default plus bepoke validation

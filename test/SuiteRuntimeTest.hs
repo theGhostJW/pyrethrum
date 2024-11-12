@@ -59,7 +59,7 @@ unit_configError_duplicate =
 -- $ > unit_simple_pass
 
 unit_simple_pass :: IO ()
-unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
+unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Pass]]]
 
 -- $ > unit_simple_fail
 

@@ -155,10 +155,10 @@ defParams =
       maxBranches = 4,
       maxDelay = 1000,
       passPcnt = 90,
-      -- hookPassPcnt = 90,
-      hookPassPcnt = 50,
-      hookPassThroughErrPcnt = 30,
-      -- hookPassThroughErrPcnt = 2,
+      hookPassPcnt = 90,
+      -- hookPassPcnt = 50,
+      -- hookPassThroughErrPcnt = 30,
+      hookPassThroughErrPcnt = 2,
       maxDepth = 5,
       minHz = Once,
       threadCount = ThreadCount 5,
@@ -210,7 +210,6 @@ runProp testNo isShrinking testName o p =
       result = unsafePerformIO $ tryRunTest numTests testNo isShrinking p t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
-
 -- $ > test_suite_preload
 test_suite_preload :: IO ()
 test_suite_preload = do
@@ -218,9 +217,9 @@ test_suite_preload = do
   shrinkState <- newTVarIO False
   testNo <- newTVarIO 0
   defaultMain $
-    testGroup "PreLoad" [runProp testNo shrinkState "Preload" testOpts {overrideNumTests = Just 1000} defParams {genStrategy = Preload}]
+    testGroup "PreLoad" [runProp testNo shrinkState "Preload" testOpts {overrideNumTests = Just 10000} defParams {genStrategy = Preload}]
 
--- $> test_suite_runtime
+-- $ > test_suite_runtime
 test_suite_runtime :: IO ()
 test_suite_runtime = do
   -- need a separate shrinkState for every test group
@@ -229,10 +228,10 @@ test_suite_runtime = do
   defaultMain $
     testGroup
       "generator stubs"
-      [ runProp testNo shrinkState "Runtime" testOpts {overrideNumTests = Just 10000} defParams {genStrategy = Runtime, minTestsPerFixture = 1}
+      [ runProp testNo shrinkState "Runtime" testOpts {overrideNumTests = Just 1000} defParams {genStrategy = Runtime, minTestsPerFixture = 1}
       ]
 
-{- TODO: Check out performance.
+{- TODO: Check out performance
   NResult threads is slower than a handfull
   Threads   Time for 100 tests (Seconds)
   --------------------------------------

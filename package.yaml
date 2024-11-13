@@ -167,7 +167,7 @@ ghc-options:
   - -fno-break-points
   # this would be nice but seems to break ghcid
   # - -Werror=prepositive-qualified-module
-  # - -fdefer-type-error
+  - -fdefer-type-errors
   # profiling
   # - -ddump-to-file 
   # - -ddump-timings

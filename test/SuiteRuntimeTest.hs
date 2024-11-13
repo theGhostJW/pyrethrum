@@ -3,14 +3,14 @@ module SuiteRuntimeTest where
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 
 import Filter (FilterResult (..))
-import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
+import FullSuiteTestTemplate (Directive (..), Spec (..), SpecGen (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.SuiteRuntime (ThreadCount (..))
+import Internal.SuiteValidation
 import PyrethrumExtras (txt)
 import PyrethrumExtras.Test (chk, chkEq)
-import SuiteRuntimeTestBase
+import SuiteRuntimeTestBase hiding (LogResult (..))
 import Prelude hiding (All, bug, id)
-import Internal.SuiteValidation
 
 -- TODO :: chkJust, chkNothing
 
@@ -23,13 +23,13 @@ chkInitFailure expected filterResults =
   where
     actualFail = (.failure) <$> chkSuite filterResults
 
--- $> unit_configError_valid_pass
+-- $ > unit_configError_valid_pass
 
 unit_configError_valid_pass :: IO ()
 unit_configError_valid_pass =
   chkInitFailure Nothing [MkFilterResult "" Nothing]
 
--- $> unit_configError_valid_fail
+-- $ > unit_configError_valid_fail
 
 unit_configError_valid_fail :: IO ()
 unit_configError_valid_fail =
@@ -39,12 +39,12 @@ unit_configError_valid_fail =
       MkFilterResult "1" Nothing
     ]
 
--- $> unit_configError_empty
+-- $ > unit_configError_empty
 
 unit_configError_empty :: IO ()
 unit_configError_empty = chkInitFailure (Just "Filtered Test Suite is Empty") []
 
--- $> unit_configError_duplicate
+-- $ > unit_configError_duplicate
 
 unit_configError_duplicate :: IO ()
 unit_configError_duplicate =
@@ -56,14 +56,14 @@ unit_configError_duplicate =
       MkFilterResult "1" Nothing
     ]
 
--- $> unit_simple_pass
+-- $ > unit_simple_pass
 unit_simple_pass :: IO ()
-unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Fail]]]
+unit_simple_pass = runTest defaultSeed (ThreadCount 1) [onceAround Pass Pass [fixture [test Pass, test Pass]]]
 
--- $> unit_simple_fail
+-- $ > unit_simple_fail
+
 unit_simple_fail :: IO ()
 unit_simple_fail = runTest defaultSeed (ThreadCount 1) [onceAround Fail Pass [fixture [test Pass, test Fail]]]
-
 
 -- >>> unit_nested_pass_fail
 unit_nested_pass_fail :: IO ()
@@ -122,7 +122,7 @@ passProbSuite specGen =
         ]
     ]
   where
-    passProb pcnt = T.PassProb specGen pcnt 100 1000
+    passProb pcnt = T.PassProb specGen pcnt 0 100 1000
     passProb0 = passProb 0
     passProb20 = passProb 20
     passProb50 = passProb 50
@@ -245,7 +245,7 @@ unit_pass_prob_no_pregen = passProbSuite Runtime
 
 {-
   property test revealed incorrect template transformation due to
-  selectors being flipped when genrating action (mkManyAction)
+  selectors being flipped when genrating action (mknAction)
   intermittent - hence replicate n
 
   Commit:        ef509617ef3bf4762e2a3215d192cf3ebab873ca
@@ -271,11 +271,12 @@ propFailTemplateGenWrongEachHookResult =
             T.PassProb
               { genStrategy = Preload,
                 passPcnt = 95,
+                hookPassThroughErrPcnt = 0,
                 minDelay = 0,
                 maxDelay = 0
               },
           subNodes =
-            [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
         }
     ]
 
@@ -292,12 +293,12 @@ unit_prop_fail_each_after_out_of_order =
     defaultSeed
     (ThreadCount 1)
     [ EachAfter
-        { eachSpec = T.All Spec {delay = 0, result = Pass},
+        { eachSpec = T.All Spec {delay = 0, directive = Pass},
           subNodes =
             [ EachAfter
-                { eachSpec = T.All Spec {delay = 0, result = Pass},
+                { eachSpec = T.All Spec {delay = 0, directive = Pass},
                   subNodes =
-                    [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                 }
             ]
         }
@@ -311,12 +312,12 @@ unit_prop_fail_each_after_out_of_order1 =
     defaultSeed
     (ThreadCount 1)
     [ EachAfter
-        { eachSpec = T.All Spec {delay = 0, result = Pass},
+        { eachSpec = T.All Spec {delay = 0, directive = Pass},
           subNodes =
             [ EachBefore
-                { eachSpec = T.All Spec {delay = 0, result = Pass},
+                { eachSpec = T.All Spec {delay = 0, directive = Pass},
                   subNodes =
-                    [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                 }
             ]
         }
@@ -334,14 +335,15 @@ unit_prop_fail_each_after =
             T.PassProb
               { genStrategy = Preload,
                 passPcnt = 95,
+                hookPassThroughErrPcnt = 0,
                 minDelay = 0,
                 maxDelay = 0
               },
           subNodes =
             [ Fixture
                 { tests =
-                    [ Spec {delay = 0, result = Pass},
-                      Spec {delay = 0, result = Pass}
+                    [ Spec {delay = 0, directive = Pass},
+                      Spec {delay = 0, directive = Pass}
                     ]
                 }
             ]
@@ -356,10 +358,10 @@ unit_missing_setup =
     defaultSeed
     (ThreadCount 1)
     [ EachAround
-        { eachSetupSpec = T.All $ Spec {delay = 0, result = Pass},
-          eachTeardownSpec = T.All $ Spec {delay = 0, result = Pass},
+        { eachSetupSpec = T.All $ Spec {delay = 0, directive = Pass},
+          eachTeardownSpec = T.All $ Spec {delay = 0, directive = Pass},
           subNodes =
-            [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
         }
     ]
 
@@ -371,21 +373,22 @@ unit_wrong_result =
     defaultSeed
     (ThreadCount 1)
     [ ThreadAfter
-        { threadSpec = T.All $ Spec {delay = 0, result = Pass},
+        { threadSpec = T.All $ Spec {delay = 0, directive = Pass},
           subNodes =
             [ ThreadBefore
-                { threadSpec = T.All $ Spec {delay = 0, result = Pass},
+                { threadSpec = T.All $ Spec {delay = 0, directive = Pass},
                   subNodes =
                     [ ThreadAfter
                         { threadSpec =
                             T.PassProb
                               { genStrategy = Preload,
                                 passPcnt = 100,
+                                hookPassThroughErrPcnt = 0,
                                 minDelay = 0,
                                 maxDelay = 0
                               },
                           subNodes =
-                            [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                         }
                     ]
                 }
@@ -409,20 +412,21 @@ mayFail =
   runTest
     defaultSeed
     (ThreadCount 5)
-    [ Fixture {tests = [Spec {delay = 0, result = Pass}]},
+    [ Fixture {tests = [Spec {delay = 0, directive = Pass}]},
       OnceBefore
-        { spec = Spec {delay = 0, result = Pass},
+        { spec = Spec {delay = 0, directive = Pass},
           subNodes =
             [ ThreadAfter
                 { threadSpec =
                     T.PassProb
                       { genStrategy = Preload,
                         passPcnt = 95,
+                        hookPassThroughErrPcnt = 0,
                         minDelay = 0,
                         maxDelay = 0
                       },
                   subNodes =
-                    [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                 }
             ]
         }
@@ -439,16 +443,16 @@ missingHookFail =
     defaultSeed
     (ThreadCount 5)
     [ ThreadAround
-        { setupThreadSpec = T.All $ Spec {delay = 0, result = Pass},
-          teardownThreadSpec = T.All $ Spec {delay = 0, result = Pass},
+        { setupThreadSpec = T.All $ Spec {delay = 0, directive = Pass},
+          teardownThreadSpec = T.All $ Spec {delay = 0, directive = Pass},
           subNodes =
             [ ThreadAfter
-                { threadSpec = T.All $ Spec {delay = 0, result = Pass},
+                { threadSpec = T.All $ Spec {delay = 0, directive = Pass},
                   subNodes =
                     [ Fixture
                         { tests =
-                            [ Spec {delay = 0, result = Pass},
-                              Spec {delay = 0, result = Pass}
+                            [ Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass}
                             ]
                         }
                     ]
@@ -467,28 +471,29 @@ wrongFailurePath =
   runTest
     defaultSeed
     (ThreadCount 5)
-    [ Fixture {tests = [Spec {delay = 0, result = Pass}]},
+    [ Fixture {tests = [Spec {delay = 0, directive = Pass}]},
       ThreadAfter
-        { threadSpec = T.All Spec {delay = 0, result = Pass},
+        { threadSpec = T.All Spec {delay = 0, directive = Pass},
           subNodes =
             [ ThreadAround
                 { setupThreadSpec =
                     T.PassProb
                       { genStrategy = Preload,
                         passPcnt = 95,
+                        hookPassThroughErrPcnt = 0,
                         minDelay = 0,
                         maxDelay = 2
                       },
-                  teardownThreadSpec = T.All Spec {delay = 0, result = Pass},
+                  teardownThreadSpec = T.All Spec {delay = 0, directive = Pass},
                   subNodes =
-                    [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                 }
             ]
         },
       OnceBefore
-        { spec = Spec {delay = 0, result = Pass},
+        { spec = Spec {delay = 0, directive = Pass},
           subNodes =
-            [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
         }
     ]
 
@@ -500,19 +505,19 @@ unit_once_failure_missing =
     defaultSeed
     (ThreadCount 1)
     [ OnceBefore
-        { spec = Spec {delay = 0, result = Fail},
+        { spec = Spec {delay = 0, directive = Fail},
           subNodes =
             [ ThreadAround
-                { setupThreadSpec = T.All Spec {delay = 0, result = Pass},
-                  teardownThreadSpec = T.All Spec {delay = 0, result = Pass},
+                { setupThreadSpec = T.All Spec {delay = 0, directive = Pass},
+                  teardownThreadSpec = T.All Spec {delay = 0, directive = Pass},
                   subNodes =
                     [ ThreadBefore
-                        { threadSpec = T.All Spec {delay = 0, result = Pass},
+                        { threadSpec = T.All Spec {delay = 0, directive = Pass},
                           subNodes =
                             [ ThreadAfter
-                                { threadSpec = T.All Spec {delay = 0, result = Pass},
+                                { threadSpec = T.All Spec {delay = 0, directive = Pass},
                                   subNodes =
-                                    [Fixture {tests = [Spec {delay = 0, result = Pass}]}]
+                                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
                                 }
                             ]
                         }
@@ -521,3 +526,398 @@ unit_once_failure_missing =
             ]
         }
     ]
+
+-- $ > unit_fixture_passthrough
+
+unit_fixture_passthrough :: IO ()
+unit_fixture_passthrough =
+  runTest
+    defaultSeed
+    (ThreadCount 1)
+    [ Fixture
+        { tests = [Spec {delay = 0, directive = PassThroughFail}]
+        }
+    ]
+
+-- >>> unit_once_hook_passthrough
+unit_once_hook_passthrough :: IO ()
+unit_once_hook_passthrough =
+  runTest
+    defaultSeed
+    (ThreadCount 1)
+    [ OnceBefore
+        { spec = Spec {delay = 0, directive = PassThroughFail},
+          subNodes =
+            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+        }
+    ]
+
+-- >>> unit_thread_hook_passthrough
+
+-- *** Exception: HUnitFailure (Just (SrcLoc {srcLocPackage = "pyrethrum-extras-0.1.0.0-45a391d86e6b7dfbde63f5b7b8cbfda38e90a6a643d2e35c818247d1adcb93d9", srcLocModule = "PyrethrumExtras.Test.Tasty.HUnit.Extended", srcLocFile = "src/PyrethrumExtras/Test/Tasty/HUnit/Extended.hs", srcLocStartLine = 72, srcLocStartCol = 15, srcLocEndLine = 72, srcLocEndCol = 25})) "Unexpected result for:\n MkEventPath\n  { path = TestPath { id = 0 , title = \"0.0.Test #0\" }\n  , nodeType = Test\n  }\n   expected: All Pass\n  actual: [ Fail ]"
+
+unit_thread_hook_passthrough :: IO ()
+unit_thread_hook_passthrough =
+  runTest
+    defaultSeed
+    (ThreadCount 1)
+    [ ThreadBefore
+        { threadSpec = T.All $ Spec {delay = 0, directive = PassThroughFail},
+          subNodes =
+            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+        }
+    ]
+
+-- >>> unit_basic_each_before
+unit_basic_each_before :: IO ()
+unit_basic_each_before =
+  runTest
+    defaultSeed
+    (ThreadCount 1)
+    [ EachBefore
+        { eachSpec = T.All {spec = Spec {delay = 0, directive = Pass}},
+          subNodes =
+            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+        }
+    ]
+
+-- >>> unit_another_broken_test
+unit_another_broken_test :: IO ()
+unit_another_broken_test =
+  runTest'
+    NoLog
+    defaultSeed
+    (ThreadCount 1)
+    [ EachAfter
+        { eachSpec = T.All {spec = Spec {delay = 0, directive = Pass}},
+          subNodes =
+            [ EachAfter
+                { eachSpec =
+                    T.PassProb
+                      { genStrategy = Preload,
+                        passPcnt = 90,
+                        hookPassThroughErrPcnt = 2,
+                        minDelay = 0,
+                        maxDelay = 0
+                      },
+                  subNodes =
+                    [ Fixture
+                        { tests =
+                            [ Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass},
+                              Spec {delay = 0, directive = Pass}
+                            ]
+                        },
+                      Fixture {tests = [Spec {delay = 0, directive = Pass}]}
+                    ]
+                }
+            ]
+        }
+    ]
+
+-- $ > unit_and_another_broken_test
+
+unit_and_another_broken_test :: IO ()
+unit_and_another_broken_test =
+  runTest'
+    NoLog
+    defaultSeed
+    (ThreadCount 1)
+    [ OnceBefore
+        { spec = Spec {delay = 0, directive = Pass},
+          subNodes =
+            [ OnceAfter
+                { spec = Spec {delay = 0, directive = Pass},
+                  subNodes =
+                    [ ThreadBefore
+                        { threadSpec = T.All {spec = Spec {delay = 0, directive = Pass}},
+                          subNodes =
+                            [ ThreadAround
+                                { setupThreadSpec =
+                                    T.All {spec = Spec {delay = 0, directive = Pass}},
+                                  teardownThreadSpec =
+                                    T.All {spec = Spec {delay = 0, directive = Pass}},
+                                  subNodes =
+                                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+
+-- >>> unit_and_one_more_broken_test
+unit_and_one_more_broken_test :: IO ()
+unit_and_one_more_broken_test =
+  runTest'
+    Log
+    defaultSeed
+    (ThreadCount 1)
+    [ OnceAround
+        { setupSpec = Spec {delay = 0, directive = Pass},
+          teardownSpec = Spec {delay = 0, directive = Pass},
+          subNodes =
+            [ EachAfter
+                { eachSpec = T.All {spec = Spec {delay = 0, directive = Pass}},
+                  subNodes =
+                    [ EachAround
+                        { eachSetupSpec =
+                            T.All {spec = Spec {delay = 0, directive = PassThroughFail}},
+                          eachTeardownSpec =
+                            T.All {spec = Spec {delay = 0, directive = Pass}},
+                          subNodes =
+                            [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+
+-- >>> unit_and_here_is_another_broken_test
+unit_and_here_is_another_broken_test :: IO ()
+unit_and_here_is_another_broken_test =
+  runTest'
+    Log
+    defaultSeed
+    (ThreadCount 1)
+    [ ThreadAround
+        { setupThreadSpec =
+            T.All {spec = Spec {delay = 0, directive = Pass}},
+          teardownThreadSpec =
+            T.All {spec = Spec {delay = 0, directive = Pass}},
+          subNodes =
+            [ ThreadAfter
+                { threadSpec = T.All {spec = Spec {delay = 0, directive = Pass}},
+                  subNodes =
+                    [ EachAround
+                        { eachSetupSpec =
+                            T.All {spec = Spec {delay = 0, directive = PassThroughFail}},
+                          eachTeardownSpec =
+                            T.All {spec = Spec {delay = 0, directive = Pass}},
+                          subNodes =
+                            [ EachAfter
+                                { eachSpec = T.All {spec = Spec {delay = 0, directive = Pass}},
+                                  subNodes =
+                                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+
+-- >>> unit_and_here_is_yet_another_broken_test
+unit_and_here_is_yet_another_broken_test :: IO ()
+unit_and_here_is_yet_another_broken_test =
+  replicateM_ 100 $
+    runTest'
+      LogFails
+      defaultSeed
+      (ThreadCount 10)
+      [ Fixture {tests = [Spec {delay = 0, directive = Pass}]},
+        Fixture {tests = [Spec {delay = 0, directive = Pass}]},
+        OnceAfter
+          { spec = Spec {delay = 0, directive = Pass},
+            subNodes =
+              [ OnceBefore
+                  { spec = Spec {delay = 0, directive = Fail},
+                    subNodes =
+                      [ OnceBefore
+                          { spec = Spec {delay = 0, directive = Pass},
+                            subNodes =
+                              [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+                          }
+                      ]
+                  }
+              ]
+          },
+        ThreadBefore
+          { threadSpec =
+              T.PassProb
+                { genStrategy = Preload,
+                  passPcnt = 25,
+                  -- , passPcnt = 90
+                  hookPassThroughErrPcnt = 50,
+                  -- , hookPassThroughErrPcnt = 2
+                  minDelay = 0,
+                  maxDelay = 0
+                },
+            subNodes =
+              [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+          }
+      ]
+
+-- $ > unit_leaf_hook_failure
+
+unit_leaf_hook_failure :: IO ()
+unit_leaf_hook_failure =
+  replicateM_ 1000 $
+    runTest'
+      LogFailsAndStartTest
+      defaultSeed
+      (ThreadCount 5)
+      [ Fixture {tests = [Spec {delay = 0, directive = Fail}]},
+        OnceBefore
+          { spec = Spec {delay = 0, directive = Pass},
+            subNodes =
+              [ OnceAround
+                  { setupSpec = Spec {delay = 0, directive = PassThroughFail},
+                    teardownSpec = Spec {delay = 0, directive = Pass},
+                    subNodes =
+                      [ EachAfter
+                          { eachSpec = T.All {spec = Spec {delay = 237, directive = Pass}},
+                            subNodes =
+                              [ Fixture
+                                  { tests =
+                                      [ Spec {delay = 344, directive = Pass},
+                                        Spec {delay = 36, directive = Pass},
+                                        Spec {delay = 2, directive = Pass}
+                                      ]
+                                  }
+                              ]
+                          }
+                      ]
+                  }
+              ]
+          }
+      ]
+
+-- $ > unit_failed_again
+
+unit_failed_again :: IO ()
+unit_failed_again =
+  replicateM_ 1000 $
+    runTest'
+      LogFailsAndStartTest
+      defaultSeed
+      (ThreadCount 5)
+      [ OnceAround
+          { setupSpec = Spec {delay = 0, directive = Fail},
+            teardownSpec = Spec {delay = 0, directive = Pass},
+            subNodes =
+              [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+          },
+        OnceAround
+          { setupSpec = Spec {delay = 0, directive = Fail},
+            teardownSpec = Spec {delay = 0, directive = Pass},
+            subNodes =
+              [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+          }
+      ]
+
+-- $ > unit_bypass_failed
+
+unit_bypass_failed :: IO ()
+unit_bypass_failed =
+  replicateM_ 1000 $
+    runTest'
+      LogFailsAndStartTest
+      defaultSeed
+      (ThreadCount 5)
+      [ EachBefore
+          { eachSpec = T.All {spec = Spec {delay = 0, directive = Pass}},
+            subNodes =
+              [ Fixture {tests = [Spec {delay = 0, directive = Pass}]},
+                EachBefore
+                  { eachSpec =
+                      T.PassProb
+                        { genStrategy = Preload,
+                          passPcnt = 90,
+                          hookPassThroughErrPcnt = 2,
+                          minDelay = 0,
+                          maxDelay = 0
+                        },
+                    subNodes =
+                      [ Fixture
+                          { tests =
+                              [ Spec {delay = 0, directive = Pass},
+                                Spec {delay = 0, directive = Pass},
+                                Spec {delay = 0, directive = Pass},
+                                Spec {delay = 0, directive = Pass},
+                                Spec {delay = 0, directive = Pass},
+                                Spec {delay = 0, directive = Pass},
+                                Spec {delay = 0, directive = Pass},
+                                Spec {delay = 0, directive = Pass},
+                                Spec {delay = 0, directive = Pass},
+                                Spec {delay = 0, directive = Pass}
+                              ]
+                          }
+                      ]
+                  }
+              ]
+          }
+      ]
+
+-- $ > unit_passthrough_fail
+
+unit_passthrough_fail :: IO ()
+unit_passthrough_fail =
+  runTest'
+    LogFailsAndStartTest
+    defaultSeed
+    (ThreadCount 1)
+    [ OnceBefore
+        { spec = Spec {delay = 0, directive = Pass},
+          subNodes =
+            [ OnceAround
+                { setupSpec = Spec {delay = 0, directive = PassThroughFail},
+                  teardownSpec = Spec {delay = 0, directive = Pass},
+                  subNodes =
+                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+                }
+            ]
+        }
+    ]
+
+
+-- $ > unit_passthrough_fail2
+unit_passthrough_fail2 :: IO ()
+unit_passthrough_fail2 =
+  runTest'
+    LogFailsAndStartTest
+    defaultSeed
+    (ThreadCount 1)
+    [ OnceAround
+        { setupSpec = Spec {delay = 0, directive = PassThroughFail},
+          teardownSpec = Spec {delay = 0, directive = Pass},
+          subNodes =
+            [ EachBefore
+                { eachSpec = T.All {spec = Spec {delay = 0, directive = Pass}},
+                  subNodes =
+                    [Fixture {tests = [Spec {delay = 0, directive = Pass}]}]
+                }
+            ]
+        }
+    ]
+
+
+{-
+TODO:
+- rethink failure propagation checks :: DONE
+- get unit working :: DONE
+- rerun prop based tests - runtime - 1000 x 
+- rerun prop based tests - runtime - 1000 x - high pass through error rate
+- fix once hook pass through error
+- rerun prop based test - preload - 1000 x DONE
+- rerun prop based tests - runtime - 10000 x DONE
+- rerun prop based tests - runtime - 10000 x - DONE - high pass through error rate
+- rerun prop based test - preload - 10000 x
+- rerun prop based test - preload - 10000 x - high pass through error rate
+- delete legacy propagation check - clean up unit tests
+- merge
+-}

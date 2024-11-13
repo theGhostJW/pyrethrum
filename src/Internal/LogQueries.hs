@@ -4,52 +4,75 @@ import CoreUtils
 import Internal.Logging( NodeType(..),
       HookPos(..),
       Log(..),
-      FLog,
-      evnt )
+      FullLog(..),
+      FLog)
 
 isSetup :: NodeType -> Bool
 isSetup = \case
   Hook _ Setup -> True
   _ -> False
 
-isTeardown :: NodeType -> Bool
-isTeardown = \case
+isBefore :: NodeType -> Bool
+isBefore = \case
+  Hook _ Before -> True
+  _ -> False
+
+isTeardownNode :: NodeType -> Bool
+isTeardownNode = \case
   Hook _ Teardown -> True
   _ -> False
 
-evtTypeToFrequency :: NodeType -> Hz
-evtTypeToFrequency = \case
+isTeardown :: FLog l a -> Bool
+isTeardown = nodeTypeMatch isTeardownNode
+
+nodeFrequency :: NodeType -> Hz
+nodeFrequency = \case
   Hook hz _ -> hz
   -- an individual test is always run once
   Test -> Once
 
-isSuiteEventFailureWith :: (NodeType -> Bool) -> FLog l a -> Bool
-isSuiteEventFailureWith evntPredicate l =
-  evnt l & \case
-    ParentFailure {nodeType = s} -> evntPredicate s
+isBypassed :: FLog l a -> Bool
+isBypassed = isBypassedWith (const True)
+
+isBypassedWith :: (NodeType -> Bool) -> FLog l a -> Bool
+isBypassedWith nodeTypePredicate l =
+  l.log & \case
+    Bypassed {nodeType = s} -> nodeTypePredicate s
     _ -> False
 
-isOnceHookParentFailure :: FLog l a -> Bool
-isOnceHookParentFailure = isSuiteEventFailureWith onceHook
+isPreHookFailure :: FLog l a -> Bool
+isPreHookFailure l = 
+   l.log & \case
+      Failure {nodeType} -> isSetup nodeType || isBefore nodeType
+      _ -> False
 
-isHookParentFailure :: FLog l a -> Bool
-isHookParentFailure = isSuiteEventFailureWith isHook
+isOnceHookBypassed :: FLog l a -> Bool
+isOnceHookBypassed = isBypassedWith onceHook
+
+isOnceHook :: FLog l a -> Bool
+isOnceHook = nodeTypeMatch onceHook 
+
+isEachHook :: FLog l a -> Bool
+isEachHook = nodeTypeMatch eachHook 
+
+isHookBypassed :: FLog l a -> Bool
+isHookBypassed = isBypassedWith isHook
 
 isTest :: NodeType -> Bool
 isTest = \case
   Test {} -> True
   _ -> False
 
-isTestParentFailure :: FLog l a -> Bool
-isTestParentFailure l = evnt l & \case
-  ParentFailure {nodeType = s} -> isTest s
+isTestBypassed :: FLog l a -> Bool
+isTestBypassed l = l.log & \case
+  Bypassed {nodeType = s} -> isTest s
   _ -> False
 
 isTestLogItem :: FLog l a -> Bool
-isTestLogItem li = (isTest <$> getSuiteEvent li) == Just True
+isTestLogItem li = (isTest <$> getNodeType li) == Just True
 
-isTestEventOrTestParentFailure :: FLog l a -> Bool
-isTestEventOrTestParentFailure te = isTestParentFailure te || isTestLogItem te
+isTestEventOrTestBypassed :: FLog l a -> Bool
+isTestEventOrTestBypassed te = isTestBypassed te || isTestLogItem te
 
 isHook :: NodeType -> Bool
 isHook = \case
@@ -67,8 +90,11 @@ onceHook = hookWithHz Once
 threadHook :: NodeType -> Bool
 threadHook = hookWithHz Thread
 
+eachHook :: NodeType -> Bool
+eachHook = hookWithHz Each
+
 onceSuiteEvent :: NodeType -> Bool
-onceSuiteEvent = (== Once) . evtTypeToFrequency
+onceSuiteEvent = (== Once) . nodeFrequency
 
 isChildless :: FLog l a -> Bool
 isChildless =
@@ -82,14 +108,22 @@ suitEvntToBool :: (NodeType -> Bool) -> Maybe NodeType -> Bool
 suitEvntToBool = maybe False
 
 threadEventToBool :: (NodeType -> Bool) -> FLog l a -> Bool
-threadEventToBool prd = suitEvntToBool prd . getSuiteEvent
+threadEventToBool prd = suitEvntToBool prd . getNodeType
+
+nodeTypeMatch :: (NodeType -> Bool) -> FLog l a -> Bool
+nodeTypeMatch p l = l.log & \case
+  StartExecution {} -> False
+  InitialisationFailure {} -> False
+  NodeLog {} -> False
+  node -> p node.nodeType
+
 
 startEndNodeMatch :: (NodeType -> Bool) -> FLog l a -> Bool
-startEndNodeMatch p l = evnt l & \case
+startEndNodeMatch p l = l.log & \case
   StartExecution {} -> False
   InitialisationFailure {} -> False
   Failure {} -> False
-  ParentFailure {} -> False
+  Bypassed {} -> False
   NodeLog {} -> False
   EndExecution {} -> False
   FilterLog {} -> False
@@ -99,18 +133,18 @@ startEndNodeMatch p l = evnt l & \case
 
 
 isStart :: FLog a b -> Bool
-isStart l = evnt l  & \case
+isStart l = l.log  & \case
   Start {} -> True
   _ -> False
 
 isEnd :: FLog a b -> Bool
-isEnd l = evnt l  & \case
+isEnd l = l.log  & \case
   End {} -> True
   _ -> False
 
-suiteEventOrParentFailureSuiteEvent :: FLog a b -> Maybe NodeType
-suiteEventOrParentFailureSuiteEvent l = 
-  evnt l  & \case
+suiteEventOrBypassedSuiteEvent :: FLog a b -> Maybe NodeType
+suiteEventOrBypassedSuiteEvent l = 
+  l.log  & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   StartExecution {} -> Nothing
@@ -118,17 +152,17 @@ suiteEventOrParentFailureSuiteEvent l =
   End {nodeType = s} -> Just s
   InitialisationFailure {} -> Nothing
   Failure {} -> Nothing
-  ParentFailure {nodeType = s} -> Just s
+  Bypassed {nodeType = s} -> Just s
   NodeLog {} -> Nothing
   EndExecution {} -> Nothing
 
-getSuiteEvent :: FLog a b -> Maybe NodeType
-getSuiteEvent l = evnt l  & \case
+getNodeType :: FLog a b -> Maybe NodeType
+getNodeType l = l.log  & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   Start {nodeType} -> Just nodeType
   End {nodeType} -> Just nodeType
-  ParentFailure {nodeType} -> Just nodeType
+  Bypassed {nodeType} -> Just nodeType
   InitialisationFailure {nodeType} -> Just nodeType
   Failure {nodeType} -> Just nodeType
   StartExecution {} -> Nothing
@@ -137,12 +171,12 @@ getSuiteEvent l = evnt l  & \case
 
 getHookInfo :: FLog a b -> Maybe (Hz, HookPos)
 getHookInfo t =
-  getSuiteEvent t >>= \case
+  getNodeType t >>= \case
     Hook hz pos -> Just (hz, pos)
     Test {} -> Nothing
 
-startOrParentFailure :: FLog l a -> Bool
-startOrParentFailure l = evnt l  & \case
+startOrBypassed :: FLog l a -> Bool
+startOrBypassed l = l.log  & \case
   FilterLog {} -> False
   SuiteInitFailure {} -> False
   StartExecution {} -> False
@@ -152,12 +186,12 @@ startOrParentFailure l = evnt l  & \case
   InitialisationFailure {} -> False
   -- event will either have a start or be
   -- represented by a parent failure if skipped
-  ParentFailure {} -> True
+  Bypassed {} -> True
   Start {} -> True
   End {} -> False
 
 startSuiteEventLoc :: FLog l a -> Maybe l
-startSuiteEventLoc l = evnt l & \case
+startSuiteEventLoc l = l.log & \case
   FilterLog {} -> Nothing
   SuiteInitFailure {} -> Nothing
   StartExecution {} -> Nothing
@@ -167,6 +201,16 @@ startSuiteEventLoc l = evnt l & \case
   InitialisationFailure {} -> Nothing
   -- event will either have a start or be
   -- represented by a parent failure if skipped
-  ParentFailure {loc} -> Just loc
+  Bypassed {loc} -> Just loc
   Start {loc} -> Just loc
   End {} -> Nothing
+
+getLoc :: FLog l a -> Maybe l
+getLoc l = l.log & \case
+  FilterLog {} -> Nothing
+  SuiteInitFailure {} -> Nothing
+  StartExecution {} -> Nothing
+  EndExecution {} -> Nothing
+  NodeLog {} -> Nothing 
+  l' -> Just l'.loc
+

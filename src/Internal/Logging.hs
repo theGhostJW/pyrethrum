@@ -29,12 +29,9 @@ type FLog l a = FullLog LineInfo (Log l a)
 
 {- Fully polymorphic base logging functions -}
 
-evnt :: FullLog LineInfo (Log l a) -> Log l a
-evnt = (.event)
-
 data FullLog li evt = MkLog
   { lineInfo :: li,
-    event :: evt
+    log :: evt
   }
   deriving (Show)
   deriving (Generic, NFData)
@@ -181,6 +178,7 @@ displayExePath (ExePath l) = T.intercalate "." $ (.title) <$> reverse l
 -- TODO :: will need thread id
 data FailPoint = FailPoint
   { path :: ExePath,
+    initialisationFailure :: Bool,
     nodeType :: NodeType
   }
   deriving (Show)
@@ -218,11 +216,12 @@ data Log loc nodeLog
         loc :: loc,
         exception :: C.PException
       }
-  | ParentFailure
+  | Bypassed
       { loc :: loc,
         nodeType :: NodeType,
-        failLoc :: loc,
-        failSuiteEvent :: NodeType
+        initialisationFailure :: Bool,
+        sourceFailureLoc :: loc,
+        sourceFailureNodeType :: NodeType
       }
   | NodeLog
       { nodeLog :: nodeLog

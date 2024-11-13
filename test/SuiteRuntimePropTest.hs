@@ -7,7 +7,7 @@ module SuiteRuntimePropTest where
 -- TODO review PyrethrumExtras.Test remove hedgehog in favour of falsify
 
 import BasePrelude (unsafePerformIO)
-import FullSuiteTestTemplate (Result (..), Spec (..), SpecGen (..))
+import FullSuiteTestTemplate (Directive (..), Spec (..), SpecGen (..))
 import FullSuiteTestTemplate qualified as T
 import Internal.SuiteRuntime (ThreadCount (..))
 import CoreUtils (Hz (..))
@@ -31,6 +31,7 @@ import Test.Tasty.Falsify
 import Text.Show.Pretty (pPrint, ppShow)
 import UnliftIO (tryAny)
 import Prelude hiding (All, bug, id)
+import Data.Text.IO qualified as TIO
 
 -- $ > genPlay
 
@@ -46,15 +47,16 @@ genPlay = do
 demoProp :: (Show a) => String -> Gen a -> TestTree
 demoProp label gen' = testPropertyWith testOpts label $ gen gen' >>= collect label . pure
 
-genResult :: Word -> Gen Result
-genResult passPcnt =
+genResult :: Word -> Word -> Gen Directive
+genResult passPcnt hookPassThroughErrPcnt =
   frequency
-    [ (passPcnt, pure Pass),
-      (100 - passPcnt, pure Fail)
+    [ (passPcnt, pure T.Pass),
+      (100 - passPcnt - hookPassThroughErrPcnt, pure T.Fail),
+      (hookPassThroughErrPcnt, pure PassThroughFail)
     ]
 
 demoResult :: TestTree
-demoResult = demoProp "result" $ genResult 80
+demoResult = demoProp "result" $ genResult 80 5
 
 genDelay :: Int -> Gen Int
 genDelay maxms = inRange $ skewedBy 2 (0, maxms)
@@ -62,11 +64,11 @@ genDelay maxms = inRange $ skewedBy 2 (0, maxms)
 demoDelay :: TestTree
 demoDelay = demoProp "delay" $ genDelay 3000
 
-genSpec :: Int -> Word -> Gen Spec
-genSpec maxDelay passPcnt = Spec <$> genDelay maxDelay <*> genResult passPcnt
+genHookSpec :: Int -> Word -> Word -> Gen Spec
+genHookSpec maxDelay passPcnt hookPassThroughErrPcnt = Spec <$> genDelay maxDelay <*> genResult passPcnt hookPassThroughErrPcnt
 
 demoSpec :: TestTree
-demoSpec = demoProp "spec" $ genSpec 3000 80
+demoSpec = demoProp "spec" $ genHookSpec 3000 80 4
 
 data TGenParams = GenParams
   { genStrategy :: SpecGen,
@@ -76,6 +78,7 @@ data TGenParams = GenParams
     maxDelay :: Int,
     passPcnt :: Word,
     hookPassPcnt :: Word,
+    hookPassThroughErrPcnt :: Word,
     maxDepth :: Word,
     minHz :: Hz,
     threadCount :: ThreadCount,
@@ -94,6 +97,7 @@ templateGenParams
       minTestsPerFixture,
       maxTestsPerFixture,
       hookPassPcnt,
+      hookPassThroughErrPcnt,
       passPcnt
     } =
     frequency
@@ -117,21 +121,21 @@ templateGenParams
       nxtLimits = gl {maxDepth = maxDepth - 1}
       genSubnodes = G.list (between (1, maxBranches))
       genOnceSubnodes = genSubnodes $ templateGenParams (nxtLimits {minHz = Once})
-      genSpec' = genSpec maxDelay passPcnt
-      genSpec'' = genSpec maxDelay passPcnt
+      genSpec' = genHookSpec maxDelay passPcnt hookPassThroughErrPcnt
+      genSpec'' = genHookSpec maxDelay passPcnt hookPassThroughErrPcnt
       genOnceBefore = OnceBefore <$> genSpec' <*> genOnceSubnodes
       genOnceAfter = OnceAfter <$> genSpec' <*> genOnceSubnodes
       genOnceAround = OnceAround <$> genSpec' <*> genSpec'' <*> genOnceSubnodes
       genThreadSubnodes = genSubnodes $ templateGenParams (nxtLimits {minHz = Thread})
       genManySpec =
         frequency
-          [ (10, T.All <$> genSpec'),
-            (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$> genDelay maxDelay)
+          [ (50, T.All <$> genSpec'),
+            (50, T.PassProb genStrategy (fromIntegral hookPassPcnt) (fromIntegral hookPassThroughErrPcnt) 0 <$> genDelay maxDelay)
           ]
       genManySpec' =
         frequency
-          [ (10, T.All <$> genSpec'),
-            (90, T.PassProb genStrategy (fromIntegral hookPassPcnt) 0 <$> genDelay maxDelay)
+          [ (50, T.All <$> genSpec'),
+            (50, T.PassProb genStrategy (fromIntegral hookPassPcnt) (fromIntegral hookPassThroughErrPcnt) 0 <$> genDelay maxDelay)
           ]
       genThreadBefore = ThreadBefore <$> genManySpec <*> genThreadSubnodes
       genThreadAfter = ThreadAfter <$> genManySpec <*> genThreadSubnodes
@@ -151,29 +155,35 @@ defParams =
       maxBranches = 4,
       maxDelay = 1000,
       passPcnt = 90,
-      hookPassPcnt = 95,
+      hookPassPcnt = 90,
+      -- hookPassPcnt = 50,
+      -- hookPassThroughErrPcnt = 30,
+      hookPassThroughErrPcnt = 2,
       maxDepth = 5,
       minHz = Once,
       threadCount = ThreadCount 5,
-      logging = LogFails,
+      logging = NoLog,
       test = runTest'
     }
 
 genTemplate :: TGenParams -> Gen [Template]
 genTemplate p = G.list (between (1, p.maxBranches)) $ templateGenParams p
 
--- tryRunTest :: Logging -> ThreadCount -> [Template] -> IO (Either SomeException ())
-tryRunTest :: TVar Bool -> TGenParams -> [Template] -> IO (Either SomeException ())
-tryRunTest isShinking p suite = do
+
+tryRunTest :: Word -> TVar Int -> TVar Bool -> TGenParams -> [Template] -> IO (Either SomeException ())
+tryRunTest maxTests testNo isShinking p suite = do
   r <- tryAny $ p.test p.logging defaultSeed p.threadCount suite
   srk <- readTVarIO isShinking
-  let sfx = srk ? " (shrinking)" $ ""
+  i <- atomically $ modifyTVar' testNo succ >> readTVar testNo
+  let
+    prgrs = txt i <> " / " <> txt maxTests 
+    sfx = (srk ? " (shrinking) " $ " ") <> prgrs
   if isRight r
     then
-      printNow $ "PASS" <> sfx
+      TIO.putStrLn $ "PASS" <> sfx
     else do
       atomically $ writeTVar isShinking True
-      printNow $ "FAIL" <> sfx
+      TIO.putStrLn $ "FAIL" <> sfx
       putStrLn "========="
   pure r
 
@@ -187,14 +197,17 @@ testOpts =
       overrideMaxRatio = Nothing
     }
 
+
 -- todo: add timestamp to debug
 -- https://hackage.haskell.org/package/base-4.19.1.0/docs/System-IO-Unsafe.html
 {-# NOINLINE runProp #-}
-runProp ::  TVar Bool -> TestName -> TestOptions -> TGenParams -> TestTree
-runProp isShrinking testName o p =
+runProp :: TVar Int -> TVar Bool -> TestName -> TestOptions -> TGenParams -> TestTree
+runProp testNo isShrinking testName o p =
   testPropertyWith o testName $ do
     t <- genWith (Just . ppShow) $ genTemplate p
-    let result = unsafePerformIO $ tryRunTest isShrinking p t
+    let 
+      numTests = fromMaybe 100 o.overrideNumTests
+      result = unsafePerformIO $ tryRunTest numTests testNo isShrinking p t
     assert $ FP.expect True `FP.dot` FP.fn ("is right", isRight) FP..$ ("t", result)
 
 -- $ > test_suite_preload
@@ -202,23 +215,24 @@ test_suite_preload :: IO ()
 test_suite_preload = do
   -- need a separate shrinkState for every test group
   shrinkState <- newTVarIO False
+  testNo <- newTVarIO 0
   defaultMain $
-    testGroup "PreLoad" [runProp shrinkState "Preload" testOpts defParams {genStrategy = Preload}]
+    testGroup "PreLoad" [runProp testNo shrinkState "Preload" testOpts {overrideNumTests = Just 10000} defParams {genStrategy = Preload}]
 
 -- $ > test_suite_runtime
-
 test_suite_runtime :: IO ()
 test_suite_runtime = do
   -- need a separate shrinkState for every test group
   shrinkState <- newTVarIO False
+  testNo <- newTVarIO 0
   defaultMain $
     testGroup
       "generator stubs"
-      [ runProp shrinkState "Runtime" testOpts {overrideNumTests = Just 100} defParams {genStrategy = Runtime, minTestsPerFixture = 1}
+      [ runProp testNo shrinkState "Runtime" testOpts {overrideNumTests = Just 1000} defParams {genStrategy = Runtime, minTestsPerFixture = 1}
       ]
 
-{- TODO: Check out performance.
-  Many threads is slower than a handfull
+{- TODO: Check out performance
+  NResult threads is slower than a handfull
   Threads   Time for 100 tests (Seconds)
   --------------------------------------
   1         254

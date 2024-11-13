@@ -137,8 +137,6 @@ ghc-options:
   # - -dth-dec-file
   # - -ddump-to-file
 
-  # - -j3 #number of cores used by ghc in compiling
-
   # threading related options only has an effect for exes
   # - -threaded
   # - -rtsopts

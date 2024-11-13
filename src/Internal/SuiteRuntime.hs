@@ -8,7 +8,7 @@ import Internal.Logging qualified as L
 import Internal.SuiteFiltering (FilteredSuite (..))
 import Internal.SuiteValidation (SuiteValidationError (..))
 import Prepare qualified as P
-import PyrethrumExtras (txt, (?), db)
+import PyrethrumExtras (txt, (?))
 import UnliftIO
   ( finally,
     replicateConcurrently_,

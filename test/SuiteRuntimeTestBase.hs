@@ -44,7 +44,6 @@ import Internal.LogQueries
 import Internal.Logging as L
   ( ExePath (..),
     FLog,
-    FailPoint (initialisationFailure),
     FullLog (..),
     HookPos (..),
     LineInfo (..),
@@ -56,7 +55,7 @@ import Internal.Logging as L
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
-import PyrethrumExtras (ConvertString, db, onError, toS, txt, (?))
+import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
 import PyrethrumExtras qualified as PE
 import PyrethrumExtras.Test (chk', chkFail)
 import System.Random.Stateful qualified as RS

@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 54d8765ec1817c0fffa481b4b3a8171458f8de785bfc7618961d0f210fa2271e
+-- hash: 81eb0d5accf9db444741ce2831d4d0a55f969ebe1904dc053a2ce0939a450874
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -121,6 +121,7 @@ library
       PyrethrumConfigTypes
       PyrethrumDemoTest
       RunDemo
+      TestCompilerErrorDemo
       WebDriverDemo
       WebDriverDocInterpreter
       WebDriverEffect

@@ -13,6 +13,7 @@ import PyrethrumExtras (txt)
 import WebDriverEffect as WE
 import WebDriverSpec (DriverStatus (Ready))
 import DSL.Logging (log)
+import GHC.TypeLits qualified as TL
 
 -- ########## Types #############
 
@@ -83,7 +84,6 @@ parse AS {..} = pure $ DS {..}
 items :: RunConfig -> DataSource Data
 items _rc =
   ItemList [ ]
-
 
 -- #### Compiler Error Wrong DataSource Data Type #### --
 

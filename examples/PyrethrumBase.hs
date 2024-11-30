@@ -220,6 +220,41 @@ data Fixture hi where
     } ->
     Fixture a
 
+{-
+create IsFixture constraint
+CHAPTER 12. CUSTOM TYPE ERRORS
+
+https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_errors.
+
+gpt
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
+data Foo = Foo | Bar
+
+-- Define a type class that represents the constraint "IsFoo"
+class IsFoo a where
+    showFoo :: a -> Text
+
+-- Provide instances for specific types (e.g., `Foo`)
+instance IsFoo Foo where
+    showFoo Foo = "Foo"
+    showFoo Bar = "Bar"
+
+
+-}
+-- instance
+--  ( TL.TypeError
+--   ( TL.Text "Attempting to interpret a number as a function " TL.:$$: TL.Text "in the type `"
+--     TL.:<>: TL.ShowType (a -> b)
+--     TL.:<>: TL.Text "'"
+--     TL.:$$: TL.Text "Did you forget to specify the function you wanted?"
+--  )
+--  ) => Fixture hi  where
+
+
 type Suite = [Node ()]
 
 data Node i where

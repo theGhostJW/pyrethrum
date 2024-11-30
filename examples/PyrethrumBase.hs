@@ -49,6 +49,8 @@ import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
+import GHC.TypeLits (TypeError)
+import GHC.TypeError (ErrorMessage(..))
 
 --  these will probably be split off and go into core or another library
 -- module later
@@ -181,6 +183,7 @@ data Hook hz when input output where
       teardown' :: RunConfig -> o -> Action ()
     } ->
     Hook hz C.Around i o
+
 
 data Fixture hi where
   Full ::

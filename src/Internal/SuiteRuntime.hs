@@ -152,7 +152,7 @@ data TestSource hi = Queue (ChildQ (P.Test IO hi)) | PropertyTest hi
 
 loadTests :: C.DataSource (P.Test IO hi) -> IO (TestSource hi)
 loadTests = \case
-  C.ItemList tests -> Queue <$> mkChildQ tests
+  C.Items tests -> Queue <$> mkChildQ tests
   C.Property _i -> noImpPropertyError
 
 mkXTree :: L.ExePath -> [P.PreNode IO hi] -> IO (ChildQ (ExeTree hi))
@@ -326,7 +326,7 @@ runChildQ concurrency runner childCanRun ChildQ {childNodes, status, runningCoun
                         -- runner MUST ensure the integrity of sub element status and handle all exceptions
                         Runnable -> do
                           -- when Concurrent, the element is placed back on the end of the q before running so
-                          -- can be picked up by other threads child qs are concurrent test items are not
+                          -- can be picked up by other threads child qs are concurrent test dataSource are not
                           when (concurrency == Concurrent) $
                             atomically (writeTQueue childNodes a)
                           runner a

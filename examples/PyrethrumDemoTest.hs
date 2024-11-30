@@ -121,7 +121,7 @@ config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
 test :: Fixture ()
-test = Full config action parse items
+test = Full config action parse dataSource
 
 action :: RunConfig -> Item -> Action ApState
 action _expectedrc itm = do
@@ -151,10 +151,10 @@ data Item = Item
   }
   deriving (Show, Read)
 
-items :: RunConfig -> DataSource Item
-items =
+dataSource :: RunConfig -> DataSource Item
+dataSource =
   const $
-    C.ItemList [ Item
+    C.Items [ Item
         { id = 1
         , title = "test the value is one"
         , value = 2
@@ -207,7 +207,7 @@ data Item2 = Item2
 
 items2 :: RunConfig -> DataSource Item2
 items2 rc =
-  ItemList $ filter
+  Items $ filter
     (\i -> rc.depth == Regression || i.id < 10)
     [ Item2
         { id = 1
@@ -233,9 +233,9 @@ test3 =
         log $ txt itm
         pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
     , parse' = \AS{..} -> pure DS{..}
-    , items' =
+    , dataSource' =
         const .
-         ItemList $ [ Item2
+         Items $ [ Item2
               { id = 1
               , title = "test the value is one"
               , value = 2
@@ -253,9 +253,9 @@ test4 =
     , action' = \_rc _hi itm -> do
         log $ txt itm
         pure $ DS (itm.value + 1) $ txt itm.value
-    , items' =
+    , dataSource' =
         const .
-          ItemList $ [ Item2
+          Items $ [ Item2
               { id = 1
               , title = "test the value is one"
               , value = 2
@@ -355,7 +355,7 @@ suite =
     stubRaw,
     stubHash (make a hash of props other than id and title: aDfG165Er7 - 10 letter hash - module + item first 4 letters is module, next 6 is item),
     stubAll,
-    stubFilter (takes a predicate and stubs all items that match it)
+    stubFilter (takes a predicate and stubs all dataSource that match it)
 
 -- ToDO webdriveIO protocol
 --- https://github.com/webdriverio/webdriverio/blob/main/packages/wdio-protocols/src/protocols/gecko.ts

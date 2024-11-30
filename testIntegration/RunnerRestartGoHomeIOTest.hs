@@ -3,7 +3,7 @@ module RunnerRestartGoHomeIOTest where
 import           Pyrelude as P
 
 goHomeExceptionMessage :: Text
-goHomeExceptionMessage = "PreTestCheckExecutionError GoHome \"No items run for test. Execution of GoHome check\" (IOError user error (Pretend IO Error))"
+goHomeExceptionMessage = "PreTestCheckExecutionError GoHome \"No dataSource run for test. Execution of GoHome check\" (IOError user error (Pretend IO Error))"
 
 -- unit_go_home_iteration_fail = do
 --                                 (log, _) <- capture runExceptG2GoHomeCheckIO

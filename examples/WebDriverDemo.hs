@@ -45,7 +45,7 @@ runIODemo = runDemo ioRunner
 -- >>> runIODemo suite
 
 test :: Fixture ()
-test = Full config action parse items
+test = Full config action parse dataSource
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
@@ -94,9 +94,9 @@ data Data = Item
 parse :: AS -> Either ParseException DS
 parse AS {..} = pure $ DS {..}
 
-items :: RunConfig -> DataSource Data
-items _rc =
-  ItemList
+dataSource :: RunConfig -> DataSource Data
+dataSource _rc =
+  Items
     [ Item
         { id = 1,
           title = "test the internet",

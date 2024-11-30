@@ -4,7 +4,7 @@ module SuiteRuntimeTestBase where
 -- don't use chkFail it does not format properly
 
 import Chronos (Time, now)
-import Core (DataSource (ItemList))
+import Core (DataSource (Items))
 import Core qualified
 import CoreUtils (Hz (..), ThreadId)
 import DSL.Internal.NodeLog qualified as AE
@@ -81,7 +81,7 @@ printNow lbl = do
   t <- now
   printTime lbl t
 
--- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
+-- TODO : change list dataSource to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
 -- TODO: other collection types generator / shrinker
 
 -- todo :: add repeatedly to Pyrelude
@@ -973,8 +973,8 @@ chkAllTemplateItemsLogged ts lgs =
   unless (null errMissng || null errExtra) $
     fail (errMissng <> "\n" <> errExtra)
   where
-    errMissng = null missing ? "" $ "template items not present in log:\n" <> ppShow missing
-    errExtra = null extra ? "" $ "extra items in the log that are not in the template:\n" <> ppShow extra
+    errMissng = null missing ? "" $ "template dataSource not present in log:\n" <> ppShow missing
+    errExtra = null extra ? "" $ "extra dataSource in the log that are not in the template:\n" <> ppShow extra
     extra = S.difference logStartPaths tmplatePaths
     missing = S.difference tmplatePaths logStartPaths
 
@@ -1421,7 +1421,7 @@ mkNodes baseSeed mxThreads = mapM mkNode
             P.Fixture
               { config = fc,
                 path,
-                tests = ItemList $ mkTestItem <$> tests
+                tests = Items $ mkTestItem <$> tests
               }
       _ ->
         do

@@ -206,7 +206,7 @@ prepareTest ::
   PreNode IO hi
 prepareTest mode interpreter rc path =
   \case
-    C.Full {config, action, parse, items} ->
+    C.Full {config, action, parse, dataSource} ->
       Fixture
         { config,
           path,
@@ -218,9 +218,9 @@ prepareTest mode interpreter rc path =
                     action = \snk _hi -> runTest (action rc) parse i snk
                   }
             )
-              <$> items rc
+              <$> dataSource rc
         }
-    C.Full' {config', action', parse', items'} ->
+    C.Full' {config', action', parse', dataSource'} ->
       Fixture
         { config = config',
           path,
@@ -232,9 +232,9 @@ prepareTest mode interpreter rc path =
                     action = \snk hi -> runTest (action' rc hi) parse' i snk
                   }
             )
-              <$> items' rc
+              <$> dataSource' rc
         }
-    C.Direct {config, action, items} ->
+    C.Direct {config, action, dataSource} ->
       Fixture
         { config,
           path,
@@ -246,9 +246,9 @@ prepareTest mode interpreter rc path =
                     action = \snk _hi -> runDirectTest (action rc) i snk
                   }
             )
-              <$> items rc
+              <$> dataSource rc
         }
-    C.Direct' {config', action', items'} ->
+    C.Direct' {config', action', dataSource'} ->
       Fixture
         { config = config',
           path,
@@ -260,7 +260,7 @@ prepareTest mode interpreter rc path =
                     action = \snk hi -> runDirectTest (action' rc hi) i snk
                   }
             )
-              <$> items' rc
+              <$> dataSource' rc
         }
   where
     applyParser :: forall as ds. ((HasCallStack) => as -> Either C.ParseException ds) -> as -> Either SomeException ds

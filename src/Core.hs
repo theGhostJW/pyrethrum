@@ -131,7 +131,7 @@ data Hook m rc hz i o where
 hookFrequency :: forall m rc hz i o. (Frequency hz) => Hook m rc hz i o -> Hz
 hookFrequency _ = frequency @hz
 
-data DataSource i = ItemList [i] | Property i deriving (Show, Functor)
+data DataSource i = Items [i] | Property i deriving (Show, Functor)
 
 getConfig :: Fixture m rc fc hi -> fc
 getConfig = \case
@@ -141,14 +141,15 @@ getConfig = \case
   Direct' {config'} -> config'
 
 fixtureEmpty :: forall m rc fc hi. rc -> Fixture m rc fc hi -> Bool
-fixtureEmpty rc = \case
-  Full {items} -> dsEmpty $ items rc
-  Full' {items'} -> dsEmpty $ items' rc
-  Direct {items} -> dsEmpty $ items rc
-  Direct' {items'} -> dsEmpty $ items' rc
+fixtureEmpty rc = 
+  \case
+  Full {dataSource} -> dsEmpty $ dataSource rc
+  Full' {dataSource'} -> dsEmpty $ dataSource' rc
+  Direct {dataSource} -> dsEmpty $ dataSource rc
+  Direct' {dataSource'} -> dsEmpty $ dataSource' rc
   where
     dsEmpty = \case
-      ItemList itms -> null itms
+      Items itms -> null itms
       Property {} -> False
 
 data Fixture m rc fc hi where
@@ -157,7 +158,7 @@ data Fixture m rc fc hi where
     { config :: fc,
       action :: rc -> i -> m as,
       parse :: as -> Either ParseException ds,
-      items :: rc -> DataSource i
+      dataSource :: rc -> DataSource i
     } ->
     Fixture m rc fc ()
   Full' ::
@@ -166,14 +167,14 @@ data Fixture m rc fc hi where
       depends :: Hook m rc hz pi hi,
       action' :: rc -> hi -> i -> m as,
       parse' :: as -> Either ParseException ds,
-      items' :: rc -> DataSource i
+      dataSource' :: rc -> DataSource i
     } ->
     Fixture m rc fc hi
   Direct ::
     (Item i ds) =>
     { config :: fc,
       action :: rc -> i -> m ds,
-      items :: rc -> DataSource i
+      dataSource :: rc -> DataSource i
     } ->
     Fixture m rc fc ()
   Direct' ::
@@ -181,7 +182,7 @@ data Fixture m rc fc hi where
     { config' :: fc,
       depends :: Hook m rc hz pi hi,
       action' :: rc -> hi -> i -> m ds,
-      items' :: rc -> DataSource i
+      dataSource' :: rc -> DataSource i
     } ->
     Fixture m rc fc hi
 

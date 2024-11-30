@@ -191,7 +191,7 @@ data Fixture hi where
     { config :: FixtureConfig,
       action :: RunConfig -> i -> Action as,
       parse :: as -> Either C.ParseException ds,
-      items :: RunConfig -> C.DataSource i
+      dataSource :: RunConfig -> C.DataSource i
     } ->
     Fixture ()
   Full' ::
@@ -200,7 +200,7 @@ data Fixture hi where
       depends :: Hook hz pw pi a,
       action' :: RunConfig -> a -> i -> Action as,
       parse' :: as -> Either C.ParseException ds,
-      items' :: RunConfig -> C.DataSource i
+      dataSource' :: RunConfig -> C.DataSource i
     } ->
     Fixture a
   Direct ::
@@ -208,7 +208,7 @@ data Fixture hi where
     (C.Item i ds) =>
     { config :: FixtureConfig,
       action :: RunConfig -> i -> Action ds,
-      items :: RunConfig -> C.DataSource i
+      dataSource :: RunConfig -> C.DataSource i
     } ->
     Fixture ()
   Direct' ::
@@ -216,7 +216,7 @@ data Fixture hi where
     { config' :: FixtureConfig,
       depends :: Hook hz pw pi a,
       action' :: RunConfig -> a -> i -> Action ds,
-      items' :: RunConfig -> C.DataSource i
+      dataSource' :: RunConfig -> C.DataSource i
     } ->
     Fixture a
 
@@ -275,7 +275,7 @@ mkFixture :: Fixture hi -> C.Fixture Action RunConfig FixtureConfig hi
 mkFixture = \case
   Full {..} -> C.Full {..}
   Direct {..} -> C.Direct {..}
-  Full' {..} -> C.Full' config' (mkHook depends) action' parse' items'
+  Full' {..} -> C.Full' config' (mkHook depends) action' parse' dataSource'
   Direct' {..} -> C.Direct' {depends = mkHook depends, ..}
 
 mkCoreSuite :: Suite -> [C.Node Action RunConfig FixtureConfig ()]

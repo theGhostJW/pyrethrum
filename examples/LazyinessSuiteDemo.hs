@@ -138,7 +138,7 @@ config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
 fxLogMessage :: Bool -> Fixture DriverStatus
-fxLogMessage readStatus = Full' config pureOnceErrorHook (action' readStatus) parse items
+fxLogMessage readStatus = Full' config pureOnceErrorHook (action' readStatus) parse dataSource
 
 --- Hook ---
 
@@ -217,9 +217,9 @@ data Data = Item
 parse :: AS -> Either ParseException DS
 parse AS {..} = pure $ DS {..}
 
-items :: RunConfig -> DataSource Data
-items _rc =
-  ItemList
+dataSource :: RunConfig -> DataSource Data
+dataSource _rc =
+  Items
     [ Item
         { id = 1,
           title = "test the internet",

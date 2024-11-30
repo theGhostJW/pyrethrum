@@ -88,7 +88,7 @@ parse AS {..} = pure $ DS {..}
 
 data' :: RunConfig -> DataSource Data
 data' _rc =
-  ItemList [ ]
+  Items [ ]
 
   {-
   
@@ -183,7 +183,7 @@ data Fixture hi where
     { config :: FixtureConfig,
       action :: RunConfig -> i -> Action as,
       parse :: as -> Either C.ParseException ds,
-      items :: RunConfig -> C.DataSource i
+      dataSource :: RunConfig -> C.DataSource i
     } ->
     Fixture ()
   Full' ::
@@ -192,7 +192,7 @@ data Fixture hi where
       depends :: Hook hz pw pi a,
       action' :: RunConfig -> a -> i -> Action as,
       parse' :: as -> Either C.ParseException ds,
-      items' :: RunConfig -> C.DataSource i
+      dataSource' :: RunConfig -> C.DataSource i
     } ->
     Fixture a
   Direct ::
@@ -200,7 +200,7 @@ data Fixture hi where
     (C.Item i ds) =>
     { config :: FixtureConfig,
       action :: RunConfig -> i -> Action ds,
-      items :: RunConfig -> C.DataSource i
+      dataSource :: RunConfig -> C.DataSource i
     } ->
     Fixture ()
   Direct' ::
@@ -208,7 +208,7 @@ data Fixture hi where
     { config' :: FixtureConfig,
       depends :: Hook hz pw pi a,
       action' :: RunConfig -> a -> i -> Action ds,
-      items' :: RunConfig -> C.DataSource i
+      dataSource' :: RunConfig -> C.DataSource i
     } ->
     Fixture a
 
@@ -249,7 +249,7 @@ testAlt = Full config action parse dataAlt
 
 dataAlt :: RunConfig -> DataSource DataAlt
 dataAlt _rc =
-  ItemList [ ] 
+  Items [ ] 
 
 
 -- #### Compiler Error Wrong Parse Result Data Type #### --

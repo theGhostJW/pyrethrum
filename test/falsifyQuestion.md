@@ -80,7 +80,7 @@ What am I doing wrong here? I'd expect to see much gentler shrinking than this.
         { tests =
             [ Spec { delay = 129 , result = Pass }
             , Spec { delay = 10 , result = Pass }
-            -- + 19 items
+            -- + 19 dataSource
             ]
         }
     , OnceBefore
@@ -89,7 +89,7 @@ What am I doing wrong here? I'd expect to see much gentler shrinking than this.
             [ Fixture
                 { tests =
                     [ Spec { delay = 258 , result = Pass }
-                     -- + 10 items
+                     -- + 10 dataSource
                     ]
                 }
             ]
@@ -97,13 +97,13 @@ What am I doing wrong here? I'd expect to see much gentler shrinking than this.
     , Fixture
         { tests =
             [ Spec { delay = 172 , result = Pass }
-            -- + 10 items
+            -- + 10 dataSource
             ]
         }
     , Fixture
         { tests =
             [ Spec { delay = 182 , result = Fail }
-            -- + 13 items
+            -- + 13 dataSource
             ]
         }
     ] at CallStack (from HasCallStack):

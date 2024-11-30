@@ -143,7 +143,7 @@ parsefs FSAS {..} = pure $ FSDS {..}
 
 fsItems :: RunConfig -> DataSource FSData
 fsItems _rc =
-  ItemList
+  Items
     [ FSItem
         { id = 1,
           title = "test the file system",
@@ -218,7 +218,7 @@ intOnceHook =
 --- Fixture ---
 
 test :: Fixture Int
-test = Full' config intOnceHook action parse items
+test = Full' config intOnceHook action parse dataSource
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
@@ -276,9 +276,9 @@ data Data = Item
 parse :: AS -> Either ParseException DS
 parse AS {..} = pure $ DS {..}
 
-items :: RunConfig -> DataSource Data
-items _rc =
-  ItemList
+dataSource :: RunConfig -> DataSource Data
+dataSource _rc =
+  Items
     [ Item
         { id = 1,
           title = "test the internet",

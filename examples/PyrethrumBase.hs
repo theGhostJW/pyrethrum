@@ -49,8 +49,7 @@ import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
-import GHC.TypeLits (TypeError)
-import GHC.TypeError (ErrorMessage(..))
+import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType)
 
 --  these will probably be split off and go into core or another library
 -- module later
@@ -184,14 +183,22 @@ data Hook hz when input output where
     } ->
     Hook hz C.Around i o
 
-
 data Fixture hi where
   Full ::
-    (C.Item i ds, Show as) =>
+     forall i ds dataSource action as. 
+    (
+     DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType action),
+     C.Item i ds, 
+     Show as,
+     dataSource ~ (RunConfig -> C.DataSource i),
+     action ~ (RunConfig -> i -> Action as),
+     DataSourceType dataSource ~ i,
+     ActionInputType action ~ i
+    ) =>
     { config :: FixtureConfig,
-      action :: RunConfig -> i -> Action as,
+      action :: action,
       parse :: as -> Either C.ParseException ds,
-      dataSource :: RunConfig -> C.DataSource i
+      dataSource :: dataSource
     } ->
     Fixture ()
   Full' ::
@@ -204,11 +211,17 @@ data Fixture hi where
     } ->
     Fixture a
   Direct ::
-    forall i ds.
-    (C.Item i ds) =>
+    forall i dataSource action as. 
+    (C.Item i as, 
+     dataSource ~ (RunConfig -> C.DataSource i),
+     action ~ (RunConfig -> i -> Action as),
+     DataSourceType dataSource ~ i,
+     ActionInputType action ~ i,
+     DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType action)
+     ) =>
     { config :: FixtureConfig,
-      action :: RunConfig -> i -> Action ds,
-      dataSource :: RunConfig -> C.DataSource i
+      action :: action,
+      dataSource :: dataSource
     } ->
     Fixture ()
   Direct' ::

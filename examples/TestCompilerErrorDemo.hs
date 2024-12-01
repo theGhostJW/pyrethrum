@@ -220,24 +220,6 @@ data Fixture hi where
 
 -}
 
-type family DataSourceType ds where
-    DataSourceType (DataSource a) = a
-
-type family ActionInputType a where
-    ActionInputType (rc -> i -> r) = i
-
-type family ActionMatchesDataSource a b :: Constraint where
-    ActionMatchesDataSource a a = ()  -- Types match, constraint satisfied
-    ActionMatchesDataSource a b = TypeError
-      ( 'Text "Type mismatch between 'inFnc' and 'outFnc'."
-      :$$: 'Text "The output type of 'inFnc' is "
-      :<>: 'ShowType a
-      :$$: 'Text "But the input type of 'outFnc' is "
-      :<>: 'ShowType b
-      )
-
-{-
-
 -- #### Compiler Error Wrong DataSource Data Type #### --
 
 failsSuite :: Suite
@@ -252,6 +234,7 @@ dataAlt _rc =
   Items [ ] 
 
 
+{-
 -- #### Compiler Error Wrong Parse Result Data Type #### --
 
 failsSuite1 :: Suite

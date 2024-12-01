@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 955b5b4c90c9077ad5f69642b79f54e3fce4c4dd38adfd7f07428eb685e6f82f
+-- hash: 050633a98caf5d248650837c0ee994ce2d40845e2ca9777a4171d289bdb86899
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -80,6 +80,7 @@ library
       AuxFiles
       Check
       Core
+      CoreTypeFamilies
       CoreTypes
       CoreUtils
       DSL.DocInterpreterUtils
@@ -185,7 +186,7 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points -fdefer-type-errors
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points
   build-depends:
       aeson
     , aeson-pretty

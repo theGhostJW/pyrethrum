@@ -18,7 +18,9 @@ module PyrethrumBase
     ioRunner,
     docRunner,
     defaultRunConfig,
-    docInterpreter
+    docInterpreter,
+    mkDirect,
+    mkFull
   )
 where
 
@@ -49,7 +51,7 @@ import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
-import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType)
+import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType, ActionInputType')
 
 --  these will probably be split off and go into core or another library
 -- module later
@@ -187,13 +189,13 @@ data Fixture hi where
   Full ::
      forall i ds dataSource action as. 
     (
-     DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType action),
-     C.Item i ds, 
      Show as,
+     C.Item i ds, 
      dataSource ~ (RunConfig -> C.DataSource i),
      action ~ (RunConfig -> i -> Action as),
      DataSourceType dataSource ~ i,
-     ActionInputType action ~ i
+     ActionInputType action ~ i,
+     DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType action)
     ) =>
     { config :: FixtureConfig,
       action :: action,
@@ -202,12 +204,22 @@ data Fixture hi where
     } ->
     Fixture ()
   Full' ::
-    (C.Item i ds, Show as, C.Frequency hz) =>
+      forall hz pw pi a i ds dataSource action as. 
+    (
+     Show as,
+     C.Item i ds, 
+     C.Frequency hz,
+     dataSource ~ (RunConfig -> C.DataSource i),
+     action ~ (RunConfig -> a -> i -> Action as),
+     DataSourceType dataSource ~ i,
+     ActionInputType' action ~ i,
+     DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType' action)
+    ) =>
     { config' :: FixtureConfig,
       depends :: Hook hz pw pi a,
       action' :: RunConfig -> a -> i -> Action as,
       parse' :: as -> Either C.ParseException ds,
-      dataSource' :: RunConfig -> C.DataSource i
+      dataSource' :: dataSource
     } ->
     Fixture a
   Direct ::
@@ -225,13 +237,34 @@ data Fixture hi where
     } ->
     Fixture ()
   Direct' ::
-    (C.Item i ds, C.Frequency hz) =>
+    forall i hz pw pi a dataSource action ds. 
+    (C.Item i ds, 
+     C.Frequency hz,
+     dataSource ~ (RunConfig -> C.DataSource i),
+     action ~ (RunConfig -> a -> i -> Action ds),
+     DataSourceType dataSource ~ i,
+     ActionInputType' action ~ i,
+     DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType' action)
+     ) =>
     { config' :: FixtureConfig,
       depends :: Hook hz pw pi a,
       action' :: RunConfig -> a -> i -> Action ds,
-      dataSource' :: RunConfig -> C.DataSource i
+      dataSource' :: dataSource
     } ->
     Fixture a
+
+
+mkDirect :: C.Item i ds => FixtureConfig -> (RunConfig -> i -> Action ds) -> (RunConfig -> C.DataSource i) -> Fixture ()
+mkDirect config action dataSource = Direct {..}
+
+mkFull :: (C.Item i ds, Show as) => 
+ FixtureConfig -- fixture config
+ -> (RunConfig -> i -> Action as)  --
+ -> (as -> Either C.ParseException ds) --
+ -> (RunConfig -> C.DataSource i) --
+ -> Fixture ()
+mkFull config action parse dataSource = Full {..}
+
 
 {-
 create IsFixture constraint

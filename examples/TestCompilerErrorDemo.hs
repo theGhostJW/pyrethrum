@@ -233,6 +233,9 @@ dataAlt :: RunConfig -> DataSource DataAlt
 dataAlt _rc =
   Items [ ] 
 
+testAlt2 :: Fixture ()
+testAlt2 = mkFull config action parse dataAlt
+
 
 {-
 -- #### Compiler Error Wrong Parse Result Data Type #### --

@@ -24,7 +24,7 @@ data AS = AS
     checkButtonText :: Text
   }
   deriving (Show)
-data DS = DS
+data VS = VS
   { status :: DriverStatus,
     checkButtonText :: Text
   }
@@ -33,7 +33,7 @@ data DS = DS
 data Data = Item
   { id :: Int,
     title :: Text,
-    checks :: Checks DS
+    checks :: Checks VS
   }
   deriving (Show, Read)
 
@@ -65,7 +65,7 @@ compilesSuite =
   [Fixture (NodePath "WebDriverDemo" "test") test]
 
 test :: Fixture ()
-test = Full config action parse data'
+test = mkFull config action parse data'
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
@@ -80,8 +80,8 @@ action ::  RunConfig -> Data -> Eff es AS
 action _rc _i = 
   pure $ AS {status = Ready, checkButtonText = "Blah"}
 
-parse :: AS -> Either ParseException DS
-parse AS {..} = pure $ DS {..}
+parse :: AS -> Either ParseException VS
+parse AS {..} = pure $ VS {..}
 
 data' :: RunConfig -> DataSource Data
 data' _rc =
@@ -218,7 +218,7 @@ data Fixture hi where
 -}
 
 -- #### Compiler Error Wrong DataSource Data Type #### --
-{-
+
 
 failsSuite :: Suite
 failsSuite =
@@ -234,9 +234,22 @@ dataWrongType _rc =
 testAlt2 :: Fixture ()
 testAlt2 = mkFull config action parse dataWrongType
 
-testAlt3 :: Fixture ()
-testAlt3 = mkFullDemoErrMsgs config action parse dataWrongType
+testAltRawConstructors :: Fixture ()
+testAltRawConstructors = Full config action parse dataWrongType
 
+testAlt2RawConstrucors2 :: Fixture ()
+testAlt2RawConstrucors2 = Full  { 
+      config = config,
+      action = action,
+      parse = parse,
+      dataSource = dataWrongType
+    }
+
+
+
+-- testAlt3 :: Fixture ()
+-- testAlt3 = mkFullDemoErrMsgs config action parse dataWrongType
+{-
 
 -- #### Compiler Error Wrong Parse Result Data Type #### --
 

@@ -1,7 +1,8 @@
 module PyrethrumBase
   ( Action,
     Depth (..),
-    Fixture (..),
+    -- export fixture constructors for demo purposes (rmove later)
+    Fixture(..),
     Hook (..),
     LogEffs,
     Node (..),
@@ -21,7 +22,9 @@ module PyrethrumBase
     docInterpreter,
     mkDirect,
     -- mkFullDemoErrMsgs,
-    mkFull
+    mkDirect',
+    mkFull,
+    mkFull'
   )
 where
 
@@ -53,7 +56,7 @@ import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
-import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType, ActionInputType')
+-- import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType, ActionInputType')
 
 --  these will probably be split off and go into core or another library
 -- module later
@@ -236,8 +239,38 @@ data Fixture hi where
     Fixture a
 
 
+mkFull :: (
+ C.Item i vs, 
+ Show as
+ ) =>
+ FixtureConfig 
+ -> (RunConfig -> i -> Action as)  
+ -> (as -> Either C.ParseException vs)
+ -> (RunConfig -> DataSource i)
+ -> Fixture ()
+mkFull config action parse dataSource = Full {..}
+
+mkFull' :: (
+ C.Item i vs, 
+ Show as, 
+ C.Frequency hz
+ ) =>
+ FixtureConfig 
+ -> Hook hz pw pi a
+ -> (RunConfig -> a -> i -> Action as)  
+ -> (as -> Either C.ParseException vs)
+ -> (RunConfig -> DataSource i)
+ -> Fixture a
+mkFull' config' depends action' parse' dataSource' = Full' {..}
+
+
 mkDirect :: C.Item i vs => FixtureConfig -> (RunConfig -> i -> Action vs) -> (RunConfig -> C.DataSource i) -> Fixture ()
 mkDirect config action dataSource = Direct {..}
+
+mkDirect' :: (C.Item i vs, C.Frequency hz) => FixtureConfig -> Hook hz pw pi a -> (RunConfig -> a -> i -> Action vs) -> (RunConfig -> C.DataSource i) -> Fixture a
+mkDirect' config' depends action' dataSource' = Direct' {..}
+
+
 
 -- Type synonyms for readability
 -- type MkAction i as = RunConfig -> i -> Action as
@@ -282,16 +315,7 @@ mkFullDemoErrMsgs :: forall i as vs action dataSource. (
 mkFullDemoErrMsgs config action parse dataSource = Full {..}
 -}
 
-mkFull :: (
- C.Item i vs, 
- Show as
- ) =>
- FixtureConfig 
- -> (RunConfig -> i -> Action as)  
- -> (as -> Either C.ParseException vs)
- -> (RunConfig -> DataSource i)
- -> Fixture ()
-mkFull config action parse dataSource = Full {..}
+
 
 
 {-

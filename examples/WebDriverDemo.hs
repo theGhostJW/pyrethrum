@@ -45,7 +45,7 @@ runIODemo = runDemo ioRunner
 -- >>> runIODemo suite
 
 test :: Fixture ()
-test = Full config action parse dataSource
+test = mkFull config action parse dataSource
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression

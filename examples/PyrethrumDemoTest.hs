@@ -9,7 +9,7 @@ import Effectful (Eff)
 import PyrethrumBase (
   Action,
   Depth (..),
-  Fixture (..),
+  Fixture,
   HasLog,
   Hook (..),
   LogEffs,
@@ -18,7 +18,7 @@ import PyrethrumBase (
   Suite,
   FixtureConfig (..),
   DataSource(..),
-  FixtureConfig, Country (..), Environment (..), fxCfg,
+  FixtureConfig, Country (..), Environment (..), fxCfg, mkFull, mkFull', mkDirect',
  )
 import PyrethrumExtras (txt)
 import qualified Core as C
@@ -121,7 +121,7 @@ config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
 test :: Fixture ()
-test = Full config action parse dataSource
+test = mkFull config action parse dataSource
 
 action :: RunConfig -> Item -> Action ApState
 action _expectedrc itm = do
@@ -168,7 +168,7 @@ config2 :: FixtureConfig
 config2 = FxCfg "test" DeepRegression
 
 test2 :: Fixture HookInfo
-test2 = Full' config2 infoThreadHook action2 parse2 items2
+test2 = mkFull' config2 infoThreadHook action2 parse2 items2
 
 action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
 action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = do
@@ -226,15 +226,17 @@ items2 rc =
 
 test3 :: Fixture Int
 test3 =
-  Full'
-    { depends = eachIntBefore
-    , config' = FxCfg "test" DeepRegression
-    , action' = \_rc hkInt itm -> do
+  mkFull'
+    (FxCfg "test" DeepRegression)
+    eachIntBefore
+    (
+    \_rc hkInt itm -> do
         log $ txt itm
         pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
-    , parse' = \AS{..} -> pure DS{..}
-    , dataSource' =
-        const .
+        )
+    (\AS{..} -> pure DS{..})
+    (
+    const .
          Items $ [ Item2
               { id = 1
               , title = "test the value is one"
@@ -242,19 +244,21 @@ test3 =
               , checks = chk "test" ((== 1) . (.value))
               }
           ]
-    }
+    )
+
 
 -- ############### Test Direct (Record) ###################
 test4 :: Fixture Int
 test4 =
-  Direct'
-    { config' = FxCfg "test" DeepRegression
-    , depends = eachAfter
-    , action' = \_rc _hi itm -> do
+  mkDirect'
+    (FxCfg "test" DeepRegression)
+    eachAfter
+    (\_rc _hi itm -> do
         log $ txt itm
         pure $ DS (itm.value + 1) $ txt itm.value
-    , dataSource' =
-        const .
+    )
+    (
+    const .
           Items $ [ Item2
               { id = 1
               , title = "test the value is one"
@@ -262,7 +266,8 @@ test4 =
               , checks = chk "test" ((== 1) . (.value))
               }
           ]
-    }
+    )
+  
 
 -- ############### Construct Tests ###################
 -- this will be generated either by implmenting deriving,

@@ -138,7 +138,7 @@ config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
 fxLogMessage :: Bool -> Fixture DriverStatus
-fxLogMessage readStatus = Full' config pureOnceErrorHook (action' readStatus) parse dataSource
+fxLogMessage readStatus = mkFull' config pureOnceErrorHook (action' readStatus) parse dataSource
 
 --- Hook ---
 

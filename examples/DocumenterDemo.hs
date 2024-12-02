@@ -18,7 +18,7 @@ import Path as P (Path, reldir, toFilePath)
 import PyrethrumBase
   ( DataSource (..),
     Depth (..),
-    Fixture (..),
+    Fixture,
     FixtureConfig (..),
     Hook (..),
     Node (..),
@@ -26,7 +26,7 @@ import PyrethrumBase
     Suite,
     SuiteRunner,
     defaultRunConfig,
-    docRunner,
+    docRunner, mkFull, mkFull',
   )
 import PyrethrumExtras (Abs, File, relfile, toS, txt, (?))
 import WebDriverEffect
@@ -93,7 +93,7 @@ fsSuite =
   [Fixture (NodePath "FS Demo Test" "test") fstest]
 
 fstest :: Fixture ()
-fstest = Full config fsAction parsefs fsItems
+fstest = mkFull config fsAction parsefs fsItems
 
 getFailNested :: Eff es FSAS
 getFailNested = pure $ error "This is a nested error !!! "
@@ -218,7 +218,7 @@ intOnceHook =
 --- Fixture ---
 
 test :: Fixture Int
-test = Full' config intOnceHook action parse dataSource
+test = mkFull' config intOnceHook action parse dataSource
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression

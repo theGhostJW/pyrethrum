@@ -11,11 +11,26 @@ import Check (Checks)
 type family DataSourceType dataSource where
     DataSourceType (rc -> ds i) = i
 
-type family ActionInputType action where
-    ActionInputType (rc -> i -> m as) = i
+type family ActionInType action where
+    ActionInType (rc -> i -> m as) = i
 
-type family ActionInputType' action where
-    ActionInputType' (hi -> rc -> i -> m as) = i
+type family ActionInType' action where
+    ActionInType' (hi -> rc -> i -> m as) = i
+
+type family ActionOutType action where
+    ActionOutType (rc -> i -> m as) = as
+
+type family ActionOutType' action where
+    ActionOutType' (hi -> rc -> i -> m as) = as
+
+type family ValStateType item where
+    ValStateType (Item i vs) = vs
+
+type family ParserInType parser where
+    ParserInType (as -> Either l vs) = as
+
+type family ParserOutType parser where
+    ParserOutType (as -> Either l vs) = vs
 
 type family DataSourceMatchesAction ds ai :: Constraint where
     DataSourceMatchesAction ds ds = ()  -- Types match, constraint satisfied
@@ -38,9 +53,7 @@ type family DataSourceMatchesAction ds ai :: Constraint where
         :$$: 'Text "     so the dataSource elements match the input for the action."
       )
 
-
--- type Item i vs = (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Read i, Show vs, Show i)
-
+type DataSourceMatch ds ai = DataSourceMatchesAction (DataSourceType ds) (ActionInType ai)
 
 type HasTitle a = HasField "title" a Text
 
@@ -48,6 +61,6 @@ type HasId a = HasField "id" a Int
 
 class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
 
-class (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Show vs) => Item i vs
+type Item i vs = (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Show vs) 
 
-instance (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Show vs) => Item i vs
+

@@ -20,7 +20,7 @@ module PyrethrumBase
     defaultRunConfig,
     docInterpreter,
     mkDirect,
-    mkFullDemoErrMsgs,
+    -- mkFullDemoErrMsgs,
     mkFull
   )
 where
@@ -189,6 +189,66 @@ data Hook hz when input output where
 
 data Fixture hi where
   Full ::
+     forall i vs as. 
+    (
+     Show as,
+     C.Item i vs
+    ) =>
+    { config :: FixtureConfig,
+      action :: RunConfig -> i -> Action as,
+      parse :: as -> Either C.ParseException vs,
+      dataSource :: RunConfig -> C.DataSource i
+    } ->
+    Fixture ()
+  Full' ::
+      forall hz pw pi a i vs as. 
+    (
+     Show as,
+     C.Item i vs, 
+     C.Frequency hz
+    ) =>
+    { config' :: FixtureConfig,
+      depends :: Hook hz pw pi a,
+      action' :: RunConfig -> a -> i -> Action as,
+      parse' :: as -> Either C.ParseException vs,
+      dataSource' :: RunConfig -> C.DataSource i
+    } ->
+    Fixture a
+  Direct ::
+    forall i as. 
+    (C.Item i as
+     ) =>
+    { config :: FixtureConfig,
+      action :: RunConfig -> i -> Action as,
+      dataSource :: RunConfig -> C.DataSource i
+    } ->
+    Fixture ()
+  Direct' ::
+    forall i hz pw pi a vs. 
+    (C.Item i vs, 
+     C.Frequency hz
+     ) =>
+    { config' :: FixtureConfig,
+      depends :: Hook hz pw pi a,
+      action' :: RunConfig -> a -> i -> Action vs,
+      dataSource' :: RunConfig -> C.DataSource i
+    } ->
+    Fixture a
+
+
+mkDirect :: C.Item i vs => FixtureConfig -> (RunConfig -> i -> Action vs) -> (RunConfig -> C.DataSource i) -> Fixture ()
+mkDirect config action dataSource = Direct {..}
+
+-- Type synonyms for readability
+-- type MkAction i as = RunConfig -> i -> Action as
+-- type Parser as vs = as -> Either C.ParseException vs
+-- type MkDataSource i = RunConfig -> DataSource i
+
+{- 
+example full fixture with custom type error ~ requires similar contraints on the Full value 
+constructor to compile
+
+  Full ::
      forall i ds dataSource action as. 
     (
      Show as,
@@ -205,88 +265,30 @@ data Fixture hi where
       dataSource :: dataSource
     } ->
     Fixture ()
-  Full' ::
-      forall hz pw pi a i ds dataSource action as. 
-    (
-     Show as,
-     C.Item i ds, 
-     C.Frequency hz,
-     dataSource ~ (RunConfig -> C.DataSource i),
-     action ~ (RunConfig -> a -> i -> Action as),
-     DataSourceType dataSource ~ i,
-     ActionInputType' action ~ i,
-     DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType' action)
-    ) =>
-    { config' :: FixtureConfig,
-      depends :: Hook hz pw pi a,
-      action' :: RunConfig -> a -> i -> Action as,
-      parse' :: as -> Either C.ParseException ds,
-      dataSource' :: dataSource
-    } ->
-    Fixture a
-  Direct ::
-    forall i dataSource action as. 
-    (C.Item i as, 
-     dataSource ~ (RunConfig -> C.DataSource i),
-     action ~ (RunConfig -> i -> Action as),
-     DataSourceType dataSource ~ i,
-     ActionInputType action ~ i,
-     DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType action)
-     ) =>
-    { config :: FixtureConfig,
-      action :: action,
-      dataSource :: dataSource
-    } ->
-    Fixture ()
-  Direct' ::
-    forall i hz pw pi a dataSource action ds. 
-    (C.Item i ds, 
-     C.Frequency hz,
-     dataSource ~ (RunConfig -> C.DataSource i),
-     action ~ (RunConfig -> a -> i -> Action ds),
-     DataSourceType dataSource ~ i,
-     ActionInputType' action ~ i,
-     DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType' action)
-     ) =>
-    { config' :: FixtureConfig,
-      depends :: Hook hz pw pi a,
-      action' :: RunConfig -> a -> i -> Action ds,
-      dataSource' :: dataSource
-    } ->
-    Fixture a
-
-
-mkDirect :: C.Item i ds => FixtureConfig -> (RunConfig -> i -> Action ds) -> (RunConfig -> C.DataSource i) -> Fixture ()
-mkDirect config action dataSource = Direct {..}
-
--- Type synonyms for readability
-type MkAction i as = RunConfig -> i -> Action as
-type Parser as ds = as -> Either C.ParseException ds
-type MkDataSource i = RunConfig -> DataSource i
-
+    
 -- | Creates a full fixture using the provided configuration, action, parser, and data source.
-mkFullDemoErrMsgs :: forall i as ds action dataSource. (
+mkFullDemoErrMsgs :: forall i as vs action dataSource. (
  action ~ (RunConfig -> i -> Action as),
  dataSource ~ (RunConfig -> DataSource i),
- C.Item i ds, 
+ C.Item i vs, 
  Show as, 
  DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType action)
  ) =>
  FixtureConfig 
  -> action-- action :: RunConfig -> i -> Action as
- -> Parser as ds  -- parser  :: as -> Either C.ParseException ds
+ -> as -> Either C.ParseException vs -- parser  :: as -> Either C.ParseException vs
  -> dataSource-- dataSource :: RunConfig -> DataSource i
  -> Fixture ()
 mkFullDemoErrMsgs config action parse dataSource = Full {..}
-
+-}
 
 mkFull :: (
- C.Item i ds, 
+ C.Item i vs, 
  Show as
  ) =>
  FixtureConfig 
  -> (RunConfig -> i -> Action as)  
- -> (as -> Either C.ParseException ds)
+ -> (as -> Either C.ParseException vs)
  -> (RunConfig -> DataSource i)
  -> Fixture ()
 mkFull config action parse dataSource = Full {..}

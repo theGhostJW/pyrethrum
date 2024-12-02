@@ -16,9 +16,6 @@ import PyrethrumExtras (txt)
 import WebDriverEffect as WE
 import WebDriverSpec (DriverStatus (Ready))
 import DSL.Logging (log)
-import GHC.TypeLits as TL
-import GHC.Show (Show(showsPrec))
-import BasePrelude (toLower)
 
 -- ########## Types #############
 
@@ -222,9 +219,10 @@ data Fixture hi where
 
 -- #### Compiler Error Wrong DataSource Data Type #### --
 {-
+
 failsSuite :: Suite
 failsSuite =
-  [Fixture (NodePath "WebDriverDemo" "test") testAlt]
+  [Fixture (NodePath "WebDriverDemo" "test") testAlt2]
 
 -- testAlt :: Fixture ()
 -- testAlt = Full config action parse dataWrongType
@@ -237,9 +235,7 @@ testAlt2 :: Fixture ()
 testAlt2 = mkFull config action parse dataWrongType
 
 testAlt3 :: Fixture ()
-testAlt3 = mkFull2 config action parse dataWrongType
-
-
+testAlt3 = mkFullDemoErrMsgs config action parse dataWrongType
 
 
 -- #### Compiler Error Wrong Parse Result Data Type #### --

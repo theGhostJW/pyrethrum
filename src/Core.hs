@@ -36,7 +36,7 @@ type HasId a = HasField "id" a Int
 
 class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
 
-type Item i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), Show i, Read i, Show ds, Show i)
+type Item i vs = (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Read i, Show vs, Show i)
 
 failParser :: Text -> Either ParseException a
 failParser = Left . ParseFailure
@@ -148,40 +148,41 @@ fixtureEmpty rc =
   Direct {dataSource} -> dsEmpty $ dataSource rc
   Direct' {dataSource'} -> dsEmpty $ dataSource' rc
   where
+    dsEmpty :: forall i. DataSource i -> Bool
     dsEmpty = \case
       Items itms -> null itms
       Property {} -> False
 
 data Fixture m rc fc hi where
   Full ::
-    (Item i ds, Show as) =>
+    (Item i vs, Show as) =>
     { config :: fc,
       action :: rc -> i -> m as,
-      parse :: as -> Either ParseException ds,
+      parse :: as -> Either ParseException vs,
       dataSource :: rc -> DataSource i
     } ->
     Fixture m rc fc ()
   Full' ::
-    (Item i ds, Show as) =>
+    (Item i vs, Show as) =>
     { config' :: fc,
       depends :: Hook m rc hz pi hi,
       action' :: rc -> hi -> i -> m as,
-      parse' :: as -> Either ParseException ds,
+      parse' :: as -> Either ParseException vs,
       dataSource' :: rc -> DataSource i
     } ->
     Fixture m rc fc hi
   Direct ::
-    (Item i ds) =>
+    (Item i vs) =>
     { config :: fc,
-      action :: rc -> i -> m ds,
+      action :: rc -> i -> m vs,
       dataSource :: rc -> DataSource i
     } ->
     Fixture m rc fc ()
   Direct' ::
-    (Item i ds) =>
+    (Item i vs) =>
     { config' :: fc,
       depends :: Hook m rc hz pi hi,
-      action' :: rc -> hi -> i -> m ds,
+      action' :: rc -> hi -> i -> m vs,
       dataSource' :: rc -> DataSource i
     } ->
     Fixture m rc fc hi

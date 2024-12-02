@@ -221,7 +221,7 @@ data Fixture hi where
 -}
 
 -- #### Compiler Error Wrong DataSource Data Type #### --
-
+{-
 failsSuite :: Suite
 failsSuite =
   [Fixture (NodePath "WebDriverDemo" "test") testAlt]
@@ -241,7 +241,7 @@ testAlt3 = mkFull2 config action parse dataWrongType
 
 
 
-{-
+
 -- #### Compiler Error Wrong Parse Result Data Type #### --
 
 failsSuite1 :: Suite

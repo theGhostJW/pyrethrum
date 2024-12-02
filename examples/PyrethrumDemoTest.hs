@@ -134,20 +134,20 @@ data ApState = ApState
   }
   deriving (Show, Read)
 
-data DState = DState
+data VState = VState
   { value :: Int
   , valTxt :: Text
   }
   deriving (Show, Read)
 
-parse :: ApState -> Either ParseException DState
-parse ApState{..} = pure DState{..}
+parse :: ApState -> Either ParseException VState
+parse ApState{..} = pure VState{..}
 
 data Item = Item
   { id :: Int
   , title :: Text
   , value :: Int
-  , checks :: Checks DState
+  , checks :: Checks VState
   }
   deriving (Show, Read)
 

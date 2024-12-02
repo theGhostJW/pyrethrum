@@ -56,6 +56,7 @@ import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
+import CoreTypeFamilies (Item)
 -- import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType, ActionInputType')
 
 --  these will probably be split off and go into core or another library
@@ -195,7 +196,7 @@ data Fixture hi where
      forall i vs as. 
     (
      Show as,
-     C.Item i vs
+     Item i vs
     ) =>
     { config :: FixtureConfig,
       action :: RunConfig -> i -> Action as,
@@ -207,7 +208,7 @@ data Fixture hi where
       forall hz pw pi a i vs as. 
     (
      Show as,
-     C.Item i vs, 
+     Item i vs, 
      C.Frequency hz
     ) =>
     { config' :: FixtureConfig,
@@ -218,17 +219,17 @@ data Fixture hi where
     } ->
     Fixture a
   Direct ::
-    forall i as. 
-    (C.Item i as
+    forall i vs. 
+    (Item i vs
      ) =>
     { config :: FixtureConfig,
-      action :: RunConfig -> i -> Action as,
+      action :: RunConfig -> i -> Action vs,
       dataSource :: RunConfig -> C.DataSource i
     } ->
     Fixture ()
   Direct' ::
     forall i hz pw pi a vs. 
-    (C.Item i vs, 
+    (Item i vs, 
      C.Frequency hz
      ) =>
     { config' :: FixtureConfig,
@@ -240,7 +241,7 @@ data Fixture hi where
 
 
 mkFull :: (
- C.Item i vs, 
+ Item i vs, 
  Show as
  ) =>
  FixtureConfig 
@@ -251,7 +252,7 @@ mkFull :: (
 mkFull config action parse dataSource = Full {..}
 
 mkFull' :: (
- C.Item i vs, 
+ Item i vs, 
  Show as, 
  C.Frequency hz
  ) =>
@@ -264,10 +265,10 @@ mkFull' :: (
 mkFull' config' depends action' parse' dataSource' = Full' {..}
 
 
-mkDirect :: C.Item i vs => FixtureConfig -> (RunConfig -> i -> Action vs) -> (RunConfig -> C.DataSource i) -> Fixture ()
+mkDirect :: Item i vs => FixtureConfig -> (RunConfig -> i -> Action vs) -> (RunConfig -> C.DataSource i) -> Fixture ()
 mkDirect config action dataSource = Direct {..}
 
-mkDirect' :: (C.Item i vs, C.Frequency hz) => FixtureConfig -> Hook hz pw pi a -> (RunConfig -> a -> i -> Action vs) -> (RunConfig -> C.DataSource i) -> Fixture a
+mkDirect' :: (Item i vs, C.Frequency hz) => FixtureConfig -> Hook hz pw pi a -> (RunConfig -> a -> i -> Action vs) -> (RunConfig -> C.DataSource i) -> Fixture a
 mkDirect' config' depends action' dataSource' = Direct' {..}
 
 
@@ -285,7 +286,7 @@ constructor to compile
      forall i ds dataSource action as. 
     (
      Show as,
-     C.Item i ds, 
+     Item i ds, 
      dataSource ~ (RunConfig -> C.DataSource i),
      action ~ (RunConfig -> i -> Action as),
      DataSourceType dataSource ~ i,

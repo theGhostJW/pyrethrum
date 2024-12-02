@@ -1,7 +1,7 @@
 module PyrethrumConfigTypes where
 
-import Core qualified as C
 import Data.Aeson.TH (defaultOptions, deriveJSON)
+import CoreTypeFamilies (Config)
 
 data Environment = TST | UAT | PreProd | Prod deriving (Show, Eq, Ord, Enum, Bounded)
 $(deriveJSON defaultOptions ''Environment)
@@ -23,7 +23,7 @@ data RunConfig = RunConfig
 
 $(deriveJSON defaultOptions ''RunConfig)
 
-instance C.Config RunConfig
+instance Config RunConfig
 
 defaultRunConfig :: RunConfig
 defaultRunConfig = RunConfig "test" TST 1 AU DeepRegression
@@ -56,4 +56,4 @@ fxCfg title =
 
 $(deriveJSON defaultOptions ''FixtureConfig)
 
-instance C.Config FixtureConfig
+instance Config FixtureConfig

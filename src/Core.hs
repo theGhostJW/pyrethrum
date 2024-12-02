@@ -1,11 +1,9 @@
 module Core where
 
-import Check (Checks)
 import CoreUtils (Hz (..))
 import DSL.Internal.NodeLog (LogSink, Path)
-import Data.Aeson (ToJSON (..))
 import Filter (Filters)
-import GHC.Records (HasField)
+import CoreTypeFamilies ( Item )
 
 data Before
 
@@ -29,14 +27,6 @@ newtype ParseException
   deriving (Show, Read)
 
 instance Exception ParseException
-
-type HasTitle a = HasField "title" a Text
-
-type HasId a = HasField "id" a Int
-
-class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
-
-type Item i vs = (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Read i, Show vs, Show i)
 
 failParser :: Text -> Either ParseException a
 failParser = Left . ParseFailure

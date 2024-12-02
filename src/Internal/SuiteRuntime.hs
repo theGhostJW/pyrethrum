@@ -26,6 +26,7 @@ import UnliftIO.STM
     writeTQueue,
   )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
+import CoreTypeFamilies (Config)
 
 {-
 todo :: define defect properties with sum type type and typeclass which returns defect info
@@ -42,7 +43,7 @@ executeWithoutValidation :: ThreadCount -> L.LogActions Log -> [P.PreNode IO ()]
 executeWithoutValidation tc lc pn =
   L.runWithLogger lc (\l -> executeNodeList tc l pn)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogActions Log -> C.SuiteExeParams m rc fc -> IO ()
+execute :: (Config rc, Config fc) => ThreadCount -> L.LogActions Log -> C.SuiteExeParams m rc fc -> IO ()
 execute tc lc prms =
   L.runWithLogger lc execute'
   where

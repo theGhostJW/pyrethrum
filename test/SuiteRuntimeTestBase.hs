@@ -5,7 +5,6 @@ module SuiteRuntimeTestBase where
 
 import Chronos (Time, now)
 import Core (DataSource (Items))
-import Core qualified
 import CoreUtils (Hz (..), ThreadId)
 import DSL.Internal.NodeLog qualified as AE
 import Data.Aeson (ToJSON)
@@ -66,6 +65,7 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
+import CoreTypeFamilies (Config)
 
 defaultSeed :: Int
 defaultSeed = 13579
@@ -1273,7 +1273,7 @@ newtype FixtureConfig = FxCfg
 
 instance ToJSON FixtureConfig
 
-instance Core.Config FixtureConfig
+instance Config FixtureConfig
 
 fc :: FixtureConfig
 fc = FxCfg {title = "fixture config"}

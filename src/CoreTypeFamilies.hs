@@ -1,7 +1,12 @@
+{-# LANGUAGE UndecidableInstances #-}
+
 module CoreTypeFamilies where
 
 import GHC.TypeLits (TypeError)
 import GHC.TypeError (ErrorMessage(..))
+import GHC.Records (HasField)
+import Data.Aeson (ToJSON)
+import Check (Checks)
 
 type family DataSourceType dataSource where
     DataSourceType (rc -> ds i) = i
@@ -32,3 +37,17 @@ type family DataSourceMatchesAction ds ai :: Constraint where
         :<>: 'ShowType ai
         :$$: 'Text "     so the dataSource elements match the input for the action."
       )
+
+
+-- type Item i vs = (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Read i, Show vs, Show i)
+
+
+type HasTitle a = HasField "title" a Text
+
+type HasId a = HasField "id" a Int
+
+class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
+
+class (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Show vs) => Item i vs
+
+instance (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Show vs) => Item i vs

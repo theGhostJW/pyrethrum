@@ -44,7 +44,7 @@ data ASAlt = ASAlt
     checkButtonText :: Text
   }
   deriving (Show)
-data DSAlt = DSAlt
+data VSAlt = VSAlt
   { status :: DriverStatus,
     checkButtonText :: Text
   }
@@ -53,7 +53,7 @@ data DSAlt = DSAlt
 data DataAlt = ItemAlt
   { id :: Int,
     title :: Text,
-    checks :: Checks DSAlt
+    checks :: Checks VSAlt
   }
   deriving (Show, Read)
 
@@ -86,6 +86,8 @@ parse AS {..} = pure $ VS {..}
 data' :: RunConfig -> DataSource Data
 data' _rc =
   Items [ ]
+
+
 
 -- #### Compiler Error Wrong DataSource Data Type #### --
 
@@ -120,15 +122,60 @@ testAlt2RawConstrucors2 = Full  {
 
 -- #### Compiler Error Wrong Parse Result Data Type #### --
 
+-- Bad checks :: Checks VS vs VSAlt in Data1 but nothing about it in the message
+
 failsSuite1 :: Suite
 failsSuite1 =
-  [Fixture (NodePath "WebDriverDemo" "test") testAlt2]
+  [Fixture (NodePath "WebDriverDemo" "test") testAlt1]
+
+testAlt1 :: Fixture ()
+testAlt1 = Full config action1 parseAlt1 data1
+
+action1 ::  RunConfig -> Data1 -> Eff es AS
+action1 _rc _i = 
+  pure $ AS {status = Ready, checkButtonText = "Blah"}
+
+parseAlt1 :: AS -> Either ParseException VSAlt
+parseAlt1 AS {..} = pure $ VSAlt {..}
+
+data1 :: RunConfig -> DataSource Data1
+data1 _rc =
+  Items [ ]
+
+data Data1 = Item1
+  { id :: Int,
+    title :: Text,
+    checks :: Checks VS
+  }
+  deriving (Show, Read)
+
+-- -- #### Compiler Error Data 2 missing Checks #### --
+
+
+failsSuite2 :: Suite
+failsSuite2 =
+  [Fixture (NodePath "WebDriverDemo" "test") testAlt2']
 
 testAlt2' :: Fixture ()
-testAlt2' = Full config action parseAlt2 data'
+testAlt2' = Full config action2 parseAlt2 data2
 
-parseAlt2 :: AS -> Either ParseException DSAlt
-parseAlt2 AS {..} = pure $ DSAlt {..}
+action2 ::  RunConfig -> Data2 -> Eff es AS
+action2 _rc _i = 
+  pure $ AS {status = Ready, checkButtonText = "Blah"}
+
+parseAlt2 :: AS -> Either ParseException VS
+parseAlt2 AS {..} = pure $ VS {..}
+
+data2 :: RunConfig -> DataSource Data2
+data2 _rc =
+  Items [ ]
+
+data Data2 = Item2
+  { id :: Int,
+    checks :: Checks VS
+  }
+  deriving (Show, Read)
+
 
 -- #### Compiler Error ApState Result Data Type #### --
 
@@ -159,14 +206,24 @@ action4 _rc _i =
 
 
 
--- #### Compiler Error Wrong DataSource Data Type - Direct #### --
 
+-- #### Compiler Error Wrong DataSource Data Type - Direct #### --
+-- example of bad error message
 failsSuite5 :: Suite 
 failsSuite5 = 
   [Fixture (NodePath "WebDriverDemo" "test") testAlt5]
 
 testAlt5 :: Fixture ()
-testAlt5 = Direct config action5 dataWrongType
+testAlt5 = Direct config5 action5 data'
+
+config5 :: FixtureConfig
+config5 = FxCfg "test" DeepRegression
+
+
+dataWrongType5 :: RunConfig -> DataSource DataAlt
+dataWrongType5 _rc =
+  Items [ ] 
+
 
 action5 ::  RunConfig -> Data -> Eff es AS
 action5 _rc _i = 

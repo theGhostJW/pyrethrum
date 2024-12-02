@@ -226,15 +226,19 @@ failsSuite :: Suite
 failsSuite =
   [Fixture (NodePath "WebDriverDemo" "test") testAlt]
 
-testAlt :: Fixture ()
-testAlt = Full config action parse dataAlt
+-- testAlt :: Fixture ()
+-- testAlt = Full config action parse dataWrongType
 
-dataAlt :: RunConfig -> DataSource DataAlt
-dataAlt _rc =
+dataWrongType :: RunConfig -> DataSource DataAlt
+dataWrongType _rc =
   Items [ ] 
 
 testAlt2 :: Fixture ()
-testAlt2 = mkFull config action parse dataAlt
+testAlt2 = mkFull config action parse dataWrongType
+
+testAlt3 :: Fixture ()
+testAlt3 = mkFull2 config action parse dataWrongType
+
 
 
 {-
@@ -286,7 +290,7 @@ failsSuite5 =
   [Fixture (NodePath "WebDriverDemo" "test") testAlt5]
 
 testAlt5 :: Fixture ()
-testAlt5 = Direct config action5 dataAlt
+testAlt5 = Direct config action5 dataWrongType
 
 action5 ::  RunConfig -> Data -> Eff es AS
 action5 _rc _i = 

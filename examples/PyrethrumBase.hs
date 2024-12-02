@@ -20,10 +20,12 @@ module PyrethrumBase
     defaultRunConfig,
     docInterpreter,
     mkDirect,
-    mkFull
+    mkFull,
+    mkFull2
   )
 where
 
+import Core (DataSource) 
 import Core qualified as C
 import DSL.FileSystemDocInterpreter qualified as FDoc (runFileSystem)
 import DSL.FileSystemEffect (FileSystem)
@@ -257,13 +259,37 @@ data Fixture hi where
 mkDirect :: C.Item i ds => FixtureConfig -> (RunConfig -> i -> Action ds) -> (RunConfig -> C.DataSource i) -> Fixture ()
 mkDirect config action dataSource = Direct {..}
 
-mkFull :: (C.Item i ds, Show as) => 
- FixtureConfig -- fixture config
- -> (RunConfig -> i -> Action as)  --
- -> (as -> Either C.ParseException ds) --
- -> (RunConfig -> C.DataSource i) --
+-- Type synonyms for readability
+type MkAction i as = RunConfig -> i -> Action as
+type Parser as ds = as -> Either C.ParseException ds
+type MkDataSource i = RunConfig -> DataSource i
+
+-- | Creates a full fixture using the provided configuration, action, parser, and data source.
+mkFull :: forall i as ds action dataSource. (
+ action ~ (RunConfig -> i -> Action as),
+ dataSource ~ (RunConfig -> DataSource i),
+ C.Item i ds, 
+ Show as, 
+ DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType action)
+ ) =>
+ FixtureConfig 
+ -> action-- action :: RunConfig -> i -> Action as
+ -> Parser as ds  -- parser  :: as -> Either C.ParseException ds
+ -> dataSource-- dataSource :: RunConfig -> DataSource i
  -> Fixture ()
 mkFull config action parse dataSource = Full {..}
+
+
+mkFull2 :: (
+ C.Item i ds, 
+ Show as
+ ) =>
+ FixtureConfig 
+ -> (RunConfig -> i -> Action as)  
+ -> (as -> Either C.ParseException ds)
+ -> (RunConfig -> DataSource i)
+ -> Fixture ()
+mkFull2 config action parse dataSource = Full {..}
 
 
 {-

@@ -20,8 +20,8 @@ module PyrethrumBase
     defaultRunConfig,
     docInterpreter,
     mkDirect,
-    mkFull,
-    mkFull2
+    mkFullDemoErrMsgs,
+    mkFull
   )
 where
 
@@ -265,7 +265,7 @@ type Parser as ds = as -> Either C.ParseException ds
 type MkDataSource i = RunConfig -> DataSource i
 
 -- | Creates a full fixture using the provided configuration, action, parser, and data source.
-mkFull :: forall i as ds action dataSource. (
+mkFullDemoErrMsgs :: forall i as ds action dataSource. (
  action ~ (RunConfig -> i -> Action as),
  dataSource ~ (RunConfig -> DataSource i),
  C.Item i ds, 
@@ -277,10 +277,10 @@ mkFull :: forall i as ds action dataSource. (
  -> Parser as ds  -- parser  :: as -> Either C.ParseException ds
  -> dataSource-- dataSource :: RunConfig -> DataSource i
  -> Fixture ()
-mkFull config action parse dataSource = Full {..}
+mkFullDemoErrMsgs config action parse dataSource = Full {..}
 
 
-mkFull2 :: (
+mkFull :: (
  C.Item i ds, 
  Show as
  ) =>
@@ -289,7 +289,7 @@ mkFull2 :: (
  -> (as -> Either C.ParseException ds)
  -> (RunConfig -> DataSource i)
  -> Fixture ()
-mkFull2 config action parse dataSource = Full {..}
+mkFull config action parse dataSource = Full {..}
 
 
 {-

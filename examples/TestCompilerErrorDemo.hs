@@ -91,17 +91,12 @@ data' _rc =
 
 -- #### Compiler Error Wrong DataSource Data Type #### --
 
-failsSuite :: Suite
-failsSuite =
-  [Fixture (NodePath "WebDriverDemo" "test") testAlt2]
-
--- testAlt :: Fixture ()
--- testAlt = Full config action parse dataWrongType
 
 dataWrongType :: RunConfig -> DataSource DataAlt
 dataWrongType _rc =
   Items [ ] 
 
+{-
 testAlt2 :: Fixture ()
 testAlt2 = mkFull config action parse dataWrongType
 
@@ -115,7 +110,7 @@ testAlt2RawConstrucors2 = Full  {
       parse = parse,
       dataSource = dataWrongType
     }
-
+-}
 -- testAlt3 :: Fixture ()
 -- testAlt3 = mkFullDemoErrMsgs config action parse dataWrongType
 
@@ -130,6 +125,12 @@ failsSuite1 =
 
 testAlt1 :: Fixture ()
 testAlt1 = Full config action1 parseAlt1 data1
+
+{-
+testAlt1' :: Fixture ()
+testAlt1' = mkFull config action1 parseAlt1 data1
+-}
+
 
 action1 ::  RunConfig -> Data1 -> Eff es AS
 action1 _rc _i = 
@@ -148,7 +149,7 @@ data Data1 = Item1
     checks :: Checks VS
   }
   deriving (Show, Read)
-
+{-
 -- -- #### Compiler Error Data 2 missing Checks #### --
 
 
@@ -228,4 +229,4 @@ dataWrongType5 _rc =
 action5 ::  RunConfig -> Data -> Eff es AS
 action5 _rc _i = 
   pure $ AS {status = Ready, checkButtonText = "Blah"}
-
+-}

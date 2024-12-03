@@ -56,7 +56,7 @@ import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
-import CoreTypeFamilies (Item)
+import CoreTypeFamilies (Item, FixtureTypeCheckFull, FixtureTypeCheckDirect)
 -- import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType, ActionInputType')
 
 --  these will probably be split off and go into core or another library
@@ -193,82 +193,125 @@ data Hook hz when input output where
 
 data Fixture hi where
   Full ::
-     forall i vs as. 
+     forall i vs as action dataSource parser. 
     (
+     dataSource ~ (RunConfig -> DataSource i),
+     action ~ (RunConfig -> i -> Action as),
+     parser ~ (as -> Either C.ParseException vs),
+     FixtureTypeCheckFull action parser dataSource,
      Show as,
      Item i vs
     ) =>
     { config :: FixtureConfig,
-      action :: RunConfig -> i -> Action as,
-      parse :: as -> Either C.ParseException vs,
-      dataSource :: RunConfig -> C.DataSource i
+      action :: action,
+      parse :: parser,
+      dataSource :: dataSource
     } ->
     Fixture ()
   Full' ::
-      forall hz pw pi a i vs as. 
+      forall hz pw pi a i vs as action' dataSource' parser'. 
     (
+     dataSource' ~ (RunConfig -> DataSource i),
+     action' ~ (RunConfig -> a -> i -> Action as),
+     parser' ~ (as -> Either C.ParseException vs),
+     FixtureTypeCheckFull action' parser' dataSource',
      Show as,
      Item i vs, 
      C.Frequency hz
     ) =>
     { config' :: FixtureConfig,
       depends :: Hook hz pw pi a,
-      action' :: RunConfig -> a -> i -> Action as,
-      parse' :: as -> Either C.ParseException vs,
-      dataSource' :: RunConfig -> C.DataSource i
+      action' :: action',
+      parse' :: parser',
+      dataSource' :: dataSource'
     } ->
     Fixture a
   Direct ::
-    forall i vs. 
-    (Item i vs
+    forall i vs action dataSource. 
+    (
+     dataSource ~ (RunConfig -> DataSource i),
+     action ~ (RunConfig -> i -> Action vs),
+     FixtureTypeCheckDirect action dataSource,
+     Item i vs
      ) =>
     { config :: FixtureConfig,
-      action :: RunConfig -> i -> Action vs,
-      dataSource :: RunConfig -> C.DataSource i
+      action :: action,
+      dataSource :: dataSource
     } ->
     Fixture ()
   Direct' ::
-    forall i hz pw pi a vs. 
-    (Item i vs, 
+    forall i hz pw pi a vs action' dataSource'. 
+    (
+     dataSource' ~ (RunConfig -> DataSource i),
+     action' ~ (RunConfig -> a -> i -> Action vs),
+     FixtureTypeCheckDirect action' dataSource',
+     Item i vs, 
      C.Frequency hz
      ) =>
     { config' :: FixtureConfig,
       depends :: Hook hz pw pi a,
-      action' :: RunConfig -> a -> i -> Action vs,
-      dataSource' :: RunConfig -> C.DataSource i
+      action' :: action',
+      dataSource' :: dataSource'
     } ->
     Fixture a
 
 
 mkFull :: (
+ dataSource ~ (RunConfig -> DataSource i),
+ action ~ (RunConfig -> i -> Action as),
+ parser ~ (as -> Either C.ParseException vs),
+ FixtureTypeCheckFull action parser dataSource,
  Item i vs, 
  Show as
  ) =>
  FixtureConfig 
- -> (RunConfig -> i -> Action as)  
- -> (as -> Either C.ParseException vs)
- -> (RunConfig -> DataSource i)
+ -> action
+ -> parser
+ -> dataSource
  -> Fixture ()
 mkFull config action parse dataSource = Full {..}
 
 mkFull' :: (
+ dataSource ~ (RunConfig -> DataSource i),
+ action ~ (RunConfig -> ho -> i -> Action as),
+ parser ~ (as -> Either C.ParseException vs),
+ FixtureTypeCheckFull action parser dataSource,
  Item i vs, 
  Show as, 
  C.Frequency hz
  ) =>
  FixtureConfig 
- -> Hook hz pw pi a
- -> (RunConfig -> a -> i -> Action as)  
- -> (as -> Either C.ParseException vs)
- -> (RunConfig -> DataSource i)
- -> Fixture a
+ -> Hook hz pw pi ho
+ -> action
+ -> parser
+ -> dataSource
+ -> Fixture ho
 mkFull' config' depends action' parse' dataSource' = Full' {..}
 
-
-mkDirect :: Item i vs => FixtureConfig -> (RunConfig -> i -> Action vs) -> (RunConfig -> C.DataSource i) -> Fixture ()
+mkDirect :: (
+ dataSource ~ (RunConfig -> DataSource i),
+ action ~ (RunConfig -> i -> Action vs),
+ FixtureTypeCheckDirect action dataSource,
+ Item i vs
+ ) =>
+ FixtureConfig 
+ -> action
+ -> dataSource
+ -> Fixture ()
 mkDirect config action dataSource = Direct {..}
 
-mkDirect' :: (Item i vs, C.Frequency hz) => FixtureConfig -> Hook hz pw pi a -> (RunConfig -> a -> i -> Action vs) -> (RunConfig -> C.DataSource i) -> Fixture a
+mkDirect'  :: (
+ dataSource ~ (RunConfig -> DataSource i),
+ action ~ (RunConfig -> ho -> i -> Action vs),
+ FixtureTypeCheckDirect action dataSource,
+ Item i vs, 
+ C.Frequency hz
+ ) =>
+ FixtureConfig 
+ -> Hook hz pw pi ho
+ -> action
+ -> dataSource
+ -> Fixture ho
 mkDirect' config' depends action' dataSource' = Direct' {..}
 
 

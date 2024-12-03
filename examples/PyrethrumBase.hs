@@ -9,7 +9,6 @@ module PyrethrumBase
     RunConfig (..),
     Country (..),
     Environment (..),
-    C.DataSource (..),
     Suite,
     SuiteRunner,
     FixtureConfig (..),
@@ -28,7 +27,6 @@ module PyrethrumBase
   )
 where
 
-import Core (DataSource) 
 import Core qualified as C
 import DSL.FileSystemDocInterpreter qualified as FDoc (runFileSystem)
 import DSL.FileSystemEffect (FileSystem)
@@ -56,7 +54,7 @@ import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
-import CoreTypeFamilies (Item, FixtureTypeCheckFull, FixtureTypeCheckDirect)
+import CoreTypeFamilies (Item, FixtureTypeCheckFull, FixtureTypeCheckDirect, DataSource)
 -- import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType, ActionInputType')
 
 --  these will probably be split off and go into core or another library

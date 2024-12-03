@@ -15,7 +15,7 @@ import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
 import Core (Mode (..), SuiteExeParams)
 import Core qualified as C
-import CoreTypeFamilies (Config, Item)
+import CoreTypeFamilies (Config, Item, DataSource)
 import CoreUtils (Hz)
 import DSL.Internal.NodeLog
   ( ApStateText (ApStateText),
@@ -82,7 +82,7 @@ data PreNode m hi where
     (Config fc) =>
     { config :: fc,
       path :: Path,
-      tests :: C.DataSource (Test m hi)
+      tests :: DataSource (Test m hi)
     } ->
     PreNode m hi
 

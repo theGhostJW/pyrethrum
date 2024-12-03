@@ -16,6 +16,7 @@ import PyrethrumExtras (txt)
 import WebDriverEffect as WE
 import WebDriverSpec (DriverStatus (Ready))
 import DSL.Logging (log)
+import CoreTypeFamilies (DataSource (..))
 
 -- ########## Types #############
 
@@ -149,7 +150,7 @@ data Data1 = Item1
     checks :: Checks VS
   }
   deriving (Show, Read)
-{-
+
 -- -- #### Compiler Error Data 2 missing Checks #### --
 
 
@@ -229,4 +230,4 @@ dataWrongType5 _rc =
 action5 ::  RunConfig -> Data -> Eff es AS
 action5 _rc _i = 
   pure $ AS {status = Ready, checkButtonText = "Blah"}
--}
+

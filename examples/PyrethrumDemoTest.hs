@@ -17,11 +17,10 @@ import PyrethrumBase (
   RunConfig (..),
   Suite,
   FixtureConfig (..),
-  DataSource(..),
   FixtureConfig, Country (..), Environment (..), fxCfg, mkFull, mkFull', mkDirect',
  )
 import PyrethrumExtras (txt)
-import qualified Core as C
+import CoreTypeFamilies (DataSource (Items))
 
 {-
 Note:: tried alternative with individual hook types but the results
@@ -154,7 +153,7 @@ data Item = Item
 dataSource :: RunConfig -> DataSource Item
 dataSource =
   const $
-    C.Items [ Item
+    Items [ Item
         { id = 1
         , title = "test the value is one"
         , value = 2

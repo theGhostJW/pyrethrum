@@ -16,7 +16,7 @@ import Internal.Logging qualified as L
 import Internal.SuiteRuntime (ThreadCount (..))
 import Path as P (Path, reldir, toFilePath)
 import PyrethrumBase
-  ( DataSource (..),
+  ( 
     Depth (..),
     Fixture,
     FixtureConfig (..),
@@ -42,6 +42,7 @@ import WebDriverEffect
   )
 import WebDriverPure (seconds)
 import WebDriverSpec (DriverStatus (..), Selector (CSS))
+import CoreTypeFamilies (DataSource (..))
 
 runDemo :: SuiteRunner -> Suite -> IO ()
 runDemo runner suite = do

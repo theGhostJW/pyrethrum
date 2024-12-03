@@ -17,6 +17,7 @@ import Internal.SuiteRuntime (ThreadCount(..))
 import Internal.Logging qualified as L
 import WebDriverPure (seconds)
 import DSL.Logging (log)
+import CoreTypeFamilies (DataSource (..))
 
 
 -- ################### Effectful Demo ##################

@@ -21,6 +21,7 @@ import PyrethrumBase qualified as PB
 import UnliftIO (catchAny)
 import WebDriverSpec (DriverStatus (Ready))
 import PyrethrumExtras (txt)
+import CoreTypeFamilies (DataSource (..))
 
 -- ################### Effectful Demo ##################
 

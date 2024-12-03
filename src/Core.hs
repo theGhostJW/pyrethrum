@@ -3,7 +3,7 @@ module Core where
 import CoreUtils (Hz (..))
 import DSL.Internal.NodeLog (LogSink, Path)
 import Filter (Filters)
-import CoreTypeFamilies ( Item )
+import CoreTypeFamilies ( Item, DataSource (..) )
 
 data Before
 
@@ -120,8 +120,6 @@ data Hook m rc hz i o where
 
 hookFrequency :: forall m rc hz i o. (Frequency hz) => Hook m rc hz i o -> Hz
 hookFrequency _ = frequency @hz
-
-data DataSource i = Items [i] | Property i deriving (Show, Functor)
 
 getConfig :: Fixture m rc fc hi -> fc
 getConfig = \case

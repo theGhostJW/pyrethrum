@@ -4,7 +4,6 @@ module SuiteRuntimeTestBase where
 -- don't use chkFail it does not format properly
 
 import Chronos (Time, now)
-import Core (DataSource (Items))
 import CoreUtils (Hz (..), ThreadId)
 import DSL.Internal.NodeLog qualified as AE
 import Data.Aeson (ToJSON)
@@ -65,7 +64,7 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
-import CoreTypeFamilies (Config)
+import CoreTypeFamilies (Config, DataSource (..))
 
 defaultSeed :: Int
 defaultSeed = 13579

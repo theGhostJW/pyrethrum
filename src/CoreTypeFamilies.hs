@@ -34,7 +34,7 @@ type family ParserOutType parser where
     ParserOutType (as -> Either l vs) = vs
 
 type family ValStateType item where
-    ValStateType (HasChecks i vs) = vs
+    ValStateType (Item i vs) = vs
 
 -- class ValStateType2 dataSource where
 -- instance ValStateType2 dataSource where
@@ -112,7 +112,7 @@ type FixtureTypeCheckFull action parser dataSource =
     ( 
       DataSourceMatchesAction (DataSourceType dataSource) (ActionInType action)
     , ActionMatchesParser (ActionOutType action) (ParserInType parser)
-    -- , ParserMatchesValState (ParserOutType parser) (ValStateType (DataSourceType dataSource))
+    , ParserMatchesValState (ParserOutType parser) (ValStateType (DataSourceType dataSource))
     )
 
 type FixtureTypeCheckDirect action dataSource  = 
@@ -131,3 +131,104 @@ type Item i vs = (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, 
 type HasChecks i vs = HasField "checks" i (Checks vs)
 
 
+------
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ConstraintKinds #-}
+
+import GHC.Records (HasField)
+import Data.Aeson (ToJSON)
+import Data.Text (Text)
+import Data.Kind (Constraint)
+
+-- Original type synonym (commented out)
+-- type Item i vs = (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Show vs)
+
+-- Convert to type class with functional dependency
+class (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Show vs) => Item i vs | i -> vs
+
+-- Provide an instance (if necessary)
+instance (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Show vs) => Item i vs
+
+type ValStateType i = VsFromItem i
+
+-- Helper type family to get 'vs' from 'i' using the 'Item' class
+type family VsFromItem i where
+  VsFromItem i = VsFromItemClass i
+
+-- Define a type family that leverages the functional dependency
+type family VsFromItemClass i where
+  VsFromItemClass i = Vs -- 'Vs' is determined by the functional dependency 'i -> vs' in 'Item i vs'
+
+-- Since 'Item i vs' implies 'i -> vs', we can define:
+type ValStateType i = VsFor i
+
+-- We need a way to refer to 'vs' given 'i'
+-- We can use a type class to achieve this:
+class Item i vs => HasValStateType i vs | i -> vs
+
+-- Provide an instance
+instance Item i vs => HasValStateType i vs
+
+-- Now, 'ValStateType i' can be defined as:
+type ValStateType i = VsFor i
+
+type family VsFor i where
+  -- We can't extract 'vs' directly in a type family, but we can use 'HasValStateType' in constraints
+  -- So, we use 'ValStateType i' in constraints where necessary
+    {-# LANGUAGE TypeFamilies #-}
+  {-# LANGUAGE TypeOperators #-}
+  {-# LANGUAGE DataKinds #-}
+  
+  import GHC.TypeLits (TypeError, ErrorMessage(..))
+  
+  -- Type-level 'If' construct
+  type family IfThenElse (cond :: Bool) (trueBranch :: k) (falseBranch :: k) :: k where
+    IfThenElse 'True trueBranch _ = trueBranch
+    IfThenElse 'False _ falseBranch = falseBranch
+  
+  -- Custom type error when parser output doesn't match 'vs' from 'i'
+  type family ParserMatchesValState parserOut vs :: Constraint where
+    ParserMatchesValState parserOut vs =
+      IfThenElse (parserOut == vs)
+        (() :: Constraint)
+        (TypeError
+          ( 'Text "Pyrethrum Fixture Type Error:"
+          ':$$: 'Text "❌ Mismatch between parser output and DataSource checks (ValState)"
+          ':$$: 'Text "Parser returns: " ':<>: 'ShowType parserOut
+          ':$$: 'Text "But the 'checks' field in DataSource elements expects: " ':<>: 'ShowType vs
+          ':$$: 'Text ""
+          ':$$: 'Text "These types must match because the parser output is used as input for the checks."
+          ':$$: 'Text "Possible fixes:"
+          ':$$: 'Text "1. Change the parser output type to: " ':<>: 'ShowType vs
+          ':$$: 'Text "   so it matches the expected ValState."
+          ':$$: 'Text "2. Change the 'checks' field type in DataSource elements to: " ':<>: 'ShowType parserOut
+          ':$$: 'Text "   so it matches the parser output."
+          )
+        )        
+        
+        
+        type FixtureTypeCheckFull action parser dataSource =
+          ( DataSourceMatchesAction (DataSourceType dataSource) (ActionInType action)
+          , ActionMatchesParser (ActionOutType action) (ParserInType parser)
+          , HasValStateType (DataSourceType dataSource) vs  -- Ensure we have 'vs' from 'i'
+          , ParserMatchesValState (ParserOutType parser) vs  -- Compare 'parser' output with 'vs'
+          )
+
+data Fixture a where
+  Full ::
+    ( dataSource ~ (RunConfig -> DataSource i)
+    , action ~ (RunConfig -> i -> Action as)
+    , parser ~ (as -> Either ParseException parserOut)
+    , FixtureTypeCheckFull action parser dataSource
+    , Item i vs
+    , HasValStateType i vs  -- Ensure we can get 'vs' from 'i'
+    , Show as
+    ) =>
+    { config     :: FixtureConfig
+    , action     :: action
+    , parse      :: parser
+    , dataSource :: dataSource
+    } ->
+    Fixture a

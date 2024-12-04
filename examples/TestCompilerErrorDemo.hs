@@ -141,7 +141,7 @@ parseAlt1 :: AS -> Either ParseException VSAlt
 parseAlt1 AS {..} = pure $ VSAlt {..}
 
 -- lies about the data type its actually VS
-data1 :: Item DataSource Data1 VSAlt -> RunConfig -> DataSource VSAlt Data1
+data1 :: Item Data1 VSAlt => RunConfig -> DataSource VSAlt Data1
 data1 _rc =
   Items [ ]
 

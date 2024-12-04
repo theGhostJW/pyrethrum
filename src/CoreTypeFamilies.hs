@@ -1,4 +1,5 @@
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 
 module CoreTypeFamilies where
 
@@ -6,12 +7,31 @@ import GHC.TypeLits (TypeError)
 import GHC.TypeError as TE (ErrorMessage(..)) 
 import GHC.Records (HasField)
 import Data.Aeson (ToJSON)
-import Check (Checks)
+import Check (Checks, chk)
 import Effectful (Eff)
+import GHC.Show as SH (Show(..)) 
 
 type ErrorHeader = 'Text "Pyrethrum Fixture Type Error"
 
-data DataSource (vs :: Type) i = Items [i] | Property i deriving (Show, Functor)
+data DataSource i vs = Items [DataElm i vs] | Property (DataElm i vs) 
+
+type DataElm i vs = (Item i vs) => i
+
+data EgItem = EgItem { title :: Text, checks :: Checks Int } deriving (Show, Read)
+
+ds :: DataSource EgItem Int
+ds = Items [
+  EgItem "one"  $ chk "fail all" (const False), 
+  EgItem "two" $ chk "fail all" (const False)
+  ]
+-- instance Show (DataSource i vs) where
+--     show (Items xs) = SH.show xs
+--     show (Property x) = SH.show x
+
+
+
+
+
 
 type family DataSourceType dataSource where
     DataSourceType (rc -> DataSource vs i) = i

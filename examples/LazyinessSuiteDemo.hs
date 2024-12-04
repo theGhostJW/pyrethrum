@@ -202,7 +202,7 @@ data AS = AS
   }
   deriving (Show)
 
-data DS = DS
+data VS = VS
   { status :: DriverStatus,
     checkButtonText :: Text
   }
@@ -211,14 +211,14 @@ data DS = DS
 data Data = Item
   { id :: Int,
     title :: Text,
-    checks :: Checks DS
+    checks :: Checks VS
   }
   deriving (Show, Read)
 
-parse :: AS -> Either ParseException DS
-parse AS {..} = pure $ DS {..}
+parse :: AS -> Either ParseException VS
+parse AS {..} = pure $ VS {..}
 
-dataSource :: RunConfig -> DataSource Data
+dataSource :: RunConfig -> DataSource VS Data
 dataSource _rc =
   Items
     [ Item

@@ -84,7 +84,7 @@ action _rc _i =
 parse :: AS -> Either ParseException VS
 parse AS {..} = pure $ VS {..}
 
-data' :: RunConfig -> DataSource Data
+data' :: RunConfig -> DataSource VS Data
 data' _rc =
   Items [ ]
 
@@ -93,7 +93,7 @@ data' _rc =
 -- #### Compiler Error Wrong DataSource Data Type #### --
 
 
-dataWrongType :: RunConfig -> DataSource DataAlt
+dataWrongType :: RunConfig -> DataSource VSAlt DataAlt
 dataWrongType _rc =
   Items [ ] 
 
@@ -140,7 +140,8 @@ action1 _rc _i =
 parseAlt1 :: AS -> Either ParseException VSAlt
 parseAlt1 AS {..} = pure $ VSAlt {..}
 
-data1 :: RunConfig -> DataSource Data1
+-- lies about the data type its actually VS
+data1 :: Item DataSource Data1 VSAlt -> RunConfig -> DataSource VSAlt Data1
 data1 _rc =
   Items [ ]
 
@@ -153,6 +154,7 @@ data Data1 = Item1
 
 -- -- #### Compiler Error Data 2 missing Checks #### --
 
+-- WHY NO TYPE ERROR ???
 
 failsSuite2 :: Suite
 failsSuite2 =
@@ -168,13 +170,13 @@ action2 _rc _i =
 parseAlt2 :: AS -> Either ParseException VS
 parseAlt2 AS {..} = pure $ VS {..}
 
-data2 :: RunConfig -> DataSource Data2
+data2 :: RunConfig -> DataSource VS Data2
 data2 _rc =
   Items [ ]
 
 data Data2 = Item2
   { id :: Int,
-    checks :: Checks VS
+   title :: Text
   }
   deriving (Show, Read)
 
@@ -222,7 +224,7 @@ config5 :: FixtureConfig
 config5 = FxCfg "test" DeepRegression
 
 
-dataWrongType5 :: RunConfig -> DataSource DataAlt
+dataWrongType5 :: RunConfig -> DataSource VSAlt DataAlt
 dataWrongType5 _rc =
   Items [ ] 
 

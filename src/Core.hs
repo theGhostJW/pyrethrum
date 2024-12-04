@@ -136,7 +136,7 @@ fixtureEmpty rc =
   Direct {dataSource} -> dsEmpty $ dataSource rc
   Direct' {dataSource'} -> dsEmpty $ dataSource' rc
   where
-    dsEmpty :: forall i. DataSource i -> Bool
+    dsEmpty :: forall i vs. DataSource vs i -> Bool
     dsEmpty = \case
       Items itms -> null itms
       Property {} -> False
@@ -147,7 +147,7 @@ data Fixture m rc fc hi where
     { config :: fc,
       action :: rc -> i -> m as,
       parse :: as -> Either ParseException vs,
-      dataSource :: rc -> DataSource i
+      dataSource :: rc -> DataSource vs i
     } ->
     Fixture m rc fc ()
   Full' ::
@@ -156,14 +156,14 @@ data Fixture m rc fc hi where
       depends :: Hook m rc hz pi hi,
       action' :: rc -> hi -> i -> m as,
       parse' :: as -> Either ParseException vs,
-      dataSource' :: rc -> DataSource i
+      dataSource' :: rc -> DataSource vs i
     } ->
     Fixture m rc fc hi
   Direct ::
     (Item i vs) =>
     { config :: fc,
       action :: rc -> i -> m vs,
-      dataSource :: rc -> DataSource i
+      dataSource :: rc -> DataSource vs i
     } ->
     Fixture m rc fc ()
   Direct' ::
@@ -171,7 +171,7 @@ data Fixture m rc fc hi where
     { config' :: fc,
       depends :: Hook m rc hz pi hi,
       action' :: rc -> hi -> i -> m vs,
-      dataSource' :: rc -> DataSource i
+      dataSource' :: rc -> DataSource vs i
     } ->
     Fixture m rc fc hi
 

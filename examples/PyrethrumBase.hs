@@ -54,7 +54,7 @@ import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
-import CoreTypeFamilies (Item, FixtureTypeCheckFull, FixtureTypeCheckDirect, DataSource)
+import CoreTypeFamilies (Item, FixtureTypeCheckFull, FixtureTypeCheckDirect, DataSource, ValStateType)
 -- import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType, ActionInputType')
 
 --  these will probably be split off and go into core or another library
@@ -193,10 +193,10 @@ data Fixture hi where
   Full ::
      forall i vs as action dataSource parser. 
     (
-     dataSource ~ (RunConfig -> DataSource i),
+     dataSource ~ (RunConfig -> DataSource vs i),
      action ~ (RunConfig -> i -> Action as),
      parser ~ (as -> Either C.ParseException vs),
-     FixtureTypeCheckFull action parser dataSource,
+     FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
      Show as,
      Item i vs
     ) =>
@@ -207,27 +207,27 @@ data Fixture hi where
     } ->
     Fixture ()
   Full' ::
-      forall hz pw pi a i vs as action' dataSource' parser'. 
+      forall hz pw pi a i vs as action dataSource parser. 
     (
-     dataSource' ~ (RunConfig -> DataSource i),
-     action' ~ (RunConfig -> a -> i -> Action as),
-     parser' ~ (as -> Either C.ParseException vs),
-     FixtureTypeCheckFull action' parser' dataSource',
+     dataSource ~ (RunConfig -> DataSource vs i),
+     action ~ (RunConfig -> a -> i -> Action as),
+     parser ~ (as -> Either C.ParseException vs),
+     FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
      Show as,
      Item i vs, 
      C.Frequency hz
     ) =>
     { config' :: FixtureConfig,
       depends :: Hook hz pw pi a,
-      action' :: action',
-      parse' :: parser',
-      dataSource' :: dataSource'
+      action' :: action,
+      parse' :: parser,
+      dataSource' :: dataSource
     } ->
     Fixture a
   Direct ::
     forall i vs action dataSource. 
     (
-     dataSource ~ (RunConfig -> DataSource i),
+     dataSource ~ (RunConfig -> DataSource vs i),
      action ~ (RunConfig -> i -> Action vs),
      FixtureTypeCheckDirect action dataSource,
      Item i vs
@@ -240,7 +240,7 @@ data Fixture hi where
   Direct' ::
     forall i hz pw pi a vs action' dataSource'. 
     (
-     dataSource' ~ (RunConfig -> DataSource i),
+     dataSource' ~ (RunConfig -> DataSource vs i),
      action' ~ (RunConfig -> a -> i -> Action vs),
      FixtureTypeCheckDirect action' dataSource',
      Item i vs, 
@@ -255,10 +255,10 @@ data Fixture hi where
 
 
 mkFull :: (
- dataSource ~ (RunConfig -> DataSource i),
+ dataSource ~ (RunConfig -> DataSource vs i),
  action ~ (RunConfig -> i -> Action as),
  parser ~ (as -> Either C.ParseException vs),
- FixtureTypeCheckFull action parser dataSource,
+ FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
  Item i vs, 
  Show as
  ) =>
@@ -270,11 +270,11 @@ mkFull :: (
 mkFull config action parse dataSource = Full {..}
 
 mkFull' :: (
- dataSource ~ (RunConfig -> DataSource i),
+ dataSource ~ (RunConfig -> DataSource vs i),
  action ~ (RunConfig -> ho -> i -> Action as),
  parser ~ (as -> Either C.ParseException vs),
- FixtureTypeCheckFull action parser dataSource,
  Item i vs, 
+ FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
  Show as, 
  C.Frequency hz
  ) =>
@@ -287,7 +287,7 @@ mkFull' :: (
 mkFull' config' depends action' parse' dataSource' = Full' {..}
 
 mkDirect :: (
- dataSource ~ (RunConfig -> DataSource i),
+ dataSource ~ (RunConfig -> DataSource vs i),
  action ~ (RunConfig -> i -> Action vs),
  FixtureTypeCheckDirect action dataSource,
  Item i vs
@@ -299,7 +299,7 @@ mkDirect :: (
 mkDirect config action dataSource = Direct {..}
 
 mkDirect'  :: (
- dataSource ~ (RunConfig -> DataSource i),
+ dataSource ~ (RunConfig -> DataSource vs i),
  action ~ (RunConfig -> ho -> i -> Action vs),
  FixtureTypeCheckDirect action dataSource,
  Item i vs, 

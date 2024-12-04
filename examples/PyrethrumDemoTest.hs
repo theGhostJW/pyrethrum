@@ -150,7 +150,7 @@ data Item = Item
   }
   deriving (Show, Read)
 
-dataSource :: RunConfig -> DataSource Item
+dataSource :: RunConfig -> DataSource VState Item
 dataSource =
   const $
     Items [ Item
@@ -181,8 +181,8 @@ action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = d
     log "Completing payment with test credit card"
   pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
 
-parse2 :: AS -> Either ParseException DS
-parse2 AS{..} = pure DS{..}
+parse2 :: AS -> Either ParseException VS
+parse2 AS{..} = pure VS{..}
 
 data AS = AS
   { value :: Int
@@ -190,7 +190,7 @@ data AS = AS
   }
   deriving (Show, Read)
 
-data DS = DS
+data VS = VS
   { value :: Int
   , valTxt :: Text
   }
@@ -200,11 +200,11 @@ data Item2 = Item2
   { id :: Int
   , title :: Text
   , value :: Int
-  , checks :: Checks DS
+  , checks :: Checks VS
   }
   deriving (Show, Read)
 
-items2 :: RunConfig -> DataSource Item2
+items2 :: RunConfig -> DataSource VS Item2
 items2 rc =
   Items $ filter
     (\i -> rc.depth == Regression || i.id < 10)
@@ -214,7 +214,7 @@ items2 rc =
         , value = 2
         , checks =
             chk "test" ((== 1) . (.value))
-              <> chk "test2" (\DS{..} -> value < 10)
+              <> chk "test2" (\VS{..} -> value < 10)
               <> chk "test3" (\ds -> ds.value < 10)
         }
     ]
@@ -233,7 +233,7 @@ test3 =
         log $ txt itm
         pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
         )
-    (\AS{..} -> pure DS{..})
+    (\AS{..} -> pure VS{..})
     (
     const .
          Items $ [ Item2
@@ -254,7 +254,7 @@ test4 =
     eachAfter
     (\_rc _hi itm -> do
         log $ txt itm
-        pure $ DS (itm.value + 1) $ txt itm.value
+        pure $ VS (itm.value + 1) $ txt itm.value
     )
     (
     const .

@@ -151,7 +151,7 @@ data ExeTree hi where
 
 data TestSource hi = Queue (ChildQ (P.Test IO hi)) | PropertyTest hi
 
-loadTests :: DataSource (P.Test IO hi) -> IO (TestSource hi)
+loadTests :: DataSource vs (P.Test IO hi) -> IO (TestSource hi)
 loadTests = \case
   Items tests -> Queue <$> mkChildQ tests
   Property _i -> noImpPropertyError

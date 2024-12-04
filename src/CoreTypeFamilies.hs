@@ -11,10 +11,10 @@ import Effectful (Eff)
 
 type ErrorHeader = 'Text "Pyrethrum Fixture Type Error"
 
-data DataSource i = Items [i] | Property i deriving (Show, Functor)
+data DataSource (vs :: Type) i = Items [i] | Property i deriving (Show, Functor)
 
 type family DataSourceType dataSource where
-    DataSourceType (rc -> DataSource i) = i
+    DataSourceType (rc -> DataSource vs i) = i
 
 type family ActionInType action where
     ActionInType (hi -> rc -> i -> m as) = i
@@ -33,8 +33,8 @@ type family ParserInType parser where
 type family ParserOutType parser where
     ParserOutType (as -> Either l vs) = vs
 
-type family ValStateType item where
-    ValStateType (Item i vs) = vs
+type family ValStateType dataSource where
+    ValStateType (rc -> DataSource vs i) = vs
 
 -- class ValStateType2 dataSource where
 -- instance ValStateType2 dataSource where
@@ -86,7 +86,7 @@ type family ActionMatchesParser aOut pIn :: Constraint where
       )
 
 type family ParserMatchesValState pOut vs :: Constraint where
-    -- ParserMatchesValState pOut pOut = ()  -- Types match, constraint satisfied
+    ParserMatchesValState pOut pOut = ()  -- Types match, constraint satisfied
     ParserMatchesValState pOut vs = TypeError
       ( 
         ErrorHeader
@@ -108,17 +108,17 @@ type family ParserMatchesValState pOut vs :: Constraint where
       )
 
 
-type FixtureTypeCheckFull action parser dataSource = 
+type FixtureTypeCheckFull action parser dataSource vs = 
     ( 
       DataSourceMatchesAction (DataSourceType dataSource) (ActionInType action)
     , ActionMatchesParser (ActionOutType action) (ParserInType parser)
-    , ParserMatchesValState (ParserOutType parser) (ValStateType (DataSourceType dataSource))
+    , ParserMatchesValState (ParserOutType parser) (ValStateType dataSource)
     )
 
 type FixtureTypeCheckDirect action dataSource  = 
     ( DataSourceMatchesAction (DataSourceType dataSource) (ActionInType action)
     -- reword this when it works needs a separate rule with different wording caus there is no parser
-    -- , ParserMatchesValState (ActionOutType action) (ValStateType (DataSourceType dataSource))
+    , ParserMatchesValState (ActionOutType action) (ValStateType dataSource)
     )
 
 type HasTitle a = HasField "title" a Text
@@ -130,7 +130,7 @@ class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
 type Item i vs = (HasTitle i, HasId i, HasField "checks" i (Checks vs), Show i, Show vs) 
 type HasChecks i vs = HasField "checks" i (Checks vs)
 
-
+{-
 ------
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -232,3 +232,4 @@ data Fixture a where
     , dataSource :: dataSource
     } ->
     Fixture a
+-}

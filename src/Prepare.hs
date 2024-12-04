@@ -82,7 +82,7 @@ data PreNode m hi where
     (Config fc) =>
     { config :: fc,
       path :: Path,
-      tests :: DataSource (Test m hi)
+      tests :: DataSource vs (Test m hi)
     } ->
     PreNode m hi
 

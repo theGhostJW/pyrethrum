@@ -1,6 +1,7 @@
+{-# LANGUAGE ImpredicativeTypes #-}
 module Core where
 
-import Check (Checks)
+import Check (Checks, chk)
 import CoreUtils (Hz (..))
 import DSL.Internal.NodeLog (LogSink, Path)
 import Data.Aeson (ToJSON (..))
@@ -40,6 +41,24 @@ type Item i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), Show i, 
 
 failParser :: Text -> Either ParseException a
 failParser = Left . ParseFailure
+
+mkElem :: Item i ds => i -> i
+mkElem = id
+
+elm :: forall i vs. i -> i
+elm = mkElem $ EgItem "one"  $ chk "fail all" (const False),
+
+data DataSource2 i vs = Items2 [DataElm i vs] | Property2 (DataElm i vs) 
+
+type DataElm i vs = (Item i vs) => i
+
+data EgItem = EgItem { title :: Text, checks :: Checks Int } deriving (Show, Read)
+
+ds :: DataSource2 EgItem Int
+ds = Items2 [
+  EgItem "one"  $ chk "fail all" (const False), 
+  EgItem "two" $ chk "fail all" (const False)
+  ]
 
 -- add a function to serialise known properties to JSON on id, title, -> optional tricky may need to parse from string  notes, calcs
 -- https://softwareengineering.stackexchange.com/a/250135https://softwareengineering.stackexchange.com/a/250135

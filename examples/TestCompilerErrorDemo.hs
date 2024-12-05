@@ -59,7 +59,7 @@ data DataAlt = ItemAlt
   deriving (Show, Read)
 
 
--- #######################################
+-- #### Baseline - Compiles Successfully #### --
 
 compilesSuite :: Suite
 compilesSuite =
@@ -88,9 +88,10 @@ data' :: RunConfig -> DataSource Data VS
 data' _rc =
   Items [ ]
 
--- -- #### Compiler Error Data  missing Checks #### --
+{-
+-- #### Compiler Error Data missing Checks #### --
 
--- NOTE :: this error will only come up in a later phase of compilation
+-- Note: this error will only come up in a later phase of compilation
 -- so it may not appear when the other errors in this file are active.
 -- To see this error comment out the failures below this case
 
@@ -133,7 +134,7 @@ action4 _rc _i =
   pure $ AS {status = Ready, checkButtonText = "Blah"}
 
 
--- #### Compiler Error Action ApState Mismatch with Parser In #### --
+-- #### Compiler Error - Action ApState Mismatch with Parser In #### --
 
 failsSuite3 :: Suite
 failsSuite3 =
@@ -147,7 +148,8 @@ action3 _rc _i =
   pure $ ASAlt {status1 = Ready, checkButtonText1 = "Blahh"}
 
 
--- #### Compiler Error Wrong DataSource Data Type - Direct #### --
+-- #### Compiler Error - Checks Type Does Not Match Action - Direct #### --
+
 -- example of bad error message
 failsSuite5 :: Suite 
 failsSuite5 = 
@@ -212,7 +214,7 @@ data Data1 = Item1
   deriving (Show, Read)
 
 
--- #### Compiler Error Wrong Parse Result Does Not Match Checks ### --
+-- #### Compiler Error - Wrong Parse Result Does Not Match Checks ### --
 
 
 failsSuite11 :: Suite
@@ -247,3 +249,5 @@ data Data11 = Item11
     checks :: Checks VS
   }
   deriving (Show, Read)
+
+-}

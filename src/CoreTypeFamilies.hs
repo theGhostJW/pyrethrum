@@ -77,16 +77,16 @@ type family ActionMatchesParser aOut pIn :: Constraint where
         :<>: 'ShowType aOut
         :$$: 'Text "    but the parser expects an input of type: "
         :<>: 'ShowType pIn
-        :$$: 'Text "As the action output is the input for the parser"
+        :$$: 'Text "As the action return value is the input for the parser"
         :<>: 'Text " their types must match."
         :$$: 'Text "Either: "
-        :$$: 'Text "1. Change the action output type to: "
+        :$$: 'Text "1. Change the action return type to: "
         :<>: 'ShowType pIn
-        :$$: 'Text "     so the action output matches the input for the parser."
+        :$$: 'Text "     so the action return type matches the input for the parser."
         :$$: 'Text "Or"
         :$$: 'Text "2. Change the parser input type to: "
         :<>: 'ShowType aOut
-        :$$: 'Text "     so the parser input type matches the action output"
+        :$$: 'Text "     so the parser input type matches the action return type"
       )
 
 type family ParserMatchesValState pOut vs :: Constraint where
@@ -94,21 +94,43 @@ type family ParserMatchesValState pOut vs :: Constraint where
     ParserMatchesValState pOut vs = TypeError
       ( 
         ErrorHeader
-        :$$: 'Text "❌ ~ parser -> dataSource checks (ValState)"
+        :$$: 'Text "❌ ~ parser -> checks (on dataSource items)"
         :$$: 'Text "The parser returns elements of type: "
         :<>: 'ShowType pOut
         :$$: 'Text "    but the checks on the DataSource expect an input of type: "
         :<>: 'ShowType vs
-        :$$: 'Text "As the parser output is the input for the dataSource checks input (ValState))"
+        :$$: 'Text "As the value returned by the parser forms the input for checks"
         :<>: 'Text " their types must match."
         :$$: 'Text "Either: "
-        :$$: 'Text "1. Change the parser output type to: "
+        :$$: 'Text "1. Change the parser return type to: "
         :<>: 'ShowType vs
-        :$$: 'Text "     so the parser output matches dataSource checks input (ValState)."
+        :$$: 'Text "     so the parser return type matches dataSource checks input."
         :$$: 'Text "Or"
-        :$$: 'Text "2. Change the dataSource checks (ValState) input type to: "
+        :$$: 'Text "2. Change the dataSource checks input type to: "
         :<>: 'ShowType pOut
-        :$$: 'Text "     so the value state input type matches the parser output"
+        :$$: 'Text "     so the checks input type matches the parser return type"
+      )
+
+type family ActionMatchesValState pOut vs :: Constraint where
+    ActionMatchesValState pOut pOut = ()  -- Types match, constraint satisfied
+    ActionMatchesValState pOut vs = TypeError
+      (
+        ErrorHeader
+        :$$: 'Text "❌ ~ action -> checks (on dataSource items)"
+        :$$: 'Text "The action returns elements of type: "
+        :<>: 'ShowType pOut
+        :$$: 'Text "    but the checks on the DataSource expect an input of type: "
+        :<>: 'ShowType vs
+        :$$: 'Text "In `Direct` fixtures the action return value is the input for checks,"
+        :<>: 'Text " so their types must match."
+        :$$: 'Text "Either: "
+        :$$: 'Text "1. Change the action return type to: "
+        :<>: 'ShowType vs
+        :$$: 'Text "     so the action return value matches dataSource checks input."
+        :$$: 'Text "Or"
+        :$$: 'Text "2. Change the dataSource checks input type to: "
+        :<>: 'ShowType pOut
+        :$$: 'Text "     so the checks input type matches the parser return type"
       )
 
 
@@ -121,8 +143,7 @@ type FixtureTypeCheckFull action parser dataSource vs =
 
 type FixtureTypeCheckDirect action dataSource  = 
     ( DataSourceMatchesAction (DataSourceType dataSource) (ActionInType action)
-    -- reword this when it works needs a separate rule with different wording caus there is no parser
-    , ParserMatchesValState (ActionOutType action) (ValStateType dataSource)
+    , ActionMatchesValState (ActionOutType action) (ValStateType dataSource)
     )
 
 type HasTitle a = HasField "title" a Text

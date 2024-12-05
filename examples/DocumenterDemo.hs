@@ -115,7 +115,7 @@ fsAction _rc i = do
 data FSData = FSItem
   { id :: Int,
     title :: Text,
-    checks :: Checks FSDS
+    checks :: Checks FSVS
   }
   deriving (Show, Read)
 
@@ -134,15 +134,15 @@ newtype FSAS = FSAS
   }
   deriving (Show)
 
-newtype FSDS = FSDS
+newtype FSVS = FSVS
   { paths :: [P.Path Abs File]
   }
   deriving (Show)
 
-parsefs :: FSAS -> Either ParseException FSDS
-parsefs FSAS {..} = pure $ FSDS {..}
+parsefs :: FSAS -> Either ParseException FSVS
+parsefs FSAS {..} = pure $ FSVS {..}
 
-fsItems :: RunConfig -> DataSource FSDS FSData
+fsItems :: RunConfig -> DataSource FSData FSVS 
 fsItems _rc =
   Items
     [ FSItem
@@ -277,7 +277,7 @@ data Data = Item
 parse :: AS -> Either ParseException VS
 parse AS {..} = pure $ VS {..}
 
-dataSource :: RunConfig -> DataSource VS Data
+dataSource :: RunConfig -> DataSource Data VS 
 dataSource _rc =
   Items
     [ Item

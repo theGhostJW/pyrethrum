@@ -64,7 +64,8 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
-import CoreTypeFamilies (Config, DataSource (..))
+import CoreTypeFamilies (Config)
+import Prepare (PreppedTests(PreppedItems))
 
 defaultSeed :: Int
 defaultSeed = 13579
@@ -1417,10 +1418,10 @@ mkNodes baseSeed mxThreads = mapM mkNode
           tests
         } ->
           pure $
-            P.Fixture
+            P.PreppedFixture
               { config = fc,
                 path,
-                tests = Items $ mkTestItem <$> tests
+                tests = PreppedItems $ mkTestItem <$> tests
               }
       _ ->
         do
@@ -1630,8 +1631,8 @@ mkRootNode = \case
         teardown = teardown,
         subNodes = subNodes
       }
-  P.Fixture {config, path, tests} ->
-    P.Fixture
+  P.PreppedFixture {config, path, tests} ->
+    P.PreppedFixture
       { config,
         path,
         tests = mkRootTest <$> tests

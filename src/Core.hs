@@ -3,7 +3,7 @@ module Core where
 import CoreUtils (Hz (..))
 import DSL.Internal.NodeLog (LogSink, Path)
 import Filter (Filters)
-import CoreTypeFamilies ( Item, DataSource (..) )
+import CoreTypeFamilies ( HasTestFields, DataSource (..) )
 
 data Before
 
@@ -136,42 +136,44 @@ fixtureEmpty rc =
   Direct {dataSource} -> dsEmpty $ dataSource rc
   Direct' {dataSource'} -> dsEmpty $ dataSource' rc
   where
-    dsEmpty :: forall i vs. DataSource vs i -> Bool
+    dsEmpty :: forall i vs. DataSource i vs -> Bool
     dsEmpty = \case
-      Items itms -> null itms
+      Items itms -> case itms of
+        [] -> True
+        _ -> False
       Property {} -> False
 
 data Fixture m rc fc hi where
   Full ::
-    (Item i vs, Show as) =>
+    (HasTestFields i vs, Show as) =>
     { config :: fc,
       action :: rc -> i -> m as,
       parse :: as -> Either ParseException vs,
-      dataSource :: rc -> DataSource vs i
+      dataSource :: rc -> DataSource i vs
     } ->
     Fixture m rc fc ()
   Full' ::
-    (Item i vs, Show as) =>
+    (HasTestFields i vs, Show as) =>
     { config' :: fc,
       depends :: Hook m rc hz pi hi,
       action' :: rc -> hi -> i -> m as,
       parse' :: as -> Either ParseException vs,
-      dataSource' :: rc -> DataSource vs i
+      dataSource' :: rc -> DataSource i vs
     } ->
     Fixture m rc fc hi
   Direct ::
-    (Item i vs) =>
+    (HasTestFields i vs) =>
     { config :: fc,
       action :: rc -> i -> m vs,
-      dataSource :: rc -> DataSource vs i
+      dataSource :: rc -> DataSource i vs
     } ->
     Fixture m rc fc ()
   Direct' ::
-    (Item i vs) =>
+    (HasTestFields i vs) =>
     { config' :: fc,
       depends :: Hook m rc hz pi hi,
       action' :: rc -> hi -> i -> m vs,
-      dataSource' :: rc -> DataSource vs i
+      dataSource' :: rc -> DataSource i vs
     } ->
     Fixture m rc fc hi
 

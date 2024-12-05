@@ -54,7 +54,7 @@ import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
-import CoreTypeFamilies (Item, FixtureTypeCheckFull, FixtureTypeCheckDirect, DataSource, ValStateType)
+import CoreTypeFamilies (HasTestFields, FixtureTypeCheckFull, FixtureTypeCheckDirect, DataSource, ValStateType)
 -- import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType, ActionInputType')
 
 --  these will probably be split off and go into core or another library
@@ -193,12 +193,12 @@ data Fixture hi where
   Full ::
      forall i vs as action dataSource parser. 
     (
-     dataSource ~ (RunConfig -> DataSource vs i),
+     dataSource ~ (RunConfig -> DataSource i vs),
      action ~ (RunConfig -> i -> Action as),
      parser ~ (as -> Either C.ParseException vs),
      FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
      Show as,
-     Item i vs
+     HasTestFields i vs
     ) =>
     { config :: FixtureConfig,
       action :: action,
@@ -209,12 +209,12 @@ data Fixture hi where
   Full' ::
       forall hz pw pi a i vs as action dataSource parser. 
     (
-     dataSource ~ (RunConfig -> DataSource vs i),
+     dataSource ~ (RunConfig -> DataSource i vs),
      action ~ (RunConfig -> a -> i -> Action as),
      parser ~ (as -> Either C.ParseException vs),
      FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
      Show as,
-     Item i vs, 
+     HasTestFields i vs, 
      C.Frequency hz
     ) =>
     { config' :: FixtureConfig,
@@ -227,10 +227,10 @@ data Fixture hi where
   Direct ::
     forall i vs action dataSource. 
     (
-     dataSource ~ (RunConfig -> DataSource vs i),
+     dataSource ~ (RunConfig -> DataSource i vs),
      action ~ (RunConfig -> i -> Action vs),
      FixtureTypeCheckDirect action dataSource,
-     Item i vs
+     HasTestFields i vs
      ) =>
     { config :: FixtureConfig,
       action :: action,
@@ -240,10 +240,10 @@ data Fixture hi where
   Direct' ::
     forall i hz pw pi a vs action' dataSource'. 
     (
-     dataSource' ~ (RunConfig -> DataSource vs i),
+     dataSource' ~ (RunConfig -> DataSource i vs),
      action' ~ (RunConfig -> a -> i -> Action vs),
      FixtureTypeCheckDirect action' dataSource',
-     Item i vs, 
+     HasTestFields i vs, 
      C.Frequency hz
      ) =>
     { config' :: FixtureConfig,
@@ -255,11 +255,11 @@ data Fixture hi where
 
 
 mkFull :: (
- dataSource ~ (RunConfig -> DataSource vs i),
+ dataSource ~ (RunConfig -> DataSource i vs),
  action ~ (RunConfig -> i -> Action as),
  parser ~ (as -> Either C.ParseException vs),
  FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
- Item i vs, 
+ HasTestFields i vs, 
  Show as
  ) =>
  FixtureConfig 
@@ -270,10 +270,10 @@ mkFull :: (
 mkFull config action parse dataSource = Full {..}
 
 mkFull' :: (
- dataSource ~ (RunConfig -> DataSource vs i),
+ dataSource ~ (RunConfig -> DataSource i vs),
  action ~ (RunConfig -> ho -> i -> Action as),
  parser ~ (as -> Either C.ParseException vs),
- Item i vs, 
+ HasTestFields i vs, 
  FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
  Show as, 
  C.Frequency hz
@@ -287,10 +287,10 @@ mkFull' :: (
 mkFull' config' depends action' parse' dataSource' = Full' {..}
 
 mkDirect :: (
- dataSource ~ (RunConfig -> DataSource vs i),
+ dataSource ~ (RunConfig -> DataSource i vs),
  action ~ (RunConfig -> i -> Action vs),
  FixtureTypeCheckDirect action dataSource,
- Item i vs
+ HasTestFields i vs
  ) =>
  FixtureConfig 
  -> action
@@ -299,10 +299,10 @@ mkDirect :: (
 mkDirect config action dataSource = Direct {..}
 
 mkDirect'  :: (
- dataSource ~ (RunConfig -> DataSource vs i),
+ dataSource ~ (RunConfig -> DataSource i vs),
  action ~ (RunConfig -> ho -> i -> Action vs),
  FixtureTypeCheckDirect action dataSource,
- Item i vs, 
+ HasTestFields i vs, 
  C.Frequency hz
  ) =>
  FixtureConfig 
@@ -327,7 +327,7 @@ constructor to compile
      forall i ds dataSource action as. 
     (
      Show as,
-     Item i ds, 
+     HasTestFields i ds, 
      dataSource ~ (RunConfig -> C.DataSource i),
      action ~ (RunConfig -> i -> Action as),
      DataSourceType dataSource ~ i,
@@ -345,7 +345,7 @@ constructor to compile
 mkFullDemoErrMsgs :: forall i as vs action dataSource. (
  action ~ (RunConfig -> i -> Action as),
  dataSource ~ (RunConfig -> DataSource i),
- C.Item i vs, 
+ C.HasTestFields i vs, 
  Show as, 
  DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType action)
  ) =>

@@ -26,7 +26,7 @@ import UnliftIO.STM
     writeTQueue,
   )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
-import CoreTypeFamilies (Config, DataSource (..))
+import CoreTypeFamilies (Config)
 
 {-
 todo :: define defect properties with sum type type and typeclass which returns defect info
@@ -151,10 +151,10 @@ data ExeTree hi where
 
 data TestSource hi = Queue (ChildQ (P.Test IO hi)) | PropertyTest hi
 
-loadTests :: DataSource vs (P.Test IO hi) -> IO (TestSource hi)
+loadTests :: P.PreppedTests (P.Test IO hi) -> IO (TestSource hi)
 loadTests = \case
-  Items tests -> Queue <$> mkChildQ tests
-  Property _i -> noImpPropertyError
+  P.PreppedItems tests -> Queue <$> mkChildQ tests
+  P.PreppedProperty _i -> noImpPropertyError
 
 mkXTree :: L.ExePath -> [P.PreNode IO hi] -> IO (ChildQ (ExeTree hi))
 mkXTree xpth preNodes =
@@ -217,7 +217,7 @@ mkXTree xpth preNodes =
                 Each ->
                   pure $ EachAround path setup childTree teardown
         --
-        P.Fixture
+        P.PreppedFixture
           { config = c,
             tests
           } -> do

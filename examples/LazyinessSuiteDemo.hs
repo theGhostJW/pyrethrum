@@ -218,7 +218,7 @@ data Data = Item
 parse :: AS -> Either ParseException VS
 parse AS {..} = pure $ VS {..}
 
-dataSource :: RunConfig -> DataSource VS Data
+dataSource :: RunConfig -> DataSource Data VS
 dataSource _rc =
   Items
     [ Item

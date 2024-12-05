@@ -150,7 +150,7 @@ data Item = Item
   }
   deriving (Show, Read)
 
-dataSource :: RunConfig -> DataSource VState Item
+dataSource :: RunConfig -> DataSource Item VState
 dataSource =
   const $
     Items [ Item
@@ -204,7 +204,7 @@ data Item2 = Item2
   }
   deriving (Show, Read)
 
-items2 :: RunConfig -> DataSource VS Item2
+items2 :: RunConfig -> DataSource Item2 VS
 items2 rc =
   Items $ filter
     (\i -> rc.depth == Regression || i.id < 10)

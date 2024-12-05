@@ -31,7 +31,7 @@ data VS = VS
   }
   deriving (Show)
 
-data Data = Item
+data Data = HasTestFields
   { id :: Int,
     title :: Text,
     checks :: Checks VS
@@ -41,13 +41,13 @@ data Data = Item
 -- ########## Alternate Types #############
 
 data ASAlt = ASAlt
-  { status :: DriverStatus,
-    checkButtonText :: Text
+  { status1 :: DriverStatus,
+    checkButtonText1 :: Text
   }
   deriving (Show)
 data VSAlt = VSAlt
-  { status :: DriverStatus,
-    checkButtonText :: Text
+  { statusAlt :: DriverStatus,
+    checkButtonTextAlt :: Text
   }
   deriving (Show)
 
@@ -84,10 +84,9 @@ action _rc _i =
 parse :: AS -> Either ParseException VS
 parse AS {..} = pure $ VS {..}
 
-data' :: RunConfig -> DataSource VS Data
+data' :: RunConfig -> DataSource Data VS
 data' _rc =
   Items [ ]
-
 
 
 -- #### Compiler Error Wrong DataSource Data Type #### --
@@ -97,28 +96,14 @@ dataWrongType :: RunConfig -> DataSource VSAlt DataAlt
 dataWrongType _rc =
   Items [ ] 
 
-{-
-testAlt2 :: Fixture ()
-testAlt2 = mkFull config action parse dataWrongType
-
-testAltRawConstructors :: Fixture ()
-testAltRawConstructors = Full config action parse dataWrongType
-
-testAlt2RawConstrucors2 :: Fixture ()
-testAlt2RawConstrucors2 = Full  { 
-      config = config,
-      action = action,
-      parse = parse,
-      dataSource = dataWrongType
-    }
--}
--- testAlt3 :: Fixture ()
--- testAlt3 = mkFullDemoErrMsgs config action parse dataWrongType
-
 
 -- #### Compiler Error Wrong Parse Result Data Type #### --
 
--- Bad checks :: Checks VS vs VSAlt in Data1 but nothing about it in the message
+-- Bad checks :: type signature is wrong for data1 ~ VSAlt is actually VS
+-- can't improve this as cant get compile time type of specific field
+-- Checks withoutt writing a typeclass instance per datatype
+-- removing the type signature for data 1 will invoke the custom
+-- type error
 
 failsSuite1 :: Suite
 failsSuite1 =
@@ -127,23 +112,24 @@ failsSuite1 =
 testAlt1 :: Fixture ()
 testAlt1 = Full config action1 parseAlt1 data1
 
-{-
-testAlt1' :: Fixture ()
-testAlt1' = mkFull config action1 parseAlt1 data1
--}
-
-
 action1 ::  RunConfig -> Data1 -> Eff es AS
 action1 _rc _i = 
   pure $ AS {status = Ready, checkButtonText = "Blah"}
 
 parseAlt1 :: AS -> Either ParseException VSAlt
-parseAlt1 AS {..} = pure $ VSAlt {..}
+parseAlt1 AS {status, checkButtonText} = pure $ VSAlt {
+  statusAlt = status, 
+  checkButtonTextAlt = checkButtonText}
 
 -- lies about the data type its actually VS
-data1 :: Item Data1 VSAlt => RunConfig -> DataSource VSAlt Data1
+data1 :: RunConfig -> DataSource Data1 VSAlt 
 data1 _rc =
-  Items [ ]
+  Items [ 
+   Item1{ 
+    id = 1,
+    title = "one",
+    checks = chk "Driver is ready" (\v -> v.status == Ready)
+  }]
 
 data Data1 = Item1
   { id :: Int,
@@ -170,9 +156,13 @@ action2 _rc _i =
 parseAlt2 :: AS -> Either ParseException VS
 parseAlt2 AS {..} = pure $ VS {..}
 
-data2 :: RunConfig -> DataSource VS Data2
+data2 :: RunConfig -> DataSource Data2 VS 
 data2 _rc =
-  Items [ ]
+  Items [ Item2 1 "one" ]
+
+data21 ::  DataSource Data2 Int
+data21 =
+  Items [ Item2 1 "one" ]
 
 data Data2 = Item2
   { id :: Int,
@@ -192,7 +182,7 @@ testAlt3 = Full config action3 parse data'
 
 action3 ::  RunConfig -> Data -> Eff es ASAlt
 action3 _rc _i = 
-  pure $ ASAlt {status = Ready, checkButtonText = "Blahh"}
+  pure $ ASAlt {status1 = Ready, checkButtonText1 = "Blahh"}
 
 -- #### Compiler Error Wrong Data Source in Action #### --
 
@@ -228,8 +218,6 @@ dataWrongType5 :: RunConfig -> DataSource VSAlt DataAlt
 dataWrongType5 _rc =
   Items [ ] 
 
-
 action5 ::  RunConfig -> Data -> Eff es AS
 action5 _rc _i = 
   pure $ AS {status = Ready, checkButtonText = "Blah"}
-

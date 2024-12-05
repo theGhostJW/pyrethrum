@@ -21,6 +21,7 @@ import PyrethrumBase qualified as PB
 import UnliftIO (catchAny)
 import WebDriverSpec (DriverStatus (Ready))
 import PyrethrumExtras (txt)
+import CoreTypeFamilies (DataSource (..))
 
 -- ################### Effectful Demo ##################
 
@@ -138,7 +139,7 @@ config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
 fxLogMessage :: Bool -> Fixture DriverStatus
-fxLogMessage readStatus = Full' config pureOnceErrorHook (action' readStatus) parse items
+fxLogMessage readStatus = mkFull' config pureOnceErrorHook (action' readStatus) parse dataSource
 
 --- Hook ---
 
@@ -201,7 +202,7 @@ data AS = AS
   }
   deriving (Show)
 
-data DS = DS
+data VS = VS
   { status :: DriverStatus,
     checkButtonText :: Text
   }
@@ -210,16 +211,16 @@ data DS = DS
 data Data = Item
   { id :: Int,
     title :: Text,
-    checks :: Checks DS
+    checks :: Checks VS
   }
   deriving (Show, Read)
 
-parse :: AS -> Either ParseException DS
-parse AS {..} = pure $ DS {..}
+parse :: AS -> Either ParseException VS
+parse AS {..} = pure $ VS {..}
 
-items :: RunConfig -> DataSource Data
-items _rc =
-  ItemList
+dataSource :: RunConfig -> DataSource Data VS
+dataSource _rc =
+  Items
     [ Item
         { id = 1,
           title = "test the internet",

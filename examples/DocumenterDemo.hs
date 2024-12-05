@@ -16,9 +16,9 @@ import Internal.Logging qualified as L
 import Internal.SuiteRuntime (ThreadCount (..))
 import Path as P (Path, reldir, toFilePath)
 import PyrethrumBase
-  ( DataSource (..),
+  ( 
     Depth (..),
-    Fixture (..),
+    Fixture,
     FixtureConfig (..),
     Hook (..),
     Node (..),
@@ -26,7 +26,7 @@ import PyrethrumBase
     Suite,
     SuiteRunner,
     defaultRunConfig,
-    docRunner,
+    docRunner, mkFull, mkFull',
   )
 import PyrethrumExtras (Abs, File, relfile, toS, txt, (?))
 import WebDriverEffect
@@ -42,6 +42,7 @@ import WebDriverEffect
   )
 import WebDriverPure (seconds)
 import WebDriverSpec (DriverStatus (..), Selector (CSS))
+import CoreTypeFamilies (DataSource (..))
 
 runDemo :: SuiteRunner -> Suite -> IO ()
 runDemo runner suite = do
@@ -93,7 +94,7 @@ fsSuite =
   [Fixture (NodePath "FS Demo Test" "test") fstest]
 
 fstest :: Fixture ()
-fstest = Full config fsAction parsefs fsItems
+fstest = mkFull config fsAction parsefs fsItems
 
 getFailNested :: Eff es FSAS
 getFailNested = pure $ error "This is a nested error !!! "
@@ -114,7 +115,7 @@ fsAction _rc i = do
 data FSData = FSItem
   { id :: Int,
     title :: Text,
-    checks :: Checks FSDS
+    checks :: Checks FSVS
   }
   deriving (Show, Read)
 
@@ -123,7 +124,7 @@ TODO: make better compile error example
 data FSData = FSItem
   { id :: Int,
     title :: Text,
-    checks :: Checks DS
+    checks :: Checks VS
   }
   deriving (Show, Read)
 -}
@@ -133,17 +134,17 @@ newtype FSAS = FSAS
   }
   deriving (Show)
 
-newtype FSDS = FSDS
+newtype FSVS = FSVS
   { paths :: [P.Path Abs File]
   }
   deriving (Show)
 
-parsefs :: FSAS -> Either ParseException FSDS
-parsefs FSAS {..} = pure $ FSDS {..}
+parsefs :: FSAS -> Either ParseException FSVS
+parsefs FSAS {..} = pure $ FSVS {..}
 
-fsItems :: RunConfig -> DataSource FSData
+fsItems :: RunConfig -> DataSource FSData FSVS 
 fsItems _rc =
-  ItemList
+  Items
     [ FSItem
         { id = 1,
           title = "test the file system",
@@ -218,7 +219,7 @@ intOnceHook =
 --- Fixture ---
 
 test :: Fixture Int
-test = Full' config intOnceHook action parse items
+test = mkFull' config intOnceHook action parse dataSource
 
 config :: FixtureConfig
 config = FxCfg "test" DeepRegression
@@ -260,7 +261,7 @@ data AS = AS
   }
   deriving (Show)
 
-data DS = DS
+data VS = VS
   { status :: DriverStatus,
     checkButtonText :: Text
   }
@@ -269,16 +270,16 @@ data DS = DS
 data Data = Item
   { id :: Int,
     title :: Text,
-    checks :: Checks DS
+    checks :: Checks VS
   }
   deriving (Show, Read)
 
-parse :: AS -> Either ParseException DS
-parse AS {..} = pure $ DS {..}
+parse :: AS -> Either ParseException VS
+parse AS {..} = pure $ VS {..}
 
-items :: RunConfig -> DataSource Data
-items _rc =
-  ItemList
+dataSource :: RunConfig -> DataSource Data VS 
+dataSource _rc =
+  Items
     [ Item
         { id = 1,
           title = "test the internet",

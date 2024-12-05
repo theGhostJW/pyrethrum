@@ -39,14 +39,14 @@ data FailStatus = NonTerminal | Terminal deriving (Show, Read, Eq)
 
 $(deriveToJSON defaultOptions ''FailStatus)
 
-data Check ds = Check
+data Check vs = Check
   { -- failStatus:
     -- NonTerminal for regular checks (suceeding checks will be run)
     -- Terminal for asserts (suceeding checks will not be run)
     header :: Text,
-    message :: Maybe (ds -> Text),
+    message :: Maybe (vs -> Text),
     failStatus :: FailStatus,
-    rule :: ds -> Bool
+    rule :: vs -> Bool
   }
 
 data CheckReadable = CheckLog
@@ -55,20 +55,20 @@ data CheckReadable = CheckLog
   }
   deriving (Show, Read)
 
-singleton :: Text -> Maybe (ds -> Text) -> FailStatus -> (ds -> Bool) -> Checks ds
+singleton :: Text -> Maybe (vs -> Text) -> FailStatus -> (vs -> Bool) -> Checks vs
 singleton hdr msg fs rule = Checks [Check hdr msg fs rule]
 
-chk :: Text -> (ds -> Bool) -> Checks ds
+chk :: Text -> (vs -> Bool) -> Checks vs
 chk header = singleton header Nothing NonTerminal
 
-chk' :: Text -> (ds -> Text) -> (ds -> Bool) -> Checks ds
+chk' :: Text -> (vs -> Text) -> (vs -> Bool) -> Checks vs
 chk' header message = singleton header (Just message) NonTerminal
 
-assert :: Text -> (ds -> Bool) -> Checks ds
+assert :: Text -> (vs -> Bool) -> Checks vs
 assert header = singleton header Nothing Terminal
 
 -- todo: play with labelling values to see if useful similar to falsify: https://well-typed.com/blog/2023/04/falsify/?utm_source=pocket_reader#predicates
-assert' :: Text -> (ds -> Text) -> (ds -> Bool) -> Checks ds
+assert' :: Text -> (vs -> Text) -> (vs -> Bool) -> Checks vs
 assert' header message = singleton header (Just message) Terminal
 
 instance Show (Check v) where
@@ -92,16 +92,16 @@ instance ToJSON (Check v) where
   toJSON :: Check v -> Value
   toJSON = String . toS . (.header)
 
-newtype Checks ds = Checks
-  { un :: [Check ds]
+newtype Checks vs = Checks
+  { un :: [Check vs]
   }
   deriving (Show, Read)
   deriving newtype (Semigroup, Monoid, IsList)
 
-mapRules :: (Check ds -> Check ds') -> Checks ds -> Checks ds'
+mapRules :: (Check vs -> Check vs') -> Checks vs -> Checks vs'
 mapRules f = Checks . fmap f . coerce
 
-filterRules :: (Check ds -> Bool) -> Checks ds -> Checks ds
+filterRules :: (Check vs -> Bool) -> Checks vs -> Checks vs
 filterRules f = Checks . P.filter f . coerce
 
 data CheckResult
@@ -126,22 +126,22 @@ data CheckReport
       }
   deriving (Show, Eq, Generic, NFData)
 
-skipCheck :: Check ds -> CheckReport
+skipCheck :: Check vs -> CheckReport
 skipCheck (Check {header}) = CheckReport header "Validation skipped" Skip
 
-skipChecks :: Checks ds -> [CheckReport]
+skipChecks :: Checks vs -> [CheckReport]
 skipChecks chks = skipCheck <$> chks.un
 
-listChecks :: Checks ds -> [CheckReport]
+listChecks :: Checks vs -> [CheckReport]
 listChecks chks = listCheck <$> chks.un
  where 
-  listCheck :: Check ds -> CheckReport
+  listCheck :: Check vs -> CheckReport
   listCheck (Check {header}) = CheckListing header
 
 -- need to do this in an error handling context so we can catch and report
 -- exceptions thrown applying the check
-applyCheck :: (MonadUnliftIO m) => ds -> FailStatus -> Check ds -> m (CheckReport, FailStatus)
-applyCheck ds failStatus ck =
+applyCheck :: (MonadUnliftIO m) => vs -> FailStatus -> Check vs -> m (CheckReport, FailStatus)
+applyCheck vs failStatus ck =
   do
     rslt <-
       tryAny
@@ -150,7 +150,7 @@ applyCheck ds failStatus ck =
           Terminal -> (report Skip, Terminal)
           NonTerminal ->
             first report
-              $ ck.rule ds
+              $ ck.rule vs
                 ? (Pass, NonTerminal)
               $ (Fail, ck.failStatus)
 
@@ -168,7 +168,7 @@ applyCheck ds failStatus ck =
         )
         pure
   where
-    report = CheckReport ck.header (ck.message & maybe "" (ds &))
+    report = CheckReport ck.header (ck.message & maybe "" (vs &))
 
 $(deriveJSON defaultOptions ''CheckResult)
 $(deriveJSON defaultOptions ''CheckReport)

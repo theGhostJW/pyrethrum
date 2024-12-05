@@ -9,7 +9,7 @@ import Effectful (Eff)
 import PyrethrumBase (
   Action,
   Depth (..),
-  Fixture (..),
+  Fixture,
   HasLog,
   Hook (..),
   LogEffs,
@@ -17,11 +17,10 @@ import PyrethrumBase (
   RunConfig (..),
   Suite,
   FixtureConfig (..),
-  DataSource(..),
-  FixtureConfig, Country (..), Environment (..), fxCfg,
+  FixtureConfig, Country (..), Environment (..), fxCfg, mkFull, mkFull', mkDirect',
  )
 import PyrethrumExtras (txt)
-import qualified Core as C
+import CoreTypeFamilies (DataSource (Items))
 
 {-
 Note:: tried alternative with individual hook types but the results
@@ -121,7 +120,7 @@ config :: FixtureConfig
 config = FxCfg "test" DeepRegression
 
 test :: Fixture ()
-test = Full config action parse items
+test = mkFull config action parse dataSource
 
 action :: RunConfig -> Item -> Action ApState
 action _expectedrc itm = do
@@ -134,27 +133,27 @@ data ApState = ApState
   }
   deriving (Show, Read)
 
-data DState = DState
+data VState = VState
   { value :: Int
   , valTxt :: Text
   }
   deriving (Show, Read)
 
-parse :: ApState -> Either ParseException DState
-parse ApState{..} = pure DState{..}
+parse :: ApState -> Either ParseException VState
+parse ApState{..} = pure VState{..}
 
 data Item = Item
   { id :: Int
   , title :: Text
   , value :: Int
-  , checks :: Checks DState
+  , checks :: Checks VState
   }
   deriving (Show, Read)
 
-items :: RunConfig -> DataSource Item
-items =
+dataSource :: RunConfig -> DataSource Item VState
+dataSource =
   const $
-    C.ItemList [ Item
+    Items [ Item
         { id = 1
         , title = "test the value is one"
         , value = 2
@@ -168,7 +167,7 @@ config2 :: FixtureConfig
 config2 = FxCfg "test" DeepRegression
 
 test2 :: Fixture HookInfo
-test2 = Full' config2 infoThreadHook action2 parse2 items2
+test2 = mkFull' config2 infoThreadHook action2 parse2 items2
 
 action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
 action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = do
@@ -182,8 +181,8 @@ action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = d
     log "Completing payment with test credit card"
   pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
 
-parse2 :: AS -> Either ParseException DS
-parse2 AS{..} = pure DS{..}
+parse2 :: AS -> Either ParseException VS
+parse2 AS{..} = pure VS{..}
 
 data AS = AS
   { value :: Int
@@ -191,7 +190,7 @@ data AS = AS
   }
   deriving (Show, Read)
 
-data DS = DS
+data VS = VS
   { value :: Int
   , valTxt :: Text
   }
@@ -201,13 +200,13 @@ data Item2 = Item2
   { id :: Int
   , title :: Text
   , value :: Int
-  , checks :: Checks DS
+  , checks :: Checks VS
   }
   deriving (Show, Read)
 
-items2 :: RunConfig -> DataSource Item2
+items2 :: RunConfig -> DataSource Item2 VS
 items2 rc =
-  ItemList $ filter
+  Items $ filter
     (\i -> rc.depth == Regression || i.id < 10)
     [ Item2
         { id = 1
@@ -215,7 +214,7 @@ items2 rc =
         , value = 2
         , checks =
             chk "test" ((== 1) . (.value))
-              <> chk "test2" (\DS{..} -> value < 10)
+              <> chk "test2" (\VS{..} -> value < 10)
               <> chk "test3" (\ds -> ds.value < 10)
         }
     ]
@@ -226,43 +225,48 @@ items2 rc =
 
 test3 :: Fixture Int
 test3 =
-  Full'
-    { depends = eachIntBefore
-    , config' = FxCfg "test" DeepRegression
-    , action' = \_rc hkInt itm -> do
+  mkFull'
+    (FxCfg "test" DeepRegression)
+    eachIntBefore
+    (
+    \_rc hkInt itm -> do
         log $ txt itm
         pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
-    , parse' = \AS{..} -> pure DS{..}
-    , items' =
-        const .
-         ItemList $ [ Item2
+        )
+    (\AS{..} -> pure VS{..})
+    (
+    const .
+         Items $ [ Item2
               { id = 1
               , title = "test the value is one"
               , value = 2
               , checks = chk "test" ((== 1) . (.value))
               }
           ]
-    }
+    )
+
 
 -- ############### Test Direct (Record) ###################
 test4 :: Fixture Int
 test4 =
-  Direct'
-    { config' = FxCfg "test" DeepRegression
-    , depends = eachAfter
-    , action' = \_rc _hi itm -> do
+  mkDirect'
+    (FxCfg "test" DeepRegression)
+    eachAfter
+    (\_rc _hi itm -> do
         log $ txt itm
-        pure $ DS (itm.value + 1) $ txt itm.value
-    , items' =
-        const .
-          ItemList $ [ Item2
+        pure $ VS (itm.value + 1) $ txt itm.value
+    )
+    (
+    const .
+          Items $ [ Item2
               { id = 1
               , title = "test the value is one"
               , value = 2
               , checks = chk "test" ((== 1) . (.value))
               }
           ]
-    }
+    )
+  
 
 -- ############### Construct Tests ###################
 -- this will be generated either by implmenting deriving,
@@ -355,7 +359,7 @@ suite =
     stubRaw,
     stubHash (make a hash of props other than id and title: aDfG165Er7 - 10 letter hash - module + item first 4 letters is module, next 6 is item),
     stubAll,
-    stubFilter (takes a predicate and stubs all items that match it)
+    stubFilter (takes a predicate and stubs all dataSource that match it)
 
 -- ToDO webdriveIO protocol
 --- https://github.com/webdriverio/webdriverio/blob/main/packages/wdio-protocols/src/protocols/gecko.ts

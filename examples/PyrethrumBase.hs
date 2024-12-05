@@ -1,14 +1,14 @@
 module PyrethrumBase
   ( Action,
     Depth (..),
-    Fixture (..),
+    -- export fixture constructors for demo purposes (rmove later)
+    Fixture(..),
     Hook (..),
     LogEffs,
     Node (..),
     RunConfig (..),
     Country (..),
     Environment (..),
-    C.DataSource (..),
     Suite,
     SuiteRunner,
     FixtureConfig (..),
@@ -18,7 +18,12 @@ module PyrethrumBase
     ioRunner,
     docRunner,
     defaultRunConfig,
-    docInterpreter
+    docInterpreter,
+    mkDirect,
+    -- mkFullDemoErrMsgs,
+    mkDirect',
+    mkFull,
+    mkFull'
   )
 where
 
@@ -49,6 +54,8 @@ import WebDriverIOInterpreter qualified as WDIO (runWebDriver)
 import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
+import CoreTypeFamilies (HasTestFields, FixtureTypeCheckFull, FixtureTypeCheckDirect, DataSource, ValStateType)
+-- import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType, ActionInputType')
 
 --  these will probably be split off and go into core or another library
 -- module later
@@ -184,38 +191,209 @@ data Hook hz when input output where
 
 data Fixture hi where
   Full ::
-    (C.Item i ds, Show as) =>
+     forall i vs as action dataSource parser. 
+    (
+     dataSource ~ (RunConfig -> DataSource i vs),
+     action ~ (RunConfig -> i -> Action as),
+     parser ~ (as -> Either C.ParseException vs),
+     FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
+     Show as,
+     HasTestFields i vs
+    ) =>
     { config :: FixtureConfig,
-      action :: RunConfig -> i -> Action as,
-      parse :: as -> Either C.ParseException ds,
-      items :: RunConfig -> C.DataSource i
+      action :: action,
+      parse :: parser,
+      dataSource :: dataSource
     } ->
     Fixture ()
   Full' ::
-    (C.Item i ds, Show as, C.Frequency hz) =>
+      forall hz pw pi a i vs as action dataSource parser. 
+    (
+     dataSource ~ (RunConfig -> DataSource i vs),
+     action ~ (RunConfig -> a -> i -> Action as),
+     parser ~ (as -> Either C.ParseException vs),
+     FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
+     Show as,
+     HasTestFields i vs, 
+     C.Frequency hz
+    ) =>
     { config' :: FixtureConfig,
       depends :: Hook hz pw pi a,
-      action' :: RunConfig -> a -> i -> Action as,
-      parse' :: as -> Either C.ParseException ds,
-      items' :: RunConfig -> C.DataSource i
+      action' :: action,
+      parse' :: parser,
+      dataSource' :: dataSource
     } ->
     Fixture a
   Direct ::
-    forall i ds.
-    (C.Item i ds) =>
+    forall i vs action dataSource. 
+    (
+     dataSource ~ (RunConfig -> DataSource i vs),
+     action ~ (RunConfig -> i -> Action vs),
+     FixtureTypeCheckDirect action dataSource,
+     HasTestFields i vs
+     ) =>
     { config :: FixtureConfig,
-      action :: RunConfig -> i -> Action ds,
-      items :: RunConfig -> C.DataSource i
+      action :: action,
+      dataSource :: dataSource
     } ->
     Fixture ()
   Direct' ::
-    (C.Item i ds, C.Frequency hz) =>
+    forall i hz pw pi a vs action' dataSource'. 
+    (
+     dataSource' ~ (RunConfig -> DataSource i vs),
+     action' ~ (RunConfig -> a -> i -> Action vs),
+     FixtureTypeCheckDirect action' dataSource',
+     HasTestFields i vs, 
+     C.Frequency hz
+     ) =>
     { config' :: FixtureConfig,
       depends :: Hook hz pw pi a,
-      action' :: RunConfig -> a -> i -> Action ds,
-      items' :: RunConfig -> C.DataSource i
+      action' :: action',
+      dataSource' :: dataSource'
     } ->
     Fixture a
+
+
+mkFull :: (
+ dataSource ~ (RunConfig -> DataSource i vs),
+ action ~ (RunConfig -> i -> Action as),
+ parser ~ (as -> Either C.ParseException vs),
+ FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
+ HasTestFields i vs, 
+ Show as
+ ) =>
+ FixtureConfig 
+ -> action
+ -> parser
+ -> dataSource
+ -> Fixture ()
+mkFull config action parse dataSource = Full {..}
+
+mkFull' :: (
+ dataSource ~ (RunConfig -> DataSource i vs),
+ action ~ (RunConfig -> ho -> i -> Action as),
+ parser ~ (as -> Either C.ParseException vs),
+ HasTestFields i vs, 
+ FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
+ Show as, 
+ C.Frequency hz
+ ) =>
+ FixtureConfig 
+ -> Hook hz pw pi ho
+ -> action
+ -> parser
+ -> dataSource
+ -> Fixture ho
+mkFull' config' depends action' parse' dataSource' = Full' {..}
+
+mkDirect :: (
+ dataSource ~ (RunConfig -> DataSource i vs),
+ action ~ (RunConfig -> i -> Action vs),
+ FixtureTypeCheckDirect action dataSource,
+ HasTestFields i vs
+ ) =>
+ FixtureConfig 
+ -> action
+ -> dataSource
+ -> Fixture ()
+mkDirect config action dataSource = Direct {..}
+
+mkDirect'  :: (
+ dataSource ~ (RunConfig -> DataSource i vs),
+ action ~ (RunConfig -> ho -> i -> Action vs),
+ FixtureTypeCheckDirect action dataSource,
+ HasTestFields i vs, 
+ C.Frequency hz
+ ) =>
+ FixtureConfig 
+ -> Hook hz pw pi ho
+ -> action
+ -> dataSource
+ -> Fixture ho
+mkDirect' config' depends action' dataSource' = Direct' {..}
+
+
+
+-- Type synonyms for readability
+-- type MkAction i as = RunConfig -> i -> Action as
+-- type Parser as vs = as -> Either C.ParseException vs
+-- type MkDataSource i = RunConfig -> DataSource i
+
+{- 
+example full fixture with custom type error ~ requires similar contraints on the Full value 
+constructor to compile
+
+  Full ::
+     forall i ds dataSource action as. 
+    (
+     Show as,
+     HasTestFields i ds, 
+     dataSource ~ (RunConfig -> C.DataSource i),
+     action ~ (RunConfig -> i -> Action as),
+     DataSourceType dataSource ~ i,
+     ActionInputType action ~ i,
+     DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType action)
+    ) =>
+    { config :: FixtureConfig,
+      action :: action,
+      parse :: as -> Either C.ParseException ds,
+      dataSource :: dataSource
+    } ->
+    Fixture ()
+    
+-- | Creates a full fixture using the provided configuration, action, parser, and data source.
+mkFullDemoErrMsgs :: forall i as vs action dataSource. (
+ action ~ (RunConfig -> i -> Action as),
+ dataSource ~ (RunConfig -> DataSource i),
+ C.HasTestFields i vs, 
+ Show as, 
+ DataSourceMatchesAction (DataSourceType dataSource) (ActionInputType action)
+ ) =>
+ FixtureConfig 
+ -> action-- action :: RunConfig -> i -> Action as
+ -> as -> Either C.ParseException vs -- parser  :: as -> Either C.ParseException vs
+ -> dataSource-- dataSource :: RunConfig -> DataSource i
+ -> Fixture ()
+mkFullDemoErrMsgs config action parse dataSource = Full {..}
+-}
+
+
+
+
+{-
+create IsFixture constraint
+CHAPTER 12. CUSTOM TYPE ERRORS
+
+https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_errors.
+
+gpt
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
+data Foo = Foo | Bar
+
+-- Define a type class that represents the constraint "IsFoo"
+class IsFoo a where
+    showFoo :: a -> Text
+
+-- Provide instances for specific types (e.g., `Foo`)
+instance IsFoo Foo where
+    showFoo Foo = "Foo"
+    showFoo Bar = "Bar"
+
+
+-}
+-- instance
+--  ( TL.TypeError
+--   ( TL.Text "Attempting to interpret a number as a function " TL.:$$: TL.Text "in the type `"
+--     TL.:<>: TL.ShowType (a -> b)
+--     TL.:<>: TL.Text "'"
+--     TL.:$$: TL.Text "Did you forget to specify the function you wanted?"
+--  )
+--  ) => Fixture hi  where
+
 
 type Suite = [Node ()]
 
@@ -237,7 +415,7 @@ mkFixture :: Fixture hi -> C.Fixture Action RunConfig FixtureConfig hi
 mkFixture = \case
   Full {..} -> C.Full {..}
   Direct {..} -> C.Direct {..}
-  Full' {..} -> C.Full' config' (mkHook depends) action' parse' items'
+  Full' {..} -> C.Full' config' (mkHook depends) action' parse' dataSource'
   Direct' {..} -> C.Direct' {depends = mkHook depends, ..}
 
 mkCoreSuite :: Suite -> [C.Node Action RunConfig FixtureConfig ()]

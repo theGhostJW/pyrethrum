@@ -1,7 +1,9 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module Prepare
-  ( PreNode (..),
+  (
+    PreNode (..),
+    PreppedTests(..),
     LogSink,
     Test (..),
     prepare,
@@ -15,10 +17,11 @@ import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
 import Core (Mode (..), SuiteExeParams)
 import Core qualified as C
+import CoreTypeFamilies as CTF (Config, HasTestFields, DataSource (..)) 
 import CoreUtils (Hz)
 import DSL.Internal.NodeLog
   ( ApStateText (ApStateText),
-    DStateText (DStateText),
+    VStateText (VStateText),
     FrameworkLog (..),
     ItemText (ItemText),
     LogSink,
@@ -36,7 +39,7 @@ import UnliftIO.Exception (tryAny)
 -- can reuse some suiteruntime chks
 -- should be able to write a converter from template to core hooks and fixtures
 
-prepare :: (C.Config rc, C.Config fc, HasCallStack) => SuiteExeParams m rc fc -> Either SuiteValidationError (FilteredSuite (PreNode IO ()))
+prepare :: (Config rc, Config fc, HasCallStack) => SuiteExeParams m rc fc -> Either SuiteValidationError (FilteredSuite (PreNode IO ()))
 prepare C.MkSuiteExeParams {suite, mode, filters, interpreter, runConfig = rc} =
   mSuiteError
     & maybe
@@ -51,7 +54,7 @@ prepare C.MkSuiteExeParams {suite, mode, filters, interpreter, runConfig = rc} =
     filtered = filterSuite filters rc suite
     mSuiteError = chkSuite filtered.filterResults
 
-prepSuite :: (C.Config rc, C.Config fc, HasCallStack) => Mode -> (forall a. LogSink -> m a -> IO a) -> rc -> [C.Node m rc fc ()] -> [PreNode IO ()]
+prepSuite :: (Config rc, Config fc, HasCallStack) => Mode -> (forall a. LogSink -> m a -> IO a) -> rc -> [C.Node m rc fc ()] -> [PreNode IO ()]
 prepSuite mode interpreter rc suite = prepNode mode interpreter rc <$> suite
 
 data PreNode m hi where
@@ -77,11 +80,11 @@ data PreNode m hi where
       teardown :: LogSink -> o -> m ()
     } ->
     PreNode m hi
-  Fixture ::
-    (C.Config fc) =>
+  PreppedFixture ::
+    (Config fc) =>
     { config :: fc,
       path :: Path,
-      tests :: C.DataSource (Test m hi)
+      tests :: PreppedTests (Test m hi)
     } ->
     PreNode m hi
 
@@ -93,7 +96,7 @@ listPaths =
     step :: forall hi'. Int -> [(Int, Path)] -> PreNode m hi' -> [(Int, Path)]
     step i accum n =
       n & \case
-        Fixture {} -> accum'
+        PreppedFixture {} -> accum'
         Before {subNodes} -> accumPaths subNodes
         After {subNodes'} -> accumPaths subNodes'
         Around {subNodes} -> accumPaths subNodes
@@ -110,7 +113,7 @@ data Test m hi = MkTest
 
 prepNode ::
   forall m rc fc hi.
-  (HasCallStack, C.Config rc, C.Config fc) =>
+  (HasCallStack, Config rc, Config fc) =>
   Mode ->
   (forall a. LogSink -> m a -> IO a) -> -- interpreter
   rc -> -- runConfig
@@ -195,9 +198,19 @@ logThrow sink ex = sink (exceptionEvent ex callStack) >> throwIO ex
 unTry :: forall a. LogSink -> Either SomeException a -> IO a
 unTry es = either (logThrow es) pure
 
+
+data PreppedTests i = PreppedItems [i] | PreppedProperty i deriving (Show, Functor)
+
+
+dataSrcToTestSrc :: (a -> b) -> DataSource a vs -> PreppedTests b
+dataSrcToTestSrc f = \case
+  CTF.Items xs -> PreppedItems $ f <$> xs
+  CTF.Property x -> PreppedProperty $ f x
+
+
 prepareTest ::
   forall m rc fc hi.
-  (C.Config fc) =>
+  (Config fc) =>
   Mode -> -- meta interpreter mode
   (forall a. LogSink -> m a -> IO a) -> -- interpreter
   rc -> -- runConfig
@@ -206,8 +219,8 @@ prepareTest ::
   PreNode IO hi
 prepareTest mode interpreter rc path =
   \case
-    C.Full {config, action, parse, items} ->
-      Fixture
+    C.Full {config, action, parse, dataSource} ->
+      PreppedFixture
         { config,
           path,
           tests =
@@ -218,10 +231,10 @@ prepareTest mode interpreter rc path =
                     action = \snk _hi -> runTest (action rc) parse i snk
                   }
             )
-              <$> items rc
+              `dataSrcToTestSrc` dataSource rc
         }
-    C.Full' {config', action', parse', items'} ->
-      Fixture
+    C.Full' {config', action', parse', dataSource'} ->
+      PreppedFixture
         { config = config',
           path,
           tests =
@@ -232,10 +245,10 @@ prepareTest mode interpreter rc path =
                     action = \snk hi -> runTest (action' rc hi) parse' i snk
                   }
             )
-              <$> items' rc
+              `dataSrcToTestSrc` dataSource' rc
         }
-    C.Direct {config, action, items} ->
-      Fixture
+    C.Direct {config, action, dataSource} ->
+      PreppedFixture
         { config,
           path,
           tests =
@@ -246,10 +259,10 @@ prepareTest mode interpreter rc path =
                     action = \snk _hi -> runDirectTest (action rc) i snk
                   }
             )
-              <$> items rc
+              `dataSrcToTestSrc` dataSource rc
         }
-    C.Direct' {config', action', items'} ->
-      Fixture
+    C.Direct' {config', action', dataSource'} ->
+      PreppedFixture
         { config = config',
           path,
           tests =
@@ -260,10 +273,10 @@ prepareTest mode interpreter rc path =
                     action = \snk hi -> runDirectTest (action' rc hi) i snk
                   }
             )
-              <$> items' rc
+              `dataSrcToTestSrc` dataSource' rc
         }
   where
-    applyParser :: forall as ds. ((HasCallStack) => as -> Either C.ParseException ds) -> as -> Either SomeException ds
+    applyParser :: forall as vs. ((HasCallStack) => as -> Either C.ParseException vs) -> as -> Either SomeException vs
     applyParser parser as = mapLeft toException $ parser as
 
     logTest :: forall i. (Show i) => LogSink -> i -> IO ()
@@ -274,10 +287,10 @@ prepareTest mode interpreter rc path =
       logTest snk i
       flog snk $ ActionStart path 
 
-    runAction :: forall i as ds. (C.Item i ds) => LogSink -> (i -> m as) -> i -> IO as
+    runAction :: forall i as vs. (HasTestFields i vs) => LogSink -> (i -> m as) -> i -> IO as
     runAction snk action = catchLog snk . interpreter snk . action
 
-    runListing :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> i -> LogSink -> Bool -> Bool -> IO ()
+    runListing :: forall i as vs. (Show as, HasTestFields i vs) => (i -> m as) -> i -> LogSink -> Bool -> Bool -> IO ()
     runListing action i snk includeSteps includeChecks = do
             logTest snk i
             when includeSteps $
@@ -287,12 +300,12 @@ prepareTest mode interpreter rc path =
             where 
               logChk = flog snk . Check path
     
-    runTest :: forall i as ds. (Show as, C.Item i ds) => (i -> m as) -> ((HasCallStack) => as -> Either C.ParseException ds) -> i -> LogSink -> IO ()
+    runTest :: forall i as vs. (Show as, HasTestFields i vs) => (i -> m as) -> ((HasCallStack) => as -> Either C.ParseException vs) -> i -> LogSink -> IO ()
     runTest action parser i snk =
       case mode of
         Run ->
           do
-            ds <- tryAny
+            vs <- tryAny
               do
                 logTestAndAction snk i
                 as <- runAction snk action i
@@ -303,19 +316,19 @@ prepareTest mode interpreter rc path =
 
                 flog snk evt
                 unTry snk $ applyParser parser as
-            applyChecks snk path i.checks ds
+            applyChecks snk path i.checks vs
         Listing {includeSteps, includeChecks} -> 
           runListing action i snk includeSteps includeChecks
 
 
-    runDirectTest :: forall i ds. (C.Item i ds) => (i -> m ds) -> i -> LogSink -> IO ()
+    runDirectTest :: forall i vs. (HasTestFields i vs) => (i -> m vs) -> i -> LogSink -> IO ()
     runDirectTest action i snk =
       case mode of
         Run -> logTestAndAction snk i >> tryAny (runAction snk action i) >>= applyChecks snk path i.checks
         Listing {includeSteps, includeChecks} -> 
           runListing action i snk includeSteps includeChecks
       
-applyChecks :: forall ds. (Show ds) => LogSink -> Path -> Checks ds -> Either SomeException ds -> IO ()
+applyChecks :: forall vs. (Show vs) => LogSink -> Path -> Checks vs -> Either SomeException vs -> IO ()
 applyChecks snk p chks = 
   either
     ( \e -> do
@@ -327,14 +340,14 @@ applyChecks snk p chks =
   where
     log = flog snk
     logChk = log . Check p
-    applyChecks' ds =
+    applyChecks' vs =
       do
-        flog snk . CheckStart p . DStateText $ txt ds
-        foldM_ (applyCheck' ds) NonTerminal chks.un
+        flog snk . CheckStart p . VStateText $ txt vs
+        foldM_ (applyCheck' vs) NonTerminal chks.un
 
-    applyCheck' :: ds -> FailStatus -> Check ds -> IO FailStatus
-    applyCheck' ds ts chk = do
-      (cr, ts') <- applyCheck ds ts chk
+    applyCheck' :: vs -> FailStatus -> Check vs -> IO FailStatus
+    applyCheck' vs ts chk = do
+      (cr, ts') <- applyCheck vs ts chk
       logChk cr
       pure ts'
  

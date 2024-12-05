@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 54d8765ec1817c0fffa481b4b3a8171458f8de785bfc7618961d0f210fa2271e
+-- hash: b71a2a4bbd5712ba751a07d511412350d0b61d703ce096ed67bd6fc16203697e
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -80,6 +80,7 @@ library
       AuxFiles
       Check
       Core
+      CoreTypeFamilies
       CoreTypes
       CoreUtils
       DSL.DocInterpreterUtils
@@ -121,6 +122,7 @@ library
       PyrethrumConfigTypes
       PyrethrumDemoTest
       RunDemo
+      TestCompilerErrorDemo
       WebDriverDemo
       WebDriverDocInterpreter
       WebDriverEffect
@@ -184,7 +186,7 @@ library
       TypeFamilies
       TypeFamilyDependencies
       TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points -fdefer-type-errors
   build-depends:
       aeson
     , aeson-pretty

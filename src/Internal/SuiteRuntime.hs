@@ -8,7 +8,7 @@ import Internal.Logging qualified as L
 import Internal.SuiteFiltering (FilteredSuite (..))
 import Internal.SuiteValidation (SuiteValidationError (..))
 import Prepare qualified as P
-import PyrethrumExtras (txt, (?), db)
+import PyrethrumExtras (txt, (?))
 import UnliftIO
   ( finally,
     replicateConcurrently_,
@@ -26,6 +26,7 @@ import UnliftIO.STM
     writeTQueue,
   )
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
+import CoreTypeFamilies (Config)
 
 {-
 todo :: define defect properties with sum type type and typeclass which returns defect info
@@ -42,7 +43,7 @@ executeWithoutValidation :: ThreadCount -> L.LogActions Log -> [P.PreNode IO ()]
 executeWithoutValidation tc lc pn =
   L.runWithLogger lc (\l -> executeNodeList tc l pn)
 
-execute :: (C.Config rc, C.Config fc) => ThreadCount -> L.LogActions Log -> C.SuiteExeParams m rc fc -> IO ()
+execute :: (Config rc, Config fc) => ThreadCount -> L.LogActions Log -> C.SuiteExeParams m rc fc -> IO ()
 execute tc lc prms =
   L.runWithLogger lc execute'
   where
@@ -150,10 +151,10 @@ data ExeTree hi where
 
 data TestSource hi = Queue (ChildQ (P.Test IO hi)) | PropertyTest hi
 
-loadTests :: C.DataSource (P.Test IO hi) -> IO (TestSource hi)
+loadTests :: P.PreppedTests (P.Test IO hi) -> IO (TestSource hi)
 loadTests = \case
-  C.ItemList tests -> Queue <$> mkChildQ tests
-  C.Property _i -> noImpPropertyError
+  P.PreppedItems tests -> Queue <$> mkChildQ tests
+  P.PreppedProperty _i -> noImpPropertyError
 
 mkXTree :: L.ExePath -> [P.PreNode IO hi] -> IO (ChildQ (ExeTree hi))
 mkXTree xpth preNodes =
@@ -216,7 +217,7 @@ mkXTree xpth preNodes =
                 Each ->
                   pure $ EachAround path setup childTree teardown
         --
-        P.Fixture
+        P.PreppedFixture
           { config = c,
             tests
           } -> do
@@ -326,7 +327,7 @@ runChildQ concurrency runner childCanRun ChildQ {childNodes, status, runningCoun
                         -- runner MUST ensure the integrity of sub element status and handle all exceptions
                         Runnable -> do
                           -- when Concurrent, the element is placed back on the end of the q before running so
-                          -- can be picked up by other threads child qs are concurrent test items are not
+                          -- can be picked up by other threads child qs are concurrent test dataSource are not
                           when (concurrency == Concurrent) $
                             atomically (writeTQueue childNodes a)
                           runner a

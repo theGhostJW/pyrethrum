@@ -4,8 +4,6 @@ module SuiteRuntimeTestBase where
 -- don't use chkFail it does not format properly
 
 import Chronos (Time, now)
-import Core (DataSource (ItemList))
-import Core qualified
 import CoreUtils (Hz (..), ThreadId)
 import DSL.Internal.NodeLog qualified as AE
 import Data.Aeson (ToJSON)
@@ -44,7 +42,6 @@ import Internal.LogQueries
 import Internal.Logging as L
   ( ExePath (..),
     FLog,
-    FailPoint (initialisationFailure),
     FullLog (..),
     HookPos (..),
     LineInfo (..),
@@ -56,7 +53,7 @@ import Internal.Logging as L
   )
 import Internal.SuiteRuntime (ThreadCount (..), executeWithoutValidation)
 import Prepare qualified as P
-import PyrethrumExtras (ConvertString, db, onError, toS, txt, (?))
+import PyrethrumExtras (ConvertString, onError, toS, txt, (?))
 import PyrethrumExtras qualified as PE
 import PyrethrumExtras.Test (chk', chkFail)
 import System.Random.Stateful qualified as RS
@@ -67,6 +64,8 @@ import UnliftIO.Concurrent as C
 import UnliftIO.STM (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Prelude hiding (All, bug, id)
 import Prelude qualified as PR
+import CoreTypeFamilies (Config)
+import Prepare (PreppedTests(PreppedItems))
 
 defaultSeed :: Int
 defaultSeed = 13579
@@ -82,7 +81,7 @@ printNow lbl = do
   t <- now
   printTime lbl t
 
--- TODO : change list items to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
+-- TODO : change list dataSource to data nad add a constructor in preparation for other kinds of tests (eg. property tests)
 -- TODO: other collection types generator / shrinker
 
 -- todo :: add repeatedly to Pyrelude
@@ -974,8 +973,8 @@ chkAllTemplateItemsLogged ts lgs =
   unless (null errMissng || null errExtra) $
     fail (errMissng <> "\n" <> errExtra)
   where
-    errMissng = null missing ? "" $ "template items not present in log:\n" <> ppShow missing
-    errExtra = null extra ? "" $ "extra items in the log that are not in the template:\n" <> ppShow extra
+    errMissng = null missing ? "" $ "template dataSource not present in log:\n" <> ppShow missing
+    errExtra = null extra ? "" $ "extra dataSource in the log that are not in the template:\n" <> ppShow extra
     extra = S.difference logStartPaths tmplatePaths
     missing = S.difference tmplatePaths logStartPaths
 
@@ -1274,7 +1273,7 @@ newtype FixtureConfig = FxCfg
 
 instance ToJSON FixtureConfig
 
-instance Core.Config FixtureConfig
+instance Config FixtureConfig
 
 fc :: FixtureConfig
 fc = FxCfg {title = "fixture config"}
@@ -1419,10 +1418,10 @@ mkNodes baseSeed mxThreads = mapM mkNode
           tests
         } ->
           pure $
-            P.Fixture
+            P.PreppedFixture
               { config = fc,
                 path,
-                tests = ItemList $ mkTestItem <$> tests
+                tests = PreppedItems $ mkTestItem <$> tests
               }
       _ ->
         do
@@ -1632,8 +1631,8 @@ mkRootNode = \case
         teardown = teardown,
         subNodes = subNodes
       }
-  P.Fixture {config, path, tests} ->
-    P.Fixture
+  P.PreppedFixture {config, path, tests} ->
+    P.PreppedFixture
       { config,
         path,
         tests = mkRootTest <$> tests

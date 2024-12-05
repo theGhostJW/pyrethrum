@@ -7,6 +7,7 @@ import Core qualified as C
 import Filter
 import PyrethrumExtras ((?))
 import Prelude hiding (All, atomically, id, newEmptyTMVarIO, newTVarIO, readMVar)
+import qualified CoreTypeFamilies as C
 
 {-
 todo :: define defect properties with sum type type and typeclass which returns defect info

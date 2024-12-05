@@ -1,11 +1,9 @@
 module Core where
 
-import Check (Checks)
 import CoreUtils (Hz (..))
 import DSL.Internal.NodeLog (LogSink, Path)
-import Data.Aeson (ToJSON (..))
 import Filter (Filters)
-import GHC.Records (HasField)
+import CoreTypeFamilies ( HasTestFields, DataSource (..) )
 
 data Before
 
@@ -29,14 +27,6 @@ newtype ParseException
   deriving (Show, Read)
 
 instance Exception ParseException
-
-type HasTitle a = HasField "title" a Text
-
-type HasId a = HasField "id" a Int
-
-class (HasTitle a, Show a, ToJSON a, Eq a) => Config a
-
-type Item i ds = (HasTitle i, HasId i, HasField "checks" i (Checks ds), Show i, Read i, Show ds, Show i)
 
 failParser :: Text -> Either ParseException a
 failParser = Left . ParseFailure
@@ -131,8 +121,6 @@ data Hook m rc hz i o where
 hookFrequency :: forall m rc hz i o. (Frequency hz) => Hook m rc hz i o -> Hz
 hookFrequency _ = frequency @hz
 
-data DataSource i = ItemList [i] | Property i deriving (Show, Functor)
-
 getConfig :: Fixture m rc fc hi -> fc
 getConfig = \case
   Full {config} -> config
@@ -141,47 +129,51 @@ getConfig = \case
   Direct' {config'} -> config'
 
 fixtureEmpty :: forall m rc fc hi. rc -> Fixture m rc fc hi -> Bool
-fixtureEmpty rc = \case
-  Full {items} -> dsEmpty $ items rc
-  Full' {items'} -> dsEmpty $ items' rc
-  Direct {items} -> dsEmpty $ items rc
-  Direct' {items'} -> dsEmpty $ items' rc
+fixtureEmpty rc = 
+  \case
+  Full {dataSource} -> dsEmpty $ dataSource rc
+  Full' {dataSource'} -> dsEmpty $ dataSource' rc
+  Direct {dataSource} -> dsEmpty $ dataSource rc
+  Direct' {dataSource'} -> dsEmpty $ dataSource' rc
   where
+    dsEmpty :: forall i vs. DataSource i vs -> Bool
     dsEmpty = \case
-      ItemList itms -> null itms
+      Items itms -> case itms of
+        [] -> True
+        _ -> False
       Property {} -> False
 
 data Fixture m rc fc hi where
   Full ::
-    (Item i ds, Show as) =>
+    (HasTestFields i vs, Show as) =>
     { config :: fc,
       action :: rc -> i -> m as,
-      parse :: as -> Either ParseException ds,
-      items :: rc -> DataSource i
+      parse :: as -> Either ParseException vs,
+      dataSource :: rc -> DataSource i vs
     } ->
     Fixture m rc fc ()
   Full' ::
-    (Item i ds, Show as) =>
+    (HasTestFields i vs, Show as) =>
     { config' :: fc,
       depends :: Hook m rc hz pi hi,
       action' :: rc -> hi -> i -> m as,
-      parse' :: as -> Either ParseException ds,
-      items' :: rc -> DataSource i
+      parse' :: as -> Either ParseException vs,
+      dataSource' :: rc -> DataSource i vs
     } ->
     Fixture m rc fc hi
   Direct ::
-    (Item i ds) =>
+    (HasTestFields i vs) =>
     { config :: fc,
-      action :: rc -> i -> m ds,
-      items :: rc -> DataSource i
+      action :: rc -> i -> m vs,
+      dataSource :: rc -> DataSource i vs
     } ->
     Fixture m rc fc ()
   Direct' ::
-    (Item i ds) =>
+    (HasTestFields i vs) =>
     { config' :: fc,
       depends :: Hook m rc hz pi hi,
-      action' :: rc -> hi -> i -> m ds,
-      items' :: rc -> DataSource i
+      action' :: rc -> hi -> i -> m vs,
+      dataSource' :: rc -> DataSource i vs
     } ->
     Fixture m rc fc hi
 

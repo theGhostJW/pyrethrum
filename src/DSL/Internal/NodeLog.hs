@@ -36,7 +36,7 @@ newtype ItemText = ItemText {text :: Text}
   deriving (Eq, Show)
   deriving newtype (IsString, NFData)
 
-newtype DStateText = DStateText {text :: Text}
+newtype VStateText = VStateText {text :: Text}
   deriving (Eq, Show)
   deriving newtype (IsString, NFData)
 
@@ -56,7 +56,7 @@ data FrameworkLog
       }
   | CheckStart
       { path :: Path,
-        dState :: DStateText
+        vState :: VStateText
       }
   | SkipedCheckStart
       { path :: Path
@@ -115,7 +115,7 @@ newtype ApStateText = ApStateText {text :: Text}
 
 $(deriveJSON defaultOptions ''ApStateText)
 
-$(deriveJSON defaultOptions ''DStateText)
+$(deriveJSON defaultOptions ''VStateText)
 $(deriveJSON defaultOptions ''ItemText)
 
 exceptionEvent :: (Exception e) => e -> CallStack -> NodeLog

@@ -7,13 +7,10 @@ import GHC.TypeLits (TypeError)
 import GHC.TypeError as TE (ErrorMessage(..)) 
 import GHC.Records (HasField)
 import Data.Aeson (ToJSON)
-import Check (Checks, chk)
+import Check (Checks)
 import Effectful (Eff)
-import GHC.Show as SH (Show(..)) 
 
 type ErrorHeader = 'Text "Pyrethrum Fixture Type Error"
-
--- data DataSource i vs = Items [Item i vs => i] | Property (Item i vs => i) 
 
 data DataSource i vs where 
   Items :: HasTestFields i vs => [i] -> DataSource i vs
@@ -21,19 +18,8 @@ data DataSource i vs where
 
 type DataElm i vs = (HasTestFields i vs) => i
 
-
 data EgItem = EgItem { id :: Int, title :: Text} deriving (Show, Read)
 
--- ds :: DataSource EgItem Int
--- ds = Items [
---   EgItem 1 "one"  , 
---   EgItem 2 "two" 
---   ]
-
-
--- instance Show (DataSource i vs) where
---     show (Items xs) = SH.show xs
---     show (Property x) = SH.show x
 
 type family DataSourceType dataSource where
     DataSourceType (rc -> DataSource i vs) = i
@@ -111,7 +97,7 @@ type family ParserMatchesValState pOut vs :: Constraint where
         :$$: 'Text "❌ ~ parser -> dataSource checks (ValState)"
         :$$: 'Text "The parser returns elements of type: "
         :<>: 'ShowType pOut
-        :$$: 'Text "    but the checks on the DataSource an input of type: "
+        :$$: 'Text "    but the checks on the DataSource expect an input of type: "
         :<>: 'ShowType vs
         :$$: 'Text "As the parser output is the input for the dataSource checks input (ValState))"
         :<>: 'Text " their types must match."
@@ -153,5 +139,3 @@ class   (
   Show vs) => HasTestFields i vs
 
 instance (HasField "title" i Text, HasField "id" i Int, HasField "checks" i (Checks vs), Show i, Show vs) => HasTestFields i vs
-
-type HasChecks i vs = HasField "checks" i (Checks vs)

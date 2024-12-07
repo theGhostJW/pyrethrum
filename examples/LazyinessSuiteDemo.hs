@@ -146,7 +146,7 @@ fxLogMessage readStatus = mkFull' config pureOnceErrorHook (action' readStatus) 
 nothingOnceBefore :: PB.Hook Once Before () ()
 nothingOnceBefore =
   BeforeHook
-    { action = \_rc -> do
+    { action = do
         log "This is the outer hook"
     }
 
@@ -168,7 +168,7 @@ eachHook :: PB.Hook Each Before DriverStatus DriverStatus
 eachHook =
   BeforeHook'
     { depends = pureOnceErrorHook,
-      action' = \_rc ds -> do
+      action' = \ds -> do
         log "This is each hook"
         pure ds
     }
@@ -178,18 +178,18 @@ eachFailureHook :: PB.Hook Each Before () DriverStatus
 eachFailureHook =
   BeforeHook'
     { depends = nothingOnceBefore,
-      action' =  \_rc _ds -> do 
+      action' =  \_ds -> do 
         log "This is each hook" 
         pure $ error "BANG !!!! eachFailureHook Hook failed !!!"
     }
 
-pureError :: (Out NodeLog :> es) => Text -> Text -> rc -> i -> Eff es b
-pureError logMsg errMsg _rc _i = do
+pureError :: (Out NodeLog :> es) => Text -> Text -> i -> Eff es b
+pureError logMsg errMsg _i = do
   log logMsg
   pure $ error errMsg
 
-action' :: (Out NodeLog :> es) => Bool -> RunConfig -> DriverStatus -> Data -> Eff es AS
-action' readStatus _rc hookDriverStatus itm = do
+action' :: (Out NodeLog :> es) => Bool -> DriverStatus -> Data -> Eff es AS
+action' readStatus hookDriverStatus itm = do
   when readStatus $
     log $ "Reading status: " <> txt hookDriverStatus
 

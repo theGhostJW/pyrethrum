@@ -17,7 +17,7 @@ import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)
 import Core (Mode (..), SuiteExeParams)
 import Core qualified as C
-import CoreTypeFamilies as CTF (Config, HasTestFields, DataSource (..)) 
+import CoreTypeFamilies as CTF (Config, HasTestFields, DataSource (..))
 import CoreUtils (Hz)
 import DSL.Internal.NodeLog
   ( ApStateText (ApStateText),
@@ -127,7 +127,7 @@ prepNode mode interpreter rc suiteElm =
           Before
             { path,
               frequency,
-              action = \snk -> const . intprt snk $ action rc,
+              action = \snk -> const . intprt snk $ action,
               subNodes
             }
         C.Before'
@@ -136,7 +136,7 @@ prepNode mode interpreter rc suiteElm =
             Before
               { path,
                 frequency,
-                action = \snk -> intprt snk . action' rc,
+                action = \snk -> intprt snk . action',
                 subNodes
               }
         C.After {afterAction} ->
@@ -144,14 +144,14 @@ prepNode mode interpreter rc suiteElm =
             { path,
               frequency,
               subNodes' = subNodes,
-              after = \snk -> intprt snk $ afterAction rc
+              after = (`intprt` afterAction)
             }
         C.After' {afterAction'} ->
           After
             { path,
               frequency,
               subNodes' = subNodes,
-              after = \snk -> intprt snk $ afterAction' rc
+              after = (`intprt` afterAction')
             }
         C.Around
           { setup,
@@ -160,9 +160,9 @@ prepNode mode interpreter rc suiteElm =
             Around
               { path,
                 frequency,
-                setup = \snk -> const . intprt snk $ setup rc,
+                setup = \snk -> const . intprt snk $ setup,
                 subNodes,
-                teardown = \snk -> intprt snk . teardown rc
+                teardown = \snk -> intprt snk . teardown
               }
         C.Around'
           { setup',
@@ -171,9 +171,9 @@ prepNode mode interpreter rc suiteElm =
             Around
               { path,
                 frequency,
-                setup = \snk -> intprt snk . setup' rc,
+                setup = \snk -> intprt snk . setup',
                 subNodes,
-                teardown = \snk -> intprt snk . teardown' rc
+                teardown = \snk -> intprt snk . teardown'
               }
       where
         frequency = C.hookFrequency hook
@@ -228,7 +228,7 @@ prepareTest mode interpreter rc path =
                 MkTest
                   { id = i.id,
                     title = i.title,
-                    action = \snk _hi -> runTest (action rc) parse i snk
+                    action = \snk _hi -> runTest action parse i snk
                   }
             )
               `dataSrcToTestSrc` dataSource rc
@@ -242,7 +242,7 @@ prepareTest mode interpreter rc path =
                 MkTest
                   { id = i.id,
                     title = i.title,
-                    action = \snk hi -> runTest (action' rc hi) parse' i snk
+                    action = \snk hi -> runTest (action' hi) parse' i snk
                   }
             )
               `dataSrcToTestSrc` dataSource' rc
@@ -256,7 +256,7 @@ prepareTest mode interpreter rc path =
                 MkTest
                   { id = i.id,
                     title = i.title,
-                    action = \snk _hi -> runDirectTest (action rc) i snk
+                    action = \snk _hi -> runDirectTest action i snk
                   }
             )
               `dataSrcToTestSrc` dataSource rc
@@ -270,7 +270,7 @@ prepareTest mode interpreter rc path =
                 MkTest
                   { id = i.id,
                     title = i.title,
-                    action = \snk hi -> runDirectTest (action' rc hi) i snk
+                    action = \snk hi -> runDirectTest (action' hi) i snk
                   }
             )
               `dataSrcToTestSrc` dataSource' rc
@@ -283,9 +283,9 @@ prepareTest mode interpreter rc path =
     logTest snk = flog snk . Test path . ItemText . txt
 
     logTestAndAction :: forall i. (Show i) => LogSink -> i -> IO ()
-    logTestAndAction snk i = do 
+    logTestAndAction snk i = do
       logTest snk i
-      flog snk $ ActionStart path 
+      flog snk $ ActionStart path
 
     runAction :: forall i as vs. (HasTestFields i vs) => LogSink -> (i -> m as) -> i -> IO as
     runAction snk action = catchLog snk . interpreter snk . action
@@ -297,9 +297,9 @@ prepareTest mode interpreter rc path =
               void $ runAction snk action i
             when includeChecks $
               traverse_ logChk (listChecks i.checks)
-            where 
+            where
               logChk = flog snk . Check path
-    
+
     runTest :: forall i as vs. (Show as, HasTestFields i vs) => (i -> m as) -> ((HasCallStack) => as -> Either C.ParseException vs) -> i -> LogSink -> IO ()
     runTest action parser i snk =
       case mode of
@@ -317,7 +317,7 @@ prepareTest mode interpreter rc path =
                 flog snk evt
                 unTry snk $ applyParser parser as
             applyChecks snk path i.checks vs
-        Listing {includeSteps, includeChecks} -> 
+        Listing {includeSteps, includeChecks} ->
           runListing action i snk includeSteps includeChecks
 
 
@@ -325,11 +325,11 @@ prepareTest mode interpreter rc path =
     runDirectTest action i snk =
       case mode of
         Run -> logTestAndAction snk i >> tryAny (runAction snk action i) >>= applyChecks snk path i.checks
-        Listing {includeSteps, includeChecks} -> 
+        Listing {includeSteps, includeChecks} ->
           runListing action i snk includeSteps includeChecks
-      
+
 applyChecks :: forall vs. (Show vs) => LogSink -> Path -> Checks vs -> Either SomeException vs -> IO ()
-applyChecks snk p chks = 
+applyChecks snk p chks =
   either
     ( \e -> do
         log $ SkipedCheckStart p
@@ -350,4 +350,4 @@ applyChecks snk p chks =
       (cr, ts') <- applyCheck vs ts chk
       logChk cr
       pure ts'
- 
+

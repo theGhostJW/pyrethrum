@@ -81,44 +81,44 @@ instance CanDependOn Each Thread
 
 instance CanDependOn Each Each
 
-data Hook m rc hz i o where
+data Hook m hz i o where
   Before ::
     (Frequency hz) =>
-    { action :: rc -> m o
+    { action :: m o
     } ->
-    Hook m rc hz () o
+    Hook m hz () o
   Before' ::
     (Frequency phz, Frequency hz, CanDependOn hz phz) =>
-    { depends :: Hook m rc phz pi i,
-      action' :: rc -> i -> m o
+    { depends :: Hook m phz pi i,
+      action' :: i -> m o
     } ->
-    Hook m rc hz i o
+    Hook m hz i o
   After ::
     (Frequency hz) =>
-    { afterAction :: rc -> m ()
+    { afterAction :: m ()
     } ->
-    Hook m rc hz () ()
+    Hook m hz () ()
   After' ::
     (Frequency phz, Frequency hz, CanDependOn hz phz) =>
-    { afterDepends :: Hook m rc phz pi i,
-      afterAction' :: rc -> m ()
+    { afterDepends :: Hook m phz pi i,
+      afterAction' :: m ()
     } ->
-    Hook m rc hz i i
+    Hook m hz i i
   Around ::
     (Frequency hz) =>
-    { setup :: rc -> m o,
-      teardown :: rc -> o -> m ()
+    { setup :: m o,
+      teardown :: o -> m ()
     } ->
-    Hook m rc hz () o
+    Hook m hz () o
   Around' ::
     (Frequency phz, Frequency hz, CanDependOn hz phz) =>
-    { depends :: Hook m rc phz pi i,
-      setup' :: rc -> i -> m o,
-      teardown' :: rc -> o -> m ()
+    { depends :: Hook m  phz pi i,
+      setup' :: i -> m o,
+      teardown' :: o -> m ()
     } ->
-    Hook m rc hz i o
+    Hook m hz i o
 
-hookFrequency :: forall m rc hz i o. (Frequency hz) => Hook m rc hz i o -> Hz
+hookFrequency :: forall m hz i o. (Frequency hz) => Hook m hz i o -> Hz
 hookFrequency _ = frequency @hz
 
 getConfig :: Fixture m rc fc hi -> fc
@@ -147,7 +147,7 @@ data Fixture m rc fc hi where
   Full ::
     (HasTestFields i vs, Show as) =>
     { config :: fc,
-      action :: rc -> i -> m as,
+      action :: i -> m as,
       parse :: as -> Either ParseException vs,
       dataSource :: rc -> DataSource i vs
     } ->
@@ -155,8 +155,8 @@ data Fixture m rc fc hi where
   Full' ::
     (HasTestFields i vs, Show as) =>
     { config' :: fc,
-      depends :: Hook m rc hz pi hi,
-      action' :: rc -> hi -> i -> m as,
+      depends :: Hook m hz pi hi,
+      action' :: hi -> i -> m as,
       parse' :: as -> Either ParseException vs,
       dataSource' :: rc -> DataSource i vs
     } ->
@@ -164,15 +164,15 @@ data Fixture m rc fc hi where
   Direct ::
     (HasTestFields i vs) =>
     { config :: fc,
-      action :: rc -> i -> m vs,
+      action :: i -> m vs,
       dataSource :: rc -> DataSource i vs
     } ->
     Fixture m rc fc ()
   Direct' ::
     (HasTestFields i vs) =>
     { config' :: fc,
-      depends :: Hook m rc hz pi hi,
-      action' :: rc -> hi -> i -> m vs,
+      depends :: Hook m hz pi hi,
+      action' :: hi -> i -> m vs,
       dataSource' :: rc -> DataSource i vs
     } ->
     Fixture m rc fc hi
@@ -181,7 +181,7 @@ data Node m rc fc hi where
   Hook ::
     (Frequency hz) =>
     { path :: Path,
-      hook :: Hook m rc hz hi o,
+      hook :: Hook m hz hi o,
       subNodes :: [Node m rc fc o]
     } ->
     Node m rc fc hi

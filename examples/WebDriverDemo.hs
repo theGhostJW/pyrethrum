@@ -57,8 +57,8 @@ driver_status = do
   log $ "the driver status is: " <> txt status
   pure status
 
-action :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> Data -> Eff es AS
-action _rc i = do
+action :: (WebUI :> es, Out NodeLog :> es) => Data -> Eff es AS
+action i = do
   log i.title
   status <- driver_status
   log $ "the driver status is (from test): " <> txt status

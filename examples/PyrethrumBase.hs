@@ -23,7 +23,8 @@ module PyrethrumBase
     -- mkFullDemoErrMsgs,
     mkDirect',
     mkFull,
-    mkFull'
+    mkFull',
+    runConfig
   )
 where
 
@@ -36,6 +37,8 @@ import DSL.Internal.NodeLog qualified as AE
 import DSL.OutEffect (Out)
 import DSL.OutInterpreter ( runOut )
 import Effectful (Eff, IOE, runEff, type (:>))
+import Effectful.Labeled.Reader as LR (ask, Reader, runReader)
+
 import Filter (Filters)
 import Internal.Logging qualified as L
 import Internal.SuiteRuntime (ThreadCount, execute, executeWithoutValidation)
@@ -55,6 +58,7 @@ import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
 import CoreTypeFamilies (HasTestFields, FixtureTypeCheckFull, FixtureTypeCheckDirect, DataSource, ValStateType)
+import Effectful.Labeled
 -- import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType, ActionInputType')
 
 --  these will probably be split off and go into core or another library
@@ -65,7 +69,11 @@ type HasLog es = Out NodeLog :> es
 
 type LogEffs a = forall es. (Out NodeLog :> es) => Eff es a
 
-type ApEffs = '[FileSystem, WebUI, Out NodeLog, IOE]
+type ApEffs = '[RunConfigReader, FileSystem, WebUI, Out NodeLog, IOE]
+-- type ApEffs = '[FileSystem, WebUI, Out NodeLog, IOE]
+
+-- Define a labeled Reader effect for RunConfig
+type RunConfigReader = Labeled "runConfig" (LR.Reader RunConfig) 
 
 -- type ApConstraints es = (FileSystem :> es, Out NodeLog :> es, Error FSException :> es, IOE :> es)
 -- type AppEffs a = forall es. (FileSystem :> es, Out NodeLog :> es, Error FSException :> es, IOE :> es) => Eff es a
@@ -77,14 +85,17 @@ type SuiteRunner = Suite
   -> L.LogActions (L.Log L.ExePath AE.NodeLog)
   -> IO ()
 
-ioInterpreter :: AE.LogSink -> Action a -> IO a
-ioInterpreter sink ap =
+ioInterpreter :: RunConfig -> AE.LogSink -> Action a -> IO a
+ioInterpreter rc sink ap =
   ap
+    & LR.runReader @"runConfig" rc
     & FIO.runFileSystem
     & WDIO.runWebDriver
     & runOut sink
     & runEff
 
+runConfig :: RunConfigReader :> es => Eff es RunConfig
+runConfig = LR.ask @"runConfig" 
 
 -- docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.MkLogActions (L.Event L.ExePath AE.NodeLog) (L.FLog L.ExePath AE.NodeLog) -> IO ()
 -- docRunner suite filters runConfig threadCount logControls =
@@ -97,42 +108,41 @@ ioInterpreter sink ap =
 --       }
 
 docRunner :: Bool -> Bool -> Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogActions (L.Log L.ExePath AE.NodeLog) -> IO ()
-docRunner includeSteps includeChecks suite filters runConfig threadCount logControls =
+docRunner includeSteps includeChecks suite filters runConfig' threadCount logControls =
   prepared & either 
     print
     (\s -> executeWithoutValidation threadCount logControls s.suite)
   where 
     prepared :: Either SuiteValidationError (FilteredSuite (PreNode IO ()))
     prepared = prepare $ C.MkSuiteExeParams
-      { interpreter = docInterpreter,
+      { interpreter = docInterpreter runConfig',
         mode = C.Listing {includeSteps, includeChecks},
         suite = mkCoreSuite suite,
         filters,
-        runConfig
+        runConfig = runConfig'
       }
  
 
 
 ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogActions (L.Log L.ExePath AE.NodeLog) -> IO ()
-ioRunner suite filters runConfig threadCount logControls =
+ioRunner suite filters runConfig' threadCount logControls =
   execute threadCount logControls $
     C.MkSuiteExeParams
-      { interpreter = ioInterpreter,
+      { interpreter = ioInterpreter runConfig',
         mode = C.Run,
         suite = mkCoreSuite suite,
         filters,
-        runConfig
+        runConfig = runConfig'
       }
 
-docInterpreter :: AE.LogSink -> Action a  -> IO a
-docInterpreter sink ap =
+docInterpreter :: RunConfig -> AE.LogSink -> Action a  -> IO a
+docInterpreter rc sink ap =
   ap
+    & LR.runReader @"runConfig" rc
     & FDoc.runFileSystem
     & WDDoc.runWebDriver
     & runOut sink
     & runEff
-
-
 
 
 {-
@@ -155,37 +165,37 @@ runErrorIO effs = mapLeft upCastException <$> runError effs
 data Hook hz when input output where
   BeforeHook ::
     (C.Frequency hz) =>
-    { action :: RunConfig -> Action o
+    { action :: Action o
     } ->
     Hook hz C.Before () o
   BeforeHook' ::
     (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
     { depends :: Hook phz pw pi i,
-      action' :: RunConfig -> i -> Action o
+      action' :: i -> Action o
     } ->
     Hook hz C.Before i o
   AfterHook ::
     (C.Frequency hz) =>
-    { afterAction :: RunConfig -> Action ()
+    { afterAction :: Action ()
     } ->
     Hook hz C.After () ()
   AfterHook' ::
     (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
     { afterDepends :: Hook phz pw pi i,
-      afterAction' :: RunConfig -> Action ()
+      afterAction' :: Action ()
     } ->
     Hook hz C.After i i
   AroundHook ::
     (C.Frequency hz) =>
-    { setup :: RunConfig -> Action o,
-      teardown :: RunConfig -> o -> Action ()
+    { setup :: Action o,
+      teardown :: o -> Action ()
     } ->
     Hook hz C.Around () o
   AroundHook' ::
     (C.Frequency phz, C.Frequency hz, C.CanDependOn hz phz) =>
     { aroundDepends :: Hook phz pw pi i,
-      setup' :: RunConfig -> i -> Action o,
-      teardown' :: RunConfig -> o -> Action ()
+      setup' :: i -> Action o,
+      teardown' :: o -> Action ()
     } ->
     Hook hz C.Around i o
 
@@ -194,7 +204,7 @@ data Fixture hi where
      forall i vs as action dataSource parser. 
     (
      dataSource ~ (RunConfig -> DataSource i vs),
-     action ~ (RunConfig -> i -> Action as),
+     action ~ (i -> Action as),
      parser ~ (as -> Either C.ParseException vs),
      FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
      Show as,
@@ -210,7 +220,7 @@ data Fixture hi where
       forall hz pw pi a i vs as action dataSource parser. 
     (
      dataSource ~ (RunConfig -> DataSource i vs),
-     action ~ (RunConfig -> a -> i -> Action as),
+     action ~ (a -> i -> Action as),
      parser ~ (as -> Either C.ParseException vs),
      FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
      Show as,
@@ -228,7 +238,7 @@ data Fixture hi where
     forall i vs action dataSource. 
     (
      dataSource ~ (RunConfig -> DataSource i vs),
-     action ~ (RunConfig -> i -> Action vs),
+     action ~ (i -> Action vs),
      FixtureTypeCheckDirect action dataSource,
      HasTestFields i vs
      ) =>
@@ -241,7 +251,7 @@ data Fixture hi where
     forall i hz pw pi a vs action' dataSource'. 
     (
      dataSource' ~ (RunConfig -> DataSource i vs),
-     action' ~ (RunConfig -> a -> i -> Action vs),
+     action' ~ (a -> i -> Action vs),
      FixtureTypeCheckDirect action' dataSource',
      HasTestFields i vs, 
      C.Frequency hz
@@ -256,7 +266,7 @@ data Fixture hi where
 
 mkFull :: (
  dataSource ~ (RunConfig -> DataSource i vs),
- action ~ (RunConfig -> i -> Action as),
+ action ~ (i -> Action as),
  parser ~ (as -> Either C.ParseException vs),
  FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
  HasTestFields i vs, 
@@ -271,7 +281,7 @@ mkFull config action parse dataSource = Full {..}
 
 mkFull' :: (
  dataSource ~ (RunConfig -> DataSource i vs),
- action ~ (RunConfig -> ho -> i -> Action as),
+ action ~ (ho -> i -> Action as),
  parser ~ (as -> Either C.ParseException vs),
  HasTestFields i vs, 
  FixtureTypeCheckFull action parser dataSource (ValStateType dataSource),
@@ -288,7 +298,7 @@ mkFull' config' depends action' parse' dataSource' = Full' {..}
 
 mkDirect :: (
  dataSource ~ (RunConfig -> DataSource i vs),
- action ~ (RunConfig -> i -> Action vs),
+ action ~ (i -> Action vs),
  FixtureTypeCheckDirect action dataSource,
  HasTestFields i vs
  ) =>
@@ -300,7 +310,7 @@ mkDirect config action dataSource = Direct {..}
 
 mkDirect'  :: (
  dataSource ~ (RunConfig -> DataSource i vs),
- action ~ (RunConfig -> ho -> i -> Action vs),
+ action ~ (ho -> i -> Action vs),
  FixtureTypeCheckDirect action dataSource,
  HasTestFields i vs, 
  C.Frequency hz
@@ -421,7 +431,7 @@ mkFixture = \case
 mkCoreSuite :: Suite -> [C.Node Action RunConfig FixtureConfig ()]
 mkCoreSuite tr = mkNode <$> tr
 
-mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) RunConfig hz i o
+mkHook :: Hook hz pw i o -> C.Hook (Eff ApEffs) hz i o
 mkHook = \case
   BeforeHook {..} -> C.Before {..}
   BeforeHook' {..} -> C.Before' (mkHook depends) action'

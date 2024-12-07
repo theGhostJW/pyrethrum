@@ -102,8 +102,8 @@ getFailNested = pure $ error "This is a nested error !!! "
 getFail :: Eff es FSAS
 getFail = error "This is an error !!! "
 
-fsAction :: (FileSystem :> es, Out NodeLog :> es) => RunConfig -> FSData -> Eff es FSAS
-fsAction _rc i = do
+fsAction :: (FileSystem :> es, Out NodeLog :> es) => FSData -> Eff es FSAS
+fsAction i = do
   getFailNested
   -- getFail
   paths <- getPaths
@@ -201,7 +201,7 @@ webDriverSuite =
 nothingBefore :: Hook Once Before () ()
 nothingBefore =
   BeforeHook
-    { action = \_rc -> do
+    { action =  do
         log "This is the outer hook"
         log "Run once before the test"
     }
@@ -210,7 +210,7 @@ intOnceHook :: Hook Once Before () Int
 intOnceHook =
   BeforeHook'
     { depends = nothingBefore,
-      action' = \_rc _void -> do
+      action' = \ _void -> do
         log "This is the inner hook"
         log "Run once before the test"
         pure 8
@@ -235,8 +235,8 @@ _theInternet = "https://the-internet.herokuapp.com/"
 _checkBoxesLinkCss :: Selector
 _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
-action :: (WebUI :> es, Out NodeLog :> es) => RunConfig -> Int -> Data -> Eff es AS
-action _rc hkInt i = do
+action :: (WebUI :> es, Out NodeLog :> es) => Int -> Data -> Eff es AS
+action hkInt i = do
   log $ "test title is: " <> i.title
   log $ "received hook int: " <> txt hkInt <> " from the hook"
   status <- driver_status

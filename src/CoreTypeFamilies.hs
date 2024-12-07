@@ -25,15 +25,15 @@ type family DataSourceType dataSource where
     DataSourceType (rc -> DataSource i vs) = i
 
 type family ActionInType action where
-    ActionInType (hi -> rc -> i -> m as) = i
-    ActionInType (rc -> i -> m as) = i
+    ActionInType (hi -> i -> m as) = i
+    ActionInType (i -> m as) = i
 
 type family ActionOutType action where
     -- Note must be a concrete monad not a type variable
     -- this does not work
     -- ActionOutType (rc -> i -> m as) = as
-    ActionOutType (rc -> i -> Eff es as) = as
-    ActionOutType (hi -> rc -> i -> Eff es as) = as
+    ActionOutType (i -> Eff es as) = as
+    ActionOutType (hi -> i -> Eff es as) = as
 
 type family ParserInType parser where
     ParserInType (as -> Either l vs) = as

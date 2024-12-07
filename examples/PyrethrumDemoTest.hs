@@ -17,7 +17,7 @@ import PyrethrumBase (
   RunConfig (..),
   Suite,
   FixtureConfig (..),
-  FixtureConfig, Country (..), Environment (..), fxCfg, mkFull, mkFull', mkDirect',
+  FixtureConfig, Country (..), Environment (..), fxCfg, mkFull, mkFull', mkDirect', runConfig,
  )
 import PyrethrumExtras (txt)
 import CoreTypeFamilies (DataSource (Items))
@@ -39,8 +39,8 @@ logShow = out . User . Info . txt
   Hook has all the effects of the application but will compile with
   an action that only requires a sublist of these effects
 -}
-logReturnInt :: RunConfig -> LogEffs Int
-logReturnInt _ = log "Returning One" >> pure 1
+logReturnInt :: () ->  LogEffs Int
+logReturnInt _a = log "Returning One" >> pure 1
 
 runSomethingToDoWithTestDepth :: Depth -> Action ()
 runSomethingToDoWithTestDepth = logShow
@@ -48,14 +48,14 @@ runSomethingToDoWithTestDepth = logShow
 demoOnceAfterHook :: Hook Once After () ()
 demoOnceAfterHook =
   AfterHook
-    { afterAction = const $ log "After all tests"
+    { afterAction =  log "After all tests"
     }
 
 intOnceHook :: Hook Once Before () Int
 intOnceHook =
   BeforeHook'
     { depends = demoOnceAfterHook
-    , action' = \rc _void -> logReturnInt rc
+    , action' = logReturnInt 
     }
 
 addOnceIntHook :: Hook Once Before Int Int
@@ -63,13 +63,13 @@ addOnceIntHook =
   BeforeHook'
     { depends = intOnceHook
     , action' =
-        \_rc i -> do
+        \i -> do
           log $ "beforeAll' " <> txt i
           pure $ i + 1
     }
 
 _intThreadHook :: Hook Thread Before () Int
-_intThreadHook = BeforeHook $ \_rc -> do
+_intThreadHook = BeforeHook $ do
   log "deriving meaning of life' "
   pure 42
 
@@ -80,7 +80,7 @@ data HookInfo = HookInfo
   deriving (Show, Generic)
 
 infoThreadHook :: Hook Thread Before Int HookInfo
-infoThreadHook = BeforeHook' addOnceIntHook $ \_rc i -> do
+infoThreadHook = BeforeHook' addOnceIntHook $ \i -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 
@@ -88,10 +88,10 @@ eachInfoAround :: Hook Each Around HookInfo Int
 eachInfoAround =
   AroundHook'
     { aroundDepends = infoThreadHook
-    , setup' = \_rc hi -> do
+    , setup' = \hi -> do
         log "eachSetup"
         pure $ hi.value + 1
-    , teardown' = \_rc _i -> do
+    , teardown' = \_i -> do
         log "eachTearDown"
         pure ()
     }
@@ -100,7 +100,7 @@ eachAfter :: Hook Each After Int Int
 eachAfter =
   AfterHook'
     { afterDepends = eachInfoAround
-    , afterAction' = \_rc -> do
+    , afterAction' = do
         log "eachAfter"
         pure ()
     }
@@ -109,7 +109,7 @@ eachIntBefore :: Hook Each Before Int Int
 eachIntBefore =
   BeforeHook'
     { depends = eachInfoAround
-    , action' = \_rc hi -> do
+    , action' = \hi -> do
         log "eachSetup"
         pure $ hi + 1
     }
@@ -122,8 +122,8 @@ config = FxCfg "test" DeepRegression
 test :: Fixture ()
 test = mkFull config action parse dataSource
 
-action :: RunConfig -> Item -> Action ApState
-action _expectedrc itm = do
+action :: Item -> Action ApState
+action itm = do
   log $ txt itm
   pure $ ApState (itm.value + 1) $ txt itm.value
 
@@ -169,10 +169,12 @@ config2 = FxCfg "test" DeepRegression
 test2 :: Fixture HookInfo
 test2 = mkFull' config2 infoThreadHook action2 parse2 items2
 
-action2 :: RunConfig -> HookInfo -> Item2 -> Action AS
-action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = do
+action2 ::  HookInfo -> Item2 -> Action AS
+-- action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = do
+action2 HookInfo{value = hookVal} itm = do
   logShow itm
-  when (country == AU) $
+  RunConfig {country, depth, environment} <- runConfig
+  when (country == AU )$
     log "Aus test"
   when (country == NZ) $
     log "NZ test"
@@ -229,7 +231,7 @@ test3 =
     (FxCfg "test" DeepRegression)
     eachIntBefore
     (
-    \_rc hkInt itm -> do
+    \hkInt itm -> do
         log $ txt itm
         pure $ AS (itm.value + 1 + hkInt) $ txt itm.value
         )
@@ -252,7 +254,7 @@ test4 =
   mkDirect'
     (FxCfg "test" DeepRegression)
     eachAfter
-    (\_rc _hi itm -> do
+    (\_hi itm -> do
         log $ txt itm
         pure $ VS (itm.value + 1) $ txt itm.value
     )

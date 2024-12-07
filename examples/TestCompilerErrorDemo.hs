@@ -77,8 +77,8 @@ driver_status = do
   log $ "the driver status is: " <> txt status
   pure status
 
-action ::  RunConfig -> Data -> Eff es AS
-action _rc _i = 
+action ::  Data -> Eff es AS
+action _i = 
   pure $ AS {status = Ready, checkButtonText = "Blah"}
 
 parse :: AS -> Either ParseException VS

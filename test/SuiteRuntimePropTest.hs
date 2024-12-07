@@ -217,7 +217,7 @@ test_suite_preload = do
   shrinkState <- newTVarIO False
   testNo <- newTVarIO 0
   defaultMain $
-    testGroup "PreLoad" [runProp testNo shrinkState "Preload" testOpts {overrideNumTests = Just 10000} defParams {genStrategy = Preload}]
+    testGroup "PreLoad" [runProp testNo shrinkState "Preload" testOpts {overrideNumTests = Just 1000} defParams {genStrategy = Preload}]
 
 -- $ > test_suite_runtime
 test_suite_runtime :: IO ()

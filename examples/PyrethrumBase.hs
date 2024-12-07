@@ -23,7 +23,8 @@ module PyrethrumBase
     -- mkFullDemoErrMsgs,
     mkDirect',
     mkFull,
-    mkFull'
+    mkFull',
+    runConfig
   )
 where
 
@@ -36,8 +37,7 @@ import DSL.Internal.NodeLog qualified as AE
 import DSL.OutEffect (Out)
 import DSL.OutInterpreter ( runOut )
 import Effectful (Eff, IOE, runEff, type (:>))
-import Effectful.Reader.Static as ESR (Reader, ask, runReader)
-import Effectful.Labeled ( runLabeled, Labeled)
+import Effectful.Labeled.Reader as LR (ask, Reader, runReader)
 
 import Filter (Filters)
 import Internal.Logging qualified as L
@@ -58,6 +58,7 @@ import Prepare (prepare, PreNode)
 import Internal.SuiteValidation (SuiteValidationError)
 import Internal.SuiteFiltering (FilteredSuite(..))
 import CoreTypeFamilies (HasTestFields, FixtureTypeCheckFull, FixtureTypeCheckDirect, DataSource, ValStateType)
+import Effectful.Labeled
 -- import CoreTypeFamilies (DataSourceMatchesAction, DataSourceType, ActionInputType, ActionInputType')
 
 --  these will probably be split off and go into core or another library
@@ -68,11 +69,12 @@ type HasLog es = Out NodeLog :> es
 
 type LogEffs a = forall es. (Out NodeLog :> es) => Eff es a
 
--- type ApEffs = '[RunConfigReader, FileSystem, WebUI, Out NodeLog, IOE]
-type ApEffs = '[FileSystem, WebUI, Out NodeLog, IOE]
+type ApEffs = '[RunConfigReader, FileSystem, WebUI, Out NodeLog, IOE]
+-- type ApEffs = '[FileSystem, WebUI, Out NodeLog, IOE]
 
 -- Define a labeled Reader effect for RunConfig
--- type RunConfigReader = (Labeled "runConfig"  (ESR.Reader RunConfig) )
+type RunConfigReader = Labeled "runConfig" (LR.Reader RunConfig) 
+
 -- type ApConstraints es = (FileSystem :> es, Out NodeLog :> es, Error FSException :> es, IOE :> es)
 -- type AppEffs a = forall es. (FileSystem :> es, Out NodeLog :> es, Error FSException :> es, IOE :> es) => Eff es a
 
@@ -86,14 +88,14 @@ type SuiteRunner = Suite
 ioInterpreter :: RunConfig -> AE.LogSink -> Action a -> IO a
 ioInterpreter rc sink ap =
   ap
-    -- & runLabeled @"runConfig" (ESR.runReader rc)
+    & LR.runReader @"runConfig" rc
     & FIO.runFileSystem
     & WDIO.runWebDriver
     & runOut sink
     & runEff
 
--- runConfig :: Eff (RunConfigReader : es) a -> Eff es RunConfig
--- runConfig = ESR.ask
+runConfig :: RunConfigReader :> es => Eff es RunConfig
+runConfig = LR.ask @"runConfig" 
 
 -- docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.MkLogActions (L.Event L.ExePath AE.NodeLog) (L.FLog L.ExePath AE.NodeLog) -> IO ()
 -- docRunner suite filters runConfig threadCount logControls =
@@ -106,37 +108,37 @@ ioInterpreter rc sink ap =
 --       }
 
 docRunner :: Bool -> Bool -> Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogActions (L.Log L.ExePath AE.NodeLog) -> IO ()
-docRunner includeSteps includeChecks suite filters runConfig threadCount logControls =
+docRunner includeSteps includeChecks suite filters runConfig' threadCount logControls =
   prepared & either 
     print
     (\s -> executeWithoutValidation threadCount logControls s.suite)
   where 
     prepared :: Either SuiteValidationError (FilteredSuite (PreNode IO ()))
     prepared = prepare $ C.MkSuiteExeParams
-      { interpreter = docInterpreter runConfig,
+      { interpreter = docInterpreter runConfig',
         mode = C.Listing {includeSteps, includeChecks},
         suite = mkCoreSuite suite,
         filters,
-        runConfig
+        runConfig = runConfig'
       }
  
 
 
 ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogActions (L.Log L.ExePath AE.NodeLog) -> IO ()
-ioRunner suite filters runConfig threadCount logControls =
+ioRunner suite filters runConfig' threadCount logControls =
   execute threadCount logControls $
     C.MkSuiteExeParams
-      { interpreter = ioInterpreter runConfig,
+      { interpreter = ioInterpreter runConfig',
         mode = C.Run,
         suite = mkCoreSuite suite,
         filters,
-        runConfig
+        runConfig = runConfig'
       }
 
 docInterpreter :: RunConfig -> AE.LogSink -> Action a  -> IO a
 docInterpreter rc sink ap =
   ap
-    --  & runLabeled @"runConfig" (ESR.runReader rc)
+    & LR.runReader @"runConfig" rc
     & FDoc.runFileSystem
     & WDDoc.runWebDriver
     & runOut sink

@@ -17,7 +17,7 @@ import PyrethrumBase (
   RunConfig (..),
   Suite,
   FixtureConfig (..),
-  FixtureConfig, Country (..), Environment (..), fxCfg, mkFull, mkFull', mkDirect',
+  FixtureConfig, Country (..), Environment (..), fxCfg, mkFull, mkFull', mkDirect', runConfig,
  )
 import PyrethrumExtras (txt)
 import CoreTypeFamilies (DataSource (Items))
@@ -173,13 +173,14 @@ action2 ::  HookInfo -> Item2 -> Action AS
 -- action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = do
 action2 HookInfo{value = hookVal} itm = do
   logShow itm
-  -- when (country == AU) $
-  --   log "Aus test"
-  -- when (country == NZ) $
-  --   log "NZ test"
-  -- runSomethingToDoWithTestDepth depth
-  -- unless (environment == Prod) $
-  --   log "Completing payment with test credit card"
+  RunConfig {country, depth, environment} <- runConfig
+  when (country == AU )$
+    log "Aus test"
+  when (country == NZ) $
+    log "NZ test"
+  runSomethingToDoWithTestDepth depth
+  unless (environment == Prod) $
+    log "Completing payment with test credit card"
   pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
 
 parse2 :: AS -> Either ParseException VS

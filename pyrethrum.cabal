@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b71a2a4bbd5712ba751a07d511412350d0b61d703ce096ed67bd6fc16203697e
+-- hash: 6c32ec864acd03f911e5795cc47191dde4f7c1b3dd2cb21d342eaa11b745a577
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -131,6 +131,10 @@ library
       WebDriverIOStubs
       WebDriverPure
       WebDriverSpec
+  other-modules:
+      Paths_pyrethrum
+  autogen-modules:
+      Paths_pyrethrum
   hs-source-dirs:
       src
       test
@@ -219,6 +223,114 @@ library
     , transformers-either
     , unliftio
     , unordered-containers
+    , webdriver-w3c
+    , yaml
+  default-language: Haskell2010
+
+library discover
+  visibility: public
+  exposed-modules:
+      Discover
+      WeederLibCopy.Weeder
+      WeederLibCopy.Weeder.Config
+      WeederLibCopy.Weeder.Main
+      WeederLibCopy.Weeder.Run
+  hs-source-dirs:
+      discover
+  default-extensions:
+      AllowAmbiguousTypes
+      BangPatterns
+      BlockArguments
+      ConstrainedClassMethods
+      ConstraintKinds
+      DisambiguateRecordFields
+      DuplicateRecordFields
+      DataKinds
+      DefaultSignatures
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      ExtendedDefaultRules
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      LiberalTypeSynonyms
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      NoFieldSelectors
+      NumericUnderscores
+      OverloadedStrings
+      OverloadedRecordDot
+      PartialTypeSignatures
+      PatternSynonyms
+      PolyKinds
+      QuasiQuotes
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      StrictData
+      TemplateHaskell
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+      FieldSelectors
+  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points -fdefer-type-errors -O0
+  build-depends:
+      Glob
+    , aeson
+    , aeson-pretty
+    , algebraic-graphs
+    , async
+    , base
+    , base-prelude
+    , bytestring
+    , chronos
+    , containers
+    , directory
+    , dlist
+    , effectful
+    , effectful-core
+    , effectful-plugin
+    , effectful-th
+    , exceptions
+    , extra
+    , filepath
+    , generic-lens
+    , ghc
+    , hashable
+    , lens
+    , mtl
+    , optparse-applicative
+    , parallel
+    , path
+    , path-io
+    , pretty-show
+    , pyrethrum-extras
+    , random
+    , raw-strings-qq
+    , regex-tdfa
+    , req
+    , text
+    , time
+    , toml-reader
+    , transformers
+    , transformers-either
+    , unliftio
     , webdriver-w3c
     , yaml
   default-language: Haskell2010

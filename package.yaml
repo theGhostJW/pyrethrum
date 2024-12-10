@@ -19,6 +19,9 @@ extra-source-files:
 # common to point users to the README.md file.
 description: Please see the README on GitHub at <https://github.com/githubuser/simple-hpack#readme>
 
+# The minimum version of hpack that is required to parse this package description.
+spec-version: 0.36.0
+
 # command line:
 # development
 # cabal build --flags="-optimised +godLibrary"
@@ -104,14 +107,13 @@ dependencies:
   - path # - version set in extra deps - until can roll forward
   - path-io # -
   - pretty-show
-  - pyrethrum-extras
   # since removing pyrelude
+  - pyrethrum-extras
   - text
   - time # need for timezone which is missing from chronos
   - transformers-either
   - random
   - raw-strings-qq
-  # - relude
   - unliftio
   - yaml
   # used to talk to ghecko driver
@@ -224,57 +226,45 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
-# internal-libraries:
-#   examples:
-#     ghc-options: -O0
-#     source-dirs:
-#       - examples
-#       # remove later
-#       - src
-#     dependencies:
-#       - unordered-containers
-#       - pyrethrum
-#       - template-haskell
-#     verbatim:
-#       import: reludeImports
-
-#   discover:
-#     # change optimisation and move later
-#     default-extensions:
-#       - FieldSelectors
-#     ghc-options: -O0
-#     visibility: public
-#     source-dirs:
-#       - discover
-#       # remove later
-#     dependencies:
-#       - algebraic-graphs     ^>= 0.7
-#       - base                 ^>= 4.17.0.0 || ^>= 4.18.0.0
-#       - bytestring           ^>= 0.10.9.0 || ^>= 0.11.0.0
-#       - containers           ^>= 0.6.2.1
-#       - directory            ^>= 1.3.3.2
-#       - filepath             ^>= 1.4.2.1
-#       - generic-lens         ^>= 2.2.0.0
-#       - ghc                  ^>= 9.4 || ^>= 9.6
-#       - lens               
-#       - mtl                  ^>= 2.2.2 || ^>= 2.3
-#       - optparse-applicative
-#       - regex-tdfa           ^>= 1.2.0.0 || ^>= 1.3.1.0
-#       - text                 ^>= 2.0.1
-#       - toml-reader          ^>= 0.2.0.0
-#       - transformers         ^>= 0.5.6.2 || ^>= 0.6
+internal-libraries:
+  discover:
+    # change optimisation and move later
+    default-extensions:
+      - FieldSelectors
+    ghc-options: -O0
+    visibility: public
+    source-dirs:
+      - discover
+      # remove later
+    # generated-other-modules: Paths_discover
+    dependencies:
+      - algebraic-graphs    
+      - async               
+      - base                
+      - bytestring          
+      - containers          
+      - directory           
+      - filepath            
+      - generic-lens        
+      - ghc                 
+      - Glob                
+      - lens                
+      - mtl                 
+      - optparse-applicative
+      - parallel            
+      - regex-tdfa          
+      - text                
+      - toml-reader         
+      - transformers        
 
 library:
-  when:
-    # https://github.com/sol/hpack#handling-of-paths_-modules
-    - condition: false
-      other-modules: Paths_pyrethrum
   source-dirs:
     - src
     # remove later when finish most dev and move away from god modules
     # TODO: God modules probably not required with latest cabal spilt fix once and for all
     - test
     - examples
+  generated-other-modules: Paths_pyrethrum # substitute name with the package name
   dependencies:
     - deepseq
     - unordered-containers

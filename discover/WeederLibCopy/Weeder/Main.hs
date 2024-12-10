@@ -1,4 +1,5 @@
 {-# language ApplicativeDo #-}
+{-# language ScopedTypeVariables #-}
 {-# language BlockArguments #-}
 {-# language FlexibleContexts #-}
 {-# language NamedFieldPuns #-}
@@ -8,61 +9,110 @@
 
 -- | This module provides an entry point to the Weeder executable.
 
-module WeederLibCopy.Weeder.Main ( main, mainWithConfig, discover ) where
+module WeederLibCopy.Weeder.Main ( main, mainWithConfig, getHieFiles ) where
+
+-- async
+import Control.Concurrent.Async ( async, link, ExceptionInLinkedThread ( ExceptionInLinkedThread ) )
 
 -- base
-import Control.Exception ( throwIO )
-import Control.Monad ( guard, unless )
+import Control.Exception ( Exception, throwIO, displayException, catches, Handler ( Handler ), SomeException ( SomeException ))
+import Control.Concurrent ( getChanContents, newChan, writeChan, setNumCapabilities )
+import Data.List
+import Control.Monad ( unless, when )
 import Data.Foldable
-import Data.List ( isSuffixOf, sortOn )
+import Data.Maybe ( isJust, catMaybes )
 import Data.Version ( showVersion )
-import System.Exit ( exitFailure, ExitCode(..), exitWith )
+import System.Exit ( ExitCode(..), exitWith )
 import System.IO ( stderr, hPutStrLn )
 
--- containers
-import Data.Map.Strict qualified as Map
-import Data.Set ( Set )
-import Data.Set qualified as Set
-
 -- toml-reader
-import TOML qualified
+import qualified TOML
 
 -- directory
-import System.Directory ( canonicalizePath, doesDirectoryExist, doesFileExist, doesPathExist, listDirectory, withCurrentDirectory )
+import System.Directory ( doesFileExist )
 
 -- filepath
-import System.FilePath ( isExtensionOf )
+import System.FilePath ( isExtSeparator )
+
+-- glob
+import qualified System.FilePath.Glob as Glob
 
 -- ghc
 import GHC.Iface.Ext.Binary ( HieFileResult( HieFileResult, hie_file_result ), readHieFileWithVersion )
-import GHC.Iface.Ext.Types ( HieFile(.. ), hieVersion, HieASTs (..), HieAST, TypeIndex )
-import GHC.Unit.Module ( moduleName, moduleNameString, GenModule (..) )
+import GHC.Iface.Ext.Types ( HieFile( hie_hs_file ), hieVersion )
 import GHC.Types.Name.Cache ( initNameCache, NameCache )
-import GHC.Types.Name ( occNameString )
-import GHC.Types.SrcLoc ( RealSrcLoc, realSrcSpanStart, srcLocLine )
-import Text.Show.Pretty (PrettyVal (prettyVal), pPrint, pPrintList, ppDocList, ppShow, ppShowList)
-
--- regex-tdfa
-import Text.Regex.TDFA ( (=~) )
 
 -- optparse-applicative
 import Options.Applicative
 
 -- text
-import Data.Text.IO qualified as T
-
--- transformers
-import Control.Monad.Trans.State.Strict ( execStateT )
+import qualified Data.Text.IO as T
 
 -- weeder
-import WeederLibCopy.Weeder
+import WeederLibCopy.Weeder.Run
 import WeederLibCopy.Weeder.Config
-import Paths_pyrethrum (version)
-import BasePrelude ((&))
-import Debug.Trace
-import Data.Text (Text, intercalate, isInfixOf)
-import PyrethrumExtras (uu, txt, toS)
-import GHC.Plugins (Outputable(..), renderWithContext, defaultSDocContext)
+-- import Paths_discover (version)
+
+
+-- | Each exception corresponds to an exit code.
+data WeederException 
+  = ExitNoHieFilesFailure
+  | ExitHieVersionFailure 
+      FilePath -- ^ Path to HIE file
+      Integer -- ^ HIE file's header version
+  | ExitConfigFailure
+      String -- ^ Error message
+  | ExitWeedsFound
+  deriving Show
+
+
+weederExitCode :: WeederException -> ExitCode
+weederExitCode = \case
+  ExitWeedsFound -> ExitFailure 228
+  ExitHieVersionFailure _ _ -> ExitFailure 2
+  ExitConfigFailure _ -> ExitFailure 3
+  ExitNoHieFilesFailure -> ExitFailure 4
+
+
+instance Exception WeederException where
+  displayException = \case
+    ExitNoHieFilesFailure -> noHieFilesFoundMessage
+    ExitHieVersionFailure path v -> hieVersionMismatchMessage path v
+    ExitConfigFailure s -> s
+    ExitWeedsFound -> mempty
+    where
+
+      noHieFilesFoundMessage =  
+        "No HIE files found: check that the directory is correct "
+        <> "and that the -fwrite-ide-info compilation flag is set."
+
+      hieVersionMismatchMessage path v = unlines
+        [ "incompatible hie file: " <> path
+        , "    this version of weeder was compiled with GHC version "
+          <> show hieVersion
+        , "    the hie files in this project were generated with GHC version "
+          <> show v
+        , "    weeder must be built with the same GHC version"
+          <> " as the project it is used on"
+        ]
+
+
+-- | Convert 'WeederException' to the corresponding 'ExitCode' and emit an error 
+-- message to stderr.
+--
+-- Additionally, unwrap 'ExceptionInLinkedThread' exceptions: this is for
+-- 'getHieFiles'.
+handleWeederException :: IO a -> IO a
+handleWeederException a = catches a handlers 
+  where
+    handlers = [ Handler rethrowExits
+               , Handler unwrapLinks
+               ]
+    rethrowExits w = do
+      hPutStrLn stderr (displayException w)
+      exitWith (weederExitCode w)
+    unwrapLinks (ExceptionInLinkedThread _ (SomeException w)) =
+      throwIO w
 
 
 data CLIArguments = CLIArguments
@@ -72,6 +122,7 @@ data CLIArguments = CLIArguments
   , requireHsFiles :: Bool
   , writeDefaultConfig :: Bool
   , noDefaultFields :: Bool
+  , capabilities :: Maybe Int
   }
 
 
@@ -107,15 +158,30 @@ parseCLIArguments = do
           ( long "no-default-fields"
               <> help "Do not use default field values for missing fields in the configuration."
           )
+    capabilities <- nParser <|> jParser
     pure CLIArguments{..}
+    where
+      jParser = Just <$> option auto
+          ( short 'j'
+              <> value 1
+              <> help "Number of cores to use."
+              <> showDefault)
+      nParser = flag' Nothing
+          ( short 'N'
+              <> help "Use all available cores."
+          )
 
 
 -- | Parse command line arguments and into a 'Config' and run 'mainWithConfig'.
+--
+-- Exits with one of the listed Weeder exit codes on failure.
 main :: IO ()
-main = do
+main = handleWeederException do
   CLIArguments{..} <-
     execParser $
       info (parseCLIArguments <**> helper <**> versionP) mempty
+
+  traverse_ setNumCapabilities capabilities
 
   configExists <-
     doesFileExist configPath
@@ -124,17 +190,18 @@ main = do
     hPutStrLn stderr $ "Did not find config: wrote default config to " ++ configPath
     writeFile configPath (configToToml defaultConfig)
 
-  (exitCode, _) <-
-    decodeConfig noDefaultFields configPath
-      >>= either throwIO pure
-      >>= mainWithConfig hieExt hieDirectories requireHsFiles
-
-  exitWith exitCode
+  decodeConfig noDefaultFields configPath
+    >>= either throwConfigError pure
+    >>= mainWithConfig hieExt hieDirectories requireHsFiles
   where
+    throwConfigError e =
+      throwIO $ ExitConfigFailure (displayException e)
+
     decodeConfig noDefaultFields =
       if noDefaultFields
         then fmap (TOML.decodeWith decodeNoDefaults) . T.readFile
         else TOML.decodeFile
+
     versionP = infoOption ( "weeder version "
                             <> showVersion version
                             <> "\nhie version "
@@ -146,158 +213,82 @@ main = do
 --
 -- This will recursively find all files with the given extension in the given directories, perform
 -- analysis, and report all unused definitions according to the 'Config'.
-mainWithConfig :: String -> [FilePath] -> Bool -> Config -> IO (ExitCode, Analysis)
-mainWithConfig hieExt hieDirectories requireHsFiles weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances } = do
-  hieFilePaths <-
+--
+-- Exits with one of the listed Weeder exit codes on failure.
+mainWithConfig :: String -> [FilePath] -> Bool -> Config -> IO ()
+mainWithConfig hieExt hieDirectories requireHsFiles weederConfig = handleWeederException do
+  hieFiles <-
+    getHieFiles hieExt hieDirectories requireHsFiles
+
+  when (null hieFiles) $ throwIO ExitNoHieFilesFailure
+
+  let
+    (weeds, _) =
+      runWeeder weederConfig hieFiles
+
+  mapM_ (putStrLn . formatWeed) weeds
+
+  unless (null weeds) $ throwIO ExitWeedsFound
+
+
+-- | Find and read all .hie files in the given directories according to the given parameters,
+-- exiting if any are incompatible with the current version of GHC.
+-- The .hie files are returned as a lazy stream in the form of a list.
+--
+-- Will rethrow exceptions as 'ExceptionInLinkedThread' to the calling thread.
+getHieFiles :: String -> [FilePath] -> Bool -> IO [HieFile]
+getHieFiles hieExt hieDirectories requireHsFiles = do
+  let hiePat = "**/*." <> hieExtNoSep
+      hieExtNoSep = if isExtSeparator (head hieExt) then tail hieExt else hieExt
+
+  hieFilePaths :: [FilePath] <-
     concat <$>
-      traverse ( getFilesIn hieExt )
+      traverse ( getFilesIn hiePat )
         ( if null hieDirectories
           then ["./."]
           else hieDirectories
         )
 
-  hsFilePaths <-
+  hsFilePaths :: [FilePath] <-
     if requireHsFiles
-      then getFilesIn ".hs" "./."
+      then getFilesIn "**/*.hs" "./."
       else pure []
+
+  hieFileResultsChan <- newChan
 
   nameCache <-
     initNameCache 'z' []
 
-  hieFileResults <-
-    mapM ( readCompatibleHieFileOrExit nameCache ) hieFilePaths
+  a <- async $ handleWeederException do
+    readHieFiles nameCache hieFilePaths hieFileResultsChan hsFilePaths
+    writeChan hieFileResultsChan Nothing
+ 
+  link a
 
-  let
-    hieFileResults' = flip filter hieFileResults \hieFileResult ->
-      let hsFileExists = any ( hie_hs_file hieFileResult `isSuffixOf` ) hsFilePaths
-       in requireHsFiles ==> hsFileExists
-
-  analysis <-
-    execStateT ( analyseHieFiles weederConfig hieFileResults' ) emptyAnalysis
-
-  let
-    roots =
-      Set.filter
-        ( \d ->
-            any
-              ( displayDeclaration d =~ )
-              rootPatterns
-        )
-        ( allDeclarations analysis )
-
-    reachableSet =
-      reachable
-        analysis
-        ( Set.map DeclarationRoot roots <> filterImplicitRoots analysis ( implicitRoots analysis ) )
-
-    dead =
-      allDeclarations analysis Set.\\ reachableSet
-
-    warnings =
-      Map.unionsWith (++) $
-      foldMap
-        ( \d ->
-            fold $ do
-              moduleFilePath <- Map.lookup ( declModule d ) ( modulePaths analysis )
-              spans <- Map.lookup d ( declarationSites analysis )
-              guard $ not $ null spans
-              let starts = map realSrcSpanStart $ Set.toList spans
-              return [ Map.singleton moduleFilePath ( liftA2 (,) starts (pure d) ) ]
-        )
-        dead
-
-  for_ ( Map.toList warnings ) \( path, declarations ) ->
-    for_ (sortOn (srcLocLine . fst) declarations) \( start, d ) ->
-      case Map.lookup d (prettyPrintedType analysis) of
-        Nothing -> putStrLn $ showWeed path start d
-        Just t -> putStrLn $ showPath path start <> "(Instance) :: " <> t
-
-  let exitCode = if null warnings then ExitSuccess else ExitFailure 1
-
-  pure (exitCode, analysis)
+  catMaybes . takeWhile isJust <$> getChanContents hieFileResultsChan
 
   where
 
-    filterImplicitRoots :: Analysis -> Set Root -> Set Root
-    filterImplicitRoots Analysis{ prettyPrintedType, modulePaths } = Set.filter $ \case
-      DeclarationRoot _ -> True -- keep implicit roots for rewrite rules etc
-
-      ModuleRoot _ -> True
-
-      InstanceRoot d c -> typeClassRoots || matchingType
-        where
-          matchingType =
-            let mt = Map.lookup d prettyPrintedType
-                matches = maybe (const False) (=~) mt
-            in any (maybe True matches) filteredInstances
-
-          filteredInstances :: Set (Maybe String)
-          filteredInstances =
-            Set.map instancePattern
-            . Set.filter (maybe True (displayDeclaration c =~) . classPattern)
-            . Set.filter (maybe True modulePathMatches . modulePattern)
-            $ rootInstances
-
-          modulePathMatches :: String -> Bool
-          modulePathMatches p = maybe False (=~ p) (Map.lookup ( declModule d ) modulePaths)
-
-
-displayDeclaration :: Declaration -> String
-displayDeclaration d =
-  moduleNameString ( moduleName ( declModule d ) ) <> "." <> occNameString ( declOccName d )
-
-
-showWeed :: FilePath -> RealSrcLoc -> Declaration -> String
-showWeed path start d =
-  showPath path start
-    <> occNameString ( declOccName d)
-
-
-showPath :: FilePath -> RealSrcLoc -> String
-showPath path start =
-  path <> ":" <> show ( srcLocLine start ) <> ": "
+    readHieFiles nameCache hieFilePaths hieFileResultsChan hsFilePaths =
+      for_ hieFilePaths \hieFilePath -> do
+        hieFileResult <-
+          readCompatibleHieFileOrExit nameCache hieFilePath
+        let hsFileExists = any ( hie_hs_file hieFileResult `isSuffixOf` ) hsFilePaths
+        when (requireHsFiles ==> hsFileExists) $
+          writeChan hieFileResultsChan (Just hieFileResult)
 
 
 -- | Recursively search for files with the given extension in given directory
 getFilesIn
   :: String
-  -- ^ Only files with this extension are considered
+  -- ^ Only files matching this pattern are considered.
   -> FilePath
   -- ^ Directory to look in
   -> IO [FilePath]
-getFilesIn ext path = do
-  exists <-
-    doesPathExist path
-
-  if exists
-    then do
-      isFile <-
-        doesFileExist path
-
-      if isFile && ext `isExtensionOf` path
-        then do
-          path' <-
-            canonicalizePath path
-
-          return [ path' ]
-
-        else do
-          isDir <-
-            doesDirectoryExist path
-
-          if isDir
-            then do
-              cnts <-
-                listDirectory path
-
-              withCurrentDirectory path ( foldMap ( getFilesIn ext ) cnts )
-
-            else
-              return []
-
-    else
-      return []
-
+getFilesIn pat root = do
+  [result] <- Glob.globDir [Glob.compile pat] root
+  pure result
+  
 
 -- | Read a .hie file, exiting if it's an incompatible version.
 readCompatibleHieFileOrExit :: NameCache -> FilePath -> IO HieFile
@@ -306,15 +297,8 @@ readCompatibleHieFileOrExit nameCache path = do
   case res of
     Right HieFileResult{ hie_file_result } ->
       return hie_file_result
-    Left ( v, _ghcVersion ) -> do
-      putStrLn $ "incompatible hie file: " <> path
-      putStrLn $ "    this version of weeder was compiled with GHC version "
-               <> show hieVersion
-      putStrLn $ "    the hie files in this project were generated with GHC version "
-               <> show v
-      putStrLn $ "    weeder must be built with the same GHC version"
-               <> " as the project it is used on"
-      exitFailure
+    Left ( v, _ghcVersion ) ->
+      throwIO $ ExitHieVersionFailure path v
 
 
 infixr 5 ==>
@@ -324,95 +308,3 @@ infixr 5 ==>
 (==>) :: Bool -> Bool -> Bool
 True  ==> x = x
 False ==> _ = True
-
-
-
-displayHieAst :: HieAST TypeIndex -> Text
-displayHieAst ast = toS . renderWithContext defaultSDocContext $ ppr ast
-
-data DecShow = DecShow {
-  path :: Text,
-  decs :: Text
-} deriving Show
-
-displayInfo :: HieFile -> Text
-displayInfo HieFile {hie_hs_file, hie_module = hie_module@Module {
-  moduleUnit, moduleName
-}, hie_types, hie_asts, hie_hs_src } =
-  -- intercalate ", " $ txt <$> paths
-  -- txt . ppShow $ astDs -- hangs
-  toS . ppShowList $ decs2 -- module path
-  --  str <- lookupPprType t 
- where
-  asts = getAsts hie_asts
-  paths = Map.keys asts
-  decs = findDeclarations <$> asts
-  justEg =  Map.filterWithKey (\k _ -> isInfixOf "DemoTest" $ txt k) decs
-  decs2 =  Map.mapWithKey (\k v -> DecShow (txt k) (toS $ ppShowList v)) decs
-  astDs = Map.mapWithKey (\k v ->
-     DecShow (txt k) (displayHieAst v)
-    ) asts
-
-
--- My Non Weeder Code
--- discover :: IO (ExitCode, Analysis)
-discover :: IO ()
-discover = do
-  hieFilePaths <- concat <$> traverse ( getFilesIn ".hie" ) ["./."]
-  hsFilePaths <- getFilesIn ".hs" "./."
-  nameCache <- initNameCache 'z' []
-
-  hieFiles <-
-    mapM ( readCompatibleHieFileOrExit nameCache ) hieFilePaths
-
-  let
-    filteredHieFiles = 
-      flip filter hieFiles \hieFile -> (isInfixOf "DemoTest" . toS $ hie_hs_file hieFile) && any ( hie_hs_file hieFile `isSuffixOf`) hsFilePaths
-
-  traverse_ (pPrint . displayInfo) filteredHieFiles
-  -- analysis <-
-  --   execStateT ( analyseHieFilesDiscover hieFileResults' ) emptyAnalysis
-
-  -- let
-  --   roots = allDeclarations analysis
-
-  --   reachableSet =
-  --     reachable
-  --       analysis
-  --       ( Set.map DeclarationRoot roots <> filterImplicitRoots analysis ( implicitRoots analysis ) )
-
-  --   dead =
-  --     allDeclarations analysis Set.\\ reachableSet
-
-  --   warnings =
-  --     Map.unionsWith (++) $
-  --     foldMap
-  --       ( \d ->
-  --           fold $ do
-  --             moduleFilePath <- Map.lookup ( declModule d ) ( modulePaths analysis )
-  --             spans <- Map.lookup d ( declarationSites analysis )
-  --             guard $ not $ null spans
-  --             let starts = map realSrcSpanStart $ Set.toList spans
-  --             return [ Map.singleton moduleFilePath ( liftA2 (,) starts (pure d) ) ]
-  --       )
-  --       dead
-
-  -- for_ ( Map.toList warnings ) \( path, declarations ) ->
-  --   for_ (sortOn (srcLocLine . fst) declarations) \( start, d ) ->
-  --     case Map.lookup d (prettyPrintedType analysis) of
-  --       Nothing -> putStrLn $ showWeed path start d
-  --       Just t -> putStrLn $ showPath path start <> "(Instance) :: " <> t
-
-  -- let exitCode = if null warnings then ExitSuccess else ExitFailure 1
-
-  -- pure (exitCode, analysis)
-
-  where
-
-    filterImplicitRoots :: Analysis -> Set Root -> Set Root
-    filterImplicitRoots Analysis{ prettyPrintedType, modulePaths } = Set.filter $ \case
-      DeclarationRoot _ -> True -- keep implicit roots for rewrite rules etc
-
-      ModuleRoot _ -> True
-
-      InstanceRoot d c -> True

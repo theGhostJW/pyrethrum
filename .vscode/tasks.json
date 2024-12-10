@@ -6,7 +6,7 @@
     {
       "label": "ghciwatch",
       "type": "shell",
-      "command": "ghciwatch --log-filter info --before-startup-shell 'hpack --force' --restart-glob package.yaml --command 'cabal repl --repl-no-load' --watch src --watch test --watch examples --watch testIntegration --allow-eval --clear --backtrace full",
+      "command": "ghciwatch --log-filter info --before-startup-shell --restart-glob package.yaml --command 'cabal repl --repl-no-load' --watch src --watch test --watch examples --watch testIntegration --allow-eval --clear --backtrace full",
       "presentation": {
         "reveal": "always",
         "panel": "shared",
@@ -23,7 +23,6 @@
         "showReuseMessage": true
       },
       "dependsOn": [
-        "hpack",
         "cabal build"
       ]
     },

@@ -10,6 +10,11 @@ extra-source-files:
   - README.md
   - ChangeLog.md
 
+
+# Temporarily deprecating the use of HPack in favour of cabal file
+# when the plugin is complete will and split off will go back to using HPack if something
+# better is not developed in the mean time because auto globbing is not supported in cabal files
+
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
 # category:            Web

@@ -74,6 +74,66 @@ flag optimised
   manual: True
   default: False
 
+library pyrethrum-discover-plugin
+  hs-source-dirs: pyrethrum-plugin/src
+  default-extensions:
+      AllowAmbiguousTypes
+      BangPatterns
+      BlockArguments
+      ConstrainedClassMethods
+      ConstraintKinds
+      DisambiguateRecordFields
+      DuplicateRecordFields
+      DataKinds
+      DefaultSignatures
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      ExtendedDefaultRules
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      LiberalTypeSynonyms
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      NoFieldSelectors
+      NumericUnderscores
+      OverloadedStrings
+      OverloadedRecordDot
+      PartialTypeSignatures
+      PatternSynonyms
+      PolyKinds
+      QuasiQuotes
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      StrictData
+      TemplateHaskell
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+  build-depends: 
+      base
+    , ghc
+    , containers
+  exposed-modules:
+      PyrethrumDiscoverPlugin
+
 library
   import: libImports, pyrethrumProps, reludeImports
   exposed-modules:

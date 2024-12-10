@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 257e188dfbc9b7192be653c2b754cf8002b9e5d96a47a7861bdec17461c9e0ad
+-- hash: 4fcaa58dfdf717ec0507377ca6fc2cfba0ad97270603692593d52925e301de27
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -306,6 +306,8 @@ library discover
     , mtl
     , optparse-applicative
     , parallel
+    , pretty-show
+    , pyrethrum-extras
     , regex-tdfa
     , text
     , toml-reader

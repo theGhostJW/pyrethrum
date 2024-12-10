@@ -42,7 +42,8 @@ import Control.Monad.State.Strict ( execState )
 -- weeder
 import WeederLibCopy.Weeder
 import WeederLibCopy.Weeder.Config
-
+import Text.Show.Pretty (pPrint)
+import PyrethrumExtras (db)
 
 data Weed = Weed
   { weedPackage :: String
@@ -86,7 +87,7 @@ runWeeder weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances, root
     -- Evaluating 'analysis1' first allows us to begin analysis 
     -- while hieFiles is still being read (since rf depends on all hie files)
     analysis = analysis1 `pseq`
-      analyseEvidenceUses' analysis1
+     analyseEvidenceUses' analysis1 & db "analysis"
 
     -- We limit ourselves to outputable declarations only rather than all
     -- declarations in the graph. This has a slight performance benefit,

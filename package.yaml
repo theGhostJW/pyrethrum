@@ -198,7 +198,6 @@ internal-libraries:
       - algebraic-graphs    
       - async               
       - base    
-      - base-prelude            
       - bytestring          
       - containers          
       - directory           
@@ -212,8 +211,12 @@ internal-libraries:
       - parallel            
       - regex-tdfa          
       - text                
-      - toml-reader         
+      - toml-reader 
       - transformers        
+      # -- added by me        
+      - base-prelude   
+      - pretty-show  
+      - pyrethrum-extras  
 
 library:
   source-dirs:

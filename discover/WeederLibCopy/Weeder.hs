@@ -131,7 +131,7 @@ data Declaration =
       -- ^ The symbol name of a declaration.
     }
   deriving
-    ( Eq, Ord, Generic, NFData )
+    ( Eq, Ord, Generic, NFData)
 
 
 instance Show Declaration where
@@ -186,8 +186,10 @@ data Analysis =
       -- hie files.
     }
   deriving
-    ( Generic, NFData )
+    ( Generic, NFData, Show )
 
+instance Show Name where
+  show = occNameString . nameOccName
 
 instance Semigroup Analysis where
   (<>) (Analysis a1 b1 c1 d1 e1 f1 g1) (Analysis a2 b2 c2 d2 e2 f2 g2)= 
@@ -222,8 +224,15 @@ data Root
   | -- | All exported declarations in a module are roots.
     ModuleRoot Module
   deriving
-    ( Eq, Ord, Generic, NFData )
+    ( Eq, Ord, Generic, NFData, Show )
 
+
+-- Johns orphans
+  
+instance Show Module where
+  show = moduleStableString
+
+---
 
 -- | Determine the set of all declaration reachable from a set of roots.
 reachable :: Analysis -> Set Root -> Set Declaration

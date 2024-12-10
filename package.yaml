@@ -87,48 +87,6 @@ verbatim:
         base hiding (Prelude),
         relude (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
 
-dependencies:
-  - aeson
-  - aeson-pretty
-  - base-prelude # needed for IOError
-  - bytestring
-  - chronos
-  - containers
-  - directory
-  - dlist
-  - exceptions
-  - effectful-core
-  - effectful
-  - effectful-plugin
-  - effectful-th
-  - extra
-  - hashable
-  - mtl
-  - path # - version set in extra deps - until can roll forward
-  - path-io # -
-  - pretty-show
-  # since removing pyrelude
-  - pyrethrum-extras
-  - text
-  - time # need for timezone which is missing from chronos
-  - transformers-either
-  - random
-  - raw-strings-qq
-  - unliftio
-  - yaml
-  # used to talk to ghecko driver
-  # - http-client
-  # - http-types
-  - req
-  # webdriver used in TestdemoSelenium
-  - webdriver-w3c
-  # - name: base
-  #   mixin:
-  #     - hiding (Prelude)
-  # - name: relude
-  #   mixin:
-  #     - (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
-
 ghc-options:
   # - -threaded
   - -fmax-pmcheck-models=10000000
@@ -152,7 +110,6 @@ ghc-options:
   - -Wincomplete-record-updates
   - -Wincomplete-uni-patterns
   - -Wredundant-constraints
-  - -fplugin=Effectful.Plugin
   - -fwarn-tabs
   - -fwrite-ide-info
   # - -fno-warn-unused-imports
@@ -240,7 +197,8 @@ internal-libraries:
     dependencies:
       - algebraic-graphs    
       - async               
-      - base                
+      - base    
+      - base-prelude            
       - bytestring          
       - containers          
       - directory           
@@ -265,7 +223,43 @@ library:
     - test
     - examples
   generated-other-modules: Paths_pyrethrum # substitute name with the package name
+  ghc-options: 
+    - -fplugin=Effectful.Plugin
   dependencies:
+    - aeson
+    - aeson-pretty
+    - base-prelude # needed for IOError
+    - bytestring
+    - chronos
+    - containers
+    - directory
+    - dlist
+    - exceptions
+    - effectful-core
+    - effectful
+    - effectful-plugin
+    - effectful-th
+    - extra
+    - hashable
+    - mtl
+    - path # - version set in extra deps - until can roll forward
+    - path-io # -
+    - pretty-show
+    # since removing pyrelude
+    - pyrethrum-extras
+    - text
+    - time # need for timezone which is missing from chronos
+    - transformers-either
+    - random
+    - raw-strings-qq
+    - unliftio
+    - yaml
+    # used to talk to ghecko driver
+    # - http-client
+    # - http-types
+    - req
+    # webdriver used in TestdemoSelenium
+    - webdriver-w3c
     - deepseq
     - unordered-containers
     - template-haskell

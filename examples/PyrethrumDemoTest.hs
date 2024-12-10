@@ -21,6 +21,7 @@ import PyrethrumBase (
  )
 import PyrethrumExtras (txt)
 import CoreTypeFamilies (DataSource (Items))
+import GHC.Records (HasField)
 
 {-
 Note:: tried alternative with individual hook types but the results
@@ -206,6 +207,12 @@ data Item2 = Item2
   }
   deriving (Show, Read)
 
+valLessThan10 :: (Ord a, HasField "value" r a, Num a) => r -> Bool
+valLessThan10 ds = ds.value < 10
+
+chkIncomeLessThan10 :: (Ord a, HasField "value" r a, Num a) => Checks r
+chkIncomeLessThan10 = chk "test3" valLessThan10 
+
 items2 :: RunConfig -> DataSource Item2 VS
 items2 rc =
   Items $ filter
@@ -217,7 +224,7 @@ items2 rc =
         , checks =
             chk "test" ((== 1) . (.value))
               <> chk "test2" (\VS{..} -> value < 10)
-              <> chk "test3" (\ds -> ds.value < 10)
+              <> chkIncomeLessThan10
         }
     ]
 

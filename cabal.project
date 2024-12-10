@@ -13,6 +13,8 @@ source-repository-package
   tag: 55a8b6e7d8568fc664355c3902ff9a3fcc964e2d
 
 
+multi-repl: True
+
 optimization: 0
 
 -- https://well-typed.com/blog/2023/08/reducing-haskell-parallel-build-times

@@ -21,7 +21,7 @@ import Data.List
 import Control.Monad ( unless, when )
 import Data.Foldable
 import Data.Maybe ( isJust, catMaybes )
-import Data.Version ( showVersion )
+import Data.Version ( showVersion, Version (Version) )
 import System.Exit ( ExitCode(..), exitWith )
 import System.IO ( stderr, hPutStrLn )
 
@@ -51,8 +51,10 @@ import qualified Data.Text.IO as T
 -- weeder
 import WeederLibCopy.Weeder.Run
 import WeederLibCopy.Weeder.Config
--- import Paths_discover (version)
 
+-- replace weeder version to get compiling - was relying on paths
+version :: Version
+version = Version [0, 1, 0, 0] []
 
 -- | Each exception corresponds to an exit code.
 data WeederException 

@@ -4,10 +4,19 @@ import WeederLibCopy.Weeder.Main qualified as W
 import BasePrelude qualified as P
 import WeederLibCopy.Weeder qualified as W
 
--- $ > Discover.discover
+
+{-
+- list modules ending in Test
+- or Hook
+- extract Fixtures and depended on hooks
+- extract hook dependencies 
+- validate??
+- generate main
+-}
+
+-- >>> discover
+-- *** Exception: ExitFailure 228
 discover :: IO ()
-discover = do 
-  --- W.main
-  -- (xcode, an) <- 
-  W.discover
-  -- print xcode
+discover = do
+  putStrLn "Discovering..."
+  P.withArgs [] W.main

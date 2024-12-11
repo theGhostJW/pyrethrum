@@ -163,7 +163,6 @@ runWeeder weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances, root
                 matches = maybe (const False) (flip matchTest) mt
             in any (maybe True matches) filteredInstances
 
-          -- filteredInstances :: [Maybe Regex]
           filteredInstances :: [Maybe Regex]
           filteredInstances = 
             map (.instancePattern) 

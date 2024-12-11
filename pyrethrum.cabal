@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 49b387120855710090e96f024962073a53193c11bcb723f6d4994c57792938f3
+-- hash: e80d9989ab5b8db2f47c110fc915eb58e5e44406e526c4967cc2ec252bc8c1fd
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -131,11 +131,6 @@ library
       WebDriverIOStubs
       WebDriverPure
       WebDriverSpec
-      Discover
-      WeederLibCopy.Weeder
-      WeederLibCopy.Weeder.Config
-      WeederLibCopy.Weeder.Main
-      WeederLibCopy.Weeder.Run
   other-modules:
       Paths_pyrethrum
   autogen-modules:
@@ -144,7 +139,7 @@ library
       src
       test
       examples
-      discover
+      discoverinstancePattern
   default-extensions:
       AllowAmbiguousTypes
       BangPatterns

@@ -34,7 +34,7 @@ import Control.Parallel (pseq)
 import Control.Parallel.Strategies (parMap, rdeepseq)
 
 -- regex-tdfa
-import Text.Regex.TDFA ( matchTest )
+import Text.Regex.TDFA ( matchTest, Regex )
 
 -- transformers
 import Control.Monad.State.Strict ( execState )
@@ -157,16 +157,20 @@ runWeeder weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances, root
 
       InstanceRoot d c -> typeClassRoots || matchingType
         where
+          matchingType :: Bool
           matchingType = 
             let mt = Map.lookup d prettyPrintedType
                 matches = maybe (const False) (flip matchTest) mt
             in any (maybe True matches) filteredInstances
 
+          -- filteredInstances :: [Maybe Regex]
+          filteredInstances :: [Maybe Regex]
           filteredInstances = 
-            map instancePattern 
-            . filter (maybe True (`matchTest` displayDeclaration c) . classPattern) 
-            . filter (maybe True modulePathMatches . modulePattern) 
+            map (.instancePattern) 
+            . filter (maybe True (`matchTest` displayDeclaration c) . (.classPattern)) 
+            . filter (maybe True modulePathMatches . (.modulePattern)) 
             $ rootInstances
+
 
           modulePathMatches p = maybe False (p `matchTest`) (Map.lookup ( declModule d ) modulePaths)
 

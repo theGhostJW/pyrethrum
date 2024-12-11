@@ -258,9 +258,9 @@ outputableDeclarations Analysis{ declarationSites } =
 
 -- Generate an initial graph of the current HieFile.
 initialGraph :: AnalysisInfo -> Graph Declaration
-initialGraph info =
-  let hf@HieFile{ hie_asts = HieASTs hieAsts } = currentHieFile info
-      Config{ unusedTypes } = weederConfig info
+initialGraph AnalysisInfo {currentHieFile, weederConfig} =
+  let hf@HieFile{ hie_asts = HieASTs hieAsts } = currentHieFile
+      Config{ unusedTypes } = weederConfig
       asts = Map.elems hieAsts
       decls = concatMap (toList . findIdentifiers' (const True)) asts
   in if unusedTypes
@@ -283,7 +283,7 @@ analyseHieFile weederConfig hieFile =
 
 analyseHieFile' :: ( MonadState Analysis m, MonadReader AnalysisInfo m ) => m ()
 analyseHieFile' = do
-  HieFile{ hie_asts = HieASTs hieASTs, hie_exports, hie_module, hie_hs_file } <- asks currentHieFile
+  HieFile{ hie_asts = HieASTs hieASTs, hie_exports, hie_module, hie_hs_file } <- asks (.currentHieFile)
   #modulePaths %= Map.insert hie_module hie_hs_file
   
   g <- asks initialGraph
@@ -365,7 +365,7 @@ addInstanceRoot x t cls = do
     #implicitRoots %= Set.insert (InstanceRoot x cls')
 
   -- since instances will not appear in the output if typeClassRoots is True
-  Config{ typeClassRoots } <- asks weederConfig
+  Config{ typeClassRoots } <- asks (.weederConfig)
   unless typeClassRoots $ do
     str <- lookupPprType t
     #prettyPrintedType %= Map.insert x str
@@ -382,7 +382,7 @@ define decl span =
 
 topLevelAnalysis :: ( MonadState Analysis m, MonadReader AnalysisInfo m ) => HieAST TypeIndex -> m ()
 topLevelAnalysis n@Node{ nodeChildren } = do
-  Config{ unusedTypes } <- asks weederConfig
+  Config{ unusedTypes } <- asks (.weederConfig)
   analysed <-
     runMaybeT
       ( msum $
@@ -482,7 +482,7 @@ analyseDataDeclaration :: ( Alternative m, MonadState Analysis m, MonadReader An
 analyseDataDeclaration n = do
   guard $ annsContain n ("DataDecl", "TyClDecl")
 
-  Config{ unusedTypes } <- asks weederConfig
+  Config{ unusedTypes } <- asks (.weederConfig)
 
   for_
     ( foldMap
@@ -724,7 +724,7 @@ unNodeAnnotation (NodeAnnotation x y) = (unpackFS x, unpackFS y)
 -- | Add evidence uses found under the given node to 'requestedEvidence'.
 requestEvidence :: ( MonadState Analysis m, MonadReader AnalysisInfo m ) => HieAST a -> Declaration -> m ()
 requestEvidence n d = do
-  Config{ typeClassRoots } <- asks weederConfig
+  Config{ typeClassRoots } <- asks (.weederConfig)
 
   -- If type-class-roots flag is set then we don't need to follow
   -- evidence uses as the binding sites will be roots anyway

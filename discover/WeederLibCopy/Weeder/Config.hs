@@ -33,6 +33,7 @@ import Control.Applicative ((<|>), empty)
 import Data.Bifunctor (bimap)
 import Data.Char (toLower)
 import Data.List (intersperse, intercalate)
+import Data.String qualified as S
 
 -- containers
 import Data.Containers.ListUtils (nubOrd)
@@ -44,7 +45,6 @@ import Text.Regex.TDFA.ReadRegex ( parseRegex )
 
 -- toml-reader
 import qualified TOML
-
 
 -- | Configuration for Weeder analysis.
 type Config = ConfigType Regex
@@ -114,11 +114,11 @@ instance TOML.DecodeTOML Config where
 
 instance TOML.DecodeTOML ConfigParsed where
   tomlDecoder = do
-    rootPatterns <- TOML.getFieldOr (rootPatterns defaultConfig) "roots"
-    typeClassRoots <- TOML.getFieldOr (typeClassRoots defaultConfig) "type-class-roots"
-    rootInstances <- TOML.getFieldOr (rootInstances defaultConfig) "root-instances" 
-    unusedTypes <- TOML.getFieldOr (unusedTypes defaultConfig) "unused-types"
-    rootModules <- TOML.getFieldOr (rootModules defaultConfig) "root-modules"
+    rootPatterns <- TOML.getFieldOr defaultConfig.rootPatterns "roots"
+    typeClassRoots <- TOML.getFieldOr defaultConfig.typeClassRoots "type-class-roots"
+    rootInstances <- TOML.getFieldOr defaultConfig.rootInstances "root-instances" 
+    unusedTypes <- TOML.getFieldOr defaultConfig.unusedTypes "unused-types"
+    rootModules <- TOML.getFieldOr defaultConfig.rootModules "root-modules"
 
     pure Config{..}
 
@@ -172,9 +172,9 @@ showInstancePattern = \case
   p -> "{ " ++ table ++ " }"
     where
       table = intercalate ", " . filter (not . null) $
-          [ maybe mempty typeField (instancePattern p)
-          , maybe mempty classField (classPattern p)
-          , maybe mempty moduleField (modulePattern p)
+          [ maybe mempty typeField p.instancePattern
+          , maybe mempty classField p.classPattern
+          , maybe mempty moduleField p.modulePattern
           ]
       typeField t = "instance = " ++ show t
       classField c = "class = " ++ show c
@@ -197,7 +197,7 @@ compileConfig conf@Config{ rootInstances, rootPatterns, rootModules } =
 
 configToToml :: ConfigParsed -> String
 configToToml Config{..}
-  = unlines . intersperse mempty $
+  = S.unlines . intersperse mempty $
       [ "roots = " ++ show rootPatterns
       , "type-class-roots = " ++ map toLower (show typeClassRoots)
       , "root-instances = " ++ "[" ++ intercalate "," (map showInstancePattern rootInstances') ++ "]"

@@ -300,7 +300,7 @@ lookupType hf t = recoverFullType t $ hie_types hf
 
 lookupPprType :: MonadReader AnalysisInfo m => TypeIndex -> m String
 lookupPprType t = do
-  hf <- asks currentHieFile
+  hf <- asks (.currentHieFile)
   pure . renderType $ lookupType hf t
 
   where

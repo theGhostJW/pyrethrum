@@ -1,8 +1,5 @@
 module Discover where
 
-import WeederLibCopy.Weeder.Main qualified as W
-import WeederLibCopy.Weeder qualified as W
-
 -- glob
 import qualified System.FilePath.Glob as Glob
 import Data.Text as TXT
@@ -14,6 +11,9 @@ import Prelude as P
 import qualified Data.List
 import System.FilePath (isExtSeparator)
 import Control.Concurrent.Async (async, ExceptionInLinkedThread (..), link)
+import Text.Show.Pretty (pPrint)
+import PyrethrumExtras qualified as PE
+import PyrethrumExtras.Test qualified as PET
 
 
 {-
@@ -29,6 +29,9 @@ import Control.Concurrent.Async (async, ExceptionInLinkedThread (..), link)
 discover :: IO ()
 discover = do
   P.putStrLn "Discovering..."
+  hieFiles <- getHieFiles "hie" ["./"] True
+  P.putStrLn "Hie files found"
+  pPrint hieFiles
   -- P.withArgs [] W.main
 
 moduleTarget :: Text

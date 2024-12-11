@@ -37,12 +37,10 @@ import Control.Parallel.Strategies (parMap, rdeepseq)
 import Text.Regex.TDFA ( matchTest, Regex )
 
 -- transformers
-import Control.Monad.State.Strict ( execState )
 
 -- weeder
 import WeederLibCopy.Weeder
 import WeederLibCopy.Weeder.Config
-import Text.Show.Pretty (pPrint)
 import PyrethrumExtras (db)
 
 data Weed = Weed
@@ -59,7 +57,7 @@ formatWeed :: Weed -> String
 formatWeed Weed{..} =
   weedPackage <> ": " <> weedPath <> ":" <> show weedLine <> ":" <> show weedCol <> ": "
     <> case weedPrettyPrintedType of
-      Nothing -> occNameString ( declOccName weedDeclaration )
+      Nothing -> occNameString weedDeclaration.declOccName
       Just t -> "(Instance) :: " <> t
 
 -- | Run Weeder on the given .hie files with the given 'Config'.
@@ -105,14 +103,14 @@ runWeeder weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances, root
     matchingModules = 
       Set.filter 
         ((\s -> any (`matchTest` s) rootModules) . moduleNameString . moduleName) 
-      ( Map.keysSet $ exports analysis )
+      ( Map.keysSet analysis.exports )
 
     reachableSet =
       reachable
         analysis
         ( Set.map DeclarationRoot roots 
         <> Set.map ModuleRoot matchingModules 
-        <> filterImplicitRoots analysis ( implicitRoots analysis ) 
+        <> filterImplicitRoots analysis analysis.implicitRoots 
         )
 
     -- We only care about dead declarations if they have a span assigned,
@@ -125,9 +123,9 @@ runWeeder weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances, root
       foldMap
         ( \d ->
             fold $ do
-              moduleFilePath <- Map.lookup ( declModule d ) ( modulePaths analysis )
-              let packageName = unitString . moduleUnit . declModule $ d
-              starts <- Map.lookup d ( declarationSites analysis )
+              moduleFilePath <- Map.lookup d.declModule  analysis.modulePaths
+              let packageName = unitString . moduleUnit $ d.declModule 
+              starts <- Map.lookup d analysis.declarationSites
               let locs = (,) packageName <$> Set.toList starts
               guard $ not $ null starts
               return [ Map.singleton moduleFilePath ( liftA2 (,) locs (pure d) ) ]
@@ -137,7 +135,7 @@ runWeeder weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances, root
     weeds =
       Map.toList warnings & concatMap \( weedPath, declarations ) ->
         sortOn fst declarations & map \( (weedPackage, (weedLine, weedCol)) , weedDeclaration ) ->
-          Weed { weedPrettyPrintedType = Map.lookup weedDeclaration (prettyPrintedType analysis)
+          Weed { weedPrettyPrintedType = Map.lookup weedDeclaration analysis.prettyPrintedType
                , weedPackage
                , weedPath
                , weedLine
@@ -171,9 +169,9 @@ runWeeder weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances, root
             $ rootInstances
 
 
-          modulePathMatches p = maybe False (p `matchTest`) (Map.lookup ( declModule d ) modulePaths)
+          modulePathMatches p = maybe False (p `matchTest`) (Map.lookup d.declModule modulePaths)
 
 
 displayDeclaration :: Declaration -> String
 displayDeclaration d = 
-  moduleNameString ( moduleName ( declModule d ) ) <> "." <> occNameString ( declOccName d )
+  moduleNameString ( moduleName d.declModule ) <> "." <> occNameString d.declOccName

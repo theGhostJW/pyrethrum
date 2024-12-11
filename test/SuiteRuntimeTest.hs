@@ -80,7 +80,7 @@ unit_nested_pass_fail =
           threadAround Pass Pass [eachBefore Fail [fixture [test Fail, test Pass]]],
           eachAround Fail Pass [fixture [test Fail, test Pass]],
           eachBefore
-            Fail
+            Failarrggh 
             [ fixture [test Pass, test Pass],
               eachAround
                 Pass

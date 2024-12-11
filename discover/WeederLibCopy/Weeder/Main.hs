@@ -88,7 +88,7 @@ instance Exception WeederException where
         "No HIE files found: check that the directory is correct "
         <> "and that the -fwrite-ide-info compilation flag is set."
 
-      hieVersionMismatchMessage path v = unlines
+      hieVersionMismatchMessage path v = Data.List.unlines
         [ "incompatible hie file: " <> path
         , "    this version of weeder was compiled with GHC version "
           <> show hieVersion
@@ -112,7 +112,7 @@ handleWeederException a = catches a handlers
                ]
     rethrowExits w = do
       hPutStrLn stderr (displayException w)
-      exitWith (weederExitCode w)
+      System.Exit.exitWith (weederExitCode w)
     unwrapLinks (ExceptionInLinkedThread _ (SomeException w)) =
       throwIO w
 
@@ -241,7 +241,7 @@ mainWithConfig hieExt hieDirectories requireHsFiles weederConfig = handleWeederE
 getHieFiles :: String -> [FilePath] -> Bool -> IO [HieFile]
 getHieFiles hieExt hieDirectories requireHsFiles = do
   let hiePat = "**/*." <> hieExtNoSep
-      hieExtNoSep = if isExtSeparator (head hieExt) then tail hieExt else hieExt
+      hieExtNoSep = if isExtSeparator (Data.List.head hieExt) then Data.List.tail hieExt else hieExt
 
   hieFilePaths :: [FilePath] <-
     concat <$>

@@ -183,40 +183,40 @@ default-extensions:
   - TypeFamilyDependencies
   - TypeOperators
 
-internal-libraries:
-  discover:
-    # change optimisation and move later
-    default-extensions:
-      - FieldSelectors
-    ghc-options: -O0
-    visibility: public
-    source-dirs:
-      - discover
-      # remove later
-    # generated-other-modules: Paths_discover
-    dependencies:
-      - algebraic-graphs    
-      - async               
-      - base    
-      - bytestring          
-      - containers          
-      - directory           
-      - filepath            
-      - generic-lens        
-      - ghc                 
-      - Glob                
-      - lens                
-      - mtl                 
-      - optparse-applicative
-      - parallel            
-      - regex-tdfa          
-      - text                
-      - toml-reader 
-      - transformers        
-      # -- added by me        
-      - base-prelude   
-      - pretty-show  
-      - pyrethrum-extras  
+# internal-libraries:
+#   discover:
+#     # change optimisation and move later
+#     default-extensions:
+#       - FieldSelectors
+#     ghc-options: -O0
+#     visibility: public
+#     source-dirs:
+#       - discover
+#       # remove later
+#     # generated-other-modules: Paths_discover
+#     dependencies:
+#       - algebraic-graphs    
+#       - async               
+#       - base    
+#       - bytestring          
+#       - containers          
+#       - directory           
+#       - filepath            
+#       - generic-lens        
+#       - ghc                 
+#       - Glob                
+#       - lens                
+#       - mtl                 
+#       - optparse-applicative
+#       - parallel            
+#       - regex-tdfa          
+#       - text                
+#       - toml-reader 
+#       - transformers        
+#       # -- added by me        
+#       - base-prelude   
+#       - pretty-show  
+#       - pyrethrum-extras  
 
 library:
   source-dirs:
@@ -225,6 +225,7 @@ library:
     # TODO: God modules probably not required with latest cabal spilt fix once and for all
     - test
     - examples
+    - discover
   generated-other-modules: Paths_pyrethrum # substitute name with the package name
   ghc-options: 
     - -fplugin=Effectful.Plugin
@@ -267,6 +268,25 @@ library:
     - unordered-containers
     - template-haskell
     - fmt
+    #  Weeder
+    - algebraic-graphs    
+    - async               
+    - base    
+    - bytestring          
+    - containers          
+    - directory           
+    - filepath            
+    - generic-lens        
+    - ghc                 
+    - Glob                
+    - lens                
+    - mtl                 
+    - optparse-applicative
+    - parallel            
+    - regex-tdfa          
+    - text                
+    - toml-reader 
+    - transformers   
   # verbatum needs to go last otherwise exposed module inference does not work
   verbatim:
     import: libImports, pyrethrumProps, reludeImports

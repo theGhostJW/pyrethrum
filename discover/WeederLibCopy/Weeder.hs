@@ -9,6 +9,7 @@
 {-# language OverloadedLabels #-}
 {-# language OverloadedStrings #-}
 {-# language TupleSections #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module WeederLibCopy.Weeder
   ( -- * Analysis
@@ -27,8 +28,10 @@ module WeederLibCopy.Weeder
   )
    where
 
+import BasePrelude( Show(show) )
+
 -- algebraic-graphs
-import Algebra.Graph ( Graph, edge, empty, overlay, vertex, stars, star, overlays )
+import Algebra.Graph as AG ( Graph, edge, empty, overlay, vertex, stars, star, overlays )
 import Algebra.Graph.ToGraph ( dfs )
 
 -- base
@@ -42,7 +45,6 @@ import Data.List ( intercalate )
 import Data.Monoid ( First( First ), getFirst )
 import GHC.Generics ( Generic )
 import Prelude hiding ( span )
-
 -- containers
 import Data.Containers.ListUtils ( nubOrd )
 import Data.Map.Strict ( Map )
@@ -209,7 +211,7 @@ data AnalysisInfo =
 
 -- | The empty analysis - the result of analysing zero @.hie@ files.
 emptyAnalysis :: Analysis
-emptyAnalysis = Analysis empty mempty mempty mempty mempty mempty mempty
+emptyAnalysis = Analysis AG.empty mempty mempty mempty mempty mempty mempty
 
 
 -- | A root for reachability analysis.

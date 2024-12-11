@@ -14,8 +14,7 @@ import WeederLibCopy.Weeder qualified as W
 - generate main
 -}
 
--- >>> discover
--- *** Exception: ExitFailure 228
+-- $> discover
 discover :: IO ()
 discover = do
   putStrLn "Discovering..."

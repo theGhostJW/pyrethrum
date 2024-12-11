@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4fcaa58dfdf717ec0507377ca6fc2cfba0ad97270603692593d52925e301de27
+-- hash: 49b387120855710090e96f024962073a53193c11bcb723f6d4994c57792938f3
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -131,6 +131,11 @@ library
       WebDriverIOStubs
       WebDriverPure
       WebDriverSpec
+      Discover
+      WeederLibCopy.Weeder
+      WeederLibCopy.Weeder.Config
+      WeederLibCopy.Weeder.Main
+      WeederLibCopy.Weeder.Run
   other-modules:
       Paths_pyrethrum
   autogen-modules:
@@ -139,6 +144,7 @@ library
       src
       test
       examples
+      discover
   default-extensions:
       AllowAmbiguousTypes
       BangPatterns
@@ -192,8 +198,12 @@ library
       TypeOperators
   ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points -fdefer-type-errors -fplugin=Effectful.Plugin
   build-depends:
-      aeson
+      Glob
+    , aeson
     , aeson-pretty
+    , algebraic-graphs
+    , async
+    , base
     , base-prelude
     , bytestring
     , chronos
@@ -207,109 +217,31 @@ library
     , effectful-th
     , exceptions
     , extra
+    , filepath
     , fmt
+    , generic-lens
+    , ghc
     , hashable
+    , lens
     , mtl
+    , optparse-applicative
+    , parallel
     , path
     , path-io
     , pretty-show
     , pyrethrum-extras
     , random
     , raw-strings-qq
+    , regex-tdfa
     , req
     , template-haskell
     , text
     , time
+    , toml-reader
+    , transformers
     , transformers-either
     , unliftio
     , unordered-containers
     , webdriver-w3c
     , yaml
-  default-language: Haskell2010
-
-library discover
-  visibility: public
-  exposed-modules:
-      Discover
-      WeederLibCopy.Weeder
-      WeederLibCopy.Weeder.Config
-      WeederLibCopy.Weeder.Main
-      WeederLibCopy.Weeder.Run
-  hs-source-dirs:
-      discover
-  default-extensions:
-      AllowAmbiguousTypes
-      BangPatterns
-      BlockArguments
-      ConstrainedClassMethods
-      ConstraintKinds
-      DisambiguateRecordFields
-      DuplicateRecordFields
-      DataKinds
-      DefaultSignatures
-      DeriveFoldable
-      DeriveFunctor
-      DeriveGeneric
-      DeriveLift
-      DeriveTraversable
-      DerivingStrategies
-      EmptyCase
-      ExistentialQuantification
-      ExtendedDefaultRules
-      FlexibleContexts
-      FlexibleInstances
-      FunctionalDependencies
-      GADTs
-      GeneralizedNewtypeDeriving
-      ImportQualifiedPost
-      InstanceSigs
-      KindSignatures
-      LambdaCase
-      LiberalTypeSynonyms
-      MultiParamTypeClasses
-      MultiWayIf
-      NamedFieldPuns
-      NoFieldSelectors
-      NumericUnderscores
-      OverloadedStrings
-      OverloadedRecordDot
-      PartialTypeSignatures
-      PatternSynonyms
-      PolyKinds
-      QuasiQuotes
-      RankNTypes
-      RecordWildCards
-      ScopedTypeVariables
-      StandaloneDeriving
-      StrictData
-      TemplateHaskell
-      TupleSections
-      TypeApplications
-      TypeFamilies
-      TypeFamilyDependencies
-      TypeOperators
-      FieldSelectors
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points -fdefer-type-errors -O0
-  build-depends:
-      Glob
-    , algebraic-graphs
-    , async
-    , base
-    , base-prelude
-    , bytestring
-    , containers
-    , directory
-    , filepath
-    , generic-lens
-    , ghc
-    , lens
-    , mtl
-    , optparse-applicative
-    , parallel
-    , pretty-show
-    , pyrethrum-extras
-    , regex-tdfa
-    , text
-    , toml-reader
-    , transformers
   default-language: Haskell2010

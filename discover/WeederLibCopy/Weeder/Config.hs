@@ -19,9 +19,9 @@ module WeederLibCopy.Weeder.Config
   , defaultConfig
     -- * Marking instances as roots
   , InstancePattern
-  , modulePattern
-  , instancePattern
-  , classPattern
+  -- , modulePattern
+  -- , instancePattern
+  -- , classPattern
   , pattern InstanceOnly
   , pattern ClassOnly
   , pattern ModuleOnly

@@ -1,9 +1,13 @@
+-- Weeder uses head and tail
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module Discover where
+
 
 -- glob
 import qualified System.FilePath.Glob as Glob
 import Data.Text as TXT
-import GHC.Iface.Ext.Types (HieFile (hie_hs_file), hieVersion)
+import GHC.Iface.Ext.Types (HieFile (..), hieVersion)
 import GHC.Types.Name.Cache
 import GHC.Iface.Ext.Binary (HieFileResult(..), readHieFileWithVersion)
 import BasePrelude as BP hiding (show) 
@@ -11,10 +15,11 @@ import Prelude as P
 import qualified Data.List
 import System.FilePath (isExtSeparator)
 import Control.Concurrent.Async (async, ExceptionInLinkedThread (..), link)
-import Text.Show.Pretty (pPrint)
+-- import Text.Show.Pretty (pPrint)
 import PyrethrumExtras qualified as PE
-import PyrethrumExtras.Test qualified as PET
-
+-- import PyrethrumExtras.Test qualified as PET
+import GHC (Module)
+import GHC.Unit.Types (GenModule(..))
 
 {-
 - list modules ending in Test
@@ -25,14 +30,35 @@ import PyrethrumExtras.Test qualified as PET
 - generate main
 -}
 
+
 -- $> discover
 discover :: IO ()
 discover = do
   P.putStrLn "Discovering..."
   hieFiles <- getHieFiles "hie" ["./"] True
   P.putStrLn "Hie files found"
-  pPrint hieFiles
-  -- P.withArgs [] W.main
+  traverse_ processHieFile $ flip P.filter hieFiles \h -> "DemoTest" `BP.isInfixOf` h.hie_hs_file
+
+  
+  
+processHieFile :: HieFile -> IO ()
+processHieFile HieFile {
+  hie_hs_file, 
+  hie_module
+  -- hie_types,
+  -- hie_asts,
+  -- hie_exports,
+  -- hie_hs_src
+}  = do
+  putTextLn ""
+  P.putStrLn "---- HIE FILE ----"
+  putTextLn $ PE.toS hie_hs_file
+  putTextLn $ showModule hie_module
+
+
+showModule :: Module -> Text
+-- showModule  Module  {moduleUnit, moduleName} = {-"Unit: " <> PE.txt moduleUnit <> "\n" <> -}PE.txt moduleName
+showModule  Module  {moduleName} = {-"Unit: " <> PE.txt moduleUnit <> "\n" <> -}PE.txt moduleName
 
 moduleTarget :: Text
 moduleTarget = "SuiteRuntimeTest"

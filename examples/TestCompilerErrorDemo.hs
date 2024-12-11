@@ -88,7 +88,10 @@ data' :: RunConfig -> DataSource Data VS
 data' _rc =
   Items [ ]
 
+
 {-
+
+
 -- #### Compiler Error Data missing Checks #### --
 
 -- Note: this error will only come up in a later phase of compilation
@@ -102,8 +105,8 @@ failsSuite2 =
 testAlt2' :: Fixture ()
 testAlt2' = Full config action2 parseAlt2 data2
 
-action2 ::  RunConfig -> Data2 -> Eff es AS
-action2 _rc _i = 
+action2 :: Data2 -> Eff es AS
+action2 _i = 
   pure $ AS {status = Ready, checkButtonText = "Blah"}
 
 parseAlt2 :: AS -> Either ParseException VS
@@ -118,6 +121,7 @@ data Data2 = Item2
    title :: Text
   }
   deriving (Show, Read)
+
 
 -- #### Compiler Error - Data Source Mismatch #### --
 
@@ -249,5 +253,4 @@ data Data11 = Item11
     checks :: Checks VS
   }
   deriving (Show, Read)
-
 -}

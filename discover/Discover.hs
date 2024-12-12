@@ -27,8 +27,9 @@ import PyrethrumExtras qualified as PE
 -- import PyrethrumExtras.Test qualified as PET
 import GHC (Module)
 import GHC.Unit.Types (GenModule(..))
-import GHC.Plugins (Outputable(..))
+import GHC.Plugins (Outputable(..), SDoc)
 import GHC.Utils.Outputable (traceSDocContext, renderWithContext)
+import GHC.Iface.Syntax (IfaceTyCon(..))
 
 {-
 - list modules ending in Test
@@ -70,23 +71,34 @@ processHieFile HieFile {
   putLines $ showHieTypeFlat `mapMaybe` toList hie_types
   P.putStrLn "---- HieArgs ----"
 
+
+
 showHieTypeFlat :: HieType TypeIndex -> Maybe Text
 showHieTypeFlat = \case
-  HTyVarTy n -> render "Name" $ ppr n
-  HAppTy a (HieArgs a') -> PE.toS . (<> (" ~ idx: " <> show a)) <$> render "HAppTy" (ppr a')
+  HTyVarTy n -> renderM "Name" n
+  HAppTy a (HieArgs a') -> PE.toS . (<> (" ~ idx: " <> show a)) <$> renderM "HAppTy" a'
+  HTyConApp ifaceTyCon (HieArgs a) -> Just $ "IHTyConApp " <> showIfaceTyCon ifaceTyCon <> " ~ idx: " <> show a
+  HForAllTy ((name, a), forAllTyFlag) a'	 -> Just $ "HForAllTy " <> render "Name" name <> " ~ idx: " <> show a
   _ -> Nothing
-  -- HTyConApp IfaceTyCon (HieArgs a)	 
-  -- HForAllTy ((Name, a), ForAllTyFlag) a	 
   -- HFunTy a a a	 
   -- HQualTy a a	
- where
-   render lbl targ = Just . PE.toS $  lbl <> ": " <> renderUnlabled targ
-   renderUnlabled = renderWithContext traceSDocContext
-
 -- HLitTy IfaceTyLit	 
 -- HCastTy a	 
 -- HCoercionTy
+ where
+   renderM lbl = Just . render lbl
+   
 
+
+render :: Outputable a => Text -> a -> Text
+render lbl targ = PE.toS $  lbl <> ": " <> renderUnlabled (ppr targ)
+   
+renderUnlabled :: SDoc -> Text
+renderUnlabled = PE.toS . renderWithContext traceSDocContext
+
+
+showIfaceTyCon :: IfaceTyCon -> Text
+showIfaceTyCon IfaceTyCon {ifaceTyConName, ifaceTyConInfo} = render "Name" ifaceTyConName <> " ~ " <> render "TyConInfo" ifaceTyConInfo
 
 showModule :: Module -> Text
 -- showModule  Module  {moduleUnit, moduleName} = {-"Unit: " <> PE.txt moduleUnit <> "\n" <> -}PE.txt moduleName

@@ -78,7 +78,8 @@ showHieTypeFlat = \case
   HTyVarTy n -> renderM "Name" n
   HAppTy a (HieArgs a') -> PE.toS . (<> (" ~ idx: " <> show a)) <$> renderM "HAppTy" a'
   HTyConApp ifaceTyCon (HieArgs a) -> Just $ "IHTyConApp " <> showIfaceTyCon ifaceTyCon <> " ~ idx: " <> show a
-  HForAllTy ((name, a), forAllTyFlag) a'	 -> Just $ "HForAllTy " <> render "Name" name <> " ~ idx: " <> show a
+  HForAllTy ((name, a), forAllTyFlag) a' -> Just $ "HForAllTy ((" <> render "Name" name
+   <> " ~ idx: " <> show a <> ") " <> render "forAllTyFlag" forAllTyFlag <> ") ~ a': " <> show a' 
   _ -> Nothing
   -- HFunTy a a a	 
   -- HQualTy a a	
@@ -87,8 +88,6 @@ showHieTypeFlat = \case
 -- HCoercionTy
  where
    renderM lbl = Just . render lbl
-   
-
 
 render :: Outputable a => Text -> a -> Text
 render lbl targ = PE.toS $  lbl <> ": " <> renderUnlabled (ppr targ)

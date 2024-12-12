@@ -7,10 +7,17 @@ module Discover where
 -- glob
 import qualified System.FilePath.Glob as Glob
 import Data.Text as TXT
-import GHC.Iface.Ext.Types (HieFile (..), hieVersion)
+import GHC.Iface.Ext.Types (HieFile (..), hieVersion, HieTypeFlat(..), TypeIndex, HieType (..), HieArgs (..))
 import GHC.Types.Name.Cache
 import GHC.Iface.Ext.Binary (HieFileResult(..), readHieFileWithVersion)
-import BasePrelude as BP hiding (show) 
+import BasePrelude (
+ ExitCode (..),
+ throwIO,
+ hPutStrLn,
+ Handler (..),
+ catches,
+ writeChan, newChan, getChanContents)
+import BasePrelude qualified as BP
 import Prelude as P
 import qualified Data.List
 import System.FilePath (isExtSeparator)
@@ -20,6 +27,8 @@ import PyrethrumExtras qualified as PE
 -- import PyrethrumExtras.Test qualified as PET
 import GHC (Module)
 import GHC.Unit.Types (GenModule(..))
+import GHC.Plugins (Outputable(..))
+import GHC.Utils.Outputable (traceSDocContext, renderWithContext)
 
 {-
 - list modules ending in Test
@@ -39,21 +48,44 @@ discover = do
   P.putStrLn "Hie files found"
   traverse_ processHieFile $ flip P.filter hieFiles \h -> "DemoTest" `BP.isInfixOf` h.hie_hs_file
 
-  
-  
+
+
+putLines :: Foldable t => t Text -> IO ()
+putLines = traverse_ putTextLn
+
 processHieFile :: HieFile -> IO ()
 processHieFile HieFile {
-  hie_hs_file, 
-  hie_module
-  -- hie_types,
-  -- hie_asts,
-  -- hie_exports,
-  -- hie_hs_src
+  hie_hs_file
+  , hie_module
+  , hie_types
+  -- , hie_asts
+  -- , hie_exports
+  -- , hie_hs_src
 }  = do
   putTextLn ""
   P.putStrLn "---- HIE FILE ----"
   putTextLn $ PE.toS hie_hs_file
   putTextLn $ showModule hie_module
+  P.putStrLn "---- TYPES ----"
+  putLines $ showHieTypeFlat `mapMaybe` toList hie_types
+  P.putStrLn "---- HieArgs ----"
+
+showHieTypeFlat :: HieType TypeIndex -> Maybe Text
+showHieTypeFlat = \case
+  HTyVarTy n -> render "Name" $ ppr n
+  HAppTy a (HieArgs a') -> PE.toS . (<> (" ~ idx: " <> show a)) <$> render "HAppTy" (ppr a')
+  _ -> Nothing
+  -- HTyConApp IfaceTyCon (HieArgs a)	 
+  -- HForAllTy ((Name, a), ForAllTyFlag) a	 
+  -- HFunTy a a a	 
+  -- HQualTy a a	
+ where
+   render lbl targ = Just . PE.toS $  lbl <> ": " <> renderUnlabled targ
+   renderUnlabled = renderWithContext traceSDocContext
+
+-- HLitTy IfaceTyLit	 
+-- HCastTy a	 
+-- HCoercionTy
 
 
 showModule :: Module -> Text
@@ -96,7 +128,7 @@ getHieFiles hieExt hieDirectories requireHsFiles = do
   a <- async $ handleWeederException do
     readHieFiles nameCache hieFilePaths hieFileResultsChan hsFilePaths
     writeChan hieFileResultsChan Nothing
- 
+
   link a
 
   catMaybes P.. P.takeWhile isJust <$> getChanContents hieFileResultsChan
@@ -104,7 +136,7 @@ getHieFiles hieExt hieDirectories requireHsFiles = do
   where
 
     readHieFiles nameCache hieFilePaths hieFileResultsChan hsFilePaths =
-      BP.for_ hieFilePaths \hieFilePath -> do
+      for_ hieFilePaths \hieFilePath -> do
         hieFileResult <-
           readCompatibleHieFileOrExit nameCache hieFilePath
         let hsFileExists = P.any ( hie_hs_file hieFileResult `BP.isSuffixOf` ) hsFilePaths
@@ -122,7 +154,7 @@ getFilesIn
 getFilesIn pat root = do
   [result] <- Glob.globDir [Glob.compile pat] root
   pure result
-  
+
 
 -- | Read a .hie file, exiting if it's an incompatible version.
 readCompatibleHieFileOrExit :: NameCache -> FilePath -> IO HieFile
@@ -150,14 +182,14 @@ False ==> _ = True
 -- Additionally, unwrap 'ExceptionInLinkedThread' exceptions: this is for
 -- 'getHieFiles'.
 handleWeederException :: IO a -> IO a
-handleWeederException a = catches a handlers 
+handleWeederException a = catches a handlers
   where
     handlers = [ Handler rethrowExits
                , Handler unwrapLinks
                ]
     rethrowExits w = do
       hPutStrLn stderr (displayException w)
-      BP.exitWith (weederExitCode w)
+      exitWith (weederExitCode w)
     unwrapLinks (ExceptionInLinkedThread _ (SomeException w)) =
       throwIO w
 
@@ -170,9 +202,9 @@ weederExitCode = \case
   ExitNoHieFilesFailure -> ExitFailure 4
 
 -- | Each exception corresponds to an exit code.
-data WeederException 
+data WeederException
   = ExitNoHieFilesFailure
-  | ExitHieVersionFailure 
+  | ExitHieVersionFailure
       FilePath -- ^ Path to HIE file
       Integer -- ^ HIE file's header version
   | ExitConfigFailure
@@ -188,7 +220,7 @@ instance Exception WeederException where
     ExitWeedsFound -> mempty
     where
 
-      noHieFilesFoundMessage =  
+      noHieFilesFoundMessage =
         "No HIE files found: check that the directory is correct "
         <> "and that the -fwrite-ide-info compilation flag is set."
 

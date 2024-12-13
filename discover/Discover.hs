@@ -7,7 +7,7 @@ module Discover where
 -- glob
 import qualified System.FilePath.Glob as Glob
 import Data.Text as TXT
-import GHC.Iface.Ext.Types (HieFile (..), hieVersion, HieTypeFlat(..), TypeIndex, HieType (..), HieArgs (..))
+import GHC.Iface.Ext.Types (HieFile (..), hieVersion, TypeIndex, HieType (..), HieArgs (..))
 import GHC.Types.Name.Cache
 import GHC.Iface.Ext.Binary (HieFileResult(..), readHieFileWithVersion)
 import BasePrelude (
@@ -68,33 +68,27 @@ processHieFile HieFile {
   putTextLn $ PE.toS hie_hs_file
   putTextLn $ showModule hie_module
   P.putStrLn "---- TYPES ----"
-  putLines $ showHieTypeFlat `mapMaybe` toList hie_types
+  putLines $ showHieTypeFlat <$> hie_types
   P.putStrLn "---- HieArgs ----"
 
-
-
-showHieTypeFlat :: HieType TypeIndex -> Maybe Text
+showHieTypeFlat :: HieType TypeIndex -> Text
 showHieTypeFlat = \case
-  HTyVarTy n -> renderM "Name" n
-  HAppTy a (HieArgs a') -> PE.toS . (<> (" ~ idx: " <> show a)) <$> renderM "HAppTy" a'
-  HTyConApp ifaceTyCon (HieArgs a) -> Just $ "IHTyConApp " <> showIfaceTyCon ifaceTyCon <> " ~ idx: " <> show a
-  HForAllTy ((name, a), forAllTyFlag) a' -> Just $ "HForAllTy ((" <> render "Name" name
+  HTyVarTy n -> render "Name" n
+  HAppTy a (HieArgs a') -> PE.toS $ render "HAppTy" a' <> (" ~ idx: " <> show a)
+  HTyConApp ifaceTyCon (HieArgs a) -> "IHTyConApp " <> showIfaceTyCon ifaceTyCon <> " ~ idx: " <> show a
+  HForAllTy ((name, a), forAllTyFlag) a' -> "HForAllTy ((" <> render "Name" name
    <> " ~ idx: " <> show a <> ") " <> render "forAllTyFlag" forAllTyFlag <> ") ~ a': " <> show a' 
-  _ -> Nothing
-  -- HFunTy a a a	 
-  -- HQualTy a a	
--- HLitTy IfaceTyLit	 
--- HCastTy a	 
--- HCoercionTy
- where
-   renderM lbl = Just . render lbl
+  HFunTy a a1 a2 -> "HFunTy " <> render "a" a <> " ~ " <> render "a1" a1 <> " ~ " <> render "a2" a2
+  HQualTy a a1 -> "HQualTy " <> render "a" a <> " ~ " <> render "a1" a1
+  HLitTy ifaceTyLit -> "HLitTy " <> renderUnlabled (ppr ifaceTyLit)
+  HCastTy a -> "HCastTy " <> render "a" a
+  HCoercionTy -> "HCoercionTy"
 
 render :: Outputable a => Text -> a -> Text
 render lbl targ = PE.toS $  lbl <> ": " <> renderUnlabled (ppr targ)
    
 renderUnlabled :: SDoc -> Text
 renderUnlabled = PE.toS . renderWithContext traceSDocContext
-
 
 showIfaceTyCon :: IfaceTyCon -> Text
 showIfaceTyCon IfaceTyCon {ifaceTyConName, ifaceTyConInfo} = render "Name" ifaceTyConName <> " ~ " <> render "TyConInfo" ifaceTyConInfo

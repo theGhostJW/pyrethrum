@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 49b387120855710090e96f024962073a53193c11bcb723f6d4994c57792938f3
+-- hash: 4b4acfe52b080e6e0f77cd2723ffd179737709f6b9b86fd1ce6e752cf1ee7876
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -120,6 +120,7 @@ library
       LazyinessSuiteDemo
       PyrethrumBase
       PyrethrumConfigTypes
+      PyrethrumDemoMinimalTest
       PyrethrumDemoTest
       RunDemo
       TestCompilerErrorDemo

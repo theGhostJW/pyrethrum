@@ -12,6 +12,7 @@ module PyrethrumBase
     Suite,
     SuiteRunner,
     FixtureConfig (..),
+    environment,
     fxCfg,
     HasLog,
     mkCoreSuite,
@@ -37,7 +38,7 @@ import DSL.Internal.NodeLog qualified as AE
 import DSL.OutEffect (Out)
 import DSL.OutInterpreter ( runOut )
 import Effectful (Eff, IOE, runEff, type (:>))
-import Effectful.Labeled.Reader as LR (ask, Reader, runReader)
+import Effectful.Labeled.Reader as LR (ask, Reader, runReader, asks)
 
 import Filter (Filters)
 import Internal.Logging qualified as L
@@ -96,6 +97,9 @@ ioInterpreter rc sink ap =
 
 runConfig :: RunConfigReader :> es => Eff es RunConfig
 runConfig = LR.ask @"runConfig" 
+
+environment :: RunConfigReader :> es => Eff es Environment
+environment = LR.asks @"runConfig" (.environment)
 
 -- docRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.MkLogActions (L.Event L.ExePath AE.NodeLog) (L.FLog L.ExePath AE.NodeLog) -> IO ()
 -- docRunner suite filters runConfig threadCount logControls =

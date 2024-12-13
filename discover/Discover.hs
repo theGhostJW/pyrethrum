@@ -44,16 +44,24 @@ import Data.Text.IO qualified as TIO
 -}
 
 -- >>> discover
-discover :: IO ()
+-- "log file written: hieresults.log"
+discover :: IO Text
 discover = do
   P.putStrLn "Discovering..."
   hieFiles <- getHieFiles "hie" ["./"] True
   P.putStrLn "Hie files found"
-  -- let fileContent = P.concatMap txtHieFile $ P.filter (isInfixOf "DemoT") hieFiles
-  let fileContent = P.concatMap txtHieFile hieFiles
-  let logFile = "hieresults.log" 
-  TIO.writeFile logFile (TXT.unlines fileContent)
-  P.putStrLn $ "log file written: " <> logFile
+  let filesOfInterest = P.filter (\f -> 
+                                   let 
+                                    moduleName = PE.txt f.hie_module.moduleName 
+                                   in 
+                                    "Minimal" `isInfixOf` moduleName ||
+                                     "mBase" `isInfixOf` moduleName)  hieFiles
+      fileContent = P.concatMap txtHieFile filesOfInterest
+      logFile = "hieresults.log"
+      message = "log file written: " <> logFile
+  TIO.writeFile (PE.toS logFile) (TXT.unlines fileContent)
+  TIO.putStrLn message
+  pure message
 
 putLines :: Foldable t => t Text -> IO ()
 putLines = traverse_ putTextLn
@@ -65,8 +73,8 @@ txtHieFile HieFile {
   , hie_types
   , hie_asts
   , hie_exports
-  , hie_hs_src
-}  = 
+  -- , hie_hs_src
+}  =
   "---- HIE FILE ----" :
     PE.toS hie_hs_file :
      showModule hie_module

@@ -7,7 +7,7 @@ module Discover where
 -- glob
 import qualified System.FilePath.Glob as Glob
 import Data.Text as TXT
-import GHC.Iface.Ext.Types (HieFile (..), hieVersion, TypeIndex, HieType (..), HieArgs (..))
+import GHC.Iface.Ext.Types (HieFile (..), hieVersion, TypeIndex, HieType (..), HieArgs (..), HiePath, HieAST (..), HieASTs (..))
 import GHC.Types.Name.Cache
 import GHC.Iface.Ext.Binary (HieFileResult(..), readHieFileWithVersion)
 import BasePrelude (
@@ -30,6 +30,7 @@ import GHC.Unit.Types (GenModule(..))
 import GHC.Plugins (Outputable(..), SDoc)
 import GHC.Utils.Outputable (traceSDocContext, renderWithContext)
 import GHC.Iface.Syntax (IfaceTyCon(..))
+import Data.Map qualified as M
 
 {-
 - list modules ending in Test
@@ -49,8 +50,6 @@ discover = do
   P.putStrLn "Hie files found"
   traverse_ processHieFile $ flip P.filter hieFiles \h -> "DemoTest" `BP.isInfixOf` h.hie_hs_file
 
-
-
 putLines :: Foldable t => t Text -> IO ()
 putLines = traverse_ putTextLn
 
@@ -58,8 +57,8 @@ processHieFile :: HieFile -> IO ()
 processHieFile HieFile {
   hie_hs_file
   , hie_module
-  , hie_types
-  -- , hie_asts
+  -- , hie_types
+  , hie_asts
   -- , hie_exports
   -- , hie_hs_src
 }  = do
@@ -67,9 +66,32 @@ processHieFile HieFile {
   P.putStrLn "---- HIE FILE ----"
   putTextLn $ PE.toS hie_hs_file
   putTextLn $ showModule hie_module
-  P.putStrLn "---- TYPES ----"
-  putLines $ showHieTypeFlat <$> hie_types
-  P.putStrLn "---- HieArgs ----"
+  {-
+    P.putStrLn "---- TYPES ----"
+    putLines $ showHieTypeFlat <$> hie_types
+  -}
+  P.putStrLn "---- HIE AST ----"
+  putLines $ showAst <$> M.toList hie_asts.getAsts
+
+
+showAst :: (HiePath, HieAST TypeIndex) -> Text
+showAst (path, node) =
+  "Path: " <> show path
+    <> "\n"
+    <> showNode node
+  where
+    showNode Node {sourcedNodeInfo,
+                      nodeSpan,
+                      nodeChildren} =
+                        render "sourcedNodeInfo" sourcedNodeInfo
+                        <> "\n"
+                        <> render "nodeSpan" nodeSpan
+                        <> "\n"
+                        <> "Children: " <> show (P.length nodeChildren)
+                        <> "\n"
+                        <> TXT.unlines (showNode <$> nodeChildren)
+
+
 
 showHieTypeFlat :: HieType TypeIndex -> Text
 showHieTypeFlat = \case
@@ -77,7 +99,7 @@ showHieTypeFlat = \case
   HAppTy a (HieArgs a') -> PE.toS $ render "HAppTy" a' <> (" ~ idx: " <> show a)
   HTyConApp ifaceTyCon (HieArgs a) -> "IHTyConApp " <> showIfaceTyCon ifaceTyCon <> " ~ idx: " <> show a
   HForAllTy ((name, a), forAllTyFlag) a' -> "HForAllTy ((" <> render "Name" name
-   <> " ~ idx: " <> show a <> ") " <> render "forAllTyFlag" forAllTyFlag <> ") ~ a': " <> show a' 
+   <> " ~ idx: " <> show a <> ") " <> render "forAllTyFlag" forAllTyFlag <> ") ~ a': " <> show a'
   HFunTy a a1 a2 -> "HFunTy " <> render "a" a <> " ~ " <> render "a1" a1 <> " ~ " <> render "a2" a2
   HQualTy a a1 -> "HQualTy " <> render "a" a <> " ~ " <> render "a1" a1
   HLitTy ifaceTyLit -> "HLitTy " <> renderUnlabled (ppr ifaceTyLit)
@@ -86,7 +108,7 @@ showHieTypeFlat = \case
 
 render :: Outputable a => Text -> a -> Text
 render lbl targ = PE.toS $  lbl <> ": " <> renderUnlabled (ppr targ)
-   
+
 renderUnlabled :: SDoc -> Text
 renderUnlabled = PE.toS . renderWithContext traceSDocContext
 

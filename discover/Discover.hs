@@ -43,13 +43,13 @@ import Data.Text.IO qualified as TIO
 - generate main
 -}
 
-
--- $> discover
+-- >>> discover
 discover :: IO ()
 discover = do
   P.putStrLn "Discovering..."
   hieFiles <- getHieFiles "hie" ["./"] True
   P.putStrLn "Hie files found"
+  -- let fileContent = P.concatMap txtHieFile $ P.filter (isInfixOf "DemoT") hieFiles
   let fileContent = P.concatMap txtHieFile hieFiles
   let logFile = "hieresults.log" 
   TIO.writeFile logFile (TXT.unlines fileContent)

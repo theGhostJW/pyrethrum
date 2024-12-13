@@ -31,6 +31,8 @@ import GHC.Plugins (Outputable(..), SDoc)
 import GHC.Utils.Outputable (traceSDocContext, renderWithContext)
 import GHC.Iface.Syntax (IfaceTyCon(..))
 import Data.Map qualified as M
+import GHC.Types.Avail (AvailInfo)
+import Data.Text.IO qualified as TIO
 
 {-
 - list modules ending in Test
@@ -48,31 +50,46 @@ discover = do
   P.putStrLn "Discovering..."
   hieFiles <- getHieFiles "hie" ["./"] True
   P.putStrLn "Hie files found"
-  traverse_ processHieFile $ flip P.filter hieFiles \h -> "DemoTest" `BP.isInfixOf` h.hie_hs_file
+  let fileContent = P.concatMap txtHieFile hieFiles
+  let logFile = "hieresults.log" 
+  TIO.writeFile logFile (TXT.unlines fileContent)
+  P.putStrLn $ "log file written: " <> logFile
 
 putLines :: Foldable t => t Text -> IO ()
 putLines = traverse_ putTextLn
 
-processHieFile :: HieFile -> IO ()
-processHieFile HieFile {
+txtHieFile :: HieFile -> [Text]
+txtHieFile HieFile {
   hie_hs_file
   , hie_module
-  -- , hie_types
+  , hie_types
   , hie_asts
-  -- , hie_exports
-  -- , hie_hs_src
-}  = do
-  putTextLn ""
-  P.putStrLn "---- HIE FILE ----"
-  putTextLn $ PE.toS hie_hs_file
-  putTextLn $ showModule hie_module
-  {-
-    P.putStrLn "---- TYPES ----"
-    putLines $ showHieTypeFlat <$> hie_types
-  -}
-  P.putStrLn "---- HIE AST ----"
-  putLines $ showAst <$> M.toList hie_asts.getAsts
+  , hie_exports
+  , hie_hs_src
+}  = 
+  "---- HIE FILE ----" :
+    PE.toS hie_hs_file :
+     showModule hie_module
+     <> (
+      "---- TYPES ----" :
+      (showHieTypeFlat <$> toList hie_types)
+     )
+     <>
+      ("---- HIE AST ----" :
+       (showAst <$> M.toList hie_asts.getAsts)
+      )
+      <>
+        ("---- HIE EXPORTS ----" :
+        (showHIEExport <$> hie_exports)
+        )
+      <> ("---- HIE SOURCE ----"
+        : TXT.lines (decodeUtf8 hie_hs_src)
+        )
+      <> ["---- END ----"]
 
+
+showHIEExport :: AvailInfo -> Text
+showHIEExport = render "Name"
 
 showAst :: (HiePath, HieAST TypeIndex) -> Text
 showAst (path, node) =
@@ -115,9 +132,8 @@ renderUnlabled = PE.toS . renderWithContext traceSDocContext
 showIfaceTyCon :: IfaceTyCon -> Text
 showIfaceTyCon IfaceTyCon {ifaceTyConName, ifaceTyConInfo} = render "Name" ifaceTyConName <> " ~ " <> render "TyConInfo" ifaceTyConInfo
 
-showModule :: Module -> Text
--- showModule  Module  {moduleUnit, moduleName} = {-"Unit: " <> PE.txt moduleUnit <> "\n" <> -}PE.txt moduleName
-showModule  Module  {moduleName} = {-"Unit: " <> PE.txt moduleUnit <> "\n" <> -}PE.txt moduleName
+showModule :: Module -> [Text]
+showModule  Module  {moduleName, moduleUnit} = ["Unit: " <> PE.txt moduleUnit, "Module: " <>  PE.txt moduleName]
 
 moduleTarget :: Text
 moduleTarget = "SuiteRuntimeTest"

@@ -302,7 +302,6 @@ cfg = fxCfg "test"
 
 -- ############### Suite ###################
 -- this will be generated
-{-
 suite :: Suite
 suite =
   [ Fixture (NodePath "module" "testName") test
@@ -349,7 +348,7 @@ suite =
       }
   ]
 
-
+{-
 -- TODO: test documenter that returns a handle from onceHook
       - research lazy vs strict TVar - may need to run differently doc and exe
       - aftr depends on before

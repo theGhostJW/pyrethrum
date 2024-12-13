@@ -82,9 +82,9 @@ txtHieFile HieFile {
         ("---- HIE EXPORTS ----" :
         (showHIEExport <$> hie_exports)
         )
-      <> ("---- HIE SOURCE ----"
-        : TXT.lines (decodeUtf8 hie_hs_src)
-        )
+      -- <> ("---- HIE SOURCE ----"
+      --   : TXT.lines (decodeUtf8 hie_hs_src)
+      --   )
       <> ["---- END ----"]
 
 

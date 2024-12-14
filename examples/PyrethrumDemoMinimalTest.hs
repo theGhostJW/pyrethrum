@@ -19,6 +19,7 @@ import PyrethrumBase (
 import PyrethrumExtras (txt)
 import CoreTypeFamilies (DataSource (Items))
 import GHC.Records (HasField)
+import PyrethrumDemoTest (intOnceHook)
 
 {-
 Note:: tried alternative with individual hook types but the results
@@ -47,13 +48,6 @@ demoOnceAfterHook :: Hook Once After () ()
 demoOnceAfterHook =
   AfterHook
     { afterAction =  log "After all tests"
-    }
-
-intOnceHook :: Hook Once Before () Int
-intOnceHook =
-  BeforeHook'
-    { depends = demoOnceAfterHook
-    , action' = logReturnInt 
     }
 
 addOnceIntHook :: Hook Once Before Int Int

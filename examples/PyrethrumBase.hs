@@ -126,8 +126,6 @@ docRunner includeSteps includeChecks suite filters runConfig' threadCount logCon
         runConfig = runConfig'
       }
  
-
-
 ioRunner :: Suite -> Filters RunConfig FixtureConfig -> RunConfig -> ThreadCount -> L.LogActions (L.Log L.ExePath AE.NodeLog) -> IO ()
 ioRunner suite filters runConfig' threadCount logControls =
   execute threadCount logControls $

@@ -8,7 +8,7 @@ module Discover where
 -- glob
 import qualified System.FilePath.Glob as Glob
 import Data.Text as TXT
-import GHC.Iface.Ext.Types (HieFile (..), hieVersion, TypeIndex, HieType (..), HieArgs (..), HiePath, HieAST (..), HieASTs (..), IdentifierDetails (..), ContextInfo, SourcedNodeInfo (getSourcedNodeInfo), nodeIdentifiers, HieTypeFix(..), NodeIdentifiers, NodeInfo)
+import GHC.Iface.Ext.Types (HieFile (..), hieVersion, TypeIndex, HieType (..), HieArgs (..), HiePath, HieAST (..), HieASTs (..), IdentifierDetails (..), ContextInfo (..), SourcedNodeInfo (getSourcedNodeInfo), nodeIdentifiers, HieTypeFix(..), NodeIdentifiers, NodeInfo (..), BindType (..), Scope (..))
 import GHC.Types.Name.Cache
 import GHC.Iface.Ext.Binary (HieFileResult(..), readHieFileWithVersion, readHieFile)
 import BasePrelude (
@@ -47,7 +47,7 @@ import GHC.Types.Name
       nameOccName )
 import GHC.Iface.Ext.Utils (recoverFullType, hieTypeToIface)
 import qualified Data.Set as Set
-import Debug.Trace.Extended (uu)
+import Debug.Trace.Extended (uu, db)
 import qualified Data.IntMap.Merge.Lazy as M
 
 
@@ -60,29 +60,32 @@ import qualified Data.IntMap.Merge.Lazy as M
 - generate main
 -}
 
+-- >>> gptDiscover
+gptDiscover :: IO ()
 gptDiscover = do
-  hieFiles <- getHieFiles "hie" ["./"] True
+  hieFiles <- hieFilePaths "hie" ["./"]
   P.putStrLn "Hie files found"
-  let mainHiePath = (.hie_hs_file) $ BP.head $ P.filter (\f ->
+  let mainHiePath = BP.head $ P.filter (\f ->
                                    let
-                                    moduleName = PE.txt f.hie_module.moduleName
+                                    moduleName = PE.txt f
                                    in
-                                    "Minimal" `isInfixOf` moduleName
-                                    -- ||
-                                    -- "mBase" `isInfixOf` moduleName
+                                    "Minimal" `isInfixOf` moduleName || "mBase" `isInfixOf` moduleName
                                      )  hieFiles
-  let otherHiePaths = (.hie_hs_file) <$> P.filter (\f ->
+  let otherHiePaths = P.filter (\f ->
                                    let
-                                    moduleName = PE.txt f.hie_module.moduleName
+                                    moduleName = PE.txt f
                                    in
                                      "mBase" `isInfixOf` moduleName ||
                                      "DemoTest" `isInfixOf` moduleName
                                      )  hieFiles
   tree <- buildDependencyTree mainHiePath otherHiePaths
-  P.print tree
+  let
+   logFile = "hieResultsMinimalGPT.log"
+   message = "log file written: " <> logFile
+  TIO.writeFile (PE.toS logFile) (TXT.unlines $ PE.txt <$> tree)
+  putStrLn message
 
--- >>> discover
--- "log file written: hieResultsMinimal.log"
+
 discover :: IO Text
 discover = do
   P.putStrLn "Discovering..."
@@ -96,10 +99,14 @@ discover = do
                                     -- ||
                                     -- "mBase" `isInfixOf` moduleName
                                      )  hieFiles
+
+
+      logFile = "hieResultsMinimal2.log"
       fileContent = P.concatMap txtHieFile2 filesOfInterest
+
+      -- logFile = "hieResultsMinimal.log"
       -- fileContent = P.concatMap txtHieFile filesOfInterest
-      -- logFile = "hieResultsBase.log"
-      logFile = "hieResultsMinimal.log"
+
       message = "log file written: " <> logFile
   TIO.writeFile (PE.toS logFile) (TXT.unlines fileContent)
   TIO.putStrLn message
@@ -164,7 +171,7 @@ txtHieFile HieFile {
   , hie_types
   , hie_asts
   , hie_exports
-  -- , hie_hs_src
+  , hie_hs_src
 }  =
   "---- HIE FILE ----" :
     PE.toS hie_hs_file :
@@ -186,31 +193,106 @@ txtHieFile HieFile {
       --   )
       <> ["---- END ----"]
 
+-- >>> discover
+-- "log file written: hieResultsMinimal2.log"
 txtHieFile2 :: HieFile -> [Text]
 txtHieFile2 hieFile@HieFile{hie_module, hie_hs_file} =
   "---- HIE FILE ----" :
     PE.toS hie_hs_file :
-     lookupRenderType hieFile 178:
-     lookupRenderType hieFile 172:
+     "test2" :
+     lookupRenderType hieFile 321:
+     "infoThreadHook" :
+     lookupRenderType hieFile 284:
      showModule hie_module
      <> (
       "---- INFO ----" :
-      (showInfo <$> info)
+      P.filter (not . TXT.null) (showInfo <$> info)
      )
       <> ["---- END ----"]
   where
     info =  declarationInfo hieFile
     showInfo :: (Declaration, IdentifierDetails TypeIndex, HieAST TypeIndex) -> Text
     showInfo (decl, ids, ast) =
-      "-----------------"
-      <> "\n"
-      <> "Declaration:\n"
-      <> PE.txt (declarationStableName decl)
-      <> "\nIdentifierDetails: "
-      <> renderUnlabled (ppr ids)
-      <> "\nAST: "
-      <> showNode ast
+      wantInfo PE.?
+        "-----------------"
+        <> "\n"
+        <> "!!!! Declaration !!!!\n"
+        <> stableName
+        <> "\n!!!! IdentifierDetails !!!!\n"
+        <> renderUnlabled (ppr ids)
+        <> "\n!!!! AST !!!!\n"
+        <> showNode ast
+       $ ""
+      where
+        stableName = PE.toS $ declarationStableName decl
+        wantInfo = "test2" `isInfixOf` stableName || "infoThreadHook" `isInfixOf` stableName
+          -- "infoThreadHook" `isInfixOf` stableName || "addOnceIntHook" `isInfixOf` stableName
 
+
+findDeclarations :: HieAST a -> Seq Declaration
+findDeclarations =
+  findIdentifiers
+    (   not
+      . Set.null
+      . Set.filter \case
+          -- Things that count as declarations
+          ValBind RegularBind ModuleScope _ -> True
+          PatternBind ModuleScope _ _       -> True
+          Decl _ _                          -> True
+          TyDecl                            -> True
+          ClassTyDecl{}                     -> True
+
+          -- Anything else is not a declaration
+          _ -> False
+    )
+
+
+
+findIdentifiers
+  :: ( Set ContextInfo -> Bool )
+  -> HieAST a
+  -> Seq Declaration
+findIdentifiers f = fmap (\(d, _, _) -> d) . findIdentifiers' f
+
+
+-- | Version of findIdentifiers containing more information,
+-- namely the IdentifierDetails of the declaration and the
+-- node it was found in.
+findIdentifiers'
+  :: ( Set ContextInfo -> Bool )
+  -> HieAST a
+  -> Seq (Declaration, IdentifierDetails a, HieAST a)
+findIdentifiers' f n@Node{ sourcedNodeInfo, nodeChildren } =
+     foldMap
+       (\case
+           ( Left _, _ ) ->
+             mempty
+
+           ( Right name, ids@IdentifierDetails{ identInfo } ) ->
+             if f identInfo then
+               (, ids, n) <$> foldMap pure (nameToDeclaration name)
+
+             else
+               mempty
+           )
+       (foldMap (M.toList . nodeIdentifiers) (getSourcedNodeInfo sourcedNodeInfo))
+  <> foldMap ( findIdentifiers' f ) nodeChildren
+    
+annsContain :: HieAST a -> (String, String) -> Bool
+annsContain Node{ sourcedNodeInfo } ann =
+  P.any (Set.member ann . Set.map (.unNodeAnnotation) . nodeAnnotations)  $ getSourcedNodeInfo sourcedNodeInfo
+
+analyseBinding ::  HieFile -> HieAST a -> m ()
+analyseBinding hieFile ast@Node{ nodeSpan } = do
+  let bindAnns = Set.fromList [("FunBind", "HsBindLR"), ("PatBind", "HsBindLR")]
+  guard $ P.any (annsContain ast) bindAnns
+
+  for_ ( findDeclarations ast ) \d -> do
+    define d nodeSpan
+
+    requestEvidence ast d
+
+    for_ ( uses ast ) $ addDependency d
 
 data Declaration =
   Declaration
@@ -247,28 +329,6 @@ nameToDeclaration name = do
   m <- nameModule_maybe name
   return Declaration { declModule = m, declOccName = nameOccName name }
 
--- | Version of findIdentifiers containing more information,
--- namely the IdentifierDetails of the declaration and the
--- node it was found in.
-findIdentifiers'
-  :: ( Set ContextInfo -> Bool )
-  -> HieAST a
-  -> Seq (Declaration, IdentifierDetails a, HieAST a)
-findIdentifiers' f n@Node{ sourcedNodeInfo, nodeChildren } =
-     foldMap
-       (\case
-           ( Left _, _ ) ->
-             mempty
-
-           ( Right name, ids@IdentifierDetails{ identInfo } ) ->
-             if f identInfo then
-               (, ids, n) <$> foldMap pure (nameToDeclaration name)
-
-             else
-               mempty
-           )
-       (foldMap (M.toList . nodeIdentifiers) (getSourcedNodeInfo sourcedNodeInfo))
-  <> foldMap ( findIdentifiers' f ) nodeChildren
 
 
 declarationInfo :: HieFile -> [(Declaration, IdentifierDetails TypeIndex, HieAST TypeIndex)]
@@ -331,7 +391,16 @@ showModule  Module  {moduleName, moduleUnit} = ["Unit: " <> PE.txt moduleUnit, "
 moduleTarget :: Text
 moduleTarget = "SuiteRuntimeTest"
 
-
+hieFilePaths :: String -> [FilePath] -> IO [FilePath]
+hieFilePaths hieExt hieDirectories =  P.concat <$>
+      traverse ( getFilesIn hiePat )
+        ( if BP.null hieDirectories
+          then ["./."]
+          else hieDirectories
+        )
+      where
+        hiePat = "**/*." <> hieExtNoSep
+        hieExtNoSep = if isExtSeparator (Data.List.head hieExt) then Data.List.tail hieExt else hieExt
 
 -- | Find and read all .hie files in the given directories according to the given parameters,
 -- exiting if any are incompatible with the current version of GHC.
@@ -340,16 +409,8 @@ moduleTarget = "SuiteRuntimeTest"
 -- Will rethrow exceptions as 'ExceptionInLinkedThread' to the calling thread.
 getHieFiles :: String -> [FilePath] -> Bool -> IO [HieFile]
 getHieFiles hieExt hieDirectories requireHsFiles = do
-  let hiePat = "**/*." <> hieExtNoSep
-      hieExtNoSep = if isExtSeparator (Data.List.head hieExt) then Data.List.tail hieExt else hieExt
 
-  hieFilePaths :: [FilePath] <-
-    P.concat <$>
-      traverse ( getFilesIn hiePat )
-        ( if BP.null hieDirectories
-          then ["./."]
-          else hieDirectories
-        )
+  hieFilePaths' <- hieFilePaths hieExt hieDirectories
 
   hsFilePaths :: [FilePath] <-
     if requireHsFiles
@@ -362,7 +423,7 @@ getHieFiles hieExt hieDirectories requireHsFiles = do
     initNameCache 'z' []
 
   a <- async $ handleWeederException do
-    readHieFiles nameCache hieFilePaths hieFileResultsChan hsFilePaths
+    readHieFiles nameCache hieFilePaths' hieFileResultsChan hsFilePaths
     writeChan hieFileResultsChan Nothing
 
   link a
@@ -475,7 +536,7 @@ instance Exception WeederException where
 -- Data type representing a Fixture or Hook
 data Node' = Node'
   { nodeName :: String
-  , nodeType :: String
+  , nodeType :: Text
   , nodeModule :: String
   , nodeDependencies :: [Node']
   } deriving (Show)
@@ -507,13 +568,13 @@ extractDefinitions :: [HieFile] -> [Node']
 extractDefinitions = P.concatMap extractFromHieFile
 
 extractFromHieFile :: HieFile -> [Node']
-extractFromHieFile HieFile{..} = P.concatMap (extractFromAST hie_module.moduleName) (getAsts hie_asts)
-
+extractFromHieFile hieFile@HieFile{..} = P.concatMap (extractFromAST hieFile hie_module.moduleName) (getAsts hie_asts)
 
 allNodeIdentifiers :: HieAST TypeIndex -> NodeIdentifiers TypeIndex
-allNodeIdentifiers Node {sourcedNodeInfo} = M.merge  $ getIdentifiers <$> sis 
-  where 
-    sis = srcNodeInfos sourcedNodeInfo 
+allNodeIdentifiers Node {sourcedNodeInfo} = M.unions allNis
+  where
+    sis = srcNodeInfos sourcedNodeInfo
+    allNis =  getIdentifiers <$> sis
     srcNodeInfos :: SourcedNodeInfo TypeIndex -> [NodeInfo TypeIndex]
     srcNodeInfos si = M.elems si.getSourcedNodeInfo
 
@@ -521,18 +582,18 @@ allNodeIdentifiers Node {sourcedNodeInfo} = M.merge  $ getIdentifiers <$> sis
     getIdentifiers i = i.nodeIdentifiers
 
 
-extractFromAST :: ModuleName -> HieAST TypeIndex -> [Node']
-extractFromAST modName ast = case M.toList (nodeIdentifiers ast) of
-  [] -> P.concatMap (extractFromAST modName) (nodeChildren ast)
+extractFromAST :: HieFile -> ModuleName -> HieAST TypeIndex -> [Node']
+extractFromAST hieFile modName ast = case M.toList (allNodeIdentifiers ast) of
+  [] -> P.concatMap (extractFromAST hieFile modName) (nodeChildren ast)
   ids -> [ Node'
             { nodeName = occNameString (nameOccName name)
-            , nodeType = show identType
+            , nodeType = identType & maybe "Unknown" (lookupRenderType hieFile)
             , nodeModule = moduleNameString modName
             , nodeDependencies = []
             }
          | (Right name, identDetails) <- ids
          , let identType =  identDetails.identType
-         ] ++ P.concatMap (extractFromAST modName) (nodeChildren ast)
+         ] ++ P.concatMap (extractFromAST hieFile modName) (nodeChildren ast)
 
 -- Resolve dependencies for a Node
 resolveDependencies :: M.Map String Node' -> Node' -> IO Node'

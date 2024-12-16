@@ -49,6 +49,7 @@ import GHC.Iface.Ext.Utils (recoverFullType, hieTypeToIface)
 import qualified Data.Set as Set
 import Debug.Trace.Extended (uu, db)
 import qualified Data.IntMap.Merge.Lazy as M
+import Algebra.Graph (Graph)
 
 
 {-
@@ -281,6 +282,63 @@ findIdentifiers' f n@Node{ sourcedNodeInfo, nodeChildren } =
 annsContain :: HieAST a -> (String, String) -> Bool
 annsContain Node{ sourcedNodeInfo } ann =
   P.any (Set.member ann . Set.map (.unNodeAnnotation) . nodeAnnotations)  $ getSourcedNodeInfo sourcedNodeInfo
+
+-- | A root for reachability analysis.
+data Root
+  = -- | A given declaration is a root.
+    DeclarationRoot Declaration
+  | -- | We store extra information for instances in order to be able
+    -- to specify e.g. all instances of a class as roots.
+    InstanceRoot 
+      Declaration -- ^ Declaration of the instance
+      Declaration -- ^ Declaration of the parent class
+  | -- | All exported declarations in a module are roots.
+    ModuleRoot Module
+  deriving
+    ( Eq, Ord, Generic, NFData, Show )
+
+
+-- | All information maintained by 'analyseHieFile'.
+data Analysis =
+  Analysis
+    { dependencyGraph :: Graph Declaration
+      -- ^ A graph between declarations, capturing dependencies.
+    , declarationSites :: Map Declaration (Set (Int, Int))
+      -- ^ A partial mapping between declarations and their line numbers.
+      -- This Map is partial as we don't always know where a Declaration was
+      -- defined (e.g., it may come from a package without source code).
+      -- We capture a set of sites, because a declaration may be defined in
+      -- multiple locations, e.g., a type signature for a function separate
+      -- from its definition.
+    , implicitRoots :: Set Root
+      -- ^ Stores information on Declarations that may be automatically marked
+      -- as always reachable. This is used, for example, to capture knowledge 
+      -- not yet modelled in weeder, or to mark all instances of a class as 
+      -- roots.
+    , exports :: Map Module ( Set Declaration )
+      -- ^ All exports for a given module.
+    , modulePaths :: Map Module FilePath
+      -- ^ A map from modules to the file path to the .hs file defining them.
+    , prettyPrintedType :: Map Declaration String
+      -- ^ Used to match against the types of instances and to replace the
+      -- appearance of declarations in the output
+    , requestedEvidence :: Map Declaration (Set Name)
+      -- ^ Map from declarations to the names containing evidence uses that
+      -- should be followed and treated as dependencies of the declaration.
+      -- We use this to be able to delay analysing evidence uses until later,
+      -- allowing us to begin the rest of the analysis before we have read all
+      -- hie files.
+    }
+  deriving
+    ( Generic, NFData, Show )
+
+define :: MonadState Analysis m => Declaration -> RealSrcSpan -> m ()
+define decl span =
+  when ( realSrcSpanStart span /= realSrcSpanEnd span ) do
+    let start = realSrcSpanStart span
+    let loc = (srcLocLine start, srcLocCol start)
+    #declarationSites %= Map.insertWith Set.union decl ( Set.singleton loc)
+    #dependencyGraph %= overlay ( vertex decl )
 
 analyseBinding ::  HieFile -> HieAST a -> m ()
 analyseBinding hieFile ast@Node{ nodeSpan } = do

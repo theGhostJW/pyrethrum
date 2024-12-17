@@ -1,5 +1,6 @@
 -- Weeder uses head and tail
 {-# OPTIONS_GHC -Wno-x-partial #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE DeriveAnyClass #-}
 
 module Discover where
@@ -8,7 +9,7 @@ module Discover where
 -- glob
 import qualified System.FilePath.Glob as Glob
 import Data.Text as TXT
-import GHC.Iface.Ext.Types (HieFile (..), hieVersion, TypeIndex, HieType (..), HieArgs (..), HiePath, HieAST (..), HieASTs (..), IdentifierDetails (..), ContextInfo (..), SourcedNodeInfo (getSourcedNodeInfo), nodeIdentifiers, HieTypeFix(..), NodeIdentifiers, NodeInfo (..), BindType (..), Scope (..))
+import GHC.Iface.Ext.Types (HieFile (..), hieVersion, TypeIndex, HieType (..), HieArgs (..), HiePath, HieAST (..), HieASTs (..), IdentifierDetails (..), ContextInfo (..), SourcedNodeInfo (getSourcedNodeInfo), nodeIdentifiers, HieTypeFix(..), NodeIdentifiers, NodeInfo (..), BindType (..), Scope (..), RecFieldContext (..), NodeAnnotation (NodeAnnotation))
 import GHC.Types.Name.Cache
 import GHC.Iface.Ext.Binary (HieFileResult(..), readHieFileWithVersion, readHieFile)
 import BasePrelude (
@@ -17,7 +18,9 @@ import BasePrelude (
  hPutStrLn,
  Handler (..),
  catches,
- writeChan, newChan, getChanContents)
+ writeChan, 
+ newChan, 
+ getChanContents)
 import BasePrelude qualified as BP
 import Prelude as P
 import qualified Data.List
@@ -26,7 +29,7 @@ import Control.Concurrent.Async (async, ExceptionInLinkedThread (..), link)
 -- import Text.Show.Pretty (pPrint)
 import PyrethrumExtras qualified as PE
 -- import PyrethrumExtras.Test qualified as PET
-import GHC (Module, ModuleName, moduleNameString)
+import GHC (Module, ModuleName, moduleNameString, RealSrcSpan)
 import GHC.Unit.Types (GenModule(..))
 import GHC.Plugins (Outputable(..), SDoc, moduleStableString)
 import GHC.Utils.Outputable (traceSDocContext, renderWithContext, showSDocOneLine, defaultSDocContext)
@@ -49,7 +52,10 @@ import GHC.Iface.Ext.Utils (recoverFullType, hieTypeToIface)
 import qualified Data.Set as Set
 import Debug.Trace.Extended (uu, db)
 import qualified Data.IntMap.Merge.Lazy as M
-import Algebra.Graph (Graph)
+import Algebra.Graph  as AG (Graph, vertex, overlay, empty, edge)
+import GHC.Types.SrcLoc (realSrcSpanStart, srcLocLine, srcLocCol)
+import GHC.Types.SrcLoc (realSrcSpanEnd)
+import GHC.Data.FastString (unpackFS)
 
 
 {-
@@ -110,6 +116,37 @@ discover = do
 
       message = "log file written: " <> logFile
   TIO.writeFile (PE.toS logFile) (TXT.unlines fileContent)
+  TIO.putStrLn message
+  pure message
+
+-- >>> discoverAnalysis
+-- "log file written: hieResultsMinimalAnalysis.log"
+discoverAnalysis :: IO Text
+discoverAnalysis = do
+  P.putStrLn "Discovering..."
+  hieFiles <- getHieFiles "hie" ["./"] True
+  P.putStrLn "Hie files found"
+  -- let filesOfInterest = P.filter (\f ->
+  --                                  let
+  --                                   moduleName = PE.txt f.hie_module.moduleName
+  --                                  in
+  --                                   "Minimal" `isInfixOf` moduleName
+  --                                   || "mBase" `isInfixOf` moduleName
+  --                                    )  hieFiles
+  let filesOfInterest = hieFiles
+
+
+      logFile = "hieResultsMinimalAnalysis.log"
+      asts = do 
+        hieFile <- filesOfInterest
+        M.elems hieFile.hie_asts.getAsts
+      fileContent = P.foldl' analyseBinding emptyAnalysis asts
+
+      -- logFile = "hieResultsMinimal.log"
+      -- fileContent = P.concatMap txtHieFile filesOfInterest
+
+      message = "log file written: " <> logFile
+  TIO.writeFile (PE.toS logFile) (PE.txt fileContent)
   TIO.putStrLn message
   pure message
 
@@ -279,9 +316,13 @@ findIdentifiers' f n@Node{ sourcedNodeInfo, nodeChildren } =
        (foldMap (M.toList . nodeIdentifiers) (getSourcedNodeInfo sourcedNodeInfo))
   <> foldMap ( findIdentifiers' f ) nodeChildren
     
+
+unNodeAnnotation :: NodeAnnotation -> (String, String)
+unNodeAnnotation (NodeAnnotation x y) = (unpackFS x, unpackFS y)
+   
 annsContain :: HieAST a -> (String, String) -> Bool
 annsContain Node{ sourcedNodeInfo } ann =
-  P.any (Set.member ann . Set.map (.unNodeAnnotation) . nodeAnnotations)  $ getSourcedNodeInfo sourcedNodeInfo
+  P.any (Set.member ann . Set.map unNodeAnnotation . nodeAnnotations) $ getSourcedNodeInfo sourcedNodeInfo
 
 -- | A root for reachability analysis.
 data Root
@@ -297,6 +338,12 @@ data Root
   deriving
     ( Eq, Ord, Generic, NFData, Show )
 
+instance Show Module where
+  show :: Module -> String
+  show = moduleStableString
+
+instance Show Name where
+  show = occNameString . nameOccName
 
 -- | All information maintained by 'analyseHieFile'.
 data Analysis =
@@ -332,25 +379,73 @@ data Analysis =
   deriving
     ( Generic, NFData, Show )
 
-define :: MonadState Analysis m => Declaration -> RealSrcSpan -> m ()
-define decl span =
-  when ( realSrcSpanStart span /= realSrcSpanEnd span ) do
-    let start = realSrcSpanStart span
-    let loc = (srcLocLine start, srcLocCol start)
-    #declarationSites %= Map.insertWith Set.union decl ( Set.singleton loc)
-    #dependencyGraph %= overlay ( vertex decl )
 
-analyseBinding ::  HieFile -> HieAST a -> m ()
-analyseBinding hieFile ast@Node{ nodeSpan } = do
-  let bindAnns = Set.fromList [("FunBind", "HsBindLR"), ("PatBind", "HsBindLR")]
-  guard $ P.any (annsContain ast) bindAnns
+isUse :: ContextInfo -> Bool
+isUse = \case
+  Use -> True
+  -- not RecFieldMatch and RecFieldDecl because they occur under
+  -- data declarations, which we do not want to add as dependencies
+  -- because that would make the graph no longer acyclic
+  -- RecFieldAssign will be most likely accompanied by the constructor
+  RecField RecFieldOcc _ -> True
+  _ -> False
 
-  for_ ( findDeclarations ast ) \d -> do
-    define d nodeSpan
 
-    requestEvidence ast d
+uses :: HieAST a -> Set Declaration
+uses =
+    foldMap Set.singleton
+  . findIdentifiers (P.any isUse)
 
-    for_ ( uses ast ) $ addDependency d
+
+define :: Declaration -> RealSrcSpan -> Analysis -> Analysis
+define decl span' analysis@Analysis{declarationSites, dependencyGraph} =
+  if realSrcSpanStart span' == realSrcSpanEnd span' then
+    analysis
+  else
+    let loc = ( srcLocLine (realSrcSpanStart span'),  srcLocCol (realSrcSpanStart span'))
+    in
+      analysis
+        { 
+          declarationSites = M.insertWith Set.union decl ( Set.singleton loc) declarationSites  ,
+          dependencyGraph = overlay ( vertex decl ) dependencyGraph 
+        }
+  
+  
+  -- when ( realSrcSpanStart span /= realSrcSpanEnd span ) do
+-- | The empty analysis - the result of analysing zero @.hie@ files.
+emptyAnalysis :: Analysis
+emptyAnalysis = Analysis AG.empty mempty mempty mempty mempty mempty mempty
+
+
+-- | @addDependency x y@ adds the information that @x@ depends on @y@.
+addDependency :: Declaration -> Analysis -> Declaration -> Analysis
+addDependency  x analysis y =
+  analysis { dependencyGraph = overlay ( edge x y ) analysis.dependencyGraph }
+
+
+analyseBinding ::  Analysis -> HieAST a -> Analysis
+analyseBinding analysis ast@Node{ nodeSpan } = 
+  let 
+    bindAnns = Set.fromList [("FunBind", "HsBindLR"), ("PatBind", "HsBindLR")]
+    declarations = findDeclarations ast
+  in
+  if P.any (annsContain ast) bindAnns then
+    P.foldl' (\acc decl -> 
+      let result = define decl nodeSpan acc
+      in 
+         P.foldl' (addDependency decl) result ( uses ast ) 
+      ) analysis declarations
+
+  else
+    analysis
+
+
+  -- for_ ( findDeclarations ast ) \d -> do
+  --   define d nodeSpan
+
+  --   requestEvidence ast d
+
+  --   for_ ( uses ast ) $ addDependency d
 
 data Declaration =
   Declaration
@@ -403,7 +498,7 @@ showHIEExport = render "Name"
 
 showAst :: (HiePath, HieAST TypeIndex) -> Text
 showAst (path, node) =
-  "Path: " <> show path
+  "Path: " <> P.show path
     <> "\n"
     <> showNode node
 
@@ -415,7 +510,7 @@ showNode Node {sourcedNodeInfo,
                     <> "\n"
                     <> render "nodeSpan" nodeSpan
                     <> "\n"
-                    <> "Children: " <> show (P.length nodeChildren)
+                    <> "Children: " <> P.show (P.length nodeChildren)
                     <> "\n"
                     <> TXT.unlines (showNode <$> nodeChildren)
 

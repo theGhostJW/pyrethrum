@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4b4acfe52b080e6e0f77cd2723ffd179737709f6b9b86fd1ce6e752cf1ee7876
+-- hash: acd8ed4939ca5fa8d7de18e046a8cffa22f1a02ad83f7ca1e240e3383afc3d8e
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -137,6 +137,10 @@ library
       WeederLibCopy.Weeder.Config
       WeederLibCopy.Weeder.Main
       WeederLibCopy.Weeder.Run
+      WeederLibForkModified.Weeder
+      WeederLibForkModified.Weeder.Config
+      WeederLibForkModified.Weeder.Main
+      WeederLibForkModified.Weeder.Run
   other-modules:
       Paths_pyrethrum
   autogen-modules:

@@ -9,7 +9,7 @@
 
 -- | This module provides an entry point to the Weeder executable.
 
-module WeederLibCopy.Weeder.Main ( main, mainWithConfig, getHieFiles ) where
+module WeederLibForkModified.Weeder.Main ( main, mainWithConfig, getHieFiles ) where
 
 -- async
 import Control.Concurrent.Async ( async, link, ExceptionInLinkedThread ( ExceptionInLinkedThread ) )

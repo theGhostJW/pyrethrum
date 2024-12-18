@@ -167,8 +167,8 @@ dataSource =
 config2 :: FixtureConfig
 config2 = FxCfg "test" DeepRegression
 
-test2 :: Fixture HookInfo
-test2 = mkFull' config2 infoThreadHook action2 parse2 items2
+test2Test :: Fixture HookInfo
+test2Test = mkFull' config2 infoThreadHook action2 parse2 items2
 
 action2 ::  HookInfo -> Item2 -> Action AS
 -- action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = do
@@ -322,7 +322,7 @@ suite =
                               { path = NodePath "module" "name"
                               , hook = infoThreadHook
                               , subNodes =
-                                  [ Fixture (NodePath "module" "testName") test2
+                                  [ Fixture (NodePath "module" "testName") test2Test
                                   , Hook
                                       { path = NodePath "module" "name"
                                       , hook = eachInfoAround

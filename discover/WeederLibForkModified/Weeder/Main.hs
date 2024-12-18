@@ -6,6 +6,9 @@
 {-# language OverloadedStrings #-}
 {-# language LambdaCase #-}
 {-# language RecordWildCards #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
+{-# OPTIONS_GHC -Wno-x-orphans #-}
+{-# OPTIONS_GHC -Wno-w-unused-top-binds #-}
 
 -- | This module provides an entry point to the Weeder executable.
 
@@ -15,15 +18,13 @@ module WeederLibForkModified.Weeder.Main ( main, mainWithConfig, getHieFiles ) w
 import Control.Concurrent.Async ( async, link, ExceptionInLinkedThread ( ExceptionInLinkedThread ) )
 
 -- base
-import Control.Exception ( Exception, throwIO, displayException, catches, Handler ( Handler ), SomeException ( SomeException ))
+import Control.Exception ( throwIO, catches, Handler ( Handler ))
 import Control.Concurrent ( getChanContents, newChan, writeChan, setNumCapabilities )
 import Data.List
-import Control.Monad ( unless, when )
-import Data.Foldable
-import Data.Maybe ( isJust, catMaybes )
+import Data.Map.Strict qualified as M
 import Data.Version ( showVersion, Version (Version) )
 import System.Exit ( ExitCode(..), exitWith )
-import System.IO ( stderr, hPutStrLn )
+import System.IO ( hPutStrLn )
 
 -- jw
 import Data.Text.IO qualified as TIO
@@ -51,19 +52,28 @@ import Options.Applicative
 
 -- text
 import qualified Data.Text.IO as T
+import Data.Set qualified as S
 
 -- weeder
 import WeederLibForkModified.Weeder.Run
 import WeederLibForkModified.Weeder.Config
+import WeederLibForkModified.Weeder
+import GHC.Types.Name (occNameString)
+import GHC.Generics (Datatype(..))
+import qualified GHC as Module
+import GHC.Unit.Module as UM (moduleNameString, moduleName) 
+import Data.Text qualified as T
+import Internal.LogQueries (isTest, isHook)
+import GHC.Unit.Types (Module)
 
 -- replace weeder version to get compiling - was relying on paths
 version :: Version
 version = Version [0, 1, 0, 0] []
 
 -- | Each exception corresponds to an exit code.
-data WeederException 
+data WeederException
   = ExitNoHieFilesFailure
-  | ExitHieVersionFailure 
+  | ExitHieVersionFailure
       FilePath -- ^ Path to HIE file
       Integer -- ^ HIE file's header version
   | ExitConfigFailure
@@ -88,7 +98,7 @@ instance Exception WeederException where
     ExitWeedsFound -> mempty
     where
 
-      noHieFilesFoundMessage =  
+      noHieFilesFoundMessage =
         "No HIE files found: check that the directory is correct "
         <> "and that the -fwrite-ide-info compilation flag is set."
 
@@ -102,14 +112,13 @@ instance Exception WeederException where
           <> " as the project it is used on"
         ]
 
-
 -- | Convert 'WeederException' to the corresponding 'ExitCode' and emit an error 
 -- message to stderr.
 --
 -- Additionally, unwrap 'ExceptionInLinkedThread' exceptions: this is for
 -- 'getHieFiles'.
 handleWeederException :: IO a -> IO a
-handleWeederException a = catches a handlers 
+handleWeederException a = catches a handlers
   where
     handlers = [ Handler rethrowExits
                , Handler unwrapLinks
@@ -213,42 +222,46 @@ main_ = handleWeederException do
                             <> show hieVersion )
         ( long "version" <> help "Show version" )
 
-
 -- $> main
 main :: IO ()
 main = handleWeederException do
-  args@CLIArguments{..} <-
-    execParser $
-      info (parseCLIArguments <**> helper <**> versionP) mempty
+  let config =
+       Config {
+              rootPatterns = [ "Main.main", "^Paths_.*"]
+            , typeClassRoots = False
+            , rootInstances = [ ClassOnly "\\.IsString$", ClassOnly "\\.IsList$" ]
+            , unusedTypes = False
+            , rootModules = mempty
+            } :: ConfigParsed
+      hieDirectories = []
+      hieExt = ".hie"
+      requireHsFiles = True
+      capabilities = 1
 
-  pure $ PE.db "ARGS" $ PE.txt args
-  traverse_ setNumCapabilities capabilities
+  setNumCapabilities capabilities
+  compileConfig config &
+      either (throwIO . ExitConfigFailure) (mainWithConfig hieExt hieDirectories requireHsFiles)
 
-  configExists <-
-    doesFileExist configPath
 
-  unless (writeDefaultConfig ==> configExists) do
-    hPutStrLn stderr $ "Did not find config: wrote default config to " ++ configPath
-    writeFile configPath (configToToml defaultConfig)
+data Export = MkExport { moduleName :: Text, exportName :: [Text]}
+  deriving (Show, Eq, Ord)
 
-  decodeConfig noDefaultFields configPath
-    >>= either throwConfigError pure
-    >>= mainWithConfig hieExt hieDirectories requireHsFiles
-  where
-    throwConfigError e =
-      throwIO $ ExitConfigFailure (displayException e)
+matchSuffix :: [Text] -> Text -> Bool
+matchSuffix suffixes name = any (`T.isSuffixOf` name) suffixes
 
-    decodeConfig noDefaultFields =
-      if noDefaultFields
-        then fmap (TOML.decodeWith decodeNoDefaults) . T.readFile
-        else TOML.decodeFile
 
-    versionP = infoOption ( "weeder version "
-                            <> showVersion version
-                            <> "\nhie version "
-                            <> show hieVersion )
-        ( long "version" <> help "Show version" )
+isTestName :: Text -> Bool
+isTestName name = matchSuffix ["Test", "Tests"] name && not ("_" `T.isPrefixOf` name)
 
+isHookName :: Text -> Bool
+isHookName = matchSuffix ["Hook", "Hooks"]
+
+filterRule :: Text -> Bool
+filterRule name = isTestName name || isHookName name
+                                                 
+
+showModuleName :: Module -> Text
+showModuleName = PE.toS . moduleNameString . UM.moduleName
 
 -- | Run Weeder in the current working directory with a given 'Config'.
 --
@@ -264,14 +277,23 @@ mainWithConfig hieExt hieDirectories requireHsFiles weederConfig = handleWeederE
   when (null hieFiles) $ throwIO ExitNoHieFilesFailure
 
   let
-    (weeds, analysis) =
+    (weeds, analysis :: Analysis) =
       runWeeder weederConfig hieFiles
+    filterTransformExports expSet = S.filter filterRule $ S.map (\exs -> PE.toS $ occNameString exs.declOccName) expSet
+    exportModuleMap = filterTransformExports <$> M.filterWithKey (\k _v -> filterRule k) (M.mapKeys showModuleName analysis.exports) 
+
+  -- let exports = S.toList $ S.unions $ S.map (\exp' -> MkExport (PE.toS $ moduleNameString exp'.declModule.moduleName)  (PE.toS $ occNameString exp'.declOccName)) <$> M.elems analysis.exports
+  -- print $ length exports
+
+
+  let !filteredExports = PE.db "filtered exports"  exportModuleMap
+  print $ length filteredExports
 
   let logFile = "weeder.log"
   TIO.writeFile (PE.toS logFile) (PE.txt analysis)
   TIO.putStrLn logFile
 
-  mapM_ (putStrLn . formatWeed) weeds
+  -- mapM_ (putStrLn . formatWeed) weeds
 
   unless (null weeds) $ throwIO ExitWeedsFound
 
@@ -307,7 +329,7 @@ getHieFiles hieExt hieDirectories requireHsFiles = do
   a <- async $ handleWeederException do
     readHieFiles nameCache hieFilePaths hieFileResultsChan hsFilePaths
     writeChan hieFileResultsChan Nothing
- 
+
   link a
 
   catMaybes . takeWhile isJust <$> getChanContents hieFileResultsChan
@@ -333,7 +355,7 @@ getFilesIn
 getFilesIn pat root = do
   [result] <- Glob.globDir [Glob.compile pat] root
   pure result
-  
+
 
 -- | Read a .hie file, exiting if it's an incompatible version.
 readCompatibleHieFileOrExit :: NameCache -> FilePath -> IO HieFile

@@ -39,8 +39,8 @@ import Text.Regex.TDFA ( matchTest, Regex )
 -- transformers
 
 -- weeder
-import WeederLibCopy.Weeder
-import WeederLibCopy.Weeder.Config
+import WeederLibForkModified.Weeder
+import WeederLibForkModified.Weeder.Config as CFG
 import PyrethrumExtras (db)
 
 data Weed = Weed
@@ -64,7 +64,7 @@ formatWeed Weed{..} =
 --
 -- Returns a list of 'Weed's that can be displayed using
 -- 'formatWeed', and the final 'Analysis'.
-runWeeder :: Config -> [HieFile] -> ([Weed], Analysis)
+runWeeder :: CFG.Config -> [HieFile] -> ([Weed], Analysis)
 runWeeder weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances, rootModules } hieFiles =
   let 
     asts = concatMap (Map.elems . getAsts . hie_asts) hieFiles
@@ -85,7 +85,7 @@ runWeeder weederConfig@Config{ rootPatterns, typeClassRoots, rootInstances, root
     -- Evaluating 'analysis1' first allows us to begin analysis 
     -- while hieFiles is still being read (since rf depends on all hie files)
     analysis = analysis1 `pseq`
-     analyseEvidenceUses' analysis1 & db "analysis"
+     analyseEvidenceUses' analysis1 -- & db "analysis"
 
     -- We limit ourselves to outputable declarations only rather than all
     -- declarations in the graph. This has a slight performance benefit,

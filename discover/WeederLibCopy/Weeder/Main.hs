@@ -180,8 +180,6 @@ parseCLIArguments = do
 -- | Parse command line arguments and into a 'Config' and run 'mainWithConfig'.
 --
 -- Exits with one of the listed Weeder exit codes on failure.
--- $> main
--- *** Exception: ExitFailure 1
 main :: IO ()
 main = handleWeederException do
   CLIArguments{..} <-

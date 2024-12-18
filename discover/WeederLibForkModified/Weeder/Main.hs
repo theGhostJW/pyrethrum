@@ -53,8 +53,8 @@ import Options.Applicative
 import qualified Data.Text.IO as T
 
 -- weeder
-import WeederLibCopy.Weeder.Run
-import WeederLibCopy.Weeder.Config
+import WeederLibForkModified.Weeder.Run
+import WeederLibForkModified.Weeder.Config
 
 -- replace weeder version to get compiling - was relying on paths
 version :: Version
@@ -129,7 +129,7 @@ data CLIArguments = CLIArguments
   , writeDefaultConfig :: Bool
   , noDefaultFields :: Bool
   , capabilities :: Maybe Int
-  }
+  } deriving Show
 
 
 parseCLIArguments :: Parser CLIArguments
@@ -180,14 +180,48 @@ parseCLIArguments = do
 -- | Parse command line arguments and into a 'Config' and run 'mainWithConfig'.
 --
 -- Exits with one of the listed Weeder exit codes on failure.
--- $> main
--- *** Exception: ExitFailure 1
-main :: IO ()
-main = handleWeederException do
+main_ :: IO ()
+main_ = handleWeederException do
   CLIArguments{..} <-
     execParser $
       info (parseCLIArguments <**> helper <**> versionP) mempty
 
+  traverse_ setNumCapabilities capabilities
+
+  configExists <-
+    doesFileExist configPath
+
+  unless (writeDefaultConfig ==> configExists) do
+    hPutStrLn stderr $ "Did not find config: wrote default config to " ++ configPath
+    writeFile configPath (configToToml defaultConfig)
+
+  decodeConfig noDefaultFields configPath
+    >>= either throwConfigError pure
+    >>= mainWithConfig hieExt hieDirectories requireHsFiles
+  where
+    throwConfigError e =
+      throwIO $ ExitConfigFailure (displayException e)
+
+    decodeConfig noDefaultFields =
+      if noDefaultFields
+        then fmap (TOML.decodeWith decodeNoDefaults) . T.readFile
+        else TOML.decodeFile
+
+    versionP = infoOption ( "weeder version "
+                            <> showVersion version
+                            <> "\nhie version "
+                            <> show hieVersion )
+        ( long "version" <> help "Show version" )
+
+
+-- $> main
+main :: IO ()
+main = handleWeederException do
+  args@CLIArguments{..} <-
+    execParser $
+      info (parseCLIArguments <**> helper <**> versionP) mempty
+
+  pure $ PE.db "ARGS" $ PE.txt args
   traverse_ setNumCapabilities capabilities
 
   configExists <-
@@ -235,6 +269,7 @@ mainWithConfig hieExt hieDirectories requireHsFiles weederConfig = handleWeederE
 
   let logFile = "weeder.log"
   TIO.writeFile (PE.toS logFile) (PE.txt analysis)
+  TIO.putStrLn logFile
 
   mapM_ (putStrLn . formatWeed) weeds
 

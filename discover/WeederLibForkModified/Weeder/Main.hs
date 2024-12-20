@@ -89,7 +89,6 @@ weederExitCode = \case
   ExitConfigFailure _ -> ExitFailure 3
   ExitNoHieFilesFailure -> ExitFailure 4
 
-
 instance Exception WeederException where
   displayException = \case
     ExitNoHieFilesFailure -> noHieFilesFoundMessage
@@ -128,8 +127,6 @@ handleWeederException a = catches a handlers
       System.Exit.exitWith (weederExitCode w)
     unwrapLinks (ExceptionInLinkedThread _ (SomeException w)) =
       throwIO w
-
-
 data CLIArguments = CLIArguments
   { configPath :: FilePath
   , hieExt :: String
@@ -140,89 +137,7 @@ data CLIArguments = CLIArguments
   , capabilities :: Maybe Int
   } deriving Show
 
-
-parseCLIArguments :: Parser CLIArguments
-parseCLIArguments = do
-    configPath <- strOption
-        ( long "config"
-            <> help "A file path for Weeder's configuration."
-            <> value "./weeder.toml"
-            <> metavar "<weeder.toml>"
-        )
-    hieExt <- strOption
-        ( long "hie-extension"
-            <> value ".hie"
-            <> help "Extension of HIE files"
-            <> showDefault
-        )
-    hieDirectories <- many (
-        strOption
-            ( long "hie-directory"
-                <> help "A directory to look for .hie files in. Maybe specified multiple times. Default ./."
-            )
-        )
-    requireHsFiles <- switch
-          ( long "require-hs-files"
-              <> help "Skip stale .hie files with no matching .hs modules"
-          )
-    writeDefaultConfig <- switch
-          ( long "write-default-config"
-              <> help "Write a default configuration file if the one specified by --config does not exist"
-          )
-    noDefaultFields <- switch
-          ( long "no-default-fields"
-              <> help "Do not use default field values for missing fields in the configuration."
-          )
-    capabilities <- nParser <|> jParser
-    pure CLIArguments{..}
-    where
-      jParser = Just <$> option auto
-          ( short 'j'
-              <> value 1
-              <> help "Number of cores to use."
-              <> showDefault)
-      nParser = flag' Nothing
-          ( short 'N'
-              <> help "Use all available cores."
-          )
-
--- | Parse command line arguments and into a 'Config' and run 'mainWithConfig'.
---
--- Exits with one of the listed Weeder exit codes on failure.
-main_ :: IO ()
-main_ = handleWeederException do
-  CLIArguments{..} <-
-    execParser $
-      info (parseCLIArguments <**> helper <**> versionP) mempty
-
-  traverse_ setNumCapabilities capabilities
-
-  configExists <-
-    doesFileExist configPath
-
-  unless (writeDefaultConfig ==> configExists) do
-    hPutStrLn stderr $ "Did not find config: wrote default config to " ++ configPath
-    writeFile configPath (configToToml defaultConfig)
-
-  decodeConfig noDefaultFields configPath
-    >>= either throwConfigError pure
-    >>= mainWithConfig hieExt hieDirectories requireHsFiles
-  where
-    throwConfigError e =
-      throwIO $ ExitConfigFailure (displayException e)
-
-    decodeConfig noDefaultFields =
-      if noDefaultFields
-        then fmap (TOML.decodeWith decodeNoDefaults) . T.readFile
-        else TOML.decodeFile
-
-    versionP = infoOption ( "weeder version "
-                            <> showVersion version
-                            <> "\nhie version "
-                            <> show hieVersion )
-        ( long "version" <> help "Show version" )
-
--- $> main
+-- $> main 
 main :: IO ()
 main = handleWeederException do
   let config =
@@ -242,26 +157,8 @@ main = handleWeederException do
   compileConfig config &
       either (throwIO . ExitConfigFailure) (mainWithConfig hieExt hieDirectories requireHsFiles)
 
-
 data Export = MkExport { moduleName :: Text, exportName :: [Text]}
   deriving (Show, Eq, Ord)
-
-matchSuffix :: [Text] -> Text -> Bool
-matchSuffix suffixes name = any (`T.isSuffixOf` name) suffixes
-
-
-isTestName :: Text -> Bool
-isTestName name = matchSuffix ["Test", "Tests"] name && not ("_" `T.isPrefixOf` name)
-
-isHookName :: Text -> Bool
-isHookName = matchSuffix ["Hook", "Hooks"]
-
-filterRule :: Text -> Bool
-filterRule name = isTestName name || isHookName name
-                                                 
-
-showModuleName :: Module -> Text
-showModuleName = PE.toS . moduleNameString . UM.moduleName
 
 -- | Run Weeder in the current working directory with a given 'Config'.
 --
@@ -281,9 +178,7 @@ mainWithConfig hieExt hieDirectories requireHsFiles weederConfig = handleWeederE
       runWeeder weederConfig hieFiles
     filterTransformExports expSet = S.filter filterRule $ S.map (\exs -> PE.toS $ occNameString exs.declOccName) expSet
     exportModuleMap = filterTransformExports <$> M.filterWithKey (\k _v -> filterRule k) (M.mapKeys showModuleName analysis.exports) 
-
-  -- let exports = S.toList $ S.unions $ S.map (\exp' -> MkExport (PE.toS $ moduleNameString exp'.declModule.moduleName)  (PE.toS $ occNameString exp'.declOccName)) <$> M.elems analysis.exports
-  -- print $ length exports
+    dependencyGraph = analysis.dependencyGraph
 
 
   let !filteredExports = PE.db "filtered exports"  exportModuleMap
@@ -294,9 +189,7 @@ mainWithConfig hieExt hieDirectories requireHsFiles weederConfig = handleWeederE
   TIO.putStrLn logFile
 
   -- mapM_ (putStrLn . formatWeed) weeds
-
-  unless (null weeds) $ throwIO ExitWeedsFound
-
+  -- unless (null weeds) $ throwIO ExitWeedsFound
 
 -- | Find and read all .hie files in the given directories according to the given parameters,
 -- exiting if any are incompatible with the current version of GHC.

@@ -35,7 +35,7 @@ import GHC.Plugins (Outputable(..), SDoc, moduleStableString)
 import GHC.Utils.Outputable (traceSDocContext, renderWithContext, showSDocOneLine, defaultSDocContext)
 import GHC.Iface.Syntax (IfaceTyCon(..), pprIfaceSigmaType, ShowForAllFlag (..))
 import Data.Map qualified as M
-import GHC.Types.Avail (AvailInfo)
+import GHC.Types.Avail (AvailInfo (..), availName)
 import Data.Text.IO qualified as TIO
 import GHC.Types.Name
     ( OccName,
@@ -56,6 +56,7 @@ import Algebra.Graph  as AG (Graph, vertex, overlay, empty, edge)
 import GHC.Types.SrcLoc (realSrcSpanStart, srcLocLine, srcLocCol)
 import GHC.Types.SrcLoc (realSrcSpanEnd)
 import GHC.Data.FastString (unpackFS)
+import Data.Text.Lazy.Lens (Text)
 
 
 {-
@@ -202,8 +203,20 @@ typeToNames (Roll t) = case t of
     hieArgsTypes :: [(Bool, HieTypeFix)] -> Set Name
     hieArgsTypes = foldMap (typeToNames . snd) . P.filter fst
 
+expandNonTypeClassExports :: HieFile -> [Export]
+expandNonTypeClassExports HieFile {hie_exports, hie_module} = 
+  exportNames <&> \name ->
+    Export
+      { name
+      , typeIndex = 9999999
+      , renderedType = ""
+      , expModule = hie_module
+      }
+  where 
+    exportNames = availName <$> hie_exports
+
 txtHieFile :: HieFile -> [Text]
-txtHieFile HieFile {
+txtHieFile hieFile@HieFile {
   hie_hs_file
   , hie_module
   , hie_types
@@ -224,12 +237,20 @@ txtHieFile HieFile {
       )
       <>
         ("---- HIE EXPORTS ----" :
-        (showHIEExport <$> hie_exports)
+        ( PE.txt <$> expandNonTypeClassExports hieFile)
         )
       -- <> ("---- HIE SOURCE ----"
       --   : TXT.lines (decodeUtf8 hie_hs_src)
       --   )
       <> ["---- END ----"]
+
+
+data Export = Export
+  { name :: Name
+  , typeIndex :: TypeIndex
+  , renderedType :: Text
+  , expModule :: Module
+  } deriving (Show)
 
 -- >>> discover
 -- "log file written: hieResultsMinimal2.log"
@@ -246,9 +267,21 @@ txtHieFile2 hieFile@HieFile{hie_module, hie_hs_file} =
       "---- INFO ----" :
       P.filter (not . TXT.null) (showInfo <$> info)
      )
+      <> ["\n"]
+     <> (
+      "---- INFO II ----" :
+      P.filter (not . TXT.null) info2
+     )
+      <> ["\n"]
+      <>
+      ("---- HIE EXPORTS ----" :
+        ( PE.txt <$> expandNonTypeClassExports hieFile)
+        )
+      <> ["\n"]
       <> ["---- END ----"]
   where
     info =  declarationInfo hieFile
+    info2 =  declarationInfo2 hieFile
     showInfo :: (Declaration, IdentifierDetails TypeIndex, HieAST TypeIndex) -> Text
     showInfo (decl, ids, ast) =
       wantInfo PE.?
@@ -483,6 +516,37 @@ nameToDeclaration name = do
   return Declaration { declModule = m, declOccName = nameOccName name }
 
 
+
+declarationInfo2 :: HieFile -> [Text]
+declarationInfo2 hieFile = PE.txt <$> keys
+  where
+    HieFile{ hie_asts = HieASTs hieAsts } = hieFile
+    keys = M.keys hieAsts
+    kvs = M.toList hieAsts
+
+    hieAstTxt :: HieAST TypeIndex -> Text
+    hieAstTxt Node {sourcedNodeInfo, nodeSpan , nodeChildren} = uu
+       where 
+        nodeInfoMap = sourcedNodeInfo.getSourcedNodeInfo
+
+    
+    nodeInfoTxt :: NodeInfo TypeIndex -> Text
+    nodeInfoTxt NodeInfo {nodeAnnotations, nodeType, nodeIdentifiers} =  uu 
+
+    nodeIdentifiersText :: Map Identifier (IdentifierDetails TypeIndex) -> Text
+    nodeIdentifiersText = uu
+      where 
+        
+        -- in
+        --   "Node Info: " <> PE.txt nodeInfoMap
+        --   <> "\n"
+        --   <> "Node Span: " <> PE.txt nodeSpan
+        --   <> "\n"
+        --   <> "Children: " <> PE.txt (P.length nodeChildren)
+        --   <> "\n"
+        --   <> "Node Children: " <> TXT.unlines (hieAstTxt <$> nodeChildren)
+  -- in
+    -- P.concatMap (toList . findIdentifiers' (const True)) asts
 
 declarationInfo :: HieFile -> [(Declaration, IdentifierDetails TypeIndex, HieAST TypeIndex)]
 declarationInfo hieFile =

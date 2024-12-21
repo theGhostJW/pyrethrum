@@ -71,7 +71,9 @@ data HookInfo = HookInfo
   }
   deriving (Show, Generic)
 
-infoThreadHook :: Hook Thread Before Int HookInfo
+type BreakIt = Hook Thread Before Int HookInfo
+
+infoThreadHook :: BreakIt
 infoThreadHook = BeforeHook' addOnceIntHook $ \i -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i

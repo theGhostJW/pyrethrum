@@ -33,7 +33,7 @@ import GHC.Plugins
   , moduleName
   , moduleNameString, Module
   )
-import GHC.Iface.Ext.Types ( HieFile(.. ), getAsts, TypeIndex, Identifier, Span, IdentifierDetails (..), ContextInfo (..), HieTypeFix (..), HieType (..), HieArgs (..) )
+import GHC.Iface.Ext.Types ( HieFile(.. ), getAsts, TypeIndex, Identifier, Span, IdentifierDetails (..), ContextInfo (..), HieTypeFix (..), HieType (..), HieArgs (..), RecFieldContext (..) )
 import GHC.Iface.Ext.Utils (generateReferencesMap, RefMap, recoverFullType, hieTypeToIface)
 
 -- parallel
@@ -240,6 +240,16 @@ renderRefMapRecord nameHieMap idnt references =
 
 renderUnlabled :: Outputable a => a -> Text
 renderUnlabled = PE.toS . renderWithContext traceSDocContext . ppr
+
+isUse :: ContextInfo -> Bool
+isUse = \case
+  Use -> True
+  -- not RecFieldMatch and RecFieldDecl because they occur under
+  -- data declarations, which we do not want to add as dependencies
+  -- because that would make the graph no longer acyclic
+  -- RecFieldAssign will be most likely accompanied by the constructor
+  RecField RecFieldOcc _ -> True
+  _ -> False
 
 displayRefMap ::  Map Name HieFile -> RefMap TypeIndex -> Text
 displayRefMap nameHieMap rm =

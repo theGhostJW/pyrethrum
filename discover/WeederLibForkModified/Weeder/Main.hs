@@ -137,7 +137,7 @@ data CLIArguments = CLIArguments
   , capabilities :: Maybe Int
   } deriving Show
 
--- $> main 
+-- >>> main 
 main :: IO ()
 main = handleWeederException do
   let config =

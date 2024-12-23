@@ -19,7 +19,7 @@ import PyrethrumBase (
 import PyrethrumExtras (txt)
 import CoreTypeFamilies (DataSource (Items))
 import GHC.Records (HasField)
-import PyrethrumDemoTest (intOnceHook)
+import PyrethrumDemoTest hiding (chkIncomeLessThan10, valLessThan10, VS, runSomethingToDoWithTestDepth, AS, Item2, items2, parse2, action2, infoThreadHook, config2, addOnceIntHook, HookInfo, logShow, log)
 
 {-
 Note:: tried alternative with individual hook types but the results
@@ -50,10 +50,17 @@ demoOnceAfterHook =
     { afterAction =  log "After all tests"
     }
 
+intOnceHook :: Hook Once Before () Int
+intOnceHook =
+  BeforeHook'
+    { depends = PyrethrumDemoMinimalTest.demoOnceAfterHook
+    , action' = PyrethrumDemoMinimalTest.logReturnInt 
+    }
+
 addOnceIntHook :: Hook Once Before Int Int
 addOnceIntHook =
   BeforeHook'
-    { depends = intOnceHook
+    { depends = PyrethrumDemoTest.intOnceHook
     , action' =
         \i -> do
           log $ "beforeAll' " <> txt i
@@ -74,7 +81,7 @@ data HookInfo = HookInfo
 type BreakIt = Hook Thread Before Int HookInfo
 
 infoThreadHook :: BreakIt
-infoThreadHook = BeforeHook' addOnceIntHook $ \i -> do
+infoThreadHook = BeforeHook' PyrethrumDemoMinimalTest.intOnceHook $ \i -> do
   log $ "beforeThread' " <> txt i
   pure $ HookInfo "Hello there" i
 

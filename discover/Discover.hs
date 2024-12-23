@@ -9,7 +9,7 @@ module Discover where
 -- glob
 import qualified System.FilePath.Glob as Glob
 import Data.Text as TXT
-import GHC.Iface.Ext.Types (HieFile (..), hieVersion, TypeIndex, HieType (..), HieArgs (..), HiePath, HieAST (..), HieASTs (..), IdentifierDetails (..), ContextInfo (..), SourcedNodeInfo (getSourcedNodeInfo), nodeIdentifiers, HieTypeFix(..), NodeIdentifiers, NodeInfo (..), BindType (..), Scope (..), RecFieldContext (..), NodeAnnotation (NodeAnnotation))
+import GHC.Iface.Ext.Types (HieFile (..), hieVersion, TypeIndex, HieType (..), HieArgs (..), HiePath, HieAST (..), HieASTs (..), IdentifierDetails (..), ContextInfo (..), SourcedNodeInfo (getSourcedNodeInfo), nodeIdentifiers, HieTypeFix(..), NodeIdentifiers, NodeInfo (..), BindType (..), Scope (..), RecFieldContext (..), NodeAnnotation (NodeAnnotation), Identifier, NodeOrigin, Span)
 import GHC.Types.Name.Cache
 import GHC.Iface.Ext.Binary (HieFileResult(..), readHieFileWithVersion, readHieFile)
 import BasePrelude (
@@ -18,8 +18,8 @@ import BasePrelude (
  hPutStrLn,
  Handler (..),
  catches,
- writeChan, 
- newChan, 
+ writeChan,
+ newChan,
  getChanContents)
 import BasePrelude qualified as BP
 import Prelude as P
@@ -29,7 +29,7 @@ import Control.Concurrent.Async (async, ExceptionInLinkedThread (..), link)
 -- import Text.Show.Pretty (pPrint)
 import PyrethrumExtras qualified as PE
 -- import PyrethrumExtras.Test qualified as PET
-import GHC (Module, ModuleName, moduleNameString, RealSrcSpan)
+import GHC (Module, ModuleName, moduleNameString, RealSrcSpan, unguardedGRHSs)
 import GHC.Unit.Types (GenModule(..))
 import GHC.Plugins (Outputable(..), SDoc, moduleStableString)
 import GHC.Utils.Outputable (traceSDocContext, renderWithContext, showSDocOneLine, defaultSDocContext)
@@ -48,7 +48,7 @@ import GHC.Types.Name
       isDataSymOcc,
       occNameString,
       nameOccName )
-import GHC.Iface.Ext.Utils (recoverFullType, hieTypeToIface)
+import GHC.Iface.Ext.Utils (recoverFullType, hieTypeToIface, RefMap, generateReferencesMap)
 import qualified Data.Set as Set
 import Debug.Trace.Extended (uu, db)
 import qualified Data.IntMap.Merge.Lazy as M
@@ -56,7 +56,8 @@ import Algebra.Graph  as AG (Graph, vertex, overlay, empty, edge)
 import GHC.Types.SrcLoc (realSrcSpanStart, srcLocLine, srcLocCol)
 import GHC.Types.SrcLoc (realSrcSpanEnd)
 import GHC.Data.FastString (unpackFS)
-import Data.Text.Lazy.Lens (Text)
+import qualified BasePrelude as S
+import PyrethrumExtras ((?))
 
 
 {-
@@ -94,6 +95,14 @@ gptDiscover = do
   putStrLn message
 
 
+refMap :: [HieFile] -> RefMap TypeIndex
+refMap hieFiles = 
+  generateReferencesMap asts
+  where
+    asts = P.concatMap (M.elems . getAsts . hie_asts) hieFiles
+    -- nameHieFileMap = nameFileMap hieFiles
+
+
 discover :: IO Text
 discover = do
   P.putStrLn "Discovering..."
@@ -110,13 +119,22 @@ discover = do
 
 
       logFile = "hieResultsMinimal2.log"
+      refMap' = refMap hieFiles
+      -- refMapTxt = displayRefMap (nameFileMap filesOfInterest) refMap'
+      refMapTxt = displayRefMap (nameFileMap hieFiles) refMap'
+
       fileContent = P.concatMap txtHieFile2 filesOfInterest
+
 
       -- logFile = "hieResultsMinimal.log"
       -- fileContent = P.concatMap txtHieFile filesOfInterest
 
       message = "log file written: " <> logFile
-  TIO.writeFile (PE.toS logFile) (TXT.unlines fileContent)
+  TIO.writeFile (PE.toS logFile) (TXT.unlines fileContent 
+        <> "\n" 
+        <> "!!!!!!!!!!!! REF MAP !!!!!!!!!!!!!" 
+        <> "\n" 
+        <> refMapTxt)
   TIO.putStrLn message
   pure message
 
@@ -138,7 +156,7 @@ discoverAnalysis = do
 
 
       logFile = "hieResultsMinimalAnalysis.log"
-      asts = do 
+      asts = do
         hieFile <- filesOfInterest
         M.elems hieFile.hie_asts.getAsts
       fileContent = P.foldl' analyseBinding emptyAnalysis asts
@@ -162,16 +180,17 @@ renderType = showSDocOneLine defaultSDocContext . pprIfaceSigmaType ShowForAllWh
 
 lookupRenderType :: HieFile -> TypeIndex -> Text
 lookupRenderType hieFile t =
-    PE.toS (renderType typ)
+    PE.txt t
+    <> ": "
+    <>  PE.toS (renderType typ)
     <> "\n"
-    <> "Names"
+    <> "Names: "
     <> "\n"
-    <> renderNameSet (typeToNames typ)
+    <> indentTxt (renderNameSet (typeToNames typ))
    where typ = lookupType hieFile t
 
-
 renderNameSet  :: Set Name -> Text
-renderNameSet = P.unlines . fmap (renderUnlabled .  ppr) . Set.toList
+renderNameSet = P.unlines . fmap (\n -> renderUnlabled (ppr n) <> " [" <> PE.txt n <> "] ") . Set.toList
 
 -- | Names mentioned within the type.
 typeToNames :: HieTypeFix -> Set Name
@@ -204,7 +223,7 @@ typeToNames (Roll t) = case t of
     hieArgsTypes = foldMap (typeToNames . snd) . P.filter fst
 
 expandNonTypeClassExports :: HieFile -> [Export]
-expandNonTypeClassExports HieFile {hie_exports, hie_module} = 
+expandNonTypeClassExports HieFile {hie_exports, hie_module} =
   exportNames <&> \name ->
     Export
       { name
@@ -212,7 +231,7 @@ expandNonTypeClassExports HieFile {hie_exports, hie_module} =
       , renderedType = ""
       , expModule = hie_module
       }
-  where 
+  where
     exportNames = availName <$> hie_exports
 
 txtHieFile :: HieFile -> [Text]
@@ -252,31 +271,160 @@ data Export = Export
   , expModule :: Module
   } deriving (Show)
 
--- >>> discover
+
+nameFileMap :: [HieFile] -> M.Map Name HieFile
+nameFileMap = M.fromList . P.concatMap (\hf -> (,hf) <$> getIdentifiierExportNames  hf)
+
+getIdentifiierExportNames :: HieFile -> [Name]
+getIdentifiierExportNames f = mapMaybe availName f.hie_exports
+  where
+    availName = \case
+      Avail name -> Just name
+      AvailTC _ _ -> Nothing
+
+displayRefMap :: Map Name HieFile -> RefMap TypeIndex -> Text
+displayRefMap nameHieMap rm = P.unlines $ mapRec <$> M.toList rm
+    where 
+      mapRec :: (Identifier, [(Span, IdentifierDetails TypeIndex)]) -> Text
+      mapRec (idn, details) = indentTxt $ renderRefMapRecord idn details
+
+    -- P.unlines
+    -- . P.filter (\i -> TXT.isInfixOf "test2" i || TXT.isInfixOf "Hook" i )
+    -- . M.elems
+    -- $ M.mapWithKey (renderRefMapRecord nameHieMap) rm
+
+hieFileExportLookup :: Map Name HieFile -> Identifier -> Maybe HieFile
+hieFileExportLookup nameHieMap ident =
+  case ident of
+    Left _name -> Nothing
+    Right name ->  M.lookup name nameHieMap
+
+-- identToTxt ::  Map Name HieFile ->  Identifier -> Text
+-- identToTxt nameHieMap ident =
+--   PE.toS $ either show show ident
+--   <> (exportHieFile ident & maybe " - No Export Module" (\f -> " - In Module: " <> PE.toS (moduleStableString f.hie_module)))
+--   where
+--     exportHieFile = hieFileExportLookup nameHieMap
+
+identToTxt :: Identifier -> Text
+identToTxt ident =
+  PE.toS $ either show show ident
+  -- <> (exportHieFile ident & maybe " - No Export Module" (\f -> " - In Module: " <> PE.toS (moduleStableString f.hie_module)))
+  -- where
+  --   exportHieFile = hieFileExportLookup nameHieMap
+
+renderRefMapRecord :: Identifier -> [(Span, IdentifierDetails TypeIndex)] -> Text
+renderRefMapRecord idnt references =
+  "!!!!!!!!!!!! "
+   <> identToTxt idnt
+   <> " !!!!!!!!!!!!"
+   <> "\n"
+   <> P.unlines (renderSingleRef <$> references)
+  -- where
+  --   hieExportFile :: Identifier -> Maybe HieFile
+  --   hieExportFile = hieFileExportLookup nameHieMap
+
+    -- renderType' :: Maybe TypeIndex -> Maybe Text
+    -- renderType' mti = do
+    --   ti <- mti
+    --   hieFile <- hieExportFile idnt
+    --   pure $ lookupRenderType hieFile ti
+
+-- renderRefMapRecord :: Map Name HieFile -> Identifier -> [(Span, IdentifierDetails TypeIndex)] -> Text
+-- renderRefMapRecord nameHieMap idnt references =
+--   "!!!!!!!!!!!! "
+--    <> identToTxt nameHieMap idnt
+--    <> " !!!!!!!!!!!!"
+--    <> "\n"
+--    <> P.unlines (renderSingleRef <$> references)
+--   where
+--     hieExportFile :: Identifier -> Maybe HieFile
+--     hieExportFile = hieFileExportLookup nameHieMap
+
+--     renderType' :: Maybe TypeIndex -> Maybe Text
+--     renderType' mti = do
+--       ti <- mti
+--       hieFile <- hieExportFile idnt
+--       pure $ lookupRenderType hieFile ti
+
+
+renderSingleRef ::  (Span, IdentifierDetails TypeIndex) -> Text
+renderSingleRef (span, IdentifierDetails {identInfo, identType} ) =
+  "##### identType #####\n" 
+  <> PE.txt identType
+  <> "\n"
+  <> "##### Span #####\n" 
+  <> PE.txt span
+  -- <> fromMaybe (txt identType) (renderType' identType)
+  <> "\n"
+  <> "##### identInfo #####"
+  <> "\n"
+  <> renderIdentInfo identInfo
+  where
+  renderIdentInfo :: Set ContextInfo -> Text
+  renderIdentInfo = P.unlines . fmap renderContextInfo . Set.toList
+
+  renderContextInfo :: ContextInfo -> Text
+  renderContextInfo ci = 
+    render "ContextInfo" ci 
+    <> "\n"
+    <> "Constructor: " 
+    <> showContextConstructor ci
+    <> "\n"
+    <> (isValBind ci  
+         ? maybe "" PE.txt identType 
+         $ ""
+        )
+
+  isValBind :: ContextInfo -> Bool
+  isValBind = \case
+      ValBind {} -> True
+      _ -> False
+
+  showContextConstructor :: ContextInfo -> Text
+  showContextConstructor = \case 
+      Use -> "Use"             
+      MatchBind -> "MatchBind"
+      IEThing {} -> "IEThing"
+      TyDecl -> "TyDecl"
+      ValBind {} -> "ValBind"
+      PatternBind {} -> "PatternBind"
+      ClassTyDecl {} -> "ClassTyDecl"
+      Decl {} -> "Decl"
+      TyVarBind {} -> "TyVarBind"
+      RecField {} -> "RecField"
+      EvidenceVarBind {} -> "EvidenceVarBind"
+      EvidenceVarUse -> "EvidenceVarUse"
+
+-- $> discover
 -- "log file written: hieResultsMinimal2.log"
 txtHieFile2 :: HieFile -> [Text]
-txtHieFile2 hieFile@HieFile{hie_module, hie_hs_file} =
+txtHieFile2 hieFile@HieFile{hie_module, hie_hs_file, hie_types} =
   "---- HIE FILE ----" :
-    PE.toS hie_hs_file :
-     "test2" :
-     lookupRenderType hieFile 321:
-     "infoThreadHook" :
-     lookupRenderType hieFile 284:
+     PE.toS hie_hs_file :
+    --  "test2" :
+    --  lookupRenderType hieFile 321:
+    --  "infoThreadHook" :
+    --  lookupRenderType hieFile 284:
      showModule hie_module
-     <> (
-      "---- INFO ----" :
-      P.filter (not . TXT.null) (showInfo <$> info)
+    --  <> (
+    --   "---- INFO ----" :
+    --   P.filter (not . TXT.null) (showInfo <$> info)
+    --  )
+    --   <> ["\n"]
+    <> (
+      "---- TYPES ----" :
+      (showHieType <$> toList hie_types)
      )
-      <> ["\n"]
+     <>
+      ("---- HIE EXPORTS ----" :
+        ( PE.txt <$> expandNonTypeClassExports hieFile)
+        )
+     <> ["\n"]
      <> (
       "---- INFO II ----" :
       P.filter (not . TXT.null) info2
      )
-      <> ["\n"]
-      <>
-      ("---- HIE EXPORTS ----" :
-        ( PE.txt <$> expandNonTypeClassExports hieFile)
-        )
       <> ["\n"]
       <> ["---- END ----"]
   where
@@ -348,11 +496,11 @@ findIdentifiers' f n@Node{ sourcedNodeInfo, nodeChildren } =
            )
        (foldMap (M.toList . nodeIdentifiers) (getSourcedNodeInfo sourcedNodeInfo))
   <> foldMap ( findIdentifiers' f ) nodeChildren
-    
+
 
 unNodeAnnotation :: NodeAnnotation -> (String, String)
 unNodeAnnotation (NodeAnnotation x y) = (unpackFS x, unpackFS y)
-   
+
 annsContain :: HieAST a -> (String, String) -> Bool
 annsContain Node{ sourcedNodeInfo } ann =
   P.any (Set.member ann . Set.map unNodeAnnotation . nodeAnnotations) $ getSourcedNodeInfo sourcedNodeInfo
@@ -363,7 +511,7 @@ data Root
     DeclarationRoot Declaration
   | -- | We store extra information for instances in order to be able
     -- to specify e.g. all instances of a class as roots.
-    InstanceRoot 
+    InstanceRoot
       Declaration -- ^ Declaration of the instance
       Declaration -- ^ Declaration of the parent class
   | -- | All exported declarations in a module are roots.
@@ -438,12 +586,12 @@ define decl span' analysis@Analysis{declarationSites, dependencyGraph} =
     let loc = ( srcLocLine (realSrcSpanStart span'),  srcLocCol (realSrcSpanStart span'))
     in
       analysis
-        { 
+        {
           declarationSites = M.insertWith Set.union decl ( Set.singleton loc) declarationSites  ,
-          dependencyGraph = overlay ( vertex decl ) dependencyGraph 
+          dependencyGraph = overlay ( vertex decl ) dependencyGraph
         }
-  
-  
+
+
   -- when ( realSrcSpanStart span /= realSrcSpanEnd span ) do
 -- | The empty analysis - the result of analysing zero @.hie@ files.
 emptyAnalysis :: Analysis
@@ -457,16 +605,16 @@ addDependency  x analysis y =
 
 
 analyseBinding ::  Analysis -> HieAST a -> Analysis
-analyseBinding analysis ast@Node{ nodeSpan } = 
-  let 
+analyseBinding analysis ast@Node{ nodeSpan } =
+  let
     bindAnns = Set.fromList [("FunBind", "HsBindLR"), ("PatBind", "HsBindLR")]
     declarations = findDeclarations ast
   in
   if P.any (annsContain ast) bindAnns then
-    P.foldl' (\acc decl -> 
+    P.foldl' (\acc decl ->
       let result = define decl nodeSpan acc
-      in 
-         P.foldl' (addDependency decl) result ( uses ast ) 
+      in
+         P.foldl' (addDependency decl) result ( uses ast )
       ) analysis declarations
 
   else
@@ -516,27 +664,74 @@ nameToDeclaration name = do
   return Declaration { declModule = m, declOccName = nameOccName name }
 
 
+indentTxt :: Text -> Text
+indentTxt = TXT.unlines . fmap ("  "  <>) . TXT.lines
 
 declarationInfo2 :: HieFile -> [Text]
-declarationInfo2 hieFile = PE.txt <$> keys
+declarationInfo2 hieFile =
+  hieAstTxt <$> kvs
+
   where
     HieFile{ hie_asts = HieASTs hieAsts } = hieFile
     keys = M.keys hieAsts
     kvs = M.toList hieAsts
+    vals = M.elems hieAsts
 
-    hieAstTxt :: HieAST TypeIndex -> Text
-    hieAstTxt Node {sourcedNodeInfo, nodeSpan , nodeChildren} = uu
-       where 
-        nodeInfoMap = sourcedNodeInfo.getSourcedNodeInfo
+    hieAstTxt :: (HiePath, HieAST TypeIndex) -> Text
+    hieAstTxt  (hiePath, hieAst) =
+        "hiePath: "
+        <> PE.txt hiePath
+        <> "\n"
+        <> astToTxt hieAst
+       where
+        astToTxt :: HieAST TypeIndex -> Text
+        astToTxt Node {sourcedNodeInfo, nodeSpan , nodeChildren} =
+         indentTxt $ 
+         PE.txt nodeSpan
+         <> "\n"
+         <> TXT.unlines (nodeInfoTxt <$> M.elems sourcedNodeInfo.getSourcedNodeInfo)
+         <> "children:"
+         <> "\n"
+          <> indentTxt (TXT.unlines $ astToTxt <$> nodeChildren)
 
-    
     nodeInfoTxt :: NodeInfo TypeIndex -> Text
-    nodeInfoTxt NodeInfo {nodeAnnotations, nodeType, nodeIdentifiers} =  uu 
+    nodeInfoTxt NodeInfo {nodeAnnotations, nodeType, nodeIdentifiers} =
+      indentTxt $
+        "\n"
+        <> renderNodeidentifiers nodeIdentifiers
+        <> renderNodeType nodeType
+        <> TXT.unlines (render "node annotation" <$> S.toList nodeAnnotations)
 
-    nodeIdentifiersText :: Map Identifier (IdentifierDetails TypeIndex) -> Text
-    nodeIdentifiersText = uu
+    renderNodeType :: [TypeIndex] -> Text
+    renderNodeType typs = "nodeType:" <> (P.null typs ? " NA\n" $ "\n" <> TXT.unlines (lookupRenderType hieFile <$> typs))
+     
+    renderNodeidentifiers :: NodeIdentifiers TypeIndex -> Text
+    renderNodeidentifiers nodeIdentifiers = 
+      "Node Identifiers: " <>
+       TXT.unlines (nodeIdentifierText <$> M.toList nodeIdentifiers )   
+
+    nodeIdentifierText :: (Identifier, IdentifierDetails TypeIndex) -> Text
+    nodeIdentifierText (idnt, details) = 
+      getName idnt 
+      <> "\n"
+      <> "Identifier Details"
+      <> "\n"
+      <> indentTxt (identDetailsText details)
       where 
-        
+        getName = either (renderUnlabled . ppr) (renderUnlabled . ppr)
+
+    identDetailsText :: IdentifierDetails TypeIndex -> Text
+    identDetailsText IdentifierDetails {identType, identInfo} = 
+      "type: " <>
+      fromMaybe "No Type" identTypeText <> 
+      "\n" <> 
+      "info\n" <> 
+       identInfoText
+      where
+        identTypeText = lookupRenderType hieFile <$> identType
+        identInfoText = renderUnlabled (ppr identInfo)
+    --   where 
+    --     uu
         -- in
         --   "Node Info: " <> PE.txt nodeInfoMap
         --   <> "\n"

@@ -103,40 +103,37 @@ refMap hieFiles =
     -- nameHieFileMap = nameFileMap hieFiles
 
 
+moduleName :: HieFile -> Text
+moduleName f = PE.toS $ moduleNameString f.hie_module.moduleName
+
+isNodeText :: Text -> Bool 
+isNodeText t = ("Test" `isSuffixOf` t || "Hook" `isSuffixOf` t) && not ("_" `TXT.isPrefixOf` t)
+
+matchFile :: HieFile -> Bool
+matchFile f = isNodeText $ Discover.moduleName f
+
+--  TODO :: moduleName' = Discover.moduleName f & PE.db' "module name"
+
+getSuiteNodeFiles :: [HieFile] -> [HieFile]
+getSuiteNodeFiles = P.filter matchFile
+                                  
+writeLogFile :: Text -> Text -> IO ()                            
+writeLogFile fileName content = do
+    TIO.writeFile (PE.toS fileName) content
+    TIO.putStrLn $ "log file written: " <> fileName                            
+                                    
 discover :: IO Text
 discover = do
   P.putStrLn "Discovering..."
   hieFiles <- getHieFiles "hie" ["./"] True
   P.putStrLn "Hie files found"
-  let filesOfInterest = P.filter (\f ->
-                                   let
-                                    moduleName = PE.txt f.hie_module.moduleName
-                                   in
-                                    "Minimal" `isInfixOf` moduleName
-                                    -- ||
-                                    -- "mBase" `isInfixOf` moduleName
-                                     )  hieFiles
-
-
-      logFile = "hieResultsMinimal2.log"
+  let suiteNodeFiles = getSuiteNodeFiles hieFiles
       refMap' = refMap hieFiles
-      -- refMapTxt = displayRefMap (nameFileMap filesOfInterest) refMap'
       refMapTxt = displayRefMap (nameFileMap hieFiles) refMap'
 
-      fileContent = P.concatMap txtHieFile2 filesOfInterest
-
-
-      -- logFile = "hieResultsMinimal.log"
-      -- fileContent = P.concatMap txtHieFile filesOfInterest
-
-      message = "log file written: " <> logFile
-  TIO.writeFile (PE.toS logFile) (TXT.unlines fileContent 
-        <> "\n" 
-        <> "!!!!!!!!!!!! REF MAP !!!!!!!!!!!!!" 
-        <> "\n" 
-        <> refMapTxt)
-  TIO.putStrLn message
-  pure message
+  writeLogFile "hieResultsMinimal2.log" . TXT.unlines $ P.concatMap txtHieFile2 suiteNodeFiles
+  writeLogFile "refMapLogFile.log" refMapTxt
+  pure "Done"
 
 -- >>> discoverAnalysis
 -- "log file written: hieResultsMinimalAnalysis.log"
@@ -144,14 +141,6 @@ discoverAnalysis :: IO Text
 discoverAnalysis = do
   P.putStrLn "Discovering..."
   hieFiles <- getHieFiles "hie" ["./"] True
-  P.putStrLn "Hie files found"
-  -- let filesOfInterest = P.filter (\f ->
-  --                                  let
-  --                                   moduleName = PE.txt f.hie_module.moduleName
-  --                                  in
-  --                                   "Minimal" `isInfixOf` moduleName
-  --                                   || "mBase" `isInfixOf` moduleName
-  --                                    )  hieFiles
   let filesOfInterest = hieFiles
 
 
@@ -222,17 +211,17 @@ typeToNames (Roll t) = case t of
     hieArgsTypes :: [(Bool, HieTypeFix)] -> Set Name
     hieArgsTypes = foldMap (typeToNames . snd) . P.filter fst
 
-expandNonTypeClassExports :: HieFile -> [Export]
-expandNonTypeClassExports HieFile {hie_exports, hie_module} =
-  exportNames <&> \name ->
+nodeExports :: HieFile -> [Export]
+nodeExports HieFile {hie_exports, hie_module, hie_hs_file} =
+   (\name ->
     Export
       { name
       , typeIndex = 9999999
       , renderedType = ""
       , expModule = hie_module
-      }
+      }) <$> exportNames
   where
-    exportNames = availName <$> hie_exports
+    exportNames = P.filter (isNodeText . PE.db ("RENDERED " <>  PE.toS hie_hs_file) . renderUnlabled . ppr) $ availName <$> hie_exports
 
 txtHieFile :: HieFile -> [Text]
 txtHieFile hieFile@HieFile {
@@ -256,7 +245,7 @@ txtHieFile hieFile@HieFile {
       )
       <>
         ("---- HIE EXPORTS ----" :
-        ( PE.txt <$> expandNonTypeClassExports hieFile)
+        ( PE.txt <$> nodeExports hieFile)
         )
       -- <> ("---- HIE SOURCE ----"
       --   : TXT.lines (decodeUtf8 hie_hs_src)
@@ -396,6 +385,7 @@ renderSingleRef (span, IdentifierDetails {identInfo, identType} ) =
       EvidenceVarBind {} -> "EvidenceVarBind"
       EvidenceVarUse -> "EvidenceVarUse"
 
+
 -- $> discover
 -- "log file written: hieResultsMinimal2.log"
 txtHieFile2 :: HieFile -> [Text]
@@ -412,14 +402,14 @@ txtHieFile2 hieFile@HieFile{hie_module, hie_hs_file, hie_types} =
     --   P.filter (not . TXT.null) (showInfo <$> info)
     --  )
     --   <> ["\n"]
+     <>
+      ("---- HIE EXPORTS ----" :
+        ( PE.txt <$> nodeExports hieFile)
+        )
     <> (
       "---- TYPES ----" :
       (showHieType <$> toList hie_types)
      )
-     <>
-      ("---- HIE EXPORTS ----" :
-        ( PE.txt <$> expandNonTypeClassExports hieFile)
-        )
      <> ["\n"]
      <> (
       "---- INFO II ----" :

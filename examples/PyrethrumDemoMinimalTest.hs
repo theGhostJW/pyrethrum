@@ -2,24 +2,29 @@ module PyrethrumDemoMinimalTest where
 
 import Check (Checks, chk)
 import Core (After, Before, Once, ParseException, Thread)
+import CoreTypeFamilies (DataSource (Items))
 import DSL.Internal.NodeLog (NodeLog (..), UserLog (Info))
 import DSL.OutEffect (out)
 import Effectful (Eff)
-import PyrethrumBase (
-  Action,
-  Depth (..),
-  Fixture,
-  HasLog,
-  Hook (..),
-  LogEffs,
-  RunConfig (..),
-  FixtureConfig (..),
-  FixtureConfig, Country (..), Environment (..), fxCfg, mkFull', runConfig, environment,
- )
-import PyrethrumExtras (txt)
-import CoreTypeFamilies (DataSource (Items))
 import GHC.Records (HasField)
-import PyrethrumDemoTest hiding (chkIncomeLessThan10, valLessThan10, VS, runSomethingToDoWithTestDepth, AS, Item2, items2, parse2, action2, infoThreadHook, config2, addOnceIntHook, HookInfo, logShow, log)
+import PyrethrumBase
+  ( Action,
+    Country (..),
+    Depth (..),
+    Environment (..),
+    Fixture,
+    FixtureConfig (..),
+    HasLog,
+    Hook (..),
+    LogEffs,
+    RunConfig (..),
+    environment,
+    fxCfg,
+    mkFull',
+    runConfig,
+  )
+import PyrethrumDemoTest hiding (AS, HookInfo, Item2, VS, action2, addOnceIntHook, chkIncomeLessThan10, config2, infoThreadHook, items2, log, logShow, parse2, runSomethingToDoWithTestDepth, valLessThan10)
+import PyrethrumExtras (txt)
 
 {-
 Note:: tried alternative with individual hook types but the results
@@ -38,7 +43,7 @@ logShow = out . User . Info . txt
   Hook has all the effects of the application but will compile with
   an action that only requires a sublist of these effects
 -}
-logReturnInt :: () ->  LogEffs Int
+logReturnInt :: () -> LogEffs Int
 logReturnInt _a = log "Returning One" >> pure 1
 
 runSomethingToDoWithTestDepth :: Depth -> Action ()
@@ -47,21 +52,28 @@ runSomethingToDoWithTestDepth = logShow
 demoOnceAfterHook :: Hook Once After () ()
 demoOnceAfterHook =
   AfterHook
-    { afterAction =  log "After all tests"
+    { afterAction = log "After all tests"
     }
 
 intOnceHook :: Hook Once Before () Int
 intOnceHook =
   BeforeHook'
-    { depends = PyrethrumDemoMinimalTest.demoOnceAfterHook
-    , action' = PyrethrumDemoMinimalTest.logReturnInt 
+    { depends = PyrethrumDemoMinimalTest.demoOnceAfterHook,
+      action' = PyrethrumDemoMinimalTest.logReturnInt
+    }
+
+intOnceHook2 :: Hook Once Before () Int
+intOnceHook2 =
+  BeforeHook'
+    { depends = PyrethrumDemoTest.demoOnceAfterHook,
+      action' = PyrethrumDemoMinimalTest.logReturnInt
     }
 
 addOnceIntHook :: Hook Once Before Int Int
 addOnceIntHook =
   BeforeHook'
-    { depends = PyrethrumDemoTest.intOnceHook
-    , action' =
+    { depends = PyrethrumDemoTest.intOnceHook,
+      action' =
         \i -> do
           log $ "beforeAll' " <> txt i
           pure $ i + 1
@@ -73,8 +85,8 @@ _intThreadHook = BeforeHook $ do
   pure 42
 
 data HookInfo = HookInfo
-  { message :: Text
-  , value :: Int
+  { message :: Text,
+    value :: Int
   }
   deriving (Show, Generic)
 
@@ -90,15 +102,15 @@ infoThreadHook = BeforeHook' PyrethrumDemoMinimalTest.intOnceHook $ \i -> do
 config2 :: FixtureConfig
 config2 = FxCfg "test" DeepRegression
 
-test2 :: Fixture HookInfo
-test2 = mkFull' config2 infoThreadHook action2 parse2 items2
+fullTest :: Fixture HookInfo
+fullTest = mkFull' config2 infoThreadHook action2 parse2 items2
 
-action2 ::  HookInfo -> Item2 -> Action AS
+action2 :: HookInfo -> Item2 -> Action AS
 -- action2 RunConfig{country, depth, environment} HookInfo{value = hookVal} itm = do
-action2 HookInfo{value = hookVal} itm = do
+action2 HookInfo {value = hookVal} itm = do
   logShow itm
   RunConfig {country, depth} <- runConfig
-  when (country == AU )$
+  when (country == AU) $
     log "Aus test"
   when (country == NZ) $
     log "NZ test"
@@ -109,25 +121,25 @@ action2 HookInfo{value = hookVal} itm = do
   pure $ AS (itm.value + 1 + hookVal) $ txt itm.value
 
 parse2 :: AS -> Either ParseException VS
-parse2 AS{..} = pure VS{..}
+parse2 AS {..} = pure VS {..}
 
 data AS = AS
-  { value :: Int
-  , valTxt :: Text
+  { value :: Int,
+    valTxt :: Text
   }
   deriving (Show, Read)
 
 data VS = VS
-  { value :: Int
-  , valTxt :: Text
+  { value :: Int,
+    valTxt :: Text
   }
   deriving (Show, Read)
 
 data Item2 = Item2
-  { id :: Int
-  , title :: Text
-  , value :: Int
-  , checks :: Checks VS
+  { id :: Int,
+    title :: Text,
+    value :: Int,
+    checks :: Checks VS
   }
   deriving (Show, Read)
 
@@ -135,22 +147,23 @@ valLessThan10 :: (Ord a, HasField "value" r a, Num a) => r -> Bool
 valLessThan10 ds = ds.value < 10
 
 chkIncomeLessThan10 :: (Ord a, HasField "value" r a, Num a) => Checks r
-chkIncomeLessThan10 = chk "test3" valLessThan10 
+chkIncomeLessThan10 = chk "test3" valLessThan10
 
 items2 :: RunConfig -> DataSource Item2 VS
 items2 rc =
-  Items $ filter
-    (\i -> rc.depth == Regression || i.id < 10)
-    [ Item2
-        { id = 1
-        , title = "test the value is one"
-        , value = 2
-        , checks =
-            chk "test" ((== 1) . (.value))
-              <> chk "test2" (\VS{..} -> value < 10)
-              <> chkIncomeLessThan10
-        }
-    ]
+  Items $
+    filter
+      (\i -> rc.depth == Regression || i.id < 10)
+      [ Item2
+          { id = 1,
+            title = "test the value is one",
+            value = 2,
+            checks =
+              chk "test" ((== 1) . (.value))
+                <> chk "test2" (\VS {..} -> value < 10)
+                <> chkIncomeLessThan10
+          }
+      ]
 
 -- ############### Construct Tests ###################
 -- this will be generated either by implmenting deriving,

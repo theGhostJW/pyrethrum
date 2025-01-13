@@ -121,7 +121,8 @@ writeLogFile :: Text -> Text -> IO ()
 writeLogFile fileName content = do
     TIO.writeFile (PE.toS fileName) content
     TIO.putStrLn $ "log file written: " <> fileName                            
-                                    
+
+-- $> discover                                
 discover :: IO Text
 discover = do
   P.putStrLn "Discovering..."
@@ -214,7 +215,7 @@ typeToNames (Roll t) = case t of
 
 {-
 https://hackage.haskell.org/package/ghc-9.12.1/docs/GHC-Iface-Ext-Types.html#t:HieFile
-- new hie_entity_infos ghc 9.12 will make things much easier 
+- new hie_entity_infos ghc 9.12 will make things much easier (looking up type for name when populating renderedType)
 
 -}
 nodeExports :: HieFile -> [Export]
@@ -392,8 +393,6 @@ renderSingleRef (span, IdentifierDetails {identInfo, identType} ) =
       EvidenceVarUse -> "EvidenceVarUse"
 
 
--- $> discover
--- "log file written: hieResultsMinimal2.log"
 txtHieFile2 :: HieFile -> [Text]
 txtHieFile2 hieFile@HieFile{hie_module, hie_hs_file, hie_types} =
   "---- HIE FILE ----" :

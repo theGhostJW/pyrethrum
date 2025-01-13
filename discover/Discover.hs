@@ -211,8 +211,14 @@ typeToNames (Roll t) = case t of
     hieArgsTypes :: [(Bool, HieTypeFix)] -> Set Name
     hieArgsTypes = foldMap (typeToNames . snd) . P.filter fst
 
+
+{-
+https://hackage.haskell.org/package/ghc-9.12.1/docs/GHC-Iface-Ext-Types.html#t:HieFile
+- new hie_entity_infos ghc 9.12 will make things much easier 
+
+-}
 nodeExports :: HieFile -> [Export]
-nodeExports HieFile {hie_exports, hie_module, hie_hs_file} = -- new hie_entity_infos ghc 9.12
+nodeExports HieFile {hie_exports, hie_module, hie_hs_file} = 
    (\name ->
     Export
       { name

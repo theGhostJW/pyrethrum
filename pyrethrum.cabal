@@ -4,7 +4,7 @@ cabal-version: 3.6
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b71a2a4bbd5712ba751a07d511412350d0b61d703ce096ed67bd6fc16203697e
+-- hash: 5a57a438d20dbf824425ee512df043d8df1b2db6786c34e1faac5f057fd888b1
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -116,6 +116,10 @@ library
       EffectfulDemoSpeakIOInterpreterDynamic
       FileSystemDocDemo
       HigherOrderEffectDemo
+      IOActionDemo
+      IOActionDocInterpreter
+      IOActionEffect
+      IOActionIOInterpreter
       IOEffectDemo
       LazyinessSuiteDemo
       PyrethrumBase

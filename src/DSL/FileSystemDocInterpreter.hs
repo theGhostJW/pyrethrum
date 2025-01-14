@@ -20,7 +20,7 @@ import DSL.Internal.NodeLog (NodeLog)
 
 -- TODO: implement docVal, docHush, docVoid, docVal', or docVoid'
 
-runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es{- , E.Error DocException :> es -}) => Eff (FileSystem : es) a -> Eff es a
+runFileSystem :: forall es a. (HasCallStack, IOE :> es, Out NodeLog :> es) => Eff (FileSystem : es) a -> Eff es a
 runFileSystem =
   interpret handler
  where

@@ -41,4 +41,4 @@ runWebDriver =
       ClickElem sessionRef elemRef -> click sessionRef elemRef
       ReadElem sessionRef elemRef -> elementText sessionRef elemRef
       -- TODO move this its more generic (eg. used in REST wait loops)
-      Sleep milliSec -> threadDelay milliSec
+      Sleep milliSec -> threadDelay $ milliSec * 1_000

@@ -12,6 +12,7 @@ module WebDriverIO
     findElement,
     click,
     elementText,
+    sleepMilliSecs
   )
 where
 
@@ -42,63 +43,52 @@ import PyrethrumExtras (getLenient, toS, txt)
 -- import UnliftIO (try)
 -- TODO deprecate
 import Web.Api.WebDriver (Capabilities, defaultFirefoxCapabilities)
-import WebDriverPure (RequestArgs (..), capsToJson)
-import WebDriverSpec as WD
-  ( DriverStatus,
-    ElementRef,
-    HttpResponse (..),
-    Selector,
-    SessionRef,
-    W3Spec (..),
-    clickSpec,
-    deleteSessionSpec,
-    elementTextSpec,
-    findElementSpec,
-    fullscreenWindowSpec,
-    maximizeWindowSpec,
-    minimizeWindowSpec,
-    navigateToSpec,
-    newSessionSpec',
-    statusSpec,
-  )
+import WebDriverPure (capsToJson, RequestArgs (..))
+import WebDriverSpec qualified as W
+import WebDriverSpec (DriverStatus,SessionRef, Selector, ElementRef, W3Spec(..), HttpResponse (..))
+
 import Prelude hiding (get, second)
+import UnliftIO.Concurrent (threadDelay)
 
 -- ############# IO Implementation #############
 
 status :: IO DriverStatus
-status = run statusSpec
+status = run W.status
 
 maximizeWindow :: SessionRef -> IO ()
-maximizeWindow = run . maximizeWindowSpec
+maximizeWindow = run . W.maximizeWindow
 
 minimizeWindow :: SessionRef -> IO ()
-minimizeWindow = run . minimizeWindowSpec
+minimizeWindow = run . W.minimizeWindow
 
 fullscreenWindow :: SessionRef -> IO ()
-fullscreenWindow = run . fullscreenWindowSpec
+fullscreenWindow = run . W.fullscreenWindow
 
 newSession :: Capabilities -> IO SessionRef
-newSession = run . newSessionSpec' . capsToJson
+newSession = run . W.newSession' . capsToJson
 
 newDefaultFirefoxSession :: IO SessionRef
 newDefaultFirefoxSession = newSession defaultFirefoxCapabilities
 
 deleteSession :: SessionRef -> IO ()
-deleteSession = run . deleteSessionSpec
+deleteSession = run . W.deleteSession
 
 navigateTo :: SessionRef -> Text -> IO ()
-navigateTo s = run . navigateToSpec s
+navigateTo s = run . W.navigateTo s
 
 findElement :: SessionRef -> Selector -> IO ElementRef
-findElement s = run . findElementSpec s
+findElement s = run . W.findElement s
 
 click :: SessionRef -> ElementRef -> IO ()
-click s = run . clickSpec s
+click s = run . W.click s
 
 elementText :: SessionRef -> ElementRef -> IO Text
-elementText s = run . elementTextSpec s
+elementText s = run . W.elementText s
 
 -- ############# Utils #############
+
+sleepMilliSecs :: Int -> IO ()
+sleepMilliSecs = threadDelay . (* 1_000)
 
 -- no console out for "production"
 run :: W3Spec a -> IO a
@@ -112,7 +102,7 @@ mkRequest = \case
   PostEmpty {path} -> RequestParams path POST (ReqBodyJson $ object []) 4444
   Delete {path} -> RequestParams path DELETE NoReqBody 4444
 
-parseIO :: W3Spec a -> WD.HttpResponse -> IO a
+parseIO :: W3Spec a -> W.HttpResponse -> IO a
 parseIO spec r =
   spec.parser r
     & maybe

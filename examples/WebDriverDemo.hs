@@ -11,22 +11,17 @@ import Effectful as EF
 import PyrethrumBase
 import PyrethrumExtras (txt)
 import WebDriverEffect as WE
-import WebDriverSpec (DriverStatus (Ready), Selector (CSS))
+import WebDriverSpec (DriverStatus (Ready))
 import Filter (Filters(..))
 import Internal.SuiteRuntime (ThreadCount(..))
 import Internal.Logging qualified as L
 import WebDriverPure (seconds)
 import DSL.Logging (log)
 import CoreTypeFamilies (DataSource (..))
+import WebDriverDemoUtils ( theInternet, checkBoxesLinkCss )
 
 
 -- ################### Effectful Demo ##################
-
-_theInternet :: Text
-_theInternet = "https://the-internet.herokuapp.com/"
-
-_checkBoxesLinkCss :: Selector
-_checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
 suite :: Suite
 suite =
@@ -64,8 +59,8 @@ action i = do
   log $ "the driver status is (from test): " <> txt status
   ses <- newSession
   maximiseWindow ses
-  go ses _theInternet
-  link <- findElem ses _checkBoxesLinkCss
+  go ses theInternet
+  link <- findElem ses checkBoxesLinkCss
   checkButtonText <- readElem ses link
   clickElem ses link
   -- so we can see the navigation worked

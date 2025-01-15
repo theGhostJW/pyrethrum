@@ -7,21 +7,22 @@ module WebDriverSpec
     SessionRef (..),
     DriverStatus (..),
     Selector (..),
+    Cookie (..),
     -- Capabilities(..),
     mkShowable,
     --- Specs
-    statusSpec,
-    maximizeWindowSpec,
-    minimizeWindowSpec,
-    fullscreenWindowSpec,
+    status,
+    maximizeWindow,
+    minimizeWindow,
+    fullscreenWindow,
     -- newSessionSpec,
-    newSessionSpec',
-    deleteSessionSpec,
-    navigateToSpec,
-    findElementSpec,
-    findElementSpec',
-    clickSpec,
-    elementTextSpec,
+    newSession',
+    deleteSession,
+    navigateTo,
+    findElement,
+    findElement',
+    click,
+    elementText,
   )
 where
 import Data.Aeson
@@ -32,8 +33,6 @@ import Data.Aeson
   )
 import Data.Aeson.KeyMap qualified as AKM
 import Prelude hiding (get)
-
--- import Network.HTTP.Client qualified as NC (CookieJar)
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
 
 {- Pure types and functions used in Webdriver -}
@@ -96,11 +95,31 @@ data DriverStatus
   | Unknown {statusCode :: Int, statusMessage :: Text}
   deriving (Show, Eq)
 
+-- https://www.w3.org/TR/webdriver2/#cookies
+data SameSite
+  = Lax
+  | Strict
+  | None
+  deriving (Show, Eq)
+data Cookie = Cookie
+  { name :: Text,
+    value :: Text,
+    -- optional
+    path :: Maybe Text,
+    domain :: Maybe Text,
+    secureOnly :: Maybe Bool,
+    httpOnly :: Maybe Bool,
+    sameSite :: Maybe SameSite,
+    -- When the cookie expires, specified in seconds since Unix Epoch. 
+    expiry :: Maybe Int
+  }
+  deriving (Show)
+
 -- TODO: add more selector types
 newtype Selector = CSS Text
   deriving (Show)
 
--- TODO capabilities for all browsers - to and from JSON
+-- TODO capabilities for all browsers - to annewSessionSpec'd from JSON
 -- move to separate module added typed definition to all APIs that require
 -- JSON
 data Capabilities = MkCapabilities
@@ -156,129 +175,181 @@ capsToJson caps =
 -- ######################################################################
 -- ########################### WebDriver API ############################
 -- ######################################################################
-
--- https://www.w3.org/TR/2024/WD-webdriver2-20240723/
-{-
+{- FUll List
+https://www.w3.org/TR/2024/WD-webdriver2-20241212/#endpoints
+61 endpoints
 Method 	URI Template 	Command
+POST 	/session 	New Session
+DELETE 	/session/{session id} 	Delete Session
 GET 	/status 	Status
--}
-statusSpec :: W3Spec DriverStatus
-statusSpec = Get "Get Driver Status" ["status"] parseDriverStatus
-
-{-
 GET 	/session/{session id}/timeouts 	Get Timeouts
-GET 	/session/{session id}/url 	Get Current URL
-GET 	/session/{session id}/title 	Get Title
-GET 	/session/{session id}/window 	Get Window Handle
-GET 	/session/{session id}/window/handles 	Get Window Handles
-GET 	/session/{session id}/window/rect 	Get Window Rect
-GET 	/session/{session id}/element/active 	Get Active Element
-GET 	/session/{session id}/element/{element id}/shadow 	Get Element Shadow Root
-GET 	/session/{session id}/element/{element id}/selected 	Is Element Selected
-GET 	/session/{session id}/element/{element id}/attribute/{name} 	Get Element Attribute
--}
-
--- GET 	/session/{session id}/element/{element id}/text 	Get Element Text
-elementTextSpec :: SessionRef -> ElementRef -> W3Spec Text
-elementTextSpec sessionRef elementRef = Get "Get Element Text" (element1 sessionRef elementRef "text") parseElmText
-
-{-
-GET 	/session/{session id}/element/{element id}/property/{name} 	Get Element Property
-GET 	/session/{session id}/element/{element id}/css/{property name} 	Get Element CSS Value
-GET 	/session/{session id}/element/{element id}/name 	Get Element Tag Name
-GET 	/session/{session id}/element/{element id}/rect 	Get Element Rect
-GET 	/session/{session id}/element/{element id}/enabled 	Is Element Enabled
-GET 	/session/{session id}/element/{element id}/computedrole 	Get Computed Role
-GET 	/session/{session id}/element/{element id}/computedlabel 	Get Computed Label
-GET 	/session/{session id}/source 	Get Page Source
-GET 	/session/{session id}/cookie 	Get All Cookies
-GET 	/session/{session id}/alert/text 	Get Alert Text
-GET 	/session/{session id}/cookie/{name} 	Get Named Cookie
-GET 	/session/{session id}/screenshot 	Take Screenshot
-GET 	/session/{session id}/element/{element id}/screenshot 	Take Element Screenshot
--}
-
--- POST 	/session 	New Session
--- TODO: native capabilities type
--- newSessionSpec :: Capabilities -> W3Spec SessionRef
--- newSessionSpec capabilities = newSessionSpec' $ capsToJson capabilities
-
-newSessionSpec' :: Value -> W3Spec SessionRef
-newSessionSpec' capabilities = Post "Create New Session" [session] capabilities parseSessionRef
-
-{-
 POST 	/session/{session id}/timeouts 	Set Timeouts
--}
-
--- POST 	/session/{session id}/url 	Navigate To
-navigateToSpec :: SessionRef -> Text -> W3Spec ()
-navigateToSpec sessionRef url = Post "Navigate To" (sessionId1 sessionRef "url") (object ["url" .= url]) voidParser
-
-{-
+POST 	/session/{session id}/url 	Navigate To
+GET 	/session/{session id}/url 	Get Current URL
 POST 	/session/{session id}/back 	Back
 POST 	/session/{session id}/forward 	Forward
 POST 	/session/{session id}/refresh 	Refresh
+GET 	/session/{session id}/title 	Get Title
+GET 	/session/{session id}/window 	Get Window Handle
+DELETE 	/session/{session id}/window 	Close Window
 POST 	/session/{session id}/window 	Switch To Window
+GET 	/session/{session id}/window/handles 	Get Window Handles
 POST 	/session/{session id}/window/new 	New Window
 POST 	/session/{session id}/frame 	Switch To Frame
 POST 	/session/{session id}/frame/parent 	Switch To Parent Frame
+GET 	/session/{session id}/window/rect 	Get Window Rect
 POST 	/session/{session id}/window/rect 	Set Window Rect
--}
-
--- POST 	/session/{session id}/window/maximize 	Maximize Window
-maximizeWindowSpec :: SessionRef -> W3Spec ()
-maximizeWindowSpec sessionRef = PostEmpty "Maximize Window" (window1 sessionRef "maximize") voidParser
-
--- POST 	/session/{session id}/window/minimize 	Minimize Window
-minimizeWindowSpec :: SessionRef -> W3Spec ()
-minimizeWindowSpec sessionRef = PostEmpty "Minimize Window" (window1 sessionRef "minimize") voidParser
-
--- POST 	/session/{session id}/window/fullscreen 	Fullscreen Window
-fullscreenWindowSpec :: SessionRef -> W3Spec ()
-fullscreenWindowSpec sessionRef = PostEmpty "Fullscreen Window" (window1 sessionRef "fullscreen") voidParser
-
--- POST 	/session/{session id}/element 	Find Element
-findElementSpec :: SessionRef -> Selector -> W3Spec ElementRef
-findElementSpec sessionRef = findElementSpec' sessionRef . selectorJson
-
-findElementSpec' :: SessionRef -> Value -> W3Spec ElementRef
-findElementSpec' sessionRef selector = Post "Find Element" (sessionId1 sessionRef "element") selector parseElementRef
-
-{-
+POST 	/session/{session id}/window/maximize 	Maximize Window
+POST 	/session/{session id}/window/minimize 	Minimize Window
+POST 	/session/{session id}/window/fullscreen 	Fullscreen Window
+GET 	/session/{session id}/element/active 	Get Active Element
+GET 	/session/{session id}/element/{element id}/shadow 	Get Element Shadow Root
+POST 	/session/{session id}/element 	Find Element
 POST 	/session/{session id}/elements 	Find Elements
 POST 	/session/{session id}/element/{element id}/element 	Find Element From Element
 POST 	/session/{session id}/element/{element id}/elements 	Find Elements From Element
 POST 	/session/{session id}/shadow/{shadow id}/element 	Find Element From Shadow Root
 POST 	/session/{session id}/shadow/{shadow id}/elements 	Find Elements From Shadow Root
--}
-
--- POST 	/session/{session id}/element/{element id}/click 	Element Click
-clickSpec :: SessionRef -> ElementRef -> W3Spec ()
-clickSpec sessionRef elementRef = PostEmpty "Click Element" (element1 sessionRef elementRef "click") voidParser
-
-{-
+GET 	/session/{session id}/element/{element id}/selected 	Is Element Selected
+GET 	/session/{session id}/element/{element id}/attribute/{name} 	Get Element Attribute
+GET 	/session/{session id}/element/{element id}/property/{name} 	Get Element Property
+GET 	/session/{session id}/element/{element id}/css/{property name} 	Get Element CSS Value
+GET 	/session/{session id}/element/{element id}/text 	Get Element Text
+GET 	/session/{session id}/element/{element id}/name 	Get Element Tag Name
+GET 	/session/{session id}/element/{element id}/rect 	Get Element Rect
+GET 	/session/{session id}/element/{element id}/enabled 	Is Element Enabled
+GET 	/session/{session id}/element/{element id}/computedrole 	Get Computed Role
+GET 	/session/{session id}/element/{element id}/computedlabel 	Get Computed Label
+POST 	/session/{session id}/element/{element id}/click 	Element Click
 POST 	/session/{session id}/element/{element id}/clear 	Element Clear
 POST 	/session/{session id}/element/{element id}/value 	Element Send Keys
+GET 	/session/{session id}/source 	Get Page Source
 POST 	/session/{session id}/execute/sync 	Execute Script
 POST 	/session/{session id}/execute/async 	Execute Async Script
+GET 	/session/{session id}/cookie 	Get All Cookies
+GET 	/session/{session id}/cookie/{name} 	Get Named Cookie
 POST 	/session/{session id}/cookie 	Add Cookie
+DELETE 	/session/{session id}/cookie/{name} 	Delete Cookie
+DELETE 	/session/{session id}/cookie 	Delete All Cookies
 POST 	/session/{session id}/actions 	Perform Actions
+DELETE 	/session/{session id}/actions 	Release Actions
 POST 	/session/{session id}/alert/dismiss 	Dismiss Alert
 POST 	/session/{session id}/alert/accept 	Accept Alert
+GET 	/session/{session id}/alert/text 	Get Alert Text
 POST 	/session/{session id}/alert/text 	Send Alert Text
+GET 	/session/{session id}/screenshot 	Take Screenshot
+GET 	/session/{session id}/element/{element id}/screenshot 	Take Element Screenshot
 POST 	/session/{session id}/print 	Print Page
 -}
 
--- DELETE /session/{session id} 	Delete Session
-deleteSessionSpec :: SessionRef -> W3Spec ()
-deleteSessionSpec sessionRef = Delete "Delete Session" (session1 sessionRef.id) voidParser
+-- https://www.w3.org/TR/2024/WD-webdriver2-20241212/#endpoints
+-- 61 endpoints
+-- Method 	URI Template 	Command
 
-{-
-DELETE /session/{session id}/window 	Close Window
-DELETE /session/{session id}/cookie/{name} 	Delete Cookie
-DELETE /session/{session id}/cookie 	Delete All Cookies
-DELETE /session/{session id}/actions 	Release Actions
--}
+-- TODO: native capabilities type - change this to use type
+-- newSessionSpec :: Capabilities -> W3Spec SessionRef
+-- newSessionSpec capabilities = newSessionSpec' $ capsToJson capabilities
+
+-- POST 	/session 	New Session
+newSession' :: Value -> W3Spec SessionRef
+newSession' capabilities = Post "Create New Session" [session] capabilities parseSessionRef
+
+
+-- DELETE 	/session/{session id} 	Delete Session
+deleteSession :: SessionRef -> W3Spec ()
+deleteSession sessionRef = Delete "Delete Session" (session1 sessionRef.id) voidParser
+
+-- GET 	/status 	Status
+status :: W3Spec DriverStatus
+status = Get "Get Driver Status" ["status"] parseDriverStatus
+
+-- GET 	/session/{session id}/timeouts 	Get Timeouts
+-- POST 	/session/{session id}/timeouts 	Set Timeouts
+
+-- POST 	/session/{session id}/url 	Navigate To
+navigateTo :: SessionRef -> Text -> W3Spec ()
+navigateTo sessionRef url = Post "Navigate To" (sessionId1 sessionRef "url") (object ["url" .= url]) voidParser
+
+-- GET 	/session/{session id}/url 	Get Current URL
+-- POST 	/session/{session id}/back 	Back
+-- POST 	/session/{session id}/forward 	Forward
+-- POST 	/session/{session id}/refresh 	Refresh
+-- GET 	/session/{session id}/title 	Get Title
+-- GET 	/session/{session id}/window 	Get Window Handle
+-- DELETE 	/session/{session id}/window 	Close Window
+-- POST 	/session/{session id}/window 	Switch To Window
+-- GET 	/session/{session id}/window/handles 	Get Window Handles
+-- POST 	/session/{session id}/window/new 	New Window
+-- POST 	/session/{session id}/frame 	Switch To Frame
+-- POST 	/session/{session id}/frame/parent 	Switch To Parent Frame
+-- GET 	/session/{session id}/window/rect 	Get Window Rect
+-- POST 	/session/{session id}/window/rect 	Set Window Rect
+
+-- POST 	/session/{session id}/window/maximize 	Maximize 
+maximizeWindow :: SessionRef -> W3Spec ()
+maximizeWindow sessionRef = PostEmpty "Maximize Window" (window1 sessionRef "maximize") voidParser
+
+-- POST 	/session/{session id}/window/minimize 	Minimize Window
+minimizeWindow :: SessionRef -> W3Spec ()
+minimizeWindow sessionRef = PostEmpty "Minimize Window" (window1 sessionRef "minimize") voidParser
+
+-- POST 	/session/{session id}/window/fullscreen 	Fullscreen Window
+fullscreenWindow :: SessionRef -> W3Spec ()
+fullscreenWindow sessionRef = PostEmpty "Fullscreen Window" (window1 sessionRef "fullscreen") voidParser
+
+-- GET 	/session/{session id}/element/active 	Get Active Element
+-- GET 	/session/{session id}/element/{element id}/shadow 	Get Element Shadow Root
+
+-- POST 	/session/{session id}/element 	Find Element
+findElement :: SessionRef -> Selector -> W3Spec ElementRef
+findElement sessionRef = findElement' sessionRef . selectorJson
+
+-- POST 	/session/{session id}/elements 	Find Elements
+-- POST 	/session/{session id}/element/{element id}/element 	Find Element From Element
+-- POST 	/session/{session id}/element/{element id}/elements 	Find Elements From Element
+-- POST 	/session/{session id}/shadow/{shadow id}/element 	Find Element From Shadow Root
+-- POST 	/session/{session id}/shadow/{shadow id}/elements 	Find Elements From Shadow Root
+-- GET 	/session/{session id}/element/{element id}/selected 	Is Element Selected
+-- GET 	/session/{session id}/element/{element id}/attribute/{name} 	Get Element Attribute
+-- GET 	/session/{session id}/element/{element id}/property/{name} 	Get Element Property
+-- GET 	/session/{session id}/element/{element id}/css/{property name} 	Get Element CSS Value
+
+-- GET 	/session/{session id}/element/{element id}/text 	Get Element Text
+elementText :: SessionRef -> ElementRef -> W3Spec Text
+elementText sessionRef elementRef = Get "Get Element Text" (element1 sessionRef elementRef "text") parseElmText
+
+-- GET 	/session/{session id}/element/{element id}/name 	Get Element Tag Name
+-- GET 	/session/{session id}/element/{element id}/rect 	Get Element Rect
+-- GET 	/session/{session id}/element/{element id}/enabled 	Is Element Enabled
+-- GET 	/session/{session id}/element/{element id}/computedrole 	Get Computed Role
+-- GET 	/session/{session id}/element/{element id}/computedlabel 	Get Computed Label
+
+-- POST 	/session/{session id}/element/{element id}/click 	Element Click
+click :: SessionRef -> ElementRef -> W3Spec ()
+click sessionRef elementRef = PostEmpty "Click Element" (element1 sessionRef elementRef "click") voidParser
+
+-- POST 	/session/{session id}/element/{element id}/clear 	Element Clear
+-- POST 	/session/{session id}/element/{element id}/value 	Element Send Keys
+-- GET 	/session/{session id}/source 	Get Page Source
+-- POST 	/session/{session id}/execute/sync 	Execute Script
+-- POST 	/session/{session id}/execute/async 	Execute Async Script
+-- GET 	/session/{session id}/cookie 	Get All Cookies
+-- GET 	/session/{session id}/cookie/{name} 	Get Named Cookie
+-- POST 	/session/{session id}/cookie 	Add Cookie
+-- DELETE 	/session/{session id}/cookie/{name} 	Delete Cookie
+-- DELETE 	/session/{session id}/cookie 	Delete All Cookies
+-- POST 	/session/{session id}/actions 	Perform Actions
+-- DELETE 	/session/{session id}/actions 	Release Actions
+-- POST 	/session/{session id}/alert/dismiss 	Dismiss Alert
+-- POST 	/session/{session id}/alert/accept 	Accept Alert
+-- GET 	/session/{session id}/alert/text 	Get Alert Text
+-- POST 	/session/{session id}/alert/text 	Send Alert Text
+-- GET 	/session/{session id}/screenshot 	Take Screenshot
+-- GET 	/session/{session id}/element/{element id}/screenshot 	Take Element Screenshot
+-- POST 	/session/{session id}/print 	Print Page
+
+findElement' :: SessionRef -> Value -> W3Spec ElementRef
+findElement' sessionRef selector = Post "Find Element" (sessionId1 sessionRef "element") selector parseElementRef
 
 -- #### Utils ####
 

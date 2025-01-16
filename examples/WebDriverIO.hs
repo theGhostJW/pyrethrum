@@ -1,10 +1,23 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module WebDriverIO
-  ( status,
+  ( W.Timeouts (..),
+    W.WindowHandle(..),
+    status,
+    getTimeouts,
+    setTimeouts,
+    back,
+    forward,
+    refresh,
+    getCurrentUrl,
+    getTitle,
+    getWindowHandles,
     maximizeWindow,
     minimizeWindow,
-    fullscreenWindow,
+    fullScreenWindow,
+    getWindowHandle,
+    closeWindow,
+    newWindow,
     newSession,
     newDefaultFirefoxSession,
     deleteSession,
@@ -12,7 +25,8 @@ module WebDriverIO
     findElement,
     click,
     elementText,
-    sleepMilliSecs
+    sleepMilliSecs,
+    switchToWindow
   )
 where
 
@@ -42,18 +56,33 @@ import Network.HTTP.Req as R
 import PyrethrumExtras (getLenient, toS, txt)
 -- import UnliftIO (try)
 -- TODO deprecate
-import Web.Api.WebDriver (Capabilities, defaultFirefoxCapabilities)
-import WebDriverPure (capsToJson, RequestArgs (..))
-import WebDriverSpec qualified as W
-import WebDriverSpec (DriverStatus,SessionRef, Selector, ElementRef, W3Spec(..), HttpResponse (..))
 
-import Prelude hiding (get, second)
 import UnliftIO.Concurrent (threadDelay)
+import Web.Api.WebDriver (Capabilities, defaultFirefoxCapabilities)
+import WebDriverPure (RequestArgs (..), capsToJson)
+import WebDriverSpec (DriverStatus, ElementRef, HttpResponse (..), Selector, SessionRef, W3Spec (..))
+import WebDriverSpec qualified as W
+import Prelude hiding (get, second)
 
 -- ############# IO Implementation #############
 
 status :: IO DriverStatus
 status = run W.status
+
+newSession :: Capabilities -> IO SessionRef
+newSession = run . W.newSession' . capsToJson
+
+getTimeouts :: SessionRef -> IO W.Timeouts
+getTimeouts = run . W.getTimeouts
+
+setTimeouts :: SessionRef -> W.Timeouts -> IO ()
+setTimeouts s = run . W.setTimeouts s
+
+getCurrentUrl :: SessionRef -> IO Text
+getCurrentUrl = run . W.getCurrentUrl
+
+getTitle :: SessionRef -> IO Text
+getTitle = run . W.getTitle
 
 maximizeWindow :: SessionRef -> IO ()
 maximizeWindow = run . W.maximizeWindow
@@ -61,11 +90,32 @@ maximizeWindow = run . W.maximizeWindow
 minimizeWindow :: SessionRef -> IO ()
 minimizeWindow = run . W.minimizeWindow
 
-fullscreenWindow :: SessionRef -> IO ()
-fullscreenWindow = run . W.fullscreenWindow
+fullScreenWindow :: SessionRef -> IO ()
+fullScreenWindow = run . W.fullscreenWindow
 
-newSession :: Capabilities -> IO SessionRef
-newSession = run . W.newSession' . capsToJson
+getWindowHandle :: SessionRef -> IO Text
+getWindowHandle = run . W.getWindowHandle
+
+getWindowHandles :: SessionRef -> IO [Text]
+getWindowHandles = run . W.getWindowHandles
+
+newWindow :: SessionRef -> IO W.WindowHandle
+newWindow = run . W.newWindow
+
+switchToWindow :: SessionRef -> Text -> IO ()
+switchToWindow s = run . W.switchToWindow s
+
+closeWindow :: SessionRef -> IO ()
+closeWindow = run . W.closeWindow
+
+back :: SessionRef -> IO ()
+back = run . W.back
+
+forward :: SessionRef -> IO ()
+forward = run . W.forward
+
+refresh :: SessionRef -> IO ()
+refresh = run . W.refresh
 
 newDefaultFirefoxSession :: IO SessionRef
 newDefaultFirefoxSession = newSession defaultFirefoxCapabilities
@@ -133,7 +183,6 @@ callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
     url :: Url 'Http
     url = foldl' (/:) (http "127.0.0.1") subDirs
 
-
 --------------------------------------------------------------------------------
 -- console out (to haskell output window) for debugging
 -- run :: forall a. (Show a) =>  W3Spec a -> IO a
@@ -142,7 +191,6 @@ callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
 --     devLog . txt $ mkShowable spec
 --     r <- callWebDriver True $ mkRequest spec
 --     parseIO spec r
-
 
 -- describe :: (Show a) => Text -> IO a -> IO a
 -- describe msg action = do

@@ -8,6 +8,8 @@ module WebDriverSpec
     DriverStatus (..),
     Selector (..),
     Cookie (..),
+    Timeouts (..),
+    WindowHandle (..),
     -- Capabilities(..),
     mkShowable,
     --- Specs
@@ -15,9 +17,21 @@ module WebDriverSpec
     maximizeWindow,
     minimizeWindow,
     fullscreenWindow,
+    getTimeouts,
+    setTimeouts,
+    getCurrentUrl,
+    getTitle,
+    getWindowHandle,
+    closeWindow,
+    back,
+    forward,
+    refresh,
     -- newSessionSpec,
     newSession',
     deleteSession,
+    getWindowHandles,
+    newWindow,
+    switchToWindow,
     navigateTo,
     findElement,
     findElement',
@@ -25,14 +39,16 @@ module WebDriverSpec
     elementText,
   )
 where
+
 import Data.Aeson
   ( Key,
     KeyValue ((.=)),
-    Value (Object, String),
+    Value (..),
     object,
   )
 import Data.Aeson.KeyMap qualified as AKM
 import Prelude hiding (get)
+
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
 
 {- Pure types and functions used in Webdriver -}
@@ -71,7 +87,6 @@ data W3SpecShowable = Request
   }
   deriving (Show)
 
-
 data HttpResponse = Response
   { statusCode :: Int,
     statusMessage :: Text,
@@ -81,6 +96,12 @@ data HttpResponse = Response
     -- cookies :: NC.CookieJar
   }
   deriving (Show)
+
+data WindowHandle = Handle
+  { handle :: Text,
+    handletype :: Text
+  }
+  deriving (Show, Eq)
 
 newtype ElementRef = Element {id :: Text}
   deriving (Show, Eq)
@@ -101,6 +122,7 @@ data SameSite
   | Strict
   | None
   deriving (Show, Eq)
+
 data Cookie = Cookie
   { name :: Text,
     value :: Text,
@@ -110,7 +132,7 @@ data Cookie = Cookie
     secureOnly :: Maybe Bool,
     httpOnly :: Maybe Bool,
     sameSite :: Maybe SameSite,
-    -- When the cookie expires, specified in seconds since Unix Epoch. 
+    -- When the cookie expires, specified in seconds since Unix Epoch.
     expiry :: Maybe Int
   }
   deriving (Show)
@@ -133,7 +155,7 @@ data Capabilities = MkCapabilities
   deriving (Show)
 
 {-
--- TODO: own capabilities type to from Json 
+-- TODO: own capabilities type to from Json
 -- capsToJson :: Capabilities -> Value
 -- capsToJson caps = uu
 
@@ -170,7 +192,6 @@ capsToJson caps =
       "desiredCapabilities" .= toJSON caps
     ]
 -}
-
 
 -- ######################################################################
 -- ########################### WebDriver API ############################
@@ -254,7 +275,6 @@ POST 	/session/{session id}/print 	Print Page
 newSession' :: Value -> W3Spec SessionRef
 newSession' capabilities = Post "Create New Session" [session] capabilities parseSessionRef
 
-
 -- DELETE 	/session/{session id} 	Delete Session
 deleteSession :: SessionRef -> W3Spec ()
 deleteSession sessionRef = Delete "Delete Session" (session1 sessionRef.id) voidParser
@@ -264,28 +284,64 @@ status :: W3Spec DriverStatus
 status = Get "Get Driver Status" ["status"] parseDriverStatus
 
 -- GET 	/session/{session id}/timeouts 	Get Timeouts
+getTimeouts :: SessionRef -> W3Spec Timeouts
+getTimeouts sessionRef = Get "Get Timeouts" (sessionId1 sessionRef "timeouts") parseTimeouts
+
 -- POST 	/session/{session id}/timeouts 	Set Timeouts
+setTimeouts :: SessionRef -> Timeouts -> W3Spec ()
+setTimeouts sessionRef Timeouts {implicit, pageLoad, script} =
+  Post "Set Timeouts" (sessionId1 sessionRef "timeouts") (object ["implicit" .= implicit, "pageLoad" .= pageLoad, "script" .= script]) voidParser
 
 -- POST 	/session/{session id}/url 	Navigate To
 navigateTo :: SessionRef -> Text -> W3Spec ()
 navigateTo sessionRef url = Post "Navigate To" (sessionId1 sessionRef "url") (object ["url" .= url]) voidParser
 
 -- GET 	/session/{session id}/url 	Get Current URL
+getCurrentUrl :: SessionRef -> W3Spec Text
+getCurrentUrl sessionRef = Get "Get Current URL" (sessionId1 sessionRef "url") parseValueTxt
+
 -- POST 	/session/{session id}/back 	Back
+back :: SessionRef -> W3Spec ()
+back sessionRef = PostEmpty "Back" (sessionId1 sessionRef "back") voidParser
+
 -- POST 	/session/{session id}/forward 	Forward
+forward :: SessionRef -> W3Spec ()
+forward sessionRef = PostEmpty "Forward" (sessionId1 sessionRef "forward") voidParser
+
 -- POST 	/session/{session id}/refresh 	Refresh
+refresh :: SessionRef -> W3Spec ()
+refresh sessionRef = PostEmpty "Refresh" (sessionId1 sessionRef "refresh") voidParser
+
 -- GET 	/session/{session id}/title 	Get Title
+getTitle :: SessionRef -> W3Spec Text
+getTitle sessionRef = Get "Get Title" (sessionId1 sessionRef "title") parseValueTxt
+
 -- GET 	/session/{session id}/window 	Get Window Handle
--- DELETE 	/session/{session id}/window 	Close Window
--- POST 	/session/{session id}/window 	Switch To Window
--- GET 	/session/{session id}/window/handles 	Get Window Handles
+getWindowHandle :: SessionRef -> W3Spec Text
+getWindowHandle sessionRef = Get "Get Window Handle" (sessionId1 sessionRef "window") parseValueTxt
+
 -- POST 	/session/{session id}/window/new 	New Window
+newWindow :: SessionRef -> W3Spec WindowHandle
+newWindow sessionRef = PostEmpty "New Window" (sessionId2 sessionRef "window" "new") windowHandleParser
+
+-- DELETE 	/session/{session id}/window 	Close Window
+closeWindow :: SessionRef -> W3Spec ()
+closeWindow sessionRef = Delete "Close Window" (sessionId1 sessionRef "window") voidParser
+
+-- POST 	/session/{session id}/window 	Switch To Window
+switchToWindow :: SessionRef -> Text -> W3Spec ()
+switchToWindow sessionRef handle = Post "Switch To Window" (sessionId1 sessionRef "window") (object ["handle" .= handle]) voidParser
+
+-- GET 	/session/{session id}/window/handles 	Get Window Handles
+getWindowHandles :: SessionRef -> W3Spec [Text]
+getWindowHandles sessionRef = Get "Get Window Handles" (sessionId2 sessionRef "window" "handles") windowHandlesParser
+
 -- POST 	/session/{session id}/frame 	Switch To Frame
 -- POST 	/session/{session id}/frame/parent 	Switch To Parent Frame
 -- GET 	/session/{session id}/window/rect 	Get Window Rect
 -- POST 	/session/{session id}/window/rect 	Set Window Rect
 
--- POST 	/session/{session id}/window/maximize 	Maximize 
+-- POST 	/session/{session id}/window/maximize 	Maximize
 maximizeWindow :: SessionRef -> W3Spec ()
 maximizeWindow sessionRef = PostEmpty "Maximize Window" (window1 sessionRef "maximize") voidParser
 
@@ -353,12 +409,82 @@ findElement' sessionRef selector = Post "Find Element" (sessionId1 sessionRef "e
 
 -- #### Utils ####
 
+data Timeouts = Timeouts
+  { implicit :: Int,
+    pageLoad :: Int,
+    script :: Int
+  }
+  deriving (Show)
+
+  {-
+  Response
+  { statusCode = 200
+  , statusMessage = "OK"
+  , body =
+      Object
+        (fromList
+           [ ( "value"
+             , Array
+                 [ String "38573ea0-0402-4845-9186-54ad3dc874b1"
+                 , String "f145ab04-c1ab-48d1-8c62-1f73d43650d7"
+                 ]
+             )
+           ])
+  }
+  
+  
+  
+  -}
+
+windowHandleParser :: HttpResponse -> Maybe WindowHandle
+windowHandleParser r =
+  lookup "value" r.body
+    >>= windowHandleFromValue
+
+windowHandlesParser :: HttpResponse -> Maybe [Text]
+windowHandlesParser r = do
+  lookup "value" r.body
+    >>= \case
+      Array a -> Just $ catMaybes $ toList $ asText <$> a
+      _ -> Nothing
+
+windowHandleFromValue :: Value -> Maybe WindowHandle
+windowHandleFromValue v =
+  Handle
+    <$> ( lookup "handle" v
+            >>= asText
+        )
+    <*> ( lookup "type" v
+            >>= asText
+        )
+
+parseTimeouts :: HttpResponse -> Maybe Timeouts
+parseTimeouts r =
+  Timeouts
+    <$> ( lookup "value" r.body
+            >>= lookup "implicit"
+            >>= asInt
+        )
+    <*> ( lookup "value" r.body
+            >>= lookup "pageLoad"
+            >>= asInt
+        )
+    <*> ( lookup "value" r.body
+            >>= lookup "script"
+            >>= asInt
+        )
+
 selectorJson :: Selector -> Value
 selectorJson = \case
   CSS css -> object ["using" .= ("css selector" :: Text), "value" .= css]
 
 voidParser :: HttpResponse -> Maybe ()
 voidParser _ = Just ()
+
+parseValueTxt :: HttpResponse -> Maybe Text
+parseValueTxt r =
+  lookup "value" r.body
+    >>= asText
 
 -- TODO Ason helpers separate module
 lookup :: Key -> Value -> Maybe Value
@@ -369,6 +495,11 @@ lookup k = \case
 asText :: Value -> Maybe Text
 asText = \case
   String t -> Just t
+  _ -> Nothing
+
+asInt :: Value -> Maybe Int
+asInt = \case
+  Number t -> Just $ floor t
   _ -> Nothing
 
 parseSessionRef :: HttpResponse -> Maybe SessionRef
@@ -401,6 +532,9 @@ session1 sp = [session, sp]
 
 sessionId1 :: SessionRef -> Text -> [Text]
 sessionId1 sr sp = [session, sr.id, sp]
+
+sessionId2 :: SessionRef -> Text -> Text -> [Text]
+sessionId2 sr sp sp2 = [session, sr.id, sp, sp2]
 
 window :: Text
 window = "window"

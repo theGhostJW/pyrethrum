@@ -13,7 +13,7 @@ import WebDriverIO
       click,
       maximizeWindow,
       minimizeWindow,
-      fullscreenWindow,
+      fullScreenWindow,
       elementText )
 import WebDriverSpec
     ( DriverStatus,
@@ -82,7 +82,7 @@ _minimizeWindow = minimizeWindow _latestSession
 -- >>> _minimizeWindow
 
 _fullscreenWindow :: IO ()
-_fullscreenWindow = fullscreenWindow _latestSession
+_fullscreenWindow = fullScreenWindow _latestSession
 
 -- >>> _fullscreenWindow
 

@@ -17,7 +17,7 @@ import WebDriverIO
     elementText,
     navigateTo,
     newDefaultFirefoxSession,
-    status, findElement, fullscreenWindow, maximizeWindow, minimizeWindow, sleepMilliSecs,
+    status, findElement, fullScreenWindow, maximizeWindow, minimizeWindow, sleepMilliSecs,
   )
 
 runWebDriver :: forall es a. (IOE :> es) => Eff (WebUI : es) a -> Eff es a
@@ -30,7 +30,7 @@ runWebDriver =
       NewSession -> newDefaultFirefoxSession
       KillSession sessionRef -> deleteSession sessionRef
       -- window
-      FullscreenWindow sessionRef -> fullscreenWindow sessionRef
+      FullscreenWindow sessionRef -> fullScreenWindow sessionRef
       MaximiseWindow sessionRef -> maximizeWindow sessionRef
       MinimiseWindow sessionRef -> minimizeWindow sessionRef
       -- navigate

@@ -2,8 +2,10 @@
 
 module WebDriverIO
   ( W.Timeouts (..),
-    W.WindowHandle(..),
+    W.WindowHandle (..),
+    W.SessionRef (..),
     status,
+    findElements,
     getTimeouts,
     setTimeouts,
     back,
@@ -26,7 +28,8 @@ module WebDriverIO
     click,
     elementText,
     sleepMilliSecs,
-    switchToWindow
+    switchToWindow,
+    switchToFrame,
   )
 where
 
@@ -105,6 +108,9 @@ newWindow = run . W.newWindow
 switchToWindow :: SessionRef -> Text -> IO ()
 switchToWindow s = run . W.switchToWindow s
 
+switchToFrame :: SessionRef -> ElementRef -> IO ()
+switchToFrame s = run . W.switchToFrame s
+
 closeWindow :: SessionRef -> IO ()
 closeWindow = run . W.closeWindow
 
@@ -129,6 +135,9 @@ navigateTo s = run . W.navigateTo s
 findElement :: SessionRef -> Selector -> IO ElementRef
 findElement s = run . W.findElement s
 
+findElements :: SessionRef -> Selector -> IO [ElementRef]
+findElements s = run . W.findElements s
+
 click :: SessionRef -> ElementRef -> IO ()
 click s = run . W.click s
 
@@ -140,9 +149,12 @@ elementText s = run . W.elementText s
 sleepMilliSecs :: Int -> IO ()
 sleepMilliSecs = threadDelay . (* 1_000)
 
+debug :: Bool
+debug = False
+
 -- no console out for "production"
 run :: W3Spec a -> IO a
-run spec = callWebDriver False (mkRequest spec) >>= parseIO spec
+run spec = callWebDriver debug (mkRequest spec) >>= parseIO spec
 
 -- TODO: will neeed to be parameterised later
 mkRequest :: forall a. W3Spec a -> RequestArgs

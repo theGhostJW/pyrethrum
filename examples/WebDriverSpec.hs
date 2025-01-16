@@ -19,7 +19,9 @@ module WebDriverSpec
     fullscreenWindow,
     getTimeouts,
     setTimeouts,
+    switchToFrame,
     getCurrentUrl,
+    findElements,
     getTitle,
     getWindowHandle,
     closeWindow,
@@ -277,7 +279,7 @@ newSession' capabilities = Post "Create New Session" [session] capabilities pars
 
 -- DELETE 	/session/{session id} 	Delete Session
 deleteSession :: SessionRef -> W3Spec ()
-deleteSession sessionRef = Delete "Delete Session" (session1 sessionRef.id) voidParser
+deleteSession sessionRef = Delete "Delete Session" (sessionUrl sessionRef.id) voidParser
 
 -- GET 	/status 	Status
 status :: W3Spec DriverStatus
@@ -337,6 +339,9 @@ getWindowHandles :: SessionRef -> W3Spec [Text]
 getWindowHandles sessionRef = Get "Get Window Handles" (sessionId2 sessionRef "window" "handles") windowHandlesParser
 
 -- POST 	/session/{session id}/frame 	Switch To Frame
+switchToFrame :: SessionRef -> ElementRef -> W3Spec ()
+switchToFrame sessionRef elementRef = PostEmpty "Switch To Frame" (element1 sessionRef elementRef "frame") voidParser
+
 -- POST 	/session/{session id}/frame/parent 	Switch To Parent Frame
 -- GET 	/session/{session id}/window/rect 	Get Window Rect
 -- POST 	/session/{session id}/window/rect 	Set Window Rect
@@ -361,6 +366,9 @@ findElement :: SessionRef -> Selector -> W3Spec ElementRef
 findElement sessionRef = findElement' sessionRef . selectorJson
 
 -- POST 	/session/{session id}/elements 	Find Elements
+findElements :: SessionRef -> Selector -> W3Spec [ElementRef]
+findElements sessionRef selector = Post "Find Elements" (sessionId1 sessionRef "elements") (selectorJson selector) parseElementsRef
+
 -- POST 	/session/{session id}/element/{element id}/element 	Find Element From Element
 -- POST 	/session/{session id}/element/{element id}/elements 	Find Elements From Element
 -- POST 	/session/{session id}/shadow/{shadow id}/element 	Find Element From Shadow Root
@@ -372,7 +380,7 @@ findElement sessionRef = findElement' sessionRef . selectorJson
 
 -- GET 	/session/{session id}/element/{element id}/text 	Get Element Text
 elementText :: SessionRef -> ElementRef -> W3Spec Text
-elementText sessionRef elementRef = Get "Get Element Text" (element1 sessionRef elementRef "text") parseElmText
+elementText sessionRef elementRef = Get "Get Element Text" (element1 sessionRef elementRef "text") parseValueTxt
 
 -- GET 	/session/{session id}/element/{element id}/name 	Get Element Tag Name
 -- GET 	/session/{session id}/element/{element id}/rect 	Get Element Rect
@@ -438,12 +446,12 @@ data Timeouts = Timeouts
 
 windowHandleParser :: HttpResponse -> Maybe WindowHandle
 windowHandleParser r =
-  lookup "value" r.body
+  bodyValue r
     >>= windowHandleFromValue
 
 windowHandlesParser :: HttpResponse -> Maybe [Text]
 windowHandlesParser r = do
-  lookup "value" r.body
+  bodyValue r
     >>= \case
       Array a -> Just $ catMaybes $ toList $ asText <$> a
       _ -> Nothing
@@ -461,18 +469,20 @@ windowHandleFromValue v =
 parseTimeouts :: HttpResponse -> Maybe Timeouts
 parseTimeouts r =
   Timeouts
-    <$> ( lookup "value" r.body
+    <$> ( value
             >>= lookup "implicit"
             >>= asInt
         )
-    <*> ( lookup "value" r.body
+    <*> ( value
             >>= lookup "pageLoad"
             >>= asInt
         )
-    <*> ( lookup "value" r.body
+    <*> ( value
             >>= lookup "script"
             >>= asInt
         )
+    where
+      value = bodyValue r
 
 selectorJson :: Selector -> Value
 selectorJson = \case
@@ -482,9 +492,14 @@ voidParser :: HttpResponse -> Maybe ()
 voidParser _ = Just ()
 
 parseValueTxt :: HttpResponse -> Maybe Text
-parseValueTxt r =
-  lookup "value" r.body
-    >>= asText
+parseValueTxt r = bodyValue r >>= asText
+
+parseElementsRef :: HttpResponse -> Maybe [ElementRef]
+parseElementsRef r =
+  bodyValue r
+    >>= \case
+      Array a -> Just $ mapMaybe elemtRefFromBody (toList a)
+      _ -> Nothing
 
 -- TODO Ason helpers separate module
 lookup :: Key -> Value -> Maybe Value
@@ -505,30 +520,36 @@ asInt = \case
 parseSessionRef :: HttpResponse -> Maybe SessionRef
 parseSessionRef r =
   Session
-    <$> ( lookup "value" r.body
+    <$> ( bodyValue r
             >>= lookup "sessionId"
             >>= asText
         )
 
-parseElmText :: HttpResponse -> Maybe Text
-parseElmText r =
-  lookup "value" r.body
-    >>= asText
+bodyValue :: HttpResponse -> Maybe Value
+bodyValue r =  lookup "value" r.body
+
 
 parseElementRef :: HttpResponse -> Maybe ElementRef
 parseElementRef r =
   Element
-    <$> ( lookup "value" r.body
+    <$> ( bodyValue r
             -- very strange choice for prop name - in response and sane as webdriver-w3c
             >>= lookup "element-6066-11e4-a52e-4f735466cecf"
+            >>= asText
+        )
+
+elemtRefFromBody :: Value -> Maybe ElementRef
+elemtRefFromBody v =
+  Element
+    <$> ( lookup "element-6066-11e4-a52e-4f735466cecf" v
             >>= asText
         )
 
 session :: Text
 session = "session"
 
-session1 :: Text -> [Text]
-session1 sp = [session, sp]
+sessionUrl :: Text -> [Text]
+sessionUrl sp = [session, sp]
 
 sessionId1 :: SessionRef -> Text -> [Text]
 sessionId1 sr sp = [session, sr.id, sp]

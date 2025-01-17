@@ -3,13 +3,15 @@
 module WebDriverIO
   ( W.Timeouts (..),
     W.WindowHandle (..),
-    W.SessionRef (..),
+    W.SessionId (..),
+    W.FrameReference (..),
     status,
     findElements,
     getTimeouts,
     setTimeouts,
     back,
     forward,
+    getActiveElement,
     refresh,
     getCurrentUrl,
     getTitle,
@@ -63,7 +65,7 @@ import PyrethrumExtras (getLenient, toS, txt)
 import UnliftIO.Concurrent (threadDelay)
 import Web.Api.WebDriver (Capabilities, defaultFirefoxCapabilities)
 import WebDriverPure (RequestArgs (..), capsToJson)
-import WebDriverSpec (DriverStatus, ElementRef, HttpResponse (..), Selector, SessionRef, W3Spec (..))
+import WebDriverSpec (DriverStatus, ElementId, HttpResponse (..), Selector, SessionId, W3Spec (..))
 import WebDriverSpec qualified as W
 import Prelude hiding (get, second)
 
@@ -72,76 +74,79 @@ import Prelude hiding (get, second)
 status :: IO DriverStatus
 status = run W.status
 
-newSession :: Capabilities -> IO SessionRef
+newSession :: Capabilities -> IO SessionId
 newSession = run . W.newSession' . capsToJson
 
-getTimeouts :: SessionRef -> IO W.Timeouts
+getTimeouts :: SessionId -> IO W.Timeouts
 getTimeouts = run . W.getTimeouts
 
-setTimeouts :: SessionRef -> W.Timeouts -> IO ()
+setTimeouts :: SessionId -> W.Timeouts -> IO ()
 setTimeouts s = run . W.setTimeouts s
 
-getCurrentUrl :: SessionRef -> IO Text
+getCurrentUrl :: SessionId -> IO Text
 getCurrentUrl = run . W.getCurrentUrl
 
-getTitle :: SessionRef -> IO Text
+getTitle :: SessionId -> IO Text
 getTitle = run . W.getTitle
 
-maximizeWindow :: SessionRef -> IO ()
+maximizeWindow :: SessionId -> IO ()
 maximizeWindow = run . W.maximizeWindow
 
-minimizeWindow :: SessionRef -> IO ()
+minimizeWindow :: SessionId -> IO ()
 minimizeWindow = run . W.minimizeWindow
 
-fullScreenWindow :: SessionRef -> IO ()
+fullScreenWindow :: SessionId -> IO ()
 fullScreenWindow = run . W.fullscreenWindow
 
-getWindowHandle :: SessionRef -> IO Text
+getWindowHandle :: SessionId -> IO Text
 getWindowHandle = run . W.getWindowHandle
 
-getWindowHandles :: SessionRef -> IO [Text]
+getWindowHandles :: SessionId -> IO [Text]
 getWindowHandles = run . W.getWindowHandles
 
-newWindow :: SessionRef -> IO W.WindowHandle
+newWindow :: SessionId -> IO W.WindowHandle
 newWindow = run . W.newWindow
 
-switchToWindow :: SessionRef -> Text -> IO ()
+switchToWindow :: SessionId -> Text -> IO ()
 switchToWindow s = run . W.switchToWindow s
 
-switchToFrame :: SessionRef -> ElementRef -> IO ()
+switchToFrame :: SessionId -> W.FrameReference -> IO ()
 switchToFrame s = run . W.switchToFrame s
 
-closeWindow :: SessionRef -> IO ()
+closeWindow :: SessionId -> IO ()
 closeWindow = run . W.closeWindow
 
-back :: SessionRef -> IO ()
+back :: SessionId -> IO ()
 back = run . W.back
 
-forward :: SessionRef -> IO ()
+forward :: SessionId -> IO ()
 forward = run . W.forward
 
-refresh :: SessionRef -> IO ()
+refresh :: SessionId -> IO ()
 refresh = run . W.refresh
 
-newDefaultFirefoxSession :: IO SessionRef
+newDefaultFirefoxSession :: IO SessionId
 newDefaultFirefoxSession = newSession defaultFirefoxCapabilities
 
-deleteSession :: SessionRef -> IO ()
+deleteSession :: SessionId -> IO ()
 deleteSession = run . W.deleteSession
 
-navigateTo :: SessionRef -> Text -> IO ()
+navigateTo :: SessionId -> Text -> IO ()
 navigateTo s = run . W.navigateTo s
 
-findElement :: SessionRef -> Selector -> IO ElementRef
+findElement :: SessionId -> Selector -> IO ElementId
 findElement s = run . W.findElement s
 
-findElements :: SessionRef -> Selector -> IO [ElementRef]
+getActiveElement :: SessionId -> IO ElementId
+getActiveElement = run . W.getActiveElement
+
+findElements :: SessionId -> Selector -> IO [ElementId]
 findElements s = run . W.findElements s
 
-click :: SessionRef -> ElementRef -> IO ()
+click :: SessionId -> ElementId -> IO ()
 click s = run . W.click s
 
-elementText :: SessionRef -> ElementRef -> IO Text
+elementText :: SessionId -> ElementId -> IO Text
 elementText s = run . W.elementText s
 
 -- ############# Utils #############
@@ -153,8 +158,12 @@ debug :: Bool
 debug = False
 
 -- no console out for "production"
-run :: W3Spec a -> IO a
-run spec = callWebDriver debug (mkRequest spec) >>= parseIO spec
+run :: Show a => W3Spec a -> IO a
+run spec = do 
+  when debug $ do 
+    devLog "Request"
+    devLog . txt $ spec
+  callWebDriver debug (mkRequest spec) >>= parseIO spec
 
 -- TODO: will neeed to be parameterised later
 mkRequest :: forall a. W3Spec a -> RequestArgs

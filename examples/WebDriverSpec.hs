@@ -3,13 +3,14 @@
 module WebDriverSpec
   ( W3Spec (..),
     HttpResponse (..),
-    ElementRef (..),
-    SessionRef (..),
+    ElementId (..),
+    SessionId (..),
     DriverStatus (..),
     Selector (..),
     Cookie (..),
     Timeouts (..),
     WindowHandle (..),
+    FrameReference (..),
     -- Capabilities(..),
     mkShowable,
     --- Specs
@@ -31,6 +32,7 @@ module WebDriverSpec
     -- newSessionSpec,
     newSession',
     deleteSession,
+    getActiveElement,
     getWindowHandles,
     newWindow,
     switchToWindow,
@@ -42,13 +44,18 @@ module WebDriverSpec
   )
 where
 
+import BasePrelude (Show (..))
 import Data.Aeson
   ( Key,
     KeyValue ((.=)),
+    ToJSON (toJSON),
     Value (..),
     object,
   )
+import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap qualified as AKM
+import Data.ByteString.Lazy.Char8 (unpack)
+import PyrethrumExtras (toS)
 import Prelude hiding (get)
 
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
@@ -81,11 +88,15 @@ data W3Spec a
         parser :: HttpResponse -> Maybe a
       }
 
+instance (Show a) => Show (W3Spec a) where
+  show :: W3Spec a -> String
+  show = Prelude.show . mkShowable
+
 data W3SpecShowable = Request
   { description :: Text,
     method :: Text,
     path :: [Text],
-    body :: Maybe Value
+    body :: Maybe Text
   }
   deriving (Show)
 
@@ -105,10 +116,10 @@ data WindowHandle = Handle
   }
   deriving (Show, Eq)
 
-newtype ElementRef = Element {id :: Text}
+newtype ElementId = Element {id :: Text}
   deriving (Show, Eq)
 
-newtype SessionRef = Session {id :: Text}
+newtype SessionId = Session {id :: Text}
   deriving (Show)
 
 data DriverStatus
@@ -124,6 +135,23 @@ data SameSite
   | Strict
   | None
   deriving (Show, Eq)
+
+data FrameReference
+  = TopLevelFrame
+  | FrameNumber Word16
+  | FrameElementId ElementId
+  deriving (Show)
+
+frameJson :: FrameReference -> Value
+frameJson fr =
+  object
+    ["id" .= toJSON (frameVariant fr)]
+  where
+    frameVariant =
+      \case
+        TopLevelFrame -> Null
+        FrameNumber n ->  Number $ fromIntegral n
+        FrameElementId elm -> object [elementFieldName .= elm.id]
 
 data Cookie = Cookie
   { name :: Text,
@@ -274,100 +302,103 @@ POST 	/session/{session id}/print 	Print Page
 -- newSessionSpec capabilities = newSessionSpec' $ capsToJson capabilities
 
 -- POST 	/session 	New Session
-newSession' :: Value -> W3Spec SessionRef
+newSession' :: Value -> W3Spec SessionId
 newSession' capabilities = Post "Create New Session" [session] capabilities parseSessionRef
 
 -- DELETE 	/session/{session id} 	Delete Session
-deleteSession :: SessionRef -> W3Spec ()
-deleteSession sessionRef = Delete "Delete Session" (sessionUrl sessionRef.id) voidParser
+deleteSession :: SessionId -> W3Spec ()
+deleteSession sessionRef = Delete "Delete Session" (sessionUri sessionRef.id) voidParser
 
 -- GET 	/status 	Status
 status :: W3Spec DriverStatus
 status = Get "Get Driver Status" ["status"] parseDriverStatus
 
 -- GET 	/session/{session id}/timeouts 	Get Timeouts
-getTimeouts :: SessionRef -> W3Spec Timeouts
-getTimeouts sessionRef = Get "Get Timeouts" (sessionId1 sessionRef "timeouts") parseTimeouts
+getTimeouts :: SessionId -> W3Spec Timeouts
+getTimeouts sessionRef = Get "Get Timeouts" (sessionUri1 sessionRef "timeouts") parseTimeouts
 
 -- POST 	/session/{session id}/timeouts 	Set Timeouts
-setTimeouts :: SessionRef -> Timeouts -> W3Spec ()
+setTimeouts :: SessionId -> Timeouts -> W3Spec ()
 setTimeouts sessionRef Timeouts {implicit, pageLoad, script} =
-  Post "Set Timeouts" (sessionId1 sessionRef "timeouts") (object ["implicit" .= implicit, "pageLoad" .= pageLoad, "script" .= script]) voidParser
+  Post "Set Timeouts" (sessionUri1 sessionRef "timeouts") (object ["implicit" .= implicit, "pageLoad" .= pageLoad, "script" .= script]) voidParser
 
 -- POST 	/session/{session id}/url 	Navigate To
-navigateTo :: SessionRef -> Text -> W3Spec ()
-navigateTo sessionRef url = Post "Navigate To" (sessionId1 sessionRef "url") (object ["url" .= url]) voidParser
+navigateTo :: SessionId -> Text -> W3Spec ()
+navigateTo sessionRef url = Post "Navigate To" (sessionUri1 sessionRef "url") (object ["url" .= url]) voidParser
 
 -- GET 	/session/{session id}/url 	Get Current URL
-getCurrentUrl :: SessionRef -> W3Spec Text
-getCurrentUrl sessionRef = Get "Get Current URL" (sessionId1 sessionRef "url") parseValueTxt
+getCurrentUrl :: SessionId -> W3Spec Text
+getCurrentUrl sessionRef = Get "Get Current URL" (sessionUri1 sessionRef "url") parseValueTxt
 
 -- POST 	/session/{session id}/back 	Back
-back :: SessionRef -> W3Spec ()
-back sessionRef = PostEmpty "Back" (sessionId1 sessionRef "back") voidParser
+back :: SessionId -> W3Spec ()
+back sessionRef = PostEmpty "Back" (sessionUri1 sessionRef "back") voidParser
 
 -- POST 	/session/{session id}/forward 	Forward
-forward :: SessionRef -> W3Spec ()
-forward sessionRef = PostEmpty "Forward" (sessionId1 sessionRef "forward") voidParser
+forward :: SessionId -> W3Spec ()
+forward sessionRef = PostEmpty "Forward" (sessionUri1 sessionRef "forward") voidParser
 
 -- POST 	/session/{session id}/refresh 	Refresh
-refresh :: SessionRef -> W3Spec ()
-refresh sessionRef = PostEmpty "Refresh" (sessionId1 sessionRef "refresh") voidParser
+refresh :: SessionId -> W3Spec ()
+refresh sessionRef = PostEmpty "Refresh" (sessionUri1 sessionRef "refresh") voidParser
 
 -- GET 	/session/{session id}/title 	Get Title
-getTitle :: SessionRef -> W3Spec Text
-getTitle sessionRef = Get "Get Title" (sessionId1 sessionRef "title") parseValueTxt
+getTitle :: SessionId -> W3Spec Text
+getTitle sessionRef = Get "Get Title" (sessionUri1 sessionRef "title") parseValueTxt
 
 -- GET 	/session/{session id}/window 	Get Window Handle
-getWindowHandle :: SessionRef -> W3Spec Text
-getWindowHandle sessionRef = Get "Get Window Handle" (sessionId1 sessionRef "window") parseValueTxt
+getWindowHandle :: SessionId -> W3Spec Text
+getWindowHandle sessionRef = Get "Get Window Handle" (sessionUri1 sessionRef "window") parseValueTxt
 
 -- POST 	/session/{session id}/window/new 	New Window
-newWindow :: SessionRef -> W3Spec WindowHandle
-newWindow sessionRef = PostEmpty "New Window" (sessionId2 sessionRef "window" "new") windowHandleParser
+newWindow :: SessionId -> W3Spec WindowHandle
+newWindow sessionRef = PostEmpty "New Window" (sessionUri2 sessionRef "window" "new") windowHandleParser
 
 -- DELETE 	/session/{session id}/window 	Close Window
-closeWindow :: SessionRef -> W3Spec ()
-closeWindow sessionRef = Delete "Close Window" (sessionId1 sessionRef "window") voidParser
+closeWindow :: SessionId -> W3Spec ()
+closeWindow sessionRef = Delete "Close Window" (sessionUri1 sessionRef "window") voidParser
 
 -- POST 	/session/{session id}/window 	Switch To Window
-switchToWindow :: SessionRef -> Text -> W3Spec ()
-switchToWindow sessionRef handle = Post "Switch To Window" (sessionId1 sessionRef "window") (object ["handle" .= handle]) voidParser
+switchToWindow :: SessionId -> Text -> W3Spec ()
+switchToWindow sessionRef handle = Post "Switch To Window" (sessionUri1 sessionRef "window") (object ["handle" .= handle]) voidParser
 
 -- GET 	/session/{session id}/window/handles 	Get Window Handles
-getWindowHandles :: SessionRef -> W3Spec [Text]
-getWindowHandles sessionRef = Get "Get Window Handles" (sessionId2 sessionRef "window" "handles") windowHandlesParser
+getWindowHandles :: SessionId -> W3Spec [Text]
+getWindowHandles sessionRef = Get "Get Window Handles" (sessionUri2 sessionRef "window" "handles") windowHandlesParser
 
 -- POST 	/session/{session id}/frame 	Switch To Frame
-switchToFrame :: SessionRef -> ElementRef -> W3Spec ()
-switchToFrame sessionRef elementRef = PostEmpty "Switch To Frame" (element1 sessionRef elementRef "frame") voidParser
+switchToFrame :: SessionId -> FrameReference -> W3Spec ()
+switchToFrame sessionRef frameRef = Post "Switch To Frame" (sessionUri1 sessionRef "frame") (frameJson frameRef) voidParser
 
 -- POST 	/session/{session id}/frame/parent 	Switch To Parent Frame
 -- GET 	/session/{session id}/window/rect 	Get Window Rect
 -- POST 	/session/{session id}/window/rect 	Set Window Rect
 
 -- POST 	/session/{session id}/window/maximize 	Maximize
-maximizeWindow :: SessionRef -> W3Spec ()
-maximizeWindow sessionRef = PostEmpty "Maximize Window" (window1 sessionRef "maximize") voidParser
+maximizeWindow :: SessionId -> W3Spec ()
+maximizeWindow sessionRef = PostEmpty "Maximize Window" (windowUri1 sessionRef "maximize") voidParser
 
 -- POST 	/session/{session id}/window/minimize 	Minimize Window
-minimizeWindow :: SessionRef -> W3Spec ()
-minimizeWindow sessionRef = PostEmpty "Minimize Window" (window1 sessionRef "minimize") voidParser
+minimizeWindow :: SessionId -> W3Spec ()
+minimizeWindow sessionRef = PostEmpty "Minimize Window" (windowUri1 sessionRef "minimize") voidParser
 
 -- POST 	/session/{session id}/window/fullscreen 	Fullscreen Window
-fullscreenWindow :: SessionRef -> W3Spec ()
-fullscreenWindow sessionRef = PostEmpty "Fullscreen Window" (window1 sessionRef "fullscreen") voidParser
+fullscreenWindow :: SessionId -> W3Spec ()
+fullscreenWindow sessionRef = PostEmpty "Fullscreen Window" (windowUri1 sessionRef "fullscreen") voidParser
 
 -- GET 	/session/{session id}/element/active 	Get Active Element
+getActiveElement :: SessionId -> W3Spec ElementId
+getActiveElement sessionId = Get "Get Active Element" (sessionUri2 sessionId "element" "active") parseElementRef
+
 -- GET 	/session/{session id}/element/{element id}/shadow 	Get Element Shadow Root
 
 -- POST 	/session/{session id}/element 	Find Element
-findElement :: SessionRef -> Selector -> W3Spec ElementRef
+findElement :: SessionId -> Selector -> W3Spec ElementId
 findElement sessionRef = findElement' sessionRef . selectorJson
 
 -- POST 	/session/{session id}/elements 	Find Elements
-findElements :: SessionRef -> Selector -> W3Spec [ElementRef]
-findElements sessionRef selector = Post "Find Elements" (sessionId1 sessionRef "elements") (selectorJson selector) parseElementsRef
+findElements :: SessionId -> Selector -> W3Spec [ElementId]
+findElements sessionRef selector = Post "Find Elements" (sessionUri1 sessionRef "elements") (selectorJson selector) parseElementsRef
 
 -- POST 	/session/{session id}/element/{element id}/element 	Find Element From Element
 -- POST 	/session/{session id}/element/{element id}/elements 	Find Elements From Element
@@ -379,8 +410,8 @@ findElements sessionRef selector = Post "Find Elements" (sessionId1 sessionRef "
 -- GET 	/session/{session id}/element/{element id}/css/{property name} 	Get Element CSS Value
 
 -- GET 	/session/{session id}/element/{element id}/text 	Get Element Text
-elementText :: SessionRef -> ElementRef -> W3Spec Text
-elementText sessionRef elementRef = Get "Get Element Text" (element1 sessionRef elementRef "text") parseValueTxt
+elementText :: SessionId -> ElementId -> W3Spec Text
+elementText sessionRef elementRef = Get "Get Element Text" (elementUri1 sessionRef elementRef "text") parseValueTxt
 
 -- GET 	/session/{session id}/element/{element id}/name 	Get Element Tag Name
 -- GET 	/session/{session id}/element/{element id}/rect 	Get Element Rect
@@ -389,8 +420,8 @@ elementText sessionRef elementRef = Get "Get Element Text" (element1 sessionRef 
 -- GET 	/session/{session id}/element/{element id}/computedlabel 	Get Computed Label
 
 -- POST 	/session/{session id}/element/{element id}/click 	Element Click
-click :: SessionRef -> ElementRef -> W3Spec ()
-click sessionRef elementRef = PostEmpty "Click Element" (element1 sessionRef elementRef "click") voidParser
+click :: SessionId -> ElementId -> W3Spec ()
+click sessionRef elementRef = PostEmpty "Click Element" (elementUri1 sessionRef elementRef "click") voidParser
 
 -- POST 	/session/{session id}/element/{element id}/clear 	Element Clear
 -- POST 	/session/{session id}/element/{element id}/value 	Element Send Keys
@@ -412,8 +443,8 @@ click sessionRef elementRef = PostEmpty "Click Element" (element1 sessionRef ele
 -- GET 	/session/{session id}/element/{element id}/screenshot 	Take Element Screenshot
 -- POST 	/session/{session id}/print 	Print Page
 
-findElement' :: SessionRef -> Value -> W3Spec ElementRef
-findElement' sessionRef selector = Post "Find Element" (sessionId1 sessionRef "element") selector parseElementRef
+findElement' :: SessionId -> Value -> W3Spec ElementId
+findElement' sessionRef selector = Post "Find Element" (sessionUri1 sessionRef "element") selector parseElementRef
 
 -- #### Utils ####
 
@@ -423,26 +454,6 @@ data Timeouts = Timeouts
     script :: Int
   }
   deriving (Show)
-
-  {-
-  Response
-  { statusCode = 200
-  , statusMessage = "OK"
-  , body =
-      Object
-        (fromList
-           [ ( "value"
-             , Array
-                 [ String "38573ea0-0402-4845-9186-54ad3dc874b1"
-                 , String "f145ab04-c1ab-48d1-8c62-1f73d43650d7"
-                 ]
-             )
-           ])
-  }
-  
-  
-  
-  -}
 
 windowHandleParser :: HttpResponse -> Maybe WindowHandle
 windowHandleParser r =
@@ -481,8 +492,8 @@ parseTimeouts r =
             >>= lookup "script"
             >>= asInt
         )
-    where
-      value = bodyValue r
+  where
+    value = bodyValue r
 
 selectorJson :: Selector -> Value
 selectorJson = \case
@@ -494,7 +505,7 @@ voidParser _ = Just ()
 parseValueTxt :: HttpResponse -> Maybe Text
 parseValueTxt r = bodyValue r >>= asText
 
-parseElementsRef :: HttpResponse -> Maybe [ElementRef]
+parseElementsRef :: HttpResponse -> Maybe [ElementId]
 parseElementsRef r =
   bodyValue r
     >>= \case
@@ -517,7 +528,7 @@ asInt = \case
   Number t -> Just $ floor t
   _ -> Nothing
 
-parseSessionRef :: HttpResponse -> Maybe SessionRef
+parseSessionRef :: HttpResponse -> Maybe SessionId
 parseSessionRef r =
   Session
     <$> ( bodyValue r
@@ -526,10 +537,12 @@ parseSessionRef r =
         )
 
 bodyValue :: HttpResponse -> Maybe Value
-bodyValue r =  lookup "value" r.body
+bodyValue r = lookup "value" r.body
 
+elementFieldName :: Key
+elementFieldName = "element-6066-11e4-a52e-4f735466cecf"
 
-parseElementRef :: HttpResponse -> Maybe ElementRef
+parseElementRef :: HttpResponse -> Maybe ElementId
 parseElementRef r =
   Element
     <$> ( bodyValue r
@@ -538,38 +551,38 @@ parseElementRef r =
             >>= asText
         )
 
-elemtRefFromBody :: Value -> Maybe ElementRef
+elemtRefFromBody :: Value -> Maybe ElementId
 elemtRefFromBody v =
   Element
-    <$> ( lookup "element-6066-11e4-a52e-4f735466cecf" v
+    <$> ( lookup elementFieldName v
             >>= asText
         )
 
 session :: Text
 session = "session"
 
-sessionUrl :: Text -> [Text]
-sessionUrl sp = [session, sp]
+sessionUri :: Text -> [Text]
+sessionUri sp = [session, sp]
 
-sessionId1 :: SessionRef -> Text -> [Text]
-sessionId1 sr sp = [session, sr.id, sp]
+sessionUri1 :: SessionId -> Text -> [Text]
+sessionUri1 sr sp = [session, sr.id, sp]
 
-sessionId2 :: SessionRef -> Text -> Text -> [Text]
-sessionId2 sr sp sp2 = [session, sr.id, sp, sp2]
+sessionUri2 :: SessionId -> Text -> Text -> [Text]
+sessionUri2 sr sp sp2 = [session, sr.id, sp, sp2]
 
 window :: Text
 window = "window"
 
-window1 :: SessionRef -> Text -> [Text]
-window1 sr sp = [session, sr.id, window, sp]
+windowUri1 :: SessionId -> Text -> [Text]
+windowUri1 sr sp = [session, sr.id, window, sp]
 
-element1 :: SessionRef -> ElementRef -> Text -> [Text]
-element1 sr er sp = [session, sr.id, "element", er.id, sp]
+elementUri1 :: SessionId -> ElementId -> Text -> [Text]
+elementUri1 sr er sp = [session, sr.id, "element", er.id, sp]
 
 mkShowable :: W3Spec a -> W3SpecShowable
 mkShowable = \case
   Get d p _ -> Request d "GET" p Nothing
-  Post d p b _ -> Request d "POST" p (Just b)
+  Post d p b _ -> Request d "POST" p (Just . toS . unpack $ encodePretty b)
   PostEmpty d p _ -> Request d "POST" p Nothing
   Delete d p _ -> Request d "DELETE" p Nothing
 

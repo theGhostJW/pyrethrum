@@ -17,9 +17,9 @@ import WebDriverIO
       elementText )
 import WebDriverSpec
     ( DriverStatus,
-      SessionRef(Session),
+      SessionId(Session),
       Selector(..),
-      ElementRef(Element) )
+      ElementId(Element) )
 import Prelude hiding (get, second)
 import Data.Text.IO qualified as T
 import PyrethrumExtras (txt)
@@ -31,7 +31,7 @@ _status = status
 -- >>> _status
 -- Ready
 
-_newDefaultFirefoxSession :: IO SessionRef
+_newDefaultFirefoxSession :: IO SessionId
 _newDefaultFirefoxSession = newDefaultFirefoxSession
 -- >>> newDefaultFirefoxSession
 
@@ -68,7 +68,7 @@ _newDefaultFirefoxSession = newDefaultFirefoxSession
 -- }
 -- , responseEarlyHints = []}) "{\"value\":{\"error\":\"session not created\",\"message\":\"Session is already started\",\"stacktrace\":\"\"}}"))
 
-_latestSession :: SessionRef
+_latestSession :: SessionId
 _latestSession = Session "1beac3df-15c8-490d-8eb5-65691b6e16d0"
 
 _maximizeWindow :: IO ()
@@ -133,16 +133,16 @@ _navigateToTheInternet = navigateTo _latestSession _theInternet
 _checkBoxesLinkCss :: Selector
 _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
-_findCheckBoxesLink :: IO ElementRef
+_findCheckBoxesLink :: IO ElementId
 _findCheckBoxesLink = findElement _latestSession _checkBoxesLinkCss
 
 -- >>> _findCheckBoxesLink
 -- Element {id = "ffef18ab-c34c-48b5-8031-4b762c453b64"}
 
-_checkboxesLinkElement :: ElementRef
+_checkboxesLinkElement :: ElementId
 _checkboxesLinkElement = Element "ffef18ab-c34c-48b5-8031-4b762c453b64"
 
-_findMissing :: IO ElementRef
+_findMissing :: IO ElementId
 _findMissing = findElement _latestSession $ CSS "#notHere"
 
 -- >>> _findMissing

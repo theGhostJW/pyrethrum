@@ -2,7 +2,7 @@ module WebDriverPlainIODemo where
 
 import Data.Text.IO qualified as TIO
 import PyrethrumExtras (txt)
-import WebDriverDemoUtils (checkBoxesLinkCss, theInternet, framesUrl, topFrameCSS, midFrameTitle, bottomFrameCss)
+import WebDriverDemoUtils (checkBoxesLinkCss, theInternet, framesUrl, topFrameCSS, midFrameTitle, bottomFrameCss, midFrameCss)
 import WebDriverIO
   ( Timeouts (..),
     WindowHandle (..),
@@ -25,7 +25,7 @@ import WebDriverIO
     refresh,
     setTimeouts,
     sleepMilliSecs,
-    status, newWindow, switchToWindow, switchToFrame, getWindowHandles, SessionRef, findElements,
+    status, newWindow, switchToWindow, switchToFrame, getWindowHandles, SessionId, findElements, FrameReference (FrameElementId, TopLevelFrame, FrameNumber), getActiveElement,
   )
 import WebDriverPure (seconds)
 
@@ -35,11 +35,14 @@ logTxt = TIO.putStrLn
 log :: Text -> Text -> IO ()
 log l t = logTxt $ l <> ": " <> t
 
+logShow :: (Show a) => Text -> a -> IO ()
+logShow l = log l . txt
+
 logM :: Text -> IO Text -> IO ()
 logM l t = t >>= log l
 
 logShowM :: (Show a) => Text -> IO a -> IO ()
-logShowM l t = t >>= log l . txt
+logShowM l t = t >>= logShow l
 
 
 sleep1 :: IO ()
@@ -112,56 +115,40 @@ demo = do
   deleteSession ses
 
 -- >>> demoFrames
--- *** Exception: VanillaHttpException (HttpExceptionRequest Request {
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session/58167c4f-8540-42e9-b6c9-f8f0cfa93816/element/8c99d472-4b87-4bfb-b5df-5f236680dc1f/frame"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
---  (StatusCodeException (Response {responseStatus = Status {statusCode = 405, statusMessage = "Method Not Allowed"}, responseVersion = HTTP/1.1, responseHeaders = [("content-type","text/plain; charset=utf-8"),("content-length","23"),("date","Thu, 16 Jan 2025 21:59:02 GMT")], responseBody = (), responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session/58167c4f-8540-42e9-b6c9-f8f0cfa93816/element/8c99d472-4b87-4bfb-b5df-5f236680dc1f/frame"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
--- , responseEarlyHints = []}) "HTTP method not allowed"))
 demoFrames :: IO ()
 demoFrames = do
   ses <- newDefaultFirefoxSession
   navigateTo ses framesUrl
 
-  sleep1
-
+  logTxt "At top level frame"
   logShowM "bottom frame exists" $ bottomFameExists ses
   
+  -- switch frames using element id
   tf <- findElement ses topFrameCSS
-  switchToFrame ses tf
+  logShow "switch to top frame" tf
+  switchToFrame ses (FrameElementId tf)
 
   logShowM "bottom frame exists after switching to top frame" $ bottomFameExists ses
 
+  mf <- findElement ses midFrameCss
+  switchToFrame ses (FrameElementId mf)
+
   fTitle <- findElement ses midFrameTitle
-  logM "checkButtonText" $ elementText ses fTitle
+  logM "middle frame title" $ elementText ses fTitle
+
+  logTxt "switch to top level frame"
+  switchToFrame ses TopLevelFrame
+  logShowM "bottom frame exists" $ bottomFameExists ses
+  logShowM "active element" $ getActiveElement ses
+
+  logTxt "Switch to frame 1"
+  switchToFrame ses $ FrameNumber 1
+
+  logShowM "bottom frame exists" $ bottomFameExists ses
+  logShowM "active element" $ getActiveElement ses
 
   deleteSession ses
 
-bottomFameExists :: SessionRef -> IO Bool
+bottomFameExists :: SessionId -> IO Bool
 bottomFameExists ses = not . null <$> findElements ses bottomFrameCss 
   

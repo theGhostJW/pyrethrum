@@ -27,7 +27,7 @@ import Effectful as EF ( Effect, DispatchOf, Dispatch(Dynamic))
 import Effectful.Reader.Static as ERS
 import Effectful.TH (makeEffect)
 import Prelude hiding (second)
-import WebDriverSpec (ElementRef, DriverStatus, Selector, SessionRef)
+import WebDriverSpec (ElementId, DriverStatus, Selector, SessionId)
 
 -- Effect
 
@@ -47,19 +47,19 @@ data WebUI :: Effect where
   -- driver 
   DriverStatus :: WebUI m  DriverStatus
   -- session
-  NewSession :: WebUI m SessionRef
-  KillSession :: SessionRef -> WebUI m ()
+  NewSession :: WebUI m SessionId
+  KillSession :: SessionId -> WebUI m ()
   -- window
-  FullscreenWindow :: SessionRef -> WebUI m ()
-  MaximiseWindow :: SessionRef -> WebUI m ()
-  MinimiseWindow :: SessionRef -> WebUI m ()
+  FullscreenWindow :: SessionId -> WebUI m ()
+  MaximiseWindow :: SessionId -> WebUI m ()
+  MinimiseWindow :: SessionId -> WebUI m ()
   -- navigate
-  Go :: SessionRef -> Text -> WebUI m ()
+  Go :: SessionId -> Text -> WebUI m ()
   -- element interactions
   -- toDO Click, Read... (take selector param)
-  FindElem :: SessionRef -> Selector -> WebUI m ElementRef
-  ClickElem :: SessionRef -> ElementRef -> WebUI m ()
-  ReadElem :: SessionRef -> ElementRef -> WebUI m Text
+  FindElem :: SessionId -> Selector -> WebUI m ElementId
+  ClickElem :: SessionId -> ElementId -> WebUI m ()
+  ReadElem :: SessionId -> ElementId -> WebUI m Text
   -- TODO move this its more generic (eg. used in REST wait loops)
   Sleep :: Int -> WebUI m ()
 

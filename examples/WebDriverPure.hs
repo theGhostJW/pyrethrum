@@ -58,6 +58,7 @@ data RequestArgs where
       port :: Int
     } ->
     RequestArgs
+  
 
 defaultRequest :: RequestArgs
 defaultRequest = RequestParams [] GET NoReqBody 4444

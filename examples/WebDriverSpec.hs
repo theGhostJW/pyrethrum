@@ -11,6 +11,7 @@ module WebDriverSpec
     Timeouts (..),
     WindowHandle (..),
     FrameReference (..),
+    WindowRect (..),
     -- Capabilities(..),
     mkShowable,
     --- Specs
@@ -39,12 +40,16 @@ module WebDriverSpec
     navigateTo,
     findElement,
     findElement',
+    getWindowRect,
     click,
-    elementText,
+    getElementText,
+    switchToParentFrame,
+    getElementProperty,
+    getElementCssValue,
   )
 where
 
-import BasePrelude (Show (..))
+import BasePrelude (Show (..), liftA)
 import Data.Aeson
   ( Key,
     KeyValue ((.=)),
@@ -56,6 +61,7 @@ import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap qualified as AKM
 import Data.ByteString.Lazy.Char8 (unpack)
 import PyrethrumExtras (toS)
+import Web.Api.WebDriver (setWindowRect)
 import Prelude hiding (get)
 
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
@@ -150,7 +156,7 @@ frameJson fr =
     frameVariant =
       \case
         TopLevelFrame -> Null
-        FrameNumber n ->  Number $ fromIntegral n
+        FrameNumber n -> Number $ fromIntegral n
         FrameElementId elm -> object [elementFieldName .= elm.id]
 
 data Cookie = Cookie
@@ -371,20 +377,28 @@ switchToFrame :: SessionId -> FrameReference -> W3Spec ()
 switchToFrame sessionRef frameRef = Post "Switch To Frame" (sessionUri1 sessionRef "frame") (frameJson frameRef) voidParser
 
 -- POST 	/session/{session id}/frame/parent 	Switch To Parent Frame
+switchToParentFrame :: SessionId -> W3Spec ()
+switchToParentFrame sessionRef = PostEmpty "Switch To Parent Frame" (sessionUri2 sessionRef "frame" "parent") voidParser
+
 -- GET 	/session/{session id}/window/rect 	Get Window Rect
+getWindowRect :: SessionId -> W3Spec WindowRect
+getWindowRect sessionRef = Get "Get Window Rect" (sessionUri2 sessionRef "window" "rect") parseWindowRect
+
 -- POST 	/session/{session id}/window/rect 	Set Window Rect
+-- setWindowRect :: SessionId -> WindowRect -> W3Spec ()
+-- setWindowRect sessionRef rect = Post "Set Window Rect" (sessionUri1 sessionRef "window/rect") (toJSON rect) voidParser
 
 -- POST 	/session/{session id}/window/maximize 	Maximize
-maximizeWindow :: SessionId -> W3Spec ()
-maximizeWindow sessionRef = PostEmpty "Maximize Window" (windowUri1 sessionRef "maximize") voidParser
+maximizeWindow :: SessionId -> W3Spec WindowRect
+maximizeWindow sessionRef = PostEmpty "Maximize Window" (windowUri1 sessionRef "maximize") parseWindowRect
 
 -- POST 	/session/{session id}/window/minimize 	Minimize Window
-minimizeWindow :: SessionId -> W3Spec ()
-minimizeWindow sessionRef = PostEmpty "Minimize Window" (windowUri1 sessionRef "minimize") voidParser
+minimizeWindow :: SessionId -> W3Spec WindowRect
+minimizeWindow sessionRef = PostEmpty "Minimize Window" (windowUri1 sessionRef "minimize") parseWindowRect
 
 -- POST 	/session/{session id}/window/fullscreen 	Fullscreen Window
-fullscreenWindow :: SessionId -> W3Spec ()
-fullscreenWindow sessionRef = PostEmpty "Fullscreen Window" (windowUri1 sessionRef "fullscreen") voidParser
+fullscreenWindow :: SessionId -> W3Spec WindowRect
+fullscreenWindow sessionRef = PostEmpty "Fullscreen Window" (windowUri1 sessionRef "fullscreen") parseWindowRect
 
 -- GET 	/session/{session id}/element/active 	Get Active Element
 getActiveElement :: SessionId -> W3Spec ElementId
@@ -406,12 +420,18 @@ findElements sessionRef selector = Post "Find Elements" (sessionUri1 sessionRef 
 -- POST 	/session/{session id}/shadow/{shadow id}/elements 	Find Elements From Shadow Root
 -- GET 	/session/{session id}/element/{element id}/selected 	Is Element Selected
 -- GET 	/session/{session id}/element/{element id}/attribute/{name} 	Get Element Attribute
+
 -- GET 	/session/{session id}/element/{element id}/property/{name} 	Get Element Property
+getElementProperty :: SessionId -> ElementId -> Text -> W3Spec Value
+getElementProperty sessionId elementId propertyName = Get "Get Element Property" (elementUri2 sessionId elementId "property" propertyName) bodyValue
+
 -- GET 	/session/{session id}/element/{element id}/css/{property name} 	Get Element CSS Value
+getElementCssValue :: SessionId -> ElementId -> Text -> W3Spec Text
+getElementCssValue sessionId elementId propertyName = Get "Get Element CSS Value" (elementUri2 sessionId elementId "css" propertyName) parseValueTxt
 
 -- GET 	/session/{session id}/element/{element id}/text 	Get Element Text
-elementText :: SessionId -> ElementId -> W3Spec Text
-elementText sessionRef elementRef = Get "Get Element Text" (elementUri1 sessionRef elementRef "text") parseValueTxt
+getElementText :: SessionId -> ElementId -> W3Spec Text
+getElementText sessionId elementId = Get "Get Element Text" (elementUri1 sessionId elementId "text") parseValueTxt
 
 -- GET 	/session/{session id}/element/{element id}/name 	Get Element Tag Name
 -- GET 	/session/{session id}/element/{element id}/rect 	Get Element Rect
@@ -421,7 +441,7 @@ elementText sessionRef elementRef = Get "Get Element Text" (elementUri1 sessionR
 
 -- POST 	/session/{session id}/element/{element id}/click 	Element Click
 click :: SessionId -> ElementId -> W3Spec ()
-click sessionRef elementRef = PostEmpty "Click Element" (elementUri1 sessionRef elementRef "click") voidParser
+click sessionId elementId = PostEmpty "Click Element" (elementUri1 sessionId elementId "click") voidParser
 
 -- POST 	/session/{session id}/element/{element id}/clear 	Element Clear
 -- POST 	/session/{session id}/element/{element id}/value 	Element Send Keys
@@ -448,6 +468,24 @@ findElement' sessionRef selector = Post "Find Element" (sessionUri1 sessionRef "
 
 -- #### Utils ####
 
+data WindowRect = WindowRect
+  { x :: Int,
+    y :: Int,
+    width :: Int,
+    height :: Int
+  }
+  deriving (Show)
+
+parseWindowRect :: HttpResponse -> Maybe WindowRect
+parseWindowRect r =
+  WindowRect
+    <$> (v >>= lookupInt "x")
+    <*> (v >>= lookupInt "y")
+    <*> (v >>= lookupInt "width")
+    <*> (v >>= lookupInt "height")
+  where
+    v = bodyValue r
+
 data Timeouts = Timeouts
   { implicit :: Int,
     pageLoad :: Int,
@@ -469,31 +507,17 @@ windowHandlesParser r = do
 
 windowHandleFromValue :: Value -> Maybe WindowHandle
 windowHandleFromValue v =
-  Handle
-    <$> ( lookup "handle" v
-            >>= asText
-        )
-    <*> ( lookup "type" v
-            >>= asText
-        )
+  liftA2 Handle (lookupTxt "handle" v) (lookupTxt "type" v)
 
 parseTimeouts :: HttpResponse -> Maybe Timeouts
 parseTimeouts r =
-  Timeouts
-    <$> ( value
-            >>= lookup "implicit"
-            >>= asInt
-        )
-    <*> ( value
-            >>= lookup "pageLoad"
-            >>= asInt
-        )
-    <*> ( value
-            >>= lookup "script"
-            >>= asInt
-        )
+  liftA3
+    Timeouts
+    (v >>= lookupInt "implicit")
+    (v >>= lookupInt "pageLoad")
+    (v >>= lookupInt "script")
   where
-    value = bodyValue r
+    v = bodyValue r
 
 selectorJson :: Selector -> Value
 selectorJson = \case
@@ -512,11 +536,17 @@ parseElementsRef r =
       Array a -> Just $ mapMaybe elemtRefFromBody (toList a)
       _ -> Nothing
 
--- TODO Ason helpers separate module
+-- TODO Aeson helpers separate module
 lookup :: Key -> Value -> Maybe Value
 lookup k = \case
   Object o -> AKM.lookup k o
   _ -> Nothing
+
+lookupTxt :: Key -> Value -> Maybe Text
+lookupTxt k v = lookup k v >>= asText
+
+lookupInt :: Key -> Value -> Maybe Int
+lookupInt k v = lookup k v >>= asInt
 
 asText :: Value -> Maybe Text
 asText = \case
@@ -531,10 +561,7 @@ asInt = \case
 parseSessionRef :: HttpResponse -> Maybe SessionId
 parseSessionRef r =
   Session
-    <$> ( bodyValue r
-            >>= lookup "sessionId"
-            >>= asText
-        )
+    <$> (bodyValue r >>= lookupTxt "sessionId")
 
 bodyValue :: HttpResponse -> Maybe Value
 bodyValue r = lookup "value" r.body
@@ -547,16 +574,12 @@ parseElementRef r =
   Element
     <$> ( bodyValue r
             -- very strange choice for prop name - in response and sane as webdriver-w3c
-            >>= lookup "element-6066-11e4-a52e-4f735466cecf"
-            >>= asText
+            >>= lookupTxt "element-6066-11e4-a52e-4f735466cecf"
         )
 
 elemtRefFromBody :: Value -> Maybe ElementId
 elemtRefFromBody v =
-  Element
-    <$> ( lookup elementFieldName v
-            >>= asText
-        )
+  Element <$> lookupTxt elementFieldName v
 
 session :: Text
 session = "session"
@@ -578,6 +601,9 @@ windowUri1 sr sp = [session, sr.id, window, sp]
 
 elementUri1 :: SessionId -> ElementId -> Text -> [Text]
 elementUri1 sr er sp = [session, sr.id, "element", er.id, sp]
+
+elementUri2 :: SessionId -> ElementId -> Text -> Text -> [Text]
+elementUri2 sr er sp sp2 = [session, sr.id, "element", er.id, sp, sp2]
 
 mkShowable :: W3Spec a -> W3SpecShowable
 mkShowable = \case

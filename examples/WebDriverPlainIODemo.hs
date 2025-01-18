@@ -2,9 +2,11 @@ module WebDriverPlainIODemo where
 
 import Data.Text.IO qualified as TIO
 import PyrethrumExtras (txt)
-import WebDriverDemoUtils (checkBoxesLinkCss, theInternet, framesUrl, topFrameCSS, midFrameTitle, bottomFrameCss, midFrameCss)
+import WebDriverDemoUtils (bottomFrameCss, checkBoxesCss, checkBoxesLinkCss, divCss, framesUrl, midFrameCss, midFrameTitle, theInternet, topFrameCSS)
 import WebDriverIO
-  ( Timeouts (..),
+  ( FrameReference (FrameElementId, FrameNumber, TopLevelFrame),
+    SessionId,
+    Timeouts (..),
     WindowHandle (..),
     back,
     click,
@@ -12,20 +14,29 @@ import WebDriverIO
     deleteSession,
     elementText,
     findElement,
+    findElements,
     forward,
     fullScreenWindow,
+    getActiveElement,
     getCurrentUrl,
+    getElementCssValue,
+    getElementProperty,
     getTimeouts,
     getTitle,
     getWindowHandle,
+    getWindowHandles,
     maximizeWindow,
     minimizeWindow,
     navigateTo,
     newDefaultFirefoxSession,
+    newWindow,
     refresh,
     setTimeouts,
-    sleepMilliSecs,
-    status, newWindow, switchToWindow, switchToFrame, getWindowHandles, SessionId, findElements, FrameReference (FrameElementId, TopLevelFrame, FrameNumber), getActiveElement,
+    sleepMs,
+    status,
+    switchToFrame,
+    switchToParentFrame,
+    switchToWindow, getWindowRect,
   )
 import WebDriverPure (seconds)
 
@@ -44,15 +55,12 @@ logM l t = t >>= log l
 logShowM :: (Show a) => Text -> IO a -> IO ()
 logShowM l t = t >>= logShow l
 
-
 sleep1 :: IO ()
-sleep1 = sleepMilliSecs $ 1 * seconds
+sleep1 = sleepMs $ 1 * seconds
 
 -- >>> demo
 demo :: IO ()
 demo = do
-  logTxt "WebDriverPlainIODemo action"
-
   logShowM "driver status" status
 
   ses <- newDefaultFirefoxSession
@@ -62,9 +70,9 @@ demo = do
 
   let timeouts =
         Timeouts
-          { pageLoad = 5 * seconds,
-            script = 6 * seconds,
-            implicit = 7 * seconds
+          { pageLoad = 30 * seconds,
+            script = 11 * seconds,
+            implicit = 12 * seconds
           }
   setTimeouts ses timeouts
   logShowM "timeouts" $ getTimeouts ses
@@ -73,17 +81,26 @@ demo = do
   navigateTo ses theInternet
   logM "current url" $ getCurrentUrl ses
 
-  minimizeWindow ses
+  logShowM "minimizeWindow" $  minimizeWindow ses
   sleep1
 
-  fullScreenWindow ses
+  logShowM "fullscreen" $ fullScreenWindow ses
   sleep1
 
-  maximizeWindow ses
+  logShowM "maximizeWindow" $ maximizeWindow ses
 
   link <- findElement ses checkBoxesLinkCss
-  logM "checkButtonText" $ elementText ses link
+  logM "check box link text" $ elementText ses link
   click ses link
+
+  sleepMs $ 5 * seconds
+  cbs <- findElements ses checkBoxesCss
+  forM_ cbs $ \cb ->
+    logShowM "checkBox checked property" $ getElementProperty ses cb "checked"
+
+  divs <- findElements ses divCss
+  forM_ divs $ \d ->
+    logShowM "div overflow value" $ getElementCssValue ses d "overflow"
 
   -- so we can see the navigation worked
   sleep1
@@ -103,16 +120,34 @@ demo = do
 
   w <- newWindow ses
   log "new window Handle" $ txt w
-  sleep1 
+  sleep1
 
   switchToWindow ses w.handle
 
   logShowM "all windows handles" $ getWindowHandles ses
-  
+
   closeWindow ses
   log "windows closed" $ txt ses
 
   deleteSession ses
+
+-- >>> demo2
+demo2 :: IO ()
+demo2 = do
+  logShowM "driver status" status
+
+  ses <- newDefaultFirefoxSession
+  setTimeouts
+    ses
+    Timeouts
+      { pageLoad = 30 * seconds,
+        script = 11 * seconds,
+        implicit = 12 * seconds
+      }
+  ---
+  logShowM "window rect" $ getWindowRect ses
+  sleepMs $ 2 * seconds
+
 
 -- >>> demoFrames
 demoFrames :: IO ()
@@ -122,7 +157,7 @@ demoFrames = do
 
   logTxt "At top level frame"
   logShowM "bottom frame exists" $ bottomFameExists ses
-  
+
   -- switch frames using element id
   tf <- findElement ses topFrameCSS
   logShow "switch to top frame" tf
@@ -141,6 +176,25 @@ demoFrames = do
   logShowM "bottom frame exists" $ bottomFameExists ses
   logShowM "active element" $ getActiveElement ses
 
+  -- drill back down to middle frame (repeat the above steps)
+  tf' <- findElement ses topFrameCSS
+  logShow "switch back to top frame" tf'
+  switchToFrame ses (FrameElementId tf')
+  logShowM "active element" $ getActiveElement ses
+
+  mf' <- findElement ses midFrameCss
+  logShow "drill back down to middle frame" mf'
+  switchToFrame ses (FrameElementId mf')
+  logShowM "active element" $ getActiveElement ses
+
+  logTxt "switch to parent frame"
+  switchToParentFrame ses
+  logShowM "active element" $ getActiveElement ses
+
+  logTxt "switch to parent frame again"
+  switchToParentFrame ses
+  logShowM "active element" $ getActiveElement ses
+
   logTxt "Switch to frame 1"
   switchToFrame ses $ FrameNumber 1
 
@@ -150,5 +204,4 @@ demoFrames = do
   deleteSession ses
 
 bottomFameExists :: SessionId -> IO Bool
-bottomFameExists ses = not . null <$> findElements ses bottomFrameCss 
-  
+bottomFameExists ses = not . null <$> findElements ses bottomFrameCss

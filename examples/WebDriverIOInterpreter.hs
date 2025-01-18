@@ -17,7 +17,7 @@ import WebDriverIO
     elementText,
     navigateTo,
     newDefaultFirefoxSession,
-    status, findElement, fullScreenWindow, maximizeWindow, minimizeWindow, sleepMilliSecs,
+    status, findElement, fullScreenWindow, maximizeWindow, minimizeWindow, sleepMs,
   )
 
 runWebDriver :: forall es a. (IOE :> es) => Eff (WebUI : es) a -> Eff es a
@@ -40,4 +40,4 @@ runWebDriver =
       ClickElem sessionRef elemRef -> click sessionRef elemRef
       ReadElem sessionRef elemRef -> elementText sessionRef elemRef
       -- TODO move this its more generic (eg. used in REST wait loops)
-      Sleep milliSec -> sleepMilliSecs milliSec
+      Sleep milliSec -> sleepMs milliSec

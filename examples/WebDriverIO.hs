@@ -5,6 +5,7 @@ module WebDriverIO
     W.WindowHandle (..),
     W.SessionId (..),
     W.FrameReference (..),
+    W.WindowRect (..),
     status,
     findElements,
     getTimeouts,
@@ -20,6 +21,7 @@ module WebDriverIO
     minimizeWindow,
     fullScreenWindow,
     getWindowHandle,
+    getWindowRect,
     closeWindow,
     newWindow,
     newSession,
@@ -29,9 +31,12 @@ module WebDriverIO
     findElement,
     click,
     elementText,
-    sleepMilliSecs,
+    sleepMs,
     switchToWindow,
     switchToFrame,
+    switchToParentFrame,
+    getElementProperty,
+    getElementCssValue
   )
 where
 
@@ -89,17 +94,20 @@ getCurrentUrl = run . W.getCurrentUrl
 getTitle :: SessionId -> IO Text
 getTitle = run . W.getTitle
 
-maximizeWindow :: SessionId -> IO ()
+maximizeWindow :: SessionId -> IO W.WindowRect
 maximizeWindow = run . W.maximizeWindow
 
-minimizeWindow :: SessionId -> IO ()
+minimizeWindow :: SessionId -> IO W.WindowRect
 minimizeWindow = run . W.minimizeWindow
 
-fullScreenWindow :: SessionId -> IO ()
+fullScreenWindow :: SessionId -> IO W.WindowRect
 fullScreenWindow = run . W.fullscreenWindow
 
 getWindowHandle :: SessionId -> IO Text
 getWindowHandle = run . W.getWindowHandle
+
+getWindowRect :: SessionId -> IO W.WindowRect
+getWindowRect = run . W.getWindowRect
 
 getWindowHandles :: SessionId -> IO [Text]
 getWindowHandles = run . W.getWindowHandles
@@ -112,6 +120,9 @@ switchToWindow s = run . W.switchToWindow s
 
 switchToFrame :: SessionId -> W.FrameReference -> IO ()
 switchToFrame s = run . W.switchToFrame s
+
+switchToParentFrame :: SessionId -> IO ()
+switchToParentFrame = run . W.switchToParentFrame
 
 closeWindow :: SessionId -> IO ()
 closeWindow = run . W.closeWindow
@@ -147,20 +158,26 @@ click :: SessionId -> ElementId -> IO ()
 click s = run . W.click s
 
 elementText :: SessionId -> ElementId -> IO Text
-elementText s = run . W.elementText s
+elementText s = run . W.getElementText s
+
+getElementProperty :: SessionId -> ElementId -> Text -> IO Value
+getElementProperty s eid = run . W.getElementProperty s eid
+
+getElementCssValue :: SessionId -> ElementId -> Text -> IO Text
+getElementCssValue s eid = run . W.getElementCssValue s eid
 
 -- ############# Utils #############
 
-sleepMilliSecs :: Int -> IO ()
-sleepMilliSecs = threadDelay . (* 1_000)
+sleepMs :: Int -> IO ()
+sleepMs = threadDelay . (* 1_000)
 
 debug :: Bool
 debug = False
 
 -- no console out for "production"
-run :: Show a => W3Spec a -> IO a
-run spec = do 
-  when debug $ do 
+run :: (Show a) => W3Spec a -> IO a
+run spec = do
+  when debug $ do
     devLog "Request"
     devLog . txt $ spec
   callWebDriver debug (mkRequest spec) >>= parseIO spec

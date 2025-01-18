@@ -46,10 +46,11 @@ module WebDriverSpec
     switchToParentFrame,
     getElementProperty,
     getElementCssValue,
+    setWindowRect
   )
 where
 
-import BasePrelude (Show (..), liftA)
+import BasePrelude (Show (..))
 import Data.Aeson
   ( Key,
     KeyValue ((.=)),
@@ -61,7 +62,6 @@ import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap qualified as AKM
 import Data.ByteString.Lazy.Char8 (unpack)
 import PyrethrumExtras (toS)
-import Web.Api.WebDriver (setWindowRect)
 import Prelude hiding (get)
 
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
@@ -385,8 +385,8 @@ getWindowRect :: SessionId -> W3Spec WindowRect
 getWindowRect sessionRef = Get "Get Window Rect" (sessionUri2 sessionRef "window" "rect") parseWindowRect
 
 -- POST 	/session/{session id}/window/rect 	Set Window Rect
--- setWindowRect :: SessionId -> WindowRect -> W3Spec ()
--- setWindowRect sessionRef rect = Post "Set Window Rect" (sessionUri1 sessionRef "window/rect") (toJSON rect) voidParser
+setWindowRect :: SessionId -> WindowRect -> W3Spec WindowRect
+setWindowRect sessionRef rect = Post "Set Window Rect" (sessionUri2 sessionRef "window" "rect") (toJSON rect) parseWindowRect
 
 -- POST 	/session/{session id}/window/maximize 	Maximize
 maximizeWindow :: SessionId -> W3Spec WindowRect
@@ -468,17 +468,27 @@ findElement' sessionRef selector = Post "Find Element" (sessionUri1 sessionRef "
 
 -- #### Utils ####
 
-data WindowRect = WindowRect
+data WindowRect = Rect
   { x :: Int,
     y :: Int,
     width :: Int,
     height :: Int
   }
-  deriving (Show)
-
+  deriving (Show, Eq)
+  
+instance ToJSON WindowRect where
+  toJSON :: WindowRect -> Value
+  toJSON Rect {x, y, width, height} =
+    object
+      [ "x" .= x,
+        "y" .= y,
+        "width" .= width,
+        "height" .= height
+      ]
+      
 parseWindowRect :: HttpResponse -> Maybe WindowRect
 parseWindowRect r =
-  WindowRect
+  Rect
     <$> (v >>= lookupInt "x")
     <*> (v >>= lookupInt "y")
     <*> (v >>= lookupInt "width")

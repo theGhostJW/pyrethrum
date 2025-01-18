@@ -27,7 +27,7 @@ import Effectful as EF ( Effect, DispatchOf, Dispatch(Dynamic))
 import Effectful.Reader.Static as ERS
 import Effectful.TH (makeEffect)
 import Prelude hiding (second)
-import WebDriverSpec (ElementId, DriverStatus, Selector, SessionId)
+import WebDriverSpec (ElementId, DriverStatus, Selector, SessionId, WindowRect)
 
 -- Effect
 
@@ -50,9 +50,9 @@ data WebUI :: Effect where
   NewSession :: WebUI m SessionId
   KillSession :: SessionId -> WebUI m ()
   -- window
-  FullscreenWindow :: SessionId -> WebUI m ()
-  MaximiseWindow :: SessionId -> WebUI m ()
-  MinimiseWindow :: SessionId -> WebUI m ()
+  FullscreenWindow :: SessionId -> WebUI m WindowRect
+  MaximiseWindow :: SessionId -> WebUI m WindowRect
+  MinimiseWindow :: SessionId -> WebUI m WindowRect
   -- navigate
   Go :: SessionId -> Text -> WebUI m ()
   -- element interactions

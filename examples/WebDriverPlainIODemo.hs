@@ -8,6 +8,7 @@ import WebDriverIO
     SessionId,
     Timeouts (..),
     WindowHandle (..),
+    WindowRect (..),
     back,
     click,
     closeWindow,
@@ -25,6 +26,7 @@ import WebDriverIO
     getTitle,
     getWindowHandle,
     getWindowHandles,
+    getWindowRect,
     maximizeWindow,
     minimizeWindow,
     navigateTo,
@@ -32,11 +34,12 @@ import WebDriverIO
     newWindow,
     refresh,
     setTimeouts,
+    setWindowRect,
     sleepMs,
     status,
     switchToFrame,
     switchToParentFrame,
-    switchToWindow, getWindowRect,
+    switchToWindow,
   )
 import WebDriverPure (seconds)
 
@@ -81,7 +84,7 @@ demo = do
   navigateTo ses theInternet
   logM "current url" $ getCurrentUrl ses
 
-  logShowM "minimizeWindow" $  minimizeWindow ses
+  logShowM "minimizeWindow" $ minimizeWindow ses
   sleep1
 
   logShowM "fullscreen" $ fullScreenWindow ses
@@ -147,7 +150,9 @@ demo2 = do
   ---
   logShowM "window rect" $ getWindowRect ses
   sleepMs $ 2 * seconds
-
+  logShowM "set window rect" $ setWindowRect ses $ Rect 500 300 500 500
+  sleepMs $ 2 * seconds
+  deleteSession ses
 
 -- >>> demoFrames
 demoFrames :: IO ()

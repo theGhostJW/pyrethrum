@@ -15,7 +15,7 @@ import Effectful.Dispatch.Dynamic
   ( interpret, LocalEnv,
   )
 import WebDriverEffect (WebUI (..))
-import DSL.DocInterpreterUtils (docAction, docFake, docAction2, docFake2)
+import DSL.DocInterpreterUtils (docAction, docFake, docAction2, docFake2, docErr)
 import DSL.Internal.NodeLog (NodeLog)
 import DSL.OutEffect ( Out )
 import PyrethrumExtras (txt)
@@ -39,9 +39,9 @@ runWebDriver =
         NewSession ->  docFake (Session "new-session-id" )"create new driver session"
         KillSession _sessionRef -> docAction "kill driver session"
         -- window
-        FullscreenWindow _sessionRef -> docAction "make browser fullscreen"
-        MaximiseWindow _sessionRef -> docAction "maximise browser window"
-        MinimiseWindow _sessionRef -> docAction "minimise browser window"
+        FullscreenWindow _sessionRef -> docErr "fullscreenWindow" "make browser to fullscreen"
+        MaximiseWindow _sessionRef -> docErr "maximiseWindow" "maximise browser window"
+        MinimiseWindow _sessionRef -> docErr "minimiseWindow" "minimise browser window"
         -- navigate
         Go _sessionRef url -> docAction2 "navigate to:" url
         -- page

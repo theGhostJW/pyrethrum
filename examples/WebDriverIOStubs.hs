@@ -14,7 +14,7 @@ import WebDriverIO
       maximizeWindow,
       minimizeWindow,
       fullScreenWindow,
-      elementText )
+      elementText, WindowRect )
 import WebDriverSpec
     ( DriverStatus,
       SessionId(Session),
@@ -71,17 +71,17 @@ _newDefaultFirefoxSession = newDefaultFirefoxSession
 _latestSession :: SessionId
 _latestSession = Session "1beac3df-15c8-490d-8eb5-65691b6e16d0"
 
-_maximizeWindow :: IO ()
+_maximizeWindow :: IO WindowRect
 _maximizeWindow = maximizeWindow _latestSession
 
 -- >>> _maximizeWindow
 
-_minimizeWindow :: IO ()
+_minimizeWindow :: IO WindowRect
 _minimizeWindow = minimizeWindow _latestSession
 
 -- >>> _minimizeWindow
 
-_fullscreenWindow :: IO ()
+_fullscreenWindow :: IO WindowRect
 _fullscreenWindow = fullScreenWindow _latestSession
 
 -- >>> _fullscreenWindow

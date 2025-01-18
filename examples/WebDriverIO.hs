@@ -31,6 +31,7 @@ module WebDriverIO
     findElement,
     click,
     elementText,
+    setWindowRect,
     sleepMs,
     switchToWindow,
     switchToFrame,
@@ -135,6 +136,9 @@ forward = run . W.forward
 
 refresh :: SessionId -> IO ()
 refresh = run . W.refresh
+
+setWindowRect :: SessionId -> W.WindowRect -> IO W.WindowRect
+setWindowRect s = run . W.setWindowRect s
 
 newDefaultFirefoxSession :: IO SessionId
 newDefaultFirefoxSession = newSession defaultFirefoxCapabilities

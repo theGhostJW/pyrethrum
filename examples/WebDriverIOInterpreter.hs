@@ -14,7 +14,7 @@ import WebDriverEffect (WebUI (..))
 import WebDriverIO
   ( click,
     deleteSession,
-    elementText,
+    getElementText,
     navigateTo,
     newDefaultFirefoxSession,
     status, findElement, fullScreenWindow, maximizeWindow, minimizeWindow, sleepMs,
@@ -38,6 +38,6 @@ runWebDriver =
       -- page
       FindElem sessionRef selector -> findElement sessionRef selector
       ClickElem sessionRef elemRef -> click sessionRef elemRef
-      ReadElem sessionRef elemRef -> elementText sessionRef elemRef
+      ReadElem sessionRef elemRef -> getElementText sessionRef elemRef
       -- TODO move this its more generic (eg. used in REST wait loops)
       Sleep milliSec -> sleepMs milliSec

@@ -29,7 +29,26 @@ divCss = CSS "div"
 midFrameTitle :: Selector
 midFrameTitle = CSS "#content"
 
+myTextCss:: Selector
+myTextCss = CSS "[name='my-text']"
+
 framesUrl :: Text
 framesUrl = "https://the-internet.herokuapp.com/nested_frames"
+
+inputsUrl :: Text
+inputsUrl = "https://the-internet.herokuapp.com/inputs"
+
+shadowDomUrl :: Text
+shadowDomUrl = "https://the-internet.herokuapp.com/shadowdom"
+
+contentCss :: Selector
+contentCss = CSS "#content"
+
+inputTagCss :: Selector
+inputTagCss = CSS "input"
+
+anyElmCss :: Selector
+anyElmCss = CSS "*"
+
 
 

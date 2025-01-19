@@ -7,6 +7,8 @@ module WebDriverIO
     W.FrameReference (..),
     W.WindowRect (..),
     status,
+    findElementFromElement,
+    findElementsFromElement,
     findElements,
     getTimeouts,
     setTimeouts,
@@ -15,6 +17,8 @@ module WebDriverIO
     getActiveElement,
     refresh,
     getCurrentUrl,
+    getElementShadowRoot,
+    findElementFromShadowRoot,
     getTitle,
     getWindowHandles,
     maximizeWindow,
@@ -30,7 +34,7 @@ module WebDriverIO
     navigateTo,
     findElement,
     click,
-    elementText,
+    getElementText,
     setWindowRect,
     sleepMs,
     switchToWindow,
@@ -152,8 +156,20 @@ navigateTo s = run . W.navigateTo s
 findElement :: SessionId -> Selector -> IO ElementId
 findElement s = run . W.findElement s
 
+findElementFromElement :: SessionId -> ElementId -> Selector -> IO ElementId
+findElementFromElement s eid = run . W.findElementFromElement s eid
+
+findElementsFromElement :: SessionId -> ElementId -> Selector -> IO [ElementId]
+findElementsFromElement s eid = run . W.findElementsFromElement s eid
+
 getActiveElement :: SessionId -> IO ElementId
 getActiveElement = run . W.getActiveElement
+
+getElementShadowRoot :: SessionId -> ElementId -> IO ElementId
+getElementShadowRoot s = run . W.getElementShadowRoot s
+
+findElementFromShadowRoot :: SessionId -> ElementId -> Selector -> IO ElementId
+findElementFromShadowRoot s e = run . W.findElementFromShadowRoot s e
 
 findElements :: SessionId -> Selector -> IO [ElementId]
 findElements s = run . W.findElements s
@@ -161,8 +177,8 @@ findElements s = run . W.findElements s
 click :: SessionId -> ElementId -> IO ()
 click s = run . W.click s
 
-elementText :: SessionId -> ElementId -> IO Text
-elementText s = run . W.getElementText s
+getElementText :: SessionId -> ElementId -> IO Text
+getElementText s = run . W.getElementText s
 
 getElementProperty :: SessionId -> ElementId -> Text -> IO Value
 getElementProperty s eid = run . W.getElementProperty s eid

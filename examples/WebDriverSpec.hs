@@ -23,6 +23,8 @@ module WebDriverSpec
     setTimeouts,
     switchToFrame,
     getCurrentUrl,
+    findElementFromElement,
+    findElementsFromElement,
     findElements,
     getTitle,
     getWindowHandle,
@@ -39,14 +41,16 @@ module WebDriverSpec
     switchToWindow,
     navigateTo,
     findElement,
-    findElement',
+    -- findElement',
     getWindowRect,
     click,
     getElementText,
     switchToParentFrame,
     getElementProperty,
     getElementCssValue,
-    setWindowRect
+    setWindowRect,
+    getElementShadowRoot,
+    findElementFromShadowRoot
   )
 where
 
@@ -405,6 +409,8 @@ getActiveElement :: SessionId -> W3Spec ElementId
 getActiveElement sessionId = Get "Get Active Element" (sessionUri2 sessionId "element" "active") parseElementRef
 
 -- GET 	/session/{session id}/element/{element id}/shadow 	Get Element Shadow Root
+getElementShadowRoot :: SessionId -> ElementId -> W3Spec ElementId
+getElementShadowRoot sessionId elementId = Get "Get Element Shadow Root" (elementUri1 sessionId elementId "shadow") parseShadowElementRef
 
 -- POST 	/session/{session id}/element 	Find Element
 findElement :: SessionId -> Selector -> W3Spec ElementId
@@ -415,8 +421,17 @@ findElements :: SessionId -> Selector -> W3Spec [ElementId]
 findElements sessionRef selector = Post "Find Elements" (sessionUri1 sessionRef "elements") (selectorJson selector) parseElementsRef
 
 -- POST 	/session/{session id}/element/{element id}/element 	Find Element From Element
+findElementFromElement :: SessionId -> ElementId -> Selector -> W3Spec ElementId
+findElementFromElement sessionId elementId selector = Post "Find Element From Element" (elementUri1 sessionId elementId "element") (selectorJson selector) parseElementRef
+
 -- POST 	/session/{session id}/element/{element id}/elements 	Find Elements From Element
+findElementsFromElement :: SessionId -> ElementId -> Selector -> W3Spec [ElementId]
+findElementsFromElement sessionId elementId selector = Post "Find Elements From Element" (elementUri1 sessionId elementId "elements") (selectorJson selector) parseElementsRef
+
 -- POST 	/session/{session id}/shadow/{shadow id}/element 	Find Element From Shadow Root
+findElementFromShadowRoot :: SessionId -> ElementId -> Selector -> W3Spec ElementId
+findElementFromShadowRoot sessionId shadowId selector = Post "Find Element From Shadow Root" (elementUri1 sessionId shadowId "element") (selectorJson selector) parseElementRef
+
 -- POST 	/session/{session id}/shadow/{shadow id}/elements 	Find Elements From Shadow Root
 -- GET 	/session/{session id}/element/{element id}/selected 	Is Element Selected
 -- GET 	/session/{session id}/element/{element id}/attribute/{name} 	Get Element Attribute
@@ -586,6 +601,15 @@ parseElementRef r =
             -- very strange choice for prop name - in response and sane as webdriver-w3c
             >>= lookupTxt "element-6066-11e4-a52e-4f735466cecf"
         )
+
+parseShadowElementRef :: HttpResponse -> Maybe ElementId
+parseShadowElementRef r =
+  Element
+    <$> ( bodyValue r
+            -- very strange choice for prop name - in response and sane as webdriver-w3c
+            >>= lookupTxt "shadow-6066-11e4-a52e-4f735466cecf"
+        )
+
 
 elemtRefFromBody :: Value -> Maybe ElementId
 elemtRefFromBody v =

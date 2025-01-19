@@ -14,7 +14,8 @@ import WebDriverIO
       maximizeWindow,
       minimizeWindow,
       fullScreenWindow,
-      elementText, WindowRect )
+      getElementText, 
+      WindowRect )
 import WebDriverSpec
     ( DriverStatus,
       SessionId(Session),
@@ -181,7 +182,7 @@ _findMissing = findElement _latestSession $ CSS "#notHere"
 -- , responseEarlyHints = []}) "{\"value\":{\"error\":\"no such element\",\"message\":\"Unable to locate element: #notHere\",\"stacktrace\":\"RemoteError@chrome://remote/content/shared/RemoteError.sys.mjs:8:8\\nWebDriverError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:193:5\\nNoSuchElementError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:511:5\\ndom.find/</<@chrome://remote/content/shared/DOM.sys.mjs:136:16\\n\"}}")))
 
 _checkBoxesLinkText :: IO Text
-_checkBoxesLinkText = elementText _latestSession _checkboxesLinkElement
+_checkBoxesLinkText = getElementText _latestSession _checkboxesLinkElement
 
 -- >>> _checkBoxesLinkText
 -- "Checkboxes"
@@ -229,7 +230,7 @@ _endToEnd = do
     maximizeWindow ses
     navigateTo ses _theInternet
     link <- findElement ses _checkBoxesLinkCss
-    cbTxt <- elementText ses link
+    cbTxt <- getElementText ses link
     click ses link
     deleteSession ses
     T.putStrLn ""

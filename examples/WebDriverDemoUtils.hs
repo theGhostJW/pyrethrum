@@ -1,6 +1,7 @@
 module WebDriverDemoUtils where
 
 import WebDriverSpec (Selector (CSS))
+import GHC.RTS.Flags (TraceFlags(user))
 
 
 -- ################### Effectful Demo ##################
@@ -32,11 +33,20 @@ midFrameTitle = CSS "#content"
 myTextCss:: Selector
 myTextCss = CSS "[name='my-text']"
 
+userNameCss :: Selector
+userNameCss = CSS "#username"
+
 framesUrl :: Text
 framesUrl = "https://the-internet.herokuapp.com/nested_frames"
 
 inputsUrl :: Text
 inputsUrl = "https://the-internet.herokuapp.com/inputs"
+
+loginUrl :: Text
+loginUrl = "https://the-internet.herokuapp.com/login"
+
+checkBoxesUrl :: Text
+checkBoxesUrl = "https://the-internet.herokuapp.com/checkboxes"
 
 shadowDomUrl :: Text
 shadowDomUrl = "https://the-internet.herokuapp.com/shadowdom"

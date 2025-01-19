@@ -17,7 +17,7 @@ import WebDriverDemoUtils
     myTextCss,
     shadowDomUrl,
     theInternet,
-    topFrameCSS,
+    topFrameCSS, loginUrl, userNameCss, checkBoxesUrl,
   )
 import WebDriverIO
   ( FrameReference (FrameElementId, FrameNumber, TopLevelFrame),
@@ -26,7 +26,7 @@ import WebDriverIO
     WindowHandle (..),
     WindowRect (..),
     back,
-    click,
+    elementClick,
     closeWindow,
     deleteSession,
     findElement,
@@ -59,7 +59,7 @@ import WebDriverIO
     status,
     switchToFrame,
     switchToParentFrame,
-    switchToWindow,
+    switchToWindow, findElementsFromShadowRoot, isElementSelected,
   )
 import WebDriverPure (seconds)
 import WebDriverSpec (Selector (..))
@@ -115,7 +115,7 @@ demo = do
 
   link <- findElement ses checkBoxesLinkCss
   logM "check box link text" $ getElementText ses link
-  click ses link
+  elementClick ses link
 
   sleepMs $ 5 * seconds
   cbs <- findElements ses checkBoxesCss
@@ -242,86 +242,57 @@ bottomFameExists :: SessionId -> IO Bool
 bottomFameExists ses = not . null <$> findElements ses bottomFrameCss
 
 -- >>> demoShadowDom
--- *** Exception: VanillaHttpException (HttpExceptionRequest Request {
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session/a14a4aae-f94b-481b-9ae7-fcbcc14f716c/element/acc1c176-9a0f-4f99-9bdd-5f0a66cb9c0a/element"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
---  (StatusCodeException (Response {responseStatus = Status {statusCode = 404, statusMessage = "Not Found"}, responseVersion = HTTP/1.1, responseHeaders = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","980"),("date","Sun, 19 Jan 2025 07:29:28 GMT")], responseBody = (), responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session/a14a4aae-f94b-481b-9ae7-fcbcc14f716c/element/acc1c176-9a0f-4f99-9bdd-5f0a66cb9c0a/element"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
--- , responseEarlyHints = []}) "{\"value\":{\"error\":\"no such element\",\"message\":\"The element with the reference acc1c176-9a0f-4f99-9bdd-5f0a66cb9c0a is not of type HTMLElement\",\"stacktrace\":\"RemoteError@chrome://remote/content/shared/RemoteError.sys.mjs:8:8\\nWebDriverError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:193:5\\nNoSuchElementError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:511:5\\ngetKnownElement@chrome://remote/content/marionette/json.sys.mjs:397:11\\ndeserializeJSON@chrome://remote/content/marionette/json.sys.mjs:263:20\\ncloneObject@chrome://remote/content/marionette/json.sys.mjs:59:24\\ndeserializeJSON@chrome://remote/content/marionette/json.sys.mjs:293:16\\ncloneObject@chrome://remote/content/marionette/json.sys.mjs:59:24\\ndeserializeJSON@chrome://remote/content/marionette/json.sys.mjs:293:16\\njson.deserialize@chrome://remote/content/marionette/json.sys.mjs:297:10\\nreceiveMessage@chrome://remote/content/marionette/actors/MarionetteCommandsChild.sys.mjs:195:30\\n\"}}"))
-
--- *** Exception: VanillaHttpException (HttpExceptionRequest Request {
-
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
---  (StatusCodeException (Response {responseStatus = Status {statusCode = 500, statusMessage = "Internal Server Error"}, responseVersion = HTTP/1.1, responseHeaders = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","96"),("date","Sun, 19 Jan 2025 07:11:41 GMT")], responseBody = (), responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
--- , responseEarlyHints = []}) "{\"value\":{\"error\":\"session not created\",\"message\":\"Session is already started\",\"stacktrace\":\"\"}}"))
 demoShadowDom :: IO ()
 demoShadowDom = do
+  -- TODO: Session deletion causes gheckoDriver to thow an error
+  -- even though the steps all work - driver bug? investiggate log
   ses <- newDefaultFirefoxSession
   navigateTo ses shadowDomUrl
 
   -- Find the custom element:
   myParagraphId <- findElement ses (CSS "my-paragraph")
   logShow "my-paragraph" myParagraphId
+  
   -- Get its shadow root:
   shadowRootId <- getElementShadowRoot ses myParagraphId
   logShow "shadowRootId" shadowRootId
 
-  -- From the shadow root, find the <p> element inside:
-  pInsideShadow <- findElementFromShadowRoot ses shadowRootId (CSS "p")
-  logShow "pInsideShadow" pInsideShadow
+  -- From the shadow root, find all elements
+  -- allInsideShadow <- findElementsFromShadowRoot ses shadowRootId (CSS "*")
+  allInsideShadow <- findElementsFromShadowRoot ses myParagraphId anyElmCss
+  logShow "shadow root elements" allInsideShadow
 
+  logTxt "got root elements"
+
+  srootElm <- findElementFromShadowRoot ses myParagraphId anyElmCss
+  logShow "shadow root element" srootElm
+  
   -- Retrieve text from the shadow element:
-  logShowM "shadow text" $ getElementText ses pInsideShadow
+  logShowM "shadow text" $ getElementText ses srootElm
   deleteSession ses
+
+
+-- >>> demoIsElementSelected
+demoIsElementSelected :: IO ()
+demoIsElementSelected = do
+  logShowM "driver status" status
+
+  ses <- newDefaultFirefoxSession
+  setTimeouts
+    ses
+    Timeouts
+      { pageLoad = 30 * seconds,
+        script = 11 * seconds,
+        implicit = 12 * seconds
+      }
+  navigateTo ses checkBoxesUrl
+  allCbs <- findElements ses checkBoxesCss
+  forM_ allCbs $ \cb -> do
+    logShowM "checkBox isElementSelected" $ isElementSelected ses cb
+    elementClick ses cb
+    logTxt "clicked"
+    logShowM "checkBox isElementSelected" $ isElementSelected ses cb
+    logTxt "------------------"
+
+  deleteSession ses
+

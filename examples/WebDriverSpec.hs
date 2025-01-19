@@ -28,6 +28,7 @@ module WebDriverSpec
     findElements,
     getTitle,
     getWindowHandle,
+    isElementSelected,
     closeWindow,
     back,
     forward,
@@ -43,12 +44,13 @@ module WebDriverSpec
     findElement,
     -- findElement',
     getWindowRect,
-    click,
+    elementClick,
     getElementText,
     switchToParentFrame,
     getElementProperty,
     getElementCssValue,
     setWindowRect,
+    findElementsFromShadowRoot,
     getElementShadowRoot,
     findElementFromShadowRoot
   )
@@ -338,7 +340,7 @@ navigateTo sessionRef url = Post "Navigate To" (sessionUri1 sessionRef "url") (o
 
 -- GET 	/session/{session id}/url 	Get Current URL
 getCurrentUrl :: SessionId -> W3Spec Text
-getCurrentUrl sessionRef = Get "Get Current URL" (sessionUri1 sessionRef "url") parseValueTxt
+getCurrentUrl sessionRef = Get "Get Current URL" (sessionUri1 sessionRef "url") parseBodyTxt
 
 -- POST 	/session/{session id}/back 	Back
 back :: SessionId -> W3Spec ()
@@ -354,11 +356,11 @@ refresh sessionRef = PostEmpty "Refresh" (sessionUri1 sessionRef "refresh") void
 
 -- GET 	/session/{session id}/title 	Get Title
 getTitle :: SessionId -> W3Spec Text
-getTitle sessionRef = Get "Get Title" (sessionUri1 sessionRef "title") parseValueTxt
+getTitle sessionRef = Get "Get Title" (sessionUri1 sessionRef "title") parseBodyTxt
 
 -- GET 	/session/{session id}/window 	Get Window Handle
 getWindowHandle :: SessionId -> W3Spec Text
-getWindowHandle sessionRef = Get "Get Window Handle" (sessionUri1 sessionRef "window") parseValueTxt
+getWindowHandle sessionRef = Get "Get Window Handle" (sessionUri1 sessionRef "window") parseBodyTxt
 
 -- POST 	/session/{session id}/window/new 	New Window
 newWindow :: SessionId -> W3Spec WindowHandle
@@ -433,7 +435,13 @@ findElementFromShadowRoot :: SessionId -> ElementId -> Selector -> W3Spec Elemen
 findElementFromShadowRoot sessionId shadowId selector = Post "Find Element From Shadow Root" (elementUri1 sessionId shadowId "element") (selectorJson selector) parseElementRef
 
 -- POST 	/session/{session id}/shadow/{shadow id}/elements 	Find Elements From Shadow Root
+findElementsFromShadowRoot :: SessionId -> ElementId -> Selector -> W3Spec [ElementId]
+findElementsFromShadowRoot sessionId shadowId selector = Post "Find Elements From Shadow Root" (elementUri1 sessionId shadowId "elements") (selectorJson selector) parseElementsRef
+
 -- GET 	/session/{session id}/element/{element id}/selected 	Is Element Selected
+isElementSelected :: SessionId -> ElementId -> W3Spec Bool
+isElementSelected sessionId elementId = Get "Is Element Selected" (elementUri1 sessionId elementId "selected") parseBodyBool
+
 -- GET 	/session/{session id}/element/{element id}/attribute/{name} 	Get Element Attribute
 
 -- GET 	/session/{session id}/element/{element id}/property/{name} 	Get Element Property
@@ -442,11 +450,11 @@ getElementProperty sessionId elementId propertyName = Get "Get Element Property"
 
 -- GET 	/session/{session id}/element/{element id}/css/{property name} 	Get Element CSS Value
 getElementCssValue :: SessionId -> ElementId -> Text -> W3Spec Text
-getElementCssValue sessionId elementId propertyName = Get "Get Element CSS Value" (elementUri2 sessionId elementId "css" propertyName) parseValueTxt
+getElementCssValue sessionId elementId propertyName = Get "Get Element CSS Value" (elementUri2 sessionId elementId "css" propertyName) parseBodyTxt
 
 -- GET 	/session/{session id}/element/{element id}/text 	Get Element Text
 getElementText :: SessionId -> ElementId -> W3Spec Text
-getElementText sessionId elementId = Get "Get Element Text" (elementUri1 sessionId elementId "text") parseValueTxt
+getElementText sessionId elementId = Get "Get Element Text" (elementUri1 sessionId elementId "text") parseBodyTxt
 
 -- GET 	/session/{session id}/element/{element id}/name 	Get Element Tag Name
 -- GET 	/session/{session id}/element/{element id}/rect 	Get Element Rect
@@ -455,8 +463,8 @@ getElementText sessionId elementId = Get "Get Element Text" (elementUri1 session
 -- GET 	/session/{session id}/element/{element id}/computedlabel 	Get Computed Label
 
 -- POST 	/session/{session id}/element/{element id}/click 	Element Click
-click :: SessionId -> ElementId -> W3Spec ()
-click sessionId elementId = PostEmpty "Click Element" (elementUri1 sessionId elementId "click") voidParser
+elementClick :: SessionId -> ElementId -> W3Spec ()
+elementClick sessionId elementId = PostEmpty "Click Element" (elementUri1 sessionId elementId "click") voidParser
 
 -- POST 	/session/{session id}/element/{element id}/clear 	Element Clear
 -- POST 	/session/{session id}/element/{element id}/value 	Element Send Keys
@@ -504,12 +512,13 @@ instance ToJSON WindowRect where
 parseWindowRect :: HttpResponse -> Maybe WindowRect
 parseWindowRect r =
   Rect
-    <$> (v >>= lookupInt "x")
-    <*> (v >>= lookupInt "y")
-    <*> (v >>= lookupInt "width")
-    <*> (v >>= lookupInt "height")
+    <$> bdyInt "x"
+    <*> bdyInt "y"
+    <*> bdyInt "width"
+    <*> bdyInt "height"
   where
-    v = bodyValue r
+    bdyInt = bodyInt r
+
 
 data Timeouts = Timeouts
   { implicit :: Int,
@@ -538,11 +547,11 @@ parseTimeouts :: HttpResponse -> Maybe Timeouts
 parseTimeouts r =
   liftA3
     Timeouts
-    (v >>= lookupInt "implicit")
-    (v >>= lookupInt "pageLoad")
-    (v >>= lookupInt "script")
+    (bdyInt "implicit")
+    (bdyInt "pageLoad")
+    (bdyInt "script")
   where
-    v = bodyValue r
+    bdyInt = bodyInt r
 
 selectorJson :: Selector -> Value
 selectorJson = \case
@@ -551,8 +560,25 @@ selectorJson = \case
 voidParser :: HttpResponse -> Maybe ()
 voidParser _ = Just ()
 
-parseValueTxt :: HttpResponse -> Maybe Text
-parseValueTxt r = bodyValue r >>= asText
+bodyText' :: Maybe Value -> Key -> Maybe Text
+bodyText' v k = v >>= lookupTxt k
+
+bodyText :: HttpResponse -> Key -> Maybe Text
+bodyText r = bodyText' (bodyValue r) 
+
+bodyInt' :: Maybe Value -> Key -> Maybe Int
+bodyInt' v k = v >>= lookupInt k
+
+bodyInt :: HttpResponse -> Key -> Maybe Int
+bodyInt r = bodyInt' (bodyValue r)
+
+parseBodyTxt :: HttpResponse -> Maybe Text
+parseBodyTxt r = bodyValue r >>= asText
+
+parseBodyBool :: HttpResponse -> Maybe Bool
+parseBodyBool r = bodyValue r >>= \case
+  Bool b -> Just b
+  _ -> Nothing
 
 parseElementsRef :: HttpResponse -> Maybe [ElementId]
 parseElementsRef r =
@@ -586,34 +612,31 @@ asInt = \case
 parseSessionRef :: HttpResponse -> Maybe SessionId
 parseSessionRef r =
   Session
-    <$> (bodyValue r >>= lookupTxt "sessionId")
+    <$> bodyText r "sessionId"
 
 bodyValue :: HttpResponse -> Maybe Value
 bodyValue r = lookup "value" r.body
 
+-- https://www.w3.org/TR/webdriver2/#elements
 elementFieldName :: Key
 elementFieldName = "element-6066-11e4-a52e-4f735466cecf"
 
+-- https://www.w3.org/TR/webdriver2/#shadow-root
+shadowRootFieldName :: Key
+shadowRootFieldName = "shadow-6066-11e4-a52e-4f735466cecf"
+
 parseElementRef :: HttpResponse -> Maybe ElementId
 parseElementRef r =
-  Element
-    <$> ( bodyValue r
-            -- very strange choice for prop name - in response and sane as webdriver-w3c
-            >>= lookupTxt "element-6066-11e4-a52e-4f735466cecf"
-        )
+  Element <$> bodyText r elementFieldName
+        
 
 parseShadowElementRef :: HttpResponse -> Maybe ElementId
 parseShadowElementRef r =
-  Element
-    <$> ( bodyValue r
-            -- very strange choice for prop name - in response and sane as webdriver-w3c
-            >>= lookupTxt "shadow-6066-11e4-a52e-4f735466cecf"
-        )
+  Element <$> bodyText r shadowRootFieldName
 
 
 elemtRefFromBody :: Value -> Maybe ElementId
-elemtRefFromBody v =
-  Element <$> lookupTxt elementFieldName v
+elemtRefFromBody b = Element <$> lookupTxt elementFieldName b
 
 session :: Text
 session = "session"

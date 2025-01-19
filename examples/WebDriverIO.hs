@@ -19,8 +19,10 @@ module WebDriverIO
     getCurrentUrl,
     getElementShadowRoot,
     findElementFromShadowRoot,
+    findElementsFromShadowRoot,
     getTitle,
     getWindowHandles,
+    isElementSelected,
     maximizeWindow,
     minimizeWindow,
     fullScreenWindow,
@@ -33,7 +35,7 @@ module WebDriverIO
     deleteSession,
     navigateTo,
     findElement,
-    click,
+    elementClick,
     getElementText,
     setWindowRect,
     sleepMs,
@@ -165,6 +167,9 @@ findElementsFromElement s eid = run . W.findElementsFromElement s eid
 getActiveElement :: SessionId -> IO ElementId
 getActiveElement = run . W.getActiveElement
 
+isElementSelected :: SessionId -> ElementId -> IO Bool
+isElementSelected s = run . W.isElementSelected s
+
 getElementShadowRoot :: SessionId -> ElementId -> IO ElementId
 getElementShadowRoot s = run . W.getElementShadowRoot s
 
@@ -174,8 +179,11 @@ findElementFromShadowRoot s e = run . W.findElementFromShadowRoot s e
 findElements :: SessionId -> Selector -> IO [ElementId]
 findElements s = run . W.findElements s
 
-click :: SessionId -> ElementId -> IO ()
-click s = run . W.click s
+findElementsFromShadowRoot :: SessionId -> ElementId -> Selector -> IO [ElementId]
+findElementsFromShadowRoot s e = run . W.findElementsFromShadowRoot s e
+
+elementClick :: SessionId -> ElementId -> IO ()
+elementClick s = run . W.elementClick s
 
 getElementText :: SessionId -> ElementId -> IO Text
 getElementText s = run . W.getElementText s

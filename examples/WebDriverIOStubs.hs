@@ -10,7 +10,7 @@ import WebDriverIO
       deleteSession,
       navigateTo,
       findElement,
-      click,
+      elementClick,
       maximizeWindow,
       minimizeWindow,
       fullScreenWindow,
@@ -188,7 +188,7 @@ _checkBoxesLinkText = getElementText _latestSession _checkboxesLinkElement
 -- "Checkboxes"
 
 _clickCheckBoxesLink :: IO ()
-_clickCheckBoxesLink = click _latestSession _checkboxesLinkElement
+_clickCheckBoxesLink = elementClick _latestSession _checkboxesLinkElement
 
 -- >>> _clickCheckBoxesLink
 -- *** Exception: user error (VanillaHttpException (HttpExceptionRequest Request {
@@ -231,7 +231,7 @@ _endToEnd = do
     navigateTo ses _theInternet
     link <- findElement ses _checkBoxesLinkCss
     cbTxt <- getElementText ses link
-    click ses link
+    elementClick ses link
     deleteSession ses
     T.putStrLn ""
     T.putStrLn $ "----- " <> "Results" <> " -----"

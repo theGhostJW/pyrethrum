@@ -48,6 +48,7 @@ module WebDriverSpec
     getElementText,
     switchToParentFrame,
     getElementProperty,
+    getElementAttribute,
     getElementCssValue,
     setWindowRect,
     findElementsFromShadowRoot,
@@ -443,6 +444,8 @@ isElementSelected :: SessionId -> ElementId -> W3Spec Bool
 isElementSelected sessionId elementId = Get "Is Element Selected" (elementUri1 sessionId elementId "selected") parseBodyBool
 
 -- GET 	/session/{session id}/element/{element id}/attribute/{name} 	Get Element Attribute
+getElementAttribute :: SessionId -> ElementId -> Text -> W3Spec Text
+getElementAttribute sessionId elementId attributeName = Get "Get Element Attribute" (elementUri2 sessionId elementId "attribute" attributeName) parseBodyTxt
 
 -- GET 	/session/{session id}/element/{element id}/property/{name} 	Get Element Property
 getElementProperty :: SessionId -> ElementId -> Text -> W3Spec Value

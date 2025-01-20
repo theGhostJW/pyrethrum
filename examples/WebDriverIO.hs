@@ -17,6 +17,7 @@ module WebDriverIO
     getActiveElement,
     refresh,
     getCurrentUrl,
+    getElementAttribute,
     getElementShadowRoot,
     findElementFromShadowRoot,
     findElementsFromShadowRoot,
@@ -190,6 +191,9 @@ getElementText s = run . W.getElementText s
 
 getElementProperty :: SessionId -> ElementId -> Text -> IO Value
 getElementProperty s eid = run . W.getElementProperty s eid
+
+getElementAttribute :: SessionId -> ElementId -> Text -> IO Text
+getElementAttribute s eid = run . W.getElementAttribute s eid
 
 getElementCssValue :: SessionId -> ElementId -> Text -> IO Text
 getElementCssValue s eid = run . W.getElementCssValue s eid

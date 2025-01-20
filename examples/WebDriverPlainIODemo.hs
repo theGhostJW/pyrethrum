@@ -63,6 +63,7 @@ import WebDriverIO
   )
 import WebDriverPure (seconds)
 import WebDriverSpec (Selector (..))
+import WebDriverEffect (clickElem)
 
 logTxt :: Text -> IO ()
 logTxt = TIO.putStrLn
@@ -126,7 +127,7 @@ demoForwardBackRefresh = do
 
   refresh ses
   sleep1
-  
+
   logM "current url" $ getCurrentUrl ses
   logM "title" $ getTitle ses
 
@@ -175,7 +176,7 @@ demoWindowSizes = do
   
   deleteSession ses
 
--- >>> demo
+-- >>> demoElementPageProps
 demoElementPageProps :: IO ()
 demoElementPageProps = do
   ses <- mkExtendedTimeoutsSession
@@ -185,10 +186,13 @@ demoElementPageProps = do
 
   link <- findElement ses checkBoxesLinkCss
   logM "check box link text" $ getElementText ses link
+  elementClick ses link
 
   cbs <- findElements ses checkBoxesCss
-  forM_ cbs $ \cb ->
+  forM_ cbs $ \cb -> do
     logShowM "checkBox checked property" $ getElementProperty ses cb "checked"
+    logShowM "getElementAttribute type" $ getElementProperty ses cb "type"
+    logShowM "getElementCssValue display" $ getElementCssValue ses cb "display"
 
   divs <- findElements ses divCss
   forM_ divs $ \d ->
